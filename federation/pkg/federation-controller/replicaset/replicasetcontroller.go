@@ -31,11 +31,13 @@ import (
 	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_4"
 	planner "k8s.io/kubernetes/federation/pkg/federation-controller/replicaset/planner"
 	fedutil "k8s.io/kubernetes/federation/pkg/federation-controller/util"
+	"k8s.io/kubernetes/federation/pkg/federation-controller/util/eventsink"
 	"k8s.io/kubernetes/pkg/api"
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	extensionsv1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4"
+	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -90,12 +92,18 @@ type ReplicaSetController struct {
 	fedUpdater fedutil.FederatedUpdater
 
 	replicaSetBackoff *flowcontrol.Backoff
+	// For events
+	eventRecorder record.EventRecorder
 
 	defaultPlanner *planner.Planner
 }
 
 // NewclusterController returns a new cluster controller
 func NewReplicaSetController(federationClient fedclientset.Interface) *ReplicaSetController {
+	broadcaster := record.NewBroadcaster()
+	broadcaster.StartRecordingToSink(eventsink.NewFederatedEventSink(federationClient))
+	recorder := broadcaster.NewRecorder(api.EventSource{Component: "federated-replicaset-controller"})
+
 	frsc := &ReplicaSetController{
 		fedClient:           federationClient,
 		replicasetDeliverer: fedutil.NewDelayingDeliverer(),
@@ -107,6 +115,7 @@ func NewReplicaSetController(federationClient fedclientset.Interface) *ReplicaSe
 				"*": {Weight: 1},
 			},
 		}),
+		eventRecorder: recorder,
 	}
 
 	replicaSetFedInformerFactory := func(cluster *fedv1.Cluster, clientset kubeclientset.Interface) (cache.Store, framework.ControllerInterface) {
@@ -464,6 +473,9 @@ func (frsc *ReplicaSetController) reconcileReplicaSet(key string) (reconciliatio
 
 		if !exists {
 			if replicas > 0 {
+				frsc.eventRecorder.Eventf(frs, api.EventTypeNormal, "CreateInCluster",
+					"Creating replicaset in cluster %s", clusterName)
+
 				operations = append(operations, fedutil.FederatedOperation{
 					Type:        fedutil.OperationTypeAdd,
 					Obj:         lrs,
@@ -475,6 +487,9 @@ func (frsc *ReplicaSetController) reconcileReplicaSet(key string) (reconciliatio
 			// Update existing replica set, if needed.
 			if !fedutil.ObjectMetaEquivalent(lrs.ObjectMeta, currentLrs.ObjectMeta) ||
 				!reflect.DeepEqual(lrs.Spec, currentLrs.Spec) {
+				frsc.eventRecorder.Eventf(frs, api.EventTypeNormal, "UpdateInCluster",
+					"Updating replicaset in cluster %s", clusterName)
+
 				operations = append(operations, fedutil.FederatedOperation{
 					Type:        fedutil.OperationTypeUpdate,
 					Obj:         lrs,
@@ -498,7 +513,10 @@ func (frsc *ReplicaSetController) reconcileReplicaSet(key string) (reconciliatio
 		// Everything is in order
 		return statusAllOk, nil
 	}
-	err = frsc.fedUpdater.Update(operations, updateTimeout)
+	err = frsc.fedUpdater.UpdateWithOnError(operations, updateTimeout, func(op fedutil.FederatedOperation, operror error) {
+		frsc.eventRecorder.Eventf(frs, api.EventTypeNormal, "FailedUpdateInCluster",
+			"Replicaset update in cluster %s failed: %v", op.ClusterName, operror)
+	})
 	if err != nil {
 		glog.Errorf("Failed to execute updates for %s: %v", key, err)
 		return statusError, err
