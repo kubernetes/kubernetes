@@ -30,21 +30,22 @@ import (
 )
 
 func RetrieveTrustedClusterInfo(params *kubeadmapi.BootstrapParams) (*clientcmdapi.Config, error) {
-	apiServerURL, err := url.Parse(strings.Split(params.Discovery.ApiServerURLs, ",")[0])
+	firstURL := strings.Split(params.Discovery.ApiServerURLs, ",")[0] // TODO obviously we should do something better.. .
+	apiServerURL, err := url.Parse(firstURL)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("<node/discovery> failed to parse given API server URL (%q) [%s]", firstURL, err)
 	}
 
-	host, port := strings.Split(apiServerURL.Host, ":")[0], 9898
+	host, port := strings.Split(apiServerURL.Host, ":")[0], 9898 // TODO this is too naive
 
 	req, err := http.NewRequest("GET", fmt.Sprintf("http://%s:%d/cluster-info/v1/?token-id=%s", host, port, params.Discovery.TokenID), nil)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("<node/discovery> failed to consturct an HTTP request [%s]", err)
 	}
 
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("<node/discovery> failed to request cluster info [%s]", err)
 	}
 	buf := new(bytes.Buffer)
 	io.Copy(buf, res.Body)
@@ -52,24 +53,24 @@ func RetrieveTrustedClusterInfo(params *kubeadmapi.BootstrapParams) (*clientcmda
 
 	object, err := jose.ParseSigned(buf.String())
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("<node/discovery> failed to parse response as JWS object [%s]", err)
 	}
 
 	output, err := object.Verify(params.Discovery.Token)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("<node/discovery> failed to verify JWS signature of recieved cluster info object [%s]", err)
 	}
 
 	clusterInfo := kubeadmapi.ClusterInfo{}
 
 	if err := json.Unmarshal(output, &clusterInfo); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("<node/discovery> failed to unmarshal recieved cluster info object [%s]", err)
 	}
 
-	fmt.Printf("ClusterInfo: %#v", clusterInfo)
+	fmt.Printf("ClusterInfo: %#v\n", clusterInfo)
 
 	if len(clusterInfo.CertificateAuthorities) == 0 || len(clusterInfo.Endpoints) == 0 {
-		return nil, fmt.Errorf("Cluster discovery object (ClusterInfo) is invalid")
+		return nil, fmt.Errorf("<node/discovery> cluster info object is invalid - no endpoints and/or root CA certificates found")
 	}
 
 	// TODO we need to configure the client to validate the server

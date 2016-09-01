@@ -21,7 +21,8 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	//"k8s.io/kubernetes/pkg/client/unversioned" // TODO use a clientset
+	unversionedapi "k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
@@ -71,6 +72,35 @@ func CreateClientAndWaitForAPI(adminConfig *clientcmdapi.Config) (*clientset.Cli
 
 	// TODO may be also check node status
 	return client, nil
+}
+
+func NewDaemonSet(daemonName string, podSpec api.PodSpec) *extensions.DaemonSet {
+	l := map[string]string{"component": daemonName, "tier": "node"}
+	return &extensions.DaemonSet{
+		ObjectMeta: api.ObjectMeta{Name: daemonName},
+		Spec: extensions.DaemonSetSpec{
+			Selector: &unversionedapi.LabelSelector{MatchLabels: l},
+			Template: api.PodTemplateSpec{
+				ObjectMeta: api.ObjectMeta{Labels: l},
+				Spec:       podSpec,
+			},
+		},
+	}
+}
+
+func NewDeployment(deploymentName string, replicas int32, podSpec api.PodSpec) *extensions.Deployment {
+	l := map[string]string{"name": deploymentName}
+	return &extensions.Deployment{
+		ObjectMeta: api.ObjectMeta{Name: deploymentName},
+		Spec: extensions.DeploymentSpec{
+			Replicas: replicas,
+			Selector: &unversionedapi.LabelSelector{MatchLabels: l},
+			Template: api.PodTemplateSpec{
+				ObjectMeta: api.ObjectMeta{Labels: l},
+				Spec:       podSpec,
+			},
+		},
+	}
 }
 
 func TaintMaster(*clientset.Clientset) error {

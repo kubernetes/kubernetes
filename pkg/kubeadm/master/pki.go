@@ -19,6 +19,7 @@ package kubemaster
 import (
 	"crypto/rsa"
 	"crypto/x509"
+	"fmt"
 	"net"
 	"path"
 
@@ -27,10 +28,16 @@ import (
 	"k8s.io/kubernetes/pkg/util/crypto"
 )
 
+/*
+func errorf(f string, err error, vargs ...string) error {
+	return fmt.Errorf("<master/pki> %s [%s]", fmt.Sprintf(f, v...), err)
+}
+*/
+
 func newCertificateAuthority() (*rsa.PrivateKey, *x509.Certificate, error) {
 	key, err := tlsutil.NewPrivateKey()
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("unable to create private key [%s]", err)
 	}
 
 	config := tlsutil.CertConfig{
@@ -39,16 +46,16 @@ func newCertificateAuthority() (*rsa.PrivateKey, *x509.Certificate, error) {
 
 	cert, err := tlsutil.NewSelfSignedCACertificate(config, key)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("unable to create self-singed certificate [%s]", err)
 	}
 
-	return key, cert, err
+	return key, cert, nil
 }
 
 func newServerKeyAndCert(caCert *x509.Certificate, caKey *rsa.PrivateKey, altNames tlsutil.AltNames) (*rsa.PrivateKey, *x509.Certificate, error) {
 	key, err := tlsutil.NewPrivateKey()
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("unabel to create private key [%s]", err)
 	}
 	// TODO these are all hardcoded for now, but we need to figure out what shall we do here exactly
 	altNames.IPs = append(altNames.IPs, net.ParseIP("10.3.0.1"))
@@ -65,43 +72,52 @@ func newServerKeyAndCert(caCert *x509.Certificate, caKey *rsa.PrivateKey, altNam
 	}
 	cert, err := tlsutil.NewSignedCertificate(config, key, caCert, caKey)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("unable to sing certificate [%s]", err)
 	}
-	return key, cert, err
+
+	return key, cert, nil
 }
 
 func newClientKeyAndCert(caCert *x509.Certificate, caKey *rsa.PrivateKey) (*rsa.PrivateKey, *x509.Certificate, error) {
 	key, err := tlsutil.NewPrivateKey()
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("unable to create private key [%s]", err)
 	}
+
 	config := tlsutil.CertConfig{
 		CommonName: "kubernetes-admin",
 	}
 	cert, err := tlsutil.NewSignedCertificate(config, key, caCert, caKey)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("unable to sign certificate [%s]", err)
 	}
-	return key, cert, err
+
+	return key, cert, nil
 }
 
 func writeKeysAndCert(pkiPath string, name string, key *rsa.PrivateKey, cert *x509.Certificate) error {
+	var (
+		publicKeyPath   = path.Join(pkiPath, fmt.Sprintf("%s-pub.pem", name))
+		privateKeyPath  = path.Join(pkiPath, fmt.Sprintf("%s-key.pem", name))
+		certificatePath = path.Join(pkiPath, fmt.Sprintf("%s.pem", name))
+	)
+
 	if key != nil {
-		if err := crypto.WriteKeyToPath(path.Join(pkiPath, name+"-key.pem"), tlsutil.EncodePrivateKeyPEM(key)); err != nil {
-			return err
+		if err := crypto.WriteKeyToPath(privateKeyPath, tlsutil.EncodePrivateKeyPEM(key)); err != nil {
+			return fmt.Errorf("unable to write private key file (%q) [%s]", privateKeyPath, err)
 		}
 		if pubKey, err := tlsutil.EncodePublicKeyPEM(&key.PublicKey); err == nil {
-			if err := crypto.WriteKeyToPath(path.Join(pkiPath, name+"-pub.pem"), pubKey); err != nil {
-				return err
+			if err := crypto.WriteKeyToPath(publicKeyPath, pubKey); err != nil {
+				return fmt.Errorf("unable to write public key file (%q) [%s]", publicKeyPath, err)
 			}
 		} else {
-			return err
+			return fmt.Errorf("unable to encode public key to PEM [%s]", err)
 		}
 	}
 
 	if cert != nil {
-		if err := crypto.WriteCertToPath(path.Join(pkiPath, name+".pem"), tlsutil.EncodeCertificatePEM(cert)); err != nil {
-			return err
+		if err := crypto.WriteCertToPath(certificatePath, tlsutil.EncodeCertificatePEM(cert)); err != nil {
+			return fmt.Errorf("unable to write certificate file (%q) [%s]", err)
 		}
 	}
 
@@ -113,7 +129,7 @@ func newServiceAccountKey() (*rsa.PrivateKey, error) {
 	if err != nil {
 		return nil, err
 	}
-	return key, err
+	return key, nil
 }
 
 func CreatePKIAssets(params *kubeadmapi.BootstrapParams) (*rsa.PrivateKey, *x509.Certificate, error) {
@@ -134,29 +150,29 @@ func CreatePKIAssets(params *kubeadmapi.BootstrapParams) (*rsa.PrivateKey, *x509
 
 	caKey, caCert, err := newCertificateAuthority()
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("<master/pki> failure while creating CA keys and certificate - %s", err)
 	}
 
 	if err := writeKeysAndCert(pkiPath, "ca", caKey, caCert); err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("<master/pki> failure while saving CA keys and certificate - %s", err)
 	}
 
 	apiKey, apiCert, err := newServerKeyAndCert(caCert, caKey, altNames)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("<master/pki> failure while creating API server keys and certificate - %s", err)
 	}
 
 	if err := writeKeysAndCert(pkiPath, "apiserver", apiKey, apiCert); err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("<master/pki> failure while saving API server keys and certificate - %s", err)
 	}
 
 	saKey, err := newServiceAccountKey()
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("<master/pki> failure while creating service account signing keys [%s]", err)
 	}
 
 	if err := writeKeysAndCert(pkiPath, "sa", saKey, nil); err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("<master/pki> failure while saving service account singing keys - %s", err)
 	}
 
 	return caKey, caCert, nil
