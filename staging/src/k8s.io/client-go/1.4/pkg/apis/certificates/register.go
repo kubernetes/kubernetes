@@ -28,7 +28,7 @@ var (
 )
 
 // GroupName is the group name use in this package
-const GroupName = "certificates"
+const GroupName = "certificates.k8s.io"
 
 // SchemeGroupVersion is group version used to register these objects
 var SchemeGroupVersion = unversioned.GroupVersion{Group: GroupName, Version: runtime.APIVersionInternal}

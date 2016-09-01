@@ -455,7 +455,7 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 	go attachDetachController.Run(wait.NeverStop)
 	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 
-	groupVersion = "certificates/v1alpha1"
+	groupVersion = "certificates.k8s.io/v1alpha1"
 	resources, found = resourceMap[groupVersion]
 	glog.Infof("Attempting to start certificates, full resource map %+v", resourceMap)
 	if containsVersion(versions, groupVersion) && found {

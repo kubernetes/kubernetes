@@ -66,11 +66,11 @@
     "description": "get information of a group"
    },
    {
-    "path": "/apis/certificates/v1alpha1",
-    "description": "API at /apis/certificates/v1alpha1"
+    "path": "/apis/certificates.k8s.io/v1alpha1",
+    "description": "API at /apis/certificates.k8s.io/v1alpha1"
    },
    {
-    "path": "/apis/certificates",
+    "path": "/apis/certificates.k8s.io",
     "description": "get information of a group"
    },
    {
