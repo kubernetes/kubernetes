@@ -14,16 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1beta1
+package unversioned
 
-type DaemonSetExpansion interface{}
-
-type IngressExpansion interface{}
-
-type JobExpansion interface{}
-
-type PodSecurityPolicyExpansion interface{}
-
-type ReplicaSetExpansion interface{}
-
-type ThirdPartyResourceExpansion interface{}
+type StorageClassExpansion interface{}

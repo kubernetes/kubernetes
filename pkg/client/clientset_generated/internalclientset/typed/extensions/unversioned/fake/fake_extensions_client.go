@@ -50,10 +50,6 @@ func (c *FakeExtensions) Scales(namespace string) unversioned.ScaleInterface {
 	return &FakeScales{c, namespace}
 }
 
-func (c *FakeExtensions) StorageClasses() unversioned.StorageClassInterface {
-	return &FakeStorageClasses{c}
-}
-
 func (c *FakeExtensions) ThirdPartyResources() unversioned.ThirdPartyResourceInterface {
 	return &FakeThirdPartyResources{c}
 }
