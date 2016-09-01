@@ -63,13 +63,30 @@ func NewNamespaceController(
 	groupVersionResources []unversioned.GroupVersionResource,
 	resyncPeriod time.Duration,
 	finalizerToken api.FinalizerName) *NamespaceController {
+
+	// the namespace deletion code looks at the discovery document to enumerate the set of resources on the server.
+	// it then finds all namespaced resources, and in response to namespace deletion, will call delete on all of them.
+	// unfortunately, the discovery information does not include the list of supported verbs/methods.  if the namespace
+	// controller calls LIST/DELETECOLLECTION for a resource, it will get a 405 error from the server and cache that that was the case.
+	// we found in practice though that some auth engines when encountering paths they don't know about may return a 50x.
+	// until we have verbs, we pre-populate resources that do not support list or delete for well-known apis rather than
+	// probing the server once in order to be told no.
+	opCache := operationNotSupportedCache{}
+	ignoredGroupVersionResources := []unversioned.GroupVersionResource{
+		{Group: "", Version: "v1", Resource: "bindings"},
+	}
+	for _, ignoredGroupVersionResource := range ignoredGroupVersionResources {
+		opCache[operationKey{op: operationDeleteCollection, gvr: ignoredGroupVersionResource}] = true
+		opCache[operationKey{op: operationList, gvr: ignoredGroupVersionResource}] = true
+	}
+
 	// create the controller so we can inject the enqueue function
 	namespaceController := &NamespaceController{
 		kubeClient: kubeClient,
 		clientPool: clientPool,
 		queue:      workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "namespace"),
 		groupVersionResources: groupVersionResources,
-		opCache:               operationNotSupportedCache{},
+		opCache:               opCache,
 		finalizerToken:        finalizerToken,
 	}
 
