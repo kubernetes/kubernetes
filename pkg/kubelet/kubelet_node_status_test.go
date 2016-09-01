@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/version"
+	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 )
 
 // generateTestingImageList generate randomly generated image list and corresponding expectedImageList.
@@ -839,7 +840,7 @@ func TestUpdateNodeStatusError(t *testing.T) {
 	}
 }
 
-func TestRegisterExistingNodeWithApiserver(t *testing.T) {
+func TestRegisterWithApiServer(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	kubelet := testKubelet.kubelet
 	kubeClient := testKubelet.fakeKubeClient
@@ -886,7 +887,7 @@ func TestRegisterExistingNodeWithApiserver(t *testing.T) {
 
 	done := make(chan struct{})
 	go func() {
-		kubelet.registerWithApiserver()
+		kubelet.registerWithApiServer()
 		done <- struct{}{}
 	}()
 	select {
@@ -894,5 +895,186 @@ func TestRegisterExistingNodeWithApiserver(t *testing.T) {
 		t.Errorf("timed out waiting for registration")
 	case <-done:
 		return
+	}
+}
+
+func TestTryRegisterWithApiServer(t *testing.T) {
+	alreadyExists := &apierrors.StatusError{
+		ErrStatus: unversioned.Status{Reason: unversioned.StatusReasonAlreadyExists},
+	}
+
+	conflict := &apierrors.StatusError{
+		ErrStatus: unversioned.Status{Reason: unversioned.StatusReasonConflict},
+	}
+
+	newNode := func(cmad bool, externalID string) *api.Node {
+		node := &api.Node{
+			ObjectMeta: api.ObjectMeta{},
+			Spec: api.NodeSpec{
+				ExternalID: externalID,
+			},
+		}
+
+		if cmad {
+			node.Annotations = make(map[string]string)
+			node.Annotations[volumehelper.ControllerManagedAttachAnnotation] = "true"
+		}
+
+		return node
+	}
+
+	cases := []struct {
+		name            string
+		newNode         *api.Node
+		existingNode    *api.Node
+		createError     error
+		getError        error
+		updateError     error
+		deleteError     error
+		expectedResult  bool
+		expectedActions int
+		testSavedNode   bool
+		savedNodeIndex  int
+		savedNodeCMAD   bool
+	}{
+		{
+			name:            "success case - new node",
+			newNode:         &api.Node{},
+			expectedResult:  true,
+			expectedActions: 1,
+		},
+		{
+			name:            "success case - existing node - no change in CMAD",
+			newNode:         newNode(true, "a"),
+			createError:     alreadyExists,
+			existingNode:    newNode(true, "a"),
+			expectedResult:  true,
+			expectedActions: 2,
+		},
+		{
+			name:            "success case - existing node - CMAD disabled",
+			newNode:         newNode(false, "a"),
+			createError:     alreadyExists,
+			existingNode:    newNode(true, "a"),
+			expectedResult:  true,
+			expectedActions: 3,
+			testSavedNode:   true,
+			savedNodeIndex:  2,
+			savedNodeCMAD:   false,
+		},
+		{
+			name:            "success case - existing node - CMAD enabled",
+			newNode:         newNode(true, "a"),
+			createError:     alreadyExists,
+			existingNode:    newNode(false, "a"),
+			expectedResult:  true,
+			expectedActions: 3,
+			testSavedNode:   true,
+			savedNodeIndex:  2,
+			savedNodeCMAD:   true,
+		},
+		{
+			name:            "success case - external ID changed",
+			newNode:         newNode(false, "b"),
+			createError:     alreadyExists,
+			existingNode:    newNode(false, "a"),
+			expectedResult:  false,
+			expectedActions: 3,
+		},
+		{
+			name:            "create failed",
+			newNode:         newNode(false, "b"),
+			createError:     conflict,
+			expectedResult:  false,
+			expectedActions: 1,
+		},
+		{
+			name:            "get existing node failed",
+			newNode:         newNode(false, "a"),
+			createError:     alreadyExists,
+			getError:        conflict,
+			expectedResult:  false,
+			expectedActions: 2,
+		},
+		{
+			name:            "update existing node failed",
+			newNode:         newNode(false, "a"),
+			createError:     alreadyExists,
+			existingNode:    newNode(true, "a"),
+			updateError:     conflict,
+			expectedResult:  false,
+			expectedActions: 3,
+		},
+		{
+			name:            "delete existing node failed",
+			newNode:         newNode(false, "b"),
+			createError:     alreadyExists,
+			existingNode:    newNode(false, "a"),
+			deleteError:     conflict,
+			expectedResult:  false,
+			expectedActions: 3,
+		},
+	}
+
+	for _, tc := range cases {
+		testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled is a don't-care for this test */)
+		kubelet := testKubelet.kubelet
+		kubeClient := testKubelet.fakeKubeClient
+
+		kubeClient.AddReactor("create", "nodes", func(action core.Action) (bool, runtime.Object, error) {
+			return true, nil, tc.createError
+		})
+		kubeClient.AddReactor("get", "nodes", func(action core.Action) (bool, runtime.Object, error) {
+			// Return an existing (matching) node on get.
+			return true, tc.existingNode, tc.getError
+		})
+		kubeClient.AddReactor("update", "nodes", func(action core.Action) (bool, runtime.Object, error) {
+			return true, nil, tc.updateError
+		})
+		kubeClient.AddReactor("delete", "nodes", func(action core.Action) (bool, runtime.Object, error) {
+			return true, nil, tc.deleteError
+		})
+		kubeClient.AddReactor("*", "*", func(action core.Action) (bool, runtime.Object, error) {
+			return true, nil, fmt.Errorf("no reaction implemented for %s", action)
+		})
+
+		result := kubelet.tryRegisterWithApiServer(tc.newNode)
+		if e, a := tc.expectedResult, result; e != a {
+			t.Errorf("%v: unexpected result; expected %v got %v", tc.name, e, a)
+			continue
+		}
+
+		actions := kubeClient.Actions()
+		if e, a := tc.expectedActions, len(actions); e != a {
+			t.Errorf("%v: unexpected number of actions, expected %v, got %v", tc.name, e, a)
+		}
+
+		if tc.testSavedNode {
+			var savedNode *api.Node
+			var ok bool
+
+			t.Logf("actions: %v: %+v", len(actions), actions)
+			action := actions[tc.savedNodeIndex]
+			if action.GetVerb() == "create" {
+				createAction := action.(core.CreateAction)
+				savedNode, ok = createAction.GetObject().(*api.Node)
+				if !ok {
+					t.Errorf("%v: unexpected type; couldn't convert to *api.Node: %+v", tc.name, createAction.GetObject())
+					continue
+				}
+			} else if action.GetVerb() == "update" {
+				updateAction := action.(core.UpdateAction)
+				savedNode, ok = updateAction.GetObject().(*api.Node)
+				if !ok {
+					t.Errorf("%v: unexpected type; couldn't convert to *api.Node: %+v", tc.name, updateAction.GetObject())
+					continue
+				}
+			}
+
+			actualCMAD, _ := strconv.ParseBool(savedNode.Annotations[volumehelper.ControllerManagedAttachAnnotation])
+			if e, a := tc.savedNodeCMAD, actualCMAD; e != a {
+				t.Errorf("%v: unexpected attach-detach value on saved node; expected %v got %v", tc.name, e, a)
+			}
+		}
 	}
 }
