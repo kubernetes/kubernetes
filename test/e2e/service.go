@@ -72,9 +72,19 @@ var _ = framework.KubeDescribe("Services", func() {
 	f := framework.NewDefaultFramework("services")
 
 	var c *client.Client
+	var gceController *GCEIngressController
 
 	BeforeEach(func() {
 		c = f.Client
+		By("Initializing gce controller")
+		gceController = &GCEIngressController{ns: f.Namespace.Name, Project: framework.TestContext.CloudConfig.ProjectID, c: c}
+		gceController.init()
+	})
+
+	// Platform specific cleanup
+	AfterEach(func() {
+		By("Cleaning up cloud resources")
+		cleanupGCE(gceController)
 	})
 
 	// TODO: We get coverage of TCP/UDP and multi-port services through the DNS test. We should have a simpler test for multi-port TCP here.
