@@ -32,10 +32,10 @@ option go_package = "v1";
 
 // CrossVersionObjectReference contains enough information to let you identify the referred resource.
 message CrossVersionObjectReference {
-  // Kind of the referent; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+  // Kind of the referent; More info: http://releases.k8s.io/release-1.4/docs/devel/api-conventions.md#types-kinds"
   optional string kind = 1;
 
-  // Name of the referent; More info: http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#names
+  // Name of the referent; More info: http://releases.k8s.io/release-1.4/docs/user-guide/identifiers.md#names
   optional string name = 2;
 
   // API version of the referent
@@ -44,10 +44,10 @@ message CrossVersionObjectReference {
 
 // configuration of a horizontal pod autoscaler.
 message HorizontalPodAutoscaler {
-  // Standard object metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+  // Standard object metadata. More info: http://releases.k8s.io/release-1.4/docs/devel/api-conventions.md#metadata
   optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
 
-  // behaviour of autoscaler. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status.
+  // behaviour of autoscaler. More info: http://releases.k8s.io/release-1.4/docs/devel/api-conventions.md#spec-and-status.
   optional HorizontalPodAutoscalerSpec spec = 2;
 
   // current information about the autoscaler.
@@ -102,13 +102,13 @@ message HorizontalPodAutoscalerStatus {
 
 // Scale represents a scaling request for a resource.
 message Scale {
-  // Standard object metadata; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata.
+  // Standard object metadata; More info: http://releases.k8s.io/release-1.4/docs/devel/api-conventions.md#metadata.
   optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
 
-  // defines the behavior of the scale. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status.
+  // defines the behavior of the scale. More info: http://releases.k8s.io/release-1.4/docs/devel/api-conventions.md#spec-and-status.
   optional ScaleSpec spec = 2;
 
-  // current status of the scale. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status. Read-only.
+  // current status of the scale. More info: http://releases.k8s.io/release-1.4/docs/devel/api-conventions.md#spec-and-status. Read-only.
   optional ScaleStatus status = 3;
 }
 
@@ -126,7 +126,7 @@ message ScaleStatus {
   // label query over pods that should match the replicas count. This is same
   // as the label selector but in the string format to avoid introspection
   // by clients. The string will be in the same format as the query-param syntax.
-  // More info about label selectors: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors
+  // More info about label selectors: http://releases.k8s.io/release-1.4/docs/user-guide/labels.md#label-selectors
   optional string selector = 2;
 }
 

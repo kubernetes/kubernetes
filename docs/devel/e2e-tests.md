@@ -1,34 +1,5 @@
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
-<!-- BEGIN STRIP_FOR_RELEASE -->
-
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-
-<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
-
-If you are using a released version of Kubernetes, you should
-refer to the docs that go with that version.
-
-<!-- TAG RELEASE_LINK, added by the munger automatically -->
-<strong>
-The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.3/docs/devel/e2e-tests.md).
-
-Documentation for other releases can be found at
-[releases.k8s.io](http://releases.k8s.io).
-</strong>
---
-
-<!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
@@ -423,7 +394,7 @@ similarly enough to older versions.  The general strategy is to cover the follow
    same version (e.g. a cluster upgraded to v1.3 passes the same v1.3 tests as
    a newly-created v1.3 cluster).
 
-[hack/e2e-runner.sh](http://releases.k8s.io/HEAD/hack/jenkins/e2e-runner.sh) is
+[hack/e2e-runner.sh](http://releases.k8s.io/release-1.4/hack/jenkins/e2e-runner.sh) is
 the authoritative source on how to run version-skewed tests, but below is a
 quick-and-dirty tutorial.
 
@@ -732,6 +703,13 @@ You should also know the [testing conventions](coding-conventions.md#testing-con
 
 **HAPPY TESTING!**
 
+
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

@@ -1,34 +1,5 @@
 <!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
 
-<!-- BEGIN STRIP_FOR_RELEASE -->
-
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-
-<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
-
-If you are using a released version of Kubernetes, you should
-refer to the docs that go with that version.
-
-<!-- TAG RELEASE_LINK, added by the munger automatically -->
-<strong>
-The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.3/docs/design/admission_control_resource_quota.md).
-
-Documentation for other releases can be found at
-[releases.k8s.io](http://releases.k8s.io).
-</strong>
---
-
-<!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
@@ -69,13 +40,13 @@ const (
 // ResourceQuotaSpec defines the desired hard limits to enforce for Quota
 type ResourceQuotaSpec struct {
   // Hard is the set of desired hard limits for each named resource
-  Hard ResourceList `json:"hard,omitempty" description:"hard is the set of desired hard limits for each named resource; see http://releases.k8s.io/HEAD/docs/design/admission_control_resource_quota.md#admissioncontrol-plugin-resourcequota"`
+  Hard ResourceList `json:"hard,omitempty" description:"hard is the set of desired hard limits for each named resource; see http://releases.k8s.io/release-1.4/docs/design/admission_control_resource_quota.md#admissioncontrol-plugin-resourcequota"`
 }
 
 // ResourceQuotaStatus defines the enforced hard limits and observed use
 type ResourceQuotaStatus struct {
   // Hard is the set of enforced hard limits for each named resource
-  Hard ResourceList `json:"hard,omitempty" description:"hard is the set of enforced hard limits for each named resource; see http://releases.k8s.io/HEAD/docs/design/admission_control_resource_quota.md#admissioncontrol-plugin-resourcequota"`
+  Hard ResourceList `json:"hard,omitempty" description:"hard is the set of enforced hard limits for each named resource; see http://releases.k8s.io/release-1.4/docs/design/admission_control_resource_quota.md#admissioncontrol-plugin-resourcequota"`
   // Used is the current observed total usage of the resource in the namespace
   Used ResourceList `json:"used,omitempty" description:"used is the current observed total usage of the resource in the namespace"`
 }
@@ -83,22 +54,22 @@ type ResourceQuotaStatus struct {
 // ResourceQuota sets aggregate quota restrictions enforced per namespace
 type ResourceQuota struct {
   TypeMeta   `json:",inline"`
-  ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"`
+  ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see http://releases.k8s.io/release-1.4/docs/devel/api-conventions.md#metadata"`
 
   // Spec defines the desired quota
-  Spec ResourceQuotaSpec `json:"spec,omitempty" description:"spec defines the desired quota; http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"`
+  Spec ResourceQuotaSpec `json:"spec,omitempty" description:"spec defines the desired quota; http://releases.k8s.io/release-1.4/docs/devel/api-conventions.md#spec-and-status"`
 
   // Status defines the actual enforced quota and its current usage
-  Status ResourceQuotaStatus `json:"status,omitempty" description:"status defines the actual enforced quota and current usage; http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"`
+  Status ResourceQuotaStatus `json:"status,omitempty" description:"status defines the actual enforced quota and current usage; http://releases.k8s.io/release-1.4/docs/devel/api-conventions.md#spec-and-status"`
 }
 
 // ResourceQuotaList is a list of ResourceQuota items
 type ResourceQuotaList struct {
   TypeMeta `json:",inline"`
-  ListMeta `json:"metadata,omitempty" description:"standard list metadata; see http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"`
+  ListMeta `json:"metadata,omitempty" description:"standard list metadata; see http://releases.k8s.io/release-1.4/docs/devel/api-conventions.md#metadata"`
 
   // Items is a list of ResourceQuota objects
-  Items []ResourceQuota `json:"items" description:"items is a list of ResourceQuota objects; see http://releases.k8s.io/HEAD/docs/design/admission_control_resource_quota.md#admissioncontrol-plugin-resourcequota"`
+  Items []ResourceQuota `json:"items" description:"items is a list of ResourceQuota objects; see http://releases.k8s.io/release-1.4/docs/design/admission_control_resource_quota.md#admissioncontrol-plugin-resourcequota"`
 }
 ```
 
@@ -243,6 +214,13 @@ services                 0         5
 ## More information
 
 See [resource quota document](../admin/resource-quota.md) and the [example of Resource Quota](../admin/resourcequota/) for more information.
+
+
+
+<!-- BEGIN MUNGE: IS_VERSIONED -->
+<!-- TAG IS_VERSIONED -->
+<!-- END MUNGE: IS_VERSIONED -->
+
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/admission_control_resource_quota.md?pixel)]()
