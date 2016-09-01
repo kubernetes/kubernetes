@@ -24,7 +24,6 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
-	"reflect"
 	"sort"
 	"testing"
 	"time"
@@ -32,6 +31,7 @@ import (
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
@@ -64,7 +64,6 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/clock"
-	"k8s.io/kubernetes/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/util/mount"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
@@ -228,18 +227,15 @@ func newTestKubeletWithImageList(
 	}
 	// setup eviction manager
 	evictionManager, evictionAdmitHandler, err := eviction.NewManager(kubelet.resourceAnalyzer, eviction.Config{}, killPodNow(kubelet.podWorkers), kubelet.imageManager, fakeRecorder, nodeRef, kubelet.clock)
-	if err != nil {
-		t.Fatalf("failed to initialize eviction manager: %v", err)
-	}
+	require.NoError(t, err, "Failed to initialize eviction manager")
+
 	kubelet.evictionManager = evictionManager
 	kubelet.AddPodAdmitHandler(evictionAdmitHandler)
 
 	plug := &volumetest.FakeVolumePlugin{PluginName: "fake", Host: nil}
 	kubelet.volumePluginMgr, err =
 		NewInitializedVolumePluginMgr(kubelet, []volume.VolumePlugin{plug})
-	if err != nil {
-		t.Fatalf("failed to initialize VolumePluginMgr: %v", err)
-	}
+	require.NoError(t, err, "Failed to initialize VolumePluginMgr")
 
 	kubelet.mounter = &mount.FakeMounter{}
 	kubelet.volumeManager, err = kubeletvolume.NewVolumeManager(
@@ -252,15 +248,12 @@ func newTestKubeletWithImageList(
 		kubelet.mounter,
 		kubelet.getPodsDir(),
 		kubelet.recorder)
-	if err != nil {
-		t.Fatalf("failed to initialize volume manager: %v", err)
-	}
+	require.NoError(t, err, "Failed to initialize volume manager")
 
 	// enable active deadline handler
 	activeDeadlineHandler, err := newActiveDeadlineHandler(kubelet.statusManager, kubelet.recorder, kubelet.clock)
-	if err != nil {
-		t.Fatalf("can't initialize active deadline handler: %v", err)
-	}
+	require.NoError(t, err, "Can't initialize active deadline handler")
+
 	kubelet.AddPodSyncLoopHandler(activeDeadlineHandler)
 	kubelet.AddPodSyncHandler(activeDeadlineHandler)
 
@@ -293,9 +286,7 @@ func TestSyncLoopTimeUpdate(t *testing.T) {
 	kubelet := testKubelet.kubelet
 
 	loopTime1 := kubelet.LatestLoopEntryTime()
-	if !loopTime1.IsZero() {
-		t.Errorf("Unexpected sync loop time: %s, expected 0", loopTime1)
-	}
+	require.True(t, loopTime1.IsZero(), "Expect sync loop time to be zero")
 
 	// Start sync ticker.
 	syncCh := make(chan time.Time, 1)
@@ -304,16 +295,14 @@ func TestSyncLoopTimeUpdate(t *testing.T) {
 	syncCh <- time.Now()
 	kubelet.syncLoopIteration(make(chan kubetypes.PodUpdate), kubelet, syncCh, housekeepingCh, plegCh)
 	loopTime2 := kubelet.LatestLoopEntryTime()
-	if loopTime2.IsZero() {
-		t.Errorf("Unexpected sync loop time: 0, expected non-zero value.")
-	}
+	require.False(t, loopTime2.IsZero(), "Expect sync loop time to be non-zero")
 
 	syncCh <- time.Now()
 	kubelet.syncLoopIteration(make(chan kubetypes.PodUpdate), kubelet, syncCh, housekeepingCh, plegCh)
 	loopTime3 := kubelet.LatestLoopEntryTime()
-	if !loopTime3.After(loopTime1) {
-		t.Errorf("Sync Loop Time was not updated correctly. Second update timestamp should be greater than first update timestamp")
-	}
+	require.True(t, loopTime3.After(loopTime1),
+		"Sync Loop Time was not updated correctly. Second update timestamp %v should be greater than first update timestamp %v",
+		loopTime3, loopTime1)
 }
 
 func TestSyncLoopAbort(t *testing.T) {
@@ -330,9 +319,7 @@ func TestSyncLoopAbort(t *testing.T) {
 
 	// sanity check (also prevent this test from hanging in the next step)
 	ok := kubelet.syncLoopIteration(ch, kubelet, make(chan time.Time), make(chan time.Time), make(chan *pleg.PodLifecycleEvent, 1))
-	if ok {
-		t.Fatalf("expected syncLoopIteration to return !ok since update chan was closed")
-	}
+	require.False(t, ok, "Expected syncLoopIteration to return !ok since update chan was closed")
 
 	// this should terminate immediately; if it hangs then the syncLoopIteration isn't aborting properly
 	kubelet.syncLoop(ch, kubelet)
@@ -414,49 +401,25 @@ func TestVolumeAttachAndMountControllerDisabled(t *testing.T) {
 
 	kubelet.podManager.SetPods([]*api.Pod{pod})
 	err := kubelet.volumeManager.WaitForAttachAndMount(pod)
-	if err != nil {
-		t.Errorf("Expected success: %v", err)
-	}
+	assert.NoError(t, err)
 
 	podVolumes := kubelet.volumeManager.GetMountedVolumesForPod(
 		volumehelper.GetUniquePodName(pod))
 
 	expectedPodVolumes := []string{"vol1"}
-	if len(expectedPodVolumes) != len(podVolumes) {
-		t.Errorf("Unexpected volumes. Expected %#v got %#v.  Manifest was: %#v", expectedPodVolumes, podVolumes, pod)
-	}
+	assert.Len(t, podVolumes, len(expectedPodVolumes), "Volumes for pod %+v", pod)
 	for _, name := range expectedPodVolumes {
-		if _, ok := podVolumes[name]; !ok {
-			t.Errorf("api.Pod volumes map is missing key: %s. %#v", name, podVolumes)
-		}
+		assert.Contains(t, podVolumes, name, "Volumes for pod %+v", pod)
 	}
-	if testKubelet.volumePlugin.GetNewAttacherCallCount() < 1 {
-		t.Errorf("Expected plugin NewAttacher to be called at least once")
-	}
-
-	err = volumetest.VerifyWaitForAttachCallCount(
-		1 /* expectedWaitForAttachCallCount */, testKubelet.volumePlugin)
-	if err != nil {
-		t.Error(err)
-	}
-
-	err = volumetest.VerifyAttachCallCount(
-		1 /* expectedAttachCallCount */, testKubelet.volumePlugin)
-	if err != nil {
-		t.Error(err)
-	}
-
-	err = volumetest.VerifyMountDeviceCallCount(
-		1 /* expectedMountDeviceCallCount */, testKubelet.volumePlugin)
-	if err != nil {
-		t.Error(err)
-	}
-
-	err = volumetest.VerifySetUpCallCount(
-		1 /* expectedSetUpCallCount */, testKubelet.volumePlugin)
-	if err != nil {
-		t.Error(err)
-	}
+	assert.True(t, testKubelet.volumePlugin.GetNewAttacherCallCount() >= 1, "Expected plugin NewAttacher to be called at least once")
+	assert.NoError(t, volumetest.VerifyWaitForAttachCallCount(
+		1 /* expectedWaitForAttachCallCount */, testKubelet.volumePlugin))
+	assert.NoError(t, volumetest.VerifyAttachCallCount(
+		1 /* expectedAttachCallCount */, testKubelet.volumePlugin))
+	assert.NoError(t, volumetest.VerifyMountDeviceCallCount(
+		1 /* expectedMountDeviceCallCount */, testKubelet.volumePlugin))
+	assert.NoError(t, volumetest.VerifySetUpCallCount(
+		1 /* expectedSetUpCallCount */, testKubelet.volumePlugin))
 }
 
 func TestVolumeUnmountAndDetachControllerDisabled(t *testing.T) {
@@ -486,87 +449,47 @@ func TestVolumeUnmountAndDetachControllerDisabled(t *testing.T) {
 
 	// Verify volumes attached
 	err := kubelet.volumeManager.WaitForAttachAndMount(pod)
-	if err != nil {
-		t.Errorf("Expected success: %v", err)
-	}
+	assert.NoError(t, err)
 
 	podVolumes := kubelet.volumeManager.GetMountedVolumesForPod(
 		volumehelper.GetUniquePodName(pod))
 
 	expectedPodVolumes := []string{"vol1"}
-	if len(expectedPodVolumes) != len(podVolumes) {
-		t.Errorf("Unexpected volumes. Expected %#v got %#v.  Manifest was: %#v", expectedPodVolumes, podVolumes, pod)
-	}
+	assert.Len(t, podVolumes, len(expectedPodVolumes), "Volumes for pod %+v", pod)
 	for _, name := range expectedPodVolumes {
-		if _, ok := podVolumes[name]; !ok {
-			t.Errorf("api.Pod volumes map is missing key: %s. %#v", name, podVolumes)
-		}
-	}
-	if testKubelet.volumePlugin.GetNewAttacherCallCount() < 1 {
-		t.Errorf("Expected plugin NewAttacher to be called at least once")
+		assert.Contains(t, podVolumes, name, "Volumes for pod %+v", pod)
 	}
 
-	err = volumetest.VerifyWaitForAttachCallCount(
-		1 /* expectedWaitForAttachCallCount */, testKubelet.volumePlugin)
-	if err != nil {
-		t.Error(err)
-	}
-
-	err = volumetest.VerifyAttachCallCount(
-		1 /* expectedAttachCallCount */, testKubelet.volumePlugin)
-	if err != nil {
-		t.Error(err)
-	}
-
-	err = volumetest.VerifyMountDeviceCallCount(
-		1 /* expectedMountDeviceCallCount */, testKubelet.volumePlugin)
-	if err != nil {
-		t.Error(err)
-	}
-
-	err = volumetest.VerifySetUpCallCount(
-		1 /* expectedSetUpCallCount */, testKubelet.volumePlugin)
-	if err != nil {
-		t.Error(err)
-	}
+	assert.True(t, testKubelet.volumePlugin.GetNewAttacherCallCount() >= 1, "Expected plugin NewAttacher to be called at least once")
+	assert.NoError(t, volumetest.VerifyWaitForAttachCallCount(
+		1 /* expectedWaitForAttachCallCount */, testKubelet.volumePlugin))
+	assert.NoError(t, volumetest.VerifyAttachCallCount(
+		1 /* expectedAttachCallCount */, testKubelet.volumePlugin))
+	assert.NoError(t, volumetest.VerifyMountDeviceCallCount(
+		1 /* expectedMountDeviceCallCount */, testKubelet.volumePlugin))
+	assert.NoError(t, volumetest.VerifySetUpCallCount(
+		1 /* expectedSetUpCallCount */, testKubelet.volumePlugin))
 
 	// Remove pod
 	kubelet.podManager.SetPods([]*api.Pod{})
 
-	err = waitForVolumeUnmount(kubelet.volumeManager, pod)
-	if err != nil {
-		t.Error(err)
-	}
+	assert.NoError(t, waitForVolumeUnmount(kubelet.volumeManager, pod))
 
 	// Verify volumes unmounted
 	podVolumes = kubelet.volumeManager.GetMountedVolumesForPod(
 		volumehelper.GetUniquePodName(pod))
 
-	if len(podVolumes) != 0 {
-		t.Errorf("Expected volumes to be unmounted and detached. But some volumes are still mounted: %#v", podVolumes)
-	}
+	assert.Len(t, podVolumes, 0,
+		"Expected volumes to be unmounted and detached. But some volumes are still mounted: %#v", podVolumes)
 
-	err = volumetest.VerifyTearDownCallCount(
-		1 /* expectedTearDownCallCount */, testKubelet.volumePlugin)
-	if err != nil {
-		t.Error(err)
-	}
+	assert.NoError(t, volumetest.VerifyTearDownCallCount(
+		1 /* expectedTearDownCallCount */, testKubelet.volumePlugin))
 
 	// Verify volumes detached and no longer reported as in use
-	err = waitForVolumeDetach(api.UniqueVolumeName("fake/vol1"), kubelet.volumeManager)
-	if err != nil {
-		t.Error(err)
-	}
-
-	if testKubelet.volumePlugin.GetNewDetacherCallCount() < 1 {
-		t.Errorf("Expected plugin NewDetacher to be called at least once")
-	}
-
-	err = volumetest.VerifyDetachCallCount(
-		1 /* expectedDetachCallCount */, testKubelet.volumePlugin)
-	if err != nil {
-		t.Error(err)
-	}
+	assert.NoError(t, waitForVolumeDetach(api.UniqueVolumeName("fake/vol1"), kubelet.volumeManager))
+	assert.True(t, testKubelet.volumePlugin.GetNewAttacherCallCount() >= 1, "Expected plugin NewAttacher to be called at least once")
+	assert.NoError(t, volumetest.VerifyDetachCallCount(
+		1 /* expectedDetachCallCount */, testKubelet.volumePlugin))
 }
 
 func TestVolumeAttachAndMountControllerEnabled(t *testing.T) {
@@ -617,49 +540,24 @@ func TestVolumeAttachAndMountControllerEnabled(t *testing.T) {
 		stopCh,
 		kubelet.volumeManager)
 
-	err := kubelet.volumeManager.WaitForAttachAndMount(pod)
-	if err != nil {
-		t.Errorf("Expected success: %v", err)
-	}
+	assert.NoError(t, kubelet.volumeManager.WaitForAttachAndMount(pod))
 
 	podVolumes := kubelet.volumeManager.GetMountedVolumesForPod(
 		volumehelper.GetUniquePodName(pod))
 
 	expectedPodVolumes := []string{"vol1"}
-	if len(expectedPodVolumes) != len(podVolumes) {
-		t.Errorf("Unexpected volumes. Expected %#v got %#v.  Manifest was: %#v", expectedPodVolumes, podVolumes, pod)
-	}
+	assert.Len(t, podVolumes, len(expectedPodVolumes), "Volumes for pod %+v", pod)
 	for _, name := range expectedPodVolumes {
-		if _, ok := podVolumes[name]; !ok {
-			t.Errorf("api.Pod volumes map is missing key: %s. %#v", name, podVolumes)
-		}
+		assert.Contains(t, podVolumes, name, "Volumes for pod %+v", pod)
 	}
-	if testKubelet.volumePlugin.GetNewAttacherCallCount() < 1 {
-		t.Errorf("Expected plugin NewAttacher to be called at least once")
-	}
-
-	err = volumetest.VerifyWaitForAttachCallCount(
-		1 /* expectedWaitForAttachCallCount */, testKubelet.volumePlugin)
-	if err != nil {
-		t.Error(err)
-	}
-
-	err = volumetest.VerifyZeroAttachCalls(testKubelet.volumePlugin)
-	if err != nil {
-		t.Error(err)
-	}
-
-	err = volumetest.VerifyMountDeviceCallCount(
-		1 /* expectedMountDeviceCallCount */, testKubelet.volumePlugin)
-	if err != nil {
-		t.Error(err)
-	}
-
-	err = volumetest.VerifySetUpCallCount(
-		1 /* expectedSetUpCallCount */, testKubelet.volumePlugin)
-	if err != nil {
-		t.Error(err)
-	}
+	assert.True(t, testKubelet.volumePlugin.GetNewAttacherCallCount() >= 1, "Expected plugin NewAttacher to be called at least once")
+	assert.NoError(t, volumetest.VerifyWaitForAttachCallCount(
+		1 /* expectedWaitForAttachCallCount */, testKubelet.volumePlugin))
+	assert.NoError(t, volumetest.VerifyZeroAttachCalls(testKubelet.volumePlugin))
+	assert.NoError(t, volumetest.VerifyMountDeviceCallCount(
+		1 /* expectedMountDeviceCallCount */, testKubelet.volumePlugin))
+	assert.NoError(t, volumetest.VerifySetUpCallCount(
+		1 /* expectedSetUpCallCount */, testKubelet.volumePlugin))
 }
 
 func TestVolumeUnmountAndDetachControllerEnabled(t *testing.T) {
@@ -712,86 +610,45 @@ func TestVolumeUnmountAndDetachControllerEnabled(t *testing.T) {
 		kubelet.volumeManager)
 
 	// Verify volumes attached
-	err := kubelet.volumeManager.WaitForAttachAndMount(pod)
-	if err != nil {
-		t.Errorf("Expected success: %v", err)
-	}
+	assert.NoError(t, kubelet.volumeManager.WaitForAttachAndMount(pod))
 
 	podVolumes := kubelet.volumeManager.GetMountedVolumesForPod(
 		volumehelper.GetUniquePodName(pod))
 
 	expectedPodVolumes := []string{"vol1"}
-	if len(expectedPodVolumes) != len(podVolumes) {
-		t.Errorf("Unexpected volumes. Expected %#v got %#v.  Manifest was: %#v", expectedPodVolumes, podVolumes, pod)
-	}
+	assert.Len(t, podVolumes, len(expectedPodVolumes), "Volumes for pod %+v", pod)
 	for _, name := range expectedPodVolumes {
-		if _, ok := podVolumes[name]; !ok {
-			t.Errorf("api.Pod volumes map is missing key: %s. %#v", name, podVolumes)
-		}
-	}
-	if testKubelet.volumePlugin.GetNewAttacherCallCount() < 1 {
-		t.Errorf("Expected plugin NewAttacher to be called at least once")
+		assert.Contains(t, podVolumes, name, "Volumes for pod %+v", pod)
 	}
 
-	err = volumetest.VerifyWaitForAttachCallCount(
-		1 /* expectedWaitForAttachCallCount */, testKubelet.volumePlugin)
-	if err != nil {
-		t.Error(err)
-	}
-
-	err = volumetest.VerifyZeroAttachCalls(testKubelet.volumePlugin)
-	if err != nil {
-		t.Error(err)
-	}
-
-	err = volumetest.VerifyMountDeviceCallCount(
-		1 /* expectedMountDeviceCallCount */, testKubelet.volumePlugin)
-	if err != nil {
-		t.Error(err)
-	}
-
-	err = volumetest.VerifySetUpCallCount(
-		1 /* expectedSetUpCallCount */, testKubelet.volumePlugin)
-	if err != nil {
-		t.Error(err)
-	}
+	assert.True(t, testKubelet.volumePlugin.GetNewAttacherCallCount() >= 1, "Expected plugin NewAttacher to be called at least once")
+	assert.NoError(t, volumetest.VerifyWaitForAttachCallCount(
+		1 /* expectedWaitForAttachCallCount */, testKubelet.volumePlugin))
+	assert.NoError(t, volumetest.VerifyZeroAttachCalls(testKubelet.volumePlugin))
+	assert.NoError(t, volumetest.VerifyMountDeviceCallCount(
+		1 /* expectedMountDeviceCallCount */, testKubelet.volumePlugin))
+	assert.NoError(t, volumetest.VerifySetUpCallCount(
+		1 /* expectedSetUpCallCount */, testKubelet.volumePlugin))
 
 	// Remove pod
 	kubelet.podManager.SetPods([]*api.Pod{})
 
-	err = waitForVolumeUnmount(kubelet.volumeManager, pod)
-	if err != nil {
-		t.Error(err)
-	}
+	assert.NoError(t, waitForVolumeUnmount(kubelet.volumeManager, pod))
 
 	// Verify volumes unmounted
 	podVolumes = kubelet.volumeManager.GetMountedVolumesForPod(
 		volumehelper.GetUniquePodName(pod))
 
-	if len(podVolumes) != 0 {
-		t.Errorf("Expected volumes to be unmounted and detached. But some volumes are still mounted: %#v", podVolumes)
-	}
+	assert.Len(t, podVolumes, 0,
+		"Expected volumes to be unmounted and detached. But some volumes are still mounted: %#v", podVolumes)
 
-	err = volumetest.VerifyTearDownCallCount(
-		1 /* expectedTearDownCallCount */, testKubelet.volumePlugin)
-	if err != nil {
-		t.Error(err)
-	}
+	assert.NoError(t, volumetest.VerifyTearDownCallCount(
+		1 /* expectedTearDownCallCount */, testKubelet.volumePlugin))
 
 	// Verify volumes detached and no longer reported as in use
-	err = waitForVolumeDetach(api.UniqueVolumeName("fake/vol1"), kubelet.volumeManager)
-	if err != nil {
-		t.Error(err)
-	}
-
-	if testKubelet.volumePlugin.GetNewDetacherCallCount() < 1 {
-		t.Errorf("Expected plugin NewDetacher to be called at least once")
-	}
-
-	err = volumetest.VerifyZeroDetachCallCount(testKubelet.volumePlugin)
-	if err != nil {
-		t.Error(err)
-	}
+	assert.NoError(t, waitForVolumeDetach(api.UniqueVolumeName("fake/vol1"), kubelet.volumeManager))
+	assert.True(t, testKubelet.volumePlugin.GetNewAttacherCallCount() >= 1, "Expected plugin NewAttacher to be called at least once")
+	assert.NoError(t, volumetest.VerifyZeroDetachCallCount(testKubelet.volumePlugin))
 }
 
 type stubVolume struct {
@@ -887,9 +744,7 @@ func TestMakeVolumeMounts(t *testing.T) {
 			SELinuxRelabel: false,
 		},
 	}
-	if !reflect.DeepEqual(mounts, expectedMounts) {
-		t.Errorf("Unexpected mounts: Expected %#v got %#v.  Container was: %#v", expectedMounts, mounts, container)
-	}
+	assert.Equal(t, expectedMounts, mounts, "mounts of container %+v", container)
 }
 
 type fakeContainerCommandRunner struct {
@@ -947,12 +802,8 @@ func TestRunInContainerNoSuchPod(t *testing.T) {
 		"",
 		containerName,
 		[]string{"ls"})
-	if output != nil {
-		t.Errorf("unexpected non-nil command: %v", output)
-	}
-	if err == nil {
-		t.Error("unexpected non-error")
-	}
+	assert.Error(t, err)
+	assert.Nil(t, output, "output should be nil")
 }
 
 func TestRunInContainer(t *testing.T) {
@@ -982,19 +833,11 @@ func TestRunInContainer(t *testing.T) {
 		}
 		cmd := []string{"ls"}
 		actualOutput, err := kubelet.RunInContainer("podFoo_nsFoo", "", "containerFoo", cmd)
-		if fakeCommandRunner.ID != containerID {
-			t.Errorf("(testError=%v) unexpected Name: %s", testError, fakeCommandRunner.ID)
-		}
-		if !reflect.DeepEqual(fakeCommandRunner.Cmd, cmd) {
-			t.Errorf("(testError=%v) unexpected command: %s", testError, fakeCommandRunner.Cmd)
-		}
+		assert.Equal(t, containerID, fakeCommandRunner.ID, "(testError=%v) ID", testError)
+		assert.Equal(t, cmd, fakeCommandRunner.Cmd, "(testError=%v) command", testError)
 		// this isn't 100% foolproof as a bug in a real ContainerCommandRunner where it fails to copy to stdout/stderr wouldn't be caught by this test
-		if "foobar" != string(actualOutput) {
-			t.Errorf("(testError=%v) unexpected output %q", testError, actualOutput)
-		}
-		if e, a := fmt.Sprintf("%v", testError), fmt.Sprintf("%v", err); e != a {
-			t.Errorf("(testError=%v) error: expected %s, got %s", testError, e, a)
-		}
+		assert.Equal(t, "foobar", string(actualOutput), "(testError=%v) output", testError)
+		assert.Equal(t, fmt.Sprintf("%s", err), fmt.Sprintf("%s", testError), "(testError=%v) err", testError)
 	}
 }
 
@@ -1467,7 +1310,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 		},
 	}
 
-	for i, tc := range testCases {
+	for _, tc := range testCases {
 		testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 		kl := testKubelet.kubelet
 		kl.masterServiceNamespace = tc.masterServiceNs
@@ -1490,16 +1333,11 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 		podIP := "1.2.3.4"
 
 		result, err := kl.makeEnvironmentVariables(testPod, tc.container, podIP)
-		if err != nil {
-			t.Errorf("[%v] Unexpected error: %v", tc.name, err)
-		}
+		assert.NoError(t, err, "[%s]", tc.name)
 
 		sort.Sort(envs(result))
 		sort.Sort(envs(tc.expectedEnvs))
-
-		if !reflect.DeepEqual(result, tc.expectedEnvs) {
-			t.Errorf("%d: [%v] Unexpected env entries; expected {%v}, got {%v}", i, tc.name, tc.expectedEnvs, result)
-		}
+		assert.Equal(t, tc.expectedEnvs, result, "[%s] env entries", tc.name)
 	}
 }
 
@@ -1656,9 +1494,8 @@ func TestPodPhaseWithRestartAlways(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		if status := GetPhase(&test.pod.Spec, test.pod.Status.ContainerStatuses); status != test.status {
-			t.Errorf("In test %s, expected %v, got %v", test.test, test.status, status)
-		}
+		status := GetPhase(&test.pod.Spec, test.pod.Status.ContainerStatuses)
+		assert.Equal(t, test.status, status, "[test %s]", test.test)
 	}
 }
 
@@ -1757,9 +1594,8 @@ func TestPodPhaseWithRestartNever(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		if status := GetPhase(&test.pod.Spec, test.pod.Status.ContainerStatuses); status != test.status {
-			t.Errorf("In test %s, expected %v, got %v", test.test, test.status, status)
-		}
+		status := GetPhase(&test.pod.Spec, test.pod.Status.ContainerStatuses)
+		assert.Equal(t, test.status, status, "[test %s]", test.test)
 	}
 }
 
@@ -1871,9 +1707,8 @@ func TestPodPhaseWithRestartOnFailure(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		if status := GetPhase(&test.pod.Spec, test.pod.Status.ContainerStatuses); status != test.status {
-			t.Errorf("In test %s, expected %v, got %v", test.test, test.status, status)
-		}
+		status := GetPhase(&test.pod.Spec, test.pod.Status.ContainerStatuses)
+		assert.Equal(t, test.status, status, "[test %s]", test.test)
 	}
 }
 
@@ -1899,12 +1734,8 @@ func TestExecInContainerNoSuchPod(t *testing.T) {
 		false,
 		nil,
 	)
-	if err == nil {
-		t.Fatal("unexpected non-error")
-	}
-	if !fakeCommandRunner.ID.IsEmpty() {
-		t.Fatal("unexpected invocation of runner.ExecInContainer")
-	}
+	require.Error(t, err)
+	require.True(t, fakeCommandRunner.ID.IsEmpty(), "Unexpected invocation of runner.ExecInContainer")
 }
 
 func TestExecInContainerNoSuchContainer(t *testing.T) {
@@ -1944,12 +1775,8 @@ func TestExecInContainerNoSuchContainer(t *testing.T) {
 		false,
 		nil,
 	)
-	if err == nil {
-		t.Fatal("unexpected non-error")
-	}
-	if !fakeCommandRunner.ID.IsEmpty() {
-		t.Fatal("unexpected invocation of runner.ExecInContainer")
-	}
+	require.Error(t, err)
+	require.True(t, fakeCommandRunner.ID.IsEmpty(), "Unexpected invocation of runner.ExecInContainer")
 }
 
 type fakeReadWriteCloser struct{}
@@ -2005,27 +1832,13 @@ func TestExecInContainer(t *testing.T) {
 		tty,
 		nil,
 	)
-	if err != nil {
-		t.Fatalf("unexpected error: %s", err)
-	}
-	if e, a := containerID, fakeCommandRunner.ID.ID; e != a {
-		t.Fatalf("container name: expected %q, got %q", e, a)
-	}
-	if e, a := command, fakeCommandRunner.Cmd; !reflect.DeepEqual(e, a) {
-		t.Fatalf("command: expected '%v', got '%v'", e, a)
-	}
-	if e, a := stdin, fakeCommandRunner.Stdin; e != a {
-		t.Fatalf("stdin: expected %#v, got %#v", e, a)
-	}
-	if e, a := stdout, fakeCommandRunner.Stdout; e != a {
-		t.Fatalf("stdout: expected %#v, got %#v", e, a)
-	}
-	if e, a := stderr, fakeCommandRunner.Stderr; e != a {
-		t.Fatalf("stderr: expected %#v, got %#v", e, a)
-	}
-	if e, a := tty, fakeCommandRunner.TTY; e != a {
-		t.Fatalf("tty: expected %t, got %t", e, a)
-	}
+	require.NoError(t, err)
+	require.Equal(t, fakeCommandRunner.ID.ID, containerID, "ID")
+	require.Equal(t, fakeCommandRunner.Cmd, command, "Command")
+	require.Equal(t, fakeCommandRunner.Stdin, stdin, "Stdin")
+	require.Equal(t, fakeCommandRunner.Stdout, stdout, "Stdout")
+	require.Equal(t, fakeCommandRunner.Stderr, stderr, "Stderr")
+	require.Equal(t, fakeCommandRunner.TTY, tty, "TTY")
 }
 
 func TestPortForwardNoSuchPod(t *testing.T) {
@@ -2046,12 +1859,8 @@ func TestPortForwardNoSuchPod(t *testing.T) {
 		port,
 		nil,
 	)
-	if err == nil {
-		t.Fatal("unexpected non-error")
-	}
-	if !fakeCommandRunner.ID.IsEmpty() {
-		t.Fatal("unexpected invocation of runner.PortForward")
-	}
+	require.Error(t, err)
+	require.True(t, fakeCommandRunner.ID.IsEmpty(), "unexpected invocation of runner.PortForward")
 }
 
 func TestPortForward(t *testing.T) {
@@ -2090,18 +1899,10 @@ func TestPortForward(t *testing.T) {
 		port,
 		stream,
 	)
-	if err != nil {
-		t.Fatalf("unexpected error: %s", err)
-	}
-	if e, a := podID, fakeCommandRunner.PodID; e != a {
-		t.Fatalf("container id: expected %q, got %q", e, a)
-	}
-	if e, a := port, fakeCommandRunner.Port; e != a {
-		t.Fatalf("port: expected %v, got %v", e, a)
-	}
-	if e, a := stream, fakeCommandRunner.Stream; e != a {
-		t.Fatalf("stream: expected %v, got %v", e, a)
-	}
+	require.NoError(t, err)
+	require.Equal(t, fakeCommandRunner.PodID, podID, "Pod ID")
+	require.Equal(t, fakeCommandRunner.Port, port, "Port")
+	require.Equal(t, fakeCommandRunner.Stream, stream, "stream")
 }
 
 // Tests that identify the host port conflicts are detected correctly.
@@ -2113,18 +1914,14 @@ func TestGetHostPortConflicts(t *testing.T) {
 		{Spec: api.PodSpec{Containers: []api.Container{{Ports: []api.ContainerPort{{HostPort: 83}}}}}},
 	}
 	// Pods should not cause any conflict.
-	if hasHostPortConflicts(pods) {
-		t.Errorf("expected no conflicts, Got conflicts")
-	}
+	assert.False(t, hasHostPortConflicts(pods), "Should not have port conflicts")
 
 	expected := &api.Pod{
 		Spec: api.PodSpec{Containers: []api.Container{{Ports: []api.ContainerPort{{HostPort: 81}}}}},
 	}
 	// The new pod should cause conflict and be reported.
 	pods = append(pods, expected)
-	if !hasHostPortConflicts(pods) {
-		t.Errorf("expected conflict, Got no conflicts")
-	}
+	assert.True(t, hasHostPortConflicts(pods), "Should have port conflicts")
 }
 
 // Tests that we handle port conflicts correctly by setting the failed status in status map.
@@ -2172,20 +1969,13 @@ func TestHandlePortConflicts(t *testing.T) {
 	// Check pod status stored in the status map.
 	// notfittingPod should be Failed
 	status, found := kl.statusManager.GetPodStatus(notfittingPod.UID)
-	if !found {
-		t.Fatalf("status of pod %q is not found in the status map", notfittingPod.UID)
-	}
-	if status.Phase != api.PodFailed {
-		t.Fatalf("expected pod status %q. Got %q.", api.PodFailed, status.Phase)
-	}
+	require.True(t, found, "Status of pod %q is not found in the status map", notfittingPod.UID)
+	require.Equal(t, api.PodFailed, status.Phase)
+
 	// fittingPod should be Pending
 	status, found = kl.statusManager.GetPodStatus(fittingPod.UID)
-	if !found {
-		t.Fatalf("status of pod %q is not found in the status map", fittingPod.UID)
-	}
-	if status.Phase != api.PodPending {
-		t.Fatalf("expected pod status %q. Got %q.", api.PodPending, status.Phase)
-	}
+	require.True(t, found, "Status of pod %q is not found in the status map", fittingPod.UID)
+	require.Equal(t, api.PodPending, status.Phase)
 }
 
 // Tests that we handle host name conflicts correctly by setting the failed status in status map.
@@ -2230,20 +2020,13 @@ func TestHandleHostNameConflicts(t *testing.T) {
 	// Check pod status stored in the status map.
 	// notfittingPod should be Failed
 	status, found := kl.statusManager.GetPodStatus(notfittingPod.UID)
-	if !found {
-		t.Fatalf("status of pod %q is not found in the status map", notfittingPod.UID)
-	}
-	if status.Phase != api.PodFailed {
-		t.Fatalf("expected pod status %q. Got %q.", api.PodFailed, status.Phase)
-	}
+	require.True(t, found, "Status of pod %q is not found in the status map", notfittingPod.UID)
+	require.Equal(t, api.PodFailed, status.Phase)
+
 	// fittingPod should be Pending
 	status, found = kl.statusManager.GetPodStatus(fittingPod.UID)
-	if !found {
-		t.Fatalf("status of pod %q is not found in the status map", fittingPod.UID)
-	}
-	if status.Phase != api.PodPending {
-		t.Fatalf("expected pod status %q. Got %q.", api.PodPending, status.Phase)
-	}
+	require.True(t, found, "Status of pod %q is not found in the status map", fittingPod.UID)
+	require.Equal(t, api.PodPending, status.Phase)
 }
 
 // Tests that we handle not matching labels selector correctly by setting the failed status in status map.
@@ -2277,20 +2060,13 @@ func TestHandleNodeSelector(t *testing.T) {
 	// Check pod status stored in the status map.
 	// notfittingPod should be Failed
 	status, found := kl.statusManager.GetPodStatus(notfittingPod.UID)
-	if !found {
-		t.Fatalf("status of pod %q is not found in the status map", notfittingPod.UID)
-	}
-	if status.Phase != api.PodFailed {
-		t.Fatalf("expected pod status %q. Got %q.", api.PodFailed, status.Phase)
-	}
+	require.True(t, found, "Status of pod %q is not found in the status map", notfittingPod.UID)
+	require.Equal(t, api.PodFailed, status.Phase)
+
 	// fittingPod should be Pending
 	status, found = kl.statusManager.GetPodStatus(fittingPod.UID)
-	if !found {
-		t.Fatalf("status of pod %q is not found in the status map", fittingPod.UID)
-	}
-	if status.Phase != api.PodPending {
-		t.Fatalf("expected pod status %q. Got %q.", api.PodPending, status.Phase)
-	}
+	require.True(t, found, "Status of pod %q is not found in the status map", fittingPod.UID)
+	require.Equal(t, api.PodPending, status.Phase)
 }
 
 // Tests that we handle exceeded resources correctly by setting the failed status in status map.
@@ -2332,20 +2108,13 @@ func TestHandleMemExceeded(t *testing.T) {
 	// Check pod status stored in the status map.
 	// notfittingPod should be Failed
 	status, found := kl.statusManager.GetPodStatus(notfittingPod.UID)
-	if !found {
-		t.Fatalf("status of pod %q is not found in the status map", notfittingPod.UID)
-	}
-	if status.Phase != api.PodFailed {
-		t.Fatalf("expected pod status %q. Got %q.", api.PodFailed, status.Phase)
-	}
+	require.True(t, found, "Status of pod %q is not found in the status map", notfittingPod.UID)
+	require.Equal(t, api.PodFailed, status.Phase)
+
 	// fittingPod should be Pending
 	status, found = kl.statusManager.GetPodStatus(fittingPod.UID)
-	if !found {
-		t.Fatalf("status of pod %q is not found in the status map", fittingPod.UID)
-	}
-	if status.Phase != api.PodPending {
-		t.Fatalf("expected pod status %q. Got %q.", api.PodPending, status.Phase)
-	}
+	require.True(t, found, "Status of pod %q is not found in the status map", fittingPod.UID)
+	require.Equal(t, api.PodPending, status.Phase)
 }
 
 // TODO(filipg): This test should be removed once StatusSyncer can do garbage collection without external signal.
@@ -2386,7 +2155,8 @@ func TestValidateContainerLogStatus(t *testing.T) {
 	containerName := "x"
 	testCases := []struct {
 		statuses []api.ContainerStatus
-		success  bool
+		success  bool // whether getting logs for the container should succeed.
+		pSuccess bool // whether getting logs for the previous container should succeed.
 	}{
 		{
 			statuses: []api.ContainerStatus{
@@ -2400,7 +2170,8 @@ func TestValidateContainerLogStatus(t *testing.T) {
 					},
 				},
 			},
-			success: true,
+			success:  true,
+			pSuccess: true,
 		},
 		{
 			statuses: []api.ContainerStatus{
@@ -2411,7 +2182,8 @@ func TestValidateContainerLogStatus(t *testing.T) {
 					},
 				},
 			},
-			success: true,
+			success:  true,
+			pSuccess: false,
 		},
 		{
 			statuses: []api.ContainerStatus{
@@ -2422,7 +2194,8 @@ func TestValidateContainerLogStatus(t *testing.T) {
 					},
 				},
 			},
-			success: true,
+			success:  true,
+			pSuccess: false,
 		},
 		{
 			statuses: []api.ContainerStatus{
@@ -2433,7 +2206,8 @@ func TestValidateContainerLogStatus(t *testing.T) {
 					},
 				},
 			},
-			success: false,
+			success:  false,
+			pSuccess: false,
 		},
 		{
 			statuses: []api.ContainerStatus{
@@ -2442,7 +2216,8 @@ func TestValidateContainerLogStatus(t *testing.T) {
 					State: api.ContainerState{Waiting: &api.ContainerStateWaiting{Reason: "ErrImagePull"}},
 				},
 			},
-			success: false,
+			success:  false,
+			pSuccess: false,
 		},
 		{
 			statuses: []api.ContainerStatus{
@@ -2451,46 +2226,32 @@ func TestValidateContainerLogStatus(t *testing.T) {
 					State: api.ContainerState{Waiting: &api.ContainerStateWaiting{Reason: "ErrImagePullBackOff"}},
 				},
 			},
-			success: false,
+			success:  false,
+			pSuccess: false,
 		},
 	}
 
 	for i, tc := range testCases {
-		_, err := kubelet.validateContainerLogStatus("podName", &api.PodStatus{
-			ContainerStatuses: tc.statuses,
-		}, containerName, false)
-		if tc.success {
-			if err != nil {
-				t.Errorf("[case %d]: unexpected failure - %v", i, err)
-			}
-		} else if err == nil {
-			t.Errorf("[case %d]: unexpected success", i)
+		// Access the log of the most recent container
+		previous := false
+		podStatus := &api.PodStatus{ContainerStatuses: tc.statuses}
+		_, err := kubelet.validateContainerLogStatus("podName", podStatus, containerName, previous)
+		if !tc.success {
+			assert.Error(t, err, "[case %d] error", i)
+		} else {
+			assert.NoError(t, err, "[case %d] error", i)
 		}
-	}
-	if _, err := kubelet.validateContainerLogStatus("podName", &api.PodStatus{
-		ContainerStatuses: testCases[0].statuses,
-	}, "blah", false); err == nil {
-		t.Errorf("expected error with invalid container name")
-	}
-	if _, err := kubelet.validateContainerLogStatus("podName", &api.PodStatus{
-		ContainerStatuses: testCases[0].statuses,
-	}, containerName, true); err != nil {
-		t.Errorf("unexpected error with for previous terminated container - %v", err)
-	}
-	if _, err := kubelet.validateContainerLogStatus("podName", &api.PodStatus{
-		ContainerStatuses: testCases[0].statuses,
-	}, containerName, false); err != nil {
-		t.Errorf("unexpected error with for most recent container - %v", err)
-	}
-	if _, err := kubelet.validateContainerLogStatus("podName", &api.PodStatus{
-		ContainerStatuses: testCases[1].statuses,
-	}, containerName, true); err == nil {
-		t.Errorf("expected error with for previous terminated container")
-	}
-	if _, err := kubelet.validateContainerLogStatus("podName", &api.PodStatus{
-		ContainerStatuses: testCases[1].statuses,
-	}, containerName, false); err != nil {
-		t.Errorf("unexpected error with for most recent container")
+		// Access the log of the previous, terminated container
+		previous = true
+		_, err = kubelet.validateContainerLogStatus("podName", podStatus, containerName, previous)
+		if !tc.pSuccess {
+			assert.Error(t, err, "[case %d] error", i)
+		} else {
+			assert.NoError(t, err, "[case %d] error", i)
+		}
+		// Access the log of a container that's not in the pod
+		_, err = kubelet.validateContainerLogStatus("podName", podStatus, "blah", false)
+		assert.Error(t, err, "[case %d] invalid container name should cause an error", i)
 	}
 }
 
@@ -2533,16 +2294,10 @@ func TestCreateMirrorPod(t *testing.T) {
 			podStatus:  &kubecontainer.PodStatus{},
 			updateType: updateType,
 		})
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
+		assert.NoError(t, err)
 		podFullName := kubecontainer.GetPodFullName(pod)
-		if !manager.HasPod(podFullName) {
-			t.Errorf("expected mirror pod %q to be created", podFullName)
-		}
-		if manager.NumOfPods() != 1 || !manager.HasPod(podFullName) {
-			t.Errorf("expected one mirror pod %q, got %v", podFullName, manager.GetPods())
-		}
+		assert.True(t, manager.HasPod(podFullName), "Expected mirror pod %q to be created", podFullName)
+		assert.Equal(t, 1, manager.NumOfPods(), "Expected only 1 mirror pod %q, got %+v", podFullName, manager.GetPods())
 	}
 }
 
@@ -2580,9 +2335,7 @@ func TestDeleteOutdatedMirrorPod(t *testing.T) {
 		podStatus:  &kubecontainer.PodStatus{},
 		updateType: kubetypes.SyncPodUpdate,
 	})
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	assert.NoError(t, err)
 	name := kubecontainer.GetPodFullName(pod)
 	creates, deletes := manager.GetCounts(name)
 	if creates != 1 || deletes != 1 {
@@ -2627,9 +2380,7 @@ func TestDeleteOrphanedMirrorPods(t *testing.T) {
 	kl.podManager.SetPods(orphanPods)
 	// Sync with an empty pod list to delete all mirror pods.
 	kl.HandlePodCleanups()
-	if manager.NumOfPods() != 0 {
-		t.Errorf("expected zero mirror pods, got %v", manager.GetPods())
-	}
+	assert.Len(t, manager.GetPods(), 0, "Expected 0 mirror pods")
 	for _, pod := range orphanPods {
 		name := kubecontainer.GetPodFullName(pod)
 		creates, deletes := manager.GetCounts(name)
@@ -2708,12 +2459,8 @@ func TestGetContainerInfoForMirrorPods(t *testing.T) {
 	kubelet.podManager.SetPods(pods)
 	// Use the mirror pod UID to retrieve the stats.
 	stats, err := kubelet.GetContainerInfo("qux_ns", "5678", "foo", cadvisorReq)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	if stats == nil {
-		t.Fatalf("stats should not be nil")
-	}
+	assert.NoError(t, err)
+	require.NotNil(t, stats)
 	mockCadvisor.AssertExpectations(t)
 }
 
@@ -2748,9 +2495,7 @@ func TestHostNetworkAllowed(t *testing.T) {
 		podStatus:  &kubecontainer.PodStatus{},
 		updateType: kubetypes.SyncPodUpdate,
 	})
-	if err != nil {
-		t.Errorf("expected pod infra creation to succeed: %v", err)
-	}
+	assert.NoError(t, err, "expected pod infra creation to succeed")
 }
 
 func TestHostNetworkDisallowed(t *testing.T) {
@@ -2783,9 +2528,7 @@ func TestHostNetworkDisallowed(t *testing.T) {
 		podStatus:  &kubecontainer.PodStatus{},
 		updateType: kubetypes.SyncPodUpdate,
 	})
-	if err == nil {
-		t.Errorf("expected pod infra creation to fail")
-	}
+	assert.Error(t, err, "expected pod infra creation to fail")
 }
 
 func TestPrivilegeContainerAllowed(t *testing.T) {
@@ -2814,9 +2557,7 @@ func TestPrivilegeContainerAllowed(t *testing.T) {
 		podStatus:  &kubecontainer.PodStatus{},
 		updateType: kubetypes.SyncPodUpdate,
 	})
-	if err != nil {
-		t.Errorf("expected pod infra creation to succeed: %v", err)
-	}
+	assert.NoError(t, err, "expected pod infra creation to succeed")
 }
 
 func TestPrivilegedContainerDisallowed(t *testing.T) {
@@ -2842,9 +2583,7 @@ func TestPrivilegedContainerDisallowed(t *testing.T) {
 		podStatus:  &kubecontainer.PodStatus{},
 		updateType: kubetypes.SyncPodUpdate,
 	})
-	if err == nil {
-		t.Errorf("expected pod infra creation to fail")
-	}
+	assert.Error(t, err, "expected pod infra creation to fail")
 }
 
 func TestFilterOutTerminatedPods(t *testing.T) {
@@ -2859,9 +2598,7 @@ func TestFilterOutTerminatedPods(t *testing.T) {
 	expected := []*api.Pod{pods[2], pods[3], pods[4]}
 	kubelet.podManager.SetPods(pods)
 	actual := kubelet.filterOutTerminatedPods(pods)
-	if !reflect.DeepEqual(expected, actual) {
-		t.Errorf("expected %#v, got %#v", expected, actual)
-	}
+	assert.Equal(t, expected, actual)
 }
 
 func TestMakePortMappings(t *testing.T) {
@@ -2911,9 +2648,7 @@ func TestMakePortMappings(t *testing.T) {
 
 	for i, tt := range tests {
 		actual := makePortMappings(tt.container)
-		if !reflect.DeepEqual(tt.expectedPortMappings, actual) {
-			t.Errorf("%d: Expected: %#v, saw: %#v", i, tt.expectedPortMappings, actual)
-		}
+		assert.Equal(t, tt.expectedPortMappings, actual, "[%d]", i)
 	}
 }
 
@@ -2960,12 +2695,8 @@ func TestSyncPodsSetStatusToFailedForPodsThatRunTooLong(t *testing.T) {
 	// Let the pod worker sets the status to fail after this sync.
 	kubelet.HandlePodUpdates(pods)
 	status, found := kubelet.statusManager.GetPodStatus(pods[0].UID)
-	if !found {
-		t.Errorf("expected to found status for pod %q", pods[0].UID)
-	}
-	if status.Phase != api.PodFailed {
-		t.Fatalf("expected pod status %q, got %q.", api.PodFailed, status.Phase)
-	}
+	assert.True(t, found, "expected to found status for pod %q", pods[0].UID)
+	assert.Equal(t, api.PodFailed, status.Phase)
 }
 
 func TestSyncPodsDoesNotSetPodsThatDidNotRunTooLongToFailed(t *testing.T) {
@@ -3016,12 +2747,8 @@ func TestSyncPodsDoesNotSetPodsThatDidNotRunTooLongToFailed(t *testing.T) {
 	kubelet.podManager.SetPods(pods)
 	kubelet.HandlePodUpdates(pods)
 	status, found := kubelet.statusManager.GetPodStatus(pods[0].UID)
-	if !found {
-		t.Errorf("expected to found status for pod %q", pods[0].UID)
-	}
-	if status.Phase == api.PodFailed {
-		t.Fatalf("expected pod status to not be %q", status.Phase)
-	}
+	assert.True(t, found, "expected to found status for pod %q", pods[0].UID)
+	assert.NotEqual(t, api.PodFailed, status.Phase)
 }
 
 func podWithUidNameNs(uid types.UID, name, namespace string) *api.Pod {
@@ -3058,20 +2785,14 @@ func TestDeletePodDirsForDeletedPods(t *testing.T) {
 	// Sync to create pod directories.
 	kl.HandlePodSyncs(kl.podManager.GetPods())
 	for i := range pods {
-		if !dirExists(kl.getPodDir(pods[i].UID)) {
-			t.Errorf("expected directory to exist for pod %d", i)
-		}
+		assert.True(t, dirExists(kl.getPodDir(pods[i].UID)), "Expected directory to exist for pod %d", i)
 	}
 
 	// Pod 1 has been deleted and no longer exists.
 	kl.podManager.SetPods([]*api.Pod{pods[0]})
 	kl.HandlePodCleanups()
-	if !dirExists(kl.getPodDir(pods[0].UID)) {
-		t.Errorf("expected directory to exist for pod 0")
-	}
-	if dirExists(kl.getPodDir(pods[1].UID)) {
-		t.Errorf("expected directory to be deleted for pod 1")
-	}
+	assert.True(t, dirExists(kl.getPodDir(pods[0].UID)), "Expected directory to exist for pod 0")
+	assert.False(t, dirExists(kl.getPodDir(pods[1].UID)), "Expected directory to be deleted for pod 1")
 }
 
 func syncAndVerifyPodDir(t *testing.T, testKubelet *TestKubelet, pods []*api.Pod, podsToCheck []*api.Pod, shouldExist bool) {
@@ -3082,11 +2803,7 @@ func syncAndVerifyPodDir(t *testing.T, testKubelet *TestKubelet, pods []*api.Pod
 	kl.HandlePodCleanups()
 	for i, pod := range podsToCheck {
 		exist := dirExists(kl.getPodDir(pod.UID))
-		if shouldExist && !exist {
-			t.Errorf("expected directory to exist for pod %d", i)
-		} else if !shouldExist && exist {
-			t.Errorf("expected directory to be removed for pod %d", i)
-		}
+		assert.Equal(t, shouldExist, exist, "directory of pod %d", i)
 	}
 }
 
@@ -3167,26 +2884,11 @@ func TestGetPodsToSync(t *testing.T) {
 
 	clock.Step(1 * time.Minute)
 
-	expectedPods := []*api.Pod{pods[0], pods[2], pods[3]}
-
+	expected := []*api.Pod{pods[2], pods[3], pods[0]}
 	podsToSync := kubelet.getPodsToSync()
-
-	if len(podsToSync) == len(expectedPods) {
-		for _, expect := range expectedPods {
-			var found bool
-			for _, got := range podsToSync {
-				if expect.UID == got.UID {
-					found = true
-					break
-				}
-			}
-			if !found {
-				t.Errorf("expected pod not found: %#v", expect)
-			}
-		}
-	} else {
-		t.Errorf("expected %d pods to sync, got %d", len(expectedPods), len(podsToSync))
-	}
+	sort.Sort(podsByUID(expected))
+	sort.Sort(podsByUID(podsToSync))
+	assert.Equal(t, expected, podsToSync)
 }
 
 func TestGenerateAPIPodStatusWithSortedContainers(t *testing.T) {
@@ -3237,17 +2939,11 @@ func TestGenerateAPIPodStatusWithSortedContainers(t *testing.T) {
 	}
 }
 
-func verifyContainerStatuses(statuses []api.ContainerStatus, state, lastTerminationState map[string]api.ContainerState) error {
+func verifyContainerStatuses(t *testing.T, statuses []api.ContainerStatus, state, lastTerminationState map[string]api.ContainerState, message string) {
 	for _, s := range statuses {
-		if !reflect.DeepEqual(s.State, state[s.Name]) {
-			return fmt.Errorf("unexpected state: %s", diff.ObjectDiff(state[s.Name], s.State))
-		}
-		if !reflect.DeepEqual(s.LastTerminationState, lastTerminationState[s.Name]) {
-			return fmt.Errorf("unexpected last termination state %s", diff.ObjectDiff(
-				lastTerminationState[s.Name], s.LastTerminationState))
-		}
+		assert.Equal(t, s.State, state[s.Name], "%s: state", message)
+		assert.Equal(t, s.LastTerminationState, lastTerminationState[s.Name], "%s: last terminated state", message)
 	}
-	return nil
 }
 
 // Test generateAPIPodStatus with different reason cache and old api pod status.
@@ -3422,7 +3118,7 @@ func TestGenerateAPIPodStatusWithReasonCache(t *testing.T) {
 		pod.Status.ContainerStatuses = test.oldStatuses
 		podStatus.ContainerStatuses = test.statuses
 		apiStatus := kubelet.generateAPIPodStatus(pod, podStatus)
-		assert.NoError(t, verifyContainerStatuses(apiStatus.ContainerStatuses, test.expectedState, test.expectedLastTerminationState), "case %d", i)
+		verifyContainerStatuses(t, apiStatus.ContainerStatuses, test.expectedState, test.expectedLastTerminationState, fmt.Sprintf("case %d", i))
 	}
 
 	// Everything should be the same for init containers
@@ -3439,7 +3135,7 @@ func TestGenerateAPIPodStatusWithReasonCache(t *testing.T) {
 		if test.expectedInitState != nil {
 			expectedState = test.expectedInitState
 		}
-		assert.NoError(t, verifyContainerStatuses(apiStatus.InitContainerStatuses, expectedState, test.expectedLastTerminationState), "case %d", i)
+		verifyContainerStatuses(t, apiStatus.InitContainerStatuses, expectedState, test.expectedLastTerminationState, fmt.Sprintf("case %d", i))
 	}
 }
 
@@ -3578,7 +3274,7 @@ func TestGenerateAPIPodStatusWithDifferentRestartPolicies(t *testing.T) {
 		pod.Spec.Containers = containers
 		apiStatus := kubelet.generateAPIPodStatus(pod, podStatus)
 		expectedState, expectedLastTerminationState := test.expectedState, test.expectedLastTerminationState
-		assert.NoError(t, verifyContainerStatuses(apiStatus.ContainerStatuses, expectedState, expectedLastTerminationState), "case %d", c)
+		verifyContainerStatuses(t, apiStatus.ContainerStatuses, expectedState, expectedLastTerminationState, fmt.Sprintf("case %d", c))
 		pod.Spec.Containers = nil
 
 		// Test init containers
@@ -3590,7 +3286,7 @@ func TestGenerateAPIPodStatusWithDifferentRestartPolicies(t *testing.T) {
 		if test.expectedInitLastTerminationState != nil {
 			expectedLastTerminationState = test.expectedInitLastTerminationState
 		}
-		assert.NoError(t, verifyContainerStatuses(apiStatus.InitContainerStatuses, expectedState, expectedLastTerminationState), "case %d", c)
+		verifyContainerStatuses(t, apiStatus.InitContainerStatuses, expectedState, expectedLastTerminationState, fmt.Sprintf("case %d", c))
 		pod.Spec.InitContainers = nil
 	}
 }
@@ -3665,20 +3361,13 @@ func TestHandlePodAdditionsInvokesPodAdmitHandlers(t *testing.T) {
 	// Check pod status stored in the status map.
 	// podToReject should be Failed
 	status, found := kl.statusManager.GetPodStatus(podToReject.UID)
-	if !found {
-		t.Fatalf("status of pod %q is not found in the status map", podToReject.UID)
-	}
-	if status.Phase != api.PodFailed {
-		t.Fatalf("expected pod status %q. Got %q.", api.PodFailed, status.Phase)
-	}
+	require.True(t, found, "Status of pod %q is not found in the status map", podToAdmit.UID)
+	require.Equal(t, api.PodFailed, status.Phase)
+
 	// podToAdmit should be Pending
 	status, found = kl.statusManager.GetPodStatus(podToAdmit.UID)
-	if !found {
-		t.Fatalf("status of pod %q is not found in the status map", podToAdmit.UID)
-	}
-	if status.Phase != api.PodPending {
-		t.Fatalf("expected pod status %q. Got %q.", api.PodPending, status.Phase)
-	}
+	require.True(t, found, "Status of pod %q is not found in the status map", podToAdmit.UID)
+	require.Equal(t, api.PodPending, status.Phase)
 }
 
 // testPodSyncLoopHandler is a lifecycle.PodSyncLoopHandler that is used for testing.
@@ -3702,41 +3391,14 @@ func TestGetPodsToSyncInvokesPodSyncLoopHandlers(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	kubelet := testKubelet.kubelet
 	pods := newTestPods(5)
-	podUIDs := []types.UID{}
-	for _, pod := range pods {
-		podUIDs = append(podUIDs, pod.UID)
-	}
-	podsToSync := []*api.Pod{pods[0]}
-	kubelet.AddPodSyncLoopHandler(&testPodSyncLoopHandler{podsToSync})
-
+	expected := []*api.Pod{pods[0]}
+	kubelet.AddPodSyncLoopHandler(&testPodSyncLoopHandler{expected})
 	kubelet.podManager.SetPods(pods)
 
-	expectedPodsUID := []types.UID{pods[0].UID}
-
-	podsToSync = kubelet.getPodsToSync()
-
-	if len(podsToSync) == len(expectedPodsUID) {
-		var rightNum int
-		for _, podUID := range expectedPodsUID {
-			for _, podToSync := range podsToSync {
-				if podToSync.UID == podUID {
-					rightNum++
-					break
-				}
-			}
-		}
-		if rightNum != len(expectedPodsUID) {
-			// Just for report error
-			podsToSyncUID := []types.UID{}
-			for _, podToSync := range podsToSync {
-				podsToSyncUID = append(podsToSyncUID, podToSync.UID)
-			}
-			t.Errorf("expected pods %v to sync, got %v", expectedPodsUID, podsToSyncUID)
-		}
-
-	} else {
-		t.Errorf("expected %d pods to sync, got %d", 3, len(podsToSync))
-	}
+	podsToSync := kubelet.getPodsToSync()
+	sort.Sort(podsByUID(expected))
+	sort.Sort(podsByUID(podsToSync))
+	assert.Equal(t, expected, podsToSync)
 }
 
 // testPodSyncHandler is a lifecycle.PodSyncHandler that is used for testing.
@@ -3772,15 +3434,9 @@ func TestGenerateAPIPodStatusInvokesPodSyncHandlers(t *testing.T) {
 		Namespace: pod.Namespace,
 	}
 	apiStatus := kubelet.generateAPIPodStatus(pod, status)
-	if apiStatus.Phase != api.PodFailed {
-		t.Fatalf("Expected phase %v, but got %v", api.PodFailed, apiStatus.Phase)
-	}
-	if apiStatus.Reason != "Evicted" {
-		t.Fatalf("Expected reason %v, but got %v", "Evicted", apiStatus.Reason)
-	}
-	if apiStatus.Message != "because" {
-		t.Fatalf("Expected message %v, but got %v", "because", apiStatus.Message)
-	}
+	require.Equal(t, api.PodFailed, apiStatus.Phase)
+	require.Equal(t, "Evicted", apiStatus.Reason)
+	require.Equal(t, "because", apiStatus.Message)
 }
 
 func TestSyncPodKillPod(t *testing.T) {
@@ -3811,17 +3467,11 @@ func TestSyncPodKillPod(t *testing.T) {
 			PodTerminationGracePeriodSecondsOverride: &gracePeriodOverride,
 		},
 	})
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 	// Check pod status stored in the status map.
 	status, found := kl.statusManager.GetPodStatus(pod.UID)
-	if !found {
-		t.Fatalf("status of pod %q is not found in the status map", pod.UID)
-	}
-	if status.Phase != api.PodFailed {
-		t.Fatalf("expected pod status %q. Got %q.", api.PodFailed, status.Phase)
-	}
+	require.True(t, found, "Status of pod %q is not found in the status map", pod.UID)
+	require.Equal(t, api.PodFailed, status.Phase)
 }
 
 func waitForVolumeUnmount(
@@ -3904,3 +3554,10 @@ func runVolumeManager(kubelet *Kubelet) chan struct{} {
 	go kubelet.volumeManager.Run(kubelet.sourcesReady, stopCh)
 	return stopCh
 }
+
+// Sort pods by UID.
+type podsByUID []*api.Pod
+
+func (p podsByUID) Len() int           { return len(p) }
+func (p podsByUID) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
+func (p podsByUID) Less(i, j int) bool { return p[i].UID < p[j].UID }
