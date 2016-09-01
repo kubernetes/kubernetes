@@ -73,11 +73,15 @@ func GetPreferredDockercfgPath() string {
 	defer preferredPathLock.Unlock()
 	return preferredPath
 }
+func GetDockercfgPaths() []string {
+	return []string{GetPreferredDockercfgPath(), workingDirPath, homeDirPath, rootDirPath, homeJsonDirPath, rootJsonDirPath}
+}
 
-func ReadDockerConfigFile() (cfg DockerConfig, err error) {
-	// Try happy path first - latest config file
-	dockerConfigJsonLocations := []string{GetPreferredDockercfgPath(), workingDirPath, homeJsonDirPath, rootJsonDirPath}
-	for _, configPath := range dockerConfigJsonLocations {
+func ReadDockerConfigFile(paths []string) (cfg DockerConfig, err error) {
+	if len(paths) == 0 {
+		paths = GetDockercfgPaths()
+	}
+	for _, configPath := range paths {
 		absDockerConfigFileLocation, err := filepath.Abs(filepath.Join(configPath, configJsonFileName))
 		if err != nil {
 			glog.Errorf("while trying to canonicalize %s: %v", configPath, err)
@@ -98,11 +102,10 @@ func ReadDockerConfigFile() (cfg DockerConfig, err error) {
 			return cfg, nil
 		}
 	}
-	glog.V(4).Infof("couldn't find valid .docker/config.json after checking in %v", dockerConfigJsonLocations)
+	glog.V(4).Infof("couldn't find valid .docker/config.json after checking in %v", paths)
 
 	// Can't find latest config file so check for the old one
-	dockerConfigFileLocations := []string{GetPreferredDockercfgPath(), workingDirPath, homeDirPath, rootDirPath}
-	for _, configPath := range dockerConfigFileLocations {
+	for _, configPath := range paths {
 		absDockerConfigFileLocation, err := filepath.Abs(filepath.Join(configPath, configFileName))
 		if err != nil {
 			glog.Errorf("while trying to canonicalize %s: %v", configPath, err)
@@ -123,7 +126,7 @@ func ReadDockerConfigFile() (cfg DockerConfig, err error) {
 			return cfg, nil
 		}
 	}
-	return nil, fmt.Errorf("couldn't find valid .dockercfg after checking in %v", dockerConfigFileLocations)
+	return nil, fmt.Errorf("couldn't find valid .dockercfg after checking in %v", paths)
 }
 
 // HttpError wraps a non-StatusOK error code as an error.
