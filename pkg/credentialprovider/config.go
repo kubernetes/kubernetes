@@ -74,35 +74,22 @@ func GetPreferredDockercfgPath() string {
 	return preferredPath
 }
 
-func ReadDockerConfigFile() (cfg DockerConfig, err error) {
-	// Try happy path first - latest config file
-	dockerConfigJsonLocations := []string{GetPreferredDockercfgPath(), workingDirPath, homeJsonDirPath, rootJsonDirPath}
-	for _, configPath := range dockerConfigJsonLocations {
-		absDockerConfigFileLocation, err := filepath.Abs(filepath.Join(configPath, configJsonFileName))
-		if err != nil {
-			glog.Errorf("while trying to canonicalize %s: %v", configPath, err)
-			continue
-		}
-		glog.V(4).Infof("looking for .docker/config.json at %s", absDockerConfigFileLocation)
-		contents, err := ioutil.ReadFile(absDockerConfigFileLocation)
-		if os.IsNotExist(err) {
-			continue
-		}
-		if err != nil {
-			glog.V(4).Infof("while trying to read %s: %v", absDockerConfigFileLocation, err)
-			continue
-		}
-		cfg, err := readDockerConfigJsonFileFromBytes(contents)
-		if err == nil {
-			glog.V(4).Infof("found .docker/config.json at %s", absDockerConfigFileLocation)
-			return cfg, nil
-		}
-	}
-	glog.V(4).Infof("couldn't find valid .docker/config.json after checking in %v", dockerConfigJsonLocations)
+func DefaultDockercfgPaths() []string {
+	return []string{GetPreferredDockercfgPath(), workingDirPath, homeDirPath, rootDirPath}
+}
 
-	// Can't find latest config file so check for the old one
-	dockerConfigFileLocations := []string{GetPreferredDockercfgPath(), workingDirPath, homeDirPath, rootDirPath}
-	for _, configPath := range dockerConfigFileLocations {
+func DefaultDockerConfigJSONPaths() []string {
+	return []string{GetPreferredDockercfgPath(), workingDirPath, homeJsonDirPath, rootJsonDirPath}
+}
+
+// ReadDockercfgFile attempts to read a legacy dockercfg file from the given paths.
+// if searchPaths is empty, the default paths are used.
+func ReadDockercfgFile(searchPaths []string) (cfg DockerConfig, err error) {
+	if len(searchPaths) == 0 {
+		searchPaths = DefaultDockercfgPaths()
+	}
+
+	for _, configPath := range searchPaths {
 		absDockerConfigFileLocation, err := filepath.Abs(filepath.Join(configPath, configFileName))
 		if err != nil {
 			glog.Errorf("while trying to canonicalize %s: %v", configPath, err)
@@ -123,7 +110,46 @@ func ReadDockerConfigFile() (cfg DockerConfig, err error) {
 			return cfg, nil
 		}
 	}
-	return nil, fmt.Errorf("couldn't find valid .dockercfg after checking in %v", dockerConfigFileLocations)
+	return nil, fmt.Errorf("couldn't find valid .dockercfg after checking in %v", searchPaths)
+}
+
+// ReadDockerConfigJSONFile attempts to read a docker config.json file from the given paths.
+// if searchPaths is empty, the default paths are used.
+func ReadDockerConfigJSONFile(searchPaths []string) (cfg DockerConfig, err error) {
+	if len(searchPaths) == 0 {
+		searchPaths = DefaultDockerConfigJSONPaths()
+	}
+
+	for _, configPath := range searchPaths {
+		absDockerConfigFileLocation, err := filepath.Abs(filepath.Join(configPath, configJsonFileName))
+		if err != nil {
+			glog.Errorf("while trying to canonicalize %s: %v", configPath, err)
+			continue
+		}
+		glog.V(4).Infof("looking for .docker/config.json at %s", absDockerConfigFileLocation)
+		contents, err := ioutil.ReadFile(absDockerConfigFileLocation)
+		if os.IsNotExist(err) {
+			continue
+		}
+		if err != nil {
+			glog.V(4).Infof("while trying to read %s: %v", absDockerConfigFileLocation, err)
+			continue
+		}
+		cfg, err := readDockerConfigJsonFileFromBytes(contents)
+		if err == nil {
+			glog.V(4).Infof("found .docker/config.json at %s", absDockerConfigFileLocation)
+			return cfg, nil
+		}
+	}
+	return nil, fmt.Errorf("couldn't find valid .docker/config.json after checking in %v", searchPaths)
+}
+
+func ReadDockerConfigFile(paths []string) (cfg DockerConfig, err error) {
+	if cfg, err := ReadDockerConfigJSONFile(paths); err == nil {
+		return cfg, nil
+	}
+	// Can't find latest config file so check for the old one
+	return ReadDockercfgFile(paths)
 }
 
 // HttpError wraps a non-StatusOK error code as an error.
