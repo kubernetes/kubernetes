@@ -522,17 +522,38 @@ func (s *GenericAPIServer) InstallSwaggerAPI() {
 	swagger.RegisterSwaggerService(*s.getSwaggerConfig(), s.HandlerContainer)
 }
 
-// InstallOpenAPI installs the /swagger.json endpoint to allow new OpenAPI schema discovery.
+// InstallOpenAPI installs spec endpoints for each web service.
 func (s *GenericAPIServer) InstallOpenAPI() {
-	openAPIConfig := openapi.Config{
-		SwaggerConfig:   s.getSwaggerConfig(),
-		IgnorePrefixes:  []string{"/swaggerapi"},
-		Info:            &s.openAPIInfo,
-		DefaultResponse: &s.openAPIDefaultResponse,
+	// Install one spec per web service, an ideal client will have a ClientSet containing one client
+	// per each of these specs.
+	for _, w := range s.HandlerContainer.RegisteredWebServices() {
+		if w.RootPath() == "/swaggerapi" {
+			continue
+		}
+		info := s.openAPIInfo
+		info.Title = info.Title + " " + w.RootPath()
+		err := openapi.RegisterOpenAPIService(&openapi.Config{
+			OpenAPIServePath: w.RootPath() + "/swagger.json",
+			WebServices:      []*restful.WebService{w},
+			ProtocolList:     []string{"https"},
+			IgnorePrefixes:   []string{"/swaggerapi"},
+			Info:             &info,
+			DefaultResponse:  &s.openAPIDefaultResponse,
+		}, s.HandlerContainer)
+		if err != nil {
+			glog.Fatalf("Failed to register open api spec for %v: %v", w.RootPath(), err)
+		}
 	}
-	err := openapi.RegisterOpenAPIService(&openAPIConfig, s.HandlerContainer)
+	err := openapi.RegisterOpenAPIService(&openapi.Config{
+		OpenAPIServePath: "/swagger.json",
+		WebServices:      s.HandlerContainer.RegisteredWebServices(),
+		ProtocolList:     []string{"https"},
+		IgnorePrefixes:   []string{"/swaggerapi"},
+		Info:             &s.openAPIInfo,
+		DefaultResponse:  &s.openAPIDefaultResponse,
+	}, s.HandlerContainer)
 	if err != nil {
-		glog.Fatalf("Failed to generate open api spec: %v", err)
+		glog.Fatalf("Failed to register open api spec for root: %v", err)
 	}
 }
 

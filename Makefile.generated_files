@@ -35,7 +35,7 @@ SHELL := /bin/bash
 # This rule collects all the generated file sets into a single rule.  Other
 # rules should depend on this to ensure generated files are rebuilt.
 .PHONY: generated_files
-generated_files: gen_deepcopy gen_conversion
+generated_files: gen_deepcopy gen_conversion gen_openapi
 
 # Code-generation logic.
 #
@@ -202,10 +202,10 @@ DEEPCOPY_GEN := $(BIN_DIR)/deepcopy-gen
 ifeq ($(DBG_MAKEFILE),1)
     $(warning ***** finding all +k8s:deepcopy-gen tags)
 endif
-DEEPCOPY_DIRS := $(shell                               \
+DEEPCOPY_DIRS := $(shell                                             \
     grep --color=never -l '+k8s:deepcopy-gen=' $(ALL_K8S_TAG_FILES)  \
-        | xargs -n1 dirname                            \
-        | sort -u                                      \
+        | xargs -n1 dirname                                          \
+        | sort -u                                                    \
 )
 DEEPCOPY_FILES := $(addsuffix /$(DEEPCOPY_FILENAME), $(DEEPCOPY_DIRS))
 
@@ -286,6 +286,107 @@ $(DEEPCOPY_GEN):
 	touch $@
 
 #
+# Open-api generation
+#
+# Any package that wants open-api functions generated must include a
+# comment-tag in column 0 of one file of the form:
+#     // +k8s:openapi-gen=true
+#
+# The result file, in each pkg, of open-api generation.
+OPENAPI_BASENAME := $(GENERATED_FILE_PREFIX)openapi
+OPENAPI_FILENAME := $(OPENAPI_BASENAME).go
+
+# The tool used to generate open apis.
+OPENAPI_GEN := $(BIN_DIR)/openapi-gen
+
+# Find all the directories that request open-api generation.
+ifeq ($(DBG_MAKEFILE),1)
+    $(warning ***** finding all +k8s:openapi-gen tags)
+endif
+OPENAPI_DIRS := $(shell                                             \
+    grep --color=never -l '+k8s:openapi-gen=' $(ALL_K8S_TAG_FILES)  \
+        | xargs -n1 dirname                                         \
+        | sort -u                                                   \
+)
+
+OPENAPI_FILES := $(addsuffix /$(OPENAPI_FILENAME), $(OPENAPI_DIRS))
+
+# This rule aggregates the set of files to generate and then generates them all
+# in a single run of the tool.
+.PHONY: gen_openapi
+gen_openapi: $(OPENAPI_FILES)
+	if [[ -f $(META_DIR)/$(OPENAPI_GEN).todo ]]; then                   \
+	    ./hack/run-in-gopath.sh $(OPENAPI_GEN)                          \
+	        --v $(KUBE_VERBOSE)                                         \
+	        -i $$(cat $(META_DIR)/$(OPENAPI_GEN).todo | paste -sd, -)   \
+	        -O $(OPENAPI_BASENAME);                                     \
+	fi
+
+# For each dir in OPENAPI_DIRS, this establishes a dependency between the
+# output file and the input files that should trigger a rebuild.
+#
+# Note that this is a deps-only statement, not a full rule (see below).  This
+# has to be done in a distinct step because wildcards don't work in static
+# pattern rules.
+#
+# The '$(eval)' is needed because this has a different RHS for each LHS, and
+# would otherwise produce results that make can't parse.
+#
+# We depend on the $(GOFILES_META).stamp to detect when the set of input files
+# has changed.  This allows us to detect deleted input files.
+$(foreach dir, $(OPENAPI_DIRS), $(eval                                     \
+    $(dir)/$(OPENAPI_FILENAME): $(META_DIR)/$(dir)/$(GOFILES_META).stamp   \
+                                 $(gofiles__$(dir))                        \
+))
+
+# Unilaterally remove any leftovers from previous runs.
+$(shell rm -f $(META_DIR)/$(OPENAPI_GEN)*.todo)
+
+# How to regenerate open-api code.  We need to collect these up and trigger one
+# single run to generate definition for all types.
+$(OPENAPI_FILES): $(OPENAPI_GEN)
+	mkdir -p $$(dirname $(META_DIR)/$(OPENAPI_GEN))
+	echo $(PRJ_SRC_PATH)/$(@D) >> $(META_DIR)/$(OPENAPI_GEN).todo
+
+# This calculates the dependencies for the generator tool, so we only rebuild
+# it when needed.  It is PHONY so that it always runs, but it only updates the
+# file if the contents have actually changed.  We 'sinclude' this later.
+.PHONY: $(META_DIR)/$(OPENAPI_GEN).mk
+$(META_DIR)/$(OPENAPI_GEN).mk:
+	mkdir -p $(@D);                                        \
+	(echo -n "$(OPENAPI_GEN): ";                           \
+	 DIRECT=$$(go list -f '{{.Dir}} {{.Dir}}/*.go'         \
+	     ./cmd/libs/go2idl/openapi-gen);                   \
+	 INDIRECT=$$(go list                                   \
+	     -f '{{range .Deps}}{{.}}{{"\n"}}{{end}}'          \
+	     ./cmd/libs/go2idl/openapi-gen                     \
+	     | grep --color=never "^$(PRJ_SRC_PATH)"           \
+	     | sed 's|^$(PRJ_SRC_PATH)|./|'                    \
+	     | xargs go list -f '{{.Dir}} {{.Dir}}/*.go');     \
+	 echo $$DIRECT $$INDIRECT                              \
+	     | sed 's/ / \\=,/g'                               \
+	     | tr '=,' '\n\t';                                 \
+	) | sed "s|$$(pwd -P)/||" > $@.tmp;                    \
+	cmp -s $@.tmp $@ || cat $@.tmp > $@ && rm -f $@.tmp
+
+# Include dependency info for the generator tool.  This will cause the rule of
+# the same name to be considered and if it is updated, make will restart.
+sinclude $(META_DIR)/$(OPENAPI_GEN).mk
+
+# How to build the generator tool.  The deps for this are defined in
+# the $(OPENAPI_GEN).mk, above.
+#
+# A word on the need to touch: This rule might trigger if, for example, a
+# non-Go file was added or deleted from a directory on which this depends.
+# This target needs to be reconsidered, but Go realizes it doesn't actually
+# have to be rebuilt.  In that case, make will forever see the dependency as
+# newer than the binary, and try to rebuild it over and over.  So we touch it,
+# and make is happy.
+$(OPENAPI_GEN):
+	hack/make-rules/build.sh cmd/libs/go2idl/openapi-gen
+	touch $@
+
+#
 # Conversion generation
 #
 # Any package that wants conversion functions generated must include one or
@@ -315,11 +416,11 @@ CONVERSIONS_META := conversions.mk
 ifeq ($(DBG_MAKEFILE),1)
     $(warning ***** finding all +k8s:conversion-gen tags)
 endif
-CONVERSION_DIRS := $(shell                                \
+CONVERSION_DIRS := $(shell                                              \
     grep --color=never '^// *+k8s:conversion-gen=' $(ALL_K8S_TAG_FILES) \
-        | cut -f1 -d:                                     \
-        | xargs -n1 dirname                               \
-        | sort -u                                         \
+        | cut -f1 -d:                                                   \
+        | xargs -n1 dirname                                             \
+        | sort -u                                                       \
 )
 
 CONVERSION_FILES := $(addsuffix /$(CONVERSION_FILENAME), $(CONVERSION_DIRS))
@@ -362,11 +463,11 @@ $(foreach dir, $(CONVERSION_DIRS), $(eval           \
 $(foreach dir, $(CONVERSION_DIRS),  \
     $(META_DIR)/$(dir)/$(CONVERSIONS_META)):
 	TAGS=$$(grep --color=never -h '^// *+k8s:conversion-gen=' $</*.go   \
-	    | cut -f2- -d=                                    \
-	    | sed 's|$(PRJ_SRC_PATH)/||');                    \
-	mkdir -p $(@D);                                       \
-	echo "conversions__$< := $$(echo $${TAGS})" >$@.tmp;  \
-	cmp -s $@.tmp $@ || touch $@.stamp;                   \
+	    | cut -f2- -d=                                                  \
+	    | sed 's|$(PRJ_SRC_PATH)/||');                                  \
+	mkdir -p $(@D);                                                     \
+	echo "conversions__$< := $$(echo $${TAGS})" >$@.tmp;                \
+	cmp -s $@.tmp $@ || touch $@.stamp;                                 \
 	mv $@.tmp $@
 
 # Include any deps files as additional Makefile rules.  This triggers make to

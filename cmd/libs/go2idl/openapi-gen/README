@@ -1,0 +1,4 @@
+# Generate OpenAPI definitions
+
+- To generate definition for a specific type or package add "+k8s:openapi-gen=true" tag to the type/package comment lines.
+- To exclude a type or a member from a tagged package/type, add "+k8s:openapi-gen=false" tag to the comment lines.
