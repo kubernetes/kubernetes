@@ -24,6 +24,4 @@ type PodSecurityPolicyExpansion interface{}
 
 type ReplicaSetExpansion interface{}
 
-type StorageClassExpansion interface{}
-
 type ThirdPartyResourceExpansion interface{}
