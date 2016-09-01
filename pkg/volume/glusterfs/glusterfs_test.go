@@ -236,3 +236,58 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 		t.Errorf("Expected true for mounter.IsReadOnly")
 	}
 }
+
+func TestAnnotations(t *testing.T) {
+	// Pass a provisioningConfigs through paramToAnnotations and back through
+	// annotationsToParam and check it did not change in the process.
+	tests := []provisioningConfig{
+		{
+		// Everything empty
+		},
+		{
+			// Everything with a value
+			url:             "http://localhost",
+			userId:          "admin",
+			secretNamespace: "default",
+			secretName:      "gluster-secret",
+		},
+		{
+			// No secret
+			url:             "http://localhost",
+			userId:          "admin",
+			secretNamespace: "",
+			secretName:      "",
+		},
+	}
+
+	for i, test := range tests {
+		provisioner := &glusterfsVolumeProvisioner{
+			provisioningConfig: test,
+		}
+		deleter := &glusterfsVolumeDeleter{}
+
+		pv := &api.PersistentVolume{
+			ObjectMeta: api.ObjectMeta{
+				Name: "pv",
+			},
+		}
+
+		provisioner.paramToAnnotations(pv)
+		err := deleter.annotationsToParam(pv)
+		if err != nil {
+			t.Errorf("test %d failed: %v", i, err)
+		}
+		if test.url != deleter.url {
+			t.Errorf("test %d failed: expected url %q, got %q", i, test.url, deleter.url)
+		}
+		if test.userId != deleter.userId {
+			t.Errorf("test %d failed: expected userId %q, got %q", i, test.userId, deleter.userId)
+		}
+		if test.secretNamespace != deleter.secretNamespace {
+			t.Errorf("test %d failed: expected secretNamespace %q, got %q", i, test.secretNamespace, deleter.secretNamespace)
+		}
+		if test.secretName != deleter.secretName {
+			t.Errorf("test %d failed: expected secretName %q, got %q", i, test.secretName, deleter.secretName)
+		}
+	}
+}
