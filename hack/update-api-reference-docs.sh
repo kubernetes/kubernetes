@@ -34,7 +34,7 @@ OUTPUT=${1:-${DEFAULT_OUTPUT}}
 
 SWAGGER_SPEC_PATH="${REPO_DIR}/api/swagger-spec"
 
-GROUP_VERSIONS=("v1" "extensions/v1beta1" "batch/v1" "autoscaling/v1" "certificates/v1alpha1")
+GROUP_VERSIONS=("v1" "extensions/v1beta1" "batch/v1" "autoscaling/v1" "certificates.k8s.io/v1alpha1")
 GV_DIRS=()
 for gv in "${GROUP_VERSIONS[@]}"; do
   GV_DIRS+=("${REPO_DIR}/pkg/$(kube::util::group-version-to-pkg-path "${gv}")")
