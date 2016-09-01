@@ -77,12 +77,14 @@ var _ = framework.KubeDescribe("Summary API", func() {
 					"CapacityBytes":  fsCapacityBounds,
 					"UsedBytes":      bounded(0, 10*gb),
 					"InodesFree":     bounded(1E4, 1E8),
+					"Inodes":         bounded(1E4, 1E8),
 				}),
 				"Logs": structP(m.Fields{
 					"AvailableBytes": fsCapacityBounds,
 					"CapacityBytes":  fsCapacityBounds,
 					"UsedBytes":      bounded(kb, 10*gb),
 					"InodesFree":     bounded(1E4, 1E8),
+					"Inodes":         bounded(1E4, 1E8),
 				}),
 				"UserDefinedMetrics": BeEmpty(),
 			})
@@ -113,12 +115,14 @@ var _ = framework.KubeDescribe("Summary API", func() {
 							"CapacityBytes":  fsCapacityBounds,
 							"UsedBytes":      bounded(kb, 10*mb),
 							"InodesFree":     bounded(1E4, 1E8),
+							"Inodes":         bounded(1E4, 1E8),
 						}),
 						"Logs": structP(m.Fields{
 							"AvailableBytes": fsCapacityBounds,
 							"CapacityBytes":  fsCapacityBounds,
 							"UsedBytes":      bounded(kb, 10*mb),
 							"InodesFree":     bounded(1E4, 1E8),
+							"Inodes":         bounded(1E4, 1E8),
 						}),
 						"UserDefinedMetrics": BeEmpty(),
 					}),
@@ -138,6 +142,7 @@ var _ = framework.KubeDescribe("Summary API", func() {
 							"CapacityBytes":  fsCapacityBounds,
 							"UsedBytes":      bounded(kb, 1*mb),
 							"InodesFree":     BeNil(),
+							"Inodes":         bounded(1E4, 1E8),
 						}),
 					}),
 				}),
@@ -179,6 +184,7 @@ var _ = framework.KubeDescribe("Summary API", func() {
 						"CapacityBytes":  fsCapacityBounds,
 						"UsedBytes":      bounded(kb, 10*gb),
 						"InodesFree":     bounded(1E4, 1E8),
+						"Inodes":         bounded(1E4, 1E8),
 					}),
 					"Runtime": structP(m.Fields{
 						"ImageFs": structP(m.Fields{
@@ -186,6 +192,7 @@ var _ = framework.KubeDescribe("Summary API", func() {
 							"CapacityBytes":  fsCapacityBounds,
 							"UsedBytes":      bounded(kb, 10*gb),
 							"InodesFree":     bounded(1E4, 1E8),
+							"Inodes":         bounded(1E4, 1E8),
 						}),
 					}),
 				}),
