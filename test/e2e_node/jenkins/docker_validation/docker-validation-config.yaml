@@ -1,0 +1,5 @@
+images:
+  gci-canary:
+    image_regex: gci-test-*
+    project: container-vm-image-staging
+    metadata: "user-data<test/e2e_node/jenkins/gci-init.yaml"
