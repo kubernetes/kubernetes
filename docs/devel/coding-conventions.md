@@ -51,7 +51,7 @@ Updated: 5/3/2016
 
   - Bash
 
-    - https://google-styleguide.googlecode.com/svn/trunk/shell.xml
+    - https://google.github.io/styleguide/shell.xml
 
     - Ensure that build, release, test, and cluster-management scripts run on
 OS X
