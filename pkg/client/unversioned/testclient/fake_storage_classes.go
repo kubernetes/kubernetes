@@ -18,7 +18,7 @@ package testclient
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/storage"
 	kclientlib "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -26,46 +26,46 @@ import (
 // FakeStorageClasses implements StorageClassInterface. Meant to be embedded into a struct to get a default
 // implementation. This makes faking out just the method you want to test easier.
 type FakeStorageClasses struct {
-	Fake *FakeExperimental
+	Fake *FakeStorage
 }
 
 // Ensure statically that FakeStorageClasses implements StorageClassInterface.
 var _ kclientlib.StorageClassInterface = &FakeStorageClasses{}
 
-func (c *FakeStorageClasses) Get(name string) (*extensions.StorageClass, error) {
-	obj, err := c.Fake.Invokes(NewGetAction("storageclasses", "", name), &extensions.StorageClass{})
+func (c *FakeStorageClasses) Get(name string) (*storage.StorageClass, error) {
+	obj, err := c.Fake.Invokes(NewGetAction("storageclasses", "", name), &storage.StorageClass{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*extensions.StorageClass), err
+	return obj.(*storage.StorageClass), err
 }
 
-func (c *FakeStorageClasses) List(opts api.ListOptions) (*extensions.StorageClassList, error) {
-	obj, err := c.Fake.Invokes(NewListAction("storageclasses", "", opts), &extensions.StorageClassList{})
+func (c *FakeStorageClasses) List(opts api.ListOptions) (*storage.StorageClassList, error) {
+	obj, err := c.Fake.Invokes(NewListAction("storageclasses", "", opts), &storage.StorageClassList{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*extensions.StorageClassList), err
+	return obj.(*storage.StorageClassList), err
 }
 
-func (c *FakeStorageClasses) Create(np *extensions.StorageClass) (*extensions.StorageClass, error) {
-	obj, err := c.Fake.Invokes(NewCreateAction("storageclasses", "", np), &extensions.StorageClass{})
+func (c *FakeStorageClasses) Create(np *storage.StorageClass) (*storage.StorageClass, error) {
+	obj, err := c.Fake.Invokes(NewCreateAction("storageclasses", "", np), &storage.StorageClass{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*extensions.StorageClass), err
+	return obj.(*storage.StorageClass), err
 }
 
-func (c *FakeStorageClasses) Update(np *extensions.StorageClass) (*extensions.StorageClass, error) {
-	obj, err := c.Fake.Invokes(NewUpdateAction("storageclasses", "", np), &extensions.StorageClass{})
+func (c *FakeStorageClasses) Update(np *storage.StorageClass) (*storage.StorageClass, error) {
+	obj, err := c.Fake.Invokes(NewUpdateAction("storageclasses", "", np), &storage.StorageClass{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*extensions.StorageClass), err
+	return obj.(*storage.StorageClass), err
 }
 
 func (c *FakeStorageClasses) Delete(name string) error {
-	_, err := c.Fake.Invokes(NewDeleteAction("storageclasses", "", name), &extensions.StorageClass{})
+	_, err := c.Fake.Invokes(NewDeleteAction("storageclasses", "", name), &storage.StorageClass{})
 	return err
 }
 

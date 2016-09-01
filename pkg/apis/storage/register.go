@@ -14,18 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package extensions
+package storage
 
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/apis/autoscaling"
-	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
 // GroupName is the group name use in this package
-const GroupName = "extensions"
+const GroupName = "storage.k8s.io"
 
 // SchemeGroupVersion is group version used to register these objects
 var SchemeGroupVersion = unversioned.GroupVersion{Group: GroupName, Version: runtime.APIVersionInternal}
@@ -45,37 +43,14 @@ var (
 	AddToScheme   = SchemeBuilder.AddToScheme
 )
 
-// Adds the list of known types to api.Scheme.
 func addKnownTypes(scheme *runtime.Scheme) error {
-	// TODO this gets cleaned up when the types are fixed
 	scheme.AddKnownTypes(SchemeGroupVersion,
-		&Deployment{},
-		&DeploymentList{},
-		&DeploymentRollback{},
-		&autoscaling.HorizontalPodAutoscaler{},
-		&autoscaling.HorizontalPodAutoscalerList{},
-		&batch.Job{},
-		&batch.JobList{},
-		&batch.JobTemplate{},
-		&ReplicationControllerDummy{},
-		&Scale{},
-		&ThirdPartyResource{},
-		&ThirdPartyResourceList{},
-		&DaemonSetList{},
-		&DaemonSet{},
-		&ThirdPartyResourceData{},
-		&ThirdPartyResourceDataList{},
-		&Ingress{},
-		&IngressList{},
 		&api.ListOptions{},
 		&api.DeleteOptions{},
-		&ReplicaSet{},
-		&ReplicaSetList{},
 		&api.ExportOptions{},
-		&PodSecurityPolicy{},
-		&PodSecurityPolicyList{},
-		&NetworkPolicy{},
-		&NetworkPolicyList{},
+
+		&StorageClass{},
+		&StorageClassList{},
 	)
 	return nil
 }

@@ -24,46 +24,27 @@ import (
 )
 
 // GroupName is the group name use in this package
-const GroupName = "extensions"
+const GroupName = "storage.k8s.io"
 
 // SchemeGroupVersion is group version used to register these objects
 var SchemeGroupVersion = unversioned.GroupVersion{Group: GroupName, Version: "v1beta1"}
 
 var (
-	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes, addDefaultingFuncs, addConversionFuncs)
+	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)
 	AddToScheme   = SchemeBuilder.AddToScheme
 )
 
 // Adds the list of known types to api.Scheme.
 func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
-		&Deployment{},
-		&DeploymentList{},
-		&DeploymentRollback{},
-		&HorizontalPodAutoscaler{},
-		&HorizontalPodAutoscalerList{},
-		&Job{},
-		&JobList{},
-		&ReplicationControllerDummy{},
-		&Scale{},
-		&ThirdPartyResource{},
-		&ThirdPartyResourceList{},
-		&DaemonSetList{},
-		&DaemonSet{},
-		&ThirdPartyResourceData{},
-		&ThirdPartyResourceDataList{},
-		&Ingress{},
-		&IngressList{},
-		&ListOptions{},
+		&v1.ListOptions{},
 		&v1.DeleteOptions{},
-		&ReplicaSet{},
-		&ReplicaSetList{},
-		&PodSecurityPolicy{},
-		&PodSecurityPolicyList{},
-		&NetworkPolicy{},
-		&NetworkPolicyList{},
+		&v1.ExportOptions{},
+
+		&StorageClass{},
+		&StorageClassList{},
 	)
-	// Add the watch version that applies
+
 	versionedwatch.AddToGroupVersion(scheme, SchemeGroupVersion)
 	return nil
 }
