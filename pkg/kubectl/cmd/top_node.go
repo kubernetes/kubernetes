@@ -107,11 +107,7 @@ func (o *TopNodeOptions) Validate() error {
 }
 
 func (o TopNodeOptions) RunTopNode() error {
-	metrics, err := o.Client.GetNodeMetrics(o.ResourceName, o.Selector)
-	if err != nil {
-		return err
-	}
-
+	var err error
 	selector := labels.Everything()
 	if len(o.Selector) > 0 {
 		selector, err = labels.Parse(o.Selector)
@@ -119,6 +115,11 @@ func (o TopNodeOptions) RunTopNode() error {
 			return err
 		}
 	}
+	metrics, err := o.Client.GetNodeMetrics(o.ResourceName, selector)
+	if err != nil {
+		return err
+	}
+
 	var nodes []api.Node
 	if len(o.ResourceName) > 0 {
 		node, err := o.Client.Nodes().Get(o.ResourceName)
