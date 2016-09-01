@@ -23,6 +23,9 @@ import (
 	"strconv"
 	"strings"
 
+	"k8s.io/kubernetes/cmd/libs/go2idl/openapi-gen/generators/common"
+
+	"github.com/go-openapi/spec"
 	"github.com/google/gofuzz"
 )
 
@@ -34,6 +37,7 @@ import (
 //
 // +protobuf=true
 // +protobuf.options.(gogoproto.goproto_stringer)=false
+// +k8s:openapi-gen=true
 type IntOrString struct {
 	Type   Type   `protobuf:"varint,1,opt,name=type,casttype=Type"`
 	IntVal int32  `protobuf:"varint,2,opt,name=intVal"`
@@ -98,6 +102,17 @@ func (intstr IntOrString) MarshalJSON() ([]byte, error) {
 		return json.Marshal(intstr.StrVal)
 	default:
 		return []byte{}, fmt.Errorf("impossible IntOrString.Type")
+	}
+}
+
+func (_ IntOrString) OpenAPIDefinition() common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Type:   []string{"string"},
+				Format: "int-or-string",
+			},
+		},
 	}
 }
 
