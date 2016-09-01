@@ -28,7 +28,7 @@ import (
 )
 
 // RegisterFakeWatch adds a new fake watcher for the specified resource in the given fake client.
-// All subsequent requrest for watch on the client will result in returning this fake watcher.
+// All subsequent requests for a watch on the client will result in returning this fake watcher.
 func RegisterFakeWatch(resource string, client *core.Fake) *watch.FakeWatcher {
 	watcher := watch.NewFake()
 	client.AddWatchReactor(resource, func(action core.Action) (bool, watch.Interface, error) { return true, watcher, nil })
@@ -43,8 +43,8 @@ func RegisterFakeList(resource string, client *core.Fake, obj runtime.Object) {
 	})
 }
 
-// RegisterFakeCopyOnCreate register a reactor in the given fake client that passes
-// all created object to the given watcher and also copies them to a channel for
+// RegisterFakeCopyOnCreate registers a reactor in the given fake client that passes
+// all created objects to the given watcher and also copies them to a channel for
 // in-test inspection.
 func RegisterFakeCopyOnCreate(resource string, client *core.Fake, watcher *watch.FakeWatcher) chan runtime.Object {
 	objChan := make(chan runtime.Object, 100)
@@ -60,8 +60,8 @@ func RegisterFakeCopyOnCreate(resource string, client *core.Fake, watcher *watch
 	return objChan
 }
 
-// RegisterFakeCopyOnCreate register a reactor in the given fake client that passes
-// all updated object to the given watcher and also copies them to a channel for
+// RegisterFakeCopyOnCreate registers a reactor in the given fake client that passes
+// all updated objects to the given watcher and also copies them to a channel for
 // in-test inspection.
 func RegisterFakeCopyOnUpdate(resource string, client *core.Fake, watcher *watch.FakeWatcher) chan runtime.Object {
 	objChan := make(chan runtime.Object, 100)
@@ -93,7 +93,7 @@ func ToFederatedInformerForTestOnly(informer util.FederatedInformer) util.Federa
 	return inter.(util.FederatedInformerForTestOnly)
 }
 
-// NewCluster build a new cluster object.
+// NewCluster builds a new cluster object.
 func NewCluster(name string, readyStatus api_v1.ConditionStatus) *federation_api.Cluster {
 	return &federation_api.Cluster{
 		ObjectMeta: api_v1.ObjectMeta{
