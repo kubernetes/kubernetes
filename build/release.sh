@@ -27,10 +27,16 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/build/common.sh"
 
 KUBE_RELEASE_RUN_TESTS=${KUBE_RELEASE_RUN_TESTS-y}
+KUBE_RELEASE_DO_COMPILE=${KUBE_RELEASE_DO_COMPILE-y}
 
 kube::build::verify_prereqs
-kube::build::build_image
-kube::build::run_build_command make cross
+
+if [[ $KUBE_RELEASE_DO_COMPILE =~ ^[yY]$ ]]; then
+    kube::build::build_image
+    kube::build::run_build_command make cross
+else
+    kube::version::get_version_vars
+fi
 
 if [[ $KUBE_RELEASE_RUN_TESTS =~ ^[yY]$ ]]; then
   kube::build::run_build_command make test
@@ -44,7 +50,9 @@ if [[ "${FEDERATION:-}" == "true" ]];then
 	kube::release::semantic_image_tag_version > "${KUBE_ROOT}/federation/manifests/federated-image.tag"
     )
 fi
+if [[ $KUBE_RELEASE_DO_COMPILE =~ ^[yY]$ ]]; then
+    kube::build::copy_output
+fi
 
-kube::build::copy_output
 kube::release::package_tarballs
 kube::release::package_hyperkube
