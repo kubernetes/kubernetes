@@ -434,6 +434,8 @@ type PersistentVolumeList struct {
 	Items []PersistentVolume `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
+// +genclient=true
+
 // PersistentVolumeClaim is a user's request for and claim to a persistent volume
 type PersistentVolumeClaim struct {
 	unversioned.TypeMeta `json:",inline"`
