@@ -89,6 +89,7 @@ func InitializeWatchCacheSizes(expectedRAMCapacityMB int) {
 	watchCacheSizes[Endpoints] = maxInt(10*clusterSize, 1000)
 	watchCacheSizes[Nodes] = maxInt(3*clusterSize, 1000)
 	watchCacheSizes[Pods] = maxInt(10*clusterSize, 1000)
+	watchCacheSizes[Services] = maxInt(5*clusterSize, 1000)
 }
 
 func SetWatchCacheSizes(cacheSizes []string) {
