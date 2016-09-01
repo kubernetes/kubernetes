@@ -74,9 +74,9 @@ func GetPreferredDockercfgPath() string {
 	return preferredPath
 }
 
-func ReadDockerConfigFile() (cfg DockerConfig, err error) {
+func ReadDockerConfigFile(firstDockercfgPath string) (cfg DockerConfig, err error) {
 	// Try happy path first - latest config file
-	dockerConfigJsonLocations := []string{GetPreferredDockercfgPath(), workingDirPath, homeJsonDirPath, rootJsonDirPath}
+	dockerConfigJsonLocations := []string{firstDockercfgPath, GetPreferredDockercfgPath(), workingDirPath, homeJsonDirPath, rootJsonDirPath}
 	for _, configPath := range dockerConfigJsonLocations {
 		absDockerConfigFileLocation, err := filepath.Abs(filepath.Join(configPath, configJsonFileName))
 		if err != nil {
@@ -101,7 +101,7 @@ func ReadDockerConfigFile() (cfg DockerConfig, err error) {
 	glog.V(4).Infof("couldn't find valid .docker/config.json after checking in %v", dockerConfigJsonLocations)
 
 	// Can't find latest config file so check for the old one
-	dockerConfigFileLocations := []string{GetPreferredDockercfgPath(), workingDirPath, homeDirPath, rootDirPath}
+	dockerConfigFileLocations := []string{firstDockercfgPath, GetPreferredDockercfgPath(), workingDirPath, homeDirPath, rootDirPath}
 	for _, configPath := range dockerConfigFileLocations {
 		absDockerConfigFileLocation, err := filepath.Abs(filepath.Join(configPath, configFileName))
 		if err != nil {

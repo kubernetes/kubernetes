@@ -83,7 +83,8 @@ func (d *defaultDockerConfigProvider) Enabled() bool {
 // Provide implements dockerConfigProvider
 func (d *defaultDockerConfigProvider) Provide() DockerConfig {
 	// Read the standard Docker credentials from .dockercfg
-	if cfg, err := ReadDockerConfigFile(); err == nil {
+	firstDockerconfigPath := ""
+	if cfg, err := ReadDockerConfigFile(firstDockerconfigPath); err == nil {
 		return cfg
 	} else if !os.IsNotExist(err) {
 		glog.V(4).Infof("Unable to parse Docker config file: %v", err)
