@@ -32,6 +32,7 @@ import (
 	"github.com/ghodss/yaml"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
 	"k8s.io/kubernetes/pkg/client/restclient"
@@ -440,6 +441,17 @@ func TestServiceAlloc(t *testing.T) {
 				},
 			},
 		}
+	}
+
+	// Wait until the default "kubernetes" service is created.
+	if err = wait.Poll(250*time.Millisecond, time.Minute, func() (bool, error) {
+		_, err := client.Services(api.NamespaceDefault).Get("kubernetes")
+		if err != nil && !errors.IsNotFound(err) {
+			return false, err
+		}
+		return !errors.IsNotFound(err), nil
+	}); err != nil {
+		t.Fatalf("creating kubernetes service timed out")
 	}
 
 	// Make a service.
