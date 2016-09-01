@@ -19,6 +19,7 @@ package framework
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -38,6 +39,7 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+	"text/tabwriter"
 	"time"
 
 	"k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_4"
@@ -482,6 +484,30 @@ func logPodStates(pods []api.Pod) {
 	Logf("") // Final empty line helps for readability.
 }
 
+// errorBadPodsStates create error message of basic info of bad pods for debugging.
+func errorBadPodsStates(badPods []api.Pod, desiredPods int, ns string, timeout time.Duration) string {
+	errStr := fmt.Sprintf("%d / %d pods in namespace %q are NOT in the desired state in %v\n", len(badPods), desiredPods, ns, timeout)
+	// Pirnt bad pods info only if there are fewer than 10 bad pods
+	if len(badPods) > 10 {
+		return errStr + "There are too many bad pods. Please check log for details."
+	}
+
+	buf := bytes.NewBuffer(nil)
+	w := tabwriter.NewWriter(buf, 0, 0, 1, ' ', 0)
+	fmt.Fprintln(w, "POD\tNODE\tPHASE\tGRACE\tCONDITIONS")
+	for _, badPod := range badPods {
+		grace := ""
+		if badPod.DeletionGracePeriodSeconds != nil {
+			grace = fmt.Sprintf("%ds", *badPod.DeletionGracePeriodSeconds)
+		}
+		podInfo := fmt.Sprintf("%s\t%s\t%s\t%s\t%s",
+			badPod.ObjectMeta.Name, badPod.Spec.NodeName, badPod.Status.Phase, grace, badPod.Status.Conditions)
+		fmt.Fprintln(w, podInfo)
+	}
+	w.Flush()
+	return errStr + buf.String()
+}
+
 // PodRunningReady checks whether pod p's phase is running and it has a ready
 // condition of status true.
 func PodRunningReady(p *api.Pod) (bool, error) {
@@ -586,6 +612,8 @@ func WaitForPodsRunningReady(c *client.Client, ns string, minPods int32, timeout
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	var waitForSuccessError error
+	badPods := []api.Pod{}
+	desiredPods := 0
 	go func() {
 		waitForSuccessError = WaitForPodsSuccess(c, ns, ignoreLabels, timeout)
 		wg.Done()
@@ -610,7 +638,9 @@ func WaitForPodsRunningReady(c *client.Client, ns string, minPods int32, timeout
 			Logf("Error getting pods in namespace '%s': %v", ns, err)
 			return false, nil
 		}
-		nOk, replicaOk, badPods := int32(0), int32(0), []api.Pod{}
+		nOk, replicaOk := int32(0), int32(0)
+		badPods = []api.Pod{}
+		desiredPods = len(podList.Items)
 		for _, pod := range podList.Items {
 			if len(ignoreLabels) != 0 && ignoreSelector.Matches(labels.Set(pod.Labels)) {
 				Logf("%v in state %v, ignoring", pod.Name, pod.Status.Phase)
@@ -643,7 +673,7 @@ func WaitForPodsRunningReady(c *client.Client, ns string, minPods int32, timeout
 		logPodStates(badPods)
 		return false, nil
 	}) != nil {
-		return fmt.Errorf("Not all pods in namespace '%s' running and ready within %v", ns, timeout)
+		return errors.New(errorBadPodsStates(badPods, desiredPods, ns, timeout))
 	}
 	wg.Wait()
 	if waitForSuccessError != nil {
