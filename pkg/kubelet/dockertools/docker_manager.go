@@ -652,7 +652,7 @@ func (dm *DockerManager) runContainer(
 			CPUShares:  cpuShares,
 			Devices:    devices,
 		},
-		SecurityOpt: securityOpts,
+		SecurityOpt: fmtSecurityOpts,
 	}
 
 	// Set sysctls if requested
