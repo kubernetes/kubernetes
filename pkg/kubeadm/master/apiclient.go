@@ -35,17 +35,17 @@ func CreateClientAndWaitForAPI(adminConfig *clientcmdapi.Config) (*clientset.Cli
 		&clientcmd.ConfigOverrides{},
 	).ClientConfig()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("<master/apiclient> failed to create API client configuration [%s]", err)
 	}
 
-	fmt.Println("configuring the client...")
+	fmt.Println("<master/apiclient> created API client configuration")
 
 	client, err := clientset.NewForConfig(adminClientConfig)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("<master/apiclient> failed to create API client [%s]", err)
 	}
 
-	fmt.Println("polling API server forever...")
+	fmt.Println("<master/apiclient> created API client, waiting for the control plane to become ready")
 
 	start := time.Now()
 	wait.PollInfinite(500*time.Millisecond, func() (bool, error) {
@@ -54,19 +54,19 @@ func CreateClientAndWaitForAPI(adminConfig *clientcmdapi.Config) (*clientset.Cli
 			return false, nil
 		}
 		if len(cs.Items) < 3 {
-			fmt.Println("Not all control plane components had been deployed yet")
+			fmt.Println("<master/apiclient> not all control plane components are ready yet")
 			return false, nil
 		}
 		for _, item := range cs.Items {
 			for _, condition := range item.Conditions {
 				if condition.Type != api.ComponentHealthy {
-					fmt.Printf("Control plane component %q is still unhealthy: %#v\n", item.ObjectMeta.Name, item.Conditions)
+					fmt.Printf("<master/apiclient> control plane component %q is still unhealthy: %#v\n", item.ObjectMeta.Name, item.Conditions)
 					return false, nil
 				}
 			}
 		}
 
-		fmt.Printf("All control plane components are healthy now (took %s seconds)\n", time.Since(start).Seconds())
+		fmt.Printf("<master/apiclient> all control plane components are healthy after %s seconds\n", time.Since(start).Seconds())
 		return true, nil
 	})
 

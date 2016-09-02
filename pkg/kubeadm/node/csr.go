@@ -57,28 +57,29 @@ func PerformTLSBootstrap(params *kubeadmapi.BootstrapParams, apiEndpoint string,
 		&clientcmd.ConfigOverrides{},
 	).ClientConfig()
 	if err != nil {
-		return nil, fmt.Errorf("<node/csr> failed to create an API client configuration [%s]", err)
+		return nil, fmt.Errorf("<node/csr> failed to create API client configuration [%s]", err)
 	}
-	//fmt.Printf("loaded bootstrap client configuration: %#v\n", bootstrapClientConfig)
 
-	//fmt.Println("creating CSR...")
 	client, err := unversionedcertificates.NewForConfig(bootstrapClientConfig)
 	if err != nil {
-		return nil, fmt.Errorf("<node/csr> failed to create an API client [%s]", err)
+		return nil, fmt.Errorf("<node/csr> failed to create API client [%s]", err)
 	}
 	csrClient := client.CertificateSigningRequests()
+
+	fmt.Println("<node/csr> created API client to obtain unique certificate for this node, generating keys and certificate signing request")
 
 	keyData, err := utilcertificates.GeneratePrivateKey()
 	if err != nil {
 		return nil, fmt.Errorf("<node/csr> failed to generating private key [%s]", err)
 	}
-	//fmt.Println("CSR created, asking the API server to sign it...")
-	// Pass 'requestClientCertificate()' the CSR client, existing key data, and node name to
-	// request for client certificate from the API server.
+
 	certData, err := kubeletapp.RequestClientCertificate(csrClient, keyData, nodeName)
 	if err != nil {
 		return nil, fmt.Errorf("<node/csr> failed to request signed certificate from the API server [%s]", err)
 	}
+
+	// TODO print some basic info about the cert
+	fmt.Println("<node/csr> received signed certificate from the API server, generating kubelet configuration")
 
 	finalConfig := kubeadmutil.MakeClientConfigWithCerts(
 		bareClientConfig, "kubernetes", fmt.Sprintf("kubelet-%s", nodeName),

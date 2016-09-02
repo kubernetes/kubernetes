@@ -82,8 +82,12 @@ func CreateEssentialAddons(params *kubeadmapi.BootstrapParams, client *clientset
 	kubeProxyDaemonSet := NewDaemonSet("kube-proxy", createKubeProxyPodSpec(params))
 
 	if _, err := client.Extensions().DaemonSets(api.NamespaceSystem).Create(kubeProxyDaemonSet); err != nil {
-		return fmt.Errorf("<master/addons> failed creating kube-proxy addon [%s]", err)
+		return fmt.Errorf("<master/addons> failed creating essential kube-proxy addon [%s]", err)
 	}
+
+	fmt.Println("<master/addons> created essential addon: kube-proxy")
+
+	// TODO should we wait for it to become ready at least on the master?
 
 	return nil
 }

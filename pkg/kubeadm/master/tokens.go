@@ -33,7 +33,11 @@ func generateTokenIfNeeded(params *kubeadmapi.BootstrapParams) error {
 		if err != nil {
 			return err
 		}
-		return kubeadmutil.GenerateToken(params)
+		err = kubeadmutil.GenerateToken(params)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("<master/tokens> generated token: %q\n", params.Discovery.GivenToken)
 	}
 
 	return nil
@@ -49,7 +53,7 @@ func CreateTokenAuthFile(params *kubeadmapi.BootstrapParams) error {
 	}
 	serialized := []byte(fmt.Sprintf("%s,kubeadm-node-csr,%s,system:kubelet-bootstrap\n", params.Discovery.BearerToken, uuid.NewUUID()))
 	if err := cmdutil.DumpReaderToFile(bytes.NewReader(serialized), tokenAuthFilePath); err != nil {
-		return fmt.Errorf("<master/tokens> failed to save token authenticatio file (%q) [%s]", tokenAuthFilePath, err)
+		return fmt.Errorf("<master/tokens> failed to save token auth file (%q) [%s]", tokenAuthFilePath, err)
 	}
 	return nil
 }
