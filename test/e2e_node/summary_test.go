@@ -69,23 +69,12 @@ var _ = framework.KubeDescribe("Summary API", func() {
 					"UsageBytes":      bounded(10*mb, 1*gb),
 					"WorkingSetBytes": bounded(10*mb, 1*gb),
 					"RSSBytes":        bounded(10*mb, 1*gb),
-					"PageFaults":      bounded(100000, 1E9),
+					"PageFaults":      bounded(1000, 1E9),
 					"MajorPageFaults": bounded(0, 100000),
 				}),
-				"Rootfs": structP(m.Fields{
-					"AvailableBytes": fsCapacityBounds,
-					"CapacityBytes":  fsCapacityBounds,
-					"UsedBytes":      bounded(0, 10*gb),
-					"InodesFree":     bounded(1E4, 1E8),
-					"Inodes":         bounded(1E4, 1E8),
-				}),
-				"Logs": structP(m.Fields{
-					"AvailableBytes": fsCapacityBounds,
-					"CapacityBytes":  fsCapacityBounds,
-					"UsedBytes":      bounded(kb, 10*gb),
-					"InodesFree":     bounded(1E4, 1E8),
-					"Inodes":         bounded(1E4, 1E8),
-				}),
+				// TODO(#31999): Don't report FS stats for system containers.
+				"Rootfs":             m.Ignore(),
+				"Logs":               m.Ignore(),
 				"UserDefinedMetrics": BeEmpty(),
 			})
 			// Expectations for pods.
@@ -142,7 +131,7 @@ var _ = framework.KubeDescribe("Summary API", func() {
 							"CapacityBytes":  fsCapacityBounds,
 							"UsedBytes":      bounded(kb, 1*mb),
 							"InodesFree":     BeNil(),
-							"Inodes":         bounded(1E4, 1E8),
+							"Inodes":         BeNil(),
 						}),
 					}),
 				}),
