@@ -69,7 +69,6 @@ func WriteStaticPodManifests(params *kubeadmapi.BootstrapParams) error {
 				"apiserver",
 				"--address=127.0.0.1",
 				"--etcd-servers=http://127.0.0.1:2379",
-				"--cloud-provider=fake", // TODO parametrise
 				"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota",
 				SERVICE_CLUSTER_IP_RANGE,
 				"--service-account-key-file=/etc/kubernetes/pki/apiserver-key.pem",
