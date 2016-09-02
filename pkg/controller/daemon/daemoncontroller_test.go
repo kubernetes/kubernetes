@@ -583,31 +583,3 @@ func TestNodeAffinityDaemonLaunchesPods(t *testing.T) {
 	manager.dsStore.Add(daemon)
 	syncAndValidateDaemonSets(t, manager, daemon, podControl, 3, 0)
 }
-
-func TestNodeTaintDaemonDoesntLaunchIntolerantPods(t *testing.T) {
-	manager, podControl := newTestController()
-	node := newNode("", nil)
-	node.ObjectMeta.Annotations = map[string]string{
-		api.TaintsAnnotationKey: `[{"key":"dedictated","value":"master","effect":"NoSchedule"}]`,
-	}
-	manager.nodeStore.Store.Add(node)
-	daemon := newDaemonSet("foo")
-	manager.dsStore.Add(daemon)
-	syncAndValidateDaemonSets(t, manager, daemon, podControl, 0, 0)
-}
-
-func TestNodeTaintDaemonLaunchesTolerantPods(t *testing.T) {
-	manager, podControl := newTestController()
-	node := newNode("", nil)
-	node.ObjectMeta.Annotations = map[string]string{
-		api.TaintsAnnotationKey: `[{"key":"dedictated","value":"master","effect":"NoSchedule"}]`,
-	}
-	manager.nodeStore.Store.Add(node)
-	daemon := newDaemonSet("foo")
-	daemon.Spec.Template.ObjectMeta.Annotations = map[string]string{
-		api.TolerationsAnnotationKey: `[{"key":"dedictated","operator":"Equal","value":"master"}]`,
-	}
-
-	manager.dsStore.Add(daemon)
-	syncAndValidateDaemonSets(t, manager, daemon, podControl, 1, 0)
-}
