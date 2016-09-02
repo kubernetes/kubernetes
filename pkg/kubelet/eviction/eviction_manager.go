@@ -94,22 +94,30 @@ func NewManager(
 func (m *managerImpl) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
 	m.RLock()
 	defer m.RUnlock()
+	defer glog.Infof("eviction manager: end Admit: %v", attrs.Pod.Name)
+	glog.Infof("eviction manager: start Admit: %v", attrs.Pod.Name)
 	if len(m.nodeConditions) == 0 {
+		glog.Infof("eviction manager: no node conditions, will admit")
 		return lifecycle.PodAdmitResult{Admit: true}
 	}
 
+	glog.Infof("eviction manager: has node conditions")
 	// Check the node conditions to identify the resource under pressure.
 	// The resource can only be either disk or memory; set the default to disk.
 	resource := api.ResourceStorage
 	if hasNodeCondition(m.nodeConditions, api.NodeMemoryPressure) {
+		glog.Infof("eviction manager: has memory pressure")
 		resource = api.ResourceMemory
 		// the node has memory pressure, admit if not best-effort
 		notBestEffort := qos.BestEffort != qos.GetPodQOS(attrs.Pod)
+		glog.Infof("eviction manager: pod qos %v", qos.GetPodQOS(attrs.Pod))
 		if notBestEffort {
+			glog.Infof("eviction manager: admitting pod")
 			return lifecycle.PodAdmitResult{Admit: true}
 		}
 	}
 
+	glog.Infof("eviction manager: failing pod")
 	// reject pods when under memory pressure (if pod is best effort), or if under disk pressure.
 	glog.Warningf("Failed to admit pod %q - node has conditions: %v", format.Pod(attrs.Pod), m.nodeConditions)
 	return lifecycle.PodAdmitResult{
@@ -170,29 +178,47 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 	// find the list of thresholds that are met independent of grace period
 	now := m.clock.Now()
 
+	glog.V(3).Infof("eviction manager: signal observations: %v", observations)
+
 	// determine the set of thresholds met independent of grace period
 	thresholds = thresholdsMet(thresholds, observations, false)
 
+	glog.V(3).Infof("eviction manager: pre thresholds: %v", thresholds)
+
 	// determine the set of thresholds previously met that have not yet satisfied the associated min-reclaim
 	if len(m.thresholdsMet) > 0 {
+		glog.V(3).Infof("eviction manager: previous thresholds: %v", m.thresholdsMet)
 		thresholdsNotYetResolved := thresholdsMet(m.thresholdsMet, observations, true)
+		glog.V(3).Infof("eviction manager: thrsholds not yet resolved: %v", thresholdsNotYetResolved)
 		thresholds = mergeThresholds(thresholds, thresholdsNotYetResolved)
 	}
+
+	glog.V(3).Infof("eviction manager: post thresholds: %v", thresholds)
 
 	// track when a threshold was first observed
 	thresholdsFirstObservedAt := thresholdsFirstObservedAt(thresholds, m.thresholdsFirstObservedAt, now)
 
+	glog.V(3).Infof("eviction manager: thresholds first observed at: %v", thresholdsFirstObservedAt)
+
 	// the set of node conditions that are triggered by currently observed thresholds
 	nodeConditions := nodeConditions(thresholds)
+
+	glog.V(3).Infof("eviction manager: node conditions: %v", nodeConditions)
 
 	// track when a node condition was last observed
 	nodeConditionsLastObservedAt := nodeConditionsLastObservedAt(nodeConditions, m.nodeConditionsLastObservedAt, now)
 
+	glog.V(3).Infof("eviction manager: node conditions last obseved at: %v", nodeConditionsLastObservedAt)
+
 	// node conditions report true if it has been observed within the transition period window
 	nodeConditions = nodeConditionsObservedSince(nodeConditionsLastObservedAt, m.config.PressureTransitionPeriod, now)
 
+	glog.V(3).Infof("eviction manager: node conditions observed since: %v", nodeConditions)
+
 	// determine the set of thresholds we need to drive eviction behavior (i.e. all grace periods are met)
 	thresholds = thresholdsMetGracePeriod(thresholdsFirstObservedAt, now)
+
+	glog.V(3).Infof("eviction manager: final thresholds: %v", thresholds)
 
 	// update internal state
 	m.Lock()

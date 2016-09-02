@@ -28,6 +28,10 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+func Logf(format string, args ...interface{}) {
+	fmt.Fprintf(GinkgoWriter, "INFO: "+format+"\n", args...)
+}
+
 // Eviction Policy is described here:
 // https://github.com/kubernetes/kubernetes/blob/master/docs/proposals/kubelet-eviction.md
 
@@ -62,6 +66,7 @@ var _ = framework.KubeDescribe("MemoryEvictionSimple [FLAKY] [Slow] [Serial] [Di
 		})
 		var guaranteed *api.Pod
 		It("should contain node memory pressure condition)", func() {
+			Logf("NAMESPACE: %v", f.Namespace.Name)
 			memoryLimit := getMemoryLimit(f)
 			By("creating a memory hogging pod.")
 			guaranteed = createMemhogPod(f, "guaranteed-", "guaranteed", api.ResourceRequirements{
@@ -72,6 +77,7 @@ var _ = framework.KubeDescribe("MemoryEvictionSimple [FLAKY] [Slow] [Serial] [Di
 					"memory": memoryLimit,
 				},
 			}, true)
+			Logf("POD CLIENT NAMESPACE: %v, POD NAMESPACE: %v", f.Namespace.Name, guaranteed.Namespace)
 
 			By("polling the node condition and wait till memory pressure ")
 			Eventually(func() error {
@@ -93,11 +99,6 @@ var _ = framework.KubeDescribe("MemoryEvictionSimple [FLAKY] [Slow] [Serial] [Di
 			}, 5*time.Minute, 5*time.Second).Should(BeNil())
 		})
 		It("should drop the node memory pressure condition", func() {
-			By("deleting the memory hog pod.")
-			graceperiod := int64(1)
-			err := f.PodClient().Delete(guaranteed.Name, &api.DeleteOptions{GracePeriodSeconds: &graceperiod})
-			Expect(err).To(BeNil(), fmt.Sprintf("Failed to delete memory hogging pod: %v", err))
-
 			// Wait for the memory pressure condition to disappear from the node status before continuing.
 			Eventually(func() error {
 				nodeList, err := f.Client.Nodes().List(api.ListOptions{})
