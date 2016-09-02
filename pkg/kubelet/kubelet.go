@@ -17,6 +17,7 @@ limitations under the License.
 package kubelet
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
 	"io"
@@ -24,6 +25,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"sort"
@@ -350,6 +352,31 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 	if err != nil {
 		return nil, err
 	}
+	if len(thresholds) > 0 {
+		// Check whether swap is enabled. Memory eviction requires swap to be disabled.
+		// TODO(mtaufen): Will this work on Azure/Windows?
+		cmd := exec.Command("cat", "/proc/swaps")
+		stdout, err := cmd.StdoutPipe()
+		if err != nil {
+			return nil, err
+		}
+		if err := cmd.Start(); err != nil {
+			return nil, err
+		}
+		var buf []string
+		scanner := bufio.NewScanner(stdout)
+		for scanner.Scan() { // Splits on newlines by default
+			buf = append(buf, scanner.Text())
+		}
+		// If there is more than one line (table headers) in /proc/swaps, swap is enabled and we should error out.
+		if len(buf) > 1 {
+			return nil, fmt.Errorf("Swap must be disabled to use memory eviction, but /proc/swaps contained: %v", buf)
+		}
+		if err := cmd.Wait(); err != nil { // Clean up
+			return nil, err
+		}
+	}
+
 	evictionConfig := eviction.Config{
 		PressureTransitionPeriod: kubeCfg.EvictionPressureTransitionPeriod.Duration,
 		MaxPodGracePeriodSeconds: int64(kubeCfg.EvictionMaxPodGracePeriod),
