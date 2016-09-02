@@ -31,10 +31,13 @@ import (
 type SliceMatcher struct {
 	// Matchers for each element.
 	Elements Elements
-	// Whether extra elements are considered an error.
-	Strict bool
 	// Function for identifying a slice element.
 	Identifier Identifier
+
+	// Whether to ignore extra elements or consider it an error.
+	IgnoreExtras bool
+	// Whether to ignore missing elements or consider it an error.
+	IgnoreMissing bool
 
 	// State.
 	failures []error
@@ -79,7 +82,7 @@ func (m *SliceMatcher) matchElements(actual interface{}) (errs []error) {
 
 		matcher, expected := m.Elements[id]
 		if !expected {
-			if m.Strict {
+			if !m.IgnoreExtras {
 				errs = append(errs, fmt.Errorf("unexpected element %s", id))
 			}
 			continue
@@ -101,7 +104,7 @@ func (m *SliceMatcher) matchElements(actual interface{}) (errs []error) {
 	}
 
 	for id := range m.Elements {
-		if !elements[id] {
+		if !elements[id] && !m.IgnoreMissing {
 			errs = append(errs, fmt.Errorf("missing expected element %s", id))
 		}
 	}

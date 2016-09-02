@@ -32,8 +32,10 @@ import (
 type StructMatcher struct {
 	// Matchers for each field.
 	Fields Fields
-	// Whether extra fields are considered an error.
-	Strict bool
+	// Whether to ignore extra elements or consider it an error.
+	IgnoreExtras bool
+	// Whether to ignore missing elements or consider it an error.
+	IgnoreMissing bool
 
 	// State.
 	failures []error
@@ -73,7 +75,7 @@ func (m *StructMatcher) matchFields(actual interface{}) (errs []error) {
 
 			matcher, expected := m.Fields[fieldName]
 			if !expected {
-				if m.Strict {
+				if m.IgnoreExtras {
 					return fmt.Errorf("unexpected field %s: %+v", fieldName, actual)
 				}
 				return nil
@@ -103,7 +105,7 @@ func (m *StructMatcher) matchFields(actual interface{}) (errs []error) {
 	}
 
 	for field := range m.Fields {
-		if !fields[field] {
+		if !fields[field] && !m.IgnoreMissing {
 			errs = append(errs, fmt.Errorf("missing expected field %s", field))
 		}
 	}

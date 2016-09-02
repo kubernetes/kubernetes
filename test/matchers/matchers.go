@@ -55,15 +55,20 @@ func Fail() types.GomegaMatcher {
 func StrictStruct(fields Fields) types.GomegaMatcher {
 	return &StructMatcher{
 		Fields: fields,
-		Strict: true,
 	}
 }
 
+const (
+	IgnoreExtras = 1 << iota
+	IgnoreMissing
+)
+
 // A struct matcher where present fields must match the expectations, and extra fields are ignored.
-func LooseStruct(fields Fields) types.GomegaMatcher {
+func LooseStruct(ignores int, fields Fields) types.GomegaMatcher {
 	return &StructMatcher{
-		Fields: fields,
-		Strict: false,
+		Fields:        fields,
+		IgnoreExtras:  ignores&IgnoreExtras != 0,
+		IgnoreMissing: ignores&IgnoreMissing != 0,
 	}
 }
 
@@ -73,17 +78,17 @@ func StrictSlice(identifier Identifier, elements Elements) types.GomegaMatcher {
 	return &SliceMatcher{
 		Identifier: identifier,
 		Elements:   elements,
-		Strict:     true,
 	}
 }
 
 // A slice matcher where present elements identified by the identifier must match the expectations,
 // and extra elements are ignored.
-func LooseSlice(identifier Identifier, elements Elements) types.GomegaMatcher {
+func LooseSlice(identifier Identifier, ignores int, elements Elements) types.GomegaMatcher {
 	return &SliceMatcher{
-		Identifier: identifier,
-		Elements:   elements,
-		Strict:     false,
+		Identifier:    identifier,
+		Elements:      elements,
+		IgnoreExtras:  ignores&IgnoreExtras != 0,
+		IgnoreMissing: ignores&IgnoreMissing != 0,
 	}
 }
 

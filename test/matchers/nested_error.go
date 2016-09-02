@@ -41,9 +41,14 @@ type NestedError struct {
 }
 
 func (e *NestedError) Error() string {
-	// Indent Errors.
-	indented := strings.Replace(e.Err.Error(), "\n", "\n\t", -1)
-	return fmt.Sprintf("%s:\n\t%v", e.Path, indented)
+	msg := e.Err.Error()
+	if strings.ContainsRune(msg, '\n') {
+		// Indent Errors.
+		indented := strings.Replace(msg, "\n", "\n\t", -1)
+		return fmt.Sprintf("%s:\n\t%v", e.Path, indented)
+	} else {
+		return fmt.Sprintf("%s: %v", e.Path, msg)
+	}
 }
 
 // Create a NestedError with the given path.
