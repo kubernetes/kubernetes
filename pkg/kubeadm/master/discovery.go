@@ -13,6 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+
 package kubemaster
 
 import (
@@ -61,7 +62,11 @@ func encodeKubeDiscoverySecretData(params *kubeadmapi.BootstrapParams, caCert *x
 
 func newKubeDiscoveryPodSpec(params *kubeadmapi.BootstrapParams) api.PodSpec {
 	return api.PodSpec{
-		SecurityContext: &api.PodSecurityContext{HostNetwork: true}, // TODO we should just use map it to a host port
+		// We have to use host network namespace, as `HostPort`/`HostIP` are Docker's
+		// buisness and CNI support isn't quite there yet (except for kubenet)
+		// (see https://github.com/kubernetes/kubernetes/issues/31307)
+		// TODO update this when #31307 is resolved
+		SecurityContext: &api.PodSecurityContext{HostNetwork: true},
 		Containers: []api.Container{{
 			Name:    kubeDiscoverynName,
 			Image:   params.EnvParams["discovery_image"],
@@ -71,6 +76,10 @@ func newKubeDiscoveryPodSpec(params *kubeadmapi.BootstrapParams) api.PodSpec {
 				MountPath: "/tmp/secret", // TODO use a shared constant
 				ReadOnly:  true,
 			}},
+			Ports: []api.ContainerPort{
+				// TODO when CNI issue (#31307) is resolved, we should add `HostIP: params.Discovery.ListenIP`
+				{Name: "http", ContainerPort: 9898, HostPort: 9898},
+			},
 		}},
 		Volumes: []api.Volume{{
 			Name: kubeDiscoverySecretName,
@@ -82,8 +91,7 @@ func newKubeDiscoveryPodSpec(params *kubeadmapi.BootstrapParams) api.PodSpec {
 }
 
 func newKubeDiscovery(params *kubeadmapi.BootstrapParams, caCert *x509.Certificate) kubeDiscovery {
-	// TODO pin to master
-	return kubeDiscovery{
+	kd := kubeDiscovery{
 		Deployment: NewDeployment(kubeDiscoverynName, 1, newKubeDiscoveryPodSpec(params)),
 		Secret: &api.Secret{
 			ObjectMeta: api.ObjectMeta{Name: kubeDiscoverySecretName},
@@ -91,16 +99,21 @@ func newKubeDiscovery(params *kubeadmapi.BootstrapParams, caCert *x509.Certifica
 			Data:       encodeKubeDiscoverySecretData(params, caCert),
 		},
 	}
+
+	SetMasterTaintTolerations(&kd.Deployment.Spec.Template.ObjectMeta)
+	SetMasterNodeAffinity(&kd.Deployment.Spec.Template.ObjectMeta)
+
+	return kd
 }
 
 func CreateDiscoveryDeploymentAndSecret(params *kubeadmapi.BootstrapParams, client *clientset.Clientset, caCert *x509.Certificate) error {
 	kd := newKubeDiscovery(params, caCert)
 
 	if _, err := client.Extensions().Deployments(api.NamespaceSystem).Create(kd.Deployment); err != nil {
-		return fmt.Errorf("<master/discovery> failed to create %q deployment", kubeDiscoverynName)
+		return fmt.Errorf("<master/discovery> failed to create %q deployment [%s]", kubeDiscoverynName, err)
 	}
 	if _, err := client.Secrets(api.NamespaceSystem).Create(kd.Secret); err != nil {
-		return fmt.Errorf("<master/discovery> failed to create %q secret", kubeDiscoverySecretName)
+		return fmt.Errorf("<master/discovery> failed to create %q secret [%s]", kubeDiscoverySecretName, err)
 	}
 
 	fmt.Println("<master/discovery> created essential addon: kube-discovery")
