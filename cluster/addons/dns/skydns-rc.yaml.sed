@@ -12,14 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This file should be kept in sync with cluster/images/hyperkube/dns-rc.yaml
-
 # TODO - At some point, we need to rename all skydns-*.yaml.* files to kubedns-*.yaml.*
 
 # Warning: This is a file generated from the base underscore template file: skydns-rc.yaml.base
 
-apiVersion: v1
-kind: ReplicationController
+apiVersion: extensions/v1beta1
+kind: Deployment
 metadata:
   name: kube-dns-v19
   namespace: kube-system
@@ -30,8 +28,9 @@ metadata:
 spec:
   replicas: $DNS_REPLICAS
   selector:
-    k8s-app: kube-dns
-    version: v19
+    matchLabels:
+      k8s-app: kube-dns
+      version: v19
   template:
     metadata:
       labels:
