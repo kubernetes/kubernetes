@@ -1,3 +1,32 @@
+<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
+
+<!-- BEGIN STRIP_FOR_RELEASE -->
+
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
+     width="25" height="25">
+
+<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
+
+If you are using a released version of Kubernetes, you should
+refer to the docs that go with that version.
+
+Documentation for other releases can be found at
+[releases.k8s.io](http://releases.k8s.io).
+</strong>
+--
+
+<!-- END STRIP_FOR_RELEASE -->
+
+<!-- END MUNGE: UNVERSIONED_WARNING -->
+
 Kubernetes Snapshotting Proposal
 ================================
 
@@ -11,7 +40,7 @@ Typical existing backup solutions offer on demand or scheduled snapshots.
 
 An application developer using a storage may want to create a snapshot before an update or other major event. Kubernetes does not currently offer a standardized snapshot API for creating, listing, deleting, and restoring snapshots on an arbitrary volume.
 
-Existing solutions for scheduled snapshotting include [cron jobs](https://forums.aws.amazon.com/message.jspa?messageID=570265) and [external storage drivers](http://rancher.com/introducing-convoy-a-docker-volume-driver-for-backup-and-recovery-of-persistent-data/). Some cloud storage volumes can be configured to take automatic snapshots, but this is specified on the volumes themselves. 
+Existing solutions for scheduled snapshotting include [cron jobs](https://forums.aws.amazon.com/message.jspa?messageID=570265) and [external storage drivers](http://rancher.com/introducing-convoy-a-docker-volume-driver-for-backup-and-recovery-of-persistent-data/). Some cloud storage volumes can be configured to take automatic snapshots, but this is specified on the volumes themselves.
 
 ## Objectives
 
@@ -19,7 +48,7 @@ For the first version of snapshotting support in Kubernetes, only on-demand snap
 
 * Goal 1: Enable *on-demand* snapshots of Kubernetes persistent volumes by application developers.
 
-    * Nongoal: Enable *automatic* periodic snapshotting for direct volumes in pods. 
+    * Nongoal: Enable *automatic* periodic snapshotting for direct volumes in pods.
 
 * Goal 2: Expose standardized snapshotting operations Create and List in Kubernetes REST API.
 
@@ -85,7 +114,7 @@ Snapshot operations will be triggered by [annotations](http://kubernetes.io/docs
 
     * Value: [snapshot name]
 
-* **List:** 
+* **List:**
 
     * Key: snapshot.volume.alpha.kubernetes.io/[snapshot name]
 
@@ -153,7 +182,7 @@ The controller will have a loop that does the following:
 
     * Once a snapshot operation completes, write the snapshot ID/timestamp to the PVC Annotations and delete the create snapshot annotation in the PVC object via the API server.
 
-Snapshot operations can take a long time to complete, so the primary controller loop should not block on these operations. Instead the reconciler should spawn separate threads for these operations via the operation executor. 
+Snapshot operations can take a long time to complete, so the primary controller loop should not block on these operations. Instead the reconciler should spawn separate threads for these operations via the operation executor.
 
 The controller will reject snapshot requests if the unique volume ID already exists in the SnapshotRequests. Concurrent operations on the same volume will be prevented by the operation executor.
 
@@ -248,7 +277,7 @@ Nongoal: Use snapshotting to provide additional features such as migration.
 
 Many storage systems (GCE PD, Amazon EBS, NFS, etc.) provide the ability to create "snapshots" of a persistent volumes to protect against data loss. Snapshots can be used in place of a traditional backup system to back up and restore primary and critical data. Snapshots allow for quick data backup (for example, it takes a fraction of a second to create a GCE PD snapshot) and offer fast recovery time objectives (RTOs) and recovery point objectives (RPOs).
 
-Currently, no container orchestration software (i.e. Kubernetes and its competitors) provide snapshot scheduling for application storage. 
+Currently, no container orchestration software (i.e. Kubernetes and its competitors) provide snapshot scheduling for application storage.
 
 Existing solutions for automatic snapshotting include [cron jobs](https://forums.aws.amazon.com/message.jspa?messageID=570265)/shell scripts. Some volumes can be configured to take automatic snapshots, but this is specified on the volumes themselves, not via their associated applications. Snapshotting support gives Kubernetes clear competitive advantage for users who want automatic snapshotting on their volumes, and particularly those who want to configure application-specific schedules.
 
@@ -270,7 +299,7 @@ Automated schedule -- times or intervals? Before major event?
 
 Performance
 
-Snapshots are supposed to provide timely state freezing. What is the SLA from issuing one to it completing? 
+Snapshots are supposed to provide timely state freezing. What is the SLA from issuing one to it completing?
 
 * GCE: The snapshot operation takes [a fraction of a second](https://cloudplatform.googleblog.com/2013/10/persistent-disk-backups-using-snapshots.html). If file writes can be paused, they should be paused until the snapshot is created (but can be restarted while it is pending). If file writes cannot be paused, the volume should be unmounted before snapshotting then remounted afterwards.
 
@@ -324,7 +353,7 @@ Users will specify a snapshotting schedule for particular volumes, which Kuberne
 
                 1. By the user independently of the pod (i.e. with something like my-volume.yaml). In order to create 1 pod with a volume, the user needs to create 2 yaml files and run 2 commands.
 
-                2. When a unique volume is specified in a pod or PV spec. 
+                2. When a unique volume is specified in a pod or PV spec.
 
     2. Directly in volume definition in the pod/PV object
 
@@ -334,7 +363,7 @@ Users will specify a snapshotting schedule for particular volumes, which Kuberne
 
             4. Easy for users to implement and understand
 
-        8. Cons 
+        8. Cons
 
             5. The same underlying PD may be used by different pods. In this case, we need to resolve when and how often to take snapshots. If two pods specify the same snapshot time for the same PD, we should not perform two snapshots at that time. However, there is no unique global identifier for a volume defined in a pod definition--its identifying details are particular to the volume plugin used.
 
@@ -384,7 +413,7 @@ Users will specify a snapshotting schedule for particular volumes, which Kuberne
 
             15. Application flush, sync, and fsfreeze before creating snapshot
 
-    6. Suggestion: 
+    6. Suggestion:
 
         18. New SnapshotController on master
 
@@ -428,15 +457,15 @@ Users will specify a snapshotting schedule for particular volumes, which Kuberne
 
     12. Time or period
 
-    13. What is our SLO around time accuracy?  
+    13. What is our SLO around time accuracy?
 
-        21. Best effort, but no guarantees (depends on time or period) -- if going with time. 
+        21. Best effort, but no guarantees (depends on time or period) -- if going with time.
 
-    14. What if we miss a snapshot? 
+    14. What if we miss a snapshot?
 
         22. We will retry (assuming this means that we failed) -- take at the nearest next opportunity
 
-    15. Will we know when an operation has failed?  How do we report that?  
+    15. Will we know when an operation has failed?  How do we report that?
 
         23. Get response from volume plugin API, log in kubelet log, generate Kube event in success and failure cases
 
@@ -512,7 +541,12 @@ spec:
 
 * Kubernetes
 
-* Persistent volume snapshot support through API 
+* Persistent volume snapshot support through API
 
     * POST https://www.googleapis.com/compute/v1/projects/example-project/zones/us-central1-f/disks/example-disk/createSnapshot
 
+
+
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/volume-snapshotting.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->
