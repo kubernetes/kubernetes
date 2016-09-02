@@ -33,6 +33,7 @@ type CoreInterface interface {
 	NamespacesGetter
 	NodesGetter
 	PersistentVolumesGetter
+	PersistentVolumeClaimsGetter
 	PodsGetter
 	PodTemplatesGetter
 	ReplicationControllersGetter
@@ -77,6 +78,10 @@ func (c *CoreClient) Nodes() NodeInterface {
 
 func (c *CoreClient) PersistentVolumes() PersistentVolumeInterface {
 	return newPersistentVolumes(c)
+}
+
+func (c *CoreClient) PersistentVolumeClaims(namespace string) PersistentVolumeClaimInterface {
+	return newPersistentVolumeClaims(c, namespace)
 }
 
 func (c *CoreClient) Pods(namespace string) PodInterface {
