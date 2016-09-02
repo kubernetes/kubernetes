@@ -189,7 +189,7 @@ func createMemhogPod(f *framework.Framework, genName string, ctnName string, res
 	var memLimit string
 	if limit, ok := res.Limits["memory"]; ok {
 		memLimit = strconv.Itoa(int(
-			float64(limit.Value()) * 0.8))
+			float64(limit.Value()) * 0.6))
 	} else {
 		memLimit = "$(MEMORY_LIMIT)"
 	}

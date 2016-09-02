@@ -60,11 +60,11 @@ var _ = framework.KubeDescribe("MemoryEvictionSimple [Slow] [Serial] [Disruptive
 				return fmt.Errorf("current available memory is: %d bytes. Expected at least %d bytes available.", avail, halflimit)
 			}, 5*time.Minute, 15*time.Second).Should(BeNil())
 		})
-
+		var burstable *api.Pod
 		It("should contain node memory pressure condition)", func() {
 			memoryLimit := getMemoryLimit(f)
 			By("creating a memory hogging pod.")
-			burstable := createMemhogPod(f, "burstable-", "burstable", api.ResourceRequirements{
+			burstable = createMemhogPod(f, "burstable-", "burstable", api.ResourceRequirements{
 				Limits: api.ResourceList{
 					"cpu": resource.MustParse("100m"),
 					// Set the memory limit to 80% of machine capacity to induce memory pressure.
@@ -91,7 +91,8 @@ var _ = framework.KubeDescribe("MemoryEvictionSimple [Slow] [Serial] [Disruptive
 				}
 				return nil
 			}, 5*time.Minute, 5*time.Second).Should(BeNil())
-
+		})
+		It("should drop the node memory pressure condition", func() {
 			By("deleting the memory hog pod.")
 			graceperiod := int64(1)
 			err := f.PodClient().Delete(burstable.Name, &api.DeleteOptions{GracePeriodSeconds: &graceperiod})
@@ -114,6 +115,8 @@ var _ = framework.KubeDescribe("MemoryEvictionSimple [Slow] [Serial] [Disruptive
 				}
 				return nil
 			}, 5*time.Minute, 15*time.Second).Should(BeNil())
+		})
+		It("should admit a best effort pod", func() {
 			// Finally, try starting a new pod and wait for it to be scheduled and running.
 			// This is the final check to try to prevent interference with subsequent tests.
 			podName := "admit-best-effort-pod"
