@@ -127,10 +127,12 @@ func NewIngressController(client federationclientset.Interface) *IngressControll
 	ic.ingressInformerStore, ic.ingressInformerController = cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (pkg_runtime.Object, error) {
-				return client.Extensions().Ingresses(api.NamespaceAll).List(options)
+				versionedOptions := util.VersionizeV1ListOptions(options)
+				return client.Extensions().Ingresses(api.NamespaceAll).List(versionedOptions)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return client.Extensions().Ingresses(api.NamespaceAll).Watch(options)
+				versionedOptions := util.VersionizeV1ListOptions(options)
+				return client.Extensions().Ingresses(api.NamespaceAll).Watch(versionedOptions)
 			},
 		},
 		&extensions_v1beta1.Ingress{},
@@ -148,10 +150,12 @@ func NewIngressController(client federationclientset.Interface) *IngressControll
 			return cache.NewInformer(
 				&cache.ListWatch{
 					ListFunc: func(options api.ListOptions) (pkg_runtime.Object, error) {
-						return targetClient.Extensions().Ingresses(api.NamespaceAll).List(options)
+						versionedOptions := util.VersionizeV1ListOptions(options)
+						return targetClient.Extensions().Ingresses(api.NamespaceAll).List(versionedOptions)
 					},
 					WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-						return targetClient.Extensions().Ingresses(api.NamespaceAll).Watch(options)
+						versionedOptions := util.VersionizeV1ListOptions(options)
+						return targetClient.Extensions().Ingresses(api.NamespaceAll).Watch(versionedOptions)
 					},
 				},
 				&extensions_v1beta1.Ingress{},
@@ -184,13 +188,15 @@ func NewIngressController(client federationclientset.Interface) *IngressControll
 						if targetClient == nil {
 							glog.Errorf("Internal error: targetClient is nil")
 						}
-						return targetClient.Core().ConfigMaps(uidConfigMapNamespace).List(options) // we only want to list one by name - unfortunately Kubernetes don't have a selector for that.
+						versionedOptions := util.VersionizeV1ListOptions(options)
+						return targetClient.Core().ConfigMaps(uidConfigMapNamespace).List(versionedOptions) // we only want to list one by name - unfortunately Kubernetes don't have a selector for that.
 					},
 					WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 						if targetClient == nil {
 							glog.Errorf("Internal error: targetClient is nil")
 						}
-						return targetClient.Core().ConfigMaps(uidConfigMapNamespace).Watch(options) // as above
+						versionedOptions := util.VersionizeV1ListOptions(options)
+						return targetClient.Core().ConfigMaps(uidConfigMapNamespace).Watch(versionedOptions) // as above
 					},
 				},
 				&v1.ConfigMap{},
@@ -238,7 +244,7 @@ func NewIngressController(client federationclientset.Interface) *IngressControll
 		func(client kubeclientset.Interface, obj pkg_runtime.Object) error {
 			ingress := obj.(*extensions_v1beta1.Ingress)
 			glog.V(4).Infof("Attempting to delete Ingress: %v", ingress)
-			err := client.Extensions().Ingresses(ingress.Namespace).Delete(ingress.Name, &api.DeleteOptions{})
+			err := client.Extensions().Ingresses(ingress.Namespace).Delete(ingress.Name, &v1.DeleteOptions{})
 			return err
 		})
 
@@ -267,7 +273,7 @@ func NewIngressController(client federationclientset.Interface) *IngressControll
 			configMap := obj.(*v1.ConfigMap)
 			configMapName := types.NamespacedName{Name: configMap.Name, Namespace: configMap.Namespace}
 			glog.Errorf("Internal error: Incorrectly attempting to delete ConfigMap: %q", configMapName)
-			err := client.Core().ConfigMaps(configMap.Namespace).Delete(configMap.Name, &api.DeleteOptions{})
+			err := client.Core().ConfigMaps(configMap.Namespace).Delete(configMap.Name, &v1.DeleteOptions{})
 			return err
 		})
 	return ic
