@@ -1361,6 +1361,9 @@ func (d *awsDisk) deleteVolume() (bool, error) {
 			if awsError.Code() == "InvalidVolume.NotFound" {
 				return false, nil
 			}
+			if awsError.Code() == "VolumeInUse" {
+				return false, volume.NewTryAgainError(err.Error())
+			}
 		}
 		return false, fmt.Errorf("error deleting EBS volumes: %v", err)
 	}

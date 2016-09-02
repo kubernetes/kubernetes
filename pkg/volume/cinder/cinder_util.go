@@ -124,6 +124,8 @@ func (util *CinderDiskUtil) DeleteVolume(cd *cinderVolumeDeleter) error {
 	}
 
 	if err = cloud.DeleteVolume(cd.pdName); err != nil {
+		// OpenStack cloud provider returns volume.tryAgainError when necessary,
+		// no handling needed here.
 		glog.V(2).Infof("Error deleting cinder volume %s: %v", cd.pdName, err)
 		return err
 	}
