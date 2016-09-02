@@ -97,5 +97,7 @@ func WriteKubeconfigIfNotExists(params *kubeadmapi.BootstrapParams, name string,
 	if err := clientcmd.WriteToFile(*kubeconfig, filename); err != nil {
 		return fmt.Errorf("<util/kubeconfig> failed to write to %q [%s]", filename, err)
 	}
+
+	fmt.Println("<util/kubeconfig> created %q", filename)
 	return nil
 }

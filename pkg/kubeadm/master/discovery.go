@@ -103,5 +103,9 @@ func CreateDiscoveryDeploymentAndSecret(params *kubeadmapi.BootstrapParams, clie
 		return fmt.Errorf("<master/discovery> failed to create %q secret", kubeDiscoverySecretName)
 	}
 
+	fmt.Println("<master/discovery> created essential addon: kube-discovery")
+
+	// TODO we should probably wait for the pod to become ready
+
 	return nil
 }

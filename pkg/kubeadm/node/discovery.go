@@ -37,11 +37,13 @@ func RetrieveTrustedClusterInfo(params *kubeadmapi.BootstrapParams) (*clientcmda
 	}
 
 	host, port := strings.Split(apiServerURL.Host, ":")[0], 9898 // TODO this is too naive
-
-	req, err := http.NewRequest("GET", fmt.Sprintf("http://%s:%d/cluster-info/v1/?token-id=%s", host, port, params.Discovery.TokenID), nil)
+	requestURL := fmt.Sprintf("http://%s:%d/cluster-info/v1/?token-id=%s", host, port, params.Discovery.TokenID)
+	req, err := http.NewRequest("GET", requestURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("<node/discovery> failed to consturct an HTTP request [%s]", err)
 	}
+
+	fmt.Println("<node/discovery> created cluster info discovery client, requesting info from %q", requestURL)
 
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -56,6 +58,8 @@ func RetrieveTrustedClusterInfo(params *kubeadmapi.BootstrapParams) (*clientcmda
 		return nil, fmt.Errorf("<node/discovery> failed to parse response as JWS object [%s]", err)
 	}
 
+	fmt.Println("<node/discovery> cluster info object recieved, verifying signature using given token")
+
 	output, err := object.Verify(params.Discovery.Token)
 	if err != nil {
 		return nil, fmt.Errorf("<node/discovery> failed to verify JWS signature of recieved cluster info object [%s]", err)
@@ -67,11 +71,12 @@ func RetrieveTrustedClusterInfo(params *kubeadmapi.BootstrapParams) (*clientcmda
 		return nil, fmt.Errorf("<node/discovery> failed to unmarshal recieved cluster info object [%s]", err)
 	}
 
-	fmt.Printf("ClusterInfo: %#v\n", clusterInfo)
-
 	if len(clusterInfo.CertificateAuthorities) == 0 || len(clusterInfo.Endpoints) == 0 {
-		return nil, fmt.Errorf("<node/discovery> cluster info object is invalid - no endpoints and/or root CA certificates found")
+		return nil, fmt.Errorf("<node/discovery> cluster info object is invalid - no endpoint(s) and/or root CA certificate(s) found")
 	}
+
+	// TODO print checksum of the CA certificate
+	fmt.Printf("<node/discovery> cluser info signature and contents are valid, will use API endpoints %v\n", clusterInfo.Endpoints)
 
 	// TODO we need to configure the client to validate the server
 	// if it is signed by any of the returned certificates
