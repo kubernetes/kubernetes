@@ -27,12 +27,12 @@ import (
 	kubemaster "k8s.io/kubernetes/pkg/kubeadm/master"
 	kubenode "k8s.io/kubernetes/pkg/kubeadm/node"
 	kubeadmutil "k8s.io/kubernetes/pkg/kubeadm/util"
+	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	netutil "k8s.io/kubernetes/pkg/util/net"
-	// TODO: cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
 var (
-	manual_done_msgf = dedent.Dedent(`
+	manual_init_done_msgf = dedent.Dedent(`
 		Master initialization complete:
 
 		* Static pods written and kubelet's kubeconfig written.
@@ -47,6 +47,14 @@ var (
 
 		kubeadm manual bootstrap join-node --ca-cert-file <path-to-ca-cert> \
 		    --token %s --api-server-urls https://%s:443/
+		`)
+	manual_join_done_msgf = dedent.Dedent(`
+		Node join complete:
+		* Certificate signing request sent to master and response
+		  received.
+		* Kubelet informed of new secure connection details.
+
+		Run 'kubectl get nodes' on the master to see this node join.
 		`)
 )
 
@@ -92,42 +100,9 @@ func NewCmdManualBootstrapInitMaster(out io.Writer, params *kubeadmapi.Bootstrap
 			Will create TLS certificates and set up static pods for Kubernetes master
 			components.
 		`),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			if params.Discovery.ListenIP == "" {
-				ip, err := netutil.ChooseHostInterface()
-				if err != nil {
-					return fmt.Errorf("Unable to autodetect IP address [%s], please specify with --listen-ip", err)
-				}
-				params.Discovery.ListenIP = ip.String()
-			}
-			if err := kubemaster.CreateTokenAuthFile(params); err != nil {
-				return err
-			}
-			if err := kubemaster.WriteStaticPodManifests(params); err != nil {
-				return err
-			}
-			caKey, caCert, err := kubemaster.CreatePKIAssets(params)
-			if err != nil {
-				return err
-			}
-			kubeconfigs, err := kubemaster.CreateCertsAndConfigForClients(params, []string{"kubelet", "admin"}, caKey, caCert)
-			if err != nil {
-				return err
-			}
-			for name, kubeconfig := range kubeconfigs {
-				if err := kubeadmutil.WriteKubeconfigIfNotExists(params, name, kubeconfig); err != nil {
-					out.Write([]byte(fmt.Sprintf("Unable to write admin for master:\n%s\n", err)))
-					return nil
-				}
-			}
-
-			// TODO use templates to reference struct fields directly as order of args is fragile
-			fmt.Fprintf(out, manual_done_msgf,
-				params.Discovery.BearerToken,
-				params.Discovery.ListenIP,
-			)
-
-			return nil
+		Run: func(cmd *cobra.Command, args []string) {
+			err := RunManualBootstrapInitMaster(out, cmd, args, params)
+			cmdutil.CheckErr(err)
 		},
 	}
 
@@ -143,43 +118,50 @@ func NewCmdManualBootstrapInitMaster(out io.Writer, params *kubeadmapi.Bootstrap
 	return cmd
 }
 
+func RunManualBootstrapInitMaster(out io.Writer, cmd *cobra.Command, args []string, params *kubeadmapi.BootstrapParams) error {
+	if params.Discovery.ListenIP == "" {
+		ip, err := netutil.ChooseHostInterface()
+		if err != nil {
+			return fmt.Errorf("<cmd/join> unable to autodetect IP address [%s], please specify with --listen-ip", err)
+		}
+		params.Discovery.ListenIP = ip.String()
+	}
+	if err := kubemaster.CreateTokenAuthFile(params); err != nil {
+		return err
+	}
+	if err := kubemaster.WriteStaticPodManifests(params); err != nil {
+		return err
+	}
+	caKey, caCert, err := kubemaster.CreatePKIAssets(params)
+	if err != nil {
+		return err
+	}
+	kubeconfigs, err := kubemaster.CreateCertsAndConfigForClients(params, []string{"kubelet", "admin"}, caKey, caCert)
+	if err != nil {
+		return err
+	}
+	for name, kubeconfig := range kubeconfigs {
+		if err := kubeadmutil.WriteKubeconfigIfNotExists(params, name, kubeconfig); err != nil {
+			return err
+		}
+	}
+
+	// TODO use templates to reference struct fields directly as order of args is fragile
+	fmt.Fprintf(out, manual_init_done_msgf,
+		params.Discovery.BearerToken,
+		params.Discovery.ListenIP,
+	)
+	return nil
+}
+
 func NewCmdManualBootstrapJoinNode(out io.Writer, params *kubeadmapi.BootstrapParams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "join-node",
 		Short: "Manually bootstrap a node 'out-of-band', joining it into a cluster with extant control plane",
 
 		Run: func(cmd *cobra.Command, args []string) {
-			if params.Discovery.CaCertFile == "" {
-				out.Write([]byte(fmt.Sprintf("Must specify --ca-cert-file (see --help)\n")))
-				return
-			}
-
-			if params.Discovery.ApiServerURLs == "" {
-				out.Write([]byte(fmt.Sprintf("Must specify --api-server-urls (see --help)\n")))
-				return
-			}
-
-			kubeconfig, err := kubenode.PerformTLSBootstrapFromParams(params)
-			if err != nil {
-				out.Write([]byte(fmt.Sprintf("Failed to perform TLS bootstrap: %s\n", err)))
-				return
-			}
-			//fmt.Println("recieved signed certificate from the API server, will write `/etc/kubernetes/kubelet.conf`...")
-
-			err = kubeadmutil.WriteKubeconfigIfNotExists(params, "kubelet", kubeconfig)
-			if err != nil {
-				out.Write([]byte(fmt.Sprintf("Unable to write config for node:\n%s\n", err)))
-				return
-			}
-			out.Write([]byte(dedent.Dedent(`
-				Node join complete:
-				* Certificate signing request sent to master and response
-				  received.
-				* Kubelet informed of new secure connection details.
-
-				Run 'kubectl get nodes' on the master to see this node join.
-
-			`)))
+			err := RunManualBootstrapJoinNode(out, cmd, args, params)
+			cmdutil.CheckErr(err)
 		},
 	}
 	cmd.PersistentFlags().StringVarP(&params.Discovery.CaCertFile, "ca-cert-file", "", "",
@@ -192,4 +174,31 @@ func NewCmdManualBootstrapJoinNode(out io.Writer, params *kubeadmapi.BootstrapPa
 		`Shared secret used to secure bootstrap. Must match output of 'init-master'.`)
 
 	return cmd
+}
+
+func RunManualBootstrapJoinNode(out io.Writer, cmd *cobra.Command, args []string, params *kubeadmapi.BootstrapParams) error {
+	if params.Discovery.CaCertFile == "" {
+		fmt.Fprintf(out, "Must specify --ca-cert-file (see --help)\n")
+		return nil
+	}
+
+	if params.Discovery.ApiServerURLs == "" {
+		fmt.Fprintf(out, "Must specify --api-server-urls (see --help)\n")
+		return nil
+	}
+
+	kubeconfig, err := kubenode.PerformTLSBootstrapFromParams(params)
+	if err != nil {
+		fmt.Fprintf(out, "Failed to perform TLS bootstrap: %s\n", err)
+		return err
+	}
+
+	err = kubeadmutil.WriteKubeconfigIfNotExists(params, "kubelet", kubeconfig)
+	if err != nil {
+		fmt.Fprintf(out, "Unable to write config for node:\n%s\n", err)
+		return err
+	}
+
+	fmt.Fprintf(out, manual_join_done_msgf)
+	return nil
 }

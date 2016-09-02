@@ -17,8 +17,7 @@ limitations under the License.
 package kubeadmapi
 
 type BootstrapParams struct {
-	// A struct with methods that implement Discover()
-	// kubeadm will do the CSR dance
+	// TODO this is mostly out of date and bloated now, let's revisit this soon
 	Discovery *OutOfBandDiscovery
 	EnvParams map[string]string
 }

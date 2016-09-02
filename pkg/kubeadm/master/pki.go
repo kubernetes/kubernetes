@@ -175,6 +175,6 @@ func CreatePKIAssets(params *kubeadmapi.BootstrapParams) (*rsa.PrivateKey, *x509
 	}
 
 	// TODO print a summary of SANs used and checksums (signatures) of each of the certiicates
-	fmt.Println("<master/pki> created keys and certificates in %q", params.EnvParams["host_pki_path"])
+	fmt.Printf("<master/pki> created keys and certificates in %q\n", params.EnvParams["host_pki_path"])
 	return caKey, caCert, nil
 }
