@@ -444,6 +444,13 @@ const (
 	ClaimLost PersistentVolumeClaimPhase = "Lost"
 )
 
+const (
+	// AnnSnapshotCreate is the string key value for the snapshot creation
+	// annotation on the pvc object
+	AnnSnapshotCreate string = "create.snapshot.volume.alpha.kubernetes.io"
+	SnapshotPrefix    string = "snapshot.volume.alpha.kubernetes.io/"
+)
+
 // Represents a host path mapped into a pod.
 // Host path volumes do not support ownership management or SELinux relabeling.
 type HostPathVolumeSource struct {

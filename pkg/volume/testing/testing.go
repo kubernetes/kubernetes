@@ -150,12 +150,14 @@ func ProbeVolumePlugins(config VolumeConfig) []VolumePlugin {
 //   volume.RegisterPlugin(&FakePlugin{"fake-name"})
 type FakeVolumePlugin struct {
 	sync.RWMutex
-	PluginName             string
-	Host                   VolumeHost
-	Config                 VolumeConfig
-	LastProvisionerOptions VolumeOptions
-	NewAttacherCallCount   int
-	NewDetacherCallCount   int
+	PluginName              string
+	Host                    VolumeHost
+	Config                  VolumeConfig
+	LastProvisionerOptions  VolumeOptions
+	NewAttacherCallCount    int
+	NewDetacherCallCount    int
+	CreateSnapshotCallCount int
+	SnapshotNames           map[string]bool
 
 	Mounters   []*FakeVolume
 	Unmounters []*FakeVolume
@@ -271,6 +273,27 @@ func (plugin *FakeVolumePlugin) GetNewDetacherCallCount() int {
 	plugin.RLock()
 	defer plugin.RUnlock()
 	return plugin.NewDetacherCallCount
+}
+
+func (plugin *FakeVolumePlugin) CreateSnapshot(spec *Spec, snapshotName string) (string, error) {
+	plugin.Lock()
+	defer plugin.Unlock()
+	plugin.CreateSnapshotCallCount = plugin.CreateSnapshotCallCount + 1
+	plugin.SnapshotNames[snapshotName] = true
+	return "snapshot-timestamp", nil
+}
+
+func (plugin *FakeVolumePlugin) GetCreateSnapshotCallCount() int {
+	plugin.RLock()
+	defer plugin.RUnlock()
+	return plugin.CreateSnapshotCallCount
+}
+
+func (plugin *FakeVolumePlugin) SnapshotExists(snapshotName string) (bool, error) {
+	plugin.RLock()
+	defer plugin.RUnlock()
+	_, exists := plugin.SnapshotNames[snapshotName]
+	return exists, nil
 }
 
 func (plugin *FakeVolumePlugin) NewRecycler(pvName string, spec *Spec) (Recycler, error) {

@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"testing"
 
+	"google.golang.org/api/compute/v1"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
@@ -361,4 +363,20 @@ func (testcase *testcase) DeleteDisk(diskToDelete string) error {
 
 func (testcase *testcase) GetAutoLabelsForPD(name string, zone string) (map[string]string, error) {
 	return map[string]string{}, errors.New("Not implemented")
+}
+
+func (testcase *testcase) CreateSnapshot(diskName string, snapshot *compute.Snapshot) error {
+	return errors.New("Not implemented")
+}
+
+func (testcase *testcase) GetSnapshot(snapshotName string) (*compute.Snapshot, error) {
+	return nil, errors.New("Not implemented")
+}
+
+func (testcase *testcase) SnapshotExists(snapshotName string) (bool, error) {
+	return false, errors.New("Not implemented")
+}
+
+func (testcase *testcase) DeleteSnapshot(snapshotName string) error {
+	return errors.New("Not implemented")
 }

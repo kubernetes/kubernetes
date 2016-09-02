@@ -22,6 +22,9 @@ import (
 	"fmt"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/types"
 )
@@ -86,4 +89,57 @@ func GetUniqueVolumeNameFromSpec(
 			volumePlugin.GetPluginName(),
 			volumeName),
 		nil
+}
+
+// PostEventToPersistentVolumeClaim posts an event to the given PersistentVolumeClaim
+// API object with the given message and event type.
+func PostEventToPersistentVolumeClaim(
+	kubeClient internalclientset.Interface,
+	pvc *api.PersistentVolumeClaim,
+	eventName string,
+	message string,
+	eventType string) error {
+	timeStamp := unversioned.Now()
+	name := fmt.Sprintf("%s-%s", pvc.Name, eventName)
+	if event, err := kubeClient.Core().Events(pvc.Namespace).Get(name); err == nil {
+		// event already exists, update the count and timeStamp
+		event.Count++
+		event.LastTimestamp = timeStamp
+		_, updateErr := kubeClient.Core().Events(pvc.Namespace).Update(event)
+		if updateErr != nil {
+			return fmt.Errorf(
+				"Failed to post event %q, err=%v",
+				name,
+				updateErr)
+		}
+	} else {
+		ref, refErr := api.GetReference(runtime.Object(pvc))
+		if refErr != nil {
+			return fmt.Errorf(
+				"Failed to GetReference from PersistentVolumeClaim %q, err=%v",
+				pvc.Name,
+				refErr)
+		}
+		event := &api.Event{
+			ObjectMeta: api.ObjectMeta{
+				Namespace: pvc.Namespace,
+				Name:      name,
+			},
+			InvolvedObject: *ref,
+			Message:        message,
+			Source:         api.EventSource{Component: "controllermanager"},
+			FirstTimestamp: timeStamp,
+			LastTimestamp:  timeStamp,
+			Count:          1,
+			Type:           eventType,
+		}
+		_, createErr := kubeClient.Core().Events(pvc.Namespace).Create(event)
+		if createErr != nil {
+			return fmt.Errorf(
+				"Failed to post event %q, err=%v",
+				name,
+				createErr)
+		}
+	}
+	return nil
 }

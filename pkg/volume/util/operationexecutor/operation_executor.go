@@ -106,6 +106,11 @@ type OperationExecutor interface {
 	// IsOperationPending returns true if an operation for the given volumeName and podName is pending,
 	// otherwise it returns false
 	IsOperationPending(volumeName api.UniqueVolumeName, podName volumetypes.UniquePodName) bool
+
+	// CreateSnapshot creates a snapshot on the specified volume. It then updates
+	// the API persistentVolumeClaim object to reflect that the snapshot has been
+	// created.
+	CreateSnapshot(volumeToSnapshot VolumeToSnapshot, snapshotName string, actualStateOfWorld ActualStateOfWorldSnapshotUpdater) error
 }
 
 // NewOperationExecutor returns a new instance of OperationExecutor.
@@ -153,6 +158,12 @@ type ActualStateOfWorldAttacherUpdater interface {
 
 	// Marks the specified volume as detached from the specified node
 	MarkVolumeAsDetached(volumeName api.UniqueVolumeName, nodeName string)
+}
+
+// ActualStateOfWorldSnapshotUpdater defines a set of operations updating the
+// actual state of the world cache after successful snapshot operations.
+type ActualStateOfWorldSnapshotUpdater interface {
+	MarkVolumeAsSnapshotted(volumeName api.UniqueVolumeName)
 }
 
 // VolumeToAttach represents a volume that should be attached to a node.
@@ -214,6 +225,21 @@ type VolumeToMount struct {
 	// ReportedInUse indicates that the volume was successfully added to the
 	// VolumesInUse field in the node's status.
 	ReportedInUse bool
+}
+
+// VolumeToSnapshot represents a volume that backs a PVS and is Snapshottable.
+type VolumeToSnapshot struct {
+	// VolumeName is the unique identifier for the volume that should be
+	// snapshotted.
+	VolumeName api.UniqueVolumeName
+
+	// VolumeSpec is a volume spec containing the specification for the volume
+	// that should be snapshotted.
+	VolumeSpec *volume.Spec
+
+	// PersistentVolumeClaim is a persistent volume claim api object that
+	// references the volume to be snapshotted.
+	PersistentVolumeClaim *api.PersistentVolumeClaim
 }
 
 // AttachedVolume represents a volume that is attached to a node.
@@ -441,6 +467,22 @@ func (oe *operationExecutor) UnmountDevice(
 
 	return oe.pendingOperations.Run(
 		deviceToDetach.VolumeName, "" /* podName */, unmountDeviceFunc)
+}
+
+func (oe *operationExecutor) CreateSnapshot(
+	volumeToSnapshot VolumeToSnapshot,
+	snapshotName string,
+	actualStateOfWorld ActualStateOfWorldSnapshotUpdater) error {
+
+	createSnapshotFunc, err :=
+		oe.generateCreateSnapshotFunc(volumeToSnapshot, snapshotName, actualStateOfWorld)
+
+	if err != nil {
+		return err
+	}
+
+	return oe.pendingOperations.Run(
+		volumeToSnapshot.VolumeName, "" /* podName */, createSnapshotFunc)
 }
 
 func (oe *operationExecutor) VerifyControllerAttachedVolume(
@@ -987,6 +1029,89 @@ func (oe *operationExecutor) generateUnmountDeviceFunc(
 				deviceToDetach.VolumeSpec.Name(),
 				markDeviceUnmountedErr)
 		}
+
+		return nil
+	}, nil
+}
+
+func (oe *operationExecutor) generateCreateSnapshotFunc(
+	volumeToSnapshot VolumeToSnapshot,
+	snapshotName string,
+	actualStateOfWorld ActualStateOfWorldSnapshotUpdater) (func() error, error) {
+
+	snapshottableVolumePlugin, err :=
+		oe.volumePluginMgr.FindSnapshottablePluginBySpec(volumeToSnapshot.VolumeSpec)
+	if err != nil || snapshottableVolumePlugin == nil {
+		return nil, fmt.Errorf(
+			"CreateSnapshot.FindSnapshottablePluginBySpec failed for volume %q (spec.Name: %q) with: %v",
+			volumeToSnapshot.VolumeName,
+			volumeToSnapshot.VolumeSpec.Name(),
+			err)
+	}
+
+	return func() error {
+		// Check if a snapshot of this name already exists
+		exists, existsErr := snapshottableVolumePlugin.SnapshotExists(snapshotName)
+		if existsErr != nil {
+			// On failure, return error. Caller will log and retry.
+			return fmt.Errorf(
+				"CreateSnapshot.SnapshotExists failed for volume %q (spec.Name: %q) with: %v",
+				volumeToSnapshot.VolumeName,
+				volumeToSnapshot.VolumeSpec.Name(),
+				existsErr)
+		}
+
+		if exists {
+			// Post event to API server that snapshot already exists
+			eventErr := volumehelper.PostEventToPersistentVolumeClaim(
+				oe.kubeClient,
+				volumeToSnapshot.PersistentVolumeClaim,
+				"SnapshotSkipped",
+				fmt.Sprintf("Snapshot %q skipped: snapshot with name already exists.", snapshotName),
+				api.EventTypeNormal)
+			if eventErr != nil {
+				glog.Infof("CreateSnapshot failed with: %v", eventErr)
+			}
+		} else {
+			// Execute create snapshot
+			snapshotTimestamp, snapshotErr := snapshottableVolumePlugin.CreateSnapshot(
+				volumeToSnapshot.VolumeSpec, snapshotName)
+
+			if snapshotErr != nil {
+				// On failure, return error. Caller will log and retry.
+				return fmt.Errorf(
+					"CreateSnapshot.CreateSnapshot failed for volume %q (spec.Name: %q) with: %v",
+					volumeToSnapshot.VolumeName,
+					volumeToSnapshot.VolumeSpec.Name(),
+					snapshotErr)
+			}
+
+			glog.Infof(
+				"CreateSnapshot.CreateSnapshot succeeded for volume %q (spec.Name: %q).",
+				volumeToSnapshot.VolumeName,
+				volumeToSnapshot.VolumeSpec.Name())
+
+			volumeToSnapshot.PersistentVolumeClaim.Annotations[api.SnapshotPrefix+snapshotName] = snapshotTimestamp
+		}
+
+		// Update PVC object
+		delete(volumeToSnapshot.PersistentVolumeClaim.Annotations, api.AnnSnapshotCreate)
+
+		namespace := volumeToSnapshot.PersistentVolumeClaim.Namespace
+		_, updateErr := oe.kubeClient.Core().PersistentVolumeClaims(namespace).Update(volumeToSnapshot.PersistentVolumeClaim)
+		if updateErr != nil {
+			// On failure, return error. Caller will log and retry.
+			return fmt.Errorf(
+				"CreateSnapshot failed removing create-snapshot annotation from PVC %q with: %v",
+				volumeToSnapshot.PersistentVolumeClaim.Name,
+				updateErr)
+		}
+
+		glog.Infof(
+			"CreateSnapshot.CreateSnapshot succeeded removing create-snapshot annotation from PVC %q.",
+			volumeToSnapshot.PersistentVolumeClaim.Name)
+
+		actualStateOfWorld.MarkVolumeAsSnapshotted(volumeToSnapshot.VolumeName)
 
 		return nil
 	}, nil

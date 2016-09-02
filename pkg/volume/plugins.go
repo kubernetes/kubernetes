@@ -165,6 +165,20 @@ type AttachableVolumePlugin interface {
 	GetDeviceMountRefs(deviceMountPath string) ([]string, error)
 }
 
+// SnapshottableVolumePlugin is an extended interface of VolumePlugin and
+// is used for volumes that have snapshot capability.
+// In alpha version, only cloud storage volumes will be supported.
+type SnapshottableVolumePlugin interface {
+	VolumePlugin
+	// CreateSnapshot contains the plugin-specific logic to trigger a snapshot.
+	// In alpha, only implemented for GCE PD.
+	CreateSnapshot(spec *Spec, snapshotName string) (string, error)
+	// SnapshotExists returns whether or not a snapshot with the specified name
+	// exists.
+	// In alpha, only implemented for GCE PD.
+	SnapshotExists(snapshotName string) (bool, error)
+}
+
 // VolumeHost is an interface that plugins can use to access the kubelet.
 type VolumeHost interface {
 	// GetPluginDir returns the absolute path to a directory under which
@@ -516,6 +530,20 @@ func (pm *VolumePluginMgr) FindAttachablePluginByName(name string) (AttachableVo
 	}
 	if attachablePlugin, ok := volumePlugin.(AttachableVolumePlugin); ok {
 		return attachablePlugin, nil
+	}
+	return nil, nil
+}
+
+// FindSnapshottablePluginBySpec fetches a snapshottable volume plugin by name.
+// This does not return error if no plugin is found since snapshots are not
+// supported on all volumes.
+func (pm *VolumePluginMgr) FindSnapshottablePluginBySpec(spec *Spec) (SnapshottableVolumePlugin, error) {
+	volumePlugin, err := pm.FindPluginBySpec(spec)
+	if err != nil {
+		return nil, err
+	}
+	if snapshottablePlugin, ok := volumePlugin.(SnapshottableVolumePlugin); ok {
+		return snapshottablePlugin, nil
 	}
 	return nil, nil
 }

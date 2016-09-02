@@ -144,6 +144,18 @@ type Disks interface {
 	// zone can be provided to specify the zone for the PD,
 	// if empty all managed zones will be searched.
 	GetAutoLabelsForPD(name string, zone string) (map[string]string, error)
+
+	// CreateSnapshot creates a snapshot of a disk
+	CreateSnapshot(diskName string, snapshot *compute.Snapshot) error
+
+	// GetSnapshot gets the snapshot with the specified name
+	GetSnapshot(snapshotName string) (*compute.Snapshot, error)
+
+	// DeleteSnapshot deletes the snapshot with the specified name
+	DeleteSnapshot(snapshotName string) error
+
+	// SnapshotExists checks if a snapshot with the specified name exists
+	SnapshotExists(snapshotName string) (bool, error)
 }
 
 func init() {
@@ -2530,6 +2542,49 @@ func (gce *GCECloud) DiskIsAttached(diskName, instanceID string) (bool, error) {
 	}
 
 	return false, nil
+}
+
+func (gce *GCECloud) CreateSnapshot(diskName string, snapshot *compute.Snapshot) error {
+	disk, err := gce.getDiskByNameUnknownZone(diskName)
+	if err != nil {
+		return err
+	}
+
+	createOp, err := gce.service.Disks.CreateSnapshot(gce.projectID, disk.Zone, disk.Name, snapshot).Do()
+	if err != nil {
+		return err
+	}
+
+	return gce.waitForZoneOp(createOp, disk.Zone)
+}
+
+func (gce *GCECloud) GetSnapshot(snapshotName string) (*compute.Snapshot, error) {
+	snapshot, err := gce.service.Snapshots.Get(gce.projectID, snapshotName).Do()
+	if err != nil {
+		return nil, err
+	}
+
+	return snapshot, nil
+}
+
+func (gce *GCECloud) DeleteSnapshot(snapshotName string) error {
+	deleteOp, err := gce.service.Snapshots.Delete(gce.projectID, snapshotName).Do()
+	if err != nil {
+		return err
+	}
+
+	return gce.waitForGlobalOp(deleteOp)
+}
+
+func (gce *GCECloud) SnapshotExists(snapshotName string) (bool, error) {
+	snapshot, err := gce.GetSnapshot(snapshotName)
+	if snapshot != nil {
+		return true, nil
+	} else if isHTTPErrorCode(err, http.StatusNotFound) {
+		return false, nil
+	} else {
+		return false, err
+	}
 }
 
 // Returns a gceDisk for the disk, if it is found in the specified zone.
