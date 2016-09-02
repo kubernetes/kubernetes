@@ -88,6 +88,7 @@ func packageForGroup(gv unversioned.GroupVersion, typeList []*types.Type, packag
 					},
 					outputPackage: outputPackagePath,
 					group:         normalization.BeforeFirstDot(gv.Group),
+					version:       gv.Version,
 					typeToMatch:   t,
 					imports:       generator.NewImportTracker(),
 				})
