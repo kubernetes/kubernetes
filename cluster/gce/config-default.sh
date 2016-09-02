@@ -17,7 +17,7 @@
 # This will generally always be unique, per machine.
 # This allows people to run kube-up multiple times even if they
 # Are using the same group account.
-GCLOUD_HASH=`gcloud info | md5` && GENERATED_ID="${GCLOUD_HASH:27}"
+GCLOUD_HASH=`gcloud info | grep 'Account\|Project\|Configuration'` && GENERATED_ID="${GCLOUD_HASH:27}"
 
 # TODO(jbeda): Provide a way to override project
 # gcloud multiplexing for shared GCE/GKE tests.
