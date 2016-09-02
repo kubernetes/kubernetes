@@ -257,8 +257,8 @@ function create-federation-apiserver-certs {
   local sans
 
   if [[ "${IS_DNS_NAME:-}" == "true" ]];then
-      primary_cn="${MASTER_NAME}"
-      sans="DNS:${1}"
+      primary_cn="$(printf "${1}" | sha1sum | tr " -" " ")"
+      sans="DNS:${1},DNS:${MASTER_NAME}"
   else
       primary_cn="${1}"
       sans="IP:${1},DNS:${MASTER_NAME}"
