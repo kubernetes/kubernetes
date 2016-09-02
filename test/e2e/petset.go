@@ -26,6 +26,7 @@ import (
 
 	inf "gopkg.in/inf.v0"
 
+	"github.com/golang/glog"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"k8s.io/kubernetes/pkg/api"
@@ -243,6 +244,130 @@ var _ = framework.KubeDescribe("PetSet [Slow] [Feature:PetSet]", func() {
 	})
 })
 
+var _ = framework.KubeDescribe("Pet set recreate [Slow] [Feature:PetSet]", func() {
+	f := framework.NewDefaultFramework("pet-set-recreate")
+	var c *client.Client
+	var ns string
+
+	labels := map[string]string{
+		"foo": "bar",
+		"baz": "blah",
+	}
+	headlessSvcName := "test"
+	pvName := "pv-local-0"
+	podName := "test-pod"
+	petSetName := "web"
+	petPodName := "web-0"
+
+	BeforeEach(func() {
+		By("creating service " + headlessSvcName + " in namespace " + f.Namespace.Name)
+		headlessService := createServiceSpec(headlessSvcName, "", true, labels)
+		_, err := f.Client.Services(f.Namespace.Name).Create(headlessService)
+		framework.ExpectNoError(err)
+		c = f.Client
+		ns = f.Namespace.Name
+	})
+
+	AfterEach(func() {
+		if framework.ProviderIs("vagrant") {
+			By("cleaning created pv")
+			err := c.PersistentVolumes().Delete(pvName)
+			framework.ExpectNoError(err)
+		}
+		if CurrentGinkgoTestDescription().Failed {
+			dumpDebugInfo(c, ns)
+		}
+		By("Deleting all petset in ns " + ns)
+		deleteAllPetSets(c, ns)
+	})
+
+	It("should recreate evicted petset", func() {
+		By("looking for a node to schedule pet set and pod")
+		nodes := framework.GetReadySchedulableNodesOrDie(f.Client)
+		node := nodes.Items[0]
+
+		By("creating pod with conflicting port in namespace " + f.Namespace.Name)
+		conflictingPort := api.ContainerPort{HostPort: 21017, ContainerPort: 21017, Name: "conflict"}
+		pod := &api.Pod{
+			ObjectMeta: api.ObjectMeta{
+				Name: podName,
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name:  "nginx",
+						Image: "gcr.io/google_containers/nginx-slim:0.7",
+						Ports: []api.ContainerPort{conflictingPort},
+					},
+				},
+				NodeName: node.Name,
+			},
+		}
+		pod, err := f.Client.Pods(f.Namespace.Name).Create(pod)
+		framework.ExpectNoError(err)
+
+		By("creating petset with conflicting port in namespace " + f.Namespace.Name)
+		petMounts := []api.VolumeMount{{Name: "datadir", MountPath: "/data/"}}
+		podMounts := []api.VolumeMount{{Name: "home", MountPath: "/home"}}
+		ps := newPetSet(petSetName, f.Namespace.Name, headlessSvcName, 1, petMounts, podMounts, labels)
+		petContainer := &ps.Spec.Template.Spec.Containers[0]
+		petContainer.Ports = append(petContainer.Ports, conflictingPort)
+		ps.Spec.Template.Spec.NodeName = node.Name
+		if framework.ProviderIs("vagrant") {
+			glog.Infof("creating pv web-datadir-0 in namespace %v", f.Namespace.Name)
+			_, err := f.Client.PersistentVolumes().Create(newLocalPV(pvName, map[string]string{"type": "local"}))
+			framework.ExpectNoError(err)
+		}
+		_, err = f.Client.Apps().PetSets(f.Namespace.Name).Create(ps)
+		framework.ExpectNoError(err)
+
+		By("waiting until pod " + podName + " pet pod " + petPodName + " will be created in namespace " + f.Namespace.Name)
+		Eventually(func() error {
+			_, err := f.Client.Pods(f.Namespace.Name).Get(petPodName)
+			if err != nil {
+				return err
+			}
+			_, err = f.Client.Pods(f.Namespace.Name).Get(podName)
+			if err != nil {
+				return err
+			}
+			return nil
+		}, 2*time.Minute, 2*time.Second).Should(BeNil())
+
+		petPod, err := f.Client.Pods(f.Namespace.Name).Get(petPodName)
+		framework.ExpectNoError(err)
+		initialPetPodUID := petPod.UID
+
+		By("waiting until pet pod will enter failed state in namespace " + f.Namespace.Name)
+		Eventually(func() error {
+			petPod, err := f.Client.Pods(f.Namespace.Name).Get(petPod.Name)
+			// if err not nil - pod was already removed and we can move on to the next step
+			if petPod.Status.Phase == api.PodFailed || err != nil {
+				return nil
+			}
+			return fmt.Errorf("pet pod %v expected to fail", petPod.Name)
+		}, 2*time.Minute, 2*time.Second).Should(BeNil())
+
+		By("removing pod with conflicting port in namespace " + f.Namespace.Name)
+		err = f.Client.Pods(f.Namespace.Name).Delete(pod.Name, api.NewDeleteOptions(0))
+		framework.ExpectNoError(err)
+
+		By("waiting when pet pod will be recreated in namespace " + f.Namespace.Name)
+		Eventually(func() error {
+			petPod, err := f.Client.Pods(f.Namespace.Name).Get(petPod.Name)
+			if err != nil {
+				return err
+			}
+			if petPod.Status.Phase == api.PodRunning && petPod.UID != initialPetPodUID {
+				return nil
+			}
+			return fmt.Errorf(
+				"pet pod %v with initial UID %v expected to be recreated with new UID %v and running",
+				petPod.Name, initialPetPodUID, petPod.UID)
+		}, 1*time.Minute, 2*time.Second).Should(BeNil())
+	})
+})
+
 func dumpDebugInfo(c *client.Client, ns string) {
 	pl, _ := c.Pods(ns).List(api.ListOptions{LabelSelector: labels.Everything()})
 	for _, p := range pl.Items {
@@ -264,6 +389,26 @@ func kubectlExecWithRetries(args ...string) (out string) {
 	}
 	framework.Failf("Failed to execute \"%v\" with retries: %v", args, err)
 	return
+}
+
+func newLocalPV(name string, labels map[string]string) *api.PersistentVolume {
+	return &api.PersistentVolume{
+		ObjectMeta: api.ObjectMeta{
+			Name:   name,
+			Labels: labels,
+		},
+		Spec: api.PersistentVolumeSpec{
+			AccessModes: []api.PersistentVolumeAccessMode{
+				api.ReadWriteOnce,
+			},
+			Capacity: api.ResourceList{
+				api.ResourceName(api.ResourceStorage): *resource.NewQuantity(1, resource.BinarySI),
+			},
+			PersistentVolumeSource: api.PersistentVolumeSource{
+				HostPath: &api.HostPathVolumeSource{fmt.Sprintf("/tmp/%s", name)},
+			},
+		},
+	}
 }
 
 type petTester interface {
@@ -676,12 +821,17 @@ func dec(i int64, exponent int) *inf.Dec {
 }
 
 func newPVC(name string) api.PersistentVolumeClaim {
+	// TODO storage class for vagrant provider https://github.com/kubernetes/kubernetes/issues/32119
+	var annotations map[string]string
+	if !framework.ProviderIs("vagrant") {
+		annotations = map[string]string{
+			"volume.alpha.kubernetes.io/storage-class": "anything",
+		}
+	}
 	return api.PersistentVolumeClaim{
 		ObjectMeta: api.ObjectMeta{
-			Name: name,
-			Annotations: map[string]string{
-				"volume.alpha.kubernetes.io/storage-class": "anything",
-			},
+			Name:        name,
+			Annotations: annotations,
 		},
 		Spec: api.PersistentVolumeClaimSpec{
 			AccessModes: []api.PersistentVolumeAccessMode{
