@@ -83,7 +83,7 @@ func newKubeClient(dnsConfig *options.KubeDNSConfig) (clientset.Interface, error
 		//  3) neither flag
 		// In any case, the logic is the same.  If (3), this will automatically
 		// fall back on the service account token.
-		overrides := &kclientcmd.ConfigOverrides{}
+		overrides := &kclientcmd.ConfigOverrides{ClusterDefaults: kclientcmd.DefaultCluster}  // need this because ClientConfig would not set DefaultCluster now
 		overrides.ClusterInfo.Server = dnsConfig.KubeMasterURL                                // might be "", but that is OK
 		rules := &kclientcmd.ClientConfigLoadingRules{ExplicitPath: dnsConfig.KubeConfigFile} // might be "", but that is OK
 		if config, err = kclientcmd.NewNonInteractiveDeferredLoadingClientConfig(rules, overrides).ClientConfig(); err != nil {
