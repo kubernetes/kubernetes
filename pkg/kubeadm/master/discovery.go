@@ -62,7 +62,7 @@ func encodeKubeDiscoverySecretData(params *kubeadmapi.BootstrapParams, caCert *x
 
 func newKubeDiscoveryPodSpec(params *kubeadmapi.BootstrapParams) api.PodSpec {
 	return api.PodSpec{
-		SecurityContext: &api.PodSecurityContext{HostNetwork: true}, // TODO we should just use map it to a host port
+		// SecurityContext: &api.PodSecurityContext{HostNetwork: true},
 		Containers: []api.Container{{
 			Name:    kubeDiscoverynName,
 			Image:   params.EnvParams["discovery_image"],
@@ -72,6 +72,9 @@ func newKubeDiscoveryPodSpec(params *kubeadmapi.BootstrapParams) api.PodSpec {
 				MountPath: "/tmp/secret", // TODO use a shared constant
 				ReadOnly:  true,
 			}},
+			Ports: []api.ContainerPort{
+				{Name: "http", ContainerPort: 9898, HostPort: 9898},
+			},
 		}},
 		Volumes: []api.Volume{{
 			Name: kubeDiscoverySecretName,

@@ -53,6 +53,7 @@ func CreateClientAndWaitForAPI(adminConfig *clientcmdapi.Config) (*clientset.Cli
 		if err != nil {
 			return false, nil
 		}
+		// TODO revisit this when we implement HA
 		if len(cs.Items) < 3 {
 			fmt.Println("<master/apiclient> not all control plane components are ready yet")
 			return false, nil
@@ -66,7 +67,7 @@ func CreateClientAndWaitForAPI(adminConfig *clientcmdapi.Config) (*clientset.Cli
 			}
 		}
 
-		fmt.Printf("<master/apiclient> all control plane components are healthy after %s seconds\n", time.Since(start).Seconds())
+		fmt.Printf("<master/apiclient> all control plane components are healthy after %f seconds\n", time.Since(start).Seconds())
 		return true, nil
 	})
 
