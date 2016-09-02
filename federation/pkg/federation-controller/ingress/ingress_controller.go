@@ -128,12 +128,12 @@ func NewIngressController(client federationclientset.Interface) *IngressControll
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (pkg_runtime.Object, error) {
 				// TODO: remove this when Reflector takes an interface rather than a particular ListOptions as input parameter.
-				versionedOptions := util.VersionizeExtensionsV1Beta1ListOptions(options)
+				versionedOptions := util.VersionizeV1ListOptions(options)
 				return client.Extensions().Ingresses(api.NamespaceAll).List(versionedOptions)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 				// TODO: remove this when Reflector takes an interface rather than a particular ListOptions as input parameter.
-				versionedOptions := util.VersionizeExtensionsV1Beta1ListOptions(options)
+				versionedOptions := util.VersionizeV1ListOptions(options)
 				return client.Extensions().Ingresses(api.NamespaceAll).Watch(versionedOptions)
 			},
 		},
@@ -153,12 +153,12 @@ func NewIngressController(client federationclientset.Interface) *IngressControll
 				&cache.ListWatch{
 					ListFunc: func(options api.ListOptions) (pkg_runtime.Object, error) {
 						// TODO: remove this when Reflector takes an interface rather than a particular ListOptions as input parameter.
-						versionedOptions := util.VersionizeExtensionsV1Beta1ListOptions(options)
+						versionedOptions := util.VersionizeV1ListOptions(options)
 						return targetClient.Extensions().Ingresses(api.NamespaceAll).List(versionedOptions)
 					},
 					WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 						// TODO: remove this when Reflector takes an interface rather than a particular ListOptions as input parameter.
-						versionedOptions := util.VersionizeExtensionsV1Beta1ListOptions(options)
+						versionedOptions := util.VersionizeV1ListOptions(options)
 						return targetClient.Extensions().Ingresses(api.NamespaceAll).Watch(versionedOptions)
 					},
 				},

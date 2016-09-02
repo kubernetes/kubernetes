@@ -122,12 +122,12 @@ func NewReplicaSetController(federationClient fedclientset.Interface) *ReplicaSe
 			&cache.ListWatch{
 				ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 					// TODO: remove this when Reflector takes an interface rather than a particular ListOptions as input parameter.
-					versionedOptions := fedutil.VersionizeExtensionsV1Beta1ListOptions(options)
+					versionedOptions := fedutil.VersionizeV1ListOptions(options)
 					return clientset.Extensions().ReplicaSets(apiv1.NamespaceAll).List(versionedOptions)
 				},
 				WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 					// TODO: remove this when Reflector takes an interface rather than a particular ListOptions as input parameter.
-					versionedOptions := fedutil.VersionizeExtensionsV1Beta1ListOptions(options)
+					versionedOptions := fedutil.VersionizeV1ListOptions(options)
 					return clientset.Extensions().ReplicaSets(apiv1.NamespaceAll).Watch(versionedOptions)
 				},
 			},
@@ -177,12 +177,12 @@ func NewReplicaSetController(federationClient fedclientset.Interface) *ReplicaSe
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				// TODO: remove this when Reflector takes an interface rather than a particular ListOptions as input parameter.
-				versionedOptions := fedutil.VersionizeExtensionsV1Beta1ListOptions(options)
+				versionedOptions := fedutil.VersionizeV1ListOptions(options)
 				return frsc.fedClient.Extensions().ReplicaSets(apiv1.NamespaceAll).List(versionedOptions)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 				// TODO: remove this when Reflector takes an interface rather than a particular ListOptions as input parameter.
-				versionedOptions := fedutil.VersionizeExtensionsV1Beta1ListOptions(options)
+				versionedOptions := fedutil.VersionizeV1ListOptions(options)
 				return frsc.fedClient.Extensions().ReplicaSets(apiv1.NamespaceAll).Watch(versionedOptions)
 			},
 		},

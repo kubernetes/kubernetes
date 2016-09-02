@@ -144,12 +144,6 @@ func (g *genFakeForType) GenerateType(c *generator.Context, t *types.Type, w io.
 		m["DeleteOptions"] = c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/api/v1", Name: "DeleteOptions"})
 		m["ListOptions"] = c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/api/v1", Name: "ListOptions"})
 	}
-	if c.Universe.Package(t.Name.Package).Has("DeleteOptions") {
-		m["DeleteOptions"] = c.Universe.Type(types.Name{Package: t.Name.Package, Name: "DeleteOptions"})
-	}
-	if c.Universe.Package(t.Name.Package).Has("ListOptions") {
-		m["ListOptions"] = c.Universe.Type(types.Name{Package: t.Name.Package, Name: "ListOptions"})
-	}
 
 	noMethods := extractBoolTagOrDie("noMethods", t.SecondClosestCommentLines) == true
 

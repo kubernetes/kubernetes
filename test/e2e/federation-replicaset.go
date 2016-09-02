@@ -51,7 +51,7 @@ var _ = framework.KubeDescribe("Federation replicasets [Feature:Federation]", fu
 
 			// Delete registered replicasets.
 			nsName := f.FederationNamespace.Name
-			replicasetList, err := f.FederationClientset_1_4.Extensions().ReplicaSets(nsName).List(v1beta1.ListOptions{})
+			replicasetList, err := f.FederationClientset_1_4.Extensions().ReplicaSets(nsName).List(v1.ListOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			for _, replicaset := range replicasetList.Items {
 				err := f.FederationClientset_1_4.Extensions().ReplicaSets(nsName).Delete(replicaset.Name, &v1.DeleteOptions{})

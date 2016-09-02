@@ -54,7 +54,7 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 		AfterEach(func() {
 			nsName := f.FederationNamespace.Name
 			// Delete registered ingresses.
-			ingressList, err := f.FederationClientset_1_4.Extensions().Ingresses(nsName).List(v1beta1.ListOptions{})
+			ingressList, err := f.FederationClientset_1_4.Extensions().Ingresses(nsName).List(v1.ListOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			for _, ingress := range ingressList.Items {
 				err := f.FederationClientset_1_4.Extensions().Ingresses(nsName).Delete(ingress.Name, &v1.DeleteOptions{})

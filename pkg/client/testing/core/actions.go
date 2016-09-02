@@ -24,7 +24,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -230,16 +229,6 @@ func ExtractFromListOptions(opts interface{}) (labelSelector labels.Selector, fi
 		fieldSelector = t.FieldSelector
 		resourceVersion = t.ResourceVersion
 	case v1.ListOptions:
-		labelSelector, err = labels.Parse(t.LabelSelector)
-		if err != nil {
-			panic(err)
-		}
-		fieldSelector, err = fields.ParseSelector(t.FieldSelector)
-		if err != nil {
-			panic(err)
-		}
-		resourceVersion = t.ResourceVersion
-	case v1beta1.ListOptions:
 		labelSelector, err = labels.Parse(t.LabelSelector)
 		if err != nil {
 			panic(err)
