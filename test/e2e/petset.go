@@ -37,16 +37,20 @@ import (
 	"k8s.io/kubernetes/pkg/controller/petset"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
 	utilyaml "k8s.io/kubernetes/pkg/util/yaml"
+	"k8s.io/kubernetes/pkg/watch"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 const (
 	petsetPoll = 10 * time.Second
 	// Some pets install base packages via wget
-	petsetTimeout           = 10 * time.Minute
+	petsetTimeout = 10 * time.Minute
+	// Timeout for pet pods to change state
+	petPodTimeout           = 5 * time.Minute
 	zookeeperManifestPath   = "test/e2e/testing-manifests/petset/zookeeper"
 	mysqlGaleraManifestPath = "test/e2e/testing-manifests/petset/mysql-galera"
 	redisManifestPath       = "test/e2e/testing-manifests/petset/redis"
@@ -240,6 +244,121 @@ var _ = framework.KubeDescribe("PetSet [Slow] [Feature:PetSet]", func() {
 				framework.Failf("Read unexpected value %v, expected bar under key foo", v)
 			}
 		})
+	})
+})
+
+var _ = framework.KubeDescribe("Pet set recreate [Slow] [Feature:PetSet]", func() {
+	f := framework.NewDefaultFramework("pet-set-recreate")
+	var c *client.Client
+	var ns string
+
+	labels := map[string]string{
+		"foo": "bar",
+		"baz": "blah",
+	}
+	headlessSvcName := "test"
+	podName := "test-pod"
+	petSetName := "web"
+	petPodName := "web-0"
+
+	BeforeEach(func() {
+		framework.SkipUnlessProviderIs("gce", "vagrant")
+		By("creating service " + headlessSvcName + " in namespace " + f.Namespace.Name)
+		headlessService := createServiceSpec(headlessSvcName, "", true, labels)
+		_, err := f.Client.Services(f.Namespace.Name).Create(headlessService)
+		framework.ExpectNoError(err)
+		c = f.Client
+		ns = f.Namespace.Name
+	})
+
+	AfterEach(func() {
+		if CurrentGinkgoTestDescription().Failed {
+			dumpDebugInfo(c, ns)
+		}
+		By("Deleting all petset in ns " + ns)
+		deleteAllPetSets(c, ns)
+	})
+
+	It("should recreate evicted petset", func() {
+		By("looking for a node to schedule pet set and pod")
+		nodes := framework.GetReadySchedulableNodesOrDie(f.Client)
+		node := nodes.Items[0]
+
+		By("creating pod with conflicting port in namespace " + f.Namespace.Name)
+		conflictingPort := api.ContainerPort{HostPort: 21017, ContainerPort: 21017, Name: "conflict"}
+		pod := &api.Pod{
+			ObjectMeta: api.ObjectMeta{
+				Name: podName,
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name:  "nginx",
+						Image: "gcr.io/google_containers/nginx-slim:0.7",
+						Ports: []api.ContainerPort{conflictingPort},
+					},
+				},
+				NodeName: node.Name,
+			},
+		}
+		pod, err := f.Client.Pods(f.Namespace.Name).Create(pod)
+		framework.ExpectNoError(err)
+
+		By("creating petset with conflicting port in namespace " + f.Namespace.Name)
+		ps := newPetSet(petSetName, f.Namespace.Name, headlessSvcName, 1, nil, nil, labels)
+		petContainer := &ps.Spec.Template.Spec.Containers[0]
+		petContainer.Ports = append(petContainer.Ports, conflictingPort)
+		ps.Spec.Template.Spec.NodeName = node.Name
+		_, err = f.Client.Apps().PetSets(f.Namespace.Name).Create(ps)
+		framework.ExpectNoError(err)
+
+		By("waiting until pod " + podName + " will start running in namespace " + f.Namespace.Name)
+		if err := f.WaitForPodRunning(podName); err != nil {
+			framework.Failf("Pod %v did not start running: %v", podName, err)
+		}
+
+		var initialPetPodUID types.UID
+		By("waiting until pet pod " + petPodName + " will be recreated and deleted at least once in namespace " + f.Namespace.Name)
+		w, err := f.Client.Pods(f.Namespace.Name).Watch(api.SingleObject(api.ObjectMeta{Name: petPodName}))
+		framework.ExpectNoError(err)
+		// we need to get UID from pod in any state and wait until pet set controller will remove pod atleast once
+		_, err = watch.Until(petPodTimeout, w, func(event watch.Event) (bool, error) {
+			pod := event.Object.(*api.Pod)
+			switch event.Type {
+			case watch.Deleted:
+				framework.Logf("Observed delete event for pet pod %v in namespace %v", pod.Name, pod.Namespace)
+				if initialPetPodUID == "" {
+					return false, nil
+				}
+				return true, nil
+			}
+			framework.Logf("Observed pet pod in namespace: %v, name: %v, uid: %v, status phase: %v. Waiting for petset controller to delete.",
+				pod.Namespace, pod.Name, pod.UID, pod.Status.Phase)
+			initialPetPodUID = pod.UID
+			return false, nil
+		})
+		if err != nil {
+			framework.Failf("Pod %v expected to be re-created atleast once", petPodName)
+		}
+
+		By("removing pod with conflicting port in namespace " + f.Namespace.Name)
+		err = f.Client.Pods(f.Namespace.Name).Delete(pod.Name, api.NewDeleteOptions(0))
+		framework.ExpectNoError(err)
+
+		By("waiting when pet pod " + petPodName + " will be recreated in namespace " + f.Namespace.Name + " and will be in running state")
+		// we may catch delete event, thats why we are waiting for running phase like this, and not with watch.Until
+		Eventually(func() error {
+			petPod, err := f.Client.Pods(f.Namespace.Name).Get(petPodName)
+			if err != nil {
+				return err
+			}
+			if petPod.Status.Phase != api.PodRunning {
+				return fmt.Errorf("Pod %v is not in running phase: %v", petPod.Name, petPod.Status.Phase)
+			} else if petPod.UID == initialPetPodUID {
+				return fmt.Errorf("Pod %v wasn't recreated: %v == %v", petPod.Name, petPod.UID, initialPetPodUID)
+			}
+			return nil
+		}, petPodTimeout, 2*time.Second).Should(BeNil())
 	})
 })
 
