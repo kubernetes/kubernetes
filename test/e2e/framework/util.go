@@ -965,7 +965,7 @@ func WaitForSnapshotCreated(c *client.Client, ns, pvcName, snapshotName string, 
 			Logf("Get persistent volume claim %s in failed, ignoring for %v: %v", pvcName, Poll, err)
 			continue
 		} else {
-			if snapshotTimestamp, exists := pvc.Annotations[snapshotName]; exists {
+			if snapshotTimestamp, exists := pvc.Annotations[api.SnapshotPrefix+snapshotName]; exists {
 				Logf("Snapshot %s found and timestamp=%s (%v)", snapshotName, snapshotTimestamp, time.Since(start))
 				return nil
 			} else {

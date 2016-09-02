@@ -447,7 +447,8 @@ const (
 const (
 	// AnnSnapshotCreate is the string key value for the snapshot creation
 	// annotation on the pvc object
-	AnnSnapshotCreate string = "volume.alpha.kubernetes.io/snapshot-create"
+	AnnSnapshotCreate string = "create.snapshot.volume.alpha.kubernetes.io"
+	SnapshotPrefix    string = "snapshot.volume.alpha.kubernetes.io/"
 )
 
 // Represents a host path mapped into a pod.

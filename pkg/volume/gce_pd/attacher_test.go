@@ -376,3 +376,7 @@ func (testcase *testcase) GetSnapshot(snapshotName string) (*compute.Snapshot, e
 func (testcase *testcase) SnapshotExists(snapshotName string) (bool, error) {
 	return false, errors.New("Not implemented")
 }
+
+func (testcase *testcase) DeleteSnapshot(snapshotName string) error {
+	return errors.New("Not implemented")
+}

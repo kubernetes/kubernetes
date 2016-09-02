@@ -1082,7 +1082,7 @@ func (oe *operationExecutor) generateCreateSnapshotFunc(
 				volumeToSnapshot.VolumeName,
 				volumeToSnapshot.VolumeSpec.Name())
 
-			volumeToSnapshot.PersistentVolumeClaim.Annotations[snapshotName] = snapshotTimestamp
+			volumeToSnapshot.PersistentVolumeClaim.Annotations[api.SnapshotPrefix+snapshotName] = snapshotTimestamp
 		}
 
 		// Update PVC object
