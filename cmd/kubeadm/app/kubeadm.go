@@ -41,7 +41,7 @@ func getEnvParams() map[string]string {
 		"discovery_image": "dgoodwin/kubediscovery:latest",
 	}
 
-	for k, _ := range envParams {
+	for k := range envParams {
 		if v := os.Getenv(fmt.Sprintf("KUBE_%s", strings.ToUpper(k))); v != "" {
 			envParams[k] = v
 		}
