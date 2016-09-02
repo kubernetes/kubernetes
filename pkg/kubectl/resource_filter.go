@@ -6,6 +6,7 @@ import (
 	"reflect"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
@@ -42,6 +43,7 @@ func NewResourceFilter(opts *PrintOptions) ResourceFilter {
 
 func (f *filterOptions) addDefaultHandlers() {
 	f.AddFilter(reflect.TypeOf(&api.Pod{}), filterPods)
+	f.AddFilter(reflect.TypeOf(&v1.Pod{}), filterPods)
 }
 
 func (f *filterOptions) AddFilter(objType reflect.Type, handlerFn FilterFunc) error {
@@ -52,15 +54,26 @@ func (f *filterOptions) AddFilter(objType reflect.Type, handlerFn FilterFunc) er
 // filterPods is a FilterFunc type implementation.
 // returns true if a pod should be skipped. Defaults to true for terminated pods
 func filterPods(obj runtime.Object, options PrintOptions) bool {
-	if pod, ok := obj.(*api.Pod); ok {
-		reason := string(pod.Status.Phase)
-		if pod.Status.Reason != "" {
-			reason = pod.Status.Reason
+	var reason string
+
+	switch p := obj.(type) {
+	case *v1.Pod:
+		reason = string(p.Status.Phase)
+		if p.Status.Reason != "" {
+			reason = p.Status.Reason
 		}
-		return !options.ShowAll && (reason == string(api.PodSucceeded) || reason == string(api.PodFailed))
+	case *api.Pod:
+		reason = string(p.Status.Phase)
+		if p.Status.Reason != "" {
+			reason = p.Status.Reason
+		}
 	}
 
-	return false
+	if len(reason) == 0 {
+		return false
+	}
+
+	return !options.ShowAll && (reason == string(api.PodSucceeded) || reason == string(api.PodFailed))
 }
 
 // PrintFilterCount prints an info message indicating the amount of resources

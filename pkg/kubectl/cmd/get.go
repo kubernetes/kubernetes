@@ -23,6 +23,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
+	"k8s.io/kubernetes/pkg/api"
 
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/kubectl"
@@ -284,6 +285,11 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 	}
 
 	if generic {
+		clientConfig, err := f.ClientConfig()
+		if err != nil {
+			return err
+		}
+
 		allErrs := []error{}
 		singular := false
 		infos, err := r.IntoSingular(&singular).Infos()
@@ -294,22 +300,52 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 			allErrs = append(allErrs, err)
 		}
 
+		// the outermost object will be converted to the output-version, but inner
+		// objects can use their mappings
+		version, err := cmdutil.OutputVersion(cmd, clientConfig.GroupVersion)
+		if err != nil {
+			return err
+		}
+
 		res := ""
 		if len(infos) > 0 {
 			res = infos[0].ResourceMapping().Resource
 		}
 
-		for ix := range infos {
-			if isFiltered, err := filterFunc(infos[ix].Object); !isFiltered {
-				if err != nil {
-					allErrs = append(allErrs, err)
-					continue
+		obj, err := resource.AsVersionedObject(infos, !singular, version, f.JSONEncoder())
+		if err != nil {
+			return err
+		}
+
+		if meta.IsListType(obj) {
+			items, err := meta.ExtractList(obj)
+			if err != nil {
+				return err
+			}
+			if errs := runtime.DecodeList(items, api.Codecs.UniversalDecoder(), runtime.UnstructuredJSONScheme); len(errs) > 0 {
+				return utilerrors.NewAggregate(errs)
+			}
+			for _, obj := range items {
+				if isFiltered, err := filterFunc(obj); !isFiltered {
+					if err != nil {
+						glog.V(2).Infof("Unable to filter resource: %v", err)
+						continue
+					}
+					if err := printer.PrintObj(obj, out); err != nil {
+						allErrs = append(allErrs, err)
+					}
 				}
-				if err := printer.PrintObj(infos[ix].Object, out); err != nil {
-					allErrs = append(allErrs, err)
-				}
-			} else if err != nil {
+			}
+
+			filterOpts.PrintFilterCount(errOut, res)
+			return utilerrors.NewAggregate(allErrs)
+		}
+
+		if isFiltered, err := filterFunc(obj); !isFiltered {
+			if err != nil {
 				glog.V(2).Infof("Unable to filter resource: %v", err)
+			} else if err := printer.PrintObj(obj, out); err != nil {
+				allErrs = append(allErrs, err)
 			}
 		}
 
