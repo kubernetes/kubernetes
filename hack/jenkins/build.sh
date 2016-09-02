@@ -67,7 +67,7 @@ go run ./hack/e2e.go -v --build
 # Push to GCS?
 if [[ ${KUBE_SKIP_PUSH_GCS:-} =~ ^[yY]$ ]]; then
   echo "Not pushed to GCS..."
-elif ${RELEASE_INFRA_PUSH-}; then
+else
   readonly release_infra_clone="${WORKSPACE}/_tmp/release.git"
   mkdir -p ${WORKSPACE}/_tmp
   git clone https://github.com/kubernetes/release ${release_infra_clone}
@@ -84,9 +84,7 @@ elif ${RELEASE_INFRA_PUSH-}; then
   ${FEDERATION} && federation_flag="--federation"
   ${SET_NOMOCK_FLAG} && mock_flag="--nomock"
   ${release_infra_clone}/push-ci-build.sh ${bucket_flag-} ${federation_flag-} \
-                                          ${mock_flag-}
-else
-  ./build/push-ci-build.sh
+                                          ${mock_flag-} --verbose
 fi
 
 sha256sum _output/release-tars/kubernetes*.tar.gz
