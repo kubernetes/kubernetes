@@ -446,6 +446,8 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 
 	framework.KubeDescribe("Hazelcast", func() {
 		It("should create and scale hazelcast", func() {
+			framework.Skipf("Skipping because of upstream race condition. Remove Skip when https://github.com/pires/hazelcast-kubernetes-bootstrapper/issues/9 is fixed")
+
 			mkpath := func(file string) string {
 				return filepath.Join(framework.TestContext.RepoRoot, "examples/storage/hazelcast", file)
 			}
