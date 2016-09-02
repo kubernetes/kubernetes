@@ -64,8 +64,9 @@ var _ = framework.KubeDescribe("Summary API", func() {
 					"UsageCoreNanoSeconds": bounded(10000000, 1E15),
 				}),
 				"Memory": structP(m.Fields{
-					"Time":            m.Recent(maxStatsAge),
-					"AvailableBytes":  bounded(100*mb, 100*gb),
+					"Time": m.Recent(maxStatsAge),
+					// We don't limit system container memory.
+					"AvailableBytes":  BeNil(),
 					"UsageBytes":      bounded(10*mb, 1*gb),
 					"WorkingSetBytes": bounded(10*mb, 1*gb),
 					"RSSBytes":        bounded(10*mb, 1*gb),
@@ -130,15 +131,16 @@ var _ = framework.KubeDescribe("Summary API", func() {
 							"AvailableBytes": fsCapacityBounds,
 							"CapacityBytes":  fsCapacityBounds,
 							"UsedBytes":      bounded(kb, 1*mb),
-							"InodesFree":     BeNil(),
-							"Inodes":         BeNil(),
+							// Inodes are not reported for Volumes.
+							"InodesFree": BeNil(),
+							"Inodes":     BeNil(),
 						}),
 					}),
 				}),
 			})
 			matchExpectations := structP(m.Fields{
 				"Node": m.StrictStruct(m.Fields{
-					"NodeName":  m.Ignore(),
+					"NodeName":  Equal(framework.TestContext.NodeName),
 					"StartTime": m.Recent(maxStartAge),
 					"SystemContainers": m.StrictSlice(summaryObjectID, m.Elements{
 						"kubelet": sysContExpectations,
@@ -153,8 +155,8 @@ var _ = framework.KubeDescribe("Summary API", func() {
 						"Time":            m.Recent(maxStatsAge),
 						"AvailableBytes":  bounded(100*mb, 100*gb),
 						"UsageBytes":      bounded(10*mb, 10*gb),
-						"WorkingSetBytes": bounded(10*mb, 1*gb),
-						"RSSBytes":        bounded(1*mb, 1*gb),
+						"WorkingSetBytes": bounded(10*mb, 10*gb),
+						"RSSBytes":        bounded(1*kb, 1*gb),
 						"PageFaults":      bounded(1000, 1E9),
 						"MajorPageFaults": bounded(0, 100000),
 					}),
@@ -185,7 +187,8 @@ var _ = framework.KubeDescribe("Summary API", func() {
 						}),
 					}),
 				}),
-				"Pods": m.StrictSlice(summaryObjectID, m.Elements{
+				// Ignore extra pods since the tests run in parallel.
+				"Pods": m.LooseSlice(summaryObjectID, m.IgnoreExtras, m.Elements{
 					fmt.Sprintf("%s::%s", f.Namespace.Name, pod0): podExpectations,
 					fmt.Sprintf("%s::%s", f.Namespace.Name, pod1): podExpectations,
 				}),
