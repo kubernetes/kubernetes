@@ -333,7 +333,7 @@ func (f *Framework) AfterEach() {
 		if len(nsDeletionErrors) != 0 {
 			messages := []string{}
 			for namespaceKey, namespaceErr := range nsDeletionErrors {
-				messages = append(messages, fmt.Sprintf("Couldn't delete ns: %q: %s", namespaceKey, namespaceErr))
+				messages = append(messages, fmt.Sprintf("Couldn't delete ns: %q: %s (%#v)", namespaceKey, namespaceErr, namespaceErr))
 			}
 			Failf(strings.Join(messages, ","))
 		}
