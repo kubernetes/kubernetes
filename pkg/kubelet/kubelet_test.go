@@ -286,7 +286,7 @@ func TestSyncLoopTimeUpdate(t *testing.T) {
 	kubelet := testKubelet.kubelet
 
 	loopTime1 := kubelet.LatestLoopEntryTime()
-	require.True(t, loopTime1.IsZero(), "Sync loop time")
+	require.True(t, loopTime1.IsZero(), "Expect ync loop time to be zero")
 
 	// Start sync ticker.
 	syncCh := make(chan time.Time, 1)
@@ -295,13 +295,14 @@ func TestSyncLoopTimeUpdate(t *testing.T) {
 	syncCh <- time.Now()
 	kubelet.syncLoopIteration(make(chan kubetypes.PodUpdate), kubelet, syncCh, housekeepingCh, plegCh)
 	loopTime2 := kubelet.LatestLoopEntryTime()
-	require.False(t, loopTime2.IsZero(), "Sync loop time")
+	require.False(t, loopTime2.IsZero(), "Expect sync loop time to be non-zero")
 
 	syncCh <- time.Now()
 	kubelet.syncLoopIteration(make(chan kubetypes.PodUpdate), kubelet, syncCh, housekeepingCh, plegCh)
 	loopTime3 := kubelet.LatestLoopEntryTime()
 	require.True(t, loopTime3.After(loopTime1),
-		"Sync Loop Time was not updated correctly. Second update timestamp should be greater than first update timestamp")
+		"Sync Loop Time was not updated correctly. Second update timestamp %v should be greater than first update timestamp %v",
+		loopTime3, loopTime1)
 }
 
 func TestSyncLoopAbort(t *testing.T) {
@@ -406,12 +407,9 @@ func TestVolumeAttachAndMountControllerDisabled(t *testing.T) {
 		volumehelper.GetUniquePodName(pod))
 
 	expectedPodVolumes := []string{"vol1"}
-	assert.Equal(t, len(expectedPodVolumes), len(podVolumes),
-		"Unexpected volumes. Expected %#v got %#v.  Manifest was: %#v", expectedPodVolumes, podVolumes, pod)
+	assert.Len(t, podVolumes, len(expectedPodVolumes), "Volumes for pod %+v", pod)
 	for _, name := range expectedPodVolumes {
-		if _, ok := podVolumes[name]; !ok {
-			t.Errorf("api.Pod volumes map is missing key: %s. %#v", name, podVolumes)
-		}
+		assert.Contains(t, podVolumes, name, "Volumes for pod %+v", pod)
 	}
 	assert.True(t, testKubelet.volumePlugin.GetNewAttacherCallCount() >= 1, "Expected plugin NewAttacher to be called at least once")
 	assert.NoError(t, volumetest.VerifyWaitForAttachCallCount(
@@ -457,13 +455,11 @@ func TestVolumeUnmountAndDetachControllerDisabled(t *testing.T) {
 		volumehelper.GetUniquePodName(pod))
 
 	expectedPodVolumes := []string{"vol1"}
-	assert.Equal(t, len(expectedPodVolumes), len(podVolumes),
-		"Unexpected volumes. Expected %#v got %#v.  Manifest was: %#v", expectedPodVolumes, podVolumes, pod)
+	assert.Len(t, podVolumes, len(expectedPodVolumes), "Volumes for pod %+v", pod)
 	for _, name := range expectedPodVolumes {
-		if _, ok := podVolumes[name]; !ok {
-			t.Errorf("api.Pod volumes map is missing key: %s. %#v", name, podVolumes)
-		}
+		assert.Contains(t, podVolumes, name, "Volumes for pod %+v", pod)
 	}
+
 	assert.True(t, testKubelet.volumePlugin.GetNewAttacherCallCount() >= 1, "Expected plugin NewAttacher to be called at least once")
 	assert.NoError(t, volumetest.VerifyWaitForAttachCallCount(
 		1 /* expectedWaitForAttachCallCount */, testKubelet.volumePlugin))
@@ -550,14 +546,10 @@ func TestVolumeAttachAndMountControllerEnabled(t *testing.T) {
 		volumehelper.GetUniquePodName(pod))
 
 	expectedPodVolumes := []string{"vol1"}
-	assert.Equal(t, len(expectedPodVolumes), len(podVolumes),
-		"Unexpected volumes. Expected %#v got %#v.  Manifest was: %#v", expectedPodVolumes, podVolumes, pod)
+	assert.Len(t, podVolumes, len(expectedPodVolumes), "Volumes for pod %+v", pod)
 	for _, name := range expectedPodVolumes {
-		if _, ok := podVolumes[name]; !ok {
-			t.Errorf("api.Pod volumes map is missing key: %s. %#v", name, podVolumes)
-		}
+		assert.Contains(t, podVolumes, name, "Volumes for pod %+v", pod)
 	}
-
 	assert.True(t, testKubelet.volumePlugin.GetNewAttacherCallCount() >= 1, "Expected plugin NewAttacher to be called at least once")
 	assert.NoError(t, volumetest.VerifyWaitForAttachCallCount(
 		1 /* expectedWaitForAttachCallCount */, testKubelet.volumePlugin))
@@ -624,13 +616,11 @@ func TestVolumeUnmountAndDetachControllerEnabled(t *testing.T) {
 		volumehelper.GetUniquePodName(pod))
 
 	expectedPodVolumes := []string{"vol1"}
-	assert.Equal(t, len(expectedPodVolumes), len(podVolumes),
-		"Unexpected volumes. Expected %#v got %#v.  Manifest was: %#v", expectedPodVolumes, podVolumes, pod)
+	assert.Len(t, podVolumes, len(expectedPodVolumes), "Volumes for pod %+v", pod)
 	for _, name := range expectedPodVolumes {
-		if _, ok := podVolumes[name]; !ok {
-			t.Errorf("api.Pod volumes map is missing key: %s. %#v", name, podVolumes)
-		}
+		assert.Contains(t, podVolumes, name, "Volumes for pod %+v", pod)
 	}
+
 	assert.True(t, testKubelet.volumePlugin.GetNewAttacherCallCount() >= 1, "Expected plugin NewAttacher to be called at least once")
 	assert.NoError(t, volumetest.VerifyWaitForAttachCallCount(
 		1 /* expectedWaitForAttachCallCount */, testKubelet.volumePlugin))
