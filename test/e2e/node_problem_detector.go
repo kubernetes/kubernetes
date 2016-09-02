@@ -202,7 +202,7 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 			By("Make sure the default node condition is generated")
 			Eventually(func() error {
 				return verifyCondition(c.Nodes(), node.Name, condition, api.ConditionFalse, defaultReason, defaultMessage)
-			}, pollConsistent, pollInterval).Should(Succeed())
+			}, pollTimeout, pollInterval).Should(Succeed())
 
 			num := 3
 			By(fmt.Sprintf("Inject %d temporary errors", num))
