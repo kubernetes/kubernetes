@@ -13,6 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+
 package kubeadmutil
 
 import (
@@ -61,8 +62,9 @@ func GenerateToken(params *kubeadmapi.BootstrapParams) error {
 
 func UseGivenTokenIfValid(params *kubeadmapi.BootstrapParams) (bool, error) {
 	if params.Discovery.GivenToken == "" {
-		return false, nil
+		return false, nil // not given
 	}
+	fmt.Println("<util/tokens> validating provided token")
 	givenToken := strings.Split(strings.ToLower(params.Discovery.GivenToken), ".")
 	// TODO print desired format
 	// TODO could also print more specific messages in each case
