@@ -98,6 +98,6 @@ func WriteKubeconfigIfNotExists(params *kubeadmapi.BootstrapParams, name string,
 		return fmt.Errorf("<util/kubeconfig> failed to write to %q [%s]", filename, err)
 	}
 
-	fmt.Println("<util/kubeconfig> created %q", filename)
+	fmt.Printf("<util/kubeconfig> created %q\n", filename)
 	return nil
 }

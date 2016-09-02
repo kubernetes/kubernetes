@@ -35,7 +35,6 @@ import (
 // init master` and `kubeadm manual bootstrap master` can get going.
 
 const (
-	COMPONENT_LOGLEVEL       = "--v=4"
 	SERVICE_CLUSTER_IP_RANGE = "--service-cluster-ip-range=10.16.0.0/12"
 	CLUSTER_NAME             = "--cluster-name=kubernetes"
 	MASTER                   = "--master=127.0.0.1:8080"
@@ -55,7 +54,7 @@ func WriteStaticPodManifests(params *kubeadmapi.BootstrapParams) error {
 				"--advertise-client-urls=http://127.0.0.1:2379,http://127.0.0.1:4001",
 				"--data-dir=/var/etcd/data",
 			},
-			Image:         "gcr.io/google_containers/etcd:2.2.1", // TODO parametrise
+			Image:         params.EnvParams["etcd_image"],
 			LivenessProbe: componentProbe(2379, "/health"),
 			Name:          "etcd-server",
 			Resources:     componentResources("200m"),
@@ -69,7 +68,6 @@ func WriteStaticPodManifests(params *kubeadmapi.BootstrapParams) error {
 				"apiserver",
 				"--address=127.0.0.1",
 				"--etcd-servers=http://127.0.0.1:2379",
-				"--cloud-provider=fake", // TODO parametrise
 				"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota",
 				SERVICE_CLUSTER_IP_RANGE,
 				"--service-account-key-file=/etc/kubernetes/pki/apiserver-key.pem",
@@ -78,7 +76,7 @@ func WriteStaticPodManifests(params *kubeadmapi.BootstrapParams) error {
 				"--tls-private-key-file=/etc/kubernetes/pki/apiserver-key.pem",
 				"--secure-port=443",
 				"--allow-privileged",
-				COMPONENT_LOGLEVEL,
+				params.EnvParams["component_loglevel"],
 				"--token-auth-file=/etc/kubernetes/pki/tokens.csv",
 			},
 			VolumeMounts:  []api.VolumeMount{pkiVolumeMount()},
@@ -99,7 +97,7 @@ func WriteStaticPodManifests(params *kubeadmapi.BootstrapParams) error {
 				"--cluster-signing-cert-file=/etc/kubernetes/pki/ca.pem",
 				"--cluster-signing-key-file=/etc/kubernetes/pki/ca-key.pem",
 				"--insecure-experimental-approve-all-kubelet-csrs-for-group=system:kubelet-bootstrap",
-				COMPONENT_LOGLEVEL,
+				params.EnvParams["component_loglevel"],
 			},
 			VolumeMounts:  []api.VolumeMount{pkiVolumeMount()},
 			LivenessProbe: componentProbe(10252, "/healthz"),
@@ -113,7 +111,7 @@ func WriteStaticPodManifests(params *kubeadmapi.BootstrapParams) error {
 				"scheduler",
 				"--leader-elect",
 				MASTER,
-				COMPONENT_LOGLEVEL,
+				params.EnvParams["component_loglevel"],
 			},
 			LivenessProbe: componentProbe(10251, "/healthz"),
 			Resources:     componentResources("100m"),
