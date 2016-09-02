@@ -107,7 +107,7 @@ func (kl *Kubelet) tryRegisterWithApiServer(node *api.Node) bool {
 		// annotation.
 		requiresUpdate := kl.reconcileCMADAnnotationWithExistingNode(node, existingNode)
 		if requiresUpdate {
-			if _, err := kl.kubeClient.Core().Nodes().Update(existingNode); err != nil {
+			if _, err := kl.kubeClient.Core().Nodes().UpdateStatus(existingNode); err != nil {
 				glog.Errorf("Unable to reconcile node %q with API server: error updating node: %v", kl.nodeName, err)
 				return false
 			}
