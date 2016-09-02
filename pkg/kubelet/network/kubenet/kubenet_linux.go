@@ -69,6 +69,9 @@ const (
 	dedupChain = utilebtables.Chain("KUBE-DEDUP")
 )
 
+// CNI plugins required by kubenet in /opt/cni/bin or vendor directory
+var requiredCNIPlugins = [...]string{"bridge", "host-local", "loopback"}
+
 type kubenetNetworkPlugin struct {
 	network.NoopNetworkPlugin
 
@@ -531,7 +534,41 @@ func (plugin *kubenetNetworkPlugin) Status() error {
 	if plugin.netConfig == nil {
 		return fmt.Errorf("Kubenet does not have netConfig. This is most likely due to lack of PodCIDR")
 	}
+
+	if !plugin.checkCNIPlugin() {
+		return fmt.Errorf("could not locate kubenet required CNI plugins %v at %q or %q", requiredCNIPlugins, DefaultCNIDir, plugin.vendorDir)
+	}
 	return nil
+}
+
+// checkCNIPlugin returns if all kubenet required cni plugins can be found at /opt/cni/bin or user specifed NetworkPluginDir.
+func (plugin *kubenetNetworkPlugin) checkCNIPlugin() bool {
+	if plugin.checkCNIPluginInDir(DefaultCNIDir) || plugin.checkCNIPluginInDir(plugin.vendorDir) {
+		return true
+	}
+	return false
+}
+
+// checkCNIPluginInDir returns if all required cni plugins are placed in dir
+func (plugin *kubenetNetworkPlugin) checkCNIPluginInDir(dir string) bool {
+	output, err := plugin.execer.Command("ls", dir).CombinedOutput()
+	if err != nil {
+		return false
+	}
+	fields := strings.Fields(string(output))
+	for _, cniPlugin := range requiredCNIPlugins {
+		found := false
+		for _, file := range fields {
+			if strings.TrimSpace(file) == cniPlugin {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
 }
 
 // Returns a list of pods running on this node and each pod's IP address.  Assumes
