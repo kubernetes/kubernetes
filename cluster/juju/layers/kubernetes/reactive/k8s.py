@@ -307,7 +307,7 @@ def start_cadvisor():
 
 
 @when('kubelet.available', 'kubeconfig.created')
-@when_any('proxy.available', 'cadvisor.available', 'skydns.available')
+@when_any('proxy.available', 'cadvisor.available', 'kubedns.available')
 def final_message():
     '''Issue some final messages when the services are started. '''
     # TODO: Run a simple/quick health checks before issuing this message.
