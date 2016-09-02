@@ -472,9 +472,11 @@ func (cm *containerManagerImpl) Start(node *api.Node) error {
 	for _, cont := range cm.systemContainers {
 		if cont.ensureStateFunc != nil {
 			numEnsureStateFuncs++
+			//If has anyone, we quit this for block
+			break
 		}
 	}
-	if numEnsureStateFuncs >= 0 {
+	if numEnsureStateFuncs > 0 {
 		// Run ensure state functions every minute.
 		go wait.Until(func() {
 			for _, cont := range cm.systemContainers {
