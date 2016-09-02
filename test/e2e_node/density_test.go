@@ -79,7 +79,7 @@ var _ = framework.KubeDescribe("Density [Serial] [Slow]", func() {
 				podsNr:   10,
 				interval: 0 * time.Millisecond,
 				cpuLimits: framework.ContainersCPUSummary{
-					stats.SystemContainerKubelet: {0.50: 0.25, 0.95: 0.40},
+					stats.SystemContainerKubelet: {0.50: 0.30, 0.95: 0.50},
 					stats.SystemContainerRuntime: {0.50: 0.40, 0.95: 0.60},
 				},
 				memLimits: framework.ResourceUsagePerContainer{
@@ -177,7 +177,7 @@ var _ = framework.KubeDescribe("Density [Serial] [Slow]", func() {
 				podsNr:   10,
 				bgPodsNr: 50,
 				cpuLimits: framework.ContainersCPUSummary{
-					stats.SystemContainerKubelet: {0.50: 0.25, 0.95: 0.40},
+					stats.SystemContainerKubelet: {0.50: 0.30, 0.95: 0.50},
 					stats.SystemContainerRuntime: {0.50: 0.40, 0.95: 0.60},
 				},
 				memLimits: framework.ResourceUsagePerContainer{
