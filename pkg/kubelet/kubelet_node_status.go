@@ -116,6 +116,20 @@ func (kl *Kubelet) tryRegisterWithApiServer(node *api.Node) bool {
 		return true
 	}
 
+	if kl.cloud == nil {
+		// In the case where we're not using a cloud provider, the ExternalID could either have
+		// been the NodeIP, or the actual hostname.  If we switch between the two, consider it
+		// ok to keep using that value.
+
+		for _, addr := range existingNode.Status.Addresses {
+			if existingNode.Spec.ExternalID == addr.Address {
+				glog.Warningf("Node %s was previously registered with an external ID of %q, but if recreated would use an external ID of its hostname %q", kl.nodeName, existingNode.Spec.ExternalID, node.Spec.ExternalID)
+				glog.Infof("Node %s was previously registered", kl.nodeName)
+				return true
+			}
+		}
+	}
+
 	glog.Errorf(
 		"Previously node %q had externalID %q; now it is %q; will delete and recreate.",
 		kl.nodeName, node.Spec.ExternalID, existingNode.Spec.ExternalID,

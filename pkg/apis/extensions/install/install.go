@@ -23,6 +23,8 @@ import (
 
 	"github.com/golang/glog"
 
+	_ "k8s.io/kubernetes/pkg/api/install" // force extensions to be loaded after the main API
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"

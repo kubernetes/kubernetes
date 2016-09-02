@@ -33,6 +33,9 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
+
+	// force determinstic ordering when loading these packages
+	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
 )
 
 const importPrefix = "k8s.io/kubernetes/pkg/apis/batch"
