@@ -293,6 +293,7 @@ kube::util::analytics-link() {
 # * default behavior: extensions/v1beta1 -> apis/extensions/v1beta1
 # * default behavior for only a group: experimental -> apis/experimental
 # * Special handling for empty group: v1 -> api/v1, unversioned -> api/unversioned
+# * Special handling for groups suffixed with ".k8s.io": foo.k8s.io/v1 -> apis/foo/v1
 # * Very special handling for when both group and version are "": / -> api
 kube::util::group-version-to-pkg-path() {
   local group_version="$1"
@@ -309,6 +310,12 @@ kube::util::group-version-to-pkg-path() {
       ;;
     unversioned)
       echo "api/unversioned"
+      ;;
+    *.k8s.io)
+      echo "apis/${group_version%.k8s.io}"
+      ;;
+    *.k8s.io/*)
+      echo "apis/${group_version/.k8s.io/}"
       ;;
     *)
       echo "apis/${group_version%__internal}"

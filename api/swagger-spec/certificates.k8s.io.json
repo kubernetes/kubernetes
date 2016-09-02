@@ -2,14 +2,14 @@
   "swaggerVersion": "1.2",
   "apiVersion": "",
   "basePath": "https://10.10.10.10:6443",
-  "resourcePath": "/apis/certificates",
+  "resourcePath": "/apis/certificates.k8s.io",
   "info": {
    "title": "",
    "description": ""
   },
   "apis": [
    {
-    "path": "/apis/certificates",
+    "path": "/apis/certificates.k8s.io",
     "description": "get information of a group",
     "operations": [
      {
