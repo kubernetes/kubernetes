@@ -19,9 +19,11 @@ limitations under the License.
 package cm
 
 import (
+	"bufio"
 	"fmt"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"path"
 	"strconv"
 	"sync"
@@ -164,7 +166,40 @@ func validateSystemRequirements(mountUtil mount.Interface) (features, error) {
 // TODO(vmarmol): Add limits to the system containers.
 // Takes the absolute name of the specified containers.
 // Empty container name disables use of the specified container.
-func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.Interface, nodeConfig NodeConfig) (ContainerManager, error) {
+func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.Interface, nodeConfig NodeConfig, evictionEnabled bool) (ContainerManager, error) {
+	// TODO(mtaufen): For now, check here whether swap is enabled at the same time as memory eviction. If so,
+	//                fail fast. Memory eviction does not work when swap is enabled. IMO, we need to have a discussion
+	//                about where different kinds of validation need to happen. It seems that the container manager is the
+	//                appropriate place to validate node configuration. We don't really have a clear place for validating
+	//                KubeletConfiguration, though a lot of validation does seem to happen in pkg/kubelet/kubelet.go's
+	//                NewMainKubelet function. Finally, we have scenarios like *this* one, where we need to validate the
+	//                interaction of KubeletConfiguration and node configuration. I'm not sure whether this should happen in
+	//                the container manager or not. It feels kind of weird to leak the KubeletConfiguration into this module.
+
+	if evictionEnabled {
+		// Check whether swap is enabled. Memory eviction requires swap to be disabled.
+		cmd := exec.Command("cat", "/proc/swaps")
+		stdout, err := cmd.StdoutPipe()
+		if err != nil {
+			return nil, err
+		}
+		if err := cmd.Start(); err != nil {
+			return nil, err
+		}
+		var buf []string
+		scanner := bufio.NewScanner(stdout)
+		for scanner.Scan() { // Splits on newlines by default
+			buf = append(buf, scanner.Text())
+		}
+		// If there is more than one line (table headers) in /proc/swaps, swap is enabled and we should error out.
+		if len(buf) > 1 {
+			return nil, fmt.Errorf("Swap must be disabled to use memory eviction, but /proc/swaps contained: %v", buf)
+		}
+		if err := cmd.Wait(); err != nil { // Clean up
+			return nil, err
+		}
+	}
+
 	// Check if Cgroup-root actually exists on the node
 	if nodeConfig.CgroupsPerQOS {
 		if nodeConfig.CgroupRoot == "" {

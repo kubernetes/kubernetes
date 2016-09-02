@@ -43,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kconfig "k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
+	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
@@ -215,12 +216,17 @@ func (s *KubeletExecutorServer) runKubelet(
 	}
 
 	kubeDeps.CAdvisorInterface = cAdvisorInterface
+	thresholds, err := eviction.ParseThresholdConfig(s.EvictionHard, s.EvictionSoft, s.EvictionSoftGracePeriod, s.EvictionMinimumReclaim)
+	evictionEnabled := len(thresholds) > 0
+	if err != nil {
+		return err
+	}
 	kubeDeps.ContainerManager, err = cm.NewContainerManager(kubeDeps.Mounter, cAdvisorInterface, cm.NodeConfig{
 		RuntimeCgroupsName: s.RuntimeCgroups,
 		SystemCgroupsName:  s.SystemCgroups,
 		KubeletCgroupsName: s.KubeletCgroups,
 		ContainerRuntime:   s.ContainerRuntime,
-	})
+	}, evictionEnabled)
 	if err != nil {
 		return err
 	}
