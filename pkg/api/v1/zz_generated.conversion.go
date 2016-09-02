@@ -1543,6 +1543,7 @@ func Convert_api_DeprecatedDownwardAPIVolumeFile_To_v1_DeprecatedDownwardAPIVolu
 }
 
 func autoConvert_v1_DeprecatedDownwardAPIVolumeSource_To_api_DeprecatedDownwardAPIVolumeSource(in *DeprecatedDownwardAPIVolumeSource, out *api.DeprecatedDownwardAPIVolumeSource, s conversion.Scope) error {
+	SetDefaults_DeprecatedDownwardAPIVolumeSource(in)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]api.DeprecatedDownwardAPIVolumeFile, len(*in))

@@ -199,6 +199,14 @@ func SetDefaults_DownwardAPIVolumeSource(obj *DownwardAPIVolumeSource) {
 		obj.DefaultMode = &perm
 	}
 }
+
+func SetDefaults_DeprecatedDownwardAPIVolumeSource(obj *DeprecatedDownwardAPIVolumeSource) {
+	if obj.DefaultMode == nil {
+		perm := int32(DownwardAPIVolumeSourceDefaultMode)
+		obj.DefaultMode = &perm
+	}
+}
+
 func SetDefaults_Secret(obj *Secret) {
 	if obj.Type == "" {
 		obj.Type = SecretTypeOpaque
