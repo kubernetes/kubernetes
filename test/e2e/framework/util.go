@@ -4292,14 +4292,17 @@ func RestartKubeProxy(host string) error {
 		return fmt.Errorf("unsupported provider: %s", TestContext.Provider)
 	}
 	// kubelet will restart the kube-proxy since it's running in a static pod
+	Logf("Killing kube-proxy on node %v", host)
 	result, err := SSH("sudo pkill kube-proxy", host, TestContext.Provider)
 	if err != nil || result.Code != 0 {
 		LogSSHResult(result)
 		return fmt.Errorf("couldn't restart kube-proxy: %v", err)
 	}
 	// wait for kube-proxy to come back up
+	sshCmd := "sudo /bin/sh -c 'pgrep kube-proxy | wc -l'"
 	err = wait.Poll(5*time.Second, 60*time.Second, func() (bool, error) {
-		result, err := SSH("sudo /bin/sh -c 'pgrep kube-proxy | wc -l'", host, TestContext.Provider)
+		Logf("Waiting for kubeproxy to come back up with %v on %v", sshCmd, host)
+		result, err := SSH(sshCmd, host, TestContext.Provider)
 		if err != nil {
 			return false, err
 		}
@@ -4346,6 +4349,7 @@ func sshRestartMaster() error {
 	} else {
 		command = "sudo /etc/init.d/kube-apiserver restart"
 	}
+	Logf("Restarting master via ssh, running: %v", command)
 	result, err := SSH(command, GetMasterHost()+":22", TestContext.Provider)
 	if err != nil || result.Code != 0 {
 		LogSSHResult(result)
