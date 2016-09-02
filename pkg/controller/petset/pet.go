@@ -96,8 +96,8 @@ func (p *petSyncer) Sync(pet *pcb) error {
 	if err := p.SyncPVCs(pet); err != nil {
 		return err
 	}
-	// if pet was evicted - we need to remove old one because of consistent naming
-	if exists && isEvicted(realPet.pod) {
+	// if pet failed - we need to remove old one because of consistent naming
+	if exists && realPet.pod.Status.Phase == api.PodFailed {
 		glog.V(4).Infof("Delete evicted pod %v", realPet.pod.Name)
 		if err := p.petClient.Delete(realPet); err != nil {
 			return err
@@ -316,8 +316,4 @@ func (d *defaultPetHealthChecker) isHealthy(pod *api.Pod) bool {
 // will never return false.
 func (d *defaultPetHealthChecker) isDying(pod *api.Pod) bool {
 	return pod != nil && pod.DeletionTimestamp != nil
-}
-
-func isEvicted(pod *api.Pod) bool {
-	return pod != nil && pod.Status.Phase == api.PodFailed && pod.Status.Reason == "Evicted"
 }
