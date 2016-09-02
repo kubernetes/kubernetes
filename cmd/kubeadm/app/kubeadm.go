@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"runtime"
 	"strings"
 
 	"github.com/spf13/pflag"
@@ -40,13 +41,16 @@ func getEnvParams() map[string]string {
 	}
 
 	envParams := map[string]string{
-		"prefix":          globalPrefix,
-		"host_pki_path":   path.Join(globalPrefix, "pki"),
-		"hyperkube_image": "gcr.io/google_containers/hyperkube:v1.4.0-alpha.3",
-		"discovery_image": "dgoodwin/kubediscovery:latest",
+		"prefix":        globalPrefix,
+		"host_pki_path": path.Join(globalPrefix, "pki"),
+		// TODO find a way to specify image versions for all of these...
+		"hyperkube_image":    fmt.Sprintf("gcr.io/google_containers/hyperkube-%s:%s", runtime.GOARCH, "v1.4.0-alpha.3"),
+		"discovery_image":    "dgoodwin/kubediscovery:latest",
+		"etcd_image":         fmt.Sprintf("gcr.io/google_containers/etcd-%s:%s", runtime.GOARCH, "2.2.5"),
+		"component_loglevel": "--v=4",
 	}
 
-	for k, _ := range envParams {
+	for k := range envParams {
 		if v := os.Getenv(fmt.Sprintf("KUBE_%s", strings.ToUpper(k))); v != "" {
 			envParams[k] = v
 		}

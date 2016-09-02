@@ -13,6 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+
 package kubemaster
 
 import (
@@ -35,7 +36,7 @@ func createKubeProxyPodSpec(params *kubeadmapi.BootstrapParams) api.PodSpec {
 				"/hyperkube",
 				"proxy",
 				"--kubeconfig=/run/kubeconfig",
-				COMPONENT_LOGLEVEL,
+				params.EnvParams["component_loglevel"],
 			},
 			SecurityContext: &api.SecurityContext{Privileged: &privilegedTrue},
 			VolumeMounts: []api.VolumeMount{
@@ -80,6 +81,7 @@ func createKubeProxyPodSpec(params *kubeadmapi.BootstrapParams) api.PodSpec {
 
 func CreateEssentialAddons(params *kubeadmapi.BootstrapParams, client *clientset.Clientset) error {
 	kubeProxyDaemonSet := NewDaemonSet("kube-proxy", createKubeProxyPodSpec(params))
+	SetMasterTaintTolerations(&kubeProxyDaemonSet.Spec.Template.ObjectMeta)
 
 	if _, err := client.Extensions().DaemonSets(api.NamespaceSystem).Create(kubeProxyDaemonSet); err != nil {
 		return fmt.Errorf("<master/addons> failed creating essential kube-proxy addon [%s]", err)
