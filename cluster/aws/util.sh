@@ -411,9 +411,9 @@ function create-security-group {
 
   local sgid=$(get_security_group_id "${name}")
   if [[ -z "$sgid" ]]; then
-	  echo "Creating security group ${name}."
-	  sgid=$($AWS_CMD create-security-group --group-name "${name}" --description "${description}" --vpc-id "${VPC_ID}" --query GroupId)
-	  add-tag $sgid KubernetesCluster ${CLUSTER_ID}
+          echo "Creating security group ${name}."
+          sgid=$($AWS_CMD create-security-group --group-name "${name}" --description "${description}" --vpc-id "${VPC_ID}" --query GroupId)
+          add-tag $sgid KubernetesCluster ${CLUSTER_ID}
   fi
 }
 
@@ -821,13 +821,13 @@ function conceal-no-such-entity-response {
     # in plain english: redirect stderr to stdout, and stdout to the log file
     local -r errMsg=$($@ 2>&1 > $LOG)
     if [[ "$errMsg" == "" ]];then
-	return
+        return
     fi
 
     echo $errMsg
     if [[ "$errMsg" =~ " (NoSuchEntity) " ]];then
-	echo " -> no such entity response detected. will assume operation is not necessary due to prior incomplete teardown"
-	return
+        echo " -> no such entity response detected. will assume operation is not necessary due to prior incomplete teardown"
+        return
     fi
 
     echo "Error message is fatal. Will exit"
@@ -854,12 +854,12 @@ function vpc-setup {
     VPC_ID=$(get_vpc_id)
   fi
   if [[ -z "$VPC_ID" ]]; then
-	  echo "Creating vpc."
-	  VPC_ID=$($AWS_CMD create-vpc --cidr-block ${VPC_CIDR} --query Vpc.VpcId)
-	  $AWS_CMD modify-vpc-attribute --vpc-id $VPC_ID --enable-dns-support '{"Value": true}' > $LOG
-	  $AWS_CMD modify-vpc-attribute --vpc-id $VPC_ID --enable-dns-hostnames '{"Value": true}' > $LOG
-	  add-tag $VPC_ID Name ${VPC_NAME}
-	  add-tag $VPC_ID KubernetesCluster ${CLUSTER_ID}
+          echo "Creating vpc."
+          VPC_ID=$($AWS_CMD create-vpc --cidr-block ${VPC_CIDR} --query Vpc.VpcId)
+          $AWS_CMD modify-vpc-attribute --vpc-id $VPC_ID --enable-dns-support '{"Value": true}' > $LOG
+          $AWS_CMD modify-vpc-attribute --vpc-id $VPC_ID --enable-dns-hostnames '{"Value": true}' > $LOG
+          add-tag $VPC_ID Name ${VPC_NAME}
+          add-tag $VPC_ID KubernetesCluster ${CLUSTER_ID}
   fi
 
   echo "Using VPC $VPC_ID"
@@ -919,9 +919,9 @@ function kube-up {
 
   IGW_ID=$(get_igw_id $VPC_ID)
   if [[ -z "$IGW_ID" ]]; then
-	  echo "Creating Internet Gateway."
-	  IGW_ID=$($AWS_CMD create-internet-gateway --query InternetGateway.InternetGatewayId)
-	  $AWS_CMD attach-internet-gateway --internet-gateway-id $IGW_ID --vpc-id $VPC_ID > $LOG
+          echo "Creating Internet Gateway."
+          IGW_ID=$($AWS_CMD create-internet-gateway --query InternetGateway.InternetGatewayId)
+          $AWS_CMD attach-internet-gateway --internet-gateway-id $IGW_ID --vpc-id $VPC_ID > $LOG
   fi
 
   echo "Using Internet Gateway $IGW_ID"

@@ -111,40 +111,40 @@ function create-federation-api-objects {
     export KUBE_MASTER_IP=""
     local is_dns_name="false"
     if [[ "$KUBERNETES_PROVIDER" == "vagrant" ]];then
-	# The vagrant approach is to use a nodeport service, and point kubectl at one of the nodes
-	$template "${manifests_root}/federation-apiserver-nodeport-service.yaml" | $host_kubectl create -f -
-	node_addresses=`$host_kubectl get nodes -o=jsonpath='{.items[*].status.addresses[?(@.type=="InternalIP")].address}'`
-	FEDERATION_API_HOST=`printf "$node_addresses" | cut -d " " -f1`
-	KUBE_MASTER_IP="${FEDERATION_API_HOST}:${FEDERATION_API_NODEPORT}"
+        # The vagrant approach is to use a nodeport service, and point kubectl at one of the nodes
+        $template "${manifests_root}/federation-apiserver-nodeport-service.yaml" | $host_kubectl create -f -
+        node_addresses=`$host_kubectl get nodes -o=jsonpath='{.items[*].status.addresses[?(@.type=="InternalIP")].address}'`
+        FEDERATION_API_HOST=`printf "$node_addresses" | cut -d " " -f1`
+        KUBE_MASTER_IP="${FEDERATION_API_HOST}:${FEDERATION_API_NODEPORT}"
     elif [[ "$KUBERNETES_PROVIDER" == "gce" || "$KUBERNETES_PROVIDER" == "gke" || "$KUBERNETES_PROVIDER" == "aws" ]];then
 
-	# Any providers where ingress is a DNS name should tick this box.
-	# TODO(chom): attempt to do this automatically
-	if [[ "$KUBERNETES_PROVIDER" == "aws" ]];then
-	    is_dns_name="true"
-	fi
-	# any capable providers should use a loadbalancer service
-	# we check for ingress.ip and ingress.hostname, so should work for any loadbalancer-providing provider
-	# allows 30x5 = 150 seconds for loadbalancer creation
-	$template "${manifests_root}/federation-apiserver-lb-service.yaml" | $host_kubectl create -f -
-	for i in {1..30};do
-	    echo "attempting to get federation-apiserver loadbalancer hostname ($i / 30)"
-	    for field in ip hostname;do
-		FEDERATION_API_HOST=`${host_kubectl} get -o=jsonpath svc/${FEDERATION_APISERVER_DEPLOYMENT_NAME} --template '{.status.loadBalancer.ingress[*].'"${field}}"`
-		if [[ ! -z "${FEDERATION_API_HOST// }" ]];then
-		    break 2
-		fi
-	    done
-	    if [[ $i -eq 30 ]];then
-		echo "Could not find ingress hostname for federation-apiserver loadbalancer service"
-		exit 1
-	    fi
-	    sleep 5
-	done
-	KUBE_MASTER_IP="${FEDERATION_API_HOST}:443"
+        # Any providers where ingress is a DNS name should tick this box.
+        # TODO(chom): attempt to do this automatically
+        if [[ "$KUBERNETES_PROVIDER" == "aws" ]];then
+            is_dns_name="true"
+        fi
+        # any capable providers should use a loadbalancer service
+        # we check for ingress.ip and ingress.hostname, so should work for any loadbalancer-providing provider
+        # allows 30x5 = 150 seconds for loadbalancer creation
+        $template "${manifests_root}/federation-apiserver-lb-service.yaml" | $host_kubectl create -f -
+        for i in {1..30};do
+            echo "attempting to get federation-apiserver loadbalancer hostname ($i / 30)"
+            for field in ip hostname;do
+                FEDERATION_API_HOST=`${host_kubectl} get -o=jsonpath svc/${FEDERATION_APISERVER_DEPLOYMENT_NAME} --template '{.status.loadBalancer.ingress[*].'"${field}}"`
+                if [[ ! -z "${FEDERATION_API_HOST// }" ]];then
+                    break 2
+                fi
+            done
+            if [[ $i -eq 30 ]];then
+                echo "Could not find ingress hostname for federation-apiserver loadbalancer service"
+                exit 1
+            fi
+            sleep 5
+        done
+        KUBE_MASTER_IP="${FEDERATION_API_HOST}:443"
     else
-	echo "provider ${KUBERNETES_PROVIDER} is not (yet) supported for e2e testing"
-	exit 1
+        echo "provider ${KUBERNETES_PROVIDER} is not (yet) supported for e2e testing"
+        exit 1
     fi
     echo "Found federation-apiserver host at $FEDERATION_API_HOST"
 
@@ -159,11 +159,11 @@ function create-federation-api-objects {
     # Note that the file name should be "kubeconfig" so that the secret key gets the same name.
     KUBECONFIG_DIR=$(dirname ${KUBECONFIG:-$DEFAULT_KUBECONFIG})
     CONTEXT=federation-cluster \
-	   KUBE_BEARER_TOKEN="$FEDERATION_API_TOKEN" \
+           KUBE_BEARER_TOKEN="$FEDERATION_API_TOKEN" \
            KUBE_USER="${KUBE_USER}" \
            KUBE_PASSWORD="${KUBE_PASSWORD}" \
            KUBECONFIG="${KUBECONFIG_DIR}/federation/federation-apiserver/kubeconfig" \
-	   create-kubeconfig
+           create-kubeconfig
 
     # Create secret with federation-apiserver's kubeconfig
     $host_kubectl create secret generic federation-apiserver-kubeconfig --from-file="${KUBECONFIG_DIR}/federation/federation-apiserver/kubeconfig" --namespace="${FEDERATION_NAMESPACE}"
@@ -201,46 +201,46 @@ function create-federation-api-objects {
 
     # Update the users kubeconfig to include federation-apiserver credentials.
     CONTEXT=federation-cluster \
-	   KUBE_BEARER_TOKEN="$FEDERATION_API_TOKEN" \
+           KUBE_BEARER_TOKEN="$FEDERATION_API_TOKEN" \
            KUBE_USER="${KUBE_USER}" \
            KUBE_PASSWORD="${KUBE_PASSWORD}" \
-	   SECONDARY_KUBECONFIG=true \
-	   create-kubeconfig
+           SECONDARY_KUBECONFIG=true \
+           create-kubeconfig
 
     # Don't finish provisioning until federation-apiserver pod is running
     for i in {1..30};do
-	#TODO(colhom): in the future this needs to scale out for N pods. This assumes just one pod
-	phase="$($host_kubectl get -o=jsonpath pods -lapp=federated-cluster,module=federation-apiserver --template '{.items[*].status.phase}')"
-	echo "Waiting for federation-apiserver to be running...(phase= $phase)"
-	if [[ "$phase" == "Running" ]];then
-	    echo "federation-apiserver pod is running!"
-	    break
-	fi
+        #TODO(colhom): in the future this needs to scale out for N pods. This assumes just one pod
+        phase="$($host_kubectl get -o=jsonpath pods -lapp=federated-cluster,module=federation-apiserver --template '{.items[*].status.phase}')"
+        echo "Waiting for federation-apiserver to be running...(phase= $phase)"
+        if [[ "$phase" == "Running" ]];then
+            echo "federation-apiserver pod is running!"
+            break
+        fi
 
-	if [[ $i -eq 30 ]];then
-	    echo "federation-apiserver pod is not running! giving up."
-	    exit 1
-	fi
+        if [[ $i -eq 30 ]];then
+            echo "federation-apiserver pod is not running! giving up."
+            exit 1
+        fi
 
-	sleep 4
+        sleep 4
     done
 
     # Verify that federation-controller-manager pod is running.
     for i in {1..30};do
-	#TODO(colhom): in the future this needs to scale out for N pods. This assumes just one pod
-	phase="$($host_kubectl get -o=jsonpath pods -lapp=federated-cluster,module=federation-controller-manager --template '{.items[*].status.phase}')"
-	echo "Waiting for federation-controller-manager to be running...(phase= $phase)"
-	if [[ "$phase" == "Running" ]];then
-	    echo "federation-controller-manager pod is running!"
-	    break
-	fi
+        #TODO(colhom): in the future this needs to scale out for N pods. This assumes just one pod
+        phase="$($host_kubectl get -o=jsonpath pods -lapp=federated-cluster,module=federation-controller-manager --template '{.items[*].status.phase}')"
+        echo "Waiting for federation-controller-manager to be running...(phase= $phase)"
+        if [[ "$phase" == "Running" ]];then
+            echo "federation-controller-manager pod is running!"
+            break
+        fi
 
-	if [[ $i -eq 30 ]];then
-	    echo "federation-controller-manager pod is not running! giving up."
-	    exit 1
-	fi
+        if [[ $i -eq 30 ]];then
+            echo "federation-controller-manager pod is not running! giving up."
+            exit 1
+        fi
 
-	sleep 4
+        sleep 4
     done
 )
 }

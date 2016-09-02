@@ -45,9 +45,9 @@ fi
 
 if [[ "${FEDERATION:-}" == "true" ]];then
     (
-	source "${KUBE_ROOT}/build/util.sh"
-	# Write federated docker image tag to workspace
-	kube::release::semantic_image_tag_version > "${KUBE_ROOT}/federation/manifests/federated-image.tag"
+        source "${KUBE_ROOT}/build/util.sh"
+        # Write federated docker image tag to workspace
+        kube::release::semantic_image_tag_version > "${KUBE_ROOT}/federation/manifests/federated-image.tag"
     )
 fi
 if [[ $KUBE_RELEASE_DO_COMPILE =~ ^[yY]$ ]]; then
