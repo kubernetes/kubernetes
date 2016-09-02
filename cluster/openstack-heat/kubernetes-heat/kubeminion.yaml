@@ -106,6 +106,9 @@ parameters:
   fixed_subnet:
     type: string
     description: Subnet from which to allocate fixed addresses.
+  cluster_cidr:
+    type: string
+    description: Subnet from which to allocate pod subnets.
   wait_condition_timeout:
     type: number
     description : >
@@ -215,6 +218,7 @@ resources:
             "$OS_REGION_NAME": {get_param: os_region_name}
             "$OS_TENANT_ID": {get_param: os_tenant_id}
             "$role": "kubernetes-pool"
+            "$cluster_cidr": {get_param: cluster_cidr}
 
   run_salt:
     type: OS::Heat::SoftwareConfig
