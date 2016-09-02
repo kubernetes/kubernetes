@@ -88,6 +88,7 @@ func (e *E2EServices) Start() error {
 		"--manifest-path", framework.TestContext.ManifestPath,
 		"--eviction-hard", framework.TestContext.EvictionHard,
 		"--logtostderr",
+		"--vmodule=*=4",
 	)
 	e.services = newServer("services", startCmd, nil, nil, getHealthCheckURLs(), servicesLogFile, false)
 	return e.services.start()
