@@ -108,14 +108,6 @@ func getPortByIP(client *gophercloud.ServiceClient, ipAddress string) (neutronpo
 	return targetPort, err
 }
 
-func getPortIDByIP(client *gophercloud.ServiceClient, ipAddress string) (string, error) {
-	targetPort, err := getPortByIP(client, ipAddress)
-	if err != nil {
-		return targetPort.ID, err
-	}
-	return targetPort.ID, nil
-}
-
 func getFloatingIPByPortID(client *gophercloud.ServiceClient, portID string) (*floatingips.FloatingIP, error) {
 	opts := floatingips.ListOpts{
 		PortID: portID,
@@ -1099,12 +1091,12 @@ func (lbaas *LbaasV2) EnsureLoadBalancerDeleted(clusterName string, service *v1.
 	}
 
 	if lbaas.opts.FloatingNetworkId != "" && loadbalancer != nil {
-		portID, err := getPortIDByIP(lbaas.network, loadbalancer.VipAddress)
+		port, err := getPortByIP(lbaas.network, loadbalancer.VipAddress)
 		if err != nil {
 			return err
 		}
 
-		floatingIP, err := getFloatingIPByPortID(lbaas.network, portID)
+		floatingIP, err := getFloatingIPByPortID(lbaas.network, port.ID)
 		if err != nil && err != ErrNotFound {
 			return err
 		}
