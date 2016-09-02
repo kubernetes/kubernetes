@@ -359,6 +359,7 @@ func isDirectlyConvertible(in, out *types.Type, manualConversions conversionFunc
 			// Check if there is an out member with that name.
 			outMember, found := findMember(out, inMember.Name)
 			if !found {
+				glog.V(5).Infof("%s.%s is not directly convertible to %s because the destination struct field did not exist", in.Name, inMember.Name, out.Name)
 				return false
 			}
 			convertible = convertible && isConvertible(inMember.Type, outMember.Type, manualConversions)
@@ -577,7 +578,11 @@ func (g *genConversion) GenerateType(c *generator.Context, t *types.Type, w io.W
 		g.generateConversion(peerType, t, sw)
 	}
 	if didForward != didBackward {
-		glog.Fatalf("Could only generate one direction of conversion for %v <-> %v", t, peerType)
+		if didForward {
+			glog.Fatalf("Could only generate one direction of conversion for %v -> %v", t, peerType)
+		} else {
+			glog.Fatalf("Could only generate one direction of conversion for %v <- %v", t, peerType)
+		}
 	}
 	if !didForward && !didBackward {
 		// TODO: This should be fatal but we have at least 8 types that
