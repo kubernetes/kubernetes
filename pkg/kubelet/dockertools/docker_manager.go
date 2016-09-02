@@ -2159,7 +2159,7 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, _ api.PodStatus, podStatus *kubec
 				result.Fail(err)
 				return
 			}
-			glog.V(4).Infof("Determined pod ip after infra change: %q: %q", format.Pod(pod), podIP)
+			glog.Infof("Determined pod ip after infra change: %q: %q", format.Pod(pod), podIP)
 		}
 	}
 
