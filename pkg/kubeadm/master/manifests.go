@@ -55,7 +55,7 @@ func WriteStaticPodManifests(params *kubeadmapi.BootstrapParams) error {
 				"--advertise-client-urls=http://127.0.0.1:2379,http://127.0.0.1:4001",
 				"--data-dir=/var/etcd/data",
 			},
-			Image:         "gcr.io/google_containers/etcd:2.2.1", // TODO parametrise
+			Image:         params.EnvParams["etcd_image"],
 			LivenessProbe: componentProbe(2379, "/health"),
 			Name:          "etcd-server",
 			Resources:     componentResources("200m"),

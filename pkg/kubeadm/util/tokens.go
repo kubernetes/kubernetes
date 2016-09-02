@@ -62,8 +62,9 @@ func GenerateToken(params *kubeadmapi.BootstrapParams) error {
 
 func UseGivenTokenIfValid(params *kubeadmapi.BootstrapParams) (bool, error) {
 	if params.Discovery.GivenToken == "" {
-		return false, nil
+		return false, nil // not given
 	}
+	fmt.Println("<util/tokens> validating provided token")
 	givenToken := strings.Split(strings.ToLower(params.Discovery.GivenToken), ".")
 	// TODO print desired format
 	// TODO could also print more specific messages in each case

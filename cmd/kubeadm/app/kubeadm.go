@@ -20,13 +20,13 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"runtime"
 	"strings"
 
 	"k8s.io/kubernetes/pkg/kubeadm/cmd"
 	"k8s.io/kubernetes/pkg/util/logs"
 )
 
-// TODO add this to hyperkube?
 // we need some params for testing etc, let's keep these hidden for now
 func getEnvParams() map[string]string {
 	globalPrefix := os.Getenv("KUBE_PREFIX_ALL")
@@ -35,10 +35,12 @@ func getEnvParams() map[string]string {
 	}
 
 	envParams := map[string]string{
-		"prefix":          globalPrefix,
-		"host_pki_path":   path.Join(globalPrefix, "pki"),
-		"hyperkube_image": "gcr.io/google_containers/hyperkube:v1.4.0-alpha.3",
+		"prefix":        globalPrefix,
+		"host_pki_path": path.Join(globalPrefix, "pki"),
+		// TODO find a way to specify image versions for all of these...
+		"hyperkube_image": fmt.Sprintf("gcr.io/google_containers/hyperkube-%s:%s", runtime.GOARCH, "v1.4.0-alpha.3"),
 		"discovery_image": "dgoodwin/kubediscovery:latest",
+		"etcd_image":      fmt.Sprintf("gcr.io/google_containers/etcd-%s:%s", runtime.GOARCH, "2.2.5"),
 	}
 
 	for k := range envParams {
