@@ -77,7 +77,7 @@ spec:
             - /eventer
             - --source=kubernetes:''
             - --sink=influxdb:http://monitoring-influxdb:8086
-        - image: gcr.io/google_containers/addon-resizer:1.5
+        - image: gcr.io/google_containers/addon-resizer:1.6
           name: heapster-nanny
           resources:
             limits:
@@ -106,7 +106,7 @@ spec:
             - --container=heapster
             - --poll-period=300000
             - --estimator=exponential
-        - image: gcr.io/google_containers/addon-resizer:1.5
+        - image: gcr.io/google_containers/addon-resizer:1.6
           name: eventer-nanny
           resources:
             limits:
