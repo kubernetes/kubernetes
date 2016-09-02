@@ -465,17 +465,17 @@ function kube-up {
   printf "Waiting for salt-master to be up on ${KUBE_MASTER} ...\n"
   remote-pgrep ${KUBE_MASTER_IP} "salt-master"
 
-  printf "Waiting for all packages to be installed on ${KUBE_MASTER} ...\n"
-  kube-check  ${KUBE_MASTER_IP} 'sudo salt "kubernetes-master" state.highstate -t 30 | grep -E "Failed:[[:space:]]+0"'
-
   local i
   for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
     printf "Waiting for salt-minion to be up on ${NODE_NAMES[$i]} ....\n"
     remote-pgrep ${KUBE_NODE_IP_ADDRESSES[$i]} "salt-minion"
-    printf "Waiting for all salt packages to be installed on ${NODE_NAMES[$i]} .... \n"
-    kube-check  ${KUBE_MASTER_IP} 'sudo salt '"${NODE_NAMES[$i]}"' state.highstate -t 30 | grep -E "Failed:[[:space:]]+0"'
     printf " OK\n"
   done
+
+  printf "Waiting for init highstate to be done on all nodes (this can take a few minutes) ...\n"
+  kube-check  ${KUBE_MASTER_IP} 'sudo salt '\''*'\'' state.show_highstate -t 50'
+  printf "Waiting for all packages to be installed on all nodes (this can take a few minutes) ...\n"
+  kube-check  ${KUBE_MASTER_IP} 'sudo salt '\''*'\'' state.highstate -t 50 | grep -E "Failed:[[:space:]]+0"'
 
   echo
 
