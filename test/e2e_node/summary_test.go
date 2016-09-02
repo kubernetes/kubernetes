@@ -67,9 +67,9 @@ var _ = framework.KubeDescribe("Summary API", func() {
 					"Time": m.Recent(maxStatsAge),
 					// We don't limit system container memory.
 					"AvailableBytes":  BeNil(),
-					"UsageBytes":      bounded(10*mb, 1*gb),
-					"WorkingSetBytes": bounded(10*mb, 1*gb),
-					"RSSBytes":        bounded(10*mb, 1*gb),
+					"UsageBytes":      bounded(5*mb, 1*gb),
+					"WorkingSetBytes": bounded(5*mb, 1*gb),
+					"RSSBytes":        bounded(5*mb, 1*gb),
 					"PageFaults":      bounded(1000, 1E9),
 					"MajorPageFaults": bounded(0, 100000),
 				}),
@@ -145,6 +145,8 @@ var _ = framework.KubeDescribe("Summary API", func() {
 					"SystemContainers": m.StrictSlice(summaryObjectID, m.Elements{
 						"kubelet": sysContExpectations,
 						"runtime": sysContExpectations,
+						// Misc system daemons we don't control.
+						"misc": m.Ignore(),
 					}),
 					"CPU": structP(m.Fields{
 						"Time":                 m.Recent(maxStatsAge),
