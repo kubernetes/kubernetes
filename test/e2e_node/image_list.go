@@ -31,14 +31,20 @@ const (
 	maxImagePullRetries = 5
 	// Sleep duration between image pull retry attempts.
 	imagePullRetryDelay = time.Second
-	busyBoxImage        = iota
 
+	busyBoxImage = iota
+	epTestImage
 	hostExecImage
+	livenessImage
+	mountTestImage5
+	mountTestImage6
+	mountTestImage7
+	mountTestUserImage
 	netExecImage
 	nginxImage
-	mountTestImage
-	testWebServer
 	pauseImage
+	serveHostnameImage
+	testWebServer
 
 	// Images just used for explicitly testing pulling of images
 	pullTestAlpine
@@ -48,13 +54,19 @@ const (
 )
 
 var ImageRegistry = map[int]string{
-	busyBoxImage:   "gcr.io/google_containers/busybox:1.24",
-	hostExecImage:  "gcr.io/google_containers/hostexec:1.2",
-	netExecImage:   "gcr.io/google_containers/netexec:1.4",
-	nginxImage:     "gcr.io/google_containers/nginx-slim:0.7",
-	mountTestImage: "gcr.io/google_containers/mounttest:0.6",
-	testWebServer:  "gcr.io/google_containers/test-webserver:e2e",
-	pauseImage:     framework.GetPauseImageNameForHostArch(),
+	busyBoxImage:       "gcr.io/google_containers/busybox:1.24",
+	epTestImage:        "gcr.io/google_containers/eptest:0.1",
+	hostExecImage:      "gcr.io/google_containers/hostexec:1.2",
+	livenessImage:      "gcr.io/google_containers/liveness:e2e",
+	mountTestImage5:    "gcr.io/google_containers/mounttest:0.5",
+	mountTestImage6:    "gcr.io/google_containers/mounttest:0.6",
+	mountTestImage7:    "gcr.io/google_containers/mounttest:0.7",
+	mountTestUserImage: "gcr.io/google_containers/mounttest-user:0.3",
+	netExecImage:       "gcr.io/google_containers/netexec:1.4",
+	nginxImage:         "gcr.io/google_containers/nginx-slim:0.7",
+	pauseImage:         framework.GetPauseImageNameForHostArch(),
+	serveHostnameImage: "gcr.io/google_containers/serve_hostname:v1.4",
+	testWebServer:      "gcr.io/google_containers/test-webserver:e2e",
 }
 
 // These are used by tests that explicitly test the ability to pull images
