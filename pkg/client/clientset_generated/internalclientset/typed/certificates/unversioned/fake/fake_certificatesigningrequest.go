@@ -30,7 +30,7 @@ type FakeCertificateSigningRequests struct {
 	Fake *FakeCertificates
 }
 
-var certificatesigningrequestsResource = unversioned.GroupVersionResource{Group: "certificates", Version: "", Resource: "certificatesigningrequests"}
+var certificatesigningrequestsResource = unversioned.GroupVersionResource{Group: "certificates.k8s.io", Version: "", Resource: "certificatesigningrequests"}
 
 func (c *FakeCertificateSigningRequests) Create(certificateSigningRequest *certificates.CertificateSigningRequest) (result *certificates.CertificateSigningRequest, err error) {
 	obj, err := c.Fake.
