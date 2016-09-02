@@ -1,16 +1,16 @@
 {
   "swaggerVersion": "1.2",
-  "apiVersion": "certificates/v1alpha1",
+  "apiVersion": "certificates.k8s.io/v1alpha1",
   "basePath": "https://10.10.10.10:6443",
-  "resourcePath": "/apis/certificates/v1alpha1",
+  "resourcePath": "/apis/certificates.k8s.io/v1alpha1",
   "info": {
    "title": "",
    "description": ""
   },
   "apis": [
    {
-    "path": "/apis/certificates/v1alpha1/certificatesigningrequests",
-    "description": "API at /apis/certificates/v1alpha1",
+    "path": "/apis/certificates.k8s.io/v1alpha1/certificatesigningrequests",
+    "description": "API at /apis/certificates.k8s.io/v1alpha1",
     "operations": [
      {
       "type": "v1alpha1.CertificateSigningRequestList",
@@ -196,8 +196,8 @@
     ]
    },
    {
-    "path": "/apis/certificates/v1alpha1/watch/certificatesigningrequests",
-    "description": "API at /apis/certificates/v1alpha1",
+    "path": "/apis/certificates.k8s.io/v1alpha1/watch/certificatesigningrequests",
+    "description": "API at /apis/certificates.k8s.io/v1alpha1",
     "operations": [
      {
       "type": "*versioned.Event",
@@ -274,8 +274,8 @@
     ]
    },
    {
-    "path": "/apis/certificates/v1alpha1/certificatesigningrequests/{name}",
-    "description": "API at /apis/certificates/v1alpha1",
+    "path": "/apis/certificates.k8s.io/v1alpha1/certificatesigningrequests/{name}",
+    "description": "API at /apis/certificates.k8s.io/v1alpha1",
     "operations": [
      {
       "type": "v1alpha1.CertificateSigningRequest",
@@ -478,8 +478,8 @@
     ]
    },
    {
-    "path": "/apis/certificates/v1alpha1/watch/certificatesigningrequests/{name}",
-    "description": "API at /apis/certificates/v1alpha1",
+    "path": "/apis/certificates.k8s.io/v1alpha1/watch/certificatesigningrequests/{name}",
+    "description": "API at /apis/certificates.k8s.io/v1alpha1",
     "operations": [
      {
       "type": "*versioned.Event",
@@ -564,8 +564,8 @@
     ]
    },
    {
-    "path": "/apis/certificates/v1alpha1/certificatesigningrequests/{name}/approval",
-    "description": "API at /apis/certificates/v1alpha1",
+    "path": "/apis/certificates.k8s.io/v1alpha1/certificatesigningrequests/{name}/approval",
+    "description": "API at /apis/certificates.k8s.io/v1alpha1",
     "operations": [
      {
       "type": "v1alpha1.CertificateSigningRequest",
@@ -617,8 +617,8 @@
     ]
    },
    {
-    "path": "/apis/certificates/v1alpha1/certificatesigningrequests/{name}/status",
-    "description": "API at /apis/certificates/v1alpha1",
+    "path": "/apis/certificates.k8s.io/v1alpha1/certificatesigningrequests/{name}/status",
+    "description": "API at /apis/certificates.k8s.io/v1alpha1",
     "operations": [
      {
       "type": "v1alpha1.CertificateSigningRequest",
@@ -670,8 +670,8 @@
     ]
    },
    {
-    "path": "/apis/certificates/v1alpha1",
-    "description": "API at /apis/certificates/v1alpha1",
+    "path": "/apis/certificates.k8s.io/v1alpha1",
+    "description": "API at /apis/certificates.k8s.io/v1alpha1",
     "operations": [
      {
       "type": "unversioned.APIResourceList",

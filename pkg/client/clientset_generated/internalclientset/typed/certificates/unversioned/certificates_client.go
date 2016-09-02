@@ -66,7 +66,7 @@ func New(c *restclient.RESTClient) *CertificatesClient {
 
 func setConfigDefaults(config *restclient.Config) error {
 	// if certificates group is not registered, return an error
-	g, err := registered.Group("certificates")
+	g, err := registered.Group("certificates.k8s.io")
 	if err != nil {
 		return err
 	}
