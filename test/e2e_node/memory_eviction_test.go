@@ -31,7 +31,7 @@ import (
 // Eviction Policy is described here:
 // https://github.com/kubernetes/kubernetes/blob/master/docs/proposals/kubelet-eviction.md
 
-var _ = framework.KubeDescribe("MemoryEvictionSimple [Slow] [Serial] [Disruptive]", func() {
+var _ = framework.KubeDescribe("MemoryEvictionSimple [FLAKY] [Slow] [Serial] [Disruptive]", func() {
 	f := framework.NewDefaultFramework("eviction-test-simple")
 
 	Context("when there is memory pressure", func() {
@@ -60,11 +60,11 @@ var _ = framework.KubeDescribe("MemoryEvictionSimple [Slow] [Serial] [Disruptive
 				return fmt.Errorf("current available memory is: %d bytes. Expected at least %d bytes available.", avail, halflimit)
 			}, 5*time.Minute, 15*time.Second).Should(BeNil())
 		})
-		var burstable *api.Pod
+		var guaranteed *api.Pod
 		It("should contain node memory pressure condition)", func() {
 			memoryLimit := getMemoryLimit(f)
 			By("creating a memory hogging pod.")
-			burstable = createMemhogPod(f, "burstable-", "burstable", api.ResourceRequirements{
+			guaranteed = createMemhogPod(f, "guaranteed-", "guaranteed", api.ResourceRequirements{
 				Limits: api.ResourceList{
 					"cpu": resource.MustParse("100m"),
 					// Set the memory limit to 80% of machine capacity to induce memory pressure.
@@ -95,7 +95,7 @@ var _ = framework.KubeDescribe("MemoryEvictionSimple [Slow] [Serial] [Disruptive
 		It("should drop the node memory pressure condition", func() {
 			By("deleting the memory hog pod.")
 			graceperiod := int64(1)
-			err := f.PodClient().Delete(burstable.Name, &api.DeleteOptions{GracePeriodSeconds: &graceperiod})
+			err := f.PodClient().Delete(guaranteed.Name, &api.DeleteOptions{GracePeriodSeconds: &graceperiod})
 			Expect(err).To(BeNil(), fmt.Sprintf("Failed to delete memory hogging pod: %v", err))
 
 			// Wait for the memory pressure condition to disappear from the node status before continuing.
