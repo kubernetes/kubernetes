@@ -1,10 +1,7 @@
 Kubernetes Snapshotting Proposal
+================================
 
-**Status:** Draft (as of 4 August 2016)
-
-**Authors: **[Cindy Wang](mailto:ciwang@google.com)
-
-[[TOC]]
+**Authors:** [Cindy Wang](https://github.com/ciwang)
 
 ## Background
 
@@ -82,19 +79,19 @@ Major features, in order of priority (bold features are priorities for v1):
 
 Snapshot operations will be triggered by [annotations](http://kubernetes.io/docs/user-guide/annotations/) on PVC API objects.
 
-* **Create: **
+* **Create:**
 
-    * Key: volume.alpha.kubernetes.io/snapshot-create
+    * Key: create.snapshot.volume.alpha.kubernetes.io
 
     * Value: [snapshot name]
 
 * **List:** 
 
-    * Key: [snapshot name]
+    * Key: snapshot.volume.alpha.kubernetes.io/[snapshot name]
 
     * Value: [snapshot timestamp]
 
-A new controller responsible solely for snapshot operations will be added to the controllermanager on the master. This controller will watch the API server for new annotations on PVCs. When a snapshot-create annotation is created, it will trigger the appropriate snapshot creation logic for the underlying persistent volume type. The list annotation will be populated by the controller and only identify all snapshots created for that PVC by Kubernetes.
+A new controller responsible solely for snapshot operations will be added to the controllermanager on the master. This controller will watch the API server for new annotations on PVCs. When a create snapshot annotation is added, it will trigger the appropriate snapshot creation logic for the underlying persistent volume type. The list annotation will be populated by the controller and only identify all snapshots created for that PVC by Kubernetes.
 
 The snapshot operation is a no-op for volume plugins that do not support snapshots via an API call (i.e. non-cloud storage).
 
@@ -106,7 +103,7 @@ The snapshot operation is a no-op for volume plugins that do not support snapsho
 
     * Usage:
 
-        * Users create annotation with key "volume.alpha.kubernetes.io/snapshot-create", value does not matter
+        * Users create annotation with key "create.snapshot.volume.alpha.kubernetes.io", value does not matter
 
         * When the annotation is deleted, the operation has succeeded. The snapshot will be listed in the value of snapshot-list.
 
@@ -136,9 +133,9 @@ The snapshot operation is a no-op for volume plugins that do not support snapsho
 
 **PVC Informer:** A shared informer that stores (references to) PVC objects, populated by the API server. The annotations on the PVC objects are used to add items to SnapshotRequests.
 
-**SnapshotRequests:** An in-memory cache of incomplete snapshot requests that is populated by the PVC informer. This maps unique volume IDs to PVC objects. Volumes are added when the snapshot-create annotation is added, and deleted when snapshot requests are completed successfully.
+**SnapshotRequests:** An in-memory cache of incomplete snapshot requests that is populated by the PVC informer. This maps unique volume IDs to PVC objects. Volumes are added when the create snapshot annotation is added, and deleted when snapshot requests are completed successfully.
 
-**Reconciler:** Simple loop that triggers asynchronous snapshots via the OperationExecutor. Deletes snapshot-create annotation if successful.
+**Reconciler:** Simple loop that triggers asynchronous snapshots via the OperationExecutor. Deletes create snapshot annotation if successful.
 
 The controller will have a loop that does the following:
 
@@ -150,11 +147,11 @@ The controller will have a loop that does the following:
 
     * Trigger snapshot:
 
-        * Loop through SnapshotRequests and trigger create snapshot logic (see below) for any PVCs that have the snapshot-create annotation.
+        * Loop through SnapshotRequests and trigger create snapshot logic (see below) for any PVCs that have the create snapshot annotation.
 
 * Persist State
 
-    * Once a snapshot operation completes, write the snapshot ID/timestamp to the PVC Annotations and delete the snapshot-create annotation in the PVC object via the API server.
+    * Once a snapshot operation completes, write the snapshot ID/timestamp to the PVC Annotations and delete the create snapshot annotation in the PVC object via the API server.
 
 Snapshot operations can take a long time to complete, so the primary controller loop should not block on these operations. Instead the reconciler should spawn separate threads for these operations via the operation executor. 
 
@@ -176,7 +173,7 @@ To create a snapshot:
 
     * Once a snapshot is created successfully:
 
-        * Make a call to the API server to delete the snapshot-create annotation in the PVC object.
+        * Make a call to the API server to delete the create snapshot annotation in the PVC object.
 
         * Make a call to the API server to add the new snapshot ID/timestamp to the PVC Annotations.
 
