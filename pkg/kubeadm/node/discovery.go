@@ -13,6 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+
 package kubenode
 
 import (
@@ -43,7 +44,7 @@ func RetrieveTrustedClusterInfo(params *kubeadmapi.BootstrapParams) (*clientcmda
 		return nil, fmt.Errorf("<node/discovery> failed to consturct an HTTP request [%s]", err)
 	}
 
-	fmt.Println("<node/discovery> created cluster info discovery client, requesting info from %q", requestURL)
+	fmt.Printf("<node/discovery> created cluster info discovery client, requesting info from %q\n", requestURL)
 
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {

@@ -17,10 +17,12 @@ limitations under the License.
 package kubemaster
 
 import (
+	"encoding/json"
 	"fmt"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	unversionedapi "k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
@@ -53,6 +55,7 @@ func CreateClientAndWaitForAPI(adminConfig *clientcmdapi.Config) (*clientset.Cli
 		if err != nil {
 			return false, nil
 		}
+		// TODO revisit this when we implement HA
 		if len(cs.Items) < 3 {
 			fmt.Println("<master/apiclient> not all control plane components are ready yet")
 			return false, nil
@@ -66,11 +69,32 @@ func CreateClientAndWaitForAPI(adminConfig *clientcmdapi.Config) (*clientset.Cli
 			}
 		}
 
-		fmt.Printf("<master/apiclient> all control plane components are healthy after %s seconds\n", time.Since(start).Seconds())
+		fmt.Printf("<master/apiclient> all control plane components are healthy after %f seconds\n", time.Since(start).Seconds())
 		return true, nil
 	})
 
-	// TODO may be also check node status
+	fmt.Println("<master/apiclient> waiting for at least one node to register and become ready")
+	start = time.Now()
+	wait.PollInfinite(500*time.Millisecond, func() (bool, error) {
+		nodeList, err := client.Nodes().List(api.ListOptions{})
+		if err != nil {
+			fmt.Println("<master/apiclient> temporarily unable to list nodes (will retry)")
+			return false, nil
+		}
+		if len(nodeList.Items) < 1 {
+			//fmt.Printf("<master/apiclient> %d nodes have registered so far", len(nodeList.Items))
+			return false, nil
+		}
+		n := &nodeList.Items[0]
+		if !api.IsNodeReady(n) {
+			fmt.Println("<master/apiclient> first node has registered, but is not ready yet")
+			return false, nil
+		}
+
+		fmt.Printf("<master/apiclient> first node is ready after %f seconds\n", time.Since(start).Seconds())
+		return true, nil
+	})
+
 	return client, nil
 }
 
@@ -103,9 +127,72 @@ func NewDeployment(deploymentName string, replicas int32, podSpec api.PodSpec) *
 	}
 }
 
-func TaintMaster(*clientset.Clientset) error {
-	// TODO
-	annotations := make(map[string]string)
-	annotations[api.TaintsAnnotationKey] = ""
+// It's safe to do this for alpha, as we don't have HA and there is no way we can get
+// more then one node here (TODO find a way to determine owr own node name)
+func findMyself(client *clientset.Clientset) (*api.Node, error) {
+	nodeList, err := client.Nodes().List(api.ListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("unable to list nodes [%s]", err)
+	}
+	if len(nodeList.Items) < 1 {
+		return nil, fmt.Errorf("no nodes found")
+	}
+	node := &nodeList.Items[0]
+	return node, nil
+}
+
+func attemptToUpdateMasterRoleLabelsAndTaints(client *clientset.Clientset) error {
+	n, err := findMyself(client)
+	if err != nil {
+		return err
+	}
+
+	n.ObjectMeta.Labels["kubeadm.alpha.kubernetes.io/role"] = "master"
+	taintsAnnotation, _ := json.Marshal([]api.Taint{{Key: "dedicated", Value: "master", Effect: "NoSchedule"}})
+	n.ObjectMeta.Annotations[api.TaintsAnnotationKey] = string(taintsAnnotation)
+
+	if _, err := client.Nodes().Update(n); err != nil {
+		if apierrs.IsConflict(err) {
+			fmt.Println("<master/apiclient> temporarily unable to update master node metadata due to conflict (will retry)")
+			time.Sleep(500 * time.Millisecond)
+			attemptToUpdateMasterRoleLabelsAndTaints(client)
+		} else {
+			return err
+		}
+	}
+
 	return nil
+}
+
+func UpdateMasterRoleLabelsAndTaints(client *clientset.Clientset) error {
+	err := attemptToUpdateMasterRoleLabelsAndTaints(client)
+	if err != nil {
+		return fmt.Errorf("<master/apiclient> failed to update master node - %s", err)
+	}
+	return nil
+}
+
+func SetMasterTaintTolerations(meta *api.ObjectMeta) {
+	tolerationsAnnotation, _ := json.Marshal([]api.Toleration{{Key: "dedicated", Value: "master", Effect: "NoSchedule"}})
+	if meta.Annotations == nil {
+		meta.Annotations = map[string]string{}
+	}
+	meta.Annotations[api.TolerationsAnnotationKey] = string(tolerationsAnnotation)
+}
+
+func SetMasterNodeAffinity(meta *api.ObjectMeta) {
+	nodeAffinity := &api.NodeAffinity{
+		RequiredDuringSchedulingIgnoredDuringExecution: &api.NodeSelector{
+			NodeSelectorTerms: []api.NodeSelectorTerm{{
+				MatchExpressions: []api.NodeSelectorRequirement{{
+					Key: "kubeadm.alpha.kubernetes.io/role", Operator: api.NodeSelectorOpIn, Values: []string{"master"},
+				}},
+			}},
+		},
+	}
+	affinityAnnotation, _ := json.Marshal(api.Affinity{NodeAffinity: nodeAffinity})
+	if meta.Annotations == nil {
+		meta.Annotations = map[string]string{}
+	}
+	meta.Annotations[api.AffinityAnnotationKey] = string(affinityAnnotation)
 }
