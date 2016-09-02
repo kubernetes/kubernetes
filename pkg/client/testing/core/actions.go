@@ -17,11 +17,13 @@ limitations under the License.
 package core
 
 import (
+	"fmt"
 	"path"
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -46,36 +48,22 @@ func NewGetAction(resource unversioned.GroupVersionResource, namespace, name str
 	return action
 }
 
-func NewRootListAction(resource unversioned.GroupVersionResource, opts api.ListOptions) ListActionImpl {
+func NewRootListAction(resource unversioned.GroupVersionResource, opts interface{}) ListActionImpl {
 	action := ListActionImpl{}
 	action.Verb = "list"
 	action.Resource = resource
-	labelSelector := opts.LabelSelector
-	if labelSelector == nil {
-		labelSelector = labels.Everything()
-	}
-	fieldSelector := opts.FieldSelector
-	if fieldSelector == nil {
-		fieldSelector = fields.Everything()
-	}
+	labelSelector, fieldSelector, _ := ExtractFromListOptions(opts)
 	action.ListRestrictions = ListRestrictions{labelSelector, fieldSelector}
 
 	return action
 }
 
-func NewListAction(resource unversioned.GroupVersionResource, namespace string, opts api.ListOptions) ListActionImpl {
+func NewListAction(resource unversioned.GroupVersionResource, namespace string, opts interface{}) ListActionImpl {
 	action := ListActionImpl{}
 	action.Verb = "list"
 	action.Resource = resource
 	action.Namespace = namespace
-	labelSelector := opts.LabelSelector
-	if labelSelector == nil {
-		labelSelector = labels.Everything()
-	}
-	fieldSelector := opts.FieldSelector
-	if fieldSelector == nil {
-		fieldSelector = fields.Everything()
-	}
+	labelSelector, fieldSelector, _ := ExtractFromListOptions(opts)
 	action.ListRestrictions = ListRestrictions{labelSelector, fieldSelector}
 
 	return action
@@ -202,72 +190,73 @@ func NewDeleteAction(resource unversioned.GroupVersionResource, namespace, name 
 	return action
 }
 
-func NewRootDeleteCollectionAction(resource unversioned.GroupVersionResource, opts api.ListOptions) DeleteCollectionActionImpl {
+func NewRootDeleteCollectionAction(resource unversioned.GroupVersionResource, opts interface{}) DeleteCollectionActionImpl {
 	action := DeleteCollectionActionImpl{}
 	action.Verb = "delete-collection"
 	action.Resource = resource
-	labelSelector := opts.LabelSelector
-	if labelSelector == nil {
-		labelSelector = labels.Everything()
-	}
-	fieldSelector := opts.FieldSelector
-	if fieldSelector == nil {
-		fieldSelector = fields.Everything()
-	}
+	labelSelector, fieldSelector, _ := ExtractFromListOptions(opts)
 	action.ListRestrictions = ListRestrictions{labelSelector, fieldSelector}
 
 	return action
 }
 
-func NewDeleteCollectionAction(resource unversioned.GroupVersionResource, namespace string, opts api.ListOptions) DeleteCollectionActionImpl {
+func NewDeleteCollectionAction(resource unversioned.GroupVersionResource, namespace string, opts interface{}) DeleteCollectionActionImpl {
 	action := DeleteCollectionActionImpl{}
 	action.Verb = "delete-collection"
 	action.Resource = resource
 	action.Namespace = namespace
-	labelSelector := opts.LabelSelector
-	if labelSelector == nil {
-		labelSelector = labels.Everything()
-	}
-	fieldSelector := opts.FieldSelector
-	if fieldSelector == nil {
-		fieldSelector = fields.Everything()
-	}
+	labelSelector, fieldSelector, _ := ExtractFromListOptions(opts)
 	action.ListRestrictions = ListRestrictions{labelSelector, fieldSelector}
 
 	return action
 }
 
-func NewRootWatchAction(resource unversioned.GroupVersionResource, opts api.ListOptions) WatchActionImpl {
+func NewRootWatchAction(resource unversioned.GroupVersionResource, opts interface{}) WatchActionImpl {
 	action := WatchActionImpl{}
 	action.Verb = "watch"
 	action.Resource = resource
-	labelSelector := opts.LabelSelector
-	if labelSelector == nil {
-		labelSelector = labels.Everything()
-	}
-	fieldSelector := opts.FieldSelector
-	if fieldSelector == nil {
-		fieldSelector = fields.Everything()
-	}
-	action.WatchRestrictions = WatchRestrictions{labelSelector, fieldSelector, opts.ResourceVersion}
+	labelSelector, fieldSelector, resourceVersion := ExtractFromListOptions(opts)
+	action.WatchRestrictions = WatchRestrictions{labelSelector, fieldSelector, resourceVersion}
 
 	return action
 }
 
-func NewWatchAction(resource unversioned.GroupVersionResource, namespace string, opts api.ListOptions) WatchActionImpl {
+func ExtractFromListOptions(opts interface{}) (labelSelector labels.Selector, fieldSelector fields.Selector, resourceVersion string) {
+	var err error
+	switch t := opts.(type) {
+	case api.ListOptions:
+		labelSelector = t.LabelSelector
+		fieldSelector = t.FieldSelector
+		resourceVersion = t.ResourceVersion
+	case v1.ListOptions:
+		labelSelector, err = labels.Parse(t.LabelSelector)
+		if err != nil {
+			panic(err)
+		}
+		fieldSelector, err = fields.ParseSelector(t.FieldSelector)
+		if err != nil {
+			panic(err)
+		}
+		resourceVersion = t.ResourceVersion
+	default:
+		panic(fmt.Errorf("expect a ListOptions"))
+	}
+	if labelSelector == nil {
+		labelSelector = labels.Everything()
+	}
+	if fieldSelector == nil {
+		fieldSelector = fields.Everything()
+	}
+	return labelSelector, fieldSelector, resourceVersion
+}
+
+func NewWatchAction(resource unversioned.GroupVersionResource, namespace string, opts interface{}) WatchActionImpl {
 	action := WatchActionImpl{}
 	action.Verb = "watch"
 	action.Resource = resource
 	action.Namespace = namespace
-	labelSelector := opts.LabelSelector
-	if labelSelector == nil {
-		labelSelector = labels.Everything()
-	}
-	fieldSelector := opts.FieldSelector
-	if fieldSelector == nil {
-		fieldSelector = fields.Everything()
-	}
-	action.WatchRestrictions = WatchRestrictions{labelSelector, fieldSelector, opts.ResourceVersion}
+	labelSelector, fieldSelector, resourceVersion := ExtractFromListOptions(opts)
+	action.WatchRestrictions = WatchRestrictions{labelSelector, fieldSelector, resourceVersion}
 
 	return action
 }

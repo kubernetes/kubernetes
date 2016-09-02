@@ -21,9 +21,8 @@ import (
 	"os"
 	"time"
 
-	"k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_4"
+	"k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5"
 	fedutil "k8s.io/kubernetes/federation/pkg/federation-controller/util"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -51,10 +50,10 @@ var _ = framework.KubeDescribe("Federation replicasets [Feature:Federation]", fu
 
 			// Delete registered replicasets.
 			nsName := f.FederationNamespace.Name
-			replicasetList, err := f.FederationClientset_1_4.Extensions().ReplicaSets(nsName).List(api.ListOptions{})
+			replicasetList, err := f.FederationClientset_1_5.Extensions().ReplicaSets(nsName).List(v1.ListOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			for _, replicaset := range replicasetList.Items {
-				err := f.FederationClientset_1_4.Extensions().ReplicaSets(nsName).Delete(replicaset.Name, &api.DeleteOptions{})
+				err := f.FederationClientset_1_5.Extensions().ReplicaSets(nsName).Delete(replicaset.Name, &v1.DeleteOptions{})
 				Expect(err).NotTo(HaveOccurred())
 			}
 		})
@@ -63,10 +62,10 @@ var _ = framework.KubeDescribe("Federation replicasets [Feature:Federation]", fu
 			framework.SkipUnlessFederated(f.Client)
 
 			nsName := f.FederationNamespace.Name
-			replicaset := createReplicaSetOrFail(f.FederationClientset_1_4, nsName)
+			replicaset := createReplicaSetOrFail(f.FederationClientset_1_5, nsName)
 			By(fmt.Sprintf("Creation of replicaset %q in namespace %q succeeded.  Deleting replicaset.", replicaset.Name, nsName))
 			// Cleanup
-			err := f.FederationClientset_1_4.Extensions().ReplicaSets(nsName).Delete(replicaset.Name, &api.DeleteOptions{})
+			err := f.FederationClientset_1_5.Extensions().ReplicaSets(nsName).Delete(replicaset.Name, &v1.DeleteOptions{})
 			framework.ExpectNoError(err, "Error deleting replicaset %q in namespace %q", replicaset.Name, replicaset.Namespace)
 			By(fmt.Sprintf("Deletion of replicaset %q in namespace %q succeeded.", replicaset.Name, nsName))
 		})
@@ -94,32 +93,32 @@ var _ = framework.KubeDescribe("Federation replicasets [Feature:Federation]", fu
 
 		It("should create and update matching replicasets in underling clusters", func() {
 			nsName := f.FederationNamespace.Name
-			rs := createReplicaSetOrFail(f.FederationClientset_1_4, nsName)
+			rs := createReplicaSetOrFail(f.FederationClientset_1_5, nsName)
 			defer func() {
 				// cleanup. deletion of replicasets is not supported for underlying clusters
 				By(fmt.Sprintf("Preparing replicaset %q/%q for deletion by setting replicas to zero", nsName, rs.Name))
 				replicas := int32(0)
 				rs.Spec.Replicas = &replicas
-				f.FederationClientset_1_4.ReplicaSets(nsName).Update(rs)
-				waitForReplicaSetOrFail(f.FederationClientset_1_4, nsName, rs.Name, clusters)
-				f.FederationClientset_1_4.ReplicaSets(nsName).Delete(rs.Name, &api.DeleteOptions{})
+				f.FederationClientset_1_5.ReplicaSets(nsName).Update(rs)
+				waitForReplicaSetOrFail(f.FederationClientset_1_5, nsName, rs.Name, clusters)
+				f.FederationClientset_1_5.ReplicaSets(nsName).Delete(rs.Name, &v1.DeleteOptions{})
 			}()
 
-			waitForReplicaSetOrFail(f.FederationClientset_1_4, nsName, rs.Name, clusters)
+			waitForReplicaSetOrFail(f.FederationClientset_1_5, nsName, rs.Name, clusters)
 			By(fmt.Sprintf("Successfuly created and synced replicaset %q/%q to clusters", nsName, rs.Name))
-			updateReplicaSetOrFail(f.FederationClientset_1_4, nsName)
-			waitForReplicaSetOrFail(f.FederationClientset_1_4, nsName, rs.Name, clusters)
+			updateReplicaSetOrFail(f.FederationClientset_1_5, nsName)
+			waitForReplicaSetOrFail(f.FederationClientset_1_5, nsName, rs.Name, clusters)
 			By(fmt.Sprintf("Successfuly updated and synced replicaset %q/%q to clusters", nsName, rs.Name))
 		})
 	})
 })
 
-func waitForReplicaSetOrFail(c *federation_release_1_4.Clientset, namespace string, replicaSetName string, clusters map[string]*cluster) {
+func waitForReplicaSetOrFail(c *federation_release_1_5.Clientset, namespace string, replicaSetName string, clusters map[string]*cluster) {
 	err := waitForReplicaSet(c, namespace, replicaSetName, clusters)
 	framework.ExpectNoError(err, "Failed to verify replicaset %q/%q, err: %v", namespace, replicaSetName, err)
 }
 
-func waitForReplicaSet(c *federation_release_1_4.Clientset, namespace string, replicaSetName string, clusters map[string]*cluster) error {
+func waitForReplicaSet(c *federation_release_1_5.Clientset, namespace string, replicaSetName string, clusters map[string]*cluster) error {
 	err := wait.Poll(10*time.Second, FederatedReplicaSetTimeout, func() (bool, error) {
 		frs, err := c.ReplicaSets(namespace).Get(replicaSetName)
 		if err != nil {
@@ -158,7 +157,7 @@ func equivalentReplicaSet(fedReplicaSet, localReplicaSet *v1beta1.ReplicaSet) bo
 		reflect.DeepEqual(fedReplicaSet.Spec, localReplicaSetSpec)
 }
 
-func createReplicaSetOrFail(clientset *federation_release_1_4.Clientset, namespace string) *v1beta1.ReplicaSet {
+func createReplicaSetOrFail(clientset *federation_release_1_5.Clientset, namespace string) *v1beta1.ReplicaSet {
 	if clientset == nil || len(namespace) == 0 {
 		Fail(fmt.Sprintf("Internal error: invalid parameters passed to createReplicaSetOrFail: clientset: %v, namespace: %v", clientset, namespace))
 	}
@@ -172,7 +171,7 @@ func createReplicaSetOrFail(clientset *federation_release_1_4.Clientset, namespa
 	return replicaset
 }
 
-func updateReplicaSetOrFail(clientset *federation_release_1_4.Clientset, namespace string) *v1beta1.ReplicaSet {
+func updateReplicaSetOrFail(clientset *federation_release_1_5.Clientset, namespace string) *v1beta1.ReplicaSet {
 	if clientset == nil || len(namespace) == 0 {
 		Fail(fmt.Sprintf("Internal error: invalid parameters passed to updateReplicaSetOrFail: clientset: %v, namespace: %v", clientset, namespace))
 	}
