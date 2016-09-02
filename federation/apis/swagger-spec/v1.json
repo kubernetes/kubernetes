@@ -1346,6 +1346,59 @@
     ]
    },
    {
+    "path": "/api/v1/namespaces/{name}/finalize",
+    "description": "API at /api/v1",
+    "operations": [
+     {
+      "type": "v1.Namespace",
+      "method": "PUT",
+      "summary": "replace finalize of the specified Namespace",
+      "nickname": "replaceNamespaceFinalize",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1.Namespace",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Namespace",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1.Namespace"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
     "path": "/api/v1/namespaces/{name}/status",
     "description": "API at /api/v1",
     "operations": [
