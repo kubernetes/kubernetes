@@ -73,6 +73,7 @@ func newKubeDiscoveryPodSpec(params *kubeadmapi.BootstrapParams) api.PodSpec {
 				ReadOnly:  true,
 			}},
 			Ports: []api.ContainerPort{
+				// TODO add a service, so host port gets exposed
 				{Name: "http", ContainerPort: 9898, HostPort: 9898},
 			},
 		}},
