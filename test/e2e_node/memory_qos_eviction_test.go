@@ -134,7 +134,7 @@ var _ = framework.KubeDescribe("MemoryEvictionQOS [Slow] [Serial] [Disruptive]",
 
 				// memory limit = avail + wset
 				limit := avail + wset
-				halflimit := limit / 2
+				halflimit := limit / 5
 
 				// Wait for at least half of memory limit to be available
 				if avail >= halflimit {

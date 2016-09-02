@@ -79,7 +79,7 @@ var _ = framework.KubeDescribe("MemoryEvictionSimple [FLAKY] [Slow] [Serial] [Di
 			}, true)
 			Logf("POD CLIENT NAMESPACE: %v, POD NAMESPACE: %v", f.Namespace.Name, guaranteed.Namespace)
 
-			By("polling the node condition and wait till memory pressure ")
+			By("polling the node condition and wait till memory pressure is present")
 			Eventually(func() error {
 				nodeList, err := f.Client.Nodes().List(api.ListOptions{})
 				if err != nil {
@@ -97,9 +97,8 @@ var _ = framework.KubeDescribe("MemoryEvictionSimple [FLAKY] [Slow] [Serial] [Di
 				}
 				return nil
 			}, 5*time.Minute, 5*time.Second).Should(BeNil())
-		})
-		It("should drop the node memory pressure condition", func() {
 			// Wait for the memory pressure condition to disappear from the node status before continuing.
+			By("polling the node condition and wait till memory pressure is removed")
 			Eventually(func() error {
 				nodeList, err := f.Client.Nodes().List(api.ListOptions{})
 				if err != nil {
@@ -116,8 +115,7 @@ var _ = framework.KubeDescribe("MemoryEvictionSimple [FLAKY] [Slow] [Serial] [Di
 				}
 				return nil
 			}, 5*time.Minute, 15*time.Second).Should(BeNil())
-		})
-		It("should admit a best effort pod", func() {
+			By("should admit a best effort pod")
 			// Finally, try starting a new pod and wait for it to be scheduled and running.
 			// This is the final check to try to prevent interference with subsequent tests.
 			podName := "admit-best-effort-pod"
@@ -135,7 +133,6 @@ var _ = framework.KubeDescribe("MemoryEvictionSimple [FLAKY] [Slow] [Serial] [Di
 					},
 				},
 			})
-			// Pod admitted. Memory eviction feature test ends.
 		})
 	})
 })
