@@ -86,8 +86,8 @@ func (p *petSyncer) Sync(pet *pcb) error {
 	if pet == nil {
 		return nil
 	}
-	realPet, exists, err := p.Get(pet)
-	if err != nil {
+	realPet, err := p.Get(pet)
+	if err != nil && !errors.IsNotFound(err) {
 		return err
 	}
 	// There is not constraint except quota on the number of pvcs created.
@@ -96,7 +96,7 @@ func (p *petSyncer) Sync(pet *pcb) error {
 	if err := p.SyncPVCs(pet); err != nil {
 		return err
 	}
-	if exists {
+	if realPet != nil {
 		if !p.isHealthy(realPet.pod) {
 			glog.Infof("PetSet %v waiting on unhealthy pet %v", pet.parent.Name, realPet.pod.Name)
 		}
@@ -125,11 +125,11 @@ func (p *petSyncer) Delete(pet *pcb) error {
 	if pet == nil {
 		return nil
 	}
-	realPet, exists, err := p.Get(pet)
-	if err != nil {
+	realPet, err := p.Get(pet)
+	if err != nil && !errors.IsNotFound(err) {
 		return err
 	}
-	if !exists {
+	if realPet == nil {
 		return nil
 	}
 	if p.blockingPet != nil {
@@ -152,7 +152,7 @@ type petClient interface {
 	pvcClient
 	petHealthChecker
 	Delete(*pcb) error
-	Get(*pcb) (*pcb, bool, error)
+	Get(*pcb) (*pcb, error)
 	Create(*pcb) error
 	Update(*pcb, *pcb) error
 }
@@ -165,20 +165,15 @@ type apiServerPetClient struct {
 }
 
 // Get gets the pet in the pcb from the apiserver.
-func (p *apiServerPetClient) Get(pet *pcb) (*pcb, bool, error) {
-	found := true
+func (p *apiServerPetClient) Get(pet *pcb) (*pcb, error) {
 	ns := pet.parent.Namespace
 	pod, err := podClient(p.c, ns).Get(pet.pod.Name)
-	if errors.IsNotFound(err) {
-		found = false
-		err = nil
-	}
-	if err != nil || !found {
-		return nil, found, err
+	if err != nil {
+		return nil, err
 	}
 	realPet := *pet
 	realPet.pod = pod
-	return &realPet, true, nil
+	return &realPet, nil
 }
 
 // Delete deletes the pet in the pcb from the apiserver.

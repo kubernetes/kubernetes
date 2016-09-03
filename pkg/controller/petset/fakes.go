@@ -23,6 +23,7 @@ import (
 	inf "gopkg.in/inf.v0"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
 	api_pod "k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -181,13 +182,14 @@ func (f *fakePetClient) Delete(p *pcb) error {
 }
 
 // Get fakes getting pets.
-func (f *fakePetClient) Get(p *pcb) (*pcb, bool, error) {
+func (f *fakePetClient) Get(p *pcb) (*pcb, error) {
 	for i, pet := range f.pets {
 		if p.pod.Name == pet.pod.Name {
-			return f.pets[i], true, nil
+			return f.pets[i], nil
 		}
 	}
-	return nil, false, nil
+	// TODO return other type errors besides NotFound error
+	return nil, errors.NewNotFound(api.Resource("petset"), "test")
 }
 
 // Create fakes pet creation.

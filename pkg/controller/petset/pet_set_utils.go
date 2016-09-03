@@ -21,6 +21,7 @@ import (
 	"sync"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
@@ -117,13 +118,14 @@ func (u *unhealthyPetTracker) Get(ps *apps.PetSet, knownPets []*api.Pod) (*pcb, 
 	// disappears, it's no longer blocking. If it exists, it continues to block
 	// till it turns healthy or disappears.
 	bp := obj.(*pcb)
-	blockingPet, exists, err := u.pc.Get(bp)
+	blockingPet, err := u.pc.Get(bp)
 	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		glog.V(4).Infof("Clearing blocking pet %v for PetSet %v because it's been deleted", bp.pod.Name, ps.Name)
-		return nil, nil
+		if errors.IsNotFound(err) {
+			glog.V(4).Infof("Clearing blocking pet %v for PetSet %v because it's been deleted", bp.pod.Name, ps.Name)
+			return nil, nil
+		} else {
+			return nil, err
+		}
 	}
 	blockingPetPod := blockingPet.pod
 	if hc.isHealthy(blockingPetPod) && !hc.isDying(blockingPetPod) {
