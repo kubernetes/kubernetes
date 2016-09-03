@@ -210,6 +210,7 @@ func defaultPriorities() sets.String {
 	)
 }
 
+// GetEquivalencePod returns a EquivalencePod which contains a group of pod attributes which can be reused.
 func GetEquivalencePod(pod *api.Pod) interface{} {
 	equivalencePod := EquivalencePod{}
 	podSpec := &(pod.Spec)
@@ -219,12 +220,23 @@ func GetEquivalencePod(pod *api.Pod) interface{} {
 	equivalencePod.NodeSelector = podSpec.NodeSelector
 	equivalencePod.Request = predicates.GetResourceRequest(pod)
 	equivalencePod.Ports = predicates.GetUsedPorts(pod)
+	equivalencePod.Namespace = pod.Namespace
+
+	affinity, err := api.GetAffinityFromPodAnnotations(pod.Annotations)
+	if err != nil {
+		glog.Errorf("GetEquivalencePod failed to get Affinity from Pod %+v, err: %+v", pod.Name, err)
+	}
+
+	equivalencePod.Affinity = affinity
 	return &equivalencePod
 }
 
+// EquivalencePod is a group of pod attributes which can be reused as equivalence to schedule other pods.
 type EquivalencePod struct {
+	Namespace    string
 	Volumes      []api.Volume
 	NodeSelector map[string]string
 	Ports        map[int]bool
 	Request      *schedulercache.Resource
+	Affinity     *api.Affinity
 }
