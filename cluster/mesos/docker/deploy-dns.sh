@@ -30,6 +30,7 @@ workspace=$(pwd)
 # Process salt pillar templates manually
 sed -e "s/{{ pillar\['dns_replicas'\] }}/${DNS_REPLICAS}/g;s/{{ pillar\['dns_domain'\] }}/${DNS_DOMAIN}/g" "${KUBE_ROOT}/cluster/addons/dns/skydns-rc.yaml.in" > "${workspace}/skydns-rc.yaml"
 sed -e "s/{{ pillar\['dns_server'\] }}/${DNS_SERVER_IP}/g" "${KUBE_ROOT}/cluster/addons/dns/skydns-svc.yaml.in" > "${workspace}/skydns-svc.yaml"
+sed -e "s/{{ pillar\['dns_server'\] }}/${DNS_SERVER_IP}/g" "${KUBE_ROOT}/cluster/addons/dns/skydns-configmap.yaml.in" > "${workspace}/skydns-configmap.yaml"
 
 # Federation specific values.
 if [[ "${FEDERATION:-}" == "true" ]]; then
@@ -49,3 +50,4 @@ fi
 # Use kubectl to create skydns rc and service
 "${kubectl}" create -f "${workspace}/skydns-rc.yaml"
 "${kubectl}" create -f "${workspace}/skydns-svc.yaml"
+"${kubectl}" create -f "${workspace}/skydns-configmap.yaml"

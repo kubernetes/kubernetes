@@ -90,6 +90,15 @@ addon-dir-create:
     - makedirs: True
 {% endif %}
 
+/etc/kubernetes/addons/dns/skydns-configmap.yaml:
+  file.managed:
+    - source: salt://kube-addons/dns/skydns-configmap.yaml.in
+    - template: jinja
+    - group: root
+    - dir_mode: 755
+    - makedirs: True
+{% endif %}
+
 {% if pillar.get('enable_cluster_registry', '').lower() == 'true' %}
 /etc/kubernetes/addons/registry/registry-svc.yaml:
   file.managed:

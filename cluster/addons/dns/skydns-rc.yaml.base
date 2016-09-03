@@ -18,8 +18,8 @@
 
 # __MACHINE_GENERATED_WARNING__
 
-apiVersion: v1
 kind: ReplicationController
+apiVersion: v1
 metadata:
   name: kube-dns-v19
   namespace: kube-system
