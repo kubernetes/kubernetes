@@ -24,7 +24,6 @@ import (
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
-	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	"sync"
 )
 
@@ -36,14 +35,13 @@ type HostPredicate struct {
 }
 
 type AlgorithmCache struct {
+	// Only consider predicates for now, priorities rely on: #31606
 	predicatesCache *lru.Cache
-	prioritiesCache *lru.Cache
 }
 
 func newAlgorithmCache() AlgorithmCache {
 	return AlgorithmCache{
 		predicatesCache: lru.New(maxCacheEntries),
-		prioritiesCache: lru.New(maxCacheEntries),
 	}
 }
 
@@ -66,14 +64,6 @@ func NewEquivalenceCache(getEquivalencePodFunc algorithm.GetEquivalencePodFunc) 
 	}
 }
 
-// addPodPriority adds pod priority for equivalence class
-func (ec *EquivalenceCache) addPodPriority(podKey uint64, nodeName string, score int) {
-	if _, exist := ec.algorithmCache[nodeName]; !exist {
-		ec.algorithmCache[nodeName] = newAlgorithmCache()
-	}
-	ec.algorithmCache[nodeName].prioritiesCache.Add(podKey, schedulerapi.HostPriority{Host: nodeName, Score: score})
-}
-
 // addPodPredicate adds pod predicate for equivalence class
 func (ec *EquivalenceCache) addPodPredicate(podKey uint64, nodeName string, fit bool, failReasons []algorithm.PredicateFailureReason) {
 	if _, exist := ec.algorithmCache[nodeName]; !exist {
@@ -91,15 +81,6 @@ func (ec *EquivalenceCache) AddPodPredicatesCache(pod *api.Pod, fitNodeList []*a
 	}
 	for failNodeName, failReasons := range *failedPredicates {
 		ec.addPodPredicate(equivalenceHash, failNodeName, false, failReasons)
-	}
-}
-
-// AddPodPredicatesCache cache pod priority for equivalence class
-func (ec *EquivalenceCache) AddPodPrioritiesCache(pod *api.Pod, priorities schedulerapi.HostPriorityList) {
-	equivalenceHash := ec.hashEquivalencePod(pod)
-
-	for _, priority := range priorities {
-		ec.addPodPriority(equivalenceHash, priority.Host, priority.Score)
 	}
 }
 
@@ -127,30 +108,6 @@ func (ec *EquivalenceCache) GetCachedPredicates(pod *api.Pod, nodes []*api.Node)
 		}
 	}
 	return fitNodeList, failedPredicates, noCacheNodeList
-}
-
-// GetCachedPriorities gets cached priorities for equivalence class
-func (ec *EquivalenceCache) GetCachedPriorities(pod *api.Pod, nodes []*api.Node) (schedulerapi.HostPriorityList, []*api.Node) {
-	cachedPriorities := schedulerapi.HostPriorityList{}
-	noCacheNodeList := []*api.Node{}
-
-	equivalenceHash := ec.hashEquivalencePod(pod)
-
-	for _, node := range nodes {
-		findCache := false
-		if algorithmCache, exist := ec.algorithmCache[node.Name]; exist {
-			if cachePriority, exist := algorithmCache.prioritiesCache.Get(equivalenceHash); exist {
-				hostPriotity := cachePriority.(schedulerapi.HostPriority)
-				cachedPriorities = append(cachedPriorities, hostPriotity)
-				findCache = true
-			}
-		}
-		if !findCache {
-			noCacheNodeList = append(noCacheNodeList, node)
-		}
-	}
-
-	return cachedPriorities, noCacheNodeList
 }
 
 // SendInvalidAlgorithmCacheReq marks AlgorithmCache item as invalid
