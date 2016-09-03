@@ -28,8 +28,6 @@ import (
 	"strings"
 	"time"
 
-	"gopkg.in/gcfg.v1"
-
 	"k8s.io/kubernetes/pkg/api"
 	apiservice "k8s.io/kubernetes/pkg/api/service"
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -48,6 +46,7 @@ import (
 	container "google.golang.org/api/container/v1"
 	"google.golang.org/api/googleapi"
 	"google.golang.org/cloud/compute/metadata"
+	"gopkg.in/gcfg.v1"
 )
 
 const (
@@ -324,6 +323,16 @@ func CreateGCECloud(projectID, region, zone string, managedZones []string, netwo
 		}
 	} else {
 		glog.Infof("Using existing Token Source %#v", tokenSource)
+	}
+
+	if err := wait.PollImmediate(5*time.Second, 30*time.Second, func() (bool, error) {
+		if _, err := tokenSource.Token(); err != nil {
+			glog.Errorf("error fetching initial token: %v", err)
+			return false, nil
+		}
+		return true, nil
+	}); err != nil {
+		return nil, err
 	}
 
 	client := oauth2.NewClient(oauth2.NoContext, tokenSource)
