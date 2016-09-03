@@ -39,4 +39,12 @@ func SetDefaults_Job(obj *Job) {
 		obj.Spec.Parallelism = new(int32)
 		*obj.Spec.Parallelism = 1
 	}
+	// When manualSelector is true, set metadata.Labels according to
+	// obj.Spec.Template.Labels
+	labels := obj.Spec.Template.Labels
+	if labels != nil {
+		if len(obj.Labels) == 0 {
+			obj.Labels = labels
+		}
+	}
 }
