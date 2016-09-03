@@ -283,8 +283,8 @@ func testCoreResourceList(t *testing.T) {
 	}
 	assert.Equal(t, "", apiResourceList.APIVersion)
 	assert.Equal(t, v1.SchemeGroupVersion.String(), apiResourceList.GroupVersion)
-	// Assert that there are exactly 6 resources.
-	assert.Equal(t, 6, len(apiResourceList.APIResources))
+	// Assert that there are exactly 7 resources.
+	assert.Equal(t, 7, len(apiResourceList.APIResources))
 
 	// Verify services.
 	found := findResource(apiResourceList.APIResources, "services")
@@ -299,6 +299,9 @@ func testCoreResourceList(t *testing.T) {
 	assert.NotNil(t, found)
 	assert.False(t, found.Namespaced)
 	found = findResource(apiResourceList.APIResources, "namespaces/status")
+	assert.NotNil(t, found)
+	assert.False(t, found.Namespaced)
+	found = findResource(apiResourceList.APIResources, "namespaces/finalize")
 	assert.NotNil(t, found)
 	assert.False(t, found.Namespaced)
 

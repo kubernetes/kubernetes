@@ -42,16 +42,17 @@ import (
 
 func installCoreAPIs(s *options.ServerRunOptions, g *genericapiserver.GenericAPIServer, f genericapiserver.StorageFactory) {
 	serviceStore, serviceStatusStore := serviceetcd.NewREST(createRESTOptionsOrDie(s, g, f, api.Resource("service")))
-	namespaceStore, namespaceStatusStore, _ := namespaceetcd.NewREST(createRESTOptionsOrDie(s, g, f, api.Resource("namespaces")))
+	namespaceStore, namespaceStatusStore, namespaceFinalizeStore := namespaceetcd.NewREST(createRESTOptionsOrDie(s, g, f, api.Resource("namespaces")))
 	secretStore := secretetcd.NewREST(createRESTOptionsOrDie(s, g, f, api.Resource("secrets")))
 	eventStore := eventetcd.NewREST(createRESTOptionsOrDie(s, g, f, api.Resource("events")), uint64(s.EventTTL.Seconds()))
 	coreResources := map[string]rest.Storage{
-		"secrets":           secretStore,
-		"services":          serviceStore,
-		"services/status":   serviceStatusStore,
-		"namespaces":        namespaceStore,
-		"namespaces/status": namespaceStatusStore,
-		"events":            eventStore,
+		"secrets":             secretStore,
+		"services":            serviceStore,
+		"services/status":     serviceStatusStore,
+		"namespaces":          namespaceStore,
+		"namespaces/status":   namespaceStatusStore,
+		"namespaces/finalize": namespaceFinalizeStore,
+		"events":              eventStore,
 	}
 	coreGroupMeta := registered.GroupOrDie(core.GroupName)
 	apiGroupInfo := genericapiserver.APIGroupInfo{
