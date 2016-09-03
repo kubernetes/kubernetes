@@ -169,9 +169,11 @@ func (p *apiServerPetClient) Get(pet *pcb) (*pcb, bool, error) {
 	found := true
 	ns := pet.parent.Namespace
 	pod, err := podClient(p.c, ns).Get(pet.pod.Name)
-	if errors.IsNotFound(err) {
+	if err != nil {
 		found = false
-		err = nil
+		if errors.IsNotFound(err) {
+			err = nil
+		}
 	}
 	if err != nil || !found {
 		return nil, found, err
