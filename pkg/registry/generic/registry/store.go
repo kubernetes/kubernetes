@@ -227,6 +227,20 @@ func (e *Store) Create(ctx api.Context, obj runtime.Object) (runtime.Object, err
 	if err := e.Storage.Create(ctx, key, obj, out, ttl); err != nil {
 		err = storeerr.InterpretCreateError(err, e.QualifiedResource, name)
 		err = rest.CheckGeneratedNameError(e.CreateStrategy, err, obj)
+		if !kubeerr.IsAlreadyExists(err) {
+			return nil, err
+		}
+		if errGet := e.Storage.Get(ctx, key, out, false); errGet != nil {
+			return nil, err
+		}
+		accessor, errGetAcc := meta.Accessor(out)
+		if errGetAcc != nil {
+			return nil, err
+		}
+		if accessor.GetDeletionTimestamp() != nil {
+			msg := &err.(*kubeerr.StatusError).ErrStatus.Message
+			*msg = fmt.Sprintf("object is being deleted: %s", *msg)
+		}
 		return nil, err
 	}
 	if e.AfterCreate != nil {
