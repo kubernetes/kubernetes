@@ -18,6 +18,7 @@ package e2e
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -761,6 +762,75 @@ func testRollbackDeployment(f *framework.Framework) {
 	// Current newRS annotation should be "update", after the rollback
 	err = framework.CheckNewRSAnnotations(c, ns, deploymentName, updateAnnotation)
 	Expect(err).NotTo(HaveOccurred())
+}
+
+// testDryRunRollbackDeployment tests that a deployment is created (revision 1) and updated (revision 2), and
+// then rollback with dry-run option (should just output template of revision 1).
+func testDryRunRollbackDeployment(f *framework.Framework) {
+	ns := f.Namespace.Name
+	unversionedClient := f.Client
+	c := adapter.FromUnversionedClient(unversionedClient)
+	podName := "nginx"
+	deploymentPodLabels := map[string]string{"name": podName}
+
+	// 1. Create a deployment to create nginx pods
+	deploymentName, deploymentImageName := "test-dry-run-rollback-deployment", nginxImageName
+	deploymentReplicas := int32(1)
+	deploymentImage := nginxImage
+	deploymentStrategyType := extensions.RollingUpdateDeploymentStrategyType
+	framework.Logf("Creating deployment %s", deploymentName)
+	d := newDeployment(deploymentName, deploymentReplicas, deploymentPodLabels, deploymentImageName, deploymentImage, deploymentStrategyType, nil)
+	createAnnotation := map[string]string{"action": "create", "author": "minion"}
+	d.Annotations = createAnnotation
+	deploy, err := c.Extensions().Deployments(ns).Create(d)
+	Expect(err).NotTo(HaveOccurred())
+	defer stopDeployment(c, f.Client, ns, deploymentName)
+
+	// Wait for it to be updated to revision 1
+	err = framework.WaitForDeploymentRevisionAndImage(c, ns, deploymentName, "1", deploymentImage)
+	Expect(err).NotTo(HaveOccurred())
+
+	err = framework.WaitForDeploymentStatus(c, deploy)
+	Expect(err).NotTo(HaveOccurred())
+
+	// Current newRS annotation should be "create"
+	err = framework.CheckNewRSAnnotations(c, ns, deploymentName, createAnnotation)
+	Expect(err).NotTo(HaveOccurred())
+
+	// 2. Update the deployment to create redis pods.
+	updatedDeploymentImage := redisImage
+	updatedDeploymentImageName := redisImageName
+	updateAnnotation := map[string]string{"action": "update", "log": "I need to update it"}
+	deployment, err := framework.UpdateDeploymentWithRetries(c, ns, d.Name, func(update *extensions.Deployment) {
+		update.Spec.Template.Spec.Containers[0].Name = updatedDeploymentImageName
+		update.Spec.Template.Spec.Containers[0].Image = updatedDeploymentImage
+		update.Annotations = updateAnnotation
+	})
+	Expect(err).NotTo(HaveOccurred())
+
+	// Use observedGeneration to determine if the controller noticed the pod template update.
+	err = framework.WaitForObservedDeployment(c, ns, deploymentName, deployment.Generation)
+	Expect(err).NotTo(HaveOccurred())
+
+	// Wait for it to be updated to revision 2
+	err = framework.WaitForDeploymentRevisionAndImage(c, ns, deploymentName, "2", updatedDeploymentImage)
+	Expect(err).NotTo(HaveOccurred())
+
+	err = framework.WaitForDeploymentStatus(c, deployment)
+	Expect(err).NotTo(HaveOccurred())
+
+	// Current newRS annotation should be "update"
+	err = framework.CheckNewRSAnnotations(c, ns, deploymentName, updateAnnotation)
+	Expect(err).NotTo(HaveOccurred())
+
+	rollbacker, err := kubectl.RollbackerFor(extensions.Kind("Deployment"), c)
+	Expect(err).NotTo(HaveOccurred())
+
+	// dry-run rollback to revision 1
+	toRevision := int64(1)
+	result, err := rollbacker.Rollback(deployment, false, toRevision, true)
+	Expect(err).NotTo(HaveOccurred())
+	Expect(strings.Split(result, "\n")).Should(ContainElement(ContainSubstring("nginx")))
 }
 
 // testRollbackDeploymentRSNoRevision tests that deployment supports rollback even when there's old replica set without revision.
