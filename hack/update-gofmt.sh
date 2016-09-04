@@ -34,6 +34,7 @@ find_files() {
         -o -wholename './_output' \
         -o -wholename './_gopath' \
         -o -wholename './release' \
+        -o -wholename './staging' \
         -o -wholename './target' \
         -o -wholename '*/third_party/*' \
         -o -wholename '*/vendor/*' \
