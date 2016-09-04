@@ -29,10 +29,6 @@ import (
 	inf "gopkg.in/inf.v0"
 )
 
-var (
-	testQuantityFlag = QuantityFlag("quantityFlag", "1M", "dummy flag for testing the quantity flag mechanism")
-)
-
 var useInfDec bool
 
 func amount(i int64, exponent int) infDecAmount {
