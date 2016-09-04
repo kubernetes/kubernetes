@@ -365,7 +365,6 @@ func (kl *Kubelet) setNodeAddress(node *api.Node) error {
 		if err != nil {
 			return fmt.Errorf("failed to get node address from cloud provider: %v", err)
 		}
-
 		if kl.nodeIP != nil {
 			for _, nodeAddress := range nodeAddresses {
 				if nodeAddress.Address == kl.nodeIP.String() {
@@ -377,7 +376,6 @@ func (kl *Kubelet) setNodeAddress(node *api.Node) error {
 			}
 			return fmt.Errorf("failed to get node address from cloud provider that matches ip: %v", kl.nodeIP)
 		}
-
 		node.Status.Addresses = append(nodeAddresses, hostnameAddress)
 	} else {
 		var ipAddr net.IP
@@ -419,6 +417,7 @@ func (kl *Kubelet) setNodeAddress(node *api.Node) error {
 	}
 	return nil
 }
+
 func (kl *Kubelet) setNodeStatusMachineInfo(node *api.Node) {
 	// TODO: Post NotReady if we cannot get MachineInfo from cAdvisor. This needs to start
 	// cAdvisor locally, e.g. for test-cmd.sh, and in integration test.
