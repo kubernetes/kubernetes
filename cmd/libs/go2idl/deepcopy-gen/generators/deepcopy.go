@@ -609,7 +609,7 @@ func (g *genDeepCopy) doPointer(t *types.Type, sw *generator.SnippetWriter) {
 		sw.Do("if newVal, err := c.DeepCopy(*in); err != nil {\n", nil)
 		sw.Do("return err\n", nil)
 		sw.Do("} else {\n", nil)
-		sw.Do("*out = newVal.($.|raw$)\n", t.Elem)
+		sw.Do("*out = newVal.(*$.|raw$)\n", t.Elem)
 		sw.Do("}\n", nil)
 	}
 }
