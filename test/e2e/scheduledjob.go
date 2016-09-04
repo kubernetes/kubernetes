@@ -59,6 +59,11 @@ var _ = framework.KubeDescribe("ScheduledJob", func() {
 	BeforeEach(func() {
 		c = f.Client
 		ns = f.Namespace.Name
+
+		resourceList, err := c.DiscoveryClient.ServerResourcesForGroupVersion("batch/v2alpha1")
+		if err != nil || resourceList.Size() == 0 {
+			framework.Skipf("Could not find ScheduledJobs resource, skipping test: %#v", err)
+		}
 	})
 
 	// multiple jobs running at once
