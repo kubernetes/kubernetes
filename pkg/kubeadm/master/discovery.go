@@ -90,8 +90,7 @@ func newKubeDiscoveryPodSpec(params *kubeadmapi.BootstrapParams) api.PodSpec {
 }
 
 func newKubeDiscovery(params *kubeadmapi.BootstrapParams, caCert *x509.Certificate) kubeDiscovery {
-	// TODO pin to master
-	return kubeDiscovery{
+	kd := kubeDiscovery{
 		Deployment: NewDeployment(kubeDiscoverynName, 1, newKubeDiscoveryPodSpec(params)),
 		Secret: &api.Secret{
 			ObjectMeta: api.ObjectMeta{Name: kubeDiscoverySecretName},
@@ -99,16 +98,31 @@ func newKubeDiscovery(params *kubeadmapi.BootstrapParams, caCert *x509.Certifica
 			Data:       encodeKubeDiscoverySecretData(params, caCert),
 		},
 	}
+
+	/* why this doesn't work?
+	kd.Deployment.Spec.Template.ObjectMeta.Annotations = map[string]string{}
+	kd.Deployment.Spec.Template.ObjectMeta.Annotations[api.AffinityAnnotationKey] = `{
+		"nodeAffinity": {
+			"requiredDuringSchedulingIgnoredDuringExecution": {
+				"nodeSelectorTerms": [{
+					"matchExpressions": [{ "key": "role", "operator": "In", "values": ["master"] }]
+				}]
+			}
+		}
+	}`
+	*/
+
+	return kd
 }
 
 func CreateDiscoveryDeploymentAndSecret(params *kubeadmapi.BootstrapParams, client *clientset.Clientset, caCert *x509.Certificate) error {
 	kd := newKubeDiscovery(params, caCert)
 
 	if _, err := client.Extensions().Deployments(api.NamespaceSystem).Create(kd.Deployment); err != nil {
-		return fmt.Errorf("<master/discovery> failed to create %q deployment", kubeDiscoverynName)
+		return fmt.Errorf("<master/discovery> failed to create %q deployment [%s]", kubeDiscoverynName, err)
 	}
 	if _, err := client.Secrets(api.NamespaceSystem).Create(kd.Secret); err != nil {
-		return fmt.Errorf("<master/discovery> failed to create %q secret", kubeDiscoverySecretName)
+		return fmt.Errorf("<master/discovery> failed to create %q secret [%s]", kubeDiscoverySecretName, err)
 	}
 
 	fmt.Println("<master/discovery> created essential addon: kube-discovery")

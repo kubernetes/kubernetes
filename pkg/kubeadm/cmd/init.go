@@ -91,6 +91,10 @@ func RunInit(out io.Writer, cmd *cobra.Command, args []string, params *kubeadmap
 		return err
 	}
 
+	if err := kubemaster.UpdateMasterRoleLabelsAndTaints(client); err != nil {
+		return err
+	}
+
 	if err := kubemaster.CreateDiscoveryDeploymentAndSecret(params, client, caCert); err != nil {
 		return err
 	}

@@ -17,6 +17,7 @@ limitations under the License.
 package kubemaster
 
 import (
+	_ "encoding/json"
 	"fmt"
 	"time"
 
@@ -71,7 +72,28 @@ func CreateClientAndWaitForAPI(adminConfig *clientcmdapi.Config) (*clientset.Cli
 		return true, nil
 	})
 
-	// TODO may be also check node status
+	fmt.Println("<master/apiclient> waiting for at least one node to register and become ready")
+	start = time.Now()
+	wait.PollInfinite(500*time.Millisecond, func() (bool, error) {
+		nodeList, err := client.Nodes().List(api.ListOptions{})
+		if err != nil {
+			fmt.Println("<master/apiclient> not able to list nodes (will retry)")
+			return false, nil
+		}
+		if len(nodeList.Items) < 1 {
+			//fmt.Printf("<master/apiclient> %d nodes have registered so far", len(nodeList.Items))
+			return false, nil
+		}
+		n := &nodeList.Items[0]
+		if !api.IsNodeReady(n) {
+			fmt.Println("<master/apiclient> first node has registered, but is not ready yet")
+			return false, nil
+		}
+
+		fmt.Printf("<master/apiclient> first node is ready after %f seconds\n", time.Since(start).Seconds())
+		return true, nil
+	})
+
 	return client, nil
 }
 
@@ -104,9 +126,33 @@ func NewDeployment(deploymentName string, replicas int32, podSpec api.PodSpec) *
 	}
 }
 
-func TaintMaster(*clientset.Clientset) error {
-	// TODO
-	annotations := make(map[string]string)
-	annotations[api.TaintsAnnotationKey] = ""
+// It's safe to do this for alpha, as we don't have HA and there is no way we can get
+// more then one node here (TODO find a way to determine owr own node name)
+func findMyself(client *clientset.Clientset) (*api.Node, error) {
+	nodeList, err := client.Nodes().List(api.ListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("unable to list nodes [%s]", err)
+	}
+	if len(nodeList.Items) < 1 {
+		return nil, fmt.Errorf("no nodes found")
+	}
+	node := &nodeList.Items[0]
+	return node, nil
+}
+
+func UpdateMasterRoleLabelsAndTaints(client *clientset.Clientset) error {
+	n, err := findMyself(client)
+	if err != nil {
+		return fmt.Errorf("<master/apiclient> failed to update master node - %s", err)
+	}
+
+	n.ObjectMeta.Labels["role"] = "master"
+	//TODO make it happen here, and reflect in kube-discovery
+	//n.ObjectMeta.Annotations[api.TaintsAnnotationKey] = "{}"
+
+	if _, err := client.Nodes().Update(n); err != nil {
+		return fmt.Errorf("<master/apiclient> failed to update master node - %s", err)
+	}
+
 	return nil
 }
