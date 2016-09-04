@@ -24,12 +24,12 @@ import (
 	. "github.com/onsi/gomega"
 
 	"k8s.io/kubernetes/pkg/api"
+	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller/job"
 	"k8s.io/kubernetes/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
@@ -38,15 +38,7 @@ const (
 	scheduledJobTimeout = 5 * time.Minute
 )
 
-var (
-	// ScheduledJobs were introduced in v1.4, so we don't expect tests that rely on
-	// ScheduledJobs to work on clusters before that.
-	scheduledJobsVersion = version.MustParse("v1.4.0-alpha.3")
-)
-
 var _ = framework.KubeDescribe("ScheduledJob", func() {
-	defer GinkgoRecover()
-
 	options := framework.FrameworkOptions{
 		ClientQPS:    20,
 		ClientBurst:  50,
@@ -54,148 +46,139 @@ var _ = framework.KubeDescribe("ScheduledJob", func() {
 	}
 	f := framework.NewFramework("scheduledjob", options, nil)
 
-	var c *client.Client
-	var ns string
 	BeforeEach(func() {
-		c = f.Client
-		ns = f.Namespace.Name
+		if _, err := f.Client.Batch().ScheduledJobs(f.Namespace.Name).List(api.ListOptions{}); err != nil {
+			if apierrs.IsNotFound(err) {
+				framework.Skipf("Could not find ScheduledJobs resource, skipping test: %#v", err)
+			}
+		}
 	})
 
 	// multiple jobs running at once
 	It("should schedule multiple jobs concurrently", func() {
-		framework.SkipUnlessServerVersionGTE(scheduledJobsVersion, c)
-
 		By("Creating a scheduledjob")
 		scheduledJob := newTestScheduledJob("concurrent", "*/1 * * * ?", batch.AllowConcurrent, true)
-		scheduledJob, err := createScheduledJob(c, ns, scheduledJob)
+		scheduledJob, err := createScheduledJob(f.Client, f.Namespace.Name, scheduledJob)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring more than one job is running at a time")
-		err = waitForActiveJobs(c, ns, scheduledJob.Name, 2)
+		err = waitForActiveJobs(f.Client, f.Namespace.Name, scheduledJob.Name, 2)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring at least two running jobs exists by listing jobs explicitly")
-		jobs, err := c.Batch().Jobs(ns).List(api.ListOptions{})
+		jobs, err := f.Client.Batch().Jobs(f.Namespace.Name).List(api.ListOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		activeJobs := filterActiveJobs(jobs)
 		Expect(len(activeJobs) >= 2).To(BeTrue())
 
 		By("Removing scheduledjob")
-		err = deleteScheduledJob(c, ns, scheduledJob.Name)
+		err = deleteScheduledJob(f.Client, f.Namespace.Name, scheduledJob.Name)
 		Expect(err).NotTo(HaveOccurred())
 	})
 
 	// suspended should not schedule jobs
 	It("should not schedule jobs when suspended [Slow]", func() {
-		framework.SkipUnlessServerVersionGTE(scheduledJobsVersion, c)
-
 		By("Creating a suspended scheduledjob")
 		scheduledJob := newTestScheduledJob("suspended", "*/1 * * * ?", batch.AllowConcurrent, true)
 		scheduledJob.Spec.Suspend = newBool(true)
-		scheduledJob, err := createScheduledJob(c, ns, scheduledJob)
+		scheduledJob, err := createScheduledJob(f.Client, f.Namespace.Name, scheduledJob)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring no jobs are scheduled")
-		err = waitForNoJobs(c, ns, scheduledJob.Name)
+		err = waitForNoJobs(f.Client, f.Namespace.Name, scheduledJob.Name)
 		Expect(err).To(HaveOccurred())
 
 		By("Ensuring no job exists by listing jobs explicitly")
-		jobs, err := c.Batch().Jobs(ns).List(api.ListOptions{})
+		jobs, err := f.Client.Batch().Jobs(f.Namespace.Name).List(api.ListOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		Expect(jobs.Items).To(HaveLen(0))
 
 		By("Removing scheduledjob")
-		err = deleteScheduledJob(c, ns, scheduledJob.Name)
+		err = deleteScheduledJob(f.Client, f.Namespace.Name, scheduledJob.Name)
 		Expect(err).NotTo(HaveOccurred())
 	})
 
 	// only single active job is allowed for ForbidConcurrent
 	It("should not schedule new jobs when ForbidConcurrent [Slow]", func() {
-		framework.SkipUnlessServerVersionGTE(scheduledJobsVersion, c)
-
 		By("Creating a ForbidConcurrent scheduledjob")
 		scheduledJob := newTestScheduledJob("forbid", "*/1 * * * ?", batch.ForbidConcurrent, true)
-		scheduledJob, err := createScheduledJob(c, ns, scheduledJob)
+		scheduledJob, err := createScheduledJob(f.Client, f.Namespace.Name, scheduledJob)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring a job is scheduled")
-		err = waitForActiveJobs(c, ns, scheduledJob.Name, 1)
+		err = waitForActiveJobs(f.Client, f.Namespace.Name, scheduledJob.Name, 1)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring exactly one is scheduled")
-		scheduledJob, err = getScheduledJob(c, ns, scheduledJob.Name)
+		scheduledJob, err = getScheduledJob(f.Client, f.Namespace.Name, scheduledJob.Name)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(scheduledJob.Status.Active).Should(HaveLen(1))
 
 		By("Ensuring exaclty one running job exists by listing jobs explicitly")
-		jobs, err := c.Batch().Jobs(ns).List(api.ListOptions{})
+		jobs, err := f.Client.Batch().Jobs(f.Namespace.Name).List(api.ListOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		activeJobs := filterActiveJobs(jobs)
 		Expect(activeJobs).To(HaveLen(1))
 
 		By("Ensuring no more jobs are scheduled")
-		err = waitForActiveJobs(c, ns, scheduledJob.Name, 2)
+		err = waitForActiveJobs(f.Client, f.Namespace.Name, scheduledJob.Name, 2)
 		Expect(err).To(HaveOccurred())
 
 		By("Removing scheduledjob")
-		err = deleteScheduledJob(c, ns, scheduledJob.Name)
+		err = deleteScheduledJob(f.Client, f.Namespace.Name, scheduledJob.Name)
 		Expect(err).NotTo(HaveOccurred())
 	})
 
 	// only single active job is allowed for ReplaceConcurrent
 	It("should replace jobs when ReplaceConcurrent", func() {
-		framework.SkipUnlessServerVersionGTE(scheduledJobsVersion, c)
-
 		By("Creating a ReplaceConcurrent scheduledjob")
 		scheduledJob := newTestScheduledJob("replace", "*/1 * * * ?", batch.ReplaceConcurrent, true)
-		scheduledJob, err := createScheduledJob(c, ns, scheduledJob)
+		scheduledJob, err := createScheduledJob(f.Client, f.Namespace.Name, scheduledJob)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring a job is scheduled")
-		err = waitForActiveJobs(c, ns, scheduledJob.Name, 1)
+		err = waitForActiveJobs(f.Client, f.Namespace.Name, scheduledJob.Name, 1)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring exactly one is scheduled")
-		scheduledJob, err = getScheduledJob(c, ns, scheduledJob.Name)
+		scheduledJob, err = getScheduledJob(f.Client, f.Namespace.Name, scheduledJob.Name)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(scheduledJob.Status.Active).Should(HaveLen(1))
 
 		By("Ensuring exaclty one running job exists by listing jobs explicitly")
-		jobs, err := c.Batch().Jobs(ns).List(api.ListOptions{})
+		jobs, err := f.Client.Batch().Jobs(f.Namespace.Name).List(api.ListOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		activeJobs := filterActiveJobs(jobs)
 		Expect(activeJobs).To(HaveLen(1))
 
 		By("Ensuring the job is replaced with a new one")
-		err = waitForJobReplaced(c, ns, jobs.Items[0].Name)
+		err = waitForJobReplaced(f.Client, f.Namespace.Name, jobs.Items[0].Name)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Removing scheduledjob")
-		err = deleteScheduledJob(c, ns, scheduledJob.Name)
+		err = deleteScheduledJob(f.Client, f.Namespace.Name, scheduledJob.Name)
 		Expect(err).NotTo(HaveOccurred())
 	})
 
 	// shouldn't give us unexpected warnings
 	It("should not emit unexpected warnings", func() {
-		framework.SkipUnlessServerVersionGTE(scheduledJobsVersion, c)
-
 		By("Creating a scheduledjob")
 		scheduledJob := newTestScheduledJob("concurrent", "*/1 * * * ?", batch.AllowConcurrent, false)
-		scheduledJob, err := createScheduledJob(c, ns, scheduledJob)
+		scheduledJob, err := createScheduledJob(f.Client, f.Namespace.Name, scheduledJob)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring at least two jobs and at least one finished job exists by listing jobs explicitly")
-		err = waitForJobsAtLeast(c, ns, 2)
+		err = waitForJobsAtLeast(f.Client, f.Namespace.Name, 2)
 		Expect(err).NotTo(HaveOccurred())
-		err = waitForAnyFinishedJob(c, ns)
+		err = waitForAnyFinishedJob(f.Client, f.Namespace.Name)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring no unexpected event has happened")
-		err = checkNoUnexpectedEvents(c, ns, scheduledJob.Name)
+		err = checkNoUnexpectedEvents(f.Client, f.Namespace.Name, scheduledJob.Name)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Removing scheduledjob")
-		err = deleteScheduledJob(c, ns, scheduledJob.Name)
+		err = deleteScheduledJob(f.Client, f.Namespace.Name, scheduledJob.Name)
 		Expect(err).NotTo(HaveOccurred())
 	})
 })
