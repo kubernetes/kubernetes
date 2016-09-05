@@ -8,6 +8,9 @@ metadata:
     app: sysdig-agent
 spec:
   template:
+    metadata:
+      labels:
+        name: sysdig-agent
     spec:
       volumes:
       - name: docker-sock
