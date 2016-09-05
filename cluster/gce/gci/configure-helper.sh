@@ -1049,6 +1049,11 @@ function start-kube-addons {
      [[ "${ENABLE_CLUSTER_LOGGING:-}" == "true" ]]; then
     setup-addon-manifests "addons" "fluentd-elasticsearch"
   fi
+  if [[ "${ENABLE_NODE_LOGGING:-}" == "true" ]] && \
+     [[ "${LOGGING_DESTINATION:-}" == "gcp" ]] && \
+     [[ "${ENABLE_CLUSTER_LOGGING:-}" == "true" ]]; then
+    setup-addon-manifests "addons" "fluentd-gcp"
+  fi
   if [[ "${ENABLE_CLUSTER_UI:-}" == "true" ]]; then
     setup-addon-manifests "addons" "dashboard"
   fi
@@ -1064,20 +1069,6 @@ function start-kube-addons {
 
   # Place addon manager pod manifest.
   cp "${src_dir}/kube-addon-manager.yaml" /etc/kubernetes/manifests
-}
-
-# Starts a fluentd static pod for logging.
-function start-fluentd {
-  echo "Start fluentd pod"
-  if [[ "${ENABLE_NODE_LOGGING:-}" == "true" ]]; then
-    if [[ "${LOGGING_DESTINATION:-}" == "gcp" ]]; then
-      cp "${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/gci/fluentd-gcp.yaml" /etc/kubernetes/manifests/
-    elif [[ "${LOGGING_DESTINATION:-}" == "elasticsearch" && "${KUBERNETES_MASTER:-}" != "true" ]]; then
-      # Running fluentd-es on the master is pointless, as it can't communicate
-      # with elasticsearch from there in the default configuration.
-      cp "${KUBE_HOME}/kube-manifests/kubernetes/fluentd-es.yaml" /etc/kubernetes/manifests/
-    fi
-  fi
 }
 
 # Starts a l7 loadbalancing controller for ingress.
@@ -1191,6 +1182,5 @@ else
     cp "${KUBE_HOME}/kube-manifests/kubernetes/kube-registry-proxy.yaml" /etc/kubernetes/manifests
 	fi
 fi
-start-fluentd
 reset-motd
 echo "Done for the configuration for kubernetes"

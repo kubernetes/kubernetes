@@ -769,17 +769,6 @@ start-rescheduler() {
   fi
 }
 
-# Starts a fluentd static pod for logging.
-start_fluentd() {
-  if [ "${ENABLE_NODE_LOGGING:-}" = "true" ]; then
-    if [ "${LOGGING_DESTINATION:-}" = "gcp" ]; then
-      cp /home/kubernetes/kube-manifests/kubernetes/fluentd-gcp.yaml /etc/kubernetes/manifests/
-    elif [ "${LOGGING_DESTINATION:-}" = "elasticsearch" ]; then
-      cp /home/kubernetes/kube-manifests/kubernetes/fluentd-es.yaml /etc/kubernetes/manifests/
-    fi
-  fi
-}
-
 # A helper function for copying addon manifests and set dir/files
 # permissions.
 # $1: addon category under /etc/kubernetes
@@ -902,6 +891,11 @@ start_kube_addons() {
      [ "${LOGGING_DESTINATION:-}" = "elasticsearch" ] && \
      [ "${ENABLE_CLUSTER_LOGGING:-}" = "true" ]; then
     setup_addon_manifests "addons" "fluentd-elasticsearch"
+  fi
+  if [ "${ENABLE_NODE_LOGGING:-}" = "true" ] && \
+     [ "${LOGGING_DESTINATION:-}" = "gcp" ] && \
+     [ "${ENABLE_CLUSTER_LOGGING:-}" = "true" ]; then
+    setup_addon_manifests "addons" "fluentd-gcp"
   fi
   if [ "${ENABLE_CLUSTER_UI:-}" = "true" ]; then
     setup_addon_manifests "addons" "dashboard"

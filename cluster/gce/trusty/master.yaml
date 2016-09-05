@@ -185,7 +185,6 @@ script
 	. /etc/kube-configure-helper.sh
 	. /etc/kube-env
 	start_etcd_servers
-	start_fluentd
 	compute_master_manifest_variables
 	start_kube_apiserver
 	start_kube_controller_manager
