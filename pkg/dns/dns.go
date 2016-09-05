@@ -99,7 +99,7 @@ type KubeDNS struct {
 	// Map of cluster IP to service object. Headless services are not part of this map.
 	// Used to get a service when given its cluster IP.
 	// Access to this is coordinated using cacheLock. We use the same lock for cache and this map
-	// to ensure that they dont get out of sync.
+	// to ensure that they don't get out of sync.
 	clusterIPServiceMap map[string]*kapi.Service
 
 	// caller is responsible for using the cacheLock before invoking methods on cache
@@ -253,7 +253,7 @@ func (kd *KubeDNS) newService(obj interface{}) {
 			return
 		}
 		if len(service.Spec.Ports) == 0 {
-			glog.Warningf("Unexpected service with no ports, this should not have happend: %v", service)
+			glog.Warningf("Unexpected service with no ports, this should not have happened: %v", service)
 		}
 		kd.newPortalService(service)
 	}

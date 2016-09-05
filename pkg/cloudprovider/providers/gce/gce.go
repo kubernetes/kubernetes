@@ -2605,7 +2605,7 @@ func (gce *GCECloud) getDiskByNameUnknownZone(diskName string) (*gceDisk, error)
 
 // GetGCERegion returns region of the gce zone. Zone names
 // are of the form: ${region-name}-${ix}.
-// For example "us-central1-b" has a region of "us-central1".
+// For example, "us-central1-b" has a region of "us-central1".
 // So we look for the last '-' and trim to just before that.
 func GetGCERegion(zone string) (string, error) {
 	ix := strings.LastIndex(zone, "-")

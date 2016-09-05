@@ -53,7 +53,7 @@ func (cache *TreeCache) Serialize() (string, error) {
 func (cache *TreeCache) setEntry(key string, val *skymsg.Service, fqdn string, path ...string) {
 	// TODO: Consolidate setEntry and setSubCache into a single method with a
 	// type switch.
-	// TODO: Insted of passing the fqdn as an argument, we can reconstruct
+	// TODO: Instead of passing the fqdn as an argument, we can reconstruct
 	// it from the path, provided callers always pass the full path to the
 	// object. This is currently *not* the case, since callers first create
 	// a new, empty node, populate it, then parent it under the right path.

@@ -1026,7 +1026,7 @@ func (c *Cloud) List(filter string) ([]string, error) {
 // It currently involves querying all instances
 func (c *Cloud) getAllZones() (sets.String, error) {
 	// We don't currently cache this; it is currently used only in volume
-	// creation which is expected to be a comparatively rare occurence.
+	// creation which is expected to be a comparatively rare occurrence.
 
 	// TODO: Caching / expose api.Nodes to the cloud provider?
 	// TODO: We could also query for subnets, I think

@@ -129,7 +129,7 @@ func (os *OpenStack) getVolume(diskName string) (volumes.Volume, error) {
 		return false, errors.New(errmsg)
 	})
 	if err != nil {
-		glog.Errorf("Error occured getting volume: %s", diskName)
+		glog.Errorf("Error occurred getting volume: %s", diskName)
 		return volume, err
 	}
 	return volume, err
