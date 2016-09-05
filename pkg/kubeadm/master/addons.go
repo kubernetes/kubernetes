@@ -36,7 +36,7 @@ func createKubeProxyPodSpec(params *kubeadmapi.BootstrapParams) api.PodSpec {
 				"/hyperkube",
 				"proxy",
 				"--kubeconfig=/run/kubeconfig",
-				COMPONENT_LOGLEVEL,
+				params.EnvParams["component_loglevel"],
 			},
 			SecurityContext: &api.SecurityContext{Privileged: &privilegedTrue},
 			VolumeMounts: []api.VolumeMount{

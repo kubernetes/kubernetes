@@ -77,7 +77,8 @@ func newKubeDiscoveryPodSpec(params *kubeadmapi.BootstrapParams) api.PodSpec {
 				ReadOnly:  true,
 			}},
 			Ports: []api.ContainerPort{
-				{Name: "http", ContainerPort: 9898, HostIP: params.Discovery.ListenIP, HostPort: 9898},
+				// TODO when CNI issue (#31307) is resolved, we should add `HostIP: params.Discovery.ListenIP`
+				{Name: "http", ContainerPort: 9898, HostPort: 9898},
 			},
 		}},
 		Volumes: []api.Volume{{
@@ -99,9 +100,10 @@ func newKubeDiscovery(params *kubeadmapi.BootstrapParams, caCert *x509.Certifica
 		},
 	}
 
-	//kd.Deployment.Spec.Template.ObjectMeta.Annotations = map[string]string{}
 	SetMasterTaintTolerations(&kd.Deployment.Spec.Template.ObjectMeta)
+	/* This doesn't work due to nodeInfo being cached by kubelet
 	SetMasterNodeAffinity(&kd.Deployment.Spec.Template.ObjectMeta)
+	*/
 
 	return kd
 }
