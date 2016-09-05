@@ -199,7 +199,7 @@ binary | sha256 hash
 ### Other notable changes
 
 * rkt: Improve support for privileged pod (pod whose all containers are privileged)  ([#31286](https://github.com/kubernetes/kubernetes/pull/31286), [@yifan-gu](https://github.com/yifan-gu))
-* The pod annotation `security.alpha.kubernetes.io/sysctls` now allows customization of namespaced and well isolated kernel parameters (sysctls), starting with `kernel.shm_rmid_forced`, `net.ipv4.ip_local_port_range`, `net.ipv4.tcp_max_syn_backlog` and `net.ipv4.tcp_syncookies` for Kubernetes 1.4. ([#27180](https://github.com/kubernetes/kubernetes/pull/27180), [@sttts](https://github.com/sttts))
+* The pod annotation `security.alpha.kubernetes.io/sysctls` now allows customization of namespaced and well isolated kernel parameters (sysctls), starting with `kernel.shm_rmid_forced`, `net.ipv4.ip_local_port_range` and `net.ipv4.tcp_syncookies` for Kubernetes 1.4. ([#27180](https://github.com/kubernetes/kubernetes/pull/27180), [@sttts](https://github.com/sttts))
     * The pod annotation  `security.alpha.kubernetes.io/unsafe-sysctls` allows customization of namespaced sysctls where isolation is unclear. Unsafe sysctls must be enabled at-your-own-risk on the kubelet with the `--experimental-allowed-unsafe-sysctls` flag. Future versions will improve on resource isolation and more sysctls will be considered safe.
 * Increase request timeout based on termination grace period ([#31275](https://github.com/kubernetes/kubernetes/pull/31275), [@dims](https://github.com/dims))
 * Fixed two issues of kubectl bash completion. ([#31135](https://github.com/kubernetes/kubernetes/pull/31135), [@xingzhou](https://github.com/xingzhou))
