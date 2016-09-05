@@ -75,11 +75,7 @@ func NewCmdRolloutPause(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 			if err != nil {
 				allErrs = append(allErrs, err)
 			}
-			err = opts.RunPause()
-			if err != nil {
-				allErrs = append(allErrs, err)
-			}
-			cmdutil.CheckErr(utilerrors.Flatten(utilerrors.NewAggregate(allErrs)))
+			opts.RunPause()
 		},
 		ValidArgs:  validArgs,
 		ArgAliases: argAliases,
@@ -114,9 +110,7 @@ func (o *PauseConfig) CompletePause(f *cmdutil.Factory, cmd *cobra.Command, out 
 		Flatten().
 		Do()
 	err = r.Err()
-	if err != nil {
-		return err
-	}
+	cmdutil.CheckErr(err)
 
 	o.Infos, err = r.Infos()
 	if err != nil {
@@ -125,7 +119,7 @@ func (o *PauseConfig) CompletePause(f *cmdutil.Factory, cmd *cobra.Command, out 
 	return nil
 }
 
-func (o PauseConfig) RunPause() error {
+func (o PauseConfig) RunPause() {
 	allErrs := []error{}
 	for _, info := range o.Infos {
 		isAlreadyPaused, err := o.PauseObject(info.Object)
@@ -139,5 +133,5 @@ func (o PauseConfig) RunPause() error {
 		}
 		cmdutil.PrintSuccess(o.Mapper, false, o.Out, info.Mapping.Resource, info.Name, "paused")
 	}
-	return utilerrors.NewAggregate(allErrs)
+	cmdutil.CheckErr(utilerrors.Flatten(utilerrors.NewAggregate(allErrs)))
 }

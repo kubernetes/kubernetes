@@ -73,11 +73,7 @@ func NewCmdRolloutResume(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 			if err != nil {
 				allErrs = append(allErrs, err)
 			}
-			err = opts.RunResume()
-			if err != nil {
-				allErrs = append(allErrs, err)
-			}
-			cmdutil.CheckErr(utilerrors.Flatten(utilerrors.NewAggregate(allErrs)))
+			opts.RunResume()
 		},
 		ValidArgs:  validArgs,
 		ArgAliases: argAliases,
@@ -112,9 +108,7 @@ func (o *ResumeConfig) CompleteResume(f *cmdutil.Factory, cmd *cobra.Command, ou
 		Flatten().
 		Do()
 	err = r.Err()
-	if err != nil {
-		return err
-	}
+	cmdutil.CheckErr(err)
 
 	err = r.Visit(func(info *resource.Info, err error) error {
 		if err != nil {
@@ -143,5 +137,5 @@ func (o ResumeConfig) RunResume() error {
 		}
 		cmdutil.PrintSuccess(o.Mapper, false, o.Out, info.Mapping.Resource, info.Name, "resumed")
 	}
-	return utilerrors.NewAggregate(allErrs)
+	cmdutil.CheckErr(utilerrors.Flatten(utilerrors.NewAggregate(allErrs)))
 }
