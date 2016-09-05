@@ -163,6 +163,10 @@ const (
 
 	// Number of times we want to retry Updates in case of conflict
 	UpdateRetries = 5
+
+	// Number of objects that gc can delete in a second.
+	// GC issues 2 requestes for single delete.
+	gcThroughput = 10
 )
 
 var (
@@ -3354,17 +3358,16 @@ func DeleteRCAndWaitForGC(c *client.Client, ns, name string) error {
 	var interval, timeout time.Duration
 	switch {
 	case rc.Spec.Replicas < 100:
-		interval = 10 * time.Millisecond
-		timeout = 10 * time.Minute
+		interval = 100 * time.Millisecond
 	case rc.Spec.Replicas < 1000:
 		interval = 1 * time.Second
-		timeout = 10 * time.Minute
-	case rc.Spec.Replicas < 10000:
-		interval = 10 * time.Second
-		timeout = 10 * time.Minute
 	default:
 		interval = 10 * time.Second
-		timeout = 40 * time.Minute
+	}
+	if rc.Spec.Replicas < 5000 {
+		timeout = 10 * time.Minute
+	} else {
+		timeout = time.Duration(rc.Spec.Replicas / gcThroughput)
 	}
 	err = waitForPodsInactive(ps, interval, timeout)
 	if err != nil {
