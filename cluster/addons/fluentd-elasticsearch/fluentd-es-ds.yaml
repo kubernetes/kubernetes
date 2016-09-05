@@ -30,6 +30,8 @@ spec:
         - name: varlibdockercontainers
           mountPath: /var/lib/docker/containers
           readOnly: true
+      nodeSelector:
+        kubernetes.io/fluentd-ds-ready: "true"
       terminationGracePeriodSeconds: 30
       volumes:
       - name: varlog
