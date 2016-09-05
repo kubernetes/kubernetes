@@ -49,7 +49,10 @@ var (
 
 		Replaces the specified replication controller with a new replication controller by updating one pod at a time to use the
 		new PodTemplate. The new-controller.json must specify the same namespace as the
-		existing replication controller and overwrite at least one (common) label in its replicaSelector.`)
+		existing replication controller and overwrite at least one (common) label in its replicaSelector.
+
+		![Workflow](http://kubernetes.io/images/docs/kubectl_rollingupdate.svg)
+`)
 	rollingUpdate_example = dedent.Dedent(`
 		# Update pods of frontend-v1 using new replication controller data in frontend-v2.json.
 		kubectl rolling-update frontend-v1 -f frontend-v2.json
