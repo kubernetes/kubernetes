@@ -3367,7 +3367,7 @@ func DeleteRCAndWaitForGC(c *client.Client, ns, name string) error {
 	if rc.Spec.Replicas < 5000 {
 		timeout = 10 * time.Minute
 	} else {
-		timeout = time.Duration(rc.Spec.Replicas / gcThroughput) * time.Second
+		timeout = time.Duration(rc.Spec.Replicas/gcThroughput) * time.Second
 	}
 	err = waitForPodsInactive(ps, interval, timeout)
 	if err != nil {
