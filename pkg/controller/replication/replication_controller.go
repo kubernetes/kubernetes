@@ -319,6 +319,8 @@ func (rm *ReplicationManager) updateRC(old, cur interface{}) {
 	if !reflect.DeepEqual(oldRC.Spec.Selector, curRC.Spec.Selector) {
 		rm.lookupCache.InvalidateAll()
 	}
+	// TODO: Remove when #31981 is resolved!
+	glog.Infof("Observed updated replication controller %v. Pod count change: %d->%d", curRC.Name, oldRC.Status.Replicas, curRC.Status.Replicas)
 
 	// You might imagine that we only really need to enqueue the
 	// controller when Spec changes, but it is safer to sync any
