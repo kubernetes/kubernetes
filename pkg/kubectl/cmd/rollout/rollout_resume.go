@@ -73,16 +73,12 @@ func NewCmdRolloutResume(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		Long:    resume_long,
 		Example: resume_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			allErrs := []error{}
-			err := options.CompleteResume(f, cmd, out, args)
-			if err != nil {
-				allErrs = append(allErrs, err)
+			if err := options.CompleteResume(f, cmd, out, args); err != nil {
+				cmdutil.CheckErr(err)
 			}
-			err = options.RunResume()
-			if err != nil {
-				allErrs = append(allErrs, err)
+			if err := options.RunResume(); err != nil {
+				cmdutil.CheckErr(err)
 			}
-			cmdutil.CheckErr(utilerrors.Flatten(utilerrors.NewAggregate(allErrs)))
 		},
 		ValidArgs:  validArgs,
 		ArgAliases: argAliases,
