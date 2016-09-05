@@ -78,7 +78,7 @@ func (r *RemoteImageService) ImageStatus(image *runtimeApi.ImageSpec) (*runtimeA
 	return resp.Image, nil
 }
 
-// PullImage pulls a image with authentication config.
+// PullImage pulls an image with authentication config.
 func (r *RemoteImageService) PullImage(image *runtimeApi.ImageSpec, auth *runtimeApi.AuthConfig) error {
 	ctx, cancel := getContextWithTimeout(r.timeout)
 	defer cancel()
