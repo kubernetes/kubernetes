@@ -486,7 +486,10 @@ func (nc *NodeController) Run() {
 // post "NodeReady==ConditionUnknown". It also evicts all pods if node is not ready or
 // not reachable for a long period of time.
 func (nc *NodeController) monitorNodeStatus() error {
-	nodes, err := nc.kubeClient.Core().Nodes().List(api.ListOptions{})
+	// It is enough to list Nodes from apiserver, since we can tolerate some small
+	// delays comparing to state from etcd and there is eventual consistency anyway.
+	// TODO: We should list them from local cache: nodeStore.
+	nodes, err := nc.kubeClient.Core().Nodes().List(api.ListOptions{ResourceVersion: "0"})
 	if err != nil {
 		return err
 	}
