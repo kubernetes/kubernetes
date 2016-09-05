@@ -101,9 +101,7 @@ func newKubeDiscovery(params *kubeadmapi.BootstrapParams, caCert *x509.Certifica
 	}
 
 	SetMasterTaintTolerations(&kd.Deployment.Spec.Template.ObjectMeta)
-	/* This doesn't work due to nodeInfo being cached by kubelet
 	SetMasterNodeAffinity(&kd.Deployment.Spec.Template.ObjectMeta)
-	*/
 
 	return kd
 }
