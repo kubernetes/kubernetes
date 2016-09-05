@@ -428,7 +428,7 @@ func Test() bool {
 	}
 
 	// TODO(fejta): add a --federated or something similar
-	if os.Getenv("FEDERATION") == "" {
+	if os.Getenv("FEDERATION") != "true" {
 		if *checkNodeCount {
 			ValidateClusterSize()
 		}
