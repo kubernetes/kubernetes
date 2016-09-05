@@ -742,7 +742,7 @@ func getNextUnitNumber(devices object.VirtualDeviceList, c types.BaseVirtualCont
 			return int32(unitNumber), nil
 		}
 	}
-	return -1, fmt.Errorf("SCSI Controller with key=%d does not have any avaiable slots (LUN).", key)
+	return -1, fmt.Errorf("SCSI Controller with key=%d does not have any available slots (LUN).", key)
 }
 
 func getSCSIController(vmDevices object.VirtualDeviceList, scsiType string) *types.VirtualController {
