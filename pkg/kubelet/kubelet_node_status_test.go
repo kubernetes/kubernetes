@@ -1016,6 +1016,10 @@ func TestTryRegisterWithApiServer(t *testing.T) {
 		},
 	}
 
+	notImplemented := func(action core.Action) (bool, runtime.Object, error) {
+		return true, nil, fmt.Errorf("no reaction implemented for %s", action)
+	}
+
 	for _, tc := range cases {
 		testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled is a don't-care for this test */)
 		kubelet := testKubelet.kubelet
@@ -1028,17 +1032,17 @@ func TestTryRegisterWithApiServer(t *testing.T) {
 			// Return an existing (matching) node on get.
 			return true, tc.existingNode, tc.getError
 		})
-		kubeClient.AddReactor("update", "*", func(action core.Action) (bool, runtime.Object, error) {
-			if action.GetResource().Resource == "nodes" && action.GetSubresource() == "status" {
+		kubeClient.AddReactor("update", "nodes", func(action core.Action) (bool, runtime.Object, error) {
+			if action.GetSubresource() == "status" {
 				return true, nil, tc.updateError
 			}
-			return true, nil, fmt.Errorf("no reaction implemented for %s", action)
+			return notImplemented(action)
 		})
 		kubeClient.AddReactor("delete", "nodes", func(action core.Action) (bool, runtime.Object, error) {
 			return true, nil, tc.deleteError
 		})
 		kubeClient.AddReactor("*", "*", func(action core.Action) (bool, runtime.Object, error) {
-			return true, nil, fmt.Errorf("no reaction implemented for %s", action)
+			return notImplemented(action)
 		})
 
 		result := kubelet.tryRegisterWithApiServer(tc.newNode)
