@@ -73,6 +73,8 @@ const (
 	evictionRateLimiterBurst = 1
 	// The amount of time the nodecontroller polls on the list nodes endpoint.
 	apiserverStartupGracePeriod = 10 * time.Minute
+	// The amount of time the nodecontroller should sleep between retrying NodeStatus updates
+	retrySleepTime = 20 * time.Millisecond
 )
 
 type zoneState string
@@ -535,6 +537,7 @@ func (nc *NodeController) monitorNodeStatus() error {
 				glog.Errorf("Failed while getting a Node to retry updating NodeStatus. Probably Node %s was deleted.", name)
 				break
 			}
+			time.Sleep(retrySleepTime)
 		}
 		if err != nil {
 			glog.Errorf("Update status  of Node %v from NodeController exceeds retry count."+
