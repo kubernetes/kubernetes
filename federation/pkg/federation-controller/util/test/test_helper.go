@@ -97,7 +97,8 @@ func ToFederatedInformerForTestOnly(informer util.FederatedInformer) util.Federa
 func NewCluster(name string, readyStatus api_v1.ConditionStatus) *federation_api.Cluster {
 	return &federation_api.Cluster{
 		ObjectMeta: api_v1.ObjectMeta{
-			Name: name,
+			Name:        name,
+			Annotations: map[string]string{},
 		},
 		Status: federation_api.ClusterStatus{
 			Conditions: []federation_api.ClusterCondition{

@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/framework"
+	"k8s.io/kubernetes/pkg/conversion"
 	pkg_runtime "k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
@@ -78,8 +79,7 @@ type IngressController struct {
 	// Definitions of ingresses that should be federated.
 	ingressInformerStore cache.Store
 	// Informer controller for ingresses that should be federated.
-	ingressInformerController   framework.ControllerInterface
-	configMapInformerController framework.ControllerInterface
+	ingressInformerController framework.ControllerInterface
 
 	// Client to federated api server.
 	federatedApiClient federation_release_1_4.Interface
@@ -167,7 +167,7 @@ func NewIngressController(client federation_release_1_4.Interface) *IngressContr
 		&util.ClusterLifecycleHandlerFuncs{
 			ClusterAvailable: func(cluster *federation_api.Cluster) {
 				// When new cluster becomes available process all the ingresses again, and configure it's ingress controller's configmap with the correct UID
-				ic.clusterDeliverer.DeliverAt(cluster.Name, cluster, time.Now().Add(ic.clusterAvailableDelay))
+				ic.clusterDeliverer.DeliverAfter(cluster.Name, cluster, ic.clusterAvailableDelay)
 			},
 		},
 	)
@@ -181,8 +181,6 @@ func NewIngressController(client federation_release_1_4.Interface) *IngressContr
 					ListFunc: func(options api.ListOptions) (pkg_runtime.Object, error) {
 						if targetClient == nil {
 							glog.Errorf("targetClient is nil")
-						} else if targetClient.Core() == nil {
-							glog.Errorf("targetClient.Core() returned nil")
 						}
 						return targetClient.Core().ConfigMaps(api.NamespaceAll).List(options) // we only want to list one by name - unfortunately Kubernetes don't have a selector for that.
 					},
@@ -204,7 +202,7 @@ func NewIngressController(client federation_release_1_4.Interface) *IngressContr
 
 		&util.ClusterLifecycleHandlerFuncs{
 			ClusterAvailable: func(cluster *federation_api.Cluster) {
-				ic.clusterDeliverer.DeliverAt(cluster.Name, cluster, time.Now().Add(ic.clusterAvailableDelay))
+				ic.clusterDeliverer.DeliverAfter(cluster.Name, cluster, ic.clusterAvailableDelay)
 			},
 		},
 	)
@@ -221,6 +219,11 @@ func NewIngressController(client federation_release_1_4.Interface) *IngressContr
 			ingress := obj.(*extensions_v1beta1.Ingress)
 			/* TODO: Back to V(4) */ glog.Errorf("Attempting to update Ingress: %v", ingress)
 			_, err := client.Extensions().Ingresses(ingress.Namespace).Update(ingress)
+			if err != nil {
+				/* TODO: Back to V(4) */ glog.Errorf("Failed to update Ingress: %v", err)
+			} else {
+				/* TODO: Back to V(4) */ glog.Errorf("Successfully updated Ingress: %q", types.NamespacedName{Name: ingress.Name, Namespace: ingress.Namespace})
+			}
 			return err
 		},
 		func(client kube_release_1_4.Interface, obj pkg_runtime.Object) error {
@@ -256,15 +259,11 @@ func (ic *IngressController) Run(stopChan <-chan struct{}) {
 	go ic.ingressInformerController.Run(stopChan)
 	glog.Infof("... Starting Ingress Federated Informer")
 	ic.ingressFederatedInformer.Start()
+	ic.configMapFederatedInformer.Start()
 	go func() {
 		<-stopChan
 		glog.Infof("Stopping Ingress Informer")
 		ic.ingressFederatedInformer.Stop()
-	}()
-	ic.configMapFederatedInformer.Start()
-	go func() {
-		<-stopChan
-		glog.Infof("Stopping ConfigMap Informer")
 		ic.configMapFederatedInformer.Stop()
 	}()
 	ic.ingressDeliverer.StartWithHandler(func(item *util.DelayingDelivererItem) {
@@ -279,8 +278,8 @@ func (ic *IngressController) Run(stopChan <-chan struct{}) {
 		} else {
 			/* TODO: Back to V(4) */ glog.Errorf("Cluster change delivered for all clusters, reconciling configmaps and ingresses for all clusters")
 		}
-		ic.reconcileConfigMapForCluster(clusterName)
 		ic.reconcileIngressesOnClusterChange(clusterName)
+		ic.reconcileConfigMapForCluster(clusterName)
 	})
 	ic.configMapDeliverer.StartWithHandler(func(item *util.DelayingDelivererItem) {
 		clusterName := item.Key
@@ -293,6 +292,7 @@ func (ic *IngressController) Run(stopChan <-chan struct{}) {
 			/* TODO: Back to V(4) */ glog.Errorf("Ingress controller is garbage collecting")
 			ic.ingressBackoff.GC()
 			ic.configMapBackoff.GC()
+			/* TODO: Back to V(4) */ glog.Errorf("Ingress controller garbage collection complete")
 		case <-stopChan:
 			return
 		}
@@ -337,7 +337,7 @@ func (ic *IngressController) deliverConfigMap(cluster string, configMap types.Na
 // synced with the coresponding api server.
 func (ic *IngressController) isSynced() bool {
 	if !ic.ingressFederatedInformer.ClustersSynced() {
-		glog.V(2).Infof("Cluster list not synced for ingress federated informer")
+		/* TODO Back to V(2) */ glog.Errorf("Cluster list not synced for ingress federated informer")
 		return false
 	}
 	clusters, err := ic.ingressFederatedInformer.GetReadyClusters()
@@ -346,11 +346,11 @@ func (ic *IngressController) isSynced() bool {
 		return false
 	}
 	if !ic.ingressFederatedInformer.GetTargetStore().ClustersSynced(clusters) {
-		glog.V(2).Infof("Target store not synced for ingress federated informer")
+		/* TODO Back to V(2) */ glog.Errorf("Target store not synced for ingress federated informer")
 		return false
 	}
 	if !ic.configMapFederatedInformer.ClustersSynced() {
-		glog.V(2).Infof("Cluster list not synced for config map federated informer")
+		/* TODO Back to V(2) */ glog.Errorf("Cluster list not synced for config map federated informer")
 		return false
 	}
 	clusters, err = ic.configMapFederatedInformer.GetReadyClusters()
@@ -359,7 +359,7 @@ func (ic *IngressController) isSynced() bool {
 		return false
 	}
 	if !ic.configMapFederatedInformer.GetTargetStore().ClustersSynced(clusters) {
-		glog.V(2).Infof("Target store not synced for configmap federated informer")
+		/* TODO Back to V(2) */ glog.Errorf("Target store not synced for configmap federated informer")
 		return false
 	}
 	/* TODO: Back to V(4) */ glog.Errorf("Cluster list is synced")
@@ -369,14 +369,51 @@ func (ic *IngressController) isSynced() bool {
 // The function triggers reconcilation of all federated ingresses.  clusterName is the name of the cluster that changed
 // but all ingresses in all clusters are reconciled
 func (ic *IngressController) reconcileIngressesOnClusterChange(clusterName string) {
-	/* TODO: Back to V(4) */ glog.Errorf("Reconciling ingresses on cluster change")
+	/* TODO: Back to V(4) */ glog.Errorf("Reconciling ingresses on cluster change for cluster %q", clusterName)
 	if !ic.isSynced() {
-		ic.clusterDeliverer.DeliverAt(clusterName, nil, time.Now().Add(ic.clusterAvailableDelay))
+		/* TODO: Back to V(4) */ glog.Errorf("Not synced, will try again later to reconcile ingresses.")
+		ic.clusterDeliverer.DeliverAfter(clusterName, nil, ic.clusterAvailableDelay)
 	}
-	for _, obj := range ic.ingressInformerStore.List() {
+	ingressList := ic.ingressInformerStore.List()
+	if len(ingressList) <= 0 {
+		/* TODO: Back to V(4) */ glog.Errorf("No federated ingresses to reconcile.")
+	}
+
+	for _, obj := range ingressList {
 		ingress := obj.(*extensions_v1beta1.Ingress)
+		/* TODO: Back to V(4) */ glog.Errorf("Delivering federated ingress %q", types.NamespacedName{Name: ingress.Name, Namespace: ingress.Namespace})
 		ic.deliverIngress(types.NamespacedName{Namespace: ingress.Namespace, Name: ingress.Name}, ic.smallDelay, false)
 	}
+}
+
+// HACK Because util.FederatedInformer().GetReadyCluster(name) doesn't work, while GetReadyClusters() does.
+// Also easy to switch between using configMapFederatedInformer and ingressFederatedInformer for debugging.
+func (ic *IngressController) getReadyCluster(clusterName string) (*federation_api.Cluster, error) {
+	cluster, found, err := ic.ingressFederatedInformer.GetReadyCluster(clusterName)
+
+	if !found || err != nil {
+		// TODO Hack!  Check whether GetReadyClusters can find it! - Looks like a bug in GetReadyCluster
+		clusters, err := ic.ingressFederatedInformer.GetReadyClusters()
+		if err != nil {
+			glog.Errorf("Whoooaah! Internal error.  Failed to get ready clusters: %v", err)
+			return nil, err
+		} else {
+			for _, c := range clusters {
+				if c.Name == clusterName {
+					/* TODO: Back to V(4) */ glog.Errorf("Whooah! Internal error: Found cluster %q via GetReadyClusters() but not via GetReadyCluster()!!", clusterName)
+					found = true
+					cluster = c
+				}
+			}
+			if !found {
+				/* TODO: Back to V(4) */ glog.Errorf("Internal error: Did not find cluster %q via GetReadyClusters() nor via GetReadyCluster()!!", clusterName)
+				return nil, fmt.Errorf("Ready cluster %q not found", clusterName)
+			} else {
+				return cluster, nil
+			}
+		}
+	}
+	return cluster, nil
 }
 
 /*
@@ -388,7 +425,7 @@ func (ic *IngressController) reconcileConfigMapForCluster(clusterName string) {
 	/* TODO: Back to V(4) */ glog.Errorf("Reconciling ConfigMap for cluster(s) %q", clusterName)
 
 	if !ic.isSynced() {
-		ic.configMapDeliverer.DeliverAt(clusterName, nil, time.Now().Add(ic.clusterAvailableDelay))
+		ic.configMapDeliverer.DeliverAfter(clusterName, nil, ic.clusterAvailableDelay)
 		return
 	}
 
@@ -396,7 +433,7 @@ func (ic *IngressController) reconcileConfigMapForCluster(clusterName string) {
 		clusters, err := ic.configMapFederatedInformer.GetReadyClusters()
 		if err != nil {
 			glog.Errorf("Failed to get ready clusters.  redelivering %q: %v", clusterName, err)
-			ic.configMapDeliverer.DeliverAt(clusterName, nil, time.Now().Add(ic.clusterAvailableDelay))
+			ic.configMapDeliverer.DeliverAfter(clusterName, nil, ic.clusterAvailableDelay)
 			return
 		}
 		for _, cluster := range clusters {
@@ -405,20 +442,26 @@ func (ic *IngressController) reconcileConfigMapForCluster(clusterName string) {
 		}
 		return
 	} else {
-		cluster, found, err := ic.configMapFederatedInformer.GetReadyCluster(clusterName)
-		if !found || err != nil {
+		cluster, err := ic.getReadyCluster(clusterName)
+		if err != nil {
 			glog.Errorf("Internal error: Cluster %q queued for configmap reconciliation, but not found.  Will try again later: error = %v", clusterName, err)
-			ic.configMapDeliverer.DeliverAt(clusterName, nil, time.Now().Add(ic.clusterAvailableDelay))
+			ic.configMapDeliverer.DeliverAfter(clusterName, nil, ic.clusterAvailableDelay)
 			return
 		}
 		uidConfigMapNamespacedName := types.NamespacedName{Name: uidConfigMapName, Namespace: uidConfigMapNamespace}
 		configMapObj, found, err := ic.configMapFederatedInformer.GetTargetStore().GetByKey(cluster.Name, uidConfigMapNamespacedName.String())
 		if !found || err != nil {
 			glog.Errorf("Failed to get ConfigMap %q for cluster %q.  Will try again later: %v", uidConfigMapNamespacedName, clusterName, err)
-			ic.configMapDeliverer.DeliverAt(clusterName, nil, time.Now().Add(ic.configMapReviewDelay))
+			ic.configMapDeliverer.DeliverAfter(clusterName, nil, ic.configMapReviewDelay)
 			return
 		}
-		ic.reconcileConfigMap(cluster, configMapObj.(v1.ConfigMap))
+		/* TODO: Back to V(4) */ glog.Errorf("Successfully got ConfigMap %q for cluster %q.", uidConfigMapNamespacedName, clusterName)
+		configMap, ok := configMapObj.(*v1.ConfigMap)
+		if !ok {
+			glog.Errorf("Internal error: The object in the ConfigMap cache for cluster %q configmap %q is not a *ConfigMap", cluster.Name, uidConfigMapNamespacedName)
+			return
+		}
+		ic.reconcileConfigMap(cluster, configMap)
 		return
 	}
 }
@@ -437,20 +480,27 @@ func (ic *IngressController) reconcileConfigMapForCluster(clusterName string) {
   In cases 2 and 3, the configmaps will be updated in the next cycle, triggered by the federation cluster update(s)
 
 */
-func (ic *IngressController) reconcileConfigMap(cluster *federation_api.Cluster, configMap v1.ConfigMap) {
-	/* TODO: Back to V(4) */ glog.Errorf("Reconciling ConfigMap %q in cluster %q", types.NamespacedName{Name: configMap.Name, Namespace: configMap.Namespace}, cluster.Name)
+func (ic *IngressController) reconcileConfigMap(cluster *federation_api.Cluster, configMap *v1.ConfigMap) {
+	configMapNsName := types.NamespacedName{Name: configMap.Name, Namespace: configMap.Namespace}
+	/* TODO: Back to V(4) */ glog.Errorf("Reconciling ConfigMap %q in cluster %q", configMapNsName, cluster.Name)
 
 	clusterIngressUID, clusterIngressUIDExists := cluster.ObjectMeta.Annotations[uidAnnotationKey]
-	configMapUID, _ := configMap.Data[uidKey]
+	configMapUID, ok := configMap.Data[uidKey]
+
+	if !ok {
+		glog.Errorf("Warning: ConfigMap %q in cluster %q does not contain data key %q.  Therefore it cannot become the master.", configMapNsName, cluster.Name, uidKey)
+	}
+
 	if !clusterIngressUIDExists || clusterIngressUID == "" {
 		ic.updateClusterIngressUIDToMasters(cluster, configMapUID) // Second argument is the fallback, in case this is the only cluster, in which case it becomes the master
 		return
 	}
 	if configMapUID != clusterIngressUID { // An update is required
-		configMap.ObjectMeta.Annotations[uidAnnotationKey] = clusterIngressUID
+		/* TODO: Back to V(4) */ glog.Errorf("Ingress UID update is required: configMapUID %q not equal to clusterIngressUID %q", configMapUID, clusterIngressUID)
+		configMap.Data[uidKey] = clusterIngressUID
 		operations := []util.FederatedOperation{{
 			Type:        util.OperationTypeUpdate,
-			Obj:         &configMap,
+			Obj:         configMap,
 			ClusterName: cluster.Name,
 		}}
 		/* TODO: Back to V(4) */ glog.Errorf("Calling federatedConfigMapUpdater.Update() - operations: %v", operations)
@@ -458,8 +508,10 @@ func (ic *IngressController) reconcileConfigMap(cluster *federation_api.Cluster,
 		if err != nil {
 			configMapName := types.NamespacedName{Name: configMap.Name, Namespace: configMap.Namespace}
 			glog.Errorf("Failed to execute update of ConfigMap %q on cluster %q: %v", configMapName, cluster.Name, err)
-			ic.configMapDeliverer.DeliverAt(cluster.Name, nil, time.Now().Add(ic.configMapReviewDelay))
+			ic.configMapDeliverer.DeliverAfter(cluster.Name, nil, ic.configMapReviewDelay)
 		}
+	} else {
+		/* TODO: Back to V(4) */ glog.Errorf("Ingress UID update is not required: configMapUID %q is equal to clusterIngressUID %q", configMapUID, clusterIngressUID)
 	}
 }
 
@@ -490,22 +542,33 @@ func (ic *IngressController) getMasterCluster() (master *federation_api.Cluster,
 */
 func (ic *IngressController) updateClusterIngressUIDToMasters(cluster *federation_api.Cluster, fallbackUID string) {
 	masterCluster, masterUID, err := ic.getMasterCluster()
-	if err != nil {
-		if masterCluster.Name != cluster.Name { // If we are the master, no update needed
+	/* TODO REMOVE - FOR DEBUG ONLY */ glog.Errorf("-> updateClusterIngressUIDToMasters: masterCluster: %q, masterUID: %q, cluster: %q, err: %v", masterCluster, masterUID, cluster, err)
+	clusterObj, clusterErr := conversion.NewCloner().DeepCopy(cluster) // Make a clone so that we don't clobber our input param
+	cluster, ok := clusterObj.(*federation_api.Cluster)
+	if clusterErr != nil || !ok {
+		glog.Errorf("Internal error: Failed clone cluster resource while attempting to add master ingress UID annotation (%q = %q) from master cluster %q to cluster %q, will try again later: %v", uidAnnotationKey, masterUID, masterCluster.Name, cluster.Name, err)
+		return
+	}
+	if err == nil {
+		if masterCluster.Name != cluster.Name { // We're not the master, need to get in sync
 			cluster.ObjectMeta.Annotations[uidAnnotationKey] = masterUID
 			if _, err = ic.federatedApiClient.Federation().Clusters().Update(cluster); err != nil {
 				glog.Errorf("Failed to add master ingress UID annotation (%q = %q) from master cluster %q to cluster %q, will try again later: %v", uidAnnotationKey, masterUID, masterCluster.Name, cluster.Name, err)
 				return
+			} else {
+				/* TODO: Back to V(4) */ glog.Errorf("Successfully added master ingress UID annotation (%q = %q) from master cluster %q to cluster %q.", uidAnnotationKey, masterUID, masterCluster.Name, cluster.Name)
 			}
 		} else {
 			/* TODO: Back to V(4) */ glog.Errorf("Cluster %q with ingress UID is already the master with annotation (%q = %q), no need to update.", cluster.Name, uidAnnotationKey, cluster.ObjectMeta.Annotations[uidAnnotationKey])
 		}
 	} else {
-		glog.V(2).Infof("No master cluster found to source an ingress UID from for cluster %q.  Attempting to elect new master cluster %q with ingress UID %q = %q", cluster.Name, cluster.Name, uidAnnotationKey, fallbackUID)
+		/* TODO Back to V(2) */ glog.Errorf("No master cluster found to source an ingress UID from for cluster %q.  Attempting to elect new master cluster %q with ingress UID %q = %q", cluster.Name, cluster.Name, uidAnnotationKey, fallbackUID)
 		if fallbackUID != "" {
 			cluster.ObjectMeta.Annotations[uidAnnotationKey] = fallbackUID
 			if _, err = ic.federatedApiClient.Federation().Clusters().Update(cluster); err != nil {
 				glog.Errorf("Failed to add ingress UID annotation (%q = %q) to cluster %q. No master elected. Will try again later: %v", uidAnnotationKey, fallbackUID, cluster.Name, err)
+			} else {
+				/* TODO: Back to V(4) */ glog.Errorf("Successfully added ingress UID annotation (%q = %q) to cluster %q.", uidAnnotationKey, fallbackUID, cluster.Name)
 			}
 		} else {
 			glog.Errorf("No master cluster exists, and fallbackUID for cluster %q is invalid (%q).  This probably means that no clusters have an ingress controller configmap with key %q.  Federated Ingress currently supports clusters running Google Loadbalancer Controller (\"GLBC\")")
@@ -514,7 +577,7 @@ func (ic *IngressController) updateClusterIngressUIDToMasters(cluster *federatio
 }
 
 func (ic *IngressController) reconcileIngress(ingress types.NamespacedName) {
-	/* TODO: Back to V(4) */ glog.Errorf("Reconciling ingress %q", ingress)
+	/* TODO: Back to V(4) */ glog.Errorf("Reconciling ingress %q for all clusters", ingress)
 	if !ic.isSynced() {
 		ic.deliverIngress(ingress, ic.clusterAvailableDelay, false)
 		return
@@ -539,6 +602,8 @@ func (ic *IngressController) reconcileIngress(ingress types.NamespacedName) {
 		glog.Errorf("Failed to get cluster list: %v", err)
 		ic.deliverIngress(ingress, ic.clusterAvailableDelay, false)
 		return
+	} else {
+		/* TODO: Back to V(4) */ glog.Errorf("Found %d ready clusters across which to reconcile ingress %q", len(clusters), ingress)
 	}
 
 	operations := make([]util.FederatedOperation, 0)
@@ -547,7 +612,7 @@ func (ic *IngressController) reconcileIngress(ingress types.NamespacedName) {
 		_, baseIPExists := baseIngress.ObjectMeta.Annotations[staticIPAnnotationKey]
 		clusterIngressObj, found, err := ic.ingressFederatedInformer.GetTargetStore().GetByKey(cluster.Name, key)
 		if err != nil {
-			glog.Errorf("Failed to get %s from %s: %v", ingress, cluster.Name, err)
+			glog.Errorf("Failed to get cached ingress %s for cluster %s, will retry: %v", ingress, cluster.Name, err)
 			ic.deliverIngress(ingress, 0, true)
 			return
 		}
@@ -557,6 +622,7 @@ func (ic *IngressController) reconcileIngress(ingress types.NamespacedName) {
 		}
 
 		if !found {
+			/* TODO: Back to V(4) */ glog.Errorf("No existing Ingress %s in cluster %s - checking if appropriate to queue a create operation", ingress, cluster.Name)
 			// We can't supply server-created fields when creating a new object.
 			desiredIngress.ObjectMeta.ResourceVersion = ""
 			desiredIngress.ObjectMeta.UID = ""
@@ -570,12 +636,15 @@ func (ic *IngressController) reconcileIngress(ingress types.NamespacedName) {
 			// Note: If the first cluster becomes (e.g. temporarily) unavailable, the second cluster will be allocated
 			// index 0, but eventually all ingresses will share the single global IP recorded in the annotation
 			// of the federated ingress.
-			if baseIPExists || (clusterIndex == 0) {
+			if true /* TODO! */ || baseIPExists || (clusterIndex == 0) {
+				/* TODO: Back to V(4) */ glog.Errorf("No existing Ingress %s in cluster %s - queuing a create operation", ingress, cluster.Name)
 				operations = append(operations, util.FederatedOperation{
 					Type:        util.OperationTypeAdd,
 					Obj:         desiredIngress,
 					ClusterName: cluster.Name,
 				})
+			} else {
+				/* TODO: Back to V(4) */ glog.Errorf("No annotation %q exists on cluster %q, and cluster index %d is not zero.  Not queueing create operation for ingress %q", staticIPAnnotationKey, cluster.Name, ingress)
 			}
 		} else {
 			clusterIngress := clusterIngressObj.(*extensions_v1beta1.Ingress)
@@ -612,12 +681,15 @@ func (ic *IngressController) reconcileIngress(ingress types.NamespacedName) {
 					Obj:         desiredIngress,
 					ClusterName: cluster.Name,
 				})
+			} else {
+				/* TODO: Back to V(4) */ glog.Errorf("Ingress %q in cluster %q does not need an update: cluster ingress is equivalent to federated ingress", ingress, cluster.Name)
 			}
 		}
 	}
 
 	if len(operations) == 0 {
 		// Everything is in order
+		/* TODO: Back to V(4) */ glog.Errorf("Ingress %q is up-to-date in all clusters - no action required.", ingress)
 		return
 	}
 	/* TODO: Back to V(4) */ glog.Errorf("Calling federatedUpdater.Update() - operations: %v", operations)
