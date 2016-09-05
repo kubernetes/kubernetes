@@ -40,7 +40,7 @@ var (
 func NewCmdCreateDeployment(f *cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "deployment NAME --image=image [--dry-run]",
-		Aliases: []string{"dep"},
+		Aliases: []string{"deploy"},
 		Short:   "Create a deployment with the specified name.",
 		Long:    deploymentLong,
 		Example: deploymentExample,
