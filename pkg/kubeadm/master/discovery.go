@@ -99,18 +99,9 @@ func newKubeDiscovery(params *kubeadmapi.BootstrapParams, caCert *x509.Certifica
 		},
 	}
 
-	/* why this doesn't work?
-	kd.Deployment.Spec.Template.ObjectMeta.Annotations = map[string]string{}
-	kd.Deployment.Spec.Template.ObjectMeta.Annotations[api.AffinityAnnotationKey] = `{
-		"nodeAffinity": {
-			"requiredDuringSchedulingIgnoredDuringExecution": {
-				"nodeSelectorTerms": [{
-					"matchExpressions": [{ "key": "role", "operator": "In", "values": ["master"] }]
-				}]
-			}
-		}
-	}`
-	*/
+	//kd.Deployment.Spec.Template.ObjectMeta.Annotations = map[string]string{}
+	SetMasterTaintTolerations(&kd.Deployment.Spec.Template.ObjectMeta)
+	SetMasterNodeAffinity(&kd.Deployment.Spec.Template.ObjectMeta)
 
 	return kd
 }

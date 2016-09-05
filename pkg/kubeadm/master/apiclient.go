@@ -17,7 +17,7 @@ limitations under the License.
 package kubemaster
 
 import (
-	_ "encoding/json"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -146,13 +146,38 @@ func UpdateMasterRoleLabelsAndTaints(client *clientset.Clientset) error {
 		return fmt.Errorf("<master/apiclient> failed to update master node - %s", err)
 	}
 
-	n.ObjectMeta.Labels["role"] = "master"
-	//TODO make it happen here, and reflect in kube-discovery
-	//n.ObjectMeta.Annotations[api.TaintsAnnotationKey] = "{}"
+	n.ObjectMeta.Labels["kubeadm.alpha.kubernetes.io/role"] = "master"
+	taintsAnnotation, _ := json.Marshal([]api.Taint{{Key: "dedicated", Value: "master", Effect: "NoSchedule"}})
+	n.ObjectMeta.Annotations[api.TaintsAnnotationKey] = string(taintsAnnotation)
 
 	if _, err := client.Nodes().Update(n); err != nil {
 		return fmt.Errorf("<master/apiclient> failed to update master node - %s", err)
 	}
 
 	return nil
+}
+
+func SetMasterTaintTolerations(meta *api.ObjectMeta) {
+	tolerationsAnnotation, _ := json.Marshal([]api.Toleration{{Key: "dedicated", Value: "master", Effect: "NoSchedule"}})
+	if meta.Annotations == nil {
+		meta.Annotations = map[string]string{}
+	}
+	meta.Annotations[api.TolerationsAnnotationKey] = string(tolerationsAnnotation)
+}
+
+func SetMasterNodeAffinity(meta *api.ObjectMeta) {
+	nodeAffinity := &api.NodeAffinity{
+		RequiredDuringSchedulingIgnoredDuringExecution: &api.NodeSelector{
+			NodeSelectorTerms: []api.NodeSelectorTerm{{
+				MatchExpressions: []api.NodeSelectorRequirement{{
+					Key: "kubeadm.alpha.kubernetes.io/role", Operator: api.NodeSelectorOpIn, Values: []string{"master"},
+				}},
+			}},
+		},
+	}
+	affinityAnnotation, _ := json.Marshal(api.Affinity{NodeAffinity: nodeAffinity})
+	if meta.Annotations == nil {
+		meta.Annotations = map[string]string{}
+	}
+	meta.Annotations[api.AffinityAnnotationKey] = string(affinityAnnotation)
 }

@@ -81,6 +81,7 @@ func createKubeProxyPodSpec(params *kubeadmapi.BootstrapParams) api.PodSpec {
 
 func CreateEssentialAddons(params *kubeadmapi.BootstrapParams, client *clientset.Clientset) error {
 	kubeProxyDaemonSet := NewDaemonSet("kube-proxy", createKubeProxyPodSpec(params))
+	SetMasterTaintTolerations(&kubeProxyDaemonSet.Spec.Template.ObjectMeta)
 
 	if _, err := client.Extensions().DaemonSets(api.NamespaceSystem).Create(kubeProxyDaemonSet); err != nil {
 		return fmt.Errorf("<master/addons> failed creating essential kube-proxy addon [%s]", err)
