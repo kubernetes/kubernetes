@@ -49,9 +49,6 @@ func TestWatchList(t *testing.T) {
 // - update should trigger Modified event
 // - update that gets filtered should trigger Deleted event
 func testWatch(t *testing.T, recursive bool) {
-	ctx, store, cluster := testSetup(t)
-	defer cluster.Terminate(t)
-
 	podFoo := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 	podBar := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "bar"}}
 
@@ -93,6 +90,7 @@ func testWatch(t *testing.T, recursive bool) {
 		trigger: storage.NoTriggerFunc,
 	}}
 	for i, tt := range tests {
+		ctx, store, cluster := testSetup(t)
 		filter := storage.NewSimpleFilter(tt.filter, tt.trigger)
 		w, err := store.watch(ctx, tt.key, "0", filter, recursive)
 		if err != nil {
@@ -124,6 +122,7 @@ func testWatch(t *testing.T, recursive bool) {
 		}
 		w.Stop()
 		testCheckStop(t, i, w)
+		cluster.Terminate(t)
 	}
 }
 
