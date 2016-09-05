@@ -32,7 +32,7 @@ option go_package = "v1alpha1";
 
 // Eviction evicts a pod from its node subject to certain policies and safety constraints.
 // This is a subresource of Pod.  A request to cause such an eviction is
-// created by POSTing to .../pods/foo/evictions.
+// created by POSTing to .../pods/<pod name>/evictions.
 message Eviction {
   // ObjectMeta describes the pod that is being evicted.
   optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
