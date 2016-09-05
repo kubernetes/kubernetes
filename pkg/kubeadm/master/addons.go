@@ -19,10 +19,15 @@ package kubemaster
 import (
 	"fmt"
 	"path"
+	"strconv"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
+	unversionedapi "k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	kubeadmapi "k8s.io/kubernetes/pkg/kubeadm/api"
+	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
 func createKubeProxyPodSpec(params *kubeadmapi.BootstrapParams) api.PodSpec {
@@ -79,6 +84,158 @@ func createKubeProxyPodSpec(params *kubeadmapi.BootstrapParams) api.PodSpec {
 	}
 }
 
+func createKubeDnsDeployment(params *kubeadmapi.BootstrapParams) *extensions.Deployment {
+	metaLabels := map[string]string{
+		"k8s-app":                       "kube-dns",
+		"version":                       "v19",
+		"kubernetes.io/cluster-service": "true",
+	}
+
+	metaAnnotations := map[string]string{
+		"scheduler.alpha.kubernetes.io/critical-pod": "''",
+		"scheduler.alpha.kubernetes.io/tolerations":  "'[{\"key\":\"CriticalAddonsOnly\", \"operator\":\"Exists\"}]'",
+	}
+
+	dnsPodResources := api.ResourceList{
+		api.ResourceLimitsCPU: resource.MustParse("100m"),
+		api.ResourceMemory:    resource.MustParse("170Mi"),
+	}
+
+	healthzPodResources := api.ResourceList{
+		api.ResourceLimitsCPU: resource.MustParse("10m"),
+		api.ResourceMemory:    resource.MustParse("50Mi"),
+	}
+
+	podSpec := api.PodSpec{
+		Containers: []api.Container{
+			// DNS server
+			{
+				Name:  "kube-dns",
+				Image: "gcr.io/google_containers/kubedns-amd64:1.7",
+				Resources: api.ResourceRequirements{
+					Limits:   dnsPodResources,
+					Requests: dnsPodResources,
+				},
+				Args: []string{
+					"--domain=" + params.EnvParams["dns_domain"],
+					"--dns-port=10053",
+					// TODO __PILLAR__FEDERATIONS__DOMAIN__MAP__
+				},
+				LivenessProbe: &api.Probe{
+					Handler: api.Handler{
+						HTTPGet: &api.HTTPGetAction{
+							Path:   "/healthz",
+							Port:   intstr.FromInt(8080),
+							Scheme: api.URISchemeHTTP,
+						},
+					},
+					InitialDelaySeconds: 60,
+					TimeoutSeconds:      5,
+					SuccessThreshold:    1,
+					FailureThreshold:    1,
+				},
+				// # we poll on pod startup for the Kubernetes master service and
+				// # only setup the /readiness HTTP server once that's available.
+				ReadinessProbe: &api.Probe{
+					Handler: api.Handler{
+						HTTPGet: &api.HTTPGetAction{
+							Path:   "/readiness",
+							Port:   intstr.FromInt(8081),
+							Scheme: api.URISchemeHTTP,
+						},
+					},
+					InitialDelaySeconds: 30,
+					TimeoutSeconds:      5,
+				},
+				Ports: []api.ContainerPort{
+					{
+						ContainerPort: 10053,
+						Name:          "dns-local",
+						Protocol:      api.ProtocolUDP,
+					},
+					{
+						ContainerPort: 10053,
+						Name:          "dns-tcp-local",
+						Protocol:      api.ProtocolTCP,
+					},
+				},
+			},
+			// dnsmasq
+			{
+				Name:  "dnsmasq",
+				Image: "gcr.io/google_containers/kube-dnsmasq-amd64:1.3",
+				Resources: api.ResourceRequirements{
+					Limits:   dnsPodResources,
+					Requests: dnsPodResources,
+				},
+				Args: []string{
+					"--cache-size=1000",
+					"--no-resolv",
+					"--server=127.0.0.1#10053",
+				},
+				Ports: []api.ContainerPort{
+					{
+						ContainerPort: 53,
+						Name:          "dns",
+						Protocol:      api.ProtocolUDP,
+					},
+					{
+						ContainerPort: 53,
+						Name:          "dns-tcp",
+						Protocol:      api.ProtocolTCP,
+					},
+				},
+			},
+			// healthz
+			{
+				Name:  "healthz",
+				Image: "gcr.io/google_containers/exechealthz-amd64:1.1",
+				Resources: api.ResourceRequirements{
+					Limits:   healthzPodResources,
+					Requests: healthzPodResources,
+				},
+				Args: []string{
+					"-cmd=nslookup kubernetes.default.svc." + params.EnvParams["dns_domain"] + " 127.0.0.1 >/dev/null && nslookup kubernetes.default.svc." + params.EnvParams["dns_domain"] + " 127.0.0.1:10053 >/dev/null",
+					"-port=8080",
+					"-quiet",
+				},
+				Ports: []api.ContainerPort{
+					{
+						ContainerPort: 8080,
+						Protocol:      api.ProtocolTCP,
+					},
+				},
+			},
+		},
+		DNSPolicy: api.DNSDefault,
+	}
+
+	dnsReplicas, err := strconv.Atoi(params.EnvParams["dns_replicas"])
+	if err != nil {
+		dnsReplicas = 1
+	}
+
+	return &extensions.Deployment{
+		ObjectMeta: api.ObjectMeta{
+			Name:      "kube-dns-v19",
+			Namespace: "kube-system",
+			Labels:    metaLabels,
+		},
+		Spec: extensions.DeploymentSpec{
+			Replicas: int32(dnsReplicas),
+			Selector: &unversionedapi.LabelSelector{MatchLabels: metaLabels},
+			Template: api.PodTemplateSpec{
+				ObjectMeta: api.ObjectMeta{
+					Labels:      metaLabels,
+					Annotations: metaAnnotations,
+				},
+				Spec: podSpec,
+			},
+		},
+	}
+
+}
+
 func CreateEssentialAddons(params *kubeadmapi.BootstrapParams, client *clientset.Clientset) error {
 	kubeProxyDaemonSet := NewDaemonSet("kube-proxy", createKubeProxyPodSpec(params))
 	SetMasterTaintTolerations(&kubeProxyDaemonSet.Spec.Template.ObjectMeta)
@@ -90,6 +247,13 @@ func CreateEssentialAddons(params *kubeadmapi.BootstrapParams, client *clientset
 	fmt.Println("<master/addons> created essential addon: kube-proxy")
 
 	// TODO should we wait for it to become ready at least on the master?
+
+	kubeDnsDeployment := createKubeDnsDeployment(params)
+	if _, err := client.Extensions().Deployments(api.NamespaceSystem).Create(kubeDnsDeployment); err != nil {
+		return fmt.Errorf("<master/addons> failed creating essential kube-dns addon [%s]", err)
+	}
+
+	fmt.Println("<master/addons> created essential addon: kube-dns")
 
 	return nil
 }
