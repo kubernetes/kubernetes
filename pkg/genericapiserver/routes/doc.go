@@ -14,24 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package apiserver
-
-import (
-	"net/http"
-)
-
-// Offers additional functionality over ServeMux, for ex: supports listing registered paths.
-type MuxHelper struct {
-	Mux             Mux
-	RegisteredPaths []string
-}
-
-func (m *MuxHelper) Handle(path string, handler http.Handler) {
-	m.RegisteredPaths = append(m.RegisteredPaths, path)
-	m.Mux.Handle(path, handler)
-}
-
-func (m *MuxHelper) HandleFunc(path string, handler func(http.ResponseWriter, *http.Request)) {
-	m.RegisteredPaths = append(m.RegisteredPaths, path)
-	m.Mux.HandleFunc(path, handler)
-}
+// Package routes holds a collection of optional genericapiserver http handlers.
+package routes

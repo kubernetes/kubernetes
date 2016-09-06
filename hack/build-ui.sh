@@ -37,7 +37,7 @@ readonly SWAGGER_PKG="swagger"
 function kube::hack::build_ui() {
   local pkg="$1"
   local src="$2"
-  local output_file="pkg/ui/data/${pkg}/datafile.go"
+  local output_file="pkg/genericapiserver/routes/data/${pkg}/datafile.go"
 
   go-bindata -nocompress -o "${output_file}" -prefix ${PWD} -pkg "${pkg}" "${src}"
 

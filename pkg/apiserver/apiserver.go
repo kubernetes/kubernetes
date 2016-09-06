@@ -42,7 +42,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/flushwriter"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/wsstream"
-	"k8s.io/kubernetes/pkg/version"
 
 	"github.com/emicklei/go-restful"
 	"github.com/golang/glog"
@@ -50,12 +49,6 @@ import (
 
 func init() {
 	metrics.Register()
-}
-
-// mux is an object that can register http handlers.
-type Mux interface {
-	Handle(pattern string, handler http.Handler)
-	HandleFunc(pattern string, handler func(http.ResponseWriter, *http.Request))
 }
 
 type APIResourceLister interface {
@@ -188,48 +181,6 @@ func (g *APIGroupVersion) newInstaller() *APIInstaller {
 		minRequestTimeout: g.MinRequestTimeout,
 	}
 	return installer
-}
-
-// TODO: document all handlers
-// InstallVersionHandler registers the APIServer's `/version` handler
-func InstallVersionHandler(mux Mux, container *restful.Container) {
-	// Set up a service to return the git code version.
-	versionWS := new(restful.WebService)
-	versionWS.Path("/version")
-	versionWS.Doc("git code version from which this is built")
-	versionWS.Route(
-		versionWS.GET("/").To(handleVersion).
-			Doc("get the code version").
-			Operation("getCodeVersion").
-			Produces(restful.MIME_JSON).
-			Consumes(restful.MIME_JSON).
-			Writes(version.Info{}))
-
-	container.Add(versionWS)
-}
-
-// InstallLogsSupport registers the APIServer's `/logs` into a mux.
-func InstallLogsSupport(mux Mux, container *restful.Container) {
-	// use restful: ws.Route(ws.GET("/logs/{logpath:*}").To(fileHandler))
-	// See github.com/emicklei/go-restful/blob/master/examples/restful-serve-static.go
-	ws := new(restful.WebService)
-	ws.Path("/logs")
-	ws.Doc("get log files")
-	ws.Route(ws.GET("/{logpath:*}").To(logFileHandler))
-	ws.Route(ws.GET("/").To(logFileListHandler))
-
-	container.Add(ws)
-}
-
-func logFileHandler(req *restful.Request, resp *restful.Response) {
-	logdir := "/var/log"
-	actual := path.Join(logdir, req.PathParameter("logpath"))
-	http.ServeFile(resp.ResponseWriter, req.Request, actual)
-}
-
-func logFileListHandler(req *restful.Request, resp *restful.Response) {
-	logdir := "/var/log"
-	http.ServeFile(resp.ResponseWriter, req.Request, logdir)
 }
 
 // TODO: needs to perform response type negotiation, this is probably the wrong way to recover panics
@@ -403,11 +354,6 @@ func AddSupportedResourcesWebService(s runtime.NegotiatedSerializer, ws *restful
 		Writes(unversioned.APIResourceList{}))
 }
 
-// handleVersion writes the server's version information.
-func handleVersion(req *restful.Request, resp *restful.Response) {
-	writeRawJSON(http.StatusOK, version.Get(), resp.ResponseWriter)
-}
-
 // APIVersionHandler returns a handler which will list the provided versions as available.
 func APIVersionHandler(s runtime.NegotiatedSerializer, getAPIVersionsFunc func(req *restful.Request) *unversioned.APIVersions) restful.RouteFunction {
 	return func(req *restful.Request, resp *restful.Response) {
@@ -484,7 +430,7 @@ func writeNegotiated(s runtime.NegotiatedSerializer, gv unversioned.GroupVersion
 	serializer, err := negotiateOutputSerializer(req, s)
 	if err != nil {
 		status := errToAPIStatus(err)
-		writeRawJSON(int(status.Code), status, w)
+		WriteRawJSON(int(status.Code), status, w)
 		return
 	}
 
@@ -528,8 +474,8 @@ func errorJSONFatal(err error, codec runtime.Encoder, w http.ResponseWriter) int
 	return code
 }
 
-// writeRawJSON writes a non-API object in JSON.
-func writeRawJSON(statusCode int, object interface{}, w http.ResponseWriter) {
+// WriteRawJSON writes a non-API object in JSON.
+func WriteRawJSON(statusCode int, object interface{}, w http.ResponseWriter) {
 	output, err := json.MarshalIndent(object, "", "  ")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)

@@ -14,6 +14,23 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// package ui contains utilities for accessing the static data files compiled in
-// the data/* subdirectories.
-package ui // import "k8s.io/kubernetes/pkg/ui"
+package routes
+
+import (
+	"net/http"
+
+	"github.com/emicklei/go-restful"
+
+	"k8s.io/kubernetes/pkg/apiserver"
+)
+
+const dashboardPath = "/api/v1/proxy/namespaces/kube-system/services/kubernetes-dashboard"
+
+// UIRediect redirects /ui to the kube-ui proxy path.
+type UIRedirect struct{}
+
+func (r UIRedirect) Install(mux *apiserver.PathRecorderMux, c *restful.Container) {
+	mux.HandleFunc("/ui/", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, dashboardPath, http.StatusTemporaryRedirect)
+	})
+}

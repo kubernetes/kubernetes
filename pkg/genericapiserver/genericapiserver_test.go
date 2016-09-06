@@ -173,12 +173,11 @@ func TestHandleWithAuth(t *testing.T) {
 	server, etcdserver, _, assert := setUp(t)
 	defer etcdserver.Terminate(t)
 
-	mh := apiserver.MuxHelper{Mux: http.NewServeMux()}
-	server.MuxHelper = &mh
+	server.Mux = apiserver.NewPathRecorderMux(http.NewServeMux())
 	handler := func(r http.ResponseWriter, w *http.Request) { w.Write(nil) }
 	server.HandleWithAuth("/test", http.HandlerFunc(handler))
 
-	assert.Contains(server.MuxHelper.RegisteredPaths, "/test", "Path not found in MuxHelper")
+	assert.Contains(server.Mux.HandledPaths(), "/test", "Path not found in MuxHelper")
 }
 
 // TestHandleFuncWithAuth verifies HandleFuncWithAuth adds the path
@@ -187,12 +186,11 @@ func TestHandleFuncWithAuth(t *testing.T) {
 	server, etcdserver, _, assert := setUp(t)
 	defer etcdserver.Terminate(t)
 
-	mh := apiserver.MuxHelper{Mux: http.NewServeMux()}
-	server.MuxHelper = &mh
+	server.Mux = apiserver.NewPathRecorderMux(http.NewServeMux())
 	handler := func(r http.ResponseWriter, w *http.Request) { w.Write(nil) }
 	server.HandleFuncWithAuth("/test", handler)
 
-	assert.Contains(server.MuxHelper.RegisteredPaths, "/test", "Path not found in MuxHelper")
+	assert.Contains(server.Mux.HandledPaths(), "/test", "Path not found in MuxHelper")
 }
 
 // TestInstallSwaggerAPI verifies that the swagger api is added

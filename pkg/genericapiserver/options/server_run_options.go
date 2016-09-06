@@ -87,7 +87,6 @@ type ServerRunOptions struct {
 	AuditLogMaxAge            int
 	AuditLogMaxBackups        int
 	AuditLogMaxSize           int
-	EnableLogsSupport         bool
 	EnableProfiling           bool
 	EnableSwaggerUI           bool
 	EnableWatchCache          bool
@@ -137,7 +136,6 @@ func NewServerRunOptions() *ServerRunOptions {
 		DefaultStorageMediaType:                  "application/json",
 		DefaultStorageVersions:                   registered.AllPreferredGroupVersions(),
 		DeleteCollectionWorkers:                  1,
-		EnableLogsSupport:                        true,
 		EnableProfiling:                          true,
 		EnableWatchCache:                         true,
 		InsecureBindAddress:                      net.ParseIP("127.0.0.1"),

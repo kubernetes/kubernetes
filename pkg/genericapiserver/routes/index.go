@@ -14,19 +14,22 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package apiserver
+package routes
 
 import (
 	"net/http"
 	"sort"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
-
 	"github.com/emicklei/go-restful"
+
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apiserver"
 )
 
-func IndexHandler(container *restful.Container, muxHelper *MuxHelper) func(http.ResponseWriter, *http.Request) {
-	return func(w http.ResponseWriter, r *http.Request) {
+type Index struct{}
+
+func (i Index) Install(mux *apiserver.PathRecorderMux, c *restful.Container) {
+	mux.BaseMux().HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		status := http.StatusOK
 		if r.URL.Path != "/" && r.URL.Path != "/index.html" {
 			// Since "/" matches all paths, handleIndex is called for all paths for which there is no handler registered.
@@ -35,12 +38,12 @@ func IndexHandler(container *restful.Container, muxHelper *MuxHelper) func(http.
 		}
 		var handledPaths []string
 		// Extract the paths handled using restful.WebService
-		for _, ws := range container.RegisteredWebServices() {
+		for _, ws := range c.RegisteredWebServices() {
 			handledPaths = append(handledPaths, ws.RootPath())
 		}
 		// Extract the paths handled using mux handler.
-		handledPaths = append(handledPaths, muxHelper.RegisteredPaths...)
+		handledPaths = append(handledPaths, mux.HandledPaths()...)
 		sort.Strings(handledPaths)
-		writeRawJSON(status, unversioned.RootPaths{Paths: handledPaths}, w)
-	}
+		apiserver.WriteRawJSON(status, unversioned.RootPaths{Paths: handledPaths}, w)
+	})
 }
