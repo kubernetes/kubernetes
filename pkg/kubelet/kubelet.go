@@ -40,7 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
-	kubeExternal "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
+	componentconfigv1alpha1 "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/record"
@@ -459,7 +459,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		cadvisor:                       kubeDeps.CAdvisorInterface,
 		diskSpaceManager:               diskSpaceManager,
 		cloud:                          kubeDeps.Cloud,
-		autoDetectCloudProvider:   (kubeExternal.AutoDetectCloudProvider == kubeCfg.CloudProvider),
+		autoDetectCloudProvider:   (componentconfigv1alpha1.AutoDetectCloudProvider == kubeCfg.CloudProvider),
 		nodeRef:                   nodeRef,
 		nodeLabels:                kubeCfg.NodeLabels,
 		nodeStatusUpdateFrequency: kubeCfg.NodeStatusUpdateFrequency.Duration,
