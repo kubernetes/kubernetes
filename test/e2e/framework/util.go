@@ -4189,6 +4189,23 @@ func WaitForNodeToBe(c *client.Client, name string, conditionType api.NodeCondit
 	return false
 }
 
+// Checks whether not-ready nodes can be ignored while checking if all nodes are
+// ready (we allow e.g. for incorrect provisioning of some small percentage of nodes
+// while validating cluster, and those nodes may never become healthy).
+// Currently we allow only for:
+// - not present CNI plugins on node
+// TODO: we should extend it for other reasons.
+func allowedNotReadyReasons(nodes []*api.Node) bool {
+	for _, node := range nodes {
+		index, condition := api.GetNodeCondition(&node.Status, api.NodeReady)
+		if index == -1 ||
+			!strings.Contains(condition.Reason, "could not locate kubenet required CNI plugins") {
+			return false
+		}
+	}
+	return true
+}
+
 // Checks whether all registered nodes are ready.
 // TODO: we should change the AllNodesReady call in AfterEach to WaitForAllNodesHealthy,
 // and figure out how to do it in a configurable way, as we can't expect all setups to run
@@ -4196,7 +4213,7 @@ func WaitForNodeToBe(c *client.Client, name string, conditionType api.NodeCondit
 func AllNodesReady(c *client.Client, timeout time.Duration) error {
 	Logf("Waiting up to %v for all nodes to be ready", timeout)
 
-	var notReady []api.Node
+	var notReady []*api.Node
 	err := wait.PollImmediate(Poll, timeout, func() (bool, error) {
 		notReady = nil
 		// It should be OK to list unschedulable Nodes here.
@@ -4204,12 +4221,23 @@ func AllNodesReady(c *client.Client, timeout time.Duration) error {
 		if err != nil {
 			return false, err
 		}
-		for _, node := range nodes.Items {
-			if !IsNodeConditionSetAsExpected(&node, api.NodeReady, true) {
+		for i := range nodes.Items {
+			node := &nodes.Items[i]
+			if !IsNodeConditionSetAsExpected(node, api.NodeReady, true) {
 				notReady = append(notReady, node)
 			}
 		}
-		return len(notReady) == 0, nil
+		// Framework allows for <TestContext.AllowedNotReadyNodes> nodes to be non-ready,
+		// to make it possible e.g. for incorrect deployment of some small percentage
+		// of nodes (which we allow in cluster validation). Some nodes that are not
+		// provisioned correctly at startup will never become ready (e.g. when something
+		// won't install correctly), so we can't expect them to be ready at any point.
+		//
+		// However, we only allow non-ready nodes with some specific reasons.
+		if len(notReady) > TestContext.AllowedNotReadyNodes {
+			return false, nil
+		}
+		return allowedNotReadyReasons(notReady), nil
 	})
 
 	if err != nil && err != wait.ErrWaitTimeout {
