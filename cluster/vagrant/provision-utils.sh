@@ -78,6 +78,12 @@ opencontrail_public_subnet: '$(echo "$OPENCONTRAIL_PUBLIC_SUBNET" | sed -e "s/'/
 e2e_storage_test_environment: '$(echo "$E2E_STORAGE_TEST_ENVIRONMENT" | sed -e "s/'/''/g")'
 EOF
 
+if [ -n "${EVICTION_HARD:-}" ]; then
+  cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
+eviction_hard: '$(echo "${EVICTION_HARD}" | sed -e "s/'/''/g")'
+EOF
+fi
+
   cat <<EOF >/etc/salt/minion.d/log-level-debug.conf
 log_level: warning
 log_level_logfile: warning
