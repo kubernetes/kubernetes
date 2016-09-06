@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	remotecommandserver "k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
+	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/interrupt"
 	"k8s.io/kubernetes/pkg/util/term"
 )
@@ -178,19 +179,20 @@ func (p *ExecOptions) Complete(f *cmdutil.Factory, cmd *cobra.Command, argsIn []
 
 // Validate checks that the provided exec options are specified.
 func (p *ExecOptions) Validate() error {
+	errors := []error{}
 	if len(p.PodName) == 0 {
-		return fmt.Errorf("pod name must be specified")
+		errors = append(errors, fmt.Errorf("pod name must be specified"))
 	}
 	if len(p.Command) == 0 {
-		return fmt.Errorf("you must specify at least one command for the container")
+		errors = append(errors, fmt.Errorf("you must specify at least one command for the container"))
 	}
 	if p.Out == nil || p.Err == nil {
-		return fmt.Errorf("both output and error output must be provided")
+		errors = append(errors, fmt.Errorf("both output and error output must be provided"))
 	}
 	if p.Executor == nil || p.Client == nil || p.Config == nil {
-		return fmt.Errorf("client, client config, and executor must be provided")
+		errors = append(errors, fmt.Errorf("client, client config, and executor must be provided"))
 	}
-	return nil
+	return utilerrors.NewAggregate(errors)
 }
 
 func (o *StreamOptions) setupTTY() term.TTY {
