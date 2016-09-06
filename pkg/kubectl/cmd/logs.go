@@ -53,6 +53,10 @@ var (
 		kubectl logs --since=1h nginx`)
 )
 
+const (
+	logsUsageStr = "expected 'logs POD_NAME [CONTAINER_NAME]'.\nPOD_NAME is a required argument for the logs command"
+)
+
 type LogsOptions struct {
 	Namespace   string
 	ResourceArg string
@@ -111,17 +115,17 @@ func (o *LogsOptions) Complete(f *cmdutil.Factory, out io.Writer, cmd *cobra.Com
 	containerName := cmdutil.GetFlagString(cmd, "container")
 	switch len(args) {
 	case 0:
-		return cmdutil.UsageError(cmd, "POD is required for logs")
+		return cmdutil.UsageError(cmd, logsUsageStr)
 	case 1:
 		o.ResourceArg = args[0]
 	case 2:
 		if cmd.Flag("container").Changed {
-			return cmdutil.UsageError(cmd, "only one of -c, [CONTAINER] arg is allowed")
+			return cmdutil.UsageError(cmd, "only one of -c or an inline [CONTAINER] arg is allowed")
 		}
 		o.ResourceArg = args[0]
 		containerName = args[1]
 	default:
-		return cmdutil.UsageError(cmd, "logs POD [-c CONTAINER]")
+		return cmdutil.UsageError(cmd, logsUsageStr)
 	}
 	var err error
 	o.Namespace, _, err = f.DefaultNamespace()
