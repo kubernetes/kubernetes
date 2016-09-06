@@ -58,7 +58,7 @@ type ImageOptions struct {
 
 var (
 	image_resources = `
-  pod (po), replicationcontroller (rc), deployment, daemonset (ds), job, replicaset (rs)`
+  pod (po), replicationcontroller (rc), deployment (deploy), daemonset (ds), job, replicaset (rs)`
 
 	image_long = dedent.Dedent(`
 		Update existing container image(s) of resources.
