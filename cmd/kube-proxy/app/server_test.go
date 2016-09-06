@@ -38,12 +38,12 @@ func (fake *fakeNodeInterface) Get(hostname string) (*api.Node, error) {
 	return &fake.node, nil
 }
 
-type fakeIptablesVersioner struct {
+type fakeIPTablesVersioner struct {
 	version string // what to return
 	err     error  // what to return
 }
 
-func (fake *fakeIptablesVersioner) GetVersion() (string, error) {
+func (fake *fakeIPTablesVersioner) GetVersion() (string, error) {
 	return fake.version, fake.err
 }
 
@@ -95,7 +95,7 @@ func Test_getProxyMode(t *testing.T) {
 			flag:            "iptables",
 			iptablesVersion: iptables.MinCheckVersion,
 			kernelCompat:    true,
-			expected:        proxyModeIptables,
+			expected:        proxyModeIPTables,
 		},
 		{ // detect, error
 			flag:          "",
@@ -117,7 +117,7 @@ func Test_getProxyMode(t *testing.T) {
 			flag:            "",
 			iptablesVersion: iptables.MinCheckVersion,
 			kernelCompat:    true,
-			expected:        proxyModeIptables,
+			expected:        proxyModeIPTables,
 		},
 		{ // annotation says userspace
 			flag:          "",
@@ -153,7 +153,7 @@ func Test_getProxyMode(t *testing.T) {
 			annotationVal:   "iptables",
 			iptablesVersion: iptables.MinCheckVersion,
 			kernelCompat:    true,
-			expected:        proxyModeIptables,
+			expected:        proxyModeIPTables,
 		},
 		{ // annotation says something else, version ok
 			flag:            "",
@@ -161,7 +161,7 @@ func Test_getProxyMode(t *testing.T) {
 			annotationVal:   "other",
 			iptablesVersion: iptables.MinCheckVersion,
 			kernelCompat:    true,
-			expected:        proxyModeIptables,
+			expected:        proxyModeIPTables,
 		},
 		{ // annotation says nothing, version ok
 			flag:            "",
@@ -169,7 +169,7 @@ func Test_getProxyMode(t *testing.T) {
 			annotationVal:   "",
 			iptablesVersion: iptables.MinCheckVersion,
 			kernelCompat:    true,
-			expected:        proxyModeIptables,
+			expected:        proxyModeIPTables,
 		},
 		{ // annotation says userspace
 			flag:          "",
@@ -205,7 +205,7 @@ func Test_getProxyMode(t *testing.T) {
 			annotationVal:   "iptables",
 			iptablesVersion: iptables.MinCheckVersion,
 			kernelCompat:    true,
-			expected:        proxyModeIptables,
+			expected:        proxyModeIPTables,
 		},
 		{ // annotation says something else, version ok
 			flag:            "",
@@ -213,7 +213,7 @@ func Test_getProxyMode(t *testing.T) {
 			annotationVal:   "other",
 			iptablesVersion: iptables.MinCheckVersion,
 			kernelCompat:    true,
-			expected:        proxyModeIptables,
+			expected:        proxyModeIPTables,
 		},
 		{ // annotation says nothing, version ok
 			flag:            "",
@@ -221,7 +221,7 @@ func Test_getProxyMode(t *testing.T) {
 			annotationVal:   "",
 			iptablesVersion: iptables.MinCheckVersion,
 			kernelCompat:    true,
-			expected:        proxyModeIptables,
+			expected:        proxyModeIPTables,
 		},
 		{ // flag says userspace, annotation disagrees
 			flag:            "userspace",
@@ -236,7 +236,7 @@ func Test_getProxyMode(t *testing.T) {
 			annotationVal:   "userspace",
 			iptablesVersion: iptables.MinCheckVersion,
 			kernelCompat:    true,
-			expected:        proxyModeIptables,
+			expected:        proxyModeIPTables,
 		},
 		{ // flag says userspace, annotation disagrees
 			flag:            "userspace",
@@ -251,13 +251,13 @@ func Test_getProxyMode(t *testing.T) {
 			annotationVal:   "userspace",
 			iptablesVersion: iptables.MinCheckVersion,
 			kernelCompat:    true,
-			expected:        proxyModeIptables,
+			expected:        proxyModeIPTables,
 		},
 	}
 	for i, c := range cases {
 		getter := &fakeNodeInterface{}
 		getter.node.Annotations = map[string]string{c.annotationKey: c.annotationVal}
-		versioner := &fakeIptablesVersioner{c.iptablesVersion, c.iptablesError}
+		versioner := &fakeIPTablesVersioner{c.iptablesVersion, c.iptablesError}
 		kcompater := &fakeKernelCompatTester{c.kernelCompat}
 		r := getProxyMode(c.flag, getter, "host", versioner, kcompater)
 		if r != c.expected {

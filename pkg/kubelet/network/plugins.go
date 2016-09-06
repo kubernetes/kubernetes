@@ -154,7 +154,7 @@ func UnescapePluginName(in string) string {
 type NoopNetworkPlugin struct {
 }
 
-const sysctlBridgeCallIptables = "net/bridge/bridge-nf-call-iptables"
+const sysctlBridgeCallIPTables = "net/bridge/bridge-nf-call-iptables"
 
 func (plugin *NoopNetworkPlugin) Init(host Host, hairpinMode componentconfig.HairpinMode, nonMasqueradeCIDR string, mtu int) error {
 	// Set bridge-nf-call-iptables=1 to maintain compatibility with older
@@ -166,8 +166,8 @@ func (plugin *NoopNetworkPlugin) Init(host Host, hairpinMode componentconfig.Hai
 	// Ensure the netfilter module is loaded on kernel >= 3.18; previously
 	// it was built-in.
 	utilexec.New().Command("modprobe", "br-netfilter").CombinedOutput()
-	if err := utilsysctl.New().SetSysctl(sysctlBridgeCallIptables, 1); err != nil {
-		glog.Warningf("can't set sysctl %s: %v", sysctlBridgeCallIptables, err)
+	if err := utilsysctl.New().SetSysctl(sysctlBridgeCallIPTables, 1); err != nil {
+		glog.Warningf("can't set sysctl %s: %v", sysctlBridgeCallIPTables, err)
 	}
 
 	return nil
