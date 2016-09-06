@@ -242,6 +242,7 @@ current-context: default
 			if err != nil {
 				return fmt.Errorf("failed to read test config: %v", err)
 			}
+			defer configFile.Close()
 
 			_, err = NewImagePolicyWebhook(fake.NewSimpleClientset(), configFile)
 			return err
@@ -402,6 +403,7 @@ func newImagePolicyWebhook(callbackURL string, clientCert, clientKey, ca []byte,
 	if err != nil {
 		return nil, fmt.Errorf("failed to read test config: %v", err)
 	}
+	defer configFile.Close()
 	wh, err := NewImagePolicyWebhook(fake.NewSimpleClientset(), configFile)
 	return wh.(*imagePolicyWebhook), err
 }
