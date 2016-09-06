@@ -25,6 +25,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"os/signal"
 	"os/user"
 	"path/filepath"
 	"strconv"
@@ -157,6 +158,21 @@ func main() {
 	deploy, err := getDeployer()
 	if err != nil {
 		log.Fatalf("Error creating deployer: %v", err)
+	}
+
+	if *down {
+		// listen for signals such as ^C and gracefully attempt to clean up
+		c := make(chan os.Signal, 1)
+		signal.Notify(c, os.Interrupt)
+		go func() {
+			for range c {
+				log.Print("Captured ^C, gracefully attempting to cleanup resources..")
+				if err := deploy.Down(); err != nil {
+					log.Printf("Tearing down deployment failed: %v", err)
+					os.Exit(1)
+				}
+			}
+		}()
 	}
 
 	if err := run(deploy); err != nil {
