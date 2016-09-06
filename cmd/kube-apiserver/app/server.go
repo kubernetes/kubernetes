@@ -22,6 +22,7 @@ package app
 import (
 	"crypto/tls"
 	"net"
+	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
@@ -268,6 +269,8 @@ func Run(s *options.APIServer) error {
 		glog.Fatalf("Failed to initialize plugins: %v", err)
 	}
 
+	mux := http.NewServeMux()
+
 	genericConfig := genericapiserver.NewConfig(s.ServerRunOptions)
 	// TODO: Move the following to generic api server as well.
 	genericConfig.StorageFactory = storageFactory
@@ -282,6 +285,7 @@ func Run(s *options.APIServer) error {
 	genericConfig.ProxyTLSClientConfig = proxyTLSClientConfig
 	genericConfig.Serializer = api.Codecs
 	genericConfig.OpenAPIInfo.Title = "Kubernetes"
+	genericConfig.RestfulContainer = genericapiserver.NewHandlerContainer(mux, genericConfig.Serializer)
 
 	config := &master.Config{
 		Config:                  genericConfig,
@@ -289,6 +293,8 @@ func Run(s *options.APIServer) error {
 		DeleteCollectionWorkers: s.DeleteCollectionWorkers,
 		EventTTL:                s.EventTTL,
 		KubeletClient:           kubeletClient,
+		EnableUISupport:         true,
+		EnableLogsSupport:       true,
 
 		Tunneler: tunneler,
 	}

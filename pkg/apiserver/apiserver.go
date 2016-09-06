@@ -52,12 +52,6 @@ func init() {
 	metrics.Register()
 }
 
-// mux is an object that can register http handlers.
-type Mux interface {
-	Handle(pattern string, handler http.Handler)
-	HandleFunc(pattern string, handler func(http.ResponseWriter, *http.Request))
-}
-
 type APIResourceLister interface {
 	ListAPIResources() []unversioned.APIResource
 }
@@ -206,30 +200,6 @@ func InstallVersionHandler(mux Mux, container *restful.Container) {
 			Writes(version.Info{}))
 
 	container.Add(versionWS)
-}
-
-// InstallLogsSupport registers the APIServer's `/logs` into a mux.
-func InstallLogsSupport(mux Mux, container *restful.Container) {
-	// use restful: ws.Route(ws.GET("/logs/{logpath:*}").To(fileHandler))
-	// See github.com/emicklei/go-restful/blob/master/examples/restful-serve-static.go
-	ws := new(restful.WebService)
-	ws.Path("/logs")
-	ws.Doc("get log files")
-	ws.Route(ws.GET("/{logpath:*}").To(logFileHandler))
-	ws.Route(ws.GET("/").To(logFileListHandler))
-
-	container.Add(ws)
-}
-
-func logFileHandler(req *restful.Request, resp *restful.Response) {
-	logdir := "/var/log"
-	actual := path.Join(logdir, req.PathParameter("logpath"))
-	http.ServeFile(resp.ResponseWriter, req.Request, actual)
-}
-
-func logFileListHandler(req *restful.Request, resp *restful.Response) {
-	logdir := "/var/log"
-	http.ServeFile(resp.ResponseWriter, req.Request, logdir)
 }
 
 // TODO: needs to perform response type negotiation, this is probably the wrong way to recover panics
@@ -405,7 +375,7 @@ func AddSupportedResourcesWebService(s runtime.NegotiatedSerializer, ws *restful
 
 // handleVersion writes the server's version information.
 func handleVersion(req *restful.Request, resp *restful.Response) {
-	writeRawJSON(http.StatusOK, version.Get(), resp.ResponseWriter)
+	WriteRawJSON(http.StatusOK, version.Get(), resp.ResponseWriter)
 }
 
 // APIVersionHandler returns a handler which will list the provided versions as available.
@@ -484,7 +454,7 @@ func writeNegotiated(s runtime.NegotiatedSerializer, gv unversioned.GroupVersion
 	serializer, err := negotiateOutputSerializer(req, s)
 	if err != nil {
 		status := errToAPIStatus(err)
-		writeRawJSON(int(status.Code), status, w)
+		WriteRawJSON(int(status.Code), status, w)
 		return
 	}
 
@@ -528,8 +498,8 @@ func errorJSONFatal(err error, codec runtime.Encoder, w http.ResponseWriter) int
 	return code
 }
 
-// writeRawJSON writes a non-API object in JSON.
-func writeRawJSON(statusCode int, object interface{}, w http.ResponseWriter) {
+// WriteRawJSON writes a non-API object in JSON.
+func WriteRawJSON(statusCode int, object interface{}, w http.ResponseWriter) {
 	output, err := json.MarshalIndent(object, "", "  ")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)

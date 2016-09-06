@@ -184,6 +184,8 @@ func TestNew(t *testing.T) {
 	assert.Equal(master.MasterCount, 1)
 	assert.Equal(master.PublicReadWritePort, 6443)
 	assert.Equal(master.ServiceReadWriteIP, serviceReadWriteIP)
+	assert.Equal(master.enableUISupport, config.EnableUISupport)
+	assert.Equal(master.enableLogsSupport, config.EnableLogsSupport)
 
 	// These functions should point to the same memory location
 	masterDialer, _ := utilnet.Dialer(master.ProxyTransport)
