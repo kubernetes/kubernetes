@@ -59,17 +59,17 @@ func RetrieveTrustedClusterInfo(params *kubeadmapi.BootstrapParams) (*clientcmda
 		return nil, fmt.Errorf("<node/discovery> failed to parse response as JWS object [%s]", err)
 	}
 
-	fmt.Println("<node/discovery> cluster info object recieved, verifying signature using given token")
+	fmt.Println("<node/discovery> cluster info object received, verifying signature using given token")
 
 	output, err := object.Verify(params.Discovery.Token)
 	if err != nil {
-		return nil, fmt.Errorf("<node/discovery> failed to verify JWS signature of recieved cluster info object [%s]", err)
+		return nil, fmt.Errorf("<node/discovery> failed to verify JWS signature of received cluster info object [%s]", err)
 	}
 
 	clusterInfo := kubeadmapi.ClusterInfo{}
 
 	if err := json.Unmarshal(output, &clusterInfo); err != nil {
-		return nil, fmt.Errorf("<node/discovery> failed to unmarshal recieved cluster info object [%s]", err)
+		return nil, fmt.Errorf("<node/discovery> failed to decode received cluster info object [%s]", err)
 	}
 
 	if len(clusterInfo.CertificateAuthorities) == 0 || len(clusterInfo.Endpoints) == 0 {
@@ -77,7 +77,7 @@ func RetrieveTrustedClusterInfo(params *kubeadmapi.BootstrapParams) (*clientcmda
 	}
 
 	// TODO print checksum of the CA certificate
-	fmt.Printf("<node/discovery> cluser info signature and contents are valid, will use API endpoints %v\n", clusterInfo.Endpoints)
+	fmt.Printf("<node/discovery> cluster info signature and contents are valid, will use API endpoints %v\n", clusterInfo.Endpoints)
 
 	// TODO we need to configure the client to validate the server
 	// if it is signed by any of the returned certificates
