@@ -740,12 +740,18 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			return validation.NullSchema{}, nil
 		},
 		SwaggerSchema: func(gvk unversioned.GroupVersionKind) (*swagger.ApiDeclaration, error) {
-			version := gvk.GroupVersion()
-			client, err := clients.ClientForVersion(&version)
+			// discovery doesn't care about which groupversion you get a client for,
+			// so get whichever one you happen to have available and use that.
+			cfg, err := clients.ClientConfigForVersion(nil)
 			if err != nil {
 				return nil, err
 			}
-			return client.Discovery().SwaggerSchema(version)
+			dc, err := discovery.NewDiscoveryClientForConfig(cfg)
+			if err != nil {
+				return nil, err
+			}
+
+			return dc.SwaggerSchema(gvk.GroupVersion())
 		},
 		DefaultNamespace: func() (string, bool, error) {
 			return clientConfig.Namespace()
