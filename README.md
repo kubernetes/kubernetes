@@ -135,6 +135,9 @@ If you're interested in being a contributor and want to get involved in developi
 
 Or, if you just have an idea for a new feature, see the [Kubernetes Features](https://github.com/kubernetes/features) repository for details on how to propose it.
 
+Also, please see our [expectations](docs/devel/community-expectations.md) for members of
+the Kubernetes community.
+
 ### Support
 
 While there are many different channels that you can use to get ahold of us, you can help make sure that we are efficient in getting you the help that you need.
