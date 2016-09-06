@@ -73,7 +73,7 @@ func scalePetSet(t *testing.T, ps *apps.PetSet, psc *PetSetController, fc *fakeP
 	for i := 0; i < scale; i++ {
 		pl := fc.getPodList()
 		if len(pl) != i {
-			t.Errorf("Unexpected number of pets, expected %d found %d", i, len(fc.pets))
+			t.Errorf("Unexpected number of pets, expected %d found %d", i, len(pl))
 		}
 		if _, syncErr := psc.syncPetSet(ps, pl); syncErr != nil {
 			errs = append(errs, syncErr)
@@ -120,7 +120,7 @@ func TestPetSetControllerDeletes(t *testing.T) {
 	knownPods := fc.getPodList()
 	for i := replicas - 1; i >= 0; i-- {
 		if len(fc.pets) != i+1 {
-			t.Errorf("Unexpected number of pets, expected %d found %d", i, len(fc.pets))
+			t.Errorf("Unexpected number of pets, expected %d found %d", i+1, len(fc.pets))
 		}
 		if _, syncErr := psc.syncPetSet(ps, knownPods); syncErr != nil {
 			errs = append(errs, syncErr)
