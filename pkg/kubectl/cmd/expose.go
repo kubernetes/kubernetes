@@ -42,7 +42,7 @@ type ExposeOptions struct {
 var (
 	expose_resources = dedent.Dedent(`
 		pod (po), service (svc), replicationcontroller (rc),
-		deployment, replicaset (rs)
+		deployment (deploy), replicaset (rs)
 	`)
 
 	expose_long = dedent.Dedent(`
