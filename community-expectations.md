@@ -1,0 +1,85 @@
+## Community Expectations
+
+Kubernetes is a community project and, as such, it is wholly dependent on
+its community to provide a productive, friendly and collaborative environment.
+
+The first and foremost goal of the Kubernetes community to develop orchestration
+technology that radically simplifies the process of creating reliable
+distributed systems, however a second, equally important goal is the creation
+of a community that fosters easy, agile development of such an orcheastration
+systems.
+
+This document describes the community expectations for
+members of the Kubernetes community.  It is intended to be a living document
+that evolves as the community evolves.  It currently covers the expectations
+of conduct that govern all members of the community as well as the expectations
+around code review that govern all active contributors to Kubernetes.
+
+### Code of Conduct
+
+The most important expectation of the Kubernetes community is that all members
+abide by the Kubernetes [community code of conduct](code-of-conduct.md).
+Only by respecting each other can we develop a productive, collaborative
+community.
+
+### Code review
+
+As a community we believe in the value of code review for all contributions.
+Code review increases both the quality and readability of our codebase, which
+in turn produces high quality software.
+
+However, the code review process can also introduce latency for contributors
+and additional work for reviewers that can frustrate both parties.
+
+Consequently, as a community we expect that all active participants in the
+community will also be active reviewers.  To that end, we have set out the
+following expectations for code review:
+
+Any *active contributor* to the Kubernetes project is expected to be available
+to review code in areas where that contributor has expertise.  Active
+contributors or considered to be anyone who meets any of the following criteria:
+   * Sent more than two pull requests (PRs) in the previous one month, or more
+   than 20 PRs in the previous year.
+   * Filed more than 3 issues in the previous month, or more than 30 issues in
+   the previous year.
+   * Commented on more than 5 issues or pull requests in the previous month, or
+   more than 50 issues or pull requests in the previous year.
+   * Marked any PR as LGTM in the previous month.
+   * Have *contributor* permissions in the Kubernetes github project.
+
+In addition to these community expectations, any community member who wants to
+be an active reviewer can also add their name to an *active reviewer* file
+(location tbd) which will make them an active reviewer for as long as they
+are included in the file.
+
+#### Expectations of reviewers: Review comments
+
+Because reviewers are often the first points of contact between new members of
+the community and can significantly impact the first impression of the
+Kubernetes community, reviewers are especially important in shaping the
+Kubernetes community.  Reviewers are highly encouraged to review the
+[code of conduct](code-of-conduct.md) and are strongly encouraged to go above
+and beyond the code of conduct to promote a collaborative, respectful
+Kubernetes community.
+
+#### Expectations of reviewers: Review latency
+
+Reviewers are expected to respond in a timely fashion to PRs that are assigned
+to them.  Reviewers are expected to respond to an *active* PRs with reasonable
+latency, and if reviewers fail to respond, those PRs may be assigned to other
+reviewers.  If reviewers repeatedly fail to respond, then their own PRs (if
+they exist) will also suffer increased latency to provide an incentive for
+those reviewers to remain good stewards of a low-latency review process.
+
+*Active* PRs are considered those which have a proper CLA (`cla:yes`) label
+and do not need rebase to be merged.  PRs that do not have a proper CLA, or
+require a rebase are not considered active PRs.
+
+## Thanks
+
+Many thanks in advance to everyone who contributes their time and effort to
+making Kubernetes both a successful system as well as a successful community.
+The strength of our software shines in the strengths of each individual
+community member.  Thanks!
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/community-expectations.md?pixel)]()
