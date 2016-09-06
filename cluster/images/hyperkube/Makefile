@@ -20,7 +20,7 @@
 REGISTRY?=gcr.io/google_containers
 ARCH?=amd64
 TEMP_DIR:=$(shell mktemp -d)
-CNI_RELEASE=9d5e6e60e79491207834ae8439e80c943db65a69
+CNI_RELEASE=07a8a28637e97b22eb8dfe710eeae1344f69d16e
 
 UNAME_S:=$(shell uname -s)
 ifeq ($(UNAME_S),Darwin)

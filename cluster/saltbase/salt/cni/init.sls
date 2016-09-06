@@ -19,9 +19,9 @@ cni-tar:
     - user: root
     - name: /opt/cni
     - makedirs: True
-    - source: https://storage.googleapis.com/kubernetes-release/network-plugins/cni-9d5e6e60e79491207834ae8439e80c943db65a69.tar.gz
+    - source: https://storage.googleapis.com/kubernetes-release/network-plugins/cni-07a8a28637e97b22eb8dfe710eeae1344f69d16e.tar.gz
     - tar_options: v
-    - source_hash: md5=1ac2f8c72244f0188b8ba3d6052f9fc1
+    - source_hash: md5=dd11b04dcb0b9aca00b5287ba18dcfaa
     - archive_format: tar
     - if_missing: /opt/cni/bin
 
