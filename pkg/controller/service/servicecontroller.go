@@ -319,7 +319,7 @@ func (s *ServiceController) persistUpdate(service *api.Service) error {
 		// out so that we can process the delete, which we should soon be receiving
 		// if we haven't already.
 		if errors.IsNotFound(err) {
-			glog.Infof("Not persisting update to service '%s/%s' that no longer exists: %v",
+			glog.V(4).Infof("Not persisting update to service '%s/%s' that no longer exists: %v",
 				service.Namespace, service.Name, err)
 			return nil
 		}
@@ -632,14 +632,14 @@ func (s *ServiceController) nodeSyncLoop() {
 		s.servicesToUpdate = s.updateLoadBalancerHosts(s.servicesToUpdate, newHosts)
 		return
 	}
-	glog.Infof("Detected change in list of current cluster nodes. New node set: %v", newHosts)
+	glog.V(4).Infof("Detected change in list of current cluster nodes. New node set: %v", newHosts)
 
 	// Try updating all services, and save the ones that fail to try again next
 	// round.
 	s.servicesToUpdate = s.cache.allServices()
 	numServices := len(s.servicesToUpdate)
 	s.servicesToUpdate = s.updateLoadBalancerHosts(s.servicesToUpdate, newHosts)
-	glog.Infof("Successfully updated %d out of %d load balancers to direct traffic to the updated set of nodes",
+	glog.V(4).Infof("Successfully updated %d out of %d load balancers to direct traffic to the updated set of nodes",
 		numServices-len(s.servicesToUpdate), numServices)
 
 	s.knownHosts = newHosts

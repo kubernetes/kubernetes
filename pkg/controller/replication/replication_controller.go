@@ -319,7 +319,7 @@ func (rm *ReplicationManager) updateRC(old, cur interface{}) {
 		rm.lookupCache.InvalidateAll()
 	}
 	// TODO: Remove when #31981 is resolved!
-	glog.Infof("Observed updated replication controller %v. Desired pod count change: %d->%d", curRC.Name, oldRC.Spec.Replicas, curRC.Spec.Replicas)
+	glog.V(4).Infof("Observed updated replication controller %v. Desired pod count change: %d->%d", curRC.Name, oldRC.Spec.Replicas, curRC.Spec.Replicas)
 
 	// You might imagine that we only really need to enqueue the
 	// controller when Spec changes, but it is safer to sync any
@@ -622,14 +622,14 @@ func (rm *ReplicationManager) syncReplicationController(key string) error {
 	if !rm.podStoreSynced() {
 		// Sleep so we give the pod reflector goroutine a chance to run.
 		time.Sleep(PodStoreSyncedPollPeriod)
-		glog.Infof("Waiting for pods controller to sync, requeuing rc %v", key)
+		glog.V(4).Infof("Waiting for pods controller to sync, requeuing rc %v", key)
 		rm.queue.Add(key)
 		return nil
 	}
 
 	obj, exists, err := rm.rcStore.Indexer.GetByKey(key)
 	if !exists {
-		glog.Infof("Replication Controller has been deleted %v", key)
+		glog.V(2).Infof("Replication Controller has been deleted %v", key)
 		rm.expectations.DeleteExpectations(key)
 		return nil
 	}

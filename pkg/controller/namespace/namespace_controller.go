@@ -180,7 +180,7 @@ func (nm *NamespaceController) syncNamespaceFromKey(key string) (err error) {
 
 	obj, exists, err := nm.store.GetByKey(key)
 	if !exists {
-		glog.Infof("Namespace has been deleted %v", key)
+		glog.V(2).Infof("Namespace has been deleted %v", key)
 		return nil
 	}
 	if err != nil {

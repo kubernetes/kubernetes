@@ -252,11 +252,11 @@ func (rq *ResourceQuotaController) syncResourceQuotaFromKey(key string) (err err
 
 	obj, exists, err := rq.rqIndexer.GetByKey(key)
 	if !exists {
-		glog.Infof("Resource quota has been deleted %v", key)
+		glog.V(2).Infof("Resource quota has been deleted %v", key)
 		return nil
 	}
 	if err != nil {
-		glog.Infof("Unable to retrieve resource quota %v from store: %v", key, err)
+		glog.V(2).Infof("Unable to retrieve resource quota %v from store: %v", key, err)
 		rq.queue.Add(key)
 		return err
 	}

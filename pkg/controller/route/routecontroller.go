@@ -151,7 +151,7 @@ func (rc *RouteController) reconcile(nodes []api.Node, routes []*cloudprovider.R
 					// Ensure that we don't have more than maxConcurrentRouteCreations
 					// CreateRoute calls in flight.
 					rateLimiter <- struct{}{}
-					glog.Infof("Creating route for node %s %s with hint %s, throttled %v", nodeName, route.DestinationCIDR, nameHint, time.Now().Sub(startTime))
+					glog.V(2).Infof("Creating route for node %s %s with hint %s, throttled %v", nodeName, route.DestinationCIDR, nameHint, time.Now().Sub(startTime))
 					err := rc.routes.CreateRoute(rc.clusterName, nameHint, route)
 					<-rateLimiter
 
@@ -159,7 +159,7 @@ func (rc *RouteController) reconcile(nodes []api.Node, routes []*cloudprovider.R
 					if err != nil {
 						glog.Errorf("Could not create route %s %s for node %s after %v: %v", nameHint, route.DestinationCIDR, nodeName, time.Now().Sub(startTime), err)
 					} else {
-						glog.Infof("Created route for node %s %s with hint %s after %v", nodeName, route.DestinationCIDR, nameHint, time.Now().Sub(startTime))
+						glog.V(2).Infof("Created route for node %s %s with hint %s after %v", nodeName, route.DestinationCIDR, nameHint, time.Now().Sub(startTime))
 						return
 					}
 				}
@@ -180,11 +180,11 @@ func (rc *RouteController) reconcile(nodes []api.Node, routes []*cloudprovider.R
 				wg.Add(1)
 				// Delete the route.
 				go func(route *cloudprovider.Route, startTime time.Time) {
-					glog.Infof("Deleting route %s %s", route.Name, route.DestinationCIDR)
+					glog.V(2).Infof("Deleting route %s %s", route.Name, route.DestinationCIDR)
 					if err := rc.routes.DeleteRoute(rc.clusterName, route); err != nil {
 						glog.Errorf("Could not delete route %s %s after %v: %v", route.Name, route.DestinationCIDR, time.Now().Sub(startTime), err)
 					} else {
-						glog.Infof("Deleted route %s %s after %v", route.Name, route.DestinationCIDR, time.Now().Sub(startTime))
+						glog.V(2).Infof("Deleted route %s %s after %v", route.Name, route.DestinationCIDR, time.Now().Sub(startTime))
 					}
 					wg.Done()
 

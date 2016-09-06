@@ -96,7 +96,7 @@ func (u *unhealthyPetTracker) Get(ps *apps.PetSet, knownPets []*api.Pod) (*pcb, 
 				glog.V(4).Infof("Ignoring healthy pet %v for PetSet %v", p.Name, ps.Name)
 				continue
 			}
-			glog.Infof("No recorded blocking pet, but found unhealthy pet %v for PetSet %v", p.Name, ps.Name)
+			glog.V(2).Infof("No recorded blocking pet, but found unhealthy pet %v for PetSet %v", p.Name, ps.Name)
 			return &pcb{pod: p, parent: ps}, nil
 		}
 		return nil, nil

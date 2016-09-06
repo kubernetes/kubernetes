@@ -532,7 +532,7 @@ func (dc *DeploymentController) isScalingEvent(d *extensions.Deployment) (bool, 
 		for _, rs := range controller.FilterActiveReplicaSets(oldRSs) {
 			if updated := deploymentutil.SetReplicasAnnotations(rs, d.Spec.Replicas, d.Spec.Replicas+maxSurge); updated {
 				if _, err := dc.client.Extensions().ReplicaSets(rs.Namespace).Update(rs); err != nil {
-					glog.Infof("Cannot update annotations for replica set %q: %v", rs.Name, err)
+					glog.V(4).Infof("Cannot update annotations for replica set %q: %v", rs.Name, err)
 					return false, err
 				}
 			}
