@@ -657,27 +657,42 @@ func copyfile(src, dst string) error {
 
 // TODO(yifan): Can make rkt handle this when '--net=host'. See https://github.com/coreos/rkt/issues/2430.
 func makeHostNetworkMount(opts *kubecontainer.RunContainerOptions) (*kubecontainer.Mount, *kubecontainer.Mount, error) {
-	hostsPath := filepath.Join(opts.PodContainerDir, "etc-hosts")
-	resolvPath := filepath.Join(opts.PodContainerDir, "etc-resolv-conf")
+	mountHosts, mountResolvConf := true, true
+	for _, mnt := range opts.Mounts {
+		switch mnt.ContainerPath {
+		case "/etc/hosts":
+			mountHosts = false
+		case "/etc/resolv.conf":
+			mountResolvConf = false
+		}
+	}
 
-	if err := copyfile("/etc/hosts", hostsPath); err != nil {
-		return nil, nil, err
-	}
-	if err := copyfile("/etc/resolv.conf", resolvPath); err != nil {
-		return nil, nil, err
+	var hostsMount, resolvMount kubecontainer.Mount
+	if mountHosts {
+		hostsPath := filepath.Join(opts.PodContainerDir, "etc-hosts")
+		if err := copyfile("/etc/hosts", hostsPath); err != nil {
+			return nil, nil, err
+		}
+		hostsMount = kubecontainer.Mount{
+			Name:          "kubernetes-hostnetwork-hosts-conf",
+			ContainerPath: "/etc/hosts",
+			HostPath:      hostsPath,
+		}
+		opts.Mounts = append(opts.Mounts, hostsMount)
 	}
 
-	hostsMount := kubecontainer.Mount{
-		Name:          "kubernetes-hostnetwork-hosts-conf",
-		ContainerPath: "/etc/hosts",
-		HostPath:      hostsPath,
+	if mountResolvConf {
+		resolvPath := filepath.Join(opts.PodContainerDir, "etc-resolv-conf")
+		if err := copyfile("/etc/resolv.conf", resolvPath); err != nil {
+			return nil, nil, err
+		}
+		resolvMount = kubecontainer.Mount{
+			Name:          "kubernetes-hostnetwork-resolv-conf",
+			ContainerPath: "/etc/resolv.conf",
+			HostPath:      resolvPath,
+		}
+		opts.Mounts = append(opts.Mounts, resolvMount)
 	}
-	resolvMount := kubecontainer.Mount{
-		Name:          "kubernetes-hostnetwork-resolv-conf",
-		ContainerPath: "/etc/resolv.conf",
-		HostPath:      resolvPath,
-	}
-	opts.Mounts = append(opts.Mounts, hostsMount, resolvMount)
 	return &hostsMount, &resolvMount, nil
 }
 
