@@ -149,7 +149,7 @@ type ResourcePrinter interface {
 	HandledResources() []string
 	//Can be used to print out warning/clarifications if needed
 	//after all objects were printed
-	FinishPrint(io.Writer, string) error
+	AfterPrint(io.Writer, string) error
 }
 
 // ResourcePrinterFunc is a function that can print objects
@@ -165,7 +165,7 @@ func (fn ResourcePrinterFunc) HandledResources() []string {
 	return []string{}
 }
 
-func (fn ResourcePrinterFunc) FinishPrint(io.Writer, string) error {
+func (fn ResourcePrinterFunc) AfterPrint(io.Writer, string) error {
 	return nil
 }
 
@@ -186,7 +186,7 @@ func NewVersionedPrinter(printer ResourcePrinter, converter runtime.ObjectConver
 	}
 }
 
-func (p *VersionedPrinter) FinishPrint(w io.Writer, res string) error {
+func (p *VersionedPrinter) AfterPrint(w io.Writer, res string) error {
 	return nil
 }
 
@@ -213,7 +213,7 @@ type NamePrinter struct {
 	Typer   runtime.ObjectTyper
 }
 
-func (p *NamePrinter) FinishPrint(w io.Writer, res string) error {
+func (p *NamePrinter) AfterPrint(w io.Writer, res string) error {
 	return nil
 }
 
@@ -265,7 +265,7 @@ func (p *NamePrinter) HandledResources() []string {
 type JSONPrinter struct {
 }
 
-func (p *JSONPrinter) FinishPrint(w io.Writer, res string) error {
+func (p *JSONPrinter) AfterPrint(w io.Writer, res string) error {
 	return nil
 }
 
@@ -299,7 +299,7 @@ type YAMLPrinter struct {
 	converter runtime.ObjectConvertor
 }
 
-func (p *YAMLPrinter) FinishPrint(w io.Writer, res string) error {
+func (p *YAMLPrinter) AfterPrint(w io.Writer, res string) error {
 	return nil
 }
 
@@ -446,7 +446,7 @@ func (h *HumanReadablePrinter) HandledResources() []string {
 	return keys
 }
 
-func (h *HumanReadablePrinter) FinishPrint(output io.Writer, res string) error {
+func (h *HumanReadablePrinter) AfterPrint(output io.Writer, res string) error {
 	if !h.options.NoHeaders && !h.options.ShowAll && h.hiddenObjNum > 0 {
 		_, err := fmt.Fprintf(output, "  info: %d completed object(s) was(were) not shown in %s list. Pass --show-all to see all objects.\n\n", h.hiddenObjNum, res)
 		return err
@@ -2255,7 +2255,7 @@ func NewTemplatePrinter(tmpl []byte) (*TemplatePrinter, error) {
 	}, nil
 }
 
-func (p *TemplatePrinter) FinishPrint(w io.Writer, res string) error {
+func (p *TemplatePrinter) AfterPrint(w io.Writer, res string) error {
 	return nil
 }
 
@@ -2406,7 +2406,7 @@ func NewJSONPathPrinter(tmpl string) (*JSONPathPrinter, error) {
 	return &JSONPathPrinter{tmpl, j}, nil
 }
 
-func (j *JSONPathPrinter) FinishPrint(w io.Writer, res string) error {
+func (j *JSONPathPrinter) AfterPrint(w io.Writer, res string) error {
 	return nil
 }
 
