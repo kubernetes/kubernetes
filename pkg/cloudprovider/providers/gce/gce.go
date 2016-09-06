@@ -724,9 +724,13 @@ func (gce *GCECloud) EnsureLoadBalancer(clusterName string, apiService *api.Serv
 	// health checks. This needs to be prior to the forwarding rule deletion below otherwise it is not possible
 	// to delete just the target pool or http health checks later.
 	var hcToCreate *compute.HttpHealthCheck
-	hcExisting, _ := gce.GetHttpHealthCheck(loadBalancerName)
+	hcExisting, err := gce.GetHttpHealthCheck(loadBalancerName)
+	if err != nil && !isHTTPErrorCode(err, http.StatusNotFound) {
+		return nil, fmt.Errorf("Error checking HTTP health check %s: %v", loadBalancerName, err)
+	}
 	if path, healthCheckNodePort := apiservice.GetServiceHealthCheckPathPort(apiService); path != "" {
-		if hcExisting == nil {
+		glog.V(4).Infof("service %v needs health checks on :%d/%s)", apiService.Name, healthCheckNodePort, path)
+		if err != nil {
 			// This logic exists to detect a transition for a pre-existing service and turn on
 			// the tpNeedsUpdate flag to delete/recreate fwdrule/tpool adding the health check
 			// to the target pool.
@@ -735,14 +739,13 @@ func (gce *GCECloud) EnsureLoadBalancer(clusterName string, apiService *api.Serv
 				apiservice.AnnotationValueExternalTrafficLocal)
 			tpNeedsUpdate = true
 		}
-		glog.V(4).Infof("service %v needs health checks on :%d/%s)", apiService.Name, healthCheckNodePort, path)
 		hcToCreate, err = gce.ensureHttpHealthCheck(loadBalancerName, path, healthCheckNodePort)
 		if err != nil {
-			return nil, fmt.Errorf("Failed to create health check for localized service %v on node port %v: %v", loadBalancerName, healthCheckNodePort, err)
+			return nil, fmt.Errorf("Failed to ensure health check for localized service %v on node port %v: %v", loadBalancerName, healthCheckNodePort, err)
 		}
 	} else {
 		glog.V(4).Infof("service %v does not need health checks", apiService.Name)
-		if hcExisting != nil {
+		if err == nil {
 			glog.V(2).Infof("Deleting stale health checks for service %v LB %v", apiService.Name, loadBalancerName)
 			tpNeedsUpdate = true
 		}
@@ -1464,7 +1467,12 @@ func (gce *GCECloud) deleteTargetPool(name, region string, hc *compute.HttpHealt
 			return err
 		}
 	} else {
+		// This is a HC cleanup attempt to prevent stale HCs when errors are encountered
+		// during HC deletion in a prior pass through EnsureLoadBalancer.
+		// The HC name matches the load balancer name - normally this is expected to fail.
 		if err := gce.DeleteHttpHealthCheck(name); err == nil {
+			// We only print a warning if this deletion actually succeeded (which
+			// means there was indeed a stale health check with the LB name.
 			glog.Warningf("Deleted stale http health check for LB: %s", name)
 		}
 	}
