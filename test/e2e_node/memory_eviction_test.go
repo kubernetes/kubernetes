@@ -155,6 +155,27 @@ var _ = framework.KubeDescribe("MemoryEviction [Slow] [Serial] [Disruptive]", fu
 
 				glog.Infof("pod phase: guaranteed: %v, burstable: %v, besteffort: %v", gteedPh, burstPh, bestPh)
 
+				// NOTE/TODO(mtaufen): This should help us debug why burstable appears to fail before besteffort in some
+				//                     scenarios. We have seen some evidence that the eviction manager has in fact done the
+				//                     right thing and evicted the besteffort first, and attempted to change the besteffort phase
+				//                     to "Failed" when it evicts it, but that for some reason the test isn't seeing the updated
+				//                     phase. I'm trying to confirm or deny this.
+				//                     The eviction manager starts trying to evict things when the node comes under memory
+				//                     pressure, and the eviction manager reports this information in the pressure condition. If we
+				//                     see the eviction manager reporting a pressure condition for a while without the besteffort failing,
+				//                     and we see that the manager did in fact evict the besteffort (this should be in the Kubelet log), we
+				//                     will have more reason to believe the phase is out of date.
+				nodeList, err := f.Client.Nodes().List(api.ListOptions{})
+				if err != nil {
+					glog.Errorf("tried to get node list but got error: %v", err)
+				}
+				if len(nodeList.Items) != 1 {
+					glog.Errorf("expected 1 node, but see %d. List: %v", len(nodeList.Items), nodeList.Items)
+				}
+				node := nodeList.Items[0]
+				_, pressure := api.GetNodeCondition(&node.Status, api.NodeMemoryPressure)
+				glog.Infof("node pressure condition: %s", pressure)
+
 				if bestPh == api.PodRunning {
 					Expect(burstPh).NotTo(Equal(api.PodFailed), "burstable pod failed before best effort pod")
 					Expect(gteedPh).NotTo(Equal(api.PodFailed), "guaranteed pod failed before best effort pod")
