@@ -16,4 +16,5 @@ limitations under the License.
 
 // +k8s:deepcopy-gen=package,register
 
+// +groupName=certificates.k8s.io
 package certificates

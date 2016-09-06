@@ -1600,11 +1600,12 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 	invalidSysctlPattern := validPSP()
 	invalidSysctlPattern.Annotations[extensions.SysctlsPodSecurityPolicyAnnotationKey] = "a.*.b"
 
-	errorCases := map[string]struct {
+	type testCase struct {
 		psp         *extensions.PodSecurityPolicy
 		errorType   field.ErrorType
 		errorDetail string
-	}{
+	}
+	errorCases := map[string]testCase{
 		"no user options": {
 			psp:         noUserOptions,
 			errorType:   field.ErrorTypeNotSupported,
@@ -1704,10 +1705,33 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 			continue
 		}
 		if errs[0].Type != v.errorType {
-			t.Errorf("%s received an unexpected error type.  Expected: %v got: %v", k, v.errorType, errs[0].Type)
+			t.Errorf("[%s] received an unexpected error type.  Expected: '%s' got: '%s'", k, v.errorType, errs[0].Type)
 		}
 		if errs[0].Detail != v.errorDetail {
-			t.Errorf("%s received an unexpected error detail.  Expected %v got: %v", k, v.errorDetail, errs[0].Detail)
+			t.Errorf("[%s] received an unexpected error detail.  Expected '%s' got: '%s'", k, v.errorDetail, errs[0].Detail)
+		}
+	}
+
+	// Update error is different for 'missing object meta name'.
+	errorCases["missing object meta name"] = testCase{
+		psp:         errorCases["missing object meta name"].psp,
+		errorType:   field.ErrorTypeInvalid,
+		errorDetail: "field is immutable",
+	}
+
+	// Should not be able to update to an invalid policy.
+	for k, v := range errorCases {
+		v.psp.ResourceVersion = "444" // Required for updates.
+		errs := ValidatePodSecurityPolicyUpdate(validPSP(), v.psp)
+		if len(errs) == 0 {
+			t.Errorf("[%s] expected update errors but got none", k)
+			continue
+		}
+		if errs[0].Type != v.errorType {
+			t.Errorf("[%s] received an unexpected error type.  Expected: '%s' got: '%s'", k, v.errorType, errs[0].Type)
+		}
+		if errs[0].Detail != v.errorDetail {
+			t.Errorf("[%s] received an unexpected error detail.  Expected '%s' got: '%s'", k, v.errorDetail, errs[0].Detail)
 		}
 	}
 
@@ -1769,6 +1793,12 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 	for k, v := range successCases {
 		if errs := ValidatePodSecurityPolicy(v.psp); len(errs) != 0 {
 			t.Errorf("Expected success for %s, got %v", k, errs)
+		}
+
+		// Should be able to update to a valid PSP.
+		v.psp.ResourceVersion = "444" // Required for updates.
+		if errs := ValidatePodSecurityPolicyUpdate(validPSP(), v.psp); len(errs) != 0 {
+			t.Errorf("Expected success for %s update, got %v", k, errs)
 		}
 	}
 }

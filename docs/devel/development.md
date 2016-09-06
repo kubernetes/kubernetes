@@ -61,10 +61,11 @@ source control system). Use `apt-get install mercurial` or `yum install
 mercurial` on Linux, or [brew.sh](http://brew.sh) on OS X, or download directly
 from mercurial.
 
-Install godep (may require sudo):
+Install godep and go-bindata (may require sudo):
 
 ```sh
 go get -u github.com/tools/godep
+go get -u github.com/jteeuwen/go-bindata/go-bindata
 ```
 
 Note:

@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/eventsink"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
 	api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	kube_release_1_4 "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4"
@@ -363,7 +364,12 @@ func (nc *NamespaceController) delete(namespace *api_v1.Namespace) {
 	// TODO: What about namespaces in subclusters ???
 	err := nc.federatedApiClient.Core().Namespaces().Delete(updatedNamespace.Name, &api.DeleteOptions{})
 	if err != nil {
-		glog.Errorf("Failed to delete namespace %s: %v", namespace.Name, err)
-		nc.deliverNamespace(namespace.Name, 0, true)
+		// Its all good if the error is not found error. That means it is deleted already and we do not have to do anything.
+		// This is expected when we are processing an update as a result of namespace finalizer deletion.
+		// The process that deleted the last finalizer is also going to delete the namespace and we do not have to do anything.
+		if !errors.IsNotFound(err) {
+			glog.Errorf("Failed to delete namespace %s: %v", namespace.Name, err)
+			nc.deliverNamespace(namespace.Name, 0, true)
+		}
 	}
 }

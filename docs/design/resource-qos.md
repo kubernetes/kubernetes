@@ -199,7 +199,7 @@ Pod OOM score configuration
   - OOM_SCORE_ADJ: -998
 *Kubelet, Docker*
   - OOM_SCORE_ADJ: -999 (won’t be OOM killed)
-  - Hack, because these critical tasks might die if they conflict with guaranteed containers. in the future, we should place all user-pods into a separate cgroup, and set a limit on the memory they can consume.
+  - Hack, because these critical tasks might die if they conflict with guaranteed containers. In the future, we should place all user-pods into a separate cgroup, and set a limit on the memory they can consume.
 
 ## Known issues and possible improvements
 

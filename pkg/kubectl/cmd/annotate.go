@@ -21,8 +21,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"regexp"
-	"strings"
 
 	"github.com/golang/glog"
 	"github.com/renstrom/dedent"
@@ -60,12 +58,6 @@ type AnnotateOptions struct {
 }
 
 var (
-	annotate_resources = `
-  pod (po), service (svc), replicationcontroller (rc),
-  node (no), event (ev), componentstatuse (cs),
-  limitrange (limits), persistentvolume (pv), persistentvolumeclaim (pvc),
-  horizontalpodautoscaler (hpa), resourcequota (quota), secret`
-
 	annotate_long = dedent.Dedent(`
 		Update the annotations on one or more resources.
 
@@ -74,7 +66,7 @@ var (
 		If --overwrite is true, then existing annotations can be overwritten, otherwise attempting to overwrite an annotation will result in an error.
 		If --resource-version is specified, then updates will use this resource version, otherwise the existing resource-version will be used.
 
-		Possible resources include (case insensitive):`) + annotate_resources
+		`) + valid_resources
 
 	annotate_example = dedent.Dedent(`
 		# Update pod 'foo' with the annotation 'description' and the value 'my frontend'.
@@ -102,9 +94,12 @@ func NewCmdAnnotate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &AnnotateOptions{}
 
 	validArgs, argAliases := []string{}, []string{}
-	resources := regexp.MustCompile(`\s*,`).Split(annotate_resources, -1)
-	for _, r := range resources {
-		validArgs = append(validArgs, strings.Fields(r)[0])
+	p, err := f.Printer(nil, kubectl.PrintOptions{
+		ColumnLabels: []string{},
+	})
+	cmdutil.CheckErr(err)
+	if p != nil {
+		validArgs = p.HandledResources()
 		argAliases = kubectl.ResourceAliases(validArgs)
 	}
 

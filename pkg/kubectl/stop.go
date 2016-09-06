@@ -367,7 +367,7 @@ func (reaper *PetSetReaper) Stop(namespace, name string, timeout time.Duration, 
 	}
 
 	// TODO: Cleanup volumes? We don't want to accidentally delete volumes from
-	// stop, so just leave this up to the the petset.
+	// stop, so just leave this up to the petset.
 	return petsets.Delete(name, nil)
 }
 

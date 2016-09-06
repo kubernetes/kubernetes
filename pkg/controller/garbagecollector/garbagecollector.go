@@ -581,6 +581,9 @@ func (gc *GarbageCollector) worker() {
 	err := gc.processItem(timedItem.Object.(*node))
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("Error syncing item %#v: %v", timedItem.Object, err))
+		// retry if garbage collection of an object failed.
+		gc.dirtyQueue.Add(timedItem)
+		return
 	}
 	DirtyProcessingLatency.Observe(sinceInMicroseconds(gc.clock, timedItem.StartTime))
 }

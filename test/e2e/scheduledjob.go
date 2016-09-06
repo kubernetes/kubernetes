@@ -275,8 +275,11 @@ func waitForJobReplaced(c *client.Client, ns, previousJobName string) error {
 		if err != nil {
 			return false, err
 		}
-		if len(jobs.Items) != 1 {
-			return false, fmt.Errorf("More than one job is running")
+		if len(jobs.Items) > 1 {
+			return false, fmt.Errorf("More than one job is running %+v", jobs.Items)
+		} else if len(jobs.Items) == 0 {
+			framework.Logf("Warning: Found 0 jobs in namespace %v", ns)
+			return false, nil
 		}
 		return jobs.Items[0].Name != previousJobName, nil
 	})

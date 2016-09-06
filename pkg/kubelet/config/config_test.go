@@ -296,7 +296,7 @@ func TestNewPodAddedSetReconciled(t *testing.T) {
 	// before touching to avoid data race.
 	newTestPods := func(touchStatus, touchSpec bool) ([]*api.Pod, *api.Pod) {
 		pods := []*api.Pod{
-			CreateValidPod("changable-pod-0", "new"),
+			CreateValidPod("changeable-pod-0", "new"),
 			CreateValidPod("constant-pod-1", "new"),
 			CreateValidPod("constant-pod-2", "new"),
 		}

@@ -541,24 +541,48 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 
 			By("Waiting for Redis master to start.")
 			waitForOrFailWithDebug(1)
+
 			// Pod
-			forEachPod(func(pod api.Pod) {
-				output := framework.RunKubectlOrDie("describe", "pod", pod.Name, nsFlag)
-				requiredStrings := [][]string{
-					{"Name:", "redis-master-"},
-					{"Namespace:", ns},
-					{"Node:"},
-					{"Labels:", "app=redis"},
-					{"role=master"},
-					{"Status:", "Running"},
-					{"IP:"},
-					{"Controllers:", "ReplicationController/redis-master"},
-					{"Image:", redisImage},
-					{"State:", "Running"},
-					{"QoS Class:", "BestEffort"},
-				}
-				checkOutput(output, requiredStrings)
-			})
+			// this is terrible but we want 1.4.0 alpha to count as well
+			classVersion, err := framework.KubectlVersionGTE(version.MustParse("v1.4.0-alpha"))
+			Expect(err).NotTo(HaveOccurred())
+			if classVersion {
+				forEachPod(func(pod api.Pod) {
+					output := framework.RunKubectlOrDie("describe", "pod", pod.Name, nsFlag)
+					requiredStrings := [][]string{
+						{"Name:", "redis-master-"},
+						{"Namespace:", ns},
+						{"Node:"},
+						{"Labels:", "app=redis"},
+						{"role=master"},
+						{"Status:", "Running"},
+						{"IP:"},
+						{"Controllers:", "ReplicationController/redis-master"},
+						{"Image:", redisImage},
+						{"State:", "Running"},
+						{"QoS Class:", "BestEffort"},
+					}
+					checkOutput(output, requiredStrings)
+				})
+			} else {
+				forEachPod(func(pod api.Pod) {
+					output := framework.RunKubectlOrDie("describe", "pod", pod.Name, nsFlag)
+					requiredStrings := [][]string{
+						{"Name:", "redis-master-"},
+						{"Namespace:", ns},
+						{"Node:"},
+						{"Labels:", "app=redis"},
+						{"role=master"},
+						{"Status:", "Running"},
+						{"IP:"},
+						{"Controllers:", "ReplicationController/redis-master"},
+						{"Image:", redisImage},
+						{"State:", "Running"},
+						{"QoS Tier:", "BestEffort"},
+					}
+					checkOutput(output, requiredStrings)
+				})
+			}
 
 			// Rc
 			output := framework.RunKubectlOrDie("describe", "rc", "redis-master", nsFlag)
@@ -652,10 +676,15 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 				err := wait.Poll(framework.Poll, timeout, func() (bool, error) {
 					endpoints, err := c.Endpoints(ns).Get(name)
 					if err != nil {
-						if apierrs.IsNotFound(err) {
+						// log the real error
+						framework.Logf("Get endpoints failed (interval %v): %v", framework.Poll, err)
+
+						// if the error is API not found or could not find default credentials or TLS handshake timeout, try again
+						if apierrs.IsNotFound(err) ||
+							apierrs.IsUnauthorized(err) ||
+							apierrs.IsServerTimeout(err) {
 							err = nil
 						}
-						framework.Logf("Get endpoints failed (interval %v): %v", framework.Poll, err)
 						return false, err
 					}
 
@@ -987,7 +1016,17 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 		})
 
 		AfterEach(func() {
-			framework.RunKubectlOrDie("delete", "deployment", dName, nsFlag)
+			err := wait.Poll(framework.Poll, 2*time.Minute, func() (bool, error) {
+				out, err := framework.RunKubectl("delete", "deployment", dName, nsFlag)
+				if err != nil {
+					if strings.Contains(err.Error(), "could not find default credentials") {
+						err = nil
+					}
+					return false, fmt.Errorf("kubectl delete failed output: %s, err: %v", out, err)
+				}
+				return true, nil
+			})
+			Expect(err).NotTo(HaveOccurred())
 		})
 
 		It("should create a deployment from an image [Conformance]", func() {

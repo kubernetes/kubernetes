@@ -56,7 +56,7 @@ func TestParallelPuller(t *testing.T) {
 			pullerErr:       nil,
 			expectedErr:     []error{nil}},
 
-		{ // image present, dont pull
+		{ // image present, don't pull
 			containerImage:  "present_image",
 			policy:          api.PullIfNotPresent,
 			calledFunctions: []string{"IsImagePresent"},

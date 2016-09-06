@@ -43,7 +43,7 @@ spec:
           livenessProbe:
             httpGet:
               path: /healthz
-              port: 8080
+              port: 8082
               scheme: HTTP
             initialDelaySeconds: 180
             timeoutSeconds: 5
@@ -58,7 +58,7 @@ spec:
           command:
             - /heapster
             - --source=kubernetes.summary_api:''
-        - image: gcr.io/google_containers/addon-resizer:1.5
+        - image: gcr.io/google_containers/addon-resizer:1.6
           name: heapster-nanny
           resources:
             limits:

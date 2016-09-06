@@ -8,6 +8,7 @@ algorithm-provider
 all-namespaces
 allocate-node-cidrs
 allow-privileged
+allowed-not-ready-nodes
 api-burst
 api-prefix
 api-rate

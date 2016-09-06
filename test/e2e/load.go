@@ -149,6 +149,7 @@ var _ = framework.KubeDescribe("Load capacity", func() {
 					_, err := c.Services(service.Namespace).Create(service)
 					framework.ExpectNoError(err)
 				}
+				framework.Logf("%v Services created.", len(services))
 			} else {
 				framework.Logf("Skipping service creation")
 			}
@@ -168,6 +169,7 @@ var _ = framework.KubeDescribe("Load capacity", func() {
 			// to make it possible to create/schedule them in the meantime.
 			// Currently we assume <throughput> pods/second average throughput.
 			// We may want to revisit it in the future.
+			framework.Logf("Starting to create ReplicationControllers...")
 			creatingTime := time.Duration(totalPods/throughput) * time.Second
 			createAllRC(configs, creatingTime)
 			By("============================================================================")
@@ -177,9 +179,11 @@ var _ = framework.KubeDescribe("Load capacity", func() {
 			// Currently we assume that <throughput> pods/second average throughput.
 			// The expected number of created/deleted pods is less than totalPods/3.
 			scalingTime := time.Duration(totalPods/(3*throughput)) * time.Second
+			framework.Logf("Starting to scale ReplicationControllers first time...")
 			scaleAllRC(configs, scalingTime)
 			By("============================================================================")
 
+			framework.Logf("Starting to scale ReplicationControllers second time...")
 			scaleAllRC(configs, scalingTime)
 			By("============================================================================")
 
@@ -187,13 +191,15 @@ var _ = framework.KubeDescribe("Load capacity", func() {
 			// Currently we assume <throughput> pods/second average deletion throughput.
 			// We may want to revisit it in the future.
 			deletingTime := time.Duration(totalPods/throughput) * time.Second
+			framework.Logf("Starting to delete ReplicationControllers...")
 			deleteAllRC(configs, deletingTime)
 			if createServices == "true" {
+				framework.Logf("Starting to delete services...")
 				for _, service := range services {
 					err := c.Services(ns).Delete(service.Name)
 					framework.ExpectNoError(err)
 				}
-				framework.Logf("%v Services created.", len(services))
+				framework.Logf("Services deleted")
 			}
 		})
 	}

@@ -47,7 +47,7 @@ spec:
           livenessProbe:
             httpGet:
               path: /healthz
-              port: 8080
+              port: 8082
               scheme: HTTP
             initialDelaySeconds: 180
             timeoutSeconds: 5
@@ -86,7 +86,7 @@ spec:
             - name: ssl-certs
               mountPath: /etc/ssl/certs
               readOnly: true
-        - image: gcr.io/google_containers/addon-resizer:1.5
+        - image: gcr.io/google_containers/addon-resizer:1.6
           name: heapster-nanny
           resources:
             limits:
@@ -115,7 +115,7 @@ spec:
             - --container=heapster
             - --poll-period=300000
             - --estimator=exponential
-        - image: gcr.io/google_containers/addon-resizer:1.5
+        - image: gcr.io/google_containers/addon-resizer:1.6
           name: eventer-nanny
           resources:
             limits:

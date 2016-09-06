@@ -122,7 +122,7 @@ type HPAScaleTest struct {
 // The second state change (optional) is due to the CPU burst parameter, which HPA again responds to.
 // TODO The use of 3 states is arbitrary, we could eventually make this test handle "n" states once this test stabilizes.
 func (scaleTest *HPAScaleTest) run(name, kind string, rc *ResourceConsumer, f *framework.Framework) {
-	rc = NewDynamicResourceConsumer(name, kind, int(scaleTest.initPods), int(scaleTest.totalInitialCPUUsage), 0, 0, scaleTest.perPodCPURequest, 100, f)
+	rc = NewDynamicResourceConsumer(name, kind, int(scaleTest.initPods), int(scaleTest.totalInitialCPUUsage), 0, 0, scaleTest.perPodCPURequest, 200, f)
 	defer rc.CleanUp()
 	createCPUHorizontalPodAutoscaler(rc, scaleTest.targetCPUUtilizationPercent, scaleTest.minPods, scaleTest.maxPods)
 	rc.WaitForReplicas(int(scaleTest.firstScale))

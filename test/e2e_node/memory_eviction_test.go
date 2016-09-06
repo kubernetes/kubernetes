@@ -37,66 +37,9 @@ var _ = framework.KubeDescribe("MemoryEviction [Slow] [Serial] [Disruptive]", fu
 	f := framework.NewDefaultFramework("eviction-test")
 
 	Context("when there is memory pressure", func() {
-		It("should evict pods in the correct order (besteffort first, then burstable, then guaranteed)", func() {
-			By("creating a guaranteed pod, a burstable pod, and a besteffort pod.")
-
-			// A pod is guaranteed only when requests and limits are specified for all the containers and they are equal.
-			guaranteed := createMemhogPod(f, "guaranteed-", "guaranteed", api.ResourceRequirements{
-				Requests: api.ResourceList{
-					"cpu":    resource.MustParse("100m"),
-					"memory": resource.MustParse("100Mi"),
-				},
-				Limits: api.ResourceList{
-					"cpu":    resource.MustParse("100m"),
-					"memory": resource.MustParse("100Mi"),
-				}})
-
-			// A pod is burstable if limits and requests do not match across all containers.
-			burstable := createMemhogPod(f, "burstable-", "burstable", api.ResourceRequirements{
-				Requests: api.ResourceList{
-					"cpu":    resource.MustParse("100m"),
-					"memory": resource.MustParse("100Mi"),
-				}})
-
-			// A pod is besteffort if none of its containers have specified any requests or limits.
-			besteffort := createMemhogPod(f, "besteffort-", "besteffort", api.ResourceRequirements{})
-
-			// We poll until timeout or all pods are killed.
-			// Inside the func, we check that all pods are in a valid phase with
-			// respect to the eviction order of best effort, then burstable, then guaranteed.
-			By("polling the Status.Phase of each pod and checking for violations of the eviction order.")
-			Eventually(func() error {
-
-				gteed, gtErr := f.Client.Pods(f.Namespace.Name).Get(guaranteed.Name)
-				framework.ExpectNoError(gtErr, fmt.Sprintf("getting pod %s", guaranteed.Name))
-				gteedPh := gteed.Status.Phase
-
-				burst, buErr := f.Client.Pods(f.Namespace.Name).Get(burstable.Name)
-				framework.ExpectNoError(buErr, fmt.Sprintf("getting pod %s", burstable.Name))
-				burstPh := burst.Status.Phase
-
-				best, beErr := f.Client.Pods(f.Namespace.Name).Get(besteffort.Name)
-				framework.ExpectNoError(beErr, fmt.Sprintf("getting pod %s", besteffort.Name))
-				bestPh := best.Status.Phase
-
-				glog.Infof("pod phase: guaranteed: %v, burstable: %v, besteffort: %v", gteedPh, burstPh, bestPh)
-
-				if bestPh == api.PodRunning {
-					Expect(burstPh).NotTo(Equal(api.PodFailed), "burstable pod failed before best effort pod")
-					Expect(gteedPh).NotTo(Equal(api.PodFailed), "guaranteed pod failed before best effort pod")
-				} else if burstPh == api.PodRunning {
-					Expect(gteedPh).NotTo(Equal(api.PodFailed), "guaranteed pod failed before burstable pod")
-				}
-
-				// When both besteffort and burstable have been evicted, the test has completed.
-				if bestPh == api.PodFailed && burstPh == api.PodFailed {
-					return nil
-				}
-				return fmt.Errorf("besteffort and burstable have not yet both been evicted.")
-
-			}, 60*time.Minute, 5*time.Second).Should(BeNil())
-
+		AfterEach(func() {
 			// Wait for the memory pressure condition to disappear from the node status before continuing.
+			By("waiting for the memory pressure condition on the node to disappear before ending the test.")
 			Eventually(func() error {
 				nodeList, err := f.Client.Nodes().List(api.ListOptions{})
 				if err != nil {
@@ -166,6 +109,67 @@ var _ = framework.KubeDescribe("MemoryEviction [Slow] [Serial] [Disruptive]", fu
 					},
 				},
 			})
+		})
+
+		It("should evict pods in the correct order (besteffort first, then burstable, then guaranteed)", func() {
+			By("creating a guaranteed pod, a burstable pod, and a besteffort pod.")
+
+			// A pod is guaranteed only when requests and limits are specified for all the containers and they are equal.
+			guaranteed := createMemhogPod(f, "guaranteed-", "guaranteed", api.ResourceRequirements{
+				Requests: api.ResourceList{
+					"cpu":    resource.MustParse("100m"),
+					"memory": resource.MustParse("100Mi"),
+				},
+				Limits: api.ResourceList{
+					"cpu":    resource.MustParse("100m"),
+					"memory": resource.MustParse("100Mi"),
+				}})
+
+			// A pod is burstable if limits and requests do not match across all containers.
+			burstable := createMemhogPod(f, "burstable-", "burstable", api.ResourceRequirements{
+				Requests: api.ResourceList{
+					"cpu":    resource.MustParse("100m"),
+					"memory": resource.MustParse("100Mi"),
+				}})
+
+			// A pod is besteffort if none of its containers have specified any requests or limits.
+			besteffort := createMemhogPod(f, "besteffort-", "besteffort", api.ResourceRequirements{})
+
+			// We poll until timeout or all pods are killed.
+			// Inside the func, we check that all pods are in a valid phase with
+			// respect to the eviction order of best effort, then burstable, then guaranteed.
+			By("polling the Status.Phase of each pod and checking for violations of the eviction order.")
+			Eventually(func() error {
+
+				gteed, gtErr := f.Client.Pods(f.Namespace.Name).Get(guaranteed.Name)
+				framework.ExpectNoError(gtErr, fmt.Sprintf("getting pod %s", guaranteed.Name))
+				gteedPh := gteed.Status.Phase
+
+				burst, buErr := f.Client.Pods(f.Namespace.Name).Get(burstable.Name)
+				framework.ExpectNoError(buErr, fmt.Sprintf("getting pod %s", burstable.Name))
+				burstPh := burst.Status.Phase
+
+				best, beErr := f.Client.Pods(f.Namespace.Name).Get(besteffort.Name)
+				framework.ExpectNoError(beErr, fmt.Sprintf("getting pod %s", besteffort.Name))
+				bestPh := best.Status.Phase
+
+				glog.Infof("pod phase: guaranteed: %v, burstable: %v, besteffort: %v", gteedPh, burstPh, bestPh)
+
+				if bestPh == api.PodRunning {
+					Expect(burstPh).NotTo(Equal(api.PodFailed), "burstable pod failed before best effort pod")
+					Expect(gteedPh).NotTo(Equal(api.PodFailed), "guaranteed pod failed before best effort pod")
+				} else if burstPh == api.PodRunning {
+					Expect(gteedPh).NotTo(Equal(api.PodFailed), "guaranteed pod failed before burstable pod")
+				}
+
+				// When both besteffort and burstable have been evicted, the test has completed.
+				if bestPh == api.PodFailed && burstPh == api.PodFailed {
+					return nil
+				}
+				return fmt.Errorf("besteffort and burstable have not yet both been evicted.")
+
+			}, 60*time.Minute, 5*time.Second).Should(BeNil())
+
 		})
 	})
 })

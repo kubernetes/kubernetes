@@ -708,20 +708,10 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *api.Node, ds *exte
 	nodeInfo.SetNode(node)
 	fit, reasons, err := predicates.GeneralPredicates(newPod, nil, nodeInfo)
 	if err != nil {
-		glog.Warningf("GeneralPredicates failed on pod %s due to unexpected error: %v", newPod.Name, err)
+		glog.Warningf("GeneralPredicates failed on ds '%s/%s' due to unexpected error: %v", ds.ObjectMeta.Namespace, ds.ObjectMeta.Name, err)
 	}
 	for _, r := range reasons {
-		glog.V(2).Infof("GeneralPredicates failed on pod %s for reason: %v", newPod.Name, r.GetReason())
-	}
-	if !fit {
-		return false
-	}
-	fit, reasons, err = predicates.PodToleratesNodeTaints(newPod, predicates.PredicateMetadata(newPod, nil), nodeInfo)
-	if err != nil {
-		glog.Warningf("PodToleratesNodeTaints failed on pod %s due to unexpected error: %v", newPod.Name, err)
-	}
-	for _, r := range reasons {
-		glog.V(2).Infof("PodToleratesNodeTaints failed on pod %s for reason: %v", newPod.Name, r.GetReason())
+		glog.V(4).Infof("GeneralPredicates failed on ds '%s/%s' for reason: %v", ds.ObjectMeta.Namespace, ds.ObjectMeta.Name, r.GetReason())
 	}
 	return fit
 }

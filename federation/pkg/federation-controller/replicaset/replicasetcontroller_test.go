@@ -77,7 +77,7 @@ func TestReplicaSetController(t *testing.T) {
 	replicaSetReviewDelay = 10 * time.Millisecond
 	clusterAvailableDelay = 20 * time.Millisecond
 	clusterUnavailableDelay = 60 * time.Millisecond
-	allReplicaSetReviewDealy = 120 * time.Millisecond
+	allReplicaSetReviewDelay = 120 * time.Millisecond
 
 	fedclientset := fedclientfake.NewSimpleClientset()
 	fedrswatch := watch.NewFake()

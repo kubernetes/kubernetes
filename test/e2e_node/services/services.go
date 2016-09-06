@@ -88,6 +88,7 @@ func (e *E2EServices) Start() error {
 		"--manifest-path", framework.TestContext.ManifestPath,
 		"--eviction-hard", framework.TestContext.EvictionHard,
 		"--logtostderr",
+		"--vmodule=*=4",
 	)
 	e.services = newServer("services", startCmd, nil, nil, getHealthCheckURLs(), servicesLogFile, false)
 	return e.services.start()
@@ -242,7 +243,7 @@ func (es *e2eService) getLogFiles() {
 			if err != nil {
 				glog.Errorf("failed to get %q from journald: %v, %v", targetFileName, string(out), err)
 			} else {
-				if err = ioutil.WriteFile(targetLink, out, 0755); err != nil {
+				if err = ioutil.WriteFile(targetLink, out, 0644); err != nil {
 					glog.Errorf("failed to write logs to %q: %v", targetLink, err)
 				}
 			}

@@ -73,7 +73,7 @@ APISERVER_PID=$!
 kube::util::wait_for_url "${API_HOST}:${API_PORT}/healthz" "apiserver: "
 
 SWAGGER_API_PATH="${API_HOST}:${API_PORT}/swaggerapi/"
-DEFAULT_GROUP_VERSIONS="v1 apps/v1alpha1 authentication.k8s.io/v1beta1 authorization.k8s.io/v1beta1 autoscaling/v1 batch/v1 batch/v2alpha1 extensions/v1beta1 certificates/v1alpha1 policy/v1alpha1 rbac.authorization.k8s.io/v1alpha1"
+DEFAULT_GROUP_VERSIONS="v1 apps/v1alpha1 authentication.k8s.io/v1beta1 authorization.k8s.io/v1beta1 autoscaling/v1 batch/v1 batch/v2alpha1 extensions/v1beta1 certificates.k8s.io/v1alpha1 policy/v1alpha1 rbac.authorization.k8s.io/v1alpha1"
 VERSIONS=${VERSIONS:-$DEFAULT_GROUP_VERSIONS}
 
 kube::log::status "Updating " ${SWAGGER_ROOT_DIR}

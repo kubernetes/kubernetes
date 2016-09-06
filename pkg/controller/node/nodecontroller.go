@@ -73,6 +73,8 @@ const (
 	evictionRateLimiterBurst = 1
 	// The amount of time the nodecontroller polls on the list nodes endpoint.
 	apiserverStartupGracePeriod = 10 * time.Minute
+	// The amount of time the nodecontroller should sleep between retrying NodeStatus updates
+	retrySleepTime = 20 * time.Millisecond
 )
 
 type zoneState string
@@ -388,7 +390,7 @@ func (nc *NodeController) Run() {
 	go nc.podController.Run(wait.NeverStop)
 	go nc.daemonSetController.Run(wait.NeverStop)
 	if nc.internalPodInformer != nil {
-		nc.internalPodInformer.Run(wait.NeverStop)
+		go nc.internalPodInformer.Run(wait.NeverStop)
 	}
 
 	// Incorporate the results of node status pushed from kubelet to master.
@@ -486,7 +488,10 @@ func (nc *NodeController) Run() {
 // post "NodeReady==ConditionUnknown". It also evicts all pods if node is not ready or
 // not reachable for a long period of time.
 func (nc *NodeController) monitorNodeStatus() error {
-	nodes, err := nc.kubeClient.Core().Nodes().List(api.ListOptions{})
+	// It is enough to list Nodes from apiserver, since we can tolerate some small
+	// delays comparing to state from etcd and there is eventual consistency anyway.
+	// TODO: We should list them from local cache: nodeStore.
+	nodes, err := nc.kubeClient.Core().Nodes().List(api.ListOptions{ResourceVersion: "0"})
 	if err != nil {
 		return err
 	}
@@ -535,6 +540,7 @@ func (nc *NodeController) monitorNodeStatus() error {
 				glog.Errorf("Failed while getting a Node to retry updating NodeStatus. Probably Node %s was deleted.", name)
 				break
 			}
+			time.Sleep(retrySleepTime)
 		}
 		if err != nil {
 			glog.Errorf("Update status  of Node %v from NodeController exceeds retry count."+

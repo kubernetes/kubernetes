@@ -19,6 +19,7 @@ package framework
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -38,6 +39,7 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+	"text/tabwriter"
 	"time"
 
 	"k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_4"
@@ -161,6 +163,10 @@ const (
 
 	// Number of times we want to retry Updates in case of conflict
 	UpdateRetries = 5
+
+	// Number of objects that gc can delete in a second.
+	// GC issues 2 requestes for single delete.
+	gcThroughput = 10
 )
 
 var (
@@ -482,6 +488,30 @@ func logPodStates(pods []api.Pod) {
 	Logf("") // Final empty line helps for readability.
 }
 
+// errorBadPodsStates create error message of basic info of bad pods for debugging.
+func errorBadPodsStates(badPods []api.Pod, desiredPods int, ns string, timeout time.Duration) string {
+	errStr := fmt.Sprintf("%d / %d pods in namespace %q are NOT in the desired state in %v\n", len(badPods), desiredPods, ns, timeout)
+	// Pirnt bad pods info only if there are fewer than 10 bad pods
+	if len(badPods) > 10 {
+		return errStr + "There are too many bad pods. Please check log for details."
+	}
+
+	buf := bytes.NewBuffer(nil)
+	w := tabwriter.NewWriter(buf, 0, 0, 1, ' ', 0)
+	fmt.Fprintln(w, "POD\tNODE\tPHASE\tGRACE\tCONDITIONS")
+	for _, badPod := range badPods {
+		grace := ""
+		if badPod.DeletionGracePeriodSeconds != nil {
+			grace = fmt.Sprintf("%ds", *badPod.DeletionGracePeriodSeconds)
+		}
+		podInfo := fmt.Sprintf("%s\t%s\t%s\t%s\t%s",
+			badPod.ObjectMeta.Name, badPod.Spec.NodeName, badPod.Status.Phase, grace, badPod.Status.Conditions)
+		fmt.Fprintln(w, podInfo)
+	}
+	w.Flush()
+	return errStr + buf.String()
+}
+
 // PodRunningReady checks whether pod p's phase is running and it has a ready
 // condition of status true.
 func PodRunningReady(p *api.Pod) (bool, error) {
@@ -586,6 +616,8 @@ func WaitForPodsRunningReady(c *client.Client, ns string, minPods int32, timeout
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	var waitForSuccessError error
+	badPods := []api.Pod{}
+	desiredPods := 0
 	go func() {
 		waitForSuccessError = WaitForPodsSuccess(c, ns, ignoreLabels, timeout)
 		wg.Done()
@@ -610,7 +642,9 @@ func WaitForPodsRunningReady(c *client.Client, ns string, minPods int32, timeout
 			Logf("Error getting pods in namespace '%s': %v", ns, err)
 			return false, nil
 		}
-		nOk, replicaOk, badPods := int32(0), int32(0), []api.Pod{}
+		nOk, replicaOk := int32(0), int32(0)
+		badPods = []api.Pod{}
+		desiredPods = len(podList.Items)
 		for _, pod := range podList.Items {
 			if len(ignoreLabels) != 0 && ignoreSelector.Matches(labels.Set(pod.Labels)) {
 				Logf("%v in state %v, ignoring", pod.Name, pod.Status.Phase)
@@ -643,7 +677,7 @@ func WaitForPodsRunningReady(c *client.Client, ns string, minPods int32, timeout
 		logPodStates(badPods)
 		return false, nil
 	}) != nil {
-		return fmt.Errorf("Not all pods in namespace '%s' running and ready within %v", ns, timeout)
+		return errors.New(errorBadPodsStates(badPods, desiredPods, ns, timeout))
 	}
 	wg.Wait()
 	if waitForSuccessError != nil {
@@ -3324,17 +3358,18 @@ func DeleteRCAndWaitForGC(c *client.Client, ns, name string) error {
 	var interval, timeout time.Duration
 	switch {
 	case rc.Spec.Replicas < 100:
-		interval = 10 * time.Millisecond
-		timeout = 10 * time.Minute
+		interval = 100 * time.Millisecond
 	case rc.Spec.Replicas < 1000:
 		interval = 1 * time.Second
-		timeout = 10 * time.Minute
-	case rc.Spec.Replicas < 10000:
-		interval = 10 * time.Second
-		timeout = 10 * time.Minute
 	default:
 		interval = 10 * time.Second
-		timeout = 40 * time.Minute
+	}
+	if rc.Spec.Replicas < 5000 {
+		timeout = 10 * time.Minute
+	} else {
+		timeout = time.Duration(rc.Spec.Replicas/gcThroughput) * time.Second
+		// gcThroughput is pretty strict now, add a bit more to it
+		timeout = timeout + 3*time.Minute
 	}
 	err = waitForPodsInactive(ps, interval, timeout)
 	if err != nil {
@@ -4156,6 +4191,23 @@ func WaitForNodeToBe(c *client.Client, name string, conditionType api.NodeCondit
 	return false
 }
 
+// Checks whether not-ready nodes can be ignored while checking if all nodes are
+// ready (we allow e.g. for incorrect provisioning of some small percentage of nodes
+// while validating cluster, and those nodes may never become healthy).
+// Currently we allow only for:
+// - not present CNI plugins on node
+// TODO: we should extend it for other reasons.
+func allowedNotReadyReasons(nodes []*api.Node) bool {
+	for _, node := range nodes {
+		index, condition := api.GetNodeCondition(&node.Status, api.NodeReady)
+		if index == -1 ||
+			!strings.Contains(condition.Reason, "could not locate kubenet required CNI plugins") {
+			return false
+		}
+	}
+	return true
+}
+
 // Checks whether all registered nodes are ready.
 // TODO: we should change the AllNodesReady call in AfterEach to WaitForAllNodesHealthy,
 // and figure out how to do it in a configurable way, as we can't expect all setups to run
@@ -4163,7 +4215,7 @@ func WaitForNodeToBe(c *client.Client, name string, conditionType api.NodeCondit
 func AllNodesReady(c *client.Client, timeout time.Duration) error {
 	Logf("Waiting up to %v for all nodes to be ready", timeout)
 
-	var notReady []api.Node
+	var notReady []*api.Node
 	err := wait.PollImmediate(Poll, timeout, func() (bool, error) {
 		notReady = nil
 		// It should be OK to list unschedulable Nodes here.
@@ -4171,12 +4223,23 @@ func AllNodesReady(c *client.Client, timeout time.Duration) error {
 		if err != nil {
 			return false, err
 		}
-		for _, node := range nodes.Items {
-			if !IsNodeConditionSetAsExpected(&node, api.NodeReady, true) {
+		for i := range nodes.Items {
+			node := &nodes.Items[i]
+			if !IsNodeConditionSetAsExpected(node, api.NodeReady, true) {
 				notReady = append(notReady, node)
 			}
 		}
-		return len(notReady) == 0, nil
+		// Framework allows for <TestContext.AllowedNotReadyNodes> nodes to be non-ready,
+		// to make it possible e.g. for incorrect deployment of some small percentage
+		// of nodes (which we allow in cluster validation). Some nodes that are not
+		// provisioned correctly at startup will never become ready (e.g. when something
+		// won't install correctly), so we can't expect them to be ready at any point.
+		//
+		// However, we only allow non-ready nodes with some specific reasons.
+		if len(notReady) > TestContext.AllowedNotReadyNodes {
+			return false, nil
+		}
+		return allowedNotReadyReasons(notReady), nil
 	})
 
 	if err != nil && err != wait.ErrWaitTimeout {
@@ -4292,14 +4355,17 @@ func RestartKubeProxy(host string) error {
 		return fmt.Errorf("unsupported provider: %s", TestContext.Provider)
 	}
 	// kubelet will restart the kube-proxy since it's running in a static pod
+	Logf("Killing kube-proxy on node %v", host)
 	result, err := SSH("sudo pkill kube-proxy", host, TestContext.Provider)
 	if err != nil || result.Code != 0 {
 		LogSSHResult(result)
 		return fmt.Errorf("couldn't restart kube-proxy: %v", err)
 	}
 	// wait for kube-proxy to come back up
+	sshCmd := "sudo /bin/sh -c 'pgrep kube-proxy | wc -l'"
 	err = wait.Poll(5*time.Second, 60*time.Second, func() (bool, error) {
-		result, err := SSH("sudo /bin/sh -c 'pgrep kube-proxy | wc -l'", host, TestContext.Provider)
+		Logf("Waiting for kubeproxy to come back up with %v on %v", sshCmd, host)
+		result, err := SSH(sshCmd, host, TestContext.Provider)
 		if err != nil {
 			return false, err
 		}
@@ -4346,6 +4412,7 @@ func sshRestartMaster() error {
 	} else {
 		command = "sudo /etc/init.d/kube-apiserver restart"
 	}
+	Logf("Restarting master via ssh, running: %v", command)
 	result, err := SSH(command, GetMasterHost()+":22", TestContext.Provider)
 	if err != nil || result.Code != 0 {
 		LogSSHResult(result)

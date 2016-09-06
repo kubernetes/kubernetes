@@ -28,6 +28,8 @@ type NodeExpansion interface{}
 
 type PersistentVolumeExpansion interface{}
 
+type PersistentVolumeClaimExpansion interface{}
+
 type PodTemplateExpansion interface{}
 
 type ReplicationControllerExpansion interface{}

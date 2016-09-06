@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/util/errors"
 )
 
 func newFakePetSetController() (*PetSetController, *fakePetClient) {
@@ -67,25 +68,26 @@ func checkPets(ps *apps.PetSet, creates, deletes int, fc *fakePetClient, t *test
 	}
 }
 
-func scalePetSet(t *testing.T, ps *apps.PetSet, psc *PetSetController, fc *fakePetClient, scale int) []error {
+func scalePetSet(t *testing.T, ps *apps.PetSet, psc *PetSetController, fc *fakePetClient, scale int) error {
 	errs := []error{}
 	for i := 0; i < scale; i++ {
 		pl := fc.getPodList()
 		if len(pl) != i {
 			t.Errorf("Unexpected number of pets, expected %d found %d", i, len(fc.pets))
 		}
-		_, syncErrs := psc.syncPetSet(ps, pl)
-		errs = append(errs, syncErrs...)
+		if _, syncErr := psc.syncPetSet(ps, pl); syncErr != nil {
+			errs = append(errs, syncErr)
+		}
 		fc.setHealthy(i)
 		checkPets(ps, i+1, 0, fc, t)
 	}
-	return errs
+	return errors.NewAggregate(errs)
 }
 
 func saturatePetSet(t *testing.T, ps *apps.PetSet, psc *PetSetController, fc *fakePetClient) {
-	errs := scalePetSet(t, ps, psc, fc, ps.Spec.Replicas)
-	if len(errs) != 0 {
-		t.Errorf("%v", errs)
+	err := scalePetSet(t, ps, psc, fc, ps.Spec.Replicas)
+	if err != nil {
+		t.Errorf("Error scalePetSet: %v", err)
 	}
 }
 
@@ -99,8 +101,8 @@ func TestPetSetControllerCreates(t *testing.T) {
 	podList := fc.getPodList()
 	// Deleted pet gets recreated
 	fc.pets = fc.pets[:replicas-1]
-	if _, errs := psc.syncPetSet(ps, podList); len(errs) != 0 {
-		t.Errorf("%v", errs)
+	if _, err := psc.syncPetSet(ps, podList); err != nil {
+		t.Errorf("Error syncing PetSet: %v", err)
 	}
 	checkPets(ps, replicas+1, 0, fc, t)
 }
@@ -120,11 +122,12 @@ func TestPetSetControllerDeletes(t *testing.T) {
 		if len(fc.pets) != i+1 {
 			t.Errorf("Unexpected number of pets, expected %d found %d", i, len(fc.pets))
 		}
-		_, syncErrs := psc.syncPetSet(ps, knownPods)
-		errs = append(errs, syncErrs...)
+		if _, syncErr := psc.syncPetSet(ps, knownPods); syncErr != nil {
+			errs = append(errs, syncErr)
+		}
 	}
 	if len(errs) != 0 {
-		t.Errorf("%v", errs)
+		t.Errorf("Error syncing PetSet: %v", errors.NewAggregate(errs))
 	}
 	checkPets(ps, replicas, replicas, fc, t)
 }
@@ -138,9 +141,9 @@ func TestPetSetControllerRespectsTermination(t *testing.T) {
 
 	fc.setDeletionTimestamp(replicas - 1)
 	ps.Spec.Replicas = 2
-	_, errs := psc.syncPetSet(ps, fc.getPodList())
-	if len(errs) != 0 {
-		t.Errorf("%v", errs)
+	_, err := psc.syncPetSet(ps, fc.getPodList())
+	if err != nil {
+		t.Errorf("Error syncing PetSet: %v", err)
 	}
 	// Finding a pod with the deletion timestamp will pause all deletions.
 	knownPods := fc.getPodList()
@@ -148,9 +151,9 @@ func TestPetSetControllerRespectsTermination(t *testing.T) {
 		t.Errorf("Pods deleted prematurely before deletion timestamp expired, len %d", len(knownPods))
 	}
 	fc.pets = fc.pets[:replicas-1]
-	_, errs = psc.syncPetSet(ps, fc.getPodList())
-	if len(errs) != 0 {
-		t.Errorf("%v", errs)
+	_, err = psc.syncPetSet(ps, fc.getPodList())
+	if err != nil {
+		t.Errorf("Error syncing PetSet: %v", err)
 	}
 	checkPets(ps, replicas, 1, fc, t)
 }
@@ -175,12 +178,13 @@ func TestPetSetControllerRespectsOrder(t *testing.T) {
 		if len(fc.pets) != replicas-i {
 			t.Errorf("Unexpected number of pets, expected %d found %d", i, len(fc.pets))
 		}
-		_, syncErrs := psc.syncPetSet(ps, knownPods)
-		errs = append(errs, syncErrs...)
+		if _, syncErr := psc.syncPetSet(ps, knownPods); syncErr != nil {
+			errs = append(errs, syncErr)
+		}
 		checkPets(ps, replicas, i+1, fc, t)
 	}
 	if len(errs) != 0 {
-		t.Errorf("%v", errs)
+		t.Errorf("Error syncing PetSet: %v", errors.NewAggregate(errs))
 	}
 }
 
@@ -193,15 +197,15 @@ func TestPetSetControllerBlocksScaling(t *testing.T) {
 	// Create 4th pet, then before flipping it to healthy, kill the first pet.
 	// There should only be 1 not-healty pet at a time.
 	pl := fc.getPodList()
-	if _, errs := psc.syncPetSet(ps, pl); len(errs) != 0 {
-		t.Errorf("%v", errs)
+	if _, err := psc.syncPetSet(ps, pl); err != nil {
+		t.Errorf("Error syncing PetSet: %v", err)
 	}
 
 	deletedPod := pl[0]
 	fc.deletePetAtIndex(0)
 	pl = fc.getPodList()
-	if _, errs := psc.syncPetSet(ps, pl); len(errs) != 0 {
-		t.Errorf("%v", errs)
+	if _, err := psc.syncPetSet(ps, pl); err != nil {
+		t.Errorf("Error syncing PetSet: %v", err)
 	}
 	newPodList := fc.getPodList()
 	for _, p := range newPodList {
@@ -211,8 +215,8 @@ func TestPetSetControllerBlocksScaling(t *testing.T) {
 	}
 
 	fc.setHealthy(len(newPodList) - 1)
-	if _, errs := psc.syncPetSet(ps, pl); len(errs) != 0 {
-		t.Errorf("%v", errs)
+	if _, err := psc.syncPetSet(ps, pl); err != nil {
+		t.Errorf("Error syncing PetSet: %v", err)
 	}
 
 	found := false
@@ -247,8 +251,8 @@ func TestPetSetBlockingPetIsCleared(t *testing.T) {
 	if err := psc.psStore.Store.Delete(ps); err != nil {
 		t.Fatalf("Unable to delete pet %v from petset controller store.", ps.Name)
 	}
-	if errs := psc.Sync(fmt.Sprintf("%v/%v", ps.Namespace, ps.Name)); len(errs) != 0 {
-		t.Errorf("Error during sync of deleted petset %v", errs)
+	if err := psc.Sync(fmt.Sprintf("%v/%v", ps.Namespace, ps.Name)); err != nil {
+		t.Errorf("Error during sync of deleted petset %v", err)
 	}
 	fc.pets = []*pcb{}
 	fc.petsCreated = 0

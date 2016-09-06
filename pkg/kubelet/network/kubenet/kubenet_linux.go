@@ -54,7 +54,7 @@ const (
 	BridgeName        = "cbr0"
 	DefaultCNIDir     = "/opt/cni/bin"
 
-	sysctlBridgeCallIptables = "net/bridge/bridge-nf-call-iptables"
+	sysctlBridgeCallIPTables = "net/bridge/bridge-nf-call-iptables"
 
 	// fallbackMTU is used if an MTU is not specified, and we cannot determine the MTU
 	fallbackMTU = 1460
@@ -68,6 +68,9 @@ const (
 	// ebtables Chain to store dedup rules
 	dedupChain = utilebtables.Chain("KUBE-DEDUP")
 )
+
+// CNI plugins required by kubenet in /opt/cni/bin or vendor directory
+var requiredCNIPlugins = [...]string{"bridge", "host-local", "loopback"}
 
 type kubenetNetworkPlugin struct {
 	network.NoopNetworkPlugin
@@ -139,9 +142,9 @@ func (plugin *kubenetNetworkPlugin) Init(host network.Host, hairpinMode componen
 	// was built-in, we simply ignore the error here. A better thing to do is
 	// to check the kernel version in the future.
 	plugin.execer.Command("modprobe", "br-netfilter").CombinedOutput()
-	err := plugin.sysctl.SetSysctl(sysctlBridgeCallIptables, 1)
+	err := plugin.sysctl.SetSysctl(sysctlBridgeCallIPTables, 1)
 	if err != nil {
-		glog.Warningf("can't set sysctl %s: %v", sysctlBridgeCallIptables, err)
+		glog.Warningf("can't set sysctl %s: %v", sysctlBridgeCallIPTables, err)
 	}
 
 	plugin.loConfig, err = libcni.ConfFromBytes([]byte(`{
@@ -210,7 +213,7 @@ const NET_CONFIG_TEMPLATE = `{
   "addIf": "%s",
   "isGateway": true,
   "ipMasq": false,
-  "hairpin": "%t",
+  "hairpinMode": %t,
   "ipam": {
     "type": "host-local",
     "subnet": "%s",
@@ -531,7 +534,41 @@ func (plugin *kubenetNetworkPlugin) Status() error {
 	if plugin.netConfig == nil {
 		return fmt.Errorf("Kubenet does not have netConfig. This is most likely due to lack of PodCIDR")
 	}
+
+	if !plugin.checkCNIPlugin() {
+		return fmt.Errorf("could not locate kubenet required CNI plugins %v at %q or %q", requiredCNIPlugins, DefaultCNIDir, plugin.vendorDir)
+	}
 	return nil
+}
+
+// checkCNIPlugin returns if all kubenet required cni plugins can be found at /opt/cni/bin or user specifed NetworkPluginDir.
+func (plugin *kubenetNetworkPlugin) checkCNIPlugin() bool {
+	if plugin.checkCNIPluginInDir(DefaultCNIDir) || plugin.checkCNIPluginInDir(plugin.vendorDir) {
+		return true
+	}
+	return false
+}
+
+// checkCNIPluginInDir returns if all required cni plugins are placed in dir
+func (plugin *kubenetNetworkPlugin) checkCNIPluginInDir(dir string) bool {
+	output, err := plugin.execer.Command("ls", dir).CombinedOutput()
+	if err != nil {
+		return false
+	}
+	fields := strings.Fields(string(output))
+	for _, cniPlugin := range requiredCNIPlugins {
+		found := false
+		for _, file := range fields {
+			if strings.TrimSpace(file) == cniPlugin {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
 }
 
 // Returns a list of pods running on this node and each pod's IP address.  Assumes

@@ -37,6 +37,7 @@ var isDisabledBuild bool
 // Interface for validating that a pod with with an AppArmor profile can be run by a Node.
 type Validator interface {
 	Validate(pod *api.Pod) error
+	ValidateHost() error
 }
 
 func NewValidator(runtime string) Validator {
@@ -64,7 +65,7 @@ func (v *validator) Validate(pod *api.Pod) error {
 		return nil
 	}
 
-	if v.validateHostErr != nil {
+	if v.ValidateHost() != nil {
 		return v.validateHostErr
 	}
 
@@ -85,6 +86,10 @@ func (v *validator) Validate(pod *api.Pod) error {
 	}
 
 	return nil
+}
+
+func (v *validator) ValidateHost() error {
+	return v.validateHostErr
 }
 
 // Verify that the host and runtime is capable of enforcing AppArmor profiles.

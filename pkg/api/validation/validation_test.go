@@ -8023,11 +8023,19 @@ func TestEndpointAddressNodeNameUpdateRestrictions(t *testing.T) {
 	}
 }
 
-func TestEndpointAddressNodeNameInvalidDNS1123(t *testing.T) {
+func TestEndpointAddressNodeNameInvalidDNSSubdomain(t *testing.T) {
 	// Check NodeName DNS validation
-	endpoint := newNodeNameEndpoint("illegal.nodename")
+	endpoint := newNodeNameEndpoint("illegal*.nodename")
 	errList := ValidateEndpoints(endpoint)
 	if len(errList) == 0 {
 		t.Error("Endpoint should reject invalid NodeName")
+	}
+}
+
+func TestEndpointAddressNodeNameCanBeAnIPAddress(t *testing.T) {
+	endpoint := newNodeNameEndpoint("10.10.1.1")
+	errList := ValidateEndpoints(endpoint)
+	if len(errList) != 0 {
+		t.Error("Endpoint should accept a NodeName that is an IP address")
 	}
 }

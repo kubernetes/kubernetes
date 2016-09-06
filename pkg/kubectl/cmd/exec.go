@@ -48,6 +48,10 @@ var (
 		kubectl exec 123456-7890 -c ruby-container -i -t -- bash -il`)
 )
 
+const (
+	execUsageStr = "expected 'exec POD_NAME COMMAND [ARG1] [ARG2] ... [ARGN]'.\nPOD_NAME and COMMAND are required arguments for the exec command"
+)
+
 func NewCmdExec(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *cobra.Command {
 	options := &ExecOptions{
 		StreamOptions: StreamOptions{
@@ -135,19 +139,19 @@ type ExecOptions struct {
 func (p *ExecOptions) Complete(f *cmdutil.Factory, cmd *cobra.Command, argsIn []string, argsLenAtDash int) error {
 	// Let kubectl exec follow rules for `--`, see #13004 issue
 	if len(p.PodName) == 0 && (len(argsIn) == 0 || argsLenAtDash == 0) {
-		return cmdutil.UsageError(cmd, "POD is required for exec")
+		return cmdutil.UsageError(cmd, execUsageStr)
 	}
 	if len(p.PodName) != 0 {
-		printDeprecationWarning("exec POD", "-p POD")
+		printDeprecationWarning("exec POD_NAME", "-p POD_NAME")
 		if len(argsIn) < 1 {
-			return cmdutil.UsageError(cmd, "COMMAND is required for exec")
+			return cmdutil.UsageError(cmd, execUsageStr)
 		}
 		p.Command = argsIn
 	} else {
 		p.PodName = argsIn[0]
 		p.Command = argsIn[1:]
 		if len(p.Command) < 1 {
-			return cmdutil.UsageError(cmd, "COMMAND is required for exec")
+			return cmdutil.UsageError(cmd, execUsageStr)
 		}
 	}
 

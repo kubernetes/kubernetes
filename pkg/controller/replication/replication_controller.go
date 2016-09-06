@@ -319,6 +319,8 @@ func (rm *ReplicationManager) updateRC(old, cur interface{}) {
 	if !reflect.DeepEqual(oldRC.Spec.Selector, curRC.Spec.Selector) {
 		rm.lookupCache.InvalidateAll()
 	}
+	// TODO: Remove when #31981 is resolved!
+	glog.Infof("Observed updated replication controller %v. Desired pod count change: %d->%d", curRC.Name, oldRC.Spec.Replicas, curRC.Spec.Replicas)
 
 	// You might imagine that we only really need to enqueue the
 	// controller when Spec changes, but it is safer to sync any
@@ -333,6 +335,7 @@ func (rm *ReplicationManager) updateRC(old, cur interface{}) {
 	// that bad as rcs that haven't met expectations yet won't
 	// sync, and all the listing is done using local stores.
 	if oldRC.Status.Replicas != curRC.Status.Replicas {
+		// TODO: Should we log status or spec?
 		glog.V(4).Infof("Observed updated replica count for rc: %v, %d->%d", curRC.Name, oldRC.Status.Replicas, curRC.Status.Replicas)
 	}
 	rm.enqueueController(cur)

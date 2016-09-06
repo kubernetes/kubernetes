@@ -298,7 +298,7 @@ func initConfigz(kc *componentconfig.KubeletConfiguration) (*configz.Config, err
 
 func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 	// TODO: this should be replaced by a --standalone flag
-	standaloneMode := (len(s.APIServerList) == 0)
+	standaloneMode := (len(s.APIServerList) == 0 && !s.RequireKubeConfig)
 
 	if s.ExitOnLockContention && s.LockFilePath == "" {
 		return errors.New("cannot exit on lock file contention: no lock file specified")

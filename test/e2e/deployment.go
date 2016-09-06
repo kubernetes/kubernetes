@@ -18,6 +18,7 @@ package e2e
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -181,7 +182,15 @@ func checkDeploymentRevision(c *clientset.Clientset, ns, deploymentName, revisio
 	return deployment, newRS
 }
 
+func stopDeploymentOverlap(c *clientset.Clientset, oldC client.Interface, ns, deploymentName, overlapWith string) {
+	stopDeploymentMaybeOverlap(c, oldC, ns, deploymentName, overlapWith)
+}
+
 func stopDeployment(c *clientset.Clientset, oldC client.Interface, ns, deploymentName string) {
+	stopDeploymentMaybeOverlap(c, oldC, ns, deploymentName, "")
+}
+
+func stopDeploymentMaybeOverlap(c *clientset.Clientset, oldC client.Interface, ns, deploymentName, overlapWith string) {
 	deployment, err := c.Extensions().Deployments(ns).Get(deploymentName)
 	Expect(err).NotTo(HaveOccurred())
 
@@ -202,7 +211,18 @@ func stopDeployment(c *clientset.Clientset, oldC client.Interface, ns, deploymen
 	options := api.ListOptions{LabelSelector: selector}
 	rss, err := c.Extensions().ReplicaSets(ns).List(options)
 	Expect(err).NotTo(HaveOccurred())
-	Expect(rss.Items).Should(HaveLen(0))
+	// RSes may be created by overlapping deployments right after this deployment is deleted, ignore them
+	if len(overlapWith) == 0 {
+		Expect(rss.Items).Should(HaveLen(0))
+	} else {
+		noOverlapRSes := []extensions.ReplicaSet{}
+		for _, rs := range rss.Items {
+			if !strings.HasPrefix(rs.Name, overlapWith) {
+				noOverlapRSes = append(noOverlapRSes, rs)
+			}
+		}
+		Expect(noOverlapRSes).Should(HaveLen(0))
+	}
 	framework.Logf("Ensuring deployment %s's Pods were deleted", deploymentName)
 	var pods *api.PodList
 	if err := wait.PollImmediate(time.Second, timeout, func() (bool, error) {
@@ -210,8 +230,19 @@ func stopDeployment(c *clientset.Clientset, oldC client.Interface, ns, deploymen
 		if err != nil {
 			return false, err
 		}
-		if len(pods.Items) == 0 {
+		// Pods may be created by overlapping deployments right after this deployment is deleted, ignore them
+		if len(overlapWith) == 0 && len(pods.Items) == 0 {
 			return true, nil
+		} else if len(overlapWith) != 0 {
+			noOverlapPods := []api.Pod{}
+			for _, pod := range pods.Items {
+				if !strings.HasPrefix(pod.Name, overlapWith) {
+					noOverlapPods = append(noOverlapPods, pod)
+				}
+			}
+			if len(noOverlapPods) == 0 {
+				return true, nil
+			}
 		}
 		return false, nil
 	}); err != nil {
@@ -1224,7 +1255,7 @@ func testOverlappingDeployment(f *framework.Framework) {
 	Expect(rsList.Items[0].Spec.Template.Spec.Containers[0].Image).To(Equal(deploy.Spec.Template.Spec.Containers[0].Image))
 
 	By("Deleting the first deployment")
-	stopDeployment(c, f.Client, ns, deploy.Name)
+	stopDeploymentOverlap(c, f.Client, ns, deploy.Name, deployOverlapping.Name)
 
 	// Wait for overlapping annotation cleared
 	By("Waiting for the second deployment to clear overlapping annotation")
