@@ -94,6 +94,8 @@ type ServerRunOptions struct {
 	EtcdServersOverrides      []string
 	StorageConfig             storagebackend.Config
 	ExternalHost              string
+	EncryptionProvider        string
+	EncryptionConfig          string
 	InsecureBindAddress       net.IP
 	InsecurePort              int
 	KeystoneURL               string

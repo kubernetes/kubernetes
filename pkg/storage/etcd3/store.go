@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
+	"k8s.io/kubernetes/pkg/storage/encryptionprovider"
 	"k8s.io/kubernetes/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/watch"
 
@@ -38,11 +39,12 @@ import (
 )
 
 type store struct {
-	client     *clientv3.Client
-	codec      runtime.Codec
-	versioner  storage.Versioner
-	pathPrefix string
-	watcher    *watcher
+	client             *clientv3.Client
+	codec              runtime.Codec
+	versioner          storage.Versioner
+	pathPrefix         string
+	watcher            *watcher
+	encryptionProvider encryptionprovider.Interface
 }
 
 type elemForDecode struct {
@@ -58,18 +60,19 @@ type objState struct {
 }
 
 // New returns an etcd3 implementation of storage.Interface.
-func New(c *clientv3.Client, codec runtime.Codec, prefix string) storage.Interface {
-	return newStore(c, codec, prefix)
+func New(c *clientv3.Client, codec runtime.Codec, prefix string, encryptionProvider encryptionprovider.Interface) storage.Interface {
+	return newStore(c, codec, prefix, encryptionProvider)
 }
 
-func newStore(c *clientv3.Client, codec runtime.Codec, prefix string) *store {
+func newStore(c *clientv3.Client, codec runtime.Codec, prefix string, encryptionProvider encryptionprovider.Interface) *store {
 	versioner := etcd.APIObjectVersioner{}
 	return &store{
-		client:     c,
-		versioner:  versioner,
-		codec:      codec,
-		pathPrefix: prefix,
-		watcher:    newWatcher(c, codec, versioner),
+		client:             c,
+		versioner:          versioner,
+		codec:              codec,
+		pathPrefix:         prefix,
+		watcher:            newWatcher(c, codec, versioner),
+		encryptionProvider: encryptionProvider,
 	}
 }
 

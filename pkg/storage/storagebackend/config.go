@@ -44,4 +44,14 @@ type Config struct {
 	DeserializationCacheSize int
 
 	Codec runtime.Codec
+
+	// Handles encrypting data in Etcd
+	EncryptionConfig
+}
+
+// EncryptionConfig describes what pieces are available to enable encryption of
+// secrets in the backing store
+type EncryptionConfig struct {
+	Provider string
+	Config   string
 }

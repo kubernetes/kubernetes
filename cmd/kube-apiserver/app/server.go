@@ -62,6 +62,8 @@ import (
 	"k8s.io/kubernetes/pkg/registry/rolebinding"
 	rolebindingetcd "k8s.io/kubernetes/pkg/registry/rolebinding/etcd"
 	"k8s.io/kubernetes/pkg/serviceaccount"
+	_ "k8s.io/kubernetes/pkg/storage/encryptionprovider"
+	"k8s.io/kubernetes/pkg/storage/storagebackend"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
@@ -94,8 +96,7 @@ func Run(s *options.APIServer) error {
 			HostNetworkSources: []string{},
 			HostPIDSources:     []string{},
 			HostIPCSources:     []string{},
-		},
-		PerConnectionBandwidthLimitBytesPerSec: s.MaxConnectionBytesPerSec,
+		}, PerConnectionBandwidthLimitBytesPerSec: s.MaxConnectionBytesPerSec,
 	})
 
 	// Setup tunneler if needed
@@ -144,12 +145,20 @@ func Run(s *options.APIServer) error {
 	if err != nil {
 		glog.Fatalf("error generating storage version map: %s", err)
 	}
+
+	// Configure Encryption
+	s.StorageConfig.EncryptionConfig = storagebackend.EncryptionConfig{
+		Provider: s.EncryptionProvider,
+		Config:   s.EncryptionConfig,
+	}
+
 	storageFactory, err := genericapiserver.BuildDefaultStorageFactory(
 		s.StorageConfig, s.DefaultStorageMediaType, api.Codecs,
 		genericapiserver.NewDefaultResourceEncodingConfig(), storageGroupsToEncodingVersion,
 		// FIXME: this GroupVersionResource override should be configurable
 		[]unversioned.GroupVersionResource{batch.Resource("scheduledjobs").WithVersion("v2alpha1")},
 		master.DefaultAPIResourceConfigSource(), s.RuntimeConfig)
+
 	if err != nil {
 		glog.Fatalf("error in initializing storage factory: %s", err)
 	}
