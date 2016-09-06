@@ -133,6 +133,10 @@ For Q&A, our threads are at:
 
 If you're interested in being a contributor and want to get involved in developing Kubernetes, start in the [Kubernetes Developer Guide](docs/devel/README.md) and also review the [contributor guidelines](CONTRIBUTING.md).
 
+Also, please see our [expectations](community-expectations.md) for members of
+the Kubernetes community.
+
+
 ### Support
 
 While there are many different channels that you can use to get ahold of us, you can help make sure that we are efficient in getting you the help that you need.
