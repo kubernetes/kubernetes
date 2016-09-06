@@ -162,9 +162,9 @@ func (a *HorizontalController) computeReplicasForCPUUtilization(hpa *autoscaling
 	usageRatio := float64(utilization) / float64(targetUtilization)
 	if math.Abs(1.0-usageRatio) > tolerance {
 		return int32(math.Ceil(usageRatio * float64(currentReplicas))), &utilization, timestamp, nil
-	} else {
-		return currentReplicas, &utilization, timestamp, nil
 	}
+
+	return currentReplicas, &utilization, timestamp, nil
 }
 
 // Computes the desired number of replicas based on the CustomMetrics passed in cmAnnotation as json-serialized
@@ -175,16 +175,11 @@ func (a *HorizontalController) computeReplicasForCPUUtilization(hpa *autoscaling
 func (a *HorizontalController) computeReplicasForCustomMetrics(hpa *autoscaling.HorizontalPodAutoscaler, scale *extensions.Scale,
 	cmAnnotation string) (replicas int32, metric string, status string, timestamp time.Time, err error) {
 
-	currentReplicas := scale.Status.Replicas
-	replicas = 0
-	metric = ""
-	status = ""
-	timestamp = time.Time{}
-	err = nil
-
 	if cmAnnotation == "" {
 		return
 	}
+
+	currentReplicas := scale.Status.Replicas
 
 	var targetList extensions.CustomMetricTargetList
 	if err := json.Unmarshal([]byte(cmAnnotation), &targetList); err != nil {
@@ -259,7 +254,7 @@ func (a *HorizontalController) reconcileAutoscaler(hpa *autoscaling.HorizontalPo
 	currentReplicas := scale.Status.Replicas
 
 	cpuDesiredReplicas := int32(0)
-	var cpuCurrentUtilization *int32 = nil
+	cpuCurrentUtilization := new(int32)
 	cpuTimestamp := time.Time{}
 
 	cmDesiredReplicas := int32(0)
@@ -318,7 +313,8 @@ func (a *HorizontalController) reconcileAutoscaler(hpa *autoscaling.HorizontalPo
 		}
 		if desiredReplicas > currentReplicas {
 			rescaleReason = fmt.Sprintf("%s above target", rescaleMetric)
-		} else if desiredReplicas < currentReplicas {
+		}
+		if desiredReplicas < currentReplicas {
 			rescaleReason = "All metrics below target"
 		}
 
@@ -355,22 +351,24 @@ func (a *HorizontalController) reconcileAutoscaler(hpa *autoscaling.HorizontalPo
 }
 
 func shouldScale(hpa *autoscaling.HorizontalPodAutoscaler, currentReplicas, desiredReplicas int32, timestamp time.Time) bool {
-	if desiredReplicas != currentReplicas {
-		// Going down only if the usageRatio dropped significantly below the target
-		// and there was no rescaling in the last downscaleForbiddenWindow.
-		if desiredReplicas < currentReplicas &&
-			(hpa.Status.LastScaleTime == nil ||
-				hpa.Status.LastScaleTime.Add(downscaleForbiddenWindow).Before(timestamp)) {
-			return true
-		}
+	if desiredReplicas == currentReplicas {
+		return false
+	}
 
-		// Going up only if the usage ratio increased significantly above the target
-		// and there was no rescaling in the last upscaleForbiddenWindow.
-		if desiredReplicas > currentReplicas &&
-			(hpa.Status.LastScaleTime == nil ||
-				hpa.Status.LastScaleTime.Add(upscaleForbiddenWindow).Before(timestamp)) {
-			return true
-		}
+	// Going down only if the usageRatio dropped significantly below the target
+	// and there was no rescaling in the last downscaleForbiddenWindow.
+	if desiredReplicas < currentReplicas &&
+		(hpa.Status.LastScaleTime == nil ||
+			hpa.Status.LastScaleTime.Add(downscaleForbiddenWindow).Before(timestamp)) {
+		return true
+	}
+
+	// Going up only if the usage ratio increased significantly above the target
+	// and there was no rescaling in the last upscaleForbiddenWindow.
+	if desiredReplicas > currentReplicas &&
+		(hpa.Status.LastScaleTime == nil ||
+			hpa.Status.LastScaleTime.Add(upscaleForbiddenWindow).Before(timestamp)) {
+		return true
 	}
 	return false
 }
