@@ -328,10 +328,8 @@ func (cm *containerManagerImpl) setupNode() error {
 	if cm.ContainerRuntime == "docker" {
 		if cm.RuntimeCgroupsName != "" {
 			cont := newSystemCgroups(cm.RuntimeCgroupsName)
-			info, err := cm.cadvisorInterface.MachineInfo()
 			var capacity = api.ResourceList{}
-			if err != nil {
-			} else {
+			if info, err := cm.cadvisorInterface.MachineInfo(); err == nil {
 				capacity = cadvisor.CapacityFromMachineInfo(info)
 			}
 			memoryLimit := (int64(capacity.Memory().Value() * DockerMemoryLimitThresholdPercent / 100))
