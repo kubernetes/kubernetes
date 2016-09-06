@@ -18,6 +18,7 @@ package fake
 
 import (
 	"k8s.io/kubernetes/pkg/api/v1"
+	policy "k8s.io/kubernetes/pkg/apis/policy/v1alpha1"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/testing/core"
 )
@@ -43,4 +44,15 @@ func (c *FakePods) GetLogs(name string, opts *v1.PodLogOptions) *restclient.Requ
 
 	_, _ = c.Fake.Invokes(action, &v1.Pod{})
 	return &restclient.Request{}
+}
+
+func (c *FakePods) Evict(eviction *policy.Eviction) error {
+	action := core.CreateActionImpl{}
+	action.Verb = "create"
+	action.Resource = podsResource
+	action.Subresource = "evictions"
+	action.Object = eviction
+
+	_, err := c.Fake.Invokes(action, eviction)
+	return err
 }
