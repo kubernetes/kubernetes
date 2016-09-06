@@ -79,7 +79,9 @@ func (opts CreateOptsExt) ToServerCreateMap() (map[string]interface{}, error) {
 		blockDevice[i]["source_type"] = bd.SourceType
 		blockDevice[i]["boot_index"] = strconv.Itoa(bd.BootIndex)
 		blockDevice[i]["delete_on_termination"] = strconv.FormatBool(bd.DeleteOnTermination)
-		blockDevice[i]["volume_size"] = strconv.Itoa(bd.VolumeSize)
+		if bd.VolumeSize > 0 {
+			blockDevice[i]["volume_size"] = strconv.Itoa(bd.VolumeSize)
+		}
 		if bd.UUID != "" {
 			blockDevice[i]["uuid"] = bd.UUID
 		}

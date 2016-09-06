@@ -102,6 +102,14 @@ type RequestOpts struct {
 	MoreHeaders map[string]string
 }
 
+func (opts *RequestOpts) setBody(body interface{}) {
+	if v, ok := (body).(io.ReadSeeker); ok {
+		opts.RawBody = v
+	} else if body != nil {
+		opts.JSONBody = body
+	}
+}
+
 // UnexpectedResponseCodeError is returned by the Request method when a response code other than
 // those listed in OkCodes is encountered.
 type UnexpectedResponseCodeError struct {
@@ -268,16 +276,12 @@ func (client *ProviderClient) Get(url string, JSONResponse *interface{}, opts *R
 	return client.Request("GET", url, *opts)
 }
 
-func (client *ProviderClient) Post(url string, JSONBody interface{}, JSONResponse *interface{}, opts *RequestOpts) (*http.Response, error) {
+func (client *ProviderClient) Post(url string, body interface{}, JSONResponse *interface{}, opts *RequestOpts) (*http.Response, error) {
 	if opts == nil {
 		opts = &RequestOpts{}
 	}
 
-	if v, ok := (JSONBody).(io.ReadSeeker); ok {
-		opts.RawBody = v
-	} else if JSONBody != nil {
-		opts.JSONBody = JSONBody
-	}
+	opts.setBody(body)
 
 	if JSONResponse != nil {
 		opts.JSONResponse = JSONResponse
@@ -286,16 +290,12 @@ func (client *ProviderClient) Post(url string, JSONBody interface{}, JSONRespons
 	return client.Request("POST", url, *opts)
 }
 
-func (client *ProviderClient) Put(url string, JSONBody interface{}, JSONResponse *interface{}, opts *RequestOpts) (*http.Response, error) {
+func (client *ProviderClient) Put(url string, body interface{}, JSONResponse *interface{}, opts *RequestOpts) (*http.Response, error) {
 	if opts == nil {
 		opts = &RequestOpts{}
 	}
 
-	if v, ok := (JSONBody).(io.ReadSeeker); ok {
-		opts.RawBody = v
-	} else if JSONBody != nil {
-		opts.JSONBody = JSONBody
-	}
+	opts.setBody(body)
 
 	if JSONResponse != nil {
 		opts.JSONResponse = JSONResponse

@@ -52,8 +52,8 @@ var (
 	// It may also indicate that both a DomainID and a DomainName were provided at once.
 	ErrDomainIDOrDomainName = errors.New("You must provide exactly one of DomainID or DomainName to authenticate by Username")
 
-	// ErrMissingPassword indicates that no password was provided and no token is available.
-	ErrMissingPassword = errors.New("You must provide a password to authenticate")
+	// ErrMissingPassword indicates that no password and no token were provided and no token is available.
+	ErrMissingPassword = errors.New("You must provide a password or a token to authenticate")
 
 	// ErrScopeDomainIDOrDomainName indicates that a domain ID or Name was required in a Scope, but not present.
 	ErrScopeDomainIDOrDomainName = errors.New("You must provide exactly one of DomainID or DomainName in a Scope with ProjectName")
