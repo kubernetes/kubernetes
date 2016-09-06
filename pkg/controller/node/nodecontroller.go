@@ -388,7 +388,7 @@ func (nc *NodeController) Run() {
 	go nc.podController.Run(wait.NeverStop)
 	go nc.daemonSetController.Run(wait.NeverStop)
 	if nc.internalPodInformer != nil {
-		nc.internalPodInformer.Run(wait.NeverStop)
+		go nc.internalPodInformer.Run(wait.NeverStop)
 	}
 
 	// Incorporate the results of node status pushed from kubelet to master.
