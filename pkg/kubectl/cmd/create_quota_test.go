@@ -29,8 +29,8 @@ func TestCreateQuota(t *testing.T) {
 	resourceQuotaObject := &api.ResourceQuota{}
 	resourceQuotaObject.Name = "my-quota"
 	f, tf, codec, ns := NewAPIFactory()
-	tf.Printer = &testPrinter{}
-	tf.Client = &fake.RESTClient{
+	tf.MockPrinter = &testPrinter{}
+	tf.MockClient = &fake.RESTClient{
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {

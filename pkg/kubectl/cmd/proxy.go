@@ -45,7 +45,7 @@ var (
 		kubectl proxy --api-prefix=/k8s-api`)
 )
 
-func NewCmdProxy(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+func NewCmdProxy(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "proxy [--port=PORT] [--www=static-dir] [--www-prefix=prefix] [--api-prefix=prefix]",
 		Short: "Run a proxy to the Kubernetes API server",
@@ -86,7 +86,7 @@ func NewCmdProxy(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func RunProxy(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
+func RunProxy(f cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
 	path := cmdutil.GetFlagString(cmd, "unix-socket")
 	port := cmdutil.GetFlagInt(cmd, "port")
 	address := cmdutil.GetFlagString(cmd, "address")

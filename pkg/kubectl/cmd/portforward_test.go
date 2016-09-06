@@ -71,7 +71,7 @@ func TestPortForward(t *testing.T) {
 	for _, test := range tests {
 		var err error
 		f, tf, codec, ns := NewAPIFactory()
-		tf.Client = &fake.RESTClient{
+		tf.MockClient = &fake.RESTClient{
 			NegotiatedSerializer: ns,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				switch p, m := req.URL.Path, req.Method; {
@@ -86,7 +86,7 @@ func TestPortForward(t *testing.T) {
 			}),
 		}
 		tf.Namespace = "test"
-		tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &unversioned.GroupVersion{Version: test.version}}}
+		tf.MockClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &unversioned.GroupVersion{Version: test.version}}}
 		ff := &fakePortForwarder{}
 		if test.pfErr {
 			ff.pfErr = fmt.Errorf("pf error")
@@ -153,7 +153,7 @@ func TestPortForwardWithPFlag(t *testing.T) {
 	for _, test := range tests {
 		var err error
 		f, tf, codec, ns := NewAPIFactory()
-		tf.Client = &fake.RESTClient{
+		tf.MockClient = &fake.RESTClient{
 			NegotiatedSerializer: ns,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				switch p, m := req.URL.Path, req.Method; {
@@ -168,7 +168,7 @@ func TestPortForwardWithPFlag(t *testing.T) {
 			}),
 		}
 		tf.Namespace = "test"
-		tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &unversioned.GroupVersion{Version: test.version}}}
+		tf.MockClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &unversioned.GroupVersion{Version: test.version}}}
 		ff := &fakePortForwarder{}
 		if test.pfErr {
 			ff.pfErr = fmt.Errorf("pf error")

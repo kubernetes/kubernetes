@@ -53,7 +53,7 @@ var (
 )
 
 // ConfigMap is a command to ease creating ConfigMaps.
-func NewCmdCreateConfigMap(f *cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
+func NewCmdCreateConfigMap(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "configmap NAME [--from-file=[key=]source] [--from-literal=key1=value1] [--dry-run]",
 		Aliases: []string{"cm"},
@@ -75,7 +75,7 @@ func NewCmdCreateConfigMap(f *cmdutil.Factory, cmdOut io.Writer) *cobra.Command 
 }
 
 // CreateConfigMap is the implementation of the create configmap command.
-func CreateConfigMap(f *cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, args []string) error {
+func CreateConfigMap(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
 		return err

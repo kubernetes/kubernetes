@@ -29,8 +29,8 @@ import (
 func TestDescribeUnknownSchemaObject(t *testing.T) {
 	d := &testDescriber{Output: "test output"}
 	f, tf, codec, ns := NewTestFactory()
-	tf.Describer = d
-	tf.Client = &fake.RESTClient{
+	tf.MockDescriber = d
+	tf.MockClient = &fake.RESTClient{
 		NegotiatedSerializer: ns,
 		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &internalType{Name: "foo"})},
 	}
@@ -53,8 +53,8 @@ func TestDescribeObject(t *testing.T) {
 	_, _, rc := testData()
 	f, tf, codec, ns := NewAPIFactory()
 	d := &testDescriber{Output: "test output"}
-	tf.Describer = d
-	tf.Client = &fake.RESTClient{
+	tf.MockDescriber = d
+	tf.MockClient = &fake.RESTClient{
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
@@ -86,8 +86,8 @@ func TestDescribeListObjects(t *testing.T) {
 	pods, _, _ := testData()
 	f, tf, codec, ns := NewAPIFactory()
 	d := &testDescriber{Output: "test output"}
-	tf.Describer = d
-	tf.Client = &fake.RESTClient{
+	tf.MockDescriber = d
+	tf.MockClient = &fake.RESTClient{
 		NegotiatedSerializer: ns,
 		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, pods)},
 	}
@@ -106,8 +106,8 @@ func TestDescribeObjectShowEvents(t *testing.T) {
 	pods, _, _ := testData()
 	f, tf, codec, ns := NewAPIFactory()
 	d := &testDescriber{Output: "test output"}
-	tf.Describer = d
-	tf.Client = &fake.RESTClient{
+	tf.MockDescriber = d
+	tf.MockClient = &fake.RESTClient{
 		NegotiatedSerializer: ns,
 		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, pods)},
 	}
@@ -127,8 +127,8 @@ func TestDescribeObjectSkipEvents(t *testing.T) {
 	pods, _, _ := testData()
 	f, tf, codec, ns := NewAPIFactory()
 	d := &testDescriber{Output: "test output"}
-	tf.Describer = d
-	tf.Client = &fake.RESTClient{
+	tf.MockDescriber = d
+	tf.MockClient = &fake.RESTClient{
 		NegotiatedSerializer: ns,
 		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, pods)},
 	}

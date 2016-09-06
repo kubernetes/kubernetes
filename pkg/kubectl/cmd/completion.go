@@ -56,7 +56,7 @@ var (
 	}
 )
 
-func NewCmdCompletion(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+func NewCmdCompletion(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	shells := []string{}
 	for s := range completion_shells {
 		shells = append(shells, s)
@@ -77,7 +77,7 @@ func NewCmdCompletion(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func RunCompletion(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) error {
+func RunCompletion(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) error {
 	if len(args) == 0 {
 		return cmdutil.UsageError(cmd, "Shell not specified.")
 	}

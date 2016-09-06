@@ -43,8 +43,8 @@ func TestTopPodAllNamespacesMetrics(t *testing.T) {
 	expectedPath := fmt.Sprintf("%s/%s/pods", baseMetricsAddress, metricsApiVersion)
 
 	f, tf, _, ns := NewAPIFactory()
-	tf.Printer = &testPrinter{}
-	tf.Client = &fake.RESTClient{
+	tf.MockPrinter = &testPrinter{}
+	tf.MockClient = &fake.RESTClient{
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
@@ -61,7 +61,7 @@ func TestTopPodAllNamespacesMetrics(t *testing.T) {
 		}),
 	}
 	tf.Namespace = firstTestNamespace
-	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &unversioned.GroupVersion{Version: "v1"}}}
+	tf.MockClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &unversioned.GroupVersion{Version: "v1"}}}
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdTopPod(f, buf)
@@ -102,8 +102,8 @@ func TestTopPodAllInNamespaceMetrics(t *testing.T) {
 	expectedPath := fmt.Sprintf("%s/%s/namespaces/%s/pods", baseMetricsAddress, metricsApiVersion, testNamespace)
 
 	f, tf, _, ns := NewAPIFactory()
-	tf.Printer = &testPrinter{}
-	tf.Client = &fake.RESTClient{
+	tf.MockPrinter = &testPrinter{}
+	tf.MockClient = &fake.RESTClient{
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
@@ -120,7 +120,7 @@ func TestTopPodAllInNamespaceMetrics(t *testing.T) {
 		}),
 	}
 	tf.Namespace = testNamespace
-	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &unversioned.GroupVersion{Version: "v1"}}}
+	tf.MockClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &unversioned.GroupVersion{Version: "v1"}}}
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdTopPod(f, buf)
@@ -153,8 +153,8 @@ func TestTopPodWithNameMetrics(t *testing.T) {
 	expectedPath := fmt.Sprintf("%s/%s/namespaces/%s/pods/%s", baseMetricsAddress, metricsApiVersion, testNamespace, expectedMetrics.Name)
 
 	f, tf, _, ns := NewAPIFactory()
-	tf.Printer = &testPrinter{}
-	tf.Client = &fake.RESTClient{
+	tf.MockPrinter = &testPrinter{}
+	tf.MockClient = &fake.RESTClient{
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
@@ -171,7 +171,7 @@ func TestTopPodWithNameMetrics(t *testing.T) {
 		}),
 	}
 	tf.Namespace = testNamespace
-	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &unversioned.GroupVersion{Version: "v1"}}}
+	tf.MockClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &unversioned.GroupVersion{Version: "v1"}}}
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdTopPod(f, buf)
@@ -206,8 +206,8 @@ func TestTopPodWithLabelSelectorMetrics(t *testing.T) {
 	expectedQuery := fmt.Sprintf("labelSelector=%s", url.QueryEscape(label))
 
 	f, tf, _, ns := NewAPIFactory()
-	tf.Printer = &testPrinter{}
-	tf.Client = &fake.RESTClient{
+	tf.MockPrinter = &testPrinter{}
+	tf.MockClient = &fake.RESTClient{
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m, q := req.URL.Path, req.Method, req.URL.RawQuery; {
@@ -224,7 +224,7 @@ func TestTopPodWithLabelSelectorMetrics(t *testing.T) {
 		}),
 	}
 	tf.Namespace = testNamespace
-	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &unversioned.GroupVersion{Version: "v1"}}}
+	tf.MockClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &unversioned.GroupVersion{Version: "v1"}}}
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdTopPod(f, buf)
@@ -258,8 +258,8 @@ func TestTopPodWithContainersMetrics(t *testing.T) {
 	expectedPath := fmt.Sprintf("%s/%s/namespaces/%s/pods/%s", baseMetricsAddress, metricsApiVersion, testNamespace, expectedMetrics.Name)
 
 	f, tf, _, ns := NewAPIFactory()
-	tf.Printer = &testPrinter{}
-	tf.Client = &fake.RESTClient{
+	tf.MockPrinter = &testPrinter{}
+	tf.MockClient = &fake.RESTClient{
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
@@ -276,7 +276,7 @@ func TestTopPodWithContainersMetrics(t *testing.T) {
 		}),
 	}
 	tf.Namespace = testNamespace
-	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &unversioned.GroupVersion{Version: "v1"}}}
+	tf.MockClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &unversioned.GroupVersion{Version: "v1"}}}
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdTopPod(f, buf)

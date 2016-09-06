@@ -50,7 +50,7 @@ type AnnotateOptions struct {
 	changeCause       string
 	recordChangeCause bool
 
-	f   *cmdutil.Factory
+	f   cmdutil.Factory
 	out io.Writer
 	cmd *cobra.Command
 
@@ -90,7 +90,7 @@ var (
 		kubectl annotate pods foo description-`)
 )
 
-func NewCmdAnnotate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+func NewCmdAnnotate(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &AnnotateOptions{}
 
 	validArgs, argAliases := []string{}, []string{}
@@ -136,7 +136,7 @@ func NewCmdAnnotate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 }
 
 // Complete adapts from the command line args and factory to the data required.
-func (o *AnnotateOptions) Complete(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) (err error) {
+func (o *AnnotateOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) (err error) {
 
 	namespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {

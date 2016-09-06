@@ -28,6 +28,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/emicklei/go-restful/swagger"
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/testapi"
@@ -44,6 +48,166 @@ import (
 	"k8s.io/kubernetes/pkg/runtime/serializer"
 	"k8s.io/kubernetes/pkg/util/strings"
 )
+
+type mockFactory struct {
+	factory cmdutil.Factory
+}
+
+func (f *mockFactory) Object(thirdPartyDiscovery bool) (meta.RESTMapper, runtime.ObjectTyper) {
+	return f.factory.Object(thirdPartyDiscovery)
+}
+
+func (f *mockFactory) UnstructuredObject() (meta.RESTMapper, runtime.ObjectTyper, error) {
+	return f.factory.UnstructuredObject()
+}
+
+func (f *mockFactory) Decoder(toInternal bool) runtime.Decoder {
+	return f.factory.Decoder(toInternal)
+}
+
+func (f *mockFactory) JSONEncoder() runtime.Encoder {
+	return f.factory.JSONEncoder()
+}
+
+func (f *mockFactory) Client() (*client.Client, error) {
+	return f.factory.Client()
+}
+
+func (f *mockFactory) ClientConfig() (*restclient.Config, error) {
+	return f.factory.ClientConfig()
+}
+
+func (f *mockFactory) ClientForMapping(mapping *meta.RESTMapping) (resource.RESTClient, error) {
+	return f.factory.ClientForMapping(mapping)
+}
+
+func (f *mockFactory) UnstructuredClientForMapping(mapping *meta.RESTMapping) (resource.RESTClient, error) {
+	return f.factory.UnstructuredClientForMapping(mapping)
+}
+
+func (f *mockFactory) Describer(mapping *meta.RESTMapping) (kubectl.Describer, error) {
+	return f.factory.Describer(mapping)
+}
+
+func (f *mockFactory) Printer(mapping *meta.RESTMapping, options kubectl.PrintOptions) (kubectl.ResourcePrinter, error) {
+	return f.factory.Printer(mapping, options)
+}
+
+func (f *mockFactory) Scaler(mapping *meta.RESTMapping) (kubectl.Scaler, error) {
+	return f.factory.Scaler(mapping)
+}
+
+func (f *mockFactory) Reaper(mapping *meta.RESTMapping) (kubectl.Reaper, error) {
+	return f.factory.Reaper(mapping)
+}
+
+func (f *mockFactory) HistoryViewer(mapping *meta.RESTMapping) (kubectl.HistoryViewer, error) {
+	return f.factory.HistoryViewer(mapping)
+}
+
+func (f *mockFactory) Rollbacker(mapping *meta.RESTMapping) (kubectl.Rollbacker, error) {
+	return f.factory.Rollbacker(mapping)
+}
+
+func (f *mockFactory) StatusViewer(mapping *meta.RESTMapping) (kubectl.StatusViewer, error) {
+	return f.factory.StatusViewer(mapping)
+}
+
+func (f *mockFactory) MapBasedSelectorForObject(object runtime.Object) (string, error) {
+	return f.factory.MapBasedSelectorForObject(object)
+}
+
+func (f *mockFactory) PortsForObject(object runtime.Object) ([]string, error) {
+	return f.factory.PortsForObject(object)
+}
+
+func (f *mockFactory) ProtocolsForObject(object runtime.Object) (map[string]string, error) {
+	return f.factory.ProtocolsForObject(object)
+}
+
+func (f *mockFactory) LabelsForObject(object runtime.Object) (map[string]string, error) {
+	return f.factory.LabelsForObject(object)
+}
+
+func (f *mockFactory) LogsForObject(object, options runtime.Object) (*restclient.Request, error) {
+	return f.factory.LogsForObject(object, options)
+}
+
+func (f *mockFactory) PauseObject(object runtime.Object) (bool, error) {
+	return f.factory.PauseObject(object)
+}
+
+func (f *mockFactory) ResumeObject(object runtime.Object) (bool, error) {
+	return f.factory.ResumeObject(object)
+}
+
+func (f *mockFactory) Validator(validate bool, cacheDir string) (validation.Schema, error) {
+	return f.factory.Validator(validate, cacheDir)
+}
+
+func (f *mockFactory) SwaggerSchema(kind unversioned.GroupVersionKind) (*swagger.ApiDeclaration, error) {
+	return f.factory.SwaggerSchema(kind)
+}
+
+func (f *mockFactory) DefaultNamespace() (string, bool, error) {
+	return f.factory.DefaultNamespace()
+}
+
+func (f *mockFactory) Generators(cmdName string) map[string]kubectl.Generator {
+	return f.factory.Generators(cmdName)
+}
+
+func (f *mockFactory) CanBeExposed(kind unversioned.GroupKind) error {
+	return f.factory.CanBeExposed(kind)
+}
+
+func (f *mockFactory) CanBeAutoscaled(kind unversioned.GroupKind) error {
+	return f.factory.CanBeAutoscaled(kind)
+}
+
+func (f *mockFactory) AttachablePodForObject(object runtime.Object) (*api.Pod, error) {
+	return f.factory.AttachablePodForObject(object)
+}
+
+func (f *mockFactory) UpdatePodSpecForObject(obj runtime.Object, fn func(*api.PodSpec) error) (bool, error) {
+	return f.factory.UpdatePodSpecForObject(obj, fn)
+}
+
+func (f *mockFactory) EditorEnvs() []string {
+	return f.factory.EditorEnvs()
+}
+
+func (f *mockFactory) PrintObjectSpecificMessage(obj runtime.Object, out io.Writer) {
+	f.factory.PrintObjectSpecificMessage(obj, out)
+}
+
+func (f *mockFactory) Command() string {
+	return f.factory.Command()
+}
+
+func (f *mockFactory) Flags() *pflag.FlagSet {
+	return f.factory.Flags()
+}
+
+func (f *mockFactory) BindFlags(flags *pflag.FlagSet) {
+	f.factory.BindFlags(flags)
+}
+
+func (f *mockFactory) BindExternalFlags(flags *pflag.FlagSet) {
+	f.factory.BindExternalFlags(flags)
+}
+
+func (f *mockFactory) PrintObject(cmd *cobra.Command, mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error {
+	return f.factory.PrintObject(cmd, mapper, obj, out)
+}
+
+func (f *mockFactory) PrinterForMapping(cmd *cobra.Command, mapping *meta.RESTMapping, withNamespace bool) (kubectl.ResourcePrinter, error) {
+	return f.factory.PrinterForMapping(cmd, mapping, withNamespace)
+}
+
+func (f *mockFactory) NewBuilder(thirdPartyDiscovery bool) *resource.Builder {
+	return f.factory.NewBuilder(thirdPartyDiscovery)
+}
 
 func initTestErrorHandler(t *testing.T) {
 	cmdutil.BehaviorOnFatal(func(str string, code int) {
@@ -184,176 +348,214 @@ func (t *testDescriber) Describe(namespace, name string, describerSettings kubec
 }
 
 type testFactory struct {
-	Mapper       meta.RESTMapper
-	Typer        runtime.ObjectTyper
-	Client       kubectl.RESTClient
-	Describer    kubectl.Describer
-	Printer      kubectl.ResourcePrinter
-	Validator    validation.Schema
-	Namespace    string
-	ClientConfig *restclient.Config
-	Err          error
+	mockFactory
+	Codec            runtime.Codec
+	Mapper           meta.RESTMapper
+	Typer            runtime.ObjectTyper
+	MockClient       kubectl.RESTClient
+	MockDescriber    kubectl.Describer
+	MockPrinter      kubectl.ResourcePrinter
+	MockValidator    validation.Schema
+	Namespace        string
+	MockClientConfig *restclient.Config
+	Err              error
 }
 
-func NewTestFactory() (*cmdutil.Factory, *testFactory, runtime.Codec, runtime.NegotiatedSerializer) {
+func NewTestFactory() (cmdutil.Factory, *testFactory, runtime.Codec, runtime.NegotiatedSerializer) {
 	scheme, mapper, codec := newExternalScheme()
 	t := &testFactory{
-		Validator: validation.NullSchema{},
-		Mapper:    mapper,
-		Typer:     scheme,
+		mockFactory:   mockFactory{factory: cmdutil.NewFactory(nil)},
+		Codec:         codec,
+		MockValidator: validation.NullSchema{},
+		Mapper:        mapper,
+		Typer:         scheme,
 	}
+
 	negotiatedSerializer := serializer.NegotiatedSerializerWrapper(
 		runtime.SerializerInfo{Serializer: codec},
 		runtime.StreamSerializerInfo{})
-	return &cmdutil.Factory{
-		Object: func(discovery bool) (meta.RESTMapper, runtime.ObjectTyper) {
-			priorityRESTMapper := meta.PriorityRESTMapper{
-				Delegate: t.Mapper,
-				ResourcePriority: []unversioned.GroupVersionResource{
-					{Group: meta.AnyGroup, Version: "v1", Resource: meta.AnyResource},
-				},
-				KindPriority: []unversioned.GroupVersionKind{
-					{Group: meta.AnyGroup, Version: "v1", Kind: meta.AnyKind},
-				},
-			}
-			return priorityRESTMapper, t.Typer
-		},
-		ClientForMapping: func(*meta.RESTMapping) (resource.RESTClient, error) {
-			return t.Client, t.Err
-		},
-		Decoder: func(bool) runtime.Decoder {
-			return codec
-		},
-		JSONEncoder: func() runtime.Encoder {
-			return codec
-		},
-		Describer: func(*meta.RESTMapping) (kubectl.Describer, error) {
-			return t.Describer, t.Err
-		},
-		Printer: func(mapping *meta.RESTMapping, options kubectl.PrintOptions) (kubectl.ResourcePrinter, error) {
-			return t.Printer, t.Err
-		},
-		Validator: func(validate bool, cacheDir string) (validation.Schema, error) {
-			return t.Validator, t.Err
-		},
-		DefaultNamespace: func() (string, bool, error) {
-			return t.Namespace, false, t.Err
-		},
-		ClientConfig: func() (*restclient.Config, error) {
-			return t.ClientConfig, t.Err
-		},
-	}, t, codec, negotiatedSerializer
+
+	return t, t, codec, negotiatedSerializer
 }
 
-func NewMixedFactory(apiClient resource.RESTClient) (*cmdutil.Factory, *testFactory, runtime.Codec) {
-	f, t, c, _ := NewTestFactory()
+func (t *testFactory) Object(discovery bool) (meta.RESTMapper, runtime.ObjectTyper) {
+	priorityRESTMapper := meta.PriorityRESTMapper{
+		Delegate: t.Mapper,
+		ResourcePriority: []unversioned.GroupVersionResource{
+			{Group: meta.AnyGroup, Version: "v1", Resource: meta.AnyResource},
+		},
+		KindPriority: []unversioned.GroupVersionKind{
+			{Group: meta.AnyGroup, Version: "v1", Kind: meta.AnyKind},
+		},
+	}
+	return priorityRESTMapper, t.Typer
+}
+
+func (t *testFactory) ClientForMapping(*meta.RESTMapping) (resource.RESTClient, error) {
+	return t.MockClient, t.Err
+}
+
+func (t *testFactory) Decoder(bool) runtime.Decoder {
+	return t.Codec
+}
+
+func (t *testFactory) JSONEncoder() runtime.Encoder {
+	return t.Codec
+}
+
+func (t *testFactory) Describer(*meta.RESTMapping) (kubectl.Describer, error) {
+	return t.MockDescriber, t.Err
+}
+
+func (t *testFactory) Printer(mapping *meta.RESTMapping, options kubectl.PrintOptions) (kubectl.ResourcePrinter, error) {
+	return t.MockPrinter, t.Err
+}
+
+func (t *testFactory) Validator(validate bool, cacheDir string) (validation.Schema, error) {
+	return t.MockValidator, t.Err
+}
+
+func (t *testFactory) DefaultNamespace() (string, bool, error) {
+	return t.Namespace, false, t.Err
+}
+
+func (t *testFactory) ClientConfig() (*restclient.Config, error) {
+	return t.MockClientConfig, t.Err
+}
+
+type mixedFactory struct {
+	testFactory
+	multiRESTMapper meta.MultiRESTMapper
+	apiClient       resource.RESTClient
+}
+
+func NewMixedFactory(apiClient resource.RESTClient) (cmdutil.Factory, *mixedFactory, runtime.Codec) {
+	_, t, c, _ := NewTestFactory()
+
 	var multiRESTMapper meta.MultiRESTMapper
 	multiRESTMapper = append(multiRESTMapper, t.Mapper)
 	multiRESTMapper = append(multiRESTMapper, testapi.Default.RESTMapper())
-	f.Object = func(discovery bool) (meta.RESTMapper, runtime.ObjectTyper) {
-		priorityRESTMapper := meta.PriorityRESTMapper{
-			Delegate: multiRESTMapper,
-			ResourcePriority: []unversioned.GroupVersionResource{
-				{Group: meta.AnyGroup, Version: "v1", Resource: meta.AnyResource},
-			},
-			KindPriority: []unversioned.GroupVersionKind{
-				{Group: meta.AnyGroup, Version: "v1", Kind: meta.AnyKind},
-			},
-		}
-		return priorityRESTMapper, runtime.MultiObjectTyper{t.Typer, api.Scheme}
+
+	mf := &mixedFactory{
+		testFactory:     *t,
+		multiRESTMapper: multiRESTMapper,
+		apiClient:       apiClient,
 	}
-	f.ClientForMapping = func(m *meta.RESTMapping) (resource.RESTClient, error) {
-		if m.ObjectConvertor == api.Scheme {
-			return apiClient, t.Err
-		}
-		return t.Client, t.Err
-	}
-	return f, t, c
+
+	return mf, mf, c
 }
 
-func NewAPIFactory() (*cmdutil.Factory, *testFactory, runtime.Codec, runtime.NegotiatedSerializer) {
-	t := &testFactory{
-		Validator: validation.NullSchema{},
-	}
-
-	f := &cmdutil.Factory{
-		Object: func(discovery bool) (meta.RESTMapper, runtime.ObjectTyper) {
-			return testapi.Default.RESTMapper(), api.Scheme
+func (t *mixedFactory) Object(discovery bool) (meta.RESTMapper, runtime.ObjectTyper) {
+	priorityRESTMapper := meta.PriorityRESTMapper{
+		Delegate: t.multiRESTMapper,
+		ResourcePriority: []unversioned.GroupVersionResource{
+			{Group: meta.AnyGroup, Version: "v1", Resource: meta.AnyResource},
 		},
-		UnstructuredObject: func() (meta.RESTMapper, runtime.ObjectTyper, error) {
-			groupResources := testDynamicResources()
-			mapper := discovery.NewRESTMapper(groupResources, meta.InterfacesForUnstructured)
-			typer := discovery.NewUnstructuredObjectTyper(groupResources)
-
-			return kubectl.ShortcutExpander{RESTMapper: mapper}, typer, nil
-		},
-		Client: func() (*client.Client, error) {
-			// Swap out the HTTP client out of the client with the fake's version.
-			fakeClient := t.Client.(*fake.RESTClient)
-			c := client.NewOrDie(t.ClientConfig)
-			c.Client = fakeClient.Client
-			c.ExtensionsClient.Client = fakeClient.Client
-			return c, t.Err
-		},
-		ClientForMapping: func(*meta.RESTMapping) (resource.RESTClient, error) {
-			return t.Client, t.Err
-		},
-		UnstructuredClientForMapping: func(*meta.RESTMapping) (resource.RESTClient, error) {
-			return t.Client, t.Err
-		},
-		Decoder: func(bool) runtime.Decoder {
-			return testapi.Default.Codec()
-		},
-		JSONEncoder: func() runtime.Encoder {
-			return testapi.Default.Codec()
-		},
-		Describer: func(*meta.RESTMapping) (kubectl.Describer, error) {
-			return t.Describer, t.Err
-		},
-		Printer: func(mapping *meta.RESTMapping, options kubectl.PrintOptions) (kubectl.ResourcePrinter, error) {
-			return t.Printer, t.Err
-		},
-		Validator: func(validate bool, cacheDir string) (validation.Schema, error) {
-			return t.Validator, t.Err
-		},
-		DefaultNamespace: func() (string, bool, error) {
-			return t.Namespace, false, t.Err
-		},
-		ClientConfig: func() (*restclient.Config, error) {
-			return t.ClientConfig, t.Err
-		},
-		Generators: func(cmdName string) map[string]kubectl.Generator {
-			return cmdutil.DefaultGenerators(cmdName)
-		},
-		LogsForObject: func(object, options runtime.Object) (*restclient.Request, error) {
-			fakeClient := t.Client.(*fake.RESTClient)
-			c := client.NewOrDie(t.ClientConfig)
-			c.Client = fakeClient.Client
-
-			switch t := object.(type) {
-			case *api.Pod:
-				opts, ok := options.(*api.PodLogOptions)
-				if !ok {
-					return nil, errors.New("provided options object is not a PodLogOptions")
-				}
-				return c.Pods(t.Namespace).GetLogs(t.Name, opts), nil
-			default:
-				fqKinds, _, err := api.Scheme.ObjectKinds(object)
-				if err != nil {
-					return nil, err
-				}
-				return nil, fmt.Errorf("cannot get the logs from %v", fqKinds[0])
-			}
+		KindPriority: []unversioned.GroupVersionKind{
+			{Group: meta.AnyGroup, Version: "v1", Kind: meta.AnyKind},
 		},
 	}
-	rf := cmdutil.NewFactory(nil)
-	f.MapBasedSelectorForObject = rf.MapBasedSelectorForObject
-	f.PortsForObject = rf.PortsForObject
-	f.ProtocolsForObject = rf.ProtocolsForObject
-	f.LabelsForObject = rf.LabelsForObject
-	f.CanBeExposed = rf.CanBeExposed
-	f.PrintObjectSpecificMessage = rf.PrintObjectSpecificMessage
-	return f, t, testapi.Default.Codec(), testapi.Default.NegotiatedSerializer()
+	return priorityRESTMapper, runtime.MultiObjectTyper{t.Typer, api.Scheme}
+}
+
+func (t *mixedFactory) ClientForMapping(m *meta.RESTMapping) (resource.RESTClient, error) {
+	if m.ObjectConvertor == api.Scheme {
+		return t.apiClient, t.Err
+	}
+	return t.MockClient, t.Err
+}
+
+type apiFactory struct {
+	testFactory
+}
+
+func NewAPIFactory() (cmdutil.Factory, *apiFactory, runtime.Codec, runtime.NegotiatedSerializer) {
+	_, t, _, _ := NewTestFactory()
+	af := &apiFactory{*t}
+
+	return af, af, testapi.Default.Codec(), testapi.Default.NegotiatedSerializer()
+}
+
+func (*apiFactory) Object(discovery bool) (meta.RESTMapper, runtime.ObjectTyper) {
+	return testapi.Default.RESTMapper(), api.Scheme
+}
+
+func (*apiFactory) UnstructuredObject() (meta.RESTMapper, runtime.ObjectTyper, error) {
+	groupResources := testDynamicResources()
+	mapper := discovery.NewRESTMapper(groupResources, meta.InterfacesForUnstructured)
+	typer := discovery.NewUnstructuredObjectTyper(groupResources)
+
+	return kubectl.ShortcutExpander{RESTMapper: mapper}, typer, nil
+}
+
+func (t *apiFactory) Client() (*client.Client, error) {
+	// Swap out the HTTP client out of the client with the fake's version.
+	fakeClient := t.MockClient.(*fake.RESTClient)
+	c := client.NewOrDie(t.MockClientConfig)
+	c.Client = fakeClient.Client
+	c.ExtensionsClient.Client = fakeClient.Client
+	return c, t.Err
+}
+
+func (t *apiFactory) ClientForMapping(*meta.RESTMapping) (resource.RESTClient, error) {
+	return t.MockClient, t.Err
+}
+
+func (t *apiFactory) UnstructuredClientForMapping(*meta.RESTMapping) (resource.RESTClient, error) {
+	return t.MockClient, t.Err
+}
+
+func (t *apiFactory) Decoder(bool) runtime.Decoder {
+	return testapi.Default.Codec()
+}
+
+func (t *apiFactory) JSONEncoder() runtime.Encoder {
+	return testapi.Default.Codec()
+}
+
+func (t *apiFactory) Describer(*meta.RESTMapping) (kubectl.Describer, error) {
+	return t.MockDescriber, t.Err
+}
+
+func (t *apiFactory) Printer(mapping *meta.RESTMapping, options kubectl.PrintOptions) (kubectl.ResourcePrinter, error) {
+	return t.MockPrinter, t.Err
+}
+
+func (t *apiFactory) Validator(validate bool, cacheDir string) (validation.Schema, error) {
+	return t.MockValidator, t.Err
+}
+
+func (t *apiFactory) DefaultNamespace() (string, bool, error) {
+	return t.Namespace, false, t.Err
+}
+
+func (t *apiFactory) ClientConfig() (*restclient.Config, error) {
+	return t.MockClientConfig, t.Err
+}
+
+func (t *apiFactory) Generators(cmdName string) map[string]kubectl.Generator {
+	return cmdutil.DefaultGenerators(cmdName)
+}
+
+func (t *apiFactory) LogsForObject(object, options runtime.Object) (*restclient.Request, error) {
+	fakeClient := t.MockClient.(*fake.RESTClient)
+	c := client.NewOrDie(t.MockClientConfig)
+	c.Client = fakeClient.Client
+
+	switch t := object.(type) {
+	case *api.Pod:
+		opts, ok := options.(*api.PodLogOptions)
+		if !ok {
+			return nil, errors.New("provided options object is not a PodLogOptions")
+		}
+		return c.Pods(t.Namespace).GetLogs(t.Name, opts), nil
+	default:
+		fqKinds, _, err := api.Scheme.ObjectKinds(object)
+		if err != nil {
+			return nil, err
+		}
+		return nil, fmt.Errorf("cannot get the logs from %v", fqKinds[0])
+	}
 }
 
 func objBody(codec runtime.Codec, obj runtime.Object) io.ReadCloser {
@@ -386,11 +588,11 @@ func stringBody(body string) io.ReadCloser {
 
 func Example_printReplicationControllerWithNamespace() {
 	f, tf, _, ns := NewAPIFactory()
-	tf.Printer = kubectl.NewHumanReadablePrinter(kubectl.PrintOptions{
+	tf.MockPrinter = kubectl.NewHumanReadablePrinter(kubectl.PrintOptions{
 		WithNamespace: true,
 		ColumnLabels:  []string{},
 	})
-	tf.Client = &fake.RESTClient{
+	tf.MockClient = &fake.RESTClient{
 		NegotiatedSerializer: ns,
 		Client:               nil,
 	}
@@ -436,11 +638,11 @@ func Example_printReplicationControllerWithNamespace() {
 
 func Example_printMultiContainersReplicationControllerWithWide() {
 	f, tf, _, ns := NewAPIFactory()
-	tf.Printer = kubectl.NewHumanReadablePrinter(kubectl.PrintOptions{
+	tf.MockPrinter = kubectl.NewHumanReadablePrinter(kubectl.PrintOptions{
 		Wide:         true,
 		ColumnLabels: []string{},
 	})
-	tf.Client = &fake.RESTClient{
+	tf.MockClient = &fake.RESTClient{
 		NegotiatedSerializer: ns,
 		Client:               nil,
 	}
@@ -488,10 +690,10 @@ func Example_printMultiContainersReplicationControllerWithWide() {
 
 func Example_printReplicationController() {
 	f, tf, _, ns := NewAPIFactory()
-	tf.Printer = kubectl.NewHumanReadablePrinter(kubectl.PrintOptions{
+	tf.MockPrinter = kubectl.NewHumanReadablePrinter(kubectl.PrintOptions{
 		ColumnLabels: []string{},
 	})
-	tf.Client = &fake.RESTClient{
+	tf.MockClient = &fake.RESTClient{
 		NegotiatedSerializer: ns,
 		Client:               nil,
 	}
@@ -539,11 +741,11 @@ func Example_printReplicationController() {
 
 func Example_printPodWithWideFormat() {
 	f, tf, _, ns := NewAPIFactory()
-	tf.Printer = kubectl.NewHumanReadablePrinter(kubectl.PrintOptions{
+	tf.MockPrinter = kubectl.NewHumanReadablePrinter(kubectl.PrintOptions{
 		Wide:         true,
 		ColumnLabels: []string{},
 	})
-	tf.Client = &fake.RESTClient{
+	tf.MockClient = &fake.RESTClient{
 		NegotiatedSerializer: ns,
 		Client:               nil,
 	}
@@ -579,11 +781,11 @@ func Example_printPodWithWideFormat() {
 
 func Example_printPodWithShowLabels() {
 	f, tf, _, ns := NewAPIFactory()
-	tf.Printer = kubectl.NewHumanReadablePrinter(kubectl.PrintOptions{
+	tf.MockPrinter = kubectl.NewHumanReadablePrinter(kubectl.PrintOptions{
 		ShowLabels:   true,
 		ColumnLabels: []string{},
 	})
-	tf.Client = &fake.RESTClient{
+	tf.MockClient = &fake.RESTClient{
 		NegotiatedSerializer: ns,
 		Client:               nil,
 	}
@@ -714,10 +916,10 @@ func newAllPhasePodList() *api.PodList {
 
 func Example_printPodHideTerminated() {
 	f, tf, _, ns := NewAPIFactory()
-	tf.Printer = kubectl.NewHumanReadablePrinter(kubectl.PrintOptions{
+	tf.MockPrinter = kubectl.NewHumanReadablePrinter(kubectl.PrintOptions{
 		ColumnLabels: []string{},
 	})
-	tf.Client = &fake.RESTClient{
+	tf.MockClient = &fake.RESTClient{
 		NegotiatedSerializer: ns,
 		Client:               nil,
 	}
@@ -737,11 +939,11 @@ func Example_printPodHideTerminated() {
 
 func Example_printPodShowAll() {
 	f, tf, _, ns := NewAPIFactory()
-	tf.Printer = kubectl.NewHumanReadablePrinter(kubectl.PrintOptions{
+	tf.MockPrinter = kubectl.NewHumanReadablePrinter(kubectl.PrintOptions{
 		ShowAll:      true,
 		ColumnLabels: []string{},
 	})
-	tf.Client = &fake.RESTClient{
+	tf.MockClient = &fake.RESTClient{
 		NegotiatedSerializer: ns,
 		Client:               nil,
 	}
@@ -763,11 +965,11 @@ func Example_printPodShowAll() {
 
 func Example_printServiceWithNamespacesAndLabels() {
 	f, tf, _, ns := NewAPIFactory()
-	tf.Printer = kubectl.NewHumanReadablePrinter(kubectl.PrintOptions{
+	tf.MockPrinter = kubectl.NewHumanReadablePrinter(kubectl.PrintOptions{
 		WithNamespace: true,
 		ColumnLabels:  []string{"l1"},
 	})
-	tf.Client = &fake.RESTClient{
+	tf.MockClient = &fake.RESTClient{
 		NegotiatedSerializer: ns,
 		Client:               nil,
 	}
