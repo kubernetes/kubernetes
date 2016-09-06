@@ -44,7 +44,7 @@ func TestRateLimitingQueue(t *testing.T) {
 	}
 	queue.AddRateLimited("one")
 	waitEntry = <-delayingQueue.waitingForAddCh
-	if e, a := 10*time.Millisecond, waitEntry.readyAt.Sub(fakeClock.Now()); e != a {
+	if e, a := 2*time.Millisecond, waitEntry.readyAt.Sub(fakeClock.Now()); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 	if e, a := 2, queue.NumRequeues("one"); e != a {
@@ -58,7 +58,7 @@ func TestRateLimitingQueue(t *testing.T) {
 	}
 	queue.AddRateLimited("two")
 	waitEntry = <-delayingQueue.waitingForAddCh
-	if e, a := 10*time.Millisecond, waitEntry.readyAt.Sub(fakeClock.Now()); e != a {
+	if e, a := 2*time.Millisecond, waitEntry.readyAt.Sub(fakeClock.Now()); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 
