@@ -40,6 +40,10 @@ func SetDefaults_Job(obj *Job) {
 		obj.Spec.Parallelism = new(int32)
 		*obj.Spec.Parallelism = 1
 	}
+	labels := obj.Spec.Template.Labels
+	if labels != nil && len(obj.Labels) == 0 {
+		obj.Labels = labels
+	}
 }
 
 func SetDefaults_ScheduledJob(obj *ScheduledJob) {
