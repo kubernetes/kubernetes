@@ -235,7 +235,7 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 			if err := printer.PrintObj(obj, out); err != nil {
 				return fmt.Errorf("unable to output the provided object: %v", err)
 			}
-			printer.FinishPrint(errOut, mapping.Resource)
+			printer.AfterPrint(errOut, mapping.Resource)
 		}
 
 		// print watched changes
@@ -253,7 +253,7 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 			}
 			err := printer.PrintObj(e.Object, out)
 			if err == nil {
-				printer.FinishPrint(errOut, mapping.Resource)
+				printer.AfterPrint(errOut, mapping.Resource)
 			}
 			return err
 		})
@@ -315,7 +315,7 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 		if err := printer.PrintObj(obj, out); err != nil {
 			allErrs = append(allErrs, err)
 		}
-		printer.FinishPrint(errOut, res)
+		printer.AfterPrint(errOut, res)
 		return utilerrors.NewAggregate(allErrs)
 	}
 
@@ -382,7 +382,7 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 		if printer == nil || lastMapping == nil || mapping == nil || mapping.Resource != lastMapping.Resource {
 			if printer != nil {
 				w.Flush()
-				printer.FinishPrint(errOut, lastMapping.Resource)
+				printer.AfterPrint(errOut, lastMapping.Resource)
 			}
 			printer, err = f.PrinterForMapping(cmd, mapping, allNamespaces)
 			if err != nil {
@@ -422,7 +422,7 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 	}
 	w.Flush()
 	if printer != nil {
-		printer.FinishPrint(errOut, lastMapping.Resource)
+		printer.AfterPrint(errOut, lastMapping.Resource)
 	}
 	return utilerrors.NewAggregate(allErrs)
 }
