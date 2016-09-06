@@ -38,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/genericapiserver/authorizer"
 	genericoptions "k8s.io/kubernetes/pkg/genericapiserver/options"
 	genericvalidation "k8s.io/kubernetes/pkg/genericapiserver/validation"
+	"k8s.io/kubernetes/pkg/master/routes"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/clusterrole"
 	clusterroleetcd "k8s.io/kubernetes/pkg/registry/clusterrole/etcd"
@@ -195,6 +196,8 @@ func Run(s *options.ServerRunOptions) error {
 	if err != nil {
 		return err
 	}
+
+	routes.Version{}.Install(m.Mux, m.HandlerContainer)
 
 	installFederationAPIs(s, m, storageFactory)
 	installCoreAPIs(s, m, storageFactory)

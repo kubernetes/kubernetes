@@ -36,6 +36,8 @@ import (
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apiserver"
+	"k8s.io/kubernetes/pkg/auth/authorizer"
+	"k8s.io/kubernetes/pkg/auth/user"
 	ipallocator "k8s.io/kubernetes/pkg/registry/service/ipallocator"
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
@@ -173,12 +175,11 @@ func TestHandleWithAuth(t *testing.T) {
 	server, etcdserver, _, assert := setUp(t)
 	defer etcdserver.Terminate(t)
 
-	mh := apiserver.MuxHelper{Mux: http.NewServeMux()}
-	server.MuxHelper = &mh
+	server.Mux = apiserver.NewPathRecorderMux(http.NewServeMux())
 	handler := func(r http.ResponseWriter, w *http.Request) { w.Write(nil) }
 	server.HandleWithAuth("/test", http.HandlerFunc(handler))
 
-	assert.Contains(server.MuxHelper.RegisteredPaths, "/test", "Path not found in MuxHelper")
+	assert.Contains(server.Mux.HandledPaths(), "/test", "Path not found in MuxHelper")
 }
 
 // TestHandleFuncWithAuth verifies HandleFuncWithAuth adds the path
@@ -187,12 +188,76 @@ func TestHandleFuncWithAuth(t *testing.T) {
 	server, etcdserver, _, assert := setUp(t)
 	defer etcdserver.Terminate(t)
 
-	mh := apiserver.MuxHelper{Mux: http.NewServeMux()}
-	server.MuxHelper = &mh
+	server.Mux = apiserver.NewPathRecorderMux(http.NewServeMux())
 	handler := func(r http.ResponseWriter, w *http.Request) { w.Write(nil) }
 	server.HandleFuncWithAuth("/test", handler)
 
-	assert.Contains(server.MuxHelper.RegisteredPaths, "/test", "Path not found in MuxHelper")
+	assert.Contains(server.Mux.HandledPaths(), "/test", "Path not found in MuxHelper")
+}
+
+// TestNotRestRoutesHaveAuth checks that special non-routes are behind authz/authn.
+func TestNotRestRoutesHaveAuth(t *testing.T) {
+	_, etcdserver, config, _ := setUp(t)
+	defer etcdserver.Terminate(t)
+
+	authz := mockAuthorizer{}
+
+	config.ProxyDialer = func(network, addr string) (net.Conn, error) { return nil, nil }
+	config.ProxyTLSClientConfig = &tls.Config{}
+	config.APIPrefix = "/apiPrefix"
+	config.APIGroupPrefix = "/apiGroupPrefix"
+	config.Serializer = api.Codecs
+	config.Authorizer = &authz
+
+	config.EnableSwaggerUI = true
+	config.EnableIndex = true
+	config.EnableProfiling = true
+	config.EnableSwaggerSupport = true
+
+	s, err := config.New()
+	if err != nil {
+		t.Fatalf("Error in bringing up the server: %v", err)
+	}
+
+	for _, test := range []struct {
+		route string
+	}{
+		{"/"},
+		{"/swagger-ui/"},
+		{"/debug/pprof/"},
+	} {
+		resp := httptest.NewRecorder()
+		req, _ := http.NewRequest("GET", test.route, nil)
+		s.Handler.ServeHTTP(resp, req)
+		if resp.Code != 200 {
+			t.Errorf("route %q expected to work: code %d", test.route, resp.Code)
+			continue
+		}
+
+		if authz.lastURI != test.route {
+			t.Errorf("route %q expected to go through authorization, last route did: %q", test.route, authz.lastURI)
+		}
+	}
+}
+
+type mockAuthorizer struct {
+	lastURI string
+}
+
+func (authz *mockAuthorizer) Authorize(a authorizer.Attributes) (authorized bool, reason string, err error) {
+	authz.lastURI = a.GetPath()
+	return true, "", nil
+}
+
+type mockAuthenticator struct {
+	lastURI string
+}
+
+func (authn *mockAuthenticator) AuthenticateRequest(req *http.Request) (user.Info, bool, error) {
+	authn.lastURI = req.RequestURI
+	return &user.DefaultInfo{
+		Name: "foo",
+	}, true, nil
 }
 
 // TestInstallSwaggerAPI verifies that the swagger api is added

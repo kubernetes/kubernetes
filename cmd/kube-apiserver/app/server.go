@@ -289,6 +289,8 @@ func Run(s *options.APIServer) error {
 		DeleteCollectionWorkers: s.DeleteCollectionWorkers,
 		EventTTL:                s.EventTTL,
 		KubeletClient:           kubeletClient,
+		EnableUISupport:         true,
+		EnableLogsSupport:       true,
 
 		Tunneler: tunneler,
 	}
