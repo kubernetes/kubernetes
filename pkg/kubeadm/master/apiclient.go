@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	unversionedapi "k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
@@ -77,7 +78,7 @@ func CreateClientAndWaitForAPI(adminConfig *clientcmdapi.Config) (*clientset.Cli
 	wait.PollInfinite(500*time.Millisecond, func() (bool, error) {
 		nodeList, err := client.Nodes().List(api.ListOptions{})
 		if err != nil {
-			fmt.Println("<master/apiclient> not able to list nodes (will retry)")
+			fmt.Println("<master/apiclient> temporarily unable to list nodes (will retry)")
 			return false, nil
 		}
 		if len(nodeList.Items) < 1 {
@@ -140,10 +141,10 @@ func findMyself(client *clientset.Clientset) (*api.Node, error) {
 	return node, nil
 }
 
-func UpdateMasterRoleLabelsAndTaints(client *clientset.Clientset) error {
+func attemptToUpdateMasterRoleLabelsAndTaints(client *clientset.Clientset) error {
 	n, err := findMyself(client)
 	if err != nil {
-		return fmt.Errorf("<master/apiclient> failed to update master node - %s", err)
+		return err
 	}
 
 	n.ObjectMeta.Labels["kubeadm.alpha.kubernetes.io/role"] = "master"
@@ -151,9 +152,23 @@ func UpdateMasterRoleLabelsAndTaints(client *clientset.Clientset) error {
 	n.ObjectMeta.Annotations[api.TaintsAnnotationKey] = string(taintsAnnotation)
 
 	if _, err := client.Nodes().Update(n); err != nil {
-		return fmt.Errorf("<master/apiclient> failed to update master node - %s", err)
+		if apierrs.IsConflict(err) {
+			fmt.Println("<master/apiclient> temporarily unable to update master node metadata due to conflict (will retry)")
+			time.Sleep(500 * time.Millisecond)
+			attemptToUpdateMasterRoleLabelsAndTaints(client)
+		} else {
+			return err
+		}
 	}
 
+	return nil
+}
+
+func UpdateMasterRoleLabelsAndTaints(client *clientset.Clientset) error {
+	err := attemptToUpdateMasterRoleLabelsAndTaints(client)
+	if err != nil {
+		return fmt.Errorf("<master/apiclient> failed to update master node - %s", err)
+	}
 	return nil
 }
 
