@@ -3435,11 +3435,9 @@ func validateEndpointAddress(address *api.EndpointAddress, fldPath *field.Path, 
 	if len(address.Hostname) > 0 {
 		allErrs = append(allErrs, ValidateDNS1123Label(address.Hostname, fldPath.Child("hostname"))...)
 	}
-	// During endpoint update, verify that NodeName is a DNS subdomain and transition rules allow the update
+	// During endpoint update, validate NodeName is DNS1123 compliant and transition rules allow the update
 	if address.NodeName != nil {
-		for _, msg := range ValidateNodeName(*address.NodeName, false) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("nodeName"), *address.NodeName, msg))
-		}
+		allErrs = append(allErrs, ValidateDNS1123Label(*address.NodeName, fldPath.Child("nodeName"))...)
 	}
 	allErrs = append(allErrs, validateEpAddrNodeNameTransition(address, ipToNodeName, fldPath.Child("nodeName"))...)
 	if len(allErrs) > 0 {
