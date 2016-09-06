@@ -65,6 +65,9 @@ COPY cni-bin/bin /opt/cni/bin
 # Copy overlay configuration to default directory
 COPY cni-conf /etc/cni/net.d
 
+# Copy heapster
+COPY heapster /heapster
+
 # Create symlinks for each hyperkube server
 # TODO: replace manual symlink creation with --make-symlink command once
 # cross-building with qemu supports go binaries. See #28702
