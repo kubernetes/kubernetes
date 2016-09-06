@@ -25,6 +25,9 @@ set -o nounset
 set -o pipefail
 set -o xtrace
 
+echo "gcloud auth before changing HOME to $HOME"
+gcloud auth list
+
 # !!! ALERT !!! Jenkins default $HOME is /var/lib/jenkins, which is
 # global across jobs. We change $HOME instead to ${WORKSPACE}, which
 # is an incoming variable Jenkins provides us for this job's scratch
@@ -32,6 +35,9 @@ set -o xtrace
 export HOME=${WORKSPACE} # Nothing should want Jenkins $HOME
 export PATH=$PATH:/usr/local/go/bin
 export KUBE_SKIP_CONFIRMATIONS=y
+
+echo "gcloud auth after changing HOME to $HOME"
+gcloud auth list
 
 # Skip gcloud update checking
 export CLOUDSDK_COMPONENT_MANAGER_DISABLE_UPDATE_CHECK=true
