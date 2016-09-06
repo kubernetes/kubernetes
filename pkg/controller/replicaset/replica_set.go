@@ -560,19 +560,19 @@ func (rsc *ReplicaSetController) syncReplicaSet(key string) error {
 	if !rsc.podStoreSynced() {
 		// Sleep so we give the pod reflector goroutine a chance to run.
 		time.Sleep(PodStoreSyncedPollPeriod)
-		glog.Infof("Waiting for pods controller to sync, requeuing ReplicaSet %v", key)
+		glog.V(4).Infof("Waiting for pods controller to sync, requeuing ReplicaSet %v", key)
 		rsc.queue.Add(key)
 		return nil
 	}
 
 	obj, exists, err := rsc.rsStore.Store.GetByKey(key)
 	if !exists {
-		glog.Infof("ReplicaSet has been deleted %v", key)
+		glog.V(2).Infof("ReplicaSet has been deleted %v", key)
 		rsc.expectations.DeleteExpectations(key)
 		return nil
 	}
 	if err != nil {
-		glog.Infof("Unable to retrieve ReplicaSet %v from store: %v", key, err)
+		glog.V(2).Infof("Unable to retrieve ReplicaSet %v from store: %v", key, err)
 		rsc.queue.Add(key)
 		return err
 	}

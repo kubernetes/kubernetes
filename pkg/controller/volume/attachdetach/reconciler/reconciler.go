@@ -165,7 +165,7 @@ func (rc *reconciler) reconciliationLoopFunc() func() {
 				glog.V(5).Infof("Attempting to start AttachVolume for volume %q to node %q", volumeToAttach.VolumeName, volumeToAttach.NodeName)
 				err := rc.attacherDetacher.AttachVolume(volumeToAttach.VolumeToAttach, rc.actualStateOfWorld)
 				if err == nil {
-					glog.Infof("Started AttachVolume for volume %q to node %q", volumeToAttach.VolumeName, volumeToAttach.NodeName)
+					glog.V(5).Infof("Started AttachVolume for volume %q to node %q", volumeToAttach.VolumeName, volumeToAttach.NodeName)
 				}
 				if err != nil &&
 					!nestedpendingoperations.IsAlreadyExists(err) &&
