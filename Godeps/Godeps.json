@@ -1868,178 +1868,183 @@
 		},
 		{
 			"ImportPath": "github.com/rackspace/gophercloud",
-			"Comment": "v1.0.0-920-g934dbf8",
-			"Rev": "934dbf81977c67c521c75492dc1f55ca74dc5b04"
+			"Comment": "v1.0.0-1012-ge00690e",
+			"Rev": "e00690e87603abe613e9f02c816c7c4bef82e063"
 		},
 		{
 			"ImportPath": "github.com/rackspace/gophercloud/openstack",
-			"Comment": "v1.0.0-920-g934dbf8",
-			"Rev": "934dbf81977c67c521c75492dc1f55ca74dc5b04"
+			"Comment": "v1.0.0-1012-ge00690e",
+			"Rev": "e00690e87603abe613e9f02c816c7c4bef82e063"
 		},
 		{
 			"ImportPath": "github.com/rackspace/gophercloud/openstack/blockstorage/v1/volumes",
-			"Comment": "v1.0.0-920-g934dbf8",
-			"Rev": "934dbf81977c67c521c75492dc1f55ca74dc5b04"
+			"Comment": "v1.0.0-1012-ge00690e",
+			"Rev": "e00690e87603abe613e9f02c816c7c4bef82e063"
 		},
 		{
 			"ImportPath": "github.com/rackspace/gophercloud/openstack/common/extensions",
-			"Comment": "v1.0.0-920-g934dbf8",
-			"Rev": "934dbf81977c67c521c75492dc1f55ca74dc5b04"
+			"Comment": "v1.0.0-1012-ge00690e",
+			"Rev": "e00690e87603abe613e9f02c816c7c4bef82e063"
 		},
 		{
 			"ImportPath": "github.com/rackspace/gophercloud/openstack/compute/v2/extensions/bootfromvolume",
-			"Comment": "v1.0.0-920-g934dbf8",
-			"Rev": "934dbf81977c67c521c75492dc1f55ca74dc5b04"
+			"Comment": "v1.0.0-1012-ge00690e",
+			"Rev": "e00690e87603abe613e9f02c816c7c4bef82e063"
 		},
 		{
 			"ImportPath": "github.com/rackspace/gophercloud/openstack/compute/v2/extensions/diskconfig",
-			"Comment": "v1.0.0-920-g934dbf8",
-			"Rev": "934dbf81977c67c521c75492dc1f55ca74dc5b04"
+			"Comment": "v1.0.0-1012-ge00690e",
+			"Rev": "e00690e87603abe613e9f02c816c7c4bef82e063"
 		},
 		{
 			"ImportPath": "github.com/rackspace/gophercloud/openstack/compute/v2/extensions/volumeattach",
-			"Comment": "v1.0.0-920-g934dbf8",
-			"Rev": "934dbf81977c67c521c75492dc1f55ca74dc5b04"
+			"Comment": "v1.0.0-1012-ge00690e",
+			"Rev": "e00690e87603abe613e9f02c816c7c4bef82e063"
 		},
 		{
 			"ImportPath": "github.com/rackspace/gophercloud/openstack/compute/v2/flavors",
-			"Comment": "v1.0.0-920-g934dbf8",
-			"Rev": "934dbf81977c67c521c75492dc1f55ca74dc5b04"
+			"Comment": "v1.0.0-1012-ge00690e",
+			"Rev": "e00690e87603abe613e9f02c816c7c4bef82e063"
 		},
 		{
 			"ImportPath": "github.com/rackspace/gophercloud/openstack/compute/v2/images",
-			"Comment": "v1.0.0-920-g934dbf8",
-			"Rev": "934dbf81977c67c521c75492dc1f55ca74dc5b04"
+			"Comment": "v1.0.0-1012-ge00690e",
+			"Rev": "e00690e87603abe613e9f02c816c7c4bef82e063"
 		},
 		{
 			"ImportPath": "github.com/rackspace/gophercloud/openstack/compute/v2/servers",
-			"Comment": "v1.0.0-920-g934dbf8",
-			"Rev": "934dbf81977c67c521c75492dc1f55ca74dc5b04"
+			"Comment": "v1.0.0-1012-ge00690e",
+			"Rev": "e00690e87603abe613e9f02c816c7c4bef82e063"
 		},
 		{
 			"ImportPath": "github.com/rackspace/gophercloud/openstack/identity/v2/tenants",
-			"Comment": "v1.0.0-920-g934dbf8",
-			"Rev": "934dbf81977c67c521c75492dc1f55ca74dc5b04"
+			"Comment": "v1.0.0-1012-ge00690e",
+			"Rev": "e00690e87603abe613e9f02c816c7c4bef82e063"
 		},
 		{
 			"ImportPath": "github.com/rackspace/gophercloud/openstack/identity/v2/tokens",
-			"Comment": "v1.0.0-920-g934dbf8",
-			"Rev": "934dbf81977c67c521c75492dc1f55ca74dc5b04"
+			"Comment": "v1.0.0-1012-ge00690e",
+			"Rev": "e00690e87603abe613e9f02c816c7c4bef82e063"
+		},
+		{
+			"ImportPath": "github.com/rackspace/gophercloud/openstack/identity/v3/extensions/trust",
+			"Comment": "v1.0.0-1012-ge00690e",
+			"Rev": "e00690e87603abe613e9f02c816c7c4bef82e063"
 		},
 		{
 			"ImportPath": "github.com/rackspace/gophercloud/openstack/identity/v3/tokens",
-			"Comment": "v1.0.0-920-g934dbf8",
-			"Rev": "934dbf81977c67c521c75492dc1f55ca74dc5b04"
+			"Comment": "v1.0.0-1012-ge00690e",
+			"Rev": "e00690e87603abe613e9f02c816c7c4bef82e063"
 		},
 		{
 			"ImportPath": "github.com/rackspace/gophercloud/openstack/networking/v2/extensions",
-			"Comment": "v1.0.0-920-g934dbf8",
-			"Rev": "934dbf81977c67c521c75492dc1f55ca74dc5b04"
+			"Comment": "v1.0.0-1012-ge00690e",
+			"Rev": "e00690e87603abe613e9f02c816c7c4bef82e063"
 		},
 		{
 			"ImportPath": "github.com/rackspace/gophercloud/openstack/networking/v2/extensions/layer3/floatingips",
-			"Comment": "v1.0.0-920-g934dbf8",
-			"Rev": "934dbf81977c67c521c75492dc1f55ca74dc5b04"
+			"Comment": "v1.0.0-1012-ge00690e",
+			"Rev": "e00690e87603abe613e9f02c816c7c4bef82e063"
 		},
 		{
 			"ImportPath": "github.com/rackspace/gophercloud/openstack/networking/v2/extensions/lbaas/members",
-			"Comment": "v1.0.0-920-g934dbf8",
-			"Rev": "934dbf81977c67c521c75492dc1f55ca74dc5b04"
+			"Comment": "v1.0.0-1012-ge00690e",
+			"Rev": "e00690e87603abe613e9f02c816c7c4bef82e063"
 		},
 		{
 			"ImportPath": "github.com/rackspace/gophercloud/openstack/networking/v2/extensions/lbaas/monitors",
-			"Comment": "v1.0.0-920-g934dbf8",
-			"Rev": "934dbf81977c67c521c75492dc1f55ca74dc5b04"
+			"Comment": "v1.0.0-1012-ge00690e",
+			"Rev": "e00690e87603abe613e9f02c816c7c4bef82e063"
 		},
 		{
 			"ImportPath": "github.com/rackspace/gophercloud/openstack/networking/v2/extensions/lbaas/pools",
-			"Comment": "v1.0.0-920-g934dbf8",
-			"Rev": "934dbf81977c67c521c75492dc1f55ca74dc5b04"
+			"Comment": "v1.0.0-1012-ge00690e",
+			"Rev": "e00690e87603abe613e9f02c816c7c4bef82e063"
 		},
 		{
 			"ImportPath": "github.com/rackspace/gophercloud/openstack/networking/v2/extensions/lbaas/vips",
-			"Comment": "v1.0.0-920-g934dbf8",
-			"Rev": "934dbf81977c67c521c75492dc1f55ca74dc5b04"
+			"Comment": "v1.0.0-1012-ge00690e",
+			"Rev": "e00690e87603abe613e9f02c816c7c4bef82e063"
 		},
 		{
 			"ImportPath": "github.com/rackspace/gophercloud/openstack/networking/v2/extensions/lbaas_v2/listeners",
-			"Comment": "v1.0.0-920-g934dbf8",
-			"Rev": "934dbf81977c67c521c75492dc1f55ca74dc5b04"
+			"Comment": "v1.0.0-1012-ge00690e",
+			"Rev": "e00690e87603abe613e9f02c816c7c4bef82e063"
 		},
 		{
 			"ImportPath": "github.com/rackspace/gophercloud/openstack/networking/v2/extensions/lbaas_v2/loadbalancers",
-			"Comment": "v1.0.0-920-g934dbf8",
-			"Rev": "934dbf81977c67c521c75492dc1f55ca74dc5b04"
+			"Comment": "v1.0.0-1012-ge00690e",
+			"Rev": "e00690e87603abe613e9f02c816c7c4bef82e063"
 		},
 		{
 			"ImportPath": "github.com/rackspace/gophercloud/openstack/networking/v2/extensions/lbaas_v2/monitors",
-			"Comment": "v1.0.0-920-g934dbf8",
-			"Rev": "934dbf81977c67c521c75492dc1f55ca74dc5b04"
+			"Comment": "v1.0.0-1012-ge00690e",
+			"Rev": "e00690e87603abe613e9f02c816c7c4bef82e063"
 		},
 		{
 			"ImportPath": "github.com/rackspace/gophercloud/openstack/networking/v2/extensions/lbaas_v2/pools",
-			"Comment": "v1.0.0-920-g934dbf8",
-			"Rev": "934dbf81977c67c521c75492dc1f55ca74dc5b04"
+			"Comment": "v1.0.0-1012-ge00690e",
+			"Rev": "e00690e87603abe613e9f02c816c7c4bef82e063"
 		},
 		{
 			"ImportPath": "github.com/rackspace/gophercloud/openstack/networking/v2/extensions/security/groups",
-			"Comment": "v1.0.0-920-g934dbf8",
-			"Rev": "934dbf81977c67c521c75492dc1f55ca74dc5b04"
+			"Comment": "v1.0.0-1012-ge00690e",
+			"Rev": "e00690e87603abe613e9f02c816c7c4bef82e063"
 		},
 		{
 			"ImportPath": "github.com/rackspace/gophercloud/openstack/networking/v2/extensions/security/rules",
-			"Comment": "v1.0.0-920-g934dbf8",
-			"Rev": "934dbf81977c67c521c75492dc1f55ca74dc5b04"
+			"Comment": "v1.0.0-1012-ge00690e",
+			"Rev": "e00690e87603abe613e9f02c816c7c4bef82e063"
 		},
 		{
 			"ImportPath": "github.com/rackspace/gophercloud/openstack/networking/v2/ports",
-			"Comment": "v1.0.0-920-g934dbf8",
-			"Rev": "934dbf81977c67c521c75492dc1f55ca74dc5b04"
+			"Comment": "v1.0.0-1012-ge00690e",
+			"Rev": "e00690e87603abe613e9f02c816c7c4bef82e063"
 		},
 		{
 			"ImportPath": "github.com/rackspace/gophercloud/openstack/utils",
-			"Comment": "v1.0.0-920-g934dbf8",
-			"Rev": "934dbf81977c67c521c75492dc1f55ca74dc5b04"
+			"Comment": "v1.0.0-1012-ge00690e",
+			"Rev": "e00690e87603abe613e9f02c816c7c4bef82e063"
 		},
 		{
 			"ImportPath": "github.com/rackspace/gophercloud/pagination",
-			"Comment": "v1.0.0-920-g934dbf8",
-			"Rev": "934dbf81977c67c521c75492dc1f55ca74dc5b04"
+			"Comment": "v1.0.0-1012-ge00690e",
+			"Rev": "e00690e87603abe613e9f02c816c7c4bef82e063"
 		},
 		{
 			"ImportPath": "github.com/rackspace/gophercloud/rackspace",
-			"Comment": "v1.0.0-920-g934dbf8",
-			"Rev": "934dbf81977c67c521c75492dc1f55ca74dc5b04"
+			"Comment": "v1.0.0-1012-ge00690e",
+			"Rev": "e00690e87603abe613e9f02c816c7c4bef82e063"
 		},
 		{
 			"ImportPath": "github.com/rackspace/gophercloud/rackspace/blockstorage/v1/volumes",
-			"Comment": "v1.0.0-920-g934dbf8",
-			"Rev": "934dbf81977c67c521c75492dc1f55ca74dc5b04"
+			"Comment": "v1.0.0-1012-ge00690e",
+			"Rev": "e00690e87603abe613e9f02c816c7c4bef82e063"
 		},
 		{
 			"ImportPath": "github.com/rackspace/gophercloud/rackspace/compute/v2/servers",
-			"Comment": "v1.0.0-920-g934dbf8",
-			"Rev": "934dbf81977c67c521c75492dc1f55ca74dc5b04"
+			"Comment": "v1.0.0-1012-ge00690e",
+			"Rev": "e00690e87603abe613e9f02c816c7c4bef82e063"
 		},
 		{
 			"ImportPath": "github.com/rackspace/gophercloud/rackspace/compute/v2/volumeattach",
-			"Comment": "v1.0.0-920-g934dbf8",
-			"Rev": "934dbf81977c67c521c75492dc1f55ca74dc5b04"
+			"Comment": "v1.0.0-1012-ge00690e",
+			"Rev": "e00690e87603abe613e9f02c816c7c4bef82e063"
 		},
 		{
 			"ImportPath": "github.com/rackspace/gophercloud/rackspace/identity/v2/tokens",
-			"Comment": "v1.0.0-920-g934dbf8",
-			"Rev": "934dbf81977c67c521c75492dc1f55ca74dc5b04"
+			"Comment": "v1.0.0-1012-ge00690e",
+			"Rev": "e00690e87603abe613e9f02c816c7c4bef82e063"
 		},
 		{
 			"ImportPath": "github.com/rackspace/gophercloud/testhelper",
-			"Comment": "v1.0.0-920-g934dbf8",
-			"Rev": "934dbf81977c67c521c75492dc1f55ca74dc5b04"
+			"Comment": "v1.0.0-1012-ge00690e",
+			"Rev": "e00690e87603abe613e9f02c816c7c4bef82e063"
 		},
 		{
 			"ImportPath": "github.com/rackspace/gophercloud/testhelper/client",
-			"Comment": "v1.0.0-920-g934dbf8",
-			"Rev": "934dbf81977c67c521c75492dc1f55ca74dc5b04"
+			"Comment": "v1.0.0-1012-ge00690e",
+			"Rev": "e00690e87603abe613e9f02c816c7c4bef82e063"
 		},
 		{
 			"ImportPath": "github.com/renstrom/dedent",
