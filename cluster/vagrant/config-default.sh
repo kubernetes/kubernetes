@@ -115,3 +115,6 @@ E2E_STORAGE_TEST_ENVIRONMENT=${KUBE_E2E_STORAGE_TEST_ENVIRONMENT:-false}
 
 # Default fallback NETWORK_IF_NAME, will be used in case when no 'VAGRANT-BEGIN' comments were defined in network-script
 export DEFAULT_NETWORK_IF_NAME="eth0"
+
+# Evict pods whenever compute resource availability on the nodes gets below a threshold.
+EVICTION_HARD="${EVICTION_HARD:-memory.available<100Mi,nodefs.available<10%}"
