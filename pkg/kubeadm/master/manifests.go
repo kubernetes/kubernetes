@@ -35,7 +35,7 @@ import (
 // init master` and `kubeadm manual bootstrap master` can get going.
 
 const (
-	SERVICE_CLUSTER_IP_RANGE = "--service-cluster-ip-range=10.16.0.0/12"
+	SERVICE_CLUSTER_IP_RANGE = "--service-cluster-ip-range=100.64.0.0/12"
 	CLUSTER_NAME             = "--cluster-name=kubernetes"
 	MASTER                   = "--master=127.0.0.1:8080"
 )

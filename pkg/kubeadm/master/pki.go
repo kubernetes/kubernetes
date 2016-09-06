@@ -57,7 +57,7 @@ func newServerKeyAndCert(caCert *x509.Certificate, caKey *rsa.PrivateKey, altNam
 		return nil, nil, fmt.Errorf("unabel to create private key [%s]", err)
 	}
 	// TODO these are all hardcoded for now, but we need to figure out what shall we do here exactly
-	altNames.IPs = append(altNames.IPs, net.ParseIP("10.3.0.1"))
+	altNames.IPs = append(altNames.IPs, net.ParseIP("10.3.0.1"), net.ParseIP("10.16.0.1"), net.ParseIP("100.64.0.1"))
 	altNames.DNSNames = append(altNames.DNSNames,
 		"kubernetes",
 		"kubernetes.default",
