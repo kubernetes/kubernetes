@@ -68,9 +68,8 @@ func TestGenerateStorageVersionMap(t *testing.T) {
 	}
 	for i, test := range testCases {
 		s := options.ServerRunOptions{
-			DeprecatedStorageVersion: test.legacyVersion,
-			StorageVersions:          test.storageVersions,
-			DefaultStorageVersions:   test.defaultVersions,
+			StorageVersions:        test.storageVersions,
+			DefaultStorageVersions: test.defaultVersions,
 		}
 		output, err := s.StorageGroupsToEncodingVersion()
 		if err != nil {
