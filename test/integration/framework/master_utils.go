@@ -229,6 +229,7 @@ func NewMasterConfig() *master.Config {
 			// Set those values to avoid annoying warnings in logs.
 			ServiceClusterIPRange: parseCIDROrDie("10.0.0.0/24"),
 			ServiceNodePortRange:  utilnet.PortRange{Base: 30000, Size: 2768},
+			EnableVersion:         true,
 		},
 		KubeletClient: kubeletclient.FakeKubeletClient{},
 	}
@@ -239,6 +240,7 @@ func NewIntegrationTestMasterConfig() *master.Config {
 	masterConfig := NewMasterConfig()
 	masterConfig.EnableCoreControllers = true
 	masterConfig.EnableIndex = true
+	masterConfig.EnableVersion = true
 	masterConfig.PublicAddress = net.ParseIP("192.168.10.4")
 	masterConfig.APIResourceConfigSource = master.DefaultAPIResourceConfigSource()
 	return masterConfig

@@ -18,7 +18,6 @@ package master
 
 import (
 	"fmt"
-	"io"
 	"net"
 	"net/http"
 	"net/url"
@@ -52,7 +51,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/storage"
 	storageapiv1beta1 "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
 	"k8s.io/kubernetes/pkg/apiserver"
-	apiservermetrics "k8s.io/kubernetes/pkg/apiserver/metrics"
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/healthz"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
@@ -77,22 +75,22 @@ import (
 	resourcequotaetcd "k8s.io/kubernetes/pkg/registry/resourcequota/etcd"
 	secretetcd "k8s.io/kubernetes/pkg/registry/secret/etcd"
 	"k8s.io/kubernetes/pkg/registry/service"
+	"k8s.io/kubernetes/pkg/registry/service/allocator"
 	etcdallocator "k8s.io/kubernetes/pkg/registry/service/allocator/etcd"
 	serviceetcd "k8s.io/kubernetes/pkg/registry/service/etcd"
 	ipallocator "k8s.io/kubernetes/pkg/registry/service/ipallocator"
+	"k8s.io/kubernetes/pkg/registry/service/portallocator"
 	serviceaccountetcd "k8s.io/kubernetes/pkg/registry/serviceaccount/etcd"
 	"k8s.io/kubernetes/pkg/registry/thirdpartyresourcedata"
 	thirdpartyresourcedataetcd "k8s.io/kubernetes/pkg/registry/thirdpartyresourcedata/etcd"
+	"k8s.io/kubernetes/pkg/routes"
 	"k8s.io/kubernetes/pkg/runtime"
-	etcdmetrics "k8s.io/kubernetes/pkg/storage/etcd/metrics"
 	etcdutil "k8s.io/kubernetes/pkg/storage/etcd/util"
 	"k8s.io/kubernetes/pkg/storage/storagebackend"
 	"k8s.io/kubernetes/pkg/util/sets"
 
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
-	"k8s.io/kubernetes/pkg/registry/service/allocator"
-	"k8s.io/kubernetes/pkg/registry/service/portallocator"
 )
 
 const (
@@ -112,7 +110,9 @@ type Config struct {
 	// RESTStorageProviders provides RESTStorage building methods keyed by groupName
 	RESTStorageProviders map[string]RESTStorageProvider
 	// Used to start and monitor tunneling
-	Tunneler genericapiserver.Tunneler
+	Tunneler          genericapiserver.Tunneler
+	EnableUISupport   bool
+	EnableLogsSupport bool
 
 	disableThirdPartyControllerForTesting bool
 }
@@ -179,9 +179,18 @@ func New(c *Config) (*Master, error) {
 		return nil, fmt.Errorf("Master.New() called with config.KubeletClient == nil")
 	}
 
-	s, err := c.Config.New()
+	gc := *c.Config                                              // copy before mutations
+	gc.EnableSwaggerUI = gc.EnableSwaggerUI && c.EnableUISupport // disable swagger UI if general UI supports it
+	s, err := gc.New()
 	if err != nil {
 		return nil, err
+	}
+
+	if c.EnableUISupport {
+		routes.UIRedirect{}.Install(s.Mux, s.HandlerContainer)
+	}
+	if c.EnableLogsSupport {
+		routes.Logs{}.Install(s.Mux, s.HandlerContainer)
 	}
 
 	m := &Master{
@@ -218,19 +227,6 @@ func New(c *Config) (*Master, error) {
 	}
 
 	return m, nil
-}
-
-var defaultMetricsHandler = prometheus.Handler().ServeHTTP
-
-// MetricsWithReset is a handler that resets metrics when DELETE is passed to the endpoint.
-func MetricsWithReset(w http.ResponseWriter, req *http.Request) {
-	if req.Method == "DELETE" {
-		apiservermetrics.Reset()
-		etcdmetrics.Reset()
-		io.WriteString(w, "metrics reset\n")
-		return
-	}
-	defaultMetricsHandler(w, req)
 }
 
 func (m *Master) InstallAPIs(c *Config) {
@@ -270,12 +266,12 @@ func (m *Master) InstallAPIs(c *Config) {
 			Help: "The time since the last successful synchronization of the SSH tunnels for proxy requests.",
 		}, func() float64 { return float64(m.tunneler.SecondsSinceSync()) })
 	}
-	healthz.InstallHandler(m.MuxHelper, healthzChecks...)
+	healthz.InstallHandler(m.Mux, healthzChecks...)
 
 	if c.EnableProfiling {
-		m.MuxHelper.HandleFunc("/metrics", MetricsWithReset)
+		routes.MetricsWithReset{}.Install(m.Mux, m.HandlerContainer)
 	} else {
-		m.MuxHelper.HandleFunc("/metrics", defaultMetricsHandler)
+		routes.DefaultMetrics{}.Install(m.Mux, m.HandlerContainer)
 	}
 
 	// Install third party resource support if requested
