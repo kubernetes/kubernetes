@@ -25,6 +25,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"os/signal"
 	"os/user"
 	"path/filepath"
 	"strconv"
@@ -149,6 +150,20 @@ func writeXML(start time.Time) {
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	flag.Parse()
+
+	if *down {
+		// listen for signals such as ^C and gracefully attempt to clean up
+		c := make(chan os.Signal, 1)
+		signal.Notify(c, os.Interrupt)
+		go func() {
+			for range c {
+				log.Print("Captured ^C, gracefully attempting to cleanup resources..")
+				if !TearDown() {
+					os.Exit(1)
+				}
+			}
+		}()
+	}
 
 	if err := validWorkingDirectory(); err != nil {
 		log.Fatalf("Called from invalid working directory: %v", err)
