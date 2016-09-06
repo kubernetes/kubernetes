@@ -42,6 +42,7 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"github.com/golang/glog"
 	"k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_4"
 	"k8s.io/kubernetes/pkg/api"
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
@@ -5157,6 +5158,17 @@ func CreateFileForGoBinData(gobindataPath, outputFilename string) error {
 	err = ioutil.WriteFile(fullPath, data, 0644)
 	if err != nil {
 		return fmt.Errorf("Error while trying to write to file %v: %v", fullPath, err)
+	}
+	return nil
+}
+
+func ListNamespaceEvents(c *client.Client, ns string) error {
+	ls, err := c.Events(ns).List(api.ListOptions{})
+	if err != nil {
+		return err
+	}
+	for _, event := range ls.Items {
+		glog.Infof("Event(%#v): type: '%v' reason: '%v' %v", event.InvolvedObject, event.Type, event.Reason, event.Message)
 	}
 	return nil
 }
