@@ -93,6 +93,7 @@ func write(path, contents string, t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create %v.", path)
 	}
+	defer f.Close()
 	_, err = f.WriteString(contents)
 	if err != nil {
 		t.Fatalf("Failed to write to %v.", path)
