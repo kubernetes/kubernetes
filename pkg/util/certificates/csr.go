@@ -93,7 +93,7 @@ func NewCertificateRequest(privateKey interface{}, subject *pkix.Name, dnsSANs [
 	switch privateKey := privateKey.(type) {
 	case *ecdsa.PrivateKey:
 		switch privateKey.Curve {
-		case elliptic.P224(), elliptic.P256():
+		case elliptic.P256():
 			sigType = x509.ECDSAWithSHA256
 		case elliptic.P384():
 			sigType = x509.ECDSAWithSHA384
