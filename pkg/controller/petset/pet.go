@@ -81,6 +81,15 @@ type petSyncer struct {
 	blockingPet *pcb
 }
 
+// errUnhealthyPet is returned when a we either know for sure a pet is unhealthy,
+// or don't know its state but assume it is unhealthy. It's used as a signal to the caller for further operations like updating status.replicas.
+// This is not a fatal error.
+type errUnhealthyPet string
+
+func (e errUnhealthyPet) Error() string {
+	return string(e)
+}
+
 // Sync syncs the given pet.
 func (p *petSyncer) Sync(pet *pcb) error {
 	if pet == nil {
@@ -103,8 +112,9 @@ func (p *petSyncer) Sync(pet *pcb) error {
 		return p.Update(realPet, pet)
 	}
 	if p.blockingPet != nil {
-		glog.Infof("Create of %v in PetSet %v blocked by unhealthy pet %v", pet.pod.Name, pet.parent.Name, p.blockingPet.pod.Name)
-		return nil
+		message := errUnhealthyPet(fmt.Sprintf("Create of %v in PetSet %v blocked by unhealthy pet %v", pet.pod.Name, pet.parent.Name, p.blockingPet.pod.Name))
+		glog.Info(message)
+		return message
 	}
 	// This is counted as a create, even if it fails. We can't skip indices
 	// because some pets might allocate a special role to earlier indices.
