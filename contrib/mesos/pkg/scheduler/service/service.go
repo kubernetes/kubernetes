@@ -612,6 +612,7 @@ func (s *SchedulerServer) Run(hks hyperkube.Interface, _ []string) error {
 		if err != nil {
 			log.Fatalf("Cannot open scheduler config file: %v", err)
 		}
+		defer f.Close()
 
 		err = sc.Read(bufio.NewReader(f))
 		if err != nil {

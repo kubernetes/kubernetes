@@ -156,6 +156,7 @@ func readInstanceID() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("Cannot open %s: %v", metaDataPath, err)
 	}
+	defer file.Close()
 
 	return parseMetaData(file)
 }
