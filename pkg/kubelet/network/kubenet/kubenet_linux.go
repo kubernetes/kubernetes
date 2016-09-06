@@ -54,7 +54,7 @@ const (
 	BridgeName        = "cbr0"
 	DefaultCNIDir     = "/opt/cni/bin"
 
-	sysctlBridgeCallIptables = "net/bridge/bridge-nf-call-iptables"
+	sysctlBridgeCallIPTables = "net/bridge/bridge-nf-call-iptables"
 
 	// fallbackMTU is used if an MTU is not specified, and we cannot determine the MTU
 	fallbackMTU = 1460
@@ -142,9 +142,9 @@ func (plugin *kubenetNetworkPlugin) Init(host network.Host, hairpinMode componen
 	// was built-in, we simply ignore the error here. A better thing to do is
 	// to check the kernel version in the future.
 	plugin.execer.Command("modprobe", "br-netfilter").CombinedOutput()
-	err := plugin.sysctl.SetSysctl(sysctlBridgeCallIptables, 1)
+	err := plugin.sysctl.SetSysctl(sysctlBridgeCallIPTables, 1)
 	if err != nil {
-		glog.Warningf("can't set sysctl %s: %v", sysctlBridgeCallIptables, err)
+		glog.Warningf("can't set sysctl %s: %v", sysctlBridgeCallIPTables, err)
 	}
 
 	plugin.loConfig, err = libcni.ConfFromBytes([]byte(`{
