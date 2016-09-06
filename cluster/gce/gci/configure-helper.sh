@@ -496,7 +496,11 @@ function start-kubelet {
   fi
   # Network plugin
   if [[ -n "${NETWORK_PROVIDER:-}" ]]; then
-    flags+=" --network-plugin-dir=/home/kubernetes/bin"
+    if [[ "${NETWORK_PROVIDER:-}" == "cni" ]]; then
+      flags+=" --cni-bin-dir=/home/kubernetes/bin"
+    else
+      flags+=" --network-plugin-dir=/home/kubernetes/bin"
+    fi
     flags+=" --network-plugin=${NETWORK_PROVIDER}"
   fi
   flags+=" --reconcile-cidr=${reconcile_cidr}"
