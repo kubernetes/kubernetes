@@ -98,8 +98,15 @@ func CreateClientAndWaitForAPI(adminConfig *clientcmdapi.Config) (*clientset.Cli
 	return client, nil
 }
 
+func standardLabels(n string) map[string]string {
+	return map[string]string{
+		"component": n, "name": n, "k8s-app": n,
+		"kubernetes.io/cluster-service": "true", "tier": "node",
+	}
+}
+
 func NewDaemonSet(daemonName string, podSpec api.PodSpec) *extensions.DaemonSet {
-	l := map[string]string{"component": daemonName, "tier": "node"}
+	l := standardLabels(daemonName)
 	return &extensions.DaemonSet{
 		ObjectMeta: api.ObjectMeta{Name: daemonName},
 		Spec: extensions.DaemonSetSpec{
@@ -112,8 +119,19 @@ func NewDaemonSet(daemonName string, podSpec api.PodSpec) *extensions.DaemonSet 
 	}
 }
 
+func NewService(serviceName string, spec api.ServiceSpec) *api.Service {
+	l := standardLabels(serviceName)
+	return &api.Service{
+		ObjectMeta: api.ObjectMeta{
+			Name:   serviceName,
+			Labels: l,
+		},
+		Spec: spec,
+	}
+}
+
 func NewDeployment(deploymentName string, replicas int32, podSpec api.PodSpec) *extensions.Deployment {
-	l := map[string]string{"name": deploymentName}
+	l := standardLabels(deploymentName)
 	return &extensions.Deployment{
 		ObjectMeta: api.ObjectMeta{Name: deploymentName},
 		Spec: extensions.DeploymentSpec{
