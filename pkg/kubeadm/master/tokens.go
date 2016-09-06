@@ -51,7 +51,7 @@ func CreateTokenAuthFile(params *kubeadmapi.BootstrapParams) error {
 	if err := generateTokenIfNeeded(params); err != nil {
 		return fmt.Errorf("<master/tokens> failed to generate token(s) [%s]", err)
 	}
-	if err := os.MkdirAll(path.Join(params.EnvParams["host_pki_path"]), 0700); err != nil {
+	if err := os.MkdirAll(params.EnvParams["host_pki_path"], 0700); err != nil {
 		return fmt.Errorf("<master/tokens> failed to create directory %q [%s]", params.EnvParams["host_pki_path"], err)
 	}
 	serialized := []byte(fmt.Sprintf("%s,kubeadm-node-csr,%s,system:kubelet-bootstrap\n", params.Discovery.BearerToken, uuid.NewUUID()))
