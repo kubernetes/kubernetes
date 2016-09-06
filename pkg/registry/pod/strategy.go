@@ -192,12 +192,10 @@ func NodeNameTriggerFunc(obj runtime.Object) []storage.MatchValue {
 // TODO: fields are not labels, and the validation rules for them do not apply.
 func PodToSelectableFields(pod *api.Pod) fields.Set {
 	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(&pod.ObjectMeta, true)
-	podSpecificFieldsSet := fields.Set{
-		"spec.nodeName":      pod.Spec.NodeName,
-		"spec.restartPolicy": string(pod.Spec.RestartPolicy),
-		"status.phase":       string(pod.Status.Phase),
-	}
-	return generic.MergeFieldsSets(objectMetaFieldsSet, podSpecificFieldsSet)
+	objectMetaFieldsSet["spec.nodeName"] = pod.Spec.NodeName
+  objectMetaFieldsSet["spec.restartPolicy"] = string(pod.Spec.RestartPolicy)
+  objectMetaFieldsSet["status.phase"] = string(pod.Status.Phase)
+	return objectMetaFieldsSet
 }
 
 // ResourceGetter is an interface for retrieving resources by ResourceLocation.
