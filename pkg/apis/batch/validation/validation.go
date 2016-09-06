@@ -49,14 +49,8 @@ func ValidateGeneratedSelector(obj *batch.Job) field.ErrorList {
 		allErrs = append(allErrs, field.Required(field.NewPath("metadata").Child("uid"), ""))
 	}
 
-	// If somehow uid was unset then we would get "controller-uid=" as the selector
-	// which is bad.
-	if obj.ObjectMeta.UID == "" {
-		allErrs = append(allErrs, field.Required(field.NewPath("metadata").Child("uid"), ""))
-	}
-
 	// If selector generation was requested, then expected labels must be
-	// present on pod template, and much match job's uid and name.  The
+	// present on pod template, and must match job's uid and name.  The
 	// generated (not-manual) selectors/labels ensure no overlap with other
 	// controllers.  The manual mode allows orphaning, adoption,
 	// backward-compatibility, and experimentation with new
