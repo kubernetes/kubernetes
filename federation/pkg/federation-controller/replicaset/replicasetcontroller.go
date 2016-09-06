@@ -57,7 +57,7 @@ var (
 	replicaSetReviewDelay    = 10 * time.Second
 	clusterAvailableDelay    = 20 * time.Second
 	clusterUnavailableDelay  = 60 * time.Second
-	allReplicaSetReviewDealy = 2 * time.Minute
+	allReplicaSetReviewDelay = 2 * time.Minute
 	updateTimeout            = 30 * time.Second
 )
 
@@ -131,13 +131,13 @@ func NewReplicaSetController(federationClient fedclientset.Interface) *ReplicaSe
 			&extensionsv1.ReplicaSet{},
 			controller.NoResyncPeriodFunc(),
 			fedutil.NewTriggerOnAllChanges(
-				func(obj runtime.Object) { frsc.deliverLocalReplicaSet(obj, allReplicaSetReviewDealy) },
+				func(obj runtime.Object) { frsc.deliverLocalReplicaSet(obj, replicaSetReviewDelay) },
 			),
 		)
 	}
 	clusterLifecycle := fedutil.ClusterLifecycleHandlerFuncs{
 		ClusterAvailable: func(cluster *fedv1.Cluster) {
-			frsc.clusterDeliverer.DeliverAfter(allClustersKey, nil, clusterUnavailableDelay)
+			frsc.clusterDeliverer.DeliverAfter(allClustersKey, nil, clusterAvailableDelay)
 		},
 		ClusterUnavailable: func(cluster *fedv1.Cluster, _ []interface{}) {
 			frsc.clusterDeliverer.DeliverAfter(allClustersKey, nil, clusterUnavailableDelay)
@@ -159,7 +159,7 @@ func NewReplicaSetController(federationClient fedclientset.Interface) *ReplicaSe
 			controller.NoResyncPeriodFunc(),
 			fedutil.NewTriggerOnAllChanges(
 				func(obj runtime.Object) {
-					frsc.clusterDeliverer.DeliverAfter(allClustersKey, nil, clusterUnavailableDelay)
+					frsc.clusterDeliverer.DeliverAfter(allClustersKey, nil, allReplicaSetReviewDelay)
 				},
 			),
 		)
