@@ -81,6 +81,14 @@ type petSyncer struct {
 	blockingPet *pcb
 }
 
+type unhealthyPetBlock struct {
+	s string
+}
+
+func (e *unhealthyPetBlock) Error() string {
+	return e.s
+}
+
 // Sync syncs the given pet.
 func (p *petSyncer) Sync(pet *pcb) error {
 	if pet == nil {
@@ -103,8 +111,9 @@ func (p *petSyncer) Sync(pet *pcb) error {
 		return p.Update(realPet, pet)
 	}
 	if p.blockingPet != nil {
-		glog.Infof("Create of %v in PetSet %v blocked by unhealthy pet %v", pet.pod.Name, pet.parent.Name, p.blockingPet.pod.Name)
-		return nil
+		message := fmt.Sprintf("Create of %v in PetSet %v blocked by unhealthy pet %v", pet.pod.Name, pet.parent.Name, p.blockingPet.pod.Name)
+		glog.Error(message)
+		return &unhealthyPetBlock{message}
 	}
 	// This is counted as a create, even if it fails. We can't skip indices
 	// because some pets might allocate a special role to earlier indices.

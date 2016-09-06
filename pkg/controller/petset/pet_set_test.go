@@ -263,3 +263,12 @@ func TestPetSetBlockingPetIsCleared(t *testing.T) {
 		t.Errorf("Unexpected blocking pet, err %v: %+v", err, p)
 	}
 }
+
+func TestPetSetReplicaCount(t *testing.T) {
+	psc, fc := newFakePetSetController()
+	ps := newPetSet(3)
+	i, _ := psc.syncPetSet(ps, fc.getPodList())
+	if i != len(fc.getPodList()) {
+		t.Errorf("syncPetSet should return actual amount of pods")
+	}
+}
