@@ -25,7 +25,6 @@ import (
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	apiutil "k8s.io/kubernetes/pkg/api/util"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/restclient"
@@ -33,7 +32,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/config"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 
-	"github.com/golang/glog"
 	"github.com/spf13/pflag"
 )
 
@@ -72,17 +70,15 @@ type ServerRunOptions struct {
 	AuthorizationWebhookCacheUnauthorizedTTL time.Duration
 	AuthorizationRBACSuperUser               string
 
-	BasicAuthFile           string
-	BindAddress             net.IP
-	CertDirectory           string
-	ClientCAFile            string
-	CloudConfigFile         string
-	CloudProvider           string
-	CorsAllowedOriginList   []string
-	DefaultStorageMediaType string
-	DeleteCollectionWorkers int
-	// Used to specify the storage version that should be used for the legacy v1 api group.
-	DeprecatedStorageVersion  string
+	BasicAuthFile             string
+	BindAddress               net.IP
+	CertDirectory             string
+	ClientCAFile              string
+	CloudConfigFile           string
+	CloudProvider             string
+	CorsAllowedOriginList     []string
+	DefaultStorageMediaType   string
+	DeleteCollectionWorkers   int
 	AuditLogPath              string
 	AuditLogMaxAge            int
 	AuditLogMaxBackups        int
@@ -163,12 +159,9 @@ func (o *ServerRunOptions) WithEtcdOptions() *ServerRunOptions {
 }
 
 // StorageGroupsToEncodingVersion returns a map from group name to group version,
-// computed from the s.DeprecatedStorageVersion and s.StorageVersions flags.
+// computed from s.StorageVersions flag.
 func (s *ServerRunOptions) StorageGroupsToEncodingVersion() (map[string]unversioned.GroupVersion, error) {
 	storageVersionMap := map[string]unversioned.GroupVersion{}
-	if s.DeprecatedStorageVersion != "" {
-		storageVersionMap[""] = unversioned.GroupVersion{Group: apiutil.GetGroup(s.DeprecatedStorageVersion), Version: apiutil.GetVersion(s.DeprecatedStorageVersion)}
-	}
 
 	// First, get the defaults.
 	if err := mergeGroupVersionIntoMap(s.DefaultStorageVersions, storageVersionMap); err != nil {
@@ -221,14 +214,6 @@ func (s *ServerRunOptions) NewSelfClient() (clientset.Interface, error) {
 		QPS:   50,
 		Burst: 100,
 	}
-	if len(s.DeprecatedStorageVersion) != 0 {
-		gv, err := unversioned.ParseGroupVersion(s.DeprecatedStorageVersion)
-		if err != nil {
-			glog.Fatalf("error in parsing group version: %s", err)
-		}
-		clientConfig.GroupVersion = &gv
-	}
-
 	return clientset.NewForConfig(clientConfig)
 }
 
@@ -434,10 +419,11 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&s.StorageConfig.DeserializationCacheSize, "deserialization-cache-size", s.StorageConfig.DeserializationCacheSize,
 		"Number of deserialized json objects to cache in memory.")
 
-	fs.StringVar(&s.DeprecatedStorageVersion, "storage-version", s.DeprecatedStorageVersion,
+	deprecatedStorageVersion := ""
+	fs.StringVar(&deprecatedStorageVersion, "storage-version", deprecatedStorageVersion,
 		"DEPRECATED: the version to store the legacy v1 resources with. Defaults to server preferred.")
 	fs.MarkDeprecated("storage-version", "--storage-version is deprecated and will be removed when the v1 API "+
-		"is retired. See --storage-versions instead.")
+		"is retired. Setting this has no effect. See --storage-versions instead.")
 
 	fs.StringVar(&s.StorageVersions, "storage-versions", s.StorageVersions, ""+
 		"The per-group version to store resources in. "+
