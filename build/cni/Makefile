@@ -18,7 +18,7 @@
 #	[ARCH=amd64] [CNI_RELEASE=v0.3.0] make (build|push)
 
 ARCH?=amd64
-CNI_RELEASE?=9d5e6e60e79491207834ae8439e80c943db65a69
+CNI_RELEASE?=07a8a28637e97b22eb8dfe710eeae1344f69d16e
 CNI_TARBALL=cni-$(ARCH)-$(CNI_RELEASE).tar.gz
 CUR_DIR=$(shell pwd)
 OUTPUT_DIR=$(CUR_DIR)/output
@@ -45,7 +45,7 @@ push: build
 	gsutil cp $(OUTPUT_DIR)/$(CNI_TARBALL) gs://kubernetes-release/network-plugins
 
 ifeq ($(ARCH),amd64)
-	gsutil cp cni-$(CNI_RELEASE).tar.gz gs://kubernetes-release/network-plugins
+	gsutil cp $(OUTPUT_DIR)/cni-$(CNI_RELEASE).tar.gz gs://kubernetes-release/network-plugins
 endif
 
 clean:
