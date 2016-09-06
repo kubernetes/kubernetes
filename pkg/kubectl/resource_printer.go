@@ -448,7 +448,7 @@ func (h *HumanReadablePrinter) HandledResources() []string {
 
 func (h *HumanReadablePrinter) AfterPrint(output io.Writer, res string) error {
 	if !h.options.NoHeaders && !h.options.ShowAll && h.hiddenObjNum > 0 {
-		_, err := fmt.Fprintf(output, "  info: %d completed object(s) was(were) not shown in %s list. Pass --show-all to see all objects.\n\n", h.hiddenObjNum, res)
+		_, err := fmt.Fprintf(output, "\ninfo: %d completed %s were not shown in the list. Pass --show-all to see all.\n\n", h.hiddenObjNum, res)
 		return err
 	}
 	return nil
