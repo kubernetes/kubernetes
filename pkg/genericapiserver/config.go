@@ -19,9 +19,9 @@ package genericapiserver
 import (
 	"crypto/tls"
 	"fmt"
+	"mime"
 	"net"
 	"net/http"
-	"net/http/pprof"
 	"os"
 	"strconv"
 	"strings"
@@ -42,12 +42,12 @@ import (
 	"k8s.io/kubernetes/pkg/auth/handlers"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/genericapiserver/options"
+	"k8s.io/kubernetes/pkg/genericapiserver/routes"
 	genericvalidation "k8s.io/kubernetes/pkg/genericapiserver/validation"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/generic/registry"
 	ipallocator "k8s.io/kubernetes/pkg/registry/service/ipallocator"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/ui"
 	"k8s.io/kubernetes/pkg/util"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 )
@@ -60,14 +60,11 @@ type Config struct {
 	AuditLogMaxAge     int
 	AuditLogMaxBackups int
 	AuditLogMaxSize    int
-	// allow downstream consumers to disable the core controller loops
-	EnableLogsSupport bool
-	EnableUISupport   bool
 	// Allow downstream consumers to disable swagger.
 	// This includes returning the generated swagger spec at /swaggerapi and swagger ui at /swagger-ui.
 	EnableSwaggerSupport bool
 	// Allow downstream consumers to disable swagger ui.
-	// Note that this is ignored if either EnableSwaggerSupport or EnableUISupport is false.
+	// Note that this is ignored EnableSwaggerSupport is false
 	EnableSwaggerUI bool
 	// Allows api group versions or specific resources to be conditionally enabled/disabled.
 	APIResourceConfigSource APIResourceConfigSource
@@ -170,11 +167,9 @@ func NewConfig(options *options.ServerRunOptions) *Config {
 		AuditLogMaxBackups:        options.AuditLogMaxBackups,
 		AuditLogMaxSize:           options.AuditLogMaxSize,
 		EnableIndex:               true,
-		EnableLogsSupport:         options.EnableLogsSupport,
 		EnableProfiling:           options.EnableProfiling,
 		EnableSwaggerSupport:      true,
 		EnableSwaggerUI:           options.EnableSwaggerUI,
-		EnableUISupport:           true,
 		EnableWatchCache:          options.EnableWatchCache,
 		ExternalHost:              options.ExternalHost,
 		KubernetesServiceNodePort: options.KubernetesServiceNodePort,
@@ -318,16 +313,13 @@ func (c Config) New() (*GenericAPIServer, error) {
 	}
 
 	if c.RestfulContainer != nil {
-		s.mux = c.RestfulContainer.ServeMux
 		s.HandlerContainer = c.RestfulContainer
 	} else {
-		mux := http.NewServeMux()
-		s.mux = mux
-		s.HandlerContainer = NewHandlerContainer(mux, c.Serializer)
+		s.HandlerContainer = NewHandlerContainer(http.NewServeMux(), c.Serializer)
 	}
 	// Use CurlyRouter to be able to use regular expressions in paths. Regular expressions are required in paths for example for proxy (where the path is proxy/{kind}/{name}/{*})
 	s.HandlerContainer.Router(restful.CurlyRouter{})
-	s.MuxHelper = &apiserver.MuxHelper{Mux: s.mux, RegisteredPaths: []string{}}
+	s.Mux = apiserver.NewPathRecorderMux(s.HandlerContainer.ServeMux)
 
 	if c.ProxyDialer != nil || c.ProxyTLSClientConfig != nil {
 		s.ProxyTransport = utilnet.SetTransportDefaults(&http.Transport{
@@ -336,29 +328,26 @@ func (c Config) New() (*GenericAPIServer, error) {
 		})
 	}
 
+	// Send correct mime type for .svg files.
+	// TODO: remove when https://github.com/golang/go/commit/21e47d831bafb59f22b1ea8098f709677ec8ce33
+	// makes it into all of our supported go versions (only in v1.7.1 now).
+	mime.AddExtensionType(".svg", "image/svg+xml")
+
 	// Register root handler.
 	// We do not register this using restful Webservice since we do not want to surface this in api docs.
 	// Allow GenericAPIServer to be embedded in contexts which already have something registered at the root
 	if c.EnableIndex {
-		s.mux.HandleFunc("/", apiserver.IndexHandler(s.HandlerContainer, s.MuxHelper))
+		routes.Index{}.Install(s.Mux, s.HandlerContainer)
 	}
 
-	if c.EnableLogsSupport {
-		apiserver.InstallLogsSupport(s.MuxHelper, s.HandlerContainer)
+	if c.EnableSwaggerSupport && c.EnableSwaggerUI {
+		routes.SwaggerUI{}.Install(s.Mux, s.HandlerContainer)
 	}
-	if c.EnableUISupport {
-		ui.InstallSupport(s.MuxHelper, c.EnableSwaggerSupport && c.EnableSwaggerUI)
-	}
-
 	if c.EnableProfiling {
-		s.mux.HandleFunc("/debug/pprof/", pprof.Index)
-		s.mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
-		s.mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+		routes.Profiling{}.Install(s.Mux, s.HandlerContainer)
 	}
 
-	apiserver.InstallVersionHandler(s.MuxHelper, s.HandlerContainer)
-
-	handler := http.Handler(s.mux.(*http.ServeMux))
+	handler := http.Handler(s.Mux.BaseMux().(*http.ServeMux))
 
 	// TODO: handle CORS and auth using go-restful
 	// See github.com/emicklei/go-restful/blob/master/examples/restful-CORS-filter.go, and
