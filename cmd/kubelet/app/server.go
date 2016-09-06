@@ -139,7 +139,7 @@ func UnsecuredKubeletDeps(s *options.KubeletServer) (*kubelet.KubeletDeps, error
 		DockerClient:      dockerClient,
 		KubeClient:        nil,
 		Mounter:           mounter,
-		NetworkPlugins:    ProbeNetworkPlugins(s.NetworkPluginDir),
+		NetworkPlugins:    ProbeNetworkPlugins(s.NetworkPluginDir, s.CNIConfDir, s.CNIBinDir),
 		OOMAdjuster:       oom.NewOOMAdjuster(),
 		OSInterface:       kubecontainer.RealOS{},
 		Writer:            writer,
