@@ -65,22 +65,22 @@ func NewKubeadmCommand(f *cmdutil.Factory, in io.Reader, out, err io.Writer, env
 
 		`),
 	}
-	// TODO figure out how to avoid running as root
+	// TODO(phase2+) figure out how to avoid running as root
 	//
-	// TODO also print the alpha warning when running any commands, as well as
+	// TODO(phase1) also print the alpha warning when running any commands, as well as
 	// in the help text.
 	//
-	// TODO detect interactive vs non-interactive use and adjust output accordingly
+	// TODO(phase2) detect interactive vs non-interactive use and adjust output accordingly
 	// i.e. make it automation friendly
 	//
-	// TODO create an bastraction that defines files and the content that needs to
+	// TODO(phase2) create an bastraction that defines files and the content that needs to
 	// be written to disc and write it all in one go at the end as we have a lot of
 	// crapy little files written from different parts of this code; this could also
 	// be useful for testing
 
 	bootstrapParams := &kubeadmapi.BootstrapParams{
 		Discovery: &kubeadmapi.OutOfBandDiscovery{
-		// TODO this type no longer makes sense here
+		// TODO(phase1) this type no longer makes sense here
 		},
 		EnvParams: envParams,
 	}

@@ -19,12 +19,11 @@ package kubemaster
 import (
 	"fmt"
 	"path"
+	"runtime"
 	"strconv"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
-	unversionedapi "k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/apis/extensions"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	kubeadmapi "k8s.io/kubernetes/pkg/kubeadm/api"
 	"k8s.io/kubernetes/pkg/util/intstr"
@@ -84,34 +83,24 @@ func createKubeProxyPodSpec(params *kubeadmapi.BootstrapParams) api.PodSpec {
 	}
 }
 
-func createKubeDnsDeployment(params *kubeadmapi.BootstrapParams) *extensions.Deployment {
-	metaLabels := map[string]string{
-		"k8s-app":                       "kube-dns",
-		"version":                       "v19",
-		"kubernetes.io/cluster-service": "true",
-	}
-
-	metaAnnotations := map[string]string{
-		"scheduler.alpha.kubernetes.io/critical-pod": "''",
-		"scheduler.alpha.kubernetes.io/tolerations":  "'[{\"key\":\"CriticalAddonsOnly\", \"operator\":\"Exists\"}]'",
-	}
+func createKubeDNSPodSpec(params *kubeadmapi.BootstrapParams) api.PodSpec {
 
 	dnsPodResources := api.ResourceList{
-		api.ResourceLimitsCPU: resource.MustParse("100m"),
-		api.ResourceMemory:    resource.MustParse("170Mi"),
+		api.ResourceName(api.ResourceCPU):    resource.MustParse("100m"),
+		api.ResourceName(api.ResourceMemory): resource.MustParse("170Mi"),
 	}
 
 	healthzPodResources := api.ResourceList{
-		api.ResourceLimitsCPU: resource.MustParse("10m"),
-		api.ResourceMemory:    resource.MustParse("50Mi"),
+		api.ResourceName(api.ResourceCPU):    resource.MustParse("10m"),
+		api.ResourceName(api.ResourceMemory): resource.MustParse("50Mi"),
 	}
 
-	podSpec := api.PodSpec{
+	return api.PodSpec{
 		Containers: []api.Container{
 			// DNS server
 			{
 				Name:  "kube-dns",
-				Image: "gcr.io/google_containers/kubedns-amd64:1.7",
+				Image: "gcr.io/google_containers/kubedns-" + runtime.GOARCH + ":1.7",
 				Resources: api.ResourceRequirements{
 					Limits:   dnsPodResources,
 					Requests: dnsPodResources,
@@ -163,7 +152,7 @@ func createKubeDnsDeployment(params *kubeadmapi.BootstrapParams) *extensions.Dep
 			// dnsmasq
 			{
 				Name:  "dnsmasq",
-				Image: "gcr.io/google_containers/kube-dnsmasq-amd64:1.3",
+				Image: "gcr.io/google_containers/kube-dnsmasq-" + runtime.GOARCH + ":1.3",
 				Resources: api.ResourceRequirements{
 					Limits:   dnsPodResources,
 					Requests: dnsPodResources,
@@ -189,7 +178,7 @@ func createKubeDnsDeployment(params *kubeadmapi.BootstrapParams) *extensions.Dep
 			// healthz
 			{
 				Name:  "healthz",
-				Image: "gcr.io/google_containers/exechealthz-amd64:1.1",
+				Image: "gcr.io/google_containers/exechealthz-" + runtime.GOARCH + ":1.1",
 				Resources: api.ResourceRequirements{
 					Limits:   healthzPodResources,
 					Requests: healthzPodResources,
@@ -199,41 +188,25 @@ func createKubeDnsDeployment(params *kubeadmapi.BootstrapParams) *extensions.Dep
 					"-port=8080",
 					"-quiet",
 				},
-				Ports: []api.ContainerPort{
-					{
-						ContainerPort: 8080,
-						Protocol:      api.ProtocolTCP,
-					},
-				},
+				Ports: []api.ContainerPort{{
+					ContainerPort: 8080,
+					Protocol:      api.ProtocolTCP,
+				}},
 			},
 		},
 		DNSPolicy: api.DNSDefault,
 	}
 
-	dnsReplicas, err := strconv.Atoi(params.EnvParams["dns_replicas"])
-	if err != nil {
-		dnsReplicas = 1
-	}
-
-	return &extensions.Deployment{
-		ObjectMeta: api.ObjectMeta{
-			Name:      "kube-dns-v19",
-			Namespace: "kube-system",
-			Labels:    metaLabels,
+}
+func createKubeDNSServiceSpec(params *kubeadmapi.BootstrapParams) api.ServiceSpec {
+	return api.ServiceSpec{
+		Selector: map[string]string{"name": "kube-dns"},
+		Ports: []api.ServicePort{
+			{Name: "dns", Port: 53, Protocol: api.ProtocolUDP},
+			{Name: "dns-tcp", Port: 53, Protocol: api.ProtocolTCP},
 		},
-		Spec: extensions.DeploymentSpec{
-			Replicas: int32(dnsReplicas),
-			Selector: &unversionedapi.LabelSelector{MatchLabels: metaLabels},
-			Template: api.PodTemplateSpec{
-				ObjectMeta: api.ObjectMeta{
-					Labels:      metaLabels,
-					Annotations: metaAnnotations,
-				},
-				Spec: podSpec,
-			},
-		},
+		ClusterIP: "100.64.0.2",
 	}
-
 }
 
 func CreateEssentialAddons(params *kubeadmapi.BootstrapParams, client *clientset.Clientset) error {
@@ -248,8 +221,21 @@ func CreateEssentialAddons(params *kubeadmapi.BootstrapParams, client *clientset
 
 	// TODO should we wait for it to become ready at least on the master?
 
-	kubeDnsDeployment := createKubeDnsDeployment(params)
-	if _, err := client.Extensions().Deployments(api.NamespaceSystem).Create(kubeDnsDeployment); err != nil {
+	dnsReplicas, err := strconv.Atoi(params.EnvParams["dns_replicas"])
+	if err != nil {
+		dnsReplicas = 1
+	}
+
+	kubeDNSDeployment := NewDeployment("kube-dns", int32(dnsReplicas), createKubeDNSPodSpec(params))
+	SetMasterTaintTolerations(&kubeDNSDeployment.Spec.Template.ObjectMeta)
+
+	if _, err := client.Extensions().Deployments(api.NamespaceSystem).Create(kubeDNSDeployment); err != nil {
+		return fmt.Errorf("<master/addons> failed creating essential kube-dns addon [%s]", err)
+	}
+
+	kubeDNSService := NewService("kube-dns", createKubeDNSServiceSpec(params))
+
+	if _, err := client.Services(api.NamespaceSystem).Create(kubeDNSService); err != nil {
 		return fmt.Errorf("<master/addons> failed creating essential kube-dns addon [%s]", err)
 	}
 
