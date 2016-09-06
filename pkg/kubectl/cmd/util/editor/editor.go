@@ -169,6 +169,7 @@ func tempFile(prefix, suffix string) (f *os.File, err error) {
 		if os.IsExist(err) {
 			continue
 		}
+		defer f.Close()
 		break
 	}
 	return

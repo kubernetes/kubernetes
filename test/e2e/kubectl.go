@@ -1540,6 +1540,7 @@ func readBytesFromFile(filename string) []byte {
 	if err != nil {
 		framework.Failf(err.Error())
 	}
+	defer file.Close()
 
 	data, err := ioutil.ReadAll(file)
 	if err != nil {
