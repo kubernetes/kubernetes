@@ -172,6 +172,7 @@ __custom_func() {
    * clusters (valid only for federation apiservers)
    * componentstatuses (aka 'cs')
    * configmaps (aka 'cm')
+   * scheduledjobs (aka 'cronjob')
    * daemonsets (aka 'ds')
    * deployments (aka 'deploy')
    * events (aka 'ev')
