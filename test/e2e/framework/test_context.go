@@ -52,6 +52,7 @@ type TestContextType struct {
 	NodeOSDistro             string
 	VerifyServiceAccount     bool
 	DeleteNamespace          bool
+	AllowedNotReadyNodes     int
 	CleanStart               bool
 	// If set to 'true' or 'all' framework will start a goroutine monitoring resource usage of system add-ons.
 	// It will read the data every 30 seconds from all Nodes and print summary during afterEach. If set to 'master'
@@ -120,6 +121,7 @@ func RegisterCommonFlags() {
 	flag.StringVar(&TestContext.OutputPrintType, "output-print-type", "hr", "Comma separated list: 'hr' for human readable summaries 'json' for JSON ones.")
 	flag.BoolVar(&TestContext.DumpLogsOnFailure, "dump-logs-on-failure", true, "If set to true test will dump data about the namespace in which test was running.")
 	flag.BoolVar(&TestContext.DeleteNamespace, "delete-namespace", true, "If true tests will delete namespace after completion. It is only designed to make debugging easier, DO NOT turn it off by default.")
+	flag.IntVar(&TestContext.AllowedNotReadyNodes, "allowed-not-ready-nodes", 0, "If non-zero, framework will allow for that many non-ready nodes when checking for all ready nodes.")
 	flag.StringVar(&TestContext.Host, "host", "http://127.0.0.1:8080", "The host, or apiserver, to connect to")
 	flag.StringVar(&TestContext.ReportPrefix, "report-prefix", "", "Optional prefix for JUnit XML reports. Default is empty, which doesn't prepend anything to the default name.")
 	flag.StringVar(&TestContext.ReportDir, "report-dir", "", "Path to the directory where the JUnit XML reports should be saved. Default is empty, which doesn't generate these reports.")
