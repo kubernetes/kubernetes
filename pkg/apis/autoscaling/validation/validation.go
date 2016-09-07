@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 
 	apivalidation "k8s.io/kubernetes/pkg/api/validation"
+	pathvalidation "k8s.io/kubernetes/pkg/api/validation/path"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler"
@@ -66,7 +67,7 @@ func ValidateCrossVersionObjectReference(ref autoscaling.CrossVersionObjectRefer
 	if len(ref.Kind) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("kind"), ""))
 	} else {
-		for _, msg := range apivalidation.IsValidPathSegmentName(ref.Kind) {
+		for _, msg := range pathvalidation.IsValidPathSegmentName(ref.Kind) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("kind"), ref.Kind, msg))
 		}
 	}
@@ -74,7 +75,7 @@ func ValidateCrossVersionObjectReference(ref autoscaling.CrossVersionObjectRefer
 	if len(ref.Name) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
 	} else {
-		for _, msg := range apivalidation.IsValidPathSegmentName(ref.Name) {
+		for _, msg := range pathvalidation.IsValidPathSegmentName(ref.Name) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), ref.Name, msg))
 		}
 	}
