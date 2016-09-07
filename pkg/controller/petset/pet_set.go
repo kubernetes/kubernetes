@@ -51,7 +51,7 @@ const (
 
 // PetSetController controls petsets.
 type PetSetController struct {
-	kubeClient *client.Client
+	kubeClient client.Interface
 
 	// newSyncer returns an interface capable of syncing a single pet.
 	// Abstracted out for testing.
