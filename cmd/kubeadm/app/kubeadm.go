@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"os"
 	"path"
-	"runtime"
 	"strings"
 
 	"github.com/spf13/pflag"
@@ -43,12 +42,11 @@ func getEnvParams() map[string]string {
 	envParams := map[string]string{
 		"prefix":             globalPrefix,
 		"host_pki_path":      path.Join(globalPrefix, "pki"),
-		"hyperkube_image":    fmt.Sprintf("gcr.io/google_containers/hyperkube-%s:%s", runtime.GOARCH, "v1.4.0-alpha.3"),
-		"discovery_image":    "dgoodwin/kubediscovery:latest",
-		"etcd_image":         fmt.Sprintf("gcr.io/google_containers/etcd-%s:%s", runtime.GOARCH, "2.2.5"),
+		"hyperkube_image":    "",
+		"discovery_image":    "dgoodwin/kubediscovery:latest", // TODO(phase1): fmt.Sprintf("gcr.io/google_containers/kube-discovery-%s:%s", runtime.GOARCH, "1.0"),
+		"etcd_image":         "",
 		"component_loglevel": "--v=4",
 		"dns_domain":         "cluster.local",
-		"dns_replicas":       "1",
 	}
 
 	for k := range envParams {
@@ -64,6 +62,10 @@ func Run() error {
 	CommandLine = pflag.NewFlagSet(os.Args[0], pflag.ContinueOnError)
 	logs.InitLogs()
 	defer logs.FlushLogs()
+
+	// We do not want these flags to show up in --help
+	pflag.CommandLine.MarkHidden("google-json-key")
+	pflag.CommandLine.MarkHidden("log-flush-frequency")
 
 	cmd := cmd.NewKubeadmCommand(cmdutil.NewFactory(nil), os.Stdin, os.Stdout, os.Stderr, getEnvParams())
 	return cmd.Execute()

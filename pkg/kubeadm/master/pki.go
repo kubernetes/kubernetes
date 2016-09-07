@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kubemaster
+package master
 
 import (
 	"crypto/rsa"
@@ -137,8 +137,8 @@ func CreatePKIAssets(params *kubeadmapi.BootstrapParams) (*rsa.PrivateKey, *x509
 		altNames certutil.AltNames // TODO actual SANs
 	)
 
-	if params.Discovery.ListenIP != "" {
-		altNames.IPs = append(altNames.IPs, net.ParseIP(params.Discovery.ListenIP))
+	if params.Discovery.ListenIP != nil {
+		altNames.IPs = append(altNames.IPs, params.Discovery.ListenIP)
 	}
 
 	if params.Discovery.ApiServerDNSName != "" {

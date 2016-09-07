@@ -42,7 +42,7 @@ var (
 
 func NewCmdInit(out io.Writer, params *kubeadmapi.BootstrapParams) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "init --token <secret> [--listen-ip <addr>]",
+		Use:   "init",
 		Short: "Run this on the first server you deploy onto.",
 		Run: func(cmd *cobra.Command, args []string) {
 			err := RunInit(out, cmd, args, params)
@@ -50,21 +50,25 @@ func NewCmdInit(out io.Writer, params *kubeadmapi.BootstrapParams) *cobra.Comman
 		},
 	}
 
-	cmd.PersistentFlags().StringVarP(&params.Discovery.ListenIP, "listen-ip", "", "",
+	cmd.PersistentFlags().IPVar(&params.Discovery.ListenIP, "listen-ip", nil,
 		`(optional) IP address to listen on, in case autodetection fails.`)
-	cmd.PersistentFlags().StringVarP(&params.Discovery.GivenToken, "token", "", "",
+	cmd.PersistentFlags().StringVar(&params.Discovery.GivenToken, "token", "",
 		`(optional) Shared secret used to secure bootstrap. Will be generated and displayed if not provided.`)
+	cmd.PersistentFlags().BoolVar(&params.Discovery.UseHyperkubeImage, "use-hyperkube", false,
+		`(optional) Use the hyperkube image for running the apiserver, controller-manager, scheduler and proxy.`)
 
 	return cmd
 }
 
 func RunInit(out io.Writer, cmd *cobra.Command, args []string, params *kubeadmapi.BootstrapParams) error {
-	if params.Discovery.ListenIP == "" {
+
+	// Auto-detect the IP
+	if params.Discovery.ListenIP == nil {
 		ip, err := netutil.ChooseHostInterface()
 		if err != nil {
 			return err
 		}
-		params.Discovery.ListenIP = ip.String()
+		params.Discovery.ListenIP = ip
 	}
 	if err := kubemaster.CreateTokenAuthFile(params); err != nil {
 		return err
