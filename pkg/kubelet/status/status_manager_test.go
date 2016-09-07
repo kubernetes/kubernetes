@@ -477,7 +477,7 @@ func TestStatusEquality(t *testing.T) {
 	}
 }
 
-func TestStaticPodStatus(t *testing.T) {
+func TestStaticPod(t *testing.T) {
 	staticPod := getTestPod()
 	staticPod.Annotations = map[string]string{kubetypes.ConfigSourceAnnotationKey: "file"}
 	mirrorPod := getTestPod()
@@ -488,24 +488,36 @@ func TestStaticPodStatus(t *testing.T) {
 	}
 	client := fake.NewSimpleClientset(mirrorPod)
 	m := newTestManager(client)
+
+	// Create the static pod
 	m.podManager.AddPod(staticPod)
-	m.podManager.AddPod(mirrorPod)
-	// Verify setup.
 	assert.True(t, kubepod.IsStaticPod(staticPod), "SetUp error: staticPod")
-	assert.True(t, kubepod.IsMirrorPod(mirrorPod), "SetUp error: mirrorPod")
-	assert.Equal(t, m.podManager.TranslatePodUID(mirrorPod.UID), staticPod.UID)
 
 	status := getRandomPodStatus()
 	now := unversioned.Now()
 	status.StartTime = &now
-
 	m.SetPodStatus(staticPod, status)
+
+	// Should be able to get the static pod status from status manager
 	retrievedStatus := expectPodStatus(t, m, staticPod)
 	normalizeStatus(staticPod, &status)
 	assert.True(t, isStatusEqual(&status, &retrievedStatus), "Expected: %+v, Got: %+v", status, retrievedStatus)
+
+	// Should not sync pod because there is no corresponding mirror pod for the static pod.
+	m.testSyncBatch()
+	verifyActions(t, m.kubeClient, []core.Action{})
+	client.ClearActions()
+
+	// Create the mirror pod
+	m.podManager.AddPod(mirrorPod)
+	assert.True(t, kubepod.IsMirrorPod(mirrorPod), "SetUp error: mirrorPod")
+	assert.Equal(t, m.podManager.TranslatePodUID(mirrorPod.UID), staticPod.UID)
+
+	// Should be able to get the mirror pod status from status manager
 	retrievedStatus, _ = m.GetPodStatus(mirrorPod.UID)
 	assert.True(t, isStatusEqual(&status, &retrievedStatus), "Expected: %+v, Got: %+v", status, retrievedStatus)
-	// Should translate mirrorPod / staticPod UID.
+
+	// Should sync pod because the corresponding mirror pod is created
 	m.testSyncBatch()
 	verifyActions(t, m.kubeClient, []core.Action{
 		core.GetActionImpl{ActionImpl: core.ActionImpl{Verb: "get", Resource: unversioned.GroupVersionResource{Resource: "pods"}}},
@@ -517,17 +529,17 @@ func TestStaticPodStatus(t *testing.T) {
 	assert.True(t, isStatusEqual(&status, &updatedPod.Status), "Expected: %+v, Got: %+v", status, updatedPod.Status)
 	client.ClearActions()
 
-	// No changes.
+	// Should not sync pod because nothing is changed.
 	m.testSyncBatch()
 	verifyActions(t, m.kubeClient, []core.Action{})
 
-	// Mirror pod identity changes.
+	// Change mirror pod identity.
 	m.podManager.DeletePod(mirrorPod)
 	mirrorPod.UID = "new-mirror-pod"
 	mirrorPod.Status = api.PodStatus{}
 	m.podManager.AddPod(mirrorPod)
 
-	// Expect no update to mirror pod, since UID has changed.
+	// Should not update to mirror pod, because UID has changed.
 	m.testSyncBatch()
 	verifyActions(t, m.kubeClient, []core.Action{
 		core.GetActionImpl{ActionImpl: core.ActionImpl{Verb: "get", Resource: unversioned.GroupVersionResource{Resource: "pods"}}},
