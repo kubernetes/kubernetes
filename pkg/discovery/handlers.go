@@ -13,7 +13,6 @@ limitations under the License.
 package discovery
 
 import (
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -160,12 +159,7 @@ func (cih *ClusterInfoHandler) ServeHTTP(resp http.ResponseWriter, req *http.Req
 	}
 
 	// Instantiate an signer using HMAC-SHA256.
-	hmacKey, err := hex.DecodeString(token)
-	if err != nil {
-		log.Printf("Unable to decode hex token: %s", token)
-		http.Error(resp, "", http.StatusInternalServerError)
-		return
-	}
+	hmacKey := []byte(token)
 
 	log.Printf("Key is %d bytes long", len(hmacKey))
 	signer, err := jose.NewSigner(jose.HS256, hmacKey)
