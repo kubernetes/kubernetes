@@ -28,6 +28,8 @@ import (
 	"strings"
 	"time"
 
+	"gopkg.in/gcfg.v1"
+
 	"k8s.io/kubernetes/pkg/api"
 	apiservice "k8s.io/kubernetes/pkg/api/service"
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -46,7 +48,6 @@ import (
 	container "google.golang.org/api/container/v1"
 	"google.golang.org/api/googleapi"
 	"google.golang.org/cloud/compute/metadata"
-	"gopkg.in/gcfg.v1"
 )
 
 const (
@@ -2379,6 +2380,19 @@ func (gce *GCECloud) encodeDiskTags(tags map[string]string) (string, error) {
 // the specified zone. It stores specified tags encoded in JSON in Description
 // field.
 func (gce *GCECloud) CreateDisk(name string, diskType string, zone string, sizeGb int64, tags map[string]string) error {
+	// Do not allow creation of PDs in zones that are not managed. Such PDs
+	// then cannot be deleted by DeleteDisk.
+	isManaged := false
+	for _, managedZone := range gce.managedZones {
+		if zone == managedZone {
+			isManaged = true
+			break
+		}
+	}
+	if !isManaged {
+		return fmt.Errorf("kubernetes does not manage zone %q", zone)
+	}
+
 	tagsStr, err := gce.encodeDiskTags(tags)
 	if err != nil {
 		return err
@@ -2600,7 +2614,7 @@ func (gce *GCECloud) getDiskByNameUnknownZone(diskName string) (*gceDisk, error)
 	if found != nil {
 		return found, nil
 	}
-	return nil, fmt.Errorf("GCE persistent disk not found: %q", diskName)
+	return nil, fmt.Errorf("GCE persistent disk %q not found in managed zones (%s)", diskName, strings.Join(gce.managedZones, ","))
 }
 
 // GetGCERegion returns region of the gce zone. Zone names
