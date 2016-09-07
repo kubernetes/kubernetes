@@ -18,69 +18,166 @@ package e2e
 
 import (
 	"fmt"
+	"reflect"
+	"time"
 
 	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 	"k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_4"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_3"
+	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
-
-	. "github.com/onsi/gomega"
 )
 
 const (
-	FederatedSecretName = "federated-secret"
+	FederatedSecretName        = "federated-secret"
+	UpdatedFederatedSecretName = "updated-federated-secret"
+	FederatedSecretTimeout     = 60 * time.Second
+	MaxRetries                 = 3
 )
 
 // Create/delete secret api objects
 var _ = framework.KubeDescribe("Federation secrets [Feature:Federation]", func() {
+	var clusters map[string]*cluster // All clusters, keyed by cluster name
+
 	f := framework.NewDefaultFederatedFramework("federated-secret")
 
 	Describe("Secret objects", func() {
+
+		BeforeEach(func() {
+			framework.SkipUnlessFederated(f.Client)
+			clusters = map[string]*cluster{}
+			registerClusters(clusters, UserAgentName, "", f)
+		})
+
 		AfterEach(func() {
 			framework.SkipUnlessFederated(f.Client)
-
-			nsName := f.FederationNamespace.Name
-			// Delete registered secrets.
-			// This is if a test failed, it should not affect other tests.
-			secretList, err := f.FederationClientset_1_4.Core().Secrets(nsName).List(api.ListOptions{})
-			Expect(err).NotTo(HaveOccurred())
-			for _, secret := range secretList.Items {
-				err := f.FederationClientset_1_4.Core().Secrets(nsName).Delete(secret.Name, &api.DeleteOptions{})
-				Expect(err).NotTo(HaveOccurred())
-			}
+			unregisterClusters(clusters, f)
 		})
 
 		It("should be created and deleted successfully", func() {
 			framework.SkipUnlessFederated(f.Client)
-
 			nsName := f.FederationNamespace.Name
 			secret := createSecretOrFail(f.FederationClientset_1_4, nsName)
-			By(fmt.Sprintf("Creation of secret %q in namespace %q succeeded.  Deleting secret.", secret.Name, nsName))
-			// Cleanup
-			err := f.FederationClientset_1_4.Core().Secrets(nsName).Delete(secret.Name, &api.DeleteOptions{})
-			framework.ExpectNoError(err, "Error deleting secret %q in namespace %q", secret.Name, secret.Namespace)
-			By(fmt.Sprintf("Deletion of secret %q in namespace %q succeeded.", secret.Name, nsName))
-		})
 
+			defer func() { // Cleanup
+				By(fmt.Sprintf("Deleting secret %q in namespace %q", secret.Name, nsName))
+				err := f.FederationClientset_1_4.Core().Secrets(nsName).Delete(secret.Name, &api.DeleteOptions{})
+				framework.ExpectNoError(err, "Error deleting secret %q in namespace %q", secret.Name, nsName)
+			}()
+			// wait for secret shards being created
+			waitForSecretShardsOrFail(nsName, secret, clusters)
+			secret = updateSecretOrFail(f.FederationClientset_1_4, nsName)
+			waitForSecretShardsUpdatedOrFail(nsName, secret, clusters)
+		})
 	})
 })
 
 func createSecretOrFail(clientset *federation_release_1_4.Clientset, namespace string) *v1.Secret {
 	if clientset == nil || len(namespace) == 0 {
-		Fail(fmt.Sprintf("Internal error: invalid parameters passed to deleteSecretOrFail: clientset: %v, namespace: %v", clientset, namespace))
+		Fail(fmt.Sprintf("Internal error: invalid parameters passed to createSecretOrFail: clientset: %v, namespace: %v", clientset, namespace))
 	}
-	By(fmt.Sprintf("Creating federated secret %q in namespace %q", FederatedSecretName, namespace))
 
 	secret := &v1.Secret{
 		ObjectMeta: v1.ObjectMeta{
 			Name: FederatedSecretName,
 		},
 	}
-
-	By(fmt.Sprintf("Trying to create secret %q in namespace %q", secret.Name, namespace))
+	By(fmt.Sprintf("Creating secret %q in namespace %q", secret.Name, namespace))
 	_, err := clientset.Core().Secrets(namespace).Create(secret)
-	framework.ExpectNoError(err, "Creating secret %q in namespace %q", secret.Name, namespace)
+	framework.ExpectNoError(err, "Failed to create secret %s", secret.Name)
 	By(fmt.Sprintf("Successfully created federated secret %q in namespace %q", FederatedSecretName, namespace))
 	return secret
+}
+
+func updateSecretOrFail(clientset *federation_release_1_4.Clientset, namespace string) *v1.Secret {
+	if clientset == nil || len(namespace) == 0 {
+		Fail(fmt.Sprintf("Internal error: invalid parameters passed to updateSecretOrFail: clientset: %v, namespace: %v", clientset, namespace))
+	}
+
+	var err error
+	var newSecret *v1.Secret
+	secret := &v1.Secret{
+		ObjectMeta: v1.ObjectMeta{
+			Name: UpdatedFederatedSecretName,
+		},
+	}
+
+	for retryCount := 0; retryCount < MaxRetries; retryCount++ {
+		_, err = clientset.Core().Secrets(namespace).Get(FederatedSecretName)
+		if err != nil {
+			framework.Failf("failed to get secret %q: %v", FederatedSecretName, err)
+		}
+		newSecret, err = clientset.Core().Secrets(namespace).Update(secret)
+		if err == nil {
+			return newSecret
+		}
+		if !errors.IsConflict(err) && !errors.IsServerTimeout(err) {
+			framework.Failf("failed to update secret %q: %v", FederatedSecretName, err)
+		}
+	}
+	framework.Failf("too many retries updating secret %q", FederatedSecretName)
+	return newSecret
+}
+
+func waitForSecretShardsOrFail(namespace string, secret *v1.Secret, clusters map[string]*cluster) {
+	framework.Logf("Waiting for secret %q in %d clusters", secret.Name, len(clusters))
+	for _, c := range clusters {
+		waitForSecretOrFail(c.Clientset, namespace, secret, true, FederatedSecretTimeout)
+	}
+}
+
+func waitForSecretOrFail(clientset *release_1_3.Clientset, namespace string, secret *v1.Secret, present bool, timeout time.Duration) {
+	By(fmt.Sprintf("Fetching a federated secret shard of secret %q in namespace %q from cluster", secret.Name, namespace))
+	var clusterSecret *v1.Secret
+	err := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
+		clusterSecret, err := clientset.Core().Secrets(namespace).Get(secret.Name)
+		if (!present) && errors.IsNotFound(err) { // We want it gone, and it's gone.
+			By(fmt.Sprintf("Success: shard of federated secret %q in namespace %q in cluster is absent", secret.Name, namespace))
+			return true, nil // Success
+		}
+		if present && err == nil { // We want it present, and the Get succeeded, so we're all good.
+			By(fmt.Sprintf("Success: shard of federated secret %q in namespace %q in cluster is present", secret.Name, namespace))
+			return true, nil // Success
+		}
+		By(fmt.Sprintf("Secret %q in namespace %q in cluster.  Found: %v, waiting for Found: %v, trying again in %s (err=%v)", secret.Name, namespace, clusterSecret != nil && err == nil, present, framework.Poll, err))
+		return false, nil
+	})
+	framework.ExpectNoError(err, "Failed to verify secret %q in namespace %q in cluster: Present=%v", secret.Name, namespace, present)
+
+	if present && clusterSecret != nil {
+		Expect(equivalentSecret(*clusterSecret, *secret))
+	}
+}
+
+func waitForSecretShardsUpdatedOrFail(namespace string, secret *v1.Secret, clusters map[string]*cluster) {
+	framework.Logf("Waiting for secret %q in %d clusters", secret.Name, len(clusters))
+	for _, c := range clusters {
+		waitForSecretUpdateOrFail(c.Clientset, namespace, secret, FederatedSecretTimeout)
+	}
+}
+
+func waitForSecretUpdateOrFail(clientset *release_1_3.Clientset, namespace string, secret *v1.Secret, timeout time.Duration) {
+	By(fmt.Sprintf("Fetching a federated secret shard of secret %q in namespace %q from cluster", secret.Name, namespace))
+	err := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
+		clusterSecret, err := clientset.Core().Secrets(namespace).Get(secret.Name)
+		if err == nil { // We want it present, and the Get succeeded, so we're all good.
+			if equivalentSecret(*clusterSecret, *secret) {
+				By(fmt.Sprintf("Success: shard of federated secret %q in namespace %q in cluster is updated", secret.Name, namespace))
+				return true, nil
+			}
+			By(fmt.Sprintf("Secret %q in namespace %q in cluster, waiting for service being updated, trying again in %s (err=%v)", secret.Name, namespace, framework.Poll, err))
+			return false, nil
+		}
+		By(fmt.Sprintf("Secret %q in namespace %q in cluster, waiting for being updated, trying again in %s (err=%v)", secret.Name, namespace, framework.Poll, err))
+		return false, nil
+	})
+	framework.ExpectNoError(err, "Failed to verify secret %q in namespace %q in cluster", secret.Name, namespace)
+}
+
+func equivalentSecret(federatedSecret, clusterSecret v1.Secret) bool {
+	return reflect.DeepEqual(clusterSecret, federatedSecret)
 }
