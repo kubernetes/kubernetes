@@ -1210,6 +1210,13 @@ func DeepCopy_api_GlusterfsVolumeSource(in interface{}, out interface{}, c *conv
 		in := in.(*GlusterfsVolumeSource)
 		out := out.(*GlusterfsVolumeSource)
 		out.EndpointsName = in.EndpointsName
+		if in.Servers != nil {
+			in, out := &in.Servers, &out.Servers
+			*out = make([]string, len(*in))
+			copy(*out, *in)
+		} else {
+			out.Servers = nil
+		}
 		out.Path = in.Path
 		out.ReadOnly = in.ReadOnly
 		return nil
@@ -2190,7 +2197,9 @@ func DeepCopy_api_PersistentVolumeSource(in interface{}, out interface{}, c *con
 		if in.Glusterfs != nil {
 			in, out := &in.Glusterfs, &out.Glusterfs
 			*out = new(GlusterfsVolumeSource)
-			**out = **in
+			if err := DeepCopy_api_GlusterfsVolumeSource(*in, *out, c); err != nil {
+				return err
+			}
 		} else {
 			out.Glusterfs = nil
 		}
@@ -3613,7 +3622,9 @@ func DeepCopy_api_VolumeSource(in interface{}, out interface{}, c *conversion.Cl
 		if in.Glusterfs != nil {
 			in, out := &in.Glusterfs, &out.Glusterfs
 			*out = new(GlusterfsVolumeSource)
-			**out = **in
+			if err := DeepCopy_api_GlusterfsVolumeSource(*in, *out, c); err != nil {
+				return err
+			}
 		} else {
 			out.Glusterfs = nil
 		}
