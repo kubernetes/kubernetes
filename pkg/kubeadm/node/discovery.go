@@ -22,23 +22,15 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
-	"strings"
 
 	jose "github.com/square/go-jose"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	kubeadmapi "k8s.io/kubernetes/pkg/kubeadm/api"
 )
 
-func RetrieveTrustedClusterInfo(params *kubeadmapi.BootstrapParams) (*clientcmdapi.Config, error) {
-	firstURL := strings.Split(params.Discovery.ApiServerURLs, ",")[0] // TODO obviously we should do something better.. .
-	apiServerURL, err := url.Parse(firstURL)
-	if err != nil {
-		return nil, fmt.Errorf("<node/discovery> failed to parse given API server URL (%q) [%s]", firstURL, err)
-	}
-
-	host, port := strings.Split(apiServerURL.Host, ":")[0], 9898 // TODO this is too naive
-	requestURL := fmt.Sprintf("http://%s:%d/cluster-info/v1/?token-id=%s", host, port, params.Discovery.TokenID)
+func RetrieveTrustedClusterInfo(s *kubeadmapi.KubeadmConfig) (*clientcmdapi.Config, error) {
+	host, port := s.JoinFlags.MasterAddrs[0].String(), 9898
+	requestURL := fmt.Sprintf("http://%s:%d/cluster-info/v1/?token-id=%s", host, port, s.Secrets.TokenID)
 	req, err := http.NewRequest("GET", requestURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("<node/discovery> failed to consturct an HTTP request [%s]", err)
@@ -61,7 +53,7 @@ func RetrieveTrustedClusterInfo(params *kubeadmapi.BootstrapParams) (*clientcmda
 
 	fmt.Println("<node/discovery> cluster info object received, verifying signature using given token")
 
-	output, err := object.Verify(params.Discovery.Token)
+	output, err := object.Verify(s.Secrets.Token)
 	if err != nil {
 		return nil, fmt.Errorf("<node/discovery> failed to verify JWS signature of received cluster info object [%s]", err)
 	}
@@ -84,5 +76,5 @@ func RetrieveTrustedClusterInfo(params *kubeadmapi.BootstrapParams) (*clientcmda
 	apiServer := clusterInfo.Endpoints[0]
 	caCert := []byte(clusterInfo.CertificateAuthorities[0])
 
-	return PerformTLSBootstrap(params, apiServer, caCert)
+	return PerformTLSBootstrap(s, apiServer, caCert)
 }

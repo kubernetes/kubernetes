@@ -19,6 +19,7 @@ package cmd
 import (
 	"fmt"
 	"io"
+	"net"
 
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
@@ -40,44 +41,52 @@ var (
 		`)
 )
 
-func NewCmdJoin(out io.Writer, params *kubeadmapi.BootstrapParams) *cobra.Command {
+func NewCmdJoin(out io.Writer, s *kubeadmapi.KubeadmConfig) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "join",
 		Short: "Run this on other servers to join an existing cluster.",
 		Run: func(cmd *cobra.Command, args []string) {
-			err := RunJoin(out, cmd, args, params)
+			err := RunJoin(out, cmd, args, s)
 			cmdutil.CheckErr(err)
 		},
 	}
 
 	// TODO this should become `kubeadm join --token=<...> <master-ip-addr>`
-	cmd.PersistentFlags().StringVarP(&params.Discovery.ApiServerURLs, "api-server-urls", "", "",
-		`Comma separated list of API server URLs. Typically this might be just
-		https://<address-of-master>:8080/`)
-	cmd.PersistentFlags().StringVarP(&params.Discovery.GivenToken, "token", "", "",
-		`Shared secret used to secure bootstrap. Must match output of 'init-master'.`)
+	cmd.PersistentFlags().StringVarP(
+		&s.Secrets.GivenToken, "token", "", "",
+		`Shared secret used to secure bootstrap. Must match output of 'init-master'.`,
+	)
 
 	return cmd
 }
 
-func RunJoin(out io.Writer, cmd *cobra.Command, args []string, params *kubeadmapi.BootstrapParams) error {
-	ok, err := kubeadmutil.UseGivenTokenIfValid(params)
+func RunJoin(out io.Writer, cmd *cobra.Command, args []string, s *kubeadmapi.KubeadmConfig) error {
+	// TODO this we are missing args from the help text, there should be a way to tell cobra about it
+	if len(args) == 0 {
+		return fmt.Errorf("<cmd/join> must specify master IP address (see --help)")
+	}
+	for _, i := range args {
+		addr := net.ParseIP(i) // TODO(phase1+) should allow resolvable names too
+		if addr == nil {
+			return fmt.Errorf("<cmd/join> failed parse argument (%q) as an IP address", i)
+		}
+		s.JoinFlags.MasterAddrs = append(s.JoinFlags.MasterAddrs, addr)
+	}
+
+	ok, err := kubeadmutil.UseGivenTokenIfValid(s)
 	if !ok {
 		if err != nil {
-			return fmt.Errorf("%s (see --help)\n", err)
+			return fmt.Errorf("<cmd/join> %s (see --help)\n", err)
 		}
 		return fmt.Errorf("Must specify --token (see --help)\n")
 	}
-	if params.Discovery.ApiServerURLs == "" {
-		return fmt.Errorf("Must specify --api-server-urls (see --help)\n")
-	}
 
-	kubeconfig, err := kubenode.RetrieveTrustedClusterInfo(params)
+	kubeconfig, err := kubenode.RetrieveTrustedClusterInfo(s)
 	if err != nil {
 		return err
 	}
 
-	err = kubeadmutil.WriteKubeconfigIfNotExists(params, "kubelet", kubeconfig)
+	err = kubeadmutil.WriteKubeconfigIfNotExists(s, "kubelet", kubeconfig)
 	if err != nil {
 		return err
 	}
