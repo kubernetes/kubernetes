@@ -37,12 +37,12 @@ const (
 	defaultSandboxGracePeriod int = 10
 )
 
-// CreatePodSandbox creates a pod-level sandbox.
-// The definition of PodSandbox is at https://github.com/kubernetes/kubernetes/pull/25899
+// RunPodSandbox creates and starts a pod-level sandbox. Runtimes should ensure
+// the sandbox is in ready state.
 // For docker, PodSandbox is implemented by a container holding the network
 // namespace for the pod.
 // Note: docker doesn't use LogDirectory (yet).
-func (ds *dockerService) CreatePodSandbox(config *runtimeApi.PodSandboxConfig) (string, error) {
+func (ds *dockerService) RunPodSandbox(config *runtimeApi.PodSandboxConfig) (string, error) {
 	// Step 1: Pull the image for the sandbox.
 	// TODO: How should we handle pulling custom pod infra container image
 	// (with credentials)?
