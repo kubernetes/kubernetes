@@ -90,3 +90,5 @@ Reservations about the given proposal:
    
 4. Allowing the user access to administrative credentials/secret can present unauthorized access and prevent audit of the user as the 
    credentials are being shared.
+
+5. Will the secrets ALL be stored in a single administrative namespace, or will one new namespace be created per secret?
