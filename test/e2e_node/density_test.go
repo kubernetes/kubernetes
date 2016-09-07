@@ -171,6 +171,44 @@ var _ = framework.KubeDescribe("Density [Serial] [Slow]", func() {
 		}
 	})
 
+	Context("create a batch of pods with 60 QPS", func() {
+		dTests := []densityTest{
+			{
+				podsNr:   105,
+				interval: 0 * time.Millisecond,
+			},
+			{
+				podsNr:   105,
+				interval: 100 * time.Millisecond,
+			},
+			{
+				podsNr:   105,
+				interval: 300 * time.Millisecond,
+			},
+		}
+
+		for _, testArg := range dTests {
+			itArg := testArg
+			It(fmt.Sprintf("latency/resource should be within limit when create %d pods with %v interval [Benchmark]",
+				itArg.podsNr, itArg.interval), func() {
+				itArg.createMethod = "batch"
+				testName := itArg.getTestName()
+				// The latency caused by API QPS limit takes a large portion (up to ~33%) of e2e latency.
+				// It makes the pod startup latency of Kubelet (creation throughput as well) under-estimated.
+				// Here we set API QPS limit from default 5 to 60 in order to test real Kubelet performance.
+				// Note that it will cause higher resource usage.
+				setKubeletAPIQPSLimit(f, 60)
+				batchLag, e2eLags := runDensityBatchTest(f, rc, itArg, true)
+
+				By("Verifying latency")
+				logAndVerifyLatency(batchLag, e2eLags, itArg.podStartupLimits, itArg.podBatchStartupLimit, testName, false)
+
+				By("Verifying resource")
+				logAndVerifyResource(f, rc, itArg.cpuLimits, itArg.memLimits, testName, false)
+			})
+		}
+	})
+
 	Context("create a sequence of pods", func() {
 		dTests := []densityTest{
 			{
@@ -518,4 +556,28 @@ func logAndVerifyLatency(batchLag time.Duration, e2eLags []framework.PodLatencyD
 // logThroughput calculates and logs pod creation throughput.
 func logPodCreateThroughput(batchLag time.Duration, e2eLags []framework.PodLatencyData, podsNr int, testName string) {
 	framework.PrintPerfData(getThroughputPerfData(batchLag, e2eLags, podsNr, testName))
+}
+
+// increaseKubeletAPIQPSLimit sets Kubelet API QPS via ConfigMap. Kubelet will restart with the new QPS.
+func setKubeletAPIQPSLimit(f *framework.Framework, newAPIQPS int32) {
+	const restartGap = 40 * time.Second
+
+	resp := pollConfigz(2*time.Minute, 5*time.Second)
+	kubeCfg, err := decodeConfigz(resp)
+	framework.ExpectNoError(err)
+	framework.Logf("Old QPS limit is: %d\n", kubeCfg.KubeAPIQPS)
+
+	// Set new API QPS limit
+	kubeCfg.KubeAPIQPS = newAPIQPS
+	_, err = createConfigMap(f, kubeCfg)
+	framework.ExpectNoError(err)
+
+	// Wait for Kubelet to restart
+	time.Sleep(restartGap)
+
+	// Check new QPS has been set
+	resp = pollConfigz(2*time.Minute, 5*time.Second)
+	kubeCfg, err = decodeConfigz(resp)
+	framework.ExpectNoError(err)
+	framework.Logf("New QPS limit is: %d\n", kubeCfg.KubeAPIQPS)
 }
