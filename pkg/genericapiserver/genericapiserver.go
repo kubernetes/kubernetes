@@ -510,7 +510,7 @@ func (s *GenericAPIServer) init(c *Config) {
 			MaxBackups: c.AuditLogMaxBackups,
 			MaxSize:    c.AuditLogMaxSize,
 		}
-		handler = audit.WithAudit(handler, s.RequestContextMapper, writer)
+		handler = audit.WithAudit(handler, attributeGetter, writer)
 		defer writer.Close()
 	}
 	handler = apiserver.WithImpersonation(handler, s.RequestContextMapper, s.authorizer)
