@@ -46,7 +46,6 @@ func getEnvParams() map[string]string {
 		"discovery_image":    "dgoodwin/kubediscovery:latest", // TODO(phase1): fmt.Sprintf("gcr.io/google_containers/kube-discovery-%s:%s", runtime.GOARCH, "1.0"),
 		"etcd_image":         "",
 		"component_loglevel": "--v=4",
-		"dns_domain":         "cluster.local",
 	}
 
 	for k := range envParams {

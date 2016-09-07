@@ -28,11 +28,14 @@ import (
 	certutil "k8s.io/kubernetes/pkg/util/cert"
 )
 
-func CreateCertsAndConfigForClients(params *kubeadmapi.BootstrapParams, clientNames []string, caKey *rsa.PrivateKey, caCert *x509.Certificate) (map[string]*clientcmdapi.Config, error) {
+func CreateCertsAndConfigForClients(s *kubeadmapi.KubeadmConfig, clientNames []string, caKey *rsa.PrivateKey, caCert *x509.Certificate) (map[string]*clientcmdapi.Config, error) {
 
 	basicClientConfig := kubeadmutil.CreateBasicClientConfig(
 		"kubernetes",
-		fmt.Sprintf("https://%s:443", params.Discovery.ListenIP),
+		// TODO this is not great, but there is only one address we can use here
+		// so we'll pick the first one, there is much of chance to have an empty
+		// slice by the time this gets called
+		fmt.Sprintf("https://%s:443", s.InitFlags.API.AdvertiseAddrs[0]),
 		certutil.EncodeCertPEM(caCert),
 	)
 

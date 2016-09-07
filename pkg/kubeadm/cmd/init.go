@@ -19,6 +19,7 @@ package cmd
 import (
 	"fmt"
 	"io"
+	"net"
 
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
@@ -40,52 +41,91 @@ var (
 		`)
 )
 
-func NewCmdInit(out io.Writer, params *kubeadmapi.BootstrapParams) *cobra.Command {
+func NewCmdInit(out io.Writer, s *kubeadmapi.KubeadmConfig) *cobra.Command {
+	advertiseAddrs := &[]string{}
 	cmd := &cobra.Command{
 		Use:   "init",
 		Short: "Run this on the first server you deploy onto.",
 		Run: func(cmd *cobra.Command, args []string) {
-			err := RunInit(out, cmd, args, params)
-			cmdutil.CheckErr(err)
+			err := RunInit(out, cmd, args, s, advertiseAddrs)
+			cmdutil.CheckErr(err) // TODO(phase1+) append alpha warning with bugs URL etc
 		},
 	}
 
-	cmd.PersistentFlags().IPVar(&params.Discovery.ListenIP, "listen-ip", nil,
-		`(optional) IP address to listen on, in case autodetection fails.`)
-	cmd.PersistentFlags().StringVar(&params.Discovery.GivenToken, "token", "",
-		`(optional) Shared secret used to secure bootstrap. Will be generated and displayed if not provided.`)
-	cmd.PersistentFlags().BoolVar(&params.Discovery.UseHyperkubeImage, "use-hyperkube", false,
-		`(optional) Use the hyperkube image for running the apiserver, controller-manager, scheduler and proxy.`)
+	cmd.PersistentFlags().StringVar(
+		&s.Secrets.GivenToken, "token", "",
+		`(optional) Shared secret used to secure bootstrap. Will be generated and displayed if not provided.`,
+	)
+	cmd.PersistentFlags().StringSliceVar(
+		advertiseAddrs, "api-advertise-addr", []string{},
+		`(optional) IP address to advertise, in case autodetection fails.`,
+	)
+	cmd.PersistentFlags().StringSliceVar(
+		&s.InitFlags.API.ExternalDNSName, "api-external-dns-name", []string{},
+		`(optional) DNS name to advertise, in case you have configured one yourself.`,
+	)
+
+	cmd.PersistentFlags().IPNetVar(
+		&s.InitFlags.Services.CIDR, "service-cidr", *kubeadmapi.DefaultServicesCIDR,
+		`(optional) use alterantive range of IP address for service VIPs, e.g. "10.16.0.0/12"`,
+	)
+	cmd.PersistentFlags().StringVar(
+		&s.InitFlags.Services.DNSDomain, "service-dns-domain", kubeadmapi.DefaultServiceDNSDomain,
+		`(optional) use alterantive domain name for services, e.g. "myorg.internal"`,
+	)
+	cmd.PersistentFlags().StringVar(
+		&s.InitFlags.CloudProvider, "cloud-provider", "",
+		`(optional) enable cloud proiver features (external load-balancers, storage, etc)`,
+	)
 
 	return cmd
 }
 
-func RunInit(out io.Writer, cmd *cobra.Command, args []string, params *kubeadmapi.BootstrapParams) error {
-
+func RunInit(out io.Writer, cmd *cobra.Command, args []string, s *kubeadmapi.KubeadmConfig, advertiseAddrs *[]string) error {
 	// Auto-detect the IP
-	if params.Discovery.ListenIP == nil {
+	if len(*advertiseAddrs) == 0 {
+		// TODO(phase1+) perhaps we could actually grab eth0 and eth1
 		ip, err := netutil.ChooseHostInterface()
 		if err != nil {
 			return err
 		}
-		params.Discovery.ListenIP = ip
+		s.InitFlags.API.AdvertiseAddrs = []net.IP{ip}
+	} else {
+		for _, i := range *advertiseAddrs {
+			addr := net.ParseIP(i)
+			if addr == nil {
+				return fmt.Errorf("<cmd/init> failed to parse flag (%q) as an IP address", "--api-advertise-addr="+i)
+			}
+			s.InitFlags.API.AdvertiseAddrs = append(s.InitFlags.API.AdvertiseAddrs, addr)
+		}
 	}
-	if err := kubemaster.CreateTokenAuthFile(params); err != nil {
+
+	if s.InitFlags.CloudProvider != "" {
+		// TODO(phase2) we should be able to auto-detect it and check whether things like IAM roles are correct
+		if _, ok := kubeadmapi.SupportedCloudProviders[s.InitFlags.CloudProvider]; !ok {
+			return fmt.Errorf("<cmd/init> cloud provider %q is not supported, you can use any of %v, or leave it unset", s.InitFlags.CloudProvider, kubeadmapi.ListOfCloudProviders)
+		}
+	}
+
+	if err := kubemaster.CreateTokenAuthFile(s); err != nil {
 		return err
 	}
-	if err := kubemaster.WriteStaticPodManifests(params); err != nil {
+
+	if err := kubemaster.WriteStaticPodManifests(s); err != nil {
 		return err
 	}
-	caKey, caCert, err := kubemaster.CreatePKIAssets(params)
+
+	caKey, caCert, err := kubemaster.CreatePKIAssets(s)
 	if err != nil {
 		return err
 	}
-	kubeconfigs, err := kubemaster.CreateCertsAndConfigForClients(params, []string{"kubelet", "admin"}, caKey, caCert)
+
+	kubeconfigs, err := kubemaster.CreateCertsAndConfigForClients(s, []string{"kubelet", "admin"}, caKey, caCert)
 	if err != nil {
 		return err
 	}
 	for name, kubeconfig := range kubeconfigs {
-		if err := kubeadmutil.WriteKubeconfigIfNotExists(params, name, kubeconfig); err != nil {
+		if err := kubeadmutil.WriteKubeconfigIfNotExists(s, name, kubeconfig); err != nil {
 			return err
 		}
 	}
@@ -99,18 +139,18 @@ func RunInit(out io.Writer, cmd *cobra.Command, args []string, params *kubeadmap
 		return err
 	}
 
-	if err := kubemaster.CreateDiscoveryDeploymentAndSecret(params, client, caCert); err != nil {
+	if err := kubemaster.CreateDiscoveryDeploymentAndSecret(s, client, caCert); err != nil {
 		return err
 	}
 
-	if err := kubemaster.CreateEssentialAddons(params, client); err != nil {
+	if err := kubemaster.CreateEssentialAddons(s, client); err != nil {
 		return err
 	}
 
-	// TODO use templates to reference struct fields directly as order of args is fragile
+	// TODO(phase1+) use templates to reference struct fields directly as order of args is fragile
 	fmt.Fprintf(out, init_done_msgf,
-		params.Discovery.GivenToken,
-		params.Discovery.ListenIP,
+		s.Secrets.GivenToken,
+		s.InitFlags.API.AdvertiseAddrs[0].String(),
 	)
 
 	return nil
