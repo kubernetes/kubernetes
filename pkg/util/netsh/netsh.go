@@ -1,0 +1,139 @@
+/*
+Copyright 2014 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package netsh
+
+import (
+	"fmt"
+	"sync"
+
+	"github.com/golang/glog"
+	utilexec "k8s.io/kubernetes/pkg/util/exec"
+)
+
+// Interface is an injectable interface for running netsh commands.  Implementations must be goroutine-safe.
+type Interface interface {
+	// EnsurePortProxyRule checks if the specified redirect exists, if not creates it
+	EnsurePortProxyRule(args []string) (bool, error)
+	// DeletePortProxyRule deletes the specified portproxy rule.  If the rule did not exist, return error.
+	DeletePortProxyRule(args []string) error
+	// EnsureIPAddress checks if the specified IP Address is added to vEthernet (HNSTransparent) interface, if not, add it.  If the address existed, return true.
+	EnsureIPAddress(args []string) (bool, error)
+	// DeleteIPAddress checks if the specified IP address is present and, if so, deletes it.
+	DeleteIPAddress(args []string) error
+	// Restore runs `netsh exec` to restore portproxy or addresses using a file.
+	// TODO Check if this is required, most likely not
+	Restore(args []string) error
+}
+
+const (
+	cmdNetshAddPortProxy    string = "netsh interface portproxy add v4tov4"
+	cmdNetshAddIpv4         string = "netsh interface ipv4 add address"
+	cmdNetshDeletePortProxy string = "netsh interface portproxy delete v4tov4"
+	cmdNetshDeleteIpv4      string = "netsh interface ipv4 delete address"
+)
+
+// runner implements Interface in terms of exec("netsh").
+type runner struct {
+	mu   sync.Mutex
+	exec utilexec.Interface
+}
+
+// New returns a new Interface which will exec netsh.
+func New(exec utilexec.Interface) Interface {
+	runner := &runner{
+		exec: exec,
+	}
+	return runner
+}
+
+// EnsurePortProxyRule checks if the specified redirect exists, if not creates it.
+func (runner *runner) EnsurePortProxyRule(args []string) (bool, error) {
+	glog.V(4).Infof("running netsh interface portproxy add v4tov4 %v", args)
+	out, err := runner.exec.Command(cmdNetshAddPortProxy, args...).CombinedOutput()
+
+	if err == nil {
+		return true, nil
+	}
+	if ee, ok := err.(utilexec.ExitError); ok {
+		// netsh uses exit(0) to indicate a success of the operation,
+		// as compared to a malformed commandline, for example.
+		if ee.Exited() && ee.ExitStatus() != 0 {
+			return false, nil
+		}
+	}
+	return false, fmt.Errorf("error checking portproxy rule: %v: %s", err, out)
+
+}
+
+// DeletePortProxyRule deletes the specified portproxy rule.  If the rule did not exist, return error.
+func (runner *runner) DeletePortProxyRule(args []string) error {
+	glog.V(4).Infof("running netsh interface portproxy delete v4tov4 %v", args)
+	out, err := runner.exec.Command(cmdNetshDeletePortProxy, args...).CombinedOutput()
+
+	if err == nil {
+		return nil
+	}
+	if ee, ok := err.(utilexec.ExitError); ok {
+		// netsh uses exit(0) to indicate a success of the operation,
+		// as compared to a malformed commandline, for example.
+		if ee.Exited() && ee.ExitStatus() == 0 {
+			return nil
+		}
+	}
+	return fmt.Errorf("error deleting portproxy rule: %v: %s", err, out)
+}
+
+// EnsureIPAddress checks if the specified IP Address is added to vEthernet (HNSTransparent) interface, if not, add it.  If the address existed, return true.
+func (runner *runner) EnsureIPAddress(args []string) (bool, error) {
+	glog.V(4).Infof("running netsh interface ipv4 add address %v", args)
+	out, err := runner.exec.Command(cmdNetshAddIpv4, args...).CombinedOutput()
+
+	if err == nil {
+		return true, nil
+	}
+	if ee, ok := err.(utilexec.ExitError); ok {
+		// netsh uses exit(0) to indicate a success of the operation,
+		// as compared to a malformed commandline, for example.
+		if ee.Exited() && ee.ExitStatus() != 0 {
+			return false, nil
+		}
+	}
+	return false, fmt.Errorf("error adding ipv4 address: %v: %s", err, out)
+}
+
+// DeleteIPAddress checks if the specified IP address is present and, if so, deletes it.
+func (runner *runner) DeleteIPAddress(args []string) error {
+	glog.V(4).Infof("running netsh interface ipv4 delete address %v", args)
+	out, err := runner.exec.Command(cmdNetshDeleteIpv4, args...).CombinedOutput()
+
+	if err == nil {
+		return nil
+	}
+	if ee, ok := err.(utilexec.ExitError); ok {
+		// netsh uses exit(0) to indicate a success of the operation,
+		// as compared to a malformed commandline, for example.
+		if ee.Exited() && ee.ExitStatus() == 0 {
+			return nil
+		}
+	}
+	return fmt.Errorf("error deleting ipv4 address: %v: %s", err, out)
+}
+
+// Restore is part of Interface.
+func (runner *runner) Restore(args []string) error {
+	return nil
+}

@@ -45,6 +45,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/exec"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
+	utilnetsh "k8s.io/kubernetes/pkg/util/netsh"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/util/resourcecontainer"
@@ -136,10 +137,19 @@ func NewProxyServerDefault(config *options.ProxyServerConfig) (*ProxyServer, err
 		protocol = utiliptables.ProtocolIpv6
 	}
 
+	var netshInterface utilnetsh.Interface
+	var iptInterface utiliptables.Interface
+	var dbus utildbus.Interface
+
 	// Create a iptables utils.
 	execer := exec.New()
-	dbus := utildbus.New()
-	iptInterface := utiliptables.New(execer, dbus, protocol)
+
+	if runtime.GOOS == "windows" {
+		netshInterface = utilnetsh.New(execer)
+	} else {
+		dbus = utildbus.New()
+		iptInterface = utiliptables.New(execer, dbus, protocol)
+	}
 
 	// We omit creation of pretty much everything if we run in cleanup mode
 	if config.CleanupAndExit {
@@ -227,6 +237,7 @@ func NewProxyServerDefault(config *options.ProxyServerConfig) (*ProxyServer, err
 			loadBalancer,
 			net.ParseIP(config.BindAddress),
 			iptInterface,
+			netshInterface,
 			*utilnet.ParsePortRangeOrDie(config.PortRange),
 			config.IPTablesSyncPeriod.Duration,
 			config.UDPIdleTimeout.Duration,
@@ -237,9 +248,13 @@ func NewProxyServerDefault(config *options.ProxyServerConfig) (*ProxyServer, err
 		proxier = proxierUserspace
 		// Remove artifacts from the pure-iptables Proxier.
 		glog.V(0).Info("Tearing down pure-iptables proxy rules.")
-		iptables.CleanupLeftovers(iptInterface)
+		if runtime.GOOS != "windows" {
+			iptables.CleanupLeftovers(iptInterface)
+		}
 	}
-	iptInterface.AddReloadFunc(proxier.Sync)
+	if runtime.GOOS != "windows" {
+		iptInterface.AddReloadFunc(proxier.Sync)
+	}
 
 	// Create configs (i.e. Watches for Services and Endpoints)
 	// Note: RegisterHandler() calls need to happen before creation of Sources because sources
