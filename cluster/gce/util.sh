@@ -603,7 +603,7 @@ function kube-up() {
     create-loadbalancer
     # If replication of master fails, we need to ensure that the replica is removed from etcd clusters.
     if ! replicate-master; then
-      remove-replica-from-etcd 4001 || true
+      remove-replica-from-etcd 2379 || true
       remove-replica-from-etcd 4002 || true
     fi
   else
@@ -769,7 +769,7 @@ function replicate-master() {
   echo "Experimental: replicating existing master ${EXISTING_MASTER_ZONE}/${EXISTING_MASTER_NAME} as ${ZONE}/${REPLICA_NAME}"
 
   # Before we do anything else, we should configure etcd to expect more replicas.
-  if ! add-replica-to-etcd 4001 2380; then
+  if ! add-replica-to-etcd 2379 2380; then
     echo "Failed to add master replica to etcd cluster."
     return 1
   fi
@@ -1161,7 +1161,7 @@ function kube-down() {
   set-existing-master
 
   # Un-register the master replica from etcd and events etcd.
-  remove-replica-from-etcd 4001
+  remove-replica-from-etcd 2379
   remove-replica-from-etcd 4002
 
   # Delete the master replica (if it exists).
