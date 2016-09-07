@@ -100,6 +100,7 @@ create-external-load-balancer
 current-release-pr
 current-replicas
 daemonset-lookup-cache-size
+data-dir
 default-container-cpu-limit
 default-container-mem-limit
 delay-shutdown
