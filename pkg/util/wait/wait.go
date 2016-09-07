@@ -186,7 +186,12 @@ func pollImmediateInternal(wait WaitFunc, condition ConditionFunc) error {
 func PollInfinite(interval time.Duration, condition ConditionFunc) error {
 	done := make(chan struct{})
 	defer close(done)
-	return WaitFor(poller(interval, 0), condition, done)
+	return PollUntil(interval, condition, done)
+}
+
+// PollUntil is like Poll, but it takes a stop change instead of total duration
+func PollUntil(interval time.Duration, condition ConditionFunc, stopCh <-chan struct{}) error {
+	return WaitFor(poller(interval, 0), condition, stopCh)
 }
 
 // WaitFunc creates a channel that receives an item every time a test
