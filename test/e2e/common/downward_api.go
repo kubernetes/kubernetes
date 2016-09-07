@@ -128,7 +128,7 @@ var _ = framework.KubeDescribe("Downward API", func() {
 		testDownwardAPI(f, podName, env, expectations)
 	})
 
-	It("should provide default limits.cpu/memory from node capacity", func() {
+	It("should provide default limits.cpu/memory from node allocatable", func() {
 		podName := "downward-api-" + string(uuid.NewUUID())
 		env := []api.EnvVar{
 			{
