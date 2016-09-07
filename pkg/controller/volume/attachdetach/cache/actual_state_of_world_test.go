@@ -18,10 +18,15 @@ package cache
 
 import (
 	"testing"
+	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	controllervolumetesting "k8s.io/kubernetes/pkg/controller/volume/attachdetach/testing"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
+)
+
+const (
+	maxWaitTime = 6 * time.Minute
 )
 
 // Calls AddVolumeNode() once.
@@ -597,7 +602,7 @@ func Test_SetVolumeMountedByNode_Positive_UnsetWithInitialSetAddVolumeNodeNotRes
 }
 
 // Populates data struct with one volume/node entry.
-// Calls MarkDesireToDetach() once on volume/node entry.
+// Calls CheckAndMarkDesireToDetach() once on volume/node entry.
 // Calls SetVolumeMountedByNode() twice, first setting mounted to true then false.
 // Verifies mountedByNode is false and detachRequestedTime is NOT zero.
 func Test_SetVolumeMountedByNode_Positive_UnsetWithInitialSetVerifyDetachRequestedTimePerserved(t *testing.T) {
@@ -612,11 +617,6 @@ func Test_SetVolumeMountedByNode_Positive_UnsetWithInitialSetVerifyDetachRequest
 	if addErr != nil {
 		t.Fatalf("AddVolumeNode failed. Expected: <no error> Actual: <%v>", addErr)
 	}
-	_, err := asw.MarkDesireToDetach(generatedVolumeName, nodeName)
-	if err != nil {
-		t.Fatalf("MarkDesireToDetach failed. Expected: <no error> Actual: <%v>", err)
-	}
-	expectedDetachRequestedTime := asw.GetAttachedVolumes()[0].DetachRequestedTime
 
 	// Act
 	setVolumeMountedErr1 := asw.SetVolumeMountedByNode(generatedVolumeName, nodeName, true /* mounted */)
@@ -629,6 +629,12 @@ func Test_SetVolumeMountedByNode_Positive_UnsetWithInitialSetVerifyDetachRequest
 	if setVolumeMountedErr2 != nil {
 		t.Fatalf("SetVolumeMountedByNode2 failed. Expected <no error> Actual: <%v>", setVolumeMountedErr2)
 	}
+
+	_, err := asw.CheckAndMarkDesireToDetach(generatedVolumeName, nodeName, maxWaitTime)
+	if err != nil {
+		t.Fatalf("CheckAndMarkDesireToDetach failed. Expected: <no error> Actual: <%v>", err)
+	}
+	expectedDetachRequestedTime := asw.GetAttachedVolumes()[0].DetachRequestedTime
 
 	attachedVolumes := asw.GetAttachedVolumes()
 	if len(attachedVolumes) != 1 {
@@ -643,7 +649,7 @@ func Test_SetVolumeMountedByNode_Positive_UnsetWithInitialSetVerifyDetachRequest
 
 // Populates data struct with one volume/node entry.
 // Verifies mountedByNode is true and detachRequestedTime is zero (default values).
-func Test_MarkDesireToDetach_Positive_Set(t *testing.T) {
+func Test_AddVolumeNode_Positive_Set(t *testing.T) {
 	// Arrange
 	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
 	asw := NewActualStateOfWorld(volumePluginMgr)
@@ -668,9 +674,9 @@ func Test_MarkDesireToDetach_Positive_Set(t *testing.T) {
 }
 
 // Populates data struct with one volume/node entry.
-// Calls MarkDesireToDetach() once on volume/node entry.
+// Calls CheckAndMarkDesireToDetach() once on volume/node entry.
 // Verifies mountedByNode is true and detachRequestedTime is NOT zero.
-func Test_MarkDesireToDetach_Positive_Marked(t *testing.T) {
+func Test_MarkDesireToDetach_Negative_Marked(t *testing.T) {
 	// Arrange
 	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
 	asw := NewActualStateOfWorld(volumePluginMgr)
@@ -683,28 +689,32 @@ func Test_MarkDesireToDetach_Positive_Marked(t *testing.T) {
 		t.Fatalf("AddVolumeNode failed. Expected: <no error> Actual: <%v>", addErr)
 	}
 
-	// Act
-	_, markDesireToDetachErr := asw.MarkDesireToDetach(generatedVolumeName, nodeName)
-
-	// Assert
-	if markDesireToDetachErr != nil {
-		t.Fatalf("MarkDesireToDetach failed. Expected: <no error> Actual: <%v>", markDesireToDetachErr)
-	}
-
-	// Assert
+	// Verify volume is added
 	attachedVolumes := asw.GetAttachedVolumes()
 	if len(attachedVolumes) != 1 {
 		t.Fatalf("len(attachedVolumes) Expected: <1> Actual: <%v>", len(attachedVolumes))
 	}
+	verifyAttachedVolume(t, attachedVolumes, generatedVolumeName, string(volumeName), nodeName, true /* expectedMountedByNode */, false /* expectNonZeroDetachRequestedTime */)
 
+	// Check to detach
+	_, markDesireToDetachErr := asw.CheckAndMarkDesireToDetach(generatedVolumeName, nodeName, maxWaitTime)
+
+	// Assert: expect returning error message
+	if markDesireToDetachErr == nil {
+		t.Fatalf("CheckAndMarkDesireToDetach failed. Expected: <error message> Actual: <%v>", markDesireToDetachErr)
+	}
+	// Assert: detachRequestTime is not zero
+	attachedVolumes = asw.GetAttachedVolumes()
 	verifyAttachedVolume(t, attachedVolumes, generatedVolumeName, string(volumeName), nodeName, true /* expectedMountedByNode */, true /* expectNonZeroDetachRequestedTime */)
+
 }
 
 // Populates data struct with one volume/node entry.
-// Calls MarkDesireToDetach() once on volume/node entry.
-// Calls AddVolumeNode() to re-add the same volume/node entry.
+// Calls CheckAndMarkDesireToDetach() once on volume/node entry.
+// Calls DeleteVolumeNode to remove volume/node entry
+// Calls AddVolumeNode() to add the same volume/node entry.
 // Verifies mountedByNode is true and detachRequestedTime is reset to zero.
-func Test_MarkDesireToDetach_Positive_MarkedAddVolumeNodeReset(t *testing.T) {
+func Test_CheckAndMarkDesireToDetach_Positive_MarkedAddVolumeNodeReset(t *testing.T) {
 	// Arrange
 	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
 	asw := NewActualStateOfWorld(volumePluginMgr)
@@ -717,32 +727,52 @@ func Test_MarkDesireToDetach_Positive_MarkedAddVolumeNodeReset(t *testing.T) {
 		t.Fatalf("AddVolumeNode failed. Expected: <no error> Actual: <%v>", addErr)
 	}
 
-	// Act
-	_, markDesireToDetachErr := asw.MarkDesireToDetach(generatedVolumeName, nodeName)
-	generatedVolumeName, addErr = asw.AddVolumeNode(volumeSpec, nodeName, devicePath)
+	// Act: set as mounted and then unmounted
+	setVolumeMountedErr1 := asw.SetVolumeMountedByNode(generatedVolumeName, nodeName, true /* mounted */)
+	setVolumeMountedErr2 := asw.SetVolumeMountedByNode(generatedVolumeName, nodeName, false /* mounted */)
+
+	// Assert
+	if setVolumeMountedErr1 != nil {
+		t.Fatalf("SetVolumeMountedByNode1 failed. Expected <no error> Actual: <%v>", setVolumeMountedErr1)
+	}
+	if setVolumeMountedErr2 != nil {
+		t.Fatalf("SetVolumeMountedByNode2 failed. Expected <no error> Actual: <%v>", setVolumeMountedErr2)
+	}
+
+	// Act: check to detach and then mark
+	_, markDesireToDetachErr := asw.CheckAndMarkDesireToDetach(generatedVolumeName, nodeName, maxWaitTime)
 
 	// Assert
 	if markDesireToDetachErr != nil {
-		t.Fatalf("MarkDesireToDetach failed. Expected: <no error> Actual: <%v>", markDesireToDetachErr)
+		t.Fatalf("CheckAndMarkDesireToDetach failed. Expected: <no error> Actual: <%v>", markDesireToDetachErr)
 	}
+
+	// Act: delete volume
+	asw.DeleteVolumeNode(generatedVolumeName, nodeName)
+	attachedVolumes := asw.GetAttachedVolumes()
+	// Assert
+	if len(attachedVolumes) != 0 {
+		t.Fatalf("len(attachedVolumes) Expected: <0> Actual: <%v>", len(attachedVolumes))
+	}
+
+	// Act: add volume to attach
+	generatedVolumeName, addErr = asw.AddVolumeNode(volumeSpec, nodeName, devicePath)
 	if addErr != nil {
 		t.Fatalf("AddVolumeNode failed. Expected: <no error> Actual: <%v>", addErr)
 	}
-
 	// Assert
-	attachedVolumes := asw.GetAttachedVolumes()
+	attachedVolumes = asw.GetAttachedVolumes()
 	if len(attachedVolumes) != 1 {
 		t.Fatalf("len(attachedVolumes) Expected: <1> Actual: <%v>", len(attachedVolumes))
 	}
-
 	verifyAttachedVolume(t, attachedVolumes, generatedVolumeName, string(volumeName), nodeName, true /* expectedMountedByNode */, false /* expectNonZeroDetachRequestedTime */)
 }
 
 // Populates data struct with one volume/node entry.
 // Calls SetVolumeMountedByNode() twice, first setting mounted to true then false.
-// Calls MarkDesireToDetach() once on volume/node entry.
+// Calls CheckAndMarkDesireToDetach() once on volume/node entry.
 // Verifies mountedByNode is false and detachRequestedTime is NOT zero.
-func Test_MarkDesireToDetach_Positive_UnsetWithInitialSetVolumeMountedByNodePreserved(t *testing.T) {
+func Test_CheckAndMarkDesireToDetach_Positive_UnsetWithInitialSetVolumeMountedByNodePreserved(t *testing.T) {
 	// Arrange
 	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
 	asw := NewActualStateOfWorld(volumePluginMgr)
@@ -764,11 +794,11 @@ func Test_MarkDesireToDetach_Positive_UnsetWithInitialSetVolumeMountedByNodePres
 	}
 
 	// Act
-	_, markDesireToDetachErr := asw.MarkDesireToDetach(generatedVolumeName, nodeName)
+	_, markDesireToDetachErr := asw.CheckAndMarkDesireToDetach(generatedVolumeName, nodeName, maxWaitTime)
 
 	// Assert
 	if markDesireToDetachErr != nil {
-		t.Fatalf("MarkDesireToDetach failed. Expected: <no error> Actual: <%v>", markDesireToDetachErr)
+		t.Fatalf("CheckAndMarkDesireToDetach failed. Expected: <no error> Actual: <%v>", markDesireToDetachErr)
 	}
 
 	// Assert
@@ -911,4 +941,45 @@ func Test_GetAttachedVolumesForNode_Positive_OneVolumeTwoNodes(t *testing.T) {
 	}
 
 	verifyAttachedVolume(t, attachedVolumes, generatedVolumeName1, string(volumeName), node1Name, true /* expectedMountedByNode */, false /* expectNonZeroDetachRequestedTime */)
+}
+
+// Populates data struct with one volume/node entry.
+// Calls CheckAndMarkDesireToDetach() once on volume/node entry.
+// Verify detachRequestedTime is NOT zero
+// Calls ResetDetachRequestTime on volume/node entry
+// Verifies detachRequestedTime is zero.
+func Test_ResetDetachRequestTime(t *testing.T) {
+	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
+	asw := NewActualStateOfWorld(volumePluginMgr)
+	volumeName := api.UniqueVolumeName("volume-name")
+	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
+	nodeName := "node1-name"
+	devicePath := "fake/device/path"
+	generatedVolumeName, addErr := asw.AddVolumeNode(volumeSpec, nodeName, devicePath)
+	if addErr != nil {
+		t.Fatalf("AddVolumeNode failed. Expected: <no error> Actual: <%v>", addErr)
+	}
+	attachedVolumes := asw.GetAttachedVolumes()
+	if len(attachedVolumes) != 1 {
+		t.Fatalf("len(attachedVolumes) Expected: <1> Actual: <%v>", len(attachedVolumes))
+	}
+	verifyAttachedVolume(t, attachedVolumes, generatedVolumeName, string(volumeName), nodeName, true /* expectedMountedByNode */, false /* expectNonZeroDetachRequestedTime */)
+
+	// Check to detach
+	_, markDesireToDetachErr := asw.CheckAndMarkDesireToDetach(generatedVolumeName, nodeName, maxWaitTime)
+
+	// Assert: expect returning error message
+	if markDesireToDetachErr == nil {
+		t.Fatalf("CheckAndMarkDesireToDetach failed. Expected: <error message> Actual: <%v>", markDesireToDetachErr)
+	}
+	// Assert: detachRequestTime is not zero
+	attachedVolumes = asw.GetAttachedVolumes()
+	verifyAttachedVolume(t, attachedVolumes, generatedVolumeName, string(volumeName), nodeName, true /* expectedMountedByNode */, true /* expectNonZeroDetachRequestedTime */)
+
+	// Reset the detachRequestedTime
+	asw.ResetDetachRequestTime(generatedVolumeName, nodeName)
+	// Assert: detachRequestTime is zero
+	attachedVolumes = asw.GetAttachedVolumes()
+	verifyAttachedVolume(t, attachedVolumes, generatedVolumeName, string(volumeName), nodeName, true /* expectedMountedByNode */, false /* expectNonZeroDetachRequestedTime */)
+
 }
