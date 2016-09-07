@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/storage"
 )
 
 func TestStorageClassStrategy(t *testing.T) {
@@ -32,7 +32,7 @@ func TestStorageClassStrategy(t *testing.T) {
 		t.Errorf("StorageClass should not allow create on update")
 	}
 
-	storageClass := &extensions.StorageClass{
+	storageClass := &storage.StorageClass{
 		ObjectMeta: api.ObjectMeta{
 			Name: "valid-class",
 		},
@@ -49,7 +49,7 @@ func TestStorageClassStrategy(t *testing.T) {
 		t.Errorf("unexpected error validating %v", errs)
 	}
 
-	newStorageClass := &extensions.StorageClass{
+	newStorageClass := &storage.StorageClass{
 		ObjectMeta: api.ObjectMeta{
 			Name:            "valid-class-2",
 			ResourceVersion: "4",

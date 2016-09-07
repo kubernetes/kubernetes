@@ -33,7 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
@@ -905,7 +905,7 @@ func evaluateTestResults(ctrl *PersistentVolumeController, reactor *volumeReacto
 // 2. Call the tested function (syncClaim/syncVolume) via
 //    controllerTest.testCall *once*.
 // 3. Compare resulting volumes and claims with expected volumes and claims.
-func runSyncTests(t *testing.T, tests []controllerTest, storageClasses []*extensions.StorageClass) {
+func runSyncTests(t *testing.T, tests []controllerTest, storageClasses []*storage.StorageClass) {
 	for _, test := range tests {
 		glog.V(4).Infof("starting test %q", test.name)
 
@@ -961,7 +961,7 @@ func runSyncTests(t *testing.T, tests []controllerTest, storageClasses []*extens
 // 5. When 3. does not do any changes, finish the tests and compare final set
 //    of volumes/claims with expected claims/volumes and report differences.
 // Some limit of calls in enforced to prevent endless loops.
-func runMultisyncTests(t *testing.T, tests []controllerTest, storageClasses []*extensions.StorageClass, defaultStorageClass string) {
+func runMultisyncTests(t *testing.T, tests []controllerTest, storageClasses []*storage.StorageClass, defaultStorageClass string) {
 	for _, test := range tests {
 		glog.V(4).Infof("starting multisync test %q", test.name)
 

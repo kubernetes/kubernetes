@@ -78,6 +78,7 @@ func New() *Generator {
 			`k8s.io/kubernetes/federation/apis/federation/v1beta1`,
 			`k8s.io/kubernetes/pkg/apis/certificates/v1alpha1`,
 			`k8s.io/kubernetes/pkg/apis/imagepolicy/v1alpha1`,
+			`k8s.io/kubernetes/pkg/apis/storage/v1beta1`,
 		}, ","),
 		DropEmbeddedFields: "k8s.io/kubernetes/pkg/api/unversioned.TypeMeta",
 	}

@@ -22,7 +22,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/storage"
 )
 
 var class1Parameters = map[string]string{
@@ -31,7 +31,7 @@ var class1Parameters = map[string]string{
 var class2Parameters = map[string]string{
 	"param2": "value2",
 }
-var storageClasses = []*extensions.StorageClass{
+var storageClasses = []*storage.StorageClass{
 	{
 		TypeMeta: unversioned.TypeMeta{
 			Kind: "StorageClass",
@@ -345,7 +345,7 @@ func TestAlphaProvisionSync(t *testing.T) {
 			noevents, noerrors, wrapTestWithProvisionCalls([]provisionCall{provisionAlphaSuccess}, testSyncClaim),
 		},
 	}
-	runSyncTests(t, tests, []*extensions.StorageClass{})
+	runSyncTests(t, tests, []*storage.StorageClass{})
 }
 
 // Test multiple calls to syncClaim/syncVolume and periodic sync of all

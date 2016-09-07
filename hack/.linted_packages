@@ -72,6 +72,8 @@ pkg/apis/extensions/v1beta1
 pkg/apis/imagepolicy/install
 pkg/apis/policy/install
 pkg/apis/rbac/install
+pkg/apis/storage/install
+pkg/apis/storage/validation
 pkg/apiserver/audit
 pkg/auth/authenticator
 pkg/auth/authorizer/union

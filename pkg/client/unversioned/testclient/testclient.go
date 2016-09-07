@@ -317,6 +317,10 @@ func (c *Fake) Rbac() client.RbacInterface {
 	return &FakeRbac{Fake: c}
 }
 
+func (c *Fake) Storage() client.StorageInterface {
+	return &FakeStorage{Fake: c}
+}
+
 func (c *Fake) Authentication() client.AuthenticationInterface {
 	return &FakeAuthentication{Fake: c}
 }
@@ -444,10 +448,6 @@ func (c *FakeExperimental) NetworkPolicies(namespace string) client.NetworkPolic
 	return &FakeNetworkPolicies{Fake: c, Namespace: namespace}
 }
 
-func (c *FakeExperimental) StorageClasses() client.StorageClassInterface {
-	return &FakeStorageClasses{Fake: c}
-}
-
 func NewSimpleFakeRbac(objects ...runtime.Object) *FakeRbac {
 	return &FakeRbac{Fake: NewSimpleFake(objects...)}
 }
@@ -470,6 +470,18 @@ func (c *FakeRbac) ClusterRoles() client.ClusterRoleInterface {
 
 func (c *FakeRbac) ClusterRoleBindings() client.ClusterRoleBindingInterface {
 	return &FakeClusterRoleBindings{Fake: c}
+}
+
+func NewSimpleFakeStorage(objects ...runtime.Object) *FakeStorage {
+	return &FakeStorage{Fake: NewSimpleFake(objects...)}
+}
+
+type FakeStorage struct {
+	*Fake
+}
+
+func (c *FakeStorage) StorageClasses() client.StorageClassInterface {
+	return &FakeStorageClasses{Fake: c}
 }
 
 type FakeDiscovery struct {

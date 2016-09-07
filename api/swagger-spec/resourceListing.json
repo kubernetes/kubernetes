@@ -96,6 +96,14 @@
    {
     "path": "/apis/rbac.authorization.k8s.io",
     "description": "get information of a group"
+   },
+   {
+    "path": "/apis/storage.k8s.io/v1beta1",
+    "description": "API at /apis/storage.k8s.io/v1beta1"
+   },
+   {
+    "path": "/apis/storage.k8s.io",
+    "description": "get information of a group"
    }
   ],
   "apiVersion": "",
