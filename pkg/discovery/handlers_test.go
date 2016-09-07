@@ -13,7 +13,6 @@ limitations under the License.
 package discovery
 
 import (
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -25,15 +24,14 @@ import (
 	"github.com/square/go-jose"
 )
 
-const mockTokenID = "AAAAAA"
-const mockToken = "9537434E638E4378" // 64-bit key
-
 type mockTokenLoader struct {
+	tokenID string
+	token   string
 }
 
 func (tl *mockTokenLoader) LoadAndLookup(tokenID string) (string, error) {
-	if tokenID == mockTokenID {
-		return mockToken, nil
+	if tokenID == tl.tokenID {
+		return tl.token, nil
 	}
 	return "", errors.New(fmt.Sprintf("invalid token: %s", tokenID))
 }
@@ -57,31 +55,62 @@ func (cl *mockCALoader) LoadPEM() (string, error) {
 	return mockCA, nil
 }
 
+const mockTokenID = "AAAAAA"
+const mockToken = "9537434E638E4378"
+
+const mockTokenIDCustom = "SHAREDSECRET"
+const mockTokenCustom = "VERYSECRETTOKEN"
+
 func TestClusterInfoIndex(t *testing.T) {
+	longToken := strings.Repeat("a", 1000)
 	tests := map[string]struct {
-		tokenID          string
-		token            string
+		tokenID          string // token ID the mock loader will use
+		token            string // token the mock loader will use
+		reqTokenID       string // token ID the will request with
+		reqToken         string // token the caller will validate response with
 		expStatus        int
 		expVerifyFailure bool
 	}{
 		"no token": {
-			tokenID:   "",
-			token:     "",
-			expStatus: http.StatusForbidden,
+			tokenID:    mockTokenID,
+			token:      mockToken,
+			reqTokenID: "",
+			reqToken:   "",
+			expStatus:  http.StatusForbidden,
 		},
 		"valid token ID": {
-			tokenID:   mockTokenID,
-			token:     mockToken,
-			expStatus: http.StatusOK,
+			tokenID:    mockTokenID,
+			token:      mockToken,
+			reqTokenID: mockTokenID,
+			reqToken:   mockToken,
+			expStatus:  http.StatusOK,
+		},
+		"valid arbitrary string token": {
+			tokenID:    mockTokenIDCustom,
+			token:      mockTokenCustom,
+			reqTokenID: mockTokenIDCustom,
+			reqToken:   mockTokenCustom,
+			expStatus:  http.StatusOK,
+		},
+		"valid arbitrary long string token": {
+			tokenID:    "LONGTOKENTEST",
+			token:      longToken,
+			reqTokenID: "LONGTOKENTEST",
+			reqToken:   longToken,
+			expStatus:  http.StatusOK,
 		},
 		"invalid token ID": {
-			tokenID:   "BADTOKEN",
-			token:     mockToken,
-			expStatus: http.StatusForbidden,
+			tokenID:    mockTokenID,
+			token:      mockToken,
+			reqTokenID: "BADTOKENID",
+			reqToken:   mockToken,
+			expStatus:  http.StatusForbidden,
 		},
 		"invalid token": {
 			tokenID:          mockTokenID,
-			token:            "ABCDEF1234123456",
+			token:            mockToken,
+			reqTokenID:       mockTokenID,
+			reqToken:         "badtoken",
 			expStatus:        http.StatusOK,
 			expVerifyFailure: true,
 		},
@@ -89,11 +118,12 @@ func TestClusterInfoIndex(t *testing.T) {
 
 	for name, test := range tests {
 		t.Logf("Running test: %s", name)
+		tokenLoader := &mockTokenLoader{test.tokenID, test.token}
 		// Create a request to pass to our handler. We don't have any query parameters for now, so we'll
 		// pass 'nil' as the third parameter.
 		url := "/cluster-info/v1/"
 		if test.tokenID != "" {
-			url = fmt.Sprintf("%s?token-id=%s", url, test.tokenID)
+			url = fmt.Sprintf("%s?token-id=%s", url, test.reqTokenID)
 		}
 		req, err := http.NewRequest("GET", url, nil)
 		if err != nil {
@@ -102,7 +132,7 @@ func TestClusterInfoIndex(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 		handler := &ClusterInfoHandler{
-			tokenLoader:     &mockTokenLoader{},
+			tokenLoader:     tokenLoader,
 			caLoader:        &mockCALoader{},
 			endpointsLoader: &mockEndpointsLoader{},
 		}
@@ -132,7 +162,7 @@ func TestClusterInfoIndex(t *testing.T) {
 			// indicate the the message failed to verify, e.g. because the signature was
 			// broken or the message was tampered with.
 			var clusterInfoBytes []byte
-			hmacTestKey, _ := hex.DecodeString(test.token)
+			hmacTestKey := []byte(test.reqToken)
 			clusterInfoBytes, err = jws.Verify(hmacTestKey)
 
 			if test.expVerifyFailure {
@@ -145,15 +175,6 @@ func TestClusterInfoIndex(t *testing.T) {
 
 			if err != nil {
 				t.Errorf("Error verifing signature: %s", err)
-				continue
-			}
-
-			// Technically we should be able to lowercase our hex key and still
-			// get a valid result:
-			hmacTestKey, _ = hex.DecodeString(strings.ToLower(mockToken))
-			clusterInfoBytes, err = jws.Verify(hmacTestKey)
-			if err != nil {
-				t.Errorf("Error verifing signature when token converted to lowercase: %s", err)
 				continue
 			}
 
