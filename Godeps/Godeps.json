@@ -5,6 +5,7 @@
 	"Packages": [
 		"github.com/ugorji/go/codec/codecgen",
 		"github.com/onsi/ginkgo/ginkgo",
+		"github.com/square/go-jose",
 		"./..."
 	],
 	"Deps": [
@@ -2050,6 +2051,18 @@
 		{
 			"ImportPath": "github.com/spf13/pflag",
 			"Rev": "1560c1005499d61b80f865c04d39ca7505bf7f0b"
+		},
+		{
+			"ImportPath": "github.com/square/go-jose",
+			"Rev": "789a4c4bd4c118f7564954f441b29c153ccd6a96"
+		},
+		{
+			"ImportPath": "github.com/square/go-jose/cipher",
+			"Rev": "789a4c4bd4c118f7564954f441b29c153ccd6a96"
+		},
+		{
+			"ImportPath": "github.com/square/go-jose/json",
+			"Rev": "789a4c4bd4c118f7564954f441b29c153ccd6a96"
 		},
 		{
 			"ImportPath": "github.com/stretchr/objx",
