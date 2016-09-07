@@ -25,7 +25,7 @@ import (
 
 type LRUExpireCache struct {
 	cache *lru.Cache
-	lock  sync.RWMutex
+	lock  sync.Mutex
 }
 
 func NewLRUExpireCache(maxSize int) *LRUExpireCache {
@@ -46,8 +46,8 @@ func (c *LRUExpireCache) Add(key lru.Key, value interface{}, ttl time.Duration) 
 }
 
 func (c *LRUExpireCache) Get(key lru.Key) (interface{}, bool) {
-	c.lock.RLock()
-	defer c.lock.RUnlock()
+	c.lock.Lock()
+	defer c.lock.Unlock()
 	e, ok := c.cache.Get(key)
 	if !ok {
 		return nil, false
