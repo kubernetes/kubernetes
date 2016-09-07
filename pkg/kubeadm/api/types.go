@@ -14,7 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kubeadmapi
+package api
+
+import (
+	"net"
+)
 
 type BootstrapParams struct {
 	// TODO this is mostly out of date and bloated now, let's revisit this soon
@@ -32,7 +36,8 @@ type OutOfBandDiscovery struct {
 	BearerToken   string // set based on Token
 	// 'init-master' side
 	ApiServerDNSName string // optional, used in master bootstrap
-	ListenIP         string // optional IP for master to listen on, rather than autodetect
+	ListenIP         net.IP // optional IP for master to listen on, rather than autodetect
+	UseHyperkubeImage bool
 }
 
 type ClusterInfo struct {
