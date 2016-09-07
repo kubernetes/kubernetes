@@ -49,6 +49,8 @@ func (util *AWSDiskUtil) DeleteVolume(d *awsElasticBlockStoreDeleter) error {
 
 	deleted, err := cloud.DeleteDisk(d.volumeID)
 	if err != nil {
+		// AWS cloud provider returns volume.deletedVolumeInUseError when
+		// necessary, no handling needed here.
 		glog.V(2).Infof("Error deleting EBS Disk volume %s: %v", d.volumeID, err)
 		return err
 	}
