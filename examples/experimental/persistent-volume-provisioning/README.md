@@ -22,7 +22,7 @@ The name of a StorageClass object is significant, and is how users can request a
 
 ```yaml
 kind: StorageClass
-apiVersion: extensions/v1beta1
+apiVersion: storage.k8s.io/v1beta1
 metadata:
   name: slow
 provisioner: kubernetes.io/aws-ebs
@@ -42,7 +42,7 @@ parameters:
 
 ```yaml
 kind: StorageClass
-apiVersion: extensions/v1beta1
+apiVersion: storage.k8s.io/v1beta1
 metadata:
   name: slow
 provisioner: kubernetes.io/gce-pd
@@ -57,7 +57,7 @@ parameters:
 #### GLUSTERFS
 
 ```yaml
-apiVersion: extensions/v1beta1
+apiVersion: storage.k8s.io/v1beta1
 kind: StorageClass
 metadata:
   name: slow
@@ -109,7 +109,7 @@ $ kubectl create -f examples/volumes/glusterfs/glusterfs-service.json
 
 ```yaml
 kind: StorageClass
-apiVersion: extensions/v1beta1
+apiVersion: storage.k8s.io/v1beta1
 metadata:
   name: gold
 provisioner: kubernetes.io/cinder
