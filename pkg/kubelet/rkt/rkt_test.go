@@ -178,17 +178,15 @@ func TestCheckVersion(t *testing.T) {
 	}
 	fs.version = "100"
 	tests := []struct {
-		minimumRktBinVersion     string
-		recommendedRktBinVersion string
-		minimumRktApiVersion     string
-		minimumSystemdVersion    string
-		err                      error
-		calledGetInfo            bool
-		calledSystemVersion      bool
+		minimumRktBinVersion  string
+		minimumRktApiVersion  string
+		minimumSystemdVersion string
+		err                   error
+		calledGetInfo         bool
+		calledSystemVersion   bool
 	}{
 		// Good versions.
 		{
-			"1.2.3",
 			"1.2.3",
 			"1.2.5",
 			"99",
@@ -199,7 +197,6 @@ func TestCheckVersion(t *testing.T) {
 		// Good versions.
 		{
 			"1.2.3+git",
-			"1.2.3+git",
 			"1.2.6-alpha",
 			"100",
 			nil,
@@ -208,7 +205,6 @@ func TestCheckVersion(t *testing.T) {
 		},
 		// Requires greater binary version.
 		{
-			"1.2.4",
 			"1.2.4",
 			"1.2.6-alpha",
 			"100",
@@ -219,7 +215,6 @@ func TestCheckVersion(t *testing.T) {
 		// Requires greater API version.
 		{
 			"1.2.3",
-			"1.2.3",
 			"1.2.6",
 			"100",
 			fmt.Errorf("rkt: API version is too old(%v), requires at least %v", fr.info.ApiVersion, "1.2.6"),
@@ -229,7 +224,6 @@ func TestCheckVersion(t *testing.T) {
 		// Requires greater API version.
 		{
 			"1.2.3",
-			"1.2.3",
 			"1.2.7",
 			"100",
 			fmt.Errorf("rkt: API version is too old(%v), requires at least %v", fr.info.ApiVersion, "1.2.7"),
@@ -238,7 +232,6 @@ func TestCheckVersion(t *testing.T) {
 		},
 		// Requires greater systemd version.
 		{
-			"1.2.3",
 			"1.2.3",
 			"1.2.7",
 			"101",
@@ -250,7 +243,7 @@ func TestCheckVersion(t *testing.T) {
 
 	for i, tt := range tests {
 		testCaseHint := fmt.Sprintf("test case #%d", i)
-		err := r.checkVersion(tt.minimumRktBinVersion, tt.recommendedRktBinVersion, tt.minimumRktApiVersion, tt.minimumSystemdVersion)
+		err := r.checkVersion(tt.minimumRktBinVersion, tt.minimumRktApiVersion, tt.minimumSystemdVersion)
 		assert.Equal(t, tt.err, err, testCaseHint)
 
 		if tt.calledGetInfo {
