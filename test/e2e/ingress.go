@@ -84,7 +84,11 @@ var _ = framework.KubeDescribe("Loadbalancing: L7 [Feature:Ingress]", func() {
 		BeforeEach(func() {
 			framework.SkipUnlessProviderIs("gce", "gke")
 			By("Initializing gce controller")
-			gceController = &GCEIngressController{ns: ns, Project: framework.TestContext.CloudConfig.ProjectID, c: jig.client}
+			gceController = &GCEIngressController{
+				ns:    ns,
+				c:     jig.client,
+				cloud: framework.TestContext.CloudConfig,
+			}
 			gceController.init()
 		})
 
