@@ -14,18 +14,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kubemaster
+package master
 
 import (
 	"fmt"
 	"path"
-	"runtime"
-	"strconv"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	kubeadmapi "k8s.io/kubernetes/pkg/kubeadm/api"
+	"k8s.io/kubernetes/pkg/kubeadm/images"
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
@@ -35,13 +34,11 @@ func createKubeProxyPodSpec(params *kubeadmapi.BootstrapParams) api.PodSpec {
 		SecurityContext: &api.PodSecurityContext{HostNetwork: true},
 		Containers: []api.Container{{
 			Name:  "kube-proxy",
-			Image: params.EnvParams["hyperkube_image"],
-			Command: []string{
-				"/hyperkube",
-				"proxy",
+			Image: images.GetCoreImage(images.KubeProxyImage, params.EnvParams["hyperkube_image"], params.Discovery.UseHyperkubeImage),
+			Command: append(getImageEntrypoint("proxy", params.Discovery.UseHyperkubeImage), []string{
 				"--kubeconfig=/run/kubeconfig",
 				params.EnvParams["component_loglevel"],
-			},
+			}...),
 			SecurityContext: &api.SecurityContext{Privileged: &privilegedTrue},
 			VolumeMounts: []api.VolumeMount{
 				{
@@ -83,6 +80,7 @@ func createKubeProxyPodSpec(params *kubeadmapi.BootstrapParams) api.PodSpec {
 	}
 }
 
+// TODO(phase1): Create the DNS service as well
 func createKubeDNSPodSpec(params *kubeadmapi.BootstrapParams) api.PodSpec {
 
 	dnsPodResources := api.ResourceList{
@@ -100,7 +98,7 @@ func createKubeDNSPodSpec(params *kubeadmapi.BootstrapParams) api.PodSpec {
 			// DNS server
 			{
 				Name:  "kube-dns",
-				Image: "gcr.io/google_containers/kubedns-" + runtime.GOARCH + ":1.7",
+				Image: images.GetAddonImage(images.KubeDnsImage),
 				Resources: api.ResourceRequirements{
 					Limits:   dnsPodResources,
 					Requests: dnsPodResources,
@@ -152,7 +150,7 @@ func createKubeDNSPodSpec(params *kubeadmapi.BootstrapParams) api.PodSpec {
 			// dnsmasq
 			{
 				Name:  "dnsmasq",
-				Image: "gcr.io/google_containers/kube-dnsmasq-" + runtime.GOARCH + ":1.3",
+				Image: images.GetAddonImage(images.KubeDnsmasqImage),
 				Resources: api.ResourceRequirements{
 					Limits:   dnsPodResources,
 					Requests: dnsPodResources,
@@ -178,7 +176,7 @@ func createKubeDNSPodSpec(params *kubeadmapi.BootstrapParams) api.PodSpec {
 			// healthz
 			{
 				Name:  "healthz",
-				Image: "gcr.io/google_containers/exechealthz-" + runtime.GOARCH + ":1.1",
+				Image: images.GetAddonImage(images.KubeExechealthzImage),
 				Resources: api.ResourceRequirements{
 					Limits:   healthzPodResources,
 					Requests: healthzPodResources,
@@ -219,14 +217,7 @@ func CreateEssentialAddons(params *kubeadmapi.BootstrapParams, client *clientset
 
 	fmt.Println("<master/addons> created essential addon: kube-proxy")
 
-	// TODO should we wait for it to become ready at least on the master?
-
-	dnsReplicas, err := strconv.Atoi(params.EnvParams["dns_replicas"])
-	if err != nil {
-		dnsReplicas = 1
-	}
-
-	kubeDNSDeployment := NewDeployment("kube-dns", int32(dnsReplicas), createKubeDNSPodSpec(params))
+	kubeDNSDeployment := NewDeployment("kube-dns", 1, createKubeDNSPodSpec(params))
 	SetMasterTaintTolerations(&kubeDNSDeployment.Spec.Template.ObjectMeta)
 
 	if _, err := client.Extensions().Deployments(api.NamespaceSystem).Create(kubeDNSDeployment); err != nil {
