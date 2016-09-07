@@ -16,9 +16,13 @@
 
 # A set of helpers for starting/running etcd for tests
 
-ETCD_VERSION=${ETCD_VERSION:-3.0.4}
+ETCD_VERSION_DEFAULT=3.0.4
+ETCD_VERSION=${ETCD_VERSION:-$ETCD_VERSION_DEFAULT}
 ETCD_HOST=${ETCD_HOST:-127.0.0.1}
 ETCD_PORT=${ETCD_PORT:-2379}
+
+# This is the SHA256 digest of the linux-amd64 release tarball.
+ETCD_DEFAULT_HASH="788f9f74e605cf33be21f2f3a7c96e6691efd5e09a081d18dc222a78d080b917"
 
 kube::etcd::start() {
   which etcd >/dev/null || {
@@ -79,7 +83,23 @@ kube::etcd::install() {
       ln -fns "etcd-v${ETCD_VERSION}-darwin-amd64" etcd
       rm "${download_file}"
     else
-      curl -fsSL --retry 3 --keepalive-time 2 https://github.com/coreos/etcd/releases/download/v${ETCD_VERSION}/etcd-v${ETCD_VERSION}-linux-amd64.tar.gz | tar xzf -
+      download_file="etcd-v${ETCD_VERSION}-linux-amd64.tar.gz"
+      gcs_path="gs://kubernetes-jenkins/dependencies/etcd/${download_file}"
+      if gsutil -q cp "${gcs_path}" .; then
+        from_upstream=0
+      else
+        curl -fsSLO --retry 3 --keepalive-time 2 https://github.com/coreos/etcd/releases/download/v${ETCD_VERSION}/${download_file}
+        from_upstream=1
+      fi
+      if [[ "${ETCD_VERSION}" = "${ETCD_VERSION_DEFAULT}" ]]; then
+        sha256sum --quiet --check <<< "${ETCD_DEFAULT_HASH} ${download_file}"
+        if [[ "${from_upstream}" = 1 ]]; then
+          # try to cache this on GCS (we might not have permissions, ignore failures)
+          gsutil -q cp -a public-read ${download_file} ${gcs_path} || true
+        fi
+      fi
+      tar xzf ${download_file}
+      rm ${download_file}
       ln -fns "etcd-v${ETCD_VERSION}-linux-amd64" etcd
     fi
     kube::log::info "etcd v${ETCD_VERSION} installed. To use:"
