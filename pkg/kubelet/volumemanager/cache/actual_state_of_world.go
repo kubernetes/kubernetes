@@ -296,6 +296,15 @@ func (asw *actualStateOfWorld) MarkVolumeAsMounted(
 		volumeGidValue)
 }
 
+func (asw *actualStateOfWorld) UnmarkDesireToDetachVolume(volumeName api.UniqueVolumeName, nodeName string) {
+	// no operation for kubelet side
+}
+
+func (asw *actualStateOfWorld) MarkDesireToDetachVolume(volumeName api.UniqueVolumeName, nodeName string) error {
+	// no operation for kubelet side
+	return nil
+}
+
 func (asw *actualStateOfWorld) MarkVolumeAsUnmounted(
 	podName volumetypes.UniquePodName, volumeName api.UniqueVolumeName) error {
 	return asw.DeletePodFromVolume(podName, volumeName)
