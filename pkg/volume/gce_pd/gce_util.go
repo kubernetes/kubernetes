@@ -60,6 +60,8 @@ func (util *GCEDiskUtil) DeleteVolume(d *gcePersistentDiskDeleter) error {
 
 	if err = cloud.DeleteDisk(d.pdName); err != nil {
 		glog.V(2).Infof("Error deleting GCE PD volume %s: %v", d.pdName, err)
+		// GCE cloud provider returns volume.deletedVolumeInUseError when
+		// necessary, no handling needed here.
 		return err
 	}
 	glog.V(2).Infof("Successfully deleted GCE PD volume %s", d.pdName)

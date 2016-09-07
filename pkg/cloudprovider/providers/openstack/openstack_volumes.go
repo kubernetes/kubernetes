@@ -23,6 +23,8 @@ import (
 	"path"
 	"strings"
 
+	"k8s.io/kubernetes/pkg/volume"
+
 	"github.com/rackspace/gophercloud"
 	"github.com/rackspace/gophercloud/openstack"
 	"github.com/rackspace/gophercloud/openstack/blockstorage/v1/volumes"
@@ -182,6 +184,15 @@ func (os *OpenStack) GetDevicePath(diskId string) string {
 }
 
 func (os *OpenStack) DeleteVolume(volumeName string) error {
+	used, err := os.diskIsUsed(volumeName)
+	if err != nil {
+		return err
+	}
+	if used {
+		msg := fmt.Sprintf("Cannot delete the volume %q, it's still attached to a node", volumeName)
+		return volume.NewDeletedVolumeInUseError(msg)
+	}
+
 	sClient, err := openstack.NewBlockStorageV1(os.provider, gophercloud.EndpointOpts{
 		Region: os.region,
 	})
@@ -224,6 +235,18 @@ func (os *OpenStack) DiskIsAttached(diskName, instanceID string) (bool, error) {
 		return false, err
 	}
 	if len(disk.Attachments) > 0 && disk.Attachments[0]["server_id"] != nil && instanceID == disk.Attachments[0]["server_id"] {
+		return true, nil
+	}
+	return false, nil
+}
+
+// diskIsUsed returns true a disk is attached to any node.
+func (os *OpenStack) diskIsUsed(diskName string) (bool, error) {
+	disk, err := os.getVolume(diskName)
+	if err != nil {
+		return false, err
+	}
+	if len(disk.Attachments) > 0 {
 		return true, nil
 	}
 	return false, nil
