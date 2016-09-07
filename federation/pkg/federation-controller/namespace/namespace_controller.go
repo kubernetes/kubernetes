@@ -22,14 +22,14 @@ import (
 	"time"
 
 	federation_api "k8s.io/kubernetes/federation/apis/federation/v1beta1"
-	federation_release_1_4 "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_4"
+	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/eventsink"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
-	kube_release_1_4 "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4"
+	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/framework"
@@ -65,7 +65,7 @@ type NamespaceController struct {
 	namespaceInformerController framework.ControllerInterface
 
 	// Client to federated api server.
-	federatedApiClient federation_release_1_4.Interface
+	federatedApiClient fedclientset.Interface
 
 	// Backoff manager for namespaces
 	namespaceBackoff *flowcontrol.Backoff
@@ -80,7 +80,7 @@ type NamespaceController struct {
 }
 
 // NewNamespaceController returns a new namespace controller
-func NewNamespaceController(client federation_release_1_4.Interface) *NamespaceController {
+func NewNamespaceController(client fedclientset.Interface) *NamespaceController {
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartRecordingToSink(eventsink.NewFederatedEventSink(client))
 	recorder := broadcaster.NewRecorder(api.EventSource{Component: "federated-namespace-controller"})
@@ -116,7 +116,7 @@ func NewNamespaceController(client federation_release_1_4.Interface) *NamespaceC
 	// Federated informer on namespaces in members of federation.
 	nc.namespaceFederatedInformer = util.NewFederatedInformer(
 		client,
-		func(cluster *federation_api.Cluster, targetClient kube_release_1_4.Interface) (cache.Store, framework.ControllerInterface) {
+		func(cluster *federation_api.Cluster, targetClient kubeclientset.Interface) (cache.Store, framework.ControllerInterface) {
 			return framework.NewInformer(
 				&cache.ListWatch{
 					ListFunc: func(options api.ListOptions) (pkg_runtime.Object, error) {
@@ -145,17 +145,17 @@ func NewNamespaceController(client federation_release_1_4.Interface) *NamespaceC
 
 	// Federated updeater along with Create/Update/Delete operations.
 	nc.federatedUpdater = util.NewFederatedUpdater(nc.namespaceFederatedInformer,
-		func(client kube_release_1_4.Interface, obj pkg_runtime.Object) error {
+		func(client kubeclientset.Interface, obj pkg_runtime.Object) error {
 			namespace := obj.(*api_v1.Namespace)
 			_, err := client.Core().Namespaces().Create(namespace)
 			return err
 		},
-		func(client kube_release_1_4.Interface, obj pkg_runtime.Object) error {
+		func(client kubeclientset.Interface, obj pkg_runtime.Object) error {
 			namespace := obj.(*api_v1.Namespace)
 			_, err := client.Core().Namespaces().Update(namespace)
 			return err
 		},
-		func(client kube_release_1_4.Interface, obj pkg_runtime.Object) error {
+		func(client kubeclientset.Interface, obj pkg_runtime.Object) error {
 			namespace := obj.(*api_v1.Namespace)
 			err := client.Core().Namespaces().Delete(namespace.Name, &api.DeleteOptions{})
 			return err

@@ -23,11 +23,11 @@ import (
 	"time"
 
 	federation_api "k8s.io/kubernetes/federation/apis/federation/v1beta1"
-	fake_federation_release_1_4 "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_4/fake"
+	fake_fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5/fake"
 	. "k8s.io/kubernetes/federation/pkg/federation-controller/util/test"
 	api_v1 "k8s.io/kubernetes/pkg/api/v1"
-	kube_release_1_4 "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4"
-	fake_kube_release_1_4 "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4/fake"
+	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
+	fake_kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/fake"
 	"k8s.io/kubernetes/pkg/runtime"
 
 	"github.com/stretchr/testify/assert"
@@ -37,26 +37,26 @@ func TestSecretController(t *testing.T) {
 	cluster1 := NewCluster("cluster1", api_v1.ConditionTrue)
 	cluster2 := NewCluster("cluster2", api_v1.ConditionTrue)
 
-	fakeClient := &fake_federation_release_1_4.Clientset{}
+	fakeClient := &fake_fedclientset.Clientset{}
 	RegisterFakeList("clusters", &fakeClient.Fake, &federation_api.ClusterList{Items: []federation_api.Cluster{*cluster1}})
 	RegisterFakeList("secrets", &fakeClient.Fake, &api_v1.SecretList{Items: []api_v1.Secret{}})
 	secretWatch := RegisterFakeWatch("secrets", &fakeClient.Fake)
 	clusterWatch := RegisterFakeWatch("clusters", &fakeClient.Fake)
 
-	cluster1Client := &fake_kube_release_1_4.Clientset{}
+	cluster1Client := &fake_kubeclientset.Clientset{}
 	cluster1Watch := RegisterFakeWatch("secrets", &cluster1Client.Fake)
 	RegisterFakeList("secrets", &cluster1Client.Fake, &api_v1.SecretList{Items: []api_v1.Secret{}})
 	cluster1CreateChan := RegisterFakeCopyOnCreate("secrets", &cluster1Client.Fake, cluster1Watch)
 	cluster1UpdateChan := RegisterFakeCopyOnUpdate("secrets", &cluster1Client.Fake, cluster1Watch)
 
-	cluster2Client := &fake_kube_release_1_4.Clientset{}
+	cluster2Client := &fake_kubeclientset.Clientset{}
 	cluster2Watch := RegisterFakeWatch("secrets", &cluster2Client.Fake)
 	RegisterFakeList("secrets", &cluster2Client.Fake, &api_v1.SecretList{Items: []api_v1.Secret{}})
 	cluster2CreateChan := RegisterFakeCopyOnCreate("secrets", &cluster2Client.Fake, cluster2Watch)
 
 	secretController := NewSecretController(fakeClient)
 	informer := ToFederatedInformerForTestOnly(secretController.secretFederatedInformer)
-	informer.SetClientFactory(func(cluster *federation_api.Cluster) (kube_release_1_4.Interface, error) {
+	informer.SetClientFactory(func(cluster *federation_api.Cluster) (kubeclientset.Interface, error) {
 		switch cluster.Name {
 		case cluster1.Name:
 			return cluster1Client, nil

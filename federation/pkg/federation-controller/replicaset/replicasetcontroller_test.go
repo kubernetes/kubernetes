@@ -23,13 +23,13 @@ import (
 	"time"
 
 	fedv1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
-	fedclientfake "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_4/fake"
+	fedclientfake "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5/fake"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/test"
 	"k8s.io/kubernetes/pkg/api/meta"
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	extensionsv1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	kube_release_1_4 "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4"
-	kubeclientfake "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4/fake"
+	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
+	kubeclientfake "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/fake"
 	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/watch"
 
@@ -97,7 +97,7 @@ func TestReplicaSetController(t *testing.T) {
 	kube2Podwatch := watch.NewFake()
 	kube2clientset.PrependWatchReactor("pods", core.DefaultWatchReactor(kube2Podwatch, nil))
 
-	fedInformerClientFactory := func(cluster *fedv1.Cluster) (kube_release_1_4.Interface, error) {
+	fedInformerClientFactory := func(cluster *fedv1.Cluster) (kubeclientset.Interface, error) {
 		switch cluster.Name {
 		case "k8s-1":
 			return kube1clientset, nil

@@ -23,12 +23,12 @@ import (
 	"time"
 
 	federation_api "k8s.io/kubernetes/federation/apis/federation/v1beta1"
-	fake_federation_release_1_4 "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_4/fake"
+	fake_fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5/fake"
 	. "k8s.io/kubernetes/federation/pkg/federation-controller/util/test"
 	api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	extensions_v1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	kube_release_1_4 "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4"
-	fake_kube_release_1_4 "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4/fake"
+	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
+	fake_kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/fake"
 	"k8s.io/kubernetes/pkg/runtime"
 
 	"github.com/stretchr/testify/assert"
@@ -38,26 +38,26 @@ func TestIngressController(t *testing.T) {
 	cluster1 := NewCluster("cluster1", api_v1.ConditionTrue)
 	cluster2 := NewCluster("cluster2", api_v1.ConditionTrue)
 
-	fakeClient := &fake_federation_release_1_4.Clientset{}
+	fakeClient := &fake_fedclientset.Clientset{}
 	RegisterFakeList("clusters", &fakeClient.Fake, &federation_api.ClusterList{Items: []federation_api.Cluster{*cluster1}})
 	RegisterFakeList("ingresses", &fakeClient.Fake, &extensions_v1beta1.IngressList{Items: []extensions_v1beta1.Ingress{}})
 	ingressWatch := RegisterFakeWatch("ingresses", &fakeClient.Fake)
 	clusterWatch := RegisterFakeWatch("clusters", &fakeClient.Fake)
 
-	cluster1Client := &fake_kube_release_1_4.Clientset{}
+	cluster1Client := &fake_kubeclientset.Clientset{}
 	cluster1Watch := RegisterFakeWatch("ingresses", &cluster1Client.Fake)
 	RegisterFakeList("ingresses", &cluster1Client.Fake, &extensions_v1beta1.IngressList{Items: []extensions_v1beta1.Ingress{}})
 	cluster1CreateChan := RegisterFakeCopyOnCreate("ingresses", &cluster1Client.Fake, cluster1Watch)
 	cluster1UpdateChan := RegisterFakeCopyOnUpdate("ingresses", &cluster1Client.Fake, cluster1Watch)
 
-	cluster2Client := &fake_kube_release_1_4.Clientset{}
+	cluster2Client := &fake_kubeclientset.Clientset{}
 	cluster2Watch := RegisterFakeWatch("ingresses", &cluster2Client.Fake)
 	RegisterFakeList("ingresses", &cluster2Client.Fake, &extensions_v1beta1.IngressList{Items: []extensions_v1beta1.Ingress{}})
 	cluster2CreateChan := RegisterFakeCopyOnCreate("ingresses", &cluster2Client.Fake, cluster2Watch)
 
 	ingressController := NewIngressController(fakeClient)
 	informer := ToFederatedInformerForTestOnly(ingressController.ingressFederatedInformer)
-	informer.SetClientFactory(func(cluster *federation_api.Cluster) (kube_release_1_4.Interface, error) {
+	informer.SetClientFactory(func(cluster *federation_api.Cluster) (kubeclientset.Interface, error) {
 		switch cluster.Name {
 		case cluster1.Name:
 			return cluster1Client, nil

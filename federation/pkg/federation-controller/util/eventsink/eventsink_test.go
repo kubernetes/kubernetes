@@ -19,7 +19,7 @@ package eventsink
 import (
 	"testing"
 
-	fake_federation_release_1_4 "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_4/fake"
+	fake_fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5/fake"
 	. "k8s.io/kubernetes/federation/pkg/federation-controller/util/test"
 	api "k8s.io/kubernetes/pkg/api"
 	api_v1 "k8s.io/kubernetes/pkg/api/v1"
@@ -30,7 +30,7 @@ import (
 )
 
 func TestEventSink(t *testing.T) {
-	fakeFederationClient := &fake_federation_release_1_4.Clientset{}
+	fakeFederationClient := &fake_fedclientset.Clientset{}
 	createdChan := make(chan runtime.Object, 100)
 	fakeFederationClient.AddReactor("create", "events", func(action core.Action) (bool, runtime.Object, error) {
 		createAction := action.(core.CreateAction)

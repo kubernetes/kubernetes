@@ -24,7 +24,7 @@ import (
 	"testing"
 
 	federation_v1beta1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
-	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_4"
+	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5"
 	controller_util "k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"

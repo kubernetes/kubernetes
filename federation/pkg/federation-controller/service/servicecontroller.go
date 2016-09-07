@@ -26,13 +26,13 @@ import (
 	"github.com/golang/glog"
 	v1beta1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	federationcache "k8s.io/kubernetes/federation/client/cache"
-	federation_release_1_4 "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_4"
+	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	cache "k8s.io/kubernetes/pkg/client/cache"
-	release_1_4 "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4"
+	release_1_4 "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/framework"
@@ -99,7 +99,7 @@ type serviceCache struct {
 
 type ServiceController struct {
 	dns              dnsprovider.Interface
-	federationClient federation_release_1_4.Interface
+	federationClient fedclientset.Interface
 	federationName   string
 	zoneName         string
 	// each federation should be configured with a single zone (e.g. "mycompany.com")
@@ -124,7 +124,7 @@ type ServiceController struct {
 // New returns a new service controller to keep DNS provider service resources
 // (like Kubernetes Services and DNS server records for service discovery) in sync with the registry.
 
-func New(federationClient federation_release_1_4.Interface, dns dnsprovider.Interface, federationName, zoneName string) *ServiceController {
+func New(federationClient fedclientset.Interface, dns dnsprovider.Interface, federationName, zoneName string) *ServiceController {
 	broadcaster := record.NewBroadcaster()
 	// federationClient event is not supported yet
 	// broadcaster.StartRecordingToSink(&unversioned_core.EventSinkImpl{Interface: kubeClient.Core().Events("")})
