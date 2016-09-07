@@ -73,25 +73,25 @@ func NewKubeadmCommand(f *cmdutil.Factory, in io.Reader, out, err io.Writer, env
 	// TODO(phase2) detect interactive vs non-interactive use and adjust output accordingly
 	// i.e. make it automation friendly
 	//
-	// TODO(phase2) create an bastraction that defines files and the content that needs to
+	// TODO(phase2) create an abstraction that defines files and the content that needs to
 	// be written to disc and write it all in one go at the end as we have a lot of
 	// crapy little files written from different parts of this code; this could also
 	// be useful for testing
 
-	bootstrapParams := &kubeadmapi.BootstrapParams{
-		Discovery: &kubeadmapi.OutOfBandDiscovery{
-		// TODO(phase1) this type no longer makes sense here
-		},
-		EnvParams: envParams,
-	}
+	s := new(kubeadmapi.KubeadmConfig)
+	s.EnvParams = envParams
+
+	//s.InitFlags, s.JoinFlags = new(kubeadmapi.InitFlags), new(kubeadmapi.JoinFlags)
+
+	//s.ManualFlags = new(kubeadmapi.ManualFlags)
 
 	cmds.ResetFlags()
 	cmds.SetGlobalNormalizationFunc(flag.WarnWordSepNormalizeFunc)
 
-	cmds.AddCommand(NewCmdInit(out, bootstrapParams))
-	cmds.AddCommand(NewCmdJoin(out, bootstrapParams))
-	cmds.AddCommand(NewCmdUser(out, bootstrapParams))
-	cmds.AddCommand(NewCmdManual(out, bootstrapParams))
+	cmds.AddCommand(NewCmdInit(out, s))
+	cmds.AddCommand(NewCmdJoin(out, s))
+	cmds.AddCommand(NewCmdUser(out, s))
+	cmds.AddCommand(NewCmdManual(out, s))
 
 	return cmds
 }

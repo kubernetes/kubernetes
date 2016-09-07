@@ -20,10 +20,10 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"fmt"
-	"net"
 	"path"
 
 	kubeadmapi "k8s.io/kubernetes/pkg/kubeadm/api"
+	ipallocator "k8s.io/kubernetes/pkg/registry/service/ipallocator"
 	certutil "k8s.io/kubernetes/pkg/util/cert"
 )
 
@@ -51,19 +51,26 @@ func newCertificateAuthority() (*rsa.PrivateKey, *x509.Certificate, error) {
 	return key, cert, nil
 }
 
-func newServerKeyAndCert(caCert *x509.Certificate, caKey *rsa.PrivateKey, altNames certutil.AltNames) (*rsa.PrivateKey, *x509.Certificate, error) {
+func newServerKeyAndCert(s *kubeadmapi.KubeadmConfig, caCert *x509.Certificate, caKey *rsa.PrivateKey, altNames certutil.AltNames) (*rsa.PrivateKey, *x509.Certificate, error) {
 	key, err := certutil.NewPrivateKey()
 	if err != nil {
 		return nil, nil, fmt.Errorf("unabel to create private key [%s]", err)
 	}
-	// TODO these are all hardcoded for now, but we need to figure out what shall we do here exactly
-	altNames.IPs = append(altNames.IPs, net.ParseIP("10.3.0.1"), net.ParseIP("10.16.0.1"), net.ParseIP("100.64.0.1"))
-	altNames.DNSNames = append(altNames.DNSNames,
+
+	internalAPIServerFQDN := []string{
 		"kubernetes",
 		"kubernetes.default",
 		"kubernetes.default.svc",
-		"kubernetes.default.svc.cluster.local",
-	)
+		fmt.Sprintf("kubernetes.default.svc.%s", s.InitFlags.Services.DNSDomain),
+	}
+
+	internalAPIServerVirtualIP, err := ipallocator.GetIndexedIP(&s.InitFlags.Services.CIDR, 1)
+	if err != nil {
+		return nil, nil, fmt.Errorf("unable to allocate IP address for the API server from the given CIDR (%q) [%s]")
+	}
+
+	altNames.IPs = append(altNames.IPs, internalAPIServerVirtualIP)
+	altNames.DNSNames = append(altNames.DNSNames, internalAPIServerFQDN...)
 
 	config := certutil.CertConfig{
 		CommonName: "kube-apiserver",
@@ -131,21 +138,21 @@ func newServiceAccountKey() (*rsa.PrivateKey, error) {
 	return key, nil
 }
 
-func CreatePKIAssets(params *kubeadmapi.BootstrapParams) (*rsa.PrivateKey, *x509.Certificate, error) {
+func CreatePKIAssets(s *kubeadmapi.KubeadmConfig) (*rsa.PrivateKey, *x509.Certificate, error) {
 	var (
 		err      error
-		altNames certutil.AltNames // TODO actual SANs
+		altNames certutil.AltNames
 	)
 
-	if params.Discovery.ListenIP != nil {
-		altNames.IPs = append(altNames.IPs, params.Discovery.ListenIP)
+	if len(s.InitFlags.API.AdvertiseAddrs) > 0 {
+		altNames.IPs = append(altNames.IPs, s.InitFlags.API.AdvertiseAddrs...)
 	}
 
-	if params.Discovery.ApiServerDNSName != "" {
-		altNames.DNSNames = append(altNames.DNSNames, params.Discovery.ApiServerDNSName)
+	if len(s.InitFlags.API.ExternalDNSName) > 0 {
+		altNames.DNSNames = append(altNames.DNSNames, s.InitFlags.API.ExternalDNSName...)
 	}
 
-	pkiPath := path.Join(params.EnvParams["host_pki_path"])
+	pkiPath := path.Join(s.EnvParams["host_pki_path"])
 
 	caKey, caCert, err := newCertificateAuthority()
 	if err != nil {
@@ -156,7 +163,7 @@ func CreatePKIAssets(params *kubeadmapi.BootstrapParams) (*rsa.PrivateKey, *x509
 		return nil, nil, fmt.Errorf("<master/pki> failure while saving CA keys and certificate - %s", err)
 	}
 
-	apiKey, apiCert, err := newServerKeyAndCert(caCert, caKey, altNames)
+	apiKey, apiCert, err := newServerKeyAndCert(s, caCert, caKey, altNames)
 	if err != nil {
 		return nil, nil, fmt.Errorf("<master/pki> failure while creating API server keys and certificate - %s", err)
 	}
@@ -174,7 +181,7 @@ func CreatePKIAssets(params *kubeadmapi.BootstrapParams) (*rsa.PrivateKey, *x509
 		return nil, nil, fmt.Errorf("<master/pki> failure while saving service account singing keys - %s", err)
 	}
 
-	// TODO print a summary of SANs used and checksums (signatures) of each of the certiicates
-	fmt.Printf("<master/pki> created keys and certificates in %q\n", params.EnvParams["host_pki_path"])
+	// TODO(phase1+) print a summary of SANs used and checksums (signatures) of each of the certiicates
+	fmt.Printf("<master/pki> created keys and certificates in %q\n", pkiPath)
 	return caKey, caCert, nil
 }

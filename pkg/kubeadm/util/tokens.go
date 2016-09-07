@@ -42,7 +42,7 @@ func randBytes(length int) ([]byte, string, error) {
 	return b, hex.EncodeToString(b), nil
 }
 
-func GenerateToken(params *kubeadmapi.BootstrapParams) error {
+func GenerateToken(s *kubeadmapi.KubeadmConfig) error {
 	_, tokenID, err := randBytes(TokenIDLen / 2)
 	if err != nil {
 		return err
@@ -53,19 +53,19 @@ func GenerateToken(params *kubeadmapi.BootstrapParams) error {
 		return err
 	}
 
-	params.Discovery.TokenID = tokenID
-	params.Discovery.BearerToken = token
-	params.Discovery.Token = tokenBytes
-	params.Discovery.GivenToken = fmt.Sprintf("%s.%s", tokenID, token)
+	s.Secrets.TokenID = tokenID
+	s.Secrets.BearerToken = token
+	s.Secrets.Token = tokenBytes
+	s.Secrets.GivenToken = fmt.Sprintf("%s.%s", tokenID, token)
 	return nil
 }
 
-func UseGivenTokenIfValid(params *kubeadmapi.BootstrapParams) (bool, error) {
-	if params.Discovery.GivenToken == "" {
+func UseGivenTokenIfValid(s *kubeadmapi.KubeadmConfig) (bool, error) {
+	if s.Secrets.GivenToken == "" {
 		return false, nil // not given
 	}
 	fmt.Println("<util/tokens> validating provided token")
-	givenToken := strings.Split(strings.ToLower(params.Discovery.GivenToken), ".")
+	givenToken := strings.Split(strings.ToLower(s.Secrets.GivenToken), ".")
 	// TODO print desired format
 	// TODO could also print more specific messages in each case
 	invalidErr := "<util/tokens> provided token is invalid - %s"
@@ -86,8 +86,8 @@ func UseGivenTokenIfValid(params *kubeadmapi.BootstrapParams) (bool, error) {
 			"length of second part is incorrect [%d (given) != %d (expected)]",
 			len(tokenBytes), TokenBytes))
 	}
-	params.Discovery.TokenID = givenToken[0]
-	params.Discovery.BearerToken = givenToken[1]
-	params.Discovery.Token = tokenBytes
+	s.Secrets.TokenID = givenToken[0]
+	s.Secrets.BearerToken = givenToken[1]
+	s.Secrets.Token = tokenBytes
 	return true, nil // given and valid
 }
