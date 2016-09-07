@@ -21,7 +21,7 @@ import (
 )
 
 type BootstrapParams struct {
-	// TODO this is mostly out of date and bloated now, let's revisit this soon
+	// TODO(phase1+) this is mostly out of date and bloated now, let's revisit this soon
 	Discovery *OutOfBandDiscovery
 	EnvParams map[string]string
 }
@@ -36,13 +36,22 @@ type OutOfBandDiscovery struct {
 	BearerToken   string // set based on Token
 	// 'init-master' side
 	ApiServerDNSName string // optional, used in master bootstrap
-	ListenIP         net.IP // optional IP for master to listen on, rather than autodetect
+	// TODO(phase1+) this is not really the address anything is going to listen on, may we should
+	// call it `--advertise-ip-address` or something like that, or simply --use-address`,
+	// or actually we should probably probably provide user to a way of saying that they
+	// prefer public network or private with an option to pass the interface name.
+	// we should also discuss if we could just pick private interface by default, which
+	// is very often `eth1` and also make API server bind to that with 0.0.0.0 being
+	// optional. DNS name is another one we don't really have, of course, and we should
+	// have some flexibility there. All of this should reflect API severver flags etc.
+	// Also kubelets care about hostnames and IPs, which we should present in a sane way
+	// through one or two flags.
+	ListenIP          net.IP // optional IP for master to listen on, rather than autodetect
 	UseHyperkubeImage bool
 }
 
 type ClusterInfo struct {
-	// TODO Kind, apiVersion
-	// TODO clusterId, fetchedTime, expiredTime
+	// TODO(pahse1?) this may become simply `api.Config`
 	CertificateAuthorities []string `json:"certificateAuthorities"`
 	Endpoints              []string `json:"endpoints"`
 }

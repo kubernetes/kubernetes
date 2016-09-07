@@ -80,7 +80,6 @@ func createKubeProxyPodSpec(params *kubeadmapi.BootstrapParams) api.PodSpec {
 	}
 }
 
-// TODO(phase1): Create the DNS service as well
 func createKubeDNSPodSpec(params *kubeadmapi.BootstrapParams) api.PodSpec {
 
 	dnsPodResources := api.ResourceList{
@@ -93,6 +92,16 @@ func createKubeDNSPodSpec(params *kubeadmapi.BootstrapParams) api.PodSpec {
 		api.ResourceName(api.ResourceMemory): resource.MustParse("50Mi"),
 	}
 
+	kubeDNSPort := int32(10053)
+	dnsmasqPort := int32(53)
+
+	nslookup := fmt.Sprintf("nslookup kubernetes.default.svc.%s 127.0.0.1", params.EnvParams["dns_domain"])
+
+	nslookup = fmt.Sprintf("-cmd=%s:%d >/dev/null && %s:%d >/dev/null",
+		nslookup, dnsmasqPort,
+		nslookup, kubeDNSPort,
+	)
+
 	return api.PodSpec{
 		Containers: []api.Container{
 			// DNS server
@@ -104,8 +113,8 @@ func createKubeDNSPodSpec(params *kubeadmapi.BootstrapParams) api.PodSpec {
 					Requests: dnsPodResources,
 				},
 				Args: []string{
-					"--domain=" + params.EnvParams["dns_domain"],
-					"--dns-port=10053",
+					fmt.Sprintf("--domain=%s", params.EnvParams["dns_domain"]),
+					fmt.Sprintf("--dns-port=%d", kubeDNSPort),
 					// TODO __PILLAR__FEDERATIONS__DOMAIN__MAP__
 				},
 				LivenessProbe: &api.Probe{
@@ -136,12 +145,12 @@ func createKubeDNSPodSpec(params *kubeadmapi.BootstrapParams) api.PodSpec {
 				},
 				Ports: []api.ContainerPort{
 					{
-						ContainerPort: 10053,
+						ContainerPort: kubeDNSPort,
 						Name:          "dns-local",
 						Protocol:      api.ProtocolUDP,
 					},
 					{
-						ContainerPort: 10053,
+						ContainerPort: kubeDNSPort,
 						Name:          "dns-tcp-local",
 						Protocol:      api.ProtocolTCP,
 					},
@@ -158,16 +167,16 @@ func createKubeDNSPodSpec(params *kubeadmapi.BootstrapParams) api.PodSpec {
 				Args: []string{
 					"--cache-size=1000",
 					"--no-resolv",
-					"--server=127.0.0.1#10053",
+					fmt.Sprintf("--server=127.0.0.1#%d", kubeDNSPort),
 				},
 				Ports: []api.ContainerPort{
 					{
-						ContainerPort: 53,
+						ContainerPort: dnsmasqPort,
 						Name:          "dns",
 						Protocol:      api.ProtocolUDP,
 					},
 					{
-						ContainerPort: 53,
+						ContainerPort: dnsmasqPort,
 						Name:          "dns-tcp",
 						Protocol:      api.ProtocolTCP,
 					},
@@ -182,7 +191,7 @@ func createKubeDNSPodSpec(params *kubeadmapi.BootstrapParams) api.PodSpec {
 					Requests: healthzPodResources,
 				},
 				Args: []string{
-					"-cmd=nslookup kubernetes.default.svc." + params.EnvParams["dns_domain"] + " 127.0.0.1 >/dev/null && nslookup kubernetes.default.svc." + params.EnvParams["dns_domain"] + " 127.0.0.1:10053 >/dev/null",
+					nslookup,
 					"-port=8080",
 					"-quiet",
 				},
@@ -203,7 +212,7 @@ func createKubeDNSServiceSpec(params *kubeadmapi.BootstrapParams) api.ServiceSpe
 			{Name: "dns", Port: 53, Protocol: api.ProtocolUDP},
 			{Name: "dns-tcp", Port: 53, Protocol: api.ProtocolTCP},
 		},
-		ClusterIP: "100.64.0.2",
+		ClusterIP: "100.64.0.2", // TODO(phase1) calculate this from cluster VIP CIDR
 	}
 }
 
