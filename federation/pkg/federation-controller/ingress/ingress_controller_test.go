@@ -61,7 +61,7 @@ func TestIngressController(t *testing.T) {
 	cluster1ConfigMapWatch := RegisterFakeWatch("configmaps", &cluster1ConfigMapClient.Fake)
 	cluster1IngressCreateChan := RegisterFakeCopyOnCreate("ingresses", &cluster1IngressClient.Fake, cluster1IngressWatch)
 	cluster1IngressUpdateChan := RegisterFakeCopyOnUpdate("ingresses", &cluster1IngressClient.Fake, cluster1IngressWatch)
-	// cluster1ConfigMapCreateChan := RegisterFakeCopyOnCreate("configmaps", &cluster1Client.Fake, cluster1ConfigMapWatch)
+	cluster1ConfigMapCreateChan := RegisterFakeCopyOnCreate("configmaps", &cluster1ConfigMapClient.Fake, cluster1ConfigMapWatch)
 	cluster1ConfigMapUpdateChan := RegisterFakeCopyOnUpdate("configmaps", &cluster1ConfigMapClient.Fake, cluster1ConfigMapWatch)
 
 	cluster2IngressClient := &fake_kube_release_1_4.Clientset{}
@@ -72,7 +72,7 @@ func TestIngressController(t *testing.T) {
 	cluster2ConfigMapWatch := RegisterFakeWatch("configmaps", &cluster2ConfigMapClient.Fake)
 	cluster2IngressCreateChan := RegisterFakeCopyOnCreate("ingresses", &cluster2IngressClient.Fake, cluster2IngressWatch)
 	cluster2IngressUpdateChan := RegisterFakeCopyOnUpdate("ingresses", &cluster2IngressClient.Fake, cluster2IngressWatch)
-	// cluster2ConfigMapCreateChan := RegisterFakeCopyOnCreate("configmaps", &cluster2Client.Fake, cluster2ConfigMapWatch)
+	cluster2ConfigMapCreateChan := RegisterFakeCopyOnCreate("configmaps", &cluster2ConfigMapClient.Fake, cluster2ConfigMapWatch)
 	cluster2ConfigMapUpdateChan := RegisterFakeCopyOnUpdate("configmaps", &cluster2ConfigMapClient.Fake, cluster2ConfigMapWatch)
 
 	t.Log("Creating Ingress Controller")
@@ -122,6 +122,7 @@ func TestIngressController(t *testing.T) {
 	t.Log("Adding cluster1")
 	fakeClusterList.Items = append(fakeClusterList.Items, *cluster1)
 	clusterWatch.Add(cluster1)
+
 	t.Log("Adding Ingress UID ConfigMap for cluster 1")
 	fakeConfigMapList1.Items = append(fakeConfigMapList1.Items, *cfg1)
 	cluster1ConfigMapWatch.Add(cfg1)
@@ -148,7 +149,9 @@ func TestIngressController(t *testing.T) {
 	fedIngressWatch.Modify(&ing1)
 	fakeClusterList.Items = append(fakeClusterList.Items, *cluster2)
 	fakeConfigMapList2.Items = append(fakeConfigMapList2.Items, *cfg2)
-	clusterWatch.Add(cluster2)
+	for i := 0; i < 10; i++ {
+		clusterWatch.Add(cluster2)
+	}
 	cluster2ConfigMapWatch.Add(cfg2)
 	t.Log("Checking that the ingress got created in cluster 2")
 	createdIngress2 := GetIngressFromChan(cluster2IngressCreateChan)
@@ -164,8 +167,8 @@ func TestIngressController(t *testing.T) {
 	_ = fedClusterUpdateChan
 	_ = cluster1ConfigMapWatch
 	_ = cluster2ConfigMapWatch
-	//_ = cluster1ConfigMapCreateChan
-	// _ = cluster2ConfigMapCreateChan
+	_ = cluster1ConfigMapCreateChan
+	_ = cluster2ConfigMapCreateChan
 	_ = cluster1ConfigMapUpdateChan
 	_ = cluster2ConfigMapUpdateChan
 	_ = cluster1IngressCreateChan
@@ -185,7 +188,7 @@ func TestIngressController(t *testing.T) {
 		assert.Equal(t, cfg1.Data["uid"], updatedConfigMap1.Data["uid"], fmt.Sprintf("UID in configmaps in cluster 1 and 2 are not equal", cfg1.Data["uid"], updatedConfigMap2.Data["uid"]))
 	*/
 	time.Sleep(10 * time.Second) // Wait to see what other things the controller processes.
-	defer close(stop)
+	// TODO defer close(stop)
 }
 
 func GetIngressFromChan(c chan runtime.Object) *extensions_v1beta1.Ingress {

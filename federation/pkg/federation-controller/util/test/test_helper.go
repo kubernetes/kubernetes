@@ -72,12 +72,14 @@ func RegisterFakeCopyOnUpdate(resource string, client *core.Fake, watcher *watch
 		obj := updateAction.GetObject()
 		go func() {
 			glog.V(4).Infof("Object updated. Writing to channel: %v", obj)
+			/* TODO Remove
 			defer func() {
 				// Sometimes the channel is already closed.
 				if panicVal := recover(); panicVal != nil {
 					glog.Errorf("Recovering from panic: %v", panicVal)
 				}
 			}()
+			*/
 			watcher.Modify(obj)
 			objChan <- obj
 		}()

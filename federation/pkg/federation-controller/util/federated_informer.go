@@ -264,11 +264,14 @@ type federatedStoreImpl struct {
 }
 
 func (f *federatedInformerImpl) Stop() {
+	glog.V(4).Infof("Stopping federated informer.")
 	f.Lock()
 	defer f.Unlock()
 
+	glog.V(4).Infof("... Closing cluster informer channel.")
 	close(f.clusterInformer.stopChan)
-	for _, informer := range f.targetInformers {
+	for key, informer := range f.targetInformers {
+		glog.V(4).Infof("... Closing informer channel for %q.", key)
 		close(informer.stopChan)
 	}
 }
