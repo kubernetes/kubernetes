@@ -23,9 +23,14 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/spf13/pflag"
+
 	"k8s.io/kubernetes/pkg/kubeadm/cmd"
+	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/util/logs"
 )
+
+var CommandLine *pflag.FlagSet
 
 // TODO(phase2) use componentconfig
 // we need some params for testing etc, let's keep these hidden for now
@@ -56,9 +61,10 @@ func getEnvParams() map[string]string {
 }
 
 func Run() error {
+	CommandLine = pflag.NewFlagSet(os.Args[0], pflag.ContinueOnError)
 	logs.InitLogs()
 	defer logs.FlushLogs()
 
-	cmd := cmd.NewKubeadmCommand(os.Stdin, os.Stdout, os.Stderr, getEnvParams())
+	cmd := cmd.NewKubeadmCommand(cmdutil.NewFactory(nil), os.Stdin, os.Stdout, os.Stderr, getEnvParams())
 	return cmd.Execute()
 }

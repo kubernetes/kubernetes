@@ -21,12 +21,12 @@ import (
 	"io/ioutil"
 	"strings"
 
-	kubeletapp "k8s.io/kubernetes/cmd/kubelet/app"
 	unversionedcertificates "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/certificates/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	kubeadmapi "k8s.io/kubernetes/pkg/kubeadm/api"
 	kubeadmutil "k8s.io/kubernetes/pkg/kubeadm/util"
+	"k8s.io/kubernetes/pkg/kubelet/util/csr"
 	utilcertificates "k8s.io/kubernetes/pkg/util/certificates"
 )
 
@@ -73,7 +73,7 @@ func PerformTLSBootstrap(params *kubeadmapi.BootstrapParams, apiEndpoint string,
 		return nil, fmt.Errorf("<node/csr> failed to generating private key [%s]", err)
 	}
 
-	certData, err := kubeletapp.RequestClientCertificate(csrClient, keyData, nodeName)
+	certData, err := csr.RequestNodeCertificate(csrClient, keyData, nodeName)
 	if err != nil {
 		return nil, fmt.Errorf("<node/csr> failed to request signed certificate from the API server [%s]", err)
 	}

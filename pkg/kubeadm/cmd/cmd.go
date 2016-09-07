@@ -22,10 +22,13 @@ import (
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
+	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/util/flag"
+
 	kubeadmapi "k8s.io/kubernetes/pkg/kubeadm/api"
 )
 
-func NewKubeadmCommand(in io.Reader, out, err io.Writer, envParams map[string]string) *cobra.Command {
+func NewKubeadmCommand(f *cmdutil.Factory, in io.Reader, out, err io.Writer, envParams map[string]string) *cobra.Command {
 	cmds := &cobra.Command{
 		Use:   "kubeadm",
 		Short: "kubeadm: bootstrap a secure kubernetes cluster easily.",
@@ -81,6 +84,9 @@ func NewKubeadmCommand(in io.Reader, out, err io.Writer, envParams map[string]st
 		},
 		EnvParams: envParams,
 	}
+
+	cmds.ResetFlags()
+	cmds.SetGlobalNormalizationFunc(flag.WarnWordSepNormalizeFunc)
 
 	cmds.AddCommand(NewCmdInit(out, bootstrapParams))
 	cmds.AddCommand(NewCmdJoin(out, bootstrapParams))
