@@ -1080,10 +1080,23 @@ function start-fluentd {
   fi
 }
 
+# Starts an image-puller - used in test clusters.
+function start-image-puller {
+  echo "Start image-puller"
+  cp "${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/e2e-image-puller.manifest" \
+    /etc/kubernetes/manifests/
+}
+
+# Starts kube-registry proxy
+function start-kube-registry-proxy {
+  echo "Start kube-registry-proxy"
+  cp "${KUBE_HOME}/kube-manifests/kubernetes/kube-registry-proxy.yaml" /etc/kubernetes/manifests
+}
+
 # Starts a l7 loadbalancing controller for ingress.
 function start-lb-controller {
   if [[ "${ENABLE_L7_LOADBALANCING:-}" == "glbc" ]]; then
-    echo "Starting GCE L7 pod"
+    echo "Start GCE L7 pod"
     prepare-log-file /var/log/glbc.log
     setup-addon-manifests "addons" "cluster-loadbalancing/glbc"
     cp "${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/glbc.manifest" \
@@ -1094,7 +1107,7 @@ function start-lb-controller {
 # Starts rescheduler.
 function start-rescheduler {
   if [[ "${ENABLE_RESCHEDULER:-}" == "true" ]]; then
-    echo "Starting Rescheduler"
+    echo "Start Rescheduler"
     prepare-log-file /var/log/rescheduler.log
     cp "${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/rescheduler.manifest" \
        /etc/kubernetes/manifests/
@@ -1188,8 +1201,11 @@ else
   start-kube-proxy
   # Kube-registry-proxy.
   if [[ "${ENABLE_CLUSTER_REGISTRY:-}" == "true" ]]; then
-    cp "${KUBE_HOME}/kube-manifests/kubernetes/kube-registry-proxy.yaml" /etc/kubernetes/manifests
-	fi
+    start-kube-registry-proxy
+  fi
+  if [[ "${PREPULL_E2E_IMAGES:-}" == "true" ]]; then
+    start-image-puller
+  fi
 fi
 start-fluentd
 reset-motd
