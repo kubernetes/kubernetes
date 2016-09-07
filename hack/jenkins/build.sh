@@ -53,7 +53,6 @@ export KUBE_RELEASE_RUN_TESTS RELEASE_INFRA_PUSH FEDERATION SET_NOMOCK_FLAG
 # state.
 rm -rf ~/.kube*
 make clean
-git clean -fdx
 
 # Uncomment if you want to purge the Docker cache completely each
 # build. It costs about 150s each build to pull the golang image and
