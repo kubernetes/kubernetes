@@ -35,7 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/api/validation"
+	pathvalidation "k8s.io/kubernetes/pkg/api/validation/path"
 	"k8s.io/kubernetes/pkg/client/metrics"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -179,7 +179,7 @@ func (r *Request) Resource(resource string) *Request {
 		r.err = fmt.Errorf("resource already set to %q, cannot change to %q", r.resource, resource)
 		return r
 	}
-	if msgs := validation.IsValidPathSegmentName(resource); len(msgs) != 0 {
+	if msgs := pathvalidation.IsValidPathSegmentName(resource); len(msgs) != 0 {
 		r.err = fmt.Errorf("invalid resource %q: %v", resource, msgs)
 		return r
 	}
@@ -199,7 +199,7 @@ func (r *Request) SubResource(subresources ...string) *Request {
 		return r
 	}
 	for _, s := range subresources {
-		if msgs := validation.IsValidPathSegmentName(s); len(msgs) != 0 {
+		if msgs := pathvalidation.IsValidPathSegmentName(s); len(msgs) != 0 {
 			r.err = fmt.Errorf("invalid subresource %q: %v", s, msgs)
 			return r
 		}
@@ -221,7 +221,7 @@ func (r *Request) Name(resourceName string) *Request {
 		r.err = fmt.Errorf("resource name already set to %q, cannot change to %q", r.resourceName, resourceName)
 		return r
 	}
-	if msgs := validation.IsValidPathSegmentName(resourceName); len(msgs) != 0 {
+	if msgs := pathvalidation.IsValidPathSegmentName(resourceName); len(msgs) != 0 {
 		r.err = fmt.Errorf("invalid resource name %q: %v", resourceName, msgs)
 		return r
 	}
@@ -238,7 +238,7 @@ func (r *Request) Namespace(namespace string) *Request {
 		r.err = fmt.Errorf("namespace already set to %q, cannot change to %q", r.namespace, namespace)
 		return r
 	}
-	if msgs := validation.IsValidPathSegmentName(namespace); len(msgs) != 0 {
+	if msgs := pathvalidation.IsValidPathSegmentName(namespace); len(msgs) != 0 {
 		r.err = fmt.Errorf("invalid namespace %q: %v", namespace, msgs)
 		return r
 	}

@@ -29,7 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/api/validation"
+	"k8s.io/kubernetes/pkg/api/validation/path"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
@@ -145,7 +145,7 @@ func NamespaceKeyFunc(ctx api.Context, prefix string, name string) (string, erro
 	if len(name) == 0 {
 		return "", kubeerr.NewBadRequest("Name parameter required.")
 	}
-	if msgs := validation.IsValidPathSegmentName(name); len(msgs) != 0 {
+	if msgs := path.IsValidPathSegmentName(name); len(msgs) != 0 {
 		return "", kubeerr.NewBadRequest(fmt.Sprintf("Name parameter invalid: %q: %s", name, strings.Join(msgs, ";")))
 	}
 	key = key + "/" + name
@@ -157,7 +157,7 @@ func NoNamespaceKeyFunc(ctx api.Context, prefix string, name string) (string, er
 	if len(name) == 0 {
 		return "", kubeerr.NewBadRequest("Name parameter required.")
 	}
-	if msgs := validation.IsValidPathSegmentName(name); len(msgs) != 0 {
+	if msgs := path.IsValidPathSegmentName(name); len(msgs) != 0 {
 		return "", kubeerr.NewBadRequest(fmt.Sprintf("Name parameter invalid: %q: %s", name, strings.Join(msgs, ";")))
 	}
 	key := prefix + "/" + name
