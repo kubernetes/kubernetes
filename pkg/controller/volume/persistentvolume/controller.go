@@ -19,6 +19,7 @@ package persistentvolume
 import (
 	"fmt"
 	"reflect"
+	"strings"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -1234,6 +1235,19 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(claimObj interfa
 		// syncVolume() call.
 		return
 	}
+	if plugin == nil {
+		// findProvisionablePlugin returned no error nor plugin.
+		// This means that an unknown provisioner is requested. Report an event
+		// and wait for the external provisioner
+		if storageClass != nil {
+			msg := fmt.Sprintf("cannot find provisioner %q, expecting that a volume for the claim is provisioned either manually or via external software", storageClass.Provisioner)
+			ctrl.eventRecorder.Event(claim, api.EventTypeNormal, "ExternalProvisioning", msg)
+			glog.V(3).Infof("provisioning claim %q: %s", claimToClaimKey(claim), msg)
+		} else {
+			glog.V(3).Infof("cannot find storage class for claim %q", claimToClaimKey(claim))
+		}
+		return
+	}
 
 	// Gather provisioning options
 	tags := make(map[string]string)
@@ -1366,6 +1380,9 @@ func (ctrl *PersistentVolumeController) scheduleOperation(operationName string, 
 	}
 }
 
+// findProvisionablePlugin finds a provisioner plugin for a given claim.
+// It returns either the provisioning plugin or nil when an external
+// provisioner is requested.
 func (ctrl *PersistentVolumeController) findProvisionablePlugin(claim *api.PersistentVolumeClaim) (vol.ProvisionableVolumePlugin, *storage.StorageClass, error) {
 	// TODO: remove this alpha behavior in 1.5
 	alpha := hasAnnotation(claim.ObjectMeta, annAlphaClass)
@@ -1399,7 +1416,11 @@ func (ctrl *PersistentVolumeController) findProvisionablePlugin(claim *api.Persi
 	// Find a plugin for the class
 	plugin, err := ctrl.volumePluginMgr.FindProvisionablePluginByName(class.Provisioner)
 	if err != nil {
-		return nil, nil, err
+		if !strings.HasPrefix(class.Provisioner, "kubernetes.io/") {
+			// External provisioner is requested, do not report error
+			return nil, class, nil
+		}
+		return nil, class, err
 	}
 	return plugin, class, nil
 }
