@@ -24,6 +24,7 @@ const (
 	FailedToStartContainer  = "Failed"
 	KillingContainer        = "Killing"
 	BackOffStartContainer   = "BackOff"
+	ExceededGracePeriod     = "ExceededGracePeriod"
 
 	// Image event reason list
 	PullingImage            = "Pulling"
