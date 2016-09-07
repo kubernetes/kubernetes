@@ -19,9 +19,12 @@ package kuberuntime
 import (
 	"fmt"
 	"io"
+	"io/ioutil"
 	"math/rand"
 	"os"
 	"path"
+	"sort"
+	"time"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
@@ -230,6 +233,73 @@ func (m *kubeGenericRuntimeManager) getContainersHelper(filter *runtimeApi.Conta
 // makeUID returns a randomly generated string.
 func makeUID() string {
 	return fmt.Sprintf("%08x", rand.Uint32())
+}
+
+// getKubeletContainerStatuses gets all containers' status for the pod sandbox.
+func (m *kubeGenericRuntimeManager) getKubeletContainerStatuses(podSandboxID string) ([]*kubecontainer.ContainerStatus, error) {
+	containers, err := m.runtimeService.ListContainers(&runtimeApi.ContainerFilter{
+		PodSandboxId: &podSandboxID,
+	})
+	if err != nil {
+		glog.Errorf("ListContainers error: %v", err)
+		return nil, err
+	}
+
+	statuses := make([]*kubecontainer.ContainerStatus, len(containers))
+	// TODO: optimization: set maximum number of containers per container name to examine.
+	for i, c := range containers {
+		status, err := m.runtimeService.ContainerStatus(c.GetId())
+		if err != nil {
+			glog.Errorf("ContainerStatus for %s error: %v", c.GetId(), err)
+			return nil, err
+		}
+
+		annotatedInfo := getContainerInfoFromAnnotations(c.Annotations)
+		labeledInfo := getContainerInfoFromLabels(c.Labels)
+		cStatus := &kubecontainer.ContainerStatus{
+			ID: kubecontainer.ContainerID{
+				Type: m.runtimeName,
+				ID:   c.GetId(),
+			},
+			Name:         labeledInfo.ContainerName,
+			Image:        status.Image.GetImage(),
+			ImageID:      status.GetImageRef(),
+			Hash:         annotatedInfo.Hash,
+			RestartCount: annotatedInfo.RestartCount,
+			State:        toKubeContainerState(c.GetState()),
+			CreatedAt:    time.Unix(status.GetCreatedAt(), 0),
+		}
+
+		if c.GetState() == runtimeApi.ContainerState_RUNNING {
+			cStatus.StartedAt = time.Unix(status.GetStartedAt(), 0)
+		} else {
+			cStatus.Reason = status.GetReason()
+			cStatus.ExitCode = int(status.GetExitCode())
+			cStatus.FinishedAt = time.Unix(status.GetFinishedAt(), 0)
+		}
+
+		message := ""
+		if !cStatus.FinishedAt.IsZero() || cStatus.ExitCode != 0 {
+			if annotatedInfo.TerminationMessagePath != "" {
+				for _, mount := range status.Mounts {
+					if mount.GetContainerPath() == annotatedInfo.TerminationMessagePath {
+						path := mount.GetHostPath()
+						if data, err := ioutil.ReadFile(path); err != nil {
+							message = fmt.Sprintf("Error on reading termination-log %s: %v", path, err)
+						} else {
+							message = string(data)
+						}
+						break
+					}
+				}
+			}
+		}
+		cStatus.Message = message
+		statuses[i] = cStatus
+	}
+
+	sort.Sort(containerStatusByCreated(statuses))
+	return statuses, nil
 }
 
 // AttachContainer attaches to the container's console
