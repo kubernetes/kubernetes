@@ -308,27 +308,27 @@ func updateIngressOrFail(clientset *federation_release_1_4.Clientset, namespace 
 		},
 	}
 
-	for MaxRetriesOnFederatedApiserver := 0; MaxRetriesOnFederatedApiserver < 3; MaxRetriesOnFederatedApiserver++ {
-		_, err = clientset.Extensions().Ingresses(namespace).Get(FederatedIngressName)
-		if err != nil {
-			framework.Failf("failed to get ingress %q: %v", FederatedIngressName, err)
-		}
+	err = waitForFederatedIngressExists(clientset, namespace, FederatedIngressName, FederatedIngressTimeout)
+	if err != nil {
+		framework.Failf("failed to get ingress %q: %v", FederatedIngressName, err)
+	}
+	for i := 0; i < MaxRetriesOnFederatedApiserver; i++ {
 		newIng, err = clientset.Extensions().Ingresses(namespace).Update(ingress)
 		if err == nil {
 			describeIng(namespace)
-			return
+			return newIng
 		}
 		if !errors.IsConflict(err) && !errors.IsServerTimeout(err) {
 			framework.Failf("failed to update ingress %q: %v", FederatedIngressName, err)
 		}
 	}
 	framework.Failf("too many retries updating ingress %q", FederatedIngressName)
-	return newIng
+	return nil
 }
 
 func (j *federationTestJig) waitForFederatedIngress() {
 	// Wait for the loadbalancer IP.
-	address, err := WaitForFederatedIngressAddress(j.client, j.ing.Namespace, j.ing.Name, lbPollTimeout)
+	address, err := waitForFederatedIngressAddress(j.client, j.ing.Namespace, j.ing.Name, lbPollTimeout)
 	if err != nil {
 		framework.Failf("Ingress failed to acquire an IP address within %v", lbPollTimeout)
 	}
@@ -360,7 +360,7 @@ func newFederationTestJig(c *federation_release_1_4.Clientset) *federationTestJi
 }
 
 // WaitForFederatedIngressAddress waits for the Ingress to acquire an address.
-func WaitForFederatedIngressAddress(c *federation_release_1_4.Clientset, ns, ingName string, timeout time.Duration) (string, error) {
+func waitForFederatedIngressAddress(c *federation_release_1_4.Clientset, ns, ingName string, timeout time.Duration) (string, error) {
 	var address string
 	err := wait.PollImmediate(10*time.Second, timeout, func() (bool, error) {
 		ipOrNameList, err := getFederatedIngressAddress(c, ns, ingName)
@@ -372,6 +372,19 @@ func WaitForFederatedIngressAddress(c *federation_release_1_4.Clientset, ns, ing
 		return true, nil
 	})
 	return address, err
+}
+
+// waitForFederatedIngressExists waits for the Ingress object exists.
+func waitForFederatedIngressExists(c *federation_release_1_4.Clientset, ns, ingName string, timeout time.Duration) error {
+	err := wait.PollImmediate(10*time.Second, timeout, func() (bool, error) {
+		_, err := c.Extensions().Ingresses(ns).Get(ingName)
+		if err != nil {
+			framework.Logf("Waiting for Ingress %v, error %v", ingName, err)
+			return false, nil
+		}
+		return true, nil
+	})
+	return err
 }
 
 // getFederatedIngressAddress returns the ips/hostnames associated with the Ingress.
