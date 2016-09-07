@@ -87,7 +87,7 @@ type FederationView interface {
 
 // A structure that combines an informer running against federated api server and listening for cluster updates
 // with multiple Kubernetes API informers (called target informers) running against federation members. Whenever a new
-// cluster is added to the federation an informer is created for it using TargetInformerFactory. Informers are stoped
+// cluster is added to the federation an informer is created for it using TargetInformerFactory. Informers are stopped
 // when a cluster is either put offline of deleted. It is assumed that some controller keeps an eye on the cluster list
 // and thus the clusters in ETCD are up to date.
 type FederatedInformer interface {
@@ -186,18 +186,22 @@ func NewFederatedInformer(
 					if clusterLifecycle.ClusterAvailable != nil {
 						clusterLifecycle.ClusterAvailable(curCluster)
 					}
+				} else {
+					glog.Errorf("Cluster %v not added.  Not of correct type, or cluster not ready.", cur)
 				}
 			},
 			UpdateFunc: func(old, cur interface{}) {
 				oldCluster, ok := old.(*federation_api.Cluster)
 				if !ok {
+					glog.Errorf("Internal error: Cluster %v not not updated.  Old cluster not of correct type.", old)
 					return
 				}
 				curCluster, ok := cur.(*federation_api.Cluster)
 				if !ok {
+					glog.Errorf("Internal error: Cluster %v not not updated.  New cluster not of correct type.", cur)
 					return
 				}
-				if isClusterReady(oldCluster) != isClusterReady(curCluster) || !reflect.DeepEqual(oldCluster.Spec, curCluster.Spec) {
+				if isClusterReady(oldCluster) != isClusterReady(curCluster) || !reflect.DeepEqual(oldCluster.Spec, curCluster.Spec) || !reflect.DeepEqual(oldCluster.ObjectMeta.Annotations, curCluster.ObjectMeta.Annotations) {
 					var data []interface{}
 					if clusterLifecycle.ClusterUnavailable != nil {
 						data = getClusterData(oldCluster.Name)
@@ -213,6 +217,8 @@ func NewFederatedInformer(
 							clusterLifecycle.ClusterAvailable(curCluster)
 						}
 					}
+				} else {
+					glog.V(4).Infof("Cluster %v not updated to %v as ready status and specs are identical", oldCluster, curCluster)
 				}
 			},
 		},
@@ -291,17 +297,16 @@ func (f *federatedInformerImpl) GetClientsetForCluster(clusterName string) (kube
 
 func (f *federatedInformerImpl) getClientsetForClusterUnlocked(clusterName string) (kube_release_1_4.Interface, error) {
 	// No locking needed. Will happen in f.GetCluster.
-	/* TODO REMOVE */ fmt.Errorf("Getting clientset for cluster %q", clusterName)
+	glog.V(4).Infof("Getting clientset for cluster %q", clusterName)
 	if cluster, found, err := f.getReadyClusterUnlocked(clusterName); found && err == nil {
-		/* TODO REMOVE */ fmt.Errorf("Got clientset for cluster %q", clusterName)
+		glog.V(4).Infof("Got clientset for cluster %q", clusterName)
 		return f.clientFactory(cluster)
 	} else {
 		if err != nil {
-			/* TODO REMOVE */ fmt.Errorf("Error getting clientset for cluster %q: %v", clusterName, err)
 			return nil, err
 		}
 	}
-	return nil, fmt.Errorf("cluster %s not found", clusterName)
+	return nil, fmt.Errorf("cluster %q not found", clusterName)
 }
 
 // GetReadyClusers returns all clusters for which the sub-informers are run.
@@ -444,7 +449,7 @@ func (fs *federatedStoreImpl) GetFromAllClusters(key string) ([]FederatedObject,
 	return result, nil
 }
 
-// GetKey for returns the key under which the item would be put in the store.
+// GetKeyFor returns the key under which the item would be put in the store.
 func (fs *federatedStoreImpl) GetKeyFor(item interface{}) string {
 	// TODO: support other keying functions.
 	key, _ := framework.DeletionHandlingMetaNamespaceKeyFunc(item)

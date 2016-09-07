@@ -25,6 +25,8 @@ import (
 	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/watch"
+
+	"github.com/golang/glog"
 )
 
 // RegisterFakeWatch adds a new fake watcher for the specified resource in the given fake client.
@@ -69,6 +71,13 @@ func RegisterFakeCopyOnUpdate(resource string, client *core.Fake, watcher *watch
 		updateAction := action.(core.UpdateAction)
 		obj := updateAction.GetObject()
 		go func() {
+			glog.V(4).Infof("Object updated. Writing to channel: %v", obj)
+			defer func() {
+				// Sometimes the channel is already closed.
+				if panicVal := recover(); panicVal != nil {
+					glog.Errorf("Recovering from panic: %v", panicVal)
+				}
+			}()
 			watcher.Modify(obj)
 			objChan <- obj
 		}()
