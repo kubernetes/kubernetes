@@ -24,6 +24,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/watch"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -35,6 +36,13 @@ import (
 
 var _ = framework.KubeDescribe("MemoryEviction [Slow] [Serial] [Disruptive]", func() {
 	f := framework.NewDefaultFramework("eviction-test")
+
+	var watchers []watch.Interface
+	AfterEach(func() {
+		for _, w := range watchers {
+			w.Stop()
+		}
+	})
 
 	Context("when there is memory pressure", func() {
 		AfterEach(func() {
@@ -135,6 +143,21 @@ var _ = framework.KubeDescribe("MemoryEviction [Slow] [Serial] [Disruptive]", fu
 			// A pod is besteffort if none of its containers have specified any requests or limits.
 			besteffort := createMemhogPod(f, "besteffort-", "besteffort", api.ResourceRequirements{})
 
+			// Watch and log pod events (namespace for this test)
+			podWatcher, err := logNamespaceEvents(f, f.Namespace.Name)
+			if err != nil {
+				glog.Errorf("Error trying to watch pod events: %v", err)
+			} else {
+				watchers = append(watchers, podWatcher)
+			}
+			// Watch and log node events (default namespace)
+			nodeWatcher, err := logNamespaceEvents(f, "")
+			if err != nil {
+				glog.Errorf("Error trying to watch node events: %v", err)
+			} else {
+				watchers = append(watchers, nodeWatcher)
+			}
+
 			// We poll until timeout or all pods are killed.
 			// Inside the func, we check that all pods are in a valid phase with
 			// respect to the eviction order of best effort, then burstable, then guaranteed.
@@ -194,6 +217,29 @@ var _ = framework.KubeDescribe("MemoryEviction [Slow] [Serial] [Disruptive]", fu
 		})
 	})
 })
+
+func logNamespaceEvents(f *framework.Framework, ns string) (watch.Interface, error) {
+	watcher, err := f.Client.Events(ns).Watch(api.ListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("Could not watch events for namespace: %s Error: %v", ns, err)
+	} else {
+		go func() {
+			for {
+				watchEvent, open := <-watcher.ResultChan()
+				if !open {
+					return
+				}
+				event, ok := watchEvent.Object.(*api.Event)
+				if !ok {
+					// This cast should always work, but just in case:
+					continue
+				}
+				glog.Infof("Event(%#v): type: '%v' reason: '%v' %v", event.InvolvedObject, event.Type, event.Reason, event.Message)
+			}
+		}()
+	}
+	return watcher, nil
+}
 
 func createMemhogPod(f *framework.Framework, genName string, ctnName string, res api.ResourceRequirements) *api.Pod {
 	env := []api.EnvVar{
