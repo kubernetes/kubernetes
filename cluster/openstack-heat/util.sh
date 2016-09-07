@@ -202,6 +202,8 @@ function run-heat-script() {
       cd ${ROOT}/kubernetes-heat
       openstack stack create --timeout 60 \
       --parameter external_network=${EXTERNAL_NETWORK} \
+      --parameter lbaas_version=${LBAAS_VERSION} \
+      --parameter fixed_network_cidr=${FIXED_NETWORK_CIDR} \
       --parameter ssh_key_name=${KUBERNETES_KEYPAIR_NAME} \
       --parameter server_image=${IMAGE_ID} \
       --parameter master_flavor=${MASTER_FLAVOR} \
