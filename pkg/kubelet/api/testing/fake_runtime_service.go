@@ -99,11 +99,11 @@ func (r *FakeRuntimeService) Version(apiVersion string) (*runtimeApi.VersionResp
 	}, nil
 }
 
-func (r *FakeRuntimeService) CreatePodSandbox(config *runtimeApi.PodSandboxConfig) (string, error) {
+func (r *FakeRuntimeService) RunPodSandbox(config *runtimeApi.PodSandboxConfig) (string, error) {
 	r.Lock()
 	defer r.Unlock()
 
-	r.Called = append(r.Called, "CreatePodSandbox")
+	r.Called = append(r.Called, "RunPodSandbox")
 
 	// PodSandboxID should be randomized for real container runtime, but here just use
 	// fixed name from BuildSandboxName() for easily making fake sandboxes.
