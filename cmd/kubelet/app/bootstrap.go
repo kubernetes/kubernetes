@@ -17,7 +17,6 @@ limitations under the License.
 package app
 
 import (
-	"crypto/x509/pkix"
 	"fmt"
 	"io/ioutil"
 	_ "net/http/pprof"
@@ -26,17 +25,13 @@ import (
 
 	"github.com/golang/glog"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/apis/certificates"
 	unversionedcertificates "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/certificates/unversioned"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
-	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/kubelet/util/csr"
 	utilcertificates "k8s.io/kubernetes/pkg/util/certificates"
 	"k8s.io/kubernetes/pkg/util/crypto"
-	"k8s.io/kubernetes/pkg/watch"
 )
 
 const (
@@ -98,7 +93,7 @@ func bootstrapClientCert(kubeconfigPath string, bootstrapPath string, certDir st
 	if err != nil {
 		return fmt.Errorf("unable to build bootstrap client cert path: %v", err)
 	}
-	certData, err := RequestClientCertificate(bootstrapClient.CertificateSigningRequests(), keyData, nodeName)
+	certData, err := csr.RequestNodeCertificate(bootstrapClient.CertificateSigningRequests(), keyData, nodeName)
 	if err != nil {
 		return err
 	}
@@ -184,76 +179,4 @@ func loadOrGenerateKeyFile(keyPath string) (data []byte, wasGenerated bool, err 
 		return nil, false, fmt.Errorf("error writing key to %s: %v", keyPath, err)
 	}
 	return generatedData, true, nil
-}
-
-// RequestClientCertificate will create a certificate signing request and send it to API server,
-// then it will watch the object's status, once approved by API server, it will return the API
-// server's issued certificate (pem-encoded). If there is any errors, or the watch timeouts,
-// it will return an error.
-func RequestClientCertificate(client unversionedcertificates.CertificateSigningRequestInterface, privateKeyData []byte, nodeName string) (certData []byte, err error) {
-	subject := &pkix.Name{
-		Organization: []string{"system:nodes"},
-		CommonName:   fmt.Sprintf("system:node:%s", nodeName),
-	}
-
-	privateKey, err := utilcertificates.ParsePrivateKey(privateKeyData)
-	if err != nil {
-		return nil, fmt.Errorf("invalid private key for certificate request: %v", err)
-	}
-	csr, err := utilcertificates.NewCertificateRequest(privateKey, subject, nil, nil)
-	if err != nil {
-		return nil, fmt.Errorf("unable to generate certificate request: %v", err)
-	}
-
-	req, err := client.Create(&certificates.CertificateSigningRequest{
-		// Username, UID, Groups will be injected by API server.
-		TypeMeta:   unversioned.TypeMeta{Kind: "CertificateSigningRequest"},
-		ObjectMeta: api.ObjectMeta{GenerateName: "csr-"},
-
-		// TODO: For now, this is a request for a certificate with allowed usage of "TLS Web Client Authentication".
-		// Need to figure out whether/how to surface the allowed usage in the spec.
-		Spec: certificates.CertificateSigningRequestSpec{Request: csr},
-	})
-	if err != nil {
-		return nil, fmt.Errorf("cannot create certificate signing request: %v", err)
-
-	}
-
-	// Make a default timeout = 3600s.
-	var defaultTimeoutSeconds int64 = 3600
-	resultCh, err := client.Watch(api.ListOptions{
-		Watch:          true,
-		TimeoutSeconds: &defaultTimeoutSeconds,
-		FieldSelector:  fields.OneTermEqualSelector("metadata.name", req.Name),
-	})
-	if err != nil {
-		return nil, fmt.Errorf("cannot watch on the certificate signing request: %v", err)
-	}
-
-	var status certificates.CertificateSigningRequestStatus
-	ch := resultCh.ResultChan()
-
-	for {
-		event, ok := <-ch
-		if !ok {
-			break
-		}
-
-		if event.Type == watch.Modified || event.Type == watch.Added {
-			if event.Object.(*certificates.CertificateSigningRequest).UID != req.UID {
-				continue
-			}
-			status = event.Object.(*certificates.CertificateSigningRequest).Status
-			for _, c := range status.Conditions {
-				if c.Type == certificates.CertificateDenied {
-					return nil, fmt.Errorf("certificate signing request is not approved, reason: %v, message: %v", c.Reason, c.Message)
-				}
-				if c.Type == certificates.CertificateApproved && status.Certificate != nil {
-					return status.Certificate, nil
-				}
-			}
-		}
-	}
-
-	return nil, fmt.Errorf("watch channel closed")
 }
