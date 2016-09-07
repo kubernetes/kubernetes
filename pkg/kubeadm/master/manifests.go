@@ -194,5 +194,5 @@ func getImageEntrypoint(component string, useHyperkube bool) []string {
 		return []string{"/hyperkube", component}
 	}
 
-	return []string{"/usr/local/bin/kube-" + component} 
+	return []string{"/usr/local/bin/kube-" + component}
 }
