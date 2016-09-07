@@ -372,6 +372,10 @@ func (m *manager) syncBatch() {
 		for uid, status := range m.podStatuses {
 			syncedUID := uid
 			if mirrorUID, ok := podToMirror[uid]; ok {
+				if mirrorUID == "" {
+					glog.V(5).Infof("Static pod %q (%s/%s) does not have a corresponding mirror pod; skipping", uid, status.podName, status.podNamespace)
+					continue
+				}
 				syncedUID = mirrorUID
 			}
 			if m.needsUpdate(syncedUID, status) {
