@@ -189,6 +189,11 @@ func PollInfinite(interval time.Duration, condition ConditionFunc) error {
 	return WaitFor(poller(interval, 0), condition, done)
 }
 
+// PollUntil is like Poll, but it takes a stop change instead of total duration
+func PollUntil(interval time.Duration, condition ConditionFunc, stopCh <-chan struct{}) error {
+	return WaitFor(poller(interval, 0), condition, stopCh)
+}
+
 // WaitFunc creates a channel that receives an item every time a test
 // should be executed and is closed when the last test should be invoked.
 type WaitFunc func(done <-chan struct{}) <-chan struct{}
