@@ -72,11 +72,23 @@ var _ = framework.KubeDescribe("Services", func() {
 	f := framework.NewDefaultFramework("services")
 
 	var c *client.Client
+	serviceLBNames := []string{}
 
 	BeforeEach(func() {
 		c = f.Client
 	})
 
+	AfterEach(func() {
+		if CurrentGinkgoTestDescription().Failed {
+			describeSvc(f.Namespace.Name)
+		}
+		for _, lb := range serviceLBNames {
+			framework.Logf("cleaning gce resource for %s", lb)
+			cleanupServiceGCEResources(lb)
+		}
+		//reset serviceLBNames
+		serviceLBNames = []string{}
+	})
 	// TODO: We get coverage of TCP/UDP and multi-port services through the DNS test. We should have a simpler test for multi-port TCP here.
 
 	It("should provide secure master service [Conformance]", func() {
@@ -498,6 +510,7 @@ var _ = framework.KubeDescribe("Services", func() {
 
 		By("creating a TCP service " + serviceName + " with type=ClusterIP in namespace " + ns1)
 		tcpService := jig.CreateTCPServiceOrFail(ns1, nil)
+
 		jig.SanityCheckService(tcpService, api.ServiceTypeClusterIP)
 
 		By("creating a UDP service " + serviceName + " with type=ClusterIP in namespace " + ns2)
@@ -574,6 +587,11 @@ var _ = framework.KubeDescribe("Services", func() {
 			udpService = jig.UpdateServiceOrFail(ns2, udpService.Name, func(s *api.Service) {
 				s.Spec.Type = api.ServiceTypeLoadBalancer
 			})
+		}
+
+		serviceLBNames = append(serviceLBNames, getLoadBalancerName(tcpService))
+		if loadBalancerSupportsUDP {
+			serviceLBNames = append(serviceLBNames, getLoadBalancerName(udpService))
 		}
 
 		By("waiting for the TCP service to have a load balancer")
@@ -1091,6 +1109,9 @@ var _ = framework.KubeDescribe("Services", func() {
 				service.AnnotationExternalTraffic: service.AnnotationValueExternalTrafficLocal}
 			svc.Spec.Ports = []api.ServicePort{{Protocol: "TCP", Port: 80}}
 		})
+
+		serviceLBNames = append(serviceLBNames, getLoadBalancerName(svc))
+
 		By("creating a pod to be part of the service " + serviceName)
 		// This container is an nginx container listening on port 80
 		// See kubernetes/contrib/ingress/echoheaders/nginx.conf for content of response
@@ -2349,4 +2370,34 @@ func execSourceipTest(f *framework.Framework, c *client.Client, ns, nodeName, se
 	sourceIp := outputs[1]
 
 	return execPodIp, sourceIp
+}
+
+func getLoadBalancerName(service *api.Service) string {
+	//GCE requires that the name of a load balancer starts with a lower case letter.
+	ret := "a" + string(service.UID)
+	ret = strings.Replace(ret, "-", "", -1)
+	//AWS requires that the name of a load balancer is shorter than 32 bytes.
+	if len(ret) > 32 {
+		ret = ret[:32]
+	}
+	return ret
+}
+
+func cleanupServiceGCEResources(loadBalancerName string) {
+	if pollErr := wait.Poll(5*time.Second, lbCleanupTimeout, func() (bool, error) {
+		if err := framework.CleanupGCEResources(loadBalancerName); err != nil {
+			framework.Logf("Still waiting for glbc to cleanup: %v", err)
+			return false, nil
+		}
+		return true, nil
+	}); pollErr != nil {
+		framework.Failf("Failed to cleanup service GCE resources.")
+	}
+}
+
+func describeSvc(ns string) {
+	framework.Logf("\nOutput of kubectl describe svc:\n")
+	desc, _ := framework.RunKubectl(
+		"describe", "svc", fmt.Sprintf("--namespace=%v", ns))
+	framework.Logf(desc)
 }
