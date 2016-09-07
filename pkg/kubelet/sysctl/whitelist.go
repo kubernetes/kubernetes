@@ -40,7 +40,6 @@ func SafeSysctlWhitelist() []string {
 	return []string{
 		"kernel.shm_rmid_forced",
 		"net.ipv4.ip_local_port_range",
-		"net.ipv4.tcp_max_syn_backlog",
 		"net.ipv4.tcp_syncookies",
 	}
 }
