@@ -21,7 +21,7 @@ spec:
       containers:
         # The Calico per-node agent.
         - name: calico-node
-          image: quay.io/calico/node:v0.21.0
+          image: quay.io/calico/node:v0.22.0
           env:
             # Tell Calico the location of the etcd Service.
             - name: ETCD_ENDPOINTS
@@ -30,6 +30,9 @@ spec:
             # policy.
             - name: CALICO_NETWORKING
               value: "false"
+            # Don't fail if we can't access etcd right away.
+            - name: WAIT_FOR_DATASTORE
+              value: "true"
           securityContext:
             privileged: true
           volumeMounts:
@@ -45,7 +48,7 @@ spec:
           # This container installs the Calico CNI binaries
           # and CNI network config file on each node.
           - name: install-cni
-            image: calico/cni:latest
+            image: calico/cni:v1.4.0
             imagePullPolicy: Always
             command: ["/install-cni.sh"]
             env:
