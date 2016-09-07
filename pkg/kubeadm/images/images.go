@@ -24,53 +24,42 @@ import (
 const (
 	KubeEtcdImage = "etcd"
 
-	KubeApiServerImage = "apiserver"
+	KubeApiServerImage         = "apiserver"
 	KubeControllerManagerImage = "controller-manager"
-	KubeSchedulerImage = "scheduler"
-	KubeProxyImage = "proxy"
+	KubeSchedulerImage         = "scheduler"
+	KubeProxyImage             = "proxy"
 
-	KubeDnsImage = "kube-dns"
-	KubeDnsmasqImage = "dnsmasq"
+	KubeDnsImage         = "kube-dns"
+	KubeDnsmasqImage     = "dnsmasq"
 	KubeExechealthzImage = "exechealthz"
 
-
-	gcrPrefix = "gcr.io/google_containers"
+	gcrPrefix   = "gcr.io/google_containers"
 	etcdVersion = "2.2.5"
 	kubeVersion = "v1.4.0-alpha.3"
 
-	kubeDnsVersion = "1.7"
-	dnsmasqVersion = "1.3"
+	kubeDnsVersion     = "1.7"
+	dnsmasqVersion     = "1.3"
 	exechealthzVersion = "1.1"
 )
 
-func GetCoreImage(image string, overrideImage string, useHyperkube bool) string {
+func GetCoreImage(image string, overrideImage string) string {
 	if overrideImage != "" {
 		return overrideImage
 	}
 
-	if useHyperkube {
-		return map[string]string{
-			KubeEtcdImage: fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "etcd", runtime.GOARCH, etcdVersion),
-			KubeApiServerImage: fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "hyperkube", runtime.GOARCH, kubeVersion),
-			KubeControllerManagerImage: fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "hyperkube", runtime.GOARCH, kubeVersion),
-			KubeSchedulerImage: fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "hyperkube", runtime.GOARCH, kubeVersion),
-			KubeProxyImage: fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "hyperkube", runtime.GOARCH, kubeVersion),
-		}[image]
-	}
-
 	return map[string]string{
-		KubeEtcdImage: fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "etcd", runtime.GOARCH, etcdVersion),
-		KubeApiServerImage: fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "kube-apiserver", runtime.GOARCH, kubeVersion),
+		KubeEtcdImage:              fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "etcd", runtime.GOARCH, etcdVersion),
+		KubeApiServerImage:         fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "kube-apiserver", runtime.GOARCH, kubeVersion),
 		KubeControllerManagerImage: fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "kube-controller-manager", runtime.GOARCH, kubeVersion),
-		KubeSchedulerImage: fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "kube-scheduler", runtime.GOARCH, kubeVersion),
-		KubeProxyImage: fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "kube-proxy", runtime.GOARCH, kubeVersion),
+		KubeSchedulerImage:         fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "kube-scheduler", runtime.GOARCH, kubeVersion),
+		KubeProxyImage:             fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "kube-proxy", runtime.GOARCH, kubeVersion),
 	}[image]
 }
 
 func GetAddonImage(image string) string {
 	return map[string]string{
-		KubeDnsImage: fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "kube-dns", runtime.GOARCH, kubeDnsVersion),
-		KubeDnsmasqImage: fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "kube-dnsmasq", runtime.GOARCH, dnsmasqVersion),
+		KubeDnsImage:         fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "kubedns", runtime.GOARCH, kubeDnsVersion),
+		KubeDnsmasqImage:     fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "kube-dnsmasq", runtime.GOARCH, dnsmasqVersion),
 		KubeExechealthzImage: fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "exechealthz", runtime.GOARCH, exechealthzVersion),
 	}[image]
 }

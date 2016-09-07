@@ -19,6 +19,7 @@ package cmd
 import (
 	"fmt"
 	"io"
+	"net"
 
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
@@ -58,23 +59,23 @@ var (
 		`)
 )
 
-// TODO --token here becomes Discovery.BearerToken and not Discovery.GivenToken
+// TODO --token here becomes `s.Secrets.BearerToken` and not `s.Secrets.GivenToken`
 // may be we should make it the same and ask user to pass dot-separated tokens
 // in any of the modes; we could also enable discovery API in the manual mode just
 // as well, there is no reason we shouldn't let user mix and match modes, unless
 // it is too difficult to support
 
-func NewCmdManual(out io.Writer, params *kubeadmapi.BootstrapParams) *cobra.Command {
+func NewCmdManual(out io.Writer, s *kubeadmapi.KubeadmConfig) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "manual",
 		Short: "Advanced, less-automated functionality, for power users.",
 		// TODO put example usage in the Long description here
 	}
-	cmd.AddCommand(NewCmdManualBootstrap(out, params))
+	cmd.AddCommand(NewCmdManualBootstrap(out, s))
 	return cmd
 }
 
-func NewCmdManualBootstrap(out io.Writer, params *kubeadmapi.BootstrapParams) *cobra.Command {
+func NewCmdManualBootstrap(out io.Writer, s *kubeadmapi.KubeadmConfig) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "bootstrap",
 		Short: "Manually bootstrap a cluster 'out-of-band'",
@@ -85,13 +86,14 @@ func NewCmdManualBootstrap(out io.Writer, params *kubeadmapi.BootstrapParams) *c
 		Run: func(cmd *cobra.Command, args []string) {
 		},
 	}
-	cmd.AddCommand(NewCmdManualBootstrapInitMaster(out, params))
-	cmd.AddCommand(NewCmdManualBootstrapJoinNode(out, params))
+	cmd.AddCommand(NewCmdManualBootstrapInitMaster(out, s))
+	cmd.AddCommand(NewCmdManualBootstrapJoinNode(out, s))
 
 	return cmd
 }
 
-func NewCmdManualBootstrapInitMaster(out io.Writer, params *kubeadmapi.BootstrapParams) *cobra.Command {
+func NewCmdManualBootstrapInitMaster(out io.Writer, s *kubeadmapi.KubeadmConfig) *cobra.Command {
+	advertiseAddrs := &[]string{}
 	cmd := &cobra.Command{
 		Use:   "init-master",
 		Short: "Manually bootstrap a master 'out-of-band'",
@@ -101,101 +103,140 @@ func NewCmdManualBootstrapInitMaster(out io.Writer, params *kubeadmapi.Bootstrap
 			components.
 		`),
 		Run: func(cmd *cobra.Command, args []string) {
-			err := RunManualBootstrapInitMaster(out, cmd, args, params)
+			err := RunManualBootstrapInitMaster(out, cmd, args, s, advertiseAddrs)
 			cmdutil.CheckErr(err)
 		},
 	}
 
-	params.Discovery.ApiServerURLs = "http://127.0.0.1:8080/" // On the master, assume you can talk to the API server
-	cmd.PersistentFlags().StringVar(&params.Discovery.ApiServerDNSName, "api-dns-name", "",
-		`(optional) DNS name for the API server, will be encoded into
-		subjectAltName in the resulting (generated) TLS certificates`)
-	cmd.PersistentFlags().IPVar(&params.Discovery.ListenIP, "listen-ip", nil,
-		`(optional) IP address to listen on, in case autodetection fails.`)
-	cmd.PersistentFlags().StringVar(&params.Discovery.BearerToken, "token", "",
-		`(optional) Shared secret used to secure bootstrap. Will be generated and displayed if not provided.`)
+	cmd.PersistentFlags().StringVar(
+		&s.Secrets.BearerToken, "token", "",
+		`(optional) Shared secret used to secure bootstrap. Will be generated and displayed if not provided.`,
+	)
+	cmd.PersistentFlags().StringSliceVar(
+		advertiseAddrs, "api-advertise-addr", nil,
+		`(optional) IP address to advertise, in case autodetection fails.`,
+	)
+	cmd.PersistentFlags().StringSliceVar(
+		&s.InitFlags.API.ExternalDNSName, "api-external-dns-name", []string{},
+		`(optional) DNS name to advertise, in case you have configured one yourself.`,
+	)
+	_, defaultServicesCIDR, _ := net.ParseCIDR("100.64.0.0/12")
+	cmd.PersistentFlags().IPNetVar(
+		&s.InitFlags.Services.CIDR, "service-cidr", *defaultServicesCIDR,
+		`(optional) use alterantive range of IP address for service VIPs, e.g. "10.16.0.0/12"`,
+	)
+	cmd.PersistentFlags().StringVar(
+		&s.InitFlags.Services.DNSDomain, "service-dns-domain", "cluster.local",
+		`(optional) use alterantive domain name for services, e.g. "myorg.internal"`,
+	)
 
 	return cmd
 }
 
-func RunManualBootstrapInitMaster(out io.Writer, cmd *cobra.Command, args []string, params *kubeadmapi.BootstrapParams) error {
+func RunManualBootstrapInitMaster(out io.Writer, cmd *cobra.Command, args []string, s *kubeadmapi.KubeadmConfig, advertiseAddrs *[]string) error {
 	// Auto-detect the IP
-	if params.Discovery.ListenIP == nil {
+	if len(*advertiseAddrs) == 0 {
+		// TODO(phase1+) perhaps we could actually grab eth0 and eth1
 		ip, err := netutil.ChooseHostInterface()
 		if err != nil {
 			return err
 		}
-		params.Discovery.ListenIP = ip
+		s.InitFlags.API.AdvertiseAddrs = []net.IP{ip}
+	} else {
+		for _, i := range *advertiseAddrs {
+			addr := net.ParseIP(i)
+			if addr == nil {
+				return fmt.Errorf("<cmd/init> failed to parse flag (%q) as an IP address", "--api-advertise-addr="+i)
+			}
+			s.InitFlags.API.AdvertiseAddrs = append(s.InitFlags.API.AdvertiseAddrs, addr)
+		}
 	}
 
-	if err := kubemaster.CreateTokenAuthFile(params); err != nil {
+	if err := kubemaster.CreateTokenAuthFile(s); err != nil {
 		return err
 	}
-	if err := kubemaster.WriteStaticPodManifests(params); err != nil {
+	if err := kubemaster.WriteStaticPodManifests(s); err != nil {
 		return err
 	}
-	caKey, caCert, err := kubemaster.CreatePKIAssets(params)
+	caKey, caCert, err := kubemaster.CreatePKIAssets(s)
 	if err != nil {
 		return err
 	}
-	kubeconfigs, err := kubemaster.CreateCertsAndConfigForClients(params, []string{"kubelet", "admin"}, caKey, caCert)
+	kubeconfigs, err := kubemaster.CreateCertsAndConfigForClients(s, []string{"kubelet", "admin"}, caKey, caCert)
 	if err != nil {
 		return err
 	}
 	for name, kubeconfig := range kubeconfigs {
-		if err := kubeadmutil.WriteKubeconfigIfNotExists(params, name, kubeconfig); err != nil {
+		if err := kubeadmutil.WriteKubeconfigIfNotExists(s, name, kubeconfig); err != nil {
 			return err
 		}
 	}
 
+	// TODO we have most of cmd/init functionality here, except for `CreateDiscoveryDeploymentAndSecret()`
+	// it may be a good idea to just merge the two commands into one, and it's something we have started talking
+	// about, the only question is where disco service should be an opt-out...
+
+	client, err := kubemaster.CreateClientAndWaitForAPI(kubeconfigs["admin"])
+	if err != nil {
+		return err
+	}
+
+	if err := kubemaster.UpdateMasterRoleLabelsAndTaints(client); err != nil {
+		return err
+	}
+
+	if err := kubemaster.CreateEssentialAddons(s, client); err != nil {
+		return err
+	}
+
 	// TODO use templates to reference struct fields directly as order of args is fragile
 	fmt.Fprintf(out, manual_init_done_msgf,
-		params.Discovery.BearerToken,
-		params.Discovery.ListenIP,
+		s.Secrets.BearerToken,
+		s.InitFlags.API.AdvertiseAddrs[0].String(),
 	)
 	return nil
 }
 
-func NewCmdManualBootstrapJoinNode(out io.Writer, params *kubeadmapi.BootstrapParams) *cobra.Command {
+func NewCmdManualBootstrapJoinNode(out io.Writer, s *kubeadmapi.KubeadmConfig) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "join-node",
 		Short: "Manually bootstrap a node 'out-of-band', joining it into a cluster with extant control plane",
 
 		Run: func(cmd *cobra.Command, args []string) {
-			err := RunManualBootstrapJoinNode(out, cmd, args, params)
+			err := RunManualBootstrapJoinNode(out, cmd, args, s)
 			cmdutil.CheckErr(err)
 		},
 	}
-	cmd.PersistentFlags().StringVarP(&params.Discovery.CaCertFile, "ca-cert-file", "", "",
+	cmd.PersistentFlags().StringVarP(&s.ManualFlags.CaCertFile, "ca-cert-file", "", "",
 		`Path to a CA cert file in PEM format. The same CA cert must be distributed to
 		all servers.`)
-	cmd.PersistentFlags().StringVarP(&params.Discovery.ApiServerURLs, "api-server-urls", "", "",
+	cmd.PersistentFlags().StringVarP(&s.ManualFlags.ApiServerURLs, "api-server-urls", "", "",
 		`Comma separated list of API server URLs. Typically this might be just
 		https://<address-of-master>:8080/`)
-	cmd.PersistentFlags().StringVarP(&params.Discovery.BearerToken, "token", "", "",
+	cmd.PersistentFlags().StringVarP(&s.ManualFlags.BearerToken, "token", "", "",
 		`Shared secret used to secure bootstrap. Must match output of 'init-master'.`)
 
 	return cmd
 }
 
-func RunManualBootstrapJoinNode(out io.Writer, cmd *cobra.Command, args []string, params *kubeadmapi.BootstrapParams) error {
-	if params.Discovery.CaCertFile == "" {
+func RunManualBootstrapJoinNode(out io.Writer, cmd *cobra.Command, args []string, s *kubeadmapi.KubeadmConfig) error {
+	if s.ManualFlags.CaCertFile == "" {
 		fmt.Fprintf(out, "Must specify --ca-cert-file (see --help)\n")
 		return nil
 	}
 
-	if params.Discovery.ApiServerURLs == "" {
+	if s.ManualFlags.ApiServerURLs == "" {
 		fmt.Fprintf(out, "Must specify --api-server-urls (see --help)\n")
 		return nil
 	}
 
-	kubeconfig, err := kubenode.PerformTLSBootstrapFromParams(params)
+	kubeconfig, err := kubenode.PerformTLSBootstrapFromConfig(s)
 	if err != nil {
 		fmt.Fprintf(out, "Failed to perform TLS bootstrap: %s\n", err)
 		return err
 	}
 
-	err = kubeadmutil.WriteKubeconfigIfNotExists(params, "kubelet", kubeconfig)
+	err = kubeadmutil.WriteKubeconfigIfNotExists(s, "kubelet", kubeconfig)
 	if err != nil {
 		fmt.Fprintf(out, "Unable to write config for node:\n%s\n", err)
 		return err
