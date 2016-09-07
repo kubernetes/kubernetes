@@ -413,9 +413,14 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *api.Ser
 		for _, host := range hosts {
 			addr, err := getAddressByName(lbaas.compute, host)
 			if err != nil {
-				// cleanup what was created so far
-				_ = lbaas.EnsureLoadBalancerDeleted(clusterName, apiService)
+				if err == ErrNotFound {
+					// Node failure, do not create member
+					continue
+				} else {
+					// cleanup what was created so far
+					_ = lbaas.EnsureLoadBalancerDeleted(clusterName, apiService)
 				return nil, err
+				}
 			}
 
 			_, err = v2_pools.CreateAssociateMember(lbaas.network, pool.ID, v2_pools.MemberCreateOpts{
