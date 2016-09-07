@@ -27,8 +27,9 @@ import (
 )
 
 func TestPodLogValidates(t *testing.T) {
-	etcdStorage, _ := registrytest.NewEtcdStorage(t, "")
-	s, destroyFunc := generic.NewRawStorage(etcdStorage)
+	config, server := registrytest.NewEtcdStorage(t, "")
+	defer server.Terminate(t)
+	s, destroyFunc := generic.NewRawStorage(config)
 	defer destroyFunc()
 	store := &registry.Store{
 		Storage: s,
