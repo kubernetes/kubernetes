@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kubemaster
+package master
 
 import (
 	"bytes"
@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	api "k8s.io/kubernetes/pkg/api/v1"
 	kubeadmapi "k8s.io/kubernetes/pkg/kubeadm/api"
+	"k8s.io/kubernetes/pkg/kubeadm/images"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
@@ -50,11 +51,11 @@ func WriteStaticPodManifests(params *kubeadmapi.BootstrapParams) error {
 		"etcd": componentPod(api.Container{
 			Command: []string{
 				"/usr/local/bin/etcd",
-				"--listen-client-urls=http://127.0.0.1:2379,http://127.0.0.1:4001",
-				"--advertise-client-urls=http://127.0.0.1:2379,http://127.0.0.1:4001",
+				"--listen-client-urls=http://127.0.0.1:2379",
+				"--advertise-client-urls=http://127.0.0.1:2379",
 				"--data-dir=/var/etcd/data",
 			},
-			Image:         params.EnvParams["etcd_image"],
+			Image:         images.GetCoreImage(images.KubeEtcdImage, params.EnvParams["etcd_image"], params.Discovery.UseHyperkubeImage),
 			LivenessProbe: componentProbe(2379, "/health"),
 			Name:          "etcd-server",
 			Resources:     componentResources("200m"),
@@ -62,10 +63,8 @@ func WriteStaticPodManifests(params *kubeadmapi.BootstrapParams) error {
 		// TODO bind-mount certs in
 		"kube-apiserver": componentPod(api.Container{
 			Name:  "kube-apiserver",
-			Image: params.EnvParams["hyperkube_image"],
-			Command: []string{
-				"/hyperkube",
-				"apiserver",
+			Image: images.GetCoreImage(images.KubeApiServerImage, params.EnvParams["hyperkube_image"], params.Discovery.UseHyperkubeImage),
+			Command: append(getImageEntrypoint("apiserver", params.Discovery.UseHyperkubeImage), []string{
 				"--address=127.0.0.1",
 				"--etcd-servers=http://127.0.0.1:2379",
 				"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota",
@@ -78,17 +77,15 @@ func WriteStaticPodManifests(params *kubeadmapi.BootstrapParams) error {
 				"--allow-privileged",
 				params.EnvParams["component_loglevel"],
 				"--token-auth-file=/etc/kubernetes/pki/tokens.csv",
-			},
+			}...),
 			VolumeMounts:  []api.VolumeMount{pkiVolumeMount()},
 			LivenessProbe: componentProbe(8080, "/healthz"),
 			Resources:     componentResources("250m"),
 		}, pkiVolume(params)),
 		"kube-controller-manager": componentPod(api.Container{
 			Name:  "kube-controller-manager",
-			Image: params.EnvParams["hyperkube_image"],
-			Command: []string{
-				"/hyperkube",
-				"controller-manager",
+			Image: images.GetCoreImage(images.KubeControllerManagerImage, params.EnvParams["hyperkube_image"], params.Discovery.UseHyperkubeImage),
+			Command: append(getImageEntrypoint("controller-manager", params.Discovery.UseHyperkubeImage), []string{
 				"--leader-elect",
 				MASTER,
 				CLUSTER_NAME,
@@ -97,22 +94,21 @@ func WriteStaticPodManifests(params *kubeadmapi.BootstrapParams) error {
 				"--cluster-signing-cert-file=/etc/kubernetes/pki/ca.pem",
 				"--cluster-signing-key-file=/etc/kubernetes/pki/ca-key.pem",
 				"--insecure-experimental-approve-all-kubelet-csrs-for-group=system:kubelet-bootstrap",
+				"--cluster-cidr=10.2.0.0/16",
 				params.EnvParams["component_loglevel"],
-			},
+			}...),
 			VolumeMounts:  []api.VolumeMount{pkiVolumeMount()},
 			LivenessProbe: componentProbe(10252, "/healthz"),
 			Resources:     componentResources("200m"),
 		}, pkiVolume(params)),
 		"kube-scheduler": componentPod(api.Container{
 			Name:  "kube-scheduler",
-			Image: params.EnvParams["hyperkube_image"],
-			Command: []string{
-				"/hyperkube",
-				"scheduler",
+			Image: images.GetCoreImage(images.KubeSchedulerImage, params.EnvParams["hyperkube_image"], params.Discovery.UseHyperkubeImage),
+			Command: append(getImageEntrypoint("scheduler", params.Discovery.UseHyperkubeImage), []string{
 				"--leader-elect",
 				MASTER,
 				params.EnvParams["component_loglevel"],
-			},
+			}...),
 			LivenessProbe: componentProbe(10251, "/healthz"),
 			Resources:     componentResources("100m"),
 		}),
@@ -191,4 +187,12 @@ func componentPod(container api.Container, volumes ...api.Volume) api.Pod {
 			Volumes:     volumes,
 		},
 	}
+}
+
+func getImageEntrypoint(component string, useHyperkube bool) []string {
+	if useHyperkube {
+		return []string{"/hyperkube", component}
+	}
+
+	return []string{"/usr/local/bin/kube-" + component} 
 }
