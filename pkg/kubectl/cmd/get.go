@@ -156,6 +156,7 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 	allNamespaces := cmdutil.GetFlagBool(cmd, "all-namespaces")
 	showKind := cmdutil.GetFlagBool(cmd, "show-kind")
 	mapper, typer := f.Object(cmdutil.GetIncludeThirdPartyAPIs(cmd))
+	printAll := false
 
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
@@ -169,6 +170,14 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 	if len(args) == 0 && len(options.Filenames) == 0 {
 		fmt.Fprint(errOut, "You must specify the type of resource to get. ", valid_resources)
 		return cmdutil.UsageError(cmd, "Required resource not specified.")
+	}
+
+	// determine if args contains "all"
+	for _, a := range args {
+		if a == "all" {
+			printAll = true
+			break
+		}
 	}
 
 	// always show resources when getting by name or filename
@@ -365,7 +374,7 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 	var lastMapping *meta.RESTMapping
 	w := kubectl.GetNewTabWriter(out)
 
-	if mustPrintWithKinds(objs, infos, sorter) {
+	if mustPrintWithKinds(objs, infos, sorter, printAll) {
 		showKind = true
 	}
 
@@ -431,8 +440,12 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 // with multiple resource kinds, in which case it will
 // return true, indicating resource kind will be
 // included as part of printer output
-func mustPrintWithKinds(objs []runtime.Object, infos []*resource.Info, sorter *kubectl.RuntimeSort) bool {
+func mustPrintWithKinds(objs []runtime.Object, infos []*resource.Info, sorter *kubectl.RuntimeSort, printAll bool) bool {
 	var lastMap *meta.RESTMapping
+
+	if len(infos) == 1 && printAll {
+		return true
+	}
 
 	for ix := range objs {
 		var mapping *meta.RESTMapping
