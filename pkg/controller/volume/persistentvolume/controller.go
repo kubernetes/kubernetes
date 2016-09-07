@@ -23,7 +23,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/record"
@@ -1366,7 +1366,7 @@ func (ctrl *PersistentVolumeController) scheduleOperation(operationName string, 
 	}
 }
 
-func (ctrl *PersistentVolumeController) findProvisionablePlugin(claim *api.PersistentVolumeClaim) (vol.ProvisionableVolumePlugin, *extensions.StorageClass, error) {
+func (ctrl *PersistentVolumeController) findProvisionablePlugin(claim *api.PersistentVolumeClaim) (vol.ProvisionableVolumePlugin, *storage.StorageClass, error) {
 	// TODO: remove this alpha behavior in 1.5
 	alpha := hasAnnotation(claim.ObjectMeta, annAlphaClass)
 	beta := hasAnnotation(claim.ObjectMeta, annClass)
@@ -1391,7 +1391,7 @@ func (ctrl *PersistentVolumeController) findProvisionablePlugin(claim *api.Persi
 	if !found {
 		return nil, nil, fmt.Errorf("StorageClass %q not found", claimClass)
 	}
-	class, ok := classObj.(*extensions.StorageClass)
+	class, ok := classObj.(*storage.StorageClass)
 	if !ok {
 		return nil, nil, fmt.Errorf("Cannot convert object to StorageClass: %+v", classObj)
 	}
@@ -1407,13 +1407,13 @@ func (ctrl *PersistentVolumeController) findProvisionablePlugin(claim *api.Persi
 // findAlphaProvisionablePlugin returns a volume plugin compatible with
 // Kubernetes 1.3.
 // TODO: remove in Kubernetes 1.5
-func (ctrl *PersistentVolumeController) findAlphaProvisionablePlugin() (vol.ProvisionableVolumePlugin, *extensions.StorageClass, error) {
+func (ctrl *PersistentVolumeController) findAlphaProvisionablePlugin() (vol.ProvisionableVolumePlugin, *storage.StorageClass, error) {
 	if ctrl.alphaProvisioner == nil {
 		return nil, nil, fmt.Errorf("cannot find volume plugin for alpha provisioning")
 	}
 
 	// Return a dummy StorageClass instance with no parameters
-	storageClass := &extensions.StorageClass{
+	storageClass := &storage.StorageClass{
 		TypeMeta: unversioned.TypeMeta{
 			Kind: "StorageClass",
 		},

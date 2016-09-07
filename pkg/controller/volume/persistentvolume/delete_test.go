@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/storage"
 )
 
 // Test single call to syncVolume, expecting recycling to happen.
@@ -134,7 +134,7 @@ func TestDeleteSync(t *testing.T) {
 			wrapTestWithReclaimCalls(operationDelete, []error{nil}, testSyncVolume),
 		},
 	}
-	runSyncTests(t, tests, []*extensions.StorageClass{})
+	runSyncTests(t, tests, []*storage.StorageClass{})
 }
 
 // Test multiple calls to syncClaim/syncVolume and periodic sync of all
@@ -166,5 +166,5 @@ func TestDeleteMultiSync(t *testing.T) {
 		},
 	}
 
-	runMultisyncTests(t, tests, []*extensions.StorageClass{}, "")
+	runMultisyncTests(t, tests, []*storage.StorageClass{}, "")
 }

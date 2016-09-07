@@ -27,7 +27,7 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 # KUBE_TEST_API_VERSIONS=${KUBE_TEST_API_VERSIONS:-"v1,extensions/v1beta1"}
 # FIXME: due to current implementation of a test client (see: pkg/api/testapi/testapi.go)
 # ONLY the last version is tested in each group.
-KUBE_TEST_API_VERSIONS=${KUBE_TEST_API_VERSIONS:-"v1,authorization.k8s.io/v1beta1,autoscaling/v1,batch/v1,apps/v1alpha1,policy/v1alpha1,extensions/v1beta1,rbac.authorization.k8s.io/v1alpha1,certificates.k8s.io/v1alpha1"}
+KUBE_TEST_API_VERSIONS=${KUBE_TEST_API_VERSIONS:-"v1,authorization.k8s.io/v1beta1,autoscaling/v1,batch/v1,apps/v1alpha1,policy/v1alpha1,extensions/v1beta1,rbac.authorization.k8s.io/v1alpha1,certificates.k8s.io/v1alpha1,storage.k8s.io/v1beta1"}
 
 # Give integration tests longer to run
 # TODO: allow a larger value to be passed in

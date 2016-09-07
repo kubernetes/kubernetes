@@ -24,6 +24,7 @@ import (
 	unversionedbatch "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/batch/unversioned"
 	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
 	unversionedextensions "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/unversioned"
+	unversionedstorage "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/storage/unversioned"
 	"k8s.io/kubernetes/pkg/client/typed/discovery"
 	"k8s.io/kubernetes/pkg/client/unversioned"
 )
@@ -67,6 +68,11 @@ func FromUnversionedClient(c *unversioned.Client) *internalclientset.Clientset {
 		clientset.DiscoveryClient = discovery.NewDiscoveryClient(c.DiscoveryClient.RESTClient)
 	} else {
 		clientset.DiscoveryClient = discovery.NewDiscoveryClient(nil)
+	}
+	if c != nil && c.StorageClient != nil {
+		clientset.StorageClient = unversionedstorage.New(c.StorageClient.RESTClient)
+	} else {
+		clientset.StorageClient = unversionedstorage.New(nil)
 	}
 
 	return &clientset
