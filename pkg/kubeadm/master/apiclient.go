@@ -119,6 +119,17 @@ func NewDaemonSet(daemonName string, podSpec api.PodSpec) *extensions.DaemonSet 
 	}
 }
 
+func NewService(serviceName string, spec api.ServiceSpec) *api.Service {
+	l := standardLabels(serviceName)
+	return &api.Service{
+		ObjectMeta: api.ObjectMeta{
+			Name:   serviceName,
+			Labels: l,
+		},
+		Spec: spec,
+	}
+}
+
 func NewDeployment(deploymentName string, replicas int32, podSpec api.PodSpec) *extensions.Deployment {
 	l := standardLabels(deploymentName)
 	return &extensions.Deployment{

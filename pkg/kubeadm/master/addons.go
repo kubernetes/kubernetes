@@ -198,6 +198,16 @@ func createKubeDNSPodSpec(params *kubeadmapi.BootstrapParams) api.PodSpec {
 	}
 
 }
+func createKubeDNSServiceSpec(params *kubeadmapi.BootstrapParams) api.ServiceSpec {
+	return api.ServiceSpec{
+		Selector: map[string]string{"name": "kube-dns"},
+		Ports: []api.ServicePort{
+			{Name: "dns", Port: 53, Protocol: api.ProtocolUDP},
+			{Name: "dns-tcp", Port: 53, Protocol: api.ProtocolTCP},
+		},
+		ClusterIP: "100.64.0.2",
+	}
+}
 
 func CreateEssentialAddons(params *kubeadmapi.BootstrapParams, client *clientset.Clientset) error {
 	kubeProxyDaemonSet := NewDaemonSet("kube-proxy", createKubeProxyPodSpec(params))
@@ -220,6 +230,12 @@ func CreateEssentialAddons(params *kubeadmapi.BootstrapParams, client *clientset
 	SetMasterTaintTolerations(&kubeDNSDeployment.Spec.Template.ObjectMeta)
 
 	if _, err := client.Extensions().Deployments(api.NamespaceSystem).Create(kubeDNSDeployment); err != nil {
+		return fmt.Errorf("<master/addons> failed creating essential kube-dns addon [%s]", err)
+	}
+
+	kubeDNSService := NewService("kube-dns", createKubeDNSServiceSpec(params))
+
+	if _, err := client.Services(api.NamespaceSystem).Create(kubeDNSService); err != nil {
 		return fmt.Errorf("<master/addons> failed creating essential kube-dns addon [%s]", err)
 	}
 
