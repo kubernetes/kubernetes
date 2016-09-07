@@ -20,7 +20,7 @@ DOCKER_OPTS=${1:-""}
 DOCKER_CONFIG=/opt/kubernetes/cfg/docker
 
 cat <<EOF >$DOCKER_CONFIG
-DOCKER_OPTS="-H tcp://127.0.0.1:4243 -H unix:///var/run/docker.sock -s devicemapper --selinux-enabled=false ${DOCKER_OPTS}"
+DOCKER_OPTS="-H tcp://127.0.0.1:4243 -H unix:///var/run/docker.sock -s overlay --selinux-enabled=false ${DOCKER_OPTS}"
 EOF
 
 cat <<EOF >/usr/lib/systemd/system/docker.service
@@ -32,12 +32,18 @@ Requires=flannel.service
 
 [Service]
 Type=notify
+NotifyAccess=all
 EnvironmentFile=-/run/flannel/docker
 EnvironmentFile=-/opt/kubernetes/cfg/docker
 WorkingDirectory=/opt/kubernetes/bin
 ExecStart=/opt/kubernetes/bin/docker daemon \$DOCKER_OPT_BIP \$DOCKER_OPT_MTU \$DOCKER_OPTS
+ExecReload=/bin/kill -s HUP $MAINPID
 LimitNOFILE=1048576
 LimitNPROC=1048576
+StandardOutput=null
+StandardError=null
+TimeoutStartSec=0
+Restart=on-abnormal
 
 [Install]
 WantedBy=multi-user.target
