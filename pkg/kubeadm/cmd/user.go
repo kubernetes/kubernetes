@@ -23,7 +23,7 @@ import (
 	kubeadmapi "k8s.io/kubernetes/pkg/kubeadm/api"
 )
 
-func NewCmdUser(out io.Writer, params *kubeadmapi.BootstrapParams) *cobra.Command {
+func NewCmdUser(out io.Writer, s *kubeadmapi.KubeadmConfig) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "user",
 		Short: "Get initial admin credentials for a cluster.", // using TLS bootstrap
