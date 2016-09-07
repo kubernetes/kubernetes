@@ -1080,6 +1080,19 @@ function start-fluentd {
   fi
 }
 
+# Starts an image-puller - used in test clusters.
+function start-image-puller {
+  echo "Start image-puller"
+  cp "${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/e2e-image-puller.manifest" \
+    /etc/kubernetes/manifests/
+}
+
+# Starts kube-registry proxy
+function start-kube-registry-proxy {
+  echo "Starting kube-registry-proxy"
+  cp "${KUBE_HOME}/kube-manifests/kubernetes/kube-registry-proxy.yaml" /etc/kubernetes/manifests
+}
+
 # Starts a l7 loadbalancing controller for ingress.
 function start-lb-controller {
   if [[ "${ENABLE_L7_LOADBALANCING:-}" == "glbc" ]]; then
@@ -1188,8 +1201,11 @@ else
   start-kube-proxy
   # Kube-registry-proxy.
   if [[ "${ENABLE_CLUSTER_REGISTRY:-}" == "true" ]]; then
-    cp "${KUBE_HOME}/kube-manifests/kubernetes/kube-registry-proxy.yaml" /etc/kubernetes/manifests
+    start-kube-registry-proxy
 	fi
+  if [[ "${PREPULL_E2E_IMAGES}" == "true" ]]; then
+    start-image-puller
+  fi
 fi
 start-fluentd
 reset-motd
