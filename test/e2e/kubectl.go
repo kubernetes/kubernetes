@@ -532,6 +532,9 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 	framework.KubeDescribe("Kubectl describe", func() {
 		It("should check if kubectl describe prints relevant information for rc and pods [Conformance]", func() {
 			framework.SkipUnlessServerVersionGTE(nodePortsOptionalVersion, c)
+			kv, err := framework.KubectlVersion()
+			Expect(err).NotTo(HaveOccurred())
+			framework.SkipUnlessServerVersionGTE(kv, c)
 			controllerJson := readTestFileOrDie(redisControllerFilename)
 			serviceJson := readTestFileOrDie(redisServiceFilename)
 
@@ -543,46 +546,23 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			waitForOrFailWithDebug(1)
 
 			// Pod
-			// this is terrible but we want 1.4.0 alpha to count as well
-			classVersion, err := framework.KubectlVersionGTE(version.MustParse("v1.4.0-alpha"))
-			Expect(err).NotTo(HaveOccurred())
-			if classVersion {
-				forEachPod(func(pod api.Pod) {
-					output := framework.RunKubectlOrDie("describe", "pod", pod.Name, nsFlag)
-					requiredStrings := [][]string{
-						{"Name:", "redis-master-"},
-						{"Namespace:", ns},
-						{"Node:"},
-						{"Labels:", "app=redis"},
-						{"role=master"},
-						{"Status:", "Running"},
-						{"IP:"},
-						{"Controllers:", "ReplicationController/redis-master"},
-						{"Image:", redisImage},
-						{"State:", "Running"},
-						{"QoS Class:", "BestEffort"},
-					}
-					checkOutput(output, requiredStrings)
-				})
-			} else {
-				forEachPod(func(pod api.Pod) {
-					output := framework.RunKubectlOrDie("describe", "pod", pod.Name, nsFlag)
-					requiredStrings := [][]string{
-						{"Name:", "redis-master-"},
-						{"Namespace:", ns},
-						{"Node:"},
-						{"Labels:", "app=redis"},
-						{"role=master"},
-						{"Status:", "Running"},
-						{"IP:"},
-						{"Controllers:", "ReplicationController/redis-master"},
-						{"Image:", redisImage},
-						{"State:", "Running"},
-						{"QoS Tier:", "BestEffort"},
-					}
-					checkOutput(output, requiredStrings)
-				})
-			}
+			forEachPod(func(pod api.Pod) {
+				output := framework.RunKubectlOrDie("describe", "pod", pod.Name, nsFlag)
+				requiredStrings := [][]string{
+					{"Name:", "redis-master-"},
+					{"Namespace:", ns},
+					{"Node:"},
+					{"Labels:", "app=redis"},
+					{"role=master"},
+					{"Status:", "Running"},
+					{"IP:"},
+					{"Controllers:", "ReplicationController/redis-master"},
+					{"Image:", redisImage},
+					{"State:", "Running"},
+					{"QoS Class:", "BestEffort"},
+				}
+				checkOutput(output, requiredStrings)
+			})
 
 			// Rc
 			output := framework.RunKubectlOrDie("describe", "rc", "redis-master", nsFlag)
