@@ -17,7 +17,7 @@ If a key was attached to a lease before, it will be created with given TTL (defa
 
 On success, it will print at the end:
 ```
-Finished.
+Finished successfully
 ```
 
 You can do simple check on keys (if any exists):
@@ -28,9 +28,11 @@ etcdctl ls /
 Important Note
 ------
 
-This tool isn't recommended to use if problem comes up. Please report bugs and we will fix it soon.
+This tool isn't recommended to use if any problem comes up in etcd3 backend.
+Please report bugs and we will fix it soon.
 
-If it's still needed to run this tool, please backup all your data beforehand.
+If it's still preferred to run this tool, please backup all your data beforehand.
+This tool will also back up datadir to same path with ".rollback.backup" suffix.
 
 Caveats:
 - No guarantee on versions.

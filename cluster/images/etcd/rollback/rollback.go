@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"log"
 	"os"
 	"path"
 	"strconv"
@@ -39,6 +38,7 @@ import (
 	"github.com/coreos/etcd/store"
 	"github.com/coreos/etcd/wal"
 	"github.com/coreos/etcd/wal/walpb"
+	"github.com/golang/glog"
 )
 
 var (
@@ -48,16 +48,21 @@ var (
 
 func init() {
 	flag.StringVar(&migrateDatadir, "data-dir", "", "Path to the data directory")
-	flag.DurationVar(&ttl, "ttl", time.Hour, "TTL of event keys (default 1 hour)")
+	flag.DurationVar(&ttl, "ttl", time.Hour, "TTL of event keys")
 	flag.Parse()
 }
 
 func main() {
+	if len(migrateDatadir) == 0 {
+		glog.Fatal("need to set '--data-dir'")
+	}
 	dbpath := path.Join(migrateDatadir, "member", "snap", "db")
 
-	be := backend.New(dbpath, time.Second, 10000)
+	// etcd3 store backend. We will use it to parse v3 data files and extract information.
+	be := backend.NewDefaultBackend(dbpath)
 	tx := be.BatchTx()
 
+	// etcd2 store backend. We will use v3 data to update this and then save snapshot to disk.
 	st := store.New(etcdserver.StoreClusterPrefix, etcdserver.StoreKeysPrefix)
 	expireTime := time.Now().Add(ttl)
 
@@ -77,7 +82,8 @@ func main() {
 		}
 
 		if !isTombstone(k) {
-			_, err := st.Set(path.Join("1", string(kv.Key)), false, string(kv.Value), ttlOpt)
+			sk := path.Join(strings.Trim(etcdserver.StoreKeysPrefix, "/"), string(kv.Key))
+			_, err := st.Set(sk, false, string(kv.Value), ttlOpt)
 			if err != nil {
 				return err
 			}
@@ -88,48 +94,48 @@ func main() {
 		return nil
 	})
 	if err != nil {
-		panic(err)
+		glog.Fatal(err)
 	}
 	tx.Unlock()
 
-	traverseAndDeleteEmptyDir(st, "/")
+	if err := traverseAndDeleteEmptyDir(st, "/"); err != nil {
+		glog.Fatal(err)
+	}
 
-	metadata, hardstate, oldSt := rebuild(migrateDatadir)
+	metadata, hardstate, oldSt, err := rebuild(migrateDatadir)
+	if err != nil {
+		glog.Fatal(err)
+	}
 
 	// In the following, it's low level logic that saves metadata and data into v2 snapshot.
-
-	if err := os.RemoveAll(migrateDatadir); err != nil {
-		panic(err)
+	backupPath := migrateDatadir + ".rollback.backup"
+	if err := os.Rename(migrateDatadir, backupPath); err != nil {
+		glog.Fatal(err)
 	}
 	if err := os.MkdirAll(path.Join(migrateDatadir, "member", "snap"), 0700); err != nil {
-		panic(err)
+		glog.Fatal(err)
 	}
 	walDir := path.Join(migrateDatadir, "member", "wal")
 
 	w, err := wal.Create(walDir, metadata)
 	if err != nil {
-		panic(err)
+		glog.Fatal(err)
 	}
 	err = w.SaveSnapshot(walpb.Snapshot{Index: hardstate.Commit, Term: hardstate.Term})
 	if err != nil {
-		panic(err)
+		glog.Fatal(err)
 	}
 	w.Close()
 
-	nodeIDs := []uint64{}
 	event, err := oldSt.Get(etcdserver.StoreClusterPrefix, true, false)
 	if err != nil {
-		panic(err)
+		glog.Fatal(err)
 	}
-	// searching all metadata nodes and:
-	// - update store
-	// - update Nodes for ConfState
-	q := []*store.NodeExtern{}
-	q = append(q, event.Node)
-	for len(q) > 0 {
-		n := q[0]
-		q = q[1:]
+	// nodes (members info) for ConfState
+	nodes := []uint64{}
+	traverseMetadata(event.Node, func(n *store.NodeExtern) {
 		if n.Key != etcdserver.StoreClusterPrefix {
+			// update store metadata
 			v := ""
 			if !n.Dir {
 				v = *n.Value
@@ -138,27 +144,24 @@ func main() {
 				v = "2.3.7"
 			}
 			if _, err := st.Set(n.Key, n.Dir, v, store.TTLOptionSet{}); err != nil {
-				panic(err)
+				glog.Fatal(err)
 			}
 
+			// update nodes
 			fields := strings.Split(n.Key, "/")
 			if len(fields) == 4 && fields[2] == "members" {
 				nodeID, err := strconv.ParseUint(fields[3], 16, 64)
 				if err != nil {
-					fmt.Println("wrong ID: %s", fields[3])
-					panic(err)
+					glog.Fatalf("failed to parse member ID (%s): %v", fields[3], err)
 				}
-				nodeIDs = append(nodeIDs, nodeID)
+				nodes = append(nodes, nodeID)
 			}
 		}
-		for _, next := range n.Nodes {
-			q = append(q, next)
-		}
-	}
+	})
 
 	data, err := st.Save()
 	if err != nil {
-		panic(err)
+		glog.Fatal(err)
 	}
 	raftSnap := raftpb.Snapshot{
 		Data: data,
@@ -166,58 +169,74 @@ func main() {
 			Index: hardstate.Commit,
 			Term:  hardstate.Term,
 			ConfState: raftpb.ConfState{
-				Nodes: nodeIDs,
+				Nodes: nodes,
 			},
 		},
 	}
 	snapshotter := snap.New(path.Join(migrateDatadir, "member", "snap"))
 	if err := snapshotter.SaveSnap(raftSnap); err != nil {
-		panic(err)
+		glog.Fatal(err)
 	}
-	fmt.Println("Finished.")
+	fmt.Println("Finished successfully")
+}
+
+func traverseMetadata(head *store.NodeExtern, handleFunc func(*store.NodeExtern)) {
+	q := []*store.NodeExtern{head}
+
+	for len(q) > 0 {
+		n := q[0]
+		q = q[1:]
+
+		handleFunc(n)
+
+		for _, next := range n.Nodes {
+			q = append(q, next)
+		}
+	}
 }
 
 const (
-	revBytesLen            = 8 + 1 + 8
-	markedRevBytesLen      = revBytesLen + 1
-	markBytePosition       = markedRevBytesLen - 1
-	markTombstone     byte = 't'
+	revBytesLen       = 8 + 1 + 8
+	markedRevBytesLen = revBytesLen + 1
+	markBytePosition  = markedRevBytesLen - 1
+
+	markTombstone byte = 't'
 )
 
 func isTombstone(b []byte) bool {
 	return len(b) == markedRevBytesLen && b[markBytePosition] == markTombstone
 }
 
-func traverseAndDeleteEmptyDir(st store.Store, dir string) {
+func traverseAndDeleteEmptyDir(st store.Store, dir string) error {
 	e, err := st.Get(dir, true, false)
 	if err != nil {
-		panic(err)
+		return err
 	}
 	if len(e.Node.Nodes) == 0 {
 		st.Delete(dir, true, true)
-		return
+		return nil
 	}
 	for _, node := range e.Node.Nodes {
 		if !node.Dir {
-			printNode(node)
+			glog.V(2).Infof("key: %s", node.Key[len(etcdserver.StoreKeysPrefix):])
 		} else {
-			traverseAndDeleteEmptyDir(st, node.Key)
+			err := traverseAndDeleteEmptyDir(st, node.Key)
+			if err != nil {
+				return err
+			}
 		}
 	}
+	return nil
 }
 
-func printNode(node *store.NodeExtern) {
-	fmt.Printf("key:%s\n", node.Key[len("/1"):])
-}
-
-func rebuild(datadir string) ([]byte, raftpb.HardState, store.Store) {
+func rebuild(datadir string) ([]byte, *raftpb.HardState, store.Store, error) {
 	waldir := path.Join(datadir, "member", "wal")
 	snapdir := path.Join(datadir, "member", "snap")
 
 	ss := snap.New(snapdir)
 	snapshot, err := ss.Load()
 	if err != nil && err != snap.ErrNoSnapshot {
-		panic(err)
+		return nil, nil, nil, err
 	}
 
 	var walsnap walpb.Snapshot
@@ -227,20 +246,20 @@ func rebuild(datadir string) ([]byte, raftpb.HardState, store.Store) {
 
 	w, err := wal.OpenForRead(waldir, walsnap)
 	if err != nil {
-		panic(err)
+		return nil, nil, nil, err
 	}
 	defer w.Close()
 
 	meta, hardstate, ents, err := w.ReadAll()
 	if err != nil {
-		panic(err)
+		return nil, nil, nil, err
 	}
 
 	st := store.New(etcdserver.StoreClusterPrefix, etcdserver.StoreKeysPrefix)
 	if snapshot != nil {
 		err := st.Recovery(snapshot.Data)
 		if err != nil {
-			panic(err)
+			return nil, nil, nil, err
 		}
 	}
 
@@ -249,7 +268,6 @@ func rebuild(datadir string) ([]byte, raftpb.HardState, store.Store) {
 
 	applier := etcdserver.NewApplierV2(st, cluster)
 	for _, ent := range ents {
-
 		if ent.Type == raftpb.EntryConfChange {
 			var cc raftpb.ConfChange
 			pbutil.MustUnmarshal(&cc, ent.Data)
@@ -257,7 +275,7 @@ func rebuild(datadir string) ([]byte, raftpb.HardState, store.Store) {
 			case raftpb.ConfChangeAddNode:
 				m := new(membership.Member)
 				if err := json.Unmarshal(cc.Context, m); err != nil {
-					log.Panicf("unmarshal member should never fail: %v", err)
+					return nil, nil, nil, err
 				}
 				cluster.AddMember(m)
 			case raftpb.ConfChangeRemoveNode:
@@ -266,7 +284,7 @@ func rebuild(datadir string) ([]byte, raftpb.HardState, store.Store) {
 			case raftpb.ConfChangeUpdateNode:
 				m := new(membership.Member)
 				if err := json.Unmarshal(cc.Context, m); err != nil {
-					log.Panicf("unmarshal member should never fail: %v", err)
+					return nil, nil, nil, err
 				}
 				cluster.UpdateRaftAttributes(m.ID, m.RaftAttributes)
 			}
@@ -286,7 +304,7 @@ func rebuild(datadir string) ([]byte, raftpb.HardState, store.Store) {
 		}
 	}
 
-	return meta, hardstate, st
+	return meta, &hardstate, st, nil
 }
 
 func toTTLOptions(r *pb.Request) store.TTLOptionSet {
@@ -304,7 +322,6 @@ func applyRequest(r *pb.Request, applyV2 etcdserver.ApplierV2) {
 	case "POST":
 		applyV2.Post(r)
 	case "PUT":
-		// fmt.Println("put", r.Path)
 		applyV2.Put(r)
 	case "DELETE":
 		applyV2.Delete(r)
@@ -313,6 +330,6 @@ func applyRequest(r *pb.Request, applyV2 etcdserver.ApplierV2) {
 	case "SYNC":
 		applyV2.Sync(r)
 	default:
-		panic("unknown command")
+		glog.Fatal("unknown command")
 	}
 }
