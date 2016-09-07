@@ -88,7 +88,7 @@ func (a *imagePolicyWebhook) filterAnnotations(allAnnotations map[string]string)
 // Function to call on webhook failure; behavior determined by defaultAllow flag
 func (a *imagePolicyWebhook) webhookError(attributes admission.Attributes, err error) error {
 	if err != nil {
-		glog.V(2).Infof("error contacting webhook backend: %s")
+		glog.V(2).Infof("error contacting webhook backend: %s", err)
 		if a.defaultAllow {
 			glog.V(2).Infof("resource allowed in spite of webhook backend failure")
 			return nil
