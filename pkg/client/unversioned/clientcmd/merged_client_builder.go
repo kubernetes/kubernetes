@@ -21,8 +21,6 @@ import (
 	"reflect"
 	"sync"
 
-	"github.com/golang/glog"
-
 	"k8s.io/kubernetes/pkg/client/restclient"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 )
@@ -39,16 +37,25 @@ type DeferredLoadingClientConfig struct {
 
 	clientConfig ClientConfig
 	loadingLock  sync.Mutex
+
+	// provided for testing
+	icc InClusterConfig
+}
+
+// InClusterConfig abstracts details of whether the client is running in a cluster for testing.
+type InClusterConfig interface {
+	ClientConfig
+	Possible() bool
 }
 
 // NewNonInteractiveDeferredLoadingClientConfig creates a ConfigClientClientConfig using the passed context name
 func NewNonInteractiveDeferredLoadingClientConfig(loader ClientConfigLoader, overrides *ConfigOverrides) ClientConfig {
-	return &DeferredLoadingClientConfig{loader: loader, overrides: overrides}
+	return &DeferredLoadingClientConfig{loader: loader, overrides: overrides, icc: inClusterClientConfig{}}
 }
 
 // NewInteractiveDeferredLoadingClientConfig creates a ConfigClientClientConfig using the passed context name and the fallback auth reader
 func NewInteractiveDeferredLoadingClientConfig(loader ClientConfigLoader, overrides *ConfigOverrides, fallbackReader io.Reader) ClientConfig {
-	return &DeferredLoadingClientConfig{loader: loader, overrides: overrides, fallbackReader: fallbackReader}
+	return &DeferredLoadingClientConfig{loader: loader, overrides: overrides, icc: inClusterClientConfig{}, fallbackReader: fallbackReader}
 }
 
 func (config *DeferredLoadingClientConfig) createClientConfig() (ClientConfig, error) {
@@ -92,18 +99,32 @@ func (config *DeferredLoadingClientConfig) ClientConfig() (*restclient.Config, e
 		return nil, err
 	}
 
+	// load the configuration and return on non-empty errors and if the
+	// content differs from the default config
 	mergedConfig, err := mergedClientConfig.ClientConfig()
-	if err != nil {
+	switch {
+	case err != nil && !IsEmptyConfig(err):
+		// return on any error except empty config
 		return nil, err
+	case mergedConfig != nil:
+		// if the configuration has any settings at all, we cannot use ICC
+		// TODO: we need to discriminate better between "empty due to env" and
+		//   "empty due to defaults"
+		// TODO: this shouldn't be a global - the client config rules should be
+		//   handling this.
+		defaultConfig, err := DefaultClientConfig.ClientConfig()
+		if err == nil && !reflect.DeepEqual(mergedConfig, defaultConfig) {
+			return mergedConfig, nil
+		}
 	}
-	// Are we running in a cluster and were no other configs found? If so, use the in-cluster-config.
-	icc := inClusterClientConfig{}
-	defaultConfig, err := DefaultClientConfig.ClientConfig()
-	if icc.Possible() && err == nil && reflect.DeepEqual(mergedConfig, defaultConfig) {
-		glog.V(2).Info("No kubeconfig could be created, falling back to service account.")
-		return icc.ClientConfig()
+
+	// check for in-cluster configuration and use it
+	if config.icc.Possible() {
+		return config.icc.ClientConfig()
 	}
-	return mergedConfig, nil
+
+	// return the result of the merged client config
+	return mergedConfig, err
 }
 
 // Namespace implements KubeConfig
