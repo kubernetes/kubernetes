@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package federation_release_1_4
+package federation_release_1_5
 
 // These imports are the API groups the client will support.
 import (
