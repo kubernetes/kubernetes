@@ -184,7 +184,7 @@ func TestExecutorLaunchAndKillTask(t *testing.T) {
 		mockDriver = &MockExecutorDriver{}
 		registry   = newFakeRegistry()
 		executor   = New(Config{
-			Docker:    dockertools.ConnectToDockerOrDie("fake://", 0),
+			Docker:    dockertools.CreateDockerClientOrDie("fake://", 0),
 			NodeInfos: make(chan NodeInfo, 1),
 			Registry:  registry,
 		})
@@ -388,7 +388,7 @@ func TestExecutorFrameworkMessage(t *testing.T) {
 		kubeletFinished = make(chan struct{})
 		registry        = newFakeRegistry()
 		executor        = New(Config{
-			Docker:    dockertools.ConnectToDockerOrDie("fake://", 0),
+			Docker:    dockertools.CreateDockerClientOrDie("fake://", 0),
 			NodeInfos: make(chan NodeInfo, 1),
 			ShutdownAlert: func() {
 				close(kubeletFinished)
@@ -585,7 +585,7 @@ func TestExecutorShutdown(t *testing.T) {
 		kubeletFinished = make(chan struct{})
 		exitCalled      = int32(0)
 		executor        = New(Config{
-			Docker:    dockertools.ConnectToDockerOrDie("fake://", 0),
+			Docker:    dockertools.CreateDockerClientOrDie("fake://", 0),
 			NodeInfos: make(chan NodeInfo, 1),
 			ShutdownAlert: func() {
 				close(kubeletFinished)
