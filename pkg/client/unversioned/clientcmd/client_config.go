@@ -350,6 +350,8 @@ func (config *DirectClientConfig) getCluster() clientcmdapi.Cluster {
 // inClusterClientConfig makes a config that will work from within a kubernetes cluster container environment.
 type inClusterClientConfig struct{}
 
+var _ ClientConfig = inClusterClientConfig{}
+
 func (inClusterClientConfig) RawConfig() (clientcmdapi.Config, error) {
 	return clientcmdapi.Config{}, fmt.Errorf("inCluster environment config doesn't support multiple clusters")
 }
@@ -358,21 +360,21 @@ func (inClusterClientConfig) ClientConfig() (*restclient.Config, error) {
 	return restclient.InClusterConfig()
 }
 
-func (inClusterClientConfig) Namespace() (string, error) {
+func (inClusterClientConfig) Namespace() (string, bool, error) {
 	// This way assumes you've set the POD_NAMESPACE environment variable using the downward API.
 	// This check has to be done first for backwards compatibility with the way InClusterConfig was originally set up
 	if ns := os.Getenv("POD_NAMESPACE"); ns != "" {
-		return ns, nil
+		return ns, true, nil
 	}
 
 	// Fall back to the namespace associated with the service account token, if available
 	if data, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace"); err == nil {
 		if ns := strings.TrimSpace(string(data)); len(ns) > 0 {
-			return ns, nil
+			return ns, true, nil
 		}
 	}
 
-	return "default", nil
+	return "default", false, nil
 }
 
 func (inClusterClientConfig) ConfigAccess() ConfigAccess {
