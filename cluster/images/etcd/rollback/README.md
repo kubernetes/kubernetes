@@ -36,3 +36,6 @@ Caveats:
 - No guarantee on versions.
 - If any v2 data exists before rollback, they will be wiped out.
 - No v3 data left after rollback.
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/cluster/images/etcd/rollback/README.md?pixel)]()
