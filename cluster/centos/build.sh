@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Download the flannel, etcd, docker, bridge-utils and K8s binaries automatically 
+# Download the flannel, etcd, docker, bridge-utils and K8s binaries automatically
 # and store into binaries directory.
 # Run as sudoers only
 
@@ -52,8 +52,8 @@ function download-releases() {
   echo "Download kubernetes release v${K8S_VERSION} ..."
   curl -L ${K8S_DOWNLOAD_URL} -o ${RELEASES_DIR}/kubernetes.tar.gz
 
-  echo "Download docker-latest ..."
-  curl -L https://get.docker.com/builds/Linux/x86_64/docker-latest -o ${RELEASES_DIR}/docker
+  echo "Download docker release ${DOCKER_VERSION} ..."
+  curl -L ${DOCKER_DOWNLOAD_URL} -o ${RELEASES_DIR}/docker.tgz
 }
 
 function unpack-releases() {
@@ -64,8 +64,11 @@ function unpack-releases() {
   # flannel
   if [[ -f ${RELEASES_DIR}/flannel.tar.gz ]] ; then
     tar xzf ${RELEASES_DIR}/flannel.tar.gz -C ${RELEASES_DIR}
-    cp ${RELEASES_DIR}/flannel-${FLANNEL_VERSION}/flanneld ${BINARY_DIR}/master/bin
-    cp ${RELEASES_DIR}/flannel-${FLANNEL_VERSION}/flanneld ${BINARY_DIR}/node/bin
+    # cp ${RELEASES_DIR}/flannel-${FLANNEL_VERSION}/flanneld ${BINARY_DIR}/master/bin
+    # cp ${RELEASES_DIR}/flannel-${FLANNEL_VERSION}/flanneld ${BINARY_DIR}/node/bin
+    cp ${RELEASES_DIR}/flanneld ${BINARY_DIR}/master/bin
+    cp ${RELEASES_DIR}/flanneld ${BINARY_DIR}/node/bin
+
   fi
 
   # ectd
@@ -95,8 +98,9 @@ function unpack-releases() {
     cp ${RELEASES_DIR}/kubernetes/server/kubernetes/server/bin/kubectl ${BINARY_DIR}
   fi
 
-  if [[ -f ${RELEASES_DIR}/docker ]]; then
-    cp ${RELEASES_DIR}/docker ${BINARY_DIR}/node/bin
+  if [[ -f ${RELEASES_DIR}/docker.tgz ]]; then
+    tar xzf ${RELEASES_DIR}/docker.tgz -C ${RELEASES_DIR}
+    cp ${RELEASES_DIR}/docker/* ${BINARY_DIR}/node/bin
   fi
 
   chmod -R +x ${BINARY_DIR}
