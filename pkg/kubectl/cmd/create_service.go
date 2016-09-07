@@ -28,7 +28,7 @@ import (
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
-// NewCmdCreateService is a macro command to create a new namespace
+// NewCmdCreateService is a macro command to create a new service
 func NewCmdCreateService(f *cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "service",
@@ -61,7 +61,7 @@ func addPortFlags(cmd *cobra.Command) {
 	cmd.Flags().StringSlice("tcp", []string{}, "Port pairs can be specified as '<port>:<targetPort>'.")
 }
 
-// NewCmdCreateServiceClusterIP is a command to create generic secrets from files, directories, or literal values
+// NewCmdCreateServiceClusterIP is a command to create a clusterIP service
 func NewCmdCreateServiceClusterIP(f *cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "clusterip NAME [--tcp=<port>:<targetPort>] [--dry-run]",
@@ -82,7 +82,7 @@ func NewCmdCreateServiceClusterIP(f *cmdutil.Factory, cmdOut io.Writer) *cobra.C
 	return cmd
 }
 
-// CreateServiceClusterIP implements the behavior to run the create namespace command
+// CreateServiceClusterIP implements the behavior to run the create service clusterIP command
 func CreateServiceClusterIP(f *cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
@@ -117,7 +117,7 @@ var (
                 kubectl create service nodeport my-ns --tcp=5678:8080`)
 )
 
-// NewCmdCreateServiceNodePort is a macro command for creating secrets to work with Docker registries
+// NewCmdCreateServiceNodePort is a macro command for creating a NodePort service
 func NewCmdCreateServiceNodePort(f *cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "nodeport NAME [--tcp=port:targetPort] [--dry-run]",
@@ -137,7 +137,7 @@ func NewCmdCreateServiceNodePort(f *cmdutil.Factory, cmdOut io.Writer) *cobra.Co
 	return cmd
 }
 
-// CreateServiceNodePort is the implementation of the create secret docker-registry command
+// CreateServiceNodePort is the implementation of the create service nodeport command
 func CreateServiceNodePort(f *cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
@@ -172,7 +172,7 @@ var (
                 kubectl create service loadbalancer my-lbs --tcp=5678:8080`)
 )
 
-// NewCmdCreateServiceLoadBalancer is a macro command for creating secrets to work with Docker registries
+// NewCmdCreateServiceLoadBalancer is a macro command for creating a LoadBalancer service
 func NewCmdCreateServiceLoadBalancer(f *cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "loadbalancer NAME [--tcp=port:targetPort] [--dry-run]",
@@ -192,7 +192,7 @@ func NewCmdCreateServiceLoadBalancer(f *cmdutil.Factory, cmdOut io.Writer) *cobr
 	return cmd
 }
 
-// CreateServiceLoadBalancer is the implementation of the create secret tls command
+// CreateServiceLoadBalancer is the implementation of the service loadbalancer command
 func CreateServiceLoadBalancer(f *cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
