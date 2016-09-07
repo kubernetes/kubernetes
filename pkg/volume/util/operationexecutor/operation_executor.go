@@ -153,6 +153,14 @@ type ActualStateOfWorldAttacherUpdater interface {
 
 	// Marks the specified volume as detached from the specified node
 	MarkVolumeAsDetached(volumeName api.UniqueVolumeName, nodeName string)
+
+	// Marks desire to detach the specified volume (remove the volume from the node's
+	// volumesToReportedAsAttached list)
+	RemoveVolumeFromReportAsAttached(volumeName api.UniqueVolumeName, nodeName string) error
+
+	// Unmarks the desire to detach for the specified volume (add the volume back to
+	// the node's volumesToReportedAsAttached list)
+	AddVolumeToReportAsAttached(volumeName api.UniqueVolumeName, nodeName string)
 }
 
 // VolumeToAttach represents a volume that should be attached to a node.
@@ -561,24 +569,23 @@ func (oe *operationExecutor) generateDetachVolumeFunc(
 	}
 
 	return func() error {
+		var err error
 		if verifySafeToDetach {
-			safeToDetachErr := oe.verifyVolumeIsSafeToDetach(volumeToDetach)
-			if safeToDetachErr != nil {
-				// On failure, return error. Caller will log and retry.
-				return err
-			}
+			err = oe.verifyVolumeIsSafeToDetach(volumeToDetach)
 		}
-
-		// Execute detach
-		detachErr := volumeDetacher.Detach(volumeName, volumeToDetach.NodeName)
-		if detachErr != nil {
-			// On failure, return error. Caller will log and retry.
+		if err == nil {
+			err = volumeDetacher.Detach(volumeName, volumeToDetach.NodeName)
+		}
+		if err != nil {
+			// On failure, add volume back to ReportAsAttached list
+			actualStateOfWorld.AddVolumeToReportAsAttached(
+				volumeToDetach.VolumeName, volumeToDetach.NodeName)
 			return fmt.Errorf(
 				"DetachVolume.Detach failed for volume %q (spec.Name: %q) from node %q with: %v",
 				volumeToDetach.VolumeName,
 				volumeToDetach.VolumeSpec.Name(),
 				volumeToDetach.NodeName,
-				detachErr)
+				err)
 		}
 
 		glog.Infof(
