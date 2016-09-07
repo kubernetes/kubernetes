@@ -107,25 +107,27 @@ func NewCmdManualBootstrapInitMaster(out io.Writer, params *kubeadmapi.Bootstrap
 	}
 
 	params.Discovery.ApiServerURLs = "http://127.0.0.1:8080/" // On the master, assume you can talk to the API server
-	cmd.PersistentFlags().StringVarP(&params.Discovery.ApiServerDNSName, "api-dns-name", "", "",
+	cmd.PersistentFlags().StringVar(&params.Discovery.ApiServerDNSName, "api-dns-name", "",
 		`(optional) DNS name for the API server, will be encoded into
 		subjectAltName in the resulting (generated) TLS certificates`)
-	cmd.PersistentFlags().StringVarP(&params.Discovery.ListenIP, "listen-ip", "", "",
+	cmd.PersistentFlags().IPVar(&params.Discovery.ListenIP, "listen-ip", nil,
 		`(optional) IP address to listen on, in case autodetection fails.`)
-	cmd.PersistentFlags().StringVarP(&params.Discovery.BearerToken, "token", "", "",
+	cmd.PersistentFlags().StringVar(&params.Discovery.BearerToken, "token", "",
 		`(optional) Shared secret used to secure bootstrap. Will be generated and displayed if not provided.`)
 
 	return cmd
 }
 
 func RunManualBootstrapInitMaster(out io.Writer, cmd *cobra.Command, args []string, params *kubeadmapi.BootstrapParams) error {
-	if params.Discovery.ListenIP == "" {
+	// Auto-detect the IP
+	if params.Discovery.ListenIP == nil {
 		ip, err := netutil.ChooseHostInterface()
 		if err != nil {
-			return fmt.Errorf("<cmd/join> unable to autodetect IP address [%s], please specify with --listen-ip", err)
+			return err
 		}
-		params.Discovery.ListenIP = ip.String()
+		params.Discovery.ListenIP = ip
 	}
+
 	if err := kubemaster.CreateTokenAuthFile(params); err != nil {
 		return err
 	}
