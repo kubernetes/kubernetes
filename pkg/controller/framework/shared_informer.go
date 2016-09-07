@@ -21,6 +21,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/golang/glog"
+
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/runtime"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
@@ -73,6 +75,52 @@ func NewSharedIndexInformer(lw cache.ListerWatcher, objType runtime.Object, resy
 		fullResyncPeriod: resyncPeriod,
 	}
 	return sharedIndexInformer
+}
+
+// InformerSynced is a function that can be used to determine if an informer has synced.  This is useful for determining if caches have synced.
+type InformerSynced func() bool
+
+// syncedPollPeriod controls how often you look at the status of your sync funcs
+const syncedPollPeriod = 100 * time.Millisecond
+
+// WaitForCacheSync waits for caches to populate.  It returns true if it was successful, false
+// if the contoller should shutdown
+func WaitForCacheSync(stopCh <-chan struct{}, cacheSyncs ...InformerSynced) bool {
+	ready := make(chan struct{})
+
+	go func() {
+		defer utilruntime.HandleCrash()
+
+		for {
+			allSynced := true
+			for _, syncFunc := range cacheSyncs {
+				allSynced = allSynced && syncFunc()
+			}
+
+			if allSynced {
+				break
+			}
+
+			glog.V(4).Infof("Waiting for the caches to sync")
+			select {
+			case <-time.After(syncedPollPeriod):
+			case <-stopCh:
+				return
+			}
+		}
+
+		close(ready)
+	}()
+
+	select {
+	case <-ready:
+	case <-stopCh:
+		glog.V(2).Infof("stop requested")
+		return false
+	}
+
+	glog.V(4).Infof("caches populated")
+	return true
 }
 
 type sharedIndexInformer struct {
