@@ -331,8 +331,9 @@ func TestFakePodWorkers(t *testing.T) {
 
 // TestKillPodNowFunc tests the blocking kill pod function works with pod workers as expected.
 func TestKillPodNowFunc(t *testing.T) {
+	fakeRecorder := &record.FakeRecorder{}
 	podWorkers, processed := createPodWorkers()
-	killPodFunc := killPodNow(podWorkers)
+	killPodFunc := killPodNow(podWorkers, fakeRecorder)
 	pod := newPod("test", "test")
 	gracePeriodOverride := int64(0)
 	err := killPodFunc(pod, api.PodStatus{Phase: api.PodFailed, Reason: "reason", Message: "message"}, &gracePeriodOverride)
