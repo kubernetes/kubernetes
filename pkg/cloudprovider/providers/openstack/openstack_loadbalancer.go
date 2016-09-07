@@ -862,7 +862,7 @@ func (lb *LbaasV1) EnsureLoadBalancer(clusterName string, apiService *api.Servic
 			Address:      addr,
 		}).Extract()
 		if err != nil {
-                        pools.Delete(lb.network, pool.ID)
+                       pools.Delete(lb.network, pool.ID)
 			return nil, err
 		}
 	}
