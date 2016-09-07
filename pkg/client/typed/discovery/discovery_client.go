@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"sort"
 	"strings"
 
 	"github.com/emicklei/go-restful/swagger"
@@ -31,7 +32,6 @@ import (
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/serializer"
-	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/version"
 )
 
@@ -149,9 +149,8 @@ func (d *DiscoveryClient) ServerResourcesForGroupVersion(groupVersion string) (r
 		// ignore 403 or 404 error to be compatible with an v1.0 server.
 		if groupVersion == "v1" && (errors.IsNotFound(err) || errors.IsForbidden(err)) {
 			return resources, nil
-		} else {
-			return nil, err
 		}
+		return nil, err
 	}
 	return resources, nil
 }
@@ -174,6 +173,29 @@ func (d *DiscoveryClient) ServerResources() (map[string]*unversioned.APIResource
 	return result, nil
 }
 
+// ErrGroupDiscoveryFailed is returned if one or more API groups fail to load.
+type ErrGroupDiscoveryFailed struct {
+	// Groups is a list of the groups that failed to load and the error cause
+	Groups map[unversioned.GroupVersion]error
+}
+
+// Error implements the error interface
+func (e *ErrGroupDiscoveryFailed) Error() string {
+	var groups []string
+	for k, v := range e.Groups {
+		groups = append(groups, fmt.Sprintf("%s: %v", k, v))
+	}
+	sort.Strings(groups)
+	return fmt.Sprintf("unable to retrieve the complete list of server APIs: %s", strings.Join(groups, ", "))
+}
+
+// IsGroupDiscoveryFailedError returns true if the provided error indicates the server was unable to discover
+// a complete list of APIs for the client to use.
+func IsGroupDiscoveryFailedError(err error) bool {
+	_, ok := err.(*ErrGroupDiscoveryFailed)
+	return err != nil && ok
+}
+
 // serverPreferredResources returns the supported resources with the version preferred by the
 // server. If namespaced is true, only namespaced resources will be returned.
 func (d *DiscoveryClient) serverPreferredResources(namespaced bool) ([]unversioned.GroupVersionResource, error) {
@@ -183,15 +205,18 @@ func (d *DiscoveryClient) serverPreferredResources(namespaced bool) ([]unversion
 		return results, err
 	}
 
-	allErrs := []error{}
+	var failedGroups map[unversioned.GroupVersion]error
 	for _, apiGroup := range serverGroupList.Groups {
 		preferredVersion := apiGroup.PreferredVersion
+		groupVersion := unversioned.GroupVersion{Group: apiGroup.Name, Version: preferredVersion.Version}
 		apiResourceList, err := d.ServerResourcesForGroupVersion(preferredVersion.GroupVersion)
 		if err != nil {
-			allErrs = append(allErrs, err)
+			if failedGroups == nil {
+				failedGroups = make(map[unversioned.GroupVersion]error)
+			}
+			failedGroups[groupVersion] = err
 			continue
 		}
-		groupVersion := unversioned.GroupVersion{Group: apiGroup.Name, Version: preferredVersion.Version}
 		for _, apiResource := range apiResourceList.APIResources {
 			// ignore the root scoped resources if "namespaced" is true.
 			if namespaced && !apiResource.Namespaced {
@@ -203,7 +228,10 @@ func (d *DiscoveryClient) serverPreferredResources(namespaced bool) ([]unversion
 			results = append(results, groupVersion.WithResource(apiResource.Name))
 		}
 	}
-	return results, utilerrors.NewAggregate(allErrs)
+	if len(failedGroups) > 0 {
+		return results, &ErrGroupDiscoveryFailed{Groups: failedGroups}
+	}
+	return results, nil
 }
 
 // ServerPreferredResources returns the supported resources with the version preferred by the
