@@ -28,8 +28,10 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/controller"
+	daemonutil "k8s.io/kubernetes/pkg/controller/daemon/util"
 	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/securitycontext"
@@ -198,11 +200,20 @@ func (f *fakePodControl) DeletePod(namespace string, podID string, object runtim
 	return nil
 }
 
+type fakePodTemplateControl struct {
+	*daemonutil.PodTemplateController
+}
+
+func (f *fakePodTemplateControl) CreatePodTemplate(template *api.PodTemplate, namespace string) (*api.PodTemplate, error) {
+	return template, nil
+}
+
 func newTestController() (*DaemonSetsController, *fakePodControl) {
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	fake := &fake.Clientset{}
 	informerFactory := informers.NewSharedInformerFactory(clientset, controller.NoResyncPeriodFunc())
 
-	manager := NewDaemonSetsController(informerFactory.DaemonSets(), informerFactory.Pods(), informerFactory.Nodes(), clientset, 0)
+	manager := NewDaemonSetsController(informerFactory.DaemonSets(), informerFactory.Pods(), informerFactory.Nodes(), fake, 0)
 	informerFactory.Start(wait.NeverStop)
 
 	manager.podStoreSynced = alwaysReady
@@ -212,7 +223,13 @@ func newTestController() (*DaemonSetsController, *fakePodControl) {
 		podStore:       manager.podStore,
 		podIDMap:       make(map[string]*api.Pod),
 	}
+	podTemplateControl := &fakePodTemplateControl{
+		PodTemplateController: &daemonutil.PodTemplateController{
+			KubeClient: fake,
+		},
+	}
 	manager.podControl = podControl
+	manager.podTemplateController = podTemplateControl
 	return manager, podControl
 }
 

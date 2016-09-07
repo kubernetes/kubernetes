@@ -33,11 +33,11 @@ import (
 	unversionedextensions "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/unversioned"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
+	daemonutil "k8s.io/kubernetes/pkg/controller/daemon/util"
 	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/pkg/labels"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/intstr"
-	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 	"k8s.io/kubernetes/pkg/util/metrics"
 	podutil "k8s.io/kubernetes/pkg/util/pod"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
@@ -89,6 +89,9 @@ type DaemonSetsController struct {
 	// Added as a member to the struct to allow injection for testing.
 	nodeStoreSynced cache.InformerSynced
 
+	// To allow injection of CreatePodTemplate for testing
+	podTemplateController daemonutil.PodTemplateControllerInterface
+
 	lookupCache *controller.MatchingCache
 
 	// DaemonSet keys that need to be synced.
@@ -110,6 +113,9 @@ func NewDaemonSetsController(daemonSetInformer informers.DaemonSetInformer, podI
 		podControl: controller.RealPodControl{
 			KubeClient: kubeClient,
 			Recorder:   eventBroadcaster.NewRecorder(api.EventSource{Component: "daemon-set"}),
+		},
+		podTemplateController: &daemonutil.PodTemplateController{
+			KubeClient: kubeClient,
 		},
 		burstReplicas: BurstReplicas,
 		expectations:  controller.NewControllerExpectations(),
@@ -521,20 +527,17 @@ func (dsc *DaemonSetsController) manage(ds *extensions.DaemonSet) error {
 	errCh := make(chan error, createDiff+deleteDiff)
 
 	glog.V(4).Infof("Nodes needing daemon pods for daemon set %s: %+v, creating %d", ds.Name, nodesNeedingDaemonPods, createDiff)
+	podtemplate, err := daemonutil.GetOrCreatePodTemplate(dsc.podTemplateController, ds, dsc.kubeClient)
+	if err != nil {
+		glog.Errorf("Couldn't get PodTemplate for daemon set %s: %v", ds.Name, err)
+		return nil
+	}
+	template := podtemplate.Template
 	createWait := sync.WaitGroup{}
 	createWait.Add(createDiff)
 	for i := 0; i < createDiff; i++ {
 		go func(ix int) {
 			defer createWait.Done()
-
-			// Make a copy
-			template := ds.Spec.Template
-			// Add podTemplateHash to pod template labels.
-			template.ObjectMeta.Labels = labelsutil.CloneAndAddLabel(
-				ds.Spec.Template.ObjectMeta.Labels,
-				extensions.DefaultDaemonSetUniqueLabelKey,
-				podutil.GetPodTemplateSpecHash(template))
-			// TODO: copy annotations from DaemonSet to pods
 
 			if err := dsc.podControl.CreatePodsOnNode(nodesNeedingDaemonPods[ix], ds.Namespace, &template, ds); err != nil {
 				glog.V(2).Infof("Failed creation, decrementing expectations for set %q/%q", ds.Namespace, ds.Name)
