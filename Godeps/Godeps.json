@@ -1982,6 +1982,16 @@
 			"Rev": "934dbf81977c67c521c75492dc1f55ca74dc5b04"
 		},
 		{
+			"ImportPath": "github.com/rackspace/gophercloud/openstack/networking/v2/extensions/security/groups",
+			"Comment": "v1.0.0-920-g934dbf8",
+			"Rev": "934dbf81977c67c521c75492dc1f55ca74dc5b04"
+		},
+		{
+			"ImportPath": "github.com/rackspace/gophercloud/openstack/networking/v2/extensions/security/rules",
+			"Comment": "v1.0.0-920-g934dbf8",
+			"Rev": "934dbf81977c67c521c75492dc1f55ca74dc5b04"
+		},
+		{
 			"ImportPath": "github.com/rackspace/gophercloud/openstack/networking/v2/ports",
 			"Comment": "v1.0.0-920-g934dbf8",
 			"Rev": "934dbf81977c67c521c75492dc1f55ca74dc5b04"
