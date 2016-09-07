@@ -343,6 +343,7 @@ func queryMetricsSource(h *HeapsterMetricsClient, path string, params map[string
 		for k, v := range params {
 			q.Add(k, v)
 		}
+		req.URL.RawQuery = q.Encode()
 	}
 
 	client := &http.Client{}
