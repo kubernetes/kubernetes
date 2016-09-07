@@ -40,14 +40,8 @@ export CLOUDSDK_COMPONENT_MANAGER_DISABLE_UPDATE_CHECK=true
 : ${FEDERATION:="false"}
 : ${KUBE_RELEASE_RUN_TESTS:="n"}
 
-# New kubernetes/release/push-ci-build.sh values
-# RELEASE_INFRA_PUSH=true when we're using kubernetes/release/push-ci-build.sh
-: ${RELEASE_INFRA_PUSH:="false"}
-# SET_NOMOCK_FLAG=true means we're doing full pushes and we pass --nomock to 
-# push-ci-build.sh. This is set to false in the
-# testing jobs and only used in the RELEASE_INFRA_PUSH=true scope below.
-: ${SET_NOMOCK_FLAG:="true"}
-export KUBE_RELEASE_RUN_TESTS RELEASE_INFRA_PUSH FEDERATION SET_NOMOCK_FLAG
+# New kubernetes/release/push-build.sh values
+export KUBE_RELEASE_RUN_TESTS FEDERATION
 
 # Clean stuff out. Assume the last build left the tree in an odd
 # state.
@@ -67,26 +61,25 @@ make release
 # Push to GCS?
 if [[ ${KUBE_SKIP_PUSH_GCS:-} =~ ^[yY]$ ]]; then
   echo "Not pushed to GCS..."
-elif ${RELEASE_INFRA_PUSH-}; then
+else
   readonly release_infra_clone="${WORKSPACE}/_tmp/release.git"
   mkdir -p ${WORKSPACE}/_tmp
   git clone https://github.com/kubernetes/release ${release_infra_clone}
+  
+  push_build=${release_infra_clone}/push-build.sh
 
-  if [[ ! -x ${release_infra_clone}/push-ci-build.sh ]]; then
-    echo "FATAL: Something went wrong." \
-         "${release_infra_clone}/push-ci-build.sh isn't available." \
-         "Exiting..." >&2
-    exit 1
+  if [[ ! -x ${push_build} ]]; then
+    # TODO: Remove/Restore this with the full deprecation PR
+    push_build=${release_infra_clone}/push-ci-build.sh
+    #echo "FATAL: Something went wrong. ${push_build} isn't available." \
+    #     "Exiting..." >&2
+    #exit 1
+  else
+    [[ -n "${KUBE_GCS_RELEASE_BUCKET-}" ]] \
+     && bucket_flag="--bucket=${KUBE_GCS_RELEASE_BUCKET-}"
+    ${FEDERATION} && federation_flag="--federation"
+    ${push_build} ${bucket_flag-} ${federation_flag-} --nomock --verbose --ci
   fi
-
-  [[ -n "${KUBE_GCS_RELEASE_BUCKET-}" ]] \
-   && bucket_flag="--bucket=${KUBE_GCS_RELEASE_BUCKET-}"
-  ${FEDERATION} && federation_flag="--federation"
-  ${SET_NOMOCK_FLAG} && mock_flag="--nomock"
-  ${release_infra_clone}/push-ci-build.sh ${bucket_flag-} ${federation_flag-} \
-                                          ${mock_flag-}
-else
-  ./build/push-ci-build.sh
 fi
 
 sha256sum _output/release-tars/kubernetes*.tar.gz
