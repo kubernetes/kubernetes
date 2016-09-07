@@ -4582,3 +4582,16 @@ func (p *E2ETestNodePreparer) CleanupNodes() error {
 	}
 	return encounteredError
 }
+
+func CleanupGCEResources(loadBalancerName string) (err error) {
+	gceCloud, ok := TestContext.CloudConfig.Provider.(*gcecloud.GCECloud)
+	if !ok {
+		return fmt.Errorf("failed to convert CloudConfig.Provider to GCECloud: %#v", TestContext.CloudConfig.Provider)
+	}
+	gceCloud.DeleteFirewall(loadBalancerName)
+	gceCloud.DeleteGlobalForwardingRule(loadBalancerName)
+	gceCloud.DeleteGlobalStaticIP(loadBalancerName)
+	hc, _ := gceCloud.GetHttpHealthCheck(loadBalancerName)
+	gceCloud.DeleteTargetPool(loadBalancerName, hc)
+	return nil
+}
