@@ -67,7 +67,7 @@ func RequireKeyUnchanged(key string) PreconditionFunc {
 	}
 }
 
-// RequireKeyUnchanged creates a precondition function that fails
+// RequireMetadataKeyUnchanged creates a precondition function that fails
 // if the metadata.key is present in the diff (indicating its value
 // has changed).
 func RequireMetadataKeyUnchanged(key string) PreconditionFunc {

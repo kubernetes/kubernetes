@@ -35,7 +35,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/editor"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/util/jsonmerge"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/crlf"
@@ -392,25 +391,18 @@ func RunEdit(f *cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args
 					return nil
 				}
 
-				patch, err := strategicpatch.CreateStrategicMergePatch(originalJS, editedJS, currOriginalObj)
-				// TODO: change all jsonmerge to strategicpatch
-				// for checking preconditions
-				preconditions := []jsonmerge.PreconditionFunc{}
+				preconditions := []strategicpatch.PreconditionFunc{strategicpatch.RequireKeyUnchanged("apiVersion"),
+					strategicpatch.RequireKeyUnchanged("kind"), strategicpatch.RequireMetadataKeyUnchanged("name")}
+				patch, err := strategicpatch.CreateTwoWayMergePatch(originalJS, editedJS, currOriginalObj, preconditions...)
 				if err != nil {
 					glog.V(4).Infof("Unable to calculate diff, no merge is possible: %v", err)
+					if strategicpatch.IsPreconditionFailed(err) {
+						return preservedFile(nil, file, errOut)
+					}
 					return err
-				} else {
-					preconditions = append(preconditions, jsonmerge.RequireKeyUnchanged("apiVersion"))
-					preconditions = append(preconditions, jsonmerge.RequireKeyUnchanged("kind"))
-					preconditions = append(preconditions, jsonmerge.RequireMetadataKeyUnchanged("name"))
-					results.version = defaultVersion
 				}
 
-				if hold, msg := jsonmerge.TestPreconditionsHold(patch, preconditions); !hold {
-					fmt.Fprintf(errOut, "error: %s", msg)
-					return preservedFile(nil, file, errOut)
-				}
-
+				results.version = defaultVersion
 				patched, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, api.StrategicMergePatchType, patch)
 				if err != nil {
 					fmt.Fprintln(out, results.addError(err, info))
