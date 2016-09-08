@@ -86,7 +86,7 @@ func TestGetJobFromTemplate(t *testing.T) {
 	if len(job.ObjectMeta.Annotations) != 2 {
 		t.Errorf("Wrong number of annotations")
 	}
-	v, ok := job.ObjectMeta.Annotations["kubernetes.io/created-by"]
+	v, ok := job.ObjectMeta.Annotations[api.CreatedByAnnotation]
 	if !ok {
 		t.Errorf("Missing created-by annotation")
 	}
@@ -140,7 +140,7 @@ func TestGetParentUIDFromJob(t *testing.T) {
 	}
 	{
 		// Case 2: Has UID annotation
-		j.ObjectMeta.Annotations = map[string]string{"kubernetes.io/created-by": `{"kind":"SerializedReference","apiVersion":"v1","reference":{"kind":"ScheduledJob","namespace":"default","name":"pi","uid":"5ef034e0-1890-11e6-8935-42010af0003e","apiVersion":"extensions","resourceVersion":"427339"}}`}
+		j.ObjectMeta.Annotations = map[string]string{api.CreatedByAnnotation: `{"kind":"SerializedReference","apiVersion":"v1","reference":{"kind":"ScheduledJob","namespace":"default","name":"pi","uid":"5ef034e0-1890-11e6-8935-42010af0003e","apiVersion":"extensions","resourceVersion":"427339"}}`}
 
 		expectedUID := types.UID("5ef034e0-1890-11e6-8935-42010af0003e")
 
@@ -158,9 +158,9 @@ func TestGroupJobsByParent(t *testing.T) {
 	uid1 := types.UID("11111111-1111-1111-1111-111111111111")
 	uid2 := types.UID("22222222-2222-2222-2222-222222222222")
 	uid3 := types.UID("33333333-3333-3333-3333-333333333333")
-	createdBy1 := map[string]string{"kubernetes.io/created-by": `{"kind":"SerializedReference","apiVersion":"v1","reference":{"kind":"ScheduledJob","namespace":"x","name":"pi","uid":"11111111-1111-1111-1111-111111111111","apiVersion":"extensions","resourceVersion":"111111"}}`}
-	createdBy2 := map[string]string{"kubernetes.io/created-by": `{"kind":"SerializedReference","apiVersion":"v1","reference":{"kind":"ScheduledJob","namespace":"x","name":"pi","uid":"22222222-2222-2222-2222-222222222222","apiVersion":"extensions","resourceVersion":"222222"}}`}
-	createdBy3 := map[string]string{"kubernetes.io/created-by": `{"kind":"SerializedReference","apiVersion":"v1","reference":{"kind":"ScheduledJob","namespace":"y","name":"pi","uid":"33333333-3333-3333-3333-333333333333","apiVersion":"extensions","resourceVersion":"333333"}}`}
+	createdBy1 := map[string]string{api.CreatedByAnnotation: `{"kind":"SerializedReference","apiVersion":"v1","reference":{"kind":"ScheduledJob","namespace":"x","name":"pi","uid":"11111111-1111-1111-1111-111111111111","apiVersion":"extensions","resourceVersion":"111111"}}`}
+	createdBy2 := map[string]string{api.CreatedByAnnotation: `{"kind":"SerializedReference","apiVersion":"v1","reference":{"kind":"ScheduledJob","namespace":"x","name":"pi","uid":"22222222-2222-2222-2222-222222222222","apiVersion":"extensions","resourceVersion":"222222"}}`}
+	createdBy3 := map[string]string{api.CreatedByAnnotation: `{"kind":"SerializedReference","apiVersion":"v1","reference":{"kind":"ScheduledJob","namespace":"y","name":"pi","uid":"33333333-3333-3333-3333-333333333333","apiVersion":"extensions","resourceVersion":"333333"}}`}
 	noCreatedBy := map[string]string{}
 
 	{
