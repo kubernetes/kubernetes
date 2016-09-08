@@ -1,3 +1,19 @@
+/*
+Copyright 2016 The Kubernetes Authors All rights reserved.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package kubectl
 
 import (
@@ -54,26 +70,22 @@ func (f *filterOptions) AddFilter(objType reflect.Type, handlerFn FilterFunc) er
 // filterPods is a FilterFunc type implementation.
 // returns true if a pod should be skipped. Defaults to true for terminated pods
 func filterPods(obj runtime.Object, options PrintOptions) bool {
-	var reason string
-
 	switch p := obj.(type) {
 	case *v1.Pod:
-		reason = string(p.Status.Phase)
+		reason := string(p.Status.Phase)
 		if p.Status.Reason != "" {
 			reason = p.Status.Reason
 		}
+		return !options.ShowAll && (reason == string(v1.PodSucceeded) || reason == string(v1.PodFailed))
 	case *api.Pod:
-		reason = string(p.Status.Phase)
+		reason := string(p.Status.Phase)
 		if p.Status.Reason != "" {
 			reason = p.Status.Reason
 		}
+		return !options.ShowAll && (reason == string(api.PodSucceeded) || reason == string(api.PodFailed))
 	}
 
-	if len(reason) == 0 {
-		return false
-	}
-
-	return !options.ShowAll && (reason == string(api.PodSucceeded) || reason == string(api.PodFailed))
+	return false
 }
 
 // PrintFilterCount prints an info message indicating the amount of resources
@@ -92,16 +104,12 @@ func (f *filterOptions) PrintFilterCount(output io.Writer, res string) error {
 // Filter extracts the filter handler, if one exists, for the given resource
 func (f *filterOptions) Filter(obj runtime.Object) (bool, error) {
 	t := reflect.TypeOf(obj)
-	if filter, ok := f.filterMap[t]; ok {
-		args := []reflect.Value{reflect.ValueOf(obj), reflect.ValueOf(f.options)}
-		filterFunc := reflect.ValueOf(filter)
-		resultValue := filterFunc.Call(args)[0]
-		isFiltered := resultValue.Interface().(bool)
+	if filter, found := f.filterMap[t]; found {
+		isFiltered := filter(obj, f.options)
 		if isFiltered {
 			f.hiddenObjNum++
 		}
 		return isFiltered, nil
 	}
-
 	return false, fmt.Errorf("error: no filter for type %#v", t)
 }
