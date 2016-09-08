@@ -1054,6 +1054,12 @@ func (lb *LbaasV1) EnsureLoadBalancerDeleted(clusterName string, service *api.Se
 				return err
 			}
 		}
+		for _, memberId := range pool.MemberIDs {
+			err = members.Delete(lb.network, memberId).ExtractErr()
+			if err != nil && !isNotFound(err) {
+				return err
+			}
+		}
 		err = pools.Delete(lb.network, pool.ID).ExtractErr()
 		if err != nil && !isNotFound(err) {
 			return err
