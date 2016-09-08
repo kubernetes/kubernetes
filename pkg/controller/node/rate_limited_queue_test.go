@@ -303,5 +303,32 @@ func TestSwapLimiter(t *testing.T) {
 	if qps != createdQPS {
 		t.Fatalf("QPS does not match create one: %v instead of %v", qps, createdQPS)
 	}
+}
 
+func TestAddAfterTry(t *testing.T) {
+	evictor := NewRateLimitedTimedQueue(flowcontrol.NewFakeAlwaysRateLimiter())
+	evictor.Add("first", "11111")
+	evictor.Add("second", "22222")
+	evictor.Add("third", "33333")
+	evictor.Remove("second")
+
+	deletedMap := sets.NewString()
+	evictor.Try(func(value TimedValue) (bool, time.Duration) {
+		deletedMap.Insert(value.Value)
+		return true, 0
+	})
+
+	setPattern := sets.NewString("first", "third")
+	if len(deletedMap) != len(setPattern) {
+		t.Fatalf("Map %v should have length %d", evictor.queue.set, len(setPattern))
+	}
+	if !CheckSetEq(setPattern, deletedMap) {
+		t.Errorf("Invalid map. Got %v, expected %v", deletedMap, setPattern)
+	}
+
+	evictor.Add("first", "11111")
+	evictor.Try(func(value TimedValue) (bool, time.Duration) {
+		t.Errorf("We shouldn't process the same value if the explicit remove wasn't called.")
+		return true, 0
+	})
 }
