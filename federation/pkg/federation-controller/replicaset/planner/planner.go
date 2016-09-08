@@ -54,7 +54,7 @@ func NewPlanner(preferences *fed_api.FederatedReplicaSetPreferences) *Planner {
 }
 
 // Distribute the desired number of replicas among the given cluster according to the planner preferences.
-// The function tries its best to assign each cluster the prefered number of replicas, however if
+// The function tries its best to assign each cluster the preferred number of replicas, however if
 // sum of MinReplicas for all cluster is bigger thant replicasToDistribute then some cluster will not
 // have all of the replicas assigned. In such case a cluster with higher weight has priority over
 // cluster with lower weight (or with lexicographically smaller name in case of draw).
