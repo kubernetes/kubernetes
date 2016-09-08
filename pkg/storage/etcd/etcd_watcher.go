@@ -19,6 +19,7 @@ package etcd
 import (
 	"fmt"
 	"net/http"
+	"reflect"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -107,6 +108,10 @@ type etcdWatcher struct {
 	// Injectable for testing. Send the event down the outgoing channel.
 	emit func(watch.Event)
 
+	// HighWaterMarks for performance debugging.
+	incomingHWM HighWaterMark
+	outgoingHWM HighWaterMark
+
 	cache etcdCache
 }
 
@@ -150,6 +155,10 @@ func newEtcdWatcher(
 		cancel:   nil,
 	}
 	w.emit = func(e watch.Event) {
+		if curLen := int64(len(w.outgoing)); w.outgoingHWM.Update(curLen) {
+			// Monitor if this gets backed up, and how much.
+			glog.V(1).Infof("watch (%v): %v objects queued in outgoing channel.", reflect.TypeOf(e.Object).String(), curLen)
+		}
 		// Give up on user stop, without this we leak a lot of goroutines in tests.
 		select {
 		case w.outgoing <- e:
@@ -262,10 +271,6 @@ func convertRecursiveResponse(node *etcd.Node, response *etcd.Response, incoming
 	incoming <- &copied
 }
 
-var (
-	watchChannelHWM HighWaterMark
-)
-
 // translate pulls stuff from etcd, converts, and pushes out the outgoing channel. Meant to be
 // called as a goroutine.
 func (w *etcdWatcher) translate() {
@@ -308,9 +313,9 @@ func (w *etcdWatcher) translate() {
 			return
 		case res, ok := <-w.etcdIncoming:
 			if ok {
-				if curLen := int64(len(w.etcdIncoming)); watchChannelHWM.Update(curLen) {
+				if curLen := int64(len(w.etcdIncoming)); w.incomingHWM.Update(curLen) {
 					// Monitor if this gets backed up, and how much.
-					glog.V(2).Infof("watch: %v objects queued in channel.", curLen)
+					glog.V(1).Infof("watch: %v objects queued in incoming channel.", curLen)
 				}
 				w.sendResult(res)
 			}
