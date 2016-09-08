@@ -34,17 +34,17 @@ func getNodeName() string {
 	return "TODO"
 }
 
-func PerformTLSBootstrapFromParams(params *kubeadmapi.BootstrapParams) (*clientcmdapi.Config, error) {
-	caCert, err := ioutil.ReadFile(params.Discovery.CaCertFile)
+func PerformTLSBootstrapFromConfig(s *kubeadmapi.KubeadmConfig) (*clientcmdapi.Config, error) {
+	caCert, err := ioutil.ReadFile(s.ManualFlags.CaCertFile)
 	if err != nil {
 		return nil, fmt.Errorf("<node/csr> failed to load CA certificate [%s]", err)
 	}
 
-	return PerformTLSBootstrap(params, strings.Split(params.Discovery.ApiServerURLs, ",")[0], caCert)
+	return PerformTLSBootstrap(s, strings.Split(s.ManualFlags.ApiServerURLs, ",")[0], caCert)
 }
 
 // Create a restful client for doing the certificate signing request.
-func PerformTLSBootstrap(params *kubeadmapi.BootstrapParams, apiEndpoint string, caCert []byte) (*clientcmdapi.Config, error) {
+func PerformTLSBootstrap(s *kubeadmapi.KubeadmConfig, apiEndpoint string, caCert []byte) (*clientcmdapi.Config, error) {
 	// TODO try all the api servers until we find one that works
 	bareClientConfig := kubeadmutil.CreateBasicClientConfig("kubernetes", apiEndpoint, caCert)
 
@@ -52,7 +52,7 @@ func PerformTLSBootstrap(params *kubeadmapi.BootstrapParams, apiEndpoint string,
 
 	bootstrapClientConfig, err := clientcmd.NewDefaultClientConfig(
 		*kubeadmutil.MakeClientConfigWithToken(
-			bareClientConfig, "kubernetes", fmt.Sprintf("kubelet-%s", nodeName), params.Discovery.BearerToken,
+			bareClientConfig, "kubernetes", fmt.Sprintf("kubelet-%s", nodeName), s.Secrets.BearerToken,
 		),
 		&clientcmd.ConfigOverrides{},
 	).ClientConfig()

@@ -28,17 +28,17 @@ import (
 	"k8s.io/kubernetes/pkg/util/uuid"
 )
 
-func generateTokenIfNeeded(params *kubeadmapi.BootstrapParams) error {
-	ok, err := kubeadmutil.UseGivenTokenIfValid(params)
+func generateTokenIfNeeded(s *kubeadmapi.KubeadmConfig) error {
+	ok, err := kubeadmutil.UseGivenTokenIfValid(s)
 	if !ok {
 		if err != nil {
 			return err
 		}
-		err = kubeadmutil.GenerateToken(params)
+		err = kubeadmutil.GenerateToken(s)
 		if err != nil {
 			return err
 		}
-		fmt.Printf("<master/tokens> generated token: %q\n", params.Discovery.GivenToken)
+		fmt.Printf("<master/tokens> generated token: %q\n", s.Secrets.GivenToken)
 	} else {
 		fmt.Println("<master/tokens> accepted provided token")
 	}
@@ -46,15 +46,15 @@ func generateTokenIfNeeded(params *kubeadmapi.BootstrapParams) error {
 	return nil
 }
 
-func CreateTokenAuthFile(params *kubeadmapi.BootstrapParams) error {
-	tokenAuthFilePath := path.Join(params.EnvParams["host_pki_path"], "tokens.csv")
-	if err := generateTokenIfNeeded(params); err != nil {
+func CreateTokenAuthFile(s *kubeadmapi.KubeadmConfig) error {
+	tokenAuthFilePath := path.Join(s.EnvParams["host_pki_path"], "tokens.csv")
+	if err := generateTokenIfNeeded(s); err != nil {
 		return fmt.Errorf("<master/tokens> failed to generate token(s) [%s]", err)
 	}
-	if err := os.MkdirAll(params.EnvParams["host_pki_path"], 0700); err != nil {
-		return fmt.Errorf("<master/tokens> failed to create directory %q [%s]", params.EnvParams["host_pki_path"], err)
+	if err := os.MkdirAll(s.EnvParams["host_pki_path"], 0700); err != nil {
+		return fmt.Errorf("<master/tokens> failed to create directory %q [%s]", s.EnvParams["host_pki_path"], err)
 	}
-	serialized := []byte(fmt.Sprintf("%s,kubeadm-node-csr,%s,system:kubelet-bootstrap\n", params.Discovery.BearerToken, uuid.NewUUID()))
+	serialized := []byte(fmt.Sprintf("%s,kubeadm-node-csr,%s,system:kubelet-bootstrap\n", s.Secrets.BearerToken, uuid.NewUUID()))
 	if err := cmdutil.DumpReaderToFile(bytes.NewReader(serialized), tokenAuthFilePath); err != nil {
 		return fmt.Errorf("<master/tokens> failed to save token auth file (%q) [%s]", tokenAuthFilePath, err)
 	}

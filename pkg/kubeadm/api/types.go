@@ -20,34 +20,45 @@ import (
 	"net"
 )
 
-type BootstrapParams struct {
-	// TODO(phase1+) this is mostly out of date and bloated now, let's revisit this soon
-	Discovery *OutOfBandDiscovery
-	EnvParams map[string]string
+type KubeadmConfig struct {
+	Secrets struct {
+		GivenToken  string // dot-separated `<TokenID>.<Token>` set by the user
+		TokenID     string // optional on master side, will be generated if not specified
+		Token       []byte // optional on master side, will be generated if not specified
+		BearerToken string // set based on Token
+	}
+	InitFlags   *InitFlags
+	JoinFlags   *JoinFlags
+	ManualFlags *ManualFlags
+	EnvParams   map[string]string // TODO(phase2) this is likely to be come componentconfig
 }
 
-type OutOfBandDiscovery struct {
-	// 'join-node' side
+// TODO(phase2) should we add validatin funcs on these structs?
+
+type InitFlags struct {
+	API struct {
+		AdvertiseAddrs  []net.IP
+		ExternalDNSName []string
+	}
+	Services struct {
+		CIDR      net.IPNet
+		DNSDomain string
+	}
+	Images struct {
+		UseHyperkube bool
+	}
+}
+
+type JoinFlags struct {
+	MasterAddrs []net.IP
+}
+
+// TODO(phase1?) we haven't decided whether manual sub commands should get merged into  main commands...
+type ManualFlags struct {
 	ApiServerURLs string // comma separated
 	CaCertFile    string
-	GivenToken    string // dot-separated `<TokenID>.<Token>` set by the user
-	TokenID       string // optional on master side, will be generated if not specified
-	Token         []byte // optional on master side, will be generated if not specified
 	BearerToken   string // set based on Token
-	// 'init-master' side
-	ApiServerDNSName string // optional, used in master bootstrap
-	// TODO(phase1+) this is not really the address anything is going to listen on, may we should
-	// call it `--advertise-ip-address` or something like that, or simply --use-address`,
-	// or actually we should probably probably provide user to a way of saying that they
-	// prefer public network or private with an option to pass the interface name.
-	// we should also discuss if we could just pick private interface by default, which
-	// is very often `eth1` and also make API server bind to that with 0.0.0.0 being
-	// optional. DNS name is another one we don't really have, of course, and we should
-	// have some flexibility there. All of this should reflect API severver flags etc.
-	// Also kubelets care about hostnames and IPs, which we should present in a sane way
-	// through one or two flags.
-	ListenIP          net.IP // optional IP for master to listen on, rather than autodetect
-	UseHyperkubeImage bool
+	ListenIP      net.IP // optional IP for master to listen on, rather than autodetect
 }
 
 type ClusterInfo struct {

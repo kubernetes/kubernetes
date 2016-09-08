@@ -45,7 +45,7 @@ const (
 //
 //E0817 17:53:22.242658       1 event.go:258] Could not construct reference to: '&api.Endpoints{TypeMeta:unversioned.TypeMeta{Kind:"", APIVersion:""}, ObjectMeta:api.ObjectMeta{Name:"kube-scheduler", GenerateName:"", Namespace:"kube-system", SelfLink:"", UID:"", ResourceVersion:"", Generation:0, CreationTimestamp:unversioned.Time{Time:time.Time{sec:0, nsec:0, loc:(*time.Location)(nil)}}, DeletionTimestamp:(*unversioned.Time)(nil), DeletionGracePeriodSeconds:(*int64)(nil), Labels:map[string]string(nil), Annotations:map[string]string(nil), OwnerReferences:[]api.OwnerReference(nil), Finalizers:[]string(nil)}, Subsets:[]api.EndpointSubset(nil)}' due to: 'selfLink was empty, can't make reference'. Will not report event: 'Normal' '%v became leader' 'moby'
 
-func WriteStaticPodManifests(params *kubeadmapi.BootstrapParams) error {
+func WriteStaticPodManifests(s *kubeadmapi.KubeadmConfig) error {
 	staticPodSpecs := map[string]api.Pod{
 		// TODO this needs a volume
 		"etcd": componentPod(api.Container{
@@ -55,7 +55,7 @@ func WriteStaticPodManifests(params *kubeadmapi.BootstrapParams) error {
 				"--advertise-client-urls=http://127.0.0.1:2379",
 				"--data-dir=/var/etcd/data",
 			},
-			Image:         images.GetCoreImage(images.KubeEtcdImage, params.EnvParams["etcd_image"], params.Discovery.UseHyperkubeImage),
+			Image:         images.GetCoreImage(images.KubeEtcdImage, s.EnvParams["etcd_image"], s.InitFlags.Images.UseHyperkube),
 			LivenessProbe: componentProbe(2379, "/health"),
 			Name:          "etcd-server",
 			Resources:     componentResources("200m"),
@@ -63,8 +63,8 @@ func WriteStaticPodManifests(params *kubeadmapi.BootstrapParams) error {
 		// TODO bind-mount certs in
 		"kube-apiserver": componentPod(api.Container{
 			Name:  "kube-apiserver",
-			Image: images.GetCoreImage(images.KubeApiServerImage, params.EnvParams["hyperkube_image"], params.Discovery.UseHyperkubeImage),
-			Command: append(getImageEntrypoint("apiserver", params.Discovery.UseHyperkubeImage), []string{
+			Image: images.GetCoreImage(images.KubeApiServerImage, s.EnvParams["hyperkube_image"], s.InitFlags.Images.UseHyperkube),
+			Command: append(getImageEntrypoint("apiserver", s.InitFlags.Images.UseHyperkube), []string{
 				"--address=127.0.0.1",
 				"--etcd-servers=http://127.0.0.1:2379",
 				"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota",
@@ -75,17 +75,17 @@ func WriteStaticPodManifests(params *kubeadmapi.BootstrapParams) error {
 				"--tls-private-key-file=/etc/kubernetes/pki/apiserver-key.pem",
 				"--secure-port=443",
 				"--allow-privileged",
-				params.EnvParams["component_loglevel"],
+				s.EnvParams["component_loglevel"],
 				"--token-auth-file=/etc/kubernetes/pki/tokens.csv",
 			}...),
 			VolumeMounts:  []api.VolumeMount{pkiVolumeMount()},
 			LivenessProbe: componentProbe(8080, "/healthz"),
 			Resources:     componentResources("250m"),
-		}, pkiVolume(params)),
+		}, pkiVolume(s)),
 		"kube-controller-manager": componentPod(api.Container{
 			Name:  "kube-controller-manager",
-			Image: images.GetCoreImage(images.KubeControllerManagerImage, params.EnvParams["hyperkube_image"], params.Discovery.UseHyperkubeImage),
-			Command: append(getImageEntrypoint("controller-manager", params.Discovery.UseHyperkubeImage), []string{
+			Image: images.GetCoreImage(images.KubeControllerManagerImage, s.EnvParams["hyperkube_image"], s.InitFlags.Images.UseHyperkube),
+			Command: append(getImageEntrypoint("controller-manager", s.InitFlags.Images.UseHyperkube), []string{
 				"--leader-elect",
 				MASTER,
 				CLUSTER_NAME,
@@ -95,26 +95,26 @@ func WriteStaticPodManifests(params *kubeadmapi.BootstrapParams) error {
 				"--cluster-signing-key-file=/etc/kubernetes/pki/ca-key.pem",
 				"--insecure-experimental-approve-all-kubelet-csrs-for-group=system:kubelet-bootstrap",
 				"--cluster-cidr=10.2.0.0/16",
-				params.EnvParams["component_loglevel"],
+				s.EnvParams["component_loglevel"],
 			}...),
 			VolumeMounts:  []api.VolumeMount{pkiVolumeMount()},
 			LivenessProbe: componentProbe(10252, "/healthz"),
 			Resources:     componentResources("200m"),
-		}, pkiVolume(params)),
+		}, pkiVolume(s)),
 		"kube-scheduler": componentPod(api.Container{
 			Name:  "kube-scheduler",
-			Image: images.GetCoreImage(images.KubeSchedulerImage, params.EnvParams["hyperkube_image"], params.Discovery.UseHyperkubeImage),
-			Command: append(getImageEntrypoint("scheduler", params.Discovery.UseHyperkubeImage), []string{
+			Image: images.GetCoreImage(images.KubeSchedulerImage, s.EnvParams["hyperkube_image"], s.InitFlags.Images.UseHyperkube),
+			Command: append(getImageEntrypoint("scheduler", s.InitFlags.Images.UseHyperkube), []string{
 				"--leader-elect",
 				MASTER,
-				params.EnvParams["component_loglevel"],
+				s.EnvParams["component_loglevel"],
 			}...),
 			LivenessProbe: componentProbe(10251, "/healthz"),
 			Resources:     componentResources("100m"),
 		}),
 	}
 
-	manifestsPath := path.Join(params.EnvParams["prefix"], "manifests")
+	manifestsPath := path.Join(s.EnvParams["prefix"], "manifests")
 	if err := os.MkdirAll(manifestsPath, 0700); err != nil {
 		return fmt.Errorf("<master/manifests> failed to create directory %q [%s]", manifestsPath, err)
 	}
@@ -131,11 +131,11 @@ func WriteStaticPodManifests(params *kubeadmapi.BootstrapParams) error {
 	return nil
 }
 
-func pkiVolume(params *kubeadmapi.BootstrapParams) api.Volume {
+func pkiVolume(s *kubeadmapi.KubeadmConfig) api.Volume {
 	return api.Volume{
 		Name: "pki",
 		VolumeSource: api.VolumeSource{
-			HostPath: &api.HostPathVolumeSource{Path: params.EnvParams["host_pki_path"]},
+			HostPath: &api.HostPathVolumeSource{Path: s.EnvParams["host_pki_path"]},
 		},
 	}
 }

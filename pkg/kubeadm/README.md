@@ -23,6 +23,7 @@ different IP addresses and DNS names.
 - `--service-cidr=<cidr>` (default: "100.64/12")
 - `--service-dns-domain=<domain>` (default: "cluster.local")
 
+- `--use-hyperkube=<bool>` (default: "false")
 
 ***TODO(phase1+)***
 

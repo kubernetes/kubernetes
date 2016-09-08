@@ -78,20 +78,17 @@ func NewKubeadmCommand(f *cmdutil.Factory, in io.Reader, out, err io.Writer, env
 	// crapy little files written from different parts of this code; this could also
 	// be useful for testing
 
-	bootstrapParams := &kubeadmapi.BootstrapParams{
-		Discovery: &kubeadmapi.OutOfBandDiscovery{
-		// TODO(phase1) this type no longer makes sense here
-		},
+	s := &kubeadmapi.KubeadmConfig{
 		EnvParams: envParams,
 	}
 
 	cmds.ResetFlags()
 	cmds.SetGlobalNormalizationFunc(flag.WarnWordSepNormalizeFunc)
 
-	cmds.AddCommand(NewCmdInit(out, bootstrapParams))
-	cmds.AddCommand(NewCmdJoin(out, bootstrapParams))
-	cmds.AddCommand(NewCmdUser(out, bootstrapParams))
-	cmds.AddCommand(NewCmdManual(out, bootstrapParams))
+	cmds.AddCommand(NewCmdInit(out, s))
+	cmds.AddCommand(NewCmdJoin(out, s))
+	cmds.AddCommand(NewCmdUser(out, s))
+	cmds.AddCommand(NewCmdManual(out, s))
 
 	return cmds
 }
