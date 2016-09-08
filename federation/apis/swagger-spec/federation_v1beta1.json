@@ -881,7 +881,7 @@
       "items": {
        "type": "string"
       },
-      "description": "Zones is the list of avaliability zones in which the nodes of the cluster exist, e.g. 'us-east1-a'. These will always be in the same region."
+      "description": "Zones is the list of availability zones in which the nodes of the cluster exist, e.g. 'us-east1-a'. These will always be in the same region."
      },
      "region": {
       "type": "string",

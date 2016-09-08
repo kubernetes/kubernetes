@@ -94,7 +94,7 @@
      {
       "type": "v1beta1.Ingress",
       "method": "POST",
-      "summary": "create a Ingress",
+      "summary": "create an Ingress",
       "nickname": "createNamespacedIngress",
       "parameters": [
        {
@@ -487,7 +487,7 @@
      {
       "type": "unversioned.Status",
       "method": "DELETE",
-      "summary": "delete a Ingress",
+      "summary": "delete an Ingress",
       "nickname": "deleteNamespacedIngress",
       "parameters": [
        {
@@ -2342,7 +2342,7 @@
    },
    "v1beta1.HTTPIngressRuleValue": {
     "id": "v1beta1.HTTPIngressRuleValue",
-    "description": "HTTPIngressRuleValue is a list of http selectors pointing to backends. In the example: http://\u003chost\u003e/\u003cpath\u003e?\u003csearchpart\u003e -\u003e backend where where parts of the url correspond to RFC 3986, this resource will be used to match against everything after the last '/' and before the first '?' or '#'.",
+    "description": "HTTPIngressRuleValue is a list of http selectors pointing to backends. In the example: http://\u003chost\u003e/\u003cpath\u003e?\u003csearchpart\u003e -\u003e backend where parts of the url correspond to RFC 3986, this resource will be used to match against everything after the last '/' and before the first '?' or '#'.",
     "required": [
      "paths"
     ],
