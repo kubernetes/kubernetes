@@ -55,7 +55,7 @@ type Reactor interface {
 type WatchReactor interface {
 	// Handles indicates whether or not this Reactor deals with a given action
 	Handles(action Action) bool
-	// React handles a watch action and returns results.  It may choose to delegate by indicated handled=false
+	// React handles a watch action and returns results.  It may choose to delegate by indicating handled=false
 	React(action Action) (handled bool, ret watch.Interface, err error)
 }
 
@@ -63,20 +63,20 @@ type WatchReactor interface {
 type ProxyReactor interface {
 	// Handles indicates whether or not this Reactor deals with a given action
 	Handles(action Action) bool
-	// React handles a watch action and returns results.  It may choose to delegate by indicated handled=false
+	// React handles a watch action and returns results.  It may choose to delegate by indicating handled=false
 	React(action Action) (handled bool, ret rest.ResponseWrapper, err error)
 }
 
 // ReactionFunc is a function that returns an object or error for a given Action.  If "handled" is false,
-// then the test client will continue ignore the results and continue to the next ReactionFunc
+// then the test client will ignore the results and continue to the next ReactionFunc
 type ReactionFunc func(action Action) (handled bool, ret runtime.Object, err error)
 
 // WatchReactionFunc is a function that returns a watch interface.  If "handled" is false,
-// then the test client will continue ignore the results and continue to the next ReactionFunc
+// then the test client will ignore the results and continue to the next ReactionFunc
 type WatchReactionFunc func(action Action) (handled bool, ret watch.Interface, err error)
 
 // ProxyReactionFunc is a function that returns a ResponseWrapper interface for a given Action.  If "handled" is false,
-// then the test client will continue ignore the results and continue to the next ProxyReactionFunc
+// then the test client will ignore the results and continue to the next ProxyReactionFunc
 type ProxyReactionFunc func(action Action) (handled bool, ret rest.ResponseWrapper, err error)
 
 // AddReactor appends a reactor to the end of the chain
@@ -184,7 +184,7 @@ func (c *Fake) ClearActions() {
 	c.actions = make([]Action, 0)
 }
 
-// Actions returns a chronologically ordered slice fake actions called on the fake client
+// Actions returns a chronologically ordered slice fake actions called on the fake client.
 func (c *Fake) Actions() []Action {
 	c.RLock()
 	defer c.RUnlock()
