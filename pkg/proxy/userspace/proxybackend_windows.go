@@ -68,7 +68,7 @@ func (proxier *Proxier) openNodePort(nodePort int, protocol api.Protocol, proxyI
 		return err
 	}
 
-	args := proxier.netshPortProxyAddArgs(localhostIPv4, nodePort, proxyIP, proxyPort, name)
+	args := proxier.netshPortProxyAddArgs(nil, nodePort, proxyIP, proxyPort, name)
 	existed, err := proxier.netsh.EnsurePortProxyRule(args)
 
 	if err != nil {
@@ -127,10 +127,12 @@ func (proxier *Proxier) closeNodePort(nodePort int, protocol api.Protocol, proxy
 func (proxier *Proxier) netshPortProxyAddArgs(destIP net.IP, destPort int, proxyIP net.IP, proxyPort int, service proxy.ServicePortName) []string {
 	args := []string{
 		"interface", "portproxy", "add", "v4tov4",
-		"listenaddress=", destIP.String(),
 		"listenPort=", strconv.Itoa(destPort),
 		"connectaddress=", proxyIP.String(),
 		"connectPort=", strconv.Itoa(proxyPort),
+	}
+	if destIP != nil {
+		args = append(args, "listenaddress=", destIP.String())
 	}
 
 	return args
