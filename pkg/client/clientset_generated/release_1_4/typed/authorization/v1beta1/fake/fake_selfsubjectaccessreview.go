@@ -14,22 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package unversioned
+package fake
 
-import (
-	authorizationapi "k8s.io/kubernetes/pkg/apis/authorization"
-)
-
-type SubjectAccessReviewExpansion interface {
-	Create(sar *authorizationapi.SubjectAccessReview) (result *authorizationapi.SubjectAccessReview, err error)
-}
-
-func (c *subjectAccessReviews) Create(sar *authorizationapi.SubjectAccessReview) (result *authorizationapi.SubjectAccessReview, err error) {
-	result = &authorizationapi.SubjectAccessReview{}
-	err = c.client.Post().
-		Resource("subjectaccessreviews").
-		Body(sar).
-		Do().
-		Into(result)
-	return
+// FakeSelfSubjectAccessReviews implements SelfSubjectAccessReviewInterface
+type FakeSelfSubjectAccessReviews struct {
+	Fake *FakeAuthorization
 }
