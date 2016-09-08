@@ -301,10 +301,10 @@ func (r *rawNamer) Name(t *types.Type) string {
 	if t.Name.Package != "" {
 		var name string
 		if r.tracker != nil {
-			r.tracker.AddType(t)
 			if t.Name.Package == r.pkg {
 				name = t.Name.Name
 			} else {
+				r.tracker.AddType(t)
 				name = r.tracker.LocalNameOf(t.Name.Package) + "." + t.Name.Name
 			}
 		} else {
