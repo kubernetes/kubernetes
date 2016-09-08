@@ -486,6 +486,9 @@ func (p *Pod) IsEmpty() bool {
 func GetPodFullName(pod *api.Pod) string {
 	// Use underscore as the delimiter because it is not allowed in pod name
 	// (DNS subdomain format), while allowed in the container name format.
+	if pod == nil {
+		return ""
+	}
 	return pod.Name + "_" + pod.Namespace
 }
 
