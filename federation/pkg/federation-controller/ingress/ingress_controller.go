@@ -45,12 +45,12 @@ const (
 )
 
 type IngressController struct {
-	// For triggering single ingress reconcilation. This is used when there is an
+	// For triggering single ingress reconciliation. This is used when there is an
 	// add/update/delete operation on an ingress in either federated API server or
 	// in some member of the federation.
 	ingressDeliverer *util.DelayingDeliverer
 
-	// For triggering reconcilation of all ingresses. This is used when
+	// For triggering reconciliation of all ingresses. This is used when
 	// a new cluster becomes available.
 	clusterDeliverer *util.DelayingDeliverer
 
@@ -94,7 +94,7 @@ func NewIngressController(client federation_release_1_4.Interface) *IngressContr
 		eventRecorder:         recorder,
 	}
 
-	// Build deliverers for triggering reconcilations.
+	// Build deliverers for triggering reconciliations.
 	ic.ingressDeliverer = util.NewDelayingDeliverer()
 	ic.clusterDeliverer = util.NewDelayingDeliverer()
 
@@ -131,8 +131,8 @@ func NewIngressController(client federation_release_1_4.Interface) *IngressContr
 				},
 				&extensions_v1beta1.Ingress{},
 				controller.NoResyncPeriodFunc(),
-				// Trigger reconcilation whenever something in federated cluster is changed. In most cases it
-				// would be just confirmation that some ingress operation suceeded.
+				// Trigger reconciliation whenever something in federated cluster is changed. In most cases it
+				// would be just confirmation that some ingress operation succeeded.
 				util.NewTriggerOnAllChanges(
 					func(obj pkg_runtime.Object) {
 						ic.deliverIngressObj(obj, ic.ingressReviewDelay, false)
@@ -219,7 +219,7 @@ func (ic *IngressController) deliverIngress(ingress types.NamespacedName, delay 
 }
 
 // Check whether all data stores are in sync. False is returned if any of the informer/stores is not yet
-// synced with the coresponding api server.
+// synced with the corresponding api server.
 func (ic *IngressController) isSynced() bool {
 	if !ic.ingressFederatedInformer.ClustersSynced() {
 		glog.V(2).Infof("Cluster list not synced")
@@ -238,7 +238,7 @@ func (ic *IngressController) isSynced() bool {
 	return true
 }
 
-// The function triggers reconcilation of all federated ingresses.
+// The function triggers reconciliation of all federated ingresses.
 func (ic *IngressController) reconcileIngressesOnClusterChange() {
 	glog.V(4).Infof("Reconciling ingresses on cluster change")
 	if !ic.isSynced() {

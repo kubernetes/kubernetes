@@ -75,7 +75,7 @@ type ClusterCondition struct {
 type ClusterStatus struct {
 	// Conditions is an array of current cluster conditions.
 	Conditions []ClusterCondition `json:"conditions,omitempty"`
-	// Zones is the list of avaliability zones in which the nodes of the cluster exist, e.g. 'us-east1-a'.
+	// Zones is the list of availability zones in which the nodes of the cluster exist, e.g. 'us-east1-a'.
 	// These will always be in the same region.
 	Zones []string `json:"zones,omitempty"`
 	// Region is the name of the region in which all of the nodes in the cluster exist.  e.g. 'us-east1'.
@@ -109,7 +109,7 @@ type ClusterList struct {
 	Items []Cluster `json:"items"`
 }
 
-// Temporary/alpha stuctures to support custom replica assignments within FederatedReplicaSet.
+// Temporary/alpha structures to support custom replica assignments within FederatedReplicaSet.
 
 // A set of preferences that can be added to federated version of ReplicaSet as a json-serialized annotation.
 // The preferences allow the user to express in which culsters he wants to put his replicas within the

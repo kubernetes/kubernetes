@@ -126,7 +126,7 @@ func getRrset(dnsName string, rrsetsInterface dnsprovider.ResourceRecordSets) (d
 	return returnVal, nil
 }
 
-/* getResolvedEndpoints perfoms DNS resolution on the provided slice of endpoints (which might be DNS names or IPv4 addresses)
+/* getResolvedEndpoints performs DNS resolution on the provided slice of endpoints (which might be DNS names or IPv4 addresses)
    and returns a list of IPv4 addresses.  If any of the endpoints are neither valid IPv4 addresses nor resolvable DNS names,
    non-nil error is also returned (possibly along with a partially complete list of resolved endpoints.
 */
@@ -135,7 +135,7 @@ func getResolvedEndpoints(endpoints []string) ([]string, error) {
 	for _, endpoint := range endpoints {
 		if net.ParseIP(endpoint) == nil {
 			// It's not a valid IP address, so assume it's a DNS name, and try to resolve it,
-			// replacing it's DNS name with it's IP addresses in expandedEndpoints
+			// replacing its DNS name with its IP addresses in expandedEndpoints
 			ipAddrs, err := net.LookupHost(endpoint)
 			if err != nil {
 				return resolvedEndpoints, err
