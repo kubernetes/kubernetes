@@ -129,7 +129,7 @@ When `limits` are not specified, they default to the node capacity.
 
 Examples:
 
-Container `bar` has not resources specified.
+Container `bar` has no resources specified.
 
 ```yaml
 containers:
@@ -145,7 +145,7 @@ containers:
 	name: bar
 ```
 
-Container `foo` and `bar` have limits set for different resources.
+Containers `foo` and `bar` have limits set for different resources.
 
 ```yaml
 containers:
