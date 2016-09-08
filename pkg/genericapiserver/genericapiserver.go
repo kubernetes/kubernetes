@@ -47,7 +47,6 @@ import (
 	"k8s.io/kubernetes/pkg/apiserver/audit"
 	"k8s.io/kubernetes/pkg/auth/authenticator"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
-	"k8s.io/kubernetes/pkg/auth/handlers"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/genericapiserver/openapi"
 	"k8s.io/kubernetes/pkg/genericapiserver/options"
@@ -517,7 +516,7 @@ func (s *GenericAPIServer) init(c *Config) {
 
 	// Install Authenticator
 	if c.Authenticator != nil {
-		authenticatedHandler, err := handlers.NewRequestAuthenticator(s.RequestContextMapper, c.Authenticator, handlers.Unauthorized(c.SupportsBasicAuth), handler)
+		authenticatedHandler, err := apiserver.NewRequestAuthenticator(s.RequestContextMapper, c.Authenticator, apiserver.Unauthorized(c.SupportsBasicAuth), handler)
 		if err != nil {
 			glog.Fatalf("Could not initialize authenticator: %v", err)
 		}

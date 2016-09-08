@@ -14,10 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package handlers
+package apiserver
 
 import (
+	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/golang/glog"
@@ -25,6 +27,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/auth/authenticator"
+	"k8s.io/kubernetes/pkg/auth/user"
 )
 
 var (
@@ -41,6 +44,11 @@ func init() {
 	prometheus.MustRegister(authenticatedUserCounter)
 }
 
+const (
+	authInfoHeader              = "Authentication-Info"
+	authInfoImpersonationHeader = "Impersonation-" + authInfoHeader
+)
+
 // NewRequestAuthenticator creates an http handler that tries to authenticate the given request as a user, and then
 // stores any such user found onto the provided context for the request. If authentication fails or returns an error
 // the failed handler is used. On success, handler is invoked to serve the request.
@@ -56,6 +64,7 @@ func NewRequestAuthenticator(mapper api.RequestContextMapper, auth authenticator
 				failed.ServeHTTP(w, req)
 				return
 			}
+			setAuthInfo(w, user, authInfoHeader)
 
 			if ctx, ok := mapper.Get(req); ok {
 				mapper.Update(req, api.WithUser(ctx, user))
@@ -106,4 +115,24 @@ func compressUsername(username string) string {
 	default:
 		return "other"
 	}
+}
+
+// setAuthInfo sets the "Authentication-Info" header for the underlying response.
+func setAuthInfo(w http.ResponseWriter, info user.Info, header string) {
+	// We use the strconv package because it encompasses the requirements, including escaping
+	// inner quotes, spaces, and non-printable characters.
+	//
+	// QuoteToASCII differs from the normal "%q" formatter by escaping unicode characters to valid
+	// ASCII. Use this because non-ASCII HTTP headers aren't guarenteed to work with many HTTP clients.
+	//
+	// QuoteToASCII example: https://play.golang.org/p/B1jyPZGXlN
+	//
+	// Relevant RFCs:
+	//   https://tools.ietf.org/html/rfc7615 ("Authentication-Info" header)
+	//   https://tools.ietf.org/html/rfc7235#section-2.1 (format of auth params)
+	//   https://tools.ietf.org/html/rfc7230#section-3.2.6 ("quoted-string" format)
+	username := strconv.QuoteToASCII(info.GetName())
+	uid := strconv.QuoteToASCII(info.GetUID())
+
+	w.Header().Set(header, fmt.Sprintf("username=%s, uid=%s", username, uid))
 }
