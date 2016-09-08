@@ -1050,6 +1050,11 @@ __EOF__
 
   ### Test kubectl get all
   output_message=$(kubectl --v=6 --namespace default get all 2>&1 "${kube_flags[@]}")
+
+  echo "======================================================================================================"
+  echo $output_message
+  echo "======================================================================================================"
+
   # Post-condition: Check if we get 200 OK from all the url(s)
   kube::test::if_has_string "${output_message}" "/api/v1/namespaces/default/pods 200 OK"
   kube::test::if_has_string "${output_message}" "/api/v1/namespaces/default/replicationcontrollers 200 OK"

@@ -1124,6 +1124,13 @@ function kube-down() {
   detect-project
   detect-node-names # For INSTANCE_GROUPS
 
+  echo "================= Start Getting list of Log files from Nodes ============="
+  for node_name in ${NODE_NAMES[@]:-}; do
+    gcloud compute ssh "${node_name}" --zone="${ZONE}" --project="${PROJECT}" \
+        --command="find /var/log/ -name *.log -print"
+  done
+  echo "================= Stop Getting list of Log files from Nodes ============="
+
   echo "Bringing down cluster"
   set +e  # Do not stop on error
 

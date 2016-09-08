@@ -279,44 +279,50 @@ func makeInterfacesFor(versionList []unversioned.GroupVersion) func(version unve
 }
 
 func DiscoveryRESTMapper(clients *ClientCache, delegate meta.RESTMapper) kubectl.ShortcutExpander {
-	defaultMapper := kubectl.NewShortcutExpander(delegate)
-	if clients == nil {
-		return defaultMapper
-	}
-
-	client, err := clients.ClientForVersion(&unversioned.GroupVersion{Version: "v1"})
-	if err != nil {
-		return defaultMapper
-	}
-
-	// Check if we have access to server resources
-	apiResources, err := client.Discovery().ServerResources()
-	if err != nil {
-		return defaultMapper
-	}
-
-	availableResources := []unversioned.GroupVersionResource{}
-	for groupVersionString, resourceList := range apiResources {
-		currVersion, err := unversioned.ParseGroupVersion(groupVersionString)
-		if err != nil {
-			return defaultMapper
-		}
-
-		for _, resource := range resourceList.APIResources {
-			availableResources = append(availableResources, currVersion.WithResource(resource.Name))
-		}
-	}
-
 	availableAll := []unversioned.GroupResource{}
-	for _, requestedResource := range defaultMapper.All {
-		for _, availableResource := range availableResources {
-			if requestedResource.Group == availableResource.Group &&
-				requestedResource.Resource == availableResource.Resource {
-				availableAll = append(availableAll, requestedResource)
-				break
-			}
-		}
-	}
+	//defaultMapper := kubectl.NewShortcutExpander(delegate)
+	//if clients == nil {
+	//	return defaultMapper
+	//}
+	//
+	//client, err := clients.ClientForVersion(&unversioned.GroupVersion{Version: "v1"})
+	//if err != nil {
+	//	return defaultMapper
+	//}
+	//
+	//discovery_client := client.Discovery()
+	//if discovery_client == nil {
+	//	return defaultMapper
+	//}
+	//
+	//// Check if we have access to server resources
+	////apiResources, err := client.Discovery().ServerResources()
+	//_, err = discovery_client.ServerResources()
+	//if err != nil {
+	//	return defaultMapper
+	//}
+	//
+	//availableResources := []unversioned.GroupVersionResource{}
+	//for groupVersionString, resourceList := range apiResources {
+	//	currVersion, err := unversioned.ParseGroupVersion(groupVersionString)
+	//	if err != nil {
+	//		return defaultMapper
+	//	}
+	//
+	//	for _, resource := range resourceList.APIResources {
+	//		availableResources = append(availableResources, currVersion.WithResource(resource.Name))
+	//	}
+	//}
+	//
+	//for _, requestedResource := range defaultMapper.All {
+	//	for _, availableResource := range availableResources {
+	//		if requestedResource.Group == availableResource.Group &&
+	//			requestedResource.Resource == availableResource.Resource {
+	//			availableAll = append(availableAll, requestedResource)
+	//			break
+	//		}
+	//	}
+	//}
 
 	return kubectl.ShortcutExpander{All: availableAll, RESTMapper: delegate}
 }
