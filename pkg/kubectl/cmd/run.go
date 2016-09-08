@@ -32,7 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	batchv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
@@ -179,11 +179,11 @@ func Run(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cob
 		generatorName = "scheduledjob/v2alpha1"
 	}
 	if len(generatorName) == 0 {
-		client, err := f.Client()
+		clientset, err := f.ClientSet()
 		if err != nil {
 			return err
 		}
-		resourcesList, err := client.Discovery().ServerResources()
+		resourcesList, err := clientset.Discovery().ServerResources()
 		// ServerResources ignores errors for old servers do not expose discovery
 		if err != nil {
 			return fmt.Errorf("failed to discover supported resources: %v", err)
@@ -270,11 +270,6 @@ func Run(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cob
 		}
 		opts.Config = config
 
-		client, err := f.Client()
-		if err != nil {
-			return err
-		}
-
 		clientset, err := f.ClientSet()
 		if err != nil {
 			return err
@@ -285,7 +280,7 @@ func Run(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cob
 		if err != nil {
 			return err
 		}
-		err = handleAttachPod(f, client, attachablePod.Namespace, attachablePod.Name, opts, quiet)
+		err = handleAttachPod(f, clientset.Core(), attachablePod.Namespace, attachablePod.Name, opts, quiet)
 		if err != nil {
 			return err
 		}
@@ -294,7 +289,7 @@ func Run(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cob
 		leaveStdinOpen := cmdutil.GetFlagBool(cmd, "leave-stdin-open")
 		waitForExitCode := !leaveStdinOpen && restartPolicy == api.RestartPolicyNever
 		if waitForExitCode {
-			pod, err = waitForPodTerminated(client, attachablePod.Namespace, attachablePod.Name, opts.Out, quiet)
+			pod, err = waitForPodTerminated(clientset.Core(), attachablePod.Namespace, attachablePod.Name, opts.Out, quiet)
 			if err != nil {
 				return err
 			}
@@ -377,8 +372,8 @@ func contains(resourcesList map[string]*unversioned.APIResourceList, resource un
 
 // waitForPod watches the given pod until the exitCondition is true. Each two seconds
 // the tick function is called e.g. for progress output.
-func waitForPod(c *client.Client, ns, name string, exitCondition func(*api.Pod) bool, tick func(*api.Pod)) (*api.Pod, error) {
-	pod, err := c.Pods(ns).Get(name)
+func waitForPod(podClient coreclient.PodsGetter, ns, name string, exitCondition func(*api.Pod) bool, tick func(*api.Pod)) (*api.Pod, error) {
+	pod, err := podClient.Pods(ns).Get(name)
 	if err != nil {
 		return nil, err
 	}
@@ -388,7 +383,7 @@ func waitForPod(c *client.Client, ns, name string, exitCondition func(*api.Pod) 
 
 	tick(pod)
 
-	w, err := c.Pods(ns).Watch(api.SingleObject(api.ObjectMeta{Name: pod.Name, ResourceVersion: pod.ResourceVersion}))
+	w, err := podClient.Pods(ns).Watch(api.SingleObject(api.ObjectMeta{Name: pod.Name, ResourceVersion: pod.ResourceVersion}))
 	if err != nil {
 		return nil, err
 	}
@@ -424,7 +419,7 @@ func waitForPod(c *client.Client, ns, name string, exitCondition func(*api.Pod) 
 	return result, err
 }
 
-func waitForPodRunning(c *client.Client, ns, name string, out io.Writer, quiet bool) (*api.Pod, error) {
+func waitForPodRunning(podClient coreclient.PodsGetter, ns, name string, out io.Writer, quiet bool) (*api.Pod, error) {
 	exitCondition := func(pod *api.Pod) bool {
 		switch pod.Status.Phase {
 		case api.PodRunning:
@@ -440,26 +435,26 @@ func waitForPodRunning(c *client.Client, ns, name string, out io.Writer, quiet b
 			return false
 		}
 	}
-	return waitForPod(c, ns, name, exitCondition, func(pod *api.Pod) {
+	return waitForPod(podClient, ns, name, exitCondition, func(pod *api.Pod) {
 		if !quiet {
 			fmt.Fprintf(out, "Waiting for pod %s/%s to be running, status is %s, pod ready: false\n", pod.Namespace, pod.Name, pod.Status.Phase)
 		}
 	})
 }
 
-func waitForPodTerminated(c *client.Client, ns, name string, out io.Writer, quiet bool) (*api.Pod, error) {
+func waitForPodTerminated(podClient coreclient.PodsGetter, ns, name string, out io.Writer, quiet bool) (*api.Pod, error) {
 	exitCondition := func(pod *api.Pod) bool {
 		return pod.Status.Phase == api.PodSucceeded || pod.Status.Phase == api.PodFailed
 	}
-	return waitForPod(c, ns, name, exitCondition, func(pod *api.Pod) {
+	return waitForPod(podClient, ns, name, exitCondition, func(pod *api.Pod) {
 		if !quiet {
 			fmt.Fprintf(out, "Waiting for pod %s/%s to terminate, status is %s\n", pod.Namespace, pod.Name, pod.Status.Phase)
 		}
 	})
 }
 
-func handleAttachPod(f *cmdutil.Factory, c *client.Client, ns, name string, opts *AttachOptions, quiet bool) error {
-	pod, err := waitForPodRunning(c, ns, name, opts.Out, quiet)
+func handleAttachPod(f *cmdutil.Factory, podClient coreclient.PodsGetter, ns, name string, opts *AttachOptions, quiet bool) error {
+	pod, err := waitForPodRunning(podClient, ns, name, opts.Out, quiet)
 	if err != nil {
 		return err
 	}
@@ -481,11 +476,7 @@ func handleAttachPod(f *cmdutil.Factory, c *client.Client, ns, name string, opts
 		return err
 	}
 
-	clientset, err := f.ClientSet()
-	if err != nil {
-		return nil
-	}
-	opts.PodClient = clientset.Core()
+	opts.PodClient = podClient
 
 	opts.PodName = name
 	opts.Namespace = ns
