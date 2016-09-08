@@ -1446,6 +1446,14 @@ func (gce *GCECloud) deleteForwardingRule(name, region string) error {
 	return nil
 }
 
+func (gce *GCECloud) DeleteForwardingRule(name string) error {
+	region, err := GetGCERegion(gce.localZone)
+	if err != nil {
+		return err
+	}
+	return gce.deleteForwardingRule(name, region)
+}
+
 // DeleteTargetPool deletes the given target pool.
 func (gce *GCECloud) DeleteTargetPool(name string, hc *compute.HttpHealthCheck) error {
 	region, err := GetGCERegion(gce.localZone)
