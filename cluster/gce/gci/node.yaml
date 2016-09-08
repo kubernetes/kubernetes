@@ -1,6 +1,20 @@
 #cloud-config
 
 write_files:
+  - path: /etc/systemd/system/kube-protect-systemd.service
+    permissions: 0644
+    owner: root
+    content: |
+      [Unit]
+      Description=Protect Systemd From OOM kills
+
+      [Service]
+      RemainAfterExit=yes
+      ExecStart=/bin/sh -c "echo -999 > /proc/`pidof systemd`/oom_score_adj"
+
+      [Install]
+      WantedBy=kubernetes.target
+
   - path: /etc/systemd/system/kube-node-installation.service
     permissions: 0644
     owner: root
