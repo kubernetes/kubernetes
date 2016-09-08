@@ -14,7 +14,7 @@ spec:
       --listen-client-urls=http://127.0.0.1:4002
       --data-dir=/var/etcd/data-events
       1>>/var/log/etcd-events.log 2>&1
-    image: gcr.io/google_containers/etcd:3.0.4
+    image: gcr.io/google_containers/etcd:2.3.7
     imagePullPolicy: IfNotPresent
     livenessProbe:
       httpGet:
