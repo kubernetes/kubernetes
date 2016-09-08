@@ -21,7 +21,8 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	extensionsclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/unversioned"
 )
 
 // StatusViewer provides an interface for resources that provides rollout status.
@@ -29,7 +30,7 @@ type StatusViewer interface {
 	Status(namespace, name string) (string, bool, error)
 }
 
-func StatusViewerFor(kind unversioned.GroupKind, c client.Interface) (StatusViewer, error) {
+func StatusViewerFor(kind unversioned.GroupKind, c internalclientset.Interface) (StatusViewer, error) {
 	switch kind {
 	case extensions.Kind("Deployment"):
 		return &DeploymentStatusViewer{c.Extensions()}, nil
@@ -38,7 +39,7 @@ func StatusViewerFor(kind unversioned.GroupKind, c client.Interface) (StatusView
 }
 
 type DeploymentStatusViewer struct {
-	c client.ExtensionsInterface
+	c extensionsclient.DeploymentsGetter
 }
 
 // Status returns a message describing deployment status, and a bool value indicating if the status is considered done

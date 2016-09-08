@@ -68,7 +68,7 @@ func IsNoSuchReaperError(err error) bool {
 	return ok
 }
 
-func ReaperFor(kind unversioned.GroupKind, c *internalclientset.Clientset) (Reaper, error) {
+func ReaperFor(kind unversioned.GroupKind, c internalclientset.Interface) (Reaper, error) {
 	switch kind {
 	case api.Kind("ReplicationController"):
 		return &ReplicationControllerReaper{c.Core(), Interval, Timeout}, nil

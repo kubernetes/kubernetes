@@ -28,7 +28,6 @@ import (
 
 func NewClientCache(loader clientcmd.ClientConfig) *ClientCache {
 	return &ClientCache{
-		clients:       make(map[unversioned.GroupVersion]*client.Client),
 		clientsets:    make(map[unversioned.GroupVersion]*internalclientset.Clientset),
 		configs:       make(map[unversioned.GroupVersion]*restclient.Config),
 		fedClientSets: make(map[unversioned.GroupVersion]fed_clientset.Interface),
@@ -40,7 +39,6 @@ func NewClientCache(loader clientcmd.ClientConfig) *ClientCache {
 // is invoked only once
 type ClientCache struct {
 	loader        clientcmd.ClientConfig
-	clients       map[unversioned.GroupVersion]*client.Client
 	clientsets    map[unversioned.GroupVersion]*internalclientset.Clientset
 	fedClientSets map[unversioned.GroupVersion]fed_clientset.Interface
 	configs       map[unversioned.GroupVersion]*restclient.Config
@@ -130,40 +128,6 @@ func (c *ClientCache) ClientSetForVersion(version *unversioned.GroupVersion) (*i
 	}
 
 	return clientset, nil
-}
-
-// ClientForVersion initializes or reuses a client for the specified version, or returns an
-// error if that is not possible
-func (c *ClientCache) ClientForVersion(version *unversioned.GroupVersion) (*client.Client, error) {
-	if version != nil {
-		if client, ok := c.clients[*version]; ok {
-			return client, nil
-		}
-	}
-	config, err := c.ClientConfigForVersion(version)
-	if err != nil {
-		return nil, err
-	}
-
-	kubeclient, err := client.New(config)
-	if err != nil {
-		return nil, err
-	}
-	c.clients[*config.GroupVersion] = kubeclient
-
-	// `version` does not necessarily equal `config.Version`.  However, we know that if we call this method again with
-	// `version`, we should get a client based on the same config we just found.  There's no guarantee that a client
-	// is copiable, so create a new client and save it in the cache.
-	if version != nil {
-		configCopy := *config
-		kubeclient, err := client.New(&configCopy)
-		if err != nil {
-			return nil, err
-		}
-		c.clients[*version] = kubeclient
-	}
-
-	return kubeclient, nil
 }
 
 func (c *ClientCache) FederationClientSetForVersion(version *unversioned.GroupVersion) (fed_clientset.Interface, error) {

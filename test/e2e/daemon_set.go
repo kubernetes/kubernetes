@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	clientsetadapter "k8s.io/kubernetes/pkg/client/unversioned/adapters/internalclientset"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -115,7 +116,7 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 		Expect(err).NotTo(HaveOccurred())
 		defer func() {
 			framework.Logf("Check that reaper kills all daemon pods for %s", dsName)
-			dsReaper, err := kubectl.ReaperFor(extensions.Kind("DaemonSet"), c)
+			dsReaper, err := kubectl.ReaperFor(extensions.Kind("DaemonSet"), clientsetadapter.FromUnversionedClient(c))
 			Expect(err).NotTo(HaveOccurred())
 			err = dsReaper.Stop(ns, dsName, 0, nil)
 			Expect(err).NotTo(HaveOccurred())

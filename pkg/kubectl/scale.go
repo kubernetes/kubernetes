@@ -49,7 +49,7 @@ type Scaler interface {
 	ScaleSimple(namespace, name string, preconditions *ScalePrecondition, newSize uint) (updatedResourceVersion string, err error)
 }
 
-func ScalerFor(kind unversioned.GroupKind, c *internalclientset.Clientset) (Scaler, error) {
+func ScalerFor(kind unversioned.GroupKind, c internalclientset.Interface) (Scaler, error) {
 	switch kind {
 	case api.Kind("ReplicationController"):
 		return &ReplicationControllerScaler{c.Core()}, nil
