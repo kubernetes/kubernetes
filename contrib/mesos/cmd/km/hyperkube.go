@@ -138,7 +138,7 @@ func (hk *HyperKube) Run(args []string) error {
 			baseCommand = baseCommand + " " + serverName
 			args = args[1:]
 		} else {
-			err = errors.New("No server specified")
+			err = errors.New("no server specified")
 			hk.Printf("Error: %v\n\n", err)
 			hk.Usage()
 			return err

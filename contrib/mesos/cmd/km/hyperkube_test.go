@@ -48,7 +48,7 @@ func testServerError(n string) *Server {
 		Long:        fmt.Sprintf("A simple server named %s that returns an error", n),
 		Run: func(s *Server, args []string) error {
 			s.hk.Printf("%s Run\n", s.Name())
-			return errors.New("Server returning error")
+			return errors.New("server returning error")
 		},
 	}
 }
@@ -90,7 +90,7 @@ func TestLinkRun(t *testing.T) {
 
 func TestTopNoArgs(t *testing.T) {
 	x := runFull(t, "hyperkube")
-	assert.EqualError(t, x.err, "No server specified")
+	assert.EqualError(t, x.err, "no server specified")
 }
 
 func TestBadServer(t *testing.T) {
@@ -140,5 +140,5 @@ func TestServerFlagsBad(t *testing.T) {
 func TestServerError(t *testing.T) {
 	x := runFull(t, "hyperkube test-error")
 	assert.Contains(t, x.output, "test-error Run")
-	assert.EqualError(t, x.err, "Server returning error")
+	assert.EqualError(t, x.err, "server returning error")
 }
