@@ -14,7 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// +k8s:deepcopy-gen=package,register
-
-// +groupName=certificates.k8s.io
-package certificates
+// Package kuberuntime contains an implementation of kubecontainer.Runtime using
+// the interface in pkg/kubelet/api/services.go.
+package kuberuntime

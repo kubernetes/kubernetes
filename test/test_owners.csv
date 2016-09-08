@@ -92,7 +92,7 @@ Docker Containers should be able to override the image's default commmand (docke
 Docker Containers should use the image defaults if command and args are blank,vishh,0
 Downward API should create a pod that prints his name and namespace,nhlfr,0
 Downward API should provide container's limits.cpu/memory and requests.cpu/memory as env vars,deads2k,1
-Downward API should provide default limits.cpu/memory from node capacity,derekwaynecarr,0
+Downward API should provide default limits.cpu/memory from node allocatable,derekwaynecarr,0
 Downward API should provide pod IP as an env var,nhlfr,0
 Downward API should provide pod name and namespace as env vars,nhlfr,0
 Downward API volume should provide container's cpu limit,smarterclayton,1

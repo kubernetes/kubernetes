@@ -23,12 +23,13 @@ Most consumers should use the Config object to create a Client:
 
     import (
       client "k8s.io/kubernetes/pkg/client/unversioned"
+      "k8s.io/kubernetes/pkg/client/restclient"
       "k8s.io/kubernetes/pkg/api"
     )
 
     [...]
 
-    config := &client.Config{
+    config := &restclient.Config{
       Host:     "http://localhost:8080",
       Username: "test",
       Password: "password",
@@ -44,7 +45,7 @@ Most consumers should use the Config object to create a Client:
 
 More advanced consumers may wish to provide their own transport via a http.RoundTripper:
 
-    config := &client.Config{
+    config := &restclient.Config{
       Host:      "https://localhost:8080",
       Transport: oauthclient.Transport(),
     }

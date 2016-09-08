@@ -596,6 +596,9 @@ func getVirtualMachineDevices(cfg *VSphereConfig, ctx context.Context, c *govmom
 
 // Removes SCSI controller which is latest attached to VM.
 func cleanUpController(newSCSIController types.BaseVirtualDevice, vmDevices object.VirtualDeviceList, vm *object.VirtualMachine, ctx context.Context) error {
+	if newSCSIController == nil || vmDevices == nil || vm == nil {
+		return nil
+	}
 	ctls := vmDevices.SelectByType(newSCSIController)
 	if len(ctls) < 1 {
 		return ErrNoDevicesFound

@@ -251,7 +251,12 @@ func (nc *NamespaceController) reconcileNamespace(namespace string) {
 	}
 	baseNamespace := baseNamespaceObj.(*api_v1.Namespace)
 	if baseNamespace.DeletionTimestamp != nil {
-		nc.delete(baseNamespace)
+		if err := nc.delete(baseNamespace); err != nil {
+			glog.Errorf("Failed to delete %s: %v", namespace, err)
+			nc.eventRecorder.Eventf(baseNamespace, api.EventTypeNormal, "DeleteFailed",
+				"Namespace delete failed: %v", err)
+			nc.deliverNamespace(namespace, 0, true)
+		}
 		return
 	}
 
@@ -320,7 +325,8 @@ func (nc *NamespaceController) reconcileNamespace(namespace string) {
 	nc.deliverNamespace(namespace, nc.namespaceReviewDelay, false)
 }
 
-func (nc *NamespaceController) delete(namespace *api_v1.Namespace) {
+// delete  deletes the given namespace or returns error if the deletion was not complete.
+func (nc *NamespaceController) delete(namespace *api_v1.Namespace) error {
 	// Set Terminating status.
 	updatedNamespace := &api_v1.Namespace{
 		ObjectMeta: namespace.ObjectMeta,
@@ -333,13 +339,33 @@ func (nc *NamespaceController) delete(namespace *api_v1.Namespace) {
 		nc.eventRecorder.Event(namespace, api.EventTypeNormal, "DeleteNamespace", fmt.Sprintf("Marking for deletion"))
 		_, err := nc.federatedApiClient.Core().Namespaces().Update(updatedNamespace)
 		if err != nil {
-			glog.Errorf("Failed to update namespace %s: %v", updatedNamespace.Name, err)
-			nc.deliverNamespace(namespace.Name, 0, true)
-			return
+			return fmt.Errorf("failed to update namespace: %v", err)
 		}
 	}
 
-	// TODO: delete all namespace content.
+	// Right now there is just 5 types of objects: ReplicaSet, Secret, Ingress, Events and Service.
+	// Temporarly these items are simply deleted one by one to squeeze this code into 1.4.
+	// TODO: Make it generic (like in the regular namespace controller) and parallel.
+	err := nc.federatedApiClient.Core().Services(namespace.Name).DeleteCollection(&api.DeleteOptions{}, api.ListOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to delete service list: %v", err)
+	}
+	err = nc.federatedApiClient.Extensions().ReplicaSets(namespace.Name).DeleteCollection(&api.DeleteOptions{}, api.ListOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to delete replicaset list from namespace: %v", err)
+	}
+	err = nc.federatedApiClient.Core().Secrets(namespace.Name).DeleteCollection(&api.DeleteOptions{}, api.ListOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to delete secret list from namespace: %v", err)
+	}
+	err = nc.federatedApiClient.Extensions().Ingresses(namespace.Name).DeleteCollection(&api.DeleteOptions{}, api.ListOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to delete ingresses list from namespace: %v", err)
+	}
+	err = nc.federatedApiClient.Core().Events(namespace.Name).DeleteCollection(&api.DeleteOptions{}, api.ListOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to delete events list from namespace: %v", err)
+	}
 
 	// Remove kube_api.FinalzerKubernetes
 	if len(updatedNamespace.Spec.Finalizers) != 0 {
@@ -355,21 +381,19 @@ func (nc *NamespaceController) delete(namespace *api_v1.Namespace) {
 		}
 		_, err := nc.federatedApiClient.Core().Namespaces().Finalize(updatedNamespace)
 		if err != nil {
-			glog.Errorf("Failed to update namespace %s: %v", updatedNamespace.Name, err)
-			nc.deliverNamespace(namespace.Name, 0, true)
-			return
+			return fmt.Errorf("failed to finalize namespace: %v", err)
 		}
 	}
 
 	// TODO: What about namespaces in subclusters ???
-	err := nc.federatedApiClient.Core().Namespaces().Delete(updatedNamespace.Name, &api.DeleteOptions{})
+	err = nc.federatedApiClient.Core().Namespaces().Delete(updatedNamespace.Name, &api.DeleteOptions{})
 	if err != nil {
 		// Its all good if the error is not found error. That means it is deleted already and we do not have to do anything.
 		// This is expected when we are processing an update as a result of namespace finalizer deletion.
 		// The process that deleted the last finalizer is also going to delete the namespace and we do not have to do anything.
 		if !errors.IsNotFound(err) {
-			glog.Errorf("Failed to delete namespace %s: %v", namespace.Name, err)
-			nc.deliverNamespace(namespace.Name, 0, true)
+			return fmt.Errorf("failed to delete namespace: %v", err)
 		}
 	}
+	return nil
 }

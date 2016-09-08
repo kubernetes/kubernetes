@@ -38,7 +38,7 @@ const (
 	scheduledJobTimeout = 5 * time.Minute
 )
 
-var _ = framework.KubeDescribe("ScheduledJob", func() {
+var _ = framework.KubeDescribe("[Feature:ScheduledJob]", func() {
 	options := framework.FrameworkOptions{
 		ClientQPS:    20,
 		ClientBurst:  50,

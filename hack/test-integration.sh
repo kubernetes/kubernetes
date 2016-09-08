@@ -22,14 +22,17 @@ set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 
+# For help output
+ARGHELP=""
+if [[ "$#" -gt 0 ]]; then
+    ARGHELP="WHAT='$@'"
+fi
+
 echo "NOTE: $0 has been replaced by 'make test-integration'"
 echo
 echo "The equivalent of this invocation is: "
-echo "    make test-integration"
+echo "    make test-integration ${ARGHELP}"
 echo
 echo
-echo make --no-print-directory -C "${KUBE_ROOT}" test-integration
-echo
-echo
-make --no-print-directory -C "${KUBE_ROOT}" test-integration
+make --no-print-directory -C "${KUBE_ROOT}" test-integration WHAT="$*"
 

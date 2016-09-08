@@ -75,7 +75,7 @@ func (m *MockExecutorDriver) SendFrameworkMessage(msg string) (mesosproto.Status
 
 func NewTestKubernetesExecutor() *Executor {
 	return New(Config{
-		Docker:   dockertools.ConnectToDockerOrDie("fake://", 0),
+		Docker:   dockertools.CreateDockerClientOrDie("fake://", 0),
 		Registry: newFakeRegistry(),
 	})
 }
