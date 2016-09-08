@@ -38,6 +38,10 @@ func (c *FakeExtensions) Ingresses(namespace string) unversioned.IngressInterfac
 	return &FakeIngresses{c, namespace}
 }
 
+func (c *FakeExtensions) NetworkPolicies(namespace string) unversioned.NetworkPolicyInterface {
+	return &FakeNetworkPolicies{c, namespace}
+}
+
 func (c *FakeExtensions) PodSecurityPolicies() unversioned.PodSecurityPolicyInterface {
 	return &FakePodSecurityPolicies{c}
 }
