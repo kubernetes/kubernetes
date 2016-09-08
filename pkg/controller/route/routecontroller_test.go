@@ -21,6 +21,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang/glog"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/client/testing/core"
@@ -55,7 +57,7 @@ func TestIsResponsibleForRoute(t *testing.T) {
 		if err != nil {
 			t.Errorf("%d. Error in test case: unparsable cidr %q", i, testCase.clusterCIDR)
 		}
-		rc := New(nil, nil, myClusterName, cidr)
+		rc := New(nil, nil, myClusterName, cidr, 0)
 		route := &cloudprovider.Route{
 			Name:            testCase.routeName,
 			TargetInstance:  "doesnt-matter-for-this-test",
@@ -74,110 +76,64 @@ func TestReconcile(t *testing.T) {
 	nodeNoCidr := api.Node{ObjectMeta: api.ObjectMeta{Name: "node-2", UID: "02"}, Spec: api.NodeSpec{PodCIDR: ""}}
 
 	testCases := []struct {
-		nodes                      []api.Node
+		node                       api.Node
 		initialRoutes              []*cloudprovider.Route
 		expectedRoutes             []*cloudprovider.Route
-		expectedNetworkUnavailable []bool
+		expectedNetworkUnavailable bool
 		clientset                  *fake.Clientset
+		statusType                 StatusType
 	}{
-		// 2 nodes, routes already there
+		// Add a node
 		{
-			nodes: []api.Node{
-				node1,
-				node2,
-			},
-			initialRoutes: []*cloudprovider.Route{
-				{cluster + "-01", "node-1", "10.120.0.0/24"},
-				{cluster + "-02", "node-2", "10.120.1.0/24"},
-			},
-			expectedRoutes: []*cloudprovider.Route{
-				{cluster + "-01", "node-1", "10.120.0.0/24"},
-				{cluster + "-02", "node-2", "10.120.1.0/24"},
-			},
-			expectedNetworkUnavailable: []bool{true, true},
-			clientset:                  fake.NewSimpleClientset(&api.NodeList{Items: []api.Node{node1, node2}}),
-		},
-		// 2 nodes, one route already there
-		{
-			nodes: []api.Node{
-				node1,
-				node2,
-			},
-			initialRoutes: []*cloudprovider.Route{
-				{cluster + "-01", "node-1", "10.120.0.0/24"},
-			},
-			expectedRoutes: []*cloudprovider.Route{
-				{cluster + "-01", "node-1", "10.120.0.0/24"},
-				{cluster + "-02", "node-2", "10.120.1.0/24"},
-			},
-			expectedNetworkUnavailable: []bool{true, true},
-			clientset:                  fake.NewSimpleClientset(&api.NodeList{Items: []api.Node{node1, node2}}),
-		},
-		// 2 nodes, no routes yet
-		{
-			nodes: []api.Node{
-				node1,
-				node2,
-			},
+			node:          node1,
 			initialRoutes: []*cloudprovider.Route{},
 			expectedRoutes: []*cloudprovider.Route{
-				{cluster + "-01", "node-1", "10.120.0.0/24"},
-				{cluster + "-02", "node-2", "10.120.1.0/24"},
+				{cluster + "-01", node1.Name, node1.Spec.PodCIDR},
 			},
-			expectedNetworkUnavailable: []bool{true, true},
-			clientset:                  fake.NewSimpleClientset(&api.NodeList{Items: []api.Node{node1, node2}}),
+			expectedNetworkUnavailable: true,
+			clientset:                  fake.NewSimpleClientset(&api.NodeList{Items: []api.Node{node1}}),
+			statusType:                 statusAdd,
 		},
-		// 2 nodes, a few too many routes
+		// Remove a node
 		{
-			nodes: []api.Node{
-				node1,
-				node2,
-			},
+			node: node1,
 			initialRoutes: []*cloudprovider.Route{
-				{cluster + "-01", "node-1", "10.120.0.0/24"},
-				{cluster + "-02", "node-2", "10.120.1.0/24"},
-				{cluster + "-03", "node-3", "10.120.2.0/24"},
-				{cluster + "-04", "node-4", "10.120.3.0/24"},
+				{cluster + "-01", node1.Name, node1.Spec.PodCIDR},
+				{cluster + "-02", node2.Name, node2.Spec.PodCIDR},
 			},
 			expectedRoutes: []*cloudprovider.Route{
-				{cluster + "-01", "node-1", "10.120.0.0/24"},
-				{cluster + "-02", "node-2", "10.120.1.0/24"},
+				{cluster + "-02", node2.Name, node2.Spec.PodCIDR},
 			},
-			expectedNetworkUnavailable: []bool{true, true},
+			expectedNetworkUnavailable: true,
 			clientset:                  fake.NewSimpleClientset(&api.NodeList{Items: []api.Node{node1, node2}}),
+			statusType:                 statusDelete,
 		},
-		// 2 nodes, 2 routes, but only 1 is right
+		// Update a node, add CIDR
 		{
-			nodes: []api.Node{
-				node1,
-				node2,
-			},
+			node: node1,
 			initialRoutes: []*cloudprovider.Route{
-				{cluster + "-01", "node-1", "10.120.0.0/24"},
-				{cluster + "-03", "node-3", "10.120.2.0/24"},
+				{cluster + "-02", node2.Name, node2.Spec.PodCIDR},
 			},
 			expectedRoutes: []*cloudprovider.Route{
-				{cluster + "-01", "node-1", "10.120.0.0/24"},
-				{cluster + "-02", "node-2", "10.120.1.0/24"},
+				{cluster + "-01", node1.Name, node1.Spec.PodCIDR},
+				{cluster + "-02", node2.Name, node2.Spec.PodCIDR},
 			},
-			expectedNetworkUnavailable: []bool{true, true},
+			expectedNetworkUnavailable: true,
 			clientset:                  fake.NewSimpleClientset(&api.NodeList{Items: []api.Node{node1, node2}}),
+			statusType:                 statusUpdate,
 		},
-		// 2 nodes, one node without CIDR assigned.
+		// Added node without CIDR assigned.
 		{
-			nodes: []api.Node{
-				node1,
-				nodeNoCidr,
-			},
-			initialRoutes: []*cloudprovider.Route{},
-			expectedRoutes: []*cloudprovider.Route{
-				{cluster + "-01", "node-1", "10.120.0.0/24"},
-			},
-			expectedNetworkUnavailable: []bool{true, false},
-			clientset:                  fake.NewSimpleClientset(&api.NodeList{Items: []api.Node{node1, nodeNoCidr}}),
+			node:                       nodeNoCidr,
+			initialRoutes:              []*cloudprovider.Route{},
+			expectedRoutes:             []*cloudprovider.Route{},
+			expectedNetworkUnavailable: false,
+			clientset:                  fake.NewSimpleClientset(&api.NodeList{Items: []api.Node{nodeNoCidr}}),
+			statusType:                 statusAdd,
 		},
 	}
 	for i, testCase := range testCases {
+		glog.Infof("Testcase: %d\n", i)
 		cloud := &fakecloud.FakeCloud{RouteMap: make(map[string]*fakecloud.FakeRoute)}
 		for _, route := range testCase.initialRoutes {
 			fakeRoute := &fakecloud.FakeRoute{}
@@ -190,8 +146,12 @@ func TestReconcile(t *testing.T) {
 			t.Error("Error in test: fakecloud doesn't support Routes()")
 		}
 		_, cidr, _ := net.ParseCIDR("10.120.0.0/16")
-		rc := New(routes, testCase.clientset, cluster, cidr)
-		if err := rc.reconcile(testCase.nodes, testCase.initialRoutes); err != nil {
+		rc := New(routes, testCase.clientset, cluster, cidr, 0)
+		nodeStatus := NodeStatus{
+			node:   &testCase.node,
+			status: testCase.statusType,
+		}
+		if err := rc.reconcile(nodeStatus, testCase.initialRoutes); err != nil {
 			t.Errorf("%d. Error from rc.reconcile(): %v", i, err)
 		}
 		for _, action := range testCase.clientset.Actions() {
@@ -201,22 +161,12 @@ func TestReconcile(t *testing.T) {
 				if condition == nil {
 					t.Errorf("%d. Missing NodeNetworkUnavailable condition for Node %v", i, node.Name)
 				} else {
-					check := func(index int) bool {
-						return (condition.Status == api.ConditionFalse) == testCase.expectedNetworkUnavailable[index]
+					check := func() bool {
+						return (condition.Status == api.ConditionFalse) == testCase.expectedNetworkUnavailable
 					}
-					index := -1
-					for j := range testCase.nodes {
-						if testCase.nodes[j].Name == node.Name {
-							index = j
-						}
-					}
-					if index == -1 {
-						// Something's wrong
-						continue
-					}
-					if !check(index) {
+					if !check() {
 						t.Errorf("%d. Invalid NodeNetworkUnavailable condition for Node %v, expected %v, got %v",
-							i, node.Name, testCase.expectedNetworkUnavailable[index], (condition.Status == api.ConditionFalse))
+							i, node.Name, testCase.expectedNetworkUnavailable, (condition.Status == api.ConditionFalse))
 					}
 				}
 			}
