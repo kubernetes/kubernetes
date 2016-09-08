@@ -314,7 +314,7 @@ func (s *ProxyServer) Run() error {
 	}
 
 	// Tune conntrack, if requested
-	if s.Conntracker != nil {
+	if s.Conntracker != nil && runtime.GOOS != "windows" {
 		max, err := getConntrackMax(s.Config)
 		if err != nil {
 			return err

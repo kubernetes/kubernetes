@@ -37,7 +37,7 @@ func (proxier *Proxier) openOnePortal(portal portal, protocol api.Protocol, prox
 	}
 
 	// Add IP address to "vEthernet (HNSTransparent)" so that portproxy could be used to redirect the traffic
-	args := proxier.netshIpv4AddressArgs(portal.ip)
+	args := proxier.netshIpv4AddressAddArgs(portal.ip)
 	existed, err := proxier.netsh.EnsureIPAddress(args)
 
 	if err != nil {
@@ -48,7 +48,7 @@ func (proxier *Proxier) openOnePortal(portal portal, protocol api.Protocol, prox
 		glog.V(3).Infof("Added ip address to HNSTransparent interface for service %q on %s %s:%d", name, protocol, portal.ip, portal.port)
 	}
 
-	args = proxier.netshPortProxyArgs(portal.ip, portal.port, proxyIP, proxyPort, name)
+	args = proxier.netshPortProxyAddArgs(portal.ip, portal.port, proxyIP, proxyPort, name)
 	existed, err = proxier.netsh.EnsurePortProxyRule(args)
 
 	if err != nil {
@@ -68,7 +68,7 @@ func (proxier *Proxier) openNodePort(nodePort int, protocol api.Protocol, proxyI
 		return err
 	}
 
-	args := proxier.netshPortProxyArgs(localhostIPv4, nodePort, proxyIP, proxyPort, name)
+	args := proxier.netshPortProxyAddArgs(localhostIPv4, nodePort, proxyIP, proxyPort, name)
 	existed, err := proxier.netsh.EnsurePortProxyRule(args)
 
 	if err != nil {
@@ -93,13 +93,13 @@ func (proxier *Proxier) closeOnePortal(portal portal, protocol api.Protocol, pro
 		}
 	}
 
-	args := proxier.netshIpv4AddressArgs(portal.ip)
+	args := proxier.netshIpv4AddressDeleteArgs(portal.ip)
 	if err := proxier.netsh.DeleteIPAddress(args); err != nil {
 		glog.Errorf("Failed to delete IP address for service %q", name)
 		el = append(el, err)
 	}
 
-	args = proxier.netshPortProxyArgs(portal.ip, portal.port, proxyIP, proxyPort, name)
+	args = proxier.netshPortProxyDeleteArgs(portal.ip, portal.port, proxyIP, proxyPort, name)
 	if err := proxier.netsh.DeletePortProxyRule(args); err != nil {
 		glog.Errorf("Failed to delete portproxy rule for service %q", name)
 		el = append(el, err)
@@ -111,7 +111,7 @@ func (proxier *Proxier) closeOnePortal(portal portal, protocol api.Protocol, pro
 func (proxier *Proxier) closeNodePort(nodePort int, protocol api.Protocol, proxyIP net.IP, proxyPort int, name proxy.ServicePortName) []error {
 	el := []error{}
 
-	args := proxier.netshPortProxyArgs(localhostIPv4, nodePort, proxyIP, proxyPort, name)
+	args := proxier.netshPortProxyDeleteArgs(localhostIPv4, nodePort, proxyIP, proxyPort, name)
 	if err := proxier.netsh.DeletePortProxyRule(args); err != nil {
 		glog.Errorf("Failed to delete portproxy rule for service %q", name)
 		el = append(el, err)
@@ -124,8 +124,9 @@ func (proxier *Proxier) closeNodePort(nodePort int, protocol api.Protocol, proxy
 	return el
 }
 
-func (proxier *Proxier) netshPortProxyArgs(destIP net.IP, destPort int, proxyIP net.IP, proxyPort int, service proxy.ServicePortName) []string {
+func (proxier *Proxier) netshPortProxyAddArgs(destIP net.IP, destPort int, proxyIP net.IP, proxyPort int, service proxy.ServicePortName) []string {
 	args := []string{
+		"interface", "portproxy", "add", "v4tov4",
 		"listenaddress=", destIP.String(),
 		"listenPort=", strconv.Itoa(destPort),
 		"connectaddress=", proxyIP.String(),
@@ -135,8 +136,31 @@ func (proxier *Proxier) netshPortProxyArgs(destIP net.IP, destPort int, proxyIP 
 	return args
 }
 
-func (proxier *Proxier) netshIpv4AddressArgs(destIP net.IP) []string {
+func (proxier *Proxier) netshIpv4AddressAddArgs(destIP net.IP) []string {
 	args := []string{
+		"interface", "ipv4", "add", "address",
+		"name=", "vEthernet (HNSTransparent)",
+		"address=", destIP.String(),
+	}
+
+	return args
+}
+
+func (proxier *Proxier) netshPortProxyDeleteArgs(destIP net.IP, destPort int, proxyIP net.IP, proxyPort int, service proxy.ServicePortName) []string {
+	args := []string{
+		"interface", "portproxy", "delete", "v4tov4",
+		"listenaddress=", destIP.String(),
+		"listenPort=", strconv.Itoa(destPort),
+		"connectaddress=", proxyIP.String(),
+		"connectPort=", strconv.Itoa(proxyPort),
+	}
+
+	return args
+}
+
+func (proxier *Proxier) netshIpv4AddressDeleteArgs(destIP net.IP) []string {
+	args := []string{
+		"interface", "ipv4", "delete", "address",
 		"name=", "vEthernet (HNSTransparent)",
 		"address=", destIP.String(),
 	}

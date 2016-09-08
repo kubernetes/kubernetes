@@ -19,6 +19,7 @@ package userspace
 import (
 	"fmt"
 	"net"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -34,7 +35,7 @@ import (
 
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/iptables"
-	"k8s.io/kubernetes/pkg/util/runtime"
+	kruntime "k8s.io/kubernetes/pkg/util/runtime"
 )
 
 type portal struct {
@@ -168,13 +169,15 @@ func createProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables
 		proxyPorts = newPortAllocator(utilnet.PortRange{})
 	}
 	// Set up the iptables foundations we need.
-	if err := iptablesInit(iptables); err != nil {
-		return nil, fmt.Errorf("failed to initialize iptables: %v", err)
-	}
-	// Flush old iptables rules (since the bound ports will be invalid after a restart).
-	// When OnUpdate() is first called, the rules will be recreated.
-	if err := iptablesFlush(iptables); err != nil {
-		return nil, fmt.Errorf("failed to flush iptables: %v", err)
+	if runtime.GOOS != "windows" {
+		if err := iptablesInit(iptables); err != nil {
+			return nil, fmt.Errorf("failed to initialize iptables: %v", err)
+		}
+		// Flush old iptables rules (since the bound ports will be invalid after a restart).
+		// When OnUpdate() is first called, the rules will be recreated.
+		if err := iptablesFlush(iptables); err != nil {
+			return nil, fmt.Errorf("failed to flush iptables: %v", err)
+		}
 	}
 	return &Proxier{
 		loadBalancer:   loadBalancer,
@@ -260,8 +263,10 @@ func CleanupLeftovers(ipt iptables.Interface) (encounteredError bool) {
 
 // Sync is called to immediately synchronize the proxier state to iptables
 func (proxier *Proxier) Sync() {
-	if err := iptablesInit(proxier.iptables); err != nil {
-		glog.Errorf("Failed to ensure iptables: %v", err)
+	if runtime.GOOS != "windows" {
+		if err := iptablesInit(proxier.iptables); err != nil {
+			glog.Errorf("Failed to ensure iptables: %v", err)
+		}
 	}
 	proxier.ensurePortals()
 	proxier.cleanupStaleStickySessions()
@@ -362,7 +367,7 @@ func (proxier *Proxier) addServiceOnPort(service proxy.ServicePortName, protocol
 
 	glog.V(2).Infof("Proxying for service %q on %s port %d", service, protocol, portNum)
 	go func(service proxy.ServicePortName, proxier *Proxier) {
-		defer runtime.HandleCrash()
+		defer kruntime.HandleCrash()
 		atomic.AddInt32(&proxier.numProxyLoops, 1)
 		sock.ProxyLoop(service, si, proxier)
 		atomic.AddInt32(&proxier.numProxyLoops, -1)
