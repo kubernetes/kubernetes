@@ -650,7 +650,8 @@ func (c *cacheWatcher) add(event watchCacheEvent) {
 		c.forget(false)
 		c.stop()
 	}
-	glog.V(2).Infof("cacheWatcher add function blocked processing for %v", time.Since(startTime))
+	glog.V(2).Infof("cacheWatcher add function blocked processing of %v for %v",
+		reflect.TypeOf(event.Object).String(), time.Since(startTime))
 }
 
 func (c *cacheWatcher) sendWatchCacheEvent(event watchCacheEvent) {
