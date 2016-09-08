@@ -166,15 +166,13 @@ type apiServerPetClient struct {
 
 // Get gets the pet in the pcb from the apiserver.
 func (p *apiServerPetClient) Get(pet *pcb) (*pcb, bool, error) {
-	found := true
 	ns := pet.parent.Namespace
 	pod, err := podClient(p.c, ns).Get(pet.pod.Name)
 	if errors.IsNotFound(err) {
-		found = false
-		err = nil
+		return nil, false, nil
 	}
-	if err != nil || !found {
-		return nil, found, err
+	if err != nil {
+		return nil, false, err
 	}
 	realPet := *pet
 	realPet.pod = pod
