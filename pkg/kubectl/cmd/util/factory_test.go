@@ -36,10 +36,11 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
+	testcore "k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
-	"k8s.io/kubernetes/pkg/client/unversioned/fake"
-	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
+	manualfake "k8s.io/kubernetes/pkg/client/unversioned/fake"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/labels"
@@ -262,9 +263,9 @@ func TestRefetchSchemaWhenValidationFails(t *testing.T) {
 	}
 	requests := map[string]int{}
 
-	c := &fake.RESTClient{
+	c := &manualfake.RESTClient{
 		NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
-		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+		Client: manualfake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case strings.HasPrefix(p, "/swaggerapi") && m == "GET":
 				requests[p] = requests[p] + 1
@@ -319,9 +320,9 @@ func TestValidateCachesSchema(t *testing.T) {
 	}
 	requests := map[string]int{}
 
-	c := &fake.RESTClient{
+	c := &manualfake.RESTClient{
 		NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
-		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+		Client: manualfake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case strings.HasPrefix(p, "/swaggerapi") && m == "GET":
 				requests[p] = requests[p] + 1
@@ -587,10 +588,7 @@ func TestGetFirstPod(t *testing.T) {
 
 	for i := range tests {
 		test := tests[i]
-		client := &testclient.Fake{}
-		client.PrependReactor("list", "pods", func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
-			return true, test.podList, nil
-		})
+		fake := fake.NewSimpleClientset(test.podList)
 		if len(test.watching) > 0 {
 			watcher := watch.NewFake()
 			for _, event := range test.watching {
@@ -601,11 +599,11 @@ func TestGetFirstPod(t *testing.T) {
 					go watcher.Modify(event.Object)
 				}
 			}
-			client.PrependWatchReactor("pods", testclient.DefaultWatchReactor(watcher, nil))
+			fake.PrependWatchReactor("pods", testcore.DefaultWatchReactor(watcher, nil))
 		}
 		selector := labels.Set(labelSet).AsSelector()
 
-		pod, numPods, err := GetFirstPod(client, api.NamespaceDefault, selector, 1*time.Minute, test.sortBy)
+		pod, numPods, err := GetFirstPod(fake.Core(), api.NamespaceDefault, selector, 1*time.Minute, test.sortBy)
 		if !test.expectedErr && err != nil {
 			t.Errorf("%s: unexpected error: %v", test.name, err)
 			continue

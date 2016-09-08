@@ -301,14 +301,6 @@ func NewAPIFactory() (*cmdutil.Factory, *testFactory, runtime.Codec, runtime.Neg
 
 			return kubectl.ShortcutExpander{RESTMapper: mapper}, typer, nil
 		},
-		Client: func() (*client.Client, error) {
-			// Swap out the HTTP client out of the client with the fake's version.
-			fakeClient := t.Client.(*fake.RESTClient)
-			c := client.NewOrDie(t.ClientConfig)
-			c.Client = fakeClient.Client
-			c.ExtensionsClient.Client = fakeClient.Client
-			return c, t.Err
-		},
 		ClientSet: func() (*internalclientset.Clientset, error) {
 			// Swap out the HTTP client out of the client with the fake's version.
 			fakeClient := t.Client.(*fake.RESTClient)
