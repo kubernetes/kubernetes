@@ -20,14 +20,14 @@ import (
 	authorizationapi "k8s.io/kubernetes/pkg/apis/authorization"
 )
 
-type SubjectAccessReviewExpansion interface {
-	Create(sar *authorizationapi.SubjectAccessReview) (result *authorizationapi.SubjectAccessReview, err error)
+type SelfSubjectAccessReviewExpansion interface {
+	Create(sar *authorizationapi.SelfSubjectAccessReview) (result *authorizationapi.SelfSubjectAccessReview, err error)
 }
 
-func (c *subjectAccessReviews) Create(sar *authorizationapi.SubjectAccessReview) (result *authorizationapi.SubjectAccessReview, err error) {
-	result = &authorizationapi.SubjectAccessReview{}
+func (c *selfSubjectAccessReviews) Create(sar *authorizationapi.SelfSubjectAccessReview) (result *authorizationapi.SelfSubjectAccessReview, err error) {
+	result = &authorizationapi.SelfSubjectAccessReview{}
 	err = c.client.Post().
-		Resource("subjectaccessreviews").
+		Resource("selfsubjectaccessreviews").
 		Body(sar).
 		Do().
 		Into(result)
