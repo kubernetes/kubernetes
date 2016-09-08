@@ -97,13 +97,15 @@ func (q *UniqueQueue) Replace(value TimedValue) bool {
 	return false
 }
 
-// Removes the value from the queue, so Get() call won't return it, and allow subsequent addition
-// of the given value. If the value is not present does nothing and returns false.
-func (q *UniqueQueue) Remove(value string) bool {
+// Removes the value from the queue, but keeps it in the set, so it won't be added second time.
+// Returns true if something was removed.
+func (q *UniqueQueue) RemoveFromQueue(value string) bool {
 	q.lock.Lock()
 	defer q.lock.Unlock()
 
-	q.set.Delete(value)
+	if !q.set.Has(value) {
+		return false
+	}
 	for i, val := range q.queue {
 		if val.Value == value {
 			heap.Remove(&q.queue, i)
@@ -111,6 +113,25 @@ func (q *UniqueQueue) Remove(value string) bool {
 		}
 	}
 	return false
+}
+
+// Removes the value from the queue, so Get() call won't return it, and allow subsequent addition
+// of the given value. If the value is not present does nothing and returns false.
+func (q *UniqueQueue) Remove(value string) bool {
+	q.lock.Lock()
+	defer q.lock.Unlock()
+
+	if !q.set.Has(value) {
+		return false
+	}
+	q.set.Delete(value)
+	for i, val := range q.queue {
+		if val.Value == value {
+			heap.Remove(&q.queue, i)
+			return true
+		}
+	}
+	return true
 }
 
 // Returns the oldest added value that wasn't returned yet.
@@ -196,7 +217,7 @@ func (q *RateLimitedTimedQueue) Try(fn ActionFunc) {
 			val.ProcessAt = now.Add(wait + 1)
 			q.queue.Replace(val)
 		} else {
-			q.queue.Remove(val.Value)
+			q.queue.RemoveFromQueue(val.Value)
 		}
 		val, ok = q.queue.Head()
 	}
