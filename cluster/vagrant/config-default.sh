@@ -105,6 +105,10 @@ if [ "${NETWORK_PROVIDER}" == "kubenet" ]; then
   CLUSTER_IP_RANGE="${CONTAINER_SUBNET}"
 fi
 
+# If enabled will provision local pv's for claim with volume.alpha annotation
+# kube-controller-manager will be started with flag --enable-hostpath-provisioner
+ENABLE_HOSTPATH_PROVISIONER="${ENABLE_HOSTPATH_PROVISIONER:-true}"
+
 # OpenContrail networking plugin specific settings
 OPENCONTRAIL_TAG="${OPENCONTRAIL_TAG:-R2.20}"
 OPENCONTRAIL_KUBERNETES_TAG="${OPENCONTRAIL_KUBERNETES_TAG:-master}"
