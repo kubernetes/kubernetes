@@ -127,12 +127,12 @@ func (proxier *Proxier) closeNodePort(nodePort int, protocol api.Protocol, proxy
 func (proxier *Proxier) netshPortProxyAddArgs(destIP net.IP, destPort int, proxyIP net.IP, proxyPort int, service proxy.ServicePortName) []string {
 	args := []string{
 		"interface", "portproxy", "add", "v4tov4",
-		"listenPort=", strconv.Itoa(destPort),
-		"connectaddress=", proxyIP.String(),
-		"connectPort=", strconv.Itoa(proxyPort),
+		"listenPort=" + strconv.Itoa(destPort),
+		"connectaddress=" + proxyIP.String(),
+		"connectPort=" + strconv.Itoa(proxyPort),
 	}
 	if destIP != nil {
-		args = append(args, "listenaddress=", destIP.String())
+		args = append(args, "listenaddress="+destIP.String())
 	}
 
 	return args
@@ -141,8 +141,8 @@ func (proxier *Proxier) netshPortProxyAddArgs(destIP net.IP, destPort int, proxy
 func (proxier *Proxier) netshIpv4AddressAddArgs(destIP net.IP) []string {
 	args := []string{
 		"interface", "ipv4", "add", "address",
-		"name=", "vEthernet (HNSTransparent)",
-		"address=", destIP.String(),
+		"name=" + "vEthernet (HNSTransparent)",
+		"address=" + destIP.String(),
 	}
 
 	return args
@@ -151,10 +151,10 @@ func (proxier *Proxier) netshIpv4AddressAddArgs(destIP net.IP) []string {
 func (proxier *Proxier) netshPortProxyDeleteArgs(destIP net.IP, destPort int, proxyIP net.IP, proxyPort int, service proxy.ServicePortName) []string {
 	args := []string{
 		"interface", "portproxy", "delete", "v4tov4",
-		"listenaddress=", destIP.String(),
-		"listenPort=", strconv.Itoa(destPort),
-		"connectaddress=", proxyIP.String(),
-		"connectPort=", strconv.Itoa(proxyPort),
+		"listenaddress=" + destIP.String(),
+		"listenPort=" + strconv.Itoa(destPort),
+		"connectaddress=" + proxyIP.String(),
+		"connectPort=" + strconv.Itoa(proxyPort),
 	}
 
 	return args
@@ -163,8 +163,8 @@ func (proxier *Proxier) netshPortProxyDeleteArgs(destIP net.IP, destPort int, pr
 func (proxier *Proxier) netshIpv4AddressDeleteArgs(destIP net.IP) []string {
 	args := []string{
 		"interface", "ipv4", "delete", "address",
-		"name=", "vEthernet (HNSTransparent)",
-		"address=", destIP.String(),
+		"name=" + "vEthernet (HNSTransparent)",
+		"address=" + destIP.String(),
 	}
 
 	return args
