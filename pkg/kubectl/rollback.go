@@ -25,7 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/watch"
@@ -36,7 +36,7 @@ type Rollbacker interface {
 	Rollback(obj runtime.Object, updatedAnnotations map[string]string, toRevision int64) (string, error)
 }
 
-func RollbackerFor(kind unversioned.GroupKind, c client.Interface) (Rollbacker, error) {
+func RollbackerFor(kind unversioned.GroupKind, c internalclientset.Interface) (Rollbacker, error) {
 	switch kind {
 	case extensions.Kind("Deployment"):
 		return &DeploymentRollbacker{c}, nil
@@ -45,7 +45,7 @@ func RollbackerFor(kind unversioned.GroupKind, c client.Interface) (Rollbacker, 
 }
 
 type DeploymentRollbacker struct {
-	c client.Interface
+	c internalclientset.Interface
 }
 
 func (r *DeploymentRollbacker) Rollback(obj runtime.Object, updatedAnnotations map[string]string, toRevision int64) (string, error) {
@@ -66,7 +66,7 @@ func (r *DeploymentRollbacker) Rollback(obj runtime.Object, updatedAnnotations m
 	result := ""
 
 	// Get current events
-	events, err := r.c.Events(d.Namespace).List(api.ListOptions{})
+	events, err := r.c.Core().Events(d.Namespace).List(api.ListOptions{})
 	if err != nil {
 		return result, err
 	}
@@ -75,7 +75,7 @@ func (r *DeploymentRollbacker) Rollback(obj runtime.Object, updatedAnnotations m
 		return result, err
 	}
 	// Watch for the changes of events
-	watch, err := r.c.Events(d.Namespace).Watch(api.ListOptions{Watch: true, ResourceVersion: events.ResourceVersion})
+	watch, err := r.c.Core().Events(d.Namespace).Watch(api.ListOptions{Watch: true, ResourceVersion: events.ResourceVersion})
 	if err != nil {
 		return result, err
 	}

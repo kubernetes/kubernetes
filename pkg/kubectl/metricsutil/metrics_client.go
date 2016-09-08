@@ -25,7 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
 )
 
@@ -46,16 +46,16 @@ var (
 )
 
 type HeapsterMetricsClient struct {
-	*client.Client
+	SVCClient         coreclient.ServicesGetter
 	HeapsterNamespace string
 	HeapsterScheme    string
 	HeapsterService   string
 	HeapsterPort      string
 }
 
-func NewHeapsterMetricsClient(client *client.Client, namespace, scheme, service, port string) *HeapsterMetricsClient {
+func NewHeapsterMetricsClient(svcClient coreclient.ServicesGetter, namespace, scheme, service, port string) *HeapsterMetricsClient {
 	return &HeapsterMetricsClient{
-		Client:            client,
+		SVCClient:         svcClient,
 		HeapsterNamespace: namespace,
 		HeapsterScheme:    scheme,
 		HeapsterService:   service,
@@ -63,8 +63,8 @@ func NewHeapsterMetricsClient(client *client.Client, namespace, scheme, service,
 	}
 }
 
-func DefaultHeapsterMetricsClient(client *client.Client) *HeapsterMetricsClient {
-	return NewHeapsterMetricsClient(client, DefaultHeapsterNamespace, DefaultHeapsterScheme, DefaultHeapsterService, DefaultHeapsterPort)
+func DefaultHeapsterMetricsClient(svcClient coreclient.ServicesGetter) *HeapsterMetricsClient {
+	return NewHeapsterMetricsClient(svcClient, DefaultHeapsterNamespace, DefaultHeapsterScheme, DefaultHeapsterService, DefaultHeapsterPort)
 }
 
 func podMetricsUrl(namespace string, name string) (string, error) {
@@ -161,7 +161,7 @@ func (cli *HeapsterMetricsClient) GetPodMetrics(namespace string, podName string
 }
 
 func GetHeapsterMetrics(cli *HeapsterMetricsClient, path string, params map[string]string) ([]byte, error) {
-	return cli.Services(cli.HeapsterNamespace).
+	return cli.SVCClient.Services(cli.HeapsterNamespace).
 		ProxyGet(cli.HeapsterScheme, cli.HeapsterService, cli.HeapsterPort, path, params).
 		DoRaw()
 }

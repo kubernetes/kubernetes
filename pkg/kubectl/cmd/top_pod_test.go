@@ -24,8 +24,6 @@ import (
 	"testing"
 
 	metrics_api "k8s.io/heapster/metrics/apis/metrics/v1alpha1"
-	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
 	"net/url"
 )
@@ -61,7 +59,7 @@ func TestTopPodAllNamespacesMetrics(t *testing.T) {
 		}),
 	}
 	tf.Namespace = firstTestNamespace
-	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &unversioned.GroupVersion{Version: "v1"}}}
+	tf.ClientConfig = defaultClientConfig()
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdTopPod(f, buf)
@@ -120,7 +118,7 @@ func TestTopPodAllInNamespaceMetrics(t *testing.T) {
 		}),
 	}
 	tf.Namespace = testNamespace
-	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &unversioned.GroupVersion{Version: "v1"}}}
+	tf.ClientConfig = defaultClientConfig()
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdTopPod(f, buf)
@@ -171,7 +169,7 @@ func TestTopPodWithNameMetrics(t *testing.T) {
 		}),
 	}
 	tf.Namespace = testNamespace
-	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &unversioned.GroupVersion{Version: "v1"}}}
+	tf.ClientConfig = defaultClientConfig()
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdTopPod(f, buf)
@@ -224,7 +222,7 @@ func TestTopPodWithLabelSelectorMetrics(t *testing.T) {
 		}),
 	}
 	tf.Namespace = testNamespace
-	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &unversioned.GroupVersion{Version: "v1"}}}
+	tf.ClientConfig = defaultClientConfig()
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdTopPod(f, buf)
@@ -276,7 +274,7 @@ func TestTopPodWithContainersMetrics(t *testing.T) {
 		}),
 	}
 	tf.Namespace = testNamespace
-	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &unversioned.GroupVersion{Version: "v1"}}}
+	tf.ClientConfig = defaultClientConfig()
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdTopPod(f, buf)

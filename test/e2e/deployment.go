@@ -195,7 +195,7 @@ func stopDeploymentMaybeOverlap(c *clientset.Clientset, oldC client.Interface, n
 	Expect(err).NotTo(HaveOccurred())
 
 	framework.Logf("Deleting deployment %s", deploymentName)
-	reaper, err := kubectl.ReaperFor(extensions.Kind("Deployment"), oldC)
+	reaper, err := kubectl.ReaperFor(extensions.Kind("Deployment"), c)
 	Expect(err).NotTo(HaveOccurred())
 	timeout := 1 * time.Minute
 	err = reaper.Stop(ns, deployment.Name, timeout, api.NewDeleteOptions(0))
@@ -1114,10 +1114,10 @@ func testScaledRolloutDeployment(f *framework.Framework) {
 	first, err = c.Extensions().ReplicaSets(first.Namespace).Get(first.Name)
 	Expect(err).NotTo(HaveOccurred())
 
-	firstCond := client.ReplicaSetHasDesiredReplicas(f.Client.Extensions(), first)
+	firstCond := client.ReplicaSetHasDesiredReplicas(c.Extensions(), first)
 	wait.PollImmediate(10*time.Millisecond, 1*time.Minute, firstCond)
 
-	secondCond := client.ReplicaSetHasDesiredReplicas(f.Client.Extensions(), second)
+	secondCond := client.ReplicaSetHasDesiredReplicas(c.Extensions(), second)
 	wait.PollImmediate(10*time.Millisecond, 1*time.Minute, secondCond)
 
 	By(fmt.Sprintf("Updating the size (up) and template at the same time for deployment %q", deploymentName))
@@ -1175,10 +1175,10 @@ func testScaledRolloutDeployment(f *framework.Framework) {
 	newRs, err := deploymentutil.GetNewReplicaSet(deployment, c)
 	Expect(err).NotTo(HaveOccurred())
 
-	oldCond := client.ReplicaSetHasDesiredReplicas(f.Client.Extensions(), oldRs)
+	oldCond := client.ReplicaSetHasDesiredReplicas(c.Extensions(), oldRs)
 	wait.PollImmediate(10*time.Millisecond, 1*time.Minute, oldCond)
 
-	newCond := client.ReplicaSetHasDesiredReplicas(f.Client.Extensions(), newRs)
+	newCond := client.ReplicaSetHasDesiredReplicas(c.Extensions(), newRs)
 	wait.PollImmediate(10*time.Millisecond, 1*time.Minute, newCond)
 
 	By(fmt.Sprintf("Updating the size (down) and template at the same time for deployment %q", deploymentName))
