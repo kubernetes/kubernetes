@@ -826,6 +826,8 @@ type PodSecurityPolicyList struct {
 	Items []PodSecurityPolicy `json:"items"`
 }
 
+// +genclient=true
+
 type NetworkPolicy struct {
 	unversioned.TypeMeta `json:",inline"`
 	api.ObjectMeta       `json:"metadata,omitempty"`
