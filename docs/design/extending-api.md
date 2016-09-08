@@ -80,7 +80,7 @@ expected to be programmatically convertible to the name of the resource using
 the following conversion. Kinds are expected to be of the form
 `<CamelCaseKind>`, and the `APIVersion` for the object is expected to be
 `<api-group>/<api-version>`. To prevent collisions, it's expected that you'll
-use a fully qualified domain name for the API group, e.g. `example.com`.
+use a DNS name of at least three segments for the API group, e.g. `stable.example.com`.
 
 For example `stable.example.com/v1`
 
@@ -101,9 +101,9 @@ for ix := range kindName {
 }
 ```
 
-As a concrete example, the resource named `camel-case-kind.example.com` defines
+As a concrete example, the resource named `camel-case-kind.stable.example.com` defines
 resources of Kind `CamelCaseKind`, in the APIGroup with the prefix
-`example.com/...`.
+`stable.example.com/...`.
 
 The reason for this is to enable rapid lookup of a `ThirdPartyResource` object
 given the kind information. This is also the reason why `ThirdPartyResource` is
