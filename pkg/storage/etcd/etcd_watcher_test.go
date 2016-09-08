@@ -17,9 +17,7 @@ limitations under the License.
 package etcd
 
 import (
-	"math/rand"
 	rt "runtime"
-	"sync"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -555,36 +553,5 @@ func TestWatchPurposefulShutdown(t *testing.T) {
 	event, open := <-watching.ResultChan()
 	if open && event.Type != watch.Error {
 		t.Errorf("Unexpected event from stopped watcher: %#v", event)
-	}
-}
-
-func TestHighWaterMark(t *testing.T) {
-	var h HighWaterMark
-
-	for i := int64(10); i < 20; i++ {
-		if !h.Update(i) {
-			t.Errorf("unexpected false for %v", i)
-		}
-		if h.Update(i - 1) {
-			t.Errorf("unexpected true for %v", i-1)
-		}
-	}
-
-	m := int64(0)
-	wg := sync.WaitGroup{}
-	for i := 0; i < 300; i++ {
-		wg.Add(1)
-		v := rand.Int63()
-		go func(v int64) {
-			defer wg.Done()
-			h.Update(v)
-		}(v)
-		if v > m {
-			m = v
-		}
-	}
-	wg.Wait()
-	if m != int64(h) {
-		t.Errorf("unexpected value, wanted %v, got %v", m, int64(h))
 	}
 }
