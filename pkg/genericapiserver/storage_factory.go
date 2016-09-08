@@ -289,6 +289,7 @@ var specialDefaultResourcePrefixes = map[unversioned.GroupResource]string{
 	unversioned.GroupResource{Group: "", Resource: "endpoints"}:              "services/endpoints",
 	unversioned.GroupResource{Group: "", Resource: "nodes"}:                  "minions",
 	unversioned.GroupResource{Group: "", Resource: "services"}:               "services/specs",
+	unversioned.GroupResource{Group: "extensions", Resource: "ingresses"}:    "ingress",
 }
 
 func (s *DefaultStorageFactory) ResourcePrefix(groupResource unversioned.GroupResource) string {
