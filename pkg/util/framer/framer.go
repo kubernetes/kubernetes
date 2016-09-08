@@ -21,6 +21,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"io"
+	"io/ioutil"
 )
 
 type lengthDelimitedFrameWriter struct {
@@ -105,6 +106,11 @@ func (r *lengthDelimitedFrameReader) Read(data []byte) (int, error) {
 }
 
 func (r *lengthDelimitedFrameReader) Close() error {
+	// The underlying ReadCloser is usually http response body.
+	// We try to ensure that it is fully read and closed before we
+	// reconnect, so that we reuse the same TCP connection.
+	const maxBodySlurpSize = 2 << 10
+	io.Copy(ioutil.Discard, &io.LimitedReader{R: r.r, N: maxBodySlurpSize})
 	return r.r.Close()
 }
 
@@ -163,5 +169,10 @@ func (r *jsonFrameReader) Read(data []byte) (int, error) {
 }
 
 func (r *jsonFrameReader) Close() error {
+	// The underlying ReadCloser is usually http response body.
+	// We try to ensure that it is fully read and closed before we
+	// reconnect, so that we reuse the same TCP connection.
+	const maxBodySlurpSize = 2 << 10
+	io.Copy(ioutil.Discard, &io.LimitedReader{R: r.r, N: maxBodySlurpSize})
 	return r.r.Close()
 }
