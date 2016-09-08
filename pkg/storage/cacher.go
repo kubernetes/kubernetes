@@ -409,6 +409,12 @@ func (c *Cacher) triggerValues(event *watchCacheEvent) ([]string, bool) {
 	return result, len(result) > 0
 }
 
+// TODO: Most probably splitting this method to a separate thread will visibily
+// improve throughput of our watch machinery. So what we should do is to:
+// - OnEvent handler simply put an element to channel
+// - processEvent be another goroutine processing events from that channel
+// Additionally, if we make this channel buffered, cacher will be more resistant
+// to single watchers being slow - see cacheWatcher::add method.
 func (c *Cacher) processEvent(event watchCacheEvent) {
 	c.incoming <- event
 }
@@ -643,6 +649,7 @@ func (c *cacheWatcher) add(event *watchCacheEvent) {
 	// OK, block sending, but only for up to 5 seconds.
 	// cacheWatcher.add is called very often, so arrange
 	// to reuse timers instead of constantly allocating.
+	startTime := time.Now()
 	const timeout = 5 * time.Second
 	t, ok := timerPool.Get().(*time.Timer)
 	if ok {
@@ -667,6 +674,7 @@ func (c *cacheWatcher) add(event *watchCacheEvent) {
 		c.forget(false)
 		c.stop()
 	}
+	glog.V(2).Infof("cacheWatcher add function blocked processing for %v", time.Since(startTime))
 }
 
 func (c *cacheWatcher) sendWatchCacheEvent(event watchCacheEvent) {
