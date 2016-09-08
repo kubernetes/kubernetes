@@ -44,7 +44,7 @@ func (wd *WatcherDispatcher) register(watcher *watch.FakeWatcher) {
 	defer wd.Unlock()
 	wd.watchers = append(wd.watchers, watcher)
 	for _, event := range wd.eventsSoFar {
-		go watcher.Action(event.Type, event.Object)
+		watcher.Action(event.Type, event.Object)
 	}
 }
 
@@ -52,13 +52,9 @@ func (wd *WatcherDispatcher) register(watcher *watch.FakeWatcher) {
 func (wd *WatcherDispatcher) Add(obj runtime.Object) {
 	wd.Lock()
 	defer wd.Unlock()
-	event := &watch.Event{
-		Type:   watch.Added,
-		Object: obj,
-	}
-	wd.eventsSoFar = append(wd.eventsSoFar, event)
+	wd.eventsSoFar = append(wd.eventsSoFar, &watch.Event{Type: watch.Added, Object: obj})
 	for _, watcher := range wd.watchers {
-		go watcher.Add(obj)
+		watcher.Add(obj)
 	}
 }
 
@@ -66,13 +62,9 @@ func (wd *WatcherDispatcher) Add(obj runtime.Object) {
 func (wd *WatcherDispatcher) Modify(obj runtime.Object) {
 	wd.Lock()
 	defer wd.Unlock()
-	event := &watch.Event{
-		Type:   watch.Modified,
-		Object: obj,
-	}
-	wd.eventsSoFar = append(wd.eventsSoFar, event)
+	wd.eventsSoFar = append(wd.eventsSoFar, &watch.Event{Type: watch.Modified, Object: obj})
 	for _, watcher := range wd.watchers {
-		go watcher.Modify(obj)
+		watcher.Modify(obj)
 	}
 }
 
@@ -80,13 +72,9 @@ func (wd *WatcherDispatcher) Modify(obj runtime.Object) {
 func (wd *WatcherDispatcher) Delete(lastValue runtime.Object) {
 	wd.Lock()
 	defer wd.Unlock()
-	event := &watch.Event{
-		Type:   watch.Deleted,
-		Object: lastValue,
-	}
-	wd.eventsSoFar = append(wd.eventsSoFar, event)
+	wd.eventsSoFar = append(wd.eventsSoFar, &watch.Event{Type: watch.Deleted, Object: lastValue})
 	for _, watcher := range wd.watchers {
-		go watcher.Delete(lastValue)
+		watcher.Delete(lastValue)
 	}
 }
 
@@ -94,13 +82,9 @@ func (wd *WatcherDispatcher) Delete(lastValue runtime.Object) {
 func (wd *WatcherDispatcher) Error(errValue runtime.Object) {
 	wd.Lock()
 	defer wd.Unlock()
-	event := &watch.Event{
-		Type:   watch.Error,
-		Object: errValue,
-	}
-	wd.eventsSoFar = append(wd.eventsSoFar, event)
+	wd.eventsSoFar = append(wd.eventsSoFar, &watch.Event{Type: watch.Error, Object: errValue})
 	for _, watcher := range wd.watchers {
-		go watcher.Error(errValue)
+		watcher.Error(errValue)
 	}
 }
 
@@ -108,13 +92,9 @@ func (wd *WatcherDispatcher) Error(errValue runtime.Object) {
 func (wd *WatcherDispatcher) Action(action watch.EventType, obj runtime.Object) {
 	wd.Lock()
 	defer wd.Unlock()
-	event := &watch.Event{
-		Type:   action,
-		Object: obj,
-	}
-	wd.eventsSoFar = append(wd.eventsSoFar, event)
+	wd.eventsSoFar = append(wd.eventsSoFar, &watch.Event{Type: action, Object: obj})
 	for _, watcher := range wd.watchers {
-		go watcher.Action(action, obj)
+		watcher.Action(action, obj)
 	}
 }
 
@@ -127,7 +107,7 @@ func RegisterFakeWatch(resource string, client *core.Fake) *WatcherDispatcher {
 	}
 
 	client.AddWatchReactor(resource, func(action core.Action) (bool, watch.Interface, error) {
-		watcher := watch.NewFake()
+		watcher := watch.NewFakeWithChanSize(100)
 		dispatcher.register(watcher)
 		return true, watcher, nil
 	})

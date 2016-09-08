@@ -89,6 +89,12 @@ func NewFake() *FakeWatcher {
 	}
 }
 
+func NewFakeWithChanSize(size int) *FakeWatcher {
+	return &FakeWatcher{
+		result: make(chan Event, size),
+	}
+}
+
 // Stop implements Interface.Stop().
 func (f *FakeWatcher) Stop() {
 	f.Lock()
