@@ -1205,7 +1205,7 @@ func (plugin *mockVolumePlugin) GetMetrics() (*vol.Metrics, error) {
 
 // Recycler interfaces
 
-func (plugin *mockVolumePlugin) NewRecycler(pvName string, spec *vol.Spec) (vol.Recycler, error) {
+func (plugin *mockVolumePlugin) NewRecycler(pvName string, spec *vol.Spec, eventRecorder vol.RecycleEventRecorder) (vol.Recycler, error) {
 	if len(plugin.recycleCalls) > 0 {
 		// mockVolumePlugin directly implements Recycler interface
 		glog.V(4).Infof("mock plugin NewRecycler called, returning mock recycler")
