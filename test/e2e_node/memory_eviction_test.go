@@ -199,6 +199,19 @@ var _ = framework.KubeDescribe("MemoryEviction [Slow] [Serial] [Disruptive]", fu
 				_, pressure := api.GetNodeCondition(&node.Status, api.NodeMemoryPressure)
 				glog.Infof("node pressure condition: %s", pressure)
 
+				// NOTE/TODO(mtaufen): Also log (at least temporarily) the actual memory consumption on the node.
+				//                     I used this to plot memory usage from a successful test run and it looks the
+				//                     way I would expect. I want to see what the plot from a flake looks like.
+				summary, err := getNodeSummary()
+				if err != nil {
+					return err
+				}
+				if summary.Node.Memory.WorkingSetBytes != nil {
+					wset := *summary.Node.Memory.WorkingSetBytes
+					glog.Infof("Node's working set is (bytes): %v", wset)
+
+				}
+
 				if bestPh == api.PodRunning {
 					Expect(burstPh).NotTo(Equal(api.PodFailed), "burstable pod failed before best effort pod")
 					Expect(gteedPh).NotTo(Equal(api.PodFailed), "guaranteed pod failed before best effort pod")
