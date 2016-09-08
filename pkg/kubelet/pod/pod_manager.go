@@ -74,10 +74,9 @@ type Manager interface {
 	// associated static pods. This method sends deletion requests to the API
 	// server, but does NOT modify the internal pod storage in basicManager.
 	DeleteOrphanedMirrorPods()
-	// TranslatePodUID returns the UID which is the mirror pod or static pod
-	// of the pod with the given UID.  If the UID belongs to a mirror pod,
-	// returns the UID of its static pod.  If the UID belongs to a static pod,
-	// returns the UID of its mirror pod.  Otherwise, returns the original UID.
+	// TranslatePodUID returns the actual UID of a pod. If the UID belongs to
+	// a mirror pod, returns the UID of its static pod. Otherwise, returns the
+	// original UID.
 	//
 	// All public-facing functions should perform this translation for UIDs
 	// because user may provide a mirror pod UID, which is not recognized by
@@ -237,6 +236,17 @@ func (pm *basicManager) GetUIDTranslations() (podToMirror, mirrorToPod map[types
 
 	podToMirror = make(map[types.UID]types.UID, len(pm.translationByUID))
 	mirrorToPod = make(map[types.UID]types.UID, len(pm.translationByUID))
+	// Insert empty translation mapping for all static pods.
+	for uid, pod := range pm.podByUID {
+		if !IsStaticPod(pod) {
+			continue
+		}
+		podToMirror[uid] = ""
+	}
+	// Fill in translations. Notice that if there is no mirror pod for a
+	// static pod, its uid will be translated into empty string "". This
+	// is WAI, from the caller side we can know that the static pod doesn't
+	// have a corresponding mirror pod instead of using static pod uid directly.
 	for k, v := range pm.translationByUID {
 		mirrorToPod[k] = v
 		podToMirror[v] = k
