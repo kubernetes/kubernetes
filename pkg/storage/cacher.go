@@ -162,7 +162,8 @@ type Cacher struct {
 	watchers   indexedWatchers
 
 	// Incoming events that should be dispatched to watchers.
-	incoming chan watchCacheEvent
+	incoming    chan watchCacheEvent
+	incomingHWM HighWaterMark
 
 	// Handling graceful termination.
 	stopLock sync.RWMutex
@@ -410,6 +411,10 @@ func (c *Cacher) triggerValues(event *watchCacheEvent) ([]string, bool) {
 }
 
 func (c *Cacher) processEvent(event watchCacheEvent) {
+	if curLen := int64(len(c.incoming)); c.incomingHWM.Update(curLen) {
+		// Monitor if this gets backed up, and how much.
+		glog.V(1).Infof("cacher (%v): %v objects queued in incoming channel.", c.objectType.String(), curLen)
+	}
 	c.incoming <- event
 }
 
