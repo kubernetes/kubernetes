@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// +groupName=certificates.k8s.io
 // +k8s:deepcopy-gen=package,register
 
+// +groupName=certificates.k8s.io
 package certificates
