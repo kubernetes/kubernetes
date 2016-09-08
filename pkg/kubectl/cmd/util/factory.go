@@ -431,12 +431,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			return restclient.RESTClientFor(clientConfig)
 		},
 		ClientSet: func() (*internalclientset.Clientset, error) {
-			cfg, err := clients.ClientConfigForVersion(nil)
-			if err != nil {
-				return nil, err
-			}
-
-			return internalclientset.NewForConfig(cfg)
+			return clients.ClientSetForVersion(nil)
 		},
 		ClientConfig: func() (*restclient.Config, error) {
 			return clients.ClientConfigForVersion(nil)
@@ -706,19 +701,19 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 		},
 		Scaler: func(mapping *meta.RESTMapping) (kubectl.Scaler, error) {
 			mappingVersion := mapping.GroupVersionKind.GroupVersion()
-			client, err := clients.ClientForVersion(&mappingVersion)
+			clientset, err := clients.ClientSetForVersion(&mappingVersion)
 			if err != nil {
 				return nil, err
 			}
-			return kubectl.ScalerFor(mapping.GroupVersionKind.GroupKind(), client)
+			return kubectl.ScalerFor(mapping.GroupVersionKind.GroupKind(), clientset)
 		},
 		Reaper: func(mapping *meta.RESTMapping) (kubectl.Reaper, error) {
 			mappingVersion := mapping.GroupVersionKind.GroupVersion()
-			client, err := clients.ClientForVersion(&mappingVersion)
+			clientset, err := clients.ClientSetForVersion(&mappingVersion)
 			if err != nil {
 				return nil, err
 			}
-			return kubectl.ReaperFor(mapping.GroupVersionKind.GroupKind(), client)
+			return kubectl.ReaperFor(mapping.GroupVersionKind.GroupKind(), clientset)
 		},
 		HistoryViewer: func(mapping *meta.RESTMapping) (kubectl.HistoryViewer, error) {
 			mappingVersion := mapping.GroupVersionKind.GroupVersion()
