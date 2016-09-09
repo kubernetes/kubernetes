@@ -35,8 +35,8 @@ func createKubeProxyPodSpec(s *kubeadmapi.KubeadmConfig) api.PodSpec {
 		SecurityContext: &api.PodSecurityContext{HostNetwork: true},
 		Containers: []api.Container{{
 			Name:  "kube-proxy",
-			Image: images.GetCoreImage(images.KubeProxyImage, s.EnvParams["hyperkube_image"], s.InitFlags.Images.UseHyperkube),
-			Command: append(getImageEntrypoint("proxy", s.InitFlags.Images.UseHyperkube), []string{
+			Image: images.GetCoreImage(images.KubeProxyImage, s.EnvParams["hyperkube_image"]),
+			Command: append(getImageEntrypoint("proxy"), []string{
 				"--kubeconfig=/run/kubeconfig",
 				s.EnvParams["component_loglevel"],
 			}...),
@@ -96,7 +96,7 @@ func createKubeDNSPodSpec(s *kubeadmapi.KubeadmConfig) api.PodSpec {
 	kubeDNSPort := int32(10053)
 	dnsmasqPort := int32(53)
 
-	nslookup := fmt.Sprintf("nslookup kubernetes.default.svc.%s 127.0.0.1", s.EnvParams["dns_domain"])
+	nslookup := fmt.Sprintf("nslookup kubernetes.default.svc.%s 127.0.0.1", s.InitFlags.Services.DNSDomain)
 
 	nslookup = fmt.Sprintf("-cmd=%s:%d >/dev/null && %s:%d >/dev/null",
 		nslookup, dnsmasqPort,
@@ -114,7 +114,7 @@ func createKubeDNSPodSpec(s *kubeadmapi.KubeadmConfig) api.PodSpec {
 					Requests: dnsPodResources,
 				},
 				Args: []string{
-					fmt.Sprintf("--domain=%s", s.EnvParams["dns_domain"]),
+					fmt.Sprintf("--domain=%s", s.InitFlags.Services.DNSDomain),
 					fmt.Sprintf("--dns-port=%d", kubeDNSPort),
 					// TODO __PILLAR__FEDERATIONS__DOMAIN__MAP__
 				},

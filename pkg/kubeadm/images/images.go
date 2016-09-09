@@ -42,19 +42,9 @@ const (
 	exechealthzVersion = "1.1"
 )
 
-func GetCoreImage(image string, overrideImage string, useHyperkube bool) string {
+func GetCoreImage(image string, overrideImage string) string {
 	if overrideImage != "" {
 		return overrideImage
-	}
-
-	if useHyperkube {
-		return map[string]string{
-			KubeEtcdImage:              fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "etcd", runtime.GOARCH, etcdVersion),
-			KubeApiServerImage:         fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "hyperkube", runtime.GOARCH, kubeVersion),
-			KubeControllerManagerImage: fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "hyperkube", runtime.GOARCH, kubeVersion),
-			KubeSchedulerImage:         fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "hyperkube", runtime.GOARCH, kubeVersion),
-			KubeProxyImage:             fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "hyperkube", runtime.GOARCH, kubeVersion),
-		}[image]
 	}
 
 	return map[string]string{

@@ -41,11 +41,16 @@ const (
 	MASTER                   = "--master=127.0.0.1:8080"
 )
 
+var useHyperkube = false
+
 // TODO look into what this really means, scheduler prints it for some reason
 //
 //E0817 17:53:22.242658       1 event.go:258] Could not construct reference to: '&api.Endpoints{TypeMeta:unversioned.TypeMeta{Kind:"", APIVersion:""}, ObjectMeta:api.ObjectMeta{Name:"kube-scheduler", GenerateName:"", Namespace:"kube-system", SelfLink:"", UID:"", ResourceVersion:"", Generation:0, CreationTimestamp:unversioned.Time{Time:time.Time{sec:0, nsec:0, loc:(*time.Location)(nil)}}, DeletionTimestamp:(*unversioned.Time)(nil), DeletionGracePeriodSeconds:(*int64)(nil), Labels:map[string]string(nil), Annotations:map[string]string(nil), OwnerReferences:[]api.OwnerReference(nil), Finalizers:[]string(nil)}, Subsets:[]api.EndpointSubset(nil)}' due to: 'selfLink was empty, can't make reference'. Will not report event: 'Normal' '%v became leader' 'moby'
 
 func WriteStaticPodManifests(s *kubeadmapi.KubeadmConfig) error {
+	if s.EnvParams["hyperkube_image"] != "" {
+		useHyperkube = true
+	}
 	staticPodSpecs := map[string]api.Pod{
 		// TODO this needs a volume
 		"etcd": componentPod(api.Container{
@@ -55,7 +60,7 @@ func WriteStaticPodManifests(s *kubeadmapi.KubeadmConfig) error {
 				"--advertise-client-urls=http://127.0.0.1:2379",
 				"--data-dir=/var/etcd/data",
 			},
-			Image:         images.GetCoreImage(images.KubeEtcdImage, s.EnvParams["etcd_image"], s.InitFlags.Images.UseHyperkube),
+			Image:         images.GetCoreImage(images.KubeEtcdImage, s.EnvParams["etcd_image"]),
 			LivenessProbe: componentProbe(2379, "/health"),
 			Name:          "etcd-server",
 			Resources:     componentResources("200m"),
@@ -63,8 +68,8 @@ func WriteStaticPodManifests(s *kubeadmapi.KubeadmConfig) error {
 		// TODO bind-mount certs in
 		"kube-apiserver": componentPod(api.Container{
 			Name:  "kube-apiserver",
-			Image: images.GetCoreImage(images.KubeApiServerImage, s.EnvParams["hyperkube_image"], s.InitFlags.Images.UseHyperkube),
-			Command: append(getImageEntrypoint("apiserver", s.InitFlags.Images.UseHyperkube), []string{
+			Image: images.GetCoreImage(images.KubeApiServerImage, s.EnvParams["hyperkube_image"]),
+			Command: append(getImageEntrypoint("apiserver"), []string{
 				"--address=127.0.0.1",
 				"--etcd-servers=http://127.0.0.1:2379",
 				"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota",
@@ -84,8 +89,8 @@ func WriteStaticPodManifests(s *kubeadmapi.KubeadmConfig) error {
 		}, pkiVolume(s)),
 		"kube-controller-manager": componentPod(api.Container{
 			Name:  "kube-controller-manager",
-			Image: images.GetCoreImage(images.KubeControllerManagerImage, s.EnvParams["hyperkube_image"], s.InitFlags.Images.UseHyperkube),
-			Command: append(getImageEntrypoint("controller-manager", s.InitFlags.Images.UseHyperkube), []string{
+			Image: images.GetCoreImage(images.KubeControllerManagerImage, s.EnvParams["hyperkube_image"]),
+			Command: append(getImageEntrypoint("controller-manager"), []string{
 				"--leader-elect",
 				MASTER,
 				CLUSTER_NAME,
@@ -103,8 +108,8 @@ func WriteStaticPodManifests(s *kubeadmapi.KubeadmConfig) error {
 		}, pkiVolume(s)),
 		"kube-scheduler": componentPod(api.Container{
 			Name:  "kube-scheduler",
-			Image: images.GetCoreImage(images.KubeSchedulerImage, s.EnvParams["hyperkube_image"], s.InitFlags.Images.UseHyperkube),
-			Command: append(getImageEntrypoint("scheduler", s.InitFlags.Images.UseHyperkube), []string{
+			Image: images.GetCoreImage(images.KubeSchedulerImage, s.EnvParams["hyperkube_image"]),
+			Command: append(getImageEntrypoint("scheduler"), []string{
 				"--leader-elect",
 				MASTER,
 				s.EnvParams["component_loglevel"],
@@ -189,7 +194,7 @@ func componentPod(container api.Container, volumes ...api.Volume) api.Pod {
 	}
 }
 
-func getImageEntrypoint(component string, useHyperkube bool) []string {
+func getImageEntrypoint(component string) []string {
 	if useHyperkube {
 		return []string{"/hyperkube", component}
 	}

@@ -74,10 +74,6 @@ func NewCmdInit(out io.Writer, s *kubeadmapi.KubeadmConfig) *cobra.Command {
 		&s.InitFlags.Services.DNSDomain, "service-dns-domain", "cluster.local",
 		`(optional) use alterantive domain name for services, e.g. "myorg.internal"`,
 	)
-	cmd.PersistentFlags().BoolVar(
-		&s.InitFlags.Images.UseHyperkube, "hyperkube-image", false,
-		`(optional) Use a hyperkube image for running the apiserver, controller-manager, scheduler and proxy.`,
-	)
 
 	return cmd
 }

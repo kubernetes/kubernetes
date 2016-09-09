@@ -44,9 +44,6 @@ type InitFlags struct {
 		CIDR      net.IPNet
 		DNSDomain string
 	}
-	Images struct {
-		UseHyperkube bool
-	}
 }
 
 type JoinFlags struct {
