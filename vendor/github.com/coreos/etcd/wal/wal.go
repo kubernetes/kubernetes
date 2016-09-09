@@ -129,22 +129,7 @@ func Create(dirpath string, metadata []byte) (*WAL, error) {
 		return nil, err
 	}
 
-	// rename of directory with locked files doesn't work on windows; close
-	// the WAL to release the locks so the directory can be renamed
-	w.Close()
-	if err := os.Rename(tmpdirpath, dirpath); err != nil {
-		return nil, err
-	}
-	// reopen and relock
-	newWAL, oerr := Open(dirpath, walpb.Snapshot{})
-	if oerr != nil {
-		return nil, oerr
-	}
-	if _, _, _, err := newWAL.ReadAll(); err != nil {
-		newWAL.Close()
-		return nil, err
-	}
-	return newWAL, nil
+	return w.renameWal(tmpdirpath)
 }
 
 // Open opens the WAL at the given snap.
@@ -299,6 +284,18 @@ func (w *WAL) ReadAll() (metadata []byte, state raftpb.HardState, ents []raftpb.
 			state.Reset()
 			return nil, state, nil, err
 		}
+		// decodeRecord() will return io.EOF if it detects a zero record,
+		// but this zero record may be followed by non-zero records from
+		// a torn write. Overwriting some of these non-zero records, but
+		// not all, will cause CRC errors on WAL open. Since the records
+		// were never fully synced to disk in the first place, it's safe
+		// to zero them out to avoid any CRC errors from new writes.
+		if _, err = w.tail().Seek(w.decoder.lastOffset(), os.SEEK_SET); err != nil {
+			return nil, state, nil, err
+		}
+		if err = fileutil.ZeroToEnd(w.tail().File); err != nil {
+			return nil, state, nil, err
+		}
 	}
 
 	err = nil
@@ -317,7 +314,6 @@ func (w *WAL) ReadAll() (metadata []byte, state raftpb.HardState, ents []raftpb.
 
 	if w.tail() != nil {
 		// create encoder (chain crc with the decoder), enable appending
-		_, err = w.tail().Seek(w.decoder.lastOffset(), os.SEEK_SET)
 		w.encoder = newEncoder(w.tail(), w.decoder.lastCRC())
 	}
 	w.decoder = nil
