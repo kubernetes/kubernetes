@@ -72,7 +72,7 @@ RUN mkdir $TMPDIR \
             github.com/jteeuwen/go-bindata/go-bindata
 
 # Download and symlink etcd. We need this for our integration tests.
-RUN export ETCD_VERSION=v2.3.7; \
+RUN export ETCD_VERSION=v2.2.1; \
   mkdir -p /usr/local/src/etcd \
   && cd /usr/local/src/etcd \
   && curl -fsSL https://github.com/coreos/etcd/releases/download/${ETCD_VERSION}/etcd-${ETCD_VERSION}-linux-amd64.tar.gz | tar -xz \
