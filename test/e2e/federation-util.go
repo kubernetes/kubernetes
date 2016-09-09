@@ -183,7 +183,6 @@ func unregisterClusters(clusters map[string]*cluster, f *framework.Framework) {
 
 // can not be moved to util, as By and Expect must be put in Ginkgo test unit
 func registerClusters(clusters map[string]*cluster, userAgentName, federationName string, f *framework.Framework) string {
-
 	contexts := f.GetUnderlyingFederatedContexts()
 
 	for _, context := range contexts {
@@ -287,6 +286,63 @@ func deleteServiceOrFail(clientset *federation_release_1_4.Clientset, namespace 
 	}
 	err := clientset.Services(namespace).Delete(serviceName, api.NewDeleteOptions(0))
 	framework.ExpectNoError(err, "Error deleting service %q from namespace %q", serviceName, namespace)
+}
+
+func cleanupServiceShardsAndProviderResources(namespace string, service *v1.Service, clusters map[string]*cluster) {
+	framework.Logf("Deleting service %q in %d clusters", service.Name, len(clusters))
+	for name, c := range clusters {
+		err := cleanupServiceShard(c.Clientset, name, namespace, service, FederatedServiceTimeout)
+		if err != nil {
+			framework.Logf("Failed to delete service %q in namespace %q, in cluster %q: %v", service.Name, namespace, name, err)
+		}
+		err = cleanupServiceShardLoadBalancer(name, service, FederatedServiceTimeout)
+		if err != nil {
+			framework.Logf("Failed to delete cloud provider resources for service %q in namespace %q, in cluster %q", service.Name, namespace, name)
+		}
+	}
+}
+
+func cleanupServiceShard(clientset *release_1_3.Clientset, clusterName, namespace string, service *v1.Service, timeout time.Duration) error {
+	err := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
+		err := clientset.Services(namespace).Delete(service.Name, &api.DeleteOptions{})
+		if err != nil && !errors.IsNotFound(err) {
+			// Deletion failed with an error, try again.
+			framework.Logf("Failed to delete service %q in namespace %q, in cluster %q", service.Name, namespace, clusterName)
+			return false, nil
+		}
+		By(fmt.Sprintf("Service %q in namespace %q in cluster %q deleted", service.Name, namespace, clusterName))
+		return true, nil
+	})
+	return err
+}
+
+func cleanupServiceShardLoadBalancer(clusterName string, service *v1.Service, timeout time.Duration) error {
+	provider := framework.TestContext.CloudConfig.Provider
+	if provider == nil {
+		return fmt.Errorf("cloud provider undefined")
+	}
+
+	internalSvc := &api.Service{}
+	err := api.Scheme.Convert(service, internalSvc, nil)
+	if err != nil {
+		return fmt.Errorf("failed to convert versioned service object to internal type: %v", err)
+	}
+
+	err = wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
+		lbi, supported := provider.LoadBalancer()
+		if !supported {
+			return false, fmt.Errorf("%q doesn't support load balancers", provider.ProviderName())
+		}
+		err := lbi.EnsureLoadBalancerDeleted(clusterName, internalSvc)
+		if err != nil {
+			// Deletion failed with an error, try again.
+			framework.Logf("Failed to delete cloud provider resources for service %q in namespace %q, in cluster %q", service.Name, service.Namespace, clusterName)
+			return false, nil
+		}
+		By(fmt.Sprintf("Cloud provider resources for Service %q in namespace %q in cluster %q deleted", service.Name, service.Namespace, clusterName))
+		return true, nil
+	})
+	return err
 }
 
 func podExitCodeDetector(f *framework.Framework, name, namespace string, code int32) func() error {

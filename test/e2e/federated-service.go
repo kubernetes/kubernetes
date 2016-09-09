@@ -80,10 +80,14 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 				nsName := f.FederationNamespace.Name
 				service := createServiceOrFail(f.FederationClientset_1_4, nsName, FederatedServiceName)
 				By(fmt.Sprintf("Creation of service %q in namespace %q succeeded.  Deleting service.", service.Name, nsName))
+
 				// Cleanup
 				err := f.FederationClientset_1_4.Services(nsName).Delete(service.Name, &api.DeleteOptions{})
 				framework.ExpectNoError(err, "Error deleting service %q in namespace %q", service.Name, service.Namespace)
 				By(fmt.Sprintf("Deletion of service %q in namespace %q succeeded.", service.Name, nsName))
+
+				By(fmt.Sprintf("Deleting service shards and their provider resources in underlying clusters for service %q in namespace %q", service.Name, nsName))
+				cleanupServiceShardsAndProviderResources(nsName, service, clusters)
 			})
 
 			It("should create matching services in underlying clusters", func() {
@@ -95,6 +99,9 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 					By(fmt.Sprintf("Deleting service %q in namespace %q", service.Name, nsName))
 					err := f.FederationClientset_1_4.Services(nsName).Delete(service.Name, &api.DeleteOptions{})
 					framework.ExpectNoError(err, "Error deleting service %q in namespace %q", service.Name, nsName)
+
+					By(fmt.Sprintf("Deleting service shards and their provider resources in underlying clusters for service %q in namespace %q", service.Name, nsName))
+					cleanupServiceShardsAndProviderResources(nsName, service, clusters)
 				}()
 				waitForServiceShardsOrFail(nsName, service, clusters)
 			})
@@ -124,6 +131,9 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 				if service != nil {
 					deleteServiceOrFail(f.FederationClientset_1_4, nsName, service.Name)
 					service = nil
+
+					By(fmt.Sprintf("Deleting service shards and their provider resources in underlying clusters for service %q in namespace %q", service.Name, nsName))
+					cleanupServiceShardsAndProviderResources(nsName, service, clusters)
 				} else {
 					By("No service to delete.  Service is nil")
 				}
