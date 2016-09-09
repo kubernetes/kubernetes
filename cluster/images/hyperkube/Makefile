@@ -67,7 +67,7 @@ endif
 	cp ${TEMP_DIR}/addons/singlenode/*.yaml ${TEMP_DIR}/addons/multinode/
 	cp kube-proxy-ds.yaml ${TEMP_DIR}/addons/multinode/kube-proxy.yaml
 
-	cp ../../../_output/dockerized/bin/linux/${ARCH}/hyperkube ${TEMP_DIR}
+	cp ../../../_output/local/bin/linux/${ARCH}/hyperkube ${TEMP_DIR}
 
 	cd ${TEMP_DIR} && sed -i.back "s|VERSION|${VERSION}|g" addons/singlenode/*.yaml addons/multinode/*.yaml static-pods/*.json
 	cd ${TEMP_DIR} && sed -i.back "s|REGISTRY|${REGISTRY}|g" addons/singlenode/*.yaml addons/multinode/*.yaml static-pods/*.json
@@ -101,7 +101,7 @@ endif
 	# Download CNI
 	curl -sSL --retry 5 https://storage.googleapis.com/kubernetes-release/network-plugins/cni-${ARCH}-${CNI_RELEASE}.tar.gz | tar -xz -C ${TEMP_DIR}/cni-bin
 
-	docker build -t ${REGISTRY}/hyperkube-${ARCH}:${VERSION} ${TEMP_DIR}
+	sudo docker build -t ${REGISTRY}/hyperkube-${ARCH}:${VERSION} ${TEMP_DIR}
 	rm -rf "${TEMP_DIR}"
 
 push: build
