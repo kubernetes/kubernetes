@@ -124,9 +124,6 @@ go run hack/e2e.go -v --build
 # Create a fresh cluster.  Deletes a cluster first, if it exists
 go run hack/e2e.go -v --up
 
-# Test if a cluster is up.
-go run hack/e2e.go -v --isup
-
 # Push code to an existing cluster
 go run hack/e2e.go -v --push
 
