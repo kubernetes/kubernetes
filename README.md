@@ -133,6 +133,8 @@ For Q&A, our threads are at:
 
 If you're interested in being a contributor and want to get involved in developing Kubernetes, start in the [Kubernetes Developer Guide](docs/devel/README.md) and also review the [contributor guidelines](CONTRIBUTING.md).
 
+Or, if you just have an idea for a new feature, see the [Kubernetes Features](https://github.com/kubernetes/features) repository for details on how to propose it.
+
 ### Support
 
 While there are many different channels that you can use to get ahold of us, you can help make sure that we are efficient in getting you the help that you need.
