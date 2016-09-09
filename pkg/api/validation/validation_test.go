@@ -248,6 +248,45 @@ func TestValidateObjectMetaUpdateIgnoresCreationTimestamp(t *testing.T) {
 	}
 }
 
+func TestValidateFinalizersUpdate(t *testing.T) {
+	testcases := map[string]struct {
+		Old         api.ObjectMeta
+		New         api.ObjectMeta
+		ExpectedErr string
+	}{
+		"invalid adding finalizers": {
+			Old:         api.ObjectMeta{Name: "test", ResourceVersion: "1", DeletionTimestamp: &unversioned.Time{}, Finalizers: []string{"x/a"}},
+			New:         api.ObjectMeta{Name: "test", ResourceVersion: "1", DeletionTimestamp: &unversioned.Time{}, Finalizers: []string{"x/a", "y/b"}},
+			ExpectedErr: "field.finalizers: Forbidden: no new finalizers can be added if the object is being deleted, found new finalizers []string{\"y/b\"}",
+		},
+		"invalid changing finalizers": {
+			Old:         api.ObjectMeta{Name: "test", ResourceVersion: "1", DeletionTimestamp: &unversioned.Time{}, Finalizers: []string{"x/a"}},
+			New:         api.ObjectMeta{Name: "test", ResourceVersion: "1", DeletionTimestamp: &unversioned.Time{}, Finalizers: []string{"x/b"}},
+			ExpectedErr: "field.finalizers: Forbidden: no new finalizers can be added if the object is being deleted, found new finalizers []string{\"x/b\"}",
+		},
+		"valid removing finalizers": {
+			Old:         api.ObjectMeta{Name: "test", ResourceVersion: "1", DeletionTimestamp: &unversioned.Time{}, Finalizers: []string{"x/a", "y/b"}},
+			New:         api.ObjectMeta{Name: "test", ResourceVersion: "1", DeletionTimestamp: &unversioned.Time{}, Finalizers: []string{"x/a"}},
+			ExpectedErr: "",
+		},
+		"valid adding finalizers for objects not being deleted": {
+			Old:         api.ObjectMeta{Name: "test", ResourceVersion: "1", Finalizers: []string{"x/a"}},
+			New:         api.ObjectMeta{Name: "test", ResourceVersion: "1", Finalizers: []string{"x/a", "y/b"}},
+			ExpectedErr: "",
+		},
+	}
+	for name, tc := range testcases {
+		errs := ValidateObjectMetaUpdate(&tc.New, &tc.Old, field.NewPath("field"))
+		if len(errs) == 0 {
+			if len(tc.ExpectedErr) != 0 {
+				t.Errorf("case: %q, expect error %q", name, tc.ExpectedErr)
+			}
+		} else if e, a := tc.ExpectedErr, errs.ToAggregate().Error(); e != a {
+			t.Errorf("case: %q, expect error %q, got error %q", name, e, a)
+		}
+	}
+}
+
 func TestValidateObjectMetaUpdatePreventsDeletionFieldMutation(t *testing.T) {
 	now := unversioned.NewTime(time.Unix(1000, 0).UTC())
 	later := unversioned.NewTime(time.Unix(2000, 0).UTC())
