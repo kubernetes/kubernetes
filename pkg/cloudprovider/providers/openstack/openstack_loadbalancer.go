@@ -17,8 +17,8 @@ limitations under the License.
 package openstack
 
 import (
-	"time"
 	"net"
+	"time"
 
 	"github.com/rackspace/gophercloud"
 	"github.com/rackspace/gophercloud/openstack/networking/v2/extensions"
@@ -530,7 +530,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *api.Ser
 	status.Ingress = []api.LoadBalancerIngress{{IP: loadbalancer.VipAddress}}
 
 	if lbaas.opts.FloatingNetworkId != "" {
-		portID, err := getPortIDByIP(lbaas.network, loadbalancer.VipAddress)
+		port, err := getPortByIP(lbaas.network, loadbalancer.VipAddress)
 		if err != nil {
 			// cleanup what was created so far
 			_ = lbaas.EnsureLoadBalancerDeleted(clusterName, apiService)
@@ -539,7 +539,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *api.Ser
 
 		floatIPOpts := floatingips.CreateOpts{
 			FloatingNetworkID: lbaas.opts.FloatingNetworkId,
-			PortID:            portID,
+			PortID:            port.ID,
 		}
 		floatIP, err := floatingips.Create(lbaas.network, floatIPOpts).Extract()
 		if err != nil {
@@ -570,9 +570,19 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *api.Ser
 
 			for _, sourceRange := range sourceRanges.StringSlice() {
 				ethertype := "IPv4"
-				if net.ParseIP(sourceRange).To4() == nil {
+				network, _, err := net.ParseCIDR(sourceRange)
+
+				if err != nil {
+					// cleanup what was created so far
+					glog.Errorf("Error parsing source range %s as a CIDR", sourceRange)
+					_ = lbaas.EnsureLoadBalancerDeleted(clusterName, apiService)
+					return nil, err
+				}
+
+				if network.To4() == nil {
 					ethertype = "IPv6"
 				}
+
 				lbSecGroupRuleCreateOpts := rules.CreateOpts{
 					Direction:      "ingress",
 					PortRangeMax:   int(port.Port),
@@ -583,7 +593,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *api.Ser
 					EtherType:      ethertype,
 				}
 
-				_, err := rules.Create(lbaas.network, lbSecGroupRuleCreateOpts).Extract()
+				_, err = rules.Create(lbaas.network, lbSecGroupRuleCreateOpts).Extract()
 
 				if err != nil {
 					// cleanup what was created so far
@@ -592,38 +602,53 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *api.Ser
 				}
 			}
 
-			createNodeSecurityGroup(lbaas.network, lbaas.opts.NodeSecurityGroupID, int(port.NodePort), string(port.Protocol), lbSecGroup.ID)
+			err := createNodeSecurityGroup(lbaas.network, lbaas.opts.NodeSecurityGroupID, int(port.NodePort), string(port.Protocol), lbSecGroup.ID)
+			if err != nil {
+				glog.Errorf("Error occured creating security group for loadbalancer %s:", loadbalancer.ID)
+				_ = lbaas.EnsureLoadBalancerDeleted(clusterName, apiService)
+				return nil, err
+			}
 		}
 
-		var port neutron_ports.Port
+		lbSecGroupRuleCreateOpts := rules.CreateOpts{
+			Direction:      "ingress",
+			PortRangeMax:   4, // ICMP: Code -  Values for ICMP  "Destination Unreachable: Fragmentation Needed and Don't Fragment was Set"
+			PortRangeMin:   3, // ICMP: Type
+			Protocol:       "icmp",
+			RemoteIPPrefix: "0.0.0.0/0", // The Fragmentation packet can come from anywhere along the path back to the sourceRange - we need to all this from all
+			SecGroupID:     lbSecGroup.ID,
+			EtherType:      "IPv4",
+		}
 
-		// Get the port ID
-		portID, err := getPortIDByIP(lbaas.network, loadbalancer.VipAddress)
+		_, err = rules.Create(lbaas.network, lbSecGroupRuleCreateOpts).Extract()
+
 		if err != nil {
 			// cleanup what was created so far
 			_ = lbaas.EnsureLoadBalancerDeleted(clusterName, apiService)
 			return nil, err
 		}
 
-		opts := neutron_ports.ListOpts{ID: portID}
+		lbSecGroupRuleCreateOpts = rules.CreateOpts{
+			Direction:      "ingress",
+			PortRangeMax:   0, // ICMP: Code - Values for ICMP "Packet Too Big"
+			PortRangeMin:   2, // ICMP: Type
+			Protocol:       "icmp",
+			RemoteIPPrefix: "::/0", // The Fragmentation packet can come from anywhere along the path back to the sourceRange - we need to all this from all
+			SecGroupID:     lbSecGroup.ID,
+			EtherType:      "IPv6",
+		}
 
-		// Get the full port detail
-		err = neutron_ports.List(lbaas.network, opts).EachPage(func(page pagination.Page) (bool, error) {
-			prts, err := neutron_ports.ExtractPorts(page)
-			if err != nil {
-				glog.Errorf("Failed to extract ports: %v", err)
-				return false, err
-			}
-			// Getting with an ID filter should have one result, and it should match the ID
-			if len(prts) != 1 || prts[0].ID != portID {
-				glog.Errorf("Failed to find port")
-				return false, err
-			}
-			port = prts[0]
-			return true, nil
-		})
+		_, err = rules.Create(lbaas.network, lbSecGroupRuleCreateOpts).Extract()
+
 		if err != nil {
-			glog.Errorf("Error occured getting port: %s", portID)
+			// cleanup what was created so far
+			_ = lbaas.EnsureLoadBalancerDeleted(clusterName, apiService)
+			return nil, err
+		}
+
+		// Get the port ID
+		port, err := getPortByIP(lbaas.network, loadbalancer.VipAddress)
+		if err != nil {
 			// cleanup what was created so far
 			_ = lbaas.EnsureLoadBalancerDeleted(clusterName, apiService)
 			return nil, err
@@ -634,7 +659,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *api.Ser
 		res := neutron_ports.Update(lbaas.network, port.ID, update_opts)
 
 		if res.Err != nil {
-			glog.Errorf("Error occured updating port: %s", portID)
+			glog.Errorf("Error occured updating port: %s", port.ID)
 			// cleanup what was created so far
 			_ = lbaas.EnsureLoadBalancerDeleted(clusterName, apiService)
 			return nil, res.Err
@@ -940,7 +965,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancerDeleted(clusterName string, service *api
 
 		} else {
 			lbSecGroup := groups.Delete(lbaas.network, lbSecGroupID)
-			if lbSecGroup.Err != nil  && !isNotFound(lbSecGroup.Err) {
+			if lbSecGroup.Err != nil && !isNotFound(lbSecGroup.Err) {
 				return lbSecGroup.Err
 			}
 		}
@@ -952,14 +977,14 @@ func (lbaas *LbaasV2) EnsureLoadBalancerDeleted(clusterName string, service *api
 		}
 		rules_, err := getSecurityGroupRules(lbaas.network, opts)
 
-		if err != nil  && !isNotFound(err){
+		if err != nil && !isNotFound(err) {
 			glog.Errorf("Error finding rules for remote group id %s in security group id %s", lbSecGroupID, lbaas.opts.NodeSecurityGroupID)
 			return err
 		}
 
 		for _, rule := range rules_ {
 			res := rules.Delete(lbaas.network, rule.ID)
-			if res.Err != nil  && !isNotFound(res.Err){
+			if res.Err != nil && !isNotFound(res.Err) {
 				return res.Err
 			}
 		}
