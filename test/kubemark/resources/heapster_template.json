@@ -2,23 +2,23 @@
 	"kind": "ReplicationController",
 	"apiVersion": "v1",
 	"metadata": {
-		"name": "heapster-v1.1.0",
+		"name": "heapster-v1.2.0-beta.3",
 		"labels": {
 			"k8s-app": "heapster",
-			"version": "v1.1.0"
+			"version": "v1.2.0-beta.3"
 		}
 	},
 	"spec": {
 		"replicas": 1,
 		"selector": {
 			"k8s-app": "heapster",
-			"version": "v1.1.0"
+			"version": "v1.2.0-beta.3"
 		},
 		"template": {
 			"metadata": {
 				"labels": {
 					"k8s-app": "heapster",
-					"version": "v1.1.0"
+					"version": "v1.2.0-beta.3"
 				}
 			},
 			"spec": {
@@ -33,7 +33,7 @@
 				"containers": [
 				{
 					"name": "heapster",
-					"image": "gcr.io/google_containers/heapster:v1.2.0-beta.1",
+					"image": "gcr.io/google_containers/heapster:v1.2.0-beta.3",
 					"resources": {
 						"requests": {
 							"cpu": "100m",
@@ -55,7 +55,7 @@
 				},
 				{
 					"name": "eventer",
-					"image": "gcr.io/google_containers/heapster:v1.2.0-beta.1",
+					"image": "gcr.io/google_containers/heapster:v1.2.0-beta.3",
 					"resources": {
 						"requests": {
 							"cpu": "100m",
