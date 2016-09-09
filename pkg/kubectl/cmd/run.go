@@ -478,8 +478,10 @@ func handleAttachPod(f *cmdutil.Factory, c *client.Client, ns, name string, opts
 	opts.Client = c
 	opts.PodName = name
 	opts.Namespace = ns
+	// TODO: opts.Run sets opts.Err to nil, we need to find a better way
+	stderr := opts.Err
 	if err := opts.Run(); err != nil {
-		fmt.Fprintf(opts.Err, "Error attaching, falling back to logs: %v\n", err)
+		fmt.Fprintf(stderr, "Error attaching, falling back to logs: %v\n", err)
 		req, err := f.LogsForObject(pod, &api.PodLogOptions{Container: ctrName})
 		if err != nil {
 			return err
