@@ -1,8 +1,8 @@
-# kubernetes-discovery
+### kube-discovery
+
 An initial implementation of a Kubernetes discovery service using JSON Web Signatures.
 
-This prototype is expected to be run by Kubernetes itself for the time being,
-and will hopefully be merged into the core API at a later time.
+This prototype is configured by kubeadm and run within kubernetes itself.
 
 ## Requirements
 
@@ -11,8 +11,8 @@ Generate a CA cert save it to: /tmp/secret/ca.pem to run the service or unit tes
 ## Build And Run From Source
 
 ```
-$ make WHAT=cmd/kubediscovery
-$ _output/local/bin/linux/amd64/kubediscovery
+$ make WHAT=cmd/kube-discovery
+$ _output/local/bin/linux/amd64/kube-discovery
 2016/08/23 19:17:28 Listening for requests on port 9898.
 
 ```
