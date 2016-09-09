@@ -647,7 +647,7 @@ func thresholdsMet(thresholds []Threshold, observations signalObservations, enfo
 		}
 		// determine if we have met the specified threshold
 		thresholdMet := false
-		quantity := getThresholdQuantity(threshold.Value, observed.capacity)
+		quantity := getThresholdQuantity(threshold.Value, observed.capacity, resource.BinarySI)
 		// if enforceMinReclaim is specified, we compare relative to value - minreclaim
 		if enforceMinReclaim && threshold.MinReclaim != nil {
 			quantity.Add(*threshold.MinReclaim)
@@ -665,11 +665,11 @@ func thresholdsMet(thresholds []Threshold, observations signalObservations, enfo
 }
 
 // getThresholdQuantity returns the expected quantity value for a thresholdValue
-func getThresholdQuantity(value ThresholdValue, capacity *resource.Quantity) *resource.Quantity {
+func getThresholdQuantity(value ThresholdValue, capacity *resource.Quantity, format resource.Format) *resource.Quantity {
 	if value.Quantity != nil {
 		return value.Quantity.Copy()
 	}
-	return resource.NewQuantity(int64(float64(capacity.Value())*float64(value.Percentage)), resource.BinarySI)
+	return resource.NewQuantity(int64(float64(capacity.Value())*float64(value.Percentage)), format)
 }
 
 // thresholdsFirstObservedAt merges the input set of thresholds with the previous observation to determine when active set of thresholds were initially met.
