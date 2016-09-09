@@ -54,6 +54,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/apis/storage"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/typed/discovery"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
@@ -98,6 +99,10 @@ type Factory struct {
 	JSONEncoder func() runtime.Encoder
 	// Returns a client for accessing Kubernetes resources or an error.
 	Client func() (*client.Client, error)
+	// ClientSet gives you back an internal, generated clientset
+	ClientSet func() (*internalclientset.Clientset, error)
+	// Returns a RESTClient for accessing Kubernetes resources or an error.
+	RESTClient func() (*restclient.RESTClient, error)
 	// Returns a client.Config for accessing the Kubernetes server.
 	ClientConfig func() (*restclient.Config, error)
 	// Returns a RESTClient for working with the specified RESTMapping or an error. This is intended
@@ -406,6 +411,16 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 		Client: func() (*client.Client, error) {
 			return clients.ClientForVersion(nil)
 		},
+		RESTClient: func() (*restclient.RESTClient, error) {
+			clientConfig, err := clients.ClientConfigForVersion(nil)
+			if err != nil {
+				return nil, err
+			}
+			return restclient.RESTClientFor(clientConfig)
+		},
+		ClientSet: func() (*internalclientset.Clientset, error) {
+			return clients.ClientSetForVersion(nil)
+		},
 		ClientConfig: func() (*restclient.Config, error) {
 			return clients.ClientConfigForVersion(nil)
 		},
@@ -674,19 +689,19 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 		},
 		Scaler: func(mapping *meta.RESTMapping) (kubectl.Scaler, error) {
 			mappingVersion := mapping.GroupVersionKind.GroupVersion()
-			client, err := clients.ClientForVersion(&mappingVersion)
+			clientset, err := clients.ClientSetForVersion(&mappingVersion)
 			if err != nil {
 				return nil, err
 			}
-			return kubectl.ScalerFor(mapping.GroupVersionKind.GroupKind(), client)
+			return kubectl.ScalerFor(mapping.GroupVersionKind.GroupKind(), clientset)
 		},
 		Reaper: func(mapping *meta.RESTMapping) (kubectl.Reaper, error) {
 			mappingVersion := mapping.GroupVersionKind.GroupVersion()
-			client, err := clients.ClientForVersion(&mappingVersion)
+			clientset, err := clients.ClientSetForVersion(&mappingVersion)
 			if err != nil {
 				return nil, err
 			}
-			return kubectl.ReaperFor(mapping.GroupVersionKind.GroupKind(), client)
+			return kubectl.ReaperFor(mapping.GroupVersionKind.GroupKind(), clientset)
 		},
 		HistoryViewer: func(mapping *meta.RESTMapping) (kubectl.HistoryViewer, error) {
 			mappingVersion := mapping.GroupVersionKind.GroupVersion()

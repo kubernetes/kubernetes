@@ -274,7 +274,12 @@ func Run(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cob
 		if err != nil {
 			return err
 		}
-		opts.Client = client
+
+		clientset, err := f.ClientSet()
+		if err != nil {
+			return err
+		}
+		opts.PodClient = clientset.Core()
 
 		attachablePod, err := f.AttachablePodForObject(obj)
 		if err != nil {
@@ -475,7 +480,13 @@ func handleAttachPod(f *cmdutil.Factory, c *client.Client, ns, name string, opts
 		_, err = io.Copy(opts.Out, readCloser)
 		return err
 	}
-	opts.Client = c
+
+	clientset, err := f.ClientSet()
+	if err != nil {
+		return nil
+	}
+	opts.PodClient = clientset.Core()
+
 	opts.PodName = name
 	opts.Namespace = ns
 	// TODO: opts.Run sets opts.Err to nil, we need to find a better way

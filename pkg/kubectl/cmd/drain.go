@@ -28,7 +28,8 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/fields"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
@@ -37,7 +38,8 @@ import (
 )
 
 type DrainOptions struct {
-	client             *client.Client
+	client             *internalclientset.Clientset
+	restClient         *restclient.RESTClient
 	factory            *cmdutil.Factory
 	Force              bool
 	GracePeriodSeconds int
@@ -177,7 +179,12 @@ func (o *DrainOptions) SetupDrain(cmd *cobra.Command, args []string) error {
 		return cmdutil.UsageError(cmd, fmt.Sprintf("USAGE: %s [flags]", cmd.Use))
 	}
 
-	if o.client, err = o.factory.Client(); err != nil {
+	if o.client, err = o.factory.ClientSet(); err != nil {
+		return err
+	}
+
+	o.restClient, err = o.factory.RESTClient()
+	if err != nil {
 		return err
 	}
 
@@ -227,13 +234,13 @@ func (o *DrainOptions) RunDrain() error {
 func (o *DrainOptions) getController(sr *api.SerializedReference) (interface{}, error) {
 	switch sr.Reference.Kind {
 	case "ReplicationController":
-		return o.client.ReplicationControllers(sr.Reference.Namespace).Get(sr.Reference.Name)
+		return o.client.Core().ReplicationControllers(sr.Reference.Namespace).Get(sr.Reference.Name)
 	case "DaemonSet":
-		return o.client.DaemonSets(sr.Reference.Namespace).Get(sr.Reference.Name)
+		return o.client.Extensions().DaemonSets(sr.Reference.Namespace).Get(sr.Reference.Name)
 	case "Job":
-		return o.client.ExtensionsClient.Jobs(sr.Reference.Namespace).Get(sr.Reference.Name)
+		return o.client.Batch().Jobs(sr.Reference.Namespace).Get(sr.Reference.Name)
 	case "ReplicaSet":
-		return o.client.ExtensionsClient.ReplicaSets(sr.Reference.Namespace).Get(sr.Reference.Name)
+		return o.client.Extensions().ReplicaSets(sr.Reference.Namespace).Get(sr.Reference.Name)
 	}
 	return nil, fmt.Errorf("Unknown controller kind %q", sr.Reference.Kind)
 }
@@ -284,7 +291,7 @@ func (o *DrainOptions) daemonsetFilter(pod api.Pod) (bool, *warning, *fatal) {
 	if sr == nil || sr.Reference.Kind != "DaemonSet" {
 		return true, nil, nil
 	}
-	if _, err := o.client.DaemonSets(sr.Reference.Namespace).Get(sr.Reference.Name); err != nil {
+	if _, err := o.client.Extensions().DaemonSets(sr.Reference.Namespace).Get(sr.Reference.Name); err != nil {
 		return false, nil, &fatal{err.Error()}
 	}
 	if !o.IgnoreDaemonsets {
@@ -335,7 +342,7 @@ func (ps podStatuses) Message() string {
 // getPodsForDeletion returns all the pods we're going to delete.  If there are
 // any pods preventing us from deleting, we return that list in an error.
 func (o *DrainOptions) getPodsForDeletion() (pods []api.Pod, err error) {
-	podList, err := o.client.Pods(api.NamespaceAll).List(api.ListOptions{
+	podList, err := o.client.Core().Pods(api.NamespaceAll).List(api.ListOptions{
 		FieldSelector: fields.SelectorFromSet(fields.Set{"spec.nodeName": o.nodeInfo.Name})})
 	if err != nil {
 		return pods, err
@@ -380,7 +387,7 @@ func (o *DrainOptions) deletePods(pods []api.Pod) error {
 	}
 
 	for _, pod := range pods {
-		err := o.client.Pods(pod.Namespace).Delete(pod.Name, &deleteOptions)
+		err := o.client.Core().Pods(pod.Namespace).Delete(pod.Name, &deleteOptions)
 		if err != nil {
 			return err
 		}
@@ -403,7 +410,7 @@ func (o *DrainOptions) RunCordonOrUncordon(desired bool) error {
 		if unsched.Bool() == desired {
 			cmdutil.PrintSuccess(o.mapper, false, o.out, o.nodeInfo.Mapping.Resource, o.nodeInfo.Name, already(desired))
 		} else {
-			helper := resource.NewHelper(o.client, o.nodeInfo.Mapping)
+			helper := resource.NewHelper(o.restClient, o.nodeInfo.Mapping)
 			unsched.SetBool(desired)
 			_, err := helper.Replace(cmdNamespace, o.nodeInfo.Name, true, o.nodeInfo.Object)
 			if err != nil {

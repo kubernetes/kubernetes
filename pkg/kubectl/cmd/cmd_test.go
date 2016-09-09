@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/typed/discovery"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
@@ -59,9 +60,22 @@ func defaultHeader() http.Header {
 
 func defaultClientConfig() *restclient.Config {
 	return &restclient.Config{
+		APIPath: "/api",
 		ContentConfig: restclient.ContentConfig{
-			ContentType:  runtime.ContentTypeJSON,
-			GroupVersion: testapi.Default.GroupVersion(),
+			NegotiatedSerializer: api.Codecs,
+			ContentType:          runtime.ContentTypeJSON,
+			GroupVersion:         testapi.Default.GroupVersion(),
+		},
+	}
+}
+
+func defaultClientConfigForVersion(version *unversioned.GroupVersion) *restclient.Config {
+	return &restclient.Config{
+		APIPath: "/api",
+		ContentConfig: restclient.ContentConfig{
+			NegotiatedSerializer: api.Codecs,
+			ContentType:          runtime.ContentTypeJSON,
+			GroupVersion:         version,
 		},
 	}
 }
@@ -294,6 +308,26 @@ func NewAPIFactory() (*cmdutil.Factory, *testFactory, runtime.Codec, runtime.Neg
 			c.Client = fakeClient.Client
 			c.ExtensionsClient.Client = fakeClient.Client
 			return c, t.Err
+		},
+		ClientSet: func() (*internalclientset.Clientset, error) {
+			// Swap out the HTTP client out of the client with the fake's version.
+			fakeClient := t.Client.(*fake.RESTClient)
+			restClient, err := restclient.RESTClientFor(t.ClientConfig)
+			if err != nil {
+				panic(err)
+			}
+			restClient.Client = fakeClient.Client
+			return internalclientset.New(restClient), t.Err
+		},
+		RESTClient: func() (*restclient.RESTClient, error) {
+			// Swap out the HTTP client out of the client with the fake's version.
+			fakeClient := t.Client.(*fake.RESTClient)
+			restClient, err := restclient.RESTClientFor(t.ClientConfig)
+			if err != nil {
+				panic(err)
+			}
+			restClient.Client = fakeClient.Client
+			return restClient, t.Err
 		},
 		ClientForMapping: func(*meta.RESTMapping) (resource.RESTClient, error) {
 			return t.Client, t.Err
