@@ -20,10 +20,16 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+echo "gcloud auth: start of push-federation-images.sh"
+gcloud auth list
+
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 
 source "${KUBE_ROOT}/build/util.sh"
 
 source "${KUBE_ROOT}/federation/cluster/common.sh"
+
+echo "gcloud auth: about to push"
+gcloud auth list
 
 FEDERATION_IMAGE_TAG="$(kube::release::semantic_image_tag_version)" push-federation-images
