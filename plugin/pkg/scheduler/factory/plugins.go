@@ -19,6 +19,7 @@ package factory
 import (
 	"fmt"
 	"regexp"
+	"sort"
 	"strings"
 	"sync"
 
@@ -317,5 +318,6 @@ func ListAlgorithmProviders() string {
 	for name := range algorithmProviderMap {
 		availableAlgorithmProviders = append(availableAlgorithmProviders, name)
 	}
+	sort.Strings(availableAlgorithmProviders)
 	return strings.Join(availableAlgorithmProviders, " | ")
 }
