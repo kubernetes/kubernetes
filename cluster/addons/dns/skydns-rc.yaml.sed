@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This file should be kept in sync with cluster/images/hyperkube/dns-rc.yaml
-
 # TODO - At some point, we need to rename all skydns-*.yaml.* files to kubedns-*.yaml.*
 
 # Warning: This is a file generated from the base underscore template file: skydns-rc.yaml.base
@@ -87,6 +85,15 @@ spec:
           protocol: TCP
       - name: dnsmasq
         image: gcr.io/google_containers/kube-dnsmasq-amd64:1.3
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8082
+            scheme: HTTP
+          initialDelaySeconds: 60
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 5
         args:
         - --cache-size=1000
         - --no-resolv
@@ -103,20 +110,20 @@ spec:
         resources:
           # keep request = limit to keep this container in guaranteed class
           limits:
-            cpu: 10m
+            cpu: 20m
             memory: 50Mi
           requests:
-            cpu: 10m
+            cpu: 20m
             # Note that this container shouldn't really need 50Mi of memory. The
             # limits are set higher than expected pending investigation on #29688.
             # The extra memory was stolen from the kubedns container to keep the
             # net memory requested by the pod constant.
             memory: 50Mi
-        args:
-        - -cmd=nslookup kubernetes.default.svc.$DNS_DOMAIN 127.0.0.1 >/dev/null && nslookup kubernetes.default.svc.$DNS_DOMAIN 127.0.0.1:10053 >/dev/null
-        - -port=8080
-        - -quiet
+        command: ["/bin/sh","-c"]
+        args: ["/exechealthz -cmd='nslookup kubernetes.default.svc.$DNS_DOMAIN 127.0.0.1 >/dev/null' -port=8082 -quiet & /exechealthz -cmd='nslookup kubernetes.default.svc.$DNS_DOMAIN 127.0.0.1:10053 >/dev/null' -port=8080 -quiet"]
         ports:
         - containerPort: 8080
+          protocol: TCP
+        - containerPort: 8082
           protocol: TCP
       dnsPolicy: Default  # Don't use cluster DNS.
