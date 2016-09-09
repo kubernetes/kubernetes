@@ -39,9 +39,16 @@ var _ = framework.KubeDescribe("MemoryEviction [Slow] [Serial] [Disruptive]", fu
 
 	var watchers []watch.Interface
 	AfterEach(func() {
+		// Stop any watchers and then list a summary of all events before ending the test.
 		for _, w := range watchers {
 			w.Stop()
 		}
+		glog.Infof("Summary of node events during the memory eviction test:")
+		err := listNamespaceEvents(f, f.Namespace.Name)
+		framework.ExpectNoError(err)
+		glog.Infof("Summary of pod events during the memory eviction test:")
+		err = listNamespaceEvents(f, "")
+		framework.ExpectNoError(err)
 	})
 
 	Context("when there is memory pressure", func() {
@@ -231,27 +238,43 @@ var _ = framework.KubeDescribe("MemoryEviction [Slow] [Serial] [Disruptive]", fu
 	})
 })
 
+func logEvent(event *api.Event) {
+	glog.Infof("Event(%#v): type: '%v' reason: '%v' %v", event.InvolvedObject, event.Type, event.Reason, event.Message)
+}
+
 func logNamespaceEvents(f *framework.Framework, ns string) (watch.Interface, error) {
 	watcher, err := f.Client.Events(ns).Watch(api.ListOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("Could not watch events for namespace: %s Error: %v", ns, err)
-	} else {
-		go func() {
-			for {
-				watchEvent, open := <-watcher.ResultChan()
-				if !open {
-					return
-				}
-				event, ok := watchEvent.Object.(*api.Event)
-				if !ok {
-					// This cast should always work, but just in case:
-					continue
-				}
-				glog.Infof("Event(%#v): type: '%v' reason: '%v' %v", event.InvolvedObject, event.Type, event.Reason, event.Message)
-			}
-		}()
 	}
+
+	go func() {
+		for {
+			watchEvent, open := <-watcher.ResultChan()
+			if !open {
+				return
+			}
+			event, ok := watchEvent.Object.(*api.Event)
+			if !ok {
+				// This cast should always work, but just in case:
+				continue
+			}
+			logEvent(event)
+		}
+	}()
+
 	return watcher, nil
+}
+
+func listNamespaceEvents(f *framework.Framework, ns string) error {
+	ls, err := f.Client.Events(ns).List(api.ListOptions{})
+	if err != nil {
+		return err
+	}
+	for _, event := range ls.Items {
+		logEvent(&event)
+	}
+	return nil
 }
 
 func createMemhogPod(f *framework.Framework, genName string, ctnName string, res api.ResourceRequirements) *api.Pod {
