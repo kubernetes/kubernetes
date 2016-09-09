@@ -98,9 +98,9 @@ func (s *volumeStatCalculator) calcAndStoreStats() {
 		metric, err := v.GetMetrics()
 		if err != nil {
 			// Expected for Volumes that don't support Metrics
-			// TODO: Disambiguate unsupported from errors
-			// See issue #20676
-			glog.V(4).Infof("Failed to calculate volume metrics for pod %s volume %s: %+v", format.Pod(s.pod), name, err)
+			if !volume.IsNotSupported(err) {
+				glog.V(4).Infof("Failed to calculate volume metrics for pod %s volume %s: %+v", format.Pod(s.pod), name, err)
+			}
 			continue
 		}
 		stats = append(stats, s.parsePodVolumeStats(name, metric))
