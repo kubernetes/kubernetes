@@ -208,6 +208,9 @@ func exclusiveOpenFailsOnDevice(pathname string) (bool, error) {
 
 func pathIsDevice(pathname string) (bool, error) {
 	finfo, err := os.Stat(pathname)
+	if os.IsNotExist(err) {
+		return false, nil
+	}
 	// err in call to os.Stat
 	if err != nil {
 		return false, err
