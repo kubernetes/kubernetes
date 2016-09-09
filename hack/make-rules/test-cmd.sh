@@ -333,7 +333,7 @@ runTests() {
   petset_replicas_field=".spec.replicas"
   job_parallelism_field=".spec.parallelism"
   deployment_replicas=".spec.replicas"
-  secret_data=".data"
+  configmap_data=".data"
   secret_type=".type"
   deployment_image_field="(index .spec.template.spec.containers 0).image"
   deployment_second_image_field="(index .spec.template.spec.containers 1).image"
@@ -570,6 +570,10 @@ runTests() {
   kubectl create configmap test-configmap --from-literal=key-2=value2 --namespace=test-kubectl-describe-pod
   # Post-condition: configmap exists and has expected values
   kube::test::get_object_assert 'configmap/test-configmap --namespace=test-kubectl-describe-pod' "{{$id_field}}" 'test-configmap'
+  # Command
+  kubectl create configmap test-copy --from-configmap=test-configmap --namespace=test-kubectl-describe-pod
+  # Post-condition: configmap exists and has expected values
+  [[ "$(kubectl get configmap/test-copy -o yaml --namespace=test-kubectl-describe-pod "${kube_flags[@]}" | grep key-2:value2)" ]]
 
   # Create a pod that consumes secret, configmap, and downward API keys as envs
   kube::test::get_object_assert 'pods --namespace=test-kubectl-describe-pod' "{{range.items}}{{$id_field}}:{{end}}" ''
@@ -582,7 +586,7 @@ runTests() {
   # Clean-up
   kubectl delete pod env-test-pod --namespace=test-kubectl-describe-pod
   kubectl delete secret test-secret --namespace=test-kubectl-describe-pod
-  kubectl delete configmap test-configmap --namespace=test-kubectl-describe-pod
+  kubectl delete cm/test-configmap cm/test-copy --namespace=test-kubectl-describe-pod
   kubectl delete namespace test-kubectl-describe-pod
 
   ### Create two PODs

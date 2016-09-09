@@ -39,6 +39,9 @@ var (
 		When creating a configmap based on a directory, each file whose basename is a valid key in the directory will be
 		packaged into the configmap.  Any directory entries except regular files are ignored (e.g. subdirectories,
 		symlinks, devices, pipes, etc).
+
+		Note that when creating a configmap based on another configmap, copied data can be overwritten by file or literal
+		sources, if any of those options are used as well.
 		`)
 
 	configMapExample = dedent.Dedent(`
@@ -49,7 +52,10 @@ var (
 		  kubectl create configmap my-config --from-file=key1=/path/to/bar/file1.txt --from-file=key2=/path/to/bar/file2.txt
 
 		  # Create a new configmap named my-config with key1=config1 and key2=config2
-		  kubectl create configmap my-config --from-literal=key1=config1 --from-literal=key2=config2`)
+		  kubectl create configmap my-config --from-literal=key1=config1 --from-literal=key2=config2
+
+		  # Create a new configmap named my-config by copying its data from a configmap named other-config
+		  kubectl create configmap my-config --from-configmap=other-config`)
 )
 
 // ConfigMap is a command to ease creating ConfigMaps.
@@ -71,6 +77,8 @@ func NewCmdCreateConfigMap(f *cmdutil.Factory, cmdOut io.Writer) *cobra.Command 
 	cmdutil.AddGeneratorFlags(cmd, cmdutil.ConfigMapV1GeneratorName)
 	cmd.Flags().StringSlice("from-file", []string{}, "Key files can be specified using their file path, in which case a default name will be given to them, or optionally with a name and file path, in which case the given name will be used.  Specifying a directory will iterate each named file in the directory that is a valid configmap key.")
 	cmd.Flags().StringSlice("from-literal", []string{}, "Specify a key and literal value to insert in configmap (i.e. mykey=somevalue)")
+	// TODO: Support cross-namespace copying?
+	cmd.Flags().String("from-configmap", "", "Copy the data from an existing config map found in the same namespace")
 	return cmd
 }
 
@@ -80,6 +88,25 @@ func CreateConfigMap(f *cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, a
 	if err != nil {
 		return err
 	}
+
+	configMapNameToCopy := cmdutil.GetFlagString(cmd, "from-configmap")
+	var data map[string]string
+	if len(configMapNameToCopy) > 0 {
+		client, err := f.Client()
+		if err != nil {
+			return err
+		}
+		namespace, _, err := f.DefaultNamespace()
+		if err != nil {
+			return err
+		}
+		configMapToCopy, err := client.ConfigMaps(namespace).Get(configMapNameToCopy)
+		if err != nil {
+			return err
+		}
+		data = configMapToCopy.Data
+	}
+
 	var generator kubectl.StructuredGenerator
 	switch generatorName := cmdutil.GetFlagString(cmd, "generator"); generatorName {
 	case cmdutil.ConfigMapV1GeneratorName:
@@ -87,6 +114,7 @@ func CreateConfigMap(f *cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, a
 			Name:           name,
 			FileSources:    cmdutil.GetFlagStringSlice(cmd, "from-file"),
 			LiteralSources: cmdutil.GetFlagStringSlice(cmd, "from-literal"),
+			Data:           data,
 		}
 	default:
 		return cmdutil.UsageError(cmd, fmt.Sprintf("Generator: %s not supported.", generatorName))
