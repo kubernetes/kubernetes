@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/imagepolicy"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/apis/rbac"
+	"k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/serializer/recognizer"
 
@@ -53,6 +54,7 @@ import (
 	_ "k8s.io/kubernetes/pkg/apis/imagepolicy/install"
 	_ "k8s.io/kubernetes/pkg/apis/policy/install"
 	_ "k8s.io/kubernetes/pkg/apis/rbac/install"
+	_ "k8s.io/kubernetes/pkg/apis/storage/install"
 )
 
 var (
@@ -66,6 +68,7 @@ var (
 	Federation   TestGroup
 	Rbac         TestGroup
 	Certificates TestGroup
+	Storage      TestGroup
 	ImagePolicy  TestGroup
 
 	serializer        runtime.SerializerInfo
@@ -218,6 +221,15 @@ func init() {
 			externalTypes:        api.Scheme.KnownTypes(externalGroupVersion),
 		}
 	}
+	if _, ok := Groups[storage.GroupName]; !ok {
+		externalGroupVersion := unversioned.GroupVersion{Group: storage.GroupName, Version: registered.GroupOrDie(storage.GroupName).GroupVersion.Version}
+		Groups[storage.GroupName] = TestGroup{
+			externalGroupVersion: externalGroupVersion,
+			internalGroupVersion: storage.SchemeGroupVersion,
+			internalTypes:        api.Scheme.KnownTypes(storage.SchemeGroupVersion),
+			externalTypes:        api.Scheme.KnownTypes(externalGroupVersion),
+		}
+	}
 	if _, ok := Groups[certificates.GroupName]; !ok {
 		externalGroupVersion := unversioned.GroupVersion{Group: certificates.GroupName, Version: registered.GroupOrDie(certificates.GroupName).GroupVersion.Version}
 		Groups[certificates.GroupName] = TestGroup{
@@ -247,6 +259,7 @@ func init() {
 	Extensions = Groups[extensions.GroupName]
 	Federation = Groups[federation.GroupName]
 	Rbac = Groups[rbac.GroupName]
+	Storage = Groups[storage.GroupName]
 	ImagePolicy = Groups[imagepolicy.GroupName]
 }
 

@@ -36,6 +36,8 @@ import (
 	fakeunversionedextensions "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/unversioned/fake"
 	unversionedrbac "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/rbac/unversioned"
 	fakeunversionedrbac "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/rbac/unversioned/fake"
+	unversionedstorage "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/storage/unversioned"
+	fakeunversionedstorage "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/storage/unversioned/fake"
 	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/client/typed/discovery"
 	fakediscovery "k8s.io/kubernetes/pkg/client/typed/discovery/fake"
@@ -114,4 +116,9 @@ func (c *Clientset) Extensions() unversionedextensions.ExtensionsInterface {
 // Rbac retrieves the RbacClient
 func (c *Clientset) Rbac() unversionedrbac.RbacInterface {
 	return &fakeunversionedrbac.FakeRbac{Fake: &c.Fake}
+}
+
+// Storage retrieves the StorageClient
+func (c *Clientset) Storage() unversionedstorage.StorageInterface {
+	return &fakeunversionedstorage.FakeStorage{Fake: &c.Fake}
 }

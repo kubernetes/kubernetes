@@ -35,7 +35,6 @@ type ExtensionsInterface interface {
 	ThirdPartyResourceNamespacer
 	ReplicaSetsNamespacer
 	PodSecurityPoliciesInterface
-	StorageClassesInterface
 }
 
 // ExtensionsClient is used to interact with experimental Kubernetes features.
@@ -79,10 +78,6 @@ func (c *ExtensionsClient) ThirdPartyResources() ThirdPartyResourceInterface {
 
 func (c *ExtensionsClient) ReplicaSets(namespace string) ReplicaSetInterface {
 	return newReplicaSets(c, namespace)
-}
-
-func (c *ExtensionsClient) StorageClasses() StorageClassInterface {
-	return newStorageClasses(c)
 }
 
 // NewExtensions creates a new ExtensionsClient for the given config. This client

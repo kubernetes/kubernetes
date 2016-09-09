@@ -945,34 +945,6 @@ message ScaleStatus {
   optional string targetSelector = 3;
 }
 
-// StorageClass describes the parameters for a class of storage for
-// which PersistentVolumes can be dynamically provisioned.
-// 
-// StorageClasses are non-namespaced; the name of the storage class
-// according to etcd is in ObjectMeta.Name.
-message StorageClass {
-  // Standard object's metadata.
-  // More info: http://releases.k8s.io/release-1.4/docs/devel/api-conventions.md#metadata
-  optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
-
-  // Provisioner indicates the type of the provisioner.
-  optional string provisioner = 2;
-
-  // Parameters holds the parameters for the provisioner that should
-  // create volumes of this storage class.
-  map<string, string> parameters = 3;
-}
-
-// StorageClassList is a collection of storage classes.
-message StorageClassList {
-  // Standard list metadata
-  // More info: http://releases.k8s.io/release-1.4/docs/devel/api-conventions.md#metadata
-  optional k8s.io.kubernetes.pkg.api.unversioned.ListMeta metadata = 1;
-
-  // Items is the list of StorageClasses
-  repeated StorageClass items = 2;
-}
-
 // SubresourceReference contains enough information to let you inspect or modify the referred subresource.
 message SubresourceReference {
   // Kind of the referent; More info: http://releases.k8s.io/release-1.4/docs/devel/api-conventions.md#types-kinds

@@ -675,27 +675,6 @@ func (ScaleStatus) SwaggerDoc() map[string]string {
 	return map_ScaleStatus
 }
 
-var map_StorageClass = map[string]string{
-	"":            "StorageClass describes the parameters for a class of storage for which PersistentVolumes can be dynamically provisioned.\n\nStorageClasses are non-namespaced; the name of the storage class according to etcd is in ObjectMeta.Name.",
-	"metadata":    "Standard object's metadata. More info: http://releases.k8s.io/release-1.4/docs/devel/api-conventions.md#metadata",
-	"provisioner": "Provisioner indicates the type of the provisioner.",
-	"parameters":  "Parameters holds the parameters for the provisioner that should create volumes of this storage class.",
-}
-
-func (StorageClass) SwaggerDoc() map[string]string {
-	return map_StorageClass
-}
-
-var map_StorageClassList = map[string]string{
-	"":         "StorageClassList is a collection of storage classes.",
-	"metadata": "Standard list metadata More info: http://releases.k8s.io/release-1.4/docs/devel/api-conventions.md#metadata",
-	"items":    "Items is the list of StorageClasses",
-}
-
-func (StorageClassList) SwaggerDoc() map[string]string {
-	return map_StorageClassList
-}
-
 var map_SubresourceReference = map[string]string{
 	"":            "SubresourceReference contains enough information to let you inspect or modify the referred subresource.",
 	"kind":        "Kind of the referent; More info: http://releases.k8s.io/release-1.4/docs/devel/api-conventions.md#types-kinds",

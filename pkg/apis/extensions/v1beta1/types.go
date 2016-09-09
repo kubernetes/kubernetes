@@ -1199,36 +1199,3 @@ type NetworkPolicyList struct {
 	// Items is a list of schema objects.
 	Items []NetworkPolicy `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
-
-// +genclient=true
-// +nonNamespaced=true
-
-// StorageClass describes the parameters for a class of storage for
-// which PersistentVolumes can be dynamically provisioned.
-//
-// StorageClasses are non-namespaced; the name of the storage class
-// according to etcd is in ObjectMeta.Name.
-type StorageClass struct {
-	unversioned.TypeMeta `json:",inline"`
-	// Standard object's metadata.
-	// More info: http://releases.k8s.io/release-1.4/docs/devel/api-conventions.md#metadata
-	v1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
-
-	// Provisioner indicates the type of the provisioner.
-	Provisioner string `json:"provisioner" protobuf:"bytes,2,opt,name=provisioner"`
-
-	// Parameters holds the parameters for the provisioner that should
-	// create volumes of this storage class.
-	Parameters map[string]string `json:"parameters,omitempty" protobuf:"bytes,3,rep,name=parameters"`
-}
-
-// StorageClassList is a collection of storage classes.
-type StorageClassList struct {
-	unversioned.TypeMeta `json:",inline"`
-	// Standard list metadata
-	// More info: http://releases.k8s.io/release-1.4/docs/devel/api-conventions.md#metadata
-	unversioned.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
-
-	// Items is the list of StorageClasses
-	Items []StorageClass `json:"items" protobuf:"bytes,2,rep,name=items"`
-}
