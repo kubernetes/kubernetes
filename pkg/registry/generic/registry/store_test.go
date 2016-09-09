@@ -21,6 +21,7 @@ import (
 	"path"
 	"reflect"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -46,8 +47,17 @@ import (
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/util/wait"
-	"strings"
 )
+
+type testGracefulStrategy struct {
+	testRESTStrategy
+}
+
+func (t testGracefulStrategy) CheckGracefulDelete(ctx api.Context, obj runtime.Object, options *api.DeleteOptions) bool {
+	return true
+}
+
+var _ rest.RESTGracefulDeleteStrategy = testGracefulStrategy{}
 
 type testOrphanDeleteStrategy struct {
 	*testRESTStrategy
@@ -608,7 +618,67 @@ func TestStoreDelete(t *testing.T) {
 	}
 }
 
-func TestStoreHandleFinalizers(t *testing.T) {
+func TestGracefulStoreHandleFinalizers(t *testing.T) {
+	EnableGarbageCollector = true
+	initialGeneration := int64(1)
+	defer func() { EnableGarbageCollector = false }()
+	podWithFinalizer := &api.Pod{
+		ObjectMeta: api.ObjectMeta{Name: "foo", Finalizers: []string{"foo.com/x"}, Generation: initialGeneration},
+		Spec:       api.PodSpec{NodeName: "machine"},
+	}
+
+	testContext := api.WithNamespace(api.NewContext(), "test")
+	destroyFunc, registry := NewTestGenericStoreRegistry(t)
+	defaultDeleteStrategy := testRESTStrategy{api.Scheme, api.SimpleNameGenerator, true, false, true}
+	registry.DeleteStrategy = testGracefulStrategy{defaultDeleteStrategy}
+	defer destroyFunc()
+	// create pod
+	_, err := registry.Create(testContext, podWithFinalizer)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	// delete the pod with grace period=0, the pod should still exist because it has a finalizer
+	_, err = registry.Delete(testContext, podWithFinalizer.Name, api.NewDeleteOptions(0))
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	_, err = registry.Get(testContext, podWithFinalizer.Name)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	updatedPodWithFinalizer := &api.Pod{
+		ObjectMeta: api.ObjectMeta{Name: "foo", Finalizers: []string{"foo.com/x"}, ResourceVersion: podWithFinalizer.ObjectMeta.ResourceVersion},
+		Spec:       api.PodSpec{NodeName: "machine"},
+	}
+	_, _, err = registry.Update(testContext, updatedPodWithFinalizer.ObjectMeta.Name, rest.DefaultUpdatedObjectInfo(updatedPodWithFinalizer, api.Scheme))
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	// the object should still exist, because it still has a finalizer
+	_, err = registry.Get(testContext, podWithFinalizer.Name)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	podWithNoFinalizer := &api.Pod{
+		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: podWithFinalizer.ObjectMeta.ResourceVersion},
+		Spec:       api.PodSpec{NodeName: "anothermachine"},
+	}
+	_, _, err = registry.Update(testContext, podWithFinalizer.ObjectMeta.Name, rest.DefaultUpdatedObjectInfo(podWithNoFinalizer, api.Scheme))
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	// the pod should be removed, because its finalizer is removed
+	_, err = registry.Get(testContext, podWithFinalizer.Name)
+	if !errors.IsNotFound(err) {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+}
+
+func TestNonGracefulStoreHandleFinalizers(t *testing.T) {
 	EnableGarbageCollector = true
 	initialGeneration := int64(1)
 	defer func() { EnableGarbageCollector = false }()
@@ -678,7 +748,7 @@ func TestStoreHandleFinalizers(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
-	// the pod should be removed, because it's finalizer is removed
+	// the pod should be removed, because its finalizer is removed
 	_, err = registry.Get(testContext, podWithFinalizer.Name)
 	if !errors.IsNotFound(err) {
 		t.Errorf("Unexpected error: %v", err)
