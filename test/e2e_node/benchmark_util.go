@@ -19,12 +19,15 @@ limitations under the License.
 package e2e_node
 
 import (
+	"fmt"
 	"sort"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/perftype"
+
+	. "github.com/onsi/gomega"
 )
 
 const (
@@ -43,12 +46,9 @@ type NodeTimeSeries struct {
 }
 
 // logDensityTimeSeries logs the time series data of operation and resource usage
-func logDensityTimeSeries(rc *ResourceCollector, create, watch map[string]unversioned.Time, testName string) {
+func logDensityTimeSeries(rc *ResourceCollector, create, watch map[string]unversioned.Time, testInfo map[string]string) {
 	timeSeries := &NodeTimeSeries{
-		Labels: map[string]string{
-			"node": framework.TestContext.NodeName,
-			"test": testName,
-		},
+		Labels:  testInfo,
 		Version: currentDataVersion,
 	}
 	// Attach operation time series.
@@ -80,7 +80,7 @@ func getCumulatedPodTimeSeries(timePerPod map[string]unversioned.Time) []int64 {
 }
 
 // getLatencyPerfData returns perf data of pod startup latency.
-func getLatencyPerfData(latency framework.LatencyMetric, testName string) *perftype.PerfData {
+func getLatencyPerfData(latency framework.LatencyMetric, testInfo map[string]string) *perftype.PerfData {
 	return &perftype.PerfData{
 		Version: currentDataVersion,
 		DataItems: []perftype.DataItem{
@@ -98,15 +98,12 @@ func getLatencyPerfData(latency framework.LatencyMetric, testName string) *perft
 				},
 			},
 		},
-		Labels: map[string]string{
-			"node": framework.TestContext.NodeName,
-			"test": testName,
-		},
+		Labels: testInfo,
 	}
 }
 
 // getThroughputPerfData returns perf data of pod creation startup throughput.
-func getThroughputPerfData(batchLag time.Duration, e2eLags []framework.PodLatencyData, podsNr int, testName string) *perftype.PerfData {
+func getThroughputPerfData(batchLag time.Duration, e2eLags []framework.PodLatencyData, podsNr int, testInfo map[string]string) *perftype.PerfData {
 	return &perftype.PerfData{
 		Version: currentDataVersion,
 		DataItems: []perftype.DataItem{
@@ -122,9 +119,40 @@ func getThroughputPerfData(batchLag time.Duration, e2eLags []framework.PodLatenc
 				},
 			},
 		},
-		Labels: map[string]string{
-			"node": framework.TestContext.NodeName,
-			"test": testName,
-		},
+		Labels: testInfo,
+	}
+}
+
+// getTestNodeInfo fetches the capacity of a node from API server and returns a map of labels.
+func getTestNodeInfo(f *framework.Framework, testName string) map[string]string {
+	nodeName := framework.TestContext.NodeName
+	node, err := f.Client.Nodes().Get(nodeName)
+	Expect(err).NotTo(HaveOccurred())
+
+	cpu, ok := node.Status.Capacity["cpu"]
+	if !ok {
+		framework.Failf("Fail to fetch CPU capacity value of test node.")
+	}
+
+	memory, ok := node.Status.Capacity["memory"]
+	if !ok {
+		framework.Failf("Fail to fetch Memory capacity value of test node.")
+	}
+
+	cpuValue, ok := cpu.AsInt64()
+	if !ok {
+		framework.Failf("Fail to fetch CPU capacity value as Int64.")
+	}
+
+	memoryValue, ok := memory.AsInt64()
+	if !ok {
+		framework.Failf("Fail to fetch Memory capacity value as Int64.")
+	}
+
+	return map[string]string{
+		"node":    nodeName,
+		"test":    testName,
+		"image":   node.Status.NodeInfo.OSImage,
+		"machine": fmt.Sprintf("cpu:%dcore,memory:%.1fGB", cpuValue, float32(memoryValue)/(1024*1024*1024)),
 	}
 }
