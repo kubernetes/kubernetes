@@ -75,11 +75,14 @@ type testCase struct {
 	maxReplicas     int32
 	initialReplicas int32
 	desiredReplicas int32
+	lastScaleTime   time.Time
+	annotations     map[string]string
 
 	// CPU target utilization as a percentage of the requested resources.
 	CPUTarget           int32
 	CPUCurrent          int32
 	verifyCPUCurrent    bool
+	reportedTime        time.Time
 	reportedLevels      []uint64
 	reportedCPURequests []resource.Quantity
 	cmTarget            *extensions.CustomMetricTargetList
@@ -143,13 +146,15 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 		tc.Lock()
 		defer tc.Unlock()
 
+		lastScaleTime := unversioned.Time{Time: tc.lastScaleTime}
 		obj := &autoscaling.HorizontalPodAutoscalerList{
 			Items: []autoscaling.HorizontalPodAutoscaler{
 				{
 					ObjectMeta: api.ObjectMeta{
-						Name:      hpaName,
-						Namespace: namespace,
-						SelfLink:  "experimental/v1/namespaces/" + namespace + "/horizontalpodautoscalers/" + hpaName,
+						Name:        hpaName,
+						Namespace:   namespace,
+						SelfLink:    "experimental/v1/namespaces/" + namespace + "/horizontalpodautoscalers/" + hpaName,
+						Annotations: tc.annotations,
 					},
 					Spec: autoscaling.HorizontalPodAutoscalerSpec{
 						ScaleTargetRef: autoscaling.CrossVersionObjectReference{
@@ -163,6 +168,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 					Status: autoscaling.HorizontalPodAutoscalerStatus{
 						CurrentReplicas: tc.initialReplicas,
 						DesiredReplicas: tc.initialReplicas,
+						LastScaleTime:   &lastScaleTime,
 					},
 				},
 			},
@@ -283,6 +289,11 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 
 		var heapsterRawMemResponse []byte
 
+		metricsTimestamp := tc.reportedTime
+		if tc.reportedTime.IsZero() {
+			metricsTimestamp = time.Now()
+		}
+
 		if tc.useMetricsApi {
 			metrics := metrics_api.PodMetricsList{}
 			for i, cpu := range tc.reportedLevels {
@@ -291,7 +302,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 						Name:      fmt.Sprintf("%s-%d", podNamePrefix, i),
 						Namespace: namespace,
 					},
-					Timestamp: unversioned.Time{Time: time.Now()},
+					Timestamp: unversioned.Time{Time: metricsTimestamp},
 					Containers: []metrics_api.ContainerMetrics{
 						{
 							Name: "container",
@@ -568,6 +579,31 @@ func TestScaleUpCM(t *testing.T) {
 	tc.runTest(t)
 }
 
+func TestScaleUpCustomWindow(t *testing.T) {
+	newWindow := defaultUpscaleForbiddenWindow / time.Duration(4)
+
+	baseTimestamp := time.Now()
+	lastScaleTime := baseTimestamp.Add(newWindow * time.Duration(-2))
+
+	tc := testCase{
+		minReplicas:      2,
+		maxReplicas:      6,
+		initialReplicas:  3,
+		desiredReplicas:  5,
+		CPUTarget:        30,
+		verifyCPUCurrent: true,
+		reportedLevels:   []uint64{300, 500, 700},
+		lastScaleTime:    lastScaleTime,
+		reportedTime:     baseTimestamp,
+		annotations: map[string]string{
+			HPAUpscaleForbiddenWindowAnnotationName: fmt.Sprintf("%v", uint64(newWindow/time.Second)),
+		},
+		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+		useMetricsApi:       true,
+	}
+	tc.runTest(t)
+}
+
 func TestDefaultScaleDown(t *testing.T) {
 	tc := testCase{
 		minReplicas:         2,
@@ -611,6 +647,31 @@ func TestScaleDownCM(t *testing.T) {
 			}}},
 		reportedLevels:      []uint64{12, 12, 12, 12, 12},
 		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+	}
+	tc.runTest(t)
+}
+
+func TestScaleDownCustomWindow(t *testing.T) {
+	newWindow := defaultDownscaleForbiddenWindow / time.Duration(4)
+
+	baseTimestamp := time.Now()
+	lastScaleTime := baseTimestamp.Add(newWindow * time.Duration(-2))
+
+	tc := testCase{
+		minReplicas:      2,
+		maxReplicas:      6,
+		initialReplicas:  5,
+		desiredReplicas:  3,
+		CPUTarget:        50,
+		verifyCPUCurrent: true,
+		reportedLevels:   []uint64{100, 300, 500, 250, 250},
+		lastScaleTime:    lastScaleTime,
+		reportedTime:     baseTimestamp,
+		annotations: map[string]string{
+			HPADownscaleForbiddenWindowAnnotationName: fmt.Sprintf("%v", uint64(newWindow/time.Second)),
+		},
+		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+		useMetricsApi:       true,
 	}
 	tc.runTest(t)
 }
