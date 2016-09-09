@@ -188,8 +188,8 @@ func (b *nfsMounter) SetUp(fsGroup *int64) error {
 
 func (b *nfsMounter) SetUpAt(dir string, fsGroup *int64) error {
 	notMnt, err := b.mounter.IsLikelyNotMountPoint(dir)
-	glog.V(4).Infof("NFS mount set up: %s %v %v", dir, !notMnt, err)
 	if err != nil && !os.IsNotExist(err) {
+		glog.V(4).Infof("NFS mount set up: %s %v %v", dir, !notMnt, err)
 		return err
 	}
 	if !notMnt {
