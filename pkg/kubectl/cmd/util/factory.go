@@ -32,6 +32,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/blang/semver"
 	"github.com/emicklei/go-restful/swagger"
 	"github.com/imdario/mergo"
 	"github.com/spf13/cobra"
@@ -51,6 +52,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/certificates"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	extensionsv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/apis/storage"
@@ -282,8 +284,6 @@ func makeInterfacesFor(versionList []unversioned.GroupVersion) func(version unve
 // if optionalClientConfig is nil, then flags will be bound to a new clientcmd.ClientConfig.
 // if optionalClientConfig is not nil, then this factory will make use of it.
 func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
-	mapper := kubectl.ShortcutExpander{RESTMapper: registered.RESTMapper()}
-
 	flags := pflag.NewFlagSet("", pflag.ContinueOnError)
 	flags.SetNormalizeFunc(utilflag.WarnWordSepNormalizeFunc) // Warn for "_" flags
 
@@ -307,82 +307,33 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			if cfg.GroupVersion != nil {
 				cmdApiVersion = *cfg.GroupVersion
 			}
-			if discoverDynamicAPIs {
-				client, err := clients.ClientForVersion(&unversioned.GroupVersion{Version: "v1"})
-				checkErrWithPrefix("failed to find client for version v1: ", err)
 
-				var versions []unversioned.GroupVersion
-				var gvks []unversioned.GroupVersionKind
-				retries := 3
-				for i := 0; i < retries; i++ {
-					versions, gvks, err = GetThirdPartyGroupVersions(client.Discovery())
-					// Retry if we got a NotFound error, because user may delete
-					// a thirdparty group when the GetThirdPartyGroupVersions is
-					// running.
-					if err == nil || !apierrors.IsNotFound(err) {
-						break
+			mapper := registered.RESTMapper()
+			// if we can find the server version and its current enough to have discovery information, use it.  Otherwise,
+			// fallback to our hardcoded list
+			if discoveryClient, err := discovery.NewDiscoveryClientForConfig(cfg); err == nil {
+				if serverVersion, err := discoveryClient.ServerVersion(); err == nil && useDiscoveryRESTMapper(serverVersion.GitVersion) {
+					// register third party resources with the api machinery groups.  This probably should be done, but
+					// its consistent with old code, so we'll start with it.
+					if err := registerThirdPartyResources(discoveryClient); err != nil {
+						fmt.Fprintf(os.Stderr, "unable to register third party resources: %v", err)
+					}
+					// ThirdPartyResourceData is special.  It's not discoverable, but needed for thirdparty resource listing
+					// TODO eliminate this once we're truly generic.
+					thirdPartyResourceDataMapper := meta.NewDefaultRESTMapper([]unversioned.GroupVersion{extensionsv1beta1.SchemeGroupVersion}, registered.InterfacesFor)
+					thirdPartyResourceDataMapper.Add(extensionsv1beta1.SchemeGroupVersion.WithKind("ThirdPartyResourceData"), meta.RESTScopeNamespace)
+					mapper = meta.MultiRESTMapper{
+						discovery.NewDeferredDiscoveryRESTMapper(discoveryClient, registered.InterfacesFor),
+						thirdPartyResourceDataMapper,
 					}
 				}
-				checkErrWithPrefix("failed to get third-party group versions: ", err)
-				if len(versions) > 0 {
-					priorityMapper, ok := mapper.RESTMapper.(meta.PriorityRESTMapper)
-					if !ok {
-						CheckErr(fmt.Errorf("expected PriorityMapper, saw: %v", mapper.RESTMapper))
-						return nil, nil
-					}
-					multiMapper, ok := priorityMapper.Delegate.(meta.MultiRESTMapper)
-					if !ok {
-						CheckErr(fmt.Errorf("unexpected type: %v", mapper.RESTMapper))
-						return nil, nil
-					}
-					groupsMap := map[string][]unversioned.GroupVersion{}
-					for _, version := range versions {
-						groupsMap[version.Group] = append(groupsMap[version.Group], version)
-					}
-					for group, versionList := range groupsMap {
-						preferredExternalVersion := versionList[0]
+			}
 
-						thirdPartyMapper, err := kubectl.NewThirdPartyResourceMapper(versionList, getGroupVersionKinds(gvks, group))
-						checkErrWithPrefix("failed to create third party resource mapper: ", err)
-						accessor := meta.NewAccessor()
-						groupMeta := apimachinery.GroupMeta{
-							GroupVersion:  preferredExternalVersion,
-							GroupVersions: versionList,
-							RESTMapper:    thirdPartyMapper,
-							SelfLinker:    runtime.SelfLinker(accessor),
-							InterfacesFor: makeInterfacesFor(versionList),
-						}
-
-						checkErrWithPrefix("failed to register group: ", registered.RegisterGroup(groupMeta))
-						registered.AddThirdPartyAPIGroupVersions(versionList...)
-						multiMapper = append(meta.MultiRESTMapper{thirdPartyMapper}, multiMapper...)
-					}
-					priorityMapper.Delegate = multiMapper
-					// Reassign to the RESTMapper here because priorityMapper is actually a copy, so if we
-					// don't reassign, the above assignement won't actually update mapper.RESTMapper
-					mapper.RESTMapper = priorityMapper
-				}
-			}
-			outputRESTMapper := kubectl.OutputVersionMapper{RESTMapper: mapper, OutputVersions: []unversioned.GroupVersion{cmdApiVersion}}
-			priorityRESTMapper := meta.PriorityRESTMapper{
-				Delegate: outputRESTMapper,
-			}
-			// TODO: this should come from registered versions
-			groups := []string{api.GroupName, autoscaling.GroupName, extensions.GroupName, federation.GroupName, batch.GroupName}
-			// set a preferred version
-			for _, group := range groups {
-				gvs := registered.EnabledVersionsForGroup(group)
-				if len(gvs) == 0 {
-					continue
-				}
-				priorityRESTMapper.ResourcePriority = append(priorityRESTMapper.ResourcePriority, unversioned.GroupVersionResource{Group: group, Version: gvs[0].Version, Resource: meta.AnyResource})
-				priorityRESTMapper.KindPriority = append(priorityRESTMapper.KindPriority, unversioned.GroupVersionKind{Group: group, Version: gvs[0].Version, Kind: meta.AnyKind})
-			}
-			for _, group := range groups {
-				priorityRESTMapper.ResourcePriority = append(priorityRESTMapper.ResourcePriority, unversioned.GroupVersionResource{Group: group, Version: meta.AnyVersion, Resource: meta.AnyResource})
-				priorityRESTMapper.KindPriority = append(priorityRESTMapper.KindPriority, unversioned.GroupVersionKind{Group: group, Version: meta.AnyVersion, Kind: meta.AnyKind})
-			}
-			return priorityRESTMapper, api.Scheme
+			// wrap with shortcuts
+			mapper = kubectl.ShortcutExpander{RESTMapper: mapper}
+			// wrap with output preferences
+			mapper = kubectl.OutputVersionMapper{RESTMapper: mapper, OutputVersions: []unversioned.GroupVersion{cmdApiVersion}}
+			return mapper, api.Scheme
 		},
 		UnstructuredObject: func() (meta.RESTMapper, runtime.ObjectTyper, error) {
 			cfg, err := clients.ClientConfigForVersion(nil)
@@ -1346,4 +1297,72 @@ func (f *Factory) NewBuilder(thirdPartyDiscovery bool) *resource.Builder {
 	mapper, typer := f.Object(thirdPartyDiscovery)
 
 	return resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true))
+}
+
+// useDiscoveryRESTMapper checks the server version to see if its recent enough to have
+// enough discovery information avaiable to reliably build a RESTMapper.  If not, use the
+// hardcoded mapper in this client (legacy behavior)
+func useDiscoveryRESTMapper(serverVersion string) bool {
+	serverSemVer, err := semver.Parse(serverVersion[1:])
+	if err != nil {
+		return false
+	}
+	if serverSemVer.LT(semver.MustParse("1.3.0")) {
+		return false
+	}
+	return true
+}
+
+// registerThirdPartyResources inspects the discovery endpoint to find thirdpartyresources in the discovery doc
+// and then registers them with the apimachinery code.  I think this is done so that scheme/codec stuff works,
+// but I really don't know.  Feels like this code should go away once kubectl is completely generic for generic
+// CRUD
+func registerThirdPartyResources(discoveryClient discovery.DiscoveryInterface) error {
+	var versions []unversioned.GroupVersion
+	var gvks []unversioned.GroupVersionKind
+	var err error
+	retries := 3
+	for i := 0; i < retries; i++ {
+		versions, gvks, err = GetThirdPartyGroupVersions(discoveryClient)
+		// Retry if we got a NotFound error, because user may delete
+		// a thirdparty group when the GetThirdPartyGroupVersions is
+		// running.
+		if err == nil || !apierrors.IsNotFound(err) {
+			break
+		}
+	}
+	if err != nil {
+		return err
+	}
+
+	if len(versions) > 0 {
+		groupsMap := map[string][]unversioned.GroupVersion{}
+		for _, version := range versions {
+			groupsMap[version.Group] = append(groupsMap[version.Group], version)
+		}
+		for group, versionList := range groupsMap {
+			preferredExternalVersion := versionList[0]
+
+			thirdPartyMapper, err := kubectl.NewThirdPartyResourceMapper(versionList, getGroupVersionKinds(gvks, group))
+			if err != nil {
+				return err
+			}
+
+			accessor := meta.NewAccessor()
+			groupMeta := apimachinery.GroupMeta{
+				GroupVersion:  preferredExternalVersion,
+				GroupVersions: versionList,
+				RESTMapper:    thirdPartyMapper,
+				SelfLinker:    runtime.SelfLinker(accessor),
+				InterfacesFor: makeInterfacesFor(versionList),
+			}
+			if err := registered.RegisterGroup(groupMeta); err != nil {
+				return err
+			}
+			registered.AddThirdPartyAPIGroupVersions(versionList...)
+
+		}
+	}
+
+	return nil
 }
