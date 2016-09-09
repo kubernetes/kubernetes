@@ -526,7 +526,7 @@ func (m *DefaultRESTMapper) RESTMapping(gk unversioned.GroupKind, versions ...st
 
 	interfaces, err := m.interfacesFunc(gvk.GroupVersion())
 	if err != nil {
-		return nil, fmt.Errorf("the provided version %q has no relevant versions", gvk.GroupVersion().String())
+		return nil, fmt.Errorf("the provided version %q has no relevant versions: %v", gvk.GroupVersion().String(), err)
 	}
 
 	retVal := &RESTMapping{
@@ -565,7 +565,7 @@ func (m *DefaultRESTMapper) RESTMappings(gk unversioned.GroupKind) ([]*RESTMappi
 
 		interfaces, err := m.interfacesFunc(gvk.GroupVersion())
 		if err != nil {
-			return nil, fmt.Errorf("the provided version %q has no relevant versions", gvk.GroupVersion().String())
+			return nil, fmt.Errorf("the provided version %q has no relevant versions: %v", gvk.GroupVersion().String(), err)
 		}
 
 		mappings = append(mappings, &RESTMapping{
