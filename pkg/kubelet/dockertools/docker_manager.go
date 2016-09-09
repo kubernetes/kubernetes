@@ -667,7 +667,7 @@ func (dm *DockerManager) runContainer(
 	}
 
 	// Set sysctls if requested
-	if if container.Name == PodInfraContainerName {
+	if container.Name == PodInfraContainerName {
 		sysctls, unsafeSysctls, err := api.SysctlsFromPodAnnotations(pod.Annotations)
 		if err != nil {
 			dm.recorder.Eventf(ref, api.EventTypeWarning, events.FailedToCreateContainer, "Failed to create docker container %q of pod %q with error: %v", container.Name, format.Pod(pod), err)
