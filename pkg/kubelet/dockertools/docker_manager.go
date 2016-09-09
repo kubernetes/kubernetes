@@ -673,8 +673,8 @@ func (dm *DockerManager) runContainer(
 			dm.recorder.Eventf(ref, api.EventTypeWarning, events.FailedToCreateContainer, "Failed to create docker container %q of pod %q with error: %v", container.Name, format.Pod(pod), err)
 			return kubecontainer.ContainerID{}, err
 		}
-		if len(sysctls) + len(unsafeSysctls) > 0 {
-			hc.Sysctls = make(map[string]string, len(sysctls) + len(unsafeSysctls))
+		if len(sysctls)+len(unsafeSysctls) > 0 {
+			hc.Sysctls = make(map[string]string, len(sysctls)+len(unsafeSysctls))
 			for _, c := range sysctls {
 				hc.Sysctls[c.Name] = c.Value
 			}
