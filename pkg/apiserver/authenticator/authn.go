@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/auth/authenticator"
 	"k8s.io/kubernetes/pkg/auth/authenticator/bearertoken"
+	"k8s.io/kubernetes/pkg/auth/group"
 	"k8s.io/kubernetes/pkg/auth/user"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	certutil "k8s.io/kubernetes/pkg/util/cert"
@@ -128,6 +129,8 @@ func New(config AuthenticatorConfig) (authenticator.Request, error) {
 	}
 
 	authenticator := union.New(authenticators...)
+
+	authenticator = group.NewGroupAdder(authenticator, []string{"system:authenticated"})
 
 	if config.Anonymous {
 		// If the authenticator chain returns an error, return an error (don't consider a bad bearer token anonymous).
