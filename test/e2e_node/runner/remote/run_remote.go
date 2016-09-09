@@ -598,8 +598,8 @@ func imageToInstanceName(imageConfig *internalGCEImage) string {
 	if imageConfig.machine == "" {
 		return *instanceNamePrefix + "-" + imageConfig.image
 	}
-	// For benchmark test, node name has the format 'machine-image-uuid'.
-	// Node name is added to test data item labels and used for benchmark dashboard.
+	// For benchmark test, node name has the format 'machine-image-uuid' to run
+	// different machine types with the same image in parallel
 	return imageConfig.machine + "-" + imageConfig.image + "-" + uuid.NewUUID().String()[:8]
 }
 
