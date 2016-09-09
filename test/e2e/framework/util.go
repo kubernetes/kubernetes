@@ -4213,7 +4213,7 @@ func allowedNotReadyReasons(nodes []*api.Node) bool {
 // and figure out how to do it in a configurable way, as we can't expect all setups to run
 // default test add-ons.
 func AllNodesReady(c *client.Client, timeout time.Duration) error {
-	Logf("Waiting up to %v for all (but %d) nodes to be ready", TestContext.AllowedNotReadyNodes, timeout)
+	Logf("Waiting up to %v for all (but %d) nodes to be ready", timeout, TestContext.AllowedNotReadyNodes)
 
 	var notReady []*api.Node
 	err := wait.PollImmediate(Poll, timeout, func() (bool, error) {
@@ -4246,8 +4246,8 @@ func AllNodesReady(c *client.Client, timeout time.Duration) error {
 		return err
 	}
 
-	if len(notReady) > 0 {
-		return fmt.Errorf("Not ready nodes: %v", notReady)
+	if len(notReady) > TestContext.AllowedNotReadyNodes || !allowedNotReadyReasons(notReady) {
+		return fmt.Errorf("Not ready nodes: %#v", notReady)
 	}
 	return nil
 }
