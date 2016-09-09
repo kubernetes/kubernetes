@@ -2952,7 +2952,11 @@ func GetReadySchedulableNodesOrDie(c *client.Client) (nodes *api.NodeList) {
 }
 
 func WaitForAllNodesSchedulable(c *client.Client) error {
+	Logf("Waiting up to %v for all (but %d) nodes to be schedulable", 4*time.Hour, TestContext.AllowedNotReadyNodes)
+
+	var notSchedulable []*api.Node
 	return wait.PollImmediate(30*time.Second, 4*time.Hour, func() (bool, error) {
+		notSchedulable = nil
 		opts := api.ListOptions{
 			ResourceVersion: "0",
 			FieldSelector:   fields.Set{"spec.unschedulable": "false"}.AsSelector(),
@@ -2963,17 +2967,23 @@ func WaitForAllNodesSchedulable(c *client.Client) error {
 			// Ignore the error here - it will be retried.
 			return false, nil
 		}
-		schedulable := 0
-		for _, node := range nodes.Items {
-			if isNodeSchedulable(&node) {
-				schedulable++
+		for i := range nodes.Items {
+			node := &nodes.Items[i]
+			if !isNodeSchedulable(node) {
+				notSchedulable = append(notSchedulable, node)
 			}
 		}
-		if schedulable != len(nodes.Items) {
-			Logf("%d/%d nodes schedulable (polling after 30s)", schedulable, len(nodes.Items))
+		// Framework allows for <TestContext.AllowedNotReadyNodes> nodes to be non-ready,
+		// to make it possible e.g. for incorrect deployment of some small percentage
+		// of nodes (which we allow in cluster validation). Some nodes that are not
+		// provisioned correctly at startup will never become ready (e.g. when something
+		// won't install correctly), so we can't expect them to be ready at any point.
+		//
+		// However, we only allow non-ready nodes with some specific reasons.
+		if len(notSchedulable) > TestContext.AllowedNotReadyNodes {
 			return false, nil
 		}
-		return true, nil
+		return allowedNotReadyReasons(notSchedulable), nil
 	})
 }
 
