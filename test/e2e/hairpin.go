@@ -18,12 +18,14 @@ package e2e
 
 import (
 	"fmt"
+	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
 var _ = framework.KubeDescribe("Hairpin Networking", func() {
@@ -39,8 +41,8 @@ var _ = framework.KubeDescribe("Hairpin Networking", func() {
 
 		By("Creating a webserver pod")
 		podName := "hairpin-webserver"
-		defer f.Client.Pods(f.Namespace.Name).Delete(podName, nil)
 		launchHairpinTestPod(f, podName, node.Name)
+		defer f.Client.Pods(f.Namespace.Name).Delete(podName, nil)
 
 		By(fmt.Sprintf("Creating a service named %q in namespace %q", svcname, f.Namespace.Name))
 		svc, err := f.Client.Services(f.Namespace.Name).Create(&api.Service{
@@ -66,7 +68,19 @@ var _ = framework.KubeDescribe("Hairpin Networking", func() {
 		}
 
 		By("Checking that the webserver is accessible from inside the same pod")
-		framework.RunKubectlOrDie("exec", fmt.Sprintf("--namespace=%v", f.Namespace.Name), podName, "--", "wget", "-s", svcname+":8080")
+		passed := false
+		// apply a 1 minute observation period to ensure the pod and service have started
+		timeout := time.Now().Add(1 * time.Minute)
+		for i := 0; !passed && timeout.After(time.Now()); i++ {
+			time.Sleep(2 * time.Second)
+			_, err := framework.RunKubectl("exec", fmt.Sprintf("--namespace=%v", f.Namespace.Name), podName, "--", "wget", "-s", svcname+":8080")
+			if err != nil {
+				framework.Logf("Attempt %v: did not succeed. (error: '%v')", i, err)
+				continue
+			}
+			passed = true
+		}
+		Expect(passed).Should(Equal(true))
 	})
 })
 
