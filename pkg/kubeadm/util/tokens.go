@@ -77,15 +77,7 @@ func UseGivenTokenIfValid(s *kubeadmapi.KubeadmConfig) (bool, error) {
 			"length of first part is incorrect [%d (given) != %d (expected) ]",
 			len(givenToken[0]), TokenIDLen))
 	}
-	tokenBytes, err := hex.DecodeString(givenToken[1])
-	if err != nil {
-		return false, fmt.Errorf(invalidErr, err)
-	}
-	if len(tokenBytes) != TokenBytes {
-		return false, fmt.Errorf(invalidErr, fmt.Sprintf(
-			"length of second part is incorrect [%d (given) != %d (expected)]",
-			len(tokenBytes), TokenBytes))
-	}
+	tokenBytes := []byte(givenToken[1])
 	s.Secrets.TokenID = givenToken[0]
 	s.Secrets.BearerToken = givenToken[1]
 	s.Secrets.Token = tokenBytes
