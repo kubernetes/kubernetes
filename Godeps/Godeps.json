@@ -1827,6 +1827,10 @@
 			"Rev": "454a56f35412459b5e684fd5ec0f9211b94f002a"
 		},
 		{
+			"ImportPath": "github.com/quobyte/api",
+			"Rev": "5a6c0f0e5d8e3f21cb4ebc36c64a2fe1fbaa1c23"
+		},
+		{
 			"ImportPath": "github.com/rackspace/gophercloud",
 			"Comment": "v1.0.0-920-g934dbf8",
 			"Rev": "934dbf81977c67c521c75492dc1f55ca74dc5b04"
