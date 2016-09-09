@@ -489,7 +489,7 @@ func TestZeroRequest(t *testing.T) {
 		// to test what's actually in production.
 		priorityConfigs := []algorithm.PriorityConfig{
 			{Map: algorithmpriorities.LeastRequestedPriorityMap, Weight: 1},
-			{Function: algorithmpriorities.BalancedResourceAllocation, Weight: 1},
+			{Map: algorithmpriorities.BalancedResourceAllocationMap, Weight: 1},
 			{
 				Function: algorithmpriorities.NewSelectorSpreadPriority(
 					algorithm.FakePodLister(test.pods),

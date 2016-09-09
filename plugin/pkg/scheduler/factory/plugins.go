@@ -206,7 +206,7 @@ func RegisterCustomPriorityFunction(policy schedulerapi.PriorityPolicy) string {
 			}
 		} else if policy.Argument.LabelPreference != nil {
 			pcf = &PriorityConfigFactory{
-				Function: func(args PluginFactoryArgs) algorithm.PriorityFunction {
+				MapReduceFunction: func(args PluginFactoryArgs) (algorithm.PriorityMapFunction, algorithm.PriorityReduceFunction) {
 					return priorities.NewNodeLabelPriority(
 						policy.Argument.LabelPreference.Label,
 						policy.Argument.LabelPreference.Presence,
