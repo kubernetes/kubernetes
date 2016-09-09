@@ -246,7 +246,7 @@ release-skip-tests quick-release:
 #   make cross
 .PHONY: cross
 cross:
-	hack/make-rules/cross.sh
+	hack/make-rules/cross.sh $(WHAT)
 
 # Add rules for all directories in cmd/
 #
