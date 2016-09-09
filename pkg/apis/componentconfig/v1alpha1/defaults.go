@@ -249,11 +249,6 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 	if obj.MinimumGCAge == zeroDuration {
 		obj.MinimumGCAge = unversioned.Duration{Duration: 0}
 	}
-	// For backwards-compat NetworkPluginDir is consulted as source of CNI config
-	// but CNIConfDir is preferred; don't set this default if CNI is in use.
-	if obj.NetworkPluginDir == "" && obj.NetworkPluginName != "cni" {
-		obj.NetworkPluginDir = "/usr/libexec/kubernetes/kubelet-plugins/net/exec/"
-	}
 	if obj.NonMasqueradeCIDR == "" {
 		obj.NonMasqueradeCIDR = "10.0.0.0/8"
 	}
