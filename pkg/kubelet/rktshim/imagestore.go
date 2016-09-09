@@ -18,14 +18,8 @@ package rktshim
 
 import (
 	"errors"
-	"fmt"
-	"strconv"
-	"strings"
-	"time"
 
 	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
-
-	"k8s.io/kubernetes/pkg/kubelet/container"
 )
 
 // TODO(tmrts): Move these errors to the container API for code re-use.
@@ -36,87 +30,32 @@ var (
 // var _ kubeletApi.ImageManagerService = (*ImageStore)(nil)
 
 // ImageStore supports CRUD operations for images.
-type ImageStore struct {
-	rkt            CLI
-	requestTimeout time.Duration
-}
+type ImageStore struct{}
 
 // TODO(tmrts): fill the image store configuration fields.
-type ImageStoreConfig struct {
-	CLI            CLI
-	RequestTimeout time.Duration
-}
+type ImageStoreConfig struct{}
 
 // NewImageStore creates an image storage that allows CRUD operations for images.
-func NewImageStore(cfg ImageStoreConfig) (*ImageStore, error) {
-	return &ImageStore{rkt: cfg.CLI, requestTimeout: cfg.RequestTimeout}, nil
+func NewImageStore(ImageStoreConfig) (*ImageStore, error) {
+	return &ImageStore{}, nil
 }
 
 // List lists the images residing in the image store.
-func (s *ImageStore) List() ([]container.Image, error) {
-	list, err := s.rkt.RunCommand("image", "list",
-		"--no-legend",
-		"--fields=id,name,size",
-		"--sort=importtime",
-	)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't list images: %v", err)
-	}
-
-	images := make([]container.Image, len(list))
-	for i, image := range list {
-		tokens := strings.Fields(image)
-
-		id, name := tokens[0], tokens[1]
-
-		size, err := strconv.ParseInt(tokens[2], 10, 0)
-		if err != nil {
-			return nil, fmt.Errorf("invalid image size format: %v", err)
-		}
-
-		images[i] = container.Image{
-			ID:       id,
-			RepoTags: []string{name},
-			Size:     size,
-		}
-	}
-
-	return images, nil
+func (*ImageStore) List() ([]runtimeApi.Image, error) {
+	panic("not implemented")
 }
 
 // Pull pulls an image into the image store and uses the given authentication method.
-func (s *ImageStore) Pull(container.ImageSpec, runtimeApi.AuthConfig, *runtimeApi.PodSandboxConfig) error {
-	panic("not implemented yet!")
+func (*ImageStore) Pull(runtimeApi.ImageSpec, runtimeApi.AuthConfig, *runtimeApi.PodSandboxConfig) error {
+	panic("not implemented")
 }
 
 // Remove removes the image from the image store.
-func (s *ImageStore) Remove(imgSpec container.ImageSpec) error {
-	img, err := s.Status(imgSpec)
-	if err != nil {
-		return err
-	}
-
-	if _, err := s.rkt.RunCommand("image", "rm", img.ID); err != nil {
-		return fmt.Errorf("failed to remove the image: %v", err)
-	}
-
-	return nil
+func (*ImageStore) Remove(runtimeApi.ImageSpec) error {
+	panic("not implemented")
 }
 
 // Status returns the status of the image.
-func (s *ImageStore) Status(spec container.ImageSpec) (container.Image, error) {
-	images, err := s.List()
-	if err != nil {
-		return container.Image{}, err
-	}
-
-	for _, img := range images {
-		for _, tag := range img.RepoTags {
-			if tag == spec.Image {
-				return img, nil
-			}
-		}
-	}
-
-	return container.Image{}, fmt.Errorf("couldn't to find the image %v", spec.Image)
+func (*ImageStore) Status(runtimeApi.ImageSpec) (runtimeApi.Image, error) {
+	panic("not implemented")
 }
