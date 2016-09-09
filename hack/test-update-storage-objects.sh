@@ -192,7 +192,8 @@ for test in ${tests[@]}; do
   new_storage_version=${test_data[5]}
 
   kube::log::status "Verifying ${resource}/${namespace}/${name} has updated storage version ${new_storage_version} in etcd"
-  ${ETCDCTL} --endpoints="${ETCD_HOST}:${ETCD_PORT}" get "/${ETCD_PREFIX}/${resource}/${namespace}/${name}" | grep ${new_storage_version}
+  # note that should use flag --endpoints for etcdctl 3
+  ${ETCDCTL} --endpoint="${ETCD_HOST}:${ETCD_PORT}" get "/${ETCD_PREFIX}/${resource}/${namespace}/${name}" | grep ${new_storage_version}
 done
 
 killApiServer

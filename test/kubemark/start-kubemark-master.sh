@@ -31,7 +31,7 @@ if [ "${EVENT_STORE_IP}" == "127.0.0.1" ]; then
 	# Retry starting etcd to avoid pulling image errors.
 	retry sudo docker run --net=host \
 		-v /var/etcd/data-events:/var/etcd/data -v /var/log:/var/log -d \
-		gcr.io/google_containers/etcd:2.3.7 /bin/sh -c "/usr/local/bin/etcd \
+		gcr.io/google_containers/etcd:2.2.1 /bin/sh -c "/usr/local/bin/etcd \
 		--listen-peer-urls http://127.0.0.1:2381 \
 		--advertise-client-urls=http://127.0.0.1:4002 \
 		--listen-client-urls=http://0.0.0.0:4002 \
@@ -41,7 +41,7 @@ fi
 # Retry starting etcd to avoid pulling image errors.
 retry sudo docker run --net=host \
 	-v /var/etcd/data:/var/etcd/data -v /var/log:/var/log -d \
-	gcr.io/google_containers/etcd:2.3.7 /bin/sh -c "/usr/local/bin/etcd \
+	gcr.io/google_containers/etcd:2.2.1 /bin/sh -c "/usr/local/bin/etcd \
 	--listen-peer-urls http://127.0.0.1:2380 \
 	--advertise-client-urls=http://127.0.0.1:2379 \
 	--listen-client-urls=http://0.0.0.0:2379 \
