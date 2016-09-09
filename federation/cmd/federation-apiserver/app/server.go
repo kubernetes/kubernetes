@@ -108,6 +108,7 @@ func Run(s *options.ServerRunOptions) error {
 	}
 
 	authenticator, err := authenticator.New(authenticator.AuthenticatorConfig{
+		Anonymous:         s.AnonymousAuth,
 		BasicAuthFile:     s.BasicAuthFile,
 		ClientCAFile:      s.ClientCAFile,
 		TokenAuthFile:     s.TokenAuthFile,
