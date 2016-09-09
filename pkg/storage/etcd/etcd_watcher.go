@@ -21,7 +21,6 @@ import (
 	"net/http"
 	"reflect"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -46,23 +45,6 @@ const (
 	EtcdCAD    = "compareAndDelete"
 	EtcdExpire = "expire"
 )
-
-// HighWaterMark is a thread-safe object for tracking the maximum value seen
-// for some quantity.
-type HighWaterMark int64
-
-// Update returns true if and only if 'current' is the highest value ever seen.
-func (hwm *HighWaterMark) Update(current int64) bool {
-	for {
-		old := atomic.LoadInt64((*int64)(hwm))
-		if current <= old {
-			return false
-		}
-		if atomic.CompareAndSwapInt64((*int64)(hwm), old, current) {
-			return true
-		}
-	}
-}
 
 // TransformFunc attempts to convert an object to another object for use with a watcher.
 type TransformFunc func(runtime.Object) (runtime.Object, error)
@@ -109,8 +91,8 @@ type etcdWatcher struct {
 	emit func(watch.Event)
 
 	// HighWaterMarks for performance debugging.
-	incomingHWM HighWaterMark
-	outgoingHWM HighWaterMark
+	incomingHWM storage.HighWaterMark
+	outgoingHWM storage.HighWaterMark
 
 	cache etcdCache
 }
