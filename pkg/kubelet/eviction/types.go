@@ -161,3 +161,6 @@ type nodeReclaimFunc func() (*resource.Quantity, error)
 
 // nodeReclaimFuncs is an ordered list of nodeReclaimFunc
 type nodeReclaimFuncs []nodeReclaimFunc
+
+// thresholdNotifierHandlerFunc is a function that takes action in response to a crossed threshold
+type thresholdNotifierHandlerFunc func(thresholdDescription string)
