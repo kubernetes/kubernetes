@@ -68,6 +68,7 @@ spec:
         - --cache-size=1000
         - --no-resolv
         - --server=127.0.0.1#10053
+        - --log-facility=-
         ports:
         - containerPort: 53
           name: dns
