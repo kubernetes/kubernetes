@@ -36,12 +36,13 @@ We need to add below features to enhance GPU(especial NVIDIA GPU) capabilities. 
 	1.2 Once Kubelet restart, the GPU information needs to be recovered from containers' imformation.
 
  2. Assign more than 1 NVIDIA GPU to 1 container, and each container could have multiple NVIDIA GPUs. The devices host/container mapping also need to be added to the runtime information, just as the volume did. The container GPU mapping list could show the GPU assignment.
-		```go
-		type ContainerGPUMapping {
+	
+```go
+		type ContainerGPUMapping struct {
 			ContainerName string	// Which container this GPU attached. If it's NULL, the status can't be Free.
 			GPUID					string	// The GPU assigned to container.
 			Status				string	// InUse/Free/Unknow. If it's InUse, must has a container name.
-		```
+```
   
 	2.1 Kubelet need to find free GPUs from the current ```GPUDevice``` list and ```ContainerGPUMapping``` list, and asssign them to container. The device path mapping on host and container are the same, like if we assgin ```/dev/nvidia1``` and ```/dev/nvidia2``` to a container, inside the container, we can see ```/dev/nvidia1``` and ```/dev/nvidia2``` as the same as on the host.
   
