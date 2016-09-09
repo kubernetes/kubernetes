@@ -27,6 +27,7 @@ import (
 	certutil "k8s.io/kubernetes/pkg/util/cert"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/password/keystone"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/password/passwordfile"
+	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/anonymous"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/basicauth"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/union"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/x509"
@@ -36,6 +37,7 @@ import (
 )
 
 type AuthenticatorConfig struct {
+	Anonymous                   bool
 	BasicAuthFile               string
 	ClientCAFile                string
 	TokenAuthFile               string
@@ -57,6 +59,7 @@ type AuthenticatorConfig struct {
 func New(config AuthenticatorConfig) (authenticator.Request, error) {
 	var authenticators []authenticator.Request
 
+	// BasicAuth methods, local first, then remote
 	if len(config.BasicAuthFile) > 0 {
 		basicAuth, err := newAuthenticatorFromBasicAuthFile(config.BasicAuthFile)
 		if err != nil {
@@ -64,7 +67,15 @@ func New(config AuthenticatorConfig) (authenticator.Request, error) {
 		}
 		authenticators = append(authenticators, basicAuth)
 	}
+	if len(config.KeystoneURL) > 0 {
+		keystoneAuth, err := newAuthenticatorFromKeystoneURL(config.KeystoneURL)
+		if err != nil {
+			return nil, err
+		}
+		authenticators = append(authenticators, keystoneAuth)
+	}
 
+	// X509 methods
 	if len(config.ClientCAFile) > 0 {
 		certAuth, err := newAuthenticatorFromClientCAFile(config.ClientCAFile)
 		if err != nil {
@@ -73,6 +84,7 @@ func New(config AuthenticatorConfig) (authenticator.Request, error) {
 		authenticators = append(authenticators, certAuth)
 	}
 
+	// Bearer token methods, local first, then remote
 	if len(config.TokenAuthFile) > 0 {
 		tokenAuth, err := newAuthenticatorFromTokenFile(config.TokenAuthFile)
 		if err != nil {
@@ -80,7 +92,6 @@ func New(config AuthenticatorConfig) (authenticator.Request, error) {
 		}
 		authenticators = append(authenticators, tokenAuth)
 	}
-
 	if len(config.ServiceAccountKeyFile) > 0 {
 		serviceAccountAuth, err := newServiceAccountAuthenticator(config.ServiceAccountKeyFile, config.ServiceAccountLookup, config.ServiceAccountTokenGetter)
 		if err != nil {
@@ -88,7 +99,6 @@ func New(config AuthenticatorConfig) (authenticator.Request, error) {
 		}
 		authenticators = append(authenticators, serviceAccountAuth)
 	}
-
 	// NOTE(ericchiang): Keep the OpenID Connect after Service Accounts.
 	//
 	// Because both plugins verify JWTs whichever comes first in the union experiences
@@ -102,15 +112,6 @@ func New(config AuthenticatorConfig) (authenticator.Request, error) {
 		}
 		authenticators = append(authenticators, oidcAuth)
 	}
-
-	if len(config.KeystoneURL) > 0 {
-		keystoneAuth, err := newAuthenticatorFromKeystoneURL(config.KeystoneURL)
-		if err != nil {
-			return nil, err
-		}
-		authenticators = append(authenticators, keystoneAuth)
-	}
-
 	if len(config.WebhookTokenAuthnConfigFile) > 0 {
 		webhookTokenAuth, err := newWebhookTokenAuthenticator(config.WebhookTokenAuthnConfigFile, config.WebhookTokenAuthnCacheTTL)
 		if err != nil {
@@ -119,14 +120,21 @@ func New(config AuthenticatorConfig) (authenticator.Request, error) {
 		authenticators = append(authenticators, webhookTokenAuth)
 	}
 
-	switch len(authenticators) {
-	case 0:
+	if len(authenticators) == 0 {
+		if config.Anonymous {
+			return anonymous.NewAuthenticator(), nil
+		}
 		return nil, nil
-	case 1:
-		return authenticators[0], nil
-	default:
-		return union.New(authenticators...), nil
 	}
+
+	authenticator := union.New(authenticators...)
+
+	if config.Anonymous {
+		// If the authenticator chain returns an error, return an error (don't consider a bad bearer token anonymous).
+		authenticator = union.NewFailOnError(authenticator, anonymous.NewAuthenticator())
+	}
+
+	return authenticator, nil
 }
 
 // IsValidServiceAccountKeyFile returns true if a valid public RSA key can be read from the given file

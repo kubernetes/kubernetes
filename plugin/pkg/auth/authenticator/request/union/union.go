@@ -35,12 +35,18 @@ type unionAuthRequestHandler struct {
 // New returns a request authenticator that validates credentials using a chain of authenticator.Request objects.
 // The entire chain is tried until one succeeds. If all fail, an aggregate error is returned.
 func New(authRequestHandlers ...authenticator.Request) authenticator.Request {
+	if len(authRequestHandlers) == 1 {
+		return authRequestHandlers[0]
+	}
 	return &unionAuthRequestHandler{Handlers: authRequestHandlers, FailOnError: false}
 }
 
 // NewFailOnError returns a request authenticator that validates credentials using a chain of authenticator.Request objects.
 // The first error short-circuits the chain.
 func NewFailOnError(authRequestHandlers ...authenticator.Request) authenticator.Request {
+	if len(authRequestHandlers) == 1 {
+		return authRequestHandlers[0]
+	}
 	return &unionAuthRequestHandler{Handlers: authRequestHandlers, FailOnError: true}
 }
 
