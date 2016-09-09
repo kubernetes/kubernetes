@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package subjectaccessreview
+package localsubjectaccessreview
 
 import (
 	"fmt"
@@ -37,28 +37,35 @@ func NewREST(authorizer authorizer.Authorizer) *REST {
 }
 
 func (r *REST) New() runtime.Object {
-	return &authorizationapi.SubjectAccessReview{}
+	return &authorizationapi.LocalSubjectAccessReview{}
 }
 
 func (r *REST) Create(ctx kapi.Context, obj runtime.Object) (runtime.Object, error) {
-	subjectAccessReview, ok := obj.(*authorizationapi.SubjectAccessReview)
+	localSubjectAccessReview, ok := obj.(*authorizationapi.LocalSubjectAccessReview)
 	if !ok {
-		return nil, kapierrors.NewBadRequest(fmt.Sprintf("not a SubjectAccessReview: %#v", obj))
+		return nil, kapierrors.NewBadRequest(fmt.Sprintf("not a LocaLocalSubjectAccessReview: %#v", obj))
 	}
-	if errs := authorizationvalidation.ValidateSubjectAccessReview(subjectAccessReview); len(errs) > 0 {
-		return nil, kapierrors.NewInvalid(authorizationapi.Kind(subjectAccessReview.Kind), "", errs)
+	if errs := authorizationvalidation.ValidateLocalSubjectAccessReview(localSubjectAccessReview); len(errs) > 0 {
+		return nil, kapierrors.NewInvalid(authorizationapi.Kind(localSubjectAccessReview.Kind), "", errs)
+	}
+	namespace := kapi.NamespaceValue(ctx)
+	if len(namespace) == 0 {
+		return nil, kapierrors.NewBadRequest(fmt.Sprintf("namespace is required on this type: %v", namespace))
+	}
+	if namespace != localSubjectAccessReview.Namespace {
+		return nil, kapierrors.NewBadRequest(fmt.Sprintf("spec.resourceAttributes.namespace must match namespace: %v", namespace))
 	}
 
-	authorizationAttributes := authorizationutil.AuthorizationAttributesFrom(subjectAccessReview.Spec)
+	authorizationAttributes := authorizationutil.AuthorizationAttributesFrom(localSubjectAccessReview.Spec)
 	allowed, reason, evaluationErr := r.authorizer.Authorize(authorizationAttributes)
 
-	subjectAccessReview.Status = authorizationapi.SubjectAccessReviewStatus{
+	localSubjectAccessReview.Status = authorizationapi.SubjectAccessReviewStatus{
 		Allowed: allowed,
 		Reason:  reason,
 	}
 	if evaluationErr != nil {
-		subjectAccessReview.Status.EvaluationError = evaluationErr.Error()
+		localSubjectAccessReview.Status.EvaluationError = evaluationErr.Error()
 	}
 
-	return subjectAccessReview, nil
+	return localSubjectAccessReview, nil
 }

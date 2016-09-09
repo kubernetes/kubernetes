@@ -245,3 +245,130 @@ func TestSelfSubjectAccessReview(t *testing.T) {
 		}
 	}
 }
+
+func TestLocalSubjectAccessReview(t *testing.T) {
+	var m *master.Master
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		m.Handler.ServeHTTP(w, req)
+	}))
+	defer s.Close()
+
+	masterConfig := framework.NewIntegrationTestMasterConfig()
+	masterConfig.Authenticator = authenticator.RequestFunc(alwaysAlice)
+	masterConfig.Authorizer = sarAuthorizer{}
+	masterConfig.AdmissionControl = admit.NewAlwaysAdmit()
+	m, err := master.New(masterConfig)
+	if err != nil {
+		t.Fatalf("error in bringing up the master: %v", err)
+	}
+
+	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+
+	tests := []struct {
+		name           string
+		namespace      string
+		sar            *authorizationapi.LocalSubjectAccessReview
+		expectedError  string
+		expectedStatus authorizationapi.SubjectAccessReviewStatus
+	}{
+		{
+			name:      "simple allow",
+			namespace: "foo",
+			sar: &authorizationapi.LocalSubjectAccessReview{
+				ObjectMeta: api.ObjectMeta{Namespace: "foo"},
+				Spec: authorizationapi.SubjectAccessReviewSpec{
+					ResourceAttributes: &authorizationapi.ResourceAttributes{
+						Verb:      "list",
+						Group:     api.GroupName,
+						Version:   "v1",
+						Resource:  "pods",
+						Namespace: "foo",
+					},
+					User: "alice",
+				},
+			},
+			expectedStatus: authorizationapi.SubjectAccessReviewStatus{
+				Allowed: true,
+				Reason:  "you're not dave",
+			},
+		},
+		{
+			name:      "simple deny",
+			namespace: "foo",
+			sar: &authorizationapi.LocalSubjectAccessReview{
+				ObjectMeta: api.ObjectMeta{Namespace: "foo"},
+				Spec: authorizationapi.SubjectAccessReviewSpec{
+					ResourceAttributes: &authorizationapi.ResourceAttributes{
+						Verb:      "list",
+						Group:     api.GroupName,
+						Version:   "v1",
+						Resource:  "pods",
+						Namespace: "foo",
+					},
+					User: "dave",
+				},
+			},
+			expectedStatus: authorizationapi.SubjectAccessReviewStatus{
+				Allowed:         false,
+				Reason:          "no",
+				EvaluationError: "I'm sorry, Dave",
+			},
+		},
+		{
+			name:      "conflicting namespace",
+			namespace: "foo",
+			sar: &authorizationapi.LocalSubjectAccessReview{
+				ObjectMeta: api.ObjectMeta{Namespace: "foo"},
+				Spec: authorizationapi.SubjectAccessReviewSpec{
+					ResourceAttributes: &authorizationapi.ResourceAttributes{
+						Verb:      "list",
+						Group:     api.GroupName,
+						Version:   "v1",
+						Resource:  "pods",
+						Namespace: "bar",
+					},
+					User: "dave",
+				},
+			},
+			expectedError: "must match metadata.namespace",
+		},
+		{
+			name:      "missing namespace",
+			namespace: "foo",
+			sar: &authorizationapi.LocalSubjectAccessReview{
+				ObjectMeta: api.ObjectMeta{Namespace: "foo"},
+				Spec: authorizationapi.SubjectAccessReviewSpec{
+					ResourceAttributes: &authorizationapi.ResourceAttributes{
+						Verb:     "list",
+						Group:    api.GroupName,
+						Version:  "v1",
+						Resource: "pods",
+					},
+					User: "dave",
+				},
+			},
+			expectedError: "must match metadata.namespace",
+		},
+	}
+
+	for _, test := range tests {
+		response, err := clientset.Authorization().LocalSubjectAccessReviews(test.namespace).Create(test.sar)
+		switch {
+		case err == nil && len(test.expectedError) == 0:
+
+		case err != nil && strings.Contains(err.Error(), test.expectedError):
+			continue
+
+		case err != nil && len(test.expectedError) != 0:
+			t.Errorf("%s: unexpected error: %v", test.name, err)
+			continue
+		default:
+			t.Errorf("%s: expected %v, got %v", test.name, test.expectedError, err)
+			continue
+		}
+		if response.Status != test.expectedStatus {
+			t.Errorf("%s: expected %v, got %v", test.name, test.expectedStatus, response.Status)
+			continue
+		}
+	}
+}
