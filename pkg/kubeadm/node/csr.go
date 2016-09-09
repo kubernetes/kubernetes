@@ -21,7 +21,10 @@ import (
 	"io/ioutil"
 	"strings"
 
+	"k8s.io/kubernetes/pkg/apis/certificates"
 	unversionedcertificates "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/certificates/unversioned"
+	"k8s.io/kubernetes/pkg/client/restclient"
+	"k8s.io/kubernetes/pkg/client/typed/discovery"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	kubeadmapi "k8s.io/kubernetes/pkg/kubeadm/api"
@@ -60,6 +63,12 @@ func PerformTLSBootstrap(s *kubeadmapi.KubeadmConfig, apiEndpoint string, caCert
 		return nil, fmt.Errorf("<node/csr> failed to create API client configuration [%s]", err)
 	}
 
+	err = checkCertsAPI(bootstrapClientConfig)
+
+	if err != nil {
+		return nil, fmt.Errorf("<node/csr> API compatibility error [%s]", err)
+	}
+
 	client, err := unversionedcertificates.NewForConfig(bootstrapClientConfig)
 	if err != nil {
 		return nil, fmt.Errorf("<node/csr> failed to create API client [%s]", err)
@@ -87,4 +96,36 @@ func PerformTLSBootstrap(s *kubeadmapi.KubeadmConfig, apiEndpoint string, caCert
 	)
 
 	return finalConfig, nil
+}
+
+func checkCertsAPI(config *restclient.Config) error {
+	discoveryClient, err := discovery.NewDiscoveryClientForConfig(config)
+
+	if err != nil {
+		return fmt.Errorf("failed to create API discovery client [%s]", err)
+	}
+
+	serverGroups, err := discoveryClient.ServerGroups()
+
+	if err != nil {
+		return fmt.Errorf("failed to retrieve a list of supported API objects [%s]", err)
+	}
+
+	for _, group := range serverGroups.Groups {
+		if group.Name == certificates.GroupName {
+			return nil
+		}
+	}
+
+	version, err := discoveryClient.ServerVersion()
+	serverVersion := version.String()
+
+	if err != nil {
+		serverVersion = "N/A"
+	}
+
+	// Due to changes in API namespaces for certificates
+	// https://github.com/kubernetes/kubernetes/pull/31887/
+	// it is compatible only with versions released after v1.4.0-beta.0
+	return fmt.Errorf("installed Kubernetes API server version \"%s\" does not support certificates signing request use v1.4.0 or newer", serverVersion)
 }
