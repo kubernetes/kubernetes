@@ -19,7 +19,6 @@ package genericapiserver
 import (
 	"crypto/tls"
 	"fmt"
-	"mime"
 	"net"
 	"net/http"
 	"path"
