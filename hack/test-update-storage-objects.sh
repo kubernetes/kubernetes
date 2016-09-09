@@ -191,7 +191,12 @@ for test in ${tests[@]}; do
   name=${test_data[3]}
   new_storage_version=${test_data[5]}
 
+  echo "debug: ${new_storage_version}"
+
   kube::log::status "Verifying ${resource}/${namespace}/${name} has updated storage version ${new_storage_version} in etcd"
+  echo "try etcdctl alone"
+  ${ETCDCTL} --endpoints="${ETCD_HOST}:${ETCD_PORT}" get "/${ETCD_PREFIX}/${resource}/${namespace}/${name}"
+  echo "done trying"
   ${ETCDCTL} --endpoints="${ETCD_HOST}:${ETCD_PORT}" get "/${ETCD_PREFIX}/${resource}/${namespace}/${name}" | grep ${new_storage_version}
 done
 
