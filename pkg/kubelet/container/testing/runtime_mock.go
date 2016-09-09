@@ -69,8 +69,8 @@ func (r *Mock) SyncPod(pod *api.Pod, apiStatus api.PodStatus, status *PodStatus,
 	return args.Get(0).(PodSyncResult)
 }
 
-func (r *Mock) KillPod(pod *api.Pod, runningPod Pod, gracePeriodOverride *int64) error {
-	args := r.Called(pod, runningPod, gracePeriodOverride)
+func (r *Mock) KillPod(pod *api.Pod, podStatus *PodStatus, gracePeriodOverride *int64) error {
+	args := r.Called(pod, podStatus, gracePeriodOverride)
 	return args.Error(0)
 }
 

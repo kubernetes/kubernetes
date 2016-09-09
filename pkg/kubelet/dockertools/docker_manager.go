@@ -1333,43 +1333,42 @@ func (dm *DockerManager) PortForward(pod *kubecontainer.Pod, port uint16, stream
 	return nil
 }
 
-// TODO(random-liu): Change running pod to pod status in the future. We can't do it now, because kubelet also uses this function without pod status.
-// We can only deprecate this after refactoring kubelet.
 // TODO(random-liu): After using pod status for KillPod(), we can also remove the kubernetesPodLabel, because all the needed information should have
 // been extract from new labels and stored in pod status.
 // only hard eviction scenarios should provide a grace period override, all other code paths must pass nil.
-func (dm *DockerManager) KillPod(pod *api.Pod, runningPod kubecontainer.Pod, gracePeriodOverride *int64) error {
-	result := dm.killPodWithSyncResult(pod, runningPod, gracePeriodOverride)
+func (dm *DockerManager) KillPod(pod *api.Pod, podStatus *kubecontainer.PodStatus, gracePeriodOverride *int64) error {
+	result := dm.killPodWithSyncResult(pod, podStatus, gracePeriodOverride)
 	return result.Error()
 }
 
 // NOTE(random-liu): The pod passed in could be *nil* when kubelet restarted.
-func (dm *DockerManager) killPodWithSyncResult(pod *api.Pod, runningPod kubecontainer.Pod, gracePeriodOverride *int64) (result kubecontainer.PodSyncResult) {
+func (dm *DockerManager) killPodWithSyncResult(pod *api.Pod, podStatus *kubecontainer.PodStatus, gracePeriodOverride *int64) (result kubecontainer.PodSyncResult) {
 	// Send the kills in parallel since they may take a long time.
-	// There may be len(runningPod.Containers) or len(runningPod.Containers)-1 of result in the channel
-	containerResults := make(chan *kubecontainer.SyncResult, len(runningPod.Containers))
+	runningContainerStatues := podStatus.GetRunningContainerStatuses()
+	count := len(runningContainerStatues)
+	containerResults := make(chan *kubecontainer.SyncResult, count)
 	wg := sync.WaitGroup{}
 	var (
-		networkContainer *kubecontainer.Container
-		networkSpec      *api.Container
+		networkContainerStatus *kubecontainer.ContainerStatus
+		networkSpec            *api.Container
 	)
-	wg.Add(len(runningPod.Containers))
-	for _, container := range runningPod.Containers {
-		go func(container *kubecontainer.Container) {
+	wg.Add(count)
+	for _, containerStatus := range runningContainerStatues {
+		go func(containerStatus *kubecontainer.ContainerStatus) {
 			defer utilruntime.HandleCrash()
 			defer wg.Done()
 
 			var containerSpec *api.Container
 			if pod != nil {
 				for i, c := range pod.Spec.Containers {
-					if c.Name == container.Name {
+					if c.Name == containerStatus.Name {
 						containerSpec = &pod.Spec.Containers[i]
 						break
 					}
 				}
 				if containerSpec == nil {
 					for i, c := range pod.Spec.InitContainers {
-						if c.Name == container.Name {
+						if c.Name == containerStatus.Name {
 							containerSpec = &pod.Spec.InitContainers[i]
 							break
 						}
@@ -1379,51 +1378,52 @@ func (dm *DockerManager) killPodWithSyncResult(pod *api.Pod, runningPod kubecont
 
 			// TODO: Handle this without signaling the pod infra container to
 			// adapt to the generic container runtime.
-			if container.Name == PodInfraContainerName {
+			if containerStatus.Name == PodInfraContainerName {
 				// Store the container runtime for later deletion.
 				// We do this so that PreStop handlers can run in the network namespace.
-				networkContainer = container
+				networkContainerStatus = containerStatus
 				networkSpec = containerSpec
 				return
 			}
 
-			killContainerResult := kubecontainer.NewSyncResult(kubecontainer.KillContainer, container.Name)
-			err := dm.KillContainerInPod(container.ID, containerSpec, pod, "Need to kill pod.", gracePeriodOverride)
+			killContainerResult := kubecontainer.NewSyncResult(kubecontainer.KillContainer, containerStatus.Name)
+			err := dm.KillContainerInPod(containerStatus.ID, containerSpec, pod, "Need to kill pod.", gracePeriodOverride)
 			if err != nil {
 				killContainerResult.Fail(kubecontainer.ErrKillContainer, err.Error())
-				glog.Errorf("Failed to delete container %v: %v; Skipping pod %q", container.ID.ID, err, runningPod.ID)
+				glog.Errorf("Failed to delete container %v: %v; Skipping pod %q", containerStatus.ID.ID, err, podStatus.ID)
 			}
 			containerResults <- killContainerResult
-		}(container)
+		}(containerStatus)
 	}
 	wg.Wait()
 	close(containerResults)
 	for containerResult := range containerResults {
 		result.AddSyncResult(containerResult)
 	}
-	if networkContainer != nil {
-		ins, err := dm.client.InspectContainer(networkContainer.ID.ID)
+	if networkContainerStatus != nil {
+		ins, err := dm.client.InspectContainer(networkContainerStatus.ID.ID)
 		if err != nil {
-			err = fmt.Errorf("Error inspecting container %v: %v", networkContainer.ID.ID, err)
+			err = fmt.Errorf("Error inspecting container %v: %v", networkContainerStatus.ID.ID, err)
 			glog.Error(err)
 			result.Fail(err)
 			return
 		}
 		if getDockerNetworkMode(ins) != namespaceModeHost {
-			teardownNetworkResult := kubecontainer.NewSyncResult(kubecontainer.TeardownNetwork, kubecontainer.BuildPodFullName(runningPod.Name, runningPod.Namespace))
+			podFullName := kubecontainer.BuildPodFullName(podStatus.Name, podStatus.Namespace)
+			teardownNetworkResult := kubecontainer.NewSyncResult(kubecontainer.TeardownNetwork, podFullName)
 			result.AddSyncResult(teardownNetworkResult)
-			glog.V(3).Infof("Calling network plugin %s to tear down pod for %s", dm.networkPlugin.Name(), kubecontainer.BuildPodFullName(runningPod.Name, runningPod.Namespace))
-			if err := dm.networkPlugin.TearDownPod(runningPod.Namespace, runningPod.Name, networkContainer.ID); err != nil {
-				message := fmt.Sprintf("Failed to teardown network for pod %q using network plugins %q: %v", runningPod.ID, dm.networkPlugin.Name(), err)
+			glog.V(3).Infof("Calling network plugin %s to tear down pod for %s", dm.networkPlugin.Name(), podFullName)
+			if err := dm.networkPlugin.TearDownPod(podStatus.Namespace, podStatus.Name, networkContainerStatus.ID); err != nil {
+				message := fmt.Sprintf("Failed to teardown network for pod %q using network plugins %q: %v", podStatus.ID, dm.networkPlugin.Name(), err)
 				teardownNetworkResult.Fail(kubecontainer.ErrTeardownNetwork, message)
 				glog.Error(message)
 			}
 		}
-		killContainerResult := kubecontainer.NewSyncResult(kubecontainer.KillContainer, networkContainer.Name)
+		killContainerResult := kubecontainer.NewSyncResult(kubecontainer.KillContainer, networkContainerStatus.Name)
 		result.AddSyncResult(killContainerResult)
-		if err := dm.KillContainerInPod(networkContainer.ID, networkSpec, pod, "Need to kill pod.", gracePeriodOverride); err != nil {
+		if err := dm.KillContainerInPod(networkContainerStatus.ID, networkSpec, pod, "Need to kill pod.", gracePeriodOverride); err != nil {
 			killContainerResult.Fail(kubecontainer.ErrKillContainer, err.Error())
-			glog.Errorf("Failed to delete container %v: %v; Skipping pod %q", networkContainer.ID.ID, err, runningPod.ID)
+			glog.Errorf("Failed to delete container %v: %v; Skipping pod %q", networkContainerStatus.ID.ID, err, podStatus.ID)
 		}
 	}
 	return
@@ -2050,8 +2050,7 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, _ api.PodStatus, podStatus *kubec
 		}
 
 		// Killing phase: if we want to start new infra container, or nothing is running kill everything (including infra container)
-		// TODO(random-liu): We'll use pod status directly in the future
-		killResult := dm.killPodWithSyncResult(pod, kubecontainer.ConvertPodStatusToRunningPod(dm.Type(), podStatus), nil)
+		killResult := dm.killPodWithSyncResult(pod, podStatus, nil)
 		result.AddPodSyncResult(killResult)
 		if killResult.Error() != nil {
 			return

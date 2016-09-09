@@ -1384,7 +1384,7 @@ func TestLifeCycleHooks(t *testing.T) {
 
 	tests := []struct {
 		pod           *api.Pod
-		runtimePod    *kubecontainer.Pod
+		podStatus     *kubecontainer.PodStatus
 		postStartRuns []string
 		preStopRuns   []string
 		err           error
@@ -1403,8 +1403,8 @@ func TestLifeCycleHooks(t *testing.T) {
 					},
 				},
 			},
-			&kubecontainer.Pod{
-				Containers: []*kubecontainer.Container{
+			&kubecontainer.PodStatus{
+				ContainerStatuses: []*kubecontainer.ContainerStatus{
 					{ID: kubecontainer.BuildContainerID("rkt", "id-1")},
 				},
 			},
@@ -1457,8 +1457,8 @@ func TestLifeCycleHooks(t *testing.T) {
 					},
 				},
 			},
-			&kubecontainer.Pod{
-				Containers: []*kubecontainer.Container{
+			&kubecontainer.PodStatus{
+				ContainerStatuses: []*kubecontainer.ContainerStatus{
 					{
 						ID:   kubecontainer.ParseContainerID("rkt://uuid:container-name-4"),
 						Name: "container-name-4",
@@ -1507,8 +1507,8 @@ func TestLifeCycleHooks(t *testing.T) {
 					},
 				},
 			},
-			&kubecontainer.Pod{
-				Containers: []*kubecontainer.Container{
+			&kubecontainer.PodStatus{
+				ContainerStatuses: []*kubecontainer.ContainerStatus{
 					{
 						ID:   kubecontainer.ParseContainerID("rkt://uuid:container-name-1"),
 						Name: "container-name-1",
@@ -1525,7 +1525,7 @@ func TestLifeCycleHooks(t *testing.T) {
 		testCaseHint := fmt.Sprintf("test case #%d", i)
 
 		pod := &rktapi.Pod{Id: "uuid"}
-		for _, c := range tt.runtimePod.Containers {
+		for _, c := range tt.podStatus.ContainerStatuses {
 			pod.Apps = append(pod.Apps, &rktapi.App{
 				Name:  c.Name,
 				State: rktapi.AppState_APP_STATE_RUNNING,
@@ -1534,7 +1534,7 @@ func TestLifeCycleHooks(t *testing.T) {
 		fr.pods = []*rktapi.Pod{pod}
 
 		// Run post-start hooks
-		err := rkt.runLifecycleHooks(tt.pod, tt.runtimePod, lifecyclePostStartHook)
+		err := rkt.runLifecycleHooks(tt.pod, tt.podStatus, lifecyclePostStartHook)
 		assert.Equal(t, tt.err, err, testCaseHint)
 
 		sort.Sort(sortedStringList(tt.postStartRuns))
@@ -1545,7 +1545,7 @@ func TestLifeCycleHooks(t *testing.T) {
 		runner.Reset()
 
 		// Run pre-stop hooks.
-		err = rkt.runLifecycleHooks(tt.pod, tt.runtimePod, lifecyclePreStopHook)
+		err = rkt.runLifecycleHooks(tt.pod, tt.podStatus, lifecyclePreStopHook)
 		assert.Equal(t, tt.err, err, testCaseHint)
 
 		sort.Sort(sortedStringList(tt.preStopRuns))

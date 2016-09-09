@@ -484,16 +484,8 @@ func containerResourceRuntimeValue(fs *api.ResourceFieldSelector, pod *api.Pod, 
 	}
 }
 
-// One of the following arguments must be non-nil: runningPod, status.
-// TODO: Modify containerRuntime.KillPod() to accept the right arguments.
 func (kl *Kubelet) killPod(pod *api.Pod, runningPod *kubecontainer.Pod, status *kubecontainer.PodStatus, gracePeriodOverride *int64) error {
-	var p kubecontainer.Pod
-	if runningPod != nil {
-		p = *runningPod
-	} else if status != nil {
-		p = kubecontainer.ConvertPodStatusToRunningPod(kl.GetRuntime().Type(), status)
-	}
-	return kl.containerRuntime.KillPod(pod, p, gracePeriodOverride)
+	return kl.containerRuntime.KillPod(pod, status, gracePeriodOverride)
 }
 
 // makePodDataDirs creates the dirs for the pod datas.
@@ -677,16 +669,17 @@ func (kl *Kubelet) podKiller() {
 				break
 			}
 			killing.Insert(string(runningPod.ID))
-			go func(apiPod *api.Pod, runningPod *kubecontainer.Pod, ch chan types.UID) {
+			podStatus, _ := kl.containerRuntime.GetPodStatus(runningPod.ID, runningPod.Name, runningPod.Namespace)
+			go func(apiPod *api.Pod, podStatus *kubecontainer.PodStatus, ch chan types.UID) {
 				defer func() {
-					ch <- runningPod.ID
+					ch <- podStatus.ID
 				}()
-				glog.V(2).Infof("Killing unwanted pod %q", runningPod.Name)
-				err := kl.killPod(apiPod, runningPod, nil, nil)
+				glog.V(2).Infof("Killing unwanted pod %q", podStatus.Name)
+				err := kl.killPod(apiPod, podStatus, nil)
 				if err != nil {
-					glog.Errorf("Failed killing the pod %q: %v", runningPod.Name, err)
+					glog.Errorf("Failed killing the pod %q: %v", podStatus.Name, err)
 				}
-			}(apiPod, runningPod, resultCh)
+			}(apiPod, podStatus, resultCh)
 
 		case podID := <-resultCh:
 			killing.Delete(string(podID))

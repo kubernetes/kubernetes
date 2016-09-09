@@ -422,22 +422,30 @@ func TestKillPod(t *testing.T) {
 		}
 		containers[i] = c
 	}
-	runningPod := kubecontainer.Pod{
-		ID:         pod.UID,
-		Name:       pod.Name,
-		Namespace:  pod.Namespace,
-		Containers: []*kubecontainer.Container{containers[0], containers[1]},
-		Sandboxes: []*kubecontainer.Container{
+	podStatus := &kubecontainer.PodStatus{
+		ID:        pod.UID,
+		Name:      pod.Name,
+		Namespace: pod.Namespace,
+		ContainerStatuses: []*kubecontainer.ContainerStatus{
 			{
-				ID: kubecontainer.ContainerID{
-					ID:   fakeSandbox.GetId(),
-					Type: apitest.FakeRuntimeName,
-				},
+				ID:    containers[0].ID,
+				Name:  containers[0].Name,
+				State: containers[0].State,
+			},
+			{
+				ID:    containers[1].ID,
+				Name:  containers[1].Name,
+				State: containers[1].State,
+			},
+		},
+		SandboxStatuses: []*runtimeApi.PodSandboxStatus{
+			{
+				Id: fakeSandbox.Id,
 			},
 		},
 	}
 
-	err = m.KillPod(pod, runningPod, nil)
+	err = m.KillPod(pod, podStatus, nil)
 	assert.NoError(t, err)
 	assert.Equal(t, 2, len(fakeRuntime.Containers))
 	assert.Equal(t, 1, len(fakeRuntime.Sandboxes))

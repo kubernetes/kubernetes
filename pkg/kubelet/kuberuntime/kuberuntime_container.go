@@ -542,21 +542,34 @@ func (m *kubeGenericRuntimeManager) killContainer(pod *api.Pod, containerID kube
 }
 
 // killContainersWithSyncResult kills all pod's containers with sync results.
-func (m *kubeGenericRuntimeManager) killContainersWithSyncResult(pod *api.Pod, runningPod kubecontainer.Pod, gracePeriodOverride *int64) (syncResults []*kubecontainer.SyncResult) {
-	containerResults := make(chan *kubecontainer.SyncResult, len(runningPod.Containers))
+func (m *kubeGenericRuntimeManager) killContainersWithSyncResult(pod *api.Pod, podStatus *kubecontainer.PodStatus, gracePeriodOverride *int64) (syncResults []*kubecontainer.SyncResult) {
+	runningContainerStatuses := podStatus.GetRunningContainerStatuses()
+	count := len(runningContainerStatuses)
+	containerResults := make(chan *kubecontainer.SyncResult, count)
 	wg := sync.WaitGroup{}
 
-	wg.Add(len(runningPod.Containers))
-	for _, container := range runningPod.Containers {
-		go func(container *kubecontainer.Container) {
+	wg.Add(count)
+	for _, containerStatus := range runningContainerStatuses {
+		go func(containerStatus *kubecontainer.ContainerStatus) {
 			defer utilruntime.HandleCrash()
 			defer wg.Done()
-			killContainerResult := kubecontainer.NewSyncResult(kubecontainer.KillContainer, container.Name)
-			if err := m.killContainer(pod, container.ID, container.Name, "Need to kill Pod", gracePeriodOverride); err != nil {
+
+			var containerSpec *api.Container
+			if pod != nil {
+				for i, c := range pod.Spec.Containers {
+					if containerStatus.Name == c.Name {
+						containerSpec = &pod.Spec.Containers[i]
+						break
+					}
+				}
+			}
+
+			killContainerResult := kubecontainer.NewSyncResult(kubecontainer.KillContainer, containerStatus.Name)
+			if err := m.killContainer(pod, containerStatus.ID, containerSpec, "Need to kill Pod", gracePeriodOverride); err != nil {
 				killContainerResult.Fail(kubecontainer.ErrKillContainer, err.Error())
 			}
 			containerResults <- killContainerResult
-		}(container)
+		}(containerStatus)
 	}
 	wg.Wait()
 	close(containerResults)

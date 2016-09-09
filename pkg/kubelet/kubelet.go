@@ -1319,7 +1319,7 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 		apiPodStatus := killPodOptions.PodStatusFunc(pod, podStatus)
 		kl.statusManager.SetPodStatus(pod, apiPodStatus)
 		// we kill the pod with the specified grace period since this is a termination
-		if err := kl.killPod(pod, nil, podStatus, killPodOptions.PodTerminationGracePeriodSecondsOverride); err != nil {
+		if err := kl.killPod(pod, podStatus, killPodOptions.PodTerminationGracePeriodSecondsOverride); err != nil {
 			// there was an error killing the pod, so we return that error directly
 			utilruntime.HandleError(err)
 			return err
@@ -1365,7 +1365,7 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 
 	// Kill pod if it should not be running
 	if errOuter := canRunPod(pod); errOuter != nil || pod.DeletionTimestamp != nil || apiPodStatus.Phase == api.PodFailed {
-		if errInner := kl.killPod(pod, nil, podStatus, nil); errInner != nil {
+		if errInner := kl.killPod(pod, podStatus, nil); errInner != nil {
 			errOuter = fmt.Errorf("error killing pod: %v", errInner)
 			utilruntime.HandleError(errOuter)
 		}
