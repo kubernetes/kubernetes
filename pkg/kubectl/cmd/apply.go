@@ -17,7 +17,6 @@ limitations under the License.
 package cmd
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"time"
@@ -92,6 +91,7 @@ func NewCmdApply(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmdutil.AddOutputFlagsForMutation(cmd)
 	cmdutil.AddRecordFlag(cmd)
 	cmdutil.AddInclude3rdPartyFlags(cmd)
+	cmd.Flags().Bool("allow-illegal-updates", false, "Allow illegal updates to controller's selector and pod template labels. Note that such updates are dangerous and make controllers not behave correctly.")
 	return cmd
 }
 
@@ -174,9 +174,10 @@ func RunApply(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *Ap
 
 		overwrite := cmdutil.GetFlagBool(cmd, "overwrite")
 		helper := resource.NewHelper(info.Client, info.Mapping)
-		patcher := NewPatcher(encoder, decoder, info.Mapping, helper, overwrite)
+		patcher := NewPatcher(encoder, decoder, info.Mapping, helper, overwrite, f.CheckIllegalUpdates)
 
-		patchBytes, err := patcher.patch(info.Object, modified, info.Source, info.Namespace, info.Name, info.Mapping.Resource)
+		resourceTypeSingular, _ := mapper.ResourceSingularizer(info.Mapping.Resource)
+		patchBytes, err := patcher.patch(info.Object, modified, info.Source, info.Namespace, info.Name, resourceTypeSingular)
 		if err != nil {
 			return cmdutil.AddSourceToErr(fmt.Sprintf("applying patch:\n%s\nto:\n%v\nfor:", patchBytes, info), info.Source, err)
 		}
@@ -217,20 +218,23 @@ type patcher struct {
 
 	overwrite bool
 	backOff   clockwork.Clock
+
+	checkIllegalUpdates func(patch []byte, name, resourceType string) error
 }
 
-func NewPatcher(encoder runtime.Encoder, decoder runtime.Decoder, mapping *meta.RESTMapping, helper *resource.Helper, overwrite bool) *patcher {
+func NewPatcher(encoder runtime.Encoder, decoder runtime.Decoder, mapping *meta.RESTMapping, helper *resource.Helper, overwrite bool, checkIllegalUpdates func(patch []byte, name, resourceType string) error) *patcher {
 	return &patcher{
-		encoder:   encoder,
-		decoder:   decoder,
-		mapping:   mapping,
-		helper:    helper,
-		overwrite: overwrite,
-		backOff:   clockwork.NewRealClock(),
+		encoder:             encoder,
+		decoder:             decoder,
+		mapping:             mapping,
+		helper:              helper,
+		overwrite:           overwrite,
+		backOff:             clockwork.NewRealClock(),
+		checkIllegalUpdates: checkIllegalUpdates,
 	}
 }
 
-func (p *patcher) patchSimple(obj runtime.Object, modified []byte, source, namespace, name, resourceType string) ([]byte, error) {
+func (p *patcher) patchSimple(obj runtime.Object, modified []byte, source, namespace, name, resourceTypeSingular string) ([]byte, error) {
 	// Serialize the current configuration of the object from the server.
 	current, err := runtime.Encode(p.encoder, obj)
 	if err != nil {
@@ -260,7 +264,7 @@ func (p *patcher) patchSimple(obj runtime.Object, modified []byte, source, names
 		return nil, cmdutil.AddSourceToErr(fmt.Sprintf(format, original, modified, current), source, err)
 	}
 
-	if err = checkIllegalChanges(patch, name, resourceType); err != nil {
+	if err = p.checkIllegalUpdates(patch, name, resourceTypeSingular); err != nil {
 		return nil, err
 	}
 
@@ -268,9 +272,9 @@ func (p *patcher) patchSimple(obj runtime.Object, modified []byte, source, names
 	return patch, err
 }
 
-func (p *patcher) patch(current runtime.Object, modified []byte, source, namespace, name, resourceType string) ([]byte, error) {
+func (p *patcher) patch(current runtime.Object, modified []byte, source, namespace, name, resourceTypeSingular string) ([]byte, error) {
 	var getErr error
-	patchBytes, err := p.patchSimple(current, modified, source, namespace, name, resourceType)
+	patchBytes, err := p.patchSimple(current, modified, source, namespace, name, resourceTypeSingular)
 	for i := 1; i <= maxPatchRetry && errors.IsConflict(err); i++ {
 		if i > triesBeforeBackOff {
 			p.backOff.Sleep(backOffPeriod)
@@ -279,39 +283,8 @@ func (p *patcher) patch(current runtime.Object, modified []byte, source, namespa
 		if getErr != nil {
 			return nil, getErr
 		}
-		patchBytes, err = p.patchSimple(current, modified, source, namespace, name, resourceType)
+		patchBytes, err = p.patchSimple(current, modified, source, namespace, name, resourceTypeSingular)
 	}
 
 	return patchBytes, err
-}
-
-// checkIllegalChanges returns error when illegal updates are made, right now only
-// pod template labels updates and selector updates are disallowed.
-// TODO: do this in other kubectl update commands or move this to server-side
-func checkIllegalChanges(patch []byte, name, resourceType string) error {
-	diff := make(map[string]interface{})
-	if err := json.Unmarshal(patch, &diff); err != nil {
-		return fmt.Errorf("failed to unmarshal patch when determining if the change is legal: %v", err)
-	}
-	templateLabelsDiff := getNestedField(diff, "spec", "template", "metadata", "labels")
-	if templateLabelsDiff != nil {
-		return fmt.Errorf("updating pod template labels of %s %q isn't allowed!", resourceType, name)
-	}
-	selectorDiff := getNestedField(diff, "spec", "selector")
-	if selectorDiff != nil {
-		return fmt.Errorf("updating selector of %s %q isn't allowed!", resourceType, name)
-	}
-	return nil
-}
-
-// getNestedField is copied from pkg/runtime/types.go
-func getNestedField(obj map[string]interface{}, fields ...string) interface{} {
-	var val interface{} = obj
-	for _, field := range fields {
-		if _, ok := val.(map[string]interface{}); !ok {
-			return nil
-		}
-		val = val.(map[string]interface{})[field]
-	}
-	return val
 }

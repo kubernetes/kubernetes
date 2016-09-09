@@ -18,6 +18,7 @@ package util
 
 import (
 	"bytes"
+	jsonencoding "encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -160,6 +161,10 @@ type Factory struct {
 	EditorEnvs func() []string
 	// PrintObjectSpecificMessage prints object-specific messages on the provided writer
 	PrintObjectSpecificMessage func(obj runtime.Object, out io.Writer)
+	// CheckIllegalUpdates returns error when illegal updates are made to a given resource. Right now
+	// only pod template labels updates and selector updates to controllers are disallowed.
+	// TODO: do this in all kubectl mutating commands or move this to server-side
+	CheckIllegalUpdates func(patch []byte, name, resourceTypeSingular string) error
 }
 
 const (
@@ -864,7 +869,47 @@ See http://releases.k8s.io/HEAD/docs/user-guide/services-firewalls.md for more d
 				}
 			}
 		},
+		CheckIllegalUpdates: func(patch []byte, name, resourceTypeSingular string) error {
+			if !needsUpdateCheck(resourceTypeSingular) {
+				return nil
+			}
+			diff := make(map[string]interface{})
+			if err := jsonencoding.Unmarshal(patch, &diff); err != nil {
+				return fmt.Errorf("failed to unmarshal patch when determining if the change is legal: %v", err)
+			}
+			templateLabelsDiff := getNestedField(diff, "spec", "template", "metadata", "labels")
+			if templateLabelsDiff != nil {
+				return fmt.Errorf("updating pod template labels of %s %q isn't allowed, please create a new %s instead", resourceTypeSingular, name, resourceTypeSingular)
+			}
+			selectorDiff := getNestedField(diff, "spec", "selector")
+			if selectorDiff != nil {
+				return fmt.Errorf("updating selector of %s %q isn't allowed, please create a new %s instead", resourceTypeSingular, name, resourceTypeSingular)
+			}
+			return nil
+		},
 	}
+}
+
+func needsUpdateCheck(resourceTypeSingular string) bool {
+	resourcesNeedUpdateCheck := []string{"deployment", "replicaset", "replicationcontroller", "jobs", "scheduledjob", "petset"}
+	for _, toCheck := range resourcesNeedUpdateCheck {
+		if resourceTypeSingular == toCheck {
+			return true
+		}
+	}
+	return false
+}
+
+// getNestedField is copied from pkg/runtime/types.go
+func getNestedField(obj map[string]interface{}, fields ...string) interface{} {
+	var val interface{} = obj
+	for _, field := range fields {
+		if _, ok := val.(map[string]interface{}); !ok {
+			return nil
+		}
+		val = val.(map[string]interface{})[field]
+	}
+	return val
 }
 
 // GetFirstPod returns a pod matching the namespace and label selector
