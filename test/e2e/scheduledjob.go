@@ -24,18 +24,24 @@ import (
 	. "github.com/onsi/gomega"
 
 	"k8s.io/kubernetes/pkg/api"
-	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller/job"
 	"k8s.io/kubernetes/pkg/util/wait"
+	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 const (
 	// How long to wait for a scheduledjob
 	scheduledJobTimeout = 5 * time.Minute
+)
+
+var (
+	// ScheduledJobs were introduced in v1.4, so we don't expect tests that rely on
+	// ScheduledJobs to work on clusters before that.
+	scheduledJobsVersion = version.MustParse("v1.4.0-alpha.3")
 )
 
 var _ = framework.KubeDescribe("[Feature:ScheduledJob]", func() {
@@ -46,16 +52,10 @@ var _ = framework.KubeDescribe("[Feature:ScheduledJob]", func() {
 	}
 	f := framework.NewFramework("scheduledjob", options, nil)
 
-	BeforeEach(func() {
-		if _, err := f.Client.Batch().ScheduledJobs(f.Namespace.Name).List(api.ListOptions{}); err != nil {
-			if apierrs.IsNotFound(err) {
-				framework.Skipf("Could not find ScheduledJobs resource, skipping test: %#v", err)
-			}
-		}
-	})
-
 	// multiple jobs running at once
 	It("should schedule multiple jobs concurrently", func() {
+		framework.SkipUnlessServerVersionGTE(scheduledJobsVersion, f.Client)
+
 		By("Creating a scheduledjob")
 		scheduledJob := newTestScheduledJob("concurrent", "*/1 * * * ?", batch.AllowConcurrent, true)
 		scheduledJob, err := createScheduledJob(f.Client, f.Namespace.Name, scheduledJob)
@@ -78,6 +78,8 @@ var _ = framework.KubeDescribe("[Feature:ScheduledJob]", func() {
 
 	// suspended should not schedule jobs
 	It("should not schedule jobs when suspended [Slow]", func() {
+		framework.SkipUnlessServerVersionGTE(scheduledJobsVersion, f.Client)
+
 		By("Creating a suspended scheduledjob")
 		scheduledJob := newTestScheduledJob("suspended", "*/1 * * * ?", batch.AllowConcurrent, true)
 		scheduledJob.Spec.Suspend = newBool(true)
@@ -100,6 +102,8 @@ var _ = framework.KubeDescribe("[Feature:ScheduledJob]", func() {
 
 	// only single active job is allowed for ForbidConcurrent
 	It("should not schedule new jobs when ForbidConcurrent [Slow]", func() {
+		framework.SkipUnlessServerVersionGTE(scheduledJobsVersion, f.Client)
+
 		By("Creating a ForbidConcurrent scheduledjob")
 		scheduledJob := newTestScheduledJob("forbid", "*/1 * * * ?", batch.ForbidConcurrent, true)
 		scheduledJob, err := createScheduledJob(f.Client, f.Namespace.Name, scheduledJob)
@@ -131,6 +135,8 @@ var _ = framework.KubeDescribe("[Feature:ScheduledJob]", func() {
 
 	// only single active job is allowed for ReplaceConcurrent
 	It("should replace jobs when ReplaceConcurrent", func() {
+		framework.SkipUnlessServerVersionGTE(scheduledJobsVersion, f.Client)
+
 		By("Creating a ReplaceConcurrent scheduledjob")
 		scheduledJob := newTestScheduledJob("replace", "*/1 * * * ?", batch.ReplaceConcurrent, true)
 		scheduledJob, err := createScheduledJob(f.Client, f.Namespace.Name, scheduledJob)
@@ -162,6 +168,8 @@ var _ = framework.KubeDescribe("[Feature:ScheduledJob]", func() {
 
 	// shouldn't give us unexpected warnings
 	It("should not emit unexpected warnings", func() {
+		framework.SkipUnlessServerVersionGTE(scheduledJobsVersion, f.Client)
+
 		By("Creating a scheduledjob")
 		scheduledJob := newTestScheduledJob("concurrent", "*/1 * * * ?", batch.AllowConcurrent, false)
 		scheduledJob, err := createScheduledJob(f.Client, f.Namespace.Name, scheduledJob)
