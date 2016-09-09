@@ -173,7 +173,11 @@ func (m *APIRegistrationManager) IsEnabledVersion(v unversioned.GroupVersion) bo
 func (m *APIRegistrationManager) EnabledVersions() []unversioned.GroupVersion {
 	ret := []unversioned.GroupVersion{}
 	for _, groupMeta := range m.groupMetaMap {
-		ret = append(ret, groupMeta.GroupVersions...)
+		for _, version := range groupMeta.GroupVersions {
+			if m.IsEnabledVersion(version) {
+				ret = append(ret, version)
+			}
+		}
 	}
 	return ret
 }
@@ -185,7 +189,13 @@ func (m *APIRegistrationManager) EnabledVersionsForGroup(group string) []unversi
 		return []unversioned.GroupVersion{}
 	}
 
-	return append([]unversioned.GroupVersion{}, groupMeta.GroupVersions...)
+	ret := []unversioned.GroupVersion{}
+	for _, version := range groupMeta.GroupVersions {
+		if m.IsEnabledVersion(version) {
+			ret = append(ret, version)
+		}
+	}
+	return ret
 }
 
 // Group returns the metadata of a group if the group is registered, otherwise
