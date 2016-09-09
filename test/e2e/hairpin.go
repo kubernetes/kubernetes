@@ -67,6 +67,14 @@ var _ = framework.KubeDescribe("Hairpin Networking", func() {
 			framework.Failf("unable to create test service named [%s] %v", svc.Name, err)
 		}
 
+		// Clean up service
+		defer func() {
+			By("Cleaning up the service")
+			if err = f.Client.Services(f.Namespace.Name).Delete(svc.Name); err != nil {
+				framework.Failf("unable to delete svc %v: %v", svc.Name, err)
+			}
+		}()
+
 		By("Checking that the webserver is accessible from inside the same pod")
 		passed := false
 		// apply a 1 minute observation period to ensure the pod and service have started
