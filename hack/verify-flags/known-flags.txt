@@ -9,6 +9,7 @@ all-namespaces
 allocate-node-cidrs
 allow-privileged
 allowed-not-ready-nodes
+anonymous-auth
 api-advertise-addresses
 api-external-dns-names
 api-burst
