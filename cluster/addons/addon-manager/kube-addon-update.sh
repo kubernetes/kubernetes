@@ -23,12 +23,12 @@
 
 
 # LIMITATIONS
-# 1. controllers are not updated unless their name is changed
+# 1. Controllers are not updated unless their name is changed
 # 3. Services will not be updated unless their name is changed,
 #    but for services we actually want updates without name change.
 # 4. Json files are not handled at all. Currently addons must be
 #    in yaml files
-# 5. exit code is probably not always correct (I haven't checked
+# 5. Exit code is probably not always correct (I haven't checked
 #    carefully if it works in 100% cases)
 # 6. There are no unittests
 # 8. Will not work if the total length of paths to addons is greater than
@@ -36,9 +36,9 @@
 # 9. Performance issue: yaml files are read many times in a single execution.
 
 # cosmetic improvements to be done
-# 1. improve the log function; add timestamp, file name, etc.
-# 2. logging doesn't work from files that print things out.
-# 3. kubectl prints the output to stderr (the output should be captured and then
+# 1. Improve the log function; add timestamp, file name, etc.
+# 2. Logging doesn't work from files that print things out.
+# 3. Kubectl prints the output to stderr (the output should be captured and then
 #    logged)
 
 # global config
