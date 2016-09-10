@@ -10,7 +10,7 @@
     "containers": [
       {
         "name": "etcd",
-        "image": "gcr.io/google_containers/etcd-ARCH:2.3.7",
+        "image": "gcr.io/google_containers/etcd-ARCH:2.2.1",
         "command": [
           "/usr/local/bin/etcd",
           "--listen-client-urls=http://127.0.0.1:2379,http://127.0.0.1:4001",
