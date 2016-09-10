@@ -71,7 +71,7 @@ func NewCmdConfigView(out io.Writer, ConfigAccess clientcmd.ConfigAccess) *cobra
 				cmd.Flags().Set("output", defaultOutputFormat)
 			}
 			if outputFormat == "" {
-				fmt.Printf("reset to default output format (%s) as --output is empty", defaultOutputFormat)
+				fmt.Printf("reset to default output format (%s) as --output is empty\n\n", defaultOutputFormat)
 				cmd.Flags().Set("output", defaultOutputFormat)
 			}
 
