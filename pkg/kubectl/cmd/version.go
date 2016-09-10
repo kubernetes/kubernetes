@@ -17,6 +17,7 @@ limitations under the License.
 package cmd
 
 import (
+	"fmt"
 	"io"
 
 	"github.com/spf13/cobra"
@@ -45,11 +46,16 @@ func RunVersion(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
 		return nil
 	}
 
-	client, err := f.Client()
+	clientset, err := f.ClientSet()
 	if err != nil {
 		return err
 	}
 
-	kubectl.GetServerVersion(out, client)
+	serverVersion, err := clientset.Discovery().ServerVersion()
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprintf(out, "Server Version: %#v\n", *serverVersion)
 	return nil
 }

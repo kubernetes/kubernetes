@@ -22,6 +22,7 @@ import (
 
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
+
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -126,12 +127,12 @@ func NewCmdGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Comma
 // TODO: convert all direct flag accessors to a struct and pass that instead of cmd
 func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Command, args []string, options *GetOptions) error {
 	if len(options.Raw) > 0 {
-		client, err := f.Client()
+		restClient, err := f.RESTClient()
 		if err != nil {
 			return err
 		}
 
-		stream, err := client.RESTClient.Get().RequestURI(options.Raw).Stream()
+		stream, err := restClient.Get().RequestURI(options.Raw).Stream()
 		if err != nil {
 			return err
 		}

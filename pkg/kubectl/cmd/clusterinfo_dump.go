@@ -25,7 +25,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
@@ -86,17 +85,17 @@ func setupOutputWriter(cmd *cobra.Command, defaultWriter io.Writer, filename str
 }
 
 func dumpClusterInfo(f *cmdutil.Factory, cmd *cobra.Command, args []string, out io.Writer) error {
-	var c *unversioned.Client
-	var err error
-	if c, err = f.Client(); err != nil {
+	clientset, err := f.ClientSet()
+	if err != nil {
 		return err
 	}
+
 	printer, _, err := kubectl.GetPrinter("json", "", false)
 	if err != nil {
 		return err
 	}
 
-	nodes, err := c.Nodes().List(api.ListOptions{})
+	nodes, err := clientset.Core().Nodes().List(api.ListOptions{})
 	if err != nil {
 		return err
 	}
@@ -107,7 +106,7 @@ func dumpClusterInfo(f *cmdutil.Factory, cmd *cobra.Command, args []string, out 
 
 	var namespaces []string
 	if cmdutil.GetFlagBool(cmd, "all-namespaces") {
-		namespaceList, err := c.Namespaces().List(api.ListOptions{})
+		namespaceList, err := clientset.Core().Namespaces().List(api.ListOptions{})
 		if err != nil {
 			return err
 		}
@@ -130,7 +129,7 @@ func dumpClusterInfo(f *cmdutil.Factory, cmd *cobra.Command, args []string, out 
 	for _, namespace := range namespaces {
 		// TODO: this is repetitive in the extreme.  Use reflection or
 		// something to make this a for loop.
-		events, err := c.Events(namespace).List(api.ListOptions{})
+		events, err := clientset.Core().Events(namespace).List(api.ListOptions{})
 		if err != nil {
 			return err
 		}
@@ -138,7 +137,7 @@ func dumpClusterInfo(f *cmdutil.Factory, cmd *cobra.Command, args []string, out 
 			return err
 		}
 
-		rcs, err := c.ReplicationControllers(namespace).List(api.ListOptions{})
+		rcs, err := clientset.Core().ReplicationControllers(namespace).List(api.ListOptions{})
 		if err != nil {
 			return err
 		}
@@ -146,7 +145,7 @@ func dumpClusterInfo(f *cmdutil.Factory, cmd *cobra.Command, args []string, out 
 			return err
 		}
 
-		svcs, err := c.Services(namespace).List(api.ListOptions{})
+		svcs, err := clientset.Core().Services(namespace).List(api.ListOptions{})
 		if err != nil {
 			return err
 		}
@@ -154,7 +153,7 @@ func dumpClusterInfo(f *cmdutil.Factory, cmd *cobra.Command, args []string, out 
 			return err
 		}
 
-		sets, err := c.DaemonSets(namespace).List(api.ListOptions{})
+		sets, err := clientset.Extensions().DaemonSets(namespace).List(api.ListOptions{})
 		if err != nil {
 			return err
 		}
@@ -162,7 +161,7 @@ func dumpClusterInfo(f *cmdutil.Factory, cmd *cobra.Command, args []string, out 
 			return err
 		}
 
-		deps, err := c.Deployments(namespace).List(api.ListOptions{})
+		deps, err := clientset.Extensions().Deployments(namespace).List(api.ListOptions{})
 		if err != nil {
 			return err
 		}
@@ -170,7 +169,7 @@ func dumpClusterInfo(f *cmdutil.Factory, cmd *cobra.Command, args []string, out 
 			return err
 		}
 
-		rps, err := c.ReplicaSets(namespace).List(api.ListOptions{})
+		rps, err := clientset.Extensions().ReplicaSets(namespace).List(api.ListOptions{})
 		if err != nil {
 			return err
 		}
@@ -178,7 +177,7 @@ func dumpClusterInfo(f *cmdutil.Factory, cmd *cobra.Command, args []string, out 
 			return err
 		}
 
-		pods, err := c.Pods(namespace).List(api.ListOptions{})
+		pods, err := clientset.Core().Pods(namespace).List(api.ListOptions{})
 		if err != nil {
 			return err
 		}
