@@ -36,7 +36,7 @@ func TestCreateSandbox(t *testing.T) {
 			Uid:       &uid,
 		},
 	}
-	id, err := ds.CreatePodSandbox(config)
+	id, err := ds.RunPodSandbox(config)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
