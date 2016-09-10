@@ -31,8 +31,7 @@ ALL_ARCH = amd64 arm arm64 ppc64le
 
 GOARM=6
 TEMP_DIR := $(shell mktemp -d)
-KUBE_CROSS_IMAGE = gcr.io/google_containers/kube-cross
-KUBE_CROSS_VERSION = $(shell cat ../../../build/build-image/cross/VERSION)
+GOLANG_VERSION = 1.6.3
 
 BIN = serve_hostname
 SRCS = serve_hostname.go
@@ -74,7 +73,7 @@ bin/$(BIN)-$(ARCH): $(SRCS)
 	cp ./* $(TEMP_DIR)
 
 	docker run -it -v $(TEMP_DIR):/build \
-	$(KUBE_CROSS_IMAGE):$(KUBE_CROSS_VERSION) \
+	golang:$(GOLANG_VERSION) \
 	/bin/bash -c "\
             cd /build && \
             CGO_ENABLED=0 GOARM=$(GOARM) GOARCH=$(ARCH) go build -a -installsuffix cgo --ldflags '-w' -o $(BIN) ./$(SRCS)"
@@ -86,7 +85,7 @@ container: .container-$(ARCH)
 
 	docker build -t $(IMAGE):$(TAG) $(TEMP_DIR)
 	if [ -n "$(TEST_REGISTRY)" ]; then \
-		docker tag -f $(IMAGE):$(TAG) $(TEST_IMAGE):$(TAG) ;\
+		docker tag $(IMAGE):$(TAG) $(TEST_IMAGE):$(TAG) ;\
 	fi
 
 push: .push-$(ARCH)

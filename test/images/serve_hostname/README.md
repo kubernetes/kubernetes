@@ -10,8 +10,10 @@ If you are releasing a new version, please bump the `TAG` value in the `Makefile
 ## How to release:
 
 ```
+# Build cross-platform binaries
+$ make all-push
+
 # Build for linux/amd64 (default)
-$ make push
 $ make push ARCH=amd64
 # ---> gcr.io/google_containers/serve_hostname-amd64:TAG
 
@@ -25,7 +27,7 @@ $ make push ARCH=ppc64le
 # ---> gcr.io/google_containers/serve_hostname-ppc64le:TAG
 ```
 
-Of course, if you don't want to push the images, just run `make container`
+Of course, if you don't want to push the images, run `make all-container` or `make container ARCH={target_arch}` instead.
 
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/contrib/for-demos/serve_hostname/README.md?pixel)]()
