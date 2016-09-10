@@ -125,6 +125,8 @@ API_CORS_ALLOWED_ORIGINS=${API_CORS_ALLOWED_ORIGINS:-"/127.0.0.1(:[0-9]+)?$,/loc
 KUBELET_PORT=${KUBELET_PORT:-10250}
 LOG_LEVEL=${LOG_LEVEL:-3}
 CONTAINER_RUNTIME=${CONTAINER_RUNTIME:-"docker"}
+CONTAINER_RUNTIME_ENDPOINT=${CONTAINER_RUNTIME_ENDPOINT:-""}
+IMAGE_SERVICE_ENDPOINT=${IMAGE_SERVICE_ENDPOINT:-""}
 RKT_PATH=${RKT_PATH:-""}
 RKT_STAGE1_IMAGE=${RKT_STAGE1_IMAGE:-""}
 CHAOS_CHANCE=${CHAOS_CHANCE:-0.0}
@@ -374,6 +376,16 @@ function start_kubelet {
         kubenet_plugin_args="--reconcile-cidr=true "
       fi
 
+      container_runtime_endpoint_args=""
+      if [[ -n "${CONTAINER_RUNTIME_ENDPOINT}" ]]; then
+        container_runtime_endpoint_args="--container-runtime-endpoint=${CONTAINER_RUNTIME_ENDPOINT}"
+      fi
+
+      image_service_endpoint_args=""
+      if [[ -n "${IMAGE_SERVICE_ENDPOINT}" ]]; then
+	image_service_endpoint_args="--image-service-endpoint=${IMAGE_SERVICE_ENDPOINT}"
+      fi
+
       sudo -E "${GO_OUT}/hyperkube" kubelet ${priv_arg}\
         --v=${LOG_LEVEL} \
         --chaos-chance="${CHAOS_CHANCE}" \
@@ -390,6 +402,8 @@ function start_kubelet {
         ${net_plugin_dir_args} \
         ${net_plugin_args} \
         ${kubenet_plugin_args} \
+        ${container_runtime_endpoint_args} \
+        ${image_service_endpoint_args} \
         --port="$KUBELET_PORT" >"${KUBELET_LOG}" 2>&1 &
       KUBELET_PID=$!
     else
