@@ -1370,6 +1370,10 @@
 			"Rev": "cb07059aed8760ef857a58d37598b9e51c36a9ae"
 		},
 		{
+			"ImportPath": "github.com/howeyc/gopass",
+			"Rev": "3ca23474a7c7203e0a0a070fd33508f6efdb9b3d"
+		},
+		{
 			"ImportPath": "github.com/imdario/mergo",
 			"Comment": "0.1.3-8-g6633656",
 			"Rev": "6633656539c1639d9d78127b7d47c622b5d7b6dc"
@@ -2205,6 +2209,10 @@
 		},
 		{
 			"ImportPath": "golang.org/x/crypto/ssh",
+			"Rev": "1f22c0103821b9390939b6776727195525381532"
+		},
+		{
+			"ImportPath": "golang.org/x/crypto/ssh/terminal",
 			"Rev": "1f22c0103821b9390939b6776727195525381532"
 		},
 		{
