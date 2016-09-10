@@ -25,7 +25,7 @@ import (
 )
 
 func TestValidateRoleBinding(t *testing.T) {
-	errs := validateRoleBinding(
+	errs := ValidateRoleBinding(
 		&rbac.RoleBinding{
 			ObjectMeta: api.ObjectMeta{Namespace: api.NamespaceDefault, Name: "master"},
 			RoleRef:    api.ObjectReference{Namespace: "master", Name: "valid"},
@@ -35,7 +35,6 @@ func TestValidateRoleBinding(t *testing.T) {
 				{Name: "valid@groupname", Kind: rbac.GroupKind},
 			},
 		},
-		true,
 	)
 	if len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
@@ -107,7 +106,7 @@ func TestValidateRoleBinding(t *testing.T) {
 		},
 	}
 	for k, v := range errorCases {
-		errs := validateRoleBinding(&v.A, true)
+		errs := ValidateRoleBinding(&v.A)
 		if len(errs) == 0 {
 			t.Errorf("expected failure %s for %v", k, v.A)
 			continue
@@ -129,13 +128,12 @@ func TestValidateRoleBindingUpdate(t *testing.T) {
 		RoleRef:    api.ObjectReference{Namespace: "master", Name: "valid"},
 	}
 
-	errs := validateRoleBindingUpdate(
+	errs := ValidateRoleBindingUpdate(
 		&rbac.RoleBinding{
 			ObjectMeta: api.ObjectMeta{Namespace: api.NamespaceDefault, Name: "master", ResourceVersion: "1"},
 			RoleRef:    api.ObjectReference{Namespace: "master", Name: "valid"},
 		},
 		old,
-		true,
 	)
 	if len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
@@ -156,7 +154,7 @@ func TestValidateRoleBindingUpdate(t *testing.T) {
 		},
 	}
 	for k, v := range errorCases {
-		errs := validateRoleBindingUpdate(&v.A, old, true)
+		errs := ValidateRoleBindingUpdate(&v.A, old)
 		if len(errs) == 0 {
 			t.Errorf("expected failure %s for %v", k, v.A)
 			continue
@@ -197,16 +195,44 @@ func TestNonResourceURLCovers(t *testing.T) {
 	}
 }
 
-type validateRoleTest struct {
-	role         rbac.Role
-	isNamespaced bool
-	wantErr      bool
-	errType      field.ErrorType
-	field        string
+type ValidateRoleTest struct {
+	role    rbac.Role
+	wantErr bool
+	errType field.ErrorType
+	field   string
 }
 
-func (v validateRoleTest) test(t *testing.T) {
-	errs := validateRole(&v.role, v.isNamespaced)
+func (v ValidateRoleTest) test(t *testing.T) {
+	errs := ValidateRole(&v.role)
+	if len(errs) == 0 {
+		if v.wantErr {
+			t.Fatal("expected validation error")
+		}
+		return
+	}
+	if !v.wantErr {
+		t.Errorf("didn't expect error, got %v", errs)
+		return
+	}
+	for i := range errs {
+		if errs[i].Type != v.errType {
+			t.Errorf("expected errors to have type %s: %v", v.errType, errs[i])
+		}
+		if errs[i].Field != v.field {
+			t.Errorf("expected errors to have field %s: %v", v.field, errs[i])
+		}
+	}
+}
+
+type ValidateClusterRoleTest struct {
+	role    rbac.ClusterRole
+	wantErr bool
+	errType field.ErrorType
+	field   string
+}
+
+func (v ValidateClusterRoleTest) test(t *testing.T) {
+	errs := ValidateClusterRole(&v.role)
 	if len(errs) == 0 {
 		if v.wantErr {
 			t.Fatal("expected validation error")
@@ -228,57 +254,53 @@ func (v validateRoleTest) test(t *testing.T) {
 }
 
 func TestValidateRoleZeroLengthNamespace(t *testing.T) {
-	validateRoleTest{
+	ValidateRoleTest{
 		role: rbac.Role{
 			ObjectMeta: api.ObjectMeta{Name: "default"},
 		},
-		isNamespaced: true,
-		wantErr:      true,
-		errType:      field.ErrorTypeRequired,
-		field:        "metadata.namespace",
+		wantErr: true,
+		errType: field.ErrorTypeRequired,
+		field:   "metadata.namespace",
 	}.test(t)
 }
 
 func TestValidateRoleZeroLengthName(t *testing.T) {
-	validateRoleTest{
+	ValidateRoleTest{
 		role: rbac.Role{
 			ObjectMeta: api.ObjectMeta{Namespace: "default"},
 		},
-		isNamespaced: true,
-		wantErr:      true,
-		errType:      field.ErrorTypeRequired,
-		field:        "metadata.name",
+		wantErr: true,
+		errType: field.ErrorTypeRequired,
+		field:   "metadata.name",
 	}.test(t)
 }
 
 func TestValidateRoleValidRole(t *testing.T) {
-	validateRoleTest{
+	ValidateRoleTest{
 		role: rbac.Role{
 			ObjectMeta: api.ObjectMeta{
 				Namespace: "default",
 				Name:      "default",
 			},
 		},
-		isNamespaced: true,
-		wantErr:      false,
+		wantErr: false,
 	}.test(t)
 }
 
 func TestValidateRoleValidRoleNoNamespace(t *testing.T) {
-	validateRoleTest{
-		role: rbac.Role{
+	ValidateClusterRoleTest{
+		role: rbac.ClusterRole{
 			ObjectMeta: api.ObjectMeta{
 				Name: "default",
 			},
 		},
-		isNamespaced: false,
-		wantErr:      false,
+		wantErr: false,
 	}.test(t)
 }
 
 func TestValidateRoleNonResourceURL(t *testing.T) {
-	validateRoleTest{
-		role: rbac.Role{
+	ValidateClusterRoleTest{
+		role: rbac.ClusterRole{
 			ObjectMeta: api.ObjectMeta{
 				Name: "default",
 			},
@@ -289,13 +311,12 @@ func TestValidateRoleNonResourceURL(t *testing.T) {
 				},
 			},
 		},
-		isNamespaced: false,
-		wantErr:      false,
+		wantErr: false,
 	}.test(t)
 }
 
 func TestValidateRoleNamespacedNonResourceURL(t *testing.T) {
-	validateRoleTest{
+	ValidateRoleTest{
 		role: rbac.Role{
 			ObjectMeta: api.ObjectMeta{
 				Namespace: "default",
@@ -309,16 +330,15 @@ func TestValidateRoleNamespacedNonResourceURL(t *testing.T) {
 				},
 			},
 		},
-		isNamespaced: true,
-		wantErr:      true,
-		errType:      field.ErrorTypeInvalid,
-		field:        "rules[0].nonResourceURLs",
+		wantErr: true,
+		errType: field.ErrorTypeInvalid,
+		field:   "rules[0].nonResourceURLs",
 	}.test(t)
 }
 
 func TestValidateRoleNonResourceURLNoVerbs(t *testing.T) {
-	validateRoleTest{
-		role: rbac.Role{
+	ValidateClusterRoleTest{
+		role: rbac.ClusterRole{
 			ObjectMeta: api.ObjectMeta{
 				Name: "default",
 			},
@@ -329,18 +349,18 @@ func TestValidateRoleNonResourceURLNoVerbs(t *testing.T) {
 				},
 			},
 		},
-		isNamespaced: false,
-		wantErr:      true,
-		errType:      field.ErrorTypeRequired,
-		field:        "rules[0].verbs",
+		wantErr: true,
+		errType: field.ErrorTypeRequired,
+		field:   "rules[0].verbs",
 	}.test(t)
 }
 
 func TestValidateRoleMixedNonResourceAndResource(t *testing.T) {
-	validateRoleTest{
+	ValidateRoleTest{
 		role: rbac.Role{
 			ObjectMeta: api.ObjectMeta{
-				Name: "default",
+				Name:      "default",
+				Namespace: "default",
 			},
 			Rules: []rbac.PolicyRule{
 				{
@@ -358,10 +378,11 @@ func TestValidateRoleMixedNonResourceAndResource(t *testing.T) {
 }
 
 func TestValidateRoleValidResource(t *testing.T) {
-	validateRoleTest{
+	ValidateRoleTest{
 		role: rbac.Role{
 			ObjectMeta: api.ObjectMeta{
-				Name: "default",
+				Name:      "default",
+				Namespace: "default",
 			},
 			Rules: []rbac.PolicyRule{
 				{
@@ -376,10 +397,11 @@ func TestValidateRoleValidResource(t *testing.T) {
 }
 
 func TestValidateRoleNoAPIGroup(t *testing.T) {
-	validateRoleTest{
+	ValidateRoleTest{
 		role: rbac.Role{
 			ObjectMeta: api.ObjectMeta{
-				Name: "default",
+				Name:      "default",
+				Namespace: "default",
 			},
 			Rules: []rbac.PolicyRule{
 				{
@@ -395,10 +417,11 @@ func TestValidateRoleNoAPIGroup(t *testing.T) {
 }
 
 func TestValidateRoleNoResources(t *testing.T) {
-	validateRoleTest{
+	ValidateRoleTest{
 		role: rbac.Role{
 			ObjectMeta: api.ObjectMeta{
-				Name: "default",
+				Name:      "default",
+				Namespace: "default",
 			},
 			Rules: []rbac.PolicyRule{
 				{

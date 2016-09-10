@@ -31,11 +31,8 @@
                     "-c",
                     "./cluster-autoscaler --kubernetes=http://127.0.0.1:8080?inClusterConfig=f --v=4 {{params}} 1>>/var/log/cluster-autoscaler.log 2>&1"
                 ],
+                # TODO: Make resource requirements depend on the size of the cluster
                 "resources": {
-                    "limits": {
-                        "cpu": "100m",
-                        "memory": "300Mi"
-                    },
                     "requests": {
                         "cpu": "20m",
                         "memory": "300Mi"

@@ -2952,7 +2952,11 @@ func GetReadySchedulableNodesOrDie(c *client.Client) (nodes *api.NodeList) {
 }
 
 func WaitForAllNodesSchedulable(c *client.Client) error {
+	Logf("Waiting up to %v for all (but %d) nodes to be schedulable", 4*time.Hour, TestContext.AllowedNotReadyNodes)
+
+	var notSchedulable []*api.Node
 	return wait.PollImmediate(30*time.Second, 4*time.Hour, func() (bool, error) {
+		notSchedulable = nil
 		opts := api.ListOptions{
 			ResourceVersion: "0",
 			FieldSelector:   fields.Set{"spec.unschedulable": "false"}.AsSelector(),
@@ -2963,17 +2967,23 @@ func WaitForAllNodesSchedulable(c *client.Client) error {
 			// Ignore the error here - it will be retried.
 			return false, nil
 		}
-		schedulable := 0
-		for _, node := range nodes.Items {
-			if isNodeSchedulable(&node) {
-				schedulable++
+		for i := range nodes.Items {
+			node := &nodes.Items[i]
+			if !isNodeSchedulable(node) {
+				notSchedulable = append(notSchedulable, node)
 			}
 		}
-		if schedulable != len(nodes.Items) {
-			Logf("%d/%d nodes schedulable (polling after 30s)", schedulable, len(nodes.Items))
+		// Framework allows for <TestContext.AllowedNotReadyNodes> nodes to be non-ready,
+		// to make it possible e.g. for incorrect deployment of some small percentage
+		// of nodes (which we allow in cluster validation). Some nodes that are not
+		// provisioned correctly at startup will never become ready (e.g. when something
+		// won't install correctly), so we can't expect them to be ready at any point.
+		//
+		// However, we only allow non-ready nodes with some specific reasons.
+		if len(notSchedulable) > TestContext.AllowedNotReadyNodes {
 			return false, nil
 		}
-		return true, nil
+		return allowedNotReadyReasons(notSchedulable), nil
 	})
 }
 
@@ -4201,7 +4211,7 @@ func allowedNotReadyReasons(nodes []*api.Node) bool {
 	for _, node := range nodes {
 		index, condition := api.GetNodeCondition(&node.Status, api.NodeReady)
 		if index == -1 ||
-			!strings.Contains(condition.Reason, "could not locate kubenet required CNI plugins") {
+			!strings.Contains(condition.Message, "could not locate kubenet required CNI plugins") {
 			return false
 		}
 	}
@@ -4213,7 +4223,7 @@ func allowedNotReadyReasons(nodes []*api.Node) bool {
 // and figure out how to do it in a configurable way, as we can't expect all setups to run
 // default test add-ons.
 func AllNodesReady(c *client.Client, timeout time.Duration) error {
-	Logf("Waiting up to %v for all nodes to be ready", timeout)
+	Logf("Waiting up to %v for all (but %d) nodes to be ready", timeout, TestContext.AllowedNotReadyNodes)
 
 	var notReady []*api.Node
 	err := wait.PollImmediate(Poll, timeout, func() (bool, error) {
@@ -4246,8 +4256,8 @@ func AllNodesReady(c *client.Client, timeout time.Duration) error {
 		return err
 	}
 
-	if len(notReady) > 0 {
-		return fmt.Errorf("Not ready nodes: %v", notReady)
+	if len(notReady) > TestContext.AllowedNotReadyNodes || !allowedNotReadyReasons(notReady) {
+		return fmt.Errorf("Not ready nodes: %#v", notReady)
 	}
 	return nil
 }

@@ -230,20 +230,40 @@ func (m *kubeGenericRuntimeManager) GetPods(all bool) ([]*kubecontainer.Pod, err
 	if err != nil {
 		return nil, err
 	}
-	for _, s := range sandboxes {
-		podUID := kubetypes.UID(s.Metadata.GetUid())
-		pods[podUID] = &kubecontainer.Pod{
-			ID:        podUID,
-			Name:      s.Metadata.GetName(),
-			Namespace: s.Metadata.GetNamespace(),
+	for i := range sandboxes {
+		s := sandboxes[i]
+		if s.Metadata == nil {
+			glog.V(4).Infof("Sandbox does not have metadata: %+v", s)
+			continue
 		}
+		podUID := kubetypes.UID(s.Metadata.GetUid())
+		if _, ok := pods[podUID]; !ok {
+			pods[podUID] = &kubecontainer.Pod{
+				ID:        podUID,
+				Name:      s.Metadata.GetName(),
+				Namespace: s.Metadata.GetNamespace(),
+			}
+		}
+		p := pods[podUID]
+		converted, err := m.sandboxToKubeContainer(s)
+		if err != nil {
+			glog.V(4).Infof("Convert %q sandbox %v of pod %q failed: %v", m.runtimeName, s, podUID, err)
+			continue
+		}
+		p.Sandboxes = append(p.Sandboxes, converted)
 	}
 
 	containers, err := m.getKubeletContainers(all)
 	if err != nil {
 		return nil, err
 	}
-	for _, c := range containers {
+	for i := range containers {
+		c := containers[i]
+		if c.Metadata == nil {
+			glog.V(4).Infof("Container does not have metadata: %+v", c)
+			continue
+		}
+
 		labelledInfo := getContainerInfoFromLabels(c.Labels)
 		pod, found := pods[labelledInfo.PodUID]
 		if !found {
@@ -257,7 +277,7 @@ func (m *kubeGenericRuntimeManager) GetPods(all bool) ([]*kubecontainer.Pod, err
 
 		converted, err := m.toKubeContainer(c)
 		if err != nil {
-			glog.Warningf("Convert %s container %v of pod %q failed: %v", m.runtimeName, c, labelledInfo.PodUID, err)
+			glog.V(4).Infof("Convert %s container %v of pod %q failed: %v", m.runtimeName, c, labelledInfo.PodUID, err)
 			continue
 		}
 
@@ -384,7 +404,14 @@ func (m *kubeGenericRuntimeManager) GetNetNS(sandboxID kubecontainer.ContainerID
 
 // GetPodContainerID gets pod sandbox ID
 func (m *kubeGenericRuntimeManager) GetPodContainerID(pod *kubecontainer.Pod) (kubecontainer.ContainerID, error) {
-	return kubecontainer.ContainerID{}, fmt.Errorf("not implemented")
+	podFullName := kubecontainer.BuildPodFullName(pod.Name, pod.Namespace)
+	if len(pod.Sandboxes) == 0 {
+		glog.Errorf("No sandboxes are found for pod %q", podFullName)
+		return kubecontainer.ContainerID{}, fmt.Errorf("sandboxes for pod %q not found", podFullName)
+	}
+
+	// return sandboxID of the first sandbox since it is the latest one
+	return pod.Sandboxes[0].ID, nil
 }
 
 // Forward the specified port from the specified pod to the stream.

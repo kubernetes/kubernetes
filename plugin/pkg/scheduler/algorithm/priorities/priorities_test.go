@@ -17,21 +17,21 @@ limitations under the License.
 package priorities
 
 import (
+	"fmt"
 	"os/exec"
+	"path/filepath"
 	"reflect"
 	"sort"
-	"strconv"
 	"testing"
 
+	"k8s.io/kubernetes/cmd/libs/go2idl/parser"
 	"k8s.io/kubernetes/cmd/libs/go2idl/types"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/util/codeinspector"
-	"k8s.io/kubernetes/plugin/pkg/scheduler"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
-	priorityutil "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities/util"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
@@ -52,126 +52,22 @@ func makeNode(node string, milliCPU, memory int64) *api.Node {
 	}
 }
 
-func TestZeroRequest(t *testing.T) {
-	// A pod with no resources. We expect spreading to count it as having the default resources.
-	noResources := api.PodSpec{
-		Containers: []api.Container{
-			{},
-		},
-	}
-	noResources1 := noResources
-	noResources1.NodeName = "machine1"
-	// A pod with the same resources as a 0-request pod gets by default as its resources (for spreading).
-	small := api.PodSpec{
-		Containers: []api.Container{
-			{
-				Resources: api.ResourceRequirements{
-					Requests: api.ResourceList{
-						"cpu": resource.MustParse(
-							strconv.FormatInt(priorityutil.DefaultMilliCpuRequest, 10) + "m"),
-						"memory": resource.MustParse(
-							strconv.FormatInt(priorityutil.DefaultMemoryRequest, 10)),
-					},
-				},
-			},
-		},
-	}
-	small2 := small
-	small2.NodeName = "machine2"
-	// A larger pod.
-	large := api.PodSpec{
-		Containers: []api.Container{
-			{
-				Resources: api.ResourceRequirements{
-					Requests: api.ResourceList{
-						"cpu": resource.MustParse(
-							strconv.FormatInt(priorityutil.DefaultMilliCpuRequest*3, 10) + "m"),
-						"memory": resource.MustParse(
-							strconv.FormatInt(priorityutil.DefaultMemoryRequest*3, 10)),
-					},
-				},
-			},
-		},
-	}
-	large1 := large
-	large1.NodeName = "machine1"
-	large2 := large
-	large2.NodeName = "machine2"
-	tests := []struct {
-		pod   *api.Pod
-		pods  []*api.Pod
-		nodes []*api.Node
-		test  string
-	}{
-		// The point of these next two tests is to show you get the same priority for a zero-request pod
-		// as for a pod with the defaults requests, both when the zero-request pod is already on the machine
-		// and when the zero-request pod is the one being scheduled.
-		{
-			pod:   &api.Pod{Spec: noResources},
-			nodes: []*api.Node{makeNode("machine1", 1000, priorityutil.DefaultMemoryRequest*10), makeNode("machine2", 1000, priorityutil.DefaultMemoryRequest*10)},
-			test:  "test priority of zero-request pod with machine with zero-request pod",
-			pods: []*api.Pod{
-				{Spec: large1}, {Spec: noResources1},
-				{Spec: large2}, {Spec: small2},
-			},
-		},
-		{
-			pod:   &api.Pod{Spec: small},
-			nodes: []*api.Node{makeNode("machine1", 1000, priorityutil.DefaultMemoryRequest*10), makeNode("machine2", 1000, priorityutil.DefaultMemoryRequest*10)},
-			test:  "test priority of nonzero-request pod with machine with zero-request pod",
-			pods: []*api.Pod{
-				{Spec: large1}, {Spec: noResources1},
-				{Spec: large2}, {Spec: small2},
-			},
-		},
-		// The point of this test is to verify that we're not just getting the same score no matter what we schedule.
-		{
-			pod:   &api.Pod{Spec: large},
-			nodes: []*api.Node{makeNode("machine1", 1000, priorityutil.DefaultMemoryRequest*10), makeNode("machine2", 1000, priorityutil.DefaultMemoryRequest*10)},
-			test:  "test priority of larger pod with machine with zero-request pod",
-			pods: []*api.Pod{
-				{Spec: large1}, {Spec: noResources1},
-				{Spec: large2}, {Spec: small2},
-			},
-		},
-	}
-
-	const expectedPriority int = 25
-	for _, test := range tests {
-		nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(test.pods, test.nodes)
-		list, err := scheduler.PrioritizeNodes(
-			test.pod,
-			nodeNameToInfo,
-			// This should match the configuration in defaultPriorities() in
-			// plugin/pkg/scheduler/algorithmprovider/defaults/defaults.go if you want
-			// to test what's actually in production.
-			[]algorithm.PriorityConfig{
-				{Function: LeastRequestedPriority, Weight: 1},
-				{Function: BalancedResourceAllocation, Weight: 1},
-				{
-					Function: NewSelectorSpreadPriority(
-						algorithm.FakePodLister(test.pods),
-						algorithm.FakeServiceLister([]api.Service{}),
-						algorithm.FakeControllerLister([]api.ReplicationController{}),
-						algorithm.FakeReplicaSetLister([]extensions.ReplicaSet{})),
-					Weight: 1,
-				},
-			},
-			algorithm.FakeNodeLister(test.nodes), []algorithm.SchedulerExtender{})
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
+func priorityFunction(mapFn algorithm.PriorityMapFunction, reduceFn algorithm.PriorityReduceFunction) algorithm.PriorityFunction {
+	return func(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodes []*api.Node) (schedulerapi.HostPriorityList, error) {
+		result := make(schedulerapi.HostPriorityList, 0, len(nodes))
+		for i := range nodes {
+			hostResult, err := mapFn(pod, nil, nodeNameToInfo[nodes[i].Name])
+			if err != nil {
+				return nil, err
+			}
+			result = append(result, hostResult)
 		}
-		for _, hp := range list {
-			if test.test == "test priority of larger pod with machine with zero-request pod" {
-				if hp.Score == expectedPriority {
-					t.Errorf("%s: expected non-%d for all priorities, got list %#v", test.test, expectedPriority, list)
-				}
-			} else {
-				if hp.Score != expectedPriority {
-					t.Errorf("%s: expected %d for all priorities, got list %#v", test.test, expectedPriority, list)
-				}
+		if reduceFn != nil {
+			if err := reduceFn(result); err != nil {
+				return nil, err
 			}
 		}
+		return result, nil
 	}
 }
 
@@ -401,7 +297,8 @@ func TestLeastRequested(t *testing.T) {
 
 	for _, test := range tests {
 		nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(test.pods, test.nodes)
-		list, err := LeastRequestedPriority(test.pod, nodeNameToInfo, test.nodes)
+		lrp := priorityFunction(LeastRequestedPriorityMap, nil)
+		list, err := lrp(test.pod, nodeNameToInfo, test.nodes)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -1054,6 +951,29 @@ func makeImageNode(node string, status api.NodeStatus) *api.Node {
 	}
 }
 
+func getPrioritySignatures() ([]*types.Signature, error) {
+	filePath := "./../types.go"
+	pkgName := filepath.Dir(filePath)
+	builder := parser.New()
+	if err := builder.AddDir(pkgName); err != nil {
+		return nil, err
+	}
+	universe, err := builder.FindTypes()
+	if err != nil {
+		return nil, err
+	}
+	signatures := []string{"PriorityFunction", "PriorityMapFunction", "PriorityReduceFunction"}
+	results := make([]*types.Signature, 0, len(signatures))
+	for _, signature := range signatures {
+		result, ok := universe[pkgName].Types[signature]
+		if !ok {
+			return nil, fmt.Errorf("%s type not defined", signature)
+		}
+		results = append(results, result.Signature)
+	}
+	return results, nil
+}
+
 func TestPrioritiesRegistered(t *testing.T) {
 	var functions []*types.Type
 
@@ -1080,8 +1000,30 @@ func TestPrioritiesRegistered(t *testing.T) {
 		}
 	}
 
+	prioritySignatures, err := getPrioritySignatures()
+	if err != nil {
+		t.Fatalf("Couldn't get priorities signatures")
+	}
+
 	// Check if all public priorities are referenced in target files.
 	for _, function := range functions {
+		// Ignore functions that don't match priorities signatures.
+		signature := function.Underlying.Signature
+		match := false
+		for _, prioritySignature := range prioritySignatures {
+			if len(prioritySignature.Parameters) != len(signature.Parameters) {
+				continue
+			}
+			if len(prioritySignature.Results) != len(signature.Results) {
+				continue
+			}
+			// TODO: Check exact types of parameters and results.
+			match = true
+		}
+		if !match {
+			continue
+		}
+
 		args := []string{"-rl", function.Name.Name}
 		args = append(args, targetFiles...)
 

@@ -154,6 +154,11 @@ type Pod struct {
 	// List of containers that belongs to this pod. It may contain only
 	// running containers, or mixed with dead ones (when GetPods(true)).
 	Containers []*Container
+	// List of sandboxes associated with this pod. The sandboxes are converted
+	// to Container temporariliy to avoid substantial changes to other
+	// components. This is only populated by kuberuntime.
+	// TODO: use the runtimeApi.PodSandbox type directly.
+	Sandboxes []*Container
 }
 
 // PodPair contains both runtime#Pod and api#Pod
@@ -456,6 +461,15 @@ func (p *Pod) FindContainerByName(containerName string) *Container {
 
 func (p *Pod) FindContainerByID(id ContainerID) *Container {
 	for _, c := range p.Containers {
+		if c.ID == id {
+			return c
+		}
+	}
+	return nil
+}
+
+func (p *Pod) FindSandboxByID(id ContainerID) *Container {
+	for _, c := range p.Sandboxes {
 		if c.ID == id {
 			return c
 		}

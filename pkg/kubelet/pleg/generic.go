@@ -141,6 +141,7 @@ func generateEvents(podID types.UID, cid string, oldState, newState plegContaine
 	if newState == oldState {
 		return nil
 	}
+
 	glog.V(4).Infof("GenericPLEG: %v/%v: %v -> %v", podID, cid, oldState, newState)
 	switch newState {
 	case plegContainerRunning:
@@ -294,6 +295,17 @@ func getContainersFromPods(pods ...*kubecontainer.Pod) []*kubecontainer.Containe
 			cidSet.Insert(cid)
 			containers = append(containers, c)
 		}
+		// Update sandboxes as containers
+		// TODO: keep track of sandboxes explicitly.
+		for _, c := range p.Sandboxes {
+			cid := string(c.ID.ID)
+			if cidSet.Has(cid) {
+				continue
+			}
+			cidSet.Insert(cid)
+			containers = append(containers, c)
+		}
+
 	}
 	return containers
 }
@@ -345,11 +357,17 @@ func getContainerState(pod *kubecontainer.Pod, cid *kubecontainer.ContainerID) p
 	if pod == nil {
 		return state
 	}
-	container := pod.FindContainerByID(*cid)
-	if container == nil {
-		return state
+	c := pod.FindContainerByID(*cid)
+	if c != nil {
+		return convertState(c.State)
 	}
-	return convertState(container.State)
+	// Search through sandboxes too.
+	c = pod.FindSandboxByID(*cid)
+	if c != nil {
+		return convertState(c.State)
+	}
+
+	return state
 }
 
 func (pr podRecords) getOld(id types.UID) *kubecontainer.Pod {

@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/certificates"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/storage"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	adapter "k8s.io/kubernetes/pkg/client/unversioned/adapters/internalclientset"
@@ -116,6 +117,7 @@ func describerMap(c *client.Client) map[unversioned.GroupKind]Describer {
 		batch.Kind("ScheduledJob"):                     &ScheduledJobDescriber{adapter.FromUnversionedClient(c)},
 		apps.Kind("PetSet"):                            &PetSetDescriber{c},
 		certificates.Kind("CertificateSigningRequest"): &CertificateSigningRequestDescriber{c},
+		storage.Kind("StorageClass"):                   &StorageClassDescriber{c},
 	}
 
 	return m
@@ -610,6 +612,8 @@ func describeVolumes(volumes []api.Volume, out io.Writer, space string) {
 			printDownwardAPIVolumeSource(volume.VolumeSource.DownwardAPI, out)
 		case volume.VolumeSource.AzureDisk != nil:
 			printAzureDiskVolumeSource(volume.VolumeSource.AzureDisk, out)
+		case volume.VolumeSource.VsphereVolume != nil:
+			printVsphereVolumeSource(volume.VolumeSource.VsphereVolume, out)
 		default:
 			fmt.Fprintf(out, "  <unknown>\n")
 		}
@@ -738,6 +742,13 @@ func printAzureDiskVolumeSource(d *api.AzureDiskVolumeSource, out io.Writer) {
 		d.DiskName, d.DataDiskURI, *d.FSType, *d.CachingMode, *d.ReadOnly)
 }
 
+func printVsphereVolumeSource(vsphere *api.VsphereVirtualDiskVolumeSource, out io.Writer) {
+	fmt.Fprintf(out, "    Type:\tvSphereVolume (a Persistent Disk resource in vSphere)\n"+
+		"    VolumePath:\t%v\n"+
+		"    FSType:\t%v\n",
+		vsphere.VolumePath, vsphere.FSType)
+}
+
 type PersistentVolumeDescriber struct {
 	client.Interface
 }
@@ -789,6 +800,8 @@ func (d *PersistentVolumeDescriber) Describe(namespace, name string, describerSe
 			printRBDVolumeSource(pv.Spec.RBD, out)
 		case pv.Spec.Quobyte != nil:
 			printQuobyteVolumeSource(pv.Spec.Quobyte, out)
+		case pv.Spec.VsphereVolume != nil:
+			printVsphereVolumeSource(pv.Spec.VsphereVolume, out)
 		}
 
 		if events != nil {
@@ -2370,6 +2383,33 @@ func describeNetworkPolicy(networkPolicy *extensions.NetworkPolicy) (string, err
 		printLabelsMultiline(out, "Labels", networkPolicy.Labels)
 		printLabelsMultiline(out, "Annotations", networkPolicy.Annotations)
 
+		return nil
+	})
+}
+
+type StorageClassDescriber struct {
+	client.Interface
+}
+
+func (s *StorageClassDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
+	sc, err := s.Storage().StorageClasses().Get(name)
+	if err != nil {
+		return "", err
+	}
+	return tabbedString(func(out io.Writer) error {
+		fmt.Fprintf(out, "Name:\t%s\n", sc.Name)
+		fmt.Fprintf(out, "Annotations:\t%s\n", labels.FormatLabels(sc.Annotations))
+		fmt.Fprintf(out, "Provisioner:\t%s\n", sc.Provisioner)
+		fmt.Fprintf(out, "Parameters:\t%s\n", labels.FormatLabels(sc.Parameters))
+		if describerSettings.ShowEvents {
+			events, err := s.Events(namespace).Search(sc)
+			if err != nil {
+				return err
+			}
+			if events != nil {
+				DescribeEvents(events, out)
+			}
+		}
 		return nil
 	})
 }

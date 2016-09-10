@@ -94,11 +94,11 @@ type Store struct {
 	// DeleteCollection call.
 	DeleteCollectionWorkers int
 
-	// Called on all objects returned from the underlying store, after
-	// the exit hooks are invoked. Decorators are intended for integrations
-	// that are above storage and should only be used for specific cases where
-	// storage of the value is not appropriate, since they cannot
-	// be watched.
+	// Decorator is called as exit hook on object returned from the underlying storage.
+	// The returned object could be individual object (e.g. Pod) or the list type (e.g. PodList).
+	// Decorator is intended for integrations that are above storage and
+	// should only be used for specific cases where storage of the value is
+	// not appropriate, since they cannot be watched.
 	Decorator rest.ObjectFunc
 	// Allows extended behavior during creation, required
 	CreateStrategy rest.RESTCreateStrategy
@@ -184,7 +184,16 @@ func (e *Store) List(ctx api.Context, options *api.ListOptions) (runtime.Object,
 	if options != nil && options.FieldSelector != nil {
 		field = options.FieldSelector
 	}
-	return e.ListPredicate(ctx, e.PredicateFunc(label, field), options)
+	out, err := e.ListPredicate(ctx, e.PredicateFunc(label, field), options)
+	if err != nil {
+		return nil, err
+	}
+	if e.Decorator != nil {
+		if err := e.Decorator(out); err != nil {
+			return nil, err
+		}
+	}
+	return out, nil
 }
 
 // ListPredicate returns a list of all the items matching m.
@@ -599,9 +608,9 @@ func (e *Store) updateForGracefulDeletionAndFinalizers(ctx api.Context, name, ke
 				existingAccessor.SetFinalizers(newFinalizers)
 			}
 
+			pendingFinalizers = len(existingAccessor.GetFinalizers()) != 0
 			if !graceful {
 				// set the DeleteGracePeriods to 0 if the object has pendingFinalizers but not supporting graceful deletion
-				pendingFinalizers = len(existingAccessor.GetFinalizers()) != 0
 				if pendingFinalizers {
 					glog.V(6).Infof("update the DeletionTimestamp to \"now\" and GracePeriodSeconds to 0 for object %s, because it has pending finalizers", name)
 					err = markAsDeleting(existing)
@@ -839,12 +848,26 @@ func (e *Store) WatchPredicate(ctx api.Context, m *generic.SelectionPredicate, r
 			if err != nil {
 				return nil, err
 			}
-			return e.Storage.Watch(ctx, key, resourceVersion, filter)
+			w, err := e.Storage.Watch(ctx, key, resourceVersion, filter)
+			if err != nil {
+				return nil, err
+			}
+			if e.Decorator != nil {
+				return newDecoratedWatcher(w, e.Decorator), nil
+			}
+			return w, nil
 		}
 		// if we cannot extract a key based on the current context, the optimization is skipped
 	}
 
-	return e.Storage.WatchList(ctx, e.KeyRootFunc(ctx), resourceVersion, filter)
+	w, err := e.Storage.WatchList(ctx, e.KeyRootFunc(ctx), resourceVersion, filter)
+	if err != nil {
+		return nil, err
+	}
+	if e.Decorator != nil {
+		return newDecoratedWatcher(w, e.Decorator), nil
+	}
+	return w, nil
 }
 
 func (e *Store) createFilter(m *generic.SelectionPredicate) storage.Filter {
@@ -853,12 +876,6 @@ func (e *Store) createFilter(m *generic.SelectionPredicate) storage.Filter {
 		if err != nil {
 			glog.Errorf("unable to match watch: %v", err)
 			return false
-		}
-		if matches && e.Decorator != nil {
-			if err := e.Decorator(obj); err != nil {
-				glog.Errorf("unable to decorate watch: %v", err)
-				return false
-			}
 		}
 		return matches
 	}

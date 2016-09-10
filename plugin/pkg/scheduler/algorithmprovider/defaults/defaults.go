@@ -165,7 +165,7 @@ func defaultPredicates() sets.String {
 func defaultPriorities() sets.String {
 	return sets.NewString(
 		// Prioritize nodes by least requested utilization.
-		factory.RegisterPriorityFunction("LeastRequestedPriority", priorities.LeastRequestedPriority, 1),
+		factory.RegisterPriorityFunction2("LeastRequestedPriority", priorities.LeastRequestedPriorityMap, nil, 1),
 		// Prioritizes nodes to help achieve balanced resource usage
 		factory.RegisterPriorityFunction("BalancedResourceAllocation", priorities.BalancedResourceAllocation, 1),
 		// spreads pods by minimizing the number of pods (belonging to the same service or replication controller) on the same node.
