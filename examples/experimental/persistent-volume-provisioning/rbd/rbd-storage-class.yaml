@@ -1,0 +1,14 @@
+apiVersion: extensions/v1beta1
+kind: StorageClass
+metadata:
+   name: slow
+provisioner: kubernetes.io/rbd
+parameters:
+    monitors: 10.16.153.105:6789
+    adminId: admin
+    adminSecretName: ceph-secret-admin
+    adminSecretNamespace: "kube-system"
+    pool: kube
+    userId: kube
+    userSecretName: ceph-secret-user
+
