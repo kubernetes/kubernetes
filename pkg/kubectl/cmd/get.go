@@ -312,11 +312,9 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 			return err
 		}
 
-		if err := printer.PrintObj(obj, out); err != nil {
-			allErrs = append(allErrs, err)
-		}
+		err = printer.PrintObj(obj, out)
 		printer.FinishPrint(errOut, res)
-		return utilerrors.NewAggregate(allErrs)
+		return err
 	}
 
 	allErrs := []error{}
