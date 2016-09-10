@@ -191,54 +191,66 @@ const (
 
 // DefaultGenerators returns the set of default generators for use in Factory instances
 func DefaultGenerators(cmdName string) map[string]kubectl.Generator {
-	generators := map[string]map[string]kubectl.Generator{}
-	generators["expose"] = map[string]kubectl.Generator{
-		ServiceV1GeneratorName: kubectl.ServiceGeneratorV1{},
-		ServiceV2GeneratorName: kubectl.ServiceGeneratorV2{},
-	}
-	generators["service-clusterip"] = map[string]kubectl.Generator{
-		ServiceClusterIPGeneratorV1Name: kubectl.ServiceClusterIPGeneratorV1{},
-	}
-	generators["service-nodeport"] = map[string]kubectl.Generator{
-		ServiceNodePortGeneratorV1Name: kubectl.ServiceNodePortGeneratorV1{},
-	}
-	generators["service-loadbalancer"] = map[string]kubectl.Generator{
-		ServiceLoadBalancerGeneratorV1Name: kubectl.ServiceLoadBalancerGeneratorV1{},
-	}
-	generators["deployment"] = map[string]kubectl.Generator{
-		DeploymentBasicV1Beta1GeneratorName: kubectl.DeploymentBasicGeneratorV1{},
-	}
-	generators["run"] = map[string]kubectl.Generator{
-		RunV1GeneratorName:                kubectl.BasicReplicationController{},
-		RunPodV1GeneratorName:             kubectl.BasicPod{},
-		DeploymentV1Beta1GeneratorName:    kubectl.DeploymentV1Beta1{},
-		JobV1Beta1GeneratorName:           kubectl.JobV1Beta1{},
-		JobV1GeneratorName:                kubectl.JobV1{},
-		ScheduledJobV2Alpha1GeneratorName: kubectl.ScheduledJobV2Alpha1{},
-	}
-	generators["autoscale"] = map[string]kubectl.Generator{
-		HorizontalPodAutoscalerV1Beta1GeneratorName: kubectl.HorizontalPodAutoscalerV1Beta1{},
-		HorizontalPodAutoscalerV1GeneratorName:      kubectl.HorizontalPodAutoscalerV1{},
-	}
-	generators["namespace"] = map[string]kubectl.Generator{
-		NamespaceV1GeneratorName: kubectl.NamespaceGeneratorV1{},
+	var generator map[string]kubectl.Generator
+	switch cmdName {
+	case "expose":
+		generator = map[string]kubectl.Generator{
+			ServiceV1GeneratorName: kubectl.ServiceGeneratorV1{},
+			ServiceV2GeneratorName: kubectl.ServiceGeneratorV2{},
+		}
+	case "service-clusterip":
+		generator = map[string]kubectl.Generator{
+			ServiceClusterIPGeneratorV1Name: kubectl.ServiceClusterIPGeneratorV1{},
+		}
+	case "service-nodeport":
+		generator = map[string]kubectl.Generator{
+			ServiceNodePortGeneratorV1Name: kubectl.ServiceNodePortGeneratorV1{},
+		}
+	case "service-loadbalancer":
+		generator = map[string]kubectl.Generator{
+			ServiceLoadBalancerGeneratorV1Name: kubectl.ServiceLoadBalancerGeneratorV1{},
+		}
+	case "deployment":
+		generator = map[string]kubectl.Generator{
+			DeploymentBasicV1Beta1GeneratorName: kubectl.DeploymentBasicGeneratorV1{},
+		}
+	case "run":
+		generator = map[string]kubectl.Generator{
+			RunV1GeneratorName:                kubectl.BasicReplicationController{},
+			RunPodV1GeneratorName:             kubectl.BasicPod{},
+			DeploymentV1Beta1GeneratorName:    kubectl.DeploymentV1Beta1{},
+			JobV1Beta1GeneratorName:           kubectl.JobV1Beta1{},
+			JobV1GeneratorName:                kubectl.JobV1{},
+			ScheduledJobV2Alpha1GeneratorName: kubectl.ScheduledJobV2Alpha1{},
+		}
+	case "autoscale":
+		generator = map[string]kubectl.Generator{
+			HorizontalPodAutoscalerV1Beta1GeneratorName: kubectl.HorizontalPodAutoscalerV1Beta1{},
+			HorizontalPodAutoscalerV1GeneratorName:      kubectl.HorizontalPodAutoscalerV1{},
+		}
+	case "namespace":
+		generator = map[string]kubectl.Generator{
+			NamespaceV1GeneratorName: kubectl.NamespaceGeneratorV1{},
+		}
+	case "quota":
+		generator = map[string]kubectl.Generator{
+			ResourceQuotaV1GeneratorName: kubectl.ResourceQuotaGeneratorV1{},
+		}
+	case "secret":
+		generator = map[string]kubectl.Generator{
+			SecretV1GeneratorName: kubectl.SecretGeneratorV1{},
+		}
+	case "secret-for-docker-registry":
+		generator = map[string]kubectl.Generator{
+			SecretForDockerRegistryV1GeneratorName: kubectl.SecretForDockerRegistryGeneratorV1{},
+		}
+	case "secret-for-tls":
+		generator = map[string]kubectl.Generator{
+			SecretForTLSV1GeneratorName: kubectl.SecretForTLSGeneratorV1{},
+		}
 	}
 
-	generators["quota"] = map[string]kubectl.Generator{
-		ResourceQuotaV1GeneratorName: kubectl.ResourceQuotaGeneratorV1{},
-	}
-
-	generators["secret"] = map[string]kubectl.Generator{
-		SecretV1GeneratorName: kubectl.SecretGeneratorV1{},
-	}
-	generators["secret-for-docker-registry"] = map[string]kubectl.Generator{
-		SecretForDockerRegistryV1GeneratorName: kubectl.SecretForDockerRegistryGeneratorV1{},
-	}
-	generators["secret-for-tls"] = map[string]kubectl.Generator{
-		SecretForTLSV1GeneratorName: kubectl.SecretForTLSGeneratorV1{},
-	}
-
-	return generators[cmdName]
+	return generator
 }
 
 func getGroupVersionKinds(gvks []unversioned.GroupVersionKind, group string) []unversioned.GroupVersionKind {
