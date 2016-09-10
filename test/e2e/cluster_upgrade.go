@@ -155,7 +155,7 @@ func testService(f *framework.Framework, sem *chaosmonkey.Semaphore, testDuringD
 	tcpService := jig.CreateTCPServiceOrFail(f.Namespace.Name, func(s *api.Service) {
 		s.Spec.Type = api.ServiceTypeLoadBalancer
 	})
-	tcpService = jig.WaitForLoadBalancerOrFail(f.Namespace.Name, tcpService.Name)
+	tcpService = jig.WaitForLoadBalancerOrFail(f.Namespace.Name, tcpService.Name, loadBalancerCreateTimeoutDefault)
 	jig.SanityCheckService(tcpService, api.ServiceTypeLoadBalancer)
 
 	// Get info to hit it with
