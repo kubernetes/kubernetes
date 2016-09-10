@@ -1,9 +1,9 @@
 apiVersion: v1
 kind: Service
 metadata:
-  annotations:
-    service.alpha.kubernetes.io/tolerate-unready-endpoints: "true"
-  name: cockroachdb
+  # This service is meant to be used by clients of the database. It exposes a ClusterIP that will
+  # automatically load balance connections to the different database pods.
+  name: cockroachdb-public
   labels:
     app: cockroachdb
 spec:
@@ -14,6 +14,33 @@ spec:
     targetPort: 26257
     name: grpc
   # The secondary port serves the UI as well as health and debug endpoints.
+  - port: 8080
+    targetPort: 8080
+    name: http
+  selector:
+    app: cockroachdb
+---
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    # Make sure DNS is resolvable during initialization.
+    service.alpha.kubernetes.io/tolerate-unready-endpoints: "true"
+    # Enable automatic monitoring of all instances when Prometheus is running in the cluster.
+    prometheus.io/scrape: "true"
+    prometheus.io/path: "_status/vars"
+    prometheus.io/port: "8080"
+  # This service only exists to create DNS entries for each pet in the petset such that they can resolve
+  # each other's IP addresses. It does not create a load-balanced ClusterIP and should not be used
+  # directly by clients in most circumstances.
+  name: cockroachdb
+  labels:
+    app: cockroachdb
+spec:
+  ports:
+  - port: 26257
+    targetPort: 26257
+    name: grpc
   - port: 8080
     targetPort: 8080
     name: http
@@ -49,6 +76,16 @@ spec:
           name: grpc
         - containerPort: 8080
           name: http
+        livenessProbe:
+          httpGet:
+            path: /_admin/v1/health
+            port: http
+          initialDelaySeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /_admin/v1/health
+            port: http
+          initialDelaySeconds: 10
         volumeMounts:
         - name: datadir
           mountPath: /cockroach/cockroach-data
@@ -79,6 +116,9 @@ spec:
               CRARGS+=("--join" "cockroachdb")
             fi
             /cockroach/cockroach ${CRARGS[*]}
+      # No pre-stop hook is required, a SIGTERM plus some time is all that's
+      # needed for graceful shutdown of a node.
+      terminationGracePeriodSeconds: 60
       volumes:
       - name: datadir
         persistentVolumeClaim:
