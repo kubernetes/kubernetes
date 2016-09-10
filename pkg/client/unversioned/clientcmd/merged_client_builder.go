@@ -113,6 +113,9 @@ func (config *DeferredLoadingClientConfig) ClientConfig() (*restclient.Config, e
 		// TODO: this shouldn't be a global - the client config rules should be
 		//   handling this.
 		defaultConfig, err := DefaultClientConfig.ClientConfig()
+		if IsConfigurationInvalid(err) {
+			return mergedConfig, nil
+		}
 		if err == nil && !reflect.DeepEqual(mergedConfig, defaultConfig) {
 			return mergedConfig, nil
 		}
