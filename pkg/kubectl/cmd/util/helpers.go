@@ -122,6 +122,11 @@ func checkErrWithPrefix(prefix string, err error) {
 // checkErr formats a given error as a string and calls the passed handleErr
 // func with that string and an kubectl exit code.
 func checkErr(prefix string, err error, handleErr func(string, int)) {
+	// unwrap aggregates of 1
+	if agg, ok := err.(utilerrors.Aggregate); ok && len(agg.Errors()) == 1 {
+		err = agg.Errors()[0]
+	}
+
 	switch {
 	case err == nil:
 		return
