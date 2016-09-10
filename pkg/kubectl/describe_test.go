@@ -538,6 +538,13 @@ func TestPersistentVolumeDescriber(t *testing.T) {
 				},
 			},
 		},
+		"cinder": {
+			Spec: api.PersistentVolumeSpec{
+				PersistentVolumeSource: api.PersistentVolumeSource{
+					Cinder: &api.CinderVolumeSource{},
+				},
+			},
+		},
 	}
 
 	for name, pv := range tests {
