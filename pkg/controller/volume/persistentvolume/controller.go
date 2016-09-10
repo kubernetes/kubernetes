@@ -154,8 +154,8 @@ const createProvisionedPVInterval = 10 * time.Second
 // framework.Controllers that watch PersistentVolume and PersistentVolumeClaim
 // changes.
 type PersistentVolumeController struct {
-	volumeController          *framework.Controller
-	volumeSource              cache.ListerWatcher
+	volumeController          framework.ControllerInterface
+	pvInformer                framework.SharedIndexInformer
 	claimController           *framework.Controller
 	claimSource               cache.ListerWatcher
 	classReflector            *cache.Reflector
@@ -175,6 +175,13 @@ type PersistentVolumeController struct {
 	volumes persistentVolumeOrderedIndex
 	claims  cache.Store
 	classes cache.Store
+
+	// isInformerInternal is true if the informer we hold is a personal informer,
+	// false if it is a shared informer. If we're using a normal shared informer,
+	// then the informer will be started for us. If we have a personal informer,
+	// we must start it ourselves. If you start the controller using
+	// NewPersistentVolumeController(passing SharedInformer), this will be false.
+	isInformerInternal bool
 
 	// Map of scheduled/running operations.
 	runningOperations goroutinemap.GoRoutineMap
