@@ -28,38 +28,52 @@ import (
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 )
 
-type ErrorReplicationControllers struct {
-	testclient.FakeReplicationControllers
+type ErrorScales struct {
+	testclient.FakeScales
 	conflict bool
 	invalid  bool
 }
 
-func (c *ErrorReplicationControllers) Update(controller *api.ReplicationController) (*api.ReplicationController, error) {
+func (c *ErrorScales) Update(kind string, scale *extensions.Scale) (*extensions.Scale, error) {
 	switch {
 	case c.invalid:
-		return nil, kerrors.NewInvalid(api.Kind(controller.Kind), controller.Name, nil)
+		return nil, kerrors.NewInvalid(api.Kind(kind), scale.Name, nil)
 	case c.conflict:
-		return nil, kerrors.NewConflict(api.Resource(controller.Kind), controller.Name, nil)
+		return nil, kerrors.NewConflict(api.Resource(kind), scale.Name, nil)
 	}
-	return nil, errors.New("Replication controller update failure")
+	return nil, errors.New("Scale update failure")
 }
 
-type ErrorReplicationControllerClient struct {
+type ErrorExtensions struct {
+	testclient.FakeExperimental
+	conflict bool
+	invalid  bool
+}
+
+func (c *ErrorExtensions) Scales(namespace string) client.ScaleInterface {
+	return &ErrorScales{
+		FakeScales: testclient.FakeScales{Fake: &c.FakeExperimental, Namespace: namespace},
+		conflict:   c.conflict,
+		invalid:    c.invalid,
+	}
+}
+
+type ErrorExtensionsClient struct {
 	testclient.Fake
 	conflict bool
 	invalid  bool
 }
 
-func (c *ErrorReplicationControllerClient) ReplicationControllers(namespace string) client.ReplicationControllerInterface {
-	return &ErrorReplicationControllers{
-		FakeReplicationControllers: testclient.FakeReplicationControllers{Fake: &c.Fake, Namespace: namespace},
-		conflict:                   c.conflict,
-		invalid:                    c.invalid,
+func (c *ErrorExtensionsClient) Extensions() client.ExtensionsInterface {
+	return &ErrorExtensions{
+		FakeExperimental: testclient.FakeExperimental{Fake: &c.Fake},
+		conflict:         c.conflict,
+		invalid:          c.invalid,
 	}
 }
 
 func TestReplicationControllerScaleRetry(t *testing.T) {
-	fake := &ErrorReplicationControllerClient{Fake: testclient.Fake{}, conflict: true}
+	fake := &ErrorExtensionsClient{Fake: testclient.Fake{}, conflict: true}
 	scaler := ReplicationControllerScaler{fake}
 	preconditions := ScalePrecondition{-1, ""}
 	count := uint(3)
@@ -83,7 +97,7 @@ func TestReplicationControllerScaleRetry(t *testing.T) {
 }
 
 func TestReplicationControllerScaleInvalid(t *testing.T) {
-	fake := &ErrorReplicationControllerClient{Fake: testclient.Fake{}, invalid: true}
+	fake := &ErrorExtensionsClient{Fake: testclient.Fake{}, invalid: true}
 	scaler := ReplicationControllerScaler{fake}
 	preconditions := ScalePrecondition{-1, ""}
 	count := uint(3)
@@ -103,7 +117,7 @@ func TestReplicationControllerScaleInvalid(t *testing.T) {
 
 func TestReplicationControllerScale(t *testing.T) {
 	fake := &testclient.Fake{}
-	scaler := ReplicationControllerScaler{fake}
+	scaler := ReplicationControllerScaler{&testclient.FakeExperimental{fake}}
 	preconditions := ScalePrecondition{-1, ""}
 	count := uint(3)
 	name := "foo"
@@ -113,17 +127,17 @@ func TestReplicationControllerScale(t *testing.T) {
 	if len(actions) != 2 {
 		t.Errorf("unexpected actions: %v, expected 2 actions (get, update)", actions)
 	}
-	if action, ok := actions[0].(testclient.GetAction); !ok || action.GetResource() != "replicationcontrollers" || action.GetName() != name {
+	if action, ok := actions[0].(testclient.GetAction); !ok || action.GetResource() != "ReplicationController" || action.GetName() != name || action.GetSubresource() != "scale" {
 		t.Errorf("unexpected action: %v, expected get-replicationController %s", actions[0], name)
 	}
-	if action, ok := actions[1].(testclient.UpdateAction); !ok || action.GetResource() != "replicationcontrollers" || action.GetObject().(*api.ReplicationController).Spec.Replicas != int32(count) {
+	if action, ok := actions[1].(testclient.UpdateAction); !ok || action.GetResource() != "ReplicationController" || action.GetObject().(*extensions.Scale).Spec.Replicas != int32(count) || action.GetSubresource() != "scale" {
 		t.Errorf("unexpected action %v, expected update-replicationController with replicas = %d", actions[1], count)
 	}
 }
 
 func TestReplicationControllerScaleFailsPreconditions(t *testing.T) {
-	fake := testclient.NewSimpleFake(&api.ReplicationController{
-		Spec: api.ReplicationControllerSpec{
+	fake := testclient.NewSimpleFake(&extensions.Scale{
+		Spec: extensions.ScaleSpec{
 			Replicas: 10,
 		},
 	})
@@ -137,15 +151,15 @@ func TestReplicationControllerScaleFailsPreconditions(t *testing.T) {
 	if len(actions) != 1 {
 		t.Errorf("unexpected actions: %v, expected 1 action (get)", actions)
 	}
-	if action, ok := actions[0].(testclient.GetAction); !ok || action.GetResource() != "replicationcontrollers" || action.GetName() != name {
+	if action, ok := actions[0].(testclient.GetAction); !ok || action.GetResource() != "ReplicationController" || action.GetName() != name || action.GetSubresource() != "scale" {
 		t.Errorf("unexpected action: %v, expected get-replicationController %s", actions[0], name)
 	}
 }
 
-func TestValidateReplicationController(t *testing.T) {
+func TestValidateScale(t *testing.T) {
 	tests := []struct {
 		preconditions ScalePrecondition
-		controller    api.ReplicationController
+		scale         extensions.Scale
 		expectError   bool
 		test          string
 	}{
@@ -156,11 +170,11 @@ func TestValidateReplicationController(t *testing.T) {
 		},
 		{
 			preconditions: ScalePrecondition{-1, ""},
-			controller: api.ReplicationController{
+			scale: extensions.Scale{
 				ObjectMeta: api.ObjectMeta{
 					ResourceVersion: "foo",
 				},
-				Spec: api.ReplicationControllerSpec{
+				Spec: extensions.ScaleSpec{
 					Replicas: 10,
 				},
 			},
@@ -169,11 +183,11 @@ func TestValidateReplicationController(t *testing.T) {
 		},
 		{
 			preconditions: ScalePrecondition{0, ""},
-			controller: api.ReplicationController{
+			scale: extensions.Scale{
 				ObjectMeta: api.ObjectMeta{
 					ResourceVersion: "foo",
 				},
-				Spec: api.ReplicationControllerSpec{
+				Spec: extensions.ScaleSpec{
 					Replicas: 0,
 				},
 			},
@@ -182,11 +196,11 @@ func TestValidateReplicationController(t *testing.T) {
 		},
 		{
 			preconditions: ScalePrecondition{-1, "foo"},
-			controller: api.ReplicationController{
+			scale: extensions.Scale{
 				ObjectMeta: api.ObjectMeta{
 					ResourceVersion: "foo",
 				},
-				Spec: api.ReplicationControllerSpec{
+				Spec: extensions.ScaleSpec{
 					Replicas: 10,
 				},
 			},
@@ -195,11 +209,11 @@ func TestValidateReplicationController(t *testing.T) {
 		},
 		{
 			preconditions: ScalePrecondition{10, "foo"},
-			controller: api.ReplicationController{
+			scale: extensions.Scale{
 				ObjectMeta: api.ObjectMeta{
 					ResourceVersion: "foo",
 				},
-				Spec: api.ReplicationControllerSpec{
+				Spec: extensions.ScaleSpec{
 					Replicas: 10,
 				},
 			},
@@ -208,11 +222,11 @@ func TestValidateReplicationController(t *testing.T) {
 		},
 		{
 			preconditions: ScalePrecondition{10, "foo"},
-			controller: api.ReplicationController{
+			scale: extensions.Scale{
 				ObjectMeta: api.ObjectMeta{
 					ResourceVersion: "foo",
 				},
-				Spec: api.ReplicationControllerSpec{
+				Spec: extensions.ScaleSpec{
 					Replicas: 20,
 				},
 			},
@@ -221,11 +235,11 @@ func TestValidateReplicationController(t *testing.T) {
 		},
 		{
 			preconditions: ScalePrecondition{10, "foo"},
-			controller: api.ReplicationController{
+			scale: extensions.Scale{
 				ObjectMeta: api.ObjectMeta{
 					ResourceVersion: "bar",
 				},
-				Spec: api.ReplicationControllerSpec{
+				Spec: extensions.ScaleSpec{
 					Replicas: 10,
 				},
 			},
@@ -234,11 +248,11 @@ func TestValidateReplicationController(t *testing.T) {
 		},
 		{
 			preconditions: ScalePrecondition{10, "foo"},
-			controller: api.ReplicationController{
+			scale: extensions.Scale{
 				ObjectMeta: api.ObjectMeta{
 					ResourceVersion: "bar",
 				},
-				Spec: api.ReplicationControllerSpec{
+				Spec: extensions.ScaleSpec{
 					Replicas: 20,
 				},
 			},
@@ -247,7 +261,7 @@ func TestValidateReplicationController(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		err := test.preconditions.ValidateReplicationController(&test.controller)
+		err := test.preconditions.ValidateScale(&test.scale)
 		if err != nil && !test.expectError {
 			t.Errorf("unexpected error: %v (%s)", err, test.test)
 		}
@@ -507,46 +521,8 @@ func TestValidateJob(t *testing.T) {
 	}
 }
 
-type ErrorDeployments struct {
-	testclient.FakeDeployments
-	conflict bool
-	invalid  bool
-}
-
-func (c *ErrorDeployments) Update(deployment *extensions.Deployment) (*extensions.Deployment, error) {
-	switch {
-	case c.invalid:
-		return nil, kerrors.NewInvalid(api.Kind(deployment.Kind), deployment.Name, nil)
-	case c.conflict:
-		return nil, kerrors.NewConflict(api.Resource(deployment.Kind), deployment.Name, nil)
-	}
-	return nil, errors.New("deployment update failure")
-}
-
-func (c *ErrorDeployments) Get(name string) (*extensions.Deployment, error) {
-	return &extensions.Deployment{
-		Spec: extensions.DeploymentSpec{
-			Replicas: 0,
-		},
-	}, nil
-}
-
-type ErrorDeploymentClient struct {
-	testclient.FakeExperimental
-	conflict bool
-	invalid  bool
-}
-
-func (c *ErrorDeploymentClient) Deployments(namespace string) client.DeploymentInterface {
-	return &ErrorDeployments{
-		FakeDeployments: testclient.FakeDeployments{Fake: &c.FakeExperimental, Namespace: namespace},
-		invalid:         c.invalid,
-		conflict:        c.conflict,
-	}
-}
-
 func TestDeploymentScaleRetry(t *testing.T) {
-	fake := &ErrorDeploymentClient{FakeExperimental: testclient.FakeExperimental{}, conflict: true}
+	fake := &ErrorExtensions{FakeExperimental: testclient.FakeExperimental{Fake: &testclient.Fake{}}, conflict: true}
 	scaler := &DeploymentScaler{fake}
 	preconditions := &ScalePrecondition{-1, ""}
 	count := uint(3)
@@ -581,16 +557,16 @@ func TestDeploymentScale(t *testing.T) {
 	if len(actions) != 2 {
 		t.Errorf("unexpected actions: %v, expected 2 actions (get, update)", actions)
 	}
-	if action, ok := actions[0].(testclient.GetAction); !ok || action.GetResource() != "deployments" || action.GetName() != name {
-		t.Errorf("unexpected action: %v, expected get-replicationController %s", actions[0], name)
+	if action, ok := actions[0].(testclient.GetAction); !ok || action.GetResource() != "Deployment" || action.GetName() != name || action.GetSubresource() != "scale" {
+		t.Errorf("unexpected action: %v, expected get-deployment %s", actions[0], name)
 	}
-	if action, ok := actions[1].(testclient.UpdateAction); !ok || action.GetResource() != "deployments" || action.GetObject().(*extensions.Deployment).Spec.Replicas != int32(count) {
+	if action, ok := actions[1].(testclient.UpdateAction); !ok || action.GetResource() != "Deployment" || action.GetObject().(*extensions.Scale).Spec.Replicas != int32(count) || action.GetSubresource() != "scale" {
 		t.Errorf("unexpected action %v, expected update-deployment with replicas = %d", actions[1], count)
 	}
 }
 
 func TestDeploymentScaleInvalid(t *testing.T) {
-	fake := &ErrorDeploymentClient{FakeExperimental: testclient.FakeExperimental{}, invalid: true}
+	fake := &ErrorExtensions{FakeExperimental: testclient.FakeExperimental{Fake: &testclient.Fake{}}, invalid: true}
 	scaler := DeploymentScaler{fake}
 	preconditions := ScalePrecondition{-1, ""}
 	count := uint(3)
@@ -609,8 +585,8 @@ func TestDeploymentScaleInvalid(t *testing.T) {
 }
 
 func TestDeploymentScaleFailsPreconditions(t *testing.T) {
-	fake := testclient.NewSimpleFake(&extensions.Deployment{
-		Spec: extensions.DeploymentSpec{
+	fake := testclient.NewSimpleFake(&extensions.Scale{
+		Spec: extensions.ScaleSpec{
 			Replicas: 10,
 		},
 	})
@@ -624,133 +600,7 @@ func TestDeploymentScaleFailsPreconditions(t *testing.T) {
 	if len(actions) != 1 {
 		t.Errorf("unexpected actions: %v, expected 1 actions (get)", actions)
 	}
-	if action, ok := actions[0].(testclient.GetAction); !ok || action.GetResource() != "deployments" || action.GetName() != name {
+	if action, ok := actions[0].(testclient.GetAction); !ok || action.GetResource() != "Deployment" || action.GetName() != name || action.GetSubresource() != "scale" {
 		t.Errorf("unexpected action: %v, expected get-deployment %s", actions[0], name)
-	}
-}
-
-func TestValidateDeployment(t *testing.T) {
-	zero, ten, twenty := int32(0), int32(10), int32(20)
-	tests := []struct {
-		preconditions ScalePrecondition
-		deployment    extensions.Deployment
-		expectError   bool
-		test          string
-	}{
-		{
-			preconditions: ScalePrecondition{-1, ""},
-			expectError:   false,
-			test:          "defaults",
-		},
-		{
-			preconditions: ScalePrecondition{-1, ""},
-			deployment: extensions.Deployment{
-				ObjectMeta: api.ObjectMeta{
-					ResourceVersion: "foo",
-				},
-				Spec: extensions.DeploymentSpec{
-					Replicas: ten,
-				},
-			},
-			expectError: false,
-			test:        "defaults 2",
-		},
-		{
-			preconditions: ScalePrecondition{0, ""},
-			deployment: extensions.Deployment{
-				ObjectMeta: api.ObjectMeta{
-					ResourceVersion: "foo",
-				},
-				Spec: extensions.DeploymentSpec{
-					Replicas: zero,
-				},
-			},
-			expectError: false,
-			test:        "size matches",
-		},
-		{
-			preconditions: ScalePrecondition{-1, "foo"},
-			deployment: extensions.Deployment{
-				ObjectMeta: api.ObjectMeta{
-					ResourceVersion: "foo",
-				},
-				Spec: extensions.DeploymentSpec{
-					Replicas: ten,
-				},
-			},
-			expectError: false,
-			test:        "resource version matches",
-		},
-		{
-			preconditions: ScalePrecondition{10, "foo"},
-			deployment: extensions.Deployment{
-				ObjectMeta: api.ObjectMeta{
-					ResourceVersion: "foo",
-				},
-				Spec: extensions.DeploymentSpec{
-					Replicas: ten,
-				},
-			},
-			expectError: false,
-			test:        "both match",
-		},
-		{
-			preconditions: ScalePrecondition{10, "foo"},
-			deployment: extensions.Deployment{
-				ObjectMeta: api.ObjectMeta{
-					ResourceVersion: "foo",
-				},
-				Spec: extensions.DeploymentSpec{
-					Replicas: twenty,
-				},
-			},
-			expectError: true,
-			test:        "size different",
-		},
-		{
-			preconditions: ScalePrecondition{10, "foo"},
-			deployment: extensions.Deployment{
-				ObjectMeta: api.ObjectMeta{
-					ResourceVersion: "foo",
-				},
-			},
-			expectError: true,
-			test:        "no replicas",
-		},
-		{
-			preconditions: ScalePrecondition{10, "foo"},
-			deployment: extensions.Deployment{
-				ObjectMeta: api.ObjectMeta{
-					ResourceVersion: "bar",
-				},
-				Spec: extensions.DeploymentSpec{
-					Replicas: ten,
-				},
-			},
-			expectError: true,
-			test:        "version different",
-		},
-		{
-			preconditions: ScalePrecondition{10, "foo"},
-			deployment: extensions.Deployment{
-				ObjectMeta: api.ObjectMeta{
-					ResourceVersion: "bar",
-				},
-				Spec: extensions.DeploymentSpec{
-					Replicas: twenty,
-				},
-			},
-			expectError: true,
-			test:        "both different",
-		},
-	}
-	for _, test := range tests {
-		err := test.preconditions.ValidateDeployment(&test.deployment)
-		if err != nil && !test.expectError {
-			t.Errorf("unexpected error: %v (%s)", err, test.test)
-		}
-		if err == nil && test.expectError {
-			t.Errorf("unexpected non-error: %v (%s)", err, test.test)
-		}
 	}
 }
