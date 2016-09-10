@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
@@ -118,31 +119,31 @@ func validateArguments(cmd *cobra.Command, filenames, args []string) error {
 	image := cmdutil.GetFlagString(cmd, "image")
 	rollback := cmdutil.GetFlagBool(cmd, "rollback")
 
+	errors := []error{}
 	if len(deploymentKey) == 0 {
-		return cmdutil.UsageError(cmd, "--deployment-label-key can not be empty")
+		errors = append(errors, cmdutil.UsageError(cmd, "--deployment-label-key can not be empty"))
 	}
 	if len(filenames) > 1 {
-		return cmdutil.UsageError(cmd, "May only specify a single filename for new controller")
+		errors = append(errors, cmdutil.UsageError(cmd, "May only specify a single filename for new controller"))
 	}
 
 	if !rollback {
 		if len(filenames) == 0 && len(image) == 0 {
-			return cmdutil.UsageError(cmd, "Must specify --filename or --image for new controller")
-		}
-		if len(filenames) != 0 && len(image) != 0 {
-			return cmdutil.UsageError(cmd, "--filename and --image can not both be specified")
+			errors = append(errors, cmdutil.UsageError(cmd, "Must specify --filename or --image for new controller"))
+		} else if len(filenames) != 0 && len(image) != 0 {
+			errors = append(errors, cmdutil.UsageError(cmd, "--filename and --image can not both be specified"))
 		}
 	} else {
 		if len(filenames) != 0 || len(image) != 0 {
-			return cmdutil.UsageError(cmd, "Don't specify --filename or --image on rollback")
+			errors = append(errors, cmdutil.UsageError(cmd, "Don't specify --filename or --image on rollback"))
 		}
 	}
 
 	if len(args) < 1 {
-		return cmdutil.UsageError(cmd, "Must specify the controller to update")
+		errors = append(errors, cmdutil.UsageError(cmd, "Must specify the controller to update"))
 	}
 
-	return nil
+	return utilerrors.NewAggregate(errors)
 }
 
 func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, options *RollingUpdateOptions) error {
