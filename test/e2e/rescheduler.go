@@ -35,7 +35,7 @@ var _ = framework.KubeDescribe("Rescheduler [Serial]", func() {
 	var totalMillicores int
 
 	BeforeEach(func() {
-		framework.SkipUnlessProviderIs("gce")
+		framework.SkipUnlessProviderIs("gce", "gke")
 		ns = f.Namespace.Name
 		nodes := framework.GetReadySchedulableNodesOrDie(f.Client)
 		nodeCount := len(nodes.Items)
