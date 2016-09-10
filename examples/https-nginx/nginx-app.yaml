@@ -17,6 +17,21 @@ spec:
     app: nginx
 ---
 apiVersion: v1
+kind: Service
+metadata:
+  name: echoheaders
+  labels:
+    app: echoheaders
+spec:
+  ports:
+  - port: 80
+    targetPort: 8080
+    protocol: TCP
+    name: http
+  selector:
+    app: echoheaders
+---
+apiVersion: v1
 kind: ReplicationController
 metadata:
   name: my-nginx
@@ -33,10 +48,28 @@ spec:
           secretName: nginxsecret
       containers:
       - name: nginxhttps
-        image: bprashanth/nginxhttps:1.0
+        image: bprashanth/redirect-proxy:1.0
         ports:
         - containerPort: 443
         - containerPort: 80
         volumeMounts:
         - mountPath: /etc/nginx/ssl
           name: secret-volume
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: echoheaders
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: echoheaders
+    spec:
+      containers:
+      - name: echoheaders
+        image: gcr.io/google_containers/echoserver:1.3
+        ports:
+        - containerPort: 8080
+

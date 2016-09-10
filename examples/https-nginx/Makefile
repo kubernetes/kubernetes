@@ -15,7 +15,7 @@
 all:
 
 TAG = 1.0
-PREFIX = bprashanth/nginxhttps
+PREFIX = bprashanth/redirect-proxy
 KEY = /tmp/nginx.key
 CERT = /tmp/nginx.crt
 SECRET = /tmp/secret.json
