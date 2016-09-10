@@ -347,6 +347,28 @@ func validatePriorityOrDie(priority schedulerapi.PriorityPolicy) {
 	}
 }
 
+func ListRegisteredFitPredicates() []string {
+	schedulerFactoryMutex.Lock()
+	defer schedulerFactoryMutex.Unlock()
+
+	names := []string{}
+	for name := range fitPredicateMap {
+		names = append(names, name)
+	}
+	return names
+}
+
+func ListRegisteredPriorityFunctions() []string {
+	schedulerFactoryMutex.Lock()
+	defer schedulerFactoryMutex.Unlock()
+
+	names := []string{}
+	for name := range priorityFunctionMap {
+		names = append(names, name)
+	}
+	return names
+}
+
 // ListAlgorithmProviders is called when listing all available algorithm providers in `kube-scheduler --help`
 func ListAlgorithmProviders() string {
 	var availableAlgorithmProviders []string
