@@ -1,3 +1,5 @@
+#!/bin/sh
+
 # Copyright 2016 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,14 +14,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM nginx
+nginx "$@"
+oldcksum=`cksum /etc/nginx/conf.d/default.conf`
 
-MAINTAINER Mengqi Yu <mengqiy@google.com>
+inotifywait -mr --timefmt '%d/%m/%y %H:%M' --format '%T' \
+/etc/nginx/conf.d/ | while read date time; do
 
-COPY index2.html /usr/share/nginx/html/index2.html
-RUN chmod +r /usr/share/nginx/html/index2.html
-COPY auto-reload-nginx.sh /home/auto-reload-nginx.sh
-RUN chmod +x /home/auto-reload-nginx.sh
+	newcksum=`cksum /etc/nginx/conf.d/default.conf`
+	if [ "$newcksum" != "$oldcksum" ]; then
+		echo "At ${time} on ${date}, config file update detected."
+		oldcksum=$newcksum
+		nginx -s reload
+	fi
 
-# install inotify
-RUN apt-get update && apt-get install -y inotify-tools
+done
