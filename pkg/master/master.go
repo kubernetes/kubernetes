@@ -297,13 +297,16 @@ func (m *Master) InstallAPIs(c *Config) {
 	// TODO find a better way to configure priority of groups
 	for _, group := range sets.StringKeySet(c.RESTStorageProviders).List() {
 		if !c.APIResourceConfigSource.AnyResourcesForGroupEnabled(group) {
+			glog.V(1).Infof("Skipping disabled API group %q.", group)
 			continue
 		}
 		restStorageBuilder := c.RESTStorageProviders[group]
 		apiGroupInfo, enabled := restStorageBuilder.NewRESTStorage(c.APIResourceConfigSource, restOptionsGetter)
 		if !enabled {
+			glog.Warningf("Problem initializing API group %q, skipping.", group)
 			continue
 		}
+		glog.V(1).Infof("Enabling API group %q.", group)
 
 		// This is here so that, if the policy group is present, the eviction
 		// subresource handler wil be able to find poddisruptionbudgets
