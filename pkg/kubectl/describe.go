@@ -2568,23 +2568,19 @@ func printTaintsMultilineWithIndent(out io.Writer, initialIndent, title, innerIn
 	// to print taints in the sorted order
 	keys := make([]string, 0, len(taints))
 	for _, taint := range taints {
-		keys = append(keys, taint.Key)
+		keys = append(keys, string(taint.Effect)+","+taint.Key)
 	}
 	sort.Strings(keys)
 
-	effects := []api.TaintEffect{api.TaintEffectNoSchedule, api.TaintEffectPreferNoSchedule}
-
 	for i, key := range keys {
-		for _, effect := range effects {
-			for _, taint := range taints {
-				if taint.Key == key && taint.Effect == effect {
-					if i != 0 {
-						fmt.Fprint(out, initialIndent)
-						fmt.Fprint(out, innerIndent)
-					}
-					fmt.Fprintf(out, "%s=%s:%s\n", taint.Key, taint.Value, taint.Effect)
-					i++
+		for _, taint := range taints {
+			if string(taint.Effect)+","+taint.Key == key {
+				if i != 0 {
+					fmt.Fprint(out, initialIndent)
+					fmt.Fprint(out, innerIndent)
 				}
+				fmt.Fprintf(out, "%s\n", taint.ToString())
+				i++
 			}
 		}
 	}
