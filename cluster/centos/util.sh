@@ -255,6 +255,7 @@ function provision-node() {
   kube-ssh "${node}" " \
     sudo cp -r ${KUBE_TEMP}/node/bin /opt/kubernetes; \
     sudo chmod -R +x /opt/kubernetes/bin; \
+    sudo ln -s /opt/kubernetes/bin/* /usr/bin 2>/dev/null; \
     sudo bash ${KUBE_TEMP}/node/scripts/flannel.sh ${ETCD_SERVERS} ${FLANNEL_NET}; \
     sudo bash ${KUBE_TEMP}/node/scripts/docker.sh \"${DOCKER_OPTS}\"; \
     sudo bash ${KUBE_TEMP}/node/scripts/kubelet.sh ${master_ip} ${node_ip}; \
