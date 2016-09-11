@@ -168,7 +168,7 @@ func (t *testPrinter) HandledResources() []string {
 	return []string{}
 }
 
-func (t *testPrinter) FinishPrint(output io.Writer, res string) error {
+func (t *testPrinter) AfterPrint(output io.Writer, res string) error {
 	return nil
 }
 
