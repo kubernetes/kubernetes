@@ -106,6 +106,7 @@ pkg/kubelet/container
 pkg/kubelet/envvars
 pkg/kubelet/eviction
 pkg/kubelet/sysctls
+pkg/kubelet/util/csr
 pkg/kubelet/util/format
 pkg/kubelet/util/ioutils
 pkg/kubelet/volume
