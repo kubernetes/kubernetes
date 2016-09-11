@@ -715,10 +715,10 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 		HistoryViewer: func(mapping *meta.RESTMapping) (kubectl.HistoryViewer, error) {
 			mappingVersion := mapping.GroupVersionKind.GroupVersion()
 			client, err := clients.ClientForVersion(&mappingVersion)
-			clientset := clientset.FromUnversionedClient(client)
 			if err != nil {
 				return nil, err
 			}
+			clientset := clientset.FromUnversionedClient(client)
 			return kubectl.HistoryViewerFor(mapping.GroupVersionKind.GroupKind(), clientset)
 		},
 		Rollbacker: func(mapping *meta.RESTMapping) (kubectl.Rollbacker, error) {
@@ -727,7 +727,8 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			if err != nil {
 				return nil, err
 			}
-			return kubectl.RollbackerFor(mapping.GroupVersionKind.GroupKind(), client)
+			clientset := clientset.FromUnversionedClient(client)
+			return kubectl.RollbackerFor(mapping.GroupVersionKind.GroupKind(), clientset)
 		},
 		StatusViewer: func(mapping *meta.RESTMapping) (kubectl.StatusViewer, error) {
 			mappingVersion := mapping.GroupVersionKind.GroupVersion()
