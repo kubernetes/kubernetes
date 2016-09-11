@@ -392,7 +392,7 @@ func (a byCreationTime) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func getGCEImages(imageRegex, project string, previousImages int) ([]string, error) {
 	ilc, err := computeService.Images.List(project).Do()
 	if err != nil {
-		return nil, fmt.Errorf("Failed to list images in project %q and zone %q", project, zone)
+		return nil, fmt.Errorf("Failed to list images in project %q: %v", project, err)
 	}
 	imageObjs := []imageObj{}
 	imageRe := regexp.MustCompile(imageRegex)
