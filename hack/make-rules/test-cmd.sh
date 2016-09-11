@@ -750,6 +750,15 @@ runTests() {
   kubectl replace "${kube_flags[@]}" --force -f /tmp/tmp-valid-pod.json
   # Post-condition: spec.container.name = "replaced-k8s-serve-hostname"
   kube::test::get_object_assert 'pod valid-pod' "{{(index .spec.containers 0).name}}" 'replaced-k8s-serve-hostname'
+
+  ## check replace --grace-period requires --force
+  output_message=$(! kubectl replace "${kube_flags[@]}" --grace-period=1 -f /tmp/tmp-valid-pod.json 2>&1)
+  kube::test::if_has_string "${output_message}" '\-\-grace-period must have \-\-force specified'
+
+  ## check replace --timeout requires --force
+  output_message=$(! kubectl replace "${kube_flags[@]}" --timeout=1s -f /tmp/tmp-valid-pod.json 2>&1)
+  kube::test::if_has_string "${output_message}" '\-\-timeout must have \-\-force specified'
+
   #cleaning
   rm /tmp/tmp-valid-pod.json
 
