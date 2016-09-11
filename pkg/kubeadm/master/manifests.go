@@ -63,11 +63,12 @@ func WriteStaticPodManifests(s *kubeadmapi.KubeadmConfig) error {
 				"--advertise-client-urls=http://127.0.0.1:2379",
 				"--data-dir=/var/etcd/data",
 			},
+			VolumeMounts:  []api.VolumeMount{etcdVolumeMount()},
 			Image:         images.GetCoreImage(images.KubeEtcdImage, s.EnvParams["etcd_image"]),
 			LivenessProbe: componentProbe(2379, "/health"),
 			Name:          etcd,
 			Resources:     componentResources("200m"),
-		}),
+		}, etcdVolume(s)),
 		// TODO bind-mount certs in
 		kubeAPIServer: componentPod(api.Container{
 			Name:          kubeAPIServer,
@@ -109,6 +110,22 @@ func WriteStaticPodManifests(s *kubeadmapi.KubeadmConfig) error {
 		}
 	}
 	return nil
+}
+
+func etcdVolume(s *kubeadmapi.KubeadmConfig) api.Volume {
+	return api.Volume{
+		Name: "etcd",
+		VolumeSource: api.VolumeSource{
+			HostPath: &api.HostPathVolumeSource{Path: s.EnvParams["host_etcd_path"]},
+		},
+	}
+}
+
+func etcdVolumeMount() api.VolumeMount {
+	return api.VolumeMount{
+		Name:      "etcd",
+		MountPath: "/var/etcd",
+	}
 }
 
 func pkiVolume(s *kubeadmapi.KubeadmConfig) api.Volume {
