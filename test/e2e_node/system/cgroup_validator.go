@@ -40,8 +40,12 @@ func (c *CgroupsValidator) Validate(spec SysSpec) error {
 	if err != nil {
 		return fmt.Errorf("failed to get cgroup subsystems: %v", err)
 	}
+	return c.validateCgroupSubsystems(spec.Cgroups, subsystems)
+}
+
+func (c *CgroupsValidator) validateCgroupSubsystems(cgroupSpec, subsystems []string) error {
 	missing := []string{}
-	for _, cgroup := range spec.Cgroups {
+	for _, cgroup := range cgroupSpec {
 		found := false
 		for _, subsystem := range subsystems {
 			if cgroup == subsystem {
@@ -61,6 +65,7 @@ func (c *CgroupsValidator) Validate(spec SysSpec) error {
 		return fmt.Errorf("missing cgroups: %s", strings.Join(missing, " "))
 	}
 	return nil
+
 }
 
 func (c *CgroupsValidator) getCgroupSubsystems() ([]string, error) {

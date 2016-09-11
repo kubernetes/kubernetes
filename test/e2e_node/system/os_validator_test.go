@@ -17,32 +17,36 @@ limitations under the License.
 package system
 
 import (
-	"fmt"
-	"os/exec"
-	"strings"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
-var _ Validator = &OSValidator{}
-
-type OSValidator struct{}
-
-func (c *OSValidator) Name() string {
-	return "os"
-}
-
-func (c *OSValidator) Validate(spec SysSpec) error {
-	out, err := exec.Command("uname").CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("failed to get os name: %v", err)
+func TestValidateOS(t *testing.T) {
+	v := &OSValidator{}
+	specOS := "Linux"
+	for _, test := range []struct {
+		os  string
+		err bool
+	}{
+		{
+			os:  "Linux",
+			err: false,
+		},
+		{
+			os:  "Windows",
+			err: true,
+		},
+		{
+			os:  "Darwin",
+			err: true,
+		},
+	} {
+		err := v.validateOS(test.os, specOS)
+		if !test.err {
+			assert.Nil(t, err, "Expect error not to occur with os %q", test.os)
+		} else {
+			assert.NotNil(t, err, "Expect error to occur with os %q", test.os)
+		}
 	}
-	return c.validateOS(strings.TrimSpace(string(out)), spec.OS)
-}
-
-func (c *OSValidator) validateOS(os, specOS string) error {
-	if os != specOS {
-		report("OS", os, bad)
-		return fmt.Errorf("unsupported operating system: %s", os)
-	}
-	report("OS", os, good)
-	return nil
 }

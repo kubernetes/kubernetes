@@ -92,6 +92,11 @@ func (k *KernelValidator) validateKernelConfig(kConfig KernelConfig) error {
 	if err != nil {
 		return fmt.Errorf("failed to parse kernel config: %v", err)
 	}
+	return k.validateCachedKernelConfig(allConfig, kConfig)
+}
+
+// validateCachedKernelConfig validates the kernel confgiurations cached in internal data type.
+func (k *KernelValidator) validateCachedKernelConfig(allConfig map[string]kConfigOption, kConfig KernelConfig) error {
 	badConfigs := []string{}
 	// reportAndRecord is a helper function to record bad config when
 	// report.
@@ -190,11 +195,17 @@ func (k *KernelValidator) getKernelConfigReader() (io.Reader, error) {
 	return nil, fmt.Errorf("no config path in %v is available", possibePaths)
 }
 
+// getKernelConfig gets kernel config from kernel config file and convert kernel config to internal type.
 func (k *KernelValidator) getKernelConfig() (map[string]kConfigOption, error) {
 	r, err := k.getKernelConfigReader()
 	if err != nil {
 		return nil, err
 	}
+	return k.parseKernelConfig(r)
+}
+
+// parseKernelConfig converts kernel config to internal type.
+func (k *KernelValidator) parseKernelConfig(r io.Reader) (map[string]kConfigOption, error) {
 	config := map[string]kConfigOption{}
 	regex := regexp.MustCompile(validKConfigRegex)
 	s := bufio.NewScanner(r)
@@ -214,4 +225,5 @@ func (k *KernelValidator) getKernelConfig() (map[string]kConfigOption, error) {
 		config[fields[0]] = kConfigOption(fields[1])
 	}
 	return config, nil
+
 }
