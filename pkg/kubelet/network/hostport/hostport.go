@@ -251,14 +251,6 @@ func (h *handler) SyncHostports(natInterfaceName string, runningPods []*RunningP
 	} else {
 		writeLine(natChains, utiliptables.MakeChainLine(kubeHostportsChain))
 	}
-	// Assuming the node is running kube-proxy in iptables mode
-	// Reusing kube-proxy's KubeMarkMasqChain for SNAT
-	// TODO: let kubelet manage KubeMarkMasqChain. Other components should just be able to use it
-	if chain, ok := existingNATChains[iptablesproxy.KubeMarkMasqChain]; ok {
-		writeLine(natChains, chain)
-	} else {
-		writeLine(natChains, utiliptables.MakeChainLine(iptablesproxy.KubeMarkMasqChain))
-	}
 
 	// Accumulate NAT chains to keep.
 	activeNATChains := map[utiliptables.Chain]bool{} // use a map as a set
@@ -284,6 +276,7 @@ func (h *handler) SyncHostports(natInterfaceName string, runningPods []*RunningP
 		}
 		writeLine(natRules, args...)
 
+		// Assuming kubelet is syncing iptables KUBE-MARK-MASQ chain
 		// If the request comes from the pod that is serving the hostport, then SNAT
 		args = []string{
 			"-A", string(hostportChain),

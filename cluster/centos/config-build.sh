@@ -23,7 +23,7 @@ RELEASES_DIR=${RELEASES_DIR:-/tmp/downloads}
 FLANNEL_VERSION=${FLANNEL_VERSION:-"0.5.5"}
 
 # Define etcd version to use.
-ETCD_VERSION=${ETCD_VERSION:-"2.3.7"}
+ETCD_VERSION=${ETCD_VERSION:-"2.2.1"}
 
 # Define k8s version to use.
 K8S_VERSION=${K8S_VERSION:-"1.1.1"}
