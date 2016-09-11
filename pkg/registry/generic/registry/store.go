@@ -599,9 +599,9 @@ func (e *Store) updateForGracefulDeletionAndFinalizers(ctx api.Context, name, ke
 				existingAccessor.SetFinalizers(newFinalizers)
 			}
 
+			pendingFinalizers = len(existingAccessor.GetFinalizers()) != 0
 			if !graceful {
 				// set the DeleteGracePeriods to 0 if the object has pendingFinalizers but not supporting graceful deletion
-				pendingFinalizers = len(existingAccessor.GetFinalizers()) != 0
 				if pendingFinalizers {
 					glog.V(6).Infof("update the DeletionTimestamp to \"now\" and GracePeriodSeconds to 0 for object %s, because it has pending finalizers", name)
 					err = markAsDeleting(existing)

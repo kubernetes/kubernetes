@@ -33,11 +33,9 @@ spec:
       name: logfile
       readOnly: false
     resources:
-      # Request and limits are set to accomodate this pod alongside the other
+      # Request is set to accomodate this pod alongside the other
       # master components on a single core master.
-      limits:
-        cpu: 100m
-        memory: 100Mi
+      # TODO: Make resource requirements depend on the size of the cluster
       requests:
         cpu: 10m
         memory: 50Mi
