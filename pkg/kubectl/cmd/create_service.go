@@ -31,9 +31,10 @@ import (
 // NewCmdCreateService is a macro command to create a new service
 func NewCmdCreateService(f *cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "service",
-		Short: "Create a service using specified subcommand.",
-		Long:  "Create a service using specified subcommand.",
+		Use:     "service",
+		Aliases: []string{"svc"},
+		Short:   "Create a service using specified subcommand.",
+		Long:    "Create a service using specified subcommand.",
 		Run: func(cmd *cobra.Command, args []string) {
 			cmd.Help()
 		},
