@@ -1084,7 +1084,11 @@ function check-cluster() {
   echo
   echo -e "${color_yellow}  https://${KUBE_MASTER_IP}"
   echo
-  echo -e "${color_green}The user name and password to use is located in ${KUBECONFIG}.${color_norm}"
+  if [[ "${KUBECONFIG}" == *":"* ]]; then
+    echo -e "${color_green}The user name and password to use is located in one of ${KUBECONFIG}.${color_norm}"
+  else
+    echo -e "${color_green}The user name and password to use is located in ${KUBECONFIG}.${color_norm}"
+  fi
   echo
 
 }

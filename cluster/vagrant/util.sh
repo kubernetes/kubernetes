@@ -272,7 +272,11 @@ function verify-cluster {
     echo
     echo "For more information on Cockpit, visit http://cockpit-project.org"
     echo
-    echo "The user name and password to use is located in ${KUBECONFIG}"
+    if [[ "${KUBECONFIG}" == *":"* ]]; then
+      echo "The user name and password to use is located in one of ${KUBECONFIG}"
+    else
+      echo "The user name and password to use is located in ${KUBECONFIG}"
+    fi
     echo
   )
 }

@@ -346,7 +346,11 @@ kube-up() {
   echo
   echo "  https://${KUBE_MASTER_IP}"
   echo
-  echo "The user name and password to use is located in ${KUBECONFIG:-$DEFAULT_KUBECONFIG}."
+  if [[ "${KUBECONFIG}" == *":"* ]]; then
+    echo "The user name and password to use is located in one of ${KUBECONFIG}."
+  else
+    echo "The user name and password to use is located in ${KUBECONFIG:-$DEFAULT_KUBECONFIG}."
+  fi
   echo
   echo "Security note: The server above uses a self signed certificate.  This is"
   echo "    subject to \"Man in the middle\" type attacks."

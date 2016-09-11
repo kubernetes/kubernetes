@@ -75,6 +75,7 @@ function create-kubeconfig() {
     mkdir -p $(dirname "${KUBECONFIG}")
     touch "${KUBECONFIG}"
   fi
+
   local cluster_args=(
       "--server=${KUBE_SERVER:-https://${KUBE_MASTER_IP}}"
   )
@@ -123,7 +124,11 @@ function create-kubeconfig() {
     KUBECONFIG="${KUBECONFIG}" "${kubectl}" config set-credentials "${CONTEXT}-basic-auth" "--username=${KUBE_USER}" "--password=${KUBE_PASSWORD}"
   fi
 
-   echo "Wrote config for ${CONTEXT} to ${KUBECONFIG}"
+  if [[ "${KUBECONFIG}" == *":"* ]]; then
+    echo "Wrote config for ${CONTEXT} in one of ${KUBECONFIG}"
+  else
+    echo "Wrote config for ${CONTEXT} in ${KUBECONFIG}"
+  fi
 }
 
 # Clear kubeconfig data for a context
