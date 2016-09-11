@@ -20,10 +20,10 @@ import (
 	"io/ioutil"
 	"os"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/imdario/mergo"
-	"k8s.io/kubernetes/pkg/client/restclient"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 )
 
@@ -357,22 +357,20 @@ func TestCreateMissingContextNoDefault(t *testing.T) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 }
+
 func TestCreateMissingContext(t *testing.T) {
-	const expectedErrorContains = "Context was not found for specified context"
+	const expectedErrorContains = "context was not found for specified context: not-present"
 	config := createValidTestConfig()
 	clientBuilder := NewNonInteractiveClientConfig(*config, "not-present", &ConfigOverrides{
 		ClusterDefaults: DefaultCluster,
 	}, nil)
 
-	clientConfig, err := clientBuilder.ClientConfig()
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
+	_, err := clientBuilder.ClientConfig()
+	if err == nil {
+		t.Fatalf("Expected error: %v", expectedErrorContains)
 	}
-
-	expectedConfig := &restclient.Config{Host: clientConfig.Host}
-
-	if !reflect.DeepEqual(expectedConfig, clientConfig) {
-		t.Errorf("Expected %#v, got %#v", expectedConfig, clientConfig)
+	if !strings.Contains(err.Error(), expectedErrorContains) {
+		t.Fatalf("Expected error: %v, but got %v", expectedErrorContains, err)
 	}
 }
 
