@@ -65,6 +65,8 @@ pkg/apis/authentication/install
 pkg/apis/authorization/install
 pkg/apis/autoscaling/install
 pkg/apis/batch/install
+pkg/apis/batch/v1
+pkg/apis/batch/v2alpha1
 pkg/apis/certificates/install
 pkg/apis/componentconfig/install
 pkg/apis/extensions/install
