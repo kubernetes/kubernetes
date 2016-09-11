@@ -129,7 +129,7 @@ EmptyDir volumes when FSGroup is specified new files should be created with FSGr
 EmptyDir volumes when FSGroup is specified new files should be created with FSGroup ownership when container is root,childsb,1
 EmptyDir volumes when FSGroup is specified volume on default medium should have the correct mode using FSGroup,eparis,1
 EmptyDir volumes when FSGroup is specified volume on tmpfs should have the correct mode using FSGroup,timothysc,1
-EmptyDir wrapper volumes should becomes running,deads2k,1
+EmptyDir wrapper volumes should not conflict,deads2k,1
 Etcd failure should recover from SIGKILL,pmorie,1
 Etcd failure should recover from network partition with master,justinsb,1
 Events should be sent by kubelets and the scheduler about pods scheduling and running,zmerlynn,1
