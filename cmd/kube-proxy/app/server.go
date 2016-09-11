@@ -391,7 +391,6 @@ func getProxyMode(proxyMode string, client nodeGetter, hostname string, iptver i
 }
 
 func tryIPTablesProxy(iptver iptables.IPTablesVersioner, kcompat iptables.KernelCompatTester) string {
-	var err error
 	// guaranteed false on error, error only necessary for debugging
 	useIPTablesProxy, err := iptables.CanUseIPTablesProxier(iptver, kcompat)
 	if err != nil {
@@ -402,7 +401,7 @@ func tryIPTablesProxy(iptver iptables.IPTablesVersioner, kcompat iptables.Kernel
 		return proxyModeIPTables
 	}
 	// Fallback.
-	glog.V(1).Infof("Can't use iptables proxy, using userspace proxier: %v", err)
+	glog.V(1).Infof("Can't use iptables proxy, using userspace proxier")
 	return proxyModeUserspace
 }
 
