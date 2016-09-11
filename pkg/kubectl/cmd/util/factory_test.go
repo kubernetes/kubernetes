@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -30,6 +31,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
@@ -45,8 +48,34 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/flag"
+	stringutil "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/watch"
 )
+
+func NewFakeCmd(f *Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "Fake Command, can not be used in console!!",
+		Aliases: []string{""},
+		Short:   "Fake command",
+		Long:    "Long Help",
+		Example: "Example Help",
+		Run: func(cmd *cobra.Command, args []string) {
+		},
+	}
+
+	addFakeCmdFlags(cmd)
+
+	AddPrinterFlags(cmd)
+	AddApplyAnnotationFlags(cmd)
+	AddRecordFlag(cmd)
+	AddInclude3rdPartyFlags(cmd)
+	return cmd
+}
+
+func addFakeCmdFlags(cmd *cobra.Command) {
+	cmd.Flags().Bool("show-namespace", false, "When printing, show namespace.")
+	cmd.Flags().StringSlice("label-columns", []string{}, "When printing, only print labels in column.")
+}
 
 func TestNewFactoryDefaultFlagBindings(t *testing.T) {
 	factory := NewFactory(nil)
@@ -713,4 +742,409 @@ func TestMakePortsString(t *testing.T) {
 			t.Errorf("expected: %s, saw: %s.", test.expectedOutput, output)
 		}
 	}
+}
+
+func Example_printReplicationControllerWithNamespace() {
+	f := NewFactory(nil)
+	mapper := testapi.Default.RESTMapper()
+	cmd := NewFakeCmd(f, os.Stdin, os.Stdout, os.Stderr)
+	cmd.Flags().Set("show-namespace", "true")
+
+	ctrl := &api.ReplicationController{
+		ObjectMeta: api.ObjectMeta{
+			Name:              "foo",
+			Namespace:         "beep",
+			Labels:            map[string]string{"foo": "bar"},
+			CreationTimestamp: unversioned.Time{Time: time.Now().AddDate(-10, 0, 0)},
+		},
+		Spec: api.ReplicationControllerSpec{
+			Replicas: 1,
+			Selector: map[string]string{"foo": "bar"},
+			Template: &api.PodTemplateSpec{
+				ObjectMeta: api.ObjectMeta{
+					Labels: map[string]string{"foo": "bar"},
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name:  "foo",
+							Image: "someimage",
+						},
+					},
+				},
+			},
+		},
+		Status: api.ReplicationControllerStatus{
+			Replicas:      1,
+			ReadyReplicas: 1,
+		},
+	}
+	err := f.PrintObject(cmd, mapper, ctrl, os.Stdout)
+	if err != nil {
+		fmt.Printf("Unexpected error: %v", err)
+	}
+	// Output:
+	// NAMESPACE   NAME      DESIRED   CURRENT   READY     AGE
+	// beep        foo       1         1         1         10y
+}
+
+func Example_printMultiContainersReplicationControllerWithWide() {
+	f := NewFactory(nil)
+	mapper := testapi.Default.RESTMapper()
+	cmd := NewFakeCmd(f, os.Stdin, os.Stdout, os.Stderr)
+	cmd.Flags().Set("output", "wide")
+
+	ctrl := &api.ReplicationController{
+		ObjectMeta: api.ObjectMeta{
+			Name:              "foo",
+			Labels:            map[string]string{"foo": "bar"},
+			CreationTimestamp: unversioned.Time{Time: time.Now().AddDate(-10, 0, 0)},
+		},
+		Spec: api.ReplicationControllerSpec{
+			Replicas: 1,
+			Selector: map[string]string{"foo": "bar"},
+			Template: &api.PodTemplateSpec{
+				ObjectMeta: api.ObjectMeta{
+					Labels: map[string]string{"foo": "bar"},
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name:  "foo",
+							Image: "someimage",
+						},
+						{
+							Name:  "foo2",
+							Image: "someimage2",
+						},
+					},
+				},
+			},
+		},
+		Status: api.ReplicationControllerStatus{
+			Replicas: 1,
+		},
+	}
+	err := f.PrintObject(cmd, mapper, ctrl, os.Stdout)
+	if err != nil {
+		fmt.Printf("Unexpected error: %v", err)
+	}
+	// Output:
+	// NAME      DESIRED   CURRENT   READY     AGE       CONTAINER(S)   IMAGE(S)               SELECTOR
+	// foo       1         1         0         10y       foo,foo2       someimage,someimage2   foo=bar
+}
+
+func Example_printReplicationController() {
+	f := NewFactory(nil)
+	mapper := testapi.Default.RESTMapper()
+	cmd := NewFakeCmd(f, os.Stdin, os.Stdout, os.Stderr)
+
+	ctrl := &api.ReplicationController{
+		ObjectMeta: api.ObjectMeta{
+			Name:              "foo",
+			Labels:            map[string]string{"foo": "bar"},
+			CreationTimestamp: unversioned.Time{Time: time.Now().AddDate(-10, 0, 0)},
+		},
+		Spec: api.ReplicationControllerSpec{
+			Replicas: 1,
+			Selector: map[string]string{"foo": "bar"},
+			Template: &api.PodTemplateSpec{
+				ObjectMeta: api.ObjectMeta{
+					Labels: map[string]string{"foo": "bar"},
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name:  "foo",
+							Image: "someimage",
+						},
+						{
+							Name:  "foo2",
+							Image: "someimage",
+						},
+					},
+				},
+			},
+		},
+		Status: api.ReplicationControllerStatus{
+			Replicas: 1,
+		},
+	}
+	err := f.PrintObject(cmd, mapper, ctrl, os.Stdout)
+	if err != nil {
+		fmt.Printf("Unexpected error: %v", err)
+	}
+	// Output:
+	// NAME      DESIRED   CURRENT   READY     AGE
+	// foo       1         1         0         10y
+}
+
+func Example_printPodWithWideFormat() {
+	f := NewFactory(nil)
+	mapper := testapi.Default.RESTMapper()
+	cmd := NewFakeCmd(f, os.Stdin, os.Stdout, os.Stderr)
+	cmd.Flags().Set("output", "wide")
+
+	nodeName := "kubernetes-minion-abcd"
+
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			Name:              "test1",
+			CreationTimestamp: unversioned.Time{Time: time.Now().AddDate(-10, 0, 0)},
+		},
+		Spec: api.PodSpec{
+			Containers: make([]api.Container, 2),
+			NodeName:   nodeName,
+		},
+		Status: api.PodStatus{
+			Phase: "podPhase",
+			ContainerStatuses: []api.ContainerStatus{
+				{Ready: true, RestartCount: 3, State: api.ContainerState{Running: &api.ContainerStateRunning{}}},
+				{RestartCount: 3},
+			},
+			PodIP: "10.1.1.3",
+		},
+	}
+	err := f.PrintObject(cmd, mapper, pod, os.Stdout)
+	if err != nil {
+		fmt.Printf("Unexpected error: %v", err)
+	}
+	// Output:
+	// NAME      READY     STATUS     RESTARTS   AGE       IP         NODE
+	// test1     1/2       podPhase   6          10y       10.1.1.3   kubernetes-minion-abcd
+}
+
+func Example_printPodWithShowLabels() {
+	f := NewFactory(nil)
+	mapper := testapi.Default.RESTMapper()
+	cmd := NewFakeCmd(f, os.Stdin, os.Stdout, os.Stderr)
+	cmd.Flags().Set("show-labels", "true")
+
+	nodeName := "kubernetes-minion-abcd"
+
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			Name:              "test1",
+			CreationTimestamp: unversioned.Time{Time: time.Now().AddDate(-10, 0, 0)},
+			Labels: map[string]string{
+				"l1": "key",
+				"l2": "value",
+			},
+		},
+		Spec: api.PodSpec{
+			Containers: make([]api.Container, 2),
+			NodeName:   nodeName,
+		},
+		Status: api.PodStatus{
+			Phase: "podPhase",
+			ContainerStatuses: []api.ContainerStatus{
+				{Ready: true, RestartCount: 3, State: api.ContainerState{Running: &api.ContainerStateRunning{}}},
+				{RestartCount: 3},
+			},
+		},
+	}
+	err := f.PrintObject(cmd, mapper, pod, os.Stdout)
+	if err != nil {
+		fmt.Printf("Unexpected error: %v", err)
+	}
+	// Output:
+	// NAME      READY     STATUS     RESTARTS   AGE       LABELS
+	// test1     1/2       podPhase   6          10y       l1=key,l2=value
+}
+
+func newAllPhasePodList() *api.PodList {
+	nodeName := "kubernetes-minion-abcd"
+	return &api.PodList{
+		Items: []api.Pod{
+			{
+				ObjectMeta: api.ObjectMeta{
+					Name:              "test1",
+					CreationTimestamp: unversioned.Time{Time: time.Now().AddDate(-10, 0, 0)},
+				},
+				Spec: api.PodSpec{
+					Containers: make([]api.Container, 2),
+					NodeName:   nodeName,
+				},
+				Status: api.PodStatus{
+					Phase: api.PodPending,
+					ContainerStatuses: []api.ContainerStatus{
+						{Ready: true, RestartCount: 3, State: api.ContainerState{Running: &api.ContainerStateRunning{}}},
+						{RestartCount: 3},
+					},
+				},
+			},
+			{
+				ObjectMeta: api.ObjectMeta{
+					Name:              "test2",
+					CreationTimestamp: unversioned.Time{Time: time.Now().AddDate(-10, 0, 0)},
+				},
+				Spec: api.PodSpec{
+					Containers: make([]api.Container, 2),
+					NodeName:   nodeName,
+				},
+				Status: api.PodStatus{
+					Phase: api.PodRunning,
+					ContainerStatuses: []api.ContainerStatus{
+						{Ready: true, RestartCount: 3, State: api.ContainerState{Running: &api.ContainerStateRunning{}}},
+						{RestartCount: 3},
+					},
+				},
+			},
+			{
+				ObjectMeta: api.ObjectMeta{
+					Name:              "test3",
+					CreationTimestamp: unversioned.Time{Time: time.Now().AddDate(-10, 0, 0)},
+				},
+				Spec: api.PodSpec{
+					Containers: make([]api.Container, 2),
+					NodeName:   nodeName,
+				},
+				Status: api.PodStatus{
+					Phase: api.PodSucceeded,
+					ContainerStatuses: []api.ContainerStatus{
+						{Ready: true, RestartCount: 3, State: api.ContainerState{Running: &api.ContainerStateRunning{}}},
+						{RestartCount: 3},
+					},
+				},
+			},
+			{
+				ObjectMeta: api.ObjectMeta{
+					Name:              "test4",
+					CreationTimestamp: unversioned.Time{Time: time.Now().AddDate(-10, 0, 0)},
+				},
+				Spec: api.PodSpec{
+					Containers: make([]api.Container, 2),
+					NodeName:   nodeName,
+				},
+				Status: api.PodStatus{
+					Phase: api.PodFailed,
+					ContainerStatuses: []api.ContainerStatus{
+						{Ready: true, RestartCount: 3, State: api.ContainerState{Running: &api.ContainerStateRunning{}}},
+						{RestartCount: 3},
+					},
+				},
+			},
+			{
+				ObjectMeta: api.ObjectMeta{
+					Name:              "test5",
+					CreationTimestamp: unversioned.Time{Time: time.Now().AddDate(-10, 0, 0)},
+				},
+				Spec: api.PodSpec{
+					Containers: make([]api.Container, 2),
+					NodeName:   nodeName,
+				},
+				Status: api.PodStatus{
+					Phase: api.PodUnknown,
+					ContainerStatuses: []api.ContainerStatus{
+						{Ready: true, RestartCount: 3, State: api.ContainerState{Running: &api.ContainerStateRunning{}}},
+						{RestartCount: 3},
+					},
+				},
+			}},
+	}
+}
+
+func Example_printPodHideTerminated() {
+	f := NewFactory(nil)
+	mapper := testapi.Default.RESTMapper()
+	cmd := NewFakeCmd(f, os.Stdin, os.Stdout, os.Stderr)
+
+	podList := newAllPhasePodList()
+
+	err := f.PrintObject(cmd, mapper, podList, os.Stdout)
+	if err != nil {
+		fmt.Printf("Unexpected error: %v", err)
+	}
+	// Output:
+	// NAME      READY     STATUS    RESTARTS   AGE
+	// test1     1/2       Pending   6          10y
+	// test2     1/2       Running   6          10y
+	// test5     1/2       Unknown   6          10y
+}
+
+func Example_printPodShowAll() {
+	f := NewFactory(nil)
+	mapper := testapi.Default.RESTMapper()
+	cmd := NewFakeCmd(f, os.Stdin, os.Stdout, os.Stderr)
+	cmd.Flags().Set("show-all", "true")
+
+	podList := newAllPhasePodList()
+
+	err := f.PrintObject(cmd, mapper, podList, os.Stdout)
+	if err != nil {
+		fmt.Printf("Unexpected error: %v", err)
+	}
+	// Output:
+	// NAME      READY     STATUS      RESTARTS   AGE
+	// test1     1/2       Pending     6          10y
+	// test2     1/2       Running     6          10y
+	// test3     1/2       Succeeded   6          10y
+	// test4     1/2       Failed      6          10y
+	// test5     1/2       Unknown     6          10y
+}
+
+func Example_printServiceWithNamespacesAndLabels() {
+	f := NewFactory(nil)
+	mapper := testapi.Default.RESTMapper()
+	cmd := NewFakeCmd(f, os.Stdin, os.Stdout, os.Stderr)
+	cmd.Flags().Set("label-columns", "l1")
+	cmd.Flags().Set("show-namespace", "true")
+
+	svc := &api.ServiceList{
+		Items: []api.Service{
+			{
+				ObjectMeta: api.ObjectMeta{
+					Name:              "svc1",
+					Namespace:         "ns1",
+					CreationTimestamp: unversioned.Time{Time: time.Now().AddDate(-10, 0, 0)},
+					Labels: map[string]string{
+						"l1": "value",
+					},
+				},
+				Spec: api.ServiceSpec{
+					Ports: []api.ServicePort{
+						{Protocol: "UDP", Port: 53},
+						{Protocol: "TCP", Port: 53},
+					},
+					Selector: map[string]string{
+						"s": "magic",
+					},
+					ClusterIP: "10.1.1.1",
+				},
+				Status: api.ServiceStatus{},
+			},
+			{
+				ObjectMeta: api.ObjectMeta{
+					Name:              "svc2",
+					Namespace:         "ns2",
+					CreationTimestamp: unversioned.Time{Time: time.Now().AddDate(-10, 0, 0)},
+					Labels: map[string]string{
+						"l1": "dolla-bill-yall",
+					},
+				},
+				Spec: api.ServiceSpec{
+					Ports: []api.ServicePort{
+						{Protocol: "TCP", Port: 80},
+						{Protocol: "TCP", Port: 8080},
+					},
+					Selector: map[string]string{
+						"s": "kazam",
+					},
+					ClusterIP: "10.1.1.2",
+				},
+				Status: api.ServiceStatus{},
+			}},
+	}
+	ld := stringutil.NewLineDelimiter(os.Stdout, "|")
+	defer ld.Flush()
+
+	err := f.PrintObject(cmd, mapper, svc, ld)
+	if err != nil {
+		fmt.Printf("Unexpected error: %v", err)
+	}
+	// Output:
+	// |NAMESPACE   NAME      CLUSTER-IP   EXTERNAL-IP   PORT(S)           AGE       L1|
+	// |ns1         svc1      10.1.1.1     <unknown>     53/UDP,53/TCP     10y       value|
+	// |ns2         svc2      10.1.1.2     <unknown>     80/TCP,8080/TCP   10y       dolla-bill-yall|
+	// ||
 }
