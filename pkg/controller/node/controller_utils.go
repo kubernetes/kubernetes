@@ -17,6 +17,7 @@ limitations under the License.
 package node
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -56,45 +57,33 @@ func cleanupOrphanedPods(pods []*api.Pod, nodeStore cache.Store, forcefulDeleteP
 	}
 }
 
-// deletePods will delete all pods from master running on given node, and return true
-// if any pods were deleted, or were found pending deletion.
-func deletePods(kubeClient clientset.Interface, recorder record.EventRecorder, nodeName, nodeUID string, daemonStore cache.StoreToDaemonSetLister) (bool, error) {
-	remaining := false
+func deletePod(kubeClient clientset.Interface, pod *api.Pod, recorder record.EventRecorder, daemonStore cache.StoreToDaemonSetLister) (bool, error) {
+	// if the pod has already been marked for deletion, we still return true that there are remaining pods.
+	if pod.DeletionGracePeriodSeconds != nil {
+		return true, nil
+	}
+	// if the pod is managed by a daemonset, ignore it
+	_, err := daemonStore.GetPodDaemonSets(pod)
+	if err == nil { // No error means at least one daemonset was found
+		return false, nil
+	}
+
+	glog.V(2).Infof("Starting deletion of pod %v", pod.Name)
+	recorder.Eventf(pod, api.EventTypeNormal, "NodeControllerEviction", "Marking for deletion Pod %s from Node %s", pod.Name, pod.Spec.NodeName)
+	if err := kubeClient.Core().Pods(pod.Namespace).Delete(pod.Name, nil); err != nil {
+		return false, err
+	}
+	return false, nil
+}
+
+func getPodsForANode(kubeClient clientset.Interface, nodeName string) (*api.PodList, error) {
 	selector := fields.OneTermEqualSelector(api.PodHostField, nodeName)
 	options := api.ListOptions{FieldSelector: selector}
 	pods, err := kubeClient.Core().Pods(api.NamespaceAll).List(options)
 	if err != nil {
-		return remaining, err
+		return nil, err
 	}
-
-	if len(pods.Items) > 0 {
-		recordNodeEvent(recorder, nodeName, nodeUID, api.EventTypeNormal, "DeletingAllPods", fmt.Sprintf("Deleting all Pods from Node %v.", nodeName))
-	}
-
-	for _, pod := range pods.Items {
-		// Defensive check, also needed for tests.
-		if pod.Spec.NodeName != nodeName {
-			continue
-		}
-		// if the pod has already been marked for deletion, we still return true that there are remaining pods.
-		if pod.DeletionGracePeriodSeconds != nil {
-			remaining = true
-			continue
-		}
-		// if the pod is managed by a daemonset, ignore it
-		_, err := daemonStore.GetPodDaemonSets(&pod)
-		if err == nil { // No error means at least one daemonset was found
-			continue
-		}
-
-		glog.V(2).Infof("Starting deletion of pod %v", pod.Name)
-		recorder.Eventf(&pod, api.EventTypeNormal, "NodeControllerEviction", "Marking for deletion Pod %s from Node %s", pod.Name, nodeName)
-		if err := kubeClient.Core().Pods(pod.Namespace).Delete(pod.Name, nil); err != nil {
-			return false, err
-		}
-		remaining = true
-	}
-	return remaining, nil
+	return pods, nil
 }
 
 func forcefullyDeletePod(c clientset.Interface, pod *api.Pod) error {
@@ -280,6 +269,148 @@ func recordNodeStatusChange(recorder record.EventRecorder, node *api.Node, new_s
 	// TODO: This requires a transaction, either both node status is updated
 	// and event is recorded or neither should happen, see issue #6055.
 	recorder.Eventf(ref, api.EventTypeNormal, new_status, "Node %s status is now: %s", node.Name, new_status)
+}
+
+func terminatePod(kubeClient clientset.Interface, recorder record.EventRecorder, nodeName string, nodeUID string, pod *api.Pod, since time.Time, maxGracePeriod time.Duration) (bool, time.Duration, error) {
+	// the time before we should try again
+	complete := true
+	nextAttempt := time.Duration(0)
+	now := time.Now()
+	elapsed := now.Sub(since)
+
+	if pod.Spec.NodeName != nodeName {
+		return complete, nextAttempt, nil
+	}
+	// only clean terminated pods
+	if pod.DeletionGracePeriodSeconds == nil {
+		return complete, nextAttempt, nil
+	}
+
+	// the user's requested grace period
+	grace := time.Duration(*pod.DeletionGracePeriodSeconds) * time.Second
+	if grace > maxGracePeriod {
+		grace = maxGracePeriod
+	}
+
+	// the time remaining before the pod should have been deleted
+	remaining := grace - elapsed
+	if remaining < 0 {
+		remaining = 0
+		glog.V(2).Infof("Removing pod %v after %s grace period", pod.Name, grace)
+		recordNodeEvent(recorder, nodeName, nodeUID, api.EventTypeNormal, "TerminatingEvictedPod", fmt.Sprintf("Pod %s has exceeded the grace period for deletion after being evicted from Node %q and is being force killed", pod.Name, nodeName))
+		if err := kubeClient.Core().Pods(pod.Namespace).Delete(pod.Name, api.NewDeleteOptions(0)); err != nil {
+			glog.Errorf("Error completing deletion of pod %s: %v", pod.Name, err)
+			complete = false
+		}
+	} else {
+		glog.V(2).Infof("Pod %v still terminating, requested grace period %s, %s remaining", pod.Name, grace, remaining)
+		complete = false
+	}
+
+	if nextAttempt < remaining {
+		nextAttempt = remaining
+	}
+	return complete, nextAttempt, nil
+}
+
+func addNodeOutageTaint(kubeClient clientset.Interface, node *api.Node) error {
+	taintNodeOutage := api.Taint{Key: "operator", Value: "node-outage", Effect: api.TaintEffectNoSchedule}
+	annotations := node.GetAnnotations()
+	if annotations == nil {
+		annotations = make(map[string]string)
+	}
+	taints, err := api.GetTaintsFromNodeAnnotations(annotations)
+	if err != nil {
+		return err
+	}
+	for _, taint := range taints {
+		if taint.Key == taintNodeOutage.Key && taint.Effect == taintNodeOutage.Effect {
+			glog.V(2).Infof("operator taint already exists with value %v", taint.Effect)
+			return nil
+		}
+	}
+	taints = append(taints, taintNodeOutage)
+	taintsData, err := json.Marshal(taints)
+	if err != nil {
+		return err
+	}
+	annotations[api.TaintsAnnotationKey] = string(taintsData)
+	node.SetAnnotations(annotations)
+	_, err = kubeClient.Core().Nodes().Update(node)
+	return err
+}
+
+func removeNodeOutageTaint(kubeClient clientset.Interface, node *api.Node) error {
+	taintNodeOutage := api.Taint{Key: "operator", Value: "node-outage", Effect: api.TaintEffectNoSchedule}
+	annotations := node.GetAnnotations()
+	if annotations == nil {
+		annotations = make(map[string]string)
+	}
+	taints, err := api.GetTaintsFromNodeAnnotations(annotations)
+	if err != nil {
+		return err
+	}
+	var newTaints []api.Taint
+	for _, taint := range taints {
+		if !(taint.Key == taintNodeOutage.Key && taint.Effect == taintNodeOutage.Effect && taint.Value == taintNodeOutage.Value) {
+			newTaints = append(newTaints, taint)
+		}
+	}
+	taintsData, err := json.Marshal(newTaints)
+	if err != nil {
+		return err
+	}
+	annotations[api.TaintsAnnotationKey] = string(taintsData)
+	node.SetAnnotations(annotations)
+	_, err = kubeClient.Core().Nodes().Update(node)
+	return err
+}
+
+type evictionMessage struct {
+	podName      string
+	podNamespace string
+	nodeUID      types.UID
+}
+
+// deletePods will delete all pods from master running on given node, and return true
+// if any pods were deleted, or were found pending deletion.
+func deletePods(kubeClient clientset.Interface, recorder record.EventRecorder, nodeName, nodeUID string, daemonStore cache.StoreToDaemonSetLister) (bool, error) {
+	remaining := false
+	selector := fields.OneTermEqualSelector(api.PodHostField, nodeName)
+	options := api.ListOptions{FieldSelector: selector}
+	pods, err := kubeClient.Core().Pods(api.NamespaceAll).List(options)
+	if err != nil {
+		return remaining, err
+	}
+
+	if len(pods.Items) > 0 {
+		recordNodeEvent(recorder, nodeName, nodeUID, api.EventTypeNormal, "DeletingAllPods", fmt.Sprintf("Deleting all Pods from Node %v.", nodeName))
+	}
+
+	for _, pod := range pods.Items {
+		// Defensive check, also needed for tests.
+		if pod.Spec.NodeName != nodeName {
+			continue
+		}
+		// if the pod has already been marked for deletion, we still return true that there are remaining pods.
+		if pod.DeletionGracePeriodSeconds != nil {
+			remaining = true
+			continue
+		}
+		// if the pod is managed by a daemonset, ignore it
+		_, err := daemonStore.GetPodDaemonSets(&pod)
+		if err == nil { // No error means at least one daemonset was found
+			continue
+		}
+
+		glog.V(2).Infof("Starting deletion of pod %v", pod.Name)
+		recorder.Eventf(&pod, api.EventTypeNormal, "NodeControllerEviction", "Marking for deletion Pod %s from Node %s", pod.Name, nodeName)
+		if err := kubeClient.Core().Pods(pod.Namespace).Delete(pod.Name, nil); err != nil {
+			return false, err
+		}
+		remaining = true
+	}
+	return remaining, nil
 }
 
 // terminatePods will ensure all pods on the given node that are in terminating state are eventually
