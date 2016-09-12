@@ -72,13 +72,14 @@ type Config struct {
 	// Allows api group versions or specific resources to be conditionally enabled/disabled.
 	APIResourceConfigSource APIResourceConfigSource
 	// allow downstream consumers to disable the index route
-	EnableIndex           bool
-	EnableProfiling       bool
-	EnableWatchCache      bool
-	APIPrefix             string
-	APIGroupPrefix        string
-	CorsAllowedOriginList []string
-	Authenticator         authenticator.Request
+	EnableIndex             bool
+	EnableProfiling         bool
+	EnableWatchCache        bool
+	EnableGarbageCollection bool
+	APIPrefix               string
+	APIGroupPrefix          string
+	CorsAllowedOriginList   []string
+	Authenticator           authenticator.Request
 	// TODO(roberthbailey): Remove once the server no longer supports http basic auth.
 	SupportsBasicAuth      bool
 	Authorizer             authorizer.Authorizer
@@ -169,6 +170,7 @@ func NewConfig(options *options.ServerRunOptions) *Config {
 		AuditLogMaxAge:            options.AuditLogMaxAge,
 		AuditLogMaxBackups:        options.AuditLogMaxBackups,
 		AuditLogMaxSize:           options.AuditLogMaxSize,
+		EnableGarbageCollection:   options.EnableGarbageCollection,
 		EnableIndex:               true,
 		EnableLogsSupport:         options.EnableLogsSupport,
 		EnableProfiling:           options.EnableProfiling,
