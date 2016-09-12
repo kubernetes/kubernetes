@@ -504,7 +504,7 @@ func (kd *KubeDNS) Records(name string, exact bool) (retval []skymsg.Service, er
 		if !kd.isHeadlessServiceRecord(&val) {
 			ok, err := kd.serviceWithClusterIPHasEndpoints(&val)
 			if err != nil {
-				glog.V(2).Infof("federation service query: unexpected error while trying to find if service has endpoint: %v")
+				glog.V(2).Infof("federation service query: unexpected error while trying to find if service has endpoint: %v", err)
 				continue
 			}
 			if !ok {
