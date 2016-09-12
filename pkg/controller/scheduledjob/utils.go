@@ -35,10 +35,6 @@ import (
 
 // Utilities for dealing with Jobs and ScheduledJobs and time.
 
-const (
-	CreatedByAnnotation = "kubernetes.io/created-by"
-)
-
 func inActiveList(sj batch.ScheduledJob, uid types.UID) bool {
 	for _, j := range sj.Status.Active {
 		if j.UID == uid {
@@ -63,7 +59,7 @@ func deleteFromActiveList(sj *batch.ScheduledJob, uid types.UID) {
 
 // getParentUIDFromJob extracts UID of job's parent and whether it was found
 func getParentUIDFromJob(j batch.Job) (types.UID, bool) {
-	creatorRefJson, found := j.ObjectMeta.Annotations[CreatedByAnnotation]
+	creatorRefJson, found := j.ObjectMeta.Annotations[api.CreatedByAnnotation]
 	if !found {
 		glog.V(4).Infof("Job with no created-by annotation, name %s namespace %s", j.Name, j.Namespace)
 		return types.UID(""), false
@@ -198,7 +194,7 @@ func getJobFromTemplate(sj *batch.ScheduledJob, scheduledTime time.Time) (*batch
 	if err != nil {
 		return nil, err
 	}
-	annotations[CreatedByAnnotation] = string(createdByRefJson)
+	annotations[api.CreatedByAnnotation] = string(createdByRefJson)
 	// We want job names for a given nominal start time to have a deterministic name to avoid the same job being created twice
 	name := fmt.Sprintf("%s-%d", sj.Name, getTimeHash(scheduledTime))
 
