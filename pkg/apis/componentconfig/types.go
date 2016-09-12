@@ -205,6 +205,15 @@ type KubeletConfiguration struct {
 	MaxContainerCount int32 `json:"maxContainerCount"`
 	// cAdvisorPort is the port of the localhost cAdvisor endpoint
 	CAdvisorPort int32 `json:"cAdvisorPort"`
+	// cAdvisorCollectorClientCertFile is the file containing a x509 Certificate (CA cert, if any,
+	// concatenated after server cert). This is used by the cAdvisor collectors when accessing
+	// a custom metric endpoint which require certificate based authentication.
+	// If cAdvisorCollectorClientCertFile and CAdvisorCollectorClientPrivateKeyFile are not provided,
+	// the default HTTP.client will be used.
+	CAdvisorCollectorClientCertFile string `json:"cAdvisorCollectorClientCertFile"`
+	// cAdvisorCollectorClientCertFile is the file containing x509 private key matching
+	// cAdvisorCollectorClientCertFile.
+	CAdvisorCollectorClientPrivateKeyFile string `json:"cAdvisorCollectorClientPrivateKeyFile"`
 	// healthzPort is the port of the localhost healthz endpoint
 	HealthzPort int32 `json:"healthzPort"`
 	// healthzBindAddress is the IP address for the healthz server to serve

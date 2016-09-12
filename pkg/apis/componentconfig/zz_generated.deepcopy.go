@@ -242,6 +242,8 @@ func DeepCopy_componentconfig_KubeletConfiguration(in interface{}, out interface
 		out.MaxPerPodContainerCount = in.MaxPerPodContainerCount
 		out.MaxContainerCount = in.MaxContainerCount
 		out.CAdvisorPort = in.CAdvisorPort
+		out.CAdvisorCollectorClientCertFile = in.CAdvisorCollectorClientCertFile
+		out.CAdvisorCollectorClientPrivateKeyFile = in.CAdvisorCollectorClientPrivateKeyFile
 		out.HealthzPort = in.HealthzPort
 		out.HealthzBindAddress = in.HealthzBindAddress
 		out.OOMScoreAdj = in.OOMScoreAdj
