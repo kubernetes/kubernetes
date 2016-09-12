@@ -176,7 +176,7 @@ In the future, the storage class may remain in an annotation or become a field o
 }
 ```
 
-### Usage Examples
+### Sample output
 
 #### GCE
 
@@ -215,7 +215,13 @@ $ kubectl get pv
 
 #### Ceph RBD
 
-For this to work you must have a functional Ceph cluster, and the `rbd` command line utility must be installed on any host/container that `kube-controller-manager` or `kubelet` are running on.
+This section will guide you on how to configure and use the Ceph RBD provisioner.
+
+##### Pre-requisites
+
+For this to work you must have a functional Ceph cluster, and the `rbd` command line utility must be installed on any host/container that `kube-controller-manager` or `kubelet` is running on.
+
+##### Configuration
 
 First we must identify the Ceph client admin key. This is usually found in `/etc/ceph/ceph.client.admin.keyring` on your Ceph cluster nodes. The file will look something like this:
 
@@ -248,14 +254,15 @@ $ ceph auth get-or-create client.kube mon 'allow r' osd 'allow rwx pool=kube'
 [client.kube]
 	key = AQBQyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy==
 ```
+##### Usage
 
-Now create a PVC in user's namespace (e.g. myns):
+Once configured, create a PVC in a user's namespace (e.g. myns):
 
 ```
 $ kubectl create -f examples/experimental/persistent-volume-provisioning/claim1.json --namespace=myns
 ```
 
-Check the PV and PVC are created:
+Eventually the PVC creation will result in a PV and RBD volume to match:
 
 ```
 $ kubectl describe pvc --namespace=myns
