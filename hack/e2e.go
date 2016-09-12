@@ -94,9 +94,7 @@ func main() {
 		}
 	}
 
-	// TODO: remove the IsUp() check after we stop testing 1.2 and earlier
-	// (or if we figure out a better way to handle TearDown failing on nonexisting clusters on old releases).
-	if *up && IsUp() {
+	if *up {
 		if err := TearDown(); err != nil {
 			log.Fatalf("error tearing down previous cluster: %v", err)
 		}
