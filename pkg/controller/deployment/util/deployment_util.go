@@ -554,7 +554,7 @@ func FindOldReplicaSets(deployment *extensions.Deployment, rsList []*extensions.
 
 // WaitForReplicaSetUpdated polls the replica set until it is updated.
 func WaitForReplicaSetUpdated(c clientset.Interface, desiredGeneration int64, namespace, name string) error {
-	return wait.Poll(10*time.Millisecond, 1*time.Minute, func() (bool, error) {
+	return wait.PollImmediate(10*time.Millisecond, 1*time.Minute, func() (bool, error) {
 		rs, err := c.Extensions().ReplicaSets(namespace).Get(name)
 		if err != nil {
 			return false, err
@@ -565,7 +565,7 @@ func WaitForReplicaSetUpdated(c clientset.Interface, desiredGeneration int64, na
 
 // WaitForPodsHashPopulated polls the replica set until updated and fully labeled.
 func WaitForPodsHashPopulated(c clientset.Interface, desiredGeneration int64, namespace, name string) error {
-	return wait.Poll(1*time.Second, 1*time.Minute, func() (bool, error) {
+	return wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
 		rs, err := c.Extensions().ReplicaSets(namespace).Get(name)
 		if err != nil {
 			return false, err
@@ -582,7 +582,12 @@ func LabelPodsWithHash(podList *api.PodList, rs *extensions.ReplicaSet, c client
 	for _, pod := range podList.Items {
 		// Only label the pod that doesn't already have the new hash
 		if pod.Labels[extensions.DefaultDeploymentUniqueLabelKey] != hash {
-			if _, podUpdated, err := podutil.UpdatePodWithRetries(c.Core().Pods(namespace), &pod,
+			copiedPod, err := PodDeepCopy(&pod)
+			if err != nil {
+				return false, fmt.Errorf("error deep copying the pod: %v", err)
+			}
+
+			if _, podUpdated, err := podutil.UpdatePodWithRetries(c.Core().Pods(namespace), copiedPod,
 				func(podToUpdate *api.Pod) error {
 					// Precondition: the pod doesn't contain the new hash in its label.
 					if podToUpdate.Labels[extensions.DefaultDeploymentUniqueLabelKey] == hash {
@@ -831,6 +836,19 @@ func ResolveFenceposts(maxSurge, maxUnavailable *intstrutil.IntOrString, desired
 	}
 
 	return int32(surge), int32(unavailable), nil
+}
+
+// PodDeepCopy deep copies the Pod
+func PodDeepCopy(pod *api.Pod) (*api.Pod, error) {
+	objCopy, err := api.Scheme.DeepCopy(pod)
+	if err != nil {
+		return nil, err
+	}
+	copied, ok := objCopy.(*api.Pod)
+	if !ok {
+		return nil, fmt.Errorf("expected Pod, got %#v", objCopy)
+	}
+	return copied, nil
 }
 
 func DeploymentDeepCopy(deployment *extensions.Deployment) (*extensions.Deployment, error) {
