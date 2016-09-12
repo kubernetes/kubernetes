@@ -38,7 +38,6 @@ import (
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector/metaonly"
-	"k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/runtime/serializer"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -121,6 +120,7 @@ func newOwnerRC(name, namespace string) *v1.ReplicationController {
 func setup(t *testing.T) (*httptest.Server, *garbagecollector.GarbageCollector, clientset.Interface) {
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	masterConfig.EnableCoreControllers = false
+	masterConfig.EnableGarbageCollection = true
 	_, s := framework.RunAMaster(masterConfig)
 
 	clientSet, err := clientset.NewForConfig(&restclient.Config{Host: s.URL})
@@ -153,9 +153,6 @@ func TestCascadingDeletion(t *testing.T) {
 	ns := framework.CreateTestingNamespace("gc-cascading-deletion", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
 
-	oldEnableGarbageCollector := registry.EnableGarbageCollector
-	registry.EnableGarbageCollector = true
-	defer func() { registry.EnableGarbageCollector = oldEnableGarbageCollector }()
 	rcClient := clientSet.Core().ReplicationControllers(ns.Name)
 	podClient := clientSet.Core().Pods(ns.Name)
 
@@ -262,9 +259,6 @@ func TestCreateWithNonExistentOwner(t *testing.T) {
 	ns := framework.CreateTestingNamespace("gc-non-existing-owner", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
 
-	oldEnableGarbageCollector := registry.EnableGarbageCollector
-	registry.EnableGarbageCollector = true
-	defer func() { registry.EnableGarbageCollector = oldEnableGarbageCollector }()
 	podClient := clientSet.Core().Pods(ns.Name)
 
 	pod := newPod(garbageCollectedPodName, ns.Name, []v1.OwnerReference{{UID: "doesn't matter", Name: toBeDeletedRCName}})
@@ -367,9 +361,6 @@ func TestStressingCascadingDeletion(t *testing.T) {
 	ns := framework.CreateTestingNamespace("gc-stressing-cascading-deletion", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
 
-	oldEnableGarbageCollector := registry.EnableGarbageCollector
-	registry.EnableGarbageCollector = true
-	defer func() { registry.EnableGarbageCollector = oldEnableGarbageCollector }()
 	stopCh := make(chan struct{})
 	go gc.Run(5, stopCh)
 	defer close(stopCh)
@@ -452,9 +443,6 @@ func TestOrphaning(t *testing.T) {
 	ns := framework.CreateTestingNamespace("gc-orphaning", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
 
-	oldEnableGarbageCollector := registry.EnableGarbageCollector
-	registry.EnableGarbageCollector = true
-	defer func() { registry.EnableGarbageCollector = oldEnableGarbageCollector }()
 	podClient := clientSet.Core().Pods(ns.Name)
 	rcClient := clientSet.Core().ReplicationControllers(ns.Name)
 	// create the RC with the orphan finalizer set
