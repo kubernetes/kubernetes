@@ -25,7 +25,7 @@ package stubs
 import dns "google.golang.org/api/dns/v1"
 
 type (
-	// TODO: We dont' need these yet, so they remain unimplemented.  Add later as required.
+	// TODO: We don't need these yet, so they remain unimplemented.  Add later as required.
 	Project         struct{ impl *dns.Project }
 	ProjectsGetCall struct{ impl *dns.ProjectsGetCall }
 	ProjectsService struct{ impl *dns.ProjectsService }

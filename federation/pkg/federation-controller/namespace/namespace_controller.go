@@ -46,12 +46,12 @@ const (
 )
 
 type NamespaceController struct {
-	// For triggering single namespace reconcilation. This is used when there is an
+	// For triggering single namespace reconciliation. This is used when there is an
 	// add/update/delete operation on a namespace in either federated API server or
 	// in some member of the federation.
 	namespaceDeliverer *util.DelayingDeliverer
 
-	// For triggering all namespaces reconcilation. This is used when
+	// For triggering all namespaces reconciliation. This is used when
 	// a new cluster becomes available.
 	clusterDeliverer *util.DelayingDeliverer
 
@@ -95,7 +95,7 @@ func NewNamespaceController(client federation_release_1_4.Interface) *NamespaceC
 		eventRecorder:         recorder,
 	}
 
-	// Build delivereres for triggering reconcilations.
+	// Build delivereres for triggering reconciliations.
 	nc.namespaceDeliverer = util.NewDelayingDeliverer()
 	nc.clusterDeliverer = util.NewDelayingDeliverer()
 
@@ -128,8 +128,8 @@ func NewNamespaceController(client federation_release_1_4.Interface) *NamespaceC
 				},
 				&api_v1.Namespace{},
 				controller.NoResyncPeriodFunc(),
-				// Trigger reconcilation whenever something in federated cluster is changed. In most cases it
-				// would be just confirmation that some namespace opration suceeded.
+				// Trigger reconciliation whenever something in federated cluster is changed. In most cases it
+				// would be just confirmation that some namespace opration succeeded.
 				util.NewTriggerOnMetaAndSpecChanges(
 					func(obj pkg_runtime.Object) { nc.deliverNamespaceObj(obj, nc.namespaceReviewDelay, false) },
 				))
@@ -204,7 +204,7 @@ func (nc *NamespaceController) deliverNamespace(namespace string, delay time.Dur
 }
 
 // Check whether all data stores are in sync. False is returned if any of the informer/stores is not yet
-// synced with the coresponding api server.
+// synced with the corresponding api server.
 func (nc *NamespaceController) isSynced() bool {
 	if !nc.namespaceFederatedInformer.ClustersSynced() {
 		glog.V(2).Infof("Cluster list not synced")
@@ -221,7 +221,7 @@ func (nc *NamespaceController) isSynced() bool {
 	return true
 }
 
-// The function triggers reconcilation of all federated namespaces.
+// The function triggers reconciliation of all federated namespaces.
 func (nc *NamespaceController) reconcileNamespacesOnClusterChange() {
 	if !nc.isSynced() {
 		nc.clusterDeliverer.DeliverAfter(allClustersKey, nil, nc.clusterAvailableDelay)

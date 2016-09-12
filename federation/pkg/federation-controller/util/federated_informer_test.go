@@ -36,7 +36,7 @@ import (
 )
 
 // Basic test for Federated Informer. Checks whether the subinformer are added and deleted
-// when the corresponding cluster entries appear and dissapear from etcd.
+// when the corresponding cluster entries appear and disappear from etcd.
 func TestFederatedInformer(t *testing.T) {
 	fakeFederationClient := &fake_federation_release_1_4.Clientset{}
 

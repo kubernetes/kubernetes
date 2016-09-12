@@ -44,12 +44,12 @@ const (
 )
 
 type SecretController struct {
-	// For triggering single secret reconcilation. This is used when there is an
+	// For triggering single secret reconciliation. This is used when there is an
 	// add/update/delete operation on a secret in either federated API server or
 	// in some member of the federation.
 	secretDeliverer *util.DelayingDeliverer
 
-	// For triggering all secrets reconcilation. This is used when
+	// For triggering all secrets reconciliation. This is used when
 	// a new cluster becomes available.
 	clusterDeliverer *util.DelayingDeliverer
 
@@ -93,7 +93,7 @@ func NewSecretController(client federation_release_1_4.Interface) *SecretControl
 		eventRecorder:         recorder,
 	}
 
-	// Build delivereres for triggering reconcilations.
+	// Build delivereres for triggering reconciliations.
 	secretcontroller.secretDeliverer = util.NewDelayingDeliverer()
 	secretcontroller.clusterDeliverer = util.NewDelayingDeliverer()
 
@@ -126,8 +126,8 @@ func NewSecretController(client federation_release_1_4.Interface) *SecretControl
 				},
 				&api_v1.Secret{},
 				controller.NoResyncPeriodFunc(),
-				// Trigger reconcilation whenever something in federated cluster is changed. In most cases it
-				// would be just confirmation that some secret opration suceeded.
+				// Trigger reconciliation whenever something in federated cluster is changed. In most cases it
+				// would be just confirmation that some secret opration succeeded.
 				util.NewTriggerOnAllChanges(
 					func(obj pkg_runtime.Object) {
 						secretcontroller.deliverSecretObj(obj, secretcontroller.secretReviewDelay, false)
@@ -216,7 +216,7 @@ func (secretcontroller *SecretController) deliverSecret(namespace string, name s
 }
 
 // Check whether all data stores are in sync. False is returned if any of the informer/stores is not yet
-// synced with the coresponding api server.
+// synced with the corresponding api server.
 func (secretcontroller *SecretController) isSynced() bool {
 	if !secretcontroller.secretFederatedInformer.ClustersSynced() {
 		glog.V(2).Infof("Cluster list not synced")
@@ -233,7 +233,7 @@ func (secretcontroller *SecretController) isSynced() bool {
 	return true
 }
 
-// The function triggers reconcilation of all federated secrets.
+// The function triggers reconciliation of all federated secrets.
 func (secretcontroller *SecretController) reconcileSecretsOnClusterChange() {
 	if !secretcontroller.isSynced() {
 		secretcontroller.clusterDeliverer.DeliverAt(allClustersKey, nil, time.Now().Add(secretcontroller.clusterAvailableDelay))
