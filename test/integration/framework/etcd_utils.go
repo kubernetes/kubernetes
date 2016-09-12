@@ -30,9 +30,8 @@ import (
 // If you need to start an etcd instance by hand, you also need to insert a key
 // for this check to pass (*any* key will do, eg:
 //curl -L http://127.0.0.1:2379/v2/keys/message -XPUT -d value="Hello world").
-func init() {
-	RequireEtcd()
-}
+
+var testing_etcd = false
 
 func GetEtcdURLFromEnv() string {
 	url := env.GetEnvAsStringOrFallback("KUBE_INTEGRATION_ETCD_URL", "http://127.0.0.1:2379")
@@ -41,6 +40,10 @@ func GetEtcdURLFromEnv() string {
 }
 
 func NewEtcdClient() etcd.Client {
+	// gaurded to avoid infinite recursion, check etcd.
+	if testing_etcd {
+		RequireEtcd()
+	}
 	cfg := etcd.Config{
 		Endpoints: []string{GetEtcdURLFromEnv()},
 	}
@@ -52,9 +55,14 @@ func NewEtcdClient() etcd.Client {
 }
 
 func RequireEtcd() {
+	testing_etcd = true
+	defer func() {
+		testing_etcd = false
+	}()
 	if _, err := etcd.NewKeysAPI(NewEtcdClient()).Get(context.TODO(), "/", nil); err != nil {
 		glog.Fatalf("unable to connect to etcd for testing: %v", err)
 	}
+
 }
 
 func WithEtcdKey(f func(string)) {
