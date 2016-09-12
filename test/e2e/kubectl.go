@@ -46,6 +46,7 @@ import (
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apis/batch"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -162,7 +163,12 @@ func runKubectlRetryOrDie(args ...string) string {
 
 var _ = framework.KubeDescribe("Kubectl client", func() {
 	defer GinkgoRecover()
-	f := framework.NewDefaultFramework("kubectl")
+	options := framework.FrameworkOptions{
+		ClientQPS:    20,
+		ClientBurst:  50,
+		GroupVersion: &unversioned.GroupVersion{Group: batch.GroupName, Version: "v2alpha1"},
+	}
+	f := framework.NewFramework("kubectl", options, nil)
 
 	// Reustable cluster state function.  This won't be adversly affected by lazy initialization of framework.
 	clusterState := func() *framework.ClusterVerification {
@@ -1067,6 +1073,43 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			}
 			if job.Spec.Template.Spec.RestartPolicy != api.RestartPolicyOnFailure {
 				framework.Failf("Failed creating a job with correct restart policy for --restart=OnFailure")
+			}
+		})
+	})
+
+	framework.KubeDescribe("Kubectl run ScheduledJob", func() {
+		var nsFlag string
+		var sjName string
+
+		BeforeEach(func() {
+			nsFlag = fmt.Sprintf("--namespace=%v", ns)
+			sjName = "e2e-test-echo-scheduledjob"
+		})
+
+		AfterEach(func() {
+			framework.RunKubectlOrDie("delete", "scheduledjobs", sjName, nsFlag)
+		})
+
+		It("should create a ScheduledJob", func() {
+			framework.SkipIfMissingResource(f.ClientPool, unversioned.GroupVersionResource{Group: batch.GroupName, Version: "v2alpha1", Resource: "scheduledjobs"}, f.Namespace.Name)
+
+			schedule := "*/5 * * * ?"
+			framework.RunKubectlOrDie("run", sjName, "--restart=OnFailure", "--generator=scheduledjob/v2alpha1",
+				"--schedule="+schedule, "--image="+busyboxImage, nsFlag)
+			By("verifying the ScheduledJob " + sjName + " was created")
+			sj, err := c.Batch().ScheduledJobs(ns).Get(sjName)
+			if err != nil {
+				framework.Failf("Failed getting ScheduledJob %s: %v", sjName, err)
+			}
+			if sj.Spec.Schedule != schedule {
+				framework.Failf("Failed creating a ScheduledJob with correct schedule %s", schedule)
+			}
+			containers := sj.Spec.JobTemplate.Spec.Template.Spec.Containers
+			if containers == nil || len(containers) != 1 || containers[0].Image != busyboxImage {
+				framework.Failf("Failed creating ScheduledJob %s for 1 pod with expected image %s", sjName, busyboxImage)
+			}
+			if sj.Spec.JobTemplate.Spec.Template.Spec.RestartPolicy != api.RestartPolicyOnFailure {
+				framework.Failf("Failed creating a ScheduledJob with correct restart policy for --restart=OnFailure")
 			}
 		})
 	})
