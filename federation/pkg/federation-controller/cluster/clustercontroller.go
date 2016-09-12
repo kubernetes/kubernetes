@@ -123,7 +123,7 @@ func (cc *ClusterController) GetClusterStatus(cluster *federation_v1beta1.Cluste
 		glog.Infof("It's a new cluster, a cluster client will be created")
 		client, err := NewClusterClientSet(cluster)
 		if err != nil || client == nil {
-			glog.Infof("Failed to create cluster client, err: %v", err)
+			glog.Errorf("Failed to create cluster client, err: %v", err)
 			return nil, err
 		}
 		clusterClient = *client
