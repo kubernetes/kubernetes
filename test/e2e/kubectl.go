@@ -495,24 +495,47 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 
 			By("Waiting for Redis master to start.")
 			waitForOrFailWithDebug(1)
+
 			// Pod
-			forEachPod(func(pod api.Pod) {
-				output := framework.RunKubectlOrDie("describe", "pod", pod.Name, nsFlag)
-				requiredStrings := [][]string{
-					{"Name:", "redis-master-"},
-					{"Namespace:", ns},
-					{"Node:"},
-					{"Labels:", "app=redis"},
-					{"role=master"},
-					{"Status:", "Running"},
-					{"IP:"},
-					{"Controllers:", "ReplicationController/redis-master"},
-					{"Image:", redisImage},
-					{"State:", "Running"},
-					{"QoS Tier:", "BestEffort"},
-				}
-				checkOutput(output, requiredStrings)
-			})
+			classVersion, err := framework.KubectlVersionGTE(version.MustParse("v1.4.0-alpha"))
+			Expect(err).NotTo(HaveOccurred())
+			if classVersion {
+				forEachPod(func(pod api.Pod) {
+					output := framework.RunKubectlOrDie("describe", "pod", pod.Name, nsFlag)
+					requiredStrings := [][]string{
+						{"Name:", "redis-master-"},
+						{"Namespace:", ns},
+						{"Node:"},
+						{"Labels:", "app=redis"},
+						{"role=master"},
+						{"Status:", "Running"},
+						{"IP:"},
+						{"Controllers:", "ReplicationController/redis-master"},
+						{"Image:", redisImage},
+						{"State:", "Running"},
+						{"QoS Class:", "BestEffort"},
+					}
+					checkOutput(output, requiredStrings)
+				})
+			} else {
+				forEachPod(func(pod api.Pod) {
+					output := framework.RunKubectlOrDie("describe", "pod", pod.Name, nsFlag)
+					requiredStrings := [][]string{
+						{"Name:", "redis-master-"},
+						{"Namespace:", ns},
+						{"Node:"},
+						{"Labels:", "app=redis"},
+						{"role=master"},
+						{"Status:", "Running"},
+						{"IP:"},
+						{"Controllers:", "ReplicationController/redis-master"},
+						{"Image:", redisImage},
+						{"State:", "Running"},
+						{"QoS Tier:", "BestEffort"},
+					}
+					checkOutput(output, requiredStrings)
+				})
+			}
 
 			// Rc
 			output := framework.RunKubectlOrDie("describe", "rc", "redis-master", nsFlag)
