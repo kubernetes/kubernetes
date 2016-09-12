@@ -320,3 +320,137 @@ func TestGetSwaggerSchemaFail(t *testing.T) {
 		t.Errorf("expected an error, got %v", err)
 	}
 }
+
+func TestGetServerPreferredResources(t *testing.T) {
+	stable := unversioned.APIResourceList{
+		GroupVersion: "v1",
+		APIResources: []unversioned.APIResource{
+			{Name: "pods", Namespaced: true, Kind: "Pod"},
+			{Name: "services", Namespaced: true, Kind: "Service"},
+			{Name: "namespaces", Namespaced: false, Kind: "Namespace"},
+		},
+	}
+	/*beta := unversioned.APIResourceList{
+		GroupVersion: "extensions/v1",
+		APIResources: []unversioned.APIResource{
+			{Name: "deployments", Namespaced: true, Kind: "Deployment"},
+			{Name: "ingresses", Namespaced: true, Kind: "Ingress"},
+			{Name: "jobs", Namespaced: true, Kind: "Job"},
+		},
+	}*/
+	tests := []struct {
+		resourcesList *unversioned.APIResourceList
+		response      func(w http.ResponseWriter, req *http.Request)
+		expectErr     func(err error) bool
+	}{
+		{
+			resourcesList: &stable,
+			expectErr:     IsGroupDiscoveryFailedError,
+			response: func(w http.ResponseWriter, req *http.Request) {
+				var list interface{}
+				switch req.URL.Path {
+				case "/apis/extensions/v1beta1":
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				case "/api/v1":
+					list = &stable
+				case "/api":
+					list = &unversioned.APIVersions{
+						Versions: []string{
+							"v1",
+						},
+					}
+				case "/apis":
+					list = &unversioned.APIGroupList{
+						Groups: []unversioned.APIGroup{
+							{
+								Versions: []unversioned.GroupVersionForDiscovery{
+									{GroupVersion: "extensions/v1beta1"},
+								},
+							},
+						},
+					}
+				default:
+					t.Logf("unexpected request: %s", req.URL.Path)
+					w.WriteHeader(http.StatusNotFound)
+					return
+				}
+				output, err := json.Marshal(list)
+				if err != nil {
+					t.Errorf("unexpected encoding error: %v", err)
+					return
+				}
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusOK)
+				w.Write(output)
+			},
+		},
+		{
+			resourcesList: nil,
+			expectErr:     IsGroupDiscoveryFailedError,
+			response: func(w http.ResponseWriter, req *http.Request) {
+				var list interface{}
+				switch req.URL.Path {
+				case "/apis/extensions/v1beta1":
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				case "/api/v1":
+					w.WriteHeader(http.StatusInternalServerError)
+				case "/api":
+					list = &unversioned.APIVersions{
+						Versions: []string{
+							"v1",
+						},
+					}
+				case "/apis":
+					list = &unversioned.APIGroupList{
+						Groups: []unversioned.APIGroup{
+							{
+								Versions: []unversioned.GroupVersionForDiscovery{
+									{GroupVersion: "extensions/v1beta1"},
+								},
+							},
+						},
+					}
+				default:
+					t.Logf("unexpected request: %s", req.URL.Path)
+					w.WriteHeader(http.StatusNotFound)
+					return
+				}
+				output, err := json.Marshal(list)
+				if err != nil {
+					t.Errorf("unexpected encoding error: %v", err)
+					return
+				}
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusOK)
+				w.Write(output)
+			},
+		},
+		/*{
+			resourcesList: &stable,
+		},*/
+	}
+	for _, test := range tests {
+		server := httptest.NewServer(http.HandlerFunc(test.response))
+		defer server.Close()
+
+		client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
+		got, err := client.ServerPreferredResources()
+		if test.expectErr != nil {
+			if err == nil {
+				t.Error("unexpected non-error")
+			}
+
+			continue
+		}
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+			continue
+		}
+		if !reflect.DeepEqual(got, test.resourcesList) {
+			t.Errorf("expected:\n%v\ngot:\n%v\n", test.resourcesList, got)
+		}
+		server.Close()
+	}
+}
