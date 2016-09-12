@@ -250,9 +250,13 @@ func (dc *DeploymentController) getNewReplicaSet(deployment *extensions.Deployme
 	if err != nil {
 		return nil, err
 	} else if existingNewRS != nil {
+		copiedRS, err := deploymentutil.ReplicaSetDeepCopy(existingNewRS)
+		if err != nil {
+			return nil, err
+		}
 		// Set existing new replica set's annotation
-		if deploymentutil.SetNewReplicaSetAnnotations(deployment, existingNewRS, newRevision, true) {
-			return dc.client.Extensions().ReplicaSets(deployment.ObjectMeta.Namespace).Update(existingNewRS)
+		if deploymentutil.SetNewReplicaSetAnnotations(deployment, copiedRS, newRevision, true) {
+			return dc.client.Extensions().ReplicaSets(deployment.ObjectMeta.Namespace).Update(copiedRS)
 		}
 		return existingNewRS, nil
 	}
@@ -530,8 +534,12 @@ func (dc *DeploymentController) isScalingEvent(d *extensions.Deployment) (bool, 
 		// sure that we will update only replica sets that don't have the current size of the deployment.
 		maxSurge := deploymentutil.MaxSurge(*d)
 		for _, rs := range controller.FilterActiveReplicaSets(oldRSs) {
-			if updated := deploymentutil.SetReplicasAnnotations(rs, d.Spec.Replicas, d.Spec.Replicas+maxSurge); updated {
-				if _, err := dc.client.Extensions().ReplicaSets(rs.Namespace).Update(rs); err != nil {
+			rsCopy, err := deploymentutil.ReplicaSetDeepCopy(rs)
+			if err != nil {
+				return false, err
+			}
+			if updated := deploymentutil.SetReplicasAnnotations(rsCopy, d.Spec.Replicas, d.Spec.Replicas+maxSurge); updated {
+				if _, err := dc.client.Extensions().ReplicaSets(rsCopy.Namespace).Update(rsCopy); err != nil {
 					glog.Infof("Cannot update annotations for replica set %q: %v", rs.Name, err)
 					return false, err
 				}
