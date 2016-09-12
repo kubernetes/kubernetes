@@ -66,24 +66,41 @@ func NewTestServer(s Service, cert, key, caCert []byte) (*httptest.Server, error
 
 	serveHTTP := func(w http.ResponseWriter, r *http.Request) {
 		var review v1beta1.TokenReview
-		if err := json.NewDecoder(r.Body).Decode(&review); err != nil {
+		bodyData, _ := ioutil.ReadAll(r.Body)
+		if err := json.Unmarshal(bodyData, &review); err != nil {
 			http.Error(w, fmt.Sprintf("failed to decode body: %v", err), http.StatusBadRequest)
 			return
 		}
+		// ensure we received the serialized tokenreview as expected
+		if review.APIVersion != "authentication.k8s.io/v1beta1" {
+			http.Error(w, fmt.Sprintf("wrong api version: %s", string(bodyData)), http.StatusBadRequest)
+			return
+		}
+		// once we have a successful request, always call the review to record that we were called
+		s.Review(&review)
 		if s.HTTPStatusCode() < 200 || s.HTTPStatusCode() >= 300 {
 			http.Error(w, "HTTP Error", s.HTTPStatusCode())
 			return
 		}
-		s.Review(&review)
 		type userInfo struct {
-			Username string   `json:"username"`
-			UID      string   `json:"uid"`
-			Groups   []string `json:"groups"`
+			Username string              `json:"username"`
+			UID      string              `json:"uid"`
+			Groups   []string            `json:"groups"`
+			Extra    map[string][]string `json:"extra"`
 		}
 		type status struct {
 			Authenticated bool     `json:"authenticated"`
 			User          userInfo `json:"user"`
 		}
+
+		var extra map[string][]string
+		if review.Status.User.Extra != nil {
+			extra = map[string][]string{}
+			for k, v := range review.Status.User.Extra {
+				extra[k] = ([]string)(v)
+			}
+		}
+
 		resp := struct {
 			APIVersion string `json:"apiVersion"`
 			Status     status `json:"status"`
@@ -95,6 +112,7 @@ func NewTestServer(s Service, cert, key, caCert []byte) (*httptest.Server, error
 					Username: review.Status.User.Username,
 					UID:      review.Status.User.UID,
 					Groups:   review.Status.User.Groups,
+					Extra:    extra,
 				},
 			},
 		}
@@ -112,9 +130,11 @@ func NewTestServer(s Service, cert, key, caCert []byte) (*httptest.Server, error
 type mockService struct {
 	allow      bool
 	statusCode int
+	called     int
 }
 
 func (m *mockService) Review(r *v1beta1.TokenReview) {
+	m.called++
 	r.Status.Authenticated = m.allow
 	if m.allow {
 		r.Status.User.Username = "realHooman@email.com"
@@ -148,7 +168,13 @@ func newTokenAuthenticator(serverURL string, clientCert, clientKey, ca []byte, c
 	if err := json.NewEncoder(tempfile).Encode(config); err != nil {
 		return nil, err
 	}
-	return newWithBackoff(p, cacheTime, 0)
+
+	c, err := tokenReviewClientFromKubeconfig(p)
+	if err != nil {
+		return nil, err
+	}
+
+	return newWithBackoff(c, cacheTime, 0)
 }
 
 func TestTLSConfig(t *testing.T) {
@@ -294,6 +320,7 @@ func TestWebhookTokenAuthenticator(t *testing.T) {
 					Username: "person@place.com",
 					UID:      "abcd-1234",
 					Groups:   []string{"stuff-dev", "main-eng"},
+					Extra:    map[string]v1beta1.ExtraValue{"foo": v1beta1.ExtraValue{"bar", "baz"}},
 				},
 			},
 			expectedAuthenticated: true,
@@ -301,6 +328,7 @@ func TestWebhookTokenAuthenticator(t *testing.T) {
 				Name:   "person@place.com",
 				UID:    "abcd-1234",
 				Groups: []string{"stuff-dev", "main-eng"},
+				Extra:  map[string][]string{"foo": []string{"bar", "baz"}},
 			},
 		},
 		// Unauthenticated shouldn't even include extra provided info.
@@ -345,7 +373,7 @@ func TestWebhookTokenAuthenticator(t *testing.T) {
 				i, authenticated, tt.expectedAuthenticated)
 		}
 		if user != nil && tt.expectedUser != nil && !reflect.DeepEqual(user, tt.expectedUser) {
-			t.Errorf("case %d: Plugin returned incorrect user. Got %v, expected %v",
+			t.Errorf("case %d: Plugin returned incorrect user. Got %#v, expected %#v",
 				i, user, tt.expectedUser)
 		}
 	}
@@ -374,8 +402,9 @@ func (a *authenticationUserInfo) GetExtra() map[string][]string {
 var _ user.Info = (*authenticationUserInfo)(nil)
 
 // TestWebhookCache verifies that error responses from the server are not
-// cached, but successful responses are.
-func TestWebhookCache(t *testing.T) {
+// cached, but successful responses are. It also ensures that the webhook
+// call is retried on 429 and 500+ errors
+func TestWebhookCacheAndRetry(t *testing.T) {
 	serv := new(mockService)
 	s, err := NewTestServer(serv, serverCert, serverKey, caCert)
 	if err != nil {
@@ -388,36 +417,129 @@ func TestWebhookCache(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	token := "t0k3n"
-	serv.allow = true
-	serv.statusCode = 500
-	if _, _, err := wh.AuthenticateToken(token); err == nil {
-		t.Errorf("Webhook returned HTTP 500, but authorizer reported success.")
+
+	testcases := []struct {
+		description string
+
+		token string
+		allow bool
+		code  int
+
+		expectError bool
+		expectOk    bool
+		expectCalls int
+	}{
+		{
+			description: "t0k3n, 500 error, retries and fails",
+
+			token: "t0k3n",
+			allow: false,
+			code:  500,
+
+			expectError: true,
+			expectOk:    false,
+			expectCalls: 5,
+		},
+		{
+			description: "t0k3n, 404 error, fails (but no retry)",
+
+			token: "t0k3n",
+			allow: false,
+			code:  404,
+
+			expectError: true,
+			expectOk:    false,
+			expectCalls: 1,
+		},
+		{
+			description: "t0k3n, 200 response, allowed, succeeds with a single call",
+
+			token: "t0k3n",
+			allow: true,
+			code:  200,
+
+			expectError: false,
+			expectOk:    true,
+			expectCalls: 1,
+		},
+		{
+			description: "t0k3n, 500 response, disallowed, but never called because previous 200 response was cached",
+
+			token: "t0k3n",
+			allow: false,
+			code:  500,
+
+			expectError: false,
+			expectOk:    true,
+			expectCalls: 0,
+		},
+
+		{
+			description: "an0th3r_t0k3n, 500 response, disallowed, should be called again with retries",
+
+			token: "an0th3r_t0k3n",
+			allow: false,
+			code:  500,
+
+			expectError: true,
+			expectOk:    false,
+			expectCalls: 5,
+		},
+		{
+			description: "an0th3r_t0k3n, 429 response, disallowed, should be called again with retries",
+
+			token: "an0th3r_t0k3n",
+			allow: false,
+			code:  429,
+
+			expectError: true,
+			expectOk:    false,
+			expectCalls: 5,
+		},
+		{
+			description: "an0th3r_t0k3n, 200 response, allowed, succeeds with a single call",
+
+			token: "an0th3r_t0k3n",
+			allow: true,
+			code:  200,
+
+			expectError: false,
+			expectOk:    true,
+			expectCalls: 1,
+		},
+		{
+			description: "an0th3r_t0k3n, 500 response, disallowed, but never called because previous 200 response was cached",
+
+			token: "an0th3r_t0k3n",
+			allow: false,
+			code:  500,
+
+			expectError: false,
+			expectOk:    true,
+			expectCalls: 0,
+		},
 	}
-	serv.statusCode = 404
-	if _, _, err := wh.AuthenticateToken(token); err == nil {
-		t.Errorf("Webhook returned HTTP 404, but authorizer reported success.")
-	}
-	serv.statusCode = 200
-	if _, _, err := wh.AuthenticateToken(token); err != nil {
-		t.Errorf("Webhook returned HTTP 200, but authorizer reported unauthorized.")
-	}
-	serv.statusCode = 500
-	if _, _, err := wh.AuthenticateToken(token); err != nil {
-		t.Errorf("Webhook should have successful response cached, but authorizer reported unauthorized.")
-	}
-	// For a different request, webhook should be called again.
-	token = "an0th3r_t0k3n"
-	serv.statusCode = 500
-	if _, _, err := wh.AuthenticateToken(token); err == nil {
-		t.Errorf("Webhook returned HTTP 500, but authorizer reported success.")
-	}
-	serv.statusCode = 200
-	if _, _, err := wh.AuthenticateToken(token); err != nil {
-		t.Errorf("Webhook returned HTTP 200, but authorizer reported unauthorized.")
-	}
-	serv.statusCode = 500
-	if _, _, err := wh.AuthenticateToken(token); err != nil {
-		t.Errorf("Webhook should have successful response cached, but authorizer reported unauthorized.")
+
+	for _, testcase := range testcases {
+		func() {
+			serv.allow = testcase.allow
+			serv.statusCode = testcase.code
+			serv.called = 0
+
+			_, ok, err := wh.AuthenticateToken(testcase.token)
+			hasError := err != nil
+			if hasError != testcase.expectError {
+				t.Log(testcase.description)
+				t.Errorf("Webhook returned HTTP %d, expected error=%v, but got error %v", testcase.code, testcase.expectError, err)
+			}
+			if serv.called != testcase.expectCalls {
+				t.Log(testcase.description)
+				t.Errorf("Expected %d calls, got %d", testcase.expectCalls, serv.called)
+			}
+			if ok != testcase.expectOk {
+				t.Log(testcase.description)
+				t.Errorf("Expected ok=%v, got %v", testcase.expectOk, ok)
+			}
+		}()
 	}
 }
