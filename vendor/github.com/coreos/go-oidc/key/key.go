@@ -3,9 +3,9 @@ package key
 import (
 	"crypto/rand"
 	"crypto/rsa"
-	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
-	"math/big"
+	"io"
 	"time"
 
 	"github.com/coreos/go-oidc/jose"
@@ -139,15 +139,15 @@ func GeneratePrivateKey() (*PrivateKey, error) {
 	if err != nil {
 		return nil, err
 	}
+	keyID := make([]byte, 20)
+	if _, err := io.ReadFull(rand.Reader, keyID); err != nil {
+		return nil, err
+	}
 
 	k := PrivateKey{
-		KeyID:      base64BigInt(pk.PublicKey.N),
+		KeyID:      hex.EncodeToString(keyID),
 		PrivateKey: pk,
 	}
 
 	return &k, nil
-}
-
-func base64BigInt(b *big.Int) string {
-	return base64.URLEncoding.EncodeToString(b.Bytes())
 }
