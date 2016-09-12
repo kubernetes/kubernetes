@@ -95,6 +95,7 @@ func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
 		PredicateFunc:     controller.MatchController,
 		QualifiedResource: api.Resource("replicationcontrollers"),
 
+		EnableGarbageCollection: opts.EnableGarbageCollection,
 		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
 
 		// Used to validate controller creation

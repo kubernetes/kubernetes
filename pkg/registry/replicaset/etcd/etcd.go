@@ -93,6 +93,7 @@ func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
 		// Used to match objects based on labels/fields for list and watch
 		PredicateFunc:           replicaset.MatchReplicaSet,
 		QualifiedResource:       api.Resource("replicasets"),
+		EnableGarbageCollection: opts.EnableGarbageCollection,
 		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
 
 		// Used to validate ReplicaSet creation

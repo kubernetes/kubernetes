@@ -51,6 +51,7 @@ func NewREST(opts generic.RESTOptions) *REST {
 		},
 		PredicateFunc:           thirdpartyresource.Matcher,
 		QualifiedResource:       extensions.Resource("thirdpartyresources"),
+		EnableGarbageCollection: opts.EnableGarbageCollection,
 		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
 		CreateStrategy:          thirdpartyresource.Strategy,
 		UpdateStrategy:          thirdpartyresource.Strategy,

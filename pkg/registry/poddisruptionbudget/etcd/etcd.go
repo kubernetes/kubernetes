@@ -70,6 +70,7 @@ func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
 		// Used to match objects based on labels/fields for list and watch
 		PredicateFunc:           poddisruptionbudget.MatchPodDisruptionBudget,
 		QualifiedResource:       policyapi.Resource("poddisruptionbudgets"),
+		EnableGarbageCollection: opts.EnableGarbageCollection,
 		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
 
 		// Used to validate controller creation

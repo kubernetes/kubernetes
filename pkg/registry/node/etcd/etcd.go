@@ -92,6 +92,7 @@ func NewStorage(opts generic.RESTOptions, connection client.ConnectionInfoGetter
 		},
 		PredicateFunc:           node.MatchNode,
 		QualifiedResource:       api.Resource("nodes"),
+		EnableGarbageCollection: opts.EnableGarbageCollection,
 		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
 
 		CreateStrategy: node.Strategy,
