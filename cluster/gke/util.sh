@@ -23,6 +23,7 @@ KUBE_PROMPT_FOR_UPDATE=y
 KUBE_SKIP_UPDATE=${KUBE_SKIP_UPDATE-"n"}
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source "${KUBE_ROOT}/cluster/gke/${KUBE_CONFIG_FILE:-config-default.sh}"
+source "${KUBE_ROOT}/cluster/lib/util.sh"
 
 # Perform preparations required to run e2e tests
 #
@@ -186,14 +187,20 @@ function test-setup() {
     --allow tcp:80,tcp:8080 \
     --project "${PROJECT}" \
     --target-tags "${NODE_TAG},${OLD_NODE_TAG}" \
-    --network="${NETWORK}"
+    --network="${NETWORK}" &
 
   "${GCLOUD}" compute firewall-rules create \
     "${CLUSTER_NAME}-nodeports" \
     --allow tcp:30000-32767,udp:30000-32767 \
     --project "${PROJECT}" \
     --target-tags "${NODE_TAG},${OLD_NODE_TAG}" \
-    --network="${NETWORK}"
+    --network="${NETWORK}" &
+
+  # Wait for firewall rules.
+  kube::util::wait-for-jobs || {
+    echo "... gke:test-setup(): Could not create firewall" >&2
+    return 1
+  }
 }
 
 # Detect the IP for the master. Note that on GKE, we don't know the name of the
@@ -290,15 +297,21 @@ function test-teardown() {
 
   detect-project >&2
 
-  # First, remove anything we did with test-setup (currently, the firewall).
+  # Tear down the cluster first.
+  "${KUBE_ROOT}/cluster/kube-down.sh" || true
+
+  # Then remove the firewall rules. We do it in this order because the
+  # time to delete a firewall is actually dependent on the number of
+  # instances, but we can safely delete the cluster before the firewall.
+  #
   # NOTE: Keep in sync with names above in test-setup.
   "${GCLOUD}" compute firewall-rules delete "${CLUSTER_NAME}-http-alt" \
-    --project="${PROJECT}" || true
+    --project="${PROJECT}" &
   "${GCLOUD}" compute firewall-rules delete "${CLUSTER_NAME}-nodeports" \
-    --project="${PROJECT}" || true
+    --project="${PROJECT}" &
 
-  # Then actually turn down the cluster.
-  "${KUBE_ROOT}/cluster/kube-down.sh"
+  # Wait for firewall rule teardown.
+  kube::util::wait-for-jobs || true
 }
 
 # Actually take down the cluster. This is called from test-teardown.
