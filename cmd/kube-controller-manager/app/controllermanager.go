@@ -221,8 +221,8 @@ func StartControllers(s *options.CMServer, kubeconfig *restclient.Config, stop <
 	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 
 	if s.TerminatedPodGCThreshold > 0 {
-		go podgc.New(client("pod-garbage-collector"), ResyncPeriod(s), int(s.TerminatedPodGCThreshold)).
-			Run(wait.NeverStop)
+		go podgc.NewFromInformer(clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "pod-garbage-collector")), sharedInformers.Pods().Informer(),
+			int(s.TerminatedPodGCThreshold)).Run(wait.NeverStop)
 		time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 	}
 

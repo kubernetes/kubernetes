@@ -145,10 +145,8 @@ func (s *CMServer) Run(_ []string) error {
 	go replicationcontroller.NewReplicationManagerFromClient(clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "replication-controller")), s.resyncPeriod, replicationcontroller.BurstReplicas, int(s.LookupCacheSizeForRC)).
 		Run(int(s.ConcurrentRCSyncs), wait.NeverStop)
 
-	if s.TerminatedPodGCThreshold > 0 {
-		go podgc.New(clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "pod-garbage-collector")), s.resyncPeriod, int(s.TerminatedPodGCThreshold)).
-			Run(wait.NeverStop)
-	}
+	go podgc.NewFromClient(clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "pod-garbage-collector")), int(s.TerminatedPodGCThreshold)).
+		Run(wait.NeverStop)
 
 	//TODO(jdef) should eventually support more cloud providers here
 	if s.CloudProvider != mesos.ProviderName {
