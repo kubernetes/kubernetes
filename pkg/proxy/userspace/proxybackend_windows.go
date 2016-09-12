@@ -151,10 +151,10 @@ func (proxier *Proxier) netshIpv4AddressAddArgs(destIP net.IP) []string {
 func (proxier *Proxier) netshPortProxyDeleteArgs(destIP net.IP, destPort int, proxyIP net.IP, proxyPort int, service proxy.ServicePortName) []string {
 	args := []string{
 		"interface", "portproxy", "delete", "v4tov4",
-		"listenaddress=" + destIP.String(),
 		"listenPort=" + strconv.Itoa(destPort),
-		"connectaddress=" + proxyIP.String(),
-		"connectPort=" + strconv.Itoa(proxyPort),
+	}
+	if destIP != nil {
+		args = append(args, "listenaddress="+destIP.String())
 	}
 
 	return args
