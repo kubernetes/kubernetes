@@ -25,6 +25,7 @@ import (
 	dockercontainer "github.com/docker/engine-api/types/container"
 	dockerfilters "github.com/docker/engine-api/types/filters"
 	dockerstrslice "github.com/docker/engine-api/types/strslice"
+	"github.com/golang/glog"
 
 	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
@@ -62,15 +63,20 @@ func (ds *dockerService) ListContainers(filter *runtimeApi.ContainerFilter) ([]*
 	}
 	// Convert docker to runtime api containers.
 	result := []*runtimeApi.Container{}
-	for _, c := range containers {
-		if len(filter.GetName()) > 0 {
-			_, _, _, containerName, _, err := parseContainerName(c.Names[0])
-			if err != nil || containerName != filter.GetName() {
-				continue
-			}
-		}
+	for i := range containers {
+		c := containers[i]
 
-		result = append(result, toRuntimeAPIContainer(&c))
+		converted, err := toRuntimeAPIContainer(&c)
+		if err != nil {
+			glog.V(5).Infof("Unable to convert docker to runtime API container: %v", err)
+			continue
+		}
+		if len(filter.GetName()) != 0 && converted.Metadata.GetName() != filter.GetName() {
+			// TODO: Remove "name" from the ContainerFilter because name can no
+			// longer be used to identify a container.
+			continue
+		}
+		result = append(result, converted)
 	}
 	return result, nil
 }
@@ -98,7 +104,7 @@ func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeApi
 		image = iSpec.GetImage()
 	}
 	createConfig := dockertypes.ContainerCreateConfig{
-		Name: buildContainerName(sandboxConfig, config),
+		Name: makeContainerName(sandboxConfig, config),
 		Config: &dockercontainer.Config{
 			// TODO: set User.
 			Hostname:   sandboxConfig.GetHostname(),
@@ -278,17 +284,14 @@ func (ds *dockerService) ContainerStatus(containerID string) (*runtimeApi.Contai
 	ct, st, ft := createdAt.Unix(), startedAt.Unix(), finishedAt.Unix()
 	exitCode := int32(r.State.ExitCode)
 
-	_, _, _, containerName, attempt, err := parseContainerName(r.Name)
+	metadata, err := parseContainerName(r.Name)
 	if err != nil {
 		return nil, err
 	}
 
 	return &runtimeApi.ContainerStatus{
-		Id: &r.ID,
-		Metadata: &runtimeApi.ContainerMetadata{
-			Name:    &containerName,
-			Attempt: &attempt,
-		},
+		Id:         &r.ID,
+		Metadata:   metadata,
 		Image:      &runtimeApi.ImageSpec{Image: &r.Config.Image},
 		ImageRef:   &r.Image,
 		Mounts:     mounts,
