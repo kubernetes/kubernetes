@@ -17,17 +17,19 @@ limitations under the License.
 package iptables
 
 import (
-	"testing"
-
 	"fmt"
 	"net"
 	"strings"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/exec"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
+	iptest "k8s.io/kubernetes/pkg/util/iptables/testing"
 )
 
 func checkAllLines(t *testing.T, table utiliptables.Table, save []byte, expectedLines map[utiliptables.Chain]string) {
@@ -473,4 +475,116 @@ func TestRevertPorts(t *testing.T) {
 
 }
 
-// TODO(thockin): add a test for syncProxyRules() or break it down further and test the pieces.
+func TestProxier_syncProxyRules(t *testing.T) {
+	testEndpoint := endpointsInfo{ip: "1.2.3.4", localEndpoint: false}
+	testEndpoints := []*endpointsInfo{&testEndpoint}
+
+	type fields struct {
+		serviceMap                  map[proxy.ServicePortName]*serviceInfo
+		endpointsMap                map[proxy.ServicePortName][]*endpointsInfo
+		portsMap                    map[localPort]closeable
+		haveReceivedServiceUpdate   bool
+		haveReceivedEndpointsUpdate bool
+		masqueradeAll               bool
+		masqueradeMark              string
+		clusterCIDR                 string
+	}
+	tests := []struct {
+		name     string
+		fields   fields
+		expected string
+	}{
+		{
+			name: "no-services",
+			fields: fields{
+				masqueradeAll:  false,
+				masqueradeMark: "",
+				clusterCIDR:    "1.2.3.4"},
+			expected: `*filter
+:KUBE-SERVICES - [0:0]
+COMMIT
+*nat
+:KUBE-SERVICES - [0:0]
+:KUBE-NODEPORTS - [0:0]
+:KUBE-POSTROUTING - [0:0]
+:KUBE-MARK-MASQ - [0:0]
+-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -m mark --mark  -j MASQUERADE
+-A KUBE-MARK-MASQ -j MARK --set-xmark 
+-A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
+COMMIT
+`,
+		},
+		{
+			name: "services and endpoints",
+			fields: fields{
+				masqueradeAll:  true,
+				masqueradeMark: "themark",
+				clusterCIDR:    "1.2.3.4",
+				serviceMap: map[proxy.ServicePortName]*serviceInfo{
+					proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: "ns1", Name: "svc2"}, Port: "45"}: {
+						sessionAffinityType: api.ServiceAffinityClientIP,
+						stickyMaxAgeSeconds: 180,
+						clusterIP:           net.IPv4(10, 20, 30, 40),
+						protocol:            "TCP",
+						nodePort:            4345,
+						externalIPs:         []string{"1.2.3.4"},
+						loadBalancerStatus:  api.LoadBalancerStatus{Ingress: []api.LoadBalancerIngress{{IP: "11.11.0.1"}}},
+					},
+				},
+				endpointsMap: map[proxy.ServicePortName][]*endpointsInfo{
+					proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: "ns1", Name: "svc2"}, Port: "45"}: testEndpoints,
+				},
+			},
+			expected: `*filter
+:KUBE-SERVICES - [0:0]
+COMMIT
+*nat
+:KUBE-SERVICES - [0:0]
+:KUBE-NODEPORTS - [0:0]
+:KUBE-POSTROUTING - [0:0]
+:KUBE-MARK-MASQ - [0:0]
+:KUBE-SVC-HXONUMBTHTE3E4SN - [0:0]
+:KUBE-FW-HXONUMBTHTE3E4SN - [0:0]
+:KUBE-SEP-SUK2EG6P2REEHVOO - [0:0]
+-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -m mark --mark themark -j MASQUERADE
+-A KUBE-MARK-MASQ -j MARK --set-xmark themark
+-A KUBE-SERVICES -m comment --comment "ns1/svc2:45 cluster IP" -m tcp -p tcp -d 10.20.30.40/32 --dport 0 -j KUBE-MARK-MASQ
+-A KUBE-SERVICES -m comment --comment "ns1/svc2:45 cluster IP" -m tcp -p tcp -d 10.20.30.40/32 --dport 0 ! -s 1.2.3.4 -j KUBE-MARK-MASQ
+-A KUBE-SERVICES -m comment --comment "ns1/svc2:45 cluster IP" -m tcp -p tcp -d 10.20.30.40/32 --dport 0 -j KUBE-SVC-HXONUMBTHTE3E4SN
+-A KUBE-SERVICES -m comment --comment "ns1/svc2:45 external IP" -m tcp -p tcp -d 1.2.3.4/32 --dport 0 -j KUBE-MARK-MASQ
+-A KUBE-SERVICES -m comment --comment "ns1/svc2:45 external IP" -m tcp -p tcp -d 1.2.3.4/32 --dport 0 -m physdev ! --physdev-is-in -m addrtype ! --src-type LOCAL -j KUBE-SVC-HXONUMBTHTE3E4SN
+-A KUBE-SERVICES -m comment --comment "ns1/svc2:45 external IP" -m tcp -p tcp -d 1.2.3.4/32 --dport 0 -m addrtype --dst-type LOCAL -j KUBE-SVC-HXONUMBTHTE3E4SN
+-A KUBE-SERVICES -m comment --comment "ns1/svc2:45 loadbalancer IP" -m tcp -p tcp -d 11.11.0.1/32 --dport 0 -j KUBE-FW-HXONUMBTHTE3E4SN
+-A KUBE-FW-HXONUMBTHTE3E4SN -m comment --comment "ns1/svc2:45 loadbalancer IP" -j KUBE-MARK-MASQ
+-A KUBE-FW-HXONUMBTHTE3E4SN -m comment --comment "ns1/svc2:45 loadbalancer IP" -j KUBE-SVC-HXONUMBTHTE3E4SN
+-A KUBE-FW-HXONUMBTHTE3E4SN -m comment --comment "ns1/svc2:45 loadbalancer IP" -j KUBE-MARK-DROP
+-A KUBE-NODEPORTS -m comment --comment ns1/svc2:45 -m tcp -p tcp --dport 4345 -j KUBE-MARK-MASQ
+-A KUBE-NODEPORTS -m comment --comment ns1/svc2:45 -m tcp -p tcp --dport 4345 -j KUBE-SVC-HXONUMBTHTE3E4SN
+-A KUBE-SVC-HXONUMBTHTE3E4SN -m comment --comment ns1/svc2:45 -m recent --name KUBE-SEP-SUK2EG6P2REEHVOO --rcheck --seconds 180 --reap -j KUBE-SEP-SUK2EG6P2REEHVOO
+-A KUBE-SVC-HXONUMBTHTE3E4SN -m comment --comment ns1/svc2:45 -j KUBE-SEP-SUK2EG6P2REEHVOO
+-A KUBE-SEP-SUK2EG6P2REEHVOO -m comment --comment ns1/svc2:45 -s 1.2.3.4/32 -j KUBE-MARK-MASQ
+-A KUBE-SEP-SUK2EG6P2REEHVOO -m comment --comment ns1/svc2:45 -m recent --name KUBE-SEP-SUK2EG6P2REEHVOO --set -m tcp -p tcp -j DNAT --to-destination 1.2.3.4
+-A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
+COMMIT
+`,
+		},
+	}
+
+	fakeIptables := iptest.NewFake()
+	for _, tt := range tests {
+		proxier := &Proxier{
+			serviceMap:                  tt.fields.serviceMap,
+			endpointsMap:                tt.fields.endpointsMap,
+			portsMap:                    tt.fields.portsMap,
+			haveReceivedServiceUpdate:   true,
+			haveReceivedEndpointsUpdate: true,
+			iptables:                    fakeIptables,
+			masqueradeAll:               tt.fields.masqueradeAll,
+			masqueradeMark:              tt.fields.masqueradeMark,
+			clusterCIDR:                 tt.fields.clusterCIDR,
+		}
+		proxier.syncProxyRules()
+		dataStr := fmt.Sprintf("%s", fakeIptables.RestoreData)
+		assert.Equal(t, tt.expected, dataStr, tt.name)
+	}
+}
