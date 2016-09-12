@@ -819,7 +819,7 @@ func (s *ServiceController) syncService(key string) error {
 	// obj holds the latest service info from apiserver
 	obj, exists, err := s.serviceStore.Store.GetByKey(key)
 	if err != nil {
-		glog.Infof("Unable to retrieve service %v from store: %v", key, err)
+		glog.Errorf("Unable to retrieve service %v from store: %v", key, err)
 		s.queue.Add(key)
 		return err
 	}

@@ -65,7 +65,7 @@ func (cc *clusterClientCache) syncService(key, clusterName string, clusterCache 
 	}
 	serviceInterface, exists, err := clusterCache.serviceStore.GetByKey(key)
 	if err != nil {
-		glog.Infof("Did not successfully get %v from store: %v, will retry later", key, err)
+		glog.Errorf("Did not successfully get %v from store: %v, will retry later", key, err)
 		clusterCache.serviceQueue.Add(key)
 		return err
 	}

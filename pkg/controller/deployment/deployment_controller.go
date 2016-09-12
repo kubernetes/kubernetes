@@ -481,7 +481,7 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 
 	obj, exists, err := dc.dStore.Indexer.GetByKey(key)
 	if err != nil {
-		glog.Infof("Unable to retrieve deployment %v from store: %v", key, err)
+		glog.Errorf("Unable to retrieve deployment %v from store: %v", key, err)
 		return err
 	}
 	if !exists {
