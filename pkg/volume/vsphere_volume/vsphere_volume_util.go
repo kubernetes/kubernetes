@@ -18,140 +18,41 @@ package vsphere_volume
 
 import (
 	"errors"
-	"io/ioutil"
-	"os"
-	"path"
+	"fmt"
 	"strings"
 	"time"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/util/keymutex"
+	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
 	"k8s.io/kubernetes/pkg/volume"
+	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
 const (
-	maxRetries = 10
+	maxRetries         = 10
+	checkSleepDuration = time.Second
+	diskByIDPath       = "/dev/disk/by-id/"
+	diskSCSIPrefix     = "wwn-0x"
 )
 
 var ErrProbeVolume = errors.New("Error scanning attached volumes")
 
-// Singleton key mutex for keeping attach/detach operations for the same PD atomic
-var attachDetachMutex = keymutex.NewKeyMutex()
-
 type VsphereDiskUtil struct{}
 
-// Attaches a disk to the current kubelet.
-// Mounts the disk to it's global path.
-func (util *VsphereDiskUtil) AttachDisk(vm *vsphereVolumeMounter, globalPDPath string) error {
-	options := []string{}
-
-	// Block execution until any pending attach/detach operations for this PD have completed
-	attachDetachMutex.LockKey(vm.volPath)
-	defer attachDetachMutex.UnlockKey(vm.volPath)
-
-	cloud, err := vm.plugin.getCloudProvider()
-	if err != nil {
-		return err
+func verifyDevicePath(path string) (string, error) {
+	if pathExists, err := volumeutil.PathExists(path); err != nil {
+		return "", fmt.Errorf("Error checking if path exists: %v", err)
+	} else if pathExists {
+		return path, nil
 	}
 
-	diskID, diskUUID, attachError := cloud.AttachDisk(vm.volPath, "")
-	if attachError != nil {
-		return attachError
-	} else if diskUUID == "" {
-		return errors.New("Disk UUID has no value")
-	}
-
-	// diskID for detach Disk
-	vm.diskID = diskID
-
-	var devicePath string
-	numTries := 0
-	for {
-		devicePath = verifyDevicePath(diskUUID)
-
-		_, err := os.Stat(devicePath)
-		if err == nil {
-			break
-		}
-		if err != nil && !os.IsNotExist(err) {
-			return err
-		}
-		numTries++
-		if numTries == maxRetries {
-			return errors.New("Could not attach disk: Timeout after 60s")
-		}
-		time.Sleep(time.Second * 60)
-	}
-
-	notMnt, err := vm.mounter.IsLikelyNotMountPoint(globalPDPath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			if err := os.MkdirAll(globalPDPath, 0750); err != nil {
-				return err
-			}
-			notMnt = true
-		} else {
-			return err
-		}
-	}
-	if notMnt {
-		err = vm.diskMounter.FormatAndMount(devicePath, globalPDPath, vm.fsType, options)
-		if err != nil {
-			os.Remove(globalPDPath)
-			return err
-		}
-		glog.V(2).Infof("Safe mount successful: %q\n", devicePath)
-	}
-	return nil
-}
-
-func verifyDevicePath(diskUUID string) string {
-	files, _ := ioutil.ReadDir("/dev/disk/by-id/")
-	for _, f := range files {
-		// TODO: should support other controllers
-		if strings.Contains(f.Name(), "scsi-") {
-			devID := f.Name()[len("scsi-"):len(f.Name())]
-			if strings.Contains(devID, diskUUID) {
-				glog.V(4).Infof("Found disk attached as %q; full devicepath: %s\n", f.Name(), path.Join("/dev/disk/by-id/", f.Name()))
-				return path.Join("/dev/disk/by-id/", f.Name())
-			}
-		}
-	}
-	glog.Warningf("Failed to find device for the diskid: %q\n", diskUUID)
-	return ""
-}
-
-// Unmounts the device and detaches the disk from the kubelet's host machine.
-func (util *VsphereDiskUtil) DetachDisk(vu *vsphereVolumeUnmounter) error {
-
-	// Block execution until any pending attach/detach operations for this PD have completed
-	attachDetachMutex.LockKey(vu.volPath)
-	defer attachDetachMutex.UnlockKey(vu.volPath)
-
-	globalPDPath := makeGlobalPDPath(vu.plugin.host, vu.volPath)
-	if err := vu.mounter.Unmount(globalPDPath); err != nil {
-		return err
-	}
-	if err := os.Remove(globalPDPath); err != nil {
-		return err
-	}
-	glog.V(2).Infof("Successfully unmounted main device: %s\n", globalPDPath)
-
-	cloud, err := vu.plugin.getCloudProvider()
-	if err != nil {
-		return err
-	}
-
-	if err = cloud.DetachDisk(vu.volPath, ""); err != nil {
-		return err
-	}
-	glog.V(2).Infof("Successfully detached vSphere volume %s", vu.volPath)
-	return nil
+	return "", nil
 }
 
 // CreateVolume creates a vSphere volume.
 func (util *VsphereDiskUtil) CreateVolume(v *vsphereVolumeProvisioner) (vmDiskPath string, volumeSizeKB int, err error) {
-	cloud, err := v.plugin.getCloudProvider()
+	cloud, err := getCloudProvider(v.plugin.host.GetCloudProvider())
 	if err != nil {
 		return "", 0, err
 	}
@@ -171,7 +72,7 @@ func (util *VsphereDiskUtil) CreateVolume(v *vsphereVolumeProvisioner) (vmDiskPa
 
 // DeleteVolume deletes a vSphere volume.
 func (util *VsphereDiskUtil) DeleteVolume(vd *vsphereVolumeDeleter) error {
-	cloud, err := vd.plugin.getCloudProvider()
+	cloud, err := getCloudProvider(vd.plugin.host.GetCloudProvider())
 	if err != nil {
 		return err
 	}
@@ -182,4 +83,26 @@ func (util *VsphereDiskUtil) DeleteVolume(vd *vsphereVolumeDeleter) error {
 	}
 	glog.V(2).Infof("Successfully deleted vsphere volume %s", vd.volPath)
 	return nil
+}
+
+func getVolPathfromDeviceMountPath(deviceMountPath string) string {
+	// Assumption: No file or folder is named starting with '[' in datastore
+	volPath := deviceMountPath[strings.LastIndex(deviceMountPath, "["):]
+	// space between datastore and vmdk name in volumePath is encoded as '\040' when returned by GetMountRefs().
+	// volumePath eg: "[local] xxx.vmdk" provided to attach/mount
+	// replacing \040 with space to match the actual volumePath
+	return strings.Replace(volPath, "\\040", " ", -1)
+}
+
+func getCloudProvider(cloud cloudprovider.Interface) (*vsphere.VSphere, error) {
+	if cloud == nil {
+		glog.Errorf("Cloud provider not initialized properly")
+		return nil, errors.New("Cloud provider not initialized properly")
+	}
+
+	vs := cloud.(*vsphere.VSphere)
+	if vs == nil {
+		return nil, errors.New("Invalid cloud provider: expected vSphere")
+	}
+	return vs, nil
 }

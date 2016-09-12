@@ -17,6 +17,8 @@ limitations under the License.
 package mo
 
 import (
+	"fmt"
+
 	"github.com/vmware/govmomi/vim25/soap"
 	"github.com/vmware/govmomi/vim25/types"
 	"golang.org/x/net/context"
@@ -76,6 +78,24 @@ func Ancestors(ctx context.Context, rt soap.RoundTripper, pc, obj types.ManagedO
 		// Find entity we're looking for given the last entity in the current tree.
 		for _, iface := range ifaces {
 			me := iface.(IsManagedEntity).GetManagedEntity()
+
+			if me.Name == "" {
+				// The types below have their own 'Name' field, so ManagedEntity.Name (me.Name) is empty.
+				// We only hit this case when the 'obj' param is one of these types.
+				// In most cases, 'obj' is a Folder so Name isn't collected in this call.
+				switch x := iface.(type) {
+				case Network:
+					me.Name = x.Name
+				case DistributedVirtualSwitch:
+					me.Name = x.Name
+				case DistributedVirtualPortgroup:
+					me.Name = x.Name
+				default:
+					// ManagedEntity always has a Name, if we hit this point we missed a case above.
+					panic(fmt.Sprintf("%#v Name is empty", me.Reference()))
+				}
+			}
+
 			if me.Parent == nil {
 				out = append(out, me)
 				break

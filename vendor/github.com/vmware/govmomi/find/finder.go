@@ -25,6 +25,7 @@ import (
 	"github.com/vmware/govmomi/property"
 	"github.com/vmware/govmomi/vim25"
 	"github.com/vmware/govmomi/vim25/mo"
+	"github.com/vmware/govmomi/vim25/types"
 	"golang.org/x/net/context"
 )
 
@@ -192,6 +193,48 @@ func (f *Finder) managedObjectList(ctx context.Context, path string, tl bool) ([
 	return f.find(ctx, fn, tl, path)
 }
 
+// Element returns an Element for the given ManagedObjectReference
+// This method is only useful for looking up the InventoryPath of a ManagedObjectReference.
+func (f *Finder) Element(ctx context.Context, ref types.ManagedObjectReference) (*list.Element, error) {
+	rl := func(_ context.Context) (object.Reference, error) {
+		return ref, nil
+	}
+
+	e, err := f.find(ctx, rl, false, ".")
+	if err != nil {
+		return nil, err
+	}
+
+	if len(e) == 0 {
+		return nil, &NotFoundError{ref.Type, ref.Value}
+	}
+
+	if len(e) > 1 {
+		panic("ManagedObjectReference must be unique")
+	}
+
+	return &e[0], nil
+}
+
+// ObjectReference converts the given ManagedObjectReference to a type from the object package via object.NewReference
+// with the object.Common.InventoryPath field set.
+func (f *Finder) ObjectReference(ctx context.Context, ref types.ManagedObjectReference) (object.Reference, error) {
+	e, err := f.Element(ctx, ref)
+	if err != nil {
+		return nil, err
+	}
+
+	r := object.NewReference(f.client, ref)
+
+	type common interface {
+		SetInventoryPath(string)
+	}
+
+	r.(common).SetInventoryPath(e.Path)
+
+	return r, nil
+}
+
 func (f *Finder) ManagedObjectList(ctx context.Context, path string) ([]list.Element, error) {
 	return f.managedObjectList(ctx, path, false)
 }
@@ -210,7 +253,9 @@ func (f *Finder) DatacenterList(ctx context.Context, path string) ([]*object.Dat
 	for _, e := range es {
 		ref := e.Object.Reference()
 		if ref.Type == "Datacenter" {
-			dcs = append(dcs, object.NewDatacenter(f.client, ref))
+			dc := object.NewDatacenter(f.client, ref)
+			dc.InventoryPath = e.Path
+			dcs = append(dcs, dc)
 		}
 	}
 
@@ -772,7 +817,7 @@ func (f *Finder) FolderList(ctx context.Context, path string) ([]*object.Folder,
 
 	for _, e := range es {
 		switch o := e.Object.(type) {
-		case mo.Folder:
+		case mo.Folder, mo.StoragePod:
 			folder := object.NewFolder(f.client, o.Reference())
 			folder.InventoryPath = e.Path
 			folders = append(folders, folder)

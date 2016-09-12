@@ -9,10 +9,8 @@ Change _$USER_ below to your github username if they are not the same.
 
 ``` shell
 export GOPATH=$HOME/govmomi
-mkdir -p $GOPATH/src/github.com/vmware
-cd $GOPATH/src/github.com/vmware
-git clone git@github.com:vmware/govmomi.git
-cd govmomi
+go get github.com/vmware/govmomi
+cd $GOPATH/src/github.com/vmware/govmomi
 git config push.default nothing # anything to avoid pushing to vmware/govmomi by default
 git remote rename origin vmware
 git remote add $USER git@github.com:$USER/govmomi.git
@@ -26,6 +24,7 @@ This is a rough outline of what a contributor's workflow looks like:
 - Create a topic branch from where you want to base your work.
 - Make commits of logical units.
 - Make sure your commit messages are in the proper format (see below).
+- Update CHANGELOG.md and/or govc/CHANGELOG.md when appropriate.
 - Push your changes to a topic branch in your fork of the repository.
 - Submit a pull request to vmware/govmomi.
 

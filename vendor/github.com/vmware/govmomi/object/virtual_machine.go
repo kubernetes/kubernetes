@@ -18,7 +18,6 @@ package object
 
 import (
 	"errors"
-	"fmt"
 	"net"
 
 	"github.com/vmware/govmomi/property"
@@ -35,32 +34,12 @@ const (
 
 type VirtualMachine struct {
 	Common
-
-	InventoryPath string
-}
-
-func (v VirtualMachine) String() string {
-	if v.InventoryPath == "" {
-		return v.Common.String()
-	}
-	return fmt.Sprintf("%v @ %v", v.Common, v.InventoryPath)
 }
 
 func NewVirtualMachine(c *vim25.Client, ref types.ManagedObjectReference) *VirtualMachine {
 	return &VirtualMachine{
 		Common: NewCommon(c, ref),
 	}
-}
-
-func (v VirtualMachine) Name(ctx context.Context) (string, error) {
-	var o mo.VirtualMachine
-
-	err := v.Properties(ctx, v.Reference(), []string{"name"}, &o)
-	if err != nil {
-		return "", err
-	}
-
-	return o.Name, nil
 }
 
 func (v VirtualMachine) PowerState(ctx context.Context) (types.VirtualMachinePowerState, error) {

@@ -33,6 +33,21 @@ func NewHostDatastoreSystem(c *vim25.Client, ref types.ManagedObjectReference) *
 	}
 }
 
+func (s HostDatastoreSystem) CreateLocalDatastore(ctx context.Context, name string, path string) (*Datastore, error) {
+	req := types.CreateLocalDatastore{
+		This: s.Reference(),
+		Name: name,
+		Path: path,
+	}
+
+	res, err := methods.CreateLocalDatastore(ctx, s.Client(), &req)
+	if err != nil {
+		return nil, err
+	}
+
+	return NewDatastore(s.Client(), res.Returnval), nil
+}
+
 func (s HostDatastoreSystem) CreateNasDatastore(ctx context.Context, spec types.HostNasVolumeSpec) (*Datastore, error) {
 	req := types.CreateNasDatastore{
 		This: s.Reference(),

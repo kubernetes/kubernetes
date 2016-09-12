@@ -19,10 +19,12 @@ package object
 import (
 	"errors"
 	"fmt"
+	"path"
 
 	"github.com/vmware/govmomi/property"
 	"github.com/vmware/govmomi/vim25"
 	"github.com/vmware/govmomi/vim25/methods"
+	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/types"
 	"golang.org/x/net/context"
 )
@@ -33,12 +35,20 @@ var (
 
 // Common contains the fields and functions common to all objects.
 type Common struct {
+	InventoryPath string
+
 	c *vim25.Client
 	r types.ManagedObjectReference
 }
 
 func (c Common) String() string {
-	return fmt.Sprintf("%v", c.Reference())
+	ref := fmt.Sprintf("%v", c.Reference())
+
+	if c.InventoryPath == "" {
+		return ref
+	}
+
+	return fmt.Sprintf("%s @ %s", ref, c.InventoryPath)
 }
 
 func NewCommon(c *vim25.Client, r types.ManagedObjectReference) Common {
@@ -51,6 +61,36 @@ func (c Common) Reference() types.ManagedObjectReference {
 
 func (c Common) Client() *vim25.Client {
 	return c.c
+}
+
+// Name returns the base name of the InventoryPath field
+func (c Common) Name() string {
+	if c.InventoryPath == "" {
+		return ""
+	}
+	return path.Base(c.InventoryPath)
+}
+
+func (c *Common) SetInventoryPath(p string) {
+	c.InventoryPath = p
+}
+
+// ObjectName returns the base name of the InventoryPath field if set,
+// otherwise fetches the mo.ManagedEntity.Name field via the property collector.
+func (c Common) ObjectName(ctx context.Context) (string, error) {
+	var o mo.ManagedEntity
+
+	name := c.Name()
+	if name != "" {
+		return name, nil
+	}
+
+	err := c.Properties(ctx, c.Reference(), []string{"name"}, &o)
+	if err != nil {
+		return "", err
+	}
+
+	return o.Name, nil
 }
 
 func (c Common) Properties(ctx context.Context, r types.ManagedObjectReference, ps []string, dst interface{}) error {
