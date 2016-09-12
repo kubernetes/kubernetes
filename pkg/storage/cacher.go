@@ -645,6 +645,7 @@ func (c *cacheWatcher) add(event *watchCacheEvent) {
 	default:
 	}
 
+	resultLen := len(c.result)
 	// OK, block sending, but only for up to 5 seconds.
 	// cacheWatcher.add is called very often, so arrange
 	// to reuse timers instead of constantly allocating.
@@ -673,8 +674,8 @@ func (c *cacheWatcher) add(event *watchCacheEvent) {
 		c.forget(false)
 		c.stop()
 	}
-	glog.V(2).Infof("cacheWatcher add function blocked processing of %v for %v",
-		reflect.TypeOf(event.Object).String(), time.Since(startTime))
+	glog.V(2).Infof("cacheWatcher add function blocked processing of %v for %v (initial result size %v)",
+		reflect.TypeOf(event.Object).String(), time.Since(startTime), resultLen)
 }
 
 func (c *cacheWatcher) sendWatchCacheEvent(event watchCacheEvent) {
