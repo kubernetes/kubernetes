@@ -406,9 +406,11 @@ func (dc *DeploymentController) scale(deployment *extensions.Deployment, newRS *
 				}
 			}
 
-			if _, err := dc.scaleReplicaSet(rs, rs.Spec.Replicas, deployment, scalingOperation); err != nil {
+			if updatedRS, err := dc.scaleReplicaSet(rs, rs.Spec.Replicas, deployment, scalingOperation); err != nil {
 				// Return as soon as we fail, the deployment is requeued
 				return err
+			} else {
+				allRSs[i] = updatedRS
 			}
 		}
 	}
@@ -431,14 +433,16 @@ func (dc *DeploymentController) scaleReplicaSetAndRecordEvent(rs *extensions.Rep
 }
 
 func (dc *DeploymentController) scaleReplicaSet(rs *extensions.ReplicaSet, newScale int32, deployment *extensions.Deployment, scalingOperation string) (*extensions.ReplicaSet, error) {
-	// NOTE: This mutates the ReplicaSet passed in. Not sure if that's a good idea.
-	rs.Spec.Replicas = newScale
-	deploymentutil.SetReplicasAnnotations(rs, deployment.Spec.Replicas, deployment.Spec.Replicas+deploymentutil.MaxSurge(*deployment))
-	rs, err := dc.client.Extensions().ReplicaSets(rs.ObjectMeta.Namespace).Update(rs)
-	if err == nil {
+	rsCopy, err := deploymentutil.ReplicaSetDeepCopy(rs)
+	if err != nil {
+		return nil, err
+	}
+	rsCopy.Spec.Replicas = newScale
+	deploymentutil.SetReplicasAnnotations(rsCopy, deployment.Spec.Replicas, deployment.Spec.Replicas+deploymentutil.MaxSurge(*deployment))
+	if rsCopy, err = dc.client.Extensions().ReplicaSets(rsCopy.ObjectMeta.Namespace).Update(rsCopy); err != nil {
 		dc.eventRecorder.Eventf(deployment, api.EventTypeNormal, "ScalingReplicaSet", "Scaled %s replica set %s to %d", scalingOperation, rs.Name, newScale)
 	}
-	return rs, err
+	return rsCopy, err
 }
 
 // cleanupDeployment is responsible for cleaning up a deployment ie. retains all but the latest N old replica sets
