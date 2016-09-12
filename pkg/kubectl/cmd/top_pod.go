@@ -79,6 +79,9 @@ func NewCmdTopPod(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 			if err := options.Complete(f, cmd, args, out); err != nil {
 				cmdutil.CheckErr(err)
 			}
+			if err := options.Validate(); err != nil {
+				cmdutil.CheckErr(cmdutil.UsageError(cmd, err.Error()))
+			}
 			if err := options.RunTopPod(); err != nil {
 				cmdutil.CheckErr(err)
 			}

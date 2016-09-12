@@ -119,6 +119,9 @@ func (o TopNodeOptions) RunTopNode() error {
 	if err != nil {
 		return err
 	}
+	if len(metrics) == 0 {
+		return errors.New("metrics not available yet")
+	}
 
 	var nodes []api.Node
 	if len(o.ResourceName) > 0 {
