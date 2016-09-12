@@ -465,15 +465,6 @@ func (nc *NodeController) Run() {
 			})
 		}
 	}, nodeEvictionPeriod, wait.NeverStop)
-
-	go wait.Until(func() {
-		pods, err := nc.podStore.List(labels.Everything())
-		if err != nil {
-			utilruntime.HandleError(err)
-			return
-		}
-		cleanupOrphanedPods(pods, nc.nodeStore.Store, nc.forcefullyDeletePod)
-	}, 30*time.Second, wait.NeverStop)
 }
 
 // monitorNodeStatus verifies node status are constantly updated by kubelet, and if not,
@@ -512,7 +503,6 @@ func (nc *NodeController) monitorNodeStatus() error {
 	for i := range deleted {
 		glog.V(1).Infof("NodeController observed a Node deletion: %v", deleted[i].Name)
 		recordNodeEvent(nc.recorder, deleted[i].Name, string(deleted[i].UID), api.EventTypeNormal, "RemovingNode", fmt.Sprintf("Removing Node %v from NodeController", deleted[i].Name))
-		nc.evictPods(deleted[i])
 		delete(nc.knownNodeSet, deleted[i].Name)
 	}
 
