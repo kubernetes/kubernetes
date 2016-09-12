@@ -111,7 +111,7 @@ func (proxier *Proxier) closeOnePortal(portal portal, protocol api.Protocol, pro
 func (proxier *Proxier) closeNodePort(nodePort int, protocol api.Protocol, proxyIP net.IP, proxyPort int, name proxy.ServicePortName) []error {
 	el := []error{}
 
-	args := proxier.netshPortProxyDeleteArgs(localhostIPv4, nodePort, proxyIP, proxyPort, name)
+	args := proxier.netshPortProxyDeleteArgs(nil, nodePort, proxyIP, proxyPort, name)
 	if err := proxier.netsh.DeletePortProxyRule(args); err != nil {
 		glog.Errorf("Failed to delete portproxy rule for service %q", name)
 		el = append(el, err)
