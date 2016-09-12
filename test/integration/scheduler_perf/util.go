@@ -44,7 +44,7 @@ import (
 // Notes on rate limiter:
 //   - client rate limit is set to 5000.
 func mustSetupScheduler() (schedulerConfigFactory *factory.ConfigFactory, destroyFunc func()) {
-	framework.DeleteAllEtcdKeys()
+	// framework.DeleteAllEtcdKeys()
 
 	var m *master.Master
 	masterConfig := framework.NewIntegrationTestMasterConfig()

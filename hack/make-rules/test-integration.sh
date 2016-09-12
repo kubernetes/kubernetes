@@ -42,6 +42,7 @@ kube::test::find_integration_test_dirs() {
     cd ${KUBE_ROOT}
     find test/integration/${1-} -name '*_test.go' -print0 \
       | xargs -0n1 dirname \
+      | uniq \
       | sort -u
   )
 }
@@ -63,6 +64,8 @@ runTests() {
       WHAT="$(kube::test::find_integration_test_dirs ${2-} | paste -sd' ' -)" \
       KUBE_GOFLAGS="${KUBE_GOFLAGS:-} -tags 'integration no-docker'" \
       KUBE_TEST_ARGS="${KUBE_TEST_ARGS:-} --vmodule=garbage*collector*=6 --alsologtostderr=true" \
+      # send the short directive so that long running tests can just integration compile and move on.
+      KUBE_GOFLAGS="${KUBE_GOFLAGS:-} -tags 'integration no-docker' -short 'true'" \
       KUBE_RACE="" \
       KUBE_TIMEOUT="${KUBE_TIMEOUT}" \
       KUBE_TEST_API_VERSIONS="$1"
