@@ -1,27 +1,23 @@
-apiVersion: extensions/v1beta1
-kind: Deployment
+apiVersion: v1
+kind: ReplicationController
 metadata:
-  name: kube-dns-v19
+  name: kube-dns-v15
   namespace: kube-system
   labels:
     k8s-app: kube-dns
-    version: v19
+    version: v15
     kubernetes.io/cluster-service: "true"
 spec:
   replicas: ${DNS_REPLICAS}
   selector:
-    matchLabels:
-      k8s-app: kube-dns
-      version: v19
+    k8s-app: kube-dns
+    version: v15
   template:
     metadata:
       labels:
         k8s-app: kube-dns
-        version: v19
+        version: v15
         kubernetes.io/cluster-service: "true"
-      annotations:
-        scheduler.alpha.kubernetes.io/critical-pod: ''
-        scheduler.alpha.kubernetes.io/tolerations: '[{"key":"CriticalAddonsOnly", "operator":"Exists"}]'
     spec:
       containers:
       - name: kubedns
@@ -67,7 +63,7 @@ spec:
           name: dns-tcp-local
           protocol: TCP
       - name: dnsmasq
-        image: gcr.io/google_containers/kube-dnsmasq-amd64:1.3
+        image: gcr.io/google_containers/dnsmasq:1.1
         args:
         - --cache-size=1000
         - --no-resolv
@@ -80,23 +76,18 @@ spec:
           name: dns-tcp
           protocol: TCP
       - name: healthz
-        image: gcr.io/google_containers/exechealthz-amd64:1.1
+        image: gcr.io/google_containers/exechealthz-amd64:1.0
         resources:
           # keep request = limit to keep this container in guaranteed class
           limits:
             cpu: 10m
-            memory: 50Mi
+            memory: 20Mi
           requests:
             cpu: 10m
-            # Note that this container shouldn't really need 50Mi of memory. The
-            # limits are set higher than expected pending investigation on #29688.
-            # The extra memory was stolen from the kubedns container to keep the
-            # net memory requested by the pod constant.
-            memory: 50Mi
+            memory: 20Mi
         args:
-        - -cmd=nslookup kubernetes.default.svc.${DNS_DOMAIN} 127.0.0.1 >/dev/null && nslookup kubernetes.default.svc.${DNS_DOMAIN} 127.0.0.1:10053 >/dev/null
+        - -cmd=nslookup kubernetes.default.svc.${DNS_DOMAIN} 127.0.0.1 >/dev/null
         - -port=8080
-        - -quiet
         ports:
         - containerPort: 8080
           protocol: TCP
