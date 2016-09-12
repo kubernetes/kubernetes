@@ -30,7 +30,7 @@ import (
 )
 
 const (
-	testImageRootUid    = "gcr.io/google_containers/mounttest:0.5"
+	testImageRootUid    = "gcr.io/google_containers/mounttest:0.7"
 	testImageNonRootUid = "gcr.io/google_containers/mounttest-user:0.3"
 )
 
