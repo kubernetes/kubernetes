@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/unversioned/portforward"
 	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 )
 
 // PortForwardOptions contains all the options for running the port-forward cli command.
@@ -147,18 +148,19 @@ func (o *PortForwardOptions) Complete(f *cmdutil.Factory, cmd *cobra.Command, ar
 
 // Validate validates all the required options for port-forward cmd.
 func (o PortForwardOptions) Validate() error {
+	var errors []error
 	if len(o.PodName) == 0 {
-		return fmt.Errorf("pod name must be specified")
+		errors = append(errors, fmt.Errorf("pod name must be specified"))
 	}
 
 	if len(o.Ports) < 1 {
-		return fmt.Errorf("at least 1 PORT is required for port-forward")
+		errors = append(errors, fmt.Errorf("at least 1 PORT is required for port-forward"))
 	}
 
 	if o.PortForwarder == nil || o.Client == nil || o.Config == nil {
-		return fmt.Errorf("client, client config, and portforwarder must be provided")
+		errors = append(errors, fmt.Errorf("client, client config, and portforwarder must be provided"))
 	}
-	return nil
+	return utilerrors.NewAggregate(errors)
 }
 
 // RunPortForward implements all the necessary functionality for port-forward cmd.
