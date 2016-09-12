@@ -30,9 +30,6 @@ import (
 // If you need to start an etcd instance by hand, you also need to insert a key
 // for this check to pass (*any* key will do, eg:
 //curl -L http://127.0.0.1:2379/v2/keys/message -XPUT -d value="Hello world").
-func init() {
-	RequireEtcd()
-}
 
 func GetEtcdURLFromEnv() string {
 	url := env.GetEnvAsStringOrFallback("KUBE_INTEGRATION_ETCD_URL", "http://127.0.0.1:2379")
@@ -41,6 +38,9 @@ func GetEtcdURLFromEnv() string {
 }
 
 func NewEtcdClient() etcd.Client {
+	// Before doing anything else, make sure etcd is available.
+	RequireEtcd()
+
 	cfg := etcd.Config{
 		Endpoints: []string{GetEtcdURLFromEnv()},
 	}
