@@ -19,6 +19,8 @@ package dockershim
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 )
 
@@ -33,9 +35,8 @@ func TestConvertDockerStatusToRuntimeAPIState(t *testing.T) {
 		{input: "Random string", expected: runtimeApi.ContainerState_UNKNOWN},
 	}
 
-	for i, test := range testCases {
-		if actual := toRuntimeAPIContainerState(test.input); actual != test.expected {
-			t.Errorf("Test[%d]: expected %q, got %q", i, test.expected, actual)
-		}
+	for _, test := range testCases {
+		actual := toRuntimeAPIContainerState(test.input)
+		assert.Equal(t, test.expected, actual)
 	}
 }

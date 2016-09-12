@@ -17,43 +17,74 @@ limitations under the License.
 package dockershim
 
 import (
+	"fmt"
 	"testing"
 
 	dockertypes "github.com/docker/engine-api/types"
+	"github.com/stretchr/testify/assert"
 
 	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 )
 
-func TestCreateSandbox(t *testing.T) {
-	ds, fakeDocker := newTestDockerSevice()
-	name := "FOO"
-	namespace := "BAR"
-	uid := "1"
-	config := &runtimeApi.PodSandboxConfig{
+// A helper to create a basic config.
+func makeSandboxConfig(name, namespace, uid string, attempt uint32) *runtimeApi.PodSandboxConfig {
+	return &runtimeApi.PodSandboxConfig{
 		Metadata: &runtimeApi.PodSandboxMetadata{
 			Name:      &name,
 			Namespace: &namespace,
 			Uid:       &uid,
+			Attempt:   &attempt,
 		},
 	}
+}
+
+// TestRunSandbox tests that RunSandbox creates and starts a container
+// acting a the sandbox for the pod.
+func TestRunSandbox(t *testing.T) {
+	ds, fakeDocker := newTestDockerSevice()
+	config := makeSandboxConfig("foo", "bar", "1", 0)
 	id, err := ds.RunPodSandbox(config)
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-	if err := fakeDocker.AssertStarted([]string{id}); err != nil {
-		t.Errorf("%v", err)
-	}
+	assert.NoError(t, err)
+	assert.NoError(t, fakeDocker.AssertStarted([]string{id}))
 
 	// List running containers and verify that there is one (and only one)
 	// running container that we just created.
 	containers, err := fakeDocker.ListContainers(dockertypes.ContainerListOptions{All: false})
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
+	assert.NoError(t, err)
+	assert.Len(t, containers, 1)
+	assert.Equal(t, id, containers[0].ID)
+}
+
+// TestListSandboxes creates several sandboxes and then list them to check
+// whether the correct metadatas, states, and labels are returned.
+func TestListSandboxes(t *testing.T) {
+	ds, _ := newTestDockerSevice()
+	name, namespace := "foo", "bar"
+	configs := []*runtimeApi.PodSandboxConfig{}
+	for i := 0; i < 3; i++ {
+		c := makeSandboxConfig(fmt.Sprintf("%s%d", name, i),
+			fmt.Sprintf("%s%d", namespace, i), fmt.Sprintf("%d", i), 0)
+		configs = append(configs, c)
 	}
-	if len(containers) != 1 {
-		t.Errorf("More than one running containers: %+v", containers)
+
+	expected := []*runtimeApi.PodSandbox{}
+	state := runtimeApi.PodSandBoxState_READY
+	var createdAt int64 = 0
+	for i := range configs {
+		id, err := ds.RunPodSandbox(configs[i])
+		assert.NoError(t, err)
+		// Prepend to the expected list because ListPodSandbox returns
+		// the most recent sandbox first.
+		expected = append([]*runtimeApi.PodSandbox{{
+			Metadata:  configs[i].Metadata,
+			Id:        &id,
+			State:     &state,
+			Labels:    map[string]string{containerTypeLabelKey: containerTypeLabelSandbox},
+			CreatedAt: &createdAt,
+		}}, expected...)
 	}
-	if containers[0].ID != id {
-		t.Errorf("Expected id %q, got %v", id, containers[0].ID)
-	}
+	sandboxes, err := ds.ListPodSandbox(nil)
+	assert.NoError(t, err)
+	assert.Len(t, sandboxes, len(expected))
+	assert.Equal(t, expected, sandboxes)
 }
