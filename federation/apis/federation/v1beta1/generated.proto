@@ -95,7 +95,7 @@ message ClusterStatus {
   // Conditions is an array of current cluster conditions.
   repeated ClusterCondition conditions = 1;
 
-  // Zones is the list of avaliability zones in which the nodes of the cluster exist, e.g. 'us-east1-a'.
+  // Zones is the list of availability zones in which the nodes of the cluster exist, e.g. 'us-east1-a'.
   // These will always be in the same region.
   repeated string zones = 5;
 
