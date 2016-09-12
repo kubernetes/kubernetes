@@ -696,7 +696,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 					framework.Failf("Wrong service port: %d", port.Port)
 				}
 				if port.TargetPort.IntValue() != redisPort {
-					framework.Failf("Wrong target port: %d")
+					framework.Failf("Wrong target port: %d", port.TargetPort.IntValue())
 				}
 			}
 
