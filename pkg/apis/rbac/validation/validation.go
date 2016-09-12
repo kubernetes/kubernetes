@@ -103,11 +103,17 @@ func ValidateRoleBinding(roleBinding *rbac.RoleBinding) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, validation.ValidateObjectMeta(&roleBinding.ObjectMeta, true, minimalNameRequirements, field.NewPath("metadata"))...)
 
-	// roleRef namespace is empty when referring to global policy.
-	if len(roleBinding.RoleRef.Namespace) > 0 {
-		for _, msg := range validation.ValidateNamespaceName(roleBinding.RoleRef.Namespace, false) {
-			allErrs = append(allErrs, field.Invalid(field.NewPath("roleRef", "namespace"), roleBinding.RoleRef.Namespace, msg))
-		}
+	// TODO allow multiple API groups.  For now, restrict to one, but I can envision other experimental roles in other groups taking
+	// advantage of the binding infrastructure
+	if roleBinding.RoleRef.APIGroup != rbac.GroupName {
+		allErrs = append(allErrs, field.NotSupported(field.NewPath("roleRef", "apiGroup"), roleBinding.RoleRef.APIGroup, []string{rbac.GroupName}))
+	}
+
+	switch roleBinding.RoleRef.Kind {
+	case "Role", "ClusterRole":
+	default:
+		allErrs = append(allErrs, field.NotSupported(field.NewPath("roleRef", "kind"), roleBinding.RoleRef.Kind, []string{"Role", "ClusterRole"}))
+
 	}
 
 	if len(roleBinding.RoleRef.Name) == 0 {
@@ -141,11 +147,17 @@ func ValidateClusterRoleBinding(roleBinding *rbac.ClusterRoleBinding) field.Erro
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, validation.ValidateObjectMeta(&roleBinding.ObjectMeta, false, minimalNameRequirements, field.NewPath("metadata"))...)
 
-	// roleRef namespace is empty when referring to global policy.
-	if len(roleBinding.RoleRef.Namespace) > 0 {
-		for _, msg := range validation.ValidateNamespaceName(roleBinding.RoleRef.Namespace, false) {
-			allErrs = append(allErrs, field.Invalid(field.NewPath("roleRef", "namespace"), roleBinding.RoleRef.Namespace, msg))
-		}
+	// TODO allow multiple API groups.  For now, restrict to one, but I can envision other experimental roles in other groups taking
+	// advantage of the binding infrastructure
+	if roleBinding.RoleRef.APIGroup != rbac.GroupName {
+		allErrs = append(allErrs, field.NotSupported(field.NewPath("roleRef", "apiGroup"), roleBinding.RoleRef.APIGroup, []string{rbac.GroupName}))
+	}
+
+	switch roleBinding.RoleRef.Kind {
+	case "ClusterRole":
+	default:
+		allErrs = append(allErrs, field.NotSupported(field.NewPath("roleRef", "kind"), roleBinding.RoleRef.Kind, []string{"ClusterRole"}))
+
 	}
 
 	if len(roleBinding.RoleRef.Name) == 0 {
