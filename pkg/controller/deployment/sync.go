@@ -101,20 +101,22 @@ func (dc *DeploymentController) rsAndPodsWithHashKeySynced(deployment *extension
 		return nil, nil, fmt.Errorf("error listing ReplicaSets: %v", err)
 	}
 	syncedRSList := []*extensions.ReplicaSet{}
+	syncedPodList := &api.PodList{Items: []api.Pod{}}
 	for _, rs := range rsList {
 		// Add pod-template-hash information if it's not in the RS.
 		// Otherwise, new RS produced by Deployment will overlap with pre-existing ones
 		// that aren't constrained by the pod-template-hash.
-		syncedRS, err := dc.addHashKeyToRSAndPods(rs)
+		syncedRS, syncedPods, err := dc.addHashKeyToRSAndPods(rs)
 		if err != nil {
 			return nil, nil, err
 		}
 		syncedRSList = append(syncedRSList, syncedRS)
+		if syncedPods != nil {
+			syncedPodList.Items = append(syncedPodList.Items, syncedPods.Items...)
+		}
 	}
-	syncedPodList, err := dc.listPods(deployment)
-	if err != nil {
-		return nil, nil, err
-	}
+	// if we failed to get list of pods when adding hash but we got syncedRSList, attempt to
+	// list the pods for the deployment.
 	return syncedRSList, syncedPodList, nil
 }
 
@@ -122,16 +124,16 @@ func (dc *DeploymentController) rsAndPodsWithHashKeySynced(deployment *extension
 // 1. Add hash label to the rs's pod template, and make sure the controller sees this update so that no orphaned pods will be created
 // 2. Add hash label to all pods this rs owns, wait until replicaset controller reports rs.Status.FullyLabeledReplicas equal to the desired number of replicas
 // 3. Add hash label to the rs's label and selector
-func (dc *DeploymentController) addHashKeyToRSAndPods(rs *extensions.ReplicaSet) (updatedRS *extensions.ReplicaSet, err error) {
+func (dc *DeploymentController) addHashKeyToRSAndPods(rs *extensions.ReplicaSet) (*extensions.ReplicaSet, *api.PodList, error) {
 	objCopy, err := api.Scheme.Copy(rs)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	updatedRS = objCopy.(*extensions.ReplicaSet)
+	updatedRS := objCopy.(*extensions.ReplicaSet)
 
 	// If the rs already has the new hash label in its selector, it's done syncing
 	if labelsutil.SelectorHasLabel(rs.Spec.Selector, extensions.DefaultDeploymentUniqueLabelKey) {
-		return
+		return nil, nil, nil
 	}
 	namespace := rs.Namespace
 	hash := rsutil.GetPodTemplateSpecHash(rs)
@@ -147,17 +149,17 @@ func (dc *DeploymentController) addHashKeyToRSAndPods(rs *extensions.ReplicaSet)
 			return nil
 		})
 	if err != nil {
-		return nil, fmt.Errorf("error updating %s %s/%s pod template label with template hash: %v", updatedRS.Kind, updatedRS.Namespace, updatedRS.Name, err)
+		return nil, nil, fmt.Errorf("error updating %s %s/%s pod template label with template hash: %v", updatedRS.Kind, updatedRS.Namespace, updatedRS.Name, err)
 	}
 	if !rsUpdated {
 		// If RS wasn't updated but didn't return error in step 1, we've hit a RS not found error.
 		// Return here and retry in the next sync loop.
-		return rs, nil
+		return rs, nil, nil
 	}
 	// Make sure rs pod template is updated so that it won't create pods without the new label (orphaned pods).
 	if updatedRS.Generation > updatedRS.Status.ObservedGeneration {
 		if err = deploymentutil.WaitForReplicaSetUpdated(dc.client, updatedRS.Generation, namespace, updatedRS.Name); err != nil {
-			return nil, fmt.Errorf("error waiting for %s %s/%s generation %d observed by controller: %v", updatedRS.Kind, updatedRS.Namespace, updatedRS.Name, updatedRS.Generation, err)
+			return nil, nil, fmt.Errorf("error waiting for %s %s/%s generation %d observed by controller: %v", updatedRS.Kind, updatedRS.Namespace, updatedRS.Name, updatedRS.Generation, err)
 		}
 	}
 	glog.V(4).Infof("Observed the update of %s %s/%s's pod template with hash %s.", rs.Kind, rs.Namespace, rs.Name, hash)
@@ -165,12 +167,12 @@ func (dc *DeploymentController) addHashKeyToRSAndPods(rs *extensions.ReplicaSet)
 	// 2. Update all pods managed by the rs to have the new hash label, so they will be correctly adopted.
 	selector, err := unversioned.LabelSelectorAsSelector(updatedRS.Spec.Selector)
 	if err != nil {
-		return nil, fmt.Errorf("error in converting selector to label selector for replica set %s: %s", updatedRS.Name, err)
+		return nil, nil, fmt.Errorf("error in converting selector to label selector for replica set %s: %s", updatedRS.Name, err)
 	}
 	options := api.ListOptions{LabelSelector: selector}
 	pods, err := dc.podLister.Pods(namespace).List(options.LabelSelector)
 	if err != nil {
-		return nil, fmt.Errorf("error in getting pod list for namespace %s and list options %+v: %s", namespace, options, err)
+		return nil, nil, fmt.Errorf("error in getting pod list for namespace %s and list options %+v: %s", namespace, options, err)
 	}
 	podList := api.PodList{Items: make([]api.Pod, 0, len(pods))}
 	for i := range pods {
@@ -178,12 +180,12 @@ func (dc *DeploymentController) addHashKeyToRSAndPods(rs *extensions.ReplicaSet)
 	}
 	allPodsLabeled := false
 	if allPodsLabeled, err = deploymentutil.LabelPodsWithHash(&podList, updatedRS, dc.client, namespace, hash); err != nil {
-		return nil, fmt.Errorf("error in adding template hash label %s to pods %+v: %s", hash, podList, err)
+		return nil, nil, fmt.Errorf("error in adding template hash label %s to pods %+v: %s", hash, podList, err)
 	}
 	// If not all pods are labeled but didn't return error in step 2, we've hit at least one pod not found error.
 	// Return here and retry in the next sync loop.
 	if !allPodsLabeled {
-		return updatedRS, nil
+		return updatedRS, nil, nil
 	}
 
 	// We need to wait for the replicaset controller to observe the pods being
@@ -192,7 +194,7 @@ func (dc *DeploymentController) addHashKeyToRSAndPods(rs *extensions.ReplicaSet)
 	// FullyLabeledReplicas to 0 already, we only need to wait it to increase
 	// back to the number of replicas in the spec.
 	if err = deploymentutil.WaitForPodsHashPopulated(dc.client, updatedRS.Generation, namespace, updatedRS.Name); err != nil {
-		return nil, fmt.Errorf("%s %s/%s: error waiting for replicaset controller to observe pods being labeled with template hash: %v", updatedRS.Kind, updatedRS.Namespace, updatedRS.Name, err)
+		return nil, nil, fmt.Errorf("%s %s/%s: error waiting for replicaset controller to observe pods being labeled with template hash: %v", updatedRS.Kind, updatedRS.Namespace, updatedRS.Name, err)
 	}
 
 	// 3. Update rs label and selector to include the new hash label
@@ -207,7 +209,7 @@ func (dc *DeploymentController) addHashKeyToRSAndPods(rs *extensions.ReplicaSet)
 			updated.Spec.Selector = labelsutil.AddLabelToSelector(updated.Spec.Selector, extensions.DefaultDeploymentUniqueLabelKey, hash)
 			return nil
 		}); err != nil {
-		return nil, fmt.Errorf("error updating %s %s/%s label and selector with template hash: %v", updatedRS.Kind, updatedRS.Namespace, updatedRS.Name, err)
+		return nil, nil, fmt.Errorf("error updating %s %s/%s label and selector with template hash: %v", updatedRS.Kind, updatedRS.Namespace, updatedRS.Name, err)
 	}
 	if rsUpdated {
 		glog.V(4).Infof("Updated %s %s/%s's selector and label with hash %s.", rs.Kind, rs.Namespace, rs.Name, hash)
@@ -216,7 +218,7 @@ func (dc *DeploymentController) addHashKeyToRSAndPods(rs *extensions.ReplicaSet)
 
 	// TODO: look for orphaned pods and label them in the background somewhere else periodically
 
-	return updatedRS, nil
+	return updatedRS, &podList, nil
 }
 
 func (dc *DeploymentController) listPods(deployment *extensions.Deployment) (*api.PodList, error) {

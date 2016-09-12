@@ -554,7 +554,7 @@ func FindOldReplicaSets(deployment *extensions.Deployment, rsList []*extensions.
 
 // WaitForReplicaSetUpdated polls the replica set until it is updated.
 func WaitForReplicaSetUpdated(c clientset.Interface, desiredGeneration int64, namespace, name string) error {
-	return wait.Poll(10*time.Millisecond, 1*time.Minute, func() (bool, error) {
+	return wait.PollImmediate(10*time.Millisecond, 1*time.Minute, func() (bool, error) {
 		rs, err := c.Extensions().ReplicaSets(namespace).Get(name)
 		if err != nil {
 			return false, err
@@ -565,7 +565,7 @@ func WaitForReplicaSetUpdated(c clientset.Interface, desiredGeneration int64, na
 
 // WaitForPodsHashPopulated polls the replica set until updated and fully labeled.
 func WaitForPodsHashPopulated(c clientset.Interface, desiredGeneration int64, namespace, name string) error {
-	return wait.Poll(1*time.Second, 1*time.Minute, func() (bool, error) {
+	return wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
 		rs, err := c.Extensions().ReplicaSets(namespace).Get(name)
 		if err != nil {
 			return false, err
