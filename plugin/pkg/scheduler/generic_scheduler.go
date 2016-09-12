@@ -255,7 +255,7 @@ func PrioritizeNodes(
 		errs = append(errs, err)
 	}
 
-	meta := priorities.PriorityMetadata(pod, nodes)
+	meta := priorities.PriorityMetadata(pod)
 	results := make([]schedulerapi.HostPriorityList, 0, len(priorityConfigs))
 	for range priorityConfigs {
 		results = append(results, nil)
@@ -298,7 +298,7 @@ func PrioritizeNodes(
 		wg.Add(1)
 		go func(index int, config algorithm.PriorityConfig) {
 			defer wg.Done()
-			if err := config.Reduce(results[index]); err != nil {
+			if err := config.Reduce(pod, results[index]); err != nil {
 				appendError(err)
 			}
 		}(i, priorityConfig)
