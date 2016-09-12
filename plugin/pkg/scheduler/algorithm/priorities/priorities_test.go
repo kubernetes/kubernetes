@@ -28,8 +28,6 @@ import (
 	"k8s.io/kubernetes/cmd/libs/go2idl/types"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/util/codeinspector"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
@@ -1041,8 +1039,6 @@ func TestPrioritiesRegistered(t *testing.T) {
 }
 
 func TestNodePreferAvoidPriority(t *testing.T) {
-	label1 := map[string]string{"foo": "bar"}
-	label2 := map[string]string{"bar": "foo"}
 	annotations1 := map[string]string{
 		api.PreferAvoidPodsAnnotationKey: `
 							{
@@ -1094,24 +1090,20 @@ func TestNodePreferAvoidPriority(t *testing.T) {
 			ObjectMeta: api.ObjectMeta{Name: "machine3"},
 		},
 	}
+	trueVar := true
 	tests := []struct {
 		pod          *api.Pod
-		rcs          []api.ReplicationController
-		rss          []extensions.ReplicaSet
 		nodes        []*api.Node
 		expectedList schedulerapi.HostPriorityList
 		test         string
 	}{
 		{
-			pod: &api.Pod{ObjectMeta: api.ObjectMeta{Namespace: "default", Labels: label1}},
-			rcs: []api.ReplicationController{
-				{
-					ObjectMeta: api.ObjectMeta{
-						Namespace: "default",
-						Name:      "foo",
-						UID:       "abcdef123456",
+			pod: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Namespace: "default",
+					OwnerReferences: []api.OwnerReference{
+						{Kind: "ReplicationController", Name: "foo", UID: "abcdef123456", Controller: &trueVar},
 					},
-					Spec: api.ReplicationControllerSpec{Selector: label1},
 				},
 			},
 			nodes:        testNodes,
@@ -1119,49 +1111,48 @@ func TestNodePreferAvoidPriority(t *testing.T) {
 			test:         "pod managed by ReplicationController should avoid a node, this node get lowest priority score",
 		},
 		{
-			pod: &api.Pod{ObjectMeta: api.ObjectMeta{Namespace: "default", Labels: label2}},
-			rss: []extensions.ReplicaSet{
-				{
-					TypeMeta: unversioned.TypeMeta{
-						APIVersion: "v1",
-						Kind:       "ReplicaSet",
+			pod: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Namespace: "default",
+					OwnerReferences: []api.OwnerReference{
+						{Kind: "RandomController", Name: "foo", UID: "abcdef123456", Controller: &trueVar},
 					},
-					ObjectMeta: api.ObjectMeta{
-						Namespace: "default",
-						Name:      "bar",
-						UID:       "qwert12345",
-					},
-					Spec: extensions.ReplicaSetSpec{Selector: &unversioned.LabelSelector{MatchLabels: label2}},
-				},
-			},
-			nodes:        testNodes,
-			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 10}, {Host: "machine2", Score: 0}, {Host: "machine3", Score: 10}},
-			test:         "pod managed by ReplicaSet should avoid a node, this node get lowest priority score",
-		},
-		{
-			pod: &api.Pod{ObjectMeta: api.ObjectMeta{Namespace: "default"}},
-			rcs: []api.ReplicationController{
-				{
-					ObjectMeta: api.ObjectMeta{
-						Namespace: "default",
-						Name:      "foo",
-						UID:       "abcdef123456",
-					},
-					Spec: api.ReplicationControllerSpec{Selector: label1},
 				},
 			},
 			nodes:        testNodes,
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 10}, {Host: "machine2", Score: 10}, {Host: "machine3", Score: 10}},
-			test:         "pod should not avoid these nodes, all nodes get highest priority score",
+			test:         "ownership by random controller should be ignored",
+		},
+		{
+			pod: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Namespace: "default",
+					OwnerReferences: []api.OwnerReference{
+						{Kind: "ReplicationController", Name: "foo", UID: "abcdef123456"},
+					},
+				},
+			},
+			nodes:        testNodes,
+			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 10}, {Host: "machine2", Score: 10}, {Host: "machine3", Score: 10}},
+			test:         "owner without Controller field set should be ignored",
+		},
+		{
+			pod: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Namespace: "default",
+					OwnerReferences: []api.OwnerReference{
+						{Kind: "ReplicaSet", Name: "foo", UID: "qwert12345", Controller: &trueVar},
+					},
+				},
+			},
+			nodes:        testNodes,
+			expectedList: []schedulerapi.HostPriority{{"machine1", 10}, {"machine2", 0}, {"machine3", 10}},
+			test:         "pod managed by ReplicaSet should avoid a node, this node get lowest priority score",
 		},
 	}
 
 	for _, test := range tests {
-		prioritizer := NodePreferAvoidPod{
-			controllerLister: algorithm.FakeControllerLister(test.rcs),
-			replicaSetLister: algorithm.FakeReplicaSetLister(test.rss),
-		}
-		list, err := prioritizer.CalculateNodePreferAvoidPodsPriority(test.pod, map[string]*schedulercache.NodeInfo{}, test.nodes)
+		list, err := CalculateNodePreferAvoidPodsPriority(test.pod, map[string]*schedulercache.NodeInfo{}, test.nodes)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
