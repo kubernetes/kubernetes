@@ -10,6 +10,10 @@ To discuss Gomega and get updates, join the [google group](https://groups.google
 
 Learn more about Ginkgo [here](http://onsi.github.io/ginkgo/)
 
+## Community Matchers
+
+A collection of community matchers is available on the [wiki](https://github.com/onsi/gomega/wiki).
+
 ## License
 
 Gomega is MIT-Licensed
