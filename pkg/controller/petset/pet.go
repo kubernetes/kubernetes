@@ -197,23 +197,26 @@ func (p *apiServerPetClient) Create(pet *pcb) error {
 }
 
 // Update updates the pet in the 'pet' pcb to match the pet in the 'expectedPet' pcb.
+// If the pod object of a pet which to be updated has been changed in server side, we
+// will get the actual value and set pet identity before retries.
 func (p *apiServerPetClient) Update(pet *pcb, expectedPet *pcb) (updateErr error) {
-	var getErr error
 	pc := podClient(p.c, pet.parent.Namespace)
 
-	pod, needsUpdate, err := copyPetID(pet, expectedPet)
-	if err != nil || !needsUpdate {
-		return err
-	}
-	glog.Infof("Resetting pet %v to match PetSet %v spec", pod.Name, pet.parent.Name)
-	for i, p := 0, &pod; ; i++ {
-		_, updateErr = pc.Update(p)
+	for i := 0; ; i++ {
+		updatePod, needsUpdate, err := copyPetID(pet, expectedPet)
+		if err != nil || !needsUpdate {
+			return err
+		}
+		glog.Infof("Resetting pet %v/%v to match PetSet %v spec", pet.pod.Namespace, pet.pod.Name, pet.parent.Name)
+		_, updateErr = pc.Update(&updatePod)
 		if updateErr == nil || i >= updateRetries {
 			return updateErr
 		}
-		if p, getErr = pc.Get(pod.Name); getErr != nil {
+		getPod, getErr := pc.Get(updatePod.Name)
+		if getErr != nil {
 			return getErr
 		}
+		pet.pod = getPod
 	}
 }
 
