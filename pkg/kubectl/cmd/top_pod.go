@@ -18,16 +18,13 @@ package cmd
 
 import (
 	"errors"
-	"fmt"
 	"io"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/metricsutil"
 	"k8s.io/kubernetes/pkg/labels"
 
-	"github.com/golang/glog"
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 )
@@ -79,6 +76,9 @@ func NewCmdTopPod(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 			if err := options.Complete(f, cmd, args, out); err != nil {
 				cmdutil.CheckErr(err)
 			}
+			if err := options.Validate(); err != nil {
+				cmdutil.CheckErr(cmdutil.UsageError(cmd, err.Error()))
+			}
 			if err := options.RunTopPod(); err != nil {
 				cmdutil.CheckErr(err)
 			}
@@ -129,58 +129,15 @@ func (o TopPodOptions) RunTopPod() error {
 		}
 	}
 	metrics, err := o.Client.GetPodMetrics(o.Namespace, o.ResourceName, o.AllNamespaces, selector)
+	if err != nil {
+		return err
+	}
 	// TODO: Refactor this once Heapster becomes the API server.
 	// First we check why no metrics have been received.
 	if len(metrics) == 0 {
 		// If the API server query is successful but all the pods are newly created,
 		// the metrics are probably not ready yet, so we return the error here in the first place.
-		e := verifyEmptyMetrics(o, selector)
-		if e != nil {
-			return e
-		}
-	}
-	if err != nil {
-		return err
+		return errors.New("metrics not available yet")
 	}
 	return o.Printer.PrintPodMetrics(metrics, o.PrintContainers, o.AllNamespaces)
-}
-
-func verifyEmptyMetrics(o TopPodOptions, selector labels.Selector) error {
-	if len(o.ResourceName) > 0 {
-		pod, err := o.Client.Pods(o.Namespace).Get(o.ResourceName)
-		if err != nil {
-			return err
-		}
-		if err := checkPodAge(pod); err != nil {
-			return err
-		}
-	} else {
-		pods, err := o.Client.Pods(o.Namespace).List(api.ListOptions{
-			LabelSelector: selector,
-		})
-		if err != nil {
-			return err
-		}
-		if len(pods.Items) == 0 {
-			return nil
-		}
-		for _, pod := range pods.Items {
-			if err := checkPodAge(&pod); err != nil {
-				return err
-			}
-		}
-	}
-	return errors.New("metrics not available yet")
-}
-
-func checkPodAge(pod *api.Pod) error {
-	age := time.Since(pod.CreationTimestamp.Time)
-	if age > metricsCreationDelay {
-		message := fmt.Sprintf("Metrics not available for pod %s/%s, age: %s", pod.Namespace, pod.Name, age.String())
-		glog.Warningf(message)
-		return errors.New(message)
-	} else {
-		glog.V(2).Infof("Metrics not yet available for pod %s/%s, age: %s", pod.Namespace, pod.Name, age.String())
-		return nil
-	}
 }
