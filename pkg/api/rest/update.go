@@ -55,6 +55,14 @@ type RESTUpdateStrategy interface {
 	AllowUnconditionalUpdate() bool
 }
 
+// RESTBeforeUpdateStrategy is an optional strategy interface that may be implemented
+// to get notified of changes before validation
+type RESTBeforeUpdateStrategy interface {
+	// BeforeUpdate is invoked after PrepareForCreate on the strategy and before Validate.
+	// All field defaulting is provided, but fields may not be valid.
+	BeforeUpdate(ctx api.Context, obj, old runtime.Object) error
+}
+
 // TODO: add other common fields that require global validation.
 func validateCommonFields(obj, old runtime.Object) (field.ErrorList, error) {
 	allErrs := field.ErrorList{}
@@ -97,6 +105,12 @@ func BeforeUpdate(strategy RESTUpdateStrategy, ctx api.Context, obj, old runtime
 
 	// ClusterName is ignored and should not be saved
 	objectMeta.ClusterName = ""
+
+	if before, ok := strategy.(RESTBeforeUpdateStrategy); ok {
+		if err := before.BeforeUpdate(ctx, obj, old); err != nil {
+			return err
+		}
+	}
 
 	// Ensure some common fields, like UID, are validated for all resources.
 	errs, err := validateCommonFields(obj, old)
