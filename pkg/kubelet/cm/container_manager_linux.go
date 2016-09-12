@@ -466,13 +466,14 @@ func (cm *containerManagerImpl) Start(node *api.Node) error {
 		return err
 	}
 	// Don't run a background thread if there are no ensureStateFuncs.
-	numEnsureStateFuncs := 0
+	hasEnsureStateFuncs := false
 	for _, cont := range cm.systemContainers {
 		if cont.ensureStateFunc != nil {
-			numEnsureStateFuncs++
+			hasEnsureStateFuncs = true
+			break
 		}
 	}
-	if numEnsureStateFuncs >= 0 {
+	if hasEnsureStateFuncs {
 		// Run ensure state functions every minute.
 		go wait.Until(func() {
 			for _, cont := range cm.systemContainers {
