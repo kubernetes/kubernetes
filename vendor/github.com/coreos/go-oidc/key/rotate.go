@@ -2,16 +2,14 @@ package key
 
 import (
 	"errors"
+	"log"
 	"time"
 
-	"github.com/coreos/pkg/capnslog"
 	ptime "github.com/coreos/pkg/timeutil"
 	"github.com/jonboulle/clockwork"
 )
 
 var (
-	log = capnslog.NewPackageLogger("github.com/coreos/go-oidc", "key")
-
 	ErrorPrivateKeysExpired = errors.New("private keys have expired")
 )
 
@@ -67,7 +65,6 @@ func (r *PrivateKeyRotator) privateKeySet() (*PrivateKeySet, error) {
 func (r *PrivateKeyRotator) nextRotation() (time.Duration, error) {
 	pks, err := r.privateKeySet()
 	if err == ErrorNoKeys {
-		log.Infof("No keys in private key set; must rotate immediately")
 		return 0, nil
 	}
 	if err != nil {
@@ -94,17 +91,15 @@ func (r *PrivateKeyRotator) Run() chan struct{} {
 	attempt := func() {
 		k, err := r.generateKey()
 		if err != nil {
-			log.Errorf("Failed generating signing key: %v", err)
+			log.Printf("go-oidc: failed generating signing key: %v", err)
 			return
 		}
 
 		exp := r.expiresAt()
 		if err := rotatePrivateKeys(r.repo, k, r.keep, exp); err != nil {
-			log.Errorf("Failed key rotation: %v", err)
+			log.Printf("go-oidc: key rotation failed: %v", err)
 			return
 		}
-
-		log.Infof("Rotated signing keys: id=%s expiresAt=%s", k.ID(), exp)
 	}
 
 	stop := make(chan struct{})
@@ -118,11 +113,10 @@ func (r *PrivateKeyRotator) Run() chan struct{} {
 					break
 				}
 				sleep = ptime.ExpBackoff(sleep, time.Minute)
-				log.Errorf("error getting nextRotation, retrying in %v: %v", sleep, err)
+				log.Printf("go-oidc: error getting nextRotation, retrying in %v: %v", sleep, err)
 				time.Sleep(sleep)
 			}
 
-			log.Infof("will rotate keys in %v", nextRotation)
 			select {
 			case <-r.clock.After(nextRotation):
 				attempt()
