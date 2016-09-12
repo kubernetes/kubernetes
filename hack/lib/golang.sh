@@ -226,7 +226,7 @@ kube::golang::current_platform() {
 # for that platform.
 kube::golang::set_platform_envs() {
   [[ -n ${1-} ]] || {
-    kube::log::error_exit "!!! Internal error.  No platform set in kube::golang::set_platform_envs"
+    kube::log::error_exit "!!! Internal error. No platform set in kube::golang::set_platform_envs"
   }
 
   export GOOS=${platform%/*}
@@ -240,6 +240,7 @@ kube::golang::set_platform_envs() {
     if [[ ${platform} == "linux/arm" ]]; then
       export CGO_ENABLED=1
       export CC=arm-linux-gnueabi-gcc
+      export GOROOT=/usr/local/go_k8s_patched
     elif [[ ${platform} == "linux/arm64" ]]; then
       export CGO_ENABLED=1
       export CC=aarch64-linux-gnu-gcc
@@ -253,6 +254,7 @@ kube::golang::set_platform_envs() {
 kube::golang::unset_platform_envs() {
   unset GOOS
   unset GOARCH
+  unset GOROOT
   unset CGO_ENABLED
   unset CC
 }
@@ -477,13 +479,18 @@ kube::golang::build_binaries_for_platform() {
       kube::golang::fallback_if_stdlib_not_installable;
   fi
 
+  # TODO: Remove this temporary workaround
+  if [[ ${platform} == "linux/arm" ]]; then
+    gcflag_arm_largemode="-largemodel"
+  fi
+
   if [[ -n ${use_go_build:-} ]]; then
     kube::log::progress "    "
     for binary in "${statics[@]:+${statics[@]}}"; do
       local outfile=$(kube::golang::output_filename_for_binary "${binary}" "${platform}")
       CGO_ENABLED=0 go build -o "${outfile}" \
         "${goflags[@]:+${goflags[@]}}" \
-        -gcflags "${gogcflags}" \
+        -gcflags "${gogcflags} ${gcflag_arm_largemode}" \
         -ldflags "${goldflags}" \
         "${binary}"
       kube::log::progress "*"
@@ -492,7 +499,7 @@ kube::golang::build_binaries_for_platform() {
       local outfile=$(kube::golang::output_filename_for_binary "${binary}" "${platform}")
       go build -o "${outfile}" \
         "${goflags[@]:+${goflags[@]}}" \
-        -gcflags "${gogcflags}" \
+        -gcflags "${gogcflags} ${gcflag_arm_largemode}" \
         -ldflags "${goldflags}" \
         "${binary}"
       kube::log::progress "*"
@@ -502,13 +509,13 @@ kube::golang::build_binaries_for_platform() {
     # Use go install.
     if [[ "${#nonstatics[@]}" != 0 ]]; then
       go install "${goflags[@]:+${goflags[@]}}" \
-        -gcflags "${gogcflags}" \
+        -gcflags "${gogcflags} ${gcflag_arm_largemode}" \
         -ldflags "${goldflags}" \
         "${nonstatics[@]:+${nonstatics[@]}}"
     fi
     if [[ "${#statics[@]}" != 0 ]]; then
       CGO_ENABLED=0 go install -installsuffix cgo "${goflags[@]:+${goflags[@]}}" \
-        -gcflags "${gogcflags}" \
+        -gcflags "${gogcflags} ${gcflag_arm_largemode}" \
         -ldflags "${goldflags}" \
         "${statics[@]:+${statics[@]}}"
     fi

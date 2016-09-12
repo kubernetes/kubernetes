@@ -35,7 +35,7 @@ RUN for platform in ${KUBE_CROSSPLATFORMS}; do GOOS=${platform%/*} GOARCH=${plat
 
 # Install g++, then download and install protoc for generating protobuf output
 RUN apt-get update \
-  && apt-get install -y g++ rsync apt-utils file \
+  && apt-get install -y g++ rsync apt-utils file patch \
   && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 RUN mkdir -p /usr/local/src/protobuf \
@@ -77,3 +77,14 @@ RUN export ETCD_VERSION=v2.2.1; \
   && cd /usr/local/src/etcd \
   && curl -fsSL https://github.com/coreos/etcd/releases/download/${ETCD_VERSION}/etcd-${ETCD_VERSION}-linux-amd64.tar.gz | tar -xz \
   && ln -s ../src/etcd/etcd-${ETCD_VERSION}-linux-amd64/etcd /usr/local/bin/
+
+# TODO: Remove the patched GOROOT
+RUN apt-get update && apt-get install patch -y \
+  && mkdir /usr/local/go_k8s_patched \
+  && curl -sSL https://github.com/golang/go/archive/go1.7.1.tar.gz | tar -xz -C /usr/local/go_k8s_patched --strip-components=1
+
+COPY golang-patches/CL28857-go1.7.1-luxas.patch /usr/local/go_k8s_patched/
+RUN cd /usr/local/go_k8s_patched \
+  && patch -p1 < CL28857-go1.7.1-luxas.patch \
+  && cd src \
+  && GOROOT_FINAL=/usr/local/go_k8s_patched GOROOT_BOOTSTRAP=/usr/local/go ./make.bash

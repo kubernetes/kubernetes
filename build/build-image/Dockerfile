@@ -18,7 +18,8 @@ FROM gcr.io/google_containers/kube-cross:KUBE_BUILD_IMAGE_CROSS_TAG
 # Mark this as a kube-build container
 RUN touch /kube-build-image
 
-# TO run as non-root we sometimes need to rebuild go stdlib packages.
+# To run as non-root we sometimes need to rebuild go stdlib packages.
+# TODO: Remove the patched GOROOT
 RUN chmod -R a+rwx /usr/local/go/pkg
 
 # The kubernetes source is expected to be mounted here.  This will be the base
