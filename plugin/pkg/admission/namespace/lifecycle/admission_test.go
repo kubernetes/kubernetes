@@ -47,7 +47,7 @@ func newHandlerForTestWithClock(c clientset.Interface, cacheClock clock.Clock) (
 		return nil, f, err
 	}
 	plugins := []admission.Interface{handler}
-	pluginInitializer := admission.NewPluginInitializer(f)
+	pluginInitializer := admission.NewPluginInitializer(f, nil)
 	pluginInitializer.Initialize(plugins)
 	err = admission.Validate(plugins)
 	return handler, f, err
