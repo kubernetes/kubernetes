@@ -185,7 +185,7 @@ func (nm *NamespaceController) syncNamespaceFromKey(key string) (err error) {
 		return nil
 	}
 	if err != nil {
-		glog.Infof("Unable to retrieve namespace %v from store: %v", key, err)
+		glog.Errorf("Unable to retrieve namespace %v from store: %v", key, err)
 		nm.queue.Add(key)
 		return err
 	}

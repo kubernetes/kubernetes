@@ -62,7 +62,7 @@ func (cc *clusterClientCache) syncEndpoint(key, clusterName string, clusterCache
 	}
 	endpointInterface, exists, err := clusterCache.endpointStore.GetByKey(key)
 	if err != nil {
-		glog.Infof("Did not successfully get %v from store: %v, will retry later", key, err)
+		glog.Errorf("Did not successfully get %v from store: %v, will retry later", key, err)
 		clusterCache.endpointQueue.Add(key)
 		return err
 	}
