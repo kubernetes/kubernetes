@@ -673,7 +673,7 @@ function create-network() {
 #   MASTER_ROOT_DISK_SIZE
 function get-master-root-disk-size() {
   if [[ "${NUM_NODES}" -le "1000" ]]; then
-    export MASTER_ROOT_DISK_SIZE="10"
+    export MASTER_ROOT_DISK_SIZE="20"
   else
     export MASTER_ROOT_DISK_SIZE="50"
   fi
