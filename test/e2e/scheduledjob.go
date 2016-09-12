@@ -37,16 +37,16 @@ const (
 	scheduledJobTimeout = 5 * time.Minute
 )
 
+var (
+	ScheduledJobGroupVersionResource = unversioned.GroupVersionResource{Group: batch.GroupName, Version: "v2alpha1", Resource: "scheduledjobs"}
+	BatchV2Alpha1GroupVersion        = unversioned.GroupVersion{Group: batch.GroupName, Version: "v2alpha1"}
+)
+
 var _ = framework.KubeDescribe("ScheduledJob", func() {
-	options := framework.FrameworkOptions{
-		ClientQPS:    20,
-		ClientBurst:  50,
-		GroupVersion: &unversioned.GroupVersion{Group: batch.GroupName, Version: "v2alpha1"},
-	}
-	f := framework.NewFramework("scheduledjob", options, nil)
+	f := framework.NewDefaultGroupVersionFramework("scheduledjob", BatchV2Alpha1GroupVersion)
 
 	BeforeEach(func() {
-		framework.SkipIfMissingResource(f.ClientPool, unversioned.GroupVersionResource{Group: batch.GroupName, Version: "v2alpha1", Resource: "scheduledjobs"}, f.Namespace.Name)
+		framework.SkipIfMissingResource(f.ClientPool, ScheduledJobGroupVersionResource, f.Namespace.Name)
 	})
 
 	// multiple jobs running at once
