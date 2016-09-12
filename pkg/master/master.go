@@ -306,7 +306,17 @@ func (m *Master) InstallAPIs(c *Config) {
 			glog.Warningf("Problem initializing API group %q, skipping.", group)
 			continue
 		}
-		glog.V(1).Infof("Enabling API group %q.", group)
+		// We need to filter apiGroupInfo.GroupMeta.GroupVersions so that it reflects
+		// what's actually enabled. By default this value contains all versions
+		// registered for a group.
+		groupVersions := []unversioned.GroupVersion{}
+		for _, gv := range apiGroupInfo.GroupMeta.GroupVersions {
+			if c.APIResourceConfigSource.AnyResourcesForVersionEnabled(gv) {
+				glog.V(1).Infof("Enabling API group %q.", gv)
+				groupVersions = append(groupVersions, gv)
+			}
+		}
+		apiGroupInfo.GroupMeta.GroupVersions = groupVersions
 
 		// This is here so that, if the policy group is present, the eviction
 		// subresource handler wil be able to find poddisruptionbudgets
