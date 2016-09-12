@@ -60,6 +60,7 @@ func NewREST(opts generic.RESTOptions) *REST {
 		},
 		PredicateFunc:           storageclass.MatchStorageClasses,
 		QualifiedResource:       storageapi.Resource("storageclasses"),
+		EnableGarbageCollection: opts.EnableGarbageCollection,
 		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
 
 		CreateStrategy:      storageclass.Strategy,

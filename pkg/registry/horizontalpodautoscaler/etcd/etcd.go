@@ -68,6 +68,7 @@ func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
 		// Used to match objects based on labels/fields for list
 		PredicateFunc:           horizontalpodautoscaler.MatchAutoscaler,
 		QualifiedResource:       autoscaling.Resource("horizontalpodautoscalers"),
+		EnableGarbageCollection: opts.EnableGarbageCollection,
 		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
 
 		// Used to validate autoscaler creation
