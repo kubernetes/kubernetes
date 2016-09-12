@@ -21,6 +21,7 @@ package kubenet
 import (
 	"fmt"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/network"
@@ -42,7 +43,7 @@ func (plugin *kubenetNetworkPlugin) Name() string {
 	return "kubenet"
 }
 
-func (plugin *kubenetNetworkPlugin) SetUpPod(namespace string, name string, id kubecontainer.ContainerID) error {
+func (plugin *kubenetNetworkPlugin) SetUpPod(pod *api.Pod, id kubecontainer.ContainerID) error {
 	return fmt.Errorf("Kubenet is not supported in this build")
 }
 

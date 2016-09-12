@@ -2526,7 +2526,7 @@ func TestSyncPodGetsPodIPFromNetworkPlugin(t *testing.T) {
 	// Can be called multiple times due to GetPodStatus
 	fnp.EXPECT().Name().Return("someNetworkPlugin").AnyTimes()
 	fnp.EXPECT().GetPodNetworkStatus("new", "foo", gomock.Any()).Return(&network.PodNetworkStatus{IP: net.ParseIP(fakePodIP)}, nil).AnyTimes()
-	fnp.EXPECT().SetUpPod("new", "foo", gomock.Any()).Return(nil)
+	fnp.EXPECT().SetUpPod(pod, gomock.Any()).Return(nil)
 
 	runSyncPod(t, dm, fakeDocker, pod, nil, false)
 	verifyCalls(t, fakeDocker, []string{

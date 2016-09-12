@@ -205,8 +205,16 @@ func TestCNIPlugin(t *testing.T) {
 		t.Fatalf("Failed to select the desired plugin: %v", err)
 	}
 
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			UID:       "12345678",
+			Name:      "podName",
+			Namespace: "podNamespace",
+		},
+	}
+
 	// Set up the pod
-	err = plug.SetUpPod("podNamespace", "podName", containerID)
+	err = plug.SetUpPod(pod, containerID)
 	if err != nil {
 		t.Errorf("Expected nil: %v", err)
 	}
@@ -223,7 +231,7 @@ func TestCNIPlugin(t *testing.T) {
 	}
 
 	// Get its IP address
-	status, err := plug.GetPodNetworkStatus("podNamespace", "podName", containerID)
+	status, err := plug.GetPodNetworkStatus(pod.Namespace, pod.Name, containerID)
 	if err != nil {
 		t.Errorf("Failed to read pod network status: %v", err)
 	}
@@ -232,12 +240,12 @@ func TestCNIPlugin(t *testing.T) {
 	}
 
 	// Tear it down
-	err = plug.TearDownPod("podNamespace", "podName", containerID)
+	err = plug.TearDownPod(pod.Namespace, pod.Name, containerID)
 	if err != nil {
 		t.Errorf("Expected nil: %v", err)
 	}
 	output, err = ioutil.ReadFile(path.Join(testNetworkConfigPath, pluginName, pluginName+".out"))
-	expectedOutput = "DEL /proc/12345/ns/net podNamespace podName test_infra_container"
+	expectedOutput = fmt.Sprintf("DEL /proc/12345/ns/net %s %s test_infra_container", pod.Namespace, pod.Name)
 	if string(output) != expectedOutput {
 		t.Errorf("Mismatch in expected output for setup hook. Expected '%s', got '%s'", expectedOutput, string(output))
 	}

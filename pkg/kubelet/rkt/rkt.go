@@ -1272,7 +1272,7 @@ func (r *Runtime) setupPodNetwork(pod *api.Pod) (string, string, error) {
 	// Set up networking with the network plugin
 	glog.V(3).Infof("Calling network plugin %s to setup pod for %s", r.networkPlugin.Name(), format.Pod(pod))
 	containerID := kubecontainer.ContainerID{ID: string(pod.UID)}
-	err = r.networkPlugin.SetUpPod(pod.Namespace, pod.Name, containerID)
+	err = r.networkPlugin.SetUpPod(pod, containerID)
 	if err != nil {
 		return "", "", fmt.Errorf("failed to set up pod network: %v", err)
 	}

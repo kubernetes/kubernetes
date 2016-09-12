@@ -26,6 +26,8 @@ import (
 	"github.com/containernetworking/cni/libcni"
 	cnitypes "github.com/containernetworking/cni/pkg/types"
 	"github.com/golang/glog"
+
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/network"
@@ -189,7 +191,7 @@ func (plugin *cniNetworkPlugin) Name() string {
 	return CNIPluginName
 }
 
-func (plugin *cniNetworkPlugin) SetUpPod(namespace string, name string, id kubecontainer.ContainerID) error {
+func (plugin *cniNetworkPlugin) SetUpPod(pod *api.Pod, id kubecontainer.ContainerID) error {
 	if err := plugin.checkInitialized(); err != nil {
 		return err
 	}
@@ -198,13 +200,13 @@ func (plugin *cniNetworkPlugin) SetUpPod(namespace string, name string, id kubec
 		return fmt.Errorf("CNI failed to retrieve network namespace path: %v", err)
 	}
 
-	_, err = plugin.loNetwork.addToNetwork(name, namespace, id, netnsPath)
+	_, err = plugin.loNetwork.addToNetwork(pod.Name, pod.Namespace, id, netnsPath)
 	if err != nil {
 		glog.Errorf("Error while adding to cni lo network: %s", err)
 		return err
 	}
 
-	_, err = plugin.getDefaultNetwork().addToNetwork(name, namespace, id, netnsPath)
+	_, err = plugin.getDefaultNetwork().addToNetwork(pod.Name, pod.Namespace, id, netnsPath)
 	if err != nil {
 		glog.Errorf("Error while adding to cni network: %s", err)
 		return err

@@ -407,30 +407,30 @@ func (plugin *kubenetNetworkPlugin) setup(namespace string, name string, id kube
 	return nil
 }
 
-func (plugin *kubenetNetworkPlugin) SetUpPod(namespace string, name string, id kubecontainer.ContainerID) error {
+func (plugin *kubenetNetworkPlugin) SetUpPod(pod *api.Pod, id kubecontainer.ContainerID) error {
 	plugin.mu.Lock()
 	defer plugin.mu.Unlock()
 
 	start := time.Now()
 	defer func() {
-		glog.V(4).Infof("SetUpPod took %v for %s/%s", time.Since(start), namespace, name)
+		glog.V(4).Infof("SetUpPod took %v for %s/%s", time.Since(start), pod.Namespace, pod.Name)
 	}()
 
-	pod, ok := plugin.host.GetPodByName(namespace, name)
+	pod, ok := plugin.host.GetPodByName(pod.Namespace, pod.Name)
 	if !ok {
-		return fmt.Errorf("pod %q cannot be found", name)
+		return fmt.Errorf("pod %q cannot be found", pod.Name)
 	}
 
 	if err := plugin.Status(); err != nil {
 		return fmt.Errorf("Kubenet cannot SetUpPod: %v", err)
 	}
 
-	if err := plugin.setup(namespace, name, id, pod); err != nil {
+	if err := plugin.setup(pod.Namespace, pod.Name, id, pod); err != nil {
 		// Make sure everything gets cleaned up on errors
 		podIP, _ := plugin.podIPs[id]
-		if err := plugin.teardown(namespace, name, id, podIP); err != nil {
+		if err := plugin.teardown(pod.Namespace, pod.Name, id, podIP); err != nil {
 			// Not a hard error or warning
-			glog.V(4).Infof("Failed to clean up %s/%s after SetUpPod failure: %v", namespace, name, err)
+			glog.V(4).Infof("Failed to clean up %s/%s after SetUpPod failure: %v", pod.Namespace, pod.Name, err)
 		}
 		return err
 	}
