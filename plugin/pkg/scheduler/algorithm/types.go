@@ -33,7 +33,7 @@ type PriorityMapFunction func(pod *api.Pod, meta interface{}, nodeInfo *schedule
 // PriorityReduceFunction is a function that aggregated per-node results and computes
 // final scores for all nodes.
 // TODO: Figure out the exact API of this method.
-type PriorityReduceFunction func(result schedulerapi.HostPriorityList) error
+type PriorityReduceFunction func(pod *api.Pod, result schedulerapi.HostPriorityList) error
 
 // DEPRECATED
 // Use Map-Reduce pattern for priority functions.
