@@ -37,7 +37,7 @@ func newHandlerForTest(c clientset.Interface) (admission.Interface, informers.Sh
 	f := informers.NewSharedInformerFactory(c, 5*time.Minute)
 	handler := NewExists(c)
 	plugins := []admission.Interface{handler}
-	pluginInitializer := admission.NewPluginInitializer(f)
+	pluginInitializer := admission.NewPluginInitializer(f, nil)
 	pluginInitializer.Initialize(plugins)
 	err := admission.Validate(plugins)
 	return handler, f, err
