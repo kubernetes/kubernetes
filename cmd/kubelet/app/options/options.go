@@ -208,6 +208,11 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&s.OutOfDiskTransitionFrequency.Duration, "outofdisk-transition-frequency", s.OutOfDiskTransitionFrequency.Duration, "Duration for which the kubelet has to wait before transitioning out of out-of-disk node condition status. Default: 5m0s")
 	fs.StringVar(&s.NodeIP, "node-ip", s.NodeIP, "IP address of the node. If set, kubelet will use this IP address for the node")
 	fs.BoolVar(&s.EnableCustomMetrics, "enable-custom-metrics", s.EnableCustomMetrics, "Support for gathering custom metrics.")
+	fs.StringVar(&s.CAdvisorCollectorCertFile, "cadvisor-collector-cert-file", s.CAdvisorCollectorCertFile, ""+
+		"File containing an x509 Certificate used for client identification by the cAdvisor custom metric collectors (CA cert, if any, concatenated after server cert). "+
+		"If --cadvisor-collector-cert-file and --cadvisor-collector-private-key-file are not provided, the default empty certificate will be presented for client verification "+
+		"to the custom metric endpoints.")
+	fs.StringVar(&s.CAdvisorCollectorPrivateKeyFile, "cadvisor-collector-private-key-file", s.CAdvisorCollectorPrivateKeyFile, "File containing x509 private key matching --cadvisor-collector-cert-file.")
 	fs.StringVar(&s.RuntimeCgroups, "runtime-cgroups", s.RuntimeCgroups, "Optional absolute name of cgroups to create and run the runtime in.")
 	fs.StringVar(&s.EvictionHard, "eviction-hard", s.EvictionHard, "A set of eviction thresholds (e.g. memory.available<1Gi) that if met would trigger a pod eviction.")
 	fs.StringVar(&s.EvictionSoft, "eviction-soft", s.EvictionSoft, "A set of eviction thresholds (e.g. memory.available<1.5Gi) that if met over a corresponding grace period would trigger a pod eviction.")

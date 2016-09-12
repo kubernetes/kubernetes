@@ -44,6 +44,8 @@ bounding-dirs
 build-dependencies
 build-only
 build-tag
+cadvisor-collector-cert-file
+cadvisor-collector-private-key-file
 cadvisor-port
 cert-dir
 certificate-authority

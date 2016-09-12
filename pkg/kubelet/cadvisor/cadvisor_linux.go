@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"time"
 
+	"crypto/tls"
 	"github.com/golang/glog"
 	"github.com/google/cadvisor/cache/memory"
 	cadvisorMetrics "github.com/google/cadvisor/container"
@@ -93,14 +94,20 @@ func containerLabels(c *cadvisorapi.ContainerInfo) map[string]string {
 }
 
 // New creates a cAdvisor and exports its API on the specified port if port > 0.
-func New(port uint, runtime string) (Interface, error) {
+func New(port uint, runtime string, cAdvisorCollectorCertFile string, cAdvisorCollectorPrivateKeyFile string) (Interface, error) {
 	sysFs, err := sysfs.NewRealSysFs()
 	if err != nil {
 		return nil, err
 	}
 
+	//generate the http.Client to be used by the cAdvisor custom metric providers
+	httpClient, err := generateCollectorHttpClient(cAdvisorCollectorCertFile, cAdvisorCollectorPrivateKeyFile)
+	if err != nil {
+		return nil, err
+	}
+
 	// Create and start the cAdvisor container manager.
-	m, err := manager.New(memory.New(statsCacheDuration, nil), sysFs, maxHousekeepingInterval, allowDynamicHousekeeping, cadvisorMetrics.MetricSet{cadvisorMetrics.NetworkTcpUsageMetrics: struct{}{}}, http.DefaultClient)
+	m, err := manager.New(memory.New(statsCacheDuration, nil), sysFs, maxHousekeepingInterval, allowDynamicHousekeeping, cadvisorMetrics.MetricSet{cadvisorMetrics.NetworkTcpUsageMetrics: struct{}{}}, httpClient)
 	if err != nil {
 		return nil, err
 	}
@@ -115,6 +122,33 @@ func New(port uint, runtime string) (Interface, error) {
 		return nil, err
 	}
 	return cadvisorClient, nil
+}
+
+func generateCollectorHttpClient(cAdvisorCollectorCertFile, cAdvisorCollectorPrivateKeyFile string) (*http.Client, error) {
+	//Enable accessing insecure endpoints. We should be able to access metrics from any endpoint
+	tlsConfig := &tls.Config{
+		InsecureSkipVerify: true,
+	}
+
+	if cAdvisorCollectorCertFile != "" {
+		if cAdvisorCollectorPrivateKeyFile == "" {
+			return nil, fmt.Errorf("invalid configuration: cAdvisorCollectorCertFile was specified and cAdvisorCollectorPrivateKeyFile was not specified.")
+		}
+		cert, err := tls.LoadX509KeyPair(cAdvisorCollectorCertFile, cAdvisorCollectorPrivateKeyFile)
+		if err != nil {
+			return nil, fmt.Errorf("Error loading the cAdvisor client certificates: %v", err)
+		}
+		tlsConfig.Certificates = []tls.Certificate{cert}
+		tlsConfig.BuildNameToCertificate()
+	}
+
+	transport := &http.Transport{
+		TLSClientConfig: tlsConfig,
+	}
+
+	httpClient := http.Client{Transport: transport}
+
+	return &httpClient, nil
 }
 
 func (cc *cadvisorClient) Start() error {
