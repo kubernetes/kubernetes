@@ -253,11 +253,12 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 			workerControllerJson := mkpath("storm-worker-controller.json")
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 			zookeeperPod := "zookeeper"
+			nimbusPod := "nimbus"
 
 			By("starting Zookeeper")
 			framework.RunKubectlOrDie("create", "-f", zookeeperPodJson, nsFlag)
 			framework.RunKubectlOrDie("create", "-f", zookeeperServiceJson, nsFlag)
-			err := framework.WaitForPodNameRunningInNamespace(c, zookeeperPod, ns)
+			err := f.WaitForPodRunningSlow(zookeeperPod)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("checking if zookeeper is up and running")
@@ -269,7 +270,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 			By("starting Nimbus")
 			framework.RunKubectlOrDie("create", "-f", nimbusPodJson, nsFlag)
 			framework.RunKubectlOrDie("create", "-f", nimbusServiceJson, nsFlag)
-			err = framework.WaitForPodNameRunningInNamespace(c, "nimbus", ns)
+			err = f.WaitForPodRunningSlow(nimbusPod)
 			Expect(err).NotTo(HaveOccurred())
 
 			err = framework.WaitForEndpoint(c, ns, "nimbus")
