@@ -530,7 +530,12 @@ func LabelPodsWithHash(podList *api.PodList, rs *extensions.ReplicaSet, c client
 	for _, pod := range podList.Items {
 		// Only label the pod that doesn't already have the new hash
 		if pod.Labels[extensions.DefaultDeploymentUniqueLabelKey] != hash {
-			if _, podUpdated, err := podutil.UpdatePodWithRetries(c.Core().Pods(namespace), &pod,
+			copiedPod, err := PodDeepCopy(&pod)
+			if err != nil {
+				return false, fmt.Errorf("error deep copying the pod: %v", err)
+			}
+
+			if _, podUpdated, err := podutil.UpdatePodWithRetries(c.Core().Pods(namespace), copiedPod,
 				func(podToUpdate *api.Pod) error {
 					// Precondition: the pod doesn't contain the new hash in its label.
 					if podToUpdate.Labels[extensions.DefaultDeploymentUniqueLabelKey] == hash {
@@ -786,6 +791,19 @@ func ResolveFenceposts(maxSurge, maxUnavailable *intstrutil.IntOrString, desired
 	}
 
 	return int32(surge), int32(unavailable), nil
+}
+
+// PodDeepCopy deep copies the Pod
+func PodDeepCopy(pod *api.Pod) (*api.Pod, error) {
+	objCopy, err := api.Scheme.DeepCopy(pod)
+	if err != nil {
+		return nil, err
+	}
+	copied, ok := objCopy.(*api.Pod)
+	if !ok {
+		return nil, fmt.Errorf("expected Pod, got %#v", objCopy)
+	}
+	return copied, nil
 }
 
 func DeploymentDeepCopy(deployment *extensions.Deployment) (*extensions.Deployment, error) {
