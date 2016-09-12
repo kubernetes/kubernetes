@@ -217,9 +217,9 @@ func NewHandlerContainer(mux *http.ServeMux, s runtime.NegotiatedSerializer) *re
 }
 
 // Exposes the given group versions in API. Helper method to install multiple group versions at once.
-func (s *GenericAPIServer) InstallAPIGroups(groupsInfo []APIGroupInfo) error {
+func (s *GenericAPIServer) InstallAPIGroups(groupsInfo []APIGroupInfo, apiResourceConfigSource APIResourceConfigSource) error {
 	for _, apiGroupInfo := range groupsInfo {
-		if err := s.InstallAPIGroup(&apiGroupInfo); err != nil {
+		if err := s.InstallAPIGroup(&apiGroupInfo, apiResourceConfigSource); err != nil {
 			return err
 		}
 	}
@@ -362,7 +362,7 @@ func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
 }
 
 // Exposes the given group version in API.
-func (s *GenericAPIServer) InstallAPIGroup(apiGroupInfo *APIGroupInfo) error {
+func (s *GenericAPIServer) InstallAPIGroup(apiGroupInfo *APIGroupInfo, apiResourceConfigSource APIResourceConfigSource) error {
 	apiPrefix := s.apiPrefix
 	if apiGroupInfo.IsLegacyGroup {
 		apiPrefix = s.legacyAPIPrefix
@@ -408,10 +408,12 @@ func (s *GenericAPIServer) InstallAPIGroup(apiGroupInfo *APIGroupInfo) error {
 		// Add a handler at /apis/<groupName> to enumerate all versions supported by this group.
 		apiVersionsForDiscovery := []unversioned.GroupVersionForDiscovery{}
 		for _, groupVersion := range apiGroupInfo.GroupMeta.GroupVersions {
-			apiVersionsForDiscovery = append(apiVersionsForDiscovery, unversioned.GroupVersionForDiscovery{
-				GroupVersion: groupVersion.String(),
-				Version:      groupVersion.Version,
-			})
+			if apiResourceConfigSource.AnyResourcesForVersionEnabled(groupVersion) {
+				apiVersionsForDiscovery = append(apiVersionsForDiscovery, unversioned.GroupVersionForDiscovery{
+					GroupVersion: groupVersion.String(),
+					Version:      groupVersion.Version,
+				})
+			}
 		}
 		preferedVersionForDiscovery := unversioned.GroupVersionForDiscovery{
 			GroupVersion: apiGroupInfo.GroupMeta.GroupVersion.String(),

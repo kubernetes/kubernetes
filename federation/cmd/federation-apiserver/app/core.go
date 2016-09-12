@@ -40,7 +40,7 @@ import (
 	serviceetcd "k8s.io/kubernetes/pkg/registry/service/etcd"
 )
 
-func installCoreAPIs(s *options.ServerRunOptions, g *genericapiserver.GenericAPIServer, f genericapiserver.StorageFactory) {
+func installCoreAPIs(s *options.ServerRunOptions, g *genericapiserver.GenericAPIServer, resourceConfig genericapiserver.APIResourceConfigSource, f genericapiserver.StorageFactory) {
 	serviceStore, serviceStatusStore := serviceetcd.NewREST(createRESTOptionsOrDie(s, g, f, api.Resource("service")))
 	namespaceStore, namespaceStatusStore, namespaceFinalizeStore := namespaceetcd.NewREST(createRESTOptionsOrDie(s, g, f, api.Resource("namespaces")))
 	secretStore := secretetcd.NewREST(createRESTOptionsOrDie(s, g, f, api.Resource("secrets")))
@@ -66,7 +66,7 @@ func installCoreAPIs(s *options.ServerRunOptions, g *genericapiserver.GenericAPI
 		ParameterCodec:         core.ParameterCodec,
 		NegotiatedSerializer:   core.Codecs,
 	}
-	if err := g.InstallAPIGroup(&apiGroupInfo); err != nil {
+	if err := g.InstallAPIGroup(&apiGroupInfo, resourceConfig); err != nil {
 		glog.Fatalf("Error in registering group version: %+v.\n Error: %v\n", apiGroupInfo, err)
 	}
 }
