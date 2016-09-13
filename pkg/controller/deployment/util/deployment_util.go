@@ -816,12 +816,17 @@ func IsDeploymentComplete(deployment *extensions.Deployment, newStatus extension
 		newStatus.AvailableReplicas >= deployment.Spec.Replicas-MaxUnavailable(*deployment)
 }
 
-// IsDeploymentProgressing reports if a deployment is progressing.
+// IsDeploymentProgressing reports progress for a deployment. Progress is estimated by comparing the
+// current with the new status of the deployment that the controller is observing. The following
+// algorithm is already used in the kubectl rolling updater.
 func IsDeploymentProgressing(deployment *extensions.Deployment, newStatus extensions.DeploymentStatus) bool {
-	return deployment.Status.Replicas != newStatus.Replicas ||
-		deployment.Status.UpdatedReplicas != newStatus.UpdatedReplicas ||
-		deployment.Status.AvailableReplicas != newStatus.AvailableReplicas ||
-		deployment.Status.UnavailableReplicas != newStatus.UnavailableReplicas
+	oldStatus := deployment.Status
+
+	// Old replicas that need to be scaled down
+	oldStatusOldReplicas := oldStatus.Replicas - oldStatus.UpdatedReplicas
+	newStatusOldReplicas := newStatus.Replicas - newStatus.UpdatedReplicas
+
+	return (newStatus.UpdatedReplicas > oldStatus.UpdatedReplicas) || (newStatusOldReplicas < oldStatusOldReplicas)
 }
 
 // used for unit testing

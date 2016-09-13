@@ -771,6 +771,151 @@ func TestNewRSNewReplicas(t *testing.T) {
 	}
 }
 
+func TestIsDeploymentComplete(t *testing.T) {
+	deployment := func(desired, current, updated, available, maxUnavailable int32) *extensions.Deployment {
+		return &extensions.Deployment{
+			Spec: extensions.DeploymentSpec{
+				Replicas: desired,
+				Strategy: extensions.DeploymentStrategy{
+					RollingUpdate: &extensions.RollingUpdateDeployment{
+						MaxUnavailable: intstr.FromInt(int(maxUnavailable)),
+					},
+					Type: extensions.RollingUpdateDeploymentStrategyType,
+				},
+			},
+			Status: extensions.DeploymentStatus{
+				Replicas:          current,
+				UpdatedReplicas:   updated,
+				AvailableReplicas: available,
+			},
+		}
+	}
+
+	tests := []struct {
+		name string
+
+		d *extensions.Deployment
+
+		expected bool
+	}{
+		{
+			name: "complete",
+
+			d:        deployment(5, 5, 5, 4, 1),
+			expected: true,
+		},
+		{
+			name: "not complete",
+
+			d:        deployment(5, 5, 5, 3, 1),
+			expected: false,
+		},
+		{
+			name: "complete #2",
+
+			d:        deployment(5, 5, 5, 5, 0),
+			expected: true,
+		},
+		{
+			name: "not complete #2",
+
+			d:        deployment(5, 5, 4, 5, 0),
+			expected: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Log(test.name)
+
+		if got, exp := IsDeploymentComplete(test.d, test.d.Status), test.expected; got != exp {
+			t.Errorf("expected complete: %t, got: %t", exp, got)
+		}
+	}
+}
+
+func TestIsDeploymentProgressing(t *testing.T) {
+	deployment := func(current, updated int32) *extensions.Deployment {
+		return &extensions.Deployment{
+			Status: extensions.DeploymentStatus{
+				Replicas:        current,
+				UpdatedReplicas: updated,
+			},
+		}
+	}
+	newStatus := func(current, updated int32) extensions.DeploymentStatus {
+		return extensions.DeploymentStatus{
+			Replicas:        current,
+			UpdatedReplicas: updated,
+		}
+	}
+
+	tests := []struct {
+		name string
+
+		d         *extensions.Deployment
+		newStatus extensions.DeploymentStatus
+
+		expected bool
+	}{
+		{
+			name: "progressing",
+
+			d:         deployment(10, 4),
+			newStatus: newStatus(10, 6),
+
+			expected: true,
+		},
+		{
+			name: "not progressing",
+
+			d:         deployment(10, 4),
+			newStatus: newStatus(10, 4),
+
+			expected: false,
+		},
+		{
+			name: "progressing #2",
+
+			d:         deployment(10, 4),
+			newStatus: newStatus(8, 4),
+
+			expected: true,
+		},
+		{
+			name: "not progressing #2",
+
+			d:         deployment(10, 7),
+			newStatus: newStatus(10, 6),
+
+			expected: false,
+		},
+		{
+			name: "progressing #3",
+
+			d:         deployment(10, 4),
+			newStatus: newStatus(8, 8),
+
+			expected: true,
+		},
+		{
+			name: "not progressing #2",
+
+			d:         deployment(10, 7),
+			newStatus: newStatus(10, 7),
+
+			expected: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Log(test.name)
+
+		if got, exp := IsDeploymentProgressing(test.d, test.newStatus), test.expected; got != exp {
+			t.Errorf("expected progressing: %t, got: %t", exp, got)
+		}
+	}
+}
+
 func TestIsDeploymentFailed(t *testing.T) {
 	var (
 		null *int32
@@ -800,8 +945,9 @@ func TestIsDeploymentFailed(t *testing.T) {
 	tests := []struct {
 		name string
 
-		d        extensions.Deployment
-		nowFn    func() time.Time
+		d     extensions.Deployment
+		nowFn func() time.Time
+
 		expected bool
 	}{
 		{
@@ -827,10 +973,12 @@ func TestIsDeploymentFailed(t *testing.T) {
 		},
 	}
 
-	for i, test := range tests {
+	for _, test := range tests {
+		t.Log(test.name)
+
 		nowFn = test.nowFn
 		if got, exp := IsDeploymentFailed(&test.d, test.d.Status), test.expected; got != exp {
-			t.Errorf("[%d] expected timeout: %t, got: %t", i, exp, got)
+			t.Errorf("expected timeout: %t, got: %t", exp, got)
 		}
 	}
 }
