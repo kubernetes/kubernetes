@@ -2240,6 +2240,7 @@ func autoConvert_v1beta1_ReplicaSetSpec_To_extensions_ReplicaSetSpec(in *Replica
 	if err := api.Convert_Pointer_int32_To_int32(&in.Replicas, &out.Replicas, s); err != nil {
 		return err
 	}
+	out.MinReadySeconds = in.MinReadySeconds
 	if in.Selector != nil {
 		in, out := &in.Selector, &out.Selector
 		*out = new(unversioned.LabelSelector)
@@ -2259,6 +2260,7 @@ func autoConvert_extensions_ReplicaSetSpec_To_v1beta1_ReplicaSetSpec(in *extensi
 	if err := api.Convert_int32_To_Pointer_int32(&in.Replicas, &out.Replicas, s); err != nil {
 		return err
 	}
+	out.MinReadySeconds = in.MinReadySeconds
 	if in.Selector != nil {
 		in, out := &in.Selector, &out.Selector
 		*out = new(LabelSelector)
@@ -2278,6 +2280,7 @@ func autoConvert_v1beta1_ReplicaSetStatus_To_extensions_ReplicaSetStatus(in *Rep
 	out.Replicas = in.Replicas
 	out.FullyLabeledReplicas = in.FullyLabeledReplicas
 	out.ReadyReplicas = in.ReadyReplicas
+	out.AvailableReplicas = in.AvailableReplicas
 	out.ObservedGeneration = in.ObservedGeneration
 	return nil
 }
@@ -2290,6 +2293,7 @@ func autoConvert_extensions_ReplicaSetStatus_To_v1beta1_ReplicaSetStatus(in *ext
 	out.Replicas = in.Replicas
 	out.FullyLabeledReplicas = in.FullyLabeledReplicas
 	out.ReadyReplicas = in.ReadyReplicas
+	out.AvailableReplicas = in.AvailableReplicas
 	out.ObservedGeneration = in.ObservedGeneration
 	return nil
 }

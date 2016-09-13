@@ -640,6 +640,8 @@ func countAvailablePods(pods []api.Pod, minReadySeconds int32) int32 {
 }
 
 // IsPodAvailable return true if the pod is available.
+// TODO: Remove this once we start using replica set status for calculating available pods
+// for a deployment.
 func IsPodAvailable(pod *api.Pod, minReadySeconds int32, now time.Time) bool {
 	if !controller.IsPodActive(pod) {
 		return false

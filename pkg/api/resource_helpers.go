@@ -17,6 +17,8 @@ limitations under the License.
 package api
 
 import (
+	"time"
+
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 )
@@ -72,6 +74,24 @@ func GetExistingContainerStatus(statuses []ContainerStatus, name string) Contain
 		}
 	}
 	return ContainerStatus{}
+}
+
+// IsPodAvailable returns true if a pod is available; false otherwise.
+// Precondition for an available pod is that it must be ready. On top
+// of that, there are two cases when a pod can be considered available:
+// 1. minReadySeconds == 0, or
+// 2. LastTransitionTime (is set) + minReadySeconds < current time
+func IsPodAvailable(pod *Pod, minReadySeconds int32, now unversioned.Time) bool {
+	if !IsPodReady(pod) {
+		return false
+	}
+
+	c := GetPodReadyCondition(pod.Status)
+	minReadySecondsDuration := time.Duration(minReadySeconds) * time.Second
+	if minReadySeconds == 0 || !c.LastTransitionTime.IsZero() && c.LastTransitionTime.Add(minReadySecondsDuration).Before(now.Time) {
+		return true
+	}
+	return false
 }
 
 // IsPodReady returns true if a pod is ready; false otherwise.
