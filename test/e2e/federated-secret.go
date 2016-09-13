@@ -18,12 +18,12 @@ package e2e
 
 import (
 	"fmt"
-	"reflect"
 	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_4"
+	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -33,14 +33,13 @@ import (
 )
 
 const (
-	FederatedSecretName        = "federated-secret"
-	UpdatedFederatedSecretName = "updated-federated-secret"
-	FederatedSecretTimeout     = 60 * time.Second
-	MaxRetries                 = 3
+	FederatedSecretName    = "federated-secret"
+	FederatedSecretTimeout = 60 * time.Second
+	MaxRetries             = 3
 )
 
 // Create/delete secret api objects
-var _ = framework.KubeDescribe("Federation secrets [Feature:Federation]", func() {
+var _ = framework.KubeDescribe("Federation secrets [Feature:Federation12]", func() {
 	var clusters map[string]*cluster // All clusters, keyed by cluster name
 
 	f := framework.NewDefaultFederatedFramework("federated-secret")
@@ -98,18 +97,16 @@ func updateSecretOrFail(clientset *federation_release_1_4.Clientset, namespace s
 		Fail(fmt.Sprintf("Internal error: invalid parameters passed to updateSecretOrFail: clientset: %v, namespace: %v", clientset, namespace))
 	}
 
-	var err error
 	var newSecret *v1.Secret
-	secret := &v1.Secret{
-		ObjectMeta: v1.ObjectMeta{
-			Name: UpdatedFederatedSecretName,
-		},
-	}
-
 	for retryCount := 0; retryCount < MaxRetries; retryCount++ {
-		_, err = clientset.Core().Secrets(namespace).Get(FederatedSecretName)
+		secret, err := clientset.Core().Secrets(namespace).Get(FederatedSecretName)
 		if err != nil {
 			framework.Failf("failed to get secret %q: %v", FederatedSecretName, err)
+		}
+
+		// Update one of the data in the secret.
+		secret.Data = map[string][]byte{
+			"key": []byte("value"),
 		}
 		newSecret, err = clientset.Core().Secrets(namespace).Update(secret)
 		if err == nil {
@@ -149,7 +146,7 @@ func waitForSecretOrFail(clientset *release_1_3.Clientset, namespace string, sec
 	framework.ExpectNoError(err, "Failed to verify secret %q in namespace %q in cluster: Present=%v", secret.Name, namespace, present)
 
 	if present && clusterSecret != nil {
-		Expect(equivalentSecret(*clusterSecret, *secret))
+		Expect(util.SecretEquivalent(*clusterSecret, *secret))
 	}
 }
 
@@ -165,19 +162,17 @@ func waitForSecretUpdateOrFail(clientset *release_1_3.Clientset, namespace strin
 	err := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
 		clusterSecret, err := clientset.Core().Secrets(namespace).Get(secret.Name)
 		if err == nil { // We want it present, and the Get succeeded, so we're all good.
-			if equivalentSecret(*clusterSecret, *secret) {
+			if util.SecretEquivalent(*clusterSecret, *secret) {
 				By(fmt.Sprintf("Success: shard of federated secret %q in namespace %q in cluster is updated", secret.Name, namespace))
 				return true, nil
+			} else {
+				By(fmt.Sprintf("Expected equal secrets. expected: %+v\nactual: %+v", *secret, *clusterSecret))
 			}
-			By(fmt.Sprintf("Secret %q in namespace %q in cluster, waiting for service being updated, trying again in %s (err=%v)", secret.Name, namespace, framework.Poll, err))
+			By(fmt.Sprintf("Secret %q in namespace %q in cluster, waiting for secret being updated, trying again in %s (err=%v)", secret.Name, namespace, framework.Poll, err))
 			return false, nil
 		}
 		By(fmt.Sprintf("Secret %q in namespace %q in cluster, waiting for being updated, trying again in %s (err=%v)", secret.Name, namespace, framework.Poll, err))
 		return false, nil
 	})
 	framework.ExpectNoError(err, "Failed to verify secret %q in namespace %q in cluster", secret.Name, namespace)
-}
-
-func equivalentSecret(federatedSecret, clusterSecret v1.Secret) bool {
-	return reflect.DeepEqual(clusterSecret, federatedSecret)
 }
