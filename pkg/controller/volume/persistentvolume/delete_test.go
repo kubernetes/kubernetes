@@ -133,6 +133,21 @@ func TestDeleteSync(t *testing.T) {
 			// deleter simulates one delete() call that succeeds.
 			wrapTestWithReclaimCalls(operationDelete, []error{nil}, testSyncVolume),
 		},
+		{
+			// PV requires external deleter
+			"8-10 - external deleter",
+			newVolumeArray("volume8-10", "1Gi", "uid10-1", "claim10-1", api.VolumeBound, api.PersistentVolumeReclaimDelete, annBoundByController),
+			newVolumeArray("volume8-10", "1Gi", "uid10-1", "claim10-1", api.VolumeReleased, api.PersistentVolumeReclaimDelete, annBoundByController),
+			noclaims,
+			noclaims,
+			noevents, noerrors,
+			func(ctrl *PersistentVolumeController, reactor *volumeReactor, test controllerTest) error {
+				// Inject external deleter annotation
+				test.initialVolumes[0].Annotations[annDynamicallyProvisioned] = "external.io/test"
+				test.expectedVolumes[0].Annotations[annDynamicallyProvisioned] = "external.io/test"
+				return testSyncVolume(ctrl, reactor, test)
+			},
+		},
 	}
 	runSyncTests(t, tests, []*storage.StorageClass{})
 }
