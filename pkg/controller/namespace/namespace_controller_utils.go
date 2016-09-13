@@ -48,6 +48,8 @@ type operation string
 const (
 	operationDeleteCollection operation = "deleteCollection"
 	operationList             operation = "list"
+	// assume a default estimate for finalizers to complete when found on items pending deletion.
+	finalizerEstimateSeconds int64 = int64(15)
 )
 
 // operationKey is an entry in a cache.
@@ -154,7 +156,12 @@ func deleteCollection(
 	}
 
 	apiResource := unversioned.APIResource{Name: gvr.Resource, Namespaced: true}
-	err := dynamicClient.Resource(&apiResource, namespace).DeleteCollection(nil, &v1.ListOptions{})
+
+	// namespace controller does not want the garbage collector to insert the orphan finalizer since it calls
+	// resource deletions generically.  it will ensure all resources in the namespace are purged prior to releasing
+	// namespace itself.
+	orphanDependents := false
+	err := dynamicClient.Resource(&apiResource, namespace).DeleteCollection(&v1.DeleteOptions{OrphanDependents: &orphanDependents}, &v1.ListOptions{})
 
 	if err == nil {
 		return true, nil
@@ -300,6 +307,14 @@ func deleteAllContentForGroupVersionResource(
 	}
 	glog.V(5).Infof("namespace controller - deleteAllContentForGroupVersionResource - items remaining - namespace: %s, gvr: %v, items: %v", namespace, gvr, len(unstructuredList.Items))
 	if len(unstructuredList.Items) != 0 && estimate == int64(0) {
+		// if any item has a finalizer, we treat that as a normal condition, and use a default estimation to allow for GC to complete.
+		for _, item := range unstructuredList.Items {
+			if len(item.GetFinalizers()) > 0 {
+				glog.V(5).Infof("namespace controller - deleteAllContentForGroupVersionResource - items remaining with finalizers - namespace: %s, gvr: %v, finalizers: %v", namespace, gvr, item.GetFinalizers())
+				return finalizerEstimateSeconds, nil
+			}
+		}
+		// nothing reported a finalizer, so something was unexpected as it should have been deleted.
 		return estimate, fmt.Errorf("unexpected items still remain in namespace: %s for gvr: %v", namespace, gvr)
 	}
 	return estimate, nil
