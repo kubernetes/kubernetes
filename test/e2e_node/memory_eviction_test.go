@@ -262,7 +262,7 @@ func createMemhogPod(f *framework.Framework, genName string, ctnName string, res
 					// 60 min timeout * 60s / tick per 10s = 360 ticks before timeout => ~11.11Mi/tick
 					// to fill ~4Gi of memory, so initial ballpark 12Mi/tick.
 					// We might see flakes due to timeout if the total memory on the nodes increases.
-					Args:      []string{"-mem-alloc-size", "120Mi", "-mem-alloc-sleep", "5s", "-mem-total", memLimit},
+					Args:      []string{"-mem-alloc-size", "12Mi", "-mem-alloc-sleep", "10s", "-mem-total", memLimit},
 					Resources: res,
 				},
 			},
