@@ -159,23 +159,29 @@ func (m *managerImpl) createThresholdNotification(diskInfoProvider DiskInfoProvi
 			continue
 		}
 
-		quantity := getThresholdQuantity(threshold.Value, observed.capacity, resource.DecimalSI).String()
 		// TODO: remove hardcoded root memory cgroup path
 		cgpath := "/sys/fs/cgroup/memory"
 		attribute := "usage_in_bytes"
-		thresholdNotifier, err := NewMemCGThresholdNotifier(cgpath, attribute, quantity)
+		thresholdNotifier, err := NewMemCGThresholdNotifier(cgpath, attribute)
 		if err != nil {
 			return err
 		}
 
-		glog.Infof("registered memory notification for %s on %s at %s", cgpath, attribute, quantity)
+		quantity := getThresholdQuantity(threshold.Value, observed.capacity, resource.DecimalSI).String()
+		err = thresholdNotifier.SetThreshold(quantity)
+		if err != nil {
+			thresholdNotifier.Close()
+			return err
+		}
+
+		glog.Infof("eviction manager: registered memory notification for %s on %s at %s", cgpath, attribute, quantity)
 		m.thresholdNotifier = thresholdNotifier
-		go m.thresholdNotifier.Start()
+		go m.thresholdNotifier.Start(wait.NeverStop)
 		go func() {
 			for {
 				// when we get a threshold notification, run synchronize to take action
 				m.thresholdNotifier.WaitForNotification()
-				glog.Infof("memory threshold notification recieved")
+				glog.Infof("eviction manager: memory threshold notification received")
 				m.synchronize(diskInfoProvider, podFunc)
 			}
 		}()
@@ -216,7 +222,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 	if m.thresholdNotifier == nil {
 		err := m.createThresholdNotification(diskInfoProvider, podFunc, observations)
 		if err != nil {
-			glog.Warningf("unable to create memory threshold notifier: %v", err)
+			glog.Warningf("eviction manager: unable to create memory threshold notifier: %v", err)
 		}
 	}
 

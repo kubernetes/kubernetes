@@ -26,8 +26,10 @@ import (
 	"syscall"
 )
 
+// ThresholdNotifier notifies the user when an attribute crosses a threshold value
 type ThresholdNotifier interface {
-	Start()
+	SetThreshold(threshold string) error
+	Start(stopCh <-chan struct{})
 	WaitForNotification()
 	Close()
 }
@@ -43,7 +45,7 @@ var _ ThresholdNotifier = &memcgThresholdNotifier{}
 
 // NewMemCGThresholdNotifier sends notifications when a memory threshold
 // is crossed (in either direction) for a given memory cgroup
-func NewMemCGThresholdNotifier(cgPath, watchedAttr, threshold string) (ThresholdNotifier, error) {
+func NewMemCGThresholdNotifier(cgPath string, watchedAttr string) (ThresholdNotifier, error) {
 	watchfd, err := syscall.Open(fmt.Sprintf("%s/memory.%s", cgPath, watchedAttr), syscall.O_RDONLY, 0)
 	if err != nil {
 		return nil, err
@@ -63,14 +65,6 @@ func NewMemCGThresholdNotifier(cgPath, watchedAttr, threshold string) (Threshold
 	if eventfd < 0 {
 		return nil, fmt.Errorf("eventfd call failed")
 	}
-	config := fmt.Sprintf("%d %d %s", eventfd, watchfd, threshold)
-	_, err = syscall.Write(controlfd, []byte(config))
-	if err != nil {
-		syscall.Close(watchfd)
-		syscall.Close(controlfd)
-		syscall.Close(eventfd)
-		return nil, err
-	}
 	return &memcgThresholdNotifier{
 		watchfd:   watchfd,
 		controlfd: controlfd,
@@ -79,14 +73,36 @@ func NewMemCGThresholdNotifier(cgPath, watchedAttr, threshold string) (Threshold
 	}, nil
 }
 
-func (n *memcgThresholdNotifier) Start() {
+func (n *memcgThresholdNotifier) SetThreshold(threshold string) error {
+	config := fmt.Sprintf("%d %d %s", n.eventfd, n.watchfd, threshold)
+	_, err := syscall.Write(n.controlfd, []byte(config))
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func getEvents(eventfd int, eventCh chan<- int) {
 	for {
 		buf := make([]byte, 8)
-		_, err := syscall.Read(n.eventfd, buf)
+		_, err := syscall.Read(eventfd, buf)
 		if err != nil {
 			return
 		}
-		n.trigger <- 0
+		eventCh <- 0
+	}
+}
+
+func (n *memcgThresholdNotifier) Start(stopCh <-chan struct{}) {
+	eventCh := make(chan int, 1)
+	go getEvents(n.eventfd, eventCh)
+	for {
+		select {
+		case <-stopCh:
+			return
+		case event := <-eventCh:
+			n.trigger <- event
+		}
 	}
 }
 
@@ -114,7 +130,14 @@ func NewNoOpThresholdNotifier() ThresholdNotifier {
 	}
 }
 
-func (n *noOpThresholdNotifier) Start() {}
+func (n *noOpThresholdNotifier) SetThreshold(threshold string) error {
+	return nil
+}
+
+func (n *noOpThresholdNotifier) Start(stopCh <-chan struct{}) {
+	<-stopCh
+	close(n.trigger)
+}
 
 func (n *noOpThresholdNotifier) WaitForNotification() {
 	// channel is never written to, blocks forever
