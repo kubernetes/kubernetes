@@ -64,10 +64,14 @@ func (wd *WatcherDispatcher) Add(obj runtime.Object) {
 func (wd *WatcherDispatcher) Modify(obj runtime.Object) {
 	wd.Lock()
 	defer wd.Unlock()
+	glog.V(4).Infof("->WatcherDispatcher.Modify(%v)", obj)
 	wd.eventsSoFar = append(wd.eventsSoFar, &watch.Event{Type: watch.Modified, Object: obj})
-	for _, watcher := range wd.watchers {
+	for i, watcher := range wd.watchers {
 		if !watcher.IsStopped() {
+			glog.V(4).Infof("->Watcher(%d).Modify(%v)", i, obj)
 			watcher.Modify(obj)
+		} else {
+			glog.V(4).Infof("->Watcher(%d) is stopped.  Not calling Modify(%v)", i, obj)
 		}
 	}
 }
@@ -173,7 +177,7 @@ func GetObjectFromChan(c chan runtime.Object) runtime.Object {
 	select {
 	case obj := <-c:
 		return obj
-	case <-time.After(10 * time.Second):
+	case <-time.After(20 * time.Second):
 		pprof.Lookup("goroutine").WriteTo(os.Stderr, 1)
 		return nil
 	}
