@@ -538,6 +538,11 @@ func (b *Builder) visitorResult() *Result {
 		b.selector = labels.Everything()
 	}
 
+	// visit items specified by paths
+	if len(b.paths) != 0 {
+		return b.visitByPaths()
+	}
+
 	// visit selectors
 	if b.selector != nil {
 		return b.visitBySelector()
@@ -551,11 +556,6 @@ func (b *Builder) visitorResult() *Result {
 	// visit items specified by name
 	if len(b.names) != 0 {
 		return b.visitByName()
-	}
-
-	// visit items specified by paths
-	if len(b.paths) != 0 {
-		return b.visitByPaths()
 	}
 
 	if len(b.resources) != 0 {
@@ -573,14 +573,6 @@ func (b *Builder) visitBySelector() *Result {
 	}
 	if len(b.resources) == 0 {
 		return &Result{err: fmt.Errorf("at least one resource must be specified to use a selector")}
-	}
-	// empty selector has different error message for paths being provided
-	if len(b.paths) != 0 {
-		if b.selector.Empty() {
-			return &Result{err: fmt.Errorf("when paths, URLs, or stdin is provided as input, you may not specify a resource by arguments as well")}
-		} else {
-			return &Result{err: fmt.Errorf("a selector may not be specified when path, URL, or stdin is provided as input")}
-		}
 	}
 	mappings, err := b.resourceMappings()
 	if err != nil {
@@ -613,9 +605,6 @@ func (b *Builder) visitByResource() *Result {
 		isSingular = len(b.resourceTuples) == 1
 	}
 
-	if len(b.paths) != 0 {
-		return &Result{singular: isSingular, err: fmt.Errorf("when paths, URLs, or stdin is provided as input, you may not specify a resource by arguments as well")}
-	}
 	if len(b.resources) != 0 {
 		return &Result{singular: isSingular, err: fmt.Errorf("you may not specify individual resources and bulk resources in the same call")}
 	}
@@ -718,6 +707,12 @@ func (b *Builder) visitByPaths() *Result {
 	if len(b.resources) != 0 {
 		return &Result{singular: singular, err: fmt.Errorf("when paths, URLs, or stdin is provided as input, you may not specify resource arguments as well")}
 	}
+	if len(b.names) != 0 {
+		return &Result{err: fmt.Errorf("name cannot be provided when a path is specified")}
+	}
+	if len(b.resourceTuples) != 0 {
+		return &Result{err: fmt.Errorf("resource/name arguments cannot be provided when a path is specified")}
+	}
 
 	var visitors Visitor
 	if b.continueOnError {
@@ -737,6 +732,9 @@ func (b *Builder) visitByPaths() *Result {
 			visitors = NewDecoratedVisitor(visitors, SetNamespace(b.namespace))
 		}
 		visitors = NewDecoratedVisitor(visitors, RetrieveLatest)
+	}
+	if b.selector != nil {
+		visitors = NewFilteredVisitor(visitors, FilterBySelector(b.selector))
 	}
 	return &Result{singular: singular, visitor: visitors, sources: b.paths}
 }
