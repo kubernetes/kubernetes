@@ -114,7 +114,9 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 	maskLocksmithdOnCoreos()
 
 	if *startServices {
-		e2es = services.NewE2EServices()
+		// If the services are expected to stop after test, they should monitor the test process.
+		// If the services are expected to keep running after test, they should not monitor the test process.
+		e2es = services.NewE2EServices(*stopServices)
 		Expect(e2es.Start()).To(Succeed(), "should be able to start node services.")
 		glog.Infof("Node services started.  Running tests...")
 	} else {
