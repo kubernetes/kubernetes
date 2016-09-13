@@ -594,7 +594,7 @@ func newTestController(kubeClient clientset.Interface, volumeSource, claimSource
 	if classSource == nil {
 		classSource = framework.NewFakeControllerSource()
 	}
-	ctrl := NewPersistentVolumeControllerFromClient(
+	ctrl := NewPersistentVolumeController(
 		kubeClient,
 		5*time.Second,        // sync period
 		nil,                  // alpha provisioner
