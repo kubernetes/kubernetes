@@ -26,7 +26,7 @@ import (
 	"sync"
 	"time"
 
-	release_1_4 "k8s.io/client-go/1.4/kubernetes"
+	staging "k8s.io/client-go/1.4/kubernetes"
 	"k8s.io/client-go/1.4/pkg/util/sets"
 	clientreporestclient "k8s.io/client-go/1.4/rest"
 	"k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_4"
@@ -34,8 +34,7 @@ import (
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_2"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_3"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
@@ -60,9 +59,8 @@ type Framework struct {
 	BaseName string
 
 	Client        *client.Client
-	Clientset_1_2 *release_1_2.Clientset
-	Clientset_1_3 *release_1_3.Clientset
-	StagingClient *release_1_4.Clientset
+	Clientset_1_5 *release_1_5.Clientset
+	StagingClient *staging.Clientset
 	ClientPool    dynamic.ClientPool
 
 	Namespace                *api.Namespace   // Every test has at least one namespace
@@ -188,11 +186,10 @@ func (f *Framework) BeforeEach() {
 		c, err := loadClientFromConfig(config)
 		Expect(err).NotTo(HaveOccurred())
 		f.Client = c
-		f.Clientset_1_2, err = release_1_2.NewForConfig(config)
-		f.Clientset_1_3, err = release_1_3.NewForConfig(config)
+		f.Clientset_1_5, err = release_1_5.NewForConfig(config)
 		Expect(err).NotTo(HaveOccurred())
 		clientRepoConfig := getClientRepoConfig(config)
-		f.StagingClient, err = release_1_4.NewForConfig(clientRepoConfig)
+		f.StagingClient, err = staging.NewForConfig(clientRepoConfig)
 		Expect(err).NotTo(HaveOccurred())
 		f.ClientPool = dynamic.NewClientPool(config, dynamic.LegacyAPIPathResolverFunc)
 	}
