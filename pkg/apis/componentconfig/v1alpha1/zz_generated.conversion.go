@@ -178,6 +178,7 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_componentconfig_KubeletConfigu
 	out.Address = in.Address
 	out.Port = in.Port
 	out.ReadOnlyPort = in.ReadOnlyPort
+	out.ClientCAFile = in.ClientCAFile
 	out.TLSCertFile = in.TLSCertFile
 	out.TLSPrivateKeyFile = in.TLSPrivateKeyFile
 	out.CertDirectory = in.CertDirectory
@@ -356,6 +357,7 @@ func autoConvert_componentconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigu
 	out.Address = in.Address
 	out.Port = in.Port
 	out.ReadOnlyPort = in.ReadOnlyPort
+	out.ClientCAFile = in.ClientCAFile
 	out.TLSCertFile = in.TLSCertFile
 	out.TLSPrivateKeyFile = in.TLSPrivateKeyFile
 	out.CertDirectory = in.CertDirectory

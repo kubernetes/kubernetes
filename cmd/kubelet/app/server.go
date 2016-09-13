@@ -505,6 +505,17 @@ func InitializeTLS(kc *componentconfig.KubeletConfiguration) (*server.TLSOptions
 		CertFile: kc.TLSCertFile,
 		KeyFile:  kc.TLSPrivateKeyFile,
 	}
+
+	if len(kc.ClientCAFile) > 0 {
+		clientCAs, err := crypto.CertPoolFromFile(kc.ClientCAFile)
+		if err != nil {
+			glog.Fatalf("Unable to load client CA file: %v", err)
+		}
+		// Specify allowed CAs for client certificates
+		tlsOptions.Config.ClientCAs = clientCAs
+		tlsOptions.Config.ClientAuth = tls.RequireAndVerifyClientCert
+	}
+
 	return tlsOptions, nil
 }
 

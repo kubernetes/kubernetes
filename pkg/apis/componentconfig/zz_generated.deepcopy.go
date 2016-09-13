@@ -203,6 +203,7 @@ func DeepCopy_componentconfig_KubeletConfiguration(in interface{}, out interface
 		out.Address = in.Address
 		out.Port = in.Port
 		out.ReadOnlyPort = in.ReadOnlyPort
+		out.ClientCAFile = in.ClientCAFile
 		out.TLSCertFile = in.TLSCertFile
 		out.TLSPrivateKeyFile = in.TLSPrivateKeyFile
 		out.CertDirectory = in.CertDirectory

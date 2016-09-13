@@ -130,6 +130,7 @@ func DeepCopy_v1alpha1_KubeletConfiguration(in interface{}, out interface{}, c *
 		out.Address = in.Address
 		out.Port = in.Port
 		out.ReadOnlyPort = in.ReadOnlyPort
+		out.ClientCAFile = in.ClientCAFile
 		out.TLSCertFile = in.TLSCertFile
 		out.TLSPrivateKeyFile = in.TLSPrivateKeyFile
 		out.CertDirectory = in.CertDirectory
