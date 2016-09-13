@@ -71,11 +71,7 @@ func (ds *dockerService) ListContainers(filter *runtimeApi.ContainerFilter) ([]*
 			glog.V(5).Infof("Unable to convert docker to runtime API container: %v", err)
 			continue
 		}
-		if len(filter.GetName()) != 0 && converted.Metadata.GetName() != filter.GetName() {
-			// TODO: Remove "name" from the ContainerFilter because name can no
-			// longer be used to identify a container.
-			continue
-		}
+
 		result = append(result, converted)
 	}
 	return result, nil
