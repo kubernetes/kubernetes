@@ -1075,6 +1075,7 @@ func (proxier *Proxier) syncProxyRules() {
 				glog.V(4).Infof("Port %s was open before and is still needed", lp.String())
 				replacementPortsMap[lp] = proxier.portsMap[lp]
 			} else {
+
 				socket, err := proxier.portMapper.OpenLocalPort(&lp)
 				if err != nil {
 					glog.Errorf("can't open %s, skipping this nodePort: %v", lp.String(), err)
@@ -1099,6 +1100,18 @@ func (proxier *Proxier) syncProxyRules() {
 				// Currently we only create it for loadbalancers (#33586).
 				writeLine(natRules, append(args, "-j", string(svcXlbChain))...)
 			}
+			// When a packet arrives, it will not go through NAT table again, because it is not "the first" packet.
+			// The solution is clearing the conntrack. Known issus:
+			// https://github.com/docker/docker/issues/8795
+			// https://github.com/kubernetes/kubernetes/issues/31983
+			if lp.protocol == "udp" {
+				glog.V(2).Infof("Deleting conntrack entries for udp connections")
+				err := proxier.execConntrackTool("-D", "-p", "udp", "--dport", strconv.Itoa(lp.port))
+				if err != nil && !strings.Contains(err.Error(), noConnectionToDelete) {
+					glog.Errorf("conntrack return with error: %v", err)
+				}
+			}
+
 		}
 
 		// If the service has no endpoints then reject packets.
