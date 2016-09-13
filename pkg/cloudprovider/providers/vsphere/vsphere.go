@@ -695,10 +695,10 @@ func (vs *VSphere) AttachDisk(vmDiskPath string, nodeName string) (diskID string
 
 		scsiController = getSCSIController(vmDevices, vs.cfg.Disk.SCSIControllerType)
 		if scsiController == nil {
-			glog.Errorf("cannot find SCSI controller in VM - %v", err)
+			glog.Errorf("cannot find SCSI controller in VM")
 			// attempt clean up of scsi controller
 			cleanUpController(newSCSIController, vmDevices, vm, ctx)
-			return "", "", err
+			return "", "", fmt.Errorf("cannot find SCSI controller in VM")
 		}
 		newSCSICreated = true
 	}
