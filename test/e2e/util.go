@@ -194,6 +194,7 @@ type TestContextType struct {
 	prefix                string
 	MinStartupPods        int
 	UpgradeTarget         string
+	UpgradeImage          string
 	PrometheusPushGateway string
 	OSDistro              string
 	VerifyServiceAccount  bool

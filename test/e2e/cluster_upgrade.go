@@ -79,14 +79,14 @@ func masterUpgradeGKE(v string) error {
 	return err
 }
 
-var nodeUpgrade = func(f *Framework, replicas int, v string) error {
+var nodeUpgrade = func(f *Framework, replicas int, v, img string) error {
 	// Perform the upgrade.
 	var err error
 	switch testContext.Provider {
 	case "gce":
 		err = nodeUpgradeGCE(v)
 	case "gke":
-		err = nodeUpgradeGKE(v)
+		err = nodeUpgradeGKE(v, img)
 	default:
 		err = fmt.Errorf("nodeUpgrade() is not implemented for provider %s", testContext.Provider)
 	}
@@ -156,16 +156,22 @@ func cleanupNodeUpgradeGCE(tmplBefore string) {
 	}
 }
 
-func nodeUpgradeGKE(v string) error {
-	Logf("Upgrading nodes to %q", v)
-	_, _, err := runCmd("gcloud", "container",
+func nodeUpgradeGKE(v, img string) error {
+	Logf("Upgrading nodes to version %q and image %q", v, img)
+	args := []string{
+		"container",
+		"clusters",
 		fmt.Sprintf("--project=%s", testContext.CloudConfig.ProjectID),
 		fmt.Sprintf("--zone=%s", testContext.CloudConfig.Zone),
-		"clusters",
 		"upgrade",
 		testContext.CloudConfig.Cluster,
 		fmt.Sprintf("--cluster-version=%s", v),
-		"--quiet")
+		"--quiet",
+	}
+	if len(img) > 0 {
+		args = append(args, fmt.Sprintf("--image-type=%s", img))
+	}
+	_, _, err := runCmd("gcloud", args...)
 	return err
 }
 
@@ -242,7 +248,7 @@ var _ = Describe("Upgrade [Feature:Upgrade]", func() {
 			By("Performing a node upgrade")
 			// Circumnavigate testUpgrade, since services don't necessarily stay up.
 			Logf("Starting upgrade")
-			expectNoError(nodeUpgrade(f, replicas, v))
+			expectNoError(nodeUpgrade(f, replicas, v, testContext.UpgradeImage))
 			Logf("Upgrade complete")
 			By("Checking node versions")
 			expectNoError(checkNodesVersions(f.Client, v))
@@ -255,7 +261,7 @@ var _ = Describe("Upgrade [Feature:Upgrade]", func() {
 			expectNoError(validate(f, svcName, rcName, ingress, replicas))
 			By("Performing a node upgrade")
 			testUpgrade(ip, v, func(v string) error {
-				return nodeUpgrade(f, replicas, v)
+				return nodeUpgrade(f, replicas, v, testContext.UpgradeImage)
 			})
 			By("Checking node versions")
 			expectNoError(checkNodesVersions(f.Client, v))
@@ -280,7 +286,7 @@ var _ = Describe("Upgrade [Feature:Upgrade]", func() {
 			By("Performing a node upgrade")
 			// Circumnavigate testUpgrade, since services don't necessarily stay up.
 			Logf("Starting upgrade")
-			expectNoError(nodeUpgrade(f, replicas, v))
+			expectNoError(nodeUpgrade(f, replicas, v, testContext.UpgradeImage))
 			Logf("Upgrade complete")
 			By("Checking node versions")
 			expectNoError(checkNodesVersions(f.Client, v))
@@ -302,7 +308,7 @@ var _ = Describe("Upgrade [Feature:Upgrade]", func() {
 			expectNoError(validate(f, svcName, rcName, ingress, replicas))
 			By("Performing a node upgrade")
 			testUpgrade(ip, v, func(v string) error {
-				return nodeUpgrade(f, replicas, v)
+				return nodeUpgrade(f, replicas, v, testContext.UpgradeImage)
 			})
 			By("Checking node versions")
 			expectNoError(checkNodesVersions(f.Client, v))
