@@ -42,6 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	clientsetadapter "k8s.io/kubernetes/pkg/client/unversioned/adapters/internalclientset"
 	"k8s.io/kubernetes/pkg/controller"
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
 	"k8s.io/kubernetes/pkg/fields"
@@ -290,7 +291,7 @@ func RCFromManifest(fileName string) *api.ReplicationController {
 
 // StopRC stops the rc via kubectl's stop library
 func StopRC(rc *api.ReplicationController, restClient *client.Client) error {
-	reaper, err := kubectl.ReaperFor(api.Kind("ReplicationController"), restClient)
+	reaper, err := kubectl.ReaperFor(api.Kind("ReplicationController"), clientsetadapter.FromUnversionedClient(restClient))
 	if err != nil || reaper == nil {
 		return err
 	}
@@ -303,7 +304,7 @@ func StopRC(rc *api.ReplicationController, restClient *client.Client) error {
 
 // ScaleRC scales the given rc to the given replicas.
 func ScaleRC(name, ns string, replicas int32, restClient *client.Client) (*api.ReplicationController, error) {
-	scaler, err := kubectl.ScalerFor(api.Kind("ReplicationController"), restClient)
+	scaler, err := kubectl.ScalerFor(api.Kind("ReplicationController"), clientsetadapter.FromUnversionedClient(restClient))
 	if err != nil {
 		return nil, err
 	}

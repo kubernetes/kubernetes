@@ -21,7 +21,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 )
 
 func TestDeploymentStatusViewerStatus(t *testing.T) {
@@ -107,6 +107,7 @@ func TestDeploymentStatusViewerStatus(t *testing.T) {
 	for _, test := range tests {
 		d := &extensions.Deployment{
 			ObjectMeta: api.ObjectMeta{
+				Namespace:  "bar",
 				Name:       "foo",
 				UID:        "8764ae47-9092-11e4-8393-42010af018ff",
 				Generation: test.generation,
@@ -116,7 +117,7 @@ func TestDeploymentStatusViewerStatus(t *testing.T) {
 			},
 			Status: test.status,
 		}
-		client := testclient.NewSimpleFake(d).Extensions()
+		client := fake.NewSimpleClientset(d).Extensions()
 		dsv := &DeploymentStatusViewer{c: client}
 		msg, done, err := dsv.Status("bar", "foo")
 		if err != nil {

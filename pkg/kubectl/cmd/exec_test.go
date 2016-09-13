@@ -31,7 +31,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
 	"k8s.io/kubernetes/pkg/util/term"
@@ -133,7 +132,7 @@ func TestPodAndContainer(t *testing.T) {
 			Client:               fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) { return nil, nil }),
 		}
 		tf.Namespace = "test"
-		tf.ClientConfig = &restclient.Config{}
+		tf.ClientConfig = defaultClientConfig()
 
 		cmd := &cobra.Command{}
 		options := test.p
@@ -162,20 +161,18 @@ func TestPodAndContainer(t *testing.T) {
 func TestExec(t *testing.T) {
 	version := testapi.Default.GroupVersion().Version
 	tests := []struct {
-		name, version, podPath, execPath, container string
-		pod                                         *api.Pod
-		execErr                                     bool
+		name, podPath, execPath, container string
+		pod                                *api.Pod
+		execErr                            bool
 	}{
 		{
 			name:     "pod exec",
-			version:  version,
 			podPath:  "/api/" + version + "/namespaces/test/pods/foo",
 			execPath: "/api/" + version + "/namespaces/test/pods/foo/exec",
 			pod:      execPod(),
 		},
 		{
 			name:     "pod exec error",
-			version:  version,
 			podPath:  "/api/" + version + "/namespaces/test/pods/foo",
 			execPath: "/api/" + version + "/namespaces/test/pods/foo/exec",
 			pod:      execPod(),
@@ -199,7 +196,7 @@ func TestExec(t *testing.T) {
 			}),
 		}
 		tf.Namespace = "test"
-		tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &unversioned.GroupVersion{Version: test.version}}}
+		tf.ClientConfig = defaultClientConfig()
 		bufOut := bytes.NewBuffer([]byte{})
 		bufErr := bytes.NewBuffer([]byte{})
 		bufIn := bytes.NewBuffer([]byte{})

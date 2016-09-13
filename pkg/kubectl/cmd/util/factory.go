@@ -49,17 +49,13 @@ import (
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/batch"
-	"k8s.io/kubernetes/pkg/apis/certificates"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/apis/policy"
-	"k8s.io/kubernetes/pkg/apis/rbac"
-	"k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/typed/discovery"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	clientset "k8s.io/kubernetes/pkg/client/unversioned/adapters/internalclientset"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/kubectl"
@@ -97,10 +93,10 @@ type Factory struct {
 	Decoder func(toInternal bool) runtime.Decoder
 	// Returns an encoder capable of encoding a provided object into JSON in the default desired version.
 	JSONEncoder func() runtime.Encoder
-	// Returns a client for accessing Kubernetes resources or an error.
-	Client func() (*client.Client, error)
 	// ClientSet gives you back an internal, generated clientset
 	ClientSet func() (*internalclientset.Clientset, error)
+	// Returns a RESTClient for accessing Kubernetes resources or an error.
+	RESTClient func() (*restclient.RESTClient, error)
 	// Returns a client.Config for accessing the Kubernetes server.
 	ClientConfig func() (*restclient.Config, error)
 	// Returns a RESTClient for working with the specified RESTMapping or an error. This is intended
@@ -308,14 +304,14 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 				cmdApiVersion = *cfg.GroupVersion
 			}
 			if discoverDynamicAPIs {
-				client, err := clients.ClientForVersion(&unversioned.GroupVersion{Version: "v1"})
+				clientset, err := clients.ClientSetForVersion(&unversioned.GroupVersion{Version: "v1"})
 				checkErrWithPrefix("failed to find client for version v1: ", err)
 
 				var versions []unversioned.GroupVersion
 				var gvks []unversioned.GroupVersionKind
 				retries := 3
 				for i := 0; i < retries; i++ {
-					versions, gvks, err = GetThirdPartyGroupVersions(client.Discovery())
+					versions, gvks, err = GetThirdPartyGroupVersions(clientset.Discovery())
 					// Retry if we got a NotFound error, because user may delete
 					// a thirdparty group when the GetThirdPartyGroupVersions is
 					// running.
@@ -418,17 +414,15 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 
 			return kubectl.ShortcutExpander{RESTMapper: mapper}, typer, nil
 		},
-		Client: func() (*client.Client, error) {
-			return clients.ClientForVersion(nil)
-		},
-
-		ClientSet: func() (*internalclientset.Clientset, error) {
-			cfg, err := clients.ClientConfigForVersion(nil)
+		RESTClient: func() (*restclient.RESTClient, error) {
+			clientConfig, err := clients.ClientConfigForVersion(nil)
 			if err != nil {
 				return nil, err
 			}
-
-			return internalclientset.NewForConfig(cfg)
+			return restclient.RESTClientFor(clientConfig)
+		},
+		ClientSet: func() (*internalclientset.Clientset, error) {
+			return clients.ClientSetForVersion(nil)
 		},
 		ClientConfig: func() (*restclient.Config, error) {
 			return clients.ClientConfigForVersion(nil)
@@ -486,11 +480,11 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 					return &kubectl.ClusterDescriber{Interface: fedClientSet}, nil
 				}
 			}
-			client, err := clients.ClientForVersion(&mappingVersion)
+			clientset, err := clients.ClientSetForVersion(&mappingVersion)
 			if err != nil {
 				return nil, err
 			}
-			if describer, ok := kubectl.DescriberFor(mapping.GroupVersionKind.GroupKind(), client); ok {
+			if describer, ok := kubectl.DescriberFor(mapping.GroupVersionKind.GroupKind(), clientset); ok {
 				return describer, nil
 			}
 			return nil, fmt.Errorf("no description has been implemented for %q", mapping.GroupVersionKind.Kind)
@@ -594,7 +588,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			return meta.NewAccessor().Labels(object)
 		},
 		LogsForObject: func(object, options runtime.Object) (*restclient.Request, error) {
-			c, err := clients.ClientForVersion(nil)
+			clientset, err := clients.ClientSetForVersion(nil)
 			if err != nil {
 				return nil, err
 			}
@@ -605,7 +599,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 				if !ok {
 					return nil, errors.New("provided options object is not a PodLogOptions")
 				}
-				return c.Pods(t.Namespace).GetLogs(t.Name, opts), nil
+				return clientset.Core().Pods(t.Namespace).GetLogs(t.Name, opts), nil
 
 			case *api.ReplicationController:
 				opts, ok := options.(*api.PodLogOptions)
@@ -614,7 +608,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 				}
 				selector := labels.SelectorFromSet(t.Spec.Selector)
 				sortBy := func(pods []*api.Pod) sort.Interface { return controller.ByLogging(pods) }
-				pod, numPods, err := GetFirstPod(c, t.Namespace, selector, 20*time.Second, sortBy)
+				pod, numPods, err := GetFirstPod(clientset.Core(), t.Namespace, selector, 20*time.Second, sortBy)
 				if err != nil {
 					return nil, err
 				}
@@ -622,7 +616,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 					fmt.Fprintf(os.Stderr, "Found %v pods, using pod/%v\n", numPods, pod.Name)
 				}
 
-				return c.Pods(pod.Namespace).GetLogs(pod.Name, opts), nil
+				return clientset.Core().Pods(pod.Namespace).GetLogs(pod.Name, opts), nil
 
 			case *extensions.ReplicaSet:
 				opts, ok := options.(*api.PodLogOptions)
@@ -634,7 +628,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 					return nil, fmt.Errorf("invalid label selector: %v", err)
 				}
 				sortBy := func(pods []*api.Pod) sort.Interface { return controller.ByLogging(pods) }
-				pod, numPods, err := GetFirstPod(c, t.Namespace, selector, 20*time.Second, sortBy)
+				pod, numPods, err := GetFirstPod(clientset.Core(), t.Namespace, selector, 20*time.Second, sortBy)
 				if err != nil {
 					return nil, err
 				}
@@ -642,7 +636,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 					fmt.Fprintf(os.Stderr, "Found %v pods, using pod/%v\n", numPods, pod.Name)
 				}
 
-				return c.Pods(pod.Namespace).GetLogs(pod.Name, opts), nil
+				return clientset.Core().Pods(pod.Namespace).GetLogs(pod.Name, opts), nil
 
 			default:
 				gvks, _, err := api.Scheme.ObjectKinds(object)
@@ -653,7 +647,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			}
 		},
 		PauseObject: func(object runtime.Object) (bool, error) {
-			c, err := clients.ClientForVersion(nil)
+			clientset, err := clients.ClientSetForVersion(nil)
 			if err != nil {
 				return false, err
 			}
@@ -664,7 +658,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 					return true, nil
 				}
 				t.Spec.Paused = true
-				_, err := c.Extensions().Deployments(t.Namespace).Update(t)
+				_, err := clientset.Extensions().Deployments(t.Namespace).Update(t)
 				return false, err
 			default:
 				gvks, _, err := api.Scheme.ObjectKinds(object)
@@ -675,7 +669,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			}
 		},
 		ResumeObject: func(object runtime.Object) (bool, error) {
-			c, err := clients.ClientForVersion(nil)
+			clientset, err := clients.ClientSetForVersion(nil)
 			if err != nil {
 				return false, err
 			}
@@ -686,7 +680,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 					return true, nil
 				}
 				t.Spec.Paused = false
-				_, err := c.Extensions().Deployments(t.Namespace).Update(t)
+				_, err := clientset.Extensions().Deployments(t.Namespace).Update(t)
 				return false, err
 			default:
 				gvks, _, err := api.Scheme.ObjectKinds(object)
@@ -698,55 +692,61 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 		},
 		Scaler: func(mapping *meta.RESTMapping) (kubectl.Scaler, error) {
 			mappingVersion := mapping.GroupVersionKind.GroupVersion()
-			client, err := clients.ClientForVersion(&mappingVersion)
+			clientset, err := clients.ClientSetForVersion(&mappingVersion)
 			if err != nil {
 				return nil, err
 			}
-			return kubectl.ScalerFor(mapping.GroupVersionKind.GroupKind(), client)
+			return kubectl.ScalerFor(mapping.GroupVersionKind.GroupKind(), clientset)
 		},
 		Reaper: func(mapping *meta.RESTMapping) (kubectl.Reaper, error) {
 			mappingVersion := mapping.GroupVersionKind.GroupVersion()
-			client, err := clients.ClientForVersion(&mappingVersion)
+			clientset, err := clients.ClientSetForVersion(&mappingVersion)
 			if err != nil {
 				return nil, err
 			}
-			return kubectl.ReaperFor(mapping.GroupVersionKind.GroupKind(), client)
+			return kubectl.ReaperFor(mapping.GroupVersionKind.GroupKind(), clientset)
 		},
 		HistoryViewer: func(mapping *meta.RESTMapping) (kubectl.HistoryViewer, error) {
 			mappingVersion := mapping.GroupVersionKind.GroupVersion()
-			client, err := clients.ClientForVersion(&mappingVersion)
+			clientset, err := clients.ClientSetForVersion(&mappingVersion)
 			if err != nil {
 				return nil, err
 			}
-			clientset := clientset.FromUnversionedClient(client)
 			return kubectl.HistoryViewerFor(mapping.GroupVersionKind.GroupKind(), clientset)
 		},
 		Rollbacker: func(mapping *meta.RESTMapping) (kubectl.Rollbacker, error) {
 			mappingVersion := mapping.GroupVersionKind.GroupVersion()
-			client, err := clients.ClientForVersion(&mappingVersion)
+			clientset, err := clients.ClientSetForVersion(&mappingVersion)
 			if err != nil {
 				return nil, err
 			}
-			clientset := clientset.FromUnversionedClient(client)
 			return kubectl.RollbackerFor(mapping.GroupVersionKind.GroupKind(), clientset)
 		},
 		StatusViewer: func(mapping *meta.RESTMapping) (kubectl.StatusViewer, error) {
 			mappingVersion := mapping.GroupVersionKind.GroupVersion()
-			client, err := clients.ClientForVersion(&mappingVersion)
+			clientset, err := clients.ClientSetForVersion(&mappingVersion)
 			if err != nil {
 				return nil, err
 			}
-			return kubectl.StatusViewerFor(mapping.GroupVersionKind.GroupKind(), client)
+			return kubectl.StatusViewerFor(mapping.GroupVersionKind.GroupKind(), clientset)
 		},
 		Validator: func(validate bool, cacheDir string) (validation.Schema, error) {
 			if validate {
-				client, err := clients.ClientForVersion(nil)
+				clientConfig, err := clients.ClientConfigForVersion(nil)
+				if err != nil {
+					return nil, err
+				}
+				restclient, err := restclient.RESTClientFor(clientConfig)
+				if err != nil {
+					return nil, err
+				}
+				clientset, err := clients.ClientSetForVersion(nil)
 				if err != nil {
 					return nil, err
 				}
 				dir := cacheDir
 				if len(dir) > 0 {
-					version, err := client.ServerVersion()
+					version, err := clientset.Discovery().ServerVersion()
 					if err != nil {
 						return nil, err
 					}
@@ -757,7 +757,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 					return nil, err
 				}
 				return &clientSwaggerSchema{
-					c:        client,
+					c:        restclient,
 					fedc:     fedClient,
 					cacheDir: dir,
 					mapper:   api.RESTMapper,
@@ -766,18 +766,12 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			return validation.NullSchema{}, nil
 		},
 		SwaggerSchema: func(gvk unversioned.GroupVersionKind) (*swagger.ApiDeclaration, error) {
-			// discovery doesn't care about which groupversion you get a client for,
-			// so get whichever one you happen to have available and use that.
-			cfg, err := clients.ClientConfigForVersion(nil)
+			version := gvk.GroupVersion()
+			clientset, err := clients.ClientSetForVersion(&version)
 			if err != nil {
 				return nil, err
 			}
-			dc, err := discovery.NewDiscoveryClientForConfig(cfg)
-			if err != nil {
-				return nil, err
-			}
-
-			return dc.SwaggerSchema(gvk.GroupVersion())
+			return clientset.Discovery().SwaggerSchema(version)
 		},
 		DefaultNamespace: func() (string, bool, error) {
 			return clientConfig.Namespace()
@@ -804,7 +798,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			return nil
 		},
 		AttachablePodForObject: func(object runtime.Object) (*api.Pod, error) {
-			client, err := clients.ClientForVersion(nil)
+			clientset, err := clients.ClientSetForVersion(nil)
 			if err != nil {
 				return nil, err
 			}
@@ -812,7 +806,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			case *api.ReplicationController:
 				selector := labels.SelectorFromSet(t.Spec.Selector)
 				sortBy := func(pods []*api.Pod) sort.Interface { return sort.Reverse(controller.ActivePods(pods)) }
-				pod, _, err := GetFirstPod(client, t.Namespace, selector, 1*time.Minute, sortBy)
+				pod, _, err := GetFirstPod(clientset.Core(), t.Namespace, selector, 1*time.Minute, sortBy)
 				return pod, err
 			case *extensions.Deployment:
 				selector, err := unversioned.LabelSelectorAsSelector(t.Spec.Selector)
@@ -820,7 +814,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 					return nil, fmt.Errorf("invalid label selector: %v", err)
 				}
 				sortBy := func(pods []*api.Pod) sort.Interface { return sort.Reverse(controller.ActivePods(pods)) }
-				pod, _, err := GetFirstPod(client, t.Namespace, selector, 1*time.Minute, sortBy)
+				pod, _, err := GetFirstPod(clientset.Core(), t.Namespace, selector, 1*time.Minute, sortBy)
 				return pod, err
 			case *batch.Job:
 				selector, err := unversioned.LabelSelectorAsSelector(t.Spec.Selector)
@@ -828,7 +822,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 					return nil, fmt.Errorf("invalid label selector: %v", err)
 				}
 				sortBy := func(pods []*api.Pod) sort.Interface { return sort.Reverse(controller.ActivePods(pods)) }
-				pod, _, err := GetFirstPod(client, t.Namespace, selector, 1*time.Minute, sortBy)
+				pod, _, err := GetFirstPod(clientset.Core(), t.Namespace, selector, 1*time.Minute, sortBy)
 				return pod, err
 			case *api.Pod:
 				return t, nil
@@ -900,7 +894,7 @@ See http://releases.k8s.io/HEAD/docs/user-guide/services-firewalls.md for more d
 
 // GetFirstPod returns a pod matching the namespace and label selector
 // and the number of all pods that match the label selector.
-func GetFirstPod(client client.PodsNamespacer, namespace string, selector labels.Selector, timeout time.Duration, sortBy func([]*api.Pod) sort.Interface) (*api.Pod, int, error) {
+func GetFirstPod(client coreclient.PodsGetter, namespace string, selector labels.Selector, timeout time.Duration, sortBy func([]*api.Pod) sort.Interface) (*api.Pod, int, error) {
 	options := api.ListOptions{LabelSelector: selector}
 
 	podList, err := client.Pods(namespace).List(options)
@@ -1026,7 +1020,7 @@ func getServiceProtocols(spec api.ServiceSpec) map[string]string {
 }
 
 type clientSwaggerSchema struct {
-	c        *client.Client
+	c        *restclient.RESTClient
 	fedc     *restclient.RESTClient
 	cacheDir string
 	mapper   meta.RESTMapper
@@ -1157,60 +1151,24 @@ func (c *clientSwaggerSchema) ValidateBytes(data []byte) error {
 	if ok := registered.IsEnabledVersion(gvk.GroupVersion()); !ok {
 		return fmt.Errorf("API version %q isn't supported, only supports API versions %q", gvk.GroupVersion().String(), registered.EnabledVersions())
 	}
-	switch gvk.Group {
-	case autoscaling.GroupName:
-		if c.c.AutoscalingClient == nil {
-			return errors.New("unable to validate: no autoscaling client")
-		}
-		return getSchemaAndValidate(c.c.AutoscalingClient.RESTClient, data, "apis/", gvk.GroupVersion().String(), c.cacheDir, c)
-	case policy.GroupName:
-		if c.c.PolicyClient == nil {
-			return errors.New("unable to validate: no policy client")
-		}
-		return getSchemaAndValidate(c.c.PolicyClient.RESTClient, data, "apis/", gvk.GroupVersion().String(), c.cacheDir, c)
-	case apps.GroupName:
-		if c.c.AppsClient == nil {
-			return errors.New("unable to validate: no apps client")
-		}
-		return getSchemaAndValidate(c.c.AppsClient.RESTClient, data, "apis/", gvk.GroupVersion().String(), c.cacheDir, c)
-	case batch.GroupName:
-		if c.c.BatchClient == nil {
-			return errors.New("unable to validate: no batch client")
-		}
-		return getSchemaAndValidate(c.c.BatchClient.RESTClient, data, "apis/", gvk.GroupVersion().String(), c.cacheDir, c)
-	case rbac.GroupName:
-		if c.c.RbacClient == nil {
-			return errors.New("unable to validate: no rbac client")
-		}
-		return getSchemaAndValidate(c.c.RbacClient.RESTClient, data, "apis/", gvk.GroupVersion().String(), c.cacheDir, c)
-	case storage.GroupName:
-		if c.c.StorageClient == nil {
-			return errors.New("unable to validate: no storage client")
-		}
-		return getSchemaAndValidate(c.c.StorageClient.RESTClient, data, "apis/", gvk.GroupVersion().String(), c.cacheDir, c)
-	}
 	if registered.IsThirdPartyAPIGroupVersion(gvk.GroupVersion()) {
 		// Don't attempt to validate third party objects
 		return nil
 	}
+
 	switch gvk.Group {
-	case extensions.GroupName:
-		if c.c.ExtensionsClient == nil {
-			return errors.New("unable to validate: no experimental client")
-		}
-		return getSchemaAndValidate(c.c.ExtensionsClient.RESTClient, data, "apis/", gvk.GroupVersion().String(), c.cacheDir, c)
 	case federation.GroupName:
 		if c.fedc == nil {
 			return errors.New("unable to validate: no federation client")
 		}
 		return getSchemaAndValidate(c.fedc, data, "apis/", gvk.GroupVersion().String(), c.cacheDir, c)
-	case certificates.GroupName:
-		if c.c.CertificatesClient == nil {
-			return errors.New("unable to validate: no certificates client")
-		}
-		return getSchemaAndValidate(c.c.CertificatesClient.RESTClient, data, "apis/", gvk.GroupVersion().String(), c.cacheDir, c)
+
+	case api.GroupName:
+		return getSchemaAndValidate(c.c, data, "api", gvk.GroupVersion().String(), c.cacheDir, c)
+
+	default:
+		return getSchemaAndValidate(c.c, data, "apis/", gvk.GroupVersion().String(), c.cacheDir, c)
 	}
-	return getSchemaAndValidate(c.c.RESTClient, data, "api", gvk.GroupVersion().String(), c.cacheDir, c)
 }
 
 // DefaultClientConfig creates a clientcmd.ClientConfig with the following hierarchy:
