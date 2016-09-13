@@ -437,7 +437,7 @@ func SkipUnlessFederated(c *client.Client) {
 }
 
 func SkipIfMissingResource(clientPool dynamic.ClientPool, gvr unversioned.GroupVersionResource, namespace string) {
-	dynamicClient, err := clientPool.ClientForGroupVersion(gvr.GroupVersion())
+	dynamicClient, err := clientPool.ClientForGroupVersionResource(gvr)
 	if err != nil {
 		Failf("Unexpected error getting dynamic client for %v: %v", gvr.GroupVersion(), err)
 	}
@@ -1230,7 +1230,7 @@ func hasRemainingContent(c *client.Client, clientPool dynamic.ClientPool, namesp
 	// dump how many of resource type is on the server in a log.
 	for _, gvr := range groupVersionResources {
 		// get a client for this group version...
-		dynamicClient, err := clientPool.ClientForGroupVersion(gvr.GroupVersion())
+		dynamicClient, err := clientPool.ClientForGroupVersionResource(gvr)
 		if err != nil {
 			// not all resource types support list, so some errors here are normal depending on the resource type.
 			Logf("namespace: %s, unable to get client - gvr: %v, error: %v", namespace, gvr, err)
