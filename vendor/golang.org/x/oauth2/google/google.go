@@ -1,4 +1,4 @@
-// Copyright 2014 The oauth2 Authors. All rights reserved.
+// Copyright 2014 The Go Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
@@ -21,9 +21,9 @@ import (
 	"strings"
 	"time"
 
+	"cloud.google.com/go/compute/metadata"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/jwt"
-	"google.golang.org/cloud/compute/metadata"
 )
 
 // Endpoint is Google's OAuth 2.0 endpoint.
@@ -37,9 +37,10 @@ const JWTTokenURL = "https://accounts.google.com/o/oauth2/token"
 
 // ConfigFromJSON uses a Google Developers Console client_credentials.json
 // file to construct a config.
-// client_credentials.json can be downloadable from https://console.developers.google.com,
-// under "APIs & Auth" > "Credentials". Download the Web application credentials in the
-// JSON format and provide the contents of the file as jsonKey.
+// client_credentials.json can be downloaded from
+// https://console.developers.google.com, under "Credentials". Download the Web
+// application credentials in the JSON format and provide the contents of the
+// file as jsonKey.
 func ConfigFromJSON(jsonKey []byte, scope ...string) (*oauth2.Config, error) {
 	type cred struct {
 		ClientID     string   `json:"client_id"`
@@ -81,22 +82,29 @@ func ConfigFromJSON(jsonKey []byte, scope ...string) (*oauth2.Config, error) {
 
 // JWTConfigFromJSON uses a Google Developers service account JSON key file to read
 // the credentials that authorize and authenticate the requests.
-// Create a service account on "Credentials" page under "APIs & Auth" for your
-// project at https://console.developers.google.com to download a JSON key file.
+// Create a service account on "Credentials" for your project at
+// https://console.developers.google.com to download a JSON key file.
 func JWTConfigFromJSON(jsonKey []byte, scope ...string) (*jwt.Config, error) {
 	var key struct {
-		Email      string `json:"client_email"`
-		PrivateKey string `json:"private_key"`
+		Email        string `json:"client_email"`
+		PrivateKey   string `json:"private_key"`
+		PrivateKeyID string `json:"private_key_id"`
+		TokenURL     string `json:"token_uri"`
 	}
 	if err := json.Unmarshal(jsonKey, &key); err != nil {
 		return nil, err
 	}
-	return &jwt.Config{
-		Email:      key.Email,
-		PrivateKey: []byte(key.PrivateKey),
-		Scopes:     scope,
-		TokenURL:   JWTTokenURL,
-	}, nil
+	config := &jwt.Config{
+		Email:        key.Email,
+		PrivateKey:   []byte(key.PrivateKey),
+		PrivateKeyID: key.PrivateKeyID,
+		Scopes:       scope,
+		TokenURL:     key.TokenURL,
+	}
+	if config.TokenURL == "" {
+		config.TokenURL = JWTTokenURL
+	}
+	return config, nil
 }
 
 // ComputeTokenSource returns a token source that fetches access tokens
