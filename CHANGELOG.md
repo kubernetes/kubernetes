@@ -245,7 +245,7 @@ binary | sha256 hash
 * Add a short `-n` for `kubectl --namespace` ([#30630](https://github.com/kubernetes/kubernetes/pull/30630), [@silasbw](https://github.com/silasbw))
 * Federated secret controller ([#30669](https://github.com/kubernetes/kubernetes/pull/30669), [@kshafiee](https://github.com/kshafiee))
 * Add Events for operation_executor to show status of mounts, failed/successful to show in describe events ([#27778](https://github.com/kubernetes/kubernetes/pull/27778), [@screeley44](https://github.com/screeley44))
-* Alpha support for OpenAPI (aka. Swagger 2.0) specification served on /swagger.json  ([#30233](https://github.com/kubernetes/kubernetes/pull/30233), [@mbohlool](https://github.com/mbohlool))
+* Alpha support for OpenAPI (aka. Swagger 2.0) specification served on /swagger.json (enabled by default)  ([#30233](https://github.com/kubernetes/kubernetes/pull/30233), [@mbohlool](https://github.com/mbohlool))
 * Disable linux/ppc64le compilation by default ([#30659](https://github.com/kubernetes/kubernetes/pull/30659), [@ixdy](https://github.com/ixdy))
 * Implement dynamic provisioning (beta) of PersistentVolumes via StorageClass ([#29006](https://github.com/kubernetes/kubernetes/pull/29006), [@jsafrane](https://github.com/jsafrane))
 * Allow setting permission mode bits on secrets, configmaps and downwardAPI files ([#28936](https://github.com/kubernetes/kubernetes/pull/28936), [@rata](https://github.com/rata))
