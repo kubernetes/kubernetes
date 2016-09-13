@@ -87,19 +87,40 @@ func (r *Runtime) PullImage(image kubecontainer.ImageSpec, pullSecrets []api.Sec
 }
 
 func (r *Runtime) IsImagePresent(image kubecontainer.ImageSpec) (bool, error) {
-	_, err := r.imageService.Status(image)
-
-	return err != nil, err
+	images, err := r.listImages(image.Image, false)
+	return len(images) > 0, err
 }
 
 // ListImages lists all the available appc images on the machine by invoking 'rkt image list'.
 func (r *Runtime) ListImages() ([]kubecontainer.Image, error) {
-	return r.imageService.List()
+	ctx, cancel := context.WithTimeout(context.Background(), r.requestTimeout)
+	defer cancel()
+	listResp, err := r.apisvc.ListImages(ctx, &rktapi.ListImagesRequest{})
+	if err != nil {
+		return nil, fmt.Errorf("couldn't list images: %v", err)
+	}
+
+	images := make([]kubecontainer.Image, len(listResp.Images))
+	for i, image := range listResp.Images {
+		images[i] = kubecontainer.Image{
+			ID:       image.Id,
+			RepoTags: []string{buildImageName(image)},
+			Size:     image.Size,
+		}
+	}
+	return images, nil
 }
 
 // RemoveImage removes an on-disk image using 'rkt image rm'.
 func (r *Runtime) RemoveImage(image kubecontainer.ImageSpec) error {
-	return r.imageService.Remove(image)
+	imageID, err := r.getImageID(image.Image)
+	if err != nil {
+		return err
+	}
+	if _, err := r.cli.RunCommand(nil, "image", "rm", imageID); err != nil {
+		return err
+	}
+	return nil
 }
 
 // buildImageName constructs the image name for kubecontainer.Image.

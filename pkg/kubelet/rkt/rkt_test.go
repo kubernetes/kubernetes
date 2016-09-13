@@ -262,7 +262,6 @@ func TestCheckVersion(t *testing.T) {
 }
 
 func TestListImages(t *testing.T) {
-	t.SkipNow()
 	fr := newFakeRktInterface()
 	fs := newFakeSystemd()
 	r := &Runtime{apisvc: fr, systemd: fs}

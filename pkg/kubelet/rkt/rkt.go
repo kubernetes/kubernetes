@@ -52,7 +52,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/kubelet/network/hairpin"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
-	"k8s.io/kubernetes/pkg/kubelet/rktshim"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/securitycontext"
@@ -161,8 +160,6 @@ type Runtime struct {
 	execer              utilexec.Interface
 	os                  kubecontainer.OSInterface
 
-	imageService *rktshim.ImageStore
-
 	// Network plugin.
 	networkPlugin network.NetworkPlugin
 
@@ -270,26 +267,9 @@ func New(
 		requestTimeout:      requestTimeout,
 	}
 
-	// TODO(tmrts): transform from being a method to function
 	rkt.config, err = rkt.getConfig(rkt.config)
 	if err != nil {
 		return nil, fmt.Errorf("rkt: cannot get config from rkt api service: %v", err)
-	}
-
-	rkt.imageService, err = rktshim.NewImageStore(rktshim.ImageStoreConfig{
-		RequestTimeout: requestTimeout,
-		// TODO(tmrts): use the new CLI api throught the rkt pkg
-		CLI: rktshim.NewRktCLI(config.Path, execer, rktshim.CLIConfig{
-			Debug:           config.Debug,
-			Dir:             config.Dir,
-			LocalConfigDir:  config.LocalConfigDir,
-			UserConfigDir:   config.UserConfigDir,
-			SystemConfigDir: config.SystemConfigDir,
-			InsecureOptions: config.InsecureOptions,
-		}),
-	})
-	if err != nil {
-		return nil, fmt.Errorf("rkt: failed to create ImageService: %v", err)
 	}
 
 	rkt.runner = lifecycle.NewHandlerRunner(httpClient, rkt, rkt)
