@@ -17,6 +17,7 @@ limitations under the License.
 package discovery
 
 import (
+	"fmt"
 	"sync"
 
 	"k8s.io/kubernetes/pkg/api/errors"
@@ -257,6 +258,14 @@ func (d *DeferredDiscoveryRESTMapper) ResourceSingularizer(resource string) (sin
 		return resource, err
 	}
 	return del.ResourceSingularizer(resource)
+}
+
+func (d *DeferredDiscoveryRESTMapper) String() string {
+	del, err := d.getDelegate()
+	if err != nil {
+		return fmt.Sprintf("DeferredDiscoveryRESTMapper{%v}", err)
+	}
+	return fmt.Sprintf("DeferredDiscoveryRESTMapper{\n\t%v\n}", del)
 }
 
 // Make sure it satisfies the interface

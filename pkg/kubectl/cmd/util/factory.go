@@ -315,9 +315,12 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 					// TODO eliminate this once we're truly generic.
 					thirdPartyResourceDataMapper := meta.NewDefaultRESTMapper([]unversioned.GroupVersion{extensionsv1beta1.SchemeGroupVersion}, registered.InterfacesFor)
 					thirdPartyResourceDataMapper.Add(extensionsv1beta1.SchemeGroupVersion.WithKind("ThirdPartyResourceData"), meta.RESTScopeNamespace)
-					mapper = meta.MultiRESTMapper{
-						discovery.NewDeferredDiscoveryRESTMapper(discoveryClient, registered.InterfacesFor),
-						thirdPartyResourceDataMapper,
+
+					mapper = meta.FirstHitRESTMapper{
+						MultiRESTMapper: meta.MultiRESTMapper{
+							discovery.NewDeferredDiscoveryRESTMapper(discoveryClient, registered.InterfacesFor),
+							thirdPartyResourceDataMapper,
+						},
 					}
 				}
 			}
