@@ -26,9 +26,24 @@ import (
 // The failure information is given by the error.
 type FitPredicate func(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, []PredicateFailureReason, error)
 
+// PriorityMapFunction is a function that computes per-node results for a given node.
+// TODO: Figure out the exact API of this method.
+type PriorityMapFunction func(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (schedulerapi.HostPriority, error)
+
+// PriorityReduceFunction is a function that aggregated per-node results and computes
+// final scores for all nodes.
+// TODO: Figure out the exact API of this method.
+type PriorityReduceFunction func(result schedulerapi.HostPriorityList) error
+
+// DEPRECATED
+// Use Map-Reduce pattern for priority functions.
 type PriorityFunction func(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodes []*api.Node) (schedulerapi.HostPriorityList, error)
 
 type PriorityConfig struct {
+	Map    PriorityMapFunction
+	Reduce PriorityReduceFunction
+	// TODO: Remove it after migrating all functions to
+	// Map-Reduce pattern.
 	Function PriorityFunction
 	Weight   int
 }

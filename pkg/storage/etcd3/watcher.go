@@ -190,6 +190,10 @@ func (wc *watchChan) processEvent(wg *sync.WaitGroup) {
 			if res == nil {
 				continue
 			}
+			if len(wc.resultChan) == outgoingBufSize {
+				glog.Warningf("Fast watcher, slow processing. Number of buffered events: %d."+
+					"Probably caused by slow dispatching events to watchers", outgoingBufSize)
+			}
 			// If user couldn't receive results fast enough, we also block incoming events from watcher.
 			// Because storing events in local will cause more memory usage.
 			// The worst case would be closing the fast watcher.
@@ -300,7 +304,7 @@ func (wc *watchChan) sendError(err error) {
 
 func (wc *watchChan) sendEvent(e *event) {
 	if len(wc.incomingEventChan) == incomingBufSize {
-		glog.V(2).Infof("Fast watcher, slow processing. Number of buffered events: %d."+
+		glog.Warningf("Fast watcher, slow processing. Number of buffered events: %d."+
 			"Probably caused by slow decoding, user not receiving fast, or other processing logic",
 			incomingBufSize)
 	}

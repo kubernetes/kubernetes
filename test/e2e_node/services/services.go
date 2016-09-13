@@ -36,6 +36,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/kardianos/osext"
 
+	utilconfig "k8s.io/kubernetes/pkg/util/config"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e_node/build"
 )
@@ -76,6 +77,10 @@ func (e *E2EServices) Start() error {
 	// TODO(random-liu): Add sudo after we statically link apiserver and etcd, because apiserver needs
 	// sudo. We can't add sudo now, because etcd may not be in PATH of root.
 	startCmd := exec.Command(testBin,
+		// TODO(mtaufen): Flags e.g. that target the TestContext need to be manually forwarded to the
+		//                test binary when we start it up in run-services mode. This is not ideal.
+		//                Very unintuitive because it prevents any falgs NOT manually forwarded here
+		//                from being set via TEST_ARGS when running tests from the command line.
 		"--run-services-mode",
 		"--server-start-timeout", serverStartTimeout.String(),
 		"--report-dir", framework.TestContext.ReportDir,
@@ -87,6 +92,7 @@ func (e *E2EServices) Start() error {
 		// "--cgroups-per-qos="+strconv.FormatBool(framework.TestContext.CgroupsPerQOS),
 		"--manifest-path", framework.TestContext.ManifestPath,
 		"--eviction-hard", framework.TestContext.EvictionHard,
+		"--feature-gates", framework.TestContext.FeatureGates,
 		"--logtostderr",
 		"--vmodule=*=4",
 	)
@@ -115,6 +121,9 @@ func (e *E2EServices) Stop() error {
 // RunE2EServices actually start the e2e services. This function is used to
 // start e2e services in current process. This is only used in run-services-mode.
 func RunE2EServices() {
+	// Populate global DefaultFeatureGate with value from TestContext.FeatureGates.
+	// This way, statically-linked components see the same feature gate config as the test context.
+	utilconfig.DefaultFeatureGate.Set(framework.TestContext.FeatureGates)
 	e := newE2EService()
 	if err := e.run(); err != nil {
 		glog.Fatalf("Failed to run e2e services: %v", err)
@@ -376,7 +385,7 @@ func (es *e2eService) startKubeletServer() (*server, error) {
 		"--pod-cidr=10.180.0.0/24", // Assign a fixed CIDR to the node because there is no node controller.
 		"--eviction-hard", framework.TestContext.EvictionHard,
 		"--eviction-pressure-transition-period", "30s",
-		"--feature-gates", "DynamicKubeletConfig=true", // TODO(mtaufen): Eventually replace with a value from the framework.TestContext
+		"--feature-gates", framework.TestContext.FeatureGates,
 	)
 	if framework.TestContext.CgroupsPerQOS {
 		// TODO: enable this when the flag is stable and available in kubelet.

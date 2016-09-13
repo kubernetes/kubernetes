@@ -750,6 +750,15 @@ runTests() {
   kubectl replace "${kube_flags[@]}" --force -f /tmp/tmp-valid-pod.json
   # Post-condition: spec.container.name = "replaced-k8s-serve-hostname"
   kube::test::get_object_assert 'pod valid-pod' "{{(index .spec.containers 0).name}}" 'replaced-k8s-serve-hostname'
+
+  ## check replace --grace-period requires --force
+  output_message=$(! kubectl replace "${kube_flags[@]}" --grace-period=1 -f /tmp/tmp-valid-pod.json 2>&1)
+  kube::test::if_has_string "${output_message}" '\-\-grace-period must have \-\-force specified'
+
+  ## check replace --timeout requires --force
+  output_message=$(! kubectl replace "${kube_flags[@]}" --timeout=1s -f /tmp/tmp-valid-pod.json 2>&1)
+  kube::test::if_has_string "${output_message}" '\-\-timeout must have \-\-force specified'
+
   #cleaning
   rm /tmp/tmp-valid-pod.json
 
@@ -946,6 +955,9 @@ __EOF__
   output_message=$(kubectl get hpa.extensions -o=jsonpath='{.items[0].apiVersion}' 2>&1 "${kube_flags[@]}")
   kube::test::if_has_string "${output_message}" 'extensions/v1beta1'
   output_message=$(kubectl get hpa.autoscaling -o=jsonpath='{.items[0].apiVersion}' 2>&1 "${kube_flags[@]}")
+  kube::test::if_has_string "${output_message}" 'autoscaling/v1'
+  # tests kubectl group prefix matching
+  output_message=$(kubectl get hpa.autoscal -o=jsonpath='{.items[0].apiVersion}' 2>&1 "${kube_flags[@]}")
   kube::test::if_has_string "${output_message}" 'autoscaling/v1'
   # Clean up
   # Note that we should delete hpa first, otherwise it may fight with the rc reaper.
@@ -1954,6 +1966,9 @@ __EOF__
   kube::test::get_object_assert deployment "{{range.items}}{{$deployment_image_field}}:{{end}}" "${IMAGE_DEPLOYMENT_R1}:"
   # Update the deployment (revision 2)
   kubectl apply -f hack/testdata/deployment-revision2.yaml "${kube_flags[@]}"
+  kube::test::get_object_assert deployment.extensions "{{range.items}}{{$deployment_image_field}}:{{end}}" "${IMAGE_DEPLOYMENT_R2}:"
+  # Rollback to revision 1 with dry-run - should be no-op
+  kubectl rollout undo deployment nginx --to-revision=1 --dry-run=true "${kube_flags[@]}"
   kube::test::get_object_assert deployment.extensions "{{range.items}}{{$deployment_image_field}}:{{end}}" "${IMAGE_DEPLOYMENT_R2}:"
   # Rollback to revision 1
   kubectl rollout undo deployment nginx --to-revision=1 "${kube_flags[@]}"

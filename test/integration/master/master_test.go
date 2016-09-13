@@ -465,7 +465,15 @@ func TestServiceAlloc(t *testing.T) {
 			t.Errorf("unexpected error text: %v", err)
 		}
 	} else {
-		t.Fatalf("unexpected sucess")
+		svcs, err := client.Services(api.NamespaceAll).List(api.ListOptions{})
+		if err != nil {
+			t.Fatalf("unexpected success, and error getting the services: %v", err)
+		}
+		allIPs := []string{}
+		for _, s := range svcs.Items {
+			allIPs = append(allIPs, s.Spec.ClusterIP)
+		}
+		t.Fatalf("unexpected creation success. The following IPs exist: %#v. It should only be possible to allocate 2 IP addresses in this cluster.\n\n%#v", allIPs, svcs)
 	}
 
 	// Delete the first service.

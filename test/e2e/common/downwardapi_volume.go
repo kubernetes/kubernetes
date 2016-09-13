@@ -231,7 +231,7 @@ func downwardAPIVolumePodForSimpleTest(name string, filePath string) *api.Pod {
 	pod.Spec.Containers = []api.Container{
 		{
 			Name:    "client-container",
-			Image:   "gcr.io/google_containers/mounttest:0.6",
+			Image:   "gcr.io/google_containers/mounttest:0.7",
 			Command: []string{"/mt", "--file_content=" + filePath},
 			VolumeMounts: []api.VolumeMount{
 				{
@@ -262,7 +262,7 @@ func downwardAPIVolumeBaseContainers(name, filePath string) []api.Container {
 	return []api.Container{
 		{
 			Name:    name,
-			Image:   "gcr.io/google_containers/mounttest:0.6",
+			Image:   "gcr.io/google_containers/mounttest:0.7",
 			Command: []string{"/mt", "--file_content=" + filePath},
 			Resources: api.ResourceRequirements{
 				Requests: api.ResourceList{
@@ -290,7 +290,7 @@ func downwardAPIVolumeDefaultBaseContainer(name, filePath string) []api.Containe
 	return []api.Container{
 		{
 			Name:    name,
-			Image:   "gcr.io/google_containers/mounttest:0.6",
+			Image:   "gcr.io/google_containers/mounttest:0.7",
 			Command: []string{"/mt", "--file_content=" + filePath},
 			VolumeMounts: []api.VolumeMount{
 				{
@@ -309,7 +309,7 @@ func downwardAPIVolumePodForUpdateTest(name string, labels, annotations map[stri
 	pod.Spec.Containers = []api.Container{
 		{
 			Name:    "client-container",
-			Image:   "gcr.io/google_containers/mounttest:0.6",
+			Image:   "gcr.io/google_containers/mounttest:0.7",
 			Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=" + filePath},
 			VolumeMounts: []api.VolumeMount{
 				{

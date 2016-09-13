@@ -179,7 +179,7 @@ func New(c *Config) (*Master, error) {
 		return nil, fmt.Errorf("Master.New() called with config.KubeletClient == nil")
 	}
 
-	s, err := genericapiserver.New(c.Config)
+	s, err := c.Config.New()
 	if err != nil {
 		return nil, err
 	}
@@ -297,13 +297,16 @@ func (m *Master) InstallAPIs(c *Config) {
 	// TODO find a better way to configure priority of groups
 	for _, group := range sets.StringKeySet(c.RESTStorageProviders).List() {
 		if !c.APIResourceConfigSource.AnyResourcesForGroupEnabled(group) {
+			glog.V(1).Infof("Skipping disabled API group %q.", group)
 			continue
 		}
 		restStorageBuilder := c.RESTStorageProviders[group]
 		apiGroupInfo, enabled := restStorageBuilder.NewRESTStorage(c.APIResourceConfigSource, restOptionsGetter)
 		if !enabled {
+			glog.Warningf("Problem initializing API group %q, skipping.", group)
 			continue
 		}
+		glog.V(1).Infof("Enabling API group %q.", group)
 
 		// This is here so that, if the policy group is present, the eviction
 		// subresource handler wil be able to find poddisruptionbudgets
@@ -760,9 +763,9 @@ func (m *Master) thirdpartyapi(group, kind, version, pluralResource string) *api
 		Serializer:     thirdpartyresourcedata.NewNegotiatedSerializer(api.Codecs, kind, externalVersion, internalVersion),
 		ParameterCodec: thirdpartyresourcedata.NewThirdPartyParameterCodec(api.ParameterCodec),
 
-		Context: m.RequestContextMapper,
+		Context: m.RequestContextMapper(),
 
-		MinRequestTimeout: m.MinRequestTimeout,
+		MinRequestTimeout: m.MinRequestTimeout(),
 
 		ResourceLister: dynamicLister{m, makeThirdPartyPath(group)},
 	}

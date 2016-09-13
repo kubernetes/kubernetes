@@ -432,3 +432,33 @@ func TestWaitForWithDelay(t *testing.T) {
 		t.Errorf("expected an ack of the done signal.")
 	}
 }
+
+func TestPollUntil(t *testing.T) {
+	stopCh := make(chan struct{})
+	called := make(chan bool)
+	pollDone := make(chan struct{})
+
+	go func() {
+		PollUntil(time.Microsecond, ConditionFunc(func() (bool, error) {
+			called <- true
+			return false, nil
+		}), stopCh)
+
+		close(pollDone)
+	}()
+
+	// make sure we're called once
+	<-called
+	// this should trigger a "done"
+	close(stopCh)
+
+	go func() {
+		// release the condition func  if needed
+		for {
+			<-called
+		}
+	}()
+
+	// make sure we finished the poll
+	<-pollDone
+}

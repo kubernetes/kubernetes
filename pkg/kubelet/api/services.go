@@ -50,9 +50,9 @@ type ContainerManager interface {
 // PodSandboxManager contains methods for operating on PodSandboxes. The methods
 // are thread-safe.
 type PodSandboxManager interface {
-	// CreatePodSandbox creates a pod-level sandbox.
-	// The definition of PodSandbox is at https://github.com/kubernetes/kubernetes/pull/25899
-	CreatePodSandbox(config *runtimeApi.PodSandboxConfig) (string, error)
+	// RunPodSandbox creates and starts a pod-level sandbox. Runtimes should ensure
+	// the sandbox is in ready state.
+	RunPodSandbox(config *runtimeApi.PodSandboxConfig) (string, error)
 	// StopPodSandbox stops the sandbox. If there are any running containers in the
 	// sandbox, they should be force terminated.
 	StopPodSandbox(podSandboxID string) error

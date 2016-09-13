@@ -552,7 +552,10 @@ type MyReq struct {
 func (m *MyReq) isFor(method string, path string) bool {
 	req := m.Request
 
-	return method == req.Method && (req.URL.Path == path || req.URL.Path == strings.Join([]string{"/api/v1", path}, "") || req.URL.Path == strings.Join([]string{"/apis/extensions/v1beta1", path}, ""))
+	return method == req.Method && (req.URL.Path == path ||
+		req.URL.Path == strings.Join([]string{"/api/v1", path}, "") ||
+		req.URL.Path == strings.Join([]string{"/apis/extensions/v1beta1", path}, "") ||
+		req.URL.Path == strings.Join([]string{"/apis/batch/v1", path}, ""))
 }
 
 func refJson(t *testing.T, o runtime.Object) string {

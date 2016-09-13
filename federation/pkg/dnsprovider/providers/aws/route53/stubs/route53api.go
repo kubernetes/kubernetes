@@ -37,7 +37,7 @@ type Route53API interface {
 
 // Route53APIStub is a minimal implementation of Route53API, used primarily for unit testing.
 // See http://http://docs.aws.amazon.com/sdk-for-go/api/service/route53.html for descriptions
-// of all of it's methods.
+// of all of its methods.
 type Route53APIStub struct {
 	zones      map[string]*route53.HostedZone
 	recordSets map[string]map[string][]*route53.ResourceRecordSet
@@ -86,7 +86,7 @@ func (r *Route53APIStub) ChangeResourceRecordSets(input *route53.ChangeResourceR
 			recordSets[key] = append(recordSets[key], change.ResourceRecordSet)
 		case route53.ChangeActionDelete:
 			if _, found := recordSets[key]; !found {
-				return nil, fmt.Errorf("Attempt to delete non-existant rrset %s", key) // TODO: Check other fields too
+				return nil, fmt.Errorf("Attempt to delete non-existent rrset %s", key) // TODO: Check other fields too
 			}
 			delete(recordSets, key)
 		case route53.ChangeActionUpsert:
@@ -94,7 +94,7 @@ func (r *Route53APIStub) ChangeResourceRecordSets(input *route53.ChangeResourceR
 		}
 	}
 	r.recordSets[*input.HostedZoneId] = recordSets
-	return output, nil // TODO: We should ideally return status etc, but we dont' use that yet.
+	return output, nil // TODO: We should ideally return status etc, but we don't' use that yet.
 }
 
 func (r *Route53APIStub) ListHostedZonesPages(input *route53.ListHostedZonesInput, fn func(p *route53.ListHostedZonesOutput, lastPage bool) (shouldContinue bool)) error {

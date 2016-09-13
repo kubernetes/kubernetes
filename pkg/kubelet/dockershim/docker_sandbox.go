@@ -22,6 +22,7 @@ import (
 	dockertypes "github.com/docker/engine-api/types"
 	dockercontainer "github.com/docker/engine-api/types/container"
 	dockerfilters "github.com/docker/engine-api/types/filters"
+	"github.com/golang/glog"
 
 	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 )
@@ -37,12 +38,12 @@ const (
 	defaultSandboxGracePeriod int = 10
 )
 
-// CreatePodSandbox creates a pod-level sandbox.
-// The definition of PodSandbox is at https://github.com/kubernetes/kubernetes/pull/25899
+// RunPodSandbox creates and starts a pod-level sandbox. Runtimes should ensure
+// the sandbox is in ready state.
 // For docker, PodSandbox is implemented by a container holding the network
 // namespace for the pod.
 // Note: docker doesn't use LogDirectory (yet).
-func (ds *dockerService) CreatePodSandbox(config *runtimeApi.PodSandboxConfig) (string, error) {
+func (ds *dockerService) RunPodSandbox(config *runtimeApi.PodSandboxConfig) (string, error) {
 	// Step 1: Pull the image for the sandbox.
 	// TODO: How should we handle pulling custom pod infra container image
 	// (with credentials)?
@@ -117,7 +118,7 @@ func (ds *dockerService) PodSandboxStatus(podSandboxID string) (*runtimeApi.PodS
 	network := &runtimeApi.PodSandboxNetworkStatus{Ip: &IP}
 	netNS := getNetworkNamespace(r)
 
-	podName, podNamespace, podUID, attempt, err := parseSandboxName(r.Name)
+	metadata, err := parseSandboxName(r.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -126,12 +127,7 @@ func (ds *dockerService) PodSandboxStatus(podSandboxID string) (*runtimeApi.PodS
 		Id:        &r.ID,
 		State:     &state,
 		CreatedAt: &ct,
-		Metadata: &runtimeApi.PodSandboxMetadata{
-			Name:      &podName,
-			Namespace: &podNamespace,
-			Uid:       &podUID,
-			Attempt:   &attempt,
-		},
+		Metadata:  metadata,
 		// TODO: We write annotations as labels on the docker containers. All
 		// these annotations will be read back as labels. Need to fix this.
 		// Also filter out labels only relevant to this shim.
@@ -182,19 +178,24 @@ func (ds *dockerService) ListPodSandbox(filter *runtimeApi.PodSandboxFilter) ([]
 
 	// Convert docker containers to runtime api sandboxes.
 	result := []*runtimeApi.PodSandbox{}
-	for _, c := range containers {
-		if len(filter.GetName()) > 0 {
-			sandboxName, _, _, _, err := parseSandboxName(c.Names[0])
-			if err != nil || sandboxName != filter.GetName() {
-				continue
-			}
-		}
+	for i := range containers {
+		c := containers[i]
 
-		s := toRuntimeAPISandbox(&c)
-		if filterOutReadySandboxes && s.GetState() == runtimeApi.PodSandBoxState_READY {
+		converted, err := toRuntimeAPISandbox(&c)
+		if err != nil {
+			glog.V(5).Infof("Unable to convert docker to runtime API sandbox: %v", err)
 			continue
 		}
-		result = append(result, s)
+		if len(filter.GetName()) > 0 && converted.Metadata.GetName() != filter.GetName() {
+			// TODO: Remove "name" from the SandboxFilter because name can no
+			// longer be used to identify a container.
+			continue
+		}
+		if filterOutReadySandboxes && converted.GetState() == runtimeApi.PodSandBoxState_READY {
+			continue
+		}
+
+		result = append(result, converted)
 	}
 	return result, nil
 }
@@ -207,7 +208,7 @@ func makeSandboxDockerConfig(c *runtimeApi.PodSandboxConfig, image string) *dock
 
 	hc := &dockercontainer.HostConfig{}
 	createConfig := &dockertypes.ContainerCreateConfig{
-		Name: buildSandboxName(c),
+		Name: makeSandboxName(c),
 		Config: &dockercontainer.Config{
 			Hostname: c.GetHostname(),
 			// TODO: Handle environment variables.

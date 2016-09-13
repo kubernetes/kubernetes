@@ -33,9 +33,10 @@ type jsonpathTest struct {
 	expect   string
 }
 
-func testJSONPath(tests []jsonpathTest, t *testing.T) {
+func testJSONPath(tests []jsonpathTest, allowMissingKeys bool, t *testing.T) {
 	for _, test := range tests {
 		j := New(test.name)
+		j.AllowMissingKeys(allowMissingKeys)
 		err := j.Parse(test.template)
 		if err != nil {
 			t.Errorf("in %s, parse %s error %v", test.name, test.template, err)
@@ -166,10 +167,15 @@ func TestStructInput(t *testing.T) {
 		{"recurarray", "{..Book[2]}", storeData,
 			"{Category: fiction, Author: Herman Melville, Title: Moby Dick, Price: 8.99}"},
 	}
-	testJSONPath(storeTests, t)
+	testJSONPath(storeTests, false, t)
+
+	missingKeyTests := []jsonpathTest{
+		{"nonexistent field", "{.hello}", storeData, ""},
+	}
+	testJSONPath(missingKeyTests, true, t)
 
 	failStoreTests := []jsonpathTest{
-		{"invalid identfier", "{hello}", storeData, "unrecognized identifier hello"},
+		{"invalid identifier", "{hello}", storeData, "unrecognized identifier hello"},
 		{"nonexistent field", "{.hello}", storeData, "hello is not found"},
 		{"invalid array", "{.Labels[0]}", storeData, "map[string]int is not array or slice"},
 		{"invalid filter operator", "{.Book[?(@.Price<>10)]}", storeData, "unrecognized filter operator <>"},
@@ -196,7 +202,7 @@ func TestJSONInput(t *testing.T) {
 		{"exists filter", "{[?(@.z)].id}", pointsData, "i2 i5"},
 		{"bracket key", "{[0]['id']}", pointsData, "i1"},
 	}
-	testJSONPath(pointsTests, t)
+	testJSONPath(pointsTests, false, t)
 }
 
 // TestKubernetes tests some use cases from kubernetes
@@ -255,7 +261,7 @@ func TestKubernetes(t *testing.T) {
 			"[127.0.0.1, map[cpu:4]] [127.0.0.2, map[cpu:8]] "},
 		{"user password", `{.users[?(@.name=="e2e")].user.password}`, &nodesData, "secret"},
 	}
-	testJSONPath(nodesTests, t)
+	testJSONPath(nodesTests, false, t)
 
 	randomPrintOrderTests := []jsonpathTest{
 		{"recursive name", "{..name}", nodesData, `127.0.0.1 127.0.0.2 myself e2e`},

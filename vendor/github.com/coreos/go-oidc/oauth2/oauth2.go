@@ -332,16 +332,16 @@ func parseTokenResponse(resp *http.Response) (result TokenResponse, err error) {
 		result.Scope = vals.Get("scope")
 	} else {
 		var r struct {
-			AccessToken  string `json:"access_token"`
-			TokenType    string `json:"token_type"`
-			IDToken      string `json:"id_token"`
-			RefreshToken string `json:"refresh_token"`
-			Scope        string `json:"scope"`
-			State        string `json:"state"`
-			ExpiresIn    int    `json:"expires_in"`
-			Expires      int    `json:"expires"`
-			Error        string `json:"error"`
-			Desc         string `json:"error_description"`
+			AccessToken  string      `json:"access_token"`
+			TokenType    string      `json:"token_type"`
+			IDToken      string      `json:"id_token"`
+			RefreshToken string      `json:"refresh_token"`
+			Scope        string      `json:"scope"`
+			State        string      `json:"state"`
+			ExpiresIn    json.Number `json:"expires_in"` // Azure AD returns string
+			Expires      int         `json:"expires"`
+			Error        string      `json:"error"`
+			Desc         string      `json:"error_description"`
 		}
 		if err = json.Unmarshal(body, &r); err != nil {
 			return
@@ -355,10 +355,10 @@ func parseTokenResponse(resp *http.Response) (result TokenResponse, err error) {
 		result.IDToken = r.IDToken
 		result.RefreshToken = r.RefreshToken
 		result.Scope = r.Scope
-		if r.ExpiresIn == 0 {
+		if expiresIn, err := r.ExpiresIn.Int64(); err != nil {
 			result.Expires = r.Expires
 		} else {
-			result.Expires = r.ExpiresIn
+			result.Expires = int(expiresIn)
 		}
 	}
 	return

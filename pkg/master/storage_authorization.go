@@ -22,6 +22,7 @@ import (
 	authorizationv1beta1 "k8s.io/kubernetes/pkg/apis/authorization/v1beta1"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/genericapiserver"
+	"k8s.io/kubernetes/pkg/registry/authorization/selfsubjectaccessreview"
 	"k8s.io/kubernetes/pkg/registry/authorization/subjectaccessreview"
 )
 
@@ -52,6 +53,9 @@ func (p AuthorizationRESTStorageProvider) v1beta1Storage(apiResourceConfigSource
 	storage := map[string]rest.Storage{}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("subjectaccessreviews")) {
 		storage["subjectaccessreviews"] = subjectaccessreview.NewREST(p.Authorizer)
+	}
+	if apiResourceConfigSource.ResourceEnabled(version.WithResource("selfsubjectaccessreviews")) {
+		storage["selfsubjectaccessreviews"] = selfsubjectaccessreview.NewREST(p.Authorizer)
 	}
 
 	return storage

@@ -17,6 +17,7 @@ limitations under the License.
 package kubectl
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"os/signal"
@@ -25,18 +26,19 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/runtime"
+	sliceutil "k8s.io/kubernetes/pkg/util/slice"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
 // Rollbacker provides an interface for resources that can be rolled back.
 type Rollbacker interface {
-	Rollback(obj runtime.Object, updatedAnnotations map[string]string, toRevision int64) (string, error)
+	Rollback(obj runtime.Object, updatedAnnotations map[string]string, toRevision int64, dryRun bool) (string, error)
 }
 
-func RollbackerFor(kind unversioned.GroupKind, c client.Interface) (Rollbacker, error) {
+func RollbackerFor(kind unversioned.GroupKind, c clientset.Interface) (Rollbacker, error) {
 	switch kind {
 	case extensions.Kind("Deployment"):
 		return &DeploymentRollbacker{c}, nil
@@ -45,13 +47,16 @@ func RollbackerFor(kind unversioned.GroupKind, c client.Interface) (Rollbacker, 
 }
 
 type DeploymentRollbacker struct {
-	c client.Interface
+	c clientset.Interface
 }
 
-func (r *DeploymentRollbacker) Rollback(obj runtime.Object, updatedAnnotations map[string]string, toRevision int64) (string, error) {
+func (r *DeploymentRollbacker) Rollback(obj runtime.Object, updatedAnnotations map[string]string, toRevision int64, dryRun bool) (string, error) {
 	d, ok := obj.(*extensions.Deployment)
 	if !ok {
 		return "", fmt.Errorf("passed object is not a Deployment: %#v", obj)
+	}
+	if dryRun {
+		return simpleDryRun(d, r.c, toRevision)
 	}
 	if d.Spec.Paused {
 		return "", fmt.Errorf("you cannot rollback a paused deployment; resume it first with 'kubectl rollout resume deployment/%s' and try again", d.Name)
@@ -66,7 +71,7 @@ func (r *DeploymentRollbacker) Rollback(obj runtime.Object, updatedAnnotations m
 	result := ""
 
 	// Get current events
-	events, err := r.c.Events(d.Namespace).List(api.ListOptions{})
+	events, err := r.c.Core().Events(d.Namespace).List(api.ListOptions{})
 	if err != nil {
 		return result, err
 	}
@@ -75,7 +80,7 @@ func (r *DeploymentRollbacker) Rollback(obj runtime.Object, updatedAnnotations m
 		return result, err
 	}
 	// Watch for the changes of events
-	watch, err := r.c.Events(d.Namespace).Watch(api.ListOptions{Watch: true, ResourceVersion: events.ResourceVersion})
+	watch, err := r.c.Core().Events(d.Namespace).Watch(api.ListOptions{Watch: true, ResourceVersion: events.ResourceVersion})
 	if err != nil {
 		return result, err
 	}
@@ -122,4 +127,51 @@ func isRollbackEvent(e *api.Event) (bool, string) {
 		}
 	}
 	return false, ""
+}
+
+func simpleDryRun(deployment *extensions.Deployment, c clientset.Interface, toRevision int64) (string, error) {
+	_, allOldRSs, newRS, err := deploymentutil.GetAllReplicaSets(deployment, c)
+	if err != nil {
+		return "", fmt.Errorf("failed to retrieve replica sets from deployment %s: %v", deployment.Name, err)
+	}
+	allRSs := allOldRSs
+	if newRS != nil {
+		allRSs = append(allRSs, newRS)
+	}
+
+	revisionToSpec := make(map[int64]*api.PodTemplateSpec)
+	for _, rs := range allRSs {
+		v, err := deploymentutil.Revision(rs)
+		if err != nil {
+			continue
+		}
+		revisionToSpec[v] = &rs.Spec.Template
+	}
+
+	if len(revisionToSpec) == 0 {
+		return "No rollout history found.", nil
+	}
+
+	if toRevision > 0 {
+		template, ok := revisionToSpec[toRevision]
+		if !ok {
+			return "", fmt.Errorf("unable to find specified revision")
+		}
+		buf := bytes.NewBuffer([]byte{})
+		DescribePodTemplate(template, buf)
+		return buf.String(), nil
+	}
+
+	// Sort the revisionToSpec map by revision
+	revisions := make([]int64, 0, len(revisionToSpec))
+	for r := range revisionToSpec {
+		revisions = append(revisions, r)
+	}
+	sliceutil.SortInts64(revisions)
+
+	template, _ := revisionToSpec[revisions[len(revisions)-1]]
+	buf := bytes.NewBuffer([]byte{})
+	buf.WriteString("\n")
+	DescribePodTemplate(template, buf)
+	return buf.String(), nil
 }

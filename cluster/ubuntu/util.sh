@@ -58,7 +58,7 @@ function setClusterInfo() {
         NODE_IPS="$NODE_IPS,$nodeIP"
       fi
     else
-      echo "unsupported role for ${i}. please check"
+      echo "unsupported role for ${i}. Please check"
       exit 1
     fi
 
@@ -156,7 +156,7 @@ function verify-cluster() {
       verify-master
       verify-node "$i"
     else
-      echo "unsupported role for ${i}. please check"
+      echo "unsupported role for ${i}. Please check"
       exit 1
     fi
 
@@ -978,7 +978,7 @@ function kube-push() {
     elif [[ "${roles_array[${ii}]}" == "ai" ]]; then
       provision-masterandnode
     else
-      echo "unsupported role for ${i}. please check"
+      echo "unsupported role for ${i}. Please check"
       exit 1
     fi
     ((ii=ii+1))

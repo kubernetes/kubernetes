@@ -22,6 +22,7 @@ import (
 	"path"
 
 	"github.com/golang/glog"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/util/mount"
 )
 
@@ -107,4 +108,21 @@ func PathExists(path string) (bool, error) {
 	} else {
 		return false, err
 	}
+}
+
+// GetSecret locates secret by name and namespace and returns secret map
+func GetSecret(namespace, secretName string, kubeClient clientset.Interface) (map[string]string, error) {
+	secret := make(map[string]string)
+	if kubeClient == nil {
+		return secret, fmt.Errorf("Cannot get kube client")
+	}
+
+	secrets, err := kubeClient.Core().Secrets(namespace).Get(secretName)
+	if err != nil {
+		return secret, err
+	}
+	for name, data := range secrets.Data {
+		secret[name] = string(data)
+	}
+	return secret, nil
 }

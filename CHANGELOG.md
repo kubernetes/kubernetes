@@ -1,52 +1,68 @@
 <!-- BEGIN MUNGE: GENERATED_TOC -->
 
-- [v1.3.6](#v136)
+- [v1.3.7](#v137)
   - [Downloads](#downloads)
-  - [Changelog since v1.3.5](#changelog-since-v135)
+  - [Changelog since v1.3.6](#changelog-since-v136)
     - [Other notable changes](#other-notable-changes)
-- [v1.4.0-alpha.3](#v140-alpha3)
+- [v1.4.0-beta.3](#v140-beta3)
   - [Downloads](#downloads-1)
-  - [Changelog since v1.4.0-alpha.2](#changelog-since-v140-alpha2)
-    - [Action Required](#action-required)
-    - [Other notable changes](#other-notable-changes-1)
-- [v1.3.5](#v135)
+  - [Changelog since v1.4.0-beta.2](#changelog-since-v140-beta2)
+- [v1.4.0-beta.2](#v140-beta2)
   - [Downloads](#downloads-2)
-  - [Changelog since v1.3.4](#changelog-since-v134)
-    - [Other notable changes](#other-notable-changes-2)
-- [v1.3.4](#v134)
+  - [Changelog since v1.4.0-beta.1](#changelog-since-v140-beta1)
+    - [Other notable changes](#other-notable-changes-1)
+- [v1.4.0-beta.1](#v140-beta1)
   - [Downloads](#downloads-3)
-  - [Changelog since v1.3.3](#changelog-since-v133)
-    - [Other notable changes](#other-notable-changes-3)
-- [v1.4.0-alpha.2](#v140-alpha2)
+  - [Changelog since v1.4.0-alpha.3](#changelog-since-v140-alpha3)
+    - [Action Required](#action-required)
+    - [Other notable changes](#other-notable-changes-2)
+- [v1.3.6](#v136)
   - [Downloads](#downloads-4)
-  - [Changelog since v1.4.0-alpha.1](#changelog-since-v140-alpha1)
+  - [Changelog since v1.3.5](#changelog-since-v135)
+    - [Other notable changes](#other-notable-changes-3)
+- [v1.4.0-alpha.3](#v140-alpha3)
+  - [Downloads](#downloads-5)
+  - [Changelog since v1.4.0-alpha.2](#changelog-since-v140-alpha2)
     - [Action Required](#action-required-1)
     - [Other notable changes](#other-notable-changes-4)
-- [v1.3.3](#v133)
-  - [Downloads](#downloads-5)
-  - [Changelog since v1.3.2](#changelog-since-v132)
+- [v1.3.5](#v135)
+  - [Downloads](#downloads-6)
+  - [Changelog since v1.3.4](#changelog-since-v134)
     - [Other notable changes](#other-notable-changes-5)
+- [v1.3.4](#v134)
+  - [Downloads](#downloads-7)
+  - [Changelog since v1.3.3](#changelog-since-v133)
+    - [Other notable changes](#other-notable-changes-6)
+- [v1.4.0-alpha.2](#v140-alpha2)
+  - [Downloads](#downloads-8)
+  - [Changelog since v1.4.0-alpha.1](#changelog-since-v140-alpha1)
+    - [Action Required](#action-required-2)
+    - [Other notable changes](#other-notable-changes-7)
+- [v1.3.3](#v133)
+  - [Downloads](#downloads-9)
+  - [Changelog since v1.3.2](#changelog-since-v132)
+    - [Other notable changes](#other-notable-changes-8)
   - [Known Issues](#known-issues)
 - [v1.3.2](#v132)
-  - [Downloads](#downloads-6)
+  - [Downloads](#downloads-10)
   - [Changelog since v1.3.1](#changelog-since-v131)
-    - [Other notable changes](#other-notable-changes-6)
+    - [Other notable changes](#other-notable-changes-9)
 - [v1.3.1](#v131)
-  - [Downloads](#downloads-7)
+  - [Downloads](#downloads-11)
   - [Changelog since v1.3.0](#changelog-since-v130)
-    - [Other notable changes](#other-notable-changes-7)
+    - [Other notable changes](#other-notable-changes-10)
 - [v1.2.6](#v126)
-  - [Downloads](#downloads-8)
+  - [Downloads](#downloads-12)
   - [Changelog since v1.2.5](#changelog-since-v125)
-    - [Other notable changes](#other-notable-changes-8)
+    - [Other notable changes](#other-notable-changes-11)
 - [v1.4.0-alpha.1](#v140-alpha1)
-  - [Downloads](#downloads-9)
+  - [Downloads](#downloads-13)
   - [Changelog since v1.3.0](#changelog-since-v130-1)
     - [Experimental Features](#experimental-features)
-    - [Action Required](#action-required-2)
-    - [Other notable changes](#other-notable-changes-9)
+    - [Action Required](#action-required-3)
+    - [Other notable changes](#other-notable-changes-12)
 - [v1.3.0](#v130)
-  - [Downloads](#downloads-10)
+  - [Downloads](#downloads-14)
   - [Highlights](#highlights)
   - [Known Issues and Important Steps before Upgrading](#known-issues-and-important-steps-before-upgrading)
       - [ThirdPartyResource](#thirdpartyresource)
@@ -57,72 +73,72 @@
   - [Provider-specific Notes](#provider-specific-notes)
   - [Previous Releases Included in v1.3.0](#previous-releases-included-in-v130)
 - [v1.3.0-beta.3](#v130-beta3)
-  - [Downloads](#downloads-11)
+  - [Downloads](#downloads-15)
   - [Changelog since v1.3.0-beta.2](#changelog-since-v130-beta2)
-    - [Action Required](#action-required-3)
-    - [Other notable changes](#other-notable-changes-10)
-- [v1.2.5](#v125)
-  - [Downloads](#downloads-12)
-  - [Changes since v1.2.4](#changes-since-v124)
-    - [Other notable changes](#other-notable-changes-11)
-- [v1.3.0-beta.2](#v130-beta2)
-  - [Downloads](#downloads-13)
-  - [Changes since v1.3.0-beta.1](#changes-since-v130-beta1)
-    - [Experimental Features](#experimental-features-1)
-    - [Other notable changes](#other-notable-changes-12)
-- [v1.3.0-beta.1](#v130-beta1)
-  - [Downloads](#downloads-14)
-  - [Changes since v1.3.0-alpha.5](#changes-since-v130-alpha5)
     - [Action Required](#action-required-4)
     - [Other notable changes](#other-notable-changes-13)
-- [v1.3.0-alpha.5](#v130-alpha5)
-  - [Downloads](#downloads-15)
-  - [Changes since v1.3.0-alpha.4](#changes-since-v130-alpha4)
-    - [Action Required](#action-required-5)
-    - [Other notable changes](#other-notable-changes-14)
-- [v1.3.0-alpha.4](#v130-alpha4)
+- [v1.2.5](#v125)
   - [Downloads](#downloads-16)
-  - [Changes since v1.3.0-alpha.3](#changes-since-v130-alpha3)
-    - [Action Required](#action-required-6)
-    - [Other notable changes](#other-notable-changes-15)
-- [v1.2.4](#v124)
+  - [Changes since v1.2.4](#changes-since-v124)
+    - [Other notable changes](#other-notable-changes-14)
+- [v1.3.0-beta.2](#v130-beta2)
   - [Downloads](#downloads-17)
-  - [Changes since v1.2.3](#changes-since-v123)
-    - [Other notable changes](#other-notable-changes-16)
-- [v1.3.0-alpha.3](#v130-alpha3)
+  - [Changes since v1.3.0-beta.1](#changes-since-v130-beta1)
+    - [Experimental Features](#experimental-features-1)
+    - [Other notable changes](#other-notable-changes-15)
+- [v1.3.0-beta.1](#v130-beta1)
   - [Downloads](#downloads-18)
-  - [Changes since v1.3.0-alpha.2](#changes-since-v130-alpha2)
-    - [Action Required](#action-required-7)
-    - [Other notable changes](#other-notable-changes-17)
-- [v1.2.3](#v123)
+  - [Changes since v1.3.0-alpha.5](#changes-since-v130-alpha5)
+    - [Action Required](#action-required-5)
+    - [Other notable changes](#other-notable-changes-16)
+- [v1.3.0-alpha.5](#v130-alpha5)
   - [Downloads](#downloads-19)
-  - [Changes since v1.2.2](#changes-since-v122)
-    - [Action Required](#action-required-8)
-    - [Other notable changes](#other-notable-changes-18)
-- [v1.3.0-alpha.2](#v130-alpha2)
+  - [Changes since v1.3.0-alpha.4](#changes-since-v130-alpha4)
+    - [Action Required](#action-required-6)
+    - [Other notable changes](#other-notable-changes-17)
+- [v1.3.0-alpha.4](#v130-alpha4)
   - [Downloads](#downloads-20)
-  - [Changes since v1.3.0-alpha.1](#changes-since-v130-alpha1)
-    - [Other notable changes](#other-notable-changes-19)
-- [v1.2.2](#v122)
+  - [Changes since v1.3.0-alpha.3](#changes-since-v130-alpha3)
+    - [Action Required](#action-required-7)
+    - [Other notable changes](#other-notable-changes-18)
+- [v1.2.4](#v124)
   - [Downloads](#downloads-21)
-  - [Changes since v1.2.1](#changes-since-v121)
-    - [Other notable changes](#other-notable-changes-20)
-- [v1.2.1](#v121)
+  - [Changes since v1.2.3](#changes-since-v123)
+    - [Other notable changes](#other-notable-changes-19)
+- [v1.3.0-alpha.3](#v130-alpha3)
   - [Downloads](#downloads-22)
-  - [Changes since v1.2.0](#changes-since-v120)
-    - [Other notable changes](#other-notable-changes-21)
-- [v1.3.0-alpha.1](#v130-alpha1)
+  - [Changes since v1.3.0-alpha.2](#changes-since-v130-alpha2)
+    - [Action Required](#action-required-8)
+    - [Other notable changes](#other-notable-changes-20)
+- [v1.2.3](#v123)
   - [Downloads](#downloads-23)
-  - [Changes since v1.2.0](#changes-since-v120-1)
+  - [Changes since v1.2.2](#changes-since-v122)
     - [Action Required](#action-required-9)
-    - [Other notable changes](#other-notable-changes-22)
-- [v1.2.0](#v120)
+    - [Other notable changes](#other-notable-changes-21)
+- [v1.3.0-alpha.2](#v130-alpha2)
   - [Downloads](#downloads-24)
+  - [Changes since v1.3.0-alpha.1](#changes-since-v130-alpha1)
+    - [Other notable changes](#other-notable-changes-22)
+- [v1.2.2](#v122)
+  - [Downloads](#downloads-25)
+  - [Changes since v1.2.1](#changes-since-v121)
+    - [Other notable changes](#other-notable-changes-23)
+- [v1.2.1](#v121)
+  - [Downloads](#downloads-26)
+  - [Changes since v1.2.0](#changes-since-v120)
+    - [Other notable changes](#other-notable-changes-24)
+- [v1.3.0-alpha.1](#v130-alpha1)
+  - [Downloads](#downloads-27)
+  - [Changes since v1.2.0](#changes-since-v120-1)
+    - [Action Required](#action-required-10)
+    - [Other notable changes](#other-notable-changes-25)
+- [v1.2.0](#v120)
+  - [Downloads](#downloads-28)
   - [Changes since v1.1.1](#changes-since-v111)
     - [Major Themes](#major-themes)
     - [Other notable improvements](#other-notable-improvements)
     - [Experimental Features](#experimental-features-2)
-    - [Action required](#action-required-10)
+    - [Action required](#action-required-11)
     - [Known Issues](#known-issues-1)
       - [Docker Known Issues](#docker-known-issues)
         - [1.9.1](#191)
@@ -134,6 +150,124 @@
 <!-- END MUNGE: GENERATED_TOC -->
 
 <!-- NEW RELEASE NOTES ENTRY -->
+
+
+# v1.3.7
+
+[Documentation](http://kubernetes.github.io) & [Examples](http://releases.k8s.io/release-1.3/examples)
+
+## Downloads
+
+binary | sha256 hash
+------ | -----------
+[kubernetes.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.3.7/kubernetes.tar.gz) | `ad18566a09ff87b36107c2ea238fa5e20988d7a62c85df9c8598920679fec4a1`
+
+## Changelog since v1.3.6
+
+### Other notable changes
+
+* AWS: Add ap-south-1 to list of known AWS regions ([#28428](https://github.com/kubernetes/kubernetes/pull/28428), [@justinsb](https://github.com/justinsb))
+* Back porting critical vSphere bug fixes to release 1.3 ([#31993](https://github.com/kubernetes/kubernetes/pull/31993), [@dagnello](https://github.com/dagnello))
+* Back port - Openstack provider allowing more than one service port for lbaas v2 ([#32001](https://github.com/kubernetes/kubernetes/pull/32001), [@dagnello](https://github.com/dagnello))
+* Fix a bug in kubelet hostport logic which flushes KUBE-MARK-MASQ iptables chain ([#32413](https://github.com/kubernetes/kubernetes/pull/32413), [@freehan](https://github.com/freehan))
+* Fixes the panic that occurs in the federation controller manager when registering a GKE cluster to the federation. Fixes issue [#30790](https://github.com/kubernetes/kubernetes/pull/30790). ([#30940](https://github.com/kubernetes/kubernetes/pull/30940), [@madhusudancs](https://github.com/madhusudancs))
+
+
+
+# v1.4.0-beta.3
+
+[Documentation](http://kubernetes.github.io) & [Examples](http://releases.k8s.io/release-1.4/examples)
+
+## Downloads
+
+binary | sha256 hash
+------ | -----------
+[kubernetes.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.4.0-beta.3/kubernetes.tar.gz) | `5a6802703c6b0b652e72166a4347fee7899c46205463f6797dc78f8086876465`
+
+## Changelog since v1.4.0-beta.2
+
+**No notable changes for this release**
+
+
+
+# v1.4.0-beta.2
+
+[Documentation](http://kubernetes.github.io) & [Examples](http://releases.k8s.io/release-1.4/examples)
+
+## Downloads
+
+binary | sha256 hash
+------ | -----------
+[kubernetes.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.4.0-beta.2/kubernetes.tar.gz) | `0c6f54eb9059090c88f10a448ed5bcb6ef663abbd76c79281fd8dcb72faa6315`
+
+## Changelog since v1.4.0-beta.1
+
+### Other notable changes
+
+* Fix a bug in kubelet hostport logic which flushes KUBE-MARK-MASQ iptables chain ([#32413](https://github.com/kubernetes/kubernetes/pull/32413), [@freehan](https://github.com/freehan))
+* Stick to 2.2.1 etcd ([#32404](https://github.com/kubernetes/kubernetes/pull/32404), [@caesarxuchao](https://github.com/caesarxuchao))
+* Use etcd 2.3.7 ([#32359](https://github.com/kubernetes/kubernetes/pull/32359), [@wojtek-t](https://github.com/wojtek-t))
+* AWS: Change default networking for kube-up to kubenet ([#32239](https://github.com/kubernetes/kubernetes/pull/32239), [@zmerlynn](https://github.com/zmerlynn))
+* Make sure finalizers prevent deletion on storage that supports graceful deletion ([#32351](https://github.com/kubernetes/kubernetes/pull/32351), [@caesarxuchao](https://github.com/caesarxuchao))
+* Some components like kube-dns and kube-proxy could fail to load the service account token when started within a pod. Properly handle empty configurations to try loading the service account config. ([#31947](https://github.com/kubernetes/kubernetes/pull/31947), [@smarterclayton](https://github.com/smarterclayton))
+* Use federated namespace instead of the bootstrap cluster's namespace in Ingress e2e tests. ([#32105](https://github.com/kubernetes/kubernetes/pull/32105), [@madhusudancs](https://github.com/madhusudancs))
+
+
+
+# v1.4.0-beta.1
+
+[Documentation](http://kubernetes.github.io) & [Examples](http://releases.k8s.io/release-1.4/examples)
+
+## Downloads
+
+binary | sha256 hash
+------ | -----------
+[kubernetes.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.4.0-beta.1/kubernetes.tar.gz) | `837296455933629b6792a8954f2c5b17d55c1149c12b644101f2f02549d06d25`
+
+## Changelog since v1.4.0-alpha.3
+
+### Action Required
+
+* The NamespaceExists and NamespaceAutoProvision admission controllers have been removed. ([#31250](https://github.com/kubernetes/kubernetes/pull/31250), [@derekwaynecarr](https://github.com/derekwaynecarr))
+    * All cluster operators should use NamespaceLifecycle.
+* Federation binaries and their corresponding docker images - `federation-apiserver` and `federation-controller-manager` are now folded in to the `hyperkube` binary. If you were using one of these binaries or docker images, please switch to using the `hyperkube` version. Please refer to the federation manifests - `federation/manifests/federation-apiserver.yaml` and `federation/manifests/federation-controller-manager-deployment.yaml` for examples. ([#29929](https://github.com/kubernetes/kubernetes/pull/29929), [@madhusudancs](https://github.com/madhusudancs))
+* Use upgraded container-vm by default on worker nodes for GCE k8s clusters ([#31023](https://github.com/kubernetes/kubernetes/pull/31023), [@vishh](https://github.com/vishh))
+
+### Other notable changes
+
+* Enable kubelet eviction whenever inodes free is < 5% on GCE ([#31545](https://github.com/kubernetes/kubernetes/pull/31545), [@vishh](https://github.com/vishh))
+* Move StorageClass to a storage group ([#31886](https://github.com/kubernetes/kubernetes/pull/31886), [@deads2k](https://github.com/deads2k))
+* Some components like kube-dns and kube-proxy could fail to load the service account token when started within a pod. Properly handle empty configurations to try loading the service account config. ([#31947](https://github.com/kubernetes/kubernetes/pull/31947), [@smarterclayton](https://github.com/smarterclayton))
+* Removed comments in json config when using kubectl edit with -o json ([#31685](https://github.com/kubernetes/kubernetes/pull/31685), [@jellonek](https://github.com/jellonek))
+* fixes invalid null selector issue in sysdig example yaml ([#31393](https://github.com/kubernetes/kubernetes/pull/31393), [@baldwinSPC](https://github.com/baldwinSPC))
+* Rescheduler which ensures that critical pods are always scheduled enabled by default in GCE. ([#31974](https://github.com/kubernetes/kubernetes/pull/31974), [@piosz](https://github.com/piosz))
+* retry oauth token fetch in gce cloudprovider ([#32021](https://github.com/kubernetes/kubernetes/pull/32021), [@mikedanese](https://github.com/mikedanese))
+* Deprecate the old cbr0 and flannel networking modes ([#31197](https://github.com/kubernetes/kubernetes/pull/31197), [@freehan](https://github.com/freehan))
+* AWS: fix volume device assignment race condition ([#31090](https://github.com/kubernetes/kubernetes/pull/31090), [@justinsb](https://github.com/justinsb))
+* The certificates API group has been renamed to certificates.k8s.io ([#31887](https://github.com/kubernetes/kubernetes/pull/31887), [@liggitt](https://github.com/liggitt))
+* Increase Dashboard UI version to v1.4.0-beta2 ([#31518](https://github.com/kubernetes/kubernetes/pull/31518), [@bryk](https://github.com/bryk))
+* Fixed incomplete kubectl bash completion. ([#31333](https://github.com/kubernetes/kubernetes/pull/31333), [@xingzhou](https://github.com/xingzhou))
+* Added liveness probe to Heapster service. ([#31878](https://github.com/kubernetes/kubernetes/pull/31878), [@mksalawa](https://github.com/mksalawa))
+* Adding clusters to the list of valid resources printed by kubectl help ([#31719](https://github.com/kubernetes/kubernetes/pull/31719), [@nikhiljindal](https://github.com/nikhiljindal))
+* Kubernetes server components using `kubeconfig` files no longer default to `http://localhost:8080`.  Administrators must specify a server value in their kubeconfig files. ([#30808](https://github.com/kubernetes/kubernetes/pull/30808), [@smarterclayton](https://github.com/smarterclayton))
+* Update influxdb to 0.12 ([#31519](https://github.com/kubernetes/kubernetes/pull/31519), [@piosz](https://github.com/piosz))
+* Include security options in the container created event ([#31557](https://github.com/kubernetes/kubernetes/pull/31557), [@timstclair](https://github.com/timstclair))
+* Federation can now be deployed using the `federation/deploy/deploy.sh` script. This script does not depend on any of the development environment shell library/scripts. This is an alternative to the current `federation-up.sh`/`federation-down.sh` scripts. Both the scripts are going to co-exist in this release, but the `federation-up.sh`/`federation-down.sh` scripts might be removed in a future release in favor of `federation/deploy/deploy.sh` script. ([#30744](https://github.com/kubernetes/kubernetes/pull/30744), [@madhusudancs](https://github.com/madhusudancs))
+* Add get/delete cluster, delete context to kubectl config ([#29821](https://github.com/kubernetes/kubernetes/pull/29821), [@alexbrand](https://github.com/alexbrand))
+* rkt: Force `rkt fetch` to fetch from remote to conform the image pull policy. ([#31378](https://github.com/kubernetes/kubernetes/pull/31378), [@yifan-gu](https://github.com/yifan-gu))
+* Allow services which use same port, different protocol to use the same nodePort for both ([#30253](https://github.com/kubernetes/kubernetes/pull/30253), [@AdoHe](https://github.com/AdoHe))
+* Handle overlapping deployments gracefully ([#30730](https://github.com/kubernetes/kubernetes/pull/30730), [@janetkuo](https://github.com/janetkuo))
+* Remove environment variables and internal Kubernetes Docker labels from cAdvisor Prometheus metric labels. ([#31064](https://github.com/kubernetes/kubernetes/pull/31064), [@grobie](https://github.com/grobie))
+    * Old behavior:
+    * - environment variables explicitly whitelisted via --docker-env-metadata-whitelist were exported as `container_env_*=*`. Default is zero so by default non were exported
+    * - all docker labels were exported as `container_label_*=*`
+    * New behavior:
+    * - Only `container_name`, `pod_name`, `namespace`, `id`, `image`, and `name` labels are exposed
+    * - no environment variables will be exposed ever via /metrics, even if whitelisted
+* Filter duplicate network packets in promiscuous bridge mode (with ebtables) ([#28717](https://github.com/kubernetes/kubernetes/pull/28717), [@freehan](https://github.com/freehan))
+* Refactor to simplify the hard-traveled path of the KubeletConfiguration object ([#29216](https://github.com/kubernetes/kubernetes/pull/29216), [@mtaufen](https://github.com/mtaufen))
+* Fix overflow issue in controller-manager rate limiter ([#31396](https://github.com/kubernetes/kubernetes/pull/31396), [@foxish](https://github.com/foxish))
+
 
 
 # v1.3.6

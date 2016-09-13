@@ -19,16 +19,17 @@ package v1alpha1
 import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/watch/versioned"
 )
 
+const GroupName = "rbac.authorization.k8s.io"
+
 // SchemeGroupVersion is group version used to register these objects
-var SchemeGroupVersion = unversioned.GroupVersion{Group: rbac.GroupName, Version: "v1alpha1"}
+var SchemeGroupVersion = unversioned.GroupVersion{Group: GroupName, Version: "v1alpha1"}
 
 var (
-	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)
+	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes, addDefaultingFuncs)
 	AddToScheme   = SchemeBuilder.AddToScheme
 )
 

@@ -20,21 +20,23 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
-const (
-	quotaLong = `
-Create a resourcequota with the specified name, hard limits and optional scopes`
+var (
+	quotaLong = dedent.Dedent(`
+		Create a resourcequota with the specified name, hard limits and optional scopes`)
 
-	quotaExample = `  // Create a new resourcequota named my-quota
-  $ kubectl create quota my-quota --hard=cpu=1,memory=1G,pods=2,services=3,replicationcontrollers=2,resourcequotas=1,secrets=5,persistentvolumeclaims=10
-
-  // Create a new resourcequota named best-effort
-  $ kubectl create quota best-effort --hard=pods=100 --scopes=BestEffort`
+	quotaExample = dedent.Dedent(`  
+		// Create a new resourcequota named my-quota
+		$ kubectl create quota my-quota --hard=cpu=1,memory=1G,pods=2,services=3,replicationcontrollers=2,resourcequotas=1,secrets=5,persistentvolumeclaims=10
+		
+		// Create a new resourcequota named best-effort
+		$ kubectl create quota best-effort --hard=pods=100 --scopes=BestEffort`)
 )
 
 // NewCmdCreateQuota is a macro command to create a new quota

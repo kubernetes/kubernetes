@@ -1,6 +1,6 @@
-#!/bin/bash
+#!/bin/sh
 
-# Copyright 2015 The Kubernetes Authors.
+# Copyright 2016 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,21 +14,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Pushes a development build to a directory in your current project,
-# pushing to something like:
-# gs://kubernetes-releases-3fda2/devel/v0.8.0-437-g7f147ed/
+nginx "$@"
+oldcksum=`cksum /etc/nginx/conf.d/default.conf`
 
-set -o errexit
-set -o nounset
-set -o pipefail
+inotifywait -mr --timefmt '%d/%m/%y %H:%M' --format '%T' \
+/etc/nginx/conf.d/ | while read date time; do
 
-LATEST=$(git describe)
-KUBE_GCS_NO_CACHING=n
-KUBE_GCS_MAKE_PUBLIC=y
-KUBE_GCS_UPLOAD_RELEASE=y
-KUBE_GCS_RELEASE_PREFIX="devel/${LATEST}"
+	newcksum=`cksum /etc/nginx/conf.d/default.conf`
+	if [ "$newcksum" != "$oldcksum" ]; then
+		echo "At ${time} on ${date}, config file update detected."
+		oldcksum=$newcksum
+		nginx -s reload
+	fi
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
-source "${KUBE_ROOT}/build/common.sh"
-
-kube::release::gcs::release
+done

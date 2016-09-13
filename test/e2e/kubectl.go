@@ -47,6 +47,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	clientsetadapter "k8s.io/kubernetes/pkg/client/unversioned/adapters/internalclientset"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/labels"
@@ -420,7 +421,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 				ExecOrDie()
 			Expect(runOutput).ToNot(ContainSubstring("stdin closed"))
 			f := func(pods []*api.Pod) sort.Interface { return sort.Reverse(controller.ActivePods(pods)) }
-			runTestPod, _, err := util.GetFirstPod(c, ns, labels.SelectorFromSet(map[string]string{"run": "run-test-3"}), 1*time.Minute, f)
+			runTestPod, _, err := util.GetFirstPod(clientsetadapter.FromUnversionedClient(c), ns, labels.SelectorFromSet(map[string]string{"run": "run-test-3"}), 1*time.Minute, f)
 			if err != nil {
 				os.Exit(1)
 			}
@@ -696,7 +697,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 					framework.Failf("Wrong service port: %d", port.Port)
 				}
 				if port.TargetPort.IntValue() != redisPort {
-					framework.Failf("Wrong target port: %d")
+					framework.Failf("Wrong target port: %d", port.TargetPort.IntValue())
 				}
 			}
 
@@ -1232,76 +1233,83 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 
 	framework.KubeDescribe("Kubectl taint", func() {
 		It("should update the taint on a node", func() {
-			taintName := fmt.Sprintf("kubernetes.io/e2e-taint-key-%s", string(uuid.NewUUID()))
-			taintValue := "testing-taint-value"
-			taintEffect := fmt.Sprintf("%s", api.TaintEffectNoSchedule)
+			testTaint := api.Taint{
+				Key:    fmt.Sprintf("kubernetes.io/e2e-taint-key-%s", string(uuid.NewUUID())),
+				Value:  "testing-taint-value",
+				Effect: api.TaintEffectNoSchedule,
+			}
 
 			nodes, err := c.Nodes().List(api.ListOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			node := nodes.Items[0]
 			nodeName := node.Name
 
-			By("adding the taint " + taintName + " with value " + taintValue + " and taint effect " + taintEffect + " to a node")
-			framework.RunKubectlOrDie("taint", "nodes", nodeName, taintName+"="+taintValue+":"+taintEffect)
-			By("verifying the node has the taint " + taintName + " with the value " + taintValue)
+			By("adding the taint " + testTaint.ToString() + " to a node")
+			framework.RunKubectlOrDie("taint", "nodes", nodeName, testTaint.ToString())
+			By("verifying the node has the taint " + testTaint.ToString())
 			output := framework.RunKubectlOrDie("describe", "node", nodeName)
 			requiredStrings := [][]string{
 				{"Name:", nodeName},
 				{"Taints:"},
-				{taintName + "=" + taintValue + ":" + taintEffect},
+				{testTaint.ToString()},
 			}
 			checkOutput(output, requiredStrings)
 
-			By("removing the taint " + taintName + " of a node")
-			framework.RunKubectlOrDie("taint", "nodes", nodeName, taintName+":"+taintEffect+"-")
-			By("verifying the node doesn't have the taint " + taintName)
+			By("removing the taint " + testTaint.ToString() + " of a node")
+			framework.RunKubectlOrDie("taint", "nodes", nodeName, testTaint.Key+":"+string(testTaint.Effect)+"-")
+			By("verifying the node doesn't have the taint " + testTaint.Key)
 			output = framework.RunKubectlOrDie("describe", "node", nodeName)
-			if strings.Contains(output, taintName) {
-				framework.Failf("Failed removing taint " + taintName + " of the node " + nodeName)
+			if strings.Contains(output, testTaint.Key) {
+				framework.Failf("Failed removing taint " + testTaint.Key + " of the node " + nodeName)
 			}
 
 		})
 
 		It("should remove all the taints with the same key off a node", func() {
-			taintName := fmt.Sprintf("kubernetes.io/e2e-taint-key-%s", string(uuid.NewUUID()))
-			taintValue := "testing-taint-value"
-			taintEffect := fmt.Sprintf("%s", api.TaintEffectNoSchedule)
+			testTaint := api.Taint{
+				Key:    fmt.Sprintf("kubernetes.io/e2e-taint-key-%s", string(uuid.NewUUID())),
+				Value:  "testing-taint-value",
+				Effect: api.TaintEffectNoSchedule,
+			}
 
 			nodes, err := c.Nodes().List(api.ListOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			node := nodes.Items[0]
 			nodeName := node.Name
 
-			By("adding the taint " + taintName + " with value " + taintValue + " and taint effect " + taintEffect + " to a node")
-			framework.RunKubectlOrDie("taint", "nodes", nodeName, taintName+"="+taintValue+":"+taintEffect)
-			By("verifying the node has the taint " + taintName + " with the value " + taintValue)
+			By("adding the taint " + testTaint.ToString() + " to a node")
+			framework.RunKubectlOrDie("taint", "nodes", nodeName, testTaint.ToString())
+			By("verifying the node has the taint " + testTaint.ToString())
 			output := framework.RunKubectlOrDie("describe", "node", nodeName)
 			requiredStrings := [][]string{
 				{"Name:", nodeName},
 				{"Taints:"},
-				{taintName + "=" + taintValue + ":" + taintEffect},
+				{testTaint.ToString()},
 			}
 			checkOutput(output, requiredStrings)
 
-			newTaintValue := "another-testing-taint-value"
-			newTaintEffect := fmt.Sprintf("%s", api.TaintEffectPreferNoSchedule)
-			By("adding another taint " + taintName + " with value " + newTaintValue + " and taint effect " + newTaintEffect + " to the node")
-			framework.RunKubectlOrDie("taint", "nodes", nodeName, taintName+"="+newTaintValue+":"+newTaintEffect)
-			By("verifying the node has the taint " + taintName + " with the value " + newTaintValue)
+			newTestTaint := api.Taint{
+				Key:    testTaint.Key,
+				Value:  "another-testing-taint-value",
+				Effect: api.TaintEffectPreferNoSchedule,
+			}
+			By("adding another taint " + newTestTaint.ToString() + " to the node")
+			framework.RunKubectlOrDie("taint", "nodes", nodeName, newTestTaint.ToString())
+			By("verifying the node has the taint " + newTestTaint.ToString())
 			output = framework.RunKubectlOrDie("describe", "node", nodeName)
 			requiredStrings = [][]string{
 				{"Name:", nodeName},
 				{"Taints:"},
-				{taintName + "=" + newTaintValue + ":" + newTaintEffect},
+				{newTestTaint.ToString()},
 			}
 			checkOutput(output, requiredStrings)
 
-			By("removing the taint " + taintName + " of a node")
-			framework.RunKubectlOrDie("taint", "nodes", nodeName, taintName+"-")
-			By("verifying the node doesn't have the taints " + taintName)
+			By("removing all taints that have the same key " + testTaint.Key + " of the node")
+			framework.RunKubectlOrDie("taint", "nodes", nodeName, testTaint.Key+"-")
+			By("verifying the node doesn't have the taints that have the same key " + testTaint.Key)
 			output = framework.RunKubectlOrDie("describe", "node", nodeName)
-			if strings.Contains(output, taintName) {
-				framework.Failf("Failed removing taint " + taintName + " of the node " + nodeName)
+			if strings.Contains(output, testTaint.Key) {
+				framework.Failf("Failed removing taints " + testTaint.Key + " of the node " + nodeName)
 			}
 		})
 	})
@@ -1520,7 +1528,7 @@ func readBytesFromFile(filename string) []byte {
 	if err != nil {
 		framework.Failf(err.Error())
 	}
-
+	defer file.Close()
 	data, err := ioutil.ReadAll(file)
 	if err != nil {
 		framework.Failf(err.Error())

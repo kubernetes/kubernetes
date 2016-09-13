@@ -17,10 +17,8 @@ spec:
     - mountPath: /var/log/rescheduler.log
       name: logfile
       readOnly: false
+    # TODO: Make resource requirements depend on the size of the cluster
     resources:
-      limits:
-        cpu: 100m
-        memory: 300Mi
       requests:
         cpu: 10m
         memory: 100Mi

@@ -48,13 +48,21 @@ type PluginFactoryArgs struct {
 // A FitPredicateFactory produces a FitPredicate from the given args.
 type FitPredicateFactory func(PluginFactoryArgs) algorithm.FitPredicate
 
+// DEPRECATED
+// Use Map-Reduce pattern for priority functions.
 // A PriorityFunctionFactory produces a PriorityConfig from the given args.
 type PriorityFunctionFactory func(PluginFactoryArgs) algorithm.PriorityFunction
 
+// A PriorityFunctionFactory produces map & reduce priority functions
+// from a given args.
+// FIXME: Rename to PriorityFunctionFactory.
+type PriorityFunctionFactory2 func(PluginFactoryArgs) (algorithm.PriorityMapFunction, algorithm.PriorityReduceFunction)
+
 // A PriorityConfigFactory produces a PriorityConfig from the given function and weight
 type PriorityConfigFactory struct {
-	Function PriorityFunctionFactory
-	Weight   int
+	Function          PriorityFunctionFactory
+	MapReduceFunction PriorityFunctionFactory2
+	Weight            int
 }
 
 var (
@@ -139,12 +147,30 @@ func IsFitPredicateRegistered(name string) bool {
 	return ok
 }
 
+// DEPRECATED
+// Use Map-Reduce pattern for priority functions.
 // Registers a priority function with the algorithm registry. Returns the name,
 // with which the function was registered.
 func RegisterPriorityFunction(name string, function algorithm.PriorityFunction, weight int) string {
 	return RegisterPriorityConfigFactory(name, PriorityConfigFactory{
 		Function: func(PluginFactoryArgs) algorithm.PriorityFunction {
 			return function
+		},
+		Weight: weight,
+	})
+}
+
+// Registers a priority function with the algorithm registry. Returns the name,
+// with which the function was registered.
+// FIXME: Rename to PriorityFunctionFactory.
+func RegisterPriorityFunction2(
+	name string,
+	mapFunction algorithm.PriorityMapFunction,
+	reduceFunction algorithm.PriorityReduceFunction,
+	weight int) string {
+	return RegisterPriorityConfigFactory(name, PriorityConfigFactory{
+		MapReduceFunction: func(PluginFactoryArgs) (algorithm.PriorityMapFunction, algorithm.PriorityReduceFunction) {
+			return mapFunction, reduceFunction
 		},
 		Weight: weight,
 	})
@@ -193,8 +219,9 @@ func RegisterCustomPriorityFunction(policy schedulerapi.PriorityPolicy) string {
 		glog.V(2).Infof("Priority type %s already registered, reusing.", policy.Name)
 		// set/update the weight based on the policy
 		pcf = &PriorityConfigFactory{
-			Function: existing_pcf.Function,
-			Weight:   policy.Weight,
+			Function:          existing_pcf.Function,
+			MapReduceFunction: existing_pcf.MapReduceFunction,
+			Weight:            policy.Weight,
 		}
 	}
 
@@ -265,10 +292,19 @@ func getPriorityFunctionConfigs(names sets.String, args PluginFactoryArgs) ([]al
 		if !ok {
 			return nil, fmt.Errorf("Invalid priority name %s specified - no corresponding function found", name)
 		}
-		configs = append(configs, algorithm.PriorityConfig{
-			Function: factory.Function(args),
-			Weight:   factory.Weight,
-		})
+		if factory.Function != nil {
+			configs = append(configs, algorithm.PriorityConfig{
+				Function: factory.Function(args),
+				Weight:   factory.Weight,
+			})
+		} else {
+			mapFunction, reduceFunction := factory.MapReduceFunction(args)
+			configs = append(configs, algorithm.PriorityConfig{
+				Map:    mapFunction,
+				Reduce: reduceFunction,
+				Weight: factory.Weight,
+			})
+		}
 	}
 	return configs, nil
 }
@@ -309,6 +345,28 @@ func validatePriorityOrDie(priority schedulerapi.PriorityPolicy) {
 			glog.Fatalf("Exactly 1 priority argument is required, numArgs: %v, Priority: %s", numArgs, priority.Name)
 		}
 	}
+}
+
+func ListRegisteredFitPredicates() []string {
+	schedulerFactoryMutex.Lock()
+	defer schedulerFactoryMutex.Unlock()
+
+	names := []string{}
+	for name := range fitPredicateMap {
+		names = append(names, name)
+	}
+	return names
+}
+
+func ListRegisteredPriorityFunctions() []string {
+	schedulerFactoryMutex.Lock()
+	defer schedulerFactoryMutex.Unlock()
+
+	names := []string{}
+	for name := range priorityFunctionMap {
+		names = append(names, name)
+	}
+	return names
 }
 
 // ListAlgorithmProviders is called when listing all available algorithm providers in `kube-scheduler --help`

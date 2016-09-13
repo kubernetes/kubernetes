@@ -62,7 +62,7 @@ func BuildClusterConfig(c *federation_v1beta1.Cluster) (*restclient.Config, erro
 	}
 	if serverAddress != "" {
 		if c.Spec.SecretRef == nil {
-			glog.Infof("didnt find secretRef for cluster %s. Trying insecure access", c.Name)
+			glog.Infof("didn't find secretRef for cluster %s. Trying insecure access", c.Name)
 			clusterConfig, err = clientcmd.BuildConfigFromFlags(serverAddress, "")
 		} else {
 			kubeconfigGetter := KubeconfigGetterForCluster(c)
@@ -78,14 +78,14 @@ func BuildClusterConfig(c *federation_v1beta1.Cluster) (*restclient.Config, erro
 }
 
 // This is to inject a different kubeconfigGetter in tests.
-// We dont use the standard one which calls NewInCluster in tests to avoid having to setup service accounts and mount files with secret tokens.
+// We don't use the standard one which calls NewInCluster in tests to avoid having to setup service accounts and mount files with secret tokens.
 var KubeconfigGetterForCluster = func(c *federation_v1beta1.Cluster) clientcmd.KubeconfigGetter {
 	return func() (*clientcmdapi.Config, error) {
 		secretRefName := ""
 		if c.Spec.SecretRef != nil {
 			secretRefName = c.Spec.SecretRef.Name
 		} else {
-			glog.Infof("didnt find secretRef for cluster %s. Trying insecure access", c.Name)
+			glog.Infof("didn't find secretRef for cluster %s. Trying insecure access", c.Name)
 		}
 		return KubeconfigGetterForSecret(secretRefName)()
 	}

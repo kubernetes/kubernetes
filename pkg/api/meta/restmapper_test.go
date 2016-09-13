@@ -131,6 +131,62 @@ func TestRESTMapperKindsFor(t *testing.T) {
 		ExpectedKindErr string
 	}{
 		{
+			// exact matches are prefered
+			Name: "groups, with group exact",
+			PreferredOrder: []unversioned.GroupVersion{
+				{Group: "first-group-1", Version: "first-version"},
+				{Group: "first-group", Version: "first-version"},
+			},
+			KindsToRegister: []unversioned.GroupVersionKind{
+				{Group: "first-group-1", Version: "first-version", Kind: "my-kind"},
+				{Group: "first-group", Version: "first-version", Kind: "my-kind"},
+			},
+			PartialResourceToRequest: unversioned.GroupVersionResource{Group: "first-group", Resource: "my-kind"},
+
+			ExpectedKinds: []unversioned.GroupVersionKind{
+				{Group: "first-group", Version: "first-version", Kind: "my-kind"},
+			},
+		},
+
+		{
+			// group prefixes work
+			Name: "groups, with group prefix",
+			PreferredOrder: []unversioned.GroupVersion{
+				{Group: "second-group", Version: "first-version"},
+				{Group: "first-group", Version: "first-version"},
+			},
+			KindsToRegister: []unversioned.GroupVersionKind{
+				{Group: "first-group", Version: "first-version", Kind: "my-kind"},
+				{Group: "second-group", Version: "first-version", Kind: "my-kind"},
+			},
+			PartialResourceToRequest: unversioned.GroupVersionResource{Group: "first", Resource: "my-kind"},
+
+			ExpectedKinds: []unversioned.GroupVersionKind{
+				{Group: "first-group", Version: "first-version", Kind: "my-kind"},
+			},
+		},
+
+		{
+			// group prefixes can be ambiguous
+			Name: "groups, with ambiguous group prefix",
+			PreferredOrder: []unversioned.GroupVersion{
+				{Group: "first-group-1", Version: "first-version"},
+				{Group: "first-group", Version: "first-version"},
+			},
+			KindsToRegister: []unversioned.GroupVersionKind{
+				{Group: "first-group-1", Version: "first-version", Kind: "my-kind"},
+				{Group: "first-group", Version: "first-version", Kind: "my-kind"},
+			},
+			PartialResourceToRequest: unversioned.GroupVersionResource{Group: "first", Resource: "my-kind"},
+
+			ExpectedKinds: []unversioned.GroupVersionKind{
+				{Group: "first-group-1", Version: "first-version", Kind: "my-kind"},
+				{Group: "first-group", Version: "first-version", Kind: "my-kind"},
+			},
+			ExpectedKindErr: " matches multiple kinds ",
+		},
+
+		{
 			Name: "ambiguous groups, with preference order",
 			PreferredOrder: []unversioned.GroupVersion{
 				{Group: "second-group", Version: "first-version"},
@@ -243,6 +299,65 @@ func TestRESTMapperResourcesFor(t *testing.T) {
 		ExpectedResources   []unversioned.GroupVersionResource
 		ExpectedResourceErr string
 	}{
+		{
+			// exact matches are prefered
+			Name: "groups, with group exact",
+			PreferredOrder: []unversioned.GroupVersion{
+				{Group: "first-group-1", Version: "first-version"},
+				{Group: "first-group", Version: "first-version"},
+			},
+			KindsToRegister: []unversioned.GroupVersionKind{
+				{Group: "first-group-1", Version: "first-version", Kind: "my-kind"},
+				{Group: "first-group", Version: "first-version", Kind: "my-kind"},
+			},
+			PluralPartialResourceToRequest:   unversioned.GroupVersionResource{Group: "first-group", Resource: "my-kinds"},
+			SingularPartialResourceToRequest: unversioned.GroupVersionResource{Group: "first-group", Resource: "my-kind"},
+
+			ExpectedResources: []unversioned.GroupVersionResource{
+				{Group: "first-group", Version: "first-version", Resource: "my-kinds"},
+			},
+		},
+
+		{
+			// group prefixes work
+			Name: "groups, with group prefix",
+			PreferredOrder: []unversioned.GroupVersion{
+				{Group: "second-group", Version: "first-version"},
+				{Group: "first-group", Version: "first-version"},
+			},
+			KindsToRegister: []unversioned.GroupVersionKind{
+				{Group: "first-group", Version: "first-version", Kind: "my-kind"},
+				{Group: "second-group", Version: "first-version", Kind: "my-kind"},
+			},
+			PluralPartialResourceToRequest:   unversioned.GroupVersionResource{Group: "first", Resource: "my-kinds"},
+			SingularPartialResourceToRequest: unversioned.GroupVersionResource{Group: "first", Resource: "my-kind"},
+
+			ExpectedResources: []unversioned.GroupVersionResource{
+				{Group: "first-group", Version: "first-version", Resource: "my-kinds"},
+			},
+		},
+
+		{
+			// group prefixes can be ambiguous
+			Name: "groups, with ambiguous group prefix",
+			PreferredOrder: []unversioned.GroupVersion{
+				{Group: "first-group-1", Version: "first-version"},
+				{Group: "first-group", Version: "first-version"},
+			},
+			KindsToRegister: []unversioned.GroupVersionKind{
+				{Group: "first-group-1", Version: "first-version", Kind: "my-kind"},
+				{Group: "first-group", Version: "first-version", Kind: "my-kind"},
+			},
+			PluralPartialResourceToRequest:   unversioned.GroupVersionResource{Group: "first", Resource: "my-kinds"},
+			SingularPartialResourceToRequest: unversioned.GroupVersionResource{Group: "first", Resource: "my-kind"},
+
+			ExpectedResources: []unversioned.GroupVersionResource{
+				{Group: "first-group-1", Version: "first-version", Resource: "my-kinds"},
+				{Group: "first-group", Version: "first-version", Resource: "my-kinds"},
+			},
+			ExpectedResourceErr: " matches multiple resources ",
+		},
+
 		{
 			Name: "ambiguous groups, with preference order",
 			PreferredOrder: []unversioned.GroupVersion{

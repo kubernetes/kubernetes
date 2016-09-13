@@ -134,7 +134,7 @@ func (sb *summaryBuilder) build() (*stats.Summary, error) {
 				CapacityBytes:  &sb.imageFsInfo.Capacity,
 				UsedBytes:      &sb.imageStats.TotalStorageBytes,
 				InodesFree:     sb.imageFsInfo.InodesFree,
-				Inodes:         sb.rootFsInfo.Inodes,
+				Inodes:         sb.imageFsInfo.Inodes,
 			},
 		},
 	}

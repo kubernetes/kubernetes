@@ -42,6 +42,7 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"github.com/golang/glog"
 	"k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_4"
 	"k8s.io/kubernetes/pkg/api"
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
@@ -55,6 +56,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/typed/discovery"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	clientsetadapter "k8s.io/kubernetes/pkg/client/unversioned/adapters/internalclientset"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
@@ -430,6 +432,22 @@ func SkipUnlessFederated(c *client.Client) {
 		} else {
 			Failf("Unexpected error getting namespace: %v", err)
 		}
+	}
+}
+
+func SkipIfMissingResource(clientPool dynamic.ClientPool, gvr unversioned.GroupVersionResource, namespace string) {
+	dynamicClient, err := clientPool.ClientForGroupVersion(gvr.GroupVersion())
+	if err != nil {
+		Failf("Unexpected error getting dynamic client for %v: %v", gvr.GroupVersion(), err)
+	}
+	apiResource := unversioned.APIResource{Name: gvr.Resource, Namespaced: true}
+	_, err = dynamicClient.Resource(&apiResource, namespace).List(&v1.ListOptions{})
+	if err != nil {
+		// not all resources support list, so we ignore those
+		if apierrs.IsMethodNotSupported(err) || apierrs.IsNotFound(err) || apierrs.IsForbidden(err) {
+			Skipf("Could not find %s resource, skipping test: %#v", gvr, err)
+		}
+		Failf("Unexpected error getting %v: %v", gvr, err)
 	}
 }
 
@@ -2952,7 +2970,11 @@ func GetReadySchedulableNodesOrDie(c *client.Client) (nodes *api.NodeList) {
 }
 
 func WaitForAllNodesSchedulable(c *client.Client) error {
+	Logf("Waiting up to %v for all (but %d) nodes to be schedulable", 4*time.Hour, TestContext.AllowedNotReadyNodes)
+
+	var notSchedulable []*api.Node
 	return wait.PollImmediate(30*time.Second, 4*time.Hour, func() (bool, error) {
+		notSchedulable = nil
 		opts := api.ListOptions{
 			ResourceVersion: "0",
 			FieldSelector:   fields.Set{"spec.unschedulable": "false"}.AsSelector(),
@@ -2963,17 +2985,23 @@ func WaitForAllNodesSchedulable(c *client.Client) error {
 			// Ignore the error here - it will be retried.
 			return false, nil
 		}
-		schedulable := 0
-		for _, node := range nodes.Items {
-			if isNodeSchedulable(&node) {
-				schedulable++
+		for i := range nodes.Items {
+			node := &nodes.Items[i]
+			if !isNodeSchedulable(node) {
+				notSchedulable = append(notSchedulable, node)
 			}
 		}
-		if schedulable != len(nodes.Items) {
-			Logf("%d/%d nodes schedulable (polling after 30s)", schedulable, len(nodes.Items))
+		// Framework allows for <TestContext.AllowedNotReadyNodes> nodes to be non-ready,
+		// to make it possible e.g. for incorrect deployment of some small percentage
+		// of nodes (which we allow in cluster validation). Some nodes that are not
+		// provisioned correctly at startup will never become ready (e.g. when something
+		// won't install correctly), so we can't expect them to be ready at any point.
+		//
+		// However, we only allow non-ready nodes with some specific reasons.
+		if len(notSchedulable) > TestContext.AllowedNotReadyNodes {
 			return false, nil
 		}
-		return true, nil
+		return allowedNotReadyReasons(notSchedulable), nil
 	})
 }
 
@@ -3048,7 +3076,7 @@ func AddOrUpdateTaintOnNode(c *client.Client, nodeName string, taint api.Taint) 
 		var newTaints []api.Taint
 		updated := false
 		for _, existingTaint := range nodeTaints {
-			if existingTaint.Key == taint.Key {
+			if taint.MatchTaint(existingTaint) {
 				newTaints = append(newTaints, taint)
 				updated = true
 				continue
@@ -3082,49 +3110,49 @@ func AddOrUpdateTaintOnNode(c *client.Client, nodeName string, taint api.Taint) 
 	}
 }
 
-func taintExists(taints []api.Taint, taintKey string) bool {
+func taintExists(taints []api.Taint, taintToFind api.Taint) bool {
 	for _, taint := range taints {
-		if taint.Key == taintKey {
+		if taint.MatchTaint(taintToFind) {
 			return true
 		}
 	}
 	return false
 }
 
-func ExpectNodeHasTaint(c *client.Client, nodeName string, taintKey string) {
-	By("verifying the node has the taint " + taintKey)
+func ExpectNodeHasTaint(c *client.Client, nodeName string, taint api.Taint) {
+	By("verifying the node has the taint " + taint.ToString())
 	node, err := c.Nodes().Get(nodeName)
 	ExpectNoError(err)
 
 	nodeTaints, err := api.GetTaintsFromNodeAnnotations(node.Annotations)
 	ExpectNoError(err)
 
-	if len(nodeTaints) == 0 || !taintExists(nodeTaints, taintKey) {
-		Failf("Failed to find taint %s on node %s", taintKey, nodeName)
+	if len(nodeTaints) == 0 || !taintExists(nodeTaints, taint) {
+		Failf("Failed to find taint %s on node %s", taint.ToString(), nodeName)
 	}
 }
 
-func deleteTaintByKey(taints []api.Taint, taintKey string) ([]api.Taint, error) {
+func deleteTaint(oldTaints []api.Taint, taintToDelete api.Taint) ([]api.Taint, error) {
 	newTaints := []api.Taint{}
 	found := false
-	for _, taint := range taints {
-		if taint.Key == taintKey {
+	for _, oldTaint := range oldTaints {
+		if oldTaint.MatchTaint(taintToDelete) {
 			found = true
 			continue
 		}
-		newTaints = append(newTaints, taint)
+		newTaints = append(newTaints, taintToDelete)
 	}
 
 	if !found {
-		return nil, fmt.Errorf("taint key=\"%s\" not found.", taintKey)
+		return nil, fmt.Errorf("taint %s not found.", taintToDelete.ToString())
 	}
 	return newTaints, nil
 }
 
 // RemoveTaintOffNode is for cleaning up taints temporarily added to node,
 // won't fail if target taint doesn't exist or has been removed.
-func RemoveTaintOffNode(c *client.Client, nodeName string, taintKey string) {
-	By("removing the taint " + taintKey + " off the node " + nodeName)
+func RemoveTaintOffNode(c *client.Client, nodeName string, taint api.Taint) {
+	By("removing the taint " + taint.ToString() + " off the node " + nodeName)
 	for attempt := 0; attempt < UpdateRetries; attempt++ {
 		node, err := c.Nodes().Get(nodeName)
 		ExpectNoError(err)
@@ -3135,11 +3163,11 @@ func RemoveTaintOffNode(c *client.Client, nodeName string, taintKey string) {
 			return
 		}
 
-		if !taintExists(nodeTaints, taintKey) {
+		if !taintExists(nodeTaints, taint) {
 			return
 		}
 
-		newTaints, err := deleteTaintByKey(nodeTaints, taintKey)
+		newTaints, err := deleteTaint(nodeTaints, taint)
 		ExpectNoError(err)
 
 		taintsData, err := json.Marshal(newTaints)
@@ -3150,7 +3178,7 @@ func RemoveTaintOffNode(c *client.Client, nodeName string, taintKey string) {
 			if !apierrs.IsConflict(err) {
 				ExpectNoError(err)
 			} else {
-				Logf("Conflict when trying to add/update taint %v to %v", taintKey, nodeName)
+				Logf("Conflict when trying to add/update taint %s to node %v", taint.ToString(), nodeName)
 			}
 		} else {
 			break
@@ -3160,17 +3188,17 @@ func RemoveTaintOffNode(c *client.Client, nodeName string, taintKey string) {
 
 	nodeUpdated, err := c.Nodes().Get(nodeName)
 	ExpectNoError(err)
-	By("verifying the node doesn't have the taint " + taintKey)
+	By("verifying the node doesn't have the taint " + taint.ToString())
 	taintsGot, err := api.GetTaintsFromNodeAnnotations(nodeUpdated.Annotations)
 	ExpectNoError(err)
-	if taintExists(taintsGot, taintKey) {
-		Failf("Failed removing taint " + taintKey + " of the node " + nodeName)
+	if taintExists(taintsGot, taint) {
+		Failf("Failed removing taint " + taint.ToString() + " of the node " + nodeName)
 	}
 }
 
 func ScaleRC(c *client.Client, ns, name string, size uint, wait bool) error {
 	By(fmt.Sprintf("Scaling replication controller %s in namespace %s to %d", name, ns, size))
-	scaler, err := kubectl.ScalerFor(api.Kind("ReplicationController"), c)
+	scaler, err := kubectl.ScalerFor(api.Kind("ReplicationController"), clientsetadapter.FromUnversionedClient(c))
 	if err != nil {
 		return err
 	}
@@ -3287,7 +3315,7 @@ func DeleteRCAndPods(c *client.Client, ns, name string) error {
 		}
 		return err
 	}
-	reaper, err := kubectl.ReaperForReplicationController(c, 10*time.Minute)
+	reaper, err := kubectl.ReaperForReplicationController(clientsetadapter.FromUnversionedClient(c).Core(), 10*time.Minute)
 	if err != nil {
 		if apierrs.IsNotFound(err) {
 			Logf("RC %s was already deleted: %v", name, err)
@@ -3435,7 +3463,7 @@ func DeleteReplicaSet(c *client.Client, ns, name string) error {
 		}
 		return err
 	}
-	reaper, err := kubectl.ReaperFor(extensions.Kind("ReplicaSet"), c)
+	reaper, err := kubectl.ReaperFor(extensions.Kind("ReplicaSet"), clientsetadapter.FromUnversionedClient(c))
 	if err != nil {
 		if apierrs.IsNotFound(err) {
 			Logf("ReplicaSet %s was already deleted: %v", name, err)
@@ -4201,7 +4229,7 @@ func allowedNotReadyReasons(nodes []*api.Node) bool {
 	for _, node := range nodes {
 		index, condition := api.GetNodeCondition(&node.Status, api.NodeReady)
 		if index == -1 ||
-			!strings.Contains(condition.Reason, "could not locate kubenet required CNI plugins") {
+			!strings.Contains(condition.Message, "could not locate kubenet required CNI plugins") {
 			return false
 		}
 	}
@@ -4213,7 +4241,7 @@ func allowedNotReadyReasons(nodes []*api.Node) bool {
 // and figure out how to do it in a configurable way, as we can't expect all setups to run
 // default test add-ons.
 func AllNodesReady(c *client.Client, timeout time.Duration) error {
-	Logf("Waiting up to %v for all nodes to be ready", timeout)
+	Logf("Waiting up to %v for all (but %d) nodes to be ready", timeout, TestContext.AllowedNotReadyNodes)
 
 	var notReady []*api.Node
 	err := wait.PollImmediate(Poll, timeout, func() (bool, error) {
@@ -4246,8 +4274,8 @@ func AllNodesReady(c *client.Client, timeout time.Duration) error {
 		return err
 	}
 
-	if len(notReady) > 0 {
-		return fmt.Errorf("Not ready nodes: %v", notReady)
+	if len(notReady) > TestContext.AllowedNotReadyNodes || !allowedNotReadyReasons(notReady) {
+		return fmt.Errorf("Not ready nodes: %#v", notReady)
 	}
 	return nil
 }
@@ -5157,6 +5185,17 @@ func CreateFileForGoBinData(gobindataPath, outputFilename string) error {
 	err = ioutil.WriteFile(fullPath, data, 0644)
 	if err != nil {
 		return fmt.Errorf("Error while trying to write to file %v: %v", fullPath, err)
+	}
+	return nil
+}
+
+func ListNamespaceEvents(c *client.Client, ns string) error {
+	ls, err := c.Events(ns).List(api.ListOptions{})
+	if err != nil {
+		return err
+	}
+	for _, event := range ls.Items {
+		glog.Infof("Event(%#v): type: '%v' reason: '%v' %v", event.InvolvedObject, event.Type, event.Reason, event.Message)
 	}
 	return nil
 }

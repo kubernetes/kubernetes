@@ -54,6 +54,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/namespace"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
+	ipallocator "k8s.io/kubernetes/pkg/registry/service/ipallocator"
 	"k8s.io/kubernetes/pkg/registry/thirdpartyresourcedata"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
@@ -113,6 +114,7 @@ func setUp(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.
 	config.APIResourceConfigSource = DefaultAPIResourceConfigSource()
 	config.ProxyDialer = func(network, addr string) (net.Conn, error) { return nil, nil }
 	config.ProxyTLSClientConfig = &tls.Config{}
+	config.RequestContextMapper = api.NewRequestContextMapper()
 
 	// TODO: this is kind of hacky.  The trouble is that the sync loop
 	// runs in a go-routine and there is no way to validate in the test
@@ -173,13 +175,15 @@ func TestNew(t *testing.T) {
 	// Verify many of the variables match their config counterparts
 	assert.Equal(master.enableCoreControllers, config.EnableCoreControllers)
 	assert.Equal(master.tunneler, config.Tunneler)
-	assert.Equal(master.APIPrefix, config.APIPrefix)
-	assert.Equal(master.APIGroupPrefix, config.APIGroupPrefix)
-	assert.Equal(master.RequestContextMapper, config.RequestContextMapper)
-	assert.Equal(master.MasterCount, config.MasterCount)
+	assert.Equal(master.RequestContextMapper(), config.RequestContextMapper)
 	assert.Equal(master.ClusterIP, config.PublicAddress)
-	assert.Equal(master.PublicReadWritePort, config.ReadWritePort)
-	assert.Equal(master.ServiceReadWriteIP, config.ServiceReadWriteIP)
+
+	// these values get defaulted
+	_, serviceClusterIPRange, _ := net.ParseCIDR("10.0.0.0/24")
+	serviceReadWriteIP, _ := ipallocator.GetIndexedIP(serviceClusterIPRange, 1)
+	assert.Equal(master.MasterCount, 1)
+	assert.Equal(master.PublicReadWritePort, 6443)
+	assert.Equal(master.ServiceReadWriteIP, serviceReadWriteIP)
 
 	// These functions should point to the same memory location
 	masterDialer, _ := utilnet.Dialer(master.ProxyTransport)

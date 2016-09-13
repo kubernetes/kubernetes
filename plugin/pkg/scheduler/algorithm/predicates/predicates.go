@@ -67,7 +67,7 @@ func (c *CachedNodeInfo) GetNodeInfo(id string) (*api.Node, error) {
 	return node.(*api.Node), nil
 }
 
-// podMetadata is a type that is passed as metadata for predicate functions
+// predicateMetadata is a type that is passed as metadata for predicate functions
 type predicateMetadata struct {
 	podBestEffort             bool
 	podRequest                *schedulercache.Resource

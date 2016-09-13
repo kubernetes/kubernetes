@@ -346,6 +346,10 @@ func (proxier *Proxier) sameConfig(info *serviceInfo, service *api.Service, port
 	if info.sessionAffinityType != service.Spec.SessionAffinity {
 		return false
 	}
+	onlyNodeLocalEndpoints := apiservice.NeedsHealthCheck(service) && featuregate.DefaultFeatureGate.ExternalTrafficLocalOnly()
+	if info.onlyNodeLocalEndpoints != onlyNodeLocalEndpoints {
+		return false
+	}
 	return true
 }
 
@@ -446,6 +450,9 @@ func (proxier *Proxier) OnServiceUpdate(allServices []api.Service) {
 					// Turn on healthcheck responder to listen on the health check nodePort
 					healthcheck.AddServiceListener(serviceName.NamespacedName, info.healthCheckNodePort)
 				}
+			} else {
+				// Delete healthcheck responders, if any, previously listening for this service
+				healthcheck.DeleteServiceListener(serviceName.NamespacedName, 0)
 			}
 			proxier.serviceMap[serviceName] = info
 
@@ -895,6 +902,9 @@ func (proxier *Proxier) syncProxyRules() {
 				writeLine(natChains, utiliptables.MakeChainLine(svcXlbChain))
 			}
 			activeNATChains[svcXlbChain] = true
+		} else if activeNATChains[svcXlbChain] {
+			// Cleanup the previously created XLB chain for this service
+			delete(activeNATChains, svcXlbChain)
 		}
 
 		// Capture the clusterIP.

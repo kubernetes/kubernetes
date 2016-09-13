@@ -50,7 +50,7 @@ message ClusterRoleBinding {
 
   // RoleRef can only reference a ClusterRole in the global namespace.
   // If the RoleRef cannot be resolved, the Authorizer must return an error.
-  optional k8s.io.kubernetes.pkg.api.v1.ObjectReference roleRef = 3;
+  optional RoleRef roleRef = 3;
 }
 
 // ClusterRoleBindingList is a collection of ClusterRoleBindings
@@ -119,7 +119,7 @@ message RoleBinding {
 
   // RoleRef can reference a Role in the current namespace or a ClusterRole in the global namespace.
   // If the RoleRef cannot be resolved, the Authorizer must return an error.
-  optional k8s.io.kubernetes.pkg.api.v1.ObjectReference roleRef = 3;
+  optional RoleRef roleRef = 3;
 }
 
 // RoleBindingList is a collection of RoleBindings
@@ -138,6 +138,18 @@ message RoleList {
 
   // Items is a list of Roles
   repeated Role items = 2;
+}
+
+// RoleRef contains information that points to the role being used
+message RoleRef {
+  // APIGroup is the group for the resource being referenced
+  optional string apiGroup = 1;
+
+  // Kind is the type of resource being referenced
+  optional string kind = 2;
+
+  // Name is the name of resource being referenced
+  optional string name = 3;
 }
 
 // Subject contains a reference to the object or user identities a role binding applies to.  This can either hold a direct API object reference,

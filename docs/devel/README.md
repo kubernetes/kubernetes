@@ -110,11 +110,7 @@ Guide](../admin/README.md).
 
 ## Building releases
 
-* **Making release notes** ([making-release-notes.md](making-release-notes.md)): Generating release notes for a new release.
-
-* **Releasing Kubernetes** ([releasing.md](releasing.md)): How to create a Kubernetes release (as in version)
-  and how the version information gets embedded into the built binaries.
-
+See the [kubernetes/release](https://github.com/kubernetes/release) repository for details on creating releases and related tools and helper scripts.
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/README.md?pixel)]()

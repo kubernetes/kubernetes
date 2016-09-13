@@ -50,7 +50,7 @@ start_etcd() {
     --listen-client-urls http://127.0.0.1:${ETCD_PORT} \
     --advertise-client-urls http://127.0.0.1:${ETCD_PORT} \
     --listen-peer-urls http://127.0.0.1:${ETCD_PEER_PORT} \
-    --initial-advertise-peer-urls http://127.0.01:${ETCD_PEER_PORT} \
+    --initial-advertise-peer-urls http://127.0.0.1:${ETCD_PEER_PORT} \
     1>>/dev/null 2>&1 &
   ETCD_PID=$!
   # Wait until etcd is up.

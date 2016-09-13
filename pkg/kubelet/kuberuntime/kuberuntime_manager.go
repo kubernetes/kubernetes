@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	kubetypes "k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
 )
@@ -45,6 +46,8 @@ const (
 	kubeRuntimeAPIVersion = "0.1.0"
 	// The root directory for pod logs
 	podLogsRootDirectory = "/var/log/pods"
+	// A minimal shutdown window for avoiding unnecessary SIGKILLs
+	minimumGracePeriodInSeconds = 2
 )
 
 var (
@@ -230,20 +233,40 @@ func (m *kubeGenericRuntimeManager) GetPods(all bool) ([]*kubecontainer.Pod, err
 	if err != nil {
 		return nil, err
 	}
-	for _, s := range sandboxes {
-		podUID := kubetypes.UID(s.Metadata.GetUid())
-		pods[podUID] = &kubecontainer.Pod{
-			ID:        podUID,
-			Name:      s.Metadata.GetName(),
-			Namespace: s.Metadata.GetNamespace(),
+	for i := range sandboxes {
+		s := sandboxes[i]
+		if s.Metadata == nil {
+			glog.V(4).Infof("Sandbox does not have metadata: %+v", s)
+			continue
 		}
+		podUID := kubetypes.UID(s.Metadata.GetUid())
+		if _, ok := pods[podUID]; !ok {
+			pods[podUID] = &kubecontainer.Pod{
+				ID:        podUID,
+				Name:      s.Metadata.GetName(),
+				Namespace: s.Metadata.GetNamespace(),
+			}
+		}
+		p := pods[podUID]
+		converted, err := m.sandboxToKubeContainer(s)
+		if err != nil {
+			glog.V(4).Infof("Convert %q sandbox %v of pod %q failed: %v", m.runtimeName, s, podUID, err)
+			continue
+		}
+		p.Sandboxes = append(p.Sandboxes, converted)
 	}
 
 	containers, err := m.getKubeletContainers(all)
 	if err != nil {
 		return nil, err
 	}
-	for _, c := range containers {
+	for i := range containers {
+		c := containers[i]
+		if c.Metadata == nil {
+			glog.V(4).Infof("Container does not have metadata: %+v", c)
+			continue
+		}
+
 		labelledInfo := getContainerInfoFromLabels(c.Labels)
 		pod, found := pods[labelledInfo.PodUID]
 		if !found {
@@ -257,7 +280,7 @@ func (m *kubeGenericRuntimeManager) GetPods(all bool) ([]*kubecontainer.Pod, err
 
 		converted, err := m.toKubeContainer(c)
 		if err != nil {
-			glog.Warningf("Convert %s container %v of pod %q failed: %v", m.runtimeName, c, labelledInfo.PodUID, err)
+			glog.V(4).Infof("Convert %s container %v of pod %q failed: %v", m.runtimeName, c, labelledInfo.PodUID, err)
 			continue
 		}
 
@@ -287,7 +310,77 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *api.Pod, _ api.PodStatus,
 // only hard kill paths are allowed to specify a gracePeriodOverride in the kubelet in order to not corrupt user data.
 // it is useful when doing SIGKILL for hard eviction scenarios, or max grace period during soft eviction scenarios.
 func (m *kubeGenericRuntimeManager) KillPod(pod *api.Pod, runningPod kubecontainer.Pod, gracePeriodOverride *int64) error {
-	return fmt.Errorf("not implemented")
+	err := m.killPodWithSyncResult(pod, runningPod, gracePeriodOverride)
+	return err.Error()
+}
+
+// killPodWithSyncResult kills a runningPod and returns SyncResult.
+// Note: The pod passed in could be *nil* when kubelet restarted.
+func (m *kubeGenericRuntimeManager) killPodWithSyncResult(pod *api.Pod, runningPod kubecontainer.Pod, gracePeriodOverride *int64) (result kubecontainer.PodSyncResult) {
+	killContainerResults := m.killContainersWithSyncResult(pod, runningPod, gracePeriodOverride)
+	for _, containerResult := range killContainerResults {
+		result.AddSyncResult(containerResult)
+	}
+
+	// Teardown network plugin
+	if len(runningPod.Sandboxes) == 0 {
+		glog.V(4).Infof("Can not find pod sandbox by UID %q, assuming already removed.", runningPod.ID)
+		return
+	}
+
+	sandboxID := runningPod.Sandboxes[0].ID.ID
+	isHostNetwork, err := m.isHostNetwork(sandboxID, pod)
+	if err != nil {
+		result.Fail(err)
+		return
+	}
+	if !isHostNetwork {
+		teardownNetworkResult := kubecontainer.NewSyncResult(kubecontainer.TeardownNetwork, pod.UID)
+		result.AddSyncResult(teardownNetworkResult)
+		// Tear down network plugin with sandbox id
+		if err := m.networkPlugin.TearDownPod(runningPod.Namespace, runningPod.Name, kubecontainer.ContainerID{
+			Type: m.runtimeName,
+			ID:   sandboxID,
+		}); err != nil {
+			message := fmt.Sprintf("Failed to teardown network for pod %q using network plugins %q: %v",
+				format.Pod(pod), m.networkPlugin.Name(), err)
+			teardownNetworkResult.Fail(kubecontainer.ErrTeardownNetwork, message)
+			glog.Error(message)
+		}
+	}
+
+	// stop sandbox, the sandbox will be removed in GarbageCollect
+	killSandboxResult := kubecontainer.NewSyncResult(kubecontainer.KillPodSandbox, runningPod.ID)
+	result.AddSyncResult(killSandboxResult)
+	// Stop all sandboxes belongs to same pod
+	for _, podSandbox := range runningPod.Sandboxes {
+		if err := m.runtimeService.StopPodSandbox(podSandbox.ID.ID); err != nil {
+			killSandboxResult.Fail(kubecontainer.ErrKillPodSandbox, err.Error())
+			glog.Errorf("Failed to stop sandbox %q", podSandbox.ID)
+		}
+	}
+
+	return
+}
+
+// isHostNetwork checks whether the pod is running in host-network mode.
+func (m *kubeGenericRuntimeManager) isHostNetwork(podSandBoxID string, pod *api.Pod) (bool, error) {
+	if pod != nil {
+		return kubecontainer.IsHostNetworkPod(pod), nil
+	}
+
+	podStatus, err := m.runtimeService.PodSandboxStatus(podSandBoxID)
+	if err != nil {
+		return false, err
+	}
+
+	if podStatus.Linux != nil && podStatus.Linux.Namespaces != nil && podStatus.Linux.Namespaces.Options != nil {
+		if podStatus.Linux.Namespaces.Options.HostNetwork != nil {
+			return podStatus.Linux.Namespaces.Options.GetHostNetwork(), nil
+		}
+	}
+
+	return false, nil
 }
 
 // GetPodStatus retrieves the status of the pod, including the
@@ -384,7 +477,14 @@ func (m *kubeGenericRuntimeManager) GetNetNS(sandboxID kubecontainer.ContainerID
 
 // GetPodContainerID gets pod sandbox ID
 func (m *kubeGenericRuntimeManager) GetPodContainerID(pod *kubecontainer.Pod) (kubecontainer.ContainerID, error) {
-	return kubecontainer.ContainerID{}, fmt.Errorf("not implemented")
+	podFullName := kubecontainer.BuildPodFullName(pod.Name, pod.Namespace)
+	if len(pod.Sandboxes) == 0 {
+		glog.Errorf("No sandboxes are found for pod %q", podFullName)
+		return kubecontainer.ContainerID{}, fmt.Errorf("sandboxes for pod %q not found", podFullName)
+	}
+
+	// return sandboxID of the first sandbox since it is the latest one
+	return pod.Sandboxes[0].ID, nil
 }
 
 // Forward the specified port from the specified pod to the stream.

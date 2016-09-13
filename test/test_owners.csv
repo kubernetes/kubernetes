@@ -129,7 +129,7 @@ EmptyDir volumes when FSGroup is specified new files should be created with FSGr
 EmptyDir volumes when FSGroup is specified new files should be created with FSGroup ownership when container is root,childsb,1
 EmptyDir volumes when FSGroup is specified volume on default medium should have the correct mode using FSGroup,eparis,1
 EmptyDir volumes when FSGroup is specified volume on tmpfs should have the correct mode using FSGroup,timothysc,1
-EmptyDir wrapper volumes should becomes running,deads2k,1
+EmptyDir wrapper volumes should not conflict,deads2k,1
 Etcd failure should recover from SIGKILL,pmorie,1
 Etcd failure should recover from network partition with master,justinsb,1
 Events should be sent by kubelets and the scheduler about pods scheduling and running,zmerlynn,1
@@ -138,14 +138,17 @@ Federated Services DNS non-local federated service should be able to discover a 
 Federated Services DNS should be able to discover a federated service,derekwaynecarr,1
 Federated Services Service creation should create matching services in underlying clusters,jbeda,1
 Federated Services Service creation should succeed,rmmh,1
+Federated ingresses Federated Ingresses Ingress connectivity and DNS should be able to discover a federated ingress service,bgrant0607,1
+Federated ingresses Federated Ingresses should create and update matching ingresses in underlying clusters,ghodss,1
+Federated ingresses Ingress objects should be created and deleted successfully,kargakis,1
 Federation API server authentication should accept cluster resources when the client has right authentication credentials,davidopp,1
 Federation API server authentication should not accept cluster resources when the client has invalid authentication credentials,yujuhong,1
 Federation API server authentication should not accept cluster resources when the client has no authentication credentials,nikhiljindal,1
 Federation apiserver Admission control should not be able to create resources if namespace does not exist,alex-mohr,1
 Federation apiserver Cluster objects should be created and deleted successfully,ghodss,1
 Federation events Event objects should be created and deleted successfully,karlkfi,1
-Federation ingresses Ingress objects should be created and deleted successfully,Random-Liu,1
 Federation namespace Namespace objects should be created and deleted successfully,xiang90,1
+Federation replicasets Federated ReplicaSet should create and update matching replicasets in underling clusters,childsb,1
 Federation replicasets ReplicaSet objects should be created and deleted successfully,apelisse,1
 Federation secrets Secret objects should be created and deleted successfully,pmorie,1
 GCE L7 LoadBalancer Controller should create GCE L7 loadbalancers and verify Ingress,bprashanth,0
@@ -153,7 +156,6 @@ GKE local SSD should write and read from node local SSD,fabioy,0
 GKE node pools should create a cluster with multiple node pools,kargakis,1
 Garbage collector should delete pods created by rc when not orphaning,justinsb,1
 Garbage collector should handle the creation of 1000 pods,xiang90,1
-Garbage collector should orphan pods created by rc,kargakis,1
 Garbage collector should orphan pods created by rc if delete options say so,fabioy,1
 Garbage collector should orphan pods created by rc if deleteOptions.OrphanDependents is nil,zmerlynn,1
 "Generated release_1_2 clientset should create pods, delete pods, watch pods",ncdc,1
@@ -252,7 +254,6 @@ Load capacity should be able to handle 30 pods per node,wojtek-t,0
 Loadbalancing: L7 GCE shoud create ingress with given static-ip,vulpecula,1
 Loadbalancing: L7 GCE should conform to Ingress spec,andyzheng0831,1
 Loadbalancing: L7 Nginx should conform to Ingress spec,ncdc,1
-"MemoryEviction When there is memory pressure It should evict pods in the correct order (besteffort first, then burstable, then guaranteed)",maisem,1
 "MemoryEviction when there is memory pressure should evict pods in the correct order (besteffort first, then burstable, then guaranteed)",ixdy,1
 Mesos applies slave attributes as labels,justinsb,1
 Mesos schedules pods annotated with roles on correct slaves,timstclair,1
@@ -369,11 +370,11 @@ ResourceQuota should verify ResourceQuota with terminating scopes.,ncdc,1
 Restart should restart all nodes and ensure all nodes and pods recover,andyzheng0831,1
 RethinkDB should create and stop rethinkdb servers,kargakis,1
 SSH should SSH to all nodes and run commands,quinton-hoole,0
-ScheduledJob should not emit unexpected warnings,nikhiljindal,1
-ScheduledJob should not schedule jobs when suspended,madhusudancs,1
-ScheduledJob should not schedule new jobs when ForbidConcurrent,smarterclayton,1
-ScheduledJob should replace jobs when ReplaceConcurrent,spxtr,1
-ScheduledJob should schedule multiple jobs concurrently,childsb,1
+ScheduledJob should not emit unexpected warnings,soltysh,0
+ScheduledJob should not schedule jobs when suspended,soltysh,0
+ScheduledJob should not schedule new jobs when ForbidConcurrent,soltysh,0
+ScheduledJob should replace jobs when ReplaceConcurrent,soltysh,0
+ScheduledJob should schedule multiple jobs concurrently,soltysh,0
 SchedulerPredicates validates MaxPods limit number of pods that are allowed to run,gmarek,0
 SchedulerPredicates validates resource limits of pods that are allowed to run,gmarek,0
 SchedulerPredicates validates that Inter-pod-Affinity is respected if not matching,hurf,1
@@ -413,9 +414,11 @@ ServiceAccounts should mount an API token into pods,liggitt,0
 ServiceLoadBalancer should support simple GET on Ingress ips,bprashanth,0
 Services should be able to change the type and ports of a service,bprashanth,0
 Services should be able to create a functioning NodePort service,bprashanth,0
+Services should be able to create services of type LoadBalancer and externalTraffic=localOnly,jlowdermilk,1
 Services should be able to up and down services,bprashanth,0
 Services should check NodePort out-of-range,bprashanth,0
 Services should create endpoints for unready pods,maisem,0
+Services should preserve source pod IP for traffic thru service cluster IP,Random-Liu,1
 Services should prevent NodePort collisions,bprashanth,0
 Services should provide secure master service,bprashanth,0
 Services should release NodePorts on delete,bprashanth,0
@@ -908,6 +911,7 @@ k8s.io/kubernetes/test/integration/garbagecollector,jlowdermilk,1
 k8s.io/kubernetes/test/integration/kubectl,vulpecula,1
 k8s.io/kubernetes/test/integration/master,fabioy,1
 k8s.io/kubernetes/test/integration/metrics,lavalamp,1
+k8s.io/kubernetes/test/integration/objectmeta,janetkuo,1
 k8s.io/kubernetes/test/integration/openshift,kevin-wangzefeng,1
 k8s.io/kubernetes/test/integration/persistentvolumes,cjcullen,1
 k8s.io/kubernetes/test/integration/pods,smarterclayton,1

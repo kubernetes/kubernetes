@@ -166,15 +166,13 @@ type apiServerPetClient struct {
 
 // Get gets the pet in the pcb from the apiserver.
 func (p *apiServerPetClient) Get(pet *pcb) (*pcb, bool, error) {
-	found := true
 	ns := pet.parent.Namespace
 	pod, err := podClient(p.c, ns).Get(pet.pod.Name)
 	if errors.IsNotFound(err) {
-		found = false
-		err = nil
+		return nil, false, nil
 	}
-	if err != nil || !found {
-		return nil, found, err
+	if err != nil {
+		return nil, false, err
 	}
 	realPet := *pet
 	realPet.pod = pod
@@ -225,18 +223,9 @@ func (p *apiServerPetClient) DeletePVCs(pet *pcb) error {
 	return nil
 }
 
-func (p *apiServerPetClient) getPVC(pvcName, pvcNamespace string) (*api.PersistentVolumeClaim, bool, error) {
-	found := true
+func (p *apiServerPetClient) getPVC(pvcName, pvcNamespace string) (*api.PersistentVolumeClaim, error) {
 	pvc, err := claimClient(p.c, pvcNamespace).Get(pvcName)
-	if errors.IsNotFound(err) {
-		found = false
-	}
-	if !found {
-		return nil, found, nil
-	} else if err != nil {
-		return nil, found, err
-	}
-	return pvc, true, nil
+	return pvc, err
 }
 
 func (p *apiServerPetClient) createPVC(pvc *api.PersistentVolumeClaim) error {
@@ -246,23 +235,25 @@ func (p *apiServerPetClient) createPVC(pvc *api.PersistentVolumeClaim) error {
 
 // SyncPVCs syncs pvcs in the given pcb.
 func (p *apiServerPetClient) SyncPVCs(pet *pcb) error {
-	errMsg := ""
+	errmsg := ""
 	// Create new claims.
 	for i, pvc := range pet.pvcs {
-		_, exists, err := p.getPVC(pvc.Name, pet.parent.Namespace)
-		if !exists {
-			var err error
-			if err = p.createPVC(&pet.pvcs[i]); err != nil {
-				errMsg += fmt.Sprintf("Failed to create %v: %v", pvc.Name, err)
+		_, err := p.getPVC(pvc.Name, pet.parent.Namespace)
+		if err != nil {
+			if errors.IsNotFound(err) {
+				var err error
+				if err = p.createPVC(&pet.pvcs[i]); err != nil {
+					errmsg += fmt.Sprintf("Failed to create %v: %v", pvc.Name, err)
+				}
+				p.event(pet.parent, "Create", fmt.Sprintf("pvc: %v", pvc.Name), err)
+			} else {
+				errmsg += fmt.Sprintf("Error trying to get pvc %v, %v.", pvc.Name, err)
 			}
-			p.event(pet.parent, "Create", fmt.Sprintf("pvc: %v", pvc.Name), err)
-		} else if err != nil {
-			errMsg += fmt.Sprintf("Error trying to get pvc %v, %v.", pvc.Name, err)
 		}
 		// TODO: Check resource requirements and accessmodes, update if necessary
 	}
-	if len(errMsg) != 0 {
-		return fmt.Errorf("%v", errMsg)
+	if len(errmsg) != 0 {
+		return fmt.Errorf("%v", errmsg)
 	}
 	return nil
 }

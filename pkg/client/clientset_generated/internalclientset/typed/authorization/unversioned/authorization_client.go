@@ -24,12 +24,17 @@ import (
 
 type AuthorizationInterface interface {
 	GetRESTClient() *restclient.RESTClient
+	SelfSubjectAccessReviewsGetter
 	SubjectAccessReviewsGetter
 }
 
 // AuthorizationClient is used to interact with features provided by the Authorization group.
 type AuthorizationClient struct {
 	*restclient.RESTClient
+}
+
+func (c *AuthorizationClient) SelfSubjectAccessReviews() SelfSubjectAccessReviewInterface {
+	return newSelfSubjectAccessReviews(c)
 }
 
 func (c *AuthorizationClient) SubjectAccessReviews() SubjectAccessReviewInterface {

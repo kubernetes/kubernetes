@@ -8,9 +8,9 @@ service RuntimeService {
     // Version returns the runtime name, runtime version and runtime API version
     rpc Version(VersionRequest) returns (VersionResponse) {}
 
-    // CreatePodSandbox creates a pod-level sandbox.
-    // The definition of PodSandbox is at https://github.com/kubernetes/kubernetes/pull/25899
-    rpc CreatePodSandbox(CreatePodSandboxRequest) returns (CreatePodSandboxResponse) {}
+    // RunPodSandbox creates and starts a pod-level sandbox. Runtimes should ensure
+    // the sandbox is in ready state.
+    rpc RunPodSandbox(RunPodSandboxRequest) returns (RunPodSandboxResponse) {}
     // StopPodSandbox stops the running sandbox. If there are any running
     // containers in the sandbox, they should be forcibly terminated.
     rpc StopPodSandbox(StopPodSandboxRequest) returns (StopPodSandboxResponse) {}
@@ -188,12 +188,12 @@ message PodSandboxConfig {
     optional LinuxPodSandboxConfig linux = 8;
 }
 
-message CreatePodSandboxRequest {
+message RunPodSandboxRequest {
     // The configuration for creating a PodSandBox.
     optional PodSandboxConfig config = 1;
 }
 
-message CreatePodSandboxResponse {
+message RunPodSandboxResponse {
     // The id of the PodSandBox
     optional string pod_sandbox_id = 1;
 }

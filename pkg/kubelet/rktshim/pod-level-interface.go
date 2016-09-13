@@ -33,8 +33,8 @@ func NewPodSandboxManager(PodSandboxManagerConfig) (kubeletApi.PodSandboxManager
 	return &PodSandboxManager{}, nil
 }
 
-// CreatePodSandbox creates a pod sandbox given a pod sandbox configuration.
-func (*PodSandboxManager) CreatePodSandbox(*runtimeApi.PodSandboxConfig) (string, error) {
+// RunPodSandbox creates and starts a pod sandbox given a pod sandbox configuration.
+func (*PodSandboxManager) RunPodSandbox(*runtimeApi.PodSandboxConfig) (string, error) {
 	panic("not implemented")
 }
 
