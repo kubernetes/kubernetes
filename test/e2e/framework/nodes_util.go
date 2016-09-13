@@ -61,14 +61,15 @@ func masterUpgradeGKE(v string) error {
 	return err
 }
 
-var NodeUpgrade = func(f *Framework, v string) error {
+var NodeUpgrade = func(f *Framework, v string, img string) error {
 	// Perform the upgrade.
 	var err error
 	switch TestContext.Provider {
 	case "gce":
+		// TODO(maisem): add GCE support for upgrading to different images.
 		err = nodeUpgradeGCE(v)
 	case "gke":
-		err = nodeUpgradeGKE(v)
+		err = nodeUpgradeGKE(v, img)
 	default:
 		err = fmt.Errorf("NodeUpgrade() is not implemented for provider %s", TestContext.Provider)
 	}
@@ -249,16 +250,22 @@ func cleanupNodeUpgradeGCE(tmplBefore string) {
 	}
 }
 
-func nodeUpgradeGKE(v string) error {
-	Logf("Upgrading nodes to %q", v)
-	_, _, err := RunCmd("gcloud", "container",
+func nodeUpgradeGKE(v string, img string) error {
+	Logf("Upgrading nodes to version %q and image %q", v, img)
+	args := []string{
+		"container",
 		"clusters",
 		fmt.Sprintf("--project=%s", TestContext.CloudConfig.ProjectID),
 		fmt.Sprintf("--zone=%s", TestContext.CloudConfig.Zone),
 		"upgrade",
 		TestContext.CloudConfig.Cluster,
 		fmt.Sprintf("--cluster-version=%s", v),
-		"--quiet")
+		"--quiet",
+	}
+	if len(img) > 0 {
+		args = append(args, fmt.Sprintf("--image-type=%s", img))
+	}
+	_, _, err := RunCmd("gcloud", args...)
 	return err
 }
 

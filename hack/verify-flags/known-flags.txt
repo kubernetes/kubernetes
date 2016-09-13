@@ -468,6 +468,7 @@ udp-port
 udp-timeout
 unix-socket
 update-period
+upgrade-image
 upgrade-target
 use-kubernetes-cluster-service
 user-whitelist
