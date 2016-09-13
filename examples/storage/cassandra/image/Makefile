@@ -14,7 +14,7 @@
 
 # build the cassandra image.
 
-VERSION=v9
+VERSION=v10
 
 all: build
 
