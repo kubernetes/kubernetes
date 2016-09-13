@@ -58,7 +58,7 @@ var _ = framework.KubeDescribe("Upgrade [Feature:Upgrade]", func() {
 			cm := chaosmonkey.New(func() {
 				v, err := realVersion(framework.TestContext.UpgradeTarget)
 				framework.ExpectNoError(err)
-				framework.ExpectNoError(framework.NodeUpgrade(f, v))
+				framework.ExpectNoError(framework.NodeUpgrade(f, v, framework.TestContext.UpgradeImage))
 				framework.ExpectNoError(checkNodesVersions(f.Client, v))
 			})
 			cm.Register(func(sem *chaosmonkey.Semaphore) {
@@ -72,7 +72,7 @@ var _ = framework.KubeDescribe("Upgrade [Feature:Upgrade]", func() {
 			cm := chaosmonkey.New(func() {
 				v, err := realVersion(framework.TestContext.UpgradeTarget)
 				framework.ExpectNoError(err)
-				framework.ExpectNoError(framework.NodeUpgrade(f, v))
+				framework.ExpectNoError(framework.NodeUpgrade(f, v, framework.TestContext.UpgradeImage))
 				framework.ExpectNoError(checkNodesVersions(f.Client, v))
 			})
 			cm.Register(func(sem *chaosmonkey.Semaphore) {
