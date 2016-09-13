@@ -213,14 +213,14 @@ from being stalled indefinitely by missing events.
 
 For v1.2, we will add a generic PLEG which relists periodically, and leave
 adopting container events for future work. We will also *not* implement the
-optimization that generate and filters out expected events to minimize
+optimization that generates and filters out expected events to minimize
 redundant syncs.
 
 - Add a generic PLEG using relisting. Modify the container runtime interface
   to provide all necessary information to detect container state changes
   in `GetPods()` (#13571).
 
-- Benchmark docker to adjust relising frequency.
+- Benchmark docker to adjust relisting frequency.
 
 - Fix/adapt features that rely on frequent, periodic pod syncing.
     * Liveness/Readiness probing: Create a separate probing manager using
