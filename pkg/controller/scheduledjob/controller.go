@@ -38,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/batch"
+	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller/job"
@@ -58,11 +59,11 @@ type ScheduledJobController struct {
 	recorder   record.EventRecorder
 }
 
-func NewScheduledJobController(kubeClient *client.Client) *ScheduledJobController {
+func NewScheduledJobController(kubeClient *client.Client, eventClient coreclient.EventsGetter) *ScheduledJobController {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
 	// TODO: remove the wrapper when every clients have moved to use the clientset.
-	eventBroadcaster.StartRecordingToSink(kubeClient.Events(""))
+	eventBroadcaster.StartRecordingToSink(eventClient.Events(""))
 
 	if kubeClient != nil && kubeClient.GetRateLimiter() != nil {
 		metrics.RegisterMetricAndTrackRateLimiterUsage("scheduledjob_controller", kubeClient.GetRateLimiter())
@@ -79,8 +80,8 @@ func NewScheduledJobController(kubeClient *client.Client) *ScheduledJobControlle
 	return jm
 }
 
-func NewScheduledJobControllerFromClient(kubeClient *client.Client) *ScheduledJobController {
-	jm := NewScheduledJobController(kubeClient)
+func NewScheduledJobControllerFromClient(kubeClient *client.Client, eventClient coreclient.EventsGetter) *ScheduledJobController {
+	jm := NewScheduledJobController(kubeClient, eventClient)
 	return jm
 }
 

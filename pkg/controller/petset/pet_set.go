@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/client/cache"
+	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller"
@@ -82,10 +83,10 @@ type PetSetController struct {
 }
 
 // NewPetSetController creates a new petset controller.
-func NewPetSetController(podInformer framework.SharedIndexInformer, kubeClient *client.Client, resyncPeriod time.Duration) *PetSetController {
+func NewPetSetController(podInformer framework.SharedIndexInformer, kubeClient *client.Client, eventClient coreclient.EventsGetter, resyncPeriod time.Duration) *PetSetController {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
-	eventBroadcaster.StartRecordingToSink(kubeClient.Events(""))
+	eventBroadcaster.StartRecordingToSink(eventClient.Events(""))
 	recorder := eventBroadcaster.NewRecorder(api.EventSource{Component: "petset"})
 	pc := &apiServerPetClient{kubeClient, recorder, &defaultPetHealthChecker{}}
 

@@ -49,16 +49,18 @@ func (fes *FederatedEventSink) Update(event *api.Event) (*api.Event, error) {
 	})
 }
 
-func (fes *FederatedEventSink) Patch(event *api.Event, data []byte) (*api.Event, error) {
-	return fes.executeOperation(event, func(eventV1 *api_v1.Event) (*api_v1.Event, error) {
-		return fes.clientset.Core().Events(event.Namespace).Patch(event.Name, api.StrategicMergePatchType, data)
+func (fes *FederatedEventSink) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (*api.Event, error) {
+	return fes.executeOperation(nil, func(eventV1 *api_v1.Event) (*api_v1.Event, error) {
+		return fes.clientset.Core().Events("").Patch(name, pt, data, subresources...)
 	})
 }
 
 func (fes *FederatedEventSink) executeOperation(event *api.Event, operation func(*api_v1.Event) (*api_v1.Event, error)) (*api.Event, error) {
 	var versionedEvent api_v1.Event
-	if err := api.Scheme.Convert(event, &versionedEvent, nil); err != nil {
-		return nil, err
+	if event != nil {
+		if err := api.Scheme.Convert(event, &versionedEvent, nil); err != nil {
+			return nil, err
+		}
 	}
 	versionedEventPtr, err := operation(&versionedEvent)
 	if err != nil {

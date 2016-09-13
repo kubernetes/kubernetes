@@ -138,6 +138,10 @@ func Run(s *options.CMServer) error {
 	if err != nil {
 		glog.Fatalf("Invalid API configuration: %v", err)
 	}
+	clientset, err := clientset.NewForConfig(restclient.AddUserAgent(kubeconfig, "shared-informers"))
+	if err != nil {
+		glog.Fatalf("Invalid API configuration: %v", err)
+	}
 
 	go func() {
 		mux := http.NewServeMux()
@@ -159,7 +163,7 @@ func Run(s *options.CMServer) error {
 
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
-	eventBroadcaster.StartRecordingToSink(kubeClient.Events(""))
+	eventBroadcaster.StartRecordingToSink(clientset.Core().Events(""))
 	recorder := eventBroadcaster.NewRecorder(api.EventSource{Component: "controller-manager"})
 
 	run := func(stop <-chan struct{}) {
@@ -375,7 +379,7 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 		glog.Infof("Starting %s apis", groupVersion)
 		if containsResource(resources, "poddisruptionbudgets") {
 			glog.Infof("Starting disruption controller")
-			go disruption.NewDisruptionController(sharedInformers.Pods().Informer(), kubeClient).Run(wait.NeverStop)
+			go disruption.NewDisruptionController(sharedInformers.Pods().Informer(), kubeClient, clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "disruption"))).Run(wait.NeverStop)
 			time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 		}
 	}
@@ -392,6 +396,7 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 				sharedInformers.Pods().Informer(),
 				// TODO: Switch to using clientset
 				kubeClient,
+				clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "petset")),
 				resyncPeriod,
 			).Run(1, wait.NeverStop)
 			time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
@@ -410,7 +415,7 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 			if err != nil {
 				glog.Fatalf("Invalid API configuration: %v", err)
 			}
-			go scheduledjob.NewScheduledJobController(kubeClient).
+			go scheduledjob.NewScheduledJobController(kubeClient, clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "scheduledjob"))).
 				Run(wait.NeverStop)
 			time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 			time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))

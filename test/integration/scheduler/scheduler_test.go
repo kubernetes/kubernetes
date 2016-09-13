@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
@@ -57,6 +58,7 @@ func TestUnschedulableNodes(t *testing.T) {
 	defer framework.DeleteTestingNamespace(ns, s, t)
 
 	restClient := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	kubeClient := internalclientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 
 	schedulerConfigFactory := factory.NewConfigFactory(restClient, api.DefaultSchedulerName, api.DefaultHardPodAffinitySymmetricWeight, api.DefaultFailureDomains)
 	schedulerConfig, err := schedulerConfigFactory.Create()
@@ -65,7 +67,7 @@ func TestUnschedulableNodes(t *testing.T) {
 	}
 	eventBroadcaster := record.NewBroadcaster()
 	schedulerConfig.Recorder = eventBroadcaster.NewRecorder(api.EventSource{Component: api.DefaultSchedulerName})
-	eventBroadcaster.StartRecordingToSink(restClient.Events(ns.Name))
+	eventBroadcaster.StartRecordingToSink(kubeClient.Core().Events(ns.Name))
 	scheduler.New(schedulerConfig).Run()
 
 	defer close(schedulerConfig.StopEverything)
@@ -322,6 +324,7 @@ func TestMultiScheduler(t *testing.T) {
 	*/
 	// 1. create and start default-scheduler
 	restClient := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	kubeClient := internalclientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 
 	// NOTE: This test cannot run in parallel, because it is creating and deleting
 	// non-namespaced objects (Nodes).
@@ -334,7 +337,7 @@ func TestMultiScheduler(t *testing.T) {
 	}
 	eventBroadcaster := record.NewBroadcaster()
 	schedulerConfig.Recorder = eventBroadcaster.NewRecorder(api.EventSource{Component: api.DefaultSchedulerName})
-	eventBroadcaster.StartRecordingToSink(restClient.Events(ns.Name))
+	eventBroadcaster.StartRecordingToSink(kubeClient.Core().Events(ns.Name))
 	scheduler.New(schedulerConfig).Run()
 	// default-scheduler will be stopped later
 
@@ -397,6 +400,7 @@ func TestMultiScheduler(t *testing.T) {
 
 	// 5. create and start a scheduler with name "foo-scheduler"
 	restClient2 := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	kubeClient2 := internalclientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 
 	schedulerConfigFactory2 := factory.NewConfigFactory(restClient2, "foo-scheduler", api.DefaultHardPodAffinitySymmetricWeight, api.DefaultFailureDomains)
 	schedulerConfig2, err := schedulerConfigFactory2.Create()
@@ -405,7 +409,7 @@ func TestMultiScheduler(t *testing.T) {
 	}
 	eventBroadcaster2 := record.NewBroadcaster()
 	schedulerConfig2.Recorder = eventBroadcaster2.NewRecorder(api.EventSource{Component: "foo-scheduler"})
-	eventBroadcaster2.StartRecordingToSink(restClient2.Events(ns.Name))
+	eventBroadcaster2.StartRecordingToSink(kubeClient2.Core().Events(ns.Name))
 	scheduler.New(schedulerConfig2).Run()
 
 	defer close(schedulerConfig2.StopEverything)
@@ -487,6 +491,7 @@ func TestAllocatable(t *testing.T) {
 
 	// 1. create and start default-scheduler
 	restClient := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	kubeClient := internalclientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 
 	// NOTE: This test cannot run in parallel, because it is creating and deleting
 	// non-namespaced objects (Nodes).
@@ -499,7 +504,7 @@ func TestAllocatable(t *testing.T) {
 	}
 	eventBroadcaster := record.NewBroadcaster()
 	schedulerConfig.Recorder = eventBroadcaster.NewRecorder(api.EventSource{Component: api.DefaultSchedulerName})
-	eventBroadcaster.StartRecordingToSink(restClient.Events(ns.Name))
+	eventBroadcaster.StartRecordingToSink(kubeClient.Core().Events(ns.Name))
 	scheduler.New(schedulerConfig).Run()
 	// default-scheduler will be stopped later
 	defer close(schedulerConfig.StopEverything)
