@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/util"
 )
 
 // ProbeVolumePlugins is the primary entrypoint for volume plugins.
@@ -347,7 +348,7 @@ func (provisioner *quobyteVolumeProvisioner) Provision() (*api.PersistentVolume,
 	if provisioner.options.Selector != nil {
 		return nil, fmt.Errorf("claim Selector is not supported")
 	}
-	var apiServer, adminSecretName string
+	var apiServer, adminSecretName, quobyteUser, quobytePassword string
 	adminSecretNamespace := "default"
 	provisioner.config = "BASE"
 	provisioner.tenant = "DEFAULT"
@@ -375,9 +376,18 @@ func (provisioner *quobyteVolumeProvisioner) Provision() (*api.PersistentVolume,
 		}
 	}
 
-	quobyteUser, quobytePassword, err := provisioner.plugin.getUserAndPasswordFromSecret(adminSecretNamespace, adminSecretName)
+	secretMap, err := util.GetSecret(adminSecretNamespace, adminSecretName, provisioner.plugin.host.GetKubeClient())
 	if err != nil {
 		return nil, err
+	}
+
+	var ok bool
+	if quobyteUser, ok = secretMap["user"]; !ok {
+		return nil, fmt.Errorf("Missing \"user\" in secret")
+	}
+
+	if quobytePassword, ok = secretMap["password"]; !ok {
+		return nil, fmt.Errorf("Missing \"password\" in secret")
 	}
 
 	if !validateRegistry(provisioner.registry) {
@@ -420,16 +430,25 @@ func (deleter *quobyteVolumeDeleter) GetPath() string {
 	return deleter.quobyte.GetPath()
 }
 
-//TODO get secret from annotations
 func (deleter *quobyteVolumeDeleter) Delete() error {
+	var quobyteUser, quobytePassword string
 	apiServer, adminSecretName, adminSecretNamespace, err := parseVolumeAnnotations(deleter.pv)
 	if err != nil {
 		return err
 	}
 
-	quobyteUser, quobytePassword, err := deleter.plugin.getUserAndPasswordFromSecret(adminSecretNamespace, adminSecretName)
+	secretMap, err := util.GetSecret(adminSecretNamespace, adminSecretName, deleter.plugin.host.GetKubeClient())
 	if err != nil {
 		return err
+	}
+
+	var ok bool
+	if quobyteUser, ok = secretMap["user"]; !ok {
+		return fmt.Errorf("Missing \"user\" in secret")
+	}
+
+	if quobytePassword, ok = secretMap["password"]; !ok {
+		return fmt.Errorf("Missing \"password\" in secret")
 	}
 
 	manager := &quobyteVolumeManager{

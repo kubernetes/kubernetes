@@ -143,39 +143,3 @@ func parseVolumeAnnotations(pv *api.PersistentVolume) (apiServer, adminSecret, a
 
 	return
 }
-
-func (plugin *quobytePlugin) getUserAndPasswordFromSecret(namespace, secretName string) (string, string, error) {
-	var user, password string
-	kubeClient := plugin.host.GetKubeClient()
-	if kubeClient == nil {
-		return user, password, fmt.Errorf("Cannot get kube client")
-	}
-
-	secrets, err := kubeClient.Core().Secrets(namespace).Get(secretName)
-	if err != nil {
-		return user, password, err
-	}
-
-	for name, data := range secrets.Data {
-		if string(name) == "user" {
-			user = string(data)
-		}
-		if string(name) == "password" {
-			password = string(data)
-		}
-
-	}
-
-	//sanity check
-	if user == "" {
-		return user, password, fmt.Errorf("Missing \"user\" in secret")
-	}
-
-	if password == "" {
-		return user, password, fmt.Errorf("Missing \"password\" in secret")
-	}
-
-	glog.V(4).Infof("quobyte secret [%q/%q] created User: %s %s", namespace, secretName, user, password)
-
-	return user, password, nil
-}
