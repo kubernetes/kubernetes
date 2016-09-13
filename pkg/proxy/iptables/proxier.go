@@ -1100,6 +1100,9 @@ func (proxier *Proxier) syncProxyRules() {
 				glog.V(4).Infof("Port %s was open before and is still needed", lp.String())
 				replacementPortsMap[lp] = proxier.portsMap[lp]
 			} else {
+				if lp.protocol == "udp" {
+					proxier.clearUdpConntrackForPort(lp.port)
+				}
 				socket, err := proxier.portMapper.OpenLocalPort(&lp)
 				if err != nil {
 					glog.Errorf("can't open %s, skipping this nodePort: %v", lp.String(), err)
@@ -1321,6 +1324,26 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 	}
 	proxier.portsMap = replacementPortsMap
+	// Delete conntrack for all UDP entries
+	proxier.clearUdpConntrackForPort(0)
+}
+
+// Clear UDP conntrack for port or all conntrack entries when port equal zero.
+// When a packet arrives, it will not go through NAT table again, because it is not "the first" packet.
+// The solution is clearing the conntrack. Known issus:
+// https://github.com/docker/docker/issues/8795
+// https://github.com/kubernetes/kubernetes/issues/31983
+func (proxier *Proxier) clearUdpConntrackForPort(port int) {
+	var err error = nil
+	glog.V(2).Infof("Deleting conntrack entries for udp connections")
+	if port > 0 {
+		err = proxier.execConntrackTool("-D", "-p", "udp", "--dport", strconv.Itoa(port))
+	} else {
+		err = proxier.execConntrackTool("-D", "-p", "udp")
+	}
+	if err != nil && !strings.Contains(err.Error(), noConnectionToDelete) {
+		glog.Errorf("conntrack return with error: %v", err)
+	}
 }
 
 // Join all words with spaces, terminate with newline and write to buf.
