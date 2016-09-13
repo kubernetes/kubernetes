@@ -80,9 +80,9 @@ expected to be programmatically convertible to the name of the resource using
 the following conversion. Kinds are expected to be of the form
 `<CamelCaseKind>`, and the `APIVersion` for the object is expected to be
 `<api-group>/<api-version>`. To prevent collisions, it's expected that you'll
-use a fully qualified domain name for the API group, e.g. `example.com`.
+use a DNS name of at least three segments for the API group, e.g. `mygroup.example.com`.
 
-For example `stable.example.com/v1`
+For example `mygroup.example.com/v1`
 
 'CamelCaseKind' is the specific type name.
 
@@ -101,9 +101,9 @@ for ix := range kindName {
 }
 ```
 
-As a concrete example, the resource named `camel-case-kind.example.com` defines
+As a concrete example, the resource named `camel-case-kind.mygroup.example.com` defines
 resources of Kind `CamelCaseKind`, in the APIGroup with the prefix
-`example.com/...`.
+`mygroup.example.com/...`.
 
 The reason for this is to enable rapid lookup of a `ThirdPartyResource` object
 given the kind information. This is also the reason why `ThirdPartyResource` is
@@ -120,7 +120,7 @@ For example, if a user creates:
 
 ```yaml
 metadata:
-  name: cron-tab.stable.example.com
+  name: cron-tab.mygroup.example.com
 apiVersion: extensions/v1beta1
 kind: ThirdPartyResource
 description: "A specification of a Pod to run on a cron style schedule"
@@ -130,7 +130,7 @@ versions:
 ```
 
 Then the API server will program in the new RESTful resource path:
-   * `/apis/stable.example.com/v1/namespaces/<namespace>/crontabs/...`
+   * `/apis/mygroup.example.com/v1/namespaces/<namespace>/crontabs/...`
 
 **Note: This may take a while before RESTful resource path registration happen, please
 always check this before you create resource instances.**
@@ -142,20 +142,20 @@ Now that this schema has been created, a user can `POST`:
    "metadata": {
      "name": "my-new-cron-object"
    },
-   "apiVersion": "stable.example.com/v1",
+   "apiVersion": "mygroup.example.com/v1",
    "kind": "CronTab",
    "cronSpec": "* * * * /5",
    "image":     "my-awesome-cron-image"
 }
 ```
 
-to: `/apis/stable.example.com/v1/namespaces/default/crontabs`
+to: `/apis/mygroup.example.com/v1/namespaces/default/crontabs`
 
 and the corresponding data will be stored into etcd by the APIServer, so that
 when the user issues:
 
 ```
-GET /apis/stable.example.com/v1/namespaces/default/crontabs/my-new-cron-object`
+GET /apis/mygroup.example.com/v1/namespaces/default/crontabs/my-new-cron-object`
 ```
 
 And when they do that, they will get back the same data, but with additional
@@ -164,21 +164,21 @@ Kubernetes metadata (e.g. `resourceVersion`, `createdTimestamp`) filled in.
 Likewise, to list all resources, a user can issue:
 
 ```
-GET /apis/stable.example.com/v1/namespaces/default/crontabs
+GET /apis/mygroup.example.com/v1/namespaces/default/crontabs
 ```
 
 and get back:
 
 ```json
 {
-   "apiVersion": "stable.example.com/v1",
+   "apiVersion": "mygroup.example.com/v1",
    "kind": "CronTabList",
    "items": [
      {
        "metadata": {
          "name": "my-new-cron-object"
        },
-       "apiVersion": "stable.example.com/v1",
+       "apiVersion": "mygroup.example.com/v1",
        "kind": "CronTab",
        "cronSpec": "* * * * /5",
        "image":     "my-awesome-cron-image"

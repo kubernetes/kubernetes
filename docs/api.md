@@ -134,10 +134,10 @@ Currently there are two API groups in use:
   This holds types which will probably move to another API group eventually.
 1. the "componentconfig" and "metrics" API groups.
 
-
-In the future we expect that there will be more API groups, all at REST path `/apis/$API_GROUP` and
-using `apiVersion: $API_GROUP/$VERSION`.  We expect that there will be a way for [third parties to
-create their own API groups](design/extending-api.md), and to avoid naming collisions.
+In the future we expect that there will be more API groups, all at REST path `/apis/$API_GROUP` and using `apiVersion: $API_GROUP/$VERSION`.
+We expect that there will be a way for [third parties to create their own API groups](design/extending-api.md).
+To avoid naming collisions, third-party API groups must be a DNS name at least three segments long.
+New Kubernetes API groups are suffixed with `.k8s.io` (e.g. `storage.k8s.io`, `rbac.authorization.k8s.io`).
 
 ## Enabling resources in the extensions group
 
