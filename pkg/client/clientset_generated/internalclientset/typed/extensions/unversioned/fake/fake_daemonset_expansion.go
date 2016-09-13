@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,14 +14,20 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package unversioned
+package fake
 
-type IngressExpansion interface{}
+import (
+	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/client/testing/core"
+)
 
-type NetworkPolicyExpansion interface{}
+func (c *FakeDaemonSets) Rollback(daemonSetRollback *extensions.DaemonSetRollback) error {
+	action := core.CreateActionImpl{}
+	action.Verb = "create"
+	action.Resource = daemonsetsResource
+	action.Subresource = "rollback"
+	action.Object = daemonSetRollback
 
-type PodSecurityPolicyExpansion interface{}
-
-type ReplicaSetExpansion interface{}
-
-type ThirdPartyResourceExpansion interface{}
+	_, err := c.Fake.Invokes(action, daemonSetRollback)
+	return err
+}

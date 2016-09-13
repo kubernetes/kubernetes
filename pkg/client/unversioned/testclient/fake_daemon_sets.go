@@ -81,3 +81,14 @@ func (c *FakeDaemonSets) Delete(name string) error {
 func (c *FakeDaemonSets) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.Fake.InvokesWatch(NewWatchAction("daemonsets", c.Namespace, opts))
 }
+
+func (c *FakeDaemonSets) Rollback(daemonRollback *extensions.DaemonSetRollback) error {
+	action := CreateActionImpl{}
+	action.Verb = "create"
+	action.Resource = "daemonsets"
+	action.Subresource = "rollback"
+	action.Object = daemonRollback
+
+	_, err := c.Fake.Invokes(action, daemonRollback)
+	return err
+}

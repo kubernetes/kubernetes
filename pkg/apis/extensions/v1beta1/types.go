@@ -432,6 +432,20 @@ type DaemonSetSpec struct {
 
 	// Update strategy to replace existing DaemonSet pods with new pods.
 	UpdateStrategy DaemonSetUpdateStrategy `json:"updateStrategy,omitempty" protobuf:"bytes,6,opt,name=updateStrategy"`
+
+	// The config this daemon set is rolling back to. Will be cleared after rollback is done.
+	RollbackTo *RollbackConfig `json:"rollbackTo,omitempty" protobuf:"bytes,7,opt,name=rollbackTo"`
+}
+
+// DaemonSetRollback stores the information required to rollback a daemonset.
+type DaemonSetRollback struct {
+	unversioned.TypeMeta `json:",inline"`
+	// Required: This must match the Name of a daemon set.
+	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
+	// The annotations to be updated to a daemon set
+	UpdatedAnnotations map[string]string `json:"updatedAnnotations,omitempty" protobuf:"bytes,2,rep,name=updatedAnnotations"`
+	// The config of this daemon set rollback.
+	RollbackTo RollbackConfig `json:"rollbackTo" protobuf:"bytes,3,opt,name=rollbackTo"`
 }
 
 const (

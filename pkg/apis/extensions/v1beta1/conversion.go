@@ -270,6 +270,12 @@ func Convert_extensions_DaemonSetSpec_To_v1beta1_DaemonSetSpec(in *extensions.Da
 	}
 	out.MinReadySeconds = int32(in.MinReadySeconds)
 	out.Paused = in.Paused
+	if in.RollbackTo != nil {
+		out.RollbackTo = new(RollbackConfig)
+		out.RollbackTo.Revision = in.RollbackTo.Revision
+	} else {
+		out.RollbackTo = nil
+	}
 	return nil
 }
 
@@ -291,6 +297,12 @@ func Convert_v1beta1_DaemonSetSpec_To_extensions_DaemonSetSpec(in *DaemonSetSpec
 	}
 	out.MinReadySeconds = int(in.MinReadySeconds)
 	out.Paused = in.Paused
+	if in.RollbackTo != nil {
+		out.RollbackTo = new(extensions.RollbackConfig)
+		out.RollbackTo.Revision = int64(in.RollbackTo.Revision)
+	} else {
+		out.RollbackTo = nil
+	}
 	return nil
 }
 

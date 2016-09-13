@@ -33,6 +33,13 @@ const (
 	// RevisionAnnotation is the revision annotation of a daemon set pod template which records its rollout sequence
 	RevisionAnnotation = "daemonset.kubernetes.io/revision"
 	PodTemplateLabel   = "damonset.kubernetes.io/daemon-name"
+
+	// RollbackRevisionNotFound is not found rollback event reason
+	RollbackRevisionNotFound = "DaemonRollbackRevisionNotFound"
+	// RollbackTemplateUnchanged is the template unchanged rollback event reason
+	RollbackTemplateUnchanged = "DaemonRollbackTemplateUnchanged"
+	// RollbackDone is the done rollback event reason
+	RollbackDone = "DaemonSetRollback"
 )
 
 type podTemplateListFunc func(string, api.ListOptions) (*api.PodTemplateList, error)
@@ -124,6 +131,23 @@ func Revision(template *api.PodTemplate) (int64, error) {
 	return strconv.ParseInt(v, 10, 64)
 }
 
+// LastRevision finds the second max revision number in all PodTemplates (the last revision)
+func LastRevision(podTemplates *api.PodTemplateList) int64 {
+	max, secMax := int64(0), int64(0)
+	for _, template := range podTemplates.Items {
+		if v, err := Revision(&template); err != nil {
+			// Skip the pod templates when it failed to parse their revision information
+			glog.V(4).Infof("Error: %v. Couldn't parse revision for pod template %#v, daemon controller will skip it when reconciling revisions.", err, template)
+		} else if v >= max {
+			secMax = max
+			max = v
+		} else if v > secMax {
+			secMax = v
+		}
+	}
+	return secMax
+}
+
 // ListPodTemplates returns a list of PodTemplates the given daemon targets.
 func ListPodTemplates(ds *extensions.DaemonSet, getPodTemplateList podTemplateListFunc) (*api.PodTemplateList, error) {
 	namespace := ds.Namespace
@@ -145,6 +169,29 @@ func listPodTemplates(ds *extensions.DaemonSet, c clientset.Interface) (*api.Pod
 
 func GetAllPodTemplates(daemon *extensions.DaemonSet, c clientset.Interface) (*api.PodTemplateList, error) {
 	return listPodTemplates(daemon, c)
+}
+
+// SetFromPodTemplate sets the desired PodTemplateSpec from a PodTemplate template to the given deployment.
+func SetFromPodTemplate(daemon *extensions.DaemonSet, podTemplate *api.PodTemplate) *extensions.DaemonSet {
+	daemon.Spec.Template.ObjectMeta = podTemplate.Template.ObjectMeta
+	daemon.Spec.Template.Spec = podTemplate.Template.Spec
+	daemon.Spec.Template.ObjectMeta.Labels = labelsutil.CloneAndRemoveLabel(
+		daemon.Spec.Template.ObjectMeta.Labels,
+		extensions.DefaultDaemonSetUniqueLabelKey)
+	return daemon
+}
+
+// SetiDaemonSetAnnotationsTo sets daemon set's annotations as given PodTemplate's annotations.
+// This action should be done if and only if the daemon set is rolling back to this PodTemplate.
+// Note that apply and revision annotations are not changed.
+func SetDaemonSetAnnotationsTo(daemon *extensions.DaemonSet, rollbackToPT *api.PodTemplate) {
+	// XXX:	deployment.Annotations = getSkippedAnnotations(deployment.Annotations)
+	daemon.Annotations = make(map[string]string)
+	for k, v := range rollbackToPT.Annotations {
+		// XXX:if !skipCopyAnnotation(k) {
+		daemon.Annotations[k] = v
+		// XXX:	}
+	}
 }
 
 // TODO: Should I make it a real controller?

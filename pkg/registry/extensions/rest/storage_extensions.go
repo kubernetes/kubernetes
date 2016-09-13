@@ -88,9 +88,10 @@ func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource genericapise
 	}
 
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("daemonsets")) {
-		daemonSetStorage, daemonSetStatusStorage := daemonetcd.NewREST(restOptionsGetter(extensions.Resource("daemonsets")))
+		daemonSetStorage, daemonSetStatusStorage, daemonSetRollbackStorage := daemonetcd.NewREST(restOptionsGetter(extensions.Resource("daemonsets")))
 		storage["daemonsets"] = daemonSetStorage
 		storage["daemonsets/status"] = daemonSetStatusStorage
+		storage["daemonsets/rollback"] = daemonSetRollbackStorage
 	}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("deployments")) {
 		deploymentStorage := deploymentetcd.NewStorage(restOptionsGetter(extensions.Resource("deployments")))

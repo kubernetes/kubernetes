@@ -640,7 +640,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 				_, err := clientset.Extensions().Deployments(t.Namespace).Update(t)
 				return false, err
 			case *extensions.DaemonSet:
-				if t.Spec.Paused {
+				if !t.Spec.Paused {
 					return true, nil
 				}
 				t.Spec.Paused = false

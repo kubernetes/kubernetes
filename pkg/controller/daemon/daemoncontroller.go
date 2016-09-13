@@ -686,6 +686,14 @@ func (dsc *DaemonSetsController) syncDaemonSet(key string) error {
 		glog.V(3).Infof("DaemonSet %s is paused, skipping manage.", ds.Name)
 		return nil
 	}
+
+	if ds.Spec.RollbackTo != nil {
+		revision := ds.Spec.RollbackTo.Revision
+		if ds, err = dsc.rollback(ds, &revision); err != nil {
+			return err
+		}
+	}
+
 	dsNeedsSync := dsc.expectations.SatisfiedExpectations(dsKey)
 	if dsNeedsSync && ds.DeletionTimestamp == nil {
 		if err := dsc.manage(ds); err != nil {
