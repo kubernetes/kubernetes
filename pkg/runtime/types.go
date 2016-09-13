@@ -43,6 +43,7 @@ import (
 //
 // +k8s:deepcopy-gen=true
 // +protobuf=true
+// +k8s:openapi-gen=true
 type TypeMeta struct {
 	APIVersion string `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty" protobuf:"bytes,1,opt,name=apiVersion"`
 	Kind       string `json:"kind,omitempty" yaml:"kind,omitempty" protobuf:"bytes,2,opt,name=kind"`
@@ -96,6 +97,7 @@ const (
 //
 // +k8s:deepcopy-gen=true
 // +protobuf=true
+// +k8s:openapi-gen=true
 type RawExtension struct {
 	// Raw is the underlying serialization of this object.
 	//
@@ -114,6 +116,7 @@ type RawExtension struct {
 //
 // +k8s:deepcopy-gen=true
 // +protobuf=true
+// +k8s:openapi-gen=true
 type Unknown struct {
 	TypeMeta `json:",inline" protobuf:"bytes,1,opt,name=typeMeta"`
 	// Raw will hold the complete serialized object which couldn't be matched

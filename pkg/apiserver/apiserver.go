@@ -215,7 +215,7 @@ func InstallLogsSupport(mux Mux, container *restful.Container) {
 	ws := new(restful.WebService)
 	ws.Path("/logs")
 	ws.Doc("get log files")
-	ws.Route(ws.GET("/{logpath:*}").To(logFileHandler))
+	ws.Route(ws.GET("/{logpath:*}").To(logFileHandler).Param(ws.PathParameter("logpath", "path to the log").DataType("string")))
 	ws.Route(ws.GET("/").To(logFileListHandler))
 
 	container.Add(ws)

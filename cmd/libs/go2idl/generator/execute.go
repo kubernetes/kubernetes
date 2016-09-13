@@ -302,5 +302,8 @@ func (c *Context) executeBody(w io.Writer, generator Generator) error {
 			return err
 		}
 	}
+	if err := generator.Finalize(c, et); err != nil {
+		return err
+	}
 	return et.Error()
 }

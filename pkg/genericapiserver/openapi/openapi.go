@@ -16,213 +16,133 @@ limitations under the License.
 
 package openapi
 
-// Note: Any reference to swagger in this document is to swagger 1.2 spec.
-
 import (
 	"fmt"
 	"net/http"
-	"net/url"
 	"reflect"
-	"strconv"
 	"strings"
 
 	"github.com/emicklei/go-restful"
-	"github.com/emicklei/go-restful/swagger"
-	"github.com/go-openapi/loads"
 	"github.com/go-openapi/spec"
-	"github.com/go-openapi/strfmt"
-	"github.com/go-openapi/validate"
+
+	"k8s.io/kubernetes/cmd/libs/go2idl/openapi-gen/generators/common"
 	"k8s.io/kubernetes/pkg/util/json"
 )
 
 const (
-	// By convention, the Swagger specification file is named swagger.json
-	OpenAPIServePath = "/swagger.json"
-	OpenAPIVersion   = "2.0"
+	OpenAPIVersion = "2.0"
 )
 
 // Config is set of configuration for openAPI spec generation.
 type Config struct {
-	// SwaggerConfig is set of configuration for go-restful swagger spec generation. Currently
-	// openAPI implementation depends on go-restful to generate models.
-	SwaggerConfig *swagger.Config
+	// Path to the spec file. by convention, it should name [.*/]*/swagger.json
+	OpenAPIServePath string
+	// List of web services for this API spec
+	WebServices []*restful.WebService
+
+	// List of supported protocols such as https, http, etc.
+	ProtocolList []string
+
 	// Info is general information about the API.
 	Info *spec.Info
 	// DefaultResponse will be used if an operation does not have any responses listed. It
-	// will show up as ... "responses" : {"default" : $DefaultResponse} in swagger spec.
+	// will show up as ... "responses" : {"default" : $DefaultResponse} in the spec.
 	DefaultResponse *spec.Response
 	// List of webservice's path prefixes to ignore
 	IgnorePrefixes []string
 }
 
+// +k8s:openapi-gen=target
 type openAPI struct {
-	config       *Config
-	swagger      *spec.Swagger
-	protocolList []string
+	config             *Config
+	swagger            *spec.Swagger
+	protocolList       []string
+	openAPIDefinitions *common.OpenAPIDefinitions
 }
 
 // RegisterOpenAPIService registers a handler to provides standard OpenAPI specification.
 func RegisterOpenAPIService(config *Config, containers *restful.Container) (err error) {
-	var _ = loads.Spec
-	var _ = strfmt.ParseDuration
-	var _ = validate.FormatOf
 	o := openAPI{
 		config: config,
+		swagger: &spec.Swagger{
+			SwaggerProps: spec.SwaggerProps{
+				Swagger:     OpenAPIVersion,
+				Definitions: spec.Definitions{},
+				Paths:       &spec.Paths{Paths: map[string]spec.PathItem{}},
+				Info:        config.Info,
+			},
+		},
 	}
-	err = o.buildSwaggerSpec()
+
+	err = o.init()
 	if err != nil {
 		return err
 	}
-	containers.ServeMux.HandleFunc(OpenAPIServePath, func(w http.ResponseWriter, r *http.Request) {
+
+	containers.ServeMux.HandleFunc(config.OpenAPIServePath, func(w http.ResponseWriter, r *http.Request) {
 		resp := restful.NewResponse(w)
-		if r.URL.Path != OpenAPIServePath {
+		if r.URL.Path != config.OpenAPIServePath {
 			resp.WriteErrorString(http.StatusNotFound, "Path not found!")
 		}
+		// TODO: we can cache json string and return it here.
 		resp.WriteAsJson(o.swagger)
 	})
 	return nil
 }
 
-func (o *openAPI) buildSwaggerSpec() (err error) {
-	if o.swagger != nil {
-		return fmt.Errorf("Swagger spec is already built. Duplicate call to buildSwaggerSpec is not allowed.")
+func (o *openAPI) init() error {
+	if o.openAPIDefinitions == nil {
+		// Compilation error here means the code generator need to run first.
+		o.openAPIDefinitions = o.OpenAPIDefinitions()
 	}
-	o.protocolList, err = o.buildProtocolList()
+	err := o.buildPaths()
 	if err != nil {
 		return err
 	}
-	definitions, err := o.buildDefinitions()
-	if err != nil {
-		return err
+	// no need to the keep type list in memory
+	o.openAPIDefinitions = nil
+
+	return nil
+}
+
+func (o *openAPI) buildDefinitionRecursively(name string) error {
+	if _, ok := o.swagger.Definitions[name]; ok {
+		return nil
 	}
-	paths, err := o.buildPaths()
-	if err != nil {
-		return err
-	}
-	o.swagger = &spec.Swagger{
-		SwaggerProps: spec.SwaggerProps{
-			Swagger:     OpenAPIVersion,
-			Definitions: definitions,
-			Paths:       &paths,
-			Info:        o.config.Info,
-		},
+	if item, ok := (*o.openAPIDefinitions)[name]; ok {
+		o.swagger.Definitions[name] = item.Schema
+		for _, v := range item.Dependencies {
+			if err := o.buildDefinitionRecursively(v); err != nil {
+				return err
+			}
+		}
+	} else {
+		return fmt.Errorf("cannot find model definition for %v. If you added a new type, you may need to add +k8s:openapi-gen=true to the package or type and run code-gen again.", name)
 	}
 	return nil
 }
 
-// buildDefinitions construct OpenAPI definitions using go-restful's swagger 1.2 generated models.
-func (o *openAPI) buildDefinitions() (definitions spec.Definitions, err error) {
-	definitions = spec.Definitions{}
-	for _, decl := range swagger.NewSwaggerBuilder(*o.config.SwaggerConfig).ProduceAllDeclarations() {
-		for _, swaggerModel := range decl.Models.List {
-			_, ok := definitions[swaggerModel.Name]
-			if ok {
-				// TODO(mbohlool): decide what to do with repeated models
-				// The best way is to make sure they have the same content and
-				// fail otherwise.
-				continue
-			}
-			definitions[swaggerModel.Name], err = buildModel(swaggerModel.Model)
-			if err != nil {
-				return definitions, err
-			}
-		}
+// buildDefinitionForType build a definition for a given type and return a referable name to it's definition.
+// This is the main function that keep track of definitions used in this spec and is depend on code generated
+// by k8s.io/kubernetes/cmd/libs/go2idl/openapi-gen.
+func (o *openAPI) buildDefinitionForType(sample interface{}) (string, error) {
+	t := reflect.TypeOf(sample)
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
 	}
-	return definitions, nil
-}
-
-func buildModel(swaggerModel swagger.Model) (ret spec.Schema, err error) {
-	ret = spec.Schema{
-		// SchemaProps.SubTypes is not used in go-restful, ignoring.
-		SchemaProps: spec.SchemaProps{
-			Description: swaggerModel.Description,
-			Required:    swaggerModel.Required,
-			Properties:  make(map[string]spec.Schema),
-		},
-		SwaggerSchemaProps: spec.SwaggerSchemaProps{
-			Discriminator: swaggerModel.Discriminator,
-		},
+	name := t.String()
+	if err := o.buildDefinitionRecursively(name); err != nil {
+		return "", err
 	}
-	for _, swaggerProp := range swaggerModel.Properties.List {
-		if _, ok := ret.Properties[swaggerProp.Name]; ok {
-			return ret, fmt.Errorf("Duplicate property in swagger 1.2 spec: %v", swaggerProp.Name)
-		}
-		ret.Properties[swaggerProp.Name], err = buildProperty(swaggerProp)
-		if err != nil {
-			return ret, err
-		}
-	}
-	return ret, nil
-}
-
-// buildProperty converts a swagger 1.2 property to an open API property.
-func buildProperty(swaggerProperty swagger.NamedModelProperty) (openAPIProperty spec.Schema, err error) {
-	if swaggerProperty.Property.Ref != nil {
-		return spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Ref: spec.MustCreateRef("#/definitions/" + *swaggerProperty.Property.Ref),
-			},
-		}, nil
-	}
-	openAPIProperty = spec.Schema{
-		SchemaProps: spec.SchemaProps{
-			Description: swaggerProperty.Property.Description,
-			Default:     getDefaultValue(swaggerProperty.Property.DefaultValue),
-			Enum:        make([]interface{}, len(swaggerProperty.Property.Enum)),
-		},
-	}
-	for i, e := range swaggerProperty.Property.Enum {
-		openAPIProperty.Enum[i] = e
-	}
-	openAPIProperty.Minimum, err = getFloat64OrNil(swaggerProperty.Property.Minimum)
-	if err != nil {
-		return spec.Schema{}, err
-	}
-	openAPIProperty.Maximum, err = getFloat64OrNil(swaggerProperty.Property.Maximum)
-	if err != nil {
-		return spec.Schema{}, err
-	}
-	if swaggerProperty.Property.UniqueItems != nil {
-		openAPIProperty.UniqueItems = *swaggerProperty.Property.UniqueItems
-	}
-
-	if swaggerProperty.Property.Items != nil {
-		if swaggerProperty.Property.Items.Ref != nil {
-			openAPIProperty.Items = &spec.SchemaOrArray{
-				Schema: &spec.Schema{
-					SchemaProps: spec.SchemaProps{
-						Ref: spec.MustCreateRef("#/definitions/" + *swaggerProperty.Property.Items.Ref),
-					},
-				},
-			}
-		} else {
-			openAPIProperty.Items = &spec.SchemaOrArray{
-				Schema: &spec.Schema{},
-			}
-			openAPIProperty.Items.Schema.Type, openAPIProperty.Items.Schema.Format, err =
-				buildType(swaggerProperty.Property.Items.Type, swaggerProperty.Property.Items.Format)
-			if err != nil {
-				return spec.Schema{}, err
-			}
-		}
-	}
-	openAPIProperty.Type, openAPIProperty.Format, err =
-		buildType(swaggerProperty.Property.Type, swaggerProperty.Property.Format)
-	if err != nil {
-		return spec.Schema{}, err
-	}
-	return openAPIProperty, nil
+	return "#/definitions/" + name, nil
 }
 
 // buildPaths builds OpenAPI paths using go-restful's web services.
-func (o *openAPI) buildPaths() (spec.Paths, error) {
-	paths := spec.Paths{
-		Paths: make(map[string]spec.PathItem),
-	}
+func (o *openAPI) buildPaths() error {
 	pathsToIgnore := createTrie(o.config.IgnorePrefixes)
 	duplicateOpId := make(map[string]bool)
 	// Find duplicate operation IDs.
-	for _, service := range o.config.SwaggerConfig.WebServices {
+	for _, service := range o.config.WebServices {
 		if pathsToIgnore.HasPrefix(service.RootPath()) {
 			continue
 		}
@@ -231,28 +151,32 @@ func (o *openAPI) buildPaths() (spec.Paths, error) {
 			duplicateOpId[route.Operation] = exists
 		}
 	}
-	for _, w := range o.config.SwaggerConfig.WebServices {
+	for _, w := range o.config.WebServices {
 		rootPath := w.RootPath()
 		if pathsToIgnore.HasPrefix(rootPath) {
 			continue
 		}
-		commonParams, err := buildParameters(w.PathParameters())
+		commonParams, err := o.buildParameters(w.PathParameters())
 		if err != nil {
-			return paths, err
+			return err
 		}
 		for path, routes := range groupRoutesByPath(w.Routes()) {
-			// go-swagger has special variable difinition {$NAME:*} that can only be
+			// go-swagger has special variable definition {$NAME:*} that can only be
 			// used at the end of the path and it is not recognized by OpenAPI.
 			if strings.HasSuffix(path, ":*}") {
 				path = path[:len(path)-3] + "}"
 			}
-			inPathCommonParamsMap, err := findCommonParameters(routes)
-			if err != nil {
-				return paths, err
+			if pathsToIgnore.HasPrefix(path) {
+				continue
 			}
-			pathItem, exists := paths.Paths[path]
+			// Aggregating common parameters make API spec (and generated clients) simpler
+			inPathCommonParamsMap, err := o.findCommonParameters(routes)
+			if err != nil {
+				return err
+			}
+			pathItem, exists := o.swagger.Paths.Paths[path]
 			if exists {
-				return paths, fmt.Errorf("Duplicate webservice route has been found for path: %v", path)
+				return fmt.Errorf("duplicate webservice route has been found for path: %v", path)
 			}
 			pathItem = spec.PathItem{
 				PathItemProps: spec.PathItemProps{
@@ -260,16 +184,14 @@ func (o *openAPI) buildPaths() (spec.Paths, error) {
 				},
 			}
 			// add web services's parameters as well as any parameters appears in all ops, as common parameters
-			for _, p := range commonParams {
-				pathItem.Parameters = append(pathItem.Parameters, p)
-			}
+			pathItem.Parameters = append(pathItem.Parameters, commonParams...)
 			for _, p := range inPathCommonParamsMap {
 				pathItem.Parameters = append(pathItem.Parameters, p)
 			}
 			for _, route := range routes {
 				op, err := o.buildOperations(route, inPathCommonParamsMap)
 				if err != nil {
-					return paths, err
+					return err
 				}
 				if duplicateOpId[op.ID] {
 					// Repeated Operation IDs are not allowed in OpenAPI spec but if
@@ -294,36 +216,21 @@ func (o *openAPI) buildPaths() (spec.Paths, error) {
 					pathItem.Patch = op
 				}
 			}
-			paths.Paths[path] = pathItem
+			o.swagger.Paths.Paths[path] = pathItem
 		}
 	}
-
-	return paths, nil
-}
-
-// buildProtocolList returns list of accepted protocols for this web service. If web service url has no protocol, it
-// will default to http.
-func (o *openAPI) buildProtocolList() ([]string, error) {
-	uri, err := url.Parse(o.config.SwaggerConfig.WebServicesUrl)
-	if err != nil {
-		return []string{}, err
-	}
-	if uri.Scheme != "" {
-		return []string{uri.Scheme}, nil
-	} else {
-		return []string{"http"}, nil
-	}
+	return nil
 }
 
 // buildOperations builds operations for each webservice path
-func (o *openAPI) buildOperations(route restful.Route, inPathCommonParamsMap map[interface{}]spec.Parameter) (*spec.Operation, error) {
-	ret := &spec.Operation{
+func (o *openAPI) buildOperations(route restful.Route, inPathCommonParamsMap map[interface{}]spec.Parameter) (ret *spec.Operation, err error) {
+	ret = &spec.Operation{
 		OperationProps: spec.OperationProps{
 			Description: route.Doc,
 			Consumes:    route.Consumes,
 			Produces:    route.Produces,
 			ID:          route.Operation,
-			Schemes:     o.protocolList,
+			Schemes:     o.config.ProtocolList,
 			Responses: &spec.Responses{
 				ResponsesProps: spec.ResponsesProps{
 					StatusCodeResponses: make(map[int]spec.Response),
@@ -331,26 +238,37 @@ func (o *openAPI) buildOperations(route restful.Route, inPathCommonParamsMap map
 			},
 		},
 	}
+
+	// Build responses
 	for _, resp := range route.ResponseErrors {
-		ret.Responses.StatusCodeResponses[resp.Code] = spec.Response{
-			ResponseProps: spec.ResponseProps{
-				Description: resp.Message,
-				Schema: &spec.Schema{
-					SchemaProps: spec.SchemaProps{
-						Ref: spec.MustCreateRef("#/definitions/" + reflect.TypeOf(resp.Model).String()),
-					},
-				},
-			},
+		ret.Responses.StatusCodeResponses[resp.Code], err = o.buildResponse(resp.Model, resp.Message)
+		if err != nil {
+			return ret, err
 		}
 	}
+	// If there is no response but a write sample, assume that write sample is an http.StatusOK response.
+	if len(ret.Responses.StatusCodeResponses) == 0 && route.WriteSample != nil {
+		ret.Responses.StatusCodeResponses[http.StatusOK], err = o.buildResponse(route.WriteSample, "OK")
+		if err != nil {
+			return ret, err
+		}
+	}
+	// If there is still no response, use default response provided.
 	if len(ret.Responses.StatusCodeResponses) == 0 {
 		ret.Responses.Default = o.config.DefaultResponse
 	}
+	// If there is a read sample, there will be a body param referring to it.
+	if route.ReadSample != nil {
+		if _, err := o.toSchema(reflect.TypeOf(route.ReadSample).String(), route.ReadSample); err != nil {
+			return ret, err
+		}
+	}
+
+	// Build non-common Parameters
 	ret.Parameters = make([]spec.Parameter, 0)
 	for _, param := range route.ParameterDocs {
-		_, isCommon := inPathCommonParamsMap[mapKeyFromParam(param)]
-		if !isCommon {
-			openAPIParam, err := buildParameter(param.Data())
+		if _, isCommon := inPathCommonParamsMap[mapKeyFromParam(param)]; !isCommon {
+			openAPIParam, err := o.buildParameter(param.Data())
 			if err != nil {
 				return ret, err
 			}
@@ -358,6 +276,20 @@ func (o *openAPI) buildOperations(route restful.Route, inPathCommonParamsMap map
 		}
 	}
 	return ret, nil
+}
+
+func (o *openAPI) buildResponse(model interface{}, description string) (spec.Response, error) {
+	typeName := reflect.TypeOf(model).String()
+	schema, err := o.toSchema(typeName, model)
+	if err != nil {
+		return spec.Response{}, err
+	}
+	return spec.Response{
+		ResponseProps: spec.ResponseProps{
+			Description: description,
+			Schema:      schema,
+		},
+	}, nil
 }
 
 func groupRoutesByPath(routes []restful.Route) (ret map[string][]restful.Route) {
@@ -382,7 +314,7 @@ func mapKeyFromParam(param *restful.Parameter) interface{} {
 	}
 }
 
-func findCommonParameters(routes []restful.Route) (map[interface{}]spec.Parameter, error) {
+func (o *openAPI) findCommonParameters(routes []restful.Route) (map[interface{}]spec.Parameter, error) {
 	commonParamsMap := make(map[interface{}]spec.Parameter, 0)
 	paramOpsCountByName := make(map[interface{}]int, 0)
 	paramNameKindToDataMap := make(map[interface{}]restful.ParameterData, 0)
@@ -395,7 +327,7 @@ func findCommonParameters(routes []restful.Route) (map[interface{}]spec.Paramete
 			key := mapKeyFromParam(param)
 			if routeParamDuplicateMap[key] {
 				msg, _ := json.Marshal(route.ParameterDocs)
-				return commonParamsMap, fmt.Errorf("Duplicate parameter %v for route %v, %v.", param.Data().Name, string(msg), s)
+				return commonParamsMap, fmt.Errorf("duplicate parameter %v for route %v, %v.", param.Data().Name, string(msg), s)
 			}
 			routeParamDuplicateMap[key] = true
 			paramOpsCountByName[key]++
@@ -404,7 +336,7 @@ func findCommonParameters(routes []restful.Route) (map[interface{}]spec.Paramete
 	}
 	for key, count := range paramOpsCountByName {
 		if count == len(routes) {
-			openAPIParam, err := buildParameter(paramNameKindToDataMap[key])
+			openAPIParam, err := o.buildParameter(paramNameKindToDataMap[key])
 			if err != nil {
 				return commonParamsMap, err
 			}
@@ -414,7 +346,31 @@ func findCommonParameters(routes []restful.Route) (map[interface{}]spec.Paramete
 	return commonParamsMap, nil
 }
 
-func buildParameter(restParam restful.ParameterData) (ret spec.Parameter, err error) {
+func (o *openAPI) toSchema(typeName string, model interface{}) (_ *spec.Schema, err error) {
+	if openAPIType, openAPIFormat := common.GetOpenAPITypeFormat(typeName); openAPIType != "" {
+		return &spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Type:   []string{openAPIType},
+				Format: openAPIFormat,
+			},
+		}, nil
+	} else {
+		ref := "#/definitions/" + typeName
+		if model != nil {
+			ref, err = o.buildDefinitionForType(model)
+			if err != nil {
+				return nil, err
+			}
+		}
+		return &spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Ref: spec.MustCreateRef(ref),
+			},
+		}, nil
+	}
+}
+
+func (o *openAPI) buildParameter(restParam restful.ParameterData) (ret spec.Parameter, err error) {
 	ret = spec.Parameter{
 		ParamProps: spec.ParamProps{
 			Name:        restParam.Name,
@@ -425,16 +381,12 @@ func buildParameter(restParam restful.ParameterData) (ret spec.Parameter, err er
 	switch restParam.Kind {
 	case restful.BodyParameterKind:
 		ret.In = "body"
-		ret.Schema = &spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Ref: spec.MustCreateRef("#/definitions/" + restParam.DataType),
-			},
-		}
-		return ret, nil
+		ret.Schema, err = o.toSchema(restParam.DataType, nil)
+		return ret, err
 	case restful.PathParameterKind:
 		ret.In = "path"
 		if !restParam.Required {
-			return ret, fmt.Errorf("Path parameters should be marked at required for parameter %v", restParam)
+			return ret, fmt.Errorf("path parameters should be marked at required for parameter %v", restParam)
 		}
 	case restful.QueryParameterKind:
 		ret.In = "query"
@@ -443,26 +395,22 @@ func buildParameter(restParam restful.ParameterData) (ret spec.Parameter, err er
 	case restful.FormParameterKind:
 		ret.In = "form"
 	default:
-		return ret, fmt.Errorf("Unknown restful operation kind : %v", restParam.Kind)
+		return ret, fmt.Errorf("unknown restful operation kind : %v", restParam.Kind)
 	}
-	if !isSimpleDataType(restParam.DataType) {
-		return ret, fmt.Errorf("Restful DataType should be a simple type, but got : %v", restParam.DataType)
+	openAPIType, openAPIFormat := common.GetOpenAPITypeFormat(restParam.DataType)
+	if openAPIType == "" {
+		return ret, fmt.Errorf("non-body Restful parameter type should be a simple type, but got : %v", restParam.DataType)
 	}
-	ret.Type = restParam.DataType
-	ret.Format = restParam.DataFormat
+	ret.Type = openAPIType
+	ret.Format = openAPIFormat
 	ret.UniqueItems = !restParam.AllowMultiple
-	// TODO(mbohlool): make sure the type of default value matches Type
-	if restParam.DefaultValue != "" {
-		ret.Default = restParam.DefaultValue
-	}
-
 	return ret, nil
 }
 
-func buildParameters(restParam []*restful.Parameter) (ret []spec.Parameter, err error) {
+func (o *openAPI) buildParameters(restParam []*restful.Parameter) (ret []spec.Parameter, err error) {
 	ret = make([]spec.Parameter, len(restParam))
 	for i, v := range restParam {
-		ret[i], err = buildParameter(v.Data())
+		ret[i], err = o.buildParameter(v.Data())
 		if err != nil {
 			return ret, err
 		}
@@ -470,60 +418,16 @@ func buildParameters(restParam []*restful.Parameter) (ret []spec.Parameter, err 
 	return ret, nil
 }
 
-func isSimpleDataType(typeName string) bool {
-	switch typeName {
-	// Note that "file" intentionally kept out of this list as it is not being used.
-	// "file" type has more requirements.
-	case "string", "number", "integer", "boolean", "array":
-		return true
-	}
-	return false
-}
-
-func getFloat64OrNil(str string) (*float64, error) {
-	if len(str) > 0 {
-		num, err := strconv.ParseFloat(str, 64)
-		return &num, err
-	}
-	return nil, nil
-}
-
-// TODO(mbohlool): Convert default value type to the type of parameter
-func getDefaultValue(str swagger.Special) interface{} {
-	if len(str) > 0 {
-		return str
-	}
-	return nil
-}
-
-func buildType(swaggerType *string, swaggerFormat string) ([]string, string, error) {
-	if swaggerType == nil {
-		return []string{}, "", nil
-	}
-	switch *swaggerType {
-	case "integer", "number", "string", "boolean", "array", "object", "file":
-		return []string{*swaggerType}, swaggerFormat, nil
-	case "int":
-		return []string{"integer"}, "int32", nil
-	case "long":
-		return []string{"integer"}, "int64", nil
-	case "float", "double":
-		return []string{"number"}, *swaggerType, nil
-	case "byte", "date", "datetime", "date-time":
-		return []string{"string"}, *swaggerType, nil
-	default:
-		return []string{}, "", fmt.Errorf("Unrecognized swagger 1.2 type : %v, %v", swaggerType, swaggerFormat)
-	}
-}
-
 // A simple trie implementation with Add an HasPrefix methods only.
 type trie struct {
 	children map[byte]*trie
+	wordTail bool
 }
 
 func createTrie(list []string) trie {
 	ret := trie{
 		children: make(map[byte]*trie),
+		wordTail: false,
 	}
 	for _, v := range list {
 		ret.Add(v)
@@ -536,22 +440,31 @@ func (t *trie) Add(v string) {
 	for _, b := range []byte(v) {
 		child, exists := root.children[b]
 		if !exists {
-			child = new(trie)
-			child.children = make(map[byte]*trie)
+			child = &trie{
+				children: make(map[byte]*trie),
+				wordTail: false,
+			}
 			root.children[b] = child
 		}
 		root = child
 	}
+	root.wordTail = true
 }
 
 func (t *trie) HasPrefix(v string) bool {
 	root := t
+	if root.wordTail {
+		return true
+	}
 	for _, b := range []byte(v) {
 		child, exists := root.children[b]
 		if !exists {
 			return false
 		}
+		if child.wordTail {
+			return true
+		}
 		root = child
 	}
-	return true
+	return false
 }

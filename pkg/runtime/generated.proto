@@ -71,6 +71,7 @@ option go_package = "runtime";
 // 
 // +k8s:deepcopy-gen=true
 // +protobuf=true
+// +k8s:openapi-gen=true
 message RawExtension {
   // Raw is the underlying serialization of this object.
   // 
@@ -91,6 +92,7 @@ message RawExtension {
 // 
 // +k8s:deepcopy-gen=true
 // +protobuf=true
+// +k8s:openapi-gen=true
 message TypeMeta {
   optional string apiVersion = 1;
 
@@ -105,6 +107,7 @@ message TypeMeta {
 // 
 // +k8s:deepcopy-gen=true
 // +protobuf=true
+// +k8s:openapi-gen=true
 message Unknown {
   optional TypeMeta typeMeta = 1;
 

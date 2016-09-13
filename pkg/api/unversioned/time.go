@@ -20,6 +20,9 @@ import (
 	"encoding/json"
 	"time"
 
+	"k8s.io/kubernetes/cmd/libs/go2idl/openapi-gen/generators/common"
+
+	"github.com/go-openapi/spec"
 	"github.com/google/gofuzz"
 )
 
@@ -140,6 +143,17 @@ func (t Time) MarshalJSON() ([]byte, error) {
 	}
 
 	return json.Marshal(t.UTC().Format(time.RFC3339))
+}
+
+func (_ Time) OpenAPIDefinition() common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Type:   []string{"string"},
+				Format: "date-time",
+			},
+		},
+	}
 }
 
 // MarshalQueryParameter converts to a URL query parameter value
