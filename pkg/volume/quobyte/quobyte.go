@@ -422,7 +422,12 @@ func (provisioner *quobyteVolumeProvisioner) Provision() (*api.PersistentVolume,
 		api.ResourceName(api.ResourceStorage): resource.MustParse(fmt.Sprintf("%dGi", sizeGB)),
 	}
 
-	addVolumeAnnotations(apiServer, adminSecretName, adminSecretNamespace, pv)
+	util.AddVolumeAnnotations(pv, map[string]string{
+		annotationQuobyteAPIServer:          apiServer,
+		annotationQuobyteAPISecret:          adminSecretName,
+		annotationQuobyteAPISecretNamespace: adminSecretNamespace,
+	})
+
 	return pv, nil
 }
 
@@ -432,12 +437,20 @@ func (deleter *quobyteVolumeDeleter) GetPath() string {
 
 func (deleter *quobyteVolumeDeleter) Delete() error {
 	var quobyteUser, quobytePassword string
-	apiServer, adminSecretName, adminSecretNamespace, err := parseVolumeAnnotations(deleter.pv)
+	annotations, err := util.ParseVolumeAnnotations(deleter.pv, []string{
+		annotationQuobyteAPISecret,
+		annotationQuobyteAPISecretNamespace,
+		annotationQuobyteAPIServer})
+
 	if err != nil {
 		return err
 	}
 
-	secretMap, err := util.GetSecret(adminSecretNamespace, adminSecretName, deleter.plugin.host.GetKubeClient())
+	secretMap, err := util.GetSecret(
+		annotations[annotationQuobyteAPISecretNamespace],
+		annotations[annotationQuobyteAPISecret],
+		deleter.plugin.host.GetKubeClient())
+
 	if err != nil {
 		return err
 	}
@@ -455,7 +468,7 @@ func (deleter *quobyteVolumeDeleter) Delete() error {
 		config: &quobyteAPIConfig{
 			quobyteUser:      quobyteUser,
 			quobytePassword:  quobytePassword,
-			quobyteApiServer: apiServer,
+			quobyteApiServer: annotations[annotationQuobyteAPIServer],
 		},
 	}
 	return manager.deleteVolume(deleter)

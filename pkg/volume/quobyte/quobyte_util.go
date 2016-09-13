@@ -17,7 +17,6 @@ limitations under the License.
 package quobyte
 
 import (
-	"fmt"
 	"net"
 	"path"
 	"strings"
@@ -106,40 +105,4 @@ func validateRegistry(registry string) bool {
 	}
 
 	return true
-}
-
-// ADD Annotations to a PersistentVolume all information needed to delete the Volume
-func addVolumeAnnotations(apiServer, adminSecret, adminSecretNamespace string, pv *api.PersistentVolume) {
-	if pv.Annotations == nil {
-		pv.Annotations = map[string]string{}
-	}
-	pv.Annotations[annotationQuobyteAPIServer] = apiServer
-	pv.Annotations[annotationQuobyteAPISecret] = adminSecret
-	pv.Annotations[annotationQuobyteAPISecretNamespace] = adminSecretNamespace
-}
-
-func parseVolumeAnnotations(pv *api.PersistentVolume) (apiServer, adminSecret, adminSecretNamespace string, err error) {
-	var ok bool
-
-	if pv.Annotations == nil {
-		err = fmt.Errorf("cannot parse volume annotations: no annotations found")
-		return
-	}
-
-	if apiServer, ok = pv.Annotations[annotationQuobyteAPIServer]; !ok {
-		err = fmt.Errorf("cannot parse volume annotations: annotation %q not found", annotationQuobyteAPIServer)
-		return
-	}
-
-	if adminSecret, ok = pv.Annotations[annotationQuobyteAPISecret]; !ok {
-		err = fmt.Errorf("cannot parse volume annotations: annotation %q not found", annotationQuobyteAPISecret)
-		return
-	}
-
-	if adminSecretNamespace, ok = pv.Annotations[annotationQuobyteAPISecretNamespace]; !ok {
-		err = fmt.Errorf("cannot parse volume annotations: annotation %q not found", annotationQuobyteAPISecretNamespace)
-		return
-	}
-
-	return
 }
