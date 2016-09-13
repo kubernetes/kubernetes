@@ -110,6 +110,11 @@ type Generator interface {
 	// Generators.)
 	Init(*Context, io.Writer) error
 
+	// Finalize should write finish up codes, and any other content that's not
+	// generated per-type. For example if you are generating one block (function,
+	// type, etc) for all types, this function can be used to close the block.
+	Finalize(*Context, io.Writer) error
+
 	// PackageVars should emit an array of variable lines. They will be
 	// placed in a var ( ... ) block. There's no need to include a leading
 	// \t or trailing \n.

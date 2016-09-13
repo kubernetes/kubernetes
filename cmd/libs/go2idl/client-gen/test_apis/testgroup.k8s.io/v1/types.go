@@ -25,8 +25,12 @@ import (
 
 type TestType struct {
 	unversioned.TypeMeta `json:",inline"`
-	api.ObjectMeta       `json:"metadata,omitempty"`
-	Status               TestTypeStatus `json:"status,omitempty"`
+	// ---
+	// the next tag removes the field from openapi spec. Adding unversioned objectMeta bring in a whole set of
+	// unversioned objects in the generate file that is not used anywhere other than this test type.
+	// +k8s:openapi-gen=false
+	api.ObjectMeta `json:"metadata,omitempty"`
+	Status         TestTypeStatus `json:"status,omitempty"`
 }
 
 type TestTypeList struct {

@@ -342,7 +342,8 @@ func (s *Server) InstallDebuggingHandlers() {
 		Operation("getLogs"))
 	ws.Route(ws.GET("/{logpath:*}").
 		To(s.getLogs).
-		Operation("getLogs"))
+		Operation("getLogs").
+		Param(ws.PathParameter("logpath", "path to the log").DataType("string")))
 	s.restfulCont.Add(ws)
 
 	ws = new(restful.WebService)
