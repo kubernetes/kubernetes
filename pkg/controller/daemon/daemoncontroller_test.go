@@ -138,6 +138,7 @@ func newTestController() (*DaemonSetsController, *controller.FakePodControl) {
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 	manager := NewDaemonSetsControllerFromClient(clientset, controller.NoResyncPeriodFunc, 0)
 	manager.podStoreSynced = alwaysReady
+	manager.nodeStoreSynced = alwaysReady
 	podControl := &controller.FakePodControl{}
 	manager.podControl = podControl
 	return manager, podControl
@@ -537,28 +538,6 @@ func TestInconsistentNameSelectorDaemonSetDoesNothing(t *testing.T) {
 	ds.Spec.Template.Spec.NodeName = "node-0"
 	manager.dsStore.Add(ds)
 	syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0)
-}
-
-func TestDSManagerNotReady(t *testing.T) {
-	manager, podControl := newTestController()
-	manager.podStoreSynced = func() bool { return false }
-	addNodes(manager.nodeStore.Store, 0, 1, nil)
-
-	// Simulates the ds reflector running before the pod reflector. We don't
-	// want to end up creating daemon pods in this case until the pod reflector
-	// has synced, so the ds manager should just requeue the ds.
-	ds := newDaemonSet("foo")
-	manager.dsStore.Add(ds)
-
-	dsKey := getKey(ds, t)
-	syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0)
-	queueDS, _ := manager.queue.Get()
-	if queueDS != dsKey {
-		t.Fatalf("Expected to find key %v in queue, found %v", dsKey, queueDS)
-	}
-
-	manager.podStoreSynced = alwaysReady
-	syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0)
 }
 
 // Daemon with node affinity should launch pods on nodes matching affinity.
