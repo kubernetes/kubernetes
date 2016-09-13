@@ -66,6 +66,7 @@ func readBytesFromFile(t *testing.T, filename string) []byte {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer file.Close()
 
 	data, err := ioutil.ReadAll(file)
 	if err != nil {
