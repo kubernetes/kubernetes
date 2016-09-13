@@ -18,18 +18,17 @@ limitations under the License.
 package webhook
 
 import (
-	"fmt"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apis/authentication"
+	_ "k8s.io/kubernetes/pkg/apis/authentication/install"
 	"k8s.io/kubernetes/pkg/apis/authentication/v1beta1"
 	"k8s.io/kubernetes/pkg/auth/authenticator"
 	"k8s.io/kubernetes/pkg/auth/user"
-	"k8s.io/kubernetes/pkg/client/restclient"
+	authenticationclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/authentication/unversioned"
 	"k8s.io/kubernetes/pkg/util/cache"
 	"k8s.io/kubernetes/plugin/pkg/webhook"
-
-	_ "k8s.io/kubernetes/pkg/apis/authentication/install"
 )
 
 var (
@@ -42,55 +41,90 @@ const retryBackoff = 500 * time.Millisecond
 var _ authenticator.Token = (*WebhookTokenAuthenticator)(nil)
 
 type WebhookTokenAuthenticator struct {
-	*webhook.GenericWebhook
-	responseCache *cache.LRUExpireCache
-	ttl           time.Duration
+	tokenReview    authenticationclient.TokenReviewInterface
+	responseCache  *cache.LRUExpireCache
+	ttl            time.Duration
+	initialBackoff time.Duration
+}
+
+// NewFromInterface creates a webhook authenticator using the given tokenReview client
+func NewFromInterface(tokenReview authenticationclient.TokenReviewInterface, ttl time.Duration) (*WebhookTokenAuthenticator, error) {
+	return newWithBackoff(tokenReview, ttl, retryBackoff)
 }
 
 // New creates a new WebhookTokenAuthenticator from the provided kubeconfig file.
 func New(kubeConfigFile string, ttl time.Duration) (*WebhookTokenAuthenticator, error) {
-	return newWithBackoff(kubeConfigFile, ttl, retryBackoff)
-}
-
-// newWithBackoff allows tests to skip the sleep.
-func newWithBackoff(kubeConfigFile string, ttl, initialBackoff time.Duration) (*WebhookTokenAuthenticator, error) {
-	gw, err := webhook.NewGenericWebhook(kubeConfigFile, groupVersions, initialBackoff)
+	tokenReview, err := tokenReviewInterfaceFromKubeconfig(kubeConfigFile)
 	if err != nil {
 		return nil, err
 	}
-	return &WebhookTokenAuthenticator{gw, cache.NewLRUExpireCache(1024), ttl}, nil
+	return newWithBackoff(tokenReview, ttl, retryBackoff)
+}
+
+// newWithBackoff allows tests to skip the sleep.
+func newWithBackoff(tokenReview authenticationclient.TokenReviewInterface, ttl, initialBackoff time.Duration) (*WebhookTokenAuthenticator, error) {
+	return &WebhookTokenAuthenticator{tokenReview, cache.NewLRUExpireCache(1024), ttl, initialBackoff}, nil
 }
 
 // AuthenticateToken implements the authenticator.Token interface.
 func (w *WebhookTokenAuthenticator) AuthenticateToken(token string) (user.Info, bool, error) {
-	r := &v1beta1.TokenReview{
-		Spec: v1beta1.TokenReviewSpec{Token: token},
+	r := &authentication.TokenReview{
+		Spec: authentication.TokenReviewSpec{Token: token},
 	}
 	if entry, ok := w.responseCache.Get(r.Spec); ok {
-		r.Status = entry.(v1beta1.TokenReviewStatus)
+		r.Status = entry.(authentication.TokenReviewStatus)
 	} else {
-		result := w.WithExponentialBackoff(func() restclient.Result {
-			return w.RestClient.Post().Body(r).Do()
+		var (
+			result *authentication.TokenReview
+			err    error
+		)
+		webhook.WithExponentialBackoff(w.initialBackoff, func() error {
+			result, err = w.tokenReview.Create(r)
+			return err
 		})
-		if err := result.Error(); err != nil {
+		if err != nil {
 			return nil, false, err
 		}
-		var statusCode int
-		if result.StatusCode(&statusCode); statusCode < 200 || statusCode >= 300 {
-			return nil, false, fmt.Errorf("Error contacting webhook: %d", statusCode)
-		}
-		spec := r.Spec
-		if err := result.Into(r); err != nil {
-			return nil, false, err
-		}
-		w.responseCache.Add(spec, r.Status, w.ttl)
+		r.Status = result.Status
+		w.responseCache.Add(r.Spec, result.Status, w.ttl)
 	}
 	if !r.Status.Authenticated {
 		return nil, false, nil
 	}
+
+	var extra map[string][]string
+	if r.Status.User.Extra != nil {
+		extra = map[string][]string{}
+		for k, v := range r.Status.User.Extra {
+			extra[k] = v
+		}
+	}
+
 	return &user.DefaultInfo{
 		Name:   r.Status.User.Username,
 		UID:    r.Status.User.UID,
 		Groups: r.Status.User.Groups,
+		Extra:  extra,
 	}, true, nil
+}
+
+// tokenReviewInterfaceFromKubeconfig builds a client from the specified kubeconfig file,
+// and returns a TokenReviewInterface that uses that client. Note that the client submits TokenReview
+// requests to the exact path specified in the kubeconfig file, so arbitrary non-API servers can be targeted.
+func tokenReviewInterfaceFromKubeconfig(kubeConfigFile string) (authenticationclient.TokenReviewInterface, error) {
+	gw, err := webhook.NewGenericWebhook(kubeConfigFile, groupVersions, 0)
+	if err != nil {
+		return nil, err
+	}
+	return &tokenReviewClient{gw}, nil
+}
+
+type tokenReviewClient struct {
+	w *webhook.GenericWebhook
+}
+
+func (t *tokenReviewClient) Create(tokenReview *authentication.TokenReview) (*authentication.TokenReview, error) {
+	result := &authentication.TokenReview{}
+	err := t.w.RestClient.Post().Body(tokenReview).Do().Into(result)
+	return result, err
 }

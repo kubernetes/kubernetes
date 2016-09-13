@@ -410,6 +410,11 @@ func IsServerTimeout(err error) bool {
 	return reasonForError(err) == unversioned.StatusReasonServerTimeout
 }
 
+// IsInternalError determines if err is an error which indicates an internal server error.
+func IsInternalError(err error) bool {
+	return reasonForError(err) == unversioned.StatusReasonInternalError
+}
+
 // IsUnexpectedServerError returns true if the server response was not in the expected API format,
 // and may be the result of another HTTP actor.
 func IsUnexpectedServerError(err error) bool {
