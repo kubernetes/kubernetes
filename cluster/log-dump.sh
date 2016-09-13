@@ -56,6 +56,7 @@ function copy-logs-from-node() {
 # $3 should be a space-separated list of files.
 # This function shouldn't ever trigger errexit
 function save-logs() {
+    set -x
     local -r node_name="${1}"
     local -r dir="${2}"
     local files="${3}"
@@ -74,6 +75,28 @@ function save-logs() {
         files="${kern_logfile} ${files} ${initd_logfiles} ${supervisord_logfiles}"
     fi
     copy-logs-from-node "${node_name}" "${dir}" "${files}"
+
+    ssh-to-node "${node_name}" "sudo chmod 777 /var/logs/" || true
+    ssh-to-node "${node_name}" "sudo chmod 755 /var/logs/*.log" || true
+    ssh-to-node "${node_name}" "sudo ls -altr /var/logs/" || true
+    ssh-to-node "${node_name}" "sudo tar -chvzf /var/log/node-logs.tgz /var/logs/*.log" || true
+
+    ssh-to-node "${node_name}" "sudo chmod 777 /var/log/containers/" || true
+    ssh-to-node "${node_name}" "sudo chmod 755 /var/log/containers/*" || true
+    ssh-to-node "${node_name}" "sudo ls -altr /var/log/containers" || true
+    ssh-to-node "${node_name}" "sudo tar -chvzf /var/log/node-containers.tgz /var/log/containers/*" || true
+
+    ssh-to-node "${node_name}" "sudo chmod 755 /var/lib/docker/containers/" || true
+    ssh-to-node "${node_name}" "sudo chmod 755 /var/lib/docker/containers/*" || true
+    ssh-to-node "${node_name}" "sudo chmod 755 /var/lib/docker/containers/*/*.log" || true
+    ssh-to-node "${node_name}" "sudo ls -altr /var/lib/docker/containers/" || true
+    ssh-to-node "${node_name}" "sudo ls -altr /var/lib/docker/containers/*/*.log" || true
+    ssh-to-node "${node_name}" "sudo tar -chvzf /var/log/node-docker-containers.tgz /var/lib/docker/containers/*" || true
+
+    gcloud compute copy-files --project "${PROJECT}" --zone "${ZONE}" "${node_name}:/var/log/node-logs.tgz" "${dir}" > /dev/null || true
+    gcloud compute copy-files --project "${PROJECT}" --zone "${ZONE}" "${node_name}:/var/log/node-containers.tgz" "${dir}" > /dev/null || true
+    gcloud compute copy-files --project "${PROJECT}" --zone "${ZONE}" "${node_name}:/var/log/node-docker-containers.tgz" "${dir}" > /dev/null || true
+    set +x
 }
 
 readonly master_ssh_supported_providers="gce aws kubemark"

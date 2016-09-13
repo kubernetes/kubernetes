@@ -16,6 +16,8 @@
 
 # Script that creates a Kubemark cluster with Master running on GCE.
 
+set -x
+
 # Hack to make it work for OS X. Ugh...
 TMP_ROOT="$(dirname "${BASH_SOURCE}")/../.."
 KUBE_ROOT=$(readlink -e ${TMP_ROOT} 2> /dev/null || perl -MCwd -e 'print Cwd::abs_path shift' ${TMP_ROOT})
@@ -154,6 +156,7 @@ gcloud compute copy-files --zone="${ZONE}" --project="${PROJECT}" \
   "${RESOURCE_DIRECTORY}/controllers_flags" \
   "${MASTER_NAME}":~
 
+
 gcloud compute ssh "${MASTER_NAME}" --zone="${ZONE}" --project="${PROJECT}" \
   --command="chmod a+x configure-kubectl.sh && chmod a+x start-kubemark-master.sh && sudo ./start-kubemark-master.sh ${EVENT_STORE_IP:-127.0.0.1} ${NUM_NODES:-0}"
 
@@ -256,6 +259,11 @@ echo "Waiting for all HollowNodes to become Running..."
 start=$(date +%s)
 nodes=$("${KUBECTL}" --kubeconfig="${LOCAL_KUBECONFIG}" get node) || true
 ready=$(($(echo "${nodes}" | grep -v "NotReady" | wc -l) - 1))
+
+echo "======================================================================="
+"${KUBECTL}" --kubeconfig="${LOCAL_KUBECONFIG}" get node
+"${KUBECTL}" --kubeconfig="${LOCAL_KUBECONFIG}" get all
+echo "======================================================================="
 
 until [[ "${ready}" -ge "${NUM_NODES}" ]]; do
   echo -n .
