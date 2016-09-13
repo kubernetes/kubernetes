@@ -3049,7 +3049,7 @@ func AddOrUpdateTaintOnNode(c *client.Client, nodeName string, taint api.Taint) 
 		var newTaints []api.Taint
 		updated := false
 		for _, existingTaint := range nodeTaints {
-			if existingTaint.Key == taint.Key {
+			if taint.MatchTaint(existingTaint) {
 				newTaints = append(newTaints, taint)
 				updated = true
 				continue
@@ -3083,49 +3083,49 @@ func AddOrUpdateTaintOnNode(c *client.Client, nodeName string, taint api.Taint) 
 	}
 }
 
-func taintExists(taints []api.Taint, taintKey string) bool {
+func taintExists(taints []api.Taint, taintToFind api.Taint) bool {
 	for _, taint := range taints {
-		if taint.Key == taintKey {
+		if taint.MatchTaint(taintToFind) {
 			return true
 		}
 	}
 	return false
 }
 
-func ExpectNodeHasTaint(c *client.Client, nodeName string, taintKey string) {
-	By("verifying the node has the taint " + taintKey)
+func ExpectNodeHasTaint(c *client.Client, nodeName string, taint api.Taint) {
+	By("verifying the node has the taint " + taint.ToString())
 	node, err := c.Nodes().Get(nodeName)
 	ExpectNoError(err)
 
 	nodeTaints, err := api.GetTaintsFromNodeAnnotations(node.Annotations)
 	ExpectNoError(err)
 
-	if len(nodeTaints) == 0 || !taintExists(nodeTaints, taintKey) {
-		Failf("Failed to find taint %s on node %s", taintKey, nodeName)
+	if len(nodeTaints) == 0 || !taintExists(nodeTaints, taint) {
+		Failf("Failed to find taint %s on node %s", taint.ToString(), nodeName)
 	}
 }
 
-func deleteTaintByKey(taints []api.Taint, taintKey string) ([]api.Taint, error) {
+func deleteTaint(oldTaints []api.Taint, taintToDelete api.Taint) ([]api.Taint, error) {
 	newTaints := []api.Taint{}
 	found := false
-	for _, taint := range taints {
-		if taint.Key == taintKey {
+	for _, oldTaint := range oldTaints {
+		if oldTaint.MatchTaint(taintToDelete) {
 			found = true
 			continue
 		}
-		newTaints = append(newTaints, taint)
+		newTaints = append(newTaints, taintToDelete)
 	}
 
 	if !found {
-		return nil, fmt.Errorf("taint key=\"%s\" not found.", taintKey)
+		return nil, fmt.Errorf("taint %s not found.", taintToDelete.ToString())
 	}
 	return newTaints, nil
 }
 
 // RemoveTaintOffNode is for cleaning up taints temporarily added to node,
 // won't fail if target taint doesn't exist or has been removed.
-func RemoveTaintOffNode(c *client.Client, nodeName string, taintKey string) {
-	By("removing the taint " + taintKey + " off the node " + nodeName)
+func RemoveTaintOffNode(c *client.Client, nodeName string, taint api.Taint) {
+	By("removing the taint " + taint.ToString() + " off the node " + nodeName)
 	for attempt := 0; attempt < UpdateRetries; attempt++ {
 		node, err := c.Nodes().Get(nodeName)
 		ExpectNoError(err)
@@ -3136,11 +3136,11 @@ func RemoveTaintOffNode(c *client.Client, nodeName string, taintKey string) {
 			return
 		}
 
-		if !taintExists(nodeTaints, taintKey) {
+		if !taintExists(nodeTaints, taint) {
 			return
 		}
 
-		newTaints, err := deleteTaintByKey(nodeTaints, taintKey)
+		newTaints, err := deleteTaint(nodeTaints, taint)
 		ExpectNoError(err)
 
 		taintsData, err := json.Marshal(newTaints)
@@ -3151,7 +3151,7 @@ func RemoveTaintOffNode(c *client.Client, nodeName string, taintKey string) {
 			if !apierrs.IsConflict(err) {
 				ExpectNoError(err)
 			} else {
-				Logf("Conflict when trying to add/update taint %v to %v", taintKey, nodeName)
+				Logf("Conflict when trying to add/update taint %s to node %v", taint.ToString(), nodeName)
 			}
 		} else {
 			break
@@ -3161,11 +3161,11 @@ func RemoveTaintOffNode(c *client.Client, nodeName string, taintKey string) {
 
 	nodeUpdated, err := c.Nodes().Get(nodeName)
 	ExpectNoError(err)
-	By("verifying the node doesn't have the taint " + taintKey)
+	By("verifying the node doesn't have the taint " + taint.ToString())
 	taintsGot, err := api.GetTaintsFromNodeAnnotations(nodeUpdated.Annotations)
 	ExpectNoError(err)
-	if taintExists(taintsGot, taintKey) {
-		Failf("Failed removing taint " + taintKey + " of the node " + nodeName)
+	if taintExists(taintsGot, taint) {
+		Failf("Failed removing taint " + taint.ToString() + " of the node " + nodeName)
 	}
 }
 

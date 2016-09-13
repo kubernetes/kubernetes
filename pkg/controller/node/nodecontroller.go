@@ -46,8 +46,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/watch"
-
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 func init() {
@@ -167,9 +165,6 @@ type NodeController struct {
 	// the controller using NewDaemonSetsController(passing SharedInformer), this
 	// will be null
 	internalPodInformer framework.SharedIndexInformer
-
-	evictions10Minutes *evictionData
-	evictions1Hour     *evictionData
 }
 
 // NewNodeController returns a new node controller to sync instances from cloudprovider.
@@ -241,8 +236,6 @@ func NewNodeController(
 		largeClusterThreshold:       largeClusterThreshold,
 		unhealthyZoneThreshold:      unhealthyZoneThreshold,
 		zoneStates:                  make(map[string]zoneState),
-		evictions10Minutes:          newEvictionData(10 * time.Minute),
-		evictions1Hour:              newEvictionData(time.Hour),
 	}
 	nc.enterPartialDisruptionFunc = nc.ReducedQPSFunc
 	nc.enterFullDisruptionFunc = nc.HealthyQPSFunc
@@ -417,7 +410,7 @@ func (nc *NodeController) Run() {
 		defer nc.evictorLock.Unlock()
 		for k := range nc.zonePodEvictor {
 			nc.zonePodEvictor[k].Try(func(value TimedValue) (bool, time.Duration) {
-				obj, exists, err := nc.nodeStore.Get(value.Value)
+				obj, exists, err := nc.nodeStore.GetByKey(value.Value)
 				if err != nil {
 					glog.Warningf("Failed to get Node %v from the nodeStore: %v", value.Value, err)
 				} else if !exists {
@@ -425,8 +418,7 @@ func (nc *NodeController) Run() {
 				} else {
 					node, _ := obj.(*api.Node)
 					zone := utilnode.GetZoneKey(node)
-					nc.evictions10Minutes.registerEviction(zone, value.Value)
-					nc.evictions1Hour.registerEviction(zone, value.Value)
+					EvictionsNumber.WithLabelValues(zone).Inc()
 				}
 
 				nodeUid, _ := value.UID.(string)
@@ -506,8 +498,9 @@ func (nc *NodeController) monitorNodeStatus() error {
 			nc.zonePodEvictor[zone] =
 				NewRateLimitedTimedQueue(
 					flowcontrol.NewTokenBucketRateLimiter(nc.evictionLimiterQPS, evictionRateLimiterBurst))
-			nc.evictions10Minutes.initZone(zone)
-			nc.evictions1Hour.initZone(zone)
+			// Init the metric for the new zone.
+			glog.Infof("Initilizing eviction metric for zone: %v", zone)
+			EvictionsNumber.WithLabelValues(zone).Add(0)
 		}
 		if _, found := nc.zoneTerminationEvictor[zone]; !found {
 			nc.zoneTerminationEvictor[zone] = NewRateLimitedTimedQueue(
@@ -607,18 +600,8 @@ func (nc *NodeController) monitorNodeStatus() error {
 		}
 	}
 	nc.handleDisruption(zoneToNodeConditions, nodes)
-	nc.updateEvictionMetric(Evictions10Minutes, nc.evictions10Minutes)
-	nc.updateEvictionMetric(Evictions1Hour, nc.evictions1Hour)
 
 	return nil
-}
-
-func (nc *NodeController) updateEvictionMetric(metric *prometheus.GaugeVec, data *evictionData) {
-	data.slideWindow()
-	zones := data.getZones()
-	for _, z := range zones {
-		metric.WithLabelValues(z).Set(float64(data.countEvictions(z)))
-	}
 }
 
 func (nc *NodeController) handleDisruption(zoneToNodeConditions map[string][]*api.NodeCondition, nodes *api.NodeList) {
@@ -924,8 +907,6 @@ func (nc *NodeController) cancelPodEviction(node *api.Node) bool {
 	wasTerminating := nc.zoneTerminationEvictor[zone].Remove(node.Name)
 	if wasDeleting || wasTerminating {
 		glog.V(2).Infof("Cancelling pod Eviction on Node: %v", node.Name)
-		nc.evictions10Minutes.removeEviction(zone, node.Name)
-		nc.evictions1Hour.removeEviction(zone, node.Name)
 		return true
 	}
 	return false

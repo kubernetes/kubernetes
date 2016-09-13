@@ -83,6 +83,7 @@ var _ = framework.KubeDescribe("Federation replicasets [Feature:Federation]", fu
 			if federationName = os.Getenv("FEDERATION_NAME"); federationName == "" {
 				federationName = DefaultFederationName
 			}
+			clusters = map[string]*cluster{}
 			registerClusters(clusters, UserAgentName, federationName, f)
 		})
 
