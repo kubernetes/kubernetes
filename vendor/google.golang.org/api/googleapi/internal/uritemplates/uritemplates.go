@@ -34,11 +34,37 @@ func pctEncode(src []byte) []byte {
 	return dst
 }
 
-func escape(s string, allowReserved bool) string {
+// pairWriter is a convenience struct which allows escaped and unescaped
+// versions of the template to be written in parallel.
+type pairWriter struct {
+	escaped, unescaped bytes.Buffer
+}
+
+// Write writes the provided string directly without any escaping.
+func (w *pairWriter) Write(s string) {
+	w.escaped.WriteString(s)
+	w.unescaped.WriteString(s)
+}
+
+// Escape writes the provided string, escaping the string for the
+// escaped output.
+func (w *pairWriter) Escape(s string, allowReserved bool) {
+	w.unescaped.WriteString(s)
 	if allowReserved {
-		return string(reserved.ReplaceAllFunc([]byte(s), pctEncode))
+		w.escaped.Write(reserved.ReplaceAllFunc([]byte(s), pctEncode))
+	} else {
+		w.escaped.Write(unreserved.ReplaceAllFunc([]byte(s), pctEncode))
 	}
-	return string(unreserved.ReplaceAllFunc([]byte(s), pctEncode))
+}
+
+// Escaped returns the escaped string.
+func (w *pairWriter) Escaped() string {
+	return w.escaped.String()
+}
+
+// Unescaped returns the unescaped string.
+func (w *pairWriter) Unescaped() string {
+	return w.unescaped.String()
 }
 
 // A uriTemplate is a parsed representation of a URI template.
@@ -170,18 +196,20 @@ func parseTerm(term string) (result templateTerm, err error) {
 	return result, err
 }
 
-// Expand expands a URI template with a set of values to produce a string.
-func (t *uriTemplate) Expand(values map[string]string) string {
-	var buf bytes.Buffer
+// Expand expands a URI template with a set of values to produce the
+// resultant URI. Two forms of the result are returned: one with all the
+// elements escaped, and one with the elements unescaped.
+func (t *uriTemplate) Expand(values map[string]string) (escaped, unescaped string) {
+	var w pairWriter
 	for _, p := range t.parts {
-		p.expand(&buf, values)
+		p.expand(&w, values)
 	}
-	return buf.String()
+	return w.Escaped(), w.Unescaped()
 }
 
-func (tp *templatePart) expand(buf *bytes.Buffer, values map[string]string) {
+func (tp *templatePart) expand(w *pairWriter, values map[string]string) {
 	if len(tp.raw) > 0 {
-		buf.WriteString(tp.raw)
+		w.Write(tp.raw)
 		return
 	}
 	var first = true
@@ -191,30 +219,30 @@ func (tp *templatePart) expand(buf *bytes.Buffer, values map[string]string) {
 			continue
 		}
 		if first {
-			buf.WriteString(tp.first)
+			w.Write(tp.first)
 			first = false
 		} else {
-			buf.WriteString(tp.sep)
+			w.Write(tp.sep)
 		}
-		tp.expandString(buf, term, value)
+		tp.expandString(w, term, value)
 	}
 }
 
-func (tp *templatePart) expandName(buf *bytes.Buffer, name string, empty bool) {
+func (tp *templatePart) expandName(w *pairWriter, name string, empty bool) {
 	if tp.named {
-		buf.WriteString(name)
+		w.Write(name)
 		if empty {
-			buf.WriteString(tp.ifemp)
+			w.Write(tp.ifemp)
 		} else {
-			buf.WriteString("=")
+			w.Write("=")
 		}
 	}
 }
 
-func (tp *templatePart) expandString(buf *bytes.Buffer, t templateTerm, s string) {
+func (tp *templatePart) expandString(w *pairWriter, t templateTerm, s string) {
 	if len(s) > t.truncate && t.truncate > 0 {
 		s = s[:t.truncate]
 	}
-	tp.expandName(buf, t.name, len(s) == 0)
-	buf.WriteString(escape(s, tp.allowReserved))
+	tp.expandName(w, t.name, len(s) == 0)
+	w.Escape(s, tp.allowReserved)
 }

@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"golang.org/x/net/context"
-	"golang.org/x/net/context/ctxhttp"
 )
 
 const (
@@ -80,7 +79,7 @@ func (rx *ResumableUpload) doUploadRequest(ctx context.Context, data io.Reader, 
 	req.Header.Set("Content-Range", contentRange)
 	req.Header.Set("Content-Type", rx.MediaType)
 	req.Header.Set("User-Agent", rx.UserAgent)
-	return ctxhttp.Do(ctx, rx.Client, req)
+	return SendRequest(ctx, rx.Client, req)
 
 }
 
@@ -135,6 +134,8 @@ func contextDone(ctx context.Context) bool {
 // It retries using the provided back off strategy until cancelled or the
 // strategy indicates to stop retrying.
 // It is called from the auto-generated API code and is not visible to the user.
+// Before sending an HTTP request, Upload calls any registered hook functions,
+// and calls the returned functions after the request returns (see send.go).
 // rx is private to the auto-generated API code.
 // Exactly one of resp or err will be nil.  If resp is non-nil, the caller must call resp.Body.Close.
 func (rx *ResumableUpload) Upload(ctx context.Context) (resp *http.Response, err error) {

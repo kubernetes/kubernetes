@@ -1,4 +1,4 @@
-// Copyright 2014 The oauth2 Authors. All rights reserved.
+// Copyright 2014 The Go Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
@@ -13,6 +13,9 @@ import (
 	"golang.org/x/net/context"
 	"golang.org/x/oauth2"
 )
+
+// Set at init time by appenginevm_hook.go. If true, we are on App Engine Managed VMs.
+var appengineVM bool
 
 // Set at init time by appengine_hook.go. If nil, we're not on App Engine.
 var appengineTokenFunc func(c context.Context, scopes ...string) (token string, expiry time.Time, err error)
