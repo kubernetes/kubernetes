@@ -54,6 +54,9 @@ type server struct {
 	// outFilename is the name of the log file. The stdout and stderr of the server
 	// will be redirected to this file.
 	outFilename string
+	// monitorParent determines whether the server should watch its parent process and exit
+	// if its parent is gone.
+	monitorParent bool
 	// restartOnExit determines whether a restart loop is launched with the server
 	restartOnExit bool
 	// Writing to this channel, if it is not nil, stops the restart loop.
@@ -65,7 +68,7 @@ type server struct {
 
 // newServer returns a new server with the given name, commands, health check
 // URLs, etc.
-func newServer(name string, start, kill, restart *exec.Cmd, urls []string, outputFileName string, restartOnExit bool) *server {
+func newServer(name string, start, kill, restart *exec.Cmd, urls []string, outputFileName string, monitorParent, restartOnExit bool) *server {
 	return &server{
 		name:            name,
 		startCommand:    start,
@@ -73,6 +76,7 @@ func newServer(name string, start, kill, restart *exec.Cmd, urls []string, outpu
 		restartCommand:  restart,
 		healthCheckUrls: urls,
 		outFilename:     outputFileName,
+		monitorParent:   monitorParent,
 		restartOnExit:   restartOnExit,
 	}
 }
@@ -177,17 +181,20 @@ func (s *server) start() error {
 		s.startCommand.Stdout = outfile
 		s.startCommand.Stderr = outfile
 
-		// Death of this test process should kill the server as well.
-		attrs := &syscall.SysProcAttr{}
-		// Hack to set linux-only field without build tags.
-		deathSigField := reflect.ValueOf(attrs).Elem().FieldByName("Pdeathsig")
-		if deathSigField.IsValid() {
-			deathSigField.Set(reflect.ValueOf(syscall.SIGTERM))
-		} else {
-			errCh <- fmt.Errorf("failed to set Pdeathsig field (non-linux build)")
-			return
+		// If monitorParent is set, set Pdeathsig when starting the server.
+		if s.monitorParent {
+			// Death of this test process should kill the server as well.
+			attrs := &syscall.SysProcAttr{}
+			// Hack to set linux-only field without build tags.
+			deathSigField := reflect.ValueOf(attrs).Elem().FieldByName("Pdeathsig")
+			if deathSigField.IsValid() {
+				deathSigField.Set(reflect.ValueOf(syscall.SIGTERM))
+			} else {
+				errCh <- fmt.Errorf("failed to set Pdeathsig field (non-linux build)")
+				return
+			}
+			s.startCommand.SysProcAttr = attrs
 		}
-		s.startCommand.SysProcAttr = attrs
 
 		// Start the command
 		err = s.startCommand.Start()

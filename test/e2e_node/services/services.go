@@ -37,9 +37,12 @@ import (
 // E2EServices starts and stops e2e services in a separate process. The test
 // uses it to start and stop all e2e services.
 type E2EServices struct {
-	services *server
-	kubelet  *server
-	logFiles map[string]logFileData
+	// monitorParent determines whether the sub-processes should watch and die with the current
+	// process.
+	monitorParent bool
+	services      *server
+	kubelet       *server
+	logFiles      map[string]logFileData
 }
 
 // logFileData holds data about logfiles to fetch with a journalctl command or
@@ -50,8 +53,9 @@ type logFileData struct {
 }
 
 // NewE2EServices returns a new E2EServices instance.
-func NewE2EServices() *E2EServices {
+func NewE2EServices(monitorParent bool) *E2EServices {
 	return &E2EServices{
+		monitorParent: monitorParent,
 		// Special log files that need to be collected for additional debugging.
 		logFiles: map[string]logFileData{
 			"kern.log":       {[]string{"/var/log/kern.log"}, []string{"-k"}},
@@ -151,7 +155,7 @@ func (e *E2EServices) startInternalServices() (*server, error) {
 		"--logtostderr",
 		"--vmodule=*="+LOG_VERBOSITY_LEVEL,
 	)
-	server := newServer("services", startCmd, nil, nil, getServicesHealthCheckURLs(), servicesLogFile, false)
+	server := newServer("services", startCmd, nil, nil, getServicesHealthCheckURLs(), servicesLogFile, e.monitorParent, false)
 	return server, server.start()
 }
 
@@ -206,7 +210,6 @@ func (e *E2EServices) startKubelet() (*server, error) {
 		"--eviction-hard", framework.TestContext.EvictionHard,
 		"--eviction-pressure-transition-period", "30s",
 		"--feature-gates", framework.TestContext.FeatureGates,
-		"--runtime-integration-type", framework.TestContext.RuntimeIntegrationType,
 		"--v", LOG_VERBOSITY_LEVEL, "--logtostderr",
 	)
 	if framework.TestContext.RuntimeIntegrationType != "" {
@@ -238,6 +241,7 @@ func (e *E2EServices) startKubelet() (*server, error) {
 		restartCommand,
 		[]string{kubeletHealthCheckURL},
 		"kubelet.log",
+		e.monitorParent,
 		true /* restartOnExit */)
 	return server, server.start()
 }
