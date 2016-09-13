@@ -308,8 +308,14 @@ type KubeletConfiguration struct {
 	// various events in kubelet/pod lifecycle
 	NetworkPluginName string `json:"networkPluginName"`
 	// networkPluginDir is the full path of the directory in which to search
-	// for network plugins
+	// for network plugins (and, for backwards-compat, CNI config files)
 	NetworkPluginDir string `json:"networkPluginDir"`
+	// CNIConfDir is the full path of the directory in which to search for
+	// CNI config files
+	CNIConfDir string `json:"cniConfDir"`
+	// CNIBinDir is the full path of the directory in which to search for
+	// CNI plugin binaries
+	CNIBinDir string `json:"cniBinDir"`
 	// networkPluginMTU is the MTU to be passed to the network plugin,
 	// and overrides the default MTU for cases where it cannot be automatically
 	// computed (such as IPSEC).
