@@ -30,7 +30,9 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-// Convenience method for getting a pod client interface in the framework's namespace.
+// Convenience method for getting a pod client interface in the framework's namespace,
+// possibly applying test-suite specific transformations to the pod spec, e.g. for
+// node e2e pod scheduling.
 func (f *Framework) PodClient() *PodClient {
 	return &PodClient{
 		f:            f,
