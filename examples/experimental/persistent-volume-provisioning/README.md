@@ -123,17 +123,17 @@ parameters:
 
 #### Ceph RBD
 
-```yaml                                                                                                                                                                                                          
-  apiVersion: extensions/v1beta1                                                                                                                                                                                   
-  kind: StorageClass                                                                                                                                                                                               
-  metadata: 
+```yaml
+apiVersion: extensions/v1beta1
+kind: StorageClass
+metadata:
    name: slow
 provisioner: kubernetes.io/rbd
 parameters:
     monitors: 127.0.0.1:6789
-    adminId: kube
-    adminSecretName: ceph-secret
-    adminSecretNamespace: kube-system
+    adminId: admin
+    adminSecretName: ceph-secret-admin
+    adminSecretNamespace: "kube-system"
     pool: kube
     userId: kube
     userSecretName: ceph-secret-user
