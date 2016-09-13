@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
@@ -54,7 +55,7 @@ func (n *NamespaceController) Start() error {
 	if err != nil {
 		return err
 	}
-	clientPool := dynamic.NewClientPool(config, dynamic.LegacyAPIPathResolverFunc)
+	clientPool := dynamic.NewClientPool(config, registered.RESTMapper(), dynamic.LegacyAPIPathResolverFunc)
 	resources, err := client.Discovery().ServerPreferredNamespacedResources()
 	if err != nil {
 		return err
