@@ -18,12 +18,12 @@ package e2e
 
 import (
 	"fmt"
-	"reflect"
 	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_4"
+	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -33,10 +33,9 @@ import (
 )
 
 const (
-	FederatedSecretName        = "federated-secret"
-	UpdatedFederatedSecretName = "updated-federated-secret"
-	FederatedSecretTimeout     = 60 * time.Second
-	MaxRetries                 = 3
+	FederatedSecretName    = "federated-secret"
+	FederatedSecretTimeout = 60 * time.Second
+	MaxRetries             = 3
 )
 
 // Create/delete secret api objects
@@ -98,18 +97,16 @@ func updateSecretOrFail(clientset *federation_release_1_4.Clientset, namespace s
 		Fail(fmt.Sprintf("Internal error: invalid parameters passed to updateSecretOrFail: clientset: %v, namespace: %v", clientset, namespace))
 	}
 
-	var err error
 	var newSecret *v1.Secret
-	secret := &v1.Secret{
-		ObjectMeta: v1.ObjectMeta{
-			Name: UpdatedFederatedSecretName,
-		},
-	}
-
 	for retryCount := 0; retryCount < MaxRetries; retryCount++ {
-		_, err = clientset.Core().Secrets(namespace).Get(FederatedSecretName)
+		secret, err := clientset.Core().Secrets(namespace).Get(FederatedSecretName)
 		if err != nil {
 			framework.Failf("failed to get secret %q: %v", FederatedSecretName, err)
+		}
+
+		// Update the secret by adding a label.
+		secret.ObjectMeta.Labels = map[string]string{
+			"updated-secret": "true",
 		}
 		newSecret, err = clientset.Core().Secrets(namespace).Update(secret)
 		if err == nil {
@@ -168,8 +165,10 @@ func waitForSecretUpdateOrFail(clientset *release_1_3.Clientset, namespace strin
 			if equivalentSecret(*clusterSecret, *secret) {
 				By(fmt.Sprintf("Success: shard of federated secret %q in namespace %q in cluster is updated", secret.Name, namespace))
 				return true, nil
+			} else {
+				By(fmt.Sprintf("Expected equal secrets. expected: %+v\nactual: %+v", *secret, *clusterSecret))
 			}
-			By(fmt.Sprintf("Secret %q in namespace %q in cluster, waiting for service being updated, trying again in %s (err=%v)", secret.Name, namespace, framework.Poll, err))
+			By(fmt.Sprintf("Secret %q in namespace %q in cluster, waiting for secret being updated, trying again in %s (err=%v)", secret.Name, namespace, framework.Poll, err))
 			return false, nil
 		}
 		By(fmt.Sprintf("Secret %q in namespace %q in cluster, waiting for being updated, trying again in %s (err=%v)", secret.Name, namespace, framework.Poll, err))
@@ -179,5 +178,5 @@ func waitForSecretUpdateOrFail(clientset *release_1_3.Clientset, namespace strin
 }
 
 func equivalentSecret(federatedSecret, clusterSecret v1.Secret) bool {
-	return reflect.DeepEqual(clusterSecret, federatedSecret)
+	return util.SecretEquivalent(clusterSecret, federatedSecret)
 }

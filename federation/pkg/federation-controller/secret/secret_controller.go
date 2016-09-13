@@ -18,7 +18,6 @@ package secret
 
 import (
 	"fmt"
-	"reflect"
 	"time"
 
 	federation_api "k8s.io/kubernetes/federation/apis/federation/v1beta1"
@@ -300,9 +299,7 @@ func (secretcontroller *SecretController) reconcileSecret(namespace string, secr
 			clusterSecret := clusterSecretObj.(*api_v1.Secret)
 
 			// Update existing secret, if needed.
-			if !util.ObjectMetaEquivalent(desiredSecret.ObjectMeta, clusterSecret.ObjectMeta) ||
-				!reflect.DeepEqual(desiredSecret.Data, clusterSecret.Data) ||
-				!reflect.DeepEqual(desiredSecret.Type, clusterSecret.Type) {
+			if !util.SecretEquivalent(*desiredSecret, *clusterSecret) {
 
 				secretcontroller.eventRecorder.Eventf(baseSecret, api.EventTypeNormal, "UpdateInCluster",
 					"Updating secret in cluster %s", cluster.Name)
