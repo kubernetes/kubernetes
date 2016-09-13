@@ -35,6 +35,11 @@ import (
 	"k8s.io/kubernetes/pkg/util/strategicpatch"
 )
 
+type ApplyOptions struct {
+	FilenameOptions resource.FilenameOptions
+	Selector        string
+}
+
 const (
 	// maxPatchRetry is the maximum number of conflicts retry for during a patch operation before returning failure
 	maxPatchRetry = 5
@@ -61,7 +66,7 @@ var (
 )
 
 func NewCmdApply(f *cmdutil.Factory, out io.Writer) *cobra.Command {
-	options := &resource.FilenameOptions{}
+	var options ApplyOptions
 
 	cmd := &cobra.Command{
 		Use:     "apply -f FILENAME",
@@ -71,15 +76,16 @@ func NewCmdApply(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(validateArgs(cmd, args))
 			cmdutil.CheckErr(cmdutil.ValidateOutputArgs(cmd))
-			cmdutil.CheckErr(RunApply(f, cmd, out, options))
+			cmdutil.CheckErr(RunApply(f, cmd, out, &options))
 		},
 	}
 
 	usage := "that contains the configuration to apply"
-	cmdutil.AddFilenameOptionFlags(cmd, options, usage)
+	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
 	cmd.MarkFlagRequired("filename")
 	cmd.Flags().Bool("overwrite", true, "Automatically resolve conflicts between the modified and live configuration by using values from the modified configuration")
 	cmdutil.AddValidateFlags(cmd)
+	cmd.Flags().StringVarP(&options.Selector, "selector", "l", "", "Selector (label query) to filter on")
 	cmdutil.AddOutputFlagsForMutation(cmd)
 	cmdutil.AddRecordFlag(cmd)
 	cmdutil.AddInclude3rdPartyFlags(cmd)
@@ -94,7 +100,7 @@ func validateArgs(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func RunApply(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *resource.FilenameOptions) error {
+func RunApply(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *ApplyOptions) error {
 	shortOutput := cmdutil.GetFlagString(cmd, "output") == "name"
 	schema, err := f.Validator(cmdutil.GetFlagBool(cmd, "validate"), cmdutil.GetFlagString(cmd, "schema-cache-dir"))
 	if err != nil {
@@ -111,7 +117,8 @@ func RunApply(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *re
 		Schema(schema).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, options).
+		FilenameParam(enforceNamespace, &options.FilenameOptions).
+		SelectorParam(options.Selector).
 		Flatten().
 		Do()
 	err = r.Err()
