@@ -408,6 +408,10 @@ func (s *GenericAPIServer) InstallAPIGroup(apiGroupInfo *APIGroupInfo) error {
 		// Add a handler at /apis/<groupName> to enumerate all versions supported by this group.
 		apiVersionsForDiscovery := []unversioned.GroupVersionForDiscovery{}
 		for _, groupVersion := range apiGroupInfo.GroupMeta.GroupVersions {
+			// Check the config to make sure that we elide versions that don't have any resources
+			if len(apiGroupInfo.VersionedResourcesStorageMap[groupVersion.Version]) == 0 {
+				continue
+			}
 			apiVersionsForDiscovery = append(apiVersionsForDiscovery, unversioned.GroupVersionForDiscovery{
 				GroupVersion: groupVersion.String(),
 				Version:      groupVersion.Version,
@@ -422,6 +426,7 @@ func (s *GenericAPIServer) InstallAPIGroup(apiGroupInfo *APIGroupInfo) error {
 			Versions:         apiVersionsForDiscovery,
 			PreferredVersion: preferedVersionForDiscovery,
 		}
+
 		s.AddAPIGroupForDiscovery(apiGroup)
 		apiserver.AddGroupWebService(s.Serializer, s.HandlerContainer, apiPrefix+"/"+apiGroup.Name, apiGroup)
 	}
