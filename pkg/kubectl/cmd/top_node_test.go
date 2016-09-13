@@ -25,8 +25,6 @@ import (
 
 	"k8s.io/heapster/metrics/apis/metrics/v1alpha1"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
 	"net/url"
 )
@@ -63,7 +61,7 @@ func TestTopNodeAllMetrics(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &unversioned.GroupVersion{Version: "v1"}}}
+	tf.ClientConfig = defaultClientConfig()
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdTopNode(f, buf)
@@ -111,7 +109,7 @@ func TestTopNodeWithNameMetrics(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &unversioned.GroupVersion{Version: "v1"}}}
+	tf.ClientConfig = defaultClientConfig()
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdTopNode(f, buf)
@@ -170,7 +168,7 @@ func TestTopNodeWithLabelSelectorMetrics(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &unversioned.GroupVersion{Version: "v1"}}}
+	tf.ClientConfig = defaultClientConfig()
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdTopNode(f, buf)

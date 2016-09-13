@@ -102,7 +102,7 @@ func TestPodAndContainerAttach(t *testing.T) {
 			Client:               fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) { return nil, nil }),
 		}
 		tf.Namespace = "test"
-		tf.ClientConfig = &restclient.Config{}
+		tf.ClientConfig = defaultClientConfig()
 
 		cmd := &cobra.Command{}
 		options := test.p

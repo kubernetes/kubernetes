@@ -24,9 +24,10 @@ import (
 	dockerterm "github.com/docker/docker/pkg/term"
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
+
 	"k8s.io/kubernetes/pkg/api"
+	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
 	"k8s.io/kubernetes/pkg/client/restclient"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	remotecommandserver "k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
@@ -132,7 +133,7 @@ type ExecOptions struct {
 
 	FullCmdName string
 	Executor    RemoteExecutor
-	Client      *client.Client
+	PodClient   coreclient.PodsGetter
 	Config      *restclient.Config
 }
 
@@ -172,11 +173,11 @@ func (p *ExecOptions) Complete(f *cmdutil.Factory, cmd *cobra.Command, argsIn []
 	}
 	p.Config = config
 
-	client, err := f.Client()
+	clientset, err := f.ClientSet()
 	if err != nil {
 		return err
 	}
-	p.Client = client
+	p.PodClient = clientset.Core()
 
 	return nil
 }
@@ -192,7 +193,7 @@ func (p *ExecOptions) Validate() error {
 	if p.Out == nil || p.Err == nil {
 		return fmt.Errorf("both output and error output must be provided")
 	}
-	if p.Executor == nil || p.Client == nil || p.Config == nil {
+	if p.Executor == nil || p.PodClient == nil || p.Config == nil {
 		return fmt.Errorf("client, client config, and executor must be provided")
 	}
 	return nil
@@ -252,7 +253,7 @@ func (o *StreamOptions) setupTTY() term.TTY {
 
 // Run executes a validated remote execution against a pod.
 func (p *ExecOptions) Run() error {
-	pod, err := p.Client.Pods(p.Namespace).Get(p.PodName)
+	pod, err := p.PodClient.Pods(p.Namespace).Get(p.PodName)
 	if err != nil {
 		return err
 	}
@@ -283,8 +284,13 @@ func (p *ExecOptions) Run() error {
 	}
 
 	fn := func() error {
+		restClient, err := restclient.RESTClientFor(p.Config)
+		if err != nil {
+			return err
+		}
+
 		// TODO: consider abstracting into a client invocation or client helper
-		req := p.Client.RESTClient.Post().
+		req := restClient.Post().
 			Resource("pods").
 			Name(pod.Name).
 			Namespace(pod.Namespace).

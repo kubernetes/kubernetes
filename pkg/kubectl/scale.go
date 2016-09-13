@@ -27,6 +27,11 @@ import (
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	appsclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/apps/unversioned"
+	batchclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/batch/unversioned"
+	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
+	extensionsclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -44,10 +49,10 @@ type Scaler interface {
 	ScaleSimple(namespace, name string, preconditions *ScalePrecondition, newSize uint) (updatedResourceVersion string, err error)
 }
 
-func ScalerFor(kind unversioned.GroupKind, c client.Interface) (Scaler, error) {
+func ScalerFor(kind unversioned.GroupKind, c internalclientset.Interface) (Scaler, error) {
 	switch kind {
 	case api.Kind("ReplicationController"):
-		return &ReplicationControllerScaler{c}, nil
+		return &ReplicationControllerScaler{c.Core()}, nil
 	case extensions.Kind("ReplicaSet"):
 		return &ReplicaSetScaler{c.Extensions()}, nil
 	case extensions.Kind("Job"), batch.Kind("Job"):
@@ -155,7 +160,7 @@ func (precondition *ScalePrecondition) ValidateReplicationController(controller 
 }
 
 type ReplicationControllerScaler struct {
-	c client.Interface
+	c coreclient.ReplicationControllersGetter
 }
 
 // ScaleSimple does a simple one-shot attempt at scaling. It returns the
@@ -253,7 +258,7 @@ func (precondition *ScalePrecondition) ValidateReplicaSet(replicaSet *extensions
 }
 
 type ReplicaSetScaler struct {
-	c client.ExtensionsInterface
+	c extensionsclient.ReplicaSetsGetter
 }
 
 // ScaleSimple does a simple one-shot attempt at scaling. It returns the
@@ -324,7 +329,7 @@ func (precondition *ScalePrecondition) ValidateJob(job *batch.Job) error {
 }
 
 type PetSetScaler struct {
-	c client.AppsInterface
+	c appsclient.PetSetsGetter
 }
 
 // ScaleSimple does a simple one-shot attempt at scaling. It returns the
@@ -377,7 +382,7 @@ func (scaler *PetSetScaler) Scale(namespace, name string, newSize uint, precondi
 }
 
 type JobScaler struct {
-	c client.BatchInterface
+	c batchclient.JobsGetter
 }
 
 // ScaleSimple is responsible for updating job's parallelism. It returns the
@@ -445,7 +450,7 @@ func (precondition *ScalePrecondition) ValidateDeployment(deployment *extensions
 }
 
 type DeploymentScaler struct {
-	c client.ExtensionsInterface
+	c extensionsclient.DeploymentsGetter
 }
 
 // ScaleSimple is responsible for updating a deployment's desired replicas

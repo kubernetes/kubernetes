@@ -56,6 +56,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/typed/discovery"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	clientsetadapter "k8s.io/kubernetes/pkg/client/unversioned/adapters/internalclientset"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
@@ -3197,7 +3198,7 @@ func RemoveTaintOffNode(c *client.Client, nodeName string, taint api.Taint) {
 
 func ScaleRC(c *client.Client, ns, name string, size uint, wait bool) error {
 	By(fmt.Sprintf("Scaling replication controller %s in namespace %s to %d", name, ns, size))
-	scaler, err := kubectl.ScalerFor(api.Kind("ReplicationController"), c)
+	scaler, err := kubectl.ScalerFor(api.Kind("ReplicationController"), clientsetadapter.FromUnversionedClient(c))
 	if err != nil {
 		return err
 	}
@@ -3314,7 +3315,7 @@ func DeleteRCAndPods(c *client.Client, ns, name string) error {
 		}
 		return err
 	}
-	reaper, err := kubectl.ReaperForReplicationController(c, 10*time.Minute)
+	reaper, err := kubectl.ReaperForReplicationController(clientsetadapter.FromUnversionedClient(c).Core(), 10*time.Minute)
 	if err != nil {
 		if apierrs.IsNotFound(err) {
 			Logf("RC %s was already deleted: %v", name, err)
@@ -3462,7 +3463,7 @@ func DeleteReplicaSet(c *client.Client, ns, name string) error {
 		}
 		return err
 	}
-	reaper, err := kubectl.ReaperFor(extensions.Kind("ReplicaSet"), c)
+	reaper, err := kubectl.ReaperFor(extensions.Kind("ReplicaSet"), clientsetadapter.FromUnversionedClient(c))
 	if err != nil {
 		if apierrs.IsNotFound(err) {
 			Logf("ReplicaSet %s was already deleted: %v", name, err)

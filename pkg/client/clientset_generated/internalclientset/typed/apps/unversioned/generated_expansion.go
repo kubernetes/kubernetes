@@ -16,14 +16,4 @@ limitations under the License.
 
 package unversioned
 
-type DaemonSetExpansion interface{}
-
-type IngressExpansion interface{}
-
-type NetworkPolicyExpansion interface{}
-
-type PodSecurityPolicyExpansion interface{}
-
-type ReplicaSetExpansion interface{}
-
-type ThirdPartyResourceExpansion interface{}
+type PetSetExpansion interface{}
