@@ -92,21 +92,23 @@ var _ = framework.KubeDescribe("Federation replicasets [Feature:Federation]", fu
 		})
 
 		It("should create and update matching replicasets in underling clusters", func() {
-			rs := createReplicaSetOrFail(f.FederationClientset_1_4, f.Namespace.Namespace)
-			defer func() { // cleanup. deletion of replicasets is not supported for underling clusters
-				By(fmt.Sprintf("zero replicas then delete replicaset %q/%q", f.Namespace.Name, rs.Name))
+			nsName := f.FederationNamespace.Name
+			rs := createReplicaSetOrFail(f.FederationClientset_1_4, nsName)
+			defer func() {
+				// cleanup. deletion of replicasets is not supported for underlying clusters
+				By(fmt.Sprintf("Preparing replicaset %q/%q for deletion by setting replicas to zero", nsName, rs.Name))
 				replicas := int32(0)
 				rs.Spec.Replicas = &replicas
-				f.FederationClientset_1_4.ReplicaSets(f.Namespace.Name).Update(rs)
-				waitForReplicaSetOrFail(f.FederationClientset_1_4, f.Namespace.Name, rs.Name, clusters)
-				f.FederationClientset_1_4.ReplicaSets(f.Namespace.Name).Delete(rs.Name, &api.DeleteOptions{})
+				f.FederationClientset_1_4.ReplicaSets(nsName).Update(rs)
+				waitForReplicaSetOrFail(f.FederationClientset_1_4, nsName, rs.Name, clusters)
+				f.FederationClientset_1_4.ReplicaSets(nsName).Delete(rs.Name, &api.DeleteOptions{})
 			}()
 
-			waitForReplicaSetOrFail(f.FederationClientset_1_4, f.Namespace.Name, rs.Name, clusters)
-			By(fmt.Sprintf("Successfuly created and synced replicaset %q/%q to clusters", f.Namespace.Namespace, rs.Name))
-			updateReplicaSetOrFail(f.FederationClientset_1_4, f.Namespace.Namespace)
-			waitForReplicaSetOrFail(f.FederationClientset_1_4, f.Namespace.Name, rs.Name, clusters)
-			By(fmt.Sprintf("Successfuly updated and synced replicaset %q/%q to clusters", f.Namespace.Namespace, rs.Name))
+			waitForReplicaSetOrFail(f.FederationClientset_1_4, nsName, rs.Name, clusters)
+			By(fmt.Sprintf("Successfuly created and synced replicaset %q/%q to clusters", nsName, rs.Name))
+			updateReplicaSetOrFail(f.FederationClientset_1_4, nsName)
+			waitForReplicaSetOrFail(f.FederationClientset_1_4, nsName, rs.Name, clusters)
+			By(fmt.Sprintf("Successfuly updated and synced replicaset %q/%q to clusters", nsName, rs.Name))
 		})
 	})
 })
