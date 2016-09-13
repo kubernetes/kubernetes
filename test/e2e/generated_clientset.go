@@ -119,84 +119,10 @@ func observeObjectDeletion(w watch.Interface) (obj runtime.Object) {
 	return
 }
 
-var _ = framework.KubeDescribe("Generated release_1_2 clientset", func() {
+var _ = framework.KubeDescribe("Generated release_1_5 clientset", func() {
 	f := framework.NewDefaultFramework("clientset")
 	It("should create pods, delete pods, watch pods", func() {
-		podClient := f.Clientset_1_2.Core().Pods(f.Namespace.Name)
-		By("constructing the pod")
-		name := "pod" + string(uuid.NewUUID())
-		value := strconv.Itoa(time.Now().Nanosecond())
-		podCopy := testingPod(name, value)
-		pod := &podCopy
-		By("setting up watch")
-		selector := labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
-		options := api.ListOptions{LabelSelector: selector}
-		pods, err := podClient.List(options)
-		if err != nil {
-			framework.Failf("Failed to query for pods: %v", err)
-		}
-		Expect(len(pods.Items)).To(Equal(0))
-		options = api.ListOptions{
-			LabelSelector:   selector,
-			ResourceVersion: pods.ListMeta.ResourceVersion,
-		}
-		w, err := podClient.Watch(options)
-		if err != nil {
-			framework.Failf("Failed to set up watch: %v", err)
-		}
-
-		By("creating the pod")
-		pod, err = podClient.Create(pod)
-		if err != nil {
-			framework.Failf("Failed to create pod: %v", err)
-		}
-		// We call defer here in case there is a problem with
-		// the test so we can ensure that we clean up after
-		// ourselves
-		defer podClient.Delete(pod.Name, api.NewDeleteOptions(0))
-
-		By("verifying the pod is in kubernetes")
-		options = api.ListOptions{
-			LabelSelector:   selector,
-			ResourceVersion: pod.ResourceVersion,
-		}
-		pods, err = podClient.List(options)
-		if err != nil {
-			framework.Failf("Failed to query for pods: %v", err)
-		}
-		Expect(len(pods.Items)).To(Equal(1))
-
-		By("verifying pod creation was observed")
-		observePodCreation(w)
-
-		// We need to wait for the pod to be scheduled, otherwise the deletion
-		// will be carried out immediately rather than gracefully.
-		framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
-
-		By("deleting the pod gracefully")
-		if err := podClient.Delete(pod.Name, api.NewDeleteOptions(30)); err != nil {
-			framework.Failf("Failed to delete pod: %v", err)
-		}
-
-		By("verifying pod deletion was observed")
-		obj := observeObjectDeletion(w)
-		lastPod := obj.(*api.Pod)
-		Expect(lastPod.DeletionTimestamp).ToNot(BeNil())
-		Expect(lastPod.Spec.TerminationGracePeriodSeconds).ToNot(BeZero())
-
-		options = api.ListOptions{LabelSelector: selector}
-		pods, err = podClient.List(options)
-		if err != nil {
-			framework.Failf("Failed to list pods to verify deletion: %v", err)
-		}
-		Expect(len(pods.Items)).To(Equal(0))
-	})
-})
-
-var _ = framework.KubeDescribe("Generated release_1_3 clientset", func() {
-	f := framework.NewDefaultFramework("clientset")
-	It("should create pods, delete pods, watch pods", func() {
-		podClient := f.Clientset_1_3.Core().Pods(f.Namespace.Name)
+		podClient := f.Clientset_1_5.Core().Pods(f.Namespace.Name)
 		By("constructing the pod")
 		name := "pod" + string(uuid.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())
