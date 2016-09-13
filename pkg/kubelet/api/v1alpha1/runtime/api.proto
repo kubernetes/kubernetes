@@ -271,16 +271,14 @@ message PodSandboxStatusResponse {
 // PodSandboxFilter is used to filter a list of PodSandboxes.
 // All those fields are combined with 'AND'
 message PodSandboxFilter {
-    // Name of the sandbox.
-    optional string name = 1;
     // ID of the sandbox.
-    optional string id = 2;
+    optional string id = 1;
     // State of the sandbox.
-    optional PodSandBoxState state = 3;
+    optional PodSandBoxState state = 2;
     // LabelSelector to select matches.
     // Only api.MatchLabels is supported for now and the requirements
     // are ANDed. MatchExpressions is not supported yet.
-    map<string, string> label_selector = 4;
+    map<string, string> label_selector = 3;
 }
 
 message ListPodSandboxRequest {
@@ -495,18 +493,16 @@ enum ContainerState {
 // ContainerFilter is used to filter containers.
 // All those fields are combined with 'AND'
 message ContainerFilter {
-    // Name of the container.
-    optional string name = 1;
     // ID of the container.
-    optional string id = 2;
+    optional string id = 1;
     // State of the container.
-    optional ContainerState state = 3;
+    optional ContainerState state = 2;
     // The id of the pod sandbox
-    optional string pod_sandbox_id = 4;
+    optional string pod_sandbox_id = 3;
     // LabelSelector to select matches.
     // Only api.MatchLabels is supported for now and the requirements
     // are ANDed. MatchExpressions is not supported yet.
-    map<string, string> label_selector = 5;
+    map<string, string> label_selector = 4;
 }
 
 message ListContainersRequest {

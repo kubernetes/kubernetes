@@ -180,15 +180,9 @@ func (ds *dockerService) ListPodSandbox(filter *runtimeApi.PodSandboxFilter) ([]
 	result := []*runtimeApi.PodSandbox{}
 	for i := range containers {
 		c := containers[i]
-
 		converted, err := toRuntimeAPISandbox(&c)
 		if err != nil {
 			glog.V(5).Infof("Unable to convert docker to runtime API sandbox: %v", err)
-			continue
-		}
-		if len(filter.GetName()) > 0 && converted.Metadata.GetName() != filter.GetName() {
-			// TODO: Remove "name" from the SandboxFilter because name can no
-			// longer be used to identify a container.
 			continue
 		}
 		if filterOutReadySandboxes && converted.GetState() == runtimeApi.PodSandBoxState_READY {
