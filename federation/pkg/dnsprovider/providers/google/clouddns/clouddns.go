@@ -20,12 +20,12 @@ package clouddns
 import (
 	"io"
 
+	"cloud.google.com/go/compute/metadata"
 	"github.com/golang/glog"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	compute "google.golang.org/api/compute/v1"
 	dns "google.golang.org/api/dns/v1"
-	"google.golang.org/cloud/compute/metadata"
 	gcfg "gopkg.in/gcfg.v1"
 
 	"k8s.io/kubernetes/federation/pkg/dnsprovider"

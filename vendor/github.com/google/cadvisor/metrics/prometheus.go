@@ -229,6 +229,26 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc) *PrometheusCo
 					}
 				},
 			}, {
+				name:        "container_fs_inodes_free",
+				help:        "Number of available Inodes",
+				valueType:   prometheus.GaugeValue,
+				extraLabels: []string{"device"},
+				getValues: func(s *info.ContainerStats) metricValues {
+					return fsValues(s.Filesystem, func(fs *info.FsStats) float64 {
+						return float64(fs.InodesFree)
+					})
+				},
+			}, {
+				name:        "container_fs_inodes_total",
+				help:        "Number of Inodes",
+				valueType:   prometheus.GaugeValue,
+				extraLabels: []string{"device"},
+				getValues: func(s *info.ContainerStats) metricValues {
+					return fsValues(s.Filesystem, func(fs *info.FsStats) float64 {
+						return float64(fs.Inodes)
+					})
+				},
+			}, {
 				name:        "container_fs_limit_bytes",
 				help:        "Number of bytes that can be consumed by the container on this filesystem.",
 				valueType:   prometheus.GaugeValue,

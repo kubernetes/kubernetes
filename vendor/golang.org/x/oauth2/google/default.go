@@ -1,4 +1,4 @@
-// Copyright 2015 The oauth2 Authors. All rights reserved.
+// Copyright 2015 The Go Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
@@ -14,10 +14,10 @@ import (
 	"path/filepath"
 	"runtime"
 
+	"cloud.google.com/go/compute/metadata"
 	"golang.org/x/net/context"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/jwt"
-	"google.golang.org/cloud/compute/metadata"
 )
 
 // DefaultClient returns an HTTP Client that uses the
@@ -50,7 +50,8 @@ func DefaultClient(ctx context.Context, scope ...string) (*http.Client, error) {
 //      On Windows, this is %APPDATA%/gcloud/application_default_credentials.json.
 //      On other systems, $HOME/.config/gcloud/application_default_credentials.json.
 //   3. On Google App Engine it uses the appengine.AccessToken function.
-//   4. On Google Compute Engine, it fetches credentials from the metadata server.
+//   4. On Google Compute Engine and Google App Engine Managed VMs, it fetches
+//      credentials from the metadata server.
 //      (In this final case any provided scopes are ignored.)
 //
 // For more details, see:
@@ -84,7 +85,7 @@ func DefaultTokenSource(ctx context.Context, scope ...string) (oauth2.TokenSourc
 	}
 
 	// Third, if we're on Google App Engine use those credentials.
-	if appengineTokenFunc != nil {
+	if appengineTokenFunc != nil && !appengineVM {
 		return AppEngineTokenSource(ctx, scope...), nil
 	}
 

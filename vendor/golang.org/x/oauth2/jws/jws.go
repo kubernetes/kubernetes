@@ -1,9 +1,17 @@
-// Copyright 2014 The oauth2 Authors. All rights reserved.
+// Copyright 2014 The Go Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// Package jws provides encoding and decoding utilities for
-// signed JWS messages.
+// Package jws provides a partial implementation
+// of JSON Web Signature encoding and decoding.
+// It exists to support the golang.org/x/oauth2 package.
+//
+// See RFC 7515.
+//
+// Deprecated: this package is not intended for public use and might be
+// removed in the future. It exists for internal use only.
+// Please switch to another JWS package or copy this package into your own
+// source tree.
 package jws
 
 import (
@@ -27,8 +35,8 @@ type ClaimSet struct {
 	Iss   string `json:"iss"`             // email address of the client_id of the application making the access token request
 	Scope string `json:"scope,omitempty"` // space-delimited list of the permissions the application requests
 	Aud   string `json:"aud"`             // descriptor of the intended target of the assertion (Optional).
-	Exp   int64  `json:"exp"`             // the expiration time of the assertion
-	Iat   int64  `json:"iat"`             // the time the assertion was issued.
+	Exp   int64  `json:"exp"`             // the expiration time of the assertion (seconds since Unix epoch)
+	Iat   int64  `json:"iat"`             // the time the assertion was issued (seconds since Unix epoch)
 	Typ   string `json:"typ,omitempty"`   // token type (Optional).
 
 	// Email for which the application is requesting delegated access (Optional).
@@ -41,23 +49,22 @@ type ClaimSet struct {
 	// See http://tools.ietf.org/html/draft-jones-json-web-token-10#section-4.3
 	// This array is marshalled using custom code (see (c *ClaimSet) encode()).
 	PrivateClaims map[string]interface{} `json:"-"`
-
-	exp time.Time
-	iat time.Time
 }
 
 func (c *ClaimSet) encode() (string, error) {
-	if c.exp.IsZero() || c.iat.IsZero() {
-		// Reverting time back for machines whose time is not perfectly in sync.
-		// If client machine's time is in the future according
-		// to Google servers, an access token will not be issued.
-		now := time.Now().Add(-10 * time.Second)
-		c.iat = now
-		c.exp = now.Add(time.Hour)
+	// Reverting time back for machines whose time is not perfectly in sync.
+	// If client machine's time is in the future according
+	// to Google servers, an access token will not be issued.
+	now := time.Now().Add(-10 * time.Second)
+	if c.Iat == 0 {
+		c.Iat = now.Unix()
 	}
-
-	c.Exp = c.exp.Unix()
-	c.Iat = c.iat.Unix()
+	if c.Exp == 0 {
+		c.Exp = now.Add(time.Hour).Unix()
+	}
+	if c.Exp < c.Iat {
+		return "", fmt.Errorf("jws: invalid Exp = %v; must be later than Iat = %v", c.Exp, c.Iat)
+	}
 
 	b, err := json.Marshal(c)
 	if err != nil {
@@ -65,7 +72,7 @@ func (c *ClaimSet) encode() (string, error) {
 	}
 
 	if len(c.PrivateClaims) == 0 {
-		return base64Encode(b), nil
+		return base64.RawURLEncoding.EncodeToString(b), nil
 	}
 
 	// Marshal private claim set and then append it to b.
@@ -83,7 +90,7 @@ func (c *ClaimSet) encode() (string, error) {
 	}
 	b[len(b)-1] = ','         // Replace closing curly brace with a comma.
 	b = append(b, prv[1:]...) // Append private claims.
-	return base64Encode(b), nil
+	return base64.RawURLEncoding.EncodeToString(b), nil
 }
 
 // Header represents the header for the signed JWS payloads.
@@ -93,6 +100,9 @@ type Header struct {
 
 	// Represents the token type.
 	Typ string `json:"typ"`
+
+	// The optional hint of which key is being used.
+	KeyID string `json:"kid,omitempty"`
 }
 
 func (h *Header) encode() (string, error) {
@@ -100,7 +110,7 @@ func (h *Header) encode() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return base64Encode(b), nil
+	return base64.RawURLEncoding.EncodeToString(b), nil
 }
 
 // Decode decodes a claim set from a JWS payload.
@@ -111,7 +121,7 @@ func Decode(payload string) (*ClaimSet, error) {
 		// TODO(jbd): Provide more context about the error.
 		return nil, errors.New("jws: invalid token received")
 	}
-	decoded, err := base64Decode(s[1])
+	decoded, err := base64.RawURLEncoding.DecodeString(s[1])
 	if err != nil {
 		return nil, err
 	}
@@ -120,8 +130,11 @@ func Decode(payload string) (*ClaimSet, error) {
 	return c, err
 }
 
-// Encode encodes a signed JWS with provided header and claim set.
-func Encode(header *Header, c *ClaimSet, signature *rsa.PrivateKey) (string, error) {
+// Signer returns a signature for the given data.
+type Signer func(data []byte) (sig []byte, err error)
+
+// EncodeWithSigner encodes a header and claim set with the provided signer.
+func EncodeWithSigner(header *Header, c *ClaimSet, sg Signer) (string, error) {
 	head, err := header.encode()
 	if err != nil {
 		return "", err
@@ -131,30 +144,39 @@ func Encode(header *Header, c *ClaimSet, signature *rsa.PrivateKey) (string, err
 		return "", err
 	}
 	ss := fmt.Sprintf("%s.%s", head, cs)
-	h := sha256.New()
-	h.Write([]byte(ss))
-	b, err := rsa.SignPKCS1v15(rand.Reader, signature, crypto.SHA256, h.Sum(nil))
+	sig, err := sg([]byte(ss))
 	if err != nil {
 		return "", err
 	}
-	sig := base64Encode(b)
-	return fmt.Sprintf("%s.%s", ss, sig), nil
+	return fmt.Sprintf("%s.%s", ss, base64.RawURLEncoding.EncodeToString(sig)), nil
 }
 
-// base64Encode returns and Base64url encoded version of the input string with any
-// trailing "=" stripped.
-func base64Encode(b []byte) string {
-	return strings.TrimRight(base64.URLEncoding.EncodeToString(b), "=")
-}
-
-// base64Decode decodes the Base64url encoded string
-func base64Decode(s string) ([]byte, error) {
-	// add back missing padding
-	switch len(s) % 4 {
-	case 2:
-		s += "=="
-	case 3:
-		s += "="
+// Encode encodes a signed JWS with provided header and claim set.
+// This invokes EncodeWithSigner using crypto/rsa.SignPKCS1v15 with the given RSA private key.
+func Encode(header *Header, c *ClaimSet, key *rsa.PrivateKey) (string, error) {
+	sg := func(data []byte) (sig []byte, err error) {
+		h := sha256.New()
+		h.Write(data)
+		return rsa.SignPKCS1v15(rand.Reader, key, crypto.SHA256, h.Sum(nil))
 	}
-	return base64.URLEncoding.DecodeString(s)
+	return EncodeWithSigner(header, c, sg)
+}
+
+// Verify tests whether the provided JWT token's signature was produced by the private key
+// associated with the supplied public key.
+func Verify(token string, key *rsa.PublicKey) error {
+	parts := strings.Split(token, ".")
+	if len(parts) != 3 {
+		return errors.New("jws: invalid token received, token must have 3 parts")
+	}
+
+	signedContent := parts[0] + "." + parts[1]
+	signatureString, err := base64.RawURLEncoding.DecodeString(parts[2])
+	if err != nil {
+		return err
+	}
+
+	h := sha256.New()
+	h.Write([]byte(signedContent))
+	return rsa.VerifyPKCS1v15(key, crypto.SHA256, h.Sum(nil), []byte(signatureString))
 }
