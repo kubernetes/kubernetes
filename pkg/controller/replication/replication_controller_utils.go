@@ -27,13 +27,14 @@ import (
 )
 
 // updateReplicaCount attempts to update the Status.Replicas of the given controller, with a single GET/PUT retry.
-func updateReplicaCount(rcClient unversionedcore.ReplicationControllerInterface, controller api.ReplicationController, numReplicas, numFullyLabeledReplicas, numReadyReplicas int) (updateErr error) {
+func updateReplicaCount(rcClient unversionedcore.ReplicationControllerInterface, controller api.ReplicationController, numReplicas, numFullyLabeledReplicas, numReadyReplicas, numAvailableReplicas int) (updateErr error) {
 	// This is the steady state. It happens when the rc doesn't have any expectations, since
 	// we do a periodic relist every 30s. If the generations differ but the replicas are
 	// the same, a caller might've resized to the same replica count.
 	if int(controller.Status.Replicas) == numReplicas &&
 		int(controller.Status.FullyLabeledReplicas) == numFullyLabeledReplicas &&
 		int(controller.Status.ReadyReplicas) == numReadyReplicas &&
+		int(controller.Status.AvailableReplicas) == numAvailableReplicas &&
 		controller.Generation == controller.Status.ObservedGeneration {
 		return nil
 	}
@@ -49,12 +50,14 @@ func updateReplicaCount(rcClient unversionedcore.ReplicationControllerInterface,
 			fmt.Sprintf("replicas %d->%d (need %d), ", controller.Status.Replicas, numReplicas, controller.Spec.Replicas) +
 			fmt.Sprintf("fullyLabeledReplicas %d->%d, ", controller.Status.FullyLabeledReplicas, numFullyLabeledReplicas) +
 			fmt.Sprintf("readyReplicas %d->%d, ", controller.Status.ReadyReplicas, numReadyReplicas) +
+			fmt.Sprintf("availableReplicas %d->%d, ", controller.Status.AvailableReplicas, numAvailableReplicas) +
 			fmt.Sprintf("sequence No: %v->%v", controller.Status.ObservedGeneration, generation))
 
 		rc.Status = api.ReplicationControllerStatus{
 			Replicas:             int32(numReplicas),
 			FullyLabeledReplicas: int32(numFullyLabeledReplicas),
 			ReadyReplicas:        int32(numReadyReplicas),
+			AvailableReplicas:    int32(numAvailableReplicas),
 			ObservedGeneration:   generation,
 		}
 		_, updateErr = rcClient.UpdateStatus(rc)
