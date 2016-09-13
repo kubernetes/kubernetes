@@ -30,8 +30,7 @@
         "name": "kube-addon-manager-data",
         "image": "REGISTRY/hyperkube-ARCH:VERSION",
         "command": [
-          "/copy-addons.sh",
-          "singlenode"
+          "/copy-addons.sh"
         ],
         "volumeMounts": [
           {
