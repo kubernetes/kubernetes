@@ -183,7 +183,7 @@ func TestCNIPlugin(t *testing.T) {
 		NetnsPath: "/proc/12345/ns/net",
 	}}
 
-	plugins := probeNetworkPluginsWithVendorCNIDirPrefix(path.Join(testNetworkConfigPath, pluginName), testVendorCNIDirPrefix)
+	plugins := probeNetworkPluginsWithVendorCNIDirPrefix(path.Join(testNetworkConfigPath, pluginName), "", testVendorCNIDirPrefix)
 	if len(plugins) != 1 {
 		t.Fatalf("Expected only one network plugin, got %d", len(plugins))
 	}
@@ -246,7 +246,7 @@ func TestCNIPlugin(t *testing.T) {
 }
 
 func TestLoNetNonNil(t *testing.T) {
-	if conf := getLoNetwork(""); conf == nil {
+	if conf := getLoNetwork("", ""); conf == nil {
 		t.Error("Expected non-nil lo network")
 	}
 }
