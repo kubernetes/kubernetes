@@ -249,9 +249,6 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 	if obj.MinimumGCAge == zeroDuration {
 		obj.MinimumGCAge = unversioned.Duration{Duration: 0}
 	}
-	if obj.NetworkPluginDir == "" {
-		obj.NetworkPluginDir = "/usr/libexec/kubernetes/kubelet-plugins/net/exec/"
-	}
 	if obj.NonMasqueradeCIDR == "" {
 		obj.NonMasqueradeCIDR = "10.0.0.0/8"
 	}

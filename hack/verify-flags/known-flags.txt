@@ -71,6 +71,8 @@ cluster-tag
 cluster-monitor-period
 cluster-signing-cert-file
 cluster-signing-key-file
+cni-bin-dir
+cni-conf-dir
 concurrent-deployment-syncs
 concurrent-endpoint-syncs
 concurrent-namespace-syncs
