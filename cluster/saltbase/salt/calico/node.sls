@@ -18,7 +18,7 @@ calico-node:
 
 calico-cni:
   file.managed:
-    - name: /opt/cni/bin/calico
+    - name: /home/kubernetes/bin
     - source: https://github.com/projectcalico/calico-cni/releases/download/v1.3.1/calico
     - source_hash: sha256=ac05cb9254b5aaa5822cf10325983431bd25489147f2edf9dec7e43d99c43e77
     - makedirs: True
