@@ -40,6 +40,7 @@ import (
 type ApplyOptions struct {
 	Filenames []string
 	Recursive bool
+	Selector  string
 }
 
 const (
@@ -86,6 +87,7 @@ func NewCmdApply(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	kubectl.AddJsonFilenameFlag(cmd, &options.Filenames, usage)
 	cmd.MarkFlagRequired("filename")
 	cmd.Flags().Bool("overwrite", true, "Automatically resolve conflicts between the modified and live configuration by using values from the modified configuration")
+	cmd.Flags().StringVarP(&options.Selector, "selector", "l", "", "Selector (label query) to filter on")
 	cmdutil.AddValidateFlags(cmd)
 	cmdutil.AddRecursiveFlag(cmd, &options.Recursive)
 	cmdutil.AddOutputFlagsForMutation(cmd)
@@ -120,6 +122,7 @@ func RunApply(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *Ap
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, options.Recursive, options.Filenames...).
+		SelectorParam(options.Selector).
 		Flatten().
 		Do()
 	err = r.Err()

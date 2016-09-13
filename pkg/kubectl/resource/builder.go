@@ -531,6 +531,41 @@ func (b *Builder) visitorResult() *Result {
 		b.selector = labels.Everything()
 	}
 
+	// visit items specified by paths
+	if len(b.paths) != 0 {
+		singular := !b.dir && !b.stream && len(b.paths) == 1
+		if len(b.resources) != 0 {
+			return &Result{singular: singular, err: fmt.Errorf("when paths, URLs, or stdin is provided as input, you may not specify resource arguments as well")}
+		}
+		if len(b.resourceTuples) != 0 {
+			return &Result{err: fmt.Errorf("paths cannot be used when passing resource/name arguments")}
+		}
+
+		var visitors Visitor
+		if b.continueOnError {
+			visitors = EagerVisitorList(b.paths)
+		} else {
+			visitors = VisitorList(b.paths)
+		}
+
+		// only items from disk can be refetched
+		if b.latest {
+			// must flatten lists prior to fetching
+			if b.flatten {
+				visitors = NewFlattenListVisitor(visitors, b.mapper)
+			}
+			// must set namespace prior to fetching
+			if b.defaultNamespace {
+				visitors = NewDecoratedVisitor(visitors, SetNamespace(b.namespace))
+			}
+			visitors = NewDecoratedVisitor(visitors, RetrieveLatest)
+		}
+		if b.selector != nil {
+			visitors = NewFilteredVisitor(visitors, FilterBySelector(b.selector))
+		}
+		return &Result{singular: singular, visitor: visitors, sources: b.paths}
+	}
+
 	// visit selectors
 	if b.selector != nil {
 		if len(b.names) != 0 {
@@ -541,14 +576,6 @@ func (b *Builder) visitorResult() *Result {
 		}
 		if len(b.resources) == 0 {
 			return &Result{err: fmt.Errorf("at least one resource must be specified to use a selector")}
-		}
-		// empty selector has different error message for paths being provided
-		if len(b.paths) != 0 {
-			if b.selector.Empty() {
-				return &Result{err: fmt.Errorf("when paths, URLs, or stdin is provided as input, you may not specify a resource by arguments as well")}
-			} else {
-				return &Result{err: fmt.Errorf("a selector may not be specified when path, URL, or stdin is provided as input")}
-			}
 		}
 		mappings, err := b.resourceMappings()
 		if err != nil {
@@ -582,9 +609,6 @@ func (b *Builder) visitorResult() *Result {
 			isSingular = len(b.resourceTuples) == 1
 		}
 
-		if len(b.paths) != 0 {
-			return &Result{singular: isSingular, err: fmt.Errorf("when paths, URLs, or stdin is provided as input, you may not specify a resource by arguments as well")}
-		}
 		if len(b.resources) != 0 {
 			return &Result{singular: isSingular, err: fmt.Errorf("you may not specify individual resources and bulk resources in the same call")}
 		}
@@ -681,35 +705,6 @@ func (b *Builder) visitorResult() *Result {
 			visitors = append(visitors, info)
 		}
 		return &Result{singular: isSingular, visitor: VisitorList(visitors), sources: visitors}
-	}
-
-	// visit items specified by paths
-	if len(b.paths) != 0 {
-		singular := !b.dir && !b.stream && len(b.paths) == 1
-		if len(b.resources) != 0 {
-			return &Result{singular: singular, err: fmt.Errorf("when paths, URLs, or stdin is provided as input, you may not specify resource arguments as well")}
-		}
-
-		var visitors Visitor
-		if b.continueOnError {
-			visitors = EagerVisitorList(b.paths)
-		} else {
-			visitors = VisitorList(b.paths)
-		}
-
-		// only items from disk can be refetched
-		if b.latest {
-			// must flatten lists prior to fetching
-			if b.flatten {
-				visitors = NewFlattenListVisitor(visitors, b.mapper)
-			}
-			// must set namespace prior to fetching
-			if b.defaultNamespace {
-				visitors = NewDecoratedVisitor(visitors, SetNamespace(b.namespace))
-			}
-			visitors = NewDecoratedVisitor(visitors, RetrieveLatest)
-		}
-		return &Result{singular: singular, visitor: visitors, sources: b.paths}
 	}
 
 	if len(b.resources) != 0 {
