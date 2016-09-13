@@ -547,6 +547,11 @@ func (rsc *ReplicaSetController) manageReplicas(filteredPods []*api.Pod, rs *ext
 	}
 }
 
+// abstracted for unit testing
+var now = func() unversioned.Time {
+	return unversioned.Now()
+}
+
 // syncReplicaSet will sync the ReplicaSet with the given key if it has had its expectations fulfilled,
 // meaning it did not expect to see any more of its pods created or deleted. This function is not meant to be
 // invoked concurrently with the same key.
@@ -658,6 +663,7 @@ func (rsc *ReplicaSetController) syncReplicaSet(key string) error {
 	// part of the filteredPods.
 	fullyLabeledReplicasCount := 0
 	readyReplicasCount := 0
+	availableReplicasCount := 0
 	templateLabel := labels.Set(rs.Spec.Template.Labels).AsSelectorPreValidated()
 	for _, pod := range filteredPods {
 		if templateLabel.Matches(labels.Set(pod.Labels)) {
@@ -665,11 +671,21 @@ func (rsc *ReplicaSetController) syncReplicaSet(key string) error {
 		}
 		if api.IsPodReady(pod) {
 			readyReplicasCount++
+			if api.IsPodAvailable(pod, rs.Spec.MinReadySeconds, now()) {
+				availableReplicasCount++
+			}
 		}
 	}
 
 	// Always updates status as pods come up or die.
-	if err := updateReplicaCount(rsc.kubeClient.Extensions().ReplicaSets(rs.Namespace), rs, len(filteredPods), fullyLabeledReplicasCount, readyReplicasCount); err != nil {
+	if err := updateReplicaCount(
+		rsc.kubeClient.Extensions().ReplicaSets(rs.Namespace),
+		rs,
+		len(filteredPods),
+		fullyLabeledReplicasCount,
+		readyReplicasCount,
+		availableReplicasCount,
+	); err != nil {
 		// Multiple things could lead to this update failing. Requeuing the replica set ensures
 		// we retry with some fairness.
 		glog.V(2).Infof("Failed to update replica count for controller %v/%v; requeuing; error: %v", rs.Namespace, rs.Name, err)
