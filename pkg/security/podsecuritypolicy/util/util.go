@@ -46,6 +46,7 @@ func GetAllFSTypesAsSet() sets.String {
 		string(extensions.EmptyDir),
 		string(extensions.GCEPersistentDisk),
 		string(extensions.AWSElasticBlockStore),
+		string(extensions.RemoteTar),
 		string(extensions.GitRepo),
 		string(extensions.Secret),
 		string(extensions.NFS),
@@ -75,6 +76,8 @@ func GetVolumeFSType(v api.Volume) (extensions.FSType, error) {
 		return extensions.GCEPersistentDisk, nil
 	case v.AWSElasticBlockStore != nil:
 		return extensions.AWSElasticBlockStore, nil
+	case v.RemoteTar != nil:
+		return extensions.RemoteTar, nil
 	case v.GitRepo != nil:
 		return extensions.GitRepo, nil
 	case v.Secret != nil:

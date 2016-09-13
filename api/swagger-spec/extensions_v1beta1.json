@@ -7972,6 +7972,10 @@
       "$ref": "v1.AWSElasticBlockStoreVolumeSource",
       "description": "AWSElasticBlockStore represents an AWS Disk resource that is attached to a kubelet's host machine and then exposed to the pod. More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#awselasticblockstore"
      },
+     "remoteTar": {
+      "$ref": "v1.RemoteTarVolumeSource",
+      "description": "RemoteTar represents a remote tar archive."
+     },
      "gitRepo": {
       "$ref": "v1.GitRepoVolumeSource",
       "description": "GitRepo represents a git repository at a particular revision."
@@ -8118,6 +8122,24 @@
      "readOnly": {
       "type": "boolean",
       "description": "Specify \"true\" to force and set the ReadOnly property in VolumeMounts to \"true\". If omitted, the default is \"false\". More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#awselasticblockstore"
+     }
+    }
+   },
+   "v1.RemoteTarVolumeSource": {
+    "id": "v1.RemoteTarVolumeSource",
+    "description": "Represents a volume that is populated with the contents of a remote tar.",
+    "required": [
+     "source",
+     "directory"
+    ],
+    "properties": {
+     "source": {
+      "type": "string",
+      "description": "Remote Tar URL"
+     },
+     "directory": {
+      "type": "string",
+      "description": "Target directory name. Must not contain or start with '..'.  If '.' is supplied, the volume directory will be the remote tar content."
      }
     }
    },

@@ -711,6 +711,7 @@ var (
 	EmptyDir              FSType = "emptyDir"
 	GCEPersistentDisk     FSType = "gcePersistentDisk"
 	AWSElasticBlockStore  FSType = "awsElasticBlockStore"
+	RemoteTar             FSType = "remoteTar"
 	GitRepo               FSType = "gitRepo"
 	Secret                FSType = "secret"
 	NFS                   FSType = "nfs"

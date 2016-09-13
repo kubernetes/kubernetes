@@ -517,6 +517,14 @@ func validateVolumeSource(source *api.VolumeSource, fldPath *field.Path) field.E
 			allErrs = append(allErrs, validateHostPathVolumeSource(source.HostPath, fldPath.Child("hostPath"))...)
 		}
 	}
+	if source.RemoteTar != nil {
+		if numVolumes > 0 {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("remoteTar"), "may not specify more than 1 volume type"))
+		} else {
+			numVolumes++
+			allErrs = append(allErrs, validateRemoteTarVolumeSource(source.RemoteTar, fldPath.Child("remoteTar"))...)
+		}
+	}
 	if source.GitRepo != nil {
 		if numVolumes > 0 {
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("gitRepo"), "may not specify more than 1 volume type"))
@@ -682,6 +690,17 @@ func validateHostPathVolumeSource(hostPath *api.HostPathVolumeSource, fldPath *f
 	if len(hostPath.Path) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("path"), ""))
 	}
+	return allErrs
+}
+
+func validateRemoteTarVolumeSource(remoteTar *api.RemoteTarVolumeSource, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if len(remoteTar.Source) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("source"), ""))
+	}
+
+	pathErrs := validateLocalDescendingPath(remoteTar.Directory, fldPath.Child("directory"))
+	allErrs = append(allErrs, pathErrs...)
 	return allErrs
 }
 
