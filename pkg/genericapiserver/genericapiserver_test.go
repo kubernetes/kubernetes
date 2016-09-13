@@ -28,6 +28,8 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/testapi"
@@ -41,8 +43,6 @@ import (
 	ipallocator "k8s.io/kubernetes/pkg/registry/service/ipallocator"
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
-
-	"github.com/stretchr/testify/assert"
 )
 
 // setUp is a convience function for setting up for (most) tests.
@@ -80,6 +80,7 @@ func TestNew(t *testing.T) {
 
 	// Verify many of the variables match their config counterparts
 	assert.Equal(s.enableSwaggerSupport, config.EnableSwaggerSupport)
+	assert.Equal(s.enableOpenAPISupport, config.EnableOpenAPISupport)
 	assert.Equal(s.legacyAPIPrefix, config.APIPrefix)
 	assert.Equal(s.apiPrefix, config.APIGroupPrefix)
 	assert.Equal(s.admissionControl, config.AdmissionControl)
@@ -260,39 +261,15 @@ func (authn *mockAuthenticator) AuthenticateRequest(req *http.Request) (user.Inf
 	}, true, nil
 }
 
-// TestInstallSwaggerAPI verifies that the swagger api is added
-// at the proper endpoint.
+// TestInstallSwaggerAPI verifies that the swagger api is not added
+// during initialization, but only on run.
 func TestInstallSwaggerAPI(t *testing.T) {
-	server, etcdserver, _, assert := setUp(t)
+	server, etcdserver, _, assert := newMaster(t)
 	defer etcdserver.Terminate(t)
 
-	mux := http.NewServeMux()
-	server.HandlerContainer = NewHandlerContainer(mux, nil)
-
-	// Ensure swagger isn't installed without the call
 	ws := server.HandlerContainer.RegisteredWebServices()
-	if !assert.Equal(len(ws), 0) {
-		for x := range ws {
-			assert.NotEqual("/swaggerapi", ws[x].RootPath(), "SwaggerAPI was installed without a call to InstallSwaggerAPI()")
-		}
-	}
-
-	// Install swagger and test
-	server.InstallSwaggerAPI()
-	ws = server.HandlerContainer.RegisteredWebServices()
-	if assert.NotEqual(0, len(ws), "SwaggerAPI not installed.") {
-		assert.Equal("/swaggerapi/", ws[0].RootPath(), "SwaggerAPI did not install to the proper path. %s != /swaggerapi", ws[0].RootPath())
-	}
-
-	// Empty externalHost verification
-	mux = http.NewServeMux()
-	server.HandlerContainer = NewHandlerContainer(mux, nil)
-	server.ExternalAddress = ""
-	server.ClusterIP = net.IPv4(10, 10, 10, 10)
-	server.PublicReadWritePort = 1010
-	server.InstallSwaggerAPI()
-	if assert.NotEqual(0, len(ws), "SwaggerAPI not installed.") {
-		assert.Equal("/swaggerapi/", ws[0].RootPath(), "SwaggerAPI did not install to the proper path. %s != /swaggerapi", ws[0].RootPath())
+	for i := range ws {
+		assert.NotEqual(t, ws[i].RootPath() == "/swaggerapi")
 	}
 }
 
