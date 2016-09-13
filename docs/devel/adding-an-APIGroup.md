@@ -49,19 +49,19 @@ We plan on improving the way the types are factored in the future; see
 [#16062](https://github.com/kubernetes/kubernetes/pull/16062) for the directions
 in which this might evolve.
 
-1. Create a folder in pkg/apis to hold you group. Create types.go in
+1. Create a folder in pkg/apis to hold your group. Create types.go in
 pkg/apis/`<group>`/ and pkg/apis/`<group>`/`<version>`/ to define API objects
 in your group;
 
 2. Create pkg/apis/`<group>`/{register.go, `<version>`/register.go} to register
 this group's API objects to the encoding/decoding scheme (e.g.,
-[pkg/apis/extensions/register.go](../../pkg/apis/extensions/register.go) and
-[pkg/apis/extensions/v1beta1/register.go](../../pkg/apis/extensions/v1beta1/register.go);
+[pkg/apis/authentication/register.go](../../pkg/apis/authentication/register.go) and
+[pkg/apis/authentication/v1beta1/register.go](../../pkg/apis/authentication/v1beta1/register.go);
 
 3. Add a pkg/apis/`<group>`/install/install.go, which is responsible for adding
 the group to the `latest` package, so that other packages can access the group's
 meta through `latest.Group`. You probably only need to change the name of group
-and version in the [example](../../pkg/apis/extensions/install/install.go)). You
+and version in the [example](../../pkg/apis/authentication/install/install.go)). You
 need to import this `install` package in {pkg/master,
 pkg/client/unversioned}/import_known_versions.go, if you want to make your group
 accessible to other packages in the kube-apiserver binary, binaries that uses
@@ -83,7 +83,10 @@ cmd/libs/go2idl/ tool.
        with the comment `// +k8s:conversion-gen=<internal-pkg>`, to catch the
        attention of our generation tools.  For most APIs the only target you
        need is `k8s.io/kubernetes/pkg/apis/<group>` (your internal API).
-    4. Run hack/update-all.sh.
+    3. Make sure your `pkg/apis/<group>` and `pkg/apis/<group>/<version>` directories
+       have a doc.go file with the comment `+groupName=<group>.k8s.io`, to correctly
+       generate the DNS-suffixed group name.
+    5. Run hack/update-all.sh.
 
 2. Generate files for Ugorji codec:
 
