@@ -6,9 +6,6 @@ metadata:
   labels:
     name: nginx
 spec:
-  initcontainers: 
-    name: busybox
-    image: busybox
   containers:
   - name: nginx
     image: nginx
