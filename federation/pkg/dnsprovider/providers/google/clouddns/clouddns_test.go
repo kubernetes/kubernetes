@@ -118,9 +118,19 @@ func addRrsetOrFail(t *testing.T, rrsets dnsprovider.ResourceRecordSets, rrset d
 	}
 }
 
-/* TestResourceRecordSetsList verifies that listing of zones succeeds */
+/* TestZonesList verifies that listing of zones succeeds */
 func TestZonesList(t *testing.T) {
 	firstZone(t)
+}
+
+/* TestZonesID verifies that the id of the zone is returned with the prefix removed */
+func TestZonesID(t *testing.T) {
+	zone := firstZone(t)
+
+	zoneID := zone.ID()
+	if zoneID != "1" {
+		t.Fatalf("Unexpected zone id: %q", zoneID)
+	}
 }
 
 /* TestZoneAddSuccess verifies that addition of a valid managed DNS zone succeeds */
