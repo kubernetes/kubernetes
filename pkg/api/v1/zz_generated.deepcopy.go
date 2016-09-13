@@ -2941,6 +2941,7 @@ func DeepCopy_v1_ReplicationControllerSpec(in interface{}, out interface{}, c *c
 		} else {
 			out.Replicas = nil
 		}
+		out.MinReadySeconds = in.MinReadySeconds
 		if in.Selector != nil {
 			in, out := &in.Selector, &out.Selector
 			*out = make(map[string]string)
@@ -2970,6 +2971,7 @@ func DeepCopy_v1_ReplicationControllerStatus(in interface{}, out interface{}, c 
 		out.Replicas = in.Replicas
 		out.FullyLabeledReplicas = in.FullyLabeledReplicas
 		out.ReadyReplicas = in.ReadyReplicas
+		out.AvailableReplicas = in.AvailableReplicas
 		out.ObservedGeneration = in.ObservedGeneration
 		return nil
 	}
