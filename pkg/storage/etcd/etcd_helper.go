@@ -113,14 +113,14 @@ func (h *etcdHelper) Create(ctx context.Context, key string, obj, out runtime.Ob
 	trace.Step("Version checked")
 
 	// Encrypt secrets data
-	// if strings.HasPrefix(key, "/registry/secrets") && h.encryptionProvider != nil {
-	// 	encryptedData, err := h.encryptionProvider.Encrypt(string(data))
-	// 	data = []byte(encryptedData)
-	//
-	// 	if err != nil {
-	// 		glog.Errorf("Attempt to encrypt failed: ", err)
-	// 	}
-	// }
+	if strings.HasPrefix(key, "/registry/secrets") && h.encryptionProvider != nil {
+		encryptedData, err := h.encryptionProvider.Encrypt(string(data))
+		data = []byte(encryptedData)
+
+		if err != nil {
+			glog.Errorf("Attempt to encrypt failed: ", err)
+		}
+	}
 
 	startTime := time.Now()
 	opts := etcd.SetOptions{
@@ -277,13 +277,13 @@ func (h *etcdHelper) bodyAndExtractObj(ctx context.Context, key string, objPtr r
 	body, node, err = h.extractObj(response, err, objPtr, ignoreNotFound, false)
 
 	// Decrypt secrets data
-	// if strings.HasPrefix(key, "/registry/secrets") && h.encryptionProvider != nil {
-	// 	body, err = h.encryptionProvider.Decrypt(body)
-	//
-	// 	if err != nil {
-	// 		glog.Error("Attempt to decrypt failed: ", err)
-	// 	}
-	// }
+	if strings.HasPrefix(key, "/registry/secrets") && h.encryptionProvider != nil {
+		body, err = h.encryptionProvider.Decrypt(body)
+
+		if err != nil {
+			glog.Error("Attempt to decrypt failed: ", err)
+		}
+	}
 
 	return body, node, response, toStorageErr(err, key, 0)
 }

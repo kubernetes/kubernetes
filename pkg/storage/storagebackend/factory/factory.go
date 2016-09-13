@@ -39,7 +39,7 @@ func Create(c storagebackend.Config) (storage.Interface, DestroyFunc, error) {
 	encryptionProvider, _ := encryptionprovider.InitEncryptionProvider(
 		c.EncryptionConfig.Provider, c.EncryptionConfig.Config)
 
-	glog.Error("STEVE: test")
+	glog.Error("STEVE: test: ", encryptionProvider)
 
 	switch c.Type {
 	case storagebackend.StorageTypeUnset, storagebackend.StorageTypeETCD2:

@@ -56,7 +56,6 @@ func NewAPIServer() *APIServer {
 		},
 		WebhookTokenAuthnCacheTTL: 2 * time.Minute,
 	}
-
 	return &s
 }
 

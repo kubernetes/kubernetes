@@ -79,6 +79,8 @@ func readAESEncryptionConfig(config io.Reader) (*EncryptionConfig, error) {
 }
 
 func (e *EncryptionProvider) Encrypt(obj string) (string, error) {
+
+	glog.Error("STEVE: encrypt!")
 	plaintext := []byte(obj)
 
 	block, err := aes.NewCipher([]byte(e.Config.Global.KeyText))
@@ -103,6 +105,9 @@ func (e *EncryptionProvider) Encrypt(obj string) (string, error) {
 }
 
 func (e *EncryptionProvider) Decrypt(obj string) (string, error) {
+
+	glog.Error("STEVE: decrypt!")
+
 	ciphertext, _ := base64.URLEncoding.DecodeString(obj)
 
 	block, err := aes.NewCipher([]byte(e.Config.Global.KeyText))
