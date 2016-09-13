@@ -48,7 +48,7 @@ const maxQueuedEvents = 1000
 type EventSink interface {
 	Create(event *api.Event) (*api.Event, error)
 	Update(event *api.Event) (*api.Event, error)
-	Patch(oldEvent *api.Event, data []byte) (*api.Event, error)
+	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *api.Event, err error)
 }
 
 // EventRecorder knows how to record events on behalf of an EventSource.
@@ -171,7 +171,7 @@ func recordEvent(sink EventSink, event *api.Event, patch []byte, updateExistingE
 	var newEvent *api.Event
 	var err error
 	if updateExistingEvent {
-		newEvent, err = sink.Patch(event, patch)
+		newEvent, err = sink.Patch(event.Name, api.StrategicMergePatchType, patch)
 	}
 	// Update can fail because the event may have been removed and it no longer exists.
 	if !updateExistingEvent || (updateExistingEvent && isKeyNotFoundError(err)) {

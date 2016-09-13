@@ -74,7 +74,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
@@ -880,7 +879,7 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 	broadcaster := record.NewBroadcaster()
 	recorder := broadcaster.NewRecorder(api.EventSource{Component: api.DefaultSchedulerName})
 	broadcaster.StartLogging(log.Infof)
-	broadcaster.StartRecordingToSink(&unversionedcore.EventSinkImpl{Interface: eventsClient.Events("")})
+	broadcaster.StartRecordingToSink(eventsClient.Events(""))
 
 	lw := cache.NewListWatchFromClient(s.client.CoreClient, "pods", api.NamespaceAll, fields.Everything())
 

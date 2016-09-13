@@ -29,7 +29,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	unversioned_core "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
@@ -100,7 +99,7 @@ type ServiceController struct {
 // (like load balancers) in sync with the registry.
 func New(cloud cloudprovider.Interface, kubeClient clientset.Interface, clusterName string) (*ServiceController, error) {
 	broadcaster := record.NewBroadcaster()
-	broadcaster.StartRecordingToSink(&unversioned_core.EventSinkImpl{Interface: kubeClient.Core().Events("")})
+	broadcaster.StartRecordingToSink(kubeClient.Core().Events(""))
 	recorder := broadcaster.NewRecorder(api.EventSource{Component: "service-controller"})
 
 	if kubeClient != nil && kubeClient.Core().GetRESTClient().GetRateLimiter() != nil {

@@ -38,7 +38,7 @@ import (
 type testEventSink struct {
 	OnCreate func(e *api.Event) (*api.Event, error)
 	OnUpdate func(e *api.Event) (*api.Event, error)
-	OnPatch  func(e *api.Event, p []byte) (*api.Event, error)
+	OnPatch  func(name string, pt api.PatchType, data []byte, subresources ...string) (*api.Event, error)
 }
 
 // CreateEvent records the event for testing.
@@ -58,28 +58,28 @@ func (t *testEventSink) Update(e *api.Event) (*api.Event, error) {
 }
 
 // PatchEvent records the event for testing.
-func (t *testEventSink) Patch(e *api.Event, p []byte) (*api.Event, error) {
+func (t *testEventSink) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (*api.Event, error) {
 	if t.OnPatch != nil {
-		return t.OnPatch(e, p)
+		return t.OnPatch(name, pt, data, subresources...)
 	}
-	return e, nil
+	return &api.Event{}, nil
 }
 
 type OnCreateFunc func(*api.Event) (*api.Event, error)
 
 func OnCreateFactory(testCache map[string]*api.Event, createEvent chan<- *api.Event) OnCreateFunc {
 	return func(event *api.Event) (*api.Event, error) {
-		testCache[getEventKey(event)] = event
+		testCache[event.Name] = event
 		createEvent <- event
 		return event, nil
 	}
 }
 
-type OnPatchFunc func(*api.Event, []byte) (*api.Event, error)
+type OnPatchFunc func(name string, pt api.PatchType, data []byte, subresources ...string) (*api.Event, error)
 
 func OnPatchFactory(testCache map[string]*api.Event, patchEvent chan<- *api.Event) OnPatchFunc {
-	return func(event *api.Event, patch []byte) (*api.Event, error) {
-		cachedEvent, found := testCache[getEventKey(event)]
+	return func(name string, pt api.PatchType, data []byte, subresources ...string) (*api.Event, error) {
+		cachedEvent, found := testCache[name]
 		if !found {
 			return nil, fmt.Errorf("unexpected error: couldn't find Event in testCache.")
 		}
@@ -87,7 +87,7 @@ func OnPatchFactory(testCache map[string]*api.Event, patchEvent chan<- *api.Even
 		if err != nil {
 			return nil, fmt.Errorf("unexpected error: %v", err)
 		}
-		patched, err := strategicpatch.StrategicMergePatch(originalData, patch, event)
+		patched, err := strategicpatch.StrategicMergePatch(originalData, data, &api.Event{})
 		if err != nil {
 			return nil, fmt.Errorf("unexpected error: %v", err)
 		}
@@ -440,7 +440,7 @@ func TestUpdateExpiredEvent(t *testing.T) {
 	var createdEvent *api.Event
 
 	sink := &testEventSink{
-		OnPatch: func(*api.Event, []byte) (*api.Event, error) {
+		OnPatch: func(name string, pt api.PatchType, data []byte, subresources ...string) (*api.Event, error) {
 			return nil, &errors.StatusError{
 				ErrStatus: unversioned.Status{
 					Code:   http.StatusNotFound,

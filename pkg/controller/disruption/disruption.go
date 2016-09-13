@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/client/cache"
+	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller"
@@ -44,7 +45,8 @@ const statusUpdateRetries = 2
 type updater func(*policy.PodDisruptionBudget) error
 
 type DisruptionController struct {
-	kubeClient *client.Client
+	eventClient coreclient.EventsGetter
+	kubeClient  *client.Client
 
 	pdbStore      cache.Store
 	pdbController *framework.Controller
@@ -84,8 +86,9 @@ type controllerAndScale struct {
 // controllers and their scale.
 type podControllerFinder func(*api.Pod) ([]controllerAndScale, error)
 
-func NewDisruptionController(podInformer framework.SharedIndexInformer, kubeClient *client.Client) *DisruptionController {
+func NewDisruptionController(podInformer framework.SharedIndexInformer, kubeClient *client.Client, eventClient coreclient.EventsGetter) *DisruptionController {
 	dc := &DisruptionController{
+		eventClient:   eventClient,
 		kubeClient:    kubeClient,
 		podController: podInformer.GetController(),
 		queue:         workqueue.NewNamed("disruption"),
@@ -257,7 +260,7 @@ func (dc *DisruptionController) Run(stopCh <-chan struct{}) {
 	glog.V(0).Infof("Starting disruption controller")
 	if dc.kubeClient != nil {
 		glog.V(0).Infof("Sending events to api server.")
-		dc.broadcaster.StartRecordingToSink(dc.kubeClient.Events(""))
+		dc.broadcaster.StartRecordingToSink(dc.eventClient.Events(""))
 	} else {
 		glog.V(0).Infof("No api server defined - no events will be sent to API server.")
 	}
