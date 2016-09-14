@@ -2100,6 +2100,11 @@
 			"Rev": "f1f1a805ed361a0e078bb537e4ea78cd37dcf065"
 		},
 		{
+			"ImportPath": "github.com/vharitonsky/iniflags",
+			"Comment": "v.1.0-30-g743d690",
+			"Rev": "743d6901e7ca8ab61ac533a8c49939ac8b560e72"
+		},
+		{
 			"ImportPath": "github.com/vishvananda/netlink",
 			"Rev": "1e2e08e8a2dcdacaae3f14ac44c5cfa31361f270"
 		},
