@@ -19,7 +19,7 @@ limitations under the License.
 package cni
 
 import (
-	"bytes"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
@@ -27,7 +27,6 @@ import (
 	"os"
 	"path"
 	"testing"
-	"text/template"
 
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 
@@ -43,65 +42,59 @@ import (
 	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 )
 
-func installPluginUnderTest(t *testing.T, testVendorCNIDirPrefix, testNetworkConfigPath, vendorName string, plugName string) {
+func installPluginUnderTest(t *testing.T, testVendorCNIDirPrefix, testNetworkConfigPath, vendorName string, plugName string, pod *api.Pod) {
 	pluginDir := path.Join(testNetworkConfigPath, plugName)
 	err := os.MkdirAll(pluginDir, 0777)
 	if err != nil {
 		t.Fatalf("Failed to create plugin config dir: %v", err)
 	}
-	pluginConfig := path.Join(pluginDir, plugName+".conf")
-	f, err := os.Create(pluginConfig)
-	if err != nil {
-		t.Fatalf("Failed to install plugin")
-	}
-	networkConfig := fmt.Sprintf("{ \"name\": \"%s\", \"type\": \"%s\" }", plugName, vendorName)
 
-	_, err = f.WriteString(networkConfig)
+	type NetConf struct {
+		Name string                 `json:"name,omitempty"`
+		Type string                 `json:"type,omitempty"`
+		Args map[string]interface{} `json:"args,omitempty"`
+	}
+
+	// Write out the CNI network config file
+	confBytes, err := json.Marshal(&NetConf{
+		Name: plugName,
+		Type: vendorName,
+		Args: map[string]interface{}{
+			"kubernetes.io/pod": pod,
+		},
+	})
 	if err != nil {
+		t.Fatalf("Failed to marshal network config (%v)", err)
+	}
+
+	pluginConfig := path.Join(pluginDir, plugName+".conf")
+	if err := ioutil.WriteFile(pluginConfig, confBytes, 0644); err != nil {
 		t.Fatalf("Failed to write network config file (%v)", err)
 	}
-	f.Close()
 
+	// Write out the CNI plugin script that kubernetes will call
 	vendorCNIDir := fmt.Sprintf(VendorCNIDirTemplate, testVendorCNIDirPrefix, vendorName)
 	err = os.MkdirAll(vendorCNIDir, 0777)
 	if err != nil {
 		t.Fatalf("Failed to create plugin dir: %v", err)
 	}
-	pluginExec := path.Join(vendorCNIDir, vendorName)
-	f, err = os.Create(pluginExec)
 
-	const execScriptTempl = `#!/bin/bash
+	outputFile := path.Join(pluginDir, plugName+".out")
+	outputEnv := path.Join(pluginDir, plugName+".env")
+	execScript := fmt.Sprintf(`#!/bin/bash
 read ignore
-env > {{.OutputEnv}}
-echo "%@" >> {{.OutputEnv}}
+env > %s
+echo "%%@" >> %s
 export $(echo ${CNI_ARGS} | sed 's/;/ /g') &> /dev/null
-mkdir -p {{.OutputDir}} &> /dev/null
-echo -n "$CNI_COMMAND $CNI_NETNS $K8S_POD_NAMESPACE $K8S_POD_NAME $K8S_POD_INFRA_CONTAINER_ID" >& {{.OutputFile}}
+mkdir -p %s &> /dev/null
+echo -n "$CNI_COMMAND $CNI_NETNS $K8S_POD_NAMESPACE $K8S_POD_NAME $K8S_POD_INFRA_CONTAINER_ID" >& %s
 echo -n "{ \"ip4\": { \"ip\": \"10.1.0.23/24\" } }"
-`
-	execTemplateData := &map[string]interface{}{
-		"OutputFile": path.Join(pluginDir, plugName+".out"),
-		"OutputEnv":  path.Join(pluginDir, plugName+".env"),
-		"OutputDir":  pluginDir,
-	}
+`, outputEnv, outputEnv, pluginDir, outputFile)
 
-	tObj := template.Must(template.New("test").Parse(execScriptTempl))
-	buf := &bytes.Buffer{}
-	if err := tObj.Execute(buf, *execTemplateData); err != nil {
-		t.Fatalf("Error in executing script template - %v", err)
-	}
-	execScript := buf.String()
-	_, err = f.WriteString(execScript)
-	if err != nil {
+	pluginExec := path.Join(vendorCNIDir, vendorName)
+	if err := ioutil.WriteFile(pluginExec, []byte(execScript), 0777); err != nil {
 		t.Fatalf("Failed to write plugin exec - %v", err)
 	}
-
-	err = f.Chmod(0777)
-	if err != nil {
-		t.Fatalf("Failed to set exec perms on plugin")
-	}
-
-	f.Close()
 }
 
 func tearDownPlugin(tmpDir string) {
@@ -164,6 +157,14 @@ func TestCNIPlugin(t *testing.T) {
 		},
 	}
 
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			UID:       "12345678",
+			Name:      "podName",
+			Namespace: "podNamespace",
+		},
+	}
+
 	mockLoCNI := &mock_cni.MockCNI{}
 	// TODO mock for the test plugin too
 
@@ -171,7 +172,7 @@ func TestCNIPlugin(t *testing.T) {
 	testNetworkConfigPath := path.Join(tmpDir, "plugins", "net", "cni")
 	testVendorCNIDirPrefix := tmpDir
 	defer tearDownPlugin(tmpDir)
-	installPluginUnderTest(t, testVendorCNIDirPrefix, testNetworkConfigPath, vendorName, pluginName)
+	installPluginUnderTest(t, testVendorCNIDirPrefix, testNetworkConfigPath, vendorName, pluginName, pod)
 
 	containerID := kubecontainer.ContainerID{Type: "test", ID: "test_infra_container"}
 	pods := []*containertest.FakePod{{
@@ -198,19 +199,18 @@ func TestCNIPlugin(t *testing.T) {
 	cniPlugin.execer = fexec
 	cniPlugin.loNetwork.CNIConfig = mockLoCNI
 
+	// CNI plugin updates JSON on-the-fly, so ensure our Mock knows about
+	// the updated JSON too
+	var err error
+	cniPlugin.loNetwork.NetworkConfig, err = updateNetConfigWithPod(cniPlugin.loNetwork.NetworkConfig, pod)
+	if err != nil {
+		t.Fatalf("Failed to update NetworkConfig: %v", err)
+	}
 	mockLoCNI.On("AddNetwork", cniPlugin.loNetwork.NetworkConfig, mock.AnythingOfType("*libcni.RuntimeConf")).Return(&cnitypes.Result{IP4: &cnitypes.IPConfig{IP: net.IPNet{IP: []byte{127, 0, 0, 1}}}}, nil)
 
 	plug, err := network.InitNetworkPlugin(plugins, "cni", NewFakeHost(nil, pods), componentconfig.HairpinNone, "10.0.0.0/8", network.UseDefaultMTU)
 	if err != nil {
 		t.Fatalf("Failed to select the desired plugin: %v", err)
-	}
-
-	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
-			UID:       "12345678",
-			Name:      "podName",
-			Namespace: "podNamespace",
-		},
 	}
 
 	// Set up the pod

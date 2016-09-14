@@ -17,6 +17,7 @@ limitations under the License.
 package cni
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"sort"
@@ -200,13 +201,13 @@ func (plugin *cniNetworkPlugin) SetUpPod(pod *api.Pod, id kubecontainer.Containe
 		return fmt.Errorf("CNI failed to retrieve network namespace path: %v", err)
 	}
 
-	_, err = plugin.loNetwork.addToNetwork(pod.Name, pod.Namespace, id, netnsPath)
+	_, err = plugin.loNetwork.addToNetwork(pod, id, netnsPath)
 	if err != nil {
 		glog.Errorf("Error while adding to cni lo network: %s", err)
 		return err
 	}
 
-	_, err = plugin.getDefaultNetwork().addToNetwork(pod.Name, pod.Namespace, id, netnsPath)
+	_, err = plugin.getDefaultNetwork().addToNetwork(pod, id, netnsPath)
 	if err != nil {
 		glog.Errorf("Error while adding to cni network: %s", err)
 		return err
@@ -243,14 +244,54 @@ func (plugin *cniNetworkPlugin) GetPodNetworkStatus(namespace string, name strin
 	return &network.PodNetworkStatus{IP: ip}, nil
 }
 
-func (network *cniNetwork) addToNetwork(podName string, podNamespace string, podInfraContainerID kubecontainer.ContainerID, podNetnsPath string) (*cnitypes.Result, error) {
-	rt, err := buildCNIRuntimeConf(podName, podNamespace, podInfraContainerID, podNetnsPath)
+func updateNetConfigWithPod(original *libcni.NetworkConfig, pod *api.Pod) (*libcni.NetworkConfig, error) {
+	type cniNetConf struct {
+		Name string                 `json:"name,omitempty"`
+		Type string                 `json:"type,omitempty"`
+		Args map[string]interface{} `json:"args,omitempty"`
+	}
+
+	// We don't want PodStatus, just the TypeMeta, ObjectMeta, and PodSpec
+	pod = &api.Pod{
+		TypeMeta:   pod.TypeMeta,
+		ObjectMeta: pod.ObjectMeta,
+	}
+
+	config := cniNetConf{}
+	err := json.Unmarshal(original.Bytes, &config)
+	if err != nil {
+		return nil, err
+	}
+	if config.Args == nil {
+		config.Args = make(map[string]interface{})
+	}
+
+	podBytes, err := json.Marshal(pod)
+	if err != nil {
+		return nil, err
+	}
+	config.Args["kubernetes.io/pod"] = string(podBytes)
+
+	return libcni.InjectConf(original, "args", config.Args)
+}
+
+func (network *cniNetwork) addToNetwork(pod *api.Pod, podInfraContainerID kubecontainer.ContainerID, podNetnsPath string) (*cnitypes.Result, error) {
+	rt, err := buildCNIRuntimeConf(pod.Name, pod.Namespace, podInfraContainerID, podNetnsPath)
 	if err != nil {
 		glog.Errorf("Error adding network: %v", err)
 		return nil, err
 	}
 
 	netconf, cninet := network.NetworkConfig, network.CNIConfig
+
+	// Merge the PodSpec into the network config's 'args' field
+	netconf, err = updateNetConfigWithPod(netconf, pod)
+	if err != nil {
+		glog.Errorf("Error updating network config with PodSpec: %v", err)
+		return nil, err
+	}
+	glog.Warningf("netconf %v", netconf.Bytes)
+
 	glog.V(4).Infof("About to run with conf.Network.Type=%v", netconf.Network.Type)
 	res, err := cninet.AddNetwork(netconf, rt)
 	if err != nil {
