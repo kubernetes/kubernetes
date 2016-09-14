@@ -25,6 +25,7 @@ import (
 	"strings"
 	"time"
 
+	dockerdigest "github.com/docker/distribution/digest"
 	dockerref "github.com/docker/distribution/reference"
 	"github.com/docker/docker/pkg/jsonmessage"
 	dockerapi "github.com/docker/engine-api/client"
@@ -152,7 +153,6 @@ func filterHTTPError(err error, image string) error {
 
 // Check if the inspected image matches what we are looking for
 func matchImageTagOrSHA(inspected dockertypes.ImageInspect, image string) bool {
-
 	// The image string follows the grammar specified here
 	// https://github.com/docker/distribution/blob/master/reference/reference.go#L4
 	named, err := dockerref.ParseNamed(image)
@@ -180,11 +180,27 @@ func matchImageTagOrSHA(inspected dockertypes.ImageInspect, image string) bool {
 	}
 
 	if isDigested {
-		algo := digest.Digest().Algorithm().String()
-		sha := digest.Digest().Hex()
-		// Look specifically for short and long sha(s)
-		if strings.Contains(inspected.ID, algo+":"+sha) {
-			// We found the short or long SHA requested
+		for _, repoDigest := range inspected.RepoDigests {
+			named, err := dockerref.ParseNamed(repoDigest)
+			if err != nil {
+				glog.V(4).Infof("couldn't parse image RepoDigest reference %q: %v", repoDigest, err)
+				continue
+			}
+			if d, isDigested := named.(dockerref.Digested); isDigested {
+				if digest.Digest().Algorithm().String() == d.Digest().Algorithm().String() &&
+					digest.Digest().Hex() == d.Digest().Hex() {
+					return true
+				}
+			}
+		}
+
+		// process the ID as a digest
+		id, err := dockerdigest.ParseDigest(inspected.ID)
+		if err != nil {
+			glog.V(4).Infof("couldn't parse image ID reference %q: %v", id, err)
+			return false
+		}
+		if digest.Digest().Algorithm().String() == id.Algorithm().String() && digest.Digest().Hex() == id.Hex() {
 			return true
 		}
 	}
