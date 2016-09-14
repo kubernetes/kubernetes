@@ -29,7 +29,6 @@ import (
 	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/runtime"
 	utilcertificates "k8s.io/kubernetes/pkg/util/certificates"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
@@ -47,7 +46,7 @@ type CertificateController struct {
 	kubeClient clientset.Interface
 
 	// CSR framework and store
-	csrController *framework.Controller
+	csrController *cache.Controller
 	csrStore      cache.StoreToCertificateRequestLister
 
 	// To allow injection of updateCertificateRequestStatus for testing.
@@ -85,7 +84,7 @@ func NewCertificateController(kubeClient clientset.Interface, syncPeriod time.Du
 	}
 
 	// Manage the addition/update of certificate requests
-	cc.csrStore.Store, cc.csrController = framework.NewInformer(
+	cc.csrStore.Store, cc.csrController = cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				return cc.kubeClient.Certificates().CertificateSigningRequests().List(options)
@@ -96,7 +95,7 @@ func NewCertificateController(kubeClient clientset.Interface, syncPeriod time.Du
 		},
 		&certificates.CertificateSigningRequest{},
 		syncPeriod,
-		framework.ResourceEventHandlerFuncs{
+		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				csr := obj.(*certificates.CertificateSigningRequest)
 				glog.V(4).Infof("Adding certificate request %s", csr.Name)

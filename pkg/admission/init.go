@@ -17,7 +17,7 @@ limitations under the License.
 package admission
 
 import (
-	"k8s.io/kubernetes/pkg/controller/framework/informers"
+	"k8s.io/kubernetes/pkg/controller/informers"
 )
 
 // PluginInitializer is used for initialization of shareable resources between admission plugins.
