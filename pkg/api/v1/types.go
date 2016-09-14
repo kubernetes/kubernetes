@@ -615,14 +615,21 @@ const (
 	ClaimLost PersistentVolumeClaimPhase = "Lost"
 )
 
+type PropagationMode string
+
+const (
+	PropagationPrivate PropagationMode = "private"
+	PropagationShared  PropagationMode = "shared"
+)
+
 // Represents a host path mapped into a pod.
 // Host path volumes do not support ownership management or SELinux relabeling.
 type HostPathVolumeSource struct {
 	// Path of the directory on the host.
 	// More info: http://kubernetes.io/docs/user-guide/volumes#hostpath
 	Path string `json:"path" protobuf:"bytes,1,opt,name=path"`
-	// Mount the host path with propagation shared. Docker only.
-	Shared bool `json:"shared,omitempty" protobuf:"bool,2,opt,name=shared"`
+	// Mount the host path with propagation mode specified. Docker only.
+	Propagation PropagationMode `json:"propagation,omitempty" protobuf:"bytes,2,opt,name=propagation,casttype=PropagationMode"`
 }
 
 // Represents an empty directory for a pod.

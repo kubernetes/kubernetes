@@ -94,8 +94,11 @@ func (plugin *hostPathPlugin) NewMounter(spec *volume.Spec, pod *api.Pod, _ volu
 		return nil, err
 	}
 	var propagation string
-	if hostPathVolumeSource.Shared {
-		propagation = "shared"
+	switch (hostPathVolumeSource.Propagation) {
+	case api.PropagationPrivate:
+		propagation = "rprivate"
+	case api.PropagationShared:
+		propagation = "rshared"
 	}
 	return &hostPathMounter{
 		hostPath:    &hostPath{path: hostPathVolumeSource.Path},
