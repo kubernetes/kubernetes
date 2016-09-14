@@ -222,12 +222,13 @@ func TestVolumes(t *testing.T) {
 		t.Fatalf("Instances.List() returned zero servers")
 	}
 
-	tags := map[string]string{
-		"adapterType": "lsiLogic",
-		"diskType":    "thin",
-	}
+	volumeOptions := &VolumeOptions{
+		CapacityKB: 1 * 1024 * 1024,
+		Tags:       nil,
+		Name:       "kubernetes-test-volume-" + rand.String(10),
+		DiskFormat: "thin"}
 
-	volPath, err := vs.CreateVolume("kubernetes-test-volume-"+rand.String(10), 1*1024*1024, &tags)
+	volPath, err := vs.CreateVolume(volumeOptions)
 	if err != nil {
 		t.Fatalf("Cannot create a new VMDK volume: %v", err)
 	}

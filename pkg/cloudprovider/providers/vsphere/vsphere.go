@@ -56,6 +56,9 @@ const (
 	SCSIDeviceSlots           = 16
 	SCSIReservedSlot          = 7
 	ThinDiskType              = "thin"
+	PreallocatedDiskType      = "preallocated"
+	EagerZeroedThickDiskType  = "eagerZeroedThick"
+	ZeroedThickDiskType       = "zeroedThick"
 	VolDir                    = "kubevols"
 )
 
@@ -65,6 +68,17 @@ const (
 // making the subsequent attaches to the node to fail.
 // TODO: Add support for lsilogic driver type
 var supportedSCSIControllerType = []string{strings.ToLower(LSILogicSASControllerType), PVSCSIControllerType}
+
+// Maps user options to API parameters.
+// Keeping user options consistent with docker volume plugin for vSphere.
+// API: http://pubs.vmware.com/vsphere-60/index.jsp#com.vmware.wssdk.apiref.doc/vim.VirtualDiskManager.VirtualDiskType.html
+var diskFormatValidType = map[string]string{
+	ThinDiskType:                              ThinDiskType,
+	strings.ToLower(EagerZeroedThickDiskType): EagerZeroedThickDiskType,
+	strings.ToLower(ZeroedThickDiskType):      PreallocatedDiskType,
+}
+
+var DiskformatValidOptions = generateDiskFormatValidOptions()
 
 var ErrNoDiskUUIDFound = errors.New("No disk UUID found")
 var ErrNoDiskIDFound = errors.New("No vSphere disk ID found")
@@ -126,10 +140,28 @@ type Volumes interface {
 	DiskIsAttached(volPath, nodeName string) (bool, error)
 
 	// CreateVolume creates a new vmdk with specified parameters.
-	CreateVolume(name string, size int, tags *map[string]string) (volumePath string, err error)
+	CreateVolume(volumeOptions *VolumeOptions) (volumePath string, err error)
 
 	// DeleteVolume deletes vmdk.
 	DeleteVolume(vmDiskPath string) error
+}
+
+// VolumeOptions specifies capacity, tags, name and diskFormat for a volume.
+type VolumeOptions struct {
+	CapacityKB int
+	Tags       map[string]string
+	Name       string
+	DiskFormat string
+}
+
+// Generates Valid Options for Diskformat
+func generateDiskFormatValidOptions() string {
+	validopts := ""
+	for diskformat := range diskFormatValidType {
+		validopts += (diskformat + ", ")
+	}
+	validopts = strings.TrimSuffix(validopts, ", ")
+	return validopts
 }
 
 // Parses vSphere cloud config file and stores it into VSphereConfig.
@@ -1064,7 +1096,22 @@ func (vs *VSphere) DetachDisk(volPath string, nodeName string) error {
 }
 
 // CreateVolume creates a volume of given size (in KiB).
-func (vs *VSphere) CreateVolume(name string, size int, tags *map[string]string) (volumePath string, err error) {
+func (vs *VSphere) CreateVolume(volumeOptions *VolumeOptions) (volumePath string, err error) {
+
+	var diskFormat string
+
+	// Default diskformat as 'thin'
+	if volumeOptions.DiskFormat == "" {
+		volumeOptions.DiskFormat = ThinDiskType
+	}
+
+	if _, ok := diskFormatValidType[volumeOptions.DiskFormat]; !ok {
+		return "", fmt.Errorf("Cannot create disk. Error diskformat %+q."+
+			" Valid options are %s.", volumeOptions.DiskFormat, DiskformatValidOptions)
+	}
+
+	diskFormat = diskFormatValidType[volumeOptions.DiskFormat]
+
 	// Create context
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -1089,13 +1136,6 @@ func (vs *VSphere) CreateVolume(name string, size int, tags *map[string]string) 
 		return "", err
 	}
 
-	if (*tags)["adapterType"] == "" {
-		(*tags)["adapterType"] = LSILogicControllerType
-	}
-	if (*tags)["diskType"] == "" {
-		(*tags)["diskType"] = ThinDiskType
-	}
-
 	// vmdks will be created inside kubevols directory
 	kubeVolsPath := filepath.Clean(ds.Path(VolDir)) + "/"
 	err = makeDirectoryInDatastore(c, dc, kubeVolsPath, false)
@@ -1103,18 +1143,19 @@ func (vs *VSphere) CreateVolume(name string, size int, tags *map[string]string) 
 		glog.Errorf("Cannot create dir %#v. err %s", kubeVolsPath, err)
 		return "", err
 	}
+	glog.V(4).Infof("Created dir with path as %+q", kubeVolsPath)
 
-	vmDiskPath := kubeVolsPath + name + ".vmdk"
+	vmDiskPath := kubeVolsPath + volumeOptions.Name + ".vmdk"
 	// Create a virtual disk manager
 	virtualDiskManager := object.NewVirtualDiskManager(c.Client)
 
 	// Create specification for new virtual disk
 	vmDiskSpec := &types.FileBackedVirtualDiskSpec{
 		VirtualDiskSpec: types.VirtualDiskSpec{
-			AdapterType: (*tags)["adapterType"],
-			DiskType:    (*tags)["diskType"],
+			AdapterType: LSILogicControllerType,
+			DiskType:    diskFormat,
 		},
-		CapacityKb: int64(size),
+		CapacityKb: int64(volumeOptions.CapacityKB),
 	}
 
 	// Create virtual disk

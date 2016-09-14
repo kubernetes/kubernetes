@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 
@@ -305,7 +306,7 @@ func (testcase *testcase) DiskIsAttached(diskName, hostName string) (bool, error
 	return expected.isAttached, expected.ret
 }
 
-func (testcase *testcase) CreateVolume(name string, size int, tags *map[string]string) (volumePath string, err error) {
+func (testcase *testcase) CreateVolume(volumeOptions *vsphere.VolumeOptions) (volumePath string, err error) {
 	return "", errors.New("Not implemented")
 }
 
