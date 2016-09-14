@@ -139,7 +139,6 @@ func (cc *CertificateController) Run(workers int, stopCh <-chan struct{}) {
 
 // worker runs a thread that dequeues CSRs, handles them, and marks them done.
 func (cc *CertificateController) worker() {
-	defer glog.Infof("certificate controller work queue is quit")
 	for cc.processNextWorkItem() {
 	}
 }
