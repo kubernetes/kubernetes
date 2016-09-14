@@ -829,6 +829,96 @@ func TestThresholdsMet(t *testing.T) {
 	}
 }
 
+func TestThresholdsUpdatedStats(t *testing.T) {
+	updatedThreshold := Threshold{
+		Signal: SignalMemoryAvailable,
+	}
+	locationUTC, err := time.LoadLocation("UTC")
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	testCases := map[string]struct {
+		thresholds   []Threshold
+		observations signalObservations
+		last         signalObservations
+		result       []Threshold
+	}{
+		"empty": {
+			thresholds:   []Threshold{},
+			observations: signalObservations{},
+			last:         signalObservations{},
+			result:       []Threshold{},
+		},
+		"no-time": {
+			thresholds: []Threshold{updatedThreshold},
+			observations: signalObservations{
+				SignalMemoryAvailable: signalObservation{},
+			},
+			last:   signalObservations{},
+			result: []Threshold{updatedThreshold},
+		},
+		"no-last-observation": {
+			thresholds: []Threshold{updatedThreshold},
+			observations: signalObservations{
+				SignalMemoryAvailable: signalObservation{
+					time: unversioned.Date(2016, 1, 1, 0, 0, 0, 0, locationUTC),
+				},
+			},
+			last:   signalObservations{},
+			result: []Threshold{updatedThreshold},
+		},
+		"time-machine": {
+			thresholds: []Threshold{updatedThreshold},
+			observations: signalObservations{
+				SignalMemoryAvailable: signalObservation{
+					time: unversioned.Date(2016, 1, 1, 0, 0, 0, 0, locationUTC),
+				},
+			},
+			last: signalObservations{
+				SignalMemoryAvailable: signalObservation{
+					time: unversioned.Date(2016, 1, 1, 0, 1, 0, 0, locationUTC),
+				},
+			},
+			result: []Threshold{},
+		},
+		"same-observation": {
+			thresholds: []Threshold{updatedThreshold},
+			observations: signalObservations{
+				SignalMemoryAvailable: signalObservation{
+					time: unversioned.Date(2016, 1, 1, 0, 0, 0, 0, locationUTC),
+				},
+			},
+			last: signalObservations{
+				SignalMemoryAvailable: signalObservation{
+					time: unversioned.Date(2016, 1, 1, 0, 0, 0, 0, locationUTC),
+				},
+			},
+			result: []Threshold{},
+		},
+		"new-observation": {
+			thresholds: []Threshold{updatedThreshold},
+			observations: signalObservations{
+				SignalMemoryAvailable: signalObservation{
+					time: unversioned.Date(2016, 1, 1, 0, 1, 0, 0, locationUTC),
+				},
+			},
+			last: signalObservations{
+				SignalMemoryAvailable: signalObservation{
+					time: unversioned.Date(2016, 1, 1, 0, 0, 0, 0, locationUTC),
+				},
+			},
+			result: []Threshold{updatedThreshold},
+		},
+	}
+	for testName, testCase := range testCases {
+		actual := thresholdsUpdatedStats(testCase.thresholds, testCase.observations, testCase.last)
+		if !thresholdList(actual).Equal(thresholdList(testCase.result)) {
+			t.Errorf("Test case: %s, expected: %v, actual: %v", testName, testCase.result, actual)
+		}
+	}
+}
+
 func TestPercentageThresholdsMet(t *testing.T) {
 	specifiecThresholds := []Threshold{
 		{
