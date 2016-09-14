@@ -782,13 +782,24 @@ func TestMonitorNodeStatusEvictPodsWithDisruption(t *testing.T) {
 }
 
 func TestMonitorNodeTaints(t *testing.T) {
+	annotationsWithTolerance := map[string]string{
+		api.TolerationsAnnotationKey: `
+						[{
+							"key": "test",
+							"operator": "Equal",
+							"value": "test",
+							"effect": "NoSchedule"
+						}]`,
+	}
 	fakeNow := unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC)
 	evictionTimeout := 10 * time.Minute
 	table := []struct {
 		nodeList     []*api.Node
 		podList      []api.Pod
 		expectedPods []string
+		podsToCancel []string
 	}{
+		// Node with NoSchedule taint, 1 pod has a toleration for such taint
 		{
 			nodeList: []*api.Node{
 				{
@@ -829,17 +840,9 @@ func TestMonitorNodeTaints(t *testing.T) {
 				},
 				{
 					ObjectMeta: api.ObjectMeta{
-						Name:      "pod2",
-						Namespace: "default",
-						Annotations: map[string]string{
-							api.TolerationsAnnotationKey: `
-						[{
-							"key": "test",
-							"operator": "Equal",
-							"value": "test",
-							"effect": "NoSchedule"
-						}]`,
-						},
+						Name:        "pod2",
+						Namespace:   "default",
+						Annotations: annotationsWithTolerance,
 					},
 					Spec: api.PodSpec{
 						Containers: []api.Container{{Image: "pod2:V1"}},
@@ -857,6 +860,60 @@ func TestMonitorNodeTaints(t *testing.T) {
 				},
 			},
 			expectedPods: []string{"pod1", "pod3"},
+		},
+		// 2 pods without toleration, both will be sent to a queue for eviction;
+		// then toleration will be added to pod2, and on next tick of monitorNodeTaints pod 2 will be removed from eviction queue
+		{
+			nodeList: []*api.Node{
+				{
+					ObjectMeta: api.ObjectMeta{
+						Name:              "node0",
+						CreationTimestamp: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+						Annotations: map[string]string{
+							api.TaintsAnnotationKey: `
+						[{
+							"key": "test",
+							"value": "test",
+							"effect": "NoSchedule"
+						}]`,
+						},
+					},
+					Status: api.NodeStatus{
+						Conditions: []api.NodeCondition{
+							{
+								Type:               api.NodeReady,
+								Status:             api.ConditionTrue,
+								LastHeartbeatTime:  unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+								LastTransitionTime: unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							},
+						},
+					},
+				},
+			},
+			podList: []api.Pod{
+				{
+					ObjectMeta: api.ObjectMeta{
+						Name:        "pod1",
+						Namespace:   "default",
+						Annotations: map[string]string{},
+					},
+					Spec: api.PodSpec{
+						Containers: []api.Container{{Image: "pod2:V1"}},
+					},
+				},
+				{
+					ObjectMeta: api.ObjectMeta{
+						Name:        "pod2",
+						Namespace:   "default",
+						Annotations: map[string]string{},
+					},
+					Spec: api.PodSpec{
+						Containers: []api.Container{{Image: "pod2:V1"}},
+					},
+				},
+			},
+			expectedPods: []string{"pod1"},
+			podsToCancel: []string{"pod2"},
 		},
 	}
 	for _, item := range table {
@@ -887,6 +944,24 @@ func TestMonitorNodeTaints(t *testing.T) {
 				t.Errorf("expected to have 1 taint: %v", taints)
 			}
 		}
+		if item.podsToCancel != nil {
+			queueLth := nodeController.zonePodEvictor[""].queue.queue.Len()
+			if queueLth != len(item.expectedPods)+len(item.podsToCancel) {
+				t.Errorf("Queue length before cancellation should be equal to number of pods to evict: %v", queueLth)
+			}
+			for _, podName := range item.podsToCancel {
+				for _, pod := range item.podList {
+					if pod.Name == podName {
+						pod.Annotations = annotationsWithTolerance
+						nodeController.kubeClient.Core().Pods(pod.Namespace).Update(&pod)
+					}
+				}
+			}
+			if err := nodeController.monitorNodeTaints(); err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+		}
+
 		queueLth := nodeController.zonePodEvictor[""].queue.queue.Len()
 		if queueLth != len(item.expectedPods) {
 			t.Errorf("Queue length should be equal to number of pods to evict: %v", queueLth)

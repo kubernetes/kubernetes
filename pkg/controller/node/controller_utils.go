@@ -57,6 +57,32 @@ func cleanupOrphanedPods(pods []*api.Pod, nodeStore cache.Store, forcefulDeleteP
 	}
 }
 
+func tolerationsToleratesTaints(tolerations []api.Toleration, taints []api.Taint) bool {
+	// If the taint list is nil/empty, it is tolerated by all tolerations by default.
+	if len(taints) == 0 {
+		return true
+	}
+
+	// The taint list isn't nil/empty, a nil/empty toleration list can't tolerate them.
+	if len(tolerations) == 0 {
+		return false
+	}
+
+	for i := range taints {
+		taint := &taints[i]
+		// skip taints that have effect PreferNoSchedule, since it is for priorities
+		if taint.Effect == api.TaintEffectPreferNoSchedule {
+			continue
+		}
+
+		if !api.TaintToleratedByTolerations(taint, tolerations) {
+			return false
+		}
+	}
+
+	return true
+}
+
 func deletePod(kubeClient clientset.Interface, pod *api.Pod, recorder record.EventRecorder, daemonStore cache.StoreToDaemonSetLister) (bool, error) {
 	// if the pod has already been marked for deletion, we still return true that there are remaining pods.
 	if pod.DeletionGracePeriodSeconds != nil {

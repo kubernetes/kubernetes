@@ -382,32 +382,6 @@ func NewNodeControllerFromClient(
 	return nc, nil
 }
 
-func tolerationsToleratesTaints(tolerations []api.Toleration, taints []api.Taint) bool {
-	// If the taint list is nil/empty, it is tolerated by all tolerations by default.
-	if len(taints) == 0 {
-		return true
-	}
-
-	// The taint list isn't nil/empty, a nil/empty toleration list can't tolerate them.
-	if len(tolerations) == 0 {
-		return false
-	}
-
-	for i := range taints {
-		taint := &taints[i]
-		// skip taints that have effect PreferNoSchedule, since it is for priorities
-		if taint.Effect == api.TaintEffectPreferNoSchedule {
-			continue
-		}
-
-		if !api.TaintToleratedByTolerations(taint, tolerations) {
-			return false
-		}
-	}
-
-	return true
-}
-
 // Run starts an asynchronous loop that monitors the status of cluster nodes.
 func (nc *NodeController) Run(period time.Duration) {
 	go nc.nodeController.Run(wait.NeverStop)
@@ -670,6 +644,8 @@ func (nc *NodeController) monitorNodeTaints() error {
 
 			if !tolerationsToleratesTaints(tolerations, taints) {
 				nc.evictPods(&node, pod)
+			} else {
+				nc.cancelPodsEviction(&node, pod)
 			}
 		}
 	}
@@ -681,6 +657,17 @@ func (nc *NodeController) evictPods(node *api.Node, pods ...api.Pod) {
 		glog.Infof("pod %v:%v will be sent for eviction", pod.Namespace, pod.Name)
 		message := evictionMessage{pod.Name, pod.Namespace, node.UID}
 		nc.zonePodEvictor[utilnode.GetZoneKey(node)].Add(pod.Name, message)
+	}
+}
+
+func (nc *NodeController) cancelPodsEviction(node *api.Node, pods ...api.Pod) {
+	for _, pod := range pods {
+		zone := utilnode.GetZoneKey(node)
+		wasDeleting := nc.zonePodEvictor[zone].Remove(pod.Name)
+		wasTerminating := nc.zoneTerminationEvictor[zone].Remove(pod.Name)
+		if wasDeleting || wasTerminating {
+			glog.V(2).Infof("Cancelling pod %v Eviction on Node: %v", pod.Name, node.Name)
+		}
 	}
 }
 
