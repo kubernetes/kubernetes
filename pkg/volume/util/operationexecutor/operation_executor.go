@@ -577,24 +577,24 @@ func (oe *operationExecutor) generateDetachVolumeFunc(
 			err = volumeDetacher.Detach(volumeName, volumeToDetach.NodeName)
 		}
 		if err != nil {
-			// On failure, add volume back to ReportAsAttached list
-			actualStateOfWorld.AddVolumeToReportAsAttached(
-				volumeToDetach.VolumeName, volumeToDetach.NodeName)
-			return fmt.Errorf(
-				"DetachVolume.Detach failed for volume %q (spec.Name: %q) from node %q with: %v",
+			glog.Errorf(
+				"DetachVolume.Detach returns error for volume %q (spec.Name: %q) from node %q with: %v",
 				volumeToDetach.VolumeName,
 				volumeToDetach.VolumeSpec.Name(),
 				volumeToDetach.NodeName,
 				err)
+		} else {
+			glog.Infof(
+				"DetachVolume.Detach succeeded for volume %q (spec.Name: %q) from node %q.",
+				volumeToDetach.VolumeName,
+				volumeToDetach.VolumeSpec.Name(),
+				volumeToDetach.NodeName)
 		}
 
-		glog.Infof(
-			"DetachVolume.Detach succeeded for volume %q (spec.Name: %q) from node %q.",
-			volumeToDetach.VolumeName,
-			volumeToDetach.VolumeSpec.Name(),
-			volumeToDetach.NodeName)
-
 		// Update actual state of world
+		glog.V(4).Infof("Mark volume %q as detached from node %q fow now",
+			volumeToDetach.VolumeName,
+			volumeToDetach.NodeName)
 		actualStateOfWorld.MarkVolumeAsDetached(
 			volumeToDetach.VolumeName, volumeToDetach.NodeName)
 
