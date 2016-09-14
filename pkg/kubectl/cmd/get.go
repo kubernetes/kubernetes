@@ -19,6 +19,7 @@ package cmd
 import (
 	"fmt"
 	"io"
+	"os"
 
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
@@ -433,6 +434,11 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 	w.Flush()
 	if printer != nil {
 		printer.AfterPrint(errOut, lastMapping.Resource)
+	}
+
+	// output empty list warning when no resources to display
+	if len(objs) == 0 {
+		fmt.Fprintf(os.Stderr, "%s\n", "There are no resources to display.")
 	}
 	return utilerrors.NewAggregate(allErrs)
 }
