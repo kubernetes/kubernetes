@@ -362,7 +362,7 @@ func (m *PortMapping) GetHostIp() string {
 	return ""
 }
 
-// Mount specifies the volume mount for the sandbox
+// Mount specifies a volume mount for a container.
 type Mount struct {
 	// The name of the volume mount.
 	Name *string `protobuf:"bytes,1,opt,name=name" json:"name,omitempty"`
