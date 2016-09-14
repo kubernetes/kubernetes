@@ -129,10 +129,6 @@ func (cc *CertificateController) Run(workers int, stopCh <-chan struct{}) {
 
 	go cc.csrController.Run(stopCh)
 
-	if !framework.WaitForCacheSync(stopCh, cc.csrStoreSynced) {
-		return
-	}
-
 	glog.Infof("Starting certificate controller manager")
 	for i := 0; i < workers; i++ {
 		go wait.Until(cc.worker, time.Second, stopCh)
@@ -143,7 +139,7 @@ func (cc *CertificateController) Run(workers int, stopCh <-chan struct{}) {
 
 // worker runs a thread that dequeues CSRs, handles them, and marks them done.
 func (cc *CertificateController) worker() {
-	defer glog.Infof("certificate controller worker shutting down")
+	defer glog.Infof("certificate controller work queue is quit")
 	for cc.processNextWorkItem() {
 	}
 }
@@ -170,7 +166,7 @@ func (cc *CertificateController) processNextWorkItem() bool {
 func (cc *CertificateController) enqueueCertificateRequest(obj interface{}) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
-		glog.Errorf("Couldn't get key for object %+v: %v", obj, err)
+		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", obj, err))
 		return
 	}
 	cc.queue.Add(key)
@@ -253,7 +249,7 @@ func (cc *CertificateController) maybeAutoApproveCSR(csr *certificates.Certifica
 
 	x509cr, err := utilcertificates.ParseCertificateRequestObject(csr)
 	if err != nil {
-		glog.Errorf("unable to parse csr %q: %v", csr.ObjectMeta.Name, err)
+		utilruntime.HandleError(fmt.Errorf("unable to parse csr %q: %v", csr.Name, err))
 		return csr, nil
 	}
 	if !reflect.DeepEqual([]string{"system:nodes"}, x509cr.Subject.Organization) {
