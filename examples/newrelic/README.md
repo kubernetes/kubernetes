@@ -92,8 +92,6 @@ spec:
       # Filter to specific nodes:
       # nodeSelector:
       #  app: newrelic
-      securityContext:
-        privileged: true
       hostPID: true
       hostIPC: true
       hostNetwork: true
@@ -106,6 +104,8 @@ spec:
               value: "/var/log/nrsysmond.log"
           image: newrelic/nrsysmond
           name: newrelic
+          securityContext:
+            privileged: true
           command: [ "bash", "-c", "source /etc/kube-newrelic/config && /usr/sbin/nrsysmond -E -F" ]
           volumeMounts:
             - name: newrelic-config
