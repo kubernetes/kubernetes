@@ -72,7 +72,7 @@ func makeAndSetFakePod(m *kubeGenericRuntimeManager, fakeRuntime *apitest.FakeRu
 }
 
 func makeFakePodSandbox(m *kubeGenericRuntimeManager, pod *api.Pod) (*apitest.FakePodSandbox, error) {
-	config, err := m.generatePodSandboxConfig(pod, "", 0)
+	config, err := m.generatePodSandboxConfig(pod, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -116,7 +116,7 @@ func makeFakeContainer(m *kubeGenericRuntimeManager, pod *api.Pod, container api
 }
 
 func makeFakeContainers(m *kubeGenericRuntimeManager, pod *api.Pod, containers []api.Container) ([]*apitest.FakeContainer, error) {
-	sandboxConfig, err := m.generatePodSandboxConfig(pod, "", 0)
+	sandboxConfig, err := m.generatePodSandboxConfig(pod, 0)
 	if err != nil {
 		return nil, err
 	}

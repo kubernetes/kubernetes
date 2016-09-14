@@ -39,7 +39,8 @@ import (
 	"k8s.io/kubernetes/pkg/util/term"
 )
 
-// startContainer starts a container through the following steps:
+// startContainer starts a container and returns a message indicates why it is failed on error.
+// It starts the container through the following steps:
 // * pull the image
 // * create the container
 // * start the container
@@ -54,7 +55,7 @@ func (m *kubeGenericRuntimeManager) startContainer(podSandboxID string, podSandb
 	// Step 2: create the container.
 	ref, err := kubecontainer.GenerateContainerRef(pod, container)
 	if err != nil {
-		glog.Errorf("Can't make a ref to pod %q, container %v: '%v'", format.Pod(pod), container.Name, err)
+		glog.Errorf("Can't make a ref to pod %q, container %v: %v", format.Pod(pod), container.Name, err)
 	}
 	glog.V(4).Infof("Generating ref for container %s: %#v", container.Name, ref)
 
