@@ -83,6 +83,21 @@ parameters:
 * `type`: `pd-standard` or `pd-ssd`. Default: `pd-ssd`
 * `zone`: GCE zone. If not specified, a random zone in the same region as controller-manager will be chosen.
 
+#### vSphere
+
+```yaml
+kind: StorageClass
+apiVersion: storage.k8s.io/v1beta1
+metadata:
+  name: slow
+provisioner: kubernetes.io/vsphere-volume
+parameters:
+  diskformat: thin
+```
+
+* `diskformat`: `thin`, `zeroedthick` and `eagerzeroedthick`. See vSphere docs for details. Default: `"thin"`.
+
+
 #### GLUSTERFS
 
 ```yaml
