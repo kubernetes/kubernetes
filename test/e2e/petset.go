@@ -59,15 +59,21 @@ const (
 // GCE Quota requirements: 3 pds, one per pet manifest declared above.
 // GCE Api requirements: nodes and master need storage r/w permissions.
 var _ = framework.KubeDescribe("PetSet [Slow] [Feature:PetSet]", func() {
-	f := framework.NewDefaultFramework("petset")
+	options := framework.FrameworkOptions{
+		GroupVersion: &unversioned.GroupVersion{Group: apps.GroupName, Version: "v1alpha1"},
+	}
+	f := framework.NewFramework("petset", options, nil)
 	var ns string
 	var c *client.Client
 
 	BeforeEach(func() {
-		// PetSet is in alpha, so it's disabled on all platforms except GCE.
+		// PetSet is in alpha, so it's disabled on some platforms. We skip this
+		// test if a resource get fails on non-GCE platforms.
 		// In theory, tests that restart pets should pass on any platform with a
 		// dynamic volume provisioner.
-		framework.SkipUnlessProviderIs("gce")
+		if !framework.ProviderIs("gce") {
+			framework.SkipIfMissingResource(f.ClientPool, unversioned.GroupVersionResource{Group: apps.GroupName, Version: "v1alpha1", Resource: "petsets"}, f.Namespace.Name)
+		}
 
 		c = f.Client
 		ns = f.Namespace.Name
@@ -166,10 +172,6 @@ var _ = framework.KubeDescribe("PetSet [Slow] [Feature:PetSet]", func() {
 	})
 
 	framework.KubeDescribe("Deploy clustered applications [Slow] [Feature:PetSet]", func() {
-		BeforeEach(func() {
-			framework.SkipUnlessProviderIs("gce")
-		})
-
 		AfterEach(func() {
 			if CurrentGinkgoTestDescription().Failed {
 				dumpDebugInfo(c, ns)
