@@ -42,6 +42,9 @@ HOSTNAME_OVERRIDE=${HOSTNAME_OVERRIDE:-"127.0.0.1"}
 CLOUD_PROVIDER=${CLOUD_PROVIDER:-""}
 CLOUD_CONFIG=${CLOUD_CONFIG:-""}
 
+# START_MODE can be 'all', 'kubeletonly', or 'nokubelet'
+START_MODE=${START_MODE:-"all"}
+
 # sanity check for OpenStack provider
 if [ "${CLOUD_PROVIDER}" == "openstack" ]; then
     if [ "${CLOUD_CONFIG}" == "" ]; then
@@ -133,6 +136,7 @@ CHAOS_CHANCE=${CHAOS_CHANCE:-0.0}
 CPU_CFS_QUOTA=${CPU_CFS_QUOTA:-false}
 ENABLE_HOSTPATH_PROVISIONER=${ENABLE_HOSTPATH_PROVISIONER:-"false"}
 CLAIM_BINDER_SYNC_PERIOD=${CLAIM_BINDER_SYNC_PERIOD:-"15s"} # current k8s default
+ENABLE_CONTROLLER_ATTACH_DETACH=${ENABLE_CONTROLLER_ATTACH_DETACH:-"true"} # current default
 
 function test_apiserver_off {
     # For the common local scenario, fail fast if server is already running.
@@ -248,7 +252,7 @@ cleanup()
   exit 0
 }
 
-function startETCD {
+function start_etcd {
     echo "Starting etcd"
     kube::etcd::start
 }
@@ -337,6 +341,11 @@ function start_controller_manager {
 function start_kubelet {
     KUBELET_LOG=/tmp/kubelet.log
 
+    priv_arg=""
+    if [[ -n "${ALLOW_PRIVILEGED}" ]]; then
+      priv_arg="--allow-privileged "
+    fi
+
     mkdir -p /var/lib/kubelet
     if [[ -z "${DOCKERIZE_KUBELET}" ]]; then
       # On selinux enabled systems, it might
@@ -398,6 +407,7 @@ function start_kubelet {
         --address="${KUBELET_HOST}" \
         --api-servers="${API_HOST}:${API_PORT}" \
         --cpu-cfs-quota=${CPU_CFS_QUOTA} \
+        --enable-controller-attach-detach="${ENABLE_CONTROLLER_ATTACH_DETACH}" \
         ${dns_args} \
         ${net_plugin_dir_args} \
         ${net_plugin_args} \
@@ -440,7 +450,7 @@ function start_kubelet {
         -i \
         --cidfile=$KUBELET_CIDFILE \
         gcr.io/google_containers/kubelet \
-        /kubelet --v=${LOG_LEVEL} --containerized ${priv_arg}--chaos-chance="${CHAOS_CHANCE}" --hostname-override="${HOSTNAME_OVERRIDE}" --cloud-provider="${CLOUD_PROVIDER}" --cloud-config="${CLOUD_CONFIG}" \ --address="127.0.0.1" --api-servers="${API_HOST}:${API_PORT}" --port="$KUBELET_PORT"  &> $KUBELET_LOG &
+        /kubelet --v=${LOG_LEVEL} --containerized ${priv_arg}--chaos-chance="${CHAOS_CHANCE}" --hostname-override="${HOSTNAME_OVERRIDE}" --cloud-provider="${CLOUD_PROVIDER}" --cloud-config="${CLOUD_CONFIG}" \ --address="127.0.0.1" --api-servers="${API_HOST}:${API_PORT}" --port="$KUBELET_PORT"  --enable-controller-attach-detach="${ENABLE_CONTROLLER_ATTACH_DETACH}" &> $KUBELET_LOG &
     fi
 }
 
@@ -498,16 +508,29 @@ EOF
 }
 
 function print_success {
-cat <<EOF
+if [[ "${START_MODE}" != "kubeletonly" ]]; then
+  cat <<EOF
 Local Kubernetes cluster is running. Press Ctrl-C to shut it down.
 
 Logs:
-  ${APISERVER_LOG}
-  ${CTLRMGR_LOG}
-  ${PROXY_LOG}
-  ${SCHEDULER_LOG}
-  ${KUBELET_LOG}
+  ${APISERVER_LOG:-}
+  ${CTLRMGR_LOG:-}
+  ${PROXY_LOG:-}
+  ${SCHEDULER_LOG:-}
+EOF
+fi
 
+if [[ "${START_MODE}" == "all" ]]; then
+  echo "  ${KUBELET_LOG}"
+elif [[ "${START_MODE}" == "nokubelet" ]]; then
+  echo
+  echo "No kubelet was started because you set START_MODE=nokubelet"
+  echo "Run this script again with START_MODE=kubeletonly to run a kubelet"
+fi
+
+if [[ "${START_MODE}" != "kubeletonly" ]]; then
+  echo
+  cat <<EOF
 To start using your cluster, open up another terminal/tab and run:
 
   export KUBERNETES_PROVIDER=local
@@ -517,10 +540,22 @@ To start using your cluster, open up another terminal/tab and run:
   cluster/kubectl.sh config use-context local
   cluster/kubectl.sh
 EOF
+else 
+  cat <<EOF
+The kubelet was started.
+
+Logs:
+  ${KUBELET_LOG}
+EOF
+fi
 }
 
 test_docker
-test_apiserver_off
+
+if [[ "${START_MODE}" != "kubeletonly" ]]; then
+  test_apiserver_off
+fi
+
 test_openssl_installed
 
 ### IF the user didn't supply an output/ for the build... Then we detect.
@@ -533,14 +568,21 @@ KUBELET_CIDFILE=/tmp/kubelet.cid
 if [[ "${ENABLE_DAEMON}" = false ]]; then
 trap cleanup EXIT
 fi
+
 echo "Starting services now!"
-startETCD
-set_service_accounts
-start_apiserver
-start_controller_manager
-start_kubelet
-start_kubeproxy
-start_kubedns
+if [[ "${START_MODE}" != "kubeletonly" ]]; then
+  start_etcd
+  set_service_accounts
+  start_apiserver
+  start_controller_manager
+  start_kubeproxy
+  start_kubedns
+fi
+
+if [[ "${START_MODE}" != "nokubelet" ]]; then
+  start_kubelet
+fi  
+
 print_success
 
 if [[ "${ENABLE_DAEMON}" = false ]]; then
