@@ -65,9 +65,11 @@ message VersionResponse {
     optional string version = 1;
     // The name of the container runtime.
     optional string runtime_name = 2;
-    // The version of the container runtime.
+    // The version of the container runtime. The string should be
+    // semver-compatible.
     optional string runtime_version = 3;
-    // The API version of the container runtime.
+    // The API version of the container runtime. The string should be
+    // semver-compatible.
     optional string runtime_api_version = 4;
 }
 
