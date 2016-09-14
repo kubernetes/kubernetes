@@ -327,6 +327,11 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 			allErrs = append(allErrs, err)
 		}
 		printer.AfterPrint(errOut, res)
+
+		// output empty list warning when no resources to display
+		if len(infos) == 0 {
+			fmt.Fprintf(os.Stderr, "%s\n", "There are no resources to display.")
+		}
 		return utilerrors.NewAggregate(allErrs)
 	}
 
