@@ -67,10 +67,13 @@ var _ = framework.KubeDescribe("PetSet [Slow] [Feature:PetSet]", func() {
 	var c *client.Client
 
 	BeforeEach(func() {
-		// PetSet is in alpha, so it's disabled on all platforms except GCE.
+		// PetSet is in alpha, so it's disabled on some platforms. We skip this
+		// test if a resource get fails on non-GCE platforms.
 		// In theory, tests that restart pets should pass on any platform with a
 		// dynamic volume provisioner.
-		framework.SkipIfMissingResource(f.ClientPool, unversioned.GroupVersionResource{Group: apps.GroupName, Version: "v1alpha1", Resource: "petsets"}, f.Namespace.Name)
+		if !framework.ProviderIs("gce") {
+			framework.SkipIfMissingResource(f.ClientPool, unversioned.GroupVersionResource{Group: apps.GroupName, Version: "v1alpha1", Resource: "petsets"}, f.Namespace.Name)
+		}
 
 		c = f.Client
 		ns = f.Namespace.Name
