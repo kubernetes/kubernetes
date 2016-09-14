@@ -295,8 +295,7 @@ func TestLeastRequested(t *testing.T) {
 
 	for _, test := range tests {
 		nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(test.pods, test.nodes)
-		lrp := priorityFunction(LeastRequestedPriorityMap, nil)
-		list, err := lrp(test.pod, nodeNameToInfo, test.nodes)
+		list, err := priorityFunction(LeastRequestedPriorityMap, nil)(test.pod, nodeNameToInfo, test.nodes)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -451,7 +450,7 @@ func TestMostRequested(t *testing.T) {
 
 	for _, test := range tests {
 		nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(test.pods, test.nodes)
-		list, err := MostRequestedPriority(test.pod, nodeNameToInfo, test.nodes)
+		list, err := priorityFunction(MostRequestedPriorityMap, nil)(test.pod, nodeNameToInfo, test.nodes)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -541,11 +540,8 @@ func TestNewNodeLabelPriority(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		prioritizer := NodeLabelPrioritizer{
-			label:    test.label,
-			presence: test.presence,
-		}
-		list, err := prioritizer.CalculateNodeLabelPriority(nil, map[string]*schedulercache.NodeInfo{}, test.nodes)
+		nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(nil, test.nodes)
+		list, err := priorityFunction(NewNodeLabelPriority(test.label, test.presence))(nil, nodeNameToInfo, test.nodes)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -784,7 +780,7 @@ func TestBalancedResourceAllocation(t *testing.T) {
 
 	for _, test := range tests {
 		nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(test.pods, test.nodes)
-		list, err := BalancedResourceAllocation(test.pod, nodeNameToInfo, test.nodes)
+		list, err := priorityFunction(BalancedResourceAllocationMap, nil)(test.pod, nodeNameToInfo, test.nodes)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -928,7 +924,7 @@ func TestImageLocalityPriority(t *testing.T) {
 
 	for _, test := range tests {
 		nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(test.pods, test.nodes)
-		list, err := ImageLocalityPriority(test.pod, nodeNameToInfo, test.nodes)
+		list, err := priorityFunction(ImageLocalityPriorityMap, nil)(test.pod, nodeNameToInfo, test.nodes)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -1152,7 +1148,8 @@ func TestNodePreferAvoidPriority(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		list, err := CalculateNodePreferAvoidPodsPriority(test.pod, map[string]*schedulercache.NodeInfo{}, test.nodes)
+		nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(nil, test.nodes)
+		list, err := priorityFunction(CalculateNodePreferAvoidPodsPriorityMap, nil)(test.pod, nodeNameToInfo, test.nodes)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
