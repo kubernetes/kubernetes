@@ -116,6 +116,7 @@ func setUp(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.
 	config.ProxyDialer = func(network, addr string) (net.Conn, error) { return nil, nil }
 	config.ProxyTLSClientConfig = &tls.Config{}
 	config.RequestContextMapper = api.NewRequestContextMapper()
+	config.Config.EnableVersion = true
 
 	// TODO: this is kind of hacky.  The trouble is that the sync loop
 	// runs in a go-routine and there is no way to validate in the test
@@ -1263,7 +1264,6 @@ func TestValidOpenAPISpec(t *testing.T) {
 
 	config.EnableOpenAPISupport = true
 	config.EnableIndex = true
-	config.EnableVersion = true
 	config.OpenAPIInfo = spec.Info{
 		InfoProps: spec.InfoProps{
 			Title:   "Kubernetes",
