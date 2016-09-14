@@ -85,7 +85,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 
 `)...)
 
-	targets := []*types.Type{}
+	targets := []*types.Package{}
 	for i := range inputs {
 		glog.V(5).Infof("considering pkg %q", i)
 		pkg, ok := context.Universe[i]
@@ -93,11 +93,9 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 			// If the input had no Go files, for example.
 			continue
 		}
-		for _, t := range pkg.Types {
-			if hasOpenAPITagValue(t.CommentLines, tagTargetType) {
-				glog.V(5).Infof("target type : %q", t)
-				targets = append(targets, t)
-			}
+		if hasOpenAPITagValue(pkg.Comments, tagTargetType) || hasOpenAPITagValue(pkg.DocComments, tagTargetType) {
+			glog.V(5).Infof("target package : %q", pkg)
+			targets = append(targets, pkg)
 		}
 	}
 	switch len(targets) {
@@ -106,7 +104,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 		// and build excluded the target package.
 		return generator.Packages{}
 	case 1:
-		pkg := context.Universe[targets[0].Name.Package]
+		pkg := targets[0]
 		return generator.Packages{&generator.DefaultPackage{
 			PackageName: strings.Split(filepath.Base(pkg.Path), ".")[0],
 			PackagePath: pkg.Path,
@@ -144,27 +142,27 @@ const (
 // openApiGen produces a file with auto-generated OpenAPI functions.
 type openAPIGen struct {
 	generator.DefaultGen
-	// TargetType is the type that will get OpenAPIDefinitions method returning all definitions.
-	targetType *types.Type
-	imports    namer.ImportTracker
-	context    *generator.Context
+	// TargetPackage is the package that will get OpenAPIDefinitions variable contains all open API definitions.
+	targetPackage *types.Package
+	imports       namer.ImportTracker
+	context       *generator.Context
 }
 
-func NewOpenAPIGen(sanitizedName string, targetType *types.Type, context *generator.Context) generator.Generator {
+func NewOpenAPIGen(sanitizedName string, targetPackage *types.Package, context *generator.Context) generator.Generator {
 	return &openAPIGen{
 		DefaultGen: generator.DefaultGen{
 			OptionalName: sanitizedName,
 		},
-		imports:    generator.NewImportTracker(),
-		targetType: targetType,
-		context:    context,
+		imports:       generator.NewImportTracker(),
+		targetPackage: targetPackage,
+		context:       context,
 	}
 }
 
 func (g *openAPIGen) Namers(c *generator.Context) namer.NameSystems {
 	// Have the raw namer for this file track what it imports.
 	return namer.NameSystems{
-		"raw": namer.NewRawNamer(g.targetType.Name.Package, g.imports),
+		"raw": namer.NewRawNamer(g.targetPackage.Path, g.imports),
 	}
 }
 
@@ -177,10 +175,10 @@ func (g *openAPIGen) Filter(c *generator.Context, t *types.Type) bool {
 }
 
 func (g *openAPIGen) isOtherPackage(pkg string) bool {
-	if pkg == g.targetType.Name.Package {
+	if pkg == g.targetPackage.Path {
 		return false
 	}
-	if strings.HasSuffix(pkg, "\""+g.targetType.Name.Package+"\"") {
+	if strings.HasSuffix(pkg, "\""+g.targetPackage.Path+"\"") {
 		return false
 	}
 	return true
@@ -205,14 +203,14 @@ func argsFromType(t *types.Type) generator.Args {
 
 func (g *openAPIGen) Init(c *generator.Context, w io.Writer) error {
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
-	sw.Do("func (_ $.type|raw$) OpenAPIDefinitions() *$.OpenAPIDefinitions|raw$ {\n", argsFromType(g.targetType))
-	sw.Do("return &$.OpenAPIDefinitions|raw${\n", argsFromType(nil))
+	sw.Do("var OpenAPIDefinitions *$.OpenAPIDefinitions|raw$ = ", argsFromType(nil))
+	sw.Do("&$.OpenAPIDefinitions|raw${\n", argsFromType(nil))
 	return sw.Error()
 }
 
 func (g *openAPIGen) Finalize(c *generator.Context, w io.Writer) error {
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
-	sw.Do("}\n}\n", nil)
+	sw.Do("}\n", nil)
 	return sw.Error()
 }
 

@@ -71,6 +71,7 @@ import (
 	"github.com/go-openapi/validate"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
+	"k8s.io/kubernetes/pkg/generated/openapi"
 )
 
 // setUp is a convience function for setting up for (most) tests.
@@ -1237,6 +1238,7 @@ func TestValidOpenAPISpec(t *testing.T) {
 	_, etcdserver, config, assert := setUp(t)
 	defer etcdserver.Terminate(t)
 
+	config.OpenAPIDefinitions = openapi.OpenAPIDefinitions
 	config.EnableOpenAPISupport = true
 	config.EnableIndex = true
 	config.OpenAPIInfo = spec.Info{
