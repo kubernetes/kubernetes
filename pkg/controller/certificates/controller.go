@@ -58,7 +58,11 @@ type CertificateController struct {
 
 	signer *local.Signer
 
-	queue *workqueue.Type
+	queue workqueue.RateLimitingInterface
+
+	// csrStoreSynced returns true if the csr store has been synced at least once.
+	// Added as a member to the struct to allow injection for testing.
+	csrStoreSynced framework.InformerSynced
 }
 
 func NewCertificateController(kubeClient clientset.Interface, syncPeriod time.Duration, caCertFile, caKeyFile string, approveAllKubeletCSRsForGroup string) (*CertificateController, error) {
@@ -79,7 +83,7 @@ func NewCertificateController(kubeClient clientset.Interface, syncPeriod time.Du
 
 	cc := &CertificateController{
 		kubeClient: kubeClient,
-		queue:      workqueue.NewNamed("certificate"),
+		queue:      workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "certificate"),
 		signer:     ca,
 		approveAllKubeletCSRsForGroup: approveAllKubeletCSRsForGroup,
 	}
@@ -121,31 +125,46 @@ func NewCertificateController(kubeClient clientset.Interface, syncPeriod time.Du
 // Run the main goroutine responsible for watching and syncing jobs.
 func (cc *CertificateController) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
+	defer cc.queue.ShutDown()
+
 	go cc.csrController.Run(stopCh)
+
+	if !framework.WaitForCacheSync(stopCh, cc.csrStoreSynced) {
+		return
+	}
+
 	glog.Infof("Starting certificate controller manager")
 	for i := 0; i < workers; i++ {
 		go wait.Until(cc.worker, time.Second, stopCh)
 	}
 	<-stopCh
 	glog.Infof("Shutting down certificate controller")
-	cc.queue.ShutDown()
 }
 
 // worker runs a thread that dequeues CSRs, handles them, and marks them done.
 func (cc *CertificateController) worker() {
-	for {
-		func() {
-			key, quit := cc.queue.Get()
-			if quit {
-				return
-			}
-			defer cc.queue.Done(key)
-			err := cc.syncHandler(key.(string))
-			if err != nil {
-				glog.Errorf("Error syncing CSR: %v", err)
-			}
-		}()
+	defer glog.Infof("certificate controller worker shutting down")
+	for cc.processNextWorkItem() {
 	}
+}
+
+// processNextWorkItem deals with one key off the queue.  It returns false when it's time to quit.
+func (cc *CertificateController) processNextWorkItem() bool {
+	cKey, quit := cc.queue.Get()
+	if quit {
+		return false
+	}
+	defer cc.queue.Done(cKey)
+
+	err := cc.syncHandler(cKey.(string))
+	if err == nil {
+		cc.queue.Forget(cKey)
+		return true
+	}
+
+	cc.queue.AddRateLimited(cKey)
+	utilruntime.HandleError(fmt.Errorf("%v failed with : %v", cKey, err))
+	return true
 }
 
 func (cc *CertificateController) enqueueCertificateRequest(obj interface{}) {
@@ -180,7 +199,6 @@ func (cc *CertificateController) maybeSignCertificate(key string) error {
 	}()
 	obj, exists, err := cc.csrStore.Store.GetByKey(key)
 	if err != nil {
-		cc.queue.Add(key)
 		return err
 	}
 	if !exists {
