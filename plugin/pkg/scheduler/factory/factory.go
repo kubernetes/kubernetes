@@ -531,10 +531,13 @@ func (factory *ConfigFactory) makeDefaultErrorFunc(backoff *podBackoff, podQueue
 				return
 			}
 			// Get the pod again; it may have changed/been scheduled already.
-			pod = &api.Pod{}
 			getBackoff := initialGetBackoff
 			for {
-				if err := factory.Client.Get().Namespace(podID.Namespace).Resource("pods").Name(podID.Name).Do().Into(pod); err == nil {
+				pod, err := factory.Client.Pods(podID.Namespace).Get(podID.Name)
+				if err == nil {
+					if len(pod.Spec.NodeName) == 0 {
+						podQueue.AddIfNotPresent(pod)
+					}
 					break
 				}
 				if errors.IsNotFound(err) {
@@ -546,9 +549,6 @@ func (factory *ConfigFactory) makeDefaultErrorFunc(backoff *podBackoff, podQueue
 					getBackoff = maximalGetBackoff
 				}
 				time.Sleep(getBackoff)
-			}
-			if pod.Spec.NodeName == "" {
-				podQueue.AddIfNotPresent(pod)
 			}
 		}()
 	}
