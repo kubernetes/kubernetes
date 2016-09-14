@@ -67,8 +67,19 @@ func ValidateSelfSubjectAccessReview(sar *authorizationapi.SelfSubjectAccessRevi
 
 func ValidateLocalSubjectAccessReview(sar *authorizationapi.LocalSubjectAccessReview) field.ErrorList {
 	allErrs := ValidateSubjectAccessReviewSpec(sar.Spec, field.NewPath("spec"))
-	if !api.Semantic.DeepEqual(api.ObjectMeta{}, sar.ObjectMeta) {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("metadata"), sar.ObjectMeta, `must be empty`))
+
+	objectMetaShallowCopy := sar.ObjectMeta
+	objectMetaShallowCopy.Namespace = ""
+	if !api.Semantic.DeepEqual(api.ObjectMeta{}, objectMetaShallowCopy) {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("metadata"), sar.ObjectMeta, `must be empty except for namespace`))
 	}
+
+	if sar.Spec.ResourceAttributes != nil && sar.Spec.ResourceAttributes.Namespace != sar.Namespace {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("spec.resourceAttributes.namespace"), sar.Spec.ResourceAttributes.Namespace, `must match metadata.namespace`))
+	}
+	if sar.Spec.NonResourceAttributes != nil {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("spec.nonResourceAttributes"), sar.Spec.NonResourceAttributes, `disallowed on this kind of request`))
+	}
+
 	return allErrs
 }

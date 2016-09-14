@@ -26,6 +26,10 @@ type FakeAuthorization struct {
 	*core.Fake
 }
 
+func (c *FakeAuthorization) LocalSubjectAccessReviews(namespace string) unversioned.LocalSubjectAccessReviewInterface {
+	return &FakeLocalSubjectAccessReviews{c, namespace}
+}
+
 func (c *FakeAuthorization) SelfSubjectAccessReviews() unversioned.SelfSubjectAccessReviewInterface {
 	return &FakeSelfSubjectAccessReviews{c}
 }
