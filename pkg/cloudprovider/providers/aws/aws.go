@@ -136,6 +136,19 @@ const ServiceAnnotationLoadBalancerSSLPorts = "service.beta.kubernetes.io/aws-lo
 // a HTTP listener is used.
 const ServiceAnnotationLoadBalancerBEProtocol = "service.beta.kubernetes.io/aws-load-balancer-backend-protocol"
 
+const (
+	// volumeAttachmentStatusTimeout is the maximum time to wait for a volume attach/detach to complete
+	volumeAttachmentStatusTimeout = 30 * time.Minute
+	// volumeAttachmentConsecutiveErrorLimit is the number of consecutive errors we will ignore when waiting for a volume to attach/detach
+	volumeAttachmentStatusConsecutiveErrorLimit = 10
+	// volumeAttachmentErrorDelay is the amount of time we wait before retrying after encountering an error,
+	// while waiting for a volume attach/detach to complete
+	volumeAttachmentStatusErrorDelay = 20 * time.Second
+	// volumeAttachmentStatusPollInterval is the interval at which we poll the volume,
+	// while waiting for a volume attach/detach to complete
+	volumeAttachmentStatusPollInterval = 10 * time.Second
+)
+
 // Maps from backend protocol to ELB protocol
 var backendProtocolMapping = map[string]string{
 	"https": "https",
@@ -1319,13 +1332,28 @@ func (d *awsDisk) describeVolume() (*ec2.Volume, error) {
 // waitForAttachmentStatus polls until the attachment status is the expected value
 // On success, it returns the last attachment state.
 func (d *awsDisk) waitForAttachmentStatus(status string) (*ec2.VolumeAttachment, error) {
-	attempt := 0
-	maxAttempts := 60
+	// We wait up to 30 minutes for the attachment to complete.
+	// This mirrors the GCE timeout.
+	timeoutAt := time.Now().UTC().Add(volumeAttachmentStatusTimeout).Unix()
+
+	// Because of rate limiting, we often see errors from describeVolume
+	// So we tolerate a limited number of failures.
+	// But once we see more than 10 errors in a row, we return the error
+	describeErrorCount := 0
 
 	for {
 		info, err := d.describeVolume()
 		if err != nil {
-			return nil, err
+			describeErrorCount++
+			if describeErrorCount > volumeAttachmentStatusConsecutiveErrorLimit {
+				return nil, err
+			} else {
+				glog.Warningf("Ignoring error from describe volume; will retry: %q", err)
+				time.Sleep(volumeAttachmentStatusErrorDelay)
+				continue
+			}
+		} else {
+			describeErrorCount = 0
 		}
 		if len(info.Attachments) > 1 {
 			// Shouldn't happen; log so we know if it is
@@ -1353,15 +1381,14 @@ func (d *awsDisk) waitForAttachmentStatus(status string) (*ec2.VolumeAttachment,
 			return attachment, nil
 		}
 
-		attempt++
-		if attempt > maxAttempts {
+		if time.Now().Unix() > timeoutAt {
 			glog.Warningf("Timeout waiting for volume state: actual=%s, desired=%s", attachmentStatus, status)
 			return nil, fmt.Errorf("Timeout waiting for volume state: actual=%s, desired=%s", attachmentStatus, status)
 		}
 
 		glog.V(2).Infof("Waiting for volume state: actual=%s, desired=%s", attachmentStatus, status)
 
-		time.Sleep(1 * time.Second)
+		time.Sleep(volumeAttachmentStatusPollInterval)
 	}
 }
 
