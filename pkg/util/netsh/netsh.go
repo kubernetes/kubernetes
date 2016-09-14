@@ -18,7 +18,10 @@ package netsh
 
 import (
 	"fmt"
+	"net"
+	"strings"
 	"sync"
+	"time"
 
 	"github.com/golang/glog"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
@@ -31,7 +34,7 @@ type Interface interface {
 	// DeletePortProxyRule deletes the specified portproxy rule.  If the rule did not exist, return error.
 	DeletePortProxyRule(args []string) error
 	// EnsureIPAddress checks if the specified IP Address is added to vEthernet (HNSTransparent) interface, if not, add it.  If the address existed, return true.
-	EnsureIPAddress(args []string) (bool, error)
+	EnsureIPAddress(args []string, ip net.IP) (bool, error)
 	// DeleteIPAddress checks if the specified IP address is present and, if so, deletes it.
 	DeleteIPAddress(args []string) error
 	// Restore runs `netsh exec` to restore portproxy or addresses using a file.
@@ -95,12 +98,33 @@ func (runner *runner) DeletePortProxyRule(args []string) error {
 }
 
 // EnsureIPAddress checks if the specified IP Address is added to vEthernet (HNSTransparent) interface, if not, add it.  If the address existed, return true.
-func (runner *runner) EnsureIPAddress(args []string) (bool, error) {
+func (runner *runner) EnsureIPAddress(args []string, ip net.IP) (bool, error) {
 	glog.V(4).Infof("running netsh interface ipv4 add address %v", args)
 	out, err := runner.exec.Command(cmdNetsh, args...).CombinedOutput()
 
 	if err == nil {
-		return true, nil
+		// Once the IP Address is added, it takes a bit to initialize and show up when querying for it
+		// Query all the IP addresses and see if the one we added is present
+		// PS: We are using netsh interface ipv4 show address here to query all the IP addresses, instead of
+		// querying net.InterfaceAddrs() as it returns the IP address as soon as it is added even though it is uninitialized
+		ipToWait := ip.String()
+		glog.V(3).Infof("Waiting until IP: %v is added to the network adapter", ipToWait)
+		args := []string{
+			"interface", "ipv4", "show", "address",
+			"name=" + "vEthernet (HNSTransparent)",
+		}
+		for {
+			ipAddress, err := runner.exec.Command(cmdNetsh, args...).CombinedOutput()
+			if err != nil {
+				return false, nil
+			}
+			ipAddressString := string(ipAddress[:])
+			glog.V(3).Infof("Searching for IP: %v in IP dump: %v", ipToWait, ipAddressString)
+			if strings.Contains(ipAddressString, ipToWait) {
+				return true, nil
+			}
+			time.Sleep(500 * time.Millisecond)
+		}
 	}
 	if ee, ok := err.(utilexec.ExitError); ok {
 		// netsh uses exit(0) to indicate a success of the operation,

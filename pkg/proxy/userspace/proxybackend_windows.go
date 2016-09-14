@@ -38,7 +38,7 @@ func (proxier *Proxier) openOnePortal(portal portal, protocol api.Protocol, prox
 
 	// Add IP address to "vEthernet (HNSTransparent)" so that portproxy could be used to redirect the traffic
 	args := proxier.netshIpv4AddressAddArgs(portal.ip)
-	existed, err := proxier.netsh.EnsureIPAddress(args)
+	existed, err := proxier.netsh.EnsureIPAddress(args, portal.ip)
 
 	if err != nil {
 		glog.Errorf("Failed to add ip address for service %q, args:%v", name, args)
