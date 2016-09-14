@@ -1183,6 +1183,7 @@ function kube-down() {
   fi
 
   # Delete the master replica pd (possibly leaked by kube-up if master create failed).
+  # TODO(jszczepkowski): remove also possibly leaked replicas' pds
   local -r replica-pd="${REPLICA_NAME:-${MASTER_NAME}}-pd"
   if gcloud compute disks describe "${replica-pd}" --zone "${ZONE}" --project "${PROJECT}" &>/dev/null; then
     gcloud compute disks delete \
