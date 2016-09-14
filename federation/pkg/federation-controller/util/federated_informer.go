@@ -29,7 +29,6 @@ import (
 	"k8s.io/kubernetes/pkg/client/cache"
 	kube_release_1_4 "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4"
 	"k8s.io/kubernetes/pkg/client/restclient"
-	"k8s.io/kubernetes/pkg/controller/framework"
 	pkg_runtime "k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/watch"
 
@@ -111,8 +110,8 @@ type FederatedInformerForTestOnly interface {
 }
 
 // A function that should be used to create an informer on the target object. Store should use
-// framework.DeletionHandlingMetaNamespaceKeyFunc as a keying function.
-type TargetInformerFactory func(*federation_api.Cluster, kube_release_1_4.Interface) (cache.Store, framework.ControllerInterface)
+// cache.DeletionHandlingMetaNamespaceKeyFunc as a keying function.
+type TargetInformerFactory func(*federation_api.Cluster, kube_release_1_4.Interface) (cache.Store, cache.ControllerInterface)
 
 // A structure with cluster lifecycle handler functions. Cluster is available (and ClusterAvailable is fired)
 // when it is created in federated etcd and ready. Cluster becomes unavailable (and ClusterUnavailable is fired)
@@ -154,7 +153,7 @@ func NewFederatedInformer(
 		return data
 	}
 
-	federatedInformer.clusterInformer.store, federatedInformer.clusterInformer.controller = framework.NewInformer(
+	federatedInformer.clusterInformer.store, federatedInformer.clusterInformer.controller = cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (pkg_runtime.Object, error) {
 				return federationClient.Federation().Clusters().List(options)
@@ -165,7 +164,7 @@ func NewFederatedInformer(
 		},
 		&federation_api.Cluster{},
 		clusterSyncPeriod,
-		framework.ResourceEventHandlerFuncs{
+		cache.ResourceEventHandlerFuncs{
 			DeleteFunc: func(old interface{}) {
 				oldCluster, ok := old.(*federation_api.Cluster)
 				if ok {
@@ -238,7 +237,7 @@ func isClusterReady(cluster *federation_api.Cluster) bool {
 }
 
 type informer struct {
-	controller framework.ControllerInterface
+	controller cache.ControllerInterface
 	store      cache.Store
 	stopChan   chan struct{}
 }
@@ -455,7 +454,7 @@ func (fs *federatedStoreImpl) GetFromAllClusters(key string) ([]FederatedObject,
 // GetKeyFor returns the key under which the item would be put in the store.
 func (fs *federatedStoreImpl) GetKeyFor(item interface{}) string {
 	// TODO: support other keying functions.
-	key, _ := framework.DeletionHandlingMetaNamespaceKeyFunc(item)
+	key, _ := cache.DeletionHandlingMetaNamespaceKeyFunc(item)
 	return key
 }
 

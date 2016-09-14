@@ -36,8 +36,7 @@ import (
 	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/controller/framework"
-	"k8s.io/kubernetes/pkg/controller/framework/informers"
+	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
@@ -81,7 +80,7 @@ type ReplicaSetController struct {
 	// we have a personal informer, we must start it ourselves.   If you start
 	// the controller using NewReplicationManager(passing SharedInformer), this
 	// will be null
-	internalPodInformer framework.SharedIndexInformer
+	internalPodInformer cache.SharedIndexInformer
 
 	// A ReplicaSet is temporarily suspended after creating/deleting these many replicas.
 	// It resumes normal action after observing the watch events for them.
@@ -95,11 +94,11 @@ type ReplicaSetController struct {
 	// A store of ReplicaSets, populated by the rsController
 	rsStore cache.StoreToReplicaSetLister
 	// Watches changes to all ReplicaSets
-	rsController *framework.Controller
+	rsController *cache.Controller
 	// A store of pods, populated by the podController
 	podStore cache.StoreToPodLister
 	// Watches changes to all pods
-	podController framework.ControllerInterface
+	podController cache.ControllerInterface
 	// podStoreSynced returns true if the pod store has been synced at least once.
 	// Added as a member to the struct to allow injection for testing.
 	podStoreSynced func() bool
@@ -115,7 +114,7 @@ type ReplicaSetController struct {
 }
 
 // NewReplicaSetController creates a new ReplicaSetController.
-func NewReplicaSetController(podInformer framework.SharedIndexInformer, kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFunc, burstReplicas int, lookupCacheSize int, garbageCollectorEnabled bool) *ReplicaSetController {
+func NewReplicaSetController(podInformer cache.SharedIndexInformer, kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFunc, burstReplicas int, lookupCacheSize int, garbageCollectorEnabled bool) *ReplicaSetController {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
 	eventBroadcaster.StartRecordingToSink(&unversionedcore.EventSinkImpl{Interface: kubeClient.Core().Events("")})
@@ -126,7 +125,7 @@ func NewReplicaSetController(podInformer framework.SharedIndexInformer, kubeClie
 }
 
 // newReplicaSetController configures a replica set controller with the specified event recorder
-func newReplicaSetController(eventRecorder record.EventRecorder, podInformer framework.SharedIndexInformer, kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFunc, burstReplicas int, lookupCacheSize int, garbageCollectorEnabled bool) *ReplicaSetController {
+func newReplicaSetController(eventRecorder record.EventRecorder, podInformer cache.SharedIndexInformer, kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFunc, burstReplicas int, lookupCacheSize int, garbageCollectorEnabled bool) *ReplicaSetController {
 	if kubeClient != nil && kubeClient.Core().GetRESTClient().GetRateLimiter() != nil {
 		metrics.RegisterMetricAndTrackRateLimiterUsage("replicaset_controller", kubeClient.Core().GetRESTClient().GetRateLimiter())
 	}
@@ -143,7 +142,7 @@ func newReplicaSetController(eventRecorder record.EventRecorder, podInformer fra
 		garbageCollectorEnabled: garbageCollectorEnabled,
 	}
 
-	rsc.rsStore.Store, rsc.rsController = framework.NewInformer(
+	rsc.rsStore.Store, rsc.rsController = cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				return rsc.kubeClient.Extensions().ReplicaSets(api.NamespaceAll).List(options)
@@ -155,7 +154,7 @@ func newReplicaSetController(eventRecorder record.EventRecorder, podInformer fra
 		&extensions.ReplicaSet{},
 		// TODO: Can we have much longer period here?
 		FullControllerResyncPeriod,
-		framework.ResourceEventHandlerFuncs{
+		cache.ResourceEventHandlerFuncs{
 			AddFunc:    rsc.enqueueReplicaSet,
 			UpdateFunc: rsc.updateRS,
 			// This will enter the sync loop and no-op, because the replica set has been deleted from the store.
@@ -165,7 +164,7 @@ func newReplicaSetController(eventRecorder record.EventRecorder, podInformer fra
 		},
 	)
 
-	podInformer.AddEventHandler(framework.ResourceEventHandlerFuncs{
+	podInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: rsc.addPod,
 		// This invokes the ReplicaSet for every pod change, eg: host assignment. Though this might seem like
 		// overkill the most frequent pod update is status, and the associated ReplicaSet will only list from

@@ -21,13 +21,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hashicorp/golang-lru"
-
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
+
+	"github.com/hashicorp/golang-lru"
 )
 
 func getResourceList(cpu, memory string) api.ResourceList {
