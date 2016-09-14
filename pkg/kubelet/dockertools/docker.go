@@ -45,6 +45,7 @@ import (
 const (
 	PodInfraContainerName = leaky.PodInfraContainerName
 	DockerPrefix          = "docker://"
+	DockerPullablePrefix  = "docker-pullable://"
 	LogSuffix             = "log"
 	ext4MaxFileNameLen    = 255
 )
@@ -153,6 +154,14 @@ func filterHTTPError(err error, image string) error {
 
 // Check if the inspected image matches what we are looking for
 func matchImageTagOrSHA(inspected dockertypes.ImageInspect, image string) bool {
+	// NB: the code below this check checks for validity of `image` as a pull spec.
+	// However, it can be useful to also inspect images by ID (config digest, e.g.
+	// when determining the manifest digestof the image in use by a container).
+	// If we literally just pass an image ID here assume that's fine.
+	if inspected.ID == image {
+		return true
+	}
+
 	// The image string follows the grammar specified here
 	// https://github.com/docker/distribution/blob/master/reference/reference.go#L4
 	named, err := dockerref.ParseNamed(image)
@@ -202,6 +211,8 @@ func matchImageTagOrSHA(inspected dockertypes.ImageInspect, image string) bool {
 		}
 		if digest.Digest().Algorithm().String() == id.Algorithm().String() && digest.Digest().Hex() == id.Hex() {
 			return true
+		} else {
+			glog.Infof("DIGEST: %v != %v", digest.Digest().Hex(), id.Hex())
 		}
 	}
 	glog.V(4).Infof("Inspected image (%q) does not match %s", inspected.ID, image)
