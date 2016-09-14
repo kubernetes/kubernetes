@@ -45,36 +45,37 @@ spec:
             - mountPath: /var/run/calico
               name: var-run-calico
               readOnly: false
-          # This container installs the Calico CNI binaries
-          # and CNI network config file on each node.
-          - name: install-cni
-            image: calico/cni:v1.4.0
-            imagePullPolicy: Always
-            command: ["/install-cni.sh"]
-            env:
-              - name: CNI_NETWORK_CONFIG
-                value: |-
-                  {
-                      "name": "k8s-pod-network",
-                      "type": "calico",
-                      "etcd_authority": "10.0.0.17:6666",
-                      "log_level": "info",
-                      "ipam": {
-                          "type": "host-local",
-                          "subnet": "usePodCidr"
-                      },
-                      "policy": {
-                          "type": "k8s"
-                      },
-                      "kubernetes": {
-                          "kubeconfig": "/var/lib/kubelet/kubeconfig"
-                      }
-                  }
-            volumeMounts:
-              - mountPath: /host/opt/cni/bin
-                name: cni-bin-dir
-              - mountPath: /host/etc/cni/net.d
-                name: cni-net-dir
+        # This container installs the Calico CNI binaries
+        # and CNI network config file on each node.
+        - name: install-cni
+          image: calico/cni:v1.4.1
+          imagePullPolicy: Always
+          command: ["/install-cni.sh"]
+          env:
+            - name: CNI_NETWORK_CONFIG
+              value: |-
+                {
+                    "name": "k8s-pod-network",
+                    "type": "calico",
+                    "etcd_authority": "10.0.0.17:6666",
+                    "log_level": "info",
+                    "ipam": {
+                        "type": "host-local",
+                        "subnet": "usePodCidr"
+                    },
+                    "policy": {
+                        "type": "k8s"
+                    },
+                    "kubernetes": {
+                        "k8s_api_root": "https://kubernetes-master",
+                        "kubeconfig": "/var/lib/kubelet/kubeconfig"
+                    }
+                }
+          volumeMounts:
+            - mountPath: /host/opt/cni/bin
+              name: cni-bin-dir
+            - mountPath: /host/etc/cni/net.d
+              name: cni-net-dir
       volumes:
         # Used by calico/node.
         - name: lib-modules
@@ -89,7 +90,7 @@ spec:
         # Used to install CNI.
         - name: cni-bin-dir
           hostPath:
-            path: /opt/cni/bin
+            path: /home/kubernetes/bin
         - name: cni-net-dir
           hostPath:
             path: /etc/cni/net.d
