@@ -80,10 +80,13 @@ func (ds *dockerService) Version(apiVersion string) (*runtimeApi.VersionResponse
 	}
 	runtimeAPIVersion := kubeAPIVersion
 	name := dockerRuntimeName
+	// Docker API version (e.g., 1.23) is not semver compatible. Add a ".0"
+	// suffix to remedy this.
+	apiVersion := fmt.Sprintf("%s.0", v.APIVersion)
 	return &runtimeApi.VersionResponse{
 		Version:           &runtimeAPIVersion,
 		RuntimeName:       &name,
 		RuntimeVersion:    &v.Version,
-		RuntimeApiVersion: &v.APIVersion,
+		RuntimeApiVersion: &apiVersion,
 	}, nil
 }
