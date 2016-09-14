@@ -179,6 +179,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 				for _, typeStr := range typesOverride {
 					if typeStr == n {
 						found = true
+						break
 					}
 				}
 				if !found {
