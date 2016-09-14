@@ -103,7 +103,6 @@ func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeApi
 		Name: makeContainerName(sandboxConfig, config),
 		Config: &dockercontainer.Config{
 			// TODO: set User.
-			Hostname:   sandboxConfig.GetHostname(),
 			Entrypoint: dockerstrslice.StrSlice(config.GetCommand()),
 			Cmd:        dockerstrslice.StrSlice(config.GetArgs()),
 			Env:        generateEnvList(config.GetEnvs()),
