@@ -227,7 +227,9 @@ var _ = Describe("Kubectl client", func() {
 		It("should support exec through an HTTP proxy", func() {
 			// Note: We are skipping local since we want to verify an apiserver with HTTPS.
 			// At this time local only supports plain HTTP.
-			SkipIfProviderIs("local")
+			// Note: We are skipping this for GKE upgrade testing as it is flaky and the test fix is
+			// large enough that we are not going to cherry-pick it into release-1.2.
+			Skipf("Test fix is large enough that we are not going to cherry-pick it into release-1.2.")
 			// Fail if the variable isn't set
 			if testContext.Host == "" {
 				Failf("--host variable must be set to the full URI to the api server on e2e run.")
