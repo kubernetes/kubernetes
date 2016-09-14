@@ -30,6 +30,7 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/intstr"
+	"k8s.io/kubernetes/pkg/util/rand"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -51,6 +52,8 @@ const (
 	// Number of retries to hit a given set of endpoints. Needs to be high
 	// because we verify iptables statistical rr loadbalancing.
 	testTries = 30
+	// Maximum number of pods in a test, to make test work in large clusters.
+	maxNetProxyPodsCount = 100
 )
 
 // NewNetworkingTestConfig creates and sets up a new test config helper.
@@ -441,13 +444,32 @@ func (config *NetworkingTestConfig) cleanup() {
 	}
 }
 
+// shuffleNodes copies nodes from the specified slice into a copy in random
+// order. It returns a new slice.
+func shuffleNodes(nodes []api.Node) []api.Node {
+	shuffled := make([]api.Node, len(nodes))
+	perm := rand.Perm(len(nodes))
+	for i, j := range perm {
+		shuffled[j] = nodes[i]
+	}
+	return shuffled
+}
+
 func (config *NetworkingTestConfig) createNetProxyPods(podName string, selector map[string]string) []*api.Pod {
 	framework.ExpectNoError(framework.WaitForAllNodesSchedulable(config.f.Client))
-	nodes := framework.GetReadySchedulableNodesOrDie(config.f.Client)
+	nodeList := framework.GetReadySchedulableNodesOrDie(config.f.Client)
+
+	// To make this test work reasonably fast in large clusters,
+	// we limit the number of NetProxyPods to no more than 100 ones
+	// on random nodes.
+	nodes := shuffleNodes(nodeList.Items)
+	if len(nodes) > maxNetProxyPodsCount {
+		nodes = nodes[:maxNetProxyPodsCount]
+	}
 
 	// create pods, one for each node
-	createdPods := make([]*api.Pod, 0, len(nodes.Items))
-	for i, n := range nodes.Items {
+	createdPods := make([]*api.Pod, 0, len(nodes))
+	for i, n := range nodes {
 		podName := fmt.Sprintf("%s-%d", podName, i)
 		pod := config.createNetShellPodSpec(podName, n.Name)
 		pod.ObjectMeta.Labels = selector
@@ -456,7 +478,7 @@ func (config *NetworkingTestConfig) createNetProxyPods(podName string, selector 
 	}
 
 	// wait that all of them are up
-	runningPods := make([]*api.Pod, 0, len(nodes.Items))
+	runningPods := make([]*api.Pod, 0, len(nodes))
 	for _, p := range createdPods {
 		framework.ExpectNoError(config.f.WaitForPodReady(p.Name))
 		rp, err := config.getPodClient().Get(p.Name)
