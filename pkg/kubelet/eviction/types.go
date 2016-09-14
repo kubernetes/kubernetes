@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
 )
 
@@ -145,6 +146,8 @@ type signalObservation struct {
 	capacity *resource.Quantity
 	// The available resource
 	available *resource.Quantity
+	// Time at which the observation was taken
+	time unversioned.Time
 }
 
 // signalObservations maps a signal to an observed quantity
