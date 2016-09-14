@@ -41,6 +41,7 @@ grep -q "^${FLANNEL_VERSION}\$" binaries/.flannel 2>/dev/null || {
   ( curl --fail -L https://github.com/coreos/flannel/releases/download/v${FLANNEL_VERSION}/flannel-v${FLANNEL_VERSION}-linux-amd64.tar.gz -o flannel.tar.gz &&
     tar xzf flannel.tar.gz flanneld -O > out/flanneld
   )
+  chmod 0755 out/flanneld
   cp out/flanneld binaries/master
   cp out/flanneld binaries/minion
   echo ${FLANNEL_VERSION} > binaries/.flannel
