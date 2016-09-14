@@ -29,29 +29,29 @@ We need to add below features to enhance GPU(especial NVIDIA GPU) capabilities. 
 
  1. Discover all the NVIDIA GPUs on a Minion, but do not need all the NVIDIA GPU details information(families, cores, memory). To discover all the NVIDIA GPUs on a node, we can simply identify all devices on the host matching /dev/nvidiaX. By directly mapping through entire devices, we can avoid using the NVIDIA Management Library (NVML). In the future, we will likely want to add this library in order to monitor per-core utilization and take advantage of other features that will allow GPUs to be shared between containers.
  
-	1.1 Kubelet needs a list of GPU information, also need to report the number of free and total GPUs. Each general GPU device could be like:
-```go
+  1.1 Kubelet needs a list of GPU information, also need to report the number of free and total GPUs. Each general GPU device could be like:
+    ```go
     type GPUDevice struct {
-		 ID		string	// GPU ID.
-	   Path string		 // The GPU path, like /dev/nvidia0, /dev/nvidia1, /dev/nvidia2...
+      ID   string	// GPU ID.
+      Path string		 // The GPU path, like /dev/nvidia0, /dev/nvidia1, /dev/nvidia2...
     }
-```
+    ```
 
-	1.2 Once Kubelet restart, the GPU information needs to be recovered from containers' imformation.
+  1.2 Once Kubelet restart, the GPU information needs to be recovered from containers' imformation.
 
  2. Assign more than 1 NVIDIA GPU to 1 container, and each container could have multiple NVIDIA GPUs. A GPU can belong to at most one container, if a pod has two containers, only one of them can have a GPU assigned to it. The devices host/container mapping also need to be added to the runtime information, just as the volume did. The container GPU mapping list could show the GPU assignment.
 	
-```go
-	type ContainerGPUMapping struct {
-		ContainerName string	// Which container this GPU attached. If it's NULL, the status can't be Free.
-		GPUID					string	// The GPU assigned to container.
-		Status				string	// InUse/Free/Unknow. If it's InUse, must has a container name.
-	}
-```
+    ```go
+    type ContainerGPUMapping struct {
+      ContainerName string	// Which container this GPU attached. If it's NULL, the status can't be Free.
+      GPUID         string	// The GPU assigned to container.
+      Status        string	// InUse/Free/Unknow. If it's InUse, must has a container name.
+    }
+    ```
   
-	2.1 Kubelet need to find free GPUs from the current ```GPUDevice``` list and ```ContainerGPUMapping``` list, and asssign them to container. The device path mapping on host and container are the same, like if we assgin ```/dev/nvidia1``` and ```/dev/nvidia2``` to a container, inside the container, we can see ```/dev/nvidia1``` and ```/dev/nvidia2``` as the same as on the host.
+  2.1 Kubelet need to find free GPUs from the current ```GPUDevice``` list and ```ContainerGPUMapping``` list, and asssign them to container. The device path mapping on host and container are the same, like if we assgin ```/dev/nvidia1``` and ```/dev/nvidia2``` to a container, inside the container, we can see ```/dev/nvidia1``` and ```/dev/nvidia2``` as the same as on the host.
   
-	2.2 Once a container dead/be killed, the GPUs attached to this container need to be set free.
+  2.2 Once a container dead/be killed, the GPUs attached to this container need to be set free.
 
  3. Provide general GPU interface for all the GPU vendors, like initialization, assign/free GPUs to container, available GPUs.
 
