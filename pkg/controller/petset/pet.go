@@ -19,6 +19,7 @@ package petset
 import (
 	"fmt"
 	"strconv"
+	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
@@ -45,6 +46,9 @@ const (
 	// pet has finished initializing itself.
 	// TODO: Replace this with init container status.
 	PetSetInitAnnotation = "pod.alpha.kubernetes.io/initialized"
+	// The amount of time the PetSet controller should sleep between retrying
+	// PetSet updates
+	retrySleepTime = 20 * time.Millisecond
 )
 
 // pcb is the control block used to transmit all updates about a single pet.
@@ -214,6 +218,7 @@ func (p *apiServerPetClient) Update(pet *pcb, expectedPet *pcb) (updateErr error
 		if p, getErr = pc.Get(pod.Name); getErr != nil {
 			return getErr
 		}
+		time.Sleep(retrySleepTime)
 	}
 }
 
