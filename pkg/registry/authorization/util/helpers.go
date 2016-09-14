@@ -42,3 +42,33 @@ func NonResourceAttributesFrom(user user.Info, in authorizationapi.NonResourceAt
 		Path:            in.Path,
 	}
 }
+
+func convertToUserInfoExtra(extra map[string]authorizationapi.ExtraValue) map[string][]string {
+	if extra == nil {
+		return nil
+	}
+	ret := map[string][]string{}
+	for k, v := range extra {
+		ret[k] = []string(v)
+	}
+
+	return ret
+}
+
+// AuthorizationAttributesFrom takes a spec and returns the proper authz attributes to check it.
+func AuthorizationAttributesFrom(spec authorizationapi.SubjectAccessReviewSpec) authorizer.AttributesRecord {
+	userToCheck := &user.DefaultInfo{
+		Name:   spec.User,
+		Groups: spec.Groups,
+		Extra:  convertToUserInfoExtra(spec.Extra),
+	}
+
+	var authorizationAttributes authorizer.AttributesRecord
+	if spec.ResourceAttributes != nil {
+		authorizationAttributes = ResourceAttributesFrom(userToCheck, *spec.ResourceAttributes)
+	} else {
+		authorizationAttributes = NonResourceAttributesFrom(userToCheck, *spec.NonResourceAttributes)
+	}
+
+	return authorizationAttributes
+}

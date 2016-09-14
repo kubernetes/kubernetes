@@ -9,6 +9,59 @@
   },
   "apis": [
    {
+    "path": "/apis/authorization.k8s.io/v1beta1/namespaces/{namespace}/localsubjectaccessreviews",
+    "description": "API at /apis/authorization.k8s.io/v1beta1",
+    "operations": [
+     {
+      "type": "v1beta1.LocalSubjectAccessReview",
+      "method": "POST",
+      "summary": "create a LocalSubjectAccessReview",
+      "nickname": "createNamespacedLocalSubjectAccessReview",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta1.LocalSubjectAccessReview",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.LocalSubjectAccessReview"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
     "path": "/apis/authorization.k8s.io/v1beta1/selfsubjectaccessreviews",
     "description": "API at /apis/authorization.k8s.io/v1beta1",
     "operations": [
@@ -123,9 +176,9 @@
    }
   ],
   "models": {
-   "v1beta1.SelfSubjectAccessReview": {
-    "id": "v1beta1.SelfSubjectAccessReview",
-    "description": "SelfSubjectAccessReview checks whether or the current user can perform an action.  Not filling in a spec.namespace means \"in all namespaces\".  Self is a special case, because users should always be able to check whether they can perform an action",
+   "v1beta1.LocalSubjectAccessReview": {
+    "id": "v1beta1.LocalSubjectAccessReview",
+    "description": "LocalSubjectAccessReview checks whether or not a user or group can perform an action in a given namespace. Having a namespace scoped resource makes it much easier to grant namespace scoped policy that includes permissions checking.",
     "required": [
      "spec"
     ],
@@ -142,8 +195,8 @@
       "$ref": "v1.ObjectMeta"
      },
      "spec": {
-      "$ref": "v1beta1.SelfSubjectAccessReviewSpec",
-      "description": "Spec holds information about the request being evaluated.  user and groups must be empty"
+      "$ref": "v1beta1.SubjectAccessReviewSpec",
+      "description": "Spec holds information about the request being evaluated.  spec.namespace must be equal to the namespace you made the request against.  If empty, it is defaulted."
      },
      "status": {
       "$ref": "v1beta1.SubjectAccessReviewStatus",
@@ -259,9 +312,9 @@
      }
     }
    },
-   "v1beta1.SelfSubjectAccessReviewSpec": {
-    "id": "v1beta1.SelfSubjectAccessReviewSpec",
-    "description": "SelfSubjectAccessReviewSpec is a description of the access request.  Exactly one of ResourceAuthorizationAttributes and NonResourceAuthorizationAttributes must be set",
+   "v1beta1.SubjectAccessReviewSpec": {
+    "id": "v1beta1.SubjectAccessReviewSpec",
+    "description": "SubjectAccessReviewSpec is a description of the access request.  Exactly one of ResourceAuthorizationAttributes and NonResourceAuthorizationAttributes must be set",
     "properties": {
      "resourceAttributes": {
       "$ref": "v1beta1.ResourceAttributes",
@@ -270,6 +323,21 @@
      "nonResourceAttributes": {
       "$ref": "v1beta1.NonResourceAttributes",
       "description": "NonResourceAttributes describes information for a non-resource access request"
+     },
+     "user": {
+      "type": "string",
+      "description": "User is the user you're testing for. If you specify \"User\" but not \"Group\", then is it interpreted as \"What if User were not a member of any groups"
+     },
+     "group": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "Groups is the groups you're testing for."
+     },
+     "extra": {
+      "type": "object",
+      "description": "Extra corresponds to the user.Info.GetExtra() method from the authenticator.  Since that is input to the authorizer it needs a reflection here."
      }
     }
    },
@@ -342,6 +410,48 @@
      }
     }
    },
+   "v1beta1.SelfSubjectAccessReview": {
+    "id": "v1beta1.SelfSubjectAccessReview",
+    "description": "SelfSubjectAccessReview checks whether or the current user can perform an action.  Not filling in a spec.namespace means \"in all namespaces\".  Self is a special case, because users should always be able to check whether they can perform an action",
+    "required": [
+     "spec"
+    ],
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "v1.ObjectMeta"
+     },
+     "spec": {
+      "$ref": "v1beta1.SelfSubjectAccessReviewSpec",
+      "description": "Spec holds information about the request being evaluated.  user and groups must be empty"
+     },
+     "status": {
+      "$ref": "v1beta1.SubjectAccessReviewStatus",
+      "description": "Status is filled in by the server and indicates whether the request is allowed or not"
+     }
+    }
+   },
+   "v1beta1.SelfSubjectAccessReviewSpec": {
+    "id": "v1beta1.SelfSubjectAccessReviewSpec",
+    "description": "SelfSubjectAccessReviewSpec is a description of the access request.  Exactly one of ResourceAuthorizationAttributes and NonResourceAuthorizationAttributes must be set",
+    "properties": {
+     "resourceAttributes": {
+      "$ref": "v1beta1.ResourceAttributes",
+      "description": "ResourceAuthorizationAttributes describes information for a resource access request"
+     },
+     "nonResourceAttributes": {
+      "$ref": "v1beta1.NonResourceAttributes",
+      "description": "NonResourceAttributes describes information for a non-resource access request"
+     }
+    }
+   },
    "v1beta1.SubjectAccessReview": {
     "id": "v1beta1.SubjectAccessReview",
     "description": "SubjectAccessReview checks whether or not a user or group can perform an action.",
@@ -367,35 +477,6 @@
      "status": {
       "$ref": "v1beta1.SubjectAccessReviewStatus",
       "description": "Status is filled in by the server and indicates whether the request is allowed or not"
-     }
-    }
-   },
-   "v1beta1.SubjectAccessReviewSpec": {
-    "id": "v1beta1.SubjectAccessReviewSpec",
-    "description": "SubjectAccessReviewSpec is a description of the access request.  Exactly one of ResourceAuthorizationAttributes and NonResourceAuthorizationAttributes must be set",
-    "properties": {
-     "resourceAttributes": {
-      "$ref": "v1beta1.ResourceAttributes",
-      "description": "ResourceAuthorizationAttributes describes information for a resource access request"
-     },
-     "nonResourceAttributes": {
-      "$ref": "v1beta1.NonResourceAttributes",
-      "description": "NonResourceAttributes describes information for a non-resource access request"
-     },
-     "user": {
-      "type": "string",
-      "description": "User is the user you're testing for. If you specify \"User\" but not \"Group\", then is it interpreted as \"What if User were not a member of any groups"
-     },
-     "group": {
-      "type": "array",
-      "items": {
-       "type": "string"
-      },
-      "description": "Groups is the groups you're testing for."
-     },
-     "extra": {
-      "type": "object",
-      "description": "Extra corresponds to the user.Info.GetExtra() method from the authenticator.  Since that is input to the authorizer it needs a reflection here."
      }
     }
    },
