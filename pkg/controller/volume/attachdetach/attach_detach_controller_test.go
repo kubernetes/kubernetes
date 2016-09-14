@@ -21,7 +21,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/client/record"
-	"k8s.io/kubernetes/pkg/controller/framework/informers"
+	"k8s.io/kubernetes/pkg/controller/informers"
 	controllervolumetesting "k8s.io/kubernetes/pkg/controller/volume/attachdetach/testing"
 )
 

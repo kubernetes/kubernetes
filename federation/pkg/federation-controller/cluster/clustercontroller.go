@@ -27,7 +27,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/runtime"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -50,7 +49,7 @@ type ClusterController struct {
 	clusterKubeClientMap map[string]ClusterClient
 
 	// cluster framework and store
-	clusterController *framework.Controller
+	clusterController *cache.Controller
 	clusterStore      cluster_cache.StoreToClusterLister
 }
 
@@ -63,7 +62,7 @@ func NewclusterController(federationClient federationclientset.Interface, cluste
 		clusterClusterStatusMap: make(map[string]federation_v1beta1.ClusterStatus),
 		clusterKubeClientMap:    make(map[string]ClusterClient),
 	}
-	cc.clusterStore.Store, cc.clusterController = framework.NewInformer(
+	cc.clusterStore.Store, cc.clusterController = cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				return cc.federationClient.Federation().Clusters().List(options)
@@ -74,7 +73,7 @@ func NewclusterController(federationClient federationclientset.Interface, cluste
 		},
 		&federation_v1beta1.Cluster{},
 		controller.NoResyncPeriodFunc(),
-		framework.ResourceEventHandlerFuncs{
+		cache.ResourceEventHandlerFuncs{
 			DeleteFunc: cc.delFromClusterSet,
 			AddFunc:    cc.addToClusterSet,
 		},

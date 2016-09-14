@@ -28,7 +28,6 @@ import (
 	kube_release_1_4 "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4"
 	fake_kube_release_1_4 "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4/fake"
 	"k8s.io/kubernetes/pkg/client/testing/core"
-	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/watch"
 
@@ -79,8 +78,8 @@ func TestFederatedInformer(t *testing.T) {
 		return true, watch.NewFake(), nil
 	})
 
-	targetInformerFactory := func(cluster *federation_api.Cluster, clientset kube_release_1_4.Interface) (cache.Store, framework.ControllerInterface) {
-		return framework.NewInformer(
+	targetInformerFactory := func(cluster *federation_api.Cluster, clientset kube_release_1_4.Interface) (cache.Store, cache.ControllerInterface) {
+		return cache.NewInformer(
 			&cache.ListWatch{
 				ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 					return clientset.Core().Services(api_v1.NamespaceAll).List(options)
@@ -91,7 +90,7 @@ func TestFederatedInformer(t *testing.T) {
 			},
 			&api_v1.Service{},
 			10*time.Second,
-			framework.ResourceEventHandlerFuncs{})
+			cache.ResourceEventHandlerFuncs{})
 	}
 
 	addedClusters := make(chan string, 1)
