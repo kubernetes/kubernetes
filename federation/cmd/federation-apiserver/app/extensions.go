@@ -29,7 +29,7 @@ import (
 	replicasetetcd "k8s.io/kubernetes/pkg/registry/replicaset/etcd"
 )
 
-func installExtensionsAPIs(s *options.ServerRunOptions, g *genericapiserver.GenericAPIServer, f genericapiserver.StorageFactory) {
+func installExtensionsAPIs(s *options.ServerRunOptions, g *genericapiserver.GenericAPIServer, resourceConfig genericapiserver.APIResourceConfigSource, f genericapiserver.StorageFactory) {
 	replicaSetStorage := replicasetetcd.NewStorage(createRESTOptionsOrDie(s, g, f, extensions.Resource("replicasets")))
 	ingressStorage, ingressStatusStorage := ingressetcd.NewREST(createRESTOptionsOrDie(s, g, f, extensions.Resource("ingresses")))
 	extensionsResources := map[string]rest.Storage{
@@ -50,7 +50,7 @@ func installExtensionsAPIs(s *options.ServerRunOptions, g *genericapiserver.Gene
 		ParameterCodec:         api.ParameterCodec,
 		NegotiatedSerializer:   api.Codecs,
 	}
-	if err := g.InstallAPIGroup(&apiGroupInfo); err != nil {
+	if err := g.InstallAPIGroup(&apiGroupInfo, resourceConfig); err != nil {
 		glog.Fatalf("Error in registering group versions: %v", err)
 	}
 }

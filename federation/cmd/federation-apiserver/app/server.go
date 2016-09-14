@@ -196,9 +196,9 @@ func Run(s *options.ServerRunOptions) error {
 		return err
 	}
 
-	installFederationAPIs(s, m, storageFactory)
-	installCoreAPIs(s, m, storageFactory)
-	installExtensionsAPIs(s, m, storageFactory)
+	installFederationAPIs(s, m, resourceConfig, storageFactory)
+	installCoreAPIs(s, m, resourceConfig, storageFactory)
+	installExtensionsAPIs(s, m, resourceConfig, storageFactory)
 
 	sharedInformers.Start(wait.NeverStop)
 	m.Run(s.ServerRunOptions)

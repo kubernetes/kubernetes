@@ -30,7 +30,7 @@ import (
 	clusteretcd "k8s.io/kubernetes/federation/registry/cluster/etcd"
 )
 
-func installFederationAPIs(s *options.ServerRunOptions, g *genericapiserver.GenericAPIServer, f genericapiserver.StorageFactory) {
+func installFederationAPIs(s *options.ServerRunOptions, g *genericapiserver.GenericAPIServer, resourceConfig genericapiserver.APIResourceConfigSource, f genericapiserver.StorageFactory) {
 	clusterStorage, clusterStatusStorage := clusteretcd.NewREST(createRESTOptionsOrDie(s, g, f, federation.Resource("clusters")))
 	federationResources := map[string]rest.Storage{
 		"clusters":        clusterStorage,
@@ -47,7 +47,7 @@ func installFederationAPIs(s *options.ServerRunOptions, g *genericapiserver.Gene
 		ParameterCodec:         api.ParameterCodec,
 		NegotiatedSerializer:   api.Codecs,
 	}
-	if err := g.InstallAPIGroup(&apiGroupInfo); err != nil {
+	if err := g.InstallAPIGroup(&apiGroupInfo, resourceConfig); err != nil {
 		glog.Fatalf("Error in registering group versions: %v", err)
 	}
 }
