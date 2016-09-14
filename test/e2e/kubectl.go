@@ -118,11 +118,19 @@ var (
 	// TODO(ihmccreery): remove once we don't care about v1.1 anymore, (tentatively in v1.4).
 	deploymentsVersion = version.MustParse("v1.2.0-alpha.7.726")
 
-	// Pod probe parameters were introduced in #15967 (v1.2) so we dont expect tests that use
+	// Pod probe parameters were introduced in #15967 (v1.2) so we don't expect tests that use
 	// these probe parameters to work on clusters before that.
 	//
 	// TODO(ihmccreery): remove once we don't care about v1.1 anymore, (tentatively in v1.4).
 	podProbeParametersVersion = version.MustParse("v1.2.0-alpha.4")
+
+	// 'kubectl create quota' was introduced in #28351 (v1.4) so we don't expect tests that use
+	// 'kubectl create quota' to work on kubectl clients before that.
+	kubectlCreateQuotaVersion = version.MustParse("v1.4.0-alpha.2")
+
+	// Returning container command exit codes in kubectl run/exec was introduced in #26541 (v1.4)
+	// so we don't expect tests that verifies return code to work on kubectl clients before that.
+	kubectlContainerExitCodeVersion = version.MustParse("v1.4.0-alpha.3")
 )
 
 // Stops everything from filePath from namespace ns and checks if everything matching selectors from the given namespace is correctly stopped.
@@ -350,6 +358,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 		})
 
 		It("should return command exit codes", func() {
+			framework.SkipUnlessKubectlVersionGTE(kubectlContainerExitCodeVersion)
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 
 			By("execing into a container with a successful command")
@@ -1335,6 +1344,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 
 	framework.KubeDescribe("Kubectl create quota", func() {
 		It("should create a quota without scopes", func() {
+			framework.SkipUnlessKubectlVersionGTE(kubectlCreateQuotaVersion)
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 			quotaName := "million"
 
@@ -1364,6 +1374,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 		})
 
 		It("should create a quota with scopes", func() {
+			framework.SkipUnlessKubectlVersionGTE(kubectlCreateQuotaVersion)
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 			quotaName := "scopes"
 
@@ -1392,6 +1403,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 		})
 
 		It("should reject quota with invalid scopes", func() {
+			framework.SkipUnlessKubectlVersionGTE(kubectlCreateQuotaVersion)
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 			quotaName := "scopes"
 
