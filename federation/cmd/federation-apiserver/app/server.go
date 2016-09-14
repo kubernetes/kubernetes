@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/apiserver/authenticator"
 	"k8s.io/kubernetes/pkg/controller/informers"
+	"k8s.io/kubernetes/pkg/generated/openapi"
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/genericapiserver/authorizer"
 	genericoptions "k8s.io/kubernetes/pkg/genericapiserver/options"
@@ -185,6 +186,8 @@ func Run(s *options.ServerRunOptions) error {
 	genericConfig.APIResourceConfigSource = storageFactory.APIResourceConfigSource
 	genericConfig.MasterServiceNamespace = s.MasterServiceNamespace
 	genericConfig.Serializer = api.Codecs
+	genericConfig.OpenAPIDefinitions = openapi.OpenAPIDefinitions
+	genericConfig.EnableOpenAPISupport = true
 
 	// TODO: Move this to generic api server (Need to move the command line flag).
 	if s.EnableWatchCache {
