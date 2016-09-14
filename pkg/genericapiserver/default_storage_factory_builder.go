@@ -70,12 +70,12 @@ func mergeAPIResourceConfigs(defaultAPIResourceConfig *ResourceConfig, resourceC
 
 	// "api/all=false" allows users to selectively enable specific api versions.
 	allAPIFlagValue, ok := overrides["api/all"]
-	if ok && allAPIFlagValue == "false" {
-		// Disable all group versions.
-		for _, groupVersion := range registered.RegisteredGroupVersions() {
-			if resourceConfig.AnyResourcesForVersionEnabled(groupVersion) {
-				resourceConfig.DisableVersions(groupVersion)
-			}
+	if ok {
+		if allAPIFlagValue == "false" {
+			// Disable all group versions.
+			resourceConfig.DisableVersions(registered.RegisteredGroupVersions()...)
+		} else if allAPIFlagValue == "true" {
+			resourceConfig.EnableVersions(registered.RegisteredGroupVersions()...)
 		}
 	}
 
