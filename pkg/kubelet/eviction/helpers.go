@@ -600,6 +600,7 @@ func makeSignalObservations(summaryProvider stats.SummaryProvider) (signalObserv
 		result[SignalMemoryAvailable] = signalObservation{
 			available: resource.NewQuantity(int64(*memory.AvailableBytes), resource.BinarySI),
 			capacity:  resource.NewQuantity(int64(*memory.AvailableBytes+*memory.WorkingSetBytes), resource.BinarySI),
+			time:      memory.Time,
 		}
 	}
 	if nodeFs := summary.Node.Fs; nodeFs != nil {
@@ -658,6 +659,23 @@ func thresholdsMet(thresholds []Threshold, observations signalObservations, enfo
 			thresholdMet = thresholdResult > 0
 		}
 		if thresholdMet {
+			results = append(results, threshold)
+		}
+	}
+	return results
+}
+
+func thresholdsUpdatedStats(thresholds []Threshold, observations, lastObservations signalObservations) []Threshold {
+	results := []Threshold{}
+	for i := range thresholds {
+		threshold := thresholds[i]
+		observed, found := observations[threshold.Signal]
+		if !found {
+			glog.Warningf("eviction manager: no observation found for eviction signal %v", threshold.Signal)
+			continue
+		}
+		last, found := lastObservations[threshold.Signal]
+		if !found || observed.time.IsZero() || !observed.time.After(last.time.Time) {
 			results = append(results, threshold)
 		}
 	}
