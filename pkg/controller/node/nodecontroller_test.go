@@ -572,305 +572,6 @@ func TestMonitorNodeStatusEvictPodsWithDisruption(t *testing.T) {
 		description             string
 	}{
 		// NetworkDisruption: Node created long time ago, node controller posted Unknown for a long period of time on both Nodes.
-		// Only zone is down - eviction shouldn't take place
-		{
-			nodeList: []*api.Node{
-				{
-					ObjectMeta: api.ObjectMeta{
-						Name:              "node0",
-						CreationTimestamp: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-						Labels: map[string]string{
-							unversioned.LabelZoneRegion:        "region1",
-							unversioned.LabelZoneFailureDomain: "zone1",
-						},
-					},
-					Status: api.NodeStatus{
-						Conditions: []api.NodeCondition{
-							{
-								Type:               api.NodeReady,
-								Status:             api.ConditionUnknown,
-								LastHeartbeatTime:  unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-								LastTransitionTime: unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-							},
-						},
-					},
-				},
-				{
-					ObjectMeta: api.ObjectMeta{
-						Name:              "node1",
-						CreationTimestamp: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-						Labels: map[string]string{
-							unversioned.LabelZoneRegion:        "region1",
-							unversioned.LabelZoneFailureDomain: "zone1",
-						},
-					},
-					Status: api.NodeStatus{
-						Conditions: []api.NodeCondition{
-							{
-								Type:               api.NodeReady,
-								Status:             api.ConditionUnknown,
-								LastHeartbeatTime:  unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-								LastTransitionTime: unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-							},
-						},
-					},
-				},
-			},
-			podList: []api.Pod{*newPod("pod0", "node0")},
-			updatedNodeStatuses: []api.NodeStatus{
-				unhealthyNodeNewStatus,
-				unhealthyNodeNewStatus,
-			},
-			expectedInitialStates:   map[string]zoneState{createZoneID("region1", "zone1"): stateFullDisruption},
-			expectedFollowingStates: map[string]zoneState{createZoneID("region1", "zone1"): stateFullDisruption},
-			expectedEvictPods:       false,
-			description:             "Network Disruption: Only zone is down - eviction shouldn't take place.",
-		},
-		// NetworkDisruption: Node created long time ago, node controller posted Unknown for a long period of time on both Nodes.
-		// Both zones down - eviction shouldn't take place
-		{
-			nodeList: []*api.Node{
-				{
-					ObjectMeta: api.ObjectMeta{
-						Name:              "node0",
-						CreationTimestamp: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-						Labels: map[string]string{
-							unversioned.LabelZoneRegion:        "region1",
-							unversioned.LabelZoneFailureDomain: "zone1",
-						},
-					},
-					Status: api.NodeStatus{
-						Conditions: []api.NodeCondition{
-							{
-								Type:               api.NodeReady,
-								Status:             api.ConditionUnknown,
-								LastHeartbeatTime:  unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-								LastTransitionTime: unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-							},
-						},
-					},
-				},
-				{
-					ObjectMeta: api.ObjectMeta{
-						Name:              "node1",
-						CreationTimestamp: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-						Labels: map[string]string{
-							unversioned.LabelZoneRegion:        "region2",
-							unversioned.LabelZoneFailureDomain: "zone2",
-						},
-					},
-					Status: api.NodeStatus{
-						Conditions: []api.NodeCondition{
-							{
-								Type:               api.NodeReady,
-								Status:             api.ConditionUnknown,
-								LastHeartbeatTime:  unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-								LastTransitionTime: unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-							},
-						},
-					},
-				},
-			},
-
-			podList: []api.Pod{*newPod("pod0", "node0")},
-			updatedNodeStatuses: []api.NodeStatus{
-				unhealthyNodeNewStatus,
-				unhealthyNodeNewStatus,
-			},
-			expectedInitialStates: map[string]zoneState{
-				createZoneID("region1", "zone1"): stateFullDisruption,
-				createZoneID("region2", "zone2"): stateFullDisruption,
-			},
-			expectedFollowingStates: map[string]zoneState{
-				createZoneID("region1", "zone1"): stateFullDisruption,
-				createZoneID("region2", "zone2"): stateFullDisruption,
-			},
-			expectedEvictPods: false,
-			description:       "Network Disruption: Both zones down - eviction shouldn't take place.",
-		},
-		// NetworkDisruption: Node created long time ago, node controller posted Unknown for a long period of time on both Nodes.
-		// One zone is down - eviction should take place
-		{
-			nodeList: []*api.Node{
-				{
-					ObjectMeta: api.ObjectMeta{
-						Name:              "node0",
-						CreationTimestamp: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-						Labels: map[string]string{
-							unversioned.LabelZoneRegion:        "region1",
-							unversioned.LabelZoneFailureDomain: "zone1",
-						},
-					},
-					Status: api.NodeStatus{
-						Conditions: []api.NodeCondition{
-							{
-								Type:               api.NodeReady,
-								Status:             api.ConditionUnknown,
-								LastHeartbeatTime:  unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-								LastTransitionTime: unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-							},
-						},
-					},
-				},
-				{
-					ObjectMeta: api.ObjectMeta{
-						Name:              "node1",
-						CreationTimestamp: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-						Labels: map[string]string{
-							unversioned.LabelZoneRegion:        "region1",
-							unversioned.LabelZoneFailureDomain: "zone2",
-						},
-					},
-					Status: api.NodeStatus{
-						Conditions: []api.NodeCondition{
-							{
-								Type:               api.NodeReady,
-								Status:             api.ConditionTrue,
-								LastHeartbeatTime:  unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-								LastTransitionTime: unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-							},
-						},
-					},
-				},
-			},
-			podList: []api.Pod{*newPod("pod0", "node0")},
-			updatedNodeStatuses: []api.NodeStatus{
-				unhealthyNodeNewStatus,
-				healthyNodeNewStatus,
-			},
-			expectedInitialStates: map[string]zoneState{
-				createZoneID("region1", "zone1"): stateFullDisruption,
-				createZoneID("region1", "zone2"): stateNormal,
-			},
-			expectedFollowingStates: map[string]zoneState{
-				createZoneID("region1", "zone1"): stateFullDisruption,
-				createZoneID("region1", "zone2"): stateNormal,
-			},
-			expectedEvictPods: true,
-			description:       "Network Disruption: One zone is down - eviction should take place.",
-		},
-		// NetworkDisruption: Node created long time ago, node controller posted Unknown for a long period
-		// of on first Node, eviction should stop even though -master Node is healthy.
-		{
-			nodeList: []*api.Node{
-				{
-					ObjectMeta: api.ObjectMeta{
-						Name:              "node0",
-						CreationTimestamp: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-						Labels: map[string]string{
-							unversioned.LabelZoneRegion:        "region1",
-							unversioned.LabelZoneFailureDomain: "zone1",
-						},
-					},
-					Status: api.NodeStatus{
-						Conditions: []api.NodeCondition{
-							{
-								Type:               api.NodeReady,
-								Status:             api.ConditionUnknown,
-								LastHeartbeatTime:  unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-								LastTransitionTime: unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-							},
-						},
-					},
-				},
-				{
-					ObjectMeta: api.ObjectMeta{
-						Name:              "node-master",
-						CreationTimestamp: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-						Labels: map[string]string{
-							unversioned.LabelZoneRegion:        "region1",
-							unversioned.LabelZoneFailureDomain: "zone1",
-						},
-					},
-					Status: api.NodeStatus{
-						Conditions: []api.NodeCondition{
-							{
-								Type:               api.NodeReady,
-								Status:             api.ConditionTrue,
-								LastHeartbeatTime:  unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-								LastTransitionTime: unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-							},
-						},
-					},
-				},
-			},
-			podList: []api.Pod{*newPod("pod0", "node0")},
-			updatedNodeStatuses: []api.NodeStatus{
-				unhealthyNodeNewStatus,
-				healthyNodeNewStatus,
-			},
-			expectedInitialStates: map[string]zoneState{
-				createZoneID("region1", "zone1"): stateFullDisruption,
-			},
-			expectedFollowingStates: map[string]zoneState{
-				createZoneID("region1", "zone1"): stateFullDisruption,
-			},
-			expectedEvictPods: false,
-			description:       "NetworkDisruption: eviction should stop, only -master Node is healthy",
-		},
-		// NetworkDisruption: Node created long time ago, node controller posted Unknown for a long period of time on both Nodes.
-		// Initially both zones down, one comes back - eviction should take place
-		{
-			nodeList: []*api.Node{
-				{
-					ObjectMeta: api.ObjectMeta{
-						Name:              "node0",
-						CreationTimestamp: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-						Labels: map[string]string{
-							unversioned.LabelZoneRegion:        "region1",
-							unversioned.LabelZoneFailureDomain: "zone1",
-						},
-					},
-					Status: api.NodeStatus{
-						Conditions: []api.NodeCondition{
-							{
-								Type:               api.NodeReady,
-								Status:             api.ConditionUnknown,
-								LastHeartbeatTime:  unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-								LastTransitionTime: unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-							},
-						},
-					},
-				},
-				{
-					ObjectMeta: api.ObjectMeta{
-						Name:              "node1",
-						CreationTimestamp: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-						Labels: map[string]string{
-							unversioned.LabelZoneRegion:        "region1",
-							unversioned.LabelZoneFailureDomain: "zone2",
-						},
-					},
-					Status: api.NodeStatus{
-						Conditions: []api.NodeCondition{
-							{
-								Type:               api.NodeReady,
-								Status:             api.ConditionUnknown,
-								LastHeartbeatTime:  unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-								LastTransitionTime: unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-							},
-						},
-					},
-				},
-			},
-
-			podList: []api.Pod{*newPod("pod0", "node0")},
-			updatedNodeStatuses: []api.NodeStatus{
-				unhealthyNodeNewStatus,
-				healthyNodeNewStatus,
-			},
-			expectedInitialStates: map[string]zoneState{
-				createZoneID("region1", "zone1"): stateFullDisruption,
-				createZoneID("region1", "zone2"): stateFullDisruption,
-			},
-			expectedFollowingStates: map[string]zoneState{
-				createZoneID("region1", "zone1"): stateFullDisruption,
-				createZoneID("region1", "zone2"): stateNormal,
-			},
-			expectedEvictPods: true,
-			description:       "Initially both zones down, one comes back - eviction should take place",
-		},
-		// NetworkDisruption: Node created long time ago, node controller posted Unknown for a long period of time on both Nodes.
 		// Zone is partially disrupted - eviction should take place
 		{
 			nodeList: []*api.Node{
@@ -1023,9 +724,13 @@ func TestMonitorNodeStatusEvictPodsWithDisruption(t *testing.T) {
 		nodeController.now = func() unversioned.Time { return unversioned.Time{Time: fakeNow.Add(timeToPass)} }
 		for i := range item.updatedNodeStatuses {
 			fakeNodeHandler.Existing[i].Status = item.updatedNodeStatuses[i]
+			nodeController.kubeClient.Core().Nodes().Update(fakeNodeHandler.Existing[i])
 		}
 
 		if err := nodeController.monitorNodeStatus(); err != nil {
+			t.Errorf("%v: unexpected error: %v", item.description, err)
+		}
+		if err := nodeController.monitorNodeTaints(); err != nil {
 			t.Errorf("%v: unexpected error: %v", item.description, err)
 		}
 		// Give some time for rate-limiter to reload
@@ -1039,16 +744,25 @@ func TestMonitorNodeStatusEvictPodsWithDisruption(t *testing.T) {
 		zones := getZones(fakeNodeHandler)
 		for _, zone := range zones {
 			nodeController.zonePodEvictor[zone].Try(func(value TimedValue) (bool, time.Duration) {
-				uid, _ := value.UID.(string)
-				remaining, _ := deletePods(fakeNodeHandler, nodeController.recorder, value.Value, uid, nodeController.daemonSetStore)
+				message, _ := value.UID.(evictionMessage)
+				podName := message.podName
+				podNamespace := message.podNamespace
+				pod, _ := nodeController.kubeClient.Core().Pods(podNamespace).Get(podName)
+				remaining, _ := deletePod(nodeController.kubeClient, pod, nodeController.recorder, nodeController.daemonSetStore)
 				if remaining {
-					nodeController.zoneTerminationEvictor[zone].Add(value.Value, value.UID)
+					nodeController.zoneTerminationEvictor[zone].Add(value.Value, message)
 				}
 				return true, 0
 			})
 			nodeController.zonePodEvictor[zone].Try(func(value TimedValue) (bool, time.Duration) {
-				uid, _ := value.UID.(string)
-				terminatePods(fakeNodeHandler, nodeController.recorder, value.Value, uid, value.AddedAt, nodeController.maximumGracePeriod)
+				message, _ := value.UID.(evictionMessage)
+				podName := message.podName
+				podNamespace := message.podNamespace
+				nodeUID := message.nodeUID
+				pod, _ := nodeController.kubeClient.Core().Pods(podNamespace).Get(podName)
+				nodeName := pod.Spec.NodeName
+
+				terminatePod(nodeController.kubeClient, nodeController.recorder, nodeName, string(nodeUID), pod, value.AddedAt, nodeController.maximumGracePeriod)
 				return true, 0
 			})
 		}
@@ -1088,6 +802,16 @@ func TestMonitorNodeTaints(t *testing.T) {
 							"value": "test",
 							"effect": "NoSchedule"
 						}]`,
+						},
+					},
+					Status: api.NodeStatus{
+						Conditions: []api.NodeCondition{
+							{
+								Type:               api.NodeReady,
+								Status:             api.ConditionTrue,
+								LastHeartbeatTime:  unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+								LastTransitionTime: unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							},
 						},
 					},
 				},
@@ -1160,9 +884,14 @@ func TestMonitorNodeTaints(t *testing.T) {
 		for _, node := range nodes.Items {
 			taints, _ := api.GetTaintsFromNodeAnnotations(node.Annotations)
 			if len(taints) != 1 {
-				t.Errorf("expected to have taint")
+				t.Errorf("expected to have 1 taint: %v", taints)
 			}
 		}
+		queueLth := nodeController.zonePodEvictor[""].queue.queue.Len()
+		if queueLth != len(item.expectedPods) {
+			t.Errorf("Queue length should be equal to number of pods to evict: %v", queueLth)
+		}
+
 		var evictedPods []string
 		for try := 0; try < len(item.expectedPods); try++ {
 			nodeController.zonePodEvictor[""].Try(func(value TimedValue) (bool, time.Duration) {
@@ -1340,7 +1069,7 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 				},
 				Clientset: fake.NewSimpleClientset(&api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}}),
 			},
-			expectedRequestCount: 3, // (List+)List+Update
+			expectedRequestCount: 4, // (List+)List+Update+Get(pod)
 			timeToPass:           time.Hour,
 			newNodeStatus: api.NodeStatus{
 				Conditions: []api.NodeCondition{
@@ -1448,6 +1177,7 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 		if item.timeToPass > 0 {
 			nodeController.now = func() unversioned.Time { return unversioned.Time{Time: fakeNow.Add(item.timeToPass)} }
 			item.fakeNodeHandler.Existing[0].Status = item.newNodeStatus
+			nodeController.kubeClient.Core().Nodes().Update(item.fakeNodeHandler.Existing[0])
 			if err := nodeController.monitorNodeStatus(); err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -1761,8 +1491,11 @@ func TestNodeDeletion(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	nodeController.zonePodEvictor[""].Try(func(value TimedValue) (bool, time.Duration) {
-		uid, _ := value.UID.(string)
-		deletePods(fakeNodeHandler, nodeController.recorder, value.Value, uid, nodeController.daemonSetStore)
+		message, _ := value.UID.(evictionMessage)
+		podName := message.podName
+		podNamespace := message.podNamespace
+		pod, _ := nodeController.kubeClient.Core().Pods(podNamespace).Get(podName)
+		deletePod(nodeController.kubeClient, pod, nodeController.recorder, nodeController.daemonSetStore)
 		return true, 0
 	})
 	podEvicted := false
@@ -1825,14 +1558,17 @@ func TestNodeEventGeneration(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	nodeController.zonePodEvictor[""].Try(func(value TimedValue) (bool, time.Duration) {
-		nodeUid, _ := value.UID.(string)
-		deletePods(fakeNodeHandler, nodeController.recorder, value.Value, nodeUid, nodeController.daemonSetStore)
+		message, _ := value.UID.(evictionMessage)
+		podName := message.podName
+		podNamespace := message.podNamespace
+		pod, _ := nodeController.kubeClient.Core().Pods(podNamespace).Get(podName)
+		deletePod(nodeController.kubeClient, pod, nodeController.recorder, nodeController.daemonSetStore)
 		return true, 0
 	})
-	if len(fakeRecorder.events) != 3 {
+	if len(fakeRecorder.events) != 2 {
 		t.Fatalf("unexpected events: %v", fakeRecorder.events)
 	}
-	if fakeRecorder.events[0].Reason != "RegisteredNode" || fakeRecorder.events[1].Reason != "RemovingNode" || fakeRecorder.events[2].Reason != "DeletingAllPods" {
+	if fakeRecorder.events[0].Reason != "RegisteredNode" || fakeRecorder.events[1].Reason != "RemovingNode" {
 		t.Fatalf("unexpected events generation: %v", fakeRecorder.events)
 	}
 	for _, event := range fakeRecorder.events {

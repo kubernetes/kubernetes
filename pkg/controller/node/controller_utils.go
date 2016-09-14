@@ -347,6 +347,9 @@ func removeNodeOutageTaint(kubeClient clientset.Interface, node *api.Node) error
 		annotations = make(map[string]string)
 	}
 	taints, err := api.GetTaintsFromNodeAnnotations(annotations)
+	if len(taints) == 0 {
+		return nil
+	}
 	if err != nil {
 		return err
 	}
@@ -370,101 +373,4 @@ type evictionMessage struct {
 	podName      string
 	podNamespace string
 	nodeUID      types.UID
-}
-
-// deletePods will delete all pods from master running on given node, and return true
-// if any pods were deleted, or were found pending deletion.
-func deletePods(kubeClient clientset.Interface, recorder record.EventRecorder, nodeName, nodeUID string, daemonStore cache.StoreToDaemonSetLister) (bool, error) {
-	remaining := false
-	selector := fields.OneTermEqualSelector(api.PodHostField, nodeName)
-	options := api.ListOptions{FieldSelector: selector}
-	pods, err := kubeClient.Core().Pods(api.NamespaceAll).List(options)
-	if err != nil {
-		return remaining, err
-	}
-
-	if len(pods.Items) > 0 {
-		recordNodeEvent(recorder, nodeName, nodeUID, api.EventTypeNormal, "DeletingAllPods", fmt.Sprintf("Deleting all Pods from Node %v.", nodeName))
-	}
-
-	for _, pod := range pods.Items {
-		// Defensive check, also needed for tests.
-		if pod.Spec.NodeName != nodeName {
-			continue
-		}
-		// if the pod has already been marked for deletion, we still return true that there are remaining pods.
-		if pod.DeletionGracePeriodSeconds != nil {
-			remaining = true
-			continue
-		}
-		// if the pod is managed by a daemonset, ignore it
-		_, err := daemonStore.GetPodDaemonSets(&pod)
-		if err == nil { // No error means at least one daemonset was found
-			continue
-		}
-
-		glog.V(2).Infof("Starting deletion of pod %v", pod.Name)
-		recorder.Eventf(&pod, api.EventTypeNormal, "NodeControllerEviction", "Marking for deletion Pod %s from Node %s", pod.Name, nodeName)
-		if err := kubeClient.Core().Pods(pod.Namespace).Delete(pod.Name, nil); err != nil {
-			return false, err
-		}
-		remaining = true
-	}
-	return remaining, nil
-}
-
-// terminatePods will ensure all pods on the given node that are in terminating state are eventually
-// cleaned up. Returns true if the node has no pods in terminating state, a duration that indicates how
-// long before we should check again (the next deadline for a pod to complete), or an error.
-func terminatePods(kubeClient clientset.Interface, recorder record.EventRecorder, nodeName string, nodeUID string, since time.Time, maxGracePeriod time.Duration) (bool, time.Duration, error) {
-	// the time before we should try again
-	nextAttempt := time.Duration(0)
-	// have we deleted all pods
-	complete := true
-
-	selector := fields.OneTermEqualSelector(api.PodHostField, nodeName)
-	options := api.ListOptions{FieldSelector: selector}
-	pods, err := kubeClient.Core().Pods(api.NamespaceAll).List(options)
-	if err != nil {
-		return false, nextAttempt, err
-	}
-
-	now := time.Now()
-	elapsed := now.Sub(since)
-	for _, pod := range pods.Items {
-		// Defensive check, also needed for tests.
-		if pod.Spec.NodeName != nodeName {
-			continue
-		}
-		// only clean terminated pods
-		if pod.DeletionGracePeriodSeconds == nil {
-			continue
-		}
-
-		// the user's requested grace period
-		grace := time.Duration(*pod.DeletionGracePeriodSeconds) * time.Second
-		if grace > maxGracePeriod {
-			grace = maxGracePeriod
-		}
-
-		// the time remaining before the pod should have been deleted
-		remaining := grace - elapsed
-		if remaining < 0 {
-			remaining = 0
-			glog.V(2).Infof("Removing pod %v after %s grace period", pod.Name, grace)
-			recordNodeEvent(recorder, nodeName, nodeUID, api.EventTypeNormal, "TerminatingEvictedPod", fmt.Sprintf("Pod %s has exceeded the grace period for deletion after being evicted from Node %q and is being force killed", pod.Name, nodeName))
-			if err := kubeClient.Core().Pods(pod.Namespace).Delete(pod.Name, api.NewDeleteOptions(0)); err != nil {
-				glog.Errorf("Error completing deletion of pod %s: %v", pod.Name, err)
-				complete = false
-			}
-		} else {
-			glog.V(2).Infof("Pod %v still terminating, requested grace period %s, %s remaining", pod.Name, grace, remaining)
-			complete = false
-		}
-
-		if nextAttempt < remaining {
-			nextAttempt = remaining
-		}
-	}
-	return complete, nextAttempt, nil
 }

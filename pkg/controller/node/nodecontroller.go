@@ -550,7 +550,11 @@ func (nc *NodeController) monitorNodeStatus() error {
 	for i := range deleted {
 		glog.V(1).Infof("NodeController observed a Node deletion: %v", deleted[i].Name)
 		recordNodeEvent(nc.recorder, deleted[i].Name, string(deleted[i].UID), api.EventTypeNormal, "RemovingNode", fmt.Sprintf("Removing Node %v from NodeController", deleted[i].Name))
-		// nc.evictPods(deleted[i])
+		pods, err := getPodsForANode(nc.kubeClient, deleted[i].Name)
+		if err != nil {
+			return err
+		}
+		nc.evictPods(deleted[i], pods.Items...)
 		delete(nc.knownNodeSet, deleted[i].Name)
 	}
 
@@ -665,13 +669,19 @@ func (nc *NodeController) monitorNodeTaints() error {
 			}
 
 			if !tolerationsToleratesTaints(tolerations, taints) {
-				glog.Infof("pod %v:%v will be sent for eviction", pod.Namespace, pod.Name)
-				message := evictionMessage{pod.Name, pod.Namespace, node.UID}
-				nc.zonePodEvictor[utilnode.GetZoneKey(&node)].Add(pod.Name, message)
+				nc.evictPods(&node, pod)
 			}
 		}
 	}
 	return nil
+}
+
+func (nc *NodeController) evictPods(node *api.Node, pods ...api.Pod) {
+	for _, pod := range pods {
+		glog.Infof("pod %v:%v will be sent for eviction", pod.Namespace, pod.Name)
+		message := evictionMessage{pod.Name, pod.Namespace, node.UID}
+		nc.zonePodEvictor[utilnode.GetZoneKey(node)].Add(pod.Name, message)
+	}
 }
 
 func (nc *NodeController) updateEvictionMetric(metric *prometheus.GaugeVec, data *evictionData) {
@@ -972,31 +982,6 @@ func (nc *NodeController) checkForNodeAddedDeleted(nodes *api.NodeList) (added, 
 		}
 	}
 	return
-}
-
-// cancelPodEviction removes any queued evictions, typically because the node is available again. It
-// returns true if an eviction was queued.
-func (nc *NodeController) cancelPodEviction(node *api.Node) bool {
-	zone := utilnode.GetZoneKey(node)
-	nc.evictorLock.Lock()
-	defer nc.evictorLock.Unlock()
-	wasDeleting := nc.zonePodEvictor[zone].Remove(node.Name)
-	wasTerminating := nc.zoneTerminationEvictor[zone].Remove(node.Name)
-	if wasDeleting || wasTerminating {
-		glog.V(2).Infof("Cancelling pod Eviction on Node: %v", node.Name)
-		nc.evictions10Minutes.removeEviction(zone, node.Name)
-		nc.evictions1Hour.removeEviction(zone, node.Name)
-		return true
-	}
-	return false
-}
-
-// evictPods queues an eviction for the provided node name, and returns false if the node is already
-// queued for eviction.
-func (nc *NodeController) evictPods(node *api.Node) bool {
-	nc.evictorLock.Lock()
-	defer nc.evictorLock.Unlock()
-	return nc.zonePodEvictor[utilnode.GetZoneKey(node)].Add(node.Name, string(node.UID))
 }
 
 // Default value for cluster eviction rate - we take nodeNum for consistency with ReducedQPSFunc.
