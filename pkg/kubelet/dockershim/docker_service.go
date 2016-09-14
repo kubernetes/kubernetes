@@ -49,7 +49,7 @@ const (
 	containerTypeLabelContainer = "container"
 )
 
-func NewDockerSevice(client dockertools.DockerInterface) DockerLegacyService {
+func NewDockerService(client dockertools.DockerInterface) DockerLegacyService {
 	return &dockerService{
 		client: dockertools.NewInstrumentedDockerInterface(client),
 	}
@@ -73,7 +73,7 @@ type dockerService struct {
 }
 
 // Version returns the runtime name, runtime version and runtime API version
-func (ds *dockerService) Version(apiVersion string) (*runtimeApi.VersionResponse, error) {
+func (ds *dockerService) Version(_ string) (*runtimeApi.VersionResponse, error) {
 	v, err := ds.client.Version()
 	if err != nil {
 		return nil, fmt.Errorf("docker: failed to get docker version: %v", err)

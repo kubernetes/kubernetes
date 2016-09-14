@@ -239,9 +239,11 @@ type VersionResponse struct {
 	Version *string `protobuf:"bytes,1,opt,name=version" json:"version,omitempty"`
 	// The name of the container runtime.
 	RuntimeName *string `protobuf:"bytes,2,opt,name=runtime_name,json=runtimeName" json:"runtime_name,omitempty"`
-	// The version of the container runtime.
+	// The version of the container runtime. The string should be
+	// semver-compatible.
 	RuntimeVersion *string `protobuf:"bytes,3,opt,name=runtime_version,json=runtimeVersion" json:"runtime_version,omitempty"`
-	// The API version of the container runtime.
+	// The API version of the container runtime. The string should be
+	// semver-compatible.
 	RuntimeApiVersion *string `protobuf:"bytes,4,opt,name=runtime_api_version,json=runtimeApiVersion" json:"runtime_api_version,omitempty"`
 	XXX_unrecognized  []byte  `json:"-"`
 }
