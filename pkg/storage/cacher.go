@@ -113,7 +113,10 @@ func (i *indexedWatchers) deleteWatcher(number int, value string, supported bool
 	}
 }
 
-func (i *indexedWatchers) terminateAll() {
+func (i *indexedWatchers) terminateAll(objectType reflect.Type) {
+	if len(i.allWatchers) > 0 || len(i.valueWatchers) > 0 {
+		glog.Warningf("Terminating all watchers from cacher %v", objectType)
+	}
 	i.allWatchers.terminateAll()
 	for index, watchers := range i.valueWatchers {
 		watchers.terminateAll()
@@ -465,10 +468,9 @@ func (c *Cacher) dispatchEvent(event *watchCacheEvent) {
 }
 
 func (c *Cacher) terminateAllWatchers() {
-	glog.Warningf("Terminating all watchers from cacher %v", c.objectType)
 	c.Lock()
 	defer c.Unlock()
-	c.watchers.terminateAll()
+	c.watchers.terminateAll(c.objectType)
 }
 
 func (c *Cacher) isStopped() bool {
