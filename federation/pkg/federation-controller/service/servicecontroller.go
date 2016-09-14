@@ -35,7 +35,6 @@ import (
 	release_1_4 "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/controller/framework"
 	pkg_runtime "k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -109,11 +108,11 @@ type ServiceController struct {
 	// A store of services, populated by the serviceController
 	serviceStore cache.StoreToServiceLister
 	// Watches changes to all services
-	serviceController *framework.Controller
+	serviceController *cache.Controller
 	// A store of services, populated by the serviceController
 	clusterStore federationcache.StoreToClusterLister
 	// Watches changes to all services
-	clusterController *framework.Controller
+	clusterController *cache.Controller
 	eventBroadcaster  record.EventBroadcaster
 	eventRecorder     record.EventRecorder
 	// services that need to be synced
@@ -145,7 +144,7 @@ func New(federationClient federation_release_1_4.Interface, dns dnsprovider.Inte
 		queue:            workqueue.New(),
 		knownClusterSet:  make(sets.String),
 	}
-	s.serviceStore.Store, s.serviceController = framework.NewInformer(
+	s.serviceStore.Store, s.serviceController = cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (pkg_runtime.Object, error) {
 				return s.federationClient.Core().Services(v1.NamespaceAll).List(options)
@@ -156,7 +155,7 @@ func New(federationClient federation_release_1_4.Interface, dns dnsprovider.Inte
 		},
 		&v1.Service{},
 		serviceSyncPeriod,
-		framework.ResourceEventHandlerFuncs{
+		cache.ResourceEventHandlerFuncs{
 			AddFunc: s.enqueueService,
 			UpdateFunc: func(old, cur interface{}) {
 				// there is case that old and new are equals but we still catch the event now.
@@ -167,7 +166,7 @@ func New(federationClient federation_release_1_4.Interface, dns dnsprovider.Inte
 			DeleteFunc: s.enqueueService,
 		},
 	)
-	s.clusterStore.Store, s.clusterController = framework.NewInformer(
+	s.clusterStore.Store, s.clusterController = cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (pkg_runtime.Object, error) {
 				return s.federationClient.Federation().Clusters().List(options)
@@ -178,7 +177,7 @@ func New(federationClient federation_release_1_4.Interface, dns dnsprovider.Inte
 		},
 		&v1beta1.Cluster{},
 		clusterSyncPeriod,
-		framework.ResourceEventHandlerFuncs{
+		cache.ResourceEventHandlerFuncs{
 			DeleteFunc: s.clusterCache.delFromClusterSet,
 			AddFunc:    s.clusterCache.addToClientMap,
 			UpdateFunc: func(old, cur interface{}) {

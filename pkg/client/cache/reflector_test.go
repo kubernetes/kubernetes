@@ -34,12 +34,12 @@ import (
 var nevererrc chan error
 
 type testLW struct {
-	ListFunc  func() (runtime.Object, error)
+	ListFunc  func(options api.ListOptions) (runtime.Object, error)
 	WatchFunc func(options api.ListOptions) (watch.Interface, error)
 }
 
 func (t *testLW) List(options api.ListOptions) (runtime.Object, error) {
-	return t.ListFunc()
+	return t.ListFunc(options)
 }
 func (t *testLW) Watch(options api.ListOptions) (watch.Interface, error) {
 	return t.WatchFunc(options)
@@ -53,7 +53,7 @@ func TestCloseWatchChannelOnError(t *testing.T) {
 		WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 			return fw, nil
 		},
-		ListFunc: func() (runtime.Object, error) {
+		ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 			return &api.PodList{ListMeta: unversioned.ListMeta{ResourceVersion: "1"}}, nil
 		},
 	}
@@ -79,7 +79,7 @@ func TestRunUntil(t *testing.T) {
 		WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 			return fw, nil
 		},
-		ListFunc: func() (runtime.Object, error) {
+		ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 			return &api.PodList{ListMeta: unversioned.ListMeta{ResourceVersion: "1"}}, nil
 		},
 	}
@@ -227,7 +227,7 @@ func TestReflectorListAndWatch(t *testing.T) {
 			go func() { createdFakes <- fw }()
 			return fw, nil
 		},
-		ListFunc: func() (runtime.Object, error) {
+		ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 			return &api.PodList{ListMeta: unversioned.ListMeta{ResourceVersion: "1"}}, nil
 		},
 	}
@@ -345,7 +345,7 @@ func TestReflectorListAndWatchWithErrors(t *testing.T) {
 				}()
 				return fw, nil
 			},
-			ListFunc: func() (runtime.Object, error) {
+			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				return item.list, item.listErr
 			},
 		}
@@ -373,7 +373,7 @@ func TestReflectorResync(t *testing.T) {
 			fw := watch.NewFake()
 			return fw, nil
 		},
-		ListFunc: func() (runtime.Object, error) {
+		ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 			return &api.PodList{ListMeta: unversioned.ListMeta{ResourceVersion: "0"}}, nil
 		},
 	}

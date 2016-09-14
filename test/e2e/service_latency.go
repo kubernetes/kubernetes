@@ -24,7 +24,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/cache"
-	controllerframework "k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -275,7 +274,7 @@ func (eq *endpointQueries) added(e *api.Endpoints) {
 
 // blocks until it has finished syncing.
 func startEndpointWatcher(f *framework.Framework, q *endpointQueries) {
-	_, controller := controllerframework.NewInformer(
+	_, controller := cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				return f.Client.Endpoints(f.Namespace.Name).List(options)
@@ -286,7 +285,7 @@ func startEndpointWatcher(f *framework.Framework, q *endpointQueries) {
 		},
 		&api.Endpoints{},
 		0,
-		controllerframework.ResourceEventHandlerFuncs{
+		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				if e, ok := obj.(*api.Endpoints); ok {
 					if len(e.Subsets) > 0 && len(e.Subsets[0].Addresses) > 0 {

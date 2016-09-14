@@ -39,7 +39,6 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/client/testing/core"
-	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
@@ -125,8 +124,8 @@ type volumeReactor struct {
 	changedObjects       []interface{}
 	changedSinceLastSync int
 	ctrl                 *PersistentVolumeController
-	volumeSource         *framework.FakePVControllerSource
-	claimSource          *framework.FakePVCControllerSource
+	volumeSource         *cache.FakePVControllerSource
+	claimSource          *cache.FakePVCControllerSource
 	lock                 sync.Mutex
 	errors               []reactorError
 }
@@ -571,7 +570,7 @@ func (r *volumeReactor) addClaimEvent(claim *api.PersistentVolumeClaim) {
 	r.claimSource.Add(claim)
 }
 
-func newVolumeReactor(client *fake.Clientset, ctrl *PersistentVolumeController, volumeSource *framework.FakePVControllerSource, claimSource *framework.FakePVCControllerSource, errors []reactorError) *volumeReactor {
+func newVolumeReactor(client *fake.Clientset, ctrl *PersistentVolumeController, volumeSource *cache.FakePVControllerSource, claimSource *cache.FakePVCControllerSource, errors []reactorError) *volumeReactor {
 	reactor := &volumeReactor{
 		volumes:      make(map[string]*api.PersistentVolume),
 		claims:       make(map[string]*api.PersistentVolumeClaim),
@@ -586,13 +585,13 @@ func newVolumeReactor(client *fake.Clientset, ctrl *PersistentVolumeController, 
 
 func newTestController(kubeClient clientset.Interface, volumeSource, claimSource, classSource cache.ListerWatcher, enableDynamicProvisioning bool) *PersistentVolumeController {
 	if volumeSource == nil {
-		volumeSource = framework.NewFakePVControllerSource()
+		volumeSource = cache.NewFakePVControllerSource()
 	}
 	if claimSource == nil {
-		claimSource = framework.NewFakePVCControllerSource()
+		claimSource = cache.NewFakePVCControllerSource()
 	}
 	if classSource == nil {
-		classSource = framework.NewFakeControllerSource()
+		classSource = cache.NewFakeControllerSource()
 	}
 	ctrl := NewPersistentVolumeControllerFromClient(
 		kubeClient,

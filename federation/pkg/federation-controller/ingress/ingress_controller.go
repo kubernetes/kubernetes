@@ -33,7 +33,6 @@ import (
 	kube_release_1_4 "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/conversion"
 	pkg_runtime "k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
@@ -81,7 +80,7 @@ type IngressController struct {
 	// Definitions of ingresses that should be federated.
 	ingressInformerStore cache.Store
 	// Informer controller for ingresses that should be federated.
-	ingressInformerController framework.ControllerInterface
+	ingressInformerController cache.ControllerInterface
 
 	// Client to federated api server.
 	federatedApiClient federation_release_1_4.Interface
@@ -125,7 +124,7 @@ func NewIngressController(client federation_release_1_4.Interface) *IngressContr
 	ic.configMapDeliverer = util.NewDelayingDeliverer()
 
 	// Start informer in federated API servers on ingresses that should be federated.
-	ic.ingressInformerStore, ic.ingressInformerController = framework.NewInformer(
+	ic.ingressInformerStore, ic.ingressInformerController = cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (pkg_runtime.Object, error) {
 				return client.Extensions().Ingresses(api.NamespaceAll).List(options)
@@ -145,8 +144,8 @@ func NewIngressController(client federation_release_1_4.Interface) *IngressContr
 	// Federated informer on ingresses in members of federation.
 	ic.ingressFederatedInformer = util.NewFederatedInformer(
 		client,
-		func(cluster *federation_api.Cluster, targetClient kube_release_1_4.Interface) (cache.Store, framework.ControllerInterface) {
-			return framework.NewInformer(
+		func(cluster *federation_api.Cluster, targetClient kube_release_1_4.Interface) (cache.Store, cache.ControllerInterface) {
+			return cache.NewInformer(
 				&cache.ListWatch{
 					ListFunc: func(options api.ListOptions) (pkg_runtime.Object, error) {
 						return targetClient.Extensions().Ingresses(api.NamespaceAll).List(options)
@@ -177,9 +176,9 @@ func NewIngressController(client federation_release_1_4.Interface) *IngressContr
 	// Federated informer on configmaps for ingress controllers in members of the federation.
 	ic.configMapFederatedInformer = util.NewFederatedInformer(
 		client,
-		func(cluster *federation_api.Cluster, targetClient kube_release_1_4.Interface) (cache.Store, framework.ControllerInterface) {
+		func(cluster *federation_api.Cluster, targetClient kube_release_1_4.Interface) (cache.Store, cache.ControllerInterface) {
 			glog.V(4).Infof("Returning new informer for cluster %q", cluster.Name)
-			return framework.NewInformer(
+			return cache.NewInformer(
 				&cache.ListWatch{
 					ListFunc: func(options api.ListOptions) (pkg_runtime.Object, error) {
 						if targetClient == nil {

@@ -29,7 +29,6 @@ import (
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/cloudprovider"
-	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/util/goroutinemap"
 	vol "k8s.io/kubernetes/pkg/volume"
@@ -151,12 +150,12 @@ const createProvisionedPVInterval = 10 * time.Second
 
 // PersistentVolumeController is a controller that synchronizes
 // PersistentVolumeClaims and PersistentVolumes. It starts two
-// framework.Controllers that watch PersistentVolume and PersistentVolumeClaim
+// cache.Controllers that watch PersistentVolume and PersistentVolumeClaim
 // changes.
 type PersistentVolumeController struct {
-	volumeController          framework.ControllerInterface
-	pvInformer                framework.SharedIndexInformer
-	claimController           *framework.Controller
+	volumeController          cache.ControllerInterface
+	pvInformer                cache.SharedIndexInformer
+	claimController           *cache.Controller
 	claimSource               cache.ListerWatcher
 	classReflector            *cache.Reflector
 	classSource               cache.ListerWatcher
@@ -199,7 +198,7 @@ type PersistentVolumeController struct {
 }
 
 // syncClaim is the main controller method to decide what to do with a claim.
-// It's invoked by appropriate framework.Controller callbacks when a claim is
+// It's invoked by appropriate cache.Controller callbacks when a claim is
 // created, updated or periodically synced. We do not differentiate between
 // these events.
 // For easier readability, it was split into syncUnboundClaim and syncBoundClaim
@@ -389,7 +388,7 @@ func (ctrl *PersistentVolumeController) syncBoundClaim(claim *api.PersistentVolu
 }
 
 // syncVolume is the main controller method to decide what to do with a volume.
-// It's invoked by appropriate framework.Controller callbacks when a volume is
+// It's invoked by appropriate cache.Controller callbacks when a volume is
 // created, updated or periodically synced. We do not differentiate between
 // these events.
 func (ctrl *PersistentVolumeController) syncVolume(volume *api.PersistentVolume) error {

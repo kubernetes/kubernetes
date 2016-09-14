@@ -28,7 +28,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
-	controllerframework "k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
 	kubemetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/labels"
@@ -478,7 +477,7 @@ func verifyPodStartupLatency(expect, actual framework.LatencyMetric) error {
 
 // newInformerWatchPod creates an informer to check whether all pods are running.
 func newInformerWatchPod(f *framework.Framework, mutex *sync.Mutex, watchTimes map[string]unversioned.Time,
-	podType string) *controllerframework.Controller {
+	podType string) *cache.Controller {
 	ns := f.Namespace.Name
 	checkPodRunning := func(p *api.Pod) {
 		mutex.Lock()
@@ -492,7 +491,7 @@ func newInformerWatchPod(f *framework.Framework, mutex *sync.Mutex, watchTimes m
 		}
 	}
 
-	_, controller := controllerframework.NewInformer(
+	_, controller := cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				options.LabelSelector = labels.SelectorFromSet(labels.Set{"type": podType})
@@ -505,7 +504,7 @@ func newInformerWatchPod(f *framework.Framework, mutex *sync.Mutex, watchTimes m
 		},
 		&api.Pod{},
 		0,
-		controllerframework.ResourceEventHandlerFuncs{
+		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				p, ok := obj.(*api.Pod)
 				Expect(ok).To(Equal(true))

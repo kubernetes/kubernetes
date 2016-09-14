@@ -31,8 +31,7 @@ import (
 	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/controller/framework"
-	"k8s.io/kubernetes/pkg/controller/framework/informers"
+	"k8s.io/kubernetes/pkg/controller/informers"
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/metrics"
@@ -51,7 +50,7 @@ type JobController struct {
 	// we have a personal informer, we must start it ourselves.   If you start
 	// the controller using NewJobController(passing SharedInformer), this
 	// will be null
-	internalPodInformer framework.SharedInformer
+	internalPodInformer cache.SharedInformer
 
 	// To allow injection of updateJobStatus for testing.
 	updateHandler func(job *batch.Job) error
@@ -66,7 +65,7 @@ type JobController struct {
 	// A store of job, populated by the jobController
 	jobStore cache.StoreToJobLister
 	// Watches changes to all jobs
-	jobController *framework.Controller
+	jobController *cache.Controller
 
 	// A store of pods, populated by the podController
 	podStore cache.StoreToPodLister
@@ -77,7 +76,7 @@ type JobController struct {
 	recorder record.EventRecorder
 }
 
-func NewJobController(podInformer framework.SharedIndexInformer, kubeClient clientset.Interface) *JobController {
+func NewJobController(podInformer cache.SharedIndexInformer, kubeClient clientset.Interface) *JobController {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
 	// TODO: remove the wrapper when every clients have moved to use the clientset.
@@ -98,7 +97,7 @@ func NewJobController(podInformer framework.SharedIndexInformer, kubeClient clie
 		recorder:     eventBroadcaster.NewRecorder(api.EventSource{Component: "job-controller"}),
 	}
 
-	jm.jobStore.Store, jm.jobController = framework.NewInformer(
+	jm.jobStore.Store, jm.jobController = cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				return jm.kubeClient.Batch().Jobs(api.NamespaceAll).List(options)
@@ -110,7 +109,7 @@ func NewJobController(podInformer framework.SharedIndexInformer, kubeClient clie
 		&batch.Job{},
 		// TODO: Can we have much longer period here?
 		replicationcontroller.FullControllerResyncPeriod,
-		framework.ResourceEventHandlerFuncs{
+		cache.ResourceEventHandlerFuncs{
 			AddFunc: jm.enqueueController,
 			UpdateFunc: func(old, cur interface{}) {
 				if job := cur.(*batch.Job); !IsJobFinished(job) {
@@ -121,7 +120,7 @@ func NewJobController(podInformer framework.SharedIndexInformer, kubeClient clie
 		},
 	)
 
-	podInformer.AddEventHandler(framework.ResourceEventHandlerFuncs{
+	podInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    jm.addPod,
 		UpdateFunc: jm.updatePod,
 		DeleteFunc: jm.deletePod,

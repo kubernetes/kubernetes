@@ -29,7 +29,6 @@ import (
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	kservice "k8s.io/kubernetes/pkg/controller/endpoint"
-	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/intstr"
@@ -43,7 +42,7 @@ import (
 )
 
 var (
-	keyFunc = framework.DeletionHandlingMetaNamespaceKeyFunc
+	keyFunc = cache.DeletionHandlingMetaNamespaceKeyFunc
 )
 
 type EndpointController interface {
@@ -56,7 +55,7 @@ func NewEndpointController(client *clientset.Clientset) *endpointController {
 		client: client,
 		queue:  workqueue.New(),
 	}
-	e.serviceStore.Store, e.serviceController = framework.NewInformer(
+	e.serviceStore.Store, e.serviceController = cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				return e.client.Core().Services(api.NamespaceAll).List(options)
@@ -67,7 +66,7 @@ func NewEndpointController(client *clientset.Clientset) *endpointController {
 		},
 		&api.Service{},
 		kservice.FullServiceResyncPeriod,
-		framework.ResourceEventHandlerFuncs{
+		cache.ResourceEventHandlerFuncs{
 			AddFunc: e.enqueueService,
 			UpdateFunc: func(old, cur interface{}) {
 				e.enqueueService(cur)
@@ -76,7 +75,7 @@ func NewEndpointController(client *clientset.Clientset) *endpointController {
 		},
 	)
 
-	e.podStore.Indexer, e.podController = framework.NewIndexerInformer(
+	e.podStore.Indexer, e.podController = cache.NewIndexerInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				return e.client.Core().Pods(api.NamespaceAll).List(options)
@@ -87,7 +86,7 @@ func NewEndpointController(client *clientset.Clientset) *endpointController {
 		},
 		&api.Pod{},
 		5*time.Minute,
-		framework.ResourceEventHandlerFuncs{
+		cache.ResourceEventHandlerFuncs{
 			AddFunc:    e.addPod,
 			UpdateFunc: e.updatePod,
 			DeleteFunc: e.deletePod,
@@ -113,8 +112,8 @@ type endpointController struct {
 
 	// Since we join two objects, we'll watch both of them with
 	// controllers.
-	serviceController *framework.Controller
-	podController     *framework.Controller
+	serviceController *cache.Controller
+	podController     *cache.Controller
 }
 
 // Runs e; will not return until stopCh is closed. workers determines how many

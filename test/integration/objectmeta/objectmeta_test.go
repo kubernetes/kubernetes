@@ -17,6 +17,8 @@ limitations under the License.
 package objectmeta
 
 import (
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/api"
@@ -27,7 +29,6 @@ import (
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
 	"k8s.io/kubernetes/test/integration/framework"
-	"testing"
 )
 
 func TestIgnoreClusterName(t *testing.T) {

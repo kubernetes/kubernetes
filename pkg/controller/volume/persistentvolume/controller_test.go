@@ -24,7 +24,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
-	"k8s.io/kubernetes/pkg/controller/framework"
 )
 
 // Test the real controller methods (add/update/delete claim/volume) with
@@ -161,8 +160,8 @@ func TestControllerSync(t *testing.T) {
 
 		// Initialize the controller
 		client := &fake.Clientset{}
-		volumeSource := framework.NewFakePVControllerSource()
-		claimSource := framework.NewFakePVCControllerSource()
+		volumeSource := cache.NewFakePVControllerSource()
+		claimSource := cache.NewFakePVCControllerSource()
 		ctrl := newTestController(client, volumeSource, claimSource, nil, true)
 		reactor := newVolumeReactor(client, ctrl, volumeSource, claimSource, test.errors)
 		for _, claim := range test.initialClaims {
@@ -247,7 +246,7 @@ func storeVersion(t *testing.T, prefix string, c cache.Store, version string, ex
 // TestControllerCache tests func storeObjectUpdate()
 func TestControllerCache(t *testing.T) {
 	// Cache under test
-	c := cache.NewStore(framework.DeletionHandlingMetaNamespaceKeyFunc)
+	c := cache.NewStore(cache.DeletionHandlingMetaNamespaceKeyFunc)
 
 	// Store new PV
 	storeVersion(t, "Step1", c, "1", true)
@@ -264,7 +263,7 @@ func TestControllerCache(t *testing.T) {
 }
 
 func TestControllerCacheParsingError(t *testing.T) {
-	c := cache.NewStore(framework.DeletionHandlingMetaNamespaceKeyFunc)
+	c := cache.NewStore(cache.DeletionHandlingMetaNamespaceKeyFunc)
 	// There must be something in the cache to compare with
 	storeVersion(t, "Step1", c, "1", true)
 
