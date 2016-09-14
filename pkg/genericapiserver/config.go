@@ -71,6 +71,7 @@ type Config struct {
 	// allow downstream consumers to disable the index route
 	EnableIndex           bool
 	EnableProfiling       bool
+	EnableVersion         bool
 	EnableWatchCache      bool
 	APIPrefix             string
 	APIGroupPrefix        string
@@ -170,6 +171,7 @@ func NewConfig(options *options.ServerRunOptions) *Config {
 		EnableProfiling:           options.EnableProfiling,
 		EnableSwaggerSupport:      true,
 		EnableSwaggerUI:           options.EnableSwaggerUI,
+		EnableVersion:             true,
 		EnableWatchCache:          options.EnableWatchCache,
 		ExternalHost:              options.ExternalHost,
 		KubernetesServiceNodePort: options.KubernetesServiceNodePort,
@@ -345,6 +347,9 @@ func (c Config) New() (*GenericAPIServer, error) {
 	}
 	if c.EnableProfiling {
 		routes.Profiling{}.Install(s.Mux, s.HandlerContainer)
+	}
+	if c.EnableVersion {
+		routes.Version{}.Install(s.Mux, s.HandlerContainer)
 	}
 
 	handler := http.Handler(s.Mux.BaseMux().(*http.ServeMux))

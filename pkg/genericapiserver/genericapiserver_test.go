@@ -213,6 +213,7 @@ func TestNotRestRoutesHaveAuth(t *testing.T) {
 	config.EnableIndex = true
 	config.EnableProfiling = true
 	config.EnableSwaggerSupport = true
+	config.EnableVersion = true
 
 	s, err := config.New()
 	if err != nil {
@@ -225,6 +226,7 @@ func TestNotRestRoutesHaveAuth(t *testing.T) {
 		{"/"},
 		{"/swagger-ui/"},
 		{"/debug/pprof/"},
+		{"/version"},
 	} {
 		resp := httptest.NewRecorder()
 		req, _ := http.NewRequest("GET", test.route, nil)

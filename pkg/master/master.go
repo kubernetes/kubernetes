@@ -192,7 +192,6 @@ func New(c *Config) (*Master, error) {
 	if c.EnableLogsSupport {
 		routes.Logs{}.Install(s.Mux, s.HandlerContainer)
 	}
-	routes.Version{}.Install(s.Mux, s.HandlerContainer)
 
 	m := &Master{
 		GenericAPIServer:        s,

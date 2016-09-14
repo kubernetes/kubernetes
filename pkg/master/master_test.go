@@ -1263,6 +1263,7 @@ func TestValidOpenAPISpec(t *testing.T) {
 
 	config.EnableOpenAPISupport = true
 	config.EnableIndex = true
+	config.EnableVersion = true
 	config.OpenAPIInfo = spec.Info{
 		InfoProps: spec.InfoProps{
 			Title:   "Kubernetes",
