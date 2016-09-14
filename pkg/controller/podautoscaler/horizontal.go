@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"strconv"
 	"time"
 
 	"github.com/golang/glog"
@@ -49,6 +50,9 @@ const (
 
 	HpaCustomMetricsTargetAnnotationName = "alpha/target.custom-metrics.podautoscaler.kubernetes.io"
 	HpaCustomMetricsStatusAnnotationName = "alpha/status.custom-metrics.podautoscaler.kubernetes.io"
+
+	HPAUpscaleForbiddenWindowAnnotationName   = "autoscaling.k8s.io/upscale-forbidden-window"
+	HPADownscaleForbiddenWindowAnnotationName = "autoscaling.k8s.io/downscale-forbidden-window"
 )
 
 type HorizontalController struct {
@@ -64,8 +68,8 @@ type HorizontalController struct {
 	controller *framework.Controller
 }
 
-var downscaleForbiddenWindow = 5 * time.Minute
-var upscaleForbiddenWindow = 3 * time.Minute
+var defaultDownscaleForbiddenWindow = 5 * time.Minute
+var defaultUpscaleForbiddenWindow = 3 * time.Minute
 
 func newInformer(controller *HorizontalController, resyncPeriod time.Duration) (cache.Store, *framework.Controller) {
 	return framework.NewInformer(
@@ -353,6 +357,29 @@ func (a *HorizontalController) reconcileAutoscaler(hpa *autoscaling.HorizontalPo
 func shouldScale(hpa *autoscaling.HorizontalPodAutoscaler, currentReplicas, desiredReplicas int32, timestamp time.Time) bool {
 	if desiredReplicas == currentReplicas {
 		return false
+	}
+
+	downscaleForbiddenWindow := defaultDownscaleForbiddenWindow
+	upscaleForbiddenWindow := defaultUpscaleForbiddenWindow
+
+	downscaleAnnotation, hasCustomDownscale := hpa.Annotations[HPADownscaleForbiddenWindowAnnotationName]
+	if hasCustomDownscale {
+		customDownscale, err := strconv.Atoi(downscaleAnnotation)
+		if err != nil {
+			utilruntime.HandleError(fmt.Errorf("unable to parse custom downscale forbidden window annoation of %q seconds on HorizontalPodAutoscaler %s/%s, using default of %v", downscaleAnnotation, hpa.Namespace, hpa.Name, downscaleForbiddenWindow))
+		} else {
+			downscaleForbiddenWindow = time.Duration(customDownscale) * time.Second
+		}
+	}
+
+	upscaleAnnotation, hasCustomUpscale := hpa.Annotations[HPAUpscaleForbiddenWindowAnnotationName]
+	if hasCustomUpscale {
+		customUpscale, err := strconv.Atoi(upscaleAnnotation)
+		if err != nil {
+			utilruntime.HandleError(fmt.Errorf("unable to parse custom upscale forbidden window annoation of %q seconds on HorizontalPodAutoscaler %s/%s, using default of %v", upscaleAnnotation, hpa.Namespace, hpa.Name, upscaleForbiddenWindow))
+		} else {
+			upscaleForbiddenWindow = time.Duration(customUpscale) * time.Second
+		}
 	}
 
 	// Going down only if the usageRatio dropped significantly below the target
