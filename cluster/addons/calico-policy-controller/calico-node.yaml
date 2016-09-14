@@ -21,7 +21,7 @@ spec:
       containers:
         # The Calico per-node agent.
         - name: calico-node
-          image: quay.io/calico/node:v0.22.0
+          image: calico/node:latest 
           env:
             # Tell Calico the location of the etcd Service.
             - name: ETCD_ENDPOINTS
@@ -33,12 +33,16 @@ spec:
             # Don't fail if we can't access etcd right away.
             - name: WAIT_FOR_DATASTORE
               value: "true"
+            # The GCI image doesn't support IPv6, so inform Felix that 
+            # it cannot program IPv6 routes / policy.
+            - name: FELIX_IPV6SUPPORT
+              value: "false"
           securityContext:
             privileged: true
           volumeMounts:
             - mountPath: /lib/modules
               name: lib-modules
-              readOnly: true
+              readOnly: false 
             - mountPath: /var/log/calico
               name: var-log-calico
               readOnly: false
@@ -48,7 +52,7 @@ spec:
         # This container installs the Calico CNI binaries
         # and CNI network config file on each node.
         - name: install-cni
-          image: calico/cni:v1.4.1
+          image: calico/cni:v1.4.2
           imagePullPolicy: Always
           command: ["/install-cni.sh"]
           env:
@@ -57,7 +61,7 @@ spec:
                 {
                     "name": "k8s-pod-network",
                     "type": "calico",
-                    "etcd_authority": "10.0.0.17:6666",
+                    "etcd_endpoints": "__ETCD_ENDPOINTS__",
                     "log_level": "info",
                     "ipam": {
                         "type": "host-local",
