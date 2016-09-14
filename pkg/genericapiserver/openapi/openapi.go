@@ -50,14 +50,16 @@ type Config struct {
 	DefaultResponse *spec.Response
 	// List of webservice's path prefixes to ignore
 	IgnorePrefixes []string
+
+	// OpenAPIDefinitions should provide definition for all models used by routes. Failure to provide this map
+	// or any of the models will result in spec generation failure.
+	OpenAPIDefinitions *common.OpenAPIDefinitions
 }
 
-// +k8s:openapi-gen=target
 type openAPI struct {
-	config             *Config
-	swagger            *spec.Swagger
-	protocolList       []string
-	openAPIDefinitions *common.OpenAPIDefinitions
+	config       *Config
+	swagger      *spec.Swagger
+	protocolList []string
 }
 
 // RegisterOpenAPIService registers a handler to provides standard OpenAPI specification.
@@ -91,17 +93,10 @@ func RegisterOpenAPIService(config *Config, containers *restful.Container) (err 
 }
 
 func (o *openAPI) init() error {
-	if o.openAPIDefinitions == nil {
-		// Compilation error here means the code generator need to run first.
-		o.openAPIDefinitions = o.OpenAPIDefinitions()
-	}
 	err := o.buildPaths()
 	if err != nil {
 		return err
 	}
-	// no need to the keep type list in memory
-	o.openAPIDefinitions = nil
-
 	return nil
 }
 
@@ -109,7 +104,7 @@ func (o *openAPI) buildDefinitionRecursively(name string) error {
 	if _, ok := o.swagger.Definitions[name]; ok {
 		return nil
 	}
-	if item, ok := (*o.openAPIDefinitions)[name]; ok {
+	if item, ok := (*o.config.OpenAPIDefinitions)[name]; ok {
 		o.swagger.Definitions[name] = item.Schema
 		for _, v := range item.Dependencies {
 			if err := o.buildDefinitionRecursively(v); err != nil {

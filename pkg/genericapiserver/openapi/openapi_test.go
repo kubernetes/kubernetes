@@ -42,10 +42,6 @@ func setUp(t *testing.T, fullMethods bool) (openAPI, *assert.Assertions) {
 				Info:        config.Info,
 			},
 		},
-		openAPIDefinitions: &common.OpenAPIDefinitions{
-			"openapi.TestInput":  *TestInput{}.OpenAPIDefinition(),
-			"openapi.TestOutput": *TestOutput{}.OpenAPIDefinition(),
-		},
 	}, assert
 }
 
@@ -192,6 +188,10 @@ func getConfig(fullMethods bool) *Config {
 				Title:       "TestAPI",
 				Description: "Test API",
 			},
+		},
+		OpenAPIDefinitions: &common.OpenAPIDefinitions{
+			"openapi.TestInput":  *TestInput{}.OpenAPIDefinition(),
+			"openapi.TestOutput": *TestOutput{}.OpenAPIDefinition(),
 		},
 	}
 }
