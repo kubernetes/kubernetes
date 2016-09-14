@@ -1183,12 +1183,13 @@ function kube-down() {
   fi
 
   # Delete the master replica pd (possibly leaked by kube-up if master create failed).
-  if gcloud compute disks describe "${REPLICA_NAME}"-pd --zone "${ZONE}" --project "${PROJECT}" &>/dev/null; then
+  local -r replica-pd="${REPLICA_NAME:-${MASTER_NAME}}-pd"
+  if gcloud compute disks describe "${replica-pd}" --zone "${ZONE}" --project "${PROJECT}" &>/dev/null; then
     gcloud compute disks delete \
       --project "${PROJECT}" \
       --quiet \
       --zone "${ZONE}" \
-      "${REPLICA_NAME}"-pd
+      "${replica-pd}"
   fi
 
   # Delete disk for cluster registry if enabled
