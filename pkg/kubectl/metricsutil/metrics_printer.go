@@ -110,8 +110,9 @@ func printSinglePodMetrics(out io.Writer, m *metrics_api.PodMetrics, printContai
 	for _, res := range MeasuredResources {
 		podMetrics[res], _ = resource.ParseQuantity("0")
 	}
-	var usage api.ResourceList
+
 	for _, c := range m.Containers {
+		var usage api.ResourceList
 		err := api.Scheme.Convert(&c.Usage, &usage, nil)
 		if err != nil {
 			return err
