@@ -104,6 +104,7 @@ grains:
   master_extra_sans: '$(echo "$MASTER_EXTRA_SANS" | sed -e "s/'/''/g")'
   keep_host_etcd: true
   kube_user: '$(echo "$KUBE_USER" | sed -e "s/'/''/g")'
+  test_api_servers: '$(echo "${TEST_API_SERVERS}" | sed -e "s/'/''/g")'
 EOF
 }
 

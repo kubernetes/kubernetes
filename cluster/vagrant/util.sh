@@ -118,7 +118,7 @@ function ensure-temp-dir {
 # Create a set of provision scripts for the master and each of the nodes
 function create-provision-scripts {
   ensure-temp-dir
-
+  echo "------------------${KUBE_TEMP}"
   (
     echo "#! /bin/bash"
     echo-kube-env
@@ -189,6 +189,7 @@ function echo-kube-env() {
   echo "E2E_STORAGE_TEST_ENVIRONMENT='${E2E_STORAGE_TEST_ENVIRONMENT:-}'"
   echo "CUSTOM_FEDORA_REPOSITORY_URL='${CUSTOM_FEDORA_REPOSITORY_URL:-}'"
   echo "EVICTION_HARD='${EVICTION_HARD:-}'"
+  echo "TEST_API_SERVERS='${TEST_API_SERVERS:-}'"
 }
 
 function verify-cluster {

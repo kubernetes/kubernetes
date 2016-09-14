@@ -22,6 +22,10 @@
   {% set api_servers_with_port = api_servers + ":6443" -%}
 {% endif -%}
 
+{% if grains.test_api_servers is defined %}
+  {% set api_servers_with_port = api_servers_with_port + grains.test_api_servers %}
+{% -%}
+
 {% set master_kubelet_args = "" %}
 
 {% set debugging_handlers = "--enable-debugging-handlers=true" -%}

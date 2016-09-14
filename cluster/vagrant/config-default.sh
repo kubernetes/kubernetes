@@ -113,6 +113,9 @@ OPENCONTRAIL_PUBLIC_SUBNET="${OPENCONTRAIL_PUBLIC_SUBNET:-10.1.0.0/16}"
 # Optional: if set to true, kube-up will configure the cluster to run e2e tests.
 E2E_STORAGE_TEST_ENVIRONMENT=${KUBE_E2E_STORAGE_TEST_ENVIRONMENT:-false}
 
+# Workaround until multiple api servers will be deployable
+TEST_API_SERVERS="${TEST_API_SERVERS:-https://${MASTER_IP}:6444}"
+
 # Default fallback NETWORK_IF_NAME, will be used in case when no 'VAGRANT-BEGIN' comments were defined in network-script
 export DEFAULT_NETWORK_IF_NAME="eth0"
 

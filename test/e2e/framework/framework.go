@@ -870,6 +870,16 @@ func filterLabels(selectors map[string]string, cli *client.Client, ns string) (*
 	return pl, err
 }
 
+// MasterExec runs provided command on master
+func MasterExec(cmd string) {
+	result, err := SSH(cmd, strings.Split(GetMasterHost(), ":")[0]+":22", TestContext.Provider)
+	Expect(err).NotTo(HaveOccurred())
+	if result.Code != 0 {
+		LogSSHResult(result)
+		Failf("master exec command returned non-zero")
+	}
+}
+
 // filter filters pods which pass a filter.  It can be used to compose
 // the more useful abstractions like ForEach, WaitFor, and so on, which
 // can be used directly by tests.
