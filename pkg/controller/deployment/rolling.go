@@ -42,7 +42,7 @@ func (dc *DeploymentController) rolloutRolling(deployment *extensions.Deployment
 	}
 	if scaledUp {
 		// Update DeploymentStatus
-		return dc.syncDeploymentStatus(allRSs, newRS, deployment)
+		return dc.syncRolloutStatus(allRSs, newRS, deployment)
 	}
 
 	// Scale down, if we can.
@@ -52,13 +52,13 @@ func (dc *DeploymentController) rolloutRolling(deployment *extensions.Deployment
 	}
 	if scaledDown {
 		// Update DeploymentStatus
-		return dc.syncDeploymentStatus(allRSs, newRS, deployment)
+		return dc.syncRolloutStatus(allRSs, newRS, deployment)
 	}
 
 	dc.cleanupDeployment(oldRSs, deployment)
 
 	// Sync deployment status
-	return dc.syncDeploymentStatus(allRSs, newRS, deployment)
+	return dc.syncRolloutStatus(allRSs, newRS, deployment)
 }
 
 func (dc *DeploymentController) reconcileNewReplicaSet(allRSs []*extensions.ReplicaSet, newRS *extensions.ReplicaSet, deployment *extensions.Deployment) (bool, error) {
