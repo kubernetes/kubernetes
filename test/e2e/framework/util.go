@@ -2169,18 +2169,20 @@ func (b kubectlBuilder) WithStdinReader(reader io.Reader) *kubectlBuilder {
 	return &b
 }
 
-func (b kubectlBuilder) ExecOrDie() (string, string) {
-	stdout, stderr, err := b.Exec()
+func (b kubectlBuilder) ExecOrDie() string {
+	str, err := b.Exec()
+	Logf("stdout: %q", str)
 	// In case of i/o timeout error, try talking to the apiserver again after 2s before dying.
 	// Note that we're still dying after retrying so that we can get visibility to triage it further.
 	if isTimeout(err) {
 		Logf("Hit i/o timeout error, talking to the server 2s later to see if it's temporary.")
 		time.Sleep(2 * time.Second)
-		_, retryErr := RunKubectl("version")
+		retryStr, retryErr := RunKubectl("version")
+		Logf("stdout: %q", retryStr)
 		Logf("err: %v", retryErr)
 	}
 	Expect(err).NotTo(HaveOccurred())
-	return stdout, stderr
+	return str
 }
 
 func isTimeout(err error) bool {
@@ -2197,14 +2199,14 @@ func isTimeout(err error) bool {
 	return false
 }
 
-func (b kubectlBuilder) Exec() (string, string, error) {
+func (b kubectlBuilder) Exec() (string, error) {
 	var stdout, stderr bytes.Buffer
 	cmd := b.cmd
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 
 	Logf("Running '%s %s'", cmd.Path, strings.Join(cmd.Args[1:], " ")) // skip arg[0] as it is printed separately
 	if err := cmd.Start(); err != nil {
-		return "", "", fmt.Errorf("error starting %v:\nCommand stdout:\n%v\nstderr:\n%v\nerror:\n%v\n", cmd, cmd.Stdout, cmd.Stderr, err)
+		return "", fmt.Errorf("error starting %v:\nCommand stdout:\n%v\nstderr:\n%v\nerror:\n%v\n", cmd, cmd.Stdout, cmd.Stderr, err)
 	}
 	errCh := make(chan error, 1)
 	go func() {
@@ -2218,39 +2220,32 @@ func (b kubectlBuilder) Exec() (string, string, error) {
 				Logf("rc: %d", rc)
 				rc = int(ee.Sys().(syscall.WaitStatus).ExitStatus())
 			}
-			return "", "", uexec.CodeExitError{
+			return "", uexec.CodeExitError{
 				Err:  fmt.Errorf("error running %v:\nCommand stdout:\n%v\nstderr:\n%v\nerror:\n%v\n", cmd, cmd.Stdout, cmd.Stderr, err),
 				Code: rc,
 			}
 		}
 	case <-b.timeout:
 		b.cmd.Process.Kill()
-		return "", "", fmt.Errorf("timed out waiting for command %v:\nCommand stdout:\n%v\nstderr:\n%v\n", cmd, cmd.Stdout, cmd.Stderr)
+		return "", fmt.Errorf("timed out waiting for command %v:\nCommand stdout:\n%v\nstderr:\n%v\n", cmd, cmd.Stdout, cmd.Stderr)
 	}
-
-	stderrString := stderr.String()
-	stdoutString := stdout.String()
-	Logf("stderr: %q", stderrString)
-	Logf("stdout: %q", stdoutString)
-	return stdoutString, stderrString, nil
+	Logf("stderr: %q", stderr.String())
+	return stdout.String(), nil
 }
 
 // RunKubectlOrDie is a convenience wrapper over kubectlBuilder
 func RunKubectlOrDie(args ...string) string {
-	stdout, _ := NewKubectlCommand(args...).ExecOrDie()
-	return stdout
+	return NewKubectlCommand(args...).ExecOrDie()
 }
 
 // RunKubectl is a convenience wrapper over kubectlBuilder
 func RunKubectl(args ...string) (string, error) {
-	stdout, _, err := NewKubectlCommand(args...).Exec()
-	return stdout, err
+	return NewKubectlCommand(args...).Exec()
 }
 
 // RunKubectlOrDieInput is a convenience wrapper over kubectlBuilder that takes input to stdin
 func RunKubectlOrDieInput(data string, args ...string) string {
-	stdout, _ := NewKubectlCommand(args...).WithStdinData(data).ExecOrDie()
-	return stdout
+	return NewKubectlCommand(args...).WithStdinData(data).ExecOrDie()
 }
 
 func StartCmdAndStreamOutput(cmd *exec.Cmd) (stdout, stderr io.ReadCloser, err error) {
