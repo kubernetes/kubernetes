@@ -4254,6 +4254,13 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 							Format:      "int32",
 						},
 					},
+					"minReadySeconds": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Minimum number of seconds for which a newly created pod should be ready without any of its container crashing, for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready)",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
 					"selector": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Selector is a label query over pods that should match the replica count. Must match in order to be controlled. If empty, defaulted to labels on pod template. More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors",
@@ -4295,6 +4302,13 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 					"readyReplicas": {
 						SchemaProps: spec.SchemaProps{
 							Description: "The number of ready replicas for this replica set.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"availableReplicas": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The number of available replicas (ready for at least minReadySeconds) for this replica set.",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -11507,6 +11521,13 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 							Format:      "int32",
 						},
 					},
+					"minReadySeconds": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Minimum number of seconds for which a newly created pod should be ready without any of its container crashing, for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready)",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
 					"selector": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Selector is a label query over pods that should match the Replicas count. If Selector is empty, it is defaulted to the labels present on the Pod template. Label keys and values that must match in order to be controlled by this replication controller, if empty defaulted to labels on Pod template. More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors",
@@ -11555,6 +11576,13 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 					"readyReplicas": {
 						SchemaProps: spec.SchemaProps{
 							Description: "The number of ready replicas for this replication controller.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"availableReplicas": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The number of available replicas (ready for at least minReadySeconds) for this replication controller.",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -16876,6 +16904,13 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 							Format:      "int32",
 						},
 					},
+					"minReadySeconds": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Minimum number of seconds for which a newly created pod should be ready without any of its container crashing, for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready)",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
 					"selector": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Selector is a label query over pods that should match the replica count. If the selector is empty, it is defaulted to the labels present on the pod template. Label keys and values that must match in order to be controlled by this replica set. More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors",
@@ -16916,6 +16951,13 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 					"readyReplicas": {
 						SchemaProps: spec.SchemaProps{
 							Description: "The number of ready replicas for this replica set.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"availableReplicas": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The number of available replicas (ready for at least minReadySeconds) for this replica set.",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
