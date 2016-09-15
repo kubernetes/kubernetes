@@ -81,7 +81,7 @@ that rank the nodes that weren't filtered out by the predicate check. For exampl
 The scheduler is extensible: the cluster administrator can choose which of the pre-defined
 scheduling policies to apply, and can add new ones.
 
-### Policies Prediates + Priorities
+### Policies (Predicates and Priorities)
 
 The built-in predicates and priorities are
 defined in [plugin/pkg/scheduler/algorithm/predicates/predicates.go](http://releases.k8s.io/HEAD/plugin/pkg/scheduler/algorithm/predicates/predicates.go) and
