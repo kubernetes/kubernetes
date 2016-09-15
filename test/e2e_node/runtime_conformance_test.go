@@ -45,7 +45,7 @@ var _ = framework.KubeDescribe("Container Runtime Conformance Test", func() {
 				restartCountVolumeName := "restart-count"
 				restartCountVolumePath := "/restart-count"
 				testContainer := api.Container{
-					Image: ImageRegistry[busyBoxImage],
+					Image: "gcr.io/google_containers/busybox:1.24",
 					VolumeMounts: []api.VolumeMount{
 						{
 							MountPath: restartCountVolumePath,
@@ -136,7 +136,7 @@ while true; do sleep 1; done
 				c := ConformanceContainer{
 					PodClient: f.PodClient(),
 					Container: api.Container{
-						Image:   ImageRegistry[busyBoxImage],
+						Image:   "gcr.io/google_containers/busybox:1.24",
 						Name:    name,
 						Command: []string{"/bin/sh", "-c"},
 						Args:    []string{fmt.Sprintf("/bin/echo -n %s > %s", terminationMessage, terminationMessagePath)},
@@ -185,6 +185,9 @@ while true; do sleep 1; done
 				Data: map[string][]byte{api.DockerConfigJsonKey: []byte(auth)},
 				Type: api.SecretTypeDockerConfigJson,
 			}
+			// The following images are not added into NodeImageWhiteList, because this test is
+			// testing image pulling, these images don't need to be prepulled. The ImagePullPolicy
+			// is api.PullAlways, so it won't be blocked by framework image white list check.
 			for _, testCase := range []struct {
 				description string
 				image       string
@@ -206,25 +209,25 @@ while true; do sleep 1; done
 				},
 				{
 					description: "should be able to pull image from gcr.io",
-					image:       NoPullImageRegistry[pullTestAlpineWithBash],
+					image:       "gcr.io/google_containers/alpine-with-bash:1.0",
 					phase:       api.PodRunning,
 					waiting:     false,
 				},
 				{
 					description: "should be able to pull image from docker hub",
-					image:       NoPullImageRegistry[pullTestAlpine],
+					image:       "alpine:3.1",
 					phase:       api.PodRunning,
 					waiting:     false,
 				},
 				{
 					description: "should not be able to pull from private registry without secret",
-					image:       NoPullImageRegistry[pullTestAuthenticatedAlpine],
+					image:       "gcr.io/authenticated-image-pulling/alpine:3.1",
 					phase:       api.PodPending,
 					waiting:     true,
 				},
 				{
 					description: "should be able to pull from private registry with secret",
-					image:       NoPullImageRegistry[pullTestAuthenticatedAlpine],
+					image:       "gcr.io/authenticated-image-pulling/alpine:3.1",
 					secret:      true,
 					phase:       api.PodRunning,
 					waiting:     false,
