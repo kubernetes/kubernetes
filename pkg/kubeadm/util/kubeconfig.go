@@ -82,11 +82,11 @@ func MakeClientConfigWithToken(config *clientcmdapi.Config, clusterName string, 
 // start it again in that case).
 
 func WriteKubeconfigIfNotExists(s *kubeadmapi.KubeadmConfig, name string, kubeconfig *clientcmdapi.Config) error {
-	if err := os.MkdirAll(s.EnvParams["prefix"], 0700); err != nil {
-		return fmt.Errorf("<util/kubeconfig> failed to create directory %q [%s]", s.EnvParams["prefix"], err)
+	if err := os.MkdirAll(s.EnvParams["kubernetes_dir"], 0700); err != nil {
+		return fmt.Errorf("<util/kubeconfig> failed to create directory %q [%s]", s.EnvParams["kubernetes_dir"], err)
 	}
 
-	filename := path.Join(s.EnvParams["prefix"], fmt.Sprintf("%s.conf", name))
+	filename := path.Join(s.EnvParams["kubernetes_dir"], fmt.Sprintf("%s.conf", name))
 	// Create and open the file, only if it does not already exist.
 	f, err := os.OpenFile(
 		filename,

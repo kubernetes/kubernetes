@@ -19,6 +19,7 @@ package master
 import (
 	"fmt"
 	"path"
+	"runtime"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
@@ -28,11 +29,14 @@ import (
 	ipallocator "k8s.io/kubernetes/pkg/registry/service/ipallocator"
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
-
-func createKubeProxyPodSpec(s *kubeadmapi.KubeadmConfig) api.PodSpec {
+// TODO(phase1+): kube-proxy should be a daemonset, three different daemonsets should not be here
+func createKubeProxyPodSpec(s *kubeadmapi.KubeadmConfig, architecture string) api.PodSpec {
 	privilegedTrue := true
 	return api.PodSpec{
 		SecurityContext: &api.PodSecurityContext{HostNetwork: true},
+		NodeSelector: map[string]string{
+			"beta.kubernetes.io/arch": architecture,
+		},
 		Containers: []api.Container{{
 			Name:            kubeProxy,
 			Image:           images.GetCoreImage(images.KubeProxyImage, s.EnvParams["hyperkube_image"]),
@@ -65,7 +69,7 @@ func createKubeProxyPodSpec(s *kubeadmapi.KubeadmConfig) api.PodSpec {
 			{
 				Name: "kubeconfig",
 				VolumeSource: api.VolumeSource{
-					HostPath: &api.HostPathVolumeSource{Path: path.Join(s.EnvParams["prefix"], "kubelet.conf")},
+					HostPath: &api.HostPathVolumeSource{Path: path.Join(s.EnvParams["kubernetes_dir"], "kubelet.conf")},
 				},
 			},
 			{
@@ -101,6 +105,9 @@ func createKubeDNSPodSpec(s *kubeadmapi.KubeadmConfig) api.PodSpec {
 	)
 
 	return api.PodSpec{
+		NodeSelector: map[string]string{
+			"beta.kubernetes.io/arch": runtime.GOARCH,
+		},
 		Containers: []api.Container{
 			// DNS server
 			{
@@ -223,11 +230,15 @@ func createKubeDNSServiceSpec(s *kubeadmapi.KubeadmConfig) (*api.ServiceSpec, er
 }
 
 func CreateEssentialAddons(s *kubeadmapi.KubeadmConfig, client *clientset.Clientset) error {
-	kubeProxyDaemonSet := NewDaemonSet(kubeProxy, createKubeProxyPodSpec(s))
-	SetMasterTaintTolerations(&kubeProxyDaemonSet.Spec.Template.ObjectMeta)
+	arches := [3]string{"amd64", "arm", "arm64"}
 
-	if _, err := client.Extensions().DaemonSets(api.NamespaceSystem).Create(kubeProxyDaemonSet); err != nil {
-		return fmt.Errorf("<master/addons> failed creating essential kube-proxy addon [%s]", err)
+	for _, arch := range arches {
+		kubeProxyDaemonSet := NewDaemonSet(kubeProxy + "-" + arch, createKubeProxyPodSpec(s, arch))
+		SetMasterTaintTolerations(&kubeProxyDaemonSet.Spec.Template.ObjectMeta)
+
+		if _, err := client.Extensions().DaemonSets(api.NamespaceSystem).Create(kubeProxyDaemonSet); err != nil {
+			return fmt.Errorf("<master/addons> failed creating essential kube-proxy addon [%s]", err)
+		}
 	}
 
 	fmt.Println("<master/addons> created essential addon: kube-proxy")
