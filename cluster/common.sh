@@ -195,8 +195,31 @@ function get-kubeconfig-basicauth() {
     cc="${KUBE_CONTEXT}"
   fi
   local user=$("${KUBE_ROOT}/cluster/kubectl.sh" config view -o jsonpath="{.contexts[?(@.name == \"${cc}\")].context.user}")
-  KUBE_USER=$("${KUBE_ROOT}/cluster/kubectl.sh" config view -o jsonpath="{.users[?(@.name == \"${user}\")].user.username}")
-  KUBE_PASSWORD=$("${KUBE_ROOT}/cluster/kubectl.sh" config view -o jsonpath="{.users[?(@.name == \"${user}\")].user.password}")
+  get-kubeconfig-user-basicauth "${user}"
+
+  if [[ -z "${KUBE_USER:-}" || -z "${KUBE_PASSWORD:-}" ]]; then
+    # kube-up stores username/password in a an additional kubeconfig section
+    # suffixed with "-basic-auth". Cloudproviders like GKE store in directly
+    # in the top level section along with the other credential information.
+    # TODO: Handle this uniformly, either get rid of "basic-auth" or
+    # consolidate its usage into a function across scripts in cluster/
+    get-kubeconfig-user-basicauth "${user}-basic-auth"
+  fi
+}
+
+# Sets KUBE_USER and KUBE_PASSWORD to the username and password specified in
+# the kubeconfig section corresponding to $1.
+#
+# Args:
+#   $1 kubeconfig section to look for basic auth (eg: user or user-basic-auth).
+# Assumed vars:
+#   KUBE_ROOT
+# Vars set:
+#   KUBE_USER
+#   KUBE_PASSWORD
+function get-kubeconfig-user-basicauth() {
+  KUBE_USER=$("${KUBE_ROOT}/cluster/kubectl.sh" config view -o jsonpath="{.users[?(@.name == \"$1\")].user.username}")
+  KUBE_PASSWORD=$("${KUBE_ROOT}/cluster/kubectl.sh" config view -o jsonpath="{.users[?(@.name == \"$1\")].user.password}")
 }
 
 # Generate basic auth user and password.
