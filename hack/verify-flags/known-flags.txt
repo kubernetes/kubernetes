@@ -64,6 +64,7 @@ cleanup-iptables
 client-ca-file
 client-certificate
 client-key
+clientset-api-path
 clientset-name
 clientset-only
 clientset-path
