@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/validation/field"
+	commonvalidation "k8s.io/kubernetes/pkg/validation"
 )
 
 // RESTUpdateStrategy defines the minimum validation, accepted input, and
@@ -106,6 +107,9 @@ func BeforeUpdate(strategy RESTUpdateStrategy, ctx api.Context, obj, old runtime
 
 	errs = append(errs, strategy.ValidateUpdate(ctx, obj, old)...)
 	if len(errs) > 0 {
+		return errors.NewInvalid(kind.GroupKind(), objectMeta.Name, errs)
+	}
+	if errs := commonvalidation.Validate(obj, commonvalidation.UPDATE); len(errs) > 0 {
 		return errors.NewInvalid(kind.GroupKind(), objectMeta.Name, errs)
 	}
 

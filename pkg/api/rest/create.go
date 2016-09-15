@@ -24,6 +24,7 @@ import (
 	path "k8s.io/kubernetes/pkg/api/validation/path"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/validation/field"
+	commonvalidation "k8s.io/kubernetes/pkg/validation"
 )
 
 // RESTCreateStrategy defines the minimum validation, accepted input, and
@@ -76,6 +77,10 @@ func BeforeCreate(strategy RESTCreateStrategy, ctx api.Context, obj runtime.Obje
 	objectMeta.ClusterName = ""
 
 	if errs := strategy.Validate(ctx, obj); len(errs) > 0 {
+		return errors.NewInvalid(kind.GroupKind(), objectMeta.Name, errs)
+	}
+
+	if errs := commonvalidation.Validate(obj, commonvalidation.CREATE); len(errs) > 0 {
 		return errors.NewInvalid(kind.GroupKind(), objectMeta.Name, errs)
 	}
 
