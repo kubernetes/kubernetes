@@ -30,7 +30,6 @@ import (
 	kube_release_1_4 "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/controller/framework"
 	pkg_runtime "k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/watch"
@@ -59,7 +58,7 @@ type SecretController struct {
 	// Definitions of secrets that should be federated.
 	secretInformerStore cache.Store
 	// Informer controller for secrets that should be federated.
-	secretInformerController framework.ControllerInterface
+	secretInformerController cache.ControllerInterface
 
 	// Client to federated api server.
 	federatedApiClient federation_release_1_4.Interface
@@ -97,7 +96,7 @@ func NewSecretController(client federation_release_1_4.Interface) *SecretControl
 	secretcontroller.clusterDeliverer = util.NewDelayingDeliverer()
 
 	// Start informer in federated API servers on secrets that should be federated.
-	secretcontroller.secretInformerStore, secretcontroller.secretInformerController = framework.NewInformer(
+	secretcontroller.secretInformerStore, secretcontroller.secretInformerController = cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (pkg_runtime.Object, error) {
 				return client.Core().Secrets(api_v1.NamespaceAll).List(options)
@@ -113,8 +112,8 @@ func NewSecretController(client federation_release_1_4.Interface) *SecretControl
 	// Federated informer on secrets in members of federation.
 	secretcontroller.secretFederatedInformer = util.NewFederatedInformer(
 		client,
-		func(cluster *federation_api.Cluster, targetClient kube_release_1_4.Interface) (cache.Store, framework.ControllerInterface) {
-			return framework.NewInformer(
+		func(cluster *federation_api.Cluster, targetClient kube_release_1_4.Interface) (cache.Store, cache.ControllerInterface) {
+			return cache.NewInformer(
 				&cache.ListWatch{
 					ListFunc: func(options api.ListOptions) (pkg_runtime.Object, error) {
 						return targetClient.Core().Secrets(api_v1.NamespaceAll).List(options)

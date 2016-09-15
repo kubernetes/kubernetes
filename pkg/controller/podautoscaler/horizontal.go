@@ -33,7 +33,6 @@ import (
 	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
 	unversionedextensions "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/unversioned"
 	"k8s.io/kubernetes/pkg/client/record"
-	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
 	"k8s.io/kubernetes/pkg/runtime"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
@@ -61,14 +60,14 @@ type HorizontalController struct {
 	// A store of HPA objects, populated by the controller.
 	store cache.Store
 	// Watches changes to all HPA objects.
-	controller *framework.Controller
+	controller *cache.Controller
 }
 
 var downscaleForbiddenWindow = 5 * time.Minute
 var upscaleForbiddenWindow = 3 * time.Minute
 
-func newInformer(controller *HorizontalController, resyncPeriod time.Duration) (cache.Store, *framework.Controller) {
-	return framework.NewInformer(
+func newInformer(controller *HorizontalController, resyncPeriod time.Duration) (cache.Store, *cache.Controller) {
+	return cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				return controller.hpaNamespacer.HorizontalPodAutoscalers(api.NamespaceAll).List(options)
@@ -79,7 +78,7 @@ func newInformer(controller *HorizontalController, resyncPeriod time.Duration) (
 		},
 		&autoscaling.HorizontalPodAutoscaler{},
 		resyncPeriod,
-		framework.ResourceEventHandlerFuncs{
+		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				hpa := obj.(*autoscaling.HorizontalPodAutoscaler)
 				hasCPUPolicy := hpa.Spec.TargetCPUUtilizationPercentage != nil

@@ -32,7 +32,6 @@ import (
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
-	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector/metaonly"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
@@ -49,7 +48,7 @@ const ResourceResyncTime time.Duration = 0
 
 type monitor struct {
 	store      cache.Store
-	controller *framework.Controller
+	controller *cache.Controller
 }
 
 type objectReference struct {
@@ -488,11 +487,11 @@ func (gc *GarbageCollector) monitorFor(resource unversioned.GroupVersionResource
 		}
 		runtimeObject.GetObjectKind().SetGroupVersionKind(kind)
 	}
-	monitor.store, monitor.controller = framework.NewInformer(
+	monitor.store, monitor.controller = cache.NewInformer(
 		gcListWatcher(client, resource),
 		nil,
 		ResourceResyncTime,
-		framework.ResourceEventHandlerFuncs{
+		cache.ResourceEventHandlerFuncs{
 			// add the event to the propagator's eventQueue.
 			AddFunc: func(obj interface{}) {
 				setObjectTypeMeta(obj)

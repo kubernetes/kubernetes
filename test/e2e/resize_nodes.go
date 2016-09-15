@@ -37,7 +37,6 @@ import (
 	. "github.com/onsi/gomega"
 	"k8s.io/kubernetes/pkg/client/cache"
 	awscloud "k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
-	controllerframework "k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/watch"
@@ -580,8 +579,8 @@ var _ = framework.KubeDescribe("Nodes [Disruptive]", func() {
 				nodeSelector := fields.OneTermEqualSelector("metadata.name", node.Name)
 				stopCh := make(chan struct{})
 				newNode := make(chan *api.Node)
-				var controller *controllerframework.Controller
-				_, controller = controllerframework.NewInformer(
+				var controller *cache.Controller
+				_, controller = cache.NewInformer(
 					&cache.ListWatch{
 						ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 							options.FieldSelector = nodeSelector
@@ -594,7 +593,7 @@ var _ = framework.KubeDescribe("Nodes [Disruptive]", func() {
 					},
 					&api.Node{},
 					0,
-					controllerframework.ResourceEventHandlerFuncs{
+					cache.ResourceEventHandlerFuncs{
 						UpdateFunc: func(oldObj, newObj interface{}) {
 							n, ok := newObj.(*api.Node)
 							Expect(ok).To(Equal(true))
