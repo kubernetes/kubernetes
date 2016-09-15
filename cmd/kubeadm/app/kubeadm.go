@@ -19,7 +19,6 @@ package app
 import (
 	"fmt"
 	"os"
-	"path"
 	"strings"
 
 	"github.com/spf13/pflag"
@@ -34,14 +33,12 @@ var CommandLine *pflag.FlagSet
 // TODO(phase2) use componentconfig
 // we need some params for testing etc, let's keep these hidden for now
 func getEnvParams() map[string]string {
-	globalPrefix := os.Getenv("KUBE_PREFIX_ALL")
-	if globalPrefix == "" {
-		globalPrefix = "/etc/kubernetes"
-	}
 
 	envParams := map[string]string{
-		"prefix":             globalPrefix,
-		"host_pki_path":      path.Join(globalPrefix, "pki"),
+		// TODO(phase1): Mode prefix and host_pki_path to another place as constants, and use them everywhere
+		// Right now they're used here and there, but not consequently
+		"kubernetes_dir":             "/etc/kubernetes",
+		"host_pki_path":      "/etc/kubernetes/pki",
 		"host_etcd_path":     "/var/lib/etcd",
 		"hyperkube_image":    "",
 		"discovery_image":    "dgoodwin/kubediscovery:latest", // TODO(phase1): fmt.Sprintf("gcr.io/google_containers/kube-discovery-%s:%s", runtime.GOARCH, "1.0"),

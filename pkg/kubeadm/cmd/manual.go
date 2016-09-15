@@ -120,9 +120,8 @@ func NewCmdManualBootstrapInitMaster(out io.Writer, s *kubeadmapi.KubeadmConfig)
 		&s.InitFlags.API.ExternalDNSName, "api-external-dns-name", []string{},
 		`(optional) DNS name to advertise, in case you have configured one yourself.`,
 	)
-	_, defaultServicesCIDR, _ := net.ParseCIDR("100.64.0.0/12")
 	cmd.PersistentFlags().IPNetVar(
-		&s.InitFlags.Services.CIDR, "service-cidr", *defaultServicesCIDR,
+		&s.InitFlags.Services.CIDR, "service-cidr", *kubeadmapi.DefaultServicesCIDR,
 		`(optional) use alterantive range of IP address for service VIPs, e.g. "10.16.0.0/12"`,
 	)
 	cmd.PersistentFlags().StringVar(
