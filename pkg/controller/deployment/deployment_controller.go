@@ -350,6 +350,24 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 		return nil
 	}
 
+	// Update deployment conditions with an Unknown condition when pausing/resuming
+	// a deployment. In this way, we can be sure that we won't timeout when a user
+	// resumes a Deployment with a set progressDeadlineSeconds.
+	if err = dc.checkPausedConditions(d); err != nil {
+		return err
+	}
+
+	failed, err := dc.hasFailed(d)
+	if err != nil {
+		return err
+	}
+	if failed {
+		// TODO: Automatically rollback here. Locate the last complete revision and populate the
+		// rollback spec with it. See https://github.com/kubernetes/kubernetes/issues/23211.
+		// For now, we will only add a Progressing condition that denotes lack of progress
+		// (reason: ProgressDeadlineExceeded) in the deployment status.
+	}
+
 	if d.Spec.Paused {
 		return dc.sync(d)
 	}
