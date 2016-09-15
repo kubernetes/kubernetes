@@ -72,6 +72,8 @@ type ObjectMeta struct {
 	// definition.
 	// Cannot be updated.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#names
+	// +k8s:openapi-gen=validate(Len(5,100))
+	// +k8s:openapi-gen=validate(OneOf(this.GenerateName))
 	Name string `json:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
 
 	// GenerateName is an optional prefix, used by the server, to generate a unique
