@@ -152,12 +152,8 @@ func (f *fixture) expectCreateRSAction(rs *extensions.ReplicaSet) {
 	f.actions = append(f.actions, core.NewCreateAction(unversioned.GroupVersionResource{Resource: "replicasets"}, rs.Namespace, rs))
 }
 
-func (f *fixture) expectUpdateRSAction(rs *extensions.ReplicaSet) {
-	f.actions = append(f.actions, core.NewUpdateAction(unversioned.GroupVersionResource{Resource: "replicasets"}, rs.Namespace, rs))
-}
-
-func (f *fixture) expectListPodAction(namespace string, opt api.ListOptions) {
-	f.actions = append(f.actions, core.NewListAction(unversioned.GroupVersionResource{Resource: "pods"}, namespace, opt))
+func (f *fixture) expectListEventsAction(namespace string, opt api.ListOptions) {
+	f.actions = append(f.actions, core.NewListAction(unversioned.GroupVersionResource{Resource: "events"}, namespace, opt))
 }
 
 func newFixture(t *testing.T) *fixture {
@@ -223,6 +219,7 @@ func TestSyncDeploymentCreatesReplicaSet(t *testing.T) {
 
 	f.expectCreateRSAction(rs)
 	f.expectUpdateDeploymentAction(d)
+	f.expectListEventsAction(d.Namespace, api.ListOptions{})
 	f.expectUpdateDeploymentStatusAction(d)
 
 	f.run(getKey(d, t))
