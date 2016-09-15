@@ -96,3 +96,26 @@ func Exist(name string) bool {
 	_, err := os.Stat(name)
 	return err == nil
 }
+
+// ZeroToEnd zeros a file starting from SEEK_CUR to its SEEK_END. May temporarily
+// shorten the length of the file.
+func ZeroToEnd(f *os.File) error {
+	// TODO: support FALLOC_FL_ZERO_RANGE
+	off, err := f.Seek(0, os.SEEK_CUR)
+	if err != nil {
+		return err
+	}
+	lenf, lerr := f.Seek(0, os.SEEK_END)
+	if lerr != nil {
+		return lerr
+	}
+	if err = f.Truncate(off); err != nil {
+		return err
+	}
+	// make sure blocks remain allocated
+	if err = Preallocate(f, lenf, true); err != nil {
+		return err
+	}
+	_, err = f.Seek(off, os.SEEK_SET)
+	return err
+}
