@@ -18,9 +18,13 @@ package informers
 
 import (
 	"reflect"
+	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/cache"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/watch"
 )
 
 // PodInformer is type of SharedIndexInformer which watches and lists all pods.
@@ -199,4 +203,95 @@ func (f *pvInformer) Informer() cache.SharedIndexInformer {
 func (f *pvInformer) Lister() *cache.StoreToPVFetcher {
 	informer := f.Informer()
 	return &cache.StoreToPVFetcher{Store: informer.GetStore()}
+}
+
+// NewPodInformer returns a SharedIndexInformer that lists and watches all pods
+func NewPodInformer(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	sharedIndexInformer := cache.NewSharedIndexInformer(
+		&cache.ListWatch{
+			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+				return client.Core().Pods(api.NamespaceAll).List(options)
+			},
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+				return client.Core().Pods(api.NamespaceAll).Watch(options)
+			},
+		},
+		&api.Pod{},
+		resyncPeriod,
+		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
+	)
+
+	return sharedIndexInformer
+}
+
+// NewNodeInformer returns a SharedIndexInformer that lists and watches all nodes
+func NewNodeInformer(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	sharedIndexInformer := cache.NewSharedIndexInformer(
+		&cache.ListWatch{
+			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+				return client.Core().Nodes().List(options)
+			},
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+				return client.Core().Nodes().Watch(options)
+			},
+		},
+		&api.Node{},
+		resyncPeriod,
+		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+
+	return sharedIndexInformer
+}
+
+// NewPVCInformer returns a SharedIndexInformer that lists and watches all PVCs
+func NewPVCInformer(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	sharedIndexInformer := cache.NewSharedIndexInformer(
+		&cache.ListWatch{
+			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+				return client.Core().PersistentVolumeClaims(api.NamespaceAll).List(options)
+			},
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+				return client.Core().PersistentVolumeClaims(api.NamespaceAll).Watch(options)
+			},
+		},
+		&api.PersistentVolumeClaim{},
+		resyncPeriod,
+		cache.Indexers{})
+
+	return sharedIndexInformer
+}
+
+// NewPVInformer returns a SharedIndexInformer that lists and watches all PVs
+func NewPVInformer(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	sharedIndexInformer := cache.NewSharedIndexInformer(
+		&cache.ListWatch{
+			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+				return client.Core().PersistentVolumes().List(options)
+			},
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+				return client.Core().PersistentVolumes().Watch(options)
+			},
+		},
+		&api.PersistentVolume{},
+		resyncPeriod,
+		cache.Indexers{})
+
+	return sharedIndexInformer
+}
+
+// NewNamespaceInformer returns a SharedIndexInformer that lists and watches namespaces
+func NewNamespaceInformer(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	sharedIndexInformer := cache.NewSharedIndexInformer(
+		&cache.ListWatch{
+			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+				return client.Core().Namespaces().List(options)
+			},
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+				return client.Core().Namespaces().Watch(options)
+			},
+		},
+		&api.Namespace{},
+		resyncPeriod,
+		cache.Indexers{})
+
+	return sharedIndexInformer
 }
