@@ -71,6 +71,13 @@ function usage() {
 function upgrade-master() {
   echo "== Upgrading master to '${SERVER_BINARY_TAR_URL}'. Do not interrupt, deleting master instance. =="
 
+  # Tries to figure out KUBE_USER/KUBE_PASSWORD by first looking under
+  # kubeconfig:username, and then under kubeconfig:username-basic-auth.
+  # TODO: KUBE_USER is used in generating ABAC policy which the
+  # apiserver may not have enabled. If it's enabled, we must have a user
+  # to generate a valid ABAC policy. If the username changes, should
+  # the script fail? Should we generate a default username and password
+  # if the section is missing in kubeconfig? Handle this better in 1.5.
   get-kubeconfig-basicauth
   get-kubeconfig-bearertoken
 
