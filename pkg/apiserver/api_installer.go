@@ -320,12 +320,12 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	var ctxFn ContextFunc
 	ctxFn = func(req *restful.Request) api.Context {
 		if context == nil {
-			return api.NewContext()
+			return api.WithUserAgent(api.NewContext(), req.HeaderParameter("User-Agent"))
 		}
 		if ctx, ok := context.Get(req.Request); ok {
-			return ctx
+			return api.WithUserAgent(ctx, req.HeaderParameter("User-Agent"))
 		}
-		return api.NewContext()
+		return api.WithUserAgent(api.NewContext(), req.HeaderParameter("User-Agent"))
 	}
 
 	allowWatchList := isWatcher && isLister // watching on lists is allowed only for kinds that support both watch and list.

@@ -11,6 +11,7 @@
 - [v1.4.0-beta.3](#v140-beta3)
   - [Downloads](#downloads-2)
   - [Changelog since v1.4.0-beta.2](#changelog-since-v140-beta2)
+  - [Known issues](#known-issues)
 - [v1.4.0-beta.2](#v140-beta2)
   - [Downloads](#downloads-3)
   - [Changelog since v1.4.0-beta.1](#changelog-since-v140-beta1)
@@ -46,7 +47,7 @@
   - [Downloads](#downloads-10)
   - [Changelog since v1.3.2](#changelog-since-v132)
     - [Other notable changes](#other-notable-changes-9)
-  - [Known Issues](#known-issues)
+  - [Known Issues](#known-issues-1)
 - [v1.3.2](#v132)
   - [Downloads](#downloads-11)
   - [Changelog since v1.3.1](#changelog-since-v131)
@@ -143,7 +144,7 @@
     - [Other notable improvements](#other-notable-improvements)
     - [Experimental Features](#experimental-features-2)
     - [Action required](#action-required-11)
-    - [Known Issues](#known-issues-1)
+    - [Known Issues](#known-issues-2)
       - [Docker Known Issues](#docker-known-issues)
         - [1.9.1](#191)
     - [Provider-specific Notes](#provider-specific-notes-1)
@@ -216,6 +217,9 @@ binary | sha256 hash
 
 **No notable changes for this release**
 
+## Known issues
+
+* master newer than v1.4.0 has backward compatible issues with older kubectl. Specifically, if "kubectl rolling-update" does not change the name of the replication controller (RC), the command will fail to create the new RC and report the RC already exists. When this happens, the pods are successfully updated, but the name of the RC is its original name plus a hash value. If you want to rename the RC, please download a kubectl newer than v1.4.0, then run rolling-update to change the name.
 
 
 # v1.4.0-beta.2
