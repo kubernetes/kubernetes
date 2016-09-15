@@ -173,23 +173,6 @@ type GenericAPIServer struct {
 	postStartHooksCalled bool
 }
 
-// PostStartHookFunc is a function that is called after the server has started.
-// It must properly handle cases like:
-//  1. asynchronous start in multiple API server processes
-//  2. conflicts between the different processes all trying to perform the same action
-//  3. partially complete work (API server crashes while running your hook)
-//  4. API server access **BEFORE** your hook has completed
-// Think of it like a mini-controller that is super privileged and gets to run in-process
-// If you use this feature, tag @deads2k on github who has promised to review code for anyone's PostStartHook
-// until it becomes easier to use.
-type PostStartHookFunc func(context PostStartHookContext) error
-
-// PostStartHookContext provides information about this API server to a PostStartHookFunc
-type PostStartHookContext struct {
-	// TODO this should probably contain a cluster-admin powered client config which can be used to loopback
-	// to this API server.  That client config doesn't exist yet.
-}
-
 func (s *GenericAPIServer) StorageDecorator() generic.StorageDecorator {
 	return s.storageDecorator
 }
@@ -270,37 +253,6 @@ func (s *GenericAPIServer) installGroupsDiscoveryHandler() {
 		}
 		return groups
 	})
-}
-
-// AddPostStartHook allows you to add a PostStartHook.  A PostStartHookFunc must properly handle cases like:
-//  1. asynchronous start in multiple API server processes
-//  2. conflicts between the different processes all trying to perform the same action
-//  3. partially complete work (API server crashes while running your hook)
-//  4. API server access **BEFORE** your hook has completed
-// Think of it like a mini-controller that is super privileged and gets to run in-process
-// If you use this feature, tag @deads2k on github who has promised to review code for anyone's PostStartHook
-// until it becomes easier to use.
-func (s *GenericAPIServer) AddPostStartHook(name string, hook PostStartHookFunc) error {
-	if len(name) == 0 {
-		return fmt.Errorf("missing name")
-	}
-	if hook == nil {
-		return nil
-	}
-
-	s.postStartHookLock.Lock()
-	defer s.postStartHookLock.Unlock()
-
-	if s.postStartHooksCalled {
-		return fmt.Errorf("unable to add %q because PostStartHooks have already been called", name)
-	}
-	if s.PostStartHooks == nil {
-		s.PostStartHooks = map[string]PostStartHookFunc{}
-	}
-
-	s.PostStartHooks[name] = hook
-
-	return nil
 }
 
 func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
@@ -432,30 +384,6 @@ func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
 	s.RunPostStartHooks(PostStartHookContext{})
 
 	select {}
-}
-
-// RunPostStartHooks runs the PostStartHooks for the server
-func (s *GenericAPIServer) RunPostStartHooks(context PostStartHookContext) {
-	s.postStartHookLock.Lock()
-	defer s.postStartHookLock.Unlock()
-	s.postStartHooksCalled = true
-
-	for hookName, hook := range s.PostStartHooks {
-		go runPostStartHook(hookName, hook, context)
-	}
-}
-
-func runPostStartHook(name string, hook PostStartHookFunc, context PostStartHookContext) {
-	var err error
-	func() {
-		// don't let the hook *accidentally* panic and kill the server
-		defer utilruntime.HandleCrash()
-		err = hook(context)
-	}()
-	// if the hook intentionally wants to kill server, let it.
-	if err != nil {
-		glog.Fatalf("PostStartHook %q failed: %v", name, err)
-	}
 }
 
 // Exposes the given group version in API.
