@@ -18,11 +18,6 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
-<!-- TAG RELEASE_LINK, added by the munger automatically -->
-<strong>
-The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.4/docs/proposals/cluster-capacity.md).
-
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
 </strong>
@@ -32,7 +27,7 @@ Documentation for other releases can be found at
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
-# DRAFT: Cluster capacity design
+# DRAFT: Cluster capacity analysis
 
 @ingvagabund
 
@@ -84,20 +79,24 @@ one needs to take into account:
 * Allocated CPU for each namespace
 * Allocated PV attachments on the nodes
 
-To get better picture of how resources are computated take a look at [2].
+[Compute resources](http://kubernetes.io/docs/user-guide/compute-resources/) document describes how to compute resources.
 Resource usage of each pod is part of Pod status.
 If a pod is scheduled without sufficient resources, scheduling fails with `PodExceedsFreeCPU` or `PodExceedsFreeMemory`.
+
+Based on configuration of individual nodes, each node can report [disk and memory pressure](kubelet-eviction.md#node-conditions) for different percentual usage.
+In order to take the pressure into account, node configuration could be reported to the Apiserver as part of the ``NodeInfo`` as well.
+Or queried once the [dynamic Kubelet settings](https://github.com/kubernetes/kubernetes/pull/29459) is implemented.
 
 ### Pod requirements
 
 There are various requirements a pod can specify.
-As each pod consists of at least one container, administrator can set resource limits and requests [10] for each container.
+As each pod consists of at least one container, administrator can set [resource limits and requests](http://kubernetes.io/docs/api-reference/v1/definitions/#_v1_resourcerequirements) for each container.
 If set, container provides better information about consumed resources (e.g. memory, cpu).
 Each pod can specify a list of volumes.
 Some of the volumes can be claimed and provisioned with volume dynamic provisioner.
 Some pods are meant to be run on dedicated nodes.
 
-In general, requirements can include:
+In general, requirements can include (the list can grow over time):
 
 * cpu
 * memory
@@ -105,49 +104,51 @@ In general, requirements can include:
 * minimal disk IOPs
 * gpu cores
 * volumes
-* zones/nodes specified by labels, taints
+* [taints](../../docs/design/taint-toleration-dedicated.md)
+* labels affinity & anti-affinity for [pods](../../docs/design/podaffinity.md) and [nodes](../../docs/design/nodeaffinity.md)
+* opaque integer resources
 
 Resources can be divided between first-class resources (memory, cpu, disk, etc.) and non-first class resources.
 
-Other resource types can include (e.g. see [4]):
+Other resource types can include (e.g. see [resource types](../../docs/design/resources.md#resource-types)):
 
-* Hadoop slots
 * Network bandwith (a.k.a NIC b/w)
 * Network operations
 * Network packates per second
 * Storage space
 * Storage time
 * Storage operations
+* Counted resources
 
 ### Use cases
 
 **Use Case 1**: A namespace is configured to allow it to allocate 40GB of memory.
 The POD with the largest amount of memory limit is 4GB.
 The namespace has a node label selector for `region1, compute nodes`.
-We need to know how many 4GB pods can be placed given the physical resources available
+As an operator I need to know how many 4GB pods can be placed given the physical resources available
 on the nodes that match the node selector of the namespace.
-We also need to know how many of the largest pod definitions can be scaled up on the
+I also need to know how many of the largest pod definitions can be scaled up on the
 namespace (in this case, the 4GB pod can be scaled up to 10,
 assuming it's the only one defined).
 
 **Use Case 2**: A namespace is configured to allow for 4 total CPUs to be used.
 The POD with the largest amount of CPU allocated is given half a CPU.
 The namespace has a node label selector for `region2, compute nodes`.
-We need to know how many half CPU pods can be placed given the physical resources available
+As an operator I need to know how many half CPU pods can be placed given the physical resources available
 on the nodes that match the node selector of the namespace.
-We also need to know how many of the largest pod definitions can be scaled up
+I also need to know how many of the largest pod definitions can be scaled up
 on this namespace (in this case, the half CPU pod can be scaled up to 8,
 assuming it's the only one defined).
 
 **Use Case 3**: A POD definition has a PV claim.
-We need to know how many nodes have available attachments such that
+As an operator I need to know how many nodes have available attachments such that
 the POD can be scheduled to nodes that fit the namespace node selector.
 
 ### Autoscaling
 
 Introduction of new nodes or increase of node resources is not the only way how to deal with insufficient cluster capacity.
-One can take advantage of Horizontal Pod Autoscaling [1] scaling a number of replicas (Replication Controller, Deployment, ReplicaSet) based on the current resource utilization.
-Or Cluster Autoscaler [1].
+One can take advantage of [Horizontal Pod Autoscaling](http://kubernetes.io/docs/user-guide/horizontal-pod-autoscaling/) scaling a number of replicas (Replication Controller, Deployment, ReplicaSet) based on the current resource utilization.
+Or [Cluster Autoscaler](https://github.com/mwielgus/contrib/blob/7262a5c1ad19abb8a495ad0cb5c5b340d4230d0e/cluster-autoscaler/README.md).
 Still, the autoscaling is another indicator of insufficient resources which can result in node scaling.
 
 ## Design considerations and design space
@@ -155,7 +156,7 @@ Still, the autoscaling is another indicator of insufficient resources which can 
 Assuming the following:
 
 * predicting remaining cluster capacity on pod bases (e.g. "How many pods of a given shape I can schedule")
-* using the scheduler workflow as it is (applying the same predicates and priority functions/executing the same code wherever possible, using the same configuration)
+* seeing the scheduling algorithms as blackboxes, using the same configuration
 * prediction must not change the state of the cluster
 * provide general framework usable for any scheduling algorithm
 
@@ -180,14 +181,14 @@ Once the current state is captured, prediction is no longer dependent on the clu
 Thus, the estimation does not have to correspond to the real scheduling since:
 
 * some nodes can be deleted, some nodes can be evacuated, some nodes can be re-labeled/re-annotated
-* some pods can get evicted in the time of prediction
+* some pods can get evicted in the time of analysis
 * remaining capacity of nodes can increase/decrease
 
-### Other aspects to consider
+### Future aspects to consider
 
-One could take into account shared resources [3] when predicting free capacity (with fragmenation) as well.
+One could take into account [shared resources](http://kubernetes.io/docs/user-guide/compute-resources/#planned-improvements) when predicting free capacity (with fragmenation) as well.
 Currently, limit and requests are supported for cpu and memory resource types only.
-In future, the types can be extended to node disk space resources and custom resource types [4].
+In future, the types can be extended to node disk space resources and custom [resource types](../../docs/design/resources.md#resource-types).
 
 Another thing to keep in mind is overcommitment with multiple levels of QoS.
 Or consider compressible vs. incompressible resources.
@@ -198,14 +199,20 @@ Allow cluster resources to be subdivided (https://github.com/kubernetes/kubernet
 
 #### Resource quota
 
-Resource quota [5] can influence number of pods that can be scheduled per namespace [6] as well.
+[Resource quota](http://kubernetes.io/docs/admin/resourcequota/) can influence number of pods that can be scheduled [per namespace](http://kubernetes.io/docs/admin/resourcequota/#object-count-quota) as well.
 Though, this limitation is not hardware specific, it can be taken into account in future implementations.
 
 Example: In a cluster with a capacity of 32 GiB RAM, and 16 cores, let team A use 20 Gib and 10 cores, let B use 10GiB and 4 cores, and hold 2GiB and 2 cores in reserve for future allocation.
 
 #### Federated scheduling
+
 Out of scope of the document.
 Can be implemented as an agreggation of cluster capacities of individual subclusters.
+
+#### Multiple schedulers
+
+Different workloads may requires different schedulers.
+For that reason, Kubernetes allows to specify [multiple schedulers](https://github.com/kubernetes/kubernetes/blob/master/docs/proposals/multiple-schedulers.md) and annotate each pod with one of the schedulers.
 
 ## Implemenation
 
@@ -218,7 +225,7 @@ Goals:
 
 ### Code analysis
 
-Currently, each iteration of the scheduler consists of the following [steps](https://github.com/kubernetes/kubernetes/blob/master/plugin/pkg/scheduler/scheduler.go#L93):
+Currently, each iteration of the scheduler consists of the following [steps](../../plugin/pkg/scheduler/scheduler.go#L93):
 
 1. ask for the next pod ``s.config.NextPod``
 1. schedule the pod ``s.config.Algorithm.Schedule``
@@ -226,7 +233,7 @@ Currently, each iteration of the scheduler consists of the following [steps](htt
 1. update scheduler cache ``s.config.SchedulerCache.AssumePod``
 1. pod binding ``s.config.Binder.Bind``
 
-Scheduling itself (``Schedule``) consists of the following [steps](https://github.com/kubernetes/kubernetes/blob/master/plugin/pkg/scheduler/generic_scheduler.go#L79):
+Scheduling itself (``Schedule``) consists of the following [steps](../../plugin/pkg/scheduler/generic_scheduler.go#L79):
 
 1. retrieve a list of nodes ``nodeLister.List``
 1. update node info ``g.cache.UpdateNodeNameToInfoMap``
@@ -235,8 +242,8 @@ Scheduling itself (``Schedule``) consists of the following [steps](https://githu
 1. pick the most suitable node ``g.selectHost``
 
 Scheduler keeps a number of caches which capture the current state of the cluster.
-Pod cache is continuosly updated [outside](https://github.com/kubernetes/kubernetes/blob/master/plugin/pkg/scheduler/factory/factory.go#L128) the scheduler.
-The same holds for the [list of nodes](https://github.com/kubernetes/kubernetes/blob/master/plugin/pkg/scheduler/factory/factory.go#L140).
+Pod cache is continuosly updated [outside](../../plugin/pkg/scheduler/factory/factory.go#L128) the scheduler.
+The same holds for the [list of nodes](../../plugin/pkg/scheduler/factory/factory.go#L140).
 
 As the individual predicates and priority functions need to query other objects such as services, controllers, etc.,
 other caches are populated as well:
@@ -247,20 +254,12 @@ other caches are populated as well:
 * Controller cache
 * ReplicaSet cache
 
-All caches are continuosly updated via [reflectors](https://github.com/kubernetes/kubernetes/blob/master/plugin/pkg/scheduler/factory/factory.go#L387):
+All caches are continuosly updated via [reflectors](../../plugin/pkg/scheduler/factory/factory.go#L387).
 
-```
-cache.NewReflector(f.createPersistentVolumeLW(), &api.PersistentVolume{}, f.PVLister.Store, 0).RunUntil(f.StopEverything)
-cache.NewReflector(f.createPersistentVolumeClaimLW(), &api.PersistentVolumeClaim{}, f.PVCLister.Store, 0).RunUntil(f.StopEverything)
-cache.NewReflector(f.createServiceLW(), &api.Service{}, f.ServiceLister.Store, 0).RunUntil(f.StopEverything)
-cache.NewReflector(f.createControllerLW(), &api.ReplicationController{}, f.ControllerLister.Indexer, 0).RunUntil(f.StopEverything)
-cache.NewReflector(f.createReplicaSetLW(), &extensions.ReplicaSet{}, f.ReplicaSetLister.Store, 0).RunUntil(f.StopEverything)
-```
-
-Once the ``f.StopEverything`` channel is closed, no cache is updated anymore.
+Once the reflectors are destroyed, no cache is updated anymore.
 
 Each iteration of the scheduler calls ``s.config.NextPod()`` function which pops one pod at a time from the queue of unscheduled pods.
-The queue is again continuously updated via [reflector](https://github.com/kubernetes/kubernetes/blob/master/plugin/pkg/scheduler/factory/factory.go#L389).
+The queue is again continuously updated via [reflector](../../plugin/pkg/scheduler/factory/factory.go#L389).
 
 Once the scheduler decides what node to schedule a pod on, the pod is bind to the Apiserver.
 Once the pod is scheduled on a node, the Kubelet runs the pod and updates node info that is periodically sent to the Apiserver.
@@ -270,7 +269,7 @@ The node info is then reflected in the scheduler cache and the process is repeat
 
 As all the caches are outside of any scheduling algorithm, the prediction is scheduling algorithm independent.
 Thus, based on the configuration, administrator can use various algorithms while keeping the same predictive framework.
-The only requirements for any scheduling algoritm is to implement ``ScheduleAlgorithm`` [interface](https://github.com/kubernetes/kubernetes/blob/master/plugin/pkg/scheduler/algorithm/scheduler_interface.go).
+The only requirements for any scheduling algoritm is to implement ``ScheduleAlgorithm`` [interface](../../plugin/pkg/scheduler/algorithm/scheduler_interface.go).
 
 As all the caches are populated via reflectors and informers, the current state can be captured the same way as is done in the scheduler factory.
 Once populated, all reflectors and informeres are stopped since the predication is done independently of the cluster state.
@@ -284,7 +283,7 @@ At this point the prediction starts:
 
 #### Scheduler
 
-For purposes of the prediction we need lightweighted version of the [scheduler](https://github.com/kubernetes/kubernetes/blob/master/plugin/pkg/scheduler/scheduler.go).
+For purposes of the prediction we need lightweighted version of the [scheduler](../../plugin/pkg/scheduler/scheduler.go).
 No need for metrics, event recorder or pod updater.
 The binding can hide the actual computation of consumed resources.
 
@@ -355,7 +354,7 @@ func (s *Scheduler) scheduleOne() bool {
 ```
 
 It is possible to use the same scheduler and use empty event recorder and metrics.
-[Pod updater](https://github.com/kubernetes/kubernetes/blob/master/plugin/pkg/scheduler/factory/factory.go#L593) delegates requests to client.
+[Pod updater](../../plugin/pkg/scheduler/factory/factory.go#L593) delegates requests to client.
 
 #### Binding and local client
 
@@ -376,15 +375,15 @@ Aim of the client is to provide:
 * recomputation of the cluster state simulating the Kubelet's behaviour (e.g. increasing node's cpu or memory)
 
 At the same time, all operations are carried over local caches (different from the scheduler ones).
-The binding process delegates pod to [client](https://github.com/kubernetes/kubernetes/blob/master/plugin/pkg/scheduler/factory/factory.go#L336).
+The binding process delegates pod to [client](../../plugin/pkg/scheduler/factory/factory.go#L336).
 Thus, it is simulated as a part of the recomputation.
 
-As the Kubelet uses scheduler's [NodeInfo.addPod](https://github.com/kubernetes/kubernetes/blob/master/plugin/pkg/scheduler/schedulercache/node_info.go#L171) to compute the overall consumption of resources, the recomputation can reuse the same code.
+As the Kubelet uses scheduler's [NodeInfo.addPod](../../plugin/pkg/scheduler/schedulercache/node_info.go#L171) to compute the overall consumption of resources, the recomputation can reuse the same code.
 
 Before the prediction starts, all the predictor caches need to be populated.
-By default, every scheduler configuration is built from the [config factory](https://github.com/kubernetes/kubernetes/blob/master/plugin/pkg/scheduler/factory/factory.go#L100).
+By default, every scheduler configuration is built from the [config factory](../../plugin/pkg/scheduler/factory/factory.go#L100).
 The factory provides various ways how to build the configuration.
-Building process also [initialize](https://github.com/kubernetes/kubernetes/blob/master/plugin/pkg/scheduler/factory/factory.go#L387) reflectors and informers responsible for caches population and updates.
+Building process also [initialize](../../plugin/pkg/scheduler/factory/factory.go#L387) reflectors and informers responsible for caches population and updates.
 Each reflector and informer has its own cache and use exactly one of the following functions to create ListerWatcher:
 
 * `createUnassignedNonTerminatedPodLW`
@@ -405,7 +404,7 @@ At this point the factory can build the configuration pointing to the local clie
 Scheduler gets created and the prediction can start.
 At the end of each scheduling iteration the binding process is converted to cache update.
 Normally, each binding results in watch event once the pod gets run on kubelet and node status gets reflected in the Apiserver.
-Thus, as a part of updating the predictor caches, watch event is generated (e.g. in the [RestClient](https://github.com/kubernetes/kubernetes/blob/master/pkg/watch/streamwatcher.go#L114) it corresponds to sending an item to a channel).
+Thus, as a part of updating the predictor caches, watch event is generated (e.g. in the [RestClient](../../pkg/watch/streamwatcher.go#L114) it corresponds to sending an item to a channel).
 
 From the point of view of the scheduler the local client behaves the same way as any client,
 i.e. it provides ``Listers``/``Watchers`` implementing ``List`` and ``Watch`` interface
@@ -441,20 +440,6 @@ Optionaly, list of nodes individual pods get scheduled on can be returned.
 ## Future
 
 * Take re-scheduler into account with possible de-fragmentation
-
-## Literature
-
-* [1] http://kubernetes.io/docs/user-guide/horizontal-pod-autoscaling/
-* [2] http://kubernetes.io/docs/user-guide/compute-resources/
-* [3] http://kubernetes.io/docs/user-guide/compute-resources/#planned-improvements
-* [4] https://github.com/kubernetes/kubernetes/blob/master/docs/design/resources.md#resource-types
-* [5] http://kubernetes.io/docs/admin/resourcequota/
-* [6] http://kubernetes.io/docs/admin/resourcequota/#object-count-quota
-* [7] https://github.com/kubernetes/kubernetes/issues/168#issuecomment-65846793
-* [8] https://github.com/kubernetes/kubernetes/issues/15743
-* [9] https://github.com/kubernetes/kubernetes/issues/15743#issuecomment-237261005
-* [10] http://kubernetes.io/docs/api-reference/v1/definitions/#_v1_resourcerequirements
-* [11] https://github.com/mwielgus/contrib/blob/7262a5c1ad19abb8a495ad0cb5c5b340d4230d0e/cluster-autoscaler/README.md
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/proposals/cluster-capacity.md?pixel)]()
