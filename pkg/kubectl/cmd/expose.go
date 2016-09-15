@@ -186,6 +186,8 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 			params["selector"] = s
 		}
 
+		isHeadlessService := params["cluster-ip"] == "None"
+
 		// For objects that need a port, derive it from the exposed object in case a user
 		// didn't explicitly specify one via --port
 		if port, found := params["port"]; found && kubectl.IsZero(port) {
@@ -195,7 +197,9 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 			}
 			switch len(ports) {
 			case 0:
-				return cmdutil.UsageError(cmd, "couldn't find port via --port flag or introspection")
+				if !isHeadlessService {
+					return cmdutil.UsageError(cmd, "couldn't find port via --port flag or introspection")
+				}
 			case 1:
 				params["port"] = ports[0]
 			default:
