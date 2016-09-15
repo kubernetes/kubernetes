@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/leaderelection"
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	clientsetadapter "k8s.io/kubernetes/pkg/client/unversioned/adapters/internalclientset"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -118,7 +119,7 @@ func Run(s *options.SchedulerServer) error {
 	eventBroadcaster := record.NewBroadcaster()
 	config.Recorder = eventBroadcaster.NewRecorder(api.EventSource{Component: s.SchedulerName})
 	eventBroadcaster.StartLogging(glog.Infof)
-	eventBroadcaster.StartRecordingToSink(kubeClient.Events(""))
+	eventBroadcaster.StartRecordingToSink(clientsetadapter.FromUnversionedClient(kubeClient).Core().Events(""))
 
 	sched := scheduler.New(config)
 

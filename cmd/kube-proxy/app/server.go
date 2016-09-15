@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/record"
 	kubeclient "k8s.io/kubernetes/pkg/client/unversioned"
+	clientsetadapter "k8s.io/kubernetes/pkg/client/unversioned/adapters/internalclientset"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	"k8s.io/kubernetes/pkg/proxy"
@@ -281,7 +282,7 @@ func (s *ProxyServer) Run() error {
 		return nil
 	}
 
-	s.Broadcaster.StartRecordingToSink(s.Client.Events(""))
+	s.Broadcaster.StartRecordingToSink(clientsetadapter.FromUnversionedClient(s.Client).Core().Events(""))
 
 	// Start up a webserver if requested
 	if s.Config.HealthzPort > 0 {
