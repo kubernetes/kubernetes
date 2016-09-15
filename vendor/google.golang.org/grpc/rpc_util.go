@@ -227,7 +227,7 @@ type parser struct {
 // No other error values or types must be returned, which also means
 // that the underlying io.Reader must not return an incompatible
 // error.
-func (p *parser) recvMsg() (pf payloadFormat, msg []byte, err error) {
+func (p *parser) recvMsg(maxMsgSize int) (pf payloadFormat, msg []byte, err error) {
 	if _, err := io.ReadFull(p.r, p.header[:]); err != nil {
 		return 0, nil, err
 	}
@@ -237,6 +237,9 @@ func (p *parser) recvMsg() (pf payloadFormat, msg []byte, err error) {
 
 	if length == 0 {
 		return pf, nil, nil
+	}
+	if length > uint32(maxMsgSize) {
+		return 0, nil, Errorf(codes.Internal, "grpc: received message length %d exceeding the max size %d", length, maxMsgSize)
 	}
 	// TODO(bradfitz,zhaoq): garbage. reuse buffer after proto decoding instead
 	// of making it for each message:
@@ -308,8 +311,8 @@ func checkRecvPayload(pf payloadFormat, recvCompress string, dc Decompressor) er
 	return nil
 }
 
-func recv(p *parser, c Codec, s *transport.Stream, dc Decompressor, m interface{}) error {
-	pf, d, err := p.recvMsg()
+func recv(p *parser, c Codec, s *transport.Stream, dc Decompressor, m interface{}, maxMsgSize int) error {
+	pf, d, err := p.recvMsg(maxMsgSize)
 	if err != nil {
 		return err
 	}
@@ -319,11 +322,16 @@ func recv(p *parser, c Codec, s *transport.Stream, dc Decompressor, m interface{
 	if pf == compressionMade {
 		d, err = dc.Do(bytes.NewReader(d))
 		if err != nil {
-			return transport.StreamErrorf(codes.Internal, "grpc: failed to decompress the received message %v", err)
+			return Errorf(codes.Internal, "grpc: failed to decompress the received message %v", err)
 		}
 	}
+	if len(d) > maxMsgSize {
+		// TODO: Revisit the error code. Currently keep it consistent with java
+		// implementation.
+		return Errorf(codes.Internal, "grpc: received a message of %d bytes exceeding %d limit", len(d), maxMsgSize)
+	}
 	if err := c.Unmarshal(d, m); err != nil {
-		return transport.StreamErrorf(codes.Internal, "grpc: failed to unmarshal the received message %v", err)
+		return Errorf(codes.Internal, "grpc: failed to unmarshal the received message %v", err)
 	}
 	return nil
 }
