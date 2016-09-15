@@ -35,7 +35,7 @@ const (
 
 	gcrPrefix   = "gcr.io/google_containers"
 	etcdVersion = "2.2.5"
-	kubeVersion = "v1.4.0-alpha.3"
+	kubeVersion = "v1.4.0-beta.6"
 
 	kubeDnsVersion     = "1.7"
 	dnsmasqVersion     = "1.3"
