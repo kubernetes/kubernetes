@@ -22,22 +22,24 @@ import (
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/kubelet/secret"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 // NewSourceApiserver creates a config source that watches and pulls from the apiserver.
-func NewSourceApiserver(c *clientset.Clientset, nodeName string, updates chan<- interface{}) {
+func NewSourceApiserver(c *clientset.Clientset, nodeName string, updates chan<- interface{}, secretManager secret.Manager) {
 	lw := cache.NewListWatchFromClient(c.CoreClient, "pods", api.NamespaceAll, fields.OneTermEqualSelector(api.PodHostField, nodeName))
-	newSourceApiserverFromLW(lw, updates)
+	newSourceApiserverFromLW(lw, updates, secretManager)
 }
 
 // newSourceApiserverFromLW holds creates a config source that watches and pulls from the apiserver.
-func newSourceApiserverFromLW(lw cache.ListerWatcher, updates chan<- interface{}) {
+func newSourceApiserverFromLW(lw cache.ListerWatcher, updates chan<- interface{}, secretManager secret.Manager) {
 	send := func(objs []interface{}) {
 		var pods []*api.Pod
 		for _, o := range objs {
 			pods = append(pods, o.(*api.Pod))
 		}
+		secretManager.Watching(pods)
 		updates <- kubetypes.PodUpdate{Pods: pods, Op: kubetypes.SET, Source: kubetypes.ApiserverSource}
 	}
 	cache.NewReflector(lw, &api.Pod{}, cache.NewUndeltaStore(send, cache.MetaNamespaceKeyFunc), 0).Run()

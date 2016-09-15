@@ -66,6 +66,7 @@ import (
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/remote"
 	"k8s.io/kubernetes/pkg/kubelet/rkt"
+	"k8s.io/kubernetes/pkg/kubelet/secret"
 	"k8s.io/kubernetes/pkg/kubelet/server"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	"k8s.io/kubernetes/pkg/kubelet/status"
@@ -236,7 +237,7 @@ type KubeletDeps struct {
 	TLSOptions        *server.TLSOptions
 }
 
-func makePodSourceConfig(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *KubeletDeps, nodeName string) (*config.PodConfig, error) {
+func makePodSourceConfig(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *KubeletDeps, nodeName string, secretManager secret.Manager) (*config.PodConfig, error) {
 	manifestURLHeader := make(http.Header)
 	if kubeCfg.ManifestURLHeader != "" {
 		pieces := strings.Split(kubeCfg.ManifestURLHeader, ":")
@@ -262,7 +263,7 @@ func makePodSourceConfig(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps
 	}
 	if kubeDeps.KubeClient != nil {
 		glog.Infof("Watching apiserver")
-		config.NewSourceApiserver(kubeDeps.KubeClient, nodeName, cfg.Channel(kubetypes.ApiserverSource))
+		config.NewSourceApiserver(kubeDeps.KubeClient, nodeName, cfg.Channel(kubetypes.ApiserverSource), secretManager)
 	}
 	return cfg, nil
 }
@@ -315,10 +316,10 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		kubeClient = kubeDeps.KubeClient
 		// TODO: remove this when we've refactored kubelet to only use clientset.
 	}
-
+	secretManager := secret.NewManager(kubeClient)
 	if kubeDeps.PodConfig == nil {
 		var err error
-		kubeDeps.PodConfig, err = makePodSourceConfig(kubeCfg, kubeDeps, nodeName)
+		kubeDeps.PodConfig, err = makePodSourceConfig(kubeCfg, kubeDeps, nodeName, secretManager)
 		if err != nil {
 			return nil, err
 		}
@@ -739,6 +740,8 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 	klet.appArmorValidator = apparmor.NewValidator(kubeCfg.ContainerRuntime)
 	klet.AddPodAdmitHandler(lifecycle.NewAppArmorAdmitHandler(klet.appArmorValidator))
 	klet.AddPodAdmitHandler(lifecycle.NewPredicateAdmitHandler(klet.getNodeAnyWay))
+
+	klet.secretManager = secretManager
 	// apply functional Option's
 	for _, opt := range kubeDeps.Options {
 		opt(klet)
@@ -1045,6 +1048,9 @@ type Kubelet struct {
 
 	// The AppArmor validator for checking whether AppArmor is supported.
 	appArmorValidator apparmor.Validator
+
+	// secretManager stores secrets by watching api server
+	secretManager secret.Manager
 }
 
 // setupDataDirs creates:
@@ -1817,7 +1823,7 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 	}
 
 	// Fetch the pull secrets for the pod
-	pullSecrets, err := kl.getPullSecretsForPod(pod)
+	pullSecrets, err := kl.secretManager.GetPullSecretsForPod(pod)
 	if err != nil {
 		glog.Errorf("Unable to get pull secrets for pod %q: %v", format.Pod(pod), err)
 		return err
