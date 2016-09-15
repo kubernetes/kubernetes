@@ -89,30 +89,9 @@ var NodeUpgrade = func(f *Framework, v string, img string) error {
 }
 
 func nodeUpgradeGCE(rawV string) error {
-	// TODO(ihmccreery) This code path should be identical to how a user
-	// would trigger a node update; right now it's very different.
 	v := "v" + rawV
-
-	Logf("Getting the node template before the upgrade")
-	tmplBefore, err := MigTemplate()
-	if err != nil {
-		return fmt.Errorf("error getting the node template before the upgrade: %v", err)
-	}
-
-	Logf("Preparing node upgrade by creating new instance template for %q", v)
-	stdout, _, err := RunCmd(path.Join(TestContext.RepoRoot, "cluster/gce/upgrade.sh"), "-P", v)
-	if err != nil {
-		cleanupNodeUpgradeGCE(tmplBefore)
-		return fmt.Errorf("error preparing node upgrade: %v", err)
-	}
-	tmpl := strings.TrimSpace(stdout)
-
-	Logf("Performing a node upgrade to %q; waiting at most %v per node", tmpl, RestartPerNodeTimeout)
-	if err := MigRollingUpdate(tmpl, RestartPerNodeTimeout); err != nil {
-		cleanupNodeUpgradeGCE(tmplBefore)
-		return fmt.Errorf("error doing node upgrade via a MigRollingUpdate to %s: %v", tmpl, err)
-	}
-	return nil
+	_, _, err := RunCmd(path.Join(TestContext.RepoRoot, "cluster/gce/upgrade.sh"), "-N", v)
+	return err
 }
 
 // MigRollingUpdate starts a MIG rolling update, upgrading the nodes to a new
