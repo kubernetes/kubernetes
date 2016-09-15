@@ -41,6 +41,11 @@ type PostStartHookContext struct {
 	// to this API server.  That client config doesn't exist yet.
 }
 
+// PostStartHookProvider is an interface in addition to provide a post start hook for the api server
+type PostStartHookProvider interface {
+	PostStartHook() (string, PostStartHookFunc, error)
+}
+
 // AddPostStartHook allows you to add a PostStartHook.
 func (s *GenericAPIServer) AddPostStartHook(name string, hook PostStartHookFunc) error {
 	if len(name) == 0 {
