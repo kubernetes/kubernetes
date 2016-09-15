@@ -63,6 +63,8 @@ Deployment deployment should label adopted RSs and pods,pwittrock,0
 Deployment deployment should support rollback,pwittrock,0
 Deployment deployment should support rollback when there's replica set with no revision,pwittrock,0
 Deployment deployment should support rollover,pwittrock,0
+Deployment iterative rollouts should eventually progress,kargakis,0
+Deployment lack of progress should be reported in the deployment status,kargakis,0
 Deployment overlapping deployment should not fight with each other,kargakis,1
 Deployment paused deployment should be able to scale,kargakis,1
 Deployment paused deployment should be ignored by the controller,kargakis,0
