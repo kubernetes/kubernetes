@@ -195,6 +195,51 @@ NAME                LABELS              STATUS              VOLUME
 myclaim-1           map[]               Bound               b16e91d6-c0ef-11e4-8be4-80e6500a981e
 ```
 
+A claim must request access modes and storage capacity. This is because internally PVs are
+indexed by their `AccessModes`, and target PVs are, to some degree, sorted by their capacity.
+A claim may request one of more of the following attributes to better match a PV: volume name, selectors,
+and volume class (currently implemented as an annotation).
+
+A PV may define a `ClaimRef` which can greatly influence (but does not absolutely guarantee) which
+PVC it will match.
+A PV may also define labels, annotations, and a volume class (currently implemented as an
+annotation) to better target PVCs.
+
+As of Kubernetes version 1.4, the following algorithm describes in more details how a claim is
+matched to a PV:
+
+1. Only PVs with `accessModes` equal to or greater than the claim's requested `accessModes` are considered.
+"Greater" here means that the PV has defined more modes than needed by the claim, but it also defines
+the mode requested by the claim.
+
+1. The potential PVs above are considered in order of the closest access mode match, with the best case
+being an exact match, and a worse case being more modes than requested by the claim.
+
+1. Each PV above is processed. If the PV has a `claimRef` matching the claim, *and* the PV's capacity
+is not less than the storage being requested by the claim then this PV will bind to the claim. Done.
+
+1. Otherwise, if the PV has the "volume.alpha.kubernetes.io/storage-class" annotation defined then it is
+skipped and will be handled by Dynamic Provisioning.
+
+1. Otherwise, if the PV has a `claimRef` defined, which can specify a different claim or simply be a
+placeholder, then the PV is skipped.
+
+1. Otherwise, if the claim is using a selector but it does *not* match the PV's labels (if any) then the
+PV is skipped. But, even if a claim has selectors which match a PV that does not guarantee a match
+since capacities may differ.
+
+1. Otherwise, if the PV's "volume.beta.kubernetes.io/storage-class" annotation (which is a placeholder
+for a volume class) does *not* match the claim's annotation (same placeholder) then the PV is skipped.
+If the annotations for the PV and PVC are empty they are treated as being equal.
+
+1. Otherwise, what remains is a list of PVs that may match the claim. Within this list of remaining PVs,
+the PV with the smallest capacity that is also equal to or greater than the claim's requested storage
+is the matching PV and will be bound to the claim. Done. In the case of two or more PVCs matching all
+of the above criteria, the first PV (remember the PV order is based on `accessModes`) is the winner.
+
+*Note:* if no PV matches the claim and the claim defines a `StorageClass` (or a default
+`StorageClass` has been defined) then a volume will be dynamically provisioned.
+
 #### Claim usage
 
 The claim holder can use their claim as a volume.  The ```PersistentVolumeClaimVolumeSource``` knows to fetch the PV backing the claim
