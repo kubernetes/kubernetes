@@ -90,6 +90,9 @@ var _ = framework.KubeDescribe("Deployment", func() {
 	It("overlapping deployment should not fight with each other", func() {
 		testOverlappingDeployment(f)
 	})
+	It("lack of progress should be reported in the deployment status", func() {
+		testFailedDeployment(f)
+	})
 	// TODO: add tests that cover deployment.Spec.MinReadySeconds once we solved clock-skew issues
 })
 
@@ -1318,4 +1321,86 @@ func testOverlappingDeployment(f *framework.Framework) {
 	By("Checking the second deployment is now synced")
 	err = framework.WaitForDeploymentRevisionAndImage(c, ns, deployOverlapping.Name, "2", redisImage)
 	Expect(err).NotTo(HaveOccurred(), "The second deployment failed to update to revision 2")
+}
+
+func testFailedDeployment(f *framework.Framework) {
+	ns := f.Namespace.Name
+	c := adapter.FromUnversionedClient(f.Client)
+
+	podLabels := map[string]string{"name": nginxImageName}
+	replicas := int32(1)
+
+	// Create a nginx deployment.
+	deploymentName := "nginx"
+	badImage := "nginx:404"
+	thirty := int32(30)
+	d := newDeployment(deploymentName, replicas, podLabels, nginxImageName, badImage, extensions.RecreateDeploymentStrategyType, nil)
+	d.Spec.ProgressDeadlineSeconds = &thirty
+	framework.Logf("Creating deployment %q with a bad image", deploymentName)
+	_, err := c.Extensions().Deployments(ns).Create(d)
+	Expect(err).NotTo(HaveOccurred())
+	defer stopDeployment(c, f.Client, ns, deploymentName)
+
+	// Check that deployment is created fine.
+	deployment, err := c.Extensions().Deployments(ns).Get(deploymentName)
+	Expect(err).NotTo(HaveOccurred())
+
+	framework.Logf("Waiting for deployment %q to be observed by the controller", deploymentName)
+	Expect(framework.WaitForObservedDeployment(c, ns, deploymentName, deployment.Generation)).NotTo(HaveOccurred())
+
+	framework.Logf("Waiting for deployment %q status", deploymentName)
+	Expect(framework.WaitForDeploymentStatus(c, deployment)).NotTo(HaveOccurred())
+
+	framework.Logf("Checking deployment %q for a timeout condition", deploymentName)
+	err = wait.PollImmediate(time.Second, 1*time.Minute, func() (bool, error) {
+		deployment, err = c.Extensions().Deployments(ns).Get(deploymentName)
+		if err != nil {
+			return false, err
+		}
+
+		return deploymentutil.DeploymentConditionExists(
+			deployment.Status,
+			extensions.DeploymentProgressing,
+			api.ConditionFalse,
+			deploymentutil.TimedOutReason,
+		), nil
+	})
+	if err == wait.ErrWaitTimeout {
+		err = fmt.Errorf("Expected a %q condition for deployment %q: %#v", deploymentutil.TimedOutReason, deployment.Name, deployment.Status.Conditions)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	framework.Logf("Updating deployment %q with a good image", deploymentName)
+	deployment, err = framework.UpdateDeploymentWithRetries(c, ns, deployment.Name, func(update *extensions.Deployment) {
+		update.Spec.Template.Spec.Containers[0].Image = nginxImage
+	})
+	Expect(err).NotTo(HaveOccurred())
+
+	// Check that deployment is created fine.
+	deployment, err = c.Extensions().Deployments(ns).Get(deploymentName)
+	Expect(err).NotTo(HaveOccurred())
+
+	framework.Logf("Waiting for deployment %q to be observed by the controller", deploymentName)
+	Expect(framework.WaitForObservedDeployment(c, ns, deploymentName, deployment.Generation)).NotTo(HaveOccurred())
+
+	framework.Logf("Waiting for deployment %q status", deploymentName)
+	Expect(framework.WaitForDeploymentStatus(c, deployment)).NotTo(HaveOccurred())
+
+	framework.Logf("Checking deployment %q for a complete condition", deploymentName)
+	err = wait.PollImmediate(time.Second, 1*time.Minute, func() (bool, error) {
+		deployment, err = c.Extensions().Deployments(ns).Get(deploymentName)
+		if err != nil {
+			return false, err
+		}
+		return deploymentutil.DeploymentConditionExists(
+			deployment.Status,
+			extensions.DeploymentProgressing,
+			api.ConditionTrue,
+			deploymentutil.NewRSAvailableReason,
+		), nil
+	})
+	if err == wait.ErrWaitTimeout {
+		err = fmt.Errorf("Expected a %q condition for deployment %q: %#v", deploymentutil.NewRSAvailableReason, deployment.Name, deployment.Status.Conditions)
+	}
+	Expect(err).NotTo(HaveOccurred())
 }
