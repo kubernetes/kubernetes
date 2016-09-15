@@ -3288,6 +3288,52 @@ func (_ openAPI) OpenAPIDefinitions() *common.OpenAPIDefinitions {
 			Dependencies: []string{
 				"api.ObjectMeta", "extensions.DeploymentSpec", "extensions.DeploymentStatus"},
 		},
+		"extensions.DeploymentCondition": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "DeploymentCondition describes the state of a deployment at a certain point.",
+					Properties: map[string]spec.Schema{
+						"type": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Type of deployment condition.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"status": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Status of the condition, one of True, False, Unknown.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"lastTransitionTime": {
+							SchemaProps: spec.SchemaProps{
+								Description: "The last time the condition transitioned from one status to another.",
+								Ref:         spec.MustCreateRef("#/definitions/unversioned.Time"),
+							},
+						},
+						"reason": {
+							SchemaProps: spec.SchemaProps{
+								Description: "The reason for the condition's last transition.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"message": {
+							SchemaProps: spec.SchemaProps{
+								Description: "A human readable message indicating details about the transition.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+					},
+					Required: []string{"type", "status"},
+				},
+			},
+			Dependencies: []string{
+				"unversioned.Time"},
+		},
 		"extensions.DeploymentList": {
 			Schema: spec.Schema{
 				SchemaProps: spec.SchemaProps{
@@ -3412,6 +3458,13 @@ func (_ openAPI) OpenAPIDefinitions() *common.OpenAPIDefinitions {
 								Ref:         spec.MustCreateRef("#/definitions/extensions.RollbackConfig"),
 							},
 						},
+						"progressDeadlineSeconds": {
+							SchemaProps: spec.SchemaProps{
+								Description: "The maximum time in seconds for a deployment to make progress before it is considered to be failed. This is not set by default.",
+								Type:        []string{"integer"},
+								Format:      "int32",
+							},
+						},
 					},
 					Required: []string{"template"},
 				},
@@ -3458,10 +3511,24 @@ func (_ openAPI) OpenAPIDefinitions() *common.OpenAPIDefinitions {
 								Format:      "int32",
 							},
 						},
+						"conditions": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Represents the latest available observations of a deployment's current state.",
+								Type:        []string{"array"},
+								Items: &spec.SchemaOrArray{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Ref: spec.MustCreateRef("#/definitions/extensions.DeploymentCondition"),
+										},
+									},
+								},
+							},
+						},
 					},
 				},
 			},
-			Dependencies: []string{},
+			Dependencies: []string{
+				"extensions.DeploymentCondition"},
 		},
 		"extensions.DeploymentStrategy": {
 			Schema: spec.Schema{
@@ -15307,6 +15374,52 @@ func (_ openAPI) OpenAPIDefinitions() *common.OpenAPIDefinitions {
 			Dependencies: []string{
 				"v1.ObjectMeta", "v1beta1.DeploymentSpec", "v1beta1.DeploymentStatus"},
 		},
+		"v1beta1.DeploymentCondition": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "DeploymentCondition describes the state of a deployment at a certain point.",
+					Properties: map[string]spec.Schema{
+						"type": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Type of deployment condition.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"status": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Status of the condition, one of True, False, Unknown.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"lastTransitionTime": {
+							SchemaProps: spec.SchemaProps{
+								Description: "The last time the condition transitioned from one status to another.",
+								Ref:         spec.MustCreateRef("#/definitions/unversioned.Time"),
+							},
+						},
+						"reason": {
+							SchemaProps: spec.SchemaProps{
+								Description: "The reason for the condition's last transition.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"message": {
+							SchemaProps: spec.SchemaProps{
+								Description: "A human readable message indicating details about the transition.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+					},
+					Required: []string{"type", "status"},
+				},
+			},
+			Dependencies: []string{
+				"unversioned.Time"},
+		},
 		"v1beta1.DeploymentList": {
 			Schema: spec.Schema{
 				SchemaProps: spec.SchemaProps{
@@ -15434,6 +15547,13 @@ func (_ openAPI) OpenAPIDefinitions() *common.OpenAPIDefinitions {
 								Ref:         spec.MustCreateRef("#/definitions/v1beta1.RollbackConfig"),
 							},
 						},
+						"progressDeadlineSeconds": {
+							SchemaProps: spec.SchemaProps{
+								Description: "The maximum time in seconds for a deployment to make progress before it is considered to be failed. This is not set by default.",
+								Type:        []string{"integer"},
+								Format:      "int32",
+							},
+						},
 					},
 					Required: []string{"template"},
 				},
@@ -15481,10 +15601,24 @@ func (_ openAPI) OpenAPIDefinitions() *common.OpenAPIDefinitions {
 								Format:      "int32",
 							},
 						},
+						"conditions": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Represents the latest available observations of a deployment's current state.",
+								Type:        []string{"array"},
+								Items: &spec.SchemaOrArray{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Ref: spec.MustCreateRef("#/definitions/v1beta1.DeploymentCondition"),
+										},
+									},
+								},
+							},
+						},
 					},
 				},
 			},
-			Dependencies: []string{},
+			Dependencies: []string{
+				"v1beta1.DeploymentCondition"},
 		},
 		"v1beta1.DeploymentStrategy": {
 			Schema: spec.Schema{
