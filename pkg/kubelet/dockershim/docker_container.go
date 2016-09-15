@@ -88,9 +88,6 @@ func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeApi
 		return "", fmt.Errorf("sandbox config is nil for container %q", config.Metadata.GetName())
 	}
 
-	// Merge annotations and labels because docker supports only labels.
-	// TODO: add a prefix to annotations so that we can distinguish labels and
-	// annotations when reading back them from the docker container.
 	labels := makeLabels(config.GetLabels(), config.GetAnnotations())
 	// Apply a the container type label.
 	labels[containerTypeLabelKey] = containerTypeLabelContainer
@@ -284,21 +281,21 @@ func (ds *dockerService) ContainerStatus(containerID string) (*runtimeApi.Contai
 		return nil, err
 	}
 
+	labels, annotations := extractLabels(r.Config.Labels)
 	return &runtimeApi.ContainerStatus{
-		Id:         &r.ID,
-		Metadata:   metadata,
-		Image:      &runtimeApi.ImageSpec{Image: &r.Config.Image},
-		ImageRef:   &r.Image,
-		Mounts:     mounts,
-		ExitCode:   &exitCode,
-		State:      &state,
-		CreatedAt:  &ct,
-		StartedAt:  &st,
-		FinishedAt: &ft,
-		Reason:     &reason,
-		// TODO: We write annotations as labels on the docker containers. All
-		// these annotations will be read back as labels. Need to fix this.
-		Labels: r.Config.Labels,
+		Id:          &r.ID,
+		Metadata:    metadata,
+		Image:       &runtimeApi.ImageSpec{Image: &r.Config.Image},
+		ImageRef:    &r.Image,
+		Mounts:      mounts,
+		ExitCode:    &exitCode,
+		State:       &state,
+		CreatedAt:   &ct,
+		StartedAt:   &st,
+		FinishedAt:  &ft,
+		Reason:      &reason,
+		Labels:      labels,
+		Annotations: annotations,
 	}, nil
 }
 
