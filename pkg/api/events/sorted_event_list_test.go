@@ -14,42 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kubectl
+package events
 
 import (
 	"sort"
-	"strings"
 	"testing"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 )
-
-// VerifyDatesInOrder checks the start of each line for a RFC1123Z date
-// and posts error if all subsequent dates are not equal or increasing
-func VerifyDatesInOrder(
-	resultToTest, rowDelimiter, columnDelimiter string, t *testing.T) {
-	lines := strings.Split(resultToTest, rowDelimiter)
-	var previousTime time.Time
-	for _, str := range lines {
-		columns := strings.Split(str, columnDelimiter)
-		if len(columns) > 0 {
-			currentTime, err := time.Parse(time.RFC1123Z, columns[0])
-			if err == nil {
-				if previousTime.After(currentTime) {
-					t.Errorf(
-						"Output is not sorted by time. %s should be listed after %s. Complete output: %s",
-						previousTime.Format(time.RFC1123Z),
-						currentTime.Format(time.RFC1123Z),
-						resultToTest)
-				}
-				previousTime = currentTime
-			}
-		}
-	}
-
-}
 
 func TestSortableEvents(t *testing.T) {
 	// Arrange
