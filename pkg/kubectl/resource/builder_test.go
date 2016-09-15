@@ -1177,39 +1177,6 @@ func TestReceiveMultipleErrors(t *testing.T) {
 	}
 }
 
-func TestReplaceAliases(t *testing.T) {
-	tests := []struct {
-		name     string
-		arg      string
-		expected string
-	}{
-		{
-			name:     "no-replacement",
-			arg:      "service",
-			expected: "service",
-		},
-		{
-			name:     "all-replacement",
-			arg:      "all",
-			expected: "rc,svc,pods,pvc",
-		},
-		{
-			name:     "alias-in-comma-separated-arg",
-			arg:      "all,secrets",
-			expected: "rc,svc,pods,pvc,secrets",
-		},
-	}
-
-	b := NewBuilder(testapi.Default.RESTMapper(), api.Scheme, fakeClient(), testapi.Default.Codec())
-
-	for _, test := range tests {
-		replaced := b.replaceAliases(test.arg)
-		if replaced != test.expected {
-			t.Errorf("%s: unexpected argument: expected %s, got %s", test.name, test.expected, replaced)
-		}
-	}
-}
-
 func TestHasNames(t *testing.T) {
 	tests := []struct {
 		args            []string

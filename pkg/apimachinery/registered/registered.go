@@ -111,6 +111,7 @@ var (
 	EnableVersions                = DefaultAPIRegistrationManager.EnableVersions
 	RegisterGroup                 = DefaultAPIRegistrationManager.RegisterGroup
 	RegisterVersions              = DefaultAPIRegistrationManager.RegisterVersions
+	InterfacesFor                 = DefaultAPIRegistrationManager.InterfacesFor
 )
 
 // RegisterVersions adds the given group versions to the list of registered group versions.
@@ -263,6 +264,15 @@ func (m *APIRegistrationManager) AddThirdPartyAPIGroupVersions(gvs ...unversione
 	m.thirdPartyGroupVersions = append(m.thirdPartyGroupVersions, filteredGVs...)
 
 	return skippedGVs
+}
+
+// InterfacesFor is a union meta.VersionInterfacesFunc func for all registered types
+func (m *APIRegistrationManager) InterfacesFor(version unversioned.GroupVersion) (*meta.VersionInterfaces, error) {
+	groupMeta, err := m.Group(version.Group)
+	if err != nil {
+		return nil, err
+	}
+	return groupMeta.InterfacesFor(version)
 }
 
 // TODO: This is an expedient function, because we don't check if a Group is
