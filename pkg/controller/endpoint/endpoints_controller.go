@@ -316,10 +316,6 @@ func (e *EndpointController) processNextWorkItem() bool {
 	if quit {
 		return false
 	}
-	// Use defer: in the unlikely event that there's a
-	// panic, we'd still like this to get marked done--
-	// otherwise the controller will not be able to sync
-	// this service again until it is restarted.
 	defer e.queue.Done(eKey)
 
 	err := e.syncService(eKey.(string))
