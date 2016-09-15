@@ -134,6 +134,10 @@ pkg/registry/node/rest
 pkg/registry/pod/etcd
 pkg/registry/podsecuritypolicy/etcd
 pkg/registry/rangeallocation
+pkg/registry/rbac/clusterrole/etcd
+pkg/registry/rbac/clusterrolebinding/etcd
+pkg/registry/rbac/role/etcd
+pkg/registry/rbac/rolebinding/etcd
 pkg/registry/role/etcd
 pkg/registry/rolebinding/etcd
 pkg/registry/service/ipallocator/controller

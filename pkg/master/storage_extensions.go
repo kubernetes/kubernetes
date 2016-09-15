@@ -44,9 +44,9 @@ type ExtensionsRESTStorageProvider struct {
 	DisableThirdPartyControllerForTesting bool
 }
 
-var _ RESTStorageProvider = &ExtensionsRESTStorageProvider{}
+var _ genericapiserver.RESTStorageProvider = &ExtensionsRESTStorageProvider{}
 
-func (p ExtensionsRESTStorageProvider) NewRESTStorage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool) {
+func (p ExtensionsRESTStorageProvider) NewRESTStorage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter genericapiserver.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool) {
 	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(extensions.GroupName)
 
 	if apiResourceConfigSource.AnyResourcesForVersionEnabled(extensionsapiv1beta1.SchemeGroupVersion) {
@@ -57,7 +57,7 @@ func (p ExtensionsRESTStorageProvider) NewRESTStorage(apiResourceConfigSource ge
 	return apiGroupInfo, true
 }
 
-func (p ExtensionsRESTStorageProvider) v1beta1Storage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter RESTOptionsGetter) map[string]rest.Storage {
+func (p ExtensionsRESTStorageProvider) v1beta1Storage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter genericapiserver.RESTOptionsGetter) map[string]rest.Storage {
 	version := extensionsapiv1beta1.SchemeGroupVersion
 
 	storage := map[string]rest.Storage{}

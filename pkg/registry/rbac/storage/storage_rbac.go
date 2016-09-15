@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package master
+package storage
 
 import (
 	"sync"
@@ -24,27 +24,27 @@ import (
 	rbacapiv1alpha1 "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"
 	rbacvalidation "k8s.io/kubernetes/pkg/apis/rbac/validation"
 	"k8s.io/kubernetes/pkg/genericapiserver"
-	"k8s.io/kubernetes/pkg/registry/clusterrole"
-	clusterroleetcd "k8s.io/kubernetes/pkg/registry/clusterrole/etcd"
-	clusterrolepolicybased "k8s.io/kubernetes/pkg/registry/clusterrole/policybased"
-	"k8s.io/kubernetes/pkg/registry/clusterrolebinding"
-	clusterrolebindingetcd "k8s.io/kubernetes/pkg/registry/clusterrolebinding/etcd"
-	clusterrolebindingpolicybased "k8s.io/kubernetes/pkg/registry/clusterrolebinding/policybased"
-	"k8s.io/kubernetes/pkg/registry/role"
-	roleetcd "k8s.io/kubernetes/pkg/registry/role/etcd"
-	rolepolicybased "k8s.io/kubernetes/pkg/registry/role/policybased"
-	"k8s.io/kubernetes/pkg/registry/rolebinding"
-	rolebindingetcd "k8s.io/kubernetes/pkg/registry/rolebinding/etcd"
-	rolebindingpolicybased "k8s.io/kubernetes/pkg/registry/rolebinding/policybased"
+	"k8s.io/kubernetes/pkg/registry/rbac/clusterrole"
+	clusterroleetcd "k8s.io/kubernetes/pkg/registry/rbac/clusterrole/etcd"
+	clusterrolepolicybased "k8s.io/kubernetes/pkg/registry/rbac/clusterrole/policybased"
+	"k8s.io/kubernetes/pkg/registry/rbac/clusterrolebinding"
+	clusterrolebindingetcd "k8s.io/kubernetes/pkg/registry/rbac/clusterrolebinding/etcd"
+	clusterrolebindingpolicybased "k8s.io/kubernetes/pkg/registry/rbac/clusterrolebinding/policybased"
+	"k8s.io/kubernetes/pkg/registry/rbac/role"
+	roleetcd "k8s.io/kubernetes/pkg/registry/rbac/role/etcd"
+	rolepolicybased "k8s.io/kubernetes/pkg/registry/rbac/role/policybased"
+	"k8s.io/kubernetes/pkg/registry/rbac/rolebinding"
+	rolebindingetcd "k8s.io/kubernetes/pkg/registry/rbac/rolebinding/etcd"
+	rolebindingpolicybased "k8s.io/kubernetes/pkg/registry/rbac/rolebinding/policybased"
 )
 
-type RBACRESTStorageProvider struct {
+type RESTStorageProvider struct {
 	AuthorizerRBACSuperUser string
 }
 
-var _ RESTStorageProvider = &RBACRESTStorageProvider{}
+var _ genericapiserver.RESTStorageProvider = &RESTStorageProvider{}
 
-func (p RBACRESTStorageProvider) NewRESTStorage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool) {
+func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter genericapiserver.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool) {
 	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(rbac.GroupName)
 
 	if apiResourceConfigSource.AnyResourcesForVersionEnabled(rbacapiv1alpha1.SchemeGroupVersion) {
@@ -55,7 +55,7 @@ func (p RBACRESTStorageProvider) NewRESTStorage(apiResourceConfigSource generica
 	return apiGroupInfo, true
 }
 
-func (p RBACRESTStorageProvider) v1alpha1Storage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter RESTOptionsGetter) map[string]rest.Storage {
+func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter genericapiserver.RESTOptionsGetter) map[string]rest.Storage {
 	version := rbacapiv1alpha1.SchemeGroupVersion
 
 	once := new(sync.Once)
