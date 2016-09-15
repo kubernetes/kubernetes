@@ -92,6 +92,17 @@ func (deploymentStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Obj
 		now := unversioned.Now()
 		newDeployment.Annotations[util.SelectorUpdateAnnotation] = now.Format(time.RFC3339)
 	}
+
+	// Update deployment conditions with an Unknown condition when pausing/resuming
+	// a deployment. In this way, we can be sure that we won't timeout when a user
+	// resumes a Deployment with a set progressDeadlineSeconds.
+	if newDeployment.Spec.Paused && !oldDeployment.Spec.Paused {
+		condition := util.NewDeploymentCondition(extensions.DeploymentProgressing, api.ConditionUnknown, util.PausedDeployReason, "Deployment is paused")
+		util.SetDeploymentCondition(&newDeployment.Status, *condition)
+	} else if !newDeployment.Spec.Paused && oldDeployment.Spec.Paused {
+		condition := util.NewDeploymentCondition(extensions.DeploymentProgressing, api.ConditionUnknown, util.ResumedDeployReason, "Deployment is resumed")
+		util.SetDeploymentCondition(&newDeployment.Status, *condition)
+	}
 }
 
 // ValidateUpdate is the default update validation for an end user.
