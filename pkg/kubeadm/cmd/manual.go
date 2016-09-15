@@ -129,6 +129,10 @@ func NewCmdManualBootstrapInitMaster(out io.Writer, s *kubeadmapi.KubeadmConfig)
 		&s.InitFlags.Services.DNSDomain, "service-dns-domain", "cluster.local",
 		`(optional) use alterantive domain name for services, e.g. "myorg.internal"`,
 	)
+	cmd.PersistentFlags().BoolVar(
+		&s.InitFlags.Schedulable, "schedule-workload", false,
+		`(optional) allow to schedule workload to the node`,
+	)
 
 	return cmd
 }
@@ -181,7 +185,7 @@ func RunManualBootstrapInitMaster(out io.Writer, cmd *cobra.Command, args []stri
 		return err
 	}
 
-	if err := kubemaster.UpdateMasterRoleLabelsAndTaints(client); err != nil {
+	if err := kubemaster.UpdateMasterRoleLabelsAndTaints(client, s.Schedulable); err != nil {
 		return err
 	}
 

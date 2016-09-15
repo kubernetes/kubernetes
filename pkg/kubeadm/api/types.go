@@ -45,6 +45,7 @@ type InitFlags struct {
 		DNSDomain string
 	}
 	CloudProvider string
+	Schedulable bool
 }
 
 const (

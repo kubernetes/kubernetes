@@ -77,6 +77,10 @@ func NewCmdInit(out io.Writer, s *kubeadmapi.KubeadmConfig) *cobra.Command {
 		&s.InitFlags.CloudProvider, "cloud-provider", "",
 		`(optional) enable cloud proiver features (external load-balancers, storage, etc)`,
 	)
+	cmd.PersistentFlags().BoolVar(
+		&s.InitFlags.Schedulable, "schedule-workload", false,
+		`(optional) allow to schedule workload to the node`,
+	)
 
 	return cmd
 }
@@ -135,7 +139,7 @@ func RunInit(out io.Writer, cmd *cobra.Command, args []string, s *kubeadmapi.Kub
 		return err
 	}
 
-	if err := kubemaster.UpdateMasterRoleLabelsAndTaints(client); err != nil {
+	if err := kubemaster.UpdateMasterRoleLabelsAndTaints(client, s.Schedulable); err != nil {
 		return err
 	}
 
