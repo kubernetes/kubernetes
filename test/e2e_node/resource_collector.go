@@ -192,7 +192,7 @@ func (r *ResourceCollector) GetLatest() (framework.ResourceUsagePerContainer, er
 	for key, name := range systemContainers {
 		contStats, ok := r.buffers[name]
 		if !ok || len(contStats) == 0 {
-			return nil, fmt.Errorf("Resource usage of %s:%s is not ready yet", key, name)
+			return nil, fmt.Errorf("No resource usage data for %s container (%s)", key, name)
 		}
 		stats[key] = contStats[len(contStats)-1]
 	}
