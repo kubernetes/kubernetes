@@ -1152,6 +1152,53 @@ var _ = framework.KubeDescribe("Services", func() {
 			jig.TestHTTPHealthCheckNodePort(publicIP, healthCheckNodePort, "/healthz", expectedSuccess)
 		}
 	})
+
+	It("should only allow access from service loadbalancer source ranges [Slow]", func() {
+		// this feature currently supported only on GCE/GKE/AWS
+		framework.SkipUnlessProviderIs("gce", "gke", "aws")
+
+		loadBalancerCreateTimeout := loadBalancerCreateTimeoutDefault
+		largeClusterMinNodesNumber := 100
+		if nodes := framework.GetReadySchedulableNodesOrDie(c); len(nodes.Items) > largeClusterMinNodesNumber {
+			loadBalancerCreateTimeout = loadBalancerCreateTimeoutLarge
+		}
+
+		namespace := f.Namespace.Name
+		serviceName := "lb-sourcerange"
+		jig := NewServiceTestJig(c, serviceName)
+
+		By("Prepare allow source ips")
+		// prepare the exec pods
+		// hostPod and acceptPod are allowed to access the loadbalancer
+		hostPod := framework.LaunchHostExecPod(c, namespace, "hostexec-accept")
+		acceptPodName := createExecPodOrFail(f.Client, namespace, "execpod-accept")
+		dropPodName := createExecPodOrFail(f.Client, namespace, "execpod-drop")
+
+		hostPod, err := c.Pods(namespace).Get(hostPod.Name)
+		Expect(err).NotTo(HaveOccurred())
+		accpetPod, err := c.Pods(namespace).Get(acceptPodName)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("creating a pod to be part of the service " + serviceName)
+		// This container is an nginx container listening on port 80
+		// See kubernetes/contrib/ingress/echoheaders/nginx.conf for content of response
+		jig.RunOrFail(namespace, nil)
+		// Create loadbalancer service with source range from node[0] and podAccept
+		svc := jig.CreateTCPServiceOrFail(namespace, func(svc *api.Service) {
+			svc.Spec.Type = api.ServiceTypeLoadBalancer
+			svc.Spec.LoadBalancerSourceRanges = []string{hostPod.Status.HostIP + "/32", accpetPod.Status.PodIP + "/32"}
+		})
+		svc = jig.WaitForLoadBalancerOrFail(namespace, serviceName, loadBalancerCreateTimeout)
+		jig.SanityCheckService(svc, api.ServiceTypeLoadBalancer)
+
+		By("check reachability from different sources")
+		svcIP := getIngressPoint(&svc.Status.LoadBalancer.Ingress[0])
+		checkReachability(true, namespace, hostPod.ObjectMeta.Name, svcIP)
+		checkReachability(true, namespace, acceptPodName, svcIP)
+		// expect not to be reachable
+		checkReachability(false, namespace, dropPodName, svcIP)
+
+	})
 })
 
 // updateService fetches a service, calls the update function on it,
@@ -2349,4 +2396,24 @@ func execSourceipTest(f *framework.Framework, c *client.Client, ns, nodeName, se
 	sourceIp := outputs[1]
 
 	return execPodIp, sourceIp
+}
+
+func checkReachability(expectToBeReachable bool, namespace, pod, target string) {
+	cmd := fmt.Sprintf("wget -T 5 -qO- %q", target)
+	if expectToBeReachable {
+		err := wait.PollImmediate(framework.Poll, 2*time.Minute, func() (bool, error) {
+			_, err := framework.RunHostCmd(namespace, pod, cmd)
+			if err != nil {
+				framework.Logf("got err: %v, retry until timeout", err)
+				return false, err
+			}
+			return true, nil
+		})
+		Expect(err).NotTo(HaveOccurred())
+	} else {
+		// expect wget to fail
+		_, err := framework.RunHostCmd(namespace, pod, cmd)
+		framework.Logf("Expecting error: %v", err)
+		Expect(err).To(HaveOccurred())
+	}
 }
