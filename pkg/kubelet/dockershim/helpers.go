@@ -161,15 +161,15 @@ func getNetworkNamespace(c *dockertypes.ContainerJSON) string {
 // dockerFilter wraps around dockerfilters.Args and provides methods to modify
 // the filter easily.
 type dockerFilter struct {
-	f *dockerfilters.Args
+	args *dockerfilters.Args
 }
 
 func newDockerFilter(args *dockerfilters.Args) *dockerFilter {
-	return &dockerFilter{f: args}
+	return &dockerFilter{args: args}
 }
 
 func (f *dockerFilter) Add(key, value string) {
-	f.Add(key, value)
+	f.args.Add(key, value)
 }
 
 func (f *dockerFilter) AddLabel(key, value string) {

@@ -49,7 +49,7 @@ const (
 	containerTypeLabelContainer = "container"
 )
 
-func NewDockerSevice(client dockertools.DockerInterface) DockerLegacyService {
+func NewDockerService(client dockertools.DockerInterface) DockerLegacyService {
 	return &dockerService{
 		client: dockertools.NewInstrumentedDockerInterface(client),
 	}
@@ -73,17 +73,20 @@ type dockerService struct {
 }
 
 // Version returns the runtime name, runtime version and runtime API version
-func (ds *dockerService) Version(apiVersion string) (*runtimeApi.VersionResponse, error) {
+func (ds *dockerService) Version(_ string) (*runtimeApi.VersionResponse, error) {
 	v, err := ds.client.Version()
 	if err != nil {
 		return nil, fmt.Errorf("docker: failed to get docker version: %v", err)
 	}
 	runtimeAPIVersion := kubeAPIVersion
 	name := dockerRuntimeName
+	// Docker API version (e.g., 1.23) is not semver compatible. Add a ".0"
+	// suffix to remedy this.
+	apiVersion := fmt.Sprintf("%s.0", v.APIVersion)
 	return &runtimeApi.VersionResponse{
 		Version:           &runtimeAPIVersion,
 		RuntimeName:       &name,
 		RuntimeVersion:    &v.Version,
-		RuntimeApiVersion: &v.APIVersion,
+		RuntimeApiVersion: &apiVersion,
 	}, nil
 }
