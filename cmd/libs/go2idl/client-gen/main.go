@@ -47,6 +47,7 @@ var (
 	includedTypesOverrides = flag.StringSlice("included-types-overrides", []string{}, "list of group/version/type for which client should be generated. By default, client is generated for all types which have genclient=true in types.go. This overrides that. For each groupVersion in this list, only the types mentioned here will be included. The default check of genclient=true will be used for other group versions.")
 	basePath               = flag.String("input-base", "k8s.io/kubernetes/pkg/apis", "base path to look for the api group. Default to \"k8s.io/kubernetes/pkg/apis\"")
 	clientsetName          = flag.StringP("clientset-name", "n", "internalclientset", "the name of the generated clientset package.")
+	clientsetAPIPath       = flag.StringP("clientset-api-path", "", "", "the value of default API path.")
 	clientsetPath          = flag.String("clientset-path", "k8s.io/kubernetes/pkg/client/clientset_generated/", "the generated clientset will be output to <clientset-path>/<clientset-name>. Default to \"k8s.io/kubernetes/pkg/client/clientset_generated/\"")
 	clientsetOnly          = flag.Bool("clientset-only", false, "when set, client-gen only generates the clientset shell, without generating the individual typed clients")
 	fakeClient             = flag.Bool("fake-clientset", true, "when set, client-gen will generate the fake clientset that can be used in tests")
@@ -160,6 +161,7 @@ func main() {
 				unversioned.GroupVersion{Group: "testgroup.k8s.io", Version: ""}: "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/test_apis/testgroup.k8s.io",
 			},
 			ClientsetName:       "test_internalclientset",
+			ClientsetAPIPath:    "/api",
 			ClientsetOutputPath: "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testoutput/clientset_generated/",
 			ClientsetOnly:       false,
 			FakeClient:          true,
@@ -174,13 +176,14 @@ func main() {
 		if err != nil {
 			glog.Fatalf("Unexpected error: %v", err)
 		}
-		glog.Infof("going to generate clientset from these input paths: %v", inputPath)
+		glog.V(3).Infof("going to generate clientset from these input paths: %v", inputPath)
 		arguments.InputDirs = append(inputPath, dependencies...)
 
 		arguments.CustomArgs = clientgenargs.Args{
 			GroupVersions:           groupVersions,
 			GroupVersionToInputPath: gvToPath,
 			ClientsetName:           *clientsetName,
+			ClientsetAPIPath:        *clientsetAPIPath,
 			ClientsetOutputPath:     *clientsetPath,
 			ClientsetOnly:           *clientsetOnly,
 			FakeClient:              *fakeClient,
@@ -188,7 +191,7 @@ func main() {
 			IncludedTypesOverrides:  includedTypesOverrides,
 		}
 
-		glog.Infof("==arguments: %v\n", arguments)
+		glog.V(3).Infof("==arguments: %v\n", arguments)
 	}
 
 	if err := arguments.Execute(
