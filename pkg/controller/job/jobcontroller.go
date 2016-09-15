@@ -40,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/util/workqueue"
 	"k8s.io/kubernetes/pkg/watch"
+	"fmt"
 )
 
 type JobController struct {
@@ -72,7 +73,7 @@ type JobController struct {
 	podStore cache.StoreToPodLister
 
 	// Jobs that need to be updated
-	queue *workqueue.Type
+	queue workqueue.RateLimitingInterface
 
 	recorder record.EventRecorder
 }
@@ -94,7 +95,7 @@ func NewJobController(podInformer framework.SharedIndexInformer, kubeClient clie
 			Recorder:   eventBroadcaster.NewRecorder(api.EventSource{Component: "job-controller"}),
 		},
 		expectations: controller.NewControllerExpectations(),
-		queue:        workqueue.NewNamed("job"),
+		queue:        workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "job"),
 		recorder:     eventBroadcaster.NewRecorder(api.EventSource{Component: "job-controller"}),
 	}
 
@@ -145,6 +146,12 @@ func NewJobControllerFromClient(kubeClient clientset.Interface, resyncPeriod con
 // Run the main goroutine responsible for watching and syncing jobs.
 func (jm *JobController) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
+	defer jm.queue.ShutDown()
+
+	if !framework.WaitForCacheSync(stopCh, jm.podStoreSynced) {
+		return
+	}
+
 	go jm.jobController.Run(stopCh)
 	for i := 0; i < workers; i++ {
 		go wait.Until(jm.worker, time.Second, stopCh)
@@ -156,7 +163,6 @@ func (jm *JobController) Run(workers int, stopCh <-chan struct{}) {
 
 	<-stopCh
 	glog.Infof("Shutting down Job Manager")
-	jm.queue.ShutDown()
 }
 
 // getPodJob returns the job managing the given pod.
@@ -167,7 +173,7 @@ func (jm *JobController) getPodJob(pod *api.Pod) *batch.Job {
 		return nil
 	}
 	if len(jobs) > 1 {
-		glog.Errorf("user error! more than one job is selecting pods with labels: %+v", pod.Labels)
+		utilruntime.HandleError(fmt.Errorf("user error! more than one job is selecting pods with labels: %+v", pod.Labels))
 		sort.Sort(byCreationTimestamp(jobs))
 	}
 	return &jobs[0]
@@ -185,7 +191,7 @@ func (jm *JobController) addPod(obj interface{}) {
 	if job := jm.getPodJob(pod); job != nil {
 		jobKey, err := controller.KeyFunc(job)
 		if err != nil {
-			glog.Errorf("Couldn't get key for job %#v: %v", job, err)
+			utilruntime.HandleError(fmt.Errorf("Couldn't get key for job %#v: %v", job, err))
 			return
 		}
 		jm.expectations.CreationObserved(jobKey)
@@ -237,19 +243,19 @@ func (jm *JobController) deletePod(obj interface{}) {
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			glog.Errorf("Couldn't get object from tombstone %+v", obj)
+			utilruntime.HandleError(fmt.Errorf("Couldn't get object from tombstone %+v", obj))
 			return
 		}
 		pod, ok = tombstone.Obj.(*api.Pod)
 		if !ok {
-			glog.Errorf("Tombstone contained object that is not a pod %+v", obj)
+			utilruntime.HandleError(fmt.Errorf("Tombstone contained object that is not a pod %+v", obj))
 			return
 		}
 	}
 	if job := jm.getPodJob(pod); job != nil {
 		jobKey, err := controller.KeyFunc(job)
 		if err != nil {
-			glog.Errorf("Couldn't get key for job %#v: %v", job, err)
+			utilruntime.HandleError(fmt.Errorf("Couldn't get key for job %#v: %v", job, err))
 			return
 		}
 		jm.expectations.DeletionObserved(jobKey)
@@ -261,7 +267,7 @@ func (jm *JobController) deletePod(obj interface{}) {
 func (jm *JobController) enqueueController(obj interface{}) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
-		glog.Errorf("Couldn't get key for object %+v: %v", obj, err)
+		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", obj, err))
 		return
 	}
 
@@ -271,25 +277,33 @@ func (jm *JobController) enqueueController(obj interface{}) {
 	// all controllers there will still be some replica instability. One way to handle this is
 	// by querying the store for all controllers that this rc overlaps, as well as all
 	// controllers that overlap this rc, and sorting them.
-	jm.queue.Add(key)
+	jm.queue.AddRateLimited(key)
 }
 
 // worker runs a worker thread that just dequeues items, processes them, and marks them done.
 // It enforces that the syncHandler is never invoked concurrently with the same key.
 func (jm *JobController) worker() {
-	for {
-		func() {
-			key, quit := jm.queue.Get()
-			if quit {
-				return
-			}
-			defer jm.queue.Done(key)
-			err := jm.syncHandler(key.(string))
-			if err != nil {
-				glog.Errorf("Error syncing job: %v", err)
-			}
-		}()
+	for jm.processNextWorkItem() {
 	}
+}
+
+func (jm *JobController) processNextWorkItem() bool {
+	jKey, quit := jm.queue.Get()
+	if quit {
+		return false
+	}
+	defer jm.queue.Done()
+
+	err := jm.syncHandler(jKey.(string))
+	if err == nil {
+		jm.queue.Forget(jKey)
+		return true
+	}
+
+	utilruntime.HandleError(fmt.Errorf("Error syncing job: %v", err))
+	jm.queue.AddRateLimited(jKey)
+
+	return true
 }
 
 // syncJob will sync the job with the given key if it has had its expectations fulfilled, meaning
@@ -301,14 +315,6 @@ func (jm *JobController) syncJob(key string) error {
 		glog.V(4).Infof("Finished syncing job %q (%v)", key, time.Now().Sub(startTime))
 	}()
 
-	if !jm.podStoreSynced() {
-		// Sleep so we give the pod reflector goroutine a chance to run.
-		time.Sleep(replicationcontroller.PodStoreSyncedPollPeriod)
-		glog.V(4).Infof("Waiting for pods controller to sync, requeuing job %v", key)
-		jm.queue.Add(key)
-		return nil
-	}
-
 	obj, exists, err := jm.jobStore.Store.GetByKey(key)
 	if !exists {
 		glog.V(4).Infof("Job has been deleted: %v", key)
@@ -316,8 +322,7 @@ func (jm *JobController) syncJob(key string) error {
 		return nil
 	}
 	if err != nil {
-		glog.Errorf("Unable to retrieve job %v from store: %v", key, err)
-		jm.queue.Add(key)
+		utilruntime.HandleError(fmt.Errorf("Unable to retrieve job %v from store: %v", key, err))
 		return err
 	}
 	job := *obj.(*batch.Job)
@@ -327,15 +332,15 @@ func (jm *JobController) syncJob(key string) error {
 	// the store after we've checked the expectation, the job sync is just deferred till the next relist.
 	jobKey, err := controller.KeyFunc(&job)
 	if err != nil {
-		glog.Errorf("Couldn't get key for job %#v: %v", job, err)
-		return err
+		utilruntime.HandleError(fmt.Errorf("Couldn't get key for job %#v: %v", job, err))
+		// We explicitly return nil to avoid re-enqueue the bad key
+		return nil
 	}
 	jobNeedsSync := jm.expectations.SatisfiedExpectations(jobKey)
 	selector, _ := unversioned.LabelSelectorAsSelector(job.Spec.Selector)
 	pods, err := jm.podStore.Pods(job.Namespace).List(selector)
 	if err != nil {
-		glog.Errorf("Error getting pods for job %q: %v", key, err)
-		jm.queue.Add(key)
+		utilruntime.HandleError(fmt.Errorf("Error getting pods for job %q: %v", key, err))
 		return err
 	}
 
@@ -419,7 +424,7 @@ func (jm *JobController) syncJob(key string) error {
 		job.Status.Failed = failed
 
 		if err := jm.updateHandler(&job); err != nil {
-			glog.Errorf("Failed to update job %v, requeuing.  Error: %v", job.Name, err)
+			utilruntime.HandleError(fmt.Errorf("Failed to update job %v, requeuing.  Error: %v", job.Name, err))
 			jm.enqueueController(&job)
 		}
 	}
@@ -465,7 +470,7 @@ func (jm *JobController) manageJob(activePods []*api.Pod, succeeded int32, job *
 	parallelism := *job.Spec.Parallelism
 	jobKey, err := controller.KeyFunc(job)
 	if err != nil {
-		glog.Errorf("Couldn't get key for job %#v: %v", job, err)
+		utilruntime.HandleError(fmt.Errorf("Couldn't get key for job %#v: %v", job, err))
 		return 0
 	}
 
@@ -517,7 +522,7 @@ func (jm *JobController) manageJob(activePods []*api.Pod, succeeded int32, job *
 		}
 		diff := wantActive - active
 		if diff < 0 {
-			glog.Errorf("More active than wanted: job %q, want %d, have %d", jobKey, wantActive, active)
+			utilruntime.HandleError(fmt.Errorf("More active than wanted: job %q, want %d, have %d", jobKey, wantActive, active))
 			diff = 0
 		}
 		jm.expectations.ExpectCreations(jobKey, int(diff))
