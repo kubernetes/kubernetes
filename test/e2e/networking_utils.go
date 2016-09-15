@@ -53,7 +53,7 @@ const (
 	// because we verify iptables statistical rr loadbalancing.
 	testTries = 30
 	// Maximum number of pods in a test, to make test work in large clusters.
-	maxNetProxyPodsCount = 100
+	maxNetProxyPodsCount = 20
 )
 
 // NewNetworkingTestConfig creates and sets up a new test config helper.
