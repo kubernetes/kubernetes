@@ -1126,7 +1126,7 @@ func createClients(ns *api.Namespace, t *testing.T, s *httptest.Server, syncPeri
 	cloud := &fake_cloud.FakeCloud{}
 
 	syncPeriod = getSyncPeriod(syncPeriod)
-	ctrl := persistentvolumecontroller.NewPersistentVolumeControllerFromClient(
+	ctrl := persistentvolumecontroller.NewPersistentVolumeController(
 		binderClient,
 		syncPeriod,
 		nil, // alpha provisioner
