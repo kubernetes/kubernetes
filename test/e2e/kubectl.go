@@ -834,6 +834,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 				for key, val := range pod.Annotations {
 					if key == "x" && val == "y" {
 						found = true
+						break
 					}
 				}
 				if !found {
