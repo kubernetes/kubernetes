@@ -97,48 +97,8 @@ func (m OutputVersionMapper) RESTMapping(gk unversioned.GroupKind, versions ...s
 	return m.RESTMapper.RESTMapping(gk, versions...)
 }
 
-// ShortcutExpander is a RESTMapper that can be used for Kubernetes
-// resources.  It expands the resource first, then invokes the wrapped RESTMapper
-type ShortcutExpander struct {
-	RESTMapper meta.RESTMapper
-}
-
-var _ meta.RESTMapper = &ShortcutExpander{}
-
-func (e ShortcutExpander) KindFor(resource unversioned.GroupVersionResource) (unversioned.GroupVersionKind, error) {
-	return e.RESTMapper.KindFor(expandResourceShortcut(resource))
-}
-
-func (e ShortcutExpander) KindsFor(resource unversioned.GroupVersionResource) ([]unversioned.GroupVersionKind, error) {
-	return e.RESTMapper.KindsFor(expandResourceShortcut(resource))
-}
-
-func (e ShortcutExpander) ResourcesFor(resource unversioned.GroupVersionResource) ([]unversioned.GroupVersionResource, error) {
-	return e.RESTMapper.ResourcesFor(expandResourceShortcut(resource))
-}
-
-func (e ShortcutExpander) ResourceFor(resource unversioned.GroupVersionResource) (unversioned.GroupVersionResource, error) {
-	return e.RESTMapper.ResourceFor(expandResourceShortcut(resource))
-}
-
-func (e ShortcutExpander) RESTMapping(gk unversioned.GroupKind, versions ...string) (*meta.RESTMapping, error) {
-	return e.RESTMapper.RESTMapping(gk, versions...)
-}
-
-func (e ShortcutExpander) RESTMappings(gk unversioned.GroupKind) ([]*meta.RESTMapping, error) {
-	return e.RESTMapper.RESTMappings(gk)
-}
-
-func (e ShortcutExpander) ResourceSingularizer(resource string) (string, error) {
-	return e.RESTMapper.ResourceSingularizer(expandResourceShortcut(unversioned.GroupVersionResource{Resource: resource}).Resource)
-}
-
-func (e ShortcutExpander) AliasesForResource(resource string) ([]string, bool) {
-	return e.RESTMapper.AliasesForResource(expandResourceShortcut(unversioned.GroupVersionResource{Resource: resource}).Resource)
-}
-
-// shortForms is the list of short names to their expanded names
-var shortForms = map[string]string{
+// ShortForms is the list of short names to their expanded names
+var ShortForms = map[string]string{
 	// Please keep this alphabetized
 	// If you add an entry here, please also take a look at pkg/kubectl/cmd/cmd.go
 	// and add an entry to valid_resources when appropriate.
@@ -165,28 +125,18 @@ var shortForms = map[string]string{
 	"svc":    "services",
 }
 
-// Look-up for resource short forms by value
+// ResourceShortFormFor looks up for a short form of resource names.
 func ResourceShortFormFor(resource string) (string, bool) {
 	var alias string
 	exists := false
-	for k, val := range shortForms {
+	for k, val := range ShortForms {
 		if val == resource {
 			alias = k
 			exists = true
+			break
 		}
 	}
 	return alias, exists
-}
-
-// expandResourceShortcut will return the expanded version of resource
-// (something that a pkg/api/meta.RESTMapper can understand), if it is
-// indeed a shortcut. Otherwise, will return resource unmodified.
-func expandResourceShortcut(resource unversioned.GroupVersionResource) unversioned.GroupVersionResource {
-	if expanded, ok := shortForms[resource.Resource]; ok {
-		// don't change the group or version that's already been specified
-		resource.Resource = expanded
-	}
-	return resource
 }
 
 // ResourceAliases returns the resource shortcuts and plural forms for the given resources.
@@ -210,7 +160,7 @@ func ResourceAliases(rs []string) []string {
 		plurals[plural] = struct{}{}
 	}
 
-	for sf, r := range shortForms {
+	for sf, r := range ShortForms {
 		if _, found := plurals[r]; found {
 			as = append(as, sf)
 		}

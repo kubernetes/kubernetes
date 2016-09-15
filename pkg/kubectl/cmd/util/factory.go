@@ -326,7 +326,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			}
 
 			// wrap with shortcuts
-			mapper = kubectl.ShortcutExpander{RESTMapper: mapper}
+			mapper = NewShortcutExpander(mapper)
 			// wrap with output preferences
 			mapper = kubectl.OutputVersionMapper{RESTMapper: mapper, OutputVersions: []unversioned.GroupVersion{cmdApiVersion}}
 			return mapper, api.Scheme
@@ -363,7 +363,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 
 			typer := discovery.NewUnstructuredObjectTyper(groupResources)
 
-			return kubectl.ShortcutExpander{RESTMapper: mapper}, typer, nil
+			return NewShortcutExpander(mapper), typer, nil
 		},
 		RESTClient: func() (*restclient.RESTClient, error) {
 			clientConfig, err := clients.ClientConfigForVersion(nil)
