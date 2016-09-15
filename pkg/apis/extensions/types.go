@@ -385,6 +385,9 @@ type DaemonSetStatus struct {
 	// DesiredNumberScheduled is the total number of nodes that should be running the daemon
 	// pod (including nodes correctly running the daemon pod).
 	DesiredNumberScheduled int32 `json:"desiredNumberScheduled"`
+
+	// The number of ready pods for this daemon set.
+	ReadyScheduled int32 `json:"readyScheduled"`
 }
 
 // +genclient=true

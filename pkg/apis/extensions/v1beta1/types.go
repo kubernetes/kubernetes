@@ -459,6 +459,9 @@ type DaemonSetStatus struct {
 	// pod (including nodes correctly running the daemon pod).
 	// More info: http://releases.k8s.io/HEAD/docs/admin/daemons.md
 	DesiredNumberScheduled int32 `json:"desiredNumberScheduled" protobuf:"varint,3,opt,name=desiredNumberScheduled"`
+
+	// The number of ready pods for this daemon set.
+	ReadyScheduled int32 `json:"readyScheduled" protobuf:"varint,4,opt,name=readyScheduled"`
 }
 
 // +genclient=true
