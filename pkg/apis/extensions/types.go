@@ -208,9 +208,18 @@ type DeploymentSpec struct {
 	// deployment controller.
 	// +optional
 	Paused bool `json:"paused,omitempty"`
+
 	// The config this deployment is rolling back to. Will be cleared after rollback is done.
 	// +optional
 	RollbackTo *RollbackConfig `json:"rollbackTo,omitempty"`
+
+	// The maximum time in seconds for a deployment to make progress before it
+	// is considered to be failed. Failed deployments are not retried by the
+	// deployment controller and require user action. Failure causes are surfaced
+	// in the deployment status as Conditions. This is not set by default.
+	// Note that progress will not be estimated during the time a deployment is
+	// paused.
+	ProgressDeadlineSeconds *int32 `json:"progressDeadlineSeconds,omitempty"`
 }
 
 // DeploymentRollback stores the information required to rollback a deployment.
@@ -311,6 +320,42 @@ type DeploymentStatus struct {
 	// Total number of unavailable pods targeted by this deployment.
 	// +optional
 	UnavailableReplicas int32 `json:"unavailableReplicas,omitempty"`
+
+	// Represents the latest available observations of a deployment's current state.
+	Conditions []DeploymentCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
+}
+
+type DeploymentConditionType string
+
+// These are valid conditions of a deployment.
+const (
+	// DeploymentAvailable means the deployment is available, ie. at least the minimum available
+	// replicas required are up and running for at least minReadySeconds.
+	DeploymentAvailable DeploymentConditionType = "Available"
+	// DeploymentProgressing means the deployment is progressing. Progress for a deployment is
+	// considered when a new replica set is created or adopted, and when new pods scale up or
+	// old pods scale down. Progress is not estimated for paused deployments, when the deployment
+	// needs to rollback, or when progressDeadlineSeconds is not specified.
+	DeploymentProgressing DeploymentConditionType = "Progressing"
+	// DeploymentReplicaFailure is added in a deployment when one of its pods
+	// fails to be created or deleted.
+	DeploymentReplicaFailure DeploymentConditionType = "ReplicaFailure"
+)
+
+// DeploymentCondition describes the state of a deployment at a certain point.
+type DeploymentCondition struct {
+	// Type of deployment condition.
+	Type DeploymentConditionType `json:"type"`
+	// Status of the condition, one of True, False, Unknown.
+	Status api.ConditionStatus `json:"status"`
+	// The last time this condition was updated.
+	LastUpdateTime unversioned.Time `json:"lastUpdateTime,omitempty"`
+	// Last time the condition transitioned from one status to another.
+	LastTransitionTime unversioned.Time `json:"lastTransitionTime,omitempty"`
+	// The reason for the condition's last transition.
+	Reason string `json:"reason,omitempty"`
+	// A human readable message indicating details about the transition.
+	Message string `json:"message,omitempty"`
 }
 
 type DeploymentList struct {
