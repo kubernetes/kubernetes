@@ -53,17 +53,12 @@ var userResources = []string{"rc", "svc", "pods", "pvc"}
 
 // AliasesForResource returns whether a resource has an alias or not
 func (e ShortcutExpander) AliasesForResource(resource string) ([]string, bool) {
-	aliases := map[string][]string{
-		"all": userResources,
-	}
-	if len(e.All) != 0 {
-		aliases["all"] = e.All
+	if resource == "all" {
+		return e.All, true
 	}
 
-	if res, ok := aliases[resource]; ok {
-		return res, true
-	}
-	return e.RESTMapper.AliasesForResource(expandResourceShortcut(unversioned.GroupVersionResource{Resource: resource}).Resource)
+	_, isAlias := kubectl.ShortForms[resource]
+	return []string{expandResourceShortcut(unversioned.GroupVersionResource{Resource: resource}).Resource}, isAlias
 }
 
 // expandResourceShortcut will return the expanded version of resource
