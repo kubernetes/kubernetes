@@ -19,7 +19,6 @@ package cmd
 import (
 	"fmt"
 	"io"
-	"os"
 
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
@@ -126,7 +125,7 @@ func NewCmdGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Comma
 
 // RunGet implements the generic Get command
 // TODO: convert all direct flag accessors to a struct and pass that instead of cmd
-func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Command, args []string, options *GetOptions) error {
+func RunGet(f *cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args []string, options *GetOptions) error {
 	if len(options.Raw) > 0 {
 		restClient, err := f.RESTClient()
 		if err != nil {
@@ -330,7 +329,7 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 
 		// output empty list warning when no resources to display
 		if len(infos) == 0 {
-			fmt.Fprintf(os.Stderr, "%s\n", "There are no resources to display.")
+			fmt.Fprintf(errOut, "%s %q %s\n", "No resources found in namespace", cmdNamespace, "that match your criteria.")
 		}
 		return utilerrors.NewAggregate(allErrs)
 	}
@@ -443,7 +442,7 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 
 	// output empty list warning when no resources to display
 	if len(objs) == 0 {
-		fmt.Fprintf(os.Stderr, "%s\n", "There are no resources to display.")
+		fmt.Fprintf(errOut, "%s %q %s\n", "No resources found in namespace", cmdNamespace, "that match your criteria.")
 	}
 	return utilerrors.NewAggregate(allErrs)
 }
