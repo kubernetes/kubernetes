@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/leaderelection"
+	"k8s.io/kubernetes/pkg/client/leaderelection/resourcelock"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
@@ -145,14 +146,21 @@ func Run(s *options.SchedulerServer) error {
 		return err
 	}
 
-	leaderelection.RunOrDie(leaderelection.LeaderElectionConfig{
+	// TODO: enable other lock types
+	rl := resourcelock.EndpointsLock{
 		EndpointsMeta: api.ObjectMeta{
 			Namespace: "kube-system",
 			Name:      "kube-scheduler",
 		},
-		Client:        leaderElectionClient,
-		Identity:      id,
-		EventRecorder: config.Recorder,
+		Client: leaderElectionClient,
+		LockConfig: resourcelock.ResourceLockConfig{
+			Identity:      id,
+			EventRecorder: config.Recorder,
+		},
+	}
+
+	leaderelection.RunOrDie(leaderelection.LeaderElectionConfig{
+		Lock:          &rl,
 		LeaseDuration: s.LeaderElection.LeaseDuration.Duration,
 		RenewDeadline: s.LeaderElection.RenewDeadline.Duration,
 		RetryPeriod:   s.LeaderElection.RetryPeriod.Duration,
