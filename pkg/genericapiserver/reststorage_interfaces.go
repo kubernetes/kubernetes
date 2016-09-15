@@ -14,6 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package certificates provides Registry interface and its RESTStorage
-// implementation for storing ClusterRoleBinding objects.
-package clusterrolebinding // import "k8s.io/kubernetes/pkg/registry/clusterrolebinding"
+package genericapiserver
+
+import (
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/registry/generic"
+)
+
+type RESTOptionsGetter func(resource unversioned.GroupResource) generic.RESTOptions
+
+type RESTStorageProvider interface {
+	NewRESTStorage(apiResourceConfigSource APIResourceConfigSource, restOptionsGetter RESTOptionsGetter) (APIGroupInfo, bool)
+}

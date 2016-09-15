@@ -22,10 +22,10 @@ import (
 	"k8s.io/kubernetes/pkg/apis/rbac/validation"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/auth/user"
-	"k8s.io/kubernetes/pkg/registry/clusterrole"
-	"k8s.io/kubernetes/pkg/registry/clusterrolebinding"
-	"k8s.io/kubernetes/pkg/registry/role"
-	"k8s.io/kubernetes/pkg/registry/rolebinding"
+	"k8s.io/kubernetes/pkg/registry/rbac/clusterrole"
+	"k8s.io/kubernetes/pkg/registry/rbac/clusterrolebinding"
+	"k8s.io/kubernetes/pkg/registry/rbac/role"
+	"k8s.io/kubernetes/pkg/registry/rbac/rolebinding"
 )
 
 type RequestToRuleMapper interface {

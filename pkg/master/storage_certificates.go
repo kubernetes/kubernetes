@@ -26,9 +26,9 @@ import (
 
 type CertificatesRESTStorageProvider struct{}
 
-var _ RESTStorageProvider = &CertificatesRESTStorageProvider{}
+var _ genericapiserver.RESTStorageProvider = &CertificatesRESTStorageProvider{}
 
-func (p CertificatesRESTStorageProvider) NewRESTStorage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool) {
+func (p CertificatesRESTStorageProvider) NewRESTStorage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter genericapiserver.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool) {
 	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(certificates.GroupName)
 
 	if apiResourceConfigSource.AnyResourcesForVersionEnabled(certificatesapiv1alpha1.SchemeGroupVersion) {
@@ -39,7 +39,7 @@ func (p CertificatesRESTStorageProvider) NewRESTStorage(apiResourceConfigSource 
 	return apiGroupInfo, true
 }
 
-func (p CertificatesRESTStorageProvider) v1alpha1Storage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter RESTOptionsGetter) map[string]rest.Storage {
+func (p CertificatesRESTStorageProvider) v1alpha1Storage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter genericapiserver.RESTOptionsGetter) map[string]rest.Storage {
 	version := certificatesapiv1alpha1.SchemeGroupVersion
 
 	storage := map[string]rest.Storage{}

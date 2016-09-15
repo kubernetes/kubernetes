@@ -26,9 +26,9 @@ import (
 
 type AppsRESTStorageProvider struct{}
 
-var _ RESTStorageProvider = &AppsRESTStorageProvider{}
+var _ genericapiserver.RESTStorageProvider = &AppsRESTStorageProvider{}
 
-func (p AppsRESTStorageProvider) NewRESTStorage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool) {
+func (p AppsRESTStorageProvider) NewRESTStorage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter genericapiserver.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool) {
 	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(apps.GroupName)
 
 	if apiResourceConfigSource.AnyResourcesForVersionEnabled(appsapiv1alpha1.SchemeGroupVersion) {
@@ -39,7 +39,7 @@ func (p AppsRESTStorageProvider) NewRESTStorage(apiResourceConfigSource generica
 	return apiGroupInfo, true
 }
 
-func (p AppsRESTStorageProvider) v1alpha1Storage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter RESTOptionsGetter) map[string]rest.Storage {
+func (p AppsRESTStorageProvider) v1alpha1Storage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter genericapiserver.RESTOptionsGetter) map[string]rest.Storage {
 	version := appsapiv1alpha1.SchemeGroupVersion
 
 	storage := map[string]rest.Storage{}
