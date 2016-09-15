@@ -37,6 +37,8 @@ func (ds *dockerService) ListContainers(filter *runtimeApi.ContainerFilter) ([]*
 
 	opts.Filter = dockerfilters.NewArgs()
 	f := newDockerFilter(&opts.Filter)
+	// Add filter to get *only* (non-sandbox) containers.
+	f.AddLabel(containerTypeLabelKey, containerTypeLabelContainer)
 
 	if filter != nil {
 		if filter.Id != nil {
@@ -54,8 +56,6 @@ func (ds *dockerService) ListContainers(filter *runtimeApi.ContainerFilter) ([]*
 				f.AddLabel(k, v)
 			}
 		}
-		// Filter out sandbox containers.
-		f.AddLabel(containerTypeLabelKey, containerTypeLabelContainer)
 	}
 	containers, err := ds.client.ListContainers(opts)
 	if err != nil {
