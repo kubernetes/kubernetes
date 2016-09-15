@@ -55,7 +55,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 					RestartPolicy: api.RestartPolicyNever,
 					Containers: []api.Container{
 						{
-							Image:   ImageRegistry[busyBoxImage],
+							Image:   "gcr.io/google_containers/busybox:1.24",
 							Name:    podName,
 							Command: []string{"sh", "-c", "echo 'Hello World' ; sleep 240"},
 						},
@@ -89,7 +89,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 					RestartPolicy: api.RestartPolicyNever,
 					Containers: []api.Container{
 						{
-							Image:   ImageRegistry[busyBoxImage],
+							Image:   "gcr.io/google_containers/busybox:1.24",
 							Name:    podName,
 							Command: []string{"/bin/false"},
 						},
@@ -136,7 +136,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 					RestartPolicy: api.RestartPolicyNever,
 					Containers: []api.Container{
 						{
-							Image:   ImageRegistry[busyBoxImage],
+							Image:   "gcr.io/google_containers/busybox:1.24",
 							Name:    podName,
 							Command: []string{"sh", "-c", "echo test > /file; sleep 240"},
 							SecurityContext: &api.SecurityContext{
@@ -221,7 +221,7 @@ func createSummaryTestPods(podClient *framework.PodClient, podNamePrefix string,
 				RestartPolicy: api.RestartPolicyNever,
 				Containers: []api.Container{
 					{
-						Image:   ImageRegistry[busyBoxImage],
+						Image:   "gcr.io/google_containers/busybox:1.24",
 						Command: []string{"sh", "-c", "while true; do echo 'hello world' | tee /test-empty-dir-mnt/file ; sleep 1; done"},
 						Name:    podName + containerSuffix,
 						VolumeMounts: []api.VolumeMount{
