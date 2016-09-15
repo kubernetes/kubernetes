@@ -59,10 +59,6 @@ type CertificateController struct {
 	signer *local.Signer
 
 	queue workqueue.RateLimitingInterface
-
-	// csrStoreSynced returns true if the csr store has been synced at least once.
-	// Added as a member to the struct to allow injection for testing.
-	csrStoreSynced framework.InformerSynced
 }
 
 func NewCertificateController(kubeClient clientset.Interface, syncPeriod time.Duration, caCertFile, caKeyFile string, approveAllKubeletCSRsForGroup string) (*CertificateController, error) {
