@@ -116,7 +116,7 @@ var _ = framework.KubeDescribe("MemoryEviction [Slow] [Serial] [Disruptive]", fu
 						RestartPolicy: api.RestartPolicyNever,
 						Containers: []api.Container{
 							{
-								Image: ImageRegistry[pauseImage],
+								Image: framework.GetPauseImageNameForHostArch(),
 								Name:  podName,
 							},
 						},

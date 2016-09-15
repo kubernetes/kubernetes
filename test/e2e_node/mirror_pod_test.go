@@ -44,7 +44,8 @@ var _ = framework.KubeDescribe("MirrorPod", func() {
 			mirrorPodName = staticPodName + "-" + framework.TestContext.NodeName
 
 			By("create the static pod")
-			err := createStaticPod(framework.TestContext.ManifestPath, staticPodName, ns, ImageRegistry[nginxImage], api.RestartPolicyAlways)
+			err := createStaticPod(framework.TestContext.ManifestPath, staticPodName, ns,
+				"gcr.io/google_containers/nginx-slim:0.7", api.RestartPolicyAlways)
 			Expect(err).ShouldNot(HaveOccurred())
 
 			By("wait for the mirror pod to be running")
@@ -59,7 +60,7 @@ var _ = framework.KubeDescribe("MirrorPod", func() {
 			uid := pod.UID
 
 			By("update the static pod container image")
-			image := ImageRegistry[pauseImage]
+			image := framework.GetPauseImageNameForHostArch()
 			err = createStaticPod(framework.TestContext.ManifestPath, staticPodName, ns, image, api.RestartPolicyAlways)
 			Expect(err).ShouldNot(HaveOccurred())
 
