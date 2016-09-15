@@ -289,7 +289,7 @@ func (s *CMServer) Run(_ []string) error {
 	if err != nil {
 		glog.Fatalf("An backward-compatible provisioner could not be created: %v, but one was expected. Provisioning will not work. This functionality is considered an early Alpha version.", err)
 	}
-	volumeController := persistentvolumecontroller.NewPersistentVolumeControllerFromClient(
+	volumeController := persistentvolumecontroller.NewPersistentVolumeController(
 		clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "persistent-volume-binder")),
 		s.PVClaimBinderSyncPeriod.Duration,
 		alphaProvisioner,
