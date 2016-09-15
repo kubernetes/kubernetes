@@ -159,21 +159,24 @@ func findMyself(client *clientset.Clientset) (*api.Node, error) {
 	return node, nil
 }
 
-func attemptToUpdateMasterRoleLabelsAndTaints(client *clientset.Clientset) error {
+func attemptToUpdateMasterRoleLabelsAndTaints(client *clientset.Clientset, schedulable bool) error {
 	n, err := findMyself(client)
 	if err != nil {
 		return err
 	}
 
 	n.ObjectMeta.Labels["kubeadm.alpha.kubernetes.io/role"] = "master"
-	taintsAnnotation, _ := json.Marshal([]api.Taint{{Key: "dedicated", Value: "master", Effect: "NoSchedule"}})
-	n.ObjectMeta.Annotations[api.TaintsAnnotationKey] = string(taintsAnnotation)
+
+	if !schedulable {
+		taintsAnnotation, _ := json.Marshal([]api.Taint{{Key: "dedicated", Value: "master", Effect: "NoSchedule"}})
+		n.ObjectMeta.Annotations[api.TaintsAnnotationKey] = string(taintsAnnotation)
+	}
 
 	if _, err := client.Nodes().Update(n); err != nil {
 		if apierrs.IsConflict(err) {
 			fmt.Println("<master/apiclient> temporarily unable to update master node metadata due to conflict (will retry)")
 			time.Sleep(500 * time.Millisecond)
-			attemptToUpdateMasterRoleLabelsAndTaints(client)
+			attemptToUpdateMasterRoleLabelsAndTaints(client, schedulable)
 		} else {
 			return err
 		}
@@ -182,8 +185,8 @@ func attemptToUpdateMasterRoleLabelsAndTaints(client *clientset.Clientset) error
 	return nil
 }
 
-func UpdateMasterRoleLabelsAndTaints(client *clientset.Clientset) error {
-	err := attemptToUpdateMasterRoleLabelsAndTaints(client)
+func UpdateMasterRoleLabelsAndTaints(client *clientset.Clientset, schedulable bool) error {
+	err := attemptToUpdateMasterRoleLabelsAndTaints(client, schedulable)
 	if err != nil {
 		return fmt.Errorf("<master/apiclient> failed to update master node - %s", err)
 	}
