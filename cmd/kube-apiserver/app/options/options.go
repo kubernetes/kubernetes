@@ -24,7 +24,6 @@ import (
 	genericoptions "k8s.io/kubernetes/pkg/genericapiserver/options"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master/ports"
-	"k8s.io/kubernetes/pkg/registry/generic/registry"
 
 	"github.com/spf13/pflag"
 )
@@ -123,8 +122,4 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 		"If true, server will do its best to fix the update request to pass the validation, "+
 		"e.g., setting empty UID in update request to its existing value. This flag can be turned off "+
 		"after we fix all the clients that send malformed updates.")
-
-	fs.BoolVar(&registry.EnableGarbageCollector, "enable-garbage-collector", true, ""+
-		"Enables the generic garbage collector. MUST be synced with the corresponding flag "+
-		"of the kube-controller-manager.")
 }

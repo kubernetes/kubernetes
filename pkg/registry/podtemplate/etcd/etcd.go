@@ -59,6 +59,7 @@ func NewREST(opts generic.RESTOptions) *REST {
 		},
 		PredicateFunc:           podtemplate.MatchPodTemplate,
 		QualifiedResource:       api.Resource("podtemplates"),
+		EnableGarbageCollection: opts.EnableGarbageCollection,
 		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
 
 		CreateStrategy: podtemplate.Strategy,

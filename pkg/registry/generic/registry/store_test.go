@@ -618,9 +618,7 @@ func TestStoreDelete(t *testing.T) {
 }
 
 func TestGracefulStoreHandleFinalizers(t *testing.T) {
-	EnableGarbageCollector = true
 	initialGeneration := int64(1)
-	defer func() { EnableGarbageCollector = false }()
 	podWithFinalizer := &api.Pod{
 		ObjectMeta: api.ObjectMeta{Name: "foo", Finalizers: []string{"foo.com/x"}, Generation: initialGeneration},
 		Spec:       api.PodSpec{NodeName: "machine"},
@@ -628,6 +626,7 @@ func TestGracefulStoreHandleFinalizers(t *testing.T) {
 
 	testContext := api.WithNamespace(api.NewContext(), "test")
 	destroyFunc, registry := NewTestGenericStoreRegistry(t)
+	registry.EnableGarbageCollection = true
 	defaultDeleteStrategy := testRESTStrategy{api.Scheme, api.SimpleNameGenerator, true, false, true}
 	registry.DeleteStrategy = testGracefulStrategy{defaultDeleteStrategy}
 	defer destroyFunc()
@@ -678,9 +677,7 @@ func TestGracefulStoreHandleFinalizers(t *testing.T) {
 }
 
 func TestNonGracefulStoreHandleFinalizers(t *testing.T) {
-	EnableGarbageCollector = true
 	initialGeneration := int64(1)
-	defer func() { EnableGarbageCollector = false }()
 	podWithFinalizer := &api.Pod{
 		ObjectMeta: api.ObjectMeta{Name: "foo", Finalizers: []string{"foo.com/x"}, Generation: initialGeneration},
 		Spec:       api.PodSpec{NodeName: "machine"},
@@ -688,6 +685,7 @@ func TestNonGracefulStoreHandleFinalizers(t *testing.T) {
 
 	testContext := api.WithNamespace(api.NewContext(), "test")
 	destroyFunc, registry := NewTestGenericStoreRegistry(t)
+	registry.EnableGarbageCollection = true
 	defer destroyFunc()
 	// create pod
 	_, err := registry.Create(testContext, podWithFinalizer)
@@ -755,9 +753,7 @@ func TestNonGracefulStoreHandleFinalizers(t *testing.T) {
 }
 
 func TestStoreDeleteWithOrphanDependents(t *testing.T) {
-	EnableGarbageCollector = true
 	initialGeneration := int64(1)
-	defer func() { EnableGarbageCollector = false }()
 	podWithOrphanFinalizer := func(name string) *api.Pod {
 		return &api.Pod{
 			ObjectMeta: api.ObjectMeta{Name: name, Finalizers: []string{"foo.com/x", api.FinalizerOrphan, "bar.com/y"}, Generation: initialGeneration},
@@ -984,6 +980,7 @@ func TestStoreDeleteWithOrphanDependents(t *testing.T) {
 
 	testContext := api.WithNamespace(api.NewContext(), "test")
 	destroyFunc, registry := NewTestGenericStoreRegistry(t)
+	registry.EnableGarbageCollection = true
 	defer destroyFunc()
 
 	for _, tc := range testcases {

@@ -61,6 +61,7 @@ func NewREST(opts generic.RESTOptions) *REST {
 		},
 		PredicateFunc:           podsecuritypolicy.MatchPodSecurityPolicy,
 		QualifiedResource:       extensions.Resource("podsecuritypolicies"),
+		EnableGarbageCollection: opts.EnableGarbageCollection,
 		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
 
 		CreateStrategy:      podsecuritypolicy.Strategy,

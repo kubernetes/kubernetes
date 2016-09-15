@@ -70,6 +70,7 @@ func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
 		// Used to match objects based on labels/fields for list and watch
 		PredicateFunc:           scheduledjob.MatchScheduledJob,
 		QualifiedResource:       batch.Resource("scheduledjobs"),
+		EnableGarbageCollection: opts.EnableGarbageCollection,
 		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
 
 		// Used to validate scheduled job creation

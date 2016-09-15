@@ -93,6 +93,7 @@ func NewREST(opts generic.RESTOptions) (*REST, *StatusREST, *RollbackREST) {
 		// Used to match objects based on labels/fields for list.
 		PredicateFunc:           deployment.MatchDeployment,
 		QualifiedResource:       extensions.Resource("deployments"),
+		EnableGarbageCollection: opts.EnableGarbageCollection,
 		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
 
 		// Used to validate deployment creation.

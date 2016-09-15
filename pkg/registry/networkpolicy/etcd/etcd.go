@@ -69,6 +69,7 @@ func NewREST(opts generic.RESTOptions) *REST {
 		// Used to match objects based on labels/fields for list and watch
 		PredicateFunc:           networkpolicy.MatchNetworkPolicy,
 		QualifiedResource:       extensionsapi.Resource("networkpolicies"),
+		EnableGarbageCollection: opts.EnableGarbageCollection,
 		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
 
 		// Used to validate controller creation
