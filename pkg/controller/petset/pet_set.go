@@ -29,7 +29,6 @@ import (
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/errors"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
@@ -63,12 +62,12 @@ type PetSetController struct {
 	// podStoreSynced returns true if the pod store has synced at least once.
 	podStoreSynced func() bool
 	// Watches changes to all pods.
-	podController framework.ControllerInterface
+	podController cache.ControllerInterface
 
 	// A store of PetSets, populated by the psController.
 	psStore cache.StoreToPetSetLister
 	// Watches changes to all PetSets.
-	psController *framework.Controller
+	psController *cache.Controller
 
 	// A store of the 1 unhealthy pet blocking progress for a given ps
 	blockingPetStore *unhealthyPetTracker
@@ -82,7 +81,7 @@ type PetSetController struct {
 }
 
 // NewPetSetController creates a new petset controller.
-func NewPetSetController(podInformer framework.SharedIndexInformer, kubeClient *client.Client, resyncPeriod time.Duration) *PetSetController {
+func NewPetSetController(podInformer cache.SharedIndexInformer, kubeClient *client.Client, resyncPeriod time.Duration) *PetSetController {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
 	eventBroadcaster.StartRecordingToSink(kubeClient.Events(""))
@@ -98,7 +97,7 @@ func NewPetSetController(podInformer framework.SharedIndexInformer, kubeClient *
 		queue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "petset"),
 	}
 
-	podInformer.AddEventHandler(framework.ResourceEventHandlerFuncs{
+	podInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		// lookup the petset and enqueue
 		AddFunc: psc.addPod,
 		// lookup current and old petset if labels changed
@@ -109,7 +108,7 @@ func NewPetSetController(podInformer framework.SharedIndexInformer, kubeClient *
 	psc.podStore.Indexer = podInformer.GetIndexer()
 	psc.podController = podInformer.GetController()
 
-	psc.psStore.Store, psc.psController = framework.NewInformer(
+	psc.psStore.Store, psc.psController = cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				return psc.kubeClient.Apps().PetSets(api.NamespaceAll).List(options)
@@ -120,7 +119,7 @@ func NewPetSetController(podInformer framework.SharedIndexInformer, kubeClient *
 		},
 		&apps.PetSet{},
 		petSetResyncPeriod,
-		framework.ResourceEventHandlerFuncs{
+		cache.ResourceEventHandlerFuncs{
 			AddFunc: psc.enqueuePetSet,
 			UpdateFunc: func(old, cur interface{}) {
 				oldPS := old.(*apps.PetSet)
