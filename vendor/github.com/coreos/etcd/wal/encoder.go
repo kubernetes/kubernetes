@@ -15,19 +15,24 @@
 package wal
 
 import (
-	"bufio"
 	"encoding/binary"
 	"hash"
 	"io"
 	"sync"
 
 	"github.com/coreos/etcd/pkg/crc"
+	"github.com/coreos/etcd/pkg/ioutil"
 	"github.com/coreos/etcd/wal/walpb"
 )
 
+// walPageBytes is the alignment for flushing records to the backing Writer.
+// It should be a multiple of the minimum sector size so that WAL repair can
+// safely between torn writes and ordinary data corruption.
+const walPageBytes = 8 * minSectorSize
+
 type encoder struct {
 	mu sync.Mutex
-	bw *bufio.Writer
+	bw *ioutil.PageWriter
 
 	crc       hash.Hash32
 	buf       []byte
@@ -36,7 +41,7 @@ type encoder struct {
 
 func newEncoder(w io.Writer, prevCrc uint32) *encoder {
 	return &encoder{
-		bw:  bufio.NewWriter(w),
+		bw:  ioutil.NewPageWriter(w, walPageBytes),
 		crc: crc.New(prevCrc, crcTable),
 		// 1MB buffer
 		buf:       make([]byte, 1024*1024),
