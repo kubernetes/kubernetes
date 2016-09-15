@@ -35,7 +35,7 @@ SKIP_MAINTAINERS = {
 
 def get_test_history(days_ago):
     url = time.strftime(GCS_URL_BASE + 'logs/%Y-%m-%d.json',
-                        time.gmtime(time.time() - days_ago * 24 * 60 * 60))
+                        time.localtime(time.time() - days_ago * 24 * 60 * 60))
     resp = urllib2.urlopen(url)
     content = resp.read()
     if resp.headers.get('content-encoding') == 'gzip':
