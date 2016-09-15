@@ -37,13 +37,11 @@ import (
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/controller/framework/informers"
 	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/runtime"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/metrics"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/util/workqueue"
-	"k8s.io/kubernetes/pkg/watch"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
@@ -67,13 +65,6 @@ type DaemonSetsController struct {
 	eventRecorder record.EventRecorder
 	podControl    controller.PodControlInterface
 
-	// internalPodInformer is used to hold a personal informer.  If we're using
-	// a normal shared informer, then the informer will be started for us.  If
-	// we have a personal informer, we must start it ourselves.   If you start
-	// the controller using NewDaemonSetsController(passing SharedInformer), this
-	// will be null
-	internalPodInformer framework.SharedInformer
-
 	// An dsc is temporarily suspended after creating/deleting these many replicas.
 	// It resumes normal action after observing the watch events for them.
 	burstReplicas int
@@ -83,17 +74,11 @@ type DaemonSetsController struct {
 	// A TTLCache of pod creates/deletes each ds expects to see
 	expectations controller.ControllerExpectationsInterface
 	// A store of daemon sets
-	dsStore cache.StoreToDaemonSetLister
+	dsStore *cache.StoreToDaemonSetLister
 	// A store of pods
-	podStore cache.StoreToPodLister
+	podStore *cache.StoreToPodLister
 	// A store of nodes
-	nodeStore cache.StoreToNodeLister
-	// Watches changes to all daemon sets.
-	dsController *framework.Controller
-	// Watches changes to all pods
-	podController framework.ControllerInterface
-	// Watches changes to all nodes.
-	nodeController *framework.Controller
+	nodeStore *cache.StoreToNodeLister
 	// podStoreSynced returns true if the pod store has been synced at least once.
 	// Added as a member to the struct to allow injection for testing.
 	podStoreSynced framework.InformerSynced
@@ -107,7 +92,7 @@ type DaemonSetsController struct {
 	queue workqueue.RateLimitingInterface
 }
 
-func NewDaemonSetsController(podInformer framework.SharedIndexInformer, kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFunc, lookupCacheSize int) *DaemonSetsController {
+func NewDaemonSetsController(daemonSetInformer informers.DaemonSetInformer, podInformer informers.PodInformer, nodeInformer informers.NodeInformer, kubeClient clientset.Interface, lookupCacheSize int) *DaemonSetsController {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
 	// TODO: remove the wrapper when every clients have moved to use the clientset.
@@ -127,90 +112,58 @@ func NewDaemonSetsController(podInformer framework.SharedIndexInformer, kubeClie
 		expectations:  controller.NewControllerExpectations(),
 		queue:         workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "daemonset"),
 	}
-	// Manage addition/update of daemon sets.
-	dsc.dsStore.Store, dsc.dsController = framework.NewInformer(
-		&cache.ListWatch{
-			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return dsc.kubeClient.Extensions().DaemonSets(api.NamespaceAll).List(options)
-			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return dsc.kubeClient.Extensions().DaemonSets(api.NamespaceAll).Watch(options)
-			},
-		},
-		&extensions.DaemonSet{},
-		// TODO: Can we have much longer period here?
-		FullDaemonSetResyncPeriod,
-		framework.ResourceEventHandlerFuncs{
-			AddFunc: func(obj interface{}) {
-				ds := obj.(*extensions.DaemonSet)
-				glog.V(4).Infof("Adding daemon set %s", ds.Name)
-				dsc.enqueueDaemonSet(ds)
-			},
-			UpdateFunc: func(old, cur interface{}) {
-				oldDS := old.(*extensions.DaemonSet)
-				curDS := cur.(*extensions.DaemonSet)
-				// We should invalidate the whole lookup cache if a DS's selector has been updated.
-				//
-				// Imagine that you have two RSs:
-				// * old DS1
-				// * new DS2
-				// You also have a pod that is attached to DS2 (because it doesn't match DS1 selector).
-				// Now imagine that you are changing DS1 selector so that it is now matching that pod,
-				// in such case we must invalidate the whole cache so that pod could be adopted by DS1
-				//
-				// This makes the lookup cache less helpful, but selector update does not happen often,
-				// so it's not a big problem
-				if !reflect.DeepEqual(oldDS.Spec.Selector, curDS.Spec.Selector) {
-					dsc.lookupCache.InvalidateAll()
-				}
 
-				glog.V(4).Infof("Updating daemon set %s", oldDS.Name)
-				dsc.enqueueDaemonSet(curDS)
-			},
-			DeleteFunc: dsc.deleteDaemonset,
+	daemonSetInformer.Informer().AddEventHandler(framework.ResourceEventHandlerFuncs{
+		AddFunc: func(obj interface{}) {
+			ds := obj.(*extensions.DaemonSet)
+			glog.V(4).Infof("Adding daemon set %s", ds.Name)
+			dsc.enqueueDaemonSet(ds)
 		},
-	)
+		UpdateFunc: func(old, cur interface{}) {
+			oldDS := old.(*extensions.DaemonSet)
+			curDS := cur.(*extensions.DaemonSet)
+			// We should invalidate the whole lookup cache if a DS's selector has been updated.
+			//
+			// Imagine that you have two RSs:
+			// * old DS1
+			// * new DS2
+			// You also have a pod that is attached to DS2 (because it doesn't match DS1 selector).
+			// Now imagine that you are changing DS1 selector so that it is now matching that pod,
+			// in such case we must invalidate the whole cache so that pod could be adopted by DS1
+			//
+			// This makes the lookup cache less helpful, but selector update does not happen often,
+			// so it's not a big problem
+			if !reflect.DeepEqual(oldDS.Spec.Selector, curDS.Spec.Selector) {
+				dsc.lookupCache.InvalidateAll()
+			}
+
+			glog.V(4).Infof("Updating daemon set %s", oldDS.Name)
+			dsc.enqueueDaemonSet(curDS)
+		},
+		DeleteFunc: dsc.deleteDaemonset,
+	})
+	dsc.dsStore = daemonSetInformer.Lister()
 
 	// Watch for creation/deletion of pods. The reason we watch is that we don't want a daemon set to create/delete
 	// more pods until all the effects (expectations) of a daemon set's create/delete have been observed.
-	podInformer.AddEventHandler(framework.ResourceEventHandlerFuncs{
+	podInformer.Informer().AddEventHandler(framework.ResourceEventHandlerFuncs{
 		AddFunc:    dsc.addPod,
 		UpdateFunc: dsc.updatePod,
 		DeleteFunc: dsc.deletePod,
 	})
-	dsc.podStore.Indexer = podInformer.GetIndexer()
-	dsc.podController = podInformer.GetController()
-	dsc.podStoreSynced = podInformer.HasSynced
+	dsc.podStore = podInformer.Lister()
+	dsc.podStoreSynced = podInformer.Informer().HasSynced
 
-	// Watch for new nodes or updates to nodes - daemon pods are launched on new nodes, and possibly when labels on nodes change,
-	dsc.nodeStore.Store, dsc.nodeController = framework.NewInformer(
-		&cache.ListWatch{
-			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return dsc.kubeClient.Core().Nodes().List(options)
-			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return dsc.kubeClient.Core().Nodes().Watch(options)
-			},
-		},
-		&api.Node{},
-		resyncPeriod(),
-		framework.ResourceEventHandlerFuncs{
-			AddFunc:    dsc.addNode,
-			UpdateFunc: dsc.updateNode,
-		},
+	nodeInformer.Informer().AddEventHandler(framework.ResourceEventHandlerFuncs{
+		AddFunc:    dsc.addNode,
+		UpdateFunc: dsc.updateNode,
+	},
 	)
-	dsc.nodeStoreSynced = dsc.nodeController.HasSynced
+	dsc.nodeStoreSynced = nodeInformer.Informer().HasSynced
+	dsc.nodeStore = nodeInformer.Lister()
 
 	dsc.syncHandler = dsc.syncDaemonSet
 	dsc.lookupCache = controller.NewMatchingCache(lookupCacheSize)
-	return dsc
-}
-
-func NewDaemonSetsControllerFromClient(kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFunc, lookupCacheSize int) *DaemonSetsController {
-	podInformer := informers.NewPodInformer(kubeClient, resyncPeriod())
-	dsc := NewDaemonSetsController(podInformer, kubeClient, resyncPeriod, lookupCacheSize)
-	dsc.internalPodInformer = podInformer
-
 	return dsc
 }
 
@@ -238,9 +191,6 @@ func (dsc *DaemonSetsController) Run(workers int, stopCh <-chan struct{}) {
 	defer dsc.queue.ShutDown()
 
 	glog.Infof("Starting Daemon Sets controller manager")
-	go dsc.dsController.Run(stopCh)
-	go dsc.podController.Run(stopCh)
-	go dsc.nodeController.Run(stopCh)
 
 	if !framework.WaitForCacheSync(stopCh, dsc.podStoreSynced, dsc.nodeStoreSynced) {
 		return
@@ -248,10 +198,6 @@ func (dsc *DaemonSetsController) Run(workers int, stopCh <-chan struct{}) {
 
 	for i := 0; i < workers; i++ {
 		go wait.Until(dsc.runWorker, time.Second, stopCh)
-	}
-
-	if dsc.internalPodInformer != nil {
-		go dsc.internalPodInformer.Run(stopCh)
 	}
 
 	<-stopCh

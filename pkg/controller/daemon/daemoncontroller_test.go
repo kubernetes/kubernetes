@@ -29,7 +29,9 @@ import (
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/controller/framework/informers"
 	"k8s.io/kubernetes/pkg/securitycontext"
+	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 var (
@@ -136,7 +138,11 @@ func addPods(podStore cache.Store, nodeName string, label map[string]string, num
 
 func newTestController() (*DaemonSetsController, *controller.FakePodControl) {
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
-	manager := NewDaemonSetsControllerFromClient(clientset, controller.NoResyncPeriodFunc, 0)
+	informerFactory := informers.NewSharedInformerFactory(clientset, controller.NoResyncPeriodFunc())
+
+	manager := NewDaemonSetsController(informerFactory.DaemonSets(), informerFactory.Pods(), informerFactory.Nodes(), clientset, 0)
+	informerFactory.Start(wait.NeverStop)
+
 	manager.podStoreSynced = alwaysReady
 	manager.nodeStoreSynced = alwaysReady
 	podControl := &controller.FakePodControl{}
