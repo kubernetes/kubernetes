@@ -84,7 +84,7 @@ var _ = framework.KubeDescribe("Kubelet Eviction Manager [Serial] [Disruptive]",
 						RestartPolicy: api.RestartPolicyNever,
 						Containers: []api.Container{
 							{
-								Image: ImageRegistry[busyBoxImage],
+								Image: "gcr.io/google_containers/busybox:1.24",
 								Name:  busyPodName,
 								// Filling the disk
 								Command: []string{"sh", "-c",
@@ -190,7 +190,7 @@ func createIdlePod(podName string, podClient *framework.PodClient) {
 			RestartPolicy: api.RestartPolicyNever,
 			Containers: []api.Container{
 				{
-					Image: ImageRegistry[pauseImage],
+					Image: framework.GetPauseImageNameForHostArch(),
 					Name:  podName,
 				},
 			},

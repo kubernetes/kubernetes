@@ -104,7 +104,7 @@ var _ = framework.KubeDescribe("Kubelet Container Manager [Serial]", func() {
 					Spec: api.PodSpec{
 						Containers: []api.Container{
 							{
-								Image: ImageRegistry[serveHostnameImage],
+								Image: "gcr.io/google_containers/serve_hostname:v1.4",
 								Name:  podName,
 							},
 						},
@@ -148,7 +148,7 @@ var _ = framework.KubeDescribe("Kubelet Container Manager [Serial]", func() {
 					Spec: api.PodSpec{
 						Containers: []api.Container{
 							{
-								Image: ImageRegistry[nginxImage],
+								Image: "gcr.io/google_containers/nginx-slim:0.7",
 								Name:  podName,
 								Resources: api.ResourceRequirements{
 									Limits: api.ResourceList{
@@ -189,7 +189,7 @@ var _ = framework.KubeDescribe("Kubelet Container Manager [Serial]", func() {
 					Spec: api.PodSpec{
 						Containers: []api.Container{
 							{
-								Image: ImageRegistry[testWebServer],
+								Image: "gcr.io/google_containers/test-webserver:e2e",
 								Name:  podName,
 								Resources: api.ResourceRequirements{
 									Requests: api.ResourceList{
