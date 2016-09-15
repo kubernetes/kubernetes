@@ -51,8 +51,11 @@ if ! diff -u "${linted_file}" <(LANG=C sort "${linted_file}"); then
 fi
 
 export IFS=$'\n'
+# NOTE: when "go list -e ./..." is run within GOPATH, it turns the k8s.io/kubernetes
+# as the prefix, however if we run it outside it returns the full path of the file
+# with a leading underscore. We'll need to support both scenarios for all_packages.
 all_packages=(
-	$(go list -e ./... | egrep -v "/(third_party|vendor|staging|generated|clientset_generated)" | sed 's/k8s.io\/kubernetes\///g')
+	$(go list -e ./... | egrep -v "/(third_party|vendor|staging|generated|clientset_generated)" | sed -e 's|^k8s.io/kubernetes/||' -e "s|^_${KUBE_ROOT}/\?||")
 )
 linted_packages=(
 	$(cat $linted_file)
