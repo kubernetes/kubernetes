@@ -619,6 +619,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 			kubecontainer.FilterEventRecorder(kubeDeps.Recorder),
 			klet.livenessManager,
 			containerRefManager,
+			klet.podManager,
 			kubeDeps.OSInterface,
 			klet.networkPlugin,
 			klet,

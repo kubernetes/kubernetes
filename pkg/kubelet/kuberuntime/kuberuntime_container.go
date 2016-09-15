@@ -239,6 +239,31 @@ func makeUID() string {
 	return fmt.Sprintf("%08x", rand.Uint32())
 }
 
+// getTerminationMessage gets termination message of the container.
+func getTerminationMessage(status *runtimeApi.ContainerStatus, kubeStatus *kubecontainer.ContainerStatus, terminationMessagePath string) string {
+	message := ""
+
+	if !kubeStatus.FinishedAt.IsZero() || kubeStatus.ExitCode != 0 {
+		if terminationMessagePath == "" {
+			return ""
+		}
+
+		for _, mount := range status.Mounts {
+			if mount.GetContainerPath() == terminationMessagePath {
+				path := mount.GetHostPath()
+				if data, err := ioutil.ReadFile(path); err != nil {
+					message = fmt.Sprintf("Error on reading termination-log %s: %v", path, err)
+				} else {
+					message = string(data)
+				}
+				break
+			}
+		}
+	}
+
+	return message
+}
+
 // getKubeletContainerStatuses gets all containers' status for the pod sandbox.
 func (m *kubeGenericRuntimeManager) getKubeletContainerStatuses(podSandboxID string) ([]*kubecontainer.ContainerStatus, error) {
 	containers, err := m.runtimeService.ListContainers(&runtimeApi.ContainerFilter{
@@ -282,23 +307,7 @@ func (m *kubeGenericRuntimeManager) getKubeletContainerStatuses(podSandboxID str
 			cStatus.FinishedAt = time.Unix(status.GetFinishedAt(), 0)
 		}
 
-		message := ""
-		if !cStatus.FinishedAt.IsZero() || cStatus.ExitCode != 0 {
-			if annotatedInfo.TerminationMessagePath != "" {
-				for _, mount := range status.Mounts {
-					if mount.GetContainerPath() == annotatedInfo.TerminationMessagePath {
-						path := mount.GetHostPath()
-						if data, err := ioutil.ReadFile(path); err != nil {
-							message = fmt.Sprintf("Error on reading termination-log %s: %v", path, err)
-						} else {
-							message = string(data)
-						}
-						break
-					}
-				}
-			}
-		}
-		cStatus.Message = message
+		cStatus.Message = getTerminationMessage(status, cStatus, annotatedInfo.TerminationMessagePath)
 		statuses[i] = cStatus
 	}
 

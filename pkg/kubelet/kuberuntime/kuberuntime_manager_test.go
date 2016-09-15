@@ -54,12 +54,12 @@ func createTestRuntimeManager() (*apitest.FakeRuntimeService, *apitest.FakeImage
 }
 
 func makeAndSetFakePod(m *kubeGenericRuntimeManager, fakeRuntime *apitest.FakeRuntimeService, pod *api.Pod) (*apitest.FakePodSandbox, []*apitest.FakeContainer, error) {
-	fakePodSandbox, err := makeFakePodSandbox(m, pod)
+	fakePodSandbox, err := makeFakePodSandbox(m, pod, fakeCreatedAt)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	fakeContainers, err := makeFakeContainers(m, pod, pod.Spec.Containers)
+	fakeContainers, err := makeFakeContainers(m, pod, pod.Spec.Containers, fakeCreatedAt)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -69,7 +69,7 @@ func makeAndSetFakePod(m *kubeGenericRuntimeManager, fakeRuntime *apitest.FakeRu
 	return fakePodSandbox, fakeContainers, nil
 }
 
-func makeFakePodSandbox(m *kubeGenericRuntimeManager, pod *api.Pod) (*apitest.FakePodSandbox, error) {
+func makeFakePodSandbox(m *kubeGenericRuntimeManager, pod *api.Pod, createdAt int64) (*apitest.FakePodSandbox, error) {
 	config, err := m.generatePodSandboxConfig(pod, "", 0)
 	if err != nil {
 		return nil, err
@@ -82,13 +82,13 @@ func makeFakePodSandbox(m *kubeGenericRuntimeManager, pod *api.Pod) (*apitest.Fa
 			Id:        &podSandboxID,
 			Metadata:  config.Metadata,
 			State:     &readyState,
-			CreatedAt: &fakeCreatedAt,
+			CreatedAt: &createdAt,
 			Labels:    config.Labels,
 		},
 	}, nil
 }
 
-func makeFakeContainer(m *kubeGenericRuntimeManager, pod *api.Pod, container api.Container, sandboxConfig *runtimeApi.PodSandboxConfig) (*apitest.FakeContainer, error) {
+func makeFakeContainer(m *kubeGenericRuntimeManager, pod *api.Pod, container api.Container, sandboxConfig *runtimeApi.PodSandboxConfig, createdAt int64) (*apitest.FakeContainer, error) {
 	containerConfig, err := m.generateContainerConfig(&container, pod, 0, "")
 	if err != nil {
 		return nil, err
@@ -104,7 +104,7 @@ func makeFakeContainer(m *kubeGenericRuntimeManager, pod *api.Pod, container api
 			Metadata:    containerConfig.Metadata,
 			Image:       containerConfig.Image,
 			ImageRef:    &imageRef,
-			CreatedAt:   &fakeCreatedAt,
+			CreatedAt:   &createdAt,
 			State:       &runningState,
 			Labels:      containerConfig.Labels,
 			Annotations: containerConfig.Annotations,
@@ -113,7 +113,7 @@ func makeFakeContainer(m *kubeGenericRuntimeManager, pod *api.Pod, container api
 	}, nil
 }
 
-func makeFakeContainers(m *kubeGenericRuntimeManager, pod *api.Pod, containers []api.Container) ([]*apitest.FakeContainer, error) {
+func makeFakeContainers(m *kubeGenericRuntimeManager, pod *api.Pod, containers []api.Container, createdAt int64) ([]*apitest.FakeContainer, error) {
 	sandboxConfig, err := m.generatePodSandboxConfig(pod, "", 0)
 	if err != nil {
 		return nil, err
@@ -121,7 +121,7 @@ func makeFakeContainers(m *kubeGenericRuntimeManager, pod *api.Pod, containers [
 
 	result := make([]*apitest.FakeContainer, len(containers))
 	for idx, c := range containers {
-		containerWithState, err := makeFakeContainer(m, pod, c, sandboxConfig)
+		containerWithState, err := makeFakeContainer(m, pod, c, sandboxConfig, createdAt)
 		if err != nil {
 			return nil, err
 		}
