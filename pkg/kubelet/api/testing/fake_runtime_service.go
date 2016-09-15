@@ -313,12 +313,14 @@ func (r *FakeRuntimeService) ListContainers(filter *runtimeApi.ContainerFilter) 
 		}
 
 		result = append(result, &runtimeApi.Container{
-			Id:       s.Id,
-			Metadata: s.Metadata,
-			State:    s.State,
-			Image:    s.Image,
-			ImageRef: s.ImageRef,
-			Labels:   s.Labels,
+			Id:           s.Id,
+			CreatedAt:    s.CreatedAt,
+			PodSandboxId: &s.SandboxID,
+			Metadata:     s.Metadata,
+			State:        s.State,
+			Image:        s.Image,
+			ImageRef:     s.ImageRef,
+			Labels:       s.Labels,
 		})
 	}
 
