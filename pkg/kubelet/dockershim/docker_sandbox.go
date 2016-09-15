@@ -145,6 +145,9 @@ func (ds *dockerService) ListPodSandbox(filter *runtimeApi.PodSandboxFilter) ([]
 
 	opts.Filter = dockerfilters.NewArgs()
 	f := newDockerFilter(&opts.Filter)
+	// Add filter to select only sandbox containers.
+	f.AddLabel(containerTypeLabelKey, containerTypeLabelSandbox)
+
 	if filter != nil {
 		if filter.Id != nil {
 			f.Add("id", filter.GetId())
@@ -168,8 +171,6 @@ func (ds *dockerService) ListPodSandbox(filter *runtimeApi.PodSandboxFilter) ([]
 				f.AddLabel(k, v)
 			}
 		}
-		// Filter out sandbox containers.
-		f.AddLabel(containerTypeLabelKey, containerTypeLabelSandbox)
 	}
 	containers, err := ds.client.ListContainers(opts)
 	if err != nil {
