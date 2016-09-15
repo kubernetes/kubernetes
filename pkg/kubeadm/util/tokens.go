@@ -30,7 +30,7 @@ const (
 	TokenBytes = 8
 )
 
-func randBytes(length int) ([]byte, string, error) {
+func RandBytes(length int) ([]byte, string, error) {
 	b := make([]byte, length)
 	_, err := rand.Read(b)
 	if err != nil {
@@ -43,12 +43,12 @@ func randBytes(length int) ([]byte, string, error) {
 }
 
 func GenerateToken(s *kubeadmapi.KubeadmConfig) error {
-	_, tokenID, err := randBytes(TokenIDLen / 2)
+	_, tokenID, err := RandBytes(TokenIDLen / 2)
 	if err != nil {
 		return err
 	}
 
-	tokenBytes, token, err := randBytes(TokenBytes)
+	tokenBytes, token, err := RandBytes(TokenBytes)
 	if err != nil {
 		return err
 	}

@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"strings"
+	"os"
 
 	"k8s.io/kubernetes/pkg/apis/certificates"
 	unversionedcertificates "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/certificates/unversioned"
@@ -32,10 +33,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util/csr"
 	certutil "k8s.io/kubernetes/pkg/util/cert"
 )
-
-func getNodeName() string {
-	return "TODO"
-}
 
 func PerformTLSBootstrapFromConfig(s *kubeadmapi.KubeadmConfig) (*clientcmdapi.Config, error) {
 	caCert, err := ioutil.ReadFile(s.ManualFlags.CaCertFile)
@@ -51,7 +48,11 @@ func PerformTLSBootstrap(s *kubeadmapi.KubeadmConfig, apiEndpoint string, caCert
 	// TODO try all the api servers until we find one that works
 	bareClientConfig := kubeadmutil.CreateBasicClientConfig("kubernetes", apiEndpoint, caCert)
 
-	nodeName := getNodeName()
+	// Try to fetch the hostname of the node
+	nodeName, err := os.Hostname()
+	if err != nil {
+		return nil, fmt.Errorf("<node/csr> failed to get node hostname [%v]", err)
+	}
 
 	bootstrapClientConfig, err := clientcmd.NewDefaultClientConfig(
 		*kubeadmutil.MakeClientConfigWithToken(
