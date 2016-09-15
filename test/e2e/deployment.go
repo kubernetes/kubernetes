@@ -188,9 +188,9 @@ func stopDeployment(c *clientset.Clientset, oldC client.Interface, ns, deploymen
 	selector, err := unversioned.LabelSelectorAsSelector(deployment.Spec.Selector)
 	Expect(err).NotTo(HaveOccurred())
 	options := api.ListOptions{LabelSelector: selector}
-	rss, err := c.Extensions().ReplicaSets(ns).List(options)
+	// NOTE: this is cherrypicked to 1.2 only to fix the kubernetes-e2e-gke-1.2-1.4-upgrade-cluster test flakes
+	err = waitForReplicaSetsGone(c, ns, options)
 	Expect(err).NotTo(HaveOccurred())
-	Expect(rss.Items).Should(HaveLen(0))
 	Logf("ensuring deployment %s pods were deleted", deploymentName)
 	var pods *api.PodList
 	if err := wait.PollImmediate(time.Second, wait.ForeverTestTimeout, func() (bool, error) {
@@ -205,6 +205,21 @@ func stopDeployment(c *clientset.Clientset, oldC client.Interface, ns, deploymen
 	}); err != nil {
 		Failf("Err : %s\n. Failed to remove deployment %s pods : %+v", err, deploymentName, pods)
 	}
+}
+
+// NOTE: this is cherrypicked to 1.2 only to fix the kubernetes-e2e-gke-1.2-1.4-upgrade-cluster test flakes
+func waitForReplicaSetsGone(c *clientset.Clientset, ns string, options api.ListOptions) error {
+	return wait.Poll(poll, wait.ForeverTestTimeout, func() (bool, error) {
+		rss, err := c.Extensions().ReplicaSets(ns).List(options)
+		if err != nil {
+			return false, err
+		}
+		if len(rss.Items) != 0 {
+			Logf("Waiting for all RSes to be gone, %d RS left", len(rss.Items))
+			return false, nil
+		}
+		return true, nil
+	})
 }
 
 func testNewDeployment(f *Framework) {
