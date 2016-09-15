@@ -31,6 +31,7 @@ type genGroup struct {
 	outputPackage string
 	group         string
 	version       string
+	apiPath       string
 	// types in this group
 	types        []*types.Type
 	imports      namer.ImportTracker
@@ -62,6 +63,9 @@ func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer
 	const pkgAPI = "k8s.io/kubernetes/pkg/api"
 	const pkgSerializer = "k8s.io/kubernetes/pkg/runtime/serializer"
 	apiPath := func(group string) string {
+		if len(g.apiPath) > 0 {
+			return `"` + g.apiPath + `"`
+		}
 		if group == "core" {
 			return `"/api"`
 		}
