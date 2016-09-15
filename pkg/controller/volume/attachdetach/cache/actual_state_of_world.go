@@ -67,11 +67,9 @@ type ActualStateOfWorld interface {
 	SetVolumeMountedByNode(volumeName api.UniqueVolumeName, nodeName string, mounted bool) error
 
 	// ResetNodeStatusUpdateNeeded resets statusUpdateNeeded for the specified
-	// node to false indicating the AttachedVolume field of the Node's Status
-	// object has been updated.
-	// If no node with the name nodeName exists in list of attached nodes for
-	// the specified volume, an error is returned.
-	ResetNodeStatusUpdateNeeded(nodeName string) error
+	// node to true indicating the AttachedVolume field of the Node's Status
+	// object needs to be updated by the node updater again.
+	ResetNodeStatusUpdateNeeded(nodeName string)
 
 	// ResetDetachRequestTime resets the detachRequestTime to 0 which indicates there is no detach
 	// request any more for the volume
@@ -433,21 +431,26 @@ func (asw *actualStateOfWorld) addVolumeToReportAsAttached(
 	}
 }
 
-func (asw *actualStateOfWorld) ResetNodeStatusUpdateNeeded(
-	nodeName string) error {
-	asw.Lock()
-	defer asw.Unlock()
-	// Remove volume from volumes to report as attached
+// Update the flag statusUpdateNeeded to indicate whether node status is already updated or
+// needs to be updated again by the node status updater.
+// This is an internal function and caller should acquire and release the lock
+func (asw *actualStateOfWorld) setNodeStatusUpdateNeeded(nodeName string, needed bool) {
 	nodeToUpdate, nodeToUpdateExists := asw.nodesToUpdateStatusFor[nodeName]
 	if !nodeToUpdateExists {
-		return fmt.Errorf(
+		// should not happen
+		glog.Errorf(
 			"failed to ResetNodeStatusUpdateNeeded(nodeName=%q) nodeName does not exist",
 			nodeName)
 	}
 
-	nodeToUpdate.statusUpdateNeeded = false
+	nodeToUpdate.statusUpdateNeeded = needed
 	asw.nodesToUpdateStatusFor[nodeName] = nodeToUpdate
-	return nil
+}
+
+func (asw *actualStateOfWorld) ResetNodeStatusUpdateNeeded(nodeName string) {
+	asw.Lock()
+	defer asw.Unlock()
+	asw.setNodeStatusUpdateNeeded(nodeName, true)
 }
 
 func (asw *actualStateOfWorld) DeleteVolumeNode(
@@ -529,7 +532,7 @@ func (asw *actualStateOfWorld) GetVolumesToReportAttached() map[string][]api.Att
 	defer asw.RUnlock()
 
 	volumesToReportAttached := make(map[string][]api.AttachedVolume)
-	for _, nodeToUpdateObj := range asw.nodesToUpdateStatusFor {
+	for nodeName, nodeToUpdateObj := range asw.nodesToUpdateStatusFor {
 		if nodeToUpdateObj.statusUpdateNeeded {
 			attachedVolumes := make(
 				[]api.AttachedVolume,
@@ -544,6 +547,10 @@ func (asw *actualStateOfWorld) GetVolumesToReportAttached() map[string][]api.Att
 			}
 			volumesToReportAttached[nodeToUpdateObj.nodeName] = attachedVolumes
 		}
+		// When GetVolumesToReportAttached is called by node status updater, the current status
+		// of this node will be updated, so set the flag statusUpdateNeeded to false indicating
+		// the current status is already updated.
+		asw.setNodeStatusUpdateNeeded(nodeName, false)
 	}
 
 	return volumesToReportAttached
