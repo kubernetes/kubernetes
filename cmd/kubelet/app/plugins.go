@@ -90,12 +90,16 @@ func ProbeVolumePlugins(pluginDir string) []volume.VolumePlugin {
 }
 
 // ProbeNetworkPlugins collects all compiled-in plugins
-func ProbeNetworkPlugins(pluginDir string) []network.NetworkPlugin {
+func ProbeNetworkPlugins(pluginDir, cniConfDir, cniBinDir string) []network.NetworkPlugin {
 	allPlugins := []network.NetworkPlugin{}
 
+	// for backwards-compat, allow pluginDir as a source of CNI config files
+	if cniConfDir == "" {
+		cniConfDir = pluginDir
+	}
 	// for each existing plugin, add to the list
 	allPlugins = append(allPlugins, exec.ProbeNetworkPlugins(pluginDir)...)
-	allPlugins = append(allPlugins, cni.ProbeNetworkPlugins(pluginDir)...)
+	allPlugins = append(allPlugins, cni.ProbeNetworkPlugins(cniConfDir, cniBinDir)...)
 	allPlugins = append(allPlugins, kubenet.NewPlugin(pluginDir))
 
 	return allPlugins
