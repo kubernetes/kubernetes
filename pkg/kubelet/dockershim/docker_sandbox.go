@@ -123,17 +123,16 @@ func (ds *dockerService) PodSandboxStatus(podSandboxID string) (*runtimeApi.PodS
 		return nil, err
 	}
 
+	labels, annotations := extractLabels(r.Config.Labels)
 	return &runtimeApi.PodSandboxStatus{
-		Id:        &r.ID,
-		State:     &state,
-		CreatedAt: &ct,
-		Metadata:  metadata,
-		// TODO: We write annotations as labels on the docker containers. All
-		// these annotations will be read back as labels. Need to fix this.
-		// Also filter out labels only relevant to this shim.
-		Labels:  r.Config.Labels,
-		Network: network,
-		Linux:   &runtimeApi.LinuxPodSandboxStatus{Namespaces: &runtimeApi.Namespace{Network: &netNS}},
+		Id:          &r.ID,
+		State:       &state,
+		CreatedAt:   &ct,
+		Metadata:    metadata,
+		Labels:      labels,
+		Annotations: annotations,
+		Network:     network,
+		Linux:       &runtimeApi.LinuxPodSandboxStatus{Namespaces: &runtimeApi.Namespace{Network: &netNS}},
 	}, nil
 }
 
