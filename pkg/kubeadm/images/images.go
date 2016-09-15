@@ -35,12 +35,14 @@ const (
 
 	gcrPrefix   = "gcr.io/google_containers"
 	etcdVersion = "2.2.5"
-	kubeVersion = "v1.4.0-beta.6"
 
 	kubeDnsVersion     = "1.7"
 	dnsmasqVersion     = "1.3"
 	exechealthzVersion = "1.1"
 )
+
+// TODO(phase1): Make this configurable + default to a v1.4 value fetched from: https://storage.googleapis.com/kubernetes-release/release/stable.txt
+var DefaultKubeVersion = "v1.4.0-beta.6"
 
 func GetCoreImage(image string, overrideImage string) string {
 	if overrideImage != "" {
@@ -49,10 +51,10 @@ func GetCoreImage(image string, overrideImage string) string {
 
 	return map[string]string{
 		KubeEtcdImage:              fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "etcd", runtime.GOARCH, etcdVersion),
-		KubeApiServerImage:         fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "kube-apiserver", runtime.GOARCH, kubeVersion),
-		KubeControllerManagerImage: fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "kube-controller-manager", runtime.GOARCH, kubeVersion),
-		KubeSchedulerImage:         fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "kube-scheduler", runtime.GOARCH, kubeVersion),
-		KubeProxyImage:             fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "kube-proxy", runtime.GOARCH, kubeVersion),
+		KubeApiServerImage:         fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "kube-apiserver", runtime.GOARCH, DefaultKubeVersion),
+		KubeControllerManagerImage: fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "kube-controller-manager", runtime.GOARCH, DefaultKubeVersion),
+		KubeSchedulerImage:         fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "kube-scheduler", runtime.GOARCH, DefaultKubeVersion),
+		KubeProxyImage:             fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "kube-proxy", runtime.GOARCH, DefaultKubeVersion),
 	}[image]
 }
 
