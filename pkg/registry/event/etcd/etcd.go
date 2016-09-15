@@ -34,7 +34,7 @@ func NewREST(opts generic.RESTOptions, ttl uint64) *REST {
 
 	// We explicitly do NOT do any decoration here - switching on Cacher
 	// for events will lead to too high memory consumption.
-	storageInterface, _ := generic.NewRawStorage(opts.StorageConfig)
+	storageInterface, dFunc := generic.NewRawStorage(opts.StorageConfig)
 
 	store := &registry.Store{
 		NewFunc:     func() runtime.Object { return &api.Event{} },
@@ -59,7 +59,8 @@ func NewREST(opts generic.RESTOptions, ttl uint64) *REST {
 		UpdateStrategy: event.Strategy,
 		DeleteStrategy: event.Strategy,
 
-		Storage: storageInterface,
+		Storage:     storageInterface,
+		DestroyFunc: dFunc,
 	}
 	return &REST{store}
 }

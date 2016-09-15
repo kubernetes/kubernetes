@@ -62,6 +62,7 @@ func validNewPodSecurityPolicy() *extensions.PodSecurityPolicy {
 func TestCreate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store).ClusterScope()
 	psp := validNewPodSecurityPolicy()
 	psp.ObjectMeta = api.ObjectMeta{GenerateName: "foo-"}
@@ -78,6 +79,7 @@ func TestCreate(t *testing.T) {
 func TestUpdate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store).ClusterScope()
 	test.TestUpdate(
 		// valid
@@ -94,6 +96,7 @@ func TestUpdate(t *testing.T) {
 func TestDelete(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store).ClusterScope().ReturnDeletedObject()
 	test.TestDelete(validNewPodSecurityPolicy())
 }
@@ -101,6 +104,7 @@ func TestDelete(t *testing.T) {
 func TestGet(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store).ClusterScope()
 	test.TestGet(validNewPodSecurityPolicy())
 }
@@ -108,6 +112,7 @@ func TestGet(t *testing.T) {
 func TestList(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store).ClusterScope()
 	test.TestList(validNewPodSecurityPolicy())
 }
@@ -115,6 +120,7 @@ func TestList(t *testing.T) {
 func TestWatch(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store).ClusterScope()
 	test.TestWatch(
 		validNewPodSecurityPolicy(),
