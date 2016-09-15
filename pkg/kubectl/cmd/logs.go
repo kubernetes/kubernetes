@@ -18,6 +18,7 @@ package cmd
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"math"
 	"os"
@@ -51,6 +52,8 @@ var (
 
 		# Show all logs from pod nginx written in the last hour
 		kubectl logs --since=1h nginx`)
+
+	selectorTail int64 = 10
 )
 
 const (
@@ -108,16 +111,23 @@ func NewCmdLogs(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().Bool("interactive", false, "If true, prompt the user for input when required.")
 	cmd.Flags().MarkDeprecated("interactive", "This flag is no longer respected and there is no replacement.")
 	cmdutil.AddInclude3rdPartyFlags(cmd)
+	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on")
 	return cmd
 }
 
 func (o *LogsOptions) Complete(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) error {
 	containerName := cmdutil.GetFlagString(cmd, "container")
+	selector := cmdutil.GetFlagString(cmd, "selector")
 	switch len(args) {
 	case 0:
-		return cmdutil.UsageError(cmd, logsUsageStr)
+		if selector == "" {
+			return cmdutil.UsageError(cmd, logsUsageStr)
+		}
 	case 1:
 		o.ResourceArg = args[0]
+		if selector != "" {
+			return cmdutil.UsageError(cmd, "only a selector (-l) or a POD name is allowed")
+		}
 	case 2:
 		if cmd.Flag("container").Changed {
 			return cmdutil.UsageError(cmd, "only one of -c or an inline [CONTAINER] arg is allowed")
@@ -162,18 +172,31 @@ func (o *LogsOptions) Complete(f *cmdutil.Factory, out io.Writer, cmd *cobra.Com
 	o.ClientMapper = resource.ClientMapperFunc(f.ClientForMapping)
 	o.Out = out
 
+	if selector != "" {
+		if logOptions.Follow {
+			return cmdutil.UsageError(cmd, "only one of follow (-f) or selector (-l) is allowed")
+		}
+		if logOptions.TailLines == nil {
+			logOptions.TailLines = &selectorTail
+		}
+	}
 	mapper, typer := f.Object()
 	decoder := f.Decoder(true)
 	if o.Object == nil {
-		infos, err := resource.NewBuilder(mapper, typer, o.ClientMapper, decoder).
+		builder := resource.NewBuilder(mapper, typer, o.ClientMapper, decoder).
 			NamespaceParam(o.Namespace).DefaultNamespace().
-			ResourceNames("pods", o.ResourceArg).
-			SingleResourceType().
-			Do().Infos()
+			SingleResourceType()
+		if o.ResourceArg != "" {
+			builder.ResourceNames("pods", o.ResourceArg)
+		}
+		if selector != "" {
+			builder.ResourceTypes("pods").SelectorParam(selector)
+		}
+		infos, err := builder.Do().Infos()
 		if err != nil {
 			return err
 		}
-		if len(infos) != 1 {
+		if selector == "" && len(infos) != 1 {
 			return errors.New("expected a resource")
 		}
 		o.Object = infos[0].Object
@@ -183,9 +206,6 @@ func (o *LogsOptions) Complete(f *cmdutil.Factory, out io.Writer, cmd *cobra.Com
 }
 
 func (o LogsOptions) Validate() error {
-	if len(o.ResourceArg) == 0 {
-		return errors.New("a pod must be specified")
-	}
 	logsOptions, ok := o.Options.(*api.PodLogOptions)
 	if !ok {
 		return errors.New("unexpected logs options object")
@@ -199,7 +219,23 @@ func (o LogsOptions) Validate() error {
 
 // RunLogs retrieves a pod log
 func (o LogsOptions) RunLogs() (int64, error) {
-	req, err := o.LogsForObject(o.Object, o.Options)
+	switch t := o.Object.(type) {
+	case *api.PodList:
+		cnt := int64(0)
+		for _, p := range t.Items {
+			fmt.Fprintf(o.Out, "======== %s\n", p.Name)
+			len, _ := o.runLogs(&p)
+			cnt += len
+		}
+		return cnt, nil
+	default:
+		return o.runLogs(o.Object)
+	}
+
+}
+
+func (o LogsOptions) runLogs(obj runtime.Object) (int64, error) {
+	req, err := o.LogsForObject(obj, o.Options)
 	if err != nil {
 		return 0, err
 	}
