@@ -44,6 +44,11 @@ const (
 	tagValueFalse = "false"
 	// Should only be used only for test
 	tagTargetType = "target"
+
+	// We ginnypigging the feature on openapi for proof of concept, it may have it's own
+	// tag on the production implementation.
+	tagValidatePrefix  = "validate"
+	tagValidatorPrefix = "validator"
 )
 
 func hasOpenAPITagValue(comments []string, value string) bool {
@@ -58,6 +63,50 @@ func hasOpenAPITagValue(comments []string, value string) bool {
 	}
 	return false
 }
+
+func getFuncLikeArgs(value, funcName string) string {
+	if !strings.HasPrefix(value, funcName+"(") || !strings.HasSuffix(value, ")") {
+		return ""
+	}
+	return value[len(funcName)+1 : len(value)-1]
+}
+
+func getOpenAPITagValue(comments []string, prefix string) string {
+	tagValues := types.ExtractCommentTags("+", comments)[tagName]
+	if tagValues == nil {
+		return ""
+	}
+	for _, val := range tagValues {
+		ret := getFuncLikeArgs(val, prefix)
+		if ret != "" {
+			return ret
+		}
+	}
+	return ""
+}
+
+func getOpenAPITagValues(comments []string, prefix string) []string {
+	tagValues := types.ExtractCommentTags("+", comments)[tagName]
+	if tagValues == nil {
+		return []string{}
+	}
+	rets := []string{}
+	for _, val := range tagValues {
+		ret := getFuncLikeArgs(val, prefix)
+		if ret != "" {
+			rets = append(rets, ret)
+		}
+	}
+	return rets
+}
+
+type validatorType struct {
+	Name string
+	Type *types.Type
+	Func *types.Type
+}
+
+var validators map[string]validatorType = map[string]validatorType{}
 
 // NameSystems returns the name system used by the generators in this package.
 func NameSystems() namer.NameSystems {
@@ -98,16 +147,77 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 				glog.V(5).Infof("target type : %q", t)
 				targets = append(targets, t)
 			}
+			if val := getOpenAPITagValue(t.CommentLines, tagValidatorPrefix); val != "" {
+				glog.V(5).Infof("validator type : %q", t)
+				if f := getFuncLikeArgs(val, "type"); f != "" {
+					if _, ok := validators[f]; ok {
+						glog.Fatalf("Duplicate validator %v", f)
+					}
+					validators[f] = validatorType{Name: f, Type: t}
+				}
+			}
+		}
+		for _, t := range pkg.Functions {
+			if val := getOpenAPITagValue(t.CommentLines, tagValidatorPrefix); val != "" {
+				glog.V(5).Infof("validator function : %q", t)
+				if f := getFuncLikeArgs(val, "new"); f != "" {
+					v, ok := validators[f]
+					if !ok {
+						glog.Fatalf("validator not found %v", f)
+					}
+					v.Func = t
+				}
+			}
 		}
 	}
+	validationTargets := map[string]*types.Package{}
+	validationTypes := map[string]*types.Type{}
+	prevLength := -1
+	for prevLength != len(validationTargets) {
+		prevLength = len(validationTargets)
+		for _, pkg := range context.Universe {
+			for _, t := range pkg.Types {
+				if t.Kind != types.Struct {
+					continue
+				}
+				for _, m := range t.Members {
+					_, ok := validationTypes[m.Type.Name.String()]
+					if ok || getOpenAPITagValue(m.CommentLines, tagValidatePrefix) != "" {
+						// TODO: Make sure the pkg is in our repo and editable
+						validationTargets[pkg.Path] = pkg
+						validationTypes[t.Name.String()] = t
+					}
+				}
+			}
+		}
+	}
+	packages := generator.Packages{}
+	for _, pkg := range validationTargets {
+		// WHY?
+		p := pkg.Path
+		packages = append(packages, &generator.DefaultPackage{
+			PackageName: strings.Split(filepath.Base(pkg.Path), ".")[0],
+			PackagePath: pkg.Path,
+			HeaderText:  header,
+			GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {
+				return []generator.Generator{NewValidatorGen("zz_generated.openapi.validation", p, validationTypes, context)}
+			},
+			FilterFunc: func(c *generator.Context, t *types.Type) bool {
+				_, ok := validationTypes[t.Name.String()]
+				return ok && t.Kind == types.Struct
+			},
+		})
+	}
+
 	switch len(targets) {
 	case 0:
 		// If no target package found, that means the generated file in target package is up to date
 		// and build excluded the target package.
-		return generator.Packages{}
+		//		return generator.Packages{}
+		return packages
 	case 1:
 		pkg := context.Universe[targets[0].Name.Package]
-		return generator.Packages{&generator.DefaultPackage{
+		packages = append(packages, &generator.DefaultPackage{
 			PackageName: strings.Split(filepath.Base(pkg.Path), ".")[0],
 			PackagePath: pkg.Path,
 			HeaderText:  header,
@@ -128,8 +238,8 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 				}
 				return false
 			},
-		},
-		}
+		})
+		return packages
 	default:
 		glog.Fatalf("Duplicate target type found: %v", targets)
 	}
@@ -515,5 +625,193 @@ func (g openAPITypeWriter) generateSliceProperty(t *types.Type) error {
 		return fmt.Errorf("slice Element kind %v is not supported in %v", elemType.Kind, t)
 	}
 	g.Do("},\n},\n},\n", nil)
+	return nil
+}
+
+const (
+	validationPackagePath          = "k8s.io/kubernetes/pkg/validation"
+	validationFieldUtilPackagePath = "k8s.io/kubernetes/pkg/util/validation/field"
+	typesPackagePath               = "k8s.io/kubernetes/cmd/libs/go2idl/types"
+)
+
+// validatorGen produces a file with auto-generated OpenAPI functions.
+type validatorGen struct {
+	generator.DefaultGen
+	targetPackage string
+	types         map[string]*types.Type
+	imports       namer.ImportTracker
+	context       *generator.Context
+}
+
+func NewValidatorGen(sanitizedName, targetPackage string, types map[string]*types.Type, context *generator.Context) generator.Generator {
+	return &validatorGen{
+		DefaultGen: generator.DefaultGen{
+			OptionalName: sanitizedName,
+		},
+		targetPackage: targetPackage,
+		imports:       generator.NewImportTracker(),
+		types:         types,
+		context:       context,
+	}
+}
+
+func (g *validatorGen) Namers(c *generator.Context) namer.NameSystems {
+	// Have the raw namer for this file track what it imports.
+	return namer.NameSystems{
+		"raw": namer.NewRawNamer(g.targetPackage, g.imports),
+	}
+}
+
+func (g *validatorGen) Filter(c *generator.Context, t *types.Type) bool {
+	_, ok := g.types[t.Name.String()]
+	if !ok {
+		return false
+	}
+	//glog.Info("\n", t, "\n", g.targetPackage, "\n", t.Name.Package, "\n", t.Name.String())
+	return g.targetPackage == t.Name.Package
+}
+
+func (g *validatorGen) isOtherPackage(pkg string) bool {
+	if pkg == g.targetPackage {
+		return false
+	}
+	if strings.HasSuffix(pkg, "\""+g.targetPackage+"\"") {
+		return false
+	}
+	return true
+}
+
+func (g *validatorGen) Imports(c *generator.Context) []string {
+	importLines := []string{}
+	for _, singleImport := range g.imports.ImportLines() {
+		if g.isOtherPackage(singleImport) {
+			importLines = append(importLines, singleImport)
+		}
+	}
+	return importLines
+}
+
+func (g *validatorGen) Init(c *generator.Context, w io.Writer) error {
+	return nil
+}
+
+func (g *validatorGen) Finalize(c *generator.Context, w io.Writer) error {
+	return nil
+}
+
+func (g *validatorGen) GenerateType(c *generator.Context, t *types.Type, w io.Writer) error {
+	if t.Kind != types.Struct {
+		return nil
+	}
+	sw := generator.NewSnippetWriter(w, c, "$", "$")
+	glog.V(5).Infof("generating for type %v", t)
+	err := newValidatorGenTypeWriter(sw, g.types).generate(t)
+	if err != nil {
+		return err
+	}
+	return sw.Error()
+}
+
+type validatorTypeWriter struct {
+	*generator.SnippetWriter
+	types map[string]*types.Type
+}
+
+func newValidatorGenTypeWriter(sw *generator.SnippetWriter, types map[string]*types.Type) validatorTypeWriter {
+	return validatorTypeWriter{
+		SnippetWriter: sw,
+		types:         types,
+	}
+}
+
+func (_ validatorTypeWriter) argsFromType(t *types.Type) generator.Args {
+	return generator.Args{
+		"type":      t,
+		"FieldMeta": types.Ref(validationPackagePath, "FieldMeta"),
+		"OpType":    types.Ref(validationPackagePath, "OperationType"),
+		"ErrorList": types.Ref(validationFieldUtilPackagePath, "ErrorList"),
+		"Type":      types.Ref(typesPackagePath, "Type"),
+	}
+}
+
+func (g validatorTypeWriter) generateFieldMeta(m types.Member) {
+	args := g.argsFromType(nil)
+	g.Do("$.FieldMeta|raw${", args)
+	g.Do("Path: meta.Child(s.$.$)", m.Name)
+	t := resolveAliasAndPtrType(m.Type)
+	if t.IsPrimitive() {
+		g.Do(",Type: \"$.$\"", t.Name.Name)
+	}
+	g.Do("}", nil)
+}
+
+func (g validatorTypeWriter) generate(t *types.Type) error {
+	args := g.argsFromType(t)
+	g.Do("func (s $.type|raw$) Validate(meta $.FieldMeta|raw$, op $.OpType|raw$) $.ErrorList|raw$ {\n", args)
+	g.Do("allErrs := $.ErrorList|raw${}\n", args)
+
+	// TODO Support validator on the type itself? if getOpenAPITagValue(t.comments, tagValidatePrefix) != "" ...
+
+	memberMap := map[string]types.Member{}
+	for _, m := range t.Members {
+		memberMap[m.Name] = m
+	}
+	for _, m := range t.Members {
+		for _, v := range getOpenAPITagValues(m.CommentLines, tagValidatePrefix) {
+			validatorName := v[:strings.Index(v, "(")]
+			validatorParam := getFuncLikeArgs(v, validatorName)
+			validator := validators[validatorName]
+
+			g.Do("{ // Validate: $.$\n", v)
+			g.Do("v := &$.|raw${}\n", validator.Type)
+			g.Do("errs := v.Init(op, ", nil)
+			g.generateFieldMeta(m)
+			// resolve params
+			for _, param := range strings.Split(validatorParam, ",") {
+				switch {
+				case strings.HasPrefix(param, "this."):
+					otherMember, ok := memberMap[param[5:]]
+					if !ok {
+						return fmt.Errorf("Member %v referenced by not found in %v. tag: %v", param, t, v)
+					}
+					g.Do(", ", nil)
+					g.generateFieldMeta(otherMember)
+				case strings.HasPrefix(param, "this"):
+					g.Do(", $.FieldMeta|raw${Path: meta}", args)
+				default:
+					// it is a literal, only pass it to init
+					g.Do(", $.$", param)
+					continue
+				}
+			}
+			g.Do(")\n", nil)
+			g.Do("if len(errs) == 0 {\n", nil)
+			g.Do("errs = v.Validate(s.$.$", m.Name)
+			for _, param := range strings.Split(validatorParam, ",") {
+				switch {
+				case strings.HasPrefix(param, "this."):
+					g.Do(", s.$.$", param[5:])
+				case strings.HasPrefix(param, "this"):
+					g.Do(", s", nil)
+				default:
+					// it is a literal, only pass it to init
+				}
+			}
+			g.Do(")\n", nil)
+			g.Do("}\n", nil)
+			g.Do("if len(errs) != 0 {\nallErrs = append(allErrs, errs)\n}\n", nil)
+			g.Do("}\n", nil)
+		}
+		_, ok := g.types[m.Type.Name.String()]
+		if !ok {
+			continue
+		}
+		g.Do("if errs := s.$.$", m.Name)
+		g.Do(".Validate(", nil)
+		g.generateFieldMeta(m)
+		g.Do(", op); len(errs) != 0 {\nallErrs = append(allErrs, errs)\n}\n", m.Name)
+		continue
+	}
+	g.Do("return allErrs\n}\n\n", nil)
 	return nil
 }
