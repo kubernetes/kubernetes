@@ -374,6 +374,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *api.Ser
 	loadbalancer, err := loadbalancers.Create(lbaas.network, createOpts).Extract()
 	if err != nil {
 		// cleanup what was created so far
+		glog.Warningf("EnsureLoadBalancer: loadbalancers.Create(%+v) error causing cleanup: %v", createOpts, err)
 		_ = lbaas.EnsureLoadBalancerDeleted(clusterName, apiService)
 		return nil, err
 	}
@@ -389,6 +390,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *api.Ser
 		}).Extract()
 		if err != nil {
 			// cleanup what was created so far
+			glog.Warningf("EnsureLoadBalancer: listeners.Create() error causing cleanup: %v", err)
 			_ = lbaas.EnsureLoadBalancerDeleted(clusterName, apiService)
 			return nil, err
 		}
@@ -404,6 +406,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *api.Ser
 		}).Extract()
 		if err != nil {
 			// cleanup what was created so far
+			glog.Warningf("EnsureLoadBalancer: v2_pools.Create() error causing cleanup: %v", err)
 			_ = lbaas.EnsureLoadBalancerDeleted(clusterName, apiService)
 			return nil, err
 		}
@@ -414,6 +417,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *api.Ser
 			addr, err := getAddressByName(lbaas.compute, host)
 			if err != nil {
 				// cleanup what was created so far
+				glog.Warningf("EnsureLoadBalancer: getAddressByName(%s) error causing cleanup: %v", host, err)
 				_ = lbaas.EnsureLoadBalancerDeleted(clusterName, apiService)
 				return nil, err
 			}
@@ -425,6 +429,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *api.Ser
 			}).Extract()
 			if err != nil {
 				// cleanup what was created so far
+				glog.Warningf("EnsureLoadBalancer: v2_pools.CreateAssociateMember() error causing cleanup: %v", err)
 				_ = lbaas.EnsureLoadBalancerDeleted(clusterName, apiService)
 				return nil, err
 			}
@@ -442,6 +447,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *api.Ser
 			}).Extract()
 			if err != nil {
 				// cleanup what was created so far
+				glog.Warningf("EnsureLoadBalancer: v2_monitors.Create() error causing cleanup: %v", err)
 				_ = lbaas.EnsureLoadBalancerDeleted(clusterName, apiService)
 				return nil, err
 			}
@@ -457,6 +463,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *api.Ser
 		portID, err := getPortIDByIP(lbaas.network, loadbalancer.VipAddress)
 		if err != nil {
 			// cleanup what was created so far
+			glog.Warningf("EnsureLoadBalancer: getPortIDByIP(%s) error causing cleanup: %v", loadbalancer.VipAddress, err)
 			_ = lbaas.EnsureLoadBalancerDeleted(clusterName, apiService)
 			return nil, err
 		}
@@ -468,6 +475,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *api.Ser
 		floatIP, err := floatingips.Create(lbaas.network, floatIPOpts).Extract()
 		if err != nil {
 			// cleanup what was created so far
+			glog.Warningf("EnsureLoadBalancer: floatingips.Create(%+v) error causing cleanup: %v", floatIPOpts, err)
 			_ = lbaas.EnsureLoadBalancerDeleted(clusterName, apiService)
 			return nil, err
 		}
