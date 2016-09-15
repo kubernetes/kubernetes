@@ -59,6 +59,7 @@ func NewREST(opts generic.RESTOptions) *REST {
 		},
 		PredicateFunc:           secret.Matcher,
 		QualifiedResource:       api.Resource("secrets"),
+		EnableGarbageCollection: opts.EnableGarbageCollection,
 		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
 
 		CreateStrategy: secret.Strategy,

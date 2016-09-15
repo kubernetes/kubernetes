@@ -52,7 +52,9 @@ func NewREST(opts generic.RESTOptions, ttl uint64) *REST {
 		TTLFunc: func(runtime.Object, uint64, bool) (uint64, error) {
 			return ttl, nil
 		},
-		QualifiedResource:       api.Resource("events"),
+		QualifiedResource: api.Resource("events"),
+
+		EnableGarbageCollection: opts.EnableGarbageCollection,
 		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
 
 		CreateStrategy: event.Strategy,

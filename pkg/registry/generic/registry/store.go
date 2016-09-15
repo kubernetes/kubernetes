@@ -42,10 +42,6 @@ import (
 	"github.com/golang/glog"
 )
 
-// EnableGarbageCollector affects the handling of Update and Delete requests. It
-// must be synced with the corresponding flag in kube-controller-manager.
-var EnableGarbageCollector bool
-
 // Store implements generic.Registry.
 // It's intended to be embeddable, so that you can implement any
 // non-generic functions if needed.
@@ -92,6 +88,10 @@ type Store struct {
 
 	// Called to cleanup storage clients.
 	DestroyFunc func()
+
+	// EnableGarbageCollection affects the handling of Update and Delete requests. It
+	// must be synced with the corresponding flag in kube-controller-manager.
+	EnableGarbageCollection bool
 
 	// DeleteCollectionWorkers is the maximum number of workers in a single
 	// DeleteCollection call.
@@ -272,7 +272,7 @@ func (e *Store) Create(ctx api.Context, obj runtime.Object) (runtime.Object, err
 // it further checks if the object's DeletionGracePeriodSeconds is 0. If so, it
 // returns true.
 func (e *Store) shouldDelete(ctx api.Context, key string, obj, existing runtime.Object) bool {
-	if !EnableGarbageCollector {
+	if !e.EnableGarbageCollection {
 		return false
 	}
 	newMeta, err := api.ObjectMetaFor(obj)
@@ -694,7 +694,7 @@ func (e *Store) Delete(ctx api.Context, name string, options *api.DeleteOptions)
 	var ignoreNotFound bool
 	var deleteImmediately bool = true
 	var lastExisting, out runtime.Object
-	if !EnableGarbageCollector {
+	if !e.EnableGarbageCollection {
 		// TODO: remove the check on graceful, because we support no-op updates now.
 		if graceful {
 			err, ignoreNotFound, deleteImmediately, out, lastExisting = e.updateForGracefulDeletion(ctx, name, key, options, preconditions, obj)

@@ -781,6 +781,7 @@ func (m *Master) GetRESTOptionsOrDie(c *Config, resource unversioned.GroupResour
 		StorageConfig:           storageConfig,
 		Decorator:               m.StorageDecorator(),
 		DeleteCollectionWorkers: m.deleteCollectionWorkers,
+		EnableGarbageCollection: c.Config.EnableGarbageCollection,
 		ResourcePrefix:          c.StorageFactory.ResourcePrefix(resource),
 	}
 }

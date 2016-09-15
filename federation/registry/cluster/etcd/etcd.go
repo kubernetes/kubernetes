@@ -73,6 +73,7 @@ func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
 		},
 		PredicateFunc:           cluster.MatchCluster,
 		QualifiedResource:       federation.Resource("clusters"),
+		EnableGarbageCollection: opts.EnableGarbageCollection,
 		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
 
 		CreateStrategy: cluster.Strategy,

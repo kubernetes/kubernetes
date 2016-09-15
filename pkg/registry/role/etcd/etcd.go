@@ -61,6 +61,7 @@ func NewREST(opts generic.RESTOptions) *REST {
 		},
 		PredicateFunc:           role.Matcher,
 		QualifiedResource:       rbac.Resource("roles"),
+		EnableGarbageCollection: opts.EnableGarbageCollection,
 		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
 
 		CreateStrategy: role.Strategy,
