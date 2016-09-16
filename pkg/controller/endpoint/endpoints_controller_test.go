@@ -110,7 +110,7 @@ func TestSyncEndpointsItemsPreserveNoSelector(t *testing.T) {
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 	endpoints := NewEndpointControllerFromClient(client, controller.NoResyncPeriodFunc)
 	endpoints.podStoreSynced = alwaysReady
-	endpoints.serviceStore.Store.Add(&api.Service{
+	endpoints.serviceStore.Indexer.Add(&api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: ns},
 		Spec:       api.ServiceSpec{Ports: []api.ServicePort{{Port: 80}}},
 	})
@@ -174,7 +174,7 @@ func TestSyncEndpointsProtocolTCP(t *testing.T) {
 	endpoints.podStoreSynced = alwaysReady
 
 	addPods(endpoints.podStore.Indexer, ns, 1, 1, 0)
-	endpoints.serviceStore.Store.Add(&api.Service{
+	endpoints.serviceStore.Indexer.Add(&api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: ns},
 		Spec: api.ServiceSpec{
 			Selector: map[string]string{},
@@ -216,7 +216,7 @@ func TestSyncEndpointsProtocolUDP(t *testing.T) {
 	endpoints := NewEndpointControllerFromClient(client, controller.NoResyncPeriodFunc)
 	endpoints.podStoreSynced = alwaysReady
 	addPods(endpoints.podStore.Indexer, ns, 1, 1, 0)
-	endpoints.serviceStore.Store.Add(&api.Service{
+	endpoints.serviceStore.Indexer.Add(&api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: ns},
 		Spec: api.ServiceSpec{
 			Selector: map[string]string{},
@@ -255,7 +255,7 @@ func TestSyncEndpointsItemsEmptySelectorSelectsAll(t *testing.T) {
 	endpoints := NewEndpointControllerFromClient(client, controller.NoResyncPeriodFunc)
 	endpoints.podStoreSynced = alwaysReady
 	addPods(endpoints.podStore.Indexer, ns, 1, 1, 0)
-	endpoints.serviceStore.Store.Add(&api.Service{
+	endpoints.serviceStore.Indexer.Add(&api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: ns},
 		Spec: api.ServiceSpec{
 			Selector: map[string]string{},
@@ -293,7 +293,7 @@ func TestSyncEndpointsItemsEmptySelectorSelectsAllNotReady(t *testing.T) {
 	endpoints := NewEndpointControllerFromClient(client, controller.NoResyncPeriodFunc)
 	endpoints.podStoreSynced = alwaysReady
 	addPods(endpoints.podStore.Indexer, ns, 0, 1, 1)
-	endpoints.serviceStore.Store.Add(&api.Service{
+	endpoints.serviceStore.Indexer.Add(&api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: ns},
 		Spec: api.ServiceSpec{
 			Selector: map[string]string{},
@@ -331,7 +331,7 @@ func TestSyncEndpointsItemsEmptySelectorSelectsAllMixed(t *testing.T) {
 	endpoints := NewEndpointControllerFromClient(client, controller.NoResyncPeriodFunc)
 	endpoints.podStoreSynced = alwaysReady
 	addPods(endpoints.podStore.Indexer, ns, 1, 1, 1)
-	endpoints.serviceStore.Store.Add(&api.Service{
+	endpoints.serviceStore.Indexer.Add(&api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: ns},
 		Spec: api.ServiceSpec{
 			Selector: map[string]string{},
@@ -373,7 +373,7 @@ func TestSyncEndpointsItemsPreexisting(t *testing.T) {
 	endpoints := NewEndpointControllerFromClient(client, controller.NoResyncPeriodFunc)
 	endpoints.podStoreSynced = alwaysReady
 	addPods(endpoints.podStore.Indexer, ns, 1, 1, 0)
-	endpoints.serviceStore.Store.Add(&api.Service{
+	endpoints.serviceStore.Indexer.Add(&api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: ns},
 		Spec: api.ServiceSpec{
 			Selector: map[string]string{"foo": "bar"},
@@ -414,7 +414,7 @@ func TestSyncEndpointsItemsPreexistingIdentical(t *testing.T) {
 	endpoints := NewEndpointControllerFromClient(client, controller.NoResyncPeriodFunc)
 	endpoints.podStoreSynced = alwaysReady
 	addPods(endpoints.podStore.Indexer, api.NamespaceDefault, 1, 1, 0)
-	endpoints.serviceStore.Store.Add(&api.Service{
+	endpoints.serviceStore.Indexer.Add(&api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault},
 		Spec: api.ServiceSpec{
 			Selector: map[string]string{"foo": "bar"},
@@ -435,7 +435,7 @@ func TestSyncEndpointsItems(t *testing.T) {
 	endpoints.podStoreSynced = alwaysReady
 	addPods(endpoints.podStore.Indexer, ns, 3, 2, 0)
 	addPods(endpoints.podStore.Indexer, "blah", 5, 2, 0) // make sure these aren't found!
-	endpoints.serviceStore.Store.Add(&api.Service{
+	endpoints.serviceStore.Indexer.Add(&api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: ns},
 		Spec: api.ServiceSpec{
 			Selector: map[string]string{"foo": "bar"},
@@ -478,7 +478,7 @@ func TestSyncEndpointsItemsWithLabels(t *testing.T) {
 	endpoints.podStoreSynced = alwaysReady
 	addPods(endpoints.podStore.Indexer, ns, 3, 2, 0)
 	serviceLabels := map[string]string{"foo": "bar"}
-	endpoints.serviceStore.Store.Add(&api.Service{
+	endpoints.serviceStore.Indexer.Add(&api.Service{
 		ObjectMeta: api.ObjectMeta{
 			Name:      "foo",
 			Namespace: ns,
@@ -539,7 +539,7 @@ func TestSyncEndpointsItemsPreexistingLabelsChange(t *testing.T) {
 	endpoints.podStoreSynced = alwaysReady
 	addPods(endpoints.podStore.Indexer, ns, 1, 1, 0)
 	serviceLabels := map[string]string{"baz": "blah"}
-	endpoints.serviceStore.Store.Add(&api.Service{
+	endpoints.serviceStore.Indexer.Add(&api.Service{
 		ObjectMeta: api.ObjectMeta{
 			Name:      "foo",
 			Namespace: ns,
