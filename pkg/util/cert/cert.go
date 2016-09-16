@@ -14,47 +14,23 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package crypto
+package cert
 
 import (
 	"bytes"
-	"crypto/rand"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	cryptorand "crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"math/big"
 	"net"
-	"os"
-	"path/filepath"
 	"time"
 )
-
-// FoundCertOrKey returns true if the certificate or key files already exists,
-// otherwise returns false.
-func FoundCertOrKey(certPath, keyPath string) bool {
-	if canReadFile(certPath) || canReadFile(keyPath) {
-		return true
-	}
-
-	return false
-}
-
-// If the file represented by path exists and
-// readable, returns true otherwise returns false.
-func canReadFile(path string) bool {
-	f, err := os.Open(path)
-	if err != nil {
-		return false
-	}
-
-	defer f.Close()
-
-	return true
-}
 
 // GenerateSelfSignedCert creates a self-signed certificate and key for the given host.
 // Host may be an IP or a DNS name
@@ -63,7 +39,7 @@ func canReadFile(path string) bool {
 // If the certificate or key files already exist, they will be overwritten.
 // Any parent directories of the certPath or keyPath will be created as needed with file mode 0755.
 func GenerateSelfSignedCert(host, certPath, keyPath string, alternateIPs []net.IP, alternateDNS []string) error {
-	priv, err := rsa.GenerateKey(rand.Reader, 2048)
+	priv, err := rsa.GenerateKey(cryptorand.Reader, 2048)
 	if err != nil {
 		return err
 	}
@@ -91,7 +67,7 @@ func GenerateSelfSignedCert(host, certPath, keyPath string, alternateIPs []net.I
 	template.IPAddresses = append(template.IPAddresses, alternateIPs...)
 	template.DNSNames = append(template.DNSNames, alternateDNS...)
 
-	derBytes, err := x509.CreateCertificate(rand.Reader, &template, &template, &priv.PublicKey, priv)
+	derBytes, err := x509.CreateCertificate(cryptorand.Reader, &template, &template, &priv.PublicKey, priv)
 	if err != nil {
 		return err
 	}
@@ -108,81 +84,20 @@ func GenerateSelfSignedCert(host, certPath, keyPath string, alternateIPs []net.I
 		return err
 	}
 
-	// Write cert
-	if err := WriteCertToPath(certPath, certBuffer.Bytes()); err != nil {
+	if err := WriteCert(certPath, certBuffer.Bytes()); err != nil {
 		return err
 	}
 
-	// Write key
-	if err := WriteKeyToPath(keyPath, keyBuffer.Bytes()); err != nil {
+	if err := WriteKey(keyPath, keyBuffer.Bytes()); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-// WriteCertToPath writes the pem-encoded certificate data to certPath.
-// The certificate file will be created with file mode 0644.
-// If the certificate file already exists, it will be overwritten.
-// The parent directory of the certPath will be created as needed with file mode 0755.
-func WriteCertToPath(certPath string, data []byte) error {
-	if err := os.MkdirAll(filepath.Dir(certPath), os.FileMode(0755)); err != nil {
-		return err
-	}
-	if err := ioutil.WriteFile(certPath, data, os.FileMode(0644)); err != nil {
-		return err
-	}
-	return nil
-}
-
-// WriteKeyToPath writes the pem-encoded key data to keyPath.
-// The key file will be created with file mode 0600.
-// If the key file already exists, it will be overwritten.
-// The parent directory of the keyPath will be created as needed with file mode 0755.
-func WriteKeyToPath(keyPath string, data []byte) error {
-	if err := os.MkdirAll(filepath.Dir(keyPath), os.FileMode(0755)); err != nil {
-		return err
-	}
-	if err := ioutil.WriteFile(keyPath, data, os.FileMode(0600)); err != nil {
-		return err
-	}
-	return nil
-}
-
-// CertPoolFromFile returns an x509.CertPool containing the certificates in the given PEM-encoded file.
-// Returns an error if the file could not be read, a certificate could not be parsed, or if the file does not contain any certificates
-func CertPoolFromFile(filename string) (*x509.CertPool, error) {
-	certs, err := certificatesFromFile(filename)
-	if err != nil {
-		return nil, err
-	}
-	pool := x509.NewCertPool()
-	for _, cert := range certs {
-		pool.AddCert(cert)
-	}
-	return pool, nil
-}
-
-// certificatesFromFile returns the x509.Certificates contained in the given PEM-encoded file.
-// Returns an error if the file could not be read, a certificate could not be parsed, or if the file does not contain any certificates
-func certificatesFromFile(file string) ([]*x509.Certificate, error) {
-	if len(file) == 0 {
-		return nil, errors.New("error reading certificates from an empty filename")
-	}
-	pemBlock, err := ioutil.ReadFile(file)
-	if err != nil {
-		return nil, err
-	}
-	certs, err := CertsFromPEM(pemBlock)
-	if err != nil {
-		return nil, fmt.Errorf("error reading %s: %s", file, err)
-	}
-	return certs, nil
-}
-
-// CertsFromPEM returns the x509.Certificates contained in the given PEM-encoded byte array
+// NewFromPEM returns the x509.Certificates contained in the given PEM-encoded byte array
 // Returns an error if a certificate could not be parsed, or if the data does not contain any certificates
-func CertsFromPEM(pemCerts []byte) ([]*x509.Certificate, error) {
+func NewFromPEM(pemCerts []byte) ([]*x509.Certificate, error) {
 	ok := false
 	certs := []*x509.Certificate{}
 	for len(pemCerts) > 0 {
@@ -209,4 +124,43 @@ func CertsFromPEM(pemCerts []byte) ([]*x509.Certificate, error) {
 		return certs, errors.New("could not read any certificates")
 	}
 	return certs, nil
+}
+
+// MakeEllipticPrivateKey returns PEM data containing a generated ECDSA private key
+func MakeEllipticPrivateKey() ([]byte, error) {
+	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), cryptorand.Reader)
+	if err != nil {
+		return nil, err
+	}
+
+	derBytes, err := x509.MarshalECPrivateKey(privateKey)
+	if err != nil {
+		return nil, err
+	}
+
+	privateKeyPemBlock := &pem.Block{
+		Type:  "EC PRIVATE KEY",
+		Bytes: derBytes,
+	}
+	return pem.EncodeToMemory(privateKeyPemBlock), nil
+}
+
+// ParsePrivateKey returns a private key parsed from a PEM block in the supplied data.
+// Recognizes PEM blocks for "EC PRIVATE KEY" and "RSA PRIVATE KEY"
+func ParsePrivateKey(keyData []byte) (interface{}, error) {
+	for {
+		var privateKeyPemBlock *pem.Block
+		privateKeyPemBlock, keyData = pem.Decode(keyData)
+		if privateKeyPemBlock == nil {
+			// we read all the PEM blocks and didn't recognize one
+			return nil, fmt.Errorf("no private key PEM block found")
+		}
+
+		switch privateKeyPemBlock.Type {
+		case "EC PRIVATE KEY":
+			return x509.ParseECPrivateKey(privateKeyPemBlock.Bytes)
+		case "RSA PRIVATE KEY":
+			return x509.ParsePKCS1PrivateKey(privateKeyPemBlock.Bytes)
+		}
+	}
 }
