@@ -11,6 +11,9 @@
 - [v1.4.0-beta.3](#v140-beta3)
   - [Downloads](#downloads-2)
   - [Changelog since v1.4.0-beta.2](#changelog-since-v140-beta2)
+  - [Behavior changes caused by enabling the garbage collector](#behavior-changes-caused-by-enabling-the-garbage-collector)
+    - [kubectl rolling-update](#kubectl-rolling-update)
+    - [kubectl delete](#kubectl-delete)
 - [v1.4.0-beta.2](#v140-beta2)
   - [Downloads](#downloads-3)
   - [Changelog since v1.4.0-beta.1](#changelog-since-v140-beta1)
@@ -216,6 +219,21 @@ binary | sha256 hash
 
 **No notable changes for this release**
 
+## Behavior changes caused by enabling the garbage collector
+
+### kubectl rolling-update
+
+Old version kubectl's rolling-update command is compatible with Kubernetes 1.4 and higher **only if** you specify a new replication controller name. You will need to update to kubectl 1.4 or higher to use the rolling update command against a 1.4 cluster if you want to keep the original name, or you'll have to do two rolling updates.
+
+If you do happen to use old version kubectl's rolling update against a 1.4 cluster, it will fail, usually with an error message that will direct you here. If you saw that error, then don't worry, the operation succeeded except for the part where the new replication controller is renamed back to the old name. You can just do another rolling update using kubectl 1.4 or higher to change the name back: look for a replication controller that has the original name plus a random suffix.
+
+Unfortunately, there is a much rarer second possible failure mode: the replication controller gets renamed to the old name, but there is a duplicated set of pods in the cluster. kubectl will not report an error since it thinks its job is done.
+
+If this happens to you, you can wait at most 10 minutes for the replication controller to start a resync, the extra pods will then be deleted. Or, you can manually trigger a resync by change the replicas in the spec of the replication controller.
+
+### kubectl delete
+
+If you use an old version kubectl to delete a replication controller or replicaset, then after the delete command has returned, the replication controller or the replicaset will continue to exist in the key-value store for a short period of time (<1s). You probably will not notice any difference if you use kubectl manually, but you might notice it if you are using kubectl in a script.
 
 
 # v1.4.0-beta.2
