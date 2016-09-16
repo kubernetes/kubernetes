@@ -268,7 +268,7 @@ func (e *Store) Create(ctx api.Context, obj runtime.Object) (runtime.Object, err
 			if e.QualifiedResource.Resource != "replicationcontrollers" {
 				return nil, err
 			}
-			*msg = fmt.Sprintf("Note: if you are using \"kubectl rolling-update\" and your kubectl version is older than v1.4.0, your rolling-update has probably failed, though the pods are correctly updated. Please see https://github.com/kubernetes/kubernetes/blob/master/CHANGELOG.md#kubectl-rolling-update for a workaround. : %s", *msg)
+			*msg = fmt.Sprintf("%s: if you're using \"kubectl rolling-update\" with kubectl version older than v1.4.0, your rolling update has failed, though the pods are correctly updated. Please see https://github.com/kubernetes/kubernetes/blob/master/CHANGELOG.md#kubectl-rolling-update for a workaround", *msg)
 		}
 		return nil, err
 	}
