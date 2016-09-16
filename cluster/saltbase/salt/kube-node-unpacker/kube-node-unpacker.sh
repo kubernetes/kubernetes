@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 The Kubernetes Authors All rights reserved.
+# Copyright 2015 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ while true; do
 
   if which docker 1>/dev/null 2>&1; then
 
-    timeout 30 docker load -i /srv/salt/kube-bins/kube-proxy.tar 1>/dev/null 2>&1
+    timeout 120 docker load -i /srv/salt/kube-bins/kube-proxy.tar 1>/dev/null 2>&1
     rc=$?
     if [[ "${rc}" == 0 ]]; then
       let loadedImageFlags="${loadedImageFlags}|1"

@@ -88,9 +88,25 @@ network_closure.sh
 
 # Juju Stuff
 /cluster/juju/charms/*
+/cluster/juju/bundles/local.yaml
 
 # Downloaded Kubernetes binary release
 /kubernetes/
 
 # direnv .envrc files
 .envrc
+
+# Downloaded kubernetes binary release tar ball
+kubernetes.tar.gz
+
+# generated files in any directory
+# TODO(thockin): uncomment this when we stop committing the generated files.
+#zz_generated.*
+
+# make-related metadata
+/.make/
+# Just in time generated data in the source, should never be commited
+/test/e2e/generated/bindata.go
+
+# This file used by some vendor repos (e.g. github.com/go-openapi/...) to store secret variables and should not be ignored
+!\.drone\.sec

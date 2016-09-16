@@ -25,5 +25,5 @@ func Unmarshal(r *request.Request) {
 
 // UnmarshalMeta unmarshals header response values for an AWS Query service.
 func UnmarshalMeta(r *request.Request) {
-	// TODO implement unmarshaling of request IDs
+	r.RequestID = r.HTTPResponse.Header.Get("X-Amzn-Requestid")
 }

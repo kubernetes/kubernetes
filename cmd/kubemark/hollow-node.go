@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,9 +18,9 @@ package main
 
 import (
 	"fmt"
-	"runtime"
 
 	"k8s.io/kubernetes/pkg/api"
+	_ "k8s.io/kubernetes/pkg/client/metrics/prometheus" // for client metric registration
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	clientset "k8s.io/kubernetes/pkg/client/unversioned/adapters/internalclientset"
@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/flag"
 	fakeiptables "k8s.io/kubernetes/pkg/util/iptables/testing"
 	"k8s.io/kubernetes/pkg/util/sets"
+	_ "k8s.io/kubernetes/pkg/version/prometheus" // for version metric registration
 
 	"github.com/golang/glog"
 	"github.com/spf13/pflag"
@@ -49,7 +50,8 @@ type HollowNodeConfig struct {
 }
 
 const (
-	maxPods = 110
+	maxPods     = 110
+	podsPerCore = 0
 )
 
 var knownMorphs = sets.NewString("kubelet", "proxy")
@@ -61,7 +63,7 @@ func (c *HollowNodeConfig) addFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&c.NodeName, "name", "fake-node", "Name of this Hollow Node.")
 	fs.IntVar(&c.ServerPort, "api-server-port", 443, "Port on which API server is listening.")
 	fs.StringVar(&c.Morph, "morph", "", fmt.Sprintf("Specifies into which Hollow component this binary should morph. Allowed values: %v", knownMorphs.List()))
-	fs.StringVar(&c.ContentType, "kube-api-content-type", "application/json", "ContentType of requests sent to apiserver. Passing application/vnd.kubernetes.protobuf is an experimental feature now.")
+	fs.StringVar(&c.ContentType, "kube-api-content-type", "application/vnd.kubernetes.protobuf", "ContentType of requests sent to apiserver.")
 }
 
 func (c *HollowNodeConfig) createClientFromFile() (*client.Client, error) {
@@ -82,7 +84,6 @@ func (c *HollowNodeConfig) createClientFromFile() (*client.Client, error) {
 }
 
 func main() {
-	runtime.GOMAXPROCS(runtime.NumCPU())
 
 	config := HollowNodeConfig{}
 	config.addFlags(pflag.CommandLine)
@@ -115,6 +116,7 @@ func main() {
 			config.KubeletReadOnlyPort,
 			containerManager,
 			maxPods,
+			podsPerCore,
 		)
 		hollowKubelet.Run()
 	}

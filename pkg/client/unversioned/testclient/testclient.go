@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -203,7 +203,7 @@ func (c *Fake) InvokesProxy(action Action) restclient.ResponseWrapper {
 // ClearActions clears the history of actions called on the fake client
 func (c *Fake) ClearActions() {
 	c.Lock()
-	c.Unlock()
+	defer c.Unlock()
 
 	c.actions = make([]Action, 0)
 }
@@ -277,12 +277,24 @@ func (c *Fake) Namespaces() client.NamespaceInterface {
 	return &FakeNamespaces{Fake: c}
 }
 
+func (c *Fake) Apps() client.AppsInterface {
+	return &FakeApps{c}
+}
+
+func (c *Fake) Authorization() client.AuthorizationInterface {
+	return &FakeAuthorization{c}
+}
+
 func (c *Fake) Autoscaling() client.AutoscalingInterface {
 	return &FakeAutoscaling{c}
 }
 
 func (c *Fake) Batch() client.BatchInterface {
 	return &FakeBatch{c}
+}
+
+func (c *Fake) Certificates() client.CertificatesInterface {
+	return &FakeCertificates{c}
 }
 
 func (c *Fake) Extensions() client.ExtensionsInterface {
@@ -301,6 +313,18 @@ func (c *Fake) ConfigMaps(namespace string) client.ConfigMapsInterface {
 	return &FakeConfigMaps{Fake: c, Namespace: namespace}
 }
 
+func (c *Fake) Rbac() client.RbacInterface {
+	return &FakeRbac{Fake: c}
+}
+
+func (c *Fake) Storage() client.StorageInterface {
+	return &FakeStorage{Fake: c}
+}
+
+func (c *Fake) Authentication() client.AuthenticationInterface {
+	return &FakeAuthentication{Fake: c}
+}
+
 // SwaggerSchema returns an empty swagger.ApiDeclaration for testing
 func (c *Fake) SwaggerSchema(version unversioned.GroupVersion) (*swagger.ApiDeclaration, error) {
 	action := ActionImpl{}
@@ -313,6 +337,32 @@ func (c *Fake) SwaggerSchema(version unversioned.GroupVersion) (*swagger.ApiDecl
 
 	c.Invokes(action, nil)
 	return &swagger.ApiDeclaration{}, nil
+}
+
+// NewSimpleFakeApps returns a client that will respond with the provided objects
+func NewSimpleFakeApps(objects ...runtime.Object) *FakeApps {
+	return &FakeApps{Fake: NewSimpleFake(objects...)}
+}
+
+type FakeApps struct {
+	*Fake
+}
+
+func (c *FakeApps) PetSets(namespace string) client.PetSetInterface {
+	return &FakePetSets{Fake: c, Namespace: namespace}
+}
+
+// NewSimpleFakeAuthorization returns a client that will respond with the provided objects
+func NewSimpleFakeAuthorization(objects ...runtime.Object) *FakeAuthorization {
+	return &FakeAuthorization{Fake: NewSimpleFake(objects...)}
+}
+
+type FakeAuthorization struct {
+	*Fake
+}
+
+func (c *FakeAuthorization) SubjectAccessReviews() client.SubjectAccessReviewInterface {
+	return &FakeSubjectAccessReviews{Fake: c}
 }
 
 // NewSimpleFakeAutoscaling returns a client that will respond with the provided objects
@@ -328,6 +378,18 @@ func (c *FakeAutoscaling) HorizontalPodAutoscalers(namespace string) client.Hori
 	return &FakeHorizontalPodAutoscalers{Fake: c, Namespace: namespace}
 }
 
+func NewSimpleFakeAuthentication(objects ...runtime.Object) *FakeAuthentication {
+	return &FakeAuthentication{Fake: NewSimpleFake(objects...)}
+}
+
+type FakeAuthentication struct {
+	*Fake
+}
+
+func (c *FakeAuthentication) TokenReviews() client.TokenReviewInterface {
+	return &FakeTokenReviews{Fake: c}
+}
+
 // NewSimpleFakeBatch returns a client that will respond with the provided objects
 func NewSimpleFakeBatch(objects ...runtime.Object) *FakeBatch {
 	return &FakeBatch{Fake: NewSimpleFake(objects...)}
@@ -339,6 +401,10 @@ type FakeBatch struct {
 
 func (c *FakeBatch) Jobs(namespace string) client.JobInterface {
 	return &FakeJobsV1{Fake: c, Namespace: namespace}
+}
+
+func (c *FakeBatch) ScheduledJobs(namespace string) client.ScheduledJobInterface {
+	return &FakeScheduledJobs{Fake: c, Namespace: namespace}
 }
 
 // NewSimpleFakeExp returns a client that will respond with the provided objects
@@ -378,8 +444,56 @@ func (c *FakeExperimental) ReplicaSets(namespace string) client.ReplicaSetInterf
 	return &FakeReplicaSets{Fake: c, Namespace: namespace}
 }
 
+func (c *FakeExperimental) NetworkPolicies(namespace string) client.NetworkPolicyInterface {
+	return &FakeNetworkPolicies{Fake: c, Namespace: namespace}
+}
+
+func NewSimpleFakeRbac(objects ...runtime.Object) *FakeRbac {
+	return &FakeRbac{Fake: NewSimpleFake(objects...)}
+}
+
+type FakeRbac struct {
+	*Fake
+}
+
+func (c *FakeRbac) Roles(namespace string) client.RoleInterface {
+	return &FakeRoles{Fake: c, Namespace: namespace}
+}
+
+func (c *FakeRbac) RoleBindings(namespace string) client.RoleBindingInterface {
+	return &FakeRoleBindings{Fake: c, Namespace: namespace}
+}
+
+func (c *FakeRbac) ClusterRoles() client.ClusterRoleInterface {
+	return &FakeClusterRoles{Fake: c}
+}
+
+func (c *FakeRbac) ClusterRoleBindings() client.ClusterRoleBindingInterface {
+	return &FakeClusterRoleBindings{Fake: c}
+}
+
+func NewSimpleFakeStorage(objects ...runtime.Object) *FakeStorage {
+	return &FakeStorage{Fake: NewSimpleFake(objects...)}
+}
+
+type FakeStorage struct {
+	*Fake
+}
+
+func (c *FakeStorage) StorageClasses() client.StorageClassInterface {
+	return &FakeStorageClasses{Fake: c}
+}
+
 type FakeDiscovery struct {
 	*Fake
+}
+
+func (c *FakeDiscovery) ServerPreferredResources() ([]unversioned.GroupVersionResource, error) {
+	return nil, nil
+}
+
+func (c *FakeDiscovery) ServerPreferredNamespacedResources() ([]unversioned.GroupVersionResource, error) {
+	return nil, nil
 }
 
 func (c *FakeDiscovery) ServerResourcesForGroupVersion(groupVersion string) (*unversioned.APIResourceList, error) {

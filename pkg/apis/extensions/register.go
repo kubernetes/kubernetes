@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -30,23 +30,23 @@ const GroupName = "extensions"
 // SchemeGroupVersion is group version used to register these objects
 var SchemeGroupVersion = unversioned.GroupVersion{Group: GroupName, Version: runtime.APIVersionInternal}
 
-// Kind takes an unqualified kind and returns back a Group qualified GroupKind
+// Kind takes an unqualified kind and returns a Group qualified GroupKind
 func Kind(kind string) unversioned.GroupKind {
 	return SchemeGroupVersion.WithKind(kind).GroupKind()
 }
 
-// Resource takes an unqualified resource and returns back a Group qualified GroupResource
+// Resource takes an unqualified resource and returns a Group qualified GroupResource
 func Resource(resource string) unversioned.GroupResource {
 	return SchemeGroupVersion.WithResource(resource).GroupResource()
 }
 
-func AddToScheme(scheme *runtime.Scheme) {
-	// Add the API to Scheme.
-	addKnownTypes(scheme)
-}
+var (
+	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)
+	AddToScheme   = SchemeBuilder.AddToScheme
+)
 
 // Adds the list of known types to api.Scheme.
-func addKnownTypes(scheme *runtime.Scheme) {
+func addKnownTypes(scheme *runtime.Scheme) error {
 	// TODO this gets cleaned up when the types are fixed
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&Deployment{},
@@ -68,28 +68,14 @@ func addKnownTypes(scheme *runtime.Scheme) {
 		&Ingress{},
 		&IngressList{},
 		&api.ListOptions{},
+		&api.DeleteOptions{},
 		&ReplicaSet{},
 		&ReplicaSetList{},
 		&api.ExportOptions{},
 		&PodSecurityPolicy{},
 		&PodSecurityPolicyList{},
+		&NetworkPolicy{},
+		&NetworkPolicyList{},
 	)
+	return nil
 }
-
-func (obj *Deployment) GetObjectKind() unversioned.ObjectKind                 { return &obj.TypeMeta }
-func (obj *DeploymentList) GetObjectKind() unversioned.ObjectKind             { return &obj.TypeMeta }
-func (obj *DeploymentRollback) GetObjectKind() unversioned.ObjectKind         { return &obj.TypeMeta }
-func (obj *ReplicationControllerDummy) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
-func (obj *Scale) GetObjectKind() unversioned.ObjectKind                      { return &obj.TypeMeta }
-func (obj *ThirdPartyResource) GetObjectKind() unversioned.ObjectKind         { return &obj.TypeMeta }
-func (obj *ThirdPartyResourceList) GetObjectKind() unversioned.ObjectKind     { return &obj.TypeMeta }
-func (obj *DaemonSet) GetObjectKind() unversioned.ObjectKind                  { return &obj.TypeMeta }
-func (obj *DaemonSetList) GetObjectKind() unversioned.ObjectKind              { return &obj.TypeMeta }
-func (obj *ThirdPartyResourceData) GetObjectKind() unversioned.ObjectKind     { return &obj.TypeMeta }
-func (obj *ThirdPartyResourceDataList) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
-func (obj *Ingress) GetObjectKind() unversioned.ObjectKind                    { return &obj.TypeMeta }
-func (obj *IngressList) GetObjectKind() unversioned.ObjectKind                { return &obj.TypeMeta }
-func (obj *ReplicaSet) GetObjectKind() unversioned.ObjectKind                 { return &obj.TypeMeta }
-func (obj *ReplicaSetList) GetObjectKind() unversioned.ObjectKind             { return &obj.TypeMeta }
-func (obj *PodSecurityPolicy) GetObjectKind() unversioned.ObjectKind          { return &obj.TypeMeta }
-func (obj *PodSecurityPolicyList) GetObjectKind() unversioned.ObjectKind      { return &obj.TypeMeta }

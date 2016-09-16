@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -15,4 +15,4 @@ limitations under the License.
 */
 
 // security contains admission plugins specific to cluster security.
-package security
+package security // import "k8s.io/kubernetes/plugin/pkg/admission/security"

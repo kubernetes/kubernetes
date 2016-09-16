@@ -20,7 +20,9 @@ import (
 	"path"
 	"strings"
 
+	rktapi "github.com/coreos/rkt/api/v1alpha"
 	"github.com/golang/glog"
+	"golang.org/x/net/context"
 )
 
 type parsedName struct {
@@ -28,34 +30,80 @@ type parsedName struct {
 	Container string
 }
 
-func verifyName(name string) (bool, error) {
-	_, err := parseName(name)
-	return err == nil, err
+func verifyPod(name string) (bool, error) {
+	pod, err := cgroupToPod(name)
+
+	if err != nil || pod == nil {
+		return false, err
+	}
+
+	// Anything handler can handle is also accepted.
+	// Accept cgroups that are sub the pod cgroup, except "system.slice"
+	//   - "system.slice" doesn't contain any processes itself
+	accept := !strings.HasSuffix(name, "/system.slice")
+
+	return accept, nil
+}
+
+func cgroupToPod(name string) (*rktapi.Pod, error) {
+	rktClient, err := Client()
+	if err != nil {
+		return nil, fmt.Errorf("couldn't get rkt api service: %v", err)
+	}
+
+	resp, err := rktClient.ListPods(context.Background(), &rktapi.ListPodsRequest{
+		Filters: []*rktapi.PodFilter{
+			{
+				States:        []rktapi.PodState{rktapi.PodState_POD_STATE_RUNNING},
+				PodSubCgroups: []string{name},
+			},
+		},
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to list pods: %v", err)
+	}
+
+	if len(resp.Pods) == 0 {
+		return nil, nil
+	}
+
+	if len(resp.Pods) != 1 {
+		return nil, fmt.Errorf("returned %d (expected 1) pods for cgroup %v", len(resp.Pods), name)
+	}
+
+	return resp.Pods[0], nil
 }
 
 /* Parse cgroup name into a pod/container name struct
    Example cgroup fs name
 
-   pod - /sys/fs/cgroup/cpu/machine.slice/machine-rkt\\x2df556b64a\\x2d17a7\\x2d47d7\\x2d93ec\\x2def2275c3d67e.scope/
-   container under pod - /sys/fs/cgroup/cpu/machine.slice/machine-rkt\\x2df556b64a\\x2d17a7\\x2d47d7\\x2d93ec\\x2def2275c3d67e.scope/system.slice/alpine-sh.service
+   pod - /machine.slice/machine-rkt\\x2df556b64a\\x2d17a7\\x2d47d7\\x2d93ec\\x2def2275c3d67e.scope/
+    or   /system.slice/k8s-..../
+   container under pod - /machine.slice/machine-rkt\\x2df556b64a\\x2d17a7\\x2d47d7\\x2d93ec\\x2def2275c3d67e.scope/system.slice/alpine-sh.service
+    or  /system.slice/k8s-..../system.slice/pause.service
 */
-//TODO{sjpotter}: this currently only recognizes machined started pods, which actually doesn't help with k8s which uses them as systemd services, need a solution for both
 func parseName(name string) (*parsedName, error) {
-	splits := strings.Split(name, "/")
-	if len(splits) == 3 || len(splits) == 5 {
-		parsed := &parsedName{}
+	pod, err := cgroupToPod(name)
+	if err != nil {
+		return nil, fmt.Errorf("parseName: couldn't convert %v to a rkt pod: %v", name, err)
+	}
+	if pod == nil {
+		return nil, fmt.Errorf("parseName: didn't return a pod for %v", name)
+	}
 
-		if splits[1] == "machine.slice" {
-			replacer := strings.NewReplacer("machine-rkt\\x2d", "", ".scope", "", "\\x2d", "-")
-			parsed.Pod = replacer.Replace(splits[2])
-			if len(splits) == 3 {
-				return parsed, nil
-			}
-			if splits[3] == "system.slice" {
-				parsed.Container = strings.Replace(splits[4], ".service", "", -1)
-				return parsed, nil
-			}
+	splits := strings.Split(name, "/")
+
+	parsed := &parsedName{}
+
+	if len(splits) == 3 || len(splits) == 5 {
+		parsed.Pod = pod.Id
+
+		if len(splits) == 5 {
+			parsed.Container = strings.Replace(splits[4], ".service", "", -1)
 		}
+
+		return parsed, nil
 	}
 
 	return nil, fmt.Errorf("%s not handled by rkt handler", name)
@@ -80,7 +128,7 @@ func getRootFs(root string, parsed *parsedName) string {
 
 	bytes, err := ioutil.ReadFile(tree)
 	if err != nil {
-		glog.Infof("ReadFile failed, couldn't read %v to get upper dir: %v", tree, err)
+		glog.Errorf("ReadFile failed, couldn't read %v to get upper dir: %v", tree, err)
 		return ""
 	}
 

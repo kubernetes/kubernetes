@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# Copyright 2015 The Kubernetes Authors All rights reserved.
+# Copyright 2015 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,7 +23,8 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 readonly branch=${1:-${KUBE_VERIFY_GIT_BRANCH:-master}}
 if ! [[ ${KUBE_FORCE_VERIFY_CHECKS:-} =~ ^[yY]$ ]] && \
-  ! kube::util::has_changes_against_upstream_branch "${branch}" 'Godeps/'; then
+  ! kube::util::has_changes_against_upstream_branch "${branch}" 'Godeps/' && \
+  ! kube::util::has_changes_against_upstream_branch "${branch}" 'vendor/'; then
   exit 0
 fi
 
@@ -32,9 +33,9 @@ fi
 # to work with docker-machine on macs
 mkdir -p "${KUBE_ROOT}/_tmp"
 _tmpdir="$(mktemp -d "${KUBE_ROOT}/_tmp/kube-godep-licenses.XXXXXX")"
-echo "Created workspace: ${_tmpdir}"
+#echo "Created workspace: ${_tmpdir}"
 function cleanup {
-  echo "Removing workspace: ${_tmpdir}"
+  #echo "Removing workspace: ${_tmpdir}"
   rm -rf "${_tmpdir}"
 }
 trap cleanup EXIT
@@ -48,7 +49,7 @@ LICENSE_ROOT="${_tmpdir}" "${KUBE_ROOT}/hack/update-godep-licenses.sh"
 
 # Compare Godep Licenses
 if ! _out="$(diff -Naupr ${KUBE_ROOT}/Godeps/LICENSES ${_tmpdir}/Godeps/LICENSES)"; then
-  echo "Your godep licenses file is out of date. Run hack/update-godep-licenses.sh --create-missing and commit the results."
+  echo "Your godep licenses file is out of date. Run hack/update-godep-licenses.sh and commit the results."
   echo "${_out}"
   exit 1
 fi

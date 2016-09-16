@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -80,5 +80,5 @@ func (kl *executorKubelet) Run(mergedUpdates <-chan kubetypes.PodUpdate) {
 
 	//TODO(jdef) revisit this if/when executor failover lands
 	// Force kubelet to delete all pods.
-	kl.HandlePodDeletions(kl.GetPods())
+	kl.HandlePodRemoves(kl.GetPods())
 }

@@ -9,15 +9,9 @@ build:
     - GOVC_INSECURE=1
     - VCA=1
   commands:
-    - go get golang.org/x/tools/cmd/vet
-    - go get golang.org/x/tools/cmd/goimports
-    - go get github.com/davecgh/go-spew/spew
-    - go get
-    - make all
-    - make install
+    - make all install
     - git clone https://github.com/sstephenson/bats.git /tmp/bats
     - /tmp/bats/install.sh /usr/local
     - apt-get -qq update && apt-get install -yqq uuid-runtime bsdmainutils jq
     - govc/test/images/update.sh
     - bats govc/test
-    - govc/test/clean.sh

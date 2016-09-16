@@ -117,7 +117,7 @@ cmd := &cobra.Command{
 ```
 
 The aliases are not shown to the user on tab completion, but they are accepted as valid nouns by
-the completion aglorithm if entered manually, e.g. in:
+the completion algorithm if entered manually, e.g. in:
 
 ```bash
 # kubectl get rc [tab][tab]
@@ -175,7 +175,7 @@ So while there are many other files in the CWD it only shows me subdirs and thos
 
 # Specifiy custom flag completion
 
-Similar to the filename completion and filtering usingn cobra.BashCompFilenameExt, you can specifiy
+Similar to the filename completion and filtering using cobra.BashCompFilenameExt, you can specifiy
 a custom flag completion function with cobra.BashCompCustom:
 
 ```go

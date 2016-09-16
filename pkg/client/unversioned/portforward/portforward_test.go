@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -88,7 +88,8 @@ func TestParsePortsAndNew(t *testing.T) {
 
 		dialer := &fakeDialer{}
 		expectedStopChan := make(chan struct{})
-		pf, err := New(dialer, test.input, expectedStopChan, os.Stdout, os.Stderr)
+		readyChan := make(chan struct{})
+		pf, err := New(dialer, test.input, expectedStopChan, readyChan, os.Stdout, os.Stderr)
 		haveError = err != nil
 		if e, a := test.expectNewError, haveError; e != a {
 			t.Fatalf("%d: New: error expected=%t, got %t: %s", i, e, a, err)
@@ -305,8 +306,9 @@ func TestForwardPorts(t *testing.T) {
 		}
 
 		stopChan := make(chan struct{}, 1)
+		readyChan := make(chan struct{})
 
-		pf, err := New(exec, test.ports, stopChan, os.Stdout, os.Stderr)
+		pf, err := New(exec, test.ports, stopChan, readyChan, os.Stdout, os.Stderr)
 		if err != nil {
 			t.Fatalf("%s: unexpected error calling New: %v", testName, err)
 		}
@@ -375,8 +377,9 @@ func TestForwardPortsReturnsErrorWhenAllBindsFailed(t *testing.T) {
 
 	stopChan1 := make(chan struct{}, 1)
 	defer close(stopChan1)
+	readyChan1 := make(chan struct{})
 
-	pf1, err := New(exec, []string{"5555"}, stopChan1, os.Stdout, os.Stderr)
+	pf1, err := New(exec, []string{"5555"}, stopChan1, readyChan1, os.Stdout, os.Stderr)
 	if err != nil {
 		t.Fatalf("error creating pf1: %v", err)
 	}
@@ -384,7 +387,8 @@ func TestForwardPortsReturnsErrorWhenAllBindsFailed(t *testing.T) {
 	<-pf1.Ready
 
 	stopChan2 := make(chan struct{}, 1)
-	pf2, err := New(exec, []string{"5555"}, stopChan2, os.Stdout, os.Stderr)
+	readyChan2 := make(chan struct{})
+	pf2, err := New(exec, []string{"5555"}, stopChan2, readyChan2, os.Stdout, os.Stderr)
 	if err != nil {
 		t.Fatalf("error creating pf2: %v", err)
 	}

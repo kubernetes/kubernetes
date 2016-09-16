@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -96,4 +96,14 @@ func (c *FakeThirdPartyResources) List(opts api.ListOptions) (result *extensions
 func (c *FakeThirdPartyResources) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(core.NewRootWatchAction(thirdpartyresourcesResource, opts))
+}
+
+// Patch applies the patch and returns the patched thirdPartyResource.
+func (c *FakeThirdPartyResources) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *extensions.ThirdPartyResource, err error) {
+	obj, err := c.Fake.
+		Invokes(core.NewRootPatchSubresourceAction(thirdpartyresourcesResource, name, data, subresources...), &extensions.ThirdPartyResource{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*extensions.ThirdPartyResource), err
 }

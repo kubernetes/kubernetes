@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,10 +21,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"regexp"
-	"strings"
 
 	"github.com/golang/glog"
+	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
@@ -58,51 +57,49 @@ type AnnotateOptions struct {
 	recursive bool
 }
 
-const (
-	annotate_resources = `
-  pod (po), service (svc), replicationcontroller (rc),
-  node (no), event (ev), componentstatuse (cs),
-  limitrange (limits), persistentvolume (pv), persistentvolumeclaim (pvc),
-  horizontalpodautoscaler (hpa), resourcequota (quota), secret
-`
+var (
+	annotate_long = dedent.Dedent(`
+		Update the annotations on one or more resources.
 
-	annotate_long = `Update the annotations on one or more resources.
+		An annotation is a key/value pair that can hold larger (compared to a label), and possibly not human-readable, data.
+		It is intended to store non-identifying auxiliary data, especially data manipulated by tools and system extensions.
+		If --overwrite is true, then existing annotations can be overwritten, otherwise attempting to overwrite an annotation will result in an error.
+		If --resource-version is specified, then updates will use this resource version, otherwise the existing resource-version will be used.
 
-An annotation is a key/value pair that can hold larger (compared to a label), and possibly not human-readable, data.
-It is intended to store non-identifying auxiliary data, especially data manipulated by tools and system extensions.
-If --overwrite is true, then existing annotations can be overwritten, otherwise attempting to overwrite an annotation will result in an error.
-If --resource-version is specified, then updates will use this resource version, otherwise the existing resource-version will be used.
+		`) + valid_resources
 
-Possible resources include (case insensitive):` + annotate_resources
+	annotate_example = dedent.Dedent(`
+		# Update pod 'foo' with the annotation 'description' and the value 'my frontend'.
+		# If the same annotation is set multiple times, only the last value will be applied
+		kubectl annotate pods foo description='my frontend'
 
-	annotate_example = `# Update pod 'foo' with the annotation 'description' and the value 'my frontend'.
-# If the same annotation is set multiple times, only the last value will be applied
-kubectl annotate pods foo description='my frontend'
+		# Update a pod identified by type and name in "pod.json"
+		kubectl annotate -f pod.json description='my frontend'
 
-# Update a pod identified by type and name in "pod.json"
-kubectl annotate -f pod.json description='my frontend'
+		# Update pod 'foo' with the annotation 'description' and the value 'my frontend running nginx', overwriting any existing value.
+		kubectl annotate --overwrite pods foo description='my frontend running nginx'
 
-# Update pod 'foo' with the annotation 'description' and the value 'my frontend running nginx', overwriting any existing value.
-kubectl annotate --overwrite pods foo description='my frontend running nginx'
+		# Update all pods in the namespace
+		kubectl annotate pods --all description='my frontend running nginx'
 
-# Update all pods in the namespace
-kubectl annotate pods --all description='my frontend running nginx'
+		# Update pod 'foo' only if the resource is unchanged from version 1.
+		kubectl annotate pods foo description='my frontend running nginx' --resource-version=1
 
-# Update pod 'foo' only if the resource is unchanged from version 1.
-kubectl annotate pods foo description='my frontend running nginx' --resource-version=1
-
-# Update pod 'foo' by removing an annotation named 'description' if it exists.
-# Does not require the --overwrite flag.
-kubectl annotate pods foo description-`
+		# Update pod 'foo' by removing an annotation named 'description' if it exists.
+		# Does not require the --overwrite flag.
+		kubectl annotate pods foo description-`)
 )
 
 func NewCmdAnnotate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &AnnotateOptions{}
 
 	validArgs, argAliases := []string{}, []string{}
-	resources := regexp.MustCompile(`\s*,`).Split(annotate_resources, -1)
-	for _, r := range resources {
-		validArgs = append(validArgs, strings.Fields(r)[0])
+	p, err := f.Printer(nil, kubectl.PrintOptions{
+		ColumnLabels: []string{},
+	})
+	cmdutil.CheckErr(err)
+	if p != nil {
+		validArgs = p.HandledResources()
 		argAliases = kubectl.ResourceAliases(validArgs)
 	}
 
@@ -148,22 +145,11 @@ func (o *AnnotateOptions) Complete(f *cmdutil.Factory, out io.Writer, cmd *cobra
 
 	// retrieves resource and annotation args from args
 	// also checks args to verify that all resources are specified before annotations
-	annotationArgs := []string{}
-	metAnnotaionArg := false
-	for _, s := range args {
-		isAnnotation := strings.Contains(s, "=") || strings.HasSuffix(s, "-")
-		switch {
-		case !metAnnotaionArg && isAnnotation:
-			metAnnotaionArg = true
-			fallthrough
-		case metAnnotaionArg && isAnnotation:
-			annotationArgs = append(annotationArgs, s)
-		case !metAnnotaionArg && !isAnnotation:
-			o.resources = append(o.resources, s)
-		case metAnnotaionArg && !isAnnotation:
-			return fmt.Errorf("all resources must be specified before annotation changes: %s", s)
-		}
+	resources, annotationArgs, err := cmdutil.GetResourcesAndPairs(args, "annotation")
+	if err != nil {
+		return err
 	}
+	o.resources = resources
 	if len(o.resources) < 1 && len(o.filenames) == 0 {
 		return fmt.Errorf("one or more resources must be specified as <resource> <name> or <resource>/<name>")
 	}
@@ -197,16 +183,7 @@ func (o *AnnotateOptions) Complete(f *cmdutil.Factory, out io.Writer, cmd *cobra
 
 // Validate checks to the AnnotateOptions to see if there is sufficient information run the command.
 func (o AnnotateOptions) Validate(args []string) error {
-	if err := validateAnnotations(o.removeAnnotations, o.newAnnotations); err != nil {
-		return err
-	}
-
-	// only apply resource version locking on a single resource
-	if len(o.resources) > 1 && len(o.resourceVersion) > 0 {
-		return fmt.Errorf("--resource-version may only be used with a single resource")
-	}
-
-	return nil
+	return validateAnnotations(o.removeAnnotations, o.newAnnotations)
 }
 
 // RunAnnotate does the work
@@ -216,12 +193,23 @@ func (o AnnotateOptions) RunAnnotate() error {
 		return err
 	}
 
+	var singularResource bool
+	r.IntoSingular(&singularResource)
+
+	// only apply resource version locking on a single resource.
+	// we must perform this check after o.builder.Do() as
+	// []o.resources can not not accurately return the proper number
+	// of resources when they are not passed in "resource/name" format.
+	if !singularResource && len(o.resourceVersion) > 0 {
+		return fmt.Errorf("--resource-version may only be used with a single resource")
+	}
+
 	return r.Visit(func(info *resource.Info, err error) error {
 		if err != nil {
 			return err
 		}
 
-		obj, err := info.Mapping.ConvertToVersion(info.Object, info.Mapping.GroupVersionKind.GroupVersion())
+		obj, err := cmdutil.MaybeConvertObject(info.Object, info.Mapping.GroupVersionKind.GroupVersion(), info.Mapping)
 		if err != nil {
 			return err
 		}
@@ -277,34 +265,7 @@ func (o AnnotateOptions) RunAnnotate() error {
 
 // parseAnnotations retrieves new and remove annotations from annotation args
 func parseAnnotations(annotationArgs []string) (map[string]string, []string, error) {
-	var invalidBuf bytes.Buffer
-	newAnnotations := map[string]string{}
-	removeAnnotations := []string{}
-	for _, annotationArg := range annotationArgs {
-		if strings.Index(annotationArg, "=") != -1 {
-			parts := strings.SplitN(annotationArg, "=", 2)
-			if len(parts) != 2 || len(parts[1]) == 0 {
-				if invalidBuf.Len() > 0 {
-					invalidBuf.WriteString(", ")
-				}
-				invalidBuf.WriteString(fmt.Sprintf(annotationArg))
-			} else {
-				newAnnotations[parts[0]] = parts[1]
-			}
-		} else if strings.HasSuffix(annotationArg, "-") {
-			removeAnnotations = append(removeAnnotations, annotationArg[:len(annotationArg)-1])
-		} else {
-			if invalidBuf.Len() > 0 {
-				invalidBuf.WriteString(", ")
-			}
-			invalidBuf.WriteString(fmt.Sprintf(annotationArg))
-		}
-	}
-	if invalidBuf.Len() > 0 {
-		return newAnnotations, removeAnnotations, fmt.Errorf("invalid annotation format: %s", invalidBuf.String())
-	}
-
-	return newAnnotations, removeAnnotations, nil
+	return cmdutil.ParsePairs(annotationArgs, "annotation", true)
 }
 
 // validateAnnotations checks the format of annotation args and checks removed annotations aren't in the new annotations map

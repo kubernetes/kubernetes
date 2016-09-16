@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -224,6 +224,12 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 	for k, tc := range testCases {
 		getter := serviceaccountcontroller.NewGetterFromClient(tc.Client)
 		authenticator := serviceaccount.JWTTokenAuthenticator(tc.Keys, tc.Client != nil, getter)
+
+		// An invalid, non-JWT token should always fail
+		if _, ok, err := authenticator.AuthenticateToken("invalid token"); err != nil || ok {
+			t.Errorf("%s: Expected err=nil, ok=false for non-JWT token", k)
+			continue
+		}
 
 		user, ok, err := authenticator.AuthenticateToken(token)
 		if (err != nil) != tc.ExpectedErr {

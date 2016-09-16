@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -28,8 +28,8 @@ type MesosCadvisor struct {
 	mem   uint64
 }
 
-func NewMesosCadvisor(cores int, mem uint64, port uint) (*MesosCadvisor, error) {
-	c, err := cadvisor.New(port)
+func NewMesosCadvisor(cores int, mem uint64, port uint, runtime string) (*MesosCadvisor, error) {
+	c, err := cadvisor.New(port, runtime)
 	if err != nil {
 		return nil, err
 	}

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -52,7 +52,7 @@ const (
 type NetworkPlugin interface {
 	// Init initializes the plugin.  This will be called exactly once
 	// before any other methods are called.
-	Init(host Host, hairpinMode componentconfig.HairpinMode) error
+	Init(host Host, hairpinMode componentconfig.HairpinMode, nonMasqueradeCIDR string, mtu int) error
 
 	// Called on various events like:
 	// NET_PLUGIN_EVENT_POD_CIDR_CHANGE
@@ -68,12 +68,15 @@ type NetworkPlugin interface {
 	// SetUpPod is the method called after the infra container of
 	// the pod has been created but before the other containers of the
 	// pod are launched.
+	// TODO: rename podInfraContainerID to sandboxID
 	SetUpPod(namespace string, name string, podInfraContainerID kubecontainer.ContainerID) error
 
 	// TearDownPod is the method called before a pod's infra container will be deleted
+	// TODO: rename podInfraContainerID to sandboxID
 	TearDownPod(namespace string, name string, podInfraContainerID kubecontainer.ContainerID) error
 
 	// Status is the method called to obtain the ipv4 or ipv6 addresses of the container
+	// TODO: rename podInfraContainerID to sandboxID
 	GetPodNetworkStatus(namespace string, name string, podInfraContainerID kubecontainer.ContainerID) (*PodNetworkStatus, error)
 
 	// NetworkStatus returns error if the network plugin is in error state
@@ -105,11 +108,11 @@ type Host interface {
 }
 
 // InitNetworkPlugin inits the plugin that matches networkPluginName. Plugins must have unique names.
-func InitNetworkPlugin(plugins []NetworkPlugin, networkPluginName string, host Host, hairpinMode componentconfig.HairpinMode) (NetworkPlugin, error) {
+func InitNetworkPlugin(plugins []NetworkPlugin, networkPluginName string, host Host, hairpinMode componentconfig.HairpinMode, nonMasqueradeCIDR string, mtu int) (NetworkPlugin, error) {
 	if networkPluginName == "" {
 		// default to the no_op plugin
 		plug := &NoopNetworkPlugin{}
-		if err := plug.Init(host, hairpinMode); err != nil {
+		if err := plug.Init(host, hairpinMode, nonMasqueradeCIDR, mtu); err != nil {
 			return nil, err
 		}
 		return plug, nil
@@ -120,8 +123,8 @@ func InitNetworkPlugin(plugins []NetworkPlugin, networkPluginName string, host H
 	allErrs := []error{}
 	for _, plugin := range plugins {
 		name := plugin.Name()
-		if len(validation.IsQualifiedName(name)) != 0 {
-			allErrs = append(allErrs, fmt.Errorf("network plugin has invalid name: %#v", plugin))
+		if errs := validation.IsQualifiedName(name); len(errs) != 0 {
+			allErrs = append(allErrs, fmt.Errorf("network plugin has invalid name: %q: %s", name, strings.Join(errs, ";")))
 			continue
 		}
 
@@ -134,7 +137,7 @@ func InitNetworkPlugin(plugins []NetworkPlugin, networkPluginName string, host H
 
 	chosenPlugin := pluginMap[networkPluginName]
 	if chosenPlugin != nil {
-		err := chosenPlugin.Init(host, hairpinMode)
+		err := chosenPlugin.Init(host, hairpinMode, nonMasqueradeCIDR, mtu)
 		if err != nil {
 			allErrs = append(allErrs, fmt.Errorf("Network plugin %q failed init: %v", networkPluginName, err))
 		} else {
@@ -154,9 +157,9 @@ func UnescapePluginName(in string) string {
 type NoopNetworkPlugin struct {
 }
 
-const sysctlBridgeCallIptables = "net/bridge/bridge-nf-call-iptables"
+const sysctlBridgeCallIPTables = "net/bridge/bridge-nf-call-iptables"
 
-func (plugin *NoopNetworkPlugin) Init(host Host, hairpinMode componentconfig.HairpinMode) error {
+func (plugin *NoopNetworkPlugin) Init(host Host, hairpinMode componentconfig.HairpinMode, nonMasqueradeCIDR string, mtu int) error {
 	// Set bridge-nf-call-iptables=1 to maintain compatibility with older
 	// kubernetes versions to ensure the iptables-based kube proxy functions
 	// correctly.  Other plugins are responsible for setting this correctly
@@ -166,8 +169,8 @@ func (plugin *NoopNetworkPlugin) Init(host Host, hairpinMode componentconfig.Hai
 	// Ensure the netfilter module is loaded on kernel >= 3.18; previously
 	// it was built-in.
 	utilexec.New().Command("modprobe", "br-netfilter").CombinedOutput()
-	if err := utilsysctl.SetSysctl(sysctlBridgeCallIptables, 1); err != nil {
-		glog.Warningf("can't set sysctl %s: %v", sysctlBridgeCallIptables, err)
+	if err := utilsysctl.New().SetSysctl(sysctlBridgeCallIPTables, 1); err != nil {
+		glog.Warningf("can't set sysctl %s: %v", sysctlBridgeCallIPTables, err)
 	}
 
 	return nil
@@ -198,4 +201,42 @@ func (plugin *NoopNetworkPlugin) GetPodNetworkStatus(namespace string, name stri
 
 func (plugin *NoopNetworkPlugin) Status() error {
 	return nil
+}
+
+func getOnePodIP(execer utilexec.Interface, nsenterPath, netnsPath, interfaceName, addrType string) (net.IP, error) {
+	// Try to retrieve ip inside container network namespace
+	output, err := execer.Command(nsenterPath, fmt.Sprintf("--net=%s", netnsPath), "-F", "--",
+		"ip", "-o", addrType, "addr", "show", "dev", interfaceName, "scope", "global").CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("Unexpected command output %s with error: %v", output, err)
+	}
+
+	lines := strings.Split(string(output), "\n")
+	if len(lines) < 1 {
+		return nil, fmt.Errorf("Unexpected command output %s", output)
+	}
+	fields := strings.Fields(lines[0])
+	if len(fields) < 4 {
+		return nil, fmt.Errorf("Unexpected address output %s ", lines[0])
+	}
+	ip, _, err := net.ParseCIDR(fields[3])
+	if err != nil {
+		return nil, fmt.Errorf("CNI failed to parse ip from output %s due to %v", output, err)
+	}
+
+	return ip, nil
+}
+
+// GetPodIP gets the IP of the pod by inspecting the network info inside the pod's network namespace.
+func GetPodIP(execer utilexec.Interface, nsenterPath, netnsPath, interfaceName string) (net.IP, error) {
+	ip, err := getOnePodIP(execer, nsenterPath, netnsPath, interfaceName, "-4")
+	if err != nil {
+		// Fall back to IPv6 address if no IPv4 address is present
+		ip, err = getOnePodIP(execer, nsenterPath, netnsPath, interfaceName, "-6")
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return ip, nil
 }

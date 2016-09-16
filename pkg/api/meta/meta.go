@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"reflect"
 
+	"k8s.io/kubernetes/pkg/api/meta/metatypes"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -28,65 +29,66 @@ import (
 	"github.com/golang/glog"
 )
 
+// errNotList is returned when an object implements the Object style interfaces but not the List style
+// interfaces.
+var errNotList = fmt.Errorf("object does not implement the List interfaces")
+
+// ListAccessor returns a List interface for the provided object or an error if the object does
+// not provide List.
+// IMPORTANT: Objects are a superset of lists, so all Objects return List metadata. Do not use this
+// check to determine whether an object *is* a List.
+// TODO: return bool instead of error
+func ListAccessor(obj interface{}) (List, error) {
+	switch t := obj.(type) {
+	case List:
+		return t, nil
+	case unversioned.List:
+		return t, nil
+	case ListMetaAccessor:
+		if m := t.GetListMeta(); m != nil {
+			return m, nil
+		}
+		return nil, errNotList
+	case unversioned.ListMetaAccessor:
+		if m := t.GetListMeta(); m != nil {
+			return m, nil
+		}
+		return nil, errNotList
+	case Object:
+		return t, nil
+	case ObjectMetaAccessor:
+		if m := t.GetObjectMeta(); m != nil {
+			return m, nil
+		}
+		return nil, errNotList
+	default:
+		return nil, errNotList
+	}
+}
+
+// errNotObject is returned when an object implements the List style interfaces but not the Object style
+// interfaces.
+var errNotObject = fmt.Errorf("object does not implement the Object interfaces")
+
 // Accessor takes an arbitrary object pointer and returns meta.Interface.
 // obj must be a pointer to an API type. An error is returned if the minimum
 // required fields are missing. Fields that are not required return the default
 // value and are a no-op if set.
+// TODO: return bool instead of error
 func Accessor(obj interface{}) (Object, error) {
-	if oi, ok := obj.(ObjectMetaAccessor); ok {
-		if om := oi.GetObjectMeta(); om != nil {
-			return om, nil
+	switch t := obj.(type) {
+	case Object:
+		return t, nil
+	case ObjectMetaAccessor:
+		if m := t.GetObjectMeta(); m != nil {
+			return m, nil
 		}
+		return nil, errNotObject
+	case List, unversioned.List, ListMetaAccessor, unversioned.ListMetaAccessor:
+		return nil, errNotObject
+	default:
+		return nil, errNotObject
 	}
-	// we may get passed an object that is directly portable to Object
-	if oi, ok := obj.(Object); ok {
-		return oi, nil
-	}
-
-	glog.V(4).Infof("Calling Accessor on non-internal object: %v", reflect.TypeOf(obj))
-	// legacy path for objects that do not implement Object and ObjectMetaAccessor via
-	// reflection - very slow code path.
-	v, err := conversion.EnforcePtr(obj)
-	if err != nil {
-		return nil, err
-	}
-	t := v.Type()
-	if v.Kind() != reflect.Struct {
-		return nil, fmt.Errorf("expected struct, but got %v: %v (%#v)", v.Kind(), t, v.Interface())
-	}
-
-	typeMeta := v.FieldByName("TypeMeta")
-	if !typeMeta.IsValid() {
-		return nil, fmt.Errorf("struct %v lacks embedded TypeMeta type", t)
-	}
-
-	a := &genericAccessor{}
-	if err := extractFromTypeMeta(typeMeta, a); err != nil {
-		return nil, fmt.Errorf("unable to find type fields on %#v: %v", typeMeta, err)
-	}
-
-	objectMeta := v.FieldByName("ObjectMeta")
-	if objectMeta.IsValid() {
-		// look for the ObjectMeta fields
-		if err := extractFromObjectMeta(objectMeta, a); err != nil {
-			return nil, fmt.Errorf("unable to find object fields on %#v: %v", objectMeta, err)
-		}
-	} else {
-		listMeta := v.FieldByName("ListMeta")
-		if listMeta.IsValid() {
-			// look for the ListMeta fields
-			if err := extractFromListMeta(listMeta, a); err != nil {
-				return nil, fmt.Errorf("unable to find list fields on %#v: %v", listMeta, err)
-			}
-		} else {
-			// look for the older TypeMeta with all metadata
-			if err := extractFromObjectMeta(typeMeta, a); err != nil {
-				return nil, fmt.Errorf("unable to find object fields on %#v: %v", typeMeta, err)
-			}
-		}
-	}
-
-	return a, nil
 }
 
 // TypeAccessor returns an interface that allows retrieving and modifying the APIVersion
@@ -243,7 +245,7 @@ func (resourceAccessor) SetUID(obj runtime.Object, uid types.UID) error {
 }
 
 func (resourceAccessor) SelfLink(obj runtime.Object) (string, error) {
-	accessor, err := Accessor(obj)
+	accessor, err := ListAccessor(obj)
 	if err != nil {
 		return "", err
 	}
@@ -251,7 +253,7 @@ func (resourceAccessor) SelfLink(obj runtime.Object) (string, error) {
 }
 
 func (resourceAccessor) SetSelfLink(obj runtime.Object, selfLink string) error {
-	accessor, err := Accessor(obj)
+	accessor, err := ListAccessor(obj)
 	if err != nil {
 		return err
 	}
@@ -294,7 +296,7 @@ func (resourceAccessor) SetAnnotations(obj runtime.Object, annotations map[strin
 }
 
 func (resourceAccessor) ResourceVersion(obj runtime.Object) (string, error) {
-	accessor, err := Accessor(obj)
+	accessor, err := ListAccessor(obj)
 	if err != nil {
 		return "", err
 	}
@@ -302,11 +304,59 @@ func (resourceAccessor) ResourceVersion(obj runtime.Object) (string, error) {
 }
 
 func (resourceAccessor) SetResourceVersion(obj runtime.Object, version string) error {
-	accessor, err := Accessor(obj)
+	accessor, err := ListAccessor(obj)
 	if err != nil {
 		return err
 	}
 	accessor.SetResourceVersion(version)
+	return nil
+}
+
+// extractFromOwnerReference extracts v to o. v is the OwnerReferences field of an object.
+func extractFromOwnerReference(v reflect.Value, o *metatypes.OwnerReference) error {
+	if err := runtime.Field(v, "APIVersion", &o.APIVersion); err != nil {
+		return err
+	}
+	if err := runtime.Field(v, "Kind", &o.Kind); err != nil {
+		return err
+	}
+	if err := runtime.Field(v, "Name", &o.Name); err != nil {
+		return err
+	}
+	if err := runtime.Field(v, "UID", &o.UID); err != nil {
+		return err
+	}
+	var controllerPtr *bool
+	if err := runtime.Field(v, "Controller", &controllerPtr); err != nil {
+		return err
+	}
+	if controllerPtr != nil {
+		controller := *controllerPtr
+		o.Controller = &controller
+	}
+	return nil
+}
+
+// setOwnerReference sets v to o. v is the OwnerReferences field of an object.
+func setOwnerReference(v reflect.Value, o *metatypes.OwnerReference) error {
+	if err := runtime.SetField(o.APIVersion, v, "APIVersion"); err != nil {
+		return err
+	}
+	if err := runtime.SetField(o.Kind, v, "Kind"); err != nil {
+		return err
+	}
+	if err := runtime.SetField(o.Name, v, "Name"); err != nil {
+		return err
+	}
+	if err := runtime.SetField(o.UID, v, "UID"); err != nil {
+		return err
+	}
+	if o.Controller != nil {
+		controller := *(o.Controller)
+		if err := runtime.SetField(&controller, v, "Controller"); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -325,6 +375,8 @@ type genericAccessor struct {
 	deletionTimestamp **unversioned.Time
 	labels            *map[string]string
 	annotations       *map[string]string
+	ownerReferences   reflect.Value
+	finalizers        *[]string
 }
 
 func (a genericAccessor) GetNamespace() string {
@@ -457,52 +509,58 @@ func (a genericAccessor) SetAnnotations(annotations map[string]string) {
 	*a.annotations = annotations
 }
 
+func (a genericAccessor) GetFinalizers() []string {
+	if a.finalizers == nil {
+		return nil
+	}
+	return *a.finalizers
+}
+
+func (a genericAccessor) SetFinalizers(finalizers []string) {
+	*a.finalizers = finalizers
+}
+
+func (a genericAccessor) GetOwnerReferences() []metatypes.OwnerReference {
+	var ret []metatypes.OwnerReference
+	s := a.ownerReferences
+	if s.Kind() != reflect.Ptr || s.Elem().Kind() != reflect.Slice {
+		glog.Errorf("expect %v to be a pointer to slice", s)
+		return ret
+	}
+	s = s.Elem()
+	// Set the capacity to one element greater to avoid copy if the caller later append an element.
+	ret = make([]metatypes.OwnerReference, s.Len(), s.Len()+1)
+	for i := 0; i < s.Len(); i++ {
+		if err := extractFromOwnerReference(s.Index(i), &ret[i]); err != nil {
+			glog.Errorf("extractFromOwnerReference failed: %v", err)
+			return ret
+		}
+	}
+	return ret
+}
+
+func (a genericAccessor) SetOwnerReferences(references []metatypes.OwnerReference) {
+	s := a.ownerReferences
+	if s.Kind() != reflect.Ptr || s.Elem().Kind() != reflect.Slice {
+		glog.Errorf("expect %v to be a pointer to slice", s)
+	}
+	s = s.Elem()
+	newReferences := reflect.MakeSlice(s.Type(), len(references), len(references))
+	for i := 0; i < len(references); i++ {
+		if err := setOwnerReference(newReferences.Index(i), &references[i]); err != nil {
+			glog.Errorf("setOwnerReference failed: %v", err)
+			return
+		}
+	}
+	s.Set(newReferences)
+}
+
 // extractFromTypeMeta extracts pointers to version and kind fields from an object
 func extractFromTypeMeta(v reflect.Value, a *genericAccessor) error {
 	if err := runtime.FieldPtr(v, "APIVersion", &a.apiVersion); err != nil {
 		return err
 	}
 	if err := runtime.FieldPtr(v, "Kind", &a.kind); err != nil {
-		return err
-	}
-	return nil
-}
-
-// extractFromObjectMeta extracts pointers to metadata fields from an object
-func extractFromObjectMeta(v reflect.Value, a *genericAccessor) error {
-	if err := runtime.FieldPtr(v, "Namespace", &a.namespace); err != nil {
-		return err
-	}
-	if err := runtime.FieldPtr(v, "Name", &a.name); err != nil {
-		return err
-	}
-	if err := runtime.FieldPtr(v, "GenerateName", &a.generateName); err != nil {
-		return err
-	}
-	if err := runtime.FieldPtr(v, "UID", &a.uid); err != nil {
-		return err
-	}
-	if err := runtime.FieldPtr(v, "ResourceVersion", &a.resourceVersion); err != nil {
-		return err
-	}
-	if err := runtime.FieldPtr(v, "SelfLink", &a.selfLink); err != nil {
-		return err
-	}
-	if err := runtime.FieldPtr(v, "Labels", &a.labels); err != nil {
-		return err
-	}
-	if err := runtime.FieldPtr(v, "Annotations", &a.annotations); err != nil {
-		return err
-	}
-	return nil
-}
-
-// extractFromObjectMeta extracts pointers to metadata fields from a list object
-func extractFromListMeta(v reflect.Value, a *genericAccessor) error {
-	if err := runtime.FieldPtr(v, "ResourceVersion", &a.resourceVersion); err != nil {
-		return err
-	}
-	if err := runtime.FieldPtr(v, "SelfLink", &a.selfLink); err != nil {
 		return err
 	}
 	return nil

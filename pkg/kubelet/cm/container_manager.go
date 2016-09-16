@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,7 +25,7 @@ type ContainerManager interface {
 	// Runs the container manager's housekeeping.
 	// - Ensures that the Docker daemon is in a container.
 	// - Creates the system container where all non-containerized processes run.
-	Start() error
+	Start(*api.Node) error
 
 	// Returns resources allocated to system cgroups in the machine.
 	// These cgroups include the system and Kubernetes services.
@@ -36,13 +36,26 @@ type ContainerManager interface {
 
 	// Returns internal Status.
 	Status() Status
+
+	// NewPodContainerManager is a factory method which returns a podContainerManager object
+	// Returns a noop implementation if qos cgroup hierarchy is not enabled
+	NewPodContainerManager() PodContainerManager
+
+	// GetMountedSubsystems returns the mounted cgroup subsytems on the node
+	GetMountedSubsystems() *CgroupSubsystems
+
+	// GetQOSContainersInfo returns the names of top level QoS containers
+	GetQOSContainersInfo() QOSContainersInfo
 }
 
 type NodeConfig struct {
-	RuntimeCgroupsName string
-	SystemCgroupsName  string
-	KubeletCgroupsName string
-	ContainerRuntime   string
+	RuntimeCgroupsName    string
+	SystemCgroupsName     string
+	KubeletCgroupsName    string
+	ContainerRuntime      string
+	CgroupsPerQOS         bool
+	CgroupRoot            string
+	ProtectKernelDefaults bool
 }
 
 type Status struct {

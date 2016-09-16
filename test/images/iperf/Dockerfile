@@ -1,4 +1,4 @@
-# Copyright 2016 The Kubernetes Authors All rights reserved.
+# Copyright 2016 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,9 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM fedora
+FROM gcr.io/google_containers/ubuntu-slim:0.2
 MAINTAINER jay@apache.org
-RUN dnf install -y git gcc gcc-c++ make
-RUN git clone https://github.com/esnet/iperf.git
-RUN cd iperf && git checkout 2.0.4-RELEASE && ./configure && make && make install && rm -rf iperf
+RUN apt-get update && apt-get install -y --no-install-recommends iperf bash \
+  && apt-get clean -y \
+  && rm -rf /var/lib/apt/lists/* \
+  && ln -s /usr/bin/iperf /usr/local/bin/iperf
 RUN ls -altrh /usr/local/bin/iperf

@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -219,7 +219,7 @@ func Test_Master(t *testing.T) {
 	expectedMaster := unpackIPv4(TEST_MASTER_IP)
 
 	if master != expectedMaster {
-		t.Fatalf("Master returns the expected value: (expected: %#v, actual: %#v", expectedMaster, master)
+		t.Fatalf("Master returns the unexpected value: (expected: %#v, actual: %#v", expectedMaster, master)
 	}
 }
 

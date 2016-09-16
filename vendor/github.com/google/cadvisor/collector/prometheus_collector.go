@@ -24,6 +24,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/cadvisor/container"
 	"github.com/google/cadvisor/info/v1"
 )
 
@@ -43,15 +44,20 @@ type PrometheusCollector struct {
 	// Limit for the number of scaped metrics. If the count is higher,
 	// no metrics will be returned.
 	metricCountLimit int
+
+	// The Http client to use when connecting to metric endpoints
+	httpClient *http.Client
 }
 
 //Returns a new collector using the information extracted from the configfile
-func NewPrometheusCollector(collectorName string, configFile []byte, metricCountLimit int) (*PrometheusCollector, error) {
+func NewPrometheusCollector(collectorName string, configFile []byte, metricCountLimit int, containerHandler container.ContainerHandler, httpClient *http.Client) (*PrometheusCollector, error) {
 	var configInJSON Prometheus
 	err := json.Unmarshal(configFile, &configInJSON)
 	if err != nil {
 		return nil, err
 	}
+
+	configInJSON.Endpoint.configure(containerHandler)
 
 	minPollingFrequency := configInJSON.PollingFrequency
 
@@ -85,6 +91,7 @@ func NewPrometheusCollector(collectorName string, configFile []byte, metricCount
 		configFile:       configInJSON,
 		metricsSet:       metricsSet,
 		metricCountLimit: metricCountLimit,
+		httpClient:       httpClient,
 	}, nil
 }
 
@@ -108,7 +115,8 @@ func getMetricData(line string) string {
 
 func (collector *PrometheusCollector) GetSpec() []v1.MetricSpec {
 	specs := []v1.MetricSpec{}
-	response, err := http.Get(collector.configFile.Endpoint)
+
+	response, err := collector.httpClient.Get(collector.configFile.Endpoint.URL)
 	if err != nil {
 		return specs
 	}
@@ -120,12 +128,18 @@ func (collector *PrometheusCollector) GetSpec() []v1.MetricSpec {
 	}
 
 	lines := strings.Split(string(pageContent), "\n")
+	lineCount := len(lines)
 	for i, line := range lines {
 		if strings.HasPrefix(line, "# HELP") {
-			stopIndex := strings.Index(lines[i+2], "{")
-			if stopIndex == -1 {
-				stopIndex = strings.Index(lines[i+2], " ")
+			if i+2 >= lineCount {
+				break
 			}
+
+			stopIndex := strings.IndexAny(lines[i+2], "{ ")
+			if stopIndex == -1 {
+				continue
+			}
+
 			name := strings.TrimSpace(lines[i+2][0:stopIndex])
 			if _, ok := collector.metricsSet[name]; collector.metricsSet != nil && !ok {
 				continue
@@ -147,8 +161,8 @@ func (collector *PrometheusCollector) Collect(metrics map[string][]v1.MetricVal)
 	currentTime := time.Now()
 	nextCollectionTime := currentTime.Add(time.Duration(collector.pollingFrequency))
 
-	uri := collector.configFile.Endpoint
-	response, err := http.Get(uri)
+	uri := collector.configFile.Endpoint.URL
+	response, err := collector.httpClient.Get(uri)
 	if err != nil {
 		return nextCollectionTime, nil, err
 	}

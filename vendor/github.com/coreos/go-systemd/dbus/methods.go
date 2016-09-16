@@ -199,6 +199,11 @@ func (c *Conn) GetUnitProperty(unit string, propertyName string) (*Property, err
 	return c.getProperty(unit, "org.freedesktop.systemd1.Unit", propertyName)
 }
 
+// GetServiceProperty returns property for given service name and property name
+func (c *Conn) GetServiceProperty(service string, propertyName string) (*Property, error) {
+	return c.getProperty(service, "org.freedesktop.systemd1.Service", propertyName)
+}
+
 // GetUnitTypeProperties returns the extra properties for a unit, specific to the unit type.
 // Valid values for unitType: Service, Socket, Target, Device, Mount, Automount, Snapshot, Timer, Swap, Path, Slice, Scope
 // return "dbus.Error: Unknown interface" if the unitType is not the correct type of the unit
@@ -219,6 +224,19 @@ func (c *Conn) SetUnitProperties(name string, runtime bool, properties ...Proper
 
 func (c *Conn) GetUnitTypeProperty(unit string, unitType string, propertyName string) (*Property, error) {
 	return c.getProperty(unit, "org.freedesktop.systemd1."+unitType, propertyName)
+}
+
+type UnitStatus struct {
+	Name        string          // The primary unit name as string
+	Description string          // The human readable description string
+	LoadState   string          // The load state (i.e. whether the unit file has been loaded successfully)
+	ActiveState string          // The active state (i.e. whether the unit is currently started or not)
+	SubState    string          // The sub state (a more fine-grained version of the active state that is specific to the unit type, which the active state is not)
+	Followed    string          // A unit that is being followed in its state by this unit, if there is any, otherwise the empty string.
+	Path        dbus.ObjectPath // The unit object path
+	JobId       uint32          // If there is a job queued for the job unit the numeric job id, 0 otherwise
+	JobType     string          // The job type as string
+	JobPath     dbus.ObjectPath // The job object path
 }
 
 // ListUnits returns an array with all currently loaded units. Note that
@@ -250,17 +268,36 @@ func (c *Conn) ListUnits() ([]UnitStatus, error) {
 	return status, nil
 }
 
-type UnitStatus struct {
-	Name        string          // The primary unit name as string
-	Description string          // The human readable description string
-	LoadState   string          // The load state (i.e. whether the unit file has been loaded successfully)
-	ActiveState string          // The active state (i.e. whether the unit is currently started or not)
-	SubState    string          // The sub state (a more fine-grained version of the active state that is specific to the unit type, which the active state is not)
-	Followed    string          // A unit that is being followed in its state by this unit, if there is any, otherwise the empty string.
-	Path        dbus.ObjectPath // The unit object path
-	JobId       uint32          // If there is a job queued for the job unit the numeric job id, 0 otherwise
-	JobType     string          // The job type as string
-	JobPath     dbus.ObjectPath // The job object path
+type UnitFile struct {
+	Path string
+	Type string
+}
+
+// ListUnitFiles returns an array of all available units on disk.
+func (c *Conn) ListUnitFiles() ([]UnitFile, error) {
+	result := make([][]interface{}, 0)
+	err := c.sysobj.Call("org.freedesktop.systemd1.Manager.ListUnitFiles", 0).Store(&result)
+	if err != nil {
+		return nil, err
+	}
+
+	resultInterface := make([]interface{}, len(result))
+	for i := range result {
+		resultInterface[i] = result[i]
+	}
+
+	files := make([]UnitFile, len(result))
+	fileInterface := make([]interface{}, len(files))
+	for i := range files {
+		fileInterface[i] = &files[i]
+	}
+
+	err = dbus.Store(resultInterface, fileInterface...)
+	if err != nil {
+		return nil, err
+	}
+
+	return files, nil
 }
 
 type LinkUnitFileChange EnableUnitFileChange

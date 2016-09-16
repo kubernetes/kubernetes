@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -162,9 +162,9 @@ func fileMode(path string) error {
 		return nil
 	}
 
-	fileinfo, err := os.Lstat(path)
+	fileinfo, err := os.Stat(path)
 	if err != nil {
-		fmt.Printf("error from Lstat(%q): %v\n", path, err)
+		fmt.Printf("error from Stat(%q): %v\n", path, err)
 		return err
 	}
 
@@ -177,9 +177,9 @@ func filePerm(path string) error {
 		return nil
 	}
 
-	fileinfo, err := os.Lstat(path)
+	fileinfo, err := os.Stat(path)
 	if err != nil {
-		fmt.Printf("error from Lstat(%q): %v\n", path, err)
+		fmt.Printf("error from Stat(%q): %v\n", path, err)
 		return err
 	}
 

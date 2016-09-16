@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,7 +26,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
@@ -50,18 +49,35 @@ const (
 	gcePersistentDiskPluginName = "kubernetes.io/gce-pd"
 )
 
+func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
+	return host.GetPodVolumeDir(uid, strings.EscapeQualifiedNameForDisk(gcePersistentDiskPluginName), volName)
+}
+
 func (plugin *gcePersistentDiskPlugin) Init(host volume.VolumeHost) error {
 	plugin.host = host
 	return nil
 }
 
-func (plugin *gcePersistentDiskPlugin) Name() string {
+func (plugin *gcePersistentDiskPlugin) GetPluginName() string {
 	return gcePersistentDiskPluginName
+}
+
+func (plugin *gcePersistentDiskPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
+	volumeSource, _, err := getVolumeSource(spec)
+	if err != nil {
+		return "", err
+	}
+
+	return volumeSource.PDName, nil
 }
 
 func (plugin *gcePersistentDiskPlugin) CanSupport(spec *volume.Spec) bool {
 	return (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.GCEPersistentDisk != nil) ||
 		(spec.Volume != nil && spec.Volume.GCEPersistentDisk != nil)
+}
+
+func (plugin *gcePersistentDiskPlugin) RequiresRemount() bool {
+	return false
 }
 
 func (plugin *gcePersistentDiskPlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
@@ -76,40 +92,44 @@ func (plugin *gcePersistentDiskPlugin) NewMounter(spec *volume.Spec, pod *api.Po
 	return plugin.newMounterInternal(spec, pod.UID, &GCEDiskUtil{}, plugin.host.GetMounter())
 }
 
+func getVolumeSource(
+	spec *volume.Spec) (*api.GCEPersistentDiskVolumeSource, bool, error) {
+	if spec.Volume != nil && spec.Volume.GCEPersistentDisk != nil {
+		return spec.Volume.GCEPersistentDisk, spec.Volume.GCEPersistentDisk.ReadOnly, nil
+	} else if spec.PersistentVolume != nil &&
+		spec.PersistentVolume.Spec.GCEPersistentDisk != nil {
+		return spec.PersistentVolume.Spec.GCEPersistentDisk, spec.ReadOnly, nil
+	}
+
+	return nil, false, fmt.Errorf("Spec does not reference a GCE volume type")
+}
+
 func (plugin *gcePersistentDiskPlugin) newMounterInternal(spec *volume.Spec, podUID types.UID, manager pdManager, mounter mount.Interface) (volume.Mounter, error) {
 	// GCEPDs used directly in a pod have a ReadOnly flag set by the pod author.
 	// GCEPDs used as a PersistentVolume gets the ReadOnly flag indirectly through the persistent-claim volume used to mount the PV
-	var readOnly bool
-
-	var gce *api.GCEPersistentDiskVolumeSource
-	if spec.Volume != nil && spec.Volume.GCEPersistentDisk != nil {
-		gce = spec.Volume.GCEPersistentDisk
-		readOnly = gce.ReadOnly
-	} else {
-		gce = spec.PersistentVolume.Spec.GCEPersistentDisk
-		readOnly = spec.ReadOnly
+	volumeSource, readOnly, err := getVolumeSource(spec)
+	if err != nil {
+		return nil, err
 	}
 
-	pdName := gce.PDName
-	fsType := gce.FSType
+	pdName := volumeSource.PDName
 	partition := ""
-	if gce.Partition != 0 {
-		partition = strconv.Itoa(int(gce.Partition))
+	if volumeSource.Partition != 0 {
+		partition = strconv.Itoa(int(volumeSource.Partition))
 	}
 
 	return &gcePersistentDiskMounter{
 		gcePersistentDisk: &gcePersistentDisk{
-			podUID:    podUID,
-			volName:   spec.Name(),
-			pdName:    pdName,
-			partition: partition,
-			mounter:   mounter,
-			manager:   manager,
-			plugin:    plugin,
+			podUID:          podUID,
+			volName:         spec.Name(),
+			pdName:          pdName,
+			partition:       partition,
+			mounter:         mounter,
+			manager:         manager,
+			plugin:          plugin,
+			MetricsProvider: volume.NewMetricsStatFS(getPath(podUID, spec.Name(), plugin.host)),
 		},
-		fsType:      fsType,
-		readOnly:    readOnly,
-		diskMounter: &mount.SafeFormatAndMount{Interface: mounter, Runner: exec.New()}}, nil
+		readOnly: readOnly}, nil
 }
 
 func (plugin *gcePersistentDiskPlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
@@ -119,11 +139,12 @@ func (plugin *gcePersistentDiskPlugin) NewUnmounter(volName string, podUID types
 
 func (plugin *gcePersistentDiskPlugin) newUnmounterInternal(volName string, podUID types.UID, manager pdManager, mounter mount.Interface) (volume.Unmounter, error) {
 	return &gcePersistentDiskUnmounter{&gcePersistentDisk{
-		podUID:  podUID,
-		volName: volName,
-		manager: manager,
-		mounter: mounter,
-		plugin:  plugin,
+		podUID:          podUID,
+		volName:         volName,
+		manager:         manager,
+		mounter:         mounter,
+		plugin:          plugin,
+		MetricsProvider: volume.NewMetricsStatFS(getPath(podUID, volName, plugin.host)),
 	}}, nil
 }
 
@@ -161,12 +182,26 @@ func (plugin *gcePersistentDiskPlugin) newProvisionerInternal(options volume.Vol
 	}, nil
 }
 
+func (plugin *gcePersistentDiskPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
+	mounter := plugin.host.GetMounter()
+	pluginDir := plugin.host.GetPluginDir(plugin.GetPluginName())
+	sourceName, err := mounter.GetDeviceNameFromMount(mountPath, pluginDir)
+	if err != nil {
+		return nil, err
+	}
+	gceVolume := &api.Volume{
+		Name: volumeName,
+		VolumeSource: api.VolumeSource{
+			GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{
+				PDName: sourceName,
+			},
+		},
+	}
+	return volume.NewSpecFromVolume(gceVolume), nil
+}
+
 // Abstract interface to PD operations.
 type pdManager interface {
-	// Attaches the disk to the kubelet's host machine.
-	AttachAndMountDisk(b *gcePersistentDiskMounter, globalPDPath string) error
-	// Detaches the disk from the kubelet's host machine.
-	DetachDisk(c *gcePersistentDiskUnmounter) error
 	// Creates a volume
 	CreateVolume(provisioner *gcePersistentDiskProvisioner) (volumeID string, volumeSizeGB int, labels map[string]string, err error)
 	// Deletes a volume
@@ -182,29 +217,18 @@ type gcePersistentDisk struct {
 	pdName string
 	// Specifies the partition to mount
 	partition string
-	// Utility interface that provides API calls to the provider to attach/detach disks.
+	// Utility interface to provision and delete disks
 	manager pdManager
 	// Mounter interface that provides system calls to mount the global path to the pod local path.
 	mounter mount.Interface
 	plugin  *gcePersistentDiskPlugin
-	volume.MetricsNil
-}
-
-func detachDiskLogError(pd *gcePersistentDisk) {
-	err := pd.manager.DetachDisk(&gcePersistentDiskUnmounter{pd})
-	if err != nil {
-		glog.Warningf("Failed to detach disk: %v (%v)", pd, err)
-	}
+	volume.MetricsProvider
 }
 
 type gcePersistentDiskMounter struct {
 	*gcePersistentDisk
-	// Filesystem type, optional.
-	fsType string
-	// Specifies whether the disk will be attached as read-only.
+	// Specifies whether the disk will be mounted as read-only.
 	readOnly bool
-	// diskMounter provides the interface that is used to mount the actual block device.
-	diskMounter *mount.SafeFormatAndMount
 }
 
 var _ volume.Mounter = &gcePersistentDiskMounter{}
@@ -217,31 +241,26 @@ func (b *gcePersistentDiskMounter) GetAttributes() volume.Attributes {
 	}
 }
 
-// SetUp attaches the disk and bind mounts to the volume path.
+// SetUp bind mounts the disk global mount to the volume path.
 func (b *gcePersistentDiskMounter) SetUp(fsGroup *int64) error {
 	return b.SetUpAt(b.GetPath(), fsGroup)
 }
 
-// SetUpAt attaches the disk and bind mounts to the volume path.
+// SetUp bind mounts the disk global mount to the give volume path.
 func (b *gcePersistentDiskMounter) SetUpAt(dir string, fsGroup *int64) error {
 	// TODO: handle failed mounts here.
 	notMnt, err := b.mounter.IsLikelyNotMountPoint(dir)
-	glog.V(4).Infof("PersistentDisk set up: %s %v %v", dir, !notMnt, err)
+	glog.V(4).Infof("PersistentDisk set up: %s %v %v, pd name %v readOnly %v", dir, !notMnt, err, b.pdName, b.readOnly)
 	if err != nil && !os.IsNotExist(err) {
+		glog.Errorf("cannot validate mount point: %s %v", dir, err)
 		return err
 	}
 	if !notMnt {
 		return nil
 	}
 
-	globalPDPath := makeGlobalPDName(b.plugin.host, b.pdName)
-	if err := b.manager.AttachAndMountDisk(b, globalPDPath); err != nil {
-		return err
-	}
-
 	if err := os.MkdirAll(dir, 0750); err != nil {
-		// TODO: we should really eject the attach/detach out into its own control loop.
-		detachDiskLogError(b.gcePersistentDisk)
+		glog.Errorf("mkdir failed on disk %s (%v)", dir, err)
 		return err
 	}
 
@@ -250,6 +269,10 @@ func (b *gcePersistentDiskMounter) SetUpAt(dir string, fsGroup *int64) error {
 	if b.readOnly {
 		options = append(options, "ro")
 	}
+
+	globalPDPath := makeGlobalPDName(b.plugin.host, b.pdName)
+	glog.V(4).Infof("attempting to mount %s", dir)
+
 	err = b.mounter.Mount(globalPDPath, dir, "", options)
 	if err != nil {
 		notMnt, mntErr := b.mounter.IsLikelyNotMountPoint(dir)
@@ -274,8 +297,7 @@ func (b *gcePersistentDiskMounter) SetUpAt(dir string, fsGroup *int64) error {
 			}
 		}
 		os.Remove(dir)
-		// TODO: we should really eject the attach/detach out into its own control loop.
-		detachDiskLogError(b.gcePersistentDisk)
+		glog.Errorf("Mount of disk %s failed: %v", dir, err)
 		return err
 	}
 
@@ -283,6 +305,7 @@ func (b *gcePersistentDiskMounter) SetUpAt(dir string, fsGroup *int64) error {
 		volume.SetVolumeOwnership(b, fsGroup)
 	}
 
+	glog.V(4).Infof("Successfully mounted %s", dir)
 	return nil
 }
 
@@ -290,9 +313,8 @@ func makeGlobalPDName(host volume.VolumeHost, devName string) string {
 	return path.Join(host.GetPluginDir(gcePersistentDiskPluginName), "mounts", devName)
 }
 
-func (pd *gcePersistentDisk) GetPath() string {
-	name := gcePersistentDiskPluginName
-	return pd.plugin.host.GetPodVolumeDir(pd.podUID, strings.EscapeQualifiedNameForDisk(name), pd.volName)
+func (b *gcePersistentDiskMounter) GetPath() string {
+	return getPath(b.podUID, b.volName, b.plugin.host)
 }
 
 type gcePersistentDiskUnmounter struct {
@@ -301,14 +323,17 @@ type gcePersistentDiskUnmounter struct {
 
 var _ volume.Unmounter = &gcePersistentDiskUnmounter{}
 
+func (c *gcePersistentDiskUnmounter) GetPath() string {
+	return getPath(c.podUID, c.volName, c.plugin.host)
+}
+
 // Unmounts the bind mount, and detaches the disk only if the PD
 // resource was the last reference to that disk on the kubelet.
 func (c *gcePersistentDiskUnmounter) TearDown() error {
 	return c.TearDownAt(c.GetPath())
 }
 
-// Unmounts the bind mount, and detaches the disk only if the PD
-// resource was the last reference to that disk on the kubelet.
+// TearDownAt unmounts the bind mount
 func (c *gcePersistentDiskUnmounter) TearDownAt(dir string) error {
 	notMnt, err := c.mounter.IsLikelyNotMountPoint(dir)
 	if err != nil {
@@ -317,23 +342,8 @@ func (c *gcePersistentDiskUnmounter) TearDownAt(dir string) error {
 	if notMnt {
 		return os.Remove(dir)
 	}
-
-	refs, err := mount.GetMountRefs(c.mounter, dir)
-	if err != nil {
-		return err
-	}
-	// Unmount the bind-mount inside this pod
 	if err := c.mounter.Unmount(dir); err != nil {
 		return err
-	}
-	// If len(refs) is 1, then all bind mounts have been removed, and the
-	// remaining reference is the global mount. It is safe to detach.
-	if len(refs) == 1 {
-		// c.pdName is not initially set for volume-unmounters, so set it here.
-		c.pdName = path.Base(refs[0])
-		if err := c.manager.DetachDisk(c); err != nil {
-			return err
-		}
 	}
 	notMnt, mntErr := c.mounter.IsLikelyNotMountPoint(dir)
 	if mntErr != nil {
@@ -341,11 +351,9 @@ func (c *gcePersistentDiskUnmounter) TearDownAt(dir string) error {
 		return err
 	}
 	if notMnt {
-		if err := os.Remove(dir); err != nil {
-			return err
-		}
+		return os.Remove(dir)
 	}
-	return nil
+	return fmt.Errorf("Failed to unmount volume dir")
 }
 
 type gcePersistentDiskDeleter struct {
@@ -355,8 +363,7 @@ type gcePersistentDiskDeleter struct {
 var _ volume.Deleter = &gcePersistentDiskDeleter{}
 
 func (d *gcePersistentDiskDeleter) GetPath() string {
-	name := gcePersistentDiskPluginName
-	return d.plugin.host.GetPodVolumeDir(d.podUID, strings.EscapeQualifiedNameForDisk(name), d.volName)
+	return getPath(d.podUID, d.volName, d.plugin.host)
 }
 
 func (d *gcePersistentDiskDeleter) Delete() error {
@@ -370,14 +377,34 @@ type gcePersistentDiskProvisioner struct {
 
 var _ volume.Provisioner = &gcePersistentDiskProvisioner{}
 
-func (c *gcePersistentDiskProvisioner) Provision(pv *api.PersistentVolume) error {
+func (c *gcePersistentDiskProvisioner) Provision() (*api.PersistentVolume, error) {
 	volumeID, sizeGB, labels, err := c.manager.CreateVolume(c)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	pv.Spec.PersistentVolumeSource.GCEPersistentDisk.PDName = volumeID
-	pv.Spec.Capacity = api.ResourceList{
-		api.ResourceName(api.ResourceStorage): resource.MustParse(fmt.Sprintf("%dGi", sizeGB)),
+
+	pv := &api.PersistentVolume{
+		ObjectMeta: api.ObjectMeta{
+			Name:   c.options.PVName,
+			Labels: map[string]string{},
+			Annotations: map[string]string{
+				"kubernetes.io/createdby": "gce-pd-dynamic-provisioner",
+			},
+		},
+		Spec: api.PersistentVolumeSpec{
+			PersistentVolumeReclaimPolicy: c.options.PersistentVolumeReclaimPolicy,
+			AccessModes:                   c.options.AccessModes,
+			Capacity: api.ResourceList{
+				api.ResourceName(api.ResourceStorage): resource.MustParse(fmt.Sprintf("%dGi", sizeGB)),
+			},
+			PersistentVolumeSource: api.PersistentVolumeSource{
+				GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{
+					PDName:    volumeID,
+					Partition: 0,
+					ReadOnly:  false,
+				},
+			},
+		},
 	}
 
 	if len(labels) != 0 {
@@ -389,34 +416,5 @@ func (c *gcePersistentDiskProvisioner) Provision(pv *api.PersistentVolume) error
 		}
 	}
 
-	return nil
-}
-
-func (c *gcePersistentDiskProvisioner) NewPersistentVolumeTemplate() (*api.PersistentVolume, error) {
-	// Provide dummy api.PersistentVolume.Spec, it will be filled in
-	// gcePersistentDiskProvisioner.Provision()
-	return &api.PersistentVolume{
-		ObjectMeta: api.ObjectMeta{
-			GenerateName: "pv-gce-",
-			Labels:       map[string]string{},
-			Annotations: map[string]string{
-				"kubernetes.io/createdby": "gce-pd-dynamic-provisioner",
-			},
-		},
-		Spec: api.PersistentVolumeSpec{
-			PersistentVolumeReclaimPolicy: c.options.PersistentVolumeReclaimPolicy,
-			AccessModes:                   c.options.AccessModes,
-			Capacity: api.ResourceList{
-				api.ResourceName(api.ResourceStorage): c.options.Capacity,
-			},
-			PersistentVolumeSource: api.PersistentVolumeSource{
-				GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{
-					PDName:    volume.ProvisionedVolumeName,
-					FSType:    "ext4",
-					Partition: 0,
-					ReadOnly:  false,
-				},
-			},
-		},
-	}, nil
+	return pv, nil
 }

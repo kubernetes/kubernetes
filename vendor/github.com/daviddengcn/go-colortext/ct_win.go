@@ -79,10 +79,7 @@ type console_screen_buffer_info struct {
 
 func getConsoleScreenBufferInfo(hConsoleOutput uintptr) *console_screen_buffer_info {
 	var csbi console_screen_buffer_info
-	ret, _, _ := procGetConsoleScreenBufferInfo.Call(
-		hConsoleOutput,
-		uintptr(unsafe.Pointer(&csbi)))
-	if ret == 0 {
+	if ret, _, _ := procGetConsoleScreenBufferInfo.Call(hConsoleOutput, uintptr(unsafe.Pointer(&csbi))); ret == 0 {
 		return nil
 	}
 	return &csbi
@@ -118,22 +115,19 @@ func changeColor(fg Color, fgBright bool, bg Color, bgBright bool) {
 		if cbufinfo == nil { // No console info - Ex: stdout redirection
 			return
 		}
-		attr = getConsoleScreenBufferInfo(hStdout).WAttributes
-	} // if
-
+		attr = cbufinfo.WAttributes
+	}
 	if fg != None {
 		attr = attr & ^foreground_mask | fg_colors[fg]
 		if fgBright {
 			attr |= foreground_intensity
-		} // if
-	} // if
-
+		}
+	}
 	if bg != None {
 		attr = attr & ^background_mask | bg_colors[bg]
 		if bgBright {
 			attr |= background_intensity
-		} // if
-	} // if
-
+		}
+	}
 	setConsoleTextAttribute(hStdout, attr)
 }

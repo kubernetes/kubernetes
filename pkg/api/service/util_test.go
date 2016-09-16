@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,6 +19,9 @@ package service
 import (
 	"testing"
 
+	"strings"
+
+	"k8s.io/kubernetes/pkg/api"
 	netsets "k8s.io/kubernetes/pkg/util/net/sets"
 )
 
@@ -26,7 +29,15 @@ func TestGetLoadBalancerSourceRanges(t *testing.T) {
 	checkError := func(v string) {
 		annotations := make(map[string]string)
 		annotations[AnnotationLoadBalancerSourceRangesKey] = v
-		_, err := GetLoadBalancerSourceRanges(annotations)
+		svc := api.Service{}
+		svc.Annotations = annotations
+		_, err := GetLoadBalancerSourceRanges(&svc)
+		if err == nil {
+			t.Errorf("Expected error parsing: %q", v)
+		}
+		svc = api.Service{}
+		svc.Spec.LoadBalancerSourceRanges = strings.Split(v, ",")
+		_, err = GetLoadBalancerSourceRanges(&svc)
 		if err == nil {
 			t.Errorf("Expected error parsing: %q", v)
 		}
@@ -41,7 +52,15 @@ func TestGetLoadBalancerSourceRanges(t *testing.T) {
 	checkOK := func(v string) netsets.IPNet {
 		annotations := make(map[string]string)
 		annotations[AnnotationLoadBalancerSourceRangesKey] = v
-		cidrs, err := GetLoadBalancerSourceRanges(annotations)
+		svc := api.Service{}
+		svc.Annotations = annotations
+		cidrs, err := GetLoadBalancerSourceRanges(&svc)
+		if err != nil {
+			t.Errorf("Unexpected error parsing: %q", v)
+		}
+		svc = api.Service{}
+		svc.Spec.LoadBalancerSourceRanges = strings.Split(v, ",")
+		cidrs, err = GetLoadBalancerSourceRanges(&svc)
 		if err != nil {
 			t.Errorf("Unexpected error parsing: %q", v)
 		}
@@ -63,7 +82,27 @@ func TestGetLoadBalancerSourceRanges(t *testing.T) {
 	if len(cidrs) != 2 {
 		t.Errorf("Expected two CIDRs: %v", cidrs.StringSlice())
 	}
-	cidrs = checkOK("")
+	// check LoadBalancerSourceRanges not specified
+	svc := api.Service{}
+	cidrs, err := GetLoadBalancerSourceRanges(&svc)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if len(cidrs) != 1 {
+		t.Errorf("Expected exactly one CIDR: %v", cidrs.StringSlice())
+	}
+	if !IsAllowAll(cidrs) {
+		t.Errorf("Expected default to be allow-all: %v", cidrs.StringSlice())
+	}
+	// check SourceRanges annotation is empty
+	annotations := make(map[string]string)
+	annotations[AnnotationLoadBalancerSourceRangesKey] = ""
+	svc = api.Service{}
+	svc.Annotations = annotations
+	cidrs, err = GetLoadBalancerSourceRanges(&svc)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
 	if len(cidrs) != 1 {
 		t.Errorf("Expected exactly one CIDR: %v", cidrs.StringSlice())
 	}

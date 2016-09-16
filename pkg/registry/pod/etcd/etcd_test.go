@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -39,7 +39,7 @@ import (
 
 func newStorage(t *testing.T) (*REST, *BindingREST, *StatusREST, *etcdtesting.EtcdTestServer) {
 	etcdStorage, server := registrytest.NewEtcdStorage(t, "")
-	restOptions := generic.RESTOptions{Storage: etcdStorage, Decorator: generic.UndecoratedStorage, DeleteCollectionWorkers: 3}
+	restOptions := generic.RESTOptions{StorageConfig: etcdStorage, Decorator: generic.UndecoratedStorage, DeleteCollectionWorkers: 3}
 	storage := NewStorage(restOptions, nil, nil)
 	return storage.Pod, storage.Binding, storage.Status, server
 }
@@ -82,6 +82,7 @@ func validChangedPod() *api.Pod {
 func TestCreate(t *testing.T) {
 	storage, _, _, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store)
 	pod := validNewPod()
 	pod.ObjectMeta = api.ObjectMeta{}
@@ -108,6 +109,7 @@ func TestCreate(t *testing.T) {
 func TestUpdate(t *testing.T) {
 	storage, _, _, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store)
 	test.TestUpdate(
 		// valid
@@ -124,6 +126,7 @@ func TestUpdate(t *testing.T) {
 func TestDelete(t *testing.T) {
 	storage, _, _, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store).ReturnDeletedObject()
 	test.TestDelete(validNewPod())
 
@@ -144,9 +147,9 @@ func (f FailDeletionStorage) Delete(ctx context.Context, key string, out runtime
 
 func newFailDeleteStorage(t *testing.T, called *bool) (*REST, *etcdtesting.EtcdTestServer) {
 	etcdStorage, server := registrytest.NewEtcdStorage(t, "")
-	failDeleteStorage := FailDeletionStorage{etcdStorage, called}
-	restOptions := generic.RESTOptions{Storage: failDeleteStorage, Decorator: generic.UndecoratedStorage, DeleteCollectionWorkers: 3}
+	restOptions := generic.RESTOptions{StorageConfig: etcdStorage, Decorator: generic.UndecoratedStorage, DeleteCollectionWorkers: 3}
 	storage := NewStorage(restOptions, nil, nil)
+	storage.Pod.Store.Storage = FailDeletionStorage{storage.Pod.Store.Storage, called}
 	return storage.Pod, server
 }
 
@@ -156,6 +159,7 @@ func TestIgnoreDeleteNotFound(t *testing.T) {
 	called := false
 	registry, server := newFailDeleteStorage(t, &called)
 	defer server.Terminate(t)
+	defer registry.Store.DestroyFunc()
 
 	// should fail if pod A is not created yet.
 	_, err := registry.Delete(testContext, pod.Name, nil)
@@ -199,6 +203,7 @@ func TestIgnoreDeleteNotFound(t *testing.T) {
 func TestCreateSetsFields(t *testing.T) {
 	storage, _, _, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
 	pod := validNewPod()
 	_, err := storage.Create(api.NewDefaultContext(), pod)
 	if err != nil {
@@ -341,6 +346,7 @@ func TestResourceLocation(t *testing.T) {
 func TestGet(t *testing.T) {
 	storage, _, _, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store)
 	test.TestGet(validNewPod())
 }
@@ -348,6 +354,7 @@ func TestGet(t *testing.T) {
 func TestList(t *testing.T) {
 	storage, _, _, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store)
 	test.TestList(validNewPod())
 }
@@ -355,6 +362,7 @@ func TestList(t *testing.T) {
 func TestWatch(t *testing.T) {
 	storage, _, _, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store)
 	test.TestWatch(
 		validNewPod(),
@@ -378,6 +386,7 @@ func TestWatch(t *testing.T) {
 func TestEtcdCreate(t *testing.T) {
 	storage, bindingStorage, _, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
 	ctx := api.NewDefaultContext()
 	key, _ := storage.KeyFunc(ctx, "foo")
 	key = etcdtest.AddPrefix(key)
@@ -406,6 +415,7 @@ func TestEtcdCreate(t *testing.T) {
 func TestEtcdCreateBindingNoPod(t *testing.T) {
 	storage, bindingStorage, _, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
 	ctx := api.NewDefaultContext()
 
 	key, _ := storage.KeyFunc(ctx, "foo")
@@ -437,6 +447,7 @@ func TestEtcdCreateBindingNoPod(t *testing.T) {
 func TestEtcdCreateFailsWithoutNamespace(t *testing.T) {
 	storage, _, _, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
 	pod := validNewPod()
 	pod.Namespace = ""
 	_, err := storage.Create(api.NewContext(), pod)
@@ -449,6 +460,7 @@ func TestEtcdCreateFailsWithoutNamespace(t *testing.T) {
 func TestEtcdCreateWithContainersNotFound(t *testing.T) {
 	storage, bindingStorage, _, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
 	ctx := api.NewDefaultContext()
 	key, _ := storage.KeyFunc(ctx, "foo")
 	key = etcdtest.AddPrefix(key)
@@ -484,6 +496,7 @@ func TestEtcdCreateWithContainersNotFound(t *testing.T) {
 func TestEtcdCreateWithConflict(t *testing.T) {
 	storage, bindingStorage, _, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
 	ctx := api.NewDefaultContext()
 
 	_, err := storage.Create(ctx, validNewPod())
@@ -514,6 +527,7 @@ func TestEtcdCreateWithConflict(t *testing.T) {
 func TestEtcdCreateWithExistingContainers(t *testing.T) {
 	storage, bindingStorage, _, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
 	ctx := api.NewDefaultContext()
 	key, _ := storage.KeyFunc(ctx, "foo")
 	key = etcdtest.AddPrefix(key)
@@ -592,6 +606,7 @@ func TestEtcdCreateBinding(t *testing.T) {
 				t.Errorf("%s: expected: %v, got: %v", k, pod.(*api.Pod).Spec.NodeName, test.binding.Target.Name)
 			}
 		}
+		storage.Store.DestroyFunc()
 		server.Terminate(t)
 	}
 }
@@ -599,6 +614,7 @@ func TestEtcdCreateBinding(t *testing.T) {
 func TestEtcdUpdateNotScheduled(t *testing.T) {
 	storage, _, _, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
 	ctx := api.NewDefaultContext()
 
 	key, _ := storage.KeyFunc(ctx, "foo")
@@ -608,7 +624,7 @@ func TestEtcdUpdateNotScheduled(t *testing.T) {
 	}
 
 	podIn := validChangedPod()
-	_, _, err := storage.Update(ctx, podIn)
+	_, _, err := storage.Update(ctx, podIn.Name, rest.DefaultUpdatedObjectInfo(podIn, api.Scheme))
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -626,6 +642,7 @@ func TestEtcdUpdateNotScheduled(t *testing.T) {
 func TestEtcdUpdateScheduled(t *testing.T) {
 	storage, _, _, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
 	ctx := api.NewDefaultContext()
 
 	key, _ := storage.KeyFunc(ctx, "foo")
@@ -675,7 +692,7 @@ func TestEtcdUpdateScheduled(t *testing.T) {
 			SecurityContext:               &api.PodSecurityContext{},
 		},
 	}
-	_, _, err = storage.Update(ctx, &podIn)
+	_, _, err = storage.Update(ctx, podIn.Name, rest.DefaultUpdatedObjectInfo(&podIn, api.Scheme))
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -695,6 +712,7 @@ func TestEtcdUpdateScheduled(t *testing.T) {
 func TestEtcdUpdateStatus(t *testing.T) {
 	storage, _, statusStorage, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
 	ctx := api.NewDefaultContext()
 
 	key, _ := storage.KeyFunc(ctx, "foo")
@@ -756,7 +774,7 @@ func TestEtcdUpdateStatus(t *testing.T) {
 	expected.Labels = podIn.Labels
 	expected.Status = podIn.Status
 
-	_, _, err = statusStorage.Update(ctx, &podIn)
+	_, _, err = statusStorage.Update(ctx, podIn.Name, rest.DefaultUpdatedObjectInfo(&podIn, api.Scheme))
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -765,10 +783,10 @@ func TestEtcdUpdateStatus(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	podOut := obj.(*api.Pod)
-	// Check to verify the Spec, Label, and Status updates match from change above.  Those are the fields changed.
-	if !api.Semantic.DeepEqual(podOut.Spec, podIn.Spec) ||
-		!api.Semantic.DeepEqual(podOut.Labels, podIn.Labels) ||
-		!api.Semantic.DeepEqual(podOut.Status, podIn.Status) {
-		t.Errorf("objects differ: %v", diff.ObjectDiff(podOut, podIn))
+	// Check to verify the Label, and Status updates match from change above.  Those are the fields changed.
+	if !api.Semantic.DeepEqual(podOut.Spec, expected.Spec) ||
+		!api.Semantic.DeepEqual(podOut.Labels, expected.Labels) ||
+		!api.Semantic.DeepEqual(podOut.Status, expected.Status) {
+		t.Errorf("objects differ: %v", diff.ObjectDiff(podOut, expected))
 	}
 }

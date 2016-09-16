@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -57,6 +57,9 @@ type RESTClient struct {
 	// serializers contain all serializers for undelying content type.
 	serializers Serializers
 
+	// creates BackoffManager that is passed to requests.
+	createBackoffMgr func() BackoffManager
+
 	// TODO extract this into a wrapper interface via the RESTClient interface in kubectl.
 	Throttle flowcontrol.RateLimiter
 
@@ -105,6 +108,7 @@ func NewRESTClient(baseURL *url.URL, versionedAPIPath string, config ContentConf
 		versionedAPIPath: versionedAPIPath,
 		contentConfig:    config,
 		serializers:      *serializers,
+		createBackoffMgr: readExpBackoffConfig,
 		Throttle:         throttle,
 		Client:           client,
 	}, nil
@@ -181,7 +185,7 @@ func createSerializers(config ContentConfig) (*Serializers, error) {
 // list, ok := resp.(*api.PodList)
 //
 func (c *RESTClient) Verb(verb string) *Request {
-	backoff := readExpBackoffConfig()
+	backoff := c.createBackoffMgr()
 
 	if c.Client == nil {
 		return NewRequest(nil, verb, c.base, c.versionedAPIPath, c.contentConfig, c.serializers, backoff, c.Throttle)
@@ -217,8 +221,4 @@ func (c *RESTClient) Delete() *Request {
 // APIVersion returns the APIVersion this RESTClient is expected to use.
 func (c *RESTClient) APIVersion() unversioned.GroupVersion {
 	return *c.contentConfig.GroupVersion
-}
-
-func (c *RESTClient) Codec() runtime.Codec {
-	return c.contentConfig.Codec
 }

@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,7 +25,7 @@ import (
 // OSInterface collects system level operations that need to be mocked out
 // during tests.
 type OSInterface interface {
-	Mkdir(path string, perm os.FileMode) error
+	MkdirAll(path string, perm os.FileMode) error
 	Symlink(oldname string, newname string) error
 	Stat(path string) (os.FileInfo, error)
 	Remove(path string) error
@@ -36,12 +36,12 @@ type OSInterface interface {
 	ReadDir(dirname string) ([]os.FileInfo, error)
 }
 
-// RealOS is used to dispatch the real system level operaitons.
+// RealOS is used to dispatch the real system level operations.
 type RealOS struct{}
 
 // MkDir will will call os.Mkdir to create a directory.
-func (RealOS) Mkdir(path string, perm os.FileMode) error {
-	return os.Mkdir(path, perm)
+func (RealOS) MkdirAll(path string, perm os.FileMode) error {
+	return os.MkdirAll(path, perm)
 }
 
 // Symlink will call os.Symlink to create a symbolic link.

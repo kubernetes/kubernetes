@@ -63,7 +63,6 @@ func EthernetCardTypes() VirtualDeviceList {
 		&types.VirtualVmxnet3{},
 	}).Select(func(device types.BaseVirtualDevice) bool {
 		c := device.(types.BaseVirtualEthernetCard).GetVirtualEthernetCard()
-		c.AddressType = string(types.VirtualEthernetCardMacTypeGenerated)
 		c.GetVirtualDevice().Key = -1
 		return true
 	})

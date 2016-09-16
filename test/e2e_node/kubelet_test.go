@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -28,8 +28,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	apiUnversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	"github.com/davecgh/go-spew/spew"
@@ -38,34 +38,30 @@ import (
 )
 
 var _ = framework.KubeDescribe("Kubelet", func() {
+	f := framework.NewDefaultFramework("kubelet-test")
+	var podClient *framework.PodClient
+	BeforeEach(func() {
+		podClient = f.PodClient()
+	})
 	Context("when scheduling a busybox command in a pod", func() {
-		// Setup the framework
-		f := NewDefaultFramework("pod-scheduling")
-		podName := "busybox-scheduling-" + string(util.NewUUID())
+		podName := "busybox-scheduling-" + string(uuid.NewUUID())
 		It("it should print the output to logs", func() {
-			podClient := f.Client.Pods(f.Namespace.Name)
-			pod := &api.Pod{
+			podClient.CreateSync(&api.Pod{
 				ObjectMeta: api.ObjectMeta{
 					Name: podName,
 				},
 				Spec: api.PodSpec{
-					// Force the Pod to schedule to the node without a scheduler running
-					NodeName: *nodeName,
 					// Don't restart the Pod since it is expected to exit
 					RestartPolicy: api.RestartPolicyNever,
 					Containers: []api.Container{
 						{
-							Image:   "gcr.io/google_containers/busybox",
+							Image:   ImageRegistry[busyBoxImage],
 							Name:    podName,
 							Command: []string{"sh", "-c", "echo 'Hello World' ; sleep 240"},
 						},
 					},
 				},
-			}
-			defer podClient.Delete(pod.Name, nil)
-			_, err := podClient.Create(pod)
-			Expect(err).To(BeNil(), fmt.Sprintf("Error creating Pod %v", err))
-			framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
+			})
 			Eventually(func() string {
 				sinceTime := apiUnversioned.NewTime(time.Now().Add(time.Duration(-1 * time.Hour)))
 				rc, err := podClient.GetLogs(podName, &api.PodLogOptions{SinceTime: &sinceTime}).Stream()
@@ -81,23 +77,19 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 	})
 
 	Context("when scheduling a read only busybox container", func() {
-		f := NewDefaultFramework("pod-scheduling")
-		podName := "busybox-readonly-fs" + string(util.NewUUID())
+		podName := "busybox-readonly-fs" + string(uuid.NewUUID())
 		It("it should not write to root filesystem", func() {
-			podClient := f.Client.Pods(f.Namespace.Name)
 			isReadOnly := true
-			pod := &api.Pod{
+			podClient.CreateSync(&api.Pod{
 				ObjectMeta: api.ObjectMeta{
 					Name: podName,
 				},
 				Spec: api.PodSpec{
-					// Force the Pod to schedule to the node without a scheduler running
-					NodeName: *nodeName,
 					// Don't restart the Pod since it is expected to exit
 					RestartPolicy: api.RestartPolicyNever,
 					Containers: []api.Container{
 						{
-							Image:   "gcr.io/google_containers/busybox",
+							Image:   ImageRegistry[busyBoxImage],
 							Name:    podName,
 							Command: []string{"sh", "-c", "echo test > /file; sleep 240"},
 							SecurityContext: &api.SecurityContext{
@@ -106,10 +98,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 						},
 					},
 				},
-			}
-			defer podClient.Delete(pod.Name, nil)
-			_, err := podClient.Create(pod)
-			Expect(err).To(BeNil(), fmt.Sprintf("Error creating Pod %v", err))
+			})
 			Eventually(func() string {
 				rc, err := podClient.GetLogs(podName, &api.PodLogOptions{}).Stream()
 				if err != nil {
@@ -123,13 +112,11 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 		})
 	})
 	Describe("metrics api", func() {
-		// Setup the framework
-		f := NewDefaultFramework("kubelet-metrics-api")
 		Context("when querying /stats/summary", func() {
 			It("it should report resource usage through the stats api", func() {
-				podNamePrefix := "stats-busybox-" + string(util.NewUUID())
+				podNamePrefix := "stats-busybox-" + string(uuid.NewUUID())
 				volumeNamePrefix := "test-empty-dir"
-				podNames, volumes := createSummaryTestPods(f, podNamePrefix, 2, volumeNamePrefix)
+				podNames, volumes := createSummaryTestPods(f.PodClient(), podNamePrefix, 2, volumeNamePrefix)
 				By("Returning stats summary")
 				summary := stats.Summary{}
 				Eventually(func() error {
@@ -169,51 +156,48 @@ const (
 	containerSuffix = "-c"
 )
 
-func createSummaryTestPods(f *framework.Framework, podNamePrefix string, count int, volumeNamePrefix string) (sets.String, sets.String) {
+func createSummaryTestPods(podClient *framework.PodClient, podNamePrefix string, count int, volumeNamePrefix string) (sets.String, sets.String) {
 	podNames := sets.NewString()
 	volumes := sets.NewString(volumeNamePrefix)
 	for i := 0; i < count; i++ {
 		podNames.Insert(fmt.Sprintf("%s%v", podNamePrefix, i))
 	}
 
+	var pods []*api.Pod
 	for _, podName := range podNames.List() {
-		createPod(f, podName, []api.Container{
-			{
-				Image:   "gcr.io/google_containers/busybox",
-				Command: []string{"sh", "-c", "while true; do echo 'hello world' | tee ~/file | tee /test-empty-dir-mnt ; sleep 1; done"},
-				Name:    podName + containerSuffix,
-				VolumeMounts: []api.VolumeMount{
-					{MountPath: "/test-empty-dir-mnt", Name: volumeNamePrefix},
+		pods = append(pods, &api.Pod{
+			ObjectMeta: api.ObjectMeta{
+				Name: podName,
+			},
+			Spec: api.PodSpec{
+				// Don't restart the Pod since it is expected to exit
+				RestartPolicy: api.RestartPolicyNever,
+				Containers: []api.Container{
+					{
+						Image:   ImageRegistry[busyBoxImage],
+						Command: []string{"sh", "-c", "while true; do echo 'hello world' | tee /test-empty-dir-mnt/file ; sleep 1; done"},
+						Name:    podName + containerSuffix,
+						VolumeMounts: []api.VolumeMount{
+							{MountPath: "/test-empty-dir-mnt", Name: volumeNamePrefix},
+						},
+					},
+				},
+				SecurityContext: &api.PodSecurityContext{
+					SELinuxOptions: &api.SELinuxOptions{
+						Level: "s0",
+					},
+				},
+				Volumes: []api.Volume{
+					// TODO: Test secret volumes
+					// TODO: Test hostpath volumes
+					{Name: volumeNamePrefix, VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},
 				},
 			},
-		}, []api.Volume{
-			// TODO: Test secret volumes
-			// TODO: Test hostpath volumes
-			{Name: volumeNamePrefix, VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},
 		})
 	}
+	podClient.CreateBatch(pods)
 
 	return podNames, volumes
-}
-
-func createPod(f *framework.Framework, podName string, containers []api.Container, volumes []api.Volume) {
-	podClient := f.Client.Pods(f.Namespace.Name)
-	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
-			Name: podName,
-		},
-		Spec: api.PodSpec{
-			// Force the Pod to schedule to the node without a scheduler running
-			NodeName: *nodeName,
-			// Don't restart the Pod since it is expected to exit
-			RestartPolicy: api.RestartPolicyNever,
-			Containers:    containers,
-			Volumes:       volumes,
-		},
-	}
-	_, err := podClient.Create(pod)
-	Expect(err).To(BeNil(), fmt.Sprintf("Error creating Pod %v", err))
-	framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
 }
 
 // Returns pods missing from summary.
@@ -248,7 +232,7 @@ func testSummaryMetrics(s stats.Summary, podNamePrefix string) error {
 		nonNilValue  = "expected %q to not be nil"
 		nonZeroValue = "expected %q to not be zero"
 	)
-	if s.Node.NodeName != *nodeName {
+	if s.Node.NodeName != framework.TestContext.NodeName {
 		return fmt.Errorf("unexpected node name - %q", s.Node.NodeName)
 	}
 	if s.Node.CPU.UsageCoreNanoSeconds == nil {

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2014 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -25,15 +25,11 @@ kube::golang::setup_env
 
 BUILD_TARGETS=(
   cmd/libs/go2idl/client-gen
-  cmd/libs/go2idl/conversion-gen
-  cmd/libs/go2idl/deepcopy-gen
   cmd/libs/go2idl/set-gen
 )
-"${KUBE_ROOT}/hack/build-go.sh" ${BUILD_TARGETS[*]}
+make -C "${KUBE_ROOT}" WHAT="${BUILD_TARGETS[*]}"
 
 clientgen=$(kube::util::find-binary "client-gen")
-conversiongen=$(kube::util::find-binary "conversion-gen")
-deepcopygen=$(kube::util::find-binary "deepcopy-gen")
 setgen=$(kube::util::find-binary "set-gen")
 
 # Please do not add any logic to this shell script. Add logic to the go code
@@ -43,13 +39,10 @@ setgen=$(kube::util::find-binary "set-gen")
 # update- and verify- scripts.
 ${clientgen} "$@"
 ${clientgen} -t "$@"
-
+${clientgen} --clientset-name="release_1_5" --input="api/v1,authorization/v1beta1,autoscaling/v1,batch/v1,extensions/v1beta1,policy/v1alpha1" "$@"
 # Clientgen for federation clientset.
-${clientgen} --clientset-name=federation_internalclientset --clientset-path=k8s.io/kubernetes/federation/client/clientset_generated --input="../../federation/apis/federation/","api/" --included-types-overrides="api/Service"   "$@"
-${clientgen} --clientset-name=federation_release_1_3 --clientset-path=k8s.io/kubernetes/federation/client/clientset_generated --input="../../federation/apis/federation/v1alpha1","api/v1" --included-types-overrides="api/v1/Service"   "$@"
-
-${conversiongen} "$@"
-${deepcopygen} "$@"
+${clientgen} --clientset-name=federation_internalclientset --clientset-path=k8s.io/kubernetes/federation/client/clientset_generated --input="../../federation/apis/federation/","api/","extensions/" --included-types-overrides="api/Service,api/Namespace,extensions/ReplicaSet,api/Secret,extensions/Ingress,api/Event"   "$@"
+${clientgen} --clientset-name=federation_release_1_5 --clientset-path=k8s.io/kubernetes/federation/client/clientset_generated --input="../../federation/apis/federation/v1beta1","api/v1","extensions/v1beta1" --included-types-overrides="api/v1/Service,api/v1/Namespace,extensions/v1beta1/ReplicaSet,api/v1/Secret,extensions/v1beta1/Ingress,api/v1/Event"   "$@"
 ${setgen} "$@"
 
 # You may add additional calls of code generators like set-gen above.

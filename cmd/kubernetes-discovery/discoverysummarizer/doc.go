@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,4 +17,4 @@ limitations under the License.
 // Package discoverysummarizer contains code for the discovery summarizer
 // (program to summarize discovery information from all federated api servers)
 // as per https://github.com/kubernetes/kubernetes/blob/master/docs/proposals/federated-api-servers.md
-package discoverysummarizer
+package discoverysummarizer // import "k8s.io/kubernetes/cmd/kubernetes-discovery/discoverysummarizer"

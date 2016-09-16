@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -28,7 +28,8 @@ func main() {
 	serverRunOptions := apiserver.NewServerRunOptions()
 
 	// Parse command line flags.
-	serverRunOptions.AddFlags(pflag.CommandLine)
+	serverRunOptions.AddUniversalFlags(pflag.CommandLine)
+	serverRunOptions.AddEtcdStorageFlags(pflag.CommandLine)
 	flag.InitFlags()
 
 	if err := apiserver.Run(serverRunOptions); err != nil {

@@ -11,13 +11,12 @@ type saltWireFmt struct {
 	Salt string `dns:"size-hex"`
 }
 
-// HashName hashes a string (label) according to RFC 5155. It returns the hashed string in
-// uppercase.
+// HashName hashes a string (label) according to RFC 5155. It returns the hashed string in uppercase.
 func HashName(label string, ha uint8, iter uint16, salt string) string {
 	saltwire := new(saltWireFmt)
 	saltwire.Salt = salt
 	wire := make([]byte, DefaultMsgSize)
-	n, err := PackStruct(saltwire, wire, 0)
+	n, err := packSaltWire(saltwire, wire)
 	if err != nil {
 		return ""
 	}
@@ -50,6 +49,8 @@ func HashName(label string, ha uint8, iter uint16, salt string) string {
 	return toBase32(nsec3)
 }
 
+// Denialer is an interface that should be implemented by types that are used to denial
+// answers in DNSSEC.
 type Denialer interface {
 	// Cover will check if the (unhashed) name is being covered by this NSEC or NSEC3.
 	Cover(name string) bool
@@ -107,4 +108,12 @@ func (rr *NSEC3) Match(name string) bool {
 		return true
 	}
 	return false
+}
+
+func packSaltWire(sw *saltWireFmt, msg []byte) (int, error) {
+	off, err := packStringHex(sw.Salt, msg, 0)
+	if err != nil {
+		return off, err
+	}
+	return off, nil
 }

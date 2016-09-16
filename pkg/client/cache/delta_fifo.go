@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -84,7 +84,7 @@ func NewDeltaFIFO(keyFunc KeyFunc, compressor DeltaCompressor, knownObjects KeyL
 // A note on the KeyLister used by the DeltaFIFO: It's main purpose is
 // to list keys that are "known", for the purpose of figuring out which
 // items have been deleted when Replace() or Delete() are called. The deleted
-// objet will be included in the DeleteFinalStateUnknown markers. These objects
+// object will be included in the DeleteFinalStateUnknown markers. These objects
 // could be stale.
 //
 // You may provide a function to compress deltas (e.g., represent a
@@ -189,12 +189,20 @@ func (f *DeltaFIFO) Delete(obj interface{}) error {
 			// Don't provide a second report of the same deletion.
 			return nil
 		}
-	} else if _, exists, err := f.knownObjects.GetByKey(id); err == nil && !exists {
-		// Presumably, this was deleted when a relist happened.
-		// Don't provide a second report of the same deletion.
-		// TODO(lavalamp): This may be racy-- we aren't properly locked
-		// with knownObjects.
-		return nil
+	} else {
+		// We only want to skip the "deletion" action if the object doesn't
+		// exist in knownObjects and it doesn't have corresponding item in items.
+		// Note that even if there is a "deletion" action in items, we can ignore it,
+		// because it will be deduped automatically in "queueActionLocked"
+		_, exists, err := f.knownObjects.GetByKey(id)
+		_, itemsExist := f.items[id]
+		if err == nil && !exists && !itemsExist {
+			// Presumably, this was deleted when a relist happened.
+			// Don't provide a second report of the same deletion.
+			// TODO(lavalamp): This may be racy-- we aren't properly locked
+			// with knownObjects.
+			return nil
+		}
 	}
 
 	return f.queueActionLocked(Deleted, obj)
@@ -220,15 +228,21 @@ func (f *DeltaFIFO) AddIfNotPresent(obj interface{}) error {
 	}
 	f.lock.Lock()
 	defer f.lock.Unlock()
+	f.addIfNotPresent(id, deltas)
+	return nil
+}
+
+// addIfNotPresent inserts deltas under id if it does not exist, and assumes the caller
+// already holds the fifo lock.
+func (f *DeltaFIFO) addIfNotPresent(id string, deltas Deltas) {
 	f.populated = true
 	if _, exists := f.items[id]; exists {
-		return nil
+		return
 	}
 
 	f.queue = append(f.queue, id)
 	f.items[id] = deltas
 	f.cond.Broadcast()
-	return nil
 }
 
 // re-listing and watching can deliver the same update multiple times in any
@@ -270,6 +284,13 @@ func isDeletionDup(a, b *Delta) *Delta {
 	return b
 }
 
+// willObjectBeDeletedLocked returns true only if the last delta for the
+// given object is Delete. Caller must lock first.
+func (f *DeltaFIFO) willObjectBeDeletedLocked(id string) bool {
+	deltas := f.items[id]
+	return len(deltas) > 0 && deltas[len(deltas)-1].Type == Deleted
+}
+
 // queueActionLocked appends to the delta list for the object, calling
 // f.deltaCompressor if needed. Caller must lock first.
 func (f *DeltaFIFO) queueActionLocked(actionType DeltaType, obj interface{}) error {
@@ -277,6 +298,14 @@ func (f *DeltaFIFO) queueActionLocked(actionType DeltaType, obj interface{}) err
 	if err != nil {
 		return KeyError{obj, err}
 	}
+
+	// If object is supposed to be deleted (last event is Deleted),
+	// then we should ignore Sync events, because it would result in
+	// recreation of this object.
+	if actionType == Sync && f.willObjectBeDeletedLocked(id) {
+		return nil
+	}
+
 	newDeltas := append(f.items[id], Delta{actionType, obj})
 	newDeltas = dedupDeltas(newDeltas)
 	if f.deltaCompressor != nil {
@@ -306,6 +335,10 @@ func (f *DeltaFIFO) queueActionLocked(actionType DeltaType, obj interface{}) err
 func (f *DeltaFIFO) List() []interface{} {
 	f.lock.RLock()
 	defer f.lock.RUnlock()
+	return f.listLocked()
+}
+
+func (f *DeltaFIFO) listLocked() []interface{} {
 	list := make([]interface{}, 0, len(f.items))
 	for _, item := range f.items {
 		// Copy item's slice so operations on this slice (delta
@@ -359,10 +392,14 @@ func (f *DeltaFIFO) GetByKey(key string) (item interface{}, exists bool, err err
 // added/updated. The item is removed from the queue (and the store) before it
 // is returned, so if you don't successfully process it, you need to add it back
 // with AddIfNotPresent().
+// process function is called under lock, so it is safe update data structures
+// in it that need to be in sync with the queue (e.g. knownKeys). The PopProcessFunc
+// may return an instance of ErrRequeue with a nested error to indicate the current
+// item should be requeued (equivalent to calling AddIfNotPresent under the lock).
 //
 // Pop returns a 'Deltas', which has a complete list of all the things
 // that happened to the object (deltas) while it was sitting in the queue.
-func (f *DeltaFIFO) Pop() interface{} {
+func (f *DeltaFIFO) Pop(process PopProcessFunc) (interface{}, error) {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 	for {
@@ -380,9 +417,14 @@ func (f *DeltaFIFO) Pop() interface{} {
 			continue
 		}
 		delete(f.items, id)
+		err := process(item)
+		if e, ok := err.(ErrRequeue); ok {
+			f.addIfNotPresent(id, item)
+			err = e.Err
+		}
 		// Don't need to copyDeltas here, because we're transferring
 		// ownership to the caller.
-		return item
+		return item, err
 	}
 }
 
@@ -448,6 +490,52 @@ func (f *DeltaFIFO) Replace(list []interface{}, resourceVersion string) error {
 		if err := f.queueActionLocked(Deleted, DeletedFinalStateUnknown{k, deletedObj}); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+// Resync will send a sync event for each item
+func (f *DeltaFIFO) Resync() error {
+	var keys []string
+	func() {
+		f.lock.RLock()
+		defer f.lock.RUnlock()
+		keys = f.knownObjects.ListKeys()
+	}()
+	for _, k := range keys {
+		if err := f.syncKey(k); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (f *DeltaFIFO) syncKey(key string) error {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+	obj, exists, err := f.knownObjects.GetByKey(key)
+	if err != nil {
+		glog.Errorf("Unexpected error %v during lookup of key %v, unable to queue object for sync", err, key)
+		return nil
+	} else if !exists {
+		glog.Infof("Key %v does not exist in known objects store, unable to queue object for sync", key)
+		return nil
+	}
+
+	// If we are doing Resync() and there is already an event queued for that object,
+	// we ignore the Resync for it. This is to avoid the race, in which the resync
+	// comes with the previous value of object (since queueing an event for the object
+	// doesn't trigger changing the underlying store <knownObjects>.
+	id, err := f.KeyOf(obj)
+	if err != nil {
+		return KeyError{obj, err}
+	}
+	if len(f.items[id]) > 0 {
+		return nil
+	}
+
+	if err := f.queueActionLocked(Sync, obj); err != nil {
+		return fmt.Errorf("couldn't queue object: %v", err)
 	}
 	return nil
 }

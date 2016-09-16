@@ -29,7 +29,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-// +build appengine
+// +build appengine js
 
 // This file contains an implementation of proto field accesses using package reflect.
 // It is slower than the code in pointer_unsafe.go but it avoids package unsafe and can
@@ -137,6 +137,11 @@ func structPointer_StringVal(p structPointer, f field) *string {
 // StringSlice returns the address of a []string field in the struct.
 func structPointer_StringSlice(p structPointer, f field) *[]string {
 	return structPointer_ifield(p, f).(*[]string)
+}
+
+// Extensions returns the address of an extension map field in the struct.
+func structPointer_Extensions(p structPointer, f field) *XXX_InternalExtensions {
+	return structPointer_ifield(p, f).(*XXX_InternalExtensions)
 }
 
 // ExtMap returns the address of an extension map field in the struct.

@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -49,24 +49,24 @@ func TestWatchList(t *testing.T) {
 // - update should trigger Modified event
 // - update that gets filtered should trigger Deleted event
 func testWatch(t *testing.T, recursive bool) {
-	ctx, store, cluster := testSetup(t)
-	defer cluster.Terminate(t)
-
 	podFoo := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 	podBar := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "bar"}}
 
 	tests := []struct {
 		key        string
-		filter     storage.FilterFunc
+		filter     func(runtime.Object) bool
+		trigger    func() []storage.MatchValue
 		watchTests []*testWatchStruct
 	}{{ // create a key
 		key:        "/somekey-1",
 		watchTests: []*testWatchStruct{{podFoo, true, watch.Added}},
-		filter:     storage.Everything,
+		filter:     storage.EverythingFunc,
+		trigger:    storage.NoTriggerFunc,
 	}, { // create a key but obj gets filtered
 		key:        "/somekey-2",
 		watchTests: []*testWatchStruct{{podFoo, false, ""}},
 		filter:     func(runtime.Object) bool { return false },
+		trigger:    storage.NoTriggerFunc,
 	}, { // create a key but obj gets filtered. Then update it with unfiltered obj
 		key:        "/somekey-3",
 		watchTests: []*testWatchStruct{{podFoo, false, ""}, {podBar, true, watch.Added}},
@@ -74,10 +74,12 @@ func testWatch(t *testing.T, recursive bool) {
 			pod := obj.(*api.Pod)
 			return pod.Name == "bar"
 		},
+		trigger: storage.NoTriggerFunc,
 	}, { // update
 		key:        "/somekey-4",
 		watchTests: []*testWatchStruct{{podFoo, true, watch.Added}, {podBar, true, watch.Modified}},
-		filter:     storage.Everything,
+		filter:     storage.EverythingFunc,
+		trigger:    storage.NoTriggerFunc,
 	}, { // delete because of being filtered
 		key:        "/somekey-5",
 		watchTests: []*testWatchStruct{{podFoo, true, watch.Added}, {podBar, true, watch.Deleted}},
@@ -85,9 +87,12 @@ func testWatch(t *testing.T, recursive bool) {
 			pod := obj.(*api.Pod)
 			return pod.Name != "bar"
 		},
+		trigger: storage.NoTriggerFunc,
 	}}
 	for i, tt := range tests {
-		w, err := store.watch(ctx, tt.key, "0", tt.filter, recursive)
+		ctx, store, cluster := testSetup(t)
+		filter := storage.NewSimpleFilter(tt.filter, tt.trigger)
+		w, err := store.watch(ctx, tt.key, "0", filter, recursive)
 		if err != nil {
 			t.Fatalf("Watch failed: %v", err)
 		}
@@ -117,6 +122,7 @@ func testWatch(t *testing.T, recursive bool) {
 		}
 		w.Stop()
 		testCheckStop(t, i, w)
+		cluster.Terminate(t)
 	}
 }
 
@@ -134,10 +140,10 @@ func TestDeleteTriggerWatch(t *testing.T) {
 	testCheckEventType(t, watch.Deleted, w)
 }
 
-// TestWatchSync tests that
+// TestWatchFromZero tests that
 // - watch from 0 should sync up and grab the object added before
 // - watch from non-0 should just watch changes after given version
-func TestWatchFromZeroAndNoneZero(t *testing.T) {
+func TestWatchFromZero(t *testing.T) {
 	ctx, store, cluster := testSetup(t)
 	defer cluster.Terminate(t)
 	key, storedObj := testPropogateStore(t, store, ctx, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}})
@@ -147,10 +153,16 @@ func TestWatchFromZeroAndNoneZero(t *testing.T) {
 		t.Fatalf("Watch failed: %v", err)
 	}
 	testCheckResult(t, 0, watch.Added, w, storedObj)
-	w.Stop()
-	testCheckStop(t, 0, w)
+}
 
-	w, err = store.Watch(ctx, key, storedObj.ResourceVersion, storage.Everything)
+// TestWatchFromNoneZero tests that
+// - watch from non-0 should just watch changes after given version
+func TestWatchFromNoneZero(t *testing.T) {
+	ctx, store, cluster := testSetup(t)
+	defer cluster.Terminate(t)
+	key, storedObj := testPropogateStore(t, store, ctx, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}})
+
+	w, err := store.Watch(ctx, key, storedObj.ResourceVersion, storage.Everything)
 	if err != nil {
 		t.Fatalf("Watch failed: %v", err)
 	}

@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -66,5 +66,14 @@ func TestShuffleStrings(t *testing.T) {
 		if _, exists := m[k]; !exists {
 			t.Errorf("Element %v missing from shuffled slice", k)
 		}
+	}
+}
+
+func TestSortInts64(t *testing.T) {
+	src := []int64{10, 1, 2, 3, 4, 5, 6}
+	expected := []int64{1, 2, 3, 4, 5, 6, 10}
+	SortInts64(src)
+	if !reflect.DeepEqual(src, expected) {
+		t.Errorf("func Ints64 didnt sort correctly, %v !- %v", src, expected)
 	}
 }

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -43,21 +43,10 @@ func ProbeVolumePlugins(volumeConfig volume.VolumeConfig) []volume.VolumePlugin 
 	}
 }
 
-func ProbeRecyclableVolumePlugins(recyclerFunc func(spec *volume.Spec, host volume.VolumeHost, volumeConfig volume.VolumeConfig) (volume.Recycler, error), volumeConfig volume.VolumeConfig) []volume.VolumePlugin {
-	return []volume.VolumePlugin{
-		&hostPathPlugin{
-			host:               nil,
-			newRecyclerFunc:    recyclerFunc,
-			newProvisionerFunc: newProvisioner,
-			config:             volumeConfig,
-		},
-	}
-}
-
 type hostPathPlugin struct {
 	host volume.VolumeHost
 	// decouple creating Recyclers/Deleters/Provisioners by deferring to a function.  Allows for easier testing.
-	newRecyclerFunc    func(spec *volume.Spec, host volume.VolumeHost, volumeConfig volume.VolumeConfig) (volume.Recycler, error)
+	newRecyclerFunc    func(pvName string, spec *volume.Spec, host volume.VolumeHost, volumeConfig volume.VolumeConfig) (volume.Recycler, error)
 	newDeleterFunc     func(spec *volume.Spec, host volume.VolumeHost) (volume.Deleter, error)
 	newProvisionerFunc func(options volume.VolumeOptions, host volume.VolumeHost) (volume.Provisioner, error)
 	config             volume.VolumeConfig
@@ -78,13 +67,26 @@ func (plugin *hostPathPlugin) Init(host volume.VolumeHost) error {
 	return nil
 }
 
-func (plugin *hostPathPlugin) Name() string {
+func (plugin *hostPathPlugin) GetPluginName() string {
 	return hostPathPluginName
+}
+
+func (plugin *hostPathPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
+	volumeSource, _, err := getVolumeSource(spec)
+	if err != nil {
+		return "", err
+	}
+
+	return volumeSource.Path, nil
 }
 
 func (plugin *hostPathPlugin) CanSupport(spec *volume.Spec) bool {
 	return (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.HostPath != nil) ||
 		(spec.Volume != nil && spec.Volume.HostPath != nil)
+}
+
+func (plugin *hostPathPlugin) RequiresRemount() bool {
+	return false
 }
 
 func (plugin *hostPathPlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
@@ -94,19 +96,14 @@ func (plugin *hostPathPlugin) GetAccessModes() []api.PersistentVolumeAccessMode 
 }
 
 func (plugin *hostPathPlugin) NewMounter(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
-	if spec.Volume != nil && spec.Volume.HostPath != nil {
-		path := spec.Volume.HostPath.Path
-		return &hostPathMounter{
-			hostPath: &hostPath{path: path},
-			readOnly: false,
-		}, nil
-	} else {
-		path := spec.PersistentVolume.Spec.HostPath.Path
-		return &hostPathMounter{
-			hostPath: &hostPath{path: path},
-			readOnly: spec.ReadOnly,
-		}, nil
+	hostPathVolumeSource, readOnly, err := getVolumeSource(spec)
+	if err != nil {
+		return nil, err
 	}
+	return &hostPathMounter{
+		hostPath: &hostPath{path: hostPathVolumeSource.Path},
+		readOnly: readOnly,
+	}, nil
 }
 
 func (plugin *hostPathPlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
@@ -115,8 +112,8 @@ func (plugin *hostPathPlugin) NewUnmounter(volName string, podUID types.UID) (vo
 	}}, nil
 }
 
-func (plugin *hostPathPlugin) NewRecycler(spec *volume.Spec) (volume.Recycler, error) {
-	return plugin.newRecyclerFunc(spec, plugin.host, plugin.config)
+func (plugin *hostPathPlugin) NewRecycler(pvName string, spec *volume.Spec) (volume.Recycler, error) {
+	return plugin.newRecyclerFunc(pvName, spec, plugin.host, plugin.config)
 }
 
 func (plugin *hostPathPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
@@ -124,13 +121,28 @@ func (plugin *hostPathPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, err
 }
 
 func (plugin *hostPathPlugin) NewProvisioner(options volume.VolumeOptions) (volume.Provisioner, error) {
+	if !plugin.config.ProvisioningEnabled {
+		return nil, fmt.Errorf("Provisioning in volume plugin %q is disabled", plugin.GetPluginName())
+	}
 	if len(options.AccessModes) == 0 {
 		options.AccessModes = plugin.GetAccessModes()
 	}
 	return plugin.newProvisionerFunc(options, plugin.host)
 }
 
-func newRecycler(spec *volume.Spec, host volume.VolumeHost, config volume.VolumeConfig) (volume.Recycler, error) {
+func (plugin *hostPathPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
+	hostPathVolume := &api.Volume{
+		Name: volumeName,
+		VolumeSource: api.VolumeSource{
+			HostPath: &api.HostPathVolumeSource{
+				Path: volumeName,
+			},
+		},
+	}
+	return volume.NewSpecFromVolume(hostPathVolume), nil
+}
+
+func newRecycler(pvName string, spec *volume.Spec, host volume.VolumeHost, config volume.VolumeConfig) (volume.Recycler, error) {
 	if spec.PersistentVolume == nil || spec.PersistentVolume.Spec.HostPath == nil {
 		return nil, fmt.Errorf("spec.PersistentVolumeSource.HostPath is nil")
 	}
@@ -141,6 +153,7 @@ func newRecycler(spec *volume.Spec, host volume.VolumeHost, config volume.Volume
 		host:    host,
 		config:  config,
 		timeout: volume.CalculateTimeoutForVolume(config.RecyclerMinimumTimeout, config.RecyclerTimeoutIncrement, spec.PersistentVolume),
+		pvName:  pvName,
 	}, nil
 }
 
@@ -221,6 +234,7 @@ type hostPathRecycler struct {
 	config  volume.VolumeConfig
 	timeout int64
 	volume.MetricsNil
+	pvName string
 }
 
 func (r *hostPathRecycler) GetPath() string {
@@ -234,13 +248,12 @@ func (r *hostPathRecycler) Recycle() error {
 	pod := r.config.RecyclerPodTemplate
 	// overrides
 	pod.Spec.ActiveDeadlineSeconds = &r.timeout
-	pod.GenerateName = "pv-recycler-hostpath-"
 	pod.Spec.Volumes[0].VolumeSource = api.VolumeSource{
 		HostPath: &api.HostPathVolumeSource{
 			Path: r.path,
 		},
 	}
-	return volume.RecycleVolumeByWatchingPodUntilCompletion(pod, r.host.GetKubeClient())
+	return volume.RecycleVolumeByWatchingPodUntilCompletion(r.pvName, pod, r.host.GetKubeClient())
 }
 
 // hostPathProvisioner implements a Provisioner for the HostPath plugin
@@ -252,18 +265,12 @@ type hostPathProvisioner struct {
 
 // Create for hostPath simply creates a local /tmp/hostpath_pv/%s directory as a new PersistentVolume.
 // This Provisioner is meant for development and testing only and WILL NOT WORK in a multi-node cluster.
-func (r *hostPathProvisioner) Provision(pv *api.PersistentVolume) error {
-	if pv.Spec.HostPath == nil {
-		return fmt.Errorf("pv.Spec.HostPath cannot be nil")
-	}
-	return os.MkdirAll(pv.Spec.HostPath.Path, 0750)
-}
+func (r *hostPathProvisioner) Provision() (*api.PersistentVolume, error) {
+	fullpath := fmt.Sprintf("/tmp/hostpath_pv/%s", uuid.NewUUID())
 
-func (r *hostPathProvisioner) NewPersistentVolumeTemplate() (*api.PersistentVolume, error) {
-	fullpath := fmt.Sprintf("/tmp/hostpath_pv/%s", util.NewUUID())
-	return &api.PersistentVolume{
+	pv := &api.PersistentVolume{
 		ObjectMeta: api.ObjectMeta{
-			GenerateName: "pv-hostpath-",
+			Name: r.options.PVName,
 			Annotations: map[string]string{
 				"kubernetes.io/createdby": "hostpath-dynamic-provisioner",
 			},
@@ -280,7 +287,9 @@ func (r *hostPathProvisioner) NewPersistentVolumeTemplate() (*api.PersistentVolu
 				},
 			},
 		},
-	}, nil
+	}
+
+	return pv, os.MkdirAll(pv.Spec.HostPath.Path, 0750)
 }
 
 // hostPathDeleter deletes a hostPath PV from the cluster.
@@ -305,4 +314,16 @@ func (r *hostPathDeleter) Delete() error {
 		return fmt.Errorf("host_path deleter only supports /tmp/.+ but received provided %s", r.GetPath())
 	}
 	return os.RemoveAll(r.GetPath())
+}
+
+func getVolumeSource(
+	spec *volume.Spec) (*api.HostPathVolumeSource, bool, error) {
+	if spec.Volume != nil && spec.Volume.HostPath != nil {
+		return spec.Volume.HostPath, spec.ReadOnly, nil
+	} else if spec.PersistentVolume != nil &&
+		spec.PersistentVolume.Spec.HostPath != nil {
+		return spec.PersistentVolume.Spec.HostPath, spec.ReadOnly, nil
+	}
+
+	return nil, false, fmt.Errorf("Spec does not reference an HostPath volume type")
 }

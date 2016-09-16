@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -167,6 +167,12 @@ func getUserIdentificationPartialConfig(configAuthInfo clientcmdapi.AuthInfo, fa
 	// blindly overwrite existing values based on precedence
 	if len(configAuthInfo.Token) > 0 {
 		mergedConfig.BearerToken = configAuthInfo.Token
+	} else if len(configAuthInfo.TokenFile) > 0 {
+		tokenBytes, err := ioutil.ReadFile(configAuthInfo.TokenFile)
+		if err != nil {
+			return nil, err
+		}
+		mergedConfig.BearerToken = string(tokenBytes)
 	}
 	if len(configAuthInfo.Impersonate) > 0 {
 		mergedConfig.Impersonate = configAuthInfo.Impersonate
@@ -189,8 +195,10 @@ func getUserIdentificationPartialConfig(configAuthInfo clientcmdapi.AuthInfo, fa
 	// if there still isn't enough information to authenticate the user, try prompting
 	if !canIdentifyUser(*mergedConfig) && (fallbackReader != nil) {
 		prompter := NewPromptingAuthLoader(fallbackReader)
-		promptedAuthInfo := prompter.Prompt()
-
+		promptedAuthInfo, err := prompter.Prompt()
+		if err != nil {
+			return nil, err
+		}
 		promptedConfig := makeUserIdentificationConfig(*promptedAuthInfo)
 		previouslyMergedConfig := mergedConfig
 		mergedConfig = &restclient.Config{}
@@ -257,6 +265,21 @@ func (config *DirectClientConfig) ConfigAccess() ConfigAccess {
 // but no errors in the sections requested or referenced.  It does not return early so that it can find as many errors as possible.
 func (config *DirectClientConfig) ConfirmUsable() error {
 	validationErrors := make([]error, 0)
+
+	var contextName string
+	if len(config.contextName) != 0 {
+		contextName = config.contextName
+	} else {
+		contextName = config.config.CurrentContext
+	}
+
+	if len(contextName) > 0 {
+		_, exists := config.config.Contexts[contextName]
+		if !exists {
+			validationErrors = append(validationErrors, &errContextNotFound{contextName})
+		}
+	}
+
 	validationErrors = append(validationErrors, validateAuthInfo(config.getAuthInfoName(), config.getAuthInfo())...)
 	validationErrors = append(validationErrors, validateClusterInfo(config.getClusterName(), config.getCluster())...)
 	// when direct client config is specified, and our only error is that no server is defined, we should
@@ -323,7 +346,7 @@ func (config *DirectClientConfig) getCluster() clientcmdapi.Cluster {
 	clusterInfoName := config.getClusterName()
 
 	var mergedClusterInfo clientcmdapi.Cluster
-	mergo.Merge(&mergedClusterInfo, DefaultCluster)
+	mergo.Merge(&mergedClusterInfo, config.overrides.ClusterDefaults)
 	mergo.Merge(&mergedClusterInfo, EnvVarCluster)
 	if configClusterInfo, exists := clusterInfos[clusterInfoName]; exists {
 		mergo.Merge(&mergedClusterInfo, configClusterInfo)
@@ -344,6 +367,8 @@ func (config *DirectClientConfig) getCluster() clientcmdapi.Cluster {
 // inClusterClientConfig makes a config that will work from within a kubernetes cluster container environment.
 type inClusterClientConfig struct{}
 
+var _ ClientConfig = inClusterClientConfig{}
+
 func (inClusterClientConfig) RawConfig() (clientcmdapi.Config, error) {
 	return clientcmdapi.Config{}, fmt.Errorf("inCluster environment config doesn't support multiple clusters")
 }
@@ -352,21 +377,21 @@ func (inClusterClientConfig) ClientConfig() (*restclient.Config, error) {
 	return restclient.InClusterConfig()
 }
 
-func (inClusterClientConfig) Namespace() (string, error) {
+func (inClusterClientConfig) Namespace() (string, bool, error) {
 	// This way assumes you've set the POD_NAMESPACE environment variable using the downward API.
 	// This check has to be done first for backwards compatibility with the way InClusterConfig was originally set up
 	if ns := os.Getenv("POD_NAMESPACE"); ns != "" {
-		return ns, nil
+		return ns, true, nil
 	}
 
 	// Fall back to the namespace associated with the service account token, if available
 	if data, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace"); err == nil {
 		if ns := strings.TrimSpace(string(data)); len(ns) > 0 {
-			return ns, nil
+			return ns, true, nil
 		}
 	}
 
-	return "default", nil
+	return "default", false, nil
 }
 
 func (inClusterClientConfig) ConfigAccess() ConfigAccess {
@@ -398,4 +423,14 @@ func BuildConfigFromFlags(masterUrl, kubeconfigPath string) (*restclient.Config,
 	return NewNonInteractiveDeferredLoadingClientConfig(
 		&ClientConfigLoadingRules{ExplicitPath: kubeconfigPath},
 		&ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: masterUrl}}).ClientConfig()
+}
+
+// BuildConfigFromKubeconfigGetter is a helper function that builds configs from a master
+// url and a kubeconfigGetter.
+func BuildConfigFromKubeconfigGetter(masterUrl string, kubeconfigGetter KubeconfigGetter) (*restclient.Config, error) {
+	// TODO: We do not need a DeferredLoader here. Refactor code and see if we can use DirectClientConfig here.
+	cc := NewNonInteractiveDeferredLoadingClientConfig(
+		&ClientConfigGetter{kubeconfigGetter: kubeconfigGetter},
+		&ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: masterUrl}})
+	return cc.ClientConfig()
 }

@@ -77,7 +77,7 @@ apiserver:
     --external-hostname=apiserver
     --etcd-servers=http://etcd:4001
     --port=8888
-    --admission-control=NamespaceLifecycle,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota
+    --admission-control=NamespaceLifecycle,LimitRanger,SecurityContextDeny,ServiceAccount,DefaultStorageClass,ResourceQuota
     --authorization-mode=AlwaysAllow
     --token-auth-file=/var/run/kubernetes/auth/token-users
     --basic-auth-file=/var/run/kubernetes/auth/basic-users

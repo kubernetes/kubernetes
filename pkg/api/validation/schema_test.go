@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -135,7 +135,7 @@ func TestLoad(t *testing.T) {
 func TestValidateOk(t *testing.T) {
 	schema, err := loadSchemaForTest()
 	if err != nil {
-		t.Errorf("Failed to load: %v", err)
+		t.Fatalf("Failed to load: %v", err)
 	}
 	tests := []struct {
 		obj      runtime.Object
@@ -167,7 +167,7 @@ func TestValidateOk(t *testing.T) {
 func TestValidateDifferentApiVersions(t *testing.T) {
 	schema, err := loadSchemaForTest()
 	if err != nil {
-		t.Errorf("Failed to load: %v", err)
+		t.Fatalf("Failed to load: %v", err)
 	}
 
 	pod := &api.Pod{}
@@ -203,12 +203,13 @@ func TestValidateDifferentApiVersions(t *testing.T) {
 func TestInvalid(t *testing.T) {
 	schema, err := loadSchemaForTest()
 	if err != nil {
-		t.Errorf("Failed to load: %v", err)
+		t.Fatalf("Failed to load: %v", err)
 	}
 	tests := []string{
 		"invalidPod1.json", // command is a string, instead of []string.
 		"invalidPod2.json", // hostPort if of type string, instead of int.
 		"invalidPod3.json", // volumes is not an array of objects.
+		"invalidPod4.yaml", // string list with empty string.
 		"invalidPod.yaml",  // command is a string, instead of []string.
 	}
 	for _, test := range tests {
@@ -226,7 +227,7 @@ func TestInvalid(t *testing.T) {
 func TestValid(t *testing.T) {
 	schema, err := loadSchemaForTest()
 	if err != nil {
-		t.Errorf("Failed to load: %v", err)
+		t.Fatalf("Failed to load: %v", err)
 	}
 	tests := []string{
 		"validPod.yaml",
@@ -238,7 +239,7 @@ func TestValid(t *testing.T) {
 		}
 		err = schema.ValidateBytes(pod)
 		if err != nil {
-			t.Errorf("unexpected error %s, for pod %s", err, pod)
+			t.Errorf("unexpected error: %s, for pod %s", err, pod)
 		}
 	}
 }
@@ -273,7 +274,7 @@ func TestVersionRegex(t *testing.T) {
 
 // Tests that validation works fine when spec contains "type": "any" instead of "type": "object"
 // Ref: https://github.com/kubernetes/kubernetes/issues/24309
-func TestTypeOAny(t *testing.T) {
+func TestTypeAny(t *testing.T) {
 	data, err := readSwaggerFile()
 	if err != nil {
 		t.Errorf("failed to read swagger file: %v", err)
@@ -282,7 +283,7 @@ func TestTypeOAny(t *testing.T) {
 	newData := strings.Replace(string(data), `"type": "object"`, `"type": "any"`, -1)
 	schema, err := NewSwaggerSchemaFromBytes([]byte(newData), nil)
 	if err != nil {
-		t.Errorf("Failed to load: %v", err)
+		t.Fatalf("Failed to load: %v", err)
 	}
 	tests := []string{
 		"validPod.yaml",
@@ -303,7 +304,7 @@ func TestTypeOAny(t *testing.T) {
 		}
 		err = schema.ValidateBytes(podBytes)
 		if err != nil {
-			t.Errorf("unexpected error %s, for pod %s", err, string(podBytes))
+			t.Errorf("unexpected error: %s, for pod %s", err, string(podBytes))
 		}
 	}
 }

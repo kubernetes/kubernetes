@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@ limitations under the License.
 package exec
 
 import (
+	"io"
 	osexec "os/exec"
 	"syscall"
 )
@@ -45,6 +46,8 @@ type Cmd interface {
 	// Output runs the command and returns standard output, but not standard err
 	Output() ([]byte, error)
 	SetDir(dir string)
+	SetStdin(in io.Reader)
+	SetStdout(out io.Writer)
 }
 
 // ExitError is an interface that presents an API similar to os.ProcessState, which is
@@ -82,6 +85,14 @@ func (cmd *cmdWrapper) SetDir(dir string) {
 	cmd.Dir = dir
 }
 
+func (cmd *cmdWrapper) SetStdin(in io.Reader) {
+	cmd.Stdin = in
+}
+
+func (cmd *cmdWrapper) SetStdout(out io.Writer) {
+	cmd.Stdout = out
+}
+
 // CombinedOutput is part of the Cmd interface.
 func (cmd *cmdWrapper) CombinedOutput() ([]byte, error) {
 	out, err := (*osexec.Cmd)(cmd).CombinedOutput()
@@ -102,7 +113,7 @@ func (cmd *cmdWrapper) Output() ([]byte, error) {
 func handleError(err error) error {
 	if ee, ok := err.(*osexec.ExitError); ok {
 		// Force a compile fail if exitErrorWrapper can't convert to ExitError.
-		var x ExitError = &exitErrorWrapper{ee}
+		var x ExitError = &ExitErrorWrapper{ee}
 		return x
 	}
 	if ee, ok := err.(*osexec.Error); ok {
@@ -113,17 +124,44 @@ func handleError(err error) error {
 	return err
 }
 
-// exitErrorWrapper is an implementation of ExitError in terms of os/exec ExitError.
+// ExitErrorWrapper is an implementation of ExitError in terms of os/exec ExitError.
 // Note: standard exec.ExitError is type *os.ProcessState, which already implements Exited().
-type exitErrorWrapper struct {
+type ExitErrorWrapper struct {
 	*osexec.ExitError
 }
 
+var _ ExitError = ExitErrorWrapper{}
+
 // ExitStatus is part of the ExitError interface.
-func (eew exitErrorWrapper) ExitStatus() int {
+func (eew ExitErrorWrapper) ExitStatus() int {
 	ws, ok := eew.Sys().(syscall.WaitStatus)
 	if !ok {
 		panic("can't call ExitStatus() on a non-WaitStatus exitErrorWrapper")
 	}
 	return ws.ExitStatus()
+}
+
+// CodeExitError is an implementation of ExitError consisting of an error object
+// and an exit code (the upper bits of os.exec.ExitStatus).
+type CodeExitError struct {
+	Err  error
+	Code int
+}
+
+var _ ExitError = CodeExitError{}
+
+func (e CodeExitError) Error() string {
+	return e.Err.Error()
+}
+
+func (e CodeExitError) String() string {
+	return e.Err.Error()
+}
+
+func (e CodeExitError) Exited() bool {
+	return true
+}
+
+func (e CodeExitError) ExitStatus() int {
+	return e.Code
 }

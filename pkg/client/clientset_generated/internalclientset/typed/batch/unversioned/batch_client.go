@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,6 +25,7 @@ import (
 type BatchInterface interface {
 	GetRESTClient() *restclient.RESTClient
 	JobsGetter
+	ScheduledJobsGetter
 }
 
 // BatchClient is used to interact with features provided by the Batch group.
@@ -34,6 +35,10 @@ type BatchClient struct {
 
 func (c *BatchClient) Jobs(namespace string) JobInterface {
 	return newJobs(c, namespace)
+}
+
+func (c *BatchClient) ScheduledJobs(namespace string) ScheduledJobInterface {
+	return newScheduledJobs(c, namespace)
 }
 
 // NewForConfig creates a new BatchClient for the given config.

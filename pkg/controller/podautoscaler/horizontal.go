@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -33,7 +33,6 @@ import (
 	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
 	unversionedextensions "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/unversioned"
 	"k8s.io/kubernetes/pkg/client/record"
-	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
 	"k8s.io/kubernetes/pkg/runtime"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
@@ -61,14 +60,14 @@ type HorizontalController struct {
 	// A store of HPA objects, populated by the controller.
 	store cache.Store
 	// Watches changes to all HPA objects.
-	controller *framework.Controller
+	controller *cache.Controller
 }
 
 var downscaleForbiddenWindow = 5 * time.Minute
 var upscaleForbiddenWindow = 3 * time.Minute
 
-func newInformer(controller *HorizontalController, resyncPeriod time.Duration) (cache.Store, *framework.Controller) {
-	return framework.NewInformer(
+func newInformer(controller *HorizontalController, resyncPeriod time.Duration) (cache.Store, *cache.Controller) {
+	return cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				return controller.hpaNamespacer.HorizontalPodAutoscalers(api.NamespaceAll).List(options)
@@ -79,7 +78,7 @@ func newInformer(controller *HorizontalController, resyncPeriod time.Duration) (
 		},
 		&autoscaling.HorizontalPodAutoscaler{},
 		resyncPeriod,
-		framework.ResourceEventHandlerFuncs{
+		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				hpa := obj.(*autoscaling.HorizontalPodAutoscaler)
 				hasCPUPolicy := hpa.Spec.TargetCPUUtilizationPercentage != nil
@@ -162,9 +161,9 @@ func (a *HorizontalController) computeReplicasForCPUUtilization(hpa *autoscaling
 	usageRatio := float64(utilization) / float64(targetUtilization)
 	if math.Abs(1.0-usageRatio) > tolerance {
 		return int32(math.Ceil(usageRatio * float64(currentReplicas))), &utilization, timestamp, nil
-	} else {
-		return currentReplicas, &utilization, timestamp, nil
 	}
+
+	return currentReplicas, &utilization, timestamp, nil
 }
 
 // Computes the desired number of replicas based on the CustomMetrics passed in cmAnnotation as json-serialized
@@ -175,16 +174,11 @@ func (a *HorizontalController) computeReplicasForCPUUtilization(hpa *autoscaling
 func (a *HorizontalController) computeReplicasForCustomMetrics(hpa *autoscaling.HorizontalPodAutoscaler, scale *extensions.Scale,
 	cmAnnotation string) (replicas int32, metric string, status string, timestamp time.Time, err error) {
 
-	currentReplicas := scale.Status.Replicas
-	replicas = 0
-	metric = ""
-	status = ""
-	timestamp = time.Time{}
-	err = nil
-
 	if cmAnnotation == "" {
 		return
 	}
+
+	currentReplicas := scale.Status.Replicas
 
 	var targetList extensions.CustomMetricTargetList
 	if err := json.Unmarshal([]byte(cmAnnotation), &targetList); err != nil {
@@ -237,7 +231,7 @@ func (a *HorizontalController) computeReplicasForCustomMetrics(hpa *autoscaling.
 		}
 		statusList.Items = append(statusList.Items, extensions.CustomMetricCurrentStatus{
 			Name:         customMetricTarget.Name,
-			CurrentValue: *quantity,
+			CurrentValue: quantity,
 		})
 	}
 	byteStatusList, err := json.Marshal(statusList)
@@ -259,7 +253,7 @@ func (a *HorizontalController) reconcileAutoscaler(hpa *autoscaling.HorizontalPo
 	currentReplicas := scale.Status.Replicas
 
 	cpuDesiredReplicas := int32(0)
-	var cpuCurrentUtilization *int32 = nil
+	cpuCurrentUtilization := new(int32)
 	cpuTimestamp := time.Time{}
 
 	cmDesiredReplicas := int32(0)
@@ -271,7 +265,10 @@ func (a *HorizontalController) reconcileAutoscaler(hpa *autoscaling.HorizontalPo
 	rescaleReason := ""
 	timestamp := time.Now()
 
-	if currentReplicas > hpa.Spec.MaxReplicas {
+	if scale.Spec.Replicas == 0 {
+		// Autoscaling is disabled for this resource
+		desiredReplicas = 0
+	} else if currentReplicas > hpa.Spec.MaxReplicas {
 		rescaleReason = "Current number of replicas above Spec.MaxReplicas"
 		desiredReplicas = hpa.Spec.MaxReplicas
 	} else if hpa.Spec.MinReplicas != nil && currentReplicas < *hpa.Spec.MinReplicas {
@@ -315,7 +312,8 @@ func (a *HorizontalController) reconcileAutoscaler(hpa *autoscaling.HorizontalPo
 		}
 		if desiredReplicas > currentReplicas {
 			rescaleReason = fmt.Sprintf("%s above target", rescaleMetric)
-		} else if desiredReplicas < currentReplicas {
+		}
+		if desiredReplicas < currentReplicas {
 			rescaleReason = "All metrics below target"
 		}
 
@@ -323,7 +321,7 @@ func (a *HorizontalController) reconcileAutoscaler(hpa *autoscaling.HorizontalPo
 			desiredReplicas = *hpa.Spec.MinReplicas
 		}
 
-		// TODO: remove when pod idling is done.
+		//  never scale down to 0, reserved for disabling autoscaling
 		if desiredReplicas == 0 {
 			desiredReplicas = 1
 		}
@@ -352,22 +350,24 @@ func (a *HorizontalController) reconcileAutoscaler(hpa *autoscaling.HorizontalPo
 }
 
 func shouldScale(hpa *autoscaling.HorizontalPodAutoscaler, currentReplicas, desiredReplicas int32, timestamp time.Time) bool {
-	if desiredReplicas != currentReplicas {
-		// Going down only if the usageRatio dropped significantly below the target
-		// and there was no rescaling in the last downscaleForbiddenWindow.
-		if desiredReplicas < currentReplicas &&
-			(hpa.Status.LastScaleTime == nil ||
-				hpa.Status.LastScaleTime.Add(downscaleForbiddenWindow).Before(timestamp)) {
-			return true
-		}
+	if desiredReplicas == currentReplicas {
+		return false
+	}
 
-		// Going up only if the usage ratio increased significantly above the target
-		// and there was no rescaling in the last upscaleForbiddenWindow.
-		if desiredReplicas > currentReplicas &&
-			(hpa.Status.LastScaleTime == nil ||
-				hpa.Status.LastScaleTime.Add(upscaleForbiddenWindow).Before(timestamp)) {
-			return true
-		}
+	if hpa.Status.LastScaleTime == nil {
+		return true
+	}
+
+	// Going down only if the usageRatio dropped significantly below the target
+	// and there was no rescaling in the last downscaleForbiddenWindow.
+	if desiredReplicas < currentReplicas && hpa.Status.LastScaleTime.Add(downscaleForbiddenWindow).Before(timestamp) {
+		return true
+	}
+
+	// Going up only if the usage ratio increased significantly above the target
+	// and there was no rescaling in the last upscaleForbiddenWindow.
+	if desiredReplicas > currentReplicas && hpa.Status.LastScaleTime.Add(upscaleForbiddenWindow).Before(timestamp) {
+		return true
 	}
 	return false
 }

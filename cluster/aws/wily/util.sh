@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 The Kubernetes Authors All rights reserved.
+# Copyright 2015 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@
 # limitations under the License.
 
 
-source "${KUBE_ROOT}/cluster/aws/trusty/common.sh"
+source "${KUBE_ROOT}/cluster/aws/common/common.sh"
 
 SSH_USER=ubuntu
 
@@ -31,6 +31,10 @@ function detect-wily-image () {
     case "${AWS_REGION}" in
       ap-northeast-1)
         AWS_IMAGE=ami-3355505d
+        ;;
+
+      ap-northeast-2)
+        AWS_IMAGE=ami-e427e98a
         ;;
 
       ap-southeast-1)

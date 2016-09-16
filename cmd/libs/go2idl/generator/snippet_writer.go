@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -94,7 +94,7 @@ func NewSnippetWriter(w io.Writer, c *Context, left, right string) *SnippetWrite
 // but you should consider doing the logic in go and stitching them together
 // for the sake of your readers.
 //
-// TODO: Change Do() to optionally take a list of pairt of parameters (key, value)
+// TODO: Change Do() to optionally take a list of pairs of parameters (key, value)
 // and have it construct a combined map with that and args.
 func (s *SnippetWriter) Do(format string, args interface{}) *SnippetWriter {
 	if s.err != nil {
@@ -117,6 +117,31 @@ func (s *SnippetWriter) Do(format string, args interface{}) *SnippetWriter {
 		s.err = err
 	}
 	return s
+}
+
+// Args exists to make it convenient to construct arguments for
+// SnippetWriter.Do.
+type Args map[interface{}]interface{}
+
+// With makes a copy of a and adds the given key, value pair.
+func (a Args) With(key, value interface{}) Args {
+	a2 := Args{key: value}
+	for k, v := range a {
+		a2[k] = v
+	}
+	return a2
+}
+
+// WithArgs makes a copy of a and adds the given arguments.
+func (a Args) WithArgs(rhs Args) Args {
+	a2 := Args{}
+	for k, v := range rhs {
+		a2[k] = v
+	}
+	for k, v := range a {
+		a2[k] = v
+	}
+	return a2
 }
 
 func (s *SnippetWriter) Out() io.Writer {

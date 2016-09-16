@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -32,7 +32,7 @@ import (
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/util/httpstream"
-	"k8s.io/kubernetes/third_party/golang/netutil"
+	"k8s.io/kubernetes/third_party/forked/golang/netutil"
 )
 
 // SpdyRoundTripper knows how to upgrade an HTTP request to one that supports
@@ -123,6 +123,10 @@ func (s *SpdyRoundTripper) dial(req *http.Request) (net.Conn, error) {
 	host, _, err := net.SplitHostPort(targetHost)
 	if err != nil {
 		return nil, err
+	}
+
+	if s.tlsConfig == nil {
+		s.tlsConfig = &tls.Config{}
 	}
 
 	if len(s.tlsConfig.ServerName) == 0 {

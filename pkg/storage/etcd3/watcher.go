@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -53,7 +53,7 @@ type watchChan struct {
 	key               string
 	initialRev        int64
 	recursive         bool
-	filter            storage.FilterFunc
+	filter            storage.Filter
 	ctx               context.Context
 	cancel            context.CancelFunc
 	incomingEventChan chan *event
@@ -76,7 +76,7 @@ func newWatcher(client *clientv3.Client, codec runtime.Codec, versioner storage.
 // If recursive is false, it watches on given key.
 // If recursive is true, it watches any children and directories under the key, excluding the root key itself.
 // filter must be non-nil. Only if filter returns true will the changes be returned.
-func (w *watcher) Watch(ctx context.Context, key string, rev int64, recursive bool, filter storage.FilterFunc) (watch.Interface, error) {
+func (w *watcher) Watch(ctx context.Context, key string, rev int64, recursive bool, filter storage.Filter) (watch.Interface, error) {
 	if recursive && !strings.HasSuffix(key, "/") {
 		key += "/"
 	}
@@ -85,7 +85,7 @@ func (w *watcher) Watch(ctx context.Context, key string, rev int64, recursive bo
 	return wc, nil
 }
 
-func (w *watcher) createWatchChan(ctx context.Context, key string, rev int64, recursive bool, filter storage.FilterFunc) *watchChan {
+func (w *watcher) createWatchChan(ctx context.Context, key string, rev int64, recursive bool, filter storage.Filter) *watchChan {
 	wc := &watchChan{
 		watcher:           w,
 		key:               key,
@@ -158,6 +158,7 @@ func (wc *watchChan) sync() error {
 func (wc *watchChan) startWatching() {
 	if wc.initialRev == 0 {
 		if err := wc.sync(); err != nil {
+			glog.Errorf("failed to sync with latest state: %v", err)
 			wc.sendError(err)
 			return
 		}
@@ -169,8 +170,10 @@ func (wc *watchChan) startWatching() {
 	wch := wc.watcher.client.Watch(wc.ctx, wc.key, opts...)
 	for wres := range wch {
 		if wres.Err() != nil {
+			err := wres.Err()
 			// If there is an error on server (e.g. compaction), the channel will return it before closed.
-			wc.sendError(wres.Err())
+			glog.Errorf("watch chan error: %v", err)
+			wc.sendError(err)
 			return
 		}
 		for _, e := range wres.Events {
@@ -189,6 +192,10 @@ func (wc *watchChan) processEvent(wg *sync.WaitGroup) {
 			res := wc.transform(e)
 			if res == nil {
 				continue
+			}
+			if len(wc.resultChan) == outgoingBufSize {
+				glog.Warningf("Fast watcher, slow processing. Number of buffered events: %d."+
+					"Probably caused by slow dispatching events to watchers", outgoingBufSize)
 			}
 			// If user couldn't receive results fast enough, we also block incoming events from watcher.
 			// Because storing events in local will cause more memory usage.
@@ -215,13 +222,14 @@ func (wc *watchChan) processEvent(wg *sync.WaitGroup) {
 func (wc *watchChan) transform(e *event) (res *watch.Event) {
 	curObj, oldObj, err := prepareObjs(wc.ctx, e, wc.watcher.client, wc.watcher.codec, wc.watcher.versioner)
 	if err != nil {
+		glog.Errorf("failed to prepare current and previous objects: %v", err)
 		wc.sendError(err)
 		return nil
 	}
 
 	switch {
 	case e.isDeleted:
-		if !wc.filter(oldObj) {
+		if !wc.filter.Filter(oldObj) {
 			return nil
 		}
 		res = &watch.Event{
@@ -229,7 +237,7 @@ func (wc *watchChan) transform(e *event) (res *watch.Event) {
 			Object: oldObj,
 		}
 	case e.isCreated:
-		if !wc.filter(curObj) {
+		if !wc.filter.Filter(curObj) {
 			return nil
 		}
 		res = &watch.Event{
@@ -237,8 +245,8 @@ func (wc *watchChan) transform(e *event) (res *watch.Event) {
 			Object: curObj,
 		}
 	default:
-		curObjPasses := wc.filter(curObj)
-		oldObjPasses := wc.filter(oldObj)
+		curObjPasses := wc.filter.Filter(curObj)
+		oldObjPasses := wc.filter.Filter(oldObj)
 		switch {
 		case curObjPasses && oldObjPasses:
 			res = &watch.Event{
@@ -300,7 +308,7 @@ func (wc *watchChan) sendError(err error) {
 
 func (wc *watchChan) sendEvent(e *event) {
 	if len(wc.incomingEventChan) == incomingBufSize {
-		glog.V(2).Infof("Fast watcher, slow processing. Number of buffered events: %d."+
+		glog.Warningf("Fast watcher, slow processing. Number of buffered events: %d."+
 			"Probably caused by slow decoding, user not receiving fast, or other processing logic",
 			incomingBufSize)
 	}

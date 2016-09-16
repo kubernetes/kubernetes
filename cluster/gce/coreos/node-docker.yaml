@@ -1,0 +1,161 @@
+#cloud-config
+
+coreos:
+  update:
+    reboot-strategy: off
+  units:
+    - name: locksmithd.service
+      mask: true
+    - name: kube-env.service
+      command: start
+      content: |
+        [Unit]
+        Description=Fetch kubernetes-node-environment
+        Requires=network-online.target
+        After=network-online.target
+        [Service]
+        Type=oneshot
+        RemainAfterExit=yes
+        ExecStartPre=/usr/bin/curl --fail --silent --show-error \
+        -H "X-Google-Metadata-Request: True" \
+        -o /etc/kube-env.yaml \
+        http://metadata.google.internal/computeMetadata/v1/instance/attributes/kube-env
+        # Transform the yaml to env file.
+        ExecStartPre=/usr/bin/mv /etc/kube-env.yaml /etc/kube-env
+        ExecStart=/usr/bin/sed -i "s/: '/=/;s/'$//" /etc/kube-env
+
+    - name: kubernetes-install-cni.service
+      command: start
+      content: |
+        [Unit]
+        Description=Download cni
+        Requires=network-online.target
+        After=network-online.target
+        [Service]
+        Type=oneshot
+        RemainAfterExit=yes
+        ExecStartPre=/usr/bin/mkdir -p /opt/cni
+        ExecStartPre=/usr/bin/curl --fail --silent --show-error --location --create-dirs --output /opt/downloads/cni.tar.gz https://storage.googleapis.com/kubernetes-release/network-plugins/cni-07a8a28637e97b22eb8dfe710eeae1344f69d16e.tar.gz
+        ExecStart=/usr/bin/tar xf /opt/downloads/cni.tar.gz -C /opt/cni/        
+
+    - name: kubernetes-download-manifests.service
+      command: start
+      content: |
+        [Unit]
+        Description=Download manifests
+        Requires=network-online.target
+        After=network-online.target
+        Requires=kube-env.service
+        After=kube-env.service
+        [Service]
+        Type=oneshot
+        RemainAfterExit=yes
+        EnvironmentFile=/etc/kube-env
+        ExecStartPre=/usr/bin/mkdir -p /opt/downloads
+        ExecStartPre=/usr/bin/curl --fail --silent --show-error --location --create-dirs --output \
+        /opt/downloads/kubernetes-manifests.tar.gz ${KUBE_MANIFESTS_TAR_URL}
+        # TODO(yifan): Check hash.
+        ExecStartPre=/usr/bin/mkdir -p /opt/kube-manifests
+        ExecStart=/usr/bin/tar xf /opt/downloads/kubernetes-manifests.tar.gz -C /opt/kube-manifests --overwrite
+
+    - name: kubernetes-install-node.service
+      command: start
+      content: |
+        [Unit]
+        Description=Install Kubernetes Server
+        Requires=network-online.target
+        After=network-online.target
+        Requires=kube-env.service
+        After=kube-env.service
+        [Service]
+        Type=oneshot
+        RemainAfterExit=yes
+        EnvironmentFile=/etc/kube-env
+        ExecStartPre=/usr/bin/mkdir -p /opt/kubernetes/pkg
+        ExecStartPre=/usr/bin/curl --fail --silent --show-error --location --create-dirs --output \
+        /opt/kubernetes/pkg/kubernetes-server-linux-amd64.tar.gz ${SERVER_BINARY_TAR_URL}
+        ExecStart=/usr/bin/tar xf /opt/kubernetes/pkg/kubernetes-server-linux-amd64.tar.gz -C /opt --overwrite
+
+    - name: kubelet.service
+      command: start
+      content: |
+        [Unit]
+        Description=Run Kubelet service
+        Requires=network-online.target kube-env.service kubernetes-download-manifests.service kubernetes-install-cni.service
+        After=network-online.target kube-env.service kubernetes-download-manifests.service kubernetes-install-cni.service
+        [Service]
+        EnvironmentFile=/etc/kube-env
+        ExecStartPre=/usr/bin/curl --fail --silent --show-error \
+        -H "X-Google-Metadata-Request: True" \
+        -o /run/configure-kubelet.sh \
+        http://metadata.google.internal/computeMetadata/v1/instance/attributes/configure-kubelet
+        ExecStartPre=/usr/bin/chmod 0755 /run/configure-kubelet.sh
+        ExecStartPre=/run/configure-kubelet.sh
+        ExecStart=/opt/kubernetes/server/bin/kubelet \
+        --api-servers=https://${INSTANCE_PREFIX}-master \
+        --enable-debugging-handlers=true \
+        --cloud-provider=gce \
+        --config=/etc/kubernetes/manifests \
+        --allow-privileged=true \
+        --v=2 \
+        --cluster-dns=${DNS_SERVER_IP} \
+        --cluster-domain=${DNS_DOMAIN} \
+        --logtostderr=true \
+        --container-runtime=docker \
+        --configure-cbr0=${KUBERNETES_CONFIGURE_CBR0} \
+        --network-plugin=${NETWORK_PROVIDER} \
+        --reconcile-cidr=true
+        Restart=always
+        RestartSec=10
+        KillMode=process
+
+    - name: kube-proxy.service
+      command: start
+      content: |
+        [Unit]
+        Description=Start Kube-proxy service as Daemon
+        Requires=kubernetes-configure-node.service
+        After=kubernetes-configure-node.service
+        [Service]
+        EnvironmentFile=/etc/kube-env
+        ExecStart=/opt/kubernetes/server/bin/kube-proxy \
+        --master=https://${KUBERNETES_MASTER_NAME} \
+        --kubeconfig=/var/lib/kube-proxy/kubeconfig \
+        --v=2 \
+        --logtostderr=true
+        Restart=always
+        RestartSec=10
+
+    - name: docker.service
+      drop-ins:
+        - name: 50-docker-opts.conf
+          content: |
+            [Service]
+            Environment='DOCKER_OPTS= --iptables=false --ip-masq=false'
+            MountFlags=slave
+            LimitNOFILE=1048576
+            LimitNPROC=1048576
+            LimitCORE=infinity
+            Restart=always
+            RestartSec=2s
+            StartLimitInterval=0
+
+    - name: kubernetes-configure-node.service
+      command: start
+      content: |
+        [Unit]
+        Description=Configure Node For Kubernetes service
+        Requires=kubernetes-install-node.service
+        After=kubernetes-install-node.service
+        Requires=kubernetes-download-manifests.service
+        After=kubernetes-download-manifests.service
+        [Service]
+        Type=oneshot
+        RemainAfterExit=yes
+        EnvironmentFile=/etc/kube-env
+        ExecStartPre=/usr/bin/curl --fail --silent --show-error \
+        -H "X-Google-Metadata-Request: True" \
+        -o /run/configure-node.sh \
+        http://metadata.google.internal/computeMetadata/v1/instance/attributes/configure-node
+        ExecStartPre=/usr/bin/chmod 0755 /run/configure-node.sh
+        ExecStart=/run/configure-node.sh

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2014 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
 
 
 MASTER_ADDRESS=${1:-"8.8.8.18"}
-ETCD_SERVERS=${2:-"http://8.8.8.18:4001"}
+ETCD_SERVERS=${2:-"http://8.8.8.18:2379"}
 SERVICE_CLUSTER_IP_RANGE=${3:-"10.10.10.0/24"}
 ADMISSION_CONTROL=${4:-""}
 
@@ -56,7 +56,7 @@ KUBE_SERVICE_ADDRESSES="--service-cluster-ip-range=${SERVICE_CLUSTER_IP_RANGE}"
 # Comma-delimited list of: 
 #   LimitRanger, AlwaysDeny, SecurityContextDeny, NamespaceExists, 
 #   NamespaceLifecycle, NamespaceAutoProvision,
-#   AlwaysAdmit, ServiceAccount, ResourceQuota
+#   AlwaysAdmit, ServiceAccount, ResourceQuota, DefaultStorageClass
 KUBE_ADMISSION_CONTROL="--admission-control=${ADMISSION_CONTROL}"
 
 # --client-ca-file="": If set, any request presenting a client certificate signed

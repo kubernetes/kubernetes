@@ -150,6 +150,16 @@ addon-dir-create:
     - file_mode: 644
 {% endif %}
 
+{% if pillar.get('enable_node_problem_detector', '').lower() == 'true' %}
+/etc/kubernetes/addons/node-problem-detector/node-problem-detector.yaml:
+  file.managed:
+    - source: salt://kube-addons/node-problem-detector/node-problem-detector.yaml
+    - user: root
+    - group: root
+    - file_mode: 644
+    - makedirs: True
+{% endif %}
+
 /etc/kubernetes/manifests/kube-addon-manager.yaml:
   file.managed:
     - source: salt://kube-addons/kube-addon-manager.yaml

@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -47,6 +47,46 @@ func TestEmptyAggregate(t *testing.T) {
 	err = agg.(error)
 	if s := err.Error(); s != "" {
 		t.Errorf("expected empty string, got %q", s)
+	}
+}
+
+func TestAggregateWithNil(t *testing.T) {
+	var slice []error
+	slice = []error{nil}
+	var agg Aggregate
+	var err error
+
+	agg = NewAggregate(slice)
+	if agg != nil {
+		t.Errorf("expected nil, got %#v", agg)
+	}
+	err = NewAggregate(slice)
+	if err != nil {
+		t.Errorf("expected nil, got %#v", err)
+	}
+
+	// Append a non-nil error
+	slice = append(slice, fmt.Errorf("err"))
+	agg = NewAggregate(slice)
+	if agg == nil {
+		t.Errorf("expected non-nil")
+	}
+	if s := agg.Error(); s != "err" {
+		t.Errorf("expected 'err', got %q", s)
+	}
+	if s := agg.Errors(); len(s) != 1 {
+		t.Errorf("expected one-element slice, got %#v", s)
+	}
+	if s := agg.Errors()[0].Error(); s != "err" {
+		t.Errorf("expected 'err', got %q", s)
+	}
+
+	err = agg.(error)
+	if err == nil {
+		t.Errorf("expected non-nil")
+	}
+	if s := err.Error(); s != "err" {
+		t.Errorf("expected 'err', got %q", s)
 	}
 }
 

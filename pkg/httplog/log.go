@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -60,6 +60,8 @@ type respLogger struct {
 	addedInfo      string
 	startTime      time.Time
 
+	captureErrorOutput bool
+
 	req *http.Request
 	w   http.ResponseWriter
 
@@ -71,7 +73,7 @@ type passthroughLogger struct{}
 
 // Addf logs info immediately.
 func (passthroughLogger) Addf(format string, data ...interface{}) {
-	glog.InfoDepth(1, fmt.Sprintf(format, data...))
+	glog.V(2).Info(fmt.Sprintf(format, data...))
 }
 
 // DefaultStacktracePred is the default implementation of StacktracePred.
@@ -175,6 +177,9 @@ func (rl *respLogger) Write(b []byte) (int, error) {
 	if !rl.statusRecorded {
 		rl.recordStatus(http.StatusOK) // Default if WriteHeader hasn't been called
 	}
+	if rl.captureErrorOutput {
+		rl.Addf("logging error output: %q\n", string(b))
+	}
 	return rl.w.Write(b)
 }
 
@@ -210,9 +215,10 @@ func (rl *respLogger) recordStatus(status int) {
 	rl.statusRecorded = true
 	if rl.logStacktracePred(status) {
 		// Only log stacks for errors
-		stack := make([]byte, 2048)
+		stack := make([]byte, 50*1024)
 		stack = stack[:runtime.Stack(stack, false)]
 		rl.statusStack = "\n" + string(stack)
+		rl.captureErrorOutput = true
 	} else {
 		rl.statusStack = ""
 	}

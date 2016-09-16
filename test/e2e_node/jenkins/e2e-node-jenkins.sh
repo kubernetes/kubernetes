@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2016 The Kubernetes Authors All rights reserved.
+# Copyright 2016 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -28,13 +28,24 @@ set -x
 
 . $1
 
-if [ "$INSTALL_GODEP" = true ] ; then
-  go get -u github.com/tools/godep
-  go get -u github.com/onsi/ginkgo/ginkgo
-  go get -u github.com/onsi/gomega
-fi
+go get -u github.com/jteeuwen/go-bindata/go-bindata
+make generated_files
 
+# TODO converge build steps with hack/build-go some day if possible.
+go generate test/e2e/framework/gobindata_util.go
 go build test/e2e_node/environment/conformance.go
-go run test/e2e_node/runner/run_e2e.go  --logtostderr --vmodule=*=2 --ssh-env="gce" \
-  --zone="$GCE_ZONE" --project="$GCE_PROJECT"  \
-  --hosts="$GCE_HOSTS" --images="$GCE_IMAGES" --cleanup="$CLEANUP"
+
+PARALLELISM=${PARALLELISM:-8}
+WORKSPACE=${WORKSPACE:-"/tmp/"}
+ARTIFACTS=${WORKSPACE}/_artifacts
+TIMEOUT=${TIMEOUT:-"45m"}
+
+mkdir -p ${ARTIFACTS}
+
+go run test/e2e_node/runner/remote/run_remote.go  --logtostderr --vmodule=*=4 --ssh-env="gce" \
+  --zone="$GCE_ZONE" --project="$GCE_PROJECT" --hosts="$GCE_HOSTS" \
+  --images="$GCE_IMAGES" --image-project="$GCE_IMAGE_PROJECT" \
+  --image-config-file="$GCE_IMAGE_CONFIG_PATH" --cleanup="$CLEANUP" \
+  --results-dir="$ARTIFACTS" --ginkgo-flags="--nodes=$PARALLELISM $GINKGO_FLAGS" \
+  --test-timeout="$TIMEOUT" --setup-node="$SETUP_NODE" --test_args="$TEST_ARGS" \
+  --instance-metadata="$GCE_INSTANCE_METADATA"

@@ -1,7 +1,7 @@
 // +build linux
 
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -130,90 +130,90 @@ func TestValidatePath(t *testing.T) {
 func TestPathsToRemove(t *testing.T) {
 	cases := []struct {
 		name     string
-		payload1 map[string][]byte
-		payload2 map[string][]byte
+		payload1 map[string]FileProjection
+		payload2 map[string]FileProjection
 		expected sets.String
 	}{
 		{
 			name: "simple",
-			payload1: map[string][]byte{
-				"foo.txt": []byte("foo"),
-				"bar.txt": []byte("bar"),
+			payload1: map[string]FileProjection{
+				"foo.txt": {Mode: 0644, Data: []byte("foo")},
+				"bar.txt": {Mode: 0644, Data: []byte("bar")},
 			},
-			payload2: map[string][]byte{
-				"foo.txt": []byte("foo"),
+			payload2: map[string]FileProjection{
+				"foo.txt": {Mode: 0644, Data: []byte("foo")},
 			},
 			expected: sets.NewString("bar.txt"),
 		},
 		{
 			name: "simple 2",
-			payload1: map[string][]byte{
-				"foo.txt":     []byte("foo"),
-				"zip/bar.txt": []byte("zip/bar"),
+			payload1: map[string]FileProjection{
+				"foo.txt":     {Mode: 0644, Data: []byte("foo")},
+				"zip/bar.txt": {Mode: 0644, Data: []byte("zip/b}ar")},
 			},
-			payload2: map[string][]byte{
-				"foo.txt": []byte("foo"),
+			payload2: map[string]FileProjection{
+				"foo.txt": {Mode: 0644, Data: []byte("foo")},
 			},
 			expected: sets.NewString("zip/bar.txt", "zip"),
 		},
 		{
 			name: "subdirs 1",
-			payload1: map[string][]byte{
-				"foo.txt":         []byte("foo"),
-				"zip/zap/bar.txt": []byte("zip/bar"),
+			payload1: map[string]FileProjection{
+				"foo.txt":         {Mode: 0644, Data: []byte("foo")},
+				"zip/zap/bar.txt": {Mode: 0644, Data: []byte("zip/bar")},
 			},
-			payload2: map[string][]byte{
-				"foo.txt": []byte("foo"),
+			payload2: map[string]FileProjection{
+				"foo.txt": {Mode: 0644, Data: []byte("foo")},
 			},
 			expected: sets.NewString("zip/zap/bar.txt", "zip", "zip/zap"),
 		},
 		{
 			name: "subdirs 2",
-			payload1: map[string][]byte{
-				"foo.txt":             []byte("foo"),
-				"zip/1/2/3/4/bar.txt": []byte("zip/bar"),
+			payload1: map[string]FileProjection{
+				"foo.txt":             {Mode: 0644, Data: []byte("foo")},
+				"zip/1/2/3/4/bar.txt": {Mode: 0644, Data: []byte("zip/b}ar")},
 			},
-			payload2: map[string][]byte{
-				"foo.txt": []byte("foo"),
+			payload2: map[string]FileProjection{
+				"foo.txt": {Mode: 0644, Data: []byte("foo")},
 			},
 			expected: sets.NewString("zip/1/2/3/4/bar.txt", "zip", "zip/1", "zip/1/2", "zip/1/2/3", "zip/1/2/3/4"),
 		},
 		{
 			name: "subdirs 3",
-			payload1: map[string][]byte{
-				"foo.txt":             []byte("foo"),
-				"zip/1/2/3/4/bar.txt": []byte("zip/bar"),
-				"zap/a/b/c/bar.txt":   []byte("zap/bar"),
+			payload1: map[string]FileProjection{
+				"foo.txt":             {Mode: 0644, Data: []byte("foo")},
+				"zip/1/2/3/4/bar.txt": {Mode: 0644, Data: []byte("zip/b}ar")},
+				"zap/a/b/c/bar.txt":   {Mode: 0644, Data: []byte("zap/bar")},
 			},
-			payload2: map[string][]byte{
-				"foo.txt": []byte("foo"),
+			payload2: map[string]FileProjection{
+				"foo.txt": {Mode: 0644, Data: []byte("foo")},
 			},
 			expected: sets.NewString("zip/1/2/3/4/bar.txt", "zip", "zip/1", "zip/1/2", "zip/1/2/3", "zip/1/2/3/4", "zap", "zap/a", "zap/a/b", "zap/a/b/c", "zap/a/b/c/bar.txt"),
 		},
 		{
 			name: "subdirs 4",
-			payload1: map[string][]byte{
-				"foo.txt":             []byte("foo"),
-				"zap/1/2/3/4/bar.txt": []byte("zip/bar"),
-				"zap/1/2/c/bar.txt":   []byte("zap/bar"),
-				"zap/1/2/magic.txt":   []byte("indigo"),
+			payload1: map[string]FileProjection{
+				"foo.txt":             {Mode: 0644, Data: []byte("foo")},
+				"zap/1/2/3/4/bar.txt": {Mode: 0644, Data: []byte("zip/bar")},
+				"zap/1/2/c/bar.txt":   {Mode: 0644, Data: []byte("zap/bar")},
+				"zap/1/2/magic.txt":   {Mode: 0644, Data: []byte("indigo")},
 			},
-			payload2: map[string][]byte{
-				"foo.txt":           []byte("foo"),
-				"zap/1/2/magic.txt": []byte("indigo"),
+			payload2: map[string]FileProjection{
+				"foo.txt":           {Mode: 0644, Data: []byte("foo")},
+				"zap/1/2/magic.txt": {Mode: 0644, Data: []byte("indigo")},
 			},
 			expected: sets.NewString("zap/1/2/3/4/bar.txt", "zap/1/2/3", "zap/1/2/3/4", "zap/1/2/3/4/bar.txt", "zap/1/2/c", "zap/1/2/c/bar.txt"),
 		},
 		{
 			name: "subdirs 5",
-			payload1: map[string][]byte{
-				"foo.txt":             []byte("foo"),
-				"zap/1/2/3/4/bar.txt": []byte("zip/bar"),
-				"zap/1/2/c/bar.txt":   []byte("zap/bar"),
+			payload1: map[string]FileProjection{
+				"foo.txt":             {Mode: 0644, Data: []byte("foo")},
+				"zap/1/2/3/4/bar.txt": {Mode: 0644, Data: []byte("zip/bar")},
+				"zap/1/2/c/bar.txt":   {Mode: 0644, Data: []byte("zap/bar")},
 			},
-			payload2: map[string][]byte{
-				"foo.txt":           []byte("foo"),
-				"zap/1/2/magic.txt": []byte("indigo"),
+			payload2: map[string]FileProjection{
+				"foo.txt":           {Mode: 0644, Data: []byte("foo")},
+				"zap/1/2/magic.txt": {Mode: 0644, Data: []byte("indigo")},
 			},
 			expected: sets.NewString("zap/1/2/3/4/bar.txt", "zap/1/2/3", "zap/1/2/3/4", "zap/1/2/3/4/bar.txt", "zap/1/2/c", "zap/1/2/c/bar.txt"),
 		},
@@ -263,88 +263,114 @@ IAAAAAAAsDyZDwU=`
 
 	cases := []struct {
 		name    string
-		payload map[string][]byte
+		payload map[string]FileProjection
 		success bool
 	}{
 		{
 			name: "invalid payload 1",
-			payload: map[string][]byte{
-				"foo":        []byte("foo"),
-				"..bar":      []byte("bar"),
-				"binary.bin": mysteryBinaryBytes,
+			payload: map[string]FileProjection{
+				"foo":        {Mode: 0644, Data: []byte("foo")},
+				"..bar":      {Mode: 0644, Data: []byte("bar")},
+				"binary.bin": {Mode: 0644, Data: mysteryBinaryBytes},
 			},
 			success: false,
 		},
 		{
 			name: "invalid payload 2",
-			payload: map[string][]byte{
-				"foo/../bar": []byte("foo"),
+			payload: map[string]FileProjection{
+				"foo/../bar": {Mode: 0644, Data: []byte("foo")},
 			},
 			success: false,
 		},
 		{
 			name: "basic 1",
-			payload: map[string][]byte{
-				"foo": []byte("foo"),
-				"bar": []byte("bar"),
+			payload: map[string]FileProjection{
+				"foo": {Mode: 0644, Data: []byte("foo")},
+				"bar": {Mode: 0644, Data: []byte("bar")},
 			},
 			success: true,
 		},
 		{
 			name: "basic 2",
-			payload: map[string][]byte{
-				"binary.bin":  mysteryBinaryBytes,
-				".binary.bin": mysteryBinaryBytes,
+			payload: map[string]FileProjection{
+				"binary.bin":  {Mode: 0644, Data: mysteryBinaryBytes},
+				".binary.bin": {Mode: 0644, Data: mysteryBinaryBytes},
+			},
+			success: true,
+		},
+		{
+			name: "basic mode 1",
+			payload: map[string]FileProjection{
+				"foo": {Mode: 0777, Data: []byte("foo")},
+				"bar": {Mode: 0400, Data: []byte("bar")},
 			},
 			success: true,
 		},
 		{
 			name: "dotfiles",
-			payload: map[string][]byte{
-				"foo":           []byte("foo"),
-				"bar":           []byte("bar"),
-				".dotfile":      []byte("dotfile"),
-				".dotfile.file": []byte("dotfile.file"),
+			payload: map[string]FileProjection{
+				"foo":           {Mode: 0644, Data: []byte("foo")},
+				"bar":           {Mode: 0644, Data: []byte("bar")},
+				".dotfile":      {Mode: 0644, Data: []byte("dotfile")},
+				".dotfile.file": {Mode: 0644, Data: []byte("dotfile.file")},
+			},
+			success: true,
+		},
+		{
+			name: "dotfiles mode",
+			payload: map[string]FileProjection{
+				"foo":           {Mode: 0407, Data: []byte("foo")},
+				"bar":           {Mode: 0440, Data: []byte("bar")},
+				".dotfile":      {Mode: 0777, Data: []byte("dotfile")},
+				".dotfile.file": {Mode: 0666, Data: []byte("dotfile.file")},
 			},
 			success: true,
 		},
 		{
 			name: "subdirectories 1",
-			payload: map[string][]byte{
-				"foo/bar.txt": []byte("foo/bar"),
-				"bar/zab.txt": []byte("bar/zab.txt"),
+			payload: map[string]FileProjection{
+				"foo/bar.txt": {Mode: 0644, Data: []byte("foo/bar")},
+				"bar/zab.txt": {Mode: 0644, Data: []byte("bar/zab.txt")},
+			},
+			success: true,
+		},
+		{
+			name: "subdirectories mode 1",
+			payload: map[string]FileProjection{
+				"foo/bar.txt": {Mode: 0400, Data: []byte("foo/bar")},
+				"bar/zab.txt": {Mode: 0644, Data: []byte("bar/zab.txt")},
 			},
 			success: true,
 		},
 		{
 			name: "subdirectories 2",
-			payload: map[string][]byte{
-				"foo//bar.txt":      []byte("foo//bar"),
-				"bar///bar/zab.txt": []byte("bar/../bar/zab.txt"),
+			payload: map[string]FileProjection{
+				"foo//bar.txt":      {Mode: 0644, Data: []byte("foo//bar")},
+				"bar///bar/zab.txt": {Mode: 0644, Data: []byte("bar/../bar/zab.txt")},
 			},
 			success: true,
 		},
 		{
 			name: "subdirectories 3",
-			payload: map[string][]byte{
-				"foo/bar.txt":      []byte("foo/bar"),
-				"bar/zab.txt":      []byte("bar/zab.txt"),
-				"foo/blaz/bar.txt": []byte("foo/blaz/bar"),
-				"bar/zib/zab.txt":  []byte("bar/zib/zab.txt"),
+			payload: map[string]FileProjection{
+				"foo/bar.txt":      {Mode: 0644, Data: []byte("foo/bar")},
+				"bar/zab.txt":      {Mode: 0644, Data: []byte("bar/zab.txt")},
+				"foo/blaz/bar.txt": {Mode: 0644, Data: []byte("foo/blaz/bar")},
+				"bar/zib/zab.txt":  {Mode: 0644, Data: []byte("bar/zib/zab.txt")},
 			},
 			success: true,
 		},
 		{
 			name: "kitchen sink",
-			payload: map[string][]byte{
-				"foo.log":                           []byte("foo"),
-				"bar.zap":                           []byte("bar"),
-				".dotfile":                          []byte("dotfile"),
-				"foo/bar.txt":                       []byte("foo/bar"),
-				"bar/zab.txt":                       []byte("bar/zab.txt"),
-				"foo/blaz/bar.txt":                  []byte("foo/blaz/bar"),
-				"bar/zib/zab.txt":                   []byte("bar/zib/zab.txt"),
-				"1/2/3/4/5/6/7/8/9/10/.dotfile.lib": []byte("1-2-3-dotfile"),
+			payload: map[string]FileProjection{
+				"foo.log":                           {Mode: 0644, Data: []byte("foo")},
+				"bar.zap":                           {Mode: 0644, Data: []byte("bar")},
+				".dotfile":                          {Mode: 0644, Data: []byte("dotfile")},
+				"foo/bar.txt":                       {Mode: 0644, Data: []byte("foo/bar")},
+				"bar/zab.txt":                       {Mode: 0644, Data: []byte("bar/zab.txt")},
+				"foo/blaz/bar.txt":                  {Mode: 0644, Data: []byte("foo/blaz/bar")},
+				"bar/zib/zab.txt":                   {Mode: 0400, Data: []byte("bar/zib/zab.txt")},
+				"1/2/3/4/5/6/7/8/9/10/.dotfile.lib": {Mode: 0777, Data: []byte("1-2-3-dotfile")},
 			},
 			success: true,
 		},
@@ -376,150 +402,150 @@ IAAAAAAAsDyZDwU=`
 func TestUpdate(t *testing.T) {
 	cases := []struct {
 		name        string
-		first       map[string][]byte
-		next        map[string][]byte
+		first       map[string]FileProjection
+		next        map[string]FileProjection
 		shouldWrite bool
 	}{
 		{
 			name: "update",
-			first: map[string][]byte{
-				"foo": []byte("foo"),
-				"bar": []byte("bar"),
+			first: map[string]FileProjection{
+				"foo": {Mode: 0644, Data: []byte("foo")},
+				"bar": {Mode: 0644, Data: []byte("bar")},
 			},
-			next: map[string][]byte{
-				"foo": []byte("foo2"),
-				"bar": []byte("bar2"),
+			next: map[string]FileProjection{
+				"foo": {Mode: 0644, Data: []byte("foo2")},
+				"bar": {Mode: 0640, Data: []byte("bar2")},
 			},
 			shouldWrite: true,
 		},
 		{
 			name: "no update",
-			first: map[string][]byte{
-				"foo": []byte("foo"),
-				"bar": []byte("bar"),
+			first: map[string]FileProjection{
+				"foo": {Mode: 0644, Data: []byte("foo")},
+				"bar": {Mode: 0644, Data: []byte("bar")},
 			},
-			next: map[string][]byte{
-				"foo": []byte("foo"),
-				"bar": []byte("bar"),
+			next: map[string]FileProjection{
+				"foo": {Mode: 0644, Data: []byte("foo")},
+				"bar": {Mode: 0644, Data: []byte("bar")},
 			},
 			shouldWrite: false,
 		},
 		{
 			name: "no update 2",
-			first: map[string][]byte{
-				"foo/bar.txt": []byte("foo"),
-				"bar/zab.txt": []byte("bar"),
+			first: map[string]FileProjection{
+				"foo/bar.txt": {Mode: 0644, Data: []byte("foo")},
+				"bar/zab.txt": {Mode: 0644, Data: []byte("bar")},
 			},
-			next: map[string][]byte{
-				"foo/bar.txt": []byte("foo"),
-				"bar/zab.txt": []byte("bar"),
+			next: map[string]FileProjection{
+				"foo/bar.txt": {Mode: 0644, Data: []byte("foo")},
+				"bar/zab.txt": {Mode: 0644, Data: []byte("bar")},
 			},
 			shouldWrite: false,
 		},
 		{
 			name: "add 1",
-			first: map[string][]byte{
-				"foo/bar.txt": []byte("foo"),
-				"bar/zab.txt": []byte("bar"),
+			first: map[string]FileProjection{
+				"foo/bar.txt": {Mode: 0644, Data: []byte("foo")},
+				"bar/zab.txt": {Mode: 0644, Data: []byte("bar")},
 			},
-			next: map[string][]byte{
-				"foo/bar.txt": []byte("foo"),
-				"bar/zab.txt": []byte("bar"),
-				"blu/zip.txt": []byte("zip"),
+			next: map[string]FileProjection{
+				"foo/bar.txt": {Mode: 0644, Data: []byte("foo")},
+				"bar/zab.txt": {Mode: 0644, Data: []byte("bar")},
+				"blu/zip.txt": {Mode: 0644, Data: []byte("zip")},
 			},
 			shouldWrite: true,
 		},
 		{
 			name: "add 2",
-			first: map[string][]byte{
-				"foo/bar.txt": []byte("foo"),
-				"bar/zab.txt": []byte("bar"),
+			first: map[string]FileProjection{
+				"foo/bar.txt": {Mode: 0644, Data: []byte("foo")},
+				"bar/zab.txt": {Mode: 0644, Data: []byte("bar")},
 			},
-			next: map[string][]byte{
-				"foo/bar.txt":             []byte("foo"),
-				"bar/zab.txt":             []byte("bar"),
-				"blu/two/2/3/4/5/zip.txt": []byte("zip"),
+			next: map[string]FileProjection{
+				"foo/bar.txt":             {Mode: 0644, Data: []byte("foo")},
+				"bar/zab.txt":             {Mode: 0644, Data: []byte("bar")},
+				"blu/two/2/3/4/5/zip.txt": {Mode: 0644, Data: []byte("zip")},
 			},
 			shouldWrite: true,
 		},
 		{
 			name: "add 3",
-			first: map[string][]byte{
-				"foo/bar.txt": []byte("foo"),
-				"bar/zab.txt": []byte("bar"),
+			first: map[string]FileProjection{
+				"foo/bar.txt": {Mode: 0644, Data: []byte("foo")},
+				"bar/zab.txt": {Mode: 0644, Data: []byte("bar")},
 			},
-			next: map[string][]byte{
-				"foo/bar.txt":         []byte("foo"),
-				"bar/zab.txt":         []byte("bar"),
-				"bar/2/3/4/5/zip.txt": []byte("zip"),
+			next: map[string]FileProjection{
+				"foo/bar.txt":         {Mode: 0644, Data: []byte("foo")},
+				"bar/zab.txt":         {Mode: 0644, Data: []byte("bar")},
+				"bar/2/3/4/5/zip.txt": {Mode: 0644, Data: []byte("zip")},
 			},
 			shouldWrite: true,
 		},
 		{
 			name: "delete 1",
-			first: map[string][]byte{
-				"foo/bar.txt": []byte("foo"),
-				"bar/zab.txt": []byte("bar"),
+			first: map[string]FileProjection{
+				"foo/bar.txt": {Mode: 0644, Data: []byte("foo")},
+				"bar/zab.txt": {Mode: 0644, Data: []byte("bar")},
 			},
-			next: map[string][]byte{
-				"foo/bar.txt": []byte("foo"),
+			next: map[string]FileProjection{
+				"foo/bar.txt": {Mode: 0644, Data: []byte("foo")},
 			},
 			shouldWrite: true,
 		},
 		{
 			name: "delete 2",
-			first: map[string][]byte{
-				"foo/bar.txt":       []byte("foo"),
-				"bar/1/2/3/zab.txt": []byte("bar"),
+			first: map[string]FileProjection{
+				"foo/bar.txt":       {Mode: 0644, Data: []byte("foo")},
+				"bar/1/2/3/zab.txt": {Mode: 0644, Data: []byte("bar")},
 			},
-			next: map[string][]byte{
-				"foo/bar.txt": []byte("foo"),
+			next: map[string]FileProjection{
+				"foo/bar.txt": {Mode: 0644, Data: []byte("foo")},
 			},
 			shouldWrite: true,
 		},
 		{
 			name: "delete 3",
-			first: map[string][]byte{
-				"foo/bar.txt":       []byte("foo"),
-				"bar/1/2/sip.txt":   []byte("sip"),
-				"bar/1/2/3/zab.txt": []byte("bar"),
+			first: map[string]FileProjection{
+				"foo/bar.txt":       {Mode: 0644, Data: []byte("foo")},
+				"bar/1/2/sip.txt":   {Mode: 0644, Data: []byte("sip")},
+				"bar/1/2/3/zab.txt": {Mode: 0644, Data: []byte("bar")},
 			},
-			next: map[string][]byte{
-				"foo/bar.txt":     []byte("foo"),
-				"bar/1/2/sip.txt": []byte("sip"),
+			next: map[string]FileProjection{
+				"foo/bar.txt":     {Mode: 0644, Data: []byte("foo")},
+				"bar/1/2/sip.txt": {Mode: 0644, Data: []byte("sip")},
 			},
 			shouldWrite: true,
 		},
 		{
 			name: "delete 4",
-			first: map[string][]byte{
-				"foo/bar.txt":            []byte("foo"),
-				"bar/1/2/sip.txt":        []byte("sip"),
-				"bar/1/2/3/4/5/6zab.txt": []byte("bar"),
+			first: map[string]FileProjection{
+				"foo/bar.txt":            {Mode: 0644, Data: []byte("foo")},
+				"bar/1/2/sip.txt":        {Mode: 0644, Data: []byte("sip")},
+				"bar/1/2/3/4/5/6zab.txt": {Mode: 0644, Data: []byte("bar")},
 			},
-			next: map[string][]byte{
-				"foo/bar.txt":     []byte("foo"),
-				"bar/1/2/sip.txt": []byte("sip"),
+			next: map[string]FileProjection{
+				"foo/bar.txt":     {Mode: 0644, Data: []byte("foo")},
+				"bar/1/2/sip.txt": {Mode: 0644, Data: []byte("sip")},
 			},
 			shouldWrite: true,
 		},
 		{
 			name: "delete all",
-			first: map[string][]byte{
-				"foo/bar.txt":            []byte("foo"),
-				"bar/1/2/sip.txt":        []byte("sip"),
-				"bar/1/2/3/4/5/6zab.txt": []byte("bar"),
+			first: map[string]FileProjection{
+				"foo/bar.txt":            {Mode: 0644, Data: []byte("foo")},
+				"bar/1/2/sip.txt":        {Mode: 0644, Data: []byte("sip")},
+				"bar/1/2/3/4/5/6zab.txt": {Mode: 0644, Data: []byte("bar")},
 			},
-			next:        map[string][]byte{},
+			next:        map[string]FileProjection{},
 			shouldWrite: true,
 		},
 		{
 			name: "add and delete 1",
-			first: map[string][]byte{
-				"foo/bar.txt": []byte("foo"),
+			first: map[string]FileProjection{
+				"foo/bar.txt": {Mode: 0644, Data: []byte("foo")},
 			},
-			next: map[string][]byte{
-				"bar/baz.txt": []byte("baz"),
+			next: map[string]FileProjection{
+				"bar/baz.txt": {Mode: 0644, Data: []byte("baz")},
 			},
 			shouldWrite: true,
 		},
@@ -563,130 +589,130 @@ func TestUpdate(t *testing.T) {
 func TestMultipleUpdates(t *testing.T) {
 	cases := []struct {
 		name     string
-		payloads []map[string][]byte
+		payloads []map[string]FileProjection
 	}{
 		{
 			name: "update 1",
-			payloads: []map[string][]byte{
+			payloads: []map[string]FileProjection{
 				{
-					"foo": []byte("foo"),
-					"bar": []byte("bar"),
+					"foo": {Mode: 0644, Data: []byte("foo")},
+					"bar": {Mode: 0644, Data: []byte("bar")},
 				},
 				{
-					"foo": []byte("foo2"),
-					"bar": []byte("bar2"),
+					"foo": {Mode: 0400, Data: []byte("foo2")},
+					"bar": {Mode: 0400, Data: []byte("bar2")},
 				},
 				{
-					"foo": []byte("foo3"),
-					"bar": []byte("bar3"),
+					"foo": {Mode: 0600, Data: []byte("foo3")},
+					"bar": {Mode: 0600, Data: []byte("bar3")},
 				},
 			},
 		},
 		{
 			name: "update 2",
-			payloads: []map[string][]byte{
+			payloads: []map[string]FileProjection{
 				{
-					"foo/bar.txt": []byte("foo/bar"),
-					"bar/zab.txt": []byte("bar/zab.txt"),
+					"foo/bar.txt": {Mode: 0644, Data: []byte("foo/bar")},
+					"bar/zab.txt": {Mode: 0644, Data: []byte("bar/zab.txt")},
 				},
 				{
-					"foo/bar.txt": []byte("foo/bar2"),
-					"bar/zab.txt": []byte("bar/zab.txt2"),
+					"foo/bar.txt": {Mode: 0644, Data: []byte("foo/bar2")},
+					"bar/zab.txt": {Mode: 0400, Data: []byte("bar/zab.txt2")},
 				},
 			},
 		},
 		{
 			name: "clear sentinel",
-			payloads: []map[string][]byte{
+			payloads: []map[string]FileProjection{
 				{
-					"foo": []byte("foo"),
-					"bar": []byte("bar"),
+					"foo": {Mode: 0644, Data: []byte("foo")},
+					"bar": {Mode: 0644, Data: []byte("bar")},
 				},
 				{
-					"foo": []byte("foo2"),
-					"bar": []byte("bar2"),
+					"foo": {Mode: 0644, Data: []byte("foo2")},
+					"bar": {Mode: 0644, Data: []byte("bar2")},
 				},
 				{
-					"foo": []byte("foo3"),
-					"bar": []byte("bar3"),
+					"foo": {Mode: 0644, Data: []byte("foo3")},
+					"bar": {Mode: 0644, Data: []byte("bar3")},
 				},
 				{
-					"foo": []byte("foo4"),
-					"bar": []byte("bar4"),
+					"foo": {Mode: 0644, Data: []byte("foo4")},
+					"bar": {Mode: 0644, Data: []byte("bar4")},
 				},
 			},
 		},
 		{
 			name: "subdirectories 2",
-			payloads: []map[string][]byte{
+			payloads: []map[string]FileProjection{
 				{
-					"foo/bar.txt":      []byte("foo/bar"),
-					"bar/zab.txt":      []byte("bar/zab.txt"),
-					"foo/blaz/bar.txt": []byte("foo/blaz/bar"),
-					"bar/zib/zab.txt":  []byte("bar/zib/zab.txt"),
+					"foo/bar.txt":      {Mode: 0644, Data: []byte("foo/bar")},
+					"bar/zab.txt":      {Mode: 0644, Data: []byte("bar/zab.txt")},
+					"foo/blaz/bar.txt": {Mode: 0644, Data: []byte("foo/blaz/bar")},
+					"bar/zib/zab.txt":  {Mode: 0644, Data: []byte("bar/zib/zab.txt")},
 				},
 				{
-					"foo/bar.txt":      []byte("foo/bar2"),
-					"bar/zab.txt":      []byte("bar/zab.txt2"),
-					"foo/blaz/bar.txt": []byte("foo/blaz/bar2"),
-					"bar/zib/zab.txt":  []byte("bar/zib/zab.txt2"),
+					"foo/bar.txt":      {Mode: 0644, Data: []byte("foo/bar2")},
+					"bar/zab.txt":      {Mode: 0644, Data: []byte("bar/zab.txt2")},
+					"foo/blaz/bar.txt": {Mode: 0644, Data: []byte("foo/blaz/bar2")},
+					"bar/zib/zab.txt":  {Mode: 0644, Data: []byte("bar/zib/zab.txt2")},
 				},
 			},
 		},
 		{
 			name: "add 1",
-			payloads: []map[string][]byte{
+			payloads: []map[string]FileProjection{
 				{
-					"foo/bar.txt":            []byte("foo/bar"),
-					"bar//zab.txt":           []byte("bar/zab.txt"),
-					"foo/blaz/bar.txt":       []byte("foo/blaz/bar"),
-					"bar/zib////zib/zab.txt": []byte("bar/zib/zab.txt"),
+					"foo/bar.txt":            {Mode: 0644, Data: []byte("foo/bar")},
+					"bar//zab.txt":           {Mode: 0644, Data: []byte("bar/zab.txt")},
+					"foo/blaz/bar.txt":       {Mode: 0644, Data: []byte("foo/blaz/bar")},
+					"bar/zib////zib/zab.txt": {Mode: 0644, Data: []byte("bar/zib/zab.txt")},
 				},
 				{
-					"foo/bar.txt":      []byte("foo/bar2"),
-					"bar/zab.txt":      []byte("bar/zab.txt2"),
-					"foo/blaz/bar.txt": []byte("foo/blaz/bar2"),
-					"bar/zib/zab.txt":  []byte("bar/zib/zab.txt2"),
-					"add/new/keys.txt": []byte("addNewKeys"),
+					"foo/bar.txt":      {Mode: 0644, Data: []byte("foo/bar2")},
+					"bar/zab.txt":      {Mode: 0644, Data: []byte("bar/zab.txt2")},
+					"foo/blaz/bar.txt": {Mode: 0644, Data: []byte("foo/blaz/bar2")},
+					"bar/zib/zab.txt":  {Mode: 0644, Data: []byte("bar/zib/zab.txt2")},
+					"add/new/keys.txt": {Mode: 0644, Data: []byte("addNewKeys")},
 				},
 			},
 		},
 		{
 			name: "add 2",
-			payloads: []map[string][]byte{
+			payloads: []map[string]FileProjection{
 				{
-					"foo/bar.txt":      []byte("foo/bar2"),
-					"bar/zab.txt":      []byte("bar/zab.txt2"),
-					"foo/blaz/bar.txt": []byte("foo/blaz/bar2"),
-					"bar/zib/zab.txt":  []byte("bar/zib/zab.txt2"),
-					"add/new/keys.txt": []byte("addNewKeys"),
+					"foo/bar.txt":      {Mode: 0644, Data: []byte("foo/bar2")},
+					"bar/zab.txt":      {Mode: 0644, Data: []byte("bar/zab.txt2")},
+					"foo/blaz/bar.txt": {Mode: 0644, Data: []byte("foo/blaz/bar2")},
+					"bar/zib/zab.txt":  {Mode: 0644, Data: []byte("bar/zib/zab.txt2")},
+					"add/new/keys.txt": {Mode: 0644, Data: []byte("addNewKeys")},
 				},
 				{
-					"foo/bar.txt":       []byte("foo/bar2"),
-					"bar/zab.txt":       []byte("bar/zab.txt2"),
-					"foo/blaz/bar.txt":  []byte("foo/blaz/bar2"),
-					"bar/zib/zab.txt":   []byte("bar/zib/zab.txt2"),
-					"add/new/keys.txt":  []byte("addNewKeys"),
-					"add/new/keys2.txt": []byte("addNewKeys2"),
-					"add/new/keys3.txt": []byte("addNewKeys3"),
+					"foo/bar.txt":       {Mode: 0644, Data: []byte("foo/bar2")},
+					"bar/zab.txt":       {Mode: 0644, Data: []byte("bar/zab.txt2")},
+					"foo/blaz/bar.txt":  {Mode: 0644, Data: []byte("foo/blaz/bar2")},
+					"bar/zib/zab.txt":   {Mode: 0644, Data: []byte("bar/zib/zab.txt2")},
+					"add/new/keys.txt":  {Mode: 0644, Data: []byte("addNewKeys")},
+					"add/new/keys2.txt": {Mode: 0644, Data: []byte("addNewKeys2")},
+					"add/new/keys3.txt": {Mode: 0644, Data: []byte("addNewKeys3")},
 				},
 			},
 		},
 		{
 			name: "remove 1",
-			payloads: []map[string][]byte{
+			payloads: []map[string]FileProjection{
 				{
-					"foo/bar.txt":         []byte("foo/bar"),
-					"bar//zab.txt":        []byte("bar/zab.txt"),
-					"foo/blaz/bar.txt":    []byte("foo/blaz/bar"),
-					"zip/zap/zup/fop.txt": []byte("zip/zap/zup/fop.txt"),
+					"foo/bar.txt":         {Mode: 0644, Data: []byte("foo/bar")},
+					"bar//zab.txt":        {Mode: 0644, Data: []byte("bar/zab.txt")},
+					"foo/blaz/bar.txt":    {Mode: 0644, Data: []byte("foo/blaz/bar")},
+					"zip/zap/zup/fop.txt": {Mode: 0644, Data: []byte("zip/zap/zup/fop.txt")},
 				},
 				{
-					"foo/bar.txt": []byte("foo/bar2"),
-					"bar/zab.txt": []byte("bar/zab.txt2"),
+					"foo/bar.txt": {Mode: 0644, Data: []byte("foo/bar2")},
+					"bar/zab.txt": {Mode: 0644, Data: []byte("bar/zab.txt2")},
 				},
 				{
-					"foo/bar.txt": []byte("foo/bar"),
+					"foo/bar.txt": {Mode: 0644, Data: []byte("foo/bar")},
 				},
 			},
 		},
@@ -709,9 +735,9 @@ func TestMultipleUpdates(t *testing.T) {
 	}
 }
 
-func checkVolumeContents(targetDir, tcName string, payload map[string][]byte, t *testing.T) {
+func checkVolumeContents(targetDir, tcName string, payload map[string]FileProjection, t *testing.T) {
 	// use filepath.Walk to reconstruct the payload, then deep equal
-	observedPayload := map[string][]byte{}
+	observedPayload := make(map[string]FileProjection)
 	visitor := func(path string, info os.FileInfo, err error) error {
 		if info.Mode().IsRegular() || info.IsDir() {
 			return nil
@@ -727,7 +753,13 @@ func checkVolumeContents(targetDir, tcName string, payload map[string][]byte, t 
 		if err != nil {
 			return err
 		}
-		observedPayload[relativePath] = content
+		fileInfo, err := os.Stat(path)
+		if err != nil {
+			return err
+		}
+		mode := int32(fileInfo.Mode())
+
+		observedPayload[relativePath] = FileProjection{Data: content, Mode: mode}
 
 		return nil
 	}
@@ -737,7 +769,7 @@ func checkVolumeContents(targetDir, tcName string, payload map[string][]byte, t 
 		t.Errorf("%v: unexpected error walking directory: %v", tcName, err)
 	}
 
-	cleanPathPayload := make(map[string][]byte, len(payload))
+	cleanPathPayload := make(map[string]FileProjection, len(payload))
 	for k, v := range payload {
 		cleanPathPayload[path.Clean(k)] = v
 	}

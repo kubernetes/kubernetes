@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,4 +18,4 @@ limitations under the License.
 // kubernetes-mesos components into a single binary form, providing a
 // simple mechanism for intra-component discovery as per the original
 // Kubernetes hyperkube package.
-package hyperkube
+package hyperkube // import "k8s.io/kubernetes/contrib/mesos/pkg/hyperkube"

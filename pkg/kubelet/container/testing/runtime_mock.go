@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@ import (
 	. "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
+	"k8s.io/kubernetes/pkg/util/term"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -88,12 +89,12 @@ func (r *Mock) GetPodStatus(uid types.UID, name, namespace string) (*PodStatus, 
 	return args.Get(0).(*PodStatus), args.Error(1)
 }
 
-func (r *Mock) ExecInContainer(containerID ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool) error {
+func (r *Mock) ExecInContainer(containerID ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size) error {
 	args := r.Called(containerID, cmd, stdin, stdout, stderr, tty)
 	return args.Error(0)
 }
 
-func (r *Mock) AttachContainer(containerID ContainerID, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool) error {
+func (r *Mock) AttachContainer(containerID ContainerID, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size) error {
 	args := r.Called(containerID, stdin, stdout, stderr, tty)
 	return args.Error(0)
 }
@@ -128,8 +129,23 @@ func (r *Mock) PortForward(pod *Pod, port uint16, stream io.ReadWriteCloser) err
 	return args.Error(0)
 }
 
-func (r *Mock) GarbageCollect(gcPolicy ContainerGCPolicy) error {
-	args := r.Called(gcPolicy)
+func (r *Mock) GetNetNS(containerID ContainerID) (string, error) {
+	args := r.Called(containerID)
+	return "", args.Error(0)
+}
+
+func (r *Mock) GetPodContainerID(pod *Pod) (ContainerID, error) {
+	args := r.Called(pod)
+	return ContainerID{}, args.Error(0)
+}
+
+func (r *Mock) GarbageCollect(gcPolicy ContainerGCPolicy, ready bool) error {
+	args := r.Called(gcPolicy, ready)
+	return args.Error(0)
+}
+
+func (r *Mock) DeleteContainer(containerID ContainerID) error {
+	args := r.Called(containerID)
 	return args.Error(0)
 }
 

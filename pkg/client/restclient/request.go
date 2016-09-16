@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package restclient
 
 import (
 	"bytes"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -34,7 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/api/validation"
+	pathvalidation "k8s.io/kubernetes/pkg/api/validation/path"
 	"k8s.io/kubernetes/pkg/client/metrics"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -56,10 +57,6 @@ var (
 	// throttle for more than longThrottleLatency will be logged.
 	longThrottleLatency = 50 * time.Millisecond
 )
-
-func init() {
-	metrics.Register()
-}
 
 // HTTPClient is an interface for testing a request object.
 type HTTPClient interface {
@@ -143,7 +140,10 @@ func NewRequest(client HTTPClient, verb string, baseURL *url.URL, versionedAPIPa
 		backoffMgr:  backoff,
 		throttle:    throttle,
 	}
-	if len(content.ContentType) > 0 {
+	switch {
+	case len(content.AcceptContentTypes) > 0:
+		r.SetHeader("Accept", content.AcceptContentTypes)
+	case len(content.ContentType) > 0:
 		r.SetHeader("Accept", content.ContentType+", */*")
 	}
 	return r
@@ -179,8 +179,8 @@ func (r *Request) Resource(resource string) *Request {
 		r.err = fmt.Errorf("resource already set to %q, cannot change to %q", r.resource, resource)
 		return r
 	}
-	if ok, msg := validation.IsValidPathSegmentName(resource); !ok {
-		r.err = fmt.Errorf("invalid resource %q: %s", resource, msg)
+	if msgs := pathvalidation.IsValidPathSegmentName(resource); len(msgs) != 0 {
+		r.err = fmt.Errorf("invalid resource %q: %v", resource, msgs)
 		return r
 	}
 	r.resource = resource
@@ -199,8 +199,8 @@ func (r *Request) SubResource(subresources ...string) *Request {
 		return r
 	}
 	for _, s := range subresources {
-		if ok, msg := validation.IsValidPathSegmentName(s); !ok {
-			r.err = fmt.Errorf("invalid subresource %q: %s", s, msg)
+		if msgs := pathvalidation.IsValidPathSegmentName(s); len(msgs) != 0 {
+			r.err = fmt.Errorf("invalid subresource %q: %v", s, msgs)
 			return r
 		}
 	}
@@ -221,8 +221,8 @@ func (r *Request) Name(resourceName string) *Request {
 		r.err = fmt.Errorf("resource name already set to %q, cannot change to %q", r.resourceName, resourceName)
 		return r
 	}
-	if ok, msg := validation.IsValidPathSegmentName(resourceName); !ok {
-		r.err = fmt.Errorf("invalid resource name %q: %s", resourceName, msg)
+	if msgs := pathvalidation.IsValidPathSegmentName(resourceName); len(msgs) != 0 {
+		r.err = fmt.Errorf("invalid resource name %q: %v", resourceName, msgs)
 		return r
 	}
 	r.resourceName = resourceName
@@ -238,8 +238,8 @@ func (r *Request) Namespace(namespace string) *Request {
 		r.err = fmt.Errorf("namespace already set to %q, cannot change to %q", r.namespace, namespace)
 		return r
 	}
-	if ok, msg := validation.IsValidPathSegmentName(namespace); !ok {
-		r.err = fmt.Errorf("invalid namespace %q: %s", namespace, msg)
+	if msgs := pathvalidation.IsValidPathSegmentName(namespace); len(msgs) != 0 {
+		r.err = fmt.Errorf("invalid namespace %q: %v", namespace, msgs)
 		return r
 	}
 	r.namespaceSet = true
@@ -335,16 +335,16 @@ func (r resourceTypeToFieldMapping) filterField(resourceType, field, value strin
 
 type versionToResourceToFieldMapping map[unversioned.GroupVersion]resourceTypeToFieldMapping
 
+// filterField transforms the given field/value selector for the given groupVersion and resource
 func (v versionToResourceToFieldMapping) filterField(groupVersion *unversioned.GroupVersion, resourceType, field, value string) (newField, newValue string, err error) {
 	rMapping, ok := v[*groupVersion]
 	if !ok {
-		glog.Warningf("Field selector: %v - %v - %v - %v: need to check if this is versioned correctly.", groupVersion, resourceType, field, value)
+		// no groupVersion overrides registered, default to identity mapping
 		return field, value, nil
 	}
 	newField, newValue, err = rMapping.filterField(resourceType, field, value)
 	if err != nil {
-		// This is only a warning until we find and fix all of the client's usages.
-		glog.Warningf("Field selector: %v - %v - %v - %v: need to check if this is versioned correctly.", groupVersion, resourceType, field, value)
+		// no groupVersionResource overrides registered, default to identity mapping
 		return field, value, nil
 	}
 	return newField, newValue, nil
@@ -538,11 +538,11 @@ func (r *Request) Body(obj interface{}) *Request {
 			r.err = err
 			return r
 		}
-		glog.V(8).Infof("Request Body: %s", string(data))
-		r.body = bytes.NewBuffer(data)
+		glog.V(8).Infof("Request Body: %#v", string(data))
+		r.body = bytes.NewReader(data)
 	case []byte:
-		glog.V(8).Infof("Request Body: %s", string(t))
-		r.body = bytes.NewBuffer(t)
+		glog.V(8).Infof("Request Body: %#v", string(t))
+		r.body = bytes.NewReader(t)
 	case io.Reader:
 		r.body = t
 	case runtime.Object:
@@ -555,8 +555,8 @@ func (r *Request) Body(obj interface{}) *Request {
 			r.err = err
 			return r
 		}
-		glog.V(8).Infof("Request Body: %s", string(data))
-		r.body = bytes.NewBuffer(data)
+		glog.V(8).Infof("Request Body: %#v", string(data))
+		r.body = bytes.NewReader(data)
 		r.SetHeader("Content-Type", r.content.ContentType)
 	default:
 		r.err = fmt.Errorf("unknown type used for body: %+v", obj)
@@ -573,7 +573,7 @@ func (r *Request) URL() *url.URL {
 	if len(r.resource) != 0 {
 		p = path.Join(p, strings.ToLower(r.resource))
 	}
-	// Join trims trailing slashes, so preserve r.pathPrefix's trailing slash for backwards compat if nothing was changed
+	// Join trims trailing slashes, so preserve r.pathPrefix's trailing slash for backwards compatibility if nothing was changed
 	if len(r.resourceName) != 0 || len(r.subpath) != 0 || len(r.subresource) != 0 {
 		p = path.Join(p, r.resourceName, r.subresource, r.subpath)
 	}
@@ -605,7 +605,7 @@ func (r *Request) URL() *url.URL {
 // underyling object.  This means some useful request info (like the types of field
 // selectors in use) will be lost.
 // TODO: preserve field selector keys
-func (r Request) finalURLTemplate() string {
+func (r Request) finalURLTemplate() url.URL {
 	if len(r.resourceName) != 0 {
 		r.resourceName = "{name}"
 	}
@@ -618,7 +618,8 @@ func (r Request) finalURLTemplate() string {
 		newParams[k] = v
 	}
 	r.params = newParams
-	return r.URL().String()
+	url := r.URL()
+	return *url
 }
 
 func (r *Request) tryThrottle() {
@@ -693,10 +694,10 @@ func updateURLMetrics(req *Request, resp *http.Response, err error) {
 
 	// If we have an error (i.e. apiserver down) we report that as a metric label.
 	if err != nil {
-		metrics.RequestResult.WithLabelValues(err.Error(), req.verb, url).Inc()
+		metrics.RequestResult.Increment(err.Error(), req.verb, url)
 	} else {
 		//Metrics for failure codes
-		metrics.RequestResult.WithLabelValues(strconv.Itoa(resp.StatusCode), req.verb, url).Inc()
+		metrics.RequestResult.Increment(strconv.Itoa(resp.StatusCode), req.verb, url)
 	}
 }
 
@@ -743,23 +744,11 @@ func (r *Request) Stream() (io.ReadCloser, error) {
 		// ensure we close the body before returning the error
 		defer resp.Body.Close()
 
-		// we have a decent shot at taking the object returned, parsing it as a status object and returning a more normal error
-		bodyBytes, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			return nil, fmt.Errorf("%v while accessing %v", resp.Status, url)
+		result := r.transformResponse(resp, req)
+		if result.err != nil {
+			return nil, result.err
 		}
-
-		// TODO: Check ContentType.
-		if runtimeObject, err := runtime.Decode(r.serializers.Decoder, bodyBytes); err == nil {
-			statusError := errors.FromObject(runtimeObject)
-
-			if _, ok := statusError.(errors.APIStatus); ok {
-				return nil, statusError
-			}
-		}
-
-		bodyText := string(bodyBytes)
-		return nil, fmt.Errorf("%s while accessing %v: %s", resp.Status, url, bodyText)
+		return nil, fmt.Errorf("%d while accessing %v: %s", result.statusCode, url, string(result.body))
 	}
 }
 
@@ -771,7 +760,7 @@ func (r *Request) request(fn func(*http.Request, *http.Response)) error {
 	//Metrics for total request latency
 	start := time.Now()
 	defer func() {
-		metrics.RequestLatency.WithLabelValues(r.verb, r.finalURLTemplate()).Observe(metrics.SinceInMicroseconds(start))
+		metrics.RequestLatency.Observe(r.verb, r.finalURLTemplate(), time.Since(start))
 	}()
 
 	if r.err != nil {
@@ -817,12 +806,28 @@ func (r *Request) request(fn func(*http.Request, *http.Response)) error {
 		}
 
 		done := func() bool {
-			// ensure the response body is closed before we reconnect, so that we reuse the same
-			// TCP connection
-			defer resp.Body.Close()
+			// Ensure the response body is fully read and closed
+			// before we reconnect, so that we reuse the same TCP
+			// connection.
+			defer func() {
+				const maxBodySlurpSize = 2 << 10
+				if resp.ContentLength <= maxBodySlurpSize {
+					io.Copy(ioutil.Discard, &io.LimitedReader{R: resp.Body, N: maxBodySlurpSize})
+				}
+				resp.Body.Close()
+			}()
 
 			retries++
 			if seconds, wait := checkWait(resp); wait && retries < maxRetries {
+				if seeker, ok := r.body.(io.Seeker); ok && r.body != nil {
+					_, err := seeker.Seek(0, 0)
+					if err != nil {
+						glog.V(4).Infof("Could not retry request, can't Seek() back to beginning of body for %T", r.body)
+						fn(req, resp)
+						return true
+					}
+				}
+
 				glog.V(4).Infof("Got a Retry-After %s response for attempt %d to %v", seconds, retries, url)
 				r.backoffMgr.Sleep(time.Duration(seconds) * time.Second)
 				return false
@@ -864,6 +869,9 @@ func (r *Request) DoRaw() ([]byte, error) {
 	var result Result
 	err := r.request(func(req *http.Request, resp *http.Response) {
 		result.body, result.err = ioutil.ReadAll(resp.Body)
+		if resp.StatusCode < http.StatusOK || resp.StatusCode > http.StatusPartialContent {
+			result.err = r.transformUnstructuredResponseError(resp, req, result.body)
+		}
 	})
 	if err != nil {
 		return nil, err
@@ -879,16 +887,49 @@ func (r *Request) transformResponse(resp *http.Response, req *http.Request) Resu
 			body = data
 		}
 	}
-	glog.V(8).Infof("Response Body: %s", string(body))
+
+	if glog.V(8) {
+		switch {
+		case bytes.IndexFunc(body, func(r rune) bool { return r < 0x0a }) != -1:
+			glog.Infof("Response Body:\n%s", hex.Dump(body))
+		default:
+			glog.Infof("Response Body: %s", string(body))
+		}
+	}
+
+	// verify the content type is accurate
+	contentType := resp.Header.Get("Content-Type")
+	decoder := r.serializers.Decoder
+	if len(contentType) > 0 && (decoder == nil || (len(r.content.ContentType) > 0 && contentType != r.content.ContentType)) {
+		mediaType, params, err := mime.ParseMediaType(contentType)
+		if err != nil {
+			return Result{err: errors.NewInternalError(err)}
+		}
+		decoder, err = r.serializers.RenegotiatedDecoder(mediaType, params)
+		if err != nil {
+			// if we fail to negotiate a decoder, treat this as an unstructured error
+			switch {
+			case resp.StatusCode == http.StatusSwitchingProtocols:
+				// no-op, we've been upgraded
+			case resp.StatusCode < http.StatusOK || resp.StatusCode > http.StatusPartialContent:
+				return Result{err: r.transformUnstructuredResponseError(resp, req, body)}
+			}
+			return Result{
+				body:        body,
+				contentType: contentType,
+				statusCode:  resp.StatusCode,
+			}
+		}
+	}
 
 	// Did the server give us a status response?
 	isStatusResponse := false
+	status := &unversioned.Status{}
 	// Because release-1.1 server returns Status with empty APIVersion at paths
 	// to the Extensions resources, we need to use DecodeInto here to provide
 	// default groupVersion, otherwise a status response won't be correctly
 	// decoded.
-	status := &unversioned.Status{}
-	err := runtime.DecodeInto(r.serializers.Decoder, body, status)
+	err := runtime.DecodeInto(decoder, body, status)
 	if err == nil && len(status.Status) > 0 {
 		isStatusResponse = true
 	}
@@ -908,25 +949,6 @@ func (r *Request) transformResponse(resp *http.Response, req *http.Request) Resu
 	if isStatusResponse && (status.Status != unversioned.StatusSuccess && !success) {
 		// "Failed" requests are clearly just an error and it makes sense to return them as such.
 		return Result{err: errors.FromObject(status)}
-	}
-
-	contentType := resp.Header.Get("Content-Type")
-	var decoder runtime.Decoder
-	if contentType == r.content.ContentType {
-		decoder = r.serializers.Decoder
-	} else {
-		mediaType, params, err := mime.ParseMediaType(contentType)
-		if err != nil {
-			return Result{err: errors.NewInternalError(err)}
-		}
-		decoder, err = r.serializers.RenegotiatedDecoder(mediaType, params)
-		if err != nil {
-			return Result{
-				body:        body,
-				contentType: contentType,
-				statusCode:  resp.StatusCode,
-			}
-		}
 	}
 
 	return Result{
@@ -961,7 +983,7 @@ func (r *Request) transformUnstructuredResponseError(resp *http.Response, req *h
 			body = data
 		}
 	}
-	glog.V(8).Infof("Response Body: %s", string(body))
+	glog.V(8).Infof("Response Body: %#v", string(body))
 
 	message := "unknown"
 	if isTextResponse(resp) {

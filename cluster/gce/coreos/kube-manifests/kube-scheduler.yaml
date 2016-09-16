@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  name: kube-scheduler-kubernetes-master
+  name: kube-scheduler
   namespace: kube-system
 spec:
   containers:
@@ -31,7 +31,7 @@ spec:
       name: logfile
   dnsPolicy: ClusterFirst
   hostNetwork: true
-  nodeName: kubernetes-master
+  nodeName: ${INSTANCE_PREFIX}-master
   restartPolicy: Always
   terminationGracePeriodSeconds: 30
   volumes:

@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -55,7 +55,7 @@ func TestPetSetStrategy(t *testing.T) {
 		Status: apps.PetSetStatus{Replicas: 3},
 	}
 
-	Strategy.PrepareForCreate(ps)
+	Strategy.PrepareForCreate(ctx, ps)
 	if ps.Status.Replicas != 0 {
 		t.Error("PetSet should not allow setting status.pets on create")
 	}
@@ -66,21 +66,21 @@ func TestPetSetStrategy(t *testing.T) {
 
 	// Just Spec.Replicas is allowed to change
 	validPs := &apps.PetSet{
-		ObjectMeta: api.ObjectMeta{Name: ps.Name, Namespace: ps.Namespace},
+		ObjectMeta: api.ObjectMeta{Name: ps.Name, Namespace: ps.Namespace, ResourceVersion: "1", Generation: 1},
 		Spec: apps.PetSetSpec{
 			Selector: ps.Spec.Selector,
 			Template: validPodTemplate.Template,
 		},
 		Status: apps.PetSetStatus{Replicas: 4},
 	}
-	Strategy.PrepareForUpdate(validPs, ps)
+	Strategy.PrepareForUpdate(ctx, validPs, ps)
 	errs = Strategy.ValidateUpdate(ctx, validPs, ps)
 	if len(errs) != 0 {
-		t.Errorf("Updating spec.Replicas is allowed on a petset.")
+		t.Errorf("Updating spec.Replicas is allowed on a petset: %v", errs)
 	}
 
 	validPs.Spec.Selector = &unversioned.LabelSelector{MatchLabels: map[string]string{"a": "bar"}}
-	Strategy.PrepareForUpdate(validPs, ps)
+	Strategy.PrepareForUpdate(ctx, validPs, ps)
 	errs = Strategy.ValidateUpdate(ctx, validPs, ps)
 	if len(errs) == 0 {
 		t.Errorf("Expected a validation error since updates are disallowed on petsets.")
@@ -130,7 +130,7 @@ func TestPetSetStatusStrategy(t *testing.T) {
 			Replicas: 2,
 		},
 	}
-	StatusStrategy.PrepareForUpdate(newPS, oldPS)
+	StatusStrategy.PrepareForUpdate(ctx, newPS, oldPS)
 	if newPS.Status.Replicas != 2 {
 		t.Errorf("PetSet status updates should allow change of pets: %v", newPS.Status.Replicas)
 	}

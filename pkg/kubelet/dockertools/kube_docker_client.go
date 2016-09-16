@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,7 +23,10 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"sync"
 	"time"
+
+	"github.com/golang/glog"
 
 	dockermessage "github.com/docker/docker/pkg/jsonmessage"
 	dockerstdcopy "github.com/docker/docker/pkg/stdcopy"
@@ -46,31 +49,54 @@ import (
 // TODO(random-liu): Swith to new docker interface by refactoring the functions in the old DockerInterface
 // one by one.
 type kubeDockerClient struct {
-	client *dockerapi.Client
+	// timeout is the timeout of short running docker operations.
+	timeout time.Duration
+	client  *dockerapi.Client
 }
 
 // Make sure that kubeDockerClient implemented the DockerInterface.
 var _ DockerInterface = &kubeDockerClient{}
 
+// There are 2 kinds of docker operations categorized by running time:
+// * Long running operation: The long running operation could run for arbitrary long time, and the running time
+// usually depends on some uncontrollable factors. These operations include: PullImage, Logs, StartExec, AttachToContainer.
+// * Non-long running operation: Given the maximum load of the system, the non-long running operation should finish
+// in expected and usually short time. These include all other operations.
+// kubeDockerClient only applies timeout on non-long running operations.
 const (
-	// defaultTimeout is the default timeout of all docker operations.
+	// defaultTimeout is the default timeout of short running docker operations.
 	defaultTimeout = 2 * time.Minute
 
 	// defaultShmSize is the default ShmSize to use (in bytes) if not specified.
 	defaultShmSize = int64(1024 * 1024 * 64)
+
+	// defaultImagePullingProgressReportInterval is the default interval of image pulling progress reporting.
+	defaultImagePullingProgressReportInterval = 10 * time.Second
+
+	// defaultImagePullingStuckTimeout is the default timeout for image pulling stuck. If no progress
+	// is made for defaultImagePullingStuckTimeout, the image pulling will be cancelled.
+	// Docker reports image progress for every 512kB block, so normally there shouldn't be too long interval
+	// between progress updates.
+	// TODO(random-liu): Make this configurable
+	defaultImagePullingStuckTimeout = 1 * time.Minute
 )
 
-// newKubeDockerClient creates an kubeDockerClient from an existing docker client.
-func newKubeDockerClient(dockerClient *dockerapi.Client) DockerInterface {
+// newKubeDockerClient creates an kubeDockerClient from an existing docker client. If requestTimeout is 0,
+// defaultTimeout will be applied.
+func newKubeDockerClient(dockerClient *dockerapi.Client, requestTimeout time.Duration) DockerInterface {
+	if requestTimeout == 0 {
+		requestTimeout = defaultTimeout
+	}
 	return &kubeDockerClient{
-		client: dockerClient,
+		client:  dockerClient,
+		timeout: requestTimeout,
 	}
 }
 
-func (k *kubeDockerClient) ListContainers(options dockertypes.ContainerListOptions) ([]dockertypes.Container, error) {
-	ctx, cancel := getDefaultContext()
+func (d *kubeDockerClient) ListContainers(options dockertypes.ContainerListOptions) ([]dockertypes.Container, error) {
+	ctx, cancel := d.getTimeoutContext()
 	defer cancel()
-	containers, err := k.client.ContainerList(ctx, options)
+	containers, err := d.client.ContainerList(ctx, options)
 	if ctxErr := contextError(ctx); ctxErr != nil {
 		return nil, ctxErr
 	}
@@ -81,7 +107,7 @@ func (k *kubeDockerClient) ListContainers(options dockertypes.ContainerListOptio
 }
 
 func (d *kubeDockerClient) InspectContainer(id string) (*dockertypes.ContainerJSON, error) {
-	ctx, cancel := getDefaultContext()
+	ctx, cancel := d.getTimeoutContext()
 	defer cancel()
 	containerJSON, err := d.client.ContainerInspect(ctx, id)
 	if ctxErr := contextError(ctx); ctxErr != nil {
@@ -97,7 +123,7 @@ func (d *kubeDockerClient) InspectContainer(id string) (*dockertypes.ContainerJS
 }
 
 func (d *kubeDockerClient) CreateContainer(opts dockertypes.ContainerCreateConfig) (*dockertypes.ContainerCreateResponse, error) {
-	ctx, cancel := getDefaultContext()
+	ctx, cancel := d.getTimeoutContext()
 	defer cancel()
 	// we provide an explicit default shm size as to not depend on docker daemon.
 	// TODO: evaluate exposing this as a knob in the API
@@ -115,7 +141,7 @@ func (d *kubeDockerClient) CreateContainer(opts dockertypes.ContainerCreateConfi
 }
 
 func (d *kubeDockerClient) StartContainer(id string) error {
-	ctx, cancel := getDefaultContext()
+	ctx, cancel := d.getTimeoutContext()
 	defer cancel()
 	err := d.client.ContainerStart(ctx, id)
 	if ctxErr := contextError(ctx); ctxErr != nil {
@@ -126,7 +152,7 @@ func (d *kubeDockerClient) StartContainer(id string) error {
 
 // Stopping an already stopped container will not cause an error in engine-api.
 func (d *kubeDockerClient) StopContainer(id string, timeout int) error {
-	ctx, cancel := getDefaultContext()
+	ctx, cancel := d.getCustomTimeoutContext(time.Duration(timeout) * time.Second)
 	defer cancel()
 	err := d.client.ContainerStop(ctx, id, timeout)
 	if ctxErr := contextError(ctx); ctxErr != nil {
@@ -136,7 +162,7 @@ func (d *kubeDockerClient) StopContainer(id string, timeout int) error {
 }
 
 func (d *kubeDockerClient) RemoveContainer(id string, opts dockertypes.ContainerRemoveOptions) error {
-	ctx, cancel := getDefaultContext()
+	ctx, cancel := d.getTimeoutContext()
 	defer cancel()
 	err := d.client.ContainerRemove(ctx, id, opts)
 	if ctxErr := contextError(ctx); ctxErr != nil {
@@ -146,7 +172,7 @@ func (d *kubeDockerClient) RemoveContainer(id string, opts dockertypes.Container
 }
 
 func (d *kubeDockerClient) InspectImage(image string) (*dockertypes.ImageInspect, error) {
-	ctx, cancel := getDefaultContext()
+	ctx, cancel := d.getTimeoutContext()
 	defer cancel()
 	resp, _, err := d.client.ImageInspectWithRaw(ctx, image, true)
 	if ctxErr := contextError(ctx); ctxErr != nil {
@@ -158,11 +184,14 @@ func (d *kubeDockerClient) InspectImage(image string) (*dockertypes.ImageInspect
 		}
 		return nil, err
 	}
+	if !matchImageTagOrSHA(resp, image) {
+		return nil, imageNotFoundError{ID: image}
+	}
 	return &resp, nil
 }
 
 func (d *kubeDockerClient) ImageHistory(id string) ([]dockertypes.ImageHistory, error) {
-	ctx, cancel := getDefaultContext()
+	ctx, cancel := d.getTimeoutContext()
 	defer cancel()
 	resp, err := d.client.ImageHistory(ctx, id)
 	if ctxErr := contextError(ctx); ctxErr != nil {
@@ -172,7 +201,7 @@ func (d *kubeDockerClient) ImageHistory(id string) ([]dockertypes.ImageHistory, 
 }
 
 func (d *kubeDockerClient) ListImages(opts dockertypes.ImageListOptions) ([]dockertypes.Image, error) {
-	ctx, cancel := getDefaultContext()
+	ctx, cancel := d.getTimeoutContext()
 	defer cancel()
 	images, err := d.client.ImageList(ctx, opts)
 	if ctxErr := contextError(ctx); ctxErr != nil {
@@ -192,24 +221,109 @@ func base64EncodeAuth(auth dockertypes.AuthConfig) (string, error) {
 	return base64.URLEncoding.EncodeToString(buf.Bytes()), nil
 }
 
+// progress is a wrapper of dockermessage.JSONMessage with a lock protecting it.
+type progress struct {
+	sync.RWMutex
+	// message stores the latest docker json message.
+	message *dockermessage.JSONMessage
+	// timestamp of the latest update.
+	timestamp time.Time
+}
+
+func newProgress() *progress {
+	return &progress{timestamp: time.Now()}
+}
+
+func (p *progress) set(msg *dockermessage.JSONMessage) {
+	p.Lock()
+	defer p.Unlock()
+	p.message = msg
+	p.timestamp = time.Now()
+}
+
+func (p *progress) get() (string, time.Time) {
+	p.RLock()
+	defer p.RUnlock()
+	if p.message == nil {
+		return "No progress", p.timestamp
+	}
+	// The following code is based on JSONMessage.Display
+	var prefix string
+	if p.message.ID != "" {
+		prefix = fmt.Sprintf("%s: ", p.message.ID)
+	}
+	if p.message.Progress == nil {
+		return fmt.Sprintf("%s%s", prefix, p.message.Status), p.timestamp
+	}
+	return fmt.Sprintf("%s%s %s", prefix, p.message.Status, p.message.Progress.String()), p.timestamp
+}
+
+// progressReporter keeps the newest image pulling progress and periodically report the newest progress.
+type progressReporter struct {
+	*progress
+	image  string
+	cancel context.CancelFunc
+	stopCh chan struct{}
+}
+
+// newProgressReporter creates a new progressReporter for specific image with specified reporting interval
+func newProgressReporter(image string, cancel context.CancelFunc) *progressReporter {
+	return &progressReporter{
+		progress: newProgress(),
+		image:    image,
+		cancel:   cancel,
+		stopCh:   make(chan struct{}),
+	}
+}
+
+// start starts the progressReporter
+func (p *progressReporter) start() {
+	go func() {
+		ticker := time.NewTicker(defaultImagePullingProgressReportInterval)
+		defer ticker.Stop()
+		for {
+			// TODO(random-liu): Report as events.
+			select {
+			case <-ticker.C:
+				progress, timestamp := p.progress.get()
+				// If there is no progress for defaultImagePullingStuckTimeout, cancel the operation.
+				if time.Now().Sub(timestamp) > defaultImagePullingStuckTimeout {
+					glog.Errorf("Cancel pulling image %q because of no progress for %v, latest progress: %q", p.image, defaultImagePullingStuckTimeout, progress)
+					p.cancel()
+					return
+				}
+				glog.V(2).Infof("Pulling image %q: %q", p.image, progress)
+			case <-p.stopCh:
+				progress, _ := p.progress.get()
+				glog.V(2).Infof("Stop pulling image %q: %q", p.image, progress)
+				return
+			}
+		}
+	}()
+}
+
+// stop stops the progressReporter
+func (p *progressReporter) stop() {
+	close(p.stopCh)
+}
+
 func (d *kubeDockerClient) PullImage(image string, auth dockertypes.AuthConfig, opts dockertypes.ImagePullOptions) error {
 	// RegistryAuth is the base64 encoded credentials for the registry
 	base64Auth, err := base64EncodeAuth(auth)
 	if err != nil {
 		return err
 	}
-	ctx, cancel := getDefaultContext()
-	defer cancel()
 	opts.RegistryAuth = base64Auth
+	ctx, cancel := d.getCancelableContext()
+	defer cancel()
 	resp, err := d.client.ImagePull(ctx, image, opts)
-	if ctxErr := contextError(ctx); ctxErr != nil {
-		return ctxErr
-	}
 	if err != nil {
 		return err
 	}
 	defer resp.Close()
-	// TODO(random-liu): Use the image pulling progress information.
+	reporter := newProgressReporter(image, cancel)
+	reporter.start()
+	defer reporter.stop()
 	decoder := json.NewDecoder(resp)
 	for {
 		var msg dockermessage.JSONMessage
@@ -223,12 +337,13 @@ func (d *kubeDockerClient) PullImage(image string, auth dockertypes.AuthConfig, 
 		if msg.Error != nil {
 			return msg.Error
 		}
+		reporter.set(&msg)
 	}
 	return nil
 }
 
 func (d *kubeDockerClient) RemoveImage(image string, opts dockertypes.ImageRemoveOptions) ([]dockertypes.ImageDelete, error) {
-	ctx, cancel := getDefaultContext()
+	ctx, cancel := d.getTimeoutContext()
 	defer cancel()
 	resp, err := d.client.ImageRemove(ctx, image, opts)
 	if ctxErr := contextError(ctx); ctxErr != nil {
@@ -238,7 +353,7 @@ func (d *kubeDockerClient) RemoveImage(image string, opts dockertypes.ImageRemov
 }
 
 func (d *kubeDockerClient) Logs(id string, opts dockertypes.ContainerLogsOptions, sopts StreamOptions) error {
-	ctx, cancel := getDefaultContext()
+	ctx, cancel := d.getCancelableContext()
 	defer cancel()
 	resp, err := d.client.ContainerLogs(ctx, id, opts)
 	if ctxErr := contextError(ctx); ctxErr != nil {
@@ -252,7 +367,7 @@ func (d *kubeDockerClient) Logs(id string, opts dockertypes.ContainerLogsOptions
 }
 
 func (d *kubeDockerClient) Version() (*dockertypes.Version, error) {
-	ctx, cancel := getDefaultContext()
+	ctx, cancel := d.getTimeoutContext()
 	defer cancel()
 	resp, err := d.client.ServerVersion(ctx)
 	if ctxErr := contextError(ctx); ctxErr != nil {
@@ -265,7 +380,7 @@ func (d *kubeDockerClient) Version() (*dockertypes.Version, error) {
 }
 
 func (d *kubeDockerClient) Info() (*dockertypes.Info, error) {
-	ctx, cancel := getDefaultContext()
+	ctx, cancel := d.getTimeoutContext()
 	defer cancel()
 	resp, err := d.client.Info(ctx)
 	if ctxErr := contextError(ctx); ctxErr != nil {
@@ -279,7 +394,7 @@ func (d *kubeDockerClient) Info() (*dockertypes.Info, error) {
 
 // TODO(random-liu): Add unit test for exec and attach functions, just like what go-dockerclient did.
 func (d *kubeDockerClient) CreateExec(id string, opts dockertypes.ExecConfig) (*dockertypes.ContainerExecCreateResponse, error) {
-	ctx, cancel := getDefaultContext()
+	ctx, cancel := d.getTimeoutContext()
 	defer cancel()
 	resp, err := d.client.ContainerExecCreate(ctx, id, opts)
 	if ctxErr := contextError(ctx); ctxErr != nil {
@@ -292,7 +407,7 @@ func (d *kubeDockerClient) CreateExec(id string, opts dockertypes.ExecConfig) (*
 }
 
 func (d *kubeDockerClient) StartExec(startExec string, opts dockertypes.ExecStartCheck, sopts StreamOptions) error {
-	ctx, cancel := getDefaultContext()
+	ctx, cancel := d.getCancelableContext()
 	defer cancel()
 	if opts.Detach {
 		err := d.client.ContainerExecStart(ctx, startExec, opts)
@@ -316,7 +431,7 @@ func (d *kubeDockerClient) StartExec(startExec string, opts dockertypes.ExecStar
 }
 
 func (d *kubeDockerClient) InspectExec(id string) (*dockertypes.ContainerExecInspect, error) {
-	ctx, cancel := getDefaultContext()
+	ctx, cancel := d.getTimeoutContext()
 	defer cancel()
 	resp, err := d.client.ContainerExecInspect(ctx, id)
 	if ctxErr := contextError(ctx); ctxErr != nil {
@@ -329,7 +444,7 @@ func (d *kubeDockerClient) InspectExec(id string) (*dockertypes.ContainerExecIns
 }
 
 func (d *kubeDockerClient) AttachToContainer(id string, opts dockertypes.ContainerAttachOptions, sopts StreamOptions) error {
-	ctx, cancel := getDefaultContext()
+	ctx, cancel := d.getCancelableContext()
 	defer cancel()
 	resp, err := d.client.ContainerAttach(ctx, id, opts)
 	if ctxErr := contextError(ctx); ctxErr != nil {
@@ -340,6 +455,24 @@ func (d *kubeDockerClient) AttachToContainer(id string, opts dockertypes.Contain
 	}
 	defer resp.Close()
 	return d.holdHijackedConnection(sopts.RawTerminal, sopts.InputStream, sopts.OutputStream, sopts.ErrorStream, resp)
+}
+
+func (d *kubeDockerClient) ResizeExecTTY(id string, height, width int) error {
+	ctx, cancel := d.getCancelableContext()
+	defer cancel()
+	return d.client.ContainerExecResize(ctx, id, dockertypes.ResizeOptions{
+		Height: height,
+		Width:  width,
+	})
+}
+
+func (d *kubeDockerClient) ResizeContainerTTY(id string, height, width int) error {
+	ctx, cancel := d.getCancelableContext()
+	defer cancel()
+	return d.client.ContainerResize(ctx, id, dockertypes.ResizeOptions{
+		Height: height,
+		Width:  width,
+	})
 }
 
 // redirectResponseToOutputStream redirect the response stream to stdout and stderr. When tty is true, all stream will
@@ -390,14 +523,30 @@ func (d *kubeDockerClient) holdHijackedConnection(tty bool, inputStream io.Reade
 	return nil
 }
 
-// parseDockerTimestamp parses the timestamp returned by DockerInterface from string to time.Time
-func parseDockerTimestamp(s string) (time.Time, error) {
-	// Timestamp returned by Docker is in time.RFC3339Nano format.
-	return time.Parse(time.RFC3339Nano, s)
+// getCancelableContext returns a new cancelable context. For long running requests without timeout, we use cancelable
+// context to avoid potential resource leak, although the current implementation shouldn't leak resource.
+func (d *kubeDockerClient) getCancelableContext() (context.Context, context.CancelFunc) {
+	return context.WithCancel(context.Background())
 }
 
-func getDefaultContext() (context.Context, context.CancelFunc) {
-	return context.WithTimeout(context.Background(), defaultTimeout)
+// getTimeoutContext returns a new context with default request timeout
+func (d *kubeDockerClient) getTimeoutContext() (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.Background(), d.timeout)
+}
+
+// getCustomTimeoutContext returns a new context with a specific request timeout
+func (d *kubeDockerClient) getCustomTimeoutContext(timeout time.Duration) (context.Context, context.CancelFunc) {
+	// Pick the larger of the two
+	if d.timeout > timeout {
+		timeout = d.timeout
+	}
+	return context.WithTimeout(context.Background(), timeout)
+}
+
+// ParseDockerTimestamp parses the timestamp returned by DockerInterface from string to time.Time
+func ParseDockerTimestamp(s string) (time.Time, error) {
+	// Timestamp returned by Docker is in time.RFC3339Nano format.
+	return time.Parse(time.RFC3339Nano, s)
 }
 
 // contextError checks the context, and returns error if the context is timeout.

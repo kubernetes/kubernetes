@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,21 +17,23 @@ limitations under the License.
 package remotecommand
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"time"
 
+	apierrors "k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/runtime"
+	"k8s.io/kubernetes/pkg/util/term"
 )
 
 // Attacher knows how to attach to a running container in a pod.
 type Attacher interface {
 	// AttachContainer attaches to the running container in the pod, copying data between in/out/err
 	// and the container's stdin/stdout/stderr.
-	AttachContainer(name string, uid types.UID, container string, in io.Reader, out, err io.WriteCloser, tty bool) error
+	AttachContainer(name string, uid types.UID, container string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan term.Size) error
 }
 
 // ServeAttach handles requests to attach to a container. After creating/receiving the required
@@ -44,10 +46,14 @@ func ServeAttach(w http.ResponseWriter, req *http.Request, attacher Attacher, po
 	}
 	defer ctx.conn.Close()
 
-	err := attacher.AttachContainer(podName, uid, container, ctx.stdinStream, ctx.stdoutStream, ctx.stderrStream, ctx.tty)
+	err := attacher.AttachContainer(podName, uid, container, ctx.stdinStream, ctx.stdoutStream, ctx.stderrStream, ctx.tty, ctx.resizeChan)
 	if err != nil {
-		msg := fmt.Sprintf("error attaching to container: %v", err)
-		runtime.HandleError(errors.New(msg))
-		fmt.Fprint(ctx.errorStream, msg)
+		err = fmt.Errorf("error attaching to container: %v", err)
+		runtime.HandleError(err)
+		ctx.writeStatus(apierrors.NewInternalError(err))
+	} else {
+		ctx.writeStatus(&apierrors.StatusError{ErrStatus: unversioned.Status{
+			Status: unversioned.StatusSuccess,
+		}})
 	}
 }

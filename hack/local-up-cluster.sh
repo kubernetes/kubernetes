@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2014 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -25,6 +25,7 @@ ALLOW_PRIVILEGED=${ALLOW_PRIVILEGED:-""}
 ALLOW_SECURITY_CONTEXT=${ALLOW_SECURITY_CONTEXT:-""}
 RUNTIME_CONFIG=${RUNTIME_CONFIG:-""}
 NET_PLUGIN=${NET_PLUGIN:-""}
+NET_PLUGIN_DIR=${NET_PLUGIN_DIR:-""}
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 # We disable cluster DNS by default because this script uses docker0 (or whatever
 # container bridge docker is currently using) and we don't know the IP of the
@@ -39,6 +40,22 @@ WAIT_FOR_URL_API_SERVER=${WAIT_FOR_URL_API_SERVER:-10}
 ENABLE_DAEMON=${ENABLE_DAEMON:-false}
 HOSTNAME_OVERRIDE=${HOSTNAME_OVERRIDE:-"127.0.0.1"}
 CLOUD_PROVIDER=${CLOUD_PROVIDER:-""}
+CLOUD_CONFIG=${CLOUD_CONFIG:-""}
+
+# START_MODE can be 'all', 'kubeletonly', or 'nokubelet'
+START_MODE=${START_MODE:-"all"}
+
+# sanity check for OpenStack provider
+if [ "${CLOUD_PROVIDER}" == "openstack" ]; then
+    if [ "${CLOUD_CONFIG}" == "" ]; then
+        echo "Missing CLOUD_CONFIG env for OpenStack provider!"
+        exit 1
+    fi
+    if [ ! -f "${CLOUD_CONFIG}" ]; then
+        echo "Cloud config ${CLOUD_CONFIG} doesn't exit"
+        exit 1
+    fi
+fi
 
 if [ "$(id -u)" != "0" ]; then
     echo "WARNING : This script MAY be run as root for docker socket / iptables functionality; if failures occur, retry as root." 2>&1
@@ -77,9 +94,7 @@ do
 done
 
 if [ "x$GO_OUT" == "x" ]; then
-    "${KUBE_ROOT}/hack/build-go.sh" \
-        cmd/kubectl \
-        cmd/hyperkube
+    make -C "${KUBE_ROOT}" WHAT="cmd/kubectl cmd/hyperkube"
 else
     echo "skipped the build."
 fi
@@ -105,22 +120,28 @@ set +e
 
 API_PORT=${API_PORT:-8080}
 API_HOST=${API_HOST:-127.0.0.1}
+API_HOST_IP=${API_HOST_IP:-${API_HOST}}
+API_BIND_ADDR=${API_HOST_IP:-"0.0.0.0"}
+KUBELET_HOST=${KUBELET_HOST:-"127.0.0.1"}
 # By default only allow CORS for requests on localhost
 API_CORS_ALLOWED_ORIGINS=${API_CORS_ALLOWED_ORIGINS:-"/127.0.0.1(:[0-9]+)?$,/localhost(:[0-9]+)?$"}
 KUBELET_PORT=${KUBELET_PORT:-10250}
 LOG_LEVEL=${LOG_LEVEL:-3}
 CONTAINER_RUNTIME=${CONTAINER_RUNTIME:-"docker"}
+CONTAINER_RUNTIME_ENDPOINT=${CONTAINER_RUNTIME_ENDPOINT:-""}
+IMAGE_SERVICE_ENDPOINT=${IMAGE_SERVICE_ENDPOINT:-""}
 RKT_PATH=${RKT_PATH:-""}
 RKT_STAGE1_IMAGE=${RKT_STAGE1_IMAGE:-""}
 CHAOS_CHANCE=${CHAOS_CHANCE:-0.0}
 CPU_CFS_QUOTA=${CPU_CFS_QUOTA:-false}
 ENABLE_HOSTPATH_PROVISIONER=${ENABLE_HOSTPATH_PROVISIONER:-"false"}
-CLAIM_BINDER_SYNC_PERIOD=${CLAIM_BINDER_SYNC_PERIOD:-"10m"} # current k8s default
+CLAIM_BINDER_SYNC_PERIOD=${CLAIM_BINDER_SYNC_PERIOD:-"15s"} # current k8s default
+ENABLE_CONTROLLER_ATTACH_DETACH=${ENABLE_CONTROLLER_ATTACH_DETACH:-"true"} # current default
 
 function test_apiserver_off {
     # For the common local scenario, fail fast if server is already running.
     # this can happen if you run local-up-cluster.sh twice and kill etcd in between.
-    curl $API_HOST:$API_PORT
+    curl --silent -g $API_HOST:$API_PORT
     if [ ! $? -eq 0 ]; then
         echo "API SERVER port is free, proceeding..."
     else
@@ -231,7 +252,7 @@ cleanup()
   exit 0
 }
 
-function startETCD {
+function start_etcd {
     echo "Starting etcd"
     kube::etcd::start
 }
@@ -249,9 +270,9 @@ function set_service_accounts {
 function start_apiserver {
     # Admission Controllers to invoke prior to persisting objects in cluster
     if [[ -z "${ALLOW_SECURITY_CONTEXT}" ]]; then
-      ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota
+      ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota,DefaultStorageClass
     else
-      ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,ServiceAccount,ResourceQuota
+      ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,ServiceAccount,ResourceQuota,DefaultStorageClass
     fi
     # This is the default dir and filename where the apiserver will generate a self-signed cert
     # which should be able to be used as the CA to verify itself
@@ -267,19 +288,28 @@ function start_apiserver {
       runtime_config="--runtime-config=${RUNTIME_CONFIG}"
     fi
 
+    # Let the API server pick a default address when API_HOST
+    # is set to 127.0.0.1
+    advertise_address=""
+    if [[ "${API_HOST}" != "127.0.0.1" ]]; then
+        advertise_address="--advertise_address=${API_HOST}"
+    fi
+
     APISERVER_LOG=/tmp/kube-apiserver.log
     sudo -E "${GO_OUT}/hyperkube" apiserver ${priv_arg} ${runtime_config}\
+      ${advertise_address} \
       --v=${LOG_LEVEL} \
       --cert-dir="${CERT_DIR}" \
       --service-account-key-file="${SERVICE_ACCOUNT_KEY}" \
       --service-account-lookup="${SERVICE_ACCOUNT_LOOKUP}" \
       --admission-control="${ADMISSION_CONTROL}" \
-      --insecure-bind-address="${API_HOST}" \
+      --bind-address="${API_BIND_ADDR}" \
+      --insecure-bind-address="${API_HOST_IP}" \
       --insecure-port="${API_PORT}" \
-      --advertise-address="${API_HOST}" \
-      --etcd-servers="http://127.0.0.1:4001" \
+      --etcd-servers="http://${ETCD_HOST}:${ETCD_PORT}" \
       --service-cluster-ip-range="10.0.0.0/24" \
       --cloud-provider="${CLOUD_PROVIDER}" \
+      --cloud-config="${CLOUD_CONFIG}" \
       --cors-allowed-origins="${API_CORS_ALLOWED_ORIGINS}" >"${APISERVER_LOG}" 2>&1 &
     APISERVER_PID=$!
 
@@ -303,12 +333,18 @@ function start_controller_manager {
       ${node_cidr_args} \
       --pvclaimbinder-sync-period="${CLAIM_BINDER_SYNC_PERIOD}" \
       --cloud-provider="${CLOUD_PROVIDER}" \
+      --cloud-config="${CLOUD_CONFIG}" \
       --master="${API_HOST}:${API_PORT}" >"${CTLRMGR_LOG}" 2>&1 &
     CTLRMGR_PID=$!
 }
 
 function start_kubelet {
     KUBELET_LOG=/tmp/kubelet.log
+
+    priv_arg=""
+    if [[ -n "${ALLOW_PRIVILEGED}" ]]; then
+      priv_arg="--allow-privileged "
+    fi
 
     mkdir -p /var/lib/kubelet
     if [[ -z "${DOCKERIZE_KUBELET}" ]]; then
@@ -319,7 +355,7 @@ function start_kubelet {
          which chcon > /dev/null ; then
          if [[ ! $(ls -Zd /var/lib/kubelet) =~ system_u:object_r:svirt_sandbox_file_t:s0 ]] ; then
             echo "Applying SELinux label to /var/lib/kubelet directory."
-            if ! chcon -R system_u:object_r:svirt_sandbox_file_t:s0 /var/lib/kubelet; then
+            if ! sudo chcon -Rt svirt_sandbox_file_t /var/lib/kubelet; then
                echo "Failed to apply selinux label to /var/lib/kubelet."
             fi
          fi
@@ -338,10 +374,25 @@ function start_kubelet {
       if [[ -n "${NET_PLUGIN}" ]]; then
         net_plugin_args="--network-plugin=${NET_PLUGIN}"
       fi
+      
+      net_plugin_dir_args=""
+      if [[ -n "${NET_PLUGIN_DIR}" ]]; then
+        net_plugin_dir_args="--network-plugin-dir=${NET_PLUGIN_DIR}"
+      fi
 
       kubenet_plugin_args=""
       if [[ "${NET_PLUGIN}" == "kubenet" ]]; then
         kubenet_plugin_args="--reconcile-cidr=true "
+      fi
+
+      container_runtime_endpoint_args=""
+      if [[ -n "${CONTAINER_RUNTIME_ENDPOINT}" ]]; then
+        container_runtime_endpoint_args="--container-runtime-endpoint=${CONTAINER_RUNTIME_ENDPOINT}"
+      fi
+
+      image_service_endpoint_args=""
+      if [[ -n "${IMAGE_SERVICE_ENDPOINT}" ]]; then
+	image_service_endpoint_args="--image-service-endpoint=${IMAGE_SERVICE_ENDPOINT}"
       fi
 
       sudo -E "${GO_OUT}/hyperkube" kubelet ${priv_arg}\
@@ -352,12 +403,17 @@ function start_kubelet {
         --rkt-stage1-image="${RKT_STAGE1_IMAGE}" \
         --hostname-override="${HOSTNAME_OVERRIDE}" \
         --cloud-provider="${CLOUD_PROVIDER}" \
-        --address="127.0.0.1" \
+        --cloud-config="${CLOUD_CONFIG}" \
+        --address="${KUBELET_HOST}" \
         --api-servers="${API_HOST}:${API_PORT}" \
         --cpu-cfs-quota=${CPU_CFS_QUOTA} \
+        --enable-controller-attach-detach="${ENABLE_CONTROLLER_ATTACH_DETACH}" \
         ${dns_args} \
+        ${net_plugin_dir_args} \
         ${net_plugin_args} \
         ${kubenet_plugin_args} \
+        ${container_runtime_endpoint_args} \
+        ${image_service_endpoint_args} \
         --port="$KUBELET_PORT" >"${KUBELET_LOG}" 2>&1 &
       KUBELET_PID=$!
     else
@@ -365,6 +421,21 @@ function start_kubelet {
       # unless that file does not already exist; clean up an existing
       # dockerized kubelet that might be running.
       cleanup_dockerized_kubelet
+      cred_bind=""
+      # path to cloud credentails. 
+      cloud_cred=""
+      if [ "${CLOUD_PROVIDER}" == "aws" ]; then
+          cloud_cred="${HOME}/.aws/credentials"
+      fi
+      if [ "${CLOUD_PROVIDER}" == "gce" ]; then
+          cloud_cred="${HOME}/.config/gcloud"
+      fi
+      if [ "${CLOUD_PROVIDER}" == "openstack" ]; then
+          cloud_cred="${CLOUD_CONFIG}"
+      fi
+      if  [[ -n "${cloud_cred}" ]]; then
+          cred_bind="--volume=${cloud_cred}:${cloud_cred}:ro"
+      fi
 
       docker run \
         --volume=/:/rootfs:ro \
@@ -372,12 +443,14 @@ function start_kubelet {
         --volume=/sys:/sys:ro \
         --volume=/var/lib/docker/:/var/lib/docker:ro \
         --volume=/var/lib/kubelet/:/var/lib/kubelet:rw,z \
+        --volume=/dev:/dev \
+        ${cred_bind} \
         --net=host \
         --privileged=true \
         -i \
         --cidfile=$KUBELET_CIDFILE \
         gcr.io/google_containers/kubelet \
-        /kubelet --v=3 --containerized ${priv_arg}--chaos-chance="${CHAOS_CHANCE}" --hostname-override="${HOSTNAME_OVERRIDE}" --cloud-provider="${CLOUD_PROVIDER}" --address="127.0.0.1" --api-servers="${API_HOST}:${API_PORT}" --port="$KUBELET_PORT" --resource-container="" &> $KUBELET_LOG &
+        /kubelet --v=${LOG_LEVEL} --containerized ${priv_arg}--chaos-chance="${CHAOS_CHANCE}" --hostname-override="${HOSTNAME_OVERRIDE}" --cloud-provider="${CLOUD_PROVIDER}" --cloud-config="${CLOUD_CONFIG}" \ --address="127.0.0.1" --api-servers="${API_HOST}:${API_PORT}" --port="$KUBELET_PORT"  --enable-controller-attach-detach="${ENABLE_CONTROLLER_ATTACH_DETACH}" &> $KUBELET_LOG &
     fi
 }
 
@@ -401,6 +474,19 @@ function start_kubedns {
     if [[ "${ENABLE_CLUSTER_DNS}" = true ]]; then
         echo "Creating kube-system namespace"
         sed -e "s/{{ pillar\['dns_replicas'\] }}/${DNS_REPLICAS}/g;s/{{ pillar\['dns_domain'\] }}/${DNS_DOMAIN}/g;" "${KUBE_ROOT}/cluster/addons/dns/skydns-rc.yaml.in" >| skydns-rc.yaml
+        if [[ "${FEDERATION:-}" == "true" ]]; then
+          FEDERATIONS_DOMAIN_MAP="${FEDERATIONS_DOMAIN_MAP:-}"
+          if [[ -z "${FEDERATIONS_DOMAIN_MAP}" && -n "${FEDERATION_NAME:-}" && -n "${DNS_ZONE_NAME:-}" ]]; then
+            FEDERATIONS_DOMAIN_MAP="${FEDERATION_NAME}=${DNS_ZONE_NAME}"
+          fi
+          if [[ -n "${FEDERATIONS_DOMAIN_MAP}" ]]; then
+            sed -i -e "s/{{ pillar\['federations_domain_map'\] }}/- --federations=${FEDERATIONS_DOMAIN_MAP}/g" skydns-rc.yaml
+          else
+            sed -i -e "/{{ pillar\['federations_domain_map'\] }}/d" skydns-rc.yaml
+          fi
+        else
+          sed -i -e "/{{ pillar\['federations_domain_map'\] }}/d" skydns-rc.yaml
+        fi
         sed -e "s/{{ pillar\['dns_server'\] }}/${DNS_SERVER_IP}/g" "${KUBE_ROOT}/cluster/addons/dns/skydns-svc.yaml.in" >| skydns-svc.yaml
         cat <<EOF >namespace.yaml
 apiVersion: v1
@@ -422,27 +508,54 @@ EOF
 }
 
 function print_success {
-cat <<EOF
+if [[ "${START_MODE}" != "kubeletonly" ]]; then
+  cat <<EOF
 Local Kubernetes cluster is running. Press Ctrl-C to shut it down.
 
 Logs:
-  ${APISERVER_LOG}
-  ${CTLRMGR_LOG}
-  ${PROXY_LOG}
-  ${SCHEDULER_LOG}
-  ${KUBELET_LOG}
+  ${APISERVER_LOG:-}
+  ${CTLRMGR_LOG:-}
+  ${PROXY_LOG:-}
+  ${SCHEDULER_LOG:-}
+EOF
+fi
 
+if [[ "${START_MODE}" == "all" ]]; then
+  echo "  ${KUBELET_LOG}"
+elif [[ "${START_MODE}" == "nokubelet" ]]; then
+  echo
+  echo "No kubelet was started because you set START_MODE=nokubelet"
+  echo "Run this script again with START_MODE=kubeletonly to run a kubelet"
+fi
+
+if [[ "${START_MODE}" != "kubeletonly" ]]; then
+  echo
+  cat <<EOF
 To start using your cluster, open up another terminal/tab and run:
+
+  export KUBERNETES_PROVIDER=local
 
   cluster/kubectl.sh config set-cluster local --server=http://${API_HOST}:${API_PORT} --insecure-skip-tls-verify=true
   cluster/kubectl.sh config set-context local --cluster=local
   cluster/kubectl.sh config use-context local
   cluster/kubectl.sh
 EOF
+else 
+  cat <<EOF
+The kubelet was started.
+
+Logs:
+  ${KUBELET_LOG}
+EOF
+fi
 }
 
 test_docker
-test_apiserver_off
+
+if [[ "${START_MODE}" != "kubeletonly" ]]; then
+  test_apiserver_off
+fi
+
 test_openssl_installed
 
 ### IF the user didn't supply an output/ for the build... Then we detect.
@@ -455,14 +568,21 @@ KUBELET_CIDFILE=/tmp/kubelet.cid
 if [[ "${ENABLE_DAEMON}" = false ]]; then
 trap cleanup EXIT
 fi
+
 echo "Starting services now!"
-startETCD
-set_service_accounts
-start_apiserver
-start_controller_manager
-start_kubelet
-start_kubeproxy
-start_kubedns
+if [[ "${START_MODE}" != "kubeletonly" ]]; then
+  start_etcd
+  set_service_accounts
+  start_apiserver
+  start_controller_manager
+  start_kubeproxy
+  start_kubedns
+fi
+
+if [[ "${START_MODE}" != "nokubelet" ]]; then
+  start_kubelet
+fi  
+
 print_success
 
 if [[ "${ENABLE_DAEMON}" = false ]]; then

@@ -12,6 +12,14 @@ import (
 	"github.com/miekg/dns"
 )
 
+// PathPrefix is the prefix used to store SkyDNS data in the backend.
+// It defaults to `skydns`.
+// You can change it by set `path-prefix` configuration or SKYDNS_PATH_PREFIX env. variable.
+// Then:
+// 	The SkyDNS's configuration object should be stored under the key "/mydns/config";
+// 	The etcd path of domain `service.staging.skydns.local.` will be "/mydns/local/skydns/staging/service".
+var PathPrefix string = "skydns"
+
 // This *is* the rdata from a SRV record, but with a twist.
 // Host (Target in SRV) must be a domain name, but if it looks like an IP
 // address (4/6), we will treat it like an IP address.
@@ -29,7 +37,7 @@ type Service struct {
 	// the record lives to a DNS name and use this as the srv.Target.  When
 	// TargetStrip > 0 we strip the left most TargetStrip labels from the
 	// DNS name.
-	TargetStrip int `json:"targetstrip",omitempty"`
+	TargetStrip int `json:"targetstrip,omitempty"`
 
 	// Group is used to group (or *not* to group) different services
 	// together. Services with an identical Group are returned in the same
@@ -42,17 +50,7 @@ type Service struct {
 
 // NewSRV returns a new SRV record based on the Service.
 func (s *Service) NewSRV(name string, weight uint16) *dns.SRV {
-	host := dns.Fqdn(s.Host)
-
-	offset, end := 0, false
-	for i := 0; i < s.TargetStrip; i++ {
-		offset, end = dns.NextLabel(host, offset)
-	}
-	if end {
-		// We overshot the name, use the orignal one.
-		offset = 0
-	}
-	host = host[offset:]
+	host := targetStrip(dns.Fqdn(s.Host), s.TargetStrip)
 
 	return &dns.SRV{Hdr: dns.RR_Header{Name: name, Rrtype: dns.TypeSRV, Class: dns.ClassINET, Ttl: s.Ttl},
 		Priority: uint16(s.Priority), Weight: weight, Port: uint16(s.Port), Target: host}
@@ -60,17 +58,7 @@ func (s *Service) NewSRV(name string, weight uint16) *dns.SRV {
 
 // NewMX returns a new MX record based on the Service.
 func (s *Service) NewMX(name string) *dns.MX {
-	host := dns.Fqdn(s.Host)
-
-	offset, end := 0, false
-	for i := 0; i < s.TargetStrip; i++ {
-		offset, end = dns.NextLabel(host, offset)
-	}
-	if end {
-		// We overshot the name, use the orignal one.
-		offset = 0
-	}
-	host = host[offset:]
+	host := targetStrip(dns.Fqdn(s.Host), s.TargetStrip)
 
 	return &dns.MX{Hdr: dns.RR_Header{Name: name, Rrtype: dns.TypeMX, Class: dns.ClassINET, Ttl: s.Ttl},
 		Preference: uint16(s.Priority), Mx: host}
@@ -118,10 +106,10 @@ func PathWithWildcard(s string) (string, bool) {
 	}
 	for i, k := range l {
 		if k == "*" || k == "any" {
-			return path.Join(append([]string{"/skydns/"}, l[:i]...)...), true
+			return path.Join(append([]string{"/" + PathPrefix + "/"}, l[:i]...)...), true
 		}
 	}
-	return path.Join(append([]string{"/skydns/"}, l...)...), false
+	return path.Join(append([]string{"/" + PathPrefix + "/"}, l...)...), false
 }
 
 // Path converts a domainname to an etcd path. If s looks like service.staging.skydns.local.,
@@ -131,7 +119,7 @@ func Path(s string) string {
 	for i, j := 0, len(l)-1; i < j; i, j = i+1, j-1 {
 		l[i], l[j] = l[j], l[i]
 	}
-	return path.Join(append([]string{"/skydns/"}, l...)...)
+	return path.Join(append([]string{"/" + PathPrefix + "/"}, l...)...)
 }
 
 // Domain is the opposite of Path.
@@ -212,4 +200,22 @@ func split255(s string) []string {
 	}
 
 	return sx
+}
+
+// targetStrip strips "targetstrip" labels from the left side of the fully qualified name.
+func targetStrip(name string, targetStrip int) string {
+	if targetStrip == 0 {
+		return name
+	}
+
+	offset, end := 0, false
+	for i := 0; i < targetStrip; i++ {
+		offset, end = dns.NextLabel(name, offset)
+	}
+	if end {
+		// We overshot the name, use the orignal one.
+		offset = 0
+	}
+	name = name[offset:]
+	return name
 }

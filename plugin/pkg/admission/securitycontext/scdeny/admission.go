@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -49,7 +49,7 @@ func NewSecurityContextDeny(client clientset.Interface) admission.Interface {
 
 // Admit will deny any pod that defines SELinuxOptions or RunAsUser.
 func (p *plugin) Admit(a admission.Attributes) (err error) {
-	if a.GetResource().GroupResource() != api.Resource("pods") {
+	if a.GetSubresource() != "" || a.GetResource().GroupResource() != api.Resource("pods") {
 		return nil
 	}
 
@@ -72,6 +72,17 @@ func (p *plugin) Admit(a admission.Attributes) (err error) {
 
 	if pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.FSGroup != nil {
 		return apierrors.NewForbidden(a.GetResource().GroupResource(), pod.Name, fmt.Errorf("SecurityContext.FSGroup is forbidden"))
+	}
+
+	for _, v := range pod.Spec.InitContainers {
+		if v.SecurityContext != nil {
+			if v.SecurityContext.SELinuxOptions != nil {
+				return apierrors.NewForbidden(a.GetResource().GroupResource(), pod.Name, fmt.Errorf("SecurityContext.SELinuxOptions is forbidden"))
+			}
+			if v.SecurityContext.RunAsUser != nil {
+				return apierrors.NewForbidden(a.GetResource().GroupResource(), pod.Name, fmt.Errorf("SecurityContext.RunAsUser is forbidden"))
+			}
+		}
 	}
 
 	for _, v := range pod.Spec.Containers {

@@ -4,18 +4,13 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 	"net/url"
 	"path"
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/coreos/pkg/capnslog"
-)
-
-var (
-	log = capnslog.NewPackageLogger("github.com/coreos/go-oidc", "http")
 )
 
 func WriteError(w http.ResponseWriter, code int, msg string) {
@@ -26,7 +21,9 @@ func WriteError(w http.ResponseWriter, code int, msg string) {
 	}
 	b, err := json.Marshal(e)
 	if err != nil {
-		log.Errorf("Failed marshaling %#v to JSON: %v", e, err)
+		log.Printf("go-oidc: failed to marshal %#v: %v", e, err)
+		code = http.StatusInternalServerError
+		b = []byte(`{"error":"server_error"}`)
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)

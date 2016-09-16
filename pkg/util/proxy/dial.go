@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,7 +26,7 @@ import (
 	"github.com/golang/glog"
 
 	utilnet "k8s.io/kubernetes/pkg/util/net"
-	"k8s.io/kubernetes/third_party/golang/netutil"
+	"k8s.io/kubernetes/third_party/forked/golang/netutil"
 )
 
 func DialURL(url *url.URL, transport http.RoundTripper) (net.Conn, error) {
@@ -69,9 +69,9 @@ func DialURL(url *url.URL, transport http.RoundTripper) (net.Conn, error) {
 					inferredHost = host
 				}
 				// Make a copy to avoid polluting the provided config
-				tlsConfigCopy := *tlsConfig
+				tlsConfigCopy, _ := utilnet.TLSClientConfig(transport)
 				tlsConfigCopy.ServerName = inferredHost
-				tlsConfig = &tlsConfigCopy
+				tlsConfig = tlsConfigCopy
 			}
 			tlsConn = tls.Client(netConn, tlsConfig)
 			if err := tlsConn.Handshake(); err != nil {

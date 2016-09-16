@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	"github.com/golang/glog"
+	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
@@ -43,30 +44,32 @@ type LabelOptions struct {
 	Recursive bool
 }
 
-const (
-	label_long = `Update the labels on a resource.
+var (
+	label_long = dedent.Dedent(`
+		Update the labels on a resource.
 
-A label must begin with a letter or number, and may contain letters, numbers, hyphens, dots, and underscores, up to %[1]d characters.
-If --overwrite is true, then existing labels can be overwritten, otherwise attempting to overwrite a label will result in an error.
-If --resource-version is specified, then updates will use this resource version, otherwise the existing resource-version will be used.`
-	label_example = `# Update pod 'foo' with the label 'unhealthy' and the value 'true'.
-kubectl label pods foo unhealthy=true
+		A label must begin with a letter or number, and may contain letters, numbers, hyphens, dots, and underscores, up to %[1]d characters.
+		If --overwrite is true, then existing labels can be overwritten, otherwise attempting to overwrite a label will result in an error.
+		If --resource-version is specified, then updates will use this resource version, otherwise the existing resource-version will be used.`)
+	label_example = dedent.Dedent(`
+		# Update pod 'foo' with the label 'unhealthy' and the value 'true'.
+		kubectl label pods foo unhealthy=true
 
-# Update pod 'foo' with the label 'status' and the value 'unhealthy', overwriting any existing value.
-kubectl label --overwrite pods foo status=unhealthy
+		# Update pod 'foo' with the label 'status' and the value 'unhealthy', overwriting any existing value.
+		kubectl label --overwrite pods foo status=unhealthy
 
-# Update all pods in the namespace
-kubectl label pods --all status=unhealthy
+		# Update all pods in the namespace
+		kubectl label pods --all status=unhealthy
 
-# Update a pod identified by the type and name in "pod.json"
-kubectl label -f pod.json status=unhealthy
+		# Update a pod identified by the type and name in "pod.json"
+		kubectl label -f pod.json status=unhealthy
 
-# Update pod 'foo' only if the resource is unchanged from version 1.
-kubectl label pods foo status=unhealthy --resource-version=1
+		# Update pod 'foo' only if the resource is unchanged from version 1.
+		kubectl label pods foo status=unhealthy --resource-version=1
 
-# Update pod 'foo' by removing a label named 'bar' if it exists.
-# Does not require the --overwrite flag.
-kubectl label pods foo bar-`
+		# Update pod 'foo' by removing a label named 'bar' if it exists.
+		# Does not require the --overwrite flag.
+		kubectl label pods foo bar-`)
 )
 
 func NewCmdLabel(f *cmdutil.Factory, out io.Writer) *cobra.Command {
@@ -74,7 +77,9 @@ func NewCmdLabel(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 
 	// retrieve a list of handled resources from printer as valid args
 	validArgs, argAliases := []string{}, []string{}
-	p, err := f.Printer(nil, false, false, false, false, false, false, []string{})
+	p, err := f.Printer(nil, kubectl.PrintOptions{
+		ColumnLabels: []string{},
+	})
 	cmdutil.CheckErr(err)
 	if p != nil {
 		validArgs = p.HandledResources()
@@ -101,7 +106,7 @@ func NewCmdLabel(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	usage := "Filename, directory, or URL to a file identifying the resource to update the labels"
 	kubectl.AddJsonFilenameFlag(cmd, &options.Filenames, usage)
 	cmdutil.AddRecursiveFlag(cmd, &options.Recursive)
-	cmd.Flags().Bool("dry-run", false, "If true, only print the object that would be sent, without sending it.")
+	cmdutil.AddDryRunFlag(cmd)
 	cmdutil.AddRecordFlag(cmd)
 	cmdutil.AddInclude3rdPartyFlags(cmd)
 
@@ -124,8 +129,11 @@ func parseLabels(spec []string) (map[string]string, []string, error) {
 	for _, labelSpec := range spec {
 		if strings.Index(labelSpec, "=") != -1 {
 			parts := strings.Split(labelSpec, "=")
-			if len(parts) != 2 || len(parts[1]) == 0 || !validation.IsValidLabelValue(parts[1]) {
+			if len(parts) != 2 || len(parts[1]) == 0 {
 				return nil, nil, fmt.Errorf("invalid label spec: %v", labelSpec)
+			}
+			if errs := validation.IsValidLabelValue(parts[1]); len(errs) != 0 {
+				return nil, nil, fmt.Errorf("invalid label value: %q: %s", labelSpec, strings.Join(errs, ";"))
 			}
 			labels[parts[0]] = parts[1]
 		} else if strings.HasSuffix(labelSpec, "-") {
@@ -173,21 +181,9 @@ func labelFunc(obj runtime.Object, overwrite bool, resourceVersion string, label
 }
 
 func RunLabel(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, options *LabelOptions) error {
-	resources, labelArgs := []string{}, []string{}
-	first := true
-	for _, s := range args {
-		isLabel := strings.Contains(s, "=") || strings.HasSuffix(s, "-")
-		switch {
-		case first && isLabel:
-			first = false
-			fallthrough
-		case !first && isLabel:
-			labelArgs = append(labelArgs, s)
-		case first && !isLabel:
-			resources = append(resources, s)
-		case !first && !isLabel:
-			return cmdutil.UsageError(cmd, "all resources must be specified before label changes: %s", s)
-		}
+	resources, labelArgs, err := cmdutil.GetResourcesAndPairs(args, "label")
+	if err != nil {
+		return err
 	}
 	if len(resources) < 1 && len(options.Filenames) == 0 {
 		return cmdutil.UsageError(cmd, "one or more resources must be specified as <resource> <name> or <resource>/<name>")
@@ -239,14 +235,14 @@ func RunLabel(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 
 		var outputObj runtime.Object
 		dataChangeMsg := "not labeled"
-		if cmdutil.GetFlagBool(cmd, "dry-run") {
+		if cmdutil.GetDryRunFlag(cmd) {
 			err = labelFunc(info.Object, overwrite, resourceVersion, lbls, remove)
 			if err != nil {
 				return err
 			}
 			outputObj = info.Object
 		} else {
-			obj, err := info.Mapping.ConvertToVersion(info.Object, info.Mapping.GroupVersionKind.GroupVersion())
+			obj, err := cmdutil.MaybeConvertObject(info.Object, info.Mapping.GroupVersionKind.GroupVersion(), info.Mapping)
 			if err != nil {
 				return err
 			}

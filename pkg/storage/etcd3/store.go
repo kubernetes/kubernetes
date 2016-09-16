@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -71,25 +71,6 @@ func newStore(c *clientv3.Client, codec runtime.Codec, prefix string) *store {
 		pathPrefix: prefix,
 		watcher:    newWatcher(c, codec, versioner),
 	}
-}
-
-// Backends implements storage.Interface.Backends.
-func (s *store) Backends(ctx context.Context) []string {
-	resp, err := s.client.MemberList(ctx)
-	if err != nil {
-		glog.Errorf("Error obtaining etcd members list: %q", err)
-		return nil
-	}
-	var mlist []string
-	for _, member := range resp.Members {
-		mlist = append(mlist, member.ClientURLs...)
-	}
-	return mlist
-}
-
-// Codec implements storage.Interface.Codec.
-func (s *store) Codec() runtime.Codec {
-	return s.codec
 }
 
 // Versioner implements storage.Interface.Versioner.
@@ -274,7 +255,7 @@ func (s *store) GuaranteedUpdate(ctx context.Context, key string, out runtime.Ob
 }
 
 // GetToList implements storage.Interface.GetToList.
-func (s *store) GetToList(ctx context.Context, key string, filter storage.FilterFunc, listObj runtime.Object) error {
+func (s *store) GetToList(ctx context.Context, key string, filter storage.Filter, listObj runtime.Object) error {
 	listPtr, err := meta.GetItemsPtr(listObj)
 	if err != nil {
 		return err
@@ -300,7 +281,7 @@ func (s *store) GetToList(ctx context.Context, key string, filter storage.Filter
 }
 
 // List implements storage.Interface.List.
-func (s *store) List(ctx context.Context, key, resourceVersion string, filter storage.FilterFunc, listObj runtime.Object) error {
+func (s *store) List(ctx context.Context, key, resourceVersion string, filter storage.Filter, listObj runtime.Object) error {
 	listPtr, err := meta.GetItemsPtr(listObj)
 	if err != nil {
 		return err
@@ -332,16 +313,16 @@ func (s *store) List(ctx context.Context, key, resourceVersion string, filter st
 }
 
 // Watch implements storage.Interface.Watch.
-func (s *store) Watch(ctx context.Context, key string, resourceVersion string, filter storage.FilterFunc) (watch.Interface, error) {
+func (s *store) Watch(ctx context.Context, key string, resourceVersion string, filter storage.Filter) (watch.Interface, error) {
 	return s.watch(ctx, key, resourceVersion, filter, false)
 }
 
 // WatchList implements storage.Interface.WatchList.
-func (s *store) WatchList(ctx context.Context, key string, resourceVersion string, filter storage.FilterFunc) (watch.Interface, error) {
+func (s *store) WatchList(ctx context.Context, key string, resourceVersion string, filter storage.Filter) (watch.Interface, error) {
 	return s.watch(ctx, key, resourceVersion, filter, true)
 }
 
-func (s *store) watch(ctx context.Context, key string, rv string, filter storage.FilterFunc, recursive bool) (watch.Interface, error) {
+func (s *store) watch(ctx context.Context, key string, rv string, filter storage.Filter, recursive bool) (watch.Interface, error) {
 	rev, err := storage.ParseWatchResourceVersion(rv)
 	if err != nil {
 		return nil, err
@@ -435,7 +416,7 @@ func decode(codec runtime.Codec, versioner storage.Versioner, value []byte, objP
 
 // decodeList decodes a list of values into a list of objects, with resource version set to corresponding rev.
 // On success, ListPtr would be set to the list of objects.
-func decodeList(elems []*elemForDecode, filter storage.FilterFunc, ListPtr interface{}, codec runtime.Codec, versioner storage.Versioner) error {
+func decodeList(elems []*elemForDecode, filter storage.Filter, ListPtr interface{}, codec runtime.Codec, versioner storage.Versioner) error {
 	v, err := conversion.EnforcePtr(ListPtr)
 	if err != nil || v.Kind() != reflect.Slice {
 		panic("need ptr to slice")
@@ -447,7 +428,7 @@ func decodeList(elems []*elemForDecode, filter storage.FilterFunc, ListPtr inter
 		}
 		// being unable to set the version does not prevent the object from being extracted
 		versioner.UpdateObject(obj, elem.rev)
-		if filter(obj) {
+		if filter.Filter(obj) {
 			v.Set(reflect.Append(v, reflect.ValueOf(obj).Elem()))
 		}
 	}

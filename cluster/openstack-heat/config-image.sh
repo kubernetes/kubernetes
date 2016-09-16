@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 The Kubernetes Authors All rights reserved.
+# Copyright 2015 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@
 OPENSTACK_IMAGE_NAME=${OPENSTACK_IMAGE_NAME:-CentOS7}
 
 # Downloaded image name for Openstack project
-IMAGE_FILE=${IMAGE_FILE:-CentOS-7-x86_64-GenericCloud-1510.qcow2}
+IMAGE_FILE=${IMAGE_FILE:-CentOS-7-x86_64-GenericCloud-1604.qcow2}
 
 # Absolute path where image file is stored.
 IMAGE_PATH=${IMAGE_PATH:-~/Downloads/openstack}

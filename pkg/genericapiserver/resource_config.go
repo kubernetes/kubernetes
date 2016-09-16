@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -27,6 +27,7 @@ type APIResourceConfigSource interface {
 	ResourceEnabled(resource unversioned.GroupVersionResource) bool
 	AllResourcesForVersionEnabled(version unversioned.GroupVersion) bool
 	AnyResourcesForVersionEnabled(version unversioned.GroupVersion) bool
+	AnyResourcesForGroupEnabled(group string) bool
 }
 
 // Specifies the overrides for various API group versions.
@@ -169,4 +170,16 @@ func (o *ResourceConfig) AnyResourcesForVersionEnabled(version unversioned.Group
 	}
 
 	return versionOverride.Enable
+}
+
+func (o *ResourceConfig) AnyResourcesForGroupEnabled(group string) bool {
+	for version := range o.GroupVersionResourceConfigs {
+		if version.Group == group {
+			if o.AnyResourcesForVersionEnabled(version) {
+				return true
+			}
+		}
+	}
+
+	return false
 }

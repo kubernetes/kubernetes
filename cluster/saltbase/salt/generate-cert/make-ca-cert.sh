@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2014 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -49,6 +49,11 @@ if [ "$cert_ip" == "_use_aws_external_ip_" ]; then
   else
     cert_ip=$(curl -f -s http://169.254.169.254/latest/meta-data/local-ipv4)
   fi
+fi
+
+if [ "$cert_ip" == "_use_azure_dns_name_" ]; then
+  cert_ip=$(uname -n | awk -F. '{ print $2 }').cloudapp.net
+  use_cn=true
 fi
 
 sans="IP:${cert_ip}"

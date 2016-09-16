@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -34,6 +34,10 @@ type Indexer interface {
 	ByIndex(indexName, indexKey string) ([]interface{}, error)
 	// GetIndexer return the indexers
 	GetIndexers() Indexers
+
+	// AddIndexers adds more indexers to this store.  If you call this after you already have data
+	// in the store, the results are undefined.
+	AddIndexers(newIndexers Indexers) error
 }
 
 // IndexFunc knows how to provide an indexed value for an object.
@@ -50,6 +54,9 @@ func IndexFuncToKeyFuncAdapter(indexFunc IndexFunc) KeyFunc {
 		}
 		if len(indexKeys) > 1 {
 			return "", fmt.Errorf("too many keys: %v", indexKeys)
+		}
+		if len(indexKeys) == 0 {
+			return "", fmt.Errorf("unexpected empty indexKeys")
 		}
 		return indexKeys[0], nil
 	}

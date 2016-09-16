@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/selection"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/sets"
 
@@ -58,16 +59,7 @@ var Semantic = conversion.EqualitiesOrDie(
 		// TODO: if we decide it's important, it should be safe to start comparing the format.
 		//
 		// Uninitialized quantities are equivalent to 0 quantities.
-		if a.Amount == nil && b.MilliValue() == 0 {
-			return true
-		}
-		if b.Amount == nil && a.MilliValue() == 0 {
-			return true
-		}
-		if a.Amount == nil || b.Amount == nil {
-			return false
-		}
-		return a.Amount.Cmp(b.Amount) == 0
+		return a.Cmp(b) == 0
 	},
 	func(a, b unversioned.Time) bool {
 		return a.UTC() == b.UTC()
@@ -143,6 +135,7 @@ var standardQuotaResources = sets.NewString(
 	string(ResourceMemory),
 	string(ResourceRequestsCPU),
 	string(ResourceRequestsMemory),
+	string(ResourceRequestsStorage),
 	string(ResourceLimitsCPU),
 	string(ResourceLimitsMemory),
 	string(ResourcePods),
@@ -230,11 +223,17 @@ func IsServiceIPSet(service *Service) bool {
 
 // this function aims to check if the service's cluster IP is requested or not
 func IsServiceIPRequested(service *Service) bool {
+	// ExternalName services are CNAME aliases to external ones. Ignore the IP.
+	if service.Spec.Type == ServiceTypeExternalName {
+		return false
+	}
 	return service.Spec.ClusterIP == ""
 }
 
 var standardFinalizers = sets.NewString(
-	string(FinalizerKubernetes))
+	string(FinalizerKubernetes),
+	FinalizerOrphan,
+)
 
 func IsStandardFinalizerName(str string) bool {
 	return standardFinalizers.Has(str)
@@ -385,20 +384,20 @@ func NodeSelectorRequirementsAsSelector(nsm []NodeSelectorRequirement) (labels.S
 	}
 	selector := labels.NewSelector()
 	for _, expr := range nsm {
-		var op labels.Operator
+		var op selection.Operator
 		switch expr.Operator {
 		case NodeSelectorOpIn:
-			op = labels.InOperator
+			op = selection.In
 		case NodeSelectorOpNotIn:
-			op = labels.NotInOperator
+			op = selection.NotIn
 		case NodeSelectorOpExists:
-			op = labels.ExistsOperator
+			op = selection.Exists
 		case NodeSelectorOpDoesNotExist:
-			op = labels.DoesNotExistOperator
+			op = selection.DoesNotExist
 		case NodeSelectorOpGt:
-			op = labels.GreaterThanOperator
+			op = selection.GreaterThan
 		case NodeSelectorOpLt:
-			op = labels.LessThanOperator
+			op = selection.LessThan
 		default:
 			return nil, fmt.Errorf("%q is not a valid node selector operator", expr.Operator)
 		}
@@ -411,19 +410,191 @@ func NodeSelectorRequirementsAsSelector(nsm []NodeSelectorRequirement) (labels.S
 	return selector, nil
 }
 
-// AffinityAnnotationKey represents the key of affinity data (json serialized)
-// in the Annotations of a Pod.
-const AffinityAnnotationKey string = "scheduler.alpha.kubernetes.io/affinity"
+const (
+	// AffinityAnnotationKey represents the key of affinity data (json serialized)
+	// in the Annotations of a Pod.
+	AffinityAnnotationKey string = "scheduler.alpha.kubernetes.io/affinity"
+
+	// TolerationsAnnotationKey represents the key of tolerations data (json serialized)
+	// in the Annotations of a Pod.
+	TolerationsAnnotationKey string = "scheduler.alpha.kubernetes.io/tolerations"
+
+	// TaintsAnnotationKey represents the key of taints data (json serialized)
+	// in the Annotations of a Node.
+	TaintsAnnotationKey string = "scheduler.alpha.kubernetes.io/taints"
+
+	// SeccompPodAnnotationKey represents the key of a seccomp profile applied
+	// to all containers of a pod.
+	SeccompPodAnnotationKey string = "seccomp.security.alpha.kubernetes.io/pod"
+
+	// SeccompContainerAnnotationKeyPrefix represents the key of a seccomp profile applied
+	// to one container of a pod.
+	SeccompContainerAnnotationKeyPrefix string = "container.seccomp.security.alpha.kubernetes.io/"
+
+	// CreatedByAnnotation represents the key used to store the spec(json)
+	// used to create the resource.
+	CreatedByAnnotation = "kubernetes.io/created-by"
+
+	// PreferAvoidPodsAnnotationKey represents the key of preferAvoidPods data (json serialized)
+	// in the Annotations of a Node.
+	PreferAvoidPodsAnnotationKey string = "scheduler.alpha.kubernetes.io/preferAvoidPods"
+
+	// SysctlsPodAnnotationKey represents the key of sysctls which are set for the infrastructure
+	// container of a pod. The annotation value is a comma separated list of sysctl_name=value
+	// key-value pairs. Only a limited set of whitelisted and isolated sysctls is supported by
+	// the kubelet. Pods with other sysctls will fail to launch.
+	SysctlsPodAnnotationKey string = "security.alpha.kubernetes.io/sysctls"
+
+	// UnsafeSysctlsPodAnnotationKey represents the key of sysctls which are set for the infrastructure
+	// container of a pod. The annotation value is a comma separated list of sysctl_name=value
+	// key-value pairs. Unsafe sysctls must be explicitly enabled for a kubelet. They are properly
+	// namespaced to a pod or a container, but their isolation is usually unclear or weak. Their use
+	// is at-your-own-risk. Pods that attempt to set an unsafe sysctl that is not enabled for a kubelet
+	// will fail to launch.
+	UnsafeSysctlsPodAnnotationKey string = "security.alpha.kubernetes.io/unsafe-sysctls"
+)
 
 // GetAffinityFromPod gets the json serialized affinity data from Pod.Annotations
 // and converts it to the Affinity type in api.
-func GetAffinityFromPodAnnotations(annotations map[string]string) (Affinity, error) {
-	var affinity Affinity
+func GetAffinityFromPodAnnotations(annotations map[string]string) (*Affinity, error) {
 	if len(annotations) > 0 && annotations[AffinityAnnotationKey] != "" {
+		var affinity Affinity
 		err := json.Unmarshal([]byte(annotations[AffinityAnnotationKey]), &affinity)
 		if err != nil {
-			return affinity, err
+			return nil, err
+		}
+		return &affinity, nil
+	}
+	return nil, nil
+}
+
+// GetTolerationsFromPodAnnotations gets the json serialized tolerations data from Pod.Annotations
+// and converts it to the []Toleration type in api.
+func GetTolerationsFromPodAnnotations(annotations map[string]string) ([]Toleration, error) {
+	var tolerations []Toleration
+	if len(annotations) > 0 && annotations[TolerationsAnnotationKey] != "" {
+		err := json.Unmarshal([]byte(annotations[TolerationsAnnotationKey]), &tolerations)
+		if err != nil {
+			return tolerations, err
 		}
 	}
-	return affinity, nil
+	return tolerations, nil
+}
+
+// GetTaintsFromNodeAnnotations gets the json serialized taints data from Pod.Annotations
+// and converts it to the []Taint type in api.
+func GetTaintsFromNodeAnnotations(annotations map[string]string) ([]Taint, error) {
+	var taints []Taint
+	if len(annotations) > 0 && annotations[TaintsAnnotationKey] != "" {
+		err := json.Unmarshal([]byte(annotations[TaintsAnnotationKey]), &taints)
+		if err != nil {
+			return []Taint{}, err
+		}
+	}
+	return taints, nil
+}
+
+// TolerationToleratesTaint checks if the toleration tolerates the taint.
+func TolerationToleratesTaint(toleration *Toleration, taint *Taint) bool {
+	if len(toleration.Effect) != 0 && toleration.Effect != taint.Effect {
+		return false
+	}
+
+	if toleration.Key != taint.Key {
+		return false
+	}
+	// TODO: Use proper defaulting when Toleration becomes a field of PodSpec
+	if (len(toleration.Operator) == 0 || toleration.Operator == TolerationOpEqual) && toleration.Value == taint.Value {
+		return true
+	}
+	if toleration.Operator == TolerationOpExists {
+		return true
+	}
+	return false
+
+}
+
+// TaintToleratedByTolerations checks if taint is tolerated by any of the tolerations.
+func TaintToleratedByTolerations(taint *Taint, tolerations []Toleration) bool {
+	tolerated := false
+	for i := range tolerations {
+		if TolerationToleratesTaint(&tolerations[i], taint) {
+			tolerated = true
+			break
+		}
+	}
+	return tolerated
+}
+
+// MatchTaint checks if the taint matches taintToMatch. Taints are unique by key:effect,
+// if the two taints have same key:effect, regard as they match.
+func (t *Taint) MatchTaint(taintToMatch Taint) bool {
+	return t.Key == taintToMatch.Key && t.Effect == taintToMatch.Effect
+}
+
+// taint.ToString() converts taint struct to string in format key=value:effect or key:effect.
+func (t *Taint) ToString() string {
+	if len(t.Value) == 0 {
+		return fmt.Sprintf("%v:%v", t.Key, t.Effect)
+	}
+	return fmt.Sprintf("%v=%v:%v", t.Key, t.Value, t.Effect)
+}
+
+func GetAvoidPodsFromNodeAnnotations(annotations map[string]string) (AvoidPods, error) {
+	var avoidPods AvoidPods
+	if len(annotations) > 0 && annotations[PreferAvoidPodsAnnotationKey] != "" {
+		err := json.Unmarshal([]byte(annotations[PreferAvoidPodsAnnotationKey]), &avoidPods)
+		if err != nil {
+			return avoidPods, err
+		}
+	}
+	return avoidPods, nil
+}
+
+// SysctlsFromPodAnnotations parses the sysctl annotations into a slice of safe Sysctls
+// and a slice of unsafe Sysctls. This is only a convenience wrapper around
+// SysctlsFromPodAnnotation.
+func SysctlsFromPodAnnotations(a map[string]string) ([]Sysctl, []Sysctl, error) {
+	safe, err := SysctlsFromPodAnnotation(a[SysctlsPodAnnotationKey])
+	if err != nil {
+		return nil, nil, err
+	}
+	unsafe, err := SysctlsFromPodAnnotation(a[UnsafeSysctlsPodAnnotationKey])
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return safe, unsafe, nil
+}
+
+// SysctlsFromPodAnnotation parses an annotation value into a slice of Sysctls.
+func SysctlsFromPodAnnotation(annotation string) ([]Sysctl, error) {
+	if len(annotation) == 0 {
+		return nil, nil
+	}
+
+	kvs := strings.Split(annotation, ",")
+	sysctls := make([]Sysctl, len(kvs))
+	for i, kv := range kvs {
+		cs := strings.Split(kv, "=")
+		if len(cs) != 2 {
+			return nil, fmt.Errorf("sysctl %q not of the format sysctl_name=value", kv)
+		}
+		sysctls[i].Name = cs[0]
+		sysctls[i].Value = cs[1]
+	}
+	return sysctls, nil
+}
+
+// PodAnnotationsFromSysctls creates an annotation value for a slice of Sysctls.
+func PodAnnotationsFromSysctls(sysctls []Sysctl) string {
+	if len(sysctls) == 0 {
+		return ""
+	}
+
+	kvs := make([]string, len(sysctls))
+	for i := range sysctls {
+		kvs[i] = fmt.Sprintf("%s=%s", sysctls[i].Name, sysctls[i].Value)
+	}
+	return strings.Join(kvs, ",")
 }

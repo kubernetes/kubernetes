@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -162,8 +162,8 @@ func (_m *MockStatsProvider) GetNodeConfig() cm.NodeConfig {
 	return r0
 }
 
-// DockerImagesFsInfo provides a mock function with given fields:
-func (_m *MockStatsProvider) DockerImagesFsInfo() (cadvisorapiv2.FsInfo, error) {
+// ImagesFsInfo provides a mock function with given fields:
+func (_m *MockStatsProvider) ImagesFsInfo() (cadvisorapiv2.FsInfo, error) {
 	ret := _m.Called()
 
 	var r0 cadvisorapiv2.FsInfo

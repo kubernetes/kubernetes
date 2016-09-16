@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -44,7 +44,7 @@ func (namespaceStrategy) NamespaceScoped() bool {
 }
 
 // PrepareForCreate clears fields that are not allowed to be set by end users on creation.
-func (namespaceStrategy) PrepareForCreate(obj runtime.Object) {
+func (namespaceStrategy) PrepareForCreate(ctx api.Context, obj runtime.Object) {
 	// on create, status is active
 	namespace := obj.(*api.Namespace)
 	namespace.Status = api.NamespaceStatus{
@@ -69,7 +69,7 @@ func (namespaceStrategy) PrepareForCreate(obj runtime.Object) {
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
-func (namespaceStrategy) PrepareForUpdate(obj, old runtime.Object) {
+func (namespaceStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
 	newNamespace := obj.(*api.Namespace)
 	oldNamespace := old.(*api.Namespace)
 	newNamespace.Spec.Finalizers = oldNamespace.Spec.Finalizers
@@ -107,7 +107,7 @@ type namespaceStatusStrategy struct {
 
 var StatusStrategy = namespaceStatusStrategy{Strategy}
 
-func (namespaceStatusStrategy) PrepareForUpdate(obj, old runtime.Object) {
+func (namespaceStatusStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
 	newNamespace := obj.(*api.Namespace)
 	oldNamespace := old.(*api.Namespace)
 	newNamespace.Spec = oldNamespace.Spec
@@ -128,31 +128,34 @@ func (namespaceFinalizeStrategy) ValidateUpdate(ctx api.Context, obj, old runtim
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
-func (namespaceFinalizeStrategy) PrepareForUpdate(obj, old runtime.Object) {
+func (namespaceFinalizeStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
 	newNamespace := obj.(*api.Namespace)
 	oldNamespace := old.(*api.Namespace)
 	newNamespace.Status = oldNamespace.Status
 }
 
 // MatchNamespace returns a generic matcher for a given label and field selector.
-func MatchNamespace(label labels.Selector, field fields.Selector) generic.Matcher {
-	return generic.MatcherFunc(func(obj runtime.Object) (bool, error) {
-		namespaceObj, ok := obj.(*api.Namespace)
-		if !ok {
-			return false, fmt.Errorf("not a namespace")
-		}
-		fields := NamespaceToSelectableFields(namespaceObj)
-		return label.Matches(labels.Set(namespaceObj.Labels)) && field.Matches(fields), nil
-	})
+func MatchNamespace(label labels.Selector, field fields.Selector) *generic.SelectionPredicate {
+	return &generic.SelectionPredicate{
+		Label: label,
+		Field: field,
+		GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
+			namespaceObj, ok := obj.(*api.Namespace)
+			if !ok {
+				return nil, nil, fmt.Errorf("not a namespace")
+			}
+			return labels.Set(namespaceObj.Labels), NamespaceToSelectableFields(namespaceObj), nil
+		},
+	}
 }
 
-// NamespaceToSelectableFields returns a label set that represents the object
-func NamespaceToSelectableFields(namespace *api.Namespace) labels.Set {
-	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(namespace.ObjectMeta, false)
+// NamespaceToSelectableFields returns a field set that represents the object
+func NamespaceToSelectableFields(namespace *api.Namespace) fields.Set {
+	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(&namespace.ObjectMeta, false)
 	specificFieldsSet := fields.Set{
 		"status.phase": string(namespace.Status.Phase),
 		// This is a bug, but we need to support it for backward compatibility.
 		"name": namespace.Name,
 	}
-	return labels.Set(generic.MergeFieldsSets(objectMetaFieldsSet, specificFieldsSet))
+	return generic.MergeFieldsSets(objectMetaFieldsSet, specificFieldsSet)
 }

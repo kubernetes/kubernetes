@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -32,8 +32,9 @@ type genGroup struct {
 	group         string
 	version       string
 	// types in this group
-	types   []*types.Type
-	imports namer.ImportTracker
+	types        []*types.Type
+	imports      namer.ImportTracker
+	inputPacakge string
 }
 
 var _ generator.Generator = &genGroup{}
@@ -59,6 +60,7 @@ func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer
 	const pkgRESTClient = "k8s.io/kubernetes/pkg/client/restclient"
 	const pkgRegistered = "k8s.io/kubernetes/pkg/apimachinery/registered"
 	const pkgAPI = "k8s.io/kubernetes/pkg/api"
+	const pkgSerializer = "k8s.io/kubernetes/pkg/runtime/serializer"
 	apiPath := func(group string) string {
 		if group == "core" {
 			return `"/api"`
@@ -66,17 +68,20 @@ func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer
 		return `"/apis"`
 	}
 
-	canonize := func(group string) string {
-		if group == "core" {
-			return ""
-		}
-		return group
+	groupName := g.group
+	if g.group == "core" {
+		groupName = ""
+	}
+	// allow user to define a group name that's different from the one parsed from the directory.
+	p := c.Universe.Package(g.inputPacakge)
+	if override := types.ExtractCommentTags("+", p.DocComments)["groupName"]; override != nil {
+		groupName = override[0]
 	}
 
 	m := map[string]interface{}{
 		"group":                      normalization.BeforeFirstDot(g.group),
 		"Group":                      namer.IC(normalization.BeforeFirstDot(g.group)),
-		"canonicalGroup":             canonize(g.group),
+		"groupName":                  groupName,
 		"types":                      g.types,
 		"Config":                     c.Universe.Type(types.Name{Package: pkgRESTClient, Name: "Config"}),
 		"DefaultKubernetesUserAgent": c.Universe.Function(types.Name{Package: pkgRESTClient, Name: "DefaultKubernetesUserAgent"}),
@@ -86,6 +91,7 @@ func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer
 		"GroupOrDie":                 c.Universe.Variable(types.Name{Package: pkgRegistered, Name: "GroupOrDie"}),
 		"apiPath":                    apiPath(g.group),
 		"codecs":                     c.Universe.Variable(types.Name{Package: pkgAPI, Name: "Codecs"}),
+		"directCodecFactory":         c.Universe.Variable(types.Name{Package: pkgSerializer, Name: "DirectCodecFactory"}),
 		"Errorf":                     c.Universe.Variable(types.Name{Package: "fmt", Name: "Errorf"}),
 	}
 	sw.Do(groupInterfaceTemplate, m)
@@ -95,7 +101,7 @@ func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer
 			"type":  t,
 			"Group": namer.IC(normalization.BeforeFirstDot(g.group)),
 		}
-		namespaced := !(types.ExtractCommentTags("+", t.SecondClosestCommentLines)["nonNamespaced"] == "true")
+		namespaced := !extractBoolTagOrDie("nonNamespaced", t.SecondClosestCommentLines)
 		if namespaced {
 			sw.Do(getterImplNamespaced, wrapper)
 		} else {
@@ -190,7 +196,7 @@ func New(c *$.RESTClient|raw$) *$.Group$Client {
 var setInternalVersionClientDefaultsTemplate = `
 func setConfigDefaults(config *$.Config|raw$) error {
 	// if $.group$ group is not registered, return an error
-	g, err := $.latestGroup|raw$("$.canonicalGroup$")
+	g, err := $.latestGroup|raw$("$.groupName$")
 	if err != nil {
 		return err
 	}
@@ -219,7 +225,7 @@ func setConfigDefaults(config *$.Config|raw$) error {
 var setClientDefaultsTemplate = `
 func setConfigDefaults(config *$.Config|raw$) error {
 	// if $.group$ group is not registered, return an error
-	g, err := $.latestGroup|raw$("$.canonicalGroup$")
+	g, err := $.latestGroup|raw$("$.groupName$")
 	if err != nil {
 		return err
 	}
@@ -233,14 +239,8 @@ func setConfigDefaults(config *$.Config|raw$) error {
 	config.GroupVersion = &copyGroupVersion
 	//}
 
-	config.NegotiatedSerializer = $.codecs|raw$
+	config.NegotiatedSerializer = $.directCodecFactory|raw${CodecFactory: $.codecs|raw$}
 
-	if config.QPS == 0 {
-		config.QPS = 5
-	}
-	if config.Burst == 0 {
-		config.Burst = 10
-	}
 	return nil
 }
 `

@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -30,7 +30,7 @@ const (
 
 	// TODO: to be de!eted after v1.3 is released. PodSpec has a dedicated Subdomain field.
 	// The annotation value is a string specifying the subdomain e.g. "my-web-service"
-	// If specified, on the the pod itself, "<hostname>.my-web-service.<namespace>.svc.<cluster domain>" would resolve to
+	// If specified, on the pod itself, "<hostname>.my-web-service.<namespace>.svc.<cluster domain>" would resolve to
 	// the pod's IP.
 	// If there is a headless service named "my-web-service" in the same namespace as the pod, then,
 	// <hostname>.my-web-service.<namespace>.svc.<cluster domain>" would be resolved by the cluster DNS Server.

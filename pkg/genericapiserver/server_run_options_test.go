@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/genericapiserver/options"
 )
 
 func TestGenerateStorageVersionMap(t *testing.T) {
@@ -66,10 +67,9 @@ func TestGenerateStorageVersionMap(t *testing.T) {
 		},
 	}
 	for i, test := range testCases {
-		s := ServerRunOptions{
-			DeprecatedStorageVersion: test.legacyVersion,
-			StorageVersions:          test.storageVersions,
-			DefaultStorageVersions:   test.defaultVersions,
+		s := options.ServerRunOptions{
+			StorageVersions:        test.storageVersions,
+			DefaultStorageVersions: test.defaultVersions,
 		}
 		output, err := s.StorageGroupsToEncodingVersion()
 		if err != nil {

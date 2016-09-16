@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -85,14 +85,8 @@ func podResources(pod *api.Pod, resourceName api.ResourceName, def, min resource
 		}
 
 		// add up the request and limit sum for all containers
-		err = requestSum.Add(request)
-		if err != nil {
-			return
-		}
-		err = limitSum.Add(limit)
-		if err != nil {
-			return
-		}
+		requestSum.Add(request)
+		limitSum.Add(limit)
 
 		// optionally write request and limit back
 		if write {

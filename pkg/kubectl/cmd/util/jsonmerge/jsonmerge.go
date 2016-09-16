@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -67,7 +67,7 @@ func RequireKeyUnchanged(key string) PreconditionFunc {
 	}
 }
 
-// RequireKeyUnchanged creates a precondition function that fails
+// RequireMetadataKeyUnchanged creates a precondition function that fails
 // if the metadata.key is present in the diff (indicating its value
 // has changed).
 func RequireMetadataKeyUnchanged(key string) PreconditionFunc {

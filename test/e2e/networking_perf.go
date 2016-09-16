@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -51,7 +51,7 @@ func runClientServerBandwidthMeasurement(f *framework.Framework, numClient int, 
 	numServer := 1
 
 	It(fmt.Sprintf("should transfer ~ 1GB onto the service endpoint %v servers (maximum of %v clients)", numServer, numClient), func() {
-		nodes := framework.ListSchedulableNodesOrDie(f.Client)
+		nodes := framework.GetReadySchedulableNodesOrDie(f.Client)
 		totalPods := len(nodes.Items)
 		// for a single service, we expect to divide bandwidth between the network.  Very crude estimate.
 		expectedBandwidth := int(float64(maxBandwidthBits) / float64(totalPods))
@@ -112,8 +112,7 @@ func runClientServerBandwidthMeasurement(f *framework.Framework, numClient int, 
 
 		// Calculate expected number of clients based on total nodes.
 		expectedCli := func() int {
-			nodes, err := framework.GetReadyNodes(f)
-			framework.ExpectNoError(err)
+			nodes := framework.GetReadySchedulableNodesOrDie(f.Client)
 			return int(math.Min(float64(len(nodes.Items)), float64(numClient)))
 		}()
 

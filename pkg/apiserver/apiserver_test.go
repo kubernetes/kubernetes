@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -120,7 +120,7 @@ func newMapper() *meta.DefaultRESTMapper {
 
 func addGrouplessTypes() {
 	type ListOptions struct {
-		runtime.Object
+		Object               runtime.Object
 		unversioned.TypeMeta `json:",inline"`
 		LabelSelector        string `json:"labelSelector,omitempty"`
 		FieldSelector        string `json:"fieldSelector,omitempty"`
@@ -131,7 +131,6 @@ func addGrouplessTypes() {
 	api.Scheme.AddKnownTypes(grouplessGroupVersion,
 		&apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &ListOptions{},
 		&api.DeleteOptions{}, &apiservertesting.SimpleGetOptions{}, &apiservertesting.SimpleRoot{})
-	api.Scheme.AddKnownTypes(grouplessGroupVersion, &api.Pod{})
 	api.Scheme.AddKnownTypes(grouplessInternalGroupVersion,
 		&apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &api.ListOptions{},
 		&apiservertesting.SimpleGetOptions{}, &apiservertesting.SimpleRoot{})
@@ -139,7 +138,7 @@ func addGrouplessTypes() {
 
 func addTestTypes() {
 	type ListOptions struct {
-		runtime.Object
+		Object               runtime.Object
 		unversioned.TypeMeta `json:",inline"`
 		LabelSelector        string `json:"labelSelector,omitempty"`
 		FieldSelector        string `json:"fieldSelector,omitempty"`
@@ -167,7 +166,7 @@ func addTestTypes() {
 
 func addNewTestTypes() {
 	type ListOptions struct {
-		runtime.Object
+		Object               runtime.Object
 		unversioned.TypeMeta `json:",inline"`
 		LabelSelector        string `json:"labelSelector,omitempty"`
 		FieldSelector        string `json:"fieldSelector,omitempty"`
@@ -271,6 +270,7 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 
 		Creater:   api.Scheme,
 		Convertor: api.Scheme,
+		Copier:    api.Scheme,
 		Typer:     api.Scheme,
 		Linker:    selfLinker,
 		Mapper:    namespaceMapper,
@@ -502,13 +502,16 @@ func (storage *SimpleRESTStorage) Create(ctx api.Context, obj runtime.Object) (r
 	return obj, err
 }
 
-func (storage *SimpleRESTStorage) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error) {
+func (storage *SimpleRESTStorage) Update(ctx api.Context, name string, objInfo rest.UpdatedObjectInfo) (runtime.Object, bool, error) {
 	storage.checkContext(ctx)
+	obj, err := objInfo.UpdatedObject(ctx, &storage.item)
+	if err != nil {
+		return nil, false, err
+	}
 	storage.updated = obj.(*apiservertesting.Simple)
 	if err := storage.errors["update"]; err != nil {
 		return nil, false, err
 	}
-	var err error
 	if storage.injectedFunction != nil {
 		obj, err = storage.injectedFunction(obj)
 	}
@@ -1097,6 +1100,29 @@ func TestList(t *testing.T) {
 	}
 }
 
+func TestLogs(t *testing.T) {
+	handler := handle(map[string]rest.Storage{})
+	server := httptest.NewServer(handler)
+	defer server.Close()
+	client := http.Client{}
+
+	request, err := http.NewRequest("GET", server.URL+"/logs", nil)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	response, err := client.Do(request)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	body, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	t.Logf("Data: %s", string(body))
+}
+
 func TestErrorList(t *testing.T) {
 	storage := map[string]rest.Storage{}
 	simpleStorage := SimpleRESTStorage{
@@ -1562,6 +1588,7 @@ func TestGetNamespaceSelfLink(t *testing.T) {
 		t.Errorf("Never set self link")
 	}
 }
+
 func TestGetMissing(t *testing.T) {
 	storage := map[string]rest.Storage{}
 	simpleStorage := SimpleRESTStorage{
@@ -1572,13 +1599,35 @@ func TestGetMissing(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	resp, err := http.Get(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simple/id")
+	resp, err := http.Get(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/id")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 
 	if resp.StatusCode != http.StatusNotFound {
 		t.Errorf("Unexpected response %#v", resp)
+	}
+}
+
+func TestGetRetryAfter(t *testing.T) {
+	storage := map[string]rest.Storage{}
+	simpleStorage := SimpleRESTStorage{
+		errors: map[string]error{"get": apierrs.NewServerTimeout(api.Resource("simples"), "id", 2)},
+	}
+	storage["simple"] = &simpleStorage
+	handler := handle(storage)
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	resp, err := http.Get(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/id")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if resp.StatusCode != http.StatusInternalServerError {
+		t.Errorf("Unexpected response %#v", resp)
+	}
+	if resp.Header.Get("Retry-After") != "2" {
+		t.Errorf("Unexpected Retry-After header: %v", resp.Header)
 	}
 }
 
@@ -1885,6 +1934,7 @@ func TestDeleteWithOptions(t *testing.T) {
 	if simpleStorage.deleted != ID {
 		t.Errorf("Unexpected delete: %s, expected %s", simpleStorage.deleted, ID)
 	}
+	simpleStorage.deleteOptions.GetObjectKind().SetGroupVersionKind(unversioned.GroupVersionKind{})
 	if !api.Semantic.DeepEqual(simpleStorage.deleteOptions, item) {
 		t.Errorf("unexpected delete options: %s", diff.ObjectDiff(simpleStorage.deleteOptions, item))
 	}
@@ -1999,6 +2049,7 @@ func TestPatch(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{
 			Name:      ID,
 			Namespace: "", // update should allow the client to send an empty namespace
+			UID:       "uid",
 		},
 		Other: "bar",
 	}
@@ -2037,6 +2088,7 @@ func TestPatchRequiresMatchingName(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{
 			Name:      ID,
 			Namespace: "", // update should allow the client to send an empty namespace
+			UID:       "uid",
 		},
 		Other: "bar",
 	}
@@ -2343,7 +2395,7 @@ func TestCreateChecksDecode(t *testing.T) {
 	client := http.Client{}
 
 	simple := &api.Pod{}
-	data, err := runtime.Encode(codec, simple, testGroupVersion)
+	data, err := runtime.Encode(testCodec, simple)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -2376,6 +2428,7 @@ func TestUpdateREST(t *testing.T) {
 			RequestInfoResolver: newTestRequestInfoResolver(),
 			Creater:             api.Scheme,
 			Convertor:           api.Scheme,
+			Copier:              api.Scheme,
 			Typer:               api.Scheme,
 			Linker:              selfLinker,
 
@@ -2460,6 +2513,7 @@ func TestParentResourceIsRequired(t *testing.T) {
 		RequestInfoResolver: newTestRequestInfoResolver(),
 		Creater:             api.Scheme,
 		Convertor:           api.Scheme,
+		Copier:              api.Scheme,
 		Typer:               api.Scheme,
 		Linker:              selfLinker,
 
@@ -2491,6 +2545,7 @@ func TestParentResourceIsRequired(t *testing.T) {
 		RequestInfoResolver: newTestRequestInfoResolver(),
 		Creater:             api.Scheme,
 		Convertor:           api.Scheme,
+		Copier:              api.Scheme,
 		Typer:               api.Scheme,
 		Linker:              selfLinker,
 
@@ -2566,7 +2621,7 @@ func TestUpdateChecksDecode(t *testing.T) {
 	client := http.Client{}
 
 	simple := &api.Pod{}
-	data, err := runtime.Encode(codec, simple, testGroupVersion)
+	data, err := runtime.Encode(testCodec, simple)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -2669,6 +2724,7 @@ func TestCreate(t *testing.T) {
 		t.Errorf("unexpected error: %v %#v", err, response)
 	}
 
+	itemOut.GetObjectKind().SetGroupVersionKind(unversioned.GroupVersionKind{})
 	if !reflect.DeepEqual(&itemOut, simple) {
 		t.Errorf("Unexpected data: %#v, expected %#v (%s)", itemOut, simple, string(body))
 	}
@@ -2738,6 +2794,7 @@ func TestCreateYAML(t *testing.T) {
 		t.Fatalf("unexpected error: %v %#v", err, response)
 	}
 
+	itemOut.GetObjectKind().SetGroupVersionKind(unversioned.GroupVersionKind{})
 	if !reflect.DeepEqual(&itemOut, simple) {
 		t.Errorf("Unexpected data: %#v, expected %#v (%s)", itemOut, simple, string(body))
 	}
@@ -2796,6 +2853,7 @@ func TestCreateInNamespace(t *testing.T) {
 		t.Fatalf("unexpected error: %v\n%s", err, data)
 	}
 
+	itemOut.GetObjectKind().SetGroupVersionKind(unversioned.GroupVersionKind{})
 	if !reflect.DeepEqual(&itemOut, simple) {
 		t.Errorf("Unexpected data: %#v, expected %#v (%s)", itemOut, simple, string(body))
 	}
@@ -3188,6 +3246,7 @@ func TestXGSubresource(t *testing.T) {
 
 		Creater:   api.Scheme,
 		Convertor: api.Scheme,
+		Copier:    api.Scheme,
 		Typer:     api.Scheme,
 		Linker:    selfLinker,
 		Mapper:    namespaceMapper,
@@ -3259,4 +3318,47 @@ func readBodyOrDie(r io.Reader) []byte {
 		panic(err)
 	}
 	return body
+}
+
+// BenchmarkUpdateProtobuf measures the cost of processing an update on the server in proto
+func BenchmarkUpdateProtobuf(b *testing.B) {
+	items := benchmarkItems()
+
+	simpleStorage := &SimpleRESTStorage{}
+	handler := handle(map[string]rest.Storage{"simples": simpleStorage})
+	server := httptest.NewServer(handler)
+	defer server.Close()
+	client := http.Client{}
+
+	dest, _ := url.Parse(server.URL)
+	dest.Path = "/" + prefix + "/" + newGroupVersion.Group + "/" + newGroupVersion.Version + "/namespaces/foo/simples/bar"
+	dest.RawQuery = ""
+
+	info, _ := api.Codecs.SerializerForMediaType("application/vnd.kubernetes.protobuf", nil)
+	e := api.Codecs.EncoderForVersion(info.Serializer, newGroupVersion)
+	data, err := runtime.Encode(e, &items[0])
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		request, err := http.NewRequest("PUT", dest.String(), bytes.NewReader(data))
+		if err != nil {
+			b.Fatalf("unexpected error: %v", err)
+		}
+		request.Header.Set("Accept", "application/vnd.kubernetes.protobuf")
+		request.Header.Set("Content-Type", "application/vnd.kubernetes.protobuf")
+		response, err := client.Do(request)
+		if err != nil {
+			b.Fatalf("unexpected error: %v", err)
+		}
+		if response.StatusCode != http.StatusBadRequest {
+			body, _ := ioutil.ReadAll(response.Body)
+			b.Fatalf("Unexpected response %#v\n%s", response, body)
+		}
+		_, _ = ioutil.ReadAll(response.Body)
+		response.Body.Close()
+	}
+	b.StopTimer()
 }

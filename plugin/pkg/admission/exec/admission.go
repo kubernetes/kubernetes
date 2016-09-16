@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -92,15 +92,15 @@ func (d *denyExec) Admit(a admission.Attributes) (err error) {
 	}
 
 	if d.hostPID && pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.HostPID {
-		return admission.NewForbidden(a, fmt.Errorf("Cannot exec into or attach to a container using host pid"))
+		return admission.NewForbidden(a, fmt.Errorf("cannot exec into or attach to a container using host pid"))
 	}
 
 	if d.hostIPC && pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.HostIPC {
-		return admission.NewForbidden(a, fmt.Errorf("Cannot exec into or attach to a container using host ipc"))
+		return admission.NewForbidden(a, fmt.Errorf("cannot exec into or attach to a container using host ipc"))
 	}
 
 	if d.privileged && isPrivileged(pod) {
-		return admission.NewForbidden(a, fmt.Errorf("Cannot exec into or attach to a privileged container"))
+		return admission.NewForbidden(a, fmt.Errorf("cannot exec into or attach to a privileged container"))
 	}
 
 	return nil
@@ -108,6 +108,14 @@ func (d *denyExec) Admit(a admission.Attributes) (err error) {
 
 // isPrivileged will return true a pod has any privileged containers
 func isPrivileged(pod *api.Pod) bool {
+	for _, c := range pod.Spec.InitContainers {
+		if c.SecurityContext == nil {
+			continue
+		}
+		if *c.SecurityContext.Privileged {
+			return true
+		}
+	}
 	for _, c := range pod.Spec.Containers {
 		if c.SecurityContext == nil {
 			continue

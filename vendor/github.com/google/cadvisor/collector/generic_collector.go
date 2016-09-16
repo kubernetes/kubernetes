@@ -24,6 +24,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/cadvisor/container"
 	"github.com/google/cadvisor/info/v1"
 )
 
@@ -36,6 +37,9 @@ type GenericCollector struct {
 
 	//holds information necessary to extract metrics
 	info *collectorInfo
+
+	// The Http client to use when connecting to metric endpoints
+	httpClient *http.Client
 }
 
 type collectorInfo struct {
@@ -51,12 +55,14 @@ type collectorInfo struct {
 }
 
 //Returns a new collector using the information extracted from the configfile
-func NewCollector(collectorName string, configFile []byte, metricCountLimit int) (*GenericCollector, error) {
+func NewCollector(collectorName string, configFile []byte, metricCountLimit int, containerHandler container.ContainerHandler, httpClient *http.Client) (*GenericCollector, error) {
 	var configInJSON Config
 	err := json.Unmarshal(configFile, &configInJSON)
 	if err != nil {
 		return nil, err
 	}
+
+	configInJSON.Endpoint.configure(containerHandler)
 
 	//TODO : Add checks for validity of config file (eg : Accurate JSON fields)
 
@@ -99,6 +105,7 @@ func NewCollector(collectorName string, configFile []byte, metricCountLimit int)
 			regexps:             regexprs,
 			metricCountLimit:    metricCountLimit,
 		},
+		httpClient: httpClient,
 	}, nil
 }
 
@@ -130,8 +137,8 @@ func (collector *GenericCollector) Collect(metrics map[string][]v1.MetricVal) (t
 	currentTime := time.Now()
 	nextCollectionTime := currentTime.Add(time.Duration(collector.info.minPollingFrequency))
 
-	uri := collector.configFile.Endpoint
-	response, err := http.Get(uri)
+	uri := collector.configFile.Endpoint.URL
+	response, err := collector.httpClient.Get(uri)
 	if err != nil {
 		return nextCollectionTime, nil, err
 	}

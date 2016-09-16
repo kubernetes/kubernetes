@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -35,7 +35,7 @@ const mb = 1024 * 1024
 type diskSpaceManager interface {
 	// Checks the available disk space
 	IsRootDiskSpaceAvailable() (bool, error)
-	IsDockerDiskSpaceAvailable() (bool, error)
+	IsRuntimeDiskSpaceAvailable() (bool, error)
 }
 
 type DiskSpacePolicy struct {
@@ -83,8 +83,8 @@ func (dm *realDiskSpaceManager) getFsInfo(fsType string, f func() (cadvisorapi.F
 	return fsi, nil
 }
 
-func (dm *realDiskSpaceManager) IsDockerDiskSpaceAvailable() (bool, error) {
-	return dm.isSpaceAvailable("docker", dm.policy.DockerFreeDiskMB, dm.cadvisor.DockerImagesFsInfo)
+func (dm *realDiskSpaceManager) IsRuntimeDiskSpaceAvailable() (bool, error) {
+	return dm.isSpaceAvailable("runtime", dm.policy.DockerFreeDiskMB, dm.cadvisor.ImagesFsInfo)
 }
 
 func (dm *realDiskSpaceManager) IsRootDiskSpaceAvailable() (bool, error) {

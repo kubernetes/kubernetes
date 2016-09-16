@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -43,7 +43,7 @@ func (persistentvolumeStrategy) NamespaceScoped() bool {
 }
 
 // ResetBeforeCreate clears the Status field which is not allowed to be set by end users on creation.
-func (persistentvolumeStrategy) PrepareForCreate(obj runtime.Object) {
+func (persistentvolumeStrategy) PrepareForCreate(ctx api.Context, obj runtime.Object) {
 	pv := obj.(*api.PersistentVolume)
 	pv.Status = api.PersistentVolumeStatus{}
 }
@@ -62,7 +62,7 @@ func (persistentvolumeStrategy) AllowCreateOnUpdate() bool {
 }
 
 // PrepareForUpdate sets the Status fields which is not allowed to be set by an end user updating a PV
-func (persistentvolumeStrategy) PrepareForUpdate(obj, old runtime.Object) {
+func (persistentvolumeStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
 	newPv := obj.(*api.PersistentVolume)
 	oldPv := old.(*api.PersistentVolume)
 	newPv.Status = oldPv.Status
@@ -84,7 +84,7 @@ type persistentvolumeStatusStrategy struct {
 var StatusStrategy = persistentvolumeStatusStrategy{Strategy}
 
 // PrepareForUpdate sets the Spec field which is not allowed to be changed when updating a PV's Status
-func (persistentvolumeStatusStrategy) PrepareForUpdate(obj, old runtime.Object) {
+func (persistentvolumeStatusStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
 	newPv := obj.(*api.PersistentVolume)
 	oldPv := old.(*api.PersistentVolume)
 	newPv.Spec = oldPv.Spec
@@ -95,23 +95,26 @@ func (persistentvolumeStatusStrategy) ValidateUpdate(ctx api.Context, obj, old r
 }
 
 // MatchPersistentVolume returns a generic matcher for a given label and field selector.
-func MatchPersistentVolumes(label labels.Selector, field fields.Selector) generic.Matcher {
-	return generic.MatcherFunc(func(obj runtime.Object) (bool, error) {
-		persistentvolumeObj, ok := obj.(*api.PersistentVolume)
-		if !ok {
-			return false, fmt.Errorf("not a persistentvolume")
-		}
-		fields := PersistentVolumeToSelectableFields(persistentvolumeObj)
-		return label.Matches(labels.Set(persistentvolumeObj.Labels)) && field.Matches(fields), nil
-	})
+func MatchPersistentVolumes(label labels.Selector, field fields.Selector) *generic.SelectionPredicate {
+	return &generic.SelectionPredicate{
+		Label: label,
+		Field: field,
+		GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
+			persistentvolumeObj, ok := obj.(*api.PersistentVolume)
+			if !ok {
+				return nil, nil, fmt.Errorf("not a persistentvolume")
+			}
+			return labels.Set(persistentvolumeObj.Labels), PersistentVolumeToSelectableFields(persistentvolumeObj), nil
+		},
+	}
 }
 
-// PersistentVolumeToSelectableFields returns a label set that represents the object
-func PersistentVolumeToSelectableFields(persistentvolume *api.PersistentVolume) labels.Set {
-	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(persistentvolume.ObjectMeta, false)
+// PersistentVolumeToSelectableFields returns a field set that represents the object
+func PersistentVolumeToSelectableFields(persistentvolume *api.PersistentVolume) fields.Set {
+	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(&persistentvolume.ObjectMeta, false)
 	specificFieldsSet := fields.Set{
 		// This is a bug, but we need to support it for backward compatibility.
 		"name": persistentvolume.Name,
 	}
-	return labels.Set(generic.MergeFieldsSets(objectMetaFieldsSet, specificFieldsSet))
+	return generic.MergeFieldsSets(objectMetaFieldsSet, specificFieldsSet)
 }

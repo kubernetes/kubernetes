@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,10 +22,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
-func ValidateClusterName(name string, prefix bool) (bool, string) {
-	return validation.NameIsDNSSubdomain(name, prefix)
-}
-
 func ValidateClusterSpec(spec *federation.ClusterSpec, fieldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	// address is required.
@@ -36,7 +32,7 @@ func ValidateClusterSpec(spec *federation.ClusterSpec, fieldPath *field.Path) fi
 }
 
 func ValidateCluster(cluster *federation.Cluster) field.ErrorList {
-	allErrs := validation.ValidateObjectMeta(&cluster.ObjectMeta, false, ValidateClusterName, field.NewPath("metadata"))
+	allErrs := validation.ValidateObjectMeta(&cluster.ObjectMeta, false, validation.ValidateClusterName, field.NewPath("metadata"))
 	allErrs = append(allErrs, ValidateClusterSpec(&cluster.Spec, field.NewPath("spec"))...)
 	return allErrs
 }

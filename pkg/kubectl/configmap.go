@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,8 +24,8 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util/validation"
 )
 
 // ConfigMapGeneratorV1 supports stable generation of a configMap.
@@ -199,10 +199,9 @@ func addKeyFromFileToConfigMap(configMap *api.ConfigMap, keyName, filePath strin
 // addKeyFromLiteralToConfigMap adds the given key and data to the given config map,
 // returning an error if the key is not valid or if the key already exists.
 func addKeyFromLiteralToConfigMap(configMap *api.ConfigMap, keyName, data string) error {
-	// Note, the rules for ConfigMap keys are the exact same as the ones for SecretKeys
-	// to be consistent; validation.IsSecretKey is used here intentionally.
-	if !validation.IsSecretKey(keyName) {
-		return fmt.Errorf("%v is not a valid key name for a configMap", keyName)
+	// Note, the rules for ConfigMap keys are the exact same as the ones for SecretKeys.
+	if errs := validation.IsConfigMapKey(keyName); len(errs) != 0 {
+		return fmt.Errorf("%q is not a valid key name for a ConfigMap: %s", keyName, strings.Join(errs, ";"))
 	}
 	if _, entryExists := configMap.Data[keyName]; entryExists {
 		return fmt.Errorf("cannot add key %s, another key by that name already exists: %v.", keyName, configMap.Data)

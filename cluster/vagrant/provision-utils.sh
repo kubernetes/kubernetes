@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 The Kubernetes Authors All rights reserved.
+# Copyright 2015 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,15 +14,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+function enable-accounting() {
+  mkdir -p /etc/systemd/system.conf.d/
+  cat <<EOF >/etc/systemd/system.conf.d/kubernetes-accounting.conf
+[Manager]
+DefaultCPUAccounting=yes
+DefaultMemoryAccounting=yes  
+EOF
+  systemctl daemon-reload
+}
+
 function prepare-package-manager() {
   echo "Prepare package manager"
 
   # Useful if a mirror is broken or slow
-  echo "fastestmirror=True" >> /etc/dnf/dnf.conf
-
-  # In Fedora 23, installed version does not work with Salt
-  # Cf. https://github.com/saltstack/salt/issues/31001
-  dnf update -y dnf dnf-plugins-core
+  if [ -z "$CUSTOM_FEDORA_REPOSITORY_URL" ]; then
+      echo "fastestmirror=True" >> /etc/dnf/dnf.conf
+  else
+      # remove trailing slash from URL if it's present
+      CUSTOM_FEDORA_REPOSITORY_URL="${CUSTOM_FEDORA_REPOSITORY_URL%/}"
+      sed -i -e "/^metalink=/d" /etc/yum.repos.d/*.repo
+      sed -i -e "s@^#baseurl=http://download.fedoraproject.org/pub/fedora@baseurl=$CUSTOM_FEDORA_REPOSITORY_URL@" /etc/yum.repos.d/*.repo
+  fi
 }
 
 
@@ -53,6 +66,7 @@ enable_cluster_dns: '$(echo "$ENABLE_CLUSTER_DNS" | sed -e "s/'/''/g")'
 dns_replicas: '$(echo "$DNS_REPLICAS" | sed -e "s/'/''/g")'
 dns_server: '$(echo "$DNS_SERVER_IP" | sed -e "s/'/''/g")'
 dns_domain: '$(echo "$DNS_DOMAIN" | sed -e "s/'/''/g")'
+federations_domain_map: ''
 instance_prefix: '$(echo "$INSTANCE_PREFIX" | sed -e "s/'/''/g")'
 admission_control: '$(echo "$ADMISSION_CONTROL" | sed -e "s/'/''/g")'
 enable_cpu_cfs_quota: '$(echo "$ENABLE_CPU_CFS_QUOTA" | sed -e "s/'/''/g")'
@@ -63,6 +77,12 @@ opencontrail_kubernetes_tag: '$(echo "$OPENCONTRAIL_KUBERNETES_TAG" | sed -e "s/
 opencontrail_public_subnet: '$(echo "$OPENCONTRAIL_PUBLIC_SUBNET" | sed -e "s/'/''/g")'
 e2e_storage_test_environment: '$(echo "$E2E_STORAGE_TEST_ENVIRONMENT" | sed -e "s/'/''/g")'
 EOF
+
+if [ -n "${EVICTION_HARD:-}" ]; then
+  cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
+eviction_hard: '$(echo "${EVICTION_HARD}" | sed -e "s/'/''/g")'
+EOF
+fi
 
   cat <<EOF >/etc/salt/minion.d/log-level-debug.conf
 log_level: warning
@@ -83,7 +103,17 @@ grains:
   docker_opts: '$(echo "$DOCKER_OPTS" | sed -e "s/'/''/g")'
   master_extra_sans: '$(echo "$MASTER_EXTRA_SANS" | sed -e "s/'/''/g")'
   keep_host_etcd: true
+  kube_user: '$(echo "$KUBE_USER" | sed -e "s/'/''/g")'
 EOF
+}
+
+function release_not_found() {
+  echo "It looks as if you don't have a compiled version of Kubernetes.  If you" >&2
+  echo "are running from a clone of the git repo, please run 'make quick-release'." >&2
+  echo "Note that this requires having Docker installed.  If you are running " >&2
+  echo "from a release tarball, something is wrong.  Look at " >&2
+  echo "http://kubernetes.io/ for information on how to contact the development team for help." >&2
+  exit 1
 }
 
 function install-salt() {
@@ -113,8 +143,10 @@ function install-salt() {
   popd
 
   if ! which salt-call >/dev/null 2>&1; then
-    # Install salt binaries
-    curl -sS -L --connect-timeout 20 --retry 6 --retry-delay 10 https://bootstrap.saltstack.com | sh -s
+    # Install salt from official repositories.
+    # Need to enable testing-repos to get version of salt with fix for dnf-core-plugins
+    dnf config-manager --set-enabled updates-testing
+    dnf install -y salt-minion
 
     # Fedora >= 23 includes salt packages but the bootstrap is
     # creating configuration for a (non-existent) salt repo anyway.

@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -99,7 +99,7 @@ func ClusterLevelLoggingWithElasticsearch(f *framework.Framework) {
 	pods, err := f.Client.Pods(api.NamespaceSystem).List(options)
 	Expect(err).NotTo(HaveOccurred())
 	for _, pod := range pods.Items {
-		err = framework.WaitForPodRunningInNamespace(f.Client, pod.Name, api.NamespaceSystem)
+		err = framework.WaitForPodRunningInNamespace(f.Client, &pod)
 		Expect(err).NotTo(HaveOccurred())
 	}
 
@@ -201,7 +201,7 @@ func ClusterLevelLoggingWithElasticsearch(f *framework.Framework) {
 	}
 
 	// Obtain a list of nodes so we can place one synthetic logger on each node.
-	nodes := framework.ListSchedulableNodesOrDie(f.Client)
+	nodes := framework.GetReadySchedulableNodesOrDie(f.Client)
 	nodeCount := len(nodes.Items)
 	if nodeCount == 0 {
 		framework.Failf("Failed to find any nodes")
@@ -227,7 +227,7 @@ func ClusterLevelLoggingWithElasticsearch(f *framework.Framework) {
 	Expect(err).NotTo(HaveOccurred())
 	for _, pod := range fluentdPods.Items {
 		if nodeInNodeList(pod.Spec.NodeName, nodes) {
-			err = framework.WaitForPodRunningInNamespace(f.Client, pod.Name, api.NamespaceSystem)
+			err = framework.WaitForPodRunningInNamespace(f.Client, &pod)
 			Expect(err).NotTo(HaveOccurred())
 		}
 	}

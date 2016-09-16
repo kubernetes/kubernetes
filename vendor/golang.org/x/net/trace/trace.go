@@ -93,13 +93,17 @@ var DebugUseAfterFinish = false
 //
 // AuthRequest may be replaced by a program to customise its authorisation requirements.
 //
-// The default AuthRequest function returns (true, true) iff the request comes from localhost/127.0.0.1/[::1].
+// The default AuthRequest function returns (true, true) if and only if the request
+// comes from localhost/127.0.0.1/[::1].
 var AuthRequest = func(req *http.Request) (any, sensitive bool) {
+	// RemoteAddr is commonly in the form "IP" or "IP:port".
+	// If it is in the form "IP:port", split off the port.
 	host, _, err := net.SplitHostPort(req.RemoteAddr)
-	switch {
-	case err != nil: // Badly formed address; fail closed.
-		return false, false
-	case host == "localhost" || host == "127.0.0.1" || host == "::1":
+	if err != nil {
+		host = req.RemoteAddr
+	}
+	switch host {
+	case "localhost", "127.0.0.1", "::1":
 		return true, true
 	default:
 		return false, false
@@ -113,6 +117,7 @@ func init() {
 			http.Error(w, "not allowed", http.StatusUnauthorized)
 			return
 		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		Render(w, req, sensitive)
 	})
 	http.HandleFunc("/debug/events", func(w http.ResponseWriter, req *http.Request) {
@@ -121,6 +126,7 @@ func init() {
 			http.Error(w, "not allowed", http.StatusUnauthorized)
 			return
 		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		RenderEvents(w, req, sensitive)
 	})
 }
@@ -172,7 +178,7 @@ func Render(w io.Writer, req *http.Request, sensitive bool) {
 
 	completedMu.RLock()
 	data.Families = make([]string, 0, len(completedTraces))
-	for fam, _ := range completedTraces {
+	for fam := range completedTraces {
 		data.Families = append(data.Families, fam)
 	}
 	completedMu.RUnlock()

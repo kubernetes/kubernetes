@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 The Kubernetes Authors All rights reserved.
+# Copyright 2015 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -38,7 +38,7 @@ function build-local() {
     # This used to build the kubernetes project. Now it rebuilds the charm(s)
     # living in `cluster/juju/layers`
 
-    charm build -o $JUJU_REPOSITORY -s trusty ${JUJU_PATH}/layers/kubernetes
+    charm build ${JUJU_PATH}/layers/kubernetes -o $JUJU_REPOSITORY -r --no-local-layers
 }
 
 function detect-master() {
@@ -54,7 +54,7 @@ function detect-master() {
 function detect-nodes() {
     # Run the Juju command that gets the minion private IP addresses.
     local ipoutput
-    ipoutput=$(juju run --service kubernetes "unit-get private-address" --format=json)
+    ipoutput=$(juju run --application kubernetes "unit-get private-address" --format=json)
     # [
     # {"MachineId":"2","Stdout":"192.168.122.188\n","UnitId":"kubernetes/0"},
     # {"MachineId":"3","Stdout":"192.168.122.166\n","UnitId":"kubernetes/1"}
@@ -68,6 +68,9 @@ function detect-nodes() {
 
 function kube-up() {
     build-local
+
+    # Replace the charm directory in the bundle.
+    sed "s|__CHARM_DIR__|${JUJU_REPOSITORY}|" < ${KUBE_BUNDLE_PATH}.base > ${KUBE_BUNDLE_PATH}
 
     # The juju-deployer command will deploy the bundle and can be run
     # multiple times to continue deploying the parts that fail.
@@ -88,7 +91,7 @@ function kube-up() {
       tar xfz ${KUBECTL_DIR}/kubectl_package.tar.gz -C ${KUBECTL_DIR}
     )
     # Export the location of the kubectl configuration file.
-    export KUBECONFIG="${KUBECTL_DIR}/config"
+    export KUBECONFIG="${KUBECTL_DIR}/kubeconfig"
 }
 
 function kube-down() {
@@ -117,7 +120,7 @@ function sleep-status() {
 
     while [[ $i < $maxtime && -z $jujustatus ]]; do
       sleep 15
-      i+=15
+      i=$((i + 15))
       jujustatus=$(${JUJU_PATH}/identify-leaders.py)
       export KUBE_MASTER_NAME=${jujustatus}
     done

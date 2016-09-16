@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,8 +21,8 @@ import (
 )
 
 var (
-	NoSuchPodErr               = errors.New("No such pod exists")
-	NoSuchTaskErr              = errors.New("No such task exists")
+	NoSuchPodErr               = errors.New("no such pod exists")
+	NoSuchTaskErr              = errors.New("no such task exists")
 	ReconciliationCancelledErr = errors.New("explicit task reconciliation cancelled")
-	NoSuitableOffersErr        = errors.New("No suitable offers for pod/task")
+	NoSuitableOffersErr        = errors.New("no suitable offers for pod/task")
 )

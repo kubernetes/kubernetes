@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,7 +24,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
@@ -32,7 +31,7 @@ func TestSelectableFieldLabelConversions(t *testing.T) {
 	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
 		testapi.Extensions.GroupVersion().String(),
 		"Deployment",
-		labels.Set(DeploymentToSelectableFields(&extensions.Deployment{})),
+		DeploymentToSelectableFields(&extensions.Deployment{}),
 		nil,
 	)
 }
@@ -56,7 +55,7 @@ func TestStatusUpdates(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		deploymentStatusStrategy{}.PrepareForUpdate(test.obj, test.old)
+		deploymentStatusStrategy{}.PrepareForUpdate(api.NewContext(), test.obj, test.old)
 		if !reflect.DeepEqual(test.expected, test.obj) {
 			t.Errorf("Unexpected object mismatch! Expected:\n%#v\ngot:\n%#v", test.expected, test.obj)
 		}

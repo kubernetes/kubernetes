@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -38,6 +38,7 @@ type ReplicationControllerInterface interface {
 	Get(name string) (*v1.ReplicationController, error)
 	List(opts api.ListOptions) (*v1.ReplicationControllerList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
+	Patch(name string, pt api.PatchType, data []byte) (result *v1.ReplicationController, err error)
 	ReplicationControllerExpansion
 }
 
@@ -147,4 +148,17 @@ func (c *replicationControllers) Watch(opts api.ListOptions) (watch.Interface, e
 		Resource("replicationcontrollers").
 		VersionedParams(&opts, api.ParameterCodec).
 		Watch()
+}
+
+// Patch applies the patch and returns the patched replicationController.
+func (c *replicationControllers) Patch(name string, pt api.PatchType, data []byte) (result *v1.ReplicationController, err error) {
+	result = &v1.ReplicationController{}
+	err = c.client.Patch(pt).
+		Namespace(c.ns).
+		Resource("replicationcontrollers").
+		Name(name).
+		Body(data).
+		Do().
+		Into(result)
+	return
 }

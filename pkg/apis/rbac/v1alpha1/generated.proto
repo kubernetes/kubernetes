@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -46,11 +46,11 @@ message ClusterRoleBinding {
   optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
 
   // Subjects holds references to the objects the role applies to.
-  repeated Subject subject = 2;
+  repeated Subject subjects = 2;
 
   // RoleRef can only reference a ClusterRole in the global namespace.
   // If the RoleRef cannot be resolved, the Authorizer must return an error.
-  optional k8s.io.kubernetes.pkg.api.v1.ObjectReference roleRef = 3;
+  optional RoleRef roleRef = 3;
 }
 
 // ClusterRoleBindingList is a collection of ClusterRoleBindings
@@ -91,9 +91,10 @@ message PolicyRule {
   // ResourceNames is an optional white list of names that the rule applies to.  An empty set means that everything is allowed.
   repeated string resourceNames = 5;
 
-  // NonResourceURLsSlice is a set of partial urls that a user should have access to.  *s are allowed, but only as the full, final step in the path
+  // NonResourceURLs is a set of partial urls that a user should have access to.  *s are allowed, but only as the full, final step in the path
   // This name is intentionally different than the internal type so that the DefaultConvert works nicely and because the ordering may be different.
   // Since non-resource URLs are not namespaced, this field is only applicable for ClusterRoles referenced from a ClusterRoleBinding.
+  // Rules can either apply to API resources (such as "pods" or "secrets") or non-resource URL paths (such as "/api"),  but not both.
   repeated string nonResourceURLs = 6;
 }
 
@@ -114,11 +115,11 @@ message RoleBinding {
   optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
 
   // Subjects holds references to the objects the role applies to.
-  repeated Subject subject = 2;
+  repeated Subject subjects = 2;
 
   // RoleRef can reference a Role in the current namespace or a ClusterRole in the global namespace.
   // If the RoleRef cannot be resolved, the Authorizer must return an error.
-  optional k8s.io.kubernetes.pkg.api.v1.ObjectReference roleRef = 3;
+  optional RoleRef roleRef = 3;
 }
 
 // RoleBindingList is a collection of RoleBindings
@@ -139,6 +140,18 @@ message RoleList {
   repeated Role items = 2;
 }
 
+// RoleRef contains information that points to the role being used
+message RoleRef {
+  // APIGroup is the group for the resource being referenced
+  optional string apiGroup = 1;
+
+  // Kind is the type of resource being referenced
+  optional string kind = 2;
+
+  // Name is the name of resource being referenced
+  optional string name = 3;
+}
+
 // Subject contains a reference to the object or user identities a role binding applies to.  This can either hold a direct API object reference,
 // or a value for non-objects such as user and group names.
 message Subject {
@@ -146,8 +159,7 @@ message Subject {
   // If the Authorizer does not recognized the kind value, the Authorizer should report an error.
   optional string kind = 1;
 
-  // APIVersion holds the API group and version of the referenced object. For non-object references such as "Group" and "User" this is
-  // expected to be API version of this API group. For example "rbac.authorization.k8s.io/v1alpha1".
+  // APIVersion holds the API group and version of the referenced object.
   optional string apiVersion = 2;
 
   // Name of the object being referenced.

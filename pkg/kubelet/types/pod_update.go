@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -35,6 +35,8 @@ const (
 	SET PodOperation = iota
 	// Pods with the given ids are new to this source
 	ADD
+	// Pods with the given ids are gracefully deleted from this source
+	DELETE
 	// Pods with the given ids have been removed from this source
 	REMOVE
 	// Pods with the given ids have been updated in this source

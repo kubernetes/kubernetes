@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -15,6 +15,15 @@ limitations under the License.
 */
 
 package types
+
+// Ref makes a reference to the given type. It can only be used for e.g.
+// passing to namers.
+func Ref(packageName, typeName string) *Type {
+	return &Type{Name: Name{
+		Name:    typeName,
+		Package: packageName,
+	}}
+}
 
 // A type name may have a package qualifier.
 type Name struct {
@@ -89,8 +98,11 @@ type Package struct {
 	// 'package x' line.
 	Name string
 
-	// Comments from doc.go file.
+	// DocComments from doc.go, if any.
 	DocComments []string
+
+	// Comments from doc.go, if any.
+	Comments []string
 
 	// Types within this package, indexed by their name (*not* including
 	// package name).
@@ -115,7 +127,9 @@ func (p *Package) Has(name string) bool {
 	return has
 }
 
-// Get (or add) the given type
+// Type gets the given Type in this Package.  If the Type is not already
+// defined, this will add it and return the new Type value.  The caller is
+// expected to finish initialization.
 func (p *Package) Type(typeName string) *Type {
 	if t, ok := p.Types[typeName]; ok {
 		return t
@@ -132,9 +146,10 @@ func (p *Package) Type(typeName string) *Type {
 	return t
 }
 
-// Get (or add) the given function. If a function is added, it's the caller's
-// responsibility to finish construction of the function by setting Underlying
-// to the correct type.
+// Function gets the given function Type in this Package. If the function is
+// not already defined, this will add it.  If a function is added, it's the
+// caller's responsibility to finish construction of the function by setting
+// Underlying to the correct type.
 func (p *Package) Function(funcName string) *Type {
 	if t, ok := p.Functions[funcName]; ok {
 		return t
@@ -145,7 +160,8 @@ func (p *Package) Function(funcName string) *Type {
 	return t
 }
 
-// Get (or add) the given varaible. If a variable is added, it's the caller's
+// Variable gets the given varaible Type in this Package. If the variable is
+// not already defined, this will add it. If a variable is added, it's the caller's
 // responsibility to finish construction of the variable by setting Underlying
 // to the correct type.
 func (p *Package) Variable(varName string) *Type {
@@ -166,19 +182,20 @@ func (p *Package) HasImport(packageName string) bool {
 }
 
 // Universe is a map of all packages. The key is the package name, but you
-// should use Get() or Package() instead of direct access.
+// should use Package(), Type(), Function(), or Variable() instead of direct
+// access.
 type Universe map[string]*Package
 
-// Get returns the canonical type for the given fully-qualified name. Builtin
+// Type returns the canonical type for the given fully-qualified name. Builtin
 // types will always be found, even if they haven't been explicitly added to
-// the map. If a non-existing type is requested, u will create (a marker for)
+// the map. If a non-existing type is requested, this will create (a marker for)
 // it.
 func (u Universe) Type(n Name) *Type {
 	return u.Package(n.Package).Type(n.Name)
 }
 
 // Function returns the canonical function for the given fully-qualified name.
-// If a non-existing function is requested, u will create (a marker for) it.
+// If a non-existing function is requested, this will create (a marker for) it.
 // If a marker is created, it's the caller's responsibility to finish
 // construction of the function by setting Underlying to the correct type.
 func (u Universe) Function(n Name) *Type {
@@ -186,7 +203,7 @@ func (u Universe) Function(n Name) *Type {
 }
 
 // Variable returns the canonical variable for the given fully-qualified name.
-// If a non-existing variable is requested, u will create (a marker for) it.
+// If a non-existing variable is requested, this will create (a marker for) it.
 // If a marker is created, it's the caller's responsibility to finish
 // construction of the variable by setting Underlying to the correct type.
 func (u Universe) Variable(n Name) *Type {
@@ -202,7 +219,10 @@ func (u Universe) AddImports(packagePath string, importPaths ...string) {
 	}
 }
 
-// Get (create if needed) the package.
+// Package returns the Package for the given path.
+// If a non-existing package is requested, this will create (a marker for) it.
+// If a marker is created, it's the caller's responsibility to finish
+// construction of the package.
 func (u Universe) Package(packagePath string) *Package {
 	if p, ok := u[packagePath]; ok {
 		return p
@@ -235,7 +255,7 @@ type Type struct {
 
 	// If there are comment lines immediately before the type definition,
 	// they will be recorded here.
-	CommentLines string
+	CommentLines []string
 
 	// If there are comment lines preceding the `CommentLines`, they will be
 	// recorded here. There are two cases:
@@ -252,7 +272,7 @@ type Type struct {
 	// a blank line
 	// type definition
 	// ---
-	SecondClosestCommentLines string
+	SecondClosestCommentLines []string
 
 	// If Kind == Struct
 	Members []Member
@@ -267,10 +287,10 @@ type Type struct {
 	// If Kind == DeclarationOf, this is the type of the declaration.
 	Underlying *Type
 
-	// If Kind == Interface, this is the list of all required functions.
+	// If Kind == Interface, this is the set of all required functions.
 	// Otherwise, if this is a named type, this is the list of methods that
 	// type has. (All elements will have Kind=="Func")
-	Methods []*Type
+	Methods map[string]*Type
 
 	// If Kind == func, this is the signature of the function.
 	Signature *Signature
@@ -285,9 +305,38 @@ func (t *Type) String() string {
 	return t.Name.String()
 }
 
-// IsAssignable returns whether the type is assignable.
+// IsPrimitive returns whether the type is a built-in type or is an alias to a
+// built-in type.  For example: strings and aliases of strings are primitives,
+// structs are not.
+func (t *Type) IsPrimitive() bool {
+	if t.Kind == Builtin || (t.Kind == Alias && t.Underlying.Kind == Builtin) {
+		return true
+	}
+	return false
+}
+
+// IsAssignable returns whether the type is deep-assignable.  For example,
+// slices and maps and pointers are shallow copies, but ints and strings are
+// complete.
 func (t *Type) IsAssignable() bool {
-	return t.Kind == Builtin || (t.Kind == Alias && t.Underlying.Kind == Builtin)
+	if t.IsPrimitive() {
+		return true
+	}
+	if t.Kind == Struct {
+		for _, m := range t.Members {
+			if !m.Type.IsAssignable() {
+				return false
+			}
+		}
+		return true
+	}
+	return false
+}
+
+// IsAnonymousStruct returns true if the type is an anonymous struct or an alias
+// to an anonymous struct.
+func (t *Type) IsAnonymousStruct() bool {
+	return (t.Kind == Struct && t.Name.Name == "struct{}") || (t.Kind == Alias && t.Underlying.IsAnonymousStruct())
 }
 
 // A single struct member
@@ -301,7 +350,7 @@ type Member struct {
 
 	// If there are comment lines immediately before the member in the type
 	// definition, they will be recorded here.
-	CommentLines string
+	CommentLines []string
 
 	// If there are tags along with this member, they will be saved here.
 	Tags string
@@ -329,7 +378,7 @@ type Signature struct {
 
 	// If there are comment lines immediately before this
 	// signature/method/function declaration, they will be recorded here.
-	CommentLines string
+	CommentLines []string
 }
 
 // Built in types.

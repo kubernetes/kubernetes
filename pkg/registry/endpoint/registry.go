@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -63,7 +63,7 @@ func (s *storage) GetEndpoints(ctx api.Context, name string) (*api.Endpoints, er
 }
 
 func (s *storage) UpdateEndpoints(ctx api.Context, endpoints *api.Endpoints) error {
-	_, _, err := s.Update(ctx, endpoints)
+	_, _, err := s.Update(ctx, endpoints.Name, rest.DefaultUpdatedObjectInfo(endpoints, api.Scheme))
 	return err
 }
 

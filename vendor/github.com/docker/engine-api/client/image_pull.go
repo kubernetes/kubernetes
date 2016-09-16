@@ -27,12 +27,12 @@ func (cli *Client) ImagePull(ctx context.Context, ref string, options types.Imag
 
 	query := url.Values{}
 	query.Set("fromImage", repository)
-	if tag != "" {
+	if tag != "" && !options.All {
 		query.Set("tag", tag)
 	}
 
 	resp, err := cli.tryImageCreate(ctx, query, options.RegistryAuth)
-	if resp.statusCode == http.StatusUnauthorized {
+	if resp.statusCode == http.StatusUnauthorized && options.PrivilegeFunc != nil {
 		newAuthHeader, privilegeErr := options.PrivilegeFunc()
 		if privilegeErr != nil {
 			return nil, privilegeErr

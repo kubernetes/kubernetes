@@ -1,8 +1,12 @@
 {
   "swaggerVersion": "1.2",
   "apiVersion": "batch/v2alpha1",
-  "basePath": "https://10.10.10.10:443",
+  "basePath": "https://10.10.10.10:6443",
   "resourcePath": "/apis/batch/v2alpha1",
+  "info": {
+   "title": "",
+   "description": ""
+  },
   "apis": [
    {
     "path": "/apis/batch/v2alpha1",

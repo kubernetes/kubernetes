@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2014 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -85,6 +85,7 @@ esac
 # to find the latest one.
 if [[ -z "${KUBECTL_PATH:-}" ]]; then
   locations=(
+    "${KUBE_ROOT}/_output/bin/kubectl"
     "${KUBE_ROOT}/_output/dockerized/bin/${host_os}/${host_arch}/kubectl"
     "${KUBE_ROOT}/_output/local/bin/${host_os}/${host_arch}/kubectl"
     "${KUBE_ROOT}/platforms/${host_os}/${host_arch}/kubectl"
@@ -96,7 +97,7 @@ if [[ -z "${KUBECTL_PATH:-}" ]]; then
       echo "It looks as if you don't have a compiled kubectl binary"
       echo
       echo "If you are running from a clone of the git repo, please run"
-      echo "'./build/run.sh hack/build-cross.sh'. Note that this requires having"
+      echo "'./build/run.sh make cross'. Note that this requires having"
       echo "Docker installed."
       echo
       echo "If you are running from a binary release tarball, something is wrong. "

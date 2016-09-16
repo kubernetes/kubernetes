@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -33,7 +33,11 @@ type SecurityContextProvider interface {
 	// security options, whether the container is privileged, volume binds, etc.
 	// An error is returned if it's not possible to secure the container as requested
 	// with a security context.
-	ModifyHostConfig(pod *api.Pod, container *api.Container, hostConfig *dockercontainer.HostConfig)
+	//
+	// - pod: the pod to modify the docker hostconfig for
+	// - container: the container to modify the hostconfig for
+	// - supplementalGids: additional supplemental GIDs associated with the pod's volumes
+	ModifyHostConfig(pod *api.Pod, container *api.Container, hostConfig *dockercontainer.HostConfig, supplementalGids []int64)
 }
 
 const (

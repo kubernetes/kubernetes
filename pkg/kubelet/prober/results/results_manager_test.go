@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -56,7 +56,7 @@ func TestUpdates(t *testing.T) {
 		select {
 		case u := <-m.Updates():
 			if expected != u {
-				t.Errorf("Expected update %v, recieved %v: %s", expected, u, msg)
+				t.Errorf("Expected update %v, received %v: %s", expected, u, msg)
 			}
 		case <-time.After(wait.ForeverTestTimeout):
 			t.Errorf("Timed out waiting for update %v: %s", expected, msg)

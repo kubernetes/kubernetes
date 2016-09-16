@@ -33,6 +33,8 @@ import (
 
 	"github.com/docker/docker/pkg/mount"
 	"github.com/golang/glog"
+	"github.com/google/cadvisor/devicemapper"
+	dockerutil "github.com/google/cadvisor/utils/docker"
 	zfs "github.com/mistifyio/go-zfs"
 )
 
@@ -41,6 +43,26 @@ const (
 	LabelDockerImages = "docker-images"
 	LabelRktImages    = "rkt-images"
 )
+
+// The maximum number of `du` tasks that can be running at once.
+const maxConsecutiveDus = 20
+
+// A pool for restricting the number of consecutive `du` tasks running.
+var duPool = make(chan struct{}, maxConsecutiveDus)
+
+func init() {
+	for i := 0; i < maxConsecutiveDus; i++ {
+		releaseDuToken()
+	}
+}
+
+func claimDuToken() {
+	<-duPool
+}
+
+func releaseDuToken() {
+	duPool <- struct{}{}
+}
 
 type partition struct {
 	mountpoint string
@@ -56,8 +78,8 @@ type RealFsInfo struct {
 	// Map from label to block device path.
 	// Labels are intent-specific tags that are auto-detected.
 	labels map[string]string
-
-	dmsetup dmsetupClient
+	// devicemapper client
+	dmsetup devicemapper.DmsetupClient
 }
 
 type Context struct {
@@ -77,15 +99,27 @@ func NewFsInfo(context Context) (FsInfo, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// Avoid devicemapper container mounts - these are tracked by the ThinPoolWatcher
+	excluded := []string{fmt.Sprintf("%s/devicemapper/mnt", context.Docker.Root)}
 	fsInfo := &RealFsInfo{
-		partitions: make(map[string]partition, 0),
+		partitions: processMounts(mounts, excluded),
 		labels:     make(map[string]string, 0),
-		dmsetup:    &defaultDmsetupClient{},
+		dmsetup:    devicemapper.NewDmsetupClient(),
 	}
 
-	fsInfo.addSystemRootLabel(mounts)
-	fsInfo.addDockerImagesLabel(context, mounts)
 	fsInfo.addRktImagesLabel(context, mounts)
+	// need to call this before the log line below printing out the partitions, as this function may
+	// add a "partition" for devicemapper to fsInfo.partitions
+	fsInfo.addDockerImagesLabel(context, mounts)
+
+	glog.Infof("Filesystem partitions: %+v", fsInfo.partitions)
+	fsInfo.addSystemRootLabel(mounts)
+	return fsInfo, nil
+}
+
+func processMounts(mounts []*mount.Info, excludedMountpointPrefixes []string) map[string]partition {
+	partitions := make(map[string]partition, 0)
 
 	supportedFsType := map[string]bool{
 		// all ext systems are checked through prefix.
@@ -93,28 +127,36 @@ func NewFsInfo(context Context) (FsInfo, error) {
 		"xfs":   true,
 		"zfs":   true,
 	}
+
 	for _, mount := range mounts {
-		var Fstype string
 		if !strings.HasPrefix(mount.Fstype, "ext") && !supportedFsType[mount.Fstype] {
 			continue
 		}
 		// Avoid bind mounts.
-		if _, ok := fsInfo.partitions[mount.Source]; ok {
+		if _, ok := partitions[mount.Source]; ok {
 			continue
 		}
-		if mount.Fstype == "zfs" {
-			Fstype = mount.Fstype
+
+		hasPrefix := false
+		for _, prefix := range excludedMountpointPrefixes {
+			if strings.HasPrefix(mount.Mountpoint, prefix) {
+				hasPrefix = true
+				break
+			}
 		}
-		fsInfo.partitions[mount.Source] = partition{
-			fsType:     Fstype,
+		if hasPrefix {
+			continue
+		}
+
+		partitions[mount.Source] = partition{
+			fsType:     mount.Fstype,
 			mountpoint: mount.Mountpoint,
 			major:      uint(mount.Major),
 			minor:      uint(mount.Minor),
 		}
 	}
 
-	glog.Infof("Filesystem partitions: %+v", fsInfo.partitions)
-	return fsInfo, nil
+	return partitions
 }
 
 // getDockerDeviceMapperInfo returns information about the devicemapper device and "partition" if
@@ -126,7 +168,7 @@ func (self *RealFsInfo) getDockerDeviceMapperInfo(context DockerContext) (string
 		return "", nil, nil
 	}
 
-	dataLoopFile := context.DriverStatus["Data loop file"]
+	dataLoopFile := context.DriverStatus[dockerutil.DriverStatusDataLoopFile]
 	if len(dataLoopFile) > 0 {
 		return "", nil, nil
 	}
@@ -274,12 +316,16 @@ func (self *RealFsInfo) GetFsInfoForPath(mountSet map[string]struct{}) ([]Fs, er
 			switch partition.fsType {
 			case DeviceMapper.String():
 				fs.Capacity, fs.Free, fs.Available, err = getDMStats(device, partition.blockSize)
+				glog.V(5).Infof("got devicemapper fs capacity stats: capacity: %v free: %v available: %v:", fs.Capacity, fs.Free, fs.Available)
 				fs.Type = DeviceMapper
 			case ZFS.String():
 				fs.Capacity, fs.Free, fs.Available, err = getZfstats(device)
 				fs.Type = ZFS
 			default:
-				fs.Capacity, fs.Free, fs.Available, fs.Inodes, fs.InodesFree, err = getVfsStats(partition.mountpoint)
+				var inodes, inodesFree uint64
+				fs.Capacity, fs.Free, fs.Available, inodes, inodesFree, err = getVfsStats(partition.mountpoint)
+				fs.Inodes = &inodes
+				fs.InodesFree = &inodesFree
 				fs.Type = VFS
 			}
 			if err != nil {
@@ -386,6 +432,8 @@ func (self *RealFsInfo) GetDirUsage(dir string, timeout time.Duration) (uint64, 
 	if dir == "" {
 		return 0, fmt.Errorf("invalid directory")
 	}
+	claimDuToken()
+	defer releaseDuToken()
 	cmd := exec.Command("nice", "-n", "19", "du", "-s", dir)
 	stdoutp, err := cmd.StdoutPipe()
 	if err != nil {
@@ -434,30 +482,15 @@ func getVfsStats(path string) (total uint64, free uint64, avail uint64, inodes u
 	return total, free, avail, inodes, inodesFree, nil
 }
 
-// dmsetupClient knows to to interact with dmsetup to retrieve information about devicemapper.
-type dmsetupClient interface {
-	table(poolName string) ([]byte, error)
-	//TODO add status(poolName string) ([]byte, error) and use it in getDMStats so we can unit test
-}
-
-// defaultDmsetupClient implements the standard behavior for interacting with dmsetup.
-type defaultDmsetupClient struct{}
-
-var _ dmsetupClient = &defaultDmsetupClient{}
-
-func (*defaultDmsetupClient) table(poolName string) ([]byte, error) {
-	return exec.Command("dmsetup", "table", poolName).Output()
-}
-
 // Devicemapper thin provisioning is detailed at
 // https://www.kernel.org/doc/Documentation/device-mapper/thin-provisioning.txt
-func dockerDMDevice(driverStatus map[string]string, dmsetup dmsetupClient) (string, uint, uint, uint, error) {
-	poolName, ok := driverStatus["Pool Name"]
+func dockerDMDevice(driverStatus map[string]string, dmsetup devicemapper.DmsetupClient) (string, uint, uint, uint, error) {
+	poolName, ok := driverStatus[dockerutil.DriverStatusPoolName]
 	if !ok || len(poolName) == 0 {
 		return "", 0, 0, 0, fmt.Errorf("Could not get dm pool name")
 	}
 
-	out, err := dmsetup.table(poolName)
+	out, err := dmsetup.Table(poolName)
 	if err != nil {
 		return "", 0, 0, 0, err
 	}
@@ -470,6 +503,8 @@ func dockerDMDevice(driverStatus map[string]string, dmsetup dmsetupClient) (stri
 	return poolName, major, minor, dataBlkSize, nil
 }
 
+// parseDMTable parses a single line of `dmsetup table` output and returns the
+// major device, minor device, block size, and an error.
 func parseDMTable(dmTable string) (uint, uint, uint, error) {
 	dmTable = strings.Replace(dmTable, ":", " ", -1)
 	dmFields := strings.Fields(dmTable)

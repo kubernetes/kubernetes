@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -69,7 +69,7 @@ func (s *storage) CreateServiceAccount(ctx api.Context, serviceAccount *api.Serv
 }
 
 func (s *storage) UpdateServiceAccount(ctx api.Context, serviceAccount *api.ServiceAccount) error {
-	_, _, err := s.Update(ctx, serviceAccount)
+	_, _, err := s.Update(ctx, serviceAccount.Name, rest.DefaultUpdatedObjectInfo(serviceAccount, api.Scheme))
 	return err
 }
 

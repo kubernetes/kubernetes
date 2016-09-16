@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,8 +20,6 @@ import (
 	"errors"
 	"math/rand"
 	"time"
-
-	"k8s.io/kubernetes/pkg/util/runtime"
 )
 
 // For any test of the style:
@@ -42,9 +40,19 @@ func Forever(f func(), period time.Duration) {
 }
 
 // Until loops until stop channel is closed, running f every period.
-// Until is syntactic sugar on top of JitterUntil with zero jitter factor
+// Until is syntactic sugar on top of JitterUntil with zero jitter
+// factor, with sliding = true (which means the timer for period
+// starts after the f completes).
 func Until(f func(), period time.Duration, stopCh <-chan struct{}) {
-	JitterUntil(f, period, 0.0, stopCh)
+	JitterUntil(f, period, 0.0, true, stopCh)
+}
+
+// NonSlidingUntil loops until stop channel is closed, running f every
+// period. NonSlidingUntil is syntactic sugar on top of JitterUntil
+// with zero jitter factor, with sliding = false (meaning the timer for
+// period starts at the same time as the function starts).
+func NonSlidingUntil(f func(), period time.Duration, stopCh <-chan struct{}) {
+	JitterUntil(f, period, 0.0, false, stopCh)
 }
 
 // JitterUntil loops until stop channel is closed, running f every period.
@@ -53,28 +61,42 @@ func Until(f func(), period time.Duration, stopCh <-chan struct{}) {
 // Catches any panics, and keeps going. f may not be invoked if
 // stop channel is already closed. Pass NeverStop to Until if you
 // don't want it stop.
-func JitterUntil(f func(), period time.Duration, jitterFactor float64, stopCh <-chan struct{}) {
-	select {
-	case <-stopCh:
-		return
-	default:
-	}
-
+func JitterUntil(f func(), period time.Duration, jitterFactor float64, sliding bool, stopCh <-chan struct{}) {
 	for {
-		func() {
-			defer runtime.HandleCrash()
-			f()
-		}()
+
+		select {
+		case <-stopCh:
+			return
+		default:
+		}
 
 		jitteredPeriod := period
 		if jitterFactor > 0.0 {
 			jitteredPeriod = Jitter(period, jitterFactor)
 		}
 
+		var t *time.Timer
+		if !sliding {
+			t = time.NewTimer(jitteredPeriod)
+		}
+
+		func() {
+			f()
+		}()
+
+		if sliding {
+			t = time.NewTimer(jitteredPeriod)
+		}
+
+		// NOTE: b/c there is no priority selection in golang
+		// it is possible for this to race, meaning we could
+		// trigger t.C and stopCh, and t.C select falls through.
+		// In order to mitigate we re-check stopCh at the beginning
+		// of every loop to prevent extra executions of f().
 		select {
 		case <-stopCh:
 			return
-		case <-time.After(jitteredPeriod):
+		case <-t.C:
 		}
 	}
 }
@@ -164,7 +186,12 @@ func pollImmediateInternal(wait WaitFunc, condition ConditionFunc) error {
 func PollInfinite(interval time.Duration, condition ConditionFunc) error {
 	done := make(chan struct{})
 	defer close(done)
-	return WaitFor(poller(interval, 0), condition, done)
+	return PollUntil(interval, condition, done)
+}
+
+// PollUntil is like Poll, but it takes a stop change instead of total duration
+func PollUntil(interval time.Duration, condition ConditionFunc, stopCh <-chan struct{}) error {
+	return WaitFor(poller(interval, 0), condition, stopCh)
 }
 
 // WaitFunc creates a channel that receives an item every time a test

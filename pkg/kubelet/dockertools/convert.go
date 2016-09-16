@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -56,10 +56,11 @@ func toRuntimeContainer(c *dockertypes.Container) (*kubecontainer.Container, err
 	}
 
 	return &kubecontainer.Container{
-		ID:    kubecontainer.DockerID(c.ID).ContainerID(),
-		Name:  dockerName.ContainerName,
-		Image: c.Image,
-		Hash:  hash,
+		ID:      kubecontainer.DockerID(c.ID).ContainerID(),
+		Name:    dockerName.ContainerName,
+		Image:   c.Image,
+		ImageID: c.ImageID,
+		Hash:    hash,
 		// (random-liu) docker uses status to indicate whether a container is running or exited.
 		// However, in kubernetes we usually use state to indicate whether a container is running or exited,
 		// while use status to indicate the comprehensive status of the container. So we have different naming

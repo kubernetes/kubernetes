@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
 )
 
@@ -29,7 +30,6 @@ func TestRecyclerSuccess(t *testing.T) {
 	client := &mockRecyclerClient{}
 	recycler := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
-			Name:      "recycler-test",
 			Namespace: api.NamespaceDefault,
 		},
 		Status: api.PodStatus{
@@ -37,7 +37,7 @@ func TestRecyclerSuccess(t *testing.T) {
 		},
 	}
 
-	err := internalRecycleVolumeByWatchingPodUntilCompletion(recycler, client)
+	err := internalRecycleVolumeByWatchingPodUntilCompletion("pv-name", recycler, client)
 	if err != nil {
 		t.Errorf("Unexpected error watching recycler pod: %+v", err)
 	}
@@ -50,7 +50,6 @@ func TestRecyclerFailure(t *testing.T) {
 	client := &mockRecyclerClient{}
 	recycler := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
-			Name:      "recycler-test",
 			Namespace: api.NamespaceDefault,
 		},
 		Status: api.PodStatus{
@@ -59,7 +58,7 @@ func TestRecyclerFailure(t *testing.T) {
 		},
 	}
 
-	err := internalRecycleVolumeByWatchingPodUntilCompletion(recycler, client)
+	err := internalRecycleVolumeByWatchingPodUntilCompletion("pv-name", recycler, client)
 	if err == nil {
 		t.Fatalf("Expected pod failure but got nil error returned")
 	}
@@ -73,14 +72,67 @@ func TestRecyclerFailure(t *testing.T) {
 	}
 }
 
+func TestRecyclerAlreadyExists(t *testing.T) {
+	// Test that internalRecycleVolumeByWatchingPodUntilCompletion does not
+	// start a new recycler when an old one is already running.
+
+	// Old recycler is running and fails with "foo" error message
+	oldRecycler := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			Name:      "recycler-test",
+			Namespace: api.NamespaceDefault,
+		},
+		Status: api.PodStatus{
+			Phase:   api.PodFailed,
+			Message: "foo",
+		},
+	}
+
+	// New recycler _would_ succeed if it was run
+	newRecycler := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			Name:      "recycler-test",
+			Namespace: api.NamespaceDefault,
+		},
+		Status: api.PodStatus{
+			Phase:   api.PodSucceeded,
+			Message: "bar",
+		},
+	}
+
+	client := &mockRecyclerClient{
+		pod: oldRecycler,
+	}
+
+	err := internalRecycleVolumeByWatchingPodUntilCompletion("pv-name", newRecycler, client)
+	if err == nil {
+		t.Fatalf("Expected pod failure but got nil error returned")
+	}
+
+	// Check the recycler failed with "foo" error message, i.e. it was the
+	// old recycler that finished and not the new one.
+	if err != nil {
+		if !strings.Contains(err.Error(), "foo") {
+			t.Errorf("Expected pod.Status.Message %s but got %s", oldRecycler.Status.Message, err)
+		}
+	}
+	if !client.deletedCalled {
+		t.Errorf("Expected deferred client.Delete to be called on recycler pod")
+	}
+}
+
 type mockRecyclerClient struct {
 	pod           *api.Pod
 	deletedCalled bool
 }
 
 func (c *mockRecyclerClient) CreatePod(pod *api.Pod) (*api.Pod, error) {
-	c.pod = pod
-	return c.pod, nil
+	if c.pod == nil {
+		c.pod = pod
+		return c.pod, nil
+	}
+	// Simulate "already exists" error
+	return nil, errors.NewAlreadyExists(api.Resource("pods"), pod.Name)
 }
 
 func (c *mockRecyclerClient) GetPod(name, namespace string) (*api.Pod, error) {
@@ -96,7 +148,7 @@ func (c *mockRecyclerClient) DeletePod(name, namespace string) error {
 	return nil
 }
 
-func (c *mockRecyclerClient) WatchPod(name, namespace, resourceVersion string, stopChannel chan struct{}) func() *api.Pod {
+func (c *mockRecyclerClient) WatchPod(name, namespace string, stopChannel chan struct{}) func() *api.Pod {
 	return func() *api.Pod {
 		return c.pod
 	}

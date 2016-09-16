@@ -67,6 +67,15 @@ func (t *AuthenticatedTransport) verifiedJWT() (jose.JWT, error) {
 	return t.jwt, nil
 }
 
+// SetJWT sets the JWT held by the Transport.
+// This is useful for cases in which you want to set an initial JWT.
+func (t *AuthenticatedTransport) SetJWT(jwt jose.JWT) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	t.jwt = jwt
+}
+
 func (t *AuthenticatedTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 	jwt, err := t.verifiedJWT()
 	if err != nil {

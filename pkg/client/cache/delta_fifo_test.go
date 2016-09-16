@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@ limitations under the License.
 package cache
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -24,22 +25,26 @@ import (
 
 // helper function to reduce stuttering
 func testPop(f *DeltaFIFO) testFifoObject {
-	return f.Pop().(Deltas).Newest().Object.(testFifoObject)
+	return Pop(f).(Deltas).Newest().Object.(testFifoObject)
 }
 
 // keyLookupFunc adapts a raw function to be a KeyLookup.
-type keyLookupFunc func() []string
+type keyLookupFunc func() []testFifoObject
 
 // ListKeys just calls kl.
 func (kl keyLookupFunc) ListKeys() []string {
-	return kl()
+	result := []string{}
+	for _, fifoObj := range kl() {
+		result = append(result, fifoObj.name)
+	}
+	return result
 }
 
 // GetByKey returns the key if it exists in the list returned by kl.
 func (kl keyLookupFunc) GetByKey(key string) (interface{}, bool, error) {
 	for _, v := range kl() {
-		if v == key {
-			return key, true, nil
+		if v.name == key {
+			return v, true, nil
 		}
 	}
 	return nil, false, nil
@@ -80,6 +85,50 @@ func TestDeltaFIFO_basic(t *testing.T) {
 	}
 }
 
+func TestDeltaFIFO_requeueOnPop(t *testing.T) {
+	f := NewDeltaFIFO(testFifoObjectKeyFunc, nil, nil)
+
+	f.Add(mkFifoObj("foo", 10))
+	_, err := f.Pop(func(obj interface{}) error {
+		if obj.(Deltas)[0].Object.(testFifoObject).name != "foo" {
+			t.Fatalf("unexpected object: %#v", obj)
+		}
+		return ErrRequeue{Err: nil}
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if _, ok, err := f.GetByKey("foo"); !ok || err != nil {
+		t.Fatalf("object should have been requeued: %t %v", ok, err)
+	}
+
+	_, err = f.Pop(func(obj interface{}) error {
+		if obj.(Deltas)[0].Object.(testFifoObject).name != "foo" {
+			t.Fatalf("unexpected object: %#v", obj)
+		}
+		return ErrRequeue{Err: fmt.Errorf("test error")}
+	})
+	if err == nil || err.Error() != "test error" {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if _, ok, err := f.GetByKey("foo"); !ok || err != nil {
+		t.Fatalf("object should have been requeued: %t %v", ok, err)
+	}
+
+	_, err = f.Pop(func(obj interface{}) error {
+		if obj.(Deltas)[0].Object.(testFifoObject).name != "foo" {
+			t.Fatalf("unexpected object: %#v", obj)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if _, ok, err := f.GetByKey("foo"); ok || err != nil {
+		t.Fatalf("object should have been removed: %t %v", ok, err)
+	}
+}
+
 func TestDeltaFIFO_compressorWorks(t *testing.T) {
 	oldestTypes := []DeltaType{}
 	f := NewDeltaFIFO(
@@ -104,7 +153,7 @@ func TestDeltaFIFO_compressorWorks(t *testing.T) {
 	if e, a := expect, oldestTypes; !reflect.DeepEqual(e, a) {
 		t.Errorf("Expected %#v, got %#v", e, a)
 	}
-	if e, a := (Deltas{{Added, mkFifoObj("foo", 25)}}), f.Pop().(Deltas); !reflect.DeepEqual(e, a) {
+	if e, a := (Deltas{{Added, mkFifoObj("foo", 25)}}), Pop(f).(Deltas); !reflect.DeepEqual(e, a) {
 		t.Fatalf("Expected %#v, got %#v", e, a)
 	}
 
@@ -126,7 +175,7 @@ func TestDeltaFIFO_addUpdate(t *testing.T) {
 	got := make(chan testFifoObject, 2)
 	go func() {
 		for {
-			obj := f.Pop().(Deltas).Newest().Object.(testFifoObject)
+			obj := testPop(f)
 			t.Logf("got a thing %#v", obj)
 			t.Logf("D len: %v", len(f.queue))
 			got <- obj
@@ -173,8 +222,8 @@ func TestDeltaFIFO_enqueueingWithLister(t *testing.T) {
 	f := NewDeltaFIFO(
 		testFifoObjectKeyFunc,
 		nil,
-		keyLookupFunc(func() []string {
-			return []string{"foo", "bar", "baz"}
+		keyLookupFunc(func() []testFifoObject {
+			return []testFifoObject{mkFifoObj("foo", 5), mkFifoObj("bar", 6), mkFifoObj("baz", 7)}
 		}),
 	)
 	f.Add(mkFifoObj("foo", 10))
@@ -220,12 +269,52 @@ func TestDeltaFIFO_addReplace(t *testing.T) {
 	}
 }
 
+func TestDeltaFIFO_ResyncNonExisting(t *testing.T) {
+	f := NewDeltaFIFO(
+		testFifoObjectKeyFunc,
+		nil,
+		keyLookupFunc(func() []testFifoObject {
+			return []testFifoObject{mkFifoObj("foo", 5)}
+		}),
+	)
+	f.Delete(mkFifoObj("foo", 10))
+	f.Resync()
+
+	deltas := f.items["foo"]
+	if len(deltas) != 1 {
+		t.Fatalf("unexpected deltas length: %v", deltas)
+	}
+	if deltas[0].Type != Deleted {
+		t.Errorf("unexpected delta: %v", deltas[0])
+	}
+}
+
+func TestDeltaFIFO_DeleteExistingNonPropagated(t *testing.T) {
+	f := NewDeltaFIFO(
+		testFifoObjectKeyFunc,
+		nil,
+		keyLookupFunc(func() []testFifoObject {
+			return []testFifoObject{}
+		}),
+	)
+	f.Add(mkFifoObj("foo", 5))
+	f.Delete(mkFifoObj("foo", 6))
+
+	deltas := f.items["foo"]
+	if len(deltas) != 2 {
+		t.Fatalf("unexpected deltas length: %v", deltas)
+	}
+	if deltas[len(deltas)-1].Type != Deleted {
+		t.Errorf("unexpected delta: %v", deltas[len(deltas)-1])
+	}
+}
+
 func TestDeltaFIFO_ReplaceMakesDeletions(t *testing.T) {
 	f := NewDeltaFIFO(
 		testFifoObjectKeyFunc,
 		nil,
-		keyLookupFunc(func() []string {
-			return []string{"foo", "bar", "baz"}
+		keyLookupFunc(func() []testFifoObject {
+			return []testFifoObject{mkFifoObj("foo", 5), mkFifoObj("bar", 6), mkFifoObj("baz", 7)}
 		}),
 	)
 	f.Delete(mkFifoObj("baz", 10))
@@ -236,11 +325,34 @@ func TestDeltaFIFO_ReplaceMakesDeletions(t *testing.T) {
 		{{Sync, mkFifoObj("foo", 5)}},
 		// Since "bar" didn't have a delete event and wasn't in the Replace list
 		// it should get a tombstone key with the right Obj.
-		{{Deleted, DeletedFinalStateUnknown{Key: "bar", Obj: "bar"}}},
+		{{Deleted, DeletedFinalStateUnknown{Key: "bar", Obj: mkFifoObj("bar", 6)}}},
 	}
 
 	for _, expected := range expectedList {
-		cur := f.Pop().(Deltas)
+		cur := Pop(f).(Deltas)
+		if e, a := expected, cur; !reflect.DeepEqual(e, a) {
+			t.Errorf("Expected %#v, got %#v", e, a)
+		}
+	}
+}
+
+func TestDeltaFIFO_UpdateResyncRace(t *testing.T) {
+	f := NewDeltaFIFO(
+		testFifoObjectKeyFunc,
+		nil,
+		keyLookupFunc(func() []testFifoObject {
+			return []testFifoObject{mkFifoObj("foo", 5)}
+		}),
+	)
+	f.Update(mkFifoObj("foo", 6))
+	f.Resync()
+
+	expectedList := []Deltas{
+		{{Updated, mkFifoObj("foo", 6)}},
+	}
+
+	for _, expected := range expectedList {
+		cur := Pop(f).(Deltas)
 		if e, a := expected, cur; !reflect.DeepEqual(e, a) {
 			t.Errorf("Expected %#v, got %#v", e, a)
 		}
@@ -279,9 +391,9 @@ func TestDeltaFIFO_addIfNotPresent(t *testing.T) {
 	f := NewDeltaFIFO(testFifoObjectKeyFunc, nil, nil)
 
 	f.Add(mkFifoObj("b", 3))
-	b3 := f.Pop()
+	b3 := Pop(f)
 	f.Add(mkFifoObj("c", 4))
-	c4 := f.Pop()
+	c4 := Pop(f)
 	if e, a := 0, len(f.items); e != a {
 		t.Fatalf("Expected %v, got %v items in queue", e, a)
 	}
@@ -358,15 +470,15 @@ func TestDeltaFIFO_HasSynced(t *testing.T) {
 		{
 			actions: []func(f *DeltaFIFO){
 				func(f *DeltaFIFO) { f.Replace([]interface{}{mkFifoObj("a", 1), mkFifoObj("b", 2)}, "0") },
-				func(f *DeltaFIFO) { f.Pop() },
+				func(f *DeltaFIFO) { Pop(f) },
 			},
 			expectedSynced: false,
 		},
 		{
 			actions: []func(f *DeltaFIFO){
 				func(f *DeltaFIFO) { f.Replace([]interface{}{mkFifoObj("a", 1), mkFifoObj("b", 2)}, "0") },
-				func(f *DeltaFIFO) { f.Pop() },
-				func(f *DeltaFIFO) { f.Pop() },
+				func(f *DeltaFIFO) { Pop(f) },
+				func(f *DeltaFIFO) { Pop(f) },
 			},
 			expectedSynced: true,
 		},

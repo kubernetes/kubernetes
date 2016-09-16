@@ -15,8 +15,6 @@ spec:
       # Filter to specific nodes:
       # nodeSelector:
       #  app: newrelic
-      securityContext:
-        privileged: true
       hostPID: true
       hostIPC: true
       hostNetwork: true
@@ -24,6 +22,8 @@ spec:
         - resources:
             requests:
               cpu: 0.15
+          securityContext:
+            privileged: true
           env:
             - name: NRSYSMOND_logfile
               value: "/var/log/nrsysmond.log"

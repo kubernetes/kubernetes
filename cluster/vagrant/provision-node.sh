@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2014 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -59,6 +59,7 @@ for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
   fi
 done
 
+enable-accounting
 prepare-package-manager
 
 # Configure network
@@ -83,3 +84,5 @@ add-volume-support
 
 run-salt
 
+dnf install -y socat ethtool
+dnf update -y docker

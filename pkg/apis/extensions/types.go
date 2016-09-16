@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -35,6 +35,13 @@ import (
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
+const (
+	// SysctlsPodSecurityPolicyAnnotationKey represents the key of a whitelist of
+	// allowed safe and unsafe sysctls in a pod spec. It's a comma-separated list of plain sysctl
+	// names or sysctl patterns (which end in *). The string "*" matches all sysctls.
+	SysctlsPodSecurityPolicyAnnotationKey string = "security.alpha.kubernetes.io/sysctls"
+)
+
 // describes the attributes of a scale subresource
 type ScaleSpec struct {
 	// desired number of instances for the scaled object.
@@ -51,7 +58,8 @@ type ScaleStatus struct {
 	Selector *unversioned.LabelSelector `json:"selector,omitempty"`
 }
 
-// +genclient=true,noMethods=true
+// +genclient=true
+// +noMethods=true
 
 // represents a scaling request for a resource.
 type Scale struct {
@@ -94,7 +102,8 @@ type CustomMetricCurrentStatusList struct {
 	Items []CustomMetricCurrentStatus `json:"items"`
 }
 
-// +genclient=true,nonNamespaced=true
+// +genclient=true
+// +nonNamespaced=true
 
 // A ThirdPartyResource is a generic representation of a resource, it is used by add-ons and plugins to add new resource
 // types to the API.  It consists of one or more Versions of the api.
@@ -548,7 +557,7 @@ type HTTPIngressRuleValue struct {
 // HTTPIngressPath associates a path regex with a backend. Incoming urls matching
 // the path are forwarded to the backend.
 type HTTPIngressPath struct {
-	// Path is a extended POSIX regex as defined by IEEE Std 1003.1,
+	// Path is an extended POSIX regex as defined by IEEE Std 1003.1,
 	// (i.e this follows the egrep/unix syntax, not the perl syntax)
 	// matched against the path of an incoming request. Currently it can
 	// contain characters disallowed from the conventional "path"
@@ -620,11 +629,15 @@ type ReplicaSetStatus struct {
 	// The number of pods that have labels matching the labels of the pod template of the replicaset.
 	FullyLabeledReplicas int32 `json:"fullyLabeledReplicas,omitempty"`
 
+	// The number of ready replicas for this replica set.
+	ReadyReplicas int32 `json:"readyReplicas,omitempty"`
+
 	// ObservedGeneration is the most recent generation observed by the controller.
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 }
 
-// +genclient=true,nonNamespaced=true
+// +genclient=true
+// +nonNamespaced=true
 
 // PodSecurityPolicy governs the ability to make requests that affect the SecurityContext
 // that will be applied to a pod and container.
@@ -641,7 +654,7 @@ type PodSecurityPolicySpec struct {
 	// Privileged determines if a pod can request to be run as privileged.
 	Privileged bool `json:"privileged,omitempty"`
 	// DefaultAddCapabilities is the default set of capabilities that will be added to the container
-	// unless the pod spec specifically drops the capability.  You may not list a capabiility in both
+	// unless the pod spec specifically drops the capability.  You may not list a capability in both
 	// DefaultAddCapabilities and RequiredDropCapabilities.
 	DefaultAddCapabilities []api.Capability `json:"defaultAddCapabilities,omitempty"`
 	// RequiredDropCapabilities are the capabilities that will be dropped from the container.  These
@@ -710,6 +723,9 @@ var (
 	DownwardAPI           FSType = "downwardAPI"
 	FC                    FSType = "fc"
 	ConfigMap             FSType = "configMap"
+	VsphereVolume         FSType = "vsphereVolume"
+	Quobyte               FSType = "quobyte"
+	AzureDisk             FSType = "azureDisk"
 	All                   FSType = "*"
 )
 
@@ -808,4 +824,92 @@ type PodSecurityPolicyList struct {
 	unversioned.ListMeta `json:"metadata,omitempty"`
 
 	Items []PodSecurityPolicy `json:"items"`
+}
+
+// +genclient=true
+
+type NetworkPolicy struct {
+	unversioned.TypeMeta `json:",inline"`
+	api.ObjectMeta       `json:"metadata,omitempty"`
+
+	// Specification of the desired behavior for this NetworkPolicy.
+	Spec NetworkPolicySpec `json:"spec,omitempty"`
+}
+
+type NetworkPolicySpec struct {
+	// Selects the pods to which this NetworkPolicy object applies.  The array of ingress rules
+	// is applied to any pods selected by this field. Multiple network policies can select the
+	// same set of pods.  In this case, the ingress rules for each are combined additively.
+	// This field is NOT optional and follows standard label selector semantics.
+	// An empty podSelector matches all pods in this namespace.
+	PodSelector unversioned.LabelSelector `json:"podSelector"`
+
+	// List of ingress rules to be applied to the selected pods.
+	// Traffic is allowed to a pod if namespace.networkPolicy.ingress.isolation is undefined and cluster policy allows it,
+	// OR if the traffic source is the pod's local node,
+	// OR if the traffic matches at least one ingress rule across all of the NetworkPolicy
+	// objects whose podSelector matches the pod.
+	// If this field is empty then this NetworkPolicy does not affect ingress isolation.
+	// If this field is present and contains at least one rule, this policy allows any traffic
+	// which matches at least one of the ingress rules in this list.
+	Ingress []NetworkPolicyIngressRule `json:"ingress,omitempty"`
+}
+
+// This NetworkPolicyIngressRule matches traffic if and only if the traffic matches both ports AND from.
+type NetworkPolicyIngressRule struct {
+	// List of ports which should be made accessible on the pods selected for this rule.
+	// Each item in this list is combined using a logical OR.
+	// If this field is not provided, this rule matches all ports (traffic not restricted by port).
+	// If this field is empty, this rule matches no ports (no traffic matches).
+	// If this field is present and contains at least one item, then this rule allows traffic
+	// only if the traffic matches at least one port in the list.
+	// TODO: Update this to be a pointer to slice as soon as auto-generation supports it.
+	Ports []NetworkPolicyPort `json:"ports,omitempty"`
+
+	// List of sources which should be able to access the pods selected for this rule.
+	// Items in this list are combined using a logical OR operation.
+	// If this field is not provided, this rule matches all sources (traffic not restricted by source).
+	// If this field is empty, this rule matches no sources (no traffic matches).
+	// If this field is present and contains at least on item, this rule allows traffic only if the
+	// traffic matches at least one item in the from list.
+	// TODO: Update this to be a pointer to slice as soon as auto-generation supports it.
+	From []NetworkPolicyPeer `json:"from,omitempty"`
+}
+
+type NetworkPolicyPort struct {
+	// Optional.  The protocol (TCP or UDP) which traffic must match.
+	// If not specified, this field defaults to TCP.
+	Protocol *api.Protocol `json:"protocol,omitempty"`
+
+	// If specified, the port on the given protocol.  This can
+	// either be a numerical or named port on a pod.  If this field is not provided,
+	// this matches all port names and numbers.
+	// If present, only traffic on the specified protocol AND port
+	// will be matched.
+	Port *intstr.IntOrString `json:"port,omitempty"`
+}
+
+type NetworkPolicyPeer struct {
+	// Exactly one of the following must be specified.
+
+	// This is a label selector which selects Pods in this namespace.
+	// This field follows standard label selector semantics.
+	// If not provided, this selector selects no pods.
+	// If present but empty, this selector selects all pods in this namespace.
+	PodSelector *unversioned.LabelSelector `json:"podSelector,omitempty"`
+
+	// Selects Namespaces using cluster scoped-labels.  This
+	// matches all pods in all namespaces selected by this label selector.
+	// This field follows standard label selector semantics.
+	// If omitted, this selector selects no namespaces.
+	// If present but empty, this selector selects all namespaces.
+	NamespaceSelector *unversioned.LabelSelector `json:"namespaceSelector,omitempty"`
+}
+
+// NetworkPolicyList is a list of NetworkPolicy objects.
+type NetworkPolicyList struct {
+	unversioned.TypeMeta `json:",inline"`
+	unversioned.ListMeta `json:"metadata,omitempty"`
+
+	Items []NetworkPolicy `json:"items"`
 }

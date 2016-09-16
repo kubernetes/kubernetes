@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -64,6 +64,8 @@ type HorizontalPodAutoscalerStatus struct {
 	// e.g. 70 means that an average pod is using now 70% of its requested CPU.
 	CurrentCPUUtilizationPercentage *int32 `json:"currentCPUUtilizationPercentage,omitempty" protobuf:"varint,5,opt,name=currentCPUUtilizationPercentage"`
 }
+
+// +genclient=true
 
 // configuration of a horizontal pod autoscaler.
 type HorizontalPodAutoscaler struct {

@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -28,7 +28,7 @@ import (
 
 // newPCB generates a new PCB using the id string as a unique qualifier
 func newPCB(id string, ps *apps.PetSet) (*pcb, error) {
-	petPod, err := controller.GetPodFromTemplate(&ps.Spec.Template, ps)
+	petPod, err := controller.GetPodFromTemplate(&ps.Spec.Template, ps, nil)
 	if err != nil {
 		return nil, err
 	}

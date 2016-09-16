@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,7 +25,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
@@ -93,7 +92,7 @@ func TestExportService(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		err := Strategy.Export(test.objIn, test.exact)
+		err := Strategy.Export(api.NewContext(), test.objIn, test.exact)
 		if err != nil {
 			if !test.expectErr {
 				t.Errorf("unexpected error: %v", err)
@@ -216,7 +215,7 @@ func TestSelectableFieldLabelConversions(t *testing.T) {
 	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
 		testapi.Default.GroupVersion().String(),
 		"Service",
-		labels.Set(ServiceToSelectableFields(&api.Service{})),
+		ServiceToSelectableFields(&api.Service{}),
 		nil,
 	)
 }
@@ -238,7 +237,7 @@ func TestServiceStatusStrategy(t *testing.T) {
 			},
 		},
 	}
-	StatusStrategy.PrepareForUpdate(&newService, &oldService)
+	StatusStrategy.PrepareForUpdate(ctx, &newService, &oldService)
 	if newService.Status.LoadBalancer.Ingress[0].IP != "127.0.0.2" {
 		t.Errorf("Service status updates should allow change of status fields")
 	}

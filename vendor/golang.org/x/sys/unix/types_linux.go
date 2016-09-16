@@ -50,18 +50,11 @@ package unix
 #include <linux/netlink.h>
 #include <linux/rtnetlink.h>
 #include <linux/icmpv6.h>
-#include <asm/termbits.h>
+#include <termios.h>
 #include <time.h>
 #include <unistd.h>
 #include <ustat.h>
 #include <utime.h>
-
-#ifdef TCSETS2
-// On systems that have "struct termios2" use this as type Termios.
-typedef struct termios2 termios_t;
-#else
-typedef struct termios termios_t;
-#endif
 
 enum {
 	sizeofPtr = sizeof(void*),
@@ -403,4 +396,4 @@ const (
 
 // Terminal handling
 
-type Termios C.termios_t
+type Termios C.struct_termios

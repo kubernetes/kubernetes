@@ -19,6 +19,7 @@ It has these top-level messages:
 	CriuDumpResp
 	CriuRestoreResp
 	CriuNotify
+	CriuFeatures
 	CriuReq
 	CriuResp
 */
@@ -30,6 +31,54 @@ import math "math"
 // Reference imports to suppress errors if they are not otherwise used.
 var _ = proto.Marshal
 var _ = math.Inf
+
+type CriuCgMode int32
+
+const (
+	CriuCgMode_IGNORE  CriuCgMode = 0
+	CriuCgMode_NONE    CriuCgMode = 1
+	CriuCgMode_PROPS   CriuCgMode = 2
+	CriuCgMode_SOFT    CriuCgMode = 3
+	CriuCgMode_FULL    CriuCgMode = 4
+	CriuCgMode_STRICT  CriuCgMode = 5
+	CriuCgMode_DEFAULT CriuCgMode = 6
+)
+
+var CriuCgMode_name = map[int32]string{
+	0: "IGNORE",
+	1: "NONE",
+	2: "PROPS",
+	3: "SOFT",
+	4: "FULL",
+	5: "STRICT",
+	6: "DEFAULT",
+}
+var CriuCgMode_value = map[string]int32{
+	"IGNORE":  0,
+	"NONE":    1,
+	"PROPS":   2,
+	"SOFT":    3,
+	"FULL":    4,
+	"STRICT":  5,
+	"DEFAULT": 6,
+}
+
+func (x CriuCgMode) Enum() *CriuCgMode {
+	p := new(CriuCgMode)
+	*p = x
+	return p
+}
+func (x CriuCgMode) String() string {
+	return proto.EnumName(CriuCgMode_name, int32(x))
+}
+func (x *CriuCgMode) UnmarshalJSON(data []byte) error {
+	value, err := proto.UnmarshalJSONEnum(CriuCgMode_value, data, "CriuCgMode")
+	if err != nil {
+		return err
+	}
+	*x = CriuCgMode(value)
+	return nil
+}
 
 type CriuReqType int32
 
@@ -43,6 +92,7 @@ const (
 	CriuReqType_NOTIFY        CriuReqType = 6
 	CriuReqType_CPUINFO_DUMP  CriuReqType = 7
 	CriuReqType_CPUINFO_CHECK CriuReqType = 8
+	CriuReqType_FEATURE_CHECK CriuReqType = 9
 )
 
 var CriuReqType_name = map[int32]string{
@@ -55,6 +105,7 @@ var CriuReqType_name = map[int32]string{
 	6: "NOTIFY",
 	7: "CPUINFO_DUMP",
 	8: "CPUINFO_CHECK",
+	9: "FEATURE_CHECK",
 }
 var CriuReqType_value = map[string]int32{
 	"EMPTY":         0,
@@ -66,6 +117,7 @@ var CriuReqType_value = map[string]int32{
 	"NOTIFY":        6,
 	"CPUINFO_DUMP":  7,
 	"CPUINFO_CHECK": 8,
+	"FEATURE_CHECK": 9,
 }
 
 func (x CriuReqType) Enum() *CriuReqType {
@@ -271,7 +323,12 @@ type CriuOpts struct {
 	SkipMnt           []string            `protobuf:"bytes,31,rep,name=skip_mnt" json:"skip_mnt,omitempty"`
 	EnableFs          []string            `protobuf:"bytes,32,rep,name=enable_fs" json:"enable_fs,omitempty"`
 	UnixSkIno         []*UnixSk           `protobuf:"bytes,33,rep,name=unix_sk_ino" json:"unix_sk_ino,omitempty"`
-	ManageCgroupsMode *uint32             `protobuf:"varint,34,opt,name=manage_cgroups_mode" json:"manage_cgroups_mode,omitempty"`
+	ManageCgroupsMode *CriuCgMode         `protobuf:"varint,34,opt,name=manage_cgroups_mode,enum=CriuCgMode" json:"manage_cgroups_mode,omitempty"`
+	GhostLimit        *uint32             `protobuf:"varint,35,opt,name=ghost_limit,def=1048576" json:"ghost_limit,omitempty"`
+	IrmapScanPaths    []string            `protobuf:"bytes,36,rep,name=irmap_scan_paths" json:"irmap_scan_paths,omitempty"`
+	External          []string            `protobuf:"bytes,37,rep,name=external" json:"external,omitempty"`
+	EmptyNs           *uint32             `protobuf:"varint,38,opt,name=empty_ns" json:"empty_ns,omitempty"`
+	NoSeccomp         *bool               `protobuf:"varint,39,opt,name=no_seccomp" json:"no_seccomp,omitempty"`
 	XXX_unrecognized  []byte              `json:"-"`
 }
 
@@ -281,6 +338,7 @@ func (*CriuOpts) ProtoMessage()    {}
 
 const Default_CriuOpts_LogLevel int32 = 2
 const Default_CriuOpts_CpuCap uint32 = 4294967295
+const Default_CriuOpts_GhostLimit uint32 = 1048576
 
 func (m *CriuOpts) GetImagesDirFd() int32 {
 	if m != nil && m.ImagesDirFd != nil {
@@ -513,11 +571,46 @@ func (m *CriuOpts) GetUnixSkIno() []*UnixSk {
 	return nil
 }
 
-func (m *CriuOpts) GetManageCgroupsMode() uint32 {
+func (m *CriuOpts) GetManageCgroupsMode() CriuCgMode {
 	if m != nil && m.ManageCgroupsMode != nil {
 		return *m.ManageCgroupsMode
 	}
+	return CriuCgMode_IGNORE
+}
+
+func (m *CriuOpts) GetGhostLimit() uint32 {
+	if m != nil && m.GhostLimit != nil {
+		return *m.GhostLimit
+	}
+	return Default_CriuOpts_GhostLimit
+}
+
+func (m *CriuOpts) GetIrmapScanPaths() []string {
+	if m != nil {
+		return m.IrmapScanPaths
+	}
+	return nil
+}
+
+func (m *CriuOpts) GetExternal() []string {
+	if m != nil {
+		return m.External
+	}
+	return nil
+}
+
+func (m *CriuOpts) GetEmptyNs() uint32 {
+	if m != nil && m.EmptyNs != nil {
+		return *m.EmptyNs
+	}
 	return 0
+}
+
+func (m *CriuOpts) GetNoSeccomp() bool {
+	if m != nil && m.NoSeccomp != nil {
+		return *m.NoSeccomp
+	}
+	return false
 }
 
 type CriuDumpResp struct {
@@ -576,6 +669,25 @@ func (m *CriuNotify) GetPid() int32 {
 	return 0
 }
 
+//
+// List of features which can queried via
+// CRIU_REQ_TYPE__FEATURE_CHECK
+type CriuFeatures struct {
+	MemTrack         *bool  `protobuf:"varint,1,opt,name=mem_track" json:"mem_track,omitempty"`
+	XXX_unrecognized []byte `json:"-"`
+}
+
+func (m *CriuFeatures) Reset()         { *m = CriuFeatures{} }
+func (m *CriuFeatures) String() string { return proto.CompactTextString(m) }
+func (*CriuFeatures) ProtoMessage()    {}
+
+func (m *CriuFeatures) GetMemTrack() bool {
+	if m != nil && m.MemTrack != nil {
+		return *m.MemTrack
+	}
+	return false
+}
+
 type CriuReq struct {
 	Type          *CriuReqType `protobuf:"varint,1,req,name=type,enum=CriuReqType" json:"type,omitempty"`
 	Opts          *CriuOpts    `protobuf:"bytes,2,opt,name=opts" json:"opts,omitempty"`
@@ -584,8 +696,13 @@ type CriuReq struct {
 	// When set service won't close the connection but
 	// will wait for more req-s to appear. Works not
 	// for all request types.
-	KeepOpen         *bool  `protobuf:"varint,4,opt,name=keep_open" json:"keep_open,omitempty"`
-	XXX_unrecognized []byte `json:"-"`
+	KeepOpen *bool `protobuf:"varint,4,opt,name=keep_open" json:"keep_open,omitempty"`
+	//
+	// 'features' can be used to query which features
+	// are supported by the installed criu/kernel
+	// via RPC.
+	Features         *CriuFeatures `protobuf:"bytes,5,opt,name=features" json:"features,omitempty"`
+	XXX_unrecognized []byte        `json:"-"`
 }
 
 func (m *CriuReq) Reset()         { *m = CriuReq{} }
@@ -620,6 +737,13 @@ func (m *CriuReq) GetKeepOpen() bool {
 	return false
 }
 
+func (m *CriuReq) GetFeatures() *CriuFeatures {
+	if m != nil {
+		return m.Features
+	}
+	return nil
+}
+
 type CriuResp struct {
 	Type             *CriuReqType        `protobuf:"varint,1,req,name=type,enum=CriuReqType" json:"type,omitempty"`
 	Success          *bool               `protobuf:"varint,2,req,name=success" json:"success,omitempty"`
@@ -628,6 +752,7 @@ type CriuResp struct {
 	Notify           *CriuNotify         `protobuf:"bytes,5,opt,name=notify" json:"notify,omitempty"`
 	Ps               *CriuPageServerInfo `protobuf:"bytes,6,opt,name=ps" json:"ps,omitempty"`
 	CrErrno          *int32              `protobuf:"varint,7,opt,name=cr_errno" json:"cr_errno,omitempty"`
+	Features         *CriuFeatures       `protobuf:"bytes,8,opt,name=features" json:"features,omitempty"`
 	XXX_unrecognized []byte              `json:"-"`
 }
 
@@ -684,6 +809,14 @@ func (m *CriuResp) GetCrErrno() int32 {
 	return 0
 }
 
+func (m *CriuResp) GetFeatures() *CriuFeatures {
+	if m != nil {
+		return m.Features
+	}
+	return nil
+}
+
 func init() {
+	proto.RegisterEnum("CriuCgMode", CriuCgMode_name, CriuCgMode_value)
 	proto.RegisterEnum("CriuReqType", CriuReqType_name, CriuReqType_value)
 }

@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,6 +24,18 @@ import (
 
 type FakeCore struct {
 	*core.Fake
+}
+
+func (c *FakeCore) Events(namespace string) unversioned.EventInterface {
+	return &FakeEvents{c, namespace}
+}
+
+func (c *FakeCore) Namespaces() unversioned.NamespaceInterface {
+	return &FakeNamespaces{c}
+}
+
+func (c *FakeCore) Secrets(namespace string) unversioned.SecretInterface {
+	return &FakeSecrets{c, namespace}
 }
 
 func (c *FakeCore) Services(namespace string) unversioned.ServiceInterface {

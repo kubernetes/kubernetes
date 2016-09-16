@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -32,9 +32,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
-	"k8s.io/kubernetes/pkg/auth/user"
 	"k8s.io/kubernetes/pkg/httplog"
-	"k8s.io/kubernetes/pkg/serviceaccount"
+	"k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
@@ -119,12 +118,16 @@ func MaxInFlightLimit(c chan bool, longRunningRequestCheck LongRunningRequestChe
 			defer func() { <-c }()
 			handler.ServeHTTP(w, r)
 		default:
-			tooManyRequests(w)
+			tooManyRequests(r, w)
 		}
 	})
 }
 
-func tooManyRequests(w http.ResponseWriter) {
+func tooManyRequests(req *http.Request, w http.ResponseWriter) {
+	// "Too Many Requests" response is returned before logger is setup for the request.
+	// So we need to explicitly log it here.
+	defer httplog.NewLogged(req, &w).Log()
+
 	// Return a 429 status indicating "Too Many Requests"
 	w.Header().Set("Retry-After", RetryAfter)
 	http.Error(w, "Too many requests, please try again later.", errors.StatusTooManyRequests)
@@ -133,12 +136,10 @@ func tooManyRequests(w http.ResponseWriter) {
 // RecoverPanics wraps an http Handler to recover and log panics.
 func RecoverPanics(handler http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		defer func() {
-			if x := recover(); x != nil {
-				http.Error(w, "apis panic. Look in log for details.", http.StatusInternalServerError)
-				glog.Errorf("APIServer panic'd on %v %v: %v\n%s\n", req.Method, req.RequestURI, x, debug.Stack())
-			}
-		}()
+		defer runtime.HandleCrash(func(err interface{}) {
+			http.Error(w, "This request caused apisever to panic. Look in log for details.", http.StatusInternalServerError)
+			glog.Errorf("APIServer panic'd on %v %v: %v\n%s\n", req.Method, req.RequestURI, err, debug.Stack())
+		})
 		defer httplog.NewLogged(req, &w).StacktraceWhen(
 			httplog.StatusIsNot(
 				http.StatusOK,
@@ -151,6 +152,7 @@ func RecoverPanics(handler http.Handler) http.Handler {
 				http.StatusNotFound,
 				http.StatusUnauthorized,
 				http.StatusForbidden,
+				http.StatusNotModified,
 				errors.StatusUnprocessableEntity,
 				http.StatusSwitchingProtocols,
 			),
@@ -161,11 +163,13 @@ func RecoverPanics(handler http.Handler) http.Handler {
 	})
 }
 
+var errConnKilled = fmt.Errorf("kill connection/stream")
+
 // TimeoutHandler returns an http.Handler that runs h with a timeout
 // determined by timeoutFunc. The new http.Handler calls h.ServeHTTP to handle
 // each request, but if a call runs for longer than its time limit, the
 // handler responds with a 503 Service Unavailable error and the message
-// provided. (If msg is empty, a suitable default message with be sent.) After
+// provided. (If msg is empty, a suitable default message will be sent.) After
 // the handler times out, writes by h to its http.ResponseWriter will return
 // http.ErrHandlerTimeout. If timeoutFunc returns a nil timeout channel, no
 // timeout will be enforced.
@@ -185,11 +189,11 @@ func (t *timeoutHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	done := make(chan struct{}, 1)
+	done := make(chan struct{})
 	tw := newTimeoutWriter(w)
 	go func() {
 		t.handler.ServeHTTP(tw, r)
-		done <- struct{}{}
+		close(done)
 	}()
 	select {
 	case <-done:
@@ -225,32 +229,48 @@ func newTimeoutWriter(w http.ResponseWriter) timeoutWriter {
 type baseTimeoutWriter struct {
 	w http.ResponseWriter
 
-	mu          sync.Mutex
-	timedOut    bool
+	mu sync.Mutex
+	// if the timeout handler has timedout
+	timedOut bool
+	// if this timeout writer has wrote header
 	wroteHeader bool
-	hijacked    bool
+	// if this timeout writer has been hijacked
+	hijacked bool
 }
 
 func (tw *baseTimeoutWriter) Header() http.Header {
+	tw.mu.Lock()
+	defer tw.mu.Unlock()
+
+	if tw.timedOut {
+		return http.Header{}
+	}
+
 	return tw.w.Header()
 }
 
 func (tw *baseTimeoutWriter) Write(p []byte) (int, error) {
 	tw.mu.Lock()
 	defer tw.mu.Unlock()
-	tw.wroteHeader = true
-	if tw.hijacked {
-		return 0, http.ErrHijacked
-	}
+
 	if tw.timedOut {
 		return 0, http.ErrHandlerTimeout
 	}
+	if tw.hijacked {
+		return 0, http.ErrHijacked
+	}
+
+	tw.wroteHeader = true
 	return tw.w.Write(p)
 }
 
 func (tw *baseTimeoutWriter) Flush() {
 	tw.mu.Lock()
 	defer tw.mu.Unlock()
+
+	if tw.timedOut {
+		return
+	}
 
 	if flusher, ok := tw.w.(http.Flusher); ok {
 		flusher.Flush()
@@ -260,9 +280,11 @@ func (tw *baseTimeoutWriter) Flush() {
 func (tw *baseTimeoutWriter) WriteHeader(code int) {
 	tw.mu.Lock()
 	defer tw.mu.Unlock()
+
 	if tw.timedOut || tw.wroteHeader || tw.hijacked {
 		return
 	}
+
 	tw.wroteHeader = true
 	tw.w.WriteHeader(code)
 }
@@ -270,6 +292,12 @@ func (tw *baseTimeoutWriter) WriteHeader(code int) {
 func (tw *baseTimeoutWriter) timeout(msg string) {
 	tw.mu.Lock()
 	defer tw.mu.Unlock()
+
+	tw.timedOut = true
+
+	// The timeout writer has not been used by the inner handler.
+	// We can safely timeout the HTTP request by sending by a timeout
+	// handler
 	if !tw.wroteHeader && !tw.hijacked {
 		tw.w.WriteHeader(http.StatusGatewayTimeout)
 		if msg != "" {
@@ -278,17 +306,40 @@ func (tw *baseTimeoutWriter) timeout(msg string) {
 			enc := json.NewEncoder(tw.w)
 			enc.Encode(errors.NewServerTimeout(api.Resource(""), "", 0))
 		}
+	} else {
+		// The timeout writer has been used by the inner handler. There is
+		// no way to timeout the HTTP request at the point. We have to shutdown
+		// the connection for HTTP1 or reset stream for HTTP2.
+		//
+		// Note from: Brad Fitzpatrick
+		// if the ServeHTTP goroutine panics, that will do the best possible thing for both
+		// HTTP/1 and HTTP/2. In HTTP/1, assuming you're replying with at least HTTP/1.1 and
+		// you've already flushed the headers so it's using HTTP chunking, it'll kill the TCP
+		// connection immediately without a proper 0-byte EOF chunk, so the peer will recognize
+		// the response as bogus. In HTTP/2 the server will just RST_STREAM the stream, leaving
+		// the TCP connection open, but resetting the stream to the peer so it'll have an error,
+		// like the HTTP/1 case.
+		panic(errConnKilled)
 	}
-	tw.timedOut = true
 }
 
 func (tw *baseTimeoutWriter) closeNotify() <-chan bool {
+	tw.mu.Lock()
+	defer tw.mu.Unlock()
+
+	if tw.timedOut {
+		done := make(chan bool)
+		close(done)
+		return done
+	}
+
 	return tw.w.(http.CloseNotifier).CloseNotify()
 }
 
 func (tw *baseTimeoutWriter) hijack() (net.Conn, *bufio.ReadWriter, error) {
 	tw.mu.Lock()
 	defer tw.mu.Unlock()
+
 	if tw.timedOut {
 		return nil, nil, http.ErrHandlerTimeout
 	}
@@ -410,79 +461,20 @@ func (r *requestAttributeGetter) GetAttribs(req *http.Request) authorizer.Attrib
 	return &attribs
 }
 
-func WithImpersonation(handler http.Handler, requestContextMapper api.RequestContextMapper, a authorizer.Authorizer) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		requestedSubject := req.Header.Get("Impersonate-User")
-		if len(requestedSubject) == 0 {
-			handler.ServeHTTP(w, req)
-			return
-		}
-
-		ctx, exists := requestContextMapper.Get(req)
-		if !exists {
-			forbidden(w, req)
-			return
-		}
-		requestor, exists := api.UserFrom(ctx)
-		if !exists {
-			forbidden(w, req)
-			return
-		}
-
-		actingAsAttributes := &authorizer.AttributesRecord{
-			User:            requestor,
-			Verb:            "impersonate",
-			APIGroup:        api.GroupName,
-			Resource:        "users",
-			Name:            requestedSubject,
-			ResourceRequest: true,
-		}
-		if namespace, name, err := serviceaccount.SplitUsername(requestedSubject); err == nil {
-			actingAsAttributes.Resource = "serviceaccounts"
-			actingAsAttributes.Namespace = namespace
-			actingAsAttributes.Name = name
-		}
-
-		err := a.Authorize(actingAsAttributes)
-		if err != nil {
-			forbidden(w, req)
-			return
-		}
-
-		switch {
-		case strings.HasPrefix(requestedSubject, serviceaccount.ServiceAccountUsernamePrefix):
-			namespace, name, err := serviceaccount.SplitUsername(requestedSubject)
-			if err != nil {
-				forbidden(w, req)
-				return
-			}
-			requestContextMapper.Update(req, api.WithUser(ctx, serviceaccount.UserInfo(namespace, name, "")))
-
-		default:
-			newUser := &user.DefaultInfo{
-				Name: requestedSubject,
-			}
-			requestContextMapper.Update(req, api.WithUser(ctx, newUser))
-		}
-
-		newCtx, _ := requestContextMapper.Get(req)
-		oldUser, _ := api.UserFrom(ctx)
-		newUser, _ := api.UserFrom(newCtx)
-		httplog.LogOf(req, w).Addf("%v is acting as %v", oldUser, newUser)
-
-		handler.ServeHTTP(w, req)
-	})
-}
-
 // WithAuthorizationCheck passes all authorized requests on to handler, and returns a forbidden error otherwise.
 func WithAuthorizationCheck(handler http.Handler, getAttribs RequestAttributeGetter, a authorizer.Authorizer) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		err := a.Authorize(getAttribs.GetAttribs(req))
-		if err == nil {
-			handler.ServeHTTP(w, req)
+		authorized, reason, err := a.Authorize(getAttribs.GetAttribs(req))
+		if err != nil {
+			internalError(w, req, err)
 			return
 		}
-		forbidden(w, req)
+		if !authorized {
+			glog.V(4).Infof("Forbidden: %#v, Reason: %s", req.RequestURI, reason)
+			forbidden(w, req)
+			return
+		}
+		handler.ServeHTTP(w, req)
 	})
 }
 

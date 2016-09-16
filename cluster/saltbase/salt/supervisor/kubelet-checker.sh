@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 The Kubernetes Authors All rights reserved.
+# Copyright 2015 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -34,7 +34,7 @@ max_seconds=10
 while true; do
   if ! curl --insecure -m ${max_seconds} -f -s https://127.0.0.1:{{kubelet_port}}/healthz > /dev/null; then
     echo "kubelet failed!"
-    curl --insecure -s http://127.0.0.1:{{kubelet_port}}/healthz
+    curl --insecure https://127.0.0.1:{{kubelet_port}}/healthz
     exit 2
   fi
   sleep 10

@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -38,7 +38,7 @@ type RateLimiter interface {
 // both overall and per-item rate limitting.  The overall is a token bucket and the per-item is exponential
 func DefaultControllerRateLimiter() RateLimiter {
 	return NewMaxOfRateLimiter(
-		DefaultItemBasedRateLimiter(),
+		NewItemExponentialFailureRateLimiter(5*time.Millisecond, 1000*time.Second),
 		// 10 qps, 100 bucket size.  This is only for retry speed and its only the overall factor (not per item)
 		&BucketRateLimiter{Bucket: ratelimit.NewBucketWithRate(float64(10), int64(100))},
 	)
@@ -83,16 +83,23 @@ func NewItemExponentialFailureRateLimiter(baseDelay time.Duration, maxDelay time
 }
 
 func DefaultItemBasedRateLimiter() RateLimiter {
-	return NewItemExponentialFailureRateLimiter(1*time.Millisecond, 1000*time.Second)
+	return NewItemExponentialFailureRateLimiter(time.Millisecond, 1000*time.Second)
 }
 
 func (r *ItemExponentialFailureRateLimiter) When(item interface{}) time.Duration {
 	r.failuresLock.Lock()
 	defer r.failuresLock.Unlock()
 
+	exp := r.failures[item]
 	r.failures[item] = r.failures[item] + 1
 
-	calculated := r.baseDelay * time.Duration(math.Pow10(r.failures[item]-1))
+	// The backoff is capped such that 'calculated' value never overflows.
+	backoff := float64(r.baseDelay.Nanoseconds()) * math.Pow(2, float64(exp))
+	if backoff > math.MaxInt64 {
+		return r.maxDelay
+	}
+
+	calculated := time.Duration(backoff)
 	if calculated > r.maxDelay {
 		return r.maxDelay
 	}

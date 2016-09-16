@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -36,7 +36,9 @@ func TestScopeNamingGenerateLink(t *testing.T) {
 	s := scopeNaming{
 		meta.RESTScopeNamespace,
 		selfLinker,
-		"/api/v1/namespaces/{namespace}/services/{name}",
+		func(name, namespace string) string {
+			return "/api/v1/namespaces/" + namespace + "/services/" + name
+		},
 		true,
 	}
 	service := &api.Service{

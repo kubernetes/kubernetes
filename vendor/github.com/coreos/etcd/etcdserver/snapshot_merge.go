@@ -1,4 +1,4 @@
-// Copyright 2015 CoreOS, Inc.
+// Copyright 2015 The etcd Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,9 +18,9 @@ import (
 	"io"
 	"log"
 
+	"github.com/coreos/etcd/mvcc/backend"
 	"github.com/coreos/etcd/raft/raftpb"
 	"github.com/coreos/etcd/snap"
-	"github.com/coreos/etcd/storage/backend"
 )
 
 // createMergedSnapshotMessage creates a snapshot message that contains: raft status (term, conf),
@@ -39,8 +39,11 @@ func (s *EtcdServer) createMergedSnapshotMessage(m raftpb.Message, snapi uint64,
 		plog.Panicf("store save should never fail: %v", err)
 	}
 
+	// commit kv to write metadata(for example: consistent index).
+	s.KV().Commit()
+	dbsnap := s.be.Snapshot()
 	// get a snapshot of v3 KV as readCloser
-	rc := newSnapshotReaderCloser(s.be.Snapshot())
+	rc := newSnapshotReaderCloser(dbsnap)
 
 	// put the []byte snapshot of store into raft snapshot and return the merged snapshot with
 	// KV readCloser snapshot.
@@ -54,7 +57,7 @@ func (s *EtcdServer) createMergedSnapshotMessage(m raftpb.Message, snapi uint64,
 	}
 	m.Snapshot = snapshot
 
-	return *snap.NewMessage(m, rc)
+	return *snap.NewMessage(m, rc, dbsnap.Size())
 }
 
 func newSnapshotReaderCloser(snapshot backend.Snapshot) io.ReadCloser {

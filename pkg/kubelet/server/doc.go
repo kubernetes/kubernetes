@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -15,4 +15,4 @@ limitations under the License.
 */
 
 // Package server contains functions related to serving Kubelet's external interface.
-package server
+package server // import "k8s.io/kubernetes/pkg/kubelet/server"

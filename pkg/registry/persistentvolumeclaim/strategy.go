@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -43,7 +43,7 @@ func (persistentvolumeclaimStrategy) NamespaceScoped() bool {
 }
 
 // PrepareForCreate clears the Status field which is not allowed to be set by end users on creation.
-func (persistentvolumeclaimStrategy) PrepareForCreate(obj runtime.Object) {
+func (persistentvolumeclaimStrategy) PrepareForCreate(ctx api.Context, obj runtime.Object) {
 	pv := obj.(*api.PersistentVolumeClaim)
 	pv.Status = api.PersistentVolumeClaimStatus{}
 }
@@ -62,7 +62,7 @@ func (persistentvolumeclaimStrategy) AllowCreateOnUpdate() bool {
 }
 
 // PrepareForUpdate sets the Status field which is not allowed to be set by end users on update
-func (persistentvolumeclaimStrategy) PrepareForUpdate(obj, old runtime.Object) {
+func (persistentvolumeclaimStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
 	newPvc := obj.(*api.PersistentVolumeClaim)
 	oldPvc := old.(*api.PersistentVolumeClaim)
 	newPvc.Status = oldPvc.Status
@@ -84,7 +84,7 @@ type persistentvolumeclaimStatusStrategy struct {
 var StatusStrategy = persistentvolumeclaimStatusStrategy{Strategy}
 
 // PrepareForUpdate sets the Spec field which is not allowed to be changed when updating a PV's Status
-func (persistentvolumeclaimStatusStrategy) PrepareForUpdate(obj, old runtime.Object) {
+func (persistentvolumeclaimStatusStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
 	newPv := obj.(*api.PersistentVolumeClaim)
 	oldPv := old.(*api.PersistentVolumeClaim)
 	newPv.Spec = oldPv.Spec
@@ -95,23 +95,26 @@ func (persistentvolumeclaimStatusStrategy) ValidateUpdate(ctx api.Context, obj, 
 }
 
 // MatchPersistentVolumeClaim returns a generic matcher for a given label and field selector.
-func MatchPersistentVolumeClaim(label labels.Selector, field fields.Selector) generic.Matcher {
-	return generic.MatcherFunc(func(obj runtime.Object) (bool, error) {
-		persistentvolumeclaimObj, ok := obj.(*api.PersistentVolumeClaim)
-		if !ok {
-			return false, fmt.Errorf("not a persistentvolumeclaim")
-		}
-		fields := PersistentVolumeClaimToSelectableFields(persistentvolumeclaimObj)
-		return label.Matches(labels.Set(persistentvolumeclaimObj.Labels)) && field.Matches(fields), nil
-	})
+func MatchPersistentVolumeClaim(label labels.Selector, field fields.Selector) *generic.SelectionPredicate {
+	return &generic.SelectionPredicate{
+		Label: label,
+		Field: field,
+		GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
+			persistentvolumeclaimObj, ok := obj.(*api.PersistentVolumeClaim)
+			if !ok {
+				return nil, nil, fmt.Errorf("not a persistentvolumeclaim")
+			}
+			return labels.Set(persistentvolumeclaimObj.Labels), PersistentVolumeClaimToSelectableFields(persistentvolumeclaimObj), nil
+		},
+	}
 }
 
-// PersistentVolumeClaimToSelectableFields returns a label set that represents the object
-func PersistentVolumeClaimToSelectableFields(persistentvolumeclaim *api.PersistentVolumeClaim) labels.Set {
-	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(persistentvolumeclaim.ObjectMeta, true)
+// PersistentVolumeClaimToSelectableFields returns a field set that represents the object
+func PersistentVolumeClaimToSelectableFields(persistentvolumeclaim *api.PersistentVolumeClaim) fields.Set {
+	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(&persistentvolumeclaim.ObjectMeta, true)
 	specificFieldsSet := fields.Set{
 		// This is a bug, but we need to support it for backward compatibility.
 		"name": persistentvolumeclaim.Name,
 	}
-	return labels.Set(generic.MergeFieldsSets(objectMetaFieldsSet, specificFieldsSet))
+	return generic.MergeFieldsSets(objectMetaFieldsSet, specificFieldsSet)
 }

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,9 +17,7 @@ limitations under the License.
 package etcd
 
 import (
-	"math/rand"
 	rt "runtime"
-	"sync"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -39,7 +37,7 @@ var versioner = APIObjectVersioner{}
 // Implements etcdCache interface as empty methods (i.e. does not cache any objects)
 type fakeEtcdCache struct{}
 
-func (f *fakeEtcdCache) getFromCache(index uint64, filter storage.FilterFunc) (runtime.Object, bool) {
+func (f *fakeEtcdCache) getFromCache(index uint64, filter storage.Filter) (runtime.Object, bool) {
 	return nil, false
 }
 
@@ -48,17 +46,26 @@ func (f *fakeEtcdCache) addToCache(index uint64, obj runtime.Object) {
 
 var _ etcdCache = &fakeEtcdCache{}
 
+// firstLetterIsB implements storage.Filter interface.
+type firstLetterIsB struct {
+}
+
+func (f *firstLetterIsB) Filter(obj runtime.Object) bool {
+	return obj.(*api.Pod).Name[0] == 'b'
+}
+
+func (f *firstLetterIsB) Trigger() []storage.MatchValue {
+	return nil
+}
+
 func TestWatchInterpretations(t *testing.T) {
 	codec := testapi.Default.Codec()
 	// Declare some pods to make the test cases compact.
 	podFoo := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 	podBar := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "bar"}}
 	podBaz := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "baz"}}
-	firstLetterIsB := func(obj runtime.Object) bool {
-		return obj.(*api.Pod).Name[0] == 'b'
-	}
 
-	// All of these test cases will be run with the firstLetterIsB FilterFunc.
+	// All of these test cases will be run with the firstLetterIsB Filter.
 	table := map[string]struct {
 		actions       []string // Run this test item for every action here.
 		prevNodeValue string
@@ -131,7 +138,7 @@ func TestWatchInterpretations(t *testing.T) {
 
 	for name, item := range table {
 		for _, action := range item.actions {
-			w := newEtcdWatcher(true, false, nil, firstLetterIsB, codec, versioner, nil, &fakeEtcdCache{})
+			w := newEtcdWatcher(true, false, nil, &firstLetterIsB{}, codec, versioner, nil, &fakeEtcdCache{})
 			emitCalled := false
 			w.emit = func(event watch.Event) {
 				emitCalled = true
@@ -222,9 +229,10 @@ func TestWatchInterpretation_ResponseBadData(t *testing.T) {
 
 func TestSendResultDeleteEventHaveLatestIndex(t *testing.T) {
 	codec := testapi.Default.Codec()
-	filter := func(obj runtime.Object) bool {
+	filterFunc := func(obj runtime.Object) bool {
 		return obj.(*api.Pod).Name != "bar"
 	}
+	filter := storage.NewSimpleFilter(filterFunc, storage.NoTriggerFunc)
 	w := newEtcdWatcher(false, false, nil, filter, codec, versioner, nil, &fakeEtcdCache{})
 
 	eventChan := make(chan watch.Event, 1)
@@ -545,36 +553,5 @@ func TestWatchPurposefulShutdown(t *testing.T) {
 	event, open := <-watching.ResultChan()
 	if open && event.Type != watch.Error {
 		t.Errorf("Unexpected event from stopped watcher: %#v", event)
-	}
-}
-
-func TestHighWaterMark(t *testing.T) {
-	var h HighWaterMark
-
-	for i := int64(10); i < 20; i++ {
-		if !h.Update(i) {
-			t.Errorf("unexpected false for %v", i)
-		}
-		if h.Update(i - 1) {
-			t.Errorf("unexpected true for %v", i-1)
-		}
-	}
-
-	m := int64(0)
-	wg := sync.WaitGroup{}
-	for i := 0; i < 300; i++ {
-		wg.Add(1)
-		v := rand.Int63()
-		go func(v int64) {
-			defer wg.Done()
-			h.Update(v)
-		}(v)
-		if v > m {
-			m = v
-		}
-	}
-	wg.Wait()
-	if m != int64(h) {
-		t.Errorf("unexpected value, wanted %v, got %v", m, int64(h))
 	}
 }

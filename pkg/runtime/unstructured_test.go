@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/meta/metatypes"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
@@ -141,6 +142,25 @@ func TestUnstructuredGetters(t *testing.T) {
 				"annotations": map[string]interface{}{
 					"test_annotation": "test_value",
 				},
+				"ownerReferences": []map[string]interface{}{
+					{
+						"kind":       "Pod",
+						"name":       "poda",
+						"apiVersion": "v1",
+						"uid":        "1",
+					},
+					{
+						"kind":       "Pod",
+						"name":       "podb",
+						"apiVersion": "v1",
+						"uid":        "2",
+					},
+				},
+				"finalizers": []interface{}{
+					"finalizer.1",
+					"finalizer.2",
+				},
+				"clusterName": "cluster123",
 			},
 		},
 	}
@@ -192,10 +212,35 @@ func TestUnstructuredGetters(t *testing.T) {
 	if got, want := unstruct.GetAnnotations(), map[string]string{"test_annotation": "test_value"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("GetAnnotations() = %s, want %s", got, want)
 	}
+	refs := unstruct.GetOwnerReferences()
+	expectedOwnerReferences := []metatypes.OwnerReference{
+		{
+			Kind:       "Pod",
+			Name:       "poda",
+			APIVersion: "v1",
+			UID:        "1",
+		},
+		{
+			Kind:       "Pod",
+			Name:       "podb",
+			APIVersion: "v1",
+			UID:        "2",
+		},
+	}
+	if got, want := refs, expectedOwnerReferences; !reflect.DeepEqual(got, want) {
+		t.Errorf("GetOwnerReferences()=%v, want %v", got, want)
+	}
+	if got, want := unstruct.GetFinalizers(), []string{"finalizer.1", "finalizer.2"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("GetFinalizers()=%v, want %v", got, want)
+	}
+	if got, want := unstruct.GetClusterName(), "cluster123"; got != want {
+		t.Errorf("GetClusterName()=%v, want %v", got, want)
+	}
 }
 
 func TestUnstructuredSetters(t *testing.T) {
 	unstruct := runtime.Unstructured{}
+	trueVar := true
 
 	want := runtime.Unstructured{
 		Object: map[string]interface{}{
@@ -216,6 +261,27 @@ func TestUnstructuredSetters(t *testing.T) {
 				"annotations": map[string]interface{}{
 					"test_annotation": "test_value",
 				},
+				"ownerReferences": []map[string]interface{}{
+					{
+						"kind":       "Pod",
+						"name":       "poda",
+						"apiVersion": "v1",
+						"uid":        "1",
+						"controller": (*bool)(nil),
+					},
+					{
+						"kind":       "Pod",
+						"name":       "podb",
+						"apiVersion": "v1",
+						"uid":        "2",
+						"controller": &trueVar,
+					},
+				},
+				"finalizers": []interface{}{
+					"finalizer.1",
+					"finalizer.2",
+				},
+				"clusterName": "cluster123",
 			},
 		},
 	}
@@ -233,9 +299,27 @@ func TestUnstructuredSetters(t *testing.T) {
 	unstruct.SetDeletionTimestamp(&date)
 	unstruct.SetLabels(map[string]string{"test_label": "test_value"})
 	unstruct.SetAnnotations(map[string]string{"test_annotation": "test_value"})
+	newOwnerReferences := []metatypes.OwnerReference{
+		{
+			Kind:       "Pod",
+			Name:       "poda",
+			APIVersion: "v1",
+			UID:        "1",
+		},
+		{
+			Kind:       "Pod",
+			Name:       "podb",
+			APIVersion: "v1",
+			UID:        "2",
+			Controller: &trueVar,
+		},
+	}
+	unstruct.SetOwnerReferences(newOwnerReferences)
+	unstruct.SetFinalizers([]string{"finalizer.1", "finalizer.2"})
+	unstruct.SetClusterName("cluster123")
 
 	if !reflect.DeepEqual(unstruct, want) {
-		t.Errorf("Wanted: \n%s\n Got:\n%s", unstruct, want)
+		t.Errorf("Wanted: \n%s\n Got:\n%s", want, unstruct)
 	}
 }
 

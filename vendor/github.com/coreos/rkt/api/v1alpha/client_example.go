@@ -17,15 +17,89 @@
 package main
 
 import (
+	"flag"
 	"fmt"
+	"io"
 	"os"
+	"time"
 
 	"github.com/coreos/rkt/api/v1alpha"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 )
 
+func getLogsWithoutFollow(c v1alpha.PublicAPIClient, p *v1alpha.Pod) {
+	if len(p.Apps) == 0 {
+		fmt.Printf("Pod %q has no apps\n", p.Id)
+		return
+	}
+
+	logsResp, err := c.GetLogs(context.Background(), &v1alpha.GetLogsRequest{
+		PodId:     p.Id,
+		Follow:    false,
+		AppName:   p.Apps[0].Name,
+		SinceTime: time.Now().Add(-time.Second * 5).Unix(),
+		Lines:     10,
+	})
+
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	logsRecvResp, err := logsResp.Recv()
+
+	if err == io.EOF {
+		return
+	}
+
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	for _, l := range logsRecvResp.Lines {
+		fmt.Println(l)
+	}
+}
+
+func getLogsWithFollow(c v1alpha.PublicAPIClient, p *v1alpha.Pod) {
+	if len(p.Apps) == 0 {
+		fmt.Printf("Pod %q has no apps\n", p.Id)
+		return
+	}
+
+	logsResp, err := c.GetLogs(context.Background(), &v1alpha.GetLogsRequest{
+		PodId:   p.Id,
+		Follow:  true,
+		AppName: p.Apps[0].Name,
+	})
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	for {
+		logsRecvResp, err := logsResp.Recv()
+		if err == io.EOF {
+			return
+		}
+
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+
+		for _, l := range logsRecvResp.Lines {
+			fmt.Println(l)
+		}
+	}
+}
+
 func main() {
+	followFlag := flag.Bool("follow", false, "enable 'follow' option on GetLogs")
+	flag.Parse()
+
 	conn, err := grpc.Dial("localhost:15441", grpc.WithInsecure())
 	if err != nil {
 		fmt.Println(err)
@@ -46,11 +120,17 @@ func main() {
 	})
 	if err != nil {
 		fmt.Println(err)
-		os.Exit(2)
+		os.Exit(1)
 	}
 
 	for _, p := range podResp.Pods {
-		fmt.Printf("Pod %q is running\n", p.Id)
+		if *followFlag {
+			fmt.Printf("Pod %q is running. Following logs:\n", p.Id)
+			getLogsWithFollow(c, p)
+		} else {
+			fmt.Printf("Pod %q is running.\n", p.Id)
+			getLogsWithoutFollow(c, p)
+		}
 	}
 
 	// List images.
@@ -65,7 +145,7 @@ func main() {
 	})
 	if err != nil {
 		fmt.Println(err)
-		os.Exit(3)
+		os.Exit(1)
 	}
 
 	for _, im := range imgResp.Images {

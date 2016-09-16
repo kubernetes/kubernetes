@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 
 	apivalidation "k8s.io/kubernetes/pkg/api/validation"
+	pathvalidation "k8s.io/kubernetes/pkg/api/validation/path"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler"
@@ -39,10 +40,7 @@ func ValidateScale(scale *autoscaling.Scale) field.ErrorList {
 
 // ValidateHorizontalPodAutoscaler can be used to check whether the given autoscaler name is valid.
 // Prefix indicates this name will be used as part of generation, in which case trailing dashes are allowed.
-func ValidateHorizontalPodAutoscalerName(name string, prefix bool) (bool, string) {
-	// TODO: finally move it to pkg/api/validation and use nameIsDNSSubdomain function
-	return apivalidation.ValidateReplicationControllerName(name, prefix)
-}
+var ValidateHorizontalPodAutoscalerName = apivalidation.ValidateReplicationControllerName
 
 func validateHorizontalPodAutoscalerSpec(autoscaler autoscaling.HorizontalPodAutoscalerSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -68,14 +66,18 @@ func ValidateCrossVersionObjectReference(ref autoscaling.CrossVersionObjectRefer
 	allErrs := field.ErrorList{}
 	if len(ref.Kind) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("kind"), ""))
-	} else if ok, msg := apivalidation.IsValidPathSegmentName(ref.Kind); !ok {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("kind"), ref.Kind, msg))
+	} else {
+		for _, msg := range pathvalidation.IsValidPathSegmentName(ref.Kind) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("kind"), ref.Kind, msg))
+		}
 	}
 
 	if len(ref.Name) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
-	} else if ok, msg := apivalidation.IsValidPathSegmentName(ref.Name); !ok {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), ref.Name, msg))
+	} else {
+		for _, msg := range pathvalidation.IsValidPathSegmentName(ref.Name) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), ref.Name, msg))
+		}
 	}
 
 	return allErrs

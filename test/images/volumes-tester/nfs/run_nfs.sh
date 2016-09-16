@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 The Kubernetes Authors All rights reserved.
+# Copyright 2015 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,10 +17,23 @@
 function start()
 {
 
+    unset gid
+    # accept "-G gid" option
+    while getopts "G:" opt; do
+        case ${opt} in
+            G) gid=${OPTARG};;
+        esac
+    done
+    shift $(($OPTIND - 1))
+
     # prepare /etc/exports
     for i in "$@"; do
         # fsid=0: needed for NFSv4
         echo "$i *(rw,fsid=0,insecure,no_root_squash)" >> /etc/exports
+        if [ -v gid ] ; then
+            chmod 070 $i
+            chgrp $gid $i
+        fi
         # move index.html to here
         /bin/cp /tmp/index.html $i/
         chmod 644 $i/index.html

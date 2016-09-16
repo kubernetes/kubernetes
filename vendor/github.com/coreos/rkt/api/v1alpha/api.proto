@@ -74,6 +74,9 @@ message Image {
 
         // Annotations on this image.
         repeated KeyValue annotations = 8;
+
+        // Labels of this image.
+        repeated KeyValue labels = 9;
 }
 
 // Network describes the network information of a pod.
@@ -217,6 +220,10 @@ message PodFilter {
 
         // If not empty, the pods whose cgroup are listed will be returned.
         repeated string cgroups = 7;
+
+        // If not empty, the pods whose these cgroup belong to will be returned.
+        // i.e. the pod's cgroup is a prefix of the specified cgroup
+        repeated string pod_sub_cgroups = 8;
 }
 
 // ImageFilter defines the condition that the returned images need to satisfy in ListImages().

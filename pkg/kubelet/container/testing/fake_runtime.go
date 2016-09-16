@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -27,15 +27,21 @@ import (
 	. "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
+	"k8s.io/kubernetes/pkg/util/term"
 	"k8s.io/kubernetes/pkg/volume"
 )
+
+type FakePod struct {
+	Pod       *Pod
+	NetnsPath string
+}
 
 // FakeRuntime is a fake container runtime for testing.
 type FakeRuntime struct {
 	sync.Mutex
 	CalledFunctions   []string
-	PodList           []*Pod
-	AllPodList        []*Pod
+	PodList           []*FakePod
+	AllPodList        []*FakePod
 	ImageList         []Image
 	APIPodStatus      api.PodStatus
 	PodStatus         PodStatus
@@ -98,8 +104,8 @@ func (f *FakeRuntime) ClearCalls() {
 	defer f.Unlock()
 
 	f.CalledFunctions = []string{}
-	f.PodList = []*Pod{}
-	f.AllPodList = []*Pod{}
+	f.PodList = []*FakePod{}
+	f.AllPodList = []*FakePod{}
 	f.APIPodStatus = api.PodStatus{}
 	f.StartedPods = []string{}
 	f.KilledPods = []string{}
@@ -182,11 +188,19 @@ func (f *FakeRuntime) GetPods(all bool) ([]*Pod, error) {
 	f.Lock()
 	defer f.Unlock()
 
+	var pods []*Pod
+
 	f.CalledFunctions = append(f.CalledFunctions, "GetPods")
 	if all {
-		return f.AllPodList, f.Err
+		for _, fakePod := range f.AllPodList {
+			pods = append(pods, fakePod.Pod)
+		}
+	} else {
+		for _, fakePod := range f.PodList {
+			pods = append(pods, fakePod.Pod)
+		}
 	}
-	return f.PodList, f.Err
+	return pods, f.Err
 }
 
 func (f *FakeRuntime) SyncPod(pod *api.Pod, _ api.PodStatus, _ *PodStatus, _ []api.Secret, backOff *flowcontrol.Backoff) (result PodSyncResult) {
@@ -260,7 +274,7 @@ func (f *FakeRuntime) GetPodStatus(uid types.UID, name, namespace string) (*PodS
 	return &status, f.Err
 }
 
-func (f *FakeRuntime) ExecInContainer(containerID ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool) error {
+func (f *FakeRuntime) ExecInContainer(containerID ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size) error {
 	f.Lock()
 	defer f.Unlock()
 
@@ -268,7 +282,7 @@ func (f *FakeRuntime) ExecInContainer(containerID ContainerID, cmd []string, std
 	return f.Err
 }
 
-func (f *FakeRuntime) AttachContainer(containerID ContainerID, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool) error {
+func (f *FakeRuntime) AttachContainer(containerID ContainerID, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size) error {
 	f.Lock()
 	defer f.Unlock()
 
@@ -338,11 +352,44 @@ func (f *FakeRuntime) PortForward(pod *Pod, port uint16, stream io.ReadWriteClos
 	return f.Err
 }
 
-func (f *FakeRuntime) GarbageCollect(gcPolicy ContainerGCPolicy) error {
+func (f *FakeRuntime) GetNetNS(containerID ContainerID) (string, error) {
+	f.Lock()
+	defer f.Unlock()
+
+	f.CalledFunctions = append(f.CalledFunctions, "GetNetNS")
+
+	for _, fp := range f.AllPodList {
+		for _, c := range fp.Pod.Containers {
+			if c.ID == containerID {
+				return fp.NetnsPath, nil
+			}
+		}
+	}
+
+	return "", f.Err
+}
+
+func (f *FakeRuntime) GetPodContainerID(pod *Pod) (ContainerID, error) {
+	f.Lock()
+	defer f.Unlock()
+
+	f.CalledFunctions = append(f.CalledFunctions, "GetPodContainerID")
+	return ContainerID{}, f.Err
+}
+
+func (f *FakeRuntime) GarbageCollect(gcPolicy ContainerGCPolicy, ready bool) error {
 	f.Lock()
 	defer f.Unlock()
 
 	f.CalledFunctions = append(f.CalledFunctions, "GarbageCollect")
+	return f.Err
+}
+
+func (f *FakeRuntime) DeleteContainer(containerID ContainerID) error {
+	f.Lock()
+	defer f.Unlock()
+
+	f.CalledFunctions = append(f.CalledFunctions, "DeleteContainer")
 	return f.Err
 }
 

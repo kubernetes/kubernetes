@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -174,6 +174,19 @@ type NamedCreater interface {
 	Create(ctx api.Context, name string, obj runtime.Object) (runtime.Object, error)
 }
 
+// UpdatedObjectInfo provides information about an updated object to an Updater.
+// It requires access to the old object in order to return the newly updated object.
+type UpdatedObjectInfo interface {
+	// Returns preconditions built from the updated object, if applicable.
+	// May return nil, or a preconditions object containing nil fields,
+	// if no preconditions can be determined from the updated object.
+	Preconditions() *api.Preconditions
+
+	// UpdatedObject returns the updated object, given a context and old object.
+	// The only time an empty oldObj should be passed in is if a "create on update" is occurring (there is no oldObj).
+	UpdatedObject(ctx api.Context, oldObj runtime.Object) (newObj runtime.Object, err error)
+}
+
 // Updater is an object that can update an instance of a RESTful object.
 type Updater interface {
 	// New returns an empty object that can be used with Update after request data has been put into it.
@@ -183,14 +196,14 @@ type Updater interface {
 	// Update finds a resource in the storage and updates it. Some implementations
 	// may allow updates creates the object - they should set the created boolean
 	// to true.
-	Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error)
+	Update(ctx api.Context, name string, objInfo UpdatedObjectInfo) (runtime.Object, bool, error)
 }
 
 // CreaterUpdater is a storage object that must support both create and update.
 // Go prevents embedded interfaces that implement the same method.
 type CreaterUpdater interface {
 	Creater
-	Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error)
+	Update(ctx api.Context, name string, objInfo UpdatedObjectInfo) (runtime.Object, bool, error)
 }
 
 // CreaterUpdater must satisfy the Updater interface.
@@ -263,7 +276,7 @@ type Connecter interface {
 // instead of decoded directly.
 type ResourceStreamer interface {
 	// InputStream should return an io.ReadCloser if the provided object supports streaming. The desired
-	// api version and a accept header (may be empty) are passed to the call. If no error occurs,
+	// api version and an accept header (may be empty) are passed to the call. If no error occurs,
 	// the caller may return a flag indicating whether the result should be flushed as writes occur
 	// and a content type string that indicates the type of the stream.
 	// If a null stream is returned, a StatusNoContent response wil be generated.

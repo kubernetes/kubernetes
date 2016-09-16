@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -35,9 +35,9 @@ var (
 	requestCounter = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "apiserver_request_count",
-			Help: "Counter of apiserver requests broken out for each verb, API resource, client, and HTTP response code.",
+			Help: "Counter of apiserver requests broken out for each verb, API resource, client, and HTTP response contentType and code.",
 		},
-		[]string{"verb", "resource", "client", "code"},
+		[]string{"verb", "resource", "client", "contentType", "code"},
 	)
 	requestLatencies = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
@@ -66,9 +66,9 @@ func Register() {
 	prometheus.MustRegister(requestLatenciesSummary)
 }
 
-func Monitor(verb, resource *string, client string, httpCode int, reqStart time.Time) {
+func Monitor(verb, resource *string, client, contentType string, httpCode int, reqStart time.Time) {
 	elapsed := float64((time.Since(reqStart)) / time.Microsecond)
-	requestCounter.WithLabelValues(*verb, *resource, client, codeToString(httpCode)).Inc()
+	requestCounter.WithLabelValues(*verb, *resource, client, contentType, codeToString(httpCode)).Inc()
 	requestLatencies.WithLabelValues(*verb, *resource).Observe(elapsed)
 	requestLatenciesSummary.WithLabelValues(*verb, *resource).Observe(elapsed)
 }
@@ -99,7 +99,7 @@ func InstrumentRouteFunc(verb, resource string, routeFunc restful.RouteFunction)
 		response.ResponseWriter = rw
 
 		routeFunc(request, response)
-		Monitor(&verb, &resource, utilnet.GetHTTPClient(request.Request), delegate.status, now)
+		Monitor(&verb, &resource, utilnet.GetHTTPClient(request.Request), rw.Header().Get("Content-Type"), delegate.status, now)
 	})
 }
 

@@ -2,15 +2,15 @@
 
 <!-- BEGIN STRIP_FOR_RELEASE -->
 
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
 
 <h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
@@ -21,7 +21,7 @@ refer to the docs that go with that version.
 <!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.2/docs/design/nodeaffinity.md).
+[here](http://releases.k8s.io/release-1.4/docs/design/nodeaffinity.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -62,14 +62,14 @@ scheduling requirements.
 rather than replacing `map[string]string`, due to backward compatibility
 requirements.)
 
-The affiniy specifications described above allow a pod to request various
+The affinity specifications described above allow a pod to request various
 properties that are inherent to nodes, for example "run this pod on a node with
 an Intel CPU" or, in a multi-zone cluster, "run this pod on a node in zone Z."
 ([This issue](https://github.com/kubernetes/kubernetes/issues/9044) describes
 some of the properties that a node might publish as labels, which affinity
 expressions can match against.) They do *not* allow a pod to request to schedule
 (or not schedule) on a node based on what other pods are running on the node.
-That feature is called "inter-pod topological affinity/anti-afinity" and is
+That feature is called "inter-pod topological affinity/anti-affinity" and is
 described [here](https://github.com/kubernetes/kubernetes/pull/18265).
 
 ## API
@@ -211,7 +211,7 @@ Users should not start using `NodeAffinity` until the full implementation has
 been in Kubelet and the master for enough binary versions that we feel
 comfortable that we will not need to roll back either Kubelet or master to a
 version that does not support them. Longer-term we will use a programatic
-approach to enforcing this (#4855).
+approach to enforcing this ([#4855](https://github.com/kubernetes/kubernetes/issues/4855)).
 
 ## Implementation plan
 
@@ -234,7 +234,7 @@ longer satisfies `RequiredDuringSchedulingRequiredDuringExecution` (see [this co
 
 We assume Kubelet publishes labels describing the node's membership in all of
 the relevant scheduling domains (e.g. node name, rack name, availability zone
-name, etc.). See #9044.
+name, etc.). See [#9044](https://github.com/kubernetes/kubernetes/issues/9044).
 
 ## Extensibility
 
@@ -268,10 +268,11 @@ Are there any other fields we should convert from `map[string]string` to
 
 ## Related issues
 
-The review for this proposal is in #18261.
+The review for this proposal is in [#18261](https://github.com/kubernetes/kubernetes/issues/18261).
 
-The main related issue is #341. Issue #367 is also related. Those issues
-reference other related issues.
+The main related issue is [#341](https://github.com/kubernetes/kubernetes/issues/341).
+Issue [#367](https://github.com/kubernetes/kubernetes/issues/367) is also related.
+Those issues reference other related issues.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

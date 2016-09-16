@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,8 +18,9 @@ package keymutex
 
 import (
 	"fmt"
-	"github.com/golang/glog"
 	"sync"
+
+	"github.com/golang/glog"
 )
 
 // KeyMutex is a thread-safe interface for acquiring locks on arbitrary strings.

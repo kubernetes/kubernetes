@@ -1,4 +1,4 @@
-// Copyright 2015 CoreOS, Inc.
+// Copyright 2015 The etcd Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -25,28 +25,28 @@ import (
 	"fmt"
 	"math/big"
 	"net"
-	"net/http"
 	"os"
 	"path"
 	"strings"
 	"time"
 
+	"github.com/coreos/etcd/pkg/fileutil"
 	"github.com/coreos/etcd/pkg/tlsutil"
 )
 
-func NewListener(addr string, scheme string, tlscfg *tls.Config) (net.Listener, error) {
-	nettype := "tcp"
-	if scheme == "unix" {
+func NewListener(addr string, scheme string, tlscfg *tls.Config) (l net.Listener, err error) {
+	if scheme == "unix" || scheme == "unixs" {
 		// unix sockets via unix://laddr
-		nettype = scheme
+		l, err = NewUnixListener(addr)
+	} else {
+		l, err = net.Listen("tcp", addr)
 	}
 
-	l, err := net.Listen(nettype, addr)
 	if err != nil {
 		return nil, err
 	}
 
-	if scheme == "https" {
+	if scheme == "https" || scheme == "unixs" {
 		if tlscfg == nil {
 			return nil, fmt.Errorf("cannot listen on TLS for %s: KeyFile and CertFile are not presented", scheme+"://"+addr)
 		}
@@ -57,33 +57,15 @@ func NewListener(addr string, scheme string, tlscfg *tls.Config) (net.Listener, 
 	return l, nil
 }
 
-func NewTransport(info TLSInfo, dialtimeoutd time.Duration) (*http.Transport, error) {
-	cfg, err := info.ClientConfig()
-	if err != nil {
-		return nil, err
-	}
-
-	t := &http.Transport{
-		Proxy: http.ProxyFromEnvironment,
-		Dial: (&net.Dialer{
-			Timeout: dialtimeoutd,
-			// value taken from http.DefaultTransport
-			KeepAlive: 30 * time.Second,
-		}).Dial,
-		// value taken from http.DefaultTransport
-		TLSHandshakeTimeout: 10 * time.Second,
-		TLSClientConfig:     cfg,
-	}
-
-	return t, nil
-}
-
 type TLSInfo struct {
 	CertFile       string
 	KeyFile        string
 	CAFile         string
 	TrustedCAFile  string
 	ClientCertAuth bool
+
+	// ServerName ensures the cert matches the given host in case of discovery / virtual hosting
+	ServerName string
 
 	selfCert bool
 
@@ -101,7 +83,7 @@ func (info TLSInfo) Empty() bool {
 }
 
 func SelfCert(dirpath string, hosts []string) (info TLSInfo, err error) {
-	if err = os.MkdirAll(dirpath, 0700); err != nil {
+	if err = fileutil.TouchDirAll(dirpath); err != nil {
 		return
 	}
 
@@ -184,7 +166,8 @@ func (info TLSInfo) baseConfig() (*tls.Config, error) {
 
 	cfg := &tls.Config{
 		Certificates: []tls.Certificate{*tlsCert},
-		MinVersion:   tls.VersionTLS10,
+		MinVersion:   tls.VersionTLS12,
+		ServerName:   info.ServerName,
 	}
 	return cfg, nil
 }
@@ -236,7 +219,7 @@ func (info TLSInfo) ClientConfig() (*tls.Config, error) {
 			return nil, err
 		}
 	} else {
-		cfg = &tls.Config{}
+		cfg = &tls.Config{ServerName: info.ServerName}
 	}
 
 	CAFiles := info.cafiles()
@@ -245,10 +228,41 @@ func (info TLSInfo) ClientConfig() (*tls.Config, error) {
 		if err != nil {
 			return nil, err
 		}
+		// if given a CA, trust any host with a cert signed by the CA
+		cfg.ServerName = ""
 	}
 
 	if info.selfCert {
 		cfg.InsecureSkipVerify = true
 	}
 	return cfg, nil
+}
+
+// ShallowCopyTLSConfig copies *tls.Config. This is only
+// work-around for go-vet tests, which complains
+//
+//   assignment copies lock value to p: crypto/tls.Config contains sync.Once contains sync.Mutex
+//
+// Keep up-to-date with 'go/src/crypto/tls/common.go'
+func ShallowCopyTLSConfig(cfg *tls.Config) *tls.Config {
+	ncfg := tls.Config{
+		Time:                     cfg.Time,
+		Certificates:             cfg.Certificates,
+		NameToCertificate:        cfg.NameToCertificate,
+		GetCertificate:           cfg.GetCertificate,
+		RootCAs:                  cfg.RootCAs,
+		NextProtos:               cfg.NextProtos,
+		ServerName:               cfg.ServerName,
+		ClientAuth:               cfg.ClientAuth,
+		ClientCAs:                cfg.ClientCAs,
+		InsecureSkipVerify:       cfg.InsecureSkipVerify,
+		CipherSuites:             cfg.CipherSuites,
+		PreferServerCipherSuites: cfg.PreferServerCipherSuites,
+		SessionTicketKey:         cfg.SessionTicketKey,
+		ClientSessionCache:       cfg.ClientSessionCache,
+		MinVersion:               cfg.MinVersion,
+		MaxVersion:               cfg.MaxVersion,
+		CurvePreferences:         cfg.CurvePreferences,
+	}
+	return &ncfg
 }

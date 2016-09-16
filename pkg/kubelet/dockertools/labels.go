@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,9 +24,10 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/custommetrics"
+	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/types"
+	kubetypes "k8s.io/kubernetes/pkg/types"
 )
 
 // This file contains all docker label related constants and functions, including:
@@ -34,17 +35,14 @@ import (
 //  * label filters (maybe in the future)
 
 const (
-	kubernetesPodNameLabel                   = "io.kubernetes.pod.name"
-	kubernetesPodNamespaceLabel              = "io.kubernetes.pod.namespace"
-	kubernetesPodUIDLabel                    = "io.kubernetes.pod.uid"
 	kubernetesPodDeletionGracePeriodLabel    = "io.kubernetes.pod.deletionGracePeriod"
 	kubernetesPodTerminationGracePeriodLabel = "io.kubernetes.pod.terminationGracePeriod"
 
-	kubernetesContainerNameLabel                   = "io.kubernetes.container.name"
 	kubernetesContainerHashLabel                   = "io.kubernetes.container.hash"
 	kubernetesContainerRestartCountLabel           = "io.kubernetes.container.restartCount"
 	kubernetesContainerTerminationMessagePathLabel = "io.kubernetes.container.terminationMessagePath"
 	kubernetesContainerPreStopHandlerLabel         = "io.kubernetes.container.preStopHandler"
+	kubernetesContainerPortsLabel                  = "io.kubernetes.container.ports" // Added in 1.4
 
 	// TODO(random-liu): Keep this for old containers, remove this when we drop support for v1.1.
 	kubernetesPodLabel = "io.kubernetes.pod.data"
@@ -57,7 +55,7 @@ const (
 type labelledContainerInfo struct {
 	PodName                   string
 	PodNamespace              string
-	PodUID                    types.UID
+	PodUID                    kubetypes.UID
 	PodDeletionGracePeriod    *int64
 	PodTerminationGracePeriod *int64
 	Name                      string
@@ -65,29 +63,14 @@ type labelledContainerInfo struct {
 	RestartCount              int
 	TerminationMessagePath    string
 	PreStopHandler            *api.Handler
-}
-
-func GetContainerName(labels map[string]string) string {
-	return labels[kubernetesContainerNameLabel]
-}
-
-func GetPodName(labels map[string]string) string {
-	return labels[kubernetesPodNameLabel]
-}
-
-func GetPodUID(labels map[string]string) string {
-	return labels[kubernetesPodUIDLabel]
-}
-
-func GetPodNamespace(labels map[string]string) string {
-	return labels[kubernetesPodNamespaceLabel]
+	Ports                     []api.ContainerPort
 }
 
 func newLabels(container *api.Container, pod *api.Pod, restartCount int, enableCustomMetrics bool) map[string]string {
 	labels := map[string]string{}
-	labels[kubernetesPodNameLabel] = pod.Name
-	labels[kubernetesPodNamespaceLabel] = pod.Namespace
-	labels[kubernetesPodUIDLabel] = string(pod.UID)
+	labels[types.KubernetesPodNameLabel] = pod.Name
+	labels[types.KubernetesPodNamespaceLabel] = pod.Namespace
+	labels[types.KubernetesPodUIDLabel] = string(pod.UID)
 	if pod.DeletionGracePeriodSeconds != nil {
 		labels[kubernetesPodDeletionGracePeriodLabel] = strconv.FormatInt(*pod.DeletionGracePeriodSeconds, 10)
 	}
@@ -95,7 +78,7 @@ func newLabels(container *api.Container, pod *api.Pod, restartCount int, enableC
 		labels[kubernetesPodTerminationGracePeriodLabel] = strconv.FormatInt(*pod.Spec.TerminationGracePeriodSeconds, 10)
 	}
 
-	labels[kubernetesContainerNameLabel] = container.Name
+	labels[types.KubernetesContainerNameLabel] = container.Name
 	labels[kubernetesContainerHashLabel] = strconv.FormatUint(kubecontainer.HashContainer(container), 16)
 	labels[kubernetesContainerRestartCountLabel] = strconv.Itoa(restartCount)
 	labels[kubernetesContainerTerminationMessagePathLabel] = container.TerminationMessagePath
@@ -108,7 +91,14 @@ func newLabels(container *api.Container, pod *api.Pod, restartCount int, enableC
 			labels[kubernetesContainerPreStopHandlerLabel] = string(rawPreStop)
 		}
 	}
-
+	if len(container.Ports) > 0 {
+		rawContainerPorts, err := json.Marshal(container.Ports)
+		if err != nil {
+			glog.Errorf("Unable to marshal container ports for container %q for pod %q: %v", container.Name, format.Pod(pod), err)
+		} else {
+			labels[kubernetesContainerPortsLabel] = string(rawContainerPorts)
+		}
+	}
 	if enableCustomMetrics {
 		path, err := custommetrics.GetCAdvisorCustomMetricsDefinitionPath(container)
 		if path != nil && err == nil {
@@ -122,10 +112,10 @@ func newLabels(container *api.Container, pod *api.Pod, restartCount int, enableC
 func getContainerInfoFromLabel(labels map[string]string) *labelledContainerInfo {
 	var err error
 	containerInfo := &labelledContainerInfo{
-		PodName:      getStringValueFromLabel(labels, kubernetesPodNameLabel),
-		PodNamespace: getStringValueFromLabel(labels, kubernetesPodNamespaceLabel),
-		PodUID:       types.UID(getStringValueFromLabel(labels, kubernetesPodUIDLabel)),
-		Name:         getStringValueFromLabel(labels, kubernetesContainerNameLabel),
+		PodName:      getStringValueFromLabel(labels, types.KubernetesPodNameLabel),
+		PodNamespace: getStringValueFromLabel(labels, types.KubernetesPodNamespaceLabel),
+		PodUID:       kubetypes.UID(getStringValueFromLabel(labels, types.KubernetesPodUIDLabel)),
+		Name:         getStringValueFromLabel(labels, types.KubernetesContainerNameLabel),
 		Hash:         getStringValueFromLabel(labels, kubernetesContainerHashLabel),
 		TerminationMessagePath: getStringValueFromLabel(labels, kubernetesContainerTerminationMessagePathLabel),
 	}
@@ -143,6 +133,12 @@ func getContainerInfoFromLabel(labels map[string]string) *labelledContainerInfo 
 		logError(containerInfo, kubernetesContainerPreStopHandlerLabel, err)
 	} else if found {
 		containerInfo.PreStopHandler = preStopHandler
+	}
+	containerPorts := []api.ContainerPort{}
+	if found, err := getJsonObjectFromLabel(labels, kubernetesContainerPortsLabel, &containerPorts); err != nil {
+		logError(containerInfo, kubernetesContainerPortsLabel, err)
+	} else if found {
+		containerInfo.Ports = containerPorts
 	}
 	supplyContainerInfoWithOldLabel(labels, containerInfo)
 	return containerInfo

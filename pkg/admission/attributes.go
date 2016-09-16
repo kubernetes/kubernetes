@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -30,10 +30,11 @@ type attributesRecord struct {
 	subresource string
 	operation   Operation
 	object      runtime.Object
+	oldObject   runtime.Object
 	userInfo    user.Info
 }
 
-func NewAttributesRecord(object runtime.Object, kind unversioned.GroupVersionKind, namespace, name string, resource unversioned.GroupVersionResource, subresource string, operation Operation, userInfo user.Info) Attributes {
+func NewAttributesRecord(object runtime.Object, oldObject runtime.Object, kind unversioned.GroupVersionKind, namespace, name string, resource unversioned.GroupVersionResource, subresource string, operation Operation, userInfo user.Info) Attributes {
 	return &attributesRecord{
 		kind:        kind,
 		namespace:   namespace,
@@ -42,6 +43,7 @@ func NewAttributesRecord(object runtime.Object, kind unversioned.GroupVersionKin
 		subresource: subresource,
 		operation:   operation,
 		object:      object,
+		oldObject:   oldObject,
 		userInfo:    userInfo,
 	}
 }
@@ -72,6 +74,10 @@ func (record *attributesRecord) GetOperation() Operation {
 
 func (record *attributesRecord) GetObject() runtime.Object {
 	return record.object
+}
+
+func (record *attributesRecord) GetOldObject() runtime.Object {
+	return record.oldObject
 }
 
 func (record *attributesRecord) GetUserInfo() user.Info {

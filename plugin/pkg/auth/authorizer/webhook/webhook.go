@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,11 +18,17 @@ limitations under the License.
 package webhook
 
 import (
-	"errors"
+	"encoding/json"
+	"fmt"
+	"time"
+
+	"github.com/golang/glog"
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/authorization/v1beta1"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
+	"k8s.io/kubernetes/pkg/client/restclient"
+	"k8s.io/kubernetes/pkg/util/cache"
 	"k8s.io/kubernetes/plugin/pkg/webhook"
 
 	_ "k8s.io/kubernetes/pkg/apis/authorization/install"
@@ -32,11 +38,16 @@ var (
 	groupVersions = []unversioned.GroupVersion{v1beta1.SchemeGroupVersion}
 )
 
+const retryBackoff = 500 * time.Millisecond
+
 // Ensure Webhook implements the authorizer.Authorizer interface.
 var _ authorizer.Authorizer = (*WebhookAuthorizer)(nil)
 
 type WebhookAuthorizer struct {
 	*webhook.GenericWebhook
+	responseCache   *cache.LRUExpireCache
+	authorizedTTL   time.Duration
+	unauthorizedTTL time.Duration
 }
 
 // New creates a new WebhookAuthorizer from the provided kubeconfig file.
@@ -59,12 +70,17 @@ type WebhookAuthorizer struct {
 //
 // For additional HTTP configuration, refer to the kubeconfig documentation
 // http://kubernetes.io/v1.1/docs/user-guide/kubeconfig-file.html.
-func New(kubeConfigFile string) (*WebhookAuthorizer, error) {
-	gw, err := webhook.NewGenericWebhook(kubeConfigFile, groupVersions)
+func New(kubeConfigFile string, authorizedTTL, unauthorizedTTL time.Duration) (*WebhookAuthorizer, error) {
+	return newWithBackoff(kubeConfigFile, authorizedTTL, unauthorizedTTL, retryBackoff)
+}
+
+// newWithBackoff allows tests to skip the sleep.
+func newWithBackoff(kubeConfigFile string, authorizedTTL, unauthorizedTTL, initialBackoff time.Duration) (*WebhookAuthorizer, error) {
+	gw, err := webhook.NewGenericWebhook(kubeConfigFile, groupVersions, initialBackoff)
 	if err != nil {
 		return nil, err
 	}
-	return &WebhookAuthorizer{gw}, nil
+	return &WebhookAuthorizer{gw, cache.NewLRUExpireCache(1024), authorizedTTL, unauthorizedTTL}, nil
 }
 
 // Authorize makes a REST request to the remote service describing the attempted action as a JSON
@@ -111,13 +127,16 @@ func New(kubeConfigFile string) (*WebhookAuthorizer, error) {
 //       }
 //     }
 //
-func (w *WebhookAuthorizer) Authorize(attr authorizer.Attributes) (err error) {
-	r := &v1beta1.SubjectAccessReview{
-		Spec: v1beta1.SubjectAccessReviewSpec{
-			User:   attr.GetUserName(),
-			Groups: attr.GetGroups(),
-		},
+func (w *WebhookAuthorizer) Authorize(attr authorizer.Attributes) (authorized bool, reason string, err error) {
+	r := &v1beta1.SubjectAccessReview{}
+	if user := attr.GetUser(); user != nil {
+		r.Spec = v1beta1.SubjectAccessReviewSpec{
+			User:   user.GetName(),
+			Groups: user.GetGroups(),
+			Extra:  convertToSARExtra(user.GetExtra()),
+		}
 	}
+
 	if attr.IsResourceRequest() {
 		r.Spec.ResourceAttributes = &v1beta1.ResourceAttributes{
 			Namespace:   attr.GetNamespace(),
@@ -134,19 +153,48 @@ func (w *WebhookAuthorizer) Authorize(attr authorizer.Attributes) (err error) {
 			Verb: attr.GetVerb(),
 		}
 	}
-	result := w.RestClient.Post().Body(r).Do()
-	if err := result.Error(); err != nil {
-		return err
+	key, err := json.Marshal(r.Spec)
+	if err != nil {
+		return false, "", err
 	}
+	if entry, ok := w.responseCache.Get(string(key)); ok {
+		r.Status = entry.(v1beta1.SubjectAccessReviewStatus)
+	} else {
+		result := w.WithExponentialBackoff(func() restclient.Result {
+			return w.RestClient.Post().Body(r).Do()
+		})
+		if err := result.Error(); err != nil {
+			// An error here indicates bad configuration or an outage. Log for debugging.
+			glog.Errorf("Failed to make webhook authorizer request: %v", err)
+			return false, "", err
+		}
+		var statusCode int
+		result.StatusCode(&statusCode)
+		switch {
+		case statusCode < 200,
+			statusCode >= 300:
+			return false, "", fmt.Errorf("Error contacting webhook: %d", statusCode)
+		}
+		if err := result.Into(r); err != nil {
+			return false, "", err
+		}
+		if r.Status.Allowed {
+			w.responseCache.Add(string(key), r.Status, w.authorizedTTL)
+		} else {
+			w.responseCache.Add(string(key), r.Status, w.unauthorizedTTL)
+		}
+	}
+	return r.Status.Allowed, r.Status.Reason, nil
+}
 
-	if err := result.Into(r); err != nil {
-		return err
-	}
-	if r.Status.Allowed {
+func convertToSARExtra(extra map[string][]string) map[string]v1beta1.ExtraValue {
+	if extra == nil {
 		return nil
 	}
-	if r.Status.Reason != "" {
-		return errors.New(r.Status.Reason)
+	ret := map[string]v1beta1.ExtraValue{}
+	for k, v := range extra {
+		ret[k] = v1beta1.ExtraValue(v)
 	}
-	return errors.New("unauthorized")
+
+	return ret
 }

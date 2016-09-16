@@ -676,7 +676,7 @@ func (p *unmarshal) field(file *generator.FileDescriptor, msg *generator.Descrip
 			p.Out()
 			p.P(`}`)
 			p.P(`m.`, fieldname, ` = &`, p.OneOfTypeName(msg, field), `{v}`)
-		} else if generator.IsMap(file.FileDescriptorProto, field) {
+		} else if p.IsMap(field) {
 			m := p.GoMapType(nil, field)
 
 			keygoTyp, _ := p.GoType(nil, m.KeyField)
@@ -1135,16 +1135,7 @@ func (p *unmarshal) Generate(file *generator.FileDescriptor) {
 			p.P(`return `, p.ioPkg.Use(), `.ErrUnexpectedEOF`)
 			p.Out()
 			p.P(`}`)
-			if gogoproto.HasExtensionsMap(file.FileDescriptorProto, message.DescriptorProto) {
-				p.P(`if m.XXX_extensions == nil {`)
-				p.In()
-				p.P(`m.XXX_extensions = make(map[int32]`, protoPkg.Use(), `.Extension)`)
-				p.Out()
-				p.P(`}`)
-				p.P(`m.XXX_extensions[int32(fieldNum)] = `, protoPkg.Use(), `.NewExtension(data[iNdEx:iNdEx+skippy])`)
-			} else {
-				p.P(`m.XXX_extensions = append(m.XXX_extensions, data[iNdEx:iNdEx+skippy]...)`)
-			}
+			p.P(protoPkg.Use(), `.AppendExtension(m, int32(fieldNum), data[iNdEx:iNdEx+skippy])`)
 			p.P(`iNdEx += skippy`)
 			p.Out()
 			p.P(`} else {`)

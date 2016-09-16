@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,14 +18,12 @@ package unversioned
 
 type DaemonSetExpansion interface{}
 
-type HorizontalPodAutoscalerExpansion interface{}
-
 type IngressExpansion interface{}
 
-type JobExpansion interface{}
+type NetworkPolicyExpansion interface{}
 
 type PodSecurityPolicyExpansion interface{}
 
-type ThirdPartyResourceExpansion interface{}
-
 type ReplicaSetExpansion interface{}
+
+type ThirdPartyResourceExpansion interface{}

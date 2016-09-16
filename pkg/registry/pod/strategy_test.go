@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -134,7 +134,7 @@ func TestCheckGracefulDelete(t *testing.T) {
 	}
 	for _, tc := range tcs {
 		out := &api.DeleteOptions{GracePeriodSeconds: &defaultGracePeriod}
-		Strategy.CheckGracefulDelete(tc.in, out)
+		Strategy.CheckGracefulDelete(api.NewContext(), tc.in, out)
 		if out.GracePeriodSeconds == nil {
 			t.Errorf("out grace period was nil but supposed to be %v", tc.gracePeriod)
 		}
@@ -199,6 +199,22 @@ func TestCheckLogLocation(t *testing.T) {
 						{Name: "container1"},
 						{Name: "container2"},
 					},
+					InitContainers: []api.Container{
+						{Name: "initcontainer1"},
+					},
+				},
+				Status: api.PodStatus{},
+			},
+			opts:        &api.PodLogOptions{},
+			expectedErr: errors.NewBadRequest("a container name must be specified for pod test, choose one of: [container1 container2] or one of the init containers: [initcontainer1]"),
+		},
+		{
+			in: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{Name: "container1"},
+						{Name: "container2"},
+					},
 				},
 				Status: api.PodStatus{},
 			},
@@ -236,7 +252,7 @@ func TestSelectableFieldLabelConversions(t *testing.T) {
 	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
 		testapi.Default.GroupVersion().String(),
 		"Pod",
-		labels.Set(PodToSelectableFields(&api.Pod{})),
+		PodToSelectableFields(&api.Pod{}),
 		nil,
 	)
 }

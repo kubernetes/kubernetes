@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -79,7 +79,6 @@ import (
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	cloud "k8s.io/kubernetes/pkg/cloudprovider/providers/mesos"
-	controllerfw "k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/master/ports"
@@ -344,7 +343,7 @@ func (s *SchedulerServer) AddStandaloneFlags(fs *pflag.FlagSet) {
 
 func (s *SchedulerServer) AddHyperkubeFlags(fs *pflag.FlagSet) {
 	s.addCoreFlags(fs)
-	fs.StringVar(&s.kmPath, "km-path", s.kmPath, "Location of the km executable, may be a URI or an absolute file path.")
+	fs.StringVar(&s.kmPath, "km-path", s.kmPath, "Location of the km executable, may be a URI or an absolute file path; may be prefixed with 'file://' to specify the path to a pre-installed, agent-local km binary.")
 }
 
 // returns (downloadURI, basename(path))
@@ -390,11 +389,16 @@ func (s *SchedulerServer) prepareExecutorInfo(hks hyperkube.Interface) (*mesos.E
 		return nil, fmt.Errorf("either run this scheduler via km or else --executor-path is required")
 	} else {
 		if strings.Index(s.kmPath, "://") > 0 {
-			// URI could point directly to executable, e.g. hdfs:///km
-			// or else indirectly, e.g. http://acmestorage/tarball.tgz
-			// so we assume that for this case the command will always "km"
-			ci.Uris = append(ci.Uris, &mesos.CommandInfo_URI{Value: proto.String(s.kmPath), Executable: proto.Bool(true)})
-			ci.Value = proto.String("./km") // TODO(jdef) extract constant
+			if strings.HasPrefix(s.kmPath, "file://") {
+				// If `kmPath` started with "file://", `km` in agent local path was used.
+				ci.Value = proto.String(strings.TrimPrefix(s.kmPath, "file://"))
+			} else {
+				// URI could point directly to executable, e.g. hdfs:///km
+				// or else indirectly, e.g. http://acmestorage/tarball.tgz
+				// so we assume that for this case the command will always "km"
+				ci.Uris = append(ci.Uris, &mesos.CommandInfo_URI{Value: proto.String(s.kmPath), Executable: proto.Bool(true)})
+				ci.Value = proto.String("./km") // TODO(jdef) extract constant
+			}
 		} else if s.kmPath != "" {
 			uri, kmCmd := s.serveFrameworkArtifact(s.kmPath)
 			ci.Uris = append(ci.Uris, &mesos.CommandInfo_URI{Value: proto.String(uri), Executable: proto.Bool(true)})
@@ -607,6 +611,7 @@ func (s *SchedulerServer) Run(hks hyperkube.Interface, _ []string) error {
 		if err != nil {
 			log.Fatalf("Cannot open scheduler config file: %v", err)
 		}
+		defer f.Close()
 
 		err = sc.Read(bufio.NewReader(f))
 		if err != nil {
@@ -780,10 +785,10 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 		log.Fatalf("Cannot create client to watch nodes: %v", err)
 	}
 	nodeLW := cache.NewListWatchFromClient(nodesClient.CoreClient, "nodes", api.NamespaceAll, fields.Everything())
-	nodeStore, nodeCtl := controllerfw.NewInformer(nodeLW, &api.Node{}, s.nodeRelistPeriod, &controllerfw.ResourceEventHandlerFuncs{
+	nodeStore, nodeCtl := cache.NewInformer(nodeLW, &api.Node{}, s.nodeRelistPeriod, &cache.ResourceEventHandlerFuncs{
 		DeleteFunc: func(obj interface{}) {
 			if eiRegistry != nil {
-				// TODO(jdef) use controllerfw.DeletionHandlingMetaNamespaceKeyFunc at some point?
+				// TODO(jdef) use cache.DeletionHandlingMetaNamespaceKeyFunc at some point?
 				nodeName := ""
 				if tombstone, ok := obj.(cache.DeletedFinalStateUnknown); ok {
 					nodeName = tombstone.Key

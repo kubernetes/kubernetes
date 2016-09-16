@@ -1,4 +1,4 @@
-// Copyright 2016 CoreOS, Inc.
+// Copyright 2016 The etcd Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -41,6 +41,8 @@ type Op struct {
 	limit        int64
 	sort         *SortOption
 	serializable bool
+	keysOnly     bool
+	countOnly    bool
 
 	// for range, watch
 	rev int64
@@ -53,21 +55,29 @@ type Op struct {
 	leaseID LeaseID
 }
 
-func (op Op) toRequestUnion() *pb.RequestUnion {
+func (op Op) toRequestOp() *pb.RequestOp {
 	switch op.t {
 	case tRange:
-		r := &pb.RangeRequest{Key: op.key, RangeEnd: op.end, Limit: op.limit, Revision: op.rev, Serializable: op.serializable}
+		r := &pb.RangeRequest{
+			Key:          op.key,
+			RangeEnd:     op.end,
+			Limit:        op.limit,
+			Revision:     op.rev,
+			Serializable: op.serializable,
+			KeysOnly:     op.keysOnly,
+			CountOnly:    op.countOnly,
+		}
 		if op.sort != nil {
 			r.SortOrder = pb.RangeRequest_SortOrder(op.sort.Order)
 			r.SortTarget = pb.RangeRequest_SortTarget(op.sort.Target)
 		}
-		return &pb.RequestUnion{Request: &pb.RequestUnion_RequestRange{RequestRange: r}}
+		return &pb.RequestOp{Request: &pb.RequestOp_RequestRange{RequestRange: r}}
 	case tPut:
 		r := &pb.PutRequest{Key: op.key, Value: op.val, Lease: int64(op.leaseID)}
-		return &pb.RequestUnion{Request: &pb.RequestUnion_RequestPut{RequestPut: r}}
+		return &pb.RequestOp{Request: &pb.RequestOp_RequestPut{RequestPut: r}}
 	case tDeleteRange:
 		r := &pb.DeleteRangeRequest{Key: op.key, RangeEnd: op.end}
-		return &pb.RequestUnion{Request: &pb.RequestUnion_RequestDeleteRange{RequestDeleteRange: r}}
+		return &pb.RequestOp{Request: &pb.RequestOp_RequestDeleteRange{RequestDeleteRange: r}}
 	default:
 		panic("Unknown Op")
 	}
@@ -97,6 +107,8 @@ func OpDelete(key string, opts ...OpOption) Op {
 		panic("unexpected sort in delete")
 	case ret.serializable:
 		panic("unexpected serializable in delete")
+	case ret.countOnly:
+		panic("unexpected countOnly in delete")
 	}
 	return ret
 }
@@ -114,7 +126,9 @@ func OpPut(key, val string, opts ...OpOption) Op {
 	case ret.sort != nil:
 		panic("unexpected sort in put")
 	case ret.serializable:
-		panic("unexpected serializable in delete")
+		panic("unexpected serializable in put")
+	case ret.countOnly:
+		panic("unexpected countOnly in delete")
 	}
 	return ret
 }
@@ -131,6 +145,8 @@ func opWatch(key string, opts ...OpOption) Op {
 		panic("unexpected sort in watch")
 	case ret.serializable:
 		panic("unexpected serializable in watch")
+	case ret.countOnly:
+		panic("unexpected countOnly in delete")
 	}
 	return ret
 }
@@ -166,6 +182,12 @@ func WithSort(target SortTarget, order SortOrder) OpOption {
 	}
 }
 
+// GetPrefixRangeEnd gets the range end of the prefix.
+// 'Get(foo, WithPrefix())' is equal to 'Get(foo, WithRange(GetPrefixRangeEnd(foo))'.
+func GetPrefixRangeEnd(prefix string) string {
+	return string(getPrefix([]byte(prefix)))
+}
+
 func getPrefix(key []byte) []byte {
 	end := make([]byte, len(key))
 	copy(end, key)
@@ -198,7 +220,7 @@ func WithRange(endKey string) OpOption {
 }
 
 // WithFromKey specifies the range of 'Get' or 'Delete' requests
-// to be equal or greater than they key in the argument.
+// to be equal or greater than the key in the argument.
 func WithFromKey() OpOption { return WithRange("\x00") }
 
 // WithSerializable makes 'Get' request serializable. By default,
@@ -206,6 +228,17 @@ func WithFromKey() OpOption { return WithRange("\x00") }
 // requirement.
 func WithSerializable() OpOption {
 	return func(op *Op) { op.serializable = true }
+}
+
+// WithKeysOnly makes the 'Get' request return only the keys and the corresponding
+// values will be omitted.
+func WithKeysOnly() OpOption {
+	return func(op *Op) { op.keysOnly = true }
+}
+
+// WithCountOnly makes the 'Get' request return only the count of keys.
+func WithCountOnly() OpOption {
+	return func(op *Op) { op.countOnly = true }
 }
 
 // WithFirstCreate gets the key with the oldest creation revision in the request range.

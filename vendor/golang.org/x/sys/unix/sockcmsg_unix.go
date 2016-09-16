@@ -77,10 +77,10 @@ func UnixRights(fds ...int) []byte {
 	h.Level = SOL_SOCKET
 	h.Type = SCM_RIGHTS
 	h.SetLen(CmsgLen(datalen))
-	data := cmsgData(h)
+	data := uintptr(cmsgData(h))
 	for _, fd := range fds {
-		*(*int32)(data) = int32(fd)
-		data = unsafe.Pointer(uintptr(data) + 4)
+		*(*int32)(unsafe.Pointer(data)) = int32(fd)
+		data += 4
 	}
 	return b
 }

@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,4 +17,4 @@ limitations under the License.
 // Package controller implements the scheduling controller which waits for pod
 // events from the queuer (i.e. from the apiserver), passes them to the
 // SchedulerAlgorithm and in case of success to the binder which does the launch.
-package controller
+package controller // import "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/components/controller"

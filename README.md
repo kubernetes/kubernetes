@@ -1,13 +1,11 @@
 # Kubernetes
 
-[![GoReportCard Widget]][GoReportCard] [![GoDoc Widget]][GoDoc] [![Travis Widget]][Travis] [![Coverage Status Widget]][Coverage Status]
+[![Submit Queue Widget]][Submit Queue] [![GoDoc Widget]][GoDoc] [![Coverage Status Widget]][Coverage Status]
 
+[Submit Queue]: http://submit-queue.k8s.io/#/e2e
+[Submit Queue Widget]: http://submit-queue.k8s.io/health.svg?v=1
 [GoDoc]: https://godoc.org/k8s.io/kubernetes
 [GoDoc Widget]: https://godoc.org/k8s.io/kubernetes?status.svg
-[GoReportCard]: https://goreportcard.com/report/k8s.io/kubernetes
-[GoReportCard Widget]: https://goreportcard.com/badge/k8s.io/kubernetes
-[Travis]: https://travis-ci.org/kubernetes/kubernetes
-[Travis Widget]: https://travis-ci.org/kubernetes/kubernetes.svg?branch=master
 [Coverage Status]: https://coveralls.io/r/kubernetes/kubernetes
 [Coverage Status Widget]: https://coveralls.io/repos/kubernetes/kubernetes/badge.svg
 
@@ -32,14 +30,13 @@ Kubernetes builds upon a [decade and a half of experience at Google running prod
 
 <hr>
 
-### Kubernetes can run anywhere!
-
-However, initial development was done on GCE and so our instructions and scripts are built around that.  If you make it work on other infrastructure please let us know and contribute instructions/code.
-
 ### Kubernetes is ready for Production!
 
 With the [1.0.1 release](https://github.com/kubernetes/kubernetes/releases/tag/v1.0.1) Kubernetes is ready to serve your production workloads.
 
+### Kubernetes can run anywhere!
+
+You can run Kubernetes on your local workstation under Vagrant, cloud providers (e.g. GCE, AWS, Azure), and physical hardware. Essentially, anywhere Linux runs you can run Kubernetes. Checkout the [Getting Started Guides](http://kubernetes.io/docs/getting-started-guides/) for details.
 
 ## Concepts
 
@@ -132,9 +129,11 @@ For Q&A, our threads are at:
  * [Stack Overflow](http://stackoverflow.com/questions/tagged/kubernetes)
  * [Slack](http://slack.k8s.io/)
 
-### Want to do more than just 'discuss' Kubernetes?
+### Want to contribute to Kubernetes?
 
 If you're interested in being a contributor and want to get involved in developing Kubernetes, start in the [Kubernetes Developer Guide](docs/devel/README.md) and also review the [contributor guidelines](CONTRIBUTING.md).
+
+Or, if you just have an idea for a new feature, see the [Kubernetes Features](https://github.com/kubernetes/features) repository for details on how to propose it.
 
 ### Support
 
@@ -144,9 +143,9 @@ If you need support, start with the [troubleshooting guide](docs/troubleshooting
 
 That said, if you have questions, reach out to us one way or another.  We don't bite!
 
-### Community resources:
+### Community resources
 
-* **Awesome-kubernetes**:
+* **Awesome-kubernetes** - [http://ramitsurana.github.io/awesome-kubernetes](http://ramitsurana.github.io/awesome-kubernetes)
 
 You can find more projects, tools and articles related to Kubernetes on the  [awesome-kubernetes](https://github.com/ramitsurana/awesome-kubernetes) list. Add your project there and help us make it better.
 
@@ -154,5 +153,8 @@ You can find more projects, tools and articles related to Kubernetes on the  [aw
 
 Instructive & educational resources for the Kubernetes community. By the community.
 
+* **Community Documentation**
+
+Here you can learn more about the current happenings in the [kubernetes community](https://github.com/kubernetes/community).
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/README.md?pixel)]()

@@ -1,4 +1,4 @@
-// Copyright 2015 CoreOS, Inc.
+// Copyright 2015 The etcd Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -22,42 +22,51 @@ import (
 )
 
 var (
-	// TODO: with label in v3?
-	proposeDurations = prometheus.NewHistogram(prometheus.HistogramOpts{
+	hasLeader = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: "etcd",
 		Subsystem: "server",
-		Name:      "proposal_durations_seconds",
-		Help:      "The latency distributions of committing proposal.",
-		Buckets:   prometheus.ExponentialBuckets(0.001, 2, 14),
+		Name:      "has_leader",
+		Help:      "Whether or not a leader exists. 1 is existence, 0 is not.",
 	})
-	proposePending = prometheus.NewGauge(prometheus.GaugeOpts{
+	leaderChanges = prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: "etcd",
 		Subsystem: "server",
-		Name:      "pending_proposal_total",
-		Help:      "The total number of pending proposals.",
+		Name:      "leader_changes_seen_total",
+		Help:      "The number of leader changes seen.",
 	})
-	// This is number of proposal failed in client's view.
-	// The proposal might be later got committed in raft.
-	proposeFailed = prometheus.NewCounter(prometheus.CounterOpts{
+	proposalsCommitted = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: "etcd",
 		Subsystem: "server",
-		Name:      "proposal_failed_total",
-		Help:      "The total number of failed proposals.",
+		Name:      "proposals_committed_total",
+		Help:      "The total number of consensus proposals committed.",
 	})
-
-	fileDescriptorUsed = prometheus.NewGauge(prometheus.GaugeOpts{
+	proposalsApplied = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: "etcd",
 		Subsystem: "server",
-		Name:      "file_descriptors_used_total",
-		Help:      "The total number of file descriptors used.",
+		Name:      "proposals_applied_total",
+		Help:      "The total number of consensus proposals applied.",
+	})
+	proposalsPending = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: "etcd",
+		Subsystem: "server",
+		Name:      "proposals_pending",
+		Help:      "The current number of pending proposals to commit.",
+	})
+	proposalsFailed = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: "etcd",
+		Subsystem: "server",
+		Name:      "proposals_failed_total",
+		Help:      "The total number of failed proposals seen.",
 	})
 )
 
 func init() {
-	prometheus.MustRegister(proposeDurations)
-	prometheus.MustRegister(proposePending)
-	prometheus.MustRegister(proposeFailed)
-	prometheus.MustRegister(fileDescriptorUsed)
+	prometheus.MustRegister(hasLeader)
+	prometheus.MustRegister(leaderChanges)
+	prometheus.MustRegister(proposalsCommitted)
+	prometheus.MustRegister(proposalsApplied)
+	prometheus.MustRegister(proposalsPending)
+	prometheus.MustRegister(proposalsFailed)
 }
 
 func monitorFileDescriptor(done <-chan struct{}) {
@@ -69,7 +78,6 @@ func monitorFileDescriptor(done <-chan struct{}) {
 			plog.Errorf("cannot monitor file descriptor usage (%v)", err)
 			return
 		}
-		fileDescriptorUsed.Set(float64(used))
 		limit, err := runtime.FDLimit()
 		if err != nil {
 			plog.Errorf("cannot monitor file descriptor usage (%v)", err)

@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -62,7 +62,7 @@ func (c *Fake) VersionInfo() (*cadvisorapi.VersionInfo, error) {
 	return new(cadvisorapi.VersionInfo), nil
 }
 
-func (c *Fake) DockerImagesFsInfo() (cadvisorapiv2.FsInfo, error) {
+func (c *Fake) ImagesFsInfo() (cadvisorapiv2.FsInfo, error) {
 	return cadvisorapiv2.FsInfo{}, nil
 }
 

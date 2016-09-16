@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -44,13 +44,13 @@ func (svcStrategy) NamespaceScoped() bool {
 }
 
 // PrepareForCreate clears fields that are not allowed to be set by end users on creation.
-func (svcStrategy) PrepareForCreate(obj runtime.Object) {
+func (svcStrategy) PrepareForCreate(ctx api.Context, obj runtime.Object) {
 	service := obj.(*api.Service)
 	service.Status = api.ServiceStatus{}
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
-func (svcStrategy) PrepareForUpdate(obj, old runtime.Object) {
+func (svcStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
 	newService := obj.(*api.Service)
 	oldService := old.(*api.Service)
 	newService.Status = oldService.Status
@@ -78,7 +78,7 @@ func (svcStrategy) AllowUnconditionalUpdate() bool {
 	return true
 }
 
-func (svcStrategy) Export(obj runtime.Object, exact bool) error {
+func (svcStrategy) Export(ctx api.Context, obj runtime.Object, exact bool) error {
 	t, ok := obj.(*api.Service)
 	if !ok {
 		// unexpected programmer error
@@ -100,7 +100,7 @@ func (svcStrategy) Export(obj runtime.Object, exact bool) error {
 	return nil
 }
 
-func MatchServices(label labels.Selector, field fields.Selector) generic.Matcher {
+func MatchServices(label labels.Selector, field fields.Selector) *generic.SelectionPredicate {
 	return &generic.SelectionPredicate{
 		Label: label,
 		Field: field,
@@ -115,7 +115,7 @@ func MatchServices(label labels.Selector, field fields.Selector) generic.Matcher
 }
 
 func ServiceToSelectableFields(service *api.Service) fields.Set {
-	return generic.ObjectMetaFieldsSet(service.ObjectMeta, true)
+	return generic.ObjectMetaFieldsSet(&service.ObjectMeta, true)
 }
 
 type serviceStatusStrategy struct {
@@ -126,7 +126,7 @@ type serviceStatusStrategy struct {
 var StatusStrategy = serviceStatusStrategy{Strategy}
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update of status
-func (serviceStatusStrategy) PrepareForUpdate(obj, old runtime.Object) {
+func (serviceStatusStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
 	newService := obj.(*api.Service)
 	oldService := old.(*api.Service)
 	// status changes are not allowed to update spec

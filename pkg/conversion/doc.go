@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,4 +21,4 @@ limitations under the License.
 // but for the fields which did not change, copying is automated. This makes it
 // easy to modify the structures you use in memory without affecting the format
 // you store on disk or respond to in your external API calls.
-package conversion
+package conversion // import "k8s.io/kubernetes/pkg/conversion"

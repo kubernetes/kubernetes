@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,4 +16,4 @@ limitations under the License.
 
 // Package namespace provides Registry interface and it's REST
 // implementation for storing Namespace api objects.
-package namespace
+package namespace // import "k8s.io/kubernetes/pkg/registry/namespace"

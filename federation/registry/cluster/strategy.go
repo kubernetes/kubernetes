@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -41,10 +41,10 @@ func (clusterStrategy) NamespaceScoped() bool {
 }
 
 func ClusterToSelectableFields(cluster *federation.Cluster) fields.Set {
-	return generic.ObjectMetaFieldsSet(cluster.ObjectMeta, false)
+	return generic.ObjectMetaFieldsSet(&cluster.ObjectMeta, false)
 }
 
-func MatchCluster(label labels.Selector, field fields.Selector) generic.Matcher {
+func MatchCluster(label labels.Selector, field fields.Selector) *generic.SelectionPredicate {
 	return &generic.SelectionPredicate{
 		Label: label,
 		Field: field,
@@ -59,7 +59,7 @@ func MatchCluster(label labels.Selector, field fields.Selector) generic.Matcher 
 }
 
 // PrepareForCreate clears fields that are not allowed to be set by end users on creation.
-func (clusterStrategy) PrepareForCreate(obj runtime.Object) {
+func (clusterStrategy) PrepareForCreate(ctx api.Context, obj runtime.Object) {
 	cluster := obj.(*federation.Cluster)
 	cluster.Status = federation.ClusterStatus{}
 }
@@ -80,7 +80,7 @@ func (clusterStrategy) AllowCreateOnUpdate() bool {
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
-func (clusterStrategy) PrepareForUpdate(obj, old runtime.Object) {
+func (clusterStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
 	cluster := obj.(*federation.Cluster)
 	oldCluster := old.(*federation.Cluster)
 	cluster.Status = oldCluster.Status
@@ -100,10 +100,10 @@ type clusterStatusStrategy struct {
 
 var StatusStrategy = clusterStatusStrategy{Strategy}
 
-func (clusterStatusStrategy) PrepareForCreate(obj runtime.Object) {
+func (clusterStatusStrategy) PrepareForCreate(ctx api.Context, obj runtime.Object) {
 	_ = obj.(*federation.Cluster)
 }
-func (clusterStatusStrategy) PrepareForUpdate(obj, old runtime.Object) {
+func (clusterStatusStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
 	cluster := obj.(*federation.Cluster)
 	oldCluster := old.(*federation.Cluster)
 	cluster.Spec = oldCluster.Spec

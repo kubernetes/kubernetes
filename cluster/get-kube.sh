@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2014 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -30,6 +30,8 @@
 #   * export KUBERNETES_PROVIDER=aws; wget -q -O - https://get.k8s.io | bash
 #  Libvirt (with CoreOS as a guest operating system)
 #   * export KUBERNETES_PROVIDER=libvirt-coreos; wget -q -O - https://get.k8s.io | bash
+#  Microsoft Azure
+#   * export KUBERNETES_PROVIDER=azure-legacy; wget -q -O - https://get.k8s.io | bash
 #  Vagrant (local virtual machines)
 #   * export KUBERNETES_PROVIDER=vagrant; wget -q -O - https://get.k8s.io | bash
 #  VMWare VSphere
@@ -65,6 +67,18 @@ function create_cluster {
 if [[ "${KUBERNETES_SKIP_DOWNLOAD-}" ]]; then
   create_cluster
   exit 0
+fi
+
+if [[ -d "./kubernetes" ]]; then
+  if [[ -n "${KUBERNETES_SKIP_CONFIRM-}" ]]; then
+    echo "'kubernetes' directory already exist. Should we skip download step and start to create cluster based on it? [Y]/n"
+    read confirm
+    if [[ "$confirm" == "y" ]]; then
+      echo "Skipping download step."
+      create_cluster
+      exit 0
+    fi
+  fi
 fi
 
 function get_latest_version_number {

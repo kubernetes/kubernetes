@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -88,7 +88,7 @@ func TestCompatibility(
 		keys := strings.Split(absentKey, ".")
 		actualValue, ok, err := getJSONValue(generic, keys...)
 		if err == nil || ok {
-			t.Errorf("Unexpected value found for for key %s: %v", absentKey, actualValue)
+			t.Errorf("Unexpected value found for key %s: %v", absentKey, actualValue)
 			hasError = true
 		}
 	}

@@ -1,7 +1,7 @@
 // +build !cgo !linux
 
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -31,7 +31,7 @@ type cadvisorUnsupported struct {
 
 var _ Interface = new(cadvisorUnsupported)
 
-func New(port uint) (Interface, error) {
+func New(port uint, runtime string) (Interface, error) {
 	return &cadvisorUnsupported{}, nil
 }
 
@@ -65,7 +65,7 @@ func (cu *cadvisorUnsupported) VersionInfo() (*cadvisorapi.VersionInfo, error) {
 	return nil, unsupportedErr
 }
 
-func (cu *cadvisorUnsupported) DockerImagesFsInfo() (cadvisorapiv2.FsInfo, error) {
+func (cu *cadvisorUnsupported) ImagesFsInfo() (cadvisorapiv2.FsInfo, error) {
 	return cadvisorapiv2.FsInfo{}, unsupportedErr
 }
 

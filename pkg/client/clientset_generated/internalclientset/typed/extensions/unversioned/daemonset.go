@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -38,6 +38,7 @@ type DaemonSetInterface interface {
 	Get(name string) (*extensions.DaemonSet, error)
 	List(opts api.ListOptions) (*extensions.DaemonSetList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
+	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *extensions.DaemonSet, err error)
 	DaemonSetExpansion
 }
 
@@ -147,4 +148,18 @@ func (c *daemonSets) Watch(opts api.ListOptions) (watch.Interface, error) {
 		Resource("daemonsets").
 		VersionedParams(&opts, api.ParameterCodec).
 		Watch()
+}
+
+// Patch applies the patch and returns the patched daemonSet.
+func (c *daemonSets) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *extensions.DaemonSet, err error) {
+	result = &extensions.DaemonSet{}
+	err = c.client.Patch(pt).
+		Namespace(c.ns).
+		Resource("daemonsets").
+		SubResource(subresources...).
+		Name(name).
+		Body(data).
+		Do().
+		Into(result)
+	return
 }

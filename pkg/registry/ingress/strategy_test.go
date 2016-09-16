@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,7 +23,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
@@ -78,7 +77,7 @@ func TestIngressStrategy(t *testing.T) {
 	}
 
 	ingress := newIngress()
-	Strategy.PrepareForCreate(&ingress)
+	Strategy.PrepareForCreate(ctx, &ingress)
 	if len(ingress.Status.LoadBalancer.Ingress) != 0 {
 		t.Error("Ingress should not allow setting status on create")
 	}
@@ -89,7 +88,7 @@ func TestIngressStrategy(t *testing.T) {
 	invalidIngress := newIngress()
 	invalidIngress.ResourceVersion = "4"
 	invalidIngress.Spec = extensions.IngressSpec{}
-	Strategy.PrepareForUpdate(&invalidIngress, &ingress)
+	Strategy.PrepareForUpdate(ctx, &invalidIngress, &ingress)
 	errs = Strategy.ValidateUpdate(ctx, &invalidIngress, &ingress)
 	if len(errs) == 0 {
 		t.Errorf("Expected a validation error")
@@ -119,7 +118,7 @@ func TestIngressStatusStrategy(t *testing.T) {
 			},
 		},
 	}
-	StatusStrategy.PrepareForUpdate(&newIngress, &oldIngress)
+	StatusStrategy.PrepareForUpdate(ctx, &newIngress, &oldIngress)
 	if newIngress.Status.LoadBalancer.Ingress[0].IP != "127.0.0.2" {
 		t.Errorf("Ingress status updates should allow change of status fields")
 	}
@@ -136,7 +135,7 @@ func TestSelectableFieldLabelConversions(t *testing.T) {
 	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
 		testapi.Extensions.GroupVersion().String(),
 		"Ingress",
-		labels.Set(IngressToSelectableFields(&extensions.Ingress{})),
+		IngressToSelectableFields(&extensions.Ingress{}),
 		nil,
 	)
 }

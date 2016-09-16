@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -65,11 +65,11 @@ var _ = framework.KubeDescribe("Mesos", func() {
 		client := f.Client
 		framework.ExpectNoError(framework.AllNodesReady(client, wait.ForeverTestTimeout), "all nodes ready")
 
-		nodelist := framework.ListSchedulableNodesOrDie(f.Client)
+		nodelist := framework.GetReadySchedulableNodesOrDie(f.Client)
 
 		const ns = "static-pods"
 		numpods := int32(len(nodelist.Items))
-		framework.ExpectNoError(framework.WaitForPodsRunningReady(ns, numpods, wait.ForeverTestTimeout),
+		framework.ExpectNoError(framework.WaitForPodsRunningReady(client, ns, numpods, wait.ForeverTestTimeout, map[string]string{}),
 			fmt.Sprintf("number of static pods in namespace %s is %d", ns, numpods))
 	})
 
@@ -94,14 +94,14 @@ var _ = framework.KubeDescribe("Mesos", func() {
 				Containers: []api.Container{
 					{
 						Name:  podName,
-						Image: "beta.gcr.io/google_containers/pause-amd64:3.0",
+						Image: framework.GetPauseImageName(f.Client),
 					},
 				},
 			},
 		})
 		framework.ExpectNoError(err)
 
-		framework.ExpectNoError(framework.WaitForPodRunningInNamespace(c, podName, ns))
+		framework.ExpectNoError(framework.WaitForPodNameRunningInNamespace(c, podName, ns))
 		pod, err := c.Pods(ns).Get(podName)
 		framework.ExpectNoError(err)
 

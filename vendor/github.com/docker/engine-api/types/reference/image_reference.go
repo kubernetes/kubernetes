@@ -27,6 +27,8 @@ func GetTagFromNamedRef(ref distreference.Named) string {
 		tag = x.Digest().String()
 	case distreference.NamedTagged:
 		tag = x.Tag()
+	default:
+		tag = "latest"
 	}
 	return tag
 }

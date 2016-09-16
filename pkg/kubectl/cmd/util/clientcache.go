@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,8 +17,10 @@ limitations under the License.
 package util
 
 import (
+	fed_clientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
@@ -26,9 +28,10 @@ import (
 
 func NewClientCache(loader clientcmd.ClientConfig) *ClientCache {
 	return &ClientCache{
-		clients: make(map[unversioned.GroupVersion]*client.Client),
-		configs: make(map[unversioned.GroupVersion]*restclient.Config),
-		loader:  loader,
+		clientsets:    make(map[unversioned.GroupVersion]*internalclientset.Clientset),
+		configs:       make(map[unversioned.GroupVersion]*restclient.Config),
+		fedClientSets: make(map[unversioned.GroupVersion]fed_clientset.Interface),
+		loader:        loader,
 	}
 }
 
@@ -36,7 +39,8 @@ func NewClientCache(loader clientcmd.ClientConfig) *ClientCache {
 // is invoked only once
 type ClientCache struct {
 	loader        clientcmd.ClientConfig
-	clients       map[unversioned.GroupVersion]*client.Client
+	clientsets    map[unversioned.GroupVersion]*internalclientset.Clientset
+	fedClientSets map[unversioned.GroupVersion]fed_clientset.Interface
 	configs       map[unversioned.GroupVersion]*restclient.Config
 	defaultConfig *restclient.Config
 	defaultClient *client.Client
@@ -73,31 +77,31 @@ func (c *ClientCache) ClientConfigForVersion(version *unversioned.GroupVersion) 
 		preferredGV = &versionCopy
 	}
 
+	client.SetKubernetesDefaults(&config)
 	negotiatedVersion, err := client.NegotiateVersion(c.defaultClient, &config, preferredGV, registered.EnabledVersions())
 	if err != nil {
 		return nil, err
 	}
 	config.GroupVersion = negotiatedVersion
-	client.SetKubernetesDefaults(&config)
 
 	if version != nil {
 		c.configs[*version] = &config
 	}
 
 	// `version` does not necessarily equal `config.Version`.  However, we know that we call this method again with
-	// `config.Version`, we should get the the config we've just built.
+	// `config.Version`, we should get the config we've just built.
 	configCopy := config
 	c.configs[*config.GroupVersion] = &configCopy
 
 	return &config, nil
 }
 
-// ClientForVersion initializes or reuses a client for the specified version, or returns an
+// ClientSetForVersion initializes or reuses a clientset for the specified version, or returns an
 // error if that is not possible
-func (c *ClientCache) ClientForVersion(version *unversioned.GroupVersion) (*client.Client, error) {
+func (c *ClientCache) ClientSetForVersion(version *unversioned.GroupVersion) (*internalclientset.Clientset, error) {
 	if version != nil {
-		if client, ok := c.clients[*version]; ok {
-			return client, nil
+		if clientset, ok := c.clientsets[*version]; ok {
+			return clientset, nil
 		}
 	}
 	config, err := c.ClientConfigForVersion(version)
@@ -105,23 +109,61 @@ func (c *ClientCache) ClientForVersion(version *unversioned.GroupVersion) (*clie
 		return nil, err
 	}
 
-	kubeclient, err := client.New(config)
+	clientset, err := internalclientset.NewForConfig(config)
 	if err != nil {
 		return nil, err
 	}
-	c.clients[*config.GroupVersion] = kubeclient
+	c.clientsets[*config.GroupVersion] = clientset
 
 	// `version` does not necessarily equal `config.Version`.  However, we know that if we call this method again with
 	// `version`, we should get a client based on the same config we just found.  There's no guarantee that a client
 	// is copiable, so create a new client and save it in the cache.
 	if version != nil {
 		configCopy := *config
-		kubeclient, err := client.New(&configCopy)
+		clientset, err := internalclientset.NewForConfig(&configCopy)
 		if err != nil {
 			return nil, err
 		}
-		c.clients[*version] = kubeclient
+		c.clientsets[*version] = clientset
 	}
 
-	return kubeclient, nil
+	return clientset, nil
+}
+
+func (c *ClientCache) FederationClientSetForVersion(version *unversioned.GroupVersion) (fed_clientset.Interface, error) {
+	if version != nil {
+		if clientSet, found := c.fedClientSets[*version]; found {
+			return clientSet, nil
+		}
+	}
+	config, err := c.ClientConfigForVersion(version)
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO: support multi versions of client with clientset
+	clientSet, err := fed_clientset.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+	c.fedClientSets[*config.GroupVersion] = clientSet
+
+	if version != nil {
+		configCopy := *config
+		clientSet, err := fed_clientset.NewForConfig(&configCopy)
+		if err != nil {
+			return nil, err
+		}
+		c.fedClientSets[*version] = clientSet
+	}
+
+	return clientSet, nil
+}
+
+func (c *ClientCache) FederationClientForVersion(version *unversioned.GroupVersion) (*restclient.RESTClient, error) {
+	fedClientSet, err := c.FederationClientSetForVersion(version)
+	if err != nil {
+		return nil, err
+	}
+	return fedClientSet.(*fed_clientset.Clientset).FederationClient.RESTClient, nil
 }

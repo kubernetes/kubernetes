@@ -59,7 +59,14 @@ type handshakeTransport struct {
 	serverVersion []byte
 	clientVersion []byte
 
-	hostKeys []Signer // If hostKeys are given, we are the server.
+	// hostKeys is non-empty if we are the server. In that case,
+	// it contains all host keys that can be used to sign the
+	// connection.
+	hostKeys []Signer
+
+	// hostKeyAlgorithms is non-empty if we are the client. In that case,
+	// we accept these key types from the server as host key.
+	hostKeyAlgorithms []string
 
 	// On read error, incoming is closed, and readError is set.
 	incoming  chan []byte
@@ -98,6 +105,11 @@ func newClientTransport(conn keyingTransport, clientVersion, serverVersion []byt
 	t.dialAddress = dialAddr
 	t.remoteAddr = addr
 	t.hostKeyCallback = config.HostKeyCallback
+	if config.HostKeyAlgorithms != nil {
+		t.hostKeyAlgorithms = config.HostKeyAlgorithms
+	} else {
+		t.hostKeyAlgorithms = supportedHostKeyAlgos
+	}
 	go t.readLoop()
 	return t
 }
@@ -141,6 +153,14 @@ func (t *handshakeTransport) readLoop() {
 		}
 		t.incoming <- p
 	}
+
+	// If we can't read, declare the writing part dead too.
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.writeError == nil {
+		t.writeError = t.readError
+	}
+	t.cond.Broadcast()
 }
 
 func (t *handshakeTransport) readOnePacket() ([]byte, error) {
@@ -234,7 +254,7 @@ func (t *handshakeTransport) sendKexInitLocked() (*kexInitMsg, []byte, error) {
 				msg.ServerHostKeyAlgos, k.PublicKey().Type())
 		}
 	} else {
-		msg.ServerHostKeyAlgos = supportedHostKeyAlgos
+		msg.ServerHostKeyAlgos = t.hostKeyAlgorithms
 	}
 	packet := Marshal(msg)
 
@@ -253,10 +273,12 @@ func (t *handshakeTransport) sendKexInitLocked() (*kexInitMsg, []byte, error) {
 
 func (t *handshakeTransport) writePacket(p []byte) error {
 	t.mu.Lock()
+	defer t.mu.Unlock()
+
 	if t.writtenSinceKex > t.config.RekeyThreshold {
 		t.sendKexInitLocked()
 	}
-	for t.sentInitMsg != nil {
+	for t.sentInitMsg != nil && t.writeError == nil {
 		t.cond.Wait()
 	}
 	if t.writeError != nil {
@@ -264,17 +286,14 @@ func (t *handshakeTransport) writePacket(p []byte) error {
 	}
 	t.writtenSinceKex += uint64(len(p))
 
-	var err error
 	switch p[0] {
 	case msgKexInit:
-		err = errors.New("ssh: only handshakeTransport can send kexInit")
+		return errors.New("ssh: only handshakeTransport can send kexInit")
 	case msgNewKeys:
-		err = errors.New("ssh: only handshakeTransport can send newKeys")
+		return errors.New("ssh: only handshakeTransport can send newKeys")
 	default:
-		err = t.conn.writePacket(p)
+		return t.conn.writePacket(p)
 	}
-	t.mu.Unlock()
-	return err
 }
 
 func (t *handshakeTransport) Close() error {
@@ -313,9 +332,9 @@ func (t *handshakeTransport) enterKeyExchange(otherInitPacket []byte) error {
 		magics.serverKexInit = otherInitPacket
 	}
 
-	algs := findAgreedAlgorithms(clientInit, serverInit)
-	if algs == nil {
-		return errors.New("ssh: no common algorithms")
+	algs, err := findAgreedAlgorithms(clientInit, serverInit)
+	if err != nil {
+		return err
 	}
 
 	// We don't send FirstKexFollows, but we handle receiving it.

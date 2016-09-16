@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -51,7 +51,7 @@ func (strategy) GenerateName(base string) string {
 	return ""
 }
 
-func (strategy) PrepareForCreate(obj runtime.Object) {
+func (strategy) PrepareForCreate(ctx api.Context, obj runtime.Object) {
 }
 
 func (strategy) Validate(ctx api.Context, obj runtime.Object) field.ErrorList {
@@ -66,7 +66,7 @@ func (strategy) AllowCreateOnUpdate() bool {
 	return false
 }
 
-func (strategy) PrepareForUpdate(obj, old runtime.Object) {
+func (strategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
 }
 
 func (strategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) field.ErrorList {
@@ -78,18 +78,21 @@ func (strategy) AllowUnconditionalUpdate() bool {
 }
 
 // Matcher returns a generic matcher for a given label and field selector.
-func Matcher(label labels.Selector, field fields.Selector) generic.Matcher {
-	return generic.MatcherFunc(func(obj runtime.Object) (bool, error) {
-		sa, ok := obj.(*extensions.ThirdPartyResource)
-		if !ok {
-			return false, fmt.Errorf("not a ThirdPartyResource")
-		}
-		fields := SelectableFields(sa)
-		return label.Matches(labels.Set(sa.Labels)) && field.Matches(fields), nil
-	})
+func Matcher(label labels.Selector, field fields.Selector) *generic.SelectionPredicate {
+	return &generic.SelectionPredicate{
+		Label: label,
+		Field: field,
+		GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
+			tpr, ok := obj.(*extensions.ThirdPartyResource)
+			if !ok {
+				return nil, nil, fmt.Errorf("not a ThirdPartyResource")
+			}
+			return labels.Set(tpr.Labels), SelectableFields(tpr), nil
+		},
+	}
 }
 
-// SelectableFields returns a label set that can be used for filter selection
-func SelectableFields(obj *extensions.ThirdPartyResource) labels.Set {
-	return labels.Set{}
+// SelectableFields returns a field set that can be used for filter selection
+func SelectableFields(obj *extensions.ThirdPartyResource) fields.Set {
+	return nil
 }

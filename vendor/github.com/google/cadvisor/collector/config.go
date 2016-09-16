@@ -17,12 +17,13 @@ package collector
 import (
 	"time"
 
+	"encoding/json"
 	"github.com/google/cadvisor/info/v1"
 )
 
 type Config struct {
 	//the endpoint to hit to scrape metrics
-	Endpoint string `json:"endpoint"`
+	Endpoint EndpointConfig `json:"endpoint"`
 
 	//holds information about different metrics that can be collected
 	MetricsConfig []MetricConfig `json:"metrics_config"`
@@ -52,11 +53,48 @@ type MetricConfig struct {
 
 type Prometheus struct {
 	//the endpoint to hit to scrape metrics
-	Endpoint string `json:"endpoint"`
+	Endpoint EndpointConfig `json:"endpoint"`
 
 	//the frequency at which metrics should be collected
 	PollingFrequency time.Duration `json:"polling_frequency"`
 
 	//holds names of different metrics that can be collected
 	MetricsConfig []string `json:"metrics_config"`
+}
+
+type EndpointConfig struct {
+	// The full URL of the endpoint to reach
+	URL string
+	// A configuration in which an actual URL is constructed from, using the container's ip address
+	URLConfig URLConfig
+}
+
+type URLConfig struct {
+	// the protocol to use for connecting to the endpoint. Eg 'http' or 'https'
+	Protocol string `json:"protocol"`
+
+	// the port to use for connecting to the endpoint. Eg '8778'
+	Port json.Number `json:"port"`
+
+	// the path to use for the endpoint. Eg '/metrics'
+	Path string `json:"path"`
+}
+
+func (ec *EndpointConfig) UnmarshalJSON(b []byte) error {
+	url := ""
+	config := URLConfig{
+		Protocol: "http",
+		Port:     "8000",
+	}
+
+	if err := json.Unmarshal(b, &url); err == nil {
+		ec.URL = url
+		return nil
+	}
+	err := json.Unmarshal(b, &config)
+	if err == nil {
+		ec.URLConfig = config
+		return nil
+	}
+	return err
 }

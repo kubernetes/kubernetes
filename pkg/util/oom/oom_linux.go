@@ -1,7 +1,7 @@
 // +build cgo,linux
 
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -76,6 +76,12 @@ func applyOOMScoreAdj(pid int, oomScoreAdj int) error {
 			continue
 		}
 		if _, err := f.Write([]byte(value)); err != nil {
+			// we can ignore the return value of f.Close() here.
+			f.Close()
+			err = fmt.Errorf("failed to apply oom-score-adj to pid %d (%v)", pid, err)
+			continue
+		}
+		if err = f.Close(); err != nil {
 			err = fmt.Errorf("failed to apply oom-score-adj to pid %d (%v)", pid, err)
 			continue
 		}

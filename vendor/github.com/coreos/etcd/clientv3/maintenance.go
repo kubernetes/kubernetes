@@ -1,4 +1,4 @@
-// Copyright 2016 CoreOS, Inc.
+// Copyright 2016 The etcd Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@
 package clientv3
 
 import (
-	"sync"
+	"io"
 
 	pb "github.com/coreos/etcd/etcdserver/etcdserverpb"
 	"golang.org/x/net/context"
@@ -45,25 +45,20 @@ type Maintenance interface {
 	// times with different endpoints.
 	Defragment(ctx context.Context, endpoint string) (*DefragmentResponse, error)
 
-	// Status gets the status of the member.
+	// Status gets the status of the endpoint.
 	Status(ctx context.Context, endpoint string) (*StatusResponse, error)
+
+	// Snapshot provides a reader for a snapshot of a backend.
+	Snapshot(ctx context.Context) (io.ReadCloser, error)
 }
 
 type maintenance struct {
-	c *Client
-
-	mu     sync.Mutex
-	conn   *grpc.ClientConn // conn in-use
+	c      *Client
 	remote pb.MaintenanceClient
 }
 
 func NewMaintenance(c *Client) Maintenance {
-	conn := c.ActiveConnection()
-	return &maintenance{
-		c:      c,
-		conn:   conn,
-		remote: pb.NewMaintenanceClient(conn),
-	}
+	return &maintenance{c: c, remote: pb.NewMaintenanceClient(c.conn)}
 }
 
 func (m *maintenance) AlarmList(ctx context.Context) (*AlarmResponse, error) {
@@ -73,15 +68,12 @@ func (m *maintenance) AlarmList(ctx context.Context) (*AlarmResponse, error) {
 		Alarm:    pb.AlarmType_NONE, // all
 	}
 	for {
-		resp, err := m.getRemote().Alarm(ctx, req)
+		resp, err := m.remote.Alarm(ctx, req, grpc.FailFast(false))
 		if err == nil {
 			return (*AlarmResponse)(resp), nil
 		}
-		if isHalted(ctx, err) {
-			return nil, err
-		}
-		if err = m.switchRemote(err); err != nil {
-			return nil, err
+		if isHaltErr(ctx, err) {
+			return nil, toErr(ctx, err)
 		}
 	}
 }
@@ -96,38 +88,36 @@ func (m *maintenance) AlarmDisarm(ctx context.Context, am *AlarmMember) (*AlarmR
 	if req.MemberID == 0 && req.Alarm == pb.AlarmType_NONE {
 		ar, err := m.AlarmList(ctx)
 		if err != nil {
-			return nil, err
+			return nil, toErr(ctx, err)
 		}
 		ret := AlarmResponse{}
 		for _, am := range ar.Alarms {
 			dresp, derr := m.AlarmDisarm(ctx, (*AlarmMember)(am))
 			if derr != nil {
-				return nil, derr
+				return nil, toErr(ctx, derr)
 			}
 			ret.Alarms = append(ret.Alarms, dresp.Alarms...)
 		}
 		return &ret, nil
 	}
 
-	resp, err := m.getRemote().Alarm(ctx, req)
+	resp, err := m.remote.Alarm(ctx, req, grpc.FailFast(false))
 	if err == nil {
 		return (*AlarmResponse)(resp), nil
 	}
-	if !isHalted(ctx, err) {
-		go m.switchRemote(err)
-	}
-	return nil, err
+	return nil, toErr(ctx, err)
 }
 
 func (m *maintenance) Defragment(ctx context.Context, endpoint string) (*DefragmentResponse, error) {
 	conn, err := m.c.Dial(endpoint)
 	if err != nil {
-		return nil, err
+		return nil, toErr(ctx, err)
 	}
+	defer conn.Close()
 	remote := pb.NewMaintenanceClient(conn)
-	resp, err := remote.Defragment(ctx, &pb.DefragmentRequest{})
+	resp, err := remote.Defragment(ctx, &pb.DefragmentRequest{}, grpc.FailFast(false))
 	if err != nil {
-		return nil, err
+		return nil, toErr(ctx, err)
 	}
 	return (*DefragmentResponse)(resp), nil
 }
@@ -135,30 +125,40 @@ func (m *maintenance) Defragment(ctx context.Context, endpoint string) (*Defragm
 func (m *maintenance) Status(ctx context.Context, endpoint string) (*StatusResponse, error) {
 	conn, err := m.c.Dial(endpoint)
 	if err != nil {
-		return nil, err
+		return nil, toErr(ctx, err)
 	}
+	defer conn.Close()
 	remote := pb.NewMaintenanceClient(conn)
-	resp, err := remote.Status(ctx, &pb.StatusRequest{})
+	resp, err := remote.Status(ctx, &pb.StatusRequest{}, grpc.FailFast(false))
 	if err != nil {
-		return nil, err
+		return nil, toErr(ctx, err)
 	}
 	return (*StatusResponse)(resp), nil
 }
 
-func (m *maintenance) getRemote() pb.MaintenanceClient {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	return m.remote
-}
-
-func (m *maintenance) switchRemote(prevErr error) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	newConn, err := m.c.retryConnection(m.conn, prevErr)
+func (m *maintenance) Snapshot(ctx context.Context) (io.ReadCloser, error) {
+	ss, err := m.remote.Snapshot(ctx, &pb.SnapshotRequest{}, grpc.FailFast(false))
 	if err != nil {
-		return err
+		return nil, toErr(ctx, err)
 	}
-	m.conn = newConn
-	m.remote = pb.NewMaintenanceClient(m.conn)
-	return nil
+
+	pr, pw := io.Pipe()
+	go func() {
+		for {
+			resp, err := ss.Recv()
+			if err != nil {
+				pw.CloseWithError(err)
+				return
+			}
+			if resp == nil && err == nil {
+				break
+			}
+			if _, werr := pw.Write(resp.Blob); werr != nil {
+				pw.CloseWithError(werr)
+				return
+			}
+		}
+		pw.Close()
+	}()
+	return pr, nil
 }

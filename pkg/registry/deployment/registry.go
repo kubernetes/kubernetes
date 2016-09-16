@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -71,7 +71,7 @@ func (s *storage) CreateDeployment(ctx api.Context, deployment *extensions.Deplo
 }
 
 func (s *storage) UpdateDeployment(ctx api.Context, deployment *extensions.Deployment) (*extensions.Deployment, error) {
-	obj, _, err := s.Update(ctx, deployment)
+	obj, _, err := s.Update(ctx, deployment.Name, rest.DefaultUpdatedObjectInfo(deployment, api.Scheme))
 	if err != nil {
 		return nil, err
 	}

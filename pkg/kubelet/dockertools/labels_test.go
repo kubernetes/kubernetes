@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -50,8 +50,23 @@ func TestLabels(t *testing.T) {
 			},
 		},
 	}
+	containerPorts := []api.ContainerPort{
+		{
+			Name:          "http",
+			HostPort:      80,
+			ContainerPort: 8080,
+			Protocol:      api.ProtocolTCP,
+		},
+		{
+			Name:          "https",
+			HostPort:      443,
+			ContainerPort: 6443,
+			Protocol:      api.ProtocolTCP,
+		},
+	}
 	container := &api.Container{
-		Name: "test_container",
+		Name:  "test_container",
+		Ports: containerPorts,
 		TerminationMessagePath: "/somepath",
 		Lifecycle:              lifecycle,
 	}
@@ -78,6 +93,7 @@ func TestLabels(t *testing.T) {
 		RestartCount:           restartCount,
 		TerminationMessagePath: container.TerminationMessagePath,
 		PreStopHandler:         container.Lifecycle.PreStop,
+		Ports:                  containerPorts,
 	}
 
 	// Test whether we can get right information from label

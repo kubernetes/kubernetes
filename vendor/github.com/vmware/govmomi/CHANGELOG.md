@@ -1,5 +1,63 @@
 # changelog
 
+### 0.8.0 (2016-06-30)
+
+* Add session.Manager.AcquireLocalTicket
+
+* Include StoragePod in Finder.FolderList
+
+* Add Finder methods for finding by ManagedObjectReference: Element, ObjectReference
+
+* Add mo.ManagedObjectReference methods: Reference, String, FromString
+
+* Add support using SessionManagerGenericServiceTicket.HostName for Datastore HTTP access
+
+### 0.7.1 (2016-06-03)
+
+* Fix object.ObjectName method
+
+### 0.7.0 (2016-06-02)
+
+* Move InventoryPath field to object.Common
+
+* Add HostDatastoreSystem.CreateLocalDatastore method
+
+* Add DatastoreNamespaceManager methods: CreateDirectory, DeleteDirectory
+
+* Add HostServiceSystem
+
+* Add HostStorageSystem methods: MarkAsSdd, MarkAsNonSdd, MarkAsLocal, MarkAsNonLocal
+
+* Add HostStorageSystem.RescanAllHba method
+
+### 0.6.2 (2016-05-11)
+
+* Get complete file details in Datastore.Stat
+
+* SOAP decoding fixes
+
+* Add VirtualMachine.RemoveAllSnapshot
+
+### 0.6.1 (2016-04-30)
+
+* Fix mo.Entity interface
+
+### 0.6.0 (2016-04-29)
+
+* Add Common.Rename method
+
+* Add mo.Entity interface
+
+* Add OptionManager
+
+* Add Finder.FolderList method
+
+* Add VirtualMachine.WaitForNetIP method
+
+* Add VirtualMachine.RevertToSnapshot method
+
+* Add Datastore.Download method
+
 ### 0.5.0 (2016-03-30)
 
 Generated fields using xsd type 'int' change to Go type 'int32'

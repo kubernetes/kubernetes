@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,13 +21,14 @@ import (
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/storage"
 )
 
 // AttrFunc returns label and field sets for List or Watch to compare against, or an error.
 type AttrFunc func(obj runtime.Object) (label labels.Set, field fields.Set, err error)
 
-// ObjectMetaFieldsSet returns a fields set that represents the ObjectMeta.
-func ObjectMetaFieldsSet(objectMeta api.ObjectMeta, hasNamespaceField bool) fields.Set {
+// ObjectMetaFieldsSet returns a fields that represents the ObjectMeta.
+func ObjectMetaFieldsSet(objectMeta *api.ObjectMeta, hasNamespaceField bool) fields.Set {
 	if !hasNamespaceField {
 		return fields.Set{
 			"metadata.name": objectMeta.Name,
@@ -50,9 +51,10 @@ func MergeFieldsSets(source fields.Set, fragment fields.Set) fields.Set {
 // SelectionPredicate implements a generic predicate that can be passed to
 // GenericRegistry's List or Watch methods. Implements the Matcher interface.
 type SelectionPredicate struct {
-	Label    labels.Selector
-	Field    fields.Selector
-	GetAttrs AttrFunc
+	Label       labels.Selector
+	Field       fields.Selector
+	GetAttrs    AttrFunc
+	IndexFields []string
 }
 
 // Matches returns true if the given object's labels and fields (as
@@ -66,7 +68,11 @@ func (s *SelectionPredicate) Matches(obj runtime.Object) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return s.Label.Matches(labels) && s.Field.Matches(fields), nil
+	matched := s.Label.Matches(labels)
+	if s.Field != nil {
+		matched = (matched && s.Field.Matches(fields))
+	}
+	return matched, nil
 }
 
 // MatchesSingle will return (name, true) if and only if s.Field matches on the object's
@@ -77,6 +83,20 @@ func (s *SelectionPredicate) MatchesSingle() (string, bool) {
 		return name, true
 	}
 	return "", false
+}
+
+// For any index defined by IndexFields, if a matcher can match only (a subset)
+// of objects that return <value> for a given index, a pair (<index name>, <value>)
+// wil be returned.
+// TODO: Consider supporting also labels.
+func (s *SelectionPredicate) MatcherIndex() []storage.MatchValue {
+	var result []storage.MatchValue
+	for _, field := range s.IndexFields {
+		if value, ok := s.Field.RequiresExactMatch(field); ok {
+			result = append(result, storage.MatchValue{IndexName: field, Value: value})
+		}
+	}
+	return result
 }
 
 // Matcher can return true if an object matches the Matcher's selection
@@ -93,50 +113,13 @@ type Matcher interface {
 	// include the object's namespace.
 	MatchesSingle() (key string, matchesSingleObject bool)
 
-	// TODO: when we start indexing objects, add something like the below:
-	//         MatchesIndices() (indexName []string, indexValue []string)
-	//       where indexName/indexValue are the same length.
-}
-
-// MatcherFunc makes a matcher from the provided function. For easy definition
-// of matchers for testing. Note: use SelectionPredicate above for real code!
-func MatcherFunc(f func(obj runtime.Object) (bool, error)) Matcher {
-	return matcherFunc(f)
-}
-
-type matcherFunc func(obj runtime.Object) (bool, error)
-
-// Matches calls the embedded function.
-func (m matcherFunc) Matches(obj runtime.Object) (bool, error) {
-	return m(obj)
-}
-
-// MatchesSingle always returns "", false-- because this is a predicate
-// implementation of Matcher.
-func (m matcherFunc) MatchesSingle() (string, bool) {
-	return "", false
-}
-
-// MatchOnKey returns a matcher that will send only the object matching key
-// through the matching function f. For testing!
-// Note: use SelectionPredicate above for real code!
-func MatchOnKey(key string, f func(obj runtime.Object) (bool, error)) Matcher {
-	return matchKey{key, f}
-}
-
-type matchKey struct {
-	key string
-	matcherFunc
-}
-
-// MatchesSingle always returns its key, true.
-func (m matchKey) MatchesSingle() (string, bool) {
-	return m.key, true
+	// For any known index, if a matcher can match only (a subset) of objects
+	// that return <value> for a given index, a pair (<index name>, <value>)
+	// will be returned.
+	MatcherIndex() []storage.MatchValue
 }
 
 var (
 	// Assert implementations match the interface.
-	_ = Matcher(matchKey{})
 	_ = Matcher(&SelectionPredicate{})
-	_ = Matcher(matcherFunc(nil))
 )

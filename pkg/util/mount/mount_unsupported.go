@@ -1,7 +1,7 @@
 // +build !linux
 
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -33,6 +33,18 @@ func (mounter *Mounter) List() ([]MountPoint, error) {
 }
 
 func (mounter *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
+	return true, nil
+}
+
+func (mounter *Mounter) GetDeviceNameFromMount(mountPath, pluginDir string) (string, error) {
+	return "", nil
+}
+
+func (mounter *Mounter) DeviceOpened(pathname string) (bool, error) {
+	return false, nil
+}
+
+func (mounter *Mounter) PathIsDevice(pathname string) (bool, error) {
 	return true, nil
 }
 

@@ -1,4 +1,4 @@
-// Copyright 2015 CoreOS, Inc.
+// Copyright 2015 The etcd Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,12 +14,20 @@
 
 package etcdserver
 
+import (
+	"sync/atomic"
+)
+
 // consistentIndex represents the offset of an entry in a consistent replica log.
-// It implements the storage.ConsistentIndexGetter interface.
+// It implements the mvcc.ConsistentIndexGetter interface.
 // It is always set to the offset of current entry before executing the entry,
 // so ConsistentWatchableKV could get the consistent index from it.
 type consistentIndex uint64
 
-func (i *consistentIndex) setConsistentIndex(v uint64) { *i = consistentIndex(v) }
+func (i *consistentIndex) setConsistentIndex(v uint64) {
+	atomic.StoreUint64((*uint64)(i), v)
+}
 
-func (i *consistentIndex) ConsistentIndex() uint64 { return uint64(*i) }
+func (i *consistentIndex) ConsistentIndex() uint64 {
+	return atomic.LoadUint64((*uint64)(i))
+}

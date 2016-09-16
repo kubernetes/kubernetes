@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -30,7 +30,7 @@ func TestSpecSourceConverters(t *testing.T) {
 
 	converted := NewSpecFromVolume(v)
 	if converted.Volume.EmptyDir == nil {
-		t.Errorf("Unexpected nil EmptyDir: %+v", converted)
+		t.Errorf("Unexpected nil EmptyDir: %#v", converted)
 	}
 	if v.Name != converted.Name() {
 		t.Errorf("Expected %v but got %v", v.Name, converted.Name())
@@ -45,7 +45,7 @@ func TestSpecSourceConverters(t *testing.T) {
 
 	converted = NewSpecFromPersistentVolume(pv, false)
 	if converted.PersistentVolume.Spec.AWSElasticBlockStore == nil {
-		t.Errorf("Unexpected nil AWSElasticBlockStore: %+v", converted)
+		t.Errorf("Unexpected nil AWSElasticBlockStore: %#v", converted)
 	}
 	if pv.Name != converted.Name() {
 		t.Errorf("Expected %v but got %v", pv.Name, converted.Name())

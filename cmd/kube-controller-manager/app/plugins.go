@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -28,23 +28,49 @@ import (
 	_ "k8s.io/kubernetes/pkg/cloudprovider/providers"
 
 	// Volume plugins
+	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/openstack"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
+	utilconfig "k8s.io/kubernetes/pkg/util/config"
 	"k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/aws_ebs"
+	"k8s.io/kubernetes/pkg/volume/azure_dd"
 	"k8s.io/kubernetes/pkg/volume/cinder"
+	"k8s.io/kubernetes/pkg/volume/flexvolume"
 	"k8s.io/kubernetes/pkg/volume/gce_pd"
+	"k8s.io/kubernetes/pkg/volume/glusterfs"
 	"k8s.io/kubernetes/pkg/volume/host_path"
 	"k8s.io/kubernetes/pkg/volume/nfs"
-
-	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/volume/rbd"
+	"k8s.io/kubernetes/pkg/volume/vsphere_volume"
 )
 
-// ProbeRecyclableVolumePlugins collects all persistent volume plugins into an easy to use list.
-func ProbeRecyclableVolumePlugins(config componentconfig.VolumeConfiguration) []volume.VolumePlugin {
+// ProbeAttachableVolumePlugins collects all volume plugins for the attach/
+// detach controller. VolumeConfiguration is used ot get FlexVolumePluginDir
+// which specifies the directory to search for additional third party volume
+// plugins.
+// The list of plugins is manually compiled. This code and the plugin
+// initialization code for kubelet really, really need a through refactor.
+func ProbeAttachableVolumePlugins(config componentconfig.VolumeConfiguration) []volume.VolumePlugin {
+	allPlugins := []volume.VolumePlugin{}
+
+	allPlugins = append(allPlugins, aws_ebs.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, gce_pd.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, cinder.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, flexvolume.ProbeVolumePlugins(config.FlexVolumePluginDir)...)
+	allPlugins = append(allPlugins, vsphere_volume.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, azure_dd.ProbeVolumePlugins()...)
+	return allPlugins
+}
+
+// ProbeControllerVolumePlugins collects all persistent volume plugins into an
+// easy to use list. Only volume plugins that implement any of
+// provisioner/recycler/deleter interface should be returned.
+func ProbeControllerVolumePlugins(cloud cloudprovider.Interface, config componentconfig.VolumeConfiguration) []volume.VolumePlugin {
 	allPlugins := []volume.VolumePlugin{}
 
 	// The list of plugins to probe is decided by this binary, not
@@ -60,6 +86,7 @@ func ProbeRecyclableVolumePlugins(config componentconfig.VolumeConfiguration) []
 		RecyclerMinimumTimeout:   int(config.PersistentVolumeRecyclerConfiguration.MinimumTimeoutHostPath),
 		RecyclerTimeoutIncrement: int(config.PersistentVolumeRecyclerConfiguration.IncrementTimeoutHostPath),
 		RecyclerPodTemplate:      volume.NewPersistentVolumeRecyclerPodTemplate(),
+		ProvisioningEnabled:      config.EnableHostPathProvisioning,
 	}
 	if err := AttemptToLoadRecycler(config.PersistentVolumeRecyclerConfiguration.PodTemplateFilePathHostPath, &hostPathConfig); err != nil {
 		glog.Fatalf("Could not create hostpath recycler pod from file %s: %+v", config.PersistentVolumeRecyclerConfiguration.PodTemplateFilePathHostPath, err)
@@ -75,28 +102,47 @@ func ProbeRecyclableVolumePlugins(config componentconfig.VolumeConfiguration) []
 		glog.Fatalf("Could not create NFS recycler pod from file %s: %+v", config.PersistentVolumeRecyclerConfiguration.PodTemplateFilePathNFS, err)
 	}
 	allPlugins = append(allPlugins, nfs.ProbeVolumePlugins(nfsConfig)...)
-
-	allPlugins = append(allPlugins, aws_ebs.ProbeVolumePlugins()...)
-	allPlugins = append(allPlugins, gce_pd.ProbeVolumePlugins()...)
-	allPlugins = append(allPlugins, cinder.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, glusterfs.ProbeVolumePlugins()...)
+	// add rbd provisioner
+	allPlugins = append(allPlugins, rbd.ProbeVolumePlugins()...)
+	if cloud != nil {
+		switch {
+		case aws.ProviderName == cloud.ProviderName():
+			allPlugins = append(allPlugins, aws_ebs.ProbeVolumePlugins()...)
+		case gce.ProviderName == cloud.ProviderName():
+			allPlugins = append(allPlugins, gce_pd.ProbeVolumePlugins()...)
+		case openstack.ProviderName == cloud.ProviderName():
+			allPlugins = append(allPlugins, cinder.ProbeVolumePlugins()...)
+		case vsphere.ProviderName == cloud.ProviderName():
+			allPlugins = append(allPlugins, vsphere_volume.ProbeVolumePlugins()...)
+		}
+	}
 
 	return allPlugins
 }
 
-// NewVolumeProvisioner returns a volume provisioner to use when running in a cloud or development environment.
-// The beta implementation of provisioning allows 1 implied provisioner per cloud, until we allow configuration of many.
-// We explicitly map clouds to volume plugins here which allows us to configure many later without backwards compatibility issues.
-// Not all cloudproviders have provisioning capability, which is the reason for the bool in the return to tell the caller to expect one or not.
-func NewVolumeProvisioner(cloud cloudprovider.Interface, config componentconfig.VolumeConfiguration) (volume.ProvisionableVolumePlugin, error) {
+// NewAlphaVolumeProvisioner returns a volume provisioner to use when running in
+// a cloud or development environment. The alpha implementation of provisioning
+// allows 1 implied provisioner per cloud and is here only for compatibility
+// with Kubernetes 1.3
+// TODO: remove in Kubernetes 1.5
+func NewAlphaVolumeProvisioner(cloud cloudprovider.Interface, config componentconfig.VolumeConfiguration) (volume.ProvisionableVolumePlugin, error) {
 	switch {
+	case !utilconfig.DefaultFeatureGate.DynamicVolumeProvisioning():
+		return nil, nil
 	case cloud == nil && config.EnableHostPathProvisioning:
-		return getProvisionablePluginFromVolumePlugins(host_path.ProbeVolumePlugins(volume.VolumeConfig{}))
+		return getProvisionablePluginFromVolumePlugins(host_path.ProbeVolumePlugins(
+			volume.VolumeConfig{
+				ProvisioningEnabled: true,
+			}))
 	case cloud != nil && aws.ProviderName == cloud.ProviderName():
 		return getProvisionablePluginFromVolumePlugins(aws_ebs.ProbeVolumePlugins())
 	case cloud != nil && gce.ProviderName == cloud.ProviderName():
 		return getProvisionablePluginFromVolumePlugins(gce_pd.ProbeVolumePlugins())
 	case cloud != nil && openstack.ProviderName == cloud.ProviderName():
 		return getProvisionablePluginFromVolumePlugins(cinder.ProbeVolumePlugins())
+	case cloud != nil && vsphere.ProviderName == cloud.ProviderName():
+		return getProvisionablePluginFromVolumePlugins(vsphere_volume.ProbeVolumePlugins())
 	}
 	return nil, nil
 }

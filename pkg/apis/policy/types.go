@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -49,7 +49,8 @@ type PodDisruptionBudgetStatus struct {
 	ExpectedPods int32 `json:"expectedPods"`
 }
 
-// +genclient=true,noMethods=true
+// +genclient=true
+// +noMethods=true
 
 // PodDisruptionBudget is an object to define the max disruption that can be caused to a collection of pods
 type PodDisruptionBudget struct {
@@ -67,4 +68,17 @@ type PodDisruptionBudgetList struct {
 	unversioned.TypeMeta `json:",inline"`
 	unversioned.ListMeta `json:"metadata,omitempty"`
 	Items                []PodDisruptionBudget `json:"items"`
+}
+
+// Eviction evicts a pod from its node subject to certain policies and safety constraints.
+// This is a subresource of Pod.  A request to cause such an eviction is
+// created by POSTing to .../pods/<pod name>/evictions.
+type Eviction struct {
+	unversioned.TypeMeta `json:",inline"`
+
+	// ObjectMeta describes the pod that is being evicted.
+	api.ObjectMeta `json:"metadata,omitempty"`
+
+	// DeleteOptions may be provided
+	DeleteOptions *api.DeleteOptions `json:"deleteOptions,omitempty"`
 }

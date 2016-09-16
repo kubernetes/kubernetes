@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -71,7 +71,7 @@ func pathWithPrefix(prefix, resource, namespace, name string) string {
 // - we correctly recover after some "short" requests finish, i.e. we can process new ones.
 func TestMaxInFlight(t *testing.T) {
 	const AllowedInflightRequestsNo = 3
-	// Size of inflightRequestsChannel determines how many concurent inflight requests
+	// Size of inflightRequestsChannel determines how many concurrent inflight requests
 	// are allowed.
 	inflightRequestsChannel := make(chan bool, AllowedInflightRequestsNo)
 	// notAccountedPathsRegexp specifies paths requests to which we don't account into

@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,7 +16,10 @@ limitations under the License.
 
 package componentconfig
 
-import "k8s.io/kubernetes/pkg/api/unversioned"
+import (
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	utilconfig "k8s.io/kubernetes/pkg/util/config"
+)
 
 type KubeProxyConfiguration struct {
 	unversioned.TypeMeta
@@ -58,14 +61,19 @@ type KubeProxyConfiguration struct {
 	PortRange string `json:"portRange"`
 	// resourceContainer is the absolute name of the resource-only container to create and run
 	// the Kube-proxy in (Default: /kube-proxy).
-	ResourceContainer string `json:"kubeletCgroups"`
+	ResourceContainer string `json:"resourceContainer"`
 	// udpIdleTimeout is how long an idle UDP connection will be kept open (e.g. '250ms', '2s').
 	// Must be greater than 0. Only applicable for proxyMode=userspace.
 	UDPIdleTimeout unversioned.Duration `json:"udpTimeoutMilliseconds"`
-	// conntrackMax is the maximum number of NAT connections to track (0 to leave as-is)")
+	// conntrackMax is the maximum number of NAT connections to track (0 to
+	// leave as-is).  This takes precedence over conntrackMaxPerCore.
 	ConntrackMax int32 `json:"conntrackMax"`
-	// conntrackTCPEstablishedTimeout is how long an idle UDP connection will be kept open
-	// (e.g. '250ms', '2s').  Must be greater than 0. Only applicable for proxyMode is Userspace
+	// conntrackMaxPerCore is the maximum number of NAT connections to track
+	// per CPU core (0 to leave as-is).  This value is only considered if
+	// conntrackMax == 0.
+	ConntrackMaxPerCore int32 `json:"conntrackMaxPerCore"`
+	// conntrackTCPEstablishedTimeout is how long an idle TCP connection will be kept open
+	// (e.g. '250ms', '2s').  Must be greater than 0.
 	ConntrackTCPEstablishedTimeout unversioned.Duration `json:"conntrackTCPEstablishedTimeout"`
 }
 
@@ -102,8 +110,11 @@ const (
 
 // TODO: curate the ordering and structure of this config object
 type KubeletConfiguration struct {
-	// config is the path to the config file or directory of files
-	Config string `json:"config"`
+	unversioned.TypeMeta
+
+	// podManifestPath is the path to the directory containing pod manifests to
+	// run, or the path to a single manifest file
+	PodManifestPath string `json:"podManifestPath"`
 	// syncFrequency is the max period between synchronizing running
 	// containers and config
 	SyncFrequency unversioned.Duration `json:"syncFrequency"`
@@ -123,19 +134,19 @@ type KubeletConfiguration struct {
 	// for all interfaces)
 	Address string `json:"address"`
 	// port is the port for the Kubelet to serve on.
-	Port uint `json:"port"`
+	Port int32 `json:"port"`
 	// readOnlyPort is the read-only port for the Kubelet to serve on with
 	// no authentication/authorization (set to 0 to disable)
-	ReadOnlyPort uint `json:"readOnlyPort"`
-	// tLSCertFile is the file containing x509 Certificate for HTTPS.  (CA cert,
+	ReadOnlyPort int32 `json:"readOnlyPort"`
+	// tlsCertFile is the file containing x509 Certificate for HTTPS.  (CA cert,
 	// if any, concatenated after server cert). If tlsCertFile and
 	// tlsPrivateKeyFile are not provided, a self-signed certificate
 	// and key are generated for the public address and saved to the directory
 	// passed to certDir.
-	TLSCertFile string `json:"tLSCertFile"`
-	// tLSPrivateKeyFile is the ile containing x509 private key matching
+	TLSCertFile string `json:"tlsCertFile"`
+	// tlsPrivateKeyFile is the ile containing x509 private key matching
 	// tlsCertFile.
-	TLSPrivateKeyFile string `json:"tLSPrivateKeyFile"`
+	TLSPrivateKeyFile string `json:"tlsPrivateKeyFile"`
 	// certDirectory is the directory where the TLS certs are located (by
 	// default /var/run/kubernetes). If tlsCertFile and tlsPrivateKeyFile
 	// are provided, this flag will be ignored.
@@ -151,28 +162,31 @@ type KubeletConfiguration struct {
 	// rootDirectory is the directory path to place kubelet files (volume
 	// mounts,etc).
 	RootDirectory string `json:"rootDirectory"`
+	// seccompProfileRoot is the directory path for seccomp profiles.
+	SeccompProfileRoot string `json:"seccompProfileRoot"`
 	// allowPrivileged enables containers to request privileged mode.
 	// Defaults to false.
 	AllowPrivileged bool `json:"allowPrivileged"`
 	// hostNetworkSources is a comma-separated list of sources from which the
-	// Kubelet allows pods to use of host network. Defaults to "*".
-	HostNetworkSources string `json:"hostNetworkSources"`
+	// Kubelet allows pods to use of host network. Defaults to "*". Valid
+	// options are "file", "http", "api", and "*" (all sources).
+	HostNetworkSources []string `json:"hostNetworkSources"`
 	// hostPIDSources is a comma-separated list of sources from which the
 	// Kubelet allows pods to use the host pid namespace. Defaults to "*".
-	HostPIDSources string `json:"hostPIDSources"`
+	HostPIDSources []string `json:"hostPIDSources"`
 	// hostIPCSources is a comma-separated list of sources from which the
 	// Kubelet allows pods to use the host ipc namespace. Defaults to "*".
-	HostIPCSources string `json:"hostIPCSources"`
+	HostIPCSources []string `json:"hostIPCSources"`
 	// registryPullQPS is the limit of registry pulls per second. If 0,
 	// unlimited. Set to 0 for no limit. Defaults to 5.0.
-	RegistryPullQPS float64 `json:"registryPullQPS"`
+	RegistryPullQPS int32 `json:"registryPullQPS"`
 	// registryBurst is the maximum size of a bursty pulls, temporarily allows
 	// pulls to burst to this number, while still not exceeding registryQps.
-	// Only used if registryQps > 0.
+	// Only used if registryQPS > 0.
 	RegistryBurst int32 `json:"registryBurst"`
 	// eventRecordQPS is the maximum event creations per second. If 0, there
 	// is no limit enforced.
-	EventRecordQPS float32 `json:"eventRecordQPS"`
+	EventRecordQPS int32 `json:"eventRecordQPS"`
 	// eventBurst is the maximum size of a bursty event records, temporarily
 	// allows event records to burst to this number, while still not exceeding
 	// event-qps. Only used if eventQps > 0
@@ -190,7 +204,7 @@ type KubeletConfiguration struct {
 	// to retain globally. Each container takes up some disk space.
 	MaxContainerCount int32 `json:"maxContainerCount"`
 	// cAdvisorPort is the port of the localhost cAdvisor endpoint
-	CAdvisorPort uint `json:"cAdvisorPort"`
+	CAdvisorPort int32 `json:"cAdvisorPort"`
 	// healthzPort is the port of the localhost healthz endpoint
 	HealthzPort int32 `json:"healthzPort"`
 	// healthzBindAddress is the IP address for the healthz server to serve
@@ -219,7 +233,7 @@ type KubeletConfiguration struct {
 	// status to master. Note: be cautious when changing the constant, it
 	// must work with nodeMonitorGracePeriod in nodecontroller.
 	NodeStatusUpdateFrequency unversioned.Duration `json:"nodeStatusUpdateFrequency"`
-	// minimumGCAge is the minimum age for a unused image before it is
+	// imageMinimumGCAge is the minimum age for an unused image before it is
 	// garbage collected.
 	ImageMinimumGCAge unversioned.Duration `json:"imageMinimumGCAge"`
 	// imageGCHighThresholdPercent is the percent of disk usage after which
@@ -238,9 +252,19 @@ type KubeletConfiguration struct {
 	// networkPluginName is the name of the network plugin to be invoked for
 	// various events in kubelet/pod lifecycle
 	NetworkPluginName string `json:"networkPluginName"`
+	// networkPluginMTU is the MTU to be passed to the network plugin,
+	// and overrides the default MTU for cases where it cannot be automatically
+	// computed (such as IPSEC).
+	NetworkPluginMTU int32 `json:"networkPluginMTU"`
 	// networkPluginDir is the full path of the directory in which to search
-	// for network plugins
+	// for network plugins (and, for backwards-compat, CNI config files)
 	NetworkPluginDir string `json:"networkPluginDir"`
+	// CNIConfDir is the full path of the directory in which to search for
+	// CNI config files
+	CNIConfDir string `json:"cniConfDir"`
+	// CNIBinDir is the full path of the directory in which to search for
+	// CNI plugin binaries
+	CNIBinDir string `json:"cniBinDir"`
 	// volumePluginDir is the full path of the directory in which to search
 	// for additional third party volume plugins
 	VolumePluginDir string `json:"volumePluginDir"`
@@ -250,17 +274,28 @@ type KubeletConfiguration struct {
 	CloudConfigFile string `json:"cloudConfigFile,omitempty"`
 	// KubeletCgroups is the absolute name of cgroups to isolate the kubelet in.
 	KubeletCgroups string `json:"kubeletCgroups,omitempty"`
+	// Enable QoS based Cgroup hierarchy: top level cgroups for QoS Classes
+	// And all Burstable and BestEffort pods are brought up under their
+	// specific top level QoS cgroup.
+	CgroupsPerQOS bool `json:"CgroupsPerQOS,omitempty"`
 	// Cgroups that container runtime is expected to be isolated in.
 	RuntimeCgroups string `json:"runtimeCgroups,omitempty"`
 	// SystemCgroups is absolute name of cgroups in which to place
 	// all non-kernel processes that are not already in a container. Empty
 	// for no container. Rolling back the flag requires a reboot.
-	SystemCgroups string `json:"systemContainer,omitempty"`
-	// cgroupRoot is the root cgroup to use for pods. This is handled by the
-	// container runtime on a best effort basis.
+	SystemCgroups string `json:"systemCgroups,omitempty"`
+	// CgroupRoot is the root cgroup to use for pods.
+	// If CgroupsPerQOS is enabled, this is the root of the QoS cgroup hierarchy.
 	CgroupRoot string `json:"cgroupRoot,omitempty"`
 	// containerRuntime is the container runtime to use.
 	ContainerRuntime string `json:"containerRuntime"`
+	// remoteRuntimeEndpoint is the endpoint of remote runtime service
+	RemoteRuntimeEndpoint string `json:"remoteRuntimeEndpoint"`
+	// remoteImageEndpoint is the endpoint of remote image service
+	RemoteImageEndpoint string `json:"remoteImageEndpoint"`
+	// runtimeRequestTimeout is the timeout for all runtime requests except long running
+	// requests - pull, logs, exec and attach.
+	RuntimeRequestTimeout unversioned.Duration `json:"runtimeRequestTimeout,omitempty"`
 	// rktPath is the path of rkt binary. Leave empty to use the first rkt in
 	// $PATH.
 	RktPath string `json:"rktPath,omitempty"`
@@ -273,6 +308,11 @@ type KubeletConfiguration struct {
 	// It uses this file as a lock to synchronize with other kubelet processes
 	// that may be running.
 	LockFilePath string `json:"lockFilePath"`
+	// ExitOnLockContention is a flag that signifies to the kubelet that it is running
+	// in "bootstrap" mode. This requires that 'LockFilePath' has been set.
+	// This will cause the kubelet to listen to inotify events on the lock file,
+	// releasing it and exiting when another process tries to open that file.
+	ExitOnLockContention bool `json:"exitOnLockContention"`
 	// configureCBR0 enables the kublet to configure cbr0 based on
 	// Node.Spec.PodCIDR.
 	ConfigureCBR0 bool `json:"configureCbr0"`
@@ -308,7 +348,7 @@ type KubeletConfiguration struct {
 	// containerized should be set to true if kubelet is running in a container.
 	Containerized bool `json:"containerized"`
 	// maxOpenFiles is Number of files that can be opened by Kubelet process.
-	MaxOpenFiles uint64 `json:"maxOpenFiles"`
+	MaxOpenFiles int64 `json:"maxOpenFiles"`
 	// reconcileCIDR is Reconcile node CIDR with the CIDR specified by the
 	// API server. No-op if register-node or configure-cbr0 is false.
 	ReconcileCIDR bool `json:"reconcileCIDR"`
@@ -318,7 +358,7 @@ type KubeletConfiguration struct {
 	// contentType is contentType of requests sent to apiserver.
 	ContentType string `json:"contentType"`
 	// kubeAPIQPS is the QPS to use while talking with kubernetes apiserver
-	KubeAPIQPS float32 `json:"kubeAPIQPS"`
+	KubeAPIQPS int32 `json:"kubeAPIQPS"`
 	// kubeAPIBurst is the burst to allow while talking with kubernetes
 	// apiserver
 	KubeAPIBurst int32 `json:"kubeAPIBurst"`
@@ -353,6 +393,40 @@ type KubeletConfiguration struct {
 	EvictionPressureTransitionPeriod unversioned.Duration `json:"evictionPressureTransitionPeriod,omitempty"`
 	// Maximum allowed grace period (in seconds) to use when terminating pods in response to a soft eviction threshold being met.
 	EvictionMaxPodGracePeriod int32 `json:"evictionMaxPodGracePeriod,omitempty"`
+	// Comma-delimited list of minimum reclaims (e.g. imagefs.available=2Gi) that describes the minimum amount of resource the kubelet will reclaim when performing a pod eviction if that resource is under pressure.
+	EvictionMinimumReclaim string `json:"evictionMinimumReclaim,omitempty"`
+	// Maximum number of pods per core. Cannot exceed MaxPods
+	PodsPerCore int32 `json:"podsPerCore"`
+	// enableControllerAttachDetach enables the Attach/Detach controller to
+	// manage attachment/detachment of volumes scheduled to this node, and
+	// disables kubelet from executing any attach/detach operations
+	EnableControllerAttachDetach bool `json:"enableControllerAttachDetach"`
+	// A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G) pairs
+	// that describe resources reserved for non-kubernetes components.
+	// Currently only cpu and memory are supported. [default=none]
+	// See http://releases.k8s.io/HEAD/docs/user-guide/compute-resources.md for more detail.
+	SystemReserved utilconfig.ConfigurationMap `json:"systemReserved"`
+	// A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G) pairs
+	// that describe resources reserved for kubernetes system components.
+	// Currently only cpu and memory are supported. [default=none]
+	// See http://releases.k8s.io/HEAD/docs/user-guide/compute-resources.md for more detail.
+	KubeReserved utilconfig.ConfigurationMap `json:"kubeReserved"`
+	// Default behaviour for kernel tuning
+	ProtectKernelDefaults bool `json:"protectKernelDefaults"`
+	// If true, Kubelet ensures a set of iptables rules are present on host.
+	// These rules will serve as utility for various components, e.g. kube-proxy.
+	// The rules will be created based on IPTablesMasqueradeBit and IPTablesDropBit.
+	MakeIPTablesUtilChains bool `json:"makeIPTablesUtilChains"`
+	// iptablesMasqueradeBit is the bit of the iptables fwmark space to use for SNAT
+	// Values must be within the range [0, 31].
+	// Warning: Please match the value of corresponding parameter in kube-proxy
+	// TODO: clean up IPTablesMasqueradeBit in kube-proxy
+	IPTablesMasqueradeBit int32 `json:"iptablesMasqueradeBit"`
+	// iptablesDropBit is the bit of the iptables fwmark space to use for dropping packets. Kubelet will ensure iptables mark and drop rules.
+	// Values must be within the range [0, 31]. Must be different from IPTablesMasqueradeBit
+	IPTablesDropBit int32 `json:"iptablesDropBit"`
+	// Whitelist of unsafe sysctls or sysctl patterns (ending in *).
+	AllowedUnsafeSysctls []string `json:"experimentalAllowedUnsafeSysctls,omitempty"`
 }
 
 type KubeSchedulerConfiguration struct {
@@ -436,6 +510,10 @@ type KubeControllerManagerConfiguration struct {
 	// allowed to sync concurrently. Larger number = more responsive replica
 	// management, but more CPU (and network) load.
 	ConcurrentRCSyncs int32 `json:"concurrentRCSyncs"`
+	// concurrentServiceSyncs is the number of services that are
+	// allowed to sync concurrently. Larger number = more responsive service
+	// management, but more CPU (and network) load.
+	ConcurrentServiceSyncs int32 `json:"concurrentServiceSyncs"`
 	// concurrentResourceQuotaSyncs is the number of resource quotas that are
 	// allowed to sync concurrently. Larger number = more responsive quota
 	// management, but more CPU (and network) load.
@@ -455,6 +533,9 @@ type KubeControllerManagerConfiguration struct {
 	// concurrentNamespaceSyncs is the number of namespace objects that are
 	// allowed to sync concurrently.
 	ConcurrentNamespaceSyncs int32 `json:"concurrentNamespaceSyncs"`
+	// concurrentSATokenSyncs is the number of service account token syncing operations
+	// that will be done concurrently.
+	ConcurrentSATokenSyncs int32 `json:"concurrentSATokenSyncs"`
 	// lookupCacheSizeForRC is the size of lookup cache for replication controllers.
 	// Larger number = more responsive replica management, but more MEM load.
 	LookupCacheSizeForRC int32 `json:"lookupCacheSizeForRC"`
@@ -471,6 +552,8 @@ type KubeControllerManagerConfiguration struct {
 	// periods will result in fewer calls to cloud provider, but may delay addition
 	// of new nodes to cluster.
 	NodeSyncPeriod unversioned.Duration `json:"nodeSyncPeriod"`
+	// routeReconciliationPeriod is the period for reconciling routes created for Nodes by cloud provider..
+	RouteReconciliationPeriod unversioned.Duration `json:"routeReconciliationPeriod"`
 	// resourceQuotaSyncPeriod is the period for syncing quota usage status
 	// in the system.
 	ResourceQuotaSyncPeriod unversioned.Duration `json:"resourceQuotaSyncPeriod"`
@@ -494,14 +577,14 @@ type KubeControllerManagerConfiguration struct {
 	DeploymentControllerSyncPeriod unversioned.Duration `json:"deploymentControllerSyncPeriod"`
 	// podEvictionTimeout is the grace period for deleting pods on failed nodes.
 	PodEvictionTimeout unversioned.Duration `json:"podEvictionTimeout"`
-	// deletingPodsQps is the number of nodes per second on which pods are deleted in
+	// DEPRECATED: deletingPodsQps is the number of nodes per second on which pods are deleted in
 	// case of node failure.
 	DeletingPodsQps float32 `json:"deletingPodsQps"`
-	// deletingPodsBurst is the number of nodes on which pods are bursty deleted in
+	// DEPRECATED: deletingPodsBurst is the number of nodes on which pods are bursty deleted in
 	// case of node failure. For more details look into RateLimiter.
 	DeletingPodsBurst int32 `json:"deletingPodsBurst"`
 	// nodeMontiorGracePeriod is the amount of time which we allow a running node to be
-	// unresponsive before marking it unhealty. Must be N times more than kubelet's
+	// unresponsive before marking it unhealthy. Must be N times more than kubelet's
 	// nodeStatusUpdateFrequency, where N means number of retries allowed for kubelet
 	// to post node status.
 	NodeMonitorGracePeriod unversioned.Duration `json:"nodeMonitorGracePeriod"`
@@ -509,22 +592,41 @@ type KubeControllerManagerConfiguration struct {
 	// Retry interval equals node-sync-period.
 	RegisterRetryCount int32 `json:"registerRetryCount"`
 	// nodeStartupGracePeriod is the amount of time which we allow starting a node to
-	// be unresponsive before marking it unhealty.
+	// be unresponsive before marking it unhealthy.
 	NodeStartupGracePeriod unversioned.Duration `json:"nodeStartupGracePeriod"`
 	// nodeMonitorPeriod is the period for syncing NodeStatus in NodeController.
 	NodeMonitorPeriod unversioned.Duration `json:"nodeMonitorPeriod"`
 	// serviceAccountKeyFile is the filename containing a PEM-encoded private RSA key
 	// used to sign service account tokens.
 	ServiceAccountKeyFile string `json:"serviceAccountKeyFile"`
+	// clusterSigningCertFile is the filename containing a PEM-encoded
+	// X509 CA certificate used to issue cluster-scoped certificates
+	ClusterSigningCertFile string `json:"clusterSigningCertFile"`
+	// clusterSigningCertFile is the filename containing a PEM-encoded
+	// RSA or ECDSA private key used to issue cluster-scoped certificates
+	ClusterSigningKeyFile string `json:"clusterSigningKeyFile"`
+	// approveAllKubeletCSRs tells the CSR controller to approve all CSRs originating
+	// from the kubelet bootstrapping group automatically.
+	// WARNING: this grants all users with access to the certificates API group
+	// the ability to create credentials for any user that has access to the boostrapping
+	// user's credentials.
+	ApproveAllKubeletCSRsForGroup string `json:"approveAllKubeletCSRsForGroup"`
 	// enableProfiling enables profiling via web interface host:port/debug/pprof/
 	EnableProfiling bool `json:"enableProfiling"`
 	// clusterName is the instance prefix for the cluster.
 	ClusterName string `json:"clusterName"`
 	// clusterCIDR is CIDR Range for Pods in cluster.
 	ClusterCIDR string `json:"clusterCIDR"`
-	// allocateNodeCIDRs enables CIDRs for Pods to be allocated and set on the
-	// cloud provider.
+	// serviceCIDR is CIDR Range for Services in cluster.
+	ServiceCIDR string `json:"serviceCIDR"`
+	// NodeCIDRMaskSize is the mask size for node cidr in cluster.
+	NodeCIDRMaskSize int32 `json:"nodeCIDRMaskSize"`
+	// allocateNodeCIDRs enables CIDRs for Pods to be allocated and, if
+	// ConfigureCloudRoutes is true, to be set on the cloud provider.
 	AllocateNodeCIDRs bool `json:"allocateNodeCIDRs"`
+	// configureCloudRoutes enables CIDRs allocated with allocateNodeCIDRs
+	// to be configured on the cloud provider.
+	ConfigureCloudRoutes bool `json:"configureCloudRoutes"`
 	// rootCAFile is the root certificate authority will be included in service
 	// account's token secret. This must be a valid PEM-encoded CA bundle.
 	RootCAFile string `json:"rootCAFile"`
@@ -540,6 +642,22 @@ type KubeControllerManagerConfiguration struct {
 	VolumeConfiguration VolumeConfiguration `json:"volumeConfiguration"`
 	// How long to wait between starting controller managers
 	ControllerStartInterval unversioned.Duration `json:"controllerStartInterval"`
+	// enables the generic garbage collector. MUST be synced with the
+	// corresponding flag of the kube-apiserver. WARNING: the generic garbage
+	// collector is an alpha feature.
+	EnableGarbageCollector bool `json:"enableGarbageCollector"`
+	// concurrentGCSyncs is the number of garbage collector workers that are
+	// allowed to sync concurrently.
+	ConcurrentGCSyncs int32 `json:"concurrentGCSyncs"`
+	// nodeEvictionRate is the number of nodes per second on which pods are deleted in case of node failure when a zone is healthy
+	NodeEvictionRate float32 `json:"nodeEvictionRate"`
+	// secondaryNodeEvictionRate is the number of nodes per second on which pods are deleted in case of node failure when a zone is unhealty
+	SecondaryNodeEvictionRate float32 `json:"secondaryNodeEvictionRate"`
+	// secondaryNodeEvictionRate is implicitly overridden to 0 for clusters smaller than or equal to largeClusterSizeThreshold
+	LargeClusterSizeThreshold int32 `json:"largeClusterSizeThreshold"`
+	// Zone is treated as unhealthy in nodeEvictionRate and secondaryNodeEvictionRate when at least
+	// unhealthyZoneThreshold (no less than 3) of Nodes in the zone are NotReady
+	UnhealthyZoneThreshold float32 `json:"unhealthyZoneThreshold"`
 }
 
 // VolumeConfiguration contains *all* enumerated flags meant to configure all volume
@@ -553,8 +671,14 @@ type VolumeConfiguration struct {
 	// provisioning is not supported in any way, won't work in a multi-node cluster, and
 	// should not be used for anything other than testing or development.
 	EnableHostPathProvisioning bool `json:"enableHostPathProvisioning"`
+	// enableDynamicProvisioning enables the provisioning of volumes when running within an environment
+	// that supports dynamic provisioning. Defaults to true.
+	EnableDynamicProvisioning bool `json:"enableDynamicProvisioning"`
 	// persistentVolumeRecyclerConfiguration holds configuration for persistent volume plugins.
 	PersistentVolumeRecyclerConfiguration PersistentVolumeRecyclerConfiguration `json:"persitentVolumeRecyclerConfiguration"`
+	// volumePluginDir is the full path of the directory in which the flex
+	// volume plugin should search for additional third party volume plugins
+	FlexVolumePluginDir string `json:"flexVolumePluginDir"`
 }
 
 type PersistentVolumeRecyclerConfiguration struct {

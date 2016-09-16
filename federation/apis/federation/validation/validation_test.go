@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -58,6 +58,17 @@ func TestValidateCluster(t *testing.T) {
 				Name: "cluster-f",
 				Labels: map[string]string{
 					"NoUppercaseOrSpecialCharsLike=Equals": "bar",
+				},
+			},
+		},
+		"invalid cluster name (is a subdomain)": {
+			ObjectMeta: api.ObjectMeta{Name: "mycluster.mycompany"},
+			Spec: federation.ClusterSpec{
+				ServerAddressByClientCIDRs: []federation.ServerAddressByClientCIDR{
+					{
+						ClientCIDR:    "0.0.0.0/0",
+						ServerAddress: "localhost:8888",
+					},
 				},
 			},
 		},

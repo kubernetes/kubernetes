@@ -1,0 +1,45 @@
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: l7-default-backend-v1.0
+  namespace: kube-system
+  labels:
+    k8s-app: glbc
+    version: v1.0
+    kubernetes.io/cluster-service: "true"
+    kubernetes.io/name: "GLBC"
+spec:
+  replicas: 1
+  selector:
+    k8s-app: glbc
+    version: v1.0
+  template:
+    metadata:
+      labels:
+        k8s-app: glbc
+        version: v1.0
+        name: glbc
+        kubernetes.io/cluster-service: "true"
+    spec:
+      containers:
+      - name: default-http-backend
+        # Any image is permissible as long as:
+        # 1. It serves a 404 page at /
+        # 2. It serves 200 on a /healthz endpoint
+        image: gcr.io/google_containers/defaultbackend:1.0
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 30
+          timeoutSeconds: 5
+        ports:
+        - containerPort: 8080
+        resources:
+          limits:
+            cpu: 10m
+            memory: 20Mi
+          requests:
+            cpu: 10m
+            memory: 20Mi

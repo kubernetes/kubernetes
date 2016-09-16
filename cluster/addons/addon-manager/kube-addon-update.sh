@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 The Kubernetes Authors All rights reserved.
+# Copyright 2015 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,12 +23,12 @@
 
 
 # LIMITATIONS
-# 1. controllers are not updated unless their name is changed
+# 1. Controllers are not updated unless their name is changed
 # 3. Services will not be updated unless their name is changed,
 #    but for services we actually want updates without name change.
 # 4. Json files are not handled at all. Currently addons must be
 #    in yaml files
-# 5. exit code is probably not always correct (I haven't checked
+# 5. Exit code is probably not always correct (I haven't checked
 #    carefully if it works in 100% cases)
 # 6. There are no unittests
 # 8. Will not work if the total length of paths to addons is greater than
@@ -36,12 +36,10 @@
 # 9. Performance issue: yaml files are read many times in a single execution.
 
 # cosmetic improvements to be done
-# 1. improve the log function; add timestamp, file name, etc.
-# 2. logging doesn't work from files that print things out.
-# 3. kubectl prints the output to stderr (the output should be captured and then
+# 1. Improve the log function; add timestamp, file name, etc.
+# 2. Logging doesn't work from files that print things out.
+# 3. Kubectl prints the output to stderr (the output should be captured and then
 #    logged)
-
-
 
 # global config
 KUBECTL=${TEST_KUBECTL:-}   # substitute for tests
@@ -51,6 +49,7 @@ if [[ ! -x ${KUBECTL} ]]; then
     echo "ERROR: kubectl command (${KUBECTL}) not found or is not executable" 1>&2
     exit 1
 fi
+KUBECTL_OPTS=${KUBECTL_OPTS:-}
 
 # If an add-on definition is incorrect, or a definition has just disappeared
 # from the local directory, the script will still keep on retrying.
@@ -133,7 +132,7 @@ try:
             try:
                 print "%s/%s" % (y["metadata"]["namespace"], y["metadata"]["name"])
             except Exception, ex:
-                print "default/%s" % y["metadata"]["name"]
+                print "/%s" % y["metadata"]["name"]
 except Exception, ex:
         print "ERROR"
     '''
@@ -198,7 +197,7 @@ function run-until-success() {
 # returns a list of <namespace>/<name> pairs (nsnames)
 function get-addon-nsnames-from-server() {
     local -r obj_type=$1
-    "${KUBECTL}" get "${obj_type}" --all-namespaces -o go-template="{{range.items}}{{.metadata.namespace}}/{{.metadata.name}} {{end}}" --api-version=v1 -l kubernetes.io/cluster-service=true
+    "${KUBECTL}" "${KUBECTL_OPTS}" get "${obj_type}" --all-namespaces -o go-template="{{range.items}}{{.metadata.namespace}}/{{.metadata.name}} {{end}}" -l kubernetes.io/cluster-service=true | sed 's/<no value>//g'
 }
 
 # returns the characters after the last separator (including)
@@ -244,7 +243,7 @@ function delete-object() {
     local -r obj_name=$3
     log INFO "Deleting ${obj_type} ${namespace}/${obj_name}"
 
-    run-until-success "${KUBECTL} delete --namespace=${namespace} ${obj_type} ${obj_name}" ${NUM_TRIES} ${DELAY_AFTER_ERROR_SEC}
+    run-until-success "${KUBECTL} ${KUBECTL_OPTS} delete --namespace=${namespace} ${obj_type} ${obj_name}" ${NUM_TRIES} ${DELAY_AFTER_ERROR_SEC}
 }
 
 function create-object() {
@@ -262,7 +261,11 @@ function create-object() {
     log INFO "Creating new ${obj_type} from file ${file_path} in namespace ${namespace}, name: ${obj_name}"
     # this will keep on failing if the ${file_path} disappeared in the meantime.
     # Do not use too many retries.
-    run-until-success "${KUBECTL} create --namespace=${namespace} -f ${file_path}" ${NUM_TRIES} ${DELAY_AFTER_ERROR_SEC}
+    if [[ -n "${namespace}" ]]; then
+        run-until-success "${KUBECTL} ${KUBECTL_OPTS} create --namespace=${namespace} -f ${file_path}" ${NUM_TRIES} ${DELAY_AFTER_ERROR_SEC}
+    else
+        run-until-success "${KUBECTL} ${KUBECTL_OPTS} create -f ${file_path}" ${NUM_TRIES} ${DELAY_AFTER_ERROR_SEC}
+    fi
 }
 
 function update-object() {
@@ -476,6 +479,8 @@ function update-addons() {
     # be careful, reconcile-objects uses global variables
     reconcile-objects ${addon_path} ReplicationController "-" &
     reconcile-objects ${addon_path} Deployment "-" &
+    reconcile-objects ${addon_path} DaemonSet "-" &
+    reconcile-objects ${addon_path} PetSet "-" &
 
     # We don't expect names to be versioned for the following kinds, so
     # we match the entire name, ignoring version suffix.
@@ -485,6 +490,7 @@ function update-addons() {
     reconcile-objects ${addon_path} Service "" &
     reconcile-objects ${addon_path} PersistentVolume "" &
     reconcile-objects ${addon_path} PersistentVolumeClaim "" &
+    reconcile-objects ${addon_path} ConfigMap "" &
 
     wait-for-jobs
     if [[ $? -eq 0 ]]; then

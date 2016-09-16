@@ -1,4 +1,4 @@
-// Copyright 2016 CoreOS, Inc.
+// Copyright 2016 The etcd Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,12 +15,21 @@
 package v3rpc
 
 import (
+	"crypto/sha256"
+	"io"
+
 	"github.com/coreos/etcd/etcdserver"
 	pb "github.com/coreos/etcd/etcdserver/etcdserverpb"
-	"github.com/coreos/etcd/storage/backend"
+	"github.com/coreos/etcd/mvcc"
+	"github.com/coreos/etcd/mvcc/backend"
+	"github.com/coreos/etcd/pkg/types"
 	"github.com/coreos/etcd/version"
 	"golang.org/x/net/context"
 )
+
+type KVGetter interface {
+	KV() mvcc.ConsistentWatchableKV
+}
 
 type BackendGetter interface {
 	Backend() backend.Backend
@@ -30,33 +39,86 @@ type Alarmer interface {
 	Alarm(ctx context.Context, ar *pb.AlarmRequest) (*pb.AlarmResponse, error)
 }
 
+type RaftStatusGetter interface {
+	Index() uint64
+	Term() uint64
+	Leader() types.ID
+}
+
 type maintenanceServer struct {
+	rg  RaftStatusGetter
+	kg  KVGetter
 	bg  BackendGetter
 	a   Alarmer
 	hdr header
 }
 
 func NewMaintenanceServer(s *etcdserver.EtcdServer) pb.MaintenanceServer {
-	return &maintenanceServer{bg: s, a: s, hdr: newHeader(s)}
+	return &maintenanceServer{rg: s, kg: s, bg: s, a: s, hdr: newHeader(s)}
 }
 
 func (ms *maintenanceServer) Defragment(ctx context.Context, sr *pb.DefragmentRequest) (*pb.DefragmentResponse, error) {
 	plog.Noticef("starting to defragment the storage backend...")
 	err := ms.bg.Backend().Defrag()
 	if err != nil {
-		plog.Errorf("failed to deframent the storage backend (%v)", err)
+		plog.Errorf("failed to defragment the storage backend (%v)", err)
 		return nil, err
 	}
 	plog.Noticef("finished defragmenting the storage backend")
 	return &pb.DefragmentResponse{}, nil
 }
 
+func (ms *maintenanceServer) Snapshot(sr *pb.SnapshotRequest, srv pb.Maintenance_SnapshotServer) error {
+	snap := ms.bg.Backend().Snapshot()
+	pr, pw := io.Pipe()
+
+	defer pr.Close()
+
+	go func() {
+		snap.WriteTo(pw)
+		if err := snap.Close(); err != nil {
+			plog.Errorf("error closing snapshot (%v)", err)
+		}
+		pw.Close()
+	}()
+
+	// send file data
+	h := sha256.New()
+	br := int64(0)
+	buf := make([]byte, 32*1024)
+	sz := snap.Size()
+	for br < sz {
+		n, err := io.ReadFull(pr, buf)
+		if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
+			return togRPCError(err)
+		}
+		br += int64(n)
+		resp := &pb.SnapshotResponse{
+			RemainingBytes: uint64(sz - br),
+			Blob:           buf[:n],
+		}
+		if err = srv.Send(resp); err != nil {
+			return togRPCError(err)
+		}
+		h.Write(buf[:n])
+	}
+
+	// send sha
+	sha := h.Sum(nil)
+	hresp := &pb.SnapshotResponse{RemainingBytes: 0, Blob: sha}
+	if err := srv.Send(hresp); err != nil {
+		return togRPCError(err)
+	}
+
+	return nil
+}
+
 func (ms *maintenanceServer) Hash(ctx context.Context, r *pb.HashRequest) (*pb.HashResponse, error) {
-	h, err := ms.bg.Backend().Hash()
+	h, rev, err := ms.kg.KV().Hash()
 	if err != nil {
 		return nil, togRPCError(err)
 	}
-	resp := &pb.HashResponse{Header: &pb.ResponseHeader{Revision: ms.hdr.rev()}, Hash: h}
+	resp := &pb.HashResponse{Header: &pb.ResponseHeader{Revision: rev}, Hash: h}
 	ms.hdr.fill(resp.Header)
 	return resp, nil
 }
@@ -66,7 +128,14 @@ func (ms *maintenanceServer) Alarm(ctx context.Context, ar *pb.AlarmRequest) (*p
 }
 
 func (ms *maintenanceServer) Status(ctx context.Context, ar *pb.StatusRequest) (*pb.StatusResponse, error) {
-	resp := &pb.StatusResponse{Header: &pb.ResponseHeader{Revision: ms.hdr.rev()}, Version: version.Version}
+	resp := &pb.StatusResponse{
+		Header:    &pb.ResponseHeader{Revision: ms.hdr.rev()},
+		Version:   version.Version,
+		DbSize:    ms.bg.Backend().Size(),
+		Leader:    uint64(ms.rg.Leader()),
+		RaftIndex: ms.rg.Index(),
+		RaftTerm:  ms.rg.Term(),
+	}
 	ms.hdr.fill(resp.Header)
 	return resp, nil
 }

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -52,10 +52,10 @@ func SplitUsername(username string) (string, string, error) {
 		return "", "", invalidUsernameErr
 	}
 	namespace, name := parts[0], parts[1]
-	if ok, _ := validation.ValidateNamespaceName(namespace, false); !ok {
+	if len(validation.ValidateNamespaceName(namespace, false)) != 0 {
 		return "", "", invalidUsernameErr
 	}
-	if ok, _ := validation.ValidateServiceAccountName(name, false); !ok {
+	if len(validation.ValidateServiceAccountName(name, false)) != 0 {
 		return "", "", invalidUsernameErr
 	}
 	return namespace, name, nil

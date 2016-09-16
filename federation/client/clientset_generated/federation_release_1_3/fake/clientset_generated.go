@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,8 +20,8 @@ import (
 	clientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_3"
 	v1core "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_3/typed/core/v1"
 	fakev1core "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_3/typed/core/v1/fake"
-	v1alpha1federation "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_3/typed/federation/v1alpha1"
-	fakev1alpha1federation "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_3/typed/federation/v1alpha1/fake"
+	v1beta1federation "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_3/typed/federation/v1beta1"
+	fakev1beta1federation "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_3/typed/federation/v1beta1/fake"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/client/testing/core"
@@ -31,9 +31,12 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 )
 
-// Clientset returns a clientset that will respond with the provided objects
+// NewSimpleClientset returns a clientset that will respond with the provided objects.
+// It's backed by a very simple object tracker that processes creates, updates and deletions as-is,
+// without applying any validations and/or defaults. It shouldn't be considered a replacement
+// for a real clientset and is mostly useful in simple unit tests.
 func NewSimpleClientset(objects ...runtime.Object) *Clientset {
-	o := core.NewObjects(api.Scheme, api.Codecs.UniversalDecoder())
+	o := core.NewObjectTracker(api.Scheme, api.Codecs.UniversalDecoder())
 	for _, obj := range objects {
 		if err := o.Add(obj); err != nil {
 			panic(err)
@@ -62,8 +65,8 @@ func (c *Clientset) Discovery() discovery.DiscoveryInterface {
 var _ clientset.Interface = &Clientset{}
 
 // Federation retrieves the FederationClient
-func (c *Clientset) Federation() v1alpha1federation.FederationInterface {
-	return &fakev1alpha1federation.FakeFederation{Fake: &c.Fake}
+func (c *Clientset) Federation() v1beta1federation.FederationInterface {
+	return &fakev1beta1federation.FakeFederation{Fake: &c.Fake}
 }
 
 // Core retrieves the CoreClient

@@ -81,7 +81,7 @@ via juju ssh:
 
     juju ssh kubernetes-master/0 -t "sudo kubectl get nodes"
 
-You may also SSH to the kuberentes-master unit (`juju ssh kubernetes-master/0`)
+You may also SSH to the kubernetes-master unit (`juju ssh kubernetes-master/0`)
 and call kubectl from the command prompt.
 
 See the

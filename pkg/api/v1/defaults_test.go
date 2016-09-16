@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -40,7 +40,7 @@ func roundTrip(t *testing.T, obj runtime.Object) runtime.Object {
 		return nil
 	}
 	obj3 := reflect.New(reflect.TypeOf(obj).Elem()).Interface().(runtime.Object)
-	err = api.Scheme.Convert(obj2, obj3)
+	err = api.Scheme.Convert(obj2, obj3, nil)
 	if err != nil {
 		t.Errorf("%v\nSource: %#v", err, obj2)
 		return nil
@@ -239,6 +239,72 @@ func TestSetDefaultService(t *testing.T) {
 	}
 	if svc2.Spec.Type != versioned.ServiceTypeClusterIP {
 		t.Errorf("Expected default type:%s, got: %s", versioned.ServiceTypeClusterIP, svc2.Spec.Type)
+	}
+}
+
+func TestSetDefaultSecretVolumeSource(t *testing.T) {
+	s := versioned.PodSpec{}
+	s.Volumes = []versioned.Volume{
+		{
+			VolumeSource: versioned.VolumeSource{
+				Secret: &versioned.SecretVolumeSource{},
+			},
+		},
+	}
+	pod := &versioned.Pod{
+		Spec: s,
+	}
+	output := roundTrip(t, runtime.Object(pod))
+	pod2 := output.(*versioned.Pod)
+	defaultMode := pod2.Spec.Volumes[0].VolumeSource.Secret.DefaultMode
+	expectedMode := versioned.SecretVolumeSourceDefaultMode
+
+	if defaultMode == nil || *defaultMode != expectedMode {
+		t.Errorf("Expected secret DefaultMode %v, got %v", expectedMode, defaultMode)
+	}
+}
+
+func TestSetDefaultConfigMapVolumeSource(t *testing.T) {
+	s := versioned.PodSpec{}
+	s.Volumes = []versioned.Volume{
+		{
+			VolumeSource: versioned.VolumeSource{
+				ConfigMap: &versioned.ConfigMapVolumeSource{},
+			},
+		},
+	}
+	pod := &versioned.Pod{
+		Spec: s,
+	}
+	output := roundTrip(t, runtime.Object(pod))
+	pod2 := output.(*versioned.Pod)
+	defaultMode := pod2.Spec.Volumes[0].VolumeSource.ConfigMap.DefaultMode
+	expectedMode := versioned.ConfigMapVolumeSourceDefaultMode
+
+	if defaultMode == nil || *defaultMode != expectedMode {
+		t.Errorf("Expected ConfigMap DefaultMode %v, got %v", expectedMode, defaultMode)
+	}
+}
+
+func TestSetDefaultDownwardAPIVolumeSource(t *testing.T) {
+	s := versioned.PodSpec{}
+	s.Volumes = []versioned.Volume{
+		{
+			VolumeSource: versioned.VolumeSource{
+				DownwardAPI: &versioned.DownwardAPIVolumeSource{},
+			},
+		},
+	}
+	pod := &versioned.Pod{
+		Spec: s,
+	}
+	output := roundTrip(t, runtime.Object(pod))
+	pod2 := output.(*versioned.Pod)
+	defaultMode := pod2.Spec.Volumes[0].VolumeSource.DownwardAPI.DefaultMode
+	expectedMode := versioned.DownwardAPIVolumeSourceDefaultMode
+
+	if defaultMode == nil || *defaultMode != expectedMode {
+		t.Errorf("Expected DownwardAPI DefaultMode %v, got %v", expectedMode, defaultMode)
 	}
 }
 
@@ -509,13 +575,17 @@ func TestSetDefaultObjectFieldSelectorAPIVersion(t *testing.T) {
 }
 
 func TestSetDefaultRequestsPod(t *testing.T) {
-	// verify we default if limits are specified
+	// verify we default if limits are specified (and that request=0 is preserved)
 	s := versioned.PodSpec{}
 	s.Containers = []versioned.Container{
 		{
 			Resources: versioned.ResourceRequirements{
+				Requests: versioned.ResourceList{
+					versioned.ResourceMemory: resource.MustParse("0"),
+				},
 				Limits: versioned.ResourceList{
-					versioned.ResourceCPU: resource.MustParse("100m"),
+					versioned.ResourceCPU:    resource.MustParse("100m"),
+					versioned.ResourceMemory: resource.MustParse("1Gi"),
 				},
 			},
 		},
@@ -526,9 +596,11 @@ func TestSetDefaultRequestsPod(t *testing.T) {
 	output := roundTrip(t, runtime.Object(pod))
 	pod2 := output.(*versioned.Pod)
 	defaultRequest := pod2.Spec.Containers[0].Resources.Requests
-	requestValue := defaultRequest[versioned.ResourceCPU]
-	if requestValue.String() != "100m" {
+	if requestValue := defaultRequest[versioned.ResourceCPU]; requestValue.String() != "100m" {
 		t.Errorf("Expected request cpu: %s, got: %s", "100m", requestValue.String())
+	}
+	if requestValue := defaultRequest[versioned.ResourceMemory]; requestValue.String() != "0" {
+		t.Errorf("Expected request memory: %s, got: %s", "0", requestValue.String())
 	}
 
 	// verify we do nothing if no limits are specified
@@ -540,8 +612,7 @@ func TestSetDefaultRequestsPod(t *testing.T) {
 	output = roundTrip(t, runtime.Object(pod))
 	pod2 = output.(*versioned.Pod)
 	defaultRequest = pod2.Spec.Containers[0].Resources.Requests
-	requestValue = defaultRequest[versioned.ResourceCPU]
-	if requestValue.String() != "0" {
+	if requestValue := defaultRequest[versioned.ResourceCPU]; requestValue.String() != "0" {
 		t.Errorf("Expected 0 request value, got: %s", requestValue.String())
 	}
 }

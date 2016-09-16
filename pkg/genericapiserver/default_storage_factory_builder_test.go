@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	extensionsapiv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 )
 
@@ -159,6 +160,36 @@ func TestParseRuntimeConfig(t *testing.T) {
 			},
 			err: true,
 		},
+		{
+			// enable all
+			runtimeConfig: map[string]string{
+				"api/all": "true",
+			},
+			defaultResourceConfig: func() *ResourceConfig {
+				return NewResourceConfig()
+			},
+			expectedAPIConfig: func() *ResourceConfig {
+				config := NewResourceConfig()
+				config.EnableVersions(registered.RegisteredGroupVersions()...)
+				return config
+			},
+			err: false,
+		},
+		{
+			// disable all
+			runtimeConfig: map[string]string{
+				"api/all": "false",
+			},
+			defaultResourceConfig: func() *ResourceConfig {
+				return NewResourceConfig()
+			},
+			expectedAPIConfig: func() *ResourceConfig {
+				config := NewResourceConfig()
+				config.DisableVersions(registered.RegisteredGroupVersions()...)
+				return config
+			},
+			err: false,
+		},
 	}
 	for _, test := range testCases {
 		actualDisablers, err := mergeAPIResourceConfigs(test.defaultResourceConfig(), test.runtimeConfig)
@@ -173,5 +204,4 @@ func TestParseRuntimeConfig(t *testing.T) {
 			t.Fatalf("%v: unexpected apiResourceDisablers. Actual: %v\n expected: %v", test.runtimeConfig, actualDisablers, expectedConfig)
 		}
 	}
-
 }

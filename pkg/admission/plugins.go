@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,12 +17,16 @@ limitations under the License.
 package admission
 
 import (
+	"bytes"
 	"io"
+	"io/ioutil"
 	"os"
+	"reflect"
 	"sort"
 	"sync"
 
 	"github.com/golang/glog"
+
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 )
 
@@ -36,7 +40,15 @@ type Factory func(client clientset.Interface, config io.Reader) (Interface, erro
 var (
 	pluginsMutex sync.Mutex
 	plugins      = make(map[string]Factory)
+
+	// PluginEnabledFn checks whether a plugin is enabled.  By default, if you ask about it, it's enabled.
+	PluginEnabledFn = func(name string, config io.Reader) bool {
+		return true
+	}
 )
+
+// PluginEnabledFunc is a function type that can provide an external check on whether an admission plugin may be enabled
+type PluginEnabledFunc func(name string, config io.Reader) bool
 
 // GetPlugins enumerates the names of all registered plugins.
 func GetPlugins() []string {
@@ -74,8 +86,31 @@ func getPlugin(name string, client clientset.Interface, config io.Reader) (Inter
 	if !found {
 		return nil, false, nil
 	}
-	ret, err := f(client, config)
+
+	config1, config2, err := splitStream(config)
+	if err != nil {
+		return nil, true, err
+	}
+	if !PluginEnabledFn(name, config1) {
+		return nil, true, nil
+	}
+
+	ret, err := f(client, config2)
 	return ret, true, err
+}
+
+// splitStream reads the stream bytes and constructs two copies of it.
+func splitStream(config io.Reader) (io.Reader, io.Reader, error) {
+	if config == nil || reflect.ValueOf(config).IsNil() {
+		return nil, nil, nil
+	}
+
+	configBytes, err := ioutil.ReadAll(config)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return bytes.NewBuffer(configBytes), bytes.NewBuffer(configBytes), nil
 }
 
 // InitPlugin creates an instance of the named interface.

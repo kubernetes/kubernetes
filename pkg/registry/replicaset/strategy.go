@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@ import (
 	"strconv"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/extensions/validation"
 	"k8s.io/kubernetes/pkg/fields"
@@ -42,13 +43,19 @@ type rsStrategy struct {
 // Strategy is the default logic that applies when creating and updating ReplicaSet objects.
 var Strategy = rsStrategy{api.Scheme, api.SimpleNameGenerator}
 
+// DefaultGarbageCollectionPolicy returns Orphan because that's the default
+// behavior before the server-side garbage collection is implemented.
+func (rsStrategy) DefaultGarbageCollectionPolicy() rest.GarbageCollectionPolicy {
+	return rest.OrphanDependents
+}
+
 // NamespaceScoped returns true because all ReplicaSets need to be within a namespace.
 func (rsStrategy) NamespaceScoped() bool {
 	return true
 }
 
 // PrepareForCreate clears the status of a ReplicaSet before creation.
-func (rsStrategy) PrepareForCreate(obj runtime.Object) {
+func (rsStrategy) PrepareForCreate(ctx api.Context, obj runtime.Object) {
 	rs := obj.(*extensions.ReplicaSet)
 	rs.Status = extensions.ReplicaSetStatus{}
 
@@ -56,7 +63,7 @@ func (rsStrategy) PrepareForCreate(obj runtime.Object) {
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
-func (rsStrategy) PrepareForUpdate(obj, old runtime.Object) {
+func (rsStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
 	newRS := obj.(*extensions.ReplicaSet)
 	oldRS := old.(*extensions.ReplicaSet)
 	// update is not allowed to set status
@@ -104,7 +111,7 @@ func (rsStrategy) AllowUnconditionalUpdate() bool {
 
 // ReplicaSetToSelectableFields returns a field set that represents the object.
 func ReplicaSetToSelectableFields(rs *extensions.ReplicaSet) fields.Set {
-	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(rs.ObjectMeta, true)
+	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(&rs.ObjectMeta, true)
 	rsSpecificFieldsSet := fields.Set{
 		"status.replicas": strconv.Itoa(int(rs.Status.Replicas)),
 	}
@@ -114,7 +121,7 @@ func ReplicaSetToSelectableFields(rs *extensions.ReplicaSet) fields.Set {
 // MatchReplicaSet is the filter used by the generic etcd backend to route
 // watch events from etcd to clients of the apiserver only interested in specific
 // labels/fields.
-func MatchReplicaSet(label labels.Selector, field fields.Selector) generic.Matcher {
+func MatchReplicaSet(label labels.Selector, field fields.Selector) *generic.SelectionPredicate {
 	return &generic.SelectionPredicate{
 		Label: label,
 		Field: field,
@@ -134,7 +141,7 @@ type rsStatusStrategy struct {
 
 var StatusStrategy = rsStatusStrategy{Strategy}
 
-func (rsStatusStrategy) PrepareForUpdate(obj, old runtime.Object) {
+func (rsStatusStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
 	newRS := obj.(*extensions.ReplicaSet)
 	oldRS := old.(*extensions.ReplicaSet)
 	// update is not allowed to set spec

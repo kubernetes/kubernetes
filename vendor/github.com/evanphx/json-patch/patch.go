@@ -32,6 +32,7 @@ type partialArray []*lazyNode
 type container interface {
 	get(key string) (*lazyNode, error)
 	set(key string, val *lazyNode) error
+	add(key string, val *lazyNode) error
 	remove(key string) error
 }
 
@@ -42,7 +43,7 @@ func newLazyNode(raw *json.RawMessage) *lazyNode {
 func (n *lazyNode) MarshalJSON() ([]byte, error) {
 	switch n.which {
 	case eRaw:
-		return *n.raw, nil
+		return json.Marshal(n.raw)
 	case eDoc:
 		return json.Marshal(n.doc)
 	case eAry:
@@ -269,7 +270,7 @@ func findObject(pd *partialDoc, path string) (container, string) {
 
 	for _, part := range parts {
 
-		next, ok := doc.get(part)
+		next, ok := doc.get(decodePatchKey(part))
 
 		if next == nil || ok != nil {
 			return nil, ""
@@ -290,10 +291,15 @@ func findObject(pd *partialDoc, path string) (container, string) {
 		}
 	}
 
-	return doc, key
+	return doc, decodePatchKey(key)
 }
 
 func (d *partialDoc) set(key string, val *lazyNode) error {
+	(*d)[key] = val
+	return nil
+}
+
+func (d *partialDoc) add(key string, val *lazyNode) error {
 	(*d)[key] = val
 	return nil
 }
@@ -303,6 +309,11 @@ func (d *partialDoc) get(key string) (*lazyNode, error) {
 }
 
 func (d *partialDoc) remove(key string) error {
+	_, ok := (*d)[key]
+	if !ok {
+		return fmt.Errorf("Unable to remove nonexistant key: %s", key)
+	}
+
 	delete(*d, key)
 	return nil
 }
@@ -314,7 +325,38 @@ func (d *partialArray) set(key string, val *lazyNode) error {
 	}
 
 	idx, err := strconv.Atoi(key)
+	if err != nil {
+		return err
+	}
 
+	sz := len(*d)
+	if idx+1 > sz {
+		sz = idx + 1
+	}
+
+	ary := make([]*lazyNode, sz)
+
+	cur := *d
+
+	copy(ary, cur)
+
+	if idx >= len(ary) {
+		fmt.Printf("huh?: %#v[%d] %s, %s\n", ary, idx)
+	}
+
+	ary[idx] = val
+
+	*d = ary
+	return nil
+}
+
+func (d *partialArray) add(key string, val *lazyNode) error {
+	if key == "-" {
+		*d = append(*d, val)
+		return nil
+	}
+
+	idx, err := strconv.Atoi(key)
 	if err != nil {
 		return err
 	}
@@ -338,17 +380,24 @@ func (d *partialArray) get(key string) (*lazyNode, error) {
 		return nil, err
 	}
 
+	if idx >= len(*d) {
+		return nil, fmt.Errorf("Unable to access invalid index: %d", idx)
+	}
+
 	return (*d)[idx], nil
 }
 
 func (d *partialArray) remove(key string) error {
 	idx, err := strconv.Atoi(key)
-
 	if err != nil {
 		return err
 	}
 
 	cur := *d
+
+	if idx >= len(cur) {
+		return fmt.Errorf("Unable to remove invalid index: %d", idx)
+	}
 
 	ary := make([]*lazyNode, len(cur)-1)
 
@@ -366,18 +415,20 @@ func (p Patch) add(doc *partialDoc, op operation) error {
 	con, key := findObject(doc, path)
 
 	if con == nil {
-		return fmt.Errorf("Missing container: %s", path)
+		return fmt.Errorf("jsonpatch add operation does not apply: doc is missing path: %s", path)
 	}
 
-	con.set(key, op.value())
-
-	return nil
+	return con.add(key, op.value())
 }
 
 func (p Patch) remove(doc *partialDoc, op operation) error {
 	path := op.path()
 
 	con, key := findObject(doc, path)
+
+	if con == nil {
+		return fmt.Errorf("jsonpatch remove operation does not apply: doc is missing path: %s", path)
+	}
 
 	return con.remove(key)
 }
@@ -387,9 +438,11 @@ func (p Patch) replace(doc *partialDoc, op operation) error {
 
 	con, key := findObject(doc, path)
 
-	con.set(key, op.value())
+	if con == nil {
+		return fmt.Errorf("jsonpatch replace operation does not apply: doc is missing path: %s", path)
+	}
 
-	return nil
+	return con.set(key, op.value())
 }
 
 func (p Patch) move(doc *partialDoc, op operation) error {
@@ -397,21 +450,29 @@ func (p Patch) move(doc *partialDoc, op operation) error {
 
 	con, key := findObject(doc, from)
 
-	val, err := con.get(key)
+	if con == nil {
+		return fmt.Errorf("jsonpatch move operation does not apply: doc is missing from path: %s", from)
+	}
 
+	val, err := con.get(key)
 	if err != nil {
 		return err
 	}
 
-	con.remove(key)
+	err = con.remove(key)
+	if err != nil {
+		return err
+	}
 
 	path := op.path()
 
 	con, key = findObject(doc, path)
 
-	con.set(key, val)
+	if con == nil {
+		return fmt.Errorf("jsonpatch move operation does not apply: doc is missing destination path: %s", path)
+	}
 
-	return nil
+	return con.set(key, val)
 }
 
 func (p Patch) test(doc *partialDoc, op operation) error {
@@ -419,10 +480,22 @@ func (p Patch) test(doc *partialDoc, op operation) error {
 
 	con, key := findObject(doc, path)
 
+	if con == nil {
+		return fmt.Errorf("jsonpatch test operation does not apply: is missing path: %s", path)
+	}
+
 	val, err := con.get(key)
 
 	if err != nil {
 		return err
+	}
+
+	if val == nil {
+		if op.value().raw == nil {
+			return nil
+		} else {
+			return fmt.Errorf("Testing value %s failed", path)
+		}
 	}
 
 	if val.equal(op.value()) {
@@ -461,6 +534,12 @@ func DecodePatch(buf []byte) (Patch, error) {
 // Apply mutates a JSON document according to the patch, and returns the new
 // document.
 func (p Patch) Apply(doc []byte) ([]byte, error) {
+	return p.ApplyIndent(doc, "")
+}
+
+// ApplyIndent mutates a JSON document according to the patch, and returns the new
+// document indented.
+func (p Patch) ApplyIndent(doc []byte, indent string) ([]byte, error) {
 	pd := &partialDoc{}
 
 	err := json.Unmarshal(doc, pd)
@@ -490,6 +569,10 @@ func (p Patch) Apply(doc []byte) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	if indent != "" {
+		return json.MarshalIndent(pd, "", indent)
 	}
 
 	return json.Marshal(pd)

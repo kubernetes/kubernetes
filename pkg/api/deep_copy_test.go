@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,32 +19,129 @@ package api_test
 import (
 	"io/ioutil"
 	"testing"
+	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/types"
 )
 
-func BenchmarkPodCopy(b *testing.B) {
-	data, err := ioutil.ReadFile("pod_example.json")
+func parseTimeOrDie(ts string) unversioned.Time {
+	t, err := time.Parse(time.RFC3339, ts)
 	if err != nil {
-		b.Fatalf("Unexpected error while reading file: %v", err)
+		panic(err)
 	}
-	var pod api.Pod
-	if err := runtime.DecodeInto(testapi.Default.Codec(), data, &pod); err != nil {
-		b.Fatalf("Unexpected error decoding pod: %v", err)
-	}
+	return unversioned.Time{Time: t}
+}
 
+var benchmarkPod api.Pod = api.Pod{
+	TypeMeta: unversioned.TypeMeta{
+		Kind:       "Pod",
+		APIVersion: "v1",
+	},
+	ObjectMeta: api.ObjectMeta{
+		Name:              "etcd-server-e2e-test-wojtekt-master",
+		Namespace:         "default",
+		SelfLink:          "/api/v1/namespaces/default/pods/etcd-server-e2e-test-wojtekt-master",
+		UID:               types.UID("a671734a-e8e5-11e4-8fde-42010af09327"),
+		ResourceVersion:   "22",
+		CreationTimestamp: parseTimeOrDie("2015-04-22T11:49:36Z"),
+		Annotations: map[string]string{
+			"kubernetes.io/config.mirror": "mirror",
+			"kubernetes.io/config.source": "file",
+		},
+	},
+	Spec: api.PodSpec{
+		Volumes: []api.Volume{
+			{
+				Name: "varetcd",
+				VolumeSource: api.VolumeSource{
+					HostPath: &api.HostPathVolumeSource{
+						Path: "/mnt/master-pd/var/etcd",
+					},
+				},
+			},
+		},
+		Containers: []api.Container{
+			{
+				Name:  "etcd-container",
+				Image: "gcr.io/google_containers/etcd:2.0.9",
+				Command: []string{
+					"/usr/local/bin/etcd",
+					"--addr",
+					"127.0.0.1:2379",
+					"--bind-addr",
+					"127.0.0.1:2379",
+					"--data-dir",
+					"/var/etcd/data",
+				},
+				Ports: []api.ContainerPort{
+					{
+						Name:          "serverport",
+						HostPort:      2380,
+						ContainerPort: 2380,
+						Protocol:      "TCP",
+					},
+					{
+						Name:          "clientport",
+						HostPort:      2379,
+						ContainerPort: 2379,
+						Protocol:      "TCP",
+					},
+				},
+				VolumeMounts: []api.VolumeMount{
+					{
+						Name:      "varetcd",
+						MountPath: "/var/etcd",
+					},
+				},
+				TerminationMessagePath: "/dev/termination-log",
+				ImagePullPolicy:        api.PullIfNotPresent,
+			},
+		},
+		RestartPolicy: api.RestartPolicyAlways,
+		DNSPolicy:     api.DNSClusterFirst,
+		NodeName:      "e2e-test-wojtekt-master",
+	},
+	Status: api.PodStatus{
+		Phase: api.PodRunning,
+		Conditions: []api.PodCondition{
+			{
+				Type:   api.PodReady,
+				Status: api.ConditionTrue,
+			},
+		},
+		ContainerStatuses: []api.ContainerStatus{
+			{
+				Name: "etcd-container",
+				State: api.ContainerState{
+					Running: &api.ContainerStateRunning{
+						StartedAt: parseTimeOrDie("2015-04-22T11:49:32Z"),
+					},
+				},
+				Ready:        true,
+				RestartCount: 0,
+				Image:        "gcr.io/google_containers/etcd:2.0.9",
+				ImageID:      "docker://b6b9a86dc06aa1361357ca1b105feba961f6a4145adca6c54e142c0be0fe87b0",
+				ContainerID:  "docker://3cbbf818f1addfc252957b4504f56ef2907a313fe6afc47fc75373674255d46d",
+			},
+		},
+	},
+}
+
+func BenchmarkPodCopy(b *testing.B) {
 	var result *api.Pod
 	for i := 0; i < b.N; i++ {
-		obj, err := api.Scheme.DeepCopy(&pod)
+		obj, err := api.Scheme.DeepCopy(&benchmarkPod)
 		if err != nil {
 			b.Fatalf("Unexpected error copying pod: %v", err)
 		}
 		result = obj.(*api.Pod)
 	}
-	if !api.Semantic.DeepEqual(pod, *result) {
-		b.Fatalf("Incorrect copy: expected %v, got %v", pod, *result)
+	if !api.Semantic.DeepEqual(benchmarkPod, *result) {
+		b.Fatalf("Incorrect copy: expected %v, got %v", benchmarkPod, *result)
 	}
 }
 

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 The Kubernetes Authors All rights reserved.
+# Copyright 2015 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,6 +19,14 @@
 # in cluster/gce/trusty/<node.yaml, master.yaml> download it and make use
 # of needed functions. The script itself is not supposed to be executed in
 # other manners.
+
+set_broken_motd() {
+  cat > /etc/motd <<EOF
+Broken (or in progress) Kubernetes node setup! If you are using Ubuntu Trusty,
+check log file /var/log/syslog. If you are using GCI image, use
+"journalctl | grep kube" to find more information.
+EOF
+}
 
 download_kube_env() {
   # Fetch kube-env from GCE metadata server.
@@ -122,18 +130,36 @@ install_kube_binary_config() {
   # a test cluster.
   readonly BIN_PATH="/usr/bin"
   if ! which kubelet > /dev/null || ! which kubectl > /dev/null; then
+    # This should be the case of trusty.
     cp "${src_dir}/kubelet" "${BIN_PATH}"
     cp "${src_dir}/kubectl" "${BIN_PATH}"
-  elif [ "${TEST_CLUSTER:-}" = "true" ]; then
-    kube_bin="${kube_home}/bin"
+  else
+    # This should be the case of GCI.
+    readonly kube_bin="${kube_home}/bin"
     mkdir -p "${kube_bin}"
+    mount --bind "${kube_bin}" "${kube_bin}"
+    mount -o remount,rw,exec "${kube_bin}"
     cp "${src_dir}/kubelet" "${kube_bin}"
     cp "${src_dir}/kubectl" "${kube_bin}"
-    mount --bind "${kube_bin}/kubelet" "${BIN_PATH}/kubelet"
-    mount --bind -o remount,ro,^noexec "${BIN_PATH}/kubelet" "${BIN_PATH}/kubelet"
-    mount --bind "${kube_bin}/kubectl" "${BIN_PATH}/kubectl"
-    mount --bind -o remount,ro,^noexec "${BIN_PATH}/kubectl" "${BIN_PATH}/kubectl"
+    chmod 544 "${kube_bin}/kubelet"
+    chmod 544 "${kube_bin}/kubectl"
+    # If the built-in binary version is different from the expected version, we use
+    # the downloaded binary. The simplest implementation is to always use the downloaded
+    # binary without checking the version. But we have another version guardian in GKE.
+    # So, we compare the versions to ensure this run-time binary replacement is only
+    # applied for OSS kubernetes.
+    readonly builtin_version="$(/usr/bin/kubelet --version=true | cut -f2 -d " ")"
+    readonly required_version="$(/home/kubernetes/bin/kubelet --version=true | cut -f2 -d " ")"
+    if [ "${TEST_CLUSTER:-}" = "true" ] || [ "${builtin_version}" != "${required_version}" ]; then
+      mount --bind "${kube_bin}/kubelet" "${BIN_PATH}/kubelet"
+      mount --bind "${kube_bin}/kubectl" "${BIN_PATH}/kubectl"
+    else
+      # Remove downloaded binary just to prevent misuse.
+      rm -f "${kube_bin}/kubelet"
+      rm -f "${kube_bin}/kubectl"
+    fi
   fi
+  cp "${kube_home}/kubernetes/LICENSES" "${kube_home}"
 
   # Put kube-system pods manifests in /home/kubernetes/kube-manifests/.
   dst_dir="${kube_home}/kube-manifests"
@@ -152,12 +178,12 @@ install_kube_binary_config() {
   tar xzf "${kube_home}/${manifests_tar}" -C "${dst_dir}" --overwrite
   readonly kube_addon_registry="${KUBE_ADDON_REGISTRY:-gcr.io/google_containers}"
   if [ "${kube_addon_registry}" != "gcr.io/google_containers" ]; then
-    find "${dst_dir}" -maxdepth 1 -name \*.yaml -or -maxdepth 1 -name \*.yaml.in | \
+    find "${dst_dir}" -name \*.yaml -or -name \*.yaml.in | \
       xargs sed -ri "s@(image:\s.*)gcr.io/google_containers@\1${kube_addon_registry}@"
-    find "${dst_dir}" -maxdepth 1 -name \*.manifest -or -maxdepth 1 -name \*.json | \
+    find "${dst_dir}" -name \*.manifest -or -name \*.json | \
       xargs sed -ri "s@(image\":\s+\")gcr.io/google_containers@\1${kube_addon_registry}@"
   fi
-  cp "${dst_dir}/kubernetes/gci-trusty/configure-helper.sh" /etc/kube-configure-helper.sh
+  cp "${dst_dir}/kubernetes/gci-trusty/trusty-configure-helper.sh" /etc/kube-configure-helper.sh
 
   # Clean up.
   rm -rf "${kube_home}/kubernetes"

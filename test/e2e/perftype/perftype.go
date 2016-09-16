@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -31,7 +31,7 @@ type DataItem struct {
 	// should have the same unit.
 	Unit string `json:"unit"`
 	// Labels is the labels of the data item.
-	Labels map[string]string `json:"labels"`
+	Labels map[string]string `json:"labels,omitempty"`
 }
 
 // PerfData contains all data items generated in current test.
@@ -40,6 +40,8 @@ type PerfData struct {
 	// to detect metrics version change and decide what version to support.
 	Version   string     `json:"version"`
 	DataItems []DataItem `json:"dataItems"`
+	// Labels is the labels of the dataset.
+	Labels map[string]string `json:"labels,omitempty"`
 }
 
 // PerfResultTag is the prefix of generated perfdata. Analyzing tools can find the perf result

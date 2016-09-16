@@ -101,9 +101,8 @@ type payload struct {
 func (p payload) String() string {
 	if p.sent {
 		return fmt.Sprintf("sent: %v", p.msg)
-	} else {
-		return fmt.Sprintf("recv: %v", p.msg)
 	}
+	return fmt.Sprintf("recv: %v", p.msg)
 }
 
 type fmtStringer struct {

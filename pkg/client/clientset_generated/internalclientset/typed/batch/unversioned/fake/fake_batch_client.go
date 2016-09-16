@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -28,6 +28,10 @@ type FakeBatch struct {
 
 func (c *FakeBatch) Jobs(namespace string) unversioned.JobInterface {
 	return &FakeJobs{c, namespace}
+}
+
+func (c *FakeBatch) ScheduledJobs(namespace string) unversioned.ScheduledJobInterface {
+	return &FakeScheduledJobs{c, namespace}
 }
 
 // GetRESTClient returns a RESTClient that is used to communicate

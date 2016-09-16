@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  name: kube-apiserver-kubernetes-master
+  name: kube-apiserver
   namespace: kube-system
 spec:
   containers:
@@ -10,7 +10,7 @@ spec:
     - -c
     - /usr/local/bin/kube-apiserver
       --address=127.0.0.1
-      --etcd-servers=http://127.0.0.1:4001
+      --etcd-servers=http://127.0.0.1:2379
       --etcd-servers-overrides=/events#http://127.0.0.1:4002 
       --cloud-provider=gce
       --admission-control=${ADMISSION_CONTROL}

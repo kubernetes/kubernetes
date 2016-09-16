@@ -1,26 +1,11 @@
-// SIG(0)
-//
-// From RFC 2931:
-//
-//     SIG(0) provides protection for DNS transactions and requests ....
-//     ... protection for glue records, DNS requests, protection for message headers
-//     on requests and responses, and protection of the overall integrity of a response.
-//
-// It works like TSIG, except that SIG(0) uses public key cryptography, instead of the shared
-// secret approach in TSIG.
-// Supported algorithms: DSA, ECDSAP256SHA256, ECDSAP384SHA384, RSASHA1, RSASHA256 and
-// RSASHA512.
-//
-// Signing subsequent messages in multi-message sessions is not implemented.
-//
 package dns
 
 import (
 	"crypto"
 	"crypto/dsa"
 	"crypto/ecdsa"
-	"crypto/rand"
 	"crypto/rsa"
+	"encoding/binary"
 	"math/big"
 	"strings"
 	"time"
@@ -29,7 +14,7 @@ import (
 // Sign signs a dns.Msg. It fills the signature with the appropriate data.
 // The SIG record should have the SignerName, KeyTag, Algorithm, Inception
 // and Expiration set.
-func (rr *SIG) Sign(k PrivateKey, m *Msg) ([]byte, error) {
+func (rr *SIG) Sign(k crypto.Signer, m *Msg) ([]byte, error) {
 	if k == nil {
 		return nil, ErrPrivKey
 	}
@@ -57,69 +42,39 @@ func (rr *SIG) Sign(k PrivateKey, m *Msg) ([]byte, error) {
 		return nil, err
 	}
 	buf = buf[:off:cap(buf)]
-	var hash crypto.Hash
-	var intlen int
-	switch rr.Algorithm {
-	case DSA, RSASHA1:
-		hash = crypto.SHA1
-	case RSASHA256, ECDSAP256SHA256:
-		hash = crypto.SHA256
-		intlen = 32
-	case ECDSAP384SHA384:
-		hash = crypto.SHA384
-		intlen = 48
-	case RSASHA512:
-		hash = crypto.SHA512
-	default:
+
+	hash, ok := AlgorithmToHash[rr.Algorithm]
+	if !ok {
 		return nil, ErrAlg
 	}
+
 	hasher := hash.New()
 	// Write SIG rdata
 	hasher.Write(buf[len(mbuf)+1+2+2+4+2:])
 	// Write message
 	hasher.Write(buf[:len(mbuf)])
-	hashed := hasher.Sum(nil)
 
-	var sig []byte
-	switch p := k.(type) {
-	case *dsa.PrivateKey:
-		t := divRoundUp(divRoundUp(p.PublicKey.Y.BitLen(), 8)-64, 8)
-		r1, s1, err := dsa.Sign(rand.Reader, p, hashed)
-		if err != nil {
-			return nil, err
-		}
-		sig = append(sig, byte(t))
-		sig = append(sig, intToBytes(r1, 20)...)
-		sig = append(sig, intToBytes(s1, 20)...)
-	case *rsa.PrivateKey:
-		sig, err = rsa.SignPKCS1v15(rand.Reader, p, hash, hashed)
-		if err != nil {
-			return nil, err
-		}
-	case *ecdsa.PrivateKey:
-		r1, s1, err := ecdsa.Sign(rand.Reader, p, hashed)
-		if err != nil {
-			return nil, err
-		}
-		sig = intToBytes(r1, intlen)
-		sig = append(sig, intToBytes(s1, intlen)...)
-	default:
-		return nil, ErrAlg
+	signature, err := sign(k, hasher.Sum(nil), hash, rr.Algorithm)
+	if err != nil {
+		return nil, err
 	}
-	rr.Signature = toBase64(sig)
+
+	rr.Signature = toBase64(signature)
+	sig := string(signature)
+
 	buf = append(buf, sig...)
 	if len(buf) > int(^uint16(0)) {
 		return nil, ErrBuf
 	}
 	// Adjust sig data length
 	rdoff := len(mbuf) + 1 + 2 + 2 + 4
-	rdlen, _ := unpackUint16(buf, rdoff)
+	rdlen := binary.BigEndian.Uint16(buf[rdoff:])
 	rdlen += uint16(len(sig))
-	buf[rdoff], buf[rdoff+1] = packUint16(rdlen)
+	binary.BigEndian.PutUint16(buf[rdoff:], rdlen)
 	// Adjust additional count
-	adc, _ := unpackUint16(buf, 10)
-	adc += 1
-	buf[10], buf[11] = packUint16(adc)
+	adc := binary.BigEndian.Uint16(buf[10:])
+	adc++
+	binary.BigEndian.PutUint16(buf[10:], adc)
 	return buf, nil
 }
 
@@ -149,10 +104,11 @@ func (rr *SIG) Verify(k *KEY, buf []byte) error {
 	hasher := hash.New()
 
 	buflen := len(buf)
-	qdc, _ := unpackUint16(buf, 4)
-	anc, _ := unpackUint16(buf, 6)
-	auc, _ := unpackUint16(buf, 8)
-	adc, offset := unpackUint16(buf, 10)
+	qdc := binary.BigEndian.Uint16(buf[4:])
+	anc := binary.BigEndian.Uint16(buf[6:])
+	auc := binary.BigEndian.Uint16(buf[8:])
+	adc := binary.BigEndian.Uint16(buf[10:])
+	offset := 12
 	var err error
 	for i := uint16(0); i < qdc && offset < buflen; i++ {
 		_, offset, err = UnpackDomainName(buf, offset)
@@ -173,7 +129,8 @@ func (rr *SIG) Verify(k *KEY, buf []byte) error {
 			continue
 		}
 		var rdlen uint16
-		rdlen, offset = unpackUint16(buf, offset)
+		rdlen = binary.BigEndian.Uint16(buf[offset:])
+		offset += 2
 		offset += int(rdlen)
 	}
 	if offset >= buflen {
@@ -195,9 +152,9 @@ func (rr *SIG) Verify(k *KEY, buf []byte) error {
 	if offset+4+4 >= buflen {
 		return &Error{err: "overflow unpacking signed message"}
 	}
-	expire := uint32(buf[offset])<<24 | uint32(buf[offset+1])<<16 | uint32(buf[offset+2])<<8 | uint32(buf[offset+3])
+	expire := binary.BigEndian.Uint32(buf[offset:])
 	offset += 4
-	incept := uint32(buf[offset])<<24 | uint32(buf[offset+1])<<16 | uint32(buf[offset+2])<<8 | uint32(buf[offset+3])
+	incept := binary.BigEndian.Uint32(buf[offset:])
 	offset += 4
 	now := uint32(time.Now().Unix())
 	if now < incept || now > expire {
@@ -246,7 +203,7 @@ func (rr *SIG) Verify(k *KEY, buf []byte) error {
 			return rsa.VerifyPKCS1v15(pk, hash, hashed, sig)
 		}
 	case ECDSAP256SHA256, ECDSAP384SHA384:
-		pk := k.publicKeyCurve()
+		pk := k.publicKeyECDSA()
 		r := big.NewInt(0)
 		r.SetBytes(sig[:len(sig)/2])
 		s := big.NewInt(0)

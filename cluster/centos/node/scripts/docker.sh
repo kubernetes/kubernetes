@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2014 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -35,7 +35,7 @@ Type=notify
 EnvironmentFile=-/run/flannel/docker
 EnvironmentFile=-/opt/kubernetes/cfg/docker
 WorkingDirectory=/opt/kubernetes/bin
-ExecStart=/opt/kubernetes/bin/docker daemon \$DOCKER_OPT_BIP \$DOCKER_OPT_MTU \$DOCKER_OPTS
+ExecStart=/opt/kubernetes/bin/dockerd \$DOCKER_OPT_BIP \$DOCKER_OPT_MTU \$DOCKER_OPTS
 LimitNOFILE=1048576
 LimitNPROC=1048576
 

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2014 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -30,6 +30,15 @@ e2e_test=$(kube::util::find-binary "e2e.test")
 
 GINKGO_PARALLEL=${GINKGO_PARALLEL:-n} # set to 'y' to run tests in parallel
 
+# If 'y', will rerun failed tests once to give them a second chance.
+GINKGO_TOLERATE_FLAKES=${GINKGO_TOLERATE_FLAKES:-n}
+
+# The number of tests that can run in parallel depends on what tests
+# are running and on the size of the cluster. Too many, and tests will
+# fail due to resource contention. 25 is a reasonable default for a
+# 3-node (n1-standard-1) cluster running all fast, non-disruptive tests.
+GINKGO_PARALLELISM=${GINKGO_PARALLELISM:-25}
+
 : ${KUBECTL:="${KUBE_ROOT}/cluster/kubectl.sh"}
 : ${KUBE_CONFIG_FILE:="config-test.sh"}
 
@@ -40,7 +49,7 @@ source "${KUBE_ROOT}/cluster/kube-util.sh"
 # ---- Do cloud-provider-specific setup
 if [[ -n "${KUBERNETES_CONFORMANCE_TEST:-}" ]]; then
     echo "Conformance test: not doing test setup."
-    KUBERNETES_PROVIDER=""
+    KUBERNETES_PROVIDER="skeleton"
 
     detect-master-from-kubeconfig
 
@@ -66,8 +75,22 @@ else
   NODE_INSTANCE_GROUP=""
 fi
 
+if [[ "${KUBERNETES_PROVIDER}" == "gce" ]]; then
+  set_num_migs
+  NODE_INSTANCE_GROUP=""
+  for ((i=1; i<=${NUM_MIGS}; i++)); do
+    if [[ $i == ${NUM_MIGS} ]]; then
+      # We are assigning the same mig names as create-nodes function from cluster/gce/util.sh.
+      NODE_INSTANCE_GROUP="${NODE_INSTANCE_GROUP}${NODE_INSTANCE_PREFIX}-group"
+    else
+      NODE_INSTANCE_GROUP="${NODE_INSTANCE_GROUP}${NODE_INSTANCE_PREFIX}-group-${i},"
+    fi
+  done
+fi
+
 if [[ "${KUBERNETES_PROVIDER}" == "gke" ]]; then
-  detect-node-instance-group
+  detect-node-instance-groups
+  NODE_INSTANCE_GROUP=$(kube::util::join , "${NODE_INSTANCE_GROUPS[@]}")
 fi
 
 ginkgo_args=()
@@ -78,7 +101,12 @@ fi
 if [[ -n "${GINKGO_PARALLEL_NODES:-}" ]]; then
   ginkgo_args+=("--nodes=${GINKGO_PARALLEL_NODES}")
 elif [[ ${GINKGO_PARALLEL} =~ ^[yY]$ ]]; then
-  ginkgo_args+=("--nodes=30") # By default, set --nodes=30.
+  ginkgo_args+=("--nodes=25")
+fi
+
+FLAKE_ATTEMPTS=1
+if [[ "${GINKGO_TOLERATE_FLAKES}" == "y" ]]; then
+  FLAKE_ATTEMPTS=2
 fi
 
 # The --host setting is used only when providing --auth_config
@@ -88,18 +116,21 @@ fi
 export PATH=$(dirname "${e2e_test}"):"${PATH}"
 "${ginkgo}" "${ginkgo_args[@]:+${ginkgo_args[@]}}" "${e2e_test}" -- \
   "${auth_config[@]:+${auth_config[@]}}" \
+  --ginkgo.flakeAttempts="${FLAKE_ATTEMPTS}" \
   --host="${KUBE_MASTER_URL}" \
   --provider="${KUBERNETES_PROVIDER}" \
   --gce-project="${PROJECT:-}" \
   --gce-zone="${ZONE:-}" \
-  --gce-service-account="${GCE_SERVICE_ACCOUNT:-}" \
   --gke-cluster="${CLUSTER_NAME:-}" \
   --kube-master="${KUBE_MASTER:-}" \
   --cluster-tag="${CLUSTER_ID:-}" \
   --repo-root="${KUBE_ROOT}" \
   --node-instance-group="${NODE_INSTANCE_GROUP:-}" \
   --prefix="${KUBE_GCE_INSTANCE_PREFIX:-e2e}" \
-  ${KUBE_OS_DISTRIBUTION:+"--os-distro=${KUBE_OS_DISTRIBUTION}"} \
+  --network="${KUBE_GCE_NETWORK:-${KUBE_GKE_NETWORK:-e2e}}" \
+  ${KUBE_CONTAINER_RUNTIME:+"--container-runtime=${KUBE_CONTAINER_RUNTIME}"} \
+  ${MASTER_OS_DISTRIBUTION:+"--master-os-distro=${MASTER_OS_DISTRIBUTION}"} \
+  ${NODE_OS_DISTRIBUTION:+"--node-os-distro=${NODE_OS_DISTRIBUTION}"} \
   ${NUM_NODES:+"--num-nodes=${NUM_NODES}"} \
   ${E2E_CLEAN_START:+"--clean-start=true"} \
   ${E2E_MIN_STARTUP_PODS:+"--minStartupPods=${E2E_MIN_STARTUP_PODS}"} \

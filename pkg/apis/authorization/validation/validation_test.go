@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ import (
 	"strings"
 	"testing"
 
+	"k8s.io/kubernetes/pkg/api"
 	authorizationapi "k8s.io/kubernetes/pkg/apis/authorization"
 	"k8s.io/kubernetes/pkg/util/validation/field"
 )
@@ -126,6 +127,71 @@ func TestValidateSelfSAR(t *testing.T) {
 		}
 
 		errs = ValidateSelfSubjectAccessReview(&authorizationapi.SelfSubjectAccessReview{Spec: c.obj})
+		if len(errs) == 0 {
+			t.Errorf("%s: expected failure for %q", c.name, c.msg)
+		} else if !strings.Contains(errs[0].Error(), c.msg) {
+			t.Errorf("%s: unexpected error: %q, expected: %q", c.name, errs[0], c.msg)
+		}
+	}
+}
+
+func TestValidateLocalSAR(t *testing.T) {
+	successCases := []authorizationapi.LocalSubjectAccessReview{
+		{
+			Spec: authorizationapi.SubjectAccessReviewSpec{
+				ResourceAttributes: &authorizationapi.ResourceAttributes{},
+				User:               "user",
+			},
+		},
+	}
+	for _, successCase := range successCases {
+		if errs := ValidateLocalSubjectAccessReview(&successCase); len(errs) != 0 {
+			t.Errorf("expected success: %v", errs)
+		}
+	}
+
+	errorCases := []struct {
+		name string
+		obj  *authorizationapi.LocalSubjectAccessReview
+		msg  string
+	}{
+		{
+			name: "name",
+			obj: &authorizationapi.LocalSubjectAccessReview{
+				ObjectMeta: api.ObjectMeta{Name: "a"},
+				Spec: authorizationapi.SubjectAccessReviewSpec{
+					ResourceAttributes: &authorizationapi.ResourceAttributes{},
+					User:               "user",
+				},
+			},
+			msg: "must be empty except for namespace",
+		},
+		{
+			name: "namespace conflict",
+			obj: &authorizationapi.LocalSubjectAccessReview{
+				ObjectMeta: api.ObjectMeta{Namespace: "a"},
+				Spec: authorizationapi.SubjectAccessReviewSpec{
+					ResourceAttributes: &authorizationapi.ResourceAttributes{},
+					User:               "user",
+				},
+			},
+			msg: "must match metadata.namespace",
+		},
+		{
+			name: "nonresource",
+			obj: &authorizationapi.LocalSubjectAccessReview{
+				ObjectMeta: api.ObjectMeta{Namespace: "a"},
+				Spec: authorizationapi.SubjectAccessReviewSpec{
+					NonResourceAttributes: &authorizationapi.NonResourceAttributes{},
+					User: "user",
+				},
+			},
+			msg: "disallowed on this kind of request",
+		},
+	}
+
+	for _, c := range errorCases {
+		errs := ValidateLocalSubjectAccessReview(c.obj)
 		if len(errs) == 0 {
 			t.Errorf("%s: expected failure for %q", c.name, c.msg)
 		} else if !strings.Contains(errs[0].Error(), c.msg) {

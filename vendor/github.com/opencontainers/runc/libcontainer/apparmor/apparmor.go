@@ -7,6 +7,7 @@ package apparmor
 // #include <stdlib.h>
 import "C"
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
 	"unsafe"
@@ -32,7 +33,7 @@ func ApplyProfile(name string) error {
 	cName := C.CString(name)
 	defer C.free(unsafe.Pointer(cName))
 	if _, err := C.aa_change_onexec(cName); err != nil {
-		return err
+		return fmt.Errorf("apparmor failed to apply profile: %s", err)
 	}
 	return nil
 }

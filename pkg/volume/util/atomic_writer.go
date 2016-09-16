@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -60,9 +60,14 @@ type AtomicWriter struct {
 	logContext string
 }
 
+type FileProjection struct {
+	Data []byte
+	Mode int32
+}
+
 // NewAtomicWriter creates a new AtomicWriter configured to write to the given
 // target directory, or returns an error if the target directory does not exist.
-func NewAtomicWriter(targetDir, logContext string) (*AtomicWriter, error) {
+func NewAtomicWriter(targetDir string, logContext string) (*AtomicWriter, error) {
 	_, err := os.Stat(targetDir)
 	if os.IsNotExist(err) {
 		return nil, err
@@ -113,7 +118,7 @@ const (
 //  9.  The new data directory symlink is renamed to the data directory; rename is atomic
 // 10.  Old paths are removed from the user-visible portion of the target directory
 // 11.  The previous timestamped directory is removed, if it exists
-func (w *AtomicWriter) Write(payload map[string][]byte) error {
+func (w *AtomicWriter) Write(payload map[string]FileProjection) error {
 	// (1)
 	cleanPayload, err := validatePayload(payload)
 	if err != nil {
@@ -203,8 +208,8 @@ func (w *AtomicWriter) Write(payload map[string][]byte) error {
 }
 
 // validatePayload returns an error if any path in the payload  returns a copy of the payload with the paths cleaned.
-func validatePayload(payload map[string][]byte) (map[string][]byte, error) {
-	cleanPayload := make(map[string][]byte)
+func validatePayload(payload map[string]FileProjection) (map[string]FileProjection, error) {
+	cleanPayload := make(map[string]FileProjection)
 	for k, content := range payload {
 		if err := validatePath(k); err != nil {
 			return nil, err
@@ -257,9 +262,9 @@ func validatePath(targetPath string) error {
 }
 
 // shouldWritePayload returns whether the payload should be written to disk.
-func (w *AtomicWriter) shouldWritePayload(payload map[string][]byte) (bool, error) {
-	for userVisiblePath, content := range payload {
-		shouldWrite, err := w.shouldWriteFile(path.Join(w.targetDir, userVisiblePath), content)
+func (w *AtomicWriter) shouldWritePayload(payload map[string]FileProjection) (bool, error) {
+	for userVisiblePath, fileProjection := range payload {
+		shouldWrite, err := w.shouldWriteFile(path.Join(w.targetDir, userVisiblePath), fileProjection.Data)
 		if err != nil {
 			return false, err
 		}
@@ -290,7 +295,7 @@ func (w *AtomicWriter) shouldWriteFile(path string, content []byte) (bool, error
 // pathsToRemove walks the user-visible portion of the target directory and
 // determines which paths should be removed (if any) after the payload is
 // written to the target directory.
-func (w *AtomicWriter) pathsToRemove(payload map[string][]byte) (sets.String, error) {
+func (w *AtomicWriter) pathsToRemove(payload map[string]FileProjection) (sets.String, error) {
 	paths := sets.NewString()
 	visitor := func(path string, info os.FileInfo, err error) error {
 		if path == w.targetDir {
@@ -355,8 +360,10 @@ func (w *AtomicWriter) newTimestampDir() (string, error) {
 
 // writePayloadToDir writes the given payload to the given directory.  The
 // directory must exist.
-func (w *AtomicWriter) writePayloadToDir(payload map[string][]byte, dir string) error {
-	for userVisiblePath, content := range payload {
+func (w *AtomicWriter) writePayloadToDir(payload map[string]FileProjection, dir string) error {
+	for userVisiblePath, fileProjection := range payload {
+		content := fileProjection.Data
+		mode := os.FileMode(fileProjection.Mode)
 		fullPath := path.Join(dir, userVisiblePath)
 		baseDir, _ := filepath.Split(fullPath)
 
@@ -366,10 +373,18 @@ func (w *AtomicWriter) writePayloadToDir(payload map[string][]byte, dir string) 
 			return err
 		}
 
-		err = ioutil.WriteFile(fullPath, content, 0644)
+		err = ioutil.WriteFile(fullPath, content, mode)
 		if err != nil {
-			glog.Errorf("%s: unable to write file %s: %v", w.logContext, fullPath, err)
+			glog.Errorf("%s: unable to write file %s with mode %v: %v", w.logContext, fullPath, mode, err)
 			return err
+		}
+		// Chmod is needed because ioutil.WriteFile() ends up calling
+		// open(2) to create the file, so the final mode used is "mode &
+		// ~umask". But we want to make sure the specified mode is used
+		// in the file no matter what the umask is.
+		err = os.Chmod(fullPath, mode)
+		if err != nil {
+			glog.Errorf("%s: unable to write file %s with mode %v: %v", w.logContext, fullPath, mode, err)
 		}
 	}
 
@@ -387,7 +402,7 @@ func (w *AtomicWriter) writePayloadToDir(payload map[string][]byte, dir string) 
 // foo/bar      -> ../..data/foo/bar
 // baz/bar      -> ../..data/baz/bar
 // foo/baz/blah -> ../../..data/foo/baz/blah
-func (w *AtomicWriter) createUserVisibleFiles(payload map[string][]byte) error {
+func (w *AtomicWriter) createUserVisibleFiles(payload map[string]FileProjection) error {
 	for userVisiblePath := range payload {
 		dir, _ := filepath.Split(userVisiblePath)
 		subDirs := 0

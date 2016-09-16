@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 The Kubernetes Authors All rights reserved.
+# Copyright 2015 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -34,6 +34,8 @@ MASTER_FLAVOR=${MASTER_FLAVOR:-m1.medium}
 MINION_FLAVOR=${MINION_FLAVOR:-m1.medium}
 
 EXTERNAL_NETWORK=${EXTERNAL_NETWORK:-public}
+
+LBAAS_VERSION=${LBAAS_VERSION:-}
 
 SWIFT_SERVER_URL=${SWIFT_SERVER_URL:-}
 

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ import (
 	"sort"
 
 	"k8s.io/kubernetes/pkg/util/json"
-	forkedjson "k8s.io/kubernetes/third_party/forked/json"
+	forkedjson "k8s.io/kubernetes/third_party/forked/golang/json"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/ghodss/yaml"
@@ -106,6 +106,28 @@ func RequireKeyUnchanged(key string) PreconditionFunc {
 
 		// The presence of key means that its value has been changed, so the test fails.
 		_, ok = patchMap[key]
+		return !ok
+	}
+}
+
+// RequireMetadataKeyUnchanged creates a precondition function that fails
+// if the metadata.key is present in the patch (indicating its value
+// has changed).
+func RequireMetadataKeyUnchanged(key string) PreconditionFunc {
+	return func(patch interface{}) bool {
+		patchMap, ok := patch.(map[string]interface{})
+		if !ok {
+			return true
+		}
+		patchMap1, ok := patchMap["metadata"]
+		if !ok {
+			return true
+		}
+		patchMap2, ok := patchMap1.(map[string]interface{})
+		if !ok {
+			return true
+		}
+		_, ok = patchMap2[key]
 		return !ok
 	}
 }
@@ -432,7 +454,7 @@ loopB:
 	if !ignoreChangesAndAdditions {
 		// Add any remaining items found only in modified
 		for ; modifiedIndex < len(modifiedSorted); modifiedIndex++ {
-			patch = append(patch, modified[modifiedIndex])
+			patch = append(patch, modifiedSorted[modifiedIndex])
 		}
 	}
 

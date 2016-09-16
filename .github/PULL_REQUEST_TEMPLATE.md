@@ -1,15 +1,19 @@
-## Pull Request Guidelines
+<!--  Thanks for sending a pull request!  Here are some tips for you:
+1. If this is your first time, read our contributor guidelines https://github.com/kubernetes/kubernetes/blob/master/CONTRIBUTING.md and developer guide https://github.com/kubernetes/kubernetes/blob/master/docs/devel/development.md
+2. If you want *faster* PR reviews, read how: https://github.com/kubernetes/kubernetes/blob/master/docs/devel/faster_reviews.md
+3. Follow the instructions for writing a release note: https://github.com/kubernetes/kubernetes/blob/master/docs/devel/pull-requests.md#release-notes
+-->
 
-1. Please read our [contributor guidelines](https://github.com/kubernetes/kubernetes/blob/master/CONTRIBUTING.md).
-1. See our [developer guide](https://github.com/kubernetes/kubernetes/blob/master/docs/devel/development.md).
-1. Follow the instructions for [labeling and writing a release note for this PR](https://github.com/kubernetes/kubernetes/blob/master/docs/devel/pull-requests.md#release-notes) in the block below.
+**What this PR does / why we need it**:
 
+**Which issue this PR fixes** *(optional, in `fixes #<issue number>(, #<issue_number>, ...)` format, will close that issue when PR gets merged)*: fixes #
+
+**Special notes for your reviewer**:
+
+**Release note**:
+<!--  Steps to write your release note:
+1. Use the release-note-* labels to set the release note state (if you have access) 
+2. Enter your extended release note in the below block; leaving it blank means using the PR title as the release note. If no release note is required, just write `NONE`. 
+-->
 ```release-note
-* Use the release-note-* labels to set the release note state 
-* Clear this block to use the PR title as the release note 
--OR-
-* Enter your extended release note here
 ```
-
-
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/.github/PULL_REQUEST_TEMPLATE.md?pixel)]()

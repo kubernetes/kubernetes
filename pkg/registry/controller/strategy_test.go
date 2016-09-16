@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,7 +22,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
-	"k8s.io/kubernetes/pkg/labels"
 )
 
 func TestControllerStrategy(t *testing.T) {
@@ -59,7 +58,7 @@ func TestControllerStrategy(t *testing.T) {
 		},
 	}
 
-	Strategy.PrepareForCreate(rc)
+	Strategy.PrepareForCreate(ctx, rc)
 	if rc.Status.Replicas != 0 {
 		t.Error("ReplicationController should not allow setting status.replicas on create")
 	}
@@ -74,7 +73,7 @@ func TestControllerStrategy(t *testing.T) {
 	invalidRc := &api.ReplicationController{
 		ObjectMeta: api.ObjectMeta{Name: "bar", ResourceVersion: "4"},
 	}
-	Strategy.PrepareForUpdate(invalidRc, rc)
+	Strategy.PrepareForUpdate(ctx, invalidRc, rc)
 	errs = Strategy.ValidateUpdate(ctx, invalidRc, rc)
 	if len(errs) == 0 {
 		t.Errorf("Expected a validation error")
@@ -129,7 +128,7 @@ func TestControllerStatusStrategy(t *testing.T) {
 			ObservedGeneration: int64(11),
 		},
 	}
-	StatusStrategy.PrepareForUpdate(newController, oldController)
+	StatusStrategy.PrepareForUpdate(ctx, newController, oldController)
 	if newController.Status.Replicas != 3 {
 		t.Errorf("Replication controller status updates should allow change of replicas: %v", newController.Status.Replicas)
 	}
@@ -146,7 +145,7 @@ func TestSelectableFieldLabelConversions(t *testing.T) {
 	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
 		testapi.Default.GroupVersion().String(),
 		"ReplicationController",
-		labels.Set(ControllerToSelectableFields(&api.ReplicationController{})),
+		ControllerToSelectableFields(&api.ReplicationController{}),
 		nil,
 	)
 }

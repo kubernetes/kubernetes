@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -38,6 +38,7 @@ type ClusterInterface interface {
 	Get(name string) (*federation.Cluster, error)
 	List(opts api.ListOptions) (*federation.ClusterList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
+	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *federation.Cluster, err error)
 	ClusterExpansion
 }
 
@@ -137,4 +138,17 @@ func (c *clusters) Watch(opts api.ListOptions) (watch.Interface, error) {
 		Resource("clusters").
 		VersionedParams(&opts, api.ParameterCodec).
 		Watch()
+}
+
+// Patch applies the patch and returns the patched cluster.
+func (c *clusters) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *federation.Cluster, err error) {
+	result = &federation.Cluster{}
+	err = c.client.Patch(pt).
+		Resource("clusters").
+		SubResource(subresources...).
+		Name(name).
+		Body(data).
+		Do().
+		Into(result)
+	return
 }

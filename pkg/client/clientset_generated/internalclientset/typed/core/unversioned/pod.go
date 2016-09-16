@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -37,6 +37,7 @@ type PodInterface interface {
 	Get(name string) (*api.Pod, error)
 	List(opts api.ListOptions) (*api.PodList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
+	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *api.Pod, err error)
 	PodExpansion
 }
 
@@ -146,4 +147,18 @@ func (c *pods) Watch(opts api.ListOptions) (watch.Interface, error) {
 		Resource("pods").
 		VersionedParams(&opts, api.ParameterCodec).
 		Watch()
+}
+
+// Patch applies the patch and returns the patched pod.
+func (c *pods) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *api.Pod, err error) {
+	result = &api.Pod{}
+	err = c.client.Patch(pt).
+		Namespace(c.ns).
+		Resource("pods").
+		SubResource(subresources...).
+		Name(name).
+		Body(data).
+		Do().
+		Into(result)
+	return
 }

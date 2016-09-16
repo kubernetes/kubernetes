@@ -51,6 +51,8 @@ type Image struct {
 	Status   string
 
 	Updated string
+	
+	Metadata map[string]string
 }
 
 // ImagePage contains a single page of results from a List operation.

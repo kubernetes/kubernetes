@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -163,7 +163,7 @@ func (hs *hawkularSource) init() error {
 
 	if v, found := opts["auth"]; found {
 		if _, f := opts["caCert"]; f {
-			return fmt.Errorf("Both auth and caCert files provided, combination is not supported")
+			return fmt.Errorf("both auth and caCert files provided, combination is not supported")
 		}
 		if len(v[0]) > 0 {
 			// Authfile
@@ -182,7 +182,7 @@ func (hs *hawkularSource) init() error {
 
 	if u, found := opts["user"]; found {
 		if _, wrong := opts["useServiceAccount"]; wrong {
-			return fmt.Errorf("If user and password are used, serviceAccount cannot be used")
+			return fmt.Errorf("if user and password are used, serviceAccount cannot be used")
 		}
 		if p, f := opts["pass"]; f {
 			hs.modifiers = append(hs.modifiers, func(req *http.Request) error {

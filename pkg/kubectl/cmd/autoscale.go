@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/renstrom/dedent"
+
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
@@ -35,21 +37,26 @@ type AutoscaleOptions struct {
 	Recursive bool
 }
 
-const (
-	autoscaleLong = `Creates an autoscaler that automatically chooses and sets the number of pods that run in a kubernetes cluster.
+var (
+	autoscaleLong = dedent.Dedent(`
+		Creates an autoscaler that automatically chooses and sets the number of pods that run in a kubernetes cluster.
 
-Looks up a Deployment, ReplicaSet, or ReplicationController by name and creates an autoscaler that uses the given resource as a reference.
-An autoscaler can automatically increase or decrease number of pods deployed within the system as needed.`
+		Looks up a Deployment, ReplicaSet, or ReplicationController by name and creates an autoscaler that uses the given resource as a reference.
+		An autoscaler can automatically increase or decrease number of pods deployed within the system as needed.`)
 
-	autoscaleExample = `# Auto scale a deployment "foo", with the number of pods between 2 to 10, target CPU utilization at a default value that server applies:
-kubectl autoscale deployment foo --min=2 --max=10
+	autoscaleExample = dedent.Dedent(`
+		# Auto scale a deployment "foo", with the number of pods between 2 and 10, target CPU utilization specified so a default autoscaling policy will be used:
+		kubectl autoscale deployment foo --min=2 --max=10
 
-# Auto scale a replication controller "foo", with the number of pods between 1 to 5, target CPU utilization at 80%:
-kubectl autoscale rc foo --max=5 --cpu-percent=80`
+		# Auto scale a replication controller "foo", with the number of pods between 1 and 5, target CPU utilization at 80%:
+		kubectl autoscale rc foo --max=5 --cpu-percent=80`)
 )
 
 func NewCmdAutoscale(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &AutoscaleOptions{}
+
+	validArgs := []string{"deployment", "replicaset", "replicationcontroller"}
+	argAliases := kubectl.ResourceAliases(validArgs)
 
 	cmd := &cobra.Command{
 		Use:     "autoscale (-f FILENAME | TYPE NAME | TYPE/NAME) [--min=MINPODS] --max=MAXPODS [--cpu-percent=CPU] [flags]",
@@ -60,15 +67,17 @@ func NewCmdAutoscale(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 			err := RunAutoscale(f, out, cmd, args, options)
 			cmdutil.CheckErr(err)
 		},
+		ValidArgs:  validArgs,
+		ArgAliases: argAliases,
 	}
 	cmdutil.AddPrinterFlags(cmd)
-	cmd.Flags().String("generator", "horizontalpodautoscaler/v1beta1", "The name of the API generator to use. Currently there is only 1 generator.")
+	cmd.Flags().String("generator", "horizontalpodautoscaler/v1", "The name of the API generator to use. Currently there is only 1 generator.")
 	cmd.Flags().Int("min", -1, "The lower limit for the number of pods that can be set by the autoscaler. If it's not specified or negative, the server will apply a default value.")
 	cmd.Flags().Int("max", -1, "The upper limit for the number of pods that can be set by the autoscaler. Required.")
 	cmd.MarkFlagRequired("max")
-	cmd.Flags().Int("cpu-percent", -1, fmt.Sprintf("The target average CPU utilization (represented as a percent of requested CPU) over all the pods. If it's not specified or negative, the server will apply a default value."))
+	cmd.Flags().Int("cpu-percent", -1, fmt.Sprintf("The target average CPU utilization (represented as a percent of requested CPU) over all the pods. If it's not specified or negative, a default autoscaling policy will be used."))
 	cmd.Flags().String("name", "", "The name for the newly created object. If not specified, the name of the input resource will be used.")
-	cmd.Flags().Bool("dry-run", false, "If true, only print the object that would be sent, without creating it.")
+	cmdutil.AddDryRunFlag(cmd)
 	usage := "Filename, directory, or URL to a file identifying the resource to autoscale."
 	kubectl.AddJsonFilenameFlag(cmd, &options.Filenames, usage)
 	cmdutil.AddRecursiveFlag(cmd, &options.Recursive)
@@ -160,8 +169,7 @@ func RunAutoscale(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []
 			}
 			object = hpa.Object
 		}
-		// TODO: extract this flag to a central location, when such a location exists.
-		if cmdutil.GetFlagBool(cmd, "dry-run") {
+		if cmdutil.GetDryRunFlag(cmd) {
 			return f.PrintObject(cmd, mapper, object, out)
 		}
 
@@ -193,12 +201,12 @@ func RunAutoscale(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []
 
 func validateFlags(cmd *cobra.Command) error {
 	errs := []error{}
-	max, min, cpu := cmdutil.GetFlagInt(cmd, "max"), cmdutil.GetFlagInt(cmd, "min"), cmdutil.GetFlagInt(cmd, "cpu-percent")
-	if max < 1 || max < min {
-		errs = append(errs, fmt.Errorf("--max=MAXPODS is required, and must be at least 1 and --min=MINPODS"))
+	max, min := cmdutil.GetFlagInt(cmd, "max"), cmdutil.GetFlagInt(cmd, "min")
+	if max < 1 {
+		errs = append(errs, fmt.Errorf("--max=MAXPODS is required and must be at least 1, max: %d", max))
 	}
-	if cpu > 100 {
-		errs = append(errs, fmt.Errorf("CPU utilization (%%) cannot exceed 100"))
+	if max < min {
+		errs = append(errs, fmt.Errorf("--max=MAXPODS must be larger or equal to --min=MINPODS, max: %d, min: %d", max, min))
 	}
 	return utilerrors.NewAggregate(errs)
 }

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -31,17 +31,14 @@ import (
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/record"
-	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/clock"
 	"k8s.io/kubernetes/pkg/util/integer"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 const (
-	CreatedByAnnotation = "kubernetes.io/created-by"
-
 	// If a watch drops a delete event for a pod, it'll take this long
 	// before a dormant controller waiting for those packets is woken up anyway. It is
 	// specifically targeted at the case where some problem prevents an update
@@ -56,7 +53,7 @@ const (
 )
 
 var (
-	KeyFunc = framework.DeletionHandlingMetaNamespaceKeyFunc
+	KeyFunc = cache.DeletionHandlingMetaNamespaceKeyFunc
 )
 
 type ResyncPeriodFunc func() time.Duration
@@ -169,13 +166,13 @@ func (r *ControllerExpectations) SatisfiedExpectations(controllerKey string) boo
 // TODO: Make this possible to disable in tests.
 // TODO: Support injection of clock.
 func (exp *ControlleeExpectations) isExpired() bool {
-	return util.RealClock{}.Since(exp.timestamp) > ExpectationsTimeout
+	return clock.RealClock{}.Since(exp.timestamp) > ExpectationsTimeout
 }
 
 // SetExpectations registers new expectations for the given controller. Forgets existing expectations.
 func (r *ControllerExpectations) SetExpectations(controllerKey string, add, del int) error {
-	exp := &ControlleeExpectations{add: int64(add), del: int64(del), key: controllerKey, timestamp: util.RealClock{}.Now()}
-	glog.V(4).Infof("Setting expectations %+v", exp)
+	exp := &ControlleeExpectations{add: int64(add), del: int64(del), key: controllerKey, timestamp: clock.RealClock{}.Now()}
+	glog.V(4).Infof("Setting expectations %#v", exp)
 	return r.Add(exp)
 }
 
@@ -192,7 +189,7 @@ func (r *ControllerExpectations) LowerExpectations(controllerKey string, add, de
 	if exp, exists, err := r.GetExpectations(controllerKey); err == nil && exists {
 		exp.Add(int64(-add), int64(-del))
 		// The expectations might've been modified since the update on the previous line.
-		glog.V(4).Infof("Lowered expectations %+v", exp)
+		glog.V(4).Infof("Lowered expectations %#v", exp)
 	}
 }
 
@@ -201,11 +198,11 @@ func (r *ControllerExpectations) RaiseExpectations(controllerKey string, add, de
 	if exp, exists, err := r.GetExpectations(controllerKey); err == nil && exists {
 		exp.Add(int64(add), int64(del))
 		// The expectations might've been modified since the update on the previous line.
-		glog.V(4).Infof("Raised expectations %+v", exp)
+		glog.V(4).Infof("Raised expectations %#v", exp)
 	}
 }
 
-// CreationObserved atomically decrements the `add` expecation count of the given controller.
+// CreationObserved atomically decrements the `add` expectation count of the given controller.
 func (r *ControllerExpectations) CreationObserved(controllerKey string) {
 	r.LowerExpectations(controllerKey, 1, 0)
 }
@@ -351,8 +348,12 @@ type PodControlInterface interface {
 	CreatePods(namespace string, template *api.PodTemplateSpec, object runtime.Object) error
 	// CreatePodsOnNode creates a new pod accorting to the spec on the specified node.
 	CreatePodsOnNode(nodeName, namespace string, template *api.PodTemplateSpec, object runtime.Object) error
+	// CreatePodsWithControllerRef creates new pods according to the spec, and sets object as the pod's controller.
+	CreatePodsWithControllerRef(namespace string, template *api.PodTemplateSpec, object runtime.Object, controllerRef *api.OwnerReference) error
 	// DeletePod deletes the pod identified by podID.
 	DeletePod(namespace string, podID string, object runtime.Object) error
+	// PatchPod patches the pod.
+	PatchPod(namespace, name string, data []byte) error
 }
 
 // RealPodControl is the default implementation of PodControlInterface.
@@ -392,28 +393,49 @@ func getPodsAnnotationSet(template *api.PodTemplateSpec, object runtime.Object) 
 	if err != nil {
 		return desiredAnnotations, fmt.Errorf("unable to serialize controller reference: %v", err)
 	}
-	desiredAnnotations[CreatedByAnnotation] = string(createdByRefJson)
+	desiredAnnotations[api.CreatedByAnnotation] = string(createdByRefJson)
 	return desiredAnnotations, nil
 }
 
 func getPodsPrefix(controllerName string) string {
 	// use the dash (if the name isn't too long) to make the pod name a bit prettier
 	prefix := fmt.Sprintf("%s-", controllerName)
-	if ok, _ := validation.ValidatePodName(prefix, true); !ok {
+	if len(validation.ValidatePodName(prefix, true)) != 0 {
 		prefix = controllerName
 	}
 	return prefix
 }
 
 func (r RealPodControl) CreatePods(namespace string, template *api.PodTemplateSpec, object runtime.Object) error {
-	return r.createPods("", namespace, template, object)
+	return r.createPods("", namespace, template, object, nil)
+}
+
+func (r RealPodControl) CreatePodsWithControllerRef(namespace string, template *api.PodTemplateSpec, controllerObject runtime.Object, controllerRef *api.OwnerReference) error {
+	if controllerRef == nil {
+		return fmt.Errorf("controllerRef is nil")
+	}
+	if len(controllerRef.APIVersion) == 0 {
+		return fmt.Errorf("controllerRef has empty APIVersion")
+	}
+	if len(controllerRef.Kind) == 0 {
+		return fmt.Errorf("controllerRef has empty Kind")
+	}
+	if controllerRef.Controller == nil || *controllerRef.Controller != true {
+		return fmt.Errorf("controllerRef.Controller is not set")
+	}
+	return r.createPods("", namespace, template, controllerObject, controllerRef)
 }
 
 func (r RealPodControl) CreatePodsOnNode(nodeName, namespace string, template *api.PodTemplateSpec, object runtime.Object) error {
-	return r.createPods(nodeName, namespace, template, object)
+	return r.createPods(nodeName, namespace, template, object, nil)
 }
 
-func GetPodFromTemplate(template *api.PodTemplateSpec, parentObject runtime.Object) (*api.Pod, error) {
+func (r RealPodControl) PatchPod(namespace, name string, data []byte) error {
+	_, err := r.KubeClient.Core().Pods(namespace).Patch(name, api.StrategicMergePatchType, data)
+	return err
+}
+
+func GetPodFromTemplate(template *api.PodTemplateSpec, parentObject runtime.Object, controllerRef *api.OwnerReference) (*api.Pod, error) {
 	desiredLabels := getPodsLabelSet(template)
 	desiredAnnotations, err := getPodsAnnotationSet(template, parentObject)
 	if err != nil {
@@ -432,21 +454,24 @@ func GetPodFromTemplate(template *api.PodTemplateSpec, parentObject runtime.Obje
 			GenerateName: prefix,
 		},
 	}
-	if err := api.Scheme.Convert(&template.Spec, &pod.Spec); err != nil {
+	if controllerRef != nil {
+		pod.OwnerReferences = append(pod.OwnerReferences, *controllerRef)
+	}
+	if err := api.Scheme.Convert(&template.Spec, &pod.Spec, nil); err != nil {
 		return nil, fmt.Errorf("unable to convert pod template: %v", err)
 	}
 	return pod, nil
 }
 
-func (r RealPodControl) createPods(nodeName, namespace string, template *api.PodTemplateSpec, object runtime.Object) error {
-	pod, err := GetPodFromTemplate(template, object)
+func (r RealPodControl) createPods(nodeName, namespace string, template *api.PodTemplateSpec, object runtime.Object, controllerRef *api.OwnerReference) error {
+	pod, err := GetPodFromTemplate(template, object, controllerRef)
 	if err != nil {
 		return err
 	}
 	if len(nodeName) != 0 {
 		pod.Spec.NodeName = nodeName
 	}
-	if labels.Set(pod.Labels).AsSelector().Empty() {
+	if labels.Set(pod.Labels).AsSelectorPreValidated().Empty() {
 		return fmt.Errorf("unable to create pods, no labels")
 	}
 	if newPod, err := r.KubeClient.Core().Pods(namespace).Create(pod); err != nil {
@@ -481,40 +506,63 @@ func (r RealPodControl) DeletePod(namespace string, podID string, object runtime
 
 type FakePodControl struct {
 	sync.Mutex
-	Templates     []api.PodTemplateSpec
-	DeletePodName []string
-	Err           error
+	Templates      []api.PodTemplateSpec
+	ControllerRefs []api.OwnerReference
+	DeletePodName  []string
+	Patches        [][]byte
+	Err            error
 }
 
 var _ PodControlInterface = &FakePodControl{}
 
-func (f *FakePodControl) CreatePods(namespace string, spec *api.PodTemplateSpec, object runtime.Object) error {
+func (f *FakePodControl) PatchPod(namespace, name string, data []byte) error {
 	f.Lock()
 	defer f.Unlock()
+	f.Patches = append(f.Patches, data)
 	if f.Err != nil {
 		return f.Err
 	}
+	return nil
+}
+
+func (f *FakePodControl) CreatePods(namespace string, spec *api.PodTemplateSpec, object runtime.Object) error {
+	f.Lock()
+	defer f.Unlock()
 	f.Templates = append(f.Templates, *spec)
+	if f.Err != nil {
+		return f.Err
+	}
+	return nil
+}
+
+func (f *FakePodControl) CreatePodsWithControllerRef(namespace string, spec *api.PodTemplateSpec, object runtime.Object, controllerRef *api.OwnerReference) error {
+	f.Lock()
+	defer f.Unlock()
+	f.Templates = append(f.Templates, *spec)
+	f.ControllerRefs = append(f.ControllerRefs, *controllerRef)
+	if f.Err != nil {
+		return f.Err
+	}
 	return nil
 }
 
 func (f *FakePodControl) CreatePodsOnNode(nodeName, namespace string, template *api.PodTemplateSpec, object runtime.Object) error {
 	f.Lock()
 	defer f.Unlock()
+	f.Templates = append(f.Templates, *template)
 	if f.Err != nil {
 		return f.Err
 	}
-	f.Templates = append(f.Templates, *template)
 	return nil
 }
 
 func (f *FakePodControl) DeletePod(namespace string, podID string, object runtime.Object) error {
 	f.Lock()
 	defer f.Unlock()
+	f.DeletePodName = append(f.DeletePodName, podID)
 	if f.Err != nil {
 		return f.Err
 	}
-	f.DeletePodName = append(f.DeletePodName, podID)
 	return nil
 }
 
@@ -523,6 +571,45 @@ func (f *FakePodControl) Clear() {
 	defer f.Unlock()
 	f.DeletePodName = []string{}
 	f.Templates = []api.PodTemplateSpec{}
+	f.ControllerRefs = []api.OwnerReference{}
+	f.Patches = [][]byte{}
+}
+
+// ByLogging allows custom sorting of pods so the best one can be picked for getting its logs.
+type ByLogging []*api.Pod
+
+func (s ByLogging) Len() int      { return len(s) }
+func (s ByLogging) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
+
+func (s ByLogging) Less(i, j int) bool {
+	// 1. assigned < unassigned
+	if s[i].Spec.NodeName != s[j].Spec.NodeName && (len(s[i].Spec.NodeName) == 0 || len(s[j].Spec.NodeName) == 0) {
+		return len(s[i].Spec.NodeName) > 0
+	}
+	// 2. PodRunning < PodUnknown < PodPending
+	m := map[api.PodPhase]int{api.PodRunning: 0, api.PodUnknown: 1, api.PodPending: 2}
+	if m[s[i].Status.Phase] != m[s[j].Status.Phase] {
+		return m[s[i].Status.Phase] < m[s[j].Status.Phase]
+	}
+	// 3. ready < not ready
+	if api.IsPodReady(s[i]) != api.IsPodReady(s[j]) {
+		return api.IsPodReady(s[i])
+	}
+	// TODO: take availability into account when we push minReadySeconds information from deployment into pods,
+	//       see https://github.com/kubernetes/kubernetes/issues/22065
+	// 4. Been ready for more time < less time < empty time
+	if api.IsPodReady(s[i]) && api.IsPodReady(s[j]) && !podReadyTime(s[i]).Equal(podReadyTime(s[j])) {
+		return afterOrZero(podReadyTime(s[j]), podReadyTime(s[i]))
+	}
+	// 5. Pods with containers with higher restart counts < lower restart counts
+	if maxContainerRestarts(s[i]) != maxContainerRestarts(s[j]) {
+		return maxContainerRestarts(s[i]) > maxContainerRestarts(s[j])
+	}
+	// 6. older pods < newer pods < empty timestamp pods
+	if !s[i].CreationTimestamp.Equal(s[j].CreationTimestamp) {
+		return afterOrZero(s[j].CreationTimestamp, s[i].CreationTimestamp)
+	}
+	return false
 }
 
 // ActivePods type allows custom sorting of pods so a controller can pick the best ones to delete.
@@ -595,12 +682,11 @@ func maxContainerRestarts(pod *api.Pod) int {
 }
 
 // FilterActivePods returns pods that have not terminated.
-func FilterActivePods(pods []api.Pod) []*api.Pod {
+func FilterActivePods(pods []*api.Pod) []*api.Pod {
 	var result []*api.Pod
-	for i := range pods {
-		p := pods[i]
+	for _, p := range pods {
 		if IsPodActive(p) {
-			result = append(result, &p)
+			result = append(result, p)
 		} else {
 			glog.V(4).Infof("Ignoring inactive pod %v/%v in state %v, deletion time %v",
 				p.Namespace, p.Name, p.Status.Phase, p.DeletionTimestamp)
@@ -609,7 +695,7 @@ func FilterActivePods(pods []api.Pod) []*api.Pod {
 	return result
 }
 
-func IsPodActive(p api.Pod) bool {
+func IsPodActive(p *api.Pod) bool {
 	return api.PodSucceeded != p.Status.Phase &&
 		api.PodFailed != p.Status.Phase &&
 		p.DeletionTimestamp == nil
@@ -619,7 +705,9 @@ func IsPodActive(p api.Pod) bool {
 func FilterActiveReplicaSets(replicaSets []*extensions.ReplicaSet) []*extensions.ReplicaSet {
 	active := []*extensions.ReplicaSet{}
 	for i := range replicaSets {
-		if replicaSets[i].Spec.Replicas > 0 {
+		rs := replicaSets[i]
+
+		if rs != nil && rs.Spec.Replicas > 0 {
 			active = append(active, replicaSets[i])
 		}
 	}
@@ -629,7 +717,7 @@ func FilterActiveReplicaSets(replicaSets []*extensions.ReplicaSet) []*extensions
 // PodKey returns a key unique to the given pod within a cluster.
 // It's used so we consistently use the same key scheme in this module.
 // It does exactly what cache.MetaNamespaceKeyFunc would have done
-// expcept there's not possibility for error since we know the exact type.
+// except there's not possibility for error since we know the exact type.
 func PodKey(pod *api.Pod) string {
 	return fmt.Sprintf("%v/%v", pod.Namespace, pod.Name)
 }
@@ -639,7 +727,6 @@ type ControllersByCreationTimestamp []*api.ReplicationController
 
 func (o ControllersByCreationTimestamp) Len() int      { return len(o) }
 func (o ControllersByCreationTimestamp) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
-
 func (o ControllersByCreationTimestamp) Less(i, j int) bool {
 	if o[i].CreationTimestamp.Equal(o[j].CreationTimestamp) {
 		return o[i].Name < o[j].Name
@@ -647,15 +734,40 @@ func (o ControllersByCreationTimestamp) Less(i, j int) bool {
 	return o[i].CreationTimestamp.Before(o[j].CreationTimestamp)
 }
 
-// ReplicaSetsByCreationTimestamp sorts a list of ReplicationSets by creation timestamp, using their names as a tie breaker.
+// ReplicaSetsByCreationTimestamp sorts a list of ReplicaSet by creation timestamp, using their names as a tie breaker.
 type ReplicaSetsByCreationTimestamp []*extensions.ReplicaSet
 
 func (o ReplicaSetsByCreationTimestamp) Len() int      { return len(o) }
 func (o ReplicaSetsByCreationTimestamp) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
-
 func (o ReplicaSetsByCreationTimestamp) Less(i, j int) bool {
 	if o[i].CreationTimestamp.Equal(o[j].CreationTimestamp) {
 		return o[i].Name < o[j].Name
 	}
 	return o[i].CreationTimestamp.Before(o[j].CreationTimestamp)
+}
+
+// ReplicaSetsBySizeOlder sorts a list of ReplicaSet by size in descending order, using their creation timestamp or name as a tie breaker.
+// By using the creation timestamp, this sorts from old to new replica sets.
+type ReplicaSetsBySizeOlder []*extensions.ReplicaSet
+
+func (o ReplicaSetsBySizeOlder) Len() int      { return len(o) }
+func (o ReplicaSetsBySizeOlder) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
+func (o ReplicaSetsBySizeOlder) Less(i, j int) bool {
+	if o[i].Spec.Replicas == o[j].Spec.Replicas {
+		return ReplicaSetsByCreationTimestamp(o).Less(i, j)
+	}
+	return o[i].Spec.Replicas > o[j].Spec.Replicas
+}
+
+// ReplicaSetsBySizeNewer sorts a list of ReplicaSet by size in descending order, using their creation timestamp or name as a tie breaker.
+// By using the creation timestamp, this sorts from new to old replica sets.
+type ReplicaSetsBySizeNewer []*extensions.ReplicaSet
+
+func (o ReplicaSetsBySizeNewer) Len() int      { return len(o) }
+func (o ReplicaSetsBySizeNewer) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
+func (o ReplicaSetsBySizeNewer) Less(i, j int) bool {
+	if o[i].Spec.Replicas == o[j].Spec.Replicas {
+		return ReplicaSetsByCreationTimestamp(o).Less(j, i)
+	}
+	return o[i].Spec.Replicas > o[j].Spec.Replicas
 }

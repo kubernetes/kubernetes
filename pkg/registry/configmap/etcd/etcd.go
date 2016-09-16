@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,11 +18,12 @@ package etcd
 
 import (
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/configmap"
 	"k8s.io/kubernetes/pkg/registry/generic"
-	"k8s.io/kubernetes/pkg/runtime"
-
 	"k8s.io/kubernetes/pkg/registry/generic/registry"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/storage"
 )
 
 // REST implements a RESTStorage for ConfigMap against etcd
@@ -32,11 +33,17 @@ type REST struct {
 
 // NewREST returns a RESTStorage object that will work with ConfigMap objects.
 func NewREST(opts generic.RESTOptions) *REST {
-	prefix := "/configmaps"
+	prefix := "/" + opts.ResourcePrefix
 
 	newListFunc := func() runtime.Object { return &api.ConfigMapList{} }
-	storageInterface := opts.Decorator(
-		opts.Storage, 100, &api.ConfigMap{}, prefix, configmap.Strategy, newListFunc)
+	storageInterface, dFunc := opts.Decorator(
+		opts.StorageConfig,
+		cachesize.GetWatchCacheSizeByResource(cachesize.ConfigMaps),
+		&api.ConfigMap{},
+		prefix,
+		configmap.Strategy,
+		newListFunc,
+		storage.NoTriggerPublisher)
 
 	store := &registry.Store{
 		NewFunc: func() runtime.Object {
@@ -68,13 +75,15 @@ func NewREST(opts generic.RESTOptions) *REST {
 
 		QualifiedResource: api.Resource("configmaps"),
 
+		EnableGarbageCollection: opts.EnableGarbageCollection,
 		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
 
 		CreateStrategy: configmap.Strategy,
 		UpdateStrategy: configmap.Strategy,
 		DeleteStrategy: configmap.Strategy,
 
-		Storage: storageInterface,
+		Storage:     storageInterface,
+		DestroyFunc: dFunc,
 	}
 	return &REST{store}
 }

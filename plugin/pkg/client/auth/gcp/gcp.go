@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,11 +25,15 @@ import (
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 
+	clientreporestclient "k8s.io/client-go/1.4/rest"
 	"k8s.io/kubernetes/pkg/client/restclient"
 )
 
 func init() {
 	if err := restclient.RegisterAuthProviderPlugin("gcp", newGCPAuthProvider); err != nil {
+		glog.Fatalf("Failed to register gcp auth plugin: %v", err)
+	}
+	if err := clientreporestclient.RegisterAuthProviderPlugin("gcp", newGCPAuthProviderForClientRepo); err != nil {
 		glog.Fatalf("Failed to register gcp auth plugin: %v", err)
 	}
 }
@@ -40,6 +44,15 @@ type gcpAuthProvider struct {
 }
 
 func newGCPAuthProvider(_ string, gcpConfig map[string]string, persister restclient.AuthProviderConfigPersister) (restclient.AuthProvider, error) {
+	ts, err := newCachedTokenSource(gcpConfig["access-token"], gcpConfig["expiry"], persister)
+	if err != nil {
+		return nil, err
+	}
+	return &gcpAuthProvider{ts, persister}, nil
+}
+
+// newGCPAuthProviderForClientRepo is the same as newGCPAuthProvider, but is programmed against client-go's interface
+func newGCPAuthProviderForClientRepo(_ string, gcpConfig map[string]string, persister clientreporestclient.AuthProviderConfigPersister) (clientreporestclient.AuthProvider, error) {
 	ts, err := newCachedTokenSource(gcpConfig["access-token"], gcpConfig["expiry"], persister)
 	if err != nil {
 		return nil, err

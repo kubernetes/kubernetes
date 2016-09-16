@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -30,6 +30,7 @@ option go_package = "versioned";
 // Event represents a single event to a watched resource.
 // 
 // +protobuf=true
+// +k8s:openapi-gen=true
 message Event {
   optional string type = 1;
 

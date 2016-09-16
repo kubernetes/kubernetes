@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -53,7 +53,7 @@ var _ = framework.KubeDescribe("LimitRange", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Creating a Pod with no resource requirements")
-		pod := newTestPod("pod-no-resources", api.ResourceList{}, api.ResourceList{})
+		pod := newTestPod(f, "pod-no-resources", api.ResourceList{}, api.ResourceList{})
 		pod, err = f.Client.Pods(f.Namespace.Name).Create(pod)
 		Expect(err).NotTo(HaveOccurred())
 
@@ -70,7 +70,7 @@ var _ = framework.KubeDescribe("LimitRange", func() {
 		}
 
 		By("Creating a Pod with partial resource requirements")
-		pod = newTestPod("pod-partial-resources", getResourceList("", "150Mi"), getResourceList("300m", ""))
+		pod = newTestPod(f, "pod-partial-resources", getResourceList("", "150Mi"), getResourceList("300m", ""))
 		pod, err = f.Client.Pods(f.Namespace.Name).Create(pod)
 		Expect(err).NotTo(HaveOccurred())
 
@@ -91,12 +91,12 @@ var _ = framework.KubeDescribe("LimitRange", func() {
 		}
 
 		By("Failing to create a Pod with less than min resources")
-		pod = newTestPod(podName, getResourceList("10m", "50Mi"), api.ResourceList{})
+		pod = newTestPod(f, podName, getResourceList("10m", "50Mi"), api.ResourceList{})
 		pod, err = f.Client.Pods(f.Namespace.Name).Create(pod)
 		Expect(err).To(HaveOccurred())
 
 		By("Failing to create a Pod with more than max resources")
-		pod = newTestPod(podName, getResourceList("600m", "600Mi"), api.ResourceList{})
+		pod = newTestPod(f, podName, getResourceList("600m", "600Mi"), api.ResourceList{})
 		pod, err = f.Client.Pods(f.Namespace.Name).Create(pod)
 		Expect(err).To(HaveOccurred())
 	})
@@ -104,7 +104,7 @@ var _ = framework.KubeDescribe("LimitRange", func() {
 })
 
 func equalResourceRequirement(expected api.ResourceRequirements, actual api.ResourceRequirements) error {
-	framework.Logf("Verifying requests: expected %s with actual %s", expected.Requests, actual.Requests)
+	framework.Logf("Verifying requests: expected %v with actual %v", expected.Requests, actual.Requests)
 	err := equalResourceList(expected.Requests, actual.Requests)
 	if err != nil {
 		return err
@@ -167,7 +167,7 @@ func newLimitRange(name string, limitType api.LimitType,
 }
 
 // newTestPod returns a pod that has the specified requests and limits
-func newTestPod(name string, requests api.ResourceList, limits api.ResourceList) *api.Pod {
+func newTestPod(f *framework.Framework, name string, requests api.ResourceList, limits api.ResourceList) *api.Pod {
 	return &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name: name,
@@ -175,8 +175,8 @@ func newTestPod(name string, requests api.ResourceList, limits api.ResourceList)
 		Spec: api.PodSpec{
 			Containers: []api.Container{
 				{
-					Name:  "nginx",
-					Image: "gcr.io/google_containers/pause-amd64:3.0",
+					Name:  "pause",
+					Image: framework.GetPauseImageName(f.Client),
 					Resources: api.ResourceRequirements{
 						Requests: requests,
 						Limits:   limits,

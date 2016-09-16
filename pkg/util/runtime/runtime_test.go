@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,19 +22,15 @@ import (
 )
 
 func TestHandleCrash(t *testing.T) {
-	count := 0
-	expect := 10
-	for i := 0; i < expect; i = i + 1 {
-		defer HandleCrash()
-		if i%2 == 0 {
-			panic("Test Panic")
+	defer func() {
+		if x := recover(); x == nil {
+			t.Errorf("Expected a panic to recover from")
 		}
-		count = count + 1
-	}
-	if count != expect {
-		t.Errorf("Expected %d iterations, found %d", expect, count)
-	}
+	}()
+	defer HandleCrash()
+	panic("Test Panic")
 }
+
 func TestCustomHandleCrash(t *testing.T) {
 	old := PanicHandlers
 	defer func() { PanicHandlers = old }()
@@ -45,6 +41,11 @@ func TestCustomHandleCrash(t *testing.T) {
 		},
 	}
 	func() {
+		defer func() {
+			if x := recover(); x == nil {
+				t.Errorf("Expected a panic to recover from")
+			}
+		}()
 		defer HandleCrash()
 		panic("test")
 	}()
@@ -52,6 +53,7 @@ func TestCustomHandleCrash(t *testing.T) {
 		t.Errorf("did not receive custom handler")
 	}
 }
+
 func TestCustomHandleError(t *testing.T) {
 	old := ErrorHandlers
 	defer func() { ErrorHandlers = old }()

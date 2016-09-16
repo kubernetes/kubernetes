@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2014 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -220,7 +220,7 @@ function kube-run {
 
 #
 # run the command remotely and check if the specific kube artifact is running or not.
-# keep checking till the you hit the timeout. default timeout 300s
+# keep checking till the you hit the timeout. Default timeout 300s
 #
 # Usage:
 #   kube_check 10.0.0.1 cmd timeout
@@ -263,7 +263,7 @@ function kube-check {
 }
 
 #
-# verify if salt master is up. check 30 times and then echo out bad output and return 0
+# verify if salt master is up. Check 30 times and then echo out bad output and return 0
 #
 # Usage:
 #   remote-pgrep 10.0.0.1 salt-master

@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"time"
 
-	influxdb "github.com/influxdb/influxdb/client"
+	influxdb "github.com/influxdata/influxdb/client"
 	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
@@ -110,7 +110,11 @@ func verifyExpectedRcsExistAndGetExpectedPods(c *client.Client) ([]string, error
 		if err != nil {
 			return nil, err
 		}
-		if (len(rcList.Items) + len(deploymentList.Items)) != 1 {
+		psList, err := c.Apps().PetSets(api.NamespaceSystem).List(options)
+		if err != nil {
+			return nil, err
+		}
+		if (len(rcList.Items) + len(deploymentList.Items) + len(psList.Items)) != 1 {
 			return nil, fmt.Errorf("expected to find one replica for RC or deployment with label %s but got %d",
 				rcLabel, len(rcList.Items))
 		}
@@ -132,6 +136,21 @@ func verifyExpectedRcsExistAndGetExpectedPods(c *client.Client) ([]string, error
 		// Do the same for all deployments.
 		for _, rc := range deploymentList.Items {
 			selector := labels.Set(rc.Spec.Selector.MatchLabels).AsSelector()
+			options := api.ListOptions{LabelSelector: selector}
+			podList, err := c.Pods(api.NamespaceSystem).List(options)
+			if err != nil {
+				return nil, err
+			}
+			for _, pod := range podList.Items {
+				if pod.DeletionTimestamp != nil {
+					continue
+				}
+				expectedPods = append(expectedPods, string(pod.UID))
+			}
+		}
+		// And for pet sets.
+		for _, ps := range psList.Items {
+			selector := labels.Set(ps.Spec.Selector.MatchLabels).AsSelector()
 			options := api.ListOptions{LabelSelector: selector}
 			podList, err := c.Pods(api.NamespaceSystem).List(options)
 			if err != nil {
@@ -190,12 +209,12 @@ func getInfluxdbData(c *client.Client, query string, tag string) (map[string]boo
 	if len(response.Results[0].Series) != 1 {
 		return nil, fmt.Errorf("expected exactly one series for query %q.", query)
 	}
-	if len(response.Results[0].Series[0].Columns) != 1 {
-		framework.Failf("Expected one column for query %q. Found %v", query, response.Results[0].Series[0].Columns)
+	if len(response.Results[0].Series[0].Columns) != 2 {
+		framework.Failf("Expected two columns for query %q. Found %v", query, response.Results[0].Series[0].Columns)
 	}
 	result := map[string]bool{}
 	for _, value := range response.Results[0].Series[0].Values {
-		name := value[0].(string)
+		name := value[1].(string)
 		result[name] = true
 	}
 	return result, nil
@@ -269,6 +288,7 @@ func printDebugInfo(c *client.Client) {
 		return
 	}
 	for _, pod := range podList.Items {
-		framework.Logf("Kubectl output:\n%v", framework.RunKubectlOrDie("log", pod.Name, "--namespace=kube-system"))
+		framework.Logf("Kubectl output:\n%v",
+			framework.RunKubectlOrDie("log", pod.Name, "--namespace=kube-system", "--container=heapster"))
 	}
 }

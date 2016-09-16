@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -72,7 +72,7 @@ func (g *genFakeForGroup) GenerateType(c *generator.Context, t *types.Type, w io
 			"Group":             namer.IC(g.group),
 			"realClientPackage": filepath.Base(g.realClientPath),
 		}
-		namespaced := !(types.ExtractCommentTags("+", t.SecondClosestCommentLines)["nonNamespaced"] == "true")
+		namespaced := !extractBoolTagOrDie("nonNamespaced", t.SecondClosestCommentLines)
 		if namespaced {
 			sw.Do(getterImplNamespaced, wrapper)
 		} else {

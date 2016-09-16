@@ -78,12 +78,10 @@ type IndexInfo struct {
 type SearchResult struct {
 	// StarCount indicates the number of stars this repository has
 	StarCount int `json:"star_count"`
-	// IsOfficial indicates whether the result is an official repository or not
+	// IsOfficial is true if the result is from an official repository.
 	IsOfficial bool `json:"is_official"`
 	// Name is the name of the repository
 	Name string `json:"name"`
-	// IsTrusted indicates whether the result is trusted
-	IsTrusted bool `json:"is_trusted"`
 	// IsAutomated indicates whether the result is automated
 	IsAutomated bool `json:"is_automated"`
 	// Description is a textual description of the repository

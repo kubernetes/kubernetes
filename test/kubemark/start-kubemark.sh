@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 The Kubernetes Authors All rights reserved.
+# Copyright 2015 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,7 +16,9 @@
 
 # Script that creates a Kubemark cluster with Master running on GCE.
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
+# Hack to make it work for OS X. Ugh...
+TMP_ROOT="$(dirname "${BASH_SOURCE}")/../.."
+KUBE_ROOT=$(readlink -e ${TMP_ROOT} 2> /dev/null || perl -MCwd -e 'print Cwd::abs_path shift' ${TMP_ROOT})
 
 source "${KUBE_ROOT}/test/kubemark/common.sh"
 
@@ -36,27 +38,48 @@ sed -i'' -e "s/\"//g" "${RESOURCE_DIRECTORY}/scheduler_flags"
 ${CONTROLLER_MANAGER_TEST_ARGS}
 --allocate-node-cidrs="${ALLOCATE_NODE_CIDRS}"
 --cluster-cidr="${CLUSTER_IP_RANGE}"
+--service-cluster-ip-range="${SERVICE_CLUSTER_IP_RANGE}"
 --terminated-pod-gc-threshold="${TERMINATED_POD_GC_THRESHOLD}"
 EOF
 sed -i'' -e "s/\"//g" "${RESOURCE_DIRECTORY}/controllers_flags"
 }
 
-RUN_FROM_DISTRO=${RUN_FROM_DISTRO:-false}
 MAKE_DIR="${KUBE_ROOT}/cluster/images/kubemark"
 
-if [ "${RUN_FROM_DISTRO}" == "false" ]; then
-  # Running from repository
+echo "Copying kubemark to ${MAKE_DIR}"
+if [[ -f "${KUBE_ROOT}/_output/release-tars/kubernetes-server-linux-amd64.tar.gz" ]]; then
+  # Running from distro
+  SERVER_TARBALL="${KUBE_ROOT}/_output/release-tars/kubernetes-server-linux-amd64.tar.gz"
+  echo "Using server tarball: ${SERVER_TARBALL}"
   cp "${KUBE_ROOT}/_output/release-stage/server/linux-amd64/kubernetes/server/bin/kubemark" "${MAKE_DIR}"
+elif [[ -f "${KUBE_ROOT}/server/kubernetes-server-linux-amd64.tar.gz" ]]; then
+  # Running from an extracted release tarball (kubernetes.tar.gz)
+  SERVER_TARBALL="${KUBE_ROOT}/server/kubernetes-server-linux-amd64.tar.gz"
+  echo "Using server tarball: ${SERVER_TARBALL}"
+  tar \
+    --strip-components=3 \
+    -xzf "${SERVER_TARBALL}" \
+    -C "${MAKE_DIR}" 'kubernetes/server/bin/kubemark' || exit 1
 else
-  cp "${KUBE_ROOT}/server/kubernetes-server-linux-amd64.tar.gz" "."
-  tar -xzf kubernetes-server-linux-amd64.tar.gz
-  cp "kubernetes/server/bin/kubemark" "${MAKE_DIR}"
-  rm -rf "kubernetes-server-linux-amd64.tar.gz" "kubernetes"
+  echo 'Cannot find kubernetes/server/bin/kubemark binary'
+  exit 1
 fi
 
 CURR_DIR=`pwd`
 cd "${MAKE_DIR}"
-make
+RETRIES=3
+for attempt in $(seq 1 ${RETRIES}); do
+  if ! make; then
+    if [[ $((attempt)) -eq "${RETRIES}" ]]; then
+      echo "${color_red}Make failed. Exiting.${color_norm}"
+      exit 1
+    fi
+    echo -e "${color_yellow}Make attempt $(($attempt)) failed. Retrying.${color_norm}" >& 2
+    sleep $(($attempt * 5))
+  else
+    break
+  fi
+done
 rm kubemark
 cd $CURR_DIR
 
@@ -67,8 +90,16 @@ run-gcloud-compute-with-retries disks create "${MASTER_NAME}-pd" \
   --type "${MASTER_DISK_TYPE}" \
   --size "${MASTER_DISK_SIZE}"
 
+run-gcloud-compute-with-retries addresses create "${MASTER_NAME}-ip" \
+  --project "${PROJECT}" \
+  --region "${REGION}" -q
+
+MASTER_IP=$(gcloud compute addresses describe "${MASTER_NAME}-ip" \
+  --project "${PROJECT}" --region "${REGION}" -q --format='value(address)')
+
 run-gcloud-compute-with-retries instances create "${MASTER_NAME}" \
   ${GCLOUD_COMMON_ARGS} \
+  --address "${MASTER_IP}" \
   --machine-type "${MASTER_SIZE}" \
   --image-project="${MASTER_IMAGE_PROJECT}" \
   --image "${MASTER_IMAGE}" \
@@ -84,50 +115,15 @@ run-gcloud-compute-with-retries firewall-rules create "${INSTANCE_PREFIX}-kubema
   --target-tags "${MASTER_TAG}" \
   --allow "tcp:443"
 
-MASTER_IP=$(gcloud compute instances describe ${MASTER_NAME} \
-  --zone="${ZONE}" --project="${PROJECT}" | grep natIP: | cut -f2 -d":" | sed "s/ //g")
-
-if [ "${SEPARATE_EVENT_MACHINE:-false}" == "true" ]; then
-  EVENT_STORE_NAME="${INSTANCE_PREFIX}-event-store"
-    run-gcloud-compute-with-retries disks create "${EVENT_STORE_NAME}-pd" \
-      ${GCLOUD_COMMON_ARGS} \
-      --type "${MASTER_DISK_TYPE}" \
-      --size "${MASTER_DISK_SIZE}"
-
-    run-gcloud-compute-with-retries instances create "${EVENT_STORE_NAME}" \
-      ${GCLOUD_COMMON_ARGS} \
-      --machine-type "${MASTER_SIZE}" \
-      --image-project="${MASTER_IMAGE_PROJECT}" \
-      --image "${MASTER_IMAGE}" \
-      --tags "${EVENT_STORE_NAME}" \
-      --network "${NETWORK}" \
-      --scopes "storage-ro,compute-rw,logging-write" \
-      --disk "name=${EVENT_STORE_NAME}-pd,device-name=master-pd,mode=rw,boot=no,auto-delete=no"
-
-  EVENT_STORE_IP=$(gcloud compute instances describe ${EVENT_STORE_NAME} \
-  --zone="${ZONE}" --project="${PROJECT}" | grep networkIP: | cut -f2 -d":" | sed "s/ //g")
-
-  until gcloud compute ssh --zone="${ZONE}" --project="${PROJECT}" "${EVENT_STORE_NAME}" --command="ls" &> /dev/null; do
-    sleep 1
-  done
-
-  gcloud compute ssh "${EVENT_STORE_NAME}" --zone="${ZONE}" --project="${PROJECT}" \
-    --command="sudo docker run --net=host -d gcr.io/google_containers/etcd:2.0.12 /usr/local/bin/etcd \
-      --listen-peer-urls http://127.0.0.1:2380 \
-      --addr=127.0.0.1:4002 \
-      --bind-addr=0.0.0.0:4002 \
-      --data-dir=/var/etcd/data"
-fi
-
 ensure-temp-dir
 gen-kube-bearertoken
 create-certs ${MASTER_IP}
 KUBELET_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
 KUBE_PROXY_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
 
-echo "${CA_CERT_BASE64}" | base64 -d > "${RESOURCE_DIRECTORY}/ca.crt"
-echo "${KUBECFG_CERT_BASE64}" | base64 -d > "${RESOURCE_DIRECTORY}/kubecfg.crt"
-echo "${KUBECFG_KEY_BASE64}" | base64 -d > "${RESOURCE_DIRECTORY}/kubecfg.key"
+echo "${CA_CERT_BASE64}" | base64 --decode > "${RESOURCE_DIRECTORY}/ca.crt"
+echo "${KUBECFG_CERT_BASE64}" | base64 --decode > "${RESOURCE_DIRECTORY}/kubecfg.crt"
+echo "${KUBECFG_KEY_BASE64}" | base64 --decode > "${RESOURCE_DIRECTORY}/kubecfg.key"
 
 until gcloud compute ssh --zone="${ZONE}" --project="${PROJECT}" "${MASTER_NAME}" --command="ls" &> /dev/null; do
   sleep 1
@@ -137,11 +133,11 @@ password=$(python -c 'import string,random; print("".join(random.SystemRandom().
 
 gcloud compute ssh --zone="${ZONE}" --project="${PROJECT}" "${MASTER_NAME}" \
   --command="sudo mkdir /srv/kubernetes -p && \
-    sudo bash -c \"echo ${MASTER_CERT_BASE64} | base64 -d > /srv/kubernetes/server.cert\" && \
-    sudo bash -c \"echo ${MASTER_KEY_BASE64} | base64 -d > /srv/kubernetes/server.key\" && \
-    sudo bash -c \"echo ${CA_CERT_BASE64} | base64 -d > /srv/kubernetes/ca.crt\" && \
-    sudo bash -c \"echo ${KUBECFG_CERT_BASE64} | base64 -d > /srv/kubernetes/kubecfg.crt\" && \
-    sudo bash -c \"echo ${KUBECFG_KEY_BASE64} | base64 -d > /srv/kubernetes/kubecfg.key\" && \
+    sudo bash -c \"echo ${MASTER_CERT_BASE64} | base64 --decode > /srv/kubernetes/server.cert\" && \
+    sudo bash -c \"echo ${MASTER_KEY_BASE64} | base64 --decode > /srv/kubernetes/server.key\" && \
+    sudo bash -c \"echo ${CA_CERT_BASE64} | base64 --decode > /srv/kubernetes/ca.crt\" && \
+    sudo bash -c \"echo ${KUBECFG_CERT_BASE64} | base64 --decode > /srv/kubernetes/kubecfg.crt\" && \
+    sudo bash -c \"echo ${KUBECFG_KEY_BASE64} | base64 --decode > /srv/kubernetes/kubecfg.key\" && \
     sudo bash -c \"echo \"${KUBE_BEARER_TOKEN},admin,admin\" > /srv/kubernetes/known_tokens.csv\" && \
     sudo bash -c \"echo \"${KUBELET_TOKEN},kubelet,kubelet\" >> /srv/kubernetes/known_tokens.csv\" && \
     sudo bash -c \"echo \"${KUBE_PROXY_TOKEN},kube_proxy,kube_proxy\" >> /srv/kubernetes/known_tokens.csv\" && \
@@ -149,28 +145,17 @@ gcloud compute ssh --zone="${ZONE}" --project="${PROJECT}" "${MASTER_NAME}" \
 
 writeEnvironmentFiles
 
-if [ "${RUN_FROM_DISTRO}" == "false" ]; then
-  gcloud compute copy-files --zone="${ZONE}" --project="${PROJECT}" \
-    "${KUBE_ROOT}/_output/release-tars/kubernetes-server-linux-amd64.tar.gz" \
-    "${KUBEMARK_DIRECTORY}/start-kubemark-master.sh" \
-    "${KUBEMARK_DIRECTORY}/configure-kubectl.sh" \
-    "${RESOURCE_DIRECTORY}/apiserver_flags" \
-    "${RESOURCE_DIRECTORY}/scheduler_flags" \
-    "${RESOURCE_DIRECTORY}/controllers_flags" \
-    "${MASTER_NAME}":~
-else
-  gcloud compute copy-files --zone="${ZONE}" --project="${PROJECT}" \
-    "${KUBE_ROOT}/server/kubernetes-server-linux-amd64.tar.gz" \
-    "${KUBEMARK_DIRECTORY}/start-kubemark-master.sh" \
-    "${KUBEMARK_DIRECTORY}/configure-kubectl.sh" \
-    "${RESOURCE_DIRECTORY}/apiserver_flags" \
-    "${RESOURCE_DIRECTORY}/scheduler_flags" \
-    "${RESOURCE_DIRECTORY}/controllers_flags" \
-    "${MASTER_NAME}":~
-fi
+gcloud compute copy-files --zone="${ZONE}" --project="${PROJECT}" \
+  "${SERVER_TARBALL}" \
+  "${KUBEMARK_DIRECTORY}/start-kubemark-master.sh" \
+  "${KUBEMARK_DIRECTORY}/configure-kubectl.sh" \
+  "${RESOURCE_DIRECTORY}/apiserver_flags" \
+  "${RESOURCE_DIRECTORY}/scheduler_flags" \
+  "${RESOURCE_DIRECTORY}/controllers_flags" \
+  "${MASTER_NAME}":~
 
 gcloud compute ssh "${MASTER_NAME}" --zone="${ZONE}" --project="${PROJECT}" \
-  --command="chmod a+x configure-kubectl.sh && chmod a+x start-kubemark-master.sh && sudo ./start-kubemark-master.sh ${EVENT_STORE_IP:-127.0.0.1}"
+  --command="chmod a+x configure-kubectl.sh && chmod a+x start-kubemark-master.sh && sudo ./start-kubemark-master.sh ${EVENT_STORE_IP:-127.0.0.1} ${NUM_NODES:-0}"
 
 # create kubeconfig for Kubelet:
 KUBECONFIG_CONTENTS=$(echo "apiVersion: v1
@@ -221,7 +206,7 @@ cat > "${NODE_CONFIGMAP}" << EOF
 }
 EOF
 
-LOCAL_KUBECONFIG="${RESOURCE_DIRECTORY}/kubeconfig.loc"
+LOCAL_KUBECONFIG="${RESOURCE_DIRECTORY}/kubeconfig.kubemark"
 cat > "${LOCAL_KUBECONFIG}" << EOF
 apiVersion: v1
 kind: Config
@@ -244,7 +229,6 @@ contexts:
   name: kubemark-context
 current-context: kubemark-context
 EOF
-
 
 sed "s/##numreplicas##/${NUM_NODES:-10}/g" "${RESOURCE_DIRECTORY}/hollow-node_template.json" > "${RESOURCE_DIRECTORY}/hollow-node.json"
 sed -i'' -e "s/##project##/${PROJECT}/g" "${RESOURCE_DIRECTORY}/hollow-node.json"
@@ -270,7 +254,7 @@ rm "${NODE_CONFIGMAP}"
 
 echo "Waiting for all HollowNodes to become Running..."
 start=$(date +%s)
-nodes=$("${KUBECTL}" --kubeconfig="${RESOURCE_DIRECTORY}/kubeconfig.loc" get node) || true
+nodes=$("${KUBECTL}" --kubeconfig="${LOCAL_KUBECONFIG}" get node) || true
 ready=$(($(echo "${nodes}" | grep -v "NotReady" | wc -l) - 1))
 
 until [[ "${ready}" -ge "${NUM_NODES}" ]]; do
@@ -282,16 +266,17 @@ until [[ "${ready}" -ge "${NUM_NODES}" ]]; do
     echo ""
     echo "Timeout waiting for all HollowNodes to become Running"
     # Try listing nodes again - if it fails it means that API server is not responding
-    if "${KUBECTL}" --kubeconfig="${RESOURCE_DIRECTORY}/kubeconfig.loc" get node &> /dev/null; then
+    if "${KUBECTL}" --kubeconfig="${LOCAL_KUBECONFIG}" get node &> /dev/null; then
       echo "Found only ${ready} ready Nodes while waiting for ${NUM_NODES}."
       exit 1
     fi
     echo "Got error while trying to list Nodes. Probably API server is down."
     exit 1
   fi
-  nodes=$("${KUBECTL}" --kubeconfig="${RESOURCE_DIRECTORY}/kubeconfig.loc" get node) || true
+  nodes=$("${KUBECTL}" --kubeconfig="${LOCAL_KUBECONFIG}" get node) || true
   ready=$(($(echo "${nodes}" | grep -v "NotReady" | wc -l) - 1))
 done
 echo ""
 
 echo "Password to kubemark master: ${password}"
+echo "Kubeconfig for kubemark master is written in ${LOCAL_KUBECONFIG}"

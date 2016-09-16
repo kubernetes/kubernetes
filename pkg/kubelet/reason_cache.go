@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -36,7 +36,7 @@ import (
 // TODO(random-liu): Use more reliable cache which could collect garbage of failed pod.
 // TODO(random-liu): Move reason cache to somewhere better.
 type ReasonCache struct {
-	lock  sync.RWMutex
+	lock  sync.Mutex
 	cache *lru.Cache
 }
 
@@ -93,8 +93,8 @@ func (c *ReasonCache) Remove(uid types.UID, name string) {
 // whether an error reason is found in the cache. If no error reason is found, empty string will
 // be returned for error reason and error message.
 func (c *ReasonCache) Get(uid types.UID, name string) (error, string, bool) {
-	c.lock.RLock()
-	defer c.lock.RUnlock()
+	c.lock.Lock()
+	defer c.lock.Unlock()
 	value, ok := c.cache.Get(c.composeKey(uid, name))
 	if !ok {
 		return nil, "", ok

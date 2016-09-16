@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,7 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/clock"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/watch"
@@ -45,7 +45,7 @@ func makeTestPod(name string, resourceVersion uint64) *api.Pod {
 // newTestWatchCache just adds a fake clock.
 func newTestWatchCache(capacity int) *watchCache {
 	wc := newWatchCache(capacity)
-	wc.clock = util.NewFakeClock(time.Now())
+	wc.clock = clock.NewFakeClock(time.Now())
 	return wc
 }
 
@@ -262,7 +262,7 @@ func TestWaitUntilFreshAndList(t *testing.T) {
 
 func TestWaitUntilFreshAndListTimeout(t *testing.T) {
 	store := newTestWatchCache(3)
-	fc := store.clock.(*util.FakeClock)
+	fc := store.clock.(*clock.FakeClock)
 
 	// In background, step clock after the below call starts the timer.
 	go func() {

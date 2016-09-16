@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,13 +22,13 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/clock"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 func TestSimpleQueue(t *testing.T) {
-	fakeClock := util.NewFakeClock(time.Now())
-	q := newDelayingQueue(fakeClock)
+	fakeClock := clock.NewFakeClock(time.Now())
+	q := newDelayingQueue(fakeClock, "")
 
 	first := "foo"
 
@@ -68,9 +68,68 @@ func TestSimpleQueue(t *testing.T) {
 	}
 }
 
+func TestDeduping(t *testing.T) {
+	fakeClock := clock.NewFakeClock(time.Now())
+	q := newDelayingQueue(fakeClock, "")
+
+	first := "foo"
+
+	q.AddAfter(first, 50*time.Millisecond)
+	if err := waitForWaitingQueueToFill(q); err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	q.AddAfter(first, 70*time.Millisecond)
+	if err := waitForWaitingQueueToFill(q); err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if q.Len() != 0 {
+		t.Errorf("should not have added")
+	}
+
+	// step past the first block, we should receive now
+	fakeClock.Step(60 * time.Millisecond)
+	if err := waitForAdded(q, 1); err != nil {
+		t.Errorf("should have added")
+	}
+	item, _ := q.Get()
+	q.Done(item)
+
+	// step past the second add
+	fakeClock.Step(20 * time.Millisecond)
+	if q.Len() != 0 {
+		t.Errorf("should not have added")
+	}
+
+	// test again, but this time the earlier should override
+	q.AddAfter(first, 50*time.Millisecond)
+	q.AddAfter(first, 30*time.Millisecond)
+	if err := waitForWaitingQueueToFill(q); err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if q.Len() != 0 {
+		t.Errorf("should not have added")
+	}
+
+	fakeClock.Step(40 * time.Millisecond)
+	if err := waitForAdded(q, 1); err != nil {
+		t.Errorf("should have added")
+	}
+	item, _ = q.Get()
+	q.Done(item)
+
+	// step past the second add
+	fakeClock.Step(20 * time.Millisecond)
+	if q.Len() != 0 {
+		t.Errorf("should not have added")
+	}
+	if q.Len() != 0 {
+		t.Errorf("should not have added")
+	}
+}
+
 func TestAddTwoFireEarly(t *testing.T) {
-	fakeClock := util.NewFakeClock(time.Now())
-	q := newDelayingQueue(fakeClock)
+	fakeClock := clock.NewFakeClock(time.Now())
+	q := newDelayingQueue(fakeClock, "")
 
 	first := "foo"
 	second := "bar"
@@ -119,8 +178,8 @@ func TestAddTwoFireEarly(t *testing.T) {
 }
 
 func TestCopyShifting(t *testing.T) {
-	fakeClock := util.NewFakeClock(time.Now())
-	q := newDelayingQueue(fakeClock)
+	fakeClock := clock.NewFakeClock(time.Now())
+	q := newDelayingQueue(fakeClock, "")
 
 	first := "foo"
 	second := "bar"

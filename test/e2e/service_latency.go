@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,7 +24,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/cache"
-	controllerframework "k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -118,7 +117,7 @@ var _ = framework.KubeDescribe("Service endpoints latency", func() {
 func runServiceLatencies(f *framework.Framework, inParallel, total int) (output []time.Duration, err error) {
 	cfg := framework.RCConfig{
 		Client:       f.Client,
-		Image:        "gcr.io/google_containers/pause-amd64:3.0",
+		Image:        framework.GetPauseImageName(f.Client),
 		Name:         "svc-latency-rc",
 		Namespace:    f.Namespace.Name,
 		Replicas:     1,
@@ -127,7 +126,7 @@ func runServiceLatencies(f *framework.Framework, inParallel, total int) (output 
 	if err := framework.RunRC(cfg); err != nil {
 		return nil, err
 	}
-	defer framework.DeleteRC(f.Client, f.Namespace.Name, cfg.Name)
+	defer framework.DeleteRCAndPods(f.Client, f.Namespace.Name, cfg.Name)
 
 	// Run a single watcher, to reduce the number of API calls we have to
 	// make; this is to minimize the timing error. It's how kube-proxy
@@ -275,7 +274,7 @@ func (eq *endpointQueries) added(e *api.Endpoints) {
 
 // blocks until it has finished syncing.
 func startEndpointWatcher(f *framework.Framework, q *endpointQueries) {
-	_, controller := controllerframework.NewInformer(
+	_, controller := cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				return f.Client.Endpoints(f.Namespace.Name).List(options)
@@ -286,7 +285,7 @@ func startEndpointWatcher(f *framework.Framework, q *endpointQueries) {
 		},
 		&api.Endpoints{},
 		0,
-		controllerframework.ResourceEventHandlerFuncs{
+		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				if e, ok := obj.(*api.Endpoints); ok {
 					if len(e.Subsets) > 0 && len(e.Subsets[0].Addresses) > 0 {

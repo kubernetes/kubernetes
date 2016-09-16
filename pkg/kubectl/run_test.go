@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -35,10 +35,11 @@ func TestGenerate(t *testing.T) {
 	}{
 		{
 			params: map[string]interface{}{
-				"name":     "foo",
-				"image":    "someimage",
-				"replicas": "1",
-				"port":     "-1",
+				"name":              "foo",
+				"image":             "someimage",
+				"image-pull-policy": "Always",
+				"replicas":          "1",
+				"port":              "-1",
 			},
 			expected: &api.ReplicationController{
 				ObjectMeta: api.ObjectMeta{
@@ -55,8 +56,9 @@ func TestGenerate(t *testing.T) {
 						Spec: api.PodSpec{
 							Containers: []api.Container{
 								{
-									Name:  "foo",
-									Image: "someimage",
+									Name:            "foo",
+									Image:           "someimage",
+									ImagePullPolicy: api.PullAlways,
 								},
 							},
 						},
@@ -110,11 +112,12 @@ func TestGenerate(t *testing.T) {
 
 		{
 			params: map[string]interface{}{
-				"name":     "foo",
-				"image":    "someimage",
-				"replicas": "1",
-				"port":     "-1",
-				"args":     []string{"bar", "baz", "blah"},
+				"name":              "foo",
+				"image":             "someimage",
+				"image-pull-policy": "Never",
+				"replicas":          "1",
+				"port":              "-1",
+				"args":              []string{"bar", "baz", "blah"},
 			},
 			expected: &api.ReplicationController{
 				ObjectMeta: api.ObjectMeta{
@@ -131,9 +134,10 @@ func TestGenerate(t *testing.T) {
 						Spec: api.PodSpec{
 							Containers: []api.Container{
 								{
-									Name:  "foo",
-									Image: "someimage",
-									Args:  []string{"bar", "baz", "blah"},
+									Name:            "foo",
+									Image:           "someimage",
+									ImagePullPolicy: api.PullNever,
+									Args:            []string{"bar", "baz", "blah"},
 								},
 							},
 						},
@@ -213,11 +217,12 @@ func TestGenerate(t *testing.T) {
 		},
 		{
 			params: map[string]interface{}{
-				"name":     "foo",
-				"image":    "someimage",
-				"replicas": "1",
-				"port":     "80",
-				"hostport": "80",
+				"name":              "foo",
+				"image":             "someimage",
+				"image-pull-policy": "IfNotPresent",
+				"replicas":          "1",
+				"port":              "80",
+				"hostport":          "80",
 			},
 			expected: &api.ReplicationController{
 				ObjectMeta: api.ObjectMeta{
@@ -234,8 +239,9 @@ func TestGenerate(t *testing.T) {
 						Spec: api.PodSpec{
 							Containers: []api.Container{
 								{
-									Name:  "foo",
-									Image: "someimage",
+									Name:            "foo",
+									Image:           "someimage",
+									ImagePullPolicy: api.PullIfNotPresent,
 									Ports: []api.ContainerPort{
 										{
 											ContainerPort: 80,
@@ -378,10 +384,12 @@ func TestGenerate(t *testing.T) {
 		},
 	}
 	generator := BasicReplicationController{}
-	for _, test := range tests {
+	for i, test := range tests {
 		obj, err := generator.Generate(test.params)
+		t.Logf("%d: %#v", i, obj)
 		if !test.expectErr && err != nil {
 			t.Errorf("unexpected error: %v", err)
+			continue
 		}
 		if test.expectErr && err != nil {
 			continue
@@ -433,9 +441,10 @@ func TestGeneratePod(t *testing.T) {
 		},
 		{
 			params: map[string]interface{}{
-				"name":  "foo",
-				"image": "someimage",
-				"env":   []string{"a=b", "c=d"},
+				"name":              "foo",
+				"image":             "someimage",
+				"image-pull-policy": "Always",
+				"env":               []string{"a=b", "c=d"},
 			},
 			expected: &api.Pod{
 				ObjectMeta: api.ObjectMeta{
@@ -446,7 +455,7 @@ func TestGeneratePod(t *testing.T) {
 						{
 							Name:            "foo",
 							Image:           "someimage",
-							ImagePullPolicy: api.PullIfNotPresent,
+							ImagePullPolicy: api.PullAlways,
 							Env: []api.EnvVar{
 								{
 									Name:  "a",
@@ -637,18 +646,19 @@ func TestGenerateDeployment(t *testing.T) {
 	}{
 		{
 			params: map[string]interface{}{
-				"labels":   "foo=bar,baz=blah",
-				"name":     "foo",
-				"replicas": "3",
-				"image":    "someimage",
-				"port":     "80",
-				"hostport": "80",
-				"stdin":    "true",
-				"command":  "true",
-				"args":     []string{"bar", "baz", "blah"},
-				"env":      []string{"a=b", "c=d"},
-				"requests": "cpu=100m,memory=100Mi",
-				"limits":   "cpu=400m,memory=200Mi",
+				"labels":            "foo=bar,baz=blah",
+				"name":              "foo",
+				"replicas":          "3",
+				"image":             "someimage",
+				"image-pull-policy": "Always",
+				"port":              "80",
+				"hostport":          "80",
+				"stdin":             "true",
+				"command":           "true",
+				"args":              []string{"bar", "baz", "blah"},
+				"env":               []string{"a=b", "c=d"},
+				"requests":          "cpu=100m,memory=100Mi",
+				"limits":            "cpu=400m,memory=200Mi",
 			},
 			expected: &extensions.Deployment{
 				ObjectMeta: api.ObjectMeta{
@@ -665,9 +675,10 @@ func TestGenerateDeployment(t *testing.T) {
 						Spec: api.PodSpec{
 							Containers: []api.Container{
 								{
-									Name:  "foo",
-									Image: "someimage",
-									Stdin: true,
+									Name:            "foo",
+									Image:           "someimage",
+									ImagePullPolicy: api.PullAlways,
+									Stdin:           true,
 									Ports: []api.ContainerPort{
 										{
 											ContainerPort: 80,
@@ -856,8 +867,13 @@ func TestParseEnv(t *testing.T) {
 			envArray: []string{
 				"WITH_OUT_VALUES=",
 			},
-			expected:  []api.EnvVar{},
-			expectErr: true,
+			expected: []api.EnvVar{
+				{
+					Name:  "WITH_OUT_VALUES",
+					Value: "",
+				},
+			},
+			expectErr: false,
 			test:      "test case 3",
 		},
 		{

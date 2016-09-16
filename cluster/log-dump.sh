@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2016 The Kubernetes Authors All rights reserved.
+# Copyright 2016 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -46,7 +46,7 @@ function copy-logs-from-node() {
 
     if [[ "${KUBERNETES_PROVIDER}" == "aws" ]]; then
         local ip=$(get_ssh_hostname "${node}")
-        scp -i "${AWS_SSH_KEY}" "${SSH_USER}@${ip}:${scp_files}" "${dir}" > /dev/null || true
+        scp -oLogLevel=quiet -oConnectTimeout=30 -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" "${SSH_USER}@${ip}:${scp_files}" "${dir}" > /dev/null || true
     else
         gcloud compute copy-files --project "${PROJECT}" --zone "${ZONE}" "${node}:${scp_files}" "${dir}" > /dev/null || true
     fi
@@ -58,18 +58,20 @@ function copy-logs-from-node() {
 function save-logs() {
     local -r node_name="${1}"
     local -r dir="${2}"
-    local files="${3} ${common_logfiles}"
-    if [[ "${KUBERNETES_PROVIDER}" == "gce" ]]; then
+    local files="${3}"
+    if [[ "${KUBERNETES_PROVIDER}" == "gce" || "${KUBERNETES_PROVIDER}" == "gke" ]]; then
         files="${files} ${gce_logfiles}"
     fi
     if [[ "${KUBERNETES_PROVIDER}" == "aws" ]]; then
         files="${files} ${aws_logfiles}"
     fi
+
     if ssh-to-node "${node_name}" "sudo systemctl status kubelet.service" &> /dev/null; then
         ssh-to-node "${node_name}" "sudo journalctl --output=cat -u kubelet.service" > "${dir}/kubelet.log" || true
         ssh-to-node "${node_name}" "sudo journalctl --output=cat -u docker.service" > "${dir}/docker.log" || true
+        ssh-to-node "${node_name}" "sudo journalctl --output=cat -k" > "${dir}/kern.log" || true
     else
-        files="${files} ${initd_logfiles} ${supervisord_logfiles}"
+        files="${kern_logfile} ${files} ${initd_logfiles} ${supervisord_logfiles}"
     fi
     copy-logs-from-node "${node_name}" "${dir}" "${files}"
 }
@@ -77,11 +79,11 @@ function save-logs() {
 readonly master_ssh_supported_providers="gce aws kubemark"
 readonly node_ssh_supported_providers="gce gke aws"
 
-readonly master_logfiles="kube-apiserver kube-scheduler kube-controller-manager etcd"
+readonly master_logfiles="kube-apiserver kube-scheduler kube-controller-manager etcd glbc cluster-autoscaler"
 readonly node_logfiles="kube-proxy"
 readonly aws_logfiles="cloud-init-output"
 readonly gce_logfiles="startupscript"
-readonly common_logfiles="kern"
+readonly kern_logfile="kern"
 readonly initd_logfiles="docker"
 readonly supervisord_logfiles="kubelet supervisor/supervisord supervisor/kubelet-stdout supervisor/kubelet-stderr supervisor/docker-stdout supervisor/docker-stderr"
 

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -44,13 +44,13 @@ func (resourcequotaStrategy) NamespaceScoped() bool {
 }
 
 // PrepareForCreate clears fields that are not allowed to be set by end users on creation.
-func (resourcequotaStrategy) PrepareForCreate(obj runtime.Object) {
+func (resourcequotaStrategy) PrepareForCreate(ctx api.Context, obj runtime.Object) {
 	resourcequota := obj.(*api.ResourceQuota)
 	resourcequota.Status = api.ResourceQuotaStatus{}
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
-func (resourcequotaStrategy) PrepareForUpdate(obj, old runtime.Object) {
+func (resourcequotaStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
 	newResourcequota := obj.(*api.ResourceQuota)
 	oldResourcequota := old.(*api.ResourceQuota)
 	newResourcequota.Status = oldResourcequota.Status
@@ -87,7 +87,7 @@ type resourcequotaStatusStrategy struct {
 
 var StatusStrategy = resourcequotaStatusStrategy{Strategy}
 
-func (resourcequotaStatusStrategy) PrepareForUpdate(obj, old runtime.Object) {
+func (resourcequotaStatusStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
 	newResourcequota := obj.(*api.ResourceQuota)
 	oldResourcequota := old.(*api.ResourceQuota)
 	newResourcequota.Spec = oldResourcequota.Spec
@@ -98,18 +98,21 @@ func (resourcequotaStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runt
 }
 
 // MatchResourceQuota returns a generic matcher for a given label and field selector.
-func MatchResourceQuota(label labels.Selector, field fields.Selector) generic.Matcher {
-	return generic.MatcherFunc(func(obj runtime.Object) (bool, error) {
-		resourcequotaObj, ok := obj.(*api.ResourceQuota)
-		if !ok {
-			return false, fmt.Errorf("not a resourcequota")
-		}
-		fields := ResourceQuotaToSelectableFields(resourcequotaObj)
-		return label.Matches(labels.Set(resourcequotaObj.Labels)) && field.Matches(fields), nil
-	})
+func MatchResourceQuota(label labels.Selector, field fields.Selector) *generic.SelectionPredicate {
+	return &generic.SelectionPredicate{
+		Label: label,
+		Field: field,
+		GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
+			resourcequotaObj, ok := obj.(*api.ResourceQuota)
+			if !ok {
+				return nil, nil, fmt.Errorf("not a resourcequota")
+			}
+			return labels.Set(resourcequotaObj.Labels), ResourceQuotaToSelectableFields(resourcequotaObj), nil
+		},
+	}
 }
 
-// ResourceQuotaToSelectableFields returns a label set that represents the object
-func ResourceQuotaToSelectableFields(resourcequota *api.ResourceQuota) labels.Set {
-	return labels.Set(generic.ObjectMetaFieldsSet(resourcequota.ObjectMeta, true))
+// ResourceQuotaToSelectableFields returns a field set that represents the object
+func ResourceQuotaToSelectableFields(resourcequota *api.ResourceQuota) fields.Set {
+	return generic.ObjectMetaFieldsSet(&resourcequota.ObjectMeta, true)
 }

@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -40,13 +40,23 @@ var (
 	ethtoolOutputRegex = regexp.MustCompile("peer_ifindex: (\\d+)")
 )
 
-func SetUpContainer(containerPid int, containerInterfaceName string) error {
-	e := exec.New()
-	return setUpContainerInternal(e, containerPid, containerInterfaceName)
+func SetUpContainerPid(containerPid int, containerInterfaceName string) error {
+	pidStr := fmt.Sprintf("%d", containerPid)
+	nsenterArgs := []string{"-t", pidStr, "-n"}
+	return setUpContainerInternal(containerInterfaceName, pidStr, nsenterArgs)
 }
 
-func setUpContainerInternal(e exec.Interface, containerPid int, containerInterfaceName string) error {
-	hostIfName, err := findPairInterfaceOfContainerInterface(e, containerPid, containerInterfaceName)
+func SetUpContainerPath(netnsPath string, containerInterfaceName string) error {
+	if netnsPath[0] != '/' {
+		return fmt.Errorf("netnsPath path '%s' was invalid", netnsPath)
+	}
+	nsenterArgs := []string{"-n", netnsPath}
+	return setUpContainerInternal(containerInterfaceName, netnsPath, nsenterArgs)
+}
+
+func setUpContainerInternal(containerInterfaceName, containerDesc string, nsenterArgs []string) error {
+	e := exec.New()
+	hostIfName, err := findPairInterfaceOfContainerInterface(e, containerInterfaceName, containerDesc, nsenterArgs)
 	if err != nil {
 		glog.Infof("Unable to find pair interface, setting up all interfaces: %v", err)
 		return setUpAllInterfaces()
@@ -54,7 +64,7 @@ func setUpContainerInternal(e exec.Interface, containerPid int, containerInterfa
 	return setUpInterface(hostIfName)
 }
 
-func findPairInterfaceOfContainerInterface(e exec.Interface, containerPid int, containerInterfaceName string) (string, error) {
+func findPairInterfaceOfContainerInterface(e exec.Interface, containerInterfaceName, containerDesc string, nsenterArgs []string) (string, error) {
 	nsenterPath, err := e.LookPath("nsenter")
 	if err != nil {
 		return "", err
@@ -63,15 +73,16 @@ func findPairInterfaceOfContainerInterface(e exec.Interface, containerPid int, c
 	if err != nil {
 		return "", err
 	}
-	// Get container's interface index
-	output, err := e.Command(nsenterPath, "-t", fmt.Sprintf("%d", containerPid), "-n", "-F", "--", ethtoolPath, "--statistics", containerInterfaceName).CombinedOutput()
+
+	nsenterArgs = append(nsenterArgs, "-F", "--", ethtoolPath, "--statistics", containerInterfaceName)
+	output, err := e.Command(nsenterPath, nsenterArgs...).CombinedOutput()
 	if err != nil {
-		return "", fmt.Errorf("Unable to query interface %s of container %d: %v: %s", containerInterfaceName, containerPid, err, string(output))
+		return "", fmt.Errorf("Unable to query interface %s of container %s: %v: %s", containerInterfaceName, containerDesc, err, string(output))
 	}
 	// look for peer_ifindex
 	match := ethtoolOutputRegex.FindSubmatch(output)
 	if match == nil {
-		return "", fmt.Errorf("No peer_ifindex in interface statistics for %s of container %d", containerInterfaceName, containerPid)
+		return "", fmt.Errorf("No peer_ifindex in interface statistics for %s of container %s", containerInterfaceName, containerDesc)
 	}
 	peerIfIndex, err := strconv.Atoi(string(match[1]))
 	if err != nil { // seems impossible (\d+ not numeric)

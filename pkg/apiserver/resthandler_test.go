@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -28,9 +28,12 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/util/strategicpatch"
 )
@@ -64,20 +67,32 @@ func TestPatchAnonymousField(t *testing.T) {
 }
 
 type testPatcher struct {
-	// startingPod is used for the first Get
+	t *testing.T
+
+	// startingPod is used for the first Update
 	startingPod *api.Pod
 
-	// updatePod is the pod that is used for conflict comparison and returned for the SECOND Get
+	// updatePod is the pod that is used for conflict comparison and used for subsequent Update calls
 	updatePod *api.Pod
 
-	numGets int
+	numUpdates int
 }
 
 func (p *testPatcher) New() runtime.Object {
 	return &api.Pod{}
 }
 
-func (p *testPatcher) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error) {
+func (p *testPatcher) Update(ctx api.Context, name string, objInfo rest.UpdatedObjectInfo) (runtime.Object, bool, error) {
+	currentPod := p.startingPod
+	if p.numUpdates > 0 {
+		currentPod = p.updatePod
+	}
+	p.numUpdates++
+
+	obj, err := objInfo.UpdatedObject(ctx, currentPod)
+	if err != nil {
+		return nil, false, err
+	}
 	inPod := obj.(*api.Pod)
 	if inPod.ResourceVersion != p.updatePod.ResourceVersion {
 		return nil, false, apierrors.NewConflict(api.Resource("pods"), inPod.Name, fmt.Errorf("existing %v, new %v", p.updatePod.ResourceVersion, inPod.ResourceVersion))
@@ -87,12 +102,8 @@ func (p *testPatcher) Update(ctx api.Context, obj runtime.Object) (runtime.Objec
 }
 
 func (p *testPatcher) Get(ctx api.Context, name string) (runtime.Object, error) {
-	if p.numGets > 0 {
-		return p.updatePod, nil
-	}
-	p.numGets++
-
-	return p.startingPod, nil
+	p.t.Fatal("Unexpected call to testPatcher.Get")
+	return nil, errors.New("Unexpected call to testPatcher.Get")
 }
 
 type testNamer struct {
@@ -138,12 +149,12 @@ type patchTestCase struct {
 	// admission chain to use, nil is fine
 	admit updateAdmissionFunc
 
-	// startingPod is used for the first Get
+	// startingPod is used as the starting point for the first Update
 	startingPod *api.Pod
 	// changedPod is the "destination" pod for the patch.  The test will create a patch from the startingPod to the changedPod
 	// to use when calling the patch operation
 	changedPod *api.Pod
-	// updatePod is the pod that is used for conflict comparison and returned for the SECOND Get
+	// updatePod is the pod that is used for conflict comparison and as the starting point for the second Update
 	updatePod *api.Pod
 
 	// expectedPod is the pod that you expect to get back after the patch is complete
@@ -160,12 +171,13 @@ func (tc *patchTestCase) Run(t *testing.T) {
 	codec := testapi.Default.Codec()
 	admit := tc.admit
 	if admit == nil {
-		admit = func(updatedObject runtime.Object) error {
+		admit = func(updatedObject runtime.Object, currentObject runtime.Object) error {
 			return nil
 		}
 	}
 
 	testPatcher := &testPatcher{}
+	testPatcher.t = t
 	testPatcher.startingPod = tc.startingPod
 	testPatcher.updatePod = tc.updatePod
 
@@ -173,12 +185,9 @@ func (tc *patchTestCase) Run(t *testing.T) {
 	ctx = api.WithNamespace(ctx, namespace)
 
 	namer := &testNamer{namespace, name}
-
-	versionedObj, err := api.Scheme.ConvertToVersion(&api.Pod{}, unversioned.GroupVersion{Version: "v1"})
-	if err != nil {
-		t.Errorf("%s: unexpected error: %v", tc.name, err)
-		return
-	}
+	copier := runtime.ObjectCopier(api.Scheme)
+	resource := unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
+	versionedObj := &v1.Pod{}
 
 	for _, patchType := range []api.PatchType{api.JSONPatchType, api.MergePatchType, api.StrategicMergePatchType} {
 		// TODO SUPPORT THIS!
@@ -219,7 +228,7 @@ func (tc *patchTestCase) Run(t *testing.T) {
 
 		}
 
-		resultObj, err := patchResource(ctx, admit, 1*time.Second, versionedObj, testPatcher, name, patchType, patch, namer, codec)
+		resultObj, err := patchResource(ctx, admit, 1*time.Second, versionedObj, testPatcher, name, patchType, patch, namer, copier, resource, codec)
 		if len(tc.expectedError) != 0 {
 			if err == nil || err.Error() != tc.expectedError {
 				t.Errorf("%s: expected error %v, but got %v", tc.name, tc.expectedError, err)
@@ -265,6 +274,7 @@ func (tc *patchTestCase) Run(t *testing.T) {
 func TestPatchResourceWithVersionConflict(t *testing.T) {
 	namespace := "bar"
 	name := "foo"
+	uid := types.UID("uid")
 	fifteen := int64(15)
 	thirty := int64(30)
 
@@ -280,18 +290,21 @@ func TestPatchResourceWithVersionConflict(t *testing.T) {
 
 	tc.startingPod.Name = name
 	tc.startingPod.Namespace = namespace
+	tc.startingPod.UID = uid
 	tc.startingPod.ResourceVersion = "1"
 	tc.startingPod.APIVersion = "v1"
 	tc.startingPod.Spec.ActiveDeadlineSeconds = &fifteen
 
 	tc.changedPod.Name = name
 	tc.changedPod.Namespace = namespace
+	tc.changedPod.UID = uid
 	tc.changedPod.ResourceVersion = "1"
 	tc.changedPod.APIVersion = "v1"
 	tc.changedPod.Spec.ActiveDeadlineSeconds = &thirty
 
 	tc.updatePod.Name = name
 	tc.updatePod.Namespace = namespace
+	tc.updatePod.UID = uid
 	tc.updatePod.ResourceVersion = "2"
 	tc.updatePod.APIVersion = "v1"
 	tc.updatePod.Spec.ActiveDeadlineSeconds = &fifteen
@@ -299,6 +312,7 @@ func TestPatchResourceWithVersionConflict(t *testing.T) {
 
 	tc.expectedPod.Name = name
 	tc.expectedPod.Namespace = namespace
+	tc.expectedPod.UID = uid
 	tc.expectedPod.ResourceVersion = "2"
 	tc.expectedPod.Spec.ActiveDeadlineSeconds = &thirty
 	tc.expectedPod.Spec.NodeName = "anywhere"
@@ -309,6 +323,7 @@ func TestPatchResourceWithVersionConflict(t *testing.T) {
 func TestPatchResourceWithConflict(t *testing.T) {
 	namespace := "bar"
 	name := "foo"
+	uid := types.UID("uid")
 
 	tc := &patchTestCase{
 		name: "TestPatchResourceWithConflict",
@@ -322,18 +337,21 @@ func TestPatchResourceWithConflict(t *testing.T) {
 
 	tc.startingPod.Name = name
 	tc.startingPod.Namespace = namespace
+	tc.startingPod.UID = uid
 	tc.startingPod.ResourceVersion = "1"
 	tc.startingPod.APIVersion = "v1"
 	tc.startingPod.Spec.NodeName = "here"
 
 	tc.changedPod.Name = name
 	tc.changedPod.Namespace = namespace
+	tc.changedPod.UID = uid
 	tc.changedPod.ResourceVersion = "1"
 	tc.changedPod.APIVersion = "v1"
 	tc.changedPod.Spec.NodeName = "there"
 
 	tc.updatePod.Name = name
 	tc.updatePod.Namespace = namespace
+	tc.updatePod.UID = uid
 	tc.updatePod.ResourceVersion = "2"
 	tc.updatePod.APIVersion = "v1"
 	tc.updatePod.Spec.NodeName = "anywhere"
@@ -344,13 +362,14 @@ func TestPatchResourceWithConflict(t *testing.T) {
 func TestPatchWithAdmissionRejection(t *testing.T) {
 	namespace := "bar"
 	name := "foo"
+	uid := types.UID("uid")
 	fifteen := int64(15)
 	thirty := int64(30)
 
 	tc := &patchTestCase{
 		name: "TestPatchWithAdmissionRejection",
 
-		admit: func(updatedObject runtime.Object) error {
+		admit: func(updatedObject runtime.Object, currentObject runtime.Object) error {
 			return errors.New("admission failure")
 		},
 
@@ -363,12 +382,14 @@ func TestPatchWithAdmissionRejection(t *testing.T) {
 
 	tc.startingPod.Name = name
 	tc.startingPod.Namespace = namespace
+	tc.startingPod.UID = uid
 	tc.startingPod.ResourceVersion = "1"
 	tc.startingPod.APIVersion = "v1"
 	tc.startingPod.Spec.ActiveDeadlineSeconds = &fifteen
 
 	tc.changedPod.Name = name
 	tc.changedPod.Namespace = namespace
+	tc.changedPod.UID = uid
 	tc.changedPod.ResourceVersion = "1"
 	tc.changedPod.APIVersion = "v1"
 	tc.changedPod.Spec.ActiveDeadlineSeconds = &thirty
@@ -379,6 +400,7 @@ func TestPatchWithAdmissionRejection(t *testing.T) {
 func TestPatchWithVersionConflictThenAdmissionFailure(t *testing.T) {
 	namespace := "bar"
 	name := "foo"
+	uid := types.UID("uid")
 	fifteen := int64(15)
 	thirty := int64(30)
 	seen := false
@@ -386,7 +408,7 @@ func TestPatchWithVersionConflictThenAdmissionFailure(t *testing.T) {
 	tc := &patchTestCase{
 		name: "TestPatchWithVersionConflictThenAdmissionFailure",
 
-		admit: func(updatedObject runtime.Object) error {
+		admit: func(updatedObject runtime.Object, currentObject runtime.Object) error {
 			if seen {
 				return errors.New("admission failure")
 			}
@@ -404,22 +426,48 @@ func TestPatchWithVersionConflictThenAdmissionFailure(t *testing.T) {
 
 	tc.startingPod.Name = name
 	tc.startingPod.Namespace = namespace
+	tc.startingPod.UID = uid
 	tc.startingPod.ResourceVersion = "1"
 	tc.startingPod.APIVersion = "v1"
 	tc.startingPod.Spec.ActiveDeadlineSeconds = &fifteen
 
 	tc.changedPod.Name = name
 	tc.changedPod.Namespace = namespace
+	tc.changedPod.UID = uid
 	tc.changedPod.ResourceVersion = "1"
 	tc.changedPod.APIVersion = "v1"
 	tc.changedPod.Spec.ActiveDeadlineSeconds = &thirty
 
 	tc.updatePod.Name = name
 	tc.updatePod.Namespace = namespace
+	tc.updatePod.UID = uid
 	tc.updatePod.ResourceVersion = "2"
 	tc.updatePod.APIVersion = "v1"
 	tc.updatePod.Spec.ActiveDeadlineSeconds = &fifteen
 	tc.updatePod.Spec.NodeName = "anywhere"
 
 	tc.Run(t)
+}
+
+func TestHasUID(t *testing.T) {
+	testcases := []struct {
+		obj    runtime.Object
+		hasUID bool
+	}{
+		{obj: nil, hasUID: false},
+		{obj: &api.Pod{}, hasUID: false},
+		{obj: nil, hasUID: false},
+		{obj: runtime.Object(nil), hasUID: false},
+		{obj: &api.Pod{ObjectMeta: api.ObjectMeta{UID: types.UID("A")}}, hasUID: true},
+	}
+	for i, tc := range testcases {
+		actual, err := hasUID(tc.obj)
+		if err != nil {
+			t.Errorf("%d: unexpected error %v", i, err)
+			continue
+		}
+		if tc.hasUID != actual {
+			t.Errorf("%d: expected %v, got %v", i, tc.hasUID, actual)
+		}
+	}
 }

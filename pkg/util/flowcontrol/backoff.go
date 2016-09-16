@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/clock"
 	"k8s.io/kubernetes/pkg/util/integer"
 )
 
@@ -31,13 +31,13 @@ type backoffEntry struct {
 
 type Backoff struct {
 	sync.Mutex
-	Clock           util.Clock
+	Clock           clock.Clock
 	defaultDuration time.Duration
 	maxDuration     time.Duration
 	perItemBackoff  map[string]*backoffEntry
 }
 
-func NewFakeBackOff(initial, max time.Duration, tc *util.FakeClock) *Backoff {
+func NewFakeBackOff(initial, max time.Duration, tc *clock.FakeClock) *Backoff {
 	return &Backoff{
 		perItemBackoff:  map[string]*backoffEntry{},
 		Clock:           tc,
@@ -49,7 +49,7 @@ func NewFakeBackOff(initial, max time.Duration, tc *util.FakeClock) *Backoff {
 func NewBackOff(initial, max time.Duration) *Backoff {
 	return &Backoff{
 		perItemBackoff:  map[string]*backoffEntry{},
-		Clock:           util.RealClock{},
+		Clock:           clock.RealClock{},
 		defaultDuration: initial,
 		maxDuration:     max,
 	}

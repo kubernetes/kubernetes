@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,12 +18,19 @@ package predicates
 
 import (
 	"fmt"
+	"math/rand"
+	"strconv"
+	"sync"
+	"time"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
+	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/labels"
+	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
+	"k8s.io/kubernetes/pkg/util/workqueue"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	priorityutil "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities/util"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
@@ -54,10 +61,40 @@ func (c *CachedNodeInfo) GetNodeInfo(id string) (*api.Node, error) {
 	}
 
 	if !exists {
-		return nil, fmt.Errorf("node '%v' is not in cache", id)
+		return nil, fmt.Errorf("node '%v' not found", id)
 	}
 
 	return node.(*api.Node), nil
+}
+
+// predicateMetadata is a type that is passed as metadata for predicate functions
+type predicateMetadata struct {
+	podBestEffort             bool
+	podRequest                *schedulercache.Resource
+	podPorts                  map[int]bool
+	matchingAntiAffinityTerms []matchingPodAntiAffinityTerm
+}
+
+type matchingPodAntiAffinityTerm struct {
+	term *api.PodAffinityTerm
+	node *api.Node
+}
+
+func PredicateMetadata(pod *api.Pod, nodeInfoMap map[string]*schedulercache.NodeInfo) interface{} {
+	// If we cannot compute metadata, just return nil
+	if pod == nil {
+		return nil
+	}
+	matchingTerms, err := getMatchingAntiAffinityTerms(pod, nodeInfoMap)
+	if err != nil {
+		return nil
+	}
+	return &predicateMetadata{
+		podBestEffort:             isPodBestEffort(pod),
+		podRequest:                getResourceRequest(pod),
+		podPorts:                  getUsedPorts(pod),
+		matchingAntiAffinityTerms: matchingTerms,
+	}
 }
 
 func isVolumeConflict(volume api.Volume, pod *api.Pod) bool {
@@ -84,7 +121,10 @@ func isVolumeConflict(volume api.Volume, pod *api.Pod) bool {
 		if volume.RBD != nil && existingVolume.RBD != nil {
 			mon, pool, image := volume.RBD.CephMonitors, volume.RBD.RBDPool, volume.RBD.RBDImage
 			emon, epool, eimage := existingVolume.RBD.CephMonitors, existingVolume.RBD.RBDPool, existingVolume.RBD.RBDImage
-			if haveSame(mon, emon) && pool == epool && image == eimage {
+			// two RBDs images are the same if they share the same Ceph monitor, are in the same RADOS Pool, and have the same image name
+			// only one read-write mount is permitted for the same RBD image.
+			// same RBD image mounted by multiple Pods conflicts unless all Pods mount the image read-only
+			if haveSame(mon, emon) && pool == epool && image == eimage && !(volume.RBD.ReadOnly && existingVolume.RBD.ReadOnly) {
 				return true
 			}
 		}
@@ -101,15 +141,15 @@ func isVolumeConflict(volume api.Volume, pod *api.Pod) bool {
 // - AWS EBS forbids any two pods mounting the same volume ID
 // - Ceph RBD forbids if any two pods share at least same monitor, and match pool and image.
 // TODO: migrate this into some per-volume specific code?
-func NoDiskConflict(pod *api.Pod, nodeInfo *schedulercache.NodeInfo) (bool, error) {
+func NoDiskConflict(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
 	for _, v := range pod.Spec.Volumes {
 		for _, ev := range nodeInfo.Pods() {
 			if isVolumeConflict(v, ev) {
-				return false, ErrDiskConflict
+				return false, []algorithm.PredicateFailureReason{ErrDiskConflict}, nil
 			}
 		}
 	}
-	return true, nil
+	return true, nil, nil
 }
 
 type MaxPDVolumeCountChecker struct {
@@ -151,11 +191,21 @@ func (c *MaxPDVolumeCountChecker) filterVolumes(volumes []api.Volume, namespace 
 		} else if vol.PersistentVolumeClaim != nil {
 			pvcName := vol.PersistentVolumeClaim.ClaimName
 			if pvcName == "" {
-				return fmt.Errorf("PersistentVolumeClaim had no name: %q", pvcName)
+				return fmt.Errorf("PersistentVolumeClaim had no name")
 			}
 			pvc, err := c.pvcInfo.GetPersistentVolumeClaimInfo(namespace, pvcName)
 			if err != nil {
-				return err
+				// if the PVC is not found, log the error and count the PV towards the PV limit
+				// generate a random volume ID since its required for de-dup
+				utilruntime.HandleError(fmt.Errorf("Unable to look up PVC info for %s/%s, assuming PVC matches predicate when counting limits: %v", namespace, pvcName, err))
+				source := rand.NewSource(time.Now().UnixNano())
+				generatedID := "missingPVC" + strconv.Itoa(rand.New(source).Intn(1000000))
+				filteredVolumes[generatedID] = true
+				return nil
+			}
+
+			if pvc == nil {
+				return fmt.Errorf("PersistentVolumeClaim not found: %q", pvcName)
 			}
 
 			pvName := pvc.Spec.VolumeName
@@ -165,7 +215,18 @@ func (c *MaxPDVolumeCountChecker) filterVolumes(volumes []api.Volume, namespace 
 
 			pv, err := c.pvInfo.GetPersistentVolumeInfo(pvName)
 			if err != nil {
-				return err
+				// if the PV is not found, log the error
+				// and count the PV towards the PV limit
+				// generate a random volume ID since its required for de-dup
+				utilruntime.HandleError(fmt.Errorf("Unable to look up PV info for %s/%s/%s, assuming PV matches predicate when counting limits: %v", namespace, pvcName, pvName, err))
+				source := rand.NewSource(time.Now().UnixNano())
+				generatedID := "missingPV" + strconv.Itoa(rand.New(source).Intn(1000000))
+				filteredVolumes[generatedID] = true
+				return nil
+			}
+
+			if pv == nil {
+				return fmt.Errorf("PersistentVolume not found: %q", pvName)
 			}
 
 			if id, ok := c.filter.FilterPersistentVolume(pv); ok {
@@ -177,22 +238,28 @@ func (c *MaxPDVolumeCountChecker) filterVolumes(volumes []api.Volume, namespace 
 	return nil
 }
 
-func (c *MaxPDVolumeCountChecker) predicate(pod *api.Pod, nodeInfo *schedulercache.NodeInfo) (bool, error) {
+func (c *MaxPDVolumeCountChecker) predicate(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
+	// If a pod doesn't have any volume attached to it, the predicate will always be true.
+	// Thus we make a fast path for it, to avoid unnecessary computations in this case.
+	if len(pod.Spec.Volumes) == 0 {
+		return true, nil, nil
+	}
+
 	newVolumes := make(map[string]bool)
 	if err := c.filterVolumes(pod.Spec.Volumes, pod.Namespace, newVolumes); err != nil {
-		return false, err
+		return false, nil, err
 	}
 
 	// quick return
 	if len(newVolumes) == 0 {
-		return true, nil
+		return true, nil, nil
 	}
 
 	// count unique volumes
 	existingVolumes := make(map[string]bool)
 	for _, existingPod := range nodeInfo.Pods() {
 		if err := c.filterVolumes(existingPod.Spec.Volumes, existingPod.Namespace, existingVolumes); err != nil {
-			return false, err
+			return false, nil, err
 		}
 	}
 	numExistingVolumes := len(existingVolumes)
@@ -208,10 +275,10 @@ func (c *MaxPDVolumeCountChecker) predicate(pod *api.Pod, nodeInfo *schedulercac
 
 	if numExistingVolumes+numNewVolumes > c.maxVolumes {
 		// violates MaxEBSVolumeCount or MaxGCEPDVolumeCount
-		return false, ErrMaxVolumeCountExceeded
+		return false, []algorithm.PredicateFailureReason{ErrMaxVolumeCountExceeded}, nil
 	}
 
-	return true, nil
+	return true, nil, nil
 }
 
 // EBSVolumeFilter is a VolumeFilter for filtering AWS ElasticBlockStore Volumes
@@ -275,10 +342,16 @@ func NewVolumeZonePredicate(pvInfo PersistentVolumeInfo, pvcInfo PersistentVolum
 	return c.predicate
 }
 
-func (c *VolumeZoneChecker) predicate(pod *api.Pod, nodeInfo *schedulercache.NodeInfo) (bool, error) {
+func (c *VolumeZoneChecker) predicate(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
+	// If a pod doesn't have any volume attached to it, the predicate will always be true.
+	// Thus we make a fast path for it, to avoid unnecessary computations in this case.
+	if len(pod.Spec.Volumes) == 0 {
+		return true, nil, nil
+	}
+
 	node := nodeInfo.Node()
 	if node == nil {
-		return false, fmt.Errorf("node not found")
+		return false, nil, fmt.Errorf("node not found")
 	}
 
 	nodeConstraints := make(map[string]string)
@@ -293,40 +366,39 @@ func (c *VolumeZoneChecker) predicate(pod *api.Pod, nodeInfo *schedulercache.Nod
 		// The node has no zone constraints, so we're OK to schedule.
 		// In practice, when using zones, all nodes must be labeled with zone labels.
 		// We want to fast-path this case though.
-		return true, nil
+		return true, nil, nil
 	}
 
 	namespace := pod.Namespace
-
 	manifest := &(pod.Spec)
 	for i := range manifest.Volumes {
 		volume := &manifest.Volumes[i]
 		if volume.PersistentVolumeClaim != nil {
 			pvcName := volume.PersistentVolumeClaim.ClaimName
 			if pvcName == "" {
-				return false, fmt.Errorf("PersistentVolumeClaim had no name: %q", pvcName)
+				return false, nil, fmt.Errorf("PersistentVolumeClaim had no name")
 			}
 			pvc, err := c.pvcInfo.GetPersistentVolumeClaimInfo(namespace, pvcName)
 			if err != nil {
-				return false, err
+				return false, nil, err
 			}
 
 			if pvc == nil {
-				return false, fmt.Errorf("PersistentVolumeClaim was not found: %q", pvcName)
+				return false, nil, fmt.Errorf("PersistentVolumeClaim was not found: %q", pvcName)
 			}
 
 			pvName := pvc.Spec.VolumeName
 			if pvName == "" {
-				return false, fmt.Errorf("PersistentVolumeClaim is not bound: %q", pvcName)
+				return false, nil, fmt.Errorf("PersistentVolumeClaim is not bound: %q", pvcName)
 			}
 
 			pv, err := c.pvInfo.GetPersistentVolumeInfo(pvName)
 			if err != nil {
-				return false, err
+				return false, nil, err
 			}
 
 			if pv == nil {
-				return false, fmt.Errorf("PersistentVolume not found: %q", pvName)
+				return false, nil, fmt.Errorf("PersistentVolume not found: %q", pvName)
 			}
 
 			for k, v := range pv.ObjectMeta.Labels {
@@ -336,111 +408,84 @@ func (c *VolumeZoneChecker) predicate(pod *api.Pod, nodeInfo *schedulercache.Nod
 				nodeV, _ := nodeConstraints[k]
 				if v != nodeV {
 					glog.V(2).Infof("Won't schedule pod %q onto node %q due to volume %q (mismatch on %q)", pod.Name, node.Name, pvName, k)
-					return false, ErrVolumeZoneConflict
+					return false, []algorithm.PredicateFailureReason{ErrVolumeZoneConflict}, nil
 				}
 			}
 		}
 	}
 
-	return true, nil
+	return true, nil, nil
 }
 
-type resourceRequest struct {
-	milliCPU  int64
-	memory    int64
-	nvidiaGPU int64
-}
-
-func getResourceRequest(pod *api.Pod) resourceRequest {
-	result := resourceRequest{}
+func getResourceRequest(pod *api.Pod) *schedulercache.Resource {
+	result := schedulercache.Resource{}
 	for _, container := range pod.Spec.Containers {
 		requests := container.Resources.Requests
-		result.memory += requests.Memory().Value()
-		result.milliCPU += requests.Cpu().MilliValue()
-		result.nvidiaGPU += requests.NvidiaGPU().Value()
+		result.Memory += requests.Memory().Value()
+		result.MilliCPU += requests.Cpu().MilliValue()
+		result.NvidiaGPU += requests.NvidiaGPU().Value()
 	}
-	return result
-}
-
-func CheckPodsExceedingFreeResources(pods []*api.Pod, allocatable api.ResourceList) (fitting []*api.Pod, notFittingCPU, notFittingMemory, notFittingNvidiaGPU []*api.Pod) {
-	totalMilliCPU := allocatable.Cpu().MilliValue()
-	totalMemory := allocatable.Memory().Value()
-	totalNvidiaGPU := allocatable.NvidiaGPU().Value()
-	milliCPURequested := int64(0)
-	memoryRequested := int64(0)
-	nvidiaGPURequested := int64(0)
-	for _, pod := range pods {
-		podRequest := getResourceRequest(pod)
-		fitsCPU := (totalMilliCPU - milliCPURequested) >= podRequest.milliCPU
-		fitsMemory := (totalMemory - memoryRequested) >= podRequest.memory
-		fitsNVidiaGPU := (totalNvidiaGPU - nvidiaGPURequested) >= podRequest.nvidiaGPU
-		if !fitsCPU {
-			// the pod doesn't fit due to CPU request
-			notFittingCPU = append(notFittingCPU, pod)
-			continue
+	// take max_resource(sum_pod, any_init_container)
+	for _, container := range pod.Spec.InitContainers {
+		requests := container.Resources.Requests
+		if mem := requests.Memory().Value(); mem > result.Memory {
+			result.Memory = mem
 		}
-		if !fitsMemory {
-			// the pod doesn't fit due to Memory request
-			notFittingMemory = append(notFittingMemory, pod)
-			continue
+		if cpu := requests.Cpu().MilliValue(); cpu > result.MilliCPU {
+			result.MilliCPU = cpu
 		}
-		if !fitsNVidiaGPU {
-			// the pod doesn't fit due to NvidiaGPU request
-			notFittingNvidiaGPU = append(notFittingNvidiaGPU, pod)
-			continue
-		}
-		// the pod fits
-		milliCPURequested += podRequest.milliCPU
-		memoryRequested += podRequest.memory
-		nvidiaGPURequested += podRequest.nvidiaGPU
-		fitting = append(fitting, pod)
 	}
-	return
+	return &result
 }
 
 func podName(pod *api.Pod) string {
 	return pod.Namespace + "/" + pod.Name
 }
 
-func PodFitsResources(pod *api.Pod, nodeInfo *schedulercache.NodeInfo) (bool, error) {
+func PodFitsResources(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
 	node := nodeInfo.Node()
 	if node == nil {
-		return false, fmt.Errorf("node not found")
-	}
-	allocatable := node.Status.Allocatable
-	allowedPodNumber := allocatable.Pods().Value()
-	if int64(len(nodeInfo.Pods()))+1 > allowedPodNumber {
-		return false,
-			newInsufficientResourceError(podCountResourceName, 1, int64(len(nodeInfo.Pods())), allowedPodNumber)
-	}
-	podRequest := getResourceRequest(pod)
-	if podRequest.milliCPU == 0 && podRequest.memory == 0 && podRequest.nvidiaGPU == 0 {
-		return true, nil
+		return false, nil, fmt.Errorf("node not found")
 	}
 
-	totalMilliCPU := allocatable.Cpu().MilliValue()
-	totalMemory := allocatable.Memory().Value()
-	totalNvidiaGPU := allocatable.NvidiaGPU().Value()
+	var predicateFails []algorithm.PredicateFailureReason
+	allowedPodNumber := nodeInfo.AllowedPodNumber()
+	if len(nodeInfo.Pods())+1 > allowedPodNumber {
+		predicateFails = append(predicateFails, NewInsufficientResourceError(api.ResourcePods, 1, int64(len(nodeInfo.Pods())), int64(allowedPodNumber)))
+	}
 
-	if totalMilliCPU < podRequest.milliCPU+nodeInfo.RequestedResource().MilliCPU {
-		return false,
-			newInsufficientResourceError(cpuResourceName, podRequest.milliCPU, nodeInfo.RequestedResource().MilliCPU, totalMilliCPU)
+	var podRequest *schedulercache.Resource
+	if predicateMeta, ok := meta.(*predicateMetadata); ok {
+		podRequest = predicateMeta.podRequest
+	} else {
+		// We couldn't parse metadata - fallback to computing it.
+		podRequest = getResourceRequest(pod)
 	}
-	if totalMemory < podRequest.memory+nodeInfo.RequestedResource().Memory {
-		return false,
-			newInsufficientResourceError(memoryResoureceName, podRequest.memory, nodeInfo.RequestedResource().Memory, totalMemory)
+	if podRequest.MilliCPU == 0 && podRequest.Memory == 0 && podRequest.NvidiaGPU == 0 {
+		return len(predicateFails) == 0, predicateFails, nil
 	}
-	if totalNvidiaGPU < podRequest.nvidiaGPU+nodeInfo.RequestedResource().NvidiaGPU {
-		return false,
-			newInsufficientResourceError(nvidiaGpuResourceName, podRequest.nvidiaGPU, nodeInfo.RequestedResource().NvidiaGPU, totalNvidiaGPU)
+
+	allocatable := nodeInfo.AllocatableResource()
+	if allocatable.MilliCPU < podRequest.MilliCPU+nodeInfo.RequestedResource().MilliCPU {
+		predicateFails = append(predicateFails, NewInsufficientResourceError(api.ResourceCPU, podRequest.MilliCPU, nodeInfo.RequestedResource().MilliCPU, allocatable.MilliCPU))
 	}
-	glog.V(10).Infof("Schedule Pod %+v on Node %+v is allowed, Node is running only %v out of %v Pods.",
-		podName(pod), node.Name, len(nodeInfo.Pods()), allowedPodNumber)
-	return true, nil
+	if allocatable.Memory < podRequest.Memory+nodeInfo.RequestedResource().Memory {
+		predicateFails = append(predicateFails, NewInsufficientResourceError(api.ResourceMemory, podRequest.Memory, nodeInfo.RequestedResource().Memory, allocatable.Memory))
+	}
+	if allocatable.NvidiaGPU < podRequest.NvidiaGPU+nodeInfo.RequestedResource().NvidiaGPU {
+		predicateFails = append(predicateFails, NewInsufficientResourceError(api.ResourceNvidiaGPU, podRequest.NvidiaGPU, nodeInfo.RequestedResource().NvidiaGPU, allocatable.NvidiaGPU))
+	}
+	if glog.V(10) {
+		// We explicitly don't do glog.V(10).Infof() to avoid computing all the parameters if this is
+		// not logged. There is visible performance gain from it.
+		glog.Infof("Schedule Pod %+v on Node %+v is allowed, Node is running only %v out of %v Pods.",
+			podName(pod), node.Name, len(nodeInfo.Pods()), allowedPodNumber)
+	}
+	return len(predicateFails) == 0, predicateFails, nil
 }
 
 // nodeMatchesNodeSelectorTerms checks if a node's labels satisfy a list of node selector terms,
-// terms are ORed, and an emtpy a list of terms will match nothing.
+// terms are ORed, and an empty list of terms will match nothing.
 func nodeMatchesNodeSelectorTerms(node *api.Node, nodeSelectorTerms []api.NodeSelectorTerm) bool {
 	for _, req := range nodeSelectorTerms {
 		nodeSelector, err := api.NodeSelectorRequirementsAsSelector(req.MatchExpressions)
@@ -456,7 +501,7 @@ func nodeMatchesNodeSelectorTerms(node *api.Node, nodeSelectorTerms []api.NodeSe
 }
 
 // The pod can only schedule onto nodes that satisfy requirements in both NodeAffinity and nodeSelector.
-func PodMatchesNodeLabels(pod *api.Pod, node *api.Node) bool {
+func podMatchesNodeLabels(pod *api.Pod, node *api.Node) bool {
 	// Check if node.Labels match pod.Spec.NodeSelector.
 	if len(pod.Spec.NodeSelector) > 0 {
 		selector := labels.SelectorFromSet(pod.Spec.NodeSelector)
@@ -480,7 +525,7 @@ func PodMatchesNodeLabels(pod *api.Pod, node *api.Node) bool {
 	// 5. zero-length non-nil []NodeSelectorRequirement matches no nodes also, just for simplicity
 	// 6. non-nil empty NodeSelectorRequirement is not allowed
 	nodeAffinityMatches := true
-	if affinity.NodeAffinity != nil {
+	if affinity != nil && affinity.NodeAffinity != nil {
 		nodeAffinity := affinity.NodeAffinity
 		// if no required NodeAffinity requirements, will do no-op, means select all nodes.
 		// TODO: Replace next line with subsequent commented-out line when implement RequiredDuringSchedulingRequiredDuringExecution.
@@ -508,29 +553,29 @@ func PodMatchesNodeLabels(pod *api.Pod, node *api.Node) bool {
 	return nodeAffinityMatches
 }
 
-func PodSelectorMatches(pod *api.Pod, nodeInfo *schedulercache.NodeInfo) (bool, error) {
+func PodSelectorMatches(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
 	node := nodeInfo.Node()
 	if node == nil {
-		return false, fmt.Errorf("node not found")
+		return false, nil, fmt.Errorf("node not found")
 	}
-	if PodMatchesNodeLabels(pod, node) {
-		return true, nil
+	if podMatchesNodeLabels(pod, node) {
+		return true, nil, nil
 	}
-	return false, ErrNodeSelectorNotMatch
+	return false, []algorithm.PredicateFailureReason{ErrNodeSelectorNotMatch}, nil
 }
 
-func PodFitsHost(pod *api.Pod, nodeInfo *schedulercache.NodeInfo) (bool, error) {
+func PodFitsHost(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
 	if len(pod.Spec.NodeName) == 0 {
-		return true, nil
+		return true, nil, nil
 	}
 	node := nodeInfo.Node()
 	if node == nil {
-		return false, fmt.Errorf("node not found")
+		return false, nil, fmt.Errorf("node not found")
 	}
 	if pod.Spec.NodeName == node.Name {
-		return true, nil
+		return true, nil, nil
 	}
-	return false, ErrPodNotMatchHostName
+	return false, []algorithm.PredicateFailureReason{ErrPodNotMatchHostName}, nil
 }
 
 type NodeLabelChecker struct {
@@ -558,10 +603,10 @@ func NewNodeLabelPredicate(labels []string, presence bool) algorithm.FitPredicat
 // Alternately, eliminating nodes that have a certain label, regardless of value, is also useful
 // A node may have a label with "retiring" as key and the date as the value
 // and it may be desirable to avoid scheduling new pods on this node
-func (n *NodeLabelChecker) CheckNodeLabelPresence(pod *api.Pod, nodeInfo *schedulercache.NodeInfo) (bool, error) {
+func (n *NodeLabelChecker) CheckNodeLabelPresence(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
 	node := nodeInfo.Node()
 	if node == nil {
-		return false, fmt.Errorf("node not found")
+		return false, nil, fmt.Errorf("node not found")
 	}
 
 	var exists bool
@@ -569,10 +614,10 @@ func (n *NodeLabelChecker) CheckNodeLabelPresence(pod *api.Pod, nodeInfo *schedu
 	for _, label := range n.labels {
 		exists = nodeLabels.Has(label)
 		if (exists && !n.presence) || (!exists && n.presence) {
-			return false, ErrNodeLabelPresenceViolated
+			return false, []algorithm.PredicateFailureReason{ErrNodeLabelPresenceViolated}, nil
 		}
 	}
-	return true, nil
+	return true, nil, nil
 }
 
 type ServiceAffinity struct {
@@ -601,7 +646,12 @@ func NewServiceAffinityPredicate(podLister algorithm.PodLister, serviceLister al
 // - L is listed in the ServiceAffinity object that is passed into the function
 // - the pod does not have any NodeSelector for L
 // - some other pod from the same service is already scheduled onto a node that has value V for label L
-func (s *ServiceAffinity) CheckServiceAffinity(pod *api.Pod, nodeInfo *schedulercache.NodeInfo) (bool, error) {
+func (s *ServiceAffinity) CheckServiceAffinity(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
+	node := nodeInfo.Node()
+	if node == nil {
+		return false, nil, fmt.Errorf("node not found")
+	}
+
 	var affinitySelector labels.Selector
 
 	// check if the pod being scheduled has the affinity labels specified in its NodeSelector
@@ -626,7 +676,7 @@ func (s *ServiceAffinity) CheckServiceAffinity(pod *api.Pod, nodeInfo *scheduler
 			selector := labels.SelectorFromSet(services[0].Spec.Selector)
 			servicePods, err := s.podLister.List(selector)
 			if err != nil {
-				return false, err
+				return false, nil, err
 			}
 			// consider only the pods that belong to the same namespace
 			nsServicePods := []*api.Pod{}
@@ -639,7 +689,7 @@ func (s *ServiceAffinity) CheckServiceAffinity(pod *api.Pod, nodeInfo *scheduler
 				// consider any service pod and fetch the node its hosted on
 				otherNode, err := s.nodeInfo.GetNodeInfo(nsServicePods[0].Spec.NodeName)
 				if err != nil {
-					return false, err
+					return false, nil, err
 				}
 				for _, l := range s.labels {
 					// If the pod being scheduled has the label value specified, do not override it
@@ -661,41 +711,42 @@ func (s *ServiceAffinity) CheckServiceAffinity(pod *api.Pod, nodeInfo *scheduler
 		affinitySelector = labels.Set(affinityLabels).AsSelector()
 	}
 
-	node := nodeInfo.Node()
-	if node == nil {
-		return false, fmt.Errorf("node not found")
-	}
-
 	// check if the node matches the selector
 	if affinitySelector.Matches(labels.Set(node.Labels)) {
-		return true, nil
+		return true, nil, nil
 	}
-	return false, ErrServiceAffinityViolated
+	return false, []algorithm.PredicateFailureReason{ErrServiceAffinityViolated}, nil
 }
 
-func PodFitsHostPorts(pod *api.Pod, nodeInfo *schedulercache.NodeInfo) (bool, error) {
-	wantPorts := getUsedPorts(pod)
-	if len(wantPorts) == 0 {
-		return true, nil
+func PodFitsHostPorts(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
+	var wantPorts map[int]bool
+	if predicateMeta, ok := meta.(*predicateMetadata); ok {
+		wantPorts = predicateMeta.podPorts
+	} else {
+		// We couldn't parse metadata - fallback to computing it.
+		wantPorts = getUsedPorts(pod)
 	}
+	if len(wantPorts) == 0 {
+		return true, nil, nil
+	}
+
+	// TODO: Aggregate it at the NodeInfo level.
 	existingPorts := getUsedPorts(nodeInfo.Pods()...)
 	for wport := range wantPorts {
-		if wport == 0 {
-			continue
-		}
-		if existingPorts[wport] {
-			return false, ErrPodNotFitsHostPorts
+		if wport != 0 && existingPorts[wport] {
+			return false, []algorithm.PredicateFailureReason{ErrPodNotFitsHostPorts}, nil
 		}
 	}
-	return true, nil
+	return true, nil, nil
 }
 
 func getUsedPorts(pods ...*api.Pod) map[int]bool {
-	// TODO: Aggregate it at the NodeInfo level.
 	ports := make(map[int]bool)
 	for _, pod := range pods {
-		for _, container := range pod.Spec.Containers {
-			for _, podPort := range container.Ports {
+		for j := range pod.Spec.Containers {
+			container := &pod.Spec.Containers[j]
+			for k := range container.Ports {
+				podPort := &container.Ports[k]
 				// "0" is explicitly ignored in PodFitsHostPorts,
 				// which is the only function that uses this value.
 				if podPort.HostPort != 0 {
@@ -719,25 +770,41 @@ func haveSame(a1, a2 []string) bool {
 	return false
 }
 
-func GeneralPredicates(pod *api.Pod, nodeInfo *schedulercache.NodeInfo) (bool, error) {
-	fit, err := PodFitsResources(pod, nodeInfo)
+func GeneralPredicates(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
+	var predicateFails []algorithm.PredicateFailureReason
+	fit, reasons, err := PodFitsResources(pod, meta, nodeInfo)
+	if err != nil {
+		return false, predicateFails, err
+	}
 	if !fit {
-		return fit, err
+		predicateFails = append(predicateFails, reasons...)
 	}
 
-	fit, err = PodFitsHost(pod, nodeInfo)
-	if !fit {
-		return fit, err
+	fit, reasons, err = PodFitsHost(pod, meta, nodeInfo)
+	if err != nil {
+		return false, predicateFails, err
 	}
-	fit, err = PodFitsHostPorts(pod, nodeInfo)
 	if !fit {
-		return fit, err
+		predicateFails = append(predicateFails, reasons...)
 	}
-	fit, err = PodSelectorMatches(pod, nodeInfo)
+
+	fit, reasons, err = PodFitsHostPorts(pod, meta, nodeInfo)
+	if err != nil {
+		return false, predicateFails, err
+	}
 	if !fit {
-		return fit, err
+		predicateFails = append(predicateFails, reasons...)
 	}
-	return true, nil
+
+	fit, reasons, err = PodSelectorMatches(pod, meta, nodeInfo)
+	if err != nil {
+		return false, predicateFails, err
+	}
+	if !fit {
+		predicateFails = append(predicateFails, reasons...)
+	}
+
+	return len(predicateFails) == 0, predicateFails, nil
 }
 
 type PodAffinityChecker struct {
@@ -755,182 +822,349 @@ func NewPodAffinityPredicate(info NodeInfo, podLister algorithm.PodLister, failu
 	return checker.InterPodAffinityMatches
 }
 
-func (checker *PodAffinityChecker) InterPodAffinityMatches(pod *api.Pod, nodeInfo *schedulercache.NodeInfo) (bool, error) {
+func (c *PodAffinityChecker) InterPodAffinityMatches(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
 	node := nodeInfo.Node()
 	if node == nil {
-		return false, fmt.Errorf("node not found")
+		return false, nil, fmt.Errorf("node not found")
 	}
-	allPods, err := checker.podLister.List(labels.Everything())
+	if !c.satisfiesExistingPodsAntiAffinity(pod, meta, node) {
+		return false, []algorithm.PredicateFailureReason{ErrPodAffinityNotMatch}, nil
+	}
+
+	// Now check if <pod> requirements will be satisfied on this node.
+	affinity, err := api.GetAffinityFromPodAnnotations(pod.Annotations)
 	if err != nil {
-		return false, err
+		return false, nil, err
 	}
-	if checker.NodeMatchPodAffinityAntiAffinity(pod, allPods, node) {
-		return true, nil
+	if affinity == nil || (affinity.PodAffinity == nil && affinity.PodAntiAffinity == nil) {
+		return true, nil, nil
 	}
-	return false, ErrPodAffinityNotMatch
+	if !c.satisfiesPodsAffinityAntiAffinity(pod, node, affinity) {
+		return false, []algorithm.PredicateFailureReason{ErrPodAffinityNotMatch}, nil
+	}
+
+	if glog.V(10) {
+		// We explicitly don't do glog.V(10).Infof() to avoid computing all the parameters if this is
+		// not logged. There is visible performance gain from it.
+		glog.Infof("Schedule Pod %+v on Node %+v is allowed, pod (anti)affinity constraints satisfied",
+			podName(pod), node.Name)
+	}
+	return true, nil, nil
 }
 
 // AnyPodMatchesPodAffinityTerm checks if any of given pods can match the specific podAffinityTerm.
-func (checker *PodAffinityChecker) AnyPodMatchesPodAffinityTerm(pod *api.Pod, allPods []*api.Pod, node *api.Node, podAffinityTerm api.PodAffinityTerm) (bool, error) {
-	for _, ep := range allPods {
-		match, err := checker.failureDomains.CheckIfPodMatchPodAffinityTerm(ep, pod, podAffinityTerm,
-			func(ep *api.Pod) (*api.Node, error) { return checker.info.GetNodeInfo(ep.Spec.NodeName) },
-			func(pod *api.Pod) (*api.Node, error) { return node, nil },
-		)
-		if err != nil || match {
-			return match, err
+// First return value indicates whether a matching pod exists on a node that matches the topology key,
+// while the second return value indicates whether a matching pod exists anywhere.
+// TODO: Do we really need any pod matching, or all pods matching? I think the latter.
+func (c *PodAffinityChecker) anyPodMatchesPodAffinityTerm(pod *api.Pod, allPods []*api.Pod, node *api.Node, term *api.PodAffinityTerm) (bool, bool, error) {
+	matchingPodExists := false
+	for _, existingPod := range allPods {
+		match, err := priorityutil.PodMatchesTermsNamespaceAndSelector(existingPod, pod, term)
+		if err != nil {
+			return false, matchingPodExists, err
+		}
+		if match {
+			matchingPodExists = true
+			existingPodNode, err := c.info.GetNodeInfo(existingPod.Spec.NodeName)
+			if err != nil {
+				return false, matchingPodExists, err
+			}
+			if c.failureDomains.NodesHaveSameTopologyKey(node, existingPodNode, term.TopologyKey) {
+				return true, matchingPodExists, nil
+			}
 		}
 	}
-	return false, nil
+	return false, matchingPodExists, nil
 }
 
-// Checks whether the given node has pods which satisfy all the required pod affinity scheduling rules.
-// If node has pods which satisfy all the required pod affinity scheduling rules then return true.
-func (checker *PodAffinityChecker) NodeMatchesHardPodAffinity(pod *api.Pod, allPods []*api.Pod, node *api.Node, podAffinity *api.PodAffinity) bool {
-	var podAffinityTerms []api.PodAffinityTerm
-	if len(podAffinity.RequiredDuringSchedulingIgnoredDuringExecution) != 0 {
-		podAffinityTerms = podAffinity.RequiredDuringSchedulingIgnoredDuringExecution
-	}
-	// TODO: Uncomment this block when implement RequiredDuringSchedulingRequiredDuringExecution.
-	//if len(podAffinity.RequiredDuringSchedulingRequiredDuringExecution) != 0 {
-	//	podAffinityTerms = append(podAffinityTerms, podAffinity.RequiredDuringSchedulingRequiredDuringExecution...)
-	//}
-
-	for _, podAffinityTerm := range podAffinityTerms {
-		podAffinityTermMatches, err := checker.AnyPodMatchesPodAffinityTerm(pod, allPods, node, podAffinityTerm)
-		if err != nil {
-			glog.V(10).Infof("Cannot schedule pod %+v onto node %v, an error ocurred when checking existing pods on the node for PodAffinityTerm %v err: %v",
-				podName(pod), node.Name, podAffinityTerm, err)
-			return false
+func getPodAffinityTerms(podAffinity *api.PodAffinity) (terms []api.PodAffinityTerm) {
+	if podAffinity != nil {
+		if len(podAffinity.RequiredDuringSchedulingIgnoredDuringExecution) != 0 {
+			terms = podAffinity.RequiredDuringSchedulingIgnoredDuringExecution
 		}
-
-		if !podAffinityTermMatches {
-			// TODO: Think about whether this can be simplified once we have controllerRef
-			// Check if it is in special case that the requiredDuringScheduling affinity requirement can be disregarded.
-			// If the requiredDuringScheduling affinity requirement matches a pod's own labels and namespace, and there are no other such pods
-			// anywhere, then disregard the requirement.
-			// This allows rules like "schedule all of the pods of this collection to the same zone" to not block forever
-			// because the first pod of the collection can't be scheduled.
-			names := priorityutil.GetNamespacesFromPodAffinityTerm(pod, podAffinityTerm)
-			labelSelector, err := unversioned.LabelSelectorAsSelector(podAffinityTerm.LabelSelector)
-			if err != nil || !names.Has(pod.Namespace) || !labelSelector.Matches(labels.Set(pod.Labels)) {
-				glog.V(10).Infof("Cannot schedule pod %+v onto node %v, because none of the existing pods on this node satisfy the PodAffinityTerm %v, err: %+v",
-					podName(pod), node.Name, podAffinityTerm, err)
-				return false
-			}
-
-			// the affinity is to put the pod together with other pods from its same service or controller
-			filteredPods := priorityutil.FilterPodsByNameSpaces(names, allPods)
-			for _, filteredPod := range filteredPods {
-				// if found an existing pod from same service or RC,
-				// the affinity scheduling rules cannot be disregarded.
-				if labelSelector.Matches(labels.Set(filteredPod.Labels)) {
-					glog.V(10).Infof("Cannot schedule pod %+v onto node %v, because none of the existing pods on this node satisfy the PodAffinityTerm %v",
-						podName(pod), node.Name, podAffinityTerm)
-					return false
-				}
-			}
-		}
+		// TODO: Uncomment this block when implement RequiredDuringSchedulingRequiredDuringExecution.
+		//if len(podAffinity.RequiredDuringSchedulingRequiredDuringExecution) != 0 {
+		//	terms = append(terms, podAffinity.RequiredDuringSchedulingRequiredDuringExecution...)
+		//}
 	}
-	// all the required pod affinity scheduling rules satisfied
-	glog.V(10).Infof("All the required pod affinity scheduling rules are satisfied for Pod %+v, on node %v", podName(pod), node.Name)
-	return true
+	return terms
 }
 
-// Checks whether the given node has pods which satisfy all the
-// required pod anti-affinity scheduling rules.
-// Also checks whether putting the pod onto the node would break
-// any anti-affinity scheduling rules indicated by existing pods.
-// If node has pods which satisfy all the required pod anti-affinity
-// scheduling rules and scheduling the pod onto the node won't
-// break any existing pods' anti-affinity rules, then return true.
-func (checker *PodAffinityChecker) NodeMatchesHardPodAntiAffinity(pod *api.Pod, allPods []*api.Pod, node *api.Node, podAntiAffinity *api.PodAntiAffinity) bool {
-	var podAntiAffinityTerms []api.PodAffinityTerm
-	if len(podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution) != 0 {
-		podAntiAffinityTerms = podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution
+func getPodAntiAffinityTerms(podAntiAffinity *api.PodAntiAffinity) (terms []api.PodAffinityTerm) {
+	if podAntiAffinity != nil {
+		if len(podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution) != 0 {
+			terms = podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution
+		}
+		// TODO: Uncomment this block when implement RequiredDuringSchedulingRequiredDuringExecution.
+		//if len(podAntiAffinity.RequiredDuringSchedulingRequiredDuringExecution) != 0 {
+		//	terms = append(terms, podAntiAffinity.RequiredDuringSchedulingRequiredDuringExecution...)
+		//}
 	}
-	// TODO: Uncomment this block when implement RequiredDuringSchedulingRequiredDuringExecution.
-	//if len(podAntiAffinity.RequiredDuringSchedulingRequiredDuringExecution) != 0 {
-	//	podAntiAffinityTerms = append(podAntiAffinityTerms, podAntiAffinity.RequiredDuringSchedulingRequiredDuringExecution...)
-	//}
+	return terms
+}
 
-	// foreach element podAntiAffinityTerm of podAntiAffinityTerms
-	// if the pod matches the term (breaks the anti-affinity),
-	// don't schedule the pod onto this node.
-	for _, podAntiAffinityTerm := range podAntiAffinityTerms {
-		podAntiAffinityTermMatches, err := checker.AnyPodMatchesPodAffinityTerm(pod, allPods, node, podAntiAffinityTerm)
-		if err != nil || podAntiAffinityTermMatches == true {
-			glog.V(10).Infof("Cannot schedule pod %+v onto node %v, because not all the existing pods on this node satisfy the PodAntiAffinityTerm %v, err: %v",
-				podName(pod), node.Name, podAntiAffinityTerm, err)
-			return false
+func getMatchingAntiAffinityTerms(pod *api.Pod, nodeInfoMap map[string]*schedulercache.NodeInfo) ([]matchingPodAntiAffinityTerm, error) {
+	allNodeNames := make([]string, 0, len(nodeInfoMap))
+	for name := range nodeInfoMap {
+		allNodeNames = append(allNodeNames, name)
+	}
+
+	var lock sync.Mutex
+	var result []matchingPodAntiAffinityTerm
+	var firstError error
+	appendResult := func(toAppend []matchingPodAntiAffinityTerm) {
+		lock.Lock()
+		defer lock.Unlock()
+		result = append(result, toAppend...)
+	}
+	catchError := func(err error) {
+		lock.Lock()
+		defer lock.Unlock()
+		if firstError == nil {
+			firstError = err
 		}
 	}
 
-	// Check if scheduling the pod onto this node would break
-	// any anti-affinity rules indicated by the existing pods on the node.
-	// If it would break, system should not schedule pod onto this node.
-	for _, ep := range allPods {
-		epAffinity, err := api.GetAffinityFromPodAnnotations(ep.Annotations)
-		if err != nil {
-			glog.V(10).Infof("Failed to get Affinity from Pod %+v, err: %+v", podName(pod), err)
-			return false
+	processNode := func(i int) {
+		nodeInfo := nodeInfoMap[allNodeNames[i]]
+		node := nodeInfo.Node()
+		if node == nil {
+			catchError(fmt.Errorf("node not found"))
+			return
 		}
-		if epAffinity.PodAntiAffinity != nil {
-			var epAntiAffinityTerms []api.PodAffinityTerm
-			if len(epAffinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution) != 0 {
-				epAntiAffinityTerms = epAffinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution
+		var nodeResult []matchingPodAntiAffinityTerm
+		for _, existingPod := range nodeInfo.PodsWithAffinity() {
+			affinity, err := api.GetAffinityFromPodAnnotations(existingPod.Annotations)
+			if err != nil {
+				catchError(err)
+				return
 			}
-			// TODO: Uncomment this block when implement RequiredDuringSchedulingRequiredDuringExecution.
-			//if len(epAffinity.PodAntiAffinity.RequiredDuringSchedulingRequiredDuringExecution) != 0 {
-			//	epAntiAffinityTerms = append(epAntiAffinityTerms, epAffinity.PodAntiAffinity.RequiredDuringSchedulingRequiredDuringExecution...)
-			//}
-
-			for _, epAntiAffinityTerm := range epAntiAffinityTerms {
-				labelSelector, err := unversioned.LabelSelectorAsSelector(epAntiAffinityTerm.LabelSelector)
+			if affinity == nil {
+				continue
+			}
+			for _, term := range getPodAntiAffinityTerms(affinity.PodAntiAffinity) {
+				match, err := priorityutil.PodMatchesTermsNamespaceAndSelector(pod, existingPod, &term)
 				if err != nil {
-					glog.V(10).Infof("Failed to get label selector from anti-affinityterm %+v of existing pod %+v, err: %+v", epAntiAffinityTerm, podName(pod), err)
-					return false
+					catchError(err)
+					return
 				}
+				if match {
+					nodeResult = append(nodeResult, matchingPodAntiAffinityTerm{term: &term, node: node})
+				}
+			}
+		}
+		if len(nodeResult) > 0 {
+			appendResult(nodeResult)
+		}
+	}
+	workqueue.Parallelize(16, len(allNodeNames), processNode)
+	return result, firstError
+}
 
-				names := priorityutil.GetNamespacesFromPodAffinityTerm(ep, epAntiAffinityTerm)
-				if (len(names) == 0 || names.Has(pod.Namespace)) && labelSelector.Matches(labels.Set(pod.Labels)) {
-					epNode, err := checker.info.GetNodeInfo(ep.Spec.NodeName)
-					if err != nil || checker.failureDomains.NodesHaveSameTopologyKey(node, epNode, epAntiAffinityTerm.TopologyKey) {
-						glog.V(10).Infof("Cannot schedule Pod %+v, onto node %v because the pod would break the PodAntiAffinityTerm %+v, of existing pod %+v, err: %v",
-							podName(pod), node.Name, epAntiAffinityTerm, podName(ep), err)
-						return false
-					}
+func (c *PodAffinityChecker) getMatchingAntiAffinityTerms(pod *api.Pod, allPods []*api.Pod) ([]matchingPodAntiAffinityTerm, error) {
+	var result []matchingPodAntiAffinityTerm
+	for _, existingPod := range allPods {
+		affinity, err := api.GetAffinityFromPodAnnotations(existingPod.Annotations)
+		if err != nil {
+			return nil, err
+		}
+		if affinity.PodAntiAffinity != nil {
+			existingPodNode, err := c.info.GetNodeInfo(existingPod.Spec.NodeName)
+			if err != nil {
+				return nil, err
+			}
+			for _, term := range getPodAntiAffinityTerms(affinity.PodAntiAffinity) {
+				match, err := priorityutil.PodMatchesTermsNamespaceAndSelector(pod, existingPod, &term)
+				if err != nil {
+					return nil, err
+				}
+				if match {
+					result = append(result, matchingPodAntiAffinityTerm{term: &term, node: existingPodNode})
 				}
 			}
 		}
 	}
-	// all the required pod anti-affinity scheduling rules are satisfied
-	glog.V(10).Infof("Can schedule Pod %+v, on node %v because all the required pod anti-affinity scheduling rules are satisfied", podName(pod), node.Name)
+	return result, nil
+}
+
+// Checks if scheduling the pod onto this node would break any anti-affinity
+// rules indicated by the existing pods.
+func (c *PodAffinityChecker) satisfiesExistingPodsAntiAffinity(pod *api.Pod, meta interface{}, node *api.Node) bool {
+	var matchingTerms []matchingPodAntiAffinityTerm
+	if predicateMeta, ok := meta.(*predicateMetadata); ok {
+		matchingTerms = predicateMeta.matchingAntiAffinityTerms
+	} else {
+		allPods, err := c.podLister.List(labels.Everything())
+		if err != nil {
+			glog.V(10).Infof("Failed to get all pods, %+v", err)
+			return false
+		}
+		if matchingTerms, err = c.getMatchingAntiAffinityTerms(pod, allPods); err != nil {
+			glog.V(10).Infof("Failed to get all terms that pod %+v matches, err: %+v", podName(pod), err)
+			return false
+		}
+	}
+	for _, term := range matchingTerms {
+		if c.failureDomains.NodesHaveSameTopologyKey(node, term.node, term.term.TopologyKey) {
+			glog.V(10).Infof("Cannot schedule pod %+v onto node %v,because of PodAntiAffinityTerm %v",
+				podName(pod), node.Name, term.term)
+			return false
+		}
+	}
+	if glog.V(10) {
+		// We explicitly don't do glog.V(10).Infof() to avoid computing all the parameters if this is
+		// not logged. There is visible performance gain from it.
+		glog.Infof("Schedule Pod %+v on Node %+v is allowed, existing pods anti-affinity rules satisfied.",
+			podName(pod), node.Name)
+	}
 	return true
 }
 
-// NodeMatchPodAffinityAntiAffinity checks if the node matches
-// the requiredDuringScheduling affinity/anti-affinity rules indicated by the pod.
-func (checker *PodAffinityChecker) NodeMatchPodAffinityAntiAffinity(pod *api.Pod, allPods []*api.Pod, node *api.Node) bool {
-	// Parse required affinity scheduling rules.
-	affinity, err := api.GetAffinityFromPodAnnotations(pod.Annotations)
+// Checks if scheduling the pod onto this node would break any rules of this pod.
+func (c *PodAffinityChecker) satisfiesPodsAffinityAntiAffinity(pod *api.Pod, node *api.Node, affinity *api.Affinity) bool {
+	allPods, err := c.podLister.List(labels.Everything())
 	if err != nil {
-		glog.V(10).Infof("Failed to get Affinity from Pod %+v, err: %+v", podName(pod), err)
 		return false
 	}
 
-	// check if the current node match the inter-pod affinity scheduling rules.
-	if affinity.PodAffinity != nil {
-		if !checker.NodeMatchesHardPodAffinity(pod, allPods, node, affinity.PodAffinity) {
+	// Check all affinity terms.
+	for _, term := range getPodAffinityTerms(affinity.PodAffinity) {
+		termMatches, matchingPodExists, err := c.anyPodMatchesPodAffinityTerm(pod, allPods, node, &term)
+		if err != nil {
+			glog.V(10).Infof("Cannot schedule pod %+v onto node %v,because of PodAffinityTerm %v, err: %v",
+				podName(pod), node.Name, term, err)
+			return false
+		}
+		if !termMatches {
+			// If the requirement matches a pod's own labels ane namespace, and there are
+			// no other such pods, then disregard the requirement. This is necessary to
+			// not block forever because the first pod of the collection can't be scheduled.
+			match, err := priorityutil.PodMatchesTermsNamespaceAndSelector(pod, pod, &term)
+			if err != nil || !match || matchingPodExists {
+				glog.V(10).Infof("Cannot schedule pod %+v onto node %v,because of PodAffinityTerm %v, err: %v",
+					podName(pod), node.Name, term, err)
+				return false
+			}
+		}
+	}
+
+	// Check all anti-affinity terms.
+	for _, term := range getPodAntiAffinityTerms(affinity.PodAntiAffinity) {
+		termMatches, _, err := c.anyPodMatchesPodAffinityTerm(pod, allPods, node, &term)
+		if err != nil || termMatches {
+			glog.V(10).Infof("Cannot schedule pod %+v onto node %v,because of PodAntiAffinityTerm %v, err: %v",
+				podName(pod), node.Name, term, err)
 			return false
 		}
 	}
 
-	// check if the current node match the inter-pod anti-affinity scheduling rules.
-	if affinity.PodAntiAffinity != nil {
-		if !checker.NodeMatchesHardPodAntiAffinity(pod, allPods, node, affinity.PodAntiAffinity) {
+	if glog.V(10) {
+		// We explicitly don't do glog.V(10).Infof() to avoid computing all the parameters if this is
+		// not logged. There is visible performance gain from it.
+		glog.Infof("Schedule Pod %+v on Node %+v is allowed, pod afinnity/anti-affinity constraints satisfied.",
+			podName(pod), node.Name)
+	}
+	return true
+}
+
+func PodToleratesNodeTaints(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
+	node := nodeInfo.Node()
+	if node == nil {
+		return false, nil, fmt.Errorf("node not found")
+	}
+
+	taints, err := api.GetTaintsFromNodeAnnotations(node.Annotations)
+	if err != nil {
+		return false, nil, err
+	}
+
+	tolerations, err := api.GetTolerationsFromPodAnnotations(pod.Annotations)
+	if err != nil {
+		return false, nil, err
+	}
+
+	if tolerationsToleratesTaints(tolerations, taints) {
+		return true, nil, nil
+	}
+	return false, []algorithm.PredicateFailureReason{ErrTaintsTolerationsNotMatch}, nil
+}
+
+func tolerationsToleratesTaints(tolerations []api.Toleration, taints []api.Taint) bool {
+	// If the taint list is nil/empty, it is tolerated by all tolerations by default.
+	if len(taints) == 0 {
+		return true
+	}
+
+	// The taint list isn't nil/empty, a nil/empty toleration list can't tolerate them.
+	if len(tolerations) == 0 {
+		return false
+	}
+
+	for i := range taints {
+		taint := &taints[i]
+		// skip taints that have effect PreferNoSchedule, since it is for priorities
+		if taint.Effect == api.TaintEffectPreferNoSchedule {
+			continue
+		}
+
+		if !api.TaintToleratedByTolerations(taint, tolerations) {
 			return false
 		}
 	}
+
 	return true
+}
+
+// Determine if a pod is scheduled with best-effort QoS
+func isPodBestEffort(pod *api.Pod) bool {
+	return qos.GetPodQOS(pod) == qos.BestEffort
+}
+
+// CheckNodeMemoryPressurePredicate checks if a pod can be scheduled on a node
+// reporting memory pressure condition.
+func CheckNodeMemoryPressurePredicate(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
+	node := nodeInfo.Node()
+	if node == nil {
+		return false, nil, fmt.Errorf("node not found")
+	}
+
+	var podBestEffort bool
+	if predicateMeta, ok := meta.(*predicateMetadata); ok {
+		podBestEffort = predicateMeta.podBestEffort
+	} else {
+		// We couldn't parse metadata - fallback to computing it.
+		podBestEffort = isPodBestEffort(pod)
+	}
+
+	// pod is not BestEffort pod
+	if !podBestEffort {
+		return true, nil, nil
+	}
+
+	// is node under presure?
+	for _, cond := range node.Status.Conditions {
+		if cond.Type == api.NodeMemoryPressure && cond.Status == api.ConditionTrue {
+			return false, []algorithm.PredicateFailureReason{ErrNodeUnderMemoryPressure}, nil
+		}
+	}
+
+	return true, nil, nil
+}
+
+// CheckNodeDiskPressurePredicate checks if a pod can be scheduled on a node
+// reporting disk pressure condition.
+func CheckNodeDiskPressurePredicate(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
+	node := nodeInfo.Node()
+	if node == nil {
+		return false, nil, fmt.Errorf("node not found")
+	}
+
+	// is node under presure?
+	for _, cond := range node.Status.Conditions {
+		if cond.Type == api.NodeDiskPressure && cond.Status == api.ConditionTrue {
+			return false, []algorithm.PredicateFailureReason{ErrNodeUnderDiskPressure}, nil
+		}
+	}
+
+	return true, nil, nil
 }

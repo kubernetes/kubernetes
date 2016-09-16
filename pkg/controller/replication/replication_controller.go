@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,16 +26,19 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/controller/framework"
-	"k8s.io/kubernetes/pkg/controller/framework/informers"
+	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
+	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/metrics"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -65,6 +68,10 @@ const (
 	statusUpdateRetries = 1
 )
 
+func getRCKind() unversioned.GroupVersionKind {
+	return v1.SchemeGroupVersion.WithKind("ReplicationController")
+}
+
 // ReplicationManager is responsible for synchronizing ReplicationController objects stored
 // in the system with actual running pods.
 // TODO: this really should be called ReplicationController. The only reason why it's a Manager
@@ -78,7 +85,7 @@ type ReplicationManager struct {
 	// we have a personal informer, we must start it ourselves.   If you start
 	// the controller using NewReplicationManager(passing SharedInformer), this
 	// will be null
-	internalPodInformer framework.SharedIndexInformer
+	internalPodInformer cache.SharedIndexInformer
 
 	// An rc is temporarily suspended after creating/deleting these many replicas.
 	// It resumes normal action after observing the watch events for them.
@@ -92,11 +99,11 @@ type ReplicationManager struct {
 	// A store of replication controllers, populated by the rcController
 	rcStore cache.StoreToReplicationControllerLister
 	// Watches changes to all replication controllers
-	rcController *framework.Controller
+	rcController *cache.Controller
 	// A store of pods, populated by the podController
 	podStore cache.StoreToPodLister
 	// Watches changes to all pods
-	podController framework.ControllerInterface
+	podController cache.ControllerInterface
 	// podStoreSynced returns true if the pod store has been synced at least once.
 	// Added as a member to the struct to allow injection for testing.
 	podStoreSynced func() bool
@@ -104,21 +111,25 @@ type ReplicationManager struct {
 	lookupCache *controller.MatchingCache
 
 	// Controllers that need to be synced
-	queue *workqueue.Type
+	queue workqueue.RateLimitingInterface
+
+	// garbageCollectorEnabled denotes if the garbage collector is enabled. RC
+	// manager behaves differently if GC is enabled.
+	garbageCollectorEnabled bool
 }
 
 // NewReplicationManager creates a replication manager
-func NewReplicationManager(podInformer framework.SharedIndexInformer, kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFunc, burstReplicas int, lookupCacheSize int) *ReplicationManager {
+func NewReplicationManager(podInformer cache.SharedIndexInformer, kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFunc, burstReplicas int, lookupCacheSize int, garbageCollectorEnabled bool) *ReplicationManager {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
 	eventBroadcaster.StartRecordingToSink(&unversionedcore.EventSinkImpl{Interface: kubeClient.Core().Events("")})
-	return newReplicationManagerInternal(
+	return newReplicationManager(
 		eventBroadcaster.NewRecorder(api.EventSource{Component: "replication-controller"}),
-		podInformer, kubeClient, resyncPeriod, burstReplicas, lookupCacheSize)
+		podInformer, kubeClient, resyncPeriod, burstReplicas, lookupCacheSize, garbageCollectorEnabled)
 }
 
-// newReplicationManagerInternal configures a replication manager with the specified event recorder
-func newReplicationManagerInternal(eventRecorder record.EventRecorder, podInformer framework.SharedIndexInformer, kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFunc, burstReplicas int, lookupCacheSize int) *ReplicationManager {
+// newReplicationManager configures a replication manager with the specified event recorder
+func newReplicationManager(eventRecorder record.EventRecorder, podInformer cache.SharedIndexInformer, kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFunc, burstReplicas int, lookupCacheSize int, garbageCollectorEnabled bool) *ReplicationManager {
 	if kubeClient != nil && kubeClient.Core().GetRESTClient().GetRateLimiter() != nil {
 		metrics.RegisterMetricAndTrackRateLimiterUsage("replication_controller", kubeClient.Core().GetRESTClient().GetRateLimiter())
 	}
@@ -131,10 +142,11 @@ func newReplicationManagerInternal(eventRecorder record.EventRecorder, podInform
 		},
 		burstReplicas: burstReplicas,
 		expectations:  controller.NewUIDTrackingControllerExpectations(controller.NewControllerExpectations()),
-		queue:         workqueue.New(),
+		queue:         workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "replicationmanager"),
+		garbageCollectorEnabled: garbageCollectorEnabled,
 	}
 
-	rm.rcStore.Indexer, rm.rcController = framework.NewIndexerInformer(
+	rm.rcStore.Indexer, rm.rcController = cache.NewIndexerInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				return rm.kubeClient.Core().ReplicationControllers(api.NamespaceAll).List(options)
@@ -146,44 +158,9 @@ func newReplicationManagerInternal(eventRecorder record.EventRecorder, podInform
 		&api.ReplicationController{},
 		// TODO: Can we have much longer period here?
 		FullControllerResyncPeriod,
-		framework.ResourceEventHandlerFuncs{
-			AddFunc: rm.enqueueController,
-			UpdateFunc: func(old, cur interface{}) {
-				oldRC := old.(*api.ReplicationController)
-				curRC := cur.(*api.ReplicationController)
-
-				// We should invalidate the whole lookup cache if a RC's selector has been updated.
-				//
-				// Imagine that you have two RCs:
-				// * old RC1
-				// * new RC2
-				// You also have a pod that is attached to RC2 (because it doesn't match RC1 selector).
-				// Now imagine that you are changing RC1 selector so that it is now matching that pod,
-				// in such case, we must invalidate the whole cache so that pod could be adopted by RC1
-				//
-				// This makes the lookup cache less helpful, but selector update does not happen often,
-				// so it's not a big problem
-				if !reflect.DeepEqual(oldRC.Spec.Selector, curRC.Spec.Selector) {
-					rm.lookupCache.InvalidateAll()
-				}
-
-				// You might imagine that we only really need to enqueue the
-				// controller when Spec changes, but it is safer to sync any
-				// time this function is triggered. That way a full informer
-				// resync can requeue any controllers that don't yet have pods
-				// but whose last attempts at creating a pod have failed (since
-				// we don't block on creation of pods) instead of those
-				// controllers stalling indefinitely. Enqueueing every time
-				// does result in some spurious syncs (like when Status.Replica
-				// is updated and the watch notification from it retriggers
-				// this function), but in general extra resyncs shouldn't be
-				// that bad as rcs that haven't met expectations yet won't
-				// sync, and all the listing is done using local stores.
-				if oldRC.Status.Replicas != curRC.Status.Replicas {
-					glog.V(4).Infof("Observed updated replica count for rc: %v, %d->%d", curRC.Name, oldRC.Status.Replicas, curRC.Status.Replicas)
-				}
-				rm.enqueueController(cur)
-			},
+		cache.ResourceEventHandlerFuncs{
+			AddFunc:    rm.enqueueController,
+			UpdateFunc: rm.updateRC,
 			// This will enter the sync loop and no-op, because the controller has been deleted from the store.
 			// Note that deleting a controller immediately after scaling it to 0 will not work. The recommended
 			// way of achieving this is by performing a `stop` operation on the controller.
@@ -192,7 +169,7 @@ func newReplicationManagerInternal(eventRecorder record.EventRecorder, podInform
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)
 
-	podInformer.AddEventHandler(framework.ResourceEventHandlerFuncs{
+	podInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: rm.addPod,
 		// This invokes the rc for every pod change, eg: host assignment. Though this might seem like overkill
 		// the most frequent pod update is status, and the associated rc will only list from local storage, so
@@ -211,16 +188,18 @@ func newReplicationManagerInternal(eventRecorder record.EventRecorder, podInform
 
 // NewReplicationManagerFromClientForIntegration creates a new ReplicationManager that runs its own informer.  It disables event recording for use in integration tests.
 func NewReplicationManagerFromClientForIntegration(kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFunc, burstReplicas int, lookupCacheSize int) *ReplicationManager {
-	podInformer := informers.CreateSharedPodIndexInformer(kubeClient, resyncPeriod())
-	rm := newReplicationManagerInternal(&record.FakeRecorder{}, podInformer, kubeClient, resyncPeriod, burstReplicas, lookupCacheSize)
+	podInformer := informers.NewPodInformer(kubeClient, resyncPeriod())
+	garbageCollectorEnabled := false
+	rm := newReplicationManager(&record.FakeRecorder{}, podInformer, kubeClient, resyncPeriod, burstReplicas, lookupCacheSize, garbageCollectorEnabled)
 	rm.internalPodInformer = podInformer
 	return rm
 }
 
 // NewReplicationManagerFromClient creates a new ReplicationManager that runs its own informer.
 func NewReplicationManagerFromClient(kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFunc, burstReplicas int, lookupCacheSize int) *ReplicationManager {
-	podInformer := informers.CreateSharedPodIndexInformer(kubeClient, resyncPeriod())
-	rm := NewReplicationManager(podInformer, kubeClient, resyncPeriod, burstReplicas, lookupCacheSize)
+	podInformer := informers.NewPodInformer(kubeClient, resyncPeriod())
+	garbageCollectorEnabled := false
+	rm := NewReplicationManager(podInformer, kubeClient, resyncPeriod, burstReplicas, lookupCacheSize, garbageCollectorEnabled)
 	rm.internalPodInformer = podInformer
 
 	return rm
@@ -255,13 +234,14 @@ func (rm *ReplicationManager) Run(workers int, stopCh <-chan struct{}) {
 
 // getPodController returns the controller managing the given pod.
 // TODO: Surface that we are ignoring multiple controllers for a single pod.
+// TODO: use ownerReference.Controller to determine if the rc controls the pod.
 func (rm *ReplicationManager) getPodController(pod *api.Pod) *api.ReplicationController {
 	// look up in the cache, if cached and the cache is valid, just return cached value
 	if obj, cached := rm.lookupCache.GetMatchingObject(pod); cached {
 		controller, ok := obj.(*api.ReplicationController)
 		if !ok {
 			// This should not happen
-			glog.Errorf("lookup cache does not retuen a ReplicationController object")
+			glog.Errorf("lookup cache does not return a ReplicationController object")
 			return nil
 		}
 		if cached && rm.isCacheValid(pod, controller) {
@@ -310,14 +290,54 @@ func isControllerMatch(pod *api.Pod, rc *api.ReplicationController) bool {
 	if rc.Namespace != pod.Namespace {
 		return false
 	}
-	labelSet := labels.Set(rc.Spec.Selector)
-	selector := labels.Set(rc.Spec.Selector).AsSelector()
+	selector := labels.Set(rc.Spec.Selector).AsSelectorPreValidated()
 
 	// If an rc with a nil or empty selector creeps in, it should match nothing, not everything.
-	if labelSet.AsSelector().Empty() || !selector.Matches(labels.Set(pod.Labels)) {
+	if selector.Empty() || !selector.Matches(labels.Set(pod.Labels)) {
 		return false
 	}
 	return true
+}
+
+// callback when RC is updated
+func (rm *ReplicationManager) updateRC(old, cur interface{}) {
+	oldRC := old.(*api.ReplicationController)
+	curRC := cur.(*api.ReplicationController)
+
+	// We should invalidate the whole lookup cache if a RC's selector has been updated.
+	//
+	// Imagine that you have two RCs:
+	// * old RC1
+	// * new RC2
+	// You also have a pod that is attached to RC2 (because it doesn't match RC1 selector).
+	// Now imagine that you are changing RC1 selector so that it is now matching that pod,
+	// in such case, we must invalidate the whole cache so that pod could be adopted by RC1
+	//
+	// This makes the lookup cache less helpful, but selector update does not happen often,
+	// so it's not a big problem
+	if !reflect.DeepEqual(oldRC.Spec.Selector, curRC.Spec.Selector) {
+		rm.lookupCache.InvalidateAll()
+	}
+	// TODO: Remove when #31981 is resolved!
+	glog.Infof("Observed updated replication controller %v. Desired pod count change: %d->%d", curRC.Name, oldRC.Spec.Replicas, curRC.Spec.Replicas)
+
+	// You might imagine that we only really need to enqueue the
+	// controller when Spec changes, but it is safer to sync any
+	// time this function is triggered. That way a full informer
+	// resync can requeue any controllers that don't yet have pods
+	// but whose last attempts at creating a pod have failed (since
+	// we don't block on creation of pods) instead of those
+	// controllers stalling indefinitely. Enqueueing every time
+	// does result in some spurious syncs (like when Status.Replica
+	// is updated and the watch notification from it retriggers
+	// this function), but in general extra resyncs shouldn't be
+	// that bad as rcs that haven't met expectations yet won't
+	// sync, and all the listing is done using local stores.
+	if oldRC.Status.Replicas != curRC.Status.Replicas {
+		// TODO: Should we log status or spec?
+		glog.V(4).Infof("Observed updated replica count for rc: %v, %d->%d", curRC.Name, oldRC.Status.Replicas, curRC.Status.Replicas)
+	}
+	rm.enqueueController(cur)
 }
 
 // When a pod is created, enqueue the controller that manages it and update it's expectations.
@@ -348,17 +368,15 @@ func (rm *ReplicationManager) addPod(obj interface{}) {
 // up. If the labels of the pod have changed we need to awaken both the old
 // and new controller. old and cur must be *api.Pod types.
 func (rm *ReplicationManager) updatePod(old, cur interface{}) {
-	if api.Semantic.DeepEqual(old, cur) {
-		// A periodic relist will send update events for all known pods.
-		return
-	}
 	curPod := cur.(*api.Pod)
-	rc := rm.getPodController(curPod)
-	if rc == nil {
+	oldPod := old.(*api.Pod)
+	if curPod.ResourceVersion == oldPod.ResourceVersion {
+		// Periodic resync will send update events for all known pods.
+		// Two different versions of the same pod will always have different RVs.
 		return
 	}
-	oldPod := old.(*api.Pod)
-
+	glog.V(4).Infof("Pod %s updated, objectMeta %+v -> %+v.", curPod.Name, oldPod.ObjectMeta, curPod.ObjectMeta)
+	labelChanged := !reflect.DeepEqual(curPod.Labels, oldPod.Labels)
 	if curPod.DeletionTimestamp != nil {
 		// when a pod is deleted gracefully it's deletion timestamp is first modified to reflect a grace period,
 		// and after such time has passed, the kubelet actually deletes it from the store. We receive an update
@@ -366,16 +384,25 @@ func (rm *ReplicationManager) updatePod(old, cur interface{}) {
 		// until the kubelet actually deletes the pod. This is different from the Phase of a pod changing, because
 		// an rc never initiates a phase change, and so is never asleep waiting for the same.
 		rm.deletePod(curPod)
+		if labelChanged {
+			// we don't need to check the oldPod.DeletionTimestamp because DeletionTimestamp cannot be unset.
+			rm.deletePod(oldPod)
+		}
 		return
 	}
-	rm.enqueueController(rc)
+
 	// Only need to get the old controller if the labels changed.
-	if !reflect.DeepEqual(curPod.Labels, oldPod.Labels) {
+	// Enqueue the oldRC before the curRC to give curRC a chance to adopt the oldPod.
+	if labelChanged {
 		// If the old and new rc are the same, the first one that syncs
 		// will set expectations preventing any damage from the second.
 		if oldRC := rm.getPodController(oldPod); oldRC != nil {
 			rm.enqueueController(oldRC)
 		}
+	}
+
+	if curRC := rm.getPodController(curPod); curRC != nil {
+		rm.enqueueController(curRC)
 	}
 }
 
@@ -391,12 +418,12 @@ func (rm *ReplicationManager) deletePod(obj interface{}) {
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			glog.Errorf("Couldn't get object from tombstone %+v", obj)
+			glog.Errorf("Couldn't get object from tombstone %#v", obj)
 			return
 		}
 		pod, ok = tombstone.Obj.(*api.Pod)
 		if !ok {
-			glog.Errorf("Tombstone contained object that is not a pod %+v", obj)
+			glog.Errorf("Tombstone contained object that is not a pod %#v", obj)
 			return
 		}
 	}
@@ -438,10 +465,15 @@ func (rm *ReplicationManager) worker() {
 			return true
 		}
 		defer rm.queue.Done(key)
+
 		err := rm.syncHandler(key.(string))
-		if err != nil {
-			glog.Errorf("Error syncing replication controller: %v", err)
+		if err == nil {
+			rm.queue.Forget(key)
+			return false
 		}
+
+		rm.queue.AddRateLimited(key)
+		utilruntime.HandleError(err)
 		return false
 	}
 	for {
@@ -453,13 +485,17 @@ func (rm *ReplicationManager) worker() {
 }
 
 // manageReplicas checks and updates replicas for the given replication controller.
-func (rm *ReplicationManager) manageReplicas(filteredPods []*api.Pod, rc *api.ReplicationController) {
+// Does NOT modify <filteredPods>.
+func (rm *ReplicationManager) manageReplicas(filteredPods []*api.Pod, rc *api.ReplicationController) error {
 	diff := len(filteredPods) - int(rc.Spec.Replicas)
 	rcKey, err := controller.KeyFunc(rc)
 	if err != nil {
-		glog.Errorf("Couldn't get key for replication controller %#v: %v", rc, err)
-		return
+		return err
 	}
+	if diff == 0 {
+		return nil
+	}
+
 	if diff < 0 {
 		diff *= -1
 		if diff > rm.burstReplicas {
@@ -470,66 +506,105 @@ func (rm *ReplicationManager) manageReplicas(filteredPods []*api.Pod, rc *api.Re
 		// UID, which would require locking *across* the create, which will turn
 		// into a performance bottleneck. We should generate a UID for the pod
 		// beforehand and store it via ExpectCreations.
+		errCh := make(chan error, diff)
 		rm.expectations.ExpectCreations(rcKey, diff)
-		wait := sync.WaitGroup{}
-		wait.Add(diff)
+		var wg sync.WaitGroup
+		wg.Add(diff)
 		glog.V(2).Infof("Too few %q/%q replicas, need %d, creating %d", rc.Namespace, rc.Name, rc.Spec.Replicas, diff)
 		for i := 0; i < diff; i++ {
 			go func() {
-				defer wait.Done()
-				if err := rm.podControl.CreatePods(rc.Namespace, rc.Spec.Template, rc); err != nil {
+				defer wg.Done()
+				var err error
+				if rm.garbageCollectorEnabled {
+					var trueVar = true
+					controllerRef := &api.OwnerReference{
+						APIVersion: getRCKind().GroupVersion().String(),
+						Kind:       getRCKind().Kind,
+						Name:       rc.Name,
+						UID:        rc.UID,
+						Controller: &trueVar,
+					}
+					err = rm.podControl.CreatePodsWithControllerRef(rc.Namespace, rc.Spec.Template, rc, controllerRef)
+				} else {
+					err = rm.podControl.CreatePods(rc.Namespace, rc.Spec.Template, rc)
+				}
+				if err != nil {
 					// Decrement the expected number of creates because the informer won't observe this pod
 					glog.V(2).Infof("Failed creation, decrementing expectations for controller %q/%q", rc.Namespace, rc.Name)
 					rm.expectations.CreationObserved(rcKey)
-					rm.enqueueController(rc)
+					errCh <- err
 					utilruntime.HandleError(err)
 				}
 			}()
 		}
-		wait.Wait()
-	} else if diff > 0 {
-		if diff > rm.burstReplicas {
-			diff = rm.burstReplicas
+		wg.Wait()
+
+		select {
+		case err := <-errCh:
+			// all errors have been reported before and they're likely to be the same, so we'll only return the first one we hit.
+			if err != nil {
+				return err
+			}
+		default:
 		}
-		glog.V(2).Infof("Too many %q/%q replicas, need %d, deleting %d", rc.Namespace, rc.Name, rc.Spec.Replicas, diff)
-		// No need to sort pods if we are about to delete all of them
-		if rc.Spec.Replicas != 0 {
-			// Sort the pods in the order such that not-ready < ready, unscheduled
-			// < scheduled, and pending < running. This ensures that we delete pods
-			// in the earlier stages whenever possible.
-			sort.Sort(controller.ActivePods(filteredPods))
-		}
-		// Snapshot the UIDs (ns/name) of the pods we're expecting to see
-		// deleted, so we know to record their expectations exactly once either
-		// when we see it as an update of the deletion timestamp, or as a delete.
-		// Note that if the labels on a pod/rc change in a way that the pod gets
-		// orphaned, the rs will only wake up after the expectations have
-		// expired even if other pods are deleted.
-		deletedPodKeys := []string{}
-		for i := 0; i < diff; i++ {
-			deletedPodKeys = append(deletedPodKeys, controller.PodKey(filteredPods[i]))
-		}
-		// We use pod namespace/name as a UID to wait for deletions, so if the
-		// labels on a pod/rc change in a way that the pod gets orphaned, the
-		// rc will only wake up after the expectation has expired.
-		rm.expectations.ExpectDeletions(rcKey, deletedPodKeys)
-		wait := sync.WaitGroup{}
-		wait.Add(diff)
-		for i := 0; i < diff; i++ {
-			go func(ix int) {
-				defer wait.Done()
-				if err := rm.podControl.DeletePod(rc.Namespace, filteredPods[ix].Name, rc); err != nil {
-					// Decrement the expected number of deletes because the informer won't observe this deletion
-					podKey := controller.PodKey(filteredPods[ix])
-					glog.V(2).Infof("Failed to delete %v due to %v, decrementing expectations for controller %q/%q", podKey, err, rc.Namespace, rc.Name)
-					rm.expectations.DeletionObserved(rcKey, podKey)
-					rm.enqueueController(rc)
-					utilruntime.HandleError(err)
-				}
-			}(i)
-		}
-		wait.Wait()
+
+		return nil
 	}
+
+	if diff > rm.burstReplicas {
+		diff = rm.burstReplicas
+	}
+	glog.V(2).Infof("Too many %q/%q replicas, need %d, deleting %d", rc.Namespace, rc.Name, rc.Spec.Replicas, diff)
+	// No need to sort pods if we are about to delete all of them
+	if rc.Spec.Replicas != 0 {
+		// Sort the pods in the order such that not-ready < ready, unscheduled
+		// < scheduled, and pending < running. This ensures that we delete pods
+		// in the earlier stages whenever possible.
+		sort.Sort(controller.ActivePods(filteredPods))
+	}
+	// Snapshot the UIDs (ns/name) of the pods we're expecting to see
+	// deleted, so we know to record their expectations exactly once either
+	// when we see it as an update of the deletion timestamp, or as a delete.
+	// Note that if the labels on a pod/rc change in a way that the pod gets
+	// orphaned, the rs will only wake up after the expectations have
+	// expired even if other pods are deleted.
+	deletedPodKeys := []string{}
+	for i := 0; i < diff; i++ {
+		deletedPodKeys = append(deletedPodKeys, controller.PodKey(filteredPods[i]))
+	}
+	// We use pod namespace/name as a UID to wait for deletions, so if the
+	// labels on a pod/rc change in a way that the pod gets orphaned, the
+	// rc will only wake up after the expectation has expired.
+	errCh := make(chan error, diff)
+	rm.expectations.ExpectDeletions(rcKey, deletedPodKeys)
+	var wg sync.WaitGroup
+	wg.Add(diff)
+	for i := 0; i < diff; i++ {
+		go func(ix int) {
+			defer wg.Done()
+			if err := rm.podControl.DeletePod(rc.Namespace, filteredPods[ix].Name, rc); err != nil {
+				// Decrement the expected number of deletes because the informer won't observe this deletion
+				podKey := controller.PodKey(filteredPods[ix])
+				glog.V(2).Infof("Failed to delete %v due to %v, decrementing expectations for controller %q/%q", podKey, err, rc.Namespace, rc.Name)
+				rm.expectations.DeletionObserved(rcKey, podKey)
+				errCh <- err
+				utilruntime.HandleError(err)
+			}
+		}(i)
+	}
+	wg.Wait()
+
+	select {
+	case err := <-errCh:
+		// all errors have been reported before and they're likely to be the same, so we'll only return the first one we hit.
+		if err != nil {
+			return err
+		}
+	default:
+	}
+
+	return nil
+
 }
 
 // syncReplicationController will sync the rc with the given key if it has had its expectations fulfilled, meaning
@@ -559,8 +634,6 @@ func (rm *ReplicationManager) syncReplicationController(key string) error {
 		return nil
 	}
 	if err != nil {
-		glog.Infof("Unable to retrieve rc %v from store: %v", key, err)
-		rm.queue.Add(key)
 		return err
 	}
 	rc := *obj.(*api.ReplicationController)
@@ -576,18 +649,64 @@ func (rm *ReplicationManager) syncReplicationController(key string) error {
 	trace.Step("ReplicationController restored")
 	rcNeedsSync := rm.expectations.SatisfiedExpectations(rcKey)
 	trace.Step("Expectations restored")
-	podList, err := rm.podStore.Pods(rc.Namespace).List(labels.Set(rc.Spec.Selector).AsSelector())
-	if err != nil {
-		glog.Errorf("Error getting pods for rc %q: %v", key, err)
-		rm.queue.Add(key)
-		return err
-	}
-	trace.Step("Pods listed")
 
-	// TODO: Do this in a single pass, or use an index.
-	filteredPods := controller.FilterActivePods(podList.Items)
-	if rcNeedsSync {
-		rm.manageReplicas(filteredPods, &rc)
+	// NOTE: filteredPods are pointing to objects from cache - if you need to
+	// modify them, you need to copy it first.
+	// TODO: Do the List and Filter in a single pass, or use an index.
+	var filteredPods []*api.Pod
+	if rm.garbageCollectorEnabled {
+		// list all pods to include the pods that don't match the rc's selector
+		// anymore but has the stale controller ref.
+		pods, err := rm.podStore.Pods(rc.Namespace).List(labels.Everything())
+		if err != nil {
+			glog.Errorf("Error getting pods for rc %q: %v", key, err)
+			rm.queue.Add(key)
+			return err
+		}
+		cm := controller.NewPodControllerRefManager(rm.podControl, rc.ObjectMeta, labels.Set(rc.Spec.Selector).AsSelectorPreValidated(), getRCKind())
+		matchesAndControlled, matchesNeedsController, controlledDoesNotMatch := cm.Classify(pods)
+		for _, pod := range matchesNeedsController {
+			err := cm.AdoptPod(pod)
+			// continue to next pod if adoption fails.
+			if err != nil {
+				// If the pod no longer exists, don't even log the error.
+				if !errors.IsNotFound(err) {
+					utilruntime.HandleError(err)
+				}
+			} else {
+				matchesAndControlled = append(matchesAndControlled, pod)
+			}
+		}
+		filteredPods = matchesAndControlled
+		// remove the controllerRef for the pods that no longer have matching labels
+		var errlist []error
+		for _, pod := range controlledDoesNotMatch {
+			err := cm.ReleasePod(pod)
+			if err != nil {
+				errlist = append(errlist, err)
+			}
+		}
+		if len(errlist) != 0 {
+			aggregate := utilerrors.NewAggregate(errlist)
+			// push the RC into work queue again. We need to try to free the
+			// pods again otherwise they will stuck with the stale
+			// controllerRef.
+			rm.queue.Add(key)
+			return aggregate
+		}
+	} else {
+		pods, err := rm.podStore.Pods(rc.Namespace).List(labels.Set(rc.Spec.Selector).AsSelectorPreValidated())
+		if err != nil {
+			glog.Errorf("Error getting pods for rc %q: %v", key, err)
+			rm.queue.Add(key)
+			return err
+		}
+		filteredPods = controller.FilterActivePods(pods)
+	}
+
+	var manageReplicasErr error
+	if rcNeedsSync && rc.DeletionTimestamp == nil {
+		manageReplicasErr = rm.manageReplicas(filteredPods, &rc)
 	}
 	trace.Step("manageReplicas done")
 
@@ -597,19 +716,22 @@ func (rm *ReplicationManager) syncReplicationController(key string) error {
 	// a superset of the selector of the replication controller, so the possible
 	// matching pods must be part of the filteredPods.
 	fullyLabeledReplicasCount := 0
-	templateLabel := labels.Set(rc.Spec.Template.Labels).AsSelector()
+	readyReplicasCount := 0
+	templateLabel := labels.Set(rc.Spec.Template.Labels).AsSelectorPreValidated()
 	for _, pod := range filteredPods {
 		if templateLabel.Matches(labels.Set(pod.Labels)) {
 			fullyLabeledReplicasCount++
 		}
+		if api.IsPodReady(pod) {
+			readyReplicasCount++
+		}
 	}
 
 	// Always updates status as pods come up or die.
-	if err := updateReplicaCount(rm.kubeClient.Core().ReplicationControllers(rc.Namespace), rc, len(filteredPods), fullyLabeledReplicasCount); err != nil {
-		// Multiple things could lead to this update failing. Requeuing the controller ensures
-		// we retry with some fairness.
-		glog.V(2).Infof("Failed to update replica count for controller %v/%v; requeuing; error: %v", rc.Namespace, rc.Name, err)
-		rm.enqueueController(&rc)
+	if err := updateReplicaCount(rm.kubeClient.Core().ReplicationControllers(rc.Namespace), rc, len(filteredPods), fullyLabeledReplicasCount, readyReplicasCount); err != nil {
+		// Multiple things could lead to this update failing.  Returning an error causes a requeue without forcing a hotloop
+		return err
 	}
-	return nil
+
+	return manageReplicasErr
 }

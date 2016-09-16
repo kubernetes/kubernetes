@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -45,11 +45,11 @@ func (endpointsStrategy) NamespaceScoped() bool {
 }
 
 // PrepareForCreate clears fields that are not allowed to be set by end users on creation.
-func (endpointsStrategy) PrepareForCreate(obj runtime.Object) {
+func (endpointsStrategy) PrepareForCreate(ctx api.Context, obj runtime.Object) {
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
-func (endpointsStrategy) PrepareForUpdate(obj, old runtime.Object) {
+func (endpointsStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
 }
 
 // Validate validates a new endpoints.
@@ -79,7 +79,7 @@ func (endpointsStrategy) AllowUnconditionalUpdate() bool {
 }
 
 // MatchEndpoints returns a generic matcher for a given label and field selector.
-func MatchEndpoints(label labels.Selector, field fields.Selector) generic.Matcher {
+func MatchEndpoints(label labels.Selector, field fields.Selector) *generic.SelectionPredicate {
 	return &generic.SelectionPredicate{Label: label, Field: field, GetAttrs: EndpointsAttributes}
 }
 
@@ -90,5 +90,5 @@ func EndpointsAttributes(obj runtime.Object) (objLabels labels.Set, objFields fi
 	if !ok {
 		return nil, nil, fmt.Errorf("invalid object type %#v", obj)
 	}
-	return endpoints.Labels, generic.ObjectMetaFieldsSet(endpoints.ObjectMeta, true), nil
+	return endpoints.Labels, generic.ObjectMetaFieldsSet(&endpoints.ObjectMeta, true), nil
 }

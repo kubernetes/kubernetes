@@ -152,11 +152,12 @@ func (r Mount) assertValid() error {
 
 // RuntimeApp describes an application referenced in a PodManifest
 type RuntimeApp struct {
-	Name        types.ACName      `json:"name"`
-	Image       RuntimeImage      `json:"image"`
-	App         *types.App        `json:"app,omitempty"`
-	Mounts      []Mount           `json:"mounts,omitempty"`
-	Annotations types.Annotations `json:"annotations,omitempty"`
+	Name           types.ACName      `json:"name"`
+	Image          RuntimeImage      `json:"image"`
+	App            *types.App        `json:"app,omitempty"`
+	ReadOnlyRootFS bool              `json:"readOnlyRootFS,omitempty"`
+	Mounts         []Mount           `json:"mounts,omitempty"`
+	Annotations    types.Annotations `json:"annotations,omitempty"`
 }
 
 // RuntimeImage describes an image referenced in a RuntimeApp

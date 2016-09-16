@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 The Kubernetes Authors All rights reserved.
+# Copyright 2015 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -34,6 +34,7 @@ retry() {
 export PATH=${GOPATH}/bin:${PWD}/third_party/etcd:/usr/local/go/bin:${PATH}
 
 retry go get github.com/tools/godep && godep version
+retry go get github.com/jteeuwen/go-bindata/go-bindata
 retry go get github.com/jstemmer/go-junit-report
 
 # Enable the Go race detector.
@@ -52,13 +53,11 @@ export LOG_LEVEL=4
 cd /go/src/k8s.io/kubernetes
 rm -rf Godeps/_workspace # Temporary until _workspace is fully obliterated
 
-./hack/build-go.sh
+make generated_files
 go install ./cmd/...
 ./hack/install-etcd.sh
 
-./hack/verify-all.sh -v
-
-./hack/test-go.sh
-./hack/test-cmd.sh
-./hack/test-integration.sh
+make test
+make test-cmd
+make test-integration
 ./hack/test-update-storage-objects.sh

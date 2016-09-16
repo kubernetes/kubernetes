@@ -1,4 +1,4 @@
-// Copyright 2015 CoreOS, Inc.
+// Copyright 2015 The etcd Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -85,7 +85,7 @@ func (q *statsQueue) Rate() (float64, float64) {
 		return 0, 0
 	}
 
-	if time.Now().Sub(back.SendingTime) > time.Second {
+	if time.Since(back.SendingTime) > time.Second {
 		q.Clear()
 		return 0, 0
 	}

@@ -18,7 +18,6 @@ import (
 	"bufio"
 	"fmt"
 	"io"
-	"os"
 	"os/exec"
 	"path"
 	"regexp"
@@ -26,6 +25,7 @@ import (
 	"time"
 
 	"github.com/google/cadvisor/utils"
+	"github.com/google/cadvisor/utils/tail"
 
 	"github.com/golang/glog"
 )
@@ -105,27 +105,29 @@ func checkIfStartOfOomMessages(line string) bool {
 // Should prevent EOF errors that occur when lines are read before being fully
 // written to the log. It reads line by line splitting on
 // the "\n" character.
-func readLinesFromFile(lineChannel chan string, ioreader *bufio.Reader) {
+func readLinesFromFile(lineChannel chan string, ioreader *bufio.Reader) error {
 	linefragment := ""
 	var line string
 	var err error
 	for true {
 		line, err = ioreader.ReadString('\n')
-		if err == io.EOF {
-			if line != "" {
-				linefragment += line
-			}
-			time.Sleep(100 * time.Millisecond)
-		} else if err == nil {
-			if linefragment != "" {
-				line = linefragment + line
-				linefragment = ""
-			}
-			lineChannel <- line
-		} else if err != nil && err != io.EOF {
+		if err != nil && err != io.EOF {
 			glog.Errorf("exiting analyzeLinesHelper with error %v", err)
+			close(lineChannel)
+			break
+		}
+		if line == "" {
+			time.Sleep(100 * time.Millisecond)
+			continue
+		}
+		if err == nil {
+			lineChannel <- linefragment + line
+			linefragment = ""
+		} else { // err == io.EOF
+			linefragment += line
 		}
 	}
+	return err
 }
 
 // Calls goroutine for readLinesFromFile, which feeds it complete lines.
@@ -144,22 +146,23 @@ func (self *OomParser) StreamOoms(outStream chan *OomInstance) {
 			oomCurrentInstance := &OomInstance{
 				ContainerName: "/",
 			}
-			finished := false
-			for !finished {
+			for line := range lineChannel {
 				err := getContainerName(line, oomCurrentInstance)
 				if err != nil {
 					glog.Errorf("%v", err)
 				}
-				finished, err = getProcessNamePid(line, oomCurrentInstance)
+				finished, err := getProcessNamePid(line, oomCurrentInstance)
 				if err != nil {
 					glog.Errorf("%v", err)
 				}
-				line = <-lineChannel
+				if finished {
+					break
+				}
 			}
 			outStream <- oomCurrentInstance
 		}
 	}
-	glog.Infof("exiting analyzeLines")
+	glog.Infof("exiting analyzeLines. OOM events will not be reported.")
 }
 
 func callJournalctl() (io.ReadCloser, error) {
@@ -183,7 +186,6 @@ func trySystemd() (*OomParser, error) {
 	return &OomParser{
 		ioreader: bufio.NewReader(readcloser),
 	}, nil
-
 }
 
 // List of possible kernel log files. These are prioritized in order so that
@@ -192,7 +194,7 @@ var kernelLogFiles = []string{"/var/log/kern.log", "/var/log/messages", "/var/lo
 
 // looks for system files that contain kernel messages and if one is found, sets
 // the systemFile attribute of the OomParser object
-func getSystemFile() (string, error) {
+func getLogFile() (string, error) {
 	for _, logFile := range kernelLogFiles {
 		if utils.FileExists(logFile) {
 			glog.Infof("OOM parser using kernel log file: %q", logFile)
@@ -202,18 +204,29 @@ func getSystemFile() (string, error) {
 	return "", fmt.Errorf("unable to find any kernel log file available from our set: %v", kernelLogFiles)
 }
 
-// initializes an OomParser object and calls getSystemFile to set the systemFile
-// attribute.  Returns and OomParser object and an error
-func New() (*OomParser, error) {
-	systemFile, err := getSystemFile()
+func tryLogFile() (*OomParser, error) {
+	logFile, err := getLogFile()
 	if err != nil {
-		return trySystemd()
+		return nil, err
 	}
-	file, err := os.Open(systemFile)
+	tail, err := tail.NewTail(logFile)
 	if err != nil {
-		return trySystemd()
+		return nil, err
 	}
 	return &OomParser{
-		ioreader: bufio.NewReader(file),
+		ioreader: bufio.NewReader(tail),
 	}, nil
+}
+
+// initializes an OomParser object. Returns an OomParser object and an error.
+func New() (*OomParser, error) {
+	parser, err := trySystemd()
+	if err == nil {
+		return parser, nil
+	}
+	parser, err = tryLogFile()
+	if err == nil {
+		return parser, nil
+	}
+	return nil, err
 }

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -31,7 +31,10 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/runtime"
+	uexec "k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
@@ -211,72 +214,88 @@ func (f *fileHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 	res.Write(f.data)
 }
 
+type checkErrTestCase struct {
+	err          error
+	expectedErr  string
+	expectedCode int
+}
+
 func TestCheckInvalidErr(t *testing.T) {
-	tests := []struct {
-		err      error
-		expected string
-	}{
+	testCheckError(t, []checkErrTestCase{
 		{
 			errors.NewInvalid(api.Kind("Invalid1"), "invalidation", field.ErrorList{field.Invalid(field.NewPath("field"), "single", "details")}),
-			`Error from server: Invalid1 "invalidation" is invalid: field: Invalid value: "single": details`,
+			"The Invalid1 \"invalidation\" is invalid: field: Invalid value: \"single\": details\n",
+			DefaultErrorExitCode,
 		},
 		{
 			errors.NewInvalid(api.Kind("Invalid2"), "invalidation", field.ErrorList{field.Invalid(field.NewPath("field1"), "multi1", "details"), field.Invalid(field.NewPath("field2"), "multi2", "details")}),
-			`Error from server: Invalid2 "invalidation" is invalid: [field1: Invalid value: "multi1": details, field2: Invalid value: "multi2": details]`,
+			"The Invalid2 \"invalidation\" is invalid: \n* field1: Invalid value: \"multi1\": details\n* field2: Invalid value: \"multi2\": details\n",
+			DefaultErrorExitCode,
 		},
 		{
 			errors.NewInvalid(api.Kind("Invalid3"), "invalidation", field.ErrorList{}),
-			`Error from server: Invalid3 "invalidation" is invalid: <nil>`,
+			"The Invalid3 \"invalidation\" is invalid",
+			DefaultErrorExitCode,
 		},
-	}
-
-	var errReturned string
-	errHandle := func(err string) {
-		errReturned = err
-	}
-
-	for _, test := range tests {
-		checkErr(test.err, errHandle)
-
-		if errReturned != test.expected {
-			t.Fatalf("Got: %s, expected: %s", errReturned, test.expected)
-		}
-	}
+		{
+			errors.NewInvalid(api.Kind("Invalid4"), "invalidation", field.ErrorList{field.Invalid(field.NewPath("field4"), "multi4", "details"), field.Invalid(field.NewPath("field4"), "multi4", "details")}),
+			"The Invalid4 \"invalidation\" is invalid: field4: Invalid value: \"multi4\": details\n",
+			DefaultErrorExitCode,
+		},
+	})
 }
 
 func TestCheckNoResourceMatchError(t *testing.T) {
-	tests := []struct {
-		err      error
-		expected string
-	}{
+	testCheckError(t, []checkErrTestCase{
 		{
 			&meta.NoResourceMatchError{PartialResource: unversioned.GroupVersionResource{Resource: "foo"}},
 			`the server doesn't have a resource type "foo"`,
+			DefaultErrorExitCode,
 		},
 		{
 			&meta.NoResourceMatchError{PartialResource: unversioned.GroupVersionResource{Version: "theversion", Resource: "foo"}},
 			`the server doesn't have a resource type "foo" in version "theversion"`,
+			DefaultErrorExitCode,
 		},
 		{
 			&meta.NoResourceMatchError{PartialResource: unversioned.GroupVersionResource{Group: "thegroup", Version: "theversion", Resource: "foo"}},
 			`the server doesn't have a resource type "foo" in group "thegroup" and version "theversion"`,
+			DefaultErrorExitCode,
 		},
 		{
 			&meta.NoResourceMatchError{PartialResource: unversioned.GroupVersionResource{Group: "thegroup", Resource: "foo"}},
 			`the server doesn't have a resource type "foo" in group "thegroup"`,
+			DefaultErrorExitCode,
 		},
-	}
+	})
+}
 
+func TestCheckExitError(t *testing.T) {
+	testCheckError(t, []checkErrTestCase{
+		{
+			uexec.CodeExitError{Err: fmt.Errorf("pod foo/bar terminated"), Code: 42},
+			"",
+			42,
+		},
+	})
+}
+
+func testCheckError(t *testing.T, tests []checkErrTestCase) {
 	var errReturned string
-	errHandle := func(err string) {
+	var codeReturned int
+	errHandle := func(err string, code int) {
 		errReturned = err
+		codeReturned = code
 	}
 
 	for _, test := range tests {
-		checkErr(test.err, errHandle)
+		checkErr("", test.err, errHandle)
 
-		if errReturned != test.expected {
-			t.Fatalf("Got: %s, expected: %s", errReturned, test.expected)
+		if errReturned != test.expectedErr {
+			t.Fatalf("Got: %s, expected: %s", errReturned, test.expectedErr)
+		}
+		if codeReturned != test.expectedCode {
+			t.Fatalf("Got: %d, expected: %d", codeReturned, test.expectedCode)
 		}
 	}
 }
@@ -300,5 +319,55 @@ func TestDumpReaderToFile(t *testing.T) {
 	stringData := string(data)
 	if stringData != testString {
 		t.Fatalf("Wrong file content %s != %s", testString, stringData)
+	}
+}
+
+func TestMaybeConvert(t *testing.T) {
+	tests := []struct {
+		input    runtime.Object
+		gv       unversioned.GroupVersion
+		expected runtime.Object
+	}{
+		{
+			input: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Name: "foo",
+				},
+			},
+			gv: unversioned.GroupVersion{Group: "", Version: "v1"},
+			expected: &v1.Pod{
+				TypeMeta: unversioned.TypeMeta{
+					APIVersion: "v1",
+					Kind:       "Pod",
+				},
+				ObjectMeta: v1.ObjectMeta{
+					Name: "foo",
+				},
+			},
+		},
+		{
+			input: &extensions.ThirdPartyResourceData{
+				ObjectMeta: api.ObjectMeta{
+					Name: "foo",
+				},
+				Data: []byte("this is some data"),
+			},
+			expected: &extensions.ThirdPartyResourceData{
+				ObjectMeta: api.ObjectMeta{
+					Name: "foo",
+				},
+				Data: []byte("this is some data"),
+			},
+		},
+	}
+
+	for _, test := range tests {
+		obj, err := MaybeConvertObject(test.input, test.gv, testapi.Default.Converter())
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if !reflect.DeepEqual(test.expected, obj) {
+			t.Errorf("expected:\n%#v\nsaw:\n%#v\n", test.expected, obj)
+		}
 	}
 }

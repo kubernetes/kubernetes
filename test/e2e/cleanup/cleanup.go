@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,10 +17,11 @@ limitations under the License.
 package main
 
 import (
-	flag "github.com/spf13/pflag"
 	"log"
 	"os"
 	"strings"
+
+	flag "github.com/spf13/pflag"
 
 	"k8s.io/kubernetes/test/e2e"
 )
@@ -39,7 +40,7 @@ func main() {
 		log.Fatalf("Please specify a resource and project to cleanup.")
 	}
 	if strings.ToLower(*resource) == "ingress" {
-		ingController := e2e.IngressController{UID: ".*", Project: *project}
+		ingController := e2e.GCEIngressController{UID: ".*", Project: *project}
 		log.Printf("%v", ingController.Cleanup(true))
 		return
 	}

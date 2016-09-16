@@ -35,6 +35,9 @@ type Device struct {
 
 	// Gid of the device.
 	Gid uint32 `json:"gid"`
+
+	// Write the file to the allowed list
+	Allow bool `json:"allow"`
 }
 
 func (d *Device) CgroupString() string {

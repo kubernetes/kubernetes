@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 The Kubernetes Authors All rights reserved.
+# Copyright 2015 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -31,13 +31,14 @@ source "${KUBE_ROOT}/cluster/lib/logging.sh"
 # NOTE This must match the version_regex in build/common.sh
 # kube::release::parse_and_validate_release_version()
 KUBE_RELEASE_VERSION_REGEX="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(-(beta|alpha)\\.(0|[1-9][0-9]*))?$"
+KUBE_RELEASE_VERSION_DASHED_REGEX="v(0|[1-9][0-9]*)-(0|[1-9][0-9]*)-(0|[1-9][0-9]*)(-(beta|alpha)-(0|[1-9][0-9]*))?"
 
 # KUBE_CI_VERSION_REGEX matches things like "v1.2.3-alpha.4.56+abcdefg" This
 #
 # NOTE This must match the version_regex in build/common.sh
 # kube::release::parse_and_validate_ci_version()
 KUBE_CI_VERSION_REGEX="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)-(beta|alpha)\\.(0|[1-9][0-9]*)(\\.(0|[1-9][0-9]*)\\+[-0-9a-z]*)?$"
-
+KUBE_CI_VERSION_DASHED_REGEX="^v(0|[1-9][0-9]*)-(0|[1-9][0-9]*)-(0|[1-9][0-9]*)-(beta|alpha)-(0|[1-9][0-9]*)(-(0|[1-9][0-9]*)\\+[-0-9a-z]*)?"
 
 # Generate kubeconfig data for the created cluster.
 # Assumed vars:
@@ -50,19 +51,36 @@ KUBE_CI_VERSION_REGEX="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)-(be
 # If the apiserver supports bearer auth, also provide:
 #   KUBE_BEARER_TOKEN
 #
+# If the kubeconfig context being created should NOT be set as the current context
+# SECONDARY_KUBECONFIG=true
+#
+# To explicitly name the context being created, use OVERRIDE_CONTEXT
+#
 # The following can be omitted for --insecure-skip-tls-verify
 #   KUBE_CERT
 #   KUBE_KEY
 #   CA_CERT
 function create-kubeconfig() {
+  KUBECONFIG=${KUBECONFIG:-$DEFAULT_KUBECONFIG}
   local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
+  SECONDARY_KUBECONFIG=${SECONDARY_KUBECONFIG:-}
+  OVERRIDE_CONTEXT=${OVERRIDE_CONTEXT:-}
 
-  export KUBECONFIG=${KUBECONFIG:-$DEFAULT_KUBECONFIG}
-  # KUBECONFIG determines the file we write to, but it may not exist yet
-  if [[ ! -e "${KUBECONFIG}" ]]; then
-    mkdir -p $(dirname "${KUBECONFIG}")
-    touch "${KUBECONFIG}"
+  if [[ "$OVERRIDE_CONTEXT" != "" ]];then
+      CONTEXT=$OVERRIDE_CONTEXT
   fi
+
+  # KUBECONFIG determines the file we write to, but it may not exist yet
+  OLD_IFS=$IFS
+  IFS=':'
+  for cfg in ${KUBECONFIG} ; do
+    if [[ ! -e "${cfg}" ]]; then
+      mkdir -p "$(dirname "${cfg}")"
+      touch "${cfg}"
+    fi
+  done
+  IFS=$OLD_IFS
+
   local cluster_args=(
       "--server=${KUBE_SERVER:-https://${KUBE_MASTER_IP}}"
   )
@@ -94,18 +112,21 @@ function create-kubeconfig() {
     )
   fi
 
-  "${kubectl}" config set-cluster "${CONTEXT}" "${cluster_args[@]}"
+  KUBECONFIG="${KUBECONFIG}" "${kubectl}" config set-cluster "${CONTEXT}" "${cluster_args[@]}"
   if [[ -n "${user_args[@]:-}" ]]; then
-    "${kubectl}" config set-credentials "${CONTEXT}" "${user_args[@]}"
+    KUBECONFIG="${KUBECONFIG}" "${kubectl}" config set-credentials "${CONTEXT}" "${user_args[@]}"
   fi
-  "${kubectl}" config set-context "${CONTEXT}" --cluster="${CONTEXT}" --user="${CONTEXT}"
-  "${kubectl}" config use-context "${CONTEXT}"  --cluster="${CONTEXT}"
+  KUBECONFIG="${KUBECONFIG}" "${kubectl}" config set-context "${CONTEXT}" --cluster="${CONTEXT}" --user="${CONTEXT}"
+
+  if [[ "${SECONDARY_KUBECONFIG}" != "true" ]];then
+      KUBECONFIG="${KUBECONFIG}" "${kubectl}" config use-context "${CONTEXT}"  --cluster="${CONTEXT}"
+  fi
 
   # If we have a bearer token, also create a credential entry with basic auth
   # so that it is easy to discover the basic auth password for your cluster
   # to use in a web browser.
   if [[ ! -z "${KUBE_BEARER_TOKEN:-}" && ! -z "${KUBE_USER:-}" && ! -z "${KUBE_PASSWORD:-}" ]]; then
-    "${kubectl}" config set-credentials "${CONTEXT}-basic-auth" "--username=${KUBE_USER}" "--password=${KUBE_PASSWORD}"
+    KUBECONFIG="${KUBECONFIG}" "${kubectl}" config set-credentials "${CONTEXT}-basic-auth" "--username=${KUBE_USER}" "--password=${KUBE_PASSWORD}"
   fi
 
    echo "Wrote config for ${CONTEXT} to ${KUBECONFIG}"
@@ -115,8 +136,16 @@ function create-kubeconfig() {
 # Assumed vars:
 #   KUBECONFIG
 #   CONTEXT
+#
+# To explicitly name the context being removed, use OVERRIDE_CONTEXT
 function clear-kubeconfig() {
   export KUBECONFIG=${KUBECONFIG:-$DEFAULT_KUBECONFIG}
+  OVERRIDE_CONTEXT=${OVERRIDE_CONTEXT:-}
+
+  if [[ "$OVERRIDE_CONTEXT" != "" ]];then
+      CONTEXT=$OVERRIDE_CONTEXT
+  fi
+
   local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
   "${kubectl}" config unset "clusters.${CONTEXT}"
   "${kubectl}" config unset "users.${CONTEXT}"
@@ -131,6 +160,19 @@ function clear-kubeconfig() {
   echo "Cleared config for ${CONTEXT} from ${KUBECONFIG}"
 }
 
+# Creates a kubeconfig file with the credentials for only the current-context
+# cluster. This is used by federation to create secrets in test setup.
+function create-kubeconfig-for-federation() {
+  if [[ "${FEDERATION:-}" == "true" ]]; then
+    echo "creating kubeconfig for federation secret"
+    local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
+    local cc=$("${kubectl}" config view -o jsonpath='{.current-context}')
+    KUBECONFIG_DIR=$(dirname ${KUBECONFIG:-$DEFAULT_KUBECONFIG})
+    KUBECONFIG_PATH="${KUBECONFIG_DIR}/federation/kubernetes-apiserver/${cc}"
+    mkdir -p "${KUBECONFIG_PATH}"
+    "${kubectl}" config view --minify --flatten > "${KUBECONFIG_PATH}/kubeconfig"
+  fi
+}
 
 function tear_down_alive_resources() {
   local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
@@ -221,6 +263,16 @@ function load-or-gen-kube-basicauth() {
   if [[ -z "${KUBE_USER:-}" || -z "${KUBE_PASSWORD:-}" ]]; then
     gen-kube-basicauth
   fi
+
+  # Make sure they don't contain any funny characters.
+  if ! [[ "${KUBE_USER}" =~ ^[-._@a-zA-Z0-9]+$ ]]; then
+    echo "Bad KUBE_USER string."
+    exit 1
+  fi
+  if ! [[ "${KUBE_PASSWORD}" =~ ^[-._@#%/a-zA-Z0-9]+$ ]]; then
+    echo "Bad KUBE_PASSWORD string."
+    exit 1
+  fi
 }
 
 function load-or-gen-kube-bearertoken() {
@@ -256,7 +308,7 @@ function detect-master-from-kubeconfig() {
 
 # Sets KUBE_VERSION variable to the proper version number (e.g. "v1.0.6",
 # "v1.2.0-alpha.1.881+376438b69c7612") or a version' publication of the form
-# <bucket>/<version> (e.g. "release/stable",' "ci/latest-1").
+# <path>/<version> (e.g. "release/stable",' "ci/latest-1").
 #
 # See the docs on getting builds for more information about version
 # publication.
@@ -267,7 +319,12 @@ function detect-master-from-kubeconfig() {
 #   KUBE_VERSION
 function set_binary_version() {
   if [[ "${1}" =~ "/" ]]; then
-    KUBE_VERSION=$(gsutil cat gs://kubernetes-release/${1}.txt)
+    IFS='/' read -a path <<< "${1}"
+    if [[ "${path[0]}" == "release" ]]; then
+      KUBE_VERSION=$(gsutil cat "gs://kubernetes-release/${1}.txt")
+    else
+      KUBE_VERSION=$(gsutil cat "gs://kubernetes-release-dev/${1}.txt")
+    fi
   else
     KUBE_VERSION=${1}
   fi
@@ -294,9 +351,15 @@ function tars_from_version() {
   elif [[ ${KUBE_VERSION} =~ ${KUBE_RELEASE_VERSION_REGEX} ]]; then
     SERVER_BINARY_TAR_URL="https://storage.googleapis.com/kubernetes-release/release/${KUBE_VERSION}/kubernetes-server-linux-amd64.tar.gz"
     SALT_TAR_URL="https://storage.googleapis.com/kubernetes-release/release/${KUBE_VERSION}/kubernetes-salt.tar.gz"
+    # TODO: Clean this up.
+    KUBE_MANIFESTS_TAR_URL="${SERVER_BINARY_TAR_URL/server-linux-amd64/manifests}"
+    KUBE_MANIFESTS_TAR_HASH=$(curl ${KUBE_MANIFESTS_TAR_URL} | sha1sum | awk '{print $1}')
   elif [[ ${KUBE_VERSION} =~ ${KUBE_CI_VERSION_REGEX} ]]; then
-    SERVER_BINARY_TAR_URL="https://storage.googleapis.com/kubernetes-release/ci/${KUBE_VERSION}/kubernetes-server-linux-amd64.tar.gz"
-    SALT_TAR_URL="https://storage.googleapis.com/kubernetes-release/ci/${KUBE_VERSION}/kubernetes-salt.tar.gz"
+    SERVER_BINARY_TAR_URL="https://storage.googleapis.com/kubernetes-release-dev/ci/${KUBE_VERSION}/kubernetes-server-linux-amd64.tar.gz"
+    SALT_TAR_URL="https://storage.googleapis.com/kubernetes-release-dev/ci/${KUBE_VERSION}/kubernetes-salt.tar.gz"
+    # TODO: Clean this up.
+    KUBE_MANIFESTS_TAR_URL="${SERVER_BINARY_TAR_URL/server-linux-amd64/manifests}"
+    KUBE_MANIFESTS_TAR_HASH=$(curl ${KUBE_MANIFESTS_TAR_URL} | sha1sum | awk '{print $1}')
   else
     echo "Version doesn't match regexp" >&2
     exit 1
@@ -347,7 +410,8 @@ function find-release-tars() {
 
   # This tarball is used by GCI, Ubuntu Trusty, and CoreOS.
   KUBE_MANIFESTS_TAR=
-  if [[ "${KUBE_OS_DISTRIBUTION:-}" == "trusty" || "${KUBE_OS_DISTRIBUTION:-}" == "gci" || "${KUBE_OS_DISTRIBUTION:-}" == "coreos" ]]; then
+  if [[ "${MASTER_OS_DISTRIBUTION:-}" == "trusty" || "${MASTER_OS_DISTRIBUTION:-}" == "gci" || "${MASTER_OS_DISTRIBUTION:-}" == "coreos" ]] || \
+     [[ "${NODE_OS_DISTRIBUTION:-}" == "trusty" || "${NODE_OS_DISTRIBUTION:-}" == "gci" || "${NODE_OS_DISTRIBUTION:-}" == "coreos" ]] ; then
     KUBE_MANIFESTS_TAR="${KUBE_ROOT}/server/kubernetes-manifests.tar.gz"
     if [[ ! -f "${KUBE_MANIFESTS_TAR}" ]]; then
       KUBE_MANIFESTS_TAR="${KUBE_ROOT}/_output/release-tars/kubernetes-manifests.tar.gz"
@@ -397,6 +461,8 @@ function stage-images() {
 
   if [[ "${KUBE_DOCKER_REGISTRY}" == "gcr.io/"* ]]; then
     local docker_push_cmd=("gcloud" "docker")
+  else
+    local docker_push_cmd=("${docker_cmd[@]}")
   fi
 
   local temp_dir="$(mktemp -d -t 'kube-server-XXXX')"
@@ -413,7 +479,7 @@ function stage-images() {
   done
 
   kube::util::wait-for-jobs || {
-    kube::log::error "unable to push images. see ${temp_dir}/*.log for more info."
+    kube::log::error "unable to push images. See ${temp_dir}/*.log for more info."
     return 1
   }
 
@@ -465,6 +531,17 @@ function build-kube-env {
   local master=$1
   local file=$2
 
+  local server_binary_tar_url=$SERVER_BINARY_TAR_URL
+  local salt_tar_url=$SALT_TAR_URL
+  local kube_manifests_tar_url="${KUBE_MANIFESTS_TAR_URL:-}"
+  if [[ "${master}" == "true" && "${MASTER_OS_DISTRIBUTION}" == "coreos" ]] || \
+     [[ "${master}" == "false" && "${NODE_OS_DISTRIBUTION}" == "coreos" ]] ; then
+    # TODO: Support fallback .tar.gz settings on CoreOS
+    server_binary_tar_url=$(split_csv "${SERVER_BINARY_TAR_URL}")
+    salt_tar_url=$(split_csv "${SALT_TAR_URL}")
+    kube_manifests_tar_url=$(split_csv "${KUBE_MANIFESTS_TAR_URL}")
+  fi
+
   build-runtime-config
   gen-uid
 
@@ -473,19 +550,23 @@ function build-kube-env {
 ENV_TIMESTAMP: $(yaml-quote $(date -u +%Y-%m-%dT%T%z))
 INSTANCE_PREFIX: $(yaml-quote ${INSTANCE_PREFIX})
 NODE_INSTANCE_PREFIX: $(yaml-quote ${NODE_INSTANCE_PREFIX})
+NODE_TAGS: $(yaml-quote ${NODE_TAGS:-})
 CLUSTER_IP_RANGE: $(yaml-quote ${CLUSTER_IP_RANGE:-10.244.0.0/16})
-SERVER_BINARY_TAR_URL: $(yaml-quote ${SERVER_BINARY_TAR_URL})
+SERVER_BINARY_TAR_URL: $(yaml-quote ${server_binary_tar_url})
 SERVER_BINARY_TAR_HASH: $(yaml-quote ${SERVER_BINARY_TAR_HASH})
-SALT_TAR_URL: $(yaml-quote ${SALT_TAR_URL})
+SALT_TAR_URL: $(yaml-quote ${salt_tar_url})
 SALT_TAR_HASH: $(yaml-quote ${SALT_TAR_HASH})
 SERVICE_CLUSTER_IP_RANGE: $(yaml-quote ${SERVICE_CLUSTER_IP_RANGE})
 KUBERNETES_MASTER_NAME: $(yaml-quote ${MASTER_NAME})
 ALLOCATE_NODE_CIDRS: $(yaml-quote ${ALLOCATE_NODE_CIDRS:-false})
 ENABLE_CLUSTER_MONITORING: $(yaml-quote ${ENABLE_CLUSTER_MONITORING:-none})
+DOCKER_REGISTRY_MIRROR_URL: $(yaml-quote ${DOCKER_REGISTRY_MIRROR_URL:-})
 ENABLE_L7_LOADBALANCING: $(yaml-quote ${ENABLE_L7_LOADBALANCING:-none})
 ENABLE_CLUSTER_LOGGING: $(yaml-quote ${ENABLE_CLUSTER_LOGGING:-false})
 ENABLE_CLUSTER_UI: $(yaml-quote ${ENABLE_CLUSTER_UI:-false})
+ENABLE_NODE_PROBLEM_DETECTOR: $(yaml-quote ${ENABLE_NODE_PROBLEM_DETECTOR:-false})
 ENABLE_NODE_LOGGING: $(yaml-quote ${ENABLE_NODE_LOGGING:-false})
+ENABLE_RESCHEDULER: $(yaml-quote ${ENABLE_RESCHEDULER:-false})
 LOGGING_DESTINATION: $(yaml-quote ${LOGGING_DESTINATION:-})
 ELASTICSEARCH_LOGGING_REPLICAS: $(yaml-quote ${ELASTICSEARCH_LOGGING_REPLICAS:-})
 ENABLE_CLUSTER_DNS: $(yaml-quote ${ENABLE_CLUSTER_DNS:-false})
@@ -504,6 +585,8 @@ CA_CERT: $(yaml-quote ${CA_CERT_BASE64:-})
 KUBELET_CERT: $(yaml-quote ${KUBELET_CERT_BASE64:-})
 KUBELET_KEY: $(yaml-quote ${KUBELET_KEY_BASE64:-})
 NETWORK_PROVIDER: $(yaml-quote ${NETWORK_PROVIDER:-})
+NETWORK_POLICY_PROVIDER: $(yaml-quote ${NETWORK_POLICY_PROVIDER:-})
+PREPULL_E2E_IMAGES: $(yaml-quote ${PREPULL_E2E_IMAGES:-})
 HAIRPIN_MODE: $(yaml-quote ${HAIRPIN_MODE:-})
 OPENCONTRAIL_TAG: $(yaml-quote ${OPENCONTRAIL_TAG:-})
 OPENCONTRAIL_KUBERNETES_TAG: $(yaml-quote ${OPENCONTRAIL_KUBERNETES_TAG:-})
@@ -531,9 +614,10 @@ EOF
 TERMINATED_POD_GC_THRESHOLD: $(yaml-quote ${TERMINATED_POD_GC_THRESHOLD})
 EOF
   fi
-  if [[ "${OS_DISTRIBUTION}" == "trusty" || "${OS_DISTRIBUTION}" == "gci" ]]; then
+  if [[ "${master}" == "true" && ("${MASTER_OS_DISTRIBUTION}" == "trusty" || "${MASTER_OS_DISTRIBUTION}" == "gci" || "${MASTER_OS_DISTRIBUTION}" == "coreos") ]] || \
+     [[ "${master}" == "false" && ("${NODE_OS_DISTRIBUTION}" == "trusty" || "${NODE_OS_DISTRIBUTION}" == "gci" || "${NODE_OS_DISTRIBUTION}" == "coreos") ]] ; then
     cat >>$file <<EOF
-KUBE_MANIFESTS_TAR_URL: $(yaml-quote ${KUBE_MANIFESTS_TAR_URL})
+KUBE_MANIFESTS_TAR_URL: $(yaml-quote ${kube_manifests_tar_url})
 KUBE_MANIFESTS_TAR_HASH: $(yaml-quote ${KUBE_MANIFESTS_TAR_HASH})
 EOF
   fi
@@ -562,6 +646,11 @@ EOF
 ENABLE_CUSTOM_METRICS: $(yaml-quote ${ENABLE_CUSTOM_METRICS})
 EOF
   fi
+  if [ -n "${FEATURE_GATES:-}" ]; then
+    cat >>$file <<EOF
+FEATURE_GATES: $(yaml-quote ${FEATURE_GATES})
+EOF
+  fi
   if [[ "${master}" == "true" ]]; then
     # Master-only env vars.
     cat >>$file <<EOF
@@ -578,7 +667,14 @@ ENABLE_MANIFEST_URL: $(yaml-quote ${ENABLE_MANIFEST_URL:-false})
 MANIFEST_URL: $(yaml-quote ${MANIFEST_URL:-})
 MANIFEST_URL_HEADER: $(yaml-quote ${MANIFEST_URL_HEADER:-})
 NUM_NODES: $(yaml-quote ${NUM_NODES})
+STORAGE_BACKEND: $(yaml-quote ${STORAGE_BACKEND:-})
+ENABLE_GARBAGE_COLLECTOR: $(yaml-quote ${ENABLE_GARBAGE_COLLECTOR:-})
 EOF
+    if [ -n "${TEST_ETCD_VERSION:-}" ]; then
+      cat >>$file <<EOF
+TEST_ETCD_VERSION: $(yaml-quote ${TEST_ETCD_VERSION})
+EOF
+    fi
     if [ -n "${APISERVER_TEST_ARGS:-}" ]; then
       cat >>$file <<EOF
 APISERVER_TEST_ARGS: $(yaml-quote ${APISERVER_TEST_ARGS})
@@ -609,6 +705,12 @@ EOF
 SCHEDULER_TEST_LOG_LEVEL: $(yaml-quote ${SCHEDULER_TEST_LOG_LEVEL})
 EOF
     fi
+    if [ -n "${INITIAL_ETCD_CLUSTER:-}" ]; then
+      cat >>$file <<EOF
+INITIAL_ETCD_CLUSTER: $(yaml-quote ${INITIAL_ETCD_CLUSTER})
+EOF
+    fi
+
   else
     # Node-only env vars.
     cat >>$file <<EOF
@@ -632,21 +734,53 @@ EOF
 NODE_LABELS: $(yaml-quote ${NODE_LABELS})
 EOF
     fi
-  if [[ "${OS_DISTRIBUTION}" == "coreos" ]]; then
+  if [ -n "${EVICTION_HARD:-}" ]; then
+      cat >>$file <<EOF
+EVICTION_HARD: $(yaml-quote ${EVICTION_HARD})
+EOF
+    fi
+  if [[ "${master}" == "true" && "${MASTER_OS_DISTRIBUTION}" == "coreos" ]] || \
+     [[ "${master}" == "false" && "${NODE_OS_DISTRIBUTION}" == "coreos" ]]; then
     # CoreOS-only env vars. TODO(yifan): Make them available on other distros.
     cat >>$file <<EOF
-KUBE_MANIFESTS_TAR_URL: $(yaml-quote ${KUBE_MANIFESTS_TAR_URL})
-KUBE_MANIFESTS_TAR_HASH: $(yaml-quote ${KUBE_MANIFESTS_TAR_HASH})
-KUBERNETES_CONTAINER_RUNTIME: $(yaml-quote ${CONTAINER_RUNTIME:-docker})
+KUBERNETES_CONTAINER_RUNTIME: $(yaml-quote ${CONTAINER_RUNTIME:-rkt})
 RKT_VERSION: $(yaml-quote ${RKT_VERSION:-})
 RKT_PATH: $(yaml-quote ${RKT_PATH:-})
+RKT_STAGE1_IMAGE: $(yaml-quote ${RKT_STAGE1_IMAGE:-})
 KUBERNETES_CONFIGURE_CBR0: $(yaml-quote ${KUBERNETES_CONFIGURE_CBR0:-true})
 EOF
   fi
-  if [[ "${ENABLE_NODE_AUTOSCALER}" == "true" ]]; then
+  if [[ "${ENABLE_CLUSTER_AUTOSCALER}" == "true" ]]; then
       cat >>$file <<EOF
-ENABLE_NODE_AUTOSCALER: $(yaml-quote ${ENABLE_NODE_AUTOSCALER})
+ENABLE_CLUSTER_AUTOSCALER: $(yaml-quote ${ENABLE_CLUSTER_AUTOSCALER})
 AUTOSCALER_MIG_CONFIG: $(yaml-quote ${AUTOSCALER_MIG_CONFIG})
+EOF
+  fi
+
+  # Federation specific environment variables.
+  if [[ -n "${FEDERATION:-}" ]]; then
+    cat >>$file <<EOF
+FEDERATION: $(yaml-quote ${FEDERATION})
+EOF
+  fi
+  if [ -n "${FEDERATIONS_DOMAIN_MAP:-}" ]; then
+    cat >>$file <<EOF
+FEDERATIONS_DOMAIN_MAP: $(yaml-quote ${FEDERATIONS_DOMAIN_MAP})
+EOF
+  fi
+  if [ -n "${FEDERATION_NAME:-}" ]; then
+    cat >>$file <<EOF
+FEDERATION_NAME: $(yaml-quote ${FEDERATION_NAME})
+EOF
+  fi
+  if [ -n "${DNS_ZONE_NAME:-}" ]; then
+    cat >>$file <<EOF
+DNS_ZONE_NAME: $(yaml-quote ${DNS_ZONE_NAME})
+EOF
+  fi
+  if [ -n "${SCHEDULING_ALGORITHM_PROVIDER:-}" ]; then
+    cat >>$file <<EOF
+SCHEDULING_ALGORITHM_PROVIDER: $(yaml-quote ${SCHEDULING_ALGORITHM_PROVIDER})
 EOF
   fi
 }
@@ -678,6 +812,7 @@ function sha1sum-file() {
 #
 # Assumed vars
 #   KUBE_TEMP
+#   MASTER_NAME
 #
 # Vars set:
 #   CERT_DIR
@@ -705,24 +840,8 @@ function create-certs {
 
   echo "Generating certs for alternate-names: ${sans}"
 
-  local -r cert_create_debug_output=$(mktemp "${KUBE_TEMP}/cert_create_debug_output.XXX")
-  # Note: This was heavily cribbed from make-ca-cert.sh
-  (set -x
-    cd "${KUBE_TEMP}"
-    curl -L -O --connect-timeout 20 --retry 6 --retry-delay 2 https://storage.googleapis.com/kubernetes-release/easy-rsa/easy-rsa.tar.gz
-    tar xzf easy-rsa.tar.gz
-    cd easy-rsa-master/easyrsa3
-    ./easyrsa init-pki
-    ./easyrsa --batch "--req-cn=${primary_cn}@$(date +%s)" build-ca nopass
-    ./easyrsa --subject-alt-name="${sans}" build-server-full "${MASTER_NAME}" nopass
-    ./easyrsa build-client-full kubelet nopass
-    ./easyrsa build-client-full kubecfg nopass) &>${cert_create_debug_output} || {
-    # If there was an error in the subshell, just die.
-    # TODO(roberthbailey): add better error handling here
-    cat "${cert_create_debug_output}" >&2
-    echo "=== Failed to generate certificates: Aborting ===" >&2
-    exit 2
-  }
+  PRIMARY_CN="${primary_cn}" SANS="${sans}" generate-certs
+
   CERT_DIR="${KUBE_TEMP}/easy-rsa-master/easyrsa3"
   # By default, linux wraps base64 output every 76 cols, so we use 'tr -d' to remove whitespaces.
   # Note 'base64 -w0' doesn't work on Mac OS X, which has different flags.
@@ -733,6 +852,37 @@ function create-certs {
   KUBELET_KEY_BASE64=$(cat "${CERT_DIR}/pki/private/kubelet.key" | base64 | tr -d '\r\n')
   KUBECFG_CERT_BASE64=$(cat "${CERT_DIR}/pki/issued/kubecfg.crt" | base64 | tr -d '\r\n')
   KUBECFG_KEY_BASE64=$(cat "${CERT_DIR}/pki/private/kubecfg.key" | base64 | tr -d '\r\n')
+}
+
+# Runs the easy RSA commands to generate certificate files.
+# The generated files are at ${KUBE_TEMP}/easy-rsa-master/easyrsa3
+#
+# Assumed vars
+#   KUBE_TEMP
+#   MASTER_NAME
+#   PRIMARY_CN: Primary canonical name
+#   SANS: Subject alternate names
+#
+#
+function generate-certs {
+  local -r cert_create_debug_output=$(mktemp "${KUBE_TEMP}/cert_create_debug_output.XXX")
+  # Note: This was heavily cribbed from make-ca-cert.sh
+  (set -x
+    cd "${KUBE_TEMP}"
+    curl -L -O --connect-timeout 20 --retry 6 --retry-delay 2 https://storage.googleapis.com/kubernetes-release/easy-rsa/easy-rsa.tar.gz
+    tar xzf easy-rsa.tar.gz
+    cd easy-rsa-master/easyrsa3
+    ./easyrsa init-pki
+    ./easyrsa --batch "--req-cn=${PRIMARY_CN}@$(date +%s)" build-ca nopass
+    ./easyrsa --subject-alt-name="${SANS}" build-server-full "${MASTER_NAME}" nopass
+    ./easyrsa build-client-full kubelet nopass
+    ./easyrsa build-client-full kubecfg nopass) &>${cert_create_debug_output} || {
+    # If there was an error in the subshell, just die.
+    # TODO(roberthbailey): add better error handling here
+    cat "${cert_create_debug_output}" >&2
+    echo "=== Failed to generate certificates: Aborting ===" >&2
+    exit 2
+  }
 }
 
 #

@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -38,6 +38,9 @@ func TestPortRange(t *testing.T) {
 		{"100 - 200", false, "", -1, -1},
 		{"-100", false, "", -1, -1},
 		{"100-", false, "", -1, -1},
+		{"200-100", false, "", -1, -1},
+		{"60000-70000", false, "", -1, -1},
+		{"70000-80000", false, "", -1, -1},
 	}
 
 	for i := range testCases {

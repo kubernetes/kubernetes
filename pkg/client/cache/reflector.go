@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -69,8 +69,6 @@ type Reflector struct {
 	resyncPeriod time.Duration
 	// now() returns current time - exposed for testing purposes
 	now func() time.Time
-	// nextResync is approximate time of next resync (0 if not scheduled)
-	nextResync time.Time
 	// lastSyncResourceVersion is the resource version token last
 	// observed when doing a sync with the underlying store
 	// it is thread safe, but not synchronized with the underlying store
@@ -164,7 +162,7 @@ func hasPackage(file string, ignoredPackages []string) bool {
 	return false
 }
 
-// trimPackagePrefix reduces dulpicate values off the front of a package name.
+// trimPackagePrefix reduces duplicate values off the front of a package name.
 func trimPackagePrefix(file string) string {
 	if l := strings.LastIndex(file, "k8s.io/kubernetes/pkg/"); l >= 0 {
 		return file[l+len("k8s.io/kubernetes/"):]
@@ -234,45 +232,14 @@ var (
 // required, and a cleanup function.
 func (r *Reflector) resyncChan() (<-chan time.Time, func() bool) {
 	if r.resyncPeriod == 0 {
-		r.nextResync = time.Time{}
 		return neverExitWatch, func() bool { return false }
 	}
 	// The cleanup function is required: imagine the scenario where watches
 	// always fail so we end up listing frequently. Then, if we don't
 	// manually stop the timer, we could end up with many timers active
 	// concurrently.
-	r.nextResync = r.now().Add(r.resyncPeriod)
 	t := time.NewTimer(r.resyncPeriod)
 	return t.C, t.Stop
-}
-
-// We want to avoid situations when periodic resyncing is breaking the TCP
-// connection.
-// If response`s body is not read to completion before calling body.Close(),
-// that TCP connection will not be reused in the future - see #15664 issue
-// for more details.
-// Thus, we set timeout for watch requests to be smaller than the remaining
-// time until next periodic resync and force resyncing ourself to avoid
-// breaking TCP connection.
-//
-// TODO: This should be parametrizable based on server load.
-func (r *Reflector) timeoutForWatch() *int64 {
-	randTimeout := time.Duration(float64(minWatchTimeout) * (rand.Float64() + 1.0))
-	timeout := r.nextResync.Sub(r.now()) - timeoutThreshold
-	if timeout < 0 || randTimeout < timeout {
-		timeout = randTimeout
-	}
-	timeoutSeconds := int64(timeout.Seconds())
-	return &timeoutSeconds
-}
-
-// Returns true if we are close enough to next planned periodic resync
-// and we can force resyncing ourself now.
-func (r *Reflector) canForceResyncNow() bool {
-	if r.nextResync.IsZero() {
-		return false
-	}
-	return r.now().Add(forceResyncThreshold).After(r.nextResync)
 }
 
 // ListAndWatch first lists all items and get the resource version at the moment of call,
@@ -292,11 +259,11 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 	if err != nil {
 		return fmt.Errorf("%s: Failed to list %v: %v", r.name, r.expectedType, err)
 	}
-	metaInterface, err := meta.Accessor(list)
+	listMetaInterface, err := meta.ListAccessor(list)
 	if err != nil {
-		return fmt.Errorf("%s: Unable to understand list result %#v", r.name, list)
+		return fmt.Errorf("%s: Unable to understand list result %#v: %v", r.name, list, err)
 	}
-	resourceVersion = metaInterface.GetResourceVersion()
+	resourceVersion = listMetaInterface.GetResourceVersion()
 	items, err := meta.ExtractList(list)
 	if err != nil {
 		return fmt.Errorf("%s: Unable to understand list result %#v (%v)", r.name, list, err)
@@ -306,13 +273,33 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 	}
 	r.setLastSyncResourceVersion(resourceVersion)
 
-	for {
-		options := api.ListOptions{
-			ResourceVersion: resourceVersion,
-			// We want to avoid situations when resyncing is breaking the TCP connection
-			// - see comment for 'timeoutForWatch()' for more details.
-			TimeoutSeconds: r.timeoutForWatch(),
+	resyncerrc := make(chan error, 1)
+	go func() {
+		for {
+			select {
+			case <-resyncCh:
+			case <-stopCh:
+				return
+			}
+			glog.V(4).Infof("%s: forcing resync", r.name)
+			if err := r.store.Resync(); err != nil {
+				resyncerrc <- err
+				return
+			}
+			cleanup()
+			resyncCh, cleanup = r.resyncChan()
 		}
+	}()
+
+	for {
+		timemoutseconds := int64(minWatchTimeout.Seconds() * (rand.Float64() + 1.0))
+		options = api.ListOptions{
+			ResourceVersion: resourceVersion,
+			// We want to avoid situations of hanging watchers. Stop any wachers that do not
+			// receive any events within the timeout window.
+			TimeoutSeconds: &timemoutseconds,
+		}
+
 		w, err := r.listerWatcher.Watch(options)
 		if err != nil {
 			switch err {
@@ -337,14 +324,11 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 			}
 			return nil
 		}
-		if err := r.watchHandler(w, &resourceVersion, resyncCh, stopCh); err != nil {
-			if err != errorResyncRequested && err != errorStopRequested {
+
+		if err := r.watchHandler(w, &resourceVersion, resyncerrc, stopCh); err != nil {
+			if err != errorStopRequested {
 				glog.Warningf("%s: watch of %v ended with: %v", r.name, r.expectedType, err)
 			}
-			return nil
-		}
-		if r.canForceResyncNow() {
-			glog.V(4).Infof("%s: next resync planned for %#v, forcing now", r.name, r.nextResync)
 			return nil
 		}
 	}
@@ -360,7 +344,7 @@ func (r *Reflector) syncWith(items []runtime.Object, resourceVersion string) err
 }
 
 // watchHandler watches w and keeps *resourceVersion up to date.
-func (r *Reflector) watchHandler(w watch.Interface, resourceVersion *string, resyncCh <-chan time.Time, stopCh <-chan struct{}) error {
+func (r *Reflector) watchHandler(w watch.Interface, resourceVersion *string, errc chan error, stopCh <-chan struct{}) error {
 	start := time.Now()
 	eventCount := 0
 
@@ -373,8 +357,8 @@ loop:
 		select {
 		case <-stopCh:
 			return errorStopRequested
-		case <-resyncCh:
-			return errorResyncRequested
+		case err := <-errc:
+			return err
 		case event, ok := <-w.ResultChan():
 			if !ok {
 				break loop

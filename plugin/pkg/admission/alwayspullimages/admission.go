@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -54,6 +54,10 @@ func (a *alwaysPullImages) Admit(attributes admission.Attributes) (err error) {
 	pod, ok := attributes.GetObject().(*api.Pod)
 	if !ok {
 		return apierrors.NewBadRequest("Resource was marked with kind Pod but was unable to be converted")
+	}
+
+	for i := range pod.Spec.InitContainers {
+		pod.Spec.InitContainers[i].ImagePullPolicy = api.PullAlways
 	}
 
 	for i := range pod.Spec.Containers {

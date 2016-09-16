@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -34,7 +34,8 @@ import (
 
 const (
 	// GCE instances can have up to 16 PD volumes attached.
-	DefaultMaxGCEPDVolumes = 16
+	DefaultMaxGCEPDVolumes    = 16
+	ClusterAutoscalerProvider = "ClusterAutoscalerProvider"
 )
 
 // getMaxVols checks the max PD volumes environment variable, otherwise returning a default value
@@ -54,6 +55,9 @@ func getMaxVols(defaultVal int) int {
 
 func init() {
 	factory.RegisterAlgorithmProvider(factory.DefaultProvider, defaultPredicates(), defaultPriorities())
+	// Cluster autoscaler friendly scheduling algorithm.
+	factory.RegisterAlgorithmProvider(ClusterAutoscalerProvider, defaultPredicates(),
+		replace(defaultPriorities(), "LeastRequestedPriority", "MostRequestedPriority"))
 	// EqualPriority is a prioritizer function that gives an equal weight of one to all nodes
 	// Register the priority function so that its available
 	// but do not include it as part of the default priorities
@@ -78,7 +82,7 @@ func init() {
 	// ImageLocalityPriority prioritizes nodes based on locality of images requested by a pod. Nodes with larger size
 	// of already-installed packages required by the pod will be preferred over nodes with no already-installed
 	// packages required by the pod or a small total size of already-installed packages required by the pod.
-	factory.RegisterPriorityFunction("ImageLocalityPriority", priorities.ImageLocalityPriority, 1)
+	factory.RegisterPriorityFunction2("ImageLocalityPriority", priorities.ImageLocalityPriorityMap, nil, 1)
 	// Fit is defined based on the absence of port conflicts.
 	// This predicate is actually a default predicate, because it is invoked from
 	// predicates.GeneralPredicates()
@@ -93,24 +97,17 @@ func init() {
 	factory.RegisterFitPredicate("HostName", predicates.PodFitsHost)
 	// Fit is determined by node selector query.
 	factory.RegisterFitPredicate("MatchNodeSelector", predicates.PodSelectorMatches)
-	// Fit is determined by inter-pod affinity.
-	factory.RegisterFitPredicateFactory(
-		"MatchInterPodAffinity",
-		func(args factory.PluginFactoryArgs) algorithm.FitPredicate {
-			return predicates.NewPodAffinityPredicate(args.NodeInfo, args.PodLister, args.FailureDomains)
-		},
-	)
-	//pods should be placed in the same topological domain (e.g. same node, same rack, same zone, same power domain, etc.)
-	//as some other pods, or, conversely, should not be placed in the same topological domain as some other pods.
-	factory.RegisterPriorityConfigFactory(
-		"InterPodAffinityPriority",
-		factory.PriorityConfigFactory{
-			Function: func(args factory.PluginFactoryArgs) algorithm.PriorityFunction {
-				return priorities.NewInterPodAffinityPriority(args.NodeInfo, args.NodeLister, args.PodLister, args.HardPodAffinitySymmetricWeight, args.FailureDomains)
-			},
-			Weight: 1,
-		},
-	)
+	// Optional, cluster-autoscaler friendly priority function - give used nodes higher priority.
+	factory.RegisterPriorityFunction2("MostRequestedPriority", priorities.MostRequestedPriorityMap, nil, 1)
+}
+
+func replace(set sets.String, replaceWhat, replaceWith string) sets.String {
+	result := sets.NewString(set.List()...)
+	if result.Has(replaceWhat) {
+		result.Delete(replaceWhat)
+		result.Insert(replaceWith)
+	}
+	return result
 }
 
 func defaultPredicates() sets.String {
@@ -145,15 +142,32 @@ func defaultPredicates() sets.String {
 		// GeneralPredicates are the predicates that are enforced by all Kubernetes components
 		// (e.g. kubelet and all schedulers)
 		factory.RegisterFitPredicate("GeneralPredicates", predicates.GeneralPredicates),
+
+		// Fit is determined based on whether a pod can tolerate all of the node's taints
+		factory.RegisterFitPredicate("PodToleratesNodeTaints", predicates.PodToleratesNodeTaints),
+
+		// Fit is determined by node memory pressure condition.
+		factory.RegisterFitPredicate("CheckNodeMemoryPressure", predicates.CheckNodeMemoryPressurePredicate),
+
+		// Fit is determined by node disk pressure condition.
+		factory.RegisterFitPredicate("CheckNodeDiskPressure", predicates.CheckNodeDiskPressurePredicate),
+
+		// Fit is determined by inter-pod affinity.
+		factory.RegisterFitPredicateFactory(
+			"MatchInterPodAffinity",
+			func(args factory.PluginFactoryArgs) algorithm.FitPredicate {
+				return predicates.NewPodAffinityPredicate(args.NodeInfo, args.PodLister, args.FailureDomains)
+			},
+		),
 	)
 }
 
 func defaultPriorities() sets.String {
 	return sets.NewString(
 		// Prioritize nodes by least requested utilization.
-		factory.RegisterPriorityFunction("LeastRequestedPriority", priorities.LeastRequestedPriority, 1),
+		factory.RegisterPriorityFunction2("LeastRequestedPriority", priorities.LeastRequestedPriorityMap, nil, 1),
 		// Prioritizes nodes to help achieve balanced resource usage
-		factory.RegisterPriorityFunction("BalancedResourceAllocation", priorities.BalancedResourceAllocation, 1),
+		factory.RegisterPriorityFunction2("BalancedResourceAllocation", priorities.BalancedResourceAllocationMap, nil, 1),
 		// spreads pods by minimizing the number of pods (belonging to the same service or replication controller) on the same node.
 		factory.RegisterPriorityConfigFactory(
 			"SelectorSpreadPriority",
@@ -164,11 +178,18 @@ func defaultPriorities() sets.String {
 				Weight: 1,
 			},
 		),
+		// Set this weight large enough to override all other priority functions.
+		// TODO: Figure out a better way to do this, maybe at same time as fixing #24720.
+		factory.RegisterPriorityFunction2("NodePreferAvoidPodsPriority", priorities.CalculateNodePreferAvoidPodsPriorityMap, nil, 10000),
+		factory.RegisterPriorityFunction("NodeAffinityPriority", priorities.CalculateNodeAffinityPriority, 1),
+		factory.RegisterPriorityFunction("TaintTolerationPriority", priorities.ComputeTaintTolerationPriority, 1),
+		// pods should be placed in the same topological domain (e.g. same node, same rack, same zone, same power domain, etc.)
+		// as some other pods, or, conversely, should not be placed in the same topological domain as some other pods.
 		factory.RegisterPriorityConfigFactory(
-			"NodeAffinityPriority",
+			"InterPodAffinityPriority",
 			factory.PriorityConfigFactory{
 				Function: func(args factory.PluginFactoryArgs) algorithm.PriorityFunction {
-					return priorities.NewNodeAffinityPriority(args.NodeLister)
+					return priorities.NewInterPodAffinityPriority(args.NodeInfo, args.NodeLister, args.PodLister, args.HardPodAffinitySymmetricWeight, args.FailureDomains)
 				},
 				Weight: 1,
 			},

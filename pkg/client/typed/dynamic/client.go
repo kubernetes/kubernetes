@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -33,13 +33,15 @@ import (
 	"k8s.io/kubernetes/pkg/conversion/queryparams"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/serializer"
+	"k8s.io/kubernetes/pkg/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
 // Client is a Kubernetes client that allows you to access metadata
 // and manipulate metadata of a Kubernetes API group.
 type Client struct {
-	cl *restclient.RESTClient
+	cl             *restclient.RESTClient
+	parameterCodec runtime.ParameterCodec
 }
 
 // NewClient returns a new client based on the passed in config. The
@@ -49,12 +51,12 @@ func NewClient(conf *restclient.Config) (*Client, error) {
 	confCopy := *conf
 	conf = &confCopy
 
-	codec := dynamicCodec{}
-
-	// TODO: it's questionable that this should be using anything other than unstructured schema and JSON
-	conf.ContentType = runtime.ContentTypeJSON
-	streamingInfo, _ := api.Codecs.StreamingSerializerForMediaType("application/json;stream=watch", nil)
-	conf.NegotiatedSerializer = serializer.NegotiatedSerializerWrapper(runtime.SerializerInfo{Serializer: codec}, streamingInfo)
+	contentConfig := ContentConfig()
+	contentConfig.GroupVersion = conf.GroupVersion
+	if conf.NegotiatedSerializer != nil {
+		contentConfig.NegotiatedSerializer = conf.NegotiatedSerializer
+	}
+	conf.ContentConfig = contentConfig
 
 	if conf.APIPath == "" {
 		conf.APIPath = "/api"
@@ -62,13 +64,6 @@ func NewClient(conf *restclient.Config) (*Client, error) {
 
 	if len(conf.UserAgent) == 0 {
 		conf.UserAgent = restclient.DefaultKubernetesUserAgent()
-	}
-
-	if conf.QPS == 0.0 {
-		conf.QPS = 5.0
-	}
-	if conf.Burst == 0 {
-		conf.Burst = 10
 	}
 
 	cl, err := restclient.RESTClientFor(conf)
@@ -79,35 +74,52 @@ func NewClient(conf *restclient.Config) (*Client, error) {
 	return &Client{cl: cl}, nil
 }
 
-// Resource returns an API interface to the specified resource for
-// this client's group and version. If resource is not a namespaced
-// resource, then namespace is ignored.
+// GetRateLimiter returns rate limier.
+func (c *Client) GetRateLimiter() flowcontrol.RateLimiter {
+	return c.cl.GetRateLimiter()
+}
+
+// Resource returns an API interface to the specified resource for this client's
+// group and version. If resource is not a namespaced resource, then namespace
+// is ignored. The ResourceClient inherits the parameter codec of c.
 func (c *Client) Resource(resource *unversioned.APIResource, namespace string) *ResourceClient {
 	return &ResourceClient{
-		cl:       c.cl,
-		resource: resource,
-		ns:       namespace,
+		cl:             c.cl,
+		resource:       resource,
+		ns:             namespace,
+		parameterCodec: c.parameterCodec,
+	}
+}
+
+// ParameterCodec returns a client with the provided parameter codec.
+func (c *Client) ParameterCodec(parameterCodec runtime.ParameterCodec) *Client {
+	return &Client{
+		cl:             c.cl,
+		parameterCodec: parameterCodec,
 	}
 }
 
 // ResourceClient is an API interface to a specific resource under a
 // dynamic client.
 type ResourceClient struct {
-	cl       *restclient.RESTClient
-	resource *unversioned.APIResource
-	ns       string
+	cl             *restclient.RESTClient
+	resource       *unversioned.APIResource
+	ns             string
+	parameterCodec runtime.ParameterCodec
 }
 
 // List returns a list of objects for this resource.
-func (rc *ResourceClient) List(opts runtime.Object) (*runtime.UnstructuredList, error) {
-	result := new(runtime.UnstructuredList)
-	err := rc.cl.Get().
+func (rc *ResourceClient) List(opts runtime.Object) (runtime.Object, error) {
+	parameterEncoder := rc.parameterCodec
+	if parameterEncoder == nil {
+		parameterEncoder = defaultParameterEncoder
+	}
+	return rc.cl.Get().
 		NamespaceIfScoped(rc.ns, rc.resource.Namespaced).
 		Resource(rc.resource.Name).
 		VersionedParams(opts, parameterEncoder).
 		Do().
-		Into(result)
-	return result, err
+		Get()
 }
 
 // Get gets the resource with the specified name.
@@ -135,6 +147,10 @@ func (rc *ResourceClient) Delete(name string, opts *v1.DeleteOptions) error {
 
 // DeleteCollection deletes a collection of objects.
 func (rc *ResourceClient) DeleteCollection(deleteOptions *v1.DeleteOptions, listOptions runtime.Object) error {
+	parameterEncoder := rc.parameterCodec
+	if parameterEncoder == nil {
+		parameterEncoder = defaultParameterEncoder
+	}
 	return rc.cl.Delete().
 		NamespaceIfScoped(rc.ns, rc.resource.Namespaced).
 		Resource(rc.resource.Name).
@@ -174,6 +190,10 @@ func (rc *ResourceClient) Update(obj *runtime.Unstructured) (*runtime.Unstructur
 
 // Watch returns a watch.Interface that watches the resource.
 func (rc *ResourceClient) Watch(opts runtime.Object) (watch.Interface, error) {
+	parameterEncoder := rc.parameterCodec
+	if parameterEncoder == nil {
+		parameterEncoder = defaultParameterEncoder
+	}
 	return rc.cl.Get().
 		Prefix("watch").
 		NamespaceIfScoped(rc.ns, rc.resource.Namespaced).
@@ -215,8 +235,20 @@ func (dynamicCodec) Decode(data []byte, gvk *unversioned.GroupVersionKind, obj r
 	return obj, gvk, nil
 }
 
-func (dynamicCodec) EncodeToStream(obj runtime.Object, w io.Writer, overrides ...unversioned.GroupVersion) error {
-	return runtime.UnstructuredJSONScheme.EncodeToStream(obj, w, overrides...)
+func (dynamicCodec) Encode(obj runtime.Object, w io.Writer) error {
+	return runtime.UnstructuredJSONScheme.Encode(obj, w)
+}
+
+// ContentConfig returns a restclient.ContentConfig for dynamic types.
+func ContentConfig() restclient.ContentConfig {
+	// TODO: it's questionable that this should be using anything other than unstructured schema and JSON
+	codec := dynamicCodec{}
+	streamingInfo, _ := api.Codecs.StreamingSerializerForMediaType("application/json;stream=watch", nil)
+	return restclient.ContentConfig{
+		AcceptContentTypes:   runtime.ContentTypeJSON,
+		ContentType:          runtime.ContentTypeJSON,
+		NegotiatedSerializer: serializer.NegotiatedSerializerWrapper(runtime.SerializerInfo{Serializer: codec}, streamingInfo),
+	}
 }
 
 // paramaterCodec is a codec converts an API object to query
@@ -231,4 +263,27 @@ func (parameterCodec) DecodeParameters(parameters url.Values, from unversioned.G
 	return errors.New("DecodeParameters not implemented on dynamic parameterCodec")
 }
 
-var parameterEncoder runtime.ParameterCodec = parameterCodec{}
+var defaultParameterEncoder runtime.ParameterCodec = parameterCodec{}
+
+type versionedParameterEncoderWithV1Fallback struct{}
+
+func (versionedParameterEncoderWithV1Fallback) EncodeParameters(obj runtime.Object, to unversioned.GroupVersion) (url.Values, error) {
+	ret, err := api.ParameterCodec.EncodeParameters(obj, to)
+	if err != nil && runtime.IsNotRegisteredError(err) {
+		// fallback to v1
+		return api.ParameterCodec.EncodeParameters(obj, v1.SchemeGroupVersion)
+	}
+	return ret, err
+}
+
+func (versionedParameterEncoderWithV1Fallback) DecodeParameters(parameters url.Values, from unversioned.GroupVersion, into runtime.Object) error {
+	return errors.New("DecodeParameters not implemented on versionedParameterEncoderWithV1Fallback")
+}
+
+// VersionedParameterEncoderWithV1Fallback is useful for encoding query
+// parameters for thirdparty resources. It tries to convert object to the
+// specified version before converting it to query parameters, and falls back to
+// converting to v1 if the object is not registered in the specified version.
+// For the record, currently API server always treats query parameters sent to a
+// thirdparty resource endpoint as v1.
+var VersionedParameterEncoderWithV1Fallback runtime.ParameterCodec = versionedParameterEncoderWithV1Fallback{}

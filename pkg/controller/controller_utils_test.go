@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -35,15 +35,16 @@ import (
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/securitycontext"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/clock"
 	"k8s.io/kubernetes/pkg/util/sets"
 	utiltesting "k8s.io/kubernetes/pkg/util/testing"
+	"k8s.io/kubernetes/pkg/util/uuid"
 )
 
 // NewFakeControllerExpectationsLookup creates a fake store for PodExpectations.
-func NewFakeControllerExpectationsLookup(ttl time.Duration) (*ControllerExpectations, *util.FakeClock) {
+func NewFakeControllerExpectationsLookup(ttl time.Duration) (*ControllerExpectations, *clock.FakeClock) {
 	fakeTime := time.Date(2009, time.November, 10, 23, 0, 0, 0, time.UTC)
-	fakeClock := util.NewFakeClock(fakeTime)
+	fakeClock := clock.NewFakeClock(fakeTime)
 	ttlPolicy := &cache.TTLPolicy{Ttl: ttl, Clock: fakeClock}
 	ttlStore := cache.NewFakeExpirationStore(
 		ExpKeyFunc, nil, ttlPolicy, fakeClock)
@@ -54,7 +55,7 @@ func newReplicationController(replicas int) *api.ReplicationController {
 	rc := &api.ReplicationController{
 		TypeMeta: unversioned.TypeMeta{APIVersion: testapi.Default.GroupVersion().String()},
 		ObjectMeta: api.ObjectMeta{
-			UID:             util.NewUUID(),
+			UID:             uuid.NewUUID(),
 			Name:            "foobar",
 			Namespace:       api.NamespaceDefault,
 			ResourceVersion: "18",
@@ -124,7 +125,7 @@ func TestControllerExpectations(t *testing.T) {
 	// RC fires off adds and deletes at apiserver, then sets expectations
 	rcKey, err := KeyFunc(rc)
 	if err != nil {
-		t.Errorf("Couldn't get key for object %+v: %v", rc, err)
+		t.Errorf("Couldn't get key for object %#v: %v", rc, err)
 	}
 	e.SetExpectations(rcKey, adds, dels)
 	var wg sync.WaitGroup
@@ -201,7 +202,7 @@ func TestUIDExpectations(t *testing.T) {
 		podList := newPodList(nil, 5, api.PodRunning, rc)
 		rcKey, err := KeyFunc(rc)
 		if err != nil {
-			t.Fatalf("Couldn't get key for object %+v: %v", rc, err)
+			t.Fatalf("Couldn't get key for object %#v: %v", rc, err)
 		}
 		rcKeys = append(rcKeys, rcKey)
 		rcPodNames := []string{}
@@ -253,7 +254,9 @@ func TestCreatePods(t *testing.T) {
 	controllerSpec := newReplicationController(1)
 
 	// Make sure createReplica sends a POST to the apiserver with a pod from the controllers pod template
-	podControl.CreatePods(ns, controllerSpec.Spec.Template, controllerSpec)
+	if err := podControl.CreatePods(ns, controllerSpec.Spec.Template, controllerSpec); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	expectedPod := api.Pod{
 		ObjectMeta: api.ObjectMeta{
@@ -265,7 +268,7 @@ func TestCreatePods(t *testing.T) {
 	fakeHandler.ValidateRequest(t, testapi.Default.ResourcePath("pods", api.NamespaceDefault, ""), "POST", nil)
 	actualPod, err := runtime.Decode(testapi.Default.Codec(), []byte(fakeHandler.RequestBody))
 	if err != nil {
-		t.Errorf("Unexpected error: %#v", err)
+		t.Fatalf("Unexpected error: %v", err)
 	}
 	if !api.Semantic.DeepDerivative(&expectedPod, actualPod) {
 		t.Logf("Body: %s", fakeHandler.RequestBody)
@@ -284,7 +287,11 @@ func TestActivePodFiltering(t *testing.T) {
 		expectedNames.Insert(pod.Name)
 	}
 
-	got := FilterActivePods(podList.Items)
+	var podPointers []*api.Pod
+	for i := range podList.Items {
+		podPointers = append(podPointers, &podList.Items[i])
+	}
+	got := FilterActivePods(podPointers)
 	gotNames := sets.NewString()
 	for _, pod := range got {
 		gotNames.Insert(pod.Name)

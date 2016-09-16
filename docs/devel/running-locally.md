@@ -2,15 +2,15 @@
 
 <!-- BEGIN STRIP_FOR_RELEASE -->
 
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
 
 <h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
@@ -21,7 +21,7 @@ refer to the docs that go with that version.
 <!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.2/docs/devel/running-locally.md).
+[here](http://releases.k8s.io/release-1.4/docs/devel/running-locally.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -143,7 +143,7 @@ However you cannot view the nginx start page on localhost. To verify that nginx 
 You can control the specifications of a pod via a user defined manifest, and reach nginx through your browser on the port specified therein:
 
 ```sh
-cluster/kubectl.sh create -f docs/user-guide/pod.yaml
+cluster/kubectl.sh create -f test/fixtures/doc-yaml/user-guide/pod.yaml
 ```
 
 Congratulations!
@@ -170,7 +170,7 @@ You are running a single node setup.  This has the limitation of only supporting
 
 ```sh
 cd kubernetes
-hack/build-go.sh
+make
 hack/local-up-cluster.sh
 ```
 
@@ -189,7 +189,7 @@ KUBE_DNS_DOMAIN="cluster.local"
 KUBE_DNS_REPLICAS=1
 ```
 
-To know more on DNS service you can look [here](http://issue.k8s.io/6667). Related documents can be found [here](../../cluster/addons/dns/#how-do-i-configure-it)
+To know more on DNS service you can look [here](http://issue.k8s.io/6667). Related documents can be found [here](../../build/kube-dns/#how-do-i-configure-it)
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

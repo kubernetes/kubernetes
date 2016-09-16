@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -38,6 +38,7 @@ var AWSRegions = [...]string{
 	"us-west-2",
 	"eu-west-1",
 	"eu-central-1",
+	"ap-south-1",
 	"ap-southeast-1",
 	"ap-southeast-2",
 	"ap-northeast-1",
@@ -50,7 +51,7 @@ var AWSRegions = [...]string{
 const registryURLTemplate = "*.dkr.ecr.%s.amazonaws.com"
 
 // awsHandlerLogger is a handler that logs all AWS SDK requests
-// Copied from cloudprovider/aws/log_handler.go
+// Copied from pkg/cloudprovider/providers/aws/log_handler.go
 func awsHandlerLogger(req *request.Request) {
 	service := req.ClientInfo.ServiceName
 	region := req.Config.Region

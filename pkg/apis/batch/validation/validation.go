@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,6 +17,8 @@ limitations under the License.
 package validation
 
 import (
+	"github.com/robfig/cron"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	unversionedvalidation "k8s.io/kubernetes/pkg/api/unversioned/validation"
@@ -47,14 +49,8 @@ func ValidateGeneratedSelector(obj *batch.Job) field.ErrorList {
 		allErrs = append(allErrs, field.Required(field.NewPath("metadata").Child("uid"), ""))
 	}
 
-	// If somehow uid was unset then we would get "controller-uid=" as the selector
-	// which is bad.
-	if obj.ObjectMeta.UID == "" {
-		allErrs = append(allErrs, field.Required(field.NewPath("metadata").Child("uid"), ""))
-	}
-
 	// If selector generation was requested, then expected labels must be
-	// present on pod template, and much match job's uid and name.  The
+	// present on pod template, and must match job's uid and name.  The
 	// generated (not-manual) selectors/labels ensure no overlap with other
 	// controllers.  The manual mode allows orphaning, adoption,
 	// backward-compatibility, and experimentation with new
@@ -87,17 +83,8 @@ func ValidateJob(job *batch.Job) field.ErrorList {
 }
 
 func ValidateJobSpec(spec *batch.JobSpec, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
+	allErrs := validateJobSpec(spec, fldPath)
 
-	if spec.Parallelism != nil {
-		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*spec.Parallelism), fldPath.Child("parallelism"))...)
-	}
-	if spec.Completions != nil {
-		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*spec.Completions), fldPath.Child("completions"))...)
-	}
-	if spec.ActiveDeadlineSeconds != nil {
-		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*spec.ActiveDeadlineSeconds), fldPath.Child("activeDeadlineSeconds"))...)
-	}
 	if spec.Selector == nil {
 		allErrs = append(allErrs, field.Required(fldPath.Child("selector"), ""))
 	} else {
@@ -110,6 +97,21 @@ func ValidateJobSpec(spec *batch.JobSpec, fldPath *field.Path) field.ErrorList {
 		if !selector.Matches(labels) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("template", "metadata", "labels"), spec.Template.Labels, "`selector` does not match template `labels`"))
 		}
+	}
+	return allErrs
+}
+
+func validateJobSpec(spec *batch.JobSpec, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if spec.Parallelism != nil {
+		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*spec.Parallelism), fldPath.Child("parallelism"))...)
+	}
+	if spec.Completions != nil {
+		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*spec.Completions), fldPath.Child("completions"))...)
+	}
+	if spec.ActiveDeadlineSeconds != nil {
+		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*spec.ActiveDeadlineSeconds), fldPath.Child("activeDeadlineSeconds"))...)
 	}
 
 	allErrs = append(allErrs, apivalidation.ValidatePodTemplateSpec(&spec.Template, fldPath.Child("template"))...)
@@ -153,5 +155,78 @@ func ValidateJobSpecUpdate(spec, oldSpec batch.JobSpec, fldPath *field.Path) fie
 func ValidateJobStatusUpdate(status, oldStatus batch.JobStatus) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, ValidateJobStatus(&status, field.NewPath("status"))...)
+	return allErrs
+}
+
+func ValidateScheduledJob(scheduledJob *batch.ScheduledJob) field.ErrorList {
+	// ScheduledJobs and rcs have the same name validation
+	allErrs := apivalidation.ValidateObjectMeta(&scheduledJob.ObjectMeta, true, apivalidation.ValidateReplicationControllerName, field.NewPath("metadata"))
+	allErrs = append(allErrs, ValidateScheduledJobSpec(&scheduledJob.Spec, field.NewPath("spec"))...)
+	return allErrs
+}
+
+func ValidateScheduledJobSpec(spec *batch.ScheduledJobSpec, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if len(spec.Schedule) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("schedule"), ""))
+	} else {
+		allErrs = append(allErrs, validateScheduleFormat(spec.Schedule, fldPath.Child("schedule"))...)
+	}
+	if spec.StartingDeadlineSeconds != nil {
+		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*spec.StartingDeadlineSeconds), fldPath.Child("startingDeadlineSeconds"))...)
+	}
+	allErrs = append(allErrs, validateConcurrencyPolicy(&spec.ConcurrencyPolicy, fldPath.Child("concurrencyPolicy"))...)
+	allErrs = append(allErrs, ValidateJobTemplateSpec(&spec.JobTemplate, fldPath.Child("jobTemplate"))...)
+
+	return allErrs
+}
+
+func validateConcurrencyPolicy(concurrencyPolicy *batch.ConcurrencyPolicy, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	switch *concurrencyPolicy {
+	case batch.AllowConcurrent, batch.ForbidConcurrent, batch.ReplaceConcurrent:
+		break
+	case "":
+		allErrs = append(allErrs, field.Required(fldPath, ""))
+	default:
+		validValues := []string{string(batch.AllowConcurrent), string(batch.ForbidConcurrent), string(batch.ReplaceConcurrent)}
+		allErrs = append(allErrs, field.NotSupported(fldPath, *concurrencyPolicy, validValues))
+	}
+
+	return allErrs
+}
+
+func validateScheduleFormat(schedule string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	// TODO soltysh: this should be removed when https://github.com/robfig/cron/issues/58 is fixed
+	tmpSchedule := schedule
+	if len(schedule) > 0 && schedule[0] != '@' {
+		tmpSchedule = "0 " + schedule
+	}
+	if _, err := cron.Parse(tmpSchedule); err != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath, schedule, err.Error()))
+	}
+
+	return allErrs
+}
+
+func ValidateJobTemplate(job *batch.JobTemplate) field.ErrorList {
+	// this method should be identical to ValidateJob
+	allErrs := apivalidation.ValidateObjectMeta(&job.ObjectMeta, true, apivalidation.ValidateReplicationControllerName, field.NewPath("metadata"))
+	allErrs = append(allErrs, ValidateJobTemplateSpec(&job.Template, field.NewPath("template"))...)
+	return allErrs
+}
+
+func ValidateJobTemplateSpec(spec *batch.JobTemplateSpec, fldPath *field.Path) field.ErrorList {
+	allErrs := validateJobSpec(&spec.Spec, fldPath.Child("spec"))
+
+	// jobtemplate will always have the selector automatically generated
+	if spec.Spec.Selector != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("spec", "selector"), spec.Spec.Selector, "`selector` will be auto-generated"))
+	}
+	if spec.Spec.ManualSelector != nil && *spec.Spec.ManualSelector {
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("spec", "manualSelector"), spec.Spec.ManualSelector, []string{"nil", "false"}))
+	}
 	return allErrs
 }

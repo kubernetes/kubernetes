@@ -11,14 +11,12 @@ import (
 	"github.com/aws/aws-sdk-go/private/signer/v4"
 )
 
-// The Amazon EC2 Container Registry makes it easier to manage public and private
-// Docker images for AWS or on-premises environments. Amazon ECR supports resource-level
-// permissions to control who can create, update, use, or delete images. Users
-// and groups can be created individually in AWS Identity and Access Management
-// (IAM) or federated with enterprise directories such as Microsoft Active Directory.
-// Images are stored on highly durable AWS infrastructure and include built-in
-// caching so that starting hundreds of containers is as fast as starting a
-// single container.
+// Amazon EC2 Container Registry (Amazon ECR) is a managed AWS Docker registry
+// service. Customers can use the familiar Docker CLI to push, pull, and manage
+// images. Amazon ECR provides a secure, scalable, and reliable registry. Amazon
+// ECR supports private Docker repositories with resource-based permissions
+// using AWS IAM so that specific users or Amazon EC2 instances can access repositories
+// and images. Developers can use the Docker CLI to author and manage images.
 //The service client's operations are safe to be used concurrently.
 // It is not safe to mutate any of the client's properties though.
 type ECR struct {

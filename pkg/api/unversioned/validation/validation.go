@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,15 +17,9 @@ limitations under the License.
 package validation
 
 import (
-	"fmt"
-
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/util/validation"
 	"k8s.io/kubernetes/pkg/util/validation/field"
-)
-
-var (
-	labelValueErrorMsg string = fmt.Sprintf(`must have at most %d characters, matching regex %s: e.g. "MyValue" or ""`, validation.LabelValueMaxLength, validation.LabelValueFmt)
 )
 
 func ValidateLabelSelector(ps *unversioned.LabelSelector, fldPath *field.Path) field.ErrorList {
@@ -61,8 +55,8 @@ func ValidateLabelSelectorRequirement(sr unversioned.LabelSelectorRequirement, f
 // ValidateLabelName validates that the label name is correctly defined.
 func ValidateLabelName(labelName string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	for _, err := range validation.IsQualifiedName(labelName) {
-		allErrs = append(allErrs, field.Invalid(fldPath, labelName, err))
+	for _, msg := range validation.IsQualifiedName(labelName) {
+		allErrs = append(allErrs, field.Invalid(fldPath, labelName, msg))
 	}
 	return allErrs
 }
@@ -72,8 +66,8 @@ func ValidateLabels(labels map[string]string, fldPath *field.Path) field.ErrorLi
 	allErrs := field.ErrorList{}
 	for k, v := range labels {
 		allErrs = append(allErrs, ValidateLabelName(k, fldPath)...)
-		if !validation.IsValidLabelValue(v) {
-			allErrs = append(allErrs, field.Invalid(fldPath, v, labelValueErrorMsg))
+		for _, msg := range validation.IsValidLabelValue(v) {
+			allErrs = append(allErrs, field.Invalid(fldPath, v, msg))
 		}
 	}
 	return allErrs

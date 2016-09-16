@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -37,7 +37,7 @@ func TestNamespaceStrategy(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "10"},
 		Status:     api.NamespaceStatus{Phase: api.NamespaceTerminating},
 	}
-	Strategy.PrepareForCreate(namespace)
+	Strategy.PrepareForCreate(ctx, namespace)
 	if namespace.Status.Phase != api.NamespaceActive {
 		t.Errorf("Namespaces do not allow setting phase on create")
 	}
@@ -52,7 +52,7 @@ func TestNamespaceStrategy(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Name: "bar", ResourceVersion: "4"},
 	}
 	// ensure we copy spec.finalizers from old to new
-	Strategy.PrepareForUpdate(invalidNamespace, namespace)
+	Strategy.PrepareForUpdate(ctx, invalidNamespace, namespace)
 	if len(invalidNamespace.Spec.Finalizers) != 1 || invalidNamespace.Spec.Finalizers[0] != api.FinalizerKubernetes {
 		t.Errorf("PrepareForUpdate should have preserved old.spec.finalizers")
 	}
@@ -83,7 +83,7 @@ func TestNamespaceStatusStrategy(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "9", DeletionTimestamp: &now},
 		Status:     api.NamespaceStatus{Phase: api.NamespaceTerminating},
 	}
-	StatusStrategy.PrepareForUpdate(namespace, oldNamespace)
+	StatusStrategy.PrepareForUpdate(ctx, namespace, oldNamespace)
 	if namespace.Status.Phase != api.NamespaceTerminating {
 		t.Errorf("Namespace status updates should allow change of phase: %v", namespace.Status.Phase)
 	}
@@ -117,7 +117,7 @@ func TestNamespaceFinalizeStrategy(t *testing.T) {
 		Spec:       api.NamespaceSpec{Finalizers: []api.FinalizerName{"example.com/foo"}},
 		Status:     api.NamespaceStatus{Phase: api.NamespaceTerminating},
 	}
-	FinalizeStrategy.PrepareForUpdate(namespace, oldNamespace)
+	FinalizeStrategy.PrepareForUpdate(ctx, namespace, oldNamespace)
 	if namespace.Status.Phase != api.NamespaceActive {
 		t.Errorf("finalize updates should not allow change of phase: %v", namespace.Status.Phase)
 	}

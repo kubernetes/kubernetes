@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -375,6 +375,12 @@ func (f *HistoricalFIFO) merge(id string, obj UniqueCopyable) (notifications []E
 		f.gc()
 	}
 	return
+}
+
+// Resync will touch all objects to put them into the processing queue
+func (f *HistoricalFIFO) Resync() error {
+	// Nothing to do
+	return nil
 }
 
 // NewHistorical returns a Store which can be used to queue up items to

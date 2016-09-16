@@ -24,6 +24,12 @@ func setUDPSocketOptions4(conn *net.UDPConn) error {
 	if err := syscall.SetsockoptInt(int(file.Fd()), syscall.IPPROTO_IP, syscall.IP_PKTINFO, 1); err != nil {
 		return err
 	}
+	// Calling File() above results in the connection becoming blocking, we must fix that.
+	// See https://github.com/miekg/dns/issues/279
+	err = syscall.SetNonblock(int(file.Fd()), true)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -34,6 +40,10 @@ func setUDPSocketOptions6(conn *net.UDPConn) error {
 		return err
 	}
 	if err := syscall.SetsockoptInt(int(file.Fd()), syscall.IPPROTO_IPV6, syscall.IPV6_RECVPKTINFO, 1); err != nil {
+		return err
+	}
+	err = syscall.SetNonblock(int(file.Fd()), true)
+	if err != nil {
 		return err
 	}
 	return nil

@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,14 +20,14 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/fields"
 )
 
 // TestSelectableFieldLabelConversions verifies that given resource have field
 // label conversion defined for each its selectable field.
 // fields contains selectable fields of the resource.
 // labelMap maps deprecated labels to their canonical names.
-func TestSelectableFieldLabelConversionsOfKind(t *testing.T, apiVersion string, kind string, fields labels.Set, labelMap map[string]string) {
+func TestSelectableFieldLabelConversionsOfKind(t *testing.T, apiVersion string, kind string, fields fields.Set, labelMap map[string]string) {
 	badFieldLabels := []string{
 		"name",
 		".name",

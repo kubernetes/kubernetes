@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,7 +25,6 @@ import (
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/batch"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/types"
 )
 
@@ -72,7 +71,7 @@ func TestJobStrategy(t *testing.T) {
 		},
 	}
 
-	Strategy.PrepareForCreate(job)
+	Strategy.PrepareForCreate(ctx, job)
 	if job.Status.Active != 0 {
 		t.Errorf("Job does not allow setting status on create")
 	}
@@ -92,7 +91,7 @@ func TestJobStrategy(t *testing.T) {
 	}
 	// ensure we do not change status
 	job.Status.Active = 10
-	Strategy.PrepareForUpdate(updatedJob, job)
+	Strategy.PrepareForUpdate(ctx, updatedJob, job)
 	if updatedJob.Status.Active != 10 {
 		t.Errorf("PrepareForUpdate should have preserved prior version status")
 	}
@@ -126,7 +125,7 @@ func TestJobStrategyWithGeneration(t *testing.T) {
 		},
 	}
 
-	Strategy.PrepareForCreate(job)
+	Strategy.PrepareForCreate(ctx, job)
 	errs := Strategy.Validate(ctx, job)
 	if len(errs) != 0 {
 		t.Errorf("Unexpected error validating %v", errs)
@@ -206,7 +205,7 @@ func TestJobStatusStrategy(t *testing.T) {
 		},
 	}
 
-	StatusStrategy.PrepareForUpdate(newJob, oldJob)
+	StatusStrategy.PrepareForUpdate(ctx, newJob, oldJob)
 	if newJob.Status.Active != 12 {
 		t.Errorf("Job status updates must allow changes to job status")
 	}
@@ -226,7 +225,7 @@ func TestSelectableFieldLabelConversions(t *testing.T) {
 	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
 		testapi.Extensions.GroupVersion().String(),
 		"Job",
-		labels.Set(JobToSelectableFields(&batch.Job{})),
+		JobToSelectableFields(&batch.Job{}),
 		nil,
 	)
 }

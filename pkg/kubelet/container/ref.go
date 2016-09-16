@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -54,6 +54,16 @@ func fieldPath(pod *api.Pod, container *api.Container) (string, error) {
 				return fmt.Sprintf("spec.containers[%d]", i), nil
 			} else {
 				return fmt.Sprintf("spec.containers{%s}", here.Name), nil
+			}
+		}
+	}
+	for i := range pod.Spec.InitContainers {
+		here := &pod.Spec.InitContainers[i]
+		if here.Name == container.Name {
+			if here.Name == "" {
+				return fmt.Sprintf("spec.initContainers[%d]", i), nil
+			} else {
+				return fmt.Sprintf("spec.initContainers{%s}", here.Name), nil
 			}
 		}
 	}

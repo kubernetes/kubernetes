@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ package restclient
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -38,7 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/serializer/streaming"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/clock"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/util/httpstream"
 	"k8s.io/kubernetes/pkg/util/intstr"
@@ -273,7 +274,6 @@ func (obj NotAnAPIObject) SetGroupVersionKind(gvk *unversioned.GroupVersionKind)
 func defaultContentConfig() ContentConfig {
 	return ContentConfig{
 		GroupVersion:         testapi.Default.GroupVersion(),
-		Codec:                testapi.Default.Codec(),
 		NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
 	}
 }
@@ -284,6 +284,9 @@ func defaultSerializers() Serializers {
 		Decoder:             testapi.Default.Codec(),
 		StreamingSerializer: testapi.Default.Codec(),
 		Framer:              runtime.DefaultFramer,
+		RenegotiatedDecoder: func(contentType string, params map[string]string) (runtime.Decoder, error) {
+			return testapi.Default.Codec(), nil
+		},
 	}
 }
 
@@ -328,7 +331,8 @@ func TestURLTemplate(t *testing.T) {
 	if full.String() != "http://localhost/pre1/namespaces/ns/r1/nm?p0=v0" {
 		t.Errorf("unexpected initial URL: %s", full)
 	}
-	actual := r.finalURLTemplate()
+	actualURL := r.finalURLTemplate()
+	actual := actualURL.String()
 	expected := "http://localhost/pre1/namespaces/%7Bnamespace%7D/r1/%7Bname%7D?p0=%7Bvalue%7D"
 	if actual != expected {
 		t.Errorf("unexpected URL template: %s %s", actual, expected)
@@ -410,6 +414,161 @@ func TestTransformResponse(t *testing.T) {
 		}
 		if test.Created != created {
 			t.Errorf("%d: expected created %t, got %t", i, test.Created, created)
+		}
+	}
+}
+
+type renegotiator struct {
+	called      bool
+	contentType string
+	params      map[string]string
+	decoder     runtime.Decoder
+	err         error
+}
+
+func (r *renegotiator) invoke(contentType string, params map[string]string) (runtime.Decoder, error) {
+	r.called = true
+	r.contentType = contentType
+	r.params = params
+	return r.decoder, r.err
+}
+
+func TestTransformResponseNegotiate(t *testing.T) {
+	invalid := []byte("aaaaa")
+	uri, _ := url.Parse("http://localhost")
+	testCases := []struct {
+		Response *http.Response
+		Data     []byte
+		Created  bool
+		Error    bool
+		ErrFn    func(err error) bool
+
+		ContentType       string
+		Called            bool
+		ExpectContentType string
+		Decoder           runtime.Decoder
+		NegotiateErr      error
+	}{
+		{
+			ContentType: "application/json",
+			Response: &http.Response{
+				StatusCode: 401,
+				Header:     http.Header{"Content-Type": []string{"application/json"}},
+				Body:       ioutil.NopCloser(bytes.NewReader(invalid)),
+			},
+			Error: true,
+			ErrFn: func(err error) bool {
+				return err.Error() != "aaaaa" && apierrors.IsUnauthorized(err)
+			},
+		},
+		{
+			ContentType: "application/json",
+			Response: &http.Response{
+				StatusCode: 401,
+				Header:     http.Header{"Content-Type": []string{"application/protobuf"}},
+				Body:       ioutil.NopCloser(bytes.NewReader(invalid)),
+			},
+			Decoder: testapi.Default.Codec(),
+
+			Called:            true,
+			ExpectContentType: "application/protobuf",
+
+			Error: true,
+			ErrFn: func(err error) bool {
+				return err.Error() != "aaaaa" && apierrors.IsUnauthorized(err)
+			},
+		},
+		{
+			ContentType: "application/json",
+			Response: &http.Response{
+				StatusCode: 500,
+				Header:     http.Header{"Content-Type": []string{"application/,others"}},
+			},
+			Decoder: testapi.Default.Codec(),
+
+			Error: true,
+			ErrFn: func(err error) bool {
+				return err.Error() == "Internal error occurred: mime: expected token after slash" && err.(apierrors.APIStatus).Status().Code == 500
+			},
+		},
+		{
+			// no negotiation when no content type specified
+			Response: &http.Response{
+				StatusCode: 200,
+				Header:     http.Header{"Content-Type": []string{"text/any"}},
+				Body:       ioutil.NopCloser(bytes.NewReader(invalid)),
+			},
+			Decoder: testapi.Default.Codec(),
+		},
+		{
+			// no negotiation when no response content type specified
+			ContentType: "text/any",
+			Response: &http.Response{
+				StatusCode: 200,
+				Body:       ioutil.NopCloser(bytes.NewReader(invalid)),
+			},
+			Decoder: testapi.Default.Codec(),
+		},
+		{
+			// unrecognized content type is not handled
+			ContentType: "application/json",
+			Response: &http.Response{
+				StatusCode: 404,
+				Header:     http.Header{"Content-Type": []string{"application/unrecognized"}},
+				Body:       ioutil.NopCloser(bytes.NewReader(invalid)),
+			},
+			Decoder: testapi.Default.Codec(),
+
+			NegotiateErr:      fmt.Errorf("aaaa"),
+			Called:            true,
+			ExpectContentType: "application/unrecognized",
+
+			Error: true,
+			ErrFn: func(err error) bool {
+				return err.Error() != "aaaaa" && apierrors.IsNotFound(err)
+			},
+		},
+	}
+	for i, test := range testCases {
+		serializers := defaultSerializers()
+		negotiator := &renegotiator{
+			decoder: test.Decoder,
+			err:     test.NegotiateErr,
+		}
+		serializers.RenegotiatedDecoder = negotiator.invoke
+		contentConfig := defaultContentConfig()
+		contentConfig.ContentType = test.ContentType
+		r := NewRequest(nil, "", uri, "", contentConfig, serializers, nil, nil)
+		if test.Response.Body == nil {
+			test.Response.Body = ioutil.NopCloser(bytes.NewReader([]byte{}))
+		}
+		result := r.transformResponse(test.Response, &http.Request{})
+		_, err := result.body, result.err
+		hasErr := err != nil
+		if hasErr != test.Error {
+			t.Errorf("%d: unexpected error: %t %v", i, test.Error, err)
+			continue
+		} else if hasErr && test.Response.StatusCode > 399 {
+			status, ok := err.(apierrors.APIStatus)
+			if !ok {
+				t.Errorf("%d: response should have been transformable into APIStatus: %v", i, err)
+				continue
+			}
+			if int(status.Status().Code) != test.Response.StatusCode {
+				t.Errorf("%d: status code did not match response: %#v", i, status.Status())
+			}
+		}
+		if test.ErrFn != nil && !test.ErrFn(err) {
+			t.Errorf("%d: error function did not match: %v", i, err)
+		}
+		if negotiator.called != test.Called {
+			t.Errorf("%d: negotiator called %t != %t", i, negotiator.called, test.Called)
+		}
+		if !test.Called {
+			continue
+		}
+		if negotiator.contentType != test.ExpectContentType {
+			t.Errorf("%d: unexpected content type: %s", i, negotiator.contentType)
 		}
 	}
 }
@@ -814,7 +973,7 @@ func TestBackoffLifecycle(t *testing.T) {
 	// which are used in the server implementation returning StatusOK above.
 	seconds := []int{0, 1, 2, 4, 8, 0, 1, 2, 4, 0}
 	request := c.Verb("POST").Prefix("backofftest").Suffix("abc")
-	clock := util.FakeClock{}
+	clock := clock.FakeClock{}
 	request.backoffMgr = &URLBackoff{
 		// Use a fake backoff here to avoid flakes and speed the test up.
 		Backoff: flowcontrol.NewFakeBackOff(
@@ -838,6 +997,21 @@ func TestBackoffLifecycle(t *testing.T) {
 	}
 }
 
+type testBackoffManager struct {
+	sleeps []time.Duration
+}
+
+func (b *testBackoffManager) UpdateBackoff(actualUrl *url.URL, err error, responseCode int) {
+}
+
+func (b *testBackoffManager) CalculateBackoff(actualUrl *url.URL) time.Duration {
+	return time.Duration(0)
+}
+
+func (b *testBackoffManager) Sleep(d time.Duration) {
+	b.sleeps = append(b.sleeps, d)
+}
+
 func TestCheckRetryClosesBody(t *testing.T) {
 	count := 0
 	ch := make(chan struct{})
@@ -849,12 +1023,16 @@ func TestCheckRetryClosesBody(t *testing.T) {
 			close(ch)
 			return
 		}
-		w.Header().Set("Retry-After", "0")
-		w.WriteHeader(apierrors.StatusTooManyRequests)
+		w.Header().Set("Retry-After", "1")
+		http.Error(w, "Too many requests, please try again later.", apierrors.StatusTooManyRequests)
 	}))
 	defer testServer.Close()
 
+	backoffMgr := &testBackoffManager{}
+	expectedSleeps := []time.Duration{0, time.Second, 0, time.Second, 0, time.Second, 0, time.Second, 0}
+
 	c := testRESTClient(t, testServer)
+	c.createBackoffMgr = func() BackoffManager { return backoffMgr }
 	_, err := c.Verb("POST").
 		Prefix("foo", "bar").
 		Suffix("baz").
@@ -868,12 +1046,22 @@ func TestCheckRetryClosesBody(t *testing.T) {
 	if count != 5 {
 		t.Errorf("unexpected retries: %d", count)
 	}
+	if !reflect.DeepEqual(backoffMgr.sleeps, expectedSleeps) {
+		t.Errorf("unexpected sleeps, expected: %v, got: %v", expectedSleeps, backoffMgr.sleeps)
+	}
 }
 
 func TestCheckRetryHandles429And5xx(t *testing.T) {
 	count := 0
 	ch := make(chan struct{})
 	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		data, err := ioutil.ReadAll(req.Body)
+		if err != nil {
+			t.Fatalf("unable to read request body: %v", err)
+		}
+		if !bytes.Equal(data, []byte(strings.Repeat("abcd", 1000))) {
+			t.Fatalf("retry did not send a complete body: %s", data)
+		}
 		t.Logf("attempt %d", count)
 		if count >= 4 {
 			w.WriteHeader(http.StatusOK)
@@ -1057,7 +1245,7 @@ func TestDoRequestNewWayFile(t *testing.T) {
 		t.Errorf("Expected: %#v, got %#v", expectedObj, obj)
 	}
 	if wasCreated {
-		t.Errorf("expected object was not created")
+		t.Errorf("expected object was created")
 	}
 	tmpStr := string(reqBodyExpected)
 	requestURL := testapi.Default.ResourcePathWithPrefix("foo/bar/baz", "", "", "")

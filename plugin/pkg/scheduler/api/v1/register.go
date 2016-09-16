@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package v1
 
 import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/api"
 )
 
@@ -26,9 +27,22 @@ import (
 var SchemeGroupVersion = unversioned.GroupVersion{Group: "", Version: "v1"}
 
 func init() {
-	api.Scheme.AddKnownTypes(SchemeGroupVersion,
+	if err := addKnownTypes(api.Scheme); err != nil {
+		// Programmer error.
+		panic(err)
+	}
+}
+
+var (
+	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)
+	AddToScheme   = SchemeBuilder.AddToScheme
+)
+
+func addKnownTypes(scheme *runtime.Scheme) error {
+	scheme.AddKnownTypes(SchemeGroupVersion,
 		&Policy{},
 	)
+	return nil
 }
 
 func (obj *Policy) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }

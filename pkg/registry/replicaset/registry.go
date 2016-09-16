@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -80,7 +80,7 @@ func (s *storage) CreateReplicaSet(ctx api.Context, replicaSet *extensions.Repli
 }
 
 func (s *storage) UpdateReplicaSet(ctx api.Context, replicaSet *extensions.ReplicaSet) (*extensions.ReplicaSet, error) {
-	obj, _, err := s.Update(ctx, replicaSet)
+	obj, _, err := s.Update(ctx, replicaSet.Name, rest.DefaultUpdatedObjectInfo(replicaSet, api.Scheme))
 	if err != nil {
 		return nil, err
 	}

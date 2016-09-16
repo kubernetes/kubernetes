@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,6 +23,9 @@ import (
 	"strconv"
 	"strings"
 
+	"k8s.io/kubernetes/cmd/libs/go2idl/openapi-gen/generators/common"
+
+	"github.com/go-openapi/spec"
 	"github.com/google/gofuzz"
 )
 
@@ -34,6 +37,7 @@ import (
 //
 // +protobuf=true
 // +protobuf.options.(gogoproto.goproto_stringer)=false
+// +k8s:openapi-gen=true
 type IntOrString struct {
 	Type   Type   `protobuf:"varint,1,opt,name=type,casttype=Type"`
 	IntVal int32  `protobuf:"varint,2,opt,name=intVal"`
@@ -101,6 +105,17 @@ func (intstr IntOrString) MarshalJSON() ([]byte, error) {
 	}
 }
 
+func (_ IntOrString) OpenAPIDefinition() common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Type:   []string{"string"},
+				Format: "int-or-string",
+			},
+		},
+	}
+}
+
 func (intstr *IntOrString) Fuzz(c fuzz.Continue) {
 	if intstr == nil {
 		return
@@ -143,5 +158,5 @@ func getIntOrPercentValue(intOrStr *IntOrString) (int, bool, error) {
 		}
 		return int(v), true, nil
 	}
-	return 0, false, fmt.Errorf("invalid value: neither int nor percentage")
+	return 0, false, fmt.Errorf("invalid type: neither int nor percentage")
 }

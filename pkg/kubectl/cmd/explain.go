@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,8 +17,10 @@ limitations under the License.
 package cmd
 
 import (
+	"fmt"
 	"io"
 
+	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -27,27 +29,29 @@ import (
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
-const (
-	explainExamples = `# Get the documentation of the resource and its fields
-kubectl explain pods
+var (
+	explainExamples = dedent.Dedent(`
+		# Get the documentation of the resource and its fields
+		kubectl explain pods
 
-# Get the documentation of a specific field of a resource
-kubectl explain pods.spec.containers`
+		# Get the documentation of a specific field of a resource
+		kubectl explain pods.spec.containers`)
 
-	explainLong = `Documentation of resources.
+	explainLong = dedent.Dedent(`
+		Documentation of resources.
 
-` + kubectl.PossibleResourceTypes
+		`) + valid_resources
 )
 
 // NewCmdExplain returns a cobra command for swagger docs
-func NewCmdExplain(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+func NewCmdExplain(f *cmdutil.Factory, out, cmdErr io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "explain RESOURCE",
-		Short:   "Documentation of resources.",
+		Short:   "Documentation of resources",
 		Long:    explainLong,
 		Example: explainExamples,
 		Run: func(cmd *cobra.Command, args []string) {
-			err := RunExplain(f, out, cmd, args)
+			err := RunExplain(f, out, cmdErr, cmd, args)
 			cmdutil.CheckErr(err)
 		},
 	}
@@ -57,8 +61,12 @@ func NewCmdExplain(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 }
 
 // RunExplain executes the appropriate steps to print a model's documentation
-func RunExplain(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) error {
-	if len(args) != 1 {
+func RunExplain(f *cmdutil.Factory, out, cmdErr io.Writer, cmd *cobra.Command, args []string) error {
+	if len(args) == 0 {
+		fmt.Fprint(cmdErr, "You must specify the type of resource to explain. ", valid_resources)
+		return cmdutil.UsageError(cmd, "Required resource not specified.")
+	}
+	if len(args) > 1 {
 		return cmdutil.UsageError(cmd, "We accept only this format: explain RESOURCE")
 	}
 
@@ -81,7 +89,7 @@ func RunExplain(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []st
 	if fullySpecifiedGVR != nil {
 		gvk, _ = mapper.KindFor(*fullySpecifiedGVR)
 	}
-	if gvk.IsEmpty() {
+	if gvk.Empty() {
 		gvk, err = mapper.KindFor(groupResource.WithVersion(""))
 		if err != nil {
 			return err

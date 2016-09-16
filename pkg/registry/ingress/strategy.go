@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -45,7 +45,7 @@ func (ingressStrategy) NamespaceScoped() bool {
 }
 
 // PrepareForCreate clears the status of an Ingress before creation.
-func (ingressStrategy) PrepareForCreate(obj runtime.Object) {
+func (ingressStrategy) PrepareForCreate(ctx api.Context, obj runtime.Object) {
 	ingress := obj.(*extensions.Ingress)
 	// create cannot set status
 	ingress.Status = extensions.IngressStatus{}
@@ -54,7 +54,7 @@ func (ingressStrategy) PrepareForCreate(obj runtime.Object) {
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
-func (ingressStrategy) PrepareForUpdate(obj, old runtime.Object) {
+func (ingressStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
 	newIngress := obj.(*extensions.Ingress)
 	oldIngress := old.(*extensions.Ingress)
 	// Update is not allowed to set status
@@ -99,13 +99,13 @@ func (ingressStrategy) AllowUnconditionalUpdate() bool {
 
 // IngressToSelectableFields returns a field set that represents the object.
 func IngressToSelectableFields(ingress *extensions.Ingress) fields.Set {
-	return generic.ObjectMetaFieldsSet(ingress.ObjectMeta, true)
+	return generic.ObjectMetaFieldsSet(&ingress.ObjectMeta, true)
 }
 
 // MatchIngress is the filter used by the generic etcd backend to ingress
 // watch events from etcd to clients of the apiserver only interested in specific
 // labels/fields.
-func MatchIngress(label labels.Selector, field fields.Selector) generic.Matcher {
+func MatchIngress(label labels.Selector, field fields.Selector) *generic.SelectionPredicate {
 	return &generic.SelectionPredicate{
 		Label: label,
 		Field: field,
@@ -126,7 +126,7 @@ type ingressStatusStrategy struct {
 var StatusStrategy = ingressStatusStrategy{Strategy}
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update of status
-func (ingressStatusStrategy) PrepareForUpdate(obj, old runtime.Object) {
+func (ingressStatusStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
 	newIngress := obj.(*extensions.Ingress)
 	oldIngress := old.(*extensions.Ingress)
 	// status changes are not allowed to update spec

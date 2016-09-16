@@ -98,3 +98,36 @@ func (m HostConfigManager) VsanSystem(ctx context.Context) (*HostVsanSystem, err
 
 	return NewHostVsanSystem(m.c, *h.ConfigManager.VsanSystem), nil
 }
+
+func (m HostConfigManager) AccountManager(ctx context.Context) (*HostAccountManager, error) {
+	var h mo.HostSystem
+
+	err := m.Properties(ctx, m.Reference(), []string{"configManager.accountManager"}, &h)
+	if err != nil {
+		return nil, err
+	}
+
+	return NewHostAccountManager(m.c, *h.ConfigManager.AccountManager), nil
+}
+
+func (m HostConfigManager) OptionManager(ctx context.Context) (*OptionManager, error) {
+	var h mo.HostSystem
+
+	err := m.Properties(ctx, m.Reference(), []string{"configManager.advancedOption"}, &h)
+	if err != nil {
+		return nil, err
+	}
+
+	return NewOptionManager(m.c, *h.ConfigManager.AdvancedOption), nil
+}
+
+func (m HostConfigManager) ServiceSystem(ctx context.Context) (*HostServiceSystem, error) {
+	var h mo.HostSystem
+
+	err := m.Properties(ctx, m.Reference(), []string{"configManager.serviceSystem"}, &h)
+	if err != nil {
+		return nil, err
+	}
+
+	return NewHostServiceSystem(m.c, *h.ConfigManager.ServiceSystem), nil
+}

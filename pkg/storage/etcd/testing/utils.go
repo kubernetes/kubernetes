@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -27,9 +27,16 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
+	"k8s.io/kubernetes/pkg/storage/etcd/testing/testingcert"
+	"k8s.io/kubernetes/pkg/storage/storagebackend"
+	"k8s.io/kubernetes/pkg/util/wait"
+
 	etcd "github.com/coreos/etcd/client"
+	"github.com/coreos/etcd/clientv3"
 	"github.com/coreos/etcd/etcdserver"
 	"github.com/coreos/etcd/etcdserver/api/v2http"
+	"github.com/coreos/etcd/integration"
 	"github.com/coreos/etcd/pkg/testutil"
 	"github.com/coreos/etcd/pkg/transport"
 	"github.com/coreos/etcd/pkg/types"
@@ -39,6 +46,8 @@ import (
 
 // EtcdTestServer encapsulates the datastructures needed to start local instance for testing
 type EtcdTestServer struct {
+	// The following are lumped etcd2 test server params
+	// TODO: Deprecate in a post 1.5 release
 	etcdserver.ServerConfig
 	PeerListeners, ClientListeners []net.Listener
 	Client                         etcd.Client
@@ -51,6 +60,10 @@ type EtcdTestServer struct {
 	raftHandler http.Handler
 	s           *etcdserver.EtcdServer
 	hss         []*httptest.Server
+
+	// The following are lumped etcd3 test server params
+	v3Cluster *integration.ClusterV3
+	v3Client  *clientv3.Client
 }
 
 // newLocalListener opens a port localhost using any port
@@ -100,7 +113,7 @@ func newHttpTransport(t *testing.T, certFile, keyFile, caFile string) etcd.Cance
 }
 
 // configureTestCluster will set the params to start an etcd server
-func configureTestCluster(t *testing.T, name string) *EtcdTestServer {
+func configureTestCluster(t *testing.T, name string, https bool) *EtcdTestServer {
 	var err error
 	m := &EtcdTestServer{}
 
@@ -111,32 +124,47 @@ func configureTestCluster(t *testing.T, name string) *EtcdTestServer {
 		t.Fatal(err)
 	}
 
-	m.CertificatesDir, err = ioutil.TempDir(os.TempDir(), "etcd_certificates")
-	if err != nil {
-		t.Fatal(err)
-	}
-	m.CertFile = path.Join(m.CertificatesDir, "etcdcert.pem")
-	if err = ioutil.WriteFile(m.CertFile, []byte(CertFileContent), 0644); err != nil {
-		t.Fatal(err)
-	}
-	m.KeyFile = path.Join(m.CertificatesDir, "etcdkey.pem")
-	if err = ioutil.WriteFile(m.KeyFile, []byte(KeyFileContent), 0644); err != nil {
-		t.Fatal(err)
-	}
-	m.CAFile = path.Join(m.CertificatesDir, "ca.pem")
-	if err = ioutil.WriteFile(m.CAFile, []byte(CAFileContent), 0644); err != nil {
-		t.Fatal(err)
+	// Allow test launches to control where etcd data goes, for space or performance reasons
+	baseDir := os.Getenv("TEST_ETCD_DIR")
+	if len(baseDir) == 0 {
+		baseDir = os.TempDir()
 	}
 
-	cln := newSecuredLocalListener(t, m.CertFile, m.KeyFile, m.CAFile)
-	m.ClientListeners = []net.Listener{cln}
-	m.ClientURLs, err = types.NewURLs([]string{"https://" + cln.Addr().String()})
-	if err != nil {
-		t.Fatal(err)
+	if https {
+		m.CertificatesDir, err = ioutil.TempDir(baseDir, "etcd_certificates")
+		if err != nil {
+			t.Fatal(err)
+		}
+		m.CertFile = path.Join(m.CertificatesDir, "etcdcert.pem")
+		if err = ioutil.WriteFile(m.CertFile, []byte(testingcert.CertFileContent), 0644); err != nil {
+			t.Fatal(err)
+		}
+		m.KeyFile = path.Join(m.CertificatesDir, "etcdkey.pem")
+		if err = ioutil.WriteFile(m.KeyFile, []byte(testingcert.KeyFileContent), 0644); err != nil {
+			t.Fatal(err)
+		}
+		m.CAFile = path.Join(m.CertificatesDir, "ca.pem")
+		if err = ioutil.WriteFile(m.CAFile, []byte(testingcert.CAFileContent), 0644); err != nil {
+			t.Fatal(err)
+		}
+
+		cln := newSecuredLocalListener(t, m.CertFile, m.KeyFile, m.CAFile)
+		m.ClientListeners = []net.Listener{cln}
+		m.ClientURLs, err = types.NewURLs([]string{"https://" + cln.Addr().String()})
+		if err != nil {
+			t.Fatal(err)
+		}
+	} else {
+		cln := newLocalListener(t)
+		m.ClientListeners = []net.Listener{cln}
+		m.ClientURLs, err = types.NewURLs([]string{"http://" + cln.Addr().String()})
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	m.Name = name
-	m.DataDir, err = ioutil.TempDir(os.TempDir(), "etcd")
+	m.DataDir, err = ioutil.TempDir(baseDir, "etcd")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -186,7 +214,7 @@ func (m *EtcdTestServer) launch(t *testing.T) error {
 // waitForEtcd wait until etcd is propagated correctly
 func (m *EtcdTestServer) waitUntilUp() error {
 	membersAPI := etcd.NewMembersAPI(m.Client)
-	for start := time.Now(); time.Since(start) < 5*time.Second; time.Sleep(10 * time.Millisecond) {
+	for start := time.Now(); time.Since(start) < wait.ForeverTestTimeout; time.Sleep(10 * time.Millisecond) {
 		members, err := membersAPI.List(context.TODO())
 		if err != nil {
 			glog.Errorf("Error when getting etcd cluster members")
@@ -201,30 +229,36 @@ func (m *EtcdTestServer) waitUntilUp() error {
 
 // Terminate will shutdown the running etcd server
 func (m *EtcdTestServer) Terminate(t *testing.T) {
-	m.Client = nil
-	m.s.Stop()
-	// TODO: This is a pretty ugly hack to workaround races during closing
-	// in-memory etcd server in unit tests - see #18928 for more details.
-	// We should get rid of it as soon as we have a proper fix - etcd clients
-	// have overwritten transport counting opened connections (probably by
-	// overwriting Dial function) and termination function waiting for all
-	// connections to be closed and stopping accepting new ones.
-	time.Sleep(250 * time.Millisecond)
-	for _, hs := range m.hss {
-		hs.CloseClientConnections()
-		hs.Close()
-	}
-	if err := os.RemoveAll(m.ServerConfig.DataDir); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.RemoveAll(m.CertificatesDir); err != nil {
-		t.Fatal(err)
+	if m.v3Cluster != nil {
+		m.v3Cluster.Terminate(t)
+	} else {
+		m.Client = nil
+		m.s.Stop()
+		// TODO: This is a pretty ugly hack to workaround races during closing
+		// in-memory etcd server in unit tests - see #18928 for more details.
+		// We should get rid of it as soon as we have a proper fix - etcd clients
+		// have overwritten transport counting opened connections (probably by
+		// overwriting Dial function) and termination function waiting for all
+		// connections to be closed and stopping accepting new ones.
+		time.Sleep(250 * time.Millisecond)
+		for _, hs := range m.hss {
+			hs.CloseClientConnections()
+			hs.Close()
+		}
+		if err := os.RemoveAll(m.ServerConfig.DataDir); err != nil {
+			t.Fatal(err)
+		}
+		if len(m.CertificatesDir) > 0 {
+			if err := os.RemoveAll(m.CertificatesDir); err != nil {
+				t.Fatal(err)
+			}
+		}
 	}
 }
 
-// NewEtcdTestClientServer creates a new client and server for testing
+// NewEtcdTestClientServer DEPRECATED creates a new client and server for testing
 func NewEtcdTestClientServer(t *testing.T) *EtcdTestServer {
-	server := configureTestCluster(t, "foo")
+	server := configureTestCluster(t, "foo", true)
 	err := server.launch(t)
 	if err != nil {
 		t.Fatalf("Failed to start etcd server error=%v", err)
@@ -237,7 +271,33 @@ func NewEtcdTestClientServer(t *testing.T) *EtcdTestServer {
 	}
 	server.Client, err = etcd.New(cfg)
 	if err != nil {
-		t.Errorf("Unexpected error in NewEtcdTestClientServer (%v)", err)
+		server.Terminate(t)
+		t.Fatalf("Unexpected error in NewEtcdTestClientServer (%v)", err)
+		return nil
+	}
+	if err := server.waitUntilUp(); err != nil {
+		server.Terminate(t)
+		t.Fatalf("Unexpected error in waitUntilUp (%v)", err)
+		return nil
+	}
+	return server
+}
+
+// NewUnsecuredEtcdTestClientServer DEPRECATED creates a new client and server for testing
+func NewUnsecuredEtcdTestClientServer(t *testing.T) *EtcdTestServer {
+	server := configureTestCluster(t, "foo", false)
+	err := server.launch(t)
+	if err != nil {
+		t.Fatalf("Failed to start etcd server error=%v", err)
+		return nil
+	}
+	cfg := etcd.Config{
+		Endpoints: server.ClientURLs.StringSlice(),
+		Transport: newHttpTransport(t, server.CertFile, server.KeyFile, server.CAFile),
+	}
+	server.Client, err = etcd.New(cfg)
+	if err != nil {
+		t.Errorf("Unexpected error in NewUnsecuredEtcdTestClientServer (%v)", err)
 		server.Terminate(t)
 		return nil
 	}
@@ -247,4 +307,19 @@ func NewEtcdTestClientServer(t *testing.T) *EtcdTestServer {
 		return nil
 	}
 	return server
+}
+
+// NewEtcd3TestClientServer creates a new client and server for testing
+func NewUnsecuredEtcd3TestClientServer(t *testing.T) (*EtcdTestServer, *storagebackend.Config) {
+	server := &EtcdTestServer{
+		v3Cluster: integration.NewClusterV3(t, &integration.ClusterConfig{Size: 1}),
+	}
+	server.v3Client = server.v3Cluster.RandClient()
+	config := &storagebackend.Config{
+		Type:                     "etcd3",
+		Prefix:                   etcdtest.PathPrefix(),
+		ServerList:               server.v3Client.Endpoints(),
+		DeserializationCacheSize: etcdtest.DeserializationCacheSize,
+	}
+	return server, config
 }

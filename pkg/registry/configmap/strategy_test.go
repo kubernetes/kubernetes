@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,7 +22,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
-	"k8s.io/kubernetes/pkg/labels"
 )
 
 func TestConfigMapStrategy(t *testing.T) {
@@ -44,7 +43,7 @@ func TestConfigMapStrategy(t *testing.T) {
 		},
 	}
 
-	Strategy.PrepareForCreate(cfg)
+	Strategy.PrepareForCreate(ctx, cfg)
 
 	errs := Strategy.Validate(ctx, cfg)
 	if len(errs) != 0 {
@@ -62,7 +61,7 @@ func TestConfigMapStrategy(t *testing.T) {
 		},
 	}
 
-	Strategy.PrepareForUpdate(newCfg, cfg)
+	Strategy.PrepareForUpdate(ctx, newCfg, cfg)
 
 	errs = Strategy.ValidateUpdate(ctx, newCfg, cfg)
 	if len(errs) == 0 {
@@ -74,7 +73,7 @@ func TestSelectableFieldLabelConversions(t *testing.T) {
 	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
 		testapi.Default.GroupVersion().String(),
 		"ConfigMap",
-		labels.Set(ConfigMapToSelectableFields(&api.ConfigMap{})),
+		ConfigMapToSelectableFields(&api.ConfigMap{}),
 		nil,
 	)
 }

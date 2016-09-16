@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -45,7 +45,7 @@ func (podDisruptionBudgetStrategy) NamespaceScoped() bool {
 }
 
 // PrepareForCreate clears the status of an PodDisruptionBudget before creation.
-func (podDisruptionBudgetStrategy) PrepareForCreate(obj runtime.Object) {
+func (podDisruptionBudgetStrategy) PrepareForCreate(ctx api.Context, obj runtime.Object) {
 	podDisruptionBudget := obj.(*policy.PodDisruptionBudget)
 	// create cannot set status
 	podDisruptionBudget.Status = policy.PodDisruptionBudgetStatus{}
@@ -54,7 +54,7 @@ func (podDisruptionBudgetStrategy) PrepareForCreate(obj runtime.Object) {
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
-func (podDisruptionBudgetStrategy) PrepareForUpdate(obj, old runtime.Object) {
+func (podDisruptionBudgetStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
 	newPodDisruptionBudget := obj.(*policy.PodDisruptionBudget)
 	oldPodDisruptionBudget := old.(*policy.PodDisruptionBudget)
 	// Update is not allowed to set status
@@ -97,12 +97,12 @@ func (podDisruptionBudgetStrategy) AllowUnconditionalUpdate() bool {
 
 // PodDisruptionBudgetToSelectableFields returns a field set that represents the object.
 func PodDisruptionBudgetToSelectableFields(podDisruptionBudget *policy.PodDisruptionBudget) fields.Set {
-	return generic.ObjectMetaFieldsSet(podDisruptionBudget.ObjectMeta, true)
+	return generic.ObjectMetaFieldsSet(&podDisruptionBudget.ObjectMeta, true)
 }
 
 // MatchPodDisruptionBudget is the filter used by the generic etcd backend to watch events
 // from etcd to clients of the apiserver only interested in specific labels/fields.
-func MatchPodDisruptionBudget(label labels.Selector, field fields.Selector) generic.Matcher {
+func MatchPodDisruptionBudget(label labels.Selector, field fields.Selector) *generic.SelectionPredicate {
 	return &generic.SelectionPredicate{
 		Label: label,
 		Field: field,
@@ -123,7 +123,7 @@ type podDisruptionBudgetStatusStrategy struct {
 var StatusStrategy = podDisruptionBudgetStatusStrategy{Strategy}
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update of status
-func (podDisruptionBudgetStatusStrategy) PrepareForUpdate(obj, old runtime.Object) {
+func (podDisruptionBudgetStatusStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
 	newPodDisruptionBudget := obj.(*policy.PodDisruptionBudget)
 	oldPodDisruptionBudget := old.(*policy.PodDisruptionBudget)
 	// status changes are not allowed to update spec

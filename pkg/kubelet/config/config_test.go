@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,8 +22,10 @@ import (
 	"sort"
 	"strconv"
 	"testing"
+	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/conversion"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -248,6 +250,25 @@ func TestNewPodAddedUpdatedRemoved(t *testing.T) {
 	expectPodUpdate(t, ch, CreatePodUpdate(kubetypes.REMOVE, TestSource, pod))
 }
 
+func TestNewPodAddedDelete(t *testing.T) {
+	channel, ch, _ := createPodConfigTester(PodConfigNotificationIncremental)
+
+	// should register an add
+	addedPod := CreateValidPod("foo", "new")
+	podUpdate := CreatePodUpdate(kubetypes.ADD, TestSource, addedPod)
+	channel <- podUpdate
+	expectPodUpdate(t, ch, CreatePodUpdate(kubetypes.ADD, TestSource, addedPod))
+
+	// mark this pod as deleted
+	timestamp := unversioned.NewTime(time.Now())
+	deletedPod := CreateValidPod("foo", "new")
+	deletedPod.ObjectMeta.DeletionTimestamp = &timestamp
+	podUpdate = CreatePodUpdate(kubetypes.DELETE, TestSource, deletedPod)
+	channel <- podUpdate
+	// the existing pod should be gracefully deleted
+	expectPodUpdate(t, ch, CreatePodUpdate(kubetypes.DELETE, TestSource, addedPod))
+}
+
 func TestNewPodAddedUpdatedSet(t *testing.T) {
 	channel, ch, _ := createPodConfigTester(PodConfigNotificationIncremental)
 
@@ -275,7 +296,7 @@ func TestNewPodAddedSetReconciled(t *testing.T) {
 	// before touching to avoid data race.
 	newTestPods := func(touchStatus, touchSpec bool) ([]*api.Pod, *api.Pod) {
 		pods := []*api.Pod{
-			CreateValidPod("changable-pod-0", "new"),
+			CreateValidPod("changeable-pod-0", "new"),
 			CreateValidPod("constant-pod-1", "new"),
 			CreateValidPod("constant-pod-2", "new"),
 		}

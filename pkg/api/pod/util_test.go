@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -92,7 +92,89 @@ func TestFindPort(t *testing.T) {
 		port:     intstr.FromString("q"),
 		expected: 33,
 		pass:     true,
-	}}
+	}, {
+		name: "valid str, two ctr with same port",
+		containers: []api.Container{{}, {Ports: []api.ContainerPort{{
+			Name:          "",
+			ContainerPort: 11,
+			Protocol:      "UDP",
+		}, {
+			Name:          "p",
+			ContainerPort: 22,
+			Protocol:      "TCP",
+		}, {
+			Name:          "q",
+			ContainerPort: 22,
+			Protocol:      "TCP",
+		}}}},
+		port:     intstr.FromString("q"),
+		expected: 22,
+		pass:     true,
+	}, {
+		name: "valid str, invalid protocol",
+		containers: []api.Container{{}, {Ports: []api.ContainerPort{{
+			Name:          "a",
+			ContainerPort: 11,
+			Protocol:      "snmp",
+		},
+		}}},
+		port:     intstr.FromString("a"),
+		expected: 0,
+		pass:     false,
+	}, {
+		name: "valid hostPort",
+		containers: []api.Container{{}, {Ports: []api.ContainerPort{{
+			Name:          "a",
+			ContainerPort: 11,
+			HostPort:      81,
+			Protocol:      "TCP",
+		},
+		}}},
+		port:     intstr.FromString("a"),
+		expected: 11,
+		pass:     true,
+	},
+		{
+			name: "invalid hostPort",
+			containers: []api.Container{{}, {Ports: []api.ContainerPort{{
+				Name:          "a",
+				ContainerPort: 11,
+				HostPort:      -1,
+				Protocol:      "TCP",
+			},
+			}}},
+			port:     intstr.FromString("a"),
+			expected: 11,
+			pass:     true,
+			//this should fail but passes.
+		},
+		{
+			name: "invalid ContainerPort",
+			containers: []api.Container{{}, {Ports: []api.ContainerPort{{
+				Name:          "a",
+				ContainerPort: -1,
+				Protocol:      "TCP",
+			},
+			}}},
+			port:     intstr.FromString("a"),
+			expected: -1,
+			pass:     true,
+			//this should fail but passes
+		},
+		{
+			name: "HostIP Address",
+			containers: []api.Container{{}, {Ports: []api.ContainerPort{{
+				Name:          "a",
+				ContainerPort: 11,
+				HostIP:        "192.168.1.1",
+				Protocol:      "TCP",
+			},
+			}}},
+			port:     intstr.FromString("a"),
+			expected: 11,
+			pass:     true,
+		},
+	}
 
 	for _, tc := range testCases {
 		port, err := FindPort(&api.Pod{Spec: api.PodSpec{Containers: tc.containers}},

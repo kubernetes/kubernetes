@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,6 +22,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math/rand"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -81,7 +83,7 @@ func TestScanYAML(t *testing.T) {
 	s := bufio.NewScanner(bytes.NewReader([]byte(`---
 stuff: 1
 
----       
+---
   `)))
 	s.Split(splitYAMLDocument)
 	if !s.Scan() {
@@ -104,7 +106,7 @@ func TestDecodeYAML(t *testing.T) {
 	s := NewYAMLToJSONDecoder(bytes.NewReader([]byte(`---
 stuff: 1
 
----       
+---
   `)))
 	obj := generic{}
 	if err := s.Decode(&obj); err != nil {
@@ -131,15 +133,16 @@ func TestDecodeBrokenYAML(t *testing.T) {
 stuff: 1
 		test-foo: 1
 
----       
+---
   `)), 100)
 	obj := generic{}
 	err := s.Decode(&obj)
 	if err == nil {
 		t.Fatal("expected error with yaml: prefix, got no error")
 	}
-	if !strings.HasPrefix(err.Error(), "yaml: line 2:") {
-		t.Fatalf("expected %q to have 'yaml: line 2:' prefix", err.Error())
+	fmt.Printf("err: %s\n", err.Error())
+	if !strings.HasPrefix(err.Error(), "yaml: line 1:") {
+		t.Fatalf("expected %q to have 'yaml: line 1:' prefix", err.Error())
 	}
 }
 
@@ -248,6 +251,66 @@ func TestYAMLOrJSONDecoder(t *testing.T) {
 		}
 		if fmt.Sprintf("%#v", testCase.out) != fmt.Sprintf("%#v", objs) {
 			t.Errorf("%d: objects were not equal: \n%#v\n%#v", i, testCase.out, objs)
+		}
+	}
+}
+
+func TestReadSingleLongLine(t *testing.T) {
+	testReadLines(t, []int{128 * 1024})
+}
+
+func TestReadRandomLineLengths(t *testing.T) {
+	minLength := 100
+	maxLength := 96 * 1024
+	maxLines := 100
+
+	lineLengths := make([]int, maxLines)
+	for i := 0; i < maxLines; i++ {
+		lineLengths[i] = rand.Intn(maxLength-minLength) + minLength
+	}
+
+	testReadLines(t, lineLengths)
+}
+
+func testReadLines(t *testing.T, lineLengths []int) {
+	var (
+		lines       [][]byte
+		inputStream []byte
+	)
+	for _, lineLength := range lineLengths {
+		inputLine := make([]byte, lineLength+1)
+		for i := 0; i < lineLength; i++ {
+			char := rand.Intn('z'-'A') + 'A'
+			inputLine[i] = byte(char)
+		}
+		inputLine[len(inputLine)-1] = '\n'
+		lines = append(lines, inputLine)
+	}
+	for _, line := range lines {
+		inputStream = append(inputStream, line...)
+	}
+
+	// init Reader
+	reader := bufio.NewReader(bytes.NewReader(inputStream))
+	lineReader := &LineReader{reader: reader}
+
+	// read lines
+	var readLines [][]byte
+	for range lines {
+		bytes, err := lineReader.Read()
+		if err != nil && err != io.EOF {
+			t.Fatalf("failed to read lines: %v", err)
+		}
+		readLines = append(readLines, bytes)
+	}
+
+	// validate
+	for i := range lines {
+		if len(lines[i]) != len(readLines[i]) {
+			t.Fatalf("expected line length: %d, but got %d", len(lines[i]), len(readLines[i]))
+		}
+		if !reflect.DeepEqual(lines[i], readLines[i]) {
+			t.Fatalf("expected line: %v, but got %v", lines[i], readLines[i])
 		}
 	}
 }

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 The Kubernetes Authors All rights reserved.
+# Copyright 2015 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -64,7 +64,9 @@ function get_latest_version_number {
   fi
 }
 
-KUBE_VERSION=$(get_latest_version_number | sed 's/^v//')
+if [ -z "$KUBE_VERSION" ]; then
+  KUBE_VERSION=$(get_latest_version_number | sed 's/^v//')
+fi
 
 # k8s
 echo "Prepare kubernetes ${KUBE_VERSION} release ..."

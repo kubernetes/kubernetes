@@ -122,6 +122,12 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
     config.proxy.https    = $https_proxy
     config.proxy.no_proxy = $no_proxy
   end
+
+  # this corrects a bug in 1.8.5 where an invalid SSH key is inserted.
+  if Vagrant::VERSION == "1.8.5"
+    config.ssh.insert_key = false
+  end
+
   def setvmboxandurl(config, provider)
     if ENV['KUBERNETES_BOX_NAME'] then
       config.vm.box = ENV['KUBERNETES_BOX_NAME']
@@ -293,8 +299,6 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
   # Kubernetes node
   $num_node.times do |n|
     node_vm_name = "node-#{n+1}"
-    node_prefix = ENV['INSTANCE_PREFIX'] || 'kubernetes' # must mirror default in cluster/vagrant/config-default.sh
-    node_hostname = "#{node_prefix}-#{node_vm_name}"
 
     config.vm.define node_vm_name do |node|
       customize_vm node, $vm_node_mem

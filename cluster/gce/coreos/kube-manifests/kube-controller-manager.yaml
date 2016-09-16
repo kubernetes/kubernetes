@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  name: kube-controller-manager-kubernetes-master
+  name: kube-controller-manager
   namespace: kube-system
 spec:
   containers:
@@ -12,6 +12,7 @@ spec:
       --master=127.0.0.1:8080
       --cluster-name=${INSTANCE_PREFIX}
       --cluster-cidr=${CLUSTER_IP_RANGE}
+      --service-cluster-ip-range="${SERVICE_CLUSTER_IP_RANGE}"
       --allocate-node-cidrs=true
       --cloud-provider=gce
       --service-account-private-key-file=/srv/kubernetes/server.key

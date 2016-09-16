@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -30,14 +30,13 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
-var status = &unversioned.Status{
-	Status:  unversioned.StatusFailure,
-	Code:    200,
-	Reason:  unversioned.StatusReasonUnknown,
-	Message: "",
-}
-
 func TestV1EncodeDecodeStatus(t *testing.T) {
+	status := &unversioned.Status{
+		Status:  unversioned.StatusFailure,
+		Code:    200,
+		Reason:  unversioned.StatusReasonUnknown,
+		Message: "",
+	}
 
 	v1Codec := testapi.Default.Codec()
 
@@ -65,6 +64,12 @@ func TestV1EncodeDecodeStatus(t *testing.T) {
 }
 
 func TestExperimentalEncodeDecodeStatus(t *testing.T) {
+	status := &unversioned.Status{
+		Status:  unversioned.StatusFailure,
+		Code:    200,
+		Reason:  unversioned.StatusReasonUnknown,
+		Message: "",
+	}
 	// TODO: caesarxuchao: use the testapi.Extensions.Codec() once the PR that
 	// moves experimental from v1 to v1beta1 got merged.
 	expCodec := api.Codecs.LegacyCodec(extensions.SchemeGroupVersion)

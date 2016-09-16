@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,6 +26,8 @@ import (
 	"path/filepath"
 	"time"
 
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
@@ -110,6 +112,12 @@ func (i *Info) Visit(fn VisitorFunc) error {
 func (i *Info) Get() (err error) {
 	obj, err := NewHelper(i.Client, i.Mapping).Get(i.Namespace, i.Name, i.Export)
 	if err != nil {
+		if errors.IsNotFound(err) && len(i.Namespace) > 0 && i.Namespace != api.NamespaceDefault && i.Namespace != api.NamespaceAll {
+			err2 := i.Client.Get().AbsPath("api", "v1", "namespaces", i.Namespace).Do().Error()
+			if err2 != nil && errors.IsNotFound(err2) {
+				return err2
+			}
+		}
 		return err
 	}
 	i.Object = obj
@@ -207,10 +215,6 @@ func ValidateSchema(data []byte, schema validation.Schema) error {
 	if schema == nil {
 		return nil
 	}
-	data, err := yaml.ToJSON(data)
-	if err != nil {
-		return fmt.Errorf("error converting to YAML: %v", err)
-	}
 	if err := schema.ValidateBytes(data); err != nil {
 		return fmt.Errorf("error validating data: %v; %s", err, stopValidateMessage)
 	}
@@ -259,7 +263,7 @@ func readHttpWithRetries(get httpget, duration time.Duration, u string, attempts
 
 		// Error - Set the error condition from the StatusCode
 		if statusCode != 200 {
-			err = fmt.Errorf("unable to read URL %q, server reported %d %s", u, statusCode, status)
+			err = fmt.Errorf("unable to read URL %q, server reported %s, status code=%d", u, status, statusCode)
 		}
 
 		if statusCode >= 500 && statusCode < 600 {
@@ -389,7 +393,7 @@ func (v FlattenListVisitor) Visit(fn VisitorFunc) error {
 
 		// If we have a GroupVersionKind on the list, prioritize that when asking for info on the objects contained in the list
 		var preferredGVKs []unversioned.GroupVersionKind
-		if info.Mapping != nil && !info.Mapping.GroupVersionKind.IsEmpty() {
+		if info.Mapping != nil && !info.Mapping.GroupVersionKind.Empty() {
 			preferredGVKs = append(preferredGVKs, info.Mapping.GroupVersionKind)
 		}
 
@@ -431,7 +435,7 @@ func FileVisitorForSTDIN(mapper *Mapper, schema validation.Schema) Visitor {
 }
 
 // ExpandPathsToFileVisitors will return a slice of FileVisitors that will handle files from the provided path.
-// After FileVisitors open the files, they will pass a io.Reader to a StreamVisitor to do the reading. (stdin
+// After FileVisitors open the files, they will pass an io.Reader to a StreamVisitor to do the reading. (stdin
 // is also taken care of). Paths argument also accepts a single file, and will return a single visitor
 func ExpandPathsToFileVisitors(mapper *Mapper, paths string, recursive bool, extensions []string, schema validation.Schema) ([]Visitor, error) {
 	var visitors []Visitor
@@ -622,13 +626,7 @@ func RetrieveLatest(info *Info, err error) error {
 	if info.Namespaced() && len(info.Namespace) == 0 {
 		return fmt.Errorf("no namespace set on resource %s %q", info.Mapping.Resource, info.Name)
 	}
-	obj, err := NewHelper(info.Client, info.Mapping).Get(info.Namespace, info.Name, info.Export)
-	if err != nil {
-		return err
-	}
-	info.Object = obj
-	info.ResourceVersion, _ = info.Mapping.MetadataAccessor.ResourceVersion(obj)
-	return nil
+	return info.Get()
 }
 
 // RetrieveLazy updates the object if it has not been loaded yet.

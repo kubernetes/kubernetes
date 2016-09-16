@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"hash"
 	"io"
+	"io/ioutil"
 )
 
 const (
@@ -114,9 +115,12 @@ var cipherModes = map[string]*streamCipherMode{
 	// should invest a cleaner way to do this.
 	gcmCipherID: {16, 12, 0, nil},
 
-	// insecure cipher, see http://www.isg.rhul.ac.uk/~kp/SandPfinal.pdf
-	// uncomment below to enable it.
-	// aes128cbcID: {16, aes.BlockSize, 0, nil},
+	// CBC mode is insecure and so is not included in the default config.
+	// (See http://www.isg.rhul.ac.uk/~kp/SandPfinal.pdf). If absolutely
+	// needed, it's possible to specify a custom Config to enable it.
+	// You should expect that an active attacker can recover plaintext if
+	// you do.
+	aes128cbcID: {16, aes.BlockSize, 0, nil},
 }
 
 // prefixLen is the length of the packet prefix that contains the packet length
@@ -350,6 +354,7 @@ func (c *gcmCipher) readPacket(seqNum uint32, r io.Reader) ([]byte, error) {
 // cbcCipher implements aes128-cbc cipher defined in RFC 4253 section 6.1
 type cbcCipher struct {
 	mac       hash.Hash
+	macSize   uint32
 	decrypter cipher.BlockMode
 	encrypter cipher.BlockMode
 
@@ -357,6 +362,10 @@ type cbcCipher struct {
 	seqNumBytes [4]byte
 	packetData  []byte
 	macResult   []byte
+
+	// Amount of data we should still read to hide which
+	// verification error triggered.
+	oracleCamouflage uint32
 }
 
 func newAESCBCCipher(iv, key, macKey []byte, algs directionAlgorithms) (packetCipher, error) {
@@ -364,12 +373,18 @@ func newAESCBCCipher(iv, key, macKey []byte, algs directionAlgorithms) (packetCi
 	if err != nil {
 		return nil, err
 	}
-	return &cbcCipher{
+
+	cbc := &cbcCipher{
 		mac:        macModes[algs.MAC].new(macKey),
 		decrypter:  cipher.NewCBCDecrypter(c, iv),
 		encrypter:  cipher.NewCBCEncrypter(c, iv),
 		packetData: make([]byte, 1024),
-	}, nil
+	}
+	if cbc.mac != nil {
+		cbc.macSize = uint32(cbc.mac.Size())
+	}
+
+	return cbc, nil
 }
 
 func maxUInt32(a, b int) uint32 {
@@ -385,42 +400,58 @@ const (
 	cbcMinPaddingSize        = 4
 )
 
+// cbcError represents a verification error that may leak information.
+type cbcError string
+
+func (e cbcError) Error() string { return string(e) }
+
 func (c *cbcCipher) readPacket(seqNum uint32, r io.Reader) ([]byte, error) {
+	p, err := c.readPacketLeaky(seqNum, r)
+	if err != nil {
+		if _, ok := err.(cbcError); ok {
+			// Verification error: read a fixed amount of
+			// data, to make distinguishing between
+			// failing MAC and failing length check more
+			// difficult.
+			io.CopyN(ioutil.Discard, r, int64(c.oracleCamouflage))
+		}
+	}
+	return p, err
+}
+
+func (c *cbcCipher) readPacketLeaky(seqNum uint32, r io.Reader) ([]byte, error) {
 	blockSize := c.decrypter.BlockSize()
 
 	// Read the header, which will include some of the subsequent data in the
 	// case of block ciphers - this is copied back to the payload later.
 	// How many bytes of payload/padding will be read with this first read.
-	firstBlockLength := (prefixLen + blockSize - 1) / blockSize * blockSize
+	firstBlockLength := uint32((prefixLen + blockSize - 1) / blockSize * blockSize)
 	firstBlock := c.packetData[:firstBlockLength]
 	if _, err := io.ReadFull(r, firstBlock); err != nil {
 		return nil, err
 	}
 
+	c.oracleCamouflage = maxPacket + 4 + c.macSize - firstBlockLength
+
 	c.decrypter.CryptBlocks(firstBlock, firstBlock)
 	length := binary.BigEndian.Uint32(firstBlock[:4])
 	if length > maxPacket {
-		return nil, errors.New("ssh: packet too large")
+		return nil, cbcError("ssh: packet too large")
 	}
 	if length+4 < maxUInt32(cbcMinPacketSize, blockSize) {
 		// The minimum size of a packet is 16 (or the cipher block size, whichever
 		// is larger) bytes.
-		return nil, errors.New("ssh: packet too small")
+		return nil, cbcError("ssh: packet too small")
 	}
 	// The length of the packet (including the length field but not the MAC) must
 	// be a multiple of the block size or 8, whichever is larger.
 	if (length+4)%maxUInt32(cbcMinPacketSizeMultiple, blockSize) != 0 {
-		return nil, errors.New("ssh: invalid packet length multiple")
+		return nil, cbcError("ssh: invalid packet length multiple")
 	}
 
 	paddingLength := uint32(firstBlock[4])
 	if paddingLength < cbcMinPaddingSize || length <= paddingLength+1 {
-		return nil, errors.New("ssh: invalid packet length")
-	}
-
-	var macSize uint32
-	if c.mac != nil {
-		macSize = uint32(c.mac.Size())
+		return nil, cbcError("ssh: invalid packet length")
 	}
 
 	// Positions within the c.packetData buffer:
@@ -428,7 +459,7 @@ func (c *cbcCipher) readPacket(seqNum uint32, r io.Reader) ([]byte, error) {
 	paddingStart := macStart - paddingLength
 
 	// Entire packet size, starting before length, ending at end of mac.
-	entirePacketSize := macStart + macSize
+	entirePacketSize := macStart + c.macSize
 
 	// Ensure c.packetData is large enough for the entire packet data.
 	if uint32(cap(c.packetData)) < entirePacketSize {
@@ -440,8 +471,10 @@ func (c *cbcCipher) readPacket(seqNum uint32, r io.Reader) ([]byte, error) {
 		c.packetData = c.packetData[:entirePacketSize]
 	}
 
-	if _, err := io.ReadFull(r, c.packetData[firstBlockLength:]); err != nil {
+	if n, err := io.ReadFull(r, c.packetData[firstBlockLength:]); err != nil {
 		return nil, err
+	} else {
+		c.oracleCamouflage -= uint32(n)
 	}
 
 	remainingCrypted := c.packetData[firstBlockLength:macStart]
@@ -455,7 +488,7 @@ func (c *cbcCipher) readPacket(seqNum uint32, r io.Reader) ([]byte, error) {
 		c.mac.Write(c.packetData[:macStart])
 		c.macResult = c.mac.Sum(c.macResult[:0])
 		if subtle.ConstantTimeCompare(c.macResult, mac) != 1 {
-			return nil, errors.New("ssh: MAC failure")
+			return nil, cbcError("ssh: MAC failure")
 		}
 	}
 
@@ -474,13 +507,9 @@ func (c *cbcCipher) writePacket(seqNum uint32, w io.Writer, rand io.Reader, pack
 	length := encLength - 4
 	paddingLength := int(length) - (1 + len(packet))
 
-	var macSize uint32
-	if c.mac != nil {
-		macSize = uint32(c.mac.Size())
-	}
 	// Overall buffer contains: header, payload, padding, mac.
 	// Space for the MAC is reserved in the capacity but not the slice length.
-	bufferSize := encLength + macSize
+	bufferSize := encLength + c.macSize
 	if uint32(cap(c.packetData)) < bufferSize {
 		c.packetData = make([]byte, encLength, bufferSize)
 	} else {

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 The Kubernetes Authors All rights reserved.
+# Copyright 2015 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -36,6 +36,8 @@ export KUBE_SKIP_CONFIRMATIONS=y
 # Skip gcloud update checking
 export CLOUDSDK_COMPONENT_MANAGER_DISABLE_UPDATE_CHECK=true
 
+# FEDERATION?
+: ${FEDERATION:="false"}
 : ${KUBE_RELEASE_RUN_TESTS:="n"}
 export KUBE_RELEASE_RUN_TESTS
 
@@ -43,7 +45,6 @@ export KUBE_RELEASE_RUN_TESTS
 # state.
 rm -rf ~/.kube*
 make clean
-git clean -fdx
 
 # Uncomment if you want to purge the Docker cache completely each
 # build. It costs about 150s each build to pull the golang image and
@@ -52,11 +53,30 @@ git clean -fdx
 # docker images -q | xargs -r docker rmi
 
 # Build
-go run ./hack/e2e.go -v --build
+# Jobs explicitly set KUBE_FASTBUILD to desired settings.
+make release
 
-[[ ${KUBE_SKIP_PUSH_GCS:-} =~ ^[yY]$ ]] || {
-    # Push to GCS
-    ./build/push-ci-build.sh
-}
+# Push to GCS?
+if [[ ${KUBE_SKIP_PUSH_GCS:-} =~ ^[yY]$ ]]; then
+  echo "Not pushed to GCS..."
+else
+  readonly release_infra_clone="${WORKSPACE}/_tmp/release.git"
+  mkdir -p ${WORKSPACE}/_tmp
+  git clone https://github.com/kubernetes/release ${release_infra_clone}
+
+  push_build=${release_infra_clone}/push-build.sh
+
+  if [[ ! -x ${push_build} ]]; then
+    # TODO: Remove/Restore this with the full deprecation PR
+    push_build=${release_infra_clone}/push-ci-build.sh
+    #echo "FATAL: Something went wrong. ${push_build} isn't available." \
+    #     "Exiting..." >&2
+    #exit 1
+  fi
+  [[ -n "${KUBE_GCS_RELEASE_BUCKET-}" ]] \
+   && bucket_flag="--bucket=${KUBE_GCS_RELEASE_BUCKET-}"
+  ${FEDERATION} && federation_flag="--federation"
+  ${push_build} ${bucket_flag-} ${federation_flag-} --nomock --verbose --ci
+fi
 
 sha256sum _output/release-tars/kubernetes*.tar.gz

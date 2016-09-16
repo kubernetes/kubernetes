@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -44,10 +44,7 @@ func newPVC(name string) api.PersistentVolumeClaim {
 		Spec: api.PersistentVolumeClaimSpec{
 			Resources: api.ResourceRequirements{
 				Requests: api.ResourceList{
-					api.ResourceStorage: resource.Quantity{
-						Amount: dec(1, 0),
-						Format: resource.BinarySI,
-					},
+					api.ResourceStorage: *resource.NewQuantity(1, resource.BinarySI),
 				},
 			},
 		},
@@ -154,11 +151,13 @@ func newFakePetClient() *fakePetClient {
 }
 
 type fakePetClient struct {
-	pets                         []*pcb
-	claims                       []api.PersistentVolumeClaim
-	petsCreated, petsDeleted     int
-	claimsCreated, claimsDeleted int
-	recorder                     record.EventRecorder
+	pets          []*pcb
+	claims        []api.PersistentVolumeClaim
+	petsCreated   int
+	petsDeleted   int
+	claimsCreated int
+	claimsDeleted int
+	recorder      record.EventRecorder
 	petHealthChecker
 }
 

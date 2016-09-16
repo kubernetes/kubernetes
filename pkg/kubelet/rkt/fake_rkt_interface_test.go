@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -107,9 +107,10 @@ func (f *fakeRktInterface) GetLogs(ctx context.Context, in *rktapi.GetLogsReques
 // See https://github.com/coreos/rkt/issues/1769.
 type fakeSystemd struct {
 	sync.Mutex
-	called  []string
-	version string
-	err     error
+	called           []string
+	resetFailedUnits []string
+	version          string
+	err              error
 }
 
 func newFakeSystemd() *fakeSystemd {
@@ -143,15 +144,9 @@ func (f *fakeSystemd) RestartUnit(name string, mode string, ch chan<- string) (i
 	return 0, fmt.Errorf("Not implemented")
 }
 
-func (f *fakeSystemd) Reload() error {
-	return fmt.Errorf("Not implemented")
-}
-
-func (f *fakeSystemd) ResetFailed() error {
-	f.Lock()
-	defer f.Unlock()
-
-	f.called = append(f.called, "ResetFailed")
+func (f *fakeSystemd) ResetFailedUnit(name string) error {
+	f.called = append(f.called, "ResetFailedUnit")
+	f.resetFailedUnits = append(f.resetFailedUnits, name)
 	return f.err
 }
 
@@ -180,6 +175,10 @@ func (f *fakeRuntimeHelper) GetPodDir(podUID types.UID) string {
 	return "/poddir/" + string(podUID)
 }
 
+func (f *fakeRuntimeHelper) GetExtraSupplementalGroupsForPod(pod *api.Pod) []int64 {
+	return nil
+}
+
 type fakeRktCli struct {
 	sync.Mutex
 	cmds   []string
@@ -194,7 +193,7 @@ func newFakeRktCli() *fakeRktCli {
 	}
 }
 
-func (f *fakeRktCli) RunCommand(args ...string) (result []string, err error) {
+func (f *fakeRktCli) RunCommand(config *Config, args ...string) (result []string, err error) {
 	f.Lock()
 	defer f.Unlock()
 	cmd := append([]string{"rkt"}, args...)

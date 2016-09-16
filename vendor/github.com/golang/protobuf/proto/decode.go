@@ -390,11 +390,12 @@ func (o *Buffer) unmarshalType(st reflect.Type, prop *StructProperties, is_group
 		if !ok {
 			// Maybe it's an extension?
 			if prop.extendable {
-				if e := structPointer_Interface(base, st).(extendableProto); isExtensionField(e, int32(tag)) {
+				if e, _ := extendable(structPointer_Interface(base, st)); isExtensionField(e, int32(tag)) {
 					if err = o.skip(st, tag, wire); err == nil {
-						ext := e.ExtensionMap()[int32(tag)] // may be missing
+						extmap := e.extensionsWrite()
+						ext := extmap[int32(tag)] // may be missing
 						ext.enc = append(ext.enc, o.buf[oi:o.index]...)
-						e.ExtensionMap()[int32(tag)] = ext
+						extmap[int32(tag)] = ext
 					}
 					continue
 				}
@@ -768,10 +769,11 @@ func (o *Buffer) dec_new_map(p *Properties, base structPointer) error {
 		}
 	}
 	keyelem, valelem := keyptr.Elem(), valptr.Elem()
-	if !keyelem.IsValid() || !valelem.IsValid() {
-		// We did not decode the key or the value in the map entry.
-		// Either way, it's an invalid map entry.
-		return fmt.Errorf("proto: bad map data: missing key/val")
+	if !keyelem.IsValid() {
+		keyelem = reflect.Zero(p.mtype.Key())
+	}
+	if !valelem.IsValid() {
+		valelem = reflect.Zero(p.mtype.Elem())
 	}
 
 	v.SetMapIndex(keyelem, valelem)

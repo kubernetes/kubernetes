@@ -248,7 +248,7 @@ func (p *plugin) GenerateField(file *generator.FileDescriptor, message *generato
 		}
 		if m.ValueField.IsMessage() || p.IsGroup(field) {
 			s := `this.` + fieldname + `[` + keyval + `] = `
-			goTypName := generator.GoTypeToName(valuegoTyp)
+			goTypName = generator.GoTypeToName(valuegoTyp)
 			funcCall := getFuncCall(goTypName)
 			if !nullable {
 				funcCall = `*` + funcCall

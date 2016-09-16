@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -56,9 +56,9 @@ func TestErrors(t *testing.T) {
 	o.Add(&api.List{
 		Items: []runtime.Object{
 			// This first call to List will return this error
-			&(errors.NewNotFound(api.Resource("ServiceList"), "").(*errors.StatusError).ErrStatus),
+			&(errors.NewNotFound(api.Resource("ServiceList"), "").ErrStatus),
 			// The second call to List will return this error
-			&(errors.NewForbidden(api.Resource("ServiceList"), "", nil).(*errors.StatusError).ErrStatus),
+			&(errors.NewForbidden(api.Resource("ServiceList"), "", nil).ErrStatus),
 		},
 	})
 	client := &Fake{}

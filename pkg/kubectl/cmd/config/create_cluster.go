@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@ import (
 	"io/ioutil"
 	"path/filepath"
 
+	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
@@ -41,24 +42,26 @@ type createClusterOptions struct {
 	embedCAData           flag.Tristate
 }
 
-const (
-	create_cluster_long = `Sets a cluster entry in kubeconfig.
-Specifying a name that already exists will merge new fields on top of existing values for those fields.`
-	create_cluster_example = `# Set only the server field on the e2e cluster entry without touching other values.
-kubectl config set-cluster e2e --server=https://1.2.3.4
+var (
+	create_cluster_long = dedent.Dedent(`
+		Sets a cluster entry in kubeconfig.
+		Specifying a name that already exists will merge new fields on top of existing values for those fields.`)
+	create_cluster_example = dedent.Dedent(`
+		# Set only the server field on the e2e cluster entry without touching other values.
+		kubectl config set-cluster e2e --server=https://1.2.3.4
 
-# Embed certificate authority data for the e2e cluster entry
-kubectl config set-cluster e2e --certificate-authority=~/.kube/e2e/kubernetes.ca.crt
+		# Embed certificate authority data for the e2e cluster entry
+		kubectl config set-cluster e2e --certificate-authority=~/.kube/e2e/kubernetes.ca.crt
 
-# Disable cert checking for the dev cluster entry
-kubectl config set-cluster e2e --insecure-skip-tls-verify=true`
+		# Disable cert checking for the dev cluster entry
+		kubectl config set-cluster e2e --insecure-skip-tls-verify=true`)
 )
 
 func NewCmdConfigSetCluster(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
 	options := &createClusterOptions{configAccess: configAccess}
 
 	cmd := &cobra.Command{
-		Use:     fmt.Sprintf("set-cluster NAME [--%v=server] [--%v=path/to/certficate/authority] [--%v=true]", clientcmd.FlagAPIServer, clientcmd.FlagCAFile, clientcmd.FlagInsecure),
+		Use:     fmt.Sprintf("set-cluster NAME [--%v=server] [--%v=path/to/certificate/authority] [--%v=true]", clientcmd.FlagAPIServer, clientcmd.FlagCAFile, clientcmd.FlagInsecure),
 		Short:   "Sets a cluster entry in kubeconfig",
 		Long:    create_cluster_long,
 		Example: create_cluster_example,

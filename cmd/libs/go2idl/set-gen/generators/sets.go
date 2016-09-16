@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -108,7 +108,7 @@ func Packages(_ *generator.Context, arguments *args.GeneratorArgs) generator.Pac
 				// // +genset
 				// or
 				// // +genset=true
-				return types.ExtractCommentTags("+", t.CommentLines)["genset"] == "true"
+				return extractBoolTagOrDie("genset", t.CommentLines) == true
 			}
 			return false
 		},
@@ -335,6 +335,15 @@ func (s $.type|public$) List() []$.type|raw$ {
 	}
 	sort.Sort(res)
 	return []$.type|raw$(res)
+}
+
+// UnsortedList returns the slice with contents in random order.
+func (s $.type|public$) UnsortedList() []$.type|raw$ {
+	res :=make([]$.type|raw$, 0, len(s))
+	for key := range s {
+		res = append(res, key)
+	}
+	return res
 }
 
 // Returns a single element from the set.

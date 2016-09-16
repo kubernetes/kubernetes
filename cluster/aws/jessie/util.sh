@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 The Kubernetes Authors All rights reserved.
+# Copyright 2015 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@
 
 # A library of helper functions for Jessie.
 
-source "${KUBE_ROOT}/cluster/aws/trusty/common.sh"
+source "${KUBE_ROOT}/cluster/aws/common/common.sh"
 
 SSH_USER=admin
 
@@ -27,12 +27,15 @@ SSH_USER=admin
 #   AWS_IMAGE
 function detect-jessie-image () {
   if [[ -z "${AWS_IMAGE-}" ]]; then
-    # TODO: publish on a k8s AWS account
+    # These images are built using the imagebuilder tool, in the kube-deploy github repo
+    # https://github.com/kubernetes/kube-deploy/tree/master/imagebuilder
+
+    # 282335181503: images published by kope.io
     aws_account="282335181503"
     # TODO: we could use a tag for the latest image, instead of bumping it every time
-    # e.g. family = k8s-1.2-debian-jessie-amd64-hvm-ebs latest/1.2=true
+    # e.g. family = k8s-1.3-debian-jessie-amd64-hvm-ebs latest/1.3=true
     if [[ -z "${AWS_IMAGE_NAME:-}" ]]; then
-      AWS_IMAGE_NAME="k8s-1.2-debian-jessie-amd64-hvm-2016-03-16-ebs"
+      AWS_IMAGE_NAME="k8s-1.3-debian-jessie-amd64-hvm-ebs-2016-06-18"
     fi
     AWS_IMAGE=`aws ec2 describe-images --owner ${aws_account} --filters Name=name,Values=${AWS_IMAGE_NAME} --query Images[].ImageId --output text`
     if [[ -z "${AWS_IMAGE-}" ]]; then

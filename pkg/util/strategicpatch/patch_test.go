@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -636,8 +636,12 @@ testCases:
       mergingList:
         - name: 3
           value: 3
+        - name: 4 
+          value: 4 
     modified:
       mergingList:
+        - name: 4 
+          value: 4 
         - name: 1
         - name: 2
           value: 2
@@ -654,6 +658,8 @@ testCases:
       mergingList:
         - name: 3
           value: 3
+        - name: 4 
+          value: 4 
     result:
       mergingList:
         - name: 1
@@ -663,6 +669,8 @@ testCases:
           other: b
         - name: 3
           value: 3
+        - name: 4 
+          value: 4 
   - description: merge lists of maps with conflict
     original:
       mergingList:

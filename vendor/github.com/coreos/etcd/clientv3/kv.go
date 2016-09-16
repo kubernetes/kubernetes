@@ -1,4 +1,4 @@
-// Copyright 2015 CoreOS, Inc.
+// Copyright 2015 The etcd Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,18 +15,17 @@
 package clientv3
 
 import (
-	"sync"
-
 	pb "github.com/coreos/etcd/etcdserver/etcdserverpb"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 )
 
 type (
-	PutResponse    pb.PutResponse
-	GetResponse    pb.RangeResponse
-	DeleteResponse pb.DeleteRangeResponse
-	TxnResponse    pb.TxnResponse
+	CompactResponse pb.CompactionResponse
+	PutResponse     pb.PutResponse
+	GetResponse     pb.RangeResponse
+	DeleteResponse  pb.DeleteRangeResponse
+	TxnResponse     pb.TxnResponse
 )
 
 type KV interface {
@@ -50,7 +49,7 @@ type KV interface {
 	Delete(ctx context.Context, key string, opts ...OpOption) (*DeleteResponse, error)
 
 	// Compact compacts etcd KV history before the given rev.
-	Compact(ctx context.Context, rev int64) error
+	Compact(ctx context.Context, rev int64, opts ...CompactOption) (*CompactResponse, error)
 
 	// Do applies a single Op on KV without a transaction.
 	// Do is useful when declaring operations to be issued at a later time
@@ -61,7 +60,7 @@ type KV interface {
 	// Do is useful when creating arbitrary operations to be issued at a
 	// later time; the user can range over the operations, calling Do to
 	// execute them. Get/Put/Delete, on the other hand, are best suited
-	// for when the	operation should be issued at the time of declaration.
+	// for when the operation should be issued at the time of declaration.
 	Do(ctx context.Context, op Op) (OpResponse, error)
 
 	// Txn creates a transaction.
@@ -74,54 +73,39 @@ type OpResponse struct {
 	del *DeleteResponse
 }
 
-type kv struct {
-	c *Client
+func (op OpResponse) Put() *PutResponse    { return op.put }
+func (op OpResponse) Get() *GetResponse    { return op.get }
+func (op OpResponse) Del() *DeleteResponse { return op.del }
 
-	mu     sync.Mutex       // guards all fields
-	conn   *grpc.ClientConn // conn in-use
+type kv struct {
 	remote pb.KVClient
 }
 
 func NewKV(c *Client) KV {
-	conn := c.ActiveConnection()
-	remote := pb.NewKVClient(conn)
-
-	return &kv{
-		conn:   c.ActiveConnection(),
-		remote: remote,
-
-		c: c,
-	}
+	return &kv{remote: RetryKVClient(c)}
 }
 
 func (kv *kv) Put(ctx context.Context, key, val string, opts ...OpOption) (*PutResponse, error) {
 	r, err := kv.Do(ctx, OpPut(key, val, opts...))
-	return r.put, err
+	return r.put, toErr(ctx, err)
 }
 
 func (kv *kv) Get(ctx context.Context, key string, opts ...OpOption) (*GetResponse, error) {
 	r, err := kv.Do(ctx, OpGet(key, opts...))
-	return r.get, err
+	return r.get, toErr(ctx, err)
 }
 
 func (kv *kv) Delete(ctx context.Context, key string, opts ...OpOption) (*DeleteResponse, error) {
 	r, err := kv.Do(ctx, OpDelete(key, opts...))
-	return r.del, err
+	return r.del, toErr(ctx, err)
 }
 
-func (kv *kv) Compact(ctx context.Context, rev int64) error {
-	r := &pb.CompactionRequest{Revision: rev}
-	_, err := kv.getRemote().Compact(ctx, r)
-	if err == nil {
-		return nil
+func (kv *kv) Compact(ctx context.Context, rev int64, opts ...CompactOption) (*CompactResponse, error) {
+	resp, err := kv.remote.Compact(ctx, OpCompact(rev, opts...).toRequest(), grpc.FailFast(false))
+	if err != nil {
+		return nil, toErr(ctx, err)
 	}
-
-	if isHalted(ctx, err) {
-		return err
-	}
-
-	go kv.switchRemote(err)
-	return err
+	return (*CompactResponse)(resp), err
 }
 
 func (kv *kv) Txn(ctx context.Context) Txn {
@@ -133,75 +117,60 @@ func (kv *kv) Txn(ctx context.Context) Txn {
 
 func (kv *kv) Do(ctx context.Context, op Op) (OpResponse, error) {
 	for {
-		var err error
-		switch op.t {
-		// TODO: handle other ops
-		case tRange:
-			var resp *pb.RangeResponse
-			r := &pb.RangeRequest{Key: op.key, RangeEnd: op.end, Limit: op.limit, Revision: op.rev, Serializable: op.serializable}
-			if op.sort != nil {
-				r.SortOrder = pb.RangeRequest_SortOrder(op.sort.Order)
-				r.SortTarget = pb.RangeRequest_SortTarget(op.sort.Target)
-			}
-
-			resp, err = kv.getRemote().Range(ctx, r)
-			if err == nil {
-				return OpResponse{get: (*GetResponse)(resp)}, nil
-			}
-		case tPut:
-			var resp *pb.PutResponse
-			r := &pb.PutRequest{Key: op.key, Value: op.val, Lease: int64(op.leaseID)}
-			resp, err = kv.getRemote().Put(ctx, r)
-			if err == nil {
-				return OpResponse{put: (*PutResponse)(resp)}, nil
-			}
-		case tDeleteRange:
-			var resp *pb.DeleteRangeResponse
-			r := &pb.DeleteRangeRequest{Key: op.key, RangeEnd: op.end}
-			resp, err = kv.getRemote().DeleteRange(ctx, r)
-			if err == nil {
-				return OpResponse{del: (*DeleteResponse)(resp)}, nil
-			}
-		default:
-			panic("Unknown op")
+		resp, err := kv.do(ctx, op)
+		if err == nil {
+			return resp, nil
 		}
-
-		if isHalted(ctx, err) {
-			return OpResponse{}, err
+		if isHaltErr(ctx, err) {
+			return resp, toErr(ctx, err)
 		}
-
 		// do not retry on modifications
 		if op.isWrite() {
-			go kv.switchRemote(err)
-			return OpResponse{}, err
-		}
-
-		if nerr := kv.switchRemote(err); nerr != nil {
-			return OpResponse{}, nerr
+			return resp, toErr(ctx, err)
 		}
 	}
 }
 
-func (kv *kv) switchRemote(prevErr error) error {
-	// Usually it's a bad idea to lock on network i/o but here it's OK
-	// since the link is down and new requests can't be processed anyway.
-	// Likewise, if connecting stalls, closing the Client can break the
-	// lock via context cancelation.
-	kv.mu.Lock()
-	defer kv.mu.Unlock()
+func (kv *kv) do(ctx context.Context, op Op) (OpResponse, error) {
+	var err error
+	switch op.t {
+	// TODO: handle other ops
+	case tRange:
+		var resp *pb.RangeResponse
+		r := &pb.RangeRequest{
+			Key:          op.key,
+			RangeEnd:     op.end,
+			Limit:        op.limit,
+			Revision:     op.rev,
+			Serializable: op.serializable,
+			KeysOnly:     op.keysOnly,
+			CountOnly:    op.countOnly,
+		}
+		if op.sort != nil {
+			r.SortOrder = pb.RangeRequest_SortOrder(op.sort.Order)
+			r.SortTarget = pb.RangeRequest_SortTarget(op.sort.Target)
+		}
 
-	newConn, err := kv.c.retryConnection(kv.conn, prevErr)
-	if err != nil {
-		return err
+		resp, err = kv.remote.Range(ctx, r, grpc.FailFast(false))
+		if err == nil {
+			return OpResponse{get: (*GetResponse)(resp)}, nil
+		}
+	case tPut:
+		var resp *pb.PutResponse
+		r := &pb.PutRequest{Key: op.key, Value: op.val, Lease: int64(op.leaseID)}
+		resp, err = kv.remote.Put(ctx, r)
+		if err == nil {
+			return OpResponse{put: (*PutResponse)(resp)}, nil
+		}
+	case tDeleteRange:
+		var resp *pb.DeleteRangeResponse
+		r := &pb.DeleteRangeRequest{Key: op.key, RangeEnd: op.end}
+		resp, err = kv.remote.DeleteRange(ctx, r)
+		if err == nil {
+			return OpResponse{del: (*DeleteResponse)(resp)}, nil
+		}
+	default:
+		panic("Unknown op")
 	}
-
-	kv.conn = newConn
-	kv.remote = pb.NewKVClient(kv.conn)
-	return nil
-}
-
-func (kv *kv) getRemote() pb.KVClient {
-	kv.mu.Lock()
-	defer kv.mu.Unlock()
-	return kv.remote
+	return OpResponse{}, err
 }

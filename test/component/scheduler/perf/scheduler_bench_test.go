@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -56,7 +56,7 @@ func benchmarkScheduling(numNodes, numScheduledPods int, b *testing.B) {
 	makeNodes(c, numNodes)
 	makePodsFromRC(c, "rc1", numScheduledPods)
 	for {
-		scheduled := schedulerConfigFactory.ScheduledPodLister.Store.List()
+		scheduled := schedulerConfigFactory.ScheduledPodLister.Indexer.List()
 		if len(scheduled) >= numScheduledPods {
 			break
 		}
@@ -68,7 +68,7 @@ func benchmarkScheduling(numNodes, numScheduledPods int, b *testing.B) {
 	for {
 		// This can potentially affect performance of scheduler, since List() is done under mutex.
 		// TODO: Setup watch on apiserver and wait until all pods scheduled.
-		scheduled := schedulerConfigFactory.ScheduledPodLister.Store.List()
+		scheduled := schedulerConfigFactory.ScheduledPodLister.Indexer.List()
 		if len(scheduled) >= numScheduledPods+b.N {
 			break
 		}

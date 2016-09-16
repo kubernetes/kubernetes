@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+
+	"k8s.io/kubernetes/pkg/selection"
 )
 
 // Selector represents a field selector.
@@ -38,6 +40,10 @@ type Selector interface {
 	// Transform returns a new copy of the selector after TransformFunc has been
 	// applied to the entire selector, or an error if fn returns an error.
 	Transform(fn TransformFunc) (Selector, error)
+
+	// Requirements converts this interface to Requirements to expose
+	// more detailed selection information.
+	Requirements() Requirements
 
 	// String returns a human readable string that represents this selector.
 	String() string
@@ -75,6 +81,14 @@ func (t *hasTerm) Transform(fn TransformFunc) (Selector, error) {
 	return &hasTerm{field, value}, nil
 }
 
+func (t *hasTerm) Requirements() Requirements {
+	return []Requirement{{
+		Field:    t.field,
+		Operator: selection.Equals,
+		Value:    t.value,
+	}}
+}
+
 func (t *hasTerm) String() string {
 	return fmt.Sprintf("%v=%v", t.field, t.value)
 }
@@ -101,6 +115,14 @@ func (t *notHasTerm) Transform(fn TransformFunc) (Selector, error) {
 		return nil, err
 	}
 	return &notHasTerm{field, value}, nil
+}
+
+func (t *notHasTerm) Requirements() Requirements {
+	return []Requirement{{
+		Field:    t.field,
+		Operator: selection.NotEquals,
+		Value:    t.value,
+	}}
 }
 
 func (t *notHasTerm) String() string {
@@ -155,6 +177,15 @@ func (t andTerm) Transform(fn TransformFunc) (Selector, error) {
 		next[i] = n
 	}
 	return andTerm(next), nil
+}
+
+func (t andTerm) Requirements() Requirements {
+	reqs := make([]Requirement, 0, len(t))
+	for _, s := range []Selector(t) {
+		rs := s.Requirements()
+		reqs = append(reqs, rs...)
+	}
+	return reqs
 }
 
 func (t andTerm) String() string {

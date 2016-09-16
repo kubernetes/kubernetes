@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -71,7 +72,7 @@ func MakeTransport(config *KubeletClientConfig) (http.RoundTripper, error) {
 
 	rt := http.DefaultTransport
 	if config.Dial != nil || tlsConfig != nil {
-		rt = utilnet.SetTransportDefaults(&http.Transport{
+		rt = utilnet.SetOldTransportDefaults(&http.Transport{
 			Dial:            config.Dial,
 			TLSClientConfig: tlsConfig,
 		})
@@ -98,8 +99,8 @@ func NewStaticKubeletClient(config *KubeletClientConfig) (KubeletClient, error) 
 
 // In default HTTPKubeletClient ctx is unused.
 func (c *HTTPKubeletClient) GetConnectionInfo(ctx api.Context, nodeName string) (string, uint, http.RoundTripper, error) {
-	if ok, msg := validation.ValidateNodeName(nodeName, false); !ok {
-		return "", 0, nil, fmt.Errorf("invalid node name: %s", msg)
+	if errs := validation.ValidateNodeName(nodeName, false); len(errs) != 0 {
+		return "", 0, nil, fmt.Errorf("invalid node name: %s", strings.Join(errs, ";"))
 	}
 	scheme := "http"
 	if c.Config.EnableHttps {

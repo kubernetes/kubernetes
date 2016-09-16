@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -165,6 +165,8 @@ type JobCondition struct {
 	Message string `json:"message,omitempty"`
 }
 
+// +genclient=true
+
 // ScheduledJob represents the configuration of a single scheduled job.
 type ScheduledJob struct {
 	unversioned.TypeMeta `json:",inline"`
@@ -207,7 +209,7 @@ type ScheduledJobSpec struct {
 
 	// Suspend flag tells the controller to suspend subsequent executions, it does
 	// not apply to already started executions.  Defaults to false.
-	Suspend bool `json:"suspend"`
+	Suspend *bool `json:"suspend,omitempty"`
 
 	// JobTemplate is the object that describes the job that will be created when
 	// executing a ScheduledJob.

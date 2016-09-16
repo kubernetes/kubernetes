@@ -35,6 +35,10 @@ func (cli *Client) ContainerLogs(ctx context.Context, container string, options 
 		query.Set("timestamps", "1")
 	}
 
+	if options.Details {
+		query.Set("details", "1")
+	}
+
 	if options.Follow {
 		query.Set("follow", "1")
 	}

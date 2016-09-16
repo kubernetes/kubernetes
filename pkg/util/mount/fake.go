@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -81,7 +81,7 @@ func (f *FakeMounter) Mount(source string, target string, fstype string, options
 	}
 
 	f.MountPoints = append(f.MountPoints, MountPoint{Device: source, Path: target, Type: fstype})
-	glog.V(5).Infof("Fake mounter: mouted %s to %s", source, target)
+	glog.V(5).Infof("Fake mounter: mounted %s to %s", source, target)
 	f.Log = append(f.Log, FakeAction{Action: FakeActionMount, Target: target, Source: source, FSType: fstype})
 	return nil
 }
@@ -93,7 +93,7 @@ func (f *FakeMounter) Unmount(target string) error {
 	newMountpoints := []MountPoint{}
 	for _, mp := range f.MountPoints {
 		if mp.Path == target {
-			glog.V(5).Infof("Fake mounter: unmouted %s from %s", mp.Device, target)
+			glog.V(5).Infof("Fake mounter: unmounted %s from %s", mp.Device, target)
 			// Don't copy it to newMountpoints
 			continue
 		}
@@ -117,10 +117,30 @@ func (f *FakeMounter) IsLikelyNotMountPoint(file string) (bool, error) {
 
 	for _, mp := range f.MountPoints {
 		if mp.Path == file {
-			glog.V(5).Infof("isLikelyMountPoint for %s: monted %s, false", file, mp.Path)
+			glog.V(5).Infof("isLikelyMountPoint for %s: mounted %s, false", file, mp.Path)
 			return false, nil
 		}
 	}
 	glog.V(5).Infof("isLikelyMountPoint for %s: true", file)
 	return true, nil
+}
+
+func (f *FakeMounter) DeviceOpened(pathname string) (bool, error) {
+	f.mutex.Lock()
+	defer f.mutex.Unlock()
+
+	for _, mp := range f.MountPoints {
+		if mp.Device == pathname {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func (f *FakeMounter) PathIsDevice(pathname string) (bool, error) {
+	return true, nil
+}
+
+func (f *FakeMounter) GetDeviceNameFromMount(mountPath, pluginDir string) (string, error) {
+	return getDeviceNameFromMount(f, mountPath, pluginDir)
 }

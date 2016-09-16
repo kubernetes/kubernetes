@@ -271,9 +271,19 @@ var (
 // Find reflect.Type for an element's type attribute.
 func (p *Decoder) typeForElement(val reflect.Value, start *StartElement) reflect.Type {
 	t := ""
-	for _, a := range start.Attr {
+	for i, a := range start.Attr {
 		if a.Name == xmlSchemaInstance {
 			t = a.Value
+			// HACK: ensure xsi:type is last in the list to avoid using that value for
+			// a "type" attribute, such as ManagedObjectReference.Type for example.
+			// Note that xsi:type is already the last attribute in VC/ESX responses.
+			// This is only an issue with govmomi simulator generated responses.
+			// Proper fix will require finding a few needles in this xml package haystack.
+			x := len(start.Attr) - 1
+			if i != x {
+				start.Attr[i] = start.Attr[x]
+				start.Attr[x] = a
+			}
 			break
 		}
 	}

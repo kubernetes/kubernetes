@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -34,6 +34,8 @@ type tlsTransportCache struct {
 	transports map[string]*http.Transport
 }
 
+const idleConnsPerHost = 25
+
 var tlsCache = &tlsTransportCache{transports: make(map[string]*http.Transport)}
 
 func (c *tlsTransportCache) get(config *Config) (http.RoundTripper, error) {
@@ -66,6 +68,7 @@ func (c *tlsTransportCache) get(config *Config) (http.RoundTripper, error) {
 		Proxy:               http.ProxyFromEnvironment,
 		TLSHandshakeTimeout: 10 * time.Second,
 		TLSClientConfig:     tlsConfig,
+		MaxIdleConnsPerHost: idleConnsPerHost,
 		Dial: (&net.Dialer{
 			Timeout:   30 * time.Second,
 			KeepAlive: 30 * time.Second,

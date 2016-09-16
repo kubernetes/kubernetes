@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,8 +17,10 @@ limitations under the License.
 package app
 
 import (
-	"k8s.io/kubernetes/pkg/util/config"
 	"testing"
+
+	"k8s.io/kubernetes/pkg/kubelet"
+	"k8s.io/kubernetes/pkg/util/config"
 )
 
 func TestValueOfAllocatableResources(t *testing.T) {
@@ -55,7 +57,7 @@ func TestValueOfAllocatableResources(t *testing.T) {
 		kubeReservedCM.Set(test.kubeReserved)
 		systemReservedCM.Set(test.systemReserved)
 
-		_, err := parseReservation(kubeReservedCM, systemReservedCM)
+		_, err := kubelet.ParseReservation(kubeReservedCM, systemReservedCM)
 		if err != nil {
 			t.Logf("%s: error returned: %v", test.name, err)
 		}

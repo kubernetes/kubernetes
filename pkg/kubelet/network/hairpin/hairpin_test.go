@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -69,7 +69,8 @@ func TestFindPairInterfaceOfContainerInterface(t *testing.T) {
 				return fmt.Sprintf("/fake-bin/%s", file), nil
 			},
 		}
-		name, err := findPairInterfaceOfContainerInterface(&fexec, 123, "eth0")
+		nsenterArgs := []string{"-t", "123", "-n"}
+		name, err := findPairInterfaceOfContainerInterface(&fexec, "eth0", "123", nsenterArgs)
 		if test.expectErr {
 			if err == nil {
 				t.Errorf("unexpected non-error")

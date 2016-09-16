@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -30,7 +30,7 @@ type EventExpansion interface {
 	CreateWithEventNamespace(event *api.Event) (*api.Event, error)
 	// UpdateWithEventNamespace is the same as a Update, except that it sends the request to the event.Namespace.
 	UpdateWithEventNamespace(event *api.Event) (*api.Event, error)
-	Patch(event *api.Event, data []byte) (*api.Event, error)
+	PatchWithEventNamespace(event *api.Event, data []byte) (*api.Event, error)
 	// Search finds events about the specified object
 	Search(objOrRef runtime.Object) (*api.EventList, error)
 	// Returns the appropriate field selector based on the API version being used to communicate with the server.
@@ -73,11 +73,15 @@ func (e *events) UpdateWithEventNamespace(event *api.Event) (*api.Event, error) 
 	return result, err
 }
 
-// Patch modifies an existing event. It returns the copy of the event that the server returns, or an
-// error. The namespace and name of the target event is deduced from the incompleteEvent. The
-// namespace must either match this event client's namespace, or this event client must have been
+// PatchWithEventNamespace modifies an existing event. It returns the copy of
+// the event that the server returns, or an error. The namespace and name of the
+// target event is deduced from the incompleteEvent. The namespace must either
+// match this event client's namespace, or this event client must have been
 // created with the "" namespace.
-func (e *events) Patch(incompleteEvent *api.Event, data []byte) (*api.Event, error) {
+func (e *events) PatchWithEventNamespace(incompleteEvent *api.Event, data []byte) (*api.Event, error) {
+	if e.ns != "" && incompleteEvent.Namespace != e.ns {
+		return nil, fmt.Errorf("can't patch an event with namespace '%v' in namespace '%v'", incompleteEvent.Namespace, e.ns)
+	}
 	result := &api.Event{}
 	err := e.client.Patch(api.StrategicMergePatchType).
 		NamespaceIfScoped(incompleteEvent.Namespace, len(incompleteEvent.Namespace) > 0).
@@ -153,5 +157,5 @@ func (e *EventSinkImpl) Update(event *api.Event) (*api.Event, error) {
 }
 
 func (e *EventSinkImpl) Patch(event *api.Event, data []byte) (*api.Event, error) {
-	return e.Interface.Patch(event, data)
+	return e.Interface.PatchWithEventNamespace(event, data)
 }

@@ -4,11 +4,24 @@
 
 package gensupport
 
-import "net/url"
+import (
+	"net/url"
+
+	"google.golang.org/api/googleapi"
+)
 
 // URLParams is a simplified replacement for url.Values
 // that safely builds up URL parameters for encoding.
 type URLParams map[string][]string
+
+// Get returns the first value for the given key, or "".
+func (u URLParams) Get(key string) string {
+	vs := u[key]
+	if len(vs) == 0 {
+		return ""
+	}
+	return vs[0]
+}
 
 // Set sets the key to value.
 // It replaces any existing values.
@@ -28,4 +41,10 @@ func (u URLParams) SetMulti(key string, values []string) {
 // ("bar=baz&foo=quux") sorted by key.
 func (u URLParams) Encode() string {
 	return url.Values(u).Encode()
+}
+
+func SetOptions(u URLParams, opts ...googleapi.CallOption) {
+	for _, o := range opts {
+		u.Set(o.Get())
+	}
 }

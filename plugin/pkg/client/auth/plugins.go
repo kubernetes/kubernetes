@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,4 +19,5 @@ package plugins
 import (
 	// Initialize all known client auth plugins.
 	_ "k8s.io/kubernetes/plugin/pkg/client/auth/gcp"
+	_ "k8s.io/kubernetes/plugin/pkg/client/auth/oidc"
 )

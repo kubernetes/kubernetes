@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -76,7 +76,8 @@ func TestGetClientIP(t *testing.T) {
 		},
 		{
 			Request: http.Request{
-				RemoteAddr: ipString,
+				// RemoteAddr is in the form host:port
+				RemoteAddr: ipString + ":1234",
 			},
 			ExpectedIP: ip,
 		},
@@ -90,6 +91,7 @@ func TestGetClientIP(t *testing.T) {
 				Header: map[string][]string{
 					"X-Forwarded-For": {invalidIPString},
 				},
+				// RemoteAddr is in the form host:port
 				RemoteAddr: ipString,
 			},
 			ExpectedIP: ip,
@@ -98,7 +100,7 @@ func TestGetClientIP(t *testing.T) {
 
 	for i, test := range testCases {
 		if a, e := GetClientIP(&test.Request), test.ExpectedIP; reflect.DeepEqual(e, a) != true {
-			t.Fatalf("test case %d failed. expected: %v, actual: %v", i+1, e, a)
+			t.Fatalf("test case %d failed. expected: %v, actual: %v", i, e, a)
 		}
 	}
 }

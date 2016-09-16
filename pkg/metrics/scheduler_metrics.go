@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,28 +16,6 @@ limitations under the License.
 
 package metrics
 
-import (
-	"k8s.io/kubernetes/pkg/util/sets"
-
-	"github.com/prometheus/common/model"
-)
-
-var KnownSchedulerMetrics = map[string][]string{
-	"rest_client_request_latency_microseconds":                   {"url", "verb", "quantile"},
-	"rest_client_request_latency_microseconds_count":             {"url", "verb"},
-	"rest_client_request_latency_microseconds_sum":               {"url", "verb"},
-	"rest_client_request_status_codes":                           {"code", "host", "method"},
-	"scheduler_binding_latency_microseconds_bucket":              {"le"},
-	"scheduler_binding_latency_microseconds_count":               {},
-	"scheduler_binding_latency_microseconds_sum":                 {},
-	"scheduler_e2e_scheduling_latency_microseconds_bucket":       {"le"},
-	"scheduler_e2e_scheduling_latency_microseconds_count":        {},
-	"scheduler_e2e_scheduling_latency_microseconds_sum":          {},
-	"scheduler_scheduling_algorithm_latency_microseconds_bucket": {"le"},
-	"scheduler_scheduling_algorithm_latency_microseconds_count":  {},
-	"scheduler_scheduling_algorithm_latency_microseconds_sum":    {},
-}
-
 type SchedulerMetrics Metrics
 
 func (m *SchedulerMetrics) Equal(o SchedulerMetrics) bool {
@@ -46,15 +24,12 @@ func (m *SchedulerMetrics) Equal(o SchedulerMetrics) bool {
 
 func NewSchedulerMetrics() SchedulerMetrics {
 	result := NewMetrics()
-	for metric := range KnownSchedulerMetrics {
-		result[metric] = make(model.Samples, 0)
-	}
 	return SchedulerMetrics(result)
 }
 
-func parseSchedulerMetrics(data string, unknownMetrics sets.String) (SchedulerMetrics, error) {
+func parseSchedulerMetrics(data string) (SchedulerMetrics, error) {
 	result := NewSchedulerMetrics()
-	if err := parseMetrics(data, KnownSchedulerMetrics, (*Metrics)(&result), unknownMetrics); err != nil {
+	if err := parseMetrics(data, (*Metrics)(&result)); err != nil {
 		return SchedulerMetrics{}, err
 	}
 	return result, nil

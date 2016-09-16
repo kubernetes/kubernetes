@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -38,6 +38,7 @@ type DeploymentInterface interface {
 	Get(name string) (*extensions.Deployment, error)
 	List(opts api.ListOptions) (*extensions.DeploymentList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
+	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *extensions.Deployment, err error)
 	DeploymentExpansion
 }
 
@@ -147,4 +148,18 @@ func (c *deployments) Watch(opts api.ListOptions) (watch.Interface, error) {
 		Resource("deployments").
 		VersionedParams(&opts, api.ParameterCodec).
 		Watch()
+}
+
+// Patch applies the patch and returns the patched deployment.
+func (c *deployments) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *extensions.Deployment, err error) {
+	result = &extensions.Deployment{}
+	err = c.client.Patch(pt).
+		Namespace(c.ns).
+		Resource("deployments").
+		SubResource(subresources...).
+		Name(name).
+		Body(data).
+		Do().
+		Into(result)
+	return
 }

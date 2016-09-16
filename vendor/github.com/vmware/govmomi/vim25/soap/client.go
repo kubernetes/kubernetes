@@ -428,23 +428,12 @@ var DefaultDownload = Download{
 	Method: "GET",
 }
 
-// DownloadFile GETs the given URL to a local file
-func (c *Client) DownloadFile(file string, u *url.URL, param *Download) error {
-	var err error
-
-	if param == nil {
-		param = &DefaultDownload
-	}
-
-	fh, err := os.Create(file)
-	if err != nil {
-		return err
-	}
-	defer fh.Close()
+// Download GETs the remote file from the given URL
+func (c *Client) Download(u *url.URL, param *Download) (io.ReadCloser, int64, error) {
 
 	req, err := http.NewRequest(param.Method, u.String(), nil)
 	if err != nil {
-		return err
+		return nil, 0, err
 	}
 
 	if param.Ticket != nil {
@@ -453,10 +442,8 @@ func (c *Client) DownloadFile(file string, u *url.URL, param *Download) error {
 
 	res, err := c.Client.Do(req)
 	if err != nil {
-		return err
+		return nil, 0, err
 	}
-
-	defer res.Body.Close()
 
 	switch res.StatusCode {
 	case http.StatusOK:
@@ -465,12 +452,37 @@ func (c *Client) DownloadFile(file string, u *url.URL, param *Download) error {
 	}
 
 	if err != nil {
-		return err
+		return nil, 0, err
 	}
 
-	var r io.Reader = res.Body
+	var r io.ReadCloser = res.Body
+
+	return r, res.ContentLength, nil
+}
+
+// DownloadFile GETs the given URL to a local file
+func (c *Client) DownloadFile(file string, u *url.URL, param *Download) error {
+	var err error
+	if param == nil {
+		param = &DefaultDownload
+	}
+
+	rc, contentLength, err := c.Download(u, param)
+	if err != nil {
+		return err
+	}
+	defer rc.Close()
+
+	var r io.Reader = rc
+
+	fh, err := os.Create(file)
+	if err != nil {
+		return err
+	}
+	defer fh.Close()
+
 	if param.Progress != nil {
-		pr := progress.NewReader(param.Progress, res.Body, res.ContentLength)
+		pr := progress.NewReader(param.Progress, r, contentLength)
 		r = pr
 
 		// Mark progress reader as done when returning from this function.

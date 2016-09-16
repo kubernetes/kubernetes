@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -28,19 +28,27 @@ import (
 )
 
 // streamProtocolV1 implements the first version of the streaming exec & attach
-// protocol. This version has some bugs, such as not being able to detecte when
+// protocol. This version has some bugs, such as not being able to detect when
 // non-interactive stdin data has ended. See http://issues.k8s.io/13394 and
 // http://issues.k8s.io/13395 for more details.
 type streamProtocolV1 struct {
-	stdin  io.Reader
-	stdout io.Writer
-	stderr io.Writer
-	tty    bool
+	StreamOptions
+
+	errorStream  httpstream.Stream
+	remoteStdin  httpstream.Stream
+	remoteStdout httpstream.Stream
+	remoteStderr httpstream.Stream
 }
 
 var _ streamProtocolHandler = &streamProtocolV1{}
 
-func (e *streamProtocolV1) stream(conn httpstream.Connection) error {
+func newStreamProtocolV1(options StreamOptions) streamProtocolHandler {
+	return &streamProtocolV1{
+		StreamOptions: options,
+	}
+}
+
+func (p *streamProtocolV1) stream(conn streamCreator) error {
 	doneChan := make(chan struct{}, 2)
 	errorChan := make(chan error)
 
@@ -55,19 +63,15 @@ func (e *streamProtocolV1) stream(conn httpstream.Connection) error {
 		}
 	}
 
-	var (
-		err                                                  error
-		errorStream, remoteStdin, remoteStdout, remoteStderr httpstream.Stream
-	)
-
 	// set up all the streams first
+	var err error
 	headers := http.Header{}
 	headers.Set(api.StreamType, api.StreamTypeError)
-	errorStream, err = conn.CreateStream(headers)
+	p.errorStream, err = conn.CreateStream(headers)
 	if err != nil {
 		return err
 	}
-	defer errorStream.Reset()
+	defer p.errorStream.Reset()
 
 	// Create all the streams first, then start the copy goroutines. The server doesn't start its copy
 	// goroutines until it's received all of the streams. If the client creates the stdin stream and
@@ -76,38 +80,38 @@ func (e *streamProtocolV1) stream(conn httpstream.Connection) error {
 	// getting processed because the server hasn't started its copying, and it won't do that until it
 	// gets all the streams. By creating all the streams first, we ensure that the server is ready to
 	// process data before the client starts sending any. See https://issues.k8s.io/16373 for more info.
-	if e.stdin != nil {
+	if p.Stdin != nil {
 		headers.Set(api.StreamType, api.StreamTypeStdin)
-		remoteStdin, err = conn.CreateStream(headers)
+		p.remoteStdin, err = conn.CreateStream(headers)
 		if err != nil {
 			return err
 		}
-		defer remoteStdin.Reset()
+		defer p.remoteStdin.Reset()
 	}
 
-	if e.stdout != nil {
+	if p.Stdout != nil {
 		headers.Set(api.StreamType, api.StreamTypeStdout)
-		remoteStdout, err = conn.CreateStream(headers)
+		p.remoteStdout, err = conn.CreateStream(headers)
 		if err != nil {
 			return err
 		}
-		defer remoteStdout.Reset()
+		defer p.remoteStdout.Reset()
 	}
 
-	if e.stderr != nil && !e.tty {
+	if p.Stderr != nil && !p.Tty {
 		headers.Set(api.StreamType, api.StreamTypeStderr)
-		remoteStderr, err = conn.CreateStream(headers)
+		p.remoteStderr, err = conn.CreateStream(headers)
 		if err != nil {
 			return err
 		}
-		defer remoteStderr.Reset()
+		defer p.remoteStderr.Reset()
 	}
 
 	// now that all the streams have been created, proceed with reading & copying
 
 	// always read from errorStream
 	go func() {
-		message, err := ioutil.ReadAll(errorStream)
+		message, err := ioutil.ReadAll(p.errorStream)
 		if err != nil && err != io.EOF {
 			errorChan <- fmt.Errorf("Error reading from error stream: %s", err)
 			return
@@ -118,25 +122,25 @@ func (e *streamProtocolV1) stream(conn httpstream.Connection) error {
 		}
 	}()
 
-	if e.stdin != nil {
+	if p.Stdin != nil {
 		// TODO this goroutine will never exit cleanly (the io.Copy never unblocks)
 		// because stdin is not closed until the process exits. If we try to call
 		// stdin.Close(), it returns no error but doesn't unblock the copy. It will
 		// exit when the process exits, instead.
-		go cp(api.StreamTypeStdin, remoteStdin, e.stdin)
+		go cp(api.StreamTypeStdin, p.remoteStdin, p.Stdin)
 	}
 
 	waitCount := 0
 	completedStreams := 0
 
-	if e.stdout != nil {
+	if p.Stdout != nil {
 		waitCount++
-		go cp(api.StreamTypeStdout, e.stdout, remoteStdout)
+		go cp(api.StreamTypeStdout, p.Stdout, p.remoteStdout)
 	}
 
-	if e.stderr != nil && !e.tty {
+	if p.Stderr != nil && !p.Tty {
 		waitCount++
-		go cp(api.StreamTypeStderr, e.stderr, remoteStderr)
+		go cp(api.StreamTypeStderr, p.Stderr, p.remoteStderr)
 	}
 
 Loop:

@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -59,6 +59,7 @@ func newTestCacher(s storage.Interface) *storage.Cacher {
 		ResourcePrefix: prefix,
 		KeyFunc:        func(obj runtime.Object) (string, error) { return storage.NamespaceKeyFunc(prefix, obj) },
 		NewListFunc:    func() runtime.Object { return &api.PodList{} },
+		Codec:          testapi.Default.Codec(),
 	}
 	return storage.NewCacherFromConfig(config)
 }
@@ -79,7 +80,7 @@ func updatePod(t *testing.T, s storage.Interface, obj, old *api.Pod) *api.Pod {
 		}
 		return newObj.(*api.Pod), nil, nil
 	}
-	key := etcdtest.AddPrefix("pods/ns/" + obj.Name)
+	key := etcdtest.AddPrefix("pods/" + obj.Namespace + "/" + obj.Name)
 	if err := s.GuaranteedUpdate(context.TODO(), key, &api.Pod{}, old == nil, nil, updateFn); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -109,6 +110,12 @@ func TestList(t *testing.T) {
 	_ = updatePod(t, etcdStorage, podBaz, nil)
 
 	_ = updatePod(t, etcdStorage, podFooPrime, fooCreated)
+
+	// Create a pod in a namespace that contains "ns" as a prefix
+	// Make sure it is not returned in a watch of "ns"
+	podFooNS2 := makeTestPod("foo")
+	podFooNS2.Namespace += "2"
+	updatePod(t, etcdStorage, podFooNS2, nil)
 
 	deleted := api.Pod{}
 	if err := etcdStorage.Delete(context.TODO(), etcdtest.AddPrefix("pods/ns/bar"), &deleted, nil); err != nil {
@@ -146,6 +153,10 @@ func TestList(t *testing.T) {
 		// unset fields that are set by the infrastructure
 		item.ResourceVersion = ""
 		item.CreationTimestamp = unversioned.Time{}
+
+		if item.Namespace != "ns" {
+			t.Errorf("Unexpected namespace: %s", item.Namespace)
+		}
 
 		var expected *api.Pod
 		switch item.Name {
@@ -185,7 +196,7 @@ type injectListError struct {
 	storage.Interface
 }
 
-func (self *injectListError) List(ctx context.Context, key string, resourceVersion string, filter storage.FilterFunc, listObj runtime.Object) error {
+func (self *injectListError) List(ctx context.Context, key string, resourceVersion string, filter storage.Filter, listObj runtime.Object) error {
 	if self.errors > 0 {
 		self.errors--
 		return fmt.Errorf("injected error")
@@ -210,6 +221,9 @@ func TestWatch(t *testing.T) {
 	podFooBis := makeTestPod("foo")
 	podFooBis.Spec.NodeName = "anotherFakeNode"
 
+	podFooNS2 := makeTestPod("foo")
+	podFooNS2.Namespace += "2"
+
 	// initialVersion is used to initate the watcher at the beginning of the world,
 	// which is not defined precisely in etcd.
 	initialVersion, err := cacher.LastSyncResourceVersion()
@@ -225,6 +239,9 @@ func TestWatch(t *testing.T) {
 	}
 	defer watcher.Stop()
 
+	// Create in another namespace first to make sure events from other namespaces don't get delivered
+	updatePod(t, etcdStorage, podFooNS2, nil)
+
 	fooCreated := updatePod(t, etcdStorage, podFoo, nil)
 	_ = updatePod(t, etcdStorage, podBar, nil)
 	fooUpdated := updatePod(t, etcdStorage, podFooPrime, fooCreated)
@@ -239,7 +256,7 @@ func TestWatch(t *testing.T) {
 	}
 	defer tooOldWatcher.Stop()
 	// Ensure we get a "Gone" error
-	expectedGoneError := errors.NewGone("").(*errors.StatusError).ErrStatus
+	expectedGoneError := errors.NewGone("").ErrStatus
 	verifyWatchEvent(t, tooOldWatcher, watch.Error, &expectedGoneError)
 
 	initialWatcher, err := cacher.Watch(context.TODO(), "pods/ns/foo", fooCreated.ResourceVersion, storage.Everything)
@@ -320,6 +337,13 @@ func TestFiltering(t *testing.T) {
 	podFooPrime.Labels = map[string]string{"filter": "foo"}
 	podFooPrime.Spec.NodeName = "fakeNode"
 
+	podFooNS2 := makeTestPod("foo")
+	podFooNS2.Namespace += "2"
+	podFooNS2.Labels = map[string]string{"filter": "foo"}
+
+	// Create in another namespace first to make sure events from other namespaces don't get delivered
+	updatePod(t, etcdStorage, podFooNS2, nil)
+
 	fooCreated := updatePod(t, etcdStorage, podFoo, nil)
 	fooFiltered := updatePod(t, etcdStorage, podFooFiltered, fooCreated)
 	fooUnfiltered := updatePod(t, etcdStorage, podFoo, fooFiltered)
@@ -332,7 +356,7 @@ func TestFiltering(t *testing.T) {
 
 	// Set up Watch for object "podFoo" with label filter set.
 	selector := labels.SelectorFromSet(labels.Set{"filter": "foo"})
-	filter := func(obj runtime.Object) bool {
+	filterFunc := func(obj runtime.Object) bool {
 		metadata, err := meta.Accessor(obj)
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
@@ -340,6 +364,7 @@ func TestFiltering(t *testing.T) {
 		}
 		return selector.Matches(labels.Set(metadata.GetLabels()))
 	}
+	filter := storage.NewSimpleFilter(filterFunc, storage.NoTriggerFunc)
 	watcher, err := cacher.Watch(context.TODO(), "pods/ns/foo", fooCreated.ResourceVersion, filter)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)

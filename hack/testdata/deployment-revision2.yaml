@@ -1,18 +1,18 @@
 apiVersion: extensions/v1beta1
 kind: Deployment
 metadata:
-  name: nginx-deployment
+  name: nginx
   labels:
-    name: nginx-deployment
+    name: nginx-undo
 spec:
   replicas: 3
   selector:
     matchLabels:
-      name: nginx
+      name: nginx-undo
   template:
     metadata:
       labels:
-        name: nginx
+        name: nginx-undo
     spec:
       containers:
       - name: nginx

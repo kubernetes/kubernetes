@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ import (
 	"strings"
 	"time"
 
-	influxdb "github.com/influxdb/influxdb/client"
+	influxdb "github.com/influxdata/influxdb/client"
 	"k8s.io/kubernetes/pkg/api"
 )
 
@@ -67,7 +67,7 @@ func (s *influxdbSource) GetUsagePercentile(kind api.ResourceName, perc int64, i
 
 	query := fmt.Sprintf("select percentile(value, %v), count(pod_id) from %v where container_base_image%v%v and time > '%v' and time < '%v'", perc, series, imgPattern, namespaceCond, start.UTC().Format(timeFormat), end.UTC().Format(timeFormat))
 	if _, err := s.query(query); err != nil {
-		return 0, 0, fmt.Errorf("Error while trying to query InfluxDB: %v", err)
+		return 0, 0, fmt.Errorf("error while trying to query InfluxDB: %v", err)
 	}
 	return 0, 0, nil
 }

@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -38,6 +38,7 @@ type IngressInterface interface {
 	Get(name string) (*v1beta1.Ingress, error)
 	List(opts api.ListOptions) (*v1beta1.IngressList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
+	Patch(name string, pt api.PatchType, data []byte) (result *v1beta1.Ingress, err error)
 	IngressExpansion
 }
 
@@ -147,4 +148,17 @@ func (c *ingresses) Watch(opts api.ListOptions) (watch.Interface, error) {
 		Resource("ingresses").
 		VersionedParams(&opts, api.ParameterCodec).
 		Watch()
+}
+
+// Patch applies the patch and returns the patched ingress.
+func (c *ingresses) Patch(name string, pt api.PatchType, data []byte) (result *v1beta1.Ingress, err error) {
+	result = &v1beta1.Ingress{}
+	err = c.client.Patch(pt).
+		Namespace(c.ns).
+		Resource("ingresses").
+		Name(name).
+		Body(data).
+		Do().
+		Into(result)
+	return
 }

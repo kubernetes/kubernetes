@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"fmt"
-	"strings"
 )
 
 type VerifierRSA struct {
@@ -20,7 +19,7 @@ type SignerRSA struct {
 }
 
 func NewVerifierRSA(jwk JWK) (*VerifierRSA, error) {
-	if strings.ToUpper(jwk.Alg) != "RS256" {
+	if jwk.Alg != "" && jwk.Alg != "RS256" {
 		return nil, fmt.Errorf("unsupported key algorithm %q", jwk.Alg)
 	}
 

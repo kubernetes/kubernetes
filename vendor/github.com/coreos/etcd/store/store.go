@@ -1,4 +1,4 @@
-// Copyright 2015 CoreOS, Inc.
+// Copyright 2015 The etcd Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -119,8 +119,8 @@ func (s *store) Index() uint64 {
 func (s *store) Get(nodePath string, recursive, sorted bool) (*Event, error) {
 	var err *etcdErr.Error
 
-	s.worldLock.Lock()
-	defer s.worldLock.Unlock()
+	s.worldLock.RLock()
+	defer s.worldLock.RUnlock()
 
 	defer func() {
 		if err == nil {
@@ -236,6 +236,9 @@ func (s *store) Set(nodePath string, dir bool, value string, expireOpts TTLOptio
 
 	if !expireOpts.Refresh {
 		s.WatcherHub.notify(e)
+	} else {
+		e.SetRefresh()
+		s.WatcherHub.add(e)
 	}
 
 	return e, nil
@@ -295,6 +298,10 @@ func (s *store) CompareAndSwap(nodePath string, prevValue string, prevIndex uint
 		return nil, err
 	}
 
+	if expireOpts.Refresh {
+		value = n.Value
+	}
+
 	// update etcd index
 	s.CurrentIndex++
 
@@ -314,6 +321,9 @@ func (s *store) CompareAndSwap(nodePath string, prevValue string, prevIndex uint
 
 	if !expireOpts.Refresh {
 		s.WatcherHub.notify(e)
+	} else {
+		e.SetRefresh()
+		s.WatcherHub.add(e)
 	}
 
 	return e, nil
@@ -345,7 +355,7 @@ func (s *store) Delete(nodePath string, dir, recursive bool) (*Event, error) {
 	}
 
 	// recursive implies dir
-	if recursive == true {
+	if recursive {
 		dir = true
 	}
 
@@ -539,6 +549,9 @@ func (s *store) Update(nodePath string, newValue string, expireOpts TTLOptionSet
 
 	if !expireOpts.Refresh {
 		s.WatcherHub.notify(e)
+	} else {
+		e.SetRefresh()
+		s.WatcherHub.add(e)
 	}
 
 	s.CurrentIndex = nextIndex

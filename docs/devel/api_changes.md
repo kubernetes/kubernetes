@@ -2,15 +2,15 @@
 
 <!-- BEGIN STRIP_FOR_RELEASE -->
 
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
 
 <h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
@@ -21,7 +21,7 @@ refer to the docs that go with that version.
 <!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.2/docs/devel/api_changes.md).
+[here](http://releases.k8s.io/release-1.4/docs/devel/api_changes.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -48,7 +48,7 @@ found at [API Conventions](api-conventions.md).
     - [Edit defaults.go](#edit-defaultsgo)
     - [Edit conversion.go](#edit-conversiongo)
   - [Changing the internal structures](#changing-the-internal-structures)
-    - [Edit types.go](#edit-typesgo)
+    - [Edit types.go](#edit-typesgo-1)
   - [Edit validation.go](#edit-validationgo)
   - [Edit version conversions](#edit-version-conversions)
   - [Generate protobuf objects](#generate-protobuf-objects)
@@ -399,7 +399,7 @@ have to do more later. The files you want are
 
 Note that the conversion machinery doesn't generically handle conversion of
 values, such as various kinds of field references and API constants. [The client
-library](../../pkg/client/unversioned/request.go) has custom conversion code for
+library](../../pkg/client/restclient/request.go) has custom conversion code for
 field references. You also need to add a call to
 api.Scheme.AddFieldLabelConversionFunc with a mapping function that understands
 supported translations.
@@ -468,12 +468,11 @@ regenerate auto-generated ones. To regenerate them run:
 hack/update-codegen.sh
 ```
 
-update-codegen will also generate code to handle deep copy of your versioned
-api objects. The deep copy code resides with each versioned API:
-   - `pkg/api/<version>/deep_copy_generated.go` containing auto-generated copy functions
-   - `pkg/apis/extensions/<version>/deep_copy_generated.go` containing auto-generated copy functions
+As part of the build, kubernetes will also generate code to handle deep copy of
+your versioned api objects. The deep copy code resides with each versioned API:
+   - `<path_to_versioned_api>/zz_generated.deepcopy.go` containing auto-generated copy functions
 
-If running the above script is impossible due to compile errors, the easiest
+If regeneration is somehow not possible due to compile errors, the easiest
 workaround is to comment out the code causing errors and let the script to
 regenerate it. If the auto-generated conversion methods are not used by the
 manually-written ones, it's fine to just remove the whole file and let the
@@ -494,7 +493,7 @@ hack/update-generated-protobuf.sh
 
 The vast majority of objects will not need any consideration when converting
 to protobuf, but be aware that if you depend on a Golang type in the standard
-library there may be additional work requried, although in practice we typically
+library there may be additional work required, although in practice we typically
 use our own equivalents for JSON serialization. The `pkg/api/serialization_test.go`
 will verify that your protobuf serialization preserves all fields - be sure to
 run it several times to ensure there are no incompletely calculated fields.
@@ -520,12 +519,11 @@ hack/update-codecgen.sh
 This section is under construction, as we make the tooling completely generic.
 
 At the moment, you'll have to make a new directory under `pkg/apis/`; copy the
-directory structure from `pkg/apis/extensions`. Add the new group/version to all
+directory structure from `pkg/apis/authentication`. Add the new group/version to all
 of the `hack/{verify,update}-generated-{deep-copy,conversions,swagger}.sh` files
 in the appropriate places--it should just require adding your new group/version
-to a bash array. You will also need to make sure your new types are imported by
-the generation commands (`cmd/gendeepcopy/` & `cmd/genconversion`). These
-instructions may not be complete and will be updated as we gain experience.
+to a bash array.  See [docs on adding an API group](adding-an-APIGroup.md) for
+more.
 
 Adding API groups outside of the `pkg/apis/` directory is not currently
 supported, but is clearly desirable. The deep copy & conversion generators need
@@ -754,7 +752,7 @@ The latter requires that all objects in the same API group as `Frobber` to be
 replicated in the new version, `v6alpha2`. This also requires user to use a new
 client which uses the other version. Therefore, this is not a preferred option.
 
-A releated issue is how a cluster manager can roll back from a new version
+A related issue is how a cluster manager can roll back from a new version
 with a new feature, that is already being used by users. See
 https://github.com/kubernetes/kubernetes/issues/4855.
 

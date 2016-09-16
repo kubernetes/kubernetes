@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -40,7 +40,7 @@ func (ClusterRole) SwaggerDoc() map[string]string {
 var map_ClusterRoleBinding = map[string]string{
 	"":         "ClusterRoleBinding references a ClusterRole, but not contain it.  It can reference a ClusterRole in the global namespace, and adds who information via Subject.",
 	"metadata": "Standard object's metadata.",
-	"subject":  "Subjects holds references to the objects the role applies to.",
+	"subjects": "Subjects holds references to the objects the role applies to.",
 	"roleRef":  "RoleRef can only reference a ClusterRole in the global namespace. If the RoleRef cannot be resolved, the Authorizer must return an error.",
 }
 
@@ -75,7 +75,7 @@ var map_PolicyRule = map[string]string{
 	"apiGroups":             "APIGroups is the name of the APIGroup that contains the resources.  If multiple API groups are specified, any action requested against one of the enumerated resources in any API group will be allowed.",
 	"resources":             "Resources is a list of resources this rule applies to.  ResourceAll represents all resources.",
 	"resourceNames":         "ResourceNames is an optional white list of names that the rule applies to.  An empty set means that everything is allowed.",
-	"nonResourceURLs":       "NonResourceURLsSlice is a set of partial urls that a user should have access to.  *s are allowed, but only as the full, final step in the path This name is intentionally different than the internal type so that the DefaultConvert works nicely and because the ordering may be different. Since non-resource URLs are not namespaced, this field is only applicable for ClusterRoles referenced from a ClusterRoleBinding.",
+	"nonResourceURLs":       "NonResourceURLs is a set of partial urls that a user should have access to.  *s are allowed, but only as the full, final step in the path This name is intentionally different than the internal type so that the DefaultConvert works nicely and because the ordering may be different. Since non-resource URLs are not namespaced, this field is only applicable for ClusterRoles referenced from a ClusterRoleBinding. Rules can either apply to API resources (such as \"pods\" or \"secrets\") or non-resource URL paths (such as \"/api\"),  but not both.",
 }
 
 func (PolicyRule) SwaggerDoc() map[string]string {
@@ -95,7 +95,7 @@ func (Role) SwaggerDoc() map[string]string {
 var map_RoleBinding = map[string]string{
 	"":         "RoleBinding references a role, but does not contain it.  It can reference a Role in the same namespace or a ClusterRole in the global namespace. It adds who information via Subjects and namespace information by which namespace it exists in.  RoleBindings in a given namespace only have effect in that namespace.",
 	"metadata": "Standard object's metadata.",
-	"subject":  "Subjects holds references to the objects the role applies to.",
+	"subjects": "Subjects holds references to the objects the role applies to.",
 	"roleRef":  "RoleRef can reference a Role in the current namespace or a ClusterRole in the global namespace. If the RoleRef cannot be resolved, the Authorizer must return an error.",
 }
 
@@ -123,10 +123,21 @@ func (RoleList) SwaggerDoc() map[string]string {
 	return map_RoleList
 }
 
+var map_RoleRef = map[string]string{
+	"":         "RoleRef contains information that points to the role being used",
+	"apiGroup": "APIGroup is the group for the resource being referenced",
+	"kind":     "Kind is the type of resource being referenced",
+	"name":     "Name is the name of resource being referenced",
+}
+
+func (RoleRef) SwaggerDoc() map[string]string {
+	return map_RoleRef
+}
+
 var map_Subject = map[string]string{
 	"":           "Subject contains a reference to the object or user identities a role binding applies to.  This can either hold a direct API object reference, or a value for non-objects such as user and group names.",
 	"kind":       "Kind of object being referenced. Values defined by this API group are \"User\", \"Group\", and \"ServiceAccount\". If the Authorizer does not recognized the kind value, the Authorizer should report an error.",
-	"apiVersion": "APIVersion holds the API group and version of the referenced object. For non-object references such as \"Group\" and \"User\" this is expected to be API version of this API group. For example \"rbac.authorization.k8s.io/v1alpha1\".",
+	"apiVersion": "APIVersion holds the API group and version of the referenced object.",
 	"name":       "Name of the object being referenced.",
 	"namespace":  "Namespace of the referenced object.  If the object kind is non-namespace, such as \"User\" or \"Group\", and this value is not empty the Authorizer should report an error.",
 }

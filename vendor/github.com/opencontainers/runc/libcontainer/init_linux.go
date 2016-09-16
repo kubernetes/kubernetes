@@ -44,22 +44,29 @@ type network struct {
 
 // initConfig is used for transferring parameters from Exec() to Init()
 type initConfig struct {
-	Args             []string        `json:"args"`
-	Env              []string        `json:"env"`
-	Cwd              string          `json:"cwd"`
-	Capabilities     []string        `json:"capabilities"`
-	User             string          `json:"user"`
-	Config           *configs.Config `json:"config"`
-	Console          string          `json:"console"`
-	Networks         []*network      `json:"network"`
-	PassedFilesCount int             `json:"passed_files_count"`
+	Args             []string         `json:"args"`
+	Env              []string         `json:"env"`
+	Cwd              string           `json:"cwd"`
+	Capabilities     []string         `json:"capabilities"`
+	ProcessLabel     string           `json:"process_label"`
+	AppArmorProfile  string           `json:"apparmor_profile"`
+	NoNewPrivileges  bool             `json:"no_new_privileges"`
+	User             string           `json:"user"`
+	AdditionalGroups []string         `json:"additional_groups"`
+	Config           *configs.Config  `json:"config"`
+	Console          string           `json:"console"`
+	Networks         []*network       `json:"network"`
+	PassedFilesCount int              `json:"passed_files_count"`
+	ContainerId      string           `json:"containerid"`
+	Rlimits          []configs.Rlimit `json:"rlimits"`
+	ExecFifoPath     string           `json:"start_pipe_path"`
 }
 
 type initer interface {
 	Init() error
 }
 
-func newContainerInit(t initType, pipe *os.File) (initer, error) {
+func newContainerInit(t initType, pipe *os.File, stateDirFD int) (initer, error) {
 	var config *initConfig
 	if err := json.NewDecoder(pipe).Decode(&config); err != nil {
 		return nil, err
@@ -74,9 +81,10 @@ func newContainerInit(t initType, pipe *os.File) (initer, error) {
 		}, nil
 	case initStandard:
 		return &linuxStandardInit{
-			pipe:      pipe,
-			parentPid: syscall.Getppid(),
-			config:    config,
+			pipe:       pipe,
+			parentPid:  syscall.Getppid(),
+			config:     config,
+			stateDirFD: stateDirFD,
 		}, nil
 	}
 	return nil, fmt.Errorf("unknown init type %q", t)
@@ -163,20 +171,22 @@ func syncParentReady(pipe io.ReadWriter) error {
 	return nil
 }
 
-// joinExistingNamespaces gets all the namespace paths specified for the container and
-// does a setns on the namespace fd so that the current process joins the namespace.
-func joinExistingNamespaces(namespaces []configs.Namespace) error {
-	for _, ns := range namespaces {
-		if ns.Path != "" {
-			f, err := os.OpenFile(ns.Path, os.O_RDONLY, 0)
-			if err != nil {
-				return err
-			}
-			err = system.Setns(f.Fd(), uintptr(ns.Syscall()))
-			f.Close()
-			if err != nil {
-				return err
-			}
+// syncParentHooks sends to the given pipe a JSON payload which indicates that
+// the parent should execute pre-start hooks. It then waits for the parent to
+// indicate that it is cleared to resume.
+func syncParentHooks(pipe io.ReadWriter) error {
+	// Tell parent.
+	if err := utils.WriteJSON(pipe, syncT{procHooks}); err != nil {
+		return err
+	}
+	// Wait for parent to give the all-clear.
+	var procSync syncT
+	if err := json.NewDecoder(pipe).Decode(&procSync); err != nil {
+		if err == io.EOF {
+			return fmt.Errorf("parent closed synchronisation channel")
+		}
+		if procSync.Type != procResume {
+			return fmt.Errorf("invalid synchronisation flag from parent")
 		}
 	}
 	return nil
@@ -204,8 +214,8 @@ func setupUser(config *initConfig) error {
 	}
 
 	var addGroups []int
-	if len(config.Config.AdditionalGroups) > 0 {
-		addGroups, err = user.GetAdditionalGroupsPath(config.Config.AdditionalGroups, groupPath)
+	if len(config.AdditionalGroups) > 0 {
+		addGroups, err = user.GetAdditionalGroupsPath(config.AdditionalGroups, groupPath)
 		if err != nil {
 			return err
 		}
@@ -309,19 +319,19 @@ func setupRoute(config *configs.Config) error {
 	return nil
 }
 
-func setupRlimits(config *configs.Config) error {
-	for _, rlimit := range config.Rlimits {
-		l := &syscall.Rlimit{Max: rlimit.Hard, Cur: rlimit.Soft}
-		if err := syscall.Setrlimit(rlimit.Type, l); err != nil {
+func setupRlimits(limits []configs.Rlimit, pid int) error {
+	for _, rlimit := range limits {
+		if err := system.Prlimit(pid, rlimit.Type, syscall.Rlimit{Max: rlimit.Hard, Cur: rlimit.Soft}); err != nil {
 			return fmt.Errorf("error setting rlimit type %v: %v", rlimit.Type, err)
 		}
 	}
 	return nil
 }
 
-func setOomScoreAdj(oomScoreAdj int) error {
-	path := "/proc/self/oom_score_adj"
-	return ioutil.WriteFile(path, []byte(strconv.Itoa(oomScoreAdj)), 0700)
+func setOomScoreAdj(oomScoreAdj int, pid int) error {
+	path := fmt.Sprintf("/proc/%d/oom_score_adj", pid)
+
+	return ioutil.WriteFile(path, []byte(strconv.Itoa(oomScoreAdj)), 0600)
 }
 
 // killCgroupProcesses freezes then iterates over all the processes inside the
@@ -338,11 +348,14 @@ func killCgroupProcesses(m cgroups.Manager) error {
 		return err
 	}
 	for _, pid := range pids {
-		if p, err := os.FindProcess(pid); err == nil {
-			procs = append(procs, p)
-			if err := p.Kill(); err != nil {
-				logrus.Warn(err)
-			}
+		p, err := os.FindProcess(pid)
+		if err != nil {
+			logrus.Warn(err)
+			continue
+		}
+		procs = append(procs, p)
+		if err := p.Kill(); err != nil {
+			logrus.Warn(err)
 		}
 	}
 	if err := m.Freeze(configs.Thawed); err != nil {

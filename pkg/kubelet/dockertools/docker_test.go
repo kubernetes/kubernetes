@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,6 +20,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"hash/adler32"
+	"math/rand"
+	"path"
 	"reflect"
 	"sort"
 	"strconv"
@@ -30,13 +32,14 @@ import (
 	dockertypes "github.com/docker/engine-api/types"
 	dockernat "github.com/docker/go-connections/nat"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
-	"k8s.io/kubernetes/cmd/kubelet/app/options"
+	"github.com/stretchr/testify/assert"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
+	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	nettest "k8s.io/kubernetes/pkg/kubelet/network/testing"
 	"k8s.io/kubernetes/pkg/types"
@@ -44,9 +47,7 @@ import (
 )
 
 func verifyCalls(t *testing.T, fakeDocker *FakeDockerClient, calls []string) {
-	fakeDocker.Lock()
-	defer fakeDocker.Unlock()
-	verifyStringArrayEquals(t, fakeDocker.called, calls)
+	assert.New(t).NoError(fakeDocker.AssertCalls(calls))
 }
 
 func verifyStringArrayEquals(t *testing.T, actual, expected []string) {
@@ -156,6 +157,164 @@ func TestContainerNaming(t *testing.T) {
 	}
 }
 
+func TestMatchImageTagOrSHA(t *testing.T) {
+	for i, testCase := range []struct {
+		Inspected dockertypes.ImageInspect
+		Image     string
+		Output    bool
+	}{
+		{
+			Inspected: dockertypes.ImageInspect{RepoTags: []string{"ubuntu:latest"}},
+			Image:     "ubuntu",
+			Output:    true,
+		},
+		{
+			Inspected: dockertypes.ImageInspect{RepoTags: []string{"ubuntu:14.04"}},
+			Image:     "ubuntu:latest",
+			Output:    false,
+		},
+		{
+			Inspected: dockertypes.ImageInspect{RepoTags: []string{"colemickens/hyperkube-amd64:217.9beff63"}},
+			Image:     "colemickens/hyperkube-amd64:217.9beff63",
+			Output:    true,
+		},
+		{
+			Inspected: dockertypes.ImageInspect{RepoTags: []string{"colemickens/hyperkube-amd64:217.9beff63"}},
+			Image:     "docker.io/colemickens/hyperkube-amd64:217.9beff63",
+			Output:    true,
+		},
+		{
+			Inspected: dockertypes.ImageInspect{RepoTags: []string{"docker.io/kubernetes/pause:latest"}},
+			Image:     "kubernetes/pause:latest",
+			Output:    true,
+		},
+		{
+			Inspected: dockertypes.ImageInspect{
+				ID: "sha256:2208f7a29005d226d1ee33a63e33af1f47af6156c740d7d23c7948e8d282d53d",
+			},
+			Image:  "myimage@sha256:2208f7a29005d226d1ee33a63e33af1f47af6156c740d7d23c7948e8d282d53d",
+			Output: true,
+		},
+		{
+			Inspected: dockertypes.ImageInspect{
+				ID: "sha256:2208f7a29005d226d1ee33a63e33af1f47af6156c740d7d23c7948e8d282d53d",
+			},
+			Image:  "myimage@sha256:2208f7a29005",
+			Output: false,
+		},
+		{
+			Inspected: dockertypes.ImageInspect{
+				ID: "sha256:2208f7a29005d226d1ee33a63e33af1f47af6156c740d7d23c7948e8d282d53d",
+			},
+			Image:  "myimage@sha256:2208",
+			Output: false,
+		},
+		{
+			// mismatched ID is ignored
+			Inspected: dockertypes.ImageInspect{
+				ID: "sha256:2208f7a29005d226d1ee33a63e33af1f47af6156c740d7d23c7948e8d282d53d",
+			},
+			Image:  "myimage@sha256:0000f7a29005d226d1ee33a63e33af1f47af6156c740d7d23c7948e8d282d53d",
+			Output: false,
+		},
+		{
+			// invalid digest is ignored
+			Inspected: dockertypes.ImageInspect{
+				ID: "sha256:unparseable",
+			},
+			Image:  "myimage@sha256:unparseable",
+			Output: false,
+		},
+		{
+			// v1 schema images can be pulled in one format and returned in another
+			Inspected: dockertypes.ImageInspect{
+				ID:          "sha256:9bbdf247c91345f0789c10f50a57e36a667af1189687ad1de88a6243d05a2227",
+				RepoDigests: []string{"centos/ruby-23-centos7@sha256:940584acbbfb0347272112d2eb95574625c0c60b4e2fdadb139de5859cf754bf"},
+			},
+			Image:  "centos/ruby-23-centos7@sha256:940584acbbfb0347272112d2eb95574625c0c60b4e2fdadb139de5859cf754bf",
+			Output: true,
+		},
+		{
+			// RepoDigest match is is required
+			Inspected: dockertypes.ImageInspect{
+				ID:          "",
+				RepoDigests: []string{"docker.io/centos/ruby-23-centos7@sha256:000084acbbfb0347272112d2eb95574625c0c60b4e2fdadb139de5859cf754bf"},
+			},
+			Image:  "centos/ruby-23-centos7@sha256:940584acbbfb0347272112d2eb95574625c0c60b4e2fdadb139de5859cf754bf",
+			Output: false,
+		},
+		{
+			// RepoDigest match is allowed
+			Inspected: dockertypes.ImageInspect{
+				ID:          "sha256:9bbdf247c91345f0789c10f50a57e36a667af1189687ad1de88a6243d05a2227",
+				RepoDigests: []string{"docker.io/centos/ruby-23-centos7@sha256:940584acbbfb0347272112d2eb95574625c0c60b4e2fdadb139de5859cf754bf"},
+			},
+			Image:  "centos/ruby-23-centos7@sha256:940584acbbfb0347272112d2eb95574625c0c60b4e2fdadb139de5859cf754bf",
+			Output: true,
+		},
+		{
+			// RepoDigest and ID are checked
+			Inspected: dockertypes.ImageInspect{
+				ID:          "sha256:940584acbbfb0347272112d2eb95574625c0c60b4e2fdadb139de5859cf754bf",
+				RepoDigests: []string{"docker.io/centos/ruby-23-centos7@sha256:9bbdf247c91345f0789c10f50a57e36a667af1189687ad1de88a6243d05a2227"},
+			},
+			Image:  "centos/ruby-23-centos7@sha256:940584acbbfb0347272112d2eb95574625c0c60b4e2fdadb139de5859cf754bf",
+			Output: true,
+		},
+		{
+			// unparseable RepoDigests are skipped
+			Inspected: dockertypes.ImageInspect{
+				ID: "sha256:9bbdf247c91345f0789c10f50a57e36a667af1189687ad1de88a6243d05a2227",
+				RepoDigests: []string{
+					"centos/ruby-23-centos7@sha256:unparseable",
+					"docker.io/centos/ruby-23-centos7@sha256:940584acbbfb0347272112d2eb95574625c0c60b4e2fdadb139de5859cf754bf",
+				},
+			},
+			Image:  "centos/ruby-23-centos7@sha256:940584acbbfb0347272112d2eb95574625c0c60b4e2fdadb139de5859cf754bf",
+			Output: true,
+		},
+		{
+			// unparseable RepoDigest is ignored
+			Inspected: dockertypes.ImageInspect{
+				ID:          "sha256:9bbdf247c91345f0789c10f50a57e36a667af1189687ad1de88a6243d05a2227",
+				RepoDigests: []string{"docker.io/centos/ruby-23-centos7@sha256:unparseable"},
+			},
+			Image:  "centos/ruby-23-centos7@sha256:940584acbbfb0347272112d2eb95574625c0c60b4e2fdadb139de5859cf754bf",
+			Output: false,
+		},
+		{
+			// unparseable image digest is ignored
+			Inspected: dockertypes.ImageInspect{
+				ID:          "sha256:9bbdf247c91345f0789c10f50a57e36a667af1189687ad1de88a6243d05a2227",
+				RepoDigests: []string{"docker.io/centos/ruby-23-centos7@sha256:unparseable"},
+			},
+			Image:  "centos/ruby-23-centos7@sha256:unparseable",
+			Output: false,
+		},
+		{
+			// prefix match is rejected for ID and RepoDigest
+			Inspected: dockertypes.ImageInspect{
+				ID:          "sha256:unparseable",
+				RepoDigests: []string{"docker.io/centos/ruby-23-centos7@sha256:unparseable"},
+			},
+			Image:  "sha256:unparseable",
+			Output: false,
+		},
+		{
+			// possible SHA prefix match is rejected for ID and RepoDigest because it is not in the named format
+			Inspected: dockertypes.ImageInspect{
+				ID:          "sha256:0000f247c91345f0789c10f50a57e36a667af1189687ad1de88a6243d05a2227",
+				RepoDigests: []string{"docker.io/centos/ruby-23-centos7@sha256:0000f247c91345f0789c10f50a57e36a667af1189687ad1de88a6243d05a2227"},
+			},
+			Image:  "sha256:0000",
+			Output: false,
+		},
+	} {
+		match := matchImageTagOrSHA(testCase.Inspected, testCase.Image)
+		assert.Equal(t, testCase.Output, match, testCase.Image+fmt.Sprintf(" is not a match (%d)", i))
+	}
+}
+
 func TestApplyDefaultImageTag(t *testing.T) {
 	for _, testCase := range []struct {
 		Input  string
@@ -227,7 +386,7 @@ func TestPullWithJSONError(t *testing.T) {
 		"Bad gateway": {
 			"ubuntu",
 			&jsonmessage.JSONError{Code: 502, Message: "<!doctype html>\n<html class=\"no-js\" lang=\"\">\n    <head>\n  </head>\n    <body>\n   <h1>Oops, there was an error!</h1>\n        <p>We have been contacted of this error, feel free to check out <a href=\"http://status.docker.com/\">status.docker.com</a>\n           to see if there is a bigger issue.</p>\n\n    </body>\n</html>"},
-			kubecontainer.RegistryUnavailable.Error(),
+			images.RegistryUnavailable.Error(),
 		},
 	}
 	for i, test := range tests {
@@ -276,25 +435,33 @@ func TestPullWithSecrets(t *testing.T) {
 		"default keyring secrets": {
 			"ubuntu",
 			[]api.Secret{},
-			credentialprovider.DockerConfig(map[string]credentialprovider.DockerConfigEntry{"index.docker.io/v1/": {"built-in", "password", "email", nil}}),
+			credentialprovider.DockerConfig(map[string]credentialprovider.DockerConfigEntry{
+				"index.docker.io/v1/": {Username: "built-in", Password: "password", Email: "email", Provider: nil},
+			}),
 			[]string{`ubuntu:latest using {"username":"built-in","password":"password","email":"email"}`},
 		},
 		"default keyring secrets unused": {
 			"ubuntu",
 			[]api.Secret{},
-			credentialprovider.DockerConfig(map[string]credentialprovider.DockerConfigEntry{"extraneous": {"built-in", "password", "email", nil}}),
+			credentialprovider.DockerConfig(map[string]credentialprovider.DockerConfigEntry{
+				"extraneous": {Username: "built-in", Password: "password", Email: "email", Provider: nil},
+			}),
 			[]string{`ubuntu:latest using {}`},
 		},
 		"builtin keyring secrets, but use passed": {
 			"ubuntu",
 			[]api.Secret{{Type: api.SecretTypeDockercfg, Data: map[string][]byte{api.DockerConfigKey: dockercfgContent}}},
-			credentialprovider.DockerConfig(map[string]credentialprovider.DockerConfigEntry{"index.docker.io/v1/": {"built-in", "password", "email", nil}}),
+			credentialprovider.DockerConfig(map[string]credentialprovider.DockerConfigEntry{
+				"index.docker.io/v1/": {Username: "built-in", Password: "password", Email: "email", Provider: nil},
+			}),
 			[]string{`ubuntu:latest using {"username":"passed-user","password":"passed-password","email":"passed-email"}`},
 		},
 		"builtin keyring secrets, but use passed with new docker config": {
 			"ubuntu",
 			[]api.Secret{{Type: api.SecretTypeDockerConfigJson, Data: map[string][]byte{api.DockerConfigJsonKey: dockerConfigJsonContent}}},
-			credentialprovider.DockerConfig(map[string]credentialprovider.DockerConfigEntry{"index.docker.io/v1/": {"built-in", "password", "email", nil}}),
+			credentialprovider.DockerConfig(map[string]credentialprovider.DockerConfigEntry{
+				"index.docker.io/v1/": {Username: "built-in", Password: "password", Email: "email", Provider: nil},
+			}),
 			[]string{`ubuntu:latest using {"username":"passed-user","password":"passed-password","email":"passed-email"}`},
 		},
 	}
@@ -651,9 +818,9 @@ func TestFindContainersByPod(t *testing.T) {
 		},
 	}
 	fakeClient := NewFakeDockerClient()
-	np, _ := network.InitNetworkPlugin([]network.NetworkPlugin{}, "", nettest.NewFakeHost(nil), componentconfig.HairpinNone)
+	np, _ := network.InitNetworkPlugin([]network.NetworkPlugin{}, "", nettest.NewFakeHost(nil), componentconfig.HairpinNone, "10.0.0.0/8", network.UseDefaultMTU)
 	// image back-off is set to nil, this test should not pull images
-	containerManager := NewFakeDockerManager(fakeClient, &record.FakeRecorder{}, nil, nil, &cadvisorapi.MachineInfo{}, options.GetDefaultPodInfraContainerImage(), 0, 0, "", &containertest.FakeOS{}, np, nil, nil, nil)
+	containerManager := NewFakeDockerManager(fakeClient, &record.FakeRecorder{}, nil, nil, &cadvisorapi.MachineInfo{}, "", 0, 0, "", &containertest.FakeOS{}, np, nil, nil, nil)
 	for i, test := range tests {
 		fakeClient.RunningContainerList = test.runningContainerList
 		fakeClient.ExitedContainerList = test.exitedContainerList
@@ -801,4 +968,25 @@ func TestMilliCPUToQuota(t *testing.T) {
 			t.Errorf("Input %v, expected quota %v period %v, but got quota %v period %v", testCase.input, testCase.quota, testCase.period, quota, period)
 		}
 	}
+}
+
+const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+func randStringBytes(n int) string {
+	b := make([]byte, n)
+	for i := range b {
+		b[i] = letterBytes[rand.Intn(len(letterBytes))]
+	}
+	return string(b)
+}
+
+func TestLogSymLink(t *testing.T) {
+	as := assert.New(t)
+	containerLogsDir := "/foo/bar"
+	podFullName := randStringBytes(128)
+	containerName := randStringBytes(70)
+	dockerId := randStringBytes(80)
+	// The file name cannot exceed 255 characters. Since .log suffix is required, the prefix cannot exceed 251 characters.
+	expectedPath := path.Join(containerLogsDir, fmt.Sprintf("%s_%s-%s", podFullName, containerName, dockerId)[:251]+".log")
+	as.Equal(expectedPath, LogSymlink(containerLogsDir, podFullName, containerName, dockerId))
 }

@@ -1,4 +1,4 @@
-# Copyright 2016 The Kubernetes Authors All rights reserved.
+# Copyright 2016 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,12 +15,12 @@
 # Build the etcd image
 #
 # Usage:
-# 	[TAG=2.2.1] [REGISTRY=gcr.io/google_containers] [ARCH=amd64] [BASEIMAGE=busybox] make (build|push)
+# 	[TAG=3.0.4] [REGISTRY=gcr.io/google_containers] [ARCH=amd64] [BASEIMAGE=busybox] make (build|push)
 
-TAG?=2.2.5
+TAG?=3.0.4
 ARCH?=amd64
 REGISTRY?=gcr.io/google_containers
-GOLANG_VERSION?=1.6.0
+GOLANG_VERSION?=1.6.3
 GOARM=6
 TEMP_DIR:=$(shell mktemp -d)
 
@@ -41,8 +41,13 @@ ifeq ($(ARCH),s390x)
 endif
 
 build:
-	# Copy the content in this dir to the temp dir
-	cp ./* $(TEMP_DIR)
+	# Copy the content in this dir to the temp dir,
+	# without copying the subdirectories.
+	find ./ -maxdepth 1 -type f | xargs cp -t $(TEMP_DIR)
+
+	# Compile attachlease
+	docker run -it -v $(shell pwd)/../../../:/go/src/k8s.io/kubernetes -v $(TEMP_DIR):/build -e GOARCH=$(ARCH) golang:$(GOLANG_VERSION) \
+		/bin/bash -c "CGO_ENABLED=0 go build -o /build/attachlease k8s.io/kubernetes/cluster/images/etcd/attachlease"
 
 ifeq ($(ARCH),amd64)
 
@@ -52,14 +57,21 @@ else
 	
 	# Download etcd in a golang container and cross-compile it statically
 	docker run -it -v $(TEMP_DIR):/etcdbin golang:$(GOLANG_VERSION) /bin/bash -c \
-		"git clone https://github.com/coreos/etcd \
-		&& cd etcd && git checkout v$(TAG) \
+		"git clone https://github.com/coreos/etcd /go/src/github.com/coreos/etcd \
+		&& cd /go/src/github.com/coreos/etcd \
+		&& git checkout v$(TAG) \
 		&& GOARM=$(GOARM) GOARCH=$(ARCH) ./build \
-		&& cp bin/* /etcdbin"
+		&& cp -f bin/$(ARCH)/etcd* bin/etcd* /etcdbin; echo 'done'"
+
+	# Add this ENV variable in order to workaround an unsupported arch blocker
+	# The multiarch feature is in an limited and experimental state right now, and etcd should work fine on arm64
+	# On arm (which is 32-bit), it can't handle >1GB data in-memory, but it is very unlikely someone tinkering with their limited arm devices would reach such a high usage
+	# ppc64le is still quite untested, but compiles and is probably in the process of being validated by IBM.
+	cd $(TEMP_DIR) && echo "ENV ETCD_UNSUPPORTED_ARCH=$(ARCH)" >> Dockerfile
 endif
 
 	# Replace BASEIMAGE with the real base image
-	cd $(TEMP_DIR) && sed -i "s|BASEIMAGE|$(BASEIMAGE)|g" Dockerfile
+	cd $(TEMP_DIR) && sed -i.bak 's|BASEIMAGE|$(BASEIMAGE)|g' Dockerfile
 
 	# And build the image
 	docker build -t $(REGISTRY)/etcd-$(ARCH):$(TAG) $(TEMP_DIR)
@@ -69,7 +81,7 @@ push: build
 
 ifeq ($(ARCH),amd64)
 	# Backward compatibility. TODO: deprecate this image tag
-	docker tag -f $(REGISTRY)/etcd-$(ARCH):$(TAG) $(REGISTRY)/etcd:$(TAG)
+	docker tag $(REGISTRY)/etcd-$(ARCH):$(TAG) $(REGISTRY)/etcd:$(TAG)
 	gcloud docker push $(REGISTRY)/etcd:$(TAG)
 endif
 

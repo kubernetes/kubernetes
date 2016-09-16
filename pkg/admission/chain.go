@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ type chainAdmissionHandler []Interface
 
 // NewFromPlugins returns an admission.Interface that will enforce admission control decisions of all
 // the given plugins.
-func NewFromPlugins(client clientset.Interface, pluginNames []string, configFilePath string) Interface {
+func NewFromPlugins(client clientset.Interface, pluginNames []string, configFilePath string, plugInit PluginInitializer) (Interface, error) {
 	plugins := []Interface{}
 	for _, pluginName := range pluginNames {
 		plugin := InitPlugin(pluginName, client, configFilePath)
@@ -31,7 +31,12 @@ func NewFromPlugins(client clientset.Interface, pluginNames []string, configFile
 			plugins = append(plugins, plugin)
 		}
 	}
-	return chainAdmissionHandler(plugins)
+	plugInit.Initialize(plugins)
+	// ensure that plugins have been properly initialized
+	if err := Validate(plugins); err != nil {
+		return nil, err
+	}
+	return chainAdmissionHandler(plugins), nil
 }
 
 // NewChainHandler creates a new chain handler from an array of handlers. Used for testing.

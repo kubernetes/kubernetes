@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"encoding/json"
+
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/endpoints"
@@ -33,8 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/controller/framework"
-	"k8s.io/kubernetes/pkg/controller/framework/informers"
+	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/metrics"
@@ -65,20 +65,20 @@ const (
 )
 
 var (
-	keyFunc = framework.DeletionHandlingMetaNamespaceKeyFunc
+	keyFunc = cache.DeletionHandlingMetaNamespaceKeyFunc
 )
 
 // NewEndpointController returns a new *EndpointController.
-func NewEndpointController(podInformer framework.SharedIndexInformer, client *clientset.Clientset) *EndpointController {
+func NewEndpointController(podInformer cache.SharedIndexInformer, client *clientset.Clientset) *EndpointController {
 	if client != nil && client.Core().GetRESTClient().GetRateLimiter() != nil {
 		metrics.RegisterMetricAndTrackRateLimiterUsage("endpoint_controller", client.Core().GetRESTClient().GetRateLimiter())
 	}
 	e := &EndpointController{
 		client: client,
-		queue:  workqueue.New(),
+		queue:  workqueue.NewNamed("endpoint"),
 	}
 
-	e.serviceStore.Store, e.serviceController = framework.NewInformer(
+	e.serviceStore.Store, e.serviceController = cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				return e.client.Core().Services(api.NamespaceAll).List(options)
@@ -90,7 +90,7 @@ func NewEndpointController(podInformer framework.SharedIndexInformer, client *cl
 		&api.Service{},
 		// TODO: Can we have much longer period here?
 		FullServiceResyncPeriod,
-		framework.ResourceEventHandlerFuncs{
+		cache.ResourceEventHandlerFuncs{
 			AddFunc: e.enqueueService,
 			UpdateFunc: func(old, cur interface{}) {
 				e.enqueueService(cur)
@@ -99,7 +99,7 @@ func NewEndpointController(podInformer framework.SharedIndexInformer, client *cl
 		},
 	)
 
-	podInformer.AddEventHandler(framework.ResourceEventHandlerFuncs{
+	podInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    e.addPod,
 		UpdateFunc: e.updatePod,
 		DeleteFunc: e.deletePod,
@@ -113,7 +113,7 @@ func NewEndpointController(podInformer framework.SharedIndexInformer, client *cl
 
 // NewEndpointControllerFromClient returns a new *EndpointController that runs its own informer.
 func NewEndpointControllerFromClient(client *clientset.Clientset, resyncPeriod controller.ResyncPeriodFunc) *EndpointController {
-	podInformer := informers.CreateSharedPodIndexInformer(client, resyncPeriod())
+	podInformer := informers.NewPodInformer(client, resyncPeriod())
 	e := NewEndpointController(podInformer, client)
 	e.internalPodInformer = podInformer
 
@@ -132,7 +132,7 @@ type EndpointController struct {
 	// we have a personal informer, we must start it ourselves.   If you start
 	// the controller using NewEndpointController(passing SharedInformer), this
 	// will be null
-	internalPodInformer framework.SharedIndexInformer
+	internalPodInformer cache.SharedIndexInformer
 
 	// Services that need to be updated. A channel is inappropriate here,
 	// because it allows services with lots of pods to be serviced much
@@ -143,8 +143,8 @@ type EndpointController struct {
 
 	// Since we join two objects, we'll watch both of them with
 	// controllers.
-	serviceController *framework.Controller
-	podController     framework.ControllerInterface
+	serviceController *cache.Controller
+	podController     cache.ControllerInterface
 	// podStoreSynced returns true if the pod store has been synced at least once.
 	// Added as a member to the struct to allow injection for testing.
 	podStoreSynced func() bool
@@ -209,17 +209,19 @@ func (e *EndpointController) addPod(obj interface{}) {
 // and what services it will be a member of, and enqueue the union of these.
 // old and cur must be *api.Pod types.
 func (e *EndpointController) updatePod(old, cur interface{}) {
-	if api.Semantic.DeepEqual(old, cur) {
+	newPod := cur.(*api.Pod)
+	oldPod := old.(*api.Pod)
+	if newPod.ResourceVersion == oldPod.ResourceVersion {
+		// Periodic resync will send update events for all known pods.
+		// Two different versions of the same pod will always have different RVs.
 		return
 	}
-	newPod := old.(*api.Pod)
 	services, err := e.getPodServiceMemberships(newPod)
 	if err != nil {
 		glog.Errorf("Unable to get pod %v/%v's service memberships: %v", newPod.Namespace, newPod.Name, err)
 		return
 	}
 
-	oldPod := cur.(*api.Pod)
 	// Only need to get the old services if the labels changed.
 	if !reflect.DeepEqual(newPod.Labels, oldPod.Labels) ||
 		!hostNameAndDomainAreEqual(newPod, oldPod) {
@@ -272,7 +274,8 @@ func (e *EndpointController) deletePod(obj interface{}) {
 	}
 	podKey, err := keyFunc(obj)
 	if err != nil {
-		glog.Errorf("Couldn't get key for object %+v: %v", obj, err)
+		glog.Errorf("Couldn't get key for object %#v: %v", obj, err)
+		return
 	}
 	glog.Infof("Pod %q was deleted but we don't have a record of its final state, so it will take up to %v before it will be removed from all endpoint records.", podKey, FullServiceResyncPeriod)
 
@@ -284,6 +287,7 @@ func (e *EndpointController) enqueueService(obj interface{}) {
 	key, err := keyFunc(obj)
 	if err != nil {
 		glog.Errorf("Couldn't get key for object %+v: %v", obj, err)
+		return
 	}
 
 	e.queue.Add(key)
@@ -319,7 +323,7 @@ func (e *EndpointController) syncService(key string) {
 	if !e.podStoreSynced() {
 		// Sleep so we give the pod reflector goroutine a chance to run.
 		time.Sleep(PodStoreSyncedPollPeriod)
-		glog.Infof("Waiting for pods controller to sync, requeuing rc %v", key)
+		glog.V(4).Infof("Waiting for pods controller to sync, requeuing service %v", key)
 		e.queue.Add(key)
 		return
 	}
@@ -353,7 +357,7 @@ func (e *EndpointController) syncService(key string) {
 	}
 
 	glog.V(5).Infof("About to update endpoints for service %q", key)
-	pods, err := e.podStore.Pods(service.Namespace).List(labels.Set(service.Spec.Selector).AsSelector())
+	pods, err := e.podStore.Pods(service.Namespace).List(labels.Set(service.Spec.Selector).AsSelectorPreValidated())
 	if err != nil {
 		// Since we're getting stuff from a local cache, it is
 		// basically impossible to get this error.
@@ -375,8 +379,11 @@ func (e *EndpointController) syncService(key string) {
 		}
 	}
 
-	for i := range pods.Items {
-		pod := &pods.Items[i]
+	readyEps := 0
+	notReadyEps := 0
+	for i := range pods {
+		// TODO: Do we need to copy here?
+		pod := &(*pods[i])
 
 		for i := range service.Spec.Ports {
 			servicePort := &service.Spec.Ports[i]
@@ -399,7 +406,8 @@ func (e *EndpointController) syncService(key string) {
 
 			epp := api.EndpointPort{Name: portName, Port: int32(portNum), Protocol: portProto}
 			epa := api.EndpointAddress{
-				IP: pod.Status.PodIP,
+				IP:       pod.Status.PodIP,
+				NodeName: &pod.Spec.NodeName,
 				TargetRef: &api.ObjectReference{
 					Kind:            "Pod",
 					Namespace:       pod.ObjectMeta.Namespace,
@@ -425,12 +433,14 @@ func (e *EndpointController) syncService(key string) {
 					Addresses: []api.EndpointAddress{epa},
 					Ports:     []api.EndpointPort{epp},
 				})
+				readyEps++
 			} else {
 				glog.V(5).Infof("Pod is out of service: %v/%v", pod.Namespace, pod.Name)
 				subsets = append(subsets, api.EndpointSubset{
 					NotReadyAddresses: []api.EndpointAddress{epa},
 					Ports:             []api.EndpointPort{epp},
 				})
+				notReadyEps++
 			}
 		}
 	}
@@ -482,7 +492,10 @@ func (e *EndpointController) syncService(key string) {
 	} else {
 		newEndpoints.Annotations[endpoints.PodHostnamesAnnotation] = serializedPodHostNames
 	}
-	if len(currentEndpoints.ResourceVersion) == 0 {
+
+	glog.V(4).Infof("Update endpoints for %v/%v, ready: %d not ready: %d", service.Namespace, service.Name, readyEps, notReadyEps)
+	createEndpoints := len(currentEndpoints.ResourceVersion) == 0
+	if createEndpoints {
 		// No previous endpoints, create them
 		_, err = e.client.Endpoints(service.Namespace).Create(newEndpoints)
 	} else {
@@ -490,7 +503,15 @@ func (e *EndpointController) syncService(key string) {
 		_, err = e.client.Endpoints(service.Namespace).Update(newEndpoints)
 	}
 	if err != nil {
-		glog.Errorf("Error updating endpoints: %v", err)
+		if createEndpoints && errors.IsForbidden(err) {
+			// A request is forbidden primarily for two reasons:
+			// 1. namespace is terminating, endpoint creation is not allowed by default.
+			// 2. policy is misconfigured, in which case no service would function anywhere.
+			// Given the frequency of 1, we log at a lower level.
+			glog.V(5).Infof("Forbidden from creating endpoints: %v", err)
+		} else {
+			utilruntime.HandleError(err)
+		}
 		e.queue.Add(key) // Retry
 	}
 }

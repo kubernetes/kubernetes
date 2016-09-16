@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2014 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -33,6 +33,9 @@ KUBE_ROOT="${DIR}/../.."
 KUBE_CONFIG_FILE="${KUBE_CONFIG_FILE:-"${DIR}/config-default.sh"}"
 source "${KUBE_CONFIG_FILE}"
 source "${KUBE_ROOT}/cluster/common.sh"
+
+AZKUBE_VERSION="v0.0.5"
+REGISTER_MASTER_KUBELET="true"
 
 function verify-prereqs() {
     required_binaries=("docker" "jq")
@@ -152,41 +155,55 @@ function ensure-hyperkube() {
     export AZURE_HYPERKUBE_SPEC="${user_image_tag}"
 }
 
-function azure-deploy(){
-    declare -a auth_params
-    declare -a docker_params
-    declare -a resource_group_params
+function deploy-kube-system() {
+    kubectl create -f - <<EOF
+apiVersion: v1
+kind: Namespace
+metadata:
+    name: kube-system
+EOF
+}
+
+function get-common-params() {
+    declare -ag AZKUBE_AUTH_PARAMS
+    declare -ag AZKUBE_DOCKER_PARAMS
+    declare -ag AZKUBE_RESOURCE_GROUP_PARAM
 
     case "${AZURE_AUTH_METHOD}" in
         "client_secret")
-            auth_params+=("--client-id=${AZURE_CLIENT_ID}" "--client-secret=${AZURE_CLIENT_SECRET}")
+            AZKUBE_AUTH_PARAMS+=("--client-id=${AZURE_CLIENT_ID}" "--client-secret=${AZURE_CLIENT_SECRET}")
             ;;
         "device")
-            auth_params+=()
+            AZKUBE_AUTH_PARAMS=()
             ;;
     esac
 
+
     if [[ ! -z "${AZURE_HTTPS_PROXY:-}" ]]; then
-        docker_params+=("--net=host" "--env=https_proxy=${AZURE_HTTPS_PROXY}")
+        AZKUBE_DOCKER_PARAMS+=("--net=host" "--env=https_proxy=${AZURE_HTTPS_PROXY}")
     fi
 
     if [[ ! -z "${AZURE_RESOURCE_GROUP:-}" ]]; then
         echo "Forcing use of resource group ${AZURE_RESOURCE_GROUP}"
-        resource_group_params+=("--resource-group=${AZURE_RESOURCE_GROUP}")
+        AZKUBE_RESOURCE_GROUP_PARAM+=("--resource-group=${AZURE_RESOURCE_GROUP}")
     fi
+}
+
+function azure-deploy(){
+    get-common-params
 
     docker run -it \
         --user "$(id -u)" \
-        "${docker_params[@]:+${docker_params[@]}}" \
+        "${AZKUBE_DOCKER_PARAMS[@]:+${AZKUBE_DOCKER_PARAMS[@]}}" \
         -v "$HOME/.azkube:/.azkube" -v "/tmp:/tmp" \
         -v "${AZURE_OUTPUT_DIR}:/opt/azkube/${AZURE_OUTPUT_RELDIR}" \
-        colemickens/azkube:v0.0.2 /opt/azkube/azkube deploy \
+        "colemickens/azkube:${AZKUBE_VERSION}" /opt/azkube/azkube deploy \
             --kubernetes-hyperkube-spec="${AZURE_HYPERKUBE_SPEC}" \
             --deployment-name="${AZURE_DEPLOY_ID}" \
             --location="${AZURE_LOCATION}" \
-            "${resource_group_params[@]:+${resource_group_params[@]}}" \
+            "${AZKUBE_RESOURCE_GROUP_PARAM[@]:+${AZKUBE_RESOURCE_GROUP_PARAM[@]}}" \
             --subscription-id="${AZURE_SUBSCRIPTION_ID}" \
-            --auth-method="${AZURE_AUTH_METHOD}" "${auth_params[@]:+${auth_params[@]}}" \
+            --auth-method="${AZURE_AUTH_METHOD}" "${AZKUBE_AUTH_PARAMS[@]:+${AZKUBE_AUTH_PARAMS[@]}}" \
             --master-size="${AZURE_MASTER_SIZE}" \
             --node-size="${AZURE_NODE_SIZE}" \
             --node-count="${NUM_NODES}" \
@@ -226,6 +243,8 @@ function kube-up {
     kubectl config set-context "${AZURE_DEPLOY_ID}" --cluster="${AZURE_DEPLOY_ID}" --user="${AZURE_DEPLOY_ID}_user"
     kubectl config use-context "${AZURE_DEPLOY_ID}"
 
+    deploy-kube-system
+
     enddate="$(date +%s)"
     duration="$(( (startdate - enddate) ))"
 
@@ -258,11 +277,11 @@ function kube-down {
     docker run -it \
         --user "$(id -u)" \
         -v "$HOME/.azkube:/.azkube" -v "/tmp:/tmp" \
-        "${docker_params[@]:+${docker_params[@]}}" \
-        colemickens/azkube:v0.0.2 /opt/azkube/azkube destroy \
+        "${AZKUBE_DOCKER_PARAMS[@]:+${AZKUBE_DOCKER_PARAMS[@]}}" \
+        "colemickens/azkube:${AZKUBE_VERSION}" /opt/azkube/azkube destroy \
             --deployment-name="${AZURE_DEPLOY_ID}" \
             --subscription-id="${AZURE_SUBSCRIPTION_ID}" \
-            --auth-method="${AZURE_AUTH_METHOD}" \
+            --auth-method="${AZURE_AUTH_METHOD}" "${AZKUBE_AUTH_PARAMS[@]:+${AZKUBE_AUTH_PARAMS[@]}}" \
             "${destroy_params[@]:+${destroy_params[@]}}" \
             "${AZURE_AZKUBE_ARGS[@]:+${AZURE_AZKUBE_ARGS[@]}}"
 }

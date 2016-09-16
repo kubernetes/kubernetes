@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package e2e
 
 import (
 	"fmt"
+	"math"
 	"math/rand"
 	"os"
 	"strconv"
@@ -47,7 +48,7 @@ const (
 	// We start RCs/Services/pods/... in different namespace in this test.
 	// nodeCountPerNamespace determines how many namespaces we will be using
 	// depending on the number of nodes in the underlying cluster.
-	nodeCountPerNamespace = 250
+	nodeCountPerNamespace = 100
 )
 
 // This test suite can take a long time to run, so by default it is added to
@@ -70,11 +71,21 @@ var _ = framework.KubeDescribe("Load capacity", func() {
 		Expect(highLatencyRequests).NotTo(BeNumerically(">", 0))
 	})
 
+	// We assume a default throughput of 10 pods/second throughput.
+	// We may want to revisit it in the future.
+	// However, this can be overriden by LOAD_TEST_THROUGHPUT env var.
+	throughput := 10
+	if throughputEnv := os.Getenv("LOAD_TEST_THROUGHPUT"); throughputEnv != "" {
+		if newThroughput, err := strconv.Atoi(throughputEnv); err == nil {
+			throughput = newThroughput
+		}
+	}
+
 	// Explicitly put here, to delete namespace at the end of the test
 	// (after measuring latency metrics, etc.).
 	options := framework.FrameworkOptions{
-		ClientQPS:   50,
-		ClientBurst: 100,
+		ClientQPS:   float32(math.Max(50.0, float64(2*throughput))),
+		ClientBurst: int(math.Max(100.0, float64(4*throughput))),
 	}
 	f := framework.NewFramework("load", options, nil)
 	f.NamespaceDeletionTimeout = time.Hour
@@ -82,8 +93,13 @@ var _ = framework.KubeDescribe("Load capacity", func() {
 	BeforeEach(func() {
 		c = f.Client
 
+		// In large clusters we may get to this point but still have a bunch
+		// of nodes without Routes created. Since this would make a node
+		// unschedulable, we need to wait until all of them are schedulable.
+		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(c))
+
 		ns = f.Namespace.Name
-		nodes := framework.ListSchedulableNodesOrDie(c)
+		nodes := framework.GetReadySchedulableNodesOrDie(c)
 		nodeCount = len(nodes.Items)
 		Expect(nodeCount).NotTo(BeZero())
 
@@ -130,9 +146,10 @@ var _ = framework.KubeDescribe("Load capacity", func() {
 				framework.Logf("Creating services")
 				services := generateServicesForConfigs(configs)
 				for _, service := range services {
-					_, err := c.Services(ns).Create(service)
+					_, err := c.Services(service.Namespace).Create(service)
 					framework.ExpectNoError(err)
 				}
+				framework.Logf("%v Services created.", len(services))
 			} else {
 				framework.Logf("Skipping service creation")
 			}
@@ -150,34 +167,39 @@ var _ = framework.KubeDescribe("Load capacity", func() {
 
 			// We would like to spread creating replication controllers over time
 			// to make it possible to create/schedule them in the meantime.
-			// Currently we assume 10 pods/second average throughput.
+			// Currently we assume <throughput> pods/second average throughput.
 			// We may want to revisit it in the future.
-			creatingTime := time.Duration(totalPods/10) * time.Second
+			framework.Logf("Starting to create ReplicationControllers...")
+			creatingTime := time.Duration(totalPods/throughput) * time.Second
 			createAllRC(configs, creatingTime)
 			By("============================================================================")
 
 			// We would like to spread scaling replication controllers over time
 			// to make it possible to create/schedule & delete them in the meantime.
-			// Currently we assume that 10 pods/second average throughput.
+			// Currently we assume that <throughput> pods/second average throughput.
 			// The expected number of created/deleted pods is less than totalPods/3.
-			scalingTime := time.Duration(totalPods/30) * time.Second
+			scalingTime := time.Duration(totalPods/(3*throughput)) * time.Second
+			framework.Logf("Starting to scale ReplicationControllers first time...")
 			scaleAllRC(configs, scalingTime)
 			By("============================================================================")
 
+			framework.Logf("Starting to scale ReplicationControllers second time...")
 			scaleAllRC(configs, scalingTime)
 			By("============================================================================")
 
 			// Cleanup all created replication controllers.
-			// Currently we assume 5 pods/second average deletion throughput.
+			// Currently we assume <throughput> pods/second average deletion throughput.
 			// We may want to revisit it in the future.
-			deletingTime := time.Duration(totalPods/5) * time.Second
+			deletingTime := time.Duration(totalPods/throughput) * time.Second
+			framework.Logf("Starting to delete ReplicationControllers...")
 			deleteAllRC(configs, deletingTime)
 			if createServices == "true" {
+				framework.Logf("Starting to delete services...")
 				for _, service := range services {
 					err := c.Services(ns).Delete(service.Name)
 					framework.ExpectNoError(err)
 				}
-				framework.Logf("%v Services created.", len(services))
+				framework.Logf("Services deleted")
 			}
 		})
 	}
@@ -324,5 +346,9 @@ func deleteRC(wg *sync.WaitGroup, config *framework.RCConfig, deletingTime time.
 	defer wg.Done()
 
 	sleepUpTo(deletingTime)
-	framework.ExpectNoError(framework.DeleteRC(config.Client, config.Namespace, config.Name), fmt.Sprintf("deleting rc %s", config.Name))
+	if framework.TestContext.GarbageCollectorEnabled {
+		framework.ExpectNoError(framework.DeleteRCAndWaitForGC(config.Client, config.Namespace, config.Name), fmt.Sprintf("deleting rc %s", config.Name))
+	} else {
+		framework.ExpectNoError(framework.DeleteRCAndPods(config.Client, config.Namespace, config.Name), fmt.Sprintf("deleting rc %s", config.Name))
+	}
 }

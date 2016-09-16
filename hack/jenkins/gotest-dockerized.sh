@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 The Kubernetes Authors All rights reserved.
+# Copyright 2015 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -36,8 +36,8 @@ mkdir -p "${HOST_ARTIFACTS_DIR}"
 # provided must be resolvable on the *HOST*, not the container.
 
 docker run --rm=true \
+  --privileged=true \
   -v /var/run/docker.sock:/var/run/docker.sock \
-  -v "$(which docker)":/bin/docker \
   -v "${REPO_DIR}":/go/src/k8s.io/kubernetes \
   -v "${WORKSPACE}/_artifacts":/workspace/artifacts \
   -v /etc/localtime:/etc/localtime:ro \
@@ -45,5 +45,5 @@ docker run --rm=true \
   -e "KUBE_VERIFY_GIT_BRANCH=${KUBE_VERIFY_GIT_BRANCH:-}" \
   -e "REPO_DIR=${REPO_DIR}" \
   -e "HOST_ARTIFACTS_DIR=${HOST_ARTIFACTS_DIR}" \
-  -i gcr.io/google_containers/kubekins-test:0.11 \
-  bash -c "cd kubernetes && ./hack/jenkins/test-dockerized.sh"
+  -i gcr.io/google_containers/kubekins-test:v20160822 \
+  bash -c "cd kubernetes && ${KUBE_TEST_SCRIPT:-./hack/jenkins/test-dockerized.sh}"

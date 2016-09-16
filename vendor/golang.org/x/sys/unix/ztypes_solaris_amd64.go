@@ -1,6 +1,7 @@
-// +build amd64,solaris
 // Created by cgo -godefs - DO NOT EDIT
 // cgo -godefs types_solaris.go
+
+// +build amd64,solaris
 
 package unix
 
@@ -10,7 +11,6 @@ const (
 	sizeofInt      = 0x4
 	sizeofLong     = 0x8
 	sizeofLongLong = 0x8
-	PathMax        = 0x400
 )
 
 type (
@@ -33,18 +33,6 @@ type Timeval struct {
 type Timeval32 struct {
 	Sec  int32
 	Usec int32
-}
-
-type Tms struct {
-	Utime  int64
-	Stime  int64
-	Cutime int64
-	Cstime int64
-}
-
-type Utimbuf struct {
-	Actime  int64
-	Modtime int64
 }
 
 type Rusage struct {
@@ -242,30 +230,6 @@ type FdSet struct {
 	Bits [1024]int64
 }
 
-type Utsname struct {
-	Sysname  [257]int8
-	Nodename [257]int8
-	Release  [257]int8
-	Version  [257]int8
-	Machine  [257]int8
-}
-
-type Ustat_t struct {
-	Tfree     int64
-	Tinode    uint64
-	Fname     [6]int8
-	Fpack     [6]int8
-	Pad_cgo_0 [4]byte
-}
-
-const (
-	AT_FDCWD            = 0xffd19553
-	AT_SYMLINK_NOFOLLOW = 0x1000
-	AT_SYMLINK_FOLLOW   = 0x2000
-	AT_REMOVEDIR        = 0x1
-	AT_EACCESS          = 0x4
-)
-
 const (
 	SizeofIfMsghdr  = 0x54
 	SizeofIfData    = 0x44
@@ -393,8 +357,6 @@ type BpfHdr struct {
 	Pad_cgo_0 [2]byte
 }
 
-const _SC_PAGESIZE = 0xb
-
 type Termios struct {
 	Iflag     uint32
 	Oflag     uint32
@@ -402,21 +364,4 @@ type Termios struct {
 	Lflag     uint32
 	Cc        [19]uint8
 	Pad_cgo_0 [1]byte
-}
-
-type Termio struct {
-	Iflag     uint16
-	Oflag     uint16
-	Cflag     uint16
-	Lflag     uint16
-	Line      int8
-	Cc        [8]uint8
-	Pad_cgo_0 [1]byte
-}
-
-type Winsize struct {
-	Row    uint16
-	Col    uint16
-	Xpixel uint16
-	Ypixel uint16
 }

@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,8 +23,10 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	unversionedextensions "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/unversioned"
+	"k8s.io/kubernetes/pkg/labels"
 	errorsutil "k8s.io/kubernetes/pkg/util/errors"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 	podutil "k8s.io/kubernetes/pkg/util/pod"
@@ -64,7 +66,7 @@ func UpdateRSWithRetries(rsClient unversionedextensions.ReplicaSetInterface, rs 
 
 	// Handle returned error from wait poll
 	if err == wait.ErrWaitTimeout {
-		err = fmt.Errorf("timed out trying to update RS: %+v", oldRs)
+		err = fmt.Errorf("timed out trying to update RS: %#v", oldRs)
 	}
 	// Ignore the RS not found error, but the RS isn't updated.
 	if errors.IsNotFound(err) {
@@ -90,4 +92,41 @@ func GetPodTemplateSpecHash(rs extensions.ReplicaSet) string {
 		ObjectMeta: meta,
 		Spec:       rs.Spec.Template.Spec,
 	}))
+}
+
+// MatchingPodsFunc returns a filter function for pods with matching labels
+func MatchingPodsFunc(rs *extensions.ReplicaSet) (func(api.Pod) bool, error) {
+	if rs == nil {
+		return nil, nil
+	}
+	selector, err := unversioned.LabelSelectorAsSelector(rs.Spec.Selector)
+	if err != nil {
+		return nil, fmt.Errorf("invalid label selector: %v", err)
+	}
+	return func(pod api.Pod) bool {
+		podLabelsSelector := labels.Set(pod.ObjectMeta.Labels)
+		return selector.Matches(podLabelsSelector)
+	}, nil
+}
+
+// ReplicaSetIsInactive returns a condition that will be true when a replica set is inactive ie.
+// it has zero running replicas.
+func ReplicaSetIsInactive(c unversionedextensions.ExtensionsInterface, replicaSet *extensions.ReplicaSet) wait.ConditionFunc {
+
+	// If we're given a ReplicaSet where the status lags the spec, it either means that the
+	// ReplicaSet is stale, or that the ReplicaSet manager hasn't noticed the update yet.
+	// Polling status.Replicas is not safe in the latter case.
+	desiredGeneration := replicaSet.Generation
+
+	return func() (bool, error) {
+		rs, err := c.ReplicaSets(replicaSet.Namespace).Get(replicaSet.Name)
+		if err != nil {
+			return false, err
+		}
+
+		return rs.Status.ObservedGeneration >= desiredGeneration &&
+			rs.Spec.Replicas == 0 &&
+			rs.Status.Replicas == 0 &&
+			rs.Status.FullyLabeledReplicas == 0, nil
+	}
 }

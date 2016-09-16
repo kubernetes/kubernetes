@@ -25,6 +25,7 @@ script
 		-o /etc/kube-configure.sh \
 		http://metadata.google.internal/computeMetadata/v1/instance/attributes/configure-sh
 	. /etc/kube-configure.sh
+	set_broken_motd
 	echo "Downloading kube-env file"
 	download_kube_env
 	. /etc/kube-env
@@ -131,9 +132,8 @@ script
 	set -o errexit
 	set -o nounset
 
-	echo "Start kubelet upstart job"
-	. /etc/default/kubelet
-	/usr/bin/kubelet ${KUBELET_OPTS} 1>>/var/log/kubelet.log 2>&1
+	. /etc/kube-configure-helper.sh
+	start_kubelet
 } 2>&1 | logger --priority daemon.info -t ${UPSTART_JOB}
 end script
 
@@ -212,7 +212,7 @@ script
 	sed -i -e "s@{{pillar\['kube_docker_registry'\]}}@${kube_docker_registry}@g" ${tmp_file}
 	sed -i -e "s@{{pillar\['kube-proxy_docker_tag'\]}}@${kube_proxy_docker_tag}@g" ${tmp_file}
 	sed -i -e "s@{{test_args}}@${test_args}@g" ${tmp_file}
-	sed -i -e "s@{{ cpurequest }}@20m@g" ${tmp_file}
+	sed -i -e "s@{{ cpurequest }}@100m@g" ${tmp_file}
 	sed -i -e "s@{{log_level}}@${log_level}@g" ${tmp_file}
 	sed -i -e "s@{{api_servers_with_port}}@${api_servers}@g" ${tmp_file}
 	if [ -n "${CLUSTER_IP_RANGE:-}" ]; then
@@ -248,6 +248,7 @@ script
 	if [ "${ENABLE_CLUSTER_REGISTRY:-}" = "true" ]; then
 		cp /home/kubernetes/kube-manifests/kubernetes/kube-registry-proxy.yaml /etc/kubernetes/manifests/
 	fi
+	reset_motd
 } 2>&1 | logger --priority daemon.info -t ${UPSTART_JOB}
 end script
 

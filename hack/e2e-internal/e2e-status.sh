@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 The Kubernetes Authors All rights reserved.
+# Copyright 2015 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -29,4 +29,19 @@ source "${KUBE_ROOT}/cluster/kube-util.sh"
 
 prepare-e2e
 
-${KUBECTL} version
+if [[ "${FEDERATION:-}" == "true" ]];then
+    FEDERATION_NAMESPACE=${FEDERATION_NAMESPACE:-federation}
+    #TODO(colhom): the last cluster that was created in the loop above is the current context.
+    # Hence, it will be the cluster that hosts the federated components.
+    # In the future, we will want to loop through the all the federated contexts,
+    # select each one and call federated-up
+    for zone in ${E2E_ZONES};do
+	(
+	    set-federation-zone-vars "$zone"
+	    printf "\n\tChecking version for $OVERRIDE_CONTEXT\n"
+	    ${KUBECTL} --context="$OVERRIDE_CONTEXT" version
+	)
+    done
+else
+    ${KUBECTL} version
+fi

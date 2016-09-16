@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,99 +17,24 @@ limitations under the License.
 package oidc
 
 import (
-	"bytes"
-	"crypto/rand"
-	"crypto/rsa"
-	"crypto/tls"
-	"crypto/x509"
-	"crypto/x509/pkix"
-	"encoding/json"
-	"encoding/pem"
 	"fmt"
-	"io/ioutil"
-	"math/big"
-	"net"
-	"net/http"
-	"net/http/httptest"
-	"net/url"
 	"os"
 	"path"
-	"path/filepath"
 	"reflect"
+	"sort"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/coreos/go-oidc/jose"
-	"github.com/coreos/go-oidc/key"
 	"github.com/coreos/go-oidc/oidc"
+
 	"k8s.io/kubernetes/pkg/auth/user"
+	oidctesting "k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/oidc/testing"
 )
 
-type oidcProvider struct {
-	mux     *http.ServeMux
-	pcfg    oidc.ProviderConfig
-	privKey *key.PrivateKey
-}
-
-func newOIDCProvider(t *testing.T) *oidcProvider {
-	privKey, err := key.GeneratePrivateKey()
-	if err != nil {
-		t.Fatalf("Cannot create OIDC Provider: %v", err)
-		return nil
-	}
-
-	op := &oidcProvider{
-		mux:     http.NewServeMux(),
-		privKey: privKey,
-	}
-
-	op.mux.HandleFunc("/.well-known/openid-configuration", op.handleConfig)
-	op.mux.HandleFunc("/keys", op.handleKeys)
-
-	return op
-
-}
-
-func mustParseURL(t *testing.T, s string) *url.URL {
-	u, err := url.Parse(s)
-	if err != nil {
-		t.Fatalf("Failed to parse url: %v", err)
-	}
-	return u
-}
-
-func (op *oidcProvider) handleConfig(w http.ResponseWriter, req *http.Request) {
-	b, err := json.Marshal(&op.pcfg)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(b)
-}
-
-func (op *oidcProvider) handleKeys(w http.ResponseWriter, req *http.Request) {
-	keys := struct {
-		Keys []jose.JWK `json:"keys"`
-	}{
-		Keys: []jose.JWK{op.privKey.JWK()},
-	}
-
-	b, err := json.Marshal(keys)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Cache-Control", fmt.Sprintf("public, max-age=%d", int(time.Hour.Seconds())))
-	w.Header().Set("Expires", time.Now().Add(time.Hour).Format(time.RFC1123))
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(b)
-}
-
-func (op *oidcProvider) generateToken(t *testing.T, iss, sub, aud string, usernameClaim, value, groupsClaim string, groups []string, iat, exp time.Time) string {
-	signer := op.privKey.Signer()
+func generateToken(t *testing.T, op *oidctesting.OIDCProvider, iss, sub, aud string, usernameClaim, value, groupsClaim string, groups []string, iat, exp time.Time) string {
+	signer := op.PrivKey.Signer()
 	claims := oidc.NewClaims(iss, sub, aud, iat, exp)
 	claims.Add(usernameClaim, value)
 	if groups != nil && groupsClaim != "" {
@@ -124,139 +49,19 @@ func (op *oidcProvider) generateToken(t *testing.T, iss, sub, aud string, userna
 	return jwt.Encode()
 }
 
-func (op *oidcProvider) generateGoodToken(t *testing.T, iss, sub, aud string, usernameClaim, value, groupsClaim string, groups []string) string {
-	return op.generateToken(t, iss, sub, aud, usernameClaim, value, groupsClaim, groups, time.Now(), time.Now().Add(time.Hour))
+func generateGoodToken(t *testing.T, op *oidctesting.OIDCProvider, iss, sub, aud string, usernameClaim, value, groupsClaim string, groups []string) string {
+	return generateToken(t, op, iss, sub, aud, usernameClaim, value, groupsClaim, groups, time.Now(), time.Now().Add(time.Hour))
 }
 
-func (op *oidcProvider) generateMalformedToken(t *testing.T, iss, sub, aud string, usernameClaim, value, groupsClaim string, groups []string) string {
-	return op.generateToken(t, iss, sub, aud, usernameClaim, value, groupsClaim, groups, time.Now(), time.Now().Add(time.Hour)) + "randombits"
+func generateMalformedToken(t *testing.T, op *oidctesting.OIDCProvider, iss, sub, aud string, usernameClaim, value, groupsClaim string, groups []string) string {
+	return generateToken(t, op, iss, sub, aud, usernameClaim, value, groupsClaim, groups, time.Now(), time.Now().Add(time.Hour)) + "randombits"
 }
 
-func (op *oidcProvider) generateExpiredToken(t *testing.T, iss, sub, aud string, usernameClaim, value, groupsClaim string, groups []string) string {
-	return op.generateToken(t, iss, sub, aud, usernameClaim, value, groupsClaim, groups, time.Now().Add(-2*time.Hour), time.Now().Add(-1*time.Hour))
+func generateExpiredToken(t *testing.T, op *oidctesting.OIDCProvider, iss, sub, aud string, usernameClaim, value, groupsClaim string, groups []string) string {
+	return generateToken(t, op, iss, sub, aud, usernameClaim, value, groupsClaim, groups, time.Now().Add(-2*time.Hour), time.Now().Add(-1*time.Hour))
 }
 
-// generateSelfSignedCert generates a self-signed cert/key pairs and writes to the certPath/keyPath.
-// This method is mostly identical to crypto.GenerateSelfSignedCert except for the 'IsCA' and 'KeyUsage'
-// in the certificate template. (Maybe we can merge these two methods).
-func generateSelfSignedCert(t *testing.T, host, certPath, keyPath string) {
-	priv, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	template := x509.Certificate{
-		SerialNumber: big.NewInt(1),
-		Subject: pkix.Name{
-			CommonName: fmt.Sprintf("%s@%d", host, time.Now().Unix()),
-		},
-		NotBefore: time.Now(),
-		NotAfter:  time.Now().Add(time.Hour * 24 * 365),
-
-		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
-		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
-		BasicConstraintsValid: true,
-		IsCA: true,
-	}
-
-	if ip := net.ParseIP(host); ip != nil {
-		template.IPAddresses = append(template.IPAddresses, ip)
-	} else {
-		template.DNSNames = append(template.DNSNames, host)
-	}
-
-	derBytes, err := x509.CreateCertificate(rand.Reader, &template, &template, &priv.PublicKey, priv)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Generate cert
-	certBuffer := bytes.Buffer{}
-	if err := pem.Encode(&certBuffer, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes}); err != nil {
-		t.Fatal(err)
-	}
-
-	// Generate key
-	keyBuffer := bytes.Buffer{}
-	if err := pem.Encode(&keyBuffer, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(priv)}); err != nil {
-		t.Fatal(err)
-	}
-
-	// Write cert
-	if err := os.MkdirAll(filepath.Dir(certPath), os.FileMode(0755)); err != nil {
-		t.Fatal(err)
-	}
-	if err := ioutil.WriteFile(certPath, certBuffer.Bytes(), os.FileMode(0644)); err != nil {
-		t.Fatal(err)
-	}
-
-	// Write key
-	if err := os.MkdirAll(filepath.Dir(keyPath), os.FileMode(0755)); err != nil {
-		t.Fatal(err)
-	}
-	if err := ioutil.WriteFile(keyPath, keyBuffer.Bytes(), os.FileMode(0600)); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestOIDCDiscoveryTimeout(t *testing.T) {
-	expectErr := fmt.Errorf("failed to fetch provider config after 1 retries")
-	_, err := New(OIDCOptions{"https://127.0.0.1:9999/bar", "client-foo", "", "sub", "", 1, 100 * time.Millisecond})
-	if !reflect.DeepEqual(err, expectErr) {
-		t.Errorf("Expecting %v, but got %v", expectErr, err)
-	}
-}
-
-func TestOIDCDiscoveryNoKeyEndpoint(t *testing.T) {
-	var err error
-	expectErr := fmt.Errorf("failed to fetch provider config after 0 retries")
-
-	cert := path.Join(os.TempDir(), "oidc-cert")
-	key := path.Join(os.TempDir(), "oidc-key")
-
-	defer os.Remove(cert)
-	defer os.Remove(key)
-
-	generateSelfSignedCert(t, "127.0.0.1", cert, key)
-
-	op := newOIDCProvider(t)
-	srv := httptest.NewUnstartedServer(op.mux)
-	srv.TLS = &tls.Config{Certificates: make([]tls.Certificate, 1)}
-	srv.TLS.Certificates[0], err = tls.LoadX509KeyPair(cert, key)
-	if err != nil {
-		t.Fatalf("Cannot load cert/key pair: %v", err)
-	}
-	srv.StartTLS()
-	defer srv.Close()
-
-	op.pcfg = oidc.ProviderConfig{
-		Issuer: mustParseURL(t, srv.URL), // An invalid ProviderConfig. Keys endpoint is required.
-	}
-
-	_, err = New(OIDCOptions{srv.URL, "client-foo", cert, "sub", "", 0, 0})
-	if !reflect.DeepEqual(err, expectErr) {
-		t.Errorf("Expecting %v, but got %v", expectErr, err)
-	}
-}
-
-func TestOIDCDiscoverySecureConnection(t *testing.T) {
-	// Verify that plain HTTP issuer URL is forbidden.
-	op := newOIDCProvider(t)
-	srv := httptest.NewServer(op.mux)
-	defer srv.Close()
-
-	op.pcfg = oidc.ProviderConfig{
-		Issuer:       mustParseURL(t, srv.URL),
-		KeysEndpoint: mustParseURL(t, srv.URL+"/keys"),
-	}
-
-	expectErr := fmt.Errorf("'oidc-issuer-url' (%q) has invalid scheme (%q), require 'https'", srv.URL, "http")
-
-	_, err := New(OIDCOptions{srv.URL, "client-foo", "", "sub", "", 0, 0})
-	if !reflect.DeepEqual(err, expectErr) {
-		t.Errorf("Expecting %v, but got %v", expectErr, err)
-	}
-
+func TestTLSConfig(t *testing.T) {
 	// Verify the cert/key pair works.
 	cert1 := path.Join(os.TempDir(), "oidc-cert-1")
 	key1 := path.Join(os.TempDir(), "oidc-key-1")
@@ -268,167 +73,232 @@ func TestOIDCDiscoverySecureConnection(t *testing.T) {
 	defer os.Remove(cert2)
 	defer os.Remove(key2)
 
-	generateSelfSignedCert(t, "127.0.0.1", cert1, key1)
-	generateSelfSignedCert(t, "127.0.0.1", cert2, key2)
+	oidctesting.GenerateSelfSignedCert(t, "127.0.0.1", cert1, key1)
+	oidctesting.GenerateSelfSignedCert(t, "127.0.0.1", cert2, key2)
 
-	// Create a TLS server using cert/key pair 1.
-	tlsSrv := httptest.NewUnstartedServer(op.mux)
-	tlsSrv.TLS = &tls.Config{Certificates: make([]tls.Certificate, 1)}
-	tlsSrv.TLS.Certificates[0], err = tls.LoadX509KeyPair(cert1, key1)
-	if err != nil {
-		t.Fatalf("Cannot load cert/key pair: %v", err)
+	tests := []struct {
+		testCase string
+
+		serverCertFile string
+		serverKeyFile  string
+
+		trustedCertFile string
+
+		wantErr bool
+	}{
+		{
+			testCase:       "provider using untrusted custom cert",
+			serverCertFile: cert1,
+			serverKeyFile:  key1,
+			wantErr:        true,
+		},
+		{
+			testCase:        "provider using untrusted cert",
+			serverCertFile:  cert1,
+			serverKeyFile:   key1,
+			trustedCertFile: cert2,
+			wantErr:         true,
+		},
+		{
+			testCase:        "provider using trusted cert",
+			serverCertFile:  cert1,
+			serverKeyFile:   key1,
+			trustedCertFile: cert1,
+			wantErr:         false,
+		},
 	}
-	tlsSrv.StartTLS()
-	defer tlsSrv.Close()
 
-	op.pcfg = oidc.ProviderConfig{
-		Issuer:       mustParseURL(t, tlsSrv.URL),
-		KeysEndpoint: mustParseURL(t, tlsSrv.URL+"/keys"),
+	for _, tc := range tests {
+		func() {
+			op := oidctesting.NewOIDCProvider(t, "")
+			srv, err := op.ServeTLSWithKeyPair(tc.serverCertFile, tc.serverKeyFile)
+			if err != nil {
+				t.Errorf("%s: %v", tc.testCase, err)
+				return
+			}
+			defer srv.Close()
+
+			issuer := srv.URL
+			clientID := "client-foo"
+
+			options := OIDCOptions{
+				IssuerURL:     srv.URL,
+				ClientID:      clientID,
+				CAFile:        tc.trustedCertFile,
+				UsernameClaim: "email",
+				GroupsClaim:   "groups",
+			}
+
+			authenticator, err := New(options)
+			if err != nil {
+				t.Errorf("%s: failed to initialize authenticator: %v", tc.testCase, err)
+				return
+			}
+			defer authenticator.Close()
+
+			email := "user-1@example.com"
+			groups := []string{"group1", "group2"}
+			sort.Strings(groups)
+
+			token := generateGoodToken(t, op, issuer, "user-1", clientID, "email", email, "groups", groups)
+
+			// Because this authenticator behaves differently for subsequent requests, run these
+			// tests multiple times (but expect the same result).
+			for i := 1; i < 4; i++ {
+
+				user, ok, err := authenticator.AuthenticateToken(token)
+				if err != nil {
+					if !tc.wantErr {
+						t.Errorf("%s (req #%d): failed to authenticate token: %v", tc.testCase, i, err)
+					}
+					continue
+				}
+
+				if tc.wantErr {
+					t.Errorf("%s (req #%d): expected error authenticating", tc.testCase, i)
+					continue
+				}
+				if !ok {
+					t.Errorf("%s (req #%d): did not get user or error", tc.testCase, i)
+					continue
+				}
+
+				if gotUsername := user.GetName(); email != gotUsername {
+					t.Errorf("%s (req #%d): GetName() expected=%q got %q", tc.testCase, i, email, gotUsername)
+				}
+				gotGroups := user.GetGroups()
+				sort.Strings(gotGroups)
+				if !reflect.DeepEqual(gotGroups, groups) {
+					t.Errorf("%s (req #%d): GetGroups() expected=%q got %q", tc.testCase, i, groups, gotGroups)
+				}
+			}
+		}()
 	}
-
-	// Create a client using cert2, should fail.
-	_, err = New(OIDCOptions{tlsSrv.URL, "client-foo", cert2, "sub", "", 0, 0})
-	if err == nil {
-		t.Fatalf("Expecting error, but got nothing")
-	}
-
 }
 
 func TestOIDCAuthentication(t *testing.T) {
-	var err error
-
 	cert := path.Join(os.TempDir(), "oidc-cert")
 	key := path.Join(os.TempDir(), "oidc-key")
 
 	defer os.Remove(cert)
 	defer os.Remove(key)
 
-	generateSelfSignedCert(t, "127.0.0.1", cert, key)
+	oidctesting.GenerateSelfSignedCert(t, "127.0.0.1", cert, key)
 
-	// Create a TLS server and a client.
-	op := newOIDCProvider(t)
-	srv := httptest.NewUnstartedServer(op.mux)
-	srv.TLS = &tls.Config{Certificates: make([]tls.Certificate, 1)}
-	srv.TLS.Certificates[0], err = tls.LoadX509KeyPair(cert, key)
-	if err != nil {
-		t.Fatalf("Cannot load cert/key pair: %v", err)
-	}
-	srv.StartTLS()
-	defer srv.Close()
+	// Ensure all tests pass when the issuer is not at a base URL.
+	for _, path := range []string{"", "/path/with/trailing/slash/"} {
 
-	// A provider config with all required fields.
-	op.pcfg = oidc.ProviderConfig{
-		Issuer:                  mustParseURL(t, srv.URL),
-		AuthEndpoint:            mustParseURL(t, srv.URL+"/auth"),
-		TokenEndpoint:           mustParseURL(t, srv.URL+"/token"),
-		KeysEndpoint:            mustParseURL(t, srv.URL+"/keys"),
-		ResponseTypesSupported:  []string{"code"},
-		SubjectTypesSupported:   []string{"public"},
-		IDTokenSigningAlgValues: []string{"RS256"},
-	}
-
-	tests := []struct {
-		userClaim   string
-		groupsClaim string
-		token       string
-		userInfo    user.Info
-		verified    bool
-		err         string
-	}{
-		{
-			"sub",
-			"",
-			op.generateGoodToken(t, srv.URL, "client-foo", "client-foo", "sub", "user-foo", "", nil),
-			&user.DefaultInfo{Name: fmt.Sprintf("%s#%s", srv.URL, "user-foo")},
-			true,
-			"",
-		},
-		{
-			// Use user defined claim (email here).
-			"email",
-			"",
-			op.generateGoodToken(t, srv.URL, "client-foo", "client-foo", "email", "foo@example.com", "", nil),
-			&user.DefaultInfo{Name: "foo@example.com"},
-			true,
-			"",
-		},
-		{
-			// Use user defined claim (email here).
-			"email",
-			"",
-			op.generateGoodToken(t, srv.URL, "client-foo", "client-foo", "email", "foo@example.com", "groups", []string{"group1", "group2"}),
-			&user.DefaultInfo{Name: "foo@example.com"},
-			true,
-			"",
-		},
-		{
-			// Use user defined claim (email here).
-			"email",
-			"groups",
-			op.generateGoodToken(t, srv.URL, "client-foo", "client-foo", "email", "foo@example.com", "groups", []string{"group1", "group2"}),
-			&user.DefaultInfo{Name: "foo@example.com", Groups: []string{"group1", "group2"}},
-			true,
-			"",
-		},
-		{
-			"sub",
-			"",
-			op.generateMalformedToken(t, srv.URL, "client-foo", "client-foo", "sub", "user-foo", "", nil),
-			nil,
-			false,
-			"oidc: unable to verify JWT signature: no matching keys",
-		},
-		{
-			// Invalid 'aud'.
-			"sub",
-			"",
-			op.generateGoodToken(t, srv.URL, "client-foo", "client-bar", "sub", "user-foo", "", nil),
-			nil,
-			false,
-			"oidc: JWT claims invalid: invalid claims, 'aud' claim and 'client_id' do not match",
-		},
-		{
-			// Invalid issuer.
-			"sub",
-			"",
-			op.generateGoodToken(t, "http://foo-bar.com", "client-foo", "client-foo", "sub", "user-foo", "", nil),
-			nil,
-			false,
-			"oidc: JWT claims invalid: invalid claim value: 'iss'.",
-		},
-		{
-			"sub",
-			"",
-			op.generateExpiredToken(t, srv.URL, "client-foo", "client-foo", "sub", "user-foo", "", nil),
-			nil,
-			false,
-			"oidc: JWT claims invalid: token is expired",
-		},
-	}
-
-	for i, tt := range tests {
-		client, err := New(OIDCOptions{srv.URL, "client-foo", cert, tt.userClaim, tt.groupsClaim, 1, 100 * time.Millisecond})
+		// Create a TLS server and a client.
+		op := oidctesting.NewOIDCProvider(t, path)
+		srv, err := op.ServeTLSWithKeyPair(cert, key)
 		if err != nil {
-			t.Errorf("Unexpected error: %v", err)
-			continue
+			t.Fatalf("Cannot start server: %v", err)
+		}
+		defer srv.Close()
+
+		tests := []struct {
+			userClaim   string
+			groupsClaim string
+			token       string
+			userInfo    user.Info
+			verified    bool
+			err         string
+		}{
+			{
+				"sub",
+				"",
+				generateGoodToken(t, op, srv.URL, "client-foo", "client-foo", "sub", "user-foo", "", nil),
+				&user.DefaultInfo{Name: fmt.Sprintf("%s#%s", srv.URL, "user-foo")},
+				true,
+				"",
+			},
+			{
+				// Use user defined claim (email here).
+				"email",
+				"",
+				generateGoodToken(t, op, srv.URL, "client-foo", "client-foo", "email", "foo@example.com", "", nil),
+				&user.DefaultInfo{Name: "foo@example.com"},
+				true,
+				"",
+			},
+			{
+				// Use user defined claim (email here).
+				"email",
+				"",
+				generateGoodToken(t, op, srv.URL, "client-foo", "client-foo", "email", "foo@example.com", "groups", []string{"group1", "group2"}),
+				&user.DefaultInfo{Name: "foo@example.com"},
+				true,
+				"",
+			},
+			{
+				// Use user defined claim (email here).
+				"email",
+				"groups",
+				generateGoodToken(t, op, srv.URL, "client-foo", "client-foo", "email", "foo@example.com", "groups", []string{"group1", "group2"}),
+				&user.DefaultInfo{Name: "foo@example.com", Groups: []string{"group1", "group2"}},
+				true,
+				"",
+			},
+			{
+				"sub",
+				"",
+				generateMalformedToken(t, op, srv.URL, "client-foo", "client-foo", "sub", "user-foo", "", nil),
+				nil,
+				false,
+				"oidc: unable to verify JWT signature: no matching keys",
+			},
+			{
+				// Invalid 'aud'.
+				"sub",
+				"",
+				generateGoodToken(t, op, srv.URL, "client-foo", "client-bar", "sub", "user-foo", "", nil),
+				nil,
+				false,
+				"oidc: JWT claims invalid: invalid claims, 'aud' claim and 'client_id' do not match",
+			},
+			{
+				// Invalid issuer.
+				"sub",
+				"",
+				generateGoodToken(t, op, "http://foo-bar.com", "client-foo", "client-foo", "sub", "user-foo", "", nil),
+				nil,
+				false,
+				"oidc: JWT claims invalid: invalid claim value: 'iss'.",
+			},
+			{
+				"sub",
+				"",
+				generateExpiredToken(t, op, srv.URL, "client-foo", "client-foo", "sub", "user-foo", "", nil),
+				nil,
+				false,
+				"oidc: JWT claims invalid: token is expired",
+			},
 		}
 
-		user, result, err := client.AuthenticateToken(tt.token)
-		if tt.err != "" {
-			if !strings.HasPrefix(err.Error(), tt.err) {
-				t.Errorf("#%d: Expecting: %v..., but got: %v", i, tt.err, err)
-			}
-		} else {
+		for i, tt := range tests {
+			client, err := New(OIDCOptions{srv.URL, "client-foo", cert, tt.userClaim, tt.groupsClaim})
 			if err != nil {
-				t.Errorf("#%d: Unexpected error: %v", i, err)
+				t.Errorf("Unexpected error: %v", err)
+				continue
 			}
+
+			user, result, err := client.AuthenticateToken(tt.token)
+			if tt.err != "" {
+				if !strings.HasPrefix(err.Error(), tt.err) {
+					t.Errorf("#%d: Expecting: %v..., but got: %v", i, tt.err, err)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("#%d: Unexpected error: %v", i, err)
+				}
+			}
+			if !reflect.DeepEqual(tt.verified, result) {
+				t.Errorf("#%d: Expecting: %v, but got: %v", i, tt.verified, result)
+			}
+			if !reflect.DeepEqual(tt.userInfo, user) {
+				t.Errorf("#%d: Expecting: %v, but got: %v", i, tt.userInfo, user)
+			}
+			client.Close()
 		}
-		if !reflect.DeepEqual(tt.verified, result) {
-			t.Errorf("#%d: Expecting: %v, but got: %v", i, tt.verified, result)
-		}
-		if !reflect.DeepEqual(tt.userInfo, user) {
-			t.Errorf("#%d: Expecting: %v, but got: %v", i, tt.userInfo, user)
-		}
-		client.Close()
 	}
 }

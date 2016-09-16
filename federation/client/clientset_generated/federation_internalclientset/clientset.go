@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ package federation_internalclientset
 import (
 	"github.com/golang/glog"
 	unversionedcore "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/core/unversioned"
+	unversionedextensions "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/extensions/unversioned"
 	unversionedfederation "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/federation/unversioned"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	discovery "k8s.io/kubernetes/pkg/client/typed/discovery"
@@ -29,6 +30,7 @@ type Interface interface {
 	Discovery() discovery.DiscoveryInterface
 	Federation() unversionedfederation.FederationInterface
 	Core() unversionedcore.CoreInterface
+	Extensions() unversionedextensions.ExtensionsInterface
 }
 
 // Clientset contains the clients for groups. Each group has exactly one
@@ -37,6 +39,7 @@ type Clientset struct {
 	*discovery.DiscoveryClient
 	*unversionedfederation.FederationClient
 	*unversionedcore.CoreClient
+	*unversionedextensions.ExtensionsClient
 }
 
 // Federation retrieves the FederationClient
@@ -55,6 +58,14 @@ func (c *Clientset) Core() unversionedcore.CoreInterface {
 	return c.CoreClient
 }
 
+// Extensions retrieves the ExtensionsClient
+func (c *Clientset) Extensions() unversionedextensions.ExtensionsInterface {
+	if c == nil {
+		return nil
+	}
+	return c.ExtensionsClient
+}
+
 // Discovery retrieves the DiscoveryClient
 func (c *Clientset) Discovery() discovery.DiscoveryInterface {
 	return c.DiscoveryClient
@@ -70,18 +81,23 @@ func NewForConfig(c *restclient.Config) (*Clientset, error) {
 	var err error
 	clientset.FederationClient, err = unversionedfederation.NewForConfig(&configShallowCopy)
 	if err != nil {
-		return &clientset, err
+		return nil, err
 	}
 	clientset.CoreClient, err = unversionedcore.NewForConfig(&configShallowCopy)
 	if err != nil {
-		return &clientset, err
+		return nil, err
+	}
+	clientset.ExtensionsClient, err = unversionedextensions.NewForConfig(&configShallowCopy)
+	if err != nil {
+		return nil, err
 	}
 
 	clientset.DiscoveryClient, err = discovery.NewDiscoveryClientForConfig(&configShallowCopy)
 	if err != nil {
 		glog.Errorf("failed to create the DiscoveryClient: %v", err)
+		return nil, err
 	}
-	return &clientset, err
+	return &clientset, nil
 }
 
 // NewForConfigOrDie creates a new Clientset for the given config and
@@ -90,6 +106,7 @@ func NewForConfigOrDie(c *restclient.Config) *Clientset {
 	var clientset Clientset
 	clientset.FederationClient = unversionedfederation.NewForConfigOrDie(c)
 	clientset.CoreClient = unversionedcore.NewForConfigOrDie(c)
+	clientset.ExtensionsClient = unversionedextensions.NewForConfigOrDie(c)
 
 	clientset.DiscoveryClient = discovery.NewDiscoveryClientForConfigOrDie(c)
 	return &clientset
@@ -100,6 +117,7 @@ func New(c *restclient.RESTClient) *Clientset {
 	var clientset Clientset
 	clientset.FederationClient = unversionedfederation.New(c)
 	clientset.CoreClient = unversionedcore.New(c)
+	clientset.ExtensionsClient = unversionedextensions.New(c)
 
 	clientset.DiscoveryClient = discovery.NewDiscoveryClient(c)
 	return &clientset

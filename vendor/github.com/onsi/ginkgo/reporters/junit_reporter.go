@@ -74,6 +74,10 @@ func (reporter *JUnitReporter) AfterSuiteDidRun(setupSummary *types.SetupSummary
 	reporter.handleSetupSummary("AfterSuite", setupSummary)
 }
 
+func failureMessage(failure types.SpecFailure) string {
+	return fmt.Sprintf("%s\n%s\n%s", failure.ComponentCodeLocation.String(), failure.Message, failure.Location.String())
+}
+
 func (reporter *JUnitReporter) handleSetupSummary(name string, setupSummary *types.SetupSummary) {
 	if setupSummary.State != types.SpecStatePassed {
 		testCase := JUnitTestCase{
@@ -83,7 +87,7 @@ func (reporter *JUnitReporter) handleSetupSummary(name string, setupSummary *typ
 
 		testCase.FailureMessage = &JUnitFailureMessage{
 			Type:    reporter.failureTypeForState(setupSummary.State),
-			Message: fmt.Sprintf("%s\n%s", setupSummary.Failure.ComponentCodeLocation.String(), setupSummary.Failure.Message),
+			Message: failureMessage(setupSummary.Failure),
 		}
 		testCase.Time = setupSummary.RunTime.Seconds()
 		reporter.suite.TestCases = append(reporter.suite.TestCases, testCase)
@@ -98,7 +102,7 @@ func (reporter *JUnitReporter) SpecDidComplete(specSummary *types.SpecSummary) {
 	if specSummary.State == types.SpecStateFailed || specSummary.State == types.SpecStateTimedOut || specSummary.State == types.SpecStatePanicked {
 		testCase.FailureMessage = &JUnitFailureMessage{
 			Type:    reporter.failureTypeForState(specSummary.State),
-			Message: fmt.Sprintf("%s\n%s", specSummary.Failure.ComponentCodeLocation.String(), specSummary.Failure.Message),
+			Message: failureMessage(specSummary.Failure),
 		}
 	}
 	if specSummary.State == types.SpecStateSkipped || specSummary.State == types.SpecStatePending {

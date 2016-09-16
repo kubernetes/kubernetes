@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -66,7 +66,7 @@ func hasStatus(t *types.Type) bool {
 func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w io.Writer) error {
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
 	pkg := filepath.Base(t.Name.Package)
-	namespaced := !(types.ExtractCommentTags("+", t.SecondClosestCommentLines)["nonNamespaced"] == "true")
+	namespaced := !extractBoolTagOrDie("nonNamespaced", t.SecondClosestCommentLines)
 	m := map[string]interface{}{
 		"type":              t,
 		"package":           pkg,
@@ -76,6 +76,7 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 		"apiDeleteOptions":  c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/api", Name: "DeleteOptions"}),
 		"apiListOptions":    c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/api", Name: "ListOptions"}),
 		"apiParameterCodec": c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/api", Name: "ParameterCodec"}),
+		"PatchType":         c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/api", Name: "PatchType"}),
 		"namespaced":        namespaced,
 	}
 
@@ -85,7 +86,7 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 	} else {
 		sw.Do(getterNonNamesapced, m)
 	}
-	noMethods := types.ExtractCommentTags("+", t.SecondClosestCommentLines)["noMethods"] == "true"
+	noMethods := extractBoolTagOrDie("noMethods", t.SecondClosestCommentLines) == true
 
 	sw.Do(interfaceTemplate1, m)
 	if !noMethods {
@@ -118,6 +119,7 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 		sw.Do(getTemplate, m)
 		sw.Do(listTemplate, m)
 		sw.Do(watchTemplate, m)
+		sw.Do(patchTemplate, m)
 	}
 
 	return sw.Error()
@@ -158,7 +160,8 @@ var interfaceTemplate3 = `
 	DeleteCollection(options *$.apiDeleteOptions|raw$, listOptions $.apiListOptions|raw$) error
 	Get(name string) (*$.type|raw$, error)
 	List(opts $.apiListOptions|raw$) (*$.type|raw$List, error)
-	Watch(opts $.apiListOptions|raw$) ($.watchInterface|raw$, error)`
+	Watch(opts $.apiListOptions|raw$) ($.watchInterface|raw$, error)
+	Patch(name string, pt $.PatchType|raw$, data []byte, subresources ...string) (result *$.type|raw$, err error)`
 
 var interfaceTemplate4 = `
 	$.type|public$Expansion
@@ -307,5 +310,21 @@ func (c *$.type|privatePlural$) Watch(opts $.apiListOptions|raw$) ($.watchInterf
 		Resource("$.type|allLowercasePlural$").
 		VersionedParams(&opts, $.apiParameterCodec|raw$).
 		Watch()
+}
+`
+
+var patchTemplate = `
+// Patch applies the patch and returns the patched $.type|private$.
+func (c *$.type|privatePlural$) Patch(name string, pt $.PatchType|raw$, data []byte, subresources ...string) (result *$.type|raw$, err error) {
+	result = &$.type|raw${}
+	err = c.client.Patch(pt).
+		$if .namespaced$Namespace(c.ns).$end$
+		Resource("$.type|allLowercasePlural$").
+		SubResource(subresources...).
+		Name(name).
+		Body(data).
+		Do().
+		Into(result)
+	return
 }
 `
