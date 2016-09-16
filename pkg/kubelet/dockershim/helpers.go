@@ -30,6 +30,10 @@ import (
 	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 )
 
+const (
+	annotationPrefix = "annotation."
+)
+
 // apiVersion implements kubecontainer.Version interface by implementing
 // Compare() and String(). It uses the compare function of engine-api to
 // compare docker apiversions.
@@ -57,21 +61,50 @@ func generateEnvList(envs []*runtimeApi.KeyValue) (result []string) {
 	return
 }
 
-// Merge annotations and labels because docker supports only labels.
-// TODO: Need to be able to distinguish annotations from labels; otherwise, we
-// couldn't restore the information when reading the labels back from docker.
+// makeLabels converts annotations to labels and merge them with the given
+// labels. This is necessary because docker does not support annotations;
+// we *fake* annotations using labels. Note that docker labels are not
+// updatable.
 func makeLabels(labels, annotations map[string]string) map[string]string {
 	merged := make(map[string]string)
 	for k, v := range labels {
 		merged[k] = v
 	}
 	for k, v := range annotations {
-		if _, ok := merged[k]; !ok {
-			// Don't overwrite the key if it already exists.
-			merged[k] = v
-		}
+		// Assume there won't be conflict.
+		merged[fmt.Sprintf("%s%s", annotationPrefix, k)] = v
 	}
 	return merged
+}
+
+// extractLabels converts raw docker labels to the CRI labels and annotations.
+// It also filters out internal labels used by this shim.
+func extractLabels(input map[string]string) (map[string]string, map[string]string) {
+	labels := make(map[string]string)
+	annotations := make(map[string]string)
+	for k, v := range input {
+		// Check if the key is used internally by the shim.
+		internal := false
+		for _, internalKey := range internalLabelKeys {
+			// TODO: containerTypeLabelKey is the only internal label the shim uses
+			// right now. Expand this to a list later.
+			if k == internalKey {
+				internal = true
+				break
+			}
+		}
+		if internal {
+			continue
+		}
+
+		// Check if the label should be treated as an annotation.
+		if strings.HasPrefix(k, annotationPrefix) {
+			annotations[strings.TrimPrefix(k, annotationPrefix)] = v
+			continue
+		}
+		labels[k] = v
+	}
+	return labels, annotations
 }
 
 // generateMountBindings converts the mount list to a list of strings that

@@ -301,6 +301,9 @@ message PodSandbox {
     optional int64 created_at = 4;
     // The labels of the PodSandbox
     map<string, string> labels = 5;
+    // Annotations is an unstructured key value map that may be set by external
+    // tools to store and retrieve arbitrary metadata.
+    map<string, string> annotations = 6;
 }
 
 message ListPodSandboxResponse {

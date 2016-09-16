@@ -29,6 +29,10 @@ import (
 
 // A helper to create a basic config.
 func makeSandboxConfig(name, namespace, uid string, attempt uint32) *runtimeApi.PodSandboxConfig {
+	return makeSandboxConfigWithLabelsAndAnnotations(name, namespace, uid, attempt, map[string]string{}, map[string]string{})
+}
+
+func makeSandboxConfigWithLabelsAndAnnotations(name, namespace, uid string, attempt uint32, labels, annotations map[string]string) *runtimeApi.PodSandboxConfig {
 	return &runtimeApi.PodSandboxConfig{
 		Metadata: &runtimeApi.PodSandboxMetadata{
 			Name:      &name,
@@ -36,6 +40,8 @@ func makeSandboxConfig(name, namespace, uid string, attempt uint32) *runtimeApi.
 			Uid:       &uid,
 			Attempt:   &attempt,
 		},
+		Labels:      labels,
+		Annotations: annotations,
 	}
 }
 
@@ -46,8 +52,11 @@ func TestListSandboxes(t *testing.T) {
 	name, namespace := "foo", "bar"
 	configs := []*runtimeApi.PodSandboxConfig{}
 	for i := 0; i < 3; i++ {
-		c := makeSandboxConfig(fmt.Sprintf("%s%d", name, i),
-			fmt.Sprintf("%s%d", namespace, i), fmt.Sprintf("%d", i), 0)
+		c := makeSandboxConfigWithLabelsAndAnnotations(fmt.Sprintf("%s%d", name, i),
+			fmt.Sprintf("%s%d", namespace, i), fmt.Sprintf("%d", i), 0,
+			map[string]string{"label": fmt.Sprintf("foo%d", i)},
+			map[string]string{"annotation": fmt.Sprintf("bar%d", i)},
+		)
 		configs = append(configs, c)
 	}
 
@@ -60,11 +69,12 @@ func TestListSandboxes(t *testing.T) {
 		// Prepend to the expected list because ListPodSandbox returns
 		// the most recent sandbox first.
 		expected = append([]*runtimeApi.PodSandbox{{
-			Metadata:  configs[i].Metadata,
-			Id:        &id,
-			State:     &state,
-			Labels:    map[string]string{containerTypeLabelKey: containerTypeLabelSandbox},
-			CreatedAt: &createdAt,
+			Metadata:    configs[i].Metadata,
+			Id:          &id,
+			State:       &state,
+			CreatedAt:   &createdAt,
+			Labels:      configs[i].Labels,
+			Annotations: configs[i].Annotations,
 		}}, expected...)
 	}
 	sandboxes, err := ds.ListPodSandbox(nil)
@@ -77,7 +87,9 @@ func TestListSandboxes(t *testing.T) {
 // the status returned reflects the operations performed.
 func TestSandboxStatus(t *testing.T) {
 	ds, _, fClock := newTestDockerSevice()
-	config := makeSandboxConfig("foo", "bar", "1", 0)
+	labels := map[string]string{"label": "foobar1"}
+	annotations := map[string]string{"annotation": "abc"}
+	config := makeSandboxConfigWithLabelsAndAnnotations("foo", "bar", "1", 0, labels, annotations)
 
 	// TODO: The following variables depend on the internal
 	// implementation of FakeDockerClient, and should be fixed.
@@ -87,12 +99,13 @@ func TestSandboxStatus(t *testing.T) {
 	state := runtimeApi.PodSandBoxState_READY
 	ct := int64(0)
 	expected := &runtimeApi.PodSandboxStatus{
-		State:     &state,
-		CreatedAt: &ct,
-		Metadata:  config.Metadata,
-		Labels:    map[string]string{containerTypeLabelKey: containerTypeLabelSandbox},
-		Network:   &runtimeApi.PodSandboxNetworkStatus{Ip: &fakeIP},
-		Linux:     &runtimeApi.LinuxPodSandboxStatus{Namespaces: &runtimeApi.Namespace{Network: &fakeNS}},
+		State:       &state,
+		CreatedAt:   &ct,
+		Metadata:    config.Metadata,
+		Network:     &runtimeApi.PodSandboxNetworkStatus{Ip: &fakeIP},
+		Linux:       &runtimeApi.LinuxPodSandboxStatus{Namespaces: &runtimeApi.Namespace{Network: &fakeNS}},
+		Labels:      labels,
+		Annotations: annotations,
 	}
 
 	// Create the sandbox.
