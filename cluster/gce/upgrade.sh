@@ -38,7 +38,7 @@ function usage() {
   echo "  -M:  Upgrade master only"
   echo "  -N:  Upgrade nodes only"
   echo "  -P:  Node upgrade prerequisites only (create a new instance template)"
-  echo "  -o:  Use os distro sepcified in KUBE_NODE_OS_DISTRIBUTION for new nodes"
+  echo "  -o:  Use os distro sepcified in KUBE_NODE_OS_DISTRIBUTION for new nodes. Options include 'debian' or 'gci'"
   echo "  -l:  Use local(dev) binaries"
   echo ""
   echo '  Version number or publication is either a proper version number'
@@ -295,7 +295,7 @@ node_prereqs=false
 local_binaries=false
 env_os_distro=false
 
-while getopts ":MNPlh" opt; do
+while getopts ":MNPlho" opt; do
   case ${opt} in
     M)
       node_upgrade=false
