@@ -251,7 +251,7 @@ func TestInsufficentCapacityNodeDaemonDoesNotLaunchPod(t *testing.T) {
 	node := newNode("too-much-mem", nil)
 	node.Status.Allocatable = allocatableResources("100M", "200m")
 	manager.nodeStore.Add(node)
-	manager.podStore.Add(&api.Pod{
+	manager.podStore.Indexer.Add(&api.Pod{
 		Spec: podSpec,
 	})
 	ds := newDaemonSet("foo")
@@ -266,7 +266,7 @@ func TestSufficentCapacityWithTerminatedPodsDaemonLaunchesPod(t *testing.T) {
 	node := newNode("too-much-mem", nil)
 	node.Status.Allocatable = allocatableResources("100M", "200m")
 	manager.nodeStore.Add(node)
-	manager.podStore.Add(&api.Pod{
+	manager.podStore.Indexer.Add(&api.Pod{
 		Spec:   podSpec,
 		Status: api.PodStatus{Phase: api.PodSucceeded},
 	})
@@ -283,7 +283,7 @@ func TestSufficentCapacityNodeDaemonLaunchesPod(t *testing.T) {
 	node := newNode("not-too-much-mem", nil)
 	node.Status.Allocatable = allocatableResources("200M", "200m")
 	manager.nodeStore.Add(node)
-	manager.podStore.Add(&api.Pod{
+	manager.podStore.Indexer.Add(&api.Pod{
 		Spec: podSpec,
 	})
 	ds := newDaemonSet("foo")
@@ -299,7 +299,7 @@ func TestDontDoAnythingIfBeingDeleted(t *testing.T) {
 	node := newNode("not-too-much-mem", nil)
 	node.Status.Allocatable = allocatableResources("200M", "200m")
 	manager.nodeStore.Add(node)
-	manager.podStore.Add(&api.Pod{
+	manager.podStore.Indexer.Add(&api.Pod{
 		Spec: podSpec,
 	})
 	ds := newDaemonSet("foo")
@@ -323,7 +323,7 @@ func TestPortConflictNodeDaemonDoesNotLaunchPod(t *testing.T) {
 	manager, podControl := newTestController()
 	node := newNode("port-conflict", nil)
 	manager.nodeStore.Add(node)
-	manager.podStore.Add(&api.Pod{
+	manager.podStore.Indexer.Add(&api.Pod{
 		Spec: podSpec,
 	})
 
@@ -349,7 +349,7 @@ func TestPortConflictWithSameDaemonPodDoesNotDeletePod(t *testing.T) {
 	manager, podControl := newTestController()
 	node := newNode("port-conflict", nil)
 	manager.nodeStore.Add(node)
-	manager.podStore.Add(&api.Pod{
+	manager.podStore.Indexer.Add(&api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Labels:    simpleDaemonSetLabel,
 			Namespace: api.NamespaceDefault,
@@ -383,7 +383,7 @@ func TestNoPortConflictNodeDaemonLaunchesPod(t *testing.T) {
 	manager, podControl := newTestController()
 	node := newNode("no-port-conflict", nil)
 	manager.nodeStore.Add(node)
-	manager.podStore.Add(&api.Pod{
+	manager.podStore.Indexer.Add(&api.Pod{
 		Spec: podSpec1,
 	})
 	ds := newDaemonSet("foo")
@@ -399,7 +399,7 @@ func TestPodIsNotDeletedByDaemonsetWithEmptyLabelSelector(t *testing.T) {
 	manager, podControl := newTestController()
 	manager.nodeStore.Store.Add(newNode("node1", nil))
 	// Create pod not controlled by a daemonset.
-	manager.podStore.Add(&api.Pod{
+	manager.podStore.Indexer.Add(&api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Labels:    map[string]string{"bang": "boom"},
 			Namespace: api.NamespaceDefault,
