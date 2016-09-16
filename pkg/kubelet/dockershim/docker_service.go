@@ -47,7 +47,10 @@ const (
 	containerTypeLabelKey       = "io.kubernetes.docker.type"
 	containerTypeLabelSandbox   = "podsandbox"
 	containerTypeLabelContainer = "container"
+	sandboxIDLabelKey           = "io.kubernetes.sandbox.id"
 )
+
+var internalLabelKeys []string = []string{containerTypeLabelKey, sandboxIDLabelKey}
 
 func NewDockerService(client dockertools.DockerInterface) DockerLegacyService {
 	return &dockerService{
