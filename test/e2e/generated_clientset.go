@@ -20,8 +20,8 @@ import (
 	"strconv"
 	"time"
 
-	clientapi "k8s.io/client-go/1.4/pkg/api"
-	clientv1 "k8s.io/client-go/1.4/pkg/api/v1"
+	clientapi "k8s.io/client-go/1.5/pkg/api"
+	clientv1 "k8s.io/client-go/1.5/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/labels"
