@@ -33,11 +33,13 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/apps"
+	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller/petset"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
 	utilyaml "k8s.io/kubernetes/pkg/util/yaml"
@@ -57,7 +59,37 @@ const (
 	// Should the test restart petset clusters?
 	// TODO: enable when we've productionzed bringup of pets in this e2e.
 	restartCluster = false
+	add            = "ADD"
+	del            = "DEL"
+	update         = "UPDATE"
 )
+
+type podEvent struct {
+	pod   *api.Pod
+	event string
+}
+
+func filterByEvent(p []podEvent, eventName string) []podEvent {
+	events := []podEvent{}
+	for _, event := range p {
+		if event.event == eventName {
+			events = append(events, event)
+		}
+	}
+	return events
+}
+
+func Added(p []podEvent) []podEvent {
+	return filterByEvent(p, add)
+}
+
+func Deleted(p []podEvent) []podEvent {
+	return filterByEvent(p, del)
+}
+
+func Updated(p []podEvent) []podEvent {
+	return filterByEvent(p, update)
+}
 
 // Time: 25m, slow by design.
 // GCE Quota requirements: 3 pds, one per pet manifest declared above.
@@ -110,7 +142,7 @@ var _ = framework.KubeDescribe("PetSet [Slow] [Feature:PetSet]", func() {
 			By("creating petset " + psName + " in namespace " + ns)
 			petMounts := []api.VolumeMount{{Name: "datadir", MountPath: "/data/"}}
 			podMounts := []api.VolumeMount{{Name: "home", MountPath: "/home"}}
-			ps := newPetSet(psName, ns, headlessSvcName, 3, petMounts, podMounts, labels)
+			ps := newPetSet(psName, ns, headlessSvcName, 3, petMounts, podMounts, labels, nil)
 			_, err := c.Apps().PetSets(ns).Create(ps)
 			Expect(err).NotTo(HaveOccurred())
 
@@ -143,19 +175,19 @@ var _ = framework.KubeDescribe("PetSet [Slow] [Feature:PetSet]", func() {
 
 			petMounts := []api.VolumeMount{{Name: "datadir", MountPath: "/data/"}}
 			podMounts := []api.VolumeMount{{Name: "home", MountPath: "/home"}}
-			ps := newPetSet(psName, ns, headlessSvcName, 2, petMounts, podMounts, labels)
+			ps := newPetSet(psName, ns, headlessSvcName, 2, petMounts, podMounts, labels, nil)
 			_, err := c.Apps().PetSets(ns).Create(ps)
 			Expect(err).NotTo(HaveOccurred())
 
 			pst := petSetTester{c: c}
 
-			pst.waitForRunning(1, ps)
+			pst.waitForRunningAndReady(1, ps)
 
 			By("Marking pet at index 0 as healthy.")
 			pst.setHealthy(ps)
 
 			By("Waiting for pet at index 1 to enter running.")
-			pst.waitForRunning(2, ps)
+			pst.waitForRunningAndReady(2, ps)
 
 			// TODO: verify petset status.replicas
 
@@ -174,6 +206,140 @@ var _ = framework.KubeDescribe("PetSet [Slow] [Feature:PetSet]", func() {
 
 			By("Confirming all pets in petset are created.")
 			pst.saturate(ps)
+		})
+	})
+
+	framework.KubeDescribe("Scale up/down testing [Slow] [Feature:PetSet]", func() {
+		psName := "pet"
+		labels := map[string]string{
+			"name": psName,
+		}
+		headlessSvcName := "test"
+		var controller *cache.Controller
+		var stopCh chan struct{}
+		var podTracker []podEvent
+
+		BeforeEach(func() {
+			framework.SkipUnlessProviderIs("gce", "vagrant")
+
+			By("creating service " + headlessSvcName + " in namespace " + ns)
+			headlessService := createServiceSpec(headlessSvcName, "", true, labels)
+			_, err := c.Services(ns).Create(headlessService)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("configuring controller to watch for added pods")
+			labelSelector, err := unversioned.LabelSelectorAsSelector(&unversioned.LabelSelector{
+				MatchLabels: labels,
+			})
+			ExpectNoError(err)
+
+			stopCh = make(chan struct{})
+			podTracker = []podEvent{}
+			_, controller = cache.NewInformer(
+				&cache.ListWatch{
+					ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+						options.LabelSelector = labelSelector
+						return f.Client.Pods(ns).List(options)
+					},
+					WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+						options.LabelSelector = labelSelector
+						return f.Client.Pods(ns).Watch(options)
+					},
+				},
+				&api.Pod{},
+				0,
+				cache.ResourceEventHandlerFuncs{
+					AddFunc: func(obj interface{}) {
+						podTracker = append(podTracker, podEvent{
+							pod:   obj.(*api.Pod),
+							event: add,
+						})
+					},
+					DeleteFunc: func(obj interface{}) {
+						podTracker = append(podTracker, podEvent{
+							pod:   obj.(*api.Pod),
+							event: del,
+						})
+					},
+				},
+			)
+			go controller.Run(stopCh)
+		})
+
+		AfterEach(func() {
+			if CurrentGinkgoTestDescription().Failed {
+				dumpDebugInfo(c, ns)
+			}
+			framework.Logf("Deleting all petset in ns %v", ns)
+			deleteAllPetSets(c, ns)
+			close(stopCh)
+		})
+
+		It("Scaling should happen in predictable order and halt if any pet is unhealthy", func() {
+			By("creating petset " + psName + " in namespace " + ns)
+			testProbe := &api.Probe{Handler: api.Handler{HTTPGet: &api.HTTPGetAction{Path: "/index.html", Port: intstr.IntOrString{IntVal: 80}}}}
+			ps := newInitializedPetSet(psName, ns, headlessSvcName, 1, nil, nil, labels, testProbe)
+			ps, err := c.Apps().PetSets(ns).Create(ps)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("waiting until all petset " + psName + " replicas will be running in namespace " + ns)
+			pst := &petSetTester{c: c}
+			pst.waitForRunningAndReady(ps.Spec.Replicas, ps)
+
+			By("confirming that petset scale up will halt with unhealthy pet")
+			pst.breakProbe(ps, testProbe)
+			pst.waitForRunningAndNotReady(ps.Spec.Replicas, ps)
+			pst.update(ps.Namespace, ps.Name, func(ps *apps.PetSet) { ps.Spec.Replicas = 3 })
+			pst.confirmPetCount(1, ps, 10*time.Second)
+
+			By("scalling up petset " + psName + " to 3 replicas and waiting until all of them will be running in namespace " + ns)
+			pst.restoreProbe(ps, testProbe)
+			pst.waitForRunningAndReady(3, ps)
+
+			By("verifying that petset " + psName + " was scaled up in order")
+			expectedOrder := []string{"pet-0", "pet-1", "pet-2"}
+			for i, event := range Added(podTracker) {
+				if event.pod.Name != expectedOrder[i] {
+					framework.Failf("Order of scale up is wrong: %v != %v", expectedOrder[i], event.pod.Name)
+				}
+			}
+
+			By("scale down will halt with unhealthy pet")
+			pst.breakProbe(ps, testProbe)
+			pst.waitForRunningAndNotReady(3, ps)
+			pst.update(ps.Namespace, ps.Name, func(ps *apps.PetSet) { ps.Spec.Replicas = 0 })
+			pst.confirmPetCount(3, ps, 10*time.Second)
+
+			By("scalling down petset " + psName + " to 0 replicas and waiting until none of pods will run " + ns)
+			pst.restoreProbe(ps, testProbe)
+			pst.scale(ps, 0)
+
+			By("verifying that petset " + psName + " was scaled down in reverse order")
+			expectedOrder = []string{"pet-2", "pet-1", "pet-0"}
+			for i, event := range Deleted(podTracker) {
+				if event.pod.Name != expectedOrder[i] {
+					framework.Failf("Order of scale down is wrong: %v != %v", expectedOrder[i], event.pod.Name)
+				}
+			}
+
+			By("verifying that scaling up before scale down is finished will not be out of order")
+			pst.scale(ps, 3)
+			podTracker = []podEvent{}
+			pst.update(ps.Namespace, ps.Name, func(ps *apps.PetSet) { ps.Spec.Replicas = 5 })
+			pst.update(ps.Namespace, ps.Name, func(ps *apps.PetSet) { ps.Spec.Replicas = 2 })
+			pst.scale(ps, 4)
+			var previous string
+			for _, event := range Added(podTracker) {
+				if previous != "" {
+					msg := fmt.Sprintf("scaling should be in order, %v should be after %v", previous, event.pod.Name)
+					if strings.Split(previous, "-")[1] > strings.Split(event.pod.Name, "-")[1] {
+						framework.Failf(msg)
+					} else {
+						framework.Logf(msg)
+					}
+				}
+				previous = event.pod.Name
+			}
 		})
 	})
 
@@ -198,7 +364,7 @@ var _ = framework.KubeDescribe("PetSet [Slow] [Feature:PetSet]", func() {
 			if restartCluster {
 				By("Restarting pet set " + ps.Name)
 				pst.restart(ps)
-				pst.waitForRunning(ps.Spec.Replicas, ps)
+				pst.waitForRunningAndReady(ps.Spec.Replicas, ps)
 			}
 
 			By("Reading value under foo from member with index 2")
@@ -219,7 +385,7 @@ var _ = framework.KubeDescribe("PetSet [Slow] [Feature:PetSet]", func() {
 			if restartCluster {
 				By("Restarting pet set " + ps.Name)
 				pst.restart(ps)
-				pst.waitForRunning(ps.Spec.Replicas, ps)
+				pst.waitForRunningAndReady(ps.Spec.Replicas, ps)
 			}
 
 			By("Reading value under foo from member with index 2")
@@ -240,7 +406,7 @@ var _ = framework.KubeDescribe("PetSet [Slow] [Feature:PetSet]", func() {
 			if restartCluster {
 				By("Restarting pet set " + ps.Name)
 				pst.restart(ps)
-				pst.waitForRunning(ps.Spec.Replicas, ps)
+				pst.waitForRunningAndReady(ps.Spec.Replicas, ps)
 			}
 
 			By("Reading value under foo from member with index 2")
@@ -309,7 +475,7 @@ var _ = framework.KubeDescribe("Pet set recreate [Slow] [Feature:PetSet]", func(
 		framework.ExpectNoError(err)
 
 		By("creating petset with conflicting port in namespace " + f.Namespace.Name)
-		ps := newPetSet(petSetName, f.Namespace.Name, headlessSvcName, 1, nil, nil, labels)
+		ps := newPetSet(petSetName, f.Namespace.Name, headlessSvcName, 1, nil, nil, labels, nil)
 		petContainer := &ps.Spec.Template.Spec.Containers[0]
 		petContainer.Ports = append(petContainer.Ports, conflictingPort)
 		ps.Spec.Template.Spec.NodeName = node.Name
@@ -539,7 +705,7 @@ func (p *petSetTester) createPetSet(manifestPath, ns string) *apps.PetSet {
 
 	framework.Logf(fmt.Sprintf("creating petset %v/%v with %d replicas and selector %+v", ps.Namespace, ps.Name, ps.Spec.Replicas, ps.Spec.Selector))
 	framework.RunKubectlOrDie("create", "-f", mkpath("petset.yaml"), fmt.Sprintf("--namespace=%v", ns))
-	p.waitForRunning(ps.Spec.Replicas, ps)
+	p.waitForRunningAndReady(ps.Spec.Replicas, ps)
 	return ps
 }
 
@@ -576,7 +742,7 @@ func (p *petSetTester) saturate(ps *apps.PetSet) {
 	var i int32
 	for i = 0; i < ps.Spec.Replicas; i++ {
 		framework.Logf("Waiting for pet at index " + fmt.Sprintf("%v", i+1) + " to enter Running")
-		p.waitForRunning(i+1, ps)
+		p.waitForRunningAndReady(i+1, ps)
 		framework.Logf("Marking pet at index " + fmt.Sprintf("%v", i) + " healthy")
 		p.setHealthy(ps)
 	}
@@ -666,7 +832,7 @@ func (p *petSetTester) confirmPetCount(count int, ps *apps.PetSet, timeout time.
 	}
 }
 
-func (p *petSetTester) waitForRunning(numPets int32, ps *apps.PetSet) {
+func (p *petSetTester) waitForRunning(numPets int32, ps *apps.PetSet, shouldBeReady bool) {
 	pollErr := wait.PollImmediate(petsetPoll, petsetTimeout,
 		func() (bool, error) {
 			podList := p.getPodList(ps)
@@ -679,8 +845,9 @@ func (p *petSetTester) waitForRunning(numPets int32, ps *apps.PetSet) {
 			}
 			for _, p := range podList.Items {
 				isReady := api.IsPodReady(&p)
-				if p.Status.Phase != api.PodRunning || !isReady {
-					framework.Logf("Waiting for pod %v to enter %v - Ready=True, currently %v - Ready=%v", p.Name, api.PodRunning, p.Status.Phase, isReady)
+				desiredReadiness := shouldBeReady == isReady
+				framework.Logf("Waiting for pod %v to enter %v - Ready=%v, currently %v - Ready=%v", p.Name, api.PodRunning, shouldBeReady, p.Status.Phase, isReady)
+				if p.Status.Phase != api.PodRunning || !desiredReadiness {
 					return false, nil
 				}
 			}
@@ -691,7 +858,15 @@ func (p *petSetTester) waitForRunning(numPets int32, ps *apps.PetSet) {
 	}
 }
 
-func (p *petSetTester) setHealthy(ps *apps.PetSet) {
+func (p *petSetTester) waitForRunningAndReady(numPets int32, ps *apps.PetSet) {
+	p.waitForRunning(numPets, ps, true)
+}
+
+func (p *petSetTester) waitForRunningAndNotReady(numPets int32, ps *apps.PetSet) {
+	p.waitForRunning(numPets, ps, false)
+}
+
+func (p *petSetTester) updateInitAnnotatation(ps *apps.PetSet, value string) {
 	podList := p.getPodList(ps)
 	markedHealthyPod := ""
 	for _, pod := range podList.Items {
@@ -705,7 +880,7 @@ func (p *petSetTester) setHealthy(ps *apps.PetSet) {
 			framework.Failf("Found multiple non-healthy pets: %v and %v", pod.Name, markedHealthyPod)
 		}
 		p, err := framework.UpdatePodWithRetries(p.c, pod.Namespace, pod.Name, func(up *api.Pod) {
-			up.Annotations[petset.PetSetInitAnnotation] = "true"
+			up.Annotations[petset.PetSetInitAnnotation] = value
 		})
 		ExpectNoError(err)
 		framework.Logf("Set annotation %v to %v on pod %v", petset.PetSetInitAnnotation, p.Annotations[petset.PetSetInitAnnotation], pod.Name)
@@ -730,6 +905,32 @@ func (p *petSetTester) waitForStatus(ps *apps.PetSet, expectedReplicas int32) {
 	if pollErr != nil {
 		framework.Failf("Failed waiting for pet set status.replicas updated to %d, got %d: %v", expectedReplicas, ps.Status.Replicas, pollErr)
 	}
+}
+
+func (p *petSetTester) breakProbe(ps *apps.PetSet, probe *api.Probe) error {
+	path := probe.HTTPGet.Path
+	if path == "" {
+		return fmt.Errorf("Path expected to be not empty: %v", path)
+	}
+	cmd := fmt.Sprintf("mv /usr/share/nginx/html%v /tmp/", path)
+	return p.execInPets(ps, cmd)
+}
+
+func (p *petSetTester) restoreProbe(ps *apps.PetSet, probe *api.Probe) error {
+	path := probe.HTTPGet.Path
+	if path == "" {
+		return fmt.Errorf("Path expected to be not empty: %v", path)
+	}
+	cmd := fmt.Sprintf("mv /tmp%v /usr/share/nginx/html/", path)
+	return p.execInPets(ps, cmd)
+}
+
+func (p *petSetTester) setHealthy(ps *apps.PetSet) {
+	p.updateInitAnnotatation(ps, "true")
+}
+
+func (p *petSetTester) setUnhealthy(ps *apps.PetSet) {
+	p.updateInitAnnotatation(ps, "false")
 }
 
 func deleteAllPetSets(c *client.Client, ns string) {
@@ -841,7 +1042,7 @@ func newPVC(name string) api.PersistentVolumeClaim {
 	}
 }
 
-func newPetSet(name, ns, governingSvcName string, replicas int32, petMounts []api.VolumeMount, podMounts []api.VolumeMount, labels map[string]string) *apps.PetSet {
+func newPetSet(name, ns, governingSvcName string, replicas int32, petMounts []api.VolumeMount, podMounts []api.VolumeMount, labels map[string]string, readinessProbe *api.Probe) *apps.PetSet {
 	mounts := append(petMounts, podMounts...)
 	claims := []api.PersistentVolumeClaim{}
 	for _, m := range petMounts {
@@ -881,9 +1082,10 @@ func newPetSet(name, ns, governingSvcName string, replicas int32, petMounts []ap
 				Spec: api.PodSpec{
 					Containers: []api.Container{
 						{
-							Name:         "nginx",
-							Image:        "gcr.io/google_containers/nginx-slim:0.7",
-							VolumeMounts: mounts,
+							Name:           "nginx",
+							Image:          "gcr.io/google_containers/nginx-slim:0.7",
+							VolumeMounts:   mounts,
+							ReadinessProbe: readinessProbe,
 						},
 					},
 					Volumes: vols,
@@ -893,4 +1095,11 @@ func newPetSet(name, ns, governingSvcName string, replicas int32, petMounts []ap
 			ServiceName:          governingSvcName,
 		},
 	}
+}
+
+func newInitializedPetSet(name, ns, governingSvcName string, replicas int32, petMounts []api.VolumeMount, podMounts []api.VolumeMount, labels map[string]string, readinessProbe *api.Probe) *apps.PetSet {
+	ps := newPetSet(name, ns, governingSvcName, replicas, petMounts, podMounts, labels, readinessProbe)
+	ps.Spec.Template.ObjectMeta.Annotations = make(map[string]string)
+	ps.Spec.Template.ObjectMeta.Annotations["pod.alpha.kubernetes.io/initialized"] = "true"
+	return ps
 }
