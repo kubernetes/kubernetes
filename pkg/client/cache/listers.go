@@ -22,6 +22,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/batch"
@@ -30,6 +31,64 @@ import (
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/labels"
 )
+
+type appendFunc func(interface{})
+
+func ListAll(store Store, selector labels.Selector, appendFn appendFunc) error {
+	for _, m := range store.List() {
+		metadata, err := meta.Accessor(m)
+		if err != nil {
+			return err
+		}
+		if selector.Matches(labels.Set(metadata.GetLabels())) {
+			appendFn(m)
+		}
+	}
+	return nil
+}
+
+func ListAllByNamespace(indexer Indexer, namespace string, selector labels.Selector, appendFn appendFunc) error {
+	if namespace == api.NamespaceAll {
+		for _, m := range indexer.List() {
+			metadata, err := meta.Accessor(m)
+			if err != nil {
+				return err
+			}
+			if selector.Matches(labels.Set(metadata.GetLabels())) {
+				appendFn(m)
+			}
+		}
+		return nil
+	}
+
+	items, err := indexer.Index(NamespaceIndex, api.ObjectMeta{Namespace: namespace})
+	if err != nil {
+		// Ignore error; do slow search without index.
+		glog.Warningf("can not retrieve list of objects using index : %v", err)
+		for _, m := range indexer.List() {
+			metadata, err := meta.Accessor(m)
+			if err != nil {
+				return err
+			}
+			if metadata.GetNamespace() == namespace && selector.Matches(labels.Set(metadata.GetLabels())) {
+				appendFn(m)
+			}
+
+		}
+		return nil
+	}
+	for _, m := range items {
+		metadata, err := meta.Accessor(m)
+		if err != nil {
+			return err
+		}
+		if selector.Matches(labels.Set(metadata.GetLabels())) {
+			appendFn(m)
+		}
+	}
+
+	return nil
+}
 
 //  TODO: generate these classes and methods for all resources of interest using
 // a script.  Can use "go generate" once 1.4 is supported by all users.
@@ -44,74 +103,34 @@ import (
 // l := StoreToPodLister{s}
 // l.List()
 type StoreToPodLister struct {
-	Indexer
+	Indexer Indexer
 }
 
-// Please note that selector is filtering among the pods that have gotten into
-// the store; there may have been some filtering that already happened before
-// that.
-// We explicitly don't return api.PodList, to avoid expensive allocations, which
-// in most cases are unnecessary.
 func (s *StoreToPodLister) List(selector labels.Selector) (pods []*api.Pod, err error) {
-	for _, m := range s.Indexer.List() {
-		pod := m.(*api.Pod)
-		if selector.Matches(labels.Set(pod.Labels)) {
-			pods = append(pods, pod)
-		}
-	}
-	return pods, nil
+	err = ListAll(s.Indexer, selector, func(m interface{}) {
+		pods = append(pods, m.(*api.Pod))
+	})
+	return pods, err
 }
 
-// Pods is taking baby steps to be more like the api in pkg/client
 func (s *StoreToPodLister) Pods(namespace string) storePodsNamespacer {
-	return storePodsNamespacer{s.Indexer, namespace}
+	return storePodsNamespacer{Indexer: s.Indexer, namespace: namespace}
 }
 
 type storePodsNamespacer struct {
-	indexer   Indexer
+	Indexer   Indexer
 	namespace string
 }
 
-// Please note that selector is filtering among the pods that have gotten into
-// the store; there may have been some filtering that already happened before
-// that.
-// We explicitly don't return api.PodList, to avoid expensive allocations, which
-// in most cases are unnecessary.
 func (s storePodsNamespacer) List(selector labels.Selector) (pods []*api.Pod, err error) {
-	if s.namespace == api.NamespaceAll {
-		for _, m := range s.indexer.List() {
-			pod := m.(*api.Pod)
-			if selector.Matches(labels.Set(pod.Labels)) {
-				pods = append(pods, pod)
-			}
-		}
-		return pods, nil
-	}
-
-	key := &api.Pod{ObjectMeta: api.ObjectMeta{Namespace: s.namespace}}
-	items, err := s.indexer.Index(NamespaceIndex, key)
-	if err != nil {
-		// Ignore error; do slow search without index.
-		glog.Warningf("can not retrieve list of objects using index : %v", err)
-		for _, m := range s.indexer.List() {
-			pod := m.(*api.Pod)
-			if s.namespace == pod.Namespace && selector.Matches(labels.Set(pod.Labels)) {
-				pods = append(pods, pod)
-			}
-		}
-		return pods, nil
-	}
-	for _, m := range items {
-		pod := m.(*api.Pod)
-		if selector.Matches(labels.Set(pod.Labels)) {
-			pods = append(pods, pod)
-		}
-	}
-	return pods, nil
+	err = ListAllByNamespace(s.Indexer, s.namespace, selector, func(m interface{}) {
+		pods = append(pods, m.(*api.Pod))
+	})
+	return pods, err
 }
 
 func (s storePodsNamespacer) Get(name string) (*api.Pod, error) {
-	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
+	obj, exists, err := s.Indexer.GetByKey(s.namespace + "/" + name)
 	if err != nil {
 		return nil, err
 	}
@@ -119,15 +138,6 @@ func (s storePodsNamespacer) Get(name string) (*api.Pod, error) {
 		return nil, errors.NewNotFound(api.Resource("pod"), name)
 	}
 	return obj.(*api.Pod), nil
-}
-
-// Exists returns true if a pod matching the namespace/name of the given pod exists in the store.
-func (s *StoreToPodLister) Exists(pod *api.Pod) (bool, error) {
-	_, exists, err := s.Indexer.Get(pod)
-	if err != nil {
-		return false, err
-	}
-	return exists, nil
 }
 
 // NodeConditionPredicate is a function that indicates whether the given node's conditions meet
