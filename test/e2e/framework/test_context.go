@@ -21,7 +21,9 @@ import (
 	"os"
 	"time"
 
+	glog "github.com/golang/glog"
 	"github.com/onsi/ginkgo/config"
+	"github.com/spf13/viper"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 )
@@ -34,7 +36,8 @@ type TestContextType struct {
 	CertDir            string
 	Host               string
 	// TODO: Deprecating this over time... instead just use gobindata_util.go , see #23987.
-	RepoRoot       string
+	RepoRoot string
+
 	Provider       string
 	CloudConfig    CloudConfig
 	KubectlPath    string
@@ -180,4 +183,29 @@ func RegisterNodeFlags() {
 	//flag.BoolVar(&TestContext.CgroupsPerQOS, "cgroups-per-qos", false, "Enable creation of QoS cgroup hierarchy, if true top level QoS and pod cgroups are created.")
 	flag.StringVar(&TestContext.EvictionHard, "eviction-hard", "memory.available<250Mi,imagefs.available<10%", "The hard eviction thresholds. If set, pods get evicted when the specified resources drop below the thresholds.")
 	flag.StringVar(&TestContext.ManifestPath, "manifest-path", "", "The path to the static pod manifest file.")
+}
+
+// Enable viper configuration management of flags.
+func ViperizeFlags() {
+	// Add viper in a minimal way.
+	// Flag interop isnt possible, since 'go test' coupling to flag.Parse.
+	viper.SetConfigName("e2e")
+	viper.AddConfigPath(".")
+	viper.ReadInConfig()
+
+	// TODO @jayunit100: Maybe a more elegant viper-flag integration for the future?
+	// For now, we layer it on top, because 'flag' deps of 'go test' make pflag wrappers
+	// fragile, seeming to force 'flag' to have deep awareness of pflag params.
+	RegisterCommonFlags()
+	RegisterClusterFlags()
+	flag.Parse()
+
+	viperFlagSetter := func(f *flag.Flag) {
+		if viper.IsSet(f.Name) {
+			glog.V(4).Infof("[viper config] Overwriting, found a settting for %v %v", f.Name, f.Value)
+			f.Value.Set(viper.GetString(f.Name))
+		}
+	}
+	// Each flag that we've declared can be set via viper.
+	flag.VisitAll(viperFlagSetter)
 }
