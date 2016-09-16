@@ -137,7 +137,11 @@ func (rc *RouteController) reconcile(nodes []api.Node, routes []*cloudprovider.R
 				}
 			}(node.Name, nameHint, route)
 		} else {
-			rc.updateNetworkingCondition(node.Name, true)
+			// Update condition only if it doesn't reflect the current state.
+			_, condition := api.GetNodeCondition(&node.Status, api.NodeNetworkUnavailable)
+			if condition == nil || condition.Status != api.ConditionFalse {
+				rc.updateNetworkingCondition(node.Name, true)
+			}
 		}
 		nodeCIDRs[node.Name] = node.Spec.PodCIDR
 	}
