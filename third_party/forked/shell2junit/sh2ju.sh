@@ -113,7 +113,7 @@ function juLog() {
       H=`echo "$out" | egrep $icase "$ereg"`
       [ -n "$H" ] && err=1
   fi
-  echo "+++ error: $err"         | tee -a $outf
+  [ $err != 0 ] && echo "+++ error: $err"         | tee -a $outf
   rm -f $outf
 
   errMsg=`cat $errf`
