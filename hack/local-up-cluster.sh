@@ -27,6 +27,7 @@ RUNTIME_CONFIG=${RUNTIME_CONFIG:-""}
 NET_PLUGIN=${NET_PLUGIN:-""}
 NET_PLUGIN_DIR=${NET_PLUGIN_DIR:-""}
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+SERVICE_CLUSTER_IP_RANGE=${SERVICE_CLUSTER_IP_RANGE:-"10.0.0.0/24"}
 # We disable cluster DNS by default because this script uses docker0 (or whatever
 # container bridge docker is currently using) and we don't know the IP of the
 # DNS pod to pass in as --cluster-dns. To set this up by hand, set this flag
@@ -307,7 +308,7 @@ function start_apiserver {
       --insecure-bind-address="${API_HOST_IP}" \
       --insecure-port="${API_PORT}" \
       --etcd-servers="http://${ETCD_HOST}:${ETCD_PORT}" \
-      --service-cluster-ip-range="10.0.0.0/24" \
+      --service-cluster-ip-range="${SERVICE_CLUSTER_IP_RANGE}" \
       --cloud-provider="${CLOUD_PROVIDER}" \
       --cloud-config="${CLOUD_CONFIG}" \
       --cors-allowed-origins="${API_CORS_ALLOWED_ORIGINS}" >"${APISERVER_LOG}" 2>&1 &
