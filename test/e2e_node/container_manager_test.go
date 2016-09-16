@@ -18,9 +18,14 @@ package e2e_node
 
 import (
 	"fmt"
+	"os/exec"
+	"path"
+	"strconv"
+	"strings"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -28,63 +33,193 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = framework.KubeDescribe("Kubelet Container Manager", func() {
+const (
+	kubeletProcessname = "kubelet"
+)
+
+func getOOMScoreForPid(pid int) (int, error) {
+	procfsPath := path.Join("/proc", strconv.Itoa(pid), "oom_score_adj")
+	out, err := exec.Command("sudo", "cat", procfsPath).CombinedOutput()
+	if err != nil {
+		return 0, err
+	}
+	return strconv.Atoi(strings.TrimSpace(string(out)))
+}
+
+func validateOOMScoreAdjSetting(pid int, expectedOOMScoreAdj int) error {
+	oomScore, err := getOOMScoreForPid(pid)
+	if err != nil {
+		return fmt.Errorf("failed to get oom_score_adj for %d: %v", pid, err)
+	}
+	if expectedOOMScoreAdj != oomScore {
+		return fmt.Errorf("expected pid %d's oom_score_adj to be %d; found %d", pid, expectedOOMScoreAdj, oomScore)
+	}
+	return nil
+}
+
+func validateOOMScoreAdjSettingIsInRange(pid int, expectedMinOOMScoreAdj, expectedMaxOOMScoreAdj int) error {
+	oomScore, err := getOOMScoreForPid(pid)
+	if err != nil {
+		return fmt.Errorf("failed to get oom_score_adj for %d", pid)
+	}
+	if oomScore < expectedMinOOMScoreAdj {
+		return fmt.Errorf("expected pid %d's oom_score_adj to be >= %d; found %d", pid, expectedMinOOMScoreAdj, oomScore)
+	}
+	if oomScore < expectedMaxOOMScoreAdj {
+		return fmt.Errorf("expected pid %d's oom_score_adj to be < %d; found %d", pid, expectedMaxOOMScoreAdj, oomScore)
+	}
+	return nil
+}
+
+var _ = framework.KubeDescribe("Kubelet Container Manager [Serial]", func() {
 	f := framework.NewDefaultFramework("kubelet-container-manager")
-	var podClient *framework.PodClient
 
-	BeforeEach(func() {
-		podClient = f.PodClient()
-	})
-
-	Describe("oom score adjusting", func() {
-		Context("when scheduling a busybox command that always fails in a pod", func() {
-			var podName string
-
-			BeforeEach(func() {
-				podName = "bin-false" + string(uuid.NewUUID())
+	Describe("Validate OOM score adjustments", func() {
+		Context("once the node is setup", func() {
+			It("docker daemon's oom-score-adj should be -999", func() {
+				dockerPids, err := getPidsForProcess(dockerProcessName, dockerPidFile)
+				Expect(err).To(BeNil(), "failed to get list of docker daemon pids")
+				for _, pid := range dockerPids {
+					Eventually(func() error {
+						return validateOOMScoreAdjSetting(pid, -999)
+					}, 5*time.Minute, 30*time.Second).Should(BeNil())
+				}
+			})
+			It("Kubelet's oom-score-adj should be -999", func() {
+				kubeletPids, err := getPidsForProcess(kubeletProcessName, "")
+				Expect(err).To(BeNil(), "failed to get list of kubelet pids")
+				Expect(len(kubeletPids)).To(Equal(1), "expected only one kubelet process; found %d", len(kubeletPids))
+				Eventually(func() error {
+					return validateOOMScoreAdjSetting(kubeletPids[0], -999)
+				}, 5*time.Minute, 30*time.Second).Should(BeNil())
+			})
+			It("pod infra containers oom-score-adj should be -998 and best effort container's should be 1000", func() {
+				var err error
+				podClient := f.PodClient()
+				podName := "besteffort" + string(uuid.NewUUID())
 				podClient.Create(&api.Pod{
 					ObjectMeta: api.ObjectMeta{
 						Name: podName,
 					},
 					Spec: api.PodSpec{
-						// Don't restart the Pod since it is expected to exit
-						RestartPolicy: api.RestartPolicyNever,
 						Containers: []api.Container{
 							{
-								Image:   ImageRegistry[busyBoxImage],
-								Name:    podName,
-								Command: []string{"/bin/false"},
+								Image: ImageRegistry[serveHostnameImage],
+								Name:  podName,
 							},
 						},
 					},
 				})
-			})
-
-			It("should have an error terminated reason", func() {
+				var pausePids []int
+				By("checking infra container's oom-score-adj")
 				Eventually(func() error {
-					podData, err := podClient.Get(podName)
+					pausePids, err = getPidsForProcess("pause", "")
 					if err != nil {
-						return err
+						return fmt.Errorf("failed to get list of pause pids: %v", err)
 					}
-					if len(podData.Status.ContainerStatuses) != 1 {
-						return fmt.Errorf("expected only one container in the pod %q", podName)
-					}
-					contTerminatedState := podData.Status.ContainerStatuses[0].State.Terminated
-					if contTerminatedState == nil {
-						return fmt.Errorf("expected state to be terminated. Got pod status: %+v", podData.Status)
-					}
-					if contTerminatedState.Reason != "Error" {
-						return fmt.Errorf("expected terminated state reason to be error. Got %+v", contTerminatedState)
+					for _, pid := range pausePids {
+						if err := validateOOMScoreAdjSetting(pid, -998); err != nil {
+							return err
+						}
 					}
 					return nil
-				}, time.Minute, time.Second*4).Should(BeNil())
-			})
+				}, 2*time.Minute, time.Second*4).Should(BeNil())
+				var shPids []int
+				By("checking besteffort container's oom-score-adj")
+				Eventually(func() error {
+					shPids, err = getPidsForProcess("serve_hostname", "")
+					if err != nil {
+						return fmt.Errorf("failed to get list of serve hostname process pids: %v", err)
+					}
+					if len(shPids) != 1 {
+						return fmt.Errorf("expected only one serve_hostname process; found %d", len(shPids))
+					}
+					return validateOOMScoreAdjSetting(shPids[0], 1000)
+				}, 2*time.Minute, time.Second*4).Should(BeNil())
 
-			It("should be possible to delete", func() {
-				err := podClient.Delete(podName, &api.DeleteOptions{})
-				Expect(err).To(BeNil(), fmt.Sprintf("Error deleting Pod %v", err))
+			})
+			It("guaranteed container's oom-score-adj should be -998", func() {
+				podClient := f.PodClient()
+				podName := "guaranteed" + string(uuid.NewUUID())
+				podClient.Create(&api.Pod{
+					ObjectMeta: api.ObjectMeta{
+						Name: podName,
+					},
+					Spec: api.PodSpec{
+						Containers: []api.Container{
+							{
+								Image: ImageRegistry[nginxImage],
+								Name:  podName,
+								Resources: api.ResourceRequirements{
+									Limits: api.ResourceList{
+										"cpu":    resource.MustParse("100m"),
+										"memory": resource.MustParse("50Mi"),
+									},
+								},
+							},
+						},
+					},
+				})
+				var (
+					ngPids []int
+					err    error
+				)
+				Eventually(func() error {
+					ngPids, err = getPidsForProcess("nginx", "")
+					if err != nil {
+						return fmt.Errorf("failed to get list of nginx process pids: %v", err)
+					}
+					for _, pid := range ngPids {
+						if err := validateOOMScoreAdjSetting(pid, -998); err != nil {
+							return err
+						}
+					}
+
+					return nil
+				}, 2*time.Minute, time.Second*4).Should(BeNil())
+
+			})
+			It("burstable container's oom-score-adj should be between [2, 1000)", func() {
+				podClient := f.PodClient()
+				podName := "burstable" + string(uuid.NewUUID())
+				podClient.Create(&api.Pod{
+					ObjectMeta: api.ObjectMeta{
+						Name: podName,
+					},
+					Spec: api.PodSpec{
+						Containers: []api.Container{
+							{
+								Image: ImageRegistry[testWebServer],
+								Name:  podName,
+								Resources: api.ResourceRequirements{
+									Requests: api.ResourceList{
+										"cpu":    resource.MustParse("100m"),
+										"memory": resource.MustParse("50Mi"),
+									},
+								},
+							},
+						},
+					},
+				})
+				var (
+					wsPids []int
+					err    error
+				)
+				Eventually(func() error {
+					wsPids, err = getPidsForProcess("test-webserver", "")
+					if err != nil {
+						return fmt.Errorf("failed to get list of test-webserver process pids: %v", err)
+					}
+					for _, pid := range wsPids {
+						if err := validateOOMScoreAdjSettingIsInRange(pid, 2, 1000); err != nil {
+							return err
+						}
+					}
+					return nil
+				}, 2*time.Minute, time.Second*4).Should(BeNil())
+
+				// TODO: Test the oom-score-adj logic for burstable more accurately.
 			})
 		})
 	})
-
 })
