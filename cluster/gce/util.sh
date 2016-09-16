@@ -1132,34 +1132,36 @@ function kube-down() {
   echo "Bringing down cluster"
   set +e  # Do not stop on error
 
-  # Get the name of the managed instance group template before we delete the
-  # managed instance group. (The name of the managed instance group template may
-  # change during a cluster upgrade.)
-  local templates=$(get-template "${PROJECT}")
+  if [[ "${KUBE_DELETE_NODES:-}" != "false" ]]; then
+    # Get the name of the managed instance group template before we delete the
+    # managed instance group. (The name of the managed instance group template may
+    # change during a cluster upgrade.)
+    local templates=$(get-template "${PROJECT}")
 
-  for group in ${INSTANCE_GROUPS[@]:-}; do
-    if gcloud compute instance-groups managed describe "${group}" --project "${PROJECT}" --zone "${ZONE}" &>/dev/null; then
-      gcloud compute instance-groups managed delete \
-        --project "${PROJECT}" \
-        --quiet \
-        --zone "${ZONE}" \
-        "${group}" &
-    fi
-  done
+    for group in ${INSTANCE_GROUPS[@]:-}; do
+      if gcloud compute instance-groups managed describe "${group}" --project "${PROJECT}" --zone "${ZONE}" &>/dev/null; then
+        gcloud compute instance-groups managed delete \
+          --project "${PROJECT}" \
+          --quiet \
+          --zone "${ZONE}" \
+          "${group}" &
+      fi
+    done
 
-  # Wait for last batch of jobs
-  kube::util::wait-for-jobs || {
-    echo -e "Failed to delete instance group(s)." >&2
-  }
+    # Wait for last batch of jobs
+    kube::util::wait-for-jobs || {
+      echo -e "Failed to delete instance group(s)." >&2
+    }
 
-  for template in ${templates[@]:-}; do
-    if gcloud compute instance-templates describe --project "${PROJECT}" "${template}" &>/dev/null; then
-      gcloud compute instance-templates delete \
-        --project "${PROJECT}" \
-        --quiet \
-        "${template}"
-    fi
-  done
+    for template in ${templates[@]:-}; do
+      if gcloud compute instance-templates describe --project "${PROJECT}" "${template}" &>/dev/null; then
+        gcloud compute instance-templates delete \
+          --project "${PROJECT}" \
+          --quiet \
+          "${template}"
+      fi
+    done
+  fi
 
   local -r REPLICA_NAME="$(get-replica-name)"
 
@@ -1261,23 +1263,25 @@ function kube-down() {
     fi
   fi
 
-  # Find out what minions are running.
-  local -a minions
-  minions=( $(gcloud compute instances list \
-                --project "${PROJECT}" --zones "${ZONE}" \
-                --regexp "${NODE_INSTANCE_PREFIX}-.+" \
-                --format='value(name)') )
-  # If any minions are running, delete them in batches.
-  while (( "${#minions[@]}" > 0 )); do
-    echo Deleting nodes "${minions[*]::${batch}}"
-    gcloud compute instances delete \
-      --project "${PROJECT}" \
-      --quiet \
-      --delete-disks boot \
-      --zone "${ZONE}" \
-      "${minions[@]::${batch}}"
-    minions=( "${minions[@]:${batch}}" )
-  done
+  if [[ "${KUBE_DELETE_NODES:-}" != "false" ]]; then
+    # Find out what minions are running.
+    local -a minions
+    minions=( $(gcloud compute instances list \
+                  --project "${PROJECT}" --zones "${ZONE}" \
+                  --regexp "${NODE_INSTANCE_PREFIX}-.+" \
+                  --format='value(name)') )
+    # If any minions are running, delete them in batches.
+    while (( "${#minions[@]}" > 0 )); do
+      echo Deleting nodes "${minions[*]::${batch}}"
+      gcloud compute instances delete \
+        --project "${PROJECT}" \
+        --quiet \
+        --delete-disks boot \
+        --zone "${ZONE}" \
+        "${minions[@]::${batch}}"
+      minions=( "${minions[@]:${batch}}" )
+    done
+  fi
 
   # Delete routes.
   local -a routes
