@@ -396,9 +396,14 @@ func (reaper *DeploymentReaper) Stop(namespace, name string, timeout time.Durati
 	errList := []error{}
 	for _, rc := range rsList.Items {
 		if err := rsReaper.Stop(rc.Namespace, rc.Name, timeout, gracePeriod); err != nil {
-			if !errors.IsNotFound(err) {
-				errList = append(errList, err)
+			// Ignore generic not found error and the one from scaler
+			// NOTE: this check is cherrypicked into 1.2 for fixing kubernetes-e2e-gke-1.2-1.4-upgrade-cluster
+			// test flake and wasn't in 1.2 kubectl client
+			scaleGetErr, ok := err.(ScaleError)
+			if errors.IsNotFound(err) || (ok && errors.IsNotFound(scaleGetErr.ActualError)) {
+				continue
 			}
+			errList = append(errList, err)
 		}
 	}
 	if len(errList) > 0 {
