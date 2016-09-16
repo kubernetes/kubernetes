@@ -214,7 +214,7 @@ func (plugin *azureDataDiskPlugin) NewDetacher() (volume.Detacher, error) {
 }
 
 // Detach detaches disk from Azure VM.
-func (detacher *azureDiskDetacher) Detach(diskName string, nodeName types.NodeName) error {
+func (detacher *azureDiskDetacher) Detach(diskName string, nodeName types.NodeName, _ *volume.Spec) error {
 	if diskName == "" {
 		return fmt.Errorf("invalid disk to detach: %q", diskName)
 	}

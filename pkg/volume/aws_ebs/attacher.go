@@ -186,7 +186,7 @@ func (plugin *awsElasticBlockStorePlugin) NewDetacher() (volume.Detacher, error)
 	}, nil
 }
 
-func (detacher *awsElasticBlockStoreDetacher) Detach(deviceMountPath string, nodeName types.NodeName) error {
+func (detacher *awsElasticBlockStoreDetacher) Detach(deviceMountPath string, nodeName types.NodeName, _ *volume.Spec) error {
 	volumeID := path.Base(deviceMountPath)
 
 	attached, err := detacher.awsVolumes.DiskIsAttached(volumeID, nodeName)

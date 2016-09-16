@@ -209,7 +209,7 @@ func (plugin *cinderPlugin) NewDetacher() (volume.Detacher, error) {
 	}, nil
 }
 
-func (detacher *cinderDiskDetacher) Detach(deviceMountPath string, nodeName types.NodeName) error {
+func (detacher *cinderDiskDetacher) Detach(deviceMountPath string, nodeName types.NodeName, _ *volume.Spec) error {
 	volumeID := path.Base(deviceMountPath)
 	instances, res := detacher.cinderProvider.Instances()
 	if !res {
