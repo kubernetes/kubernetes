@@ -165,7 +165,7 @@ func (c *SSHTunneler) nodesSyncLoop() {
 	// TODO (cjcullen) make this watch.
 	go wait.Until(func() {
 		addrs, err := c.getAddresses()
-		glog.Infof("Calling update w/ addrs: %v", addrs)
+		glog.V(4).Infof("Calling update w/ addrs: %v", addrs)
 		if err != nil {
 			glog.Errorf("Failed to getAddresses: %v", err)
 		}
