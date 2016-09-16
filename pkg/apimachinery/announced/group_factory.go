@@ -243,7 +243,5 @@ func (gmf *GroupMetaFactory) RegisterAndEnable() error {
 		return err
 	}
 
-	// TODO: find a sane way to register the rest mappers.
-	api.RegisterRESTMapper(registered.GroupOrDie(gmf.GroupArgs.GroupName).RESTMapper)
 	return nil
 }
