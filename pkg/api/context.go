@@ -59,6 +59,9 @@ const (
 
 	// uidKey is the context key for the uid to assign to an object on create.
 	uidKey
+
+	// userAgentKey is the context key for the request user agent.
+	userAgentKey
 )
 
 // NewContext instantiates a base context object for request flows.
@@ -135,4 +138,15 @@ func WithUID(parent Context, uid types.UID) Context {
 func UIDFrom(ctx Context) (types.UID, bool) {
 	uid, ok := ctx.Value(uidKey).(types.UID)
 	return uid, ok
+}
+
+// WithUserAgent returns a copy of parent in which the user value is set
+func WithUserAgent(parent Context, userAgent string) Context {
+	return WithValue(parent, userAgentKey, userAgent)
+}
+
+// UserAgentFrom returns the value of the userAgent key on the ctx
+func UserAgentFrom(ctx Context) (string, bool) {
+	userAgent, ok := ctx.Value(userAgentKey).(string)
+	return userAgent, ok
 }
