@@ -277,7 +277,7 @@ func (jm *JobController) enqueueController(obj interface{}) {
 	// all controllers there will still be some replica instability. One way to handle this is
 	// by querying the store for all controllers that this rc overlaps, as well as all
 	// controllers that overlap this rc, and sorting them.
-	jm.queue.AddRateLimited(key)
+	jm.queue.Add(key)
 }
 
 // worker runs a worker thread that just dequeues items, processes them, and marks them done.
@@ -322,7 +322,6 @@ func (jm *JobController) syncJob(key string) error {
 		return nil
 	}
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Unable to retrieve job %v from store: %v", key, err))
 		return err
 	}
 	job := *obj.(*batch.Job)
@@ -340,7 +339,6 @@ func (jm *JobController) syncJob(key string) error {
 	selector, _ := unversioned.LabelSelectorAsSelector(job.Spec.Selector)
 	pods, err := jm.podStore.Pods(job.Namespace).List(selector)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Error getting pods for job %q: %v", key, err))
 		return err
 	}
 
