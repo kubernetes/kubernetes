@@ -100,6 +100,8 @@ pkg/kubelet/api/v1alpha1/runtime/api.pb.go:	ContainerPort *int32 `protobuf:"vari
 pkg/kubelet/api/v1alpha1/runtime/api.pb.go:	OomScoreAdj      *int64 `protobuf:"varint,5,opt,name=oom_score_adj,json=oomScoreAdj" json:"oom_score_adj,omitempty"`
 pkg/kubelet/api/v1alpha1/runtime/api.proto:    optional int32 container_port = 3;
 pkg/kubelet/api/v1alpha1/runtime/api.proto:    optional int64 oom_score_adj = 5;
+pkg/kubelet/cm/container_manager_linux.go:		glog.V(3).Infof("Failed to apply oom_score_adj %d for pid %d: %v", oomScoreAdj, pid, err)
+pkg/kubelet/cm/container_manager_linux.go:	glog.V(5).Infof("attempting to apply oom_score_adj of %d to pid %d", oomScoreAdj, pid)
 pkg/kubelet/network/hairpin/hairpin.go:	hairpinModeRelativePath = "hairpin_mode"
 pkg/kubelet/qos/policy_test.go:			t.Errorf("oom_score_adj should be between %d and %d, but was %d", test.lowOOMScoreAdj, test.highOOMScoreAdj, oomScoreAdj)
 pkg/kubelet/qos/policy_test.go:	highOOMScoreAdj int // The min oom_score_adj score the container should be assigned.
@@ -117,6 +119,12 @@ test/e2e/common/host_path.go:			fmt.Sprintf("--retry_time=%d", retryDuration),
 test/e2e/es_cluster_logging.go:		framework.Failf("No cluster_name field in Elasticsearch response: %v", esResponse)
 test/e2e/es_cluster_logging.go:	// Check to see if have a cluster_name field.
 test/e2e/es_cluster_logging.go:	clusterName, ok := esResponse["cluster_name"]
+test/e2e_node/container_manager_test.go:		return fmt.Errorf("expected pid %d's oom_score_adj to be %d; found %d", pid, expectedOOMScoreAdj, oomScore)
+test/e2e_node/container_manager_test.go:		return fmt.Errorf("expected pid %d's oom_score_adj to be < %d; found %d", pid, expectedMaxOOMScoreAdj, oomScore)
+test/e2e_node/container_manager_test.go:		return fmt.Errorf("expected pid %d's oom_score_adj to be >= %d; found %d", pid, expectedMinOOMScoreAdj, oomScore)
+test/e2e_node/container_manager_test.go:		return fmt.Errorf("failed to get oom_score_adj for %d", pid)
+test/e2e_node/container_manager_test.go:		return fmt.Errorf("failed to get oom_score_adj for %d: %v", pid, err)
+test/e2e_node/container_manager_test.go:	procfsPath := path.Join("/proc", strconv.Itoa(pid), "oom_score_adj")
 test/images/mount-tester/mt.go:	flag.BoolVar(&breakOnExpectedContent, "break_on_expected_content", true, "Break out of loop on expected content, (use with --file_content_in_loop flag only)")
 test/images/mount-tester/mt.go:	flag.IntVar(&retryDuration, "retry_time", 180, "Retry time during the loop")
 test/images/mount-tester/mt.go:	flag.StringVar(&readFileContentInLoopPath, "file_content_in_loop", "", "Path to read the file content in loop from")
