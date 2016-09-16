@@ -72,7 +72,7 @@ function set-node-image() {
   if [[ "${NODE_OS_DISTRIBUTION}" == "gci" ]]; then
     # If the node image is not set, we use the latest GCI image.
     # Otherwise, we respect whatever is set by the user.
-    NODE_IMAGE=${KUBE_GCE_NODE_IMAGE:-${GCI_VERSION}}
+    NODE_IMAGE=${KUBE_GCE_NODE_IMAGE:-"$(get_latest_gci_image)"}
     NODE_IMAGE_PROJECT=${KUBE_GCE_NODE_PROJECT:-google-containers}
   elif [[ "${NODE_OS_DISTRIBUTION}" == "debian" ]]; then
     NODE_IMAGE=${KUBE_GCE_NODE_IMAGE:-${CVM_VERSION}}
