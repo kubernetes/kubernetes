@@ -42,6 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/daemon"
 	"k8s.io/kubernetes/pkg/controller/deployment"
 	endpointcontroller "k8s.io/kubernetes/pkg/controller/endpoint"
+	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/pkg/controller/job"
 	namespacecontroller "k8s.io/kubernetes/pkg/controller/namespace"
 	nodecontroller "k8s.io/kubernetes/pkg/controller/node"
@@ -262,8 +263,11 @@ func (s *CMServer) Run(_ []string) error {
 
 		if containsResource(resources, "daemonsets") {
 			glog.Infof("Starting daemon set controller")
-			go daemon.NewDaemonSetsControllerFromClient(clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "daemon-set-controller")), s.resyncPeriod, int(s.LookupCacheSizeForDaemonSet)).
+			informerFactory := informers.NewSharedInformerFactory(clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "daemon-set-controller")), s.resyncPeriod())
+
+			go daemon.NewDaemonSetsController(informerFactory.DaemonSets(), informerFactory.Pods(), informerFactory.Nodes(), clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "daemon-set-controller")), int(s.LookupCacheSizeForDaemonSet)).
 				Run(int(s.ConcurrentDaemonSetSyncs), wait.NeverStop)
+			informerFactory.Start(wait.NeverStop)
 		}
 
 		if containsResource(resources, "jobs") {
