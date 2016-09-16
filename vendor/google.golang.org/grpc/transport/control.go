@@ -72,6 +72,11 @@ type resetStream struct {
 
 func (*resetStream) item() {}
 
+type goAway struct {
+}
+
+func (*goAway) item() {}
+
 type flushIO struct {
 }
 
