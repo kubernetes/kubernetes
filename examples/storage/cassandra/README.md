@@ -64,7 +64,7 @@ This example also uses some of the core components of Kubernetes:
 - [_Pods_](../../../docs/user-guide/pods.md)
 - [ _Services_](../../../docs/user-guide/services.md)
 - [_Replication Controllers_](../../../docs/user-guide/replication-controller.md)
-- [_Pet Sets_](../../../docs/user-guide/petsets.md)
+- [_Pet Sets_](http://kubernetes.io/docs/user-guide/petset/)
 - [_Daemon Sets_](../../../docs/admin/daemons.md)
 
 ## Prerequisites
@@ -205,7 +205,7 @@ Pet Sets are a new feature that was added as an <i>Alpha</i> component in Kubern
 1.3.  Deploying stateful distributed applications, like Cassandra, within a clustered
 environment can be challenging.  We implemented Pet Set to greatly simplify this
 process.  Multiple Pet Set features are used within this example, but is out of
-scope of this documentation.  [Please refer to the Pet Set documentation.](../../../docs/user-guide/petsets.md)
+scope of this documentation.  [Please refer to the Pet Set documentation.](http://kubernetes.io/docs/user-guide/petset/)
 
 The Pet Set manifest that is included below, creates a Cassandra ring that consists
 of three pods.
@@ -432,7 +432,7 @@ functionality, like a Deployment, ReplicaSet, Replication Controller, or Job.
 
 ## Step 4: Delete Cassandra Pet Set
 
-There are some limitations with the Alpha release of Pet Set in 1.3. From the [documentation](../../../docs/user-guide/petsets.md):
+There are some limitations with the Alpha release of Pet Set in 1.3. From the [documentation](http://kubernetes.io/docs/user-guide/petset/):
 
 "Deleting the Pet Set will not delete any pets. You will either have to manually scale it down to 0 pets first, or delete the pets yourself.
 Deleting and/or scaling a Pet Set down will not delete the volumes associated with the Pet Set. This is done to ensure safety first, your data is more valuable than an auto purge of all related Pet Set resources. Deleting the Persistent Volume Claims will result in a deletion of the associated volumes."
