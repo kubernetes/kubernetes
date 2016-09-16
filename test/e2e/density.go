@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 	utiluuid "k8s.io/kubernetes/pkg/util/uuid"
+	"k8s.io/kubernetes/pkg/util/workqueue"
 	"k8s.io/kubernetes/pkg/watch"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -662,10 +663,11 @@ var _ = framework.KubeDescribe("Density", func() {
 				framework.LogSuspiciousLatency(startupLag, e2eLag, nodeCount, c)
 
 				By("Removing additional replication controllers")
-				for i := 1; i <= nodeCount; i++ {
-					name := additionalPodsPrefix + "-" + strconv.Itoa(i)
-					c.ReplicationControllers(ns).Delete(name, nil)
+				deleteRC := func(i int) {
+					name := additionalPodsPrefix + "-" + strconv.Itoa(i+1)
+					framework.ExpectNoError(framework.DeleteRCAndWaitForGC(c, ns, name))
 				}
+				workqueue.Parallelize(16, nodeCount, deleteRC)
 			}
 
 			cleanupDensityTest(dConfig)
