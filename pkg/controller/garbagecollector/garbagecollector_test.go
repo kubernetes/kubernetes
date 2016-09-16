@@ -298,8 +298,9 @@ func TestProcessEvent(t *testing.T) {
 				uidToNode: make(map[types.UID]*node),
 			},
 			gc: &GarbageCollector{
-				dirtyQueue: workqueue.NewTimedWorkQueue(),
-				clock:      clock.RealClock{},
+				dirtyQueue:       workqueue.NewTimedWorkQueue(),
+				clock:            clock.RealClock{},
+				absentOwnerCache: NewUIDCache(2),
 			},
 		}
 		for i := 0; i < len(scenario.events); i++ {
