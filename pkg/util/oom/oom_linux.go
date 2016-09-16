@@ -20,6 +20,7 @@ package oom
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path"
 	"strconv"
@@ -65,21 +66,23 @@ func applyOOMScoreAdj(pid int, oomScoreAdj int) error {
 	maxTries := 2
 	oomScoreAdjPath := path.Join("/proc", pidStr, "oom_score_adj")
 	value := strconv.Itoa(oomScoreAdj)
+	glog.V(4).Infof("attempting to set %q to %q", oomScoreAdjPath, value)
 	var err error
 	for i := 0; i < maxTries; i++ {
-		f, err := os.Open(oomScoreAdjPath)
+		err = ioutil.WriteFile(oomScoreAdjPath, []byte(value), 0700)
 		if err != nil {
 			if os.IsNotExist(err) {
+				glog.V(2).Infof("%q does not exist", oomScoreAdjPath)
 				return os.ErrNotExist
 			}
-			err = fmt.Errorf("failed to apply oom-score-adj to pid %d (%v)", pid, err)
-			continue
-		}
-		if _, err := f.Write([]byte(value)); err != nil {
-			err = fmt.Errorf("failed to apply oom-score-adj to pid %d (%v)", pid, err)
+
+			glog.V(3).Info(err)
 			continue
 		}
 		return nil
+	}
+	if err != nil {
+		glog.V(2).Infof("failed to set %q to %q: %v", oomScoreAdjPath, value, err)
 	}
 	return err
 }
