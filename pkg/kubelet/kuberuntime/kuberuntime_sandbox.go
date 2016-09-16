@@ -17,6 +17,7 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"fmt"
 	"sort"
 
 	"github.com/golang/glog"
@@ -25,10 +26,30 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/kubelet/util/format"
 )
 
+// createPodSandbox creates a pod sandbox and returns (podSandBoxID, message, error).
+func (m *kubeGenericRuntimeManager) createPodSandbox(pod *api.Pod, attempt uint32) (string, string, error) {
+	podSandboxConfig, err := m.generatePodSandboxConfig(pod, attempt)
+	if err != nil {
+		message := fmt.Sprintf("GeneratePodSandboxConfig for pod %q failed: %v", format.Pod(pod), err)
+		glog.Error(message)
+		return "", message, err
+	}
+
+	podSandBoxID, err := m.runtimeService.RunPodSandbox(podSandboxConfig)
+	if err != nil {
+		message := fmt.Sprintf("CreatePodSandbox for pod %q failed: %v", format.Pod(pod), err)
+		glog.Error(message)
+		return "", message, err
+	}
+
+	return podSandBoxID, "", nil
+}
+
 // generatePodSandboxConfig generates pod sandbox config from api.Pod.
-func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(pod *api.Pod, podIP string, attempt uint32) (*runtimeApi.PodSandboxConfig, error) {
+func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(pod *api.Pod, attempt uint32) (*runtimeApi.PodSandboxConfig, error) {
 	// TODO: deprecating podsandbox resource requirements in favor of the pod level cgroup
 	// Refer https://github.com/kubernetes/kubernetes/issues/29871
 	podUID := string(pod.UID)
@@ -63,7 +84,8 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(pod *api.Pod, podIP
 	cgroupParent := ""
 	portMappings := []*runtimeApi.PortMapping{}
 	for _, c := range pod.Spec.Containers {
-		opts, err := m.runtimeHelper.GenerateRunContainerOptions(pod, &c, podIP)
+		// TODO: use a separate interface to only generate portmappings
+		opts, err := m.runtimeHelper.GenerateRunContainerOptions(pod, &c, "")
 		if err != nil {
 			return nil, err
 		}
