@@ -21,7 +21,6 @@ import (
 	"os"
 	"time"
 
-	glog "github.com/golang/glog"
 	"github.com/onsi/ginkgo/config"
 	"github.com/spf13/viper"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
@@ -78,6 +77,15 @@ type TestContextType struct {
 	FeatureGates string
 	// Node e2e specific test context
 	NodeTestContextType
+
+	// Viper-only parameters.  These will in time replace all flags.
+	// Example: Create a file 'e2e.json' with the following:
+	// 	"Density":{
+	// 		"AllLatencyTests":"true"
+	// 	}
+	Density struct {
+		AllLatencyTests bool
+	}
 }
 
 // NodeTestContextType is part of TestContextType, it is shared by all node e2e test.
@@ -200,12 +208,20 @@ func ViperizeFlags() {
 	RegisterClusterFlags()
 	flag.Parse()
 
-	viperFlagSetter := func(f *flag.Flag) {
-		if viper.IsSet(f.Name) {
-			glog.V(4).Infof("[viper config] Overwriting, found a settting for %v %v", f.Name, f.Value)
-			f.Value.Set(viper.GetString(f.Name))
-		}
-	}
-	// Each flag that we've declared can be set via viper.
-	flag.VisitAll(viperFlagSetter)
+	viper.Unmarshal(&TestContext)
+
+	/** This can be used to overwrite a flag value.
+	*
+	*	viperFlagSetter := func(f *flag.Flag) {
+	*		if viper.IsSet(f.Name) {
+	*			glog.V(4).Infof("[viper config] Overwriting, found a settting for %v %v", f.Name, f.Value)
+	*			viper.Unmarshal(&TestContext)
+	*			// f.Value.Set(viper.GetString(f.Name))
+	*		}
+	*	}
+	*	// Each flag that we've declared can be set via viper.
+	*	flag.VisitAll(viperFlagSetter)
+	*
+	*
+	 */
 }
