@@ -326,6 +326,7 @@ func (cm *containerManagerImpl) setupNode() error {
 
 	systemContainers := []*systemContainer{}
 	if cm.ContainerRuntime == "docker" {
+		dockerVersion := getDockerVersion(cm.cadvisorInterface)
 		if cm.RuntimeCgroupsName != "" {
 			cont := newSystemCgroups(cm.RuntimeCgroupsName)
 			var capacity = api.ResourceList{}
@@ -351,13 +352,17 @@ func (cm *containerManagerImpl) setupNode() error {
 					},
 				},
 			}
-			dockerVersion := getDockerVersion(cm.cadvisorInterface)
 			cont.ensureStateFunc = func(manager *fs.Manager) error {
-				return ensureDockerInContainer(dockerVersion, -900, dockerContainer)
+				return ensureDockerInContainer(dockerVersion, qos.DockerOOMScoreAdj, dockerContainer)
 			}
 			systemContainers = append(systemContainers, cont)
 		} else {
 			cm.periodicTasks = append(cm.periodicTasks, func() {
+				glog.V(10).Infof("Adding docker daemon periodic tasks")
+				if err := ensureDockerInContainer(dockerVersion, qos.DockerOOMScoreAdj, nil); err != nil {
+					glog.Error(err)
+					return
+				}
 				cont, err := getContainerNameForProcess(dockerProcessName, dockerPidFile)
 				if err != nil {
 					glog.Error(err)
@@ -401,11 +406,15 @@ func (cm *containerManagerImpl) setupNode() error {
 			},
 		}
 		cont.ensureStateFunc = func(_ *fs.Manager) error {
-			return manager.Apply(os.Getpid())
+			return ensureProcessInContainerWithOOMScore(os.Getpid(), qos.KubeletOOMScoreAdj, &manager)
 		}
 		systemContainers = append(systemContainers, cont)
 	} else {
 		cm.periodicTasks = append(cm.periodicTasks, func() {
+			if err := ensureProcessInContainerWithOOMScore(os.Getpid(), qos.KubeletOOMScoreAdj, nil); err != nil {
+				glog.Error(err)
+				return
+			}
 			cont, err := getContainer(os.Getpid())
 			if err != nil {
 				glog.Errorf("failed to find cgroups of kubelet - %v", err)
@@ -515,16 +524,18 @@ func (cm *containerManagerImpl) SystemCgroupsLimit() api.ResourceList {
 }
 
 func isProcessRunningInHost(pid int) (bool, error) {
-	// Get init mount namespace. Mount namespace is unique for all containers.
-	initMntNs, err := os.Readlink("/proc/1/ns/mnt")
+	// Get init pid namespace.
+	initPidNs, err := os.Readlink("/proc/1/ns/pid")
 	if err != nil {
-		return false, fmt.Errorf("failed to find mount namespace of init process")
+		return false, fmt.Errorf("failed to find pid namespace of init process")
 	}
-	processMntNs, err := os.Readlink(fmt.Sprintf("/proc/%d/ns/mnt", pid))
+	glog.V(10).Infof("init pid ns is %q", initPidNs)
+	processPidNs, err := os.Readlink(fmt.Sprintf("/proc/%d/ns/pid", pid))
 	if err != nil {
-		return false, fmt.Errorf("failed to find mount namespace of process %q", pid)
+		return false, fmt.Errorf("failed to find pid namespace of process %q", pid)
 	}
-	return initMntNs == processMntNs, nil
+	glog.V(10).Infof("Pid %d pid ns is %q", pid, processPidNs)
+	return initPidNs == processPidNs, nil
 }
 
 func getPidFromPidFile(pidFile string) (int, error) {
@@ -566,7 +577,6 @@ func ensureDockerInContainer(dockerVersion semver.Version, oomScoreAdj int, mana
 	if dockerVersion.GTE(containerdVersion) {
 		dockerProcs = append(dockerProcs, process{containerdProcessName, containerdPidFile})
 	}
-
 	var errs []error
 	for _, proc := range dockerProcs {
 		pids, err := getPidsForProcess(proc.name, proc.file)
@@ -577,7 +587,7 @@ func ensureDockerInContainer(dockerVersion semver.Version, oomScoreAdj int, mana
 
 		// Move if the pid is not already in the desired container.
 		for _, pid := range pids {
-			if err := ensureProcessInContainer(pid, oomScoreAdj, manager); err != nil {
+			if err := ensureProcessInContainerWithOOMScore(pid, oomScoreAdj, manager); err != nil {
 				errs = append(errs, fmt.Errorf("errors moving %q pid: %v", proc.name, err))
 			}
 		}
@@ -585,32 +595,37 @@ func ensureDockerInContainer(dockerVersion semver.Version, oomScoreAdj int, mana
 	return utilerrors.NewAggregate(errs)
 }
 
-func ensureProcessInContainer(pid int, oomScoreAdj int, manager *fs.Manager) error {
+func ensureProcessInContainerWithOOMScore(pid int, oomScoreAdj int, manager *fs.Manager) error {
 	if runningInHost, err := isProcessRunningInHost(pid); err != nil {
 		// Err on the side of caution. Avoid moving the docker daemon unless we are able to identify its context.
 		return err
 	} else if !runningInHost {
 		// Process is running inside a container. Don't touch that.
+		glog.V(2).Infof("pid %d is not running in the host namespaces", pid)
 		return nil
 	}
 
 	var errs []error
-	cont, err := getContainer(pid)
-	if err != nil {
-		errs = append(errs, fmt.Errorf("failed to find container of PID %d: %v", pid, err))
-	}
-
-	if cont != manager.Cgroups.Name {
-		err = manager.Apply(pid)
+	if manager != nil {
+		cont, err := getContainer(pid)
 		if err != nil {
-			errs = append(errs, fmt.Errorf("failed to move PID %d (in %q) to %q", pid, cont, manager.Cgroups.Name))
+			errs = append(errs, fmt.Errorf("failed to find container of PID %d: %v", pid, err))
+		}
+
+		if cont != manager.Cgroups.Name {
+			err = manager.Apply(pid)
+			if err != nil {
+				errs = append(errs, fmt.Errorf("failed to move PID %d (in %q) to %q: %v", pid, cont, manager.Cgroups.Name, err))
+			}
 		}
 	}
 
 	// Also apply oom-score-adj to processes
 	oomAdjuster := oom.NewOOMAdjuster()
+	glog.V(5).Infof("attempting to apply oom_score_adj of %d to pid %d", oomScoreAdj, pid)
 	if err := oomAdjuster.ApplyOOMScoreAdj(pid, oomScoreAdj); err != nil {
-		errs = append(errs, fmt.Errorf("failed to apply oom score %d to PID %d", oomScoreAdj, pid))
+		glog.V(3).Infof("Failed to apply oom_score_adj %d for pid %d: %v", oomScoreAdj, pid, err)
+		errs = append(errs, fmt.Errorf("failed to apply oom score %d to PID %d: %v", oomScoreAdj, pid, err))
 	}
 	return utilerrors.NewAggregate(errs)
 }
