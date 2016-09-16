@@ -88,7 +88,7 @@ kubectl create -f examples/javaee/mysql-service.yaml
 Get status of the service:
 
 ```sh
-kubectl get -w se
+kubectl get -w svc
 NAME            LABELS                                    SELECTOR                                IP(S)          PORT(S)
 kubernetes      component=apiserver,provider=kubernetes   <none>                                  10.247.0.1     443/TCP
 mysql-service   context=docker-k8s-lab,name=mysql-pod     context=docker-k8s-lab,name=mysql-pod   10.247.63.43   3306/TCP
