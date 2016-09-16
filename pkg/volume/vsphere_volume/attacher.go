@@ -191,7 +191,7 @@ func (plugin *vsphereVolumePlugin) NewDetacher() (volume.Detacher, error) {
 }
 
 // Detach the given device from the given host.
-func (detacher *vsphereVMDKDetacher) Detach(deviceMountPath string, hostName string) error {
+func (detacher *vsphereVMDKDetacher) Detach(deviceMountPath string, hostName string, _ *volume.Spec) error {
 
 	volPath := getVolPathfromDeviceMountPath(deviceMountPath)
 	attached, err := detacher.vsphereVolumes.DiskIsAttached(volPath, hostName)

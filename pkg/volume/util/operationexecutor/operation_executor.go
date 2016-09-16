@@ -574,7 +574,7 @@ func (oe *operationExecutor) generateDetachVolumeFunc(
 			err = oe.verifyVolumeIsSafeToDetach(volumeToDetach)
 		}
 		if err == nil {
-			err = volumeDetacher.Detach(volumeName, volumeToDetach.NodeName)
+			err = volumeDetacher.Detach(volumeName, volumeToDetach.NodeName, volumeToDetach.VolumeSpec)
 		}
 		if err != nil {
 			// On failure, add volume back to ReportAsAttached list
