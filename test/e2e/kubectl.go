@@ -1107,6 +1107,14 @@ var _ = Describe("Kubectl client", func() {
 
 		It("should create a job from an image when restart is Never [Conformance]", func() {
 			SkipUnlessServerVersionGTE(jobsVersion, c)
+			// if the version is <= 1.3.0 the job with --restart=Never is a pod, see: https://github.com/kubernetes/kubernetes/commit/d76fa8a1197a6329da3125c8bfb2202dfead1273
+			isPod, err := serverVersionGTE(version.MustParse("v1.3.0"), c)
+			if err != nil {
+				Failf("Failed version check: %v", err)
+			}
+			if isPod {
+				Skipf("Skipping test for version >= v1.3.0 since jobs started with --restart=Never are pods")
+			}
 
 			By("running the image " + nginxImage)
 			runKubectlOrDie("run", jobName, "--restart=Never", "--image="+nginxImage, nsFlag)
