@@ -234,8 +234,39 @@ func (rm *ReplicationManager) Run(workers int, stopCh <-chan struct{}) {
 
 // getPodController returns the controller managing the given pod.
 // TODO: Surface that we are ignoring multiple controllers for a single pod.
-// TODO: use ownerReference.Controller to determine if the rc controls the pod.
 func (rm *ReplicationManager) getPodController(pod *api.Pod) *api.ReplicationController {
+	if rm.garbageCollectorEnabled {
+		controllerRef := controller.GetControllerOf(&pod.ObjectMeta)
+		if controllerRef == nil || controllerRef.Kind != getRCKind().Kind {
+			glog.V(4).Infof("No controllers found for pod %v, replication manager will avoid syncing", pod.Name)
+			return nil
+		}
+		// TODO: Ideally we should reuse controller.KeyFunc, but it cannot take
+		// OwnerReference as the parameter.
+		var key string
+		if len(pod.Namespace) > 0 {
+			key = pod.Namespace + "/" + controllerRef.Name
+		} else {
+			key = controllerRef.Name
+		}
+		obj, exists, err := rm.rcStore.GetByKey(key)
+		if err != nil {
+			glog.Errorf("Error while taking controller from store: %v", err)
+			return nil
+		}
+		if !exists {
+			glog.V(4).Infof("No controllers found with %s key", key)
+			return nil
+		}
+		rc, ok := obj.(*api.ReplicationController)
+		if !ok {
+			// This should not happen
+			glog.Errorf("rcStore does not return a ReplicationController object")
+			return nil
+		}
+		return rc
+	}
+
 	// look up in the cache, if cached and the cache is valid, just return cached value
 	if obj, cached := rm.lookupCache.GetMatchingObject(pod); cached {
 		controller, ok := obj.(*api.ReplicationController)
