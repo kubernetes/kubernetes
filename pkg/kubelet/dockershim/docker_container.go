@@ -48,7 +48,7 @@ func (ds *dockerService) ListContainers(filter *runtimeApi.ContainerFilter) ([]*
 			f.Add("status", toDockerContainerStatus(filter.GetState()))
 		}
 		if filter.PodSandboxId != nil {
-			// TODO: implement this after sandbox functions are implemented.
+			f.AddLabel(sandboxIDLabelKey, *filter.PodSandboxId)
 		}
 
 		if filter.LabelSelector != nil {
@@ -91,6 +91,8 @@ func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeApi
 	labels := makeLabels(config.GetLabels(), config.GetAnnotations())
 	// Apply a the container type label.
 	labels[containerTypeLabelKey] = containerTypeLabelContainer
+	// Write the sandbox ID in the labels.
+	labels[sandboxIDLabelKey] = podSandboxID
 
 	image := ""
 	if iSpec := config.GetImage(); iSpec != nil {
