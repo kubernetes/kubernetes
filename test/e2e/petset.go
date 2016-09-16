@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/apps"
+	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller/petset"
 	"k8s.io/kubernetes/pkg/labels"
@@ -40,6 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
 	utilyaml "k8s.io/kubernetes/pkg/util/yaml"
+	"k8s.io/kubernetes/pkg/watch"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
@@ -53,7 +55,32 @@ const (
 	// Should the test restart petset clusters?
 	// TODO: enable when we've productionzed bringup of pets in this e2e.
 	restartCluster = false
+	add            = "ADD"
+	del            = "DEL"
 )
+
+type podEvent struct {
+	pod   *api.Pod
+	event string
+}
+
+func filterByEvent(p []podEvent, eventName string) []podEvent {
+	events := []podEvent{}
+	for _, event := range p {
+		if event.event == eventName {
+			events = append(events, event)
+		}
+	}
+	return events
+}
+
+func Added(p []podEvent) []podEvent {
+	return filterByEvent(p, add)
+}
+
+func Deleted(p []podEvent) []podEvent {
+	return filterByEvent(p, del)
+}
 
 // Time: 25m, slow by design.
 // GCE Quota requirements: 3 pds, one per pet manifest declared above.
@@ -168,6 +195,119 @@ var _ = framework.KubeDescribe("PetSet [Slow] [Feature:PetSet]", func() {
 
 			By("Confirming all pets in petset are created.")
 			pst.saturate(ps)
+		})
+	})
+
+	framework.KubeDescribe("Scale up/down testing [Slow] [Feature:PetSet]", func() {
+		psName := "pet"
+		labels := map[string]string{
+			"name": psName,
+		}
+		headlessSvcName := "test"
+		var controller *cache.Controller
+		var stopCh chan struct{}
+		var podTracker []podEvent
+
+		BeforeEach(func() {
+			framework.SkipUnlessProviderIs("gce", "vagrant")
+
+			By("creating service " + headlessSvcName + " in namespace " + ns)
+			headlessService := createServiceSpec(headlessSvcName, "", true, labels)
+			_, err := c.Services(ns).Create(headlessService)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("configuring controller to watch for added pods")
+			labelSelector, err := unversioned.LabelSelectorAsSelector(&unversioned.LabelSelector{
+				MatchLabels: labels,
+			})
+			ExpectNoError(err)
+
+			stopCh = make(chan struct{})
+			podTracker = []podEvent{}
+			_, controller = cache.NewInformer(
+				&cache.ListWatch{
+					ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+						options.LabelSelector = labelSelector
+						return f.Client.Pods(ns).List(options)
+					},
+					WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+						options.LabelSelector = labelSelector
+						return f.Client.Pods(ns).Watch(options)
+					},
+				},
+				&api.Pod{},
+				0,
+				cache.ResourceEventHandlerFuncs{
+					AddFunc: func(obj interface{}) {
+						podTracker = append(podTracker, podEvent{
+							pod:   obj.(*api.Pod),
+							event: add,
+						})
+					},
+					DeleteFunc: func(obj interface{}) {
+						podTracker = append(podTracker, podEvent{
+							pod:   obj.(*api.Pod),
+							event: del,
+						})
+					},
+				},
+			)
+			go controller.Run(stopCh)
+		})
+
+		AfterEach(func() {
+			if CurrentGinkgoTestDescription().Failed {
+				dumpDebugInfo(c, ns)
+			}
+			framework.Logf("Deleting all petset in ns %v", ns)
+			deleteAllPetSets(c, ns)
+			close(stopCh)
+		})
+
+		It("Scale up/down in predictable order", func() {
+			By("creating petset " + psName + " in namespace " + ns)
+			ps := newPetSet(psName, ns, headlessSvcName, 1, nil, nil, labels)
+			ps, err := c.Apps().PetSets(ns).Create(ps)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("waiting until all petset " + psName + " replicas will be running in namespace " + ns)
+			pst := &petSetTester{c: c}
+			pst.waitForRunning(ps.Spec.Replicas, ps)
+
+			By("confirming that petset scale up will halt with unhealthy pet")
+			pst.update(ps.Namespace, ps.Name, func(ps *apps.PetSet) { ps.Spec.Replicas = 3 })
+			pst.confirmPetCount(1, ps, 10*time.Second)
+
+			By("scalling up petset " + psName + " to 3 replicas and waiting until all of them will be running in namespace " + ns)
+			pst.setHealthy(ps)
+			pst.waitForRunning(2, ps)
+			pst.setHealthy(ps)
+			pst.waitForRunning(3, ps)
+
+			By("verifying that petset " + psName + " was scaled up in order")
+			expectedOrder := []string{"pet-0", "pet-1", "pet-2"}
+			for i, event := range Added(podTracker) {
+				if event.pod.Name != expectedOrder[i] {
+					framework.Failf("Order of scale up is wrong: %v != %v", expectedOrder[i], event.pod.Name)
+				}
+			}
+
+			By("scale down will halt with unhealthy pet")
+			pst.setUnhealthy(ps)
+			pst.update(ps.Namespace, ps.Name, func(ps *apps.PetSet) { ps.Spec.Replicas = 0 })
+			pst.confirmPetCount(3, ps, 10*time.Second)
+
+			By("scalling down petset " + psName + " to 0 replicas and waiting until none of pods will run " + ns)
+			pst.setHealthy(ps)
+			pst.scale(ps, 0)
+
+			By("verifying that petset " + psName + " was scaled down in reverse order")
+			expectedOrder = []string{"pet-2", "pet-1", "pet-0"}
+			for i, event := range Deleted(podTracker) {
+				if event.pod.Name != expectedOrder[i] {
+					framework.Failf("Order of scale down is wrong: %v != %v", expectedOrder[i], event.pod.Name)
+				}
+			}
 		})
 	})
 
@@ -567,7 +707,7 @@ func (p *petSetTester) waitForRunning(numPets int, ps *apps.PetSet) {
 	}
 }
 
-func (p *petSetTester) setHealthy(ps *apps.PetSet) {
+func (p *petSetTester) updateInitAnnotatation(ps *apps.PetSet, value string) {
 	podList := p.getPodList(ps)
 	markedHealthyPod := ""
 	for _, pod := range podList.Items {
@@ -581,12 +721,20 @@ func (p *petSetTester) setHealthy(ps *apps.PetSet) {
 			framework.Failf("Found multiple non-healthy pets: %v and %v", pod.Name, markedHealthyPod)
 		}
 		p, err := framework.UpdatePodWithRetries(p.c, pod.Namespace, pod.Name, func(up *api.Pod) {
-			up.Annotations[petset.PetSetInitAnnotation] = "true"
+			up.Annotations[petset.PetSetInitAnnotation] = value
 		})
 		ExpectNoError(err)
 		framework.Logf("Set annotation %v to %v on pod %v", petset.PetSetInitAnnotation, p.Annotations[petset.PetSetInitAnnotation], pod.Name)
 		markedHealthyPod = pod.Name
 	}
+}
+
+func (p *petSetTester) setHealthy(ps *apps.PetSet) {
+	p.updateInitAnnotatation(ps, "true")
+}
+
+func (p *petSetTester) setUnhealthy(ps *apps.PetSet) {
+	p.updateInitAnnotatation(ps, "false")
 }
 
 func deleteAllPetSets(c *client.Client, ns string) {
