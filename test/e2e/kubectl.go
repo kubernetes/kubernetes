@@ -459,6 +459,8 @@ var _ = Describe("Kubectl client", func() {
 
 		It("should support inline execution and attach", func() {
 			SkipUnlessServerVersionGTE(jobsVersion, c)
+			// if the version is >= 1.3.0 the job with --restart=Never is a pod, see: https://github.com/kubernetes/kubernetes/commit/d76fa8a1197a6329da3125c8bfb2202dfead1273
+			SkipUnlessServerVersionLTE(version.MustParse("v1.3.0-alpha.5"), c)
 
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 
