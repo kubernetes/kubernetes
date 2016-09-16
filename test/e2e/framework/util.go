@@ -1027,7 +1027,7 @@ func CreateTestingNS(baseName string, c *client.Client, labels map[string]string
 	}
 	// Be robust about making the namespace creation call.
 	var got *api.Namespace
-	if err := wait.PollImmediate(Poll, SingleCallTimeout, func() (bool, error) {
+	if err := wait.PollImmediate(Poll, 30*time.Second, func() (bool, error) {
 		var err error
 		got, err = c.Namespaces().Create(namespaceObj)
 		if err != nil {
