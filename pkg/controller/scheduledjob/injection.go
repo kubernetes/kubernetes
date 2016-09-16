@@ -21,8 +21,8 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/batch"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/record"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
 )
 
@@ -34,7 +34,7 @@ type sjControlInterface interface {
 
 // realSJControl is the default implementation of sjControlInterface.
 type realSJControl struct {
-	KubeClient *client.Client
+	KubeClient clientset.Interface
 }
 
 var _ sjControlInterface = &realSJControl{}
@@ -73,7 +73,7 @@ type jobControlInterface interface {
 
 // realJobControl is the default implementation of jobControlInterface.
 type realJobControl struct {
-	KubeClient *client.Client
+	KubeClient clientset.Interface
 	Recorder   record.EventRecorder
 }
 
@@ -182,18 +182,18 @@ type podControlInterface interface {
 
 // realPodControl is the default implementation of podControlInterface.
 type realPodControl struct {
-	KubeClient *client.Client
+	KubeClient clientset.Interface
 	Recorder   record.EventRecorder
 }
 
 var _ podControlInterface = &realPodControl{}
 
 func (r realPodControl) ListPods(namespace string, opts api.ListOptions) (*api.PodList, error) {
-	return r.KubeClient.Pods(namespace).List(opts)
+	return r.KubeClient.Core().Pods(namespace).List(opts)
 }
 
 func (r realPodControl) DeletePod(namespace string, name string) error {
-	return r.KubeClient.Pods(namespace).Delete(name, nil)
+	return r.KubeClient.Core().Pods(namespace).Delete(name, nil)
 }
 
 type fakePodControl struct {

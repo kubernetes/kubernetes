@@ -404,13 +404,9 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 		glog.Infof("Starting %s apis", groupVersion)
 		if containsResource(resources, "scheduledjobs") {
 			glog.Infof("Starting scheduledjob controller")
-			// TODO: this is a temp fix for allowing kubeClient list v2alpha1 sj, should switch to using clientset
+			// // TODO: this is a temp fix for allowing kubeClient list v2alpha1 sj, should switch to using clientset
 			kubeconfig.ContentConfig.GroupVersion = &unversioned.GroupVersion{Group: batch.GroupName, Version: "v2alpha1"}
-			kubeClient, err := client.New(kubeconfig)
-			if err != nil {
-				glog.Fatalf("Invalid API configuration: %v", err)
-			}
-			go scheduledjob.NewScheduledJobController(kubeClient).
+			go scheduledjob.NewScheduledJobController(clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "scheduledjob-controller"))).
 				Run(wait.NeverStop)
 			time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 			time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
