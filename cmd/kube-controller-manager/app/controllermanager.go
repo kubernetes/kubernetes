@@ -74,8 +74,8 @@ import (
 	quotainstall "k8s.io/kubernetes/pkg/quota/install"
 	"k8s.io/kubernetes/pkg/runtime/serializer"
 	"k8s.io/kubernetes/pkg/serviceaccount"
+	certutil "k8s.io/kubernetes/pkg/util/cert"
 	"k8s.io/kubernetes/pkg/util/configz"
-	"k8s.io/kubernetes/pkg/util/crypto"
 	"k8s.io/kubernetes/pkg/util/wait"
 
 	"github.com/golang/glog"
@@ -482,7 +482,7 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 		if err != nil {
 			return fmt.Errorf("error reading root-ca-file at %s: %v", s.RootCAFile, err)
 		}
-		if _, err := crypto.CertsFromPEM(rootCA); err != nil {
+		if _, err := certutil.ParseCertsPEM(rootCA); err != nil {
 			return fmt.Errorf("error parsing root-ca-file at %s: %v", s.RootCAFile, err)
 		}
 	} else {

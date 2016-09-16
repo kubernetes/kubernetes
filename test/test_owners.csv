@@ -826,7 +826,7 @@ k8s.io/kubernetes/pkg/util/async,spxtr,1
 k8s.io/kubernetes/pkg/util/atomic,kargakis,1
 k8s.io/kubernetes/pkg/util/bandwidth,thockin,1
 k8s.io/kubernetes/pkg/util/cache,thockin,1
-k8s.io/kubernetes/pkg/util/certificates,karlkfi,1
+k8s.io/kubernetes/pkg/util/cert,karlkfi,1
 k8s.io/kubernetes/pkg/util/clock,zmerlynn,1
 k8s.io/kubernetes/pkg/util/config,girishkalele,1
 k8s.io/kubernetes/pkg/util/configz,ixdy,1
