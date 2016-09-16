@@ -58,7 +58,12 @@ func WriteStaticPodManifests(s *kubeadmapi.KubeadmConfig) error {
 	staticPodSpecs := map[string]api.Pod{
 		// TODO this needs a volume
 		etcd: componentPod(api.Container{
-			Command: getComponentCommand(etcd, s),
+			Command: []string{
+				"/usr/local/bin/etcd",
+				"--listen-client-urls=http://127.0.0.1:2379",
+				"--advertise-client-urls=http://127.0.0.1:2379",
+				"--data-dir=/var/etcd/data",
+			},
 			VolumeMounts:  []api.VolumeMount{etcdVolumeMount()},
 			Image:         images.GetCoreImage(images.KubeEtcdImage, s.EnvParams["etcd_image"]),
 			LivenessProbe: componentProbe(2379, "/health"),
@@ -187,12 +192,6 @@ func getComponentCommand(component string, s *kubeadmapi.KubeadmConfig) (command
 	pki_dir := "/etc/kubernetes/pki"
 
 	baseFlags := map[string][]string{
-		etcd: []string{
-			"/usr/local/bin/etcd",
-			"--listen-client-urls=http://127.0.0.1:2379",
-			"--advertise-client-urls=http://127.0.0.1:2379",
-			"--data-dir=/var/etcd/data",
-		},
 		apiServer: []string{
 			"--address=127.0.0.1",
 			"--etcd-servers=http://127.0.0.1:2379",
