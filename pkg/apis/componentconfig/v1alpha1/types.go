@@ -483,4 +483,7 @@ type KubeletConfiguration struct {
 	// Whitelist of unsafe sysctls or sysctl patterns (ending in *). Use these at your own risk.
 	// Resource isolation might be lacking and pod might influence each other on the same node.
 	AllowedUnsafeSysctls []string `json:"allowedUnsafeSysctls,omitempty"`
+	// How to integrate with runtime. If set to CRI, kubelet will switch to
+	// using the new Container Runtine Interface.
+	ExperimentalRuntimeIntegrationType string `json:"experimentalRuntimeIntegrationType,omitempty"`
 }

@@ -175,6 +175,7 @@ experimental-flannel-overlay
 experimental-keystone-url
 experimental-nvidia-gpus
 experimental-prefix
+experimental-runtime-integration-type
 external-hostname
 external-ip
 extra-peer-dirs
