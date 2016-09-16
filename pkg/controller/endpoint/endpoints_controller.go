@@ -78,7 +78,7 @@ func NewEndpointController(podInformer cache.SharedIndexInformer, client *client
 		queue:  workqueue.NewNamed("endpoint"),
 	}
 
-	e.serviceStore.Store, e.serviceController = cache.NewInformer(
+	e.serviceStore.Indexer, e.serviceController = cache.NewIndexerInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				return e.client.Core().Services(api.NamespaceAll).List(options)
@@ -97,6 +97,7 @@ func NewEndpointController(podInformer cache.SharedIndexInformer, client *client
 			},
 			DeleteFunc: e.enqueueService,
 		},
+		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)
 
 	podInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -328,7 +329,7 @@ func (e *EndpointController) syncService(key string) {
 		return
 	}
 
-	obj, exists, err := e.serviceStore.Store.GetByKey(key)
+	obj, exists, err := e.serviceStore.Indexer.GetByKey(key)
 	if err != nil || !exists {
 		// Delete the corresponding endpoint, as the service has been deleted.
 		// TODO: Please note that this will delete an endpoint when a
