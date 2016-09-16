@@ -24,6 +24,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"os/exec"
 	"sort"
 	"strconv"
 	"strings"
@@ -37,7 +38,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
 	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/util/procfs"
 	"k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -450,16 +450,19 @@ const (
 	containerdPidFile     = "/run/docker/libcontainerd/docker-containerd.pid"
 )
 
-func getPidsForProcess(name, pidFile string) ([]int, error) {
-	if len(pidFile) > 0 {
-		if pid, err := getPidFromPidFile(pidFile); err == nil {
-			return []int{pid}, nil
-		} else {
-			// log the error and fall back to pidof
-			runtime.HandleError(err)
-		}
+func getContainerNameForProcess(name, pidFile string) (string, error) {
+	pids, err := getPidsForProcess(name, pidFile)
+	if err != nil {
+		return "", fmt.Errorf("failed to detect process id for %q - %v", name, err)
 	}
-	return procfs.PidOf(name)
+	if len(pids) == 0 {
+		return "", nil
+	}
+	cont, err := getContainer(pids[0])
+	if err != nil {
+		return "", err
+	}
+	return cont, nil
 }
 
 func getPidFromPidFile(pidFile string) (int, error) {
@@ -482,19 +485,31 @@ func getPidFromPidFile(pidFile string) (int, error) {
 	return pid, nil
 }
 
-func getContainerNameForProcess(name, pidFile string) (string, error) {
-	pids, err := getPidsForProcess(name, pidFile)
+func getPidsForProcess(name, pidFile string) ([]int, error) {
+	if len(pidFile) > 0 {
+		if pid, err := getPidFromPidFile(pidFile); err == nil {
+			return []int{pid}, nil
+		} else {
+			// log the error and fall back to pidof
+			runtime.HandleError(err)
+		}
+	}
+
+	out, err := exec.Command("pidof", name).Output()
 	if err != nil {
-		return "", fmt.Errorf("failed to detect process id for %q - %v", name, err)
+		return []int{}, fmt.Errorf("failed to find pid of %q: %v", name, err)
 	}
-	if len(pids) == 0 {
-		return "", nil
+
+	// The output of pidof is a list of pids.
+	pids := []int{}
+	for _, pidStr := range strings.Split(strings.TrimSpace(string(out)), " ") {
+		pid, err := strconv.Atoi(pidStr)
+		if err != nil {
+			continue
+		}
+		pids = append(pids, pid)
 	}
-	cont, err := getContainer(pids[0])
-	if err != nil {
-		return "", err
-	}
-	return cont, nil
+	return pids, nil
 }
 
 // getContainer returns the cgroup associated with the specified pid.
