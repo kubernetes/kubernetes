@@ -164,7 +164,7 @@ func (o *AnnotateOptions) Complete(f *cmdutil.Factory, out io.Writer, cmd *cobra
 	o.recordChangeCause = cmdutil.GetRecordFlag(cmd)
 	o.changeCause = f.Command()
 
-	mapper, typer := f.Object(cmdutil.GetIncludeThirdPartyAPIs(cmd))
+	mapper, typer := f.Object()
 	o.builder = resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 		ContinueOnError().
 		NamespaceParam(namespace).DefaultNamespace().
@@ -252,7 +252,7 @@ func (o AnnotateOptions) RunAnnotate() error {
 			return err
 		}
 
-		mapper, _ := o.f.Object(cmdutil.GetIncludeThirdPartyAPIs(o.cmd))
+		mapper, _ := o.f.Object()
 		outputFormat := cmdutil.GetFlagString(o.cmd, "output")
 		if outputFormat != "" {
 			return o.f.PrintObject(o.cmd, mapper, outputObj, o.out)

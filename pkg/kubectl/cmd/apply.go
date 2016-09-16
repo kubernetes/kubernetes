@@ -114,7 +114,7 @@ func RunApply(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *Ap
 		return err
 	}
 
-	mapper, typer := f.Object(cmdutil.GetIncludeThirdPartyAPIs(cmd))
+	mapper, typer := f.Object()
 	r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 		Schema(schema).
 		ContinueOnError().
