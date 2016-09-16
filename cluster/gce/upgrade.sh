@@ -253,6 +253,7 @@ function do-node-upgrade() {
         --zones="${ZONE}" \
         --regexp="${group}" \
         --format='value(instanceTemplate)' || true))
+    echo "== Calling rolling-update for ${group}. ==" >&2
     update=$(gcloud alpha compute rolling-updates \
         --project="${PROJECT}" \
         --zone="${ZONE}" \
@@ -267,6 +268,7 @@ function do-node-upgrade() {
     updates+=("${id}")
   done
 
+  echo "== Waiting for Upgrading nodes to be finished. ==" >&2
   # Wait until rolling updates are finished.
   for update in ${updates[@]}; do
     while true; do
