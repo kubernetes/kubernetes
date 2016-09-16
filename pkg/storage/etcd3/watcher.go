@@ -158,6 +158,7 @@ func (wc *watchChan) sync() error {
 func (wc *watchChan) startWatching() {
 	if wc.initialRev == 0 {
 		if err := wc.sync(); err != nil {
+			glog.Errorf("failed to sync with latest state: %v", err)
 			wc.sendError(err)
 			return
 		}
@@ -169,8 +170,10 @@ func (wc *watchChan) startWatching() {
 	wch := wc.watcher.client.Watch(wc.ctx, wc.key, opts...)
 	for wres := range wch {
 		if wres.Err() != nil {
+			err := wres.Err()
 			// If there is an error on server (e.g. compaction), the channel will return it before closed.
-			wc.sendError(wres.Err())
+			glog.Errorf("watch chan error: %v", err)
+			wc.sendError(err)
 			return
 		}
 		for _, e := range wres.Events {
@@ -219,6 +222,7 @@ func (wc *watchChan) processEvent(wg *sync.WaitGroup) {
 func (wc *watchChan) transform(e *event) (res *watch.Event) {
 	curObj, oldObj, err := prepareObjs(wc.ctx, e, wc.watcher.client, wc.watcher.codec, wc.watcher.versioner)
 	if err != nil {
+		glog.Errorf("failed to prepare current and previous objects: %v", err)
 		wc.sendError(err)
 		return nil
 	}
