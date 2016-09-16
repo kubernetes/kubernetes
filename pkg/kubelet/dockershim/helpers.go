@@ -84,11 +84,20 @@ func extractLabels(input map[string]string) (map[string]string, map[string]strin
 	annotations := make(map[string]string)
 	for k, v := range input {
 		// Check if the key is used internally by the shim.
-		// TODO: containerTypeLabelKey is the only internal label the shim uses
-		// right now. Expand this to a list later.
-		if k == containerTypeLabelKey {
+		internal := false
+		for _, internalKey := range internalLabelKeys {
+			// TODO: containerTypeLabelKey is the only internal label the shim uses
+			// right now. Expand this to a list later.
+			if k == internalKey {
+				internal = true
+				break
+			}
+		}
+		if internal {
 			continue
 		}
+
+		// Check if the label should be treated as an annotation.
 		if strings.HasPrefix(k, annotationPrefix) {
 			annotations[strings.TrimPrefix(k, annotationPrefix)] = v
 			continue
