@@ -71,3 +71,65 @@ func (s storePodsNamespacer) Get(name string) (*api.Pod, error) {
 	}
 	return obj.(*api.Pod), nil
 }
+
+// StoreToServiceLister helps list services
+type StoreToServiceLister struct {
+	Indexer Indexer
+}
+
+func (s *StoreToServiceLister) List(selector labels.Selector) (ret []*api.Service, err error) {
+	err = ListAll(s.Indexer, selector, func(m interface{}) {
+		ret = append(ret, m.(*api.Service))
+	})
+	return ret, err
+}
+
+func (s *StoreToServiceLister) Services(namespace string) storeServicesNamespacer {
+	return storeServicesNamespacer{s.Indexer, namespace}
+}
+
+type storeServicesNamespacer struct {
+	indexer   Indexer
+	namespace string
+}
+
+func (s storeServicesNamespacer) List(selector labels.Selector) (ret []*api.Service, err error) {
+	err = ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
+		ret = append(ret, m.(*api.Service))
+	})
+	return ret, err
+}
+
+func (s storeServicesNamespacer) Get(name string) (*api.Service, error) {
+	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, errors.NewNotFound(api.Resource("service"), name)
+	}
+	return obj.(*api.Service), nil
+}
+
+// TODO: Move this back to scheduler as a helper function that takes a Store,
+// rather than a method of StoreToServiceLister.
+func (s *StoreToServiceLister) GetPodServices(pod *api.Pod) (services []*api.Service, err error) {
+	allServices, err := s.Services(pod.Namespace).List(labels.Everything())
+	if err != nil {
+		return nil, err
+	}
+
+	for i := range allServices {
+		service := allServices[i]
+		if service.Spec.Selector == nil {
+			// services with nil selectors match nothing, not everything.
+			continue
+		}
+		selector := labels.Set(service.Spec.Selector).AsSelectorPreValidated()
+		if selector.Matches(labels.Set(pod.Labels)) {
+			services = append(services, service)
+		}
+	}
+
+	return services, nil
+}
