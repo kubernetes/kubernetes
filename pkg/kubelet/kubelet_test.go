@@ -86,8 +86,6 @@ const (
 	testReservationCPU    = "200m"
 	testReservationMemory = "100M"
 
-	maxImageTagsForTest = 3
-
 	// TODO(harry) any global place for these two?
 	// Reasonable size range of all container images. 90%ile of images on dockerhub drops into this range.
 	minImgSize int64 = 23 * 1024 * 1024
