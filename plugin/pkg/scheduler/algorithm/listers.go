@@ -100,37 +100,38 @@ func (f FakeServiceLister) GetPodServices(pod *api.Pod) (services []api.Service,
 // ControllerLister interface represents anything that can produce a list of ReplicationController; the list is consumed by a scheduler.
 type ControllerLister interface {
 	// Lists all the replication controllers
-	List() ([]api.ReplicationController, error)
+	List(labels.Selector) ([]*api.ReplicationController, error)
 	// Gets the services for the given pod
-	GetPodControllers(*api.Pod) ([]api.ReplicationController, error)
+	GetPodControllers(*api.Pod) ([]*api.ReplicationController, error)
 }
 
 // EmptyControllerLister implements ControllerLister on []api.ReplicationController returning empty data
 type EmptyControllerLister struct{}
 
 // List returns nil
-func (f EmptyControllerLister) List() ([]api.ReplicationController, error) {
+func (f EmptyControllerLister) List(labels.Selector) ([]*api.ReplicationController, error) {
 	return nil, nil
 }
 
 // GetPodControllers returns nil
-func (f EmptyControllerLister) GetPodControllers(pod *api.Pod) (controllers []api.ReplicationController, err error) {
+func (f EmptyControllerLister) GetPodControllers(pod *api.Pod) (controllers []*api.ReplicationController, err error) {
 	return nil, nil
 }
 
 // FakeControllerLister implements ControllerLister on []api.ReplicationController for test purposes.
-type FakeControllerLister []api.ReplicationController
+type FakeControllerLister []*api.ReplicationController
 
 // List returns []api.ReplicationController, the list of all ReplicationControllers.
-func (f FakeControllerLister) List() ([]api.ReplicationController, error) {
+func (f FakeControllerLister) List(labels.Selector) ([]*api.ReplicationController, error) {
 	return f, nil
 }
 
 // GetPodControllers gets the ReplicationControllers that have the selector that match the labels on the given pod
-func (f FakeControllerLister) GetPodControllers(pod *api.Pod) (controllers []api.ReplicationController, err error) {
+func (f FakeControllerLister) GetPodControllers(pod *api.Pod) (controllers []*api.ReplicationController, err error) {
 	var selector labels.Selector
 
-	for _, controller := range f {
+	for i := range f {
+		controller := f[i]
 		if controller.Namespace != pod.Namespace {
 			continue
 		}
