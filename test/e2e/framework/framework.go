@@ -120,6 +120,12 @@ func NewDefaultFederatedFramework(baseName string) *Framework {
 	return f
 }
 
+func NewDefaultGroupVersionFramework(baseName string, groupVersion unversioned.GroupVersion) *Framework {
+	f := NewDefaultFramework(baseName)
+	f.options.GroupVersion = &groupVersion
+	return f
+}
+
 func NewFramework(baseName string, options FrameworkOptions, client *client.Client) *Framework {
 	f := &Framework{
 		BaseName:                 baseName,
