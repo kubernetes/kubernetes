@@ -723,7 +723,6 @@ func TestResolveFenceposts(t *testing.T) {
 }
 
 func TestNewRSNewReplicas(t *testing.T) {
-
 	tests := []struct {
 		test          string
 		strategyType  extensions.DeploymentStrategyType
@@ -738,12 +737,12 @@ func TestNewRSNewReplicas(t *testing.T) {
 			1, 5, 1, 5,
 		},
 		{
-			"scale up - to depDeplicas",
+			"scale up - to depReplicas",
 			extensions.RollingUpdateDeploymentStrategyType,
 			6, 2, 10, 6,
 		},
 		{
-			"recreate - to depDeplicas",
+			"recreate - to depReplicas",
 			extensions.RecreateDeploymentStrategyType,
 			3, 1, 1, 3,
 		},
@@ -767,6 +766,167 @@ func TestNewRSNewReplicas(t *testing.T) {
 		}
 		if rs != test.expected {
 			t.Errorf("In test case %s, expected %+v, got %+v", test.test, test.expected, rs)
+		}
+	}
+}
+
+var (
+	condProgressing = func() extensions.DeploymentCondition {
+		return extensions.DeploymentCondition{
+			Type:   extensions.DeploymentProgressing,
+			Status: api.ConditionFalse,
+			Reason: "ForSomeReason",
+		}
+	}
+
+	condProgressing2 = func() extensions.DeploymentCondition {
+		return extensions.DeploymentCondition{
+			Type:   extensions.DeploymentProgressing,
+			Status: api.ConditionTrue,
+			Reason: "BecauseItIs",
+		}
+	}
+
+	condAvailable = func() extensions.DeploymentCondition {
+		return extensions.DeploymentCondition{
+			Type:   extensions.DeploymentAvailable,
+			Status: api.ConditionTrue,
+			Reason: "AwesomeController",
+		}
+	}
+
+	status = func() *extensions.DeploymentStatus {
+		return &extensions.DeploymentStatus{
+			Conditions: []extensions.DeploymentCondition{condProgressing(), condAvailable()},
+		}
+	}
+)
+
+func TestConditionExists(t *testing.T) {
+	exampleStatus := status()
+
+	tests := []struct {
+		name string
+
+		status     extensions.DeploymentStatus
+		condType   extensions.DeploymentConditionType
+		condStatus api.ConditionStatus
+		condReason string
+
+		expected bool
+	}{
+		{
+			name: "condition exists",
+
+			status:     *exampleStatus,
+			condType:   extensions.DeploymentAvailable,
+			condStatus: api.ConditionTrue,
+			condReason: "AwesomeController",
+
+			expected: true,
+		},
+		{
+			name: "condition does not exist",
+
+			status:     *exampleStatus,
+			condType:   extensions.DeploymentProgressing,
+			condStatus: api.ConditionFalse,
+			condReason: "ForSomeOtherReason",
+
+			expected: false,
+		},
+	}
+
+	for _, test := range tests {
+		exists := DeploymentConditionExists(test.status, test.condType, test.condStatus, test.condReason)
+		if exists != test.expected {
+			t.Errorf("%s: expected condition to exist: %t, got: %t", test.name, test.expected, exists)
+		}
+	}
+}
+
+func TestSetCondition(t *testing.T) {
+	tests := []struct {
+		name string
+
+		status *extensions.DeploymentStatus
+		cond   extensions.DeploymentCondition
+
+		expectedStatus *extensions.DeploymentStatus
+	}{
+		{
+			name: "set for the first time",
+
+			status: &extensions.DeploymentStatus{},
+			cond:   condAvailable(),
+
+			expectedStatus: &extensions.DeploymentStatus{Conditions: []extensions.DeploymentCondition{condAvailable()}},
+		},
+		{
+			name: "simple set",
+
+			status: &extensions.DeploymentStatus{Conditions: []extensions.DeploymentCondition{condProgressing()}},
+			cond:   condAvailable(),
+
+			expectedStatus: status(),
+		},
+		{
+			name: "overwrite",
+
+			status: &extensions.DeploymentStatus{Conditions: []extensions.DeploymentCondition{condProgressing()}},
+			cond:   condProgressing2(),
+
+			expectedStatus: &extensions.DeploymentStatus{Conditions: []extensions.DeploymentCondition{condProgressing2()}},
+		},
+	}
+
+	for _, test := range tests {
+		SetDeploymentCondition(test.status, test.cond)
+		if !reflect.DeepEqual(test.status, test.expectedStatus) {
+			t.Errorf("%s: expected status: %v, got: %v", test.name, test.expectedStatus, test.status)
+		}
+	}
+}
+
+func TestRemoveCondition(t *testing.T) {
+	tests := []struct {
+		name string
+
+		status   *extensions.DeploymentStatus
+		condType extensions.DeploymentConditionType
+
+		expectedStatus *extensions.DeploymentStatus
+	}{
+		{
+			name: "remove from empty status",
+
+			status:   &extensions.DeploymentStatus{},
+			condType: extensions.DeploymentProgressing,
+
+			expectedStatus: &extensions.DeploymentStatus{},
+		},
+		{
+			name: "simple remove",
+
+			status:   &extensions.DeploymentStatus{Conditions: []extensions.DeploymentCondition{condProgressing()}},
+			condType: extensions.DeploymentProgressing,
+
+			expectedStatus: &extensions.DeploymentStatus{},
+		},
+		{
+			name: "doesn't remove anything",
+
+			status:   status(),
+			condType: extensions.DeploymentReplicaFailure,
+
+			expectedStatus: status(),
+		},
+	}
+
+	for _, test := range tests {
+		RemoveDeploymentCondition(test.status, test.condType)
+		if !reflect.DeepEqual(test.status, test.expectedStatus) {
+			t.Errorf("%s: expected status: %v, got: %v", test.name, test.expectedStatus, test.status)
 		}
 	}
 }
@@ -827,7 +987,7 @@ func TestIsDeploymentComplete(t *testing.T) {
 	for _, test := range tests {
 		t.Log(test.name)
 
-		if got, exp := IsDeploymentComplete(test.d, test.d.Status), test.expected; got != exp {
+		if got, exp := IsDeploymentComplete(test.d, &test.d.Status), test.expected; got != exp {
 			t.Errorf("expected complete: %t, got: %t", exp, got)
 		}
 	}
@@ -910,7 +1070,7 @@ func TestIsDeploymentProgressing(t *testing.T) {
 	for _, test := range tests {
 		t.Log(test.name)
 
-		if got, exp := IsDeploymentProgressing(test.d, test.newStatus), test.expected; got != exp {
+		if got, exp := IsDeploymentProgressing(test.d, &test.newStatus), test.expected; got != exp {
 			t.Errorf("expected progressing: %t, got: %t", exp, got)
 		}
 	}
@@ -977,7 +1137,7 @@ func TestIsDeploymentFailed(t *testing.T) {
 		t.Log(test.name)
 
 		nowFn = test.nowFn
-		if got, exp := IsDeploymentFailed(&test.d, test.d.Status), test.expected; got != exp {
+		if got, exp := IsDeploymentFailed(&test.d, &test.d.Status), test.expected; got != exp {
 			t.Errorf("expected timeout: %t, got: %t", exp, got)
 		}
 	}

@@ -254,17 +254,17 @@ func (dc *DeploymentController) getNewReplicaSet(deployment *extensions.Deployme
 			}
 		}
 
-		updateConditions := false
+		updateConditions := deploymentutil.SetDeploymentRevision(deployment, newRevision)
+		// If no other Conditions have been recorded and we need to estimate the progress of this
+		// deployment then it is likely that old users started caring about progress. In that case
+		// we need to take into account the first time we noticed their new replica set.
 		if deployment.Spec.ProgressDeadlineSeconds != nil && len(deployment.Status.Conditions) == 0 {
-			// If no other Conditions have been recorded and we need to estimate the progress of this
-			// deployment then it is likely that old users started caring about progress. In that case
-			// we need to take into account the first time we noticed their new replica set.
 			condition := deploymentutil.NewDeploymentCondition(extensions.DeploymentProgressing, api.ConditionTrue, deploymentutil.FoundNewRSReason, fmt.Sprintf("Found new replica set %q", existingNewRS.Name))
 			deploymentutil.SetDeploymentCondition(&deployment.Status, *condition)
 			updateConditions = true
 		}
 
-		if updateConditions || deploymentutil.SetDeploymentRevision(deployment, newRevision) {
+		if updateConditions {
 			if _, err := dc.client.Extensions().Deployments(deployment.ObjectMeta.Namespace).UpdateStatus(deployment); err != nil {
 				return nil, err
 			}

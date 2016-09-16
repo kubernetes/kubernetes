@@ -128,7 +128,7 @@ func RemoveDeploymentCondition(status *extensions.DeploymentStatus, condType ext
 
 // filterOutCondition returns a new slice of deployment conditions without conditions with the provided type.
 func filterOutCondition(conditions []extensions.DeploymentCondition, condType extensions.DeploymentConditionType) []extensions.DeploymentCondition {
-	newConditions := []extensions.DeploymentCondition{}
+	var newConditions []extensions.DeploymentCondition
 	for _, c := range conditions {
 		if c.Type == condType {
 			continue
@@ -142,6 +142,8 @@ func filterOutCondition(conditions []extensions.DeploymentCondition, condType ex
 // Events passed in this helper should belong to a replica set. Only warnings for a
 // replica set currently are for failed creation or deletion of a pod, so we bound
 // this helper to accept just those.
+// TODO: Once #32863 is fixed we should stop listing events and instead look into replica
+// set Conditions for failures.
 func ConditionFromWarningEvent(event api.Event) *extensions.DeploymentCondition {
 	if event.Type != api.EventTypeWarning &&
 		(event.Reason != controller.FailedCreatePodReason ||
@@ -808,7 +810,7 @@ func IsRollingUpdate(deployment *extensions.Deployment) bool {
 
 // IsDeploymentComplete considers a deployment to be complete once its desired replicas equals its
 // updatedReplicas and it doesn't violate minimum availability.
-func IsDeploymentComplete(deployment *extensions.Deployment, newStatus extensions.DeploymentStatus) bool {
+func IsDeploymentComplete(deployment *extensions.Deployment, newStatus *extensions.DeploymentStatus) bool {
 	return newStatus.UpdatedReplicas == deployment.Spec.Replicas &&
 		newStatus.AvailableReplicas >= deployment.Spec.Replicas-MaxUnavailable(*deployment)
 }
@@ -816,7 +818,7 @@ func IsDeploymentComplete(deployment *extensions.Deployment, newStatus extension
 // IsDeploymentProgressing reports progress for a deployment. Progress is estimated by comparing the
 // current with the new status of the deployment that the controller is observing. The following
 // algorithm is already used in the kubectl rolling updater to report lack of progress.
-func IsDeploymentProgressing(deployment *extensions.Deployment, newStatus extensions.DeploymentStatus) bool {
+func IsDeploymentProgressing(deployment *extensions.Deployment, newStatus *extensions.DeploymentStatus) bool {
 	oldStatus := deployment.Status
 
 	// Old replicas that need to be scaled down
@@ -831,7 +833,7 @@ var nowFn = func() time.Time { return time.Now() }
 
 // IsDeploymentFailed considers a deployment to be failed once its condition that reported progress
 // is older than the specified timeout.
-func IsDeploymentFailed(deployment *extensions.Deployment, newStatus extensions.DeploymentStatus) bool {
+func IsDeploymentFailed(deployment *extensions.Deployment, newStatus *extensions.DeploymentStatus) bool {
 	if deployment.Spec.ProgressDeadlineSeconds == nil {
 		return false
 	}

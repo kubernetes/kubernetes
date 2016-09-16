@@ -258,7 +258,11 @@ type DeploymentSpec struct {
 	RollbackTo *RollbackConfig `json:"rollbackTo,omitempty" protobuf:"bytes,8,opt,name=rollbackTo"`
 
 	// The maximum time in seconds for a deployment to make progress before it
-	// is considered to be failed. This is not set by default.
+	// is considered to be failed. Failed deployments are not retried by the
+	// deployment controller and require user action. Failure causes are surfaced
+	// in the deployment status as Conditions. This is not set by default.
+	// Note that progress will not be estimated during the time a deployment is
+	// paused or when rolling back to a previous revision.
 	ProgressDeadlineSeconds *int32 `json:"progressDeadlineSeconds,omitempty" protobuf:"varint,9,opt,name=progressDeadlineSeconds"`
 }
 

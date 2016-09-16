@@ -63,11 +63,11 @@ func (dc *DeploymentController) hasTimedOut(d *extensions.Deployment) (bool, err
 		return false, err
 	}
 
-	if util.IsDeploymentComplete(d, newStatus) || util.IsDeploymentProgressing(d, newStatus) {
+	if util.IsDeploymentComplete(d, &newStatus) || util.IsDeploymentProgressing(d, &newStatus) {
 		return false, nil
 	}
 
-	return util.IsDeploymentFailed(d, newStatus), nil
+	return util.IsDeploymentFailed(d, &newStatus), nil
 }
 
 func (dc *DeploymentController) syncFailed(deployment *extensions.Deployment) error {
@@ -93,7 +93,7 @@ func (dc *DeploymentController) syncRolloutStatus(allRSs []*extensions.ReplicaSe
 	}
 
 	switch {
-	case util.IsDeploymentComplete(d, newStatus):
+	case util.IsDeploymentComplete(d, &newStatus):
 		// Update the deployment conditions with a message for the new replica set that
 		// was successfully deployed. If the condition already exists, ignore this update.
 		// Cleanup any condition that reports lack of progress.
@@ -105,14 +105,14 @@ func (dc *DeploymentController) syncRolloutStatus(allRSs []*extensions.ReplicaSe
 		// Cleanup conditions that denote any failures since it may be confusing for users.
 		util.RemoveDeploymentCondition(&newStatus, extensions.DeploymentReplicaFailure)
 
-	case util.IsDeploymentProgressing(d, newStatus):
+	case util.IsDeploymentProgressing(d, &newStatus):
 		// If there is any progress made, continue by not checking if the deployment failed. This
 		// behavior emulates the rolling updater progressDeadline check.
 		msg := fmt.Sprintf("Replica set %q is progressing.", newRS.Name)
 		condition := util.NewDeploymentCondition(extensions.DeploymentProgressing, api.ConditionTrue, util.ReplicaSetUpdatedReason, msg)
 		util.SetDeploymentCondition(&newStatus, *condition)
 
-	case util.IsDeploymentFailed(d, newStatus):
+	case util.IsDeploymentFailed(d, &newStatus):
 		// Update the deployment with a timeout condition. If the condition already exists,
 		// ignore this update.
 		if !util.DeploymentConditionExists(newStatus, extensions.DeploymentProgressing, api.ConditionFalse, util.TimedOutReason) {
@@ -124,7 +124,7 @@ func (dc *DeploymentController) syncRolloutStatus(allRSs []*extensions.ReplicaSe
 
 	// Move warning events of the replica set in deployment conditions. Let's not display
 	// these warnings once a deployment completes, otherwise it may be confusing for users.
-	if !util.IsDeploymentComplete(d, newStatus) {
+	if !util.IsDeploymentComplete(d, &newStatus) {
 		for _, warning := range dc.getReplicaFailures(newRS) {
 			if !util.DeploymentConditionExists(newStatus, warning.Type, warning.Status, warning.Reason) {
 				util.SetDeploymentCondition(&newStatus, warning)
@@ -145,6 +145,8 @@ func (dc *DeploymentController) syncRolloutStatus(allRSs []*extensions.ReplicaSe
 // getReplicaFailures transitions all the warning events found for a replica set into
 // deployment conditions. It's up to the caller to dedupe between the conditions and
 // add just a single condition, ideally the oldest one.
+// TODO: Once #32863 is fixed we should stop listing events and instead look into replica
+// set Conditions for failures.
 func (dc *DeploymentController) getReplicaFailures(rs *extensions.ReplicaSet) []extensions.DeploymentCondition {
 	eventList, err := dc.client.Core().Events(rs.Namespace).Search(rs)
 	if err != nil {
