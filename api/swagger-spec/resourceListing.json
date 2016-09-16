@@ -2,16 +2,16 @@
   "swaggerVersion": "1.2",
   "apis": [
    {
-    "path": "/logs",
-    "description": "get log files"
-   },
-   {
     "path": "/version",
     "description": "git code version from which this is built"
    },
    {
     "path": "/apis",
     "description": "get available API versions"
+   },
+   {
+    "path": "/logs",
+    "description": "get log files"
    },
    {
     "path": "/api/v1",

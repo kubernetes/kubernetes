@@ -48,6 +48,7 @@ import (
 	roleetcd "k8s.io/kubernetes/pkg/registry/role/etcd"
 	"k8s.io/kubernetes/pkg/registry/rolebinding"
 	rolebindingetcd "k8s.io/kubernetes/pkg/registry/rolebinding/etcd"
+	"k8s.io/kubernetes/pkg/routes"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
@@ -195,6 +196,9 @@ func Run(s *options.ServerRunOptions) error {
 	if err != nil {
 		return err
 	}
+
+	routes.UIRedirect{}.Install(m.Mux, m.HandlerContainer)
+	routes.Logs{}.Install(m.Mux, m.HandlerContainer)
 
 	installFederationAPIs(s, m, storageFactory)
 	installCoreAPIs(s, m, storageFactory)
