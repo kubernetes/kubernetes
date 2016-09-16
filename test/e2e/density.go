@@ -436,13 +436,13 @@ var _ = framework.KubeDescribe("Density", func() {
 		interval time.Duration
 	}
 
+	// Optionally: Users can override this parameter to run all latency tests.  Its default should be false.
 	densityTests := []Density{
-		// TODO: Expose runLatencyTest as ginkgo flag.
-		{podsPerNode: 3, runLatencyTest: false, interval: 10 * time.Second},
-		{podsPerNode: 30, runLatencyTest: true, interval: 10 * time.Second},
-		{podsPerNode: 50, runLatencyTest: false, interval: 10 * time.Second},
-		{podsPerNode: 95, runLatencyTest: true, interval: 10 * time.Second},
-		{podsPerNode: 100, runLatencyTest: false, interval: 10 * time.Second},
+		{podsPerNode: 3, runLatencyTest: framework.TestContext.Density.AllLatencyTests || false, interval: 10 * time.Second},
+		{podsPerNode: 30, runLatencyTest: framework.TestContext.Density.AllLatencyTests || true, interval: 10 * time.Second},
+		{podsPerNode: 50, runLatencyTest: framework.TestContext.Density.AllLatencyTests || false, interval: 10 * time.Second},
+		{podsPerNode: 95, runLatencyTest: framework.TestContext.Density.AllLatencyTests || true, interval: 10 * time.Second},
+		{podsPerNode: 100, runLatencyTest: framework.TestContext.Density.AllLatencyTests || false, interval: 10 * time.Second},
 	}
 
 	for _, testArg := range densityTests {

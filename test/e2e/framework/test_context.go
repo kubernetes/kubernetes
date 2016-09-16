@@ -211,6 +211,7 @@ func ViperizeFlags() {
 
 	flag.Parse()
 
+<<<<<<< be2e1f5d96487e765cb071da7ee6f90d47ff53f6
 	// Add viper in a minimal way.
 	// Flag interop isnt possible, since 'go test' coupling to flag.Parse.
 	// This must be done after common flags are registered, since Viper is a flag option.
@@ -218,6 +219,8 @@ func ViperizeFlags() {
 	viper.AddConfigPath(".")
 	viper.ReadInConfig()
 
+=======
+>>>>>>> Viper hierarchichal density configuration
 	viper.Unmarshal(&TestContext)
 
 	/** This can be used to overwrite a flag value.
@@ -232,5 +235,9 @@ func ViperizeFlags() {
 	*	// Each flag that we've declared can be set via viper.
 	*	flag.VisitAll(viperFlagSetter)
 	*
+<<<<<<< be2e1f5d96487e765cb071da7ee6f90d47ff53f6
+=======
+	*
+>>>>>>> Viper hierarchichal density configuration
 	 */
 }
