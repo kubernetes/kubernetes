@@ -33,10 +33,83 @@ import (
 	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
+	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/types"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/term"
 )
+
+// startContainer starts a container and returns a message indicates why it is failed on error.
+// It starts the container through the following steps:
+// * pull the image
+// * create the container
+// * start the container
+// * run the post start lifecycle hooks (if applicable)
+func (m *kubeGenericRuntimeManager) startContainer(podSandboxID string, podSandboxConfig *runtimeApi.PodSandboxConfig, container *api.Container, pod *api.Pod, podStatus *kubecontainer.PodStatus, pullSecrets []api.Secret, podIP string) (string, error) {
+	// Step 1: pull the image.
+	err, msg := m.imagePuller.EnsureImageExists(pod, container, pullSecrets)
+	if err != nil {
+		return msg, err
+	}
+
+	// Step 2: create the container.
+	ref, err := kubecontainer.GenerateContainerRef(pod, container)
+	if err != nil {
+		glog.Errorf("Can't make a ref to pod %q, container %v: %v", format.Pod(pod), container.Name, err)
+	}
+	glog.V(4).Infof("Generating ref for container %s: %#v", container.Name, ref)
+
+	// For a new container, the RestartCount should be 0
+	restartCount := 0
+	containerStatus := podStatus.FindContainerStatusByName(container.Name)
+	if containerStatus != nil {
+		restartCount = containerStatus.RestartCount + 1
+	}
+
+	containerConfig, err := m.generateContainerConfig(container, pod, restartCount, podIP)
+	if err != nil {
+		m.recorder.Eventf(ref, api.EventTypeWarning, events.FailedToCreateContainer, "Failed to create container with error: %v", err)
+		return "Generate Container Config Failed", err
+	}
+	containerID, err := m.runtimeService.CreateContainer(podSandboxID, containerConfig, podSandboxConfig)
+	if err != nil {
+		m.recorder.Eventf(ref, api.EventTypeWarning, events.FailedToCreateContainer, "Failed to create container with error: %v", err)
+		return "Create Container Failed", err
+	}
+	m.recorder.Eventf(ref, api.EventTypeNormal, events.CreatedContainer, "Created container with id %v", containerID)
+	if ref != nil {
+		m.containerRefManager.SetRef(kubecontainer.ContainerID{
+			Type: m.runtimeName,
+			ID:   containerID,
+		}, ref)
+	}
+
+	// Step 3: start the container.
+	err = m.runtimeService.StartContainer(containerID)
+	if err != nil {
+		m.recorder.Eventf(ref, api.EventTypeWarning, events.FailedToStartContainer,
+			"Failed to start container with id %v with error: %v", containerID, err)
+		return "Start Container Failed", err
+	}
+	m.recorder.Eventf(ref, api.EventTypeNormal, events.StartedContainer, "Started container with id %v", containerID)
+
+	// Step 4: execute the post start hook.
+	if container.Lifecycle != nil && container.Lifecycle.PostStart != nil {
+		kubeContainerID := kubecontainer.ContainerID{
+			Type: m.runtimeName,
+			ID:   containerID,
+		}
+		msg, handlerErr := m.runner.Run(kubeContainerID, pod, container, container.Lifecycle.PostStart)
+		if handlerErr != nil {
+			err := fmt.Errorf("PostStart handler: %v", handlerErr)
+			m.generateContainerEvent(kubeContainerID, api.EventTypeWarning, events.FailedPostStartHook, msg)
+			m.killContainer(pod, kubeContainerID, container, "FailedPostStartHook", nil)
+			return "PostStart Hook Failed", err
+		}
+	}
+
+	return "", nil
+}
 
 // getContainerLogsPath gets log path for container.
 func getContainerLogsPath(containerName string, podUID types.UID) string {
@@ -370,12 +443,11 @@ func (m *kubeGenericRuntimeManager) killContainer(pod *api.Pod, containerID kube
 	if pod != nil && containerSpec != nil && containerSpec.Lifecycle != nil && containerSpec.Lifecycle.PreStop != nil {
 		gracePeriod = gracePeriod - m.executePreStopHook(pod, containerID, containerSpec, gracePeriod)
 	}
-	if gracePeriodOverride == nil {
-		// always give containers a minimal shutdown window to avoid unnecessary SIGKILLs
-		if gracePeriod < minimumGracePeriodInSeconds {
-			gracePeriod = minimumGracePeriodInSeconds
-		}
-	} else {
+	// always give containers a minimal shutdown window to avoid unnecessary SIGKILLs
+	if gracePeriod < minimumGracePeriodInSeconds {
+		gracePeriod = minimumGracePeriodInSeconds
+	}
+	if gracePeriodOverride != nil {
 		gracePeriod = *gracePeriodOverride
 		glog.V(3).Infof("Killing container %q, but using %d second grace period override", containerID, gracePeriod)
 	}

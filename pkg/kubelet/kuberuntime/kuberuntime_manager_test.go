@@ -20,6 +20,7 @@ import (
 	"reflect"
 	"sort"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"k8s.io/kubernetes/pkg/api"
@@ -31,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	nettest "k8s.io/kubernetes/pkg/kubelet/network/testing"
 	kubetypes "k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/util/flowcontrol"
 )
 
 var (
@@ -70,7 +72,7 @@ func makeAndSetFakePod(m *kubeGenericRuntimeManager, fakeRuntime *apitest.FakeRu
 }
 
 func makeFakePodSandbox(m *kubeGenericRuntimeManager, pod *api.Pod, createdAt int64) (*apitest.FakePodSandbox, error) {
-	config, err := m.generatePodSandboxConfig(pod, "", 0)
+	config, err := m.generatePodSandboxConfig(pod, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -114,7 +116,7 @@ func makeFakeContainer(m *kubeGenericRuntimeManager, pod *api.Pod, container api
 }
 
 func makeFakeContainers(m *kubeGenericRuntimeManager, pod *api.Pod, containers []api.Container, createdAt int64) ([]*apitest.FakeContainer, error) {
-	sandboxConfig, err := m.generatePodSandboxConfig(pod, "", 0)
+	sandboxConfig, err := m.generatePodSandboxConfig(pod, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -439,5 +441,46 @@ func TestKillPod(t *testing.T) {
 	}
 	for _, c := range fakeRuntime.Containers {
 		assert.Equal(t, runtimeApi.ContainerState_EXITED, c.GetState())
+	}
+}
+
+func TestSyncPod(t *testing.T) {
+	fakeRuntime, fakeImage, m, err := createTestRuntimeManager()
+	assert.NoError(t, err)
+
+	containers := []api.Container{
+		{
+			Name:            "foo1",
+			Image:           "busybox",
+			ImagePullPolicy: api.PullIfNotPresent,
+		},
+		{
+			Name:            "foo2",
+			Image:           "alpine",
+			ImagePullPolicy: api.PullIfNotPresent,
+		},
+	}
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			UID:       "12345678",
+			Name:      "foo",
+			Namespace: "new",
+		},
+		Spec: api.PodSpec{
+			Containers: containers,
+		},
+	}
+
+	backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
+	result := m.SyncPod(pod, api.PodStatus{}, &kubecontainer.PodStatus{}, []api.Secret{}, backOff)
+	assert.NoError(t, result.Error())
+	assert.Equal(t, 2, len(fakeRuntime.Containers))
+	assert.Equal(t, 2, len(fakeImage.Images))
+	assert.Equal(t, 1, len(fakeRuntime.Sandboxes))
+	for _, sandbox := range fakeRuntime.Sandboxes {
+		assert.Equal(t, runtimeApi.PodSandBoxState_READY, sandbox.GetState())
+	}
+	for _, c := range fakeRuntime.Containers {
+		assert.Equal(t, runtimeApi.ContainerState_RUNNING, c.GetState())
 	}
 }
