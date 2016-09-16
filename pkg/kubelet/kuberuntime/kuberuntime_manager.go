@@ -668,15 +668,15 @@ func (m *kubeGenericRuntimeManager) killPodWithSyncResult(pod *api.Pod, runningP
 		return
 	}
 	if !isHostNetwork {
-		teardownNetworkResult := kubecontainer.NewSyncResult(kubecontainer.TeardownNetwork, pod.UID)
+		teardownNetworkResult := kubecontainer.NewSyncResult(kubecontainer.TeardownNetwork, runningPod.ID)
 		result.AddSyncResult(teardownNetworkResult)
 		// Tear down network plugin with sandbox id
 		if err := m.networkPlugin.TearDownPod(runningPod.Namespace, runningPod.Name, kubecontainer.ContainerID{
 			Type: m.runtimeName,
 			ID:   sandboxID,
 		}); err != nil {
-			message := fmt.Sprintf("Failed to teardown network for pod %q using network plugins %q: %v",
-				format.Pod(pod), m.networkPlugin.Name(), err)
+			message := fmt.Sprintf("Failed to teardown network for pod %s_%s(%s) using network plugins %q: %v",
+				runningPod.Name, runningPod.Namespace, runningPod.ID, m.networkPlugin.Name(), err)
 			teardownNetworkResult.Fail(kubecontainer.ErrTeardownNetwork, message)
 			glog.Error(message)
 		}
