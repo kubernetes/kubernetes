@@ -21,7 +21,7 @@ import (
 
 	apivalidation "k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/apis/certificates"
-	certutil "k8s.io/kubernetes/pkg/util/certificates"
+	certutil "k8s.io/kubernetes/pkg/util/cert"
 	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
@@ -29,7 +29,7 @@ import (
 // PEM-encoded PKCS#10 certificate signing request. If this is invalid, we must
 // not accept the CSR for further processing.
 func validateCSR(obj *certificates.CertificateSigningRequest) error {
-	csr, err := certutil.ParseCertificateRequestObject(obj)
+	csr, err := certutil.ParseCSR(obj)
 	if err != nil {
 		return err
 	}

@@ -32,7 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/crypto"
+	certutil "k8s.io/kubernetes/pkg/util/cert"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/version"
 )
@@ -261,7 +261,7 @@ func InClusterConfig() (*Config, error) {
 	}
 	tlsClientConfig := TLSClientConfig{}
 	rootCAFile := "/var/run/secrets/kubernetes.io/serviceaccount/" + api.ServiceAccountRootCAKey
-	if _, err := crypto.CertPoolFromFile(rootCAFile); err != nil {
+	if _, err := certutil.NewPool(rootCAFile); err != nil {
 		glog.Errorf("Expected to load root CA config from %s, but got err: %v", rootCAFile, err)
 	} else {
 		tlsClientConfig.CAFile = rootCAFile
