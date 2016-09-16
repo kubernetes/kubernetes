@@ -48,7 +48,7 @@ type quobytePlugin struct {
 type quobyteAPIConfig struct {
 	quobyteUser      string
 	quobytePassword  string
-	quobyteApiServer string
+	quobyteAPIServer string
 }
 
 var _ volume.VolumePlugin = &quobytePlugin{}
@@ -189,7 +189,6 @@ func (plugin *quobytePlugin) newUnmounterInternal(volName string, podUID types.U
 }
 
 // Quobyte volumes represent a bare host directory mount of an quobyte export.
-//TODO add configuration + tenant
 type quobyte struct {
 	volName string
 	pod     *api.Pod
@@ -402,7 +401,7 @@ func (provisioner *quobyteVolumeProvisioner) Provision() (*api.PersistentVolume,
 	provisioner.volume = fmt.Sprintf("kubernetes-dynamic-pvc-%s", uuid.NewUUID())
 
 	cfg := &quobyteAPIConfig{
-		quobyteApiServer: apiServer,
+		quobyteAPIServer: apiServer,
 		quobyteUser:      quobyteUser,
 		quobytePassword:  quobytePassword,
 	}
@@ -468,7 +467,7 @@ func (deleter *quobyteVolumeDeleter) Delete() error {
 		config: &quobyteAPIConfig{
 			quobyteUser:      quobyteUser,
 			quobytePassword:  quobytePassword,
-			quobyteApiServer: annotations[annotationQuobyteAPIServer],
+			quobyteAPIServer: annotations[annotationQuobyteAPIServer],
 		},
 	}
 	return manager.deleteVolume(deleter)
