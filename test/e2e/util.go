@@ -386,6 +386,16 @@ func SkipUnlessServerVersionLTE(v semver.Version, c discovery.ServerVersionInter
 	}
 }
 
+func SkipUnlessServerVersionLT(v semver.Version, c discovery.ServerVersionInterface) {
+	lt, err := serverVersionLT(v, c)
+	if err != nil {
+		Failf("Failed to get server version: %v", err)
+	}
+	if !lt {
+		Skipf("Test not supported for server version %q", v)
+	}
+}
+
 // providersWithSSH are those providers where each node is accessible with SSH
 var providersWithSSH = []string{"gce", "gke", "aws"}
 
@@ -1305,6 +1315,19 @@ func serverVersionGTE(v semver.Version, c discovery.ServerVersionInterface) (boo
 		return false, fmt.Errorf("Unable to parse server version %q: %v", serverVersion.GitVersion, err)
 	}
 	return sv.GTE(v), nil
+}
+
+// serverVersionLT returns true if v is less than the server version.
+func serverVersionLT(v semver.Version, c discovery.ServerVersionInterface) (bool, error) {
+	serverVersion, err := c.ServerVersion()
+	if err != nil {
+		return false, fmt.Errorf("Unable to get server version: %v", err)
+	}
+	sv, err := version.Parse(serverVersion.GitVersion)
+	if err != nil {
+		return false, fmt.Errorf("Unable to parse server version %q: %v", serverVersion.GitVersion, err)
+	}
+	return sv.LT(v), nil
 }
 
 // kubectlVersionGTE returns true if the kubectl version is greater than or
