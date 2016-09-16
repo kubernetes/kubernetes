@@ -269,16 +269,16 @@ func (rm *ReplicationManager) getPodController(pod *api.Pod) *api.ReplicationCon
 	}
 
 	// update lookup cache
-	rm.lookupCache.Update(pod, &controllers[0])
+	rm.lookupCache.Update(pod, controllers[0])
 
-	return &controllers[0]
+	return controllers[0]
 }
 
 // isCacheValid check if the cache is valid
 func (rm *ReplicationManager) isCacheValid(pod *api.Pod, cachedRC *api.ReplicationController) bool {
-	exists, err := rm.rcStore.Exists(cachedRC)
+	_, err := rm.rcStore.ReplicationControllers(cachedRC.Namespace).Get(cachedRC.Name)
 	// rc has been deleted or updated, cache is invalid
-	if err != nil || !exists || !isControllerMatch(pod, cachedRC) {
+	if err != nil || !isControllerMatch(pod, cachedRC) {
 		return false
 	}
 	return true

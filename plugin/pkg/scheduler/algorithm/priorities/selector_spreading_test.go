@@ -57,7 +57,7 @@ func TestSelectorSpreadPriority(t *testing.T) {
 		pod          *api.Pod
 		pods         []*api.Pod
 		nodes        []string
-		rcs          []api.ReplicationController
+		rcs          []*api.ReplicationController
 		rss          []extensions.ReplicaSet
 		services     []*api.Service
 		expectedList schedulerapi.HostPriorityList
@@ -181,7 +181,7 @@ func TestSelectorSpreadPriority(t *testing.T) {
 				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicationController", "name", "abc123")}},
 			},
 			nodes:    []string{"machine1", "machine2"},
-			rcs:      []api.ReplicationController{{Spec: api.ReplicationControllerSpec{Selector: map[string]string{"foo": "bar"}}}},
+			rcs:      []*api.ReplicationController{{Spec: api.ReplicationControllerSpec{Selector: map[string]string{"foo": "bar"}}}},
 			services: []*api.Service{{Spec: api.ServiceSpec{Selector: map[string]string{"baz": "blah"}}}},
 			// "baz=blah" matches both labels1 and labels2, and "foo=bar" matches only labels 1. This means that we assume that we want to
 			// do spreading between all pods. The result should be exactly as above.
@@ -210,7 +210,7 @@ func TestSelectorSpreadPriority(t *testing.T) {
 				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicationController", "name", "abc123")}},
 			},
 			nodes:    []string{"machine1", "machine2"},
-			rcs:      []api.ReplicationController{{Spec: api.ReplicationControllerSpec{Selector: map[string]string{"foo": "bar"}}}},
+			rcs:      []*api.ReplicationController{{Spec: api.ReplicationControllerSpec{Selector: map[string]string{"foo": "bar"}}}},
 			services: []*api.Service{{Spec: api.ServiceSpec{Selector: map[string]string{"bar": "foo"}}}},
 			// Taken together Service and Replication Controller should match all Pods, hence result should be equal to one above.
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 0}, {Host: "machine2", Score: 5}},
@@ -238,7 +238,7 @@ func TestSelectorSpreadPriority(t *testing.T) {
 				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicationController", "name", "abc123")}},
 			},
 			nodes: []string{"machine1", "machine2"},
-			rcs:   []api.ReplicationController{{Spec: api.ReplicationControllerSpec{Selector: map[string]string{"foo": "bar"}}}},
+			rcs:   []*api.ReplicationController{{Spec: api.ReplicationControllerSpec{Selector: map[string]string{"foo": "bar"}}}},
 			// Both Nodes have one pod from the given RC, hence both get 0 score.
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 0}, {Host: "machine2", Score: 0}},
 			test:         "Replication controller with partial pod label matches",
@@ -264,7 +264,7 @@ func TestSelectorSpreadPriority(t *testing.T) {
 				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicationController", "name", "abc123")}},
 			},
 			nodes:        []string{"machine1", "machine2"},
-			rcs:          []api.ReplicationController{{Spec: api.ReplicationControllerSpec{Selector: map[string]string{"baz": "blah"}}}},
+			rcs:          []*api.ReplicationController{{Spec: api.ReplicationControllerSpec{Selector: map[string]string{"baz": "blah"}}}},
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 0}, {Host: "machine2", Score: 5}},
 			test:         "Another replication controller with partial pod label matches",
 		},
@@ -344,7 +344,7 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 		pod          *api.Pod
 		pods         []*api.Pod
 		nodes        []string
-		rcs          []api.ReplicationController
+		rcs          []*api.ReplicationController
 		rss          []extensions.ReplicaSet
 		services     []*api.Service
 		expectedList schedulerapi.HostPriorityList
@@ -471,7 +471,7 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 				buildPod(nodeMachine1Zone2, labels1, controllerRef("ReplicationController", "name", "abc123")),
 				buildPod(nodeMachine1Zone3, labels1, controllerRef("ReplicationController", "name", "abc123")),
 			},
-			rcs: []api.ReplicationController{{Spec: api.ReplicationControllerSpec{Selector: labels1}}},
+			rcs: []*api.ReplicationController{{Spec: api.ReplicationControllerSpec{Selector: labels1}}},
 			expectedList: []schedulerapi.HostPriority{
 				// Note that because we put two pods on the same node (nodeMachine1Zone3),
 				// the values here are questionable for zone2, in particular for nodeMachine1Zone2.
