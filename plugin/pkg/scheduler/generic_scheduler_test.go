@@ -493,8 +493,8 @@ func TestZeroRequest(t *testing.T) {
 			{
 				Function: algorithmpriorities.NewSelectorSpreadPriority(
 					algorithm.FakePodLister(test.pods),
-					algorithm.FakeServiceLister([]api.Service{}),
-					algorithm.FakeControllerLister([]api.ReplicationController{}),
+					algorithm.FakeServiceLister([]*api.Service{}),
+					algorithm.FakeControllerLister([]*api.ReplicationController{}),
 					algorithm.FakeReplicaSetLister([]extensions.ReplicaSet{})),
 				Weight: 1,
 			},
