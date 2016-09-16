@@ -1,0 +1,8 @@
+apiVersion: storage.k8s.io/v1beta1
+kind: StorageClass
+metadata:
+  name: sc-0001
+provisioner: kubernetes.io/libstorage
+parameters:
+  host: "tcp://:7979"
+  service: "virtualbox"
