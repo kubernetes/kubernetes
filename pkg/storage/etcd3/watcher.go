@@ -31,8 +31,6 @@ import (
 	etcdrpc "github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes"
 	"github.com/golang/glog"
 	"golang.org/x/net/context"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
 )
 
 const (
@@ -109,6 +107,10 @@ func (wc *watchChan) run() {
 
 	select {
 	case err := <-wc.errChan:
+		if err == context.Canceled {
+			wc.cancel() // just in case
+			break
+		}
 		errResult := parseError(err)
 		if errResult != nil {
 			// error result is guaranteed to be received by user before closing ResultChan.
@@ -294,12 +296,6 @@ func parseError(err error) *watch.Event {
 }
 
 func (wc *watchChan) sendError(err error) {
-	// Context.canceled is an expected behavior.
-	// We should just stop all goroutines in watchChan without returning error.
-	// TODO: etcd client should return context.Canceled instead of grpc specific error.
-	if grpc.Code(err) == codes.Canceled || err == context.Canceled {
-		return
-	}
 	select {
 	case wc.errChan <- err:
 	case <-wc.ctx.Done():
