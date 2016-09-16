@@ -196,8 +196,10 @@ func StandardErrorMessage(err error) (string, bool) {
 	switch {
 	case isStatus:
 		switch s := status.Status(); {
-		case s.Reason == "Unauthorized":
+		case s.Reason == unversioned.StatusReasonUnauthorized:
 			return fmt.Sprintf("error: You must be logged in to the server (%s)", s.Message), true
+		case len(s.Reason) > 0:
+			return fmt.Sprintf("Error from server (%s): %s", s.Reason, err.Error()), true
 		default:
 			return fmt.Sprintf("Error from server: %s", err.Error()), true
 		}
