@@ -37,8 +37,10 @@ function copy-logs-from-node() {
     local -r node="${1}"
     local -r dir="${2}"
     local files=(${3})
-    # Append ".log"
-    files=("${files[@]/%/.log}")
+    # Append ".log*"
+    # The * at the end is needed to also copy rotated logs (which happens
+    # in large clusters and long runs).
+    files=("${files[@]/%/.log*}")
     # Prepend "/var/log/"
     files=("${files[@]/#/\/var\/log\/}")
     # Replace spaces with commas, surround with braces
