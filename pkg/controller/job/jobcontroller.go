@@ -292,7 +292,7 @@ func (jm *JobController) processNextWorkItem() bool {
 	if quit {
 		return false
 	}
-	defer jm.queue.Done()
+	defer jm.queue.Done(jKey)
 
 	err := jm.syncHandler(jKey.(string))
 	if err == nil {
@@ -329,13 +329,7 @@ func (jm *JobController) syncJob(key string) error {
 	// Check the expectations of the job before counting active pods, otherwise a new pod can sneak in
 	// and update the expectations after we've retrieved active pods from the store. If a new pod enters
 	// the store after we've checked the expectation, the job sync is just deferred till the next relist.
-	jobKey, err := controller.KeyFunc(&job)
-	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Couldn't get key for job %#v: %v", job, err))
-		// We explicitly return nil to avoid re-enqueue the bad key
-		return nil
-	}
-	jobNeedsSync := jm.expectations.SatisfiedExpectations(jobKey)
+	jobNeedsSync := jm.expectations.SatisfiedExpectations(key)
 	selector, _ := unversioned.LabelSelectorAsSelector(job.Spec.Selector)
 	pods, err := jm.podStore.Pods(job.Namespace).List(selector)
 	if err != nil {
@@ -422,8 +416,7 @@ func (jm *JobController) syncJob(key string) error {
 		job.Status.Failed = failed
 
 		if err := jm.updateHandler(&job); err != nil {
-			utilruntime.HandleError(fmt.Errorf("Failed to update job %v, requeuing.  Error: %v", job.Name, err))
-			jm.enqueueController(&job)
+			return err
 		}
 	}
 	return nil
