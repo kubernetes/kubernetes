@@ -410,6 +410,7 @@ func (p *Propagator) processEvent() {
 		// the node's owners list.
 		p.removeDependentFromOwners(existingNode, removed)
 	case event.eventType == deleteEvent:
+		p.gc.absentOwnerCache.Add(accessor.GetUID())
 		if !found {
 			glog.V(6).Infof("%v doesn't exist in the graph, this shouldn't happen", accessor.GetUID())
 			return
