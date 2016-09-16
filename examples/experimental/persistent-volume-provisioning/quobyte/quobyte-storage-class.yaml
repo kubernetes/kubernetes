@@ -4,7 +4,7 @@ metadata:
    name: slow
 provisioner: kubernetes.io/quobyte
 parameters:
-    quobyteApiServer: "http://138.68.74.142:7860"
+    quobyteAPIServer: "http://138.68.74.142:7860"
     registry: "138.68.74.142:7861"
     adminSecretName: "quobyte-admin-secret"
     adminSecretNamespace: "kube-system"

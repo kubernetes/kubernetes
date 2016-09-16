@@ -63,7 +63,7 @@ func (manager *quobyteVolumeManager) deleteVolume(deleter *quobyteVolumeDeleter)
 
 func (manager *quobyteVolumeManager) createQuobyteClient() *quobyte_api.QuobyteClient {
 	return quobyte_api.NewQuobyteClient(
-		manager.config.quobyteApiServer,
+		manager.config.quobyteAPIServer,
 		manager.config.quobyteUser,
 		manager.config.quobytePassword,
 	)
