@@ -63,24 +63,25 @@ func (f FakePodLister) List(s labels.Selector) (selected []*api.Pod, err error) 
 // ServiceLister interface represents anything that can produce a list of services; the list is consumed by a scheduler.
 type ServiceLister interface {
 	// Lists all the services
-	List() (api.ServiceList, error)
+	List(labels.Selector) ([]*api.Service, error)
 	// Gets the services for the given pod
-	GetPodServices(*api.Pod) ([]api.Service, error)
+	GetPodServices(*api.Pod) ([]*api.Service, error)
 }
 
 // FakeServiceLister implements ServiceLister on []api.Service for test purposes.
-type FakeServiceLister []api.Service
+type FakeServiceLister []*api.Service
 
 // List returns api.ServiceList, the list of all services.
-func (f FakeServiceLister) List() (api.ServiceList, error) {
-	return api.ServiceList{Items: f}, nil
+func (f FakeServiceLister) List(labels.Selector) ([]*api.Service, error) {
+	return f, nil
 }
 
 // GetPodServices gets the services that have the selector that match the labels on the given pod
-func (f FakeServiceLister) GetPodServices(pod *api.Pod) (services []api.Service, err error) {
+func (f FakeServiceLister) GetPodServices(pod *api.Pod) (services []*api.Service, err error) {
 	var selector labels.Selector
 
-	for _, service := range f {
+	for i := range f {
+		service := f[i]
 		// consider only services that are in the same namespace as the pod
 		if service.Namespace != pod.Namespace {
 			continue
