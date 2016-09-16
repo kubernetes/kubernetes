@@ -21,9 +21,8 @@ import (
 )
 
 const (
-	PodInfraOOMAdj        int = -998
+	PodInfraOOMAdj        int = -999
 	KubeletOOMScoreAdj    int = -999
-	DockerOOMScoreAdj     int = -999
 	KubeProxyOOMScoreAdj  int = -999
 	guaranteedOOMScoreAdj int = -998
 	besteffortOOMScoreAdj int = 1000
@@ -54,10 +53,10 @@ func GetContainerOOMScoreAdjust(pod *api.Pod, container *api.Container, memoryCa
 	// Note that this is a heuristic, it won't work if a container has many small processes.
 	memoryRequest := container.Resources.Requests.Memory().Value()
 	oomScoreAdjust := 1000 - (1000*memoryRequest)/memoryCapacity
-	// A guaranteed pod using 100% of memory can have an OOM score of 10. Ensure
+	// A guaranteed pod using 100% of memory can have an OOM score of 1. Ensure
 	// that burstable pods have a higher OOM score adjustment.
-	if int(oomScoreAdjust) < (1000 + guaranteedOOMScoreAdj) {
-		return (1000 + guaranteedOOMScoreAdj)
+	if oomScoreAdjust < 2 {
+		return 2
 	}
 	// Give burstable pods a higher chance of survival over besteffort pods.
 	if int(oomScoreAdjust) == besteffortOOMScoreAdj {
