@@ -124,7 +124,6 @@ kube::golang::test_targets() {
     federation/cmd/genfeddocs
     vendor/github.com/onsi/ginkgo/ginkgo
     test/e2e/e2e.test
-    test/e2e_node/e2e_node.test
   )
   if [ -n "${KUBERNETES_CONTRIB:-}" ]; then
     for contrib in "${KUBERNETES_CONTRIB}"; do
@@ -147,6 +146,15 @@ readonly KUBE_TEST_PORTABLE=(
   hack/lib
 )
 
+# Node test has built-in etcd and kube-apiserver, it can only be built on the
+# same platforms with kube-apiserver.
+readonly KUBE_NODE_TEST_TARGETS=(
+  vendor/github.com/onsi/ginkgo/ginkgo
+  test/e2e_node/e2e_node.test
+)
+readonly KUBE_NODE_TEST_BINARIES=("${KUBE_NODE_TEST_TARGETS[@]##*/}")
+readonly KUBE_NODE_TEST_PLATFORMS=("${KUBE_SERVER_PLATFORMS[@]}")
+
 # Gigabytes desired for parallel platform builds. 11 is fairly
 # arbitrary, but is a reasonable splitting point for 2015
 # laptops-versus-not.
@@ -162,6 +170,7 @@ readonly KUBE_ALL_TARGETS=(
   "${KUBE_SERVER_TARGETS[@]}"
   "${KUBE_CLIENT_TARGETS[@]}"
   "${KUBE_TEST_TARGETS[@]}"
+  "${KUBE_NODE_TEST_TARGETS[@]}"
 )
 readonly KUBE_ALL_BINARIES=("${KUBE_ALL_TARGETS[@]##*/}")
 
