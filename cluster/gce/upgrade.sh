@@ -76,6 +76,9 @@ function upgrade-master() {
   detect-master
   parse-master-env
 
+  MASTER_OS_DISTRIBUTION=$(get-node-os "${MASTER_NAME}")
+  source "${KUBE_ROOT}/cluster/gce/${MASTER_OS_DISTRIBUTION}/node-helper.sh"
+
   # Delete the master instance. Note that the master-pd is created
   # with auto-delete=no, so it should not be deleted.
   gcloud compute instances delete \
@@ -134,6 +137,20 @@ function get-node-env() {
       'http://metadata/computeMetadata/v1/instance/attributes/kube-env'" 2>/dev/null
 }
 
+# Read os distro information from /os/release on node.
+# $1: The name of node
+#
+# Assumed vars:
+#   PROJECT
+#   ZONE
+function get-node-os() {
+  gcloud compute ssh "$1" \
+    --project "${PROJECT}" \
+    --zone "${ZONE}" \
+    --command \
+    "cat /etc/os-release | grep \"^ID=.*\" | cut -c 4-"
+}
+
 # Assumed vars:
 #   KUBE_VERSION
 #   NODE_SCOPES
@@ -177,6 +194,8 @@ function prepare-node-upgrade() {
   SANITIZED_VERSION=$(echo ${KUBE_VERSION} | sed 's/[\.\+]/-/g')
 
   detect-node-names # sets INSTANCE_GROUPS
+  NODE_OS_DISTRIBUTION=$(get-node-os "${NODE_NAMES[0]}")
+  source "${KUBE_ROOT}/cluster/gce/${NODE_OS_DISTRIBUTION}/node-helper.sh"
 
   # TODO(zmerlynn): Refactor setting scope flags.
   local scope_flags=
