@@ -93,6 +93,7 @@ func TestIngressController(t *testing.T) {
 	stop := make(chan struct{})
 	t.Log("Running Ingress Controller")
 	ingressController.Run(stop)
+	defer close(stop)
 
 	ing1 := extensions_v1beta1.Ingress{
 		ObjectMeta: api_v1.ObjectMeta{
@@ -169,7 +170,6 @@ func TestIngressController(t *testing.T) {
 			fmt.Sprintf("UID's in configmaps in cluster's 1 and 2 are not equal (%q != %q)", cfg1.Data["uid"], updatedConfigMap2.Data["uid"]))
 	}
 
-	close(stop)
 }
 
 func GetIngressFromChan(t *testing.T, c chan runtime.Object) *extensions_v1beta1.Ingress {

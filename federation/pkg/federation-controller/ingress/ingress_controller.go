@@ -280,13 +280,6 @@ func (ic *IngressController) Run(stopChan <-chan struct{}) {
 	ic.ingressFederatedInformer.Start()
 	glog.Infof("... Starting ConfigMap Federated Informer")
 	ic.configMapFederatedInformer.Start()
-	go func() {
-		<-stopChan
-		glog.Infof("Stopping Ingress Federated Informer")
-		ic.ingressFederatedInformer.Stop()
-		glog.Infof("Stopping ConfigMap Federated Informer")
-		ic.configMapFederatedInformer.Stop()
-	}()
 	ic.ingressDeliverer.StartWithHandler(func(item *util.DelayingDelivererItem) {
 		ingress := item.Value.(types.NamespacedName)
 		glog.V(4).Infof("Ingress change delivered, reconciling: %v", ingress)
@@ -311,6 +304,16 @@ func (ic *IngressController) Run(stopChan <-chan struct{}) {
 		}
 		ic.reconcileConfigMapForCluster(clusterName)
 	})
+	go func() {
+		<-stopChan
+		glog.Infof("Stopping Ingress Federated Informer")
+		ic.ingressFederatedInformer.Stop()
+		glog.Infof("Stopping ConfigMap Federated Informer")
+		ic.configMapFederatedInformer.Stop()
+		ic.ingressDeliverer.Stop()
+		ic.clusterDeliverer.Stop()
+		ic.configMapDeliverer.Stop()
+	}()
 	go func() {
 		select {
 		case <-time.After(time.Minute):
