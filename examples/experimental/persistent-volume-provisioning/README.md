@@ -70,11 +70,40 @@ parameters:
   restuserkey: "password"
 ```
 
-* `endpoint`: `glusterfs-cluster` is the endpoint/service name which includes GlusterFS trusted pool IP addresses and this parameter is mandatory.
-* `resturl` : Gluster REST service url which provision gluster volumes on demand. The format should be `IPaddress:Port` and this is a mandatory parameter for GlusterFS dynamic provisioner.
+* `endpoint`: `glusterfs-cluster` is the endpoint name which includes GlusterFS trusted pool IP addresses. This parameter is mandatory. We need to also create a service for this endpoint, so that the endpoint will be persisted. This service can be without a selector to tell Kubernetes we want to add its endpoints manually.  Please note that, glusterfs plugin looks for the endpoint in the pod namespace, so it is mandatory that the endpoint and service have to be created in Pod's namespace for successful mount of gluster volumes in the pod.
+* `resturl` : Gluster REST service/Heketi service url which provision gluster volumes on demand. The general format should be `IPaddress:Port` and this is a mandatory parameter for GlusterFS dynamic provisioner. If Heketi service is exposed as a routable service in openshift/kubernetes setup, this can have a format similar to
+`http://heketi-storage-project.cloudapps.mystorage.com` where the fqdn is a resolvable heketi service url.
 * `restauthenabled` : Gluster REST service authentication boolean is required if the authentication is enabled on the REST server. If this value is 'true', 'restuser' and 'restuserkey' have to be filled.
-* `restuser` : Gluster REST service user who has access to create volumes in the Gluster Trusted Pool.
-* `restuserkey` : Gluster REST service user's password which will be used for authentication to the REST server.
+* `restuser` : Gluster REST service/Heketi user who has access to create volumes in the Gluster Trusted Pool.
+* `restuserkey` : Gluster REST service/Heketi user's password which will be used for authentication to the REST server.
+
+Reference : ([How to configure Heketi](https://github.com/heketi/heketi/wiki/Setting-up-the-topology))
+
+Create endpoints
+
+As in example [glusterfs-endpoints.json](../../volumes/glusterfs/glusterfs-endpoints.json) file, the "IP" field should be filled with the address of a node in the Glusterfs server cluster. It is fine to give any valid value (from 1 to 65535) to the "port" field.
+
+Create the endpoints,
+
+```sh
+$ kubectl create -f examples/volumes/glusterfs/glusterfs-endpoints.json
+```
+
+You can verify that the endpoints are successfully created by running
+
+```sh
+$ kubectl get endpoints
+NAME                ENDPOINTS
+glusterfs-cluster   10.240.106.152:1,10.240.79.157:1
+```
+
+We need also create a service for this endpoints, so that the endpoints will be persisted. It is possible to create `service` without a selector to tell Kubernetes we want to add its endpoints manually. For an example service file refer [glusterfs-service.json](../../volumes/glusterfs/glusterfs-service.json).
+
+Use this command to create the service:
+
+```sh
+$ kubectl create -f examples/volumes/glusterfs/glusterfs-service.json
+```
 
 #### OpenStack Cinder
 
