@@ -44,7 +44,6 @@ import (
 	"io/ioutil"
 	"net"
 	"strings"
-	"time"
 
 	"golang.org/x/net/context"
 )
@@ -93,11 +92,12 @@ type TransportCredentials interface {
 	// ClientHandshake does the authentication handshake specified by the corresponding
 	// authentication protocol on rawConn for clients. It returns the authenticated
 	// connection and the corresponding auth information about the connection.
-	ClientHandshake(addr string, rawConn net.Conn, timeout time.Duration) (net.Conn, AuthInfo, error)
+	// Implementations must use the provided context to implement timely cancellation.
+	ClientHandshake(context.Context, string, net.Conn) (net.Conn, AuthInfo, error)
 	// ServerHandshake does the authentication handshake for servers. It returns
 	// the authenticated connection and the corresponding auth information about
 	// the connection.
-	ServerHandshake(rawConn net.Conn) (net.Conn, AuthInfo, error)
+	ServerHandshake(net.Conn) (net.Conn, AuthInfo, error)
 	// Info provides the ProtocolInfo of this TransportCredentials.
 	Info() ProtocolInfo
 }
@@ -136,42 +136,28 @@ func (c *tlsCreds) RequireTransportSecurity() bool {
 	return true
 }
 
-type timeoutError struct{}
-
-func (timeoutError) Error() string   { return "credentials: Dial timed out" }
-func (timeoutError) Timeout() bool   { return true }
-func (timeoutError) Temporary() bool { return true }
-
-func (c *tlsCreds) ClientHandshake(addr string, rawConn net.Conn, timeout time.Duration) (_ net.Conn, _ AuthInfo, err error) {
-	// borrow some code from tls.DialWithDialer
-	var errChannel chan error
-	if timeout != 0 {
-		errChannel = make(chan error, 2)
-		time.AfterFunc(timeout, func() {
-			errChannel <- timeoutError{}
-		})
-	}
+func (c *tlsCreds) ClientHandshake(ctx context.Context, addr string, rawConn net.Conn) (_ net.Conn, _ AuthInfo, err error) {
 	// use local cfg to avoid clobbering ServerName if using multiple endpoints
-	cfg := *c.config
-	if c.config.ServerName == "" {
+	cfg := cloneTLSConfig(c.config)
+	if cfg.ServerName == "" {
 		colonPos := strings.LastIndex(addr, ":")
 		if colonPos == -1 {
 			colonPos = len(addr)
 		}
 		cfg.ServerName = addr[:colonPos]
 	}
-	conn := tls.Client(rawConn, &cfg)
-	if timeout == 0 {
-		err = conn.Handshake()
-	} else {
-		go func() {
-			errChannel <- conn.Handshake()
-		}()
-		err = <-errChannel
-	}
-	if err != nil {
-		rawConn.Close()
-		return nil, nil, err
+	conn := tls.Client(rawConn, cfg)
+	errChannel := make(chan error, 1)
+	go func() {
+		errChannel <- conn.Handshake()
+	}()
+	select {
+	case err := <-errChannel:
+		if err != nil {
+			return nil, nil, err
+		}
+	case <-ctx.Done():
+		return nil, nil, ctx.Err()
 	}
 	// TODO(zhaoq): Omit the auth info for client now. It is more for
 	// information than anything else.
@@ -181,7 +167,6 @@ func (c *tlsCreds) ClientHandshake(addr string, rawConn net.Conn, timeout time.D
 func (c *tlsCreds) ServerHandshake(rawConn net.Conn) (net.Conn, AuthInfo, error) {
 	conn := tls.Server(rawConn, c.config)
 	if err := conn.Handshake(); err != nil {
-		rawConn.Close()
 		return nil, nil, err
 	}
 	return conn, TLSInfo{conn.ConnectionState()}, nil
@@ -189,7 +174,7 @@ func (c *tlsCreds) ServerHandshake(rawConn net.Conn) (net.Conn, AuthInfo, error)
 
 // NewTLS uses c to construct a TransportCredentials based on TLS.
 func NewTLS(c *tls.Config) TransportCredentials {
-	tc := &tlsCreds{c}
+	tc := &tlsCreds{cloneTLSConfig(c)}
 	tc.config.NextProtos = alpnProtoStr
 	return tc
 }
