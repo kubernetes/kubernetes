@@ -115,8 +115,6 @@ var _ = framework.KubeDescribe("Dynamic provisioning", func() {
 
 	framework.KubeDescribe("DynamicProvisioner", func() {
 		It("should create and delete persistent volumes [Slow]", func() {
-			// added until the GKE startup includes storage.k8s.io/v1beta1
-			framework.SkipIfProviderIs("gke")
 			framework.SkipUnlessProviderIs("openstack", "gce", "aws", "gke")
 
 			By("creating a StorageClass")
