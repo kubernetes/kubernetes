@@ -409,47 +409,6 @@ func (s *StoreToDaemonSetLister) GetPodDaemonSets(pod *api.Pod) (daemonSets []ex
 	return
 }
 
-// StoreToServiceLister makes a Store that has the List method of the client.ServiceInterface
-// The Store must contain (only) Services.
-type StoreToServiceLister struct {
-	Store
-}
-
-func (s *StoreToServiceLister) List() (services api.ServiceList, err error) {
-	for _, m := range s.Store.List() {
-		services.Items = append(services.Items, *(m.(*api.Service)))
-	}
-	return services, nil
-}
-
-// TODO: Move this back to scheduler as a helper function that takes a Store,
-// rather than a method of StoreToServiceLister.
-func (s *StoreToServiceLister) GetPodServices(pod *api.Pod) (services []api.Service, err error) {
-	var selector labels.Selector
-	var service api.Service
-
-	for _, m := range s.Store.List() {
-		service = *m.(*api.Service)
-		// consider only services that are in the same namespace as the pod
-		if service.Namespace != pod.Namespace {
-			continue
-		}
-		if service.Spec.Selector == nil {
-			// services with nil selectors match nothing, not everything.
-			continue
-		}
-		selector = labels.Set(service.Spec.Selector).AsSelectorPreValidated()
-		if selector.Matches(labels.Set(pod.Labels)) {
-			services = append(services, service)
-		}
-	}
-	if len(services) == 0 {
-		err = fmt.Errorf("could not find service for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
-	}
-
-	return
-}
-
 // StoreToEndpointsLister makes a Store that lists endpoints.
 type StoreToEndpointsLister struct {
 	Store
