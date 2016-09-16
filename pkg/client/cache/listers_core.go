@@ -17,6 +17,8 @@ limitations under the License.
 package cache
 
 import (
+	"fmt"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/labels"
@@ -38,11 +40,11 @@ type StoreToPodLister struct {
 	Indexer Indexer
 }
 
-func (s *StoreToPodLister) List(selector labels.Selector) (pods []*api.Pod, err error) {
+func (s *StoreToPodLister) List(selector labels.Selector) (ret []*api.Pod, err error) {
 	err = ListAll(s.Indexer, selector, func(m interface{}) {
-		pods = append(pods, m.(*api.Pod))
+		ret = append(ret, m.(*api.Pod))
 	})
-	return pods, err
+	return ret, err
 }
 
 func (s *StoreToPodLister) Pods(namespace string) storePodsNamespacer {
@@ -54,11 +56,11 @@ type storePodsNamespacer struct {
 	namespace string
 }
 
-func (s storePodsNamespacer) List(selector labels.Selector) (pods []*api.Pod, err error) {
+func (s storePodsNamespacer) List(selector labels.Selector) (ret []*api.Pod, err error) {
 	err = ListAllByNamespace(s.Indexer, s.namespace, selector, func(m interface{}) {
-		pods = append(pods, m.(*api.Pod))
+		ret = append(ret, m.(*api.Pod))
 	})
-	return pods, err
+	return ret, err
 }
 
 func (s storePodsNamespacer) Get(name string) (*api.Pod, error) {
@@ -70,4 +72,73 @@ func (s storePodsNamespacer) Get(name string) (*api.Pod, error) {
 		return nil, errors.NewNotFound(api.Resource("pod"), name)
 	}
 	return obj.(*api.Pod), nil
+}
+
+/*****************************************************************************/
+
+type StoreToReplicationControllerLister struct {
+	Indexer Indexer
+}
+
+func (s *StoreToReplicationControllerLister) List(selector labels.Selector) (ret []*api.ReplicationController, err error) {
+	err = ListAll(s.Indexer, selector, func(m interface{}) {
+		ret = append(ret, m.(*api.ReplicationController))
+	})
+	return ret, err
+}
+
+func (s *StoreToReplicationControllerLister) ReplicationControllers(namespace string) storeReplicationControllersNamespacer {
+	return storeReplicationControllersNamespacer{s.Indexer, namespace}
+}
+
+type storeReplicationControllersNamespacer struct {
+	indexer   Indexer
+	namespace string
+}
+
+func (s storeReplicationControllersNamespacer) List(selector labels.Selector) (ret []*api.ReplicationController, err error) {
+	err = ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
+		ret = append(ret, m.(*api.ReplicationController))
+	})
+	return ret, err
+}
+
+func (s storeReplicationControllersNamespacer) Get(name string) (*api.ReplicationController, error) {
+	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, errors.NewNotFound(api.Resource("replicationcontroller"), name)
+	}
+	return obj.(*api.ReplicationController), nil
+}
+
+// GetPodControllers returns a list of replication controllers managing a pod. Returns an error only if no matching controllers are found.
+func (s *StoreToReplicationControllerLister) GetPodControllers(pod *api.Pod) (controllers []*api.ReplicationController, err error) {
+	if len(pod.Labels) == 0 {
+		err = fmt.Errorf("no controllers found for pod %v because it has no labels", pod.Name)
+		return
+	}
+
+	key := &api.ReplicationController{ObjectMeta: api.ObjectMeta{Namespace: pod.Namespace}}
+	items, err := s.Indexer.Index(NamespaceIndex, key)
+	if err != nil {
+		return
+	}
+
+	for _, m := range items {
+		rc := m.(*api.ReplicationController)
+		selector := labels.Set(rc.Spec.Selector).AsSelectorPreValidated()
+
+		// If an rc with a nil or empty selector creeps in, it should match nothing, not everything.
+		if selector.Empty() || !selector.Matches(labels.Set(pod.Labels)) {
+			continue
+		}
+		controllers = append(controllers, rc)
+	}
+	if len(controllers) == 0 {
+		err = fmt.Errorf("could not find controller for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
+	}
+	return
 }
