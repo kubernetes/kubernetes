@@ -582,6 +582,8 @@ func testPausedDeployment(f *Framework) {
 	podLabels := map[string]string{"name": nginxImageName}
 	d := newDeployment(deploymentName, 1, podLabels, nginxImageName, nginxImage, extensions.RollingUpdateDeploymentStrategyType, nil)
 	d.Spec.Paused = true
+	tgps := int64(20)
+	d.Spec.Template.Spec.TerminationGracePeriodSeconds = &tgps
 	Logf("Creating paused deployment %s", deploymentName)
 	_, err := c.Extensions().Deployments(ns).Create(d)
 	Expect(err).NotTo(HaveOccurred())
@@ -635,21 +637,34 @@ func testPausedDeployment(f *Framework) {
 	err = waitForObservedDeployment(c, ns, deploymentName, deployment.Generation)
 	Expect(err).NotTo(HaveOccurred())
 
+	// Update the deployment template - the new replicaset should stay the same
+	Logf("Updating paused deployment %q", deploymentName)
+	newTGPS := int64(40)
+	deployment, err = updateDeploymentWithRetries(c, ns, d.Name, func(update *extensions.Deployment) {
+		update.Spec.Template.Spec.TerminationGracePeriodSeconds = &newTGPS
+	})
+	Expect(err).NotTo(HaveOccurred())
+
+	err = waitForObservedDeployment(c, ns, deploymentName, deployment.Generation)
+	Expect(err).NotTo(HaveOccurred())
+
+	Logf("Looking for new replicaset for paused deployment %q (there should be none)", deploymentName)
 	newRS, err := deploymentutil.GetNewReplicaSet(deployment, c)
 	Expect(err).NotTo(HaveOccurred())
-	Expect(DeleteReplicaSet(unversionedClient, ns, newRS.Name)).NotTo(HaveOccurred())
-
-	deployment, err = c.Extensions().Deployments(ns).Get(deploymentName)
-	Expect(err).NotTo(HaveOccurred())
-
-	if !deployment.Spec.Paused {
-		err = fmt.Errorf("deployment %q should be paused", deployment.Name)
+	if newRS != nil {
+		err = fmt.Errorf("No replica set should match the deployment template but there is %q", newRS.Name)
 		Expect(err).NotTo(HaveOccurred())
 	}
-	shouldBeNil, err := deploymentutil.GetNewReplicaSet(deployment, c)
+
+	_, allOldRs, err := deploymentutil.GetOldReplicaSets(deployment, c)
 	Expect(err).NotTo(HaveOccurred())
-	if shouldBeNil != nil {
-		err = fmt.Errorf("deployment %q shouldn't have a replica set but there is %q", deployment.Name, shouldBeNil.Name)
+	if len(allOldRs) != 1 {
+		err = fmt.Errorf("expected an old replica set")
+		Expect(err).NotTo(HaveOccurred())
+	}
+	Logf("Comparing deployment diff with old replica set %q", allOldRs[0].Name)
+	if *allOldRs[0].Spec.Template.Spec.TerminationGracePeriodSeconds == newTGPS {
+		err = fmt.Errorf("TerminationGracePeriodSeconds on the replica set should be %d but is %d", tgps, newTGPS)
 		Expect(err).NotTo(HaveOccurred())
 	}
 }
