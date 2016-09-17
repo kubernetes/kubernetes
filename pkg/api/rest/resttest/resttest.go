@@ -18,6 +18,7 @@ package resttest
 
 import (
 	"fmt"
+	"log"
 	"reflect"
 	"strings"
 	"testing"
@@ -1238,16 +1239,20 @@ func (t *Tester) testWatchFields(obj runtime.Object, emitFn EmitFunc, fieldsPass
 				t.Errorf("unexpected error: %v, %v", err, action)
 			}
 
+			start := time.Now()
 			if err := emitFn(obj, action); err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
+			log.Printf("field (%v), action %v, takes %v", field, action, time.Since(start))
 
 			select {
 			case _, ok := <-watcher.ResultChan():
 				if !ok {
+					log.Printf("watch channel should be open")
 					t.Errorf("watch channel should be open")
 				}
 			case <-time.After(wait.ForeverTestTimeout):
+				log.Printf("timeout")
 				t.Errorf("unexpected timeout from result channel")
 			}
 			watcher.Stop()
@@ -1261,9 +1266,11 @@ func (t *Tester) testWatchFields(obj runtime.Object, emitFn EmitFunc, fieldsPass
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
+			start := time.Now()
 			if err := emitFn(obj, action); err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
+			log.Printf("field (%v), action %v, takes %v", field, action, time.Since(start))
 
 			select {
 			case <-watcher.ResultChan():
@@ -1286,16 +1293,20 @@ func (t *Tester) testWatchLabels(obj runtime.Object, emitFn EmitFunc, labelsPass
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
+			start := time.Now()
 			if err := emitFn(obj, action); err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
+			log.Printf("label (%v), action %v, takes %v", label, action, time.Since(start))
 
 			select {
 			case _, ok := <-watcher.ResultChan():
 				if !ok {
+					log.Printf("watch channel should be open")
 					t.Errorf("watch channel should be open")
 				}
 			case <-time.After(wait.ForeverTestTimeout):
+				log.Printf("timeout")
 				t.Errorf("unexpected timeout from result channel")
 			}
 			watcher.Stop()
@@ -1309,9 +1320,11 @@ func (t *Tester) testWatchLabels(obj runtime.Object, emitFn EmitFunc, labelsPass
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
+			start := time.Now()
 			if err := emitFn(obj, action); err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
+			log.Printf("label (%v), action %v, takes %v", label, action, time.Since(start))
 
 			select {
 			case <-watcher.ResultChan():

@@ -18,6 +18,7 @@ package etcd3
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 	"sync"
@@ -99,16 +100,20 @@ func (w *watcher) createWatchChan(ctx context.Context, key string, rev int64, re
 }
 
 func (wc *watchChan) run() {
-	go wc.startWatching()
+	watchClosedCh := make(chan struct{})
+	go wc.startWatching(watchClosedCh)
 
 	var resultChanWG sync.WaitGroup
 	resultChanWG.Add(1)
 	go wc.processEvent(&resultChanWG)
 
+	// blocked until:
+	// - there is an error
+	// - etcd watch chan is closed
+	// - user cancel
 	select {
 	case err := <-wc.errChan:
 		if err == context.Canceled {
-			wc.cancel() // just in case
 			break
 		}
 		errResult := parseError(err)
@@ -119,10 +124,15 @@ func (wc *watchChan) run() {
 			case <-wc.ctx.Done(): // user has given up all results
 			}
 		}
-		wc.cancel()
-	case <-wc.ctx.Done():
+	case <-watchClosedCh:
+	case <-wc.ctx.Done(): // user cancel
 	}
-	// we need to wait until resultChan wouldn't be sent to anymore
+
+	// We use wc.ctx to reap all goroutines. Under whatever condition, we should stop them all.
+	// It's fine to double cancel.
+	wc.cancel()
+
+	// we need to wait until resultChan wouldn't be used anymore
 	resultChanWG.Wait()
 	close(wc.resultChan)
 }
@@ -156,8 +166,8 @@ func (wc *watchChan) sync() error {
 
 // startWatching does:
 // - get current objects if initialRev=0; set initialRev to current rev
-// - watch on given key and send events to process.
-func (wc *watchChan) startWatching() {
+// - watch on given key and send events to processing.
+func (wc *watchChan) startWatching(watchClosedCh chan struct{}) {
 	if wc.initialRev == 0 {
 		if err := wc.sync(); err != nil {
 			glog.Errorf("failed to sync with latest state: %v", err)
@@ -169,7 +179,12 @@ func (wc *watchChan) startWatching() {
 	if wc.recursive {
 		opts = append(opts, clientv3.WithPrefix())
 	}
+	log.Printf("start watching %p: key (%s), ctx.Err: %v", wc, wc.key, wc.ctx.Err())
 	wch := wc.watcher.client.Watch(wc.ctx, wc.key, opts...)
+	// On normal running, we should never stop the watching loop.
+	defer func() {
+		log.Printf("stop watching %p %p: key (%s), ctx.Err: %v", wc, wch, wc.key, wc.ctx.Err())
+	}()
 	for wres := range wch {
 		if wres.Err() != nil {
 			err := wres.Err()
@@ -179,9 +194,14 @@ func (wc *watchChan) startWatching() {
 			return
 		}
 		for _, e := range wres.Events {
+			log.Printf("received event: %s", e.Kv.Key)
 			wc.sendEvent(parseEvent(e))
 		}
 	}
+	// When we come to this point, it's possible that:
+	// - client side ends the watch, e.g. cancel the context, close the client.
+	// - server side ends the watch.
+	close(watchClosedCh)
 }
 
 // processEvent processes events from etcd watcher and sends results to resultChan.
