@@ -18,6 +18,7 @@ package etcd3
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 	"sync"
@@ -31,8 +32,6 @@ import (
 	etcdrpc "github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes"
 	"github.com/golang/glog"
 	"golang.org/x/net/context"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
 )
 
 const (
@@ -109,6 +108,10 @@ func (wc *watchChan) run() {
 
 	select {
 	case err := <-wc.errChan:
+		if err == context.Canceled {
+			wc.cancel() // just in case
+			break
+		}
 		errResult := parseError(err)
 		if errResult != nil {
 			// error result is guaranteed to be received by user before closing ResultChan.
@@ -120,9 +123,11 @@ func (wc *watchChan) run() {
 		wc.cancel()
 	case <-wc.ctx.Done():
 	}
+	log.Printf("exiting run: %v", wc.key)
 	// we need to wait until resultChan wouldn't be sent to anymore
 	resultChanWG.Wait()
 	close(wc.resultChan)
+	log.Printf("exited run: %v", wc.key)
 }
 
 func (wc *watchChan) Stop() {
@@ -167,6 +172,7 @@ func (wc *watchChan) startWatching() {
 	if wc.recursive {
 		opts = append(opts, clientv3.WithPrefix())
 	}
+	log.Printf("start watching: %v, ctx.Err: %v", wc.key, wc.ctx.Err())
 	wch := wc.watcher.client.Watch(wc.ctx, wc.key, opts...)
 	for wres := range wch {
 		if wres.Err() != nil {
@@ -177,9 +183,12 @@ func (wc *watchChan) startWatching() {
 			return
 		}
 		for _, e := range wres.Events {
+			log.Printf("received event: %s", e.Kv.Key)
 			wc.sendEvent(parseEvent(e))
 		}
 	}
+	log.Printf("exiting watching loop: %v, ctx.Err: %v", wc.key, wc.ctx.Err())
+	wc.cancel()
 }
 
 // processEvent processes events from etcd watcher and sends results to resultChan.
@@ -294,12 +303,6 @@ func parseError(err error) *watch.Event {
 }
 
 func (wc *watchChan) sendError(err error) {
-	// Context.canceled is an expected behavior.
-	// We should just stop all goroutines in watchChan without returning error.
-	// TODO: etcd client should return context.Canceled instead of grpc specific error.
-	if grpc.Code(err) == codes.Canceled || err == context.Canceled {
-		return
-	}
 	select {
 	case wc.errChan <- err:
 	case <-wc.ctx.Done():
