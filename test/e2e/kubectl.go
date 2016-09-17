@@ -121,6 +121,11 @@ var (
 	//
 	// TODO(ihmccreery): remove once we don't care about v1.1 anymore, (tentatively in v1.4).
 	podProbeParametersVersion = version.MustParse("v1.2.0-alpha.4")
+
+	// Garbage collector was introduced in v1.4.0 and breaks kubectl rolling-update older than
+	// v1.4.0. We don't expect older kubectl to work on v1.4 cluster. See
+	// https://github.com/kubernetes/kubernetes/blob/master/CHANGELOG.md#kubectl-rolling-update
+	kubectlRollingUpdateVersion = version.MustParse("v1.4.0")
 )
 
 // Stops everything from filePath from namespace ns and checks if everything matching selectors from the given namespace is correctly stopped.
@@ -934,6 +939,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 		})
 
 		It("should support rolling-update to same image [Conformance]", func() {
+			framework.SkipUnlessKubectlVersionGTE(kubectlRollingUpdateVersion)
 			By("running the image " + nginxImage)
 			framework.RunKubectlOrDie("run", rcName, "--image="+nginxImage, "--generator=run/v1", nsFlag)
 			By("verifying the rc " + rcName + " was created")
