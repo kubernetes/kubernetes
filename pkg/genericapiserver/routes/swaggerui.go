@@ -32,9 +32,10 @@ type SwaggerUI struct{}
 // Install adds the SwaggerUI webservice to the given mux.
 func (l SwaggerUI) Install(mux *apiserver.PathRecorderMux, c *restful.Container) {
 	fileServer := http.FileServer(&assetfs.AssetFS{
-		Asset:    swagger.Asset,
-		AssetDir: swagger.AssetDir,
-		Prefix:   "third_party/swagger-ui",
+		Asset:     swagger.Asset,
+		AssetDir:  swagger.AssetDir,
+		AssetInfo: swagger.AssetInfo,
+		Prefix:    "third_party/swagger-ui",
 	})
 	prefix := "/swagger-ui/"
 	mux.Handle(prefix, http.StripPrefix(prefix, fileServer))
