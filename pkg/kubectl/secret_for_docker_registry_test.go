@@ -79,3 +79,58 @@ func TestSecretForDockerRegistryGenerate(t *testing.T) {
 		}
 	}
 }
+
+func TestHandleSecretDockerRegistryReplace(t *testing.T) {
+	username, password, email, server := "test-user", "test-password", "test-user@example.org", "https://index.docker.io/v1/"
+	secretData, err := handleDockercfgContent(username, password, email, server)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	generatorDefaultParams := map[string]interface{}{
+		"name":            "foo",
+		"docker-server":   "https://index.docker.io/v1/",
+		"docker-username": "default-test-user",
+		"docker-password": "default-test-password",
+		"docker-email":    "default-test-user@example.org",
+	}
+
+	tests := []struct {
+		params    map[string]string
+		expected  *api.Secret
+		expectErr bool
+	}{
+		{
+			params: map[string]string{
+				"docker-server":   server,
+				"docker-username": username,
+				"docker-password": password,
+				"docker-email":    email,
+			},
+			expected: &api.Secret{
+				ObjectMeta: api.ObjectMeta{
+					Name: "foo",
+				},
+				Data: map[string][]byte{
+					api.DockerConfigKey: secretData,
+				},
+				Type: api.SecretTypeDockercfg,
+			},
+			expectErr: false,
+		},
+	}
+
+	generator := SecretForDockerRegistryGeneratorV1{}
+	for _, test := range tests {
+		obj, err := generator.Generate(generatorDefaultParams)
+		err = HandleSecretDockerRegistryReplace(obj.(*api.Secret), test.params["docker-username"], test.params["docker-password"], test.params["docker-email"], test.params["docker-server"])
+		if !test.expectErr && err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if test.expectErr && err != nil {
+			continue
+		}
+		if !reflect.DeepEqual(obj.(*api.Secret), test.expected) {
+			t.Errorf("\nexpected:\n%#v\nsaw:\n%#v", test.expected, obj.(*api.Secret))
+		}
+	}
+}

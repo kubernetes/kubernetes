@@ -28,7 +28,7 @@ import (
 )
 
 var (
-	configMapLong = dedent.Dedent(`
+	createConfigMapLong = dedent.Dedent(`
 		Create a configmap based on a file, directory, or specified literal value.
 
 		A single configmap may package one or more key/value pairs.
@@ -41,7 +41,7 @@ var (
 		symlinks, devices, pipes, etc).
 		`)
 
-	configMapExample = dedent.Dedent(`
+	createConfigMapExample = dedent.Dedent(`
 		  # Create a new configmap named my-config with keys for each file in folder bar
 		  kubectl create configmap my-config --from-file=path/to/bar
 
@@ -58,8 +58,8 @@ func NewCmdCreateConfigMap(f *cmdutil.Factory, cmdOut io.Writer) *cobra.Command 
 		Use:     "configmap NAME [--from-file=[key=]source] [--from-literal=key1=value1] [--dry-run]",
 		Aliases: []string{"cm"},
 		Short:   "Create a configmap from a local file, directory or literal value",
-		Long:    configMapLong,
-		Example: configMapExample,
+		Long:    createConfigMapLong,
+		Example: createConfigMapExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			err := CreateConfigMap(f, cmdOut, cmd, args)
 			cmdutil.CheckErr(err)

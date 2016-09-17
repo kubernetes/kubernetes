@@ -122,3 +122,18 @@ func (s SecretForTLSGeneratorV1) validate() error {
 	// 2. Format etc.
 	return nil
 }
+
+func HandleSecretTLSReplace(secret *api.Secret, cert, key string) error {
+	tlsCrt, err := readFile(cert)
+	if err != nil {
+		return err
+	}
+	tlsKey, err := readFile(key)
+	if err != nil {
+		return err
+	}
+	secret.Data = make(map[string][]byte)
+	secret.Data[api.TLSCertKey] = []byte(tlsCrt)
+	secret.Data[api.TLSPrivateKeyKey] = []byte(tlsKey)
+	return nil
+}

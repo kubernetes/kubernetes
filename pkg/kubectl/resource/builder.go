@@ -58,7 +58,7 @@ type Builder struct {
 	namespace string
 	names     []string
 
-	resourceTuples []resourceTuple
+	resourceTuples []ResourceTuple
 
 	defaultNamespace bool
 	requireNamespace bool
@@ -93,7 +93,7 @@ func IsUsageError(err error) bool {
 	return err == missingResourceError
 }
 
-type resourceTuple struct {
+type ResourceTuple struct {
 	Resource string
 	Name     string
 }
@@ -233,7 +233,7 @@ func (b *Builder) ResourceNames(resource string, names ...string) *Builder {
 		}
 
 		// Use the given default type to create a resource tuple
-		b.resourceTuples = append(b.resourceTuples, resourceTuple{Resource: resource, Name: name})
+		b.resourceTuples = append(b.resourceTuples, ResourceTuple{Resource: resource, Name: name})
 	}
 	return b
 }
@@ -415,19 +415,19 @@ func normalizeMultipleResourcesArgs(args []string) []string {
 
 // splitResourceTypeName handles type/name resource formats and returns a resource tuple
 // (empty or not), whether it successfully found one, and an error
-func splitResourceTypeName(s string) (resourceTuple, bool, error) {
+func splitResourceTypeName(s string) (ResourceTuple, bool, error) {
 	if !strings.Contains(s, "/") {
-		return resourceTuple{}, false, nil
+		return ResourceTuple{}, false, nil
 	}
 	seg := strings.Split(s, "/")
 	if len(seg) != 2 {
-		return resourceTuple{}, false, fmt.Errorf("arguments in resource/name form may not have more than one slash")
+		return ResourceTuple{}, false, fmt.Errorf("arguments in resource/name form may not have more than one slash")
 	}
 	resource, name := seg[0], seg[1]
 	if len(resource) == 0 || len(name) == 0 || len(SplitResourceArgument(resource)) != 1 {
-		return resourceTuple{}, false, fmt.Errorf("arguments in resource/name form must have a single resource and name")
+		return ResourceTuple{}, false, fmt.Errorf("arguments in resource/name form must have a single resource and name")
 	}
-	return resourceTuple{Resource: resource, Name: name}, true, nil
+	return ResourceTuple{Resource: resource, Name: name}, true, nil
 }
 
 // Flatten will convert any objects with a field named "Items" that is an array of runtime.Object

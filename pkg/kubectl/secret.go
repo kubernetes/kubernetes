@@ -127,6 +127,17 @@ func (s SecretGeneratorV1) validate() error {
 	return nil
 }
 
+func HandleSecretGenericReplace(secret *api.Secret, fileSources, literalSources []string) error {
+	secret.Data = make(map[string][]byte)
+	if err := handleFromFileSources(secret, fileSources); err != nil {
+		return err
+	}
+	if err := handleFromLiteralSources(secret, literalSources); err != nil {
+		return err
+	}
+	return nil
+}
+
 // handleFromLiteralSources adds the specified literal source information into the provided secret
 func handleFromLiteralSources(secret *api.Secret, literalSources []string) error {
 	for _, literalSource := range literalSources {
