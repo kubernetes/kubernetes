@@ -18,6 +18,7 @@ package resource
 
 import (
 	"bytes"
+	"crypto/tls"
 	"fmt"
 	"io"
 	"net/http"
@@ -33,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/runtime"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
+	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/util/yaml"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -282,7 +284,15 @@ type httpget func(url string) (int, string, io.ReadCloser, error)
 
 // httpgetImpl Implements a function to retrieve a url and return the results.
 func httpgetImpl(url string) (int, string, io.ReadCloser, error) {
-	resp, err := http.Get(url)
+	tlsConfig := &tls.Config{InsecureSkipVerify: true}
+	transport := utilnet.SetTransportDefaults(&http.Transport{TLSClientConfig: tlsConfig, DisableKeepAlives: true})
+	client := http.Client{Transport: transport}
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return 0, "", nil, err
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		return 0, "", nil, err
 	}

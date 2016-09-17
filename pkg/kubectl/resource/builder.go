@@ -17,11 +17,14 @@ limitations under the License.
 package resource
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
+	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
@@ -111,13 +114,106 @@ func (b *Builder) Schema(schema validation.Schema) *Builder {
 	return b
 }
 
+func (b *Builder) FilesFromParam(enforceNamespace bool, paths ...string) *Builder {
+	for _, s := range paths {
+		switch {
+		case s == "-":
+			location, err := os.Getwd()
+			if err != nil {
+				b.errs = append(b.errs, fmt.Errorf("failure getting working directory: %v", err))
+				continue
+			}
+			b.processFile(enforceNamespace, location, os.Stdin)
+		case strings.Index(s, "http://") == 0 || strings.Index(s, "https://") == 0:
+			location, err := url.Parse(s)
+			if err != nil {
+				b.errs = append(b.errs, fmt.Errorf("the URL passed to filename %q is not valid: %v", s, err))
+				continue
+			}
+
+			body, err := readHttpWithRetries(httpgetImpl, time.Second, location.String(), defaultHttpGetAttempts)
+			if err != nil {
+				b.errs = append(b.errs, fmt.Errorf("failing reading url %q: %v", s, err))
+				continue
+			}
+			defer body.Close()
+			base, _ := location.Parse(".")
+			b.processFile(enforceNamespace, base.String(), body)
+		default:
+			location, err := filepath.Abs(s)
+			if err != nil {
+				b.errs = append(b.errs, fmt.Errorf("failure opening %s: %v", location, err))
+				continue
+			}
+			file, err := os.Open(location)
+			if err != nil {
+				b.errs = append(b.errs, fmt.Errorf("failure opening %s: %v", location, err))
+				continue
+			}
+			defer file.Close()
+			b.processFile(enforceNamespace, filepath.Dir(location), file)
+		}
+	}
+	return b
+}
+
+func (b *Builder) processFile(enforceNamespace bool, base string, file io.Reader) {
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		path := strings.TrimSpace(scanner.Text())
+		// skip empty lines
+		if len(path) == 0 {
+			continue
+		}
+
+		if strings.Index(path, "http://") == 0 || strings.Index(path, "https://") == 0 {
+			b.FilenameParam(enforceNamespace, false, path)
+		} else {
+			location := path
+			if !filepath.IsAbs(location) {
+				if strings.Index(base, "http://") == 0 || strings.Index(base, "https://") == 0 {
+					cwd, err := os.Getwd()
+					if err != nil {
+						b.errs = append(b.errs, fmt.Errorf("failure getting working directory: %v", err))
+						continue
+					}
+					location = filepath.Join(cwd, path)
+				} else {
+					location = filepath.Join(base, path)
+				}
+			}
+			var err error
+			if _, err = os.Stat(location); err == nil {
+				b.FilenameParam(enforceNamespace, false, location)
+				continue
+			}
+
+			if strings.Index(base, "http://") == 0 || strings.Index(base, "https://") == 0 {
+				if base[len(base)-1] == '/' {
+					location = base + path
+				} else {
+					location = base + "/" + path
+				}
+				url, err := url.Parse(location)
+				if err != nil {
+					b.errs = append(b.errs, fmt.Errorf("problem parsing %q: %v", location, err))
+					continue
+				}
+				b.FilenameParam(enforceNamespace, false, url.String())
+			} else {
+				b.errs = append(b.errs, fmt.Errorf("unable to access file %q: %v", location, err))
+			}
+		}
+	}
+}
+
 // FilenameParam groups input in two categories: URLs and files (files, directories, STDIN)
 // If enforceNamespace is false, namespaces in the specs will be allowed to
 // override the default namespace. If it is true, namespaces that don't match
 // will cause an error.
 // If ContinueOnError() is set prior to this method, objects on the path that are not
 // recognized will be ignored (but logged at V(2)).
-func (b *Builder) FilenameParam(enforceNamespace, recursive bool, paths ...string) *Builder {
+func (b *Builder) FilenameParam(enforceNamespace bool, recursive bool, paths ...string) *Builder {
 	for _, s := range paths {
 		switch {
 		case s == "-":

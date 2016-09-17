@@ -34,3 +34,13 @@ func AddJsonFilenameFlag(cmd *cobra.Command, value *[]string, usage string) {
 	}
 	cmd.Flags().SetAnnotation("filename", cobra.BashCompFilenameExt, annotations)
 }
+
+func AddJsonFilelistFlag(cmd *cobra.Command, value *[]string, usage string) {
+	var FileExtensions = []string{".txt"}
+	cmd.Flags().StringSliceVar(value, "files-from", *value, usage)
+	annotations := make([]string, 0, len(FileExtensions))
+	for _, ext := range FileExtensions {
+		annotations = append(annotations, strings.TrimLeft(ext, "."))
+	}
+	cmd.Flags().SetAnnotation("filelist", cobra.BashCompFilenameExt, annotations)
+}
