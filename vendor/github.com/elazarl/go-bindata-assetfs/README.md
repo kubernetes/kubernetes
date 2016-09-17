@@ -41,6 +41,6 @@ use
      ...
      http.Handle("/",
         http.FileServer(
-        &assetfs.AssetFS{Asset: Asset, AssetDir: AssetDir, Prefix: "data"}))
+        &assetfs.AssetFS{Asset: Asset, AssetDir: AssetDir, AssetInfo: AssetInfo, Prefix: "data"}))
 
 to serve files embedded from the `data` directory.
