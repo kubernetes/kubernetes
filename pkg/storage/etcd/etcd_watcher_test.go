@@ -18,6 +18,7 @@ package etcd
 
 import (
 	rt "runtime"
+	"strconv"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -532,6 +533,202 @@ func TestWatchPurposefulShutdown(t *testing.T) {
 
 	watching.Stop()
 	rt.Gosched()
+
+	// There is a race in etcdWatcher so that after calling Stop() one of
+	// two things can happen:
+	// - ResultChan() may be closed (triggered by closing userStop channel)
+	// - an Error "context cancelled" may be emitted (triggered by cancelling request
+	//   to etcd and putting that error to etcdError channel)
+	// We need to be prepared for both here.
+	event, open := <-watching.ResultChan()
+	if open && event.Type != watch.Error {
+		t.Errorf("Unexpected event from stopped watcher: %#v", event)
+	}
+}
+
+func TestOldWatcherEvents(t *testing.T) {
+	codec := testapi.Default.Codec()
+	server := etcdtesting.NewEtcdTestClientServer(t)
+	defer server.Terminate(t)
+	key := "/some/key"
+	h := newEtcdHelper(server.Client, codec, etcdtest.PathPrefix())
+
+	// Test normal case
+	pod := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
+	returnObj := &api.Pod{}
+	err := h.Create(context.TODO(), key, pod, returnObj, 0)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	addedPod := &api.Pod{}
+	err = h.Get(context.TODO(), key, addedPod, false)
+	if err != nil {
+		t.Fatalf("Failed to load pod")
+	}
+
+	// Update an existing node #1
+	callbackCalled := false
+	objUpdate := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "bar"}}
+	err = h.GuaranteedUpdate(context.TODO(), key, returnObj, true, nil, storage.SimpleUpdate(func(in runtime.Object) (runtime.Object, error) {
+		callbackCalled = true
+
+		if in.(*api.Pod).Name != "foo" {
+			t.Errorf("Callback input was not current set value")
+		}
+
+		return objUpdate, nil
+	}))
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	objAfterFirstUpdate := &api.Pod{}
+	err = h.Get(context.TODO(), key, objAfterFirstUpdate, false)
+	if err != nil {
+		t.Errorf("Failed to load object: %+v", err)
+	}
+
+	// Update an existing node. #2
+	callbackCalled = false
+	objUpdate = &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foobar"}}
+	err = h.GuaranteedUpdate(context.TODO(), key, returnObj, true, nil, storage.SimpleUpdate(func(in runtime.Object) (runtime.Object, error) {
+		callbackCalled = true
+
+		if in.(*api.Pod).Name != "bar" {
+			t.Errorf("Callback input was not current set value")
+		}
+
+		return objUpdate, nil
+	}))
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	// Update an existing node. #3
+	callbackCalled = false
+	objUpdate = &api.Pod{ObjectMeta: api.ObjectMeta{Name: "barfoo"}}
+	err = h.GuaranteedUpdate(context.TODO(), key, returnObj, true, nil, storage.SimpleUpdate(func(in runtime.Object) (runtime.Object, error) {
+		callbackCalled = true
+
+		if in.(*api.Pod).Name != "foobar" {
+			t.Errorf("Callback input was not current set value")
+		}
+
+		return objUpdate, nil
+	}))
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	t.Logf("Direct Updated: %+v", returnObj.ObjectMeta)
+
+	// Delete the node
+	lastObj := &api.Pod{}
+	err = h.Delete(context.TODO(), key, lastObj, nil)
+
+	t.Logf("Direct Deleted: %+v", lastObj.ObjectMeta)
+
+	if lastObj.ObjectMeta.ResourceVersion != returnObj.ObjectMeta.ResourceVersion {
+		t.Errorf("Expected Ressourceversion the same as the last updated object")
+	}
+
+	if lastObj.Name != returnObj.Name {
+		t.Errorf("Expected Name the same as the last updated object")
+	}
+
+	// Recreate the node
+	recreatedPod := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "potato"}}
+	err = h.Create(context.TODO(), key, recreatedPod, nil, 0)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	readdedPod := &api.Pod{}
+	err = h.Get(context.TODO(), key, readdedPod, false)
+	if err != nil {
+		t.Fatalf("Failed to load pod")
+	}
+	if readdedPod.Name != recreatedPod.Name {
+		t.Errorf("the retrieved pod shoulf have the same name as the created one")
+	}
+
+	watching, err := h.Watch(context.TODO(), key, objAfterFirstUpdate.ObjectMeta.ResourceVersion, storage.Everything)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	// watching is explicitly closed below.
+
+	var lastVersion int
+	var currentVersion int
+
+	lastVersion, err = strconv.Atoi(addedPod.ObjectMeta.ResourceVersion)
+	if err != nil {
+		t.Errorf("Failed to parse ResourceVersion: %+v", err)
+	}
+
+	//we start watching after the first update and so expect events for two more updates
+	event := <-watching.ResultChan()
+	if e, a := watch.Modified, event.Type; e != a {
+		t.Errorf("Expected %v, got %v", e, a)
+	}
+	currentVersion, err = strconv.Atoi(event.Object.(*api.Pod).ObjectMeta.ResourceVersion)
+	if err != nil {
+		t.Errorf("Failed to parse ResourceVersion: %+v", err)
+	}
+	if currentVersion <= lastVersion {
+		t.Errorf("RessourceVersion should have increased after an object update")
+	}
+	lastVersion = currentVersion
+
+	event = <-watching.ResultChan()
+	if e, a := watch.Modified, event.Type; e != a {
+		t.Errorf("Expected %v, got %v", e, a)
+	}
+	currentVersion, err = strconv.Atoi(event.Object.(*api.Pod).ObjectMeta.ResourceVersion)
+	if err != nil {
+		t.Errorf("Failed to parse ResourceVersion: %+v", err)
+	}
+	t.Logf("Updated: %+v", event.Object.(*api.Pod).ObjectMeta)
+	if currentVersion <= lastVersion {
+		t.Errorf("RessourceVersion should have increased after an object update")
+	}
+	lastVersion = currentVersion
+
+	event = <-watching.ResultChan()
+	if e, a := watch.Deleted, event.Type; e != a {
+		t.Errorf("Expected %v, got %v", e, a)
+	}
+	t.Logf("Deleted: %+v", event.Object.(*api.Pod).ObjectMeta)
+	currentVersion, err = strconv.Atoi(event.Object.(*api.Pod).ObjectMeta.ResourceVersion)
+	if err != nil {
+		t.Errorf("Failed to parse ResourceVersion: %+v", err)
+	}
+	if currentVersion != lastVersion {
+		t.Errorf("RessourceVersion should not have increased after an object deletion")
+	}
+	lastVersion = currentVersion
+
+	event = <-watching.ResultChan()
+	if e, a := watch.Added, event.Type; e != a {
+		t.Errorf("Expected %v, got %v", e, a)
+	}
+	currentVersion, err = strconv.Atoi(event.Object.(*api.Pod).ObjectMeta.ResourceVersion)
+	if err != nil {
+		t.Errorf("Failed to parse ResourceVersion: %+v", err)
+	}
+	if currentVersion <= lastVersion {
+		t.Errorf("RessourceVersion should have increased after an object creation")
+	}
+
+	//event channel should be empty now
+	select {
+	case event, _ := <-watching.ResultChan():
+		t.Fatalf("Unexpected event: %#v", event)
+	default:
+		// fall through, expected behavior
+	}
+
+	watching.Stop()
 
 	// There is a race in etcdWatcher so that after calling Stop() one of
 	// two things can happen:
