@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/storage"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/validation/field"
+	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/watch"
 
 	"github.com/golang/glog"
@@ -206,6 +207,25 @@ func (e *Store) ListPredicate(ctx api.Context, m *generic.SelectionPredicate, op
 	return list, storeerr.InterpretListError(err, e.QualifiedResource)
 }
 
+// TODO: remove this function after 1.6
+// returns if the user agent is is kubectl older than v1.4.0
+func isOldKubectl(userAgent string) bool {
+	// example userAgent string: kubectl-1.3/v1.3.8 (linux/amd64) kubernetes/e328d5b
+	if !strings.Contains(userAgent, "kubectl") {
+		return false
+	}
+	userAgent = strings.Split(userAgent, " ")[0]
+	subs := strings.Split(userAgent, "/")
+	if len(subs) != 2 {
+		return false
+	}
+	kubectlVersion, versionErr := version.Parse(subs[1])
+	if versionErr != nil {
+		return false
+	}
+	return kubectlVersion.LT(version.MustParse("v1.4.0"))
+}
+
 // Create inserts a new item according to the unique key from the object.
 func (e *Store) Create(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
 	if err := rest.BeforeCreate(e.CreateStrategy, ctx, obj); err != nil {
@@ -240,6 +260,15 @@ func (e *Store) Create(ctx api.Context, obj runtime.Object) (runtime.Object, err
 		if accessor.GetDeletionTimestamp() != nil {
 			msg := &err.(*kubeerr.StatusError).ErrStatus.Message
 			*msg = fmt.Sprintf("object is being deleted: %s", *msg)
+			// TODO: remove this block after 1.6
+			userAgent, _ := api.UserAgentFrom(ctx)
+			if !isOldKubectl(userAgent) {
+				return nil, err
+			}
+			if e.QualifiedResource.Resource != "replicationcontrollers" {
+				return nil, err
+			}
+			*msg = fmt.Sprintf("Note: if you are using \"kubectl rolling-update\" and your kubectl version is older than v1.4.0, your rolling-update has probably failed, though the pods are correctly updated. Please see https://github.com/kubernetes/kubernetes/blob/master/CHANGELOG.md#kubectl-rolling-update for a workaround. : %s", *msg)
 		}
 		return nil, err
 	}

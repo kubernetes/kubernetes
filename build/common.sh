@@ -979,6 +979,11 @@ function kube::release::package_test_tarball() {
     cp "${test_bins[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
       "${release_stage}/platforms/${platform}"
   done
+  for platform in "${KUBE_NODE_TEST_PLATFORMS[@]}"; do
+    mkdir -p "${release_stage}/platforms/${platform}"
+    cp "${KUBE_NODE_TEST_BINARIES[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
+      "${release_stage}/platforms/${platform}"
+  done
 
   # Add the test image files
   mkdir -p "${release_stage}/test/images"
