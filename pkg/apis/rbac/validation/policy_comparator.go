@@ -131,7 +131,6 @@ func nonResourceURLCovers(ownerPath, subPath string) bool {
 // ruleCovers determines whether the ownerRule (which may have multiple verbs, resources, and resourceNames) covers
 // the subrule (which may only contain at most one verb, resource, and resourceName)
 func ruleCovers(ownerRule, subRule rbac.PolicyRule) bool {
-
 	verbMatches := has(ownerRule.Verbs, rbac.VerbAll) || hasAll(ownerRule.Verbs, subRule.Verbs)
 	groupMatches := has(ownerRule.APIGroups, rbac.APIGroupAll) || hasAll(ownerRule.APIGroups, subRule.APIGroups)
 	resourceMatches := has(ownerRule.Resources, rbac.ResourceAll) || hasAll(ownerRule.Resources, subRule.Resources)
