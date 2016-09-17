@@ -152,13 +152,13 @@ parameters:
 
 #### Ceph RBD
 
-```yaml                                                                                                                                                                                                          
-  apiVersion: extensions/v1beta1                                                                                                                                                                                   
-  kind: StorageClass                                                                                                                                                                                               
+```yaml
+  apiVersion: storage.k8s.io/v1beta1
+  kind: StorageClass
   metadata: 
-   name: fast
-provisioner: kubernetes.io/rbd
-parameters:
+    name: fast
+    provisioner: kubernetes.io/rbd
+    parameters:
     monitors: 10.16.153.105:6789
     adminId: kube
     adminSecretName: ceph-secret
