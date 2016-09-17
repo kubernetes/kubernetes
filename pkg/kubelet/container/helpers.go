@@ -84,7 +84,7 @@ func ShouldContainerBeRestarted(container *api.Container, pod *api.Pod, podStatu
 }
 
 // TODO(random-liu): Convert PodStatus to running Pod, should be deprecated soon
-func ConvertPodStatusToRunningPod(podStatus *PodStatus) Pod {
+func ConvertPodStatusToRunningPod(runtimeName string, podStatus *PodStatus) Pod {
 	runningPod := Pod{
 		ID:        podStatus.ID,
 		Name:      podStatus.Name,
@@ -104,6 +104,13 @@ func ConvertPodStatusToRunningPod(podStatus *PodStatus) Pod {
 		}
 		runningPod.Containers = append(runningPod.Containers, container)
 	}
+
+	// Need to place a sandbox in the Pod as well.
+	// TODO: Remove this once we get rid of the whole kuberuntime.Pod and kuberuntime.PodStatus.
+	runningPod.Sandboxes = append(runningPod.Sandboxes, &Container{
+		ID:    ContainerID{Type: runtimeName, ID: string(podStatus.ID)},
+		State: ContainerStateRunning,
+	})
 	return runningPod
 }
 
