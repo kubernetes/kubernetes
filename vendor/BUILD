@@ -11785,3 +11785,897 @@ go_library(
     tags = ["automanaged"],
     deps = ["//vendor:github.com/gogo/protobuf/proto"],
 )
+
+go_library(
+    name = "github.com/DataDog/datadog-go/statsd",
+    srcs = ["github.com/DataDog/datadog-go/statsd/statsd.go"],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/armon/circbuf",
+    srcs = ["github.com/armon/circbuf/circbuf.go"],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/armon/go-metrics",
+    srcs = [
+        "github.com/armon/go-metrics/const_unix.go",
+        "github.com/armon/go-metrics/inmem.go",
+        "github.com/armon/go-metrics/inmem_signal.go",
+        "github.com/armon/go-metrics/metrics.go",
+        "github.com/armon/go-metrics/sink.go",
+        "github.com/armon/go-metrics/start.go",
+        "github.com/armon/go-metrics/statsd.go",
+        "github.com/armon/go-metrics/statsite.go",
+    ],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/armon/go-metrics/circonus",
+    srcs = ["github.com/armon/go-metrics/circonus/circonus.go"],
+    tags = ["automanaged"],
+    deps = ["//vendor:github.com/circonus-labs/circonus-gometrics"],
+)
+
+go_library(
+    name = "github.com/armon/go-metrics/datadog",
+    srcs = ["github.com/armon/go-metrics/datadog/dogstatsd.go"],
+    tags = ["automanaged"],
+    deps = ["//vendor:github.com/DataDog/datadog-go/statsd"],
+)
+
+go_library(
+    name = "github.com/armon/go-radix",
+    srcs = ["github.com/armon/go-radix/radix.go"],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/bgentry/speakeasy",
+    srcs = [
+        "github.com/bgentry/speakeasy/speakeasy.go",
+        "github.com/bgentry/speakeasy/speakeasy_unix.go",
+    ],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/circonus-labs/circonus-gometrics",
+    srcs = [
+        "github.com/circonus-labs/circonus-gometrics/circonus-gometrics.go",
+        "github.com/circonus-labs/circonus-gometrics/counter.go",
+        "github.com/circonus-labs/circonus-gometrics/gauge.go",
+        "github.com/circonus-labs/circonus-gometrics/histogram.go",
+        "github.com/circonus-labs/circonus-gometrics/submit.go",
+        "github.com/circonus-labs/circonus-gometrics/text.go",
+        "github.com/circonus-labs/circonus-gometrics/tools.go",
+        "github.com/circonus-labs/circonus-gometrics/util.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/circonus-labs/circonus-gometrics/api",
+        "//vendor:github.com/circonus-labs/circonus-gometrics/checkmgr",
+        "//vendor:github.com/circonus-labs/circonusllhist",
+        "//vendor:github.com/hashicorp/go-retryablehttp",
+    ],
+)
+
+go_library(
+    name = "github.com/circonus-labs/circonus-gometrics/api",
+    srcs = [
+        "github.com/circonus-labs/circonus-gometrics/api/api.go",
+        "github.com/circonus-labs/circonus-gometrics/api/broker.go",
+        "github.com/circonus-labs/circonus-gometrics/api/check.go",
+        "github.com/circonus-labs/circonus-gometrics/api/checkbundle.go",
+    ],
+    tags = ["automanaged"],
+    deps = ["//vendor:github.com/hashicorp/go-retryablehttp"],
+)
+
+go_library(
+    name = "github.com/circonus-labs/circonus-gometrics/checkmgr",
+    srcs = [
+        "github.com/circonus-labs/circonus-gometrics/checkmgr/broker.go",
+        "github.com/circonus-labs/circonus-gometrics/checkmgr/cert.go",
+        "github.com/circonus-labs/circonus-gometrics/checkmgr/check.go",
+        "github.com/circonus-labs/circonus-gometrics/checkmgr/checkmgr.go",
+        "github.com/circonus-labs/circonus-gometrics/checkmgr/metrics.go",
+    ],
+    tags = ["automanaged"],
+    deps = ["//vendor:github.com/circonus-labs/circonus-gometrics/api"],
+)
+
+go_library(
+    name = "github.com/circonus-labs/circonusllhist",
+    srcs = ["github.com/circonus-labs/circonusllhist/circonusllhist.go"],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/docker/docker/opts",
+    srcs = [
+        "github.com/docker/docker/opts/hosts.go",
+        "github.com/docker/docker/opts/hosts_unix.go",
+        "github.com/docker/docker/opts/ip.go",
+        "github.com/docker/docker/opts/opts.go",
+        "github.com/docker/docker/opts/opts_unix.go",
+    ],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/docker/docker/pkg/archive",
+    srcs = [
+        "github.com/docker/docker/pkg/archive/archive.go",
+        "github.com/docker/docker/pkg/archive/archive_unix.go",
+        "github.com/docker/docker/pkg/archive/changes.go",
+        "github.com/docker/docker/pkg/archive/changes_linux.go",
+        "github.com/docker/docker/pkg/archive/changes_unix.go",
+        "github.com/docker/docker/pkg/archive/copy.go",
+        "github.com/docker/docker/pkg/archive/copy_unix.go",
+        "github.com/docker/docker/pkg/archive/diff.go",
+        "github.com/docker/docker/pkg/archive/time_linux.go",
+        "github.com/docker/docker/pkg/archive/whiteouts.go",
+        "github.com/docker/docker/pkg/archive/wrap.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/Sirupsen/logrus",
+        "//vendor:github.com/docker/docker/pkg/fileutils",
+        "//vendor:github.com/docker/docker/pkg/idtools",
+        "//vendor:github.com/docker/docker/pkg/ioutils",
+        "//vendor:github.com/docker/docker/pkg/pools",
+        "//vendor:github.com/docker/docker/pkg/promise",
+        "//vendor:github.com/docker/docker/pkg/system",
+    ],
+)
+
+go_library(
+    name = "github.com/docker/docker/pkg/fileutils",
+    srcs = [
+        "github.com/docker/docker/pkg/fileutils/fileutils.go",
+        "github.com/docker/docker/pkg/fileutils/fileutils_unix.go",
+    ],
+    tags = ["automanaged"],
+    deps = ["//vendor:github.com/Sirupsen/logrus"],
+)
+
+go_library(
+    name = "github.com/docker/docker/pkg/homedir",
+    srcs = ["github.com/docker/docker/pkg/homedir/homedir.go"],
+    tags = ["automanaged"],
+    deps = ["//vendor:github.com/opencontainers/runc/libcontainer/user"],
+)
+
+go_library(
+    name = "github.com/docker/docker/pkg/idtools",
+    srcs = [
+        "github.com/docker/docker/pkg/idtools/idtools.go",
+        "github.com/docker/docker/pkg/idtools/idtools_unix.go",
+        "github.com/docker/docker/pkg/idtools/usergroupadd_linux.go",
+    ],
+    tags = ["automanaged"],
+    deps = ["//vendor:github.com/docker/docker/pkg/system"],
+)
+
+go_library(
+    name = "github.com/docker/docker/pkg/ioutils",
+    srcs = [
+        "github.com/docker/docker/pkg/ioutils/bytespipe.go",
+        "github.com/docker/docker/pkg/ioutils/fmt.go",
+        "github.com/docker/docker/pkg/ioutils/multireader.go",
+        "github.com/docker/docker/pkg/ioutils/readers.go",
+        "github.com/docker/docker/pkg/ioutils/scheduler.go",
+        "github.com/docker/docker/pkg/ioutils/temp_unix.go",
+        "github.com/docker/docker/pkg/ioutils/writeflusher.go",
+        "github.com/docker/docker/pkg/ioutils/writers.go",
+    ],
+    tags = ["automanaged"],
+    deps = ["//vendor:golang.org/x/net/context"],
+)
+
+go_library(
+    name = "github.com/docker/docker/pkg/pools",
+    srcs = ["github.com/docker/docker/pkg/pools/pools.go"],
+    tags = ["automanaged"],
+    deps = ["//vendor:github.com/docker/docker/pkg/ioutils"],
+)
+
+go_library(
+    name = "github.com/docker/docker/pkg/promise",
+    srcs = ["github.com/docker/docker/pkg/promise/promise.go"],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/fsouza/go-dockerclient",
+    srcs = [
+        "github.com/fsouza/go-dockerclient/auth.go",
+        "github.com/fsouza/go-dockerclient/change.go",
+        "github.com/fsouza/go-dockerclient/client.go",
+        "github.com/fsouza/go-dockerclient/container.go",
+        "github.com/fsouza/go-dockerclient/env.go",
+        "github.com/fsouza/go-dockerclient/event.go",
+        "github.com/fsouza/go-dockerclient/exec.go",
+        "github.com/fsouza/go-dockerclient/image.go",
+        "github.com/fsouza/go-dockerclient/misc.go",
+        "github.com/fsouza/go-dockerclient/network.go",
+        "github.com/fsouza/go-dockerclient/signal.go",
+        "github.com/fsouza/go-dockerclient/tar.go",
+        "github.com/fsouza/go-dockerclient/tls.go",
+        "github.com/fsouza/go-dockerclient/volume.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/docker/docker/opts",
+        "//vendor:github.com/docker/docker/pkg/archive",
+        "//vendor:github.com/docker/docker/pkg/fileutils",
+        "//vendor:github.com/docker/docker/pkg/homedir",
+        "//vendor:github.com/docker/docker/pkg/stdcopy",
+        "//vendor:github.com/docker/go-units",
+        "//vendor:github.com/hashicorp/go-cleanhttp",
+        "//vendor:golang.org/x/net/context",
+        "//vendor:golang.org/x/net/context/ctxhttp",
+    ],
+)
+
+go_library(
+    name = "github.com/hashicorp/consul/acl",
+    srcs = [
+        "github.com/hashicorp/consul/acl/acl.go",
+        "github.com/hashicorp/consul/acl/cache.go",
+        "github.com/hashicorp/consul/acl/policy.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/armon/go-radix",
+        "//vendor:github.com/hashicorp/golang-lru",
+        "//vendor:github.com/hashicorp/hcl",
+    ],
+)
+
+go_library(
+    name = "github.com/hashicorp/consul/api",
+    srcs = [
+        "github.com/hashicorp/consul/api/acl.go",
+        "github.com/hashicorp/consul/api/agent.go",
+        "github.com/hashicorp/consul/api/api.go",
+        "github.com/hashicorp/consul/api/catalog.go",
+        "github.com/hashicorp/consul/api/coordinate.go",
+        "github.com/hashicorp/consul/api/event.go",
+        "github.com/hashicorp/consul/api/health.go",
+        "github.com/hashicorp/consul/api/kv.go",
+        "github.com/hashicorp/consul/api/lock.go",
+        "github.com/hashicorp/consul/api/operator.go",
+        "github.com/hashicorp/consul/api/prepared_query.go",
+        "github.com/hashicorp/consul/api/raw.go",
+        "github.com/hashicorp/consul/api/semaphore.go",
+        "github.com/hashicorp/consul/api/session.go",
+        "github.com/hashicorp/consul/api/status.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/hashicorp/go-cleanhttp",
+        "//vendor:github.com/hashicorp/serf/coordinate",
+    ],
+)
+
+go_library(
+    name = "github.com/hashicorp/consul/command/agent",
+    srcs = [
+        "github.com/hashicorp/consul/command/agent/acl_endpoint.go",
+        "github.com/hashicorp/consul/command/agent/agent.go",
+        "github.com/hashicorp/consul/command/agent/agent_endpoint.go",
+        "github.com/hashicorp/consul/command/agent/bindata_assetfs.go",
+        "github.com/hashicorp/consul/command/agent/catalog_endpoint.go",
+        "github.com/hashicorp/consul/command/agent/check.go",
+        "github.com/hashicorp/consul/command/agent/command.go",
+        "github.com/hashicorp/consul/command/agent/config.go",
+        "github.com/hashicorp/consul/command/agent/coordinate_endpoint.go",
+        "github.com/hashicorp/consul/command/agent/dns.go",
+        "github.com/hashicorp/consul/command/agent/event_endpoint.go",
+        "github.com/hashicorp/consul/command/agent/flag_slice_value.go",
+        "github.com/hashicorp/consul/command/agent/gated_writer.go",
+        "github.com/hashicorp/consul/command/agent/health_endpoint.go",
+        "github.com/hashicorp/consul/command/agent/http.go",
+        "github.com/hashicorp/consul/command/agent/keyring.go",
+        "github.com/hashicorp/consul/command/agent/kvs_endpoint.go",
+        "github.com/hashicorp/consul/command/agent/local.go",
+        "github.com/hashicorp/consul/command/agent/log_levels.go",
+        "github.com/hashicorp/consul/command/agent/log_writer.go",
+        "github.com/hashicorp/consul/command/agent/operator_endpoint.go",
+        "github.com/hashicorp/consul/command/agent/prepared_query_endpoint.go",
+        "github.com/hashicorp/consul/command/agent/remote_exec.go",
+        "github.com/hashicorp/consul/command/agent/rpc.go",
+        "github.com/hashicorp/consul/command/agent/rpc_client.go",
+        "github.com/hashicorp/consul/command/agent/rpc_log_stream.go",
+        "github.com/hashicorp/consul/command/agent/session_endpoint.go",
+        "github.com/hashicorp/consul/command/agent/status_endpoint.go",
+        "github.com/hashicorp/consul/command/agent/structs.go",
+        "github.com/hashicorp/consul/command/agent/syslog.go",
+        "github.com/hashicorp/consul/command/agent/translate_addr.go",
+        "github.com/hashicorp/consul/command/agent/txn_endpoint.go",
+        "github.com/hashicorp/consul/command/agent/ui_endpoint.go",
+        "github.com/hashicorp/consul/command/agent/user_event.go",
+        "github.com/hashicorp/consul/command/agent/util.go",
+        "github.com/hashicorp/consul/command/agent/watch_handler.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/armon/circbuf",
+        "//vendor:github.com/armon/go-metrics",
+        "//vendor:github.com/armon/go-metrics/circonus",
+        "//vendor:github.com/armon/go-metrics/datadog",
+        "//vendor:github.com/elazarl/go-bindata-assetfs",
+        "//vendor:github.com/fsouza/go-dockerclient",
+        "//vendor:github.com/hashicorp/consul/api",
+        "//vendor:github.com/hashicorp/consul/consul",
+        "//vendor:github.com/hashicorp/consul/consul/state",
+        "//vendor:github.com/hashicorp/consul/consul/structs",
+        "//vendor:github.com/hashicorp/consul/lib",
+        "//vendor:github.com/hashicorp/consul/tlsutil",
+        "//vendor:github.com/hashicorp/consul/types",
+        "//vendor:github.com/hashicorp/consul/watch",
+        "//vendor:github.com/hashicorp/go-checkpoint",
+        "//vendor:github.com/hashicorp/go-cleanhttp",
+        "//vendor:github.com/hashicorp/go-msgpack/codec",
+        "//vendor:github.com/hashicorp/go-reap",
+        "//vendor:github.com/hashicorp/go-syslog",
+        "//vendor:github.com/hashicorp/go-uuid",
+        "//vendor:github.com/hashicorp/logutils",
+        "//vendor:github.com/hashicorp/memberlist",
+        "//vendor:github.com/hashicorp/raft",
+        "//vendor:github.com/hashicorp/scada-client/scada",
+        "//vendor:github.com/hashicorp/serf/coordinate",
+        "//vendor:github.com/hashicorp/serf/serf",
+        "//vendor:github.com/miekg/dns",
+        "//vendor:github.com/mitchellh/cli",
+        "//vendor:github.com/mitchellh/mapstructure",
+    ],
+)
+
+go_library(
+    name = "github.com/hashicorp/consul/consul",
+    srcs = [
+        "github.com/hashicorp/consul/consul/acl.go",
+        "github.com/hashicorp/consul/consul/acl_endpoint.go",
+        "github.com/hashicorp/consul/consul/acl_replication.go",
+        "github.com/hashicorp/consul/consul/catalog_endpoint.go",
+        "github.com/hashicorp/consul/consul/client.go",
+        "github.com/hashicorp/consul/consul/config.go",
+        "github.com/hashicorp/consul/consul/coordinate_endpoint.go",
+        "github.com/hashicorp/consul/consul/filter.go",
+        "github.com/hashicorp/consul/consul/fsm.go",
+        "github.com/hashicorp/consul/consul/health_endpoint.go",
+        "github.com/hashicorp/consul/consul/internal_endpoint.go",
+        "github.com/hashicorp/consul/consul/kvs_endpoint.go",
+        "github.com/hashicorp/consul/consul/leader.go",
+        "github.com/hashicorp/consul/consul/merge.go",
+        "github.com/hashicorp/consul/consul/operator_endpoint.go",
+        "github.com/hashicorp/consul/consul/pool.go",
+        "github.com/hashicorp/consul/consul/prepared_query_endpoint.go",
+        "github.com/hashicorp/consul/consul/raft_rpc.go",
+        "github.com/hashicorp/consul/consul/rpc.go",
+        "github.com/hashicorp/consul/consul/rtt.go",
+        "github.com/hashicorp/consul/consul/serf.go",
+        "github.com/hashicorp/consul/consul/server.go",
+        "github.com/hashicorp/consul/consul/session_endpoint.go",
+        "github.com/hashicorp/consul/consul/session_ttl.go",
+        "github.com/hashicorp/consul/consul/status_endpoint.go",
+        "github.com/hashicorp/consul/consul/txn_endpoint.go",
+        "github.com/hashicorp/consul/consul/util.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/armon/go-metrics",
+        "//vendor:github.com/hashicorp/consul/acl",
+        "//vendor:github.com/hashicorp/consul/consul/agent",
+        "//vendor:github.com/hashicorp/consul/consul/servers",
+        "//vendor:github.com/hashicorp/consul/consul/state",
+        "//vendor:github.com/hashicorp/consul/consul/structs",
+        "//vendor:github.com/hashicorp/consul/lib",
+        "//vendor:github.com/hashicorp/consul/tlsutil",
+        "//vendor:github.com/hashicorp/consul/types",
+        "//vendor:github.com/hashicorp/go-msgpack/codec",
+        "//vendor:github.com/hashicorp/go-uuid",
+        "//vendor:github.com/hashicorp/golang-lru",
+        "//vendor:github.com/hashicorp/memberlist",
+        "//vendor:github.com/hashicorp/net-rpc-msgpackrpc",
+        "//vendor:github.com/hashicorp/raft",
+        "//vendor:github.com/hashicorp/raft-boltdb",
+        "//vendor:github.com/hashicorp/serf/coordinate",
+        "//vendor:github.com/hashicorp/serf/serf",
+        "//vendor:github.com/hashicorp/yamux",
+    ],
+)
+
+go_library(
+    name = "github.com/hashicorp/consul/consul/agent",
+    srcs = ["github.com/hashicorp/consul/consul/agent/server.go"],
+    tags = ["automanaged"],
+    deps = ["//vendor:github.com/hashicorp/serf/serf"],
+)
+
+go_library(
+    name = "github.com/hashicorp/consul/consul/prepared_query",
+    srcs = [
+        "github.com/hashicorp/consul/consul/prepared_query/template.go",
+        "github.com/hashicorp/consul/consul/prepared_query/walk.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/hashicorp/consul/consul/structs",
+        "//vendor:github.com/hashicorp/hil",
+        "//vendor:github.com/hashicorp/hil/ast",
+        "//vendor:github.com/mitchellh/copystructure",
+    ],
+)
+
+go_library(
+    name = "github.com/hashicorp/consul/consul/servers",
+    srcs = ["github.com/hashicorp/consul/consul/servers/manager.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/hashicorp/consul/consul/agent",
+        "//vendor:github.com/hashicorp/consul/lib",
+    ],
+)
+
+go_library(
+    name = "github.com/hashicorp/consul/consul/state",
+    srcs = [
+        "github.com/hashicorp/consul/consul/state/delay.go",
+        "github.com/hashicorp/consul/consul/state/graveyard.go",
+        "github.com/hashicorp/consul/consul/state/kvs.go",
+        "github.com/hashicorp/consul/consul/state/notify.go",
+        "github.com/hashicorp/consul/consul/state/prepared_query.go",
+        "github.com/hashicorp/consul/consul/state/prepared_query_index.go",
+        "github.com/hashicorp/consul/consul/state/schema.go",
+        "github.com/hashicorp/consul/consul/state/state_store.go",
+        "github.com/hashicorp/consul/consul/state/tombstone_gc.go",
+        "github.com/hashicorp/consul/consul/state/txn.go",
+        "github.com/hashicorp/consul/consul/state/watch.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/armon/go-radix",
+        "//vendor:github.com/hashicorp/consul/consul/prepared_query",
+        "//vendor:github.com/hashicorp/consul/consul/structs",
+        "//vendor:github.com/hashicorp/consul/types",
+        "//vendor:github.com/hashicorp/go-memdb",
+        "//vendor:github.com/hashicorp/serf/coordinate",
+    ],
+)
+
+go_library(
+    name = "github.com/hashicorp/consul/consul/structs",
+    srcs = [
+        "github.com/hashicorp/consul/consul/structs/operator.go",
+        "github.com/hashicorp/consul/consul/structs/prepared_query.go",
+        "github.com/hashicorp/consul/consul/structs/structs.go",
+        "github.com/hashicorp/consul/consul/structs/txn.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/hashicorp/consul/acl",
+        "//vendor:github.com/hashicorp/consul/types",
+        "//vendor:github.com/hashicorp/go-msgpack/codec",
+        "//vendor:github.com/hashicorp/raft",
+        "//vendor:github.com/hashicorp/serf/coordinate",
+    ],
+)
+
+go_library(
+    name = "github.com/hashicorp/consul/lib",
+    srcs = [
+        "github.com/hashicorp/consul/lib/cluster.go",
+        "github.com/hashicorp/consul/lib/math.go",
+        "github.com/hashicorp/consul/lib/rand.go",
+        "github.com/hashicorp/consul/lib/string.go",
+    ],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/hashicorp/consul/tlsutil",
+    srcs = ["github.com/hashicorp/consul/tlsutil/config.go"],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/hashicorp/consul/types",
+    srcs = ["github.com/hashicorp/consul/types/checks.go"],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/hashicorp/consul/watch",
+    srcs = [
+        "github.com/hashicorp/consul/watch/funcs.go",
+        "github.com/hashicorp/consul/watch/plan.go",
+        "github.com/hashicorp/consul/watch/watch.go",
+    ],
+    tags = ["automanaged"],
+    deps = ["//vendor:github.com/hashicorp/consul/api"],
+)
+
+go_library(
+    name = "github.com/hashicorp/errwrap",
+    srcs = ["github.com/hashicorp/errwrap/errwrap.go"],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/hashicorp/go-checkpoint",
+    srcs = ["github.com/hashicorp/go-checkpoint/checkpoint.go"],
+    tags = ["automanaged"],
+    deps = ["//vendor:github.com/hashicorp/go-cleanhttp"],
+)
+
+go_library(
+    name = "github.com/hashicorp/go-cleanhttp",
+    srcs = [
+        "github.com/hashicorp/go-cleanhttp/cleanhttp.go",
+        "github.com/hashicorp/go-cleanhttp/doc.go",
+    ],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/hashicorp/go-immutable-radix",
+    srcs = [
+        "github.com/hashicorp/go-immutable-radix/edges.go",
+        "github.com/hashicorp/go-immutable-radix/iradix.go",
+        "github.com/hashicorp/go-immutable-radix/iter.go",
+        "github.com/hashicorp/go-immutable-radix/node.go",
+    ],
+    tags = ["automanaged"],
+    deps = ["//vendor:github.com/hashicorp/golang-lru/simplelru"],
+)
+
+go_library(
+    name = "github.com/hashicorp/go-memdb",
+    srcs = [
+        "github.com/hashicorp/go-memdb/index.go",
+        "github.com/hashicorp/go-memdb/memdb.go",
+        "github.com/hashicorp/go-memdb/schema.go",
+        "github.com/hashicorp/go-memdb/txn.go",
+    ],
+    tags = ["automanaged"],
+    deps = ["//vendor:github.com/hashicorp/go-immutable-radix"],
+)
+
+go_library(
+    name = "github.com/hashicorp/go-msgpack/codec",
+    srcs = [
+        "github.com/hashicorp/go-msgpack/codec/0doc.go",
+        "github.com/hashicorp/go-msgpack/codec/binc.go",
+        "github.com/hashicorp/go-msgpack/codec/decode.go",
+        "github.com/hashicorp/go-msgpack/codec/encode.go",
+        "github.com/hashicorp/go-msgpack/codec/helper.go",
+        "github.com/hashicorp/go-msgpack/codec/helper_internal.go",
+        "github.com/hashicorp/go-msgpack/codec/msgpack.go",
+        "github.com/hashicorp/go-msgpack/codec/rpc.go",
+        "github.com/hashicorp/go-msgpack/codec/simple.go",
+        "github.com/hashicorp/go-msgpack/codec/time.go",
+    ],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/hashicorp/go-multierror",
+    srcs = [
+        "github.com/hashicorp/go-multierror/append.go",
+        "github.com/hashicorp/go-multierror/flatten.go",
+        "github.com/hashicorp/go-multierror/format.go",
+        "github.com/hashicorp/go-multierror/multierror.go",
+        "github.com/hashicorp/go-multierror/prefix.go",
+    ],
+    tags = ["automanaged"],
+    deps = ["//vendor:github.com/hashicorp/errwrap"],
+)
+
+go_library(
+    name = "github.com/hashicorp/go-reap",
+    srcs = [
+        "github.com/hashicorp/go-reap/reap.go",
+        "github.com/hashicorp/go-reap/reap_unix.go",
+    ],
+    tags = ["automanaged"],
+    deps = ["//vendor:golang.org/x/sys/unix"],
+)
+
+go_library(
+    name = "github.com/hashicorp/go-retryablehttp",
+    srcs = ["github.com/hashicorp/go-retryablehttp/client.go"],
+    tags = ["automanaged"],
+    deps = ["//vendor:github.com/hashicorp/go-cleanhttp"],
+)
+
+go_library(
+    name = "github.com/hashicorp/go-syslog",
+    srcs = [
+        "github.com/hashicorp/go-syslog/builtin.go",
+        "github.com/hashicorp/go-syslog/syslog.go",
+        "github.com/hashicorp/go-syslog/unix.go",
+    ],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/hashicorp/go-uuid",
+    srcs = ["github.com/hashicorp/go-uuid/uuid.go"],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/hashicorp/hil",
+    srcs = [
+        "github.com/hashicorp/hil/builtins.go",
+        "github.com/hashicorp/hil/check_identifier.go",
+        "github.com/hashicorp/hil/check_types.go",
+        "github.com/hashicorp/hil/convert.go",
+        "github.com/hashicorp/hil/eval.go",
+        "github.com/hashicorp/hil/evaltype_string.go",
+        "github.com/hashicorp/hil/lex.go",
+        "github.com/hashicorp/hil/parse.go",
+        "github.com/hashicorp/hil/transform_fixed.go",
+        "github.com/hashicorp/hil/walk.go",
+        "github.com/hashicorp/hil/y.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/hashicorp/hil/ast",
+        "//vendor:github.com/mitchellh/mapstructure",
+        "//vendor:github.com/mitchellh/reflectwalk",
+    ],
+)
+
+go_library(
+    name = "github.com/hashicorp/hil/ast",
+    srcs = [
+        "github.com/hashicorp/hil/ast/arithmetic.go",
+        "github.com/hashicorp/hil/ast/arithmetic_op.go",
+        "github.com/hashicorp/hil/ast/ast.go",
+        "github.com/hashicorp/hil/ast/call.go",
+        "github.com/hashicorp/hil/ast/index.go",
+        "github.com/hashicorp/hil/ast/literal.go",
+        "github.com/hashicorp/hil/ast/output.go",
+        "github.com/hashicorp/hil/ast/scope.go",
+        "github.com/hashicorp/hil/ast/stack.go",
+        "github.com/hashicorp/hil/ast/type_string.go",
+        "github.com/hashicorp/hil/ast/variable_access.go",
+        "github.com/hashicorp/hil/ast/variables_helper.go",
+    ],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/hashicorp/logutils",
+    srcs = ["github.com/hashicorp/logutils/level.go"],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/hashicorp/memberlist",
+    srcs = [
+        "github.com/hashicorp/memberlist/alive_delegate.go",
+        "github.com/hashicorp/memberlist/awareness.go",
+        "github.com/hashicorp/memberlist/broadcast.go",
+        "github.com/hashicorp/memberlist/config.go",
+        "github.com/hashicorp/memberlist/conflict_delegate.go",
+        "github.com/hashicorp/memberlist/delegate.go",
+        "github.com/hashicorp/memberlist/event_delegate.go",
+        "github.com/hashicorp/memberlist/keyring.go",
+        "github.com/hashicorp/memberlist/logging.go",
+        "github.com/hashicorp/memberlist/memberlist.go",
+        "github.com/hashicorp/memberlist/merge_delegate.go",
+        "github.com/hashicorp/memberlist/net.go",
+        "github.com/hashicorp/memberlist/ping_delegate.go",
+        "github.com/hashicorp/memberlist/queue.go",
+        "github.com/hashicorp/memberlist/security.go",
+        "github.com/hashicorp/memberlist/state.go",
+        "github.com/hashicorp/memberlist/suspicion.go",
+        "github.com/hashicorp/memberlist/util.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/armon/go-metrics",
+        "//vendor:github.com/hashicorp/go-msgpack/codec",
+        "//vendor:github.com/hashicorp/go-multierror",
+        "//vendor:github.com/miekg/dns",
+    ],
+)
+
+go_library(
+    name = "github.com/hashicorp/net-rpc-msgpackrpc",
+    srcs = [
+        "github.com/hashicorp/net-rpc-msgpackrpc/client.go",
+        "github.com/hashicorp/net-rpc-msgpackrpc/codec.go",
+        "github.com/hashicorp/net-rpc-msgpackrpc/msgpackrpc.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/hashicorp/go-msgpack/codec",
+        "//vendor:github.com/hashicorp/go-multierror",
+    ],
+)
+
+go_library(
+    name = "github.com/hashicorp/raft",
+    srcs = [
+        "github.com/hashicorp/raft/api.go",
+        "github.com/hashicorp/raft/commands.go",
+        "github.com/hashicorp/raft/commitment.go",
+        "github.com/hashicorp/raft/config.go",
+        "github.com/hashicorp/raft/configuration.go",
+        "github.com/hashicorp/raft/discard_snapshot.go",
+        "github.com/hashicorp/raft/file_snapshot.go",
+        "github.com/hashicorp/raft/fsm.go",
+        "github.com/hashicorp/raft/future.go",
+        "github.com/hashicorp/raft/inmem_store.go",
+        "github.com/hashicorp/raft/inmem_transport.go",
+        "github.com/hashicorp/raft/log.go",
+        "github.com/hashicorp/raft/log_cache.go",
+        "github.com/hashicorp/raft/net_transport.go",
+        "github.com/hashicorp/raft/observer.go",
+        "github.com/hashicorp/raft/peersjson.go",
+        "github.com/hashicorp/raft/raft.go",
+        "github.com/hashicorp/raft/replication.go",
+        "github.com/hashicorp/raft/snapshot.go",
+        "github.com/hashicorp/raft/stable.go",
+        "github.com/hashicorp/raft/state.go",
+        "github.com/hashicorp/raft/tcp_transport.go",
+        "github.com/hashicorp/raft/transport.go",
+        "github.com/hashicorp/raft/util.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/armon/go-metrics",
+        "//vendor:github.com/hashicorp/go-msgpack/codec",
+    ],
+)
+
+go_library(
+    name = "github.com/hashicorp/raft-boltdb",
+    srcs = [
+        "github.com/hashicorp/raft-boltdb/bolt_store.go",
+        "github.com/hashicorp/raft-boltdb/util.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/boltdb/bolt",
+        "//vendor:github.com/hashicorp/go-msgpack/codec",
+        "//vendor:github.com/hashicorp/raft",
+    ],
+)
+
+go_library(
+    name = "github.com/hashicorp/scada-client",
+    srcs = [
+        "github.com/hashicorp/scada-client/client.go",
+        "github.com/hashicorp/scada-client/provider.go",
+        "github.com/hashicorp/scada-client/structs.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/armon/go-metrics",
+        "//vendor:github.com/hashicorp/net-rpc-msgpackrpc",
+        "//vendor:github.com/hashicorp/yamux",
+    ],
+)
+
+go_library(
+    name = "github.com/hashicorp/scada-client/scada",
+    srcs = ["github.com/hashicorp/scada-client/scada/scada.go"],
+    tags = ["automanaged"],
+    deps = ["//vendor:github.com/hashicorp/scada-client"],
+)
+
+go_library(
+    name = "github.com/hashicorp/serf/coordinate",
+    srcs = [
+        "github.com/hashicorp/serf/coordinate/client.go",
+        "github.com/hashicorp/serf/coordinate/config.go",
+        "github.com/hashicorp/serf/coordinate/coordinate.go",
+        "github.com/hashicorp/serf/coordinate/phantom.go",
+    ],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/hashicorp/serf/serf",
+    srcs = [
+        "github.com/hashicorp/serf/serf/broadcast.go",
+        "github.com/hashicorp/serf/serf/coalesce.go",
+        "github.com/hashicorp/serf/serf/coalesce_member.go",
+        "github.com/hashicorp/serf/serf/coalesce_user.go",
+        "github.com/hashicorp/serf/serf/config.go",
+        "github.com/hashicorp/serf/serf/conflict_delegate.go",
+        "github.com/hashicorp/serf/serf/delegate.go",
+        "github.com/hashicorp/serf/serf/event.go",
+        "github.com/hashicorp/serf/serf/event_delegate.go",
+        "github.com/hashicorp/serf/serf/internal_query.go",
+        "github.com/hashicorp/serf/serf/keymanager.go",
+        "github.com/hashicorp/serf/serf/lamport.go",
+        "github.com/hashicorp/serf/serf/merge_delegate.go",
+        "github.com/hashicorp/serf/serf/messages.go",
+        "github.com/hashicorp/serf/serf/ping_delegate.go",
+        "github.com/hashicorp/serf/serf/query.go",
+        "github.com/hashicorp/serf/serf/serf.go",
+        "github.com/hashicorp/serf/serf/snapshot.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/armon/go-metrics",
+        "//vendor:github.com/hashicorp/go-msgpack/codec",
+        "//vendor:github.com/hashicorp/memberlist",
+        "//vendor:github.com/hashicorp/serf/coordinate",
+    ],
+)
+
+go_library(
+    name = "github.com/hashicorp/yamux",
+    srcs = [
+        "github.com/hashicorp/yamux/addr.go",
+        "github.com/hashicorp/yamux/const.go",
+        "github.com/hashicorp/yamux/mux.go",
+        "github.com/hashicorp/yamux/session.go",
+        "github.com/hashicorp/yamux/stream.go",
+        "github.com/hashicorp/yamux/util.go",
+    ],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/mattn/go-isatty",
+    srcs = [
+        "github.com/mattn/go-isatty/doc.go",
+        "github.com/mattn/go-isatty/isatty_linux.go",
+    ],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/mitchellh/cli",
+    srcs = [
+        "github.com/mitchellh/cli/cli.go",
+        "github.com/mitchellh/cli/command.go",
+        "github.com/mitchellh/cli/command_mock.go",
+        "github.com/mitchellh/cli/help.go",
+        "github.com/mitchellh/cli/ui.go",
+        "github.com/mitchellh/cli/ui_colored.go",
+        "github.com/mitchellh/cli/ui_concurrent.go",
+        "github.com/mitchellh/cli/ui_mock.go",
+        "github.com/mitchellh/cli/ui_writer.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/armon/go-radix",
+        "//vendor:github.com/bgentry/speakeasy",
+        "//vendor:github.com/mattn/go-isatty",
+    ],
+)
+
+go_library(
+    name = "github.com/mitchellh/copystructure",
+    srcs = [
+        "github.com/mitchellh/copystructure/copier_time.go",
+        "github.com/mitchellh/copystructure/copystructure.go",
+    ],
+    tags = ["automanaged"],
+    deps = ["//vendor:github.com/mitchellh/reflectwalk"],
+)
+
+go_library(
+    name = "github.com/mitchellh/reflectwalk",
+    srcs = [
+        "github.com/mitchellh/reflectwalk/location.go",
+        "github.com/mitchellh/reflectwalk/location_string.go",
+        "github.com/mitchellh/reflectwalk/reflectwalk.go",
+    ],
+    tags = ["automanaged"],
+)
