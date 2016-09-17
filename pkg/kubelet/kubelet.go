@@ -1675,7 +1675,7 @@ func (kl *Kubelet) killPod(pod *api.Pod, runningPod *kubecontainer.Pod, status *
 	if runningPod != nil {
 		p = *runningPod
 	} else if status != nil {
-		p = kubecontainer.ConvertPodStatusToRunningPod(status)
+		p = kuberuntime.ConvertPodStatusToRunningPod(kl.GetRuntime().Type(), status)
 	}
 	return kl.containerRuntime.KillPod(pod, p, gracePeriodOverride)
 }

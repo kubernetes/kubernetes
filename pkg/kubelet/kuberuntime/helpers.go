@@ -92,6 +92,39 @@ func sandboxToKubeContainerState(state runtimeApi.PodSandBoxState) kubecontainer
 	return kubecontainer.ContainerStateUnknown
 }
 
+// TODO(random-liu): Convert PodStatus to running Pod, should be deprecated soon
+func ConvertPodStatusToRunningPod(runtimeName string, podStatus *kubecontainer.PodStatus) kubecontainer.Pod {
+	runningPod := kubecontainer.Pod{
+		ID:        podStatus.ID,
+		Name:      podStatus.Name,
+		Namespace: podStatus.Namespace,
+	}
+	for _, containerStatus := range podStatus.ContainerStatuses {
+		if containerStatus.State != kubecontainer.ContainerStateRunning {
+			continue
+		}
+		container := &kubecontainer.Container{
+			ID:      containerStatus.ID,
+			Name:    containerStatus.Name,
+			Image:   containerStatus.Image,
+			ImageID: containerStatus.ImageID,
+			Hash:    containerStatus.Hash,
+			State:   containerStatus.State,
+		}
+		runningPod.Containers = append(runningPod.Containers, container)
+	}
+
+	// Need to place a sandbox in the Pod as well.
+	for _, sandbox := range podStatus.SandboxStatuses {
+		runningPod.Sandboxes = append(runningPod.Sandboxes, &kubecontainer.Container{
+			ID:    kubecontainer.ContainerID{Type: runtimeName, ID: *sandbox.Id},
+			State: sandboxToKubeContainerState(*sandbox.State),
+		})
+	}
+
+	return runningPod
+}
+
 // toRuntimeProtocol converts api.Protocol to runtimeApi.Protocol.
 func toRuntimeProtocol(protocol api.Protocol) runtimeApi.Protocol {
 	switch protocol {
