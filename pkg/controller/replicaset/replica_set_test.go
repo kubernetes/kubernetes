@@ -779,7 +779,7 @@ func doTestControllerBurstReplicas(t *testing.T, burstReplicas, numReplicas int)
 				// has exactly one expectation at the end, to verify that we
 				// don't double delete.
 				for i := range podsToDelete[1:] {
-					manager.podStore.Delete(podsToDelete[i])
+					manager.podStore.Indexer.Delete(podsToDelete[i])
 					manager.deletePod(podsToDelete[i])
 				}
 				podExp, exists, err := manager.expectations.GetExpectations(rsKey)
