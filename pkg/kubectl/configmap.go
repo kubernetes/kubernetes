@@ -38,6 +38,8 @@ type ConfigMapGeneratorV1 struct {
 	FileSources []string
 	// LiteralSources to derive the configMap from (optional)
 	LiteralSources []string
+	// Data contains any data that need to be copied in the new config map
+	Data map[string]string
 }
 
 // Ensure it supports the generator pattern that uses parameter injection.
@@ -103,6 +105,10 @@ func (s ConfigMapGeneratorV1) StructuredGenerate() (runtime.Object, error) {
 	configMap := &api.ConfigMap{}
 	configMap.Name = s.Name
 	configMap.Data = map[string]string{}
+	// Note that keys from file or literal sources can overwrite copied data.
+	for key, value := range s.Data {
+		configMap.Data[key] = value
+	}
 	if len(s.FileSources) > 0 {
 		if err := handleConfigMapFromFileSources(configMap, s.FileSources); err != nil {
 			return nil, err
