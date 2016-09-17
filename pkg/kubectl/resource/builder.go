@@ -93,6 +93,11 @@ func IsUsageError(err error) bool {
 	return err == missingResourceError
 }
 
+type FilenameOptions struct {
+	Filenames []string
+	Recursive bool
+}
+
 type resourceTuple struct {
 	Resource string
 	Name     string
@@ -117,7 +122,9 @@ func (b *Builder) Schema(schema validation.Schema) *Builder {
 // will cause an error.
 // If ContinueOnError() is set prior to this method, objects on the path that are not
 // recognized will be ignored (but logged at V(2)).
-func (b *Builder) FilenameParam(enforceNamespace, recursive bool, paths ...string) *Builder {
+func (b *Builder) FilenameParam(enforceNamespace bool, filenameOptions *FilenameOptions) *Builder {
+	recursive := filenameOptions.Recursive
+	paths := filenameOptions.Filenames
 	for _, s := range paths {
 		switch {
 		case s == "-":
