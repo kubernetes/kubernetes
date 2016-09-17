@@ -522,6 +522,41 @@ func (b *Builder) resourceTupleMappings() (map[string]*meta.RESTMapping, error) 
 	return mappings, nil
 }
 
+func (b *Builder) visitorResult() *Result {
+	if len(b.errs) > 0 {
+		return &Result{err: utilerrors.NewAggregate(b.errs)}
+	}
+
+	if b.selectAll {
+		b.selector = labels.Everything()
+	}
+
+	// visit selectors
+	if b.selector != nil {
+		return b.visitBySelector()
+	}
+
+	// visit items specified by resource and name
+	if len(b.resourceTuples) != 0 {
+		return b.visitByResource()
+	}
+
+	// visit items specified by name
+	if len(b.names) != 0 {
+		return b.visitByName()
+	}
+
+	// visit items specified by paths
+	if len(b.paths) != 0 {
+		return b.visitByPaths()
+	}
+
+	if len(b.resources) != 0 {
+		return &Result{err: fmt.Errorf("resource(s) were provided, but no name, label selector, or --all flag specified")}
+	}
+	return &Result{err: missingResourceError}
+}
+
 func (b *Builder) visitBySelector() *Result {
 	if len(b.names) != 0 {
 		return &Result{err: fmt.Errorf("name cannot be provided when a selector is specified")}
@@ -697,41 +732,6 @@ func (b *Builder) visitByPaths() *Result {
 		visitors = NewDecoratedVisitor(visitors, RetrieveLatest)
 	}
 	return &Result{singular: singular, visitor: visitors, sources: b.paths}
-}
-
-func (b *Builder) visitorResult() *Result {
-	if len(b.errs) > 0 {
-		return &Result{err: utilerrors.NewAggregate(b.errs)}
-	}
-
-	if b.selectAll {
-		b.selector = labels.Everything()
-	}
-
-	// visit selectors
-	if b.selector != nil {
-		return b.visitBySelector()
-	}
-
-	// visit items specified by resource and name
-	if len(b.resourceTuples) != 0 {
-		return b.visitByResource()
-	}
-
-	// visit items specified by name
-	if len(b.names) != 0 {
-		return b.visitByName()
-	}
-
-	// visit items specified by paths
-	if len(b.paths) != 0 {
-		return b.visitByPaths()
-	}
-
-	if len(b.resources) != 0 {
-		return &Result{err: fmt.Errorf("resource(s) were provided, but no name, label selector, or --all flag specified")}
-	}
-	return &Result{err: missingResourceError}
 }
 
 // Do returns a Result object with a Visitor for the resources identified by the Builder.
