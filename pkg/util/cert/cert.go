@@ -25,7 +25,6 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
-	"errors"
 	"fmt"
 	"math"
 	"math/big"
@@ -56,35 +55,7 @@ func NewPrivateKey() (*rsa.PrivateKey, error) {
 	return rsa.GenerateKey(cryptorand.Reader, RSAKeySize)
 }
 
-func EncodePublicKeyPEM(key *rsa.PublicKey) ([]byte, error) {
-	der, err := x509.MarshalPKIXPublicKey(key)
-	if err != nil {
-		return []byte{}, err
-	}
-	block := pem.Block{
-		Type:  "PUBLIC KEY",
-		Bytes: der,
-	}
-	return pem.EncodeToMemory(&block), nil
-}
-
-func EncodePrivateKeyPEM(key *rsa.PrivateKey) []byte {
-	block := pem.Block{
-		Type:  "RSA PRIVATE KEY",
-		Bytes: x509.MarshalPKCS1PrivateKey(key),
-	}
-	return pem.EncodeToMemory(&block)
-}
-
-func EncodeCertificatePEM(cert *x509.Certificate) []byte {
-	block := pem.Block{
-		Type:  "CERTIFICATE",
-		Bytes: cert.Raw,
-	}
-	return pem.EncodeToMemory(&block)
-}
-
-func NewSelfSignedCACertificate(cfg CertConfig, key *rsa.PrivateKey) (*x509.Certificate, error) {
+func NewSelfSignedCACert(cfg CertConfig, key *rsa.PrivateKey) (*x509.Certificate, error) {
 	now := time.Now()
 	tmpl := x509.Certificate{
 		SerialNumber: new(big.Int).SetInt64(0),
@@ -106,23 +77,7 @@ func NewSelfSignedCACertificate(cfg CertConfig, key *rsa.PrivateKey) (*x509.Cert
 	return x509.ParseCertificate(certDERBytes)
 }
 
-func ParsePEMEncodedCACert(pemdata []byte) (*x509.Certificate, error) {
-	decoded, _ := pem.Decode(pemdata)
-	if decoded == nil {
-		return nil, errors.New("no PEM data found")
-	}
-	return x509.ParseCertificate(decoded.Bytes)
-}
-
-func ParsePEMEncodedPrivateKey(pemdata []byte) (*rsa.PrivateKey, error) {
-	decoded, _ := pem.Decode(pemdata)
-	if decoded == nil {
-		return nil, errors.New("no PEM data found")
-	}
-	return x509.ParsePKCS1PrivateKey(decoded.Bytes)
-}
-
-func NewSignedCertificate(cfg CertConfig, key *rsa.PrivateKey, caCert *x509.Certificate, caKey *rsa.PrivateKey) (*x509.Certificate, error) {
+func NewSignedCert(cfg CertConfig, key *rsa.PrivateKey, caCert *x509.Certificate, caKey *rsa.PrivateKey) (*x509.Certificate, error) {
 	serial, err := cryptorand.Int(cryptorand.Reader, new(big.Int).SetInt64(math.MaxInt64))
 	if err != nil {
 		return nil, err
@@ -146,6 +101,25 @@ func NewSignedCertificate(cfg CertConfig, key *rsa.PrivateKey, caCert *x509.Cert
 		return nil, err
 	}
 	return x509.ParseCertificate(certDERBytes)
+}
+
+// MakeEllipticPrivateKeyPEM returns data containing a generated ECDSA private key
+func MakeEllipticPrivateKeyPEM() ([]byte, error) {
+	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), cryptorand.Reader)
+	if err != nil {
+		return nil, err
+	}
+
+	derBytes, err := x509.MarshalECPrivateKey(privateKey)
+	if err != nil {
+		return nil, err
+	}
+
+	privateKeyPemBlock := &pem.Block{
+		Type:  "EC PRIVATE KEY",
+		Bytes: derBytes,
+	}
+	return pem.EncodeToMemory(privateKeyPemBlock), nil
 }
 
 // GenerateSelfSignedCert creates a self-signed certificate and key for the given host.
@@ -209,74 +183,4 @@ func GenerateSelfSignedCert(host, certPath, keyPath string, alternateIPs []net.I
 	}
 
 	return nil
-}
-
-// NewFromPEM returns the x509.Certificates contained in the given PEM-encoded byte array
-// Returns an error if a certificate could not be parsed, or if the data does not contain any certificates
-func NewFromPEM(pemCerts []byte) ([]*x509.Certificate, error) {
-	ok := false
-	certs := []*x509.Certificate{}
-	for len(pemCerts) > 0 {
-		var block *pem.Block
-		block, pemCerts = pem.Decode(pemCerts)
-		if block == nil {
-			break
-		}
-		// Only use PEM "CERTIFICATE" blocks without extra headers
-		if block.Type != "CERTIFICATE" || len(block.Headers) != 0 {
-			continue
-		}
-
-		cert, err := x509.ParseCertificate(block.Bytes)
-		if err != nil {
-			return certs, err
-		}
-
-		certs = append(certs, cert)
-		ok = true
-	}
-
-	if !ok {
-		return certs, errors.New("could not read any certificates")
-	}
-	return certs, nil
-}
-
-// MakeEllipticPrivateKey returns PEM data containing a generated ECDSA private key
-func MakeEllipticPrivateKey() ([]byte, error) {
-	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), cryptorand.Reader)
-	if err != nil {
-		return nil, err
-	}
-
-	derBytes, err := x509.MarshalECPrivateKey(privateKey)
-	if err != nil {
-		return nil, err
-	}
-
-	privateKeyPemBlock := &pem.Block{
-		Type:  "EC PRIVATE KEY",
-		Bytes: derBytes,
-	}
-	return pem.EncodeToMemory(privateKeyPemBlock), nil
-}
-
-// ParsePrivateKey returns a private key parsed from a PEM block in the supplied data.
-// Recognizes PEM blocks for "EC PRIVATE KEY" and "RSA PRIVATE KEY"
-func ParsePrivateKey(keyData []byte) (interface{}, error) {
-	for {
-		var privateKeyPemBlock *pem.Block
-		privateKeyPemBlock, keyData = pem.Decode(keyData)
-		if privateKeyPemBlock == nil {
-			// we read all the PEM blocks and didn't recognize one
-			return nil, fmt.Errorf("no private key PEM block found")
-		}
-
-		switch privateKeyPemBlock.Type {
-		case "EC PRIVATE KEY":
-			return x509.ParseECPrivateKey(privateKeyPemBlock.Bytes)
-		case "RSA PRIVATE KEY":
-			return x509.ParsePKCS1PrivateKey(privateKeyPemBlock.Bytes)
-		}
-	}
 }

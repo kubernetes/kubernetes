@@ -482,7 +482,7 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 		if err != nil {
 			return fmt.Errorf("error reading root-ca-file at %s: %v", s.RootCAFile, err)
 		}
-		if _, err := certutil.NewFromPEM(rootCA); err != nil {
+		if _, err := certutil.ParseCertsPEM(rootCA); err != nil {
 			return fmt.Errorf("error parsing root-ca-file at %s: %v", s.RootCAFile, err)
 		}
 	} else {

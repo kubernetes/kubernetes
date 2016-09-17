@@ -39,7 +39,7 @@ func RequestNodeCertificate(client unversionedcertificates.CertificateSigningReq
 		CommonName:   fmt.Sprintf("system:node:%s", nodeName),
 	}
 
-	privateKey, err := certutil.ParsePrivateKey(privateKeyData)
+	privateKey, err := certutil.ParsePrivateKeyPEM(privateKeyData)
 	if err != nil {
 		return nil, fmt.Errorf("invalid private key for certificate request: %v", err)
 	}

@@ -1965,7 +1965,7 @@ func (p *CertificateSigningRequestDescriber) Describe(namespace, name string, de
 		return "", err
 	}
 
-	cr, err := certutil.ParseCertificateRequest(csr)
+	cr, err := certutil.ParseCSR(csr)
 	if err != nil {
 		return "", fmt.Errorf("Error parsing CSR: %v", err)
 	}

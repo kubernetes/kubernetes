@@ -170,7 +170,7 @@ func loadOrGenerateKeyFile(keyPath string) (data []byte, wasGenerated bool, err 
 		return nil, false, fmt.Errorf("error loading key from %s: %v", keyPath, err)
 	}
 
-	generatedData, err := certutil.MakeEllipticPrivateKey()
+	generatedData, err := certutil.MakeEllipticPrivateKeyPEM()
 	if err != nil {
 		return nil, false, fmt.Errorf("error generating key: %v", err)
 	}

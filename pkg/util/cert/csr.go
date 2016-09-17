@@ -31,8 +31,8 @@ import (
 	"k8s.io/kubernetes/pkg/apis/certificates"
 )
 
-// ParseCertificateRequest extracts the CSR from the API object and decodes it.
-func ParseCertificateRequest(obj *certificates.CertificateSigningRequest) (*x509.CertificateRequest, error) {
+// ParseCSR extracts the CSR from the API object and decodes it.
+func ParseCSR(obj *certificates.CertificateSigningRequest) (*x509.CertificateRequest, error) {
 	// extract PEM from request object
 	pemBytes := obj.Spec.Request
 	block, _ := pem.Decode(pemBytes)

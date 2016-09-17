@@ -35,7 +35,7 @@ func TestMakeCSR(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	key, err := ParsePrivateKey(keyData)
+	key, err := ParsePrivateKeyPEM(keyData)
 	if err != nil {
 		t.Fatal(err)
 	}
