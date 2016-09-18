@@ -39,6 +39,7 @@ const (
 	// Ports on which to run the server.
 	// Explicitly setting these to a different value than the default values, to prevent this from clashing with a local cluster.
 	InsecurePort = 8081
+	SecurePort   = 6444
 )
 
 func newStorageFactory() genericapiserver.StorageFactory {
