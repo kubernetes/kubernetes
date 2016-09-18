@@ -43,7 +43,7 @@ const (
 	testContainerHttpPort = 8080
 	clusterHttpPort       = 80
 	clusterUdpPort        = 90
-	netexecImageName      = "gcr.io/google_containers/netexec:1.5"
+	netexecImageName      = "gcr.io/google_containers/netexec:1.7"
 	hostexecImageName     = "gcr.io/google_containers/hostexec:1.2"
 	testPodName           = "test-container-pod"
 	hostTestPodName       = "host-test-container-pod"
