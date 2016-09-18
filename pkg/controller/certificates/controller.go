@@ -49,9 +49,7 @@ type CertificateController struct {
 	csrController *cache.Controller
 	csrStore      cache.StoreToCertificateRequestLister
 
-	// To allow injection of updateCertificateRequestStatus for testing.
-	updateHandler func(csr *certificates.CertificateSigningRequest) error
-	syncHandler   func(csrKey string) error
+	syncHandler func(csrKey string) error
 
 	approveAllKubeletCSRsForGroup string
 
@@ -107,7 +105,19 @@ func NewCertificateController(kubeClient clientset.Interface, syncPeriod time.Du
 				cc.enqueueCertificateRequest(new)
 			},
 			DeleteFunc: func(obj interface{}) {
-				csr := obj.(*certificates.CertificateSigningRequest)
+				csr, ok := obj.(*certificates.CertificateSigningRequest)
+				if !ok {
+					tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
+					if !ok {
+						glog.V(2).Infof("Couldn't get object from tombstone %#v", obj)
+						return
+					}
+					csr, ok = tombstone.Obj.(*certificates.CertificateSigningRequest)
+					if !ok {
+						glog.V(2).Infof("Tombstone contained object that is not a CSR: %#v", obj)
+						return
+					}
+				}
 				glog.V(4).Infof("Deleting certificate request %s", csr.Name)
 				cc.enqueueCertificateRequest(obj)
 			},
@@ -166,18 +176,6 @@ func (cc *CertificateController) enqueueCertificateRequest(obj interface{}) {
 	cc.queue.Add(key)
 }
 
-func (cc *CertificateController) updateCertificateRequestStatus(csr *certificates.CertificateSigningRequest) error {
-	_, updateErr := cc.kubeClient.Certificates().CertificateSigningRequests().UpdateStatus(csr)
-	if updateErr == nil {
-		// success!
-		return nil
-	}
-
-	// retry on failure
-	cc.enqueueCertificateRequest(csr)
-	return updateErr
-}
-
 // maybeSignCertificate will inspect the certificate request and, if it has
 // been approved and meets policy expectations, generate an X509 cert using the
 // cluster CA assets. If successful it will update the CSR approve subresource
@@ -217,7 +215,8 @@ func (cc *CertificateController) maybeSignCertificate(key string) error {
 		csr.Status.Certificate = certBytes
 	}
 
-	return cc.updateCertificateRequestStatus(csr)
+	_, err = cc.kubeClient.Certificates().CertificateSigningRequests().UpdateStatus(csr)
+	return err
 }
 
 func (cc *CertificateController) maybeAutoApproveCSR(csr *certificates.CertificateSigningRequest) (*certificates.CertificateSigningRequest, error) {
