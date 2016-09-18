@@ -25,7 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	kubeadmapi "k8s.io/kubernetes/pkg/kubeadm/api"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/api"
 	certutil "k8s.io/kubernetes/pkg/util/cert"
 )
 

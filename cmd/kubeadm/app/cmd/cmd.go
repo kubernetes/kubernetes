@@ -25,7 +25,7 @@ import (
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/util/flag"
 
-	kubeadmapi "k8s.io/kubernetes/pkg/kubeadm/api"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/api"
 )
 
 func NewKubeadmCommand(f *cmdutil.Factory, in io.Reader, out, err io.Writer, envParams map[string]string) *cobra.Command {
@@ -84,16 +84,11 @@ func NewKubeadmCommand(f *cmdutil.Factory, in io.Reader, out, err io.Writer, env
 	s := new(kubeadmapi.KubeadmConfig)
 	s.EnvParams = envParams
 
-	//s.InitFlags, s.JoinFlags = new(kubeadmapi.InitFlags), new(kubeadmapi.JoinFlags)
-
-	//s.ManualFlags = new(kubeadmapi.ManualFlags)
-
 	cmds.ResetFlags()
 	cmds.SetGlobalNormalizationFunc(flag.WarnWordSepNormalizeFunc)
 
 	cmds.AddCommand(NewCmdInit(out, s))
 	cmds.AddCommand(NewCmdJoin(out, s))
-	cmds.AddCommand(NewCmdManual(out, s))
 
 	return cmds
 }

@@ -22,8 +22,8 @@ import (
 	"os"
 	"path"
 
-	kubeadmapi "k8s.io/kubernetes/pkg/kubeadm/api"
-	kubeadmutil "k8s.io/kubernetes/pkg/kubeadm/util"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/api"
+	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/util/uuid"
 )
