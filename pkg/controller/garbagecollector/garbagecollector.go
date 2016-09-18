@@ -410,7 +410,6 @@ func (p *Propagator) processEvent() {
 		// the node's owners list.
 		p.removeDependentFromOwners(existingNode, removed)
 	case event.eventType == deleteEvent:
-		p.gc.absentOwnerCache.Add(accessor.GetUID())
 		if !found {
 			glog.V(6).Infof("%v doesn't exist in the graph, this shouldn't happen", accessor.GetUID())
 			return
@@ -418,6 +417,9 @@ func (p *Propagator) processEvent() {
 		p.removeNode(existingNode)
 		existingNode.dependentsLock.RLock()
 		defer existingNode.dependentsLock.RUnlock()
+		if len(existingNode.dependents) > 0 {
+			p.gc.absentOwnerCache.Add(accessor.GetUID())
+		}
 		for dep := range existingNode.dependents {
 			p.gc.dirtyQueue.Add(&workqueue.TimedWorkQueueItem{StartTime: p.gc.clock.Now(), Object: dep})
 		}
@@ -546,7 +548,7 @@ func NewGarbageCollector(metaOnlyClientPool dynamic.ClientPool, clientPool dynam
 		orphanQueue:                      workqueue.NewTimedWorkQueue(),
 		registeredRateLimiter:            NewRegisteredRateLimiter(resources),
 		registeredRateLimiterForMonitors: NewRegisteredRateLimiter(resources),
-		absentOwnerCache:                 NewUIDCache(100),
+		absentOwnerCache:                 NewUIDCache(500),
 	}
 	gc.propagator = &Propagator{
 		eventQueue: workqueue.NewTimedWorkQueue(),
