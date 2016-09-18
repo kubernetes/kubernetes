@@ -157,7 +157,7 @@ cd kubernetes
 git checkout release-v0.7-v1.1
 KUBERNETES_CONTRIB=mesos build/run.sh make
 cd ..
-sudo docker build -t $K8SM_IMAGE_NAME --no-cache .
+$ sudo docker build -t $K8SM_IMAGE_NAME --no-cache .
 EOF
 $ chmod 755 build.sh
 $ ./build.sh
