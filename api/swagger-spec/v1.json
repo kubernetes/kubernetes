@@ -399,7 +399,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "*versioned.Event",
+      "type": "versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of ConfigMap",
       "nickname": "watchNamespacedConfigMapList",
@@ -465,7 +465,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "*versioned.Event"
+        "responseModel": "versioned.Event"
        }
       ],
       "produces": [
@@ -721,7 +721,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "*versioned.Event",
+      "type": "versioned.Event",
       "method": "GET",
       "summary": "watch changes to an object of kind ConfigMap",
       "nickname": "watchNamespacedConfigMap",
@@ -795,7 +795,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "*versioned.Event"
+        "responseModel": "versioned.Event"
        }
       ],
       "produces": [
@@ -892,7 +892,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "*versioned.Event",
+      "type": "versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of ConfigMap",
       "nickname": "watchNamespacedConfigMapList",
@@ -950,7 +950,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "*versioned.Event"
+        "responseModel": "versioned.Event"
        }
       ],
       "produces": [
@@ -1181,7 +1181,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "*versioned.Event",
+      "type": "versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of Endpoints",
       "nickname": "watchNamespacedEndpointsList",
@@ -1247,7 +1247,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "*versioned.Event"
+        "responseModel": "versioned.Event"
        }
       ],
       "produces": [
@@ -1503,7 +1503,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "*versioned.Event",
+      "type": "versioned.Event",
       "method": "GET",
       "summary": "watch changes to an object of kind Endpoints",
       "nickname": "watchNamespacedEndpoints",
@@ -1577,7 +1577,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "*versioned.Event"
+        "responseModel": "versioned.Event"
        }
       ],
       "produces": [
@@ -1674,7 +1674,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "*versioned.Event",
+      "type": "versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of Endpoints",
       "nickname": "watchNamespacedEndpointsList",
@@ -1732,7 +1732,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "*versioned.Event"
+        "responseModel": "versioned.Event"
        }
       ],
       "produces": [
@@ -1963,7 +1963,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "*versioned.Event",
+      "type": "versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of Event",
       "nickname": "watchNamespacedEventList",
@@ -2029,7 +2029,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "*versioned.Event"
+        "responseModel": "versioned.Event"
        }
       ],
       "produces": [
@@ -2285,7 +2285,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "*versioned.Event",
+      "type": "versioned.Event",
       "method": "GET",
       "summary": "watch changes to an object of kind Event",
       "nickname": "watchNamespacedEvent",
@@ -2359,7 +2359,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "*versioned.Event"
+        "responseModel": "versioned.Event"
        }
       ],
       "produces": [
@@ -2456,7 +2456,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "*versioned.Event",
+      "type": "versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of Event",
       "nickname": "watchNamespacedEventList",
@@ -2514,7 +2514,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "*versioned.Event"
+        "responseModel": "versioned.Event"
        }
       ],
       "produces": [
@@ -2745,7 +2745,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "*versioned.Event",
+      "type": "versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of LimitRange",
       "nickname": "watchNamespacedLimitRangeList",
@@ -2811,7 +2811,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "*versioned.Event"
+        "responseModel": "versioned.Event"
        }
       ],
       "produces": [
@@ -3067,7 +3067,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "*versioned.Event",
+      "type": "versioned.Event",
       "method": "GET",
       "summary": "watch changes to an object of kind LimitRange",
       "nickname": "watchNamespacedLimitRange",
@@ -3141,7 +3141,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "*versioned.Event"
+        "responseModel": "versioned.Event"
        }
       ],
       "produces": [
@@ -3238,7 +3238,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "*versioned.Event",
+      "type": "versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of LimitRange",
       "nickname": "watchNamespacedLimitRangeList",
@@ -3296,7 +3296,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "*versioned.Event"
+        "responseModel": "versioned.Event"
        }
       ],
       "produces": [
@@ -3503,7 +3503,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "*versioned.Event",
+      "type": "versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of Namespace",
       "nickname": "watchNamespaceList",
@@ -3561,7 +3561,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "*versioned.Event"
+        "responseModel": "versioned.Event"
        }
       ],
       "produces": [
@@ -3785,7 +3785,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "*versioned.Event",
+      "type": "versioned.Event",
       "method": "GET",
       "summary": "watch changes to an object of kind Namespace",
       "nickname": "watchNamespace",
@@ -3851,7 +3851,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "*versioned.Event"
+        "responseModel": "versioned.Event"
        }
       ],
       "produces": [
@@ -4252,7 +4252,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "*versioned.Event",
+      "type": "versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of Node",
       "nickname": "watchNodeList",
@@ -4310,7 +4310,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "*versioned.Event"
+        "responseModel": "versioned.Event"
        }
       ],
       "produces": [
@@ -4534,7 +4534,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "*versioned.Event",
+      "type": "versioned.Event",
       "method": "GET",
       "summary": "watch changes to an object of kind Node",
       "nickname": "watchNode",
@@ -4600,7 +4600,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "*versioned.Event"
+        "responseModel": "versioned.Event"
        }
       ],
       "produces": [
@@ -5716,7 +5716,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "*versioned.Event",
+      "type": "versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of PersistentVolumeClaim",
       "nickname": "watchNamespacedPersistentVolumeClaimList",
@@ -5782,7 +5782,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "*versioned.Event"
+        "responseModel": "versioned.Event"
        }
       ],
       "produces": [
@@ -6038,7 +6038,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "*versioned.Event",
+      "type": "versioned.Event",
       "method": "GET",
       "summary": "watch changes to an object of kind PersistentVolumeClaim",
       "nickname": "watchNamespacedPersistentVolumeClaim",
@@ -6112,7 +6112,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "*versioned.Event"
+        "responseModel": "versioned.Event"
        }
       ],
       "produces": [
@@ -6209,7 +6209,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "*versioned.Event",
+      "type": "versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of PersistentVolumeClaim",
       "nickname": "watchNamespacedPersistentVolumeClaimList",
@@ -6267,7 +6267,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "*versioned.Event"
+        "responseModel": "versioned.Event"
        }
       ],
       "produces": [
@@ -6639,7 +6639,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "*versioned.Event",
+      "type": "versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of PersistentVolume",
       "nickname": "watchPersistentVolumeList",
@@ -6697,7 +6697,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "*versioned.Event"
+        "responseModel": "versioned.Event"
        }
       ],
       "produces": [
@@ -6921,7 +6921,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "*versioned.Event",
+      "type": "versioned.Event",
       "method": "GET",
       "summary": "watch changes to an object of kind PersistentVolume",
       "nickname": "watchPersistentVolume",
@@ -6987,7 +6987,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "*versioned.Event"
+        "responseModel": "versioned.Event"
        }
       ],
       "produces": [
@@ -7359,7 +7359,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "*versioned.Event",
+      "type": "versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of Pod",
       "nickname": "watchNamespacedPodList",
@@ -7425,7 +7425,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "*versioned.Event"
+        "responseModel": "versioned.Event"
        }
       ],
       "produces": [
@@ -7681,7 +7681,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "*versioned.Event",
+      "type": "versioned.Event",
       "method": "GET",
       "summary": "watch changes to an object of kind Pod",
       "nickname": "watchNamespacedPod",
@@ -7755,7 +7755,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "*versioned.Event"
+        "responseModel": "versioned.Event"
        }
       ],
       "produces": [
@@ -8272,7 +8272,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "*versioned.Event",
+      "type": "versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of Pod",
       "nickname": "watchNamespacedPodList",
@@ -8330,7 +8330,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "*versioned.Event"
+        "responseModel": "versioned.Event"
        }
       ],
       "produces": [
@@ -9856,7 +9856,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "*versioned.Event",
+      "type": "versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of PodTemplate",
       "nickname": "watchNamespacedPodTemplateList",
@@ -9922,7 +9922,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "*versioned.Event"
+        "responseModel": "versioned.Event"
        }
       ],
       "produces": [
@@ -10178,7 +10178,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "*versioned.Event",
+      "type": "versioned.Event",
       "method": "GET",
       "summary": "watch changes to an object of kind PodTemplate",
       "nickname": "watchNamespacedPodTemplate",
@@ -10252,7 +10252,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "*versioned.Event"
+        "responseModel": "versioned.Event"
        }
       ],
       "produces": [
@@ -10349,7 +10349,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "*versioned.Event",
+      "type": "versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of PodTemplate",
       "nickname": "watchNamespacedPodTemplateList",
@@ -10407,7 +10407,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "*versioned.Event"
+        "responseModel": "versioned.Event"
        }
       ],
       "produces": [
@@ -10638,7 +10638,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "*versioned.Event",
+      "type": "versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of ReplicationController",
       "nickname": "watchNamespacedReplicationControllerList",
@@ -10704,7 +10704,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "*versioned.Event"
+        "responseModel": "versioned.Event"
        }
       ],
       "produces": [
@@ -10960,7 +10960,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "*versioned.Event",
+      "type": "versioned.Event",
       "method": "GET",
       "summary": "watch changes to an object of kind ReplicationController",
       "nickname": "watchNamespacedReplicationController",
@@ -11034,7 +11034,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "*versioned.Event"
+        "responseModel": "versioned.Event"
        }
       ],
       "produces": [
@@ -11131,7 +11131,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "*versioned.Event",
+      "type": "versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of ReplicationController",
       "nickname": "watchNamespacedReplicationControllerList",
@@ -11189,7 +11189,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "*versioned.Event"
+        "responseModel": "versioned.Event"
        }
       ],
       "produces": [
@@ -11750,7 +11750,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "*versioned.Event",
+      "type": "versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of ResourceQuota",
       "nickname": "watchNamespacedResourceQuotaList",
@@ -11816,7 +11816,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "*versioned.Event"
+        "responseModel": "versioned.Event"
        }
       ],
       "produces": [
@@ -12072,7 +12072,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "*versioned.Event",
+      "type": "versioned.Event",
       "method": "GET",
       "summary": "watch changes to an object of kind ResourceQuota",
       "nickname": "watchNamespacedResourceQuota",
@@ -12146,7 +12146,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "*versioned.Event"
+        "responseModel": "versioned.Event"
        }
       ],
       "produces": [
@@ -12243,7 +12243,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "*versioned.Event",
+      "type": "versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of ResourceQuota",
       "nickname": "watchNamespacedResourceQuotaList",
@@ -12301,7 +12301,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "*versioned.Event"
+        "responseModel": "versioned.Event"
        }
       ],
       "produces": [
@@ -12697,7 +12697,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "*versioned.Event",
+      "type": "versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of Secret",
       "nickname": "watchNamespacedSecretList",
@@ -12763,7 +12763,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "*versioned.Event"
+        "responseModel": "versioned.Event"
        }
       ],
       "produces": [
@@ -13019,7 +13019,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "*versioned.Event",
+      "type": "versioned.Event",
       "method": "GET",
       "summary": "watch changes to an object of kind Secret",
       "nickname": "watchNamespacedSecret",
@@ -13093,7 +13093,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "*versioned.Event"
+        "responseModel": "versioned.Event"
        }
       ],
       "produces": [
@@ -13190,7 +13190,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "*versioned.Event",
+      "type": "versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of Secret",
       "nickname": "watchNamespacedSecretList",
@@ -13248,7 +13248,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "*versioned.Event"
+        "responseModel": "versioned.Event"
        }
       ],
       "produces": [
@@ -13479,7 +13479,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "*versioned.Event",
+      "type": "versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of ServiceAccount",
       "nickname": "watchNamespacedServiceAccountList",
@@ -13545,7 +13545,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "*versioned.Event"
+        "responseModel": "versioned.Event"
        }
       ],
       "produces": [
@@ -13801,7 +13801,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "*versioned.Event",
+      "type": "versioned.Event",
       "method": "GET",
       "summary": "watch changes to an object of kind ServiceAccount",
       "nickname": "watchNamespacedServiceAccount",
@@ -13875,7 +13875,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "*versioned.Event"
+        "responseModel": "versioned.Event"
        }
       ],
       "produces": [
@@ -13972,7 +13972,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "*versioned.Event",
+      "type": "versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of ServiceAccount",
       "nickname": "watchNamespacedServiceAccountList",
@@ -14030,7 +14030,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "*versioned.Event"
+        "responseModel": "versioned.Event"
        }
       ],
       "produces": [
@@ -14182,7 +14182,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "*versioned.Event",
+      "type": "versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of Service",
       "nickname": "watchNamespacedServiceList",
@@ -14248,7 +14248,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "*versioned.Event"
+        "responseModel": "versioned.Event"
        }
       ],
       "produces": [
@@ -14496,7 +14496,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "*versioned.Event",
+      "type": "versioned.Event",
       "method": "GET",
       "summary": "watch changes to an object of kind Service",
       "nickname": "watchNamespacedService",
@@ -14570,7 +14570,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "*versioned.Event"
+        "responseModel": "versioned.Event"
        }
       ],
       "produces": [
@@ -15087,7 +15087,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "*versioned.Event",
+      "type": "versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of Service",
       "nickname": "watchNamespacedServiceList",
@@ -15145,7 +15145,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "*versioned.Event"
+        "responseModel": "versioned.Event"
        }
       ],
       "produces": [
@@ -16263,9 +16263,20 @@
      }
     }
    },
-   "*versioned.Event": {
-    "id": "*versioned.Event",
-    "properties": {}
+   "versioned.Event": {
+    "id": "versioned.Event",
+    "required": [
+     "type",
+     "object"
+    ],
+    "properties": {
+     "type": {
+      "type": "string"
+     },
+     "object": {
+      "type": "string"
+     }
+    }
    },
    "unversioned.Patch": {
     "id": "unversioned.Patch",
