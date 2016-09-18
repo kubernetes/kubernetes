@@ -104,13 +104,13 @@ func (cc *ConformanceContainer) Present() (bool, error) {
 	return false, err
 }
 
-type ContainerState int
+type ContainerState string
 
 const (
-	ContainerStateWaiting ContainerState = iota
-	ContainerStateRunning
-	ContainerStateTerminated
-	ContainerStateUnknown
+	ContainerStateWaiting    ContainerState = "Waiting"
+	ContainerStateRunning    ContainerState = "Running"
+	ContainerStateTerminated ContainerState = "Terminated"
+	ContainerStateUnknown    ContainerState = "Unknown"
 )
 
 func GetContainerState(state api.ContainerState) ContainerState {
