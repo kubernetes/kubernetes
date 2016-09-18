@@ -26,8 +26,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	api "k8s.io/kubernetes/pkg/api/v1"
-	kubeadmapi "k8s.io/kubernetes/pkg/kubeadm/api"
-	"k8s.io/kubernetes/pkg/kubeadm/images"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/api"
+	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/util/intstr"
 )

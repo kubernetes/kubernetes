@@ -24,8 +24,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	kubeadmapi "k8s.io/kubernetes/pkg/kubeadm/api"
-	"k8s.io/kubernetes/pkg/kubeadm/images"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/api"
+	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	ipallocator "k8s.io/kubernetes/pkg/registry/service/ipallocator"
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
