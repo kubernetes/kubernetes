@@ -23,7 +23,7 @@ import (
 
 	"github.com/spf13/pflag"
 
-	"k8s.io/kubernetes/pkg/kubeadm/cmd"
+	"k8s.io/kubernetes/cmd/kubeadm/app/cmd"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/util/logs"
 )
@@ -37,7 +37,7 @@ func getEnvParams() map[string]string {
 	envParams := map[string]string{
 		// TODO(phase1): Mode prefix and host_pki_path to another place as constants, and use them everywhere
 		// Right now they're used here and there, but not consequently
-		"kubernetes_dir":             "/etc/kubernetes",
+		"kubernetes_dir":     "/etc/kubernetes",
 		"host_pki_path":      "/etc/kubernetes/pki",
 		"host_etcd_path":     "/var/lib/etcd",
 		"hyperkube_image":    "",
