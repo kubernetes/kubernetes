@@ -597,6 +597,8 @@ var _ = Describe("Kubectl client", func() {
 	Describe("Kubectl describe", func() {
 		It("should check if kubectl describe prints relevant information for rc and pods [Conformance]", func() {
 			SkipUnlessServerVersionGTE(nodePortsOptionalVersion, c)
+			// It's too risky to try to check all the output since things change between versions
+			SkipUnlessServerVersionLTE(version.MustParse("v1.3.0-alpha.5"), c)
 
 			mkpath := func(file string) string {
 				return filepath.Join(testContext.RepoRoot, "examples/guestbook-go", file)
