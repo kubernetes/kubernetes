@@ -287,12 +287,13 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		isGetter = true
 	}
 
-	var versionedWatchEvent runtime.Object
+	var versionedWatchEvent interface{}
 	if isWatcher {
-		versionedWatchEvent, err = a.group.Creater.New(a.group.GroupVersion.WithKind("WatchEvent"))
+		versionedWatchEventPtr, err := a.group.Creater.New(a.group.GroupVersion.WithKind("WatchEvent"))
 		if err != nil {
 			return nil, err
 		}
+		versionedWatchEvent = indirectArbitraryPointer(versionedWatchEventPtr)
 	}
 
 	var (
