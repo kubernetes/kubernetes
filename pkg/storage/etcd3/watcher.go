@@ -180,6 +180,9 @@ func (wc *watchChan) startWatching() {
 			wc.sendEvent(parseEvent(e))
 		}
 	}
+	wc.cancel()
+	// On normal cluster running, we should never stop the watching loop.
+	glog.Warningf("stop watching key (%s) from etcd.", wc.key)
 }
 
 // processEvent processes events from etcd watcher and sends results to resultChan.
