@@ -336,7 +336,7 @@ The `kubelet` will set the following:
 The `kubelet` at bootstrapping will set the `oom_score_adj` value for Kubernetes
 daemons, and any dependent container-runtime daemons.
 
-If `container-runtime` is set to `docker`, then set its `oom_score_adj=-900`
+If `container-runtime` is set to `docker`, then set its `oom_score_adj=-999`
 
 ## Implementation concerns
 
