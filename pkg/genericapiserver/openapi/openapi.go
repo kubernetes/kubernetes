@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"net/url"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -240,6 +241,7 @@ func (o *openAPI) buildPaths() (spec.Paths, error) {
 		if err != nil {
 			return paths, err
 		}
+		sort.Sort(orderedParameters(commonParams))
 		for path, routes := range groupRoutesByPath(w.Routes()) {
 			// go-swagger has special variable difinition {$NAME:*} that can only be
 			// used at the end of the path and it is not recognized by OpenAPI.
@@ -266,6 +268,7 @@ func (o *openAPI) buildPaths() (spec.Paths, error) {
 			for _, p := range inPathCommonParamsMap {
 				pathItem.Parameters = append(pathItem.Parameters, p)
 			}
+			sort.Sort(orderedParameters(pathItem.Parameters))
 			for _, route := range routes {
 				op, err := o.buildOperations(route, inPathCommonParamsMap)
 				if err != nil {
@@ -357,7 +360,19 @@ func (o *openAPI) buildOperations(route restful.Route, inPathCommonParamsMap map
 			ret.Parameters = append(ret.Parameters, openAPIParam)
 		}
 	}
+	sort.Sort(orderedParameters(ret.Parameters))
 	return ret, nil
+}
+
+type orderedParameters []spec.Parameter
+
+func (p orderedParameters) Len() int      { return len(p) }
+func (p orderedParameters) Swap(i, j int) { p[i], p[j] = p[j], p[i] }
+func (p orderedParameters) Less(i, j int) bool {
+	if p[i].Name != p[j].Name {
+		return p[i].Name < p[j].Name
+	}
+	return p[i].Description < p[j].Description
 }
 
 func groupRoutesByPath(routes []restful.Route) (ret map[string][]restful.Route) {
