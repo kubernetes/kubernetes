@@ -2073,7 +2073,7 @@ func (j *ServiceTestJig) newRCTemplate(namespace string) *api.ReplicationControl
 					Containers: []api.Container{
 						{
 							Name:  "netexec",
-							Image: "gcr.io/google_containers/netexec:1.6",
+							Image: "gcr.io/google_containers/netexec:1.7",
 							Args:  []string{"--http-port=80", "--udp-port=80"},
 							ReadinessProbe: &api.Probe{
 								PeriodSeconds: 3,
