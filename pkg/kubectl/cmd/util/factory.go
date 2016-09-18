@@ -34,7 +34,6 @@ import (
 
 	"github.com/blang/semver"
 	"github.com/emicklei/go-restful/swagger"
-	"github.com/golang/glog"
 	"github.com/imdario/mergo"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
