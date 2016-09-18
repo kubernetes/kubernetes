@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"path"
 
-	kubeadmapi "k8s.io/kubernetes/pkg/kubeadm/api"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/api"
 	ipallocator "k8s.io/kubernetes/pkg/registry/service/ipallocator"
 	certutil "k8s.io/kubernetes/pkg/util/cert"
 )

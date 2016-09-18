@@ -24,9 +24,9 @@ import (
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
-	kubeadmapi "k8s.io/kubernetes/pkg/kubeadm/api"
-	kubemaster "k8s.io/kubernetes/pkg/kubeadm/master"
-	kubeadmutil "k8s.io/kubernetes/pkg/kubeadm/util"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/api"
+	kubemaster "k8s.io/kubernetes/cmd/kubeadm/app/master"
+	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	netutil "k8s.io/kubernetes/pkg/util/net"
 )

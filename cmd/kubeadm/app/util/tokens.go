@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"strings"
 
-	kubeadmapi "k8s.io/kubernetes/pkg/kubeadm/api"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/api"
 )
 
 const (
