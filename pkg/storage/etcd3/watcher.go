@@ -168,6 +168,8 @@ func (wc *watchChan) startWatching() {
 		opts = append(opts, clientv3.WithPrefix())
 	}
 	wch := wc.watcher.client.Watch(wc.ctx, wc.key, opts...)
+	// On normal running, we should never stop the watching loop.
+	defer glog.Warningf("stop watching key (%s) from etcd.", wc.key)
 	for wres := range wch {
 		if wres.Err() != nil {
 			err := wres.Err()
@@ -180,6 +182,7 @@ func (wc *watchChan) startWatching() {
 			wc.sendEvent(parseEvent(e))
 		}
 	}
+	wc.cancel()
 }
 
 // processEvent processes events from etcd watcher and sends results to resultChan.
