@@ -262,7 +262,6 @@ func getComponentCommand(component string, s *kubeadmapi.KubeadmConfig) (command
 			"--cluster-signing-cert-file=" + pkiDir + "/ca.pem",
 			"--cluster-signing-key-file=" + pkiDir + "/ca-key.pem",
 			"--insecure-experimental-approve-all-kubelet-csrs-for-group=system:kubelet-bootstrap",
-			"--cluster-cidr=" + s.InitFlags.Services.CIDR.String(),
 		},
 		scheduler: []string{
 			// TODO: consider adding --address=127.0.0.1 in order to not expose the scheduler port to the rest of the world
@@ -281,12 +280,20 @@ func getComponentCommand(component string, s *kubeadmapi.KubeadmConfig) (command
 	command = append(command, s.EnvParams["component_loglevel"])
 	command = append(command, baseFlags[component]...)
 
-	if component == controllerManager && s.InitFlags.CloudProvider != "" {
-		command = append(command, "--cloud-provider="+s.InitFlags.CloudProvider)
+	if component == controllerManager {
+		if s.InitFlags.CloudProvider != "" {
+			command = append(command, "--cloud-provider="+s.InitFlags.CloudProvider)
 
-		// Only append the --cloud-config option if there's a such file
-		if _, err := os.Stat(DefaultCloudConfigPath); err == nil {
-			command = append(command, "--cloud-config="+DefaultCloudConfigPath)
+			// Only append the --cloud-config option if there's a such file
+			if _, err := os.Stat(DefaultCloudConfigPath); err == nil {
+				command = append(command, "--cloud-config="+DefaultCloudConfigPath)
+			}
+		}
+
+		if s.InitFlags.PodNetwork.CIDR.IP != nil {
+			// Let the controller-manager allocate Node CIDRs for the Pod overlay network.
+			// Each node will get a subspace of the address CIDR provided with --cluster-cidr.
+			command = append(command, "--allocate-node-cidrs=true", "--cluster-cidr="+s.InitFlags.PodNetwork.CIDR.String())
 		}
 	}
 
