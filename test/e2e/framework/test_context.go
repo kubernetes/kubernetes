@@ -94,6 +94,8 @@ type NodeTestContextType struct {
 	ManifestPath string
 	// PrepullImages indicates whether node e2e framework should prepull images.
 	PrepullImages bool
+	// RuntimeIntegrationType indicates how runtime is integrated with Kubelet. This is mainly used for CRI validation test.
+	RuntimeIntegrationType string
 }
 
 type CloudConfig struct {
@@ -186,6 +188,7 @@ func RegisterNodeFlags() {
 	flag.StringVar(&TestContext.EvictionHard, "eviction-hard", "memory.available<250Mi,imagefs.available<10%", "The hard eviction thresholds. If set, pods get evicted when the specified resources drop below the thresholds.")
 	flag.StringVar(&TestContext.ManifestPath, "manifest-path", "", "The path to the static pod manifest file.")
 	flag.BoolVar(&TestContext.PrepullImages, "prepull-images", true, "If true, prepull images so image pull failures do not cause test failures.")
+	flag.StringVar(&TestContext.RuntimeIntegrationType, "runtime-integration-type", "", "Choose the integration path for the container runtime, mainly used for CRI validation.")
 }
 
 // Enable viper configuration management of flags.
