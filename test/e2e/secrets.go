@@ -21,14 +21,24 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/version"
 
 	. "github.com/onsi/ginkgo"
+)
+
+var (
+	serverVersion13 = version.MustParse("v1.3.0")
 )
 
 var _ = Describe("Secrets", func() {
 	f := NewDefaultFramework("secrets")
 
 	It("should be consumable from pods in volume [Conformance]", func() {
+		// The expected behavior of secrets changed in v1.3.0. Since this test
+		// expects the old behavior it should not run against 1.3.0+.
+		// See  https://github.com/kubernetes/kubernetes/issues/32705
+		// See https://github.com/kubernetes/kubernetes/issues/26662
+		SkipUnlessServerVersionLT(serverVersion13, f.Client)
 		name := "secret-test-" + string(util.NewUUID())
 		volumeName := "secret-volume"
 		volumeMountPath := "/etc/secret-volume"
