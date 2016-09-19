@@ -270,7 +270,6 @@ func Run(s *options.APIServer) error {
 
 	genericConfig := genericapiserver.NewConfig(s.ServerRunOptions)
 	// TODO: Move the following to generic api server as well.
-	genericConfig.StorageFactory = storageFactory
 	genericConfig.Authenticator = authenticator
 	genericConfig.SupportsBasicAuth = len(s.BasicAuthFile) > 0
 	genericConfig.Authorizer = authorizer
@@ -284,7 +283,10 @@ func Run(s *options.APIServer) error {
 	genericConfig.OpenAPIInfo.Title = "Kubernetes"
 
 	config := &master.Config{
-		Config:                  genericConfig,
+		Config: genericConfig,
+
+		StorageFactory:          storageFactory,
+		EnableWatchCache:        s.EnableWatchCache,
 		EnableCoreControllers:   true,
 		DeleteCollectionWorkers: s.DeleteCollectionWorkers,
 		EventTTL:                s.EventTTL,
