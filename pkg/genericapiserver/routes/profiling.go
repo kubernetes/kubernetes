@@ -19,15 +19,19 @@ package routes
 import (
 	"github.com/emicklei/go-restful"
 
-	"k8s.io/kubernetes/pkg/apiserver"
 	"net/http/pprof"
 )
 
 // Profiling adds handlers for pprof under /debug/pprof.
 type Profiling struct{}
 
-func (d Profiling) Install(mux *apiserver.PathRecorderMux, c *restful.Container) {
-	mux.BaseMux().HandleFunc("/debug/pprof/", pprof.Index)
-	mux.BaseMux().HandleFunc("/debug/pprof/profile", pprof.Profile)
-	mux.BaseMux().HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+func (d Profiling) Install(c *restful.Container) {
+	ws := new(restful.WebService)
+	ws.Path("/debug/pprof/")
+	ws.Doc("get go pprof debugging info")
+	ws.Route(ws.GET("/").To(HandlerRouteFunction(pprof.Index)))
+	ws.Route(ws.GET("/profile").To(HandlerRouteFunction(pprof.Profile)))
+	ws.Route(ws.GET("/symbol").To(HandlerRouteFunction(pprof.Symbol)))
+
+	c.Add(ws)
 }

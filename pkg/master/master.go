@@ -187,10 +187,10 @@ func New(c *Config) (*Master, error) {
 	}
 
 	if c.EnableUISupport {
-		routes.UIRedirect{}.Install(s.Mux, s.HandlerContainer)
+		routes.UIRedirect{}.Install(s.HandlerContainer)
 	}
 	if c.EnableLogsSupport {
-		routes.Logs{}.Install(s.Mux, s.HandlerContainer)
+		routes.Logs{}.Install(s.HandlerContainer)
 	}
 
 	m := &Master{
@@ -269,9 +269,9 @@ func (m *Master) InstallAPIs(c *Config) {
 	healthz.InstallHandler(m.Mux, healthzChecks...)
 
 	if c.EnableProfiling {
-		routes.MetricsWithReset{}.Install(m.Mux, m.HandlerContainer)
+		routes.MetricsWithReset{}.Install(m.HandlerContainer)
 	} else {
-		routes.DefaultMetrics{}.Install(m.Mux, m.HandlerContainer)
+		routes.DefaultMetrics{}.Install(m.HandlerContainer)
 	}
 
 	// Install third party resource support if requested

@@ -28,8 +28,8 @@ import (
 
 type Index struct{}
 
-func (i Index) Install(mux *apiserver.PathRecorderMux, c *restful.Container) {
-	mux.BaseMux().HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+func (i Index) Install(c *restful.Container) {
+	c.ServeMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		status := http.StatusOK
 		if r.URL.Path != "/" && r.URL.Path != "/index.html" {
 			// Since "/" matches all paths, handleIndex is called for all paths for which there is no handler registered.
@@ -41,8 +41,6 @@ func (i Index) Install(mux *apiserver.PathRecorderMux, c *restful.Container) {
 		for _, ws := range c.RegisteredWebServices() {
 			handledPaths = append(handledPaths, ws.RootPath())
 		}
-		// Extract the paths handled using mux handler.
-		handledPaths = append(handledPaths, mux.HandledPaths()...)
 		sort.Strings(handledPaths)
 		apiserver.WriteRawJSON(status, unversioned.RootPaths{Paths: handledPaths}, w)
 	})
