@@ -605,7 +605,7 @@ func testPausedDeployment(f *framework.Framework) {
 	podLabels := map[string]string{"name": nginxImageName}
 	d := newDeployment(deploymentName, 1, podLabels, nginxImageName, nginxImage, extensions.RollingUpdateDeploymentStrategyType, nil)
 	d.Spec.Paused = true
-	tgps := int64(20)
+	tgps := int64(1)
 	d.Spec.Template.Spec.TerminationGracePeriodSeconds = &tgps
 	framework.Logf("Creating paused deployment %s", deploymentName)
 	_, err := c.Extensions().Deployments(ns).Create(d)
@@ -662,7 +662,7 @@ func testPausedDeployment(f *framework.Framework) {
 
 	// Update the deployment template - the new replicaset should stay the same
 	framework.Logf("Updating paused deployment %q", deploymentName)
-	newTGPS := int64(40)
+	newTGPS := int64(0)
 	deployment, err = framework.UpdateDeploymentWithRetries(c, ns, d.Name, func(update *extensions.Deployment) {
 		update.Spec.Template.Spec.TerminationGracePeriodSeconds = &newTGPS
 	})
