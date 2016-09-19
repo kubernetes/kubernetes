@@ -169,32 +169,6 @@ func TestNewHandlerContainer(t *testing.T) {
 	assert.Equal(mux, container.ServeMux, "ServerMux's do not match")
 }
 
-// TestHandleWithAuth verifies HandleWithAuth adds the path
-// to the MuxHelper.RegisteredPaths.
-func TestHandleWithAuth(t *testing.T) {
-	server, etcdserver, _, assert := setUp(t)
-	defer etcdserver.Terminate(t)
-
-	server.Mux = apiserver.NewPathRecorderMux(http.NewServeMux())
-	handler := func(r http.ResponseWriter, w *http.Request) { w.Write(nil) }
-	server.HandleWithAuth("/test", http.HandlerFunc(handler))
-
-	assert.Contains(server.Mux.HandledPaths(), "/test", "Path not found in MuxHelper")
-}
-
-// TestHandleFuncWithAuth verifies HandleFuncWithAuth adds the path
-// to the MuxHelper.RegisteredPaths.
-func TestHandleFuncWithAuth(t *testing.T) {
-	server, etcdserver, _, assert := setUp(t)
-	defer etcdserver.Terminate(t)
-
-	server.Mux = apiserver.NewPathRecorderMux(http.NewServeMux())
-	handler := func(r http.ResponseWriter, w *http.Request) { w.Write(nil) }
-	server.HandleFuncWithAuth("/test", handler)
-
-	assert.Contains(server.Mux.HandledPaths(), "/test", "Path not found in MuxHelper")
-}
-
 // TestNotRestRoutesHaveAuth checks that special non-routes are behind authz/authn.
 func TestNotRestRoutesHaveAuth(t *testing.T) {
 	_, etcdserver, config, _ := setUp(t)

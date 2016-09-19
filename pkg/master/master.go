@@ -52,6 +52,7 @@ import (
 	storageapiv1beta1 "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
 	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/genericapiserver"
+	genericroutes "k8s.io/kubernetes/pkg/genericapiserver/routes"
 	"k8s.io/kubernetes/pkg/healthz"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master/ports"
@@ -91,6 +92,7 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/emicklei/go-restful"
 )
 
 const (
@@ -266,7 +268,12 @@ func (m *Master) InstallAPIs(c *Config) {
 			Help: "The time since the last successful synchronization of the SSH tunnels for proxy requests.",
 		}, func() float64 { return float64(m.tunneler.SecondsSinceSync()) })
 	}
-	healthz.InstallHandler(m.Mux, healthzChecks...)
+	path := "/healthz"
+	ws := new(restful.WebService)
+	ws.Path(path)
+	ws.Doc("health checks")
+	healthz.InstallHandler(genericroutes.WebServiceGETMux{WS: ws, Path: path}, healthzChecks...)
+	m.HandlerContainer.Add(ws)
 
 	if c.EnableProfiling {
 		routes.MetricsWithReset{}.Install(m.HandlerContainer)
