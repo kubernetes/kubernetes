@@ -61,7 +61,29 @@ func (util *VsphereDiskUtil) CreateVolume(v *vsphereVolumeProvisioner) (vmDiskPa
 	// vSphere works with kilobytes, convert to KiB with rounding up
 	volSizeKB := int(volume.RoundUpSize(volSizeBytes, 1024))
 	name := volume.GenerateVolumeName(v.options.ClusterName, v.options.PVName, 255)
-	vmDiskPath, err = cloud.CreateVolume(name, volSizeKB, v.options.CloudTags)
+	volumeOptions := &vsphere.VolumeOptions{
+		CapacityKB: volSizeKB,
+		Tags:       *v.options.CloudTags,
+		Name:       name,
+	}
+
+	// Apply Parameters (case-insensitive). We leave validation of
+	// the values to the cloud provider.
+	for parameter, value := range v.options.Parameters {
+		switch strings.ToLower(parameter) {
+		case "diskformat":
+			volumeOptions.DiskFormat = value
+		default:
+			return "", 0, fmt.Errorf("invalid option %q for volume plugin %s", parameter, v.plugin.GetPluginName())
+		}
+	}
+
+	// TODO: implement v.options.ProvisionerSelector parsing
+	if v.options.Selector != nil {
+		return "", 0, fmt.Errorf("claim.Spec.Selector is not supported for dynamic provisioning on vSphere")
+	}
+
+	vmDiskPath, err = cloud.CreateVolume(volumeOptions)
 	if err != nil {
 		glog.V(2).Infof("Error creating vsphere volume: %v", err)
 		return "", 0, err
