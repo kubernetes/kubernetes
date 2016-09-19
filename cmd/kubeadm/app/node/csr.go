@@ -18,9 +18,7 @@ package node
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
-	"strings"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/api"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
@@ -36,10 +34,9 @@ import (
 
 // PerformTLSBootstrap creates a RESTful client in order to execute certificate signing request.
 func PerformTLSBootstrap(s *kubeadmapi.KubeadmConfig, apiEndpoint string, caCert []byte) (*clientcmdapi.Config, error) {
-	// TODO try all the api servers until we find one that works
+	// TODO(phase1+) try all the api servers until we find one that works
 	bareClientConfig := kubeadmutil.CreateBasicClientConfig("kubernetes", apiEndpoint, caCert)
 
-	// Try to fetch the hostname of the node
 	nodeName, err := os.Hostname()
 	if err != nil {
 		return nil, fmt.Errorf("<node/csr> failed to get node hostname [%v]", err)
@@ -55,17 +52,19 @@ func PerformTLSBootstrap(s *kubeadmapi.KubeadmConfig, apiEndpoint string, caCert
 		return nil, fmt.Errorf("<node/csr> failed to create API client configuration [%s]", err)
 	}
 
-	err = checkCertsAPI(bootstrapClientConfig)
-
-	if err != nil {
-		return nil, fmt.Errorf("<node/csr> API compatibility error [%s]", err)
-	}
-
 	client, err := unversionedcertificates.NewForConfig(bootstrapClientConfig)
 	if err != nil {
 		return nil, fmt.Errorf("<node/csr> failed to create API client [%s]", err)
 	}
 	csrClient := client.CertificateSigningRequests()
+
+	// TODO(phase1+) checkCertsAPI() has a side-effect of making first attempt of communicating with the API,
+	// we should _make it more explicit_ and have a user-settable _retry timeout_ to account for potential connectivity issues
+	// (for example user may be bringing up machines in parallel and for some reasons master is slow to boot)
+
+	if err := checkCertsAPI(bootstrapClientConfig); err != nil {
+		return nil, fmt.Errorf("<node/csr> fialed to proceed due to API compatibility issue - %s", err)
+	}
 
 	fmt.Println("<node/csr> created API client to obtain unique certificate for this node, generating keys and certificate signing request")
 
@@ -79,7 +78,7 @@ func PerformTLSBootstrap(s *kubeadmapi.KubeadmConfig, apiEndpoint string, caCert
 		return nil, fmt.Errorf("<node/csr> failed to request signed certificate from the API server [%s]", err)
 	}
 
-	// TODO print some basic info about the cert
+	// TODO(phase1+) print some basic info about the cert
 	fmt.Println("<node/csr> received signed certificate from the API server, generating kubelet configuration")
 
 	finalConfig := kubeadmutil.MakeClientConfigWithCerts(
@@ -110,14 +109,9 @@ func checkCertsAPI(config *restclient.Config) error {
 	}
 
 	version, err := discoveryClient.ServerVersion()
-	serverVersion := version.String()
-
 	if err != nil {
-		serverVersion = "N/A"
+		return fmt.Errorf("unable to obtain API version [%s]", err)
 	}
 
-	// Due to changes in API namespaces for certificates
-	// https://github.com/kubernetes/kubernetes/pull/31887/
-	// it is compatible only with versions released after v1.4.0-beta.0
-	return fmt.Errorf("installed Kubernetes API server version \"%s\" does not support certificates signing request use v1.4.0 or newer", serverVersion)
+	return fmt.Errorf("API version %s does not support certificates API, use v1.4.0 or newer", version.String())
 }

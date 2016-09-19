@@ -22,10 +22,9 @@ import (
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/api"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/util/flag"
-
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/api"
 )
 
 func NewKubeadmCommand(f *cmdutil.Factory, in io.Reader, out, err io.Writer, envParams map[string]string) *cobra.Command {
@@ -65,9 +64,6 @@ func NewKubeadmCommand(f *cmdutil.Factory, in io.Reader, out, err io.Writer, env
 		`),
 	}
 	// TODO(phase2+) figure out how to avoid running as root
-	//
-	// TODO(phase1) also print the alpha warning when running any commands, as well as
-	// in the help text.
 	//
 	// TODO(phase2) detect interactive vs non-interactive use and adjust output accordingly
 	// i.e. make it automation friendly
