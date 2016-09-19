@@ -608,12 +608,14 @@ func makeSignalObservations(summaryProvider stats.SummaryProvider) (signalObserv
 			result[SignalNodeFsAvailable] = signalObservation{
 				available: resource.NewQuantity(int64(*nodeFs.AvailableBytes), resource.BinarySI),
 				capacity:  resource.NewQuantity(int64(*nodeFs.CapacityBytes), resource.BinarySI),
+				// TODO: add timestamp to stat (see memory stat)
 			}
 		}
 		if nodeFs.InodesFree != nil && nodeFs.Inodes != nil {
 			result[SignalNodeFsInodesFree] = signalObservation{
 				available: resource.NewQuantity(int64(*nodeFs.InodesFree), resource.BinarySI),
 				capacity:  resource.NewQuantity(int64(*nodeFs.Inodes), resource.BinarySI),
+				// TODO: add timestamp to stat (see memory stat)
 			}
 		}
 	}
@@ -623,11 +625,13 @@ func makeSignalObservations(summaryProvider stats.SummaryProvider) (signalObserv
 				result[SignalImageFsAvailable] = signalObservation{
 					available: resource.NewQuantity(int64(*imageFs.AvailableBytes), resource.BinarySI),
 					capacity:  resource.NewQuantity(int64(*imageFs.CapacityBytes), resource.BinarySI),
+					// TODO: add timestamp to stat (see memory stat)
 				}
 				if imageFs.InodesFree != nil && imageFs.Inodes != nil {
 					result[SignalImageFsInodesFree] = signalObservation{
 						available: resource.NewQuantity(int64(*imageFs.InodesFree), resource.BinarySI),
 						capacity:  resource.NewQuantity(int64(*imageFs.Inodes), resource.BinarySI),
+						// TODO: add timestamp to stat (see memory stat)
 					}
 				}
 			}
@@ -675,7 +679,7 @@ func thresholdsUpdatedStats(thresholds []Threshold, observations, lastObservatio
 			continue
 		}
 		last, found := lastObservations[threshold.Signal]
-		if !found || observed.time.IsZero() || !observed.time.After(last.time.Time) {
+		if !found || observed.time.IsZero() || observed.time.After(last.time.Time) {
 			results = append(results, threshold)
 		}
 	}
