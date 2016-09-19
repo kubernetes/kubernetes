@@ -46,8 +46,6 @@ import (
 	"k8s.io/kubernetes/pkg/genericapiserver/routes"
 	genericvalidation "k8s.io/kubernetes/pkg/genericapiserver/validation"
 	ipallocator "k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
-	"k8s.io/kubernetes/pkg/registry/generic"
-	"k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
@@ -55,8 +53,6 @@ import (
 
 // Config is a structure used to configure a GenericAPIServer.
 type Config struct {
-	// The storage factory for other objects
-	StorageFactory     StorageFactory
 	AuditLogPath       string
 	AuditLogMaxAge     int
 	AuditLogMaxBackups int
@@ -73,7 +69,6 @@ type Config struct {
 	EnableIndex             bool
 	EnableProfiling         bool
 	EnableVersion           bool
-	EnableWatchCache        bool
 	EnableGarbageCollection bool
 	APIPrefix               string
 	APIGroupPrefix          string
@@ -179,7 +174,6 @@ func NewConfig(options *options.ServerRunOptions) *Config {
 		EnableSwaggerSupport:      true,
 		EnableSwaggerUI:           options.EnableSwaggerUI,
 		EnableVersion:             true,
-		EnableWatchCache:          options.EnableWatchCache,
 		ExternalHost:              options.ExternalHost,
 		KubernetesServiceNodePort: options.KubernetesServiceNodePort,
 		MasterCount:               options.MasterCount,
@@ -313,12 +307,6 @@ func (c Config) New() (*GenericAPIServer, error) {
 		openAPIInfo:            c.OpenAPIInfo,
 		openAPIDefaultResponse: c.OpenAPIDefaultResponse,
 		openAPIDefinitions:     c.OpenAPIDefinitions,
-	}
-
-	if c.EnableWatchCache {
-		s.storageDecorator = registry.StorageWithCacher
-	} else {
-		s.storageDecorator = generic.UndecoratedStorage
 	}
 
 	if c.RestfulContainer != nil {

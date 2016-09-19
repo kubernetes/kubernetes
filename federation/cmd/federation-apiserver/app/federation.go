@@ -20,7 +20,6 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/kubernetes/federation/apis/federation"
-	"k8s.io/kubernetes/federation/cmd/federation-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
@@ -30,8 +29,8 @@ import (
 	clusteretcd "k8s.io/kubernetes/federation/registry/cluster/etcd"
 )
 
-func installFederationAPIs(s *options.ServerRunOptions, g *genericapiserver.GenericAPIServer, f genericapiserver.StorageFactory) {
-	clusterStorage, clusterStatusStorage := clusteretcd.NewREST(createRESTOptionsOrDie(s, g, f, federation.Resource("clusters")))
+func installFederationAPIs(g *genericapiserver.GenericAPIServer, restOptionsFactory restOptionsFactory) {
+	clusterStorage, clusterStatusStorage := clusteretcd.NewREST(restOptionsFactory.NewFor(federation.Resource("clusters")))
 	federationResources := map[string]rest.Storage{
 		"clusters":        clusterStorage,
 		"clusters/status": clusterStatusStorage,

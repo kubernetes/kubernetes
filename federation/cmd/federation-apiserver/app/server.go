@@ -44,6 +44,7 @@ import (
 	genericvalidation "k8s.io/kubernetes/pkg/genericapiserver/validation"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/generic"
+	"k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/registry/rbac/clusterrole"
 	clusterroleetcd "k8s.io/kubernetes/pkg/registry/rbac/clusterrole/etcd"
 	"k8s.io/kubernetes/pkg/registry/rbac/clusterrolebinding"
@@ -201,7 +202,6 @@ func Run(s *options.ServerRunOptions) error {
 	}
 	genericConfig := genericapiserver.NewConfig(s.ServerRunOptions)
 	// TODO: Move the following to generic api server as well.
-	genericConfig.StorageFactory = storageFactory
 	genericConfig.Authenticator = apiAuthenticator
 	genericConfig.SupportsBasicAuth = len(s.BasicAuthFile) > 0
 	genericConfig.Authorizer = apiAuthorizer
@@ -227,24 +227,40 @@ func Run(s *options.ServerRunOptions) error {
 	routes.UIRedirect{}.Install(m.Mux, m.HandlerContainer)
 	routes.Logs{}.Install(m.Mux, m.HandlerContainer)
 
-	installFederationAPIs(s, m, storageFactory)
-	installCoreAPIs(s, m, storageFactory)
-	installExtensionsAPIs(s, m, storageFactory)
+	restOptionsFactory := restOptionsFactory{
+		storageFactory:          storageFactory,
+		deleteCollectionWorkers: s.DeleteCollectionWorkers,
+	}
+	if s.EnableWatchCache {
+		restOptionsFactory.storageDecorator = registry.StorageWithCacher
+	} else {
+		restOptionsFactory.storageDecorator = generic.UndecoratedStorage
+	}
+
+	installFederationAPIs(m, restOptionsFactory)
+	installCoreAPIs(s, m, restOptionsFactory)
+	installExtensionsAPIs(m, restOptionsFactory)
 
 	sharedInformers.Start(wait.NeverStop)
 	m.Run(s.ServerRunOptions)
 	return nil
 }
 
-func createRESTOptionsOrDie(s *options.ServerRunOptions, g *genericapiserver.GenericAPIServer, f genericapiserver.StorageFactory, resource unversioned.GroupResource) generic.RESTOptions {
-	config, err := f.NewConfig(resource)
+type restOptionsFactory struct {
+	storageFactory          genericapiserver.StorageFactory
+	storageDecorator        generic.StorageDecorator
+	deleteCollectionWorkers int
+}
+
+func (f restOptionsFactory) NewFor(resource unversioned.GroupResource) generic.RESTOptions {
+	config, err := f.storageFactory.NewConfig(resource)
 	if err != nil {
 		glog.Fatalf("Unable to find storage config for %v, due to %v", resource, err.Error())
 	}
 	return generic.RESTOptions{
 		StorageConfig:           config,
-		Decorator:               g.StorageDecorator(),
-		DeleteCollectionWorkers: s.DeleteCollectionWorkers,
-		ResourcePrefix:          f.ResourcePrefix(resource),
+		Decorator:               f.storageDecorator,
+		DeleteCollectionWorkers: f.deleteCollectionWorkers,
+		ResourcePrefix:          f.storageFactory.ResourcePrefix(resource),
 	}
 }

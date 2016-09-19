@@ -224,14 +224,12 @@ func NewMasterConfig() *master.Config {
 
 	return &master.Config{
 		Config: &genericapiserver.Config{
-			StorageFactory:          storageFactory,
 			APIResourceConfigSource: master.DefaultAPIResourceConfigSource(),
 			APIPrefix:               "/api",
 			APIGroupPrefix:          "/apis",
 			Authorizer:              authorizer.NewAlwaysAllowAuthorizer(),
 			AdmissionControl:        admit.NewAlwaysAdmit(),
 			Serializer:              api.Codecs,
-			EnableWatchCache:        true,
 			// Set those values to avoid annoying warnings in logs.
 			ServiceClusterIPRange: parseCIDROrDie("10.0.0.0/24"),
 			ServiceNodePortRange:  utilnet.PortRange{Base: 30000, Size: 2768},
@@ -239,7 +237,9 @@ func NewMasterConfig() *master.Config {
 			OpenAPIDefinitions:    openapi.OpenAPIDefinitions,
 			EnableOpenAPISupport:  true,
 		},
-		KubeletClient: kubeletclient.FakeKubeletClient{},
+		StorageFactory:   storageFactory,
+		EnableWatchCache: true,
+		KubeletClient:    kubeletclient.FakeKubeletClient{},
 	}
 }
 
