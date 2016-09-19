@@ -22,9 +22,9 @@ import (
 	"path"
 
 	// TODO: "k8s.io/client-go/client/tools/clientcmd/api"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/api"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/api"
 )
 
 func CreateBasicClientConfig(clusterName string, serverURL string, caCert []byte) *clientcmdapi.Config {

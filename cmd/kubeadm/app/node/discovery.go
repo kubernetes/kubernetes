@@ -24,8 +24,8 @@ import (
 	"net/http"
 
 	jose "github.com/square/go-jose"
-	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/api"
+	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 )
 
 func RetrieveTrustedClusterInfo(s *kubeadmapi.KubeadmConfig) (*clientcmdapi.Config, error) {

@@ -31,9 +31,9 @@ import (
 func NewKubeadmCommand(f *cmdutil.Factory, in io.Reader, out, err io.Writer, envParams map[string]string) *cobra.Command {
 	cmds := &cobra.Command{
 		Use:   "kubeadm",
-		Short: "kubeadm: bootstrap a secure kubernetes cluster easily.",
+		Short: "kubeadm: easily bootstrap a secure Kubernetes cluster.",
 		Long: dedent.Dedent(`
-			kubeadm: bootstrap a secure kubernetes cluster easily.
+			kubeadm: easily bootstrap a secure Kubernetes cluster.
 
 			    ┌──────────────────────────────────────────────────────────┐
 			    │ KUBEADM IS ALPHA, DO NOT USE IT FOR PRODUCTION CLUSTERS! │
@@ -51,14 +51,13 @@ func NewKubeadmCommand(f *cmdutil.Factory, in io.Reader, out, err io.Writer, env
 			    ┌──────────────────────────────────────────────────────────┐
 			    │  On the first machine                                    │
 			    ├──────────────────────────────────────────────────────────┤
-			    │ master# kubeadm init master                              │
-			    │ Your token is: <token>                                   │
+			    │ master# kubeadm init                                     │
 			    └──────────────────────────────────────────────────────────┘
 
 			    ┌──────────────────────────────────────────────────────────┐
 			    │ On the second machine                                    │
 			    ├──────────────────────────────────────────────────────────┤
-			    │ node# kubeadm join node --token=<token> <ip-of-master>   │
+			    │ node# kubeadm join --token=<token> <ip-of-master>        │
 			    └──────────────────────────────────────────────────────────┘
 
 			    You can then repeat the second step on as many other machines as you like.

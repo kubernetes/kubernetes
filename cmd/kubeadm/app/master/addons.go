@@ -21,14 +21,15 @@ import (
 	"path"
 	"runtime"
 
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/api"
+	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/api"
-	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	ipallocator "k8s.io/kubernetes/pkg/registry/service/ipallocator"
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
+
 // TODO(phase1+): kube-proxy should be a daemonset, three different daemonsets should not be here
 func createKubeProxyPodSpec(s *kubeadmapi.KubeadmConfig, architecture string) api.PodSpec {
 	privilegedTrue := true
@@ -112,7 +113,7 @@ func createKubeDNSPodSpec(s *kubeadmapi.KubeadmConfig) api.PodSpec {
 			// DNS server
 			{
 				Name:  "kube-dns",
-				Image: images.GetAddonImage(images.KubeDnsImage),
+				Image: images.GetAddonImage(images.KubeDNSImage),
 				Resources: api.ResourceRequirements{
 					Limits:   dnsPodResources,
 					Requests: dnsPodResources,
@@ -164,7 +165,7 @@ func createKubeDNSPodSpec(s *kubeadmapi.KubeadmConfig) api.PodSpec {
 			// dnsmasq
 			{
 				Name:  "dnsmasq",
-				Image: images.GetAddonImage(images.KubeDnsmasqImage),
+				Image: images.GetAddonImage(images.KubeDNSmasqImage),
 				Resources: api.ResourceRequirements{
 					Limits:   dnsPodResources,
 					Requests: dnsPodResources,
@@ -233,7 +234,7 @@ func CreateEssentialAddons(s *kubeadmapi.KubeadmConfig, client *clientset.Client
 	arches := [3]string{"amd64", "arm", "arm64"}
 
 	for _, arch := range arches {
-		kubeProxyDaemonSet := NewDaemonSet(kubeProxy + "-" + arch, createKubeProxyPodSpec(s, arch))
+		kubeProxyDaemonSet := NewDaemonSet(kubeProxy+"-"+arch, createKubeProxyPodSpec(s, arch))
 		SetMasterTaintTolerations(&kubeProxyDaemonSet.Spec.Template.ObjectMeta)
 
 		if _, err := client.Extensions().DaemonSets(api.NamespaceSystem).Create(kubeProxyDaemonSet); err != nil {

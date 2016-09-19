@@ -28,8 +28,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/logs"
 )
 
-var CommandLine *pflag.FlagSet
-
 // TODO(phase2) use componentconfig
 // we need some params for testing etc, let's keep these hidden for now
 func getEnvParams() map[string]string {
@@ -56,7 +54,6 @@ func getEnvParams() map[string]string {
 }
 
 func Run() error {
-	CommandLine = pflag.NewFlagSet(os.Args[0], pflag.ContinueOnError)
 	logs.InitLogs()
 	defer logs.FlushLogs()
 

@@ -20,10 +20,10 @@ import (
 	"net"
 )
 
+// KubeadmConfig TODO add description
 type KubeadmConfig struct {
 	InitFlags
 	JoinFlags
-	ManualFlags
 	Secrets struct {
 		GivenToken  string // dot-separated `<TokenID>.<Token>` set by the user
 		TokenID     string // optional on master side, will be generated if not specified
@@ -33,19 +33,20 @@ type KubeadmConfig struct {
 	EnvParams map[string]string // TODO(phase2) this is likely to be come componentconfig
 }
 
-// TODO(phase2) should we add validatin funcs on these structs?
+// TODO(phase2) should we add validation functions for these structs?
 
+// InitFlags holds values for "kubeadm init" command flags.
 type InitFlags struct {
 	API struct {
-		AdvertiseAddrs  []net.IP
-		ExternalDNSName []string
+		AdvertiseAddrs   []net.IP
+		ExternalDNSNames []string
 	}
 	Services struct {
 		CIDR      net.IPNet
 		DNSDomain string
 	}
 	CloudProvider string
-	Schedulable bool
+	Schedulable   bool
 }
 
 const (
@@ -77,20 +78,14 @@ func init() {
 	}
 }
 
+// JoinFlags holds values for "kubeadm join" command flags.
 type JoinFlags struct {
 	MasterAddrs []net.IP
 }
 
-// TODO(phase1?) we haven't decided whether manual sub commands should get merged into  main commands...
-type ManualFlags struct {
-	ApiServerURLs string // comma separated
-	CaCertFile    string
-	BearerToken   string // set based on Token
-	ListenIP      net.IP // optional IP for master to listen on, rather than autodetect
-}
-
+// ClusterInfo TODO add description
 type ClusterInfo struct {
-	// TODO(pahse1?) this may become simply `api.Config`
+	// TODO(phase1?) this may become simply `api.Config`
 	CertificateAuthorities []string `json:"certificateAuthorities"`
 	Endpoints              []string `json:"endpoints"`
 }

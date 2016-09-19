@@ -60,7 +60,7 @@ func newServerKeyAndCert(s *kubeadmapi.KubeadmConfig, caCert *x509.Certificate, 
 
 	internalAPIServerVirtualIP, err := ipallocator.GetIndexedIP(&s.InitFlags.Services.CIDR, 1)
 	if err != nil {
-		return nil, nil, fmt.Errorf("unable to allocate IP address for the API server from the given CIDR (%q) [%s]")
+		return nil, nil, fmt.Errorf("unable to allocate IP address for the API server from the given CIDR (%q) [%s]", &s.InitFlags.Services.CIDR, err)
 	}
 
 	altNames.IPs = append(altNames.IPs, internalAPIServerVirtualIP)
@@ -117,7 +117,7 @@ func writeKeysAndCert(pkiPath string, name string, key *rsa.PrivateKey, cert *x5
 
 	if cert != nil {
 		if err := certutil.WriteCert(certificatePath, certutil.EncodeCertPEM(cert)); err != nil {
-			return fmt.Errorf("unable to write certificate file (%q) [%s]", err)
+			return fmt.Errorf("unable to write certificate file (%q) [%s]", certificatePath, err)
 		}
 	}
 
@@ -142,8 +142,8 @@ func CreatePKIAssets(s *kubeadmapi.KubeadmConfig) (*rsa.PrivateKey, *x509.Certif
 		altNames.IPs = append(altNames.IPs, s.InitFlags.API.AdvertiseAddrs...)
 	}
 
-	if len(s.InitFlags.API.ExternalDNSName) > 0 {
-		altNames.DNSNames = append(altNames.DNSNames, s.InitFlags.API.ExternalDNSName...)
+	if len(s.InitFlags.API.ExternalDNSNames) > 0 {
+		altNames.DNSNames = append(altNames.DNSNames, s.InitFlags.API.ExternalDNSNames...)
 	}
 
 	pkiPath := path.Join(s.EnvParams["host_pki_path"])
