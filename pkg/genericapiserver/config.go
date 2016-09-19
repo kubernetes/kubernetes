@@ -368,9 +368,10 @@ func (c Config) New() (*GenericAPIServer, error) {
 	}
 
 	s.InsecureHandler = handler
+	s.Handler = handler
 
 	attributeGetter := apiserver.NewRequestAttributeGetter(c.RequestContextMapper, s.NewRequestInfoResolver())
-	handler = apiserver.WithAuthorizationCheck(handler, attributeGetter, c.Authorizer)
+	s.Handler = apiserver.WithAuthorizationCheck(s.Handler, attributeGetter, c.Authorizer)
 	if len(c.AuditLogPath) != 0 {
 		// audit handler must comes before the impersonationFilter to read the original user
 		writer := &lumberjack.Logger{
@@ -379,10 +380,10 @@ func (c Config) New() (*GenericAPIServer, error) {
 			MaxBackups: c.AuditLogMaxBackups,
 			MaxSize:    c.AuditLogMaxSize,
 		}
-		handler = audit.WithAudit(handler, attributeGetter, writer)
+		s.Handler = audit.WithAudit(s.Handler, attributeGetter, writer)
 		defer writer.Close()
 	}
-	handler = apiserver.WithImpersonation(handler, c.RequestContextMapper, c.Authorizer)
+	s.Handler = apiserver.WithImpersonation(s.Handler, c.RequestContextMapper, c.Authorizer)
 
 	// Install Authenticator
 	if c.Authenticator != nil {
@@ -393,22 +394,17 @@ func (c Config) New() (*GenericAPIServer, error) {
 		handler = authenticatedHandler
 	}
 
-	// TODO: Make this optional?  Consumers of GenericAPIServer depend on this currently.
-	s.Handler = handler
-
 	// After all wrapping is done, put a context filter around both handlers
 	var err error
-	handler, err = api.NewRequestContextFilter(c.RequestContextMapper, s.Handler)
+	s.Handler, err = api.NewRequestContextFilter(c.RequestContextMapper, s.Handler)
 	if err != nil {
 		glog.Fatalf("Could not initialize request context filter for s.Handler: %v", err)
 	}
-	s.Handler = handler
 
-	handler, err = api.NewRequestContextFilter(c.RequestContextMapper, s.InsecureHandler)
+	s.InsecureHandler, err = api.NewRequestContextFilter(c.RequestContextMapper, s.InsecureHandler)
 	if err != nil {
 		glog.Fatalf("Could not initialize request context filter for s.InsecureHandler: %v", err)
 	}
-	s.InsecureHandler = handler
 
 	s.installGroupsDiscoveryHandler()
 
