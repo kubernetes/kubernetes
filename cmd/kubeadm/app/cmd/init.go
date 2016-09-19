@@ -32,20 +32,21 @@ import (
 )
 
 var (
-	init_done_msgf = dedent.Dedent(`
+	initDoneMsgf = dedent.Dedent(`
 		Kubernetes master initialised successfully!
 
-		You can connect any number of nodes by running:
+		You can now join any number of machines by running the following on each node:
 
 		kubeadm join --token %s %s
 		`)
 )
 
+// NewCmdInit returns "kubeadm init" command.
 func NewCmdInit(out io.Writer, s *kubeadmapi.KubeadmConfig) *cobra.Command {
 	advertiseAddrs := &[]string{}
 	cmd := &cobra.Command{
 		Use:   "init",
-		Short: "Run this on the first server you deploy onto.",
+		Short: "Run this on the first machine.",
 		Run: func(cmd *cobra.Command, args []string) {
 			err := RunInit(out, cmd, args, s, advertiseAddrs)
 			cmdutil.CheckErr(err) // TODO(phase1+) append alpha warning with bugs URL etc
@@ -54,28 +55,28 @@ func NewCmdInit(out io.Writer, s *kubeadmapi.KubeadmConfig) *cobra.Command {
 
 	cmd.PersistentFlags().StringVar(
 		&s.Secrets.GivenToken, "token", "",
-		`(optional) Shared secret used to secure bootstrap. Will be generated and displayed if not provided.`,
+		`(optional) Shared secret used to secure cluster bootstrap. If none is provided, one will be generated for you.`,
 	)
 	cmd.PersistentFlags().StringSliceVar(
-		advertiseAddrs, "api-advertise-addr", []string{},
-		`(optional) IP address to advertise, in case autodetection fails.`,
+		advertiseAddrs, "api-advertise-addresses", []string{},
+		`(optional) The IP addresses to advertise, in case autodetection fails.`,
 	)
 	cmd.PersistentFlags().StringSliceVar(
-		&s.InitFlags.API.ExternalDNSName, "api-external-dns-name", []string{},
-		`(optional) DNS name to advertise, in case you have configured one yourself.`,
+		&s.InitFlags.API.ExternalDNSNames, "api-external-dns-names", []string{},
+		`(optional) The DNS names to advertise, in case you have configured them yourself.`,
 	)
 
 	cmd.PersistentFlags().IPNetVar(
 		&s.InitFlags.Services.CIDR, "service-cidr", *kubeadmapi.DefaultServicesCIDR,
-		`(optional) use alterantive range of IP address for service VIPs, e.g. "10.16.0.0/12"`,
+		`(optional) use alternative range of IP address for service VIPs, e.g. "10.16.0.0/12"`,
 	)
 	cmd.PersistentFlags().StringVar(
 		&s.InitFlags.Services.DNSDomain, "service-dns-domain", kubeadmapi.DefaultServiceDNSDomain,
-		`(optional) use alterantive domain name for services, e.g. "myorg.internal"`,
+		`(optional) use alternative domain for services, e.g. "myorg.internal"`,
 	)
 	cmd.PersistentFlags().StringVar(
 		&s.InitFlags.CloudProvider, "cloud-provider", "",
-		`(optional) enable cloud proiver features (external load-balancers, storage, etc)`,
+		`(optional) enable a specific cloud provider features (external load-balancers, storage, etc), e.g. "gce"`,
 	)
 	cmd.PersistentFlags().BoolVar(
 		&s.InitFlags.Schedulable, "schedule-workload", false,
@@ -85,6 +86,7 @@ func NewCmdInit(out io.Writer, s *kubeadmapi.KubeadmConfig) *cobra.Command {
 	return cmd
 }
 
+// RunInit executes master node provisioning, including certificates, needed static pod manifests, etc.
 func RunInit(out io.Writer, cmd *cobra.Command, args []string, s *kubeadmapi.KubeadmConfig, advertiseAddrs *[]string) error {
 	// Auto-detect the IP
 	if len(*advertiseAddrs) == 0 {
@@ -98,7 +100,7 @@ func RunInit(out io.Writer, cmd *cobra.Command, args []string, s *kubeadmapi.Kub
 		for _, i := range *advertiseAddrs {
 			addr := net.ParseIP(i)
 			if addr == nil {
-				return fmt.Errorf("<cmd/init> failed to parse flag (%q) as an IP address", "--api-advertise-addr="+i)
+				return fmt.Errorf("<cmd/init> failed to parse flag (%q) as an IP address", "--api-advertise-addresses="+i)
 			}
 			s.InitFlags.API.AdvertiseAddrs = append(s.InitFlags.API.AdvertiseAddrs, addr)
 		}
@@ -152,7 +154,7 @@ func RunInit(out io.Writer, cmd *cobra.Command, args []string, s *kubeadmapi.Kub
 	}
 
 	// TODO(phase1+) use templates to reference struct fields directly as order of args is fragile
-	fmt.Fprintf(out, init_done_msgf,
+	fmt.Fprintf(out, initDoneMsgf,
 		s.Secrets.GivenToken,
 		s.InitFlags.API.AdvertiseAddrs[0].String(),
 	)
