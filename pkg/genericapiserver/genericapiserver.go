@@ -26,6 +26,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	systemd "github.com/coreos/go-systemd/daemon"
@@ -163,6 +164,13 @@ type GenericAPIServer struct {
 	enableOpenAPISupport   bool
 	openAPIInfo            spec.Info
 	openAPIDefaultResponse spec.Response
+
+	// PostStartHooks are each called after the server has started listening, in a separate go func for each
+	// with no guaranteee of ordering between them.  The map key is a name used for error reporting.
+	// It may kill the process with a panic if it wishes to by returning an error
+	PostStartHooks       map[string]PostStartHookFunc
+	postStartHookLock    sync.Mutex
+	postStartHooksCalled bool
 }
 
 func (s *GenericAPIServer) StorageDecorator() generic.StorageDecorator {
@@ -276,6 +284,7 @@ func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
 		return time.After(globalTimeout), ""
 	}
 
+	secureStartedCh := make(chan struct{})
 	if secureLocation != "" {
 		handler := apiserver.TimeoutHandler(apiserver.RecoverPanics(s.Handler), longRunningTimeout)
 		secureServer := &http.Server{
@@ -322,6 +331,8 @@ func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
 
 		go func() {
 			defer utilruntime.HandleCrash()
+
+			notifyStarted := sync.Once{}
 			for {
 				// err == systemd.SdNotifyNoSocket when not running on a systemd system
 				if err := systemd.SdNotify("READY=1\n"); err != nil && err != systemd.SdNotifyNoSocket {
@@ -329,6 +340,10 @@ func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
 				}
 				if err := secureServer.ListenAndServeTLS(options.TLSCertFile, options.TLSPrivateKeyFile); err != nil {
 					glog.Errorf("Unable to listen for secure (%v); will try again.", err)
+				} else {
+					notifyStarted.Do(func() {
+						close(secureStartedCh)
+					})
 				}
 				time.Sleep(15 * time.Second)
 			}
@@ -338,6 +353,7 @@ func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
 		if err := systemd.SdNotify("READY=1\n"); err != nil && err != systemd.SdNotifyNoSocket {
 			glog.Errorf("Unable to send systemd daemon successful start message: %v\n", err)
 		}
+		close(secureStartedCh)
 	}
 
 	handler := apiserver.TimeoutHandler(apiserver.RecoverPanics(s.InsecureHandler), longRunningTimeout)
@@ -347,16 +363,28 @@ func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
 		MaxHeaderBytes: 1 << 20,
 	}
 
+	insecureStartedCh := make(chan struct{})
 	glog.Infof("Serving insecurely on %s", insecureLocation)
 	go func() {
 		defer utilruntime.HandleCrash()
+
+		notifyStarted := sync.Once{}
 		for {
 			if err := http.ListenAndServe(); err != nil {
 				glog.Errorf("Unable to listen for insecure (%v); will try again.", err)
+			} else {
+				notifyStarted.Do(func() {
+					close(insecureStartedCh)
+				})
 			}
 			time.Sleep(15 * time.Second)
 		}
 	}()
+
+	<-secureStartedCh
+	<-insecureStartedCh
+	s.RunPostStartHooks(PostStartHookContext{})
+
 	select {}
 }
 
