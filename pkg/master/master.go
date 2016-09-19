@@ -62,6 +62,7 @@ import (
 	endpointsetcd "k8s.io/kubernetes/pkg/registry/endpoint/etcd"
 	eventetcd "k8s.io/kubernetes/pkg/registry/event/etcd"
 	"k8s.io/kubernetes/pkg/registry/generic"
+	"k8s.io/kubernetes/pkg/registry/generic/registry"
 	limitrangeetcd "k8s.io/kubernetes/pkg/registry/limitrange/etcd"
 	"k8s.io/kubernetes/pkg/registry/namespace"
 	namespaceetcd "k8s.io/kubernetes/pkg/registry/namespace/etcd"
@@ -103,6 +104,9 @@ const (
 type Config struct {
 	*genericapiserver.Config
 
+	// The storage factory for other objects
+	StorageFactory           genericapiserver.StorageFactory
+	EnableWatchCache         bool
 	EnableCoreControllers    bool
 	EndpointReconcilerConfig EndpointReconcilerConfig
 	DeleteCollectionWorkers  int
@@ -155,6 +159,8 @@ type Master struct {
 
 	// Used to start and monitor tunneling
 	tunneler genericapiserver.Tunneler
+
+	restOptionsFactory restOptionsFactory
 }
 
 // thirdPartyEntry combines objects storage and API group into one struct
@@ -201,6 +207,18 @@ func New(c *Config) (*Master, error) {
 		tunneler:                c.Tunneler,
 
 		disableThirdPartyControllerForTesting: c.disableThirdPartyControllerForTesting,
+
+		restOptionsFactory: restOptionsFactory{
+			deleteCollectionWorkers: c.DeleteCollectionWorkers,
+			enableGarbageCollection: c.EnableGarbageCollection,
+			storageFactory:          c.StorageFactory,
+		},
+	}
+
+	if c.EnableWatchCache {
+		m.restOptionsFactory.storageDecorator = registry.StorageWithCacher
+	} else {
+		m.restOptionsFactory.storageDecorator = generic.UndecoratedStorage
 	}
 
 	// Add some hardcoded storage for now.  Append to the map.
@@ -287,7 +305,7 @@ func (m *Master) InstallAPIs(c *Config) {
 	}
 
 	restOptionsGetter := func(resource unversioned.GroupResource) generic.RESTOptions {
-		return m.GetRESTOptionsOrDie(c, resource)
+		return m.restOptionsFactory.GetRESTOptionsOrDie(resource)
 	}
 
 	// stabilize order.
@@ -338,7 +356,7 @@ func (m *Master) InstallAPIs(c *Config) {
 
 func (m *Master) initV1ResourcesStorage(c *Config) {
 	restOptions := func(resource string) generic.RESTOptions {
-		return m.GetRESTOptionsOrDie(c, api.Resource(resource))
+		return m.restOptionsFactory.GetRESTOptionsOrDie(api.Resource(resource))
 	}
 
 	podTemplateStorage := podtemplateetcd.NewREST(restOptions("podTemplates"))
@@ -778,18 +796,25 @@ func (m *Master) thirdpartyapi(group, kind, version, pluralResource string) *api
 	}
 }
 
-func (m *Master) GetRESTOptionsOrDie(c *Config, resource unversioned.GroupResource) generic.RESTOptions {
-	storageConfig, err := c.StorageFactory.NewConfig(resource)
+type restOptionsFactory struct {
+	deleteCollectionWorkers int
+	enableGarbageCollection bool
+	storageFactory          genericapiserver.StorageFactory
+	storageDecorator        generic.StorageDecorator
+}
+
+func (f restOptionsFactory) GetRESTOptionsOrDie(resource unversioned.GroupResource) generic.RESTOptions {
+	storageConfig, err := f.storageFactory.NewConfig(resource)
 	if err != nil {
 		glog.Fatalf("Unable to find storage destination for %v, due to %v", resource, err.Error())
 	}
 
 	return generic.RESTOptions{
 		StorageConfig:           storageConfig,
-		Decorator:               m.StorageDecorator(),
-		DeleteCollectionWorkers: m.deleteCollectionWorkers,
-		EnableGarbageCollection: c.Config.EnableGarbageCollection,
-		ResourcePrefix:          c.StorageFactory.ResourcePrefix(resource),
+		Decorator:               f.storageDecorator,
+		DeleteCollectionWorkers: f.deleteCollectionWorkers,
+		EnableGarbageCollection: f.enableGarbageCollection,
+		ResourcePrefix:          f.storageFactory.ResourcePrefix(resource),
 	}
 }
 

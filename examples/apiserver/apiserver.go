@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	genericoptions "k8s.io/kubernetes/pkg/genericapiserver/options"
 	genericvalidation "k8s.io/kubernetes/pkg/genericapiserver/validation"
+	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/storage/storagebackend"
 
 	// Install the testgroup API
@@ -84,7 +85,7 @@ func Run(serverOptions *genericoptions.ServerRunOptions) error {
 	}
 
 	restStorageMap := map[string]rest.Storage{
-		"testtypes": testgroupetcd.NewREST(storageConfig, s.StorageDecorator()),
+		"testtypes": testgroupetcd.NewREST(storageConfig, generic.UndecoratedStorage),
 	}
 	apiGroupInfo := genericapiserver.APIGroupInfo{
 		GroupMeta: *groupMeta,

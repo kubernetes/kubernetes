@@ -44,7 +44,6 @@ import (
 	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/genericapiserver/openapi"
 	"k8s.io/kubernetes/pkg/genericapiserver/options"
-	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/crypto"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
@@ -119,11 +118,6 @@ type GenericAPIServer struct {
 	// requestContextMapper provides a way to get the context for a request.  It may be nil.
 	requestContextMapper api.RequestContextMapper
 
-	// storageDecorator provides a decoration function for storage.  It will never be nil.
-	// TODO: this may be an abstraction at the wrong layer.  It doesn't seem like a genericAPIServer
-	// should be determining the backing storage for the RESTStorage interfaces
-	storageDecorator generic.StorageDecorator
-
 	Mux              *apiserver.PathRecorderMux
 	HandlerContainer *restful.Container
 	MasterCount      int
@@ -171,10 +165,6 @@ type GenericAPIServer struct {
 	PostStartHooks       map[string]PostStartHookFunc
 	postStartHookLock    sync.Mutex
 	postStartHooksCalled bool
-}
-
-func (s *GenericAPIServer) StorageDecorator() generic.StorageDecorator {
-	return s.storageDecorator
 }
 
 // RequestContextMapper is exposed so that third party resource storage can be build in a different location.
@@ -549,7 +539,6 @@ func (s *GenericAPIServer) getSwaggerConfig() *swagger.Config {
 // register their own web services into the Kubernetes mux prior to initialization
 // of swagger, so that other resource types show up in the documentation.
 func (s *GenericAPIServer) InstallSwaggerAPI() {
-
 	// Enable swagger UI and discovery API
 	swagger.RegisterSwaggerService(*s.getSwaggerConfig(), s.HandlerContainer)
 }
