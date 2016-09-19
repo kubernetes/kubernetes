@@ -82,7 +82,7 @@ func contains(modes []api.PersistentVolumeAccessMode, mode api.PersistentVolumeA
 	return false
 }
 
-func doTestPlugin(t *testing.T, spec *volume.Spec) {
+func doTestPlugin(t *testing.T, spec *volume.Spec, pod *api.Pod, user, group string) {
 	tmpDir, err := utiltesting.MkTmpdir("quobyte_test")
 	if err != nil {
 		t.Fatalf("error creating temp dir: %v", err)
@@ -95,8 +95,9 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
-
-	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: types.UID("poduid")}}
+	if pod == nil {
+		pod = &api.Pod{ObjectMeta: api.ObjectMeta{UID: types.UID("poduid")}}
+	}
 	mounter, err := plug.(*quobytePlugin).newMounterInternal(spec, pod, &mount.FakeMounter{})
 	volumePath := mounter.GetPath()
 	if err != nil {
@@ -106,8 +107,9 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 		t.Error("Got a nil Mounter")
 	}
 
-	if volumePath != fmt.Sprintf("%s/plugins/kubernetes.io~quobyte/root#root@vol", tmpDir) {
-		t.Errorf("Got unexpected path: %s expected: %s", volumePath, fmt.Sprintf("%s/plugins/kubernetes.io~quobyte/root#root@vol", tmpDir))
+	expectedPath := fmt.Sprintf("%s/plugins/kubernetes.io~quobyte/%s#%s@vol", tmpDir, user, group)
+	if volumePath != expectedPath {
+		t.Errorf("Got unexpected path: %s expected: %s", volumePath, expectedPath)
 	}
 	if err := mounter.SetUp(nil); err != nil {
 		t.Errorf("Expected success, got: %v", err)
@@ -132,7 +134,7 @@ func TestPluginVolume(t *testing.T) {
 			Quobyte: &api.QuobyteVolumeSource{Registry: "reg:7861", Volume: "vol", ReadOnly: false, User: "root", Group: "root"},
 		},
 	}
-	doTestPlugin(t, volume.NewSpecFromVolume(vol))
+	doTestPlugin(t, volume.NewSpecFromVolume(vol), nil, "root", "root")
 }
 
 func TestPluginPersistentVolume(t *testing.T) {
@@ -147,7 +149,27 @@ func TestPluginPersistentVolume(t *testing.T) {
 		},
 	}
 
-	doTestPlugin(t, volume.NewSpecFromPersistentVolume(vol, false))
+	doTestPlugin(t, volume.NewSpecFromPersistentVolume(vol, false), nil, "root", "root")
+}
+
+func TestPluginVolumeWithServiceAccount(t *testing.T) {
+	vol := &api.Volume{
+		Name: "vol1",
+		VolumeSource: api.VolumeSource{
+			Quobyte: &api.QuobyteVolumeSource{Registry: "reg:7861", Volume: "vol", ReadOnly: false, User: "root", Group: "root"},
+		},
+	}
+
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			UID: types.UID("poduid"),
+		},
+		Spec: api.PodSpec{
+			ServiceAccountName: "deployer",
+		},
+	}
+
+	doTestPlugin(t, volume.NewSpecFromVolume(vol), pod, "deployer", "deployer")
 }
 
 func TestPersistentClaimReadOnlyFlag(t *testing.T) {
@@ -184,9 +206,8 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	client := fake.NewSimpleClientset(pv, claim)
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), volumetest.NewFakeVolumeHost(tmpDir, client, nil, ""))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), volumetest.NewFakeVolumeHost(tmpDir, fake.NewSimpleClientset(pv, claim), nil, ""))
 	plug, _ := plugMgr.FindPluginByName(quobytePluginName)
 
 	// readOnly bool is supplied by persistent-claim volume source when its mounter creates other volumes
