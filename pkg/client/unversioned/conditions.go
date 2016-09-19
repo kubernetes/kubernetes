@@ -241,6 +241,15 @@ func PodContainerRunning(containerName string) watch.ConditionFunc {
 				}
 				return s.State.Running != nil, nil
 			}
+			for _, s := range t.Status.InitContainerStatuses {
+				if s.Name != containerName {
+					continue
+				}
+				if s.State.Terminated != nil {
+					return false, ErrContainerTerminated
+				}
+				return s.State.Running != nil, nil
+			}
 			return false, nil
 		}
 		return false, nil
