@@ -90,9 +90,9 @@ import (
 	"k8s.io/kubernetes/pkg/storage/storagebackend"
 	"k8s.io/kubernetes/pkg/util/sets"
 
+	"github.com/emicklei/go-restful"
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/emicklei/go-restful"
 )
 
 const (
@@ -194,10 +194,10 @@ func New(c *Config) (*Master, error) {
 	}
 
 	if c.EnableUISupport {
-		routes.UIRedirect{}.Install(s.HandlerContainer)
+		s.HandlerContainer.Add(routes.UIRedirect())
 	}
 	if c.EnableLogsSupport {
-		routes.Logs{}.Install(s.HandlerContainer)
+		s.HandlerContainer.Add(routes.Logs())
 	}
 
 	m := &Master{
@@ -281,9 +281,9 @@ func (m *Master) InstallAPIs(c *Config) {
 	m.HandlerContainer.Add(ws)
 
 	if c.EnableProfiling {
-		routes.MetricsWithReset{}.Install(m.HandlerContainer)
+		m.HandlerContainer.Add(routes.MetricsWithReset())
 	} else {
-		routes.DefaultMetrics{}.Install(m.HandlerContainer)
+		m.HandlerContainer.Add(routes.DefaultMetrics())
 	}
 
 	// Install third party resource support if requested
