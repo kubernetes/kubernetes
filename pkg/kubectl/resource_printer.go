@@ -352,10 +352,9 @@ type PrintOptions struct {
 // will only be printed if the object type changes. This makes it useful for printing items
 // received from watches.
 type HumanReadablePrinter struct {
-	handlerMap   map[reflect.Type]*handlerEntry
-	options      PrintOptions
-	lastType     reflect.Type
-	hiddenObjNum int
+	handlerMap map[reflect.Type]*handlerEntry
+	options    PrintOptions
+	lastType   reflect.Type
 }
 
 // NewHumanReadablePrinter creates a HumanReadablePrinter.
@@ -448,10 +447,6 @@ func (h *HumanReadablePrinter) HandledResources() []string {
 }
 
 func (h *HumanReadablePrinter) FinishPrint(output io.Writer, res string) error {
-	if !h.options.NoHeaders && !h.options.ShowAll && h.hiddenObjNum > 0 {
-		_, err := fmt.Fprintf(output, "  info: %d completed object(s) was(were) not shown in %s list. Pass --show-all to see all objects.\n\n", h.hiddenObjNum, res)
-		return err
-	}
 	return nil
 }
 
@@ -498,12 +493,6 @@ var certificateSigningRequestColumns = []string{"NAME", "AGE", "REQUESTOR", "CON
 var securityContextConstraintsColumns = []string{"NAME", "PRIV", "CAPS", "SELINUX", "RUNASUSER", "FSGROUP", "SUPGROUP", "PRIORITY", "READONLYROOTFS", "VOLUMES"}
 
 func (h *HumanReadablePrinter) printPod(pod *api.Pod, w io.Writer, options PrintOptions) error {
-	reason := string(pod.Status.Phase)
-	// if not printing all pods, skip terminated pods (default)
-	if !options.ShowAll && (reason == string(api.PodSucceeded) || reason == string(api.PodFailed)) {
-		h.hiddenObjNum++
-		return nil
-	}
 	if err := printPodBase(pod, w, options); err != nil {
 		return err
 	}
@@ -513,13 +502,6 @@ func (h *HumanReadablePrinter) printPod(pod *api.Pod, w io.Writer, options Print
 
 func (h *HumanReadablePrinter) printPodList(podList *api.PodList, w io.Writer, options PrintOptions) error {
 	for _, pod := range podList.Items {
-		reason := string(pod.Status.Phase)
-		// if not printing all pods, skip terminated pods (default)
-		if !options.ShowAll && (reason == string(api.PodSucceeded) || reason == string(api.PodFailed)) {
-			h.hiddenObjNum++
-			continue
-		}
-
 		if err := printPodBase(&pod, w, options); err != nil {
 			return err
 		}
