@@ -124,7 +124,6 @@ type GenericAPIServer struct {
 	// should be determining the backing storage for the RESTStorage interfaces
 	storageDecorator generic.StorageDecorator
 
-	Mux              *apiserver.PathRecorderMux
 	HandlerContainer *restful.Container
 	MasterCount      int
 
@@ -194,26 +193,6 @@ func (s *GenericAPIServer) NewRequestInfoResolver() *apiserver.RequestInfoResolv
 		APIPrefixes:          sets.NewString(strings.Trim(s.legacyAPIPrefix, "/"), strings.Trim(s.apiPrefix, "/")), // all possible API prefixes
 		GrouplessAPIPrefixes: sets.NewString(strings.Trim(s.legacyAPIPrefix, "/")),                                 // APIPrefixes that won't have groups (legacy)
 	}
-}
-
-// HandleWithAuth adds an http.Handler for pattern to an http.ServeMux
-// Applies the same authentication and authorization (if any is configured)
-// to the request is used for the GenericAPIServer's built-in endpoints.
-func (s *GenericAPIServer) HandleWithAuth(pattern string, handler http.Handler) {
-	// TODO: Add a way for plugged-in endpoints to translate their
-	// URLs into attributes that an Authorizer can understand, and have
-	// sensible policy defaults for plugged-in endpoints.  This will be different
-	// for generic endpoints versus REST object endpoints.
-	// TODO: convert to go-restful
-	s.Mux.Handle(pattern, handler)
-}
-
-// HandleFuncWithAuth adds an http.Handler for pattern to an http.ServeMux
-// Applies the same authentication and authorization (if any is configured)
-// to the request is used for the GenericAPIServer's built-in endpoints.
-func (s *GenericAPIServer) HandleFuncWithAuth(pattern string, handler func(http.ResponseWriter, *http.Request)) {
-	// TODO: convert to go-restful
-	s.Mux.HandleFunc(pattern, handler)
 }
 
 func NewHandlerContainer(mux *http.ServeMux, s runtime.NegotiatedSerializer) *restful.Container {

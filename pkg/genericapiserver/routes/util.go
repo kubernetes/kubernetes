@@ -17,6 +17,8 @@ limitations under the License.
 package routes
 
 import (
+	"strings"
+
 	"net/http"
 
 	"github.com/emicklei/go-restful"
@@ -27,4 +29,22 @@ func HandlerRouteFunction(h http.HandlerFunc) restful.RouteFunction {
 	return func(req *restful.Request, resp *restful.Response) {
 		h(resp.ResponseWriter, req.Request)
 	}
+}
+
+// WebServiceGETMux support adding a GET handler to a restful WebService. The
+// path is stripped from registered handler paths.
+type WebServiceGETMux struct {
+	WS   *restful.WebService
+	Path string
+}
+
+// Handle registers the given handler under the given pattern as GET handler.
+func (ws WebServiceGETMux) Handle(pattern string, handler http.Handler) {
+	if len(ws.Path) > 0 && strings.HasPrefix(pattern, ws.Path) {
+		pattern = pattern[len(ws.Path):]
+		if pattern == "" {
+			pattern = "/"
+		}
+	}
+	ws.WS.Route(ws.WS.GET(pattern).To(HandlerRouteFunction(handler.ServeHTTP)))
 }
