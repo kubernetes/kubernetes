@@ -204,6 +204,10 @@ The scheduler also offers `/debug` API endpoints that may be useful:
 - schedulers internal task registry state: /debug/registry/tasks
 - scheduler metrics are available at /metrics
 
+### Mesos Slave Configuration
+
+When running the Mesos slave in a Docker container, the volume mount under which pod filesystems are created must include the `rshared` mount option and the host directory must be a mount point conditioned with `mount --make-rshared`.  This is required so that when the kubelet populates a secrets volume, the secret data is visible from the host filesystem and thus from the pod containers created by the docker daemon.  Lacking this, you will find that, for example, a ServiceAccount's secrets volume has no data when viewed from the host or a relevant pod (see https://github.com/kubernetes/kubernetes/issues/31062).  For example, if the Mesos slave has `/var/tmp/mesos:/var/tmp/mesos` as a volume mount, it must use the `rw,rshared` mount options.  That is, you want `--volume=/var/tmp/mesos:/var/tmp/mesos:rw,rshared`.  Additionally, you must pre-condition `/var/tmp/mesos` by making it a mount pont (`mount --bind /var/tmp/mesos /var/tmp/mesos`) if it is not already one, and also by `mount --make-rshared /var/tmp/mesos`.
+
 ## DCOS Package Known Issues
 
 All of the issues in the above section also apply to the Kubernetes-Mesos DCOS package builds.
