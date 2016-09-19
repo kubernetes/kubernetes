@@ -86,6 +86,23 @@ func TestDescribePodTolerations(t *testing.T) {
 	}
 }
 
+func TestDescribeNamespace(t *testing.T) {
+	fake := testclient.NewSimpleFake(&api.Namespace{
+		ObjectMeta: api.ObjectMeta{
+			Name: "myns",
+		},
+	})
+	c := &describeClient{T: t, Namespace: "", Interface: fake}
+	d := NamespaceDescriber{c}
+	out, err := d.Describe("", "myns", DescriberSettings{ShowEvents: true})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !strings.Contains(out, "myns") {
+		t.Errorf("unexpected out: %s", out)
+	}
+}
+
 func TestDescribeService(t *testing.T) {
 	fake := testclient.NewSimpleFake(&api.Service{
 		ObjectMeta: api.ObjectMeta{
