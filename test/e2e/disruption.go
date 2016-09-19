@@ -39,7 +39,7 @@ const timeout = 60 * time.Second
 // schedulingTimeout is longer specifically because sometimes we need to wait
 // awhile to guarantee that we've been patient waiting for something ordinary
 // to happen: a pod to get scheduled and move into Ready
-const schedulingTimeout = 5 * time.Minute
+const schedulingTimeout = 10 * time.Minute
 
 var _ = framework.KubeDescribe("DisruptionController", func() {
 	f := framework.NewDefaultFramework("disruption")
