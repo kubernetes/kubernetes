@@ -63,7 +63,7 @@ type managerImpl struct {
 	resourceToRankFunc map[api.ResourceName]rankFunc
 	// resourceToNodeReclaimFuncs maps a resource to an ordered list of functions that know how to reclaim that resource.
 	resourceToNodeReclaimFuncs map[api.ResourceName]nodeReclaimFuncs
-	// mcgThresholdNotifier provides immediate notification when the root cgroup crosses a memory threshold
+	// thresholdNotifier provides immediate notification when the root cgroup crosses a memory threshold
 	thresholdNotifier ThresholdNotifier
 }
 
@@ -139,13 +139,12 @@ func (m *managerImpl) IsUnderDiskPressure() bool {
 	return hasNodeCondition(m.nodeConditions, api.NodeDiskPressure)
 }
 
-func (m *managerImpl) createThresholdNotification(diskInfoProvider DiskInfoProvider, podFunc ActivePodsFunc, observations signalObservations) error {
+func createThresholdNotifier(thresholds []Threshold, diskInfoProvider DiskInfoProvider, podFunc ActivePodsFunc, observations signalObservations) (ThresholdNotifier, error) {
 	// default to no-op notifier
-	m.thresholdNotifier = NewNoOpThresholdNotifier()
+	noOpThresholdNotifier := NewNoOpThresholdNotifier()
 
-	thresholds := m.config.Thresholds
 	if len(thresholds) == 0 {
-		return nil
+		return noOpThresholdNotifier, nil
 	}
 
 	for _, threshold := range thresholds {
@@ -162,33 +161,27 @@ func (m *managerImpl) createThresholdNotification(diskInfoProvider DiskInfoProvi
 		// TODO: remove hardcoded root memory cgroup path
 		cgpath := "/sys/fs/cgroup/memory"
 		attribute := "usage_in_bytes"
-		thresholdNotifier, err := NewMemCGThresholdNotifier(cgpath, attribute)
+		memcgThresholdNotifier, err := NewMemCGThresholdNotifier(cgpath, attribute)
 		if err != nil {
-			return err
+			glog.Warningf("eviction manager: failed to create threshold notifier: %v", err)
+			return noOpThresholdNotifier, err
 		}
 
 		quantity := getThresholdQuantity(threshold.Value, observed.capacity, resource.DecimalSI).String()
-		err = thresholdNotifier.SetThreshold(quantity)
+		err = memcgThresholdNotifier.SetThreshold(quantity)
 		if err != nil {
-			thresholdNotifier.Close()
-			return err
+			memcgThresholdNotifier.Close()
+			glog.Warningf("eviction manager: failed to set threshold: %v", err)
+			return noOpThresholdNotifier, err
 		}
 
 		glog.Infof("eviction manager: registered memory notification for %s on %s at %s", cgpath, attribute, quantity)
-		m.thresholdNotifier = thresholdNotifier
-		go m.thresholdNotifier.Start(wait.NeverStop)
-		go func() {
-			for {
-				// when we get a threshold notification, run synchronize to take action
-				m.thresholdNotifier.WaitForNotification()
-				glog.Infof("eviction manager: memory threshold notification received")
-				m.synchronize(diskInfoProvider, podFunc)
-			}
-		}()
-		return nil
+
+		return memcgThresholdNotifier, nil
 	}
 
-	return nil
+	// no thresholds with SignalMemoryAvailable
+	return noOpThresholdNotifier, nil
 }
 
 // synchronize is the main control loop that enforces eviction thresholds.
@@ -220,9 +213,19 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 
 	// attempt to create a threshold notifier to improve eviction response time
 	if m.thresholdNotifier == nil {
-		err := m.createThresholdNotification(diskInfoProvider, podFunc, observations)
+		m.thresholdNotifier, err = createThresholdNotifier(m.config.Thresholds, diskInfoProvider, podFunc, observations)
 		if err != nil {
 			glog.Warningf("eviction manager: unable to create memory threshold notifier: %v", err)
+		} else {
+			go m.thresholdNotifier.Start(wait.NeverStop)
+			go func() {
+				for {
+					// when we get a threshold notification, run synchronize to take action
+					m.thresholdNotifier.WaitForNotification()
+					glog.Infof("eviction manager: memory threshold notification received")
+					m.synchronize(diskInfoProvider, podFunc)
+				}
+			}()
 		}
 	}
 
