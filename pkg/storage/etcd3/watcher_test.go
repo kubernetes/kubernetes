@@ -196,17 +196,20 @@ func TestWatchContextCancel(t *testing.T) {
 	defer cluster.Terminate(t)
 	canceledCtx, cancel := context.WithCancel(ctx)
 	cancel()
-	w := store.watcher.createWatchChan(canceledCtx, "/abc", 0, false, storage.Everything)
-	// When we do a client.Get with a canceled context, it will return error.
-	// Nonetheless, when we try to send it over internal errChan, we should detect
-	// it's context canceled and not send it.
-	err := w.sync()
-	w.ctx = ctx
-	w.sendError(err)
+	// When we watch with a canceled context, we should detect that it's context canceled.
+	// We won't take it as error and also close the watcher.
+	w, err := store.watcher.Watch(canceledCtx, "/abc", 0, false, storage.Everything)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	select {
-	case err := <-w.errChan:
-		t.Errorf("cancelling context shouldn't return any error. Err: %v", err)
-	default:
+	case _, ok := <-w.ResultChan():
+		if ok {
+			t.Error("ResultChan() should be closed")
+		}
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Errorf("timeout after %v", wait.ForeverTestTimeout)
 	}
 }
 
