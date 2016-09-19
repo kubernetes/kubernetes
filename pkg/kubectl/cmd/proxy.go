@@ -83,13 +83,29 @@ func NewCmdProxy(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().StringP("address", "", "127.0.0.1", "The IP address on which to serve on.")
 	cmd.Flags().Bool("disable-filter", false, "If true, disable request filtering in the proxy. This is dangerous, and can leave you vulnerable to XSRF attacks, when used with an accessible port.")
 	cmd.Flags().StringP("unix-socket", "u", "", "Unix socket on which to run the proxy.")
+	cmd.Flags().StringP("curl", "", "", "Raw URI to request from the proxy server.")
 	return cmd
+}
+
+func curl(f *cmdutil.Factory, uri, address string, port int) error {
+	restClient, err := f.RESTClientProxy(address, port)
+	if err != nil {
+		return err
+	}
+
+	return cmdutil.PrintRESTClientStream(restClient, uri)
 }
 
 func RunProxy(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
 	path := cmdutil.GetFlagString(cmd, "unix-socket")
 	port := cmdutil.GetFlagInt(cmd, "port")
 	address := cmdutil.GetFlagString(cmd, "address")
+
+	uri := cmdutil.GetFlagString(cmd, "curl")
+
+	if uri != "" && path != "" {
+		return errors.New("Don't specify both --curl and --unix-socket, --curl doesn't work with unix sockets.")
+	}
 
 	if port != default_port && path != "" {
 		return errors.New("Don't specify both --unix-socket and --port")
@@ -134,7 +150,14 @@ func RunProxy(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
 	if err != nil {
 		glog.Fatal(err)
 	}
-	fmt.Fprintf(out, "Starting to serve on %s", l.Addr().String())
-	glog.Fatal(server.ServeOnListener(l))
+
+	if uri == "" {
+		fmt.Fprintf(out, "Starting to serve on %s", l.Addr().String())
+		glog.Fatal(server.ServeOnListener(l))
+	} else {
+		go server.ServeOnListener(l)
+		return curl(f, uri, address, port)
+	}
+
 	return nil
 }

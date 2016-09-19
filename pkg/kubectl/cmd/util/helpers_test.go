@@ -33,8 +33,10 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/client/unversioned/fake"
 	"k8s.io/kubernetes/pkg/runtime"
 	uexec "k8s.io/kubernetes/pkg/util/exec"
+	nettesting "k8s.io/kubernetes/pkg/util/net/testing"
 	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
@@ -368,6 +370,42 @@ func TestMaybeConvert(t *testing.T) {
 		}
 		if !reflect.DeepEqual(test.expected, obj) {
 			t.Errorf("expected:\n%#v\nsaw:\n%#v\n", test.expected, obj)
+		}
+	}
+}
+
+func TestPrintRESTClientStream(t *testing.T) {
+	tests := []struct {
+		Err     bool
+		Resp    *http.Response
+		HttpErr error
+	}{
+		{
+			Err: false,
+			Resp: &http.Response{
+				StatusCode: http.StatusOK,
+				Header:     nettesting.Header(),
+				Body:       nettesting.ObjBody(&unversioned.Status{Status: unversioned.StatusSuccess}),
+			},
+			HttpErr: nil,
+		},
+		{
+			Err:     true,
+			HttpErr: fmt.Errorf("failure"),
+		},
+	}
+	for _, test := range tests {
+		client := &fake.RESTClient{
+			NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
+			Resp:                 test.Resp,
+			Err:                  test.HttpErr,
+		}
+		err := PrintRESTClientStream(client, "/test")
+		if err != nil && !test.Err {
+			t.Errorf("Unexpected error: %#v", err)
+		}
+		if err == nil && test.Err {
+			t.Errorf("Expected error for client %#v", client)
 		}
 	}
 }
