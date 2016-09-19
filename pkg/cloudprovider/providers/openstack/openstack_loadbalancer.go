@@ -374,9 +374,8 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *api.Ser
 	loadbalancer, err := loadbalancers.Create(lbaas.network, createOpts).Extract()
 	if err != nil {
 		// cleanup what was created so far
-		glog.Errorf("Error creating loadbalancer %+v: %v", createOpts, err)
 		_ = lbaas.EnsureLoadBalancerDeleted(clusterName, apiService)
-		return nil, err
+		return nil, fmt.Errorf("Error creating loadbalancer %+v: %v", createOpts, err)
 	}
 
 	waitLoadbalancerActiveProvisioningStatus(lbaas.network, loadbalancer.ID)
@@ -390,9 +389,8 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *api.Ser
 		}).Extract()
 		if err != nil {
 			// cleanup what was created so far
-			glog.Errorf("Error creating LB listener: %v", err)
 			_ = lbaas.EnsureLoadBalancerDeleted(clusterName, apiService)
-			return nil, err
+			return nil, fmt.Errorf("Error creating LB listener: %v", err)
 		}
 
 		waitLoadbalancerActiveProvisioningStatus(lbaas.network, loadbalancer.ID)
@@ -406,9 +404,8 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *api.Ser
 		}).Extract()
 		if err != nil {
 			// cleanup what was created so far
-			glog.Errorf("Error creating LB pool: %v", err)
 			_ = lbaas.EnsureLoadBalancerDeleted(clusterName, apiService)
-			return nil, err
+			return nil, fmt.Errorf("Error creating LB pool: %v", err)
 		}
 
 		waitLoadbalancerActiveProvisioningStatus(lbaas.network, loadbalancer.ID)
@@ -417,9 +414,8 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *api.Ser
 			addr, err := getAddressByName(lbaas.compute, host)
 			if err != nil {
 				// cleanup what was created so far
-				glog.Errorf("Error getting address for host %s: %v", host, err)
 				_ = lbaas.EnsureLoadBalancerDeleted(clusterName, apiService)
-				return nil, err
+				return nil, fmt.Errorf("Error getting address for host %s: %v", host, err)
 			}
 
 			_, err = v2_pools.CreateAssociateMember(lbaas.network, pool.ID, v2_pools.MemberCreateOpts{
@@ -429,9 +425,8 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *api.Ser
 			}).Extract()
 			if err != nil {
 				// cleanup what was created so far
-				glog.Errorf("Error creating LB pool member for host: %s, %v", host, err)
 				_ = lbaas.EnsureLoadBalancerDeleted(clusterName, apiService)
-				return nil, err
+				return nil, fmt.Errorf("Error creating LB pool member for host: %s, %v", host, err)
 			}
 
 			waitLoadbalancerActiveProvisioningStatus(lbaas.network, loadbalancer.ID)
@@ -447,9 +442,8 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *api.Ser
 			}).Extract()
 			if err != nil {
 				// cleanup what was created so far
-				glog.Errorf("Error creating LB pool healthmonitor: %v", err)
 				_ = lbaas.EnsureLoadBalancerDeleted(clusterName, apiService)
-				return nil, err
+				return nil, fmt.Errorf("Error creating LB pool healthmonitor: %v", err)
 			}
 			waitLoadbalancerActiveProvisioningStatus(lbaas.network, loadbalancer.ID)
 		}
@@ -463,9 +457,8 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *api.Ser
 		portID, err := getPortIDByIP(lbaas.network, loadbalancer.VipAddress)
 		if err != nil {
 			// cleanup what was created so far
-			glog.Errorf("Error getting port for LB vip %s: %v", loadbalancer.VipAddress, err)
 			_ = lbaas.EnsureLoadBalancerDeleted(clusterName, apiService)
-			return nil, err
+			return nil, fmt.Errorf("Error getting port for LB vip %s: %v", loadbalancer.VipAddress, err)
 		}
 
 		floatIPOpts := floatingips.CreateOpts{
@@ -475,9 +468,8 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *api.Ser
 		floatIP, err := floatingips.Create(lbaas.network, floatIPOpts).Extract()
 		if err != nil {
 			// cleanup what was created so far
-			glog.Errorf("Error creating LB floatingip %+v: %v", floatIPOpts, err)
 			_ = lbaas.EnsureLoadBalancerDeleted(clusterName, apiService)
-			return nil, err
+			return nil, fmt.Errorf("Error creating LB floatingip %+v: %v", floatIPOpts, err)
 		}
 
 		status.Ingress = append(status.Ingress, api.LoadBalancerIngress{IP: floatIP.FloatingIP})
