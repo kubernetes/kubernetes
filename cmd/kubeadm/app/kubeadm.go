@@ -21,6 +21,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/renstrom/dedent"
 	"github.com/spf13/pflag"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd"
@@ -28,12 +29,18 @@ import (
 	"k8s.io/kubernetes/pkg/util/logs"
 )
 
+var AlphaWarningOnExit = dedent.Dedent(`
+	kubeadm: I am an alpha version, my authors welcome your feedback and bug reports
+	kubeadm: please create issue an using https://github.com/kubernetes/kubernetes/issues/new
+	kubeadm: and make sure to mention @kubernetes/sig-cluster-lifecycle. Thank you!
+`)
+
 // TODO(phase2) use componentconfig
 // we need some params for testing etc, let's keep these hidden for now
 func getEnvParams() map[string]string {
 
 	envParams := map[string]string{
-		// TODO(phase1): Mode prefix and host_pki_path to another place as constants, and use them everywhere
+		// TODO(phase1+): Mode prefix and host_pki_path to another place as constants, and use them everywhere
 		// Right now they're used here and there, but not consequently
 		"kubernetes_dir":     "/etc/kubernetes",
 		"host_pki_path":      "/etc/kubernetes/pki",

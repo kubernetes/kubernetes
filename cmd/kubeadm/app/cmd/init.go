@@ -49,7 +49,7 @@ func NewCmdInit(out io.Writer, s *kubeadmapi.KubeadmConfig) *cobra.Command {
 		Short: "Run this on the first machine.",
 		Run: func(cmd *cobra.Command, args []string) {
 			err := RunInit(out, cmd, args, s, advertiseAddrs)
-			cmdutil.CheckErr(err) // TODO(phase1+) append alpha warning with bugs URL etc
+			cmdutil.CheckErr(err)
 		},
 	}
 
@@ -72,8 +72,7 @@ func NewCmdInit(out io.Writer, s *kubeadmapi.KubeadmConfig) *cobra.Command {
 	)
 	cmd.PersistentFlags().IPNetVar(
 		&s.InitFlags.PodNetwork.CIDR, "pod-network-cidr", net.IPNet{},
-		`(optional) Specify range of IP addresses for the pod overlay network, e.g. 10.3.0.0/16.`+
-			`If set, the control plane will automatically attempt to allocate Pod network CIDRs for every node.`,
+		`(optional) Specify range of IP addresses for the pod network. If set, the control plane will automatically allocate CIDRs for every node.`,
 	)
 	cmd.PersistentFlags().StringVar(
 		&s.InitFlags.Services.DNSDomain, "service-dns-domain", kubeadmapi.DefaultServiceDNSDomain,
@@ -154,6 +153,16 @@ func RunInit(out io.Writer, cmd *cobra.Command, args []string, s *kubeadmapi.Kub
 	if err != nil {
 		return err
 	}
+
+	// kubeadm is responsible for writing the following kubeconfig file, which
+	// kubelet should be waiting for. Help user avoid foot-shooting by refusing to
+	// write a file that has already been written (the kubelet will be up and
+	// running in that case - they'd need to stop the kubelet, remove the file, and
+	// start it again in that case).
+	// TODO(phase1+) this is no longer the right place to guard agains foo-shooting,
+	// we need to decide how to handle existing files (it may be handy to support
+	// importing existing files, may be we could even make our command idempotant,
+	// or at least allow for external PKI and stuff)
 	for name, kubeconfig := range kubeconfigs {
 		if err := kubeadmutil.WriteKubeconfigIfNotExists(s, name, kubeconfig); err != nil {
 			return err

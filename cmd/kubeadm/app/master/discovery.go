@@ -42,10 +42,6 @@ const (
 )
 
 func encodeKubeDiscoverySecretData(s *kubeadmapi.KubeadmConfig, caCert *x509.Certificate) map[string][]byte {
-	// TODO ListenIP is probably not the right now, although it's best we have right now
-	// if user provides a DNS name, or anything else, we should use that, may be it's really
-	// the list of all SANs (minus internal DNS names and service IP)?
-
 	var (
 		data         = map[string][]byte{}
 		endpointList = []string{}
@@ -75,7 +71,7 @@ func newKubeDiscoveryPodSpec(s *kubeadmapi.KubeadmConfig) api.PodSpec {
 		Containers: []api.Container{{
 			Name:    kubeDiscoveryName,
 			Image:   s.EnvParams["discovery_image"],
-			Command: []string{"/usr/bin/kube-discovery"},
+			Command: []string{"/usr/local/bin/kube-discovery"},
 			VolumeMounts: []api.VolumeMount{{
 				Name:      kubeDiscoverySecretName,
 				MountPath: "/tmp/secret", // TODO use a shared constant
@@ -124,9 +120,8 @@ func CreateDiscoveryDeploymentAndSecret(s *kubeadmapi.KubeadmConfig, client *cli
 
 	fmt.Println("<master/discovery> created essential addon: kube-discovery, waiting for it to become ready")
 
-	// wait for the pod to become ready
 	start := time.Now()
-	wait.PollInfinite(500*time.Millisecond, func() (bool, error) {
+	wait.PollInfinite(apiCallRetryInterval, func() (bool, error) {
 		d, err := client.Extensions().Deployments(api.NamespaceSystem).Get(kubeDiscoveryName)
 		if err != nil {
 			return false, nil
