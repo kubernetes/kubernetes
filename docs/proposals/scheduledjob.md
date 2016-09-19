@@ -207,7 +207,7 @@ In the above example:
 
 * `--restart=OnFailure` implies creating a job instead of replicationController.
 * `--runAt="0 14 21 7 *"` implies the schedule with which the job should be run, here
-  July 7th, 2pm.  This value will be validated according to the same rules which
+  July 21, 2pm.  This value will be validated according to the same rules which
   apply to `.spec.schedule`.
 
 ## Fields Added to Job Template
