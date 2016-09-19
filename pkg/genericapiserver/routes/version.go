@@ -28,20 +28,20 @@ import (
 type Version struct{}
 
 // InstallVersionHandler registers the APIServer's `/version` handler
-func (v Version) Install(mux *apiserver.PathRecorderMux, c *restful.Container) {
+func (v Version) Install(c *restful.Container) {
 	// Set up a service to return the git code version.
-	versionWS := new(restful.WebService)
-	versionWS.Path("/version")
-	versionWS.Doc("git code version from which this is built")
-	versionWS.Route(
-		versionWS.GET("/").To(handleVersion).
+	ws := new(restful.WebService)
+	ws.Path("/version")
+	ws.Doc("git code version from which this is built")
+	ws.Route(
+		ws.GET("/").To(handleVersion).
 			Doc("get the code version").
 			Operation("getCodeVersion").
 			Produces(restful.MIME_JSON).
 			Consumes(restful.MIME_JSON).
 			Writes(version.Info{}))
 
-	c.Add(versionWS)
+	c.Add(ws)
 }
 
 // handleVersion writes the server's version information.

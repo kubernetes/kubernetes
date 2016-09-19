@@ -341,17 +341,17 @@ func (c Config) New() (*GenericAPIServer, error) {
 	// We do not register this using restful Webservice since we do not want to surface this in api docs.
 	// Allow GenericAPIServer to be embedded in contexts which already have something registered at the root
 	if c.EnableIndex {
-		routes.Index{}.Install(s.Mux, s.HandlerContainer)
+		routes.Index{}.Install(s.HandlerContainer)
 	}
 
 	if c.EnableSwaggerSupport && c.EnableSwaggerUI {
-		routes.SwaggerUI{}.Install(s.Mux, s.HandlerContainer)
+		routes.SwaggerUI{}.Install(s.HandlerContainer)
 	}
 	if c.EnableProfiling {
-		routes.Profiling{}.Install(s.Mux, s.HandlerContainer)
+		routes.Profiling{}.Install(s.HandlerContainer)
 	}
 	if c.EnableVersion {
-		routes.Version{}.Install(s.Mux, s.HandlerContainer)
+		routes.Version{}.Install(s.HandlerContainer)
 	}
 
 	handler := http.Handler(s.Mux.BaseMux().(*http.ServeMux))
