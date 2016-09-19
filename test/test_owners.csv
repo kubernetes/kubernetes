@@ -8,6 +8,7 @@ AppArmor when running without AppArmor should reject a pod with an AppArmor prof
 BeforeSuite,ixdy,0
 Cadvisor should be healthy on every node.,vishh,0
 Cassandra should create and scale cassandra,fabioy,1
+CassandraPetSet should create petset,erictune,1
 Celery-RabbitMQ should create and stop celery+rabbitmq servers,luxas,1
 Cluster level logging using Elasticsearch should check that logs from pods on all nodes are ingested into Elasticsearch,dchen1107,1
 Cluster size autoscaling Should scale cluster size based on cpu reservation,dchen1107,1
@@ -165,6 +166,7 @@ Federation API server authentication should not accept cluster resources when th
 Federation apiserver Admission control should not be able to create resources if namespace does not exist,alex-mohr,1
 Federation apiserver Cluster objects should be created and deleted successfully,ghodss,1
 Federation events Event objects should be created and deleted successfully,karlkfi,1
+Federation ingresses Ingress objects should be created and deleted successfully,bprashanth,1
 Federation namespace Namespace objects should be created and deleted successfully,xiang90,1
 Federation replicasets Federated ReplicaSet should create and update matching replicasets in underling clusters,childsb,1
 Federation replicasets ReplicaSet objects should be created and deleted successfully,apelisse,1
@@ -229,8 +231,9 @@ Kubectl client Kubectl logs should be able to retrieve and filter logs,jlowdermi
 Kubectl client Kubectl patch should add annotations for pods in rc,janetkuo,0
 Kubectl client Kubectl replace should update a single-container pod's image,karlkfi,1
 Kubectl client Kubectl rolling-update should support rolling-update to same image,janetkuo,0
-Kubectl client Kubectl run --quiet job should not output anything except the command when --quiet is set,eparis,1
+Kubectl client Kubectl run --quiet job should not output anything except the command when --quiet is set,soltysh,1
 "Kubectl client Kubectl run --rm job should create a job from an image, then delete the job",soltysh,0
+Kubectl client Kubectl run ScheduledJob should create a ScheduledJob,soltysh,0
 Kubectl client Kubectl run default should create an rc or deployment from an image,janetkuo,0
 Kubectl client Kubectl run deployment should create a deployment from an image,janetkuo,0
 Kubectl client Kubectl run job should create a job from an image when restart is Never,soltysh,0
@@ -251,6 +254,11 @@ Kubectl client Update Demo should create and stop a replication controller,sttts
 Kubectl client Update Demo should do a rolling update of a replication controller,sttts,0
 Kubectl client Update Demo should scale a replication controller,sttts,0
 Kubelet Cgroup Manager QOS containers On enabling QOS cgroup hierarchy Top level QoS containers should have been created,davidopp,1
+Kubelet Container Manager Validate OOM score adjustments once the node is setup Kubelet's oom-score-adj should be -999,kargakis,1
+"Kubelet Container Manager Validate OOM score adjustments once the node is setup burstable container's oom-score-adj should be between [2, 1000)",derekwaynecarr,1
+Kubelet Container Manager Validate OOM score adjustments once the node is setup docker daemon's oom-score-adj should be -999,thockin,1
+Kubelet Container Manager Validate OOM score adjustments once the node is setup guaranteed container's oom-score-adj should be -998,kargakis,1
+Kubelet Container Manager Validate OOM score adjustments once the node is setup pod infra containers oom-score-adj should be -998 and best effort container's should be 1000,timothysc,1
 Kubelet Container Manager oom score adjusting when scheduling a busybox command that always fails in a pod should be possible to delete,jbeda,1
 Kubelet Container Manager oom score adjusting when scheduling a busybox command that always fails in a pod should have an error terminated reason,vulpecula,1
 Kubelet Eviction Manager hard eviction test pod using the most disk space gets evicted when the node disk usage is above the eviction hard threshold should evict the pod using the most disk space,karlkfi,1
@@ -264,6 +272,8 @@ Kubelet regular resource usage tracking resource tracking for 0 pods per node,pm
 Kubelet regular resource usage tracking resource tracking for 100 pods per node,justinsb,1
 Kubelet regular resource usage tracking resource tracking for 35 pods per node,madhusudancs,1
 Kubelet when scheduling a busybox command in a pod it should print the output to logs,ixdy,1
+Kubelet when scheduling a busybox command that always fails in a pod should be possible to delete,smarterclayton,1
+Kubelet when scheduling a busybox command that always fails in a pod should have an error terminated reason,deads2k,1
 Kubelet when scheduling a read only busybox container it should not write to root filesystem,timothysc,1
 KubeletManagedEtcHosts should test kubelet managed /etc/hosts file,Random-Liu,1
 Kubernetes Dashboard should check that the kubernetes-dashboard instance is alive,wonderfly,0
@@ -496,7 +506,6 @@ Volumes NFS should be mountable,andyzheng0831,1
 Volumes PD should be mountable,caesarxuchao,1
 Volumes iSCSI should be mountable,jsafrane,1
 download_gcloud,hurf,1
-gcp_resource_leak_check,mikedanese,1
 hostPath should give a volume the correct mode,roberthbailey,1
 hostPath should support r/w,roberthbailey,1
 hostPath should support subPath,krousey,1
@@ -578,6 +587,8 @@ k8s.io/kubernetes/pkg/api/util,ghodss,1
 k8s.io/kubernetes/pkg/api/v1,vulpecula,1
 k8s.io/kubernetes/pkg/api/validation,smarterclayton,1
 k8s.io/kubernetes/pkg/api/validation/path,luxas,1
+k8s.io/kubernetes/pkg/apimachinery,gmarek,1
+k8s.io/kubernetes/pkg/apimachinery/announced,kargakis,1
 k8s.io/kubernetes/pkg/apimachinery/registered,jlowdermilk,1
 k8s.io/kubernetes/pkg/apis/abac/v0,liggitt,0
 k8s.io/kubernetes/pkg/apis/apps/validation,derekwaynecarr,1
@@ -608,6 +619,7 @@ k8s.io/kubernetes/pkg/client/chaosclient,deads2k,1
 k8s.io/kubernetes/pkg/client/leaderelection,xiang90,1
 k8s.io/kubernetes/pkg/client/record,karlkfi,1
 k8s.io/kubernetes/pkg/client/restclient,kargakis,1
+k8s.io/kubernetes/pkg/client/testing/cache,mikedanese,1
 k8s.io/kubernetes/pkg/client/testing/core,maisem,1
 k8s.io/kubernetes/pkg/client/transport,eparis,1
 k8s.io/kubernetes/pkg/client/typed/discovery,fabioy,1
@@ -634,6 +646,7 @@ k8s.io/kubernetes/pkg/controller/deployment,asalkeld,0
 k8s.io/kubernetes/pkg/controller/deployment/util,saad-ali,1
 k8s.io/kubernetes/pkg/controller/disruption,fabioy,1
 k8s.io/kubernetes/pkg/controller/endpoint,mwielgus,1
+k8s.io/kubernetes/pkg/controller/framework,karlkfi,1
 k8s.io/kubernetes/pkg/controller/garbagecollector,rmmh,1
 k8s.io/kubernetes/pkg/controller/garbagecollector/metaonly,cjcullen,1
 k8s.io/kubernetes/pkg/controller/gc,jdef,1
@@ -649,7 +662,7 @@ k8s.io/kubernetes/pkg/controller/replicaset,fgrzadkowski,0
 k8s.io/kubernetes/pkg/controller/replication,fgrzadkowski,0
 k8s.io/kubernetes/pkg/controller/resourcequota,ghodss,1
 k8s.io/kubernetes/pkg/controller/route,gmarek,0
-k8s.io/kubernetes/pkg/controller/scheduledjob,andyzheng0831,1
+k8s.io/kubernetes/pkg/controller/scheduledjob,soltysh,1
 k8s.io/kubernetes/pkg/controller/service,asalkeld,0
 k8s.io/kubernetes/pkg/controller/serviceaccount,liggitt,0
 k8s.io/kubernetes/pkg/controller/volume/attachdetach,luxas,1
@@ -777,7 +790,7 @@ k8s.io/kubernetes/pkg/registry/replicaset/etcd,deads2k,1
 k8s.io/kubernetes/pkg/registry/resourcequota,maisem,1
 k8s.io/kubernetes/pkg/registry/resourcequota/etcd,cjcullen,1
 k8s.io/kubernetes/pkg/registry/scheduledjob,soltysh,0
-k8s.io/kubernetes/pkg/registry/scheduledjob/etcd,spxtr,1
+k8s.io/kubernetes/pkg/registry/scheduledjob/etcd,soltysh,1
 k8s.io/kubernetes/pkg/registry/secret,spxtr,1
 k8s.io/kubernetes/pkg/registry/secret/etcd,brendandburns,1
 k8s.io/kubernetes/pkg/registry/service,thockin,1
@@ -982,8 +995,3 @@ k8s.io/kubernetes/vendor/k8s.io/client-go/1.4/tools/clientcmd/api,pmorie,1
 k8s.io/kubernetes/vendor/k8s.io/client-go/1.4/tools/record,yifan-gu,1
 k8s.io/kubernetes/vendor/k8s.io/client-go/1.4/transport,jszczepkowski,1
 kubelet Clean up pods on node kubelet should be able to delete 10 pods per node in 1m0s.,yujuhong,0
-should not emit unexpected warnings,erictune,1
-should not schedule jobs when suspended,derekwaynecarr,1
-should not schedule new jobs when ForbidConcurrent,yujuhong,1
-should replace jobs when ReplaceConcurrent,soltysh,1
-should schedule multiple jobs concurrently,soltysh,1
