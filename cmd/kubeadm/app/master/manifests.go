@@ -49,43 +49,18 @@ const (
 	kubeControllerManager = "kube-controller-manager"
 	kubeScheduler         = "kube-scheduler"
 	kubeProxy             = "kube-proxy"
+	pkiDir                = "/etc/kubernetes/pki"
 )
-
-// TODO look into what this really means, scheduler prints it for some reason
-//
-//E0817 17:53:22.242658       1 event.go:258] Could not construct reference to: '&api.Endpoints{TypeMeta:unversioned.TypeMeta{Kind:"", APIVersion:""}, ObjectMeta:api.ObjectMeta{Name:"kube-scheduler", GenerateName:"", Namespace:"kube-system", SelfLink:"", UID:"", ResourceVersion:"", Generation:0, CreationTimestamp:unversioned.Time{Time:time.Time{sec:0, nsec:0, loc:(*time.Location)(nil)}}, DeletionTimestamp:(*unversioned.Time)(nil), DeletionGracePeriodSeconds:(*int64)(nil), Labels:map[string]string(nil), Annotations:map[string]string(nil), OwnerReferences:[]api.OwnerReference(nil), Finalizers:[]string(nil)}, Subsets:[]api.EndpointSubset(nil)}' due to: 'selfLink was empty, can't make reference'. Will not report event: 'Normal' '%v became leader' 'moby'
 
 // WriteStaticPodManifests builds manifest objects based on user provided configuration and then dumps it to disk
 // where kubelet will pick and schedule them.
 func WriteStaticPodManifests(s *kubeadmapi.KubeadmConfig) error {
-	// Placeholder for kube-apiserver pod spec command
-	apiServerCommand := getComponentCommand(apiServer, s)
-
-	// Check if the user decided to use an external etcd cluster
-	if len(s.InitFlags.API.Etcd.ExternalEndpoints) > 0 {
-		arg := fmt.Sprintf("--etcd-servers=%s", strings.Join(s.InitFlags.API.Etcd.ExternalEndpoints, ","))
-		apiServerCommand = append(apiServerCommand, arg)
-	} else {
-		apiServerCommand = append(apiServerCommand, "--etcd-servers=http://127.0.0.1:2379")
-	}
-
-	// Is etcd secured?
-	if s.InitFlags.API.Etcd.ExternalCAFile != "" {
-		etcdCAFileArg := fmt.Sprintf("--etcd-cafile=%s", s.InitFlags.API.Etcd.ExternalCAFile)
-		apiServerCommand = append(apiServerCommand, etcdCAFileArg)
-	}
-	if s.InitFlags.API.Etcd.ExternalCertFile != "" && s.InitFlags.API.Etcd.ExternalKeyFile != "" {
-		etcdClientFileArg := fmt.Sprintf("--etcd-certfile=%s", s.InitFlags.API.Etcd.ExternalCertFile)
-		etcdKeyFileArg := fmt.Sprintf("--etcd-keyfile=%s", s.InitFlags.API.Etcd.ExternalKeyFile)
-		apiServerCommand = append(apiServerCommand, etcdClientFileArg, etcdKeyFileArg)
-	}
-
 	// Prepare static pod specs
 	staticPodSpecs := map[string]api.Pod{
 		kubeAPIServer: componentPod(api.Container{
 			Name:          kubeAPIServer,
 			Image:         images.GetCoreImage(images.KubeAPIServerImage, s.EnvParams["hyperkube_image"]),
-			Command:       apiServerCommand,
+			Command:       getComponentCommand(apiServer, s),
 			VolumeMounts:  []api.VolumeMount{certsVolumeMount(), k8sVolumeMount()},
 			LivenessProbe: componentProbe(8080, "/healthz"),
 			Resources:     componentResources("250m"),
@@ -163,7 +138,7 @@ func certsVolume(s *kubeadmapi.KubeadmConfig) api.Volume {
 	return api.Volume{
 		Name: "certs",
 		VolumeSource: api.VolumeSource{
-			// TODO make path configurable
+			// TODO(phase1+) make path configurable
 			HostPath: &api.HostPathVolumeSource{Path: "/etc/ssl/certs"},
 		},
 	}
@@ -235,9 +210,6 @@ func componentPod(container api.Container, volumes ...api.Volume) api.Pod {
 }
 
 func getComponentCommand(component string, s *kubeadmapi.KubeadmConfig) (command []string) {
-	// TODO: make a global constant of this
-	pkiDir := "/etc/kubernetes/pki"
-
 	baseFlags := map[string][]string{
 		apiServer: []string{
 			"--address=127.0.0.1",
@@ -253,7 +225,7 @@ func getComponentCommand(component string, s *kubeadmapi.KubeadmConfig) (command
 			"--allow-privileged",
 		},
 		controllerManager: []string{
-			// TODO: consider adding --address=127.0.0.1 in order to not expose the cm port to the rest of the world
+			// TODO(phase1+): consider adding --address=127.0.0.1 in order to not expose the cm port to the rest of the world
 			"--leader-elect",
 			"--master=127.0.0.1:8080",
 			"--cluster-name=" + DefaultClusterName,
@@ -264,7 +236,7 @@ func getComponentCommand(component string, s *kubeadmapi.KubeadmConfig) (command
 			"--insecure-experimental-approve-all-kubelet-csrs-for-group=system:kubelet-bootstrap",
 		},
 		scheduler: []string{
-			// TODO: consider adding --address=127.0.0.1 in order to not expose the scheduler port to the rest of the world
+			// TODO(phase1+): consider adding --address=127.0.0.1 in order to not expose the scheduler port to the rest of the world
 			"--leader-elect",
 			"--master=127.0.0.1:8080",
 		},
@@ -280,19 +252,39 @@ func getComponentCommand(component string, s *kubeadmapi.KubeadmConfig) (command
 	command = append(command, s.EnvParams["component_loglevel"])
 	command = append(command, baseFlags[component]...)
 
+	if component == apiServer {
+		// Check if the user decided to use an external etcd cluster
+		if len(s.InitFlags.API.Etcd.ExternalEndpoints) > 0 {
+			command = append(command, fmt.Sprintf("--etcd-servers=%s", strings.Join(s.InitFlags.API.Etcd.ExternalEndpoints, ",")))
+		} else {
+			command = append(command, "--etcd-servers=http://127.0.0.1:2379")
+		}
+
+		// Is etcd secured?
+		if s.InitFlags.API.Etcd.ExternalCAFile != "" {
+			command = append(command, fmt.Sprintf("--etcd-cafile=%s", s.InitFlags.API.Etcd.ExternalCAFile))
+		}
+		if s.InitFlags.API.Etcd.ExternalCertFile != "" && s.InitFlags.API.Etcd.ExternalKeyFile != "" {
+			etcdClientFileArg := fmt.Sprintf("--etcd-certfile=%s", s.InitFlags.API.Etcd.ExternalCertFile)
+			etcdKeyFileArg := fmt.Sprintf("--etcd-keyfile=%s", s.InitFlags.API.Etcd.ExternalKeyFile)
+			command = append(command, etcdClientFileArg, etcdKeyFileArg)
+		}
+	}
+
 	if component == controllerManager {
 		if s.InitFlags.CloudProvider != "" {
 			command = append(command, "--cloud-provider="+s.InitFlags.CloudProvider)
 
 			// Only append the --cloud-config option if there's a such file
+			// TODO(phase1+) this won't work unless it's in one of the few directories we bind-mount
 			if _, err := os.Stat(DefaultCloudConfigPath); err == nil {
 				command = append(command, "--cloud-config="+DefaultCloudConfigPath)
 			}
 		}
 
 		if s.InitFlags.PodNetwork.CIDR.IP != nil {
-			// Let the controller-manager allocate Node CIDRs for the Pod overlay network.
-			// Each node will get a subspace of the address CIDR provided with --cluster-cidr.
+			// Let the controller-manager allocate Node CIDRs for the Pod network.
+			// Each node will get a subspace of the address CIDR provided with --pod-network-cidr.
 			command = append(command, "--allocate-node-cidrs=true", "--cluster-cidr="+s.InitFlags.PodNetwork.CIDR.String())
 		}
 	}

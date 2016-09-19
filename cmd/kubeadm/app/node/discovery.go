@@ -68,11 +68,10 @@ func RetrieveTrustedClusterInfo(s *kubeadmapi.KubeadmConfig) (*clientcmdapi.Conf
 		return nil, fmt.Errorf("<node/discovery> cluster info object is invalid - no endpoint(s) and/or root CA certificate(s) found")
 	}
 
-	// TODO print checksum of the CA certificate
+	// TODO(phase1+) print summary info about the CA certificate, along with the the checksum signature
+	// we also need an ability for the user to configure the client to validate recieved CA cert agains a checksum
 	fmt.Printf("<node/discovery> cluster info signature and contents are valid, will use API endpoints %v\n", clusterInfo.Endpoints)
 
-	// TODO we need to configure the client to validate the server
-	// if it is signed by any of the returned certificates
 	apiServer := clusterInfo.Endpoints[0]
 	caCert := []byte(clusterInfo.CertificateAuthorities[0])
 
