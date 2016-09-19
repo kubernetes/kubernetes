@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
+	fakeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/controller"
@@ -640,22 +641,10 @@ func TestControllerUpdateRequeue(t *testing.T) {
 	fakePodControl := controller.FakePodControl{}
 	manager.podControl = &fakePodControl
 
-	manager.syncReplicaSet(getKey(rs, t))
-
-	ch := make(chan interface{})
-	go func() {
-		item, _ := manager.queue.Get()
-		ch <- item
-	}()
-	select {
-	case key := <-ch:
-		expectedKey := getKey(rs, t)
-		if key != expectedKey {
-			t.Errorf("Expected requeue of replica set with key %s got %s", expectedKey, key)
-		}
-	case <-time.After(wait.ForeverTestTimeout):
-		manager.queue.ShutDown()
-		t.Errorf("Expected to find a ReplicaSet in the queue, found none.")
+	// an error from the sync function will be requeued, check to make sure we returned an error
+	err := manager.syncReplicaSet(getKey(rs, t))
+	if err == nil {
+		t.Errorf("missing error for requeue")
 	}
 	// 1 Update and 1 GET, both of which fail
 	fakeHandler.ValidateRequestCount(t, 2)
@@ -1088,8 +1077,8 @@ func TestDeletionTimestamp(t *testing.T) {
 
 // setupManagerWithGCEnabled creates a RS manager with a fakePodControl
 // and with garbageCollectorEnabled set to true
-func setupManagerWithGCEnabled() (manager *ReplicaSetController, fakePodControl *controller.FakePodControl) {
-	c := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
+func setupManagerWithGCEnabled(objs ...runtime.Object) (manager *ReplicaSetController, fakePodControl *controller.FakePodControl) {
+	c := fakeclientset.NewSimpleClientset(objs...)
 	fakePodControl = &controller.FakePodControl{}
 	manager = NewReplicaSetControllerFromClient(c, controller.NoResyncPeriodFunc, BurstReplicas, 0)
 	manager.garbageCollectorEnabled = true
@@ -1099,9 +1088,9 @@ func setupManagerWithGCEnabled() (manager *ReplicaSetController, fakePodControl 
 }
 
 func TestDoNotPatchPodWithOtherControlRef(t *testing.T) {
-	manager, fakePodControl := setupManagerWithGCEnabled()
 	labelMap := map[string]string{"foo": "bar"}
 	rs := newReplicaSet(2, labelMap)
+	manager, fakePodControl := setupManagerWithGCEnabled(rs)
 	manager.rsStore.Indexer.Add(rs)
 	var trueVar = true
 	otherControllerReference := api.OwnerReference{UID: uuid.NewUUID(), APIVersion: "v1beta1", Kind: "ReplicaSet", Name: "AnotherRS", Controller: &trueVar}
@@ -1118,9 +1107,9 @@ func TestDoNotPatchPodWithOtherControlRef(t *testing.T) {
 }
 
 func TestPatchPodWithOtherOwnerRef(t *testing.T) {
-	manager, fakePodControl := setupManagerWithGCEnabled()
 	labelMap := map[string]string{"foo": "bar"}
 	rs := newReplicaSet(2, labelMap)
+	manager, fakePodControl := setupManagerWithGCEnabled(rs)
 	manager.rsStore.Indexer.Add(rs)
 	// add to podStore one more matching pod that doesn't have a controller
 	// ref, but has an owner ref pointing to other object. Expect a patch to
@@ -1139,9 +1128,9 @@ func TestPatchPodWithOtherOwnerRef(t *testing.T) {
 }
 
 func TestPatchPodWithCorrectOwnerRef(t *testing.T) {
-	manager, fakePodControl := setupManagerWithGCEnabled()
 	labelMap := map[string]string{"foo": "bar"}
 	rs := newReplicaSet(2, labelMap)
+	manager, fakePodControl := setupManagerWithGCEnabled(rs)
 	manager.rsStore.Indexer.Add(rs)
 	// add to podStore a matching pod that has an ownerRef pointing to the rs,
 	// but ownerRef.Controller is false. Expect a patch to take control it.
@@ -1159,9 +1148,9 @@ func TestPatchPodWithCorrectOwnerRef(t *testing.T) {
 }
 
 func TestPatchPodFails(t *testing.T) {
-	manager, fakePodControl := setupManagerWithGCEnabled()
 	labelMap := map[string]string{"foo": "bar"}
 	rs := newReplicaSet(2, labelMap)
+	manager, fakePodControl := setupManagerWithGCEnabled(rs)
 	manager.rsStore.Indexer.Add(rs)
 	// add to podStore two matching pods. Expect two patches to take control
 	// them.
@@ -1171,17 +1160,17 @@ func TestPatchPodFails(t *testing.T) {
 	// control of the pods and create new ones.
 	fakePodControl.Err = fmt.Errorf("Fake Error")
 	err := manager.syncReplicaSet(getKey(rs, t))
-	if err != nil {
-		t.Fatal(err)
+	if err == nil || err.Error() != "Fake Error" {
+		t.Errorf("expected Fake Error, got %+v", err)
 	}
 	// 2 patches to take control of pod1 and pod2 (both fail), 2 creates.
 	validateSyncReplicaSet(t, fakePodControl, 2, 0, 2)
 }
 
 func TestPatchExtraPodsThenDelete(t *testing.T) {
-	manager, fakePodControl := setupManagerWithGCEnabled()
 	labelMap := map[string]string{"foo": "bar"}
 	rs := newReplicaSet(2, labelMap)
+	manager, fakePodControl := setupManagerWithGCEnabled(rs)
 	manager.rsStore.Indexer.Add(rs)
 	// add to podStore three matching pods. Expect three patches to take control
 	// them, and later delete one of them.
@@ -1197,9 +1186,9 @@ func TestPatchExtraPodsThenDelete(t *testing.T) {
 }
 
 func TestUpdateLabelsRemoveControllerRef(t *testing.T) {
-	manager, fakePodControl := setupManagerWithGCEnabled()
 	labelMap := map[string]string{"foo": "bar"}
 	rs := newReplicaSet(2, labelMap)
+	manager, fakePodControl := setupManagerWithGCEnabled(rs)
 	manager.rsStore.Indexer.Add(rs)
 	// put one pod in the podStore
 	pod := newPod("pod", rs, api.PodRunning, nil)
@@ -1236,9 +1225,9 @@ func TestUpdateLabelsRemoveControllerRef(t *testing.T) {
 }
 
 func TestUpdateSelectorControllerRef(t *testing.T) {
-	manager, fakePodControl := setupManagerWithGCEnabled()
 	labelMap := map[string]string{"foo": "bar"}
 	rs := newReplicaSet(2, labelMap)
+	manager, fakePodControl := setupManagerWithGCEnabled(rs)
 	// put 2 pods in the podStore
 	newPodList(manager.podStore.Indexer, 2, api.PodRunning, labelMap, rs, "pod")
 	// update the RS so that its selector no longer matches the pods
@@ -1270,9 +1259,9 @@ func TestUpdateSelectorControllerRef(t *testing.T) {
 // RS controller shouldn't adopt or create more pods if the rc is about to be
 // deleted.
 func TestDoNotAdoptOrCreateIfBeingDeleted(t *testing.T) {
-	manager, fakePodControl := setupManagerWithGCEnabled()
 	labelMap := map[string]string{"foo": "bar"}
 	rs := newReplicaSet(2, labelMap)
+	manager, fakePodControl := setupManagerWithGCEnabled(rs)
 	now := unversioned.Now()
 	rs.DeletionTimestamp = &now
 	manager.rsStore.Indexer.Add(rs)
