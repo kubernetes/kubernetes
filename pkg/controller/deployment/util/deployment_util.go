@@ -843,19 +843,21 @@ func IsDeploymentFailed(deployment *extensions.Deployment, newStatus *extensions
 	// compare against progressDeadlineSeconds. If there is no such condition, we have
 	// no base to estimate progress.
 	var condition *extensions.DeploymentCondition
-out:
+
 	for i := range deployment.Status.Conditions {
 		cond := deployment.Status.Conditions[i]
 		if cond.Type != extensions.DeploymentProgressing {
 			continue
 		}
-		switch cond.Status {
-		case api.ConditionTrue, api.ConditionUnknown:
-			condition = &cond
-			break out
-		case api.ConditionFalse:
+		// In the future we will want to allow failing fast[1], for now treat only
+		// timeout failures as terminal failures.
+		//
+		// [1] https://github.com/kubernetes/kubernetes/issues/18568
+		if cond.Reason == TimedOutReason {
 			return true
 		}
+		condition = &cond
+		break
 	}
 	if condition == nil {
 		return false

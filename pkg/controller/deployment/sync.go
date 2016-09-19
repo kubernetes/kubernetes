@@ -64,6 +64,32 @@ func (dc *DeploymentController) sync(deployment *extensions.Deployment) error {
 	return dc.syncDeploymentStatus(allRSs, newRS, deployment)
 }
 
+// checkPausedConditions checks if the given deployment is paused or not and adds an appropriate condition.
+// These conditions are needed so that we won't accidentally report lack of progress for resumed deployments
+// that were paused for longer than progressDeadlineSeconds.
+func (dc *DeploymentController) checkPausedConditions(d *extensions.Deployment) error {
+	pausedCondExists := deploymentutil.DeploymentConditionExists(d.Status, extensions.DeploymentProgressing, api.ConditionUnknown, deploymentutil.PausedDeployReason)
+
+	needsUpdate := false
+	if d.Spec.Paused && !pausedCondExists {
+		condition := deploymentutil.NewDeploymentCondition(extensions.DeploymentProgressing, api.ConditionUnknown, deploymentutil.PausedDeployReason, "Deployment is paused")
+		deploymentutil.SetDeploymentCondition(&d.Status, *condition)
+		needsUpdate = true
+	} else if !d.Spec.Paused && pausedCondExists {
+		condition := deploymentutil.NewDeploymentCondition(extensions.DeploymentProgressing, api.ConditionUnknown, deploymentutil.ResumedDeployReason, "Deployment is resumed")
+		deploymentutil.SetDeploymentCondition(&d.Status, *condition)
+		needsUpdate = true
+	}
+
+	if !needsUpdate {
+		return nil
+	}
+
+	var err error
+	d, err = dc.client.Extensions().Deployments(d.Namespace).UpdateStatus(d)
+	return err
+}
+
 // getAllReplicaSetsAndSyncRevision returns all the replica sets for the provided deployment (new and all old), with new RS's and deployment's revision updated.
 // 1. Get all old RSes this deployment targets, and calculate the max revision number among them (maxOldV).
 // 2. Get new RS this deployment targets (whose pod template matches deployment's), and update new RS's revision number to (maxOldV + 1),
@@ -310,17 +336,16 @@ func (dc *DeploymentController) getNewReplicaSet(deployment *extensions.Deployme
 	deploymentutil.SetNewReplicaSetAnnotations(deployment, &newRS, newRevision, false)
 	createdRS, err := dc.client.Extensions().ReplicaSets(namespace).Create(&newRS)
 	if err != nil {
-		// Should this condition denote lack of progress? There are cases where this error will
-		// be transient eg. due to temporarily exceeded quota. In any case, if this exact condition
-		// already exists, then we shouldn't add it again.
-		if !deploymentutil.DeploymentConditionExists(deployment.Status, extensions.DeploymentProgressing, api.ConditionUnknown, deploymentutil.FailedRSCreateReason) {
-			msg := fmt.Sprintf("Failed to create new replica set %q: %v", createdRS.Name, err)
-			cond := deploymentutil.NewDeploymentCondition(extensions.DeploymentProgressing, api.ConditionUnknown, deploymentutil.FailedRSCreateReason, msg)
-			deploymentutil.SetDeploymentCondition(&deployment.Status, *cond)
-			// We don't really care about this error at this point, since we have a bigger issue to report.
-			_, _ = dc.client.Extensions().Deployments(deployment.ObjectMeta.Namespace).UpdateStatus(deployment)
-		}
-
+		msg := fmt.Sprintf("Failed to create new replica set %q: %v", createdRS.Name, err)
+		cond := deploymentutil.NewDeploymentCondition(extensions.DeploymentProgressing, api.ConditionFalse, deploymentutil.FailedRSCreateReason, msg)
+		deploymentutil.SetDeploymentCondition(&deployment.Status, *cond)
+		// We don't really care about this error at this point, since we have a bigger issue to report.
+		// TODO: Update the rest of the Deployment status, too. We may need to do this every time we
+		// error out in all other places in the controller so that we let users know that their deployments
+		// have been noticed by the controller, ableit with errors.
+		// TODO: Identify which errors are permanent and switch DeploymentIsFailed to take into account
+		// these reasons as well. Related issue: https://github.com/kubernetes/kubernetes/issues/18568
+		_, _ = dc.client.Extensions().Deployments(deployment.ObjectMeta.Namespace).UpdateStatus(deployment)
 		return nil, err
 	}
 	if newReplicasCount > 0 {
