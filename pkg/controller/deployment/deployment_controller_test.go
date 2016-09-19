@@ -243,7 +243,6 @@ func TestSyncDeploymentCreatesReplicaSet(t *testing.T) {
 
 	f.expectCreateRSAction(rs)
 	f.expectUpdateDeploymentAction(d)
-	f.expectListEventsAction(rs.Name, api.ListOptions{})
 	f.expectUpdateDeploymentStatusAction(d)
 
 	f.run(getKey(d, t))
