@@ -363,7 +363,7 @@ func (lbaas *LbaasV2) GetLoadBalancer(clusterName string, service *api.Service) 
 // a list of regions (from config) and query/create loadbalancers in
 // each region.
 
-func (lbaas *LbaasV2) EnsureLoadBalancer(apiService *api.Service, hosts []string) (*api.LoadBalancerStatus, error) {
+func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *api.Service, hosts []string) (*api.LoadBalancerStatus, error) {
 	glog.V(4).Infof("EnsureLoadBalancer(%v, %v, %v, %v, %v, %v)", apiService.Namespace, apiService.Name, apiService.Spec.LoadBalancerIP, apiService.Spec.Ports, hosts, apiService.Annotations)
 
 	ports := apiService.Spec.Ports
@@ -402,7 +402,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(apiService *api.Service, hosts []string
 	}
 
 	glog.V(2).Infof("Checking if openstack load balancer already exists: %s", cloudprovider.GetLoadBalancerName(apiService))
-	_, exists, err := lbaas.GetLoadBalancer(apiService)
+	_, exists, err := lbaas.GetLoadBalancer(clusterName, apiService)
 	if err != nil {
 		return nil, fmt.Errorf("error checking if openstack load balancer already exists: %v", err)
 	}
@@ -410,7 +410,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(apiService *api.Service, hosts []string
 	// TODO: Implement a more efficient update strategy for common changes than delete & create
 	// In particular, if we implement hosts update, we can get rid of UpdateHosts
 	if exists {
-		err := lbaas.EnsureLoadBalancerDeleted(apiService)
+		err := lbaas.EnsureLoadBalancerDeleted(clusterName, apiService)
 		if err != nil {
 			return nil, fmt.Errorf("error deleting existing openstack load balancer: %v", err)
 		}
@@ -436,7 +436,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(apiService *api.Service, hosts []string
 	loadbalancer, err := loadbalancers.Create(lbaas.network, createOpts).Extract()
 	if err != nil {
 		// cleanup what was created so far
-		_ = lbaas.EnsureLoadBalancerDeleted(apiService)
+		_ = lbaas.EnsureLoadBalancerDeleted(clusterName, apiService)
 		return nil, err
 	}
 
@@ -451,7 +451,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(apiService *api.Service, hosts []string
 		}).Extract()
 		if err != nil {
 			// cleanup what was created so far
-			_ = lbaas.EnsureLoadBalancerDeleted(apiService)
+			_ = lbaas.EnsureLoadBalancerDeleted(clusterName, apiService)
 			return nil, err
 		}
 
@@ -466,7 +466,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(apiService *api.Service, hosts []string
 		}).Extract()
 		if err != nil {
 			// cleanup what was created so far
-			_ = lbaas.EnsureLoadBalancerDeleted(apiService)
+			_ = lbaas.EnsureLoadBalancerDeleted(clusterName, apiService)
 			return nil, err
 		}
 
@@ -476,7 +476,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(apiService *api.Service, hosts []string
 			addr, err := getAddressByName(lbaas.compute, host)
 			if err != nil {
 				// cleanup what was created so far
-				_ = lbaas.EnsureLoadBalancerDeleted(apiService)
+				_ = lbaas.EnsureLoadBalancerDeleted(clusterName, apiService)
 				return nil, err
 			}
 
@@ -487,7 +487,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(apiService *api.Service, hosts []string
 			}).Extract()
 			if err != nil {
 				// cleanup what was created so far
-				_ = lbaas.EnsureLoadBalancerDeleted(apiService)
+				_ = lbaas.EnsureLoadBalancerDeleted(clusterName, apiService)
 				return nil, err
 			}
 
@@ -504,7 +504,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(apiService *api.Service, hosts []string
 			}).Extract()
 			if err != nil {
 				// cleanup what was created so far
-				_ = lbaas.EnsureLoadBalancerDeleted(apiService)
+				_ = lbaas.EnsureLoadBalancerDeleted(clusterName, apiService)
 				return nil, err
 			}
 			waitLoadbalancerActiveProvisioningStatus(lbaas.network, loadbalancer.ID)
@@ -519,7 +519,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(apiService *api.Service, hosts []string
 		port, err := getPortByIP(lbaas.network, loadbalancer.VipAddress)
 		if err != nil {
 			// cleanup what was created so far
-			_ = lbaas.EnsureLoadBalancerDeleted(apiService)
+			_ = lbaas.EnsureLoadBalancerDeleted(clusterName, apiService)
 			return nil, err
 		}
 
@@ -530,7 +530,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(apiService *api.Service, hosts []string
 		floatIP, err := floatingips.Create(lbaas.network, floatIPOpts).Extract()
 		if err != nil {
 			// cleanup what was created so far
-			_ = lbaas.EnsureLoadBalancerDeleted(apiService)
+			_ = lbaas.EnsureLoadBalancerDeleted(clusterName, apiService)
 			return nil, err
 		}
 
@@ -656,7 +656,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(apiService *api.Service, hosts []string
 	return status, nil
 }
 
-func (lbaas *LbaasV2) UpdateLoadBalancer(service *api.Service, hosts []string) error {
+func (lbaas *LbaasV2) UpdateLoadBalancer(clusterName string, service *api.Service, hosts []string) error {
 	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
 	glog.V(4).Infof("UpdateLoadBalancer(%v, %v)", loadBalancerName, hosts)
 
@@ -789,7 +789,7 @@ func (lbaas *LbaasV2) UpdateLoadBalancer(service *api.Service, hosts []string) e
 	return nil
 }
 
-func (lbaas *LbaasV2) EnsureLoadBalancerDeleted(service *api.Service) error {
+func (lbaas *LbaasV2) EnsureLoadBalancerDeleted(clusterName string, service *api.Service) error {
 	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
 	glog.V(4).Infof("EnsureLoadBalancerDeleted(%v)", loadBalancerName)
 
@@ -980,7 +980,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancerDeleted(service *api.Service) error {
 	return nil
 }
 
-func (lb *LbaasV1) GetLoadBalancer(service *api.Service) (*api.LoadBalancerStatus, bool, error) {
+func (lb *LbaasV1) GetLoadBalancer(clusterName string, service *api.Service) (*api.LoadBalancerStatus, bool, error) {
 	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
 	vip, err := getVipByName(lb.network, loadBalancerName)
 	if err == ErrNotFound {
@@ -1001,7 +1001,7 @@ func (lb *LbaasV1) GetLoadBalancer(service *api.Service) (*api.LoadBalancerStatu
 // a list of regions (from config) and query/create loadbalancers in
 // each region.
 
-func (lb *LbaasV1) EnsureLoadBalancer(apiService *api.Service, hosts []string) (*api.LoadBalancerStatus, error) {
+func (lb *LbaasV1) EnsureLoadBalancer(clusterName string, apiService *api.Service, hosts []string) (*api.LoadBalancerStatus, error) {
 	glog.V(4).Infof("EnsureLoadBalancer(%v, %v, %v, %v, %v, %v)", apiService.Namespace, apiService.Name, apiService.Spec.LoadBalancerIP, apiService.Spec.Ports, hosts, apiService.Annotations)
 
 	ports := apiService.Spec.Ports
@@ -1038,7 +1038,7 @@ func (lb *LbaasV1) EnsureLoadBalancer(apiService *api.Service, hosts []string) (
 	}
 
 	glog.V(2).Infof("Checking if openstack load balancer already exists: %s", cloudprovider.GetLoadBalancerName(apiService))
-	_, exists, err := lb.GetLoadBalancer(apiService)
+	_, exists, err := lb.GetLoadBalancer(clusterName, apiService)
 	if err != nil {
 		return nil, fmt.Errorf("error checking if openstack load balancer already exists: %v", err)
 	}
@@ -1046,7 +1046,7 @@ func (lb *LbaasV1) EnsureLoadBalancer(apiService *api.Service, hosts []string) (
 	// TODO: Implement a more efficient update strategy for common changes than delete & create
 	// In particular, if we implement hosts update, we can get rid of UpdateHosts
 	if exists {
-		err := lb.EnsureLoadBalancerDeleted(apiService)
+		err := lb.EnsureLoadBalancerDeleted(clusterName, apiService)
 		if err != nil {
 			return nil, fmt.Errorf("error deleting existing openstack load balancer: %v", err)
 		}
@@ -1150,7 +1150,7 @@ func (lb *LbaasV1) EnsureLoadBalancer(apiService *api.Service, hosts []string) (
 
 }
 
-func (lb *LbaasV1) UpdateLoadBalancer(service *api.Service, hosts []string) error {
+func (lb *LbaasV1) UpdateLoadBalancer(clusterName string, service *api.Service, hosts []string) error {
 	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
 	glog.V(4).Infof("UpdateLoadBalancer(%v, %v)", loadBalancerName, hosts)
 
@@ -1212,7 +1212,7 @@ func (lb *LbaasV1) UpdateLoadBalancer(service *api.Service, hosts []string) erro
 	return nil
 }
 
-func (lb *LbaasV1) EnsureLoadBalancerDeleted(service *api.Service) error {
+func (lb *LbaasV1) EnsureLoadBalancerDeleted(clusterName string, service *api.Service) error {
 	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
 	glog.V(4).Infof("EnsureLoadBalancerDeleted(%v)", loadBalancerName)
 

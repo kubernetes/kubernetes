@@ -81,13 +81,13 @@ type LoadBalancer interface {
 	// GetLoadBalancer returns whether the specified load balancer exists, and
 	// if so, what its status is.
 	// Implementations must treat the *api.Service parameter as read-only and not modify it.
-	GetLoadBalancer(service *api.Service) (status *api.LoadBalancerStatus, exists bool, err error)
+	GetLoadBalancer(clusterName string, service *api.Service) (status *api.LoadBalancerStatus, exists bool, err error)
 	// EnsureLoadBalancer creates a new load balancer 'name', or updates the existing one. Returns the status of the balancer
 	// Implementations must treat the *api.Service parameter as read-only and not modify it.
-	EnsureLoadBalancer(service *api.Service, hosts []string) (*api.LoadBalancerStatus, error)
+	EnsureLoadBalancer(clusterName string, service *api.Service, hosts []string) (*api.LoadBalancerStatus, error)
 	// UpdateLoadBalancer updates hosts under the specified load balancer.
 	// Implementations must treat the *api.Service parameter as read-only and not modify it.
-	UpdateLoadBalancer(service *api.Service, hosts []string) error
+	UpdateLoadBalancer(clusterName string, service *api.Service, hosts []string) error
 	// EnsureLoadBalancerDeleted deletes the specified load balancer if it
 	// exists, returning nil if the load balancer specified either didn't exist or
 	// was successfully deleted.
@@ -95,7 +95,7 @@ type LoadBalancer interface {
 	// have multiple underlying components, meaning a Get could say that the LB
 	// doesn't exist even if some part of it is still laying around.
 	// Implementations must treat the *api.Service parameter as read-only and not modify it.
-	EnsureLoadBalancerDeleted(service *api.Service) error
+	EnsureLoadBalancerDeleted(clusterName string, service *api.Service) error
 }
 
 // Instances is an abstract, pluggable interface for sets of instances.
