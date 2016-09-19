@@ -93,6 +93,7 @@ func (e *E2EServices) Start() error {
 		"--manifest-path", framework.TestContext.ManifestPath,
 		"--eviction-hard", framework.TestContext.EvictionHard,
 		"--feature-gates", framework.TestContext.FeatureGates,
+		"--runtime-integration-type", framework.TestContext.RuntimeIntegrationType,
 		"--logtostderr",
 		"--vmodule=*=4",
 	)
@@ -381,12 +382,16 @@ func (es *e2eService) startKubeletServer() (*server, error) {
 		"--serialize-image-pulls", "false",
 		"--config", framework.TestContext.ManifestPath,
 		"--file-check-frequency", "10s", // Check file frequently so tests won't wait too long
-		"--v", LOG_VERBOSITY_LEVEL, "--logtostderr",
 		"--pod-cidr=10.180.0.0/24", // Assign a fixed CIDR to the node because there is no node controller.
 		"--eviction-hard", framework.TestContext.EvictionHard,
 		"--eviction-pressure-transition-period", "30s",
 		"--feature-gates", framework.TestContext.FeatureGates,
+		"--v", LOG_VERBOSITY_LEVEL, "--logtostderr",
 	)
+	if framework.TestContext.RuntimeIntegrationType != "" {
+		cmdArgs = append(cmdArgs, "--experimental-runtime-integration-type",
+			framework.TestContext.RuntimeIntegrationType) // Whether to use experimental cri integration.
+	}
 	if framework.TestContext.CgroupsPerQOS {
 		// TODO: enable this when the flag is stable and available in kubelet.
 		// cmdArgs = append(cmdArgs,

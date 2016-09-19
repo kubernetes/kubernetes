@@ -55,10 +55,19 @@ func init() {
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 	// Mark the run-services-mode flag as hidden to prevent user from using it.
 	pflag.CommandLine.MarkHidden("run-services-mode")
+	// It's weird that if I directly use pflag in TestContext, it will report error.
+	// It seems that someone is using flag.Parse() after init() and TestMain().
+	// TODO(random-liu): Find who is using flag.Parse() and cause errors and move the following logic
+	// into TestContext.
+	pflag.CommandLine.MarkHidden("runtime-integration-type")
+}
+
+func TestMain(m *testing.M) {
+	pflag.Parse()
+	os.Exit(m.Run())
 }
 
 func TestE2eNode(t *testing.T) {
-	pflag.Parse()
 	if *runServicesMode {
 		// If run-services-mode is specified, only run services in current process.
 		services.RunE2EServices()
