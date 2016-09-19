@@ -332,7 +332,7 @@ func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
 		go func() {
 			defer utilruntime.HandleCrash()
 
-			startedOnce := false
+			notifyStarted := sync.Once{}
 			for {
 				// err == systemd.SdNotifyNoSocket when not running on a systemd system
 				if err := systemd.SdNotify("READY=1\n"); err != nil && err != systemd.SdNotifyNoSocket {
@@ -340,9 +340,10 @@ func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
 				}
 				if err := secureServer.ListenAndServeTLS(options.TLSCertFile, options.TLSPrivateKeyFile); err != nil {
 					glog.Errorf("Unable to listen for secure (%v); will try again.", err)
-				} else if !startedOnce {
-					startedOnce = true
-					close(secureStartedCh)
+				} else {
+					notifyStarted.Do(func() {
+						close(secureStartedCh)
+					})
 				}
 				time.Sleep(15 * time.Second)
 			}
@@ -367,13 +368,14 @@ func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
 	go func() {
 		defer utilruntime.HandleCrash()
 
-		startedOnce := false
+		notifyStarted := sync.Once{}
 		for {
 			if err := http.ListenAndServe(); err != nil {
 				glog.Errorf("Unable to listen for insecure (%v); will try again.", err)
-			} else if !startedOnce {
-				startedOnce = true
-				close(secureStartedCh)
+			} else {
+				notifyStarted.Do(func() {
+					close(insecureStartedCh)
+				})
 			}
 			time.Sleep(15 * time.Second)
 		}
