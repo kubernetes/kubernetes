@@ -25,15 +25,12 @@ import (
 const dashboardPath = "/api/v1/proxy/namespaces/kube-system/services/kubernetes-dashboard"
 
 // UIRediect redirects /ui to the kube-ui proxy path.
-type UIRedirect struct{}
-
-func (r UIRedirect) Install(c *restful.Container) {
+func UIRedirect() *restful.WebService {
 	ws := new(restful.WebService)
 	ws.Path("/ui/")
 	ws.Doc("redirects to the dashboard")
 	ws.Route(ws.GET("/").To(func(req *restful.Request, resp *restful.Response) {
 		http.Redirect(resp.ResponseWriter, req.Request, dashboardPath, http.StatusTemporaryRedirect)
 	}))
-
-	c.Add(ws)
+	return ws
 }

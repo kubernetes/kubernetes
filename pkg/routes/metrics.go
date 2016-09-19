@@ -27,14 +27,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-// DefaultMetrics installs the default prometheus metrics handler
-type DefaultMetrics struct{}
-
-func (m DefaultMetrics) Install(c *restful.Container) {
-	c.Add(NewDefaultMetricsWS())
-}
-
-func NewDefaultMetricsWS() *restful.WebService {
+// DefaultMetrics exposes the default prometheus metrics.
+func DefaultMetrics() *restful.WebService {
 	ws := new(restful.WebService)
 	ws.Path("/metrics")
 	ws.Doc("get prometheus metrics")
@@ -44,15 +38,12 @@ func NewDefaultMetricsWS() *restful.WebService {
 
 // MetricsWithReset install the prometheus metrics handler extended with support for the DELETE method
 // which resets the metrics.
-type MetricsWithReset struct{}
-
-func (m MetricsWithReset) Install(c *restful.Container) {
-	ws := NewDefaultMetricsWS()
+func MetricsWithReset() *restful.WebService {
+	ws := DefaultMetrics()
 	ws.Route(ws.DELETE("/").To(func(req *restful.Request, resp *restful.Response) {
 		apiservermetrics.Reset()
 		etcdmetrics.Reset()
 		io.WriteString(resp.ResponseWriter, "metrics reset\n")
 	}))
-
-	c.Add(ws)
+	return ws
 }

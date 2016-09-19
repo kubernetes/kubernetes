@@ -26,9 +26,7 @@ import (
 )
 
 // SwaggerUI exposes files in third_party/swagger-ui/ under /swagger-ui.
-type SwaggerUI struct{}
-
-func (l SwaggerUI) Install(c *restful.Container) {
+func SwaggerUI() *restful.WebService {
 	prefix := "/swagger-ui/"
 	handler := http.StripPrefix(prefix, http.FileServer(&assetfs.AssetFS{
 		Asset:    swagger.Asset,
@@ -41,6 +39,5 @@ func (l SwaggerUI) Install(c *restful.Container) {
 	ws.Doc("the swagger user interface")
 	ws.Route(ws.GET("/").To(HandlerRouteFunction(handler.ServeHTTP)))
 	ws.Route(ws.HEAD("/").To(HandlerRouteFunction(handler.ServeHTTP)))
-
-	c.Add(ws)
+	return ws
 }

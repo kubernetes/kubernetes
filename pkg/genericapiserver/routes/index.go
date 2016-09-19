@@ -26,10 +26,8 @@ import (
 	"k8s.io/kubernetes/pkg/apiserver"
 )
 
-type Index struct{}
-
-func (i Index) Install(c *restful.Container) {
-	c.ServeMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+func Index(c *restful.Container) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
 		status := http.StatusOK
 		if r.URL.Path != "/" && r.URL.Path != "/index.html" {
 			// Since "/" matches all paths, handleIndex is called for all paths for which there is no handler registered.
@@ -43,5 +41,5 @@ func (i Index) Install(c *restful.Container) {
 		}
 		sort.Strings(handledPaths)
 		apiserver.WriteRawJSON(status, unversioned.RootPaths{Paths: handledPaths}, w)
-	})
+	}
 }

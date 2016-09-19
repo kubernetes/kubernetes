@@ -25,10 +25,8 @@ import (
 	"k8s.io/kubernetes/pkg/version"
 )
 
-type Version struct{}
-
-// InstallVersionHandler registers the APIServer's `/version` handler
-func (v Version) Install(c *restful.Container) {
+// Version exposes version information under /version.
+func Version() *restful.WebService {
 	// Set up a service to return the git code version.
 	ws := new(restful.WebService)
 	ws.Path("/version")
@@ -40,8 +38,7 @@ func (v Version) Install(c *restful.Container) {
 			Produces(restful.MIME_JSON).
 			Consumes(restful.MIME_JSON).
 			Writes(version.Info{}))
-
-	c.Add(ws)
+	return ws
 }
 
 // handleVersion writes the server's version information.

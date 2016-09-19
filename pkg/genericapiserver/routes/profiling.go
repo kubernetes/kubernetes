@@ -22,16 +22,13 @@ import (
 	"net/http/pprof"
 )
 
-// Profiling adds handlers for pprof under /debug/pprof.
-type Profiling struct{}
-
-func (d Profiling) Install(c *restful.Container) {
+// Profiling serves pprof under /debug/pprof.
+func Profiling() *restful.WebService {
 	ws := new(restful.WebService)
 	ws.Path("/debug/pprof/")
 	ws.Doc("get go pprof debugging info")
 	ws.Route(ws.GET("/").To(HandlerRouteFunction(pprof.Index)))
 	ws.Route(ws.GET("/profile").To(HandlerRouteFunction(pprof.Profile)))
 	ws.Route(ws.GET("/symbol").To(HandlerRouteFunction(pprof.Symbol)))
-
-	c.Add(ws)
+	return ws
 }
