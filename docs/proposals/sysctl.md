@@ -487,7 +487,7 @@ type Sysctl struct {
 	// Value of a property to set
 	Value intstr.IntOrString `json:"value"`
 	// Must be true for unsafe sysctls.
-	Unsafe bool `json:"unsafe,omitempty"
+	Unsafe bool `json:"unsafe,omitempty"`
 }
 
 // PodSecurityContext holds pod-level security attributes and common container settings.
