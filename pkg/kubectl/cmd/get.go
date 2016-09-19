@@ -19,6 +19,7 @@ package cmd
 import (
 	"fmt"
 	"io"
+	"reflect"
 
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
@@ -188,41 +189,40 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 		cmd.Flag("show-all").Value.Set("true")
 	}
 	export := cmdutil.GetFlagBool(cmd, "export")
+	r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
+		NamespaceParam(cmdNamespace).DefaultNamespace().AllNamespaces(allNamespaces).
+		FilenameParam(enforceNamespace, &options.FilenameOptions).
+		SelectorParam(selector).
+		ExportParam(export).
+		ResourceTypeOrNameArgs(true, args...).
+		SingleResourceType().
+		Latest().
+		Do()
+	err = r.Err()
+	if err != nil {
+		return err
+	}
+	infos, err := r.Infos()
+	if err != nil {
+		return err
+	}
+	if len(infos) != 1 {
+		return fmt.Errorf("watch is only supported on individual resources and resource collections - %d resources were found", len(infos))
+	}
+	info := infos[0]
+	mapping := info.ResourceMapping()
+	printer, err := f.PrinterForMapping(cmd, mapping, allNamespaces)
+	if err != nil {
+		return err
+	}
+	obj, err := r.Object()
+	if err != nil {
+		return err
+	}
 
 	// handle watch separately since we cannot watch multiple resource types
 	isWatch, isWatchOnly := cmdutil.GetFlagBool(cmd, "watch"), cmdutil.GetFlagBool(cmd, "watch-only")
 	if isWatch || isWatchOnly {
-		r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
-			NamespaceParam(cmdNamespace).DefaultNamespace().AllNamespaces(allNamespaces).
-			FilenameParam(enforceNamespace, &options.FilenameOptions).
-			SelectorParam(selector).
-			ExportParam(export).
-			ResourceTypeOrNameArgs(true, args...).
-			SingleResourceType().
-			Latest().
-			Do()
-		err := r.Err()
-		if err != nil {
-			return err
-		}
-		infos, err := r.Infos()
-		if err != nil {
-			return err
-		}
-		if len(infos) != 1 {
-			return fmt.Errorf("watch is only supported on individual resources and resource collections - %d resources were found", len(infos))
-		}
-		info := infos[0]
-		mapping := info.ResourceMapping()
-		printer, err := f.PrinterForMapping(cmd, mapping, allNamespaces)
-		if err != nil {
-			return err
-		}
-		obj, err := r.Object()
-		if err != nil {
-			return err
-		}
-
 		// watching from resourceVersion 0, starts the watch at ~now and
 		// will return an initial watch event.  Starting form ~now, rather
 		// the rv of the object will insure that we start the watch from
@@ -268,7 +268,36 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 		return nil
 	}
 
-	r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
+	// Get the Object received as single resource type.
+	// Verify the following:-
+	// a: if the single resource type is a List
+	// b: if the object is of type *api.EventList
+	// c: if sort-by is not specified as an option for this object
+	// If all of the above is met, call PrintObj(obj) on the Object.
+	// This in turn calls printEventList and the events are all
+	// sorted by default bu lastTimestamp.
+	isList := meta.IsListType(obj)
+	if isList {
+		sorting, err := cmd.Flags().GetString("sort-by")
+		if err != nil {
+			return err
+		}
+		if sorting == "" {
+			// print the current object
+			typeOfObject := reflect.TypeOf(obj)
+			fmt.Println("Type of object = ", typeOfObject.String())
+			if typeOfObject.String() == "*api.EventList" {
+				if err := printer.PrintObj(obj, out); err != nil {
+					return fmt.Errorf("unable to output the provided object: %v", err)
+				}
+
+				printer.AfterPrint(errOut, mapping.Resource)
+				return nil
+			}
+		}
+	}
+
+	r = resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 		NamespaceParam(cmdNamespace).DefaultNamespace().AllNamespaces(allNamespaces).
 		FilenameParam(enforceNamespace, &options.FilenameOptions).
 		SelectorParam(selector).
@@ -328,7 +357,7 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 	}
 
 	allErrs := []error{}
-	infos, err := r.Infos()
+	infos, err = r.Infos()
 	if err != nil {
 		allErrs = append(allErrs, err)
 	}
