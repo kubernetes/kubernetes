@@ -31,35 +31,36 @@ import (
 )
 
 var (
-	join_done_msgf = dedent.Dedent(`
+	joinDoneMsgf = dedent.Dedent(`
 		Node join complete:
 		* Certificate signing request sent to master and response
 		  received.
 		* Kubelet informed of new secure connection details.
 
-		Run 'kubectl get nodes' on the master to see this node join.
+		Run 'kubectl get nodes' on the master to see this machine join.
 		`)
 )
 
+// NewCmdJoin returns "kubeadm join" command.
 func NewCmdJoin(out io.Writer, s *kubeadmapi.KubeadmConfig) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "join",
-		Short: "Run this on other servers to join an existing cluster.",
+		Short: "Run this on any machine you wish to join an existing cluster.",
 		Run: func(cmd *cobra.Command, args []string) {
 			err := RunJoin(out, cmd, args, s)
 			cmdutil.CheckErr(err)
 		},
 	}
 
-	// TODO this should become `kubeadm join --token=<...> <master-ip-addr>`
 	cmd.PersistentFlags().StringVarP(
 		&s.Secrets.GivenToken, "token", "", "",
-		`Shared secret used to secure bootstrap. Must match output of 'init-master'.`,
+		`Shared secret used to secure bootstrap. Must match the output of 'kubeadm init'.`,
 	)
 
 	return cmd
 }
 
+// RunJoin executes worked node provisioning and tries to join an existing cluster.
 func RunJoin(out io.Writer, cmd *cobra.Command, args []string, s *kubeadmapi.KubeadmConfig) error {
 	// TODO this we are missing args from the help text, there should be a way to tell cobra about it
 	if len(args) == 0 {
@@ -68,7 +69,7 @@ func RunJoin(out io.Writer, cmd *cobra.Command, args []string, s *kubeadmapi.Kub
 	for _, i := range args {
 		addr := net.ParseIP(i) // TODO(phase1+) should allow resolvable names too
 		if addr == nil {
-			return fmt.Errorf("<cmd/join> failed parse argument (%q) as an IP address", i)
+			return fmt.Errorf("<cmd/join> failed to parse argument (%q) as an IP address", i)
 		}
 		s.JoinFlags.MasterAddrs = append(s.JoinFlags.MasterAddrs, addr)
 	}
@@ -91,6 +92,6 @@ func RunJoin(out io.Writer, cmd *cobra.Command, args []string, s *kubeadmapi.Kub
 		return err
 	}
 
-	fmt.Fprintf(out, join_done_msgf)
+	fmt.Fprintf(out, joinDoneMsgf)
 	return nil
 }

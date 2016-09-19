@@ -23,11 +23,11 @@ import (
 	"os"
 	"path"
 
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/api"
+	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	api "k8s.io/kubernetes/pkg/api/v1"
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/api"
-	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
@@ -36,7 +36,7 @@ import (
 // init master` and `kubeadm manual bootstrap master` can get going.
 
 const (
-	DefaultClusterName = "kubernetes"
+	DefaultClusterName     = "kubernetes"
 	DefaultCloudConfigPath = "/etc/kubernetes/cloud-config.json"
 
 	etcd                  = "etcd"
@@ -54,6 +54,8 @@ const (
 //
 //E0817 17:53:22.242658       1 event.go:258] Could not construct reference to: '&api.Endpoints{TypeMeta:unversioned.TypeMeta{Kind:"", APIVersion:""}, ObjectMeta:api.ObjectMeta{Name:"kube-scheduler", GenerateName:"", Namespace:"kube-system", SelfLink:"", UID:"", ResourceVersion:"", Generation:0, CreationTimestamp:unversioned.Time{Time:time.Time{sec:0, nsec:0, loc:(*time.Location)(nil)}}, DeletionTimestamp:(*unversioned.Time)(nil), DeletionGracePeriodSeconds:(*int64)(nil), Labels:map[string]string(nil), Annotations:map[string]string(nil), OwnerReferences:[]api.OwnerReference(nil), Finalizers:[]string(nil)}, Subsets:[]api.EndpointSubset(nil)}' due to: 'selfLink was empty, can't make reference'. Will not report event: 'Normal' '%v became leader' 'moby'
 
+// WriteStaticPodManifests builds manifest objects based on user provided configuration and then dumps it to disk
+// where kubelet will pick and schedule them.
 func WriteStaticPodManifests(s *kubeadmapi.KubeadmConfig) error {
 	staticPodSpecs := map[string]api.Pod{
 		// TODO this needs a volume
@@ -73,7 +75,7 @@ func WriteStaticPodManifests(s *kubeadmapi.KubeadmConfig) error {
 		// TODO bind-mount certs in
 		kubeAPIServer: componentPod(api.Container{
 			Name:          kubeAPIServer,
-			Image:         images.GetCoreImage(images.KubeApiServerImage, s.EnvParams["hyperkube_image"]),
+			Image:         images.GetCoreImage(images.KubeAPIServerImage, s.EnvParams["hyperkube_image"]),
 			Command:       getComponentCommand(apiServer, s),
 			VolumeMounts:  []api.VolumeMount{k8sVolumeMount()},
 			LivenessProbe: componentProbe(8080, "/healthz"),
@@ -113,6 +115,8 @@ func WriteStaticPodManifests(s *kubeadmapi.KubeadmConfig) error {
 	return nil
 }
 
+// etcdVolume returns an host-path volume for storing etcd data.
+// By using a host-path, the data will survive pod restart.
 func etcdVolume(s *kubeadmapi.KubeadmConfig) api.Volume {
 	return api.Volume{
 		Name: "etcd",
@@ -189,7 +193,7 @@ func componentPod(container api.Container, volumes ...api.Volume) api.Pod {
 
 func getComponentCommand(component string, s *kubeadmapi.KubeadmConfig) (command []string) {
 	// TODO: make a global constant of this
-	pki_dir := "/etc/kubernetes/pki"
+	pkiDir := "/etc/kubernetes/pki"
 
 	baseFlags := map[string][]string{
 		apiServer: []string{
@@ -197,11 +201,11 @@ func getComponentCommand(component string, s *kubeadmapi.KubeadmConfig) (command
 			"--etcd-servers=http://127.0.0.1:2379",
 			"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota",
 			"--service-cluster-ip-range=" + s.InitFlags.Services.CIDR.String(),
-			"--service-account-key-file=" + pki_dir + "/apiserver-key.pem",
-			"--client-ca-file=" + pki_dir + "/ca.pem",
-			"--tls-cert-file=" + pki_dir + "/apiserver.pem",
-			"--tls-private-key-file=" + pki_dir + "/apiserver-key.pem",
-			"--token-auth-file=" + pki_dir + "/tokens.csv",
+			"--service-account-key-file=" + pkiDir + "/apiserver-key.pem",
+			"--client-ca-file=" + pkiDir + "/ca.pem",
+			"--tls-cert-file=" + pkiDir + "/apiserver.pem",
+			"--tls-private-key-file=" + pkiDir + "/apiserver-key.pem",
+			"--token-auth-file=" + pkiDir + "/tokens.csv",
 			"--secure-port=443",
 			"--allow-privileged",
 		},
@@ -210,10 +214,10 @@ func getComponentCommand(component string, s *kubeadmapi.KubeadmConfig) (command
 			"--leader-elect",
 			"--master=127.0.0.1:8080",
 			"--cluster-name=" + DefaultClusterName,
-			"--root-ca-file=" + pki_dir + "/ca.pem",
-			"--service-account-private-key-file=" + pki_dir + "/apiserver-key.pem",
-			"--cluster-signing-cert-file=" + pki_dir + "/ca.pem",
-			"--cluster-signing-key-file=" + pki_dir + "/ca-key.pem",
+			"--root-ca-file=" + pkiDir + "/ca.pem",
+			"--service-account-private-key-file=" + pkiDir + "/apiserver-key.pem",
+			"--cluster-signing-cert-file=" + pkiDir + "/ca.pem",
+			"--cluster-signing-key-file=" + pkiDir + "/ca-key.pem",
 			"--insecure-experimental-approve-all-kubelet-csrs-for-group=system:kubelet-bootstrap",
 			"--cluster-cidr=" + s.InitFlags.Services.CIDR.String(),
 		},
@@ -239,7 +243,7 @@ func getComponentCommand(component string, s *kubeadmapi.KubeadmConfig) (command
 
 		// Only append the --cloud-config option if there's a such file
 		if _, err := os.Stat(DefaultCloudConfigPath); err == nil {
-			command = append(command, "--cloud-config=" + DefaultCloudConfigPath)
+			command = append(command, "--cloud-config="+DefaultCloudConfigPath)
 		}
 	}
 
