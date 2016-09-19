@@ -144,6 +144,7 @@ var gitVersionRegexp = regexp.MustCompile("GitVersion:\"(v.+?)\"")
 // in v1.3).
 var subResourcePodProxyVersion = version.MustParse("v1.1.0")
 var subResourceServiceAndNodeProxyVersion = version.MustParse("v1.2.0")
+var serverVersion13 = version.MustParse("v1.3.0")
 
 func getServicesProxyRequest(c *client.Client, request *restclient.Request) (*restclient.Request, error) {
 	subResourceProxyAvailable, err := serverVersionGTE(subResourceServiceAndNodeProxyVersion, c)

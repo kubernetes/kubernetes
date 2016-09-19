@@ -90,6 +90,10 @@ var _ = Describe("MetricsGrabber", func() {
 	})
 
 	It("should grab all metrics from API server.", func() {
+		// From @gmarek 9/19/2016 - this test can safely be ignored for upgrade testing
+		// TODO(gmarek): Add details about why this can be safely ignored
+		// See issue https://github.com/kubernetes/kubernetes/issues/32704
+		SkipUnlessServerVersionLT(serverVersion13, c)
 		By("Connecting to /metrics endpoint")
 		unknownMetrics := sets.NewString()
 		response, err := grabber.GrabFromApiServer(unknownMetrics)
