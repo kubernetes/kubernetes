@@ -46,6 +46,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/flag"
+	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -244,12 +245,6 @@ func loadSchemaForTest() (validation.Schema, error) {
 	return validation.NewSwaggerSchemaFromBytes(data, nil)
 }
 
-func header() http.Header {
-	header := http.Header{}
-	header.Set("Content-Type", runtime.ContentTypeJSON)
-	return header
-}
-
 func TestRefetchSchemaWhenValidationFails(t *testing.T) {
 	schema, err := loadSchemaForTest()
 	if err != nil {
@@ -269,7 +264,7 @@ func TestRefetchSchemaWhenValidationFails(t *testing.T) {
 			switch p, m := req.URL.Path, req.Method; {
 			case strings.HasPrefix(p, "/swaggerapi") && m == "GET":
 				requests[p] = requests[p] + 1
-				return &http.Response{StatusCode: 200, Header: header(), Body: ioutil.NopCloser(bytes.NewBuffer(output))}, nil
+				return &http.Response{StatusCode: 200, Header: utiltesting.Header(), Body: ioutil.NopCloser(bytes.NewBuffer(output))}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				return nil, nil
@@ -326,7 +321,7 @@ func TestValidateCachesSchema(t *testing.T) {
 			switch p, m := req.URL.Path, req.Method; {
 			case strings.HasPrefix(p, "/swaggerapi") && m == "GET":
 				requests[p] = requests[p] + 1
-				return &http.Response{StatusCode: 200, Header: header(), Body: ioutil.NopCloser(bytes.NewBuffer(output))}, nil
+				return &http.Response{StatusCode: 200, Header: utiltesting.Header(), Body: ioutil.NopCloser(bytes.NewBuffer(output))}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				return nil, nil
