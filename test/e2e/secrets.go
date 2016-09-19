@@ -21,13 +21,8 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/util"
-	"k8s.io/kubernetes/pkg/version"
 
 	. "github.com/onsi/ginkgo"
-)
-
-var (
-	serverVersion13 = version.MustParse("v1.3.0")
 )
 
 var _ = Describe("Secrets", func() {
