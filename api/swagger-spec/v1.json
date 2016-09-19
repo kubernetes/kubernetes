@@ -16952,11 +16952,11 @@
     "properties": {
      "machineID": {
       "type": "string",
-      "description": "Machine ID reported by the node."
+      "description": "MachineID reported by the node. For unique machine identification in the cluster this field is prefered. Learn more from man(5) machine-id: http://man7.org/linux/man-pages/man5/machine-id.5.html"
      },
      "systemUUID": {
       "type": "string",
-      "description": "System UUID reported by the node."
+      "description": "SystemUUID reported by the node. For unique machine identification MachineID is prefered. This field is specific to Red Hat hosts https://access.redhat.com/documentation/en-US/Red_Hat_Subscription_Management/1/html/RHSM/getting-system-uuid.html"
      },
      "bootID": {
       "type": "string",
