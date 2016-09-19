@@ -1749,8 +1749,13 @@ const (
 	PodInitContainersAnnotationKey = "pod.alpha.kubernetes.io/init-containers"
 	// This annotation key will be used to contain an array of v1 JSON encoded
 	// ContainerStatuses for init containers. The annotation will be placed into the internal
-	// type and cleared.
-	PodInitContainerStatusesAnnotationKey = "pod.beta.kubernetes.io/init-container-statuses"
+	// type and cleared. This key is only recognized by version >= 1.4.
+	PodInitContainerStatusesBetaAnnotationKey = "pod.beta.kubernetes.io/init-container-statuses"
+	// This annotation key will be used to contain an array of v1 JSON encoded
+	// ContainerStatuses for init containers. The annotation will be placed into the internal
+	// type and cleared. This key is recognized by version >= 1.3. For version 1.4 code,
+	// this key will have its value copied to the beta key.
+	PodInitContainerStatusesAnnotationKey = "pod.alpha.kubernetes.io/init-container-statuses"
 )
 
 // PodSpec is a description of a pod.
