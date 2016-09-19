@@ -90,11 +90,12 @@ func init() {
 // JoinFlags holds values for "kubeadm join" command flags.
 type JoinFlags struct {
 	MasterAddrs []net.IP
+	// TODO(phase1+) add manual mode flags here, e.g. RootCACertPath
 }
 
 // ClusterInfo TODO add description
 type ClusterInfo struct {
-	// TODO(phase1?) this may become simply `api.Config`
+	// TODO(phase1+) this may become simply `api.Config`
 	CertificateAuthorities []string `json:"certificateAuthorities"`
 	Endpoints              []string `json:"endpoints"`
 }

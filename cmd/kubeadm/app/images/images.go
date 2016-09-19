@@ -42,7 +42,7 @@ const (
 )
 
 // TODO(phase1): Make this configurable + default to a v1.4 value fetched from: https://storage.googleapis.com/kubernetes-release/release/stable.txt
-var DefaultKubeVersion = "v1.4.0-beta.6"
+var DefaultKubeVersion = "v1.4.0-beta.8"
 
 func GetCoreImage(image string, overrideImage string) string {
 	if overrideImage != "" {
