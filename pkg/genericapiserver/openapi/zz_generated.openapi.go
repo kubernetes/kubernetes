@@ -3460,7 +3460,7 @@ func (_ openAPI) OpenAPIDefinitions() *common.OpenAPIDefinitions {
 						},
 						"progressDeadlineSeconds": {
 							SchemaProps: spec.SchemaProps{
-								Description: "The maximum time in seconds for a deployment to make progress before it is considered to be failed. This is not set by default.",
+								Description: "The maximum time in seconds for a deployment to make progress before it is considered to be failed. Failed deployments are not retried by the deployment controller and require user action. Failure causes are surfaced in the deployment status as Conditions. This is not set by default. Note that progress will not be estimated during the time a deployment is paused or when rolling back to a previous revision.",
 								Type:        []string{"integer"},
 								Format:      "int32",
 							},
@@ -15549,7 +15549,7 @@ func (_ openAPI) OpenAPIDefinitions() *common.OpenAPIDefinitions {
 						},
 						"progressDeadlineSeconds": {
 							SchemaProps: spec.SchemaProps{
-								Description: "The maximum time in seconds for a deployment to make progress before it is considered to be failed. This is not set by default.",
+								Description: "The maximum time in seconds for a deployment to make progress before it is considered to be failed. Failed deployments are not retried by the deployment controller and require user action. Failure causes are surfaced in the deployment status as Conditions. This is not set by default. Note that progress will not be estimated during the time a deployment is paused or when rolling back to a previous revision.",
 								Type:        []string{"integer"},
 								Format:      "int32",
 							},

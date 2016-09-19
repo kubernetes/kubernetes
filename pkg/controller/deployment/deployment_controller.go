@@ -511,6 +511,13 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 		return err
 	}
 
+	// Update deployment conditions with an Unknown condition when pausing/resuming
+	// a deployment. In this way, we can be sure that we won't timeout when a user
+	// resumes a Deployment with a set progressDeadlineSeconds.
+	if err = dc.checkPausedConditions(d); err != nil {
+		return err
+	}
+
 	timedOut, err := dc.hasTimedOut(d)
 	if err != nil {
 		return err
