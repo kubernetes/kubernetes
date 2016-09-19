@@ -62,7 +62,7 @@ func NewCmdJoin(out io.Writer, s *kubeadmapi.KubeadmConfig) *cobra.Command {
 
 // RunJoin executes worked node provisioning and tries to join an existing cluster.
 func RunJoin(out io.Writer, cmd *cobra.Command, args []string, s *kubeadmapi.KubeadmConfig) error {
-	// TODO this we are missing args from the help text, there should be a way to tell cobra about it
+	// TODO(phase1+) this we are missing args from the help text, there should be a way to tell cobra about it
 	if len(args) == 0 {
 		return fmt.Errorf("<cmd/join> must specify master IP address (see --help)")
 	}

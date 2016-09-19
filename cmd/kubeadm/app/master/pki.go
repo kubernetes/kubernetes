@@ -175,7 +175,7 @@ func CreatePKIAssets(s *kubeadmapi.KubeadmConfig) (*rsa.PrivateKey, *x509.Certif
 		return nil, nil, fmt.Errorf("<master/pki> failure while saving service account singing keys - %s", err)
 	}
 
-	// TODO(phase1+) print a summary of SANs used and checksums (signatures) of each of the certiicates
+	// TODO(phase1+) print a summary of SANs used and checksums (signatures) of each of the certificates
 	fmt.Printf("<master/pki> created keys and certificates in %q\n", pkiPath)
 	return caKey, caCert, nil
 }

@@ -31,6 +31,8 @@ import (
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
+const apiCallRetryInterval = 500 * time.Millisecond
+
 func CreateClientAndWaitForAPI(adminConfig *clientcmdapi.Config) (*clientset.Clientset, error) {
 	adminClientConfig, err := clientcmd.NewDefaultClientConfig(
 		*adminConfig,
@@ -50,12 +52,12 @@ func CreateClientAndWaitForAPI(adminConfig *clientcmdapi.Config) (*clientset.Cli
 	fmt.Println("<master/apiclient> created API client, waiting for the control plane to become ready")
 
 	start := time.Now()
-	wait.PollInfinite(500*time.Millisecond, func() (bool, error) {
+	wait.PollInfinite(apiCallRetryInterval, func() (bool, error) {
 		cs, err := client.ComponentStatuses().List(api.ListOptions{})
 		if err != nil {
 			return false, nil
 		}
-		// TODO revisit this when we implement HA
+		// TODO(phase2) must revisit this when we implement HA
 		if len(cs.Items) < 3 {
 			fmt.Println("<master/apiclient> not all control plane components are ready yet")
 			return false, nil
@@ -75,14 +77,13 @@ func CreateClientAndWaitForAPI(adminConfig *clientcmdapi.Config) (*clientset.Cli
 
 	fmt.Println("<master/apiclient> waiting for at least one node to register and become ready")
 	start = time.Now()
-	wait.PollInfinite(500*time.Millisecond, func() (bool, error) {
+	wait.PollInfinite(apiCallRetryInterval, func() (bool, error) {
 		nodeList, err := client.Nodes().List(api.ListOptions{})
 		if err != nil {
 			fmt.Println("<master/apiclient> temporarily unable to list nodes (will retry)")
 			return false, nil
 		}
 		if len(nodeList.Items) < 1 {
-			//fmt.Printf("<master/apiclient> %d nodes have registered so far", len(nodeList.Items))
 			return false, nil
 		}
 		n := &nodeList.Items[0]
@@ -146,7 +147,7 @@ func NewDeployment(deploymentName string, replicas int32, podSpec api.PodSpec) *
 }
 
 // It's safe to do this for alpha, as we don't have HA and there is no way we can get
-// more then one node here (TODO find a way to determine owr own node name)
+// more then one node here (TODO(phase1+) use os.Hostname)
 func findMyself(client *clientset.Clientset) (*api.Node, error) {
 	nodeList, err := client.Nodes().List(api.ListOptions{})
 	if err != nil {
@@ -175,7 +176,7 @@ func attemptToUpdateMasterRoleLabelsAndTaints(client *clientset.Clientset, sched
 	if _, err := client.Nodes().Update(n); err != nil {
 		if apierrs.IsConflict(err) {
 			fmt.Println("<master/apiclient> temporarily unable to update master node metadata due to conflict (will retry)")
-			time.Sleep(500 * time.Millisecond)
+			time.Sleep(apiCallRetryInterval)
 			attemptToUpdateMasterRoleLabelsAndTaints(client, schedulable)
 		} else {
 			return err

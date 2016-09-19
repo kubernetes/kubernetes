@@ -75,12 +75,6 @@ func MakeClientConfigWithToken(config *clientcmdapi.Config, clusterName string, 
 	return newConfig
 }
 
-// kubeadm is responsible for writing the following kubeconfig file, which
-// kubelet should be waiting for. Help user avoid foot-shooting by refusing to
-// write a file that has already been written (the kubelet will be up and
-// running in that case - they'd need to stop the kubelet, remove the file, and
-// start it again in that case).
-
 func WriteKubeconfigIfNotExists(s *kubeadmapi.KubeadmConfig, name string, kubeconfig *clientcmdapi.Config) error {
 	if err := os.MkdirAll(s.EnvParams["kubernetes_dir"], 0700); err != nil {
 		return fmt.Errorf("<util/kubeconfig> failed to create directory %q [%s]", s.EnvParams["kubernetes_dir"], err)
@@ -88,11 +82,7 @@ func WriteKubeconfigIfNotExists(s *kubeadmapi.KubeadmConfig, name string, kubeco
 
 	filename := path.Join(s.EnvParams["kubernetes_dir"], fmt.Sprintf("%s.conf", name))
 	// Create and open the file, only if it does not already exist.
-	f, err := os.OpenFile(
-		filename,
-		os.O_CREATE|os.O_WRONLY|os.O_EXCL,
-		0600,
-	)
+	f, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY|os.O_EXCL, 0600)
 	if err != nil {
 		return fmt.Errorf("<util/kubeconfig> failed to create %q, it already exists [%s]", filename, err)
 	}
