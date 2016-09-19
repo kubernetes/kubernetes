@@ -9552,14 +9552,14 @@ func (_ openAPI) OpenAPIDefinitions() *common.OpenAPIDefinitions {
 					Properties: map[string]spec.Schema{
 						"machineID": {
 							SchemaProps: spec.SchemaProps{
-								Description: "Machine ID reported by the node.",
+								Description: "MachineID reported by the node. For unique machine identification in the cluster this field is prefered. Learn more from man(5) machine-id: http://man7.org/linux/man-pages/man5/machine-id.5.html",
 								Type:        []string{"string"},
 								Format:      "",
 							},
 						},
 						"systemUUID": {
 							SchemaProps: spec.SchemaProps{
-								Description: "System UUID reported by the node.",
+								Description: "SystemUUID reported by the node. For unique machine identification MachineID is prefered. This field is specific to Red Hat hosts https://access.redhat.com/documentation/en-US/Red_Hat_Subscription_Management/1/html/RHSM/getting-system-uuid.html",
 								Type:        []string{"string"},
 								Format:      "",
 							},
