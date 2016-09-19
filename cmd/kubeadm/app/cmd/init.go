@@ -65,22 +65,27 @@ func NewCmdInit(out io.Writer, s *kubeadmapi.KubeadmConfig) *cobra.Command {
 		&s.InitFlags.API.ExternalDNSNames, "api-external-dns-names", []string{},
 		`(optional) The DNS names to advertise, in case you have configured them yourself.`,
 	)
-
 	cmd.PersistentFlags().IPNetVar(
 		&s.InitFlags.Services.CIDR, "service-cidr", *kubeadmapi.DefaultServicesCIDR,
-		`(optional) use alternative range of IP address for service VIPs, e.g. "10.16.0.0/12"`,
+		`(optional) Use alterantive range of IP address for service VIPs, defaults to `+
+			kubeadmapi.DefaultServicesCIDRString,
+	)
+	cmd.PersistentFlags().IPNetVar(
+		&s.InitFlags.PodNetwork.CIDR, "pod-network-cidr", net.IPNet{},
+		`(optional) Specify range of IP addresses for the pod overlay network, e.g. 10.3.0.0/16.`+
+			`If set, the control plane will automatically attempt to allocate Pod network CIDRs for every node.`,
 	)
 	cmd.PersistentFlags().StringVar(
 		&s.InitFlags.Services.DNSDomain, "service-dns-domain", kubeadmapi.DefaultServiceDNSDomain,
-		`(optional) use alternative domain for services, e.g. "myorg.internal"`,
+		`(optional) Use alternative domain for services, e.g. "myorg.internal"`,
 	)
 	cmd.PersistentFlags().StringVar(
 		&s.InitFlags.CloudProvider, "cloud-provider", "",
-		`(optional) enable a specific cloud provider features (external load-balancers, storage, etc), e.g. "gce"`,
+		`(optional) Enable a specific cloud provider features (external load-balancers, storage, etc), e.g. "gce"`,
 	)
 	cmd.PersistentFlags().BoolVar(
 		&s.InitFlags.Schedulable, "schedule-workload", false,
-		`(optional) allow to schedule workload to the node`,
+		`(optional) Allow to schedule workload to the node`,
 	)
 
 	// TODO (phase1+) @errordeveloper make the flags below not show up in --help but rather on --advanced-help
