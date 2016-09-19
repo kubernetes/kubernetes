@@ -49,10 +49,10 @@ type ImageOptions struct {
 	Local       bool
 	Cmd         *cobra.Command
 
-	PrintObject            func(cmd *cobra.Command, mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error
-	UpdatePodSpecForObject func(obj runtime.Object, fn func(*api.PodSpec) error) (bool, error)
-	Resources              []string
-	ContainerImages        map[string]string
+	PrintObject           func(cmd *cobra.Command, mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error
+	VisitPodSpecForObject func(obj runtime.Object, fn func(*api.PodSpec) error) (bool, error)
+	Resources             []string
+	ContainerImages       map[string]string
 }
 
 var (
@@ -74,7 +74,7 @@ var (
 		# Update image of all containers of daemonset abc to 'nginx:1.9.1'
 		kubectl set image daemonset abc *=nginx:1.9.1
 
-		# Print result (in yaml format) of updating nginx container image from local file, without hitting the server 
+		# Print result (in yaml format) of updating nginx container image from local file, without hitting the server
 		kubectl set image -f path/to/file.yaml nginx=nginx:1.9.1 --local -o yaml`)
 )
 
@@ -107,7 +107,7 @@ func NewCmdImage(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 
 func (o *ImageOptions) Complete(f *cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	o.Mapper, o.Typer = f.Object()
-	o.UpdatePodSpecForObject = f.UpdatePodSpecForObject
+	o.VisitPodSpecForObject = f.VisitPodSpecForObject
 	o.Encoder = f.JSONEncoder()
 	o.ShortOutput = cmdutil.GetFlagString(cmd, "output") == "name"
 	o.Record = cmdutil.GetRecordFlag(cmd)
@@ -162,7 +162,7 @@ func (o *ImageOptions) Run() error {
 
 	patches := CalculatePatches(o.Infos, o.Encoder, func(info *resource.Info) (bool, error) {
 		transformed := false
-		_, err := o.UpdatePodSpecForObject(info.Object, func(spec *api.PodSpec) error {
+		_, err := o.VisitPodSpecForObject(info.Object, func(spec *api.PodSpec) error {
 			for name, image := range o.ContainerImages {
 				containerFound := false
 				// Find the container to update, and update its image
