@@ -39,6 +39,15 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 )
 
+const (
+	// maxImagesInNodeStatus is the number of max images we store in image status.
+	maxImagesInNodeStatus = 50
+
+	// maxNamesPerImageInNodeStatus is max number of names per image stored in
+	// the node status.
+	maxNamesPerImageInNodeStatus = 5
+)
+
 // registerWithApiServer registers the node with the cluster master. It is safe
 // to call multiple times, but not concurrently (kl.registrationCompleted is
 // not locked).
@@ -501,8 +510,13 @@ func (kl *Kubelet) setNodeStatusImages(node *api.Node) {
 		}
 
 		for _, image := range containerImages {
+			names := append(image.RepoDigests, image.RepoTags...)
+			// Report up to maxNamesPerImageInNodeStatus names per image.
+			if len(names) > maxNamesPerImageInNodeStatus {
+				names = names[0:maxNamesPerImageInNodeStatus]
+			}
 			imagesOnNode = append(imagesOnNode, api.ContainerImage{
-				Names:     append(image.RepoTags, image.RepoDigests...),
+				Names:     names,
 				SizeBytes: image.Size,
 			})
 		}
