@@ -23,8 +23,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/apis/apps"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/record"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 
 	"github.com/golang/glog"
@@ -159,7 +159,7 @@ type petClient interface {
 
 // apiServerPetClient is a petset aware Kubernetes client.
 type apiServerPetClient struct {
-	c        *client.Client
+	c        internalclientset.Interface
 	recorder record.EventRecorder
 	petHealthChecker
 }
@@ -167,7 +167,7 @@ type apiServerPetClient struct {
 // Get gets the pet in the pcb from the apiserver.
 func (p *apiServerPetClient) Get(pet *pcb) (*pcb, bool, error) {
 	ns := pet.parent.Namespace
-	pod, err := podClient(p.c, ns).Get(pet.pod.Name)
+	pod, err := p.c.Core().Pods(ns).Get(pet.pod.Name)
 	if errors.IsNotFound(err) {
 		return nil, false, nil
 	}
@@ -181,7 +181,7 @@ func (p *apiServerPetClient) Get(pet *pcb) (*pcb, bool, error) {
 
 // Delete deletes the pet in the pcb from the apiserver.
 func (p *apiServerPetClient) Delete(pet *pcb) error {
-	err := podClient(p.c, pet.parent.Namespace).Delete(pet.pod.Name, nil)
+	err := p.c.Core().Pods(pet.parent.Namespace).Delete(pet.pod.Name, nil)
 	if errors.IsNotFound(err) {
 		err = nil
 	}
@@ -191,7 +191,7 @@ func (p *apiServerPetClient) Delete(pet *pcb) error {
 
 // Create creates the pet in the pcb.
 func (p *apiServerPetClient) Create(pet *pcb) error {
-	_, err := podClient(p.c, pet.parent.Namespace).Create(pet.pod)
+	_, err := p.c.Core().Pods(pet.parent.Namespace).Create(pet.pod)
 	p.event(pet.parent, "Create", fmt.Sprintf("pet: %v", pet.pod.Name), err)
 	return err
 }
@@ -200,7 +200,7 @@ func (p *apiServerPetClient) Create(pet *pcb) error {
 // If the pod object of a pet which to be updated has been changed in server side, we
 // will get the actual value and set pet identity before retries.
 func (p *apiServerPetClient) Update(pet *pcb, expectedPet *pcb) (updateErr error) {
-	pc := podClient(p.c, pet.parent.Namespace)
+	pc := p.c.Core().Pods(pet.parent.Namespace)
 
 	for i := 0; ; i++ {
 		updatePod, needsUpdate, err := copyPetID(pet, expectedPet)
@@ -227,12 +227,12 @@ func (p *apiServerPetClient) DeletePVCs(pet *pcb) error {
 }
 
 func (p *apiServerPetClient) getPVC(pvcName, pvcNamespace string) (*api.PersistentVolumeClaim, error) {
-	pvc, err := claimClient(p.c, pvcNamespace).Get(pvcName)
+	pvc, err := p.c.Core().PersistentVolumeClaims(pvcNamespace).Get(pvcName)
 	return pvc, err
 }
 
 func (p *apiServerPetClient) createPVC(pvc *api.PersistentVolumeClaim) error {
-	_, err := claimClient(p.c, pvc.Namespace).Create(pvc)
+	_, err := p.c.Core().PersistentVolumeClaims(pvc.Namespace).Create(pvc)
 	return err
 }
 

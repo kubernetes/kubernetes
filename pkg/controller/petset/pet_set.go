@@ -26,8 +26,10 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/client/cache"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
 	"k8s.io/kubernetes/pkg/client/record"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/errors"
@@ -50,7 +52,7 @@ const (
 
 // PetSetController controls petsets.
 type PetSetController struct {
-	kubeClient *client.Client
+	kubeClient internalclientset.Interface
 
 	// newSyncer returns an interface capable of syncing a single pet.
 	// Abstracted out for testing.
@@ -81,10 +83,10 @@ type PetSetController struct {
 }
 
 // NewPetSetController creates a new petset controller.
-func NewPetSetController(podInformer cache.SharedIndexInformer, kubeClient *client.Client, resyncPeriod time.Duration) *PetSetController {
+func NewPetSetController(podInformer cache.SharedIndexInformer, kubeClient internalclientset.Interface, resyncPeriod time.Duration) *PetSetController {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
-	eventBroadcaster.StartRecordingToSink(kubeClient.Events(""))
+	eventBroadcaster.StartRecordingToSink(&unversionedcore.EventSinkImpl{Interface: kubeClient.Core().Events("")})
 	recorder := eventBroadcaster.NewRecorder(api.EventSource{Component: "petset"})
 	pc := &apiServerPetClient{kubeClient, recorder, &defaultPetHealthChecker{}}
 
@@ -309,7 +311,7 @@ func (psc *PetSetController) Sync(key string) error {
 	}
 
 	numPets, syncErr := psc.syncPetSet(&ps, petList)
-	if updateErr := updatePetCount(psc.kubeClient, ps, numPets); updateErr != nil {
+	if updateErr := updatePetCount(psc.kubeClient.Apps(), ps, numPets); updateErr != nil {
 		glog.Infof("Failed to update replica count for petset %v/%v; requeuing; error: %v", ps.Namespace, ps.Name, updateErr)
 		return errors.NewAggregate([]error{syncErr, updateErr})
 	}
