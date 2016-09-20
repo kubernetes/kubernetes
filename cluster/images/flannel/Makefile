@@ -15,52 +15,31 @@
 # Build the flannel image
 #
 # Usage:
-# 	[TAG=0.5.5] [REGISTRY=gcr.io/google_containers] [ARCH=amd64] make build
+# 	[TAG=?] [REGISTRY=gcr.io/google_containers] [ARCH=amd64] make build
 
-TAG?=0.5.5
+TAG?=0.6.2-kube
 ARCH?=amd64
 REGISTRY?=gcr.io/google_containers
-KUBE_CROSS_TAG=$(shell cat ../../../build-image/cross/VERSION)
-GOARM=6
 TEMP_DIR:=$(shell mktemp -d)
 BASEIMAGE?=gcr.io/google_containers/debian-iptables-${ARCH}:v2
+ARCHES = amd64 arm arm64 ppc64le
+FLANNEL_COMMIT=44bac89c8065fa2961b35ca094573f8db92456f5
 
-ifeq ($(ARCH),arm)
-	CC=arm-linux-gnueabi-gcc
-endif
-ifeq ($(ARCH),arm64)
-	CC=aarch64-linux-gnu-gcc
-endif
-ifeq ($(ARCH),ppc64le)
-	CC=powerpc64le-linux-gnu-gcc
-endif
+all: build-all
+build-all: $(addprefix build-,$(ARCHES))
+push-all: $(addprefix push-,$(ARCHES))
 
-build:
-ifeq ($(ARCH),amd64)
-	# If we should build an amd64 flannel image, go with the official one
-	docker pull quay.io/coreos/flannel:$(TAG)
+$(TEMP_DIR)/flannel:
+	git clone https://github.com/coreos/flannel $(TEMP_DIR)/flannel
+	cd $(TEMP_DIR)/flannel && git checkout $(FLANNEL_COMMIT)
 
-	docker tag -f quay.io/coreos/flannel:$(TAG) $(REGISTRY)/flannel-$(ARCH):$(TAG)
-else
-	# Copy the content in this dir to the temp dir
-	cp ./* $(TEMP_DIR)
+build-%: $(TEMP_DIR)/flannel
 
-	docker run -it -v $(TEMP_DIR):/flannel/bin gcr.io/google_containers/kube-cross:$(KUBE_CROSS_TAG) /bin/bash -c \
-		"curl -sSL https://github.com/coreos/flannel/archive/v${TAG}.tar.gz | tar -C /flannel -xz --strip-components=1 \
-		&& cd /flannel && GOARM=$(GOARM) GOARCH=$(ARCH) CC=$(CC) CGO_ENABLED=1 ./build"
+	# Build the image with flannel's official scripts
+	cd $(TEMP_DIR)/flannel && ARCH=$* TAG=$(TAG) make dist/flanneld-$(TAG)-$*.docker
 
-	# Replace BASEIMAGE with the real base image
-	cd $(TEMP_DIR) && sed -i "s|BASEIMAGE|$(BASEIMAGE)|g" Dockerfile
+	# And retag the image to gcr.io for pushing
+	docker tag quay.io/coreos/flannel:$(TAG)-$* $(REGISTRY)/flannel-$*:$(TAG)
 
-	# Download mk-docker-opts.sh
-	curl -sSL https://raw.githubusercontent.com/coreos/flannel/v$(TAG)/dist/mk-docker-opts.sh > $(TEMP_DIR)/mk-docker-opts.sh
-
-	# And build the image
-	docker build -t $(REGISTRY)/flannel-$(ARCH):$(TAG) $(TEMP_DIR)
-endif
-
-push: build
+push-%: build-$*
 	gcloud docker push $(REGISTRY)/flannel-$(ARCH):$(TAG)
-
-all: build
-.PHONY: build push
