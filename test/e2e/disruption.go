@@ -61,7 +61,7 @@ var _ = framework.KubeDescribe("DisruptionController", func() {
 	It("should update PodDisruptionBudget status", func() {
 		createPodDisruptionBudgetOrDie(cs, ns, intstr.FromInt(2))
 
-		createPodsOrDie(cs, ns, 2)
+		createPodsOrDie(cs, ns, 3)
 
 		// Since disruptionAllowed starts out false, if we see it ever become true,
 		// that means the controller is working.
@@ -92,22 +92,22 @@ var _ = framework.KubeDescribe("DisruptionController", func() {
 		}, {
 			description:  "too few pods, absolute",
 			minAvailable: intstr.FromInt(2),
-			podCount:     1,
+			podCount:     2,
 			shouldDeny:   true,
 		}, {
 			description:  "enough pods, absolute",
 			minAvailable: intstr.FromInt(2),
-			podCount:     2,
+			podCount:     3,
 			shouldDeny:   false,
 		}, {
 			description:    "enough pods, replicaSet, percentage",
-			minAvailable:   intstr.FromString("100%"),
+			minAvailable:   intstr.FromString("90%"),
 			replicaSetSize: 10,
 			exclusive:      false,
 			shouldDeny:     false,
 		}, {
 			description:    "too few pods, replicaSet, percentage",
-			minAvailable:   intstr.FromString("100%"),
+			minAvailable:   intstr.FromString("90%"),
 			replicaSetSize: 10,
 			exclusive:      true,
 			shouldDeny:     true,
