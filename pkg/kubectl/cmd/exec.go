@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/resource"
 	remotecommandserver "k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
 	"k8s.io/kubernetes/pkg/util/interrupt"
 	"k8s.io/kubernetes/pkg/util/term"
@@ -157,6 +158,29 @@ func (p *ExecOptions) Complete(f *cmdutil.Factory, cmd *cobra.Command, argsIn []
 			return cmdutil.UsageError(cmd, execUsageStr)
 		}
 	}
+	namespace, _, err := f.DefaultNamespace()
+	if err != nil {
+		return err
+	}
+	p.Namespace = namespace
+
+	clientMapper := resource.ClientMapperFunc(f.ClientForMapping)
+	mapper, typer := f.Object()
+	decoder := f.Decoder(true)
+
+	infos, err := resource.NewBuilder(mapper, typer, clientMapper, decoder).
+		NamespaceParam(p.Namespace).DefaultNamespace().
+		ResourceNames("pods", p.PodName).
+		SingleResourceType().
+		Do().Infos()
+	if err != nil {
+		return err
+	}
+	if len(infos) != 1 {
+		return cmdutil.UsageError(cmd, execUsageStr)
+	}
+
+	p.PodName = infos[0].Name
 
 	cmdParent := cmd.Parent()
 	if cmdParent != nil {
@@ -165,12 +189,6 @@ func (p *ExecOptions) Complete(f *cmdutil.Factory, cmd *cobra.Command, argsIn []
 	if len(p.FullCmdName) > 0 && cmdutil.IsSiblingCommandExists(cmd, "describe") {
 		p.SuggestedCmdUsage = fmt.Sprintf("Use '%s describe pod/%s' to see all of the containers in this pod.", p.FullCmdName, p.PodName)
 	}
-
-	namespace, _, err := f.DefaultNamespace()
-	if err != nil {
-		return err
-	}
-	p.Namespace = namespace
 
 	config, err := f.ClientConfig()
 	if err != nil {
