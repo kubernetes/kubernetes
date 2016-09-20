@@ -86,6 +86,14 @@ func TestPodAndContainer(t *testing.T) {
 			name:          "pod in flags",
 		},
 		{
+			p:             &ExecOptions{StreamOptions: StreamOptions{PodName: "pod/foo"}},
+			args:          []string{"cmd"},
+			argsLenAtDash: -1,
+			expectedPod:   "foo",
+			expectedArgs:  []string{"cmd"},
+			name:          "pod with 'pod/' prefix in flags",
+		},
+		{
 			p:             &ExecOptions{},
 			args:          []string{"foo", "cmd"},
 			argsLenAtDash: 0,
@@ -106,6 +114,14 @@ func TestPodAndContainer(t *testing.T) {
 			expectedPod:   "foo",
 			expectedArgs:  []string{"cmd"},
 			name:          "cmd, w/o flags",
+		},
+		{
+			p:             &ExecOptions{},
+			args:          []string{"pod/foo", "cmd"},
+			argsLenAtDash: -1,
+			expectedPod:   "foo",
+			expectedArgs:  []string{"cmd"},
+			name:          "pod with 'pod/' prefix, cmd, w/o flags",
 		},
 		{
 			p:             &ExecOptions{},

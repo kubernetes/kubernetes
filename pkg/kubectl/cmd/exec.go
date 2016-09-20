@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"strings"
 
 	dockerterm "github.com/docker/docker/pkg/term"
 	"github.com/renstrom/dedent"
@@ -159,6 +160,10 @@ func (p *ExecOptions) Complete(f *cmdutil.Factory, cmd *cobra.Command, argsIn []
 		if len(p.Command) < 1 {
 			return cmdutil.UsageError(cmd, execUsageStr)
 		}
+	}
+
+	if strings.HasPrefix(p.PodName, "pod/") {
+		p.PodName = p.PodName[4:]
 	}
 
 	namespace, _, err := f.DefaultNamespace()
