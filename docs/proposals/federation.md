@@ -295,7 +295,7 @@ initial implementation targeting single cloud provider only.
 
 Up to this point, this use case ("Unavailability Zones") seems materially different from all the others above.  It does not require dynamic cross-cluster service migration (we assume that the service is already running in more than one cluster when the failure occurs).  Nor does it necessarily involve cross-cluster service discovery or location affinity.  As a result, I propose that we address this use case somewhat independently of the others (although I strongly suspect that it will become substantially easier once we've solved the others).
 
-All of the above (regarding "Unavailibility Zones") refers primarily
+All of the above (regarding "Unavailability Zones") refers primarily
 to already-running user-facing services, and minimizing the impact on
 end users of those services becoming unavailable in a given cluster.
 What about the people and systems that deploy Kubernetes services
@@ -324,7 +324,7 @@ other stateful network service.  What is tolerable is typically
 application-dependent, primarily influenced by network bandwidth
 consumption, latency requirements and cost sensitivity.
 
-For simplicity, lets assume that all Kubernetes distributed
+For simplicity, let's assume that all Kubernetes distributed
 applications fall into one of three categories with respect to relative
 location affinity:
 
@@ -361,7 +361,7 @@ location affinity:
    anyway to run effectively, even in a single Kubernetes cluster).
 
 From a fault isolation point of view, there are also opposites of the
-above.  For example a master database and it's slave replica might
+above.  For example, a master database and its slave replica might
 need to be in different availability zones.  We'll refer to this a
 anti-affinity, although it is largely outside the scope of this
 document.
@@ -376,7 +376,7 @@ and single cloud provider.  Despite being in different data centers,
 or areas within a mega data center, network in this case is often very fast
 and effectively free or very cheap. For the purposes of this network location
 affinity discussion, this case is considered analogous to a single
-availability zone. Furthermore,  if a given application doesn't fit
+availability zone. Furthermore, if a given application doesn't fit
 cleanly into one of the above, shoe-horn it into the best fit,
 defaulting to the "Strictly Coupled and Immovable" bucket if you're
 not sure.
@@ -463,7 +463,7 @@ such events include:
 1. A low capacity event in a cluster (or a cluster failure).
 1. A change of scheduling policy ("we no longer use cloud provider X").
 1. A change of resource pricing ("cloud provider Y dropped their
-   prices - lets migrate there").
+   prices - let's migrate there").
 
 Strictly Decoupled applications can be trivially moved, in part or in
 whole, one pod at a time, to one or more clusters (within applicable
@@ -569,7 +569,7 @@ prefers the Decoupled Hierarchical model for the reasons stated below).
     single Monolithic multi-zone cluster might be simpler by virtue of
     being only "one thing to manage", however in practise each of the
     underlying availability zones (and possibly cloud providers) has
-    it's own capacity, pricing, hardware platforms, and possibly
+    its own capacity, pricing, hardware platforms, and possibly
     bureaucratic boundaries (e.g. "our EMEA IT department manages those
     European clusters").  So explicitly allowing for (but not
     mandating) completely independent administration of each
