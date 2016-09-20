@@ -21,12 +21,14 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/api"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	certutil "k8s.io/kubernetes/pkg/util/cert"
+	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 type kubeDiscovery struct {
@@ -35,7 +37,7 @@ type kubeDiscovery struct {
 }
 
 const (
-	kubeDiscoverynName      = "kube-discovery"
+	kubeDiscoveryName       = "kube-discovery"
 	kubeDiscoverySecretName = "clusterinfo"
 )
 
@@ -71,7 +73,7 @@ func newKubeDiscoveryPodSpec(s *kubeadmapi.KubeadmConfig) api.PodSpec {
 		// TODO update this when #31307 is resolved
 		SecurityContext: &api.PodSecurityContext{HostNetwork: true},
 		Containers: []api.Container{{
-			Name:    kubeDiscoverynName,
+			Name:    kubeDiscoveryName,
 			Image:   s.EnvParams["discovery_image"],
 			Command: []string{"/usr/bin/kube-discovery"},
 			VolumeMounts: []api.VolumeMount{{
@@ -96,7 +98,7 @@ func newKubeDiscoveryPodSpec(s *kubeadmapi.KubeadmConfig) api.PodSpec {
 
 func newKubeDiscovery(s *kubeadmapi.KubeadmConfig, caCert *x509.Certificate) kubeDiscovery {
 	kd := kubeDiscovery{
-		Deployment: NewDeployment(kubeDiscoverynName, 1, newKubeDiscoveryPodSpec(s)),
+		Deployment: NewDeployment(kubeDiscoveryName, 1, newKubeDiscoveryPodSpec(s)),
 		Secret: &api.Secret{
 			ObjectMeta: api.ObjectMeta{Name: kubeDiscoverySecretName},
 			Type:       api.SecretTypeOpaque,
@@ -114,15 +116,27 @@ func CreateDiscoveryDeploymentAndSecret(s *kubeadmapi.KubeadmConfig, client *cli
 	kd := newKubeDiscovery(s, caCert)
 
 	if _, err := client.Extensions().Deployments(api.NamespaceSystem).Create(kd.Deployment); err != nil {
-		return fmt.Errorf("<master/discovery> failed to create %q deployment [%s]", kubeDiscoverynName, err)
+		return fmt.Errorf("<master/discovery> failed to create %q deployment [%s]", kubeDiscoveryName, err)
 	}
 	if _, err := client.Secrets(api.NamespaceSystem).Create(kd.Secret); err != nil {
 		return fmt.Errorf("<master/discovery> failed to create %q secret [%s]", kubeDiscoverySecretName, err)
 	}
 
-	fmt.Println("<master/discovery> created essential addon: kube-discovery")
+	fmt.Println("<master/discovery> created essential addon: kube-discovery, waiting for it to become ready")
 
-	// TODO we should probably wait for the pod to become ready
+	// wait for the pod to become ready
+	start := time.Now()
+	wait.PollInfinite(500*time.Millisecond, func() (bool, error) {
+		d, err := client.Extensions().Deployments(api.NamespaceSystem).Get(kubeDiscoveryName)
+		if err != nil {
+			return false, nil
+		}
+		if d.Status.AvailableReplicas < 1 {
+			return false, nil
+		}
+		return true, nil
+	})
+	fmt.Printf("<master/discovery> kube-discovery is ready after %f seconds\n", time.Since(start).Seconds())
 
 	return nil
 }
