@@ -471,6 +471,7 @@ show-all
 show-events
 show-kind
 show-labels
+show-namespace
 shutdown-fd
 shutdown-fifo
 since-seconds

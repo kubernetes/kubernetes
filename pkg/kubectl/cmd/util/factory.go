@@ -1227,19 +1227,14 @@ func (f *Factory) PrinterForMapping(cmd *cobra.Command, mapping *meta.RESTMappin
 		}
 
 	} else {
-		// Some callers do not have "label-columns" so we can't use the GetFlagStringSlice() helper
-		columnLabel, err := cmd.Flags().GetStringSlice("label-columns")
-		if err != nil {
-			columnLabel = []string{}
-		}
 		printer, err = f.Printer(mapping, kubectl.PrintOptions{
 			NoHeaders:          GetFlagBool(cmd, "no-headers"),
-			WithNamespace:      withNamespace,
+			WithNamespace:      GetShowNamespaceFlag(cmd, withNamespace),
 			Wide:               GetWideFlag(cmd),
 			ShowAll:            GetFlagBool(cmd, "show-all"),
 			ShowLabels:         GetFlagBool(cmd, "show-labels"),
 			AbsoluteTimestamps: isWatch(cmd),
-			ColumnLabels:       columnLabel,
+			ColumnLabels:       GetLabelColumnsFlag(cmd),
 		})
 		if err != nil {
 			return nil, err

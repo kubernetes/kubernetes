@@ -313,6 +313,26 @@ func GetWideFlag(cmd *cobra.Command) bool {
 	return false
 }
 
+// GetShowNamespaceFlag is use to determine if "--show-namespace" is used
+func GetShowNamespaceFlag(cmd *cobra.Command, defaultVal bool) bool {
+	b, err := cmd.Flags().GetBool("show-namespace")
+	if err != nil {
+		return defaultVal
+	}
+	return b
+}
+
+// GetColumnLabelsFlag is use to get column lables in command.
+// Empty slice is return if it's not set
+func GetLabelColumnsFlag(cmd *cobra.Command) []string {
+	// Some callers do not have "label-columns" so we can't use the GetFlagStringSlice() helper
+	columnLabel, err := cmd.Flags().GetStringSlice("label-columns")
+	if err != nil {
+		columnLabel = []string{}
+	}
+	return columnLabel
+}
+
 func GetFlagBool(cmd *cobra.Command, flag string) bool {
 	b, err := cmd.Flags().GetBool(flag)
 	if err != nil {
