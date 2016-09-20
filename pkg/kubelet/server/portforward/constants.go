@@ -19,3 +19,5 @@ package portforward
 
 // The subprotocol "portforward.k8s.io" is used for port forwarding.
 const PortForwardProtocolV1Name = "portforward.k8s.io"
+
+var SupportedPortForwardProtocols = []string{PortForwardProtocolV1Name}
