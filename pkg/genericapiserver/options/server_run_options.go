@@ -17,6 +17,7 @@ limitations under the License.
 package options
 
 import (
+	"errors"
 	"net"
 	"strconv"
 	"strings"
@@ -114,6 +115,7 @@ type ServerRunOptions struct {
 	// for testing). This is not actually exposed as a flag.
 	DefaultStorageVersions string
 	TargetRAMMB            int
+	TLSCAFile              string
 	TLSCertFile            string
 	TLSPrivateKeyFile      string
 	TokenAuthFile          string
@@ -213,12 +215,14 @@ func (s *ServerRunOptions) NewSelfClient(token string) (clientset.Interface, err
 		QPS:   50,
 		Burst: 100,
 	}
-	if s.SecurePort > 0 {
+	if s.SecurePort > 0 && len(s.TLSCAFile) > 0 {
 		clientConfig.Host = "https://" + net.JoinHostPort(s.BindAddress.String(), strconv.Itoa(s.SecurePort))
-		clientConfig.Insecure = true
+		clientConfig.CAFile = s.TLSCAFile
 		clientConfig.BearerToken = token
-	} else {
+	} else if s.InsecurePort > 0 {
 		clientConfig.Host = net.JoinHostPort(s.InsecureBindAddress.String(), strconv.Itoa(s.InsecurePort))
+	} else {
+		return nil, errors.New("Unable to set url for apiserver local client")
 	}
 
 	return clientset.NewForConfig(clientConfig)
@@ -444,6 +448,10 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"You only need to pass the groups you wish to change from the defaults. "+
 		"It defaults to a list of preferred versions of all registered groups, "+
 		"which is derived from the KUBE_API_VERSIONS environment variable.")
+
+	fs.StringVar(&s.TLSCAFile, "tls-ca-file", s.TLSCAFile, "If set, this "+
+		"certificate authority will used for secure access from Admission "+
+		"Controllers. This must be a valid PEM-encoded CA bundle.")
 
 	fs.StringVar(&s.TLSCertFile, "tls-cert-file", s.TLSCertFile, ""+
 		"File containing x509 Certificate for HTTPS. (CA cert, if any, concatenated "+
