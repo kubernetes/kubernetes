@@ -533,3 +533,4 @@ windows-line-endings
 www-prefix
 zone-name
 garbage-collector-enabled
+viper-config
