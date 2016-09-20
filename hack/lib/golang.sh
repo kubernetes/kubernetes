@@ -38,6 +38,7 @@ kube::golang::server_targets() {
     cmd/kubeadm
     cmd/kubemark
     cmd/hyperkube
+    cmd/kube-discovery
     plugin/cmd/kube-scheduler
   )
   if [ -n "${KUBERNETES_CONTRIB:-}" ]; then
@@ -181,6 +182,8 @@ readonly KUBE_STATIC_LIBRARIES=(
   kube-dns
   kube-scheduler
   kube-proxy
+  kube-discovery
+  kubeadm
   kubectl
 )
 
