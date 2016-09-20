@@ -334,18 +334,18 @@ func (c Config) New() (*GenericAPIServer, error) {
 	} else {
 		s.HandlerContainer = NewHandlerContainer(http.NewServeMux(), c.Serializer)
 	}
-	// Use CurlyRouter to be able to use regular expressions in paths. Regular expressions are required in paths for example for proxy (where the path is proxy/{kind}/{name}/{*})
-	s.HandlerContainer.Router(restful.CurlyRouter{})
+	s.AuxiliaryHandlerContainer = NewHandlerContainer(s.HandlerContainer.ServeMux, c.Serializer)
+	s.HandlerContainer.Router(restful.CurlyRouter{}) // allow regexp paths, like for proxy/{kind}/{name}/{*}
 
 	// We do not register this using restful Webservice since we do not want to surface this in api docs.
 	if c.EnableIndex {
-		s.HandlerContainer.ServeMux.HandleFunc("/", routes.Index(s.HandlerContainer))
+		s.AuxiliaryHandlerContainer.ServeMux.HandleFunc("/", routes.Index(s.AuxiliaryHandlerContainer, s.HandlerContainer))
 	}
 	if c.EnableSwaggerSupport && c.EnableSwaggerUI {
-		s.HandlerContainer.Add(routes.SwaggerUI())
+		s.AuxiliaryHandlerContainer.Add(routes.SwaggerUI())
 	}
 	if c.EnableProfiling {
-		s.HandlerContainer.Add(routes.Profiling())
+		s.AuxiliaryHandlerContainer.Add(routes.Profiling())
 	}
 	if c.EnableVersion {
 		s.HandlerContainer.Add(routes.Version())

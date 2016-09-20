@@ -123,7 +123,11 @@ type GenericAPIServer struct {
 	// should be determining the backing storage for the RESTStorage interfaces
 	storageDecorator generic.StorageDecorator
 
+	// HandlerContainer subsumes routes which are published through swagger
 	HandlerContainer *restful.Container
+	// AuxiliaryHandlerContainer subsumes routes which are visible through /, but not through swagger
+	AuxiliaryHandlerContainer *restful.Container
+
 	MasterCount      int
 
 	// ExternalAddress is the address (hostname or IP and port) that should be used in

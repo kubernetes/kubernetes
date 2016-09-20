@@ -197,7 +197,7 @@ func Run(s *options.ServerRunOptions) error {
 		return err
 	}
 
-	m.HandlerContainer.Add(routes.UIRedirect())
+	m.AuxiliaryHandlerContainer.Add(routes.UIRedirect())
 	m.HandlerContainer.Add(routes.Logs())
 
 	installFederationAPIs(s, m, storageFactory)

@@ -26,7 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/apiserver"
 )
 
-func Index(c *restful.Container) func(w http.ResponseWriter, r *http.Request) {
+func Index(aux, public *restful.Container) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		status := http.StatusOK
 		if r.URL.Path != "/" && r.URL.Path != "/index.html" {
@@ -36,7 +36,10 @@ func Index(c *restful.Container) func(w http.ResponseWriter, r *http.Request) {
 		}
 		var handledPaths []string
 		// Extract the paths handled using restful.WebService
-		for _, ws := range c.RegisteredWebServices() {
+		for _, ws := range aux.RegisteredWebServices() {
+			handledPaths = append(handledPaths, ws.RootPath())
+		}
+		for _, ws := range public.RegisteredWebServices() {
 			handledPaths = append(handledPaths, ws.RootPath())
 		}
 		sort.Strings(handledPaths)

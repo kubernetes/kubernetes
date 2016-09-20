@@ -194,7 +194,7 @@ func New(c *Config) (*Master, error) {
 	}
 
 	if c.EnableUISupport {
-		s.HandlerContainer.Add(routes.UIRedirect())
+		s.AuxiliaryHandlerContainer.Add(routes.UIRedirect())
 	}
 	if c.EnableLogsSupport {
 		s.HandlerContainer.Add(routes.Logs())
@@ -278,12 +278,12 @@ func (m *Master) InstallAPIs(c *Config) {
 	ws.Path(path)
 	ws.Doc("health checks")
 	healthz.InstallHandler(genericroutes.WebServiceGETMux{WS: ws, Path: path}, healthzChecks...)
-	m.HandlerContainer.Add(ws)
+	m.AuxiliaryHandlerContainer.Add(ws)
 
 	if c.EnableProfiling {
-		m.HandlerContainer.Add(routes.MetricsWithReset())
+		m.AuxiliaryHandlerContainer.Add(routes.MetricsWithReset())
 	} else {
-		m.HandlerContainer.Add(routes.DefaultMetrics())
+		m.AuxiliaryHandlerContainer.Add(routes.DefaultMetrics())
 	}
 
 	// Install third party resource support if requested
