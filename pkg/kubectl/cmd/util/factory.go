@@ -135,6 +135,10 @@ type Factory interface {
 	Pauser(info *resource.Info) (bool, error)
 	// Resumer resumes a paused object inside the info ie. it will be reconciled by its controller.
 	Resumer(info *resource.Info) (bool, error)
+	// ResolveImage resolves the image names. For kubernetes this function is just
+	// passthrough but it allows to perform more sophisticated image name resolving for
+	// third-party vendors.
+	ResolveImage(imageName string) (string, error)
 	// Returns a schema that can validate objects stored on disk.
 	Validator(validate bool, cacheDir string) (validation.Schema, error)
 	// SwaggerSchema returns the schema declaration for the provided group version kind.
@@ -652,6 +656,10 @@ func (f *factory) Pauser(info *resource.Info) (bool, error) {
 	default:
 		return false, fmt.Errorf("pausing is not supported")
 	}
+}
+
+func (f *factory) ResolveImage(name string) (string, error) {
+	return name, nil
 }
 
 func (f *factory) Resumer(info *resource.Info) (bool, error) {
