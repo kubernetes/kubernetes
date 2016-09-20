@@ -222,6 +222,7 @@ func (w *watcher) Watch(ctx context.Context, key string, opts ...OpOption) Watch
 		// closed
 		w.mu.Unlock()
 		ch := make(chan WatchResponse)
+		fmt.Printf("etcd Watch returns closed chan: %p\n", ch)
 		close(ch)
 		return ch
 	}
@@ -267,7 +268,7 @@ func (w *watcher) Watch(ctx context.Context, key string, opts ...OpOption) Watch
 			return w.Watch(ctx, key, opts...)
 		}
 	}
-
+	fmt.Printf("etcd Watch returns closed chan 2: %p\n", closeCh)
 	close(closeCh)
 	return closeCh
 }
@@ -288,6 +289,7 @@ func (w *watcher) Close() (err error) {
 func (w *watchGrpcStream) Close() (err error) {
 	w.mu.Lock()
 	if w.stopc != nil {
+		fmt.Printf("etcd Close: \n")
 		close(w.stopc)
 		w.stopc = nil
 	}
@@ -321,6 +323,7 @@ func (w *watchGrpcStream) addStream(resp *pb.WatchResponse, pendingReq *watchReq
 	ret := make(chan WatchResponse)
 	if resp.WatchId == -1 {
 		// failed; no channel
+		fmt.Printf("etcd addStream returns closed chan 3: %p\n", ret)
 		close(ret)
 		pendingReq.retc <- ret
 		return
@@ -355,6 +358,7 @@ func (w *watchGrpcStream) addStream(resp *pb.WatchResponse, pendingReq *watchReq
 // closeStream closes the watcher resources and removes it
 func (w *watchGrpcStream) closeStream(ws *watcherStream) {
 	w.mu.Lock()
+	fmt.Printf("etcd closeStream: %p\n", ws.outc)
 	// cancels request stream; subscriber receives nil channel
 	close(ws.initReq.retc)
 	// close subscriber's channel
@@ -384,11 +388,13 @@ func (w *watchGrpcStream) run() {
 	stopc := w.stopc
 	w.mu.RUnlock()
 	if stopc == nil {
+		fmt.Printf("etcd run, stopc == nil\n")
 		return
 	}
 
 	// start a stream with the etcd grpc server
 	if wc, closeErr = w.newWatchClient(); closeErr != nil {
+		fmt.Printf("etcd run, closeErr != nil\n")
 		return
 	}
 
@@ -427,6 +433,7 @@ func (w *watchGrpcStream) run() {
 				w.mu.Unlock()
 				if numStreams == 0 {
 					// don't leak watcher streams
+					fmt.Printf("etcd run, numStreams == 0\n")
 					return
 				}
 			default:
@@ -452,9 +459,11 @@ func (w *watchGrpcStream) run() {
 		case err := <-w.errc:
 			if toErr(w.ctx, err) == v3rpc.ErrNoLeader {
 				closeErr = err
+				fmt.Printf("etcd run, v3rpc.ErrNoLeader\n")
 				return
 			}
 			if wc, closeErr = w.newWatchClient(); closeErr != nil {
+				fmt.Printf("etcd run, closeErr: %v\n", closeErr)
 				return
 			}
 			curReqC = w.reqc
@@ -463,6 +472,7 @@ func (w *watchGrpcStream) run() {
 			}
 			cancelSet = make(map[int64]struct{})
 		case <-stopc:
+			fmt.Printf("etcd run, <-stopc\n")
 			return
 		}
 
@@ -539,6 +549,7 @@ func (w *watchGrpcStream) serveStream(ws *watcherStream) {
 		case outc <- *curWr:
 			if wrs[0].Err() != nil {
 				closing = true
+				fmt.Printf("etcd closing = true 3: %p\n", ws.outc)
 				break
 			}
 			var newRev int64
@@ -555,6 +566,7 @@ func (w *watchGrpcStream) serveStream(ws *watcherStream) {
 		case wr, ok := <-ws.recvc:
 			if !ok {
 				// shutdown from closeStream
+				fmt.Printf("etcd !ok: %p\n", ws.outc)
 				return
 			}
 			// resume up to last seen event if disconnected
@@ -587,9 +599,11 @@ func (w *watchGrpcStream) serveStream(ws *watcherStream) {
 			}
 		case <-w.donec:
 			closing = true
+			fmt.Printf("etcd closing = true: %p\n", ws.outc)
 			closeErr = w.closeErr
 		case <-ws.initReq.ctx.Done():
 			closing = true
+			fmt.Printf("etcd closing = true 2: %p\n", ws.outc)
 		}
 	}
 
@@ -610,6 +624,7 @@ func (w *watchGrpcStream) serveStream(ws *watcherStream) {
 func (wgs *watchGrpcStream) stopIfEmpty() {
 	wgs.mu.Lock()
 	if len(wgs.streams) == 0 && wgs.stopc != nil {
+		fmt.Printf("etcd stopIfEmpty: \n")
 		close(wgs.stopc)
 		wgs.stopc = nil
 	}
