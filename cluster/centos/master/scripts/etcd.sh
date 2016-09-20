@@ -35,7 +35,7 @@ ETCD_LISTEN_CLIENT_URLS="http://0.0.0.0:2379"
 #
 #[cluster]
 #ETCD_INITIAL_ADVERTISE_PEER_URLS="http://localhost:2380,http://localhost:7001"
-# if you use different ETCD_NAME (e.g. test), 
+# if you use different ETCD_NAME (e.g. test),
 # set ETCD_INITIAL_CLUSTER value for this name, i.e. "test=http://..."
 #ETCD_INITIAL_CLUSTER="default=http://localhost:2380,default=http://localhost:7001"
 #ETCD_INITIAL_CLUSTER_STATE="new"
@@ -76,4 +76,4 @@ EOF
 
 systemctl daemon-reload
 systemctl enable etcd
-systemctl start etcd
+systemctl restart etcd
