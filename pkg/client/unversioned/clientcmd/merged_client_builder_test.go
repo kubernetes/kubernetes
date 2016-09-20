@@ -84,6 +84,22 @@ func TestInClusterConfig(t *testing.T) {
 		contextName: "clean",
 		overrides:   &ConfigOverrides{},
 	}
+	invalidDefaultConfig := clientcmdapi.NewConfig()
+	invalidDefaultConfig.Clusters["clean"] = &clientcmdapi.Cluster{
+		Server: "http://localhost:8080",
+	}
+	invalidDefaultConfig.Contexts["other"] = &clientcmdapi.Context{
+		Cluster: "clean",
+	}
+	invalidDefaultConfig.CurrentContext = "clean"
+
+	defaultInvalid := &DirectClientConfig{
+		config:    *invalidDefaultConfig,
+		overrides: &ConfigOverrides{},
+	}
+	if _, err := defaultInvalid.ClientConfig(); err == nil || !IsConfigurationInvalid(err) {
+		t.Fatal(err)
+	}
 	config1, err := default1.ClientConfig()
 	if err != nil {
 		t.Fatal(err)
@@ -120,6 +136,16 @@ func TestInClusterConfig(t *testing.T) {
 
 		"in-cluster checked when config is default": {
 			defaultConfig: default1,
+			clientConfig:  &testClientConfig{config: config1},
+			icc:           &testICC{},
+
+			checkedICC: true,
+			result:     config1,
+			err:        nil,
+		},
+
+		"in-cluster checked when config is default and invalid": {
+			defaultConfig: defaultInvalid,
 			clientConfig:  &testClientConfig{config: config1},
 			icc:           &testICC{},
 
@@ -175,12 +201,12 @@ func TestInClusterConfig(t *testing.T) {
 			err:        nil,
 		},
 
-		"in-cluster not checked when default is invalid": {
+		"in-cluster checked when default is invalid": {
 			defaultConfig: &DefaultClientConfig,
 			clientConfig:  &testClientConfig{config: config2},
 			icc:           &testICC{},
 
-			checkedICC: false,
+			checkedICC: true,
 			result:     config2,
 			err:        nil,
 		},
