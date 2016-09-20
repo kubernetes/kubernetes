@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -476,12 +476,16 @@ func TestSyncJobUpdateRequeue(t *testing.T) {
 	fakePodControl := controller.FakePodControl{}
 	manager.podControl = &fakePodControl
 	manager.podStoreSynced = alwaysReady
-	manager.updateHandler = func(job *batch.Job) error { return fmt.Errorf("Fake error") }
+	updateError := fmt.Errorf("Update error")
+	manager.updateHandler = func(job *batch.Job) error {
+		manager.queue.AddRateLimited(getKey(job, t))
+		return updateError
+	}
 	job := newJob(2, 2)
 	manager.jobStore.Store.Add(job)
 	err := manager.syncJob(getKey(job, t))
-	if err != nil {
-		t.Errorf("Unxpected error when syncing jobs, got %v", err)
+	if err == nil || err != updateError {
+		t.Errorf("Expected error %v when syncing jobs, got %v", updateError, err)
 	}
 	t.Log("Waiting for a job in the queue")
 	key, _ := manager.queue.Get()
