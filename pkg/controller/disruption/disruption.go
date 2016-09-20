@@ -565,7 +565,7 @@ func (dc *DisruptionController) updatePdbSpec(pdb *policy.PodDisruptionBudget, c
 	// pods are in a safe state when their first pods appear but this controller
 	// has not updated their status yet.  This isn't the only race, but it's a
 	// common one that's easy to detect.
-	disruptionAllowed := currentHealthy >= desiredHealthy && expectedCount > 0
+	disruptionAllowed := currentHealthy-1 >= desiredHealthy && expectedCount > 0
 
 	if pdb.Status.CurrentHealthy == currentHealthy && pdb.Status.DesiredHealthy == desiredHealthy && pdb.Status.ExpectedPods == expectedCount && pdb.Status.PodDisruptionAllowed == disruptionAllowed {
 		return nil
