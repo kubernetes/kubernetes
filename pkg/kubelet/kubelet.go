@@ -51,6 +51,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/dockershim"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/envvars"
 	"k8s.io/kubernetes/pkg/kubelet/events"
@@ -544,39 +545,64 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 	// Initialize the runtime.
 	switch kubeCfg.ContainerRuntime {
 	case "docker":
-		// Only supported one for now, continue.
-		klet.containerRuntime = dockertools.NewDockerManager(
-			kubeDeps.DockerClient,
-			kubecontainer.FilterEventRecorder(kubeDeps.Recorder),
-			klet.livenessManager,
-			containerRefManager,
-			klet.podManager,
-			machineInfo,
-			kubeCfg.PodInfraContainerImage,
-			float32(kubeCfg.RegistryPullQPS),
-			int(kubeCfg.RegistryBurst),
-			containerLogsDir,
-			kubeDeps.OSInterface,
-			klet.networkPlugin,
-			klet,
-			klet.httpClient,
-			dockerExecHandler,
-			kubeDeps.OOMAdjuster,
-			procFs,
-			klet.cpuCFSQuota,
-			imageBackOff,
-			kubeCfg.SerializeImagePulls,
-			kubeCfg.EnableCustomMetrics,
-			// If using "kubenet", the Kubernetes network plugin that wraps
-			// CNI's bridge plugin, it knows how to set the hairpin veth flag
-			// so we tell the container runtime to back away from setting it.
-			// If the kubelet is started with any other plugin we can't be
-			// sure it handles the hairpin case so we instruct the docker
-			// runtime to set the flag instead.
-			klet.hairpinMode == componentconfig.HairpinVeth && kubeCfg.NetworkPluginName != "kubenet",
-			kubeCfg.SeccompProfileRoot,
-			kubeDeps.ContainerRuntimeOptions...,
-		)
+		switch kubeCfg.ExperimentalRuntimeIntegrationType {
+		case "cri":
+			// Use the new CRI shim for docker. This is need for testing the
+			// docker integration through CRI, and may be removed in the future.
+			dockerService := dockershim.NewDockerService(klet.dockerClient)
+			klet.containerRuntime, err = kuberuntime.NewKubeGenericRuntimeManager(
+				kubecontainer.FilterEventRecorder(kubeDeps.Recorder),
+				klet.livenessManager,
+				containerRefManager,
+				klet.podManager,
+				kubeDeps.OSInterface,
+				klet.networkPlugin,
+				klet,
+				klet.httpClient,
+				imageBackOff,
+				kubeCfg.SerializeImagePulls,
+				klet.cpuCFSQuota,
+				dockerService,
+				dockerService,
+			)
+			if err != nil {
+				return nil, err
+			}
+		default:
+			// Only supported one for now, continue.
+			klet.containerRuntime = dockertools.NewDockerManager(
+				kubeDeps.DockerClient,
+				kubecontainer.FilterEventRecorder(kubeDeps.Recorder),
+				klet.livenessManager,
+				containerRefManager,
+				klet.podManager,
+				machineInfo,
+				kubeCfg.PodInfraContainerImage,
+				float32(kubeCfg.RegistryPullQPS),
+				int(kubeCfg.RegistryBurst),
+				containerLogsDir,
+				kubeDeps.OSInterface,
+				klet.networkPlugin,
+				klet,
+				klet.httpClient,
+				dockerExecHandler,
+				kubeDeps.OOMAdjuster,
+				procFs,
+				klet.cpuCFSQuota,
+				imageBackOff,
+				kubeCfg.SerializeImagePulls,
+				kubeCfg.EnableCustomMetrics,
+				// If using "kubenet", the Kubernetes network plugin that wraps
+				// CNI's bridge plugin, it knows how to set the hairpin veth flag
+				// so we tell the container runtime to back away from setting it.
+				// If the kubelet is started with any other plugin we can't be
+				// sure it handles the hairpin case so we instruct the docker
+				// runtime to set the flag instead.
+				klet.hairpinMode == componentconfig.HairpinVeth && kubeCfg.NetworkPluginName != "kubenet",
+				kubeCfg.SeccompProfileRoot,
+				kubeDeps.ContainerRuntimeOptions...,
+			)
+		}
 	case "rkt":
 		// TODO: Include hairpin mode settings in rkt?
 		conf := &rkt.Config{
