@@ -299,7 +299,7 @@ func NewAPIFactory() (*cmdutil.Factory, *testFactory, runtime.Codec, runtime.Neg
 			mapper := discovery.NewRESTMapper(groupResources, meta.InterfacesForUnstructured)
 			typer := discovery.NewUnstructuredObjectTyper(groupResources)
 
-			return cmdutil.NewShortcutExpander(mapper), typer, nil
+			return cmdutil.NewShortcutExpander(mapper, nil), typer, nil
 		},
 		ClientSet: func() (*internalclientset.Clientset, error) {
 			// Swap out the HTTP client out of the client with the fake's version.
