@@ -17,7 +17,6 @@ limitations under the License.
 package routes
 
 import (
-	"fmt"
 	"net/http"
 
 	assetfs "github.com/elazarl/go-bindata-assetfs"
@@ -28,7 +27,7 @@ import (
 
 // SwaggerUI exposes files in third_party/swagger-ui/ under /swagger-ui.
 func SwaggerUI() *restful.WebService {
-	prefix := "/swagger-ui/"
+	prefix := "/swagger-ui"
 	handler := http.StripPrefix(prefix, http.FileServer(&assetfs.AssetFS{
 		Asset:    swagger.Asset,
 		AssetDir: swagger.AssetDir,
@@ -36,9 +35,12 @@ func SwaggerUI() *restful.WebService {
 	}))
 
 	ws := new(restful.WebService)
-	ws.Path(fmt.Sprintf("%s{subpath:*}", prefix)) // go-restful curly path wildcard
+	ws.Path(prefix)
 	ws.Doc("swagger user interface")
+	wildcard := "/{subpath:*}" // go-restful curly path
+	ws.Route(ws.GET(wildcard).To(HandlerRouteFunction(handler.ServeHTTP)))
+	ws.Route(ws.HEAD(wildcard).To(HandlerRouteFunction(handler.ServeHTTP))) // used for eTags
 	ws.Route(ws.GET("/").To(HandlerRouteFunction(handler.ServeHTTP)))
-	ws.Route(ws.HEAD("/").To(HandlerRouteFunction(handler.ServeHTTP)))
+	ws.Route(ws.HEAD("/").To(HandlerRouteFunction(handler.ServeHTTP))) // used for eTags
 	return ws
 }

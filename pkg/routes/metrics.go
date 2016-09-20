@@ -29,10 +29,12 @@ import (
 
 // DefaultMetrics exposes the default prometheus metrics.
 func DefaultMetrics() *restful.WebService {
+	handler := routes.HandlerRouteFunction(prometheus.Handler().ServeHTTP)
 	ws := new(restful.WebService)
 	ws.Path("/metrics")
 	ws.Doc("prometheus metrics")
-	ws.Route(ws.GET("/").To(routes.HandlerRouteFunction(prometheus.Handler().ServeHTTP)))
+	ws.Route(ws.GET("/{subpath:*}").To(handler))
+	ws.Route(ws.GET("/").To(handler))
 	return ws
 }
 
