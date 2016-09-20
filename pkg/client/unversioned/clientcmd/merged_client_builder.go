@@ -18,7 +18,6 @@ package clientcmd
 
 import (
 	"io"
-	"reflect"
 	"sync"
 
 	"k8s.io/kubernetes/pkg/client/restclient"
@@ -103,20 +102,15 @@ func (config *DeferredLoadingClientConfig) ClientConfig() (*restclient.Config, e
 	// content differs from the default config
 	mergedConfig, err := mergedClientConfig.ClientConfig()
 	switch {
-	case err != nil && !IsEmptyConfig(err):
-		// return on any error except empty config
-		return nil, err
-	case mergedConfig != nil:
-		// if the configuration has any settings at all, we cannot use ICC
-		// TODO: we need to discriminate better between "empty due to env" and
-		//   "empty due to defaults"
-		// TODO: this shouldn't be a global - the client config rules should be
-		//   handling this.
-		defaultConfig, defErr := DefaultClientConfig.ClientConfig()
-		if IsConfigurationInvalid(defErr) && !IsEmptyConfig(err) {
-			return mergedConfig, nil
+	case err != nil:
+		if !IsEmptyConfig(err) {
+			// return on any error except empty config
+			return nil, err
 		}
-		if defErr == nil && !reflect.DeepEqual(mergedConfig, defaultConfig) {
+	case mergedConfig != nil:
+		// the configuration is valid, but if this is equal to the defaults we should try
+		// in-cluster configuration
+		if !config.loader.IsDefaultConfig(mergedConfig) {
 			return mergedConfig, nil
 		}
 	}
