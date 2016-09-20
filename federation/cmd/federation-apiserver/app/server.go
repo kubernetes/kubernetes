@@ -200,7 +200,10 @@ func Run(s *options.ServerRunOptions) error {
 	routes.UIRedirect{}.Install(m.Mux, m.HandlerContainer)
 	routes.Logs{}.Install(m.Mux, m.HandlerContainer)
 
-	restOptionsFactory := restOptionsFactory{storageFactory: storageFactory}
+	restOptionsFactory := restOptionsFactory{
+		storageFactory:          storageFactory,
+		deleteCollectionWorkers: s.DeleteCollectionWorkers,
+	}
 	if s.EnableWatchCache {
 		restOptionsFactory.storageDecorator = registry.StorageWithCacher
 	} else {
@@ -217,8 +220,9 @@ func Run(s *options.ServerRunOptions) error {
 }
 
 type restOptionsFactory struct {
-	storageFactory   genericapiserver.StorageFactory
-	storageDecorator generic.StorageDecorator
+	storageFactory          genericapiserver.StorageFactory
+	storageDecorator        generic.StorageDecorator
+	deleteCollectionWorkers int
 }
 
 func (f restOptionsFactory) NewFor(resource unversioned.GroupResource) generic.RESTOptions {
@@ -227,8 +231,9 @@ func (f restOptionsFactory) NewFor(resource unversioned.GroupResource) generic.R
 		glog.Fatalf("Unable to find storage config for %v, due to %v", resource, err.Error())
 	}
 	return generic.RESTOptions{
-		StorageConfig:  config,
-		Decorator:      f.storageDecorator,
-		ResourcePrefix: f.storageFactory.ResourcePrefix(resource),
+		StorageConfig:           config,
+		Decorator:               f.storageDecorator,
+		DeleteCollectionWorkers: f.deleteCollectionWorkers,
+		ResourcePrefix:          f.storageFactory.ResourcePrefix(resource),
 	}
 }
