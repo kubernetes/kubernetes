@@ -240,7 +240,7 @@ func (plugin *kubenetNetworkPlugin) Event(name string, details map[string]interf
 	}
 
 	if plugin.netConfig != nil {
-		glog.V(5).Infof("Ignoring subsequent pod CIDR update to %s", podCIDR)
+		glog.Infof("Ignoring subsequent pod CIDR update to %s", podCIDR)
 		return
 	}
 
