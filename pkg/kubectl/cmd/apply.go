@@ -28,16 +28,23 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/strategicpatch"
 )
 
 type ApplyOptions struct {
 	FilenameOptions resource.FilenameOptions
 	Selector        string
+	Prune           bool
+	Cascade         bool
+	GracePeriod     int
 }
 
 const (
@@ -84,6 +91,9 @@ func NewCmdApply(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
 	cmd.MarkFlagRequired("filename")
 	cmd.Flags().Bool("overwrite", true, "Automatically resolve conflicts between the modified and live configuration by using values from the modified configuration")
+	cmd.Flags().BoolVar(&options.Prune, "prune", false, "Automatically delete missing objects from supplied config")
+	cmd.Flags().BoolVar(&options.Cascade, "cascade", true, "Only relevant during a prune. If true, cascade the deletion of the resources managed by pruned resources (e.g. Pods created by a ReplicationController).")
+	cmd.Flags().IntVar(&options.GracePeriod, "grace-period", -1, "Period of time in seconds given to pruned resources to terminate gracefully. Ignored if negative.")
 	cmdutil.AddValidateFlags(cmd)
 	cmd.Flags().StringVarP(&options.Selector, "selector", "l", "", "Selector (label query) to filter on")
 	cmdutil.AddOutputFlagsForMutation(cmd)
@@ -129,12 +139,24 @@ func RunApply(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *Ap
 	encoder := f.JSONEncoder()
 	decoder := f.Decoder(false)
 
+	visitedUids := sets.NewString()
+	visitedNamespaces := sets.NewString()
+	visitedNamespacedRESTMappings := map[unversioned.GroupVersionKind]*meta.RESTMapping{}
+	visitedNonNamespacedRESTMappings := map[unversioned.GroupVersionKind]*meta.RESTMapping{}
+
 	count := 0
 	err = r.Visit(func(info *resource.Info, err error) error {
 		// In this method, info.Object contains the object retrieved from the server
 		// and info.VersionedObject contains the object decoded from the input source.
 		if err != nil {
 			return err
+		}
+
+		if info.Namespaced() {
+			visitedNamespaces.Insert(info.Namespace)
+			visitedNamespacedRESTMappings[info.Mapping.GroupVersionKind] = info.Mapping
+		} else {
+			visitedNonNamespacedRESTMappings[info.Mapping.GroupVersionKind] = info.Mapping
 		}
 
 		// Get the modified configuration of the object. Embed the result
@@ -165,6 +187,11 @@ func RunApply(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *Ap
 			if err := createAndRefresh(info); err != nil {
 				return cmdutil.AddSourceToErr("creating", info.Source, err)
 			}
+			if uid, err := info.Mapping.UID(info.Object); err != nil {
+				return err
+			} else {
+				visitedUids.Insert(string(uid))
+			}
 			count++
 			cmdutil.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, "created")
 			return nil
@@ -190,6 +217,11 @@ func RunApply(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *Ap
 			}
 		}
 
+		if uid, err := info.Mapping.UID(info.Object); err != nil {
+			return err
+		} else {
+			visitedUids.Insert(string(uid))
+		}
 		count++
 		cmdutil.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, "configured")
 		return nil
@@ -198,11 +230,110 @@ func RunApply(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *Ap
 	if err != nil {
 		return err
 	}
-
 	if count == 0 {
 		return fmt.Errorf("no objects passed to apply")
 	}
 
+	if !options.Prune {
+		return nil
+	}
+
+	selector, err := labels.Parse(options.Selector)
+	if err != nil {
+		return err
+	}
+	p := pruner{
+		mapper:        mapper,
+		clientFunc:    f.ClientForMapping,
+		clientsetFunc: f.ClientSet,
+
+		selector:    selector,
+		visitedUids: visitedUids,
+
+		cascade:     options.Cascade,
+		gracePeriod: options.GracePeriod,
+
+		out: out,
+	}
+	for n, _ := range visitedNamespaces {
+		for _, m := range visitedNamespacedRESTMappings {
+			if err := p.prune(n, m, shortOutput); err != nil {
+				return fmt.Errorf("error pruning objects: %v", err)
+			}
+		}
+	}
+	for _, m := range visitedNonNamespacedRESTMappings {
+		if err := p.prune(api.NamespaceNone, m, shortOutput); err != nil {
+			return fmt.Errorf("error pruning objects: %v", err)
+		}
+	}
+
+	return nil
+}
+
+type pruner struct {
+	mapper        meta.RESTMapper
+	clientFunc    resource.ClientMapperFunc
+	clientsetFunc func() (*internalclientset.Clientset, error)
+
+	visitedUids sets.String
+	selector    labels.Selector
+
+	cascade     bool
+	gracePeriod int
+
+	out io.Writer
+}
+
+func (p *pruner) prune(namespace string, mapping *meta.RESTMapping, shortOutput bool) error {
+	c, err := p.clientFunc(mapping)
+	if err != nil {
+		return err
+	}
+
+	helper := resource.NewHelper(c, mapping)
+
+	objList, err := helper.List(namespace, mapping.GroupVersionKind.Version, p.selector, false)
+	if err != nil {
+		return err
+	}
+	objs, err := meta.ExtractList(objList)
+	if err != nil {
+		return err
+	}
+
+	for _, obj := range objs {
+		uid, err := mapping.UID(obj)
+		if err != nil {
+			return err
+		}
+		if p.visitedUids.Has(string(uid)) {
+			continue
+		}
+
+		name, err := mapping.Name(obj)
+		if err != nil {
+			return err
+		}
+		if p.cascade {
+			cs, err := p.clientsetFunc()
+			if err != nil {
+				return err
+			}
+			r, err := kubectl.ReaperFor(mapping.GroupVersionKind.GroupKind(), cs)
+			if err != nil {
+				return err
+			}
+			if err := r.Stop(namespace, name, 2*time.Minute, api.NewDeleteOptions(int64(p.gracePeriod))); err != nil {
+				return err
+			}
+		} else {
+			if helper.Delete(namespace, name); err != nil {
+				return err
+			}
+		}
+		cmdutil.PrintSuccess(p.mapper, shortOutput, p.out, mapping.Resource, name, "pruned")
+	}
 	return nil
 }
 
