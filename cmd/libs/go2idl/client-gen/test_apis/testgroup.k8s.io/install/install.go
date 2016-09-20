@@ -76,7 +76,6 @@ func enableVersions(externalVersions []unversioned.GroupVersion) error {
 	if err := registered.RegisterGroup(groupMeta); err != nil {
 		return err
 	}
-	api.RegisterRESTMapper(groupMeta.RESTMapper)
 	return nil
 }
 
