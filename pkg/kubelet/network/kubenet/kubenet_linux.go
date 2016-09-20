@@ -73,16 +73,22 @@ const (
 // CNI plugins required by kubenet in /opt/cni/bin or vendor directory
 var requiredCNIPlugins = [...]string{"bridge", "host-local", "loopback"}
 
+type podInfo struct {
+	ip        string
+	netConfig *libcni.NetworkConfig
+}
+
 type kubenetNetworkPlugin struct {
 	network.NoopNetworkPlugin
 
 	host            network.Host
+	netConfigCount  uint
 	netConfig       *libcni.NetworkConfig
 	loConfig        *libcni.NetworkConfig
 	cniConfig       libcni.CNI
 	bandwidthShaper bandwidth.BandwidthShaper
 	mu              sync.Mutex //Mutex for protecting podIPs map, netConfig, and shaper initialization
-	podIPs          map[kubecontainer.ContainerID]string
+	podIPs          map[kubecontainer.ContainerID]*podInfo
 	mtu             int
 	execer          utilexec.Interface
 	nsenterPath     string
@@ -106,7 +112,7 @@ func NewPlugin(networkPluginDir string) network.NetworkPlugin {
 	sysctl := utilsysctl.New()
 	iptInterface := utiliptables.New(execer, dbus, protocol)
 	return &kubenetNetworkPlugin{
-		podIPs:            make(map[kubecontainer.ContainerID]string),
+		podIPs:            make(map[kubecontainer.ContainerID]*podInfo),
 		execer:            utilexec.New(),
 		iptables:          iptInterface,
 		sysctl:            sysctl,
@@ -207,7 +213,7 @@ func findMinMTU() (*net.Interface, error) {
 
 const NET_CONFIG_TEMPLATE = `{
   "cniVersion": "0.1.0",
-  "name": "kubenet",
+  "name": "kubenet%d",
   "type": "bridge",
   "bridge": "%s",
   "mtu": %d,
@@ -239,11 +245,6 @@ func (plugin *kubenetNetworkPlugin) Event(name string, details map[string]interf
 		return
 	}
 
-	if plugin.netConfig != nil {
-		glog.Infof("Ignoring subsequent pod CIDR update to %s", podCIDR)
-		return
-	}
-
 	glog.V(5).Infof("PodCIDR is set to %q", podCIDR)
 	_, cidr, err := net.ParseCIDR(podCIDR)
 	if err == nil {
@@ -251,12 +252,15 @@ func (plugin *kubenetNetworkPlugin) Event(name string, details map[string]interf
 		// Set bridge address to first address in IPNet
 		cidr.IP.To4()[3] += 1
 
-		json := fmt.Sprintf(NET_CONFIG_TEMPLATE, BridgeName, plugin.mtu, network.DefaultInterfaceName, setHairpin, podCIDR, cidr.IP.String())
+		// Increment CNI config name each time PodCIDR changes so that
+		// old pods can successfully release their IP address, since
+		// host-local stores IP leases by config name
+		plugin.netConfigCount += 1
+		json := fmt.Sprintf(NET_CONFIG_TEMPLATE, plugin.netConfigCount, BridgeName, plugin.mtu, network.DefaultInterfaceName, setHairpin, podCIDR, cidr.IP.String())
+
 		glog.V(2).Infof("CNI network config set to %v", json)
 		plugin.netConfig, err = libcni.ConfFromBytes([]byte(json))
 		if err == nil {
-			glog.V(5).Infof("CNI network config:\n%s", json)
-
 			// Ensure cbr0 has no conflicting addresses; CNI's 'bridge'
 			// plugin will bail out if the bridge has an unexpected one
 			plugin.clearBridgeAddressesExcept(cidr)
@@ -392,7 +396,10 @@ func (plugin *kubenetNetworkPlugin) setup(namespace string, name string, id kube
 		}
 	}
 
-	plugin.podIPs[id] = ip4.String()
+	plugin.podIPs[id] = &podInfo{
+		ip:        ip4.String(),
+		netConfig: plugin.netConfig,
+	}
 
 	// Open any hostports the pod's containers want
 	activePods, err := plugin.getActivePods()
@@ -446,23 +453,33 @@ func (plugin *kubenetNetworkPlugin) SetUpPod(namespace string, name string, id k
 
 // Tears down as much of a pod's network as it can even if errors occur.  Returns
 // an aggregate error composed of all errors encountered during the teardown.
-func (plugin *kubenetNetworkPlugin) teardown(namespace string, name string, id kubecontainer.ContainerID, podIP string) error {
+func (plugin *kubenetNetworkPlugin) teardown(namespace string, name string, id kubecontainer.ContainerID, podIP *podInfo) error {
 	errList := []error{}
 
-	if podIP != "" {
-		glog.V(5).Infof("Removing pod IP %s from shaper", podIP)
+	if podIP != nil {
+		glog.V(5).Infof("Removing pod IP %s from shaper", podIP.ip)
 		// shaper wants /32
-		if err := plugin.shaper().Reset(fmt.Sprintf("%s/32", podIP)); err != nil {
+		if err := plugin.shaper().Reset(fmt.Sprintf("%s/32", podIP.ip)); err != nil {
 			// Possible bandwidth shaping wasn't enabled for this pod anyways
-			glog.V(4).Infof("Failed to remove pod IP %s from shaper: %v", podIP, err)
+			glog.V(4).Infof("Failed to remove pod IP %s from shaper: %v", podIP.ip, err)
 		}
 
 		delete(plugin.podIPs, id)
 	}
 
-	if err := plugin.delContainerFromNetwork(plugin.netConfig, network.DefaultInterfaceName, namespace, name, id); err != nil {
+	var netConfig *libcni.NetworkConfig
+	if podIP != nil && podIP.netConfig != nil {
+		// When deleting use the pod's original network config, as the node's PodCIDR
+		// may have changed since the pod was started
+		netConfig = podIP.netConfig
+	} else {
+		// If the pod isn't known just try deleting with current network config
+		netConfig = plugin.netConfig
+	}
+
+	if err := plugin.delContainerFromNetwork(netConfig, network.DefaultInterfaceName, namespace, name, id); err != nil {
 		// This is to prevent returning error when TearDownPod is called twice on the same pod. This helps to reduce event pollution.
-		if podIP != "" {
+		if podIP != nil {
 			glog.Warningf("Failed to delete container from kubenet: %v", err)
 		} else {
 			errList = append(errList, err)
@@ -514,7 +531,7 @@ func (plugin *kubenetNetworkPlugin) GetPodNetworkStatus(namespace string, name s
 	defer plugin.mu.Unlock()
 	// Assuming the ip of pod does not change. Try to retrieve ip from kubenet map first.
 	if podIP, ok := plugin.podIPs[id]; ok {
-		return &network.PodNetworkStatus{IP: net.ParseIP(podIP)}, nil
+		return &network.PodNetworkStatus{IP: net.ParseIP(podIP.ip)}, nil
 	}
 
 	netnsPath, err := plugin.host.GetRuntime().GetNetNS(id)
@@ -526,7 +543,7 @@ func (plugin *kubenetNetworkPlugin) GetPodNetworkStatus(namespace string, name s
 		return nil, err
 	}
 
-	plugin.podIPs[id] = ip.String()
+	plugin.podIPs[id] = &podInfo{ip: ip.String()}
 	return &network.PodNetworkStatus{IP: ip}, nil
 }
 
@@ -590,11 +607,11 @@ func (plugin *kubenetNetworkPlugin) getActivePods() ([]*hostport.ActivePod, erro
 		if err != nil {
 			continue
 		}
-		ipString, ok := plugin.podIPs[containerID]
+		podInfo, ok := plugin.podIPs[containerID]
 		if !ok {
 			continue
 		}
-		podIP := net.ParseIP(ipString)
+		podIP := net.ParseIP(podInfo.ip)
 		if podIP == nil {
 			continue
 		}
