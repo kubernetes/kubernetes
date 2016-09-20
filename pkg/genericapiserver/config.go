@@ -370,7 +370,7 @@ func (c Config) New() (*GenericAPIServer, error) {
 	attributeGetter := apiserver.NewRequestAttributeGetter(c.RequestContextMapper, s.NewRequestInfoResolver())
 	s.Handler = apiserver.WithAuthorizationCheck(s.Handler, attributeGetter, c.Authorizer)
 	if len(c.AuditLogPath) != 0 {
-		// audit handler must comes before the impersonationFilter to read the original user
+		// audit handler must come before the impersonationFilter to read the original user
 		writer := &lumberjack.Logger{
 			Filename:   c.AuditLogPath,
 			MaxAge:     c.AuditLogMaxAge,
