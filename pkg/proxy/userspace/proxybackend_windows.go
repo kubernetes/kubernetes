@@ -139,9 +139,10 @@ func (proxier *Proxier) netshPortProxyAddArgs(destIP net.IP, destPort int, proxy
 }
 
 func (proxier *Proxier) netshIpv4AddressAddArgs(destIP net.IP) []string {
+	intName := proxier.netsh.GetInterfaceToAddIP()
 	args := []string{
 		"interface", "ipv4", "add", "address",
-		"name=" + "vEthernet (HNSTransparent)",
+		"name=" + intName,
 		"address=" + destIP.String(),
 	}
 
@@ -161,9 +162,10 @@ func (proxier *Proxier) netshPortProxyDeleteArgs(destIP net.IP, destPort int, pr
 }
 
 func (proxier *Proxier) netshIpv4AddressDeleteArgs(destIP net.IP) []string {
+	intName := proxier.netsh.GetInterfaceToAddIP()
 	args := []string{
 		"interface", "ipv4", "delete", "address",
-		"name=" + "vEthernet (HNSTransparent)",
+		"name=" + intName,
 		"address=" + destIP.String(),
 	}
 

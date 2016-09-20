@@ -19,6 +19,7 @@ package netsh
 import (
 	"fmt"
 	"net"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -40,6 +41,11 @@ type Interface interface {
 	// Restore runs `netsh exec` to restore portproxy or addresses using a file.
 	// TODO Check if this is required, most likely not
 	Restore(args []string) error
+
+	// GetInterfaceToAddIP returns the interface name where Service IP needs to be added
+	// IP Address needs to be added for netsh portproxy to redirect traffic
+	// Reads Environment variable INTERFACE_TO_ADD_SERVICE_IP, if it is not defined then "vEthernet (HNSTransparent)" is returned
+	GetInterfaceToAddIP() string
 }
 
 const (
@@ -109,9 +115,10 @@ func (runner *runner) EnsureIPAddress(args []string, ip net.IP) (bool, error) {
 		// querying net.InterfaceAddrs() as it returns the IP address as soon as it is added even though it is uninitialized
 		ipToWait := ip.String()
 		glog.V(3).Infof("Waiting until IP: %v is added to the network adapter", ipToWait)
+		intName := runner.GetInterfaceToAddIP()
 		args := []string{
 			"interface", "ipv4", "show", "address",
-			"name=" + "vEthernet (HNSTransparent)",
+			"name=" + intName,
 		}
 		for {
 			ipAddress, err := runner.exec.Command(cmdNetsh, args...).CombinedOutput()
@@ -152,6 +159,16 @@ func (runner *runner) DeleteIPAddress(args []string) error {
 		}
 	}
 	return fmt.Errorf("error deleting ipv4 address: %v: %s", err, out)
+}
+
+// GetInterfaceToAddIP returns the interface name where Service IP needs to be added
+// IP Address needs to be added for netsh portproxy to redirect traffic
+// Reads Environment variable INTERFACE_TO_ADD_SERVICE_IP, if it is not defined then "vEthernet (HNSTransparent)" is returned
+func (runner *runner) GetInterfaceToAddIP() string {
+	if iface := os.Getenv("INTERFACE_TO_ADD_SERVICE_IP"); len(iface) > 0 {
+		return iface
+	}
+	return "vEthernet (HNSTransparent)"
 }
 
 // Restore is part of Interface.
