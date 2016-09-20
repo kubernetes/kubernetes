@@ -202,6 +202,16 @@ func RegisterNodeFlags() {
 
 // Enable viper configuration management of flags.
 func ViperizeFlags() {
+<<<<<<< 9a92764704417b0ade9b569f59fc56e1632618e8
+=======
+	flag.StringVar(&TestContext.Viper, "viper-config", "e2e", "The name of the viper config i.e. 'e2e' will read values from 'e2e.json' locally.  All e2e parameters are meant to be configurable by viper.")
+
+	// Add viper in a minimal way.
+	// Flag interop isnt possible, since 'go test' coupling to flag.Parse.
+	viper.SetConfigName(TestContext.Viper)
+	viper.AddConfigPath(".")
+	viper.ReadInConfig()
+>>>>>>> e2e test docs
 
 	// TODO @jayunit100: Maybe a more elegant viper-flag integration for the future?
 	// For now, we layer it on top, because 'flag' deps of 'go test' make pflag wrappers
