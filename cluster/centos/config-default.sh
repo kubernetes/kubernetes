@@ -19,7 +19,7 @@
 export MASTER=${MASTER:-"centos@172.10.0.11"}
 export MASTER_IP=${MASTER#*@}
 
-# Define all your nodes,
+# Define all your minion nodes,
 # And separated with blank space like <user_1@ip_1> <user_2@ip_2> <user_3@ip_3>.
 # The user should have sudo privilege
 export NODES=${NODES:-"centos@172.10.0.12 centos@172.10.0.13"}
@@ -49,5 +49,5 @@ export ADMISSION_CONTROL=NamespaceLifecycle,NamespaceExists,LimitRanger,ServiceA
 export DOCKER_OPTS=${DOCKER_OPTS:-""} 
 
 
-# Timeouts for process checking on master and node
+# Timeouts for process checking on master and minion
 export PROCESS_CHECK_TIMEOUT=${PROCESS_CHECK_TIMEOUT:-180} # seconds.

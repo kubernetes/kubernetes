@@ -194,7 +194,7 @@ modifying the headers.
 kube-proxy sets up two IAM roles, one for the master called
 [kubernetes-master](../../cluster/aws/templates/iam/kubernetes-master-policy.json)
 and one for the nodes called
-[kubernetes-node](../../cluster/aws/templates/iam/kubernetes-node-policy.json).
+[kubernetes-node](../../cluster/aws/templates/iam/kubernetes-minion-policy.json).
 
 The master is responsible for creating ELBs and configuring them, as well as
 setting up advanced VPC routing. Currently it has blanket permissions on EC2,

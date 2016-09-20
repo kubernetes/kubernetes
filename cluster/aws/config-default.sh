@@ -69,7 +69,7 @@ VPC_NAME=${VPC_NAME:-kubernetes-vpc}
 AWS_SSH_KEY=${AWS_SSH_KEY:-$HOME/.ssh/kube_aws_rsa}
 CONFIG_CONTEXT="${KUBE_CONFIG_CONTEXT:-aws_${INSTANCE_PREFIX}}"
 IAM_PROFILE_MASTER="kubernetes-master"
-IAM_PROFILE_NODE="kubernetes-node"
+IAM_PROFILE_NODE="kubernetes-minion"
 
 LOG="/dev/null"
 
@@ -78,13 +78,13 @@ MASTER_DISK_SIZE=${MASTER_DISK_SIZE:-20}
 # The master root EBS volume size (typically does not need to be very large)
 MASTER_ROOT_DISK_TYPE="${MASTER_ROOT_DISK_TYPE:-gp2}"
 MASTER_ROOT_DISK_SIZE=${MASTER_ROOT_DISK_SIZE:-8}
-# The nodes root EBS volume size (used to house Docker images)
+# The minions root EBS volume size (used to house Docker images)
 NODE_ROOT_DISK_TYPE="${NODE_ROOT_DISK_TYPE:-gp2}"
 NODE_ROOT_DISK_SIZE=${NODE_ROOT_DISK_SIZE:-32}
 
 MASTER_NAME="${INSTANCE_PREFIX}-master"
 MASTER_TAG="${INSTANCE_PREFIX}-master"
-NODE_TAG="${INSTANCE_PREFIX}-node"
+NODE_TAG="${INSTANCE_PREFIX}-minion"
 NODE_SCOPES=""
 NON_MASQUERADE_CIDR="${NON_MASQUERADE_CIDR:-10.0.0.0/8}" # Traffic to IPs outside this range will use IP masquerade
 SERVICE_CLUSTER_IP_RANGE="${SERVICE_CLUSTER_IP_RANGE:-10.0.0.0/16}"  # formerly PORTAL_NET
@@ -140,11 +140,11 @@ fi
 # If we included ResourceQuota, we should keep it at the end of the list to prevent incremeting quota usage prematurely.
 ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota
 
-# Optional: Enable/disable public IP assignment for nodes.
+# Optional: Enable/disable public IP assignment for minions.
 # Important Note: disable only if you have setup a NAT instance for internet access and configured appropriate routes!
 ENABLE_NODE_PUBLIC_IP=${KUBE_ENABLE_NODE_PUBLIC_IP:-true}
 
-# OS options for nodes
+# OS options for minions
 KUBE_OS_DISTRIBUTION="${KUBE_OS_DISTRIBUTION:-jessie}"
 MASTER_OS_DISTRIBUTION="${KUBE_OS_DISTRIBUTION}"
 NODE_OS_DISTRIBUTION="${KUBE_OS_DISTRIBUTION}"

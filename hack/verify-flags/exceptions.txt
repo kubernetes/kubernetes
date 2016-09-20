@@ -7,9 +7,6 @@ cluster/aws/templates/configure-vm-aws.sh:  api_servers: '${API_SERVERS}'
 cluster/aws/templates/configure-vm-aws.sh:  env-to-grains "hostname_override"
 cluster/aws/templates/configure-vm-aws.sh:  env-to-grains "runtime_config"
 cluster/aws/templates/configure-vm-aws.sh:  kubelet_api_servers: '${KUBELET_APISERVER}'
-cluster/aws/util.sh:        local node_ip=${KUBE_NODE_IP_ADDRESSES[$i]}
-cluster/aws/util.sh:      node_ip=$(get_instance_private_ip ${NODE_NAMES[$i]})
-cluster/aws/util.sh:      node_ip=$(get_instance_public_ip ${NODE_NAMES[$i]})
 cluster/centos/util.sh:  local node_ip=${node#*@}
 cluster/gce/configure-vm.sh:  advertise_address: '${EXTERNAL_IP}'
 cluster/gce/configure-vm.sh:  api_servers: '${KUBERNETES_MASTER_NAME}'
@@ -36,10 +33,8 @@ cluster/log-dump.sh:    for node_name in "${NODE_NAMES[@]}"; do
 cluster/log-dump.sh:    local -r node_name="${1}"
 cluster/log-dump.sh:readonly report_dir="${1:-_artifacts}"
 cluster/mesos/docker/km/build.sh:  km_path=$(find-binary km darwin/amd64)
-cluster/mesos/docker/util.sh:    local node_ip=$(docker inspect --format="{{.NetworkSettings.IPAddress}}" "${docker_id}")
 cluster/photon-controller/templates/salt-master.sh:  api_servers: $MASTER_NAME
-cluster/photon-controller/templates/salt-node.sh:  hostname_override: $(ip route get 1.1.1.1 | awk '{print $7}')
-cluster/photon-controller/templates/salt-node.sh:# Setting the "node_ip" here causes the kubelet to use its IP for
+cluster/photon-controller/templates/salt-minion.sh:  hostname_override: $(ip route get 1.1.1.1 | awk '{print $7}')
 cluster/photon-controller/util.sh:    node_ip=$(${PHOTON} vm networks "${node_id}" | grep -i $'\t'"00:0C:29" | grep -E '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | head -1 | awk -F'\t' '{print $3}')
 cluster/photon-controller/util.sh:  local cert_dir="/srv/kubernetes"
 cluster/photon-controller/util.sh:  node_name=${1}
@@ -66,15 +61,14 @@ cluster/saltbase/salt/kubelet/default:  {% set node_labels="--node-labels=" + pi
 cluster/saltbase/salt/kubelet/default:{% if grains['feature_gates'] is defined -%}
 cluster/saltbase/salt/kubelet/default:{% if pillar.get('non_masquerade_cidr','') -%}
 cluster/saltbase/salt/opencontrail-networking-master/init.sls:      - 'SERVICE_CLUSTER_IP_RANGE': '{{ pillar.get('service_cluster_ip_range') }}'
-cluster/saltbase/salt/opencontrail-networking-node/init.sls:      - 'SERVICE_CLUSTER_IP_RANGE': '{{ pillar.get('service_cluster_ip_range') }}'
+cluster/saltbase/salt/opencontrail-networking-minion/init.sls:      - 'SERVICE_CLUSTER_IP_RANGE': '{{ pillar.get('service_cluster_ip_range') }}'
 cluster/saltbase/salt/supervisor/kubelet-checker.sh:	{% set kubelet_port = pillar['kubelet_port'] -%}
 cluster/saltbase/salt/supervisor/supervisor_watcher.sh:# Apply oom_score_adj: -901 to processes
 cluster/ubuntu/util.sh:  local node_ip=${1}
 cluster/vagrant/provision-utils.sh:  api_servers: '$(echo "$MASTER_IP" | sed -e "s/'/''/g")'
 cluster/vagrant/provision-utils.sh:  node_ip: '$(echo "$MASTER_IP" | sed -e "s/'/''/g")'
 cluster/vagrant/provision-utils.sh:  runtime_config: '$(echo "$RUNTIME_CONFIG" | sed -e "s/'/''/g")'
-cluster/vsphere/templates/salt-node.sh:  hostname_override: $(ip route get 1.1.1.1 | awk '{print $7}')
-cluster/vsphere/templates/salt-node.sh:# Setting the "node_ip" here causes the kubelet to use its IP for
+cluster/vsphere/templates/salt-minion.sh:  hostname_override: $(ip route get 1.1.1.1 | awk '{print $7}')
 examples/cluster-dns/images/frontend/client.py:  service_address = socket.gethostbyname(hostname)
 examples/storage/cassandra/image/files/run.sh:  cluster_name \
 examples/storage/vitess/env.sh:    node_ip=$(get_node_ip)

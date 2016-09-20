@@ -20,32 +20,32 @@ sed -i -e "s/http.us.debian.org/mirrors.kernel.org/" /etc/apt/sources.list
 # Resolve hostname of master
 if ! grep -q $KUBE_MASTER /etc/hosts; then
   echo "Adding host entry for $KUBE_MASTER"
-  echo "$KUBE_MASTER_IP $KUBE_MASTER" >> /etc/hosts
+  echo "${KUBE_MASTER_IP} ${KUBE_MASTER}" >> /etc/hosts
 fi
 
 # Prepopulate the name of the Master
-mkdir -p /etc/salt/node.d
-echo "master: $KUBE_MASTER" > /etc/salt/node.d/master.conf
+mkdir -p /etc/salt/minion.d
+echo "master: ${KUBE_MASTER}" > /etc/salt/minion.d/master.conf
 
-# Turn on debugging for salt-node
-# echo "DAEMON_ARGS=\"\$DAEMON_ARGS --log-file-level=debug\"" > /etc/default/salt-node
+# Turn on debugging for salt-minion
+# echo "DAEMON_ARGS=\"\$DAEMON_ARGS --log-file-level=debug\"" > /etc/default/salt-minion
 
-# Our nodes will have a pool role to distinguish them from the master.
+# Our minions will have a pool role to distinguish them from the master.
 #
-# Setting the "node_ip" here causes the kubelet to use its IP for
+# Setting the "minion_ip" here causes the kubelet to use its IP for
 # identification instead of its hostname.
 #
-cat <<EOF >/etc/salt/node.d/grains.conf
+cat <<EOF >/etc/salt/minion.d/grains.conf
 grains:
   hostname_override: $(ip route get 1.1.1.1 | awk '{print $7}')
   roles:
     - kubernetes-pool
-    - kubernetes-pool-vsphere
-  cloud: vsphere
+    - kubernetes-pool-photon-controller
+  cloud: photon-controller
 EOF
 
 # Install Salt
 #
-# We specify -X to avoid a race condition that can cause node failure to
+# We specify -X to avoid a race condition that can cause minion failure to
 # install.  See https://github.com/saltstack/salt-bootstrap/issues/270
 curl -L --connect-timeout 20 --retry 6 --retry-delay 10 https://bootstrap.saltstack.com | sh -s -- -X

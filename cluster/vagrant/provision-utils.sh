@@ -50,7 +50,7 @@ function write-salt-config() {
   local role="$1"
 
   # Update salt configuration
-  mkdir -p /etc/salt/node.d
+  mkdir -p /etc/salt/minion.d
 
   mkdir -p /srv/salt-overlay/pillar
   cat <<EOF >/srv/salt-overlay/pillar/cluster-params.sls
@@ -85,12 +85,12 @@ eviction_hard: '$(echo "${EVICTION_HARD}" | sed -e "s/'/''/g")'
 EOF
 fi
 
-  cat <<EOF >/etc/salt/node.d/log-level-debug.conf
+  cat <<EOF >/etc/salt/minion.d/log-level-debug.conf
 log_level: warning
 log_level_logfile: warning
 EOF
 
-  cat <<EOF >/etc/salt/node.d/grains.conf
+  cat <<EOF >/etc/salt/minion.d/grains.conf
 grains:
   node_ip: '$(echo "$MASTER_IP" | sed -e "s/'/''/g")'
   publicAddressOverride: '$(echo "$MASTER_IP" | sed -e "s/'/''/g")'
@@ -147,7 +147,7 @@ function install-salt() {
     # Install salt from official repositories.
     # Need to enable testing-repos to get version of salt with fix for dnf-core-plugins
     dnf config-manager --set-enabled updates-testing
-    dnf install -y salt-node
+    dnf install -y salt-minion
 
     # Fedora >= 23 includes salt packages but the bootstrap is
     # creating configuration for a (non-existent) salt repo anyway.

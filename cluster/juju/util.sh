@@ -52,7 +52,7 @@ function detect-master() {
 }
 
 function detect-nodes() {
-    # Run the Juju command that gets the node private IP addresses.
+    # Run the Juju command that gets the minion private IP addresses.
     local ipoutput
     ipoutput=$(juju run --application kubernetes "unit-get private-address" --format=json)
     # [
@@ -62,7 +62,7 @@ function detect-nodes() {
 
     # Strip out the IP addresses
     export KUBE_NODE_IP_ADDRESSES=($(${JUJU_PATH}/return-node-ips.py "${ipoutput}"))
-    # echo "Kubernetes nodes: " ${KUBE_NODE_IP_ADDRESSES[@]} 1>&2
+    # echo "Kubernetes minions: " ${KUBE_NODE_IP_ADDRESSES[@]} 1>&2
     export NUM_NODES=${#KUBE_NODE_IP_ADDRESSES[@]}
 }
 

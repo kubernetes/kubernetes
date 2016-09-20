@@ -75,7 +75,7 @@ function ensure-install-dir() {
 }
 
 function salt-apiserver-timeout-grain() {
-    cat <<EOF >>/etc/salt/node.d/grains.conf
+    cat <<EOF >>/etc/salt/minion.d/grains.conf
   minRequestTimeout: '$1'
 EOF
 }
@@ -146,7 +146,7 @@ function remove-docker-artifacts() {
   echo "== Deleting docker0 =="
   apt-get-install bridge-utils
 
-  # Remove docker artifacts on nodes, if present
+  # Remove docker artifacts on minion nodes, if present
   iptables -t nat -F || true
   ifconfig docker0 down || true
   brctl delbr docker0 || true
@@ -280,7 +280,7 @@ auto-upgrade() {
 # Install salt from GCS.  See README.md for instructions on how to update these
 # debs.
 install-salt() {
-  if dpkg -s salt-node &>/dev/null; then
+  if dpkg -s salt-minion &>/dev/null; then
     echo "== SaltStack already installed, skipping install step =="
     return
   fi
@@ -298,7 +298,7 @@ install-salt() {
     libzmq3_3.2.3+dfsg-1~bpo70~dst+1_amd64.deb
     python-zmq_13.1.0-1~bpo70~dst+1_amd64.deb
     salt-common_2014.1.13+ds-1~bpo70+1_all.deb
-    salt-node_2014.1.13+ds-1~bpo70+1_all.deb
+    salt-minion_2014.1.13+ds-1~bpo70+1_all.deb
   )
   URL_BASE="https://storage.googleapis.com/kubernetes-release/salt"
 
@@ -310,7 +310,7 @@ install-salt() {
 
   # Based on
   # https://major.io/2014/06/26/install-debian-packages-without-starting-daemons/
-  # We do this to prevent Salt from starting the salt-node
+  # We do this to prevent Salt from starting the salt-minion
   # daemon. The other packages don't have relevant daemons. (If you
   # add a package that needs a daemon started, add it to a different
   # list.)
@@ -339,20 +339,20 @@ EOF
   echo "== Finished installing Salt =="
 }
 
-# Ensure salt-node isn't running and never runs
-stop-salt-node() {
-  if [[ -e /etc/init/salt-node.override ]]; then
+# Ensure salt-minion isn't running and never runs
+stop-salt-minion() {
+  if [[ -e /etc/init/salt-minion.override ]]; then
     # Assume this has already run (upgrade, or baked into containervm)
     return
   fi
 
   # This ensures it on next reboot
-  echo manual > /etc/init/salt-node.override
-  update-rc.d salt-node disable
+  echo manual > /etc/init/salt-minion.override
+  update-rc.d salt-minion disable
 
-  while service salt-node status >/dev/null; do
-    echo "salt-node found running, stopping"
-    service salt-node stop
+  while service salt-minion status >/dev/null; do
+    echo "salt-minion found running, stopping"
+    service salt-minion stop
     sleep 1
   done
 }
@@ -789,7 +789,7 @@ function fix-apt-sources() {
 }
 
 function salt-run-local() {
-  cat <<EOF >/etc/salt/node.d/local.conf
+  cat <<EOF >/etc/salt/minion.d/local.conf
 file_client: local
 file_roots:
   base:
@@ -798,14 +798,14 @@ EOF
 }
 
 function salt-debug-log() {
-  cat <<EOF >/etc/salt/node.d/log-level-debug.conf
+  cat <<EOF >/etc/salt/minion.d/log-level-debug.conf
 log_level: debug
 log_level_logfile: debug
 EOF
 }
 
 function salt-master-role() {
-  cat <<EOF >/etc/salt/node.d/grains.conf
+  cat <<EOF >/etc/salt/minion.d/grains.conf
 grains:
   roles:
     - kubernetes-master
@@ -826,7 +826,7 @@ network-name = ${NODE_NETWORK}
 EOF
     CLOUD_CONFIG=/etc/gce.conf
     EXTERNAL_IP=$(curl --fail --silent -H 'Metadata-Flavor: Google' "http://metadata/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip")
-    cat <<EOF >>/etc/salt/node.d/grains.conf
+    cat <<EOF >>/etc/salt/minion.d/grains.conf
   advertise_address: '${EXTERNAL_IP}'
   proxy_ssh_user: '${PROXY_SSH_USER}'
 EOF
@@ -853,7 +853,7 @@ EOF
   fi
 
   if [[ -n "${CLOUD_CONFIG:-}" ]]; then
-    cat <<EOF >>/etc/salt/node.d/grains.conf
+    cat <<EOF >>/etc/salt/minion.d/grains.conf
   cloud_config: ${CLOUD_CONFIG}
 EOF
   else
@@ -861,7 +861,7 @@ EOF
   fi
 
   if [[ -n "${GCP_AUTHN_URL:-}" ]]; then
-    cat <<EOF >>/etc/salt/node.d/grains.conf
+    cat <<EOF >>/etc/salt/minion.d/grains.conf
   webhook_authentication_config: /etc/gcp_authn.config
 EOF
     cat <<EOF >/etc/gcp_authn.config
@@ -884,7 +884,7 @@ EOF
   fi
 
   if [[ -n "${GCP_AUTHZ_URL:-}" ]]; then
-    cat <<EOF >>/etc/salt/node.d/grains.conf
+    cat <<EOF >>/etc/salt/minion.d/grains.conf
   webhook_authorization_config: /etc/gcp_authz.config
 EOF
     cat <<EOF >/etc/gcp_authz.config
@@ -947,14 +947,14 @@ EOF
   # If the kubelet on the master is enabled, give it the same CIDR range
   # as a generic node.
   if [[ ! -z "${KUBELET_APISERVER:-}" ]] && [[ ! -z "${KUBELET_CERT:-}" ]] && [[ ! -z "${KUBELET_KEY:-}" ]]; then
-    cat <<EOF >>/etc/salt/node.d/grains.conf
+    cat <<EOF >>/etc/salt/minion.d/grains.conf
   kubelet_api_servers: '${KUBELET_APISERVER}'
   cbr-cidr: 10.123.45.0/29
 EOF
   else
     # If the kubelet is running disconnected from a master, give it a fixed
     # CIDR range.
-    cat <<EOF >>/etc/salt/node.d/grains.conf
+    cat <<EOF >>/etc/salt/minion.d/grains.conf
   cbr-cidr: ${MASTER_IP_RANGE}
 EOF
   fi
@@ -964,7 +964,7 @@ EOF
 }
 
 function salt-node-role() {
-  cat <<EOF >/etc/salt/node.d/grains.conf
+  cat <<EOF >/etc/salt/minion.d/grains.conf
 grains:
   roles:
     - kubernetes-pool
@@ -980,7 +980,7 @@ function env-to-grains {
   local value=${!env_key:-}
   if [[ -n "${value}" ]]; then
     # Note this is yaml, so indentation matters
-    cat <<EOF >>/etc/salt/node.d/grains.conf
+    cat <<EOF >>/etc/salt/minion.d/grains.conf
   ${key}: '$(echo "${value}" | sed -e "s/'/''/g")'
 EOF
   fi
@@ -1007,7 +1007,7 @@ function salt-grains() {
 }
 
 function configure-salt() {
-  mkdir -p /etc/salt/node.d
+  mkdir -p /etc/salt/minion.d
   salt-run-local
   if [[ "${KUBERNETES_MASTER}" == "true" ]]; then
     salt-master-role
@@ -1020,7 +1020,7 @@ function configure-salt() {
   fi
   salt-grains
   install-salt
-  stop-salt-node
+  stop-salt-minion
 }
 
 function run-salt() {

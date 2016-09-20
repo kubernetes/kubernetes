@@ -225,7 +225,7 @@ detect-nodes() {
     KUBE_NODE_IP_ADDRESSES+=("${node_ip}")
   done
   if [ -z "$KUBE_NODE_IP_ADDRESSES" ]; then
-    echo "cluster/rackspace/util.sh: Could not detect Kubernetes nodes.  Make sure you've launched a cluster with 'kube-up.sh'"
+    echo "cluster/rackspace/util.sh: Could not detect Kubernetes node nodes.  Make sure you've launched a cluster with 'kube-up.sh'"
     exit 1
   fi
 

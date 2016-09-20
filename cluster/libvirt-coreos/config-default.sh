@@ -16,7 +16,7 @@
 
 ## Contains configuration values for interacting with the libvirt CoreOS cluster
 
-# Number of nodes in the cluster
+# Number of minions in the cluster
 NUM_NODES=${NUM_NODES:-3}
 export NUM_NODES
 

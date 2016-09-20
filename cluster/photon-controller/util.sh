@@ -470,7 +470,7 @@ function gen-node-start {
       echo "KUBE_MASTER=${KUBE_MASTER}"
       echo "KUBE_MASTER_IP=${KUBE_MASTER_IP}"
       echo "NODE_IP_RANGE=$NODE_IP_RANGES"
-      grep -v "^#" "${KUBE_ROOT}/cluster/photon-controller/templates/salt-node.sh"
+      grep -v "^#" "${KUBE_ROOT}/cluster/photon-controller/templates/salt-minion.sh"
     ) > "${KUBE_TEMP}/node-start-${i}.sh"
   done
 }
@@ -651,7 +651,7 @@ function install-kubernetes-on-nodes {
       copy-file-to-vm "${_VM_IP}" "${KUBE_TEMP}/${NODE_NAMES[${node}]}-salt.sh" "/tmp/${NODE_NAMES[${node}]}-salt.sh"
       try-until-success-ssh "${KUBE_NODE_IP_ADDRESSES[${node}]}" \
         "Waiting for salt-master to start on ${NODE_NAMES[${node}]}" \
-        "pgrep salt-node"
+        "pgrep salt-minion"
       try-until-success-ssh "${KUBE_MASTER_IP}" \
         "Installing Kubernetes on ${NODE_NAMES[${node}]} via salt" \
         "sudo /bin/bash /tmp/${NODE_NAMES[${node}]}-salt.sh"
