@@ -82,9 +82,8 @@ type Factory struct {
 	clients *ClientCache
 	flags   *pflag.FlagSet
 
-	// Returns interfaces for dealing with arbitrary runtime.Objects. If thirdPartyDiscovery is true, performs API calls
-	// to discovery dynamic API objects registered by third parties.
-	Object func(thirdPartyDiscovery bool) (meta.RESTMapper, runtime.ObjectTyper)
+	// Returns interfaces for dealing with arbitrary runtime.Objects.
+	Object func() (meta.RESTMapper, runtime.ObjectTyper)
 	// Returns interfaces for dealing with arbitrary
 	// runtime.Unstructured. This performs API calls to discover types.
 	UnstructuredObject func() (meta.RESTMapper, runtime.ObjectTyper, error)
@@ -293,7 +292,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 		clients: clients,
 		flags:   flags,
 
-		Object: func(discoverDynamicAPIs bool) (meta.RESTMapper, runtime.ObjectTyper) {
+		Object: func() (meta.RESTMapper, runtime.ObjectTyper) {
 			cfg, err := clientConfig.ClientConfig()
 			checkErrWithPrefix("failed to get client config: ", err)
 			cmdApiVersion := unversioned.GroupVersion{}
@@ -1251,8 +1250,8 @@ func (f *Factory) PrinterForMapping(cmd *cobra.Command, mapping *meta.RESTMappin
 }
 
 // One stop shopping for a Builder
-func (f *Factory) NewBuilder(thirdPartyDiscovery bool) *resource.Builder {
-	mapper, typer := f.Object(thirdPartyDiscovery)
+func (f *Factory) NewBuilder() *resource.Builder {
+	mapper, typer := f.Object()
 
 	return resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true))
 }

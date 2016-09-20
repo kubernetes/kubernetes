@@ -220,7 +220,7 @@ func NewTestFactory() (*cmdutil.Factory, *testFactory, runtime.Codec, runtime.Ne
 		runtime.SerializerInfo{Serializer: codec},
 		runtime.StreamSerializerInfo{})
 	return &cmdutil.Factory{
-		Object: func(discovery bool) (meta.RESTMapper, runtime.ObjectTyper) {
+		Object: func() (meta.RESTMapper, runtime.ObjectTyper) {
 			priorityRESTMapper := meta.PriorityRESTMapper{
 				Delegate: t.Mapper,
 				ResourcePriority: []unversioned.GroupVersionResource{
@@ -264,7 +264,7 @@ func NewMixedFactory(apiClient resource.RESTClient) (*cmdutil.Factory, *testFact
 	var multiRESTMapper meta.MultiRESTMapper
 	multiRESTMapper = append(multiRESTMapper, t.Mapper)
 	multiRESTMapper = append(multiRESTMapper, testapi.Default.RESTMapper())
-	f.Object = func(discovery bool) (meta.RESTMapper, runtime.ObjectTyper) {
+	f.Object = func() (meta.RESTMapper, runtime.ObjectTyper) {
 		priorityRESTMapper := meta.PriorityRESTMapper{
 			Delegate: multiRESTMapper,
 			ResourcePriority: []unversioned.GroupVersionResource{
@@ -291,7 +291,7 @@ func NewAPIFactory() (*cmdutil.Factory, *testFactory, runtime.Codec, runtime.Neg
 	}
 
 	f := &cmdutil.Factory{
-		Object: func(discovery bool) (meta.RESTMapper, runtime.ObjectTyper) {
+		Object: func() (meta.RESTMapper, runtime.ObjectTyper) {
 			return testapi.Default.RESTMapper(), api.Scheme
 		},
 		UnstructuredObject: func() (meta.RESTMapper, runtime.ObjectTyper, error) {
@@ -450,7 +450,7 @@ func Example_printReplicationControllerWithNamespace() {
 			ReadyReplicas: 1,
 		},
 	}
-	mapper, _ := f.Object(false)
+	mapper, _ := f.Object()
 	err := f.PrintObject(cmd, mapper, ctrl, os.Stdout)
 	if err != nil {
 		fmt.Printf("Unexpected error: %v", err)
@@ -502,7 +502,7 @@ func Example_printMultiContainersReplicationControllerWithWide() {
 			Replicas: 1,
 		},
 	}
-	mapper, _ := f.Object(false)
+	mapper, _ := f.Object()
 	err := f.PrintObject(cmd, mapper, ctrl, os.Stdout)
 	if err != nil {
 		fmt.Printf("Unexpected error: %v", err)
@@ -553,7 +553,7 @@ func Example_printReplicationController() {
 			Replicas: 1,
 		},
 	}
-	mapper, _ := f.Object(false)
+	mapper, _ := f.Object()
 	err := f.PrintObject(cmd, mapper, ctrl, os.Stdout)
 	if err != nil {
 		fmt.Printf("Unexpected error: %v", err)
@@ -593,7 +593,7 @@ func Example_printPodWithWideFormat() {
 			PodIP: "10.1.1.3",
 		},
 	}
-	mapper, _ := f.Object(false)
+	mapper, _ := f.Object()
 	err := f.PrintObject(cmd, mapper, pod, os.Stdout)
 	if err != nil {
 		fmt.Printf("Unexpected error: %v", err)
@@ -636,7 +636,7 @@ func Example_printPodWithShowLabels() {
 			},
 		},
 	}
-	mapper, _ := f.Object(false)
+	mapper, _ := f.Object()
 	err := f.PrintObject(cmd, mapper, pod, os.Stdout)
 	if err != nil {
 		fmt.Printf("Unexpected error: %v", err)
@@ -749,7 +749,7 @@ func Example_printPodHideTerminated() {
 	}
 	cmd := NewCmdRun(f, os.Stdin, os.Stdout, os.Stderr)
 	podList := newAllPhasePodList()
-	mapper, _ := f.Object(false)
+	mapper, _ := f.Object()
 	err := f.PrintObject(cmd, mapper, podList, os.Stdout)
 	if err != nil {
 		fmt.Printf("Unexpected error: %v", err)
@@ -773,7 +773,7 @@ func Example_printPodShowAll() {
 	}
 	cmd := NewCmdRun(f, os.Stdin, os.Stdout, os.Stderr)
 	podList := newAllPhasePodList()
-	mapper, _ := f.Object(false)
+	mapper, _ := f.Object()
 	err := f.PrintObject(cmd, mapper, podList, os.Stdout)
 	if err != nil {
 		fmt.Printf("Unexpected error: %v", err)
@@ -846,7 +846,7 @@ func Example_printServiceWithNamespacesAndLabels() {
 	ld := strings.NewLineDelimiter(os.Stdout, "|")
 	defer ld.Flush()
 
-	mapper, _ := f.Object(false)
+	mapper, _ := f.Object()
 	err := f.PrintObject(cmd, mapper, svc, ld)
 	if err != nil {
 		fmt.Printf("Unexpected error: %v", err)

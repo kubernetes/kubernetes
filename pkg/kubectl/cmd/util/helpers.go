@@ -553,15 +553,9 @@ func GetThirdPartyGroupVersions(discovery discovery.DiscoveryInterface) ([]unver
 	return result, gvks, nil
 }
 
-func GetIncludeThirdPartyAPIs(cmd *cobra.Command) bool {
-	if cmd.Flags().Lookup("include-extended-apis") == nil {
-		return false
-	}
-	return GetFlagBool(cmd, "include-extended-apis")
-}
-
 func AddInclude3rdPartyFlags(cmd *cobra.Command) {
 	cmd.Flags().Bool("include-extended-apis", true, "If true, include definitions of new APIs via calls to the API server. [default true]")
+	cmd.Flags().MarkDeprecated("include-extended-apis", "No longer required.")
 }
 
 // GetResourcesAndPairs retrieves resources and "KEY=VALUE or KEY-" pair args from given args

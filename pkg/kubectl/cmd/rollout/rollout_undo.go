@@ -99,7 +99,7 @@ func (o *UndoOptions) CompleteUndo(f *cmdutil.Factory, cmd *cobra.Command, out i
 	}
 
 	o.ToRevision = cmdutil.GetFlagInt64(cmd, "to-revision")
-	o.Mapper, o.Typer = f.Object(false)
+	o.Mapper, o.Typer = f.Object()
 	o.Out = out
 	o.DryRun = cmdutil.GetFlagBool(cmd, "dry-run")
 
