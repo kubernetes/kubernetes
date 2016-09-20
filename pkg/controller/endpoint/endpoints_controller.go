@@ -19,14 +19,13 @@ limitations under the License.
 package endpoint
 
 import (
+	"fmt"
 	"reflect"
 	"strconv"
 	"time"
 
 	"encoding/json"
 
-	"fmt"
-	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/endpoints"
 	"k8s.io/kubernetes/pkg/api/errors"
@@ -44,6 +43,8 @@ import (
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/util/workqueue"
 	"k8s.io/kubernetes/pkg/watch"
+
+	"github.com/golang/glog"
 )
 
 const (
