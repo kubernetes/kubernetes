@@ -105,20 +105,17 @@ func (config *DeferredLoadingClientConfig) ClientConfig() (*restclient.Config, e
 	// content differs from the default config
 	mergedConfig, err := mergedClientConfig.ClientConfig()
 	switch {
-	case err != nil && !IsEmptyConfig(err):
-		// return on any error except empty config
-		return nil, err
+	case err != nil:
+		if !IsEmptyConfig(err) {
+			// return on any error except empty config
+			return nil, err
+		}
 	case mergedConfig != nil:
 		// if the configuration has any settings at all, we cannot use ICC
-		// TODO: we need to discriminate better between "empty due to env" and
-		//   "empty due to defaults"
 		// TODO: this shouldn't be a global - the client config rules should be
 		//   handling this.
-		defaultConfig, defErr := DefaultClientConfig.ClientConfig()
-		if IsConfigurationInvalid(defErr) && !IsEmptyConfig(err) {
-			return mergedConfig, nil
-		}
-		if defErr == nil && !reflect.DeepEqual(mergedConfig, defaultConfig) {
+		defaultConfig, _ := DefaultClientConfig.ClientConfig()
+		if defaultConfig != nil && !reflect.DeepEqual(mergedConfig, defaultConfig) {
 			return mergedConfig, nil
 		}
 	}
