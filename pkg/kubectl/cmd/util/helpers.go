@@ -691,3 +691,14 @@ func PrintFilterCount(hiddenObjNum int, resource string, out io.Writer, options 
 	}
 	return nil
 }
+
+// ObjectListToVersionedObject receives a list of api objects and a group version
+// and squashes the list's items into a single versioned runtime.Object.
+func ObjectListToVersionedObject(objects []runtime.Object, version unversioned.GroupVersion) (runtime.Object, error) {
+	objectList := &api.List{Items: objects}
+	converted, err := resource.TryConvert(api.Scheme, objectList, version, registered.GroupOrDie(api.GroupName).GroupVersion)
+	if err != nil {
+		return nil, err
+	}
+	return converted, nil
+}

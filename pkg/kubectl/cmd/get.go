@@ -333,10 +333,12 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 			if errs != nil {
 				return errs
 			}
-			for _, obj := range items {
-				if err := printer.PrintObj(obj, out); err != nil {
-					allErrs = append(allErrs, err)
-				}
+			filteredObj, err := cmdutil.ObjectListToVersionedObject(items, version)
+			if err != nil {
+				return err
+			}
+			if err := printer.PrintObj(filteredObj, out); err != nil {
+				allErrs = append(allErrs, err)
 			}
 
 			cmdutil.PrintFilterCount(filteredResourceCount, res, errOut, filterOpts)
