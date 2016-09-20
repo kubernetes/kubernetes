@@ -337,11 +337,9 @@ func (c Config) New() (*GenericAPIServer, error) {
 	s.HandlerContainer.Router(restful.CurlyRouter{})
 
 	// We do not register this using restful Webservice since we do not want to surface this in api docs.
-	// Allow GenericAPIServer to be embedded in contexts which already have something registered at the root
 	if c.EnableIndex {
 		s.HandlerContainer.ServeMux.HandleFunc("/", routes.Index(s.HandlerContainer))
 	}
-
 	if c.EnableSwaggerSupport && c.EnableSwaggerUI {
 		s.HandlerContainer.Add(routes.SwaggerUI())
 	}
