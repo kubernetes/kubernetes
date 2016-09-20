@@ -134,6 +134,10 @@ type Factory struct {
 	PauseObject func(object runtime.Object) (bool, error)
 	// ResumeObject resumes a paused object ie. it will be reconciled by its controller.
 	ResumeObject func(object runtime.Object) (bool, error)
+	// ResolveImage resolves the image names. For kubernetes this function is just
+	// passthrough but it allows to perform more sophisticated image name resolving for
+	// third-party vendors.
+	ResolveImage func(imageName string) (string, error)
 	// Returns a schema that can validate objects stored on disk.
 	Validator func(validate bool, cacheDir string) (validation.Schema, error)
 	// SwaggerSchema returns the schema declaration for the provided group version kind.
@@ -670,6 +674,9 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 				}
 				return false, fmt.Errorf("cannot resume %v", gvks[0])
 			}
+		},
+		ResolveImage: func(imageName string) (string, error) {
+			return imageName, nil
 		},
 		Scaler: func(mapping *meta.RESTMapping) (kubectl.Scaler, error) {
 			mappingVersion := mapping.GroupVersionKind.GroupVersion()
