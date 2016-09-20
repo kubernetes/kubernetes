@@ -322,7 +322,7 @@ func StartPods(numPods int, host string, restClient *client.Client) error {
 	} else {
 		// Delete the rc, otherwise when we restart master components for the next benchmark
 		// the rc controller will race with the pods controller in the rc manager.
-		return restClient.ReplicationControllers(TestNS).Delete(rc.Name)
+		return restClient.ReplicationControllers(TestNS).Delete(rc.Name, nil)
 	}
 }
 

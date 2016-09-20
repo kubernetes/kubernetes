@@ -201,7 +201,7 @@ func (reaper *ReplicationControllerReaper) Stop(namespace, name string, timeout 
 			return err
 		}
 	}
-	return rc.Delete(name)
+	return rc.Delete(name, nil)
 }
 
 // TODO(madhusudancs): Implement it when controllerRef is implemented - https://github.com/kubernetes/kubernetes/issues/2210

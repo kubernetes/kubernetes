@@ -503,11 +503,11 @@ func (r *RollingUpdater) cleanupWithClients(oldRc, newRc *api.ReplicationControl
 	case DeleteRollingUpdateCleanupPolicy:
 		// delete old rc
 		fmt.Fprintf(config.Out, "Update succeeded. Deleting %s\n", oldRc.Name)
-		return r.c.ReplicationControllers(r.ns).Delete(oldRc.Name)
+		return r.c.ReplicationControllers(r.ns).Delete(oldRc.Name, nil)
 	case RenameRollingUpdateCleanupPolicy:
 		// delete old rc
 		fmt.Fprintf(config.Out, "Update succeeded. Deleting old controller: %s\n", oldRc.Name)
-		if err := r.c.ReplicationControllers(r.ns).Delete(oldRc.Name); err != nil {
+		if err := r.c.ReplicationControllers(r.ns).Delete(oldRc.Name, nil); err != nil {
 			return err
 		}
 		fmt.Fprintf(config.Out, "Renaming %s to %s\n", newRc.Name, oldRc.Name)
@@ -523,13 +523,28 @@ func Rename(c client.ReplicationControllersNamespacer, rc *api.ReplicationContro
 	oldName := rc.Name
 	rc.Name = newName
 	rc.ResourceVersion = ""
-
-	_, err := c.ReplicationControllers(rc.Namespace).Create(rc)
+	// First delete the oldName RC and orphan its pods.
+	trueVar := true
+	err := c.ReplicationControllers(rc.Namespace).Delete(oldName, &api.DeleteOptions{OrphanDependents: &trueVar})
+	if err != nil && !errors.IsNotFound(err) {
+		return err
+	}
+	err = wait.Poll(5*time.Second, 60*time.Second, func() (bool, error) {
+		_, err := c.ReplicationControllers(rc.Namespace).Get(oldName)
+		if err == nil {
+			return false, nil
+		} else if errors.IsNotFound(err) {
+			return true, nil
+		} else {
+			return false, err
+		}
+	})
 	if err != nil {
 		return err
 	}
-	err = c.ReplicationControllers(rc.Namespace).Delete(oldName)
-	if err != nil && !errors.IsNotFound(err) {
+	// Then create the same RC with the new name.
+	_, err = c.ReplicationControllers(rc.Namespace).Create(rc)
+	if err != nil {
 		return err
 	}
 	return nil

@@ -137,7 +137,7 @@ func (h *haproxyControllerTester) start(namespace string) (err error) {
 }
 
 func (h *haproxyControllerTester) stop() error {
-	return h.client.ReplicationControllers(h.rcNamespace).Delete(h.rcName)
+	return h.client.ReplicationControllers(h.rcNamespace).Delete(h.rcName, nil)
 }
 
 func (h *haproxyControllerTester) lookup(ingressKey string) string {

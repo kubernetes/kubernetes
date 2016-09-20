@@ -27,8 +27,10 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
@@ -1142,20 +1144,27 @@ func TestRollingUpdater_cleanupWithClients(t *testing.T) {
 				"delete",
 			},
 		},
-		{
-			name:      "rename",
-			policy:    RenameRollingUpdateCleanupPolicy,
-			responses: []runtime.Object{rcExisting},
-			expected: []string{
-				"get",
-				"update",
-				"get",
-				"get",
-				"delete",
-				"create",
-				"delete",
-			},
-		},
+		//{
+		// This cases is separated to a standalone
+		// TestRollingUpdater_cleanupWithClients_Rename. We have to do this
+		// because the unversioned fake client is unable to delete objects.
+		// TODO: uncomment this case when the unversioned fake client uses
+		// pkg/client/testing/core.
+		//	{
+		//		name:      "rename",
+		//		policy:    RenameRollingUpdateCleanupPolicy,
+		//		responses: []runtime.Object{rcExisting},
+		//		expected: []string{
+		//			"get",
+		//			"update",
+		//			"get",
+		//			"get",
+		//			"delete",
+		//			"create",
+		//			"delete",
+		//		},
+		//	},
+		//},
 	}
 
 	for _, test := range tests {
@@ -1184,6 +1193,39 @@ func TestRollingUpdater_cleanupWithClients(t *testing.T) {
 			if e, a := test.expected[j], action.GetVerb(); e != a {
 				t.Errorf("%s: unexpected action: expected %s, got %s", test.name, e, a)
 			}
+		}
+	}
+}
+
+// TestRollingUpdater_cleanupWithClients_Rename tests the rename cleanup policy. It's separated to
+// a standalone test because the unversioned fake client is unable to delete
+// objects.
+// TODO: move this test back to TestRollingUpdater_cleanupWithClients
+// when the fake client uses pkg/client/testing/core in the future.
+func TestRollingUpdater_cleanupWithClients_Rename(t *testing.T) {
+	rc := oldRc(2, 2)
+	rcExisting := newRc(1, 3)
+	expectedActions := []string{"delete", "get", "create"}
+	fake := &testclient.Fake{}
+	fake.AddReactor("*", "*", func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
+		switch action.(type) {
+		case testclient.CreateAction:
+			return true, nil, nil
+		case testclient.GetAction:
+			return true, nil, errors.NewNotFound(unversioned.GroupResource{}, "")
+		case testclient.DeleteAction:
+			return true, nil, nil
+		}
+		return false, nil, nil
+	})
+
+	err := Rename(fake, rcExisting, rc.Name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for j, action := range fake.Actions() {
+		if e, a := expectedActions[j], action.GetVerb(); e != a {
+			t.Errorf("unexpected action: expected %s, got %s", e, a)
 		}
 	}
 }
