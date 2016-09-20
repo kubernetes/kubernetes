@@ -17,8 +17,11 @@ limitations under the License.
 package util
 
 import (
+	"strings"
+
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/client/typed/discovery"
 	"k8s.io/kubernetes/pkg/kubectl"
 )
 
@@ -26,13 +29,52 @@ import (
 type ShortcutExpander struct {
 	RESTMapper meta.RESTMapper
 
-	All []string
+	All []unversioned.GroupResource
+
+	discoveryClient *discovery.DiscoveryClient
 }
 
 var _ meta.RESTMapper = &ShortcutExpander{}
 
-func NewShortcutExpander(delegate meta.RESTMapper) ShortcutExpander {
-	return ShortcutExpander{All: userResources, RESTMapper: delegate}
+func NewShortcutExpander(delegate meta.RESTMapper, client *discovery.DiscoveryClient) ShortcutExpander {
+	return ShortcutExpander{All: userResources, RESTMapper: delegate, discoveryClient: client}
+}
+
+func (e ShortcutExpander) getAll() []unversioned.GroupResource {
+	if e.discoveryClient == nil {
+		return e.All
+	}
+
+	// Check if we have access to server resources
+	apiResources, err := e.discoveryClient.ServerResources()
+	if err != nil {
+		return e.All
+	}
+
+	availableResources := []unversioned.GroupVersionResource{}
+	for groupVersionString, resourceList := range apiResources {
+		currVersion, err := unversioned.ParseGroupVersion(groupVersionString)
+		if err != nil {
+			return e.All
+		}
+
+		for _, resource := range resourceList.APIResources {
+			availableResources = append(availableResources, currVersion.WithResource(resource.Name))
+		}
+	}
+
+	availableAll := []unversioned.GroupResource{}
+	for _, requestedResource := range e.All {
+		for _, availableResource := range availableResources {
+			if requestedResource.Group == availableResource.Group &&
+				requestedResource.Resource == availableResource.Resource {
+				availableAll = append(availableAll, requestedResource)
+				break
+			}
+		}
+	}
+
+	return availableAll
 }
 
 func (e ShortcutExpander) KindFor(resource unversioned.GroupVersionResource) (unversioned.GroupVersionKind, error) {
@@ -65,14 +107,30 @@ func (e ShortcutExpander) RESTMappings(gk unversioned.GroupKind) ([]*meta.RESTMa
 
 // userResources are the resource names that apply to the primary, user facing resources used by
 // client tools. They are in deletion-first order - dependent resources should be last.
-var userResources = []string{"rc", "svc", "pods", "pvc"}
+var userResources = []unversioned.GroupResource{
+	{Group: "", Resource: "pods"},
+	{Group: "", Resource: "replicationcontrollers"},
+	{Group: "", Resource: "services"},
+	{Group: "apps", Resource: "petsets"},
+	{Group: "autoscaling", Resource: "horizontalpodautoscalers"},
+	{Group: "extensions", Resource: "jobs"},
+	{Group: "extensions", Resource: "deployments"},
+	{Group: "extensions", Resource: "replicasets"},
+}
 
 // AliasesForResource returns whether a resource has an alias or not
 func (e ShortcutExpander) AliasesForResource(resource string) ([]string, bool) {
-	if resource == "all" {
-		return e.All, true
+	if strings.ToLower(resource) == "all" {
+		var resources []unversioned.GroupResource
+		if resources = e.getAll(); len(resources) == 0 {
+			resources = userResources
+		}
+		aliases := []string{}
+		for _, r := range resources {
+			aliases = append(aliases, r.Resource)
+		}
+		return aliases, true
 	}
-
 	expanded := expandResourceShortcut(unversioned.GroupVersionResource{Resource: resource}).Resource
 	return []string{expanded}, (expanded != resource)
 }

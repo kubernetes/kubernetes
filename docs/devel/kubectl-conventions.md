@@ -43,6 +43,7 @@ Updated: 8/27/2015
   - [Principles](#principles)
   - [Command conventions](#command-conventions)
     - [Create commands](#create-commands)
+    - [Rules for extending special resource alias - "all"](#rules-for-extending-special-resource-alias---all)
   - [Flag conventions](#flag-conventions)
   - [Output conventions](#output-conventions)
   - [Documentation conventions](#documentation-conventions)
@@ -116,6 +117,21 @@ flavor with keys mapping to files, then there's a `docker-registry` flavor that
 is tailored for creating an image pull secret, and there's a `tls` flavor for
 creating tls secrets. You create these as separate commands to get distinct
 flags and separate help that is tailored for the particular usage.
+
+
+### Rules for extending special resource alias - "all"
+
+Here are the rules to add a new resource to the `kubectl get all` output.
+
+* No cluster scoped resources
+
+* No namespace admin level resources (limits, quota, policy, authorization
+rules)
+
+* No resources that are potentially unrecoverable (secrets and pvc)
+
+* Resources that are considered "similar" to #3 should be grouped
+the same (configmaps)
 
 
 ## Flag conventions

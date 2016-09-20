@@ -301,9 +301,10 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			}
 
 			mapper := registered.RESTMapper()
+			discoveryClient, err := discovery.NewDiscoveryClientForConfig(cfg)
 			// if we can find the server version and it's current enough to have discovery information, use it.  Otherwise,
 			// fallback to our hardcoded list
-			if discoveryClient, err := discovery.NewDiscoveryClientForConfig(cfg); err == nil {
+			if err == nil {
 				if serverVersion, err := discoveryClient.ServerVersion(); err == nil && useDiscoveryRESTMapper(serverVersion.GitVersion) {
 					// register third party resources with the api machinery groups.  This probably should be done, but
 					// its consistent with old code, so we'll start with it.
@@ -325,7 +326,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			}
 
 			// wrap with shortcuts
-			mapper = NewShortcutExpander(mapper)
+			mapper = NewShortcutExpander(mapper, discoveryClient)
 			// wrap with output preferences
 			mapper = kubectl.OutputVersionMapper{RESTMapper: mapper, OutputVersions: []unversioned.GroupVersion{cmdApiVersion}}
 			return mapper, api.Scheme
@@ -362,7 +363,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 
 			typer := discovery.NewUnstructuredObjectTyper(groupResources)
 
-			return NewShortcutExpander(mapper), typer, nil
+			return NewShortcutExpander(mapper, dc), typer, nil
 		},
 		RESTClient: func() (*restclient.RESTClient, error) {
 			clientConfig, err := clients.ClientConfigForVersion(nil)
