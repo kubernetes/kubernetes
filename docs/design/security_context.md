@@ -86,7 +86,7 @@ shared disks.
 constraints to isolate containers from their host. Different use cases need
 different settings.
 * The concept of a security context should not be tied to a particular security
-mechanism or platform (ie. SELinux, AppArmor)
+mechanism or platform (i.e. SELinux, AppArmor)
 * Applying a different security context to a scope (namespace or pod) requires
 a solution such as the one proposed for [service accounts](service_accounts.md).
 
