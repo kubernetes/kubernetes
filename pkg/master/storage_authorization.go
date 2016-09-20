@@ -31,9 +31,9 @@ type AuthorizationRESTStorageProvider struct {
 	Authorizer authorizer.Authorizer
 }
 
-var _ RESTStorageProvider = &AuthorizationRESTStorageProvider{}
+var _ genericapiserver.RESTStorageProvider = &AuthorizationRESTStorageProvider{}
 
-func (p AuthorizationRESTStorageProvider) NewRESTStorage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool) {
+func (p AuthorizationRESTStorageProvider) NewRESTStorage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter genericapiserver.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool) {
 	if p.Authorizer == nil {
 		return genericapiserver.APIGroupInfo{}, false
 	}
@@ -48,7 +48,7 @@ func (p AuthorizationRESTStorageProvider) NewRESTStorage(apiResourceConfigSource
 	return apiGroupInfo, true
 }
 
-func (p AuthorizationRESTStorageProvider) v1beta1Storage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter RESTOptionsGetter) map[string]rest.Storage {
+func (p AuthorizationRESTStorageProvider) v1beta1Storage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter genericapiserver.RESTOptionsGetter) map[string]rest.Storage {
 	version := authorizationv1beta1.SchemeGroupVersion
 
 	storage := map[string]rest.Storage{}

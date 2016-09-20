@@ -72,6 +72,7 @@ import (
 	podetcd "k8s.io/kubernetes/pkg/registry/pod/etcd"
 	podtemplateetcd "k8s.io/kubernetes/pkg/registry/podtemplate/etcd"
 	"k8s.io/kubernetes/pkg/registry/rangeallocation"
+	rbacstorage "k8s.io/kubernetes/pkg/registry/rbac/storage"
 	resourcequotaetcd "k8s.io/kubernetes/pkg/registry/resourcequota/etcd"
 	secretetcd "k8s.io/kubernetes/pkg/registry/secret/etcd"
 	"k8s.io/kubernetes/pkg/registry/service"
@@ -107,8 +108,8 @@ type Config struct {
 	DeleteCollectionWorkers  int
 	EventTTL                 time.Duration
 	KubeletClient            kubeletclient.KubeletClient
-	// RESTStorageProviders provides RESTStorage building methods keyed by groupName
-	RESTStorageProviders map[string]RESTStorageProvider
+	// genericapiserver.RESTStorageProviders provides RESTStorage building methods keyed by groupName
+	RESTStorageProviders map[string]genericapiserver.RESTStorageProvider
 	// Used to start and monitor tunneling
 	Tunneler          genericapiserver.Tunneler
 	EnableUISupport   bool
@@ -170,11 +171,6 @@ type RESTStorageProvider interface {
 	NewRESTStorage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter RESTOptionsGetter) (groupInfo genericapiserver.APIGroupInfo, enabled bool)
 }
 
-// PostStartHookProvider is an interface in addition to provide a post start hook for the api server
-type PostStartHookProvider interface {
-	PostStartHook() (string, genericapiserver.PostStartHookFunc, error)
-}
-
 // New returns a new instance of Master from the given config.
 // Certain config fields will be set to a default value if unset.
 // Certain config fields must be specified, including:
@@ -209,7 +205,7 @@ func New(c *Config) (*Master, error) {
 
 	// Add some hardcoded storage for now.  Append to the map.
 	if c.RESTStorageProviders == nil {
-		c.RESTStorageProviders = map[string]RESTStorageProvider{}
+		c.RESTStorageProviders = map[string]genericapiserver.RESTStorageProvider{}
 	}
 	c.RESTStorageProviders[appsapi.GroupName] = AppsRESTStorageProvider{}
 	c.RESTStorageProviders[autoscaling.GroupName] = AutoscalingRESTStorageProvider{}
@@ -220,7 +216,7 @@ func New(c *Config) (*Master, error) {
 		DisableThirdPartyControllerForTesting: m.disableThirdPartyControllerForTesting,
 	}
 	c.RESTStorageProviders[policy.GroupName] = PolicyRESTStorageProvider{}
-	c.RESTStorageProviders[rbac.GroupName] = &RBACRESTStorageProvider{AuthorizerRBACSuperUser: c.AuthorizerRBACSuperUser}
+	c.RESTStorageProviders[rbac.GroupName] = &rbacstorage.RESTStorageProvider{AuthorizerRBACSuperUser: c.AuthorizerRBACSuperUser}
 	c.RESTStorageProviders[storage.GroupName] = StorageRESTStorageProvider{}
 	c.RESTStorageProviders[authenticationv1beta1.GroupName] = AuthenticationRESTStorageProvider{Authenticator: c.Authenticator}
 	c.RESTStorageProviders[authorization.GroupName] = AuthorizationRESTStorageProvider{Authorizer: c.Authorizer}
@@ -309,7 +305,7 @@ func (m *Master) InstallAPIs(c *Config) {
 		}
 		glog.V(1).Infof("Enabling API group %q.", group)
 
-		if postHookProvider, ok := restStorageBuilder.(PostStartHookProvider); ok {
+		if postHookProvider, ok := restStorageBuilder.(genericapiserver.PostStartHookProvider); ok {
 			name, hook, err := postHookProvider.PostStartHook()
 			if err != nil {
 				glog.Fatalf("Error building PostStartHook: %v", err)

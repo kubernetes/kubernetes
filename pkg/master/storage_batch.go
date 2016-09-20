@@ -28,9 +28,9 @@ import (
 
 type BatchRESTStorageProvider struct{}
 
-var _ RESTStorageProvider = &BatchRESTStorageProvider{}
+var _ genericapiserver.RESTStorageProvider = &BatchRESTStorageProvider{}
 
-func (p BatchRESTStorageProvider) NewRESTStorage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool) {
+func (p BatchRESTStorageProvider) NewRESTStorage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter genericapiserver.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool) {
 	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(batch.GroupName)
 
 	if apiResourceConfigSource.AnyResourcesForVersionEnabled(batchapiv2alpha1.SchemeGroupVersion) {
@@ -45,7 +45,7 @@ func (p BatchRESTStorageProvider) NewRESTStorage(apiResourceConfigSource generic
 	return apiGroupInfo, true
 }
 
-func (p BatchRESTStorageProvider) v1Storage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter RESTOptionsGetter) map[string]rest.Storage {
+func (p BatchRESTStorageProvider) v1Storage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter genericapiserver.RESTOptionsGetter) map[string]rest.Storage {
 	version := batchapiv1.SchemeGroupVersion
 
 	storage := map[string]rest.Storage{}
@@ -57,7 +57,7 @@ func (p BatchRESTStorageProvider) v1Storage(apiResourceConfigSource genericapise
 	return storage
 }
 
-func (p BatchRESTStorageProvider) v2alpha1Storage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter RESTOptionsGetter) map[string]rest.Storage {
+func (p BatchRESTStorageProvider) v2alpha1Storage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter genericapiserver.RESTOptionsGetter) map[string]rest.Storage {
 	version := batchapiv2alpha1.SchemeGroupVersion
 
 	storage := map[string]rest.Storage{}
