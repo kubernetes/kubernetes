@@ -105,6 +105,9 @@ if [ "${NETWORK_PROVIDER}" == "kubenet" ]; then
   CLUSTER_IP_RANGE="${CONTAINER_SUBNET}"
 fi
 
+# If enabled kube-controller-manager will be started with the --enable-hostpath-provisioner flag
+ENABLE_HOSTPATH_PROVISIONER="${ENABLE_HOSTPATH_PROVISIONER:-true}"
+
 # OpenContrail networking plugin specific settings
 OPENCONTRAIL_TAG="${OPENCONTRAIL_TAG:-R2.20}"
 OPENCONTRAIL_KUBERNETES_TAG="${OPENCONTRAIL_KUBERNETES_TAG:-master}"

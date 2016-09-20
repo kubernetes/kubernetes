@@ -76,6 +76,7 @@ opencontrail_tag: '$(echo "$OPENCONTRAIL_TAG" | sed -e "s/'/''/g")'
 opencontrail_kubernetes_tag: '$(echo "$OPENCONTRAIL_KUBERNETES_TAG" | sed -e "s/'/''/g")'
 opencontrail_public_subnet: '$(echo "$OPENCONTRAIL_PUBLIC_SUBNET" | sed -e "s/'/''/g")'
 e2e_storage_test_environment: '$(echo "$E2E_STORAGE_TEST_ENVIRONMENT" | sed -e "s/'/''/g")'
+enable_hostpath_provisioner: '$(echo "$ENABLE_HOSTPATH_PROVISIONER" | sed -e "s/'/''/g")'
 EOF
 
 if [ -n "${EVICTION_HARD:-}" ]; then
