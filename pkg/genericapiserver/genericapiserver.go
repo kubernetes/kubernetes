@@ -248,12 +248,9 @@ func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
 		s.InstallOpenAPI()
 	}
 
-	secureLocation := ""
-	if options.SecurePort != 0 {
-		secureLocation = net.JoinHostPort(options.BindAddress.String(), strconv.Itoa(options.SecurePort))
-	}
 	secureStartedCh := make(chan struct{})
-	if secureLocation != "" {
+	if options.SecurePort != 0 {
+		secureLocation := net.JoinHostPort(options.BindAddress.String(), strconv.Itoa(options.SecurePort))
 		secureServer := &http.Server{
 			Addr:           secureLocation,
 			Handler:        s.Handler,
@@ -301,10 +298,6 @@ func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
 
 			notifyStarted := sync.Once{}
 			for {
-				// err == systemd.SdNotifyNoSocket when not running on a systemd system
-				if err := systemd.SdNotify("READY=1\n"); err != nil && err != systemd.SdNotifyNoSocket {
-					glog.Errorf("Unable to send systemd daemon successful start message: %v\n", err)
-				}
 				if err := secureServer.ListenAndServeTLS(options.TLSCertFile, options.TLSPrivateKeyFile); err != nil {
 					glog.Errorf("Unable to listen for secure (%v); will try again.", err)
 				} else {
@@ -316,20 +309,15 @@ func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
 			}
 		}()
 	} else {
-		// err == systemd.SdNotifyNoSocket when not running on a systemd system
-		if err := systemd.SdNotify("READY=1\n"); err != nil && err != systemd.SdNotifyNoSocket {
-			glog.Errorf("Unable to send systemd daemon successful start message: %v\n", err)
-		}
 		close(secureStartedCh)
 	}
 
 	insecureLocation := net.JoinHostPort(options.InsecureBindAddress.String(), strconv.Itoa(options.InsecurePort))
-	http := &http.Server{
+	insecureServer := &http.Server{
 		Addr:           insecureLocation,
 		Handler:        s.InsecureHandler,
 		MaxHeaderBytes: 1 << 20,
 	}
-
 	insecureStartedCh := make(chan struct{})
 	glog.Infof("Serving insecurely on %s", insecureLocation)
 	go func() {
@@ -337,7 +325,7 @@ func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
 
 		notifyStarted := sync.Once{}
 		for {
-			if err := http.ListenAndServe(); err != nil {
+			if err := insecureServer.ListenAndServe(); err != nil {
 				glog.Errorf("Unable to listen for insecure (%v); will try again.", err)
 			} else {
 				notifyStarted.Do(func() {
@@ -351,6 +339,11 @@ func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
 	<-secureStartedCh
 	<-insecureStartedCh
 	s.RunPostStartHooks(PostStartHookContext{})
+
+	// err == systemd.SdNotifyNoSocket when not running on a systemd system
+	if err := systemd.SdNotify("READY=1\n"); err != nil && err != systemd.SdNotifyNoSocket {
+		glog.Errorf("Unable to send systemd daemon successful start message: %v\n", err)
+	}
 
 	select {}
 }
