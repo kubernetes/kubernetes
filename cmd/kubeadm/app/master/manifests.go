@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"strings"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/api"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
@@ -57,30 +58,38 @@ const (
 // WriteStaticPodManifests builds manifest objects based on user provided configuration and then dumps it to disk
 // where kubelet will pick and schedule them.
 func WriteStaticPodManifests(s *kubeadmapi.KubeadmConfig) error {
+	// Placeholder for kube-apiserver pod spec command
+	apiServerCommand := getComponentCommand(apiServer, s)
+
+	// Check if the user decided to use an external etcd cluster
+	if len(s.InitFlags.API.Etcd.ExternalEndpoints) > 0 {
+		arg := fmt.Sprintf("--etcd-servers=%s", strings.Join(s.InitFlags.API.Etcd.ExternalEndpoints, ","))
+		apiServerCommand = append(apiServerCommand, arg)
+	} else {
+		apiServerCommand = append(apiServerCommand, "--etcd-servers=http://127.0.0.1:2379")
+	}
+
+	// Is etcd secured?
+	if s.InitFlags.API.Etcd.ExternalCAFile != "" {
+		etcdCAFileArg := fmt.Sprintf("--etcd-cafile=%s", s.InitFlags.API.Etcd.ExternalCAFile)
+		apiServerCommand = append(apiServerCommand, etcdCAFileArg)
+	}
+	if s.InitFlags.API.Etcd.ExternalCertFile != "" && s.InitFlags.API.Etcd.ExternalKeyFile != "" {
+		etcdClientFileArg := fmt.Sprintf("--etcd-certfile=%s", s.InitFlags.API.Etcd.ExternalCertFile)
+		etcdKeyFileArg := fmt.Sprintf("--etcd-keyfile=%s", s.InitFlags.API.Etcd.ExternalKeyFile)
+		apiServerCommand = append(apiServerCommand, etcdClientFileArg, etcdKeyFileArg)
+	}
+
+	// Prepare static pod specs
 	staticPodSpecs := map[string]api.Pod{
-		// TODO this needs a volume
-		etcd: componentPod(api.Container{
-			Command: []string{
-				"/usr/local/bin/etcd",
-				"--listen-client-urls=http://127.0.0.1:2379",
-				"--advertise-client-urls=http://127.0.0.1:2379",
-				"--data-dir=/var/etcd/data",
-			},
-			VolumeMounts:  []api.VolumeMount{etcdVolumeMount()},
-			Image:         images.GetCoreImage(images.KubeEtcdImage, s.EnvParams["etcd_image"]),
-			LivenessProbe: componentProbe(2379, "/health"),
-			Name:          etcd,
-			Resources:     componentResources("200m"),
-		}, etcdVolume(s)),
-		// TODO bind-mount certs in
 		kubeAPIServer: componentPod(api.Container{
 			Name:          kubeAPIServer,
 			Image:         images.GetCoreImage(images.KubeAPIServerImage, s.EnvParams["hyperkube_image"]),
-			Command:       getComponentCommand(apiServer, s),
-			VolumeMounts:  []api.VolumeMount{k8sVolumeMount()},
+			Command:       apiServerCommand,
+			VolumeMounts:  []api.VolumeMount{certsVolumeMount(), k8sVolumeMount()},
 			LivenessProbe: componentProbe(8080, "/healthz"),
 			Resources:     componentResources("250m"),
-		}, k8sVolume(s)),
+		}, certsVolume(s), k8sVolume(s)),
 		kubeControllerManager: componentPod(api.Container{
 			Name:          kubeControllerManager,
 			Image:         images.GetCoreImage(images.KubeControllerManagerImage, s.EnvParams["hyperkube_image"]),
@@ -96,6 +105,23 @@ func WriteStaticPodManifests(s *kubeadmapi.KubeadmConfig) error {
 			LivenessProbe: componentProbe(10251, "/healthz"),
 			Resources:     componentResources("100m"),
 		}),
+	}
+
+	// Add etcd static pod spec only if external etcd is not configured
+	if len(s.InitFlags.API.Etcd.ExternalEndpoints) == 0 {
+		staticPodSpecs[etcd] = componentPod(api.Container{
+			Name: etcd,
+			Command: []string{
+				"etcd",
+				"--listen-client-urls=http://127.0.0.1:2379",
+				"--advertise-client-urls=http://127.0.0.1:2379",
+				"--data-dir=/var/etcd/data",
+			},
+			VolumeMounts:  []api.VolumeMount{certsVolumeMount(), etcdVolumeMount(), k8sVolumeMount()},
+			Image:         images.GetCoreImage(images.KubeEtcdImage, s.EnvParams["etcd_image"]),
+			LivenessProbe: componentProbe(2379, "/health"),
+			Resources:     componentResources("200m"),
+		}, certsVolume(s), etcdVolume(s), k8sVolume(s))
 	}
 
 	manifestsPath := path.Join(s.EnvParams["kubernetes_dir"], "manifests")
@@ -115,8 +141,7 @@ func WriteStaticPodManifests(s *kubeadmapi.KubeadmConfig) error {
 	return nil
 }
 
-// etcdVolume returns an host-path volume for storing etcd data.
-// By using a host-path, the data will survive pod restart.
+// etcdVolume exposes a path on the host in order to guarantee data survival during reboot.
 func etcdVolume(s *kubeadmapi.KubeadmConfig) api.Volume {
 	return api.Volume{
 		Name: "etcd",
@@ -130,6 +155,24 @@ func etcdVolumeMount() api.VolumeMount {
 	return api.VolumeMount{
 		Name:      "etcd",
 		MountPath: "/var/etcd",
+	}
+}
+
+// certsVolume exposes host SSL certificates to pod containers.
+func certsVolume(s *kubeadmapi.KubeadmConfig) api.Volume {
+	return api.Volume{
+		Name: "certs",
+		VolumeSource: api.VolumeSource{
+			// TODO make path configurable
+			HostPath: &api.HostPathVolumeSource{Path: "/etc/ssl/certs"},
+		},
+	}
+}
+
+func certsVolumeMount() api.VolumeMount {
+	return api.VolumeMount{
+		Name:      "certs",
+		MountPath: "/etc/ssl/certs",
 	}
 }
 
