@@ -91,8 +91,8 @@ func PredicateMetadata(pod *api.Pod, nodeInfoMap map[string]*schedulercache.Node
 	}
 	return &predicateMetadata{
 		podBestEffort:             isPodBestEffort(pod),
-		podRequest:                GetResourceRequest(pod),
-		podPorts:                  GetUsedPorts(pod),
+		podRequest:                getResourceRequest(pod),
+		podPorts:                  getUsedPorts(pod),
 		matchingAntiAffinityTerms: matchingTerms,
 	}
 }
@@ -417,7 +417,7 @@ func (c *VolumeZoneChecker) predicate(pod *api.Pod, meta interface{}, nodeInfo *
 	return true, nil, nil
 }
 
-func GetResourceRequest(pod *api.Pod) *schedulercache.Resource {
+func getResourceRequest(pod *api.Pod) *schedulercache.Resource {
 	result := schedulercache.Resource{}
 	for _, container := range pod.Spec.Containers {
 		requests := container.Resources.Requests
@@ -459,7 +459,7 @@ func PodFitsResources(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.N
 		podRequest = predicateMeta.podRequest
 	} else {
 		// We couldn't parse metadata - fallback to computing it.
-		podRequest = GetResourceRequest(pod)
+		podRequest = getResourceRequest(pod)
 	}
 	if podRequest.MilliCPU == 0 && podRequest.Memory == 0 && podRequest.NvidiaGPU == 0 {
 		return len(predicateFails) == 0, predicateFails, nil
@@ -724,14 +724,14 @@ func PodFitsHostPorts(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.N
 		wantPorts = predicateMeta.podPorts
 	} else {
 		// We couldn't parse metadata - fallback to computing it.
-		wantPorts = GetUsedPorts(pod)
+		wantPorts = getUsedPorts(pod)
 	}
 	if len(wantPorts) == 0 {
 		return true, nil, nil
 	}
 
 	// TODO: Aggregate it at the NodeInfo level.
-	existingPorts := GetUsedPorts(nodeInfo.Pods()...)
+	existingPorts := getUsedPorts(nodeInfo.Pods()...)
 	for wport := range wantPorts {
 		if wport != 0 && existingPorts[wport] {
 			return false, []algorithm.PredicateFailureReason{ErrPodNotFitsHostPorts}, nil
@@ -740,7 +740,7 @@ func PodFitsHostPorts(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.N
 	return true, nil, nil
 }
 
-func GetUsedPorts(pods ...*api.Pod) map[int]bool {
+func getUsedPorts(pods ...*api.Pod) map[int]bool {
 	ports := make(map[int]bool)
 	for _, pod := range pods {
 		for j := range pod.Spec.Containers {

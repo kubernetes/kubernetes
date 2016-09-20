@@ -29,7 +29,6 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/factory"
-	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 
 	"github.com/golang/glog"
 )
@@ -204,30 +203,24 @@ func defaultPriorities() sets.String {
 // GetEquivalencePod returns a EquivalencePod which contains a group of pod attributes which can be reused.
 func GetEquivalencePod(pod *api.Pod) interface{} {
 	equivalencePod := EquivalencePod{}
-	podSpec := &(pod.Spec)
-	for _, vol := range podSpec.Volumes {
-		equivalencePod.Volumes = append(equivalencePod.Volumes, vol)
+	// For now we only consider pods:
+	// 1. OwnerReferences is Controller
+	// 2. OwnerReferences kind is not PetSet
+	// 3. with same OwnerReferences
+	// to be equivalent
+	if len(pod.OwnerReferences) != 0 {
+		for _, ref := range pod.OwnerReferences {
+			if *ref.Controller && ref.Kind != "PetSet" {
+				equivalencePod.ControllerRef = ref
+				// a pod can only belongs to one controller
+				break
+			}
+		}
 	}
-	equivalencePod.NodeSelector = podSpec.NodeSelector
-	equivalencePod.Request = predicates.GetResourceRequest(pod)
-	equivalencePod.Ports = predicates.GetUsedPorts(pod)
-	equivalencePod.Namespace = pod.Namespace
-
-	affinity, err := api.GetAffinityFromPodAnnotations(pod.Annotations)
-	if err != nil {
-		glog.Errorf("GetEquivalencePod failed to get Affinity from Pod %+v, err: %+v", pod.Name, err)
-	}
-
-	equivalencePod.Affinity = affinity
 	return &equivalencePod
 }
 
 // EquivalencePod is a group of pod attributes which can be reused as equivalence to schedule other pods.
 type EquivalencePod struct {
-	Namespace    string
-	Volumes      []api.Volume
-	NodeSelector map[string]string
-	Ports        map[int]bool
-	Request      *schedulercache.Resource
-	Affinity     *api.Affinity
+	ControllerRef api.OwnerReference
 }
