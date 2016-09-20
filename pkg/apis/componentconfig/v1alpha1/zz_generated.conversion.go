@@ -335,6 +335,7 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_componentconfig_KubeletConfigu
 		return err
 	}
 	out.AllowedUnsafeSysctls = in.AllowedUnsafeSysctls
+	out.ExperimentalRuntimeIntegrationType = in.ExperimentalRuntimeIntegrationType
 	return nil
 }
 
@@ -515,6 +516,7 @@ func autoConvert_componentconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigu
 		return err
 	}
 	out.AllowedUnsafeSysctls = in.AllowedUnsafeSysctls
+	out.ExperimentalRuntimeIntegrationType = in.ExperimentalRuntimeIntegrationType
 	return nil
 }
 

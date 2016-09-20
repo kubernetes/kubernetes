@@ -221,4 +221,8 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.EvictionMinimumReclaim, "eviction-minimum-reclaim", s.EvictionMinimumReclaim, "A set of minimum reclaims (e.g. imagefs.available=2Gi) that describes the minimum amount of resource the kubelet will reclaim when performing a pod eviction if that resource is under pressure.")
 	fs.Int32Var(&s.PodsPerCore, "pods-per-core", s.PodsPerCore, "Number of Pods per core that can run on this Kubelet. The total number of Pods on this Kubelet cannot exceed max-pods, so max-pods will be used if this calculation results in a larger number of Pods allowed on the Kubelet. A value of 0 disables this limit.")
 	fs.BoolVar(&s.ProtectKernelDefaults, "protect-kernel-defaults", s.ProtectKernelDefaults, "Default kubelet behaviour for kernel tuning. If set, kubelet errors if any of kernel tunables is different than kubelet defaults.")
+
+	// Hidden flags for experimental features that are still under development.
+	fs.StringVar(&s.ExperimentalRuntimeIntegrationType, "experimental-runtime-integration-type", s.ExperimentalRuntimeIntegrationType, "Choose the integration path for the container runtime (specified via --container-runtime). Currently, this supports only Docker. If set to \"cri\", Kubelet will use interact with docker through the new Container Runtime Interface.")
+	fs.MarkHidden("experimental-runtime-integration-type")
 }
