@@ -10,7 +10,7 @@
   "apis": [
    {
     "path": "/logs/{logpath}",
-    "description": "get log files",
+    "description": "master log files",
     "operations": [
      {
       "type": "void",
@@ -31,7 +31,7 @@
    },
    {
     "path": "/logs",
-    "description": "get log files",
+    "description": "master log files",
     "operations": [
      {
       "type": "void",
