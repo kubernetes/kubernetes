@@ -457,44 +457,46 @@ func (h *HumanReadablePrinter) AfterPrint(output io.Writer, res string) error {
 
 // NOTE: When adding a new resource type here, please update the list
 // pkg/kubectl/cmd/get.go to reflect the new resource type.
-var podColumns = []string{"NAME", "READY", "STATUS", "RESTARTS", "AGE"}
-var podTemplateColumns = []string{"TEMPLATE", "CONTAINER(S)", "IMAGE(S)", "PODLABELS"}
-var replicationControllerColumns = []string{"NAME", "DESIRED", "CURRENT", "READY", "AGE"}
-var replicaSetColumns = []string{"NAME", "DESIRED", "CURRENT", "READY", "AGE"}
-var jobColumns = []string{"NAME", "DESIRED", "SUCCESSFUL", "AGE"}
-var scheduledJobColumns = []string{"NAME", "SCHEDULE", "SUSPEND", "ACTIVE", "LAST-SCHEDULE"}
-var serviceColumns = []string{"NAME", "CLUSTER-IP", "EXTERNAL-IP", "PORT(S)", "AGE"}
-var ingressColumns = []string{"NAME", "HOSTS", "ADDRESS", "PORTS", "AGE"}
-var petSetColumns = []string{"NAME", "DESIRED", "CURRENT", "AGE"}
-var endpointColumns = []string{"NAME", "ENDPOINTS", "AGE"}
-var nodeColumns = []string{"NAME", "STATUS", "AGE"}
-var daemonSetColumns = []string{"NAME", "DESIRED", "CURRENT", "NODE-SELECTOR", "AGE"}
-var eventColumns = []string{"LASTSEEN", "FIRSTSEEN", "COUNT", "NAME", "KIND", "SUBOBJECT", "TYPE", "REASON", "SOURCE", "MESSAGE"}
-var limitRangeColumns = []string{"NAME", "AGE"}
-var resourceQuotaColumns = []string{"NAME", "AGE"}
-var namespaceColumns = []string{"NAME", "STATUS", "AGE"}
-var secretColumns = []string{"NAME", "TYPE", "DATA", "AGE"}
-var serviceAccountColumns = []string{"NAME", "SECRETS", "AGE"}
-var persistentVolumeColumns = []string{"NAME", "CAPACITY", "ACCESSMODES", "RECLAIMPOLICY", "STATUS", "CLAIM", "REASON", "AGE"}
-var persistentVolumeClaimColumns = []string{"NAME", "STATUS", "VOLUME", "CAPACITY", "ACCESSMODES", "AGE"}
-var componentStatusColumns = []string{"NAME", "STATUS", "MESSAGE", "ERROR"}
-var thirdPartyResourceColumns = []string{"NAME", "DESCRIPTION", "VERSION(S)"}
-var roleColumns = []string{"NAME", "AGE"}
-var roleBindingColumns = []string{"NAME", "AGE"}
-var clusterRoleColumns = []string{"NAME", "AGE"}
-var clusterRoleBindingColumns = []string{"NAME", "AGE"}
-var storageClassColumns = []string{"NAME", "TYPE"}
+var (
+	podColumns                   = []string{"NAME", "READY", "STATUS", "RESTARTS", "AGE"}
+	podTemplateColumns           = []string{"TEMPLATE", "CONTAINER(S)", "IMAGE(S)", "PODLABELS"}
+	replicationControllerColumns = []string{"NAME", "DESIRED", "CURRENT", "READY", "AGE"}
+	replicaSetColumns            = []string{"NAME", "DESIRED", "CURRENT", "READY", "AGE"}
+	jobColumns                   = []string{"NAME", "DESIRED", "SUCCESSFUL", "AGE"}
+	scheduledJobColumns          = []string{"NAME", "SCHEDULE", "SUSPEND", "ACTIVE", "LAST-SCHEDULE"}
+	serviceColumns               = []string{"NAME", "CLUSTER-IP", "EXTERNAL-IP", "PORT(S)", "AGE"}
+	ingressColumns               = []string{"NAME", "HOSTS", "ADDRESS", "PORTS", "AGE"}
+	petSetColumns                = []string{"NAME", "DESIRED", "CURRENT", "AGE"}
+	endpointColumns              = []string{"NAME", "ENDPOINTS", "AGE"}
+	nodeColumns                  = []string{"NAME", "STATUS", "AGE"}
+	daemonSetColumns             = []string{"NAME", "DESIRED", "CURRENT", "NODE-SELECTOR", "AGE"}
+	eventColumns                 = []string{"LASTSEEN", "FIRSTSEEN", "COUNT", "NAME", "KIND", "SUBOBJECT", "TYPE", "REASON", "SOURCE", "MESSAGE"}
+	limitRangeColumns            = []string{"NAME", "AGE"}
+	resourceQuotaColumns         = []string{"NAME", "AGE"}
+	namespaceColumns             = []string{"NAME", "STATUS", "AGE"}
+	secretColumns                = []string{"NAME", "TYPE", "DATA", "AGE"}
+	serviceAccountColumns        = []string{"NAME", "SECRETS", "AGE"}
+	persistentVolumeColumns      = []string{"NAME", "CAPACITY", "ACCESSMODES", "RECLAIMPOLICY", "STATUS", "CLAIM", "REASON", "AGE"}
+	persistentVolumeClaimColumns = []string{"NAME", "STATUS", "VOLUME", "CAPACITY", "ACCESSMODES", "AGE"}
+	componentStatusColumns       = []string{"NAME", "STATUS", "MESSAGE", "ERROR"}
+	thirdPartyResourceColumns    = []string{"NAME", "DESCRIPTION", "VERSION(S)"}
+	roleColumns                  = []string{"NAME", "AGE"}
+	roleBindingColumns           = []string{"NAME", "AGE"}
+	clusterRoleColumns           = []string{"NAME", "AGE"}
+	clusterRoleBindingColumns    = []string{"NAME", "AGE"}
+	storageClassColumns          = []string{"NAME", "TYPE"}
 
-// TODO: consider having 'KIND' for third party resource data
-var thirdPartyResourceDataColumns = []string{"NAME", "LABELS", "DATA"}
-var horizontalPodAutoscalerColumns = []string{"NAME", "REFERENCE", "TARGET", "CURRENT", "MINPODS", "MAXPODS", "AGE"}
-var withNamespacePrefixColumns = []string{"NAMESPACE"} // TODO(erictune): print cluster name too.
-var deploymentColumns = []string{"NAME", "DESIRED", "CURRENT", "UP-TO-DATE", "AVAILABLE", "AGE"}
-var configMapColumns = []string{"NAME", "DATA", "AGE"}
-var podSecurityPolicyColumns = []string{"NAME", "PRIV", "CAPS", "VOLUMEPLUGINS", "SELINUX", "RUNASUSER"}
-var clusterColumns = []string{"NAME", "STATUS", "AGE"}
-var networkPolicyColumns = []string{"NAME", "POD-SELECTOR", "AGE"}
-var certificateSigningRequestColumns = []string{"NAME", "AGE", "REQUESTOR", "CONDITION"}
+	// TODO: consider having 'KIND' for third party resource data
+	thirdPartyResourceDataColumns    = []string{"NAME", "LABELS", "DATA"}
+	horizontalPodAutoscalerColumns   = []string{"NAME", "REFERENCE", "TARGET", "CURRENT", "MINPODS", "MAXPODS", "AGE"}
+	withNamespacePrefixColumns       = []string{"NAMESPACE"} // TODO(erictune): print cluster name too.
+	deploymentColumns                = []string{"NAME", "DESIRED", "CURRENT", "UP-TO-DATE", "AVAILABLE", "AGE"}
+	configMapColumns                 = []string{"NAME", "DATA", "AGE"}
+	podSecurityPolicyColumns         = []string{"NAME", "PRIV", "CAPS", "VOLUMEPLUGINS", "SELINUX", "RUNASUSER"}
+	clusterColumns                   = []string{"NAME", "STATUS", "AGE"}
+	networkPolicyColumns             = []string{"NAME", "POD-SELECTOR", "AGE"}
+	certificateSigningRequestColumns = []string{"NAME", "AGE", "REQUESTOR", "CONDITION"}
+)
 
 func (h *HumanReadablePrinter) printPod(pod *api.Pod, w io.Writer, options PrintOptions) error {
 	reason := string(pod.Status.Phase)
