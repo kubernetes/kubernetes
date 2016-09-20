@@ -16,30 +16,6 @@ limitations under the License.
 
 package metrics
 
-import (
-	"k8s.io/kubernetes/pkg/util/sets"
-
-	"github.com/prometheus/common/model"
-)
-
-var KnownControllerManagerMetrics = map[string][]string{
-	"etcd_helper_cache_entry_count":                  {},
-	"etcd_helper_cache_hit_count":                    {},
-	"etcd_helper_cache_miss_count":                   {},
-	"etcd_request_cache_add_latencies_summary":       {"quantile"},
-	"etcd_request_cache_add_latencies_summary_count": {},
-	"etcd_request_cache_add_latencies_summary_sum":   {},
-	"etcd_request_cache_get_latencies_summary":       {"quantile"},
-	"etcd_request_cache_get_latencies_summary_count": {},
-	"etcd_request_cache_get_latencies_summary_sum":   {},
-	"get_token_count":                                {},
-	"get_token_fail_count":                           {},
-	"rest_client_request_latency_microseconds":       {"url", "verb", "quantile"},
-	"rest_client_request_latency_microseconds_count": {"url", "verb"},
-	"rest_client_request_latency_microseconds_sum":   {"url", "verb"},
-	"rest_client_request_status_codes":               {"method", "code", "host"},
-}
-
 type ControllerManagerMetrics Metrics
 
 func (m *ControllerManagerMetrics) Equal(o ControllerManagerMetrics) bool {
@@ -48,15 +24,12 @@ func (m *ControllerManagerMetrics) Equal(o ControllerManagerMetrics) bool {
 
 func NewControllerManagerMetrics() ControllerManagerMetrics {
 	result := NewMetrics()
-	for metric := range KnownControllerManagerMetrics {
-		result[metric] = make(model.Samples, 0)
-	}
 	return ControllerManagerMetrics(result)
 }
 
-func parseControllerManagerMetrics(data string, unknownMetrics sets.String) (ControllerManagerMetrics, error) {
+func parseControllerManagerMetrics(data string) (ControllerManagerMetrics, error) {
 	result := NewControllerManagerMetrics()
-	if err := parseMetrics(data, KnownControllerManagerMetrics, (*Metrics)(&result), unknownMetrics); err != nil {
+	if err := parseMetrics(data, (*Metrics)(&result)); err != nil {
 		return ControllerManagerMetrics{}, err
 	}
 	return result, nil
