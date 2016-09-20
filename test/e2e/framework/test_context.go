@@ -83,6 +83,8 @@ type TestContextType struct {
 	// 	"Density":{
 	// 		"AllLatencyTests":"true"
 	// 	}
+
+	Viper   string
 	Density struct {
 		AllLatencyTests bool
 	}
@@ -195,9 +197,11 @@ func RegisterNodeFlags() {
 
 // Enable viper configuration management of flags.
 func ViperizeFlags() {
+	flag.StringVar(&TestContext.Viper, "viper-config", "e2e", "The name of the viper config i.e. 'e2e' will read values from 'e2e.json' locally.  All e2e parameters are meant to be configurable by viper.")
+
 	// Add viper in a minimal way.
 	// Flag interop isnt possible, since 'go test' coupling to flag.Parse.
-	viper.SetConfigName("e2e")
+	viper.SetConfigName(TestContext.Viper)
 	viper.AddConfigPath(".")
 	viper.ReadInConfig()
 
