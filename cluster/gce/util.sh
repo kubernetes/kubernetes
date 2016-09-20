@@ -410,14 +410,17 @@ function create-static-ip() {
   while true; do
     if gcloud compute addresses create "$1" \
       --project "${PROJECT}" \
-      --region "${REGION}" -q > /dev/null; then
+      --region "${REGION}" -q; then
+      echo "Static IP creation succeeded"
       # successful operation
-      break
+      # TODO: redirect output to the /dev/null and uncomment break when #32789 is resolved.
+      # Removing break will make us recheck if the address was indeed created.
+      # break
     fi
 
     if cloud compute addresses describe "$1" \
       --project "${PROJECT}" \
-      --region "${REGION}" >/dev/null 2>&1; then
+      --region "${REGION}" > /dev/null 2>&1; then
       # it exists - postcondition satisfied
       break
     fi
