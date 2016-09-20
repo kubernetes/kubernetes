@@ -55,6 +55,7 @@ const (
 	HostNetworkNotSupported = "HostNetworkNotSupported"
 	UndefinedShaper         = "NilShaper"
 	NodeRebooted            = "Rebooted"
+	NodeTracing             = "NodeTracing"
 
 	// Image manager event reason list
 	InvalidDiskCapacity = "InvalidDiskCapacity"

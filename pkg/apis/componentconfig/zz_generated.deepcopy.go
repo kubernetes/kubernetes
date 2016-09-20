@@ -347,6 +347,7 @@ func DeepCopy_componentconfig_KubeletConfiguration(in interface{}, out interface
 		} else {
 			out.AllowedUnsafeSysctls = nil
 		}
+		out.EnableTracing = in.EnableTracing
 		return nil
 	}
 }

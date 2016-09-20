@@ -70,6 +70,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	"k8s.io/kubernetes/pkg/kubelet/sysctl"
+	"k8s.io/kubernetes/pkg/kubelet/tracing"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/kubelet/util/ioutils"
@@ -492,6 +493,9 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		iptablesMasqueradeBit:        int(kubeCfg.IPTablesMasqueradeBit),
 		iptablesDropBit:              int(kubeCfg.IPTablesDropBit),
 	}
+
+	// Set 'enabled' for the tracing package
+	tracing.SetEnable(kubeCfg.EnableTracing)
 
 	if klet.flannelExperimentalOverlay {
 		klet.flannelHelper = NewFlannelHelper()
@@ -1758,6 +1762,8 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 			// This is the first time we are syncing the pod. Record the latency
 			// since kubelet first saw the pod if firstSeenTime is set.
 			metrics.PodWorkerStartLatency.Observe(metrics.SinceInMicroseconds(firstSeenTime))
+			// Tracing probe
+			tracing.SetProbe(kl.nodeRef, tracing.NewMessageWithTs(pod.UID, tracing.PodCreatefirstSeen, firstSeenTime))
 		} else {
 			glog.V(3).Infof("First seen time not recorded for pod %q", pod.UID)
 		}
@@ -1775,6 +1781,10 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 	if !ok || existingStatus.Phase == api.PodPending && apiPodStatus.Phase == api.PodRunning &&
 		!firstSeenTime.IsZero() {
 		metrics.PodStartLatency.Observe(metrics.SinceInMicroseconds(firstSeenTime))
+		// Tracing probe
+		if ok {
+			tracing.SetProbe(kl.nodeRef, tracing.NewMessage(pod.UID, tracing.PodCreateRunning))
+		}
 	}
 
 	// Update status in the status manager
