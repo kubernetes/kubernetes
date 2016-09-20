@@ -40,6 +40,12 @@ type InitFlags struct {
 	API struct {
 		AdvertiseAddrs   []net.IP
 		ExternalDNSNames []string
+		Etcd             struct {
+			ExternalEndpoints []string
+			ExternalCAFile    string
+			ExternalCertFile  string
+			ExternalKeyFile   string
+		}
 	}
 	Services struct {
 		CIDR      net.IPNet
