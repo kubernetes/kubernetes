@@ -72,8 +72,9 @@ spec:
             scheme: HTTP
           # we poll on pod startup for the Kubernetes master service and
           # only setup the /readiness HTTP server once that's available.
-          initialDelaySeconds: 30
+          initialDelaySeconds: 3
           timeoutSeconds: 5
+          periodSeconds: 5
         args:
         # command = "/kube-dns"
         - --domain=$DNS_DOMAIN.
