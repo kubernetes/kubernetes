@@ -629,14 +629,14 @@ func makeSignalObservations(summaryProvider stats.SummaryProvider) (signalObserv
 			result[SignalNodeFsAvailable] = signalObservation{
 				available: resource.NewQuantity(int64(*nodeFs.AvailableBytes), resource.BinarySI),
 				capacity:  resource.NewQuantity(int64(*nodeFs.CapacityBytes), resource.BinarySI),
-				// TODO: add timestamp to stat (see memory stat)
+				time:      nodeFs.Time,
 			}
 		}
 		if nodeFs.InodesFree != nil && nodeFs.Inodes != nil {
 			result[SignalNodeFsInodesFree] = signalObservation{
 				available: resource.NewQuantity(int64(*nodeFs.InodesFree), resource.BinarySI),
 				capacity:  resource.NewQuantity(int64(*nodeFs.Inodes), resource.BinarySI),
-				// TODO: add timestamp to stat (see memory stat)
+				time:      nodeFs.Time,
 			}
 		}
 	}
@@ -646,13 +646,13 @@ func makeSignalObservations(summaryProvider stats.SummaryProvider) (signalObserv
 				result[SignalImageFsAvailable] = signalObservation{
 					available: resource.NewQuantity(int64(*imageFs.AvailableBytes), resource.BinarySI),
 					capacity:  resource.NewQuantity(int64(*imageFs.CapacityBytes), resource.BinarySI),
-					// TODO: add timestamp to stat (see memory stat)
+					time:      imageFs.Time,
 				}
 				if imageFs.InodesFree != nil && imageFs.Inodes != nil {
 					result[SignalImageFsInodesFree] = signalObservation{
 						available: resource.NewQuantity(int64(*imageFs.InodesFree), resource.BinarySI),
 						capacity:  resource.NewQuantity(int64(*imageFs.Inodes), resource.BinarySI),
-						// TODO: add timestamp to stat (see memory stat)
+						time:      imageFs.Time,
 					}
 				}
 			}

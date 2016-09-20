@@ -165,6 +165,8 @@ type VolumeStats struct {
 
 // FsStats contains data about filesystem usage.
 type FsStats struct {
+	// The time at which these stats were updated.
+	Time unversioned.Time `json:"time"`
 	// AvailableBytes represents the storage space available (bytes) for the filesystem.
 	AvailableBytes *uint64 `json:"availableBytes,omitempty"`
 	// CapacityBytes represents the total capacity (bytes) of the filesystems underlying storage.
