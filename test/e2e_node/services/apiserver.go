@@ -57,7 +57,7 @@ func (a *APIServer) Start() error {
 		}
 	}()
 
-	err = readinessCheck([]string{apiserverHealthCheckURL}, errCh)
+	err = readinessCheck("apiserver", []string{apiserverHealthCheckURL}, errCh)
 	if err != nil {
 		return err
 	}

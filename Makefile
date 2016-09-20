@@ -168,6 +168,7 @@ test-e2e: ginkgo generated_files
 #  INSTANCE_METADATA: For REMOTE=true and running on GCE only.
 #  GUBERNATOR: For REMOTE=true only. Produce link to Gubernator to view logs.
 #	 Defaults to false.
+#  PARALLELISM: The number of gingko nodes to run.  Defaults to 8.
 #
 # Example:
 #   make test-e2e-node FOCUS=Kubelet SKIP=container
