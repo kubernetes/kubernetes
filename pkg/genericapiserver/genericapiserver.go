@@ -29,7 +29,6 @@ import (
 	"sync"
 	"time"
 
-	systemd "github.com/coreos/go-systemd/daemon"
 	"github.com/emicklei/go-restful"
 	"github.com/emicklei/go-restful/swagger"
 	"github.com/golang/glog"
@@ -311,10 +310,6 @@ func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
 
 			notifyStarted := sync.Once{}
 			for {
-				// err == systemd.SdNotifyNoSocket when not running on a systemd system
-				if err := systemd.SdNotify("READY=1\n"); err != nil && err != systemd.SdNotifyNoSocket {
-					glog.Errorf("Unable to send systemd daemon successful start message: %v\n", err)
-				}
 				if err := secureServer.ListenAndServeTLS(options.TLSCertFile, options.TLSPrivateKeyFile); err != nil {
 					glog.Errorf("Unable to listen for secure (%v); will try again.", err)
 				} else {
@@ -326,10 +321,6 @@ func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
 			}
 		}()
 	} else {
-		// err == systemd.SdNotifyNoSocket when not running on a systemd system
-		if err := systemd.SdNotify("READY=1\n"); err != nil && err != systemd.SdNotifyNoSocket {
-			glog.Errorf("Unable to send systemd daemon successful start message: %v\n", err)
-		}
 		close(secureStartedCh)
 	}
 

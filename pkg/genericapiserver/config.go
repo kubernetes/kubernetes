@@ -27,6 +27,7 @@ import (
 	"strings"
 	"time"
 
+	systemd "github.com/coreos/go-systemd/daemon"
 	"github.com/emicklei/go-restful"
 	"github.com/go-openapi/spec"
 	"github.com/golang/glog"
@@ -404,6 +405,14 @@ func (c Config) New() (*GenericAPIServer, error) {
 	}
 
 	s.installGroupsDiscoveryHandler()
+
+	s.AddPostStartHook("notify systemd", func(context PostStartHookContext) error {
+		// err == systemd.SdNotifyNoSocket when not running on a systemd system
+		if err := systemd.SdNotify("READY=1\n"); err != nil && err != systemd.SdNotifyNoSocket {
+			glog.Errorf("Unable to send systemd daemon successful start message: %v\n", err)
+		}
+		return nil // above error is not critical
+	})
 
 	return s, nil
 }
