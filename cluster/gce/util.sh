@@ -669,12 +669,22 @@ function create-network() {
     gcloud compute networks create --project "${PROJECT}" "${NETWORK}" --range "10.240.0.0/16"
   fi
 
-  if ! gcloud compute firewall-rules --project "${PROJECT}" describe "${NETWORK}-default-internal" &>/dev/null; then
-    gcloud compute firewall-rules create "${NETWORK}-default-internal" \
+  if ! gcloud compute firewall-rules --project "${PROJECT}" describe "${NETWORK}-default-internal-master" &>/dev/null; then
+    gcloud compute firewall-rules create "${NETWORK}-default-internal-master" \
       --project "${PROJECT}" \
       --network "${NETWORK}" \
       --source-ranges "10.0.0.0/8" \
-      --allow "tcp:1-65535,udp:1-65535,icmp" &
+      --allow "tcp:1-2379,tcp:2382-65535,udp:1-65535,icmp" \
+      --target-tags "${MASTER_TAG}"&
+  fi
+
+  if ! gcloud compute firewall-rules --project "${PROJECT}" describe "${NETWORK}-default-internal-node" &>/dev/null; then
+    gcloud compute firewall-rules create "${NETWORK}-default-internal-node" \
+      --project "${PROJECT}" \
+      --network "${NETWORK}" \
+      --source-ranges "10.0.0.0/8" \
+      --allow "tcp:1-65535,udp:1-65535,icmp" \
+      --target-tags "${NODE_TAG}"&
   fi
 
   if ! gcloud compute firewall-rules describe --project "${PROJECT}" "${NETWORK}-default-ssh" &>/dev/null; then
@@ -721,6 +731,16 @@ function create-master() {
       --zone "${ZONE}" \
       --type "${CLUSTER_REGISTRY_DISK_TYPE_GCE}" \
       --size "${CLUSTER_REGISTRY_DISK_SIZE}" &
+  fi
+
+  # Create rule for accessing and securing etcd servers.
+  if ! gcloud compute firewall-rules --project "${PROJECT}" describe "${MASTER_NAME}-etcd" &>/dev/null; then
+    gcloud compute firewall-rules create "${MASTER_NAME}-etcd" \
+      --project "${PROJECT}" \
+      --network "${NETWORK}" \
+      --source-tags "${MASTER_TAG}" \
+      --allow "tcp:2380,tcp:2381" \
+      --target-tags "${MASTER_TAG}" &
   fi
 
   # Generate a bearer token for this cluster. We push this separately
@@ -1274,6 +1294,13 @@ function kube-down() {
         --project "${PROJECT}" \
         --quiet \
         "${NODE_TAG}-all"
+    fi
+    # Delete firewall rule for etcd servers.
+    if ! gcloud compute firewall-rules --project "${PROJECT}" describe "${MASTER_NAME}-etcd" &>/dev/null; then
+      gcloud compute firewall-rules delete  \
+        --project "${PROJECT}" \
+        --quiet \
+        "${MASTER_NAME}-etcd"
     fi
   fi
 
