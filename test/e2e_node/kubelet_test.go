@@ -38,7 +38,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 	})
 	Context("when scheduling a busybox command in a pod", func() {
 		podName := "busybox-scheduling-" + string(uuid.NewUUID())
-		It("it should print the output to logs", func() {
+		It("it should print the output to logs [Conformance]", func() {
 			podClient.CreateSync(&api.Pod{
 				ObjectMeta: api.ObjectMeta{
 					Name: podName,
@@ -118,7 +118,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 	})
 	Context("when scheduling a read only busybox container", func() {
 		podName := "busybox-readonly-fs" + string(uuid.NewUUID())
-		It("it should not write to root filesystem", func() {
+		It("it should not write to root filesystem [Conformance]", func() {
 			isReadOnly := true
 			podClient.CreateSync(&api.Pod{
 				ObjectMeta: api.ObjectMeta{

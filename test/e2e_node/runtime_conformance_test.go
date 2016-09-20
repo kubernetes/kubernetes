@@ -234,7 +234,7 @@ while true; do sleep 1; done
 				},
 			} {
 				testCase := testCase
-				It(testCase.description, func() {
+				It(testCase.description+" [Conformance]", func() {
 					name := "image-pull-test"
 					command := []string{"/bin/sh", "-c", "while true; do sleep 1; done"}
 					container := ConformanceContainer{

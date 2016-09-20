@@ -53,7 +53,7 @@ var _ = framework.KubeDescribe("MirrorPod", func() {
 				return checkMirrorPodRunning(f.ClientSet, mirrorPodName, ns)
 			}, 2*time.Minute, time.Second*4).Should(BeNil())
 		})
-		It("should be updated when static pod updated", func() {
+		It("should be updated when static pod updated [Conformance]", func() {
 			By("get mirror pod uid")
 			pod, err := f.ClientSet.Core().Pods(ns).Get(mirrorPodName)
 			Expect(err).ShouldNot(HaveOccurred())
@@ -75,7 +75,7 @@ var _ = framework.KubeDescribe("MirrorPod", func() {
 			Expect(len(pod.Spec.Containers)).Should(Equal(1))
 			Expect(pod.Spec.Containers[0].Image).Should(Equal(image))
 		})
-		It("should be recreated when mirror pod gracefully deleted", func() {
+		It("should be recreated when mirror pod gracefully deleted [Conformance]", func() {
 			By("get mirror pod uid")
 			pod, err := f.ClientSet.Core().Pods(ns).Get(mirrorPodName)
 			Expect(err).ShouldNot(HaveOccurred())
@@ -90,7 +90,7 @@ var _ = framework.KubeDescribe("MirrorPod", func() {
 				return checkMirrorPodRecreatedAndRunnig(f.ClientSet, mirrorPodName, ns, uid)
 			}, 2*time.Minute, time.Second*4).Should(BeNil())
 		})
-		It("should be recreated when mirror pod forcibly deleted", func() {
+		It("should be recreated when mirror pod forcibly deleted [Conformance]", func() {
 			By("get mirror pod uid")
 			pod, err := f.ClientSet.Core().Pods(ns).Get(mirrorPodName)
 			Expect(err).ShouldNot(HaveOccurred())
