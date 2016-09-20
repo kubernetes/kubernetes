@@ -32,6 +32,8 @@ import (
 	fakev1beta1extensions "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/extensions/v1beta1/fake"
 	v1alpha1policy "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/policy/v1alpha1"
 	fakev1alpha1policy "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/policy/v1alpha1/fake"
+	v1beta1storage "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/storage/v1beta1"
+	fakev1beta1storage "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/storage/v1beta1/fake"
 	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/client/typed/discovery"
 	fakediscovery "k8s.io/kubernetes/pkg/client/typed/discovery/fake"
@@ -100,4 +102,9 @@ func (c *Clientset) Extensions() v1beta1extensions.ExtensionsInterface {
 // Policy retrieves the PolicyClient
 func (c *Clientset) Policy() v1alpha1policy.PolicyInterface {
 	return &fakev1alpha1policy.FakePolicy{Fake: &c.Fake}
+}
+
+// Storage retrieves the StorageClient
+func (c *Clientset) Storage() v1beta1storage.StorageInterface {
+	return &fakev1beta1storage.FakeStorage{Fake: &c.Fake}
 }
