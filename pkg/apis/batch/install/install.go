@@ -28,14 +28,14 @@ import (
 func init() {
 	if err := announced.NewGroupMetaFactory(
 		&announced.GroupMetaFactoryArgs{
-			GroupName:                  "batch",
-			VersionPreferenceOrder:     []string{"v1", "v2alpha1"},
+			GroupName:                  batch.GroupName,
+			VersionPreferenceOrder:     []string{v1.SchemeGroupVersion.Version, v2alpha1.SchemeGroupVersion.Version},
 			ImportPrefix:               "k8s.io/kubernetes/pkg/apis/batch",
 			AddInternalObjectsToScheme: batch.AddToScheme,
 		},
 		announced.VersionToSchemeFunc{
-			"v1":       v1.AddToScheme,
-			"v2alpha1": v2alpha1.AddToScheme,
+			v1.SchemeGroupVersion.Version:       v1.AddToScheme,
+			v2alpha1.SchemeGroupVersion.Version: v2alpha1.AddToScheme,
 		},
 	).Announce().RegisterAndEnable(); err != nil {
 		panic(err)
