@@ -55,7 +55,7 @@ func TestPodAndContainer(t *testing.T) {
 		p                 *ExecOptions
 		name              string
 		expectError       bool
-		expectedPod       string
+		expectedPod       *api.Pod
 		expectedContainer string
 		expectedArgs      []string
 	}{
@@ -81,9 +81,17 @@ func TestPodAndContainer(t *testing.T) {
 			p:             &ExecOptions{StreamOptions: StreamOptions{PodName: "foo"}},
 			args:          []string{"cmd"},
 			argsLenAtDash: -1,
-			expectedPod:   "foo",
+			expectedPod:   execPod(),
 			expectedArgs:  []string{"cmd"},
 			name:          "pod in flags",
+		},
+		{
+			p:             &ExecOptions{StreamOptions: StreamOptions{PodName: "pod/foo"}},
+			args:          []string{"cmd"},
+			argsLenAtDash: -1,
+			expectedPod:   execPod(),
+			expectedArgs:  []string{"cmd"},
+			name:          "pod with 'pod/' prefix in flags",
 		},
 		{
 			p:             &ExecOptions{},
@@ -103,15 +111,23 @@ func TestPodAndContainer(t *testing.T) {
 			p:             &ExecOptions{},
 			args:          []string{"foo", "cmd"},
 			argsLenAtDash: -1,
-			expectedPod:   "foo",
+			expectedPod:   execPod(),
 			expectedArgs:  []string{"cmd"},
 			name:          "cmd, w/o flags",
 		},
 		{
 			p:             &ExecOptions{},
+			args:          []string{"pod/foo", "cmd"},
+			argsLenAtDash: -1,
+			expectedPod:   execPod(),
+			expectedArgs:  []string{"cmd"},
+			name:          "pod with 'pod/' prefix, cmd, w/o flags",
+		},
+		{
+			p:             &ExecOptions{},
 			args:          []string{"foo", "cmd"},
 			argsLenAtDash: 1,
-			expectedPod:   "foo",
+			expectedPod:   execPod(),
 			expectedArgs:  []string{"cmd"},
 			name:          "cmd, cmd is behind dash",
 		},
@@ -119,17 +135,27 @@ func TestPodAndContainer(t *testing.T) {
 			p:                 &ExecOptions{StreamOptions: StreamOptions{ContainerName: "bar"}},
 			args:              []string{"foo", "cmd"},
 			argsLenAtDash:     -1,
-			expectedPod:       "foo",
+			expectedPod:       execPod(),
 			expectedContainer: "bar",
 			expectedArgs:      []string{"cmd"},
 			name:              "cmd, container in flag",
 		},
 	}
 	for _, test := range tests {
-		f, tf, _, ns := NewAPIFactory()
+		f, tf, codec, ns := NewAPIFactory()
 		tf.Client = &fake.RESTClient{
 			NegotiatedSerializer: ns,
-			Client:               fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) { return nil, nil }),
+			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+				switch m := req.Method; {
+				case m == "GET":
+					body := objBody(codec, test.expectedPod)
+					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
+				default:
+					//Ensures no GET is performed when deleting by name
+					t.Errorf("%s: unexpected request: %s %#v\n%#v", test.name, req.Method, req.URL, req)
+					return nil, fmt.Errorf("unexpected request")
+				}
+			}),
 		}
 		tf.Namespace = "test"
 		tf.ClientConfig = defaultClientConfig()
@@ -146,8 +172,8 @@ func TestPodAndContainer(t *testing.T) {
 		if err != nil {
 			continue
 		}
-		if options.PodName != test.expectedPod {
-			t.Errorf("expected: %s, got: %s (%s)", test.expectedPod, options.PodName, test.name)
+		if options.PodName != test.expectedPod.Name {
+			t.Errorf("expected: %s, got: %s (%s)", test.expectedPod.Name, options.PodName, test.name)
 		}
 		if options.ContainerName != test.expectedContainer {
 			t.Errorf("expected: %s, got: %s (%s)", test.expectedContainer, options.ContainerName, test.name)
@@ -161,22 +187,24 @@ func TestPodAndContainer(t *testing.T) {
 func TestExec(t *testing.T) {
 	version := registered.GroupOrDie(api.GroupName).GroupVersion.Version
 	tests := []struct {
-		name, podPath, execPath, container string
-		pod                                *api.Pod
-		execErr                            bool
+		name, shortPodPath, podPath, execPath, container string
+		pod                                              *api.Pod
+		execErr                                          bool
 	}{
 		{
-			name:     "pod exec",
-			podPath:  "/api/" + version + "/namespaces/test/pods/foo",
-			execPath: "/api/" + version + "/namespaces/test/pods/foo/exec",
-			pod:      execPod(),
+			name:         "pod exec",
+			shortPodPath: "/namespaces/test/pods/foo",
+			podPath:      "/api/" + version + "/namespaces/test/pods/foo",
+			execPath:     "/api/" + version + "/namespaces/test/pods/foo/exec",
+			pod:          execPod(),
 		},
 		{
-			name:     "pod exec error",
-			podPath:  "/api/" + version + "/namespaces/test/pods/foo",
-			execPath: "/api/" + version + "/namespaces/test/pods/foo/exec",
-			pod:      execPod(),
-			execErr:  true,
+			name:         "pod exec error",
+			shortPodPath: "/namespaces/test/pods/foo",
+			podPath:      "/api/" + version + "/namespaces/test/pods/foo",
+			execPath:     "/api/" + version + "/namespaces/test/pods/foo/exec",
+			pod:          execPod(),
+			execErr:      true,
 		},
 	}
 	for _, test := range tests {
@@ -186,6 +214,9 @@ func TestExec(t *testing.T) {
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				switch p, m := req.URL.Path, req.Method; {
 				case p == test.podPath && m == "GET":
+					body := objBody(codec, test.pod)
+					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
+				case p == test.shortPodPath && m == "GET":
 					body := objBody(codec, test.pod)
 					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
 				default:
