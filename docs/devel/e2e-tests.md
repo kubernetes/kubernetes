@@ -511,6 +511,16 @@ breaking changes, it does *not* block the merge-queue, and thus should run in
 some separate test suites owned by the feature owner(s)
 (see [Continuous Integration](#continuous-integration) below).
 
+### Programmatic labels for tests
+
+See [The kubernetes ginkgo tag declarations](https://github.com/test/e2e/tags.go) for the set of ginkgo labels which we apply to tests, which serve as targets for filters.  We are working on implementing clearer partitioning of our e2e tests to make running a known set of tests easier (#10548).
+
+If a test has no labels, it is expected to run fast (under five minutes), be able to be run in parallel, and be consistent.
+
+### A note on Feature test tags and CI
+
+If a feature is experimental or alpha and is not enabled by default due to being incomplete or potentially subject to breaking changes, it does *not* block the merge-queue, and thus should run in some separate test suites owned by the feature owner(s) (see #continuous_integration below).
+
 ### Conformance tests
 
 Finally, `[Conformance]` tests represent a subset of the e2e-tests we expect to
