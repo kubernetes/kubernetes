@@ -293,6 +293,10 @@ func (f *FakeFactory) Resumer(info *resource.Info) (bool, error) {
 	return false, nil
 }
 
+func (f *FakeFactory) ResolveImage(name string) (string, error) {
+	return name, nil
+}
+
 func (f *FakeFactory) Validator(validate bool, cacheDir string) (validation.Schema, error) {
 	return f.tf.Validator, f.tf.Err
 }
