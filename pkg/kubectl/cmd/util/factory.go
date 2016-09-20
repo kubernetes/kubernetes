@@ -710,7 +710,6 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 					c:        restclient,
 					fedc:     fedClient,
 					cacheDir: dir,
-					mapper:   api.RESTMapper,
 				}, nil
 			}
 			return validation.NullSchema{}, nil
@@ -973,7 +972,6 @@ type clientSwaggerSchema struct {
 	c        *restclient.RESTClient
 	fedc     *restclient.RESTClient
 	cacheDir string
-	mapper   meta.RESTMapper
 }
 
 const schemaFileName = "schema.json"
