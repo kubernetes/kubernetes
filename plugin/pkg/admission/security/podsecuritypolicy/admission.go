@@ -23,10 +23,11 @@ import (
 
 	"github.com/golang/glog"
 
-	admission "k8s.io/kubernetes/pkg/admission"
-	api "k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/admission"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/auth/user"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
@@ -46,14 +47,14 @@ const (
 
 func init() {
 	admission.RegisterPlugin(PluginName, func(client clientset.Interface, config io.Reader) (admission.Interface, error) {
-		plugin := NewPlugin(client, psp.NewSimpleStrategyFactory(), getMatchingPolicies, false)
+		plugin := NewPlugin(client, psp.NewSimpleStrategyFactory(), getMatchingPolicies, true)
 		plugin.Run()
 		return plugin, nil
 	})
 }
 
 // PSPMatchFn allows plugging in how PSPs are matched against user information.
-type PSPMatchFn func(store cache.Store, user user.Info, sa user.Info) ([]*extensions.PodSecurityPolicy, error)
+type PSPMatchFn func(store cache.Store, user user.Info, sa user.Info, authz authorizer.Authorizer) ([]*extensions.PodSecurityPolicy, error)
 
 // podSecurityPolicyPlugin holds state for and implements the admission plugin.
 type podSecurityPolicyPlugin struct {
@@ -62,13 +63,28 @@ type podSecurityPolicyPlugin struct {
 	strategyFactory  psp.StrategyFactory
 	pspMatcher       PSPMatchFn
 	failOnNoPolicies bool
+	authz            authorizer.Authorizer
 
 	reflector *cache.Reflector
 	stopChan  chan struct{}
 	store     cache.Store
 }
 
+// SetAuthorizer sets the authorizer.
+func (plugin *podSecurityPolicyPlugin) SetAuthorizer(authz authorizer.Authorizer) {
+	plugin.authz = authz
+}
+
+// Validate ensures an authorizer is set.
+func (plugin *podSecurityPolicyPlugin) Validate() error {
+	if plugin.authz == nil {
+		return fmt.Errorf("%s requires an authorizer", PluginName)
+	}
+	return nil
+}
+
 var _ admission.Interface = &podSecurityPolicyPlugin{}
+var _ admission.WantsAuthorizer = &podSecurityPolicyPlugin{}
 
 // NewPlugin creates a new PSP admission plugin.
 func NewPlugin(kclient clientset.Interface, strategyFactory psp.StrategyFactory, pspMatcher PSPMatchFn, failOnNoPolicies bool) *podSecurityPolicyPlugin {
@@ -142,7 +158,7 @@ func (c *podSecurityPolicyPlugin) Admit(a admission.Attributes) error {
 		saInfo = serviceaccount.UserInfo(a.GetNamespace(), pod.Spec.ServiceAccountName, "")
 	}
 
-	matchedPolicies, err := c.pspMatcher(c.store, a.GetUserInfo(), saInfo)
+	matchedPolicies, err := c.pspMatcher(c.store, a.GetUserInfo(), saInfo, c.authz)
 	if err != nil {
 		return admission.NewForbidden(a, err)
 	}
@@ -287,7 +303,11 @@ func (c *podSecurityPolicyPlugin) createProvidersFromPolicies(psps []*extensions
 
 // getMatchingPolicies returns policies from the store.  For now this returns everything
 // in the future it can filter based on UserInfo and permissions.
-func getMatchingPolicies(store cache.Store, user user.Info, sa user.Info) ([]*extensions.PodSecurityPolicy, error) {
+//
+// TODO: this will likely need optimization since the initial implementation will
+// always query for authorization.  Needs scale testing and possibly checking against
+// a cache.
+func getMatchingPolicies(store cache.Store, user user.Info, sa user.Info, authz authorizer.Authorizer) ([]*extensions.PodSecurityPolicy, error) {
 	matchedPolicies := make([]*extensions.PodSecurityPolicy, 0)
 
 	for _, c := range store.List() {
@@ -295,10 +315,40 @@ func getMatchingPolicies(store cache.Store, user user.Info, sa user.Info) ([]*ex
 		if !ok {
 			return nil, errors.NewInternalError(fmt.Errorf("error converting object from store to a pod security policy: %v", c))
 		}
-		matchedPolicies = append(matchedPolicies, constraint)
+
+		if authorizedForPolicy(user, constraint, authz) || authorizedForPolicy(sa, constraint, authz) {
+			matchedPolicies = append(matchedPolicies, constraint)
+		}
 	}
 
 	return matchedPolicies, nil
+}
+
+// authorizedForPolicy returns true if info is authorized to perform a "get" on policy.
+func authorizedForPolicy(info user.Info, policy *extensions.PodSecurityPolicy, authz authorizer.Authorizer) bool {
+	// if no info exists then the API is being hit via the unsecured port.  In this case
+	// authorize the request.
+	if info == nil {
+		return true
+	}
+	attr := buildAttributes(info, policy)
+	allowed, _, _ := authz.Authorize(attr)
+	return allowed
+}
+
+// buildAttributes builds an attributes record for a SAR based on the user info and policy.
+func buildAttributes(info user.Info, policy *extensions.PodSecurityPolicy) authorizer.Attributes {
+	// TODO consider checking against the namespace that the pod is being
+	// created in to allow per-namespace PSP definitions.
+	attr := authorizer.AttributesRecord{
+		User:            info,
+		Verb:            "use",
+		Name:            policy.Name,
+		APIGroup:        extensions.GroupName,
+		Resource:        "podsecuritypolicies",
+		ResourceRequest: true,
+	}
+	return attr
 }
 
 // logProviders logs what providers were found for the pod as well as any errors that were encountered

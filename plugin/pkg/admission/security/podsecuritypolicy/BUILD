@@ -19,6 +19,7 @@ go_library(
         "//pkg/api:go_default_library",
         "//pkg/api/errors:go_default_library",
         "//pkg/apis/extensions:go_default_library",
+        "//pkg/auth/authorizer:go_default_library",
         "//pkg/auth/user:go_default_library",
         "//pkg/client/cache:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
@@ -43,6 +44,7 @@ go_test(
         "//pkg/admission:go_default_library",
         "//pkg/api:go_default_library",
         "//pkg/apis/extensions:go_default_library",
+        "//pkg/auth/authorizer:go_default_library",
         "//pkg/auth/user:go_default_library",
         "//pkg/client/cache:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
@@ -52,6 +54,7 @@ go_test(
         "//pkg/security/podsecuritypolicy/seccomp:go_default_library",
         "//pkg/security/podsecuritypolicy/util:go_default_library",
         "//pkg/util/diff:go_default_library",
+        "//pkg/util/sets:go_default_library",
         "//vendor:github.com/stretchr/testify/assert",
     ],
 )
