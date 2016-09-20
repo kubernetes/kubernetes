@@ -660,7 +660,17 @@ function create-network() {
       --project "${PROJECT}" \
       --network "${NETWORK}" \
       --source-ranges "10.0.0.0/8" \
-      --allow "tcp:1-65535,udp:1-65535,icmp" &
+      --allow "tcp:1-2379,tcp:2382-65535,udp:1-65535,icmp" &
+  fi
+
+  # Create rule for accessing and securing etcd servers.
+  if ! gcloud compute firewall-rules --project "${PROJECT}" describe "${MASTER_NAME}-etcd" &>/dev/null; then
+    gcloud compute firewall-rules create "${MASTER_NAME}-etcd" \
+      --project "${PROJECT}" \
+      --network "${NETWORK}" \
+      --source-tags "${MASTER_NAME}" \
+      --allow "tcp:2380,tcp:2381" \
+      --target-tags "${MASTER_NAME}" &
   fi
 
   if ! gcloud compute firewall-rules describe --project "${PROJECT}" "${NETWORK}-default-ssh" &>/dev/null; then
@@ -1260,6 +1270,13 @@ function kube-down() {
         --project "${PROJECT}" \
         --quiet \
         "${NODE_TAG}-all"
+    fi
+    # Delete firewall rule for etcd servers.
+    if ! gcloud compute firewall-rules --project "${PROJECT}" describe "${MASTER_NAME}-etcd" &>/dev/null; then
+      gcloud compute firewall-rules delete  \
+        --project "${PROJECT}" \
+        --quiet \
+        "${MASTER_NAME}-etcd"
     fi
   fi
 
