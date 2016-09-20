@@ -253,40 +253,67 @@ while true; do sleep 1; done
 						defer f.Client.Secrets(f.Namespace.Name).Delete(secret.Name)
 						container.ImagePullSecrets = []string{secret.Name}
 					}
-
-					By("create the container")
-					container.Create()
-					defer container.Delete()
-
-					// We need to check container state first. The default pod status is pending, If we check
-					// pod phase first, and the expected pod phase is Pending, the container status may not
-					// even show up when we check it.
-					By("check the container state")
-					checkContainerState := func() (bool, error) {
+					// checkContainerStatus checks whether the container status matches expectation.
+					checkContainerStatus := func() error {
 						status, err := container.GetStatus()
 						if err != nil {
-							return false, err
+							return fmt.Errorf("failed to get container status: %v", err)
 						}
-						if !testCase.waiting && status.State.Running != nil {
-							return true, nil
+						// We need to check container state first. The default pod status is pending, If we check
+						// pod phase first, and the expected pod phase is Pending, the container status may not
+						// even show up when we check it.
+						// Check container state
+						if !testCase.waiting {
+							if status.State.Running == nil {
+								return fmt.Errorf("expected container state: Running, got: %q",
+									GetContainerState(status.State))
+							}
 						}
-						if testCase.waiting && status.State.Waiting != nil {
+						if testCase.waiting {
+							if status.State.Waiting == nil {
+								return fmt.Errorf("expected container state: Waiting, got: %q",
+									GetContainerState(status.State))
+							}
 							reason := status.State.Waiting.Reason
-							return reason == images.ErrImagePull.Error() ||
-								reason == images.ErrImagePullBackOff.Error(), nil
-
+							if reason != images.ErrImagePull.Error() &&
+								reason != images.ErrImagePullBackOff.Error() {
+								return fmt.Errorf("unexpected waiting reason: %q", reason)
+							}
 						}
-						return false, nil
+						// Check pod phase
+						phase, err := container.GetPhase()
+						if err != nil {
+							return fmt.Errorf("failed to get pod phase: %v", err)
+						}
+						if phase != testCase.phase {
+							return fmt.Errorf("expected pod phase: %q, got: %q", testCase.phase, phase)
+						}
+						return nil
 					}
-					Eventually(checkContainerState, retryTimeout, pollInterval).Should(BeTrue())
-					Consistently(checkContainerState, consistentCheckTimeout, pollInterval).Should(BeTrue())
-
-					By("check the pod phase")
-					Expect(container.GetPhase()).To(Equal(testCase.phase))
-
-					By("it should be possible to delete")
-					Expect(container.Delete()).To(Succeed())
-					Eventually(container.Present, retryTimeout, pollInterval).Should(BeFalse())
+					// The image registry is not stable, which sometimes causes the test to fail. Add retry mechanism to make this
+					// less flaky.
+					const flakeRetry = 3
+					for i := 1; i <= flakeRetry; i++ {
+						var err error
+						By("create the container")
+						container.Create()
+						By("check the container status")
+						for start := time.Now(); time.Since(start) < retryTimeout; time.Sleep(pollInterval) {
+							if err = checkContainerStatus(); err == nil {
+								break
+							}
+						}
+						By("delete the container")
+						container.Delete()
+						if err == nil {
+							break
+						}
+						if i < flakeRetry {
+							framework.Logf("No.%d attempt failed: %v, retrying...", i, err)
+						} else {
+							framework.Failf("All %d attempts failed: %v", flakeRetry, err)
+						}
+					}
 				})
 			}
 		})
