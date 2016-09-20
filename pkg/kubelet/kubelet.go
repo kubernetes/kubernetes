@@ -233,6 +233,8 @@ type KubeletDeps struct {
 	TLSOptions        *server.TLSOptions
 }
 
+// makePodSourceConfig creates a config.PodConfig from the given
+// KubeletConfiguration or returns an error.
 func makePodSourceConfig(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *KubeletDeps, nodeName string) (*config.PodConfig, error) {
 	manifestURLHeader := make(http.Header)
 	if kubeCfg.ManifestURLHeader != "" {
@@ -1319,6 +1321,8 @@ func makePortMappings(container *api.Container) (ports []kubecontainer.PortMappi
 	return
 }
 
+// GeneratePodHostNameAndDomain creates a hostname and domain name for a pod,
+// given that pod's spec and annotations or returns an error.
 func (kl *Kubelet) GeneratePodHostNameAndDomain(pod *api.Pod) (string, string, error) {
 	// TODO(vmarmol): Handle better.
 	// Cap hostname at 63 chars (specification is 64bytes which is 63 chars and the null terminating char).
@@ -1413,7 +1417,8 @@ func (kl *Kubelet) GenerateRunContainerOptions(pod *api.Pod, container *api.Cont
 
 var masterServices = sets.NewString("kubernetes")
 
-// getServiceEnvVarMap makes a map[string]string of env vars for services a pod in namespace ns should see
+// getServiceEnvVarMap makes a map[string]string of env vars for services a
+// pod in namespace ns should see.
 func (kl *Kubelet) getServiceEnvVarMap(ns string) (map[string]string, error) {
 	var (
 		serviceMap = make(map[string]api.Service)
@@ -2795,6 +2800,8 @@ func (kl *Kubelet) convertStatusToAPIStatus(pod *api.Pod, podStatus *kubecontain
 	return &apiPodStatus
 }
 
+// convertToAPIContainerStatuses converts the given internal container
+// statuses into API container statuses.
 func (kl *Kubelet) convertToAPIContainerStatuses(pod *api.Pod, podStatus *kubecontainer.PodStatus, previousStatus []api.ContainerStatus, containers []api.Container, hasInitContainers, isInitContainer bool) []api.ContainerStatus {
 	convertContainerStatus := func(cs *kubecontainer.ContainerStatus) *api.ContainerStatus {
 		cid := cs.ID.String()
@@ -3057,6 +3064,8 @@ func isSyncPodWorthy(event *pleg.PodLifecycleEvent) bool {
 	return event.Type != pleg.ContainerRemoved
 }
 
+// parseResourceList parses the given configuration map into an API
+// ResourceList or returns an error.
 func parseResourceList(m utilconfig.ConfigurationMap) (api.ResourceList, error) {
 	rl := make(api.ResourceList)
 	for k, v := range m {
@@ -3078,6 +3087,9 @@ func parseResourceList(m utilconfig.ConfigurationMap) (api.ResourceList, error) 
 	return rl, nil
 }
 
+// ParseReservation parses the given kubelet- and system- reservations
+// configuration maps into an internal Reservation instance or returns an
+// error.
 func ParseReservation(kubeReserved, systemReserved utilconfig.ConfigurationMap) (*kubetypes.Reservation, error) {
 	reservation := new(kubetypes.Reservation)
 	if rl, err := parseResourceList(kubeReserved); err != nil {
