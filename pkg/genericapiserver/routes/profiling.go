@@ -26,7 +26,7 @@ import (
 func Profiling() *restful.WebService {
 	ws := new(restful.WebService)
 	ws.Path("/debug/pprof/")
-	ws.Doc("get go pprof debugging info")
+	ws.Doc("go pprof debugging info")
 	ws.Route(ws.GET("/").To(HandlerRouteFunction(pprof.Index)))
 	ws.Route(ws.GET("/profile").To(HandlerRouteFunction(pprof.Profile)))
 	ws.Route(ws.GET("/symbol").To(HandlerRouteFunction(pprof.Symbol)))

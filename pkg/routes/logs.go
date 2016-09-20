@@ -29,7 +29,7 @@ func Logs() *restful.WebService {
 	// See github.com/emicklei/go-restful/blob/master/examples/restful-serve-static.go
 	ws := new(restful.WebService)
 	ws.Path("/logs")
-	ws.Doc("get log files")
+	ws.Doc("master log files")
 	ws.Route(ws.GET("/{logpath:*}").To(logFileHandler).Param(ws.PathParameter("logpath", "path to the log").DataType("string")))
 	ws.Route(ws.GET("/").To(logFileListHandler))
 	return ws

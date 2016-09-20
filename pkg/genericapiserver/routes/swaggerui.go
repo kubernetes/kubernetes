@@ -36,7 +36,7 @@ func SwaggerUI() *restful.WebService {
 
 	ws := new(restful.WebService)
 	ws.Path(prefix)
-	ws.Doc("the swagger user interface")
+	ws.Doc("swagger user interface")
 	ws.Route(ws.GET("/").To(HandlerRouteFunction(handler.ServeHTTP)))
 	ws.Route(ws.HEAD("/").To(HandlerRouteFunction(handler.ServeHTTP)))
 	return ws

@@ -31,7 +31,7 @@ import (
 func DefaultMetrics() *restful.WebService {
 	ws := new(restful.WebService)
 	ws.Path("/metrics")
-	ws.Doc("get prometheus metrics")
+	ws.Doc("prometheus metrics")
 	ws.Route(ws.GET("/").To(routes.HandlerRouteFunction(prometheus.Handler().ServeHTTP)))
 	return ws
 }

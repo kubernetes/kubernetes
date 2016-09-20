@@ -28,7 +28,7 @@ const dashboardPath = "/api/v1/proxy/namespaces/kube-system/services/kubernetes-
 func UIRedirect() *restful.WebService {
 	ws := new(restful.WebService)
 	ws.Path("/ui/")
-	ws.Doc("redirects to the dashboard")
+	ws.Doc("redirect to the dashboard")
 	ws.Route(ws.GET("/").To(func(req *restful.Request, resp *restful.Response) {
 		http.Redirect(resp.ResponseWriter, req.Request, dashboardPath, http.StatusTemporaryRedirect)
 	}))
