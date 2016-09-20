@@ -25,6 +25,7 @@
   - [Behavior changes caused by enabling the garbage collector](#behavior-changes-caused-by-enabling-the-garbage-collector)
     - [kubectl rolling-update](#kubectl-rolling-update)
     - [kubectl delete](#kubectl-delete)
+    - [DELETE operation in REST API](#delete-operation-in-rest-api)
 - [v1.4.0-beta.2](#v140-beta2)
   - [Downloads](#downloads-6)
   - [Changelog since v1.4.0-beta.1](#changelog-since-v140-beta1)
@@ -291,13 +292,19 @@ Old version kubectl's rolling-update command is compatible with Kubernetes 1.4 a
 
 If you do happen to use old version kubectl's rolling update against a 1.4 cluster, it will fail, usually with an error message that will direct you here. If you saw that error, then don't worry, the operation succeeded except for the part where the new replication controller is renamed back to the old name. You can just do another rolling update using kubectl 1.4 or higher to change the name back: look for a replication controller that has the original name plus a random suffix.
 
-Unfortunately, there is a much rarer second possible failure mode: the replication controller gets renamed to the old name, but there is a duplicated set of pods in the cluster. kubectl will not report an error since it thinks its job is done.
+Unfortunately, there is a much rarer second possible failure mode: the replication controller gets renamed to the old name, but there is a duplicate set of pods in the cluster. kubectl will not report an error since it thinks its job is done.
 
 If this happens to you, you can wait at most 10 minutes for the replication controller to start a resync, the extra pods will then be deleted. Or, you can manually trigger a resync by change the replicas in the spec of the replication controller.
 
 ### kubectl delete
 
-If you use an old version kubectl to delete a replication controller or replicaset, then after the delete command has returned, the replication controller or the replicaset will continue to exist in the key-value store for a short period of time (<1s). You probably will not notice any difference if you use kubectl manually, but you might notice it if you are using kubectl in a script.
+If you use an old version kubectl to delete a replication controller or a replicaset, then after the delete command has returned, the replication controller or the replicaset will continue to exist in the key-value store for a short period of time (<1s). You probably will not notice any difference if you use kubectl manually, but you might notice it if you are using kubectl in a script. To fix it, you can poll the API server to confirm the object is deleted.
+
+### DELETE operation in REST API
+
+* **Replication controller & Replicaset**: the DELETE request of a replication controller or a replicaset becomes asynchronous by default. The object will continue to exist in the key-value store for some time. The API server will set its metadata.deletionTimestamp, add the "orphan" finalizer to its metadata.finalizers. The object will be deleted from the key-value store after the garbage collector orphans its dependents. Please refer to this [user-guide](http://kubernetes.io/docs/user-guide/garbage-collector/) for more information regarding the garbage collection.
+
+* **Other objects**: no changes unless you explicitly request orphaning.
 
 
 # v1.4.0-beta.2
