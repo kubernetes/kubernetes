@@ -83,6 +83,25 @@ func NewCmdInit(out io.Writer, s *kubeadmapi.KubeadmConfig) *cobra.Command {
 		`(optional) allow to schedule workload to the node`,
 	)
 
+	// TODO (phase1+) @errordeveloper make the flags below not show up in --help but rather on --advanced-help
+
+	cmd.PersistentFlags().StringSliceVar(
+		&s.InitFlags.API.Etcd.ExternalEndpoints, "external-etcd-endpoints", []string{},
+		`(optional) etcd endpoints to use, in case you have an external cluster.`,
+	)
+	cmd.PersistentFlags().StringVar(
+		&s.InitFlags.API.Etcd.ExternalCAFile, "external-etcd-cafile", "",
+		`(optional) etcd certificate authority certificate file."`,
+	)
+	cmd.PersistentFlags().StringVar(
+		&s.InitFlags.API.Etcd.ExternalCertFile, "external-etcd-certfile", "",
+		`(optional) etcd client certificate file."`,
+	)
+	cmd.PersistentFlags().StringVar(
+		&s.InitFlags.API.Etcd.ExternalKeyFile, "external-etcd-keyfile", "",
+		`(optional) etcd client key file."`,
+	)
+
 	return cmd
 }
 
