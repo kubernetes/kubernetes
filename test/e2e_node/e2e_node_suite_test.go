@@ -47,7 +47,6 @@ import (
 
 var e2es *services.E2EServices
 
-var prePullImages = flag.Bool("prepull-images", true, "If true, prepull images so image pull failures do not cause test failures.")
 var runServicesMode = flag.Bool("run-services-mode", false, "If true, only run services (etcd, apiserver) in current process, and not run test.")
 
 func init() {
@@ -94,7 +93,7 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 	}
 	// Pre-pull the images tests depend on so we can fail immediately if there is an image pull issue
 	// This helps with debugging test flakes since it is hard to tell when a test failure is due to image pulling.
-	if *prePullImages {
+	if framework.TestContext.PrepullImages {
 		glog.Infof("Pre-pulling images so that they are cached for the tests.")
 		err := PrePullAllImages()
 		Expect(err).ShouldNot(HaveOccurred())

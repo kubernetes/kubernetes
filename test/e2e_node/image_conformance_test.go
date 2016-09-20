@@ -36,8 +36,8 @@ var _ = Describe("Image Container Conformance Test", func() {
 			var conformImages []ConformanceImage
 			BeforeEach(func() {
 				existImageTags := []string{
-					NoPullImageRegistry[pullTestExecHealthz],
-					NoPullImageRegistry[pullTestAlpineWithBash],
+					"gcr.io/google_containers/exechealthz:1.0",
+					"gcr.io/google_containers/alpine-with-bash:1.0",
 				}
 				for _, existImageTag := range existImageTags {
 					conformImage, _ := NewConformanceImage("docker", existImageTag)

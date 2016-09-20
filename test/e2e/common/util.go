@@ -16,6 +16,10 @@ limitations under the License.
 
 package common
 
+import (
+	"k8s.io/kubernetes/pkg/util/sets"
+)
+
 type Suite string
 
 const (
@@ -24,3 +28,20 @@ const (
 )
 
 var CurrentSuite Suite
+
+// CommonImageWhiteList is the list of images used in common test. These images should be prepulled
+// before a tests starts, so that the tests won't fail due image pulling flakes. Currently, this is
+// only used by node e2e test.
+// TODO(random-liu): Change the image puller pod to use similar mechanism.
+var CommonImageWhiteList = sets.NewString(
+	"gcr.io/google_containers/busybox:1.24",
+	"gcr.io/google_containers/eptest:0.1",
+	"gcr.io/google_containers/liveness:e2e",
+	"gcr.io/google_containers/mounttest:0.7",
+	"gcr.io/google_containers/mounttest-user:0.3",
+	"gcr.io/google_containers/netexec:1.4",
+	"gcr.io/google_containers/nginx-slim:0.7",
+	"gcr.io/google_containers/serve_hostname:v1.4",
+	"gcr.io/google_containers/test-webserver:e2e",
+	"gcr.io/google_containers/hostexec:1.2",
+)

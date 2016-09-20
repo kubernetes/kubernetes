@@ -24,11 +24,17 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
+
+// ImageWhiteList is the images used in the current test suite. It should be initialized in test suite and
+// the images in the white list should be pre-pulled in the test suite.  Currently, this is only used by
+// node e2e test.
+var ImageWhiteList sets.String
 
 // Convenience method for getting a pod client interface in the framework's namespace,
 // possibly applying test-suite specific transformations to the pod spec, e.g. for
@@ -107,6 +113,26 @@ func (c *PodClient) mungeSpec(pod *api.Pod) {
 	if TestContext.NodeName != "" {
 		Expect(pod.Spec.NodeName).To(Or(BeZero(), Equal(TestContext.NodeName)), "Test misconfigured")
 		pod.Spec.NodeName = TestContext.NodeName
+		if !TestContext.PrepullImages {
+			return
+		}
+		// If prepull is enabled, munge the container spec to make sure the images are not pulled
+		// during the test.
+		for i := range pod.Spec.Containers {
+			c := &pod.Spec.Containers[i]
+			if c.ImagePullPolicy == api.PullAlways {
+				// If the image pull policy is PullAlways, the image doesn't need to be in
+				// the white list or pre-pulled, because the image is expected to be pulled
+				// in the test anyway.
+				continue
+			}
+			// If the image policy is not PullAlways, the image must be in the white list and
+			// pre-pulled.
+			Expect(ImageWhiteList.Has(c.Image)).To(BeTrue(), "Image %q is not in the white list, consider adding it to CommonImageWhiteList in test/e2e/common/util.go or NodeImageWhiteList in test/e2e_node/image_list.go", c.Image)
+			// Do not pull images during the tests because the images in white list should have
+			// been prepulled.
+			c.ImagePullPolicy = api.PullNever
+		}
 	}
 }
 

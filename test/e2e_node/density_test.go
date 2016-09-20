@@ -324,7 +324,7 @@ func runDensityBatchTest(f *framework.Framework, rc *ResourceCollector, testArg 
 	)
 
 	// create test pod data structure
-	pods := newTestPods(testArg.podsNr, ImageRegistry[pauseImage], podType)
+	pods := newTestPods(testArg.podsNr, framework.GetPauseImageNameForHostArch(), podType)
 
 	// the controller watches the change of pod status
 	controller := newInformerWatchPod(f, mutex, watchTimes, podType)
@@ -403,8 +403,8 @@ func runDensitySeqTest(f *framework.Framework, rc *ResourceCollector, testArg de
 		podType               = "density_test_pod"
 		sleepBeforeCreatePods = 30 * time.Second
 	)
-	bgPods := newTestPods(testArg.bgPodsNr, ImageRegistry[pauseImage], "background_pod")
-	testPods := newTestPods(testArg.podsNr, ImageRegistry[pauseImage], podType)
+	bgPods := newTestPods(testArg.bgPodsNr, framework.GetPauseImageNameForHostArch(), "background_pod")
+	testPods := newTestPods(testArg.podsNr, framework.GetPauseImageNameForHostArch(), podType)
 
 	By("Creating a batch of background pods")
 
