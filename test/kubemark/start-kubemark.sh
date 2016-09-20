@@ -261,8 +261,8 @@ until [[ "${ready}" -ge "${NUM_NODES}" ]]; do
   echo -n .
   sleep 1
   now=$(date +%s)
-  # Fail it if it already took more than 15 minutes.
-  if [ $((now - start)) -gt 900 ]; then
+  # Fail it if it already took more than 30 minutes.
+  if [ $((now - start)) -gt 1800 ]; then
     echo ""
     echo "Timeout waiting for all HollowNodes to become Running"
     # Try listing nodes again - if it fails it means that API server is not responding
