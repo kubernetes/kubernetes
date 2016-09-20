@@ -316,14 +316,6 @@ func (c Config) New() (*GenericAPIServer, error) {
 		s.storageDecorator = generic.UndecoratedStorage
 	}
 
-	if c.RestfulContainer != nil {
-		s.HandlerContainer = c.RestfulContainer
-	} else {
-		s.HandlerContainer = NewHandlerContainer(http.NewServeMux(), c.Serializer)
-	}
-	// Use CurlyRouter to be able to use regular expressions in paths. Regular expressions are required in paths for example for proxy (where the path is proxy/{kind}/{name}/{*})
-	s.HandlerContainer.Router(restful.CurlyRouter{})
-
 	if c.ProxyDialer != nil || c.ProxyTLSClientConfig != nil {
 		s.ProxyTransport = utilnet.SetTransportDefaults(&http.Transport{
 			Dial:            c.ProxyDialer,
@@ -336,7 +328,14 @@ func (c Config) New() (*GenericAPIServer, error) {
 	// makes it into all of our supported go versions (only in v1.7.1 now).
 	mime.AddExtensionType(".svg", "image/svg+xml")
 
-	// Register root handler.
+	if c.RestfulContainer != nil {
+		s.HandlerContainer = c.RestfulContainer
+	} else {
+		s.HandlerContainer = NewHandlerContainer(http.NewServeMux(), c.Serializer)
+	}
+	// Use CurlyRouter to be able to use regular expressions in paths. Regular expressions are required in paths for example for proxy (where the path is proxy/{kind}/{name}/{*})
+	s.HandlerContainer.Router(restful.CurlyRouter{})
+
 	// We do not register this using restful Webservice since we do not want to surface this in api docs.
 	// Allow GenericAPIServer to be embedded in contexts which already have something registered at the root
 	if c.EnableIndex {

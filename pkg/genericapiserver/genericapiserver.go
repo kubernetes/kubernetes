@@ -241,12 +241,6 @@ func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
 	if s.enableOpenAPISupport {
 		s.InstallOpenAPI()
 	}
-	// We serve on 2 ports. See docs/admin/accessing-the-api.md
-	secureLocation := ""
-	if options.SecurePort != 0 {
-		secureLocation = net.JoinHostPort(options.BindAddress.String(), strconv.Itoa(options.SecurePort))
-	}
-	insecureLocation := net.JoinHostPort(options.InsecureBindAddress.String(), strconv.Itoa(options.InsecurePort))
 
 	var sem chan bool
 	if options.MaxRequestsInFlight > 0 {
@@ -263,6 +257,10 @@ func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
 		return time.After(globalTimeout), ""
 	}
 
+	secureLocation := ""
+	if options.SecurePort != 0 {
+		secureLocation = net.JoinHostPort(options.BindAddress.String(), strconv.Itoa(options.SecurePort))
+	}
 	secureStartedCh := make(chan struct{})
 	if secureLocation != "" {
 		handler := apiserver.TimeoutHandler(apiserver.RecoverPanics(s.Handler), longRunningTimeout)
@@ -335,6 +333,7 @@ func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
 		close(secureStartedCh)
 	}
 
+	insecureLocation := net.JoinHostPort(options.InsecureBindAddress.String(), strconv.Itoa(options.InsecurePort))
 	handler := apiserver.TimeoutHandler(apiserver.RecoverPanics(s.InsecureHandler), longRunningTimeout)
 	http := &http.Server{
 		Addr:           insecureLocation,
