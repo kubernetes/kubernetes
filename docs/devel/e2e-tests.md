@@ -58,6 +58,7 @@ Updated: 5/3/2016
       - [Testing against local clusters](#testing-against-local-clusters)
     - [Version-skewed and upgrade testing](#version-skewed-and-upgrade-testing)
   - [Kinds of tests](#kinds-of-tests)
+    - [Viper configuration and hierarchichal test parameters.](#viper-configuration-and-hierarchichal-test-parameters)
     - [Conformance tests](#conformance-tests)
     - [Defining Conformance Subset](#defining-conformance-subset)
   - [Continuous Integration](#continuous-integration)
@@ -510,6 +511,20 @@ not enabled by default due to being incomplete or potentially subject to
 breaking changes, it does *not* block the merge-queue, and thus should run in
 some separate test suites owned by the feature owner(s)
 (see [Continuous Integration](#continuous-integration) below).
+
+### Viper configuration and hierarchichal test parameters.
+
+The future of e2e test configuration idioms will be increasingly defined using viper, and decreasingly via flags.
+
+Flags in general fall apart once tests become sufficiently complicated.  So, even if we could use another flag library, it wouldn't be ideal.
+
+To use viper, rather than flags, to configure your tests:
+
+- Just add "e2e.json" to the current directory you are in, and define parameters in it... i.e. `"kubeconfig":"/tmp/x"`.
+
+Note that advanced testing parameters, and hierarchichally defined parameters, are only defined in viper, to see what they are, you can dive into [TestContextType](../../test/e2e/framework/test_context.go).
+
+In time, it is our intent to add or autogenerate a sample viper configuration that includes all e2e parameters, to ship with kubernetes.
 
 ### Conformance tests
 
