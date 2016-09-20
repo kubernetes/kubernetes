@@ -50,7 +50,6 @@ type PodDisruptionBudgetStatus struct {
 }
 
 // +genclient=true
-// +noMethods=true
 
 // PodDisruptionBudget is an object to define the max disruption that can be caused to a collection of pods
 type PodDisruptionBudget struct {
