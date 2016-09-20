@@ -17,6 +17,7 @@ limitations under the License.
 package routes
 
 import (
+	"fmt"
 	"net/http"
 
 	assetfs "github.com/elazarl/go-bindata-assetfs"
@@ -35,7 +36,7 @@ func SwaggerUI() *restful.WebService {
 	}))
 
 	ws := new(restful.WebService)
-	ws.Path(prefix)
+	ws.Path(fmt.Sprintf("%s{subpath:*}", prefix)) // go-restful curly path wildcard
 	ws.Doc("swagger user interface")
 	ws.Route(ws.GET("/").To(HandlerRouteFunction(handler.ServeHTTP)))
 	ws.Route(ws.HEAD("/").To(HandlerRouteFunction(handler.ServeHTTP)))

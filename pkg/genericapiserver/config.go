@@ -335,7 +335,10 @@ func (c Config) New() (*GenericAPIServer, error) {
 		s.HandlerContainer = NewHandlerContainer(http.NewServeMux(), c.Serializer)
 	}
 	s.AuxiliaryHandlerContainer = NewHandlerContainer(s.HandlerContainer.ServeMux, c.Serializer)
-	s.HandlerContainer.Router(restful.CurlyRouter{}) // allow regexp paths, like for proxy/{kind}/{name}/{*}
+
+	// allow regexp paths, like for proxy/{kind}/{name}/{*}
+	s.HandlerContainer.Router(restful.CurlyRouter{})
+	s.AuxiliaryHandlerContainer.Router(restful.CurlyRouter{})
 
 	// We do not register this using restful Webservice since we do not want to surface this in api docs.
 	if c.EnableIndex {
