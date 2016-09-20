@@ -118,7 +118,7 @@ func (e *EtcdServer) Start() error {
 		errCh <- srv.Serve(l)
 	}(e.clientListen)
 
-	err = readinessCheck([]string{etcdHealthCheckURL}, errCh)
+	err = readinessCheck("etcd", []string{etcdHealthCheckURL}, errCh)
 	if err != nil {
 		return err
 	}
