@@ -826,7 +826,7 @@ function kube::release::create_docker_images_for_server() {
 
         rm -rf ${docker_build_path}
         mkdir -p ${docker_build_path}
-        ln ${binary_dir}/${binary_name} ${docker_build_path}/${binary_name}
+        ln -s ${binary_dir}/${binary_name} ${docker_build_path}/${binary_name}
         printf " FROM ${base_image} \n ADD ${binary_name} /usr/local/bin/${binary_name}\n" > ${docker_file_path}
 
         if [[ ${arch} == "amd64" ]]; then
