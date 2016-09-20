@@ -445,6 +445,7 @@ run-proxy
 run-services-mode
 runtime-cgroups
 runtime-config
+runtime-integration-type
 runtime-request-timeout
 save-config
 scheduler-config
