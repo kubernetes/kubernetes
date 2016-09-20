@@ -20,6 +20,7 @@
 # hermetic right now due to things like the golang image. It can take
 # ~8m if you force it to be totally hermetic.)
 
+exit 1
 set -o errexit
 set -o nounset
 set -o pipefail
