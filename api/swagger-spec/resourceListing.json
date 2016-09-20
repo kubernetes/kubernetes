@@ -2,10 +2,6 @@
   "swaggerVersion": "1.2",
   "apis": [
    {
-    "path": "/debug/pprof/",
-    "description": "go pprof debugging info"
-   },
-   {
     "path": "/version",
     "description": "git code version from which this is built"
    },
@@ -14,20 +10,8 @@
     "description": "get available API versions"
    },
    {
-    "path": "/ui/",
-    "description": "redirect to the dashboard"
-   },
-   {
     "path": "/logs",
     "description": "master log files"
-   },
-   {
-    "path": "/healthz",
-    "description": "health checks"
-   },
-   {
-    "path": "/metrics",
-    "description": "prometheus metrics"
    },
    {
     "path": "/api/v1",
