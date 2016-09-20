@@ -73,7 +73,7 @@ const (
 	// of the rollout process.
 	ReplicaSetUpdatedReason = "ReplicaSetUpdated"
 	// FailedRSCreateReason is added in a deployment when it cannot create a new replica set.
-	FailedRSCreateReason = "ReplicaSetCreateErr"
+	FailedRSCreateReason = "ReplicaSetCreateError"
 	// NewReplicaSetReason is added in a deployment when it creates a new replica set.
 	NewReplicaSetReason = "NewReplicaSetCreated"
 	// FoundNewRSReason is added in a deployment when it adopts an existing replica set.
@@ -84,7 +84,7 @@ const (
 	NewRSAvailableReason = "NewReplicaSetAvailable"
 	// TimedOutReason is added in a deployment when its newest replica set fails to show any progress
 	// within the given deadline (progressDeadlineSeconds).
-	TimedOutReason = "DeploymentTimedOut"
+	TimedOutReason = "ProgressDeadlineExceeded"
 	// PausedDeployReason is added in a deployment when it is paused. Lack of progress shouldn't be
 	// estimated once a deployment is paused.
 	PausedDeployReason = "DeploymentPaused"

@@ -94,6 +94,7 @@ var _ = framework.KubeDescribe("Deployment", func() {
 		testFailedDeployment(f)
 	})
 	// TODO: add tests that cover deployment.Spec.MinReadySeconds once we solved clock-skew issues
+	// See https://github.com/kubernetes/kubernetes/issues/29229
 })
 
 func newRS(rsName string, replicas int32, rsPodLabels map[string]string, imageName string, image string) *extensions.ReplicaSet {
