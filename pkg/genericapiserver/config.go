@@ -23,6 +23,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -157,6 +158,11 @@ type Config struct {
 	// OpenAPIDefinitions is a map of type to OpenAPI spec for all types used in this API server. Failure to provide
 	// this map or any of the models used by the server APIs will result in spec generation failure.
 	OpenAPIDefinitions *common.OpenAPIDefinitions
+
+	// MaxRequestsInFlight is the maximum number of parallel non-long-running requests. Every further
+	// request has to wait.
+	MaxRequestsInFlight  int
+	LongRunningRequestRE string
 }
 
 func NewConfig(options *options.ServerRunOptions) *Config {
@@ -191,6 +197,8 @@ func NewConfig(options *options.ServerRunOptions) *Config {
 				Version: "unversioned",
 			},
 		},
+		MaxRequestsInFlight:  options.MaxRequestsInFlight,
+		LongRunningRequestRE: options.LongRunningRequestRE,
 	}
 }
 
@@ -386,21 +394,34 @@ func (c Config) New() (*GenericAPIServer, error) {
 		handler = authenticatedHandler
 	}
 
-	// TODO: Make this optional?  Consumers of GenericAPIServer depend on this currently.
-	s.Handler = handler
-
-	// After all wrapping is done, put a context filter around both handlers
-	var err error
-	handler, err = api.NewRequestContextFilter(c.RequestContextMapper, s.Handler)
+	handler, err := api.NewRequestContextFilter(c.RequestContextMapper, handler)
 	if err != nil {
 		glog.Fatalf("Could not initialize request context filter for s.Handler: %v", err)
 	}
+
+	longRunningRE := regexp.MustCompile(c.LongRunningRequestRE)
+	longRunningRequestCheck := apiserver.BasicLongRunningRequestCheck(longRunningRE, map[string]string{"watch": "true"})
+	longRunningTimeout := func(req *http.Request) (<-chan time.Time, string) {
+		// TODO unify this with apiserver.MaxInFlightLimit
+		if longRunningRequestCheck(req) {
+			return nil, ""
+		}
+		return time.After(globalTimeout), ""
+	}
+	handler = apiserver.TimeoutHandler(apiserver.RecoverPanics(handler, s.NewRequestInfoResolver()), longRunningTimeout)
+
+	var inFlightTokens chan bool
+	if c.MaxRequestsInFlight > 0 {
+		inFlightTokens = make(chan bool, c.MaxRequestsInFlight)
+	}
+	handler = apiserver.MaxInFlightLimit(inFlightTokens, longRunningRequestCheck, handler)
 	s.Handler = handler
 
 	handler, err = api.NewRequestContextFilter(c.RequestContextMapper, s.InsecureHandler)
 	if err != nil {
 		glog.Fatalf("Could not initialize request context filter for s.InsecureHandler: %v", err)
 	}
+	handler = apiserver.TimeoutHandler(apiserver.RecoverPanics(handler, s.NewRequestInfoResolver()), longRunningTimeout)
 	s.InsecureHandler = handler
 
 	s.installGroupsDiscoveryHandler()

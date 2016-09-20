@@ -22,7 +22,6 @@ import (
 	"net"
 	"net/http"
 	"path"
-	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -248,34 +247,16 @@ func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
 	if s.enableOpenAPISupport {
 		s.InstallOpenAPI()
 	}
-	// We serve on 2 ports. See docs/admin/accessing-the-api.md
+
 	secureLocation := ""
 	if options.SecurePort != 0 {
 		secureLocation = net.JoinHostPort(options.BindAddress.String(), strconv.Itoa(options.SecurePort))
 	}
-	insecureLocation := net.JoinHostPort(options.InsecureBindAddress.String(), strconv.Itoa(options.InsecurePort))
-
-	var sem chan bool
-	if options.MaxRequestsInFlight > 0 {
-		sem = make(chan bool, options.MaxRequestsInFlight)
-	}
-
-	longRunningRE := regexp.MustCompile(options.LongRunningRequestRE)
-	longRunningRequestCheck := apiserver.BasicLongRunningRequestCheck(longRunningRE, map[string]string{"watch": "true"})
-	longRunningTimeout := func(req *http.Request) (<-chan time.Time, string) {
-		// TODO unify this with apiserver.MaxInFlightLimit
-		if longRunningRequestCheck(req) {
-			return nil, ""
-		}
-		return time.After(globalTimeout), ""
-	}
-
 	secureStartedCh := make(chan struct{})
 	if secureLocation != "" {
-		handler := apiserver.TimeoutHandler(apiserver.RecoverPanics(s.Handler, s.NewRequestInfoResolver()), longRunningTimeout)
 		secureServer := &http.Server{
 			Addr:           secureLocation,
-			Handler:        apiserver.MaxInFlightLimit(sem, longRunningRequestCheck, handler),
+			Handler:        s.Handler,
 			MaxHeaderBytes: 1 << 20,
 			TLSConfig: &tls.Config{
 				// Can't use SSLv3 because of POODLE and BEAST
@@ -342,10 +323,10 @@ func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
 		close(secureStartedCh)
 	}
 
-	handler := apiserver.TimeoutHandler(apiserver.RecoverPanics(s.InsecureHandler, s.NewRequestInfoResolver()), longRunningTimeout)
+	insecureLocation := net.JoinHostPort(options.InsecureBindAddress.String(), strconv.Itoa(options.InsecurePort))
 	http := &http.Server{
 		Addr:           insecureLocation,
-		Handler:        handler,
+		Handler:        s.InsecureHandler,
 		MaxHeaderBytes: 1 << 20,
 	}
 
