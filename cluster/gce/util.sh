@@ -411,7 +411,21 @@ function create-static-ip() {
     if gcloud compute addresses create "$1" \
       --project "${PROJECT}" \
       --region "${REGION}" -q > /dev/null; then
-      # successful operation
+      # successful operation - wait until it's visible
+      start="$(date +%s)"
+      while true; do
+        now="$(date +%s)"
+        # Timeout set to 15 minutes
+        if [ $((now - start)) -gt 900 ]; then
+          echo "Timeout while waiting for master IP visibility"
+          exit 2
+        fi
+        if gcloud compute addresses describe "$1" --project "${PROJECT}" --region "${REGION}" >/dev/null 2>&1; then
+          break
+        fi
+        echo "Master IP not visible yet. Waiting..."
+        sleep 5
+      done
       break
     fi
 
