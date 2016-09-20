@@ -69,7 +69,7 @@ func RunHistory(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []st
 	}
 	revision := cmdutil.GetFlagInt64(cmd, "revision")
 
-	mapper, typer := f.Object(false)
+	mapper, typer := f.Object()
 
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {

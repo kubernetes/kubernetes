@@ -110,7 +110,7 @@ func RunDescribe(f *cmdutil.Factory, out, cmdErr io.Writer, cmd *cobra.Command, 
 		return cmdutil.UsageError(cmd, "Required resource not specified.")
 	}
 
-	mapper, typer := f.Object(cmdutil.GetIncludeThirdPartyAPIs(cmd))
+	mapper, typer := f.Object()
 	r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().AllNamespaces(allNamespaces).

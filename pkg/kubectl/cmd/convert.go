@@ -113,7 +113,7 @@ func (o *ConvertOptions) Complete(f *cmdutil.Factory, out io.Writer, cmd *cobra.
 	}
 
 	// build the builder
-	mapper, typer := f.Object(cmdutil.GetIncludeThirdPartyAPIs(cmd))
+	mapper, typer := f.Object()
 	clientMapper := resource.ClientMapperFunc(f.ClientForMapping)
 
 	if o.local {

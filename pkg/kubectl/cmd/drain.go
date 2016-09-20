@@ -188,14 +188,14 @@ func (o *DrainOptions) SetupDrain(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	o.mapper, o.typer = o.factory.Object(false)
+	o.mapper, o.typer = o.factory.Object()
 
 	cmdNamespace, _, err := o.factory.DefaultNamespace()
 	if err != nil {
 		return err
 	}
 
-	r := o.factory.NewBuilder(cmdutil.GetIncludeThirdPartyAPIs(cmd)).
+	r := o.factory.NewBuilder().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		ResourceNames("node", args[0]).
 		Do()

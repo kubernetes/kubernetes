@@ -106,7 +106,7 @@ func NewCmdImage(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 }
 
 func (o *ImageOptions) Complete(f *cmdutil.Factory, cmd *cobra.Command, args []string) error {
-	o.Mapper, o.Typer = f.Object(cmdutil.GetIncludeThirdPartyAPIs(cmd))
+	o.Mapper, o.Typer = f.Object()
 	o.UpdatePodSpecForObject = f.UpdatePodSpecForObject
 	o.Encoder = f.JSONEncoder()
 	o.ShortOutput = cmdutil.GetFlagString(cmd, "output") == "name"

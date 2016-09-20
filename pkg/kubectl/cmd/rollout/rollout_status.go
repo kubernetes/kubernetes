@@ -65,7 +65,7 @@ func RunStatus(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []str
 		return cmdutil.UsageError(cmd, "Required resource not specified.")
 	}
 
-	mapper, typer := f.Object(false)
+	mapper, typer := f.Object()
 
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {

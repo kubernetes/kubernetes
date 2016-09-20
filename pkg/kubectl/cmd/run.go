@@ -305,7 +305,7 @@ func Run(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cob
 			if err != nil {
 				return err
 			}
-			_, typer := f.Object(cmdutil.GetIncludeThirdPartyAPIs(cmd))
+			_, typer := f.Object()
 			r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 				ContinueOnError().
 				NamespaceParam(namespace).DefaultNamespace().
@@ -592,7 +592,7 @@ func createGeneratedObject(f *cmdutil.Factory, cmd *cobra.Command, generator kub
 		return nil, "", nil, nil, err
 	}
 
-	mapper, typer := f.Object(cmdutil.GetIncludeThirdPartyAPIs(cmd))
+	mapper, typer := f.Object()
 	groupVersionKinds, _, err := typer.ObjectKinds(obj)
 	if err != nil {
 		return nil, "", nil, nil, err

@@ -192,7 +192,7 @@ func RunCreateSubcommand(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, 
 	if err != nil {
 		return err
 	}
-	mapper, typer := f.Object(cmdutil.GetIncludeThirdPartyAPIs(cmd))
+	mapper, typer := f.Object()
 	gvks, _, err := typer.ObjectKinds(obj)
 	if err != nil {
 		return err
