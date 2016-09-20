@@ -141,8 +141,9 @@ if [ $remote = true ] ; then
   exit $?
 
 else
-  # Refresh sudo credentials if not running on GCE.
+  # Refresh sudo credentials for local run
   if ! ping -c 1 -q metadata.google.internal &> /dev/null; then
+    echo "Updating sudo credentials"
     sudo -v || exit 1
   fi
 

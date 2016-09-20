@@ -44,12 +44,13 @@ import (
 // TODO(random-liu): Move this file to a separate package.
 var serverStartTimeout = flag.Duration("server-start-timeout", time.Second*120, "Time to wait for each server to become healthy.")
 
-// E2EServices starts and stops e2e services in a separate process. The test uses it to start and
-// stop all e2e services.
+// E2EServices starts and stops e2e services in a separate process. The test
+// uses it to start and stop all e2e services.
 type E2EServices struct {
 	services *server
 }
 
+// NewE2EServices returns a new E2EServices instance.
 func NewE2EServices() *E2EServices {
 	return &E2EServices{}
 }
@@ -57,11 +58,12 @@ func NewE2EServices() *E2EServices {
 // services.log is the combined log of all services
 const servicesLogFile = "services.log"
 
-// Start starts the e2e services in another process, it returns when all e2e
-// services are ready.
+// Start starts the e2e services in another process by calling back into the
+// test binary.  Returns when all e2e services are ready or an error.
+//
 // We want to statically link e2e services into the test binary, but we don't
-// want their glog to pollute the test result. So we run the binary in run-
-// services-mode to start e2e services in another process.
+// want their glog output to pollute the test result. So we run the binary in
+// run- services-mode to start e2e services in another process.
 func (e *E2EServices) Start() error {
 	var err error
 	// Create the manifest path for kubelet.
@@ -155,18 +157,20 @@ func getHealthCheckURLs() []string {
 	}
 }
 
-// e2eService is used internally in this file to start e2e services in current process.
+// e2eService manages e2e services in current process.
 type e2eService struct {
 	services []*server
 	rmDirs   []string
 	logFiles map[string]logFileData
 
-	// All statically linked e2e services
+	// statically linked e2e services
 	etcdServer   *EtcdServer
 	apiServer    *APIServer
 	nsController *NamespaceController
 }
 
+// logFileData holds data about logfiles to fetch with a journalctl command or
+// symlink from a node's file system.
 type logFileData struct {
 	files             []string
 	journalctlCommand []string
@@ -206,6 +210,7 @@ func (es *e2eService) run() error {
 	return nil
 }
 
+// start starts the tests embedded services or returns an error.
 func (es *e2eService) start() error {
 	glog.Info("Starting e2e services...")
 	err := es.startEtcd()
@@ -218,7 +223,7 @@ func (es *e2eService) start() error {
 		return err
 	}
 
-	s, err := es.startKubeletServer()
+	s, err := es.startKubelet()
 	if err != nil {
 		return err
 	}
@@ -232,8 +237,9 @@ func (es *e2eService) start() error {
 	return nil
 }
 
-// Get logs of interest either via journalctl or by creating sym links.
-// Since we scp files from the remote directory, symlinks will be treated as normal files and file contents will be copied over.
+// getLogFiles gets logs of interest either via journalctl or by creating sym
+// links. Since we scp files from the remote directory, symlinks will be
+// treated as normal files and file contents will be copied over.
 func (es *e2eService) getLogFiles() {
 	// Nothing to do if report dir is not specified.
 	if framework.TestContext.ReportDir == "" {
@@ -244,7 +250,7 @@ func (es *e2eService) getLogFiles() {
 	for targetFileName, logFileData := range es.logFiles {
 		targetLink := path.Join(framework.TestContext.ReportDir, targetFileName)
 		if journaldFound {
-			// Skip log files that do not have an equivalent in journald based machines.
+			// Skip log files that do not have an equivalent in journald-based machines.
 			if len(logFileData.journalctlCommand) == 0 {
 				continue
 			}
@@ -273,59 +279,55 @@ func (es *e2eService) getLogFiles() {
 	}
 }
 
-func copyLogFile(src, target string) error {
-	// If not a journald based distro, then just symlink files.
-	if out, err := exec.Command("sudo", "cp", src, target).CombinedOutput(); err != nil {
-		return fmt.Errorf("failed to copy %q to %q: %v, %v", src, target, out, err)
-	}
-	if out, err := exec.Command("sudo", "chmod", "a+r", target).CombinedOutput(); err != nil {
-		return fmt.Errorf("failed to make log file %q world readable: %v, %v", target, out, err)
-	}
-	return nil
-}
-
-func isJournaldAvailable() bool {
-	_, err := exec.LookPath("journalctl")
-	return err == nil
-}
-
+// stop stops the embedded e2e services.
 func (es *e2eService) stop() {
 	glog.Info("Stopping e2e services...")
 	es.getLogFiles()
-	// TODO(random-liu): Use a loop to stop all services after introducing service interface.
-	// Stop namespace controller
+
+	// TODO(random-liu): Use a loop to stop all services after introducing
+	// service interface.
+	glog.Info("Stopping namespace controller")
 	if es.nsController != nil {
 		if err := es.nsController.Stop(); err != nil {
 			glog.Errorf("Failed to stop %q: %v", es.nsController.Name(), err)
 		}
 	}
-	// Stop apiserver
+
+	glog.Info("Stopping API server")
 	if es.apiServer != nil {
 		if err := es.apiServer.Stop(); err != nil {
 			glog.Errorf("Failed to stop %q: %v", es.apiServer.Name(), err)
 		}
 	}
+
 	for _, s := range es.services {
+		glog.Info("Stopping service %q", s.name)
 		if err := s.kill(); err != nil {
 			glog.Errorf("Failed to stop %v: %v", s.name, err)
 		}
 	}
-	// Stop etcd
+
+	glog.Info("Stopping etcd")
 	if es.etcdServer != nil {
 		if err := es.etcdServer.Stop(); err != nil {
 			glog.Errorf("Failed to stop %q: %v", es.etcdServer.Name(), err)
 		}
 	}
+
 	for _, d := range es.rmDirs {
+		glog.Info("Deleting directory %v", d)
 		err := os.RemoveAll(d)
 		if err != nil {
 			glog.Errorf("Failed to delete directory %s.\n%v", d, err)
 		}
 	}
+
 	glog.Info("E2E services stopped.")
 }
 
+// startEtcd starts the embedded etcd instance or returns an error.
 func (es *e2eService) startEtcd() error {
+	glog.Info("Starting etcd")
 	dataDir, err := ioutil.TempDir("", "node-e2e")
 	if err != nil {
 		return err
@@ -336,17 +338,24 @@ func (es *e2eService) startEtcd() error {
 	return es.etcdServer.Start()
 }
 
+// startApiServer starts the embedded API server or returns an error.
 func (es *e2eService) startApiServer() error {
+	glog.Info("Starting API server")
 	es.apiServer = NewAPIServer()
 	return es.apiServer.Start()
 }
 
+// startNamespaceController starts the embedded namespace controller or returns an error.
 func (es *e2eService) startNamespaceController() error {
+	glog.Info("Starting namespace controller")
 	es.nsController = NewNamespaceController()
 	return es.nsController.Start()
 }
 
-func (es *e2eService) startKubeletServer() (*server, error) {
+// startKubelet starts the Kubelet in a separate process or returns an error
+// if the Kubelet fails to start.
+func (es *e2eService) startKubelet() (*server, error) {
+	glog.Info("Starting kubelet")
 	var killCommand, restartCommand *exec.Cmd
 	cmdArgs := []string{}
 	if systemdRun, err := exec.LookPath("systemd-run"); err == nil {
@@ -417,11 +426,12 @@ func (es *e2eService) startKubeletServer() (*server, error) {
 		restartCommand,
 		[]string{kubeletHealthCheckURL},
 		"kubelet.log",
-		true)
+		true /* restartOnExit */)
 	return server, server.start()
 }
 
-// server manages a server started and killed with commands.
+// A server manages a separate server process started and killed with
+// commands.
 type server struct {
 	// name is the name of the server, it is only used for logging.
 	name string
@@ -447,14 +457,16 @@ type server struct {
 	ackStopRestartingCh <-chan bool
 }
 
-func newServer(name string, start, kill, restart *exec.Cmd, urls []string, filename string, restartOnExit bool) *server {
+// newServer returns a new server with the given name, commands, health check
+// URLs, etc.
+func newServer(name string, start, kill, restart *exec.Cmd, urls []string, outputFileName string, restartOnExit bool) *server {
 	return &server{
 		name:            name,
 		startCommand:    start,
 		killCommand:     kill,
 		restartCommand:  restart,
 		healthCheckUrls: urls,
-		outFilename:     filename,
+		outFilename:     outputFileName,
 		restartOnExit:   restartOnExit,
 	}
 }
@@ -472,54 +484,15 @@ func (s *server) String() string {
 		commandToString(s.startCommand), commandToString(s.killCommand), commandToString(s.restartCommand), s.healthCheckUrls, s.outFilename)
 }
 
-// readinessCheck checks whether services are ready via the health check urls. Once there is
-// an error in errCh, the function will stop waiting and return the error.
-// TODO(random-liu): Move this to util
-func readinessCheck(urls []string, errCh <-chan error) error {
-	endTime := time.Now().Add(*serverStartTimeout)
-	blockCh := make(chan error)
-	defer close(blockCh)
-	for endTime.After(time.Now()) {
-		select {
-		// We *always* want to run the health check if there is no error on the channel.
-		// With systemd, reads from errCh report nil because cmd.Run() waits
-		// on systemd-run, rather than the service process. systemd-run quickly
-		// exits with status 0, causing the channel to be closed with no error. In
-		// this case, you want to wait for the health check to complete, rather
-		// than returning from readinessCheck as soon as the channel is closed.
-		case err, ok := <-errCh:
-			if ok { // The channel is not closed, this is a real error
-				if err != nil { // If there is an error, return it
-					return err
-				}
-				// If not, keep checking readiness.
-			} else { // The channel is closed, this is only a zero value.
-				// Replace the errCh with blockCh to avoid busy loop,
-				// and keep checking readiness.
-				errCh = blockCh
-			}
-		case <-time.After(time.Second):
-			ready := true
-			for _, url := range urls {
-				resp, err := http.Head(url)
-				if err != nil || resp.StatusCode != http.StatusOK {
-					ready = false
-					break
-				}
-			}
-			if ready {
-				return nil
-			}
-		}
-	}
-	return fmt.Errorf("e2e service readiness check timeout %v", *serverStartTimeout)
-}
-
+// start starts the server by running its commands, monitors it with a health
+// check, and ensures that it is restarted if applicable.
+//
 // Note: restartOnExit == true requires len(s.healthCheckUrls) > 0 to work properly.
 func (s *server) start() error {
-	glog.Infof("Start server %q with command %q", s.name, commandToString(s.startCommand))
+	glog.Infof("Starting server %q with command %q", s.name, commandToString(s.startCommand))
 	errCh := make(chan error)
 
+	// Set up restart channels if the server is configured for restart on exit.
 	var stopRestartingCh, ackStopRestartingCh chan bool
 	if s.restartOnExit {
 		if len(s.healthCheckUrls) == 0 {
@@ -533,6 +506,7 @@ func (s *server) start() error {
 		s.ackStopRestartingCh = ackStopRestartingCh
 	}
 
+	// This goroutine actually runs the start command for the server.
 	go func() {
 		defer close(errCh)
 
@@ -542,6 +516,8 @@ func (s *server) start() error {
 		if err != nil {
 			errCh <- fmt.Errorf("failed to create file %q for `%s` %v.", outPath, s, err)
 			return
+		} else {
+			glog.Infof("Output file for server %q: %v", s.name, outfile.Name())
 		}
 		defer outfile.Close()
 		defer outfile.Sync()
@@ -569,25 +545,29 @@ func (s *server) start() error {
 			return
 		}
 		if !s.restartOnExit {
+			glog.Infof("Waiting for server %q start command to complete", s.name)
 			// If we aren't planning on restarting, ok to Wait() here to release resources.
 			// Otherwise, we Wait() in the restart loop.
 			err = s.startCommand.Wait()
 			if err != nil {
-				errCh <- fmt.Errorf("failed to run %s: %v", s, err)
+				errCh <- fmt.Errorf("failed to run start command for server %q: %v", s.name, err)
 				return
 			}
 		} else {
-			// New stuff
 			usedStartCmd := true
 			for {
+				glog.Infof("Running health check for service %q", s.name)
 				// Wait for an initial health check to pass, so that we are sure the server started.
-				err := readinessCheck(s.healthCheckUrls, nil)
+				err := readinessCheck(s.name, s.healthCheckUrls, nil)
 				if err != nil {
 					if usedStartCmd {
+						glog.Infof("Waiting for server %q start command to complete after initial health check failed", s.name)
 						s.startCommand.Wait() // Release resources if necessary.
 					}
 					// This should not happen, immediately stop the e2eService process.
 					glog.Fatalf("restart loop readinessCheck failed for %s", s)
+				} else {
+					glog.Infof("Initial health check passed for service %q", s.name)
 				}
 
 				// Initial health check passed, wait until a health check fails again.
@@ -612,7 +592,8 @@ func (s *server) start() error {
 					usedStartCmd = false
 				}
 				if s.restartCommand != nil {
-					// Always make a fresh copy of restartCommand before running, we may have to restart multiple times
+					// Always make a fresh copy of restartCommand before
+					// running, we may have to restart multiple times
 					s.restartCommand = &exec.Cmd{
 						Path:        s.restartCommand.Path,
 						Args:        s.restartCommand.Args,
@@ -624,10 +605,13 @@ func (s *server) start() error {
 						ExtraFiles:  s.restartCommand.ExtraFiles,
 						SysProcAttr: s.restartCommand.SysProcAttr,
 					}
-					err = s.restartCommand.Run() // Run and wait for exit. This command is assumed to have short duration, e.g. systemctl restart
+					// Run and wait for exit. This command is assumed to have
+					// short duration, e.g. systemctl restart
+					glog.Infof("Restarting server %q with restart command", s.name)
+					err = s.restartCommand.Run()
 					if err != nil {
 						// This should not happen, immediately stop the e2eService process.
-						glog.Fatalf("restarting %s with restartCommand failed. Error: %v.", s, err)
+						glog.Fatalf("restarting server %s with restartCommand failed. Error: %v.", s, err)
 					}
 				} else {
 					s.startCommand = &exec.Cmd{
@@ -641,20 +625,22 @@ func (s *server) start() error {
 						ExtraFiles:  s.startCommand.ExtraFiles,
 						SysProcAttr: s.startCommand.SysProcAttr,
 					}
+					glog.Infof("Restarting server %q with start command", s.name)
 					err = s.startCommand.Start()
 					usedStartCmd = true
 					if err != nil {
 						// This should not happen, immediately stop the e2eService process.
-						glog.Fatalf("restarting %s with startCommand failed. Error: %v.", s, err)
+						glog.Fatalf("Restarting %s with startCommand failed. Error: %v.", s, err)
 					}
 				}
 			}
 		}
 	}()
 
-	return readinessCheck(s.healthCheckUrls, errCh)
+	return readinessCheck(s.name, s.healthCheckUrls, errCh)
 }
 
+// kill runs the server's kill command.
 func (s *server) kill() error {
 	glog.Infof("Kill server %q", s.name)
 	name := s.name
@@ -730,4 +716,67 @@ func (s *server) kill() error {
 
 func adjustConfigForSystemd(config string) string {
 	return strings.Replace(config, "%", "%%", -1)
+}
+
+func copyLogFile(src, target string) error {
+	// If not a journald based distro, then just symlink files.
+	if out, err := exec.Command("sudo", "cp", src, target).CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to copy %q to %q: %v, %v", src, target, out, err)
+	}
+	if out, err := exec.Command("sudo", "chmod", "a+r", target).CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to make log file %q world readable: %v, %v", target, out, err)
+	}
+	return nil
+}
+
+// isJournaldAvailable returns whether the system executing the tests uses
+// journald.
+func isJournaldAvailable() bool {
+	_, err := exec.LookPath("journalctl")
+	return err == nil
+}
+
+// readinessCheck checks whether services are ready via the supplied health
+// check URLs. Once there is an error in errCh, the function will stop waiting
+// and return the error.
+// TODO(random-liu): Move this to util
+func readinessCheck(name string, urls []string, errCh <-chan error) error {
+	glog.Infof("Running readiness check for service %q", name)
+	endTime := time.Now().Add(*serverStartTimeout)
+	blockCh := make(chan error)
+	defer close(blockCh)
+	for endTime.After(time.Now()) {
+		select {
+		// We *always* want to run the health check if there is no error on the channel.
+		// With systemd, reads from errCh report nil because cmd.Run() waits
+		// on systemd-run, rather than the service process. systemd-run quickly
+		// exits with status 0, causing the channel to be closed with no error. In
+		// this case, you want to wait for the health check to complete, rather
+		// than returning from readinessCheck as soon as the channel is closed.
+		case err, ok := <-errCh:
+			if ok { // The channel is not closed, this is a real error
+				if err != nil { // If there is an error, return it
+					return err
+				}
+				// If not, keep checking readiness.
+			} else { // The channel is closed, this is only a zero value.
+				// Replace the errCh with blockCh to avoid busy loop,
+				// and keep checking readiness.
+				errCh = blockCh
+			}
+		case <-time.After(time.Second):
+			ready := true
+			for _, url := range urls {
+				resp, err := http.Head(url)
+				if err != nil || resp.StatusCode != http.StatusOK {
+					ready = false
+					break
+				}
+			}
+			if ready {
+				return nil
+			}
+		}
+	}
+	return fmt.Errorf("e2e service %q readiness check timeout %v", name, *serverStartTimeout)
 }
