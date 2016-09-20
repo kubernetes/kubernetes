@@ -27,6 +27,7 @@ import (
 	kadmission "k8s.io/kubernetes/pkg/admission"
 	kapi "k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/auth/user"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
@@ -36,10 +37,13 @@ import (
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/seccomp"
 	psputil "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
 	"k8s.io/kubernetes/pkg/util/diff"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 const defaultContainerName = "test-c"
 
+// NewTestAdmission provides an admission plugin with test implementations of internal structs.  It uses
+// an authorizer that always returns true.
 func NewTestAdmission(store cache.Store, kclient clientset.Interface) kadmission.Interface {
 	return &podSecurityPolicyPlugin{
 		Handler:         kadmission.NewHandler(kadmission.Create),
@@ -47,8 +51,27 @@ func NewTestAdmission(store cache.Store, kclient clientset.Interface) kadmission
 		store:           store,
 		strategyFactory: kpsp.NewSimpleStrategyFactory(),
 		pspMatcher:      getMatchingPolicies,
+		authz:           &TestAuthorizer{},
 	}
 }
+
+// TestAlwaysAllowedAuthorizer is a testing struct for testing that fulfills the authorizer interface.
+type TestAuthorizer struct {
+	// disallowed contains names of disallowed policies.  Map is keyed by user.Info.GetName()
+	disallowed map[string][]string
+}
+
+func (t *TestAuthorizer) Authorize(a authorizer.Attributes) (authorized bool, reason string, err error) {
+	disallowedForUser, _ := t.disallowed[a.GetUser().GetName()]
+	for _, name := range disallowedForUser {
+		if a.GetName() == name {
+			return false, "", nil
+		}
+	}
+	return true, "", nil
+}
+
+var _ authorizer.Authorizer = &TestAuthorizer{}
 
 func useInitContainers(pod *kapi.Pod) *kapi.Pod {
 	pod.Spec.InitContainers = pod.Spec.Containers
@@ -1518,6 +1541,117 @@ func TestCreateProvidersFromConstraints(t *testing.T) {
 			if !strings.Contains(errs[0].Error(), v.expectedErr) {
 				t.Errorf("%s expected error '%s' but received %v", k, v.expectedErr, errs[0])
 			}
+		}
+	}
+}
+
+func TestGetMatchingPolicies(t *testing.T) {
+	policyWithName := func(name string) *extensions.PodSecurityPolicy {
+		p := restrictivePSP()
+		p.Name = name
+		return p
+	}
+
+	tests := map[string]struct {
+		user               user.Info
+		sa                 user.Info
+		expectedPolicies   sets.String
+		inPolicies         []*extensions.PodSecurityPolicy
+		disallowedPolicies map[string][]string
+	}{
+		"policy allowed by user": {
+			user: &user.DefaultInfo{Name: "user"},
+			sa:   &user.DefaultInfo{Name: "sa"},
+			disallowedPolicies: map[string][]string{
+				"sa": {"policy"},
+			},
+			inPolicies:       []*extensions.PodSecurityPolicy{policyWithName("policy")},
+			expectedPolicies: sets.NewString("policy"),
+		},
+		"policy allowed by sa": {
+			user: &user.DefaultInfo{Name: "user"},
+			sa:   &user.DefaultInfo{Name: "sa"},
+			disallowedPolicies: map[string][]string{
+				"user": {"policy"},
+			},
+			inPolicies:       []*extensions.PodSecurityPolicy{policyWithName("policy")},
+			expectedPolicies: sets.NewString("policy"),
+		},
+		"no policies allowed": {
+			user: &user.DefaultInfo{Name: "user"},
+			sa:   &user.DefaultInfo{Name: "sa"},
+			disallowedPolicies: map[string][]string{
+				"user": {"policy"},
+				"sa":   {"policy"},
+			},
+			inPolicies:       []*extensions.PodSecurityPolicy{policyWithName("policy")},
+			expectedPolicies: sets.NewString(),
+		},
+		"multiple policies allowed": {
+			user: &user.DefaultInfo{Name: "user"},
+			sa:   &user.DefaultInfo{Name: "sa"},
+			disallowedPolicies: map[string][]string{
+				"user": {"policy1", "policy3"},
+				"sa":   {"policy2", "policy3"},
+			},
+			inPolicies: []*extensions.PodSecurityPolicy{
+				policyWithName("policy1"), // allowed by sa
+				policyWithName("policy2"), // allowed by user
+				policyWithName("policy3"), // not allowed
+			},
+			expectedPolicies: sets.NewString("policy1", "policy2"),
+		},
+		"policies are allowed for nil user info": {
+			user: nil,
+			sa:   &user.DefaultInfo{Name: "sa"},
+			disallowedPolicies: map[string][]string{
+				"user": {"policy1", "policy3"},
+				"sa":   {"policy2", "policy3"},
+			},
+			inPolicies: []*extensions.PodSecurityPolicy{
+				policyWithName("policy1"),
+				policyWithName("policy2"),
+				policyWithName("policy3"),
+			},
+			// all policies are allowed regardless of the permissions when user info is nil
+			// (ie. a request hitting the unsecure port)
+			expectedPolicies: sets.NewString("policy1", "policy2", "policy3"),
+		},
+		"policies are allowed for nil sa info": {
+			user: &user.DefaultInfo{Name: "user"},
+			sa:   nil,
+			disallowedPolicies: map[string][]string{
+				"user": {"policy1", "policy3"},
+				"sa":   {"policy2", "policy3"},
+			},
+			inPolicies: []*extensions.PodSecurityPolicy{
+				policyWithName("policy1"),
+				policyWithName("policy2"),
+				policyWithName("policy3"),
+			},
+			// all policies are allowed regardless of the permissions when sa info is nil
+			// (ie. a request hitting the unsecure port)
+			expectedPolicies: sets.NewString("policy1", "policy2", "policy3"),
+		},
+	}
+	for k, v := range tests {
+		store := cache.NewStore(cache.MetaNamespaceKeyFunc)
+		for _, psp := range v.inPolicies {
+			store.Add(psp)
+		}
+
+		authz := &TestAuthorizer{disallowed: v.disallowedPolicies}
+		allowedPolicies, err := getMatchingPolicies(store, v.user, v.sa, authz)
+		if err != nil {
+			t.Errorf("%s got unexpected error %#v", k, err)
+			continue
+		}
+		allowedPolicyNames := sets.NewString()
+		for _, p := range allowedPolicies {
+			allowedPolicyNames.Insert(p.Name)
+		}
+		if !v.expectedPolicies.Equal(allowedPolicyNames) {
+			t.Errorf("%s received unexpected policies.  Expected %#v but got %#v", k, v.expectedPolicies.List(), allowedPolicyNames.List())
 		}
 	}
 }
