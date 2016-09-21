@@ -113,7 +113,8 @@ var _ = framework.KubeDescribe("DisruptionController", func() {
 			shouldDeny:     true,
 		},
 	}
-	for _, c := range evictionCases {
+	for i := range evictionCases {
+		c := evictionCases[i]
 		expectation := "should allow an eviction"
 		if c.shouldDeny {
 			expectation = "should not allow an eviction"
