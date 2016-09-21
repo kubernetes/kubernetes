@@ -25,7 +25,6 @@ import (
 	"os"
 	"regexp"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/emicklei/go-restful"
@@ -51,7 +50,6 @@ import (
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 )
 
@@ -371,7 +369,7 @@ func (s *GenericAPIServer) buildHandlerChains(c *Config, handler http.Handler) (
 	longRunningFunc := genericfilters.BasicLongRunningRequestCheck(longRunningRE, map[string]string{"watch": "true"})
 
 	// common filters
-	handler = genericfilters.WithCORS(handler, allowedOriginRegexps(c.CorsAllowedOriginList), nil, nil, "true")
+	handler = genericfilters.WithCORS(handler, c.CorsAllowedOriginList, nil, nil, "true")
 
 	// insecure filters
 	insecure = handler
@@ -390,14 +388,6 @@ func (s *GenericAPIServer) buildHandlerChains(c *Config, handler http.Handler) (
 	secure = genericfilters.WithMaxInFlightLimit(secure, c.MaxRequestsInFlight, longRunningFunc)
 
 	return
-}
-
-func allowedOriginRegexps(allowedOrigins []string) []*regexp.Regexp {
-	res, err := util.CompileRegexps(allowedOrigins)
-	if err != nil {
-		glog.Fatalf("Invalid CORS allowed origin, --cors-allowed-origins flag was set to %v - %v", strings.Join(allowedOrigins, ","), err)
-	}
-	return res
 }
 
 func (s *GenericAPIServer) installAPI(c *Config) {

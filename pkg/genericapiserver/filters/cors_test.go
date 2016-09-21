@@ -39,14 +39,9 @@ func TestCORSAllowedOrigins(t *testing.T) {
 	}
 
 	for _, item := range table {
-		allowedOriginRegexps, err := util.CompileRegexps(item.allowedOrigins)
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-
 		handler := WithCORS(
 			http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}),
-			allowedOriginRegexps, nil, nil, "true",
+			item.allowedOrigins, nil, nil, "true",
 		)
 		server := httptest.NewServer(handler)
 		defer server.Close()

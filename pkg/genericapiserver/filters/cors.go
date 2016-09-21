@@ -20,6 +20,10 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+
+	"github.com/golang/glog"
+
+	"k8s.io/kubernetes/pkg/util"
 )
 
 // TODO: use restful.CrossOriginResourceSharing
@@ -31,16 +35,17 @@ import (
 // WithCORS is a simple CORS implementation that wraps an http Handler.
 // Pass nil for allowedMethods and allowedHeaders to use the defaults. If allowedOriginPatterns
 // is empty or nil, no CORS support is installed.
-func WithCORS(handler http.Handler, allowedOriginPatterns []*regexp.Regexp, allowedMethods []string, allowedHeaders []string, allowCredentials string) http.Handler {
+func WithCORS(handler http.Handler, allowedOriginPatterns []string, allowedMethods []string, allowedHeaders []string, allowCredentials string) http.Handler {
 	if len(allowedOriginPatterns) == 0 {
 		return handler
 	}
+	allowedOriginPatternsREs := allowedOriginRegexps(allowedOriginPatterns)
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		origin := req.Header.Get("Origin")
 		if origin != "" {
 			allowed := false
-			for _, pattern := range allowedOriginPatterns {
-				if allowed = pattern.MatchString(origin); allowed {
+			for _, re := range allowedOriginPatternsREs {
+				if allowed = re.MatchString(origin); allowed {
 					break
 				}
 			}
@@ -67,4 +72,12 @@ func WithCORS(handler http.Handler, allowedOriginPatterns []*regexp.Regexp, allo
 		// Dispatch to the next handler
 		handler.ServeHTTP(w, req)
 	})
+}
+
+func allowedOriginRegexps(allowedOrigins []string) []*regexp.Regexp {
+	res, err := util.CompileRegexps(allowedOrigins)
+	if err != nil {
+		glog.Fatalf("Invalid CORS allowed origin, --cors-allowed-origins flag was set to %v - %v", strings.Join(allowedOrigins, ","), err)
+	}
+	return res
 }
