@@ -15,3 +15,6 @@
   ```
   export KUBERNETES_PROVIDER=centos && cluster/kube-up.sh
   ```
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/cluster/centos/README.md?pixel)]()
