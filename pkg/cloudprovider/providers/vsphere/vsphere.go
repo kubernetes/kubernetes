@@ -495,6 +495,9 @@ func (i *Instances) ExternalID(name string) (string, error) {
 
 	vm, err := getVirtualMachineByName(i.cfg, ctx, c, name)
 	if err != nil {
+		if _, ok := err.(*find.NotFoundError); ok {
+			return "", cloudprovider.InstanceNotFound
+		}
 		return "", err
 	}
 
@@ -531,6 +534,12 @@ func (i *Instances) InstanceID(name string) (string, error) {
 	defer c.Logout(ctx)
 
 	vm, err := getVirtualMachineByName(i.cfg, ctx, c, name)
+	if err != nil {
+		if _, ok := err.(*find.NotFoundError); ok {
+			return "", cloudprovider.InstanceNotFound
+		}
+		return "", err
+	}
 
 	var mvm mo.VirtualMachine
 	err = getVirtualMachineManagedObjectReference(ctx, c, vm, "summary", &mvm)
