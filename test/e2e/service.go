@@ -1359,9 +1359,9 @@ func verifyServeHostnameServiceUp(c *client.Client, ns, host string, expectedPod
 		return fmt.Sprintf("for i in $(seq 1 %d); do %s http://%s:%d 2>&1 || true; echo; done",
 			50*len(expectedPods), wget, serviceIP, servicePort)
 	}
-	commands := []func() string{
+	commands := []func(prefix string) string{
 		// verify service from node
-		func() string {
+		func(cmdPrefix string) string {
 			cmd := "set -e; " + buildCommand("wget -q --timeout=0.2 --tries=1 -O -")
 			Logf("Executing cmd %q on host %v", cmd, host)
 			result, err := SSH(cmd, host, testContext.Provider)
@@ -1372,8 +1372,8 @@ func verifyServeHostnameServiceUp(c *client.Client, ns, host string, expectedPod
 			return result.Stdout
 		},
 		// verify service from pod
-		func() string {
-			cmd := buildCommand("wget -q -T 1 -O -")
+		func(cmdPrefix string) string {
+			cmd := buildCommand(fmt.Sprintf("%s wget -q -T 1 -O -", cmdPrefix))
 			Logf("Executing cmd %q in pod %v/%v", cmd, ns, execPodName)
 			// TODO: Use exec-over-http via the netexec pod instead of kubectl exec.
 			output, err := RunHostCmd(ns, execPodName, cmd)
@@ -1390,9 +1390,25 @@ func verifyServeHostnameServiceUp(c *client.Client, ns, host string, expectedPod
 		passed := false
 		gotEndpoints := sets.NewString()
 
+		// Exec in docker 1.9 is extremely buggy. See docker/docker#14203,19362.
+		// Since we don't know the exact byte length of the final json message
+		// constructed by docker, or what was already in the daemon <-> runc
+		// pipe, just keep appending empty characters to try and push the
+		// byte length so it's not at a multiple of the default byte stream
+		// length. If the message is *just* over the default stream length,
+		// i.e say the default is 512 bytes and there's a residue of /n at
+		// 516th byte, the child reads the entire message except for the /n,
+		// closes the pipe and the parent gets ECONNRESET.
+		// With this bogus prefix a subsequent retry will not leave a
+		// complete JSON message at the 512 mark.
+		// This is checked into the 1.2 branch because 1.2 nodes use docker 1.9
+		// and the exec bug failure might mask more serious issues.
+		dockerBugPrefix := ""
+
 		// Retry cmdFunc for a while
 		for start := time.Now(); time.Since(start) < kubeProxyLagTimeout; time.Sleep(5 * time.Second) {
-			for _, endpoint := range strings.Split(cmdFunc(), "\n") {
+			dockerBugPrefix += " "
+			for _, endpoint := range strings.Split(cmdFunc(dockerBugPrefix), "\n") {
 				trimmedEp := strings.TrimSpace(endpoint)
 				if trimmedEp != "" {
 					gotEndpoints.Insert(trimmedEp)
