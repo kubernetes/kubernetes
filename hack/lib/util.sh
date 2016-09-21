@@ -312,10 +312,10 @@ kube::util::group-version-to-pkg-path() {
       echo "api/unversioned"
       ;;
     *.k8s.io)
-      echo "apis/${group_version%.k8s.io}"
+      echo "apis/${group_version%.*k8s.io}"
       ;;
     *.k8s.io/*)
-      echo "apis/${group_version/.k8s.io/}"
+      echo "apis/${group_version/.*k8s.io/}"
       ;;
     *)
       echo "apis/${group_version%__internal}"

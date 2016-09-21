@@ -44,6 +44,24 @@ source "${KUBE_ROOT}/hack/lib/etcd.sh"
 
 KUBE_OUTPUT_HOSTBIN="${KUBE_OUTPUT_BINPATH}/$(kube::util::host_platform)"
 
+# list of all available group versions.  This should be used when generated code
+# or when starting an API server that you want to have everything.
+# most preferred version for a group should appear first
+KUBE_AVAILABLE_GROUP_VERSIONS=${KUBE_AVAILABLE_GROUP_VERSIONS:-"\
+v1 \
+apps/v1alpha1 \
+authentication.k8s.io/v1beta1 \
+authorization.k8s.io/v1beta1 \
+autoscaling/v1 \
+batch/v1 \
+batch/v2alpha1 \
+extensions/v1beta1 \
+certificates.k8s.io/v1alpha1 \
+policy/v1alpha1 \
+rbac.authorization.k8s.io/v1alpha1 \
+storage.k8s.io/v1beta1 \
+"}
+
 # This emulates "readlink -f" which is not available on MacOS X.
 # Test:
 # T=/tmp/$$.$RANDOM
