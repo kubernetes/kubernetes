@@ -25,7 +25,6 @@ import (
 	"os"
 	"regexp"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/emicklei/go-restful"
@@ -40,15 +39,15 @@ import (
 	"k8s.io/kubernetes/pkg/apiserver/audit"
 	"k8s.io/kubernetes/pkg/auth/authenticator"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
-	"k8s.io/kubernetes/pkg/auth/handlers"
+	authhandlers "k8s.io/kubernetes/pkg/auth/handlers"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	genericfilters "k8s.io/kubernetes/pkg/genericapiserver/filters"
 	"k8s.io/kubernetes/pkg/genericapiserver/openapi/common"
 	"k8s.io/kubernetes/pkg/genericapiserver/options"
 	"k8s.io/kubernetes/pkg/genericapiserver/routes"
 	genericvalidation "k8s.io/kubernetes/pkg/genericapiserver/validation"
 	ipallocator "k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 )
 
@@ -333,18 +332,58 @@ func (c Config) New() (*GenericAPIServer, error) {
 		})
 	}
 
+	if len(c.AuditLogPath) != 0 {
+		s.auditWriter = &lumberjack.Logger{
+			Filename:   c.AuditLogPath,
+			MaxAge:     c.AuditLogMaxAge,
+			MaxBackups: c.AuditLogMaxBackups,
+			MaxSize:    c.AuditLogMaxSize,
+		}
+	}
+
 	// Send correct mime type for .svg files.
 	// TODO: remove when https://github.com/golang/go/commit/21e47d831bafb59f22b1ea8098f709677ec8ce33
 	// makes it into all of our supported go versions (only in v1.7.1 now).
 	mime.AddExtensionType(".svg", "image/svg+xml")
 
-	// Register root handler.
-	// We do not register this using restful Webservice since we do not want to surface this in api docs.
-	// Allow GenericAPIServer to be embedded in contexts which already have something registered at the root
+	s.installAPI(&c)
+	s.Handler, s.InsecureHandler = s.buildHandlerChains(&c, http.Handler(s.Mux.BaseMux().(*http.ServeMux)))
+
+	return s, nil
+}
+
+func (s *GenericAPIServer) buildHandlerChains(c *Config, handler http.Handler) (secure http.Handler, insecure http.Handler) {
+	longRunningRE := regexp.MustCompile(c.LongRunningRequestRE)
+	longRunningFunc := genericfilters.BasicLongRunningRequestCheck(longRunningRE, map[string]string{"watch": "true"})
+
+	// filters which insecure and secure have in common
+	handler = genericfilters.WithCORS(handler, c.CorsAllowedOriginList, nil, nil, "true")
+
+	// insecure filters
+	insecure = handler
+	insecure = api.WithRequestContext(insecure, c.RequestContextMapper)
+	insecure = apiserver.RecoverPanics(insecure, s.NewRequestInfoResolver())
+	insecure = genericfilters.WithTimeoutForNonLongRunningRequests(insecure, longRunningFunc)
+
+	// secure filters
+	attributeGetter := apiserver.NewRequestAttributeGetter(c.RequestContextMapper, s.NewRequestInfoResolver())
+	secure = handler
+	secure = apiserver.WithAuthorization(secure, attributeGetter, c.Authorizer)
+	secure = apiserver.WithImpersonation(secure, c.RequestContextMapper, c.Authorizer)
+	secure = audit.WithAudit(secure, attributeGetter, s.auditWriter) // before impersonation to read original user
+	secure = authhandlers.WithAuthentication(secure, c.RequestContextMapper, c.Authenticator, authhandlers.Unauthorized(c.SupportsBasicAuth))
+	secure = api.WithRequestContext(secure, c.RequestContextMapper)
+	secure = apiserver.RecoverPanics(secure, s.NewRequestInfoResolver())
+	secure = genericfilters.WithTimeoutForNonLongRunningRequests(secure, longRunningFunc)
+	secure = genericfilters.WithMaxInFlightLimit(secure, c.MaxRequestsInFlight, longRunningFunc)
+
+	return
+}
+
+func (s *GenericAPIServer) installAPI(c *Config) {
 	if c.EnableIndex {
 		routes.Index{}.Install(s.Mux, s.HandlerContainer)
 	}
-
 	if c.EnableSwaggerSupport && c.EnableSwaggerUI {
 		routes.SwaggerUI{}.Install(s.Mux, s.HandlerContainer)
 	}
@@ -354,79 +393,7 @@ func (c Config) New() (*GenericAPIServer, error) {
 	if c.EnableVersion {
 		routes.Version{}.Install(s.Mux, s.HandlerContainer)
 	}
-
-	handler := http.Handler(s.Mux.BaseMux().(*http.ServeMux))
-
-	// TODO: handle CORS and auth using go-restful
-	// See github.com/emicklei/go-restful/blob/master/examples/restful-CORS-filter.go, and
-	// github.com/emicklei/go-restful/blob/master/examples/restful-basic-authentication.go
-
-	if len(c.CorsAllowedOriginList) > 0 {
-		allowedOriginRegexps, err := util.CompileRegexps(c.CorsAllowedOriginList)
-		if err != nil {
-			glog.Fatalf("Invalid CORS allowed origin, --cors-allowed-origins flag was set to %v - %v", strings.Join(c.CorsAllowedOriginList, ","), err)
-		}
-		handler = apiserver.CORS(handler, allowedOriginRegexps, nil, nil, "true")
-	}
-
-	s.InsecureHandler = handler
-
-	attributeGetter := apiserver.NewRequestAttributeGetter(c.RequestContextMapper, s.NewRequestInfoResolver())
-	handler = apiserver.WithAuthorizationCheck(handler, attributeGetter, c.Authorizer)
-	handler = apiserver.WithImpersonation(handler, c.RequestContextMapper, c.Authorizer)
-	if len(c.AuditLogPath) != 0 {
-		// audit handler must comes before the impersonationFilter to read the original user
-		writer := &lumberjack.Logger{
-			Filename:   c.AuditLogPath,
-			MaxAge:     c.AuditLogMaxAge,
-			MaxBackups: c.AuditLogMaxBackups,
-			MaxSize:    c.AuditLogMaxSize,
-		}
-		handler = audit.WithAudit(handler, attributeGetter, writer)
-	}
-
-	// Install Authenticator
-	if c.Authenticator != nil {
-		authenticatedHandler, err := handlers.NewRequestAuthenticator(c.RequestContextMapper, c.Authenticator, handlers.Unauthorized(c.SupportsBasicAuth), handler)
-		if err != nil {
-			glog.Fatalf("Could not initialize authenticator: %v", err)
-		}
-		handler = authenticatedHandler
-	}
-
-	handler, err := api.NewRequestContextFilter(c.RequestContextMapper, handler)
-	if err != nil {
-		glog.Fatalf("Could not initialize request context filter for s.Handler: %v", err)
-	}
-
-	longRunningRE := regexp.MustCompile(c.LongRunningRequestRE)
-	longRunningRequestCheck := apiserver.BasicLongRunningRequestCheck(longRunningRE, map[string]string{"watch": "true"})
-	longRunningTimeout := func(req *http.Request) (<-chan time.Time, string) {
-		// TODO unify this with apiserver.MaxInFlightLimit
-		if longRunningRequestCheck(req) {
-			return nil, ""
-		}
-		return time.After(globalTimeout), ""
-	}
-	handler = apiserver.TimeoutHandler(apiserver.RecoverPanics(handler, s.NewRequestInfoResolver()), longRunningTimeout)
-
-	var inFlightTokens chan bool
-	if c.MaxRequestsInFlight > 0 {
-		inFlightTokens = make(chan bool, c.MaxRequestsInFlight)
-	}
-	handler = apiserver.MaxInFlightLimit(inFlightTokens, longRunningRequestCheck, handler)
-	s.Handler = handler
-
-	handler, err = api.NewRequestContextFilter(c.RequestContextMapper, s.InsecureHandler)
-	if err != nil {
-		glog.Fatalf("Could not initialize request context filter for s.InsecureHandler: %v", err)
-	}
-	handler = apiserver.TimeoutHandler(apiserver.RecoverPanics(handler, s.NewRequestInfoResolver()), longRunningTimeout)
-	s.InsecureHandler = handler
-
-	s.installGroupsDiscoveryHandler()
-
-	return s, nil
+	s.HandlerContainer.Add(s.DynamicApisDiscovery())
 }
 
 func DefaultAndValidateRunOptions(options *options.ServerRunOptions) {

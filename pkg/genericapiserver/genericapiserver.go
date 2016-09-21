@@ -19,6 +19,7 @@ package genericapiserver
 import (
 	"crypto/tls"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"path"
@@ -31,9 +32,9 @@ import (
 	systemd "github.com/coreos/go-systemd/daemon"
 	"github.com/emicklei/go-restful"
 	"github.com/emicklei/go-restful/swagger"
+	"github.com/go-openapi/spec"
 	"github.com/golang/glog"
 
-	"github.com/go-openapi/spec"
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
@@ -50,8 +51,6 @@ import (
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
-
-const globalTimeout = time.Minute
 
 // Info about an API group.
 type APIGroupInfo struct {
@@ -159,6 +158,7 @@ type GenericAPIServer struct {
 	enableOpenAPISupport   bool
 	openAPIInfo            spec.Info
 	openAPIDefaultResponse spec.Response
+	openAPIDefinitions     *common.OpenAPIDefinitions
 
 	// PostStartHooks are each called after the server has started listening, in a separate go func for each
 	// with no guaranteee of ordering between them.  The map key is a name used for error reporting.
@@ -166,7 +166,9 @@ type GenericAPIServer struct {
 	postStartHooks       map[string]PostStartHookFunc
 	postStartHookLock    sync.Mutex
 	postStartHooksCalled bool
-	openAPIDefinitions   *common.OpenAPIDefinitions
+
+	// Writer to write the audit log to.
+	auditWriter io.Writer
 }
 
 // RequestContextMapper is exposed so that third party resource storage can be build in a different location.
@@ -215,32 +217,8 @@ func NewHandlerContainer(mux *http.ServeMux, s runtime.NegotiatedSerializer) *re
 	return container
 }
 
-// Installs handler at /apis to list all group versions for discovery
-func (s *GenericAPIServer) installGroupsDiscoveryHandler() {
-	apiserver.AddApisWebService(s.Serializer, s.HandlerContainer, s.apiPrefix, func(req *restful.Request) []unversioned.APIGroup {
-		s.apiGroupsForDiscoveryLock.RLock()
-		defer s.apiGroupsForDiscoveryLock.RUnlock()
-
-		// Return the list of supported groups in sorted order (to have a deterministic order).
-		groups := []unversioned.APIGroup{}
-		groupNames := make([]string, len(s.apiGroupsForDiscovery))
-		var i int = 0
-		for groupName := range s.apiGroupsForDiscovery {
-			groupNames[i] = groupName
-			i++
-		}
-		sort.Strings(groupNames)
-		for _, groupName := range groupNames {
-			apiGroup := s.apiGroupsForDiscovery[groupName]
-			// Add ServerAddressByClientCIDRs.
-			apiGroup.ServerAddressByClientCIDRs = s.getServerAddressByClientCIDRs(req.Request)
-			groups = append(groups, apiGroup)
-		}
-		return groups
-	})
-}
-
 func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
+	// install APIs which depend on other APIs to be installed
 	if s.enableSwaggerSupport {
 		s.InstallSwaggerAPI()
 	}
@@ -415,7 +393,7 @@ func (s *GenericAPIServer) InstallAPIGroup(apiGroupInfo *APIGroupInfo) error {
 		}
 
 		s.AddAPIGroupForDiscovery(apiGroup)
-		apiserver.AddGroupWebService(s.Serializer, s.HandlerContainer, apiPrefix+"/"+apiGroup.Name, apiGroup)
+		s.HandlerContainer.Add(apiserver.NewGroupWebService(s.Serializer, apiPrefix+"/"+apiGroup.Name, apiGroup))
 	}
 	apiserver.InstallServiceErrorHandler(s.Serializer, s.HandlerContainer, s.NewRequestInfoResolver(), apiVersions)
 	return nil
@@ -438,8 +416,7 @@ func (s *GenericAPIServer) RemoveAPIGroupForDiscovery(groupName string) {
 func (s *GenericAPIServer) getServerAddressByClientCIDRs(req *http.Request) []unversioned.ServerAddressByClientCIDR {
 	addressCIDRMap := []unversioned.ServerAddressByClientCIDR{
 		{
-			ClientCIDR: "0.0.0.0/0",
-
+			ClientCIDR:    "0.0.0.0/0",
 			ServerAddress: s.ExternalAddress,
 		},
 	}
@@ -554,6 +531,34 @@ func (s *GenericAPIServer) InstallOpenAPI() {
 	if err != nil {
 		glog.Fatalf("Failed to register open api spec for root: %v", err)
 	}
+}
+
+// DynamicApisDiscovery returns a webservice serving api group discovery.
+// Note: during the server runtime apiGroupsForDiscovery might change.
+func (s *GenericAPIServer) DynamicApisDiscovery() *restful.WebService {
+	return apiserver.NewApisWebService(s.Serializer, s.apiPrefix, func(req *restful.Request) []unversioned.APIGroup {
+		s.apiGroupsForDiscoveryLock.RLock()
+		defer s.apiGroupsForDiscoveryLock.RUnlock()
+
+		// sort to have a deterministic order
+		sortedGroups := []unversioned.APIGroup{}
+		groupNames := make([]string, 0, len(s.apiGroupsForDiscovery))
+		for groupName := range s.apiGroupsForDiscovery {
+			groupNames = append(groupNames, groupName)
+		}
+		sort.Strings(groupNames)
+		for _, groupName := range groupNames {
+			sortedGroups = append(sortedGroups, s.apiGroupsForDiscovery[groupName])
+		}
+
+		serverCIDR := s.getServerAddressByClientCIDRs(req.Request)
+		groups := make([]unversioned.APIGroup, len(sortedGroups))
+		for i := range sortedGroups {
+			groups[i] = sortedGroups[i]
+			groups[i].ServerAddressByClientCIDRs = serverCIDR
+		}
+		return groups
+	})
 }
 
 // NewDefaultAPIGroupInfo returns an APIGroupInfo stubbed with "normal" values
