@@ -398,6 +398,7 @@ func TestMasterService(t *testing.T) {
 		for i := range svcList.Items {
 			if svcList.Items[i].Name == "kubernetes" {
 				found = true
+				break
 			}
 		}
 		if found {
