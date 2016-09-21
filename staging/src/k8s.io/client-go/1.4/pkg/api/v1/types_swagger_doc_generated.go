@@ -794,7 +794,7 @@ func (NamespaceStatus) SwaggerDoc() map[string]string {
 }
 
 var map_Node = map[string]string{
-	"":         "Node is a worker node in Kubernetes, formerly known as minion. Each node will have a unique identifier in the cache (i.e. in etcd).",
+	"":         "Node is a worker node in Kubernetes.",
 	"metadata": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
 	"spec":     "Spec defines the behavior of a node. http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
 	"status":   "Most recently observed status of the node. Populated by the system. Read-only. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",

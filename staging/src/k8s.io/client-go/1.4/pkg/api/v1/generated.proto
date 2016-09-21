@@ -1200,7 +1200,7 @@ message NamespaceStatus {
   optional string phase = 1;
 }
 
-// Node is a worker node in Kubernetes, formerly known as minion.
+// Node is a worker node in Kubernetes.
 // Each node will have a unique identifier in the cache (i.e. in etcd).
 message Node {
   // Standard object's metadata.
