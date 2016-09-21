@@ -21,7 +21,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/apps"
 	appsapiv1alpha1 "k8s.io/kubernetes/pkg/apis/apps/v1alpha1"
 	"k8s.io/kubernetes/pkg/genericapiserver"
-	petsetetcd "k8s.io/kubernetes/pkg/registry/petset/etcd"
+	petsetetcd "k8s.io/kubernetes/pkg/registry/apps/petset/etcd"
 )
 
 type AppsRESTStorageProvider struct{}

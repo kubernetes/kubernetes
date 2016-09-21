@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,4 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package poddisruptionbudget // import "k8s.io/kubernetes/pkg/registry/poddisruptionbudget"
+// Package certificates provides Registry interface and its RESTStorage
+// implementation for storing CertificateSigningRequest objects.
+package certificates // import "k8s.io/kubernetes/pkg/registry/certificates/certificates"

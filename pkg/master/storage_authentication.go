@@ -22,7 +22,7 @@ import (
 	authenticationv1beta1 "k8s.io/kubernetes/pkg/apis/authentication/v1beta1"
 	"k8s.io/kubernetes/pkg/auth/authenticator"
 	"k8s.io/kubernetes/pkg/genericapiserver"
-	"k8s.io/kubernetes/pkg/registry/tokenreview"
+	"k8s.io/kubernetes/pkg/registry/authentication/tokenreview"
 )
 
 type AuthenticationRESTStorageProvider struct {

@@ -21,7 +21,7 @@ import (
 	storageapi "k8s.io/kubernetes/pkg/apis/storage"
 	storageapiv1beta1 "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
 	"k8s.io/kubernetes/pkg/genericapiserver"
-	storageclassetcd "k8s.io/kubernetes/pkg/registry/storageclass/etcd"
+	storageclassetcd "k8s.io/kubernetes/pkg/registry/storage/storageclass/etcd"
 )
 
 type StorageRESTStorageProvider struct {
