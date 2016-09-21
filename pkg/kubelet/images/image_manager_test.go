@@ -106,7 +106,7 @@ func TestParallelPuller(t *testing.T) {
 
 		fakeRuntime := &ctest.FakeRuntime{}
 		fakeRecorder := &record.FakeRecorder{}
-		puller := NewImageManager(fakeRecorder, fakeRuntime, backOff, false)
+		puller := NewImageManager(fakeRecorder, fakeRuntime, backOff, false, 0, 0)
 
 		fakeRuntime.ImageList = []Image{{ID: "present_image", Size: 1}}
 		fakeRuntime.Err = c.pullerErr
@@ -197,7 +197,7 @@ func TestSerializedPuller(t *testing.T) {
 
 		fakeRuntime := &ctest.FakeRuntime{}
 		fakeRecorder := &record.FakeRecorder{}
-		puller := NewImageManager(fakeRecorder, fakeRuntime, backOff, true)
+		puller := NewImageManager(fakeRecorder, fakeRuntime, backOff, true, 0, 0)
 
 		fakeRuntime.ImageList = []Image{{ID: "present_image"}}
 		fakeRuntime.Err = c.pullerErr

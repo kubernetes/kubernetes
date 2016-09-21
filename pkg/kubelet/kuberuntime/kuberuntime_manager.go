@@ -109,6 +109,8 @@ func NewKubeGenericRuntimeManager(
 	httpClient types.HttpGetter,
 	imageBackOff *flowcontrol.Backoff,
 	serializeImagePulls bool,
+	imagePullQPS float32,
+	imagePullBurst int,
 	cpuCFSQuota bool,
 	runtimeService internalApi.RuntimeService,
 	imageService internalApi.ImageManagerService,
@@ -160,7 +162,9 @@ func NewKubeGenericRuntimeManager(
 		kubecontainer.FilterEventRecorder(recorder),
 		kubeRuntimeManager,
 		imageBackOff,
-		serializeImagePulls)
+		serializeImagePulls,
+		imagePullQPS,
+		imagePullBurst)
 	kubeRuntimeManager.runner = lifecycle.NewHandlerRunner(httpClient, kubeRuntimeManager, kubeRuntimeManager)
 	kubeRuntimeManager.containerGC = NewContainerGC(runtimeService, podGetter, kubeRuntimeManager)
 
