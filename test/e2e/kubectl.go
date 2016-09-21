@@ -198,7 +198,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 		pods, err := clusterState().WaitFor(atLeast, framework.PodStartTimeout)
 		if err != nil || len(pods) < atLeast {
 			// TODO: Generalize integrating debug info into these tests so we always get debug info when we need it
-			framework.DumpAllNamespaceInfo(c, f.Clientset_1_5, ns)
+			framework.DumpAllNamespaceInfo(c, f.ClientSet_1_5, ns)
 			framework.Failf("Verified %v of %v pods , error : %v", len(pods), atLeast, err)
 		}
 	}

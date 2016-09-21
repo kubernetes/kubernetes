@@ -122,7 +122,7 @@ func observeObjectDeletion(w watch.Interface) (obj runtime.Object) {
 var _ = framework.KubeDescribe("Generated release_1_5 clientset", func() {
 	f := framework.NewDefaultFramework("clientset")
 	It("should create pods, delete pods, watch pods", func() {
-		podClient := f.Clientset_1_5.Core().Pods(f.Namespace.Name)
+		podClient := f.ClientSet_1_5.Core().Pods(f.Namespace.Name)
 		By("constructing the pod")
 		name := "pod" + string(uuid.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())
