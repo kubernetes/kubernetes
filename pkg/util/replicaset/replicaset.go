@@ -108,25 +108,3 @@ func MatchingPodsFunc(rs *extensions.ReplicaSet) (func(api.Pod) bool, error) {
 		return selector.Matches(podLabelsSelector)
 	}, nil
 }
-
-// ReplicaSetIsInactive returns a condition that will be true when a replica set is inactive ie.
-// it has zero running replicas.
-func ReplicaSetIsInactive(c unversionedextensions.ExtensionsInterface, replicaSet *extensions.ReplicaSet) wait.ConditionFunc {
-
-	// If we're given a ReplicaSet where the status lags the spec, it either means that the
-	// ReplicaSet is stale, or that the ReplicaSet manager hasn't noticed the update yet.
-	// Polling status.Replicas is not safe in the latter case.
-	desiredGeneration := replicaSet.Generation
-
-	return func() (bool, error) {
-		rs, err := c.ReplicaSets(replicaSet.Namespace).Get(replicaSet.Name)
-		if err != nil {
-			return false, err
-		}
-
-		return rs.Status.ObservedGeneration >= desiredGeneration &&
-			rs.Spec.Replicas == 0 &&
-			rs.Status.Replicas == 0 &&
-			rs.Status.FullyLabeledReplicas == 0, nil
-	}
-}
