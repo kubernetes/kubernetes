@@ -30,14 +30,7 @@ import (
 func TestAuthenticateRequest(t *testing.T) {
 	success := make(chan struct{})
 	contextMapper := api.NewRequestContextMapper()
-	auth, err := NewRequestAuthenticator(
-		contextMapper,
-		authenticator.RequestFunc(func(req *http.Request) (user.Info, bool, error) {
-			return &user.DefaultInfo{Name: "user"}, true, nil
-		}),
-		http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
-			t.Errorf("unexpected call to failed")
-		}),
+	auth := WithAuthentication(
 		http.HandlerFunc(func(_ http.ResponseWriter, req *http.Request) {
 			ctx, ok := contextMapper.Get(req)
 			if ctx == nil || !ok {
@@ -48,6 +41,13 @@ func TestAuthenticateRequest(t *testing.T) {
 				t.Errorf("no user stored in context: %#v", ctx)
 			}
 			close(success)
+		}),
+		contextMapper,
+		authenticator.RequestFunc(func(req *http.Request) (user.Info, bool, error) {
+			return &user.DefaultInfo{Name: "user"}, true, nil
+		}),
+		http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
+			t.Errorf("unexpected call to failed")
 		}),
 	)
 
@@ -66,16 +66,16 @@ func TestAuthenticateRequest(t *testing.T) {
 func TestAuthenticateRequestFailed(t *testing.T) {
 	failed := make(chan struct{})
 	contextMapper := api.NewRequestContextMapper()
-	auth, err := NewRequestAuthenticator(
+	auth := WithAuthentication(
+		http.HandlerFunc(func(_ http.ResponseWriter, req *http.Request) {
+			t.Errorf("unexpected call to handler")
+		}),
 		contextMapper,
 		authenticator.RequestFunc(func(req *http.Request) (user.Info, bool, error) {
 			return nil, false, nil
 		}),
 		http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
 			close(failed)
-		}),
-		http.HandlerFunc(func(_ http.ResponseWriter, req *http.Request) {
-			t.Errorf("unexpected call to handler")
 		}),
 	)
 
@@ -94,16 +94,16 @@ func TestAuthenticateRequestFailed(t *testing.T) {
 func TestAuthenticateRequestError(t *testing.T) {
 	failed := make(chan struct{})
 	contextMapper := api.NewRequestContextMapper()
-	auth, err := NewRequestAuthenticator(
+	auth := WithAuthentication(
+		http.HandlerFunc(func(_ http.ResponseWriter, req *http.Request) {
+			t.Errorf("unexpected call to handler")
+		}),
 		contextMapper,
 		authenticator.RequestFunc(func(req *http.Request) (user.Info, bool, error) {
 			return nil, false, errors.New("failure")
 		}),
 		http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
 			close(failed)
-		}),
-		http.HandlerFunc(func(_ http.ResponseWriter, req *http.Request) {
-			t.Errorf("unexpected call to handler")
 		}),
 	)
 
