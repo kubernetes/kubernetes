@@ -3261,8 +3261,15 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 							Format:      "int32",
 						},
 					},
+					"readyScheduled": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The number of ready pods for this daemon set.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
 				},
-				Required: []string{"currentNumberScheduled", "numberMisscheduled", "desiredNumberScheduled"},
+				Required: []string{"currentNumberScheduled", "numberMisscheduled", "desiredNumberScheduled", "readyScheduled"},
 			},
 		},
 		Dependencies: []string{},
@@ -15285,8 +15292,15 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 							Format:      "int32",
 						},
 					},
+					"readyScheduled": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The number of ready pods for this daemon set.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
 				},
-				Required: []string{"currentNumberScheduled", "numberMisscheduled", "desiredNumberScheduled"},
+				Required: []string{"currentNumberScheduled", "numberMisscheduled", "desiredNumberScheduled", "readyScheduled"},
 			},
 		},
 		Dependencies: []string{},

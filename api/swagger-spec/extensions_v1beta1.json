@@ -9184,7 +9184,8 @@
     "required": [
      "currentNumberScheduled",
      "numberMisscheduled",
-     "desiredNumberScheduled"
+     "desiredNumberScheduled",
+     "readyScheduled"
     ],
     "properties": {
      "currentNumberScheduled": {
@@ -9201,6 +9202,11 @@
       "type": "integer",
       "format": "int32",
       "description": "DesiredNumberScheduled is the total number of nodes that should be running the daemon pod (including nodes correctly running the daemon pod). More info: http://releases.k8s.io/HEAD/docs/admin/daemons.md"
+     },
+     "readyScheduled": {
+      "type": "integer",
+      "format": "int32",
+      "description": "The number of ready pods for this daemon set."
      }
     }
    },
