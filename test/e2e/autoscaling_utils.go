@@ -302,9 +302,9 @@ func (rc *ResourceConsumer) CleanUp() {
 	rc.stopCustomMetric <- 0
 	// Wait some time to ensure all child goroutines are finished.
 	time.Sleep(10 * time.Second)
-	framework.ExpectNoError(framework.DeleteRCAndPods(rc.framework.Client, rc.framework.Namespace.Name, rc.name))
+	framework.ExpectNoError(framework.DeleteRCAndPods(rc.framework.Client, rc.framework.ClientSet, rc.framework.Namespace.Name, rc.name))
 	framework.ExpectNoError(rc.framework.Client.Services(rc.framework.Namespace.Name).Delete(rc.name))
-	framework.ExpectNoError(framework.DeleteRCAndPods(rc.framework.Client, rc.framework.Namespace.Name, rc.controllerName))
+	framework.ExpectNoError(framework.DeleteRCAndPods(rc.framework.Client, rc.framework.ClientSet, rc.framework.Namespace.Name, rc.controllerName))
 	framework.ExpectNoError(rc.framework.Client.Services(rc.framework.Namespace.Name).Delete(rc.controllerName))
 }
 

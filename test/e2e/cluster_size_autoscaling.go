@@ -97,7 +97,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 	It("shouldn't increase cluster size if pending pod is too large [Feature:ClusterSizeAutoscalingScaleUp]", func() {
 		By("Creating unschedulable pod")
 		ReserveMemory(f, "memory-reservation", 1, memCapacityMb, false)
-		defer framework.DeleteRCAndPods(f.Client, f.Namespace.Name, "memory-reservation")
+		defer framework.DeleteRCAndPods(f.Client, f.ClientSet, f.Namespace.Name, "memory-reservation")
 
 		By("Waiting for scale up hoping it won't happen")
 		// Verfiy, that the appropreate event was generated.
@@ -124,7 +124,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 
 	It("should increase cluster size if pending pods are small [Feature:ClusterSizeAutoscalingScaleUp]", func() {
 		ReserveMemory(f, "memory-reservation", 100, nodeCount*memCapacityMb, false)
-		defer framework.DeleteRCAndPods(f.Client, f.Namespace.Name, "memory-reservation")
+		defer framework.DeleteRCAndPods(f.Client, f.ClientSet, f.Namespace.Name, "memory-reservation")
 
 		// Verify, that cluster size is increased
 		framework.ExpectNoError(WaitForClusterSizeFunc(f.Client,
@@ -143,7 +143,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 		glog.Infof("Not enabling cluster autoscaler for the node pool (on purpose).")
 
 		ReserveMemory(f, "memory-reservation", 100, nodeCount*memCapacityMb, false)
-		defer framework.DeleteRCAndPods(f.Client, f.Namespace.Name, "memory-reservation")
+		defer framework.DeleteRCAndPods(f.Client, f.ClientSet, f.Namespace.Name, "memory-reservation")
 
 		// Verify, that cluster size is increased
 		framework.ExpectNoError(WaitForClusterSizeFunc(f.Client,
@@ -165,7 +165,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 
 	It("should increase cluster size if pods are pending due to host port conflict [Feature:ClusterSizeAutoscalingScaleUp]", func() {
 		CreateHostPortPods(f, "host-port", nodeCount+2, false)
-		defer framework.DeleteRCAndPods(f.Client, f.Namespace.Name, "host-port")
+		defer framework.DeleteRCAndPods(f.Client, f.ClientSet, f.Namespace.Name, "host-port")
 
 		framework.ExpectNoError(WaitForClusterSizeFunc(f.Client,
 			func(size int) bool { return size >= nodeCount+2 }, scaleUpTimeout))
@@ -217,7 +217,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 			func(size int) bool { return size >= nodeCount+1 }, scaleUpTimeout))
 
 		framework.ExpectNoError(waitForAllCaPodsReadyInNamespace(f, c))
-		framework.ExpectNoError(framework.DeleteRCAndPods(f.Client, f.Namespace.Name, "node-selector"))
+		framework.ExpectNoError(framework.DeleteRCAndPods(f.Client, f.ClientSet, f.Namespace.Name, "node-selector"))
 	})
 
 	It("should scale up correct target pool [Feature:ClusterSizeAutoscalingScaleUp]", func() {
@@ -232,7 +232,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 
 		By("Creating rc with 2 pods too big to fit default-pool but fitting extra-pool")
 		ReserveMemory(f, "memory-reservation", 2, 2*memCapacityMb, false)
-		defer framework.DeleteRCAndPods(f.Client, f.Namespace.Name, "memory-reservation")
+		defer framework.DeleteRCAndPods(f.Client, f.ClientSet, f.Namespace.Name, "memory-reservation")
 
 		// Apparently GKE master is restarted couple minutes after the node pool is added
 		// reseting all the timers in scale down code. Adding 5 extra minutes to workaround
