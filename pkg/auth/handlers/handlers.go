@@ -46,6 +46,7 @@ func init() {
 // the failed handler is used. On success, handler is invoked to serve the request.
 func WithAuthentication(handler http.Handler, mapper api.RequestContextMapper, auth authenticator.Request, failed http.Handler) http.Handler {
 	if auth == nil {
+		glog.Warningf("Authentication is disabled")
 		return handler
 	}
 	return api.WithRequestContext(

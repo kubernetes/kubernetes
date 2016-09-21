@@ -145,6 +145,10 @@ func (r *requestAttributeGetter) GetAttribs(req *http.Request) authorizer.Attrib
 
 // WithAuthorizationCheck passes all authorized requests on to handler, and returns a forbidden error otherwise.
 func WithAuthorization(handler http.Handler, getAttribs RequestAttributeGetter, a authorizer.Authorizer) http.Handler {
+	if a == nil {
+		glog.Warningf("Authorization is disabled")
+		return handler
+	}
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		authorized, reason, err := a.Authorize(getAttribs.GetAttribs(req))
 		if err != nil {
