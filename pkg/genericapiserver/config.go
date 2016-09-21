@@ -368,7 +368,7 @@ func (s *GenericAPIServer) buildHandlerChains(c *Config, handler http.Handler) (
 	longRunningRE := regexp.MustCompile(c.LongRunningRequestRE)
 	longRunningFunc := genericfilters.BasicLongRunningRequestCheck(longRunningRE, map[string]string{"watch": "true"})
 
-	// common filters
+	// filters which insecure and secure have in common
 	handler = genericfilters.WithCORS(handler, c.CorsAllowedOriginList, nil, nil, "true")
 
 	// insecure filters
