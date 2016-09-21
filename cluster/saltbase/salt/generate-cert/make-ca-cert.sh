@@ -83,7 +83,7 @@ cd "${tmpdir}"
 if [ -f ~/kube/easy-rsa.tar.gz ]; then
 	ln -s ~/kube/easy-rsa.tar.gz .
 else
-	curl -L -O https://storage.googleapis.com/kubernetes-release/easy-rsa/easy-rsa.tar.gz > /dev/null 2>&1
+	curl -k -L -O https://storage.googleapis.com/kubernetes-release/easy-rsa/easy-rsa.tar.gz > /dev/null 2>&1
 fi
 tar xzf easy-rsa.tar.gz > /dev/null 2>&1
 
