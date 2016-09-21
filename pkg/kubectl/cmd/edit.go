@@ -118,12 +118,16 @@ func NewCmdEdit(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 }
 
 func RunEdit(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args []string, options *resource.FilenameOptions) error {
+	return runEdit(f, out, errOut, cmd, args, options, true)
+}
+
+func runEdit(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args []string, options *resource.FilenameOptions, isUsedByEditCmd bool) error {
 	o, err := getPrinter(cmd)
 	if err != nil {
 		return err
 	}
 
-	mapper, resourceMapper, r, cmdNamespace, err := getMapperAndResult(f, args, options)
+	mapper, resourceMapper, r, cmdNamespace, err := getMapperAndResult(f, args, options, isUsedByEditCmd)
 	if err != nil {
 		return err
 	}
@@ -192,14 +196,15 @@ func RunEdit(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args 
 			if err != nil {
 				return preservedFile(err, results.file, errOut)
 			}
-			if bytes.Equal(stripComments(editedDiff), stripComments(edited)) {
-				// Ugly hack right here. We will hit this either (1) when we try to
-				// save the same changes we tried to save in the previous iteration
-				// which means our changes are invalid or (2) when we exit the second
-				// time. The second case is more usual so we can probably live with it.
-				// TODO: A less hacky fix would be welcome :)
-				fmt.Fprintln(errOut, "Edit cancelled, no valid changes were saved.")
-				return nil
+			if isUsedByEditCmd || containsError {
+				if bytes.Equal(stripComments(editedDiff), stripComments(edited)) {
+					// Ugly hack right here. We will hit this either (1) when we try to
+					// save the same changes we tried to save in the previous iteration
+					// which means our changes are invalid or (2) when we exit the second
+					// time. The second case is more usual so we can probably live with it.
+					// TODO: A less hacky fix would be welcome :)
+					return preservedFile(fmt.Errorf("%s", "Edit cancelled, no valid changes were saved."), file, errOut)
+				}
 			}
 
 			// cleanup any file from the previous pass
@@ -223,12 +228,15 @@ func RunEdit(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args 
 				continue
 			}
 
-			// Compare content without comments
-			if bytes.Equal(stripComments(original), stripComments(edited)) {
-				os.Remove(file)
-				fmt.Fprintln(errOut, "Edit cancelled, no changes made.")
-				return nil
+			if isUsedByEditCmd {
+				// Compare content without comments
+				if bytes.Equal(stripComments(original), stripComments(edited)) {
+					os.Remove(file)
+					fmt.Fprintln(errOut, "Edit cancelled, no changes made.")
+					return nil
+				}
 			}
+
 			lines, err := hasLines(bytes.NewBuffer(edited))
 			if err != nil {
 				return preservedFile(err, file, errOut)
@@ -271,7 +279,11 @@ func RunEdit(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args 
 				meta.SetList(updates.Object, mutatedObjects)
 			}
 
-			err = visitToPatch(originalObj, updates, mapper, resourceMapper, encoder, out, errOut, defaultVersion, &results, file)
+			if isUsedByEditCmd {
+				err = visitToPatch(originalObj, updates, mapper, resourceMapper, encoder, out, errOut, defaultVersion, &results, file)
+			} else {
+				err = visitToCreate(updates, mapper, resourceMapper, out, errOut, defaultVersion, &results, file)
+			}
 			if err != nil {
 				return preservedFile(err, results.file, errOut)
 			}
@@ -326,13 +338,21 @@ func getPrinter(cmd *cobra.Command) (*editPrinterOptions, error) {
 	}
 }
 
-func getMapperAndResult(f cmdutil.Factory, args []string, options *resource.FilenameOptions) (meta.RESTMapper, *resource.Mapper, *resource.Result, string, error) {
+func getMapperAndResult(f cmdutil.Factory, args []string, options *resource.FilenameOptions, isUsedByEditCmd bool) (meta.RESTMapper, *resource.Mapper, *resource.Result, string, error) {
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return nil, nil, nil, "", err
 	}
-
-	mapper, typer := f.Object()
+	var mapper meta.RESTMapper
+	var typer runtime.ObjectTyper
+	if isUsedByEditCmd {
+		mapper, typer = f.Object()
+	} else {
+		mapper, typer, err = f.UnstructuredObject()
+	}
+	if err != nil {
+		return nil, nil, nil, "", err
+	}
 	resourceMapper := &resource.Mapper{
 		ObjectTyper:  typer,
 		RESTMapper:   mapper,
@@ -345,14 +365,18 @@ func getMapperAndResult(f cmdutil.Factory, args []string, options *resource.File
 		// compare two different GroupVersions).
 		Decoder: f.Decoder(false),
 	}
-
-	r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
-		NamespaceParam(cmdNamespace).DefaultNamespace().
+	var b *resource.Builder
+	if isUsedByEditCmd {
+		b = resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
+			ResourceTypeOrNameArgs(true, args...).
+			Latest()
+	} else {
+		b = resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), runtime.UnstructuredJSONScheme)
+	}
+	r := b.NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, options).
-		ResourceTypeOrNameArgs(true, args...).
 		ContinueOnError().
 		Flatten().
-		Latest().
 		Do()
 	err = r.Err()
 	if err != nil {
@@ -428,7 +452,7 @@ func visitToPatch(originalObj runtime.Object, updates *resource.Info, mapper met
 		if err != nil {
 			glog.V(4).Infof("Unable to calculate diff, no merge is possible: %v", err)
 			if strategicpatch.IsPreconditionFailed(err) {
-				return preservedFile(nil, file, errOut)
+				return preservedFile(fmt.Errorf("%s", "At least one of apiVersion, kind and name was changed"), file, errOut)
 			}
 			return err
 		}
@@ -441,6 +465,19 @@ func visitToPatch(originalObj runtime.Object, updates *resource.Info, mapper met
 		}
 		info.Refresh(patched, true)
 		cmdutil.PrintSuccess(mapper, false, out, info.Mapping.Resource, info.Name, false, "edited")
+		return nil
+	})
+	return err
+}
+
+func visitToCreate(updates *resource.Info, mapper meta.RESTMapper, resourceMapper *resource.Mapper, out, errOut io.Writer, defaultVersion unversioned.GroupVersion, results *editResults, file string) error {
+	createVisitor := resource.NewFlattenListVisitor(updates, resourceMapper)
+	err := createVisitor.Visit(func(info *resource.Info, incomingErr error) error {
+		results.version = defaultVersion
+		if err := createAndRefresh(info); err != nil {
+			return preservedFile(err, file, errOut)
+		}
+		cmdutil.PrintSuccess(mapper, false, out, info.Mapping.Resource, info.Name, false, "created")
 		return nil
 	})
 	return err

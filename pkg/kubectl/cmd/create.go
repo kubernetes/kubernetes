@@ -19,6 +19,7 @@ package cmd
 import (
 	"fmt"
 	"io"
+	gruntime "runtime"
 
 	"github.com/spf13/cobra"
 
@@ -41,10 +42,13 @@ var (
 		kubectl create -f ./pod.json
 
 		# Create a pod based on the JSON passed into stdin.
-		cat pod.json | kubectl create -f -`)
+		cat pod.json | kubectl create -f -
+
+		# Edit the data in docker-registry.yaml in JSON using the v1 API format then create the resource using the edited data.
+		kubectl create -f docker-registry.yaml --edit --output-version=v1 -o json`)
 )
 
-func NewCmdCreate(f cmdutil.Factory, out io.Writer) *cobra.Command {
+func NewCmdCreate(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	options := &resource.FilenameOptions{}
 
 	cmd := &cobra.Command{
@@ -58,8 +62,7 @@ func NewCmdCreate(f cmdutil.Factory, out io.Writer) *cobra.Command {
 				return
 			}
 			cmdutil.CheckErr(ValidateArgs(cmd, args))
-			cmdutil.CheckErr(cmdutil.ValidateOutputArgs(cmd))
-			cmdutil.CheckErr(RunCreate(f, cmd, out, options))
+			cmdutil.CheckErr(RunCreate(f, cmd, out, errOut, options))
 		},
 	}
 
@@ -67,7 +70,11 @@ func NewCmdCreate(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmdutil.AddFilenameOptionFlags(cmd, options, usage)
 	cmd.MarkFlagRequired("filename")
 	cmdutil.AddValidateFlags(cmd)
-	cmdutil.AddPrinterFlags(cmd)
+	cmdutil.AddPrinterFlags(cmd) ////////////
+	cmd.Flags().Bool("edit", false, "Edit the API resource before creating")
+	// cmd.Flags().StringP("output", "o", "yaml", "Output format. If --edit is false, use -o name for shorter output (resource/name); Other usage will be ignored. If --edit is true, use one of: yaml|json. The default format is YAML.")
+	// cmd.Flags().String("output-version", "", "Only relevant if --edit=true. Output the formatted object with the given group version (for ex: 'extensions/v1beta1').")
+	cmd.Flags().Bool("windows-line-endings", gruntime.GOOS == "windows", "Only relevant if --edit=true. Use Windows line-endings (default Unix line-endings)")
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddRecordFlag(cmd)
 	cmdutil.AddDryRunFlag(cmd)
@@ -91,7 +98,10 @@ func ValidateArgs(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func RunCreate(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *resource.FilenameOptions) error {
+func RunCreate(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, options *resource.FilenameOptions) error {
+	if cmdutil.GetFlagBool(cmd, "edit") {
+		return runEdit(f, out, errOut, cmd, []string{}, options, false)
+	}
 	schema, err := f.Validator(cmdutil.GetFlagBool(cmd, "validate"), cmdutil.GetFlagString(cmd, "schema-cache-dir"))
 	if err != nil {
 		return err
