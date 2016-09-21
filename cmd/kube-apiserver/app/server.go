@@ -45,6 +45,7 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller/informers"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
+	"k8s.io/kubernetes/pkg/generated/openapi"
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/genericapiserver/authorizer"
 	genericoptions "k8s.io/kubernetes/pkg/genericapiserver/options"
@@ -282,6 +283,8 @@ func Run(s *options.APIServer) error {
 	genericConfig.ProxyTLSClientConfig = proxyTLSClientConfig
 	genericConfig.Serializer = api.Codecs
 	genericConfig.OpenAPIInfo.Title = "Kubernetes"
+	genericConfig.OpenAPIDefinitions = openapi.OpenAPIDefinitions
+	genericConfig.EnableOpenAPISupport = true
 
 	config := &master.Config{
 		Config:                  genericConfig,

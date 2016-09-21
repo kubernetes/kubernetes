@@ -32,6 +32,7 @@ import (
 	"github.com/golang/glog"
 	"gopkg.in/natefinch/lumberjack.v2"
 
+	"k8s.io/kubernetes/cmd/libs/go2idl/openapi-gen/generators/common"
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -157,6 +158,10 @@ type Config struct {
 
 	// OpenAPIDefaultResponse will be used if an web service operation does not have any responses listed.
 	OpenAPIDefaultResponse spec.Response
+
+	// OpenAPIDefinitions is a map of type to OpenAPI spec for all types used in this API server. Failure to provide
+	// this map or any of the models used by the server APIs will result in spec generation failure.
+	OpenAPIDefinitions *common.OpenAPIDefinitions
 }
 
 func NewConfig(options *options.ServerRunOptions) *Config {
@@ -183,7 +188,6 @@ func NewConfig(options *options.ServerRunOptions) *Config {
 		ReadWritePort:             options.SecurePort,
 		ServiceClusterIPRange:     &options.ServiceClusterIPRange,
 		ServiceNodePortRange:      options.ServiceNodePortRange,
-		EnableOpenAPISupport:      true,
 		OpenAPIDefaultResponse: spec.Response{
 			ResponseProps: spec.ResponseProps{
 				Description: "Default Response."}},
@@ -308,6 +312,7 @@ func (c Config) New() (*GenericAPIServer, error) {
 		enableOpenAPISupport:   c.EnableOpenAPISupport,
 		openAPIInfo:            c.OpenAPIInfo,
 		openAPIDefaultResponse: c.OpenAPIDefaultResponse,
+		openAPIDefinitions:     c.OpenAPIDefinitions,
 	}
 
 	if c.EnableWatchCache {
