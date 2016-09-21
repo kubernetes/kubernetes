@@ -40,6 +40,7 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_rbac_ClusterRoleBindingList, InType: reflect.TypeOf(&ClusterRoleBindingList{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_rbac_ClusterRoleList, InType: reflect.TypeOf(&ClusterRoleList{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_rbac_PolicyRule, InType: reflect.TypeOf(&PolicyRule{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_rbac_PolicyRuleBuilder, InType: reflect.TypeOf(&PolicyRuleBuilder{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_rbac_Role, InType: reflect.TypeOf(&Role{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_rbac_RoleBinding, InType: reflect.TypeOf(&RoleBinding{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_rbac_RoleBindingList, InType: reflect.TypeOf(&RoleBindingList{})},
@@ -181,6 +182,17 @@ func DeepCopy_rbac_PolicyRule(in interface{}, out interface{}, c *conversion.Clo
 			copy(*out, *in)
 		} else {
 			out.NonResourceURLs = nil
+		}
+		return nil
+	}
+}
+
+func DeepCopy_rbac_PolicyRuleBuilder(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*PolicyRuleBuilder)
+		out := out.(*PolicyRuleBuilder)
+		if err := DeepCopy_rbac_PolicyRule(&in.PolicyRule, &out.PolicyRule, c); err != nil {
+			return err
 		}
 		return nil
 	}

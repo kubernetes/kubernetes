@@ -122,7 +122,7 @@ func newPostStartHook(directClusterRoleAccess *clusterroleetcd.REST) genericapis
 			return nil
 		}
 
-		for _, clusterRole := range bootstrappolicy.ClusterRoles() {
+		for _, clusterRole := range append(bootstrappolicy.ClusterRoles(), bootstrappolicy.ControllerRoles()...) {
 			if _, err := directClusterRoleAccess.Create(ctx, &clusterRole); err != nil {
 				// don't fail on failures, try to create as many as you can
 				utilruntime.HandleError(fmt.Errorf("unable to initialize clusterroles: %v", err))
