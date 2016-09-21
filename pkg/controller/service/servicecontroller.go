@@ -119,7 +119,7 @@ func New(cloud cloudprovider.Interface, kubeClient clientset.Interface, clusterN
 		},
 		workingQueue: workqueue.NewDelayingQueue(),
 	}
-	s.serviceStore.Indexer, s.serviceController = cache.NewIndexerInformer(
+	s.serviceStore.Store, s.serviceController = cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (pkg_runtime.Object, error) {
 				return s.kubeClient.Core().Services(api.NamespaceAll).List(options)
@@ -141,7 +141,6 @@ func New(cloud cloudprovider.Interface, kubeClient clientset.Interface, clusterN
 			},
 			DeleteFunc: s.enqueueService,
 		},
-		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)
 	if err := s.init(); err != nil {
 		return nil, err
@@ -725,7 +724,7 @@ func (s *ServiceController) syncService(key string) error {
 		glog.V(4).Infof("Finished syncing service %q (%v)", key, time.Now().Sub(startTime))
 	}()
 	// obj holds the latest service info from apiserver
-	obj, exists, err := s.serviceStore.Indexer.GetByKey(key)
+	obj, exists, err := s.serviceStore.Store.GetByKey(key)
 	if err != nil {
 		glog.Infof("Unable to retrieve service %v from store: %v", key, err)
 		s.workingQueue.Add(key)

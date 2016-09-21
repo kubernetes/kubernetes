@@ -55,7 +55,7 @@ func NewEndpointController(client *clientset.Clientset) *endpointController {
 		client: client,
 		queue:  workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "endpoint"),
 	}
-	e.serviceStore.Indexer, e.serviceController = cache.NewIndexerInformer(
+	e.serviceStore.Store, e.serviceController = cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				return e.client.Core().Services(api.NamespaceAll).List(options)
@@ -73,7 +73,6 @@ func NewEndpointController(client *clientset.Clientset) *endpointController {
 			},
 			DeleteFunc: e.enqueueService,
 		},
-		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)
 
 	e.podStore.Indexer, e.podController = cache.NewIndexerInformer(
@@ -263,7 +262,7 @@ func (e *endpointController) syncService(key string) error {
 	defer func() {
 		glog.V(4).Infof("Finished syncing service %q endpoints. (%v)", key, time.Now().Sub(startTime))
 	}()
-	obj, exists, err := e.serviceStore.Indexer.GetByKey(key)
+	obj, exists, err := e.serviceStore.Store.GetByKey(key)
 	if err != nil || !exists {
 		// Delete the corresponding endpoint, as the service has been deleted.
 		// TODO: Please note that this will delete an endpoint when a
