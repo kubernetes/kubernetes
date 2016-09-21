@@ -36,6 +36,8 @@ import (
 // GetOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
 // referencing the cmd.Flags()
 type GetOptions struct {
+	FullCmdName string
+
 	resource.FilenameOptions
 
 	Raw string
@@ -80,7 +82,7 @@ var (
 
 // NewCmdGet creates a command object for the generic "get" action, which
 // retrieves one or more resources from a server.
-func NewCmdGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Command {
+func NewCmdGet(fullName string, f *cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Command {
 	options := &GetOptions{}
 
 	// retrieve a list of handled resources from printer as valid args
@@ -100,6 +102,7 @@ func NewCmdGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Comma
 		Long:    get_long,
 		Example: get_example,
 		Run: func(cmd *cobra.Command, args []string) {
+			cmdutil.CheckErr(options.Complete(fullName))
 			err := RunGet(f, out, errOut, cmd, args, options)
 			cmdutil.CheckErr(err)
 		},
@@ -122,9 +125,18 @@ func NewCmdGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Comma
 	return cmd
 }
 
+func (o *GetOptions) Complete(fullCmdName string) error {
+	o.FullCmdName = fullCmdName
+	return nil
+}
+
 // RunGet implements the generic Get command
 // TODO: convert all direct flag accessors to a struct and pass that instead of cmd
 func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Command, args []string, options *GetOptions) error {
+	if options.FullCmdName == "" {
+		options.FullCmdName = "kubectl"
+	}
+
 	if len(options.Raw) > 0 {
 		restClient, err := f.RESTClient()
 		if err != nil {
@@ -171,7 +183,8 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 
 	if len(args) == 0 && cmdutil.IsFilenameEmpty(options.Filenames) {
 		fmt.Fprint(errOut, "You must specify the type of resource to get. ", valid_resources)
-		return cmdutil.UsageError(cmd, "Required resource not specified.")
+		usageString := fmt.Sprintf("Required resource not specified.\nUse \"%s explain <resource>\" for a detailed description of that resource (e.g. %[1]s explain pods).", options.FullCmdName)
+		return cmdutil.UsageError(cmd, usageString)
 	}
 
 	// determine if args contains "all"
