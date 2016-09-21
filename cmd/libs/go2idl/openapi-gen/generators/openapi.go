@@ -28,8 +28,8 @@ import (
 	"k8s.io/kubernetes/cmd/libs/go2idl/args"
 	"k8s.io/kubernetes/cmd/libs/go2idl/generator"
 	"k8s.io/kubernetes/cmd/libs/go2idl/namer"
-	"k8s.io/kubernetes/cmd/libs/go2idl/openapi-gen/generators/common"
 	"k8s.io/kubernetes/cmd/libs/go2idl/types"
+	"k8s.io/kubernetes/pkg/genericapiserver/openapi/common"
 	"k8s.io/kubernetes/pkg/util/sets"
 
 	"github.com/golang/glog"
@@ -136,7 +136,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 
 const (
 	specPackagePath          = "github.com/go-openapi/spec"
-	openAPICommonPackagePath = "k8s.io/kubernetes/cmd/libs/go2idl/openapi-gen/generators/common"
+	openAPICommonPackagePath = "k8s.io/kubernetes/pkg/genericapiserver/openapi/common"
 )
 
 // openApiGen produces a file with auto-generated OpenAPI functions.
