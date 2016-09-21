@@ -30,7 +30,7 @@ import (
 )
 
 // NewCmdCreateSecret groups subcommands to create various types of secrets
-func NewCmdClusterInfoDump(f *cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
+func NewCmdClusterInfoDump(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "dump",
 		Short:   "Dump lots of relevant info for debugging and diagnosis",
@@ -84,7 +84,7 @@ func setupOutputWriter(cmd *cobra.Command, defaultWriter io.Writer, filename str
 	return file
 }
 
-func dumpClusterInfo(f *cmdutil.Factory, cmd *cobra.Command, args []string, out io.Writer) error {
+func dumpClusterInfo(f cmdutil.Factory, cmd *cobra.Command, args []string, out io.Writer) error {
 	clientset, err := f.ClientSet()
 	if err != nil {
 		return err

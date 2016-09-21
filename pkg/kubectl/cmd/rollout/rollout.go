@@ -36,7 +36,7 @@ var (
 		`)
 )
 
-func NewCmdRollout(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+func NewCmdRollout(f cmdutil.Factory, out io.Writer) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "rollout SUBCOMMAND",

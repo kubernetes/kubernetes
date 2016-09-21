@@ -69,7 +69,7 @@ func TestCordon(t *testing.T) {
 		description string
 		node        *api.Node
 		expected    *api.Node
-		cmd         func(*cmdutil.Factory, io.Writer) *cobra.Command
+		cmd         func(cmdutil.Factory, io.Writer) *cobra.Command
 		arg         string
 		expectFatal bool
 	}{

@@ -28,7 +28,7 @@ import (
 const help_long = `Help provides help for any command in the application.
 Simply type kubectl help [path to command] for full details.`
 
-func NewCmdHelp(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+func NewCmdHelp(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "help [command] | STRING_TO_SEARCH",
 		Short: "Help about any command",
