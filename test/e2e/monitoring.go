@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -36,6 +37,7 @@ var _ = framework.KubeDescribe("Monitoring", func() {
 
 	BeforeEach(func() {
 		framework.SkipUnlessProviderIs("gce")
+		framework.SkipUnlessServerVersionLT(version.MustParse("v1.4.0"), f.Client)
 	})
 
 	It("should verify monitoring pods and all cluster nodes are available on influxdb using heapster.", func() {
