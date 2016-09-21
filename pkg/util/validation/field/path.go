@@ -67,9 +67,14 @@ func (p *Path) Key(key string) *Path {
 
 // String produces a string representation of the Path.
 func (p *Path) String() string {
+	return p.StringRelative(nil)
+}
+
+// String produces a string representation of the Path.
+func (p *Path) StringRelative(path *Path) string {
 	// make a slice to iterate
 	elems := []*Path{}
-	for ; p != nil; p = p.parent {
+	for ; p != nil && p != path; p = p.parent {
 		elems = append(elems, p)
 	}
 
@@ -88,4 +93,30 @@ func (p *Path) String() string {
 		}
 	}
 	return buf.String()
+}
+
+func CommonParent(paths []*Path) (ret *Path) {
+	elemss := [][]*Path{}
+	min := -1
+	for _, p := range paths {
+		elems := []*Path{}
+		for ; p != nil; p = p.parent {
+			elems = append(elems, p)
+		}
+		if min < 0 || len(elems) < min {
+			min = len(elems)
+		}
+		elemss = append(elemss, elems)
+	}
+	ret = nil
+	for i := 0; i < min; i++ {
+		p := elemss[0][i]
+		for _, elems := range elemss {
+			if elems[i] != p {
+				return ret
+			}
+		}
+		ret = p
+	}
+	return ret
 }
