@@ -388,7 +388,7 @@ func RunEdit(f *cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args
 
 				if reflect.DeepEqual(originalJS, editedJS) {
 					// no edit, so just skip it.
-					cmdutil.PrintSuccess(mapper, false, out, info.Mapping.Resource, info.Name, "skipped")
+					cmdutil.PrintSuccess(mapper, false, out, info.Mapping.Resource, info.Name, false, "skipped")
 					return nil
 				}
 
@@ -417,7 +417,7 @@ func RunEdit(f *cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args
 					return nil
 				}
 				info.Refresh(patched, true)
-				cmdutil.PrintSuccess(mapper, false, out, info.Mapping.Resource, info.Name, "edited")
+				cmdutil.PrintSuccess(mapper, false, out, info.Mapping.Resource, info.Name, false, "edited")
 				return nil
 			})
 			if err != nil {

@@ -371,7 +371,7 @@ func (o TaintOptions) RunTaint() error {
 			return o.f.PrintObject(o.cmd, mapper, outputObj, o.out)
 		}
 
-		cmdutil.PrintSuccess(mapper, false, o.out, info.Mapping.Resource, info.Name, "tainted")
+		cmdutil.PrintSuccess(mapper, false, o.out, info.Mapping.Resource, info.Name, false, "tainted")
 		return nil
 	})
 }

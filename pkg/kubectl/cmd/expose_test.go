@@ -18,6 +18,7 @@ package cmd
 
 import (
 	"bytes"
+	"fmt"
 	"net/http"
 	"strings"
 	"testing"
@@ -464,7 +465,7 @@ func TestRunExposeService(t *testing.T) {
 				continue
 			}
 
-			test.expected = buf.String()
+			test.expected = fmt.Sprintf("service %q exposed (dry run)", test.flags["name"])
 		}
 
 		if !strings.Contains(out, test.expected) {
