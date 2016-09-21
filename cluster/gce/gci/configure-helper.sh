@@ -83,8 +83,9 @@ function setup-logrotate() {
 }
 EOF
 
-  # Configuration for k8s services that redirect logs to /var/log/<service>.log
-  # files. Whenever logrotate is ran, this config will:
+  # Configure log rotation for all logs in /var/log, which is where k8s services
+  # are configured to write their log files. Whenever logrotate is ran, this
+  # config will:
   # * rotate the log file if its size is > 100Mb OR if one day has elapsed
   # * save rotated logs into a gzipped timestamped backup
   # * log file timestamp (controlled by 'dateformat') includes seconds too. this
@@ -92,10 +93,8 @@ EOF
   #   (otherwise it skips rotation if 'maxsize' is reached multiple times in a
   #   day).
   # * keep only 5 old (rotated) logs, and will discard older logs.
-  local logrotate_files=( "kube-scheduler" "kube-proxy" "kube-apiserver" "kube-controller-manager" "kube-addons" )
-  for file in "${logrotate_files[@]}" ; do
-    cat > /etc/logrotate.d/${file} <<EOF
-/var/log/${file}.log {
+  cat > /etc/logrotate.d/allvarlogs <<EOF
+/var/log/*.log {
     rotate 5
     copytruncate
     missingok
@@ -108,7 +107,7 @@ EOF
     create 0644 root root
 }
 EOF
-  done
+
 }
 
 # Finds the master PD device; returns it in MASTER_PD_DEVICE
