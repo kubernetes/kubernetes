@@ -55,20 +55,12 @@ var _ = framework.KubeDescribe("Kubelet Eviction Manager [Serial] [Disruptive]",
 			var busyPodName, idlePodName, verifyPodName string
 			var containersToCleanUp map[string]bool
 
-			AfterEach(func() {
-				podClient.Delete(busyPodName, &api.DeleteOptions{})
-				podClient.Delete(idlePodName, &api.DeleteOptions{})
-				podClient.Delete(verifyPodName, &api.DeleteOptions{})
-				for container := range containersToCleanUp {
-					// TODO: to be container implementation agnostic
-					cmd := exec.Command("docker", "rm", "-f", strings.Trim(container, dockertools.DockerPrefix))
-					cmd.Run()
-				}
-			})
-
 			BeforeEach(func() {
-				if !isImageSupported() || !evictionOptionIsSet() {
-					return
+				if !isImageSupported() {
+					framework.Skipf("test skipped because the image is not supported by the test")
+				}
+				if !evictionOptionIsSet() {
+					framework.Skipf("test skipped because eviction option is not set")
 				}
 
 				busyPodName = "to-evict" + string(uuid.NewUUID())
@@ -96,16 +88,26 @@ var _ = framework.KubeDescribe("Kubelet Eviction Manager [Serial] [Disruptive]",
 				})
 			})
 
-			It("should evict the pod using the most disk space [Slow]", func() {
-				if !isImageSupported() {
-					framework.Logf("test skipped because the image is not supported by the test")
+			AfterEach(func() {
+				if !isImageSupported() || !evictionOptionIsSet() { // Skip the after each
 					return
 				}
-				if !evictionOptionIsSet() {
-					framework.Logf("test skipped because eviction option is not set")
-					return
+				podClient.Delete(busyPodName, &api.DeleteOptions{})
+				podClient.Delete(idlePodName, &api.DeleteOptions{})
+				podClient.Delete(verifyPodName, &api.DeleteOptions{})
+				for container := range containersToCleanUp {
+					// TODO: to be container implementation agnostic
+					cmd := exec.Command("docker", "rm", "-f", strings.Trim(container, dockertools.DockerPrefix))
+					cmd.Run()
 				}
+				if framework.TestContext.PrepullImages {
+					// The disk eviction test may cause the prepulled images to be evicted,
+					// prepull those images again to ensure this test not affect following tests.
+					PrePullAllImages()
+				}
+			})
 
+			It("should evict the pod using the most disk space [Slow]", func() {
 				evictionOccurred := false
 				nodeDiskPressureCondition := false
 				podRescheduleable := false
@@ -228,6 +230,7 @@ func evictionOptionIsSet() bool {
 	return len(framework.TestContext.EvictionHard) > 0
 }
 
+// TODO(random-liu): Use OSImage in node status to do the check.
 func isImageSupported() bool {
 	// TODO: Only images with image fs is selected for testing for now. When the kubelet settings can be dynamically updated,
 	// instead of skipping images the eviction thresholds should be adjusted based on the images.
