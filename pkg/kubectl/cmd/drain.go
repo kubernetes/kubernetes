@@ -127,13 +127,13 @@ var (
 		Drain node in preparation for maintenance.
 
 		The given node will be marked unschedulable to prevent new pods from arriving.
-		Then drain deletes all pods except mirror pods (which cannot be deleted through
+		The 'drain' deletes all pods except mirror pods (which cannot be deleted through
 		the API server).  If there are DaemonSet-managed pods, drain will not proceed
 		without --ignore-daemonsets, and regardless it will not delete any
 		DaemonSet-managed pods, because those pods would be immediately replaced by the
 		DaemonSet controller, which ignores unschedulable markings.  If there are any
-		pods that are neither mirror pods nor managed--by ReplicationController,
-		ReplicaSet, DaemonSet or Job--, then drain will not delete any pods unless you
+		pods that are neither mirror pods nor managed by ReplicationController,
+		ReplicaSet, DaemonSet or Job, then drain will not delete any pods unless you
 		use --force.
 
 		When you are ready to put the node back into service, use kubectl uncordon, which
