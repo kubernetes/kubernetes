@@ -96,6 +96,15 @@ func WriteStaticPodManifests(s *kubeadmapi.KubeadmConfig) error {
 			Image:         images.GetCoreImage(images.KubeEtcdImage, s.EnvParams["etcd_image"]),
 			LivenessProbe: componentProbe(2379, "/health"),
 			Resources:     componentResources("200m"),
+			SecurityContext: &api.SecurityContext{
+				SELinuxOptions: &api.SELinuxOptions{
+					// TODO: This implies our etcd container is not being restricted by
+					// SELinux. This is not optimal and would be nice to adjust in future
+					// so it can create and write /var/lib/etcd, but for now this avoids
+					// recommending setenforce 0 system-wide.
+					Type: "unconfined_t",
+				},
+			},
 		}, certsVolume(s), etcdVolume(s), k8sVolume(s))
 	}
 
