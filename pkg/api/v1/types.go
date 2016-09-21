@@ -557,6 +557,9 @@ type GlusterfsVolumeSource struct {
 	// More info: http://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod
 	EndpointsName string `json:"endpoints" protobuf:"bytes,1,opt,name=endpoints"`
 
+	// Optional: Servers is the gluster server list
+	EndpointsNameSpace *string `json:"endpointNamespace,omitempty" protobuf:"bytes,4,opt,name=endpointNamespace"`
+
 	// Path is the Glusterfs volume path.
 	// More info: http://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod
 	Path string `json:"path" protobuf:"bytes,2,opt,name=path"`
