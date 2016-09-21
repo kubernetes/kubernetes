@@ -61,7 +61,6 @@ import (
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
 	kubeletvolume "k8s.io/kubernetes/pkg/kubelet/volumemanager"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/clock"
@@ -897,11 +896,13 @@ func TestDNSConfigurationParams(t *testing.T) {
 }
 
 type testServiceLister struct {
-	services []*api.Service
+	services []api.Service
 }
 
-func (ls testServiceLister) List(labels.Selector) ([]*api.Service, error) {
-	return ls.services, nil
+func (ls testServiceLister) List() (api.ServiceList, error) {
+	return api.ServiceList{
+		Items: ls.services,
+	}, nil
 }
 
 type testNodeLister struct {
@@ -937,8 +938,8 @@ func (e envs) Swap(i, j int) { e[i], e[j] = e[j], e[i] }
 
 func (e envs) Less(i, j int) bool { return e[i].Name < e[j].Name }
 
-func buildService(name, namespace, clusterIP, protocol string, port int) *api.Service {
-	return &api.Service{
+func buildService(name, namespace, clusterIP, protocol string, port int) api.Service {
+	return api.Service{
 		ObjectMeta: api.ObjectMeta{Name: name, Namespace: namespace},
 		Spec: api.ServiceSpec{
 			Ports: []api.ServicePort{{
@@ -951,7 +952,7 @@ func buildService(name, namespace, clusterIP, protocol string, port int) *api.Se
 }
 
 func TestMakeEnvironmentVariables(t *testing.T) {
-	services := []*api.Service{
+	services := []api.Service{
 		buildService("kubernetes", api.NamespaceDefault, "1.2.3.1", "TCP", 8081),
 		buildService("test", "test1", "1.2.3.3", "TCP", 8083),
 		buildService("kubernetes", "test2", "1.2.3.4", "TCP", 8084),

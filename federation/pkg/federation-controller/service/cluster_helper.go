@@ -114,7 +114,7 @@ func (cc *clusterClientCache) startClusterLW(cluster *v1beta1.Cluster, clusterNa
 			},
 		)
 
-		cachedClusterClient.serviceStore.Indexer, cachedClusterClient.serviceController = cache.NewIndexerInformer(
+		cachedClusterClient.serviceStore.Store, cachedClusterClient.serviceController = cache.NewInformer(
 			&cache.ListWatch{
 				ListFunc: func(options api.ListOptions) (pkg_runtime.Object, error) {
 					return clientset.Core().Services(v1.NamespaceAll).List(options)
@@ -149,7 +149,6 @@ func (cc *clusterClientCache) startClusterLW(cluster *v1beta1.Cluster, clusterNa
 					glog.V(2).Infof("Service %s/%s deletion found and enque to service store %s", service.Namespace, service.Name, clusterName)
 				},
 			},
-			cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 		)
 		cc.clientMap[clusterName] = cachedClusterClient
 		go cachedClusterClient.serviceController.Run(wait.NeverStop)

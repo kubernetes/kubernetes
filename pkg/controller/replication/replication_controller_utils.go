@@ -71,7 +71,7 @@ func updateReplicaCount(rcClient unversionedcore.ReplicationControllerInterface,
 }
 
 // OverlappingControllers sorts a list of controllers by creation timestamp, using their names as a tie breaker.
-type OverlappingControllers []*api.ReplicationController
+type OverlappingControllers []api.ReplicationController
 
 func (o OverlappingControllers) Len() int      { return len(o) }
 func (o OverlappingControllers) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
