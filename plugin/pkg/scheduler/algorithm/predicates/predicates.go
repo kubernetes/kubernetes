@@ -670,7 +670,7 @@ func (s *ServiceAffinity) CheckServiceAffinity(pod *api.Pod, meta interface{}, n
 	// skip looking at other pods in the service if the current pod defines all the required affinity labels
 	if !labelsExist {
 		services, err := s.serviceLister.GetPodServices(pod)
-		if err == nil && len(services) > 0 {
+		if err == nil {
 			// just use the first service and get the other pods within the service
 			// TODO: a separate predicate can be created that tries to handle all services for the pod
 			selector := labels.SelectorFromSet(services[0].Spec.Selector)

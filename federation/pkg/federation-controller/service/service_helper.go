@@ -63,7 +63,7 @@ func (cc *clusterClientCache) syncService(key, clusterName string, clusterCache 
 		// if serviceCache does not exists, that means the service is not created by federation, we should skip it
 		return nil
 	}
-	serviceInterface, exists, err := clusterCache.serviceStore.Indexer.GetByKey(key)
+	serviceInterface, exists, err := clusterCache.serviceStore.GetByKey(key)
 	if err != nil {
 		glog.Errorf("Did not successfully get %v from store: %v, will retry later", key, err)
 		clusterCache.serviceQueue.Add(key)
