@@ -22,6 +22,7 @@ import (
 	"strings"
 )
 
+// LongRunningRequestCheck is a predicate which is true for long-running http requests.
 type LongRunningRequestCheck func(r *http.Request) bool
 
 // BasicLongRunningRequestCheck pathRegex operates against the url path, the queryParams match is case insensitive.

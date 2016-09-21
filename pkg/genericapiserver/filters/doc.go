@@ -14,6 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// package filters contains all the http handler chain filters which
+// Package filters contains all the http handler chain filters which
 // are not api related.
 package filters // import "k8s.io/kubernetes/pkg/genericapiserver/filters"

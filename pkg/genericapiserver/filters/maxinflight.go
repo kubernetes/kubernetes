@@ -25,7 +25,7 @@ import (
 
 // Constant for the retry-after interval on rate limiting.
 // TODO: maybe make this dynamic? or user-adjustable?
-const RetryAfter = "1"
+const retryAfter = "1"
 
 // WithMaxInFlightLimit limits the number of in-flight requests to buffer size of the passed in channel.
 func WithMaxInFlightLimit(handler http.Handler, limit int, longRunningRequestCheck LongRunningRequestCheck) http.Handler {
@@ -55,6 +55,6 @@ func tooManyRequests(req *http.Request, w http.ResponseWriter) {
 	defer httplog.NewLogged(req, &w).Log()
 
 	// Return a 429 status indicating "Too Many Requests"
-	w.Header().Set("Retry-After", RetryAfter)
+	w.Header().Set("Retry-After", retryAfter)
 	http.Error(w, "Too many requests, please try again later.", errors.StatusTooManyRequests)
 }
