@@ -697,10 +697,11 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 				dir := cacheDir
 				if len(dir) > 0 {
 					version, err := clientset.Discovery().ServerVersion()
-					if err != nil {
-						return nil, err
+					if err == nil {
+						dir = path.Join(cacheDir, version.String())
+					} else {
+						dir = "" // disable caching as a fallback
 					}
-					dir = path.Join(cacheDir, version.String())
 				}
 				fedClient, err := clients.FederationClientForVersion(nil)
 				if err != nil {
