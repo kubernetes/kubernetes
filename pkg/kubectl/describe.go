@@ -707,9 +707,10 @@ func printISCSIVolumeSource(iscsi *api.ISCSIVolumeSource, out io.Writer) {
 func printGlusterfsVolumeSource(glusterfs *api.GlusterfsVolumeSource, out io.Writer) {
 	fmt.Fprintf(out, "    Type:\tGlusterfs (a Glusterfs mount on the host that shares a pod's lifetime)\n"+
 		"    EndpointsName:\t%v\n"+
+		"    EndpointsNameSpace:\t%v\n"+
 		"    Path:\t%v\n"+
 		"    ReadOnly:\t%v\n",
-		glusterfs.EndpointsName, glusterfs.Path, glusterfs.ReadOnly)
+		glusterfs.EndpointsName, *glusterfs.EndpointsNameSpace, glusterfs.Path, glusterfs.ReadOnly)
 }
 
 func printPersistentVolumeClaimVolumeSource(claim *api.PersistentVolumeClaimVolumeSource, out io.Writer) {

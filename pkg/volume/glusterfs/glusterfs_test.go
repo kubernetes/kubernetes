@@ -98,6 +98,7 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 	}
 	ep := &api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "foo"}, Subsets: []api.EndpointSubset{{
 		Addresses: []api.EndpointAddress{{IP: "127.0.0.1"}}}}}
+	ep_namespace := "default"
 	var fcmd exec.FakeCmd
 	fcmd = exec.FakeCmd{
 		CombinedOutputScript: []exec.FakeCombinedOutputAction{
@@ -113,7 +114,7 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 		},
 	}
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: types.UID("poduid")}}
-	mounter, err := plug.(*glusterfsPlugin).newMounterInternal(spec, ep, pod, &mount.FakeMounter{}, &fake)
+	mounter, err := plug.(*glusterfsPlugin).newMounterInternal(spec, ep, pod, &mount.FakeMounter{}, &fake, ep_namespace)
 	volumePath := mounter.GetPath()
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)
@@ -156,7 +157,7 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 func TestPluginVolume(t *testing.T) {
 	vol := &api.Volume{
 		Name:         "vol1",
-		VolumeSource: api.VolumeSource{Glusterfs: &api.GlusterfsVolumeSource{EndpointsName: "ep", Path: "vol", ReadOnly: false}},
+		VolumeSource: api.VolumeSource{Glusterfs: &api.GlusterfsVolumeSource{EndpointsName: "ep", EndpointsNameSpace: "default", Path: "vol", ReadOnly: false}},
 	}
 	doTestPlugin(t, volume.NewSpecFromVolume(vol))
 }
@@ -168,7 +169,7 @@ func TestPluginPersistentVolume(t *testing.T) {
 		},
 		Spec: api.PersistentVolumeSpec{
 			PersistentVolumeSource: api.PersistentVolumeSource{
-				Glusterfs: &api.GlusterfsVolumeSource{EndpointsName: "ep", Path: "vol", ReadOnly: false},
+				Glusterfs: &api.GlusterfsVolumeSource{EndpointsName: "ep", EndpointsNameSpace: "default", Path: "vol", ReadOnly: false},
 			},
 		},
 	}
@@ -189,7 +190,7 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 		},
 		Spec: api.PersistentVolumeSpec{
 			PersistentVolumeSource: api.PersistentVolumeSource{
-				Glusterfs: &api.GlusterfsVolumeSource{EndpointsName: "ep", Path: "vol", ReadOnly: false},
+				Glusterfs: &api.GlusterfsVolumeSource{EndpointsName: "ep", EndpointsNameSpace: "default", Path: "vol", ReadOnly: false},
 			},
 			ClaimRef: &api.ObjectReference{
 				Name: "claimA",
