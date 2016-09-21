@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	"golang.org/x/net/context"
+	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/util/rand"
 )
 
@@ -185,11 +186,30 @@ func TestInstances(t *testing.T) {
 	}
 	t.Logf("Found ExternalID(%s) = %s\n", srvs[0], externalId)
 
+	nonExistingVM := rand.String(15)
+	externalId, err = i.ExternalID(nonExistingVM)
+	if err == cloudprovider.InstanceNotFound {
+		t.Logf("VM %s was not found as expected\n", nonExistingVM)
+	} else if err == nil {
+		t.Fatalf("Instances.ExternalID did not fail as expected, VM %s was found", nonExistingVM)
+	} else {
+		t.Fatalf("Instances.ExternalID did not fail as expected, err: %v", err)
+	}
+
 	instanceId, err := i.InstanceID(srvs[0])
 	if err != nil {
 		t.Fatalf("Instances.InstanceID(%s) failed: %s", srvs[0], err)
 	}
 	t.Logf("Found InstanceID(%s) = %s\n", srvs[0], instanceId)
+
+	instanceId, err = i.InstanceID(nonExistingVM)
+	if err == cloudprovider.InstanceNotFound {
+		t.Logf("VM %s was not found as expected\n", nonExistingVM)
+	} else if err == nil {
+		t.Fatalf("Instances.InstanceID did not fail as expected, VM %s was found", nonExistingVM)
+	} else {
+		t.Fatalf("Instances.InstanceID did not fail as expected, err: %v", err)
+	}
 
 	addrs, err := i.NodeAddresses(srvs[0])
 	if err != nil {
