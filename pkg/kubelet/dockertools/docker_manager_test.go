@@ -110,6 +110,16 @@ func (f *fakeRuntimeHelper) GetExtraSupplementalGroupsForPod(pod *api.Pod) []int
 	return nil
 }
 
+type fakeImageManager struct{}
+
+func newFakeImageManager() images.ImageManager {
+	return &fakeImageManager{}
+}
+
+func (m *fakeImageManager) EnsureImageExists(pod *api.Pod, container *api.Container, pullSecrets []api.Secret) (error, string) {
+	return nil, ""
+}
+
 func createTestDockerManager(fakeHTTPClient *fakeHTTP, fakeDocker *FakeDockerClient) (*DockerManager, *FakeDockerClient) {
 	if fakeHTTPClient == nil {
 		fakeHTTPClient = &fakeHTTP{}
@@ -144,17 +154,26 @@ func createTestDockerManager(fakeHTTPClient *fakeHTTP, fakeDocker *FakeDockerCli
 	return dockerManager, fakeDocker
 }
 
+func createTestDockerManagerWithFakeImageManager(fakeHTTPClient *fakeHTTP, fakeDocker *FakeDockerClient) (*DockerManager, *FakeDockerClient) {
+	dm, fd := createTestDockerManager(fakeHTTPClient, fakeDocker)
+	dm.imagePuller = newFakeImageManager()
+	return dm, fd
+}
+
+func newTestDockerManagerWithRealImageManager() (*DockerManager, *FakeDockerClient) {
+	return createTestDockerManager(nil, nil)
+}
 func newTestDockerManagerWithHTTPClient(fakeHTTPClient *fakeHTTP) (*DockerManager, *FakeDockerClient) {
-	return createTestDockerManager(fakeHTTPClient, nil)
+	return createTestDockerManagerWithFakeImageManager(fakeHTTPClient, nil)
 }
 
 func newTestDockerManagerWithVersion(version, apiVersion string) (*DockerManager, *FakeDockerClient) {
 	fakeDocker := NewFakeDockerClientWithVersion(version, apiVersion)
-	return createTestDockerManager(nil, fakeDocker)
+	return createTestDockerManagerWithFakeImageManager(nil, fakeDocker)
 }
 
 func newTestDockerManager() (*DockerManager, *FakeDockerClient) {
-	return createTestDockerManager(nil, nil)
+	return createTestDockerManagerWithFakeImageManager(nil, nil)
 }
 
 func matchString(t *testing.T, pattern, str string) bool {
@@ -617,14 +636,14 @@ func TestSyncPodCreateNetAndContainer(t *testing.T) {
 }
 
 func TestSyncPodCreatesNetAndContainerPullsImage(t *testing.T) {
-	dm, fakeDocker := newTestDockerManager()
-	dm.podInfraContainerImage = "pod_infra_image"
+	dm, fakeDocker := newTestDockerManagerWithRealImageManager()
+	dm.podInfraContainerImage = "foo/infra_image:v1"
 	puller := dm.dockerPuller.(*FakeDockerPuller)
 	puller.HasImages = []string{}
-	dm.podInfraContainerImage = "pod_infra_image"
+	dm.podInfraContainerImage = "foo/infra_image:v1"
 	pod := makePod("foo", &api.PodSpec{
 		Containers: []api.Container{
-			{Name: "bar", Image: "something", ImagePullPolicy: "IfNotPresent"},
+			{Name: "bar", Image: "foo/something:v0", ImagePullPolicy: "IfNotPresent"},
 		},
 	})
 
@@ -639,7 +658,7 @@ func TestSyncPodCreatesNetAndContainerPullsImage(t *testing.T) {
 
 	fakeDocker.Lock()
 
-	if !reflect.DeepEqual(puller.ImagesPulled, []string{"pod_infra_image", "something"}) {
+	if !reflect.DeepEqual(puller.ImagesPulled, []string{"foo/infra_image:v1", "foo/something:v0"}) {
 		t.Errorf("unexpected pulled containers: %v", puller.ImagesPulled)
 	}
 
@@ -1478,18 +1497,18 @@ func TestGetIPCMode(t *testing.T) {
 }
 
 func TestSyncPodWithPullPolicy(t *testing.T) {
-	dm, fakeDocker := newTestDockerManager()
+	dm, fakeDocker := newTestDockerManagerWithRealImageManager()
 	puller := dm.dockerPuller.(*FakeDockerPuller)
-	puller.HasImages = []string{"existing_one", "want:latest"}
-	dm.podInfraContainerImage = "pod_infra_image"
+	puller.HasImages = []string{"foo/existing_one:v1", "foo/want:latest"}
+	dm.podInfraContainerImage = "foo/infra_image:v1"
 
 	pod := makePod("foo", &api.PodSpec{
 		Containers: []api.Container{
-			{Name: "bar", Image: "pull_always_image", ImagePullPolicy: api.PullAlways},
-			{Name: "bar2", Image: "pull_if_not_present_image", ImagePullPolicy: api.PullIfNotPresent},
-			{Name: "bar3", Image: "existing_one", ImagePullPolicy: api.PullIfNotPresent},
-			{Name: "bar4", Image: "want:latest", ImagePullPolicy: api.PullIfNotPresent},
-			{Name: "bar5", Image: "pull_never_image", ImagePullPolicy: api.PullNever},
+			{Name: "bar", Image: "foo/pull_always_image:v1", ImagePullPolicy: api.PullAlways},
+			{Name: "bar2", Image: "foo/pull_if_not_present_image:v1", ImagePullPolicy: api.PullIfNotPresent},
+			{Name: "bar3", Image: "foo/existing_one:v1", ImagePullPolicy: api.PullIfNotPresent},
+			{Name: "bar4", Image: "foo/want:latest", ImagePullPolicy: api.PullIfNotPresent},
+			{Name: "bar5", Image: "foo/pull_never_image:v1", ImagePullPolicy: api.PullNever},
 		},
 	})
 
@@ -1503,7 +1522,7 @@ func TestSyncPodWithPullPolicy(t *testing.T) {
 		{kubecontainer.StartContainer, "bar3", nil, ""},
 		{kubecontainer.StartContainer, "bar4", nil, ""},
 		{kubecontainer.StartContainer, "bar5", images.ErrImageNeverPull,
-			"Container image \"pull_never_image\" is not present with pull policy of Never"},
+			"Container image \"foo/pull_never_image:v1\" is not present with pull policy of Never"},
 	}
 
 	result := runSyncPod(t, dm, fakeDocker, pod, nil, true)
@@ -1514,7 +1533,7 @@ func TestSyncPodWithPullPolicy(t *testing.T) {
 
 	pulledImageSorted := puller.ImagesPulled[:]
 	sort.Strings(pulledImageSorted)
-	assert.Equal(t, []string{"pod_infra_image", "pull_always_image", "pull_if_not_present_image"}, pulledImageSorted)
+	assert.Equal(t, []string{"foo/infra_image:v1", "foo/pull_always_image:v1", "foo/pull_if_not_present_image:v1"}, pulledImageSorted)
 
 	if len(fakeDocker.Created) != 5 {
 		t.Errorf("unexpected containers created %v", fakeDocker.Created)
@@ -1533,19 +1552,19 @@ func TestSyncPodWithFailure(t *testing.T) {
 		expected    []*kubecontainer.SyncResult
 	}{
 		"PullImageFailure": {
-			api.Container{Name: "bar", Image: "realImage", ImagePullPolicy: api.PullAlways},
+			api.Container{Name: "bar", Image: "foo/real_image:v1", ImagePullPolicy: api.PullAlways},
 			map[string]error{},
 			[]error{fmt.Errorf("can't pull image")},
 			[]*kubecontainer.SyncResult{{kubecontainer.StartContainer, "bar", images.ErrImagePull, "can't pull image"}},
 		},
 		"CreateContainerFailure": {
-			api.Container{Name: "bar", Image: "alreadyPresent"},
+			api.Container{Name: "bar", Image: "foo/already_present:v2"},
 			map[string]error{"create": fmt.Errorf("can't create container")},
 			[]error{},
 			[]*kubecontainer.SyncResult{{kubecontainer.StartContainer, "bar", kubecontainer.ErrRunContainer, "can't create container"}},
 		},
 		"StartContainerFailure": {
-			api.Container{Name: "bar", Image: "alreadyPresent"},
+			api.Container{Name: "bar", Image: "foo/already_present:v2"},
 			map[string]error{"start": fmt.Errorf("can't start container")},
 			[]error{},
 			[]*kubecontainer.SyncResult{{kubecontainer.StartContainer, "bar", kubecontainer.ErrRunContainer, "can't start container"}},
@@ -1553,7 +1572,7 @@ func TestSyncPodWithFailure(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		dm, fakeDocker := newTestDockerManager()
+		dm, fakeDocker := newTestDockerManagerWithRealImageManager()
 		puller := dm.dockerPuller.(*FakeDockerPuller)
 		puller.HasImages = []string{test.container.Image}
 		// Pretend that the pod infra container has already been created, so that

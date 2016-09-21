@@ -38,7 +38,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/leaky"
 	"k8s.io/kubernetes/pkg/types"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
-	"k8s.io/kubernetes/pkg/util/parsers"
 )
 
 const (
@@ -194,32 +193,7 @@ func matchImageTagOrSHA(inspected dockertypes.ImageInspect, image string) bool {
 	return false
 }
 
-// applyDefaultImageTag parses a docker image string, if it doesn't contain any tag or digest,
-// a default tag will be applied.
-func applyDefaultImageTag(image string) (string, error) {
-	named, err := dockerref.ParseNamed(image)
-	if err != nil {
-		return "", fmt.Errorf("couldn't parse image reference %q: %v", image, err)
-	}
-	_, isTagged := named.(dockerref.Tagged)
-	_, isDigested := named.(dockerref.Digested)
-	if !isTagged && !isDigested {
-		named, err := dockerref.WithTag(named, parsers.DefaultImageTag)
-		if err != nil {
-			return "", fmt.Errorf("failed to apply default image tag %q: %v", image, err)
-		}
-		image = named.String()
-	}
-	return image, nil
-}
-
 func (p dockerPuller) Pull(image string, secrets []api.Secret) error {
-	// If the image contains no tag or digest, a default tag should be applied.
-	image, err := applyDefaultImageTag(image)
-	if err != nil {
-		return err
-	}
-
 	keyring, err := credentialprovider.MakeDockerKeyring(secrets, p.keyring)
 	if err != nil {
 		return err
