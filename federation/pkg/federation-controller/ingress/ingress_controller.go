@@ -549,6 +549,9 @@ func (ic *IngressController) updateClusterIngressUIDToMasters(cluster *federatio
 	}
 	if err == nil {
 		if masterCluster.Name != cluster.Name { // We're not the master, need to get in sync
+			if cluster.ObjectMeta.Annotations == nil {
+				cluster.ObjectMeta.Annotations = map[string]string{}
+			}
 			cluster.ObjectMeta.Annotations[uidAnnotationKey] = masterUID
 			if _, err = ic.federatedApiClient.Federation().Clusters().Update(cluster); err != nil {
 				glog.Errorf("Failed to add master ingress UID annotation (%q = %q) from master cluster %q to cluster %q, will try again later: %v", uidAnnotationKey, masterUID, masterCluster.Name, cluster.Name, err)
@@ -562,6 +565,9 @@ func (ic *IngressController) updateClusterIngressUIDToMasters(cluster *federatio
 	} else {
 		glog.V(2).Infof("No master cluster found to source an ingress UID from for cluster %q.  Attempting to elect new master cluster %q with ingress UID %q = %q", cluster.Name, cluster.Name, uidAnnotationKey, fallbackUID)
 		if fallbackUID != "" {
+			if cluster.ObjectMeta.Annotations == nil {
+				cluster.ObjectMeta.Annotations = map[string]string{}
+			}
 			cluster.ObjectMeta.Annotations[uidAnnotationKey] = fallbackUID
 			if _, err = ic.federatedApiClient.Federation().Clusters().Update(cluster); err != nil {
 				glog.Errorf("Failed to add ingress UID annotation (%q = %q) to cluster %q. No master elected. Will try again later: %v", uidAnnotationKey, fallbackUID, cluster.Name, err)

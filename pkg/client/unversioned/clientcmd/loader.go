@@ -23,6 +23,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"reflect"
 	goruntime "runtime"
 	"strings"
 
@@ -30,6 +31,7 @@ import (
 	"github.com/imdario/mergo"
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	clientcmdlatest "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api/latest"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -65,6 +67,9 @@ func currentMigrationRules() map[string]string {
 
 type ClientConfigLoader interface {
 	ConfigAccess
+	// IsDefaultConfig returns true if the returned config matches the defaults.
+	IsDefaultConfig(*restclient.Config) bool
+	// Load returns the latest config
 	Load() (*clientcmdapi.Config, error)
 }
 
@@ -96,6 +101,9 @@ func (g *ClientConfigGetter) IsExplicitFile() bool {
 func (g *ClientConfigGetter) GetExplicitFile() string {
 	return ""
 }
+func (g *ClientConfigGetter) IsDefaultConfig(config *restclient.Config) bool {
+	return false
+}
 
 // ClientConfigLoadingRules is an ExplicitPath and string slice of specific locations that are used for merging together a Config
 // Callers can put the chain together however they want, but we'd recommend:
@@ -112,6 +120,10 @@ type ClientConfigLoadingRules struct {
 	// DoNotResolvePaths indicates whether or not to resolve paths with respect to the originating files.  This is phrased as a negative so
 	// that a default object that doesn't set this will usually get the behavior it wants.
 	DoNotResolvePaths bool
+
+	// DefaultClientConfig is an optional field indicating what rules to use to calculate a default configuration.
+	// This should match the overrides passed in to ClientConfig loader.
+	DefaultClientConfig ClientConfig
 }
 
 // ClientConfigLoadingRules implements the ClientConfigLoader interface.
@@ -192,6 +204,7 @@ func (rules *ClientConfigLoadingRules) Load() (*clientcmdapi.Config, error) {
 
 	// first merge all of our maps
 	mapConfig := clientcmdapi.NewConfig()
+
 	for _, kubeconfig := range kubeconfigs {
 		mergo.Merge(mapConfig, kubeconfig)
 	}
@@ -314,6 +327,18 @@ func (rules *ClientConfigLoadingRules) IsExplicitFile() bool {
 // GetExplicitFile implements ConfigAccess
 func (rules *ClientConfigLoadingRules) GetExplicitFile() string {
 	return rules.ExplicitPath
+}
+
+// IsDefaultConfig returns true if the provided configuration matches the default
+func (rules *ClientConfigLoadingRules) IsDefaultConfig(config *restclient.Config) bool {
+	if rules.DefaultClientConfig == nil {
+		return false
+	}
+	defaultConfig, err := rules.DefaultClientConfig.ClientConfig()
+	if err != nil {
+		return false
+	}
+	return reflect.DeepEqual(config, defaultConfig)
 }
 
 // LoadFromFile takes a filename and deserializes the contents into Config object
