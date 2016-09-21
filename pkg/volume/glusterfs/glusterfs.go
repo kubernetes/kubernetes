@@ -57,6 +57,7 @@ const (
 	volprefix           = "vol_"
 	replicacount        = 3
 	durabilitytype      = "replicate"
+	minvolumesize       = 8
 )
 
 func (plugin *glusterfsPlugin) Init(host volume.VolumeHost) error {
@@ -463,6 +464,10 @@ func (p *glusterfsVolumeProvisioner) CreateVolume() (r *api.GlusterfsVolumeSourc
 	if p.glusterfsClusterConf.glusterRestUrl == "" {
 		glog.Errorf("glusterfs : rest server endpoint is empty")
 		return nil, 0, fmt.Errorf("failed to create gluster REST client, REST URL is empty")
+	}
+	if sz < minvolumesize {
+		glog.Errorf("glusterfs : requested size is < minimum volume size: %d", minvolumesize)
+		return nil, 0, fmt.Errorf("glusterfs : requested size is < minimum volume size:%d", minvolumesize)
 	}
 	cli := gcli.NewClient(p.glusterRestUrl, p.glusterRestUser, p.glusterRestUserKey)
 	if cli == nil {
