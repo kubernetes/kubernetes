@@ -35,21 +35,42 @@ import (
 // worker runs a worker thread that just dequeues items, processes them, and marks them done.
 // It enforces that the syncHandler is never invoked concurrently with the same key.
 func (sc *ServiceController) clusterServiceWorker() {
-	fedClient := sc.federationClient
+	// process all pending events in serviceWorkerDoneChan
+	eventPending := true
+	for eventPending {
+		select {
+		case clusterName := <-sc.serviceWorkerDoneChan:
+			sc.serviceWorkerMap[clusterName] = false
+		default:
+			// non-blocking, comes here if all existing events are processed
+			eventPending = false
+			break
+		}
+	}
+
 	for clusterName, cache := range sc.clusterCache.clientMap {
+		workerExist, keyFound := sc.serviceWorkerMap[clusterName]
+		if keyFound && workerExist {
+			continue
+		}
+		sc.serviceWorkerMap[clusterName] = true
+
+		// create a worker only if the previous worker has finished and gone out of scope
 		go func(cache *clusterCache, clusterName string) {
+			fedClient := sc.federationClient
 			for {
-				func() {
-					key, quit := cache.serviceQueue.Get()
-					defer cache.serviceQueue.Done(key)
-					if quit {
-						return
-					}
-					err := sc.clusterCache.syncService(key.(string), clusterName, cache, sc.serviceCache, fedClient, sc)
-					if err != nil {
-						glog.Errorf("Failed to sync service: %+v", err)
-					}
-				}()
+				key, quit := cache.serviceQueue.Get()
+				if quit {
+					// send signal that current worker has finished tasks and is going out of scope
+					sc.serviceWorkerDoneChan <- clusterName
+					return
+				}
+				defer cache.serviceQueue.Done(key)
+				err := sc.clusterCache.syncService(key.(string), clusterName, cache, sc.serviceCache, fedClient, sc)
+				if err != nil {
+					glog.Errorf("Failed to sync service: %+v", err)
+				}
+
 			}
 		}(cache, clusterName)
 	}

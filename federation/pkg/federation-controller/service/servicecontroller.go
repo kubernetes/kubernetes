@@ -68,6 +68,8 @@ const (
 	UserAgentName = "federation-service-controller"
 	KubeAPIQPS    = 20.0
 	KubeAPIBurst  = 30
+
+	maxNoOfClusters = 256
 )
 
 type cachedService struct {
@@ -119,6 +121,16 @@ type ServiceController struct {
 	// services that need to be synced
 	queue           *workqueue.Type
 	knownClusterSet sets.String
+	// endpoint worker map contains all the clusters registered with an indication that worker exist
+	// key clusterName
+	endpointWorkerMap map[string]bool
+	// channel for worker to signal that it is going out of existence
+	endpointWorkerDoneChan chan string
+	// service worker map contains all the clusters registered with an indication that worker exist
+	// key clusterName
+	serviceWorkerMap map[string]bool
+	// channel for worker to signal that it is going out of existence
+	serviceWorkerDoneChan chan string
 }
 
 // New returns a new service controller to keep DNS provider service resources
@@ -205,6 +217,11 @@ func New(federationClient federation_release_1_4.Interface, dns dnsprovider.Inte
 			},
 		},
 	)
+
+	s.endpointWorkerMap = make(map[string]bool)
+	s.serviceWorkerMap = make(map[string]bool)
+	s.endpointWorkerDoneChan = make(chan string, maxNoOfClusters)
+	s.serviceWorkerDoneChan = make(chan string, maxNoOfClusters)
 	return s
 }
 
