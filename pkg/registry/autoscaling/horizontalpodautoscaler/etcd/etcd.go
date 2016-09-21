@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,82 +19,80 @@ package etcd
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
-	policyapi "k8s.io/kubernetes/pkg/apis/policy"
+	"k8s.io/kubernetes/pkg/apis/autoscaling"
+	"k8s.io/kubernetes/pkg/registry/autoscaling/horizontalpodautoscaler"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/generic/registry"
-	"k8s.io/kubernetes/pkg/registry/poddisruptionbudget"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 )
 
-// rest implements a RESTStorage for pod disruption budgets against etcd
 type REST struct {
 	*registry.Store
 }
 
-// NewREST returns a RESTStorage object that will work against pod disruption budgets.
+// NewREST returns a RESTStorage object that will work against horizontal pod autoscalers.
 func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
 	prefix := "/" + opts.ResourcePrefix
 
-	newListFunc := func() runtime.Object { return &policyapi.PodDisruptionBudgetList{} }
+	newListFunc := func() runtime.Object { return &autoscaling.HorizontalPodAutoscalerList{} }
 	storageInterface, dFunc := opts.Decorator(
 		opts.StorageConfig,
-		cachesize.GetWatchCacheSizeByResource(cachesize.PodDisruptionBudget),
-		&policyapi.PodDisruptionBudget{},
+		cachesize.GetWatchCacheSizeByResource(cachesize.HorizontalPodAutoscalers),
+		&autoscaling.HorizontalPodAutoscaler{},
 		prefix,
-		poddisruptionbudget.Strategy,
+		horizontalpodautoscaler.Strategy,
 		newListFunc,
 		storage.NoTriggerPublisher,
 	)
 
 	store := &registry.Store{
-		NewFunc: func() runtime.Object { return &policyapi.PodDisruptionBudget{} },
-
+		NewFunc: func() runtime.Object { return &autoscaling.HorizontalPodAutoscaler{} },
 		// NewListFunc returns an object capable of storing results of an etcd list.
 		NewListFunc: newListFunc,
-		// Produces a podDisruptionBudget that etcd understands, to the root of the resource
+		// Produces a path that etcd understands, to the root of the resource
 		// by combining the namespace in the context with the given prefix
 		KeyRootFunc: func(ctx api.Context) string {
 			return registry.NamespaceKeyRootFunc(ctx, prefix)
 		},
-		// Produces a podDisruptionBudget that etcd understands, to the resource by combining
+		// Produces a path that etcd understands, to the resource by combining
 		// the namespace in the context with the given prefix
 		KeyFunc: func(ctx api.Context, name string) (string, error) {
 			return registry.NamespaceKeyFunc(ctx, prefix, name)
 		},
-		// Retrieve the name field of a pod disruption budget
+		// Retrieve the name field of an autoscaler
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
-			return obj.(*policyapi.PodDisruptionBudget).Name, nil
+			return obj.(*autoscaling.HorizontalPodAutoscaler).Name, nil
 		},
-		// Used to match objects based on labels/fields for list and watch
-		PredicateFunc:           poddisruptionbudget.MatchPodDisruptionBudget,
-		QualifiedResource:       policyapi.Resource("poddisruptionbudgets"),
+		// Used to match objects based on labels/fields for list
+		PredicateFunc:           horizontalpodautoscaler.MatchAutoscaler,
+		QualifiedResource:       autoscaling.Resource("horizontalpodautoscalers"),
 		EnableGarbageCollection: opts.EnableGarbageCollection,
 		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
 
-		// Used to validate controller creation
-		CreateStrategy: poddisruptionbudget.Strategy,
+		// Used to validate autoscaler creation
+		CreateStrategy: horizontalpodautoscaler.Strategy,
 
-		// Used to validate controller updates
-		UpdateStrategy: poddisruptionbudget.Strategy,
-		DeleteStrategy: poddisruptionbudget.Strategy,
+		// Used to validate autoscaler updates
+		UpdateStrategy: horizontalpodautoscaler.Strategy,
+		DeleteStrategy: horizontalpodautoscaler.Strategy,
 
 		Storage:     storageInterface,
 		DestroyFunc: dFunc,
 	}
 	statusStore := *store
-	statusStore.UpdateStrategy = poddisruptionbudget.StatusStrategy
+	statusStore.UpdateStrategy = horizontalpodautoscaler.StatusStrategy
 	return &REST{store}, &StatusREST{store: &statusStore}
 }
 
-// StatusREST implements the REST endpoint for changing the status of an podDisruptionBudget
+// StatusREST implements the REST endpoint for changing the status of a daemonset
 type StatusREST struct {
 	store *registry.Store
 }
 
 func (r *StatusREST) New() runtime.Object {
-	return &policyapi.PodDisruptionBudget{}
+	return &autoscaling.HorizontalPodAutoscaler{}
 }
 
 // Get retrieves the object from the storage. It is required to support Patch.

@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,36 +20,36 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apis/batch"
+	"k8s.io/kubernetes/pkg/registry/batch/scheduledjob"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/generic/registry"
-	"k8s.io/kubernetes/pkg/registry/job"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 )
 
-// REST implements a RESTStorage for jobs against etcd
+// REST implements a RESTStorage for scheduled jobs against etcd
 type REST struct {
 	*registry.Store
 }
 
-// NewREST returns a RESTStorage object that will work against Jobs.
+// NewREST returns a RESTStorage object that will work against ScheduledJobs.
 func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
 	prefix := "/" + opts.ResourcePrefix
 
-	newListFunc := func() runtime.Object { return &batch.JobList{} }
+	newListFunc := func() runtime.Object { return &batch.ScheduledJobList{} }
 	storageInterface, dFunc := opts.Decorator(
 		opts.StorageConfig,
-		cachesize.GetWatchCacheSizeByResource(cachesize.Jobs),
-		&batch.Job{},
+		cachesize.GetWatchCacheSizeByResource(cachesize.ScheduledJobs),
+		&batch.ScheduledJob{},
 		prefix,
-		job.Strategy,
+		scheduledjob.Strategy,
 		newListFunc,
 		storage.NoTriggerPublisher,
 	)
 
 	store := &registry.Store{
-		NewFunc: func() runtime.Object { return &batch.Job{} },
+		NewFunc: func() runtime.Object { return &batch.ScheduledJob{} },
 
 		// NewListFunc returns an object capable of storing results of an etcd list.
 		NewListFunc: newListFunc,
@@ -63,29 +63,29 @@ func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
 		KeyFunc: func(ctx api.Context, name string) (string, error) {
 			return registry.NamespaceKeyFunc(ctx, prefix, name)
 		},
-		// Retrieve the name field of a job
+		// Retrieve the name field of a scheduled job
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
-			return obj.(*batch.Job).Name, nil
+			return obj.(*batch.ScheduledJob).Name, nil
 		},
 		// Used to match objects based on labels/fields for list and watch
-		PredicateFunc:           job.MatchJob,
-		QualifiedResource:       batch.Resource("jobs"),
+		PredicateFunc:           scheduledjob.MatchScheduledJob,
+		QualifiedResource:       batch.Resource("scheduledjobs"),
 		EnableGarbageCollection: opts.EnableGarbageCollection,
 		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
 
-		// Used to validate job creation
-		CreateStrategy: job.Strategy,
+		// Used to validate scheduled job creation
+		CreateStrategy: scheduledjob.Strategy,
 
-		// Used to validate job updates
-		UpdateStrategy: job.Strategy,
-		DeleteStrategy: job.Strategy,
+		// Used to validate scheduled job updates
+		UpdateStrategy: scheduledjob.Strategy,
+		DeleteStrategy: scheduledjob.Strategy,
 
 		Storage:     storageInterface,
 		DestroyFunc: dFunc,
 	}
 
 	statusStore := *store
-	statusStore.UpdateStrategy = job.StatusStrategy
+	statusStore.UpdateStrategy = scheduledjob.StatusStrategy
 
 	return &REST{store}, &StatusREST{store: &statusStore}
 }
@@ -96,7 +96,7 @@ type StatusREST struct {
 }
 
 func (r *StatusREST) New() runtime.Object {
-	return &batch.Job{}
+	return &batch.ScheduledJob{}
 }
 
 // Get retrieves the object from the storage. It is required to support Patch.

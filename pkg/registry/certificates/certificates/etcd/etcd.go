@@ -23,7 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
-	csrregistry "k8s.io/kubernetes/pkg/registry/certificates"
+	csrregistry "k8s.io/kubernetes/pkg/registry/certificates/certificates"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/runtime"
