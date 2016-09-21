@@ -98,6 +98,10 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	if err != nil {
 		glog.Fatal("Error loading client: ", err)
 	}
+	clientset, err := framework.LoadClientset()
+	if err != nil {
+		glog.Fatal("Error loading clientset: ", err)
+	}
 
 	// Delete any namespaces except default and kube-system. This ensures no
 	// lingering resources are left over from a previous test run.
@@ -118,7 +122,7 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	// ready will fail).
 	podStartupTimeout := framework.TestContext.SystemPodsStartupTimeout
 	if err := framework.WaitForPodsRunningReady(c, api.NamespaceSystem, int32(framework.TestContext.MinStartupPods), podStartupTimeout, framework.ImagePullerLabels); err != nil {
-		framework.DumpAllNamespaceInfo(c, api.NamespaceSystem)
+		framework.DumpAllNamespaceInfo(c, clientset, api.NamespaceSystem)
 		framework.LogFailedContainers(c, api.NamespaceSystem)
 		framework.RunKubernetesServiceTestContainer(c, api.NamespaceDefault)
 		framework.Failf("Error waiting for all pods to be running and ready: %v", err)

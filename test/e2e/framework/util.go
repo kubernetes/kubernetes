@@ -52,6 +52,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/typed/discovery"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
@@ -1978,6 +1979,14 @@ func LoadClient() (*client.Client, error) {
 	return loadClientFromConfig(config)
 }
 
+func LoadClientset() (*release_1_5.Clientset, error) {
+	config, err := LoadConfig()
+	if err != nil {
+		return nil, fmt.Errorf("error creating client: %v", err.Error())
+	}
+	return release_1_5.NewForConfig(config)
+}
+
 // randomSuffix provides a random string to append to pods,services,rcs.
 // TODO: Allow service names to have the same form as names
 //       for pods and replication controllers so we don't
@@ -2815,9 +2824,11 @@ func dumpPodDebugInfo(c *client.Client, pods []*api.Pod) {
 	DumpNodeDebugInfo(c, badNodes.List())
 }
 
-func DumpAllNamespaceInfo(c *client.Client, namespace string) {
+type EventsLister func(opts api.ListOptions, ns string) (*v1.EventList, error)
+
+func DumpEventsInNamespace(eventsLister EventsLister, namespace string) {
 	By(fmt.Sprintf("Collecting events from namespace %q.", namespace))
-	events, err := c.Events(namespace).List(api.ListOptions{})
+	events, err := eventsLister(api.ListOptions{}, namespace)
 	Expect(err).NotTo(HaveOccurred())
 
 	// Sort events by their first timestamp
@@ -2831,6 +2842,12 @@ func DumpAllNamespaceInfo(c *client.Client, namespace string) {
 	// Note that we don't wait for any Cleanup to propagate, which means
 	// that if you delete a bunch of pods right before ending your test,
 	// you may or may not see the killing/deletion/Cleanup events.
+}
+
+func DumpAllNamespaceInfo(c *client.Client, cs *release_1_5.Clientset, namespace string) {
+	DumpEventsInNamespace(func(opts api.ListOptions, ns string) (*v1.EventList, error) {
+		return cs.Core().Events(ns).List(opts)
+	}, namespace)
 
 	// If cluster is large, then the following logs are basically useless, because:
 	// 1. it takes tens of minutes or hours to grab all of them
@@ -2850,7 +2867,7 @@ func DumpAllNamespaceInfo(c *client.Client, namespace string) {
 }
 
 // byFirstTimestamp sorts a slice of events by first timestamp, using their involvedObject's name as a tie breaker.
-type byFirstTimestamp []api.Event
+type byFirstTimestamp []v1.Event
 
 func (o byFirstTimestamp) Len() int      { return len(o) }
 func (o byFirstTimestamp) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
