@@ -21,8 +21,6 @@ import (
 	"net/http/httptest"
 	"reflect"
 	"testing"
-
-	"k8s.io/kubernetes/pkg/util"
 )
 
 func TestCORSAllowedOrigins(t *testing.T) {
