@@ -118,7 +118,7 @@ func gatherMetrics(f *framework.Framework) {
 var _ = framework.KubeDescribe("Garbage collector", func() {
 	f := framework.NewDefaultFramework("gc")
 	It("[Feature:GarbageCollector] should delete pods created by rc when not orphaning", func() {
-		clientSet := f.Clientset_1_5
+		clientSet := f.ClientSet_1_5
 		rcClient := clientSet.Core().ReplicationControllers(f.Namespace.Name)
 		podClient := clientSet.Core().Pods(f.Namespace.Name)
 		rcName := "simpletest.rc"
@@ -169,7 +169,7 @@ var _ = framework.KubeDescribe("Garbage collector", func() {
 	})
 
 	It("[Feature:GarbageCollector] should orphan pods created by rc if delete options say so", func() {
-		clientSet := f.Clientset_1_5
+		clientSet := f.ClientSet_1_5
 		rcClient := clientSet.Core().ReplicationControllers(f.Namespace.Name)
 		podClient := clientSet.Core().Pods(f.Namespace.Name)
 		rcName := "simpletest.rc"
@@ -231,7 +231,7 @@ var _ = framework.KubeDescribe("Garbage collector", func() {
 	})
 
 	It("[Feature:GarbageCollector] should orphan pods created by rc if deleteOptions.OrphanDependents is nil", func() {
-		clientSet := f.Clientset_1_5
+		clientSet := f.ClientSet_1_5
 		rcClient := clientSet.Core().ReplicationControllers(f.Namespace.Name)
 		podClient := clientSet.Core().Pods(f.Namespace.Name)
 		rcName := "simpletest.rc"

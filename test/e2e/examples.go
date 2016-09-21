@@ -503,7 +503,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			By("scaling rethinkdb")
-			framework.ScaleRC(c, ns, "rethinkdb-rc", 2, true)
+			framework.ScaleRC(c, f.ClientSet, ns, "rethinkdb-rc", 2, true)
 			checkDbInstances()
 
 			By("starting admin")
@@ -546,7 +546,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			By("scaling hazelcast")
-			framework.ScaleRC(c, ns, "hazelcast", 2, true)
+			framework.ScaleRC(c, f.ClientSet, ns, "hazelcast", 2, true)
 			forEachPod("name", "hazelcast", func(pod api.Pod) {
 				_, err := framework.LookForStringInLog(ns, pod.Name, "hazelcast", "Members [2]", serverStartTimeout)
 				Expect(err).NotTo(HaveOccurred())
