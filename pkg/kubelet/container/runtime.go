@@ -93,17 +93,6 @@ type Runtime interface {
 	// GetPodStatus retrieves the status of the pod, including the
 	// information of all containers in the pod that are visble in Runtime.
 	GetPodStatus(uid types.UID, name, namespace string) (*PodStatus, error)
-	// PullImage pulls an image from the network to local storage using the supplied
-	// secrets if necessary.
-	PullImage(image ImageSpec, pullSecrets []api.Secret) error
-	// IsImagePresent checks whether the container image is already in the local storage.
-	IsImagePresent(image ImageSpec) (bool, error)
-	// Gets all images currently on the machine.
-	ListImages() ([]Image, error)
-	// Removes the specified image.
-	RemoveImage(image ImageSpec) error
-	// Returns Image statistics.
-	ImageStats() (*ImageStats, error)
 	// Returns the filesystem path of the pod's network namespace; if the
 	// runtime does not handle namespace creation itself, or cannot return
 	// the network namespace path, it should return an error.
@@ -127,6 +116,22 @@ type Runtime interface {
 	ContainerCommandRunner
 	// ContainerAttach encapsulates the attaching to containers for testability
 	ContainerAttacher
+	// ImageService provides methods to image-related methods.
+	ImageService
+}
+
+type ImageService interface {
+	// PullImage pulls an image from the network to local storage using the supplied
+	// secrets if necessary.
+	PullImage(image ImageSpec, pullSecrets []api.Secret) error
+	// IsImagePresent checks whether the container image is already in the local storage.
+	IsImagePresent(image ImageSpec) (bool, error)
+	// Gets all images currently on the machine.
+	ListImages() ([]Image, error)
+	// Removes the specified image.
+	RemoveImage(image ImageSpec) error
+	// Returns Image statistics.
+	ImageStats() (*ImageStats, error)
 }
 
 type ContainerAttacher interface {
