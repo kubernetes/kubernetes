@@ -69,7 +69,7 @@ func DialURL(url *url.URL, transport http.RoundTripper) (net.Conn, error) {
 					inferredHost = host
 				}
 				// Make a copy to avoid polluting the provided config
-				tlsConfigCopy, _ := utilnet.TLSClientConfig(transport)
+				tlsConfigCopy := utilnet.CloneTLSConfig(tlsConfig)
 				tlsConfigCopy.ServerName = inferredHost
 				tlsConfig = tlsConfigCopy
 			}
