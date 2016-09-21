@@ -122,6 +122,10 @@ func NewCmdEdit(f *cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 }
 
 func RunEdit(f *cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args []string, options *resource.FilenameOptions) error {
+	return EditHelper(f, out, errOut, cmd, args, options, true)
+}
+
+func EditHelper(f *cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args []string, options *resource.FilenameOptions, isUsedByEditCmd bool) error {
 	var printer kubectl.ResourcePrinter
 	var ext string
 	var addHeader bool
@@ -143,7 +147,16 @@ func RunEdit(f *cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args
 		return err
 	}
 
-	mapper, typer := f.Object()
+	var mapper meta.RESTMapper
+	var typer runtime.ObjectTyper
+	if isUsedByEditCmd {
+		mapper, typer = f.Object()
+	} else {
+		mapper, typer, err = f.UnstructuredObject()
+	}
+	if err != nil {
+		return err
+	}
 	resourceMapper := &resource.Mapper{
 		ObjectTyper:  typer,
 		RESTMapper:   mapper,
@@ -156,14 +169,18 @@ func RunEdit(f *cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args
 		// compare two different GroupVersions).
 		Decoder: f.Decoder(false),
 	}
-
-	r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
-		NamespaceParam(cmdNamespace).DefaultNamespace().
+	var b *resource.Builder
+	if isUsedByEditCmd {
+		b = resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
+			ResourceTypeOrNameArgs(true, args...).
+			Latest()
+	} else {
+		b = resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), runtime.UnstructuredJSONScheme)
+	}
+	r := b.NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, options).
-		ResourceTypeOrNameArgs(true, args...).
 		ContinueOnError().
 		Flatten().
-		Latest().
 		Do()
 	err = r.Err()
 	if err != nil {
@@ -234,14 +251,15 @@ func RunEdit(f *cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args
 			if err != nil {
 				return preservedFile(err, results.file, errOut)
 			}
-			if bytes.Equal(stripComments(editedDiff), stripComments(edited)) {
-				// Ugly hack right here. We will hit this either (1) when we try to
-				// save the same changes we tried to save in the previous iteration
-				// which means our changes are invalid or (2) when we exit the second
-				// time. The second case is more usual so we can probably live with it.
-				// TODO: A less hacky fix would be welcome :)
-				fmt.Fprintln(errOut, "Edit cancelled, no valid changes were saved.")
-				return nil
+			if isUsedByEditCmd || containsError {
+				if bytes.Equal(stripComments(editedDiff), stripComments(edited)) {
+					// Ugly hack right here. We will hit this either (1) when we try to
+					// save the same changes we tried to save in the previous iteration
+					// which means our changes are invalid or (2) when we exit the second
+					// time. The second case is more usual so we can probably live with it.
+					// TODO: A less hacky fix would be welcome :)
+					return preservedFile(fmt.Errorf("%s", "Edit cancelled, no valid changes were saved."), file, errOut)
+				}
 			}
 
 			// cleanup any file from the previous pass
@@ -257,15 +275,23 @@ func RunEdit(f *cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args
 			}
 			err = schema.ValidateBytes(stripComments(edited))
 			if err != nil {
-				return preservedFile(err, file, errOut)
+				results = editResults{
+					file: file,
+				}
+				containsError = true
+				results.header.reasons = append(results.header.reasons, editReason{head: fmt.Sprintf("The edited file fails validation: %v", err)})
+				continue
 			}
 
-			// Compare content without comments
-			if bytes.Equal(stripComments(original), stripComments(edited)) {
-				os.Remove(file)
-				fmt.Fprintln(errOut, "Edit cancelled, no changes made.")
-				return nil
+			if isUsedByEditCmd {
+				// Compare content without comments
+				if bytes.Equal(stripComments(original), stripComments(edited)) {
+					os.Remove(file)
+					fmt.Fprintln(errOut, "Edit cancelled, no changes made.")
+					return nil
+				}
 			}
+
 			lines, err := hasLines(bytes.NewBuffer(edited))
 			if err != nil {
 				return preservedFile(err, file, errOut)
@@ -323,89 +349,101 @@ func RunEdit(f *cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args
 				meta.SetList(updates.Object, mutatedObjects)
 			}
 
-			patchVisitor := resource.NewFlattenListVisitor(updates, resourceMapper)
-			err = patchVisitor.Visit(func(info *resource.Info, incomingErr error) error {
-				currOriginalObj := originalObj
+			if isUsedByEditCmd {
+				patchVisitor := resource.NewFlattenListVisitor(updates, resourceMapper)
+				err = patchVisitor.Visit(func(info *resource.Info, incomingErr error) error {
+					currOriginalObj := originalObj
 
-				// if we're editing a list, then navigate the list to find the item that we're currently trying to edit
-				if meta.IsListType(originalObj) {
-					currOriginalObj = nil
-					editObjUID, err := meta.NewAccessor().UID(info.Object)
-					if err != nil {
-						return err
-					}
-
-					listItems, err := meta.ExtractList(originalObj)
-					if err != nil {
-						return err
-					}
-
-					// iterate through the list to find the item with the matching UID
-					for i := range listItems {
-						originalObjUID, err := meta.NewAccessor().UID(listItems[i])
+					// if we're editing a list, then navigate the list to find the item that we're currently trying to edit
+					if meta.IsListType(originalObj) {
+						currOriginalObj = nil
+						editObjUID, err := meta.NewAccessor().UID(info.Object)
 						if err != nil {
 							return err
 						}
-						if editObjUID == originalObjUID {
-							currOriginalObj = listItems[i]
-							break
+
+						listItems, err := meta.ExtractList(originalObj)
+						if err != nil {
+							return err
 						}
+
+						// iterate through the list to find the item with the matching UID
+						for i := range listItems {
+							originalObjUID, err := meta.NewAccessor().UID(listItems[i])
+							if err != nil {
+								return err
+							}
+							if editObjUID == originalObjUID {
+								currOriginalObj = listItems[i]
+								break
+							}
+						}
+						if currOriginalObj == nil {
+							return fmt.Errorf("no original object found for %#v", info.Object)
+						}
+
 					}
-					if currOriginalObj == nil {
-						return fmt.Errorf("no original object found for %#v", info.Object)
+
+					originalSerialization, err := runtime.Encode(encoder, currOriginalObj)
+					if err != nil {
+						return err
+					}
+					editedSerialization, err := runtime.Encode(encoder, info.Object)
+					if err != nil {
+						return err
 					}
 
-				}
+					// compute the patch on a per-item basis
+					// use strategic merge to create a patch
+					originalJS, err := yaml.ToJSON(originalSerialization)
+					if err != nil {
+						return err
+					}
+					editedJS, err := yaml.ToJSON(editedSerialization)
+					if err != nil {
+						return err
+					}
 
-				originalSerialization, err := runtime.Encode(encoder, currOriginalObj)
-				if err != nil {
-					return err
-				}
-				editedSerialization, err := runtime.Encode(encoder, info.Object)
-				if err != nil {
-					return err
-				}
+					if reflect.DeepEqual(originalJS, editedJS) {
+						// no edit, so just skip it.
+						cmdutil.PrintSuccess(mapper, false, out, info.Mapping.Resource, info.Name, false, "skipped")
+						return nil
+					}
 
-				// compute the patch on a per-item basis
-				// use strategic merge to create a patch
-				originalJS, err := yaml.ToJSON(originalSerialization)
-				if err != nil {
-					return err
-				}
-				editedJS, err := yaml.ToJSON(editedSerialization)
-				if err != nil {
-					return err
-				}
+					preconditions := []strategicpatch.PreconditionFunc{strategicpatch.RequireKeyUnchanged("apiVersion"),
+						strategicpatch.RequireKeyUnchanged("kind"), strategicpatch.RequireMetadataKeyUnchanged("name")}
+					patch, err := strategicpatch.CreateTwoWayMergePatch(originalJS, editedJS, currOriginalObj, preconditions...)
+					if err != nil {
+						glog.V(4).Infof("Unable to calculate diff, no merge is possible: %v", err)
+						if strategicpatch.IsPreconditionFailed(err) {
+							return preservedFile(fmt.Errorf("%s", "At least one of apiVersion, kind and name was changed"), file, errOut)
+						}
+						return err
+					}
 
-				if reflect.DeepEqual(originalJS, editedJS) {
-					// no edit, so just skip it.
-					cmdutil.PrintSuccess(mapper, false, out, info.Mapping.Resource, info.Name, false, "skipped")
+					results.version = defaultVersion
+					patched, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, api.StrategicMergePatchType, patch)
+					if err != nil {
+						fmt.Fprintln(out, results.addError(err, info))
+						return nil
+					}
+					info.Refresh(patched, true)
+					cmdutil.PrintSuccess(mapper, false, out, info.Mapping.Resource, info.Name, false, "edited")
 					return nil
-				}
-
-				preconditions := []strategicpatch.PreconditionFunc{strategicpatch.RequireKeyUnchanged("apiVersion"),
-					strategicpatch.RequireKeyUnchanged("kind"), strategicpatch.RequireMetadataKeyUnchanged("name")}
-				patch, err := strategicpatch.CreateTwoWayMergePatch(originalJS, editedJS, currOriginalObj, preconditions...)
-				if err != nil {
-					glog.V(4).Infof("Unable to calculate diff, no merge is possible: %v", err)
-					if strategicpatch.IsPreconditionFailed(err) {
-						return preservedFile(nil, file, errOut)
+				})
+			} else {
+				createVisitor := resource.NewFlattenListVisitor(updates, resourceMapper)
+				err = createVisitor.Visit(func(info *resource.Info, incomingErr error) error {
+					results.version = defaultVersion
+					if err := createAndRefresh(info); err != nil {
+						return preservedFile(err, file, errOut)
 					}
-					return err
-				}
-
-				results.version = defaultVersion
-				patched, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, api.StrategicMergePatchType, patch)
-				if err != nil {
-					fmt.Fprintln(out, results.addError(err, info))
+					cmdutil.PrintSuccess(mapper, false, out, info.Mapping.Resource, info.Name, false, "created")
 					return nil
-				}
-				info.Refresh(patched, true)
-				cmdutil.PrintSuccess(mapper, false, out, info.Mapping.Resource, info.Name, false, "edited")
-				return nil
-			})
+				})
+			}
 			if err != nil {
-				return preservedFile(err, results.file, errOut)
+				return err
 			}
 
 			// Handle all possible errors
@@ -430,9 +468,9 @@ func RunEdit(f *cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args
 				}
 				return nil
 			}
-
-			// loop again and edit the remaining items
-			infos = results.edit
+			if len(results.header.reasons) > 0 {
+				containsError = true
+			}
 		}
 	})
 	return err
