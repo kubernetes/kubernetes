@@ -13,7 +13,7 @@ images:
     project: coreos-cloud
     metadata: "user-data<test/e2e_node/jenkins/coreos-init.json"
   containervm:
-    image: e2e-node-containervm-v20160321-image
+    image: e2e-node-containervm-v20160604-image
     project: kubernetes-node-e2e-images
   gci-family:
     image_regex: gci-dev-55-8820-0-0
