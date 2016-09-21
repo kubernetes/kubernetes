@@ -21,6 +21,13 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+function setup-os-params {
+  # Reset core_pattern. On GCI, the default core_pattern pipes the core dumps to
+  # /sbin/crash_reporter which is more restrictive in saving crash dumps. So for
+  # now, set a generic core_pattern that users can work with.
+  echo "core.%e.%p.%t" > /proc/sys/kernel/core_pattern
+}
+
 function config-ip-firewall {
   echo "Configuring IP firewall rules"
   # The GCI image has host firewall which drop most inbound/forwarded packets.
@@ -983,6 +990,7 @@ if [[ -n "${KUBE_USER:-}" ]]; then
   fi
 fi
 
+setup-os-params
 config-ip-firewall
 create-dirs
 ensure-local-ssds
