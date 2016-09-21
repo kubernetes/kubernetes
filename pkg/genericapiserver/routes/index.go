@@ -29,6 +29,7 @@ import (
 type Index struct{}
 
 func (i Index) Install(mux *apiserver.PathRecorderMux, c *restful.Container) {
+	// do not register this using restful Webservice since we do not want to surface this in api docs.
 	mux.BaseMux().HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		status := http.StatusOK
 		if r.URL.Path != "/" && r.URL.Path != "/index.html" {

@@ -19,10 +19,10 @@ package genericapiserver
 import (
 	"crypto/tls"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"path"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -31,9 +31,9 @@ import (
 	systemd "github.com/coreos/go-systemd/daemon"
 	"github.com/emicklei/go-restful"
 	"github.com/emicklei/go-restful/swagger"
+	"github.com/go-openapi/spec"
 	"github.com/golang/glog"
 
-	"github.com/go-openapi/spec"
 	"k8s.io/kubernetes/cmd/libs/go2idl/openapi-gen/generators/common"
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
@@ -51,8 +51,6 @@ import (
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
-
-const globalTimeout = time.Minute
 
 // Info about an API group.
 type APIGroupInfo struct {
@@ -164,6 +162,7 @@ type GenericAPIServer struct {
 	enableOpenAPISupport   bool
 	openAPIInfo            spec.Info
 	openAPIDefaultResponse spec.Response
+	openAPIDefinitions     *common.OpenAPIDefinitions
 
 	// PostStartHooks are each called after the server has started listening, in a separate go func for each
 	// with no guaranteee of ordering between them.  The map key is a name used for error reporting.
@@ -171,7 +170,9 @@ type GenericAPIServer struct {
 	PostStartHooks       map[string]PostStartHookFunc
 	postStartHookLock    sync.Mutex
 	postStartHooksCalled bool
-	openAPIDefinitions   *common.OpenAPIDefinitions
+
+	// Writer to write the audit log to.
+	auditWriter io.Writer
 }
 
 func (s *GenericAPIServer) StorageDecorator() generic.StorageDecorator {
@@ -232,28 +233,6 @@ func (s *GenericAPIServer) InstallAPIGroups(groupsInfo []APIGroupInfo) error {
 		}
 	}
 	return nil
-}
-
-// Installs handler at /apis to list all group versions for discovery
-func (s *GenericAPIServer) installGroupsDiscoveryHandler() {
-	apiserver.AddApisWebService(s.Serializer, s.HandlerContainer, s.apiPrefix, func(req *restful.Request) []unversioned.APIGroup {
-		// Return the list of supported groups in sorted order (to have a deterministic order).
-		groups := []unversioned.APIGroup{}
-		groupNames := make([]string, len(s.apiGroupsForDiscovery))
-		var i int = 0
-		for groupName := range s.apiGroupsForDiscovery {
-			groupNames[i] = groupName
-			i++
-		}
-		sort.Strings(groupNames)
-		for _, groupName := range groupNames {
-			apiGroup := s.apiGroupsForDiscovery[groupName]
-			// Add ServerAddressByClientCIDRs.
-			apiGroup.ServerAddressByClientCIDRs = s.getServerAddressByClientCIDRs(req.Request)
-			groups = append(groups, apiGroup)
-		}
-		return groups
-	})
 }
 
 func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
@@ -431,7 +410,7 @@ func (s *GenericAPIServer) InstallAPIGroup(apiGroupInfo *APIGroupInfo) error {
 		}
 
 		s.AddAPIGroupForDiscovery(apiGroup)
-		apiserver.AddGroupWebService(s.Serializer, s.HandlerContainer, apiPrefix+"/"+apiGroup.Name, apiGroup)
+		s.HandlerContainer.Add(apiserver.NewGroupWebService(s.Serializer, apiPrefix+"/"+apiGroup.Name, apiGroup))
 	}
 	apiserver.InstallServiceErrorHandler(s.Serializer, s.HandlerContainer, s.NewRequestInfoResolver(), apiVersions)
 	return nil
@@ -448,8 +427,7 @@ func (s *GenericAPIServer) RemoveAPIGroupForDiscovery(groupName string) {
 func (s *GenericAPIServer) getServerAddressByClientCIDRs(req *http.Request) []unversioned.ServerAddressByClientCIDR {
 	addressCIDRMap := []unversioned.ServerAddressByClientCIDR{
 		{
-			ClientCIDR: "0.0.0.0/0",
-
+			ClientCIDR:    "0.0.0.0/0",
 			ServerAddress: s.ExternalAddress,
 		},
 	}
