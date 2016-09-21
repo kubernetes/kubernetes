@@ -312,10 +312,10 @@ kube::util::group-version-to-pkg-path() {
       echo "api/unversioned"
       ;;
     *.k8s.io)
-      echo "apis/${group_version%.k8s.io}"
+      echo "apis/${group_version%.*k8s.io}"
       ;;
     *.k8s.io/*)
-      echo "apis/${group_version/.k8s.io/}"
+      echo "apis/${group_version/.*k8s.io/}"
       ;;
     *)
       echo "apis/${group_version%__internal}"
@@ -347,6 +347,9 @@ kube::util::gv-to-swagger-name() {
 # VERSIONS: Array of group versions to include in swagger spec.
 kube::util::fetch-swagger-spec() {
   for ver in ${VERSIONS}; do
+    if [[ " ${KUBE_NONSERVER_GROUP_VERSIONS} " == *" ${ver} "* ]]; then
+      continue
+    fi
     # fetch the swagger spec for each group version.
     if [[ ${ver} == "v1" ]]; then
       SUBPATH="api"

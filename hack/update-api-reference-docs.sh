@@ -34,12 +34,19 @@ OUTPUT=${1:-${DEFAULT_OUTPUT}}
 
 SWAGGER_SPEC_PATH="${REPO_DIR}/api/swagger-spec"
 
-GROUP_VERSIONS=("v1" "extensions/v1beta1" "batch/v1" "autoscaling/v1" "certificates.k8s.io/v1alpha1")
+ALL_GROUP_VERSIONS=(${KUBE_AVAILABLE_GROUP_VERSIONS})
+INTERESTING_GROUP_VERSIONS=()
 GV_DIRS=()
-for gv in "${GROUP_VERSIONS[@]}"; do
-  GV_DIRS+=("${REPO_DIR}/pkg/$(kube::util::group-version-to-pkg-path "${gv}")")
+for gv in "${ALL_GROUP_VERSIONS[@]}"; do
+	# skip groups that aren't being served, clients for these don't matter
+    if [[ " ${KUBE_NONSERVER_GROUP_VERSIONS} " == *" ${gv} "* ]]; then
+		continue
+    fi
+
+	INTERESTING_GROUP_VERSIONS+=(${gv})
+	GV_DIRS+=("${REPO_DIR}/pkg/$(kube::util::group-version-to-pkg-path "${gv}")")
 done
 
-GROUP_VERSIONS="${GROUP_VERSIONS[@]}" GV_DIRS="${GV_DIRS[@]}" kube::swagger::gen_api_ref_docs "${SWAGGER_SPEC_PATH}" "${OUTPUT}"
+GROUP_VERSIONS="${INTERESTING_GROUP_VERSIONS[@]}" GV_DIRS="${GV_DIRS[@]}" kube::swagger::gen_api_ref_docs "${SWAGGER_SPEC_PATH}" "${OUTPUT}"
 
 # ex: ts=2 sw=2 et filetype=sh
