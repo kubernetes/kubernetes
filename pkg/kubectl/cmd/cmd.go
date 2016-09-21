@@ -315,7 +315,6 @@ Find more information at https://github.com/kubernetes/kubernetes.`,
 	filters := []string{
 		"options",
 		Deprecated("kubectl", "delete", cmds, NewCmdStop(f, out)),
-		Deprecated("kubectl", "config set-context", cmds, NewCmdNamespace(out)),
 	}
 	templates.ActsAsRootCommand(cmds, filters, groups...)
 
