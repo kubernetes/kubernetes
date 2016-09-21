@@ -1549,6 +1549,7 @@ func WaitForPodToDisappear(c *client.Client, ns, podName string, label labels.Se
 			if pod.Name == podName {
 				Logf("Pod %s still exists", podName)
 				found = true
+				break
 			}
 		}
 		if !found {
