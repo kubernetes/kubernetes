@@ -35,6 +35,7 @@ import (
 	"github.com/golang/glog"
 
 	"github.com/go-openapi/spec"
+	"k8s.io/kubernetes/cmd/libs/go2idl/openapi-gen/generators/common"
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
@@ -171,6 +172,7 @@ type GenericAPIServer struct {
 	PostStartHooks       map[string]PostStartHookFunc
 	postStartHookLock    sync.Mutex
 	postStartHooksCalled bool
+	openAPIDefinitions   *common.OpenAPIDefinitions
 }
 
 func (s *GenericAPIServer) StorageDecorator() generic.StorageDecorator {
@@ -565,24 +567,26 @@ func (s *GenericAPIServer) InstallOpenAPI() {
 		info := s.openAPIInfo
 		info.Title = info.Title + " " + w.RootPath()
 		err := openapi.RegisterOpenAPIService(&openapi.Config{
-			OpenAPIServePath: w.RootPath() + "/swagger.json",
-			WebServices:      []*restful.WebService{w},
-			ProtocolList:     []string{"https"},
-			IgnorePrefixes:   []string{"/swaggerapi"},
-			Info:             &info,
-			DefaultResponse:  &s.openAPIDefaultResponse,
+			OpenAPIServePath:   w.RootPath() + "/swagger.json",
+			WebServices:        []*restful.WebService{w},
+			ProtocolList:       []string{"https"},
+			IgnorePrefixes:     []string{"/swaggerapi"},
+			Info:               &info,
+			DefaultResponse:    &s.openAPIDefaultResponse,
+			OpenAPIDefinitions: s.openAPIDefinitions,
 		}, s.HandlerContainer)
 		if err != nil {
 			glog.Fatalf("Failed to register open api spec for %v: %v", w.RootPath(), err)
 		}
 	}
 	err := openapi.RegisterOpenAPIService(&openapi.Config{
-		OpenAPIServePath: "/swagger.json",
-		WebServices:      s.HandlerContainer.RegisteredWebServices(),
-		ProtocolList:     []string{"https"},
-		IgnorePrefixes:   []string{"/swaggerapi"},
-		Info:             &s.openAPIInfo,
-		DefaultResponse:  &s.openAPIDefaultResponse,
+		OpenAPIServePath:   "/swagger.json",
+		WebServices:        s.HandlerContainer.RegisteredWebServices(),
+		ProtocolList:       []string{"https"},
+		IgnorePrefixes:     []string{"/swaggerapi"},
+		Info:               &s.openAPIInfo,
+		DefaultResponse:    &s.openAPIDefaultResponse,
+		OpenAPIDefinitions: s.openAPIDefinitions,
 	}, s.HandlerContainer)
 	if err != nil {
 		glog.Fatalf("Failed to register open api spec for root: %v", err)

@@ -58,6 +58,7 @@ import (
 
 	"github.com/go-openapi/spec"
 	"github.com/pborman/uuid"
+	"k8s.io/kubernetes/pkg/generated/openapi"
 )
 
 const (
@@ -235,6 +236,8 @@ func NewMasterConfig() *master.Config {
 			ServiceClusterIPRange: parseCIDROrDie("10.0.0.0/24"),
 			ServiceNodePortRange:  utilnet.PortRange{Base: 30000, Size: 2768},
 			EnableVersion:         true,
+			OpenAPIDefinitions:    openapi.OpenAPIDefinitions,
+			EnableOpenAPISupport:  true,
 		},
 		KubeletClient: kubeletclient.FakeKubeletClient{},
 	}
