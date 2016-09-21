@@ -382,8 +382,8 @@ func (s *GenericAPIServer) buildHandlerChains(c *Config, handler http.Handler) (
 	attributeGetter := apiserver.NewRequestAttributeGetter(c.RequestContextMapper, s.NewRequestInfoResolver())
 	secure = handler
 	secure = apiserver.WithAuthorization(secure, attributeGetter, c.Authorizer)
-	secure = audit.WithAudit(secure, attributeGetter, s.auditWriter) // before impersonation to read original user
 	secure = apiserver.WithImpersonation(secure, c.RequestContextMapper, c.Authorizer)
+	secure = audit.WithAudit(secure, attributeGetter, s.auditWriter) // before impersonation to read original user
 	secure = authhandlers.WithAuthentication(secure, c.RequestContextMapper, c.Authenticator, authhandlers.Unauthorized(c.SupportsBasicAuth))
 	secure = api.WithRequestContext(secure, c.RequestContextMapper)
 	secure = genericfilters.WithTimeoutForNonLongRunningRequests(secure, longRunningFunc)
