@@ -23,6 +23,7 @@ import (
 	"net"
 	"net/http"
 	"path"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -155,6 +156,7 @@ type GenericAPIServer struct {
 
 	// Map storing information about all groups to be exposed in discovery response.
 	// The map is from name to the group.
+	// TODO(sttts): is this modified concurrently when 3rd party resources are created? No lock exists.
 	apiGroupsForDiscovery map[string]unversioned.APIGroup
 
 	// See Config.$name for documentation of these flags
@@ -236,6 +238,7 @@ func (s *GenericAPIServer) InstallAPIGroups(groupsInfo []APIGroupInfo) error {
 }
 
 func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
+	// install APIs which depend on other APIs to be installed
 	if s.enableSwaggerSupport {
 		s.InstallSwaggerAPI()
 	}
@@ -543,6 +546,31 @@ func (s *GenericAPIServer) InstallOpenAPI() {
 	if err != nil {
 		glog.Fatalf("Failed to register open api spec for root: %v", err)
 	}
+}
+
+// DynamicApisDiscovery returns a webservice serving api group discovery.
+// Note: during the server runtime apiGroupsForDiscovery might change.
+func (s *GenericAPIServer) DynamicApisDiscovery() *restful.WebService {
+	return apiserver.NewApisWebService(s.Serializer, s.apiPrefix, func(req *restful.Request) []unversioned.APIGroup {
+		// sort to have a deterministic order
+		sortedGroups := []unversioned.APIGroup{}
+		groupNames := make([]string, 0, len(s.apiGroupsForDiscovery))
+		for groupName := range s.apiGroupsForDiscovery {
+			groupNames = append(groupNames, groupName)
+		}
+		sort.Strings(groupNames)
+		for _, groupName := range groupNames {
+			sortedGroups = append(sortedGroups, s.apiGroupsForDiscovery[groupName])
+		}
+
+		serverCIDR := s.getServerAddressByClientCIDRs(req.Request)
+		groups := make([]unversioned.APIGroup, len(sortedGroups))
+		for i := range sortedGroups {
+			groups[i] = sortedGroups[i]
+			groups[i].ServerAddressByClientCIDRs = serverCIDR
+		}
+		return groups
+	})
 }
 
 // NewDefaultAPIGroupInfo returns an APIGroupInfo stubbed with "normal" values

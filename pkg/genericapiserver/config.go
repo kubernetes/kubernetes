@@ -403,7 +403,7 @@ func (s *GenericAPIServer) installAPI(c *Config) {
 	if c.EnableVersion {
 		routes.Version{}.Install(s.Mux, s.HandlerContainer)
 	}
-	s.HandlerContainer.Add(routes.ApisDiscovery(s.Serializer, s.apiPrefix, s.apiGroupsForDiscovery, s.getServerAddressByClientCIDRs))
+	s.HandlerContainer.Add(s.DynamicApisDiscovery())
 }
 
 func DefaultAndValidateRunOptions(options *options.ServerRunOptions) {
