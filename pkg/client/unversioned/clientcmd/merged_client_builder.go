@@ -18,7 +18,6 @@ package clientcmd
 
 import (
 	"io"
-	"reflect"
 	"sync"
 
 	"github.com/golang/glog"
@@ -111,11 +110,9 @@ func (config *DeferredLoadingClientConfig) ClientConfig() (*restclient.Config, e
 			return nil, err
 		}
 	case mergedConfig != nil:
-		// if the configuration has any settings at all, we cannot use ICC
-		// TODO: this shouldn't be a global - the client config rules should be
-		//   handling this.
-		defaultConfig, _ := DefaultClientConfig.ClientConfig()
-		if defaultConfig != nil && !reflect.DeepEqual(mergedConfig, defaultConfig) {
+		// the configuration is valid, but if this is equal to the defaults we should try
+		// in-cluster configuration
+		if !config.loader.IsDefaultConfig(mergedConfig) {
 			return mergedConfig, nil
 		}
 	}

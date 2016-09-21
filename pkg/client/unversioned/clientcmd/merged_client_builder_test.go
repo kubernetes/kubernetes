@@ -70,15 +70,6 @@ func (icc *testICC) Possible() bool {
 }
 
 func TestInClusterConfig(t *testing.T) {
-	// override direct client config for this run
-	originalDefault := DefaultClientConfig
-	defer func() {
-		DefaultClientConfig = originalDefault
-	}()
-
-	baseDefault := &DirectClientConfig{
-		overrides: &ConfigOverrides{},
-	}
 	default1 := &DirectClientConfig{
 		config:      *createValidTestConfig(),
 		contextName: "clean",
@@ -144,12 +135,12 @@ func TestInClusterConfig(t *testing.T) {
 			err:        nil,
 		},
 
-		"in-cluster checked when config is default and invalid": {
+		"in-cluster not checked when default config is invalid": {
 			defaultConfig: defaultInvalid,
 			clientConfig:  &testClientConfig{config: config1},
 			icc:           &testICC{},
 
-			checkedICC: true,
+			checkedICC: false,
 			result:     config1,
 			err:        nil,
 		},
@@ -201,7 +192,7 @@ func TestInClusterConfig(t *testing.T) {
 			err:        nil,
 		},
 
-		"in-cluster not checked when default is invalid": {
+		"in-cluster not checked when standard default is invalid": {
 			defaultConfig: &DefaultClientConfig,
 			clientConfig:  &testClientConfig{config: config2},
 			icc:           &testICC{},
@@ -213,12 +204,8 @@ func TestInClusterConfig(t *testing.T) {
 	}
 
 	for name, test := range testCases {
-		if test.defaultConfig != nil {
-			DefaultClientConfig = *test.defaultConfig
-		} else {
-			DefaultClientConfig = *baseDefault
-		}
 		c := &DeferredLoadingClientConfig{icc: test.icc}
+		c.loader = &ClientConfigLoadingRules{DefaultClientConfig: test.defaultConfig}
 		c.clientConfig = test.clientConfig
 
 		cfg, err := c.ClientConfig()
