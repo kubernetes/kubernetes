@@ -18,14 +18,6 @@ package internalclientset
 
 import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	unversionedauthentication "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/authentication/unversioned"
-	unversionedauthorization "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/authorization/unversioned"
-	unversionedautoscaling "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/autoscaling/unversioned"
-	unversionedbatch "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/batch/unversioned"
-	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
-	unversionedextensions "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/unversioned"
-	unversionedstorage "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/storage/unversioned"
-	"k8s.io/kubernetes/pkg/client/typed/discovery"
 	"k8s.io/kubernetes/pkg/client/unversioned"
 )
 
@@ -33,47 +25,5 @@ import (
 // This function is temporary. We will remove it when everyone has moved to using
 // Clientset. New code should NOT use this function.
 func FromUnversionedClient(c *unversioned.Client) *internalclientset.Clientset {
-	var clientset internalclientset.Clientset
-	if c != nil {
-		clientset.CoreClient = unversionedcore.New(c.RESTClient)
-	} else {
-		clientset.CoreClient = unversionedcore.New(nil)
-	}
-	if c != nil && c.ExtensionsClient != nil {
-		clientset.ExtensionsClient = unversionedextensions.New(c.ExtensionsClient.RESTClient)
-	} else {
-		clientset.ExtensionsClient = unversionedextensions.New(nil)
-	}
-	if c != nil && c.BatchClient != nil {
-		clientset.BatchClient = unversionedbatch.New(c.BatchClient.RESTClient)
-	} else {
-		clientset.BatchClient = unversionedbatch.New(nil)
-	}
-	if c != nil && c.AuthorizationClient != nil {
-		clientset.AuthorizationClient = unversionedauthorization.New(c.AuthorizationClient.RESTClient)
-	} else {
-		clientset.AuthorizationClient = unversionedauthorization.New(nil)
-	}
-	if c != nil && c.AutoscalingClient != nil {
-		clientset.AutoscalingClient = unversionedautoscaling.New(c.AutoscalingClient.RESTClient)
-	} else {
-		clientset.AutoscalingClient = unversionedautoscaling.New(nil)
-	}
-	if c != nil && c.AuthenticationClient != nil {
-		clientset.AuthenticationClient = unversionedauthentication.New(c.AuthenticationClient.RESTClient)
-	} else {
-		clientset.AuthenticationClient = unversionedauthentication.New(nil)
-	}
-	if c != nil && c.DiscoveryClient != nil {
-		clientset.DiscoveryClient = discovery.NewDiscoveryClient(c.DiscoveryClient.RESTClient)
-	} else {
-		clientset.DiscoveryClient = discovery.NewDiscoveryClient(nil)
-	}
-	if c != nil && c.StorageClient != nil {
-		clientset.StorageClient = unversionedstorage.New(c.StorageClient.RESTClient)
-	} else {
-		clientset.StorageClient = unversionedstorage.New(nil)
-	}
-
-	return &clientset
+	return internalclientset.New(c.RESTClient)
 }
