@@ -26,6 +26,10 @@ import (
 type PodDisruptionBudgetSpec struct {
 	// The minimum number of pods that must be available simultaneously.  This
 	// can be either an integer or a string specifying a percentage, e.g. "28%".
+	// This minimum is applicable at all times.  Specifically, when the
+	// disruption controller determines if an eviction is allowed, it is deciding
+	// if *after that eviction* `MinAvailable` would still be honored.  Thus you
+	// can prevent all voluntary evictions by specifying "100%".
 	MinAvailable intstr.IntOrString `json:"minAvailable,omitempty"`
 
 	// Label query over pods whose evictions are managed by the disruption

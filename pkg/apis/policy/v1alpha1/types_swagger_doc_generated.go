@@ -57,7 +57,7 @@ func (PodDisruptionBudgetList) SwaggerDoc() map[string]string {
 
 var map_PodDisruptionBudgetSpec = map[string]string{
 	"":             "PodDisruptionBudgetSpec is a description of a PodDisruptionBudget.",
-	"minAvailable": "The minimum number of pods that must be available simultaneously.  This can be either an integer or a string specifying a percentage, e.g. \"28%\".",
+	"minAvailable": "The minimum number of pods that must be available simultaneously.  This can be either an integer or a string specifying a percentage, e.g. \"28%\". This minimum is applicable at all times.  Specifically, when the disruption controller determines if an eviction is allowed, it is deciding if *after that eviction* `MinAvailable` would still be honored.  Thus you can prevent all voluntary evictions by specifying \"100%\".",
 	"selector":     "Label query over pods whose evictions are managed by the disruption budget.",
 }
 
