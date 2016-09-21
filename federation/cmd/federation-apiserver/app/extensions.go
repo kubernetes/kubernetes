@@ -25,8 +25,8 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
 	"k8s.io/kubernetes/pkg/genericapiserver"
-	ingressetcd "k8s.io/kubernetes/pkg/registry/ingress/etcd"
-	replicasetetcd "k8s.io/kubernetes/pkg/registry/replicaset/etcd"
+	ingressetcd "k8s.io/kubernetes/pkg/registry/extensions/ingress/etcd"
+	replicasetetcd "k8s.io/kubernetes/pkg/registry/extensions/replicaset/etcd"
 )
 
 func installExtensionsAPIs(s *options.ServerRunOptions, g *genericapiserver.GenericAPIServer, f genericapiserver.StorageFactory) {
