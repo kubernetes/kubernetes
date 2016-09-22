@@ -26,10 +26,29 @@ func ClusterRoles() []rbacapi.ClusterRole {
 	return []rbacapi.ClusterRole{
 		// TODO update the expression of these rules to match openshift for ease of inspection
 		{
+			// a "root" role which can do absolutely anything
 			ObjectMeta: api.ObjectMeta{Name: "cluster-admin"},
 			Rules: []rbacapi.PolicyRule{
 				{Verbs: []string{"*"}, APIGroups: []string{"*"}, Resources: []string{"*"}},
 				{Verbs: []string{"*"}, NonResourceURLs: []string{"*"}},
+			},
+		},
+
+		{
+			// a role which provides just enough power to discovery API versions for negotiation
+			ObjectMeta: api.ObjectMeta{Name: "system:discovery"},
+			Rules: []rbacapi.PolicyRule{
+				{
+					Verbs: []string{"get"},
+					NonResourceURLs: []string{
+						// Server version checking
+						"/version",
+
+						// API discovery/negotiation
+						"/api", "/api/*",
+						"/apis", "/apis/*",
+					},
+				},
 			},
 		},
 	}
