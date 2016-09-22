@@ -225,16 +225,6 @@ func NewHandlerContainer(mux *http.ServeMux, s runtime.NegotiatedSerializer) *re
 	return container
 }
 
-// Exposes the given group versions in API. Helper method to install multiple group versions at once.
-func (s *GenericAPIServer) InstallAPIGroups(groupsInfo []APIGroupInfo) error {
-	for _, apiGroupInfo := range groupsInfo {
-		if err := s.InstallAPIGroup(&apiGroupInfo); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 // Installs handler at /apis to list all group versions for discovery
 func (s *GenericAPIServer) installGroupsDiscoveryHandler() {
 	apiserver.AddApisWebService(s.Serializer, s.HandlerContainer, s.apiPrefix, func(req *restful.Request) []unversioned.APIGroup {
@@ -390,7 +380,7 @@ func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
 	select {}
 }
 
-// Exposes the given group version in API.
+// Exposes the given api group in the API.
 func (s *GenericAPIServer) InstallAPIGroup(apiGroupInfo *APIGroupInfo) error {
 	apiPrefix := s.apiPrefix
 	if apiGroupInfo.IsLegacyGroup {
