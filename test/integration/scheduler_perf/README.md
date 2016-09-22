@@ -73,3 +73,6 @@ cd kubernetes/test/component/scheduler/perf
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/test/component/scheduler/perf/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/test/integration/scheduler_perf/README.md?pixel)]()

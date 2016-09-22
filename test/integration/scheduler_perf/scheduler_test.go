@@ -24,11 +24,17 @@ import (
 
 // TestSchedule100Node3KPods schedules 3k pods on 100 nodes.
 func TestSchedule100Node3KPods(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping because we want to run short tests")
+	}
 	schedulePods(100, 3000)
 }
 
 // TestSchedule1000Node30KPods schedules 30k pods on 1000 nodes.
 func TestSchedule1000Node30KPods(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping because we want to run short tests")
+	}
 	schedulePods(1000, 30000)
 }
 
