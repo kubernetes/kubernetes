@@ -54,6 +54,8 @@ mkcp "/pkg/client/typed" "/pkg/client"
 mkcp "/pkg/client/unversioned/auth" "/pkg/client/unversioned"
 mkcp "/pkg/client/unversioned/clientcmd" "/pkg/client/unversioned"
 mkcp "/pkg/client/unversioned/portforward" "/pkg/client/unversioned"
+
+mkcp "/plugin/pkg/client/auth" "/plugin/pkg/client"
 # remove this test because it imports the internal clientset
 rm "${CLIENT_REPO_TEMP}"/pkg/client/unversioned/portforward/portforward_test.go
 
