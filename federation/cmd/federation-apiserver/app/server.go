@@ -187,10 +187,10 @@ func Run(s *options.ServerRunOptions) error {
 		}
 
 		tokenAuthenticator := authenticator.NewAuthenticatorFromTokens(tokens)
-		apiAuthenticator = authenticatorunion.New(apiAuthenticator, tokenAuthenticator)
+		apiAuthenticator = authenticatorunion.New(tokenAuthenticator, apiAuthenticator)
 
 		tokenAuthorizer := authorizer.NewPrivilegedGroups("system:masters")
-		apiAuthorizer = authorizerunion.New(apiAuthorizer, tokenAuthorizer)
+		apiAuthorizer = authorizerunion.New(tokenAuthorizer, apiAuthorizer)
 	}
 
 	sharedInformers := informers.NewSharedInformerFactory(client, 10*time.Minute)
