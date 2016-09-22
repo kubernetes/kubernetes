@@ -29,6 +29,6 @@ all: transform
 %.sed: %.base
 	sed -f transforms2sed.sed $<  | sed s/__SOURCE_FILENAME__/$</g > $@
 
-transform: skydns-rc.yaml.in skydns-svc.yaml.in skydns-rc.yaml.sed skydns-svc.yaml.sed
+transform: skydns-rc.yaml.in skydns-rc.yaml.sed skydns-svc.yaml.in skydns-svc.yaml.sed kubedns-autoscaler-configmap.yaml.in kubedns-autoscaler-configmap.yaml.sed kubedns-autoscaler-deployment.yaml.in kubedns-autoscaler-deployment.yaml.sed
 
 .PHONY: transform

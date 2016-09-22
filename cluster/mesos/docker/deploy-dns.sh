@@ -30,6 +30,8 @@ workspace=$(pwd)
 # Process salt pillar templates manually
 sed -e "s/{{ pillar\['dns_replicas'\] }}/${DNS_REPLICAS}/g;s/{{ pillar\['dns_domain'\] }}/${DNS_DOMAIN}/g" "${KUBE_ROOT}/cluster/addons/dns/skydns-rc.yaml.in" > "${workspace}/skydns-rc.yaml"
 sed -e "s/{{ pillar\['dns_server'\] }}/${DNS_SERVER_IP}/g" "${KUBE_ROOT}/cluster/addons/dns/skydns-svc.yaml.in" > "${workspace}/skydns-svc.yaml"
+cat "${KUBE_ROOT}/cluster/addons/dns/kubedns-autoscaler-configmap.yaml.in" > "${workspace}/kubedns-autoscaler-configmap.yaml"
+cat "${KUBE_ROOT}/cluster/addons/dns/kubedns-autoscaler-deployment.yaml.in" > "${workspace}/kubedns-autoscaler-deployment.yaml"
 
 # Federation specific values.
 if [[ "${FEDERATION:-}" == "true" ]]; then
@@ -46,6 +48,8 @@ else
   sed -i -e "/{{ pillar\['federations_domain_map'\] }}/d" "${workspace}/skydns-rc.yaml"
 fi
 
-# Use kubectl to create skydns rc and service
+# Use kubectl to create skydns rc, service and autoscaler
 "${kubectl}" create -f "${workspace}/skydns-rc.yaml"
 "${kubectl}" create -f "${workspace}/skydns-svc.yaml"
+"${kubectl}" create -f "${workspace}/kubedns-autoscaler-configmap.yaml"
+"${kubectl}" create -f "${workspace}/kubedns-autoscaler-deployment.yaml"

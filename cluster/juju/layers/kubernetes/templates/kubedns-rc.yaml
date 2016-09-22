@@ -19,22 +19,22 @@
 apiVersion: v1
 kind: ReplicationController
 metadata:
-  name: kube-dns-v18
+  name: kube-dns-v19
   namespace: kube-system
   labels:
     k8s-app: kube-dns
-    version: v18
+    version: v19
     kubernetes.io/cluster-service: "true"
 spec:
   replicas: {{ pillar['dns_replicas'] }}
   selector:
     k8s-app: kube-dns
-    version: v18
+    version: v19
   template:
     metadata:
       labels:
         k8s-app: kube-dns
-        version: v18
+        version: v19
         kubernetes.io/cluster-service: "true"
     spec:
       containers:

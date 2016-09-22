@@ -88,6 +88,22 @@ addon-dir-create:
     - group: root
     - dir_mode: 755
     - makedirs: True
+
+/etc/kubernetes/addons/dns/kubedns-autoscaler-configmap.yaml:
+  file.managed:
+    - source: salt://kube-addons/dns/kubedns-autoscaler-configmap.yaml.in
+    - template: jinja
+    - group: root
+    - dir_mode: 755
+    - makedirs: True
+
+/etc/kubernetes/addons/dns/kubedns-autoscaler-deployment.yaml:
+  file.managed:
+    - source: salt://kube-addons/dns/kubedns-autoscaler-deployment.yaml.in
+    - template: jinja
+    - group: root
+    - dir_mode: 755
+    - makedirs: True
 {% endif %}
 
 {% if pillar.get('enable_cluster_registry', '').lower() == 'true' %}

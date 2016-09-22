@@ -43,17 +43,21 @@ function deploy_dns {
   echo "Deploying DNS on Kubernetes"
   sed -e "s/\\\$DNS_REPLICAS/${DNS_REPLICAS}/g;s/\\\$DNS_DOMAIN/${DNS_DOMAIN}/g;" "${KUBE_ROOT}/cluster/addons/dns/skydns-rc.yaml.sed" > skydns-rc.yaml
   sed -e "s/\\\$DNS_SERVER_IP/${DNS_SERVER_IP}/g" "${KUBE_ROOT}/cluster/addons/dns/skydns-svc.yaml.sed" > skydns-svc.yaml
+  cat "${KUBE_ROOT}/cluster/addons/dns/kubedns-autoscaler-configmap.yaml.sed" > kubedns-autoscaler-configmap.yaml
+  cat "${KUBE_ROOT}/cluster/addons/dns/kubedns-autoscaler-deployment.yaml.sed" > kubedns-autoscaler-deployment.yaml
 
   KUBEDNS=`eval "${KUBECTL} get services --namespace=kube-system | grep kube-dns | cat"`
       
   if [ ! "$KUBEDNS" ]; then
-    # use kubectl to create skydns rc and service
+    # use kubectl to create skydns rc, service and autoscaler
     ${KUBECTL} --namespace=kube-system create -f skydns-rc.yaml 
     ${KUBECTL} --namespace=kube-system create -f skydns-svc.yaml
+    ${KUBECTL} --namespace=kube-system create -f kubedns-autoscaler-configmap.yaml
+    ${KUBECTL} --namespace=kube-system create -f kubedns-autoscaler-deployment.yaml
 
-    echo "Kube-dns rc and service is successfully deployed."
+    echo "Kube-dns rc, service and autoscaler are successfully deployed."
   else
-    echo "Kube-dns rc and service is already deployed. Skipping."
+    echo "Kube-dns rc, service and autoscaler are already deployed. Skipping."
   fi
 
   echo

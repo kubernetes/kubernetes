@@ -175,6 +175,16 @@ def launch_dns():
     if return_code != 0:
         # Create the kubedns service from the rendered file.
         check_call(split('kubectl create -f files/manifests/kubedns-svc.yaml'))
+    # Check for the kubedns autoscaler configmap.
+    return_code = call(split('kubectl get -f files/manifests/kubedns-autoscaler-configmap.yaml'))
+    if return_code != 0:
+        # Create the kubedns autoscaler configmap from the rendered file.
+        check_call(split('kubectl create -f files/manifests/kubedns-autoscaler-configmap.yaml'))
+    # Check for the kubedns autoscaler deployment.
+    return_code = call(split('kubectl get -f files/manifests/kubedns-autoscaler-deployment.yaml'))
+    if return_code != 0:
+        # Create the kubedns autoscaler deployment from the rendered file.
+        check_call(split('kubectl create -f files/manifests/kubedns-autoscaler-deployment.yaml'))
     set_state('kubedns.available')
 
 
@@ -463,6 +473,14 @@ def render_files(reldata=None):
         target = os.path.join(rendered_manifest_dir, 'kubedns-rc.yaml')
         # Render files/kubernetes/kubedns-rc.yaml for the DNS pod.
         render('kubedns-rc.yaml', target, context)
+        # Source: ...cluster/addons/dns/kubedns-autoscaler-configmap.yaml
+        target = os.path.join(rendered_manifest_dir, 'kubedns-autoscaler-configmap.yaml')
+        # Render files/kubernetes/kubedns-autoscaler-configmap.yaml for the DNS autoscaler.
+        render('kubedns-autoscaler-configmap.yaml', target, context)
+        # Source: ...cluster/addons/dns/kubedns-autoscaler-deployment.yaml
+        target = os.path.join(rendered_manifest_dir, 'kubedns-autoscaler-deployment.yaml')
+        # Render files/kubernetes/kubedns-autoscaler-deployment.yaml for the DNS autoscaler.
+        render('kubedns-autoscaler-deployment.yaml', target, context)
 
 
 def status_set(level, message):

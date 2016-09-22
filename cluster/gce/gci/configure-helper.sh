@@ -1018,9 +1018,13 @@ function start-kube-addons {
     setup-addon-manifests "addons" "dns"
     local -r dns_rc_file="${dst_dir}/dns/skydns-rc.yaml"
     local -r dns_svc_file="${dst_dir}/dns/skydns-svc.yaml"
+    local -r dns_autoscaler_configmap_file="${dst_dir}/dns/kubedns-autoscaler-configmap.yaml"
+    local -r dns_autoscaler_deployment_file="${dst_dir}/dns/kubedns-autoscaler-deployment.yaml"
     mv "${dst_dir}/dns/skydns-rc.yaml.in" "${dns_rc_file}"
     mv "${dst_dir}/dns/skydns-svc.yaml.in" "${dns_svc_file}"
-    # Replace the salt configurations with variable values.
+    mv "${dst_dir}/dns/kubedns-autoscaler-configmap.yaml.in" "${dns_autoscaler_configmap_file}"
+    mv "${dst_dir}/dns/kubedns-autoscaler-deployment.yaml.in" "${dns_autoscaler_deployment_file}"
+   # Replace the salt configurations with variable values.
     sed -i -e "s@{{ *pillar\['dns_replicas'\] *}}@${DNS_REPLICAS}@g" "${dns_rc_file}"
     sed -i -e "s@{{ *pillar\['dns_domain'\] *}}@${DNS_DOMAIN}@g" "${dns_rc_file}"
     sed -i -e "s@{{ *pillar\['dns_server'\] *}}@${DNS_SERVER_IP}@g" "${dns_svc_file}"
