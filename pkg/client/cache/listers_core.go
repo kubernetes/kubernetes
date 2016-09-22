@@ -126,8 +126,8 @@ func (s *StoreToReplicationControllerLister) GetPodControllers(pod *api.Pod) (co
 		return
 	}
 
-	for _, m := range items {
-		rc := m.(*api.ReplicationController)
+	for i := range items {
+		rc := items[i].(*api.ReplicationController)
 		selector := labels.Set(rc.Spec.Selector).AsSelectorPreValidated()
 
 		// If an rc with a nil or empty selector creeps in, it should match nothing, not everything.
