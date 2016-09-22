@@ -18,7 +18,6 @@ package planer
 
 import (
 	"hash/fnv"
-	"math"
 	"sort"
 
 	fed_api "k8s.io/kubernetes/federation/apis/federation"
@@ -152,9 +151,7 @@ func (p *Planner) Plan(replicasToDistribute int64, availableClusters []string, c
 	// TODO: Prove that clusterCount * log(replicas) iterations solves the problem or adjust the number.
 	// TODO: This algorithm is O(clusterCount^2 * log(replicas)) which is good for up to 100 clusters.
 	// Find something faster.
-	replicasAtStart := remainingReplicas
-	for trial := 0; trial < int(2*(1+math.Log(float64(replicasAtStart)))*float64(len(availableClusters))) &&
-		modified && remainingReplicas > 0; trial++ {
+	for trial := 0; modified && remainingReplicas > 0; trial++ {
 
 		modified = false
 		weightSum := int64(0)
