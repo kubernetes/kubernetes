@@ -152,6 +152,7 @@ mvfolder pkg/client/unversioned/clientcmd tools/clientcmd
 mvfolder pkg/client/unversioned/portforward tools/portforward
 mvfolder pkg/client/metrics tools/metrics
 mvfolder pkg/client/testing/core testing
+mvfolder pkg/client/testing/cache tools/cache/testing
 if [ "$(find "${CLIENT_REPO}"/pkg/client -type f -name "*.go")" ]; then
     echo "${CLIENT_REPO}/pkg/client is expected to be empty"
     exit 1
