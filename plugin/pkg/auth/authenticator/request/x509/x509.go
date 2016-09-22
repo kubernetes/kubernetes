@@ -19,8 +19,10 @@ package x509
 import (
 	"crypto/x509"
 	"encoding/asn1"
+	"errors"
 	"net/http"
 
+	"github.com/cloudflare/cfssl/revoke"
 	"k8s.io/kubernetes/pkg/auth/user"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 )
@@ -40,14 +42,15 @@ func (f UserConversionFunc) User(chain []*x509.Certificate) (user.Info, bool, er
 
 // Authenticator implements request.Authenticator by extracting user info from verified client certificates
 type Authenticator struct {
-	opts x509.VerifyOptions
-	user UserConversion
+	opts   x509.VerifyOptions
+	user   UserConversion
+	revoke *revoke.Revoke
 }
 
 // New returns a request.Authenticator that verifies client certificates using the provided
 // VerifyOptions, and converts valid certificate chains into user.Info using the provided UserConversion
-func New(opts x509.VerifyOptions, user UserConversion) *Authenticator {
-	return &Authenticator{opts, user}
+func New(opts x509.VerifyOptions, user UserConversion, revoke *revoke.Revoke) *Authenticator {
+	return &Authenticator{opts, user, revoke}
 }
 
 // AuthenticateRequest authenticates the request using presented client certificates
@@ -58,6 +61,17 @@ func (a *Authenticator) AuthenticateRequest(req *http.Request) (user.Info, bool,
 
 	var errlist []error
 	for _, cert := range req.TLS.PeerCertificates {
+		if a.revoke != nil {
+			// Check whether certificate was revoked
+			revoked, ok := a.revoke.VerifyCertificate(cert)
+			if !ok && a.revoke.IsHardFail() {
+				return nil, false, errors.New("Failed to fetch CRL")
+			}
+			if revoked {
+				return nil, false, errors.New("Certificate has been revoked")
+			}
+		}
+
 		chains, err := cert.Verify(a.opts)
 		if err != nil {
 			errlist = append(errlist, err)

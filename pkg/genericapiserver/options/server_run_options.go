@@ -119,6 +119,9 @@ type ServerRunOptions struct {
 	TLSCertFile            string
 	TLSPrivateKeyFile      string
 	TokenAuthFile          string
+	CRLCheck               bool
+	CRLHardFail            bool
+	CRLFile                string
 	WatchCacheSizes        []string
 }
 
@@ -149,6 +152,8 @@ func NewServerRunOptions() *ServerRunOptions {
 		SecurePort:                               6443,
 		ServiceNodePortRange:                     DefaultServiceNodePortRange,
 		StorageVersions:                          registered.AllPreferredGroupVersions(),
+		CRLCheck:                                 false,
+		CRLHardFail:                              true,
 	}
 }
 
@@ -465,6 +470,17 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.TokenAuthFile, "token-auth-file", s.TokenAuthFile, ""+
 		"If set, the file that will be used to secure the secure port of the API server "+
 		"via token authentication.")
+
+	fs.BoolVar(&s.CRLCheck, "crl-check", s.CRLCheck,
+		"Enable CRL check for the client server.")
+
+	fs.BoolVar(&s.CRLHardFail, "crl-hard-fail", s.CRLHardFail,
+		"Enable hard fail revocation plan for the the client server."+
+			"Fail CRL check if CRL is unavailable.")
+
+	fs.StringVar(&s.CRLFile, "crl-file", s.CRLFile,
+		"Path to the client server certificate revocation list file."+
+			"If set, automatically enables --crl-check flag.")
 
 	fs.StringSliceVar(&s.WatchCacheSizes, "watch-cache-sizes", s.WatchCacheSizes, ""+
 		"List of watch cache sizes for every resource (pods, nodes, etc.), comma separated. "+
