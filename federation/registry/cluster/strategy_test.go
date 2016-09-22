@@ -27,7 +27,6 @@ import (
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
-	apistorage "k8s.io/kubernetes/pkg/storage"
 )
 
 func validNewCluster() *federation.Cluster {
@@ -146,8 +145,7 @@ func TestMatchCluster(t *testing.T) {
 	for expectedResult, fieldSet := range testFieldMap {
 		for _, field := range fieldSet {
 			m := MatchCluster(labels.Everything(), field.AsSelector())
-			p := (*apistorage.SelectionPredicate)(m)
-			_, matchesSingle := p.MatchesSingle()
+			_, matchesSingle := m.MatchesSingle()
 			if e, a := expectedResult, matchesSingle; e != a {
 				t.Errorf("%+v: expected %v, got %v", fieldSet, e, a)
 			}

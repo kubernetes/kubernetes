@@ -32,7 +32,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/validation/path"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
@@ -85,7 +84,7 @@ type Store struct {
 	TTLFunc func(obj runtime.Object, existing uint64, update bool) (uint64, error)
 
 	// Returns a matcher corresponding to the provided labels and fields.
-	PredicateFunc func(label labels.Selector, field fields.Selector) *generic.SelectionPredicate
+	PredicateFunc func(label labels.Selector, field fields.Selector) storage.SelectionPredicate
 
 	// Called to cleanup storage clients.
 	DestroyFunc func()
@@ -188,8 +187,7 @@ func (e *Store) List(ctx api.Context, options *api.ListOptions) (runtime.Object,
 	if options != nil && options.FieldSelector != nil {
 		field = options.FieldSelector
 	}
-	pred := (*storage.SelectionPredicate)(e.PredicateFunc(label, field))
-	out, err := e.ListPredicate(ctx, *pred, options)
+	out, err := e.ListPredicate(ctx, e.PredicateFunc(label, field), options)
 	if err != nil {
 		return nil, err
 	}
@@ -853,7 +851,7 @@ func (e *Store) finalizeDelete(obj runtime.Object, runHooks bool) (runtime.Objec
 
 // Watch makes a matcher for the given label and field, and calls
 // WatchPredicate. If possible, you should customize PredicateFunc to produre a
-// matcher that matches by key. generic.SelectionPredicate does this for you
+// matcher that matches by key. SelectionPredicate does this for you
 // automatically.
 func (e *Store) Watch(ctx api.Context, options *api.ListOptions) (watch.Interface, error) {
 	label := labels.Everything()
@@ -868,8 +866,7 @@ func (e *Store) Watch(ctx api.Context, options *api.ListOptions) (watch.Interfac
 	if options != nil {
 		resourceVersion = options.ResourceVersion
 	}
-	pred := (*storage.SelectionPredicate)(e.PredicateFunc(label, field))
-	return e.WatchPredicate(ctx, *pred, resourceVersion)
+	return e.WatchPredicate(ctx, e.PredicateFunc(label, field), resourceVersion)
 }
 
 // WatchPredicate starts a watch for the items that m matches.

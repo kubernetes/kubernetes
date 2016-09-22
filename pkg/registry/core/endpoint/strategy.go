@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/runtime"
+	apistorage "k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
@@ -79,12 +80,12 @@ func (endpointsStrategy) AllowUnconditionalUpdate() bool {
 }
 
 // MatchEndpoints returns a generic matcher for a given label and field selector.
-func MatchEndpoints(label labels.Selector, field fields.Selector) *generic.SelectionPredicate {
-	return &generic.SelectionPredicate{Label: label, Field: field, GetAttrs: EndpointsAttributes}
+func MatchEndpoints(label labels.Selector, field fields.Selector) apistorage.SelectionPredicate {
+	return apistorage.SelectionPredicate{Label: label, Field: field, GetAttrs: EndpointsAttributes}
 }
 
 // EndpointsAttributes returns the attributes of an endpoint such that a
-// generic.SelectionPredicate can match appropriately.
+// SelectionPredicate can match appropriately.
 func EndpointsAttributes(obj runtime.Object) (objLabels labels.Set, objFields fields.Set, err error) {
 	endpoints, ok := obj.(*api.Endpoints)
 	if !ok {

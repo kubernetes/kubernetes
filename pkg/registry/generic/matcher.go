@@ -19,7 +19,6 @@ package generic
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/storage"
 )
 
 // ObjectMetaFieldsSet returns a fields that represents the ObjectMeta.
@@ -42,5 +41,3 @@ func MergeFieldsSets(source fields.Set, fragment fields.Set) fields.Set {
 	}
 	return source
 }
-
-type SelectionPredicate storage.SelectionPredicate
