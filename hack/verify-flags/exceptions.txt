@@ -117,9 +117,9 @@ test/e2e/common/host_path.go:			fmt.Sprintf("--file_content_in_loop=%v", filePat
 test/e2e/common/host_path.go:			fmt.Sprintf("--file_content_in_loop=%v", filePathInReader),
 test/e2e/common/host_path.go:			fmt.Sprintf("--retry_time=%d", retryDuration),
 test/e2e/common/host_path.go:			fmt.Sprintf("--retry_time=%d", retryDuration),
-test/e2e/es_cluster_logging.go:		framework.Failf("No cluster_name field in Elasticsearch response: %v", esResponse)
-test/e2e/es_cluster_logging.go:	// Check to see if have a cluster_name field.
-test/e2e/es_cluster_logging.go:	clusterName, ok := esResponse["cluster_name"]
+test/e2e/cluster_logging_es.go:		return fmt.Errorf("No cluster_name field in Elasticsearch response: %v", esResponse)
+test/e2e/cluster_logging_es.go:	// Check to see if have a cluster_name field.
+test/e2e/cluster_logging_es.go:	clusterName, ok := esResponse["cluster_name"]
 test/e2e_node/container_manager_test.go:		return fmt.Errorf("expected pid %d's oom_score_adj to be %d; found %d", pid, expectedOOMScoreAdj, oomScore)
 test/e2e_node/container_manager_test.go:		return fmt.Errorf("expected pid %d's oom_score_adj to be < %d; found %d", pid, expectedMaxOOMScoreAdj, oomScore)
 test/e2e_node/container_manager_test.go:		return fmt.Errorf("expected pid %d's oom_score_adj to be >= %d; found %d", pid, expectedMinOOMScoreAdj, oomScore)
