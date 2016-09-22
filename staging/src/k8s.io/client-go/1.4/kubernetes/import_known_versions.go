@@ -27,6 +27,7 @@ import (
 	_ "k8s.io/client-go/1.4/pkg/apis/batch/install"
 	_ "k8s.io/client-go/1.4/pkg/apis/extensions/install"
 	_ "k8s.io/client-go/1.4/pkg/apis/policy/install"
+	_ "k8s.io/client-go/1.4/pkg/apis/storage/install"
 )
 
 func init() {

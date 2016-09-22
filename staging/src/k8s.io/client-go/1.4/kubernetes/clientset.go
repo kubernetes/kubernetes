@@ -25,6 +25,7 @@ import (
 	v1core "k8s.io/client-go/1.4/kubernetes/typed/core/v1"
 	v1beta1extensions "k8s.io/client-go/1.4/kubernetes/typed/extensions/v1beta1"
 	v1alpha1policy "k8s.io/client-go/1.4/kubernetes/typed/policy/v1alpha1"
+	v1beta1storage "k8s.io/client-go/1.4/kubernetes/typed/storage/v1beta1"
 	"k8s.io/client-go/1.4/pkg/util/flowcontrol"
 	rest "k8s.io/client-go/1.4/rest"
 )
@@ -37,6 +38,7 @@ type Interface interface {
 	Batch() v1batch.BatchInterface
 	Extensions() v1beta1extensions.ExtensionsInterface
 	Policy() v1alpha1policy.PolicyInterface
+	Storage() v1beta1storage.StorageInterface
 }
 
 // Clientset contains the clients for groups. Each group has exactly one
@@ -49,6 +51,7 @@ type Clientset struct {
 	*v1batch.BatchClient
 	*v1beta1extensions.ExtensionsClient
 	*v1alpha1policy.PolicyClient
+	*v1beta1storage.StorageClient
 }
 
 // Core retrieves the CoreClient
@@ -99,6 +102,14 @@ func (c *Clientset) Policy() v1alpha1policy.PolicyInterface {
 	return c.PolicyClient
 }
 
+// Storage retrieves the StorageClient
+func (c *Clientset) Storage() v1beta1storage.StorageInterface {
+	if c == nil {
+		return nil
+	}
+	return c.StorageClient
+}
+
 // Discovery retrieves the DiscoveryClient
 func (c *Clientset) Discovery() discovery.DiscoveryInterface {
 	return c.DiscoveryClient
@@ -136,6 +147,10 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	if err != nil {
 		return nil, err
 	}
+	clientset.StorageClient, err = v1beta1storage.NewForConfig(&configShallowCopy)
+	if err != nil {
+		return nil, err
+	}
 
 	clientset.DiscoveryClient, err = discovery.NewDiscoveryClientForConfig(&configShallowCopy)
 	if err != nil {
@@ -155,6 +170,7 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 	clientset.BatchClient = v1batch.NewForConfigOrDie(c)
 	clientset.ExtensionsClient = v1beta1extensions.NewForConfigOrDie(c)
 	clientset.PolicyClient = v1alpha1policy.NewForConfigOrDie(c)
+	clientset.StorageClient = v1beta1storage.NewForConfigOrDie(c)
 
 	clientset.DiscoveryClient = discovery.NewDiscoveryClientForConfigOrDie(c)
 	return &clientset
@@ -169,6 +185,7 @@ func New(c *rest.RESTClient) *Clientset {
 	clientset.BatchClient = v1batch.New(c)
 	clientset.ExtensionsClient = v1beta1extensions.New(c)
 	clientset.PolicyClient = v1alpha1policy.New(c)
+	clientset.StorageClient = v1beta1storage.New(c)
 
 	clientset.DiscoveryClient = discovery.NewDiscoveryClient(c)
 	return &clientset

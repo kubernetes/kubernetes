@@ -17,9 +17,9 @@ limitations under the License.
 package v1beta1
 
 import (
-	api "k8s.io/client-go/1.4/pkg/api"
-	v1beta1 "k8s.io/client-go/1.4/pkg/apis/extensions/v1beta1"
-	watch "k8s.io/client-go/1.4/pkg/watch"
+	api "k8s.io/kubernetes/pkg/api"
+	v1beta1 "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
+	watch "k8s.io/kubernetes/pkg/watch"
 )
 
 // StorageClassesGetter has a method to return a StorageClassInterface.
@@ -43,11 +43,11 @@ type StorageClassInterface interface {
 
 // storageClasses implements StorageClassInterface
 type storageClasses struct {
-	client *ExtensionsClient
+	client *StorageClient
 }
 
 // newStorageClasses returns a StorageClasses
-func newStorageClasses(c *ExtensionsClient) *storageClasses {
+func newStorageClasses(c *StorageClient) *storageClasses {
 	return &storageClasses{
 		client: c,
 	}
