@@ -20,16 +20,17 @@ import (
 	"hash/adler32"
 	"strings"
 
+	"github.com/golang/glog"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/record"
+	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
 	"k8s.io/kubernetes/third_party/forked/golang/expansion"
-
-	"github.com/golang/glog"
 )
 
 // HandlerRunner runs a lifecycle handler for a container.
@@ -165,4 +166,51 @@ func (irecorder *innerEventRecorder) PastEventf(object runtime.Object, timestamp
 // Pod must not be nil.
 func IsHostNetworkPod(pod *api.Pod) bool {
 	return pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.HostNetwork
+}
+
+// TODO(random-liu): Convert PodStatus to running Pod, should be deprecated soon
+func ConvertPodStatusToRunningPod(runtimeName string, podStatus *PodStatus) Pod {
+	runningPod := Pod{
+		ID:        podStatus.ID,
+		Name:      podStatus.Name,
+		Namespace: podStatus.Namespace,
+	}
+	for _, containerStatus := range podStatus.ContainerStatuses {
+		if containerStatus.State != ContainerStateRunning {
+			continue
+		}
+		container := &Container{
+			ID:      containerStatus.ID,
+			Name:    containerStatus.Name,
+			Image:   containerStatus.Image,
+			ImageID: containerStatus.ImageID,
+			Hash:    containerStatus.Hash,
+			State:   containerStatus.State,
+		}
+		runningPod.Containers = append(runningPod.Containers, container)
+	}
+
+	// Populate sandboxes in kubecontainer.Pod
+	for _, sandbox := range podStatus.SandboxStatuses {
+		runningPod.Sandboxes = append(runningPod.Sandboxes, &Container{
+			ID:    ContainerID{Type: runtimeName, ID: *sandbox.Id},
+			State: SandboxToContainerState(*sandbox.State),
+		})
+	}
+	return runningPod
+}
+
+// sandboxToContainerState converts runtimeApi.PodSandboxState to
+// kubecontainer.ContainerState.
+// This is only needed because we need to return sandboxes as if they were
+// kubecontainer.Containers to avoid substantial changes to PLEG.
+// TODO: Remove this once it becomes obsolete.
+func SandboxToContainerState(state runtimeApi.PodSandBoxState) ContainerState {
+	switch state {
+	case runtimeApi.PodSandBoxState_READY:
+		return ContainerStateRunning
+	case runtimeApi.PodSandBoxState_NOTREADY:
+		return ContainerStateExited
+	}
+	return ContainerStateUnknown
 }
