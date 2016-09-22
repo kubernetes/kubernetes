@@ -22,9 +22,9 @@ package openapi
 
 import (
 	spec "github.com/go-openapi/spec"
-	common "k8s.io/kubernetes/cmd/libs/go2idl/openapi-gen/generators/common"
 	resource "k8s.io/kubernetes/pkg/api/resource"
 	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
+	common "k8s.io/kubernetes/pkg/genericapiserver/openapi/common"
 	intstr "k8s.io/kubernetes/pkg/util/intstr"
 )
 

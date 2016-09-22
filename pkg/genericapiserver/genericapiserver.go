@@ -35,7 +35,6 @@ import (
 	"github.com/golang/glog"
 
 	"github.com/go-openapi/spec"
-	"k8s.io/kubernetes/cmd/libs/go2idl/openapi-gen/generators/common"
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
@@ -44,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/genericapiserver/openapi"
+	"k8s.io/kubernetes/pkg/genericapiserver/openapi/common"
 	"k8s.io/kubernetes/pkg/genericapiserver/options"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/runtime"
