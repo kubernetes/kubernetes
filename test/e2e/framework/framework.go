@@ -34,6 +34,7 @@ import (
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
@@ -58,7 +59,12 @@ const (
 type Framework struct {
 	BaseName string
 
-	Client        *client.Client
+	// Client is manually created and should not be used unless absolutely necessary.  Use Clientset_1_5
+	// where possible.
+	Client *client.Client
+	// ClientSet uses internal objects, you should use Clientset_1_5 where possible.
+	ClientSet internalclientset.Interface
+
 	Clientset_1_5 *release_1_5.Clientset
 	StagingClient *staging.Clientset
 	ClientPool    dynamic.ClientPool
@@ -192,6 +198,8 @@ func (f *Framework) BeforeEach() {
 		c, err := loadClientFromConfig(config)
 		Expect(err).NotTo(HaveOccurred())
 		f.Client = c
+		f.ClientSet, err = internalclientset.NewForConfig(config)
+		Expect(err).NotTo(HaveOccurred())
 		f.Clientset_1_5, err = release_1_5.NewForConfig(config)
 		Expect(err).NotTo(HaveOccurred())
 		clientRepoConfig := getClientRepoConfig(config)
