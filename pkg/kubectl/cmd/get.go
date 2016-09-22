@@ -24,6 +24,7 @@ import (
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -370,6 +371,14 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 	sorting, err := cmd.Flags().GetString("sort-by")
 	if err != nil {
 		return err
+	}
+	if sorting == "" {
+		if len(objs) > 0 {
+			_, ok := objs[0].(*api.Event)
+			if ok {
+				sorting = "{.lastTimestamp}"
+			}
+		}
 	}
 	var sorter *kubectl.RuntimeSort
 	if len(sorting) > 0 && len(objs) > 1 {
