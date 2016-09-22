@@ -40,3 +40,5 @@ pushd "${KUBE_ROOT}" > /dev/null
     ln -s ../../staging/src/k8s.io/client-go vendor/k8s.io/client-go
   fi
 popd > /dev/null
+
+echo "Don't forget to run hack/update-godep-licenses.sh if you added or removed a dependency!"
