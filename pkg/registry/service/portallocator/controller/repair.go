@@ -114,7 +114,7 @@ func (c *Repair) runOnce() error {
 				// TODO: send event
 				// port is broken, reallocate
 				runtime.HandleError(fmt.Errorf("the port %d for service %s/%s was assigned to multiple services; please recreate", port, svc.Name, svc.Namespace))
-			case portallocator.ErrNotInRange:
+			case err.(*portallocator.ErrNotInRange):
 				// TODO: send event
 				// port is broken, reallocate
 				runtime.HandleError(fmt.Errorf("the port %d for service %s/%s is not within the port range %v; please recreate", port, svc.Name, svc.Namespace, c.portRange))
