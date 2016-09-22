@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
 
@@ -106,6 +107,17 @@ func (c *PodClient) Update(name string, updateFn func(pod *api.Pod)) {
 		}
 		return false, fmt.Errorf("failed to update pod %q: %v", name, err)
 	}))
+}
+
+// DeleteSync deletes the pod and wait for the pod to disappear for `timeout`. If the pod doesn't
+// disappear before the timeout, it will fail the test.
+func (c *PodClient) DeleteSync(name string, options *api.DeleteOptions, timeout time.Duration) {
+	err := c.Delete(name, options)
+	if err != nil && !errors.IsNotFound(err) {
+		Failf("Failed to delete pod %q: %v", name, err)
+	}
+	Expect(WaitForPodToDisappear(c.f.Client, c.f.Namespace.Name, name, labels.Everything(),
+		2*time.Second, timeout)).To(Succeed(), "wait for pod %q to disappear", name)
 }
 
 // mungeSpec apply test-suite specific transformations to the pod spec.
