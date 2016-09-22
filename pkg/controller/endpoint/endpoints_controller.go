@@ -71,7 +71,7 @@ var (
 )
 
 // NewEndpointController returns a new *EndpointController.
-func NewEndpointController(podInformer cache.SharedIndexInformer, client *clientset.Clientset) *EndpointController {
+func NewEndpointController(podInformer cache.SharedIndexInformer, client clientset.Interface) *EndpointController {
 	if client != nil && client.Core().GetRESTClient().GetRateLimiter() != nil {
 		metrics.RegisterMetricAndTrackRateLimiterUsage("endpoint_controller", client.Core().GetRESTClient().GetRateLimiter())
 	}
@@ -124,7 +124,7 @@ func NewEndpointControllerFromClient(client *clientset.Clientset, resyncPeriod c
 
 // EndpointController manages selector-based service endpoints.
 type EndpointController struct {
-	client *clientset.Clientset
+	client clientset.Interface
 
 	serviceStore cache.StoreToServiceLister
 	podStore     cache.StoreToPodLister
@@ -348,7 +348,7 @@ func (e *EndpointController) syncService(key string) error {
 			// Don't retry, as the key isn't going to magically become understandable.
 			return nil
 		}
-		err = e.client.Endpoints(namespace).Delete(name, nil)
+		err = e.client.Core().Endpoints(namespace).Delete(name, nil)
 		if err != nil && !errors.IsNotFound(err) {
 			return err
 		}
@@ -451,7 +451,7 @@ func (e *EndpointController) syncService(key string) error {
 	subsets = endpoints.RepackSubsets(subsets)
 
 	// See if there's actually an update here.
-	currentEndpoints, err := e.client.Endpoints(service.Namespace).Get(service.Name)
+	currentEndpoints, err := e.client.Core().Endpoints(service.Namespace).Get(service.Name)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			currentEndpoints = &api.Endpoints{
@@ -497,10 +497,10 @@ func (e *EndpointController) syncService(key string) error {
 	createEndpoints := len(currentEndpoints.ResourceVersion) == 0
 	if createEndpoints {
 		// No previous endpoints, create them
-		_, err = e.client.Endpoints(service.Namespace).Create(newEndpoints)
+		_, err = e.client.Core().Endpoints(service.Namespace).Create(newEndpoints)
 	} else {
 		// Pre-existing
-		_, err = e.client.Endpoints(service.Namespace).Update(newEndpoints)
+		_, err = e.client.Core().Endpoints(service.Namespace).Update(newEndpoints)
 	}
 	if err != nil {
 		if createEndpoints && errors.IsForbidden(err) {
@@ -522,7 +522,7 @@ func (e *EndpointController) syncService(key string) error {
 // some stragglers could have been left behind if the endpoint controller
 // reboots).
 func (e *EndpointController) checkLeftoverEndpoints() {
-	list, err := e.client.Endpoints(api.NamespaceAll).List(api.ListOptions{})
+	list, err := e.client.Core().Endpoints(api.NamespaceAll).List(api.ListOptions{})
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("Unable to list endpoints (%v); orphaned endpoints will not be cleaned up. (They're pretty harmless, but you can restart this component if you want another attempt made.)", err))
 		return
