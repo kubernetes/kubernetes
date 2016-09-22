@@ -643,7 +643,7 @@
       "type": "v1alpha1.PodDisruptionBudgetList",
       "method": "GET",
       "summary": "list or watch objects of kind PodDisruptionBudget",
-      "nickname": "listNamespacedPodDisruptionBudget",
+      "nickname": "listPodDisruptionBudgetForAllNamespaces",
       "parameters": [
        {
         "type": "string",
@@ -720,7 +720,7 @@
       "type": "versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of PodDisruptionBudget",
-      "nickname": "watchNamespacedPodDisruptionBudgetList",
+      "nickname": "watchPodDisruptionBudgetListForAllNamespaces",
       "parameters": [
        {
         "type": "string",
