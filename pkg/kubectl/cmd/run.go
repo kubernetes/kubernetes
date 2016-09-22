@@ -411,7 +411,6 @@ func waitForPod(podClient coreclient.PodsGetter, ns, name string, exitCondition 
 	}()
 
 	intr := interrupt.New(nil, w.Stop)
-	defer intr.Close()
 	var result *api.Pod
 	intr.Run(func() error {
 		ev, err := watch.Until(0, w, func(ev watch.Event) (bool, error) {

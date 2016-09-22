@@ -258,11 +258,9 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 			return err
 		}
 
-		intr := interrupt.New(nil, w.Stop)
-		defer intr.Close()
-
 		first := true
 		filteredResourceCount = 0
+		intr := interrupt.New(nil, w.Stop)
 		intr.Run(func() error {
 			_, err := watch.Until(0, w, func(e watch.Event) (bool, error) {
 				if !isList && first {
