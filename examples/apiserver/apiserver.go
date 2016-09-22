@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/genericapiserver"
+	"k8s.io/kubernetes/pkg/genericapiserver/authorizer"
 	genericoptions "k8s.io/kubernetes/pkg/genericapiserver/options"
 	genericvalidation "k8s.io/kubernetes/pkg/genericapiserver/validation"
 	"k8s.io/kubernetes/pkg/storage/storagebackend"
@@ -39,6 +40,7 @@ const (
 	// Ports on which to run the server.
 	// Explicitly setting these to a different value than the default values, to prevent this from clashing with a local cluster.
 	InsecurePort = 8081
+	SecurePort   = 6444
 )
 
 func newStorageFactory() genericapiserver.StorageFactory {
@@ -65,6 +67,7 @@ func Run(serverOptions *genericoptions.ServerRunOptions) error {
 	genericvalidation.ValidateRunOptions(serverOptions)
 	genericvalidation.VerifyEtcdServersList(serverOptions)
 	config := genericapiserver.NewConfig(serverOptions)
+	config.Authorizer = authorizer.NewAlwaysAllowAuthorizer()
 	config.Serializer = api.Codecs
 	s, err := config.New()
 	if err != nil {

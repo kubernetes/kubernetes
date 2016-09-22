@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"github.com/pborman/uuid"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
@@ -33,6 +34,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/apiserver/authenticator"
+	authorizerunion "k8s.io/kubernetes/pkg/auth/authorizer/union"
+	"k8s.io/kubernetes/pkg/auth/user"
 	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/pkg/generated/openapi"
 	"k8s.io/kubernetes/pkg/genericapiserver"
@@ -51,6 +54,7 @@ import (
 	rolebindingetcd "k8s.io/kubernetes/pkg/registry/rbac/rolebinding/etcd"
 	"k8s.io/kubernetes/pkg/routes"
 	"k8s.io/kubernetes/pkg/util/wait"
+	authenticatorunion "k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/union"
 )
 
 // NewAPIServerCommand creates a *cobra.Command object with default parameters
@@ -109,7 +113,7 @@ func Run(s *options.ServerRunOptions) error {
 		storageFactory.SetEtcdLocation(groupResource, servers)
 	}
 
-	authenticator, err := authenticator.New(authenticator.AuthenticatorConfig{
+	apiAuthenticator, err := authenticator.New(authenticator.AuthenticatorConfig{
 		BasicAuthFile:     s.BasicAuthFile,
 		ClientCAFile:      s.ClientCAFile,
 		TokenAuthFile:     s.TokenAuthFile,
@@ -158,16 +162,36 @@ func Run(s *options.ServerRunOptions) error {
 		authorizationConfig.RBACClusterRoleBindingRegistry = clusterrolebinding.NewRegistry(clusterrolebindingetcd.NewREST(mustGetRESTOptions("clusterrolebindings")))
 	}
 
-	authorizer, err := authorizer.NewAuthorizerFromAuthorizationConfig(authorizationModeNames, authorizationConfig)
+	apiAuthorizer, err := authorizer.NewAuthorizerFromAuthorizationConfig(authorizationModeNames, authorizationConfig)
 	if err != nil {
 		glog.Fatalf("Invalid Authorization Config: %v", err)
 	}
 
 	admissionControlPluginNames := strings.Split(s.AdmissionControl, ",")
-	client, err := s.NewSelfClient()
+	privilegedLoopbackToken := uuid.NewRandom().String()
+
+	client, err := s.NewSelfClient(privilegedLoopbackToken)
 	if err != nil {
 		glog.Errorf("Failed to create clientset: %v", err)
 	}
+
+	// TODO(dims): We probably need to add an option "EnableLoopbackToken"
+	if apiAuthenticator != nil {
+		var uid = uuid.NewRandom().String()
+		tokens := make(map[string]*user.DefaultInfo)
+		tokens[privilegedLoopbackToken] = &user.DefaultInfo{
+			Name:   "system:apiserver",
+			UID:    uid,
+			Groups: []string{"system:masters"},
+		}
+
+		tokenAuthenticator := authenticator.NewAuthenticatorFromTokens(tokens)
+		apiAuthenticator = authenticatorunion.New(apiAuthenticator, tokenAuthenticator)
+
+		tokenAuthorizer := authorizer.NewPrivilegedGroups("system:masters")
+		apiAuthorizer = authorizerunion.New(apiAuthorizer, tokenAuthorizer)
+	}
+
 	sharedInformers := informers.NewSharedInformerFactory(client, 10*time.Minute)
 	pluginInitializer := admission.NewPluginInitializer(sharedInformers)
 
@@ -178,9 +202,9 @@ func Run(s *options.ServerRunOptions) error {
 	genericConfig := genericapiserver.NewConfig(s.ServerRunOptions)
 	// TODO: Move the following to generic api server as well.
 	genericConfig.StorageFactory = storageFactory
-	genericConfig.Authenticator = authenticator
+	genericConfig.Authenticator = apiAuthenticator
 	genericConfig.SupportsBasicAuth = len(s.BasicAuthFile) > 0
-	genericConfig.Authorizer = authorizer
+	genericConfig.Authorizer = apiAuthorizer
 	genericConfig.AuthorizerRBACSuperUser = s.AuthorizationRBACSuperUser
 	genericConfig.AdmissionControl = admissionController
 	genericConfig.APIResourceConfigSource = storageFactory.APIResourceConfigSource
