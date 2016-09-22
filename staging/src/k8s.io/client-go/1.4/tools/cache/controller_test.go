@@ -28,7 +28,7 @@ import (
 	"k8s.io/client-go/1.4/pkg/util/sets"
 	"k8s.io/client-go/1.4/pkg/util/wait"
 	"k8s.io/client-go/1.4/pkg/watch"
-	ftesting "k8s.io/client-go/1.4/tools/cache/testing"
+	fcache "k8s.io/client-go/1.4/tools/cache/testing"
 
 	"github.com/google/gofuzz"
 )
