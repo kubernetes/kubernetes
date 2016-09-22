@@ -13,9 +13,11 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "attacher.go",
         "disk_manager.go",
         "doc.go",
         "rbd.go",
+        "rbd_lock.go",
         "rbd_util.go",
     ],
     tags = ["automanaged"],
@@ -26,7 +28,6 @@ go_library(
         "//pkg/types:go_default_library",
         "//pkg/util/exec:go_default_library",
         "//pkg/util/mount:go_default_library",
-        "//pkg/util/node:go_default_library",
         "//pkg/util/strings:go_default_library",
         "//pkg/util/uuid:go_default_library",
         "//pkg/volume:go_default_library",

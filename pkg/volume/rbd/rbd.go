@@ -96,7 +96,10 @@ func (plugin *rbdPlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
 func (plugin *rbdPlugin) NewMounter(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
 	var secret string
 	var err error
-	source, _ := plugin.getRBDVolumeSource(spec)
+	source, _, err := getVolumeSource(spec)
+	if err != nil {
+		return nil, err
+	}
 
 	if source.SecretRef != nil {
 		if secret, err = parseSecret(pod.Namespace, source.SecretRef.Name, plugin.host.GetKubeClient()); err != nil {
@@ -109,18 +112,12 @@ func (plugin *rbdPlugin) NewMounter(spec *volume.Spec, pod *api.Pod, _ volume.Vo
 	return plugin.newMounterInternal(spec, pod.UID, &RBDUtil{}, plugin.host.GetMounter(), secret)
 }
 
-func (plugin *rbdPlugin) getRBDVolumeSource(spec *volume.Spec) (*api.RBDVolumeSource, bool) {
-	// rbd volumes used directly in a pod have a ReadOnly flag set by the pod author.
-	// rbd volumes used as a PersistentVolume gets the ReadOnly flag indirectly through the persistent-claim volume used to mount the PV
-	if spec.Volume != nil && spec.Volume.RBD != nil {
-		return spec.Volume.RBD, spec.Volume.RBD.ReadOnly
-	} else {
-		return spec.PersistentVolume.Spec.RBD, spec.ReadOnly
-	}
-}
-
 func (plugin *rbdPlugin) newMounterInternal(spec *volume.Spec, podUID types.UID, manager diskManager, mounter mount.Interface, secret string) (volume.Mounter, error) {
-	source, readOnly := plugin.getRBDVolumeSource(spec)
+	source, readOnly, err := getVolumeSource(spec)
+	if err != nil {
+		return nil, err
+	}
+
 	pool := source.RBDPool
 	id := source.RadosUser
 	keyring := source.Keyring
