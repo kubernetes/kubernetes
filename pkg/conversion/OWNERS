@@ -3,3 +3,7 @@ approvers:
 - lavalamp
 - smarterclayton
 - wojtek-t
+reviewers:
+- smarterclayton
+- thockin
+- wojtek-t

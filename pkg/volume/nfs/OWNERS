@@ -1,2 +1,6 @@
 approvers:
 - rootfs
+reviewers:
+- jsafrane
+- saad-ali
+- thockin

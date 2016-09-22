@@ -2,3 +2,7 @@ approvers:
 - lavalamp
 - smarterclayton
 - wojtek-t
+reviewers:
+- brendandburns
+- smarterclayton
+- wojtek-t

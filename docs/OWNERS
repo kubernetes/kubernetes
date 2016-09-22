@@ -3,3 +3,7 @@ approvers:
 - brendandburns
 - smarterclayton
 - thockin
+reviewers:
+- brendandburns
+- erictune
+- thockin

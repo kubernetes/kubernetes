@@ -1,3 +1,7 @@
 approvers:
 - agonzalezro
 - simonswine
+reviewers:
+- david-mcmahon
+- saad-ali
+- simonswine
