@@ -55,6 +55,8 @@ mkcp "/pkg/client/typed" "/pkg/client"
 mkcp "/pkg/client/unversioned/auth" "/pkg/client/unversioned"
 mkcp "/pkg/client/unversioned/clientcmd" "/pkg/client/unversioned"
 mkcp "/pkg/client/unversioned/portforward" "/pkg/client/unversioned"
+
+mkcp "/plugin/pkg/client/auth" "/plugin/pkg/client"
 # remove this test because it imports the internal clientset
 rm "${CLIENT_REPO_TEMP}"/pkg/client/unversioned/portforward/portforward_test.go
 
@@ -126,17 +128,18 @@ function mvfolder {
     local src_package="${src##*/}"
     local dst_package="${dst##*/}"
     find "${CLIENT_REPO}" -type f -name "*.go" -print0 | xargs -0 sed -i "s,package ${src_package},package ${dst_package},g"
-    # rewrite imports
-    # the first rule is to convert import lines like `restclient "k8s.io/client-go/pkg/client/restclient"`,
-    # where a package alias is the same the package name.
-    find "${CLIENT_REPO}" -type f -name "*.go" -print0 | \
-        xargs -0 sed -i "s,${src_package} \"${CLIENT_REPO_FROM_SRC}/${src},${dst_package} \"${CLIENT_REPO_FROM_SRC}/${dst},g"
-    find "${CLIENT_REPO}" -type f -name "*.go" -print0 | \
-        xargs -0 sed -i "s,\"${CLIENT_REPO_FROM_SRC}/${src},\"${CLIENT_REPO_FROM_SRC}/${dst},g"
-    # rewrite import invocation
-    if [ "${src_package}" != "${dst_package}" ]; then
-        find "${CLIENT_REPO}" -type f -name "*.go" -print0 | xargs -0 sed -i "s,\<${src_package}\.\([a-zA-Z]\),${dst_package}\.\1,g"
-    fi
+
+    { grep -Rl "\"${CLIENT_REPO_FROM_SRC}/${src}" "${CLIENT_REPO}" || true ; } | while read -r target ; do
+        # rewrite imports
+        # the first rule is to convert import lines like `restclient "k8s.io/client-go/pkg/client/restclient"`,
+        # where a package alias is the same the package name.
+        sed -i "s,\<${src_package} \"${CLIENT_REPO_FROM_SRC}/${src},${dst_package} \"${CLIENT_REPO_FROM_SRC}/${dst},g" "${target}"
+        sed -i "s,\"${CLIENT_REPO_FROM_SRC}/${src},\"${CLIENT_REPO_FROM_SRC}/${dst},g" "${target}"
+        # rewrite import invocation
+        if [ "${src_package}" != "${dst_package}" ]; then
+            sed -i "s,\<${src_package}\.\([a-zA-Z]\),${dst_package}\.\1,g" "${target}"
+        fi
+    done
 }
 
 mvfolder "pkg/client/clientset_generated/${CLIENTSET}" kubernetes
@@ -151,6 +154,7 @@ mvfolder pkg/client/unversioned/clientcmd tools/clientcmd
 mvfolder pkg/client/unversioned/portforward tools/portforward
 mvfolder pkg/client/metrics tools/metrics
 mvfolder pkg/client/testing/core testing
+mvfolder pkg/client/testing/cache tools/cache/testing
 if [ "$(find "${CLIENT_REPO}"/pkg/client -type f -name "*.go")" ]; then
     echo "${CLIENT_REPO}/pkg/client is expected to be empty"
     exit 1
