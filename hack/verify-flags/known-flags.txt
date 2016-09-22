@@ -506,6 +506,7 @@ tcp-services
 terminated-pod-gc-threshold
 test-flags
 test-timeout
+tls-ca-file
 tls-cert-file
 tls-private-key-file
 to-version
