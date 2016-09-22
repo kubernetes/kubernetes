@@ -42,3 +42,16 @@ func (ds *dockerService) GetContainerLogs(pod *api.Pod, containerID kubecontaine
 func (ds *dockerService) PortForward(pod *kubecontainer.Pod, port uint16, stream io.ReadWriteCloser) error {
 	return fmt.Errorf("not implemented")
 }
+
+func (ds *dockerService) ExecInContainer(containerID kubecontainer.ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size) error {
+	container, err := ds.client.InspectContainer(containerID.ID)
+	if err != nil {
+		return err
+	}
+	if !container.State.Running {
+		return fmt.Errorf("container not running (%s)", container.ID)
+	}
+
+	handler := &dockertools.NativeExecHandler{}
+	return handler.ExecInContainer(ds.client, container, cmd, stdin, stdout, stderr, tty, resize)
+}
