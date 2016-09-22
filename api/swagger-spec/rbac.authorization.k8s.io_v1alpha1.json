@@ -200,7 +200,7 @@
     "description": "API at /apis/rbac.authorization.k8s.io/v1alpha1",
     "operations": [
      {
-      "type": "*versioned.Event",
+      "type": "versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of ClusterRoleBinding",
       "nickname": "watchClusterRoleBindingList",
@@ -258,7 +258,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "*versioned.Event"
+        "responseModel": "versioned.Event"
        }
       ],
       "produces": [
@@ -466,7 +466,7 @@
     "description": "API at /apis/rbac.authorization.k8s.io/v1alpha1",
     "operations": [
      {
-      "type": "*versioned.Event",
+      "type": "versioned.Event",
       "method": "GET",
       "summary": "watch changes to an object of kind ClusterRoleBinding",
       "nickname": "watchClusterRoleBinding",
@@ -532,7 +532,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "*versioned.Event"
+        "responseModel": "versioned.Event"
        }
       ],
       "produces": [
@@ -739,7 +739,7 @@
     "description": "API at /apis/rbac.authorization.k8s.io/v1alpha1",
     "operations": [
      {
-      "type": "*versioned.Event",
+      "type": "versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of ClusterRole",
       "nickname": "watchClusterRoleList",
@@ -797,7 +797,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "*versioned.Event"
+        "responseModel": "versioned.Event"
        }
       ],
       "produces": [
@@ -1005,7 +1005,7 @@
     "description": "API at /apis/rbac.authorization.k8s.io/v1alpha1",
     "operations": [
      {
-      "type": "*versioned.Event",
+      "type": "versioned.Event",
       "method": "GET",
       "summary": "watch changes to an object of kind ClusterRole",
       "nickname": "watchClusterRole",
@@ -1071,7 +1071,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "*versioned.Event"
+        "responseModel": "versioned.Event"
        }
       ],
       "produces": [
@@ -1302,7 +1302,7 @@
     "description": "API at /apis/rbac.authorization.k8s.io/v1alpha1",
     "operations": [
      {
-      "type": "*versioned.Event",
+      "type": "versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of RoleBinding",
       "nickname": "watchNamespacedRoleBindingList",
@@ -1368,7 +1368,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "*versioned.Event"
+        "responseModel": "versioned.Event"
        }
       ],
       "produces": [
@@ -1608,7 +1608,7 @@
     "description": "API at /apis/rbac.authorization.k8s.io/v1alpha1",
     "operations": [
      {
-      "type": "*versioned.Event",
+      "type": "versioned.Event",
       "method": "GET",
       "summary": "watch changes to an object of kind RoleBinding",
       "nickname": "watchNamespacedRoleBinding",
@@ -1682,7 +1682,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "*versioned.Event"
+        "responseModel": "versioned.Event"
        }
       ],
       "produces": [
@@ -1779,7 +1779,7 @@
     "description": "API at /apis/rbac.authorization.k8s.io/v1alpha1",
     "operations": [
      {
-      "type": "*versioned.Event",
+      "type": "versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of RoleBinding",
       "nickname": "watchNamespacedRoleBindingList",
@@ -1837,7 +1837,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "*versioned.Event"
+        "responseModel": "versioned.Event"
        }
       ],
       "produces": [
@@ -2068,7 +2068,7 @@
     "description": "API at /apis/rbac.authorization.k8s.io/v1alpha1",
     "operations": [
      {
-      "type": "*versioned.Event",
+      "type": "versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of Role",
       "nickname": "watchNamespacedRoleList",
@@ -2134,7 +2134,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "*versioned.Event"
+        "responseModel": "versioned.Event"
        }
       ],
       "produces": [
@@ -2374,7 +2374,7 @@
     "description": "API at /apis/rbac.authorization.k8s.io/v1alpha1",
     "operations": [
      {
-      "type": "*versioned.Event",
+      "type": "versioned.Event",
       "method": "GET",
       "summary": "watch changes to an object of kind Role",
       "nickname": "watchNamespacedRole",
@@ -2448,7 +2448,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "*versioned.Event"
+        "responseModel": "versioned.Event"
        }
       ],
       "produces": [
@@ -2545,7 +2545,7 @@
     "description": "API at /apis/rbac.authorization.k8s.io/v1alpha1",
     "operations": [
      {
-      "type": "*versioned.Event",
+      "type": "versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of Role",
       "nickname": "watchNamespacedRoleList",
@@ -2603,7 +2603,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "*versioned.Event"
+        "responseModel": "versioned.Event"
        }
       ],
       "produces": [
@@ -2962,9 +2962,20 @@
      }
     }
    },
-   "*versioned.Event": {
-    "id": "*versioned.Event",
-    "properties": {}
+   "versioned.Event": {
+    "id": "versioned.Event",
+    "required": [
+     "type",
+     "object"
+    ],
+    "properties": {
+     "type": {
+      "type": "string"
+     },
+     "object": {
+      "type": "string"
+     }
+    }
    },
    "unversioned.Patch": {
     "id": "unversioned.Patch",

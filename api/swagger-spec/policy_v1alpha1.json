@@ -224,7 +224,7 @@
     "description": "API at /apis/policy/v1alpha1",
     "operations": [
      {
-      "type": "*versioned.Event",
+      "type": "versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of PodDisruptionBudget",
       "nickname": "watchNamespacedPodDisruptionBudgetList",
@@ -290,7 +290,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "*versioned.Event"
+        "responseModel": "versioned.Event"
        }
       ],
       "produces": [
@@ -546,7 +546,7 @@
     "description": "API at /apis/policy/v1alpha1",
     "operations": [
      {
-      "type": "*versioned.Event",
+      "type": "versioned.Event",
       "method": "GET",
       "summary": "watch changes to an object of kind PodDisruptionBudget",
       "nickname": "watchNamespacedPodDisruptionBudget",
@@ -620,7 +620,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "*versioned.Event"
+        "responseModel": "versioned.Event"
        }
       ],
       "produces": [
@@ -717,7 +717,7 @@
     "description": "API at /apis/policy/v1alpha1",
     "operations": [
      {
-      "type": "*versioned.Event",
+      "type": "versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of PodDisruptionBudget",
       "nickname": "watchNamespacedPodDisruptionBudgetList",
@@ -775,7 +775,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "*versioned.Event"
+        "responseModel": "versioned.Event"
        }
       ],
       "produces": [
@@ -1327,9 +1327,20 @@
      }
     }
    },
-   "*versioned.Event": {
-    "id": "*versioned.Event",
-    "properties": {}
+   "versioned.Event": {
+    "id": "versioned.Event",
+    "required": [
+     "type",
+     "object"
+    ],
+    "properties": {
+     "type": {
+      "type": "string"
+     },
+     "object": {
+      "type": "string"
+     }
+    }
    },
    "unversioned.Patch": {
     "id": "unversioned.Patch",
