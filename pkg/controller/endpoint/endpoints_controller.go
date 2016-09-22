@@ -191,7 +191,7 @@ func (e *EndpointController) getPodServiceMemberships(pod *api.Pod) (sets.String
 		return set, nil
 	}
 	for i := range services {
-		key, err := keyFunc(&services[i])
+		key, err := keyFunc(services[i])
 		if err != nil {
 			return nil, err
 		}
