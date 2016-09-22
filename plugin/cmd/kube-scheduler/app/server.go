@@ -27,6 +27,7 @@ import (
 	"strconv"
 
 	"k8s.io/kubernetes/pkg/api"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/leaderelection"
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
@@ -89,6 +90,10 @@ func Run(s *options.SchedulerServer) error {
 	if err != nil {
 		glog.Fatalf("Invalid API configuration: %v", err)
 	}
+	kubeClientset, err := clientset.NewForConfig(kubeconfig)
+	if err != nil {
+		glog.Fatalf("Invalid API configuration: %v", err)
+	}
 
 	go func() {
 		mux := http.NewServeMux()
@@ -144,12 +149,12 @@ func Run(s *options.SchedulerServer) error {
 			Namespace: "kube-system",
 			Name:      "kube-scheduler",
 		},
-		Client:        kubeClient,
-		Identity:      id,
-		EventRecorder: config.Recorder,
-		LeaseDuration: s.LeaderElection.LeaseDuration.Duration,
-		RenewDeadline: s.LeaderElection.RenewDeadline.Duration,
-		RetryPeriod:   s.LeaderElection.RetryPeriod.Duration,
+		EndpointsClient: kubeClientset.Core(),
+		Identity:        id,
+		EventRecorder:   config.Recorder,
+		LeaseDuration:   s.LeaderElection.LeaseDuration.Duration,
+		RenewDeadline:   s.LeaderElection.RenewDeadline.Duration,
+		RetryPeriod:     s.LeaderElection.RetryPeriod.Duration,
 		Callbacks: leaderelection.LeaderCallbacks{
 			OnStartedLeading: run,
 			OnStoppedLeading: func() {
