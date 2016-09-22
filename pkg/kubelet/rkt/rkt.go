@@ -2102,7 +2102,6 @@ func (r *Runtime) ExecInContainer(containerID kubecontainer.ContainerID, cmd []s
 //  - should we support nsenter + socat in a container, running with elevated privs and --pid=host?
 //
 // TODO(yifan): Merge with the same function in dockertools.
-// TODO(yifan): If the rkt is using lkvm as the stage1 image, then this function will fail.
 func (r *Runtime) PortForward(pod *kubecontainer.Pod, port uint16, stream io.ReadWriteCloser) error {
 	glog.V(4).Infof("Rkt port forwarding in container.")
 
@@ -2123,20 +2122,41 @@ func (r *Runtime) PortForward(pod *kubecontainer.Pod, port uint16, stream io.Rea
 		}
 		return fmt.Errorf("more than one running rkt pod for the kubernetes pod [%s]", strings.Join(podlist, ", "))
 	}
+	listPod := listResp.Pods[0]
 
 	socatPath, lookupErr := exec.LookPath("socat")
 	if lookupErr != nil {
 		return fmt.Errorf("unable to do port forwarding: socat not found.")
 	}
 
-	args := []string{"-t", fmt.Sprintf("%d", listResp.Pods[0].Pid), "-n", socatPath, "-", fmt.Sprintf("TCP4:localhost:%d", port)}
-
-	nsenterPath, lookupErr := exec.LookPath("nsenter")
-	if lookupErr != nil {
-		return fmt.Errorf("unable to do port forwarding: nsenter not found.")
+	// Check in config and in annotations if we're running kvm flavor
+	isKvm := strings.Contains(r.config.Stage1Image, "kvm")
+	for _, anno := range listPod.Annotations {
+		if anno.Key == k8sRktStage1NameAnno {
+			isKvm = strings.Contains(anno.Value, "kvm")
+			break
+		}
 	}
 
-	command := exec.Command(nsenterPath, args...)
+	var args []string
+	var fwCaller string
+	if isKvm {
+		podNetworks := listPod.GetNetworks()
+		if podNetworks == nil {
+			return fmt.Errorf("unable to get networks")
+		}
+		args = []string{"-", fmt.Sprintf("TCP4:%s:%d", podNetworks[0].Ipv4, port)}
+		fwCaller = socatPath
+	} else {
+		args = []string{"-t", fmt.Sprintf("%d", listPod.Pid), "-n", socatPath, "-", fmt.Sprintf("TCP4:localhost:%d", port)}
+		nsenterPath, lookupErr := exec.LookPath("nsenter")
+		if lookupErr != nil {
+			return fmt.Errorf("unable to do port forwarding: nsenter not found")
+		}
+		fwCaller = nsenterPath
+	}
+
+	command := exec.Command(fwCaller, args...)
 	command.Stdout = stream
 
 	// If we use Stdin, command.Run() won't return until the goroutine that's copying
