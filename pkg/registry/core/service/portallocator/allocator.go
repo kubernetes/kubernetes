@@ -82,7 +82,10 @@ func (r *PortAllocator) Free() int {
 func (r *PortAllocator) Allocate(port int) error {
 	ok, offset := r.contains(port)
 	if !ok {
-		return ErrNotInRange
+		// include valid port range in error
+		validPorts := r.portRange.String()
+		msg := fmt.Sprintf("Valid ports range is %s", validPorts)
+		return fmt.Errorf("%v. %s", ErrNotInRange, msg)
 	}
 
 	allocated, err := r.alloc.Allocate(offset)
