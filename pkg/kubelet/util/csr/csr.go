@@ -25,7 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/certificates"
 	unversionedcertificates "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/certificates/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
-	utilcertificates "k8s.io/kubernetes/pkg/util/certificates"
+	certutil "k8s.io/kubernetes/pkg/util/cert"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -39,11 +39,11 @@ func RequestNodeCertificate(client unversionedcertificates.CertificateSigningReq
 		CommonName:   fmt.Sprintf("system:node:%s", nodeName),
 	}
 
-	privateKey, err := utilcertificates.ParsePrivateKey(privateKeyData)
+	privateKey, err := certutil.ParsePrivateKeyPEM(privateKeyData)
 	if err != nil {
 		return nil, fmt.Errorf("invalid private key for certificate request: %v", err)
 	}
-	csr, err := utilcertificates.NewCertificateRequest(privateKey, subject, nil, nil)
+	csr, err := certutil.MakeCSR(privateKey, subject, nil, nil)
 	if err != nil {
 		return nil, fmt.Errorf("unable to generate certificate request: %v", err)
 	}

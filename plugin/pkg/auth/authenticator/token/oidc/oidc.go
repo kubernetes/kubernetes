@@ -40,7 +40,7 @@ import (
 	"github.com/coreos/go-oidc/oidc"
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/auth/user"
-	"k8s.io/kubernetes/pkg/util/crypto"
+	certutil "k8s.io/kubernetes/pkg/util/cert"
 	"k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/util/runtime"
 )
@@ -112,7 +112,7 @@ func New(opts OIDCOptions) (*OIDCAuthenticator, error) {
 
 	var roots *x509.CertPool
 	if opts.CAFile != "" {
-		roots, err = crypto.CertPoolFromFile(opts.CAFile)
+		roots, err = certutil.NewPool(opts.CAFile)
 		if err != nil {
 			return nil, fmt.Errorf("Failed to read the CA file: %v", err)
 		}

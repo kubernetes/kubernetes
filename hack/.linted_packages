@@ -171,9 +171,8 @@ pkg/storage
 pkg/storage/etcd3
 pkg/storage/storagebackend/factory
 pkg/util/async
-pkg/util/certificates
+pkg/util/cert
 pkg/util/codeinspector
-pkg/util/crypto
 pkg/util/flock
 pkg/util/flushwriter
 pkg/util/goroutinemap
