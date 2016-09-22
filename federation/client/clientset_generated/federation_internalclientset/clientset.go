@@ -24,6 +24,7 @@ import (
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	discovery "k8s.io/kubernetes/pkg/client/typed/discovery"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
+	_ "k8s.io/kubernetes/plugin/pkg/client/auth"
 )
 
 type Interface interface {
