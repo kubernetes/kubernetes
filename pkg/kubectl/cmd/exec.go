@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/resource"
 	remotecommandserver "k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
 	"k8s.io/kubernetes/pkg/util/interrupt"
 	"k8s.io/kubernetes/pkg/util/term"
@@ -177,6 +178,12 @@ func (p *ExecOptions) Complete(f *cmdutil.Factory, cmd *cobra.Command, argsIn []
 		p.FullCmdName = "kubectl"
 	}
 
+	namespace, _, err := f.DefaultNamespace()
+	if err != nil {
+		return err
+	}
+	p.Namespace = namespace
+
 	// Let kubectl exec follow rules for `--`, see #13004 issue
 	if len(p.PodName) == 0 && (len(argsIn) == 0 || argsLenAtDash == 0) {
 		return cmdutil.UsageError(cmd, execUsageStr)
@@ -195,22 +202,23 @@ func (p *ExecOptions) Complete(f *cmdutil.Factory, cmd *cobra.Command, argsIn []
 		}
 	}
 
-	mapper, _ := f.Object()
+	clientMapper := resource.ClientMapperFunc(f.ClientForMapping)
+	mapper, typer := f.Object()
+	decoder := f.Decoder(true)
 
-	gr, name, err := resolveResource(api.Resource(string(api.ResourcePods)), p.PodName, mapper)
+	infos, err := resource.NewBuilder(mapper, typer, clientMapper, decoder).
+		NamespaceParam(p.Namespace).DefaultNamespace().
+		ResourceNames(string(api.ResourcePods), p.PodName).
+		SingleResourceType().
+		Do().Infos()
 	if err != nil {
 		return err
 	}
-	if gr.Resource != string(api.ResourcePods) {
+	if len(infos) != 1 {
 		return cmdutil.UsageError(cmd, execUsageStr)
 	}
-	p.PodName = name
 
-	namespace, _, err := f.DefaultNamespace()
-	if err != nil {
-		return err
-	}
-	p.Namespace = namespace
+	p.PodName = infos[0].Name
 
 	config, err := f.ClientConfig()
 	if err != nil {
