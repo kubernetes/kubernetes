@@ -308,7 +308,6 @@ type FakeVolume struct {
 	AttachCallCount             int
 	DetachCallCount             int
 	WaitForAttachCallCount      int
-	WaitForDetachCallCount      int
 	MountDeviceCallCount        int
 	UnmountDeviceCallCount      int
 	GetDeviceMountPathCallCount int
@@ -423,13 +422,6 @@ func (fv *FakeVolume) GetDetachCallCount() int {
 	fv.RLock()
 	defer fv.RUnlock()
 	return fv.DetachCallCount
-}
-
-func (fv *FakeVolume) WaitForDetach(devicePath string, timeout time.Duration) error {
-	fv.Lock()
-	defer fv.Unlock()
-	fv.WaitForDetachCallCount++
-	return nil
 }
 
 func (fv *FakeVolume) UnmountDevice(globalMountPath string) error {

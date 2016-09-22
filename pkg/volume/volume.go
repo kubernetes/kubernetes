@@ -160,11 +160,6 @@ type Detacher interface {
 	// Detach the given device from the given host.
 	Detach(deviceName, hostName string) error
 
-	// WaitForDetach blocks until the device is detached from this
-	// node. If the device does not detach within the given timeout
-	// period an error is returned.
-	WaitForDetach(devicePath string, timeout time.Duration) error
-
 	// UnmountDevice unmounts the global mount of the disk. This
 	// should only be called once all bind mounts have been
 	// unmounted.
