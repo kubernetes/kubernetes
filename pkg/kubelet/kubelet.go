@@ -2981,6 +2981,19 @@ func (kl *Kubelet) setNodeAddress(node *api.Node) error {
 		if err != nil {
 			return fmt.Errorf("failed to get node address from cloud provider: %v", err)
 		}
+
+		if kl.nodeIP != nil {
+			for _, nodeAddress := range nodeAddresses {
+				if nodeAddress.Address == kl.nodeIP.String() {
+					node.Status.Addresses = []api.NodeAddress{
+						{Type: nodeAddress.Type, Address: nodeAddress.Address},
+					}
+					return nil
+				}
+			}
+			return fmt.Errorf("failed to get node address from cloud provider that matches ip: %v", kl.nodeIP)
+		}
+
 		node.Status.Addresses = nodeAddresses
 	} else {
 		if kl.nodeIP != nil {
