@@ -1014,7 +1014,7 @@ func TestDiskPressureNodeFsInodes(t *testing.T) {
 	manager.synchronize(diskInfoProvider, activePodsFunc)
 
 	// we should not have disk pressure
-	if manager.IsUnderDiskPressure() {
+	if manager.IsUnderInodePressure() {
 		t.Errorf("Manager should not report disk pressure")
 	}
 
@@ -1029,7 +1029,7 @@ func TestDiskPressureNodeFsInodes(t *testing.T) {
 	manager.synchronize(diskInfoProvider, activePodsFunc)
 
 	// we should have disk pressure
-	if !manager.IsUnderDiskPressure() {
+	if !manager.IsUnderInodePressure() {
 		t.Errorf("Manager should report disk pressure since soft threshold was met")
 	}
 
@@ -1044,7 +1044,7 @@ func TestDiskPressureNodeFsInodes(t *testing.T) {
 	manager.synchronize(diskInfoProvider, activePodsFunc)
 
 	// we should have disk pressure
-	if !manager.IsUnderDiskPressure() {
+	if !manager.IsUnderInodePressure() {
 		t.Errorf("Manager should report disk pressure since soft threshold was met")
 	}
 
@@ -1069,7 +1069,7 @@ func TestDiskPressureNodeFsInodes(t *testing.T) {
 	manager.synchronize(diskInfoProvider, activePodsFunc)
 
 	// we should not have disk pressure
-	if manager.IsUnderDiskPressure() {
+	if manager.IsUnderInodePressure() {
 		t.Errorf("Manager should not report disk pressure")
 	}
 
@@ -1079,7 +1079,7 @@ func TestDiskPressureNodeFsInodes(t *testing.T) {
 	manager.synchronize(diskInfoProvider, activePodsFunc)
 
 	// we should have disk pressure
-	if !manager.IsUnderDiskPressure() {
+	if !manager.IsUnderInodePressure() {
 		t.Errorf("Manager should report disk pressure")
 	}
 
@@ -1104,7 +1104,7 @@ func TestDiskPressureNodeFsInodes(t *testing.T) {
 	manager.synchronize(diskInfoProvider, activePodsFunc)
 
 	// we should have disk pressure (because transition period not yet met)
-	if !manager.IsUnderDiskPressure() {
+	if !manager.IsUnderInodePressure() {
 		t.Errorf("Manager should report disk pressure")
 	}
 
@@ -1125,7 +1125,7 @@ func TestDiskPressureNodeFsInodes(t *testing.T) {
 	manager.synchronize(diskInfoProvider, activePodsFunc)
 
 	// we should not have disk pressure (because transition period met)
-	if manager.IsUnderDiskPressure() {
+	if manager.IsUnderInodePressure() {
 		t.Errorf("Manager should not report disk pressure")
 	}
 
