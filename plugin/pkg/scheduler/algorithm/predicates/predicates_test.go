@@ -3034,8 +3034,8 @@ func TestPodSchedulesOnNodeWithDiskPressureCondition(t *testing.T) {
 		Status: api.NodeStatus{
 			Conditions: []api.NodeCondition{
 				{
-					Type:   "Ready",
-					Status: "True",
+					Type:   api.NodeReady,
+					Status: api.ConditionTrue,
 				},
 			},
 		},
@@ -3118,8 +3118,8 @@ func TestPodSchedulesOnNodeWithInodePressureCondition(t *testing.T) {
 		Status: api.NodeStatus{
 			Conditions: []api.NodeCondition{
 				{
-					Type:   "InodePressure",
-					Status: "True",
+					Type:   api.NodeInodePressure,
+					Status: api.ConditionTrue,
 				},
 			},
 		},
@@ -3135,13 +3135,13 @@ func TestPodSchedulesOnNodeWithInodePressureCondition(t *testing.T) {
 			pod:      pod,
 			nodeInfo: makeEmptyNodeInfo(noPressureNode),
 			fits:     true,
-			name:     "pod schedulable on node without pressure condition on",
+			name:     "pod schedulable on node without inode pressure condition on",
 		},
 		{
 			pod:      pod,
 			nodeInfo: makeEmptyNodeInfo(pressureNode),
 			fits:     false,
-			name:     "pod not schedulable on node with pressure condition on",
+			name:     "pod not schedulable on node with inode pressure condition on",
 		},
 	}
 	expectedFailureReasons := []algorithm.PredicateFailureReason{ErrNodeUnderInodePressure}
