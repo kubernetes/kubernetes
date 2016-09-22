@@ -20,10 +20,11 @@ import (
 	"fmt"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	_ "k8s.io/kubernetes/pkg/client/metrics/prometheus" // for client metric registration
 	"k8s.io/kubernetes/pkg/client/record"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	clientset "k8s.io/kubernetes/pkg/client/unversioned/adapters/internalclientset"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
@@ -66,7 +67,7 @@ func (c *HollowNodeConfig) addFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&c.ContentType, "kube-api-content-type", "application/vnd.kubernetes.protobuf", "ContentType of requests sent to apiserver.")
 }
 
-func (c *HollowNodeConfig) createClientFromFile() (*client.Client, error) {
+func (c *HollowNodeConfig) createClientConfigFromFile() (*restclient.Config, error) {
 	clientConfig, err := clientcmd.LoadFromFile(c.KubeconfigPath)
 	if err != nil {
 		return nil, fmt.Errorf("error while loading kubeconfig from file %v: %v", c.KubeconfigPath, err)
@@ -76,15 +77,10 @@ func (c *HollowNodeConfig) createClientFromFile() (*client.Client, error) {
 		return nil, fmt.Errorf("error while creating kubeconfig: %v", err)
 	}
 	config.ContentType = c.ContentType
-	client, err := client.New(config)
-	if err != nil {
-		return nil, fmt.Errorf("error while creating client: %v", err)
-	}
-	return client, nil
+	return config, nil
 }
 
 func main() {
-
 	config := HollowNodeConfig{}
 	config.addFlags(pflag.CommandLine)
 	flag.InitFlags()
@@ -94,10 +90,17 @@ func main() {
 	}
 
 	// create a client to communicate with API server.
-	cl, err := config.createClientFromFile()
-	clientset := clientset.FromUnversionedClient(cl)
+	clientConfig, err := config.createClientConfigFromFile()
 	if err != nil {
-		glog.Fatal("Failed to create a Client. Exiting.")
+		glog.Fatalf("Failed to create a ClientConfig: %v. Exiting.", err)
+	}
+	cl, err := client.New(clientConfig)
+	if err != nil {
+		glog.Fatalf("Failed to create a Client: %v. Exiting.", err)
+	}
+	clientset, err := internalclientset.NewForConfig(clientConfig)
+	if err != nil {
+		glog.Fatalf("Failed to create a ClientSet: %v. Exiting.", err)
 	}
 
 	if config.Morph == "kubelet" {

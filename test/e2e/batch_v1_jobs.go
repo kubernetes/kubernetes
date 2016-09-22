@@ -27,7 +27,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	clientsetadapter "k8s.io/kubernetes/pkg/client/unversioned/adapters/internalclientset"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -129,7 +128,7 @@ var _ = framework.KubeDescribe("V1Job", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("scale job up")
-		scaler, err := kubectl.ScalerFor(batch.Kind("Job"), clientsetadapter.FromUnversionedClient(f.Client))
+		scaler, err := kubectl.ScalerFor(batch.Kind("Job"), f.ClientSet)
 		Expect(err).NotTo(HaveOccurred())
 		waitForScale := kubectl.NewRetryParams(5*time.Second, 1*time.Minute)
 		waitForReplicas := kubectl.NewRetryParams(5*time.Second, 5*time.Minute)
@@ -154,7 +153,7 @@ var _ = framework.KubeDescribe("V1Job", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("scale job down")
-		scaler, err := kubectl.ScalerFor(batch.Kind("Job"), clientsetadapter.FromUnversionedClient(f.Client))
+		scaler, err := kubectl.ScalerFor(batch.Kind("Job"), f.ClientSet)
 		Expect(err).NotTo(HaveOccurred())
 		waitForScale := kubectl.NewRetryParams(5*time.Second, 1*time.Minute)
 		waitForReplicas := kubectl.NewRetryParams(5*time.Second, 5*time.Minute)
@@ -177,7 +176,7 @@ var _ = framework.KubeDescribe("V1Job", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("delete a job")
-		reaper, err := kubectl.ReaperFor(batch.Kind("Job"), clientsetadapter.FromUnversionedClient(f.Client))
+		reaper, err := kubectl.ReaperFor(batch.Kind("Job"), f.ClientSet)
 		Expect(err).NotTo(HaveOccurred())
 		timeout := 1 * time.Minute
 		err = reaper.Stop(f.Namespace.Name, job.Name, timeout, api.NewDeleteOptions(0))

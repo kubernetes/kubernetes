@@ -3770,11 +3770,11 @@ func CheckNewRSAnnotations(c clientset.Interface, ns, deploymentName string, exp
 	return nil
 }
 
-func WaitForPodsReady(c *clientset.Clientset, ns, name string, minReadySeconds int) error {
+func WaitForPodsReady(c clientset.Interface, ns, name string, minReadySeconds int) error {
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
 	options := api.ListOptions{LabelSelector: label}
 	return wait.Poll(Poll, 5*time.Minute, func() (bool, error) {
-		pods, err := c.Pods(ns).List(options)
+		pods, err := c.Core().Pods(ns).List(options)
 		if err != nil {
 			return false, nil
 		}
@@ -3788,7 +3788,7 @@ func WaitForPodsReady(c *clientset.Clientset, ns, name string, minReadySeconds i
 }
 
 // Waits for the deployment to clean up old rcs.
-func WaitForDeploymentOldRSsNum(c *clientset.Clientset, ns, deploymentName string, desiredRSNum int) error {
+func WaitForDeploymentOldRSsNum(c clientset.Interface, ns, deploymentName string, desiredRSNum int) error {
 	return wait.Poll(Poll, 5*time.Minute, func() (bool, error) {
 		deployment, err := c.Extensions().Deployments(ns).Get(deploymentName)
 		if err != nil {
@@ -3814,7 +3814,7 @@ func logReplicaSetsOfDeployment(deployment *extensions.Deployment, allOldRSs []*
 	}
 }
 
-func WaitForObservedDeployment(c *clientset.Clientset, ns, deploymentName string, desiredGeneration int64) error {
+func WaitForObservedDeployment(c clientset.Interface, ns, deploymentName string, desiredGeneration int64) error {
 	return deploymentutil.WaitForObservedDeployment(func() (*extensions.Deployment, error) { return c.Extensions().Deployments(ns).Get(deploymentName) }, desiredGeneration, Poll, 1*time.Minute)
 }
 
@@ -3875,7 +3875,7 @@ func WaitForPartialEvents(c *client.Client, ns string, objOrRef runtime.Object, 
 
 type updateDeploymentFunc func(d *extensions.Deployment)
 
-func UpdateDeploymentWithRetries(c *clientset.Clientset, namespace, name string, applyUpdate updateDeploymentFunc) (deployment *extensions.Deployment, err error) {
+func UpdateDeploymentWithRetries(c clientset.Interface, namespace, name string, applyUpdate updateDeploymentFunc) (deployment *extensions.Deployment, err error) {
 	deployments := c.Extensions().Deployments(namespace)
 	err = wait.Poll(10*time.Millisecond, 1*time.Minute, func() (bool, error) {
 		if deployment, err = deployments.Get(name); err != nil {
