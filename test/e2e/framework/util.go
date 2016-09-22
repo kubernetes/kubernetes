@@ -386,6 +386,16 @@ func SkipUnlessServerVersionGTE(v semver.Version, c discovery.ServerVersionInter
 	}
 }
 
+func SkipUnlessServerVersionLT(v semver.Version, c discovery.ServerVersionInterface) {
+	gte, err := ServerVersionGTE(v, c)
+	if err != nil {
+		Failf("Failed to get server version: %v", err)
+	}
+	if gte {
+		Skipf("Supported only for server versions before %q", v)
+	}
+}
+
 // Detects whether the federation namespace exists in the underlying cluster
 func SkipUnlessFederated(c *client.Client) {
 	federationNS := os.Getenv("FEDERATION_NAMESPACE")
