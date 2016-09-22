@@ -17,6 +17,7 @@ limitations under the License.
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net/url"
@@ -27,6 +28,8 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
@@ -138,6 +141,36 @@ type ExecOptions struct {
 	Config      *restclient.Config
 }
 
+func resolveResource(defaultResource unversioned.GroupResource, resourceString string, mapper meta.RESTMapper) (unversioned.GroupResource, string, error) {
+	if mapper == nil {
+		return unversioned.GroupResource{}, "", errors.New("mapper cannot be nil")
+	}
+
+	var name string
+	parts := strings.Split(resourceString, "/")
+	switch len(parts) {
+	case 1:
+		name = parts[0]
+	case 2:
+		name = parts[1]
+
+		// Allow specifying the group the same way kubectl does, as "resource.group.name"
+		groupResource := unversioned.ParseGroupResource(parts[0])
+		// normalize resource case
+		groupResource.Resource = strings.ToLower(groupResource.Resource)
+
+		gvr, err := mapper.ResourceFor(groupResource.WithVersion(""))
+		if err != nil {
+			return unversioned.GroupResource{}, "", err
+		}
+		return gvr.GroupResource(), name, nil
+	default:
+		return unversioned.GroupResource{}, "", fmt.Errorf("invalid resource format: %s", resourceString)
+	}
+
+	return defaultResource, name, nil
+}
+
 // Complete verifies command line arguments and loads data from the command environment
 func (p *ExecOptions) Complete(f *cmdutil.Factory, cmd *cobra.Command, argsIn []string, argsLenAtDash int) error {
 	if len(p.FullCmdName) == 0 {
@@ -162,9 +195,16 @@ func (p *ExecOptions) Complete(f *cmdutil.Factory, cmd *cobra.Command, argsIn []
 		}
 	}
 
-	if strings.HasPrefix(p.PodName, "pod/") {
-		p.PodName = p.PodName[4:]
+	mapper, _ := f.Object()
+
+	gr, name, err := resolveResource(api.Resource(string(api.ResourcePods)), p.PodName, mapper)
+	if err != nil {
+		return err
 	}
+	if gr.Resource != string(api.ResourcePods) {
+		return cmdutil.UsageError(cmd, execUsageStr)
+	}
+	p.PodName = name
 
 	namespace, _, err := f.DefaultNamespace()
 	if err != nil {
