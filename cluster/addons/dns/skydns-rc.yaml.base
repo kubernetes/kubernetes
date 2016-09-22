@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This file should be kept in sync with cluster/images/hyperkube/dns-rc.yaml
-
 # TODO - At some point, we need to rename all skydns-*.yaml.* files to kubedns-*.yaml.*
 
 # __MACHINE_GENERATED_WARNING__
@@ -51,7 +49,6 @@ spec:
           # guaranteed class. Currently, this container falls into the
           # "burstable" category so the kubelet doesn't backoff from restarting it.
           limits:
-            cpu: 100m
             memory: 170Mi
           requests:
             cpu: 100m
@@ -102,9 +99,7 @@ spec:
       - name: healthz
         image: gcr.io/google_containers/exechealthz-amd64:1.1
         resources:
-          # keep request = limit to keep this container in guaranteed class
           limits:
-            cpu: 10m
             memory: 50Mi
           requests:
             cpu: 10m
