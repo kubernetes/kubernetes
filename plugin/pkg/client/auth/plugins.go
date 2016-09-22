@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package plugins
+package auth
 
 import (
 	// Initialize all known client auth plugins.
