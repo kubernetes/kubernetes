@@ -96,7 +96,10 @@ func (plugin *rbdPlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
 func (plugin *rbdPlugin) NewMounter(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
 	var secret string
 	var err error
-	source, _ := plugin.getRBDVolumeSource(spec)
+	source, _, err := getVolumeSource(spec)
+	if err != nil {
+		return nil, err
+	}
 
 	if source.SecretRef != nil {
 		if secret, err = parsePodSecret(pod, source.SecretRef.Name, plugin.host.GetKubeClient()); err != nil {
@@ -109,18 +112,12 @@ func (plugin *rbdPlugin) NewMounter(spec *volume.Spec, pod *api.Pod, _ volume.Vo
 	return plugin.newMounterInternal(spec, pod.UID, &RBDUtil{}, plugin.host.GetMounter(), secret)
 }
 
-func (plugin *rbdPlugin) getRBDVolumeSource(spec *volume.Spec) (*api.RBDVolumeSource, bool) {
-	// rbd volumes used directly in a pod have a ReadOnly flag set by the pod author.
-	// rbd volumes used as a PersistentVolume gets the ReadOnly flag indirectly through the persistent-claim volume used to mount the PV
-	if spec.Volume != nil && spec.Volume.RBD != nil {
-		return spec.Volume.RBD, spec.Volume.RBD.ReadOnly
-	} else {
-		return spec.PersistentVolume.Spec.RBD, spec.ReadOnly
-	}
-}
-
 func (plugin *rbdPlugin) newMounterInternal(spec *volume.Spec, podUID types.UID, manager diskManager, mounter mount.Interface, secret string) (volume.Mounter, error) {
-	source, readOnly := plugin.getRBDVolumeSource(spec)
+	source, readOnly, err := getVolumeSource(spec)
+	if err != nil {
+		return nil, err
+	}
+
 	pool := source.RBDPool
 	id := source.RadosUser
 	keyring := source.Keyring
@@ -431,8 +428,8 @@ func getVolumeSource(
 func parsePodSecret(pod *api.Pod, secretName string, kubeClient clientset.Interface) (string, error) {
 	secret, err := volutil.GetSecretForPod(pod, secretName, kubeClient)
 	if err != nil {
-		glog.Errorf("failed to get secret from [%q/%q]", pod.Namespace, secretName)
-		return "", fmt.Errorf("failed to get secret from [%q/%q]", pod.Namespace, secretName)
+		glog.Errorf("failed to get secret from [%q/%q]: %v", pod.Namespace, secretName, err)
+		return "", fmt.Errorf("failed to get secret from [%q/%q]: %v", pod.Namespace, secretName, err)
 	}
 	return parseSecretMap(secret)
 }
@@ -440,8 +437,8 @@ func parsePodSecret(pod *api.Pod, secretName string, kubeClient clientset.Interf
 func parsePVSecret(namespace, secretName string, kubeClient clientset.Interface) (string, error) {
 	secret, err := volutil.GetSecretForPV(namespace, secretName, rbdPluginName, kubeClient)
 	if err != nil {
-		glog.Errorf("failed to get secret from [%q/%q]", namespace, secretName)
-		return "", fmt.Errorf("failed to get secret from [%q/%q]", namespace, secretName)
+		glog.Errorf("failed to get secret from [%q/%q]: %v", namespace, secretName, err)
+		return "", fmt.Errorf("failed to get secret from [%q/%q]: %v", namespace, secretName, err)
 	}
 	return parseSecretMap(secret)
 }
