@@ -134,30 +134,35 @@ func tooManyRequests(req *http.Request, w http.ResponseWriter) {
 }
 
 // RecoverPanics wraps an http Handler to recover and log panics.
-func RecoverPanics(handler http.Handler) http.Handler {
+func RecoverPanics(handler http.Handler, resolver *RequestInfoResolver) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		defer runtime.HandleCrash(func(err interface{}) {
 			http.Error(w, "This request caused apisever to panic. Look in log for details.", http.StatusInternalServerError)
 			glog.Errorf("APIServer panic'd on %v %v: %v\n%s\n", req.Method, req.RequestURI, err, debug.Stack())
 		})
-		defer httplog.NewLogged(req, &w).StacktraceWhen(
-			httplog.StatusIsNot(
-				http.StatusOK,
-				http.StatusCreated,
-				http.StatusAccepted,
-				http.StatusBadRequest,
-				http.StatusMovedPermanently,
-				http.StatusTemporaryRedirect,
-				http.StatusConflict,
-				http.StatusNotFound,
-				http.StatusUnauthorized,
-				http.StatusForbidden,
-				http.StatusNotModified,
-				errors.StatusUnprocessableEntity,
-				http.StatusSwitchingProtocols,
-			),
-		).Log()
 
+		logger := httplog.NewLogged(req, &w)
+		requestInfo, err := resolver.GetRequestInfo(req)
+		if err != nil || requestInfo.Verb != "proxy" {
+			logger.StacktraceWhen(
+				httplog.StatusIsNot(
+					http.StatusOK,
+					http.StatusCreated,
+					http.StatusAccepted,
+					http.StatusBadRequest,
+					http.StatusMovedPermanently,
+					http.StatusTemporaryRedirect,
+					http.StatusConflict,
+					http.StatusNotFound,
+					http.StatusUnauthorized,
+					http.StatusForbidden,
+					http.StatusNotModified,
+					errors.StatusUnprocessableEntity,
+					http.StatusSwitchingProtocols,
+				),
+			)
+		}
+		defer logger.Log()
 		// Dispatch to the internal handler
 		handler.ServeHTTP(w, req)
 	})

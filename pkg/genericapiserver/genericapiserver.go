@@ -288,7 +288,7 @@ func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
 
 	secureStartedCh := make(chan struct{})
 	if secureLocation != "" {
-		handler := apiserver.TimeoutHandler(apiserver.RecoverPanics(s.Handler), longRunningTimeout)
+		handler := apiserver.TimeoutHandler(apiserver.RecoverPanics(s.Handler, s.NewRequestInfoResolver()), longRunningTimeout)
 		secureServer := &http.Server{
 			Addr:           secureLocation,
 			Handler:        apiserver.MaxInFlightLimit(sem, longRunningRequestCheck, handler),
@@ -358,7 +358,7 @@ func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
 		close(secureStartedCh)
 	}
 
-	handler := apiserver.TimeoutHandler(apiserver.RecoverPanics(s.InsecureHandler), longRunningTimeout)
+	handler := apiserver.TimeoutHandler(apiserver.RecoverPanics(s.InsecureHandler, s.NewRequestInfoResolver()), longRunningTimeout)
 	http := &http.Server{
 		Addr:           insecureLocation,
 		Handler:        handler,
