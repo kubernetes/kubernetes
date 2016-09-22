@@ -87,11 +87,16 @@ type LoadBalancerOpts struct {
 	NodeSecurityGroupID  string     `gcfg:"node-security-group"`
 }
 
+type BlockStorageOpts struct {
+	TrustDevicePath bool `gcfg:"trust-device-path"` // See Issue #33128
+}
+
 // OpenStack is an implementation of cloud provider Interface for OpenStack.
 type OpenStack struct {
 	provider *gophercloud.ProviderClient
 	region   string
 	lbOpts   LoadBalancerOpts
+	bsOpts   BlockStorageOpts
 	// InstanceID of the server where this OpenStack object is instantiated.
 	localInstanceID string
 }
@@ -110,6 +115,7 @@ type Config struct {
 		Region     string
 	}
 	LoadBalancer LoadBalancerOpts
+	BlockStorage BlockStorageOpts
 }
 
 func init() {
@@ -146,6 +152,10 @@ func readConfig(config io.Reader) (Config, error) {
 	}
 
 	var cfg Config
+
+	// Set default values for config params
+	cfg.BlockStorage.TrustDevicePath = false
+
 	err := gcfg.ReadInto(&cfg, config)
 	return cfg, err
 }
@@ -187,6 +197,7 @@ func newOpenStack(cfg Config) (*OpenStack, error) {
 		provider:        provider,
 		region:          cfg.Global.Region,
 		lbOpts:          cfg.LoadBalancer,
+		bsOpts:          cfg.BlockStorage,
 		localInstanceID: id,
 	}
 
@@ -693,8 +704,10 @@ func (os *OpenStack) DeleteVolume(volumeName string) error {
 	return err
 }
 
-// Get device path of attached volume to the compute running kubelet
+// Get device path of attached volume to the compute running kubelet, as known by cinder
 func (os *OpenStack) GetAttachmentDiskPath(instanceID string, diskName string) (string, error) {
+	// See issue #33128 - Cinder does not always tell you the right device path, as such
+	// we must only use this value as a last resort.
 	disk, err := os.getVolume(diskName)
 	if err != nil {
 		return "", err
@@ -723,4 +736,9 @@ func (os *OpenStack) DiskIsAttached(diskName, instanceID string) (bool, error) {
 		return true, nil
 	}
 	return false, nil
+}
+
+// query if we should trust the cinder provide deviceName, See issue #33128
+func (os *OpenStack) ShouldTrustDevicePath() bool {
+	return os.bsOpts.TrustDevicePath
 }
