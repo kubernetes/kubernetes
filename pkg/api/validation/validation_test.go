@@ -5148,6 +5148,14 @@ func TestValidateService(t *testing.T) {
 			},
 			numErrs: 1,
 		},
+		{
+			name: "LoadBalancer type cannot have None ClusterIP",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.ClusterIP = "None"
+				s.Spec.Type = api.ServiceTypeLoadBalancer
+			},
+			numErrs: 1,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -6387,6 +6395,14 @@ func TestValidateServiceUpdate(t *testing.T) {
 				newSvc.Spec.Type = api.ServiceTypeNodePort
 			},
 			numErrs: 0,
+		},
+		{
+			name: "LoadBalancer type cannot have None ClusterIP",
+			tweakSvc: func(oldSvc, newSvc *api.Service) {
+				newSvc.Spec.ClusterIP = "None"
+				newSvc.Spec.Type = api.ServiceTypeLoadBalancer
+			},
+			numErrs: 1,
 		},
 	}
 
