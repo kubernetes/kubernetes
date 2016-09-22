@@ -1209,7 +1209,7 @@ func TestDoRequestNewWayFile(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	defer file.Close()
-
+	defer os.Remove(file.Name())
 	_, err = file.Write(reqBodyExpected)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
