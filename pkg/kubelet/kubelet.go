@@ -561,6 +561,8 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 				klet.httpClient,
 				imageBackOff,
 				kubeCfg.SerializeImagePulls,
+				float32(kubeCfg.RegistryPullQPS),
+				int(kubeCfg.RegistryBurst),
 				klet.cpuCFSQuota,
 				dockerService,
 				dockerService,
@@ -625,6 +627,8 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 			kubecontainer.RealOS{},
 			imageBackOff,
 			kubeCfg.SerializeImagePulls,
+			float32(kubeCfg.RegistryPullQPS),
+			int(kubeCfg.RegistryBurst),
 			kubeCfg.RuntimeRequestTimeout.Duration,
 		)
 		if err != nil {
@@ -651,6 +655,8 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 			klet.httpClient,
 			imageBackOff,
 			kubeCfg.SerializeImagePulls,
+			float32(kubeCfg.RegistryPullQPS),
+			int(kubeCfg.RegistryBurst),
 			klet.cpuCFSQuota,
 			remoteRuntimeService,
 			remoteImageService,

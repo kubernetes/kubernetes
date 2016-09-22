@@ -28,7 +28,6 @@ import (
 
 // PullImage pulls an image from the network to local storage using the supplied
 // secrets if necessary.
-// TODO: pull image with qps and burst, ref https://github.com/kubernetes/kubernetes/blob/master/pkg/kubelet/dockertools/docker.go#L120
 func (m *kubeGenericRuntimeManager) PullImage(image kubecontainer.ImageSpec, pullSecrets []api.Secret) error {
 	img := image.Image
 	repoToPull, _, _, err := parsers.ParseImageName(img)
