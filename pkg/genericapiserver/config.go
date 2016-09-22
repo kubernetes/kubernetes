@@ -377,6 +377,7 @@ func (c Config) New() (*GenericAPIServer, error) {
 
 	attributeGetter := apiserver.NewRequestAttributeGetter(c.RequestContextMapper, s.NewRequestInfoResolver())
 	handler = apiserver.WithAuthorizationCheck(handler, attributeGetter, c.Authorizer)
+	handler = apiserver.WithImpersonation(handler, c.RequestContextMapper, c.Authorizer)
 	if len(c.AuditLogPath) != 0 {
 		// audit handler must comes before the impersonationFilter to read the original user
 		writer := &lumberjack.Logger{
@@ -386,9 +387,7 @@ func (c Config) New() (*GenericAPIServer, error) {
 			MaxSize:    c.AuditLogMaxSize,
 		}
 		handler = audit.WithAudit(handler, attributeGetter, writer)
-		defer writer.Close()
 	}
-	handler = apiserver.WithImpersonation(handler, c.RequestContextMapper, c.Authorizer)
 
 	// Install Authenticator
 	if c.Authenticator != nil {
