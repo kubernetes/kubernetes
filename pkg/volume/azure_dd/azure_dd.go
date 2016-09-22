@@ -163,7 +163,7 @@ func (plugin *azureDataDiskPlugin) ConstructVolumeSpec(volName, mountPath string
 			},
 		},
 	}
-	return volume.NewSpecFromVolume(azVolume), nil
+	return volume.NewSpecFromVolume(azVolume, ""), nil
 }
 
 func (plugin *azureDataDiskPlugin) GetDeviceMountRefs(deviceMountPath string) ([]string, error) {

@@ -339,7 +339,7 @@ func (dswp *desiredStateOfWorldPopulator) createVolumeSpec(
 			clonedPodVolumeObj)
 	}
 
-	return volume.NewSpecFromVolume(&clonedPodVolume), "", nil
+	return volume.NewSpecFromVolume(&clonedPodVolume, podNamespace), "", nil
 }
 
 // getPVCExtractPV fetches the PVC object with the given namespace and name from
@@ -397,7 +397,7 @@ func (dswp *desiredStateOfWorldPopulator) getPVSpec(
 	}
 
 	volumeGidValue := getPVVolumeGidAnnotationValue(pv)
-	return volume.NewSpecFromPersistentVolume(pv, pvcReadOnly), volumeGidValue, nil
+	return volume.NewSpecFromPersistentVolume(pv, pvcReadOnly, pv.Spec.ClaimRef.Namespace), volumeGidValue, nil
 }
 
 func getPVVolumeGidAnnotationValue(pv *api.PersistentVolume) string {

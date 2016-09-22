@@ -188,7 +188,7 @@ func (plugin *flexVolumePlugin) ConstructVolumeSpec(volumeName, sourceName strin
 			},
 		},
 	}
-	return volume.NewSpecFromVolume(flexVolume), nil
+	return volume.NewSpecFromVolume(flexVolume, ""), nil
 }
 
 // flexVolume is the disk resource provided by this plugin.

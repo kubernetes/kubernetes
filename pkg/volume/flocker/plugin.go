@@ -126,7 +126,7 @@ func (p *flockerPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volu
 			},
 		},
 	}
-	return volume.NewSpecFromVolume(flockerVolume), nil
+	return volume.NewSpecFromVolume(flockerVolume, ""), nil
 }
 
 type flockerMounter struct {

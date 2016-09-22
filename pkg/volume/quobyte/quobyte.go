@@ -145,7 +145,7 @@ func (plugin *quobytePlugin) ConstructVolumeSpec(volumeName, mountPath string) (
 			},
 		},
 	}
-	return volume.NewSpecFromVolume(quobyteVolume), nil
+	return volume.NewSpecFromVolume(quobyteVolume, ""), nil
 }
 
 func (plugin *quobytePlugin) NewMounter(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {

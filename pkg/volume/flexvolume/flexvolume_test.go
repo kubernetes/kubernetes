@@ -378,7 +378,7 @@ func TestPluginVolumeAttacher(t *testing.T) {
 		Name:         "vol1",
 		VolumeSource: api.VolumeSource{FlexVolume: &api.FlexVolumeSource{Driver: "kubernetes.io/fakeAttacher", ReadOnly: false}},
 	}
-	doTestPluginAttachDetach(t, volume.NewSpecFromVolume(vol), tmpDir)
+	doTestPluginAttachDetach(t, volume.NewSpecFromVolume(vol, ""), tmpDir)
 }
 
 func TestPluginVolumeMounter(t *testing.T) {
@@ -392,7 +392,7 @@ func TestPluginVolumeMounter(t *testing.T) {
 		Name:         "vol1",
 		VolumeSource: api.VolumeSource{FlexVolume: &api.FlexVolumeSource{Driver: "kubernetes.io/fakeMounter", ReadOnly: false}},
 	}
-	doTestPluginMountUnmount(t, volume.NewSpecFromVolume(vol), tmpDir)
+	doTestPluginMountUnmount(t, volume.NewSpecFromVolume(vol, ""), tmpDir)
 }
 
 func TestPluginPersistentVolume(t *testing.T) {
@@ -413,5 +413,5 @@ func TestPluginPersistentVolume(t *testing.T) {
 		},
 	}
 
-	doTestPluginAttachDetach(t, volume.NewSpecFromPersistentVolume(vol, false), tmpDir)
+	doTestPluginAttachDetach(t, volume.NewSpecFromPersistentVolume(vol, false, ""), tmpDir)
 }

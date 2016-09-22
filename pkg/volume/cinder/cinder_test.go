@@ -150,7 +150,7 @@ func TestPlugin(t *testing.T) {
 			},
 		},
 	}
-	mounter, err := plug.(*cinderPlugin).newMounterInternal(volume.NewSpecFromVolume(spec), types.UID("poduid"), &fakePDManager{0}, &mount.FakeMounter{})
+	mounter, err := plug.(*cinderPlugin).newMounterInternal(volume.NewSpecFromVolume(spec, ""), types.UID("poduid"), &fakePDManager{0}, &mount.FakeMounter{})
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)
 	}

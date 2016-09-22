@@ -220,7 +220,7 @@ func (plugin *cinderPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*
 			},
 		},
 	}
-	return volume.NewSpecFromVolume(cinderVolume), nil
+	return volume.NewSpecFromVolume(cinderVolume, ""), nil
 }
 
 // Abstract interface to PD operations.

@@ -104,7 +104,7 @@ func TestPlugin(t *testing.T) {
 	// Test Mounter
 	fakeManager := &fakePDManager{}
 	fakeMounter := &mount.FakeMounter{}
-	mounter, err := plug.(*vsphereVolumePlugin).newMounterInternal(volume.NewSpecFromVolume(spec), types.UID("poduid"), fakeManager, fakeMounter)
+	mounter, err := plug.(*vsphereVolumePlugin).newMounterInternal(volume.NewSpecFromVolume(spec, ""), types.UID("poduid"), fakeManager, fakeMounter)
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)
 	}

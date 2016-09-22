@@ -230,7 +230,7 @@ func doTestPlugin(scenario struct {
 		return allErrs
 	}
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: types.UID("poduid")}}
-	mounter, err := plug.NewMounter(volume.NewSpecFromVolume(scenario.vol), pod, volume.VolumeOptions{})
+	mounter, err := plug.NewMounter(volume.NewSpecFromVolume(scenario.vol, ""), pod, volume.VolumeOptions{})
 
 	if err != nil {
 		allErrs = append(allErrs,

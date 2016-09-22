@@ -214,7 +214,7 @@ func TestPluginVolume(t *testing.T) {
 		Name:         "vol1",
 		VolumeSource: api.VolumeSource{NFS: &api.NFSVolumeSource{Server: "localhost", Path: "/somepath", ReadOnly: false}},
 	}
-	doTestPlugin(t, volume.NewSpecFromVolume(vol))
+	doTestPlugin(t, volume.NewSpecFromVolume(vol, ""))
 }
 
 func TestPluginPersistentVolume(t *testing.T) {
@@ -229,7 +229,7 @@ func TestPluginPersistentVolume(t *testing.T) {
 		},
 	}
 
-	doTestPlugin(t, volume.NewSpecFromPersistentVolume(vol, false))
+	doTestPlugin(t, volume.NewSpecFromPersistentVolume(vol, false, ""))
 }
 
 func TestPersistentClaimReadOnlyFlag(t *testing.T) {
@@ -273,7 +273,7 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 	plug, _ := plugMgr.FindPluginByName(nfsPluginName)
 
 	// readOnly bool is supplied by persistent-claim volume source when its mounter creates other volumes
-	spec := volume.NewSpecFromPersistentVolume(pv, true)
+	spec := volume.NewSpecFromPersistentVolume(pv, true, "")
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: types.UID("poduid")}}
 	mounter, _ := plug.NewMounter(spec, pod, volume.VolumeOptions{})
 

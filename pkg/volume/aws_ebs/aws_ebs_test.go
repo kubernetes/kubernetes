@@ -129,7 +129,7 @@ func TestPlugin(t *testing.T) {
 	}
 	fakeManager := &fakePDManager{}
 	fakeMounter := &mount.FakeMounter{}
-	mounter, err := plug.(*awsElasticBlockStorePlugin).newMounterInternal(volume.NewSpecFromVolume(spec), types.UID("poduid"), fakeManager, fakeMounter)
+	mounter, err := plug.(*awsElasticBlockStorePlugin).newMounterInternal(volume.NewSpecFromVolume(spec, ""), types.UID("poduid"), fakeManager, fakeMounter)
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)
 	}
@@ -258,7 +258,7 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 	plug, _ := plugMgr.FindPluginByName(awsElasticBlockStorePluginName)
 
 	// readOnly bool is supplied by persistent-claim volume source when its mounter creates other volumes
-	spec := volume.NewSpecFromPersistentVolume(pv, true)
+	spec := volume.NewSpecFromPersistentVolume(pv, true, "")
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: types.UID("poduid")}}
 	mounter, _ := plug.NewMounter(spec, pod, volume.VolumeOptions{})
 
@@ -290,7 +290,7 @@ func TestMounterAndUnmounterTypeAssert(t *testing.T) {
 		},
 	}
 
-	mounter, err := plug.(*awsElasticBlockStorePlugin).newMounterInternal(volume.NewSpecFromVolume(spec), types.UID("poduid"), &fakePDManager{}, &mount.FakeMounter{})
+	mounter, err := plug.(*awsElasticBlockStorePlugin).newMounterInternal(volume.NewSpecFromVolume(spec, ""), types.UID("poduid"), &fakePDManager{}, &mount.FakeMounter{})
 	if _, ok := mounter.(volume.Unmounter); ok {
 		t.Errorf("Volume Mounter can be type-assert to Unmounter")
 	}

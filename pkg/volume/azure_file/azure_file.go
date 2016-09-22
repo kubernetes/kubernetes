@@ -134,7 +134,7 @@ func (plugin *azureFilePlugin) ConstructVolumeSpec(volName, mountPath string) (*
 			},
 		},
 	}
-	return volume.NewSpecFromVolume(azureVolume), nil
+	return volume.NewSpecFromVolume(azureVolume, ""), nil
 }
 
 // azureFile volumes represent mount of an AzureFile share.

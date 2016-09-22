@@ -148,7 +148,7 @@ func (plugin *fcPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volu
 			FC: &api.FCVolumeSource{},
 		},
 	}
-	return volume.NewSpecFromVolume(fcVolume), nil
+	return volume.NewSpecFromVolume(fcVolume, ""), nil
 }
 
 type fcDisk struct {

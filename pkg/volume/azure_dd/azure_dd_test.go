@@ -119,7 +119,7 @@ func TestPlugin(t *testing.T) {
 			},
 		},
 	}
-	mounter, err := plug.(*azureDataDiskPlugin).newMounterInternal(volume.NewSpecFromVolume(spec), types.UID("poduid"), &mount.FakeMounter{})
+	mounter, err := plug.(*azureDataDiskPlugin).newMounterInternal(volume.NewSpecFromVolume(spec, ""), types.UID("poduid"), &mount.FakeMounter{})
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)
 	}

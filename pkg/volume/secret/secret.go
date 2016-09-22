@@ -119,7 +119,7 @@ func (plugin *secretPlugin) ConstructVolumeSpec(volName, mountPath string) (*vol
 			},
 		},
 	}
-	return volume.NewSpecFromVolume(secretVolume), nil
+	return volume.NewSpecFromVolume(secretVolume, ""), nil
 }
 
 type secretVolume struct {
