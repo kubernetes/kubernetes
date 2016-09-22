@@ -266,14 +266,14 @@ func TestUnavailable(t *testing.T) {
 
 	// Add three pods, verifying that the counts go up at each step.
 	pods := []*api.Pod{}
-	for i := int32(0); i < 4; i++ {
+	for i := int32(0); i < 3; i++ {
 		ps.VerifyPdbStatus(t, pdbName, false, i, 3, i)
 		pod, _ := newPod(t, fmt.Sprintf("yo-yo-yo %d", i))
 		pods = append(pods, pod)
 		add(t, dc.podLister.Indexer, pod)
 		dc.sync(pdbName)
 	}
-	ps.VerifyPdbStatus(t, pdbName, true, 4, 3, 4)
+	ps.VerifyPdbStatus(t, pdbName, true, 3, 3, 3)
 
 	// Now set one pod as unavailable
 	pods[0].Status.Conditions = []api.PodCondition{}
@@ -281,7 +281,7 @@ func TestUnavailable(t *testing.T) {
 	dc.sync(pdbName)
 
 	// Verify expected update
-	ps.VerifyPdbStatus(t, pdbName, false, 3, 3, 4)
+	ps.VerifyPdbStatus(t, pdbName, false, 2, 3, 3)
 }
 
 // Create a pod  with no controller, and verify that a PDB with a percentage
@@ -366,8 +366,8 @@ func TestReplicationController(t *testing.T) {
 
 	dc, ps := newFakeDisruptionController()
 
-	// 34% should round up to 2
-	pdb, pdbName := newPodDisruptionBudget(t, intstr.FromString("34%"))
+	// 67% should round up to 3
+	pdb, pdbName := newPodDisruptionBudget(t, intstr.FromString("67%"))
 	add(t, dc.pdbLister.Store, pdb)
 	rc, _ := newReplicationController(t, 3)
 	rc.Spec.Selector = labels
@@ -386,9 +386,9 @@ func TestReplicationController(t *testing.T) {
 		add(t, dc.podLister.Indexer, pod)
 		dc.sync(pdbName)
 		if i < 2 {
-			ps.VerifyPdbStatus(t, pdbName, false, i+1, 2, 3)
+			ps.VerifyPdbStatus(t, pdbName, false, i+1, 3, 3)
 		} else {
-			ps.VerifyPdbStatus(t, pdbName, true, 3, 2, 3)
+			ps.VerifyPdbStatus(t, pdbName, true, 3, 3, 3)
 		}
 	}
 
@@ -411,18 +411,9 @@ func TestTwoControllers(t *testing.T) {
 	}
 	dc, ps := newFakeDisruptionController()
 
-	// These constants are related, but I avoid calculating the correct values in
-	// code.  If you update a parameter here, recalculate the correct values for
-	// all of them.  Further down in the test, we use these to control loops, and
-	// that level of logic is enough complexity for me.
-	const collectionSize int32 = 11   // How big each collection is
-	const minAvailable string = "28%" // minAvailable we'll specify
-	const minimumOne int32 = 4        // integer minimum with one controller
-	const minimumTwo int32 = 7        // integer minimum with two controllers
-
 	pdb, pdbName := newPodDisruptionBudget(t, intstr.FromString("28%"))
 	add(t, dc.pdbLister.Store, pdb)
-	rc, _ := newReplicationController(t, collectionSize)
+	rc, _ := newReplicationController(t, 11)
 	rc.Spec.Selector = rcLabels
 	add(t, dc.rcLister.Indexer, rc)
 	dc.sync(pdbName)
@@ -431,74 +422,71 @@ func TestTwoControllers(t *testing.T) {
 
 	pods := []*api.Pod{}
 
-	unavailablePods := collectionSize - minimumOne - 1
-	for i := int32(1); i <= collectionSize; i++ {
+	for i := int32(0); i < 11; i++ {
 		pod, _ := newPod(t, fmt.Sprintf("quux %d", i))
 		pods = append(pods, pod)
 		pod.Labels = rcLabels
-		if i <= unavailablePods {
+		if i < 7 {
 			pod.Status.Conditions = []api.PodCondition{}
 		}
 		add(t, dc.podLister.Indexer, pod)
 		dc.sync(pdbName)
-		if i <= unavailablePods {
-			ps.VerifyPdbStatus(t, pdbName, false, 0, minimumOne, collectionSize)
-		} else if i-unavailablePods <= minimumOne {
-			ps.VerifyPdbStatus(t, pdbName, false, i-unavailablePods, minimumOne, collectionSize)
+		if i < 7 {
+			ps.VerifyPdbStatus(t, pdbName, false, 0, 4, 11)
+		} else if i < 10 {
+			ps.VerifyPdbStatus(t, pdbName, false, i-6, 4, 11)
 		} else {
-			ps.VerifyPdbStatus(t, pdbName, true, i-unavailablePods, minimumOne, collectionSize)
+			ps.VerifyPdbStatus(t, pdbName, true, 4, 4, 11)
 		}
 	}
 
-	d, _ := newDeployment(t, collectionSize)
+	d, _ := newDeployment(t, 11)
 	d.Spec.Selector = newSel(dLabels)
 	add(t, dc.dLister.Indexer, d)
 	dc.sync(pdbName)
-	ps.VerifyPdbStatus(t, pdbName, true, minimumOne+1, minimumOne, collectionSize)
+	ps.VerifyPdbStatus(t, pdbName, true, 4, 4, 11)
 
-	rs, _ := newReplicaSet(t, collectionSize)
+	rs, _ := newReplicaSet(t, 11)
 	rs.Spec.Selector = newSel(dLabels)
 	rs.Labels = dLabels
 	add(t, dc.rsLister.Store, rs)
 	dc.sync(pdbName)
-	ps.VerifyPdbStatus(t, pdbName, true, minimumOne+1, minimumOne, collectionSize)
+	ps.VerifyPdbStatus(t, pdbName, true, 4, 4, 11)
 
-	// By the end of this loop, the number of ready pods should be N+2 (hence minimumTwo+2).
-	unavailablePods = 2*collectionSize - (minimumTwo + 2) - unavailablePods
-	for i := int32(1); i <= collectionSize; i++ {
+	for i := int32(0); i < 11; i++ {
 		pod, _ := newPod(t, fmt.Sprintf("quuux %d", i))
 		pods = append(pods, pod)
 		pod.Labels = dLabels
-		if i <= unavailablePods {
+		if i < 7 {
 			pod.Status.Conditions = []api.PodCondition{}
 		}
 		add(t, dc.podLister.Indexer, pod)
 		dc.sync(pdbName)
-		if i <= unavailablePods {
-			ps.VerifyPdbStatus(t, pdbName, false, minimumOne+1, minimumTwo, 2*collectionSize)
-		} else if i-unavailablePods <= minimumTwo-(minimumOne+1) {
-			ps.VerifyPdbStatus(t, pdbName, false, (minimumOne+1)+(i-unavailablePods), minimumTwo, 2*collectionSize)
+		if i < 7 {
+			ps.VerifyPdbStatus(t, pdbName, false, 4, 7, 22)
+		} else if i < 9 {
+			ps.VerifyPdbStatus(t, pdbName, false, 4+i-6, 7, 22)
 		} else {
-			ps.VerifyPdbStatus(t, pdbName, true, (minimumOne+1)+(i-unavailablePods), minimumTwo, 2*collectionSize)
+			ps.VerifyPdbStatus(t, pdbName, true, 4+i-6, 7, 22)
 		}
 	}
 
 	// Now we verify we can bring down 1 pod and a disruption is still permitted,
 	// but if we bring down two, it's not.  Then we make the pod ready again and
 	// verify that a disruption is permitted again.
-	ps.VerifyPdbStatus(t, pdbName, true, 2+minimumTwo, minimumTwo, 2*collectionSize)
-	pods[collectionSize-1].Status.Conditions = []api.PodCondition{}
-	update(t, dc.podLister.Indexer, pods[collectionSize-1])
+	ps.VerifyPdbStatus(t, pdbName, true, 8, 7, 22)
+	pods[10].Status.Conditions = []api.PodCondition{}
+	update(t, dc.podLister.Indexer, pods[10])
 	dc.sync(pdbName)
-	ps.VerifyPdbStatus(t, pdbName, true, 1+minimumTwo, minimumTwo, 2*collectionSize)
+	ps.VerifyPdbStatus(t, pdbName, true, 7, 7, 22)
 
-	pods[collectionSize-2].Status.Conditions = []api.PodCondition{}
-	update(t, dc.podLister.Indexer, pods[collectionSize-2])
+	pods[9].Status.Conditions = []api.PodCondition{}
+	update(t, dc.podLister.Indexer, pods[9])
 	dc.sync(pdbName)
-	ps.VerifyPdbStatus(t, pdbName, false, minimumTwo, minimumTwo, 2*collectionSize)
+	ps.VerifyPdbStatus(t, pdbName, false, 6, 7, 22)
 
-	pods[collectionSize-1].Status.Conditions = []api.PodCondition{{Type: api.PodReady, Status: api.ConditionTrue}}
-	update(t, dc.podLister.Indexer, pods[collectionSize-1])
+	pods[10].Status.Conditions = []api.PodCondition{{Type: api.PodReady, Status: api.ConditionTrue}}
+	update(t, dc.podLister.Indexer, pods[10])
 	dc.sync(pdbName)
-	ps.VerifyPdbStatus(t, pdbName, true, 1+minimumTwo, minimumTwo, 2*collectionSize)
+	ps.VerifyPdbStatus(t, pdbName, true, 7, 7, 22)
 }
