@@ -383,7 +383,7 @@ func (tw *closeHijackTimeoutWriter) Hijack() (net.Conn, *bufio.ReadWriter, error
 // For a more detailed implementation use https://github.com/martini-contrib/cors
 // or implement CORS at your proxy layer
 // Pass nil for allowedMethods and allowedHeaders to use the defaults
-func CORS(handler http.Handler, allowedOriginPatterns []*regexp.Regexp, allowedMethods []string, allowedHeaders []string, allowCredentials string) http.Handler {
+func CORS(handler http.Handler, allowedOriginPatterns []*regexp.Regexp, allowedMethods []string, allowedHeaders []string, exposedHeaders []string, allowCredentials string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		origin := req.Header.Get("Origin")
 		if origin != "" {
@@ -402,8 +402,12 @@ func CORS(handler http.Handler, allowedOriginPatterns []*regexp.Regexp, allowedM
 				if allowedHeaders == nil {
 					allowedHeaders = []string{"Content-Type", "Content-Length", "Accept-Encoding", "X-CSRF-Token", "Authorization", "X-Requested-With", "If-Modified-Since"}
 				}
+				if exposedHeaders == nil {
+					exposedHeaders = []string{"Date"}
+				}
 				w.Header().Set("Access-Control-Allow-Methods", strings.Join(allowedMethods, ", "))
 				w.Header().Set("Access-Control-Allow-Headers", strings.Join(allowedHeaders, ", "))
+				w.Header().Set("Access-Control-Expose-Headers", strings.Join(exposedHeaders, ", "))
 				w.Header().Set("Access-Control-Allow-Credentials", allowCredentials)
 
 				// Stop here if its a preflight OPTIONS request

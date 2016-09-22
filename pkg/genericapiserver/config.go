@@ -370,7 +370,7 @@ func (c Config) New() (*GenericAPIServer, error) {
 		if err != nil {
 			glog.Fatalf("Invalid CORS allowed origin, --cors-allowed-origins flag was set to %v - %v", strings.Join(c.CorsAllowedOriginList, ","), err)
 		}
-		handler = apiserver.CORS(handler, allowedOriginRegexps, nil, nil, "true")
+		handler = apiserver.CORS(handler, allowedOriginRegexps, nil, nil, nil, "true")
 	}
 
 	s.InsecureHandler = handler

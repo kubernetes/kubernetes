@@ -3016,7 +3016,7 @@ func TestCORSAllowedOrigins(t *testing.T) {
 
 		handler := CORS(
 			handle(map[string]rest.Storage{}),
-			allowedOriginRegexps, nil, nil, "true",
+			allowedOriginRegexps, nil, nil, nil, "true",
 		)
 		server := httptest.NewServer(handler)
 		defer server.Close()
@@ -3049,6 +3049,9 @@ func TestCORSAllowedOrigins(t *testing.T) {
 			if response.Header.Get("Access-Control-Allow-Methods") == "" {
 				t.Errorf("Expected Access-Control-Allow-Methods header to be set")
 			}
+			if response.Header.Get("Access-Control-Expose-Headers") != "Date" {
+				t.Errorf("Expected Date in Access-Control-Expose-Headers header")
+			}
 		} else {
 			if response.Header.Get("Access-Control-Allow-Origin") != "" {
 				t.Errorf("Expected Access-Control-Allow-Origin header to not be set")
@@ -3064,6 +3067,9 @@ func TestCORSAllowedOrigins(t *testing.T) {
 
 			if response.Header.Get("Access-Control-Allow-Methods") != "" {
 				t.Errorf("Expected Access-Control-Allow-Methods header to not be set")
+			}
+			if response.Header.Get("Access-Control-Expose-Headers") == "Date" {
+				t.Errorf("Expected Date in Access-Control-Expose-Headers header")
 			}
 		}
 	}
