@@ -23,7 +23,7 @@ import (
 	"path"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/api"
-	ipallocator "k8s.io/kubernetes/pkg/registry/service/ipallocator"
+	ipallocator "k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	certutil "k8s.io/kubernetes/pkg/util/cert"
 )
 
@@ -33,7 +33,7 @@ func newCertificateAuthority() (*rsa.PrivateKey, *x509.Certificate, error) {
 		return nil, nil, fmt.Errorf("unable to create private key [%s]", err)
 	}
 
-	config := certutil.CertConfig{
+	config := certutil.Config{
 		CommonName: "kubernetes",
 	}
 
@@ -66,7 +66,7 @@ func newServerKeyAndCert(s *kubeadmapi.KubeadmConfig, caCert *x509.Certificate, 
 	altNames.IPs = append(altNames.IPs, internalAPIServerVirtualIP)
 	altNames.DNSNames = append(altNames.DNSNames, internalAPIServerFQDN...)
 
-	config := certutil.CertConfig{
+	config := certutil.Config{
 		CommonName: "kube-apiserver",
 		AltNames:   altNames,
 	}
@@ -84,7 +84,7 @@ func newClientKeyAndCert(caCert *x509.Certificate, caKey *rsa.PrivateKey) (*rsa.
 		return nil, nil, fmt.Errorf("unable to create private key [%s]", err)
 	}
 
-	config := certutil.CertConfig{
+	config := certutil.Config{
 		CommonName: "kubernetes-admin",
 	}
 	cert, err := certutil.NewSignedCert(config, key, caCert, caKey)

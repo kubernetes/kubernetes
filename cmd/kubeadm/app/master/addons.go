@@ -26,7 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	ipallocator "k8s.io/kubernetes/pkg/registry/service/ipallocator"
+	ipallocator "k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
