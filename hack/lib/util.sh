@@ -347,7 +347,7 @@ kube::util::gv-to-swagger-name() {
 # VERSIONS: Array of group versions to include in swagger spec.
 kube::util::fetch-swagger-spec() {
   for ver in ${VERSIONS}; do
-    if [[ ${KUBE_NONSERVER_GROUP_VERSIONS} == *" ${ver} "* ]]; then
+    if [[ " ${KUBE_NONSERVER_GROUP_VERSIONS} " == *" ${ver} "* ]]; then
       continue
     fi
     # fetch the swagger spec for each group version.

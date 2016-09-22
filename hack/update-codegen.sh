@@ -46,13 +46,13 @@ for gv in "${GROUP_VERSIONS[@]}"; do
 
 	# don't add a version for a group you've already seen
 	group=${pkg_dir%%/*}
-	if [[ ${SEEN_GROUPS} == *",${group}."* ]]; then
+	if [[ "${SEEN_GROUPS}" == *",${group}."* ]]; then
 		continue
 	fi
 	SEEN_GROUPS="${SEEN_GROUPS},${group}."
 
 	# skip groups that aren't being served, clients for these don't matter
-    if [[ ${KUBE_NONSERVER_GROUP_VERSIONS} == *" ${gv} "* ]]; then
+    if [[ " ${KUBE_NONSERVER_GROUP_VERSIONS} " == *" ${gv} "* ]]; then
       continue
     fi
 

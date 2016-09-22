@@ -28,7 +28,7 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 # FIXME: due to current implementation of a test client (see: pkg/api/testapi/testapi.go)
 # ONLY the last version is tested in each group.
 ALL_VERSIONS_CSV=$(IFS=',';echo "${KUBE_AVAILABLE_GROUP_VERSIONS[*]// /,}";IFS=$)
-KUBE_TEST_API_VERSIONS=${KUBE_TEST_API_VERSIONS:-"${ALL_VERSIONS_CSV}"}
+KUBE_TEST_API_VERSIONS="${KUBE_TEST_API_VERSIONS:-${ALL_VERSIONS_CSV}}"
 
 # Give integration tests longer to run
 # TODO: allow a larger value to be passed in
