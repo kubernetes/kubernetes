@@ -158,6 +158,9 @@ func defaultPredicates() sets.String {
 		// Fit is determined by node disk pressure condition.
 		factory.RegisterFitPredicate("CheckNodeDiskPressure", predicates.CheckNodeDiskPressurePredicate),
 
+		// Fit is determined by node disk pressure condition.
+		factory.RegisterFitPredicate("CheckNodeInodePressure", predicates.CheckNodeInodePressurePredicate),
+
 		// Fit is determined by inter-pod affinity.
 		factory.RegisterFitPredicateFactory(
 			"MatchInterPodAffinity",
