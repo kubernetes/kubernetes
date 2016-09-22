@@ -97,6 +97,7 @@ func (p *podAffinityPriorityMap) processTerm(term *api.PodAffinityTerm, podDefin
 				if p.failureDomains.NodesHaveSameTopologyKey(node, fixedNode, term.TopologyKey) {
 					p.counts[node.Name] += weight
 				}
+				// TODO i think we need to  add processing logic for pod labels here?
 			}
 		}()
 	}
