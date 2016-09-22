@@ -76,6 +76,8 @@ func TestReadConfig(t *testing.T) {
  monitor-delay = 1m
  monitor-timeout = 30s
  monitor-max-retries = 3
+ [BlockStorage]
+ trust-device-path = yes
  `))
 	if err != nil {
 		t.Fatalf("Should succeed when a valid config is provided: %s", err)
@@ -95,6 +97,9 @@ func TestReadConfig(t *testing.T) {
 	}
 	if cfg.LoadBalancer.MonitorMaxRetries != 3 {
 		t.Errorf("incorrect lb.monitormaxretries: %d", cfg.LoadBalancer.MonitorMaxRetries)
+	}
+	if cfg.BlockStorage.TrustDevicePath != true {
+		t.Errorf("incorrect bs.trustdevicepath: %v", cfg.BlockStorage.TrustDevicePath)
 	}
 }
 

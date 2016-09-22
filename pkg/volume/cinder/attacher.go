@@ -110,16 +110,13 @@ func (attacher *cinderDiskAttacher) Attach(spec *volume.Spec, nodeName types.Nod
 }
 
 func (attacher *cinderDiskAttacher) WaitForAttach(spec *volume.Spec, devicePath string, timeout time.Duration) (string, error) {
+	// NOTE: devicePath is is path as reported by Cinder, which may be incorrect and should not be used. See Issue #33128
 	volumeSource, _, err := getVolumeSource(spec)
 	if err != nil {
 		return "", err
 	}
 
 	volumeID := volumeSource.VolumeID
-
-	if devicePath == "" {
-		return "", fmt.Errorf("WaitForAttach failed for Cinder disk %q: devicePath is empty.", volumeID)
-	}
 
 	ticker := time.NewTicker(checkSleepDuration)
 	defer ticker.Stop()
@@ -132,13 +129,17 @@ func (attacher *cinderDiskAttacher) WaitForAttach(spec *volume.Spec, devicePath 
 		case <-ticker.C:
 			glog.V(5).Infof("Checking Cinder disk %q is attached.", volumeID)
 			probeAttachedVolume()
+			if !attacher.cinderProvider.ShouldTrustDevicePath() {
+				// Using the Cinder volume ID, find the real device path (See Issue #33128)
+				devicePath = attacher.cinderProvider.GetDevicePath(volumeID)
+			}
 			exists, err := volumeutil.PathExists(devicePath)
 			if exists && err == nil {
-				glog.Infof("Successfully found attached Cinder disk %q.", volumeID)
+				glog.Infof("Successfully found attached Cinder disk %q at %v.", volumeID, devicePath)
 				return devicePath, nil
 			} else {
-				//Log error, if any, and continue checking periodically
-				glog.Errorf("Error Stat Cinder disk (%q) is attached: %v", volumeID, err)
+				// Log an error, and continue checking periodically
+				glog.Errorf("Error could not find attached Cinder disk %q: %v", volumeID, err)
 			}
 		case <-timer.C:
 			return "", fmt.Errorf("Could not find attached Cinder disk %q. Timeout waiting for mount paths to be created.", volumeID)
@@ -158,6 +159,22 @@ func (attacher *cinderDiskAttacher) GetDeviceMountPath(
 
 // FIXME: this method can be further pruned.
 func (attacher *cinderDiskAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) error {
+	// NOTE: devicePath is is path as reported by Cinder, which may be incorrect and should not be used. See Issue #33128
+	volumeSource, _, err := getVolumeSource(spec)
+	if err != nil {
+		return err
+	}
+
+	volumeID := volumeSource.VolumeID
+
+	if !attacher.cinderProvider.ShouldTrustDevicePath() {
+		// Using the Cinder volume ID, find the real device path (See Issue #33128)
+		devicePath = attacher.cinderProvider.GetDevicePath(volumeID)
+		if devicePath == "" {
+			return fmt.Errorf("MountDevice failed for Cinder disk %q: devicePath is empty.", volumeID)
+		}
+	}
+
 	mounter := attacher.host.GetMounter()
 	notMnt, err := mounter.IsLikelyNotMountPoint(deviceMountPath)
 	if err != nil {
