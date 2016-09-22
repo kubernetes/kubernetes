@@ -124,9 +124,12 @@ type PersistentVolumePlugin interface {
 // again to new claims
 type RecyclableVolumePlugin interface {
 	VolumePlugin
-	// NewRecycler creates a new volume.Recycler which knows how to reclaim
-	// this resource after the volume's release from a PersistentVolumeClaim
-	NewRecycler(pvName string, spec *Spec) (Recycler, error)
+	// NewRecycler creates a new volume.Recycler which knows how to reclaim this
+	// resource after the volume's release from a PersistentVolumeClaim. The
+	// recycler will use the provided recorder to write any events that might be
+	// interesting to user. It's expected that caller will pass these events to
+	// the PV being recycled.
+	NewRecycler(pvName string, spec *Spec, eventRecorder RecycleEventRecorder) (Recycler, error)
 }
 
 // DeletableVolumePlugin is an extended interface of VolumePlugin and is used
