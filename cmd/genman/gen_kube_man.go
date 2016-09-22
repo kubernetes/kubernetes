@@ -27,17 +27,24 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"k8s.io/kubernetes/cmd/genutils"
-	"k8s.io/kubernetes/pkg/kubectl/cmd"
-	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	apiservapp "k8s.io/kubernetes/cmd/kube-apiserver/app"
+	cmapp "k8s.io/kubernetes/cmd/kube-controller-manager/app"
+	proxyapp "k8s.io/kubernetes/cmd/kube-proxy/app"
+	kubeletapp "k8s.io/kubernetes/cmd/kubelet/app"
+	kubectlcmd "k8s.io/kubernetes/pkg/kubectl/cmd"
+	kubectlcmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	schapp "k8s.io/kubernetes/plugin/cmd/kube-scheduler/app"
 )
 
 func main() {
 	// use os.Args instead of "flags" because "flags" will mess up the man pages!
 	path := "docs/man/man1"
-	if len(os.Args) == 2 {
+	module := ""
+	if len(os.Args) == 3 {
 		path = os.Args[1]
-	} else if len(os.Args) > 2 {
-		fmt.Fprintf(os.Stderr, "usage: %s [output directory]\n", os.Args[0])
+		module = os.Args[2]
+	} else {
+		fmt.Fprintf(os.Stderr, "usage: %s [output directory] [module] \n", os.Args[0])
 		os.Exit(1)
 	}
 
@@ -47,14 +54,57 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Set environment variables used by kubectl so the output is consistent,
+	// Set environment variables used by command so the output is consistent,
 	// regardless of where we run.
 	os.Setenv("HOME", "/home/username")
-	// TODO os.Stdin should really be something like ioutil.Discard, but a Reader
-	kubectl := cmd.NewKubectlCommand(cmdutil.NewFactory(nil), os.Stdin, ioutil.Discard, ioutil.Discard)
-	genMarkdown(kubectl, "", outDir)
-	for _, c := range kubectl.Commands() {
-		genMarkdown(c, "kubectl", outDir)
+
+	switch module {
+	case "kube-apiserver":
+		// generate manpage for kube-apiserver
+		apiserver := apiservapp.NewAPIServerCommand()
+		genMarkdown(apiserver, "", outDir)
+		for _, c := range apiserver.Commands() {
+			genMarkdown(c, "kube-apiserver", outDir)
+		}
+	case "kube-controller-manager":
+		// generate manpage for kube-controller-manager
+		controllermanager := cmapp.NewControllerManagerCommand()
+		genMarkdown(controllermanager, "", outDir)
+		for _, c := range controllermanager.Commands() {
+			genMarkdown(c, "kube-controller-manager", outDir)
+		}
+	case "kube-proxy":
+		// generate manpage for kube-proxy
+		proxy := proxyapp.NewProxyCommand()
+		genMarkdown(proxy, "", outDir)
+		for _, c := range proxy.Commands() {
+			genMarkdown(c, "kube-proxy", outDir)
+		}
+	case "kube-scheduler":
+		// generate manpage for kube-scheduler
+		scheduler := schapp.NewSchedulerCommand()
+		genMarkdown(scheduler, "", outDir)
+		for _, c := range scheduler.Commands() {
+			genMarkdown(c, "kube-scheduler", outDir)
+		}
+	case "kubelet":
+		// generate manpage for kubelet
+		kubelet := kubeletapp.NewKubeletCommand()
+		genMarkdown(kubelet, "", outDir)
+		for _, c := range kubelet.Commands() {
+			genMarkdown(c, "kubelet", outDir)
+		}
+	case "kubectl":
+		// generate manpage for kubectl
+		// TODO os.Stdin should really be something like ioutil.Discard, but a Reader
+		kubectl := kubectlcmd.NewKubectlCommand(kubectlcmdutil.NewFactory(nil), os.Stdin, ioutil.Discard, ioutil.Discard)
+		genMarkdown(kubectl, "", outDir)
+		for _, c := range kubectl.Commands() {
+			genMarkdown(c, "kubectl", outDir)
+		}
+	default:
+		fmt.Fprintf(os.Stderr, "Module %s is not supported", module)
+		os.Exit(1)
 	}
 }
 
