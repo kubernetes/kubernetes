@@ -19,6 +19,7 @@ package qos
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 // isResourceGuaranteed returns true if the container's resource requirements are Guaranteed.
@@ -53,6 +54,9 @@ func GetPodQOS(pod *api.Pod) QOSClass {
 	for _, container := range pod.Spec.Containers {
 		// process requests
 		for name, quantity := range container.Resources.Requests {
+			if !supportedQoSComputeResources.Has(string(name)) {
+				continue
+			}
 			if quantity.Cmp(zeroQuantity) == 1 {
 				delta := quantity.Copy()
 				if _, exists := requests[name]; !exists {
@@ -65,6 +69,9 @@ func GetPodQOS(pod *api.Pod) QOSClass {
 		}
 		// process limits
 		for name, quantity := range container.Resources.Limits {
+			if !supportedQoSComputeResources.Has(string(name)) {
+				continue
+			}
 			if quantity.Cmp(zeroQuantity) == 1 {
 				delta := quantity.Copy()
 				if _, exists := limits[name]; !exists {
@@ -75,7 +82,7 @@ func GetPodQOS(pod *api.Pod) QOSClass {
 				}
 			}
 		}
-		if len(container.Resources.Limits) != len(supportedComputeResources) {
+		if len(limits) != len(supportedQoSComputeResources) {
 			isGuaranteed = false
 		}
 	}
@@ -92,8 +99,7 @@ func GetPodQOS(pod *api.Pod) QOSClass {
 		}
 	}
 	if isGuaranteed &&
-		len(requests) == len(limits) &&
-		len(limits) == len(supportedComputeResources) {
+		len(requests) == len(limits) {
 		return Guaranteed
 	}
 	return Burstable
@@ -118,17 +124,14 @@ func GetQOS(container *api.Container) QOSList {
 	return resourceToQOS
 }
 
-// supportedComputeResources is the list of supported compute resources
-var supportedComputeResources = []api.ResourceName{
-	api.ResourceCPU,
-	api.ResourceMemory,
-}
+// supportedComputeResources is the list of compute resources for with QoS is supported.
+var supportedQoSComputeResources = sets.NewString(string(api.ResourceCPU), string(api.ResourceMemory))
 
 // allResources returns a set of all possible resources whose mapped key value is true if present on the container
 func allResources(container *api.Container) map[api.ResourceName]bool {
 	resources := map[api.ResourceName]bool{}
-	for _, resource := range supportedComputeResources {
-		resources[resource] = false
+	for _, resource := range supportedQoSComputeResources.List() {
+		resources[api.ResourceName(resource)] = false
 	}
 	for resource := range container.Resources.Requests {
 		resources[resource] = true
