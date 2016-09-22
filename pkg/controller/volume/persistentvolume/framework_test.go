@@ -1204,21 +1204,14 @@ func (plugin *mockVolumePlugin) GetMetrics() (*vol.Metrics, error) {
 }
 
 // Recycler interfaces
-
-func (plugin *mockVolumePlugin) NewRecycler(pvName string, spec *vol.Spec) (vol.Recycler, error) {
-	if len(plugin.recycleCalls) > 0 {
-		// mockVolumePlugin directly implements Recycler interface
-		glog.V(4).Infof("mock plugin NewRecycler called, returning mock recycler")
-		return plugin, nil
-	} else {
-		return nil, fmt.Errorf("Mock plugin error: no recycleCalls configured")
+func (plugin *mockVolumePlugin) Recycle(pvName string, spec *vol.Spec) error {
+	if len(plugin.recycleCalls) == 0 {
+		return fmt.Errorf("Mock plugin error: no recycleCalls configured")
 	}
-}
-
-func (plugin *mockVolumePlugin) Recycle() error {
 	if len(plugin.recycleCalls) <= plugin.recycleCallCounter {
 		return fmt.Errorf("Mock plugin error: unexpected recycle call %d", plugin.recycleCallCounter)
 	}
+
 	ret := plugin.recycleCalls[plugin.recycleCallCounter]
 	plugin.recycleCallCounter++
 	glog.V(4).Infof("mock plugin Recycle call nr. %d, returning %v", plugin.recycleCallCounter, ret)

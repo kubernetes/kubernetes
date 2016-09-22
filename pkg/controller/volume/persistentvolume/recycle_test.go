@@ -67,7 +67,7 @@ func TestRecycleSync(t *testing.T) {
 			// recycle failure - newRecycler returns error
 			"6-4 - newRecycler returns error",
 			newVolumeArray("volume6-4", "1Gi", "uid6-4", "claim6-4", api.VolumeBound, api.PersistentVolumeReclaimRecycle),
-			withMessage("Failed to create recycler: Mock plugin error: no recycleCalls configured", newVolumeArray("volume6-4", "1Gi", "uid6-4", "claim6-4", api.VolumeFailed, api.PersistentVolumeReclaimRecycle)),
+			withMessage("Recycle failed: Mock plugin error: no recycleCalls configured", newVolumeArray("volume6-4", "1Gi", "uid6-4", "claim6-4", api.VolumeFailed, api.PersistentVolumeReclaimRecycle)),
 			noclaims,
 			noclaims,
 			[]string{"Warning VolumeFailedRecycle"}, noerrors,
@@ -77,7 +77,7 @@ func TestRecycleSync(t *testing.T) {
 			// recycle failure - recycle returns error
 			"6-5 - recycle returns error",
 			newVolumeArray("volume6-5", "1Gi", "uid6-5", "claim6-5", api.VolumeBound, api.PersistentVolumeReclaimRecycle),
-			withMessage("Recycler failed: Mock recycle error", newVolumeArray("volume6-5", "1Gi", "uid6-5", "claim6-5", api.VolumeFailed, api.PersistentVolumeReclaimRecycle)),
+			withMessage("Recycle failed: Mock recycle error", newVolumeArray("volume6-5", "1Gi", "uid6-5", "claim6-5", api.VolumeFailed, api.PersistentVolumeReclaimRecycle)),
 			noclaims,
 			noclaims,
 			[]string{"Warning VolumeFailedRecycle"}, noerrors,

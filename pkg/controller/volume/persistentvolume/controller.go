@@ -996,23 +996,9 @@ func (ctrl *PersistentVolumeController) recycleVolumeOperation(arg interface{}) 
 	}
 
 	// Plugin found
-	recycler, err := plugin.NewRecycler(volume.Name, spec)
-	if err != nil {
-		// Cannot create recycler
-		strerr := fmt.Sprintf("Failed to create recycler: %v", err)
-		if _, err = ctrl.updateVolumePhaseWithEvent(volume, api.VolumeFailed, api.EventTypeWarning, "VolumeFailedRecycle", strerr); err != nil {
-			glog.V(4).Infof("recycleVolumeOperation [%s]: failed to mark volume as failed: %v", volume.Name, err)
-			// Save failed, retry on the next deletion attempt
-			return
-		}
-		// Despite the volume being Failed, the controller will retry recycling
-		// the volume in every syncVolume() call.
-		return
-	}
-
-	if err = recycler.Recycle(); err != nil {
-		// Recycler failed
-		strerr := fmt.Sprintf("Recycler failed: %s", err)
+	if err := plugin.Recycle(volume.Name, spec); err != nil {
+		// Recycle failed
+		strerr := fmt.Sprintf("Recycle failed: %s", err)
 		if _, err = ctrl.updateVolumePhaseWithEvent(volume, api.VolumeFailed, api.EventTypeWarning, "VolumeFailedRecycle", strerr); err != nil {
 			glog.V(4).Infof("recycleVolumeOperation [%s]: failed to mark volume as failed: %v", volume.Name, err)
 			// Save failed, retry on the next deletion attempt

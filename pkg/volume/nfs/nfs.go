@@ -31,23 +31,19 @@ import (
 
 // This is the primary entrypoint for volume plugins.
 // The volumeConfig arg provides the ability to configure recycler behavior.  It is implemented as a pointer to allow nils.
-// The nfsPlugin is used to store the volumeConfig and give it, when needed, to the func that creates NFS Recyclers.
-// Tests that exercise recycling should not use this func but instead use ProbeRecyclablePlugins() to override default behavior.
+// The nfsPlugin is used to store the volumeConfig and give it, when needed, to the Reycle func.
 func ProbeVolumePlugins(volumeConfig volume.VolumeConfig) []volume.VolumePlugin {
 	return []volume.VolumePlugin{
 		&nfsPlugin{
-			host:            nil,
-			newRecyclerFunc: newRecycler,
-			config:          volumeConfig,
+			host:   nil,
+			config: volumeConfig,
 		},
 	}
 }
 
 type nfsPlugin struct {
-	host volume.VolumeHost
-	// decouple creating recyclers by deferring to a function.  Allows for easier testing.
-	newRecyclerFunc func(pvName string, spec *volume.Spec, host volume.VolumeHost, volumeConfig volume.VolumeConfig) (volume.Recycler, error)
-	config          volume.VolumeConfig
+	host   volume.VolumeHost
+	config volume.VolumeConfig
 }
 
 var _ volume.VolumePlugin = &nfsPlugin{}
@@ -132,8 +128,24 @@ func (plugin *nfsPlugin) newUnmounterInternal(volName string, podUID types.UID, 
 	}}, nil
 }
 
-func (plugin *nfsPlugin) NewRecycler(pvName string, spec *volume.Spec) (volume.Recycler, error) {
-	return plugin.newRecyclerFunc(pvName, spec, plugin.host, plugin.config)
+// Recycle recycles/scrubs clean an NFS volume.
+// Recycle blocks until the pod has completed or any error occurs.
+func (plugin *nfsPlugin) Recycle(pvName string, spec *volume.Spec) error {
+	if spec.PersistentVolume == nil || spec.PersistentVolume.Spec.NFS == nil {
+		return fmt.Errorf("spec.PersistentVolumeSource.NFS is nil")
+	}
+	pod := plugin.config.RecyclerPodTemplate
+	// overrides
+	timeout := volume.CalculateTimeoutForVolume(plugin.config.RecyclerMinimumTimeout, plugin.config.RecyclerTimeoutIncrement, spec.PersistentVolume)
+	pod.Spec.ActiveDeadlineSeconds = &timeout
+	pod.GenerateName = "pv-recycler-nfs-"
+	pod.Spec.Volumes[0].VolumeSource = api.VolumeSource{
+		NFS: &api.NFSVolumeSource{
+			Server: spec.PersistentVolume.Spec.NFS.Server,
+			Path:   spec.PersistentVolume.Spec.NFS.Path,
+		},
+	}
+	return volume.RecycleVolumeByWatchingPodUntilCompletion(pvName, pod, plugin.host.GetKubeClient())
 }
 
 func (plugin *nfsPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
@@ -154,8 +166,6 @@ type nfs struct {
 	pod     *api.Pod
 	mounter mount.Interface
 	plugin  *nfsPlugin
-	// decouple creating recyclers by deferring to a function.  Allows for easier testing.
-	newRecyclerFunc func(spec *volume.Spec, host volume.VolumeHost, volumeConfig volume.VolumeConfig) (volume.Recycler, error)
 	volume.MetricsNil
 }
 
@@ -272,53 +282,6 @@ func (c *nfsUnmounter) TearDownAt(dir string) error {
 	}
 
 	return nil
-}
-
-func newRecycler(pvName string, spec *volume.Spec, host volume.VolumeHost, volumeConfig volume.VolumeConfig) (volume.Recycler, error) {
-	if spec.PersistentVolume == nil || spec.PersistentVolume.Spec.NFS == nil {
-		return nil, fmt.Errorf("spec.PersistentVolumeSource.NFS is nil")
-	}
-	return &nfsRecycler{
-		name:    spec.Name(),
-		server:  spec.PersistentVolume.Spec.NFS.Server,
-		path:    spec.PersistentVolume.Spec.NFS.Path,
-		host:    host,
-		config:  volumeConfig,
-		timeout: volume.CalculateTimeoutForVolume(volumeConfig.RecyclerMinimumTimeout, volumeConfig.RecyclerTimeoutIncrement, spec.PersistentVolume),
-		pvName:  pvName,
-	}, nil
-}
-
-// nfsRecycler scrubs an NFS volume by running "rm -rf" on the volume in a pod.
-type nfsRecycler struct {
-	name    string
-	server  string
-	path    string
-	host    volume.VolumeHost
-	config  volume.VolumeConfig
-	timeout int64
-	volume.MetricsNil
-	pvName string
-}
-
-func (r *nfsRecycler) GetPath() string {
-	return r.path
-}
-
-// Recycle recycles/scrubs clean an NFS volume.
-// Recycle blocks until the pod has completed or any error occurs.
-func (r *nfsRecycler) Recycle() error {
-	pod := r.config.RecyclerPodTemplate
-	// overrides
-	pod.Spec.ActiveDeadlineSeconds = &r.timeout
-	pod.GenerateName = "pv-recycler-nfs-"
-	pod.Spec.Volumes[0].VolumeSource = api.VolumeSource{
-		NFS: &api.NFSVolumeSource{
-			Server: r.server,
-			Path:   r.path,
-		},
-	}
-	return volume.RecycleVolumeByWatchingPodUntilCompletion(r.pvName, pod, r.host.GetKubeClient())
 }
 
 func getVolumeSource(spec *volume.Spec) (*api.NFSVolumeSource, bool, error) {
