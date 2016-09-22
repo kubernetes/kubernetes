@@ -26,10 +26,8 @@ import (
 	"k8s.io/kubernetes/pkg/apiserver"
 )
 
-type Index struct{}
-
-func (i Index) Install(mux *apiserver.PathRecorderMux, c *restful.Container) {
-	mux.BaseMux().HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+func Index(aux, public *restful.Container) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
 		status := http.StatusOK
 		if r.URL.Path != "/" && r.URL.Path != "/index.html" {
 			// Since "/" matches all paths, handleIndex is called for all paths for which there is no handler registered.
@@ -38,12 +36,13 @@ func (i Index) Install(mux *apiserver.PathRecorderMux, c *restful.Container) {
 		}
 		var handledPaths []string
 		// Extract the paths handled using restful.WebService
-		for _, ws := range c.RegisteredWebServices() {
+		for _, ws := range aux.RegisteredWebServices() {
 			handledPaths = append(handledPaths, ws.RootPath())
 		}
-		// Extract the paths handled using mux handler.
-		handledPaths = append(handledPaths, mux.HandledPaths()...)
+		for _, ws := range public.RegisteredWebServices() {
+			handledPaths = append(handledPaths, ws.RootPath())
+		}
 		sort.Strings(handledPaths)
 		apiserver.WriteRawJSON(status, unversioned.RootPaths{Paths: handledPaths}, w)
-	})
+	}
 }

@@ -11,7 +11,7 @@
    },
    {
     "path": "/logs",
-    "description": "get log files"
+    "description": "master log files"
    },
    {
     "path": "/api/v1",

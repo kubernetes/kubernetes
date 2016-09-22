@@ -20,17 +20,17 @@ import (
 	"net/http"
 
 	"github.com/emicklei/go-restful"
-
-	"k8s.io/kubernetes/pkg/apiserver"
 )
 
 const dashboardPath = "/api/v1/proxy/namespaces/kube-system/services/kubernetes-dashboard"
 
 // UIRediect redirects /ui to the kube-ui proxy path.
-type UIRedirect struct{}
-
-func (r UIRedirect) Install(mux *apiserver.PathRecorderMux, c *restful.Container) {
-	mux.HandleFunc("/ui/", func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, dashboardPath, http.StatusTemporaryRedirect)
-	})
+func UIRedirect() *restful.WebService {
+	ws := new(restful.WebService)
+	ws.Path("/ui/")
+	ws.Doc("redirect to the dashboard")
+	ws.Route(ws.GET("/").To(func(req *restful.Request, resp *restful.Response) {
+		http.Redirect(resp.ResponseWriter, req.Request, dashboardPath, http.StatusTemporaryRedirect)
+	}))
+	return ws
 }

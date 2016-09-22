@@ -22,19 +22,25 @@ import (
 	assetfs "github.com/elazarl/go-bindata-assetfs"
 	"github.com/emicklei/go-restful"
 
-	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/genericapiserver/routes/data/swagger"
 )
 
 // SwaggerUI exposes files in third_party/swagger-ui/ under /swagger-ui.
-type SwaggerUI struct{}
-
-func (l SwaggerUI) Install(mux *apiserver.PathRecorderMux, c *restful.Container) {
-	fileServer := http.FileServer(&assetfs.AssetFS{
+func SwaggerUI() *restful.WebService {
+	prefix := "/swagger-ui"
+	handler := http.StripPrefix(prefix, http.FileServer(&assetfs.AssetFS{
 		Asset:    swagger.Asset,
 		AssetDir: swagger.AssetDir,
 		Prefix:   "third_party/swagger-ui",
-	})
-	prefix := "/swagger-ui/"
-	mux.Handle(prefix, http.StripPrefix(prefix, fileServer))
+	}))
+
+	ws := new(restful.WebService)
+	ws.Path(prefix)
+	ws.Doc("swagger user interface")
+	wildcard := "/{subpath:*}" // go-restful curly path
+	ws.Route(ws.GET(wildcard).To(HandlerRouteFunction(handler.ServeHTTP)))
+	ws.Route(ws.HEAD(wildcard).To(HandlerRouteFunction(handler.ServeHTTP))) // used for eTags
+	ws.Route(ws.GET("/").To(HandlerRouteFunction(handler.ServeHTTP)))
+	ws.Route(ws.HEAD("/").To(HandlerRouteFunction(handler.ServeHTTP))) // used for eTags
+	return ws
 }

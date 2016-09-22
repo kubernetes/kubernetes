@@ -27,6 +27,7 @@ import (
 	"strings"
 	"time"
 
+	systemd "github.com/coreos/go-systemd/daemon"
 	"github.com/emicklei/go-restful"
 	"github.com/go-openapi/spec"
 	"github.com/golang/glog"
@@ -321,15 +322,6 @@ func (c Config) New() (*GenericAPIServer, error) {
 		s.storageDecorator = generic.UndecoratedStorage
 	}
 
-	if c.RestfulContainer != nil {
-		s.HandlerContainer = c.RestfulContainer
-	} else {
-		s.HandlerContainer = NewHandlerContainer(http.NewServeMux(), c.Serializer)
-	}
-	// Use CurlyRouter to be able to use regular expressions in paths. Regular expressions are required in paths for example for proxy (where the path is proxy/{kind}/{name}/{*})
-	s.HandlerContainer.Router(restful.CurlyRouter{})
-	s.Mux = apiserver.NewPathRecorderMux(s.HandlerContainer.ServeMux)
-
 	if c.ProxyDialer != nil || c.ProxyTLSClientConfig != nil {
 		s.ProxyTransport = utilnet.SetTransportDefaults(&http.Transport{
 			Dial:            c.ProxyDialer,
@@ -342,24 +334,32 @@ func (c Config) New() (*GenericAPIServer, error) {
 	// makes it into all of our supported go versions (only in v1.7.1 now).
 	mime.AddExtensionType(".svg", "image/svg+xml")
 
-	// Register root handler.
-	// We do not register this using restful Webservice since we do not want to surface this in api docs.
-	// Allow GenericAPIServer to be embedded in contexts which already have something registered at the root
-	if c.EnableIndex {
-		routes.Index{}.Install(s.Mux, s.HandlerContainer)
+	if c.RestfulContainer != nil {
+		s.HandlerContainer = c.RestfulContainer
+	} else {
+		s.HandlerContainer = NewHandlerContainer(http.NewServeMux(), c.Serializer)
 	}
+	s.AuxiliaryHandlerContainer = NewHandlerContainer(s.HandlerContainer.ServeMux, c.Serializer)
 
+	// allow regexp paths, like for proxy/{kind}/{name}/{*}
+	s.HandlerContainer.Router(restful.CurlyRouter{})
+	s.AuxiliaryHandlerContainer.Router(restful.CurlyRouter{})
+
+	// We do not register this using restful Webservice since we do not want to surface this in api docs.
+	if c.EnableIndex {
+		s.AuxiliaryHandlerContainer.ServeMux.HandleFunc("/", routes.Index(s.AuxiliaryHandlerContainer, s.HandlerContainer))
+	}
 	if c.EnableSwaggerSupport && c.EnableSwaggerUI {
-		routes.SwaggerUI{}.Install(s.Mux, s.HandlerContainer)
+		s.AuxiliaryHandlerContainer.Add(routes.SwaggerUI())
 	}
 	if c.EnableProfiling {
-		routes.Profiling{}.Install(s.Mux, s.HandlerContainer)
+		s.AuxiliaryHandlerContainer.Add(routes.Profiling())
 	}
 	if c.EnableVersion {
-		routes.Version{}.Install(s.Mux, s.HandlerContainer)
+		s.HandlerContainer.Add(routes.Version())
 	}
 
-	handler := http.Handler(s.Mux.BaseMux().(*http.ServeMux))
+	handler := http.Handler(s.HandlerContainer.ServeMux)
 
 	// TODO: handle CORS and auth using go-restful
 	// See github.com/emicklei/go-restful/blob/master/examples/restful-CORS-filter.go, and
@@ -374,21 +374,22 @@ func (c Config) New() (*GenericAPIServer, error) {
 	}
 
 	s.InsecureHandler = handler
+	s.Handler = handler
 
 	attributeGetter := apiserver.NewRequestAttributeGetter(c.RequestContextMapper, s.NewRequestInfoResolver())
-	handler = apiserver.WithAuthorizationCheck(handler, attributeGetter, c.Authorizer)
+	s.Handler = apiserver.WithAuthorizationCheck(s.Handler, attributeGetter, c.Authorizer)
 	if len(c.AuditLogPath) != 0 {
-		// audit handler must comes before the impersonationFilter to read the original user
+		// audit handler must come before the impersonationFilter to read the original user
 		writer := &lumberjack.Logger{
 			Filename:   c.AuditLogPath,
 			MaxAge:     c.AuditLogMaxAge,
 			MaxBackups: c.AuditLogMaxBackups,
 			MaxSize:    c.AuditLogMaxSize,
 		}
-		handler = audit.WithAudit(handler, attributeGetter, writer)
+		s.Handler = audit.WithAudit(s.Handler, attributeGetter, writer)
 		defer writer.Close()
 	}
-	handler = apiserver.WithImpersonation(handler, c.RequestContextMapper, c.Authorizer)
+	s.Handler = apiserver.WithImpersonation(s.Handler, c.RequestContextMapper, c.Authorizer)
 
 	// Install Authenticator
 	if c.Authenticator != nil {
@@ -399,24 +400,27 @@ func (c Config) New() (*GenericAPIServer, error) {
 		handler = authenticatedHandler
 	}
 
-	// TODO: Make this optional?  Consumers of GenericAPIServer depend on this currently.
-	s.Handler = handler
-
 	// After all wrapping is done, put a context filter around both handlers
 	var err error
-	handler, err = api.NewRequestContextFilter(c.RequestContextMapper, s.Handler)
+	s.Handler, err = api.NewRequestContextFilter(c.RequestContextMapper, s.Handler)
 	if err != nil {
 		glog.Fatalf("Could not initialize request context filter for s.Handler: %v", err)
 	}
-	s.Handler = handler
 
-	handler, err = api.NewRequestContextFilter(c.RequestContextMapper, s.InsecureHandler)
+	s.InsecureHandler, err = api.NewRequestContextFilter(c.RequestContextMapper, s.InsecureHandler)
 	if err != nil {
 		glog.Fatalf("Could not initialize request context filter for s.InsecureHandler: %v", err)
 	}
-	s.InsecureHandler = handler
 
 	s.installGroupsDiscoveryHandler()
+
+	s.AddPostStartHook("notify systemd", func(context PostStartHookContext) error {
+		// err == systemd.SdNotifyNoSocket when not running on a systemd system
+		if err := systemd.SdNotify("READY=1\n"); err != nil && err != systemd.SdNotifyNoSocket {
+			glog.Errorf("Unable to send systemd daemon successful start message: %v\n", err)
+		}
+		return nil // above error is not critical
+	})
 
 	return s, nil
 }

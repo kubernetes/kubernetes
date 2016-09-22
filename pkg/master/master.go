@@ -52,6 +52,7 @@ import (
 	storageapiv1beta1 "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
 	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/genericapiserver"
+	genericroutes "k8s.io/kubernetes/pkg/genericapiserver/routes"
 	"k8s.io/kubernetes/pkg/healthz"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master/ports"
@@ -90,6 +91,7 @@ import (
 	"k8s.io/kubernetes/pkg/storage/storagebackend"
 	"k8s.io/kubernetes/pkg/util/sets"
 
+	"github.com/emicklei/go-restful"
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -188,10 +190,10 @@ func New(c *Config) (*Master, error) {
 	}
 
 	if c.EnableUISupport {
-		routes.UIRedirect{}.Install(s.Mux, s.HandlerContainer)
+		s.AuxiliaryHandlerContainer.Add(routes.UIRedirect())
 	}
 	if c.EnableLogsSupport {
-		routes.Logs{}.Install(s.Mux, s.HandlerContainer)
+		s.HandlerContainer.Add(routes.Logs())
 	}
 
 	m := &Master{
@@ -267,12 +269,17 @@ func (m *Master) InstallAPIs(c *Config) {
 			Help: "The time since the last successful synchronization of the SSH tunnels for proxy requests.",
 		}, func() float64 { return float64(m.tunneler.SecondsSinceSync()) })
 	}
-	healthz.InstallHandler(m.Mux, healthzChecks...)
+	path := "/healthz"
+	ws := new(restful.WebService)
+	ws.Path(path)
+	ws.Doc("health checks")
+	healthz.InstallHandler(genericroutes.WebServiceGETMux{WS: ws, Path: path}, healthzChecks...)
+	m.AuxiliaryHandlerContainer.Add(ws)
 
 	if c.EnableProfiling {
-		routes.MetricsWithReset{}.Install(m.Mux, m.HandlerContainer)
+		m.AuxiliaryHandlerContainer.Add(routes.MetricsWithReset())
 	} else {
-		routes.DefaultMetrics{}.Install(m.Mux, m.HandlerContainer)
+		m.AuxiliaryHandlerContainer.Add(routes.DefaultMetrics())
 	}
 
 	// Install third party resource support if requested

@@ -29,7 +29,6 @@ import (
 	"sync"
 	"time"
 
-	systemd "github.com/coreos/go-systemd/daemon"
 	"github.com/emicklei/go-restful"
 	"github.com/emicklei/go-restful/swagger"
 	"github.com/golang/glog"
@@ -125,8 +124,11 @@ type GenericAPIServer struct {
 	// should be determining the backing storage for the RESTStorage interfaces
 	storageDecorator generic.StorageDecorator
 
-	Mux              *apiserver.PathRecorderMux
+	// HandlerContainer subsumes routes which are published through swagger
 	HandlerContainer *restful.Container
+	// AuxiliaryHandlerContainer subsumes routes which are visible through /, but not through swagger
+	AuxiliaryHandlerContainer *restful.Container
+
 	MasterCount      int
 
 	// ExternalAddress is the address (hostname or IP and port) that should be used in
@@ -198,26 +200,6 @@ func (s *GenericAPIServer) NewRequestInfoResolver() *apiserver.RequestInfoResolv
 	}
 }
 
-// HandleWithAuth adds an http.Handler for pattern to an http.ServeMux
-// Applies the same authentication and authorization (if any is configured)
-// to the request is used for the GenericAPIServer's built-in endpoints.
-func (s *GenericAPIServer) HandleWithAuth(pattern string, handler http.Handler) {
-	// TODO: Add a way for plugged-in endpoints to translate their
-	// URLs into attributes that an Authorizer can understand, and have
-	// sensible policy defaults for plugged-in endpoints.  This will be different
-	// for generic endpoints versus REST object endpoints.
-	// TODO: convert to go-restful
-	s.Mux.Handle(pattern, handler)
-}
-
-// HandleFuncWithAuth adds an http.Handler for pattern to an http.ServeMux
-// Applies the same authentication and authorization (if any is configured)
-// to the request is used for the GenericAPIServer's built-in endpoints.
-func (s *GenericAPIServer) HandleFuncWithAuth(pattern string, handler func(http.ResponseWriter, *http.Request)) {
-	// TODO: convert to go-restful
-	s.Mux.HandleFunc(pattern, handler)
-}
-
 func NewHandlerContainer(mux *http.ServeMux, s runtime.NegotiatedSerializer) *restful.Container {
 	container := restful.NewContainer()
 	container.ServeMux = mux
@@ -264,12 +246,6 @@ func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
 	if s.enableOpenAPISupport {
 		s.InstallOpenAPI()
 	}
-	// We serve on 2 ports. See docs/admin/accessing-the-api.md
-	secureLocation := ""
-	if options.SecurePort != 0 {
-		secureLocation = net.JoinHostPort(options.BindAddress.String(), strconv.Itoa(options.SecurePort))
-	}
-	insecureLocation := net.JoinHostPort(options.InsecureBindAddress.String(), strconv.Itoa(options.InsecurePort))
 
 	var sem chan bool
 	if options.MaxRequestsInFlight > 0 {
@@ -286,6 +262,10 @@ func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
 		return time.After(globalTimeout), ""
 	}
 
+	secureLocation := ""
+	if options.SecurePort != 0 {
+		secureLocation = net.JoinHostPort(options.BindAddress.String(), strconv.Itoa(options.SecurePort))
+	}
 	secureStartedCh := make(chan struct{})
 	if secureLocation != "" {
 		handler := apiserver.TimeoutHandler(apiserver.RecoverPanics(s.Handler), longRunningTimeout)
@@ -336,10 +316,6 @@ func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
 
 			notifyStarted := sync.Once{}
 			for {
-				// err == systemd.SdNotifyNoSocket when not running on a systemd system
-				if err := systemd.SdNotify("READY=1\n"); err != nil && err != systemd.SdNotifyNoSocket {
-					glog.Errorf("Unable to send systemd daemon successful start message: %v\n", err)
-				}
 				if err := secureServer.ListenAndServeTLS(options.TLSCertFile, options.TLSPrivateKeyFile); err != nil {
 					glog.Errorf("Unable to listen for secure (%v); will try again.", err)
 				} else {
@@ -351,13 +327,10 @@ func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
 			}
 		}()
 	} else {
-		// err == systemd.SdNotifyNoSocket when not running on a systemd system
-		if err := systemd.SdNotify("READY=1\n"); err != nil && err != systemd.SdNotifyNoSocket {
-			glog.Errorf("Unable to send systemd daemon successful start message: %v\n", err)
-		}
 		close(secureStartedCh)
 	}
 
+	insecureLocation := net.JoinHostPort(options.InsecureBindAddress.String(), strconv.Itoa(options.InsecurePort))
 	handler := apiserver.TimeoutHandler(apiserver.RecoverPanics(s.InsecureHandler), longRunningTimeout)
 	http := &http.Server{
 		Addr:           insecureLocation,
