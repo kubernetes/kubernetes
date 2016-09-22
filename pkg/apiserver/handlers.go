@@ -141,9 +141,10 @@ func RecoverPanics(handler http.Handler, resolver *RequestInfoResolver) http.Han
 			glog.Errorf("APIServer panic'd on %v %v: %v\n%s\n", req.Method, req.RequestURI, err, debug.Stack())
 		})
 
+		logger := httplog.NewLogged(req, &w)
 		requestInfo, err := resolver.GetRequestInfo(req)
 		if err != nil || requestInfo.Verb != "proxy" {
-			defer httplog.NewLogged(req, &w).StacktraceWhen(
+			logger.StacktraceWhen(
 				httplog.StatusIsNot(
 					http.StatusOK,
 					http.StatusCreated,
@@ -159,8 +160,9 @@ func RecoverPanics(handler http.Handler, resolver *RequestInfoResolver) http.Han
 					errors.StatusUnprocessableEntity,
 					http.StatusSwitchingProtocols,
 				),
-			).Log()
+			)
 		}
+		defer logger.Log()
 		// Dispatch to the internal handler
 		handler.ServeHTTP(w, req)
 	})
