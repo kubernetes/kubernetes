@@ -17,7 +17,6 @@ limitations under the License.
 package e2e
 
 import (
-	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -46,37 +45,10 @@ var _ = framework.KubeDescribe("Cluster level logging using Elasticsearch [Featu
 	})
 })
 
-const (
-	k8sAppKey    = "k8s-app"
-	esValue      = "elasticsearch-logging"
-	fluentdValue = "fluentd-logging"
-)
-
-func bodyToJSON(body []byte) (map[string]interface{}, error) {
-	var r map[string]interface{}
-	if err := json.Unmarshal(body, &r); err != nil {
-		framework.Logf("Bad JSON: %s", string(body))
-		return nil, fmt.Errorf("failed to unmarshal Elasticsearch response: %v", err)
-	}
-	return r, nil
-}
-
-func nodeInNodeList(nodeName string, nodeList *api.NodeList) bool {
-	for _, node := range nodeList.Items {
-		if nodeName == node.Name {
-			return true
-		}
-	}
-	return false
-}
-
 // ClusterLevelLoggingWithElasticsearch is an end to end test for cluster level logging.
 func ClusterLevelLoggingWithElasticsearch(f *framework.Framework) {
 	// graceTime is how long to keep retrying requests for status information.
 	const graceTime = 5 * time.Minute
-	// ingestionTimeout is how long to keep retrying to wait for all the
-	// logs to be ingested.
-	const ingestionTimeout = 10 * time.Minute
 
 	// Check for the existence of the Elasticsearch service.
 	By("Checking the Elasticsearch service exists.")
@@ -123,7 +95,7 @@ func ClusterLevelLoggingWithElasticsearch(f *framework.Framework) {
 			framework.Logf("After %v proxy call to elasticsearch-loigging failed: %v", time.Since(start), err)
 			continue
 		}
-		esResponse, err = bodyToJSON(body)
+		esResponse, err = bodyToJsonObject(body)
 		if err != nil {
 			framework.Logf("After %v failed to convert Elasticsearch JSON response %v to map[string]interface{}: %v", time.Since(start), string(body), err)
 			continue
@@ -176,7 +148,7 @@ func ClusterLevelLoggingWithElasticsearch(f *framework.Framework) {
 		if err != nil {
 			continue
 		}
-		health, err := bodyToJSON(body)
+		health, err := bodyToJsonObject(body)
 		if err != nil {
 			framework.Logf("Bad json response from elasticsearch: %v", err)
 			continue
@@ -200,110 +172,31 @@ func ClusterLevelLoggingWithElasticsearch(f *framework.Framework) {
 		framework.Failf("After %v elasticsearch cluster is not healthy", graceTime)
 	}
 
-	// Obtain a list of nodes so we can place one synthetic logger on each node.
-	nodes := framework.GetReadySchedulableNodesOrDie(f.Client)
-	nodeCount := len(nodes.Items)
-	if nodeCount == 0 {
-		framework.Failf("Failed to find any nodes")
-	}
-	framework.Logf("Found %d nodes.", len(nodes.Items))
-
-	// Filter out unhealthy nodes.
-	// Previous tests may have cause failures of some nodes. Let's skip
-	// 'Not Ready' nodes, just in case (there is no need to fail the test).
-	framework.FilterNodes(nodes, func(node api.Node) bool {
-		return framework.IsNodeConditionSetAsExpected(&node, api.NodeReady, true)
-	})
-	if len(nodes.Items) < 2 {
-		framework.Failf("Less than two nodes were found Ready: %d", len(nodes.Items))
-	}
-	framework.Logf("Found %d healthy nodes.", len(nodes.Items))
-
 	// Wait for the Fluentd pods to enter the running state.
 	By("Checking to make sure the Fluentd pod are running on each healthy node")
-	label = labels.SelectorFromSet(labels.Set(map[string]string{k8sAppKey: fluentdValue}))
-	options = api.ListOptions{LabelSelector: label}
-	fluentdPods, err := f.Client.Pods(api.NamespaceSystem).List(options)
-	Expect(err).NotTo(HaveOccurred())
-	for _, pod := range fluentdPods.Items {
-		if nodeInNodeList(pod.Spec.NodeName, nodes) {
-			err = framework.WaitForPodRunningInNamespace(f.Client, &pod)
-			Expect(err).NotTo(HaveOccurred())
-		}
-	}
+	// Obtain a list of healthy nodes so we can place one synthetic logger on each node.
+	nodes := getHealthyNodes(f)
+	fluentdPods, err := getFluentdPods(f)
+	Expect(err).NotTo(HaveOccurred(), "Failed to obtain fluentd pods")
+	err = waitForFluentdPods(f, nodes, fluentdPods)
+	Expect(err).NotTo(HaveOccurred(), "Failed to wait for fluentd pods entering running state")
 
-	// Check if each healthy node has fluentd running on it
-	for _, node := range nodes.Items {
-		exists := false
-		for _, pod := range fluentdPods.Items {
-			if pod.Spec.NodeName == node.Name {
-				exists = true
-				break
-			}
-		}
-		if !exists {
-			framework.Failf("Node %v does not have fluentd pod running on it.", node.Name)
-		}
-	}
-
-	// Create a unique root name for the resources in this test to permit
-	// parallel executions of this test.
-	// Use a unique namespace for the resources created in this test.
-	ns := f.Namespace.Name
-	name := "synthlogger"
-	// Form a unique name to taint log lines to be collected.
-	// Replace '-' characters with '_' to prevent the analyzer from breaking apart names.
-	taintName := strings.Replace(ns+name, "-", "_", -1)
-	framework.Logf("Tainting log lines with %v", taintName)
-	// podNames records the names of the synthetic logging pods that are created in the
-	// loop below.
-	var podNames []string
-	// countTo is the number of log lines emitted (and checked) for each synthetic logging pod.
-	const countTo = 100
-	// Instantiate a synthetic logger pod on each node.
-	for i, node := range nodes.Items {
-		podName := fmt.Sprintf("%s-%d", name, i)
-		_, err := f.Client.Pods(ns).Create(&api.Pod{
-			ObjectMeta: api.ObjectMeta{
-				Name:   podName,
-				Labels: map[string]string{"name": name},
-			},
-			Spec: api.PodSpec{
-				Containers: []api.Container{
-					{
-						Name:  "synth-logger",
-						Image: "gcr.io/google_containers/ubuntu:14.04",
-						// notice: the subshell syntax is escaped with `$$`
-						Command: []string{"bash", "-c", fmt.Sprintf("i=0; while ((i < %d)); do echo \"%d %s $i %s\"; i=$$(($i+1)); done", countTo, i, taintName, podName)},
-					},
-				},
-				NodeName:      node.Name,
-				RestartPolicy: api.RestartPolicyNever,
-			},
-		})
-		Expect(err).NotTo(HaveOccurred())
-		podNames = append(podNames, podName)
-	}
+	By("Creating dummy loggers")
+	taintName, podNames, err := createSynthLoggers(f, nodes)
+	Expect(err).NotTo(HaveOccurred(), "Failed to create dummy loggers")
 
 	// Cleanup the pods when we are done.
-	defer func() {
-		for _, pod := range podNames {
-			if err = f.Client.Pods(ns).Delete(pod, nil); err != nil {
-				framework.Logf("Failed to delete pod %s: %v", pod, err)
-			}
-		}
-	}()
+	defer cleanupLoggingPods(f, podNames)
 
 	// Wait for the synthetic logging pods to finish.
 	By("Waiting for the pods to succeed.")
-	for _, pod := range podNames {
-		err = framework.WaitForPodSuccessInNamespace(f.Client, pod, "synth-logger", ns)
-		Expect(err).NotTo(HaveOccurred())
-	}
+	err = waitForPodsToSucceed(f, podNames)
+	Expect(err).NotTo(HaveOccurred())
 
 	// Make several attempts to observe the logs ingested into Elasticsearch.
 	By("Checking all the log lines were ingested into Elasticsearch")
 	totalMissing := 0
+	nodeCount := len(nodes.Items)
 	expected := nodeCount * countTo
 	missingPerNode := []int{}
 	for start := time.Now(); time.Since(start) < ingestionTimeout; time.Sleep(25 * time.Second) {
@@ -341,7 +234,7 @@ func ClusterLevelLoggingWithElasticsearch(f *framework.Framework) {
 			continue
 		}
 
-		response, err := bodyToJSON(body)
+		response, err := bodyToJsonObject(body)
 		if err != nil {
 			framework.Logf("After %v failed to unmarshal response: %v", time.Since(start), err)
 			framework.Logf("Body: %s", string(body))
@@ -449,7 +342,7 @@ func ClusterLevelLoggingWithElasticsearch(f *framework.Framework) {
 		if missingPerNode[n] > 0 {
 			framework.Logf("Node %d %s is missing %d logs", n, nodes.Items[n].Name, missingPerNode[n])
 			opts := &api.PodLogOptions{}
-			body, err = f.Client.Pods(ns).GetLogs(podNames[n], opts).DoRaw()
+			body, err = f.Client.Pods(f.Namespace.Name).GetLogs(podNames[n], opts).DoRaw()
 			if err != nil {
 				framework.Logf("Cannot get logs from pod %v", podNames[n])
 				continue
