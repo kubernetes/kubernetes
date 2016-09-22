@@ -169,16 +169,25 @@ func (os *OpenStack) CreateVolume(name string, size int, vtype, availability str
 
 // GetDevicePath returns the path of an attached block storage volume, specified by its id.
 func (os *OpenStack) GetDevicePath(diskId string) string {
+	// Build a list of candidate device paths
+	candidateDeviceNodes := []string{
+		// KVM
+		fmt.Sprintf("virtio-%s", diskId[:20]),
+		// ESXi
+		fmt.Sprintf("wwn-0x%s", strings.Replace(diskId, "-", "", -1)),
+	}
+
 	files, _ := ioutil.ReadDir("/dev/disk/by-id/")
+
 	for _, f := range files {
-		if strings.Contains(f.Name(), "virtio-") {
-			devid_prefix := f.Name()[len("virtio-"):len(f.Name())]
-			if strings.Contains(diskId, devid_prefix) {
+		for _, c := range candidateDeviceNodes {
+			if c == f.Name() {
 				glog.V(4).Infof("Found disk attached as %q; full devicepath: %s\n", f.Name(), path.Join("/dev/disk/by-id/", f.Name()))
 				return path.Join("/dev/disk/by-id/", f.Name())
 			}
 		}
 	}
+
 	glog.Warningf("Failed to find device for the diskid: %q\n", diskId)
 	return ""
 }
