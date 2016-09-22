@@ -273,7 +273,7 @@ func TestUnavailable(t *testing.T) {
 		add(t, dc.podLister.Indexer, pod)
 		dc.sync(pdbName)
 	}
-	ps.VerifyPdbStatus(t, pdbName, true, 3, 3, 3)
+	ps.VerifyPdbStatus(t, pdbName, false, 3, 3, 3)
 
 	// Now set one pod as unavailable
 	pods[0].Status.Conditions = []api.PodCondition{}
@@ -388,7 +388,7 @@ func TestReplicationController(t *testing.T) {
 		if i < 2 {
 			ps.VerifyPdbStatus(t, pdbName, false, i+1, 3, 3)
 		} else {
-			ps.VerifyPdbStatus(t, pdbName, true, 3, 3, 3)
+			ps.VerifyPdbStatus(t, pdbName, false, 3, 3, 3)
 		}
 	}
 
@@ -398,6 +398,8 @@ func TestReplicationController(t *testing.T) {
 	ps.VerifyDisruptionAllowed(t, pdbName, false)
 }
 
+// TODO(mml): Re-enable ASAP. See #33251 for details. Commented out by davidopp.
+/*
 func TestTwoControllers(t *testing.T) {
 	// Most of this test is in verifying intermediate cases as we define the
 	// three controllers and create the pods.
@@ -490,3 +492,4 @@ func TestTwoControllers(t *testing.T) {
 	dc.sync(pdbName)
 	ps.VerifyPdbStatus(t, pdbName, true, 7, 7, 22)
 }
+*/
