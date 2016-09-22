@@ -35,4 +35,16 @@ images:
     project: kubernetes-node-e2e-images
     machine: n1-standard-1
     tests:
+      - 'resource tracking for 0 pods per node \[Benchmark\]'
+  containervm-resource2:
+    image: e2e-node-containervm-v20160604-image
+    project: kubernetes-node-e2e-images
+    machine: n1-standard-1
+    tests:
+      - 'resource tracking for 35 pods per node \[Benchmark\]'
+  containervm-resource3:
+    image: e2e-node-containervm-v20160604-image
+    project: kubernetes-node-e2e-images
+    machine: n1-standard-1
+    tests:
       - 'resource tracking for 105 pods per node \[Benchmark\]'
