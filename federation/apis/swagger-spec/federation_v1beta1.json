@@ -200,7 +200,7 @@
     "description": "API at /apis/federation/v1beta1",
     "operations": [
      {
-      "type": "*versioned.Event",
+      "type": "versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of Cluster",
       "nickname": "watchClusterList",
@@ -258,7 +258,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "*versioned.Event"
+        "responseModel": "versioned.Event"
        }
       ],
       "produces": [
@@ -482,7 +482,7 @@
     "description": "API at /apis/federation/v1beta1",
     "operations": [
      {
-      "type": "*versioned.Event",
+      "type": "versioned.Event",
       "method": "GET",
       "summary": "watch changes to an object of kind Cluster",
       "nickname": "watchCluster",
@@ -548,7 +548,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "*versioned.Event"
+        "responseModel": "versioned.Event"
        }
       ],
       "produces": [
@@ -881,7 +881,7 @@
       "items": {
        "type": "string"
       },
-      "description": "Zones is the list of avaliability zones in which the nodes of the cluster exist, e.g. 'us-east1-a'. These will always be in the same region."
+      "description": "Zones is the list of availability zones in which the nodes of the cluster exist, e.g. 'us-east1-a'. These will always be in the same region."
      },
      "region": {
       "type": "string",
@@ -1012,9 +1012,20 @@
      }
     }
    },
-   "*versioned.Event": {
-    "id": "*versioned.Event",
-    "properties": {}
+   "versioned.Event": {
+    "id": "versioned.Event",
+    "required": [
+     "type",
+     "object"
+    ],
+    "properties": {
+     "type": {
+      "type": "string"
+     },
+     "object": {
+      "type": "string"
+     }
+    }
    },
    "unversioned.Patch": {
     "id": "unversioned.Patch",
