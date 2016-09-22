@@ -162,7 +162,21 @@ func Run(s *options.CMServer) error {
 	recorder := eventBroadcaster.NewRecorder(api.EventSource{Component: "controller-manager"})
 
 	run := func(stop <-chan struct{}) {
-		err := StartControllers(s, kubeconfig, stop, recorder)
+		rootClientBuilder := SimpleControllerClientBuilder{
+			ClientConfig: kubeconfig,
+		}
+		var clientBuilder ControllerClientBuilder
+		if len(s.ServiceAccountKeyFile) > 0 {
+			clientBuilder = SAControllerClientBuilder{
+				ClientConfig: kubeconfig,
+				CoreClient:   kubeClient.Core(),
+				Namespace:    "kube-system",
+			}
+		} else {
+			clientBuilder = rootClientBuilder
+		}
+
+		err := StartControllers(s, kubeconfig, rootClientBuilder, clientBuilder, stop, recorder)
 		glog.Fatalf("error running controllers: %v", err)
 		panic("unreachable")
 	}
@@ -198,12 +212,42 @@ func Run(s *options.CMServer) error {
 	panic("unreachable")
 }
 
-func StartControllers(s *options.CMServer, kubeconfig *restclient.Config, stop <-chan struct{}, recorder record.EventRecorder) error {
+func StartControllers(s *options.CMServer, kubeconfig *restclient.Config, rootClientBuilder, clientBuilder ControllerClientBuilder, stop <-chan struct{}, recorder record.EventRecorder) error {
 	client := func(userAgent string) clientset.Interface {
-		return clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, userAgent))
+		return rootClientBuilder.ClientOrDie(userAgent)
 	}
 	discoveryClient := client("controller-discovery").Discovery()
 	sharedInformers := informers.NewSharedInformerFactory(client("shared-informers"), ResyncPeriod(s)())
+
+	// always start the SA token controller first using a full-power client, since it needs to mint tokens for the rest
+	if len(s.ServiceAccountKeyFile) > 0 {
+		privateKey, err := serviceaccount.ReadPrivateKey(s.ServiceAccountKeyFile)
+		if err != nil {
+			return fmt.Errorf("Error reading key for service account token controller: %v", err)
+		} else {
+			var rootCA []byte
+			if s.RootCAFile != "" {
+				rootCA, err = ioutil.ReadFile(s.RootCAFile)
+				if err != nil {
+					return fmt.Errorf("error reading root-ca-file at %s: %v", s.RootCAFile, err)
+				}
+				if _, err := certutil.ParseCertsPEM(rootCA); err != nil {
+					return fmt.Errorf("error parsing root-ca-file at %s: %v", s.RootCAFile, err)
+				}
+			} else {
+				rootCA = kubeconfig.CAData
+			}
+
+			go serviceaccountcontroller.NewTokensController(
+				rootClientBuilder.ClientOrDie("tokens-controller"),
+				serviceaccountcontroller.TokensControllerOptions{
+					TokenGenerator: serviceaccount.JWTTokenGenerator(privateKey),
+					RootCA:         rootCA,
+				},
+			).Run(int(s.ConcurrentSATokenSyncs), wait.NeverStop)
+			time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
+		}
+	}
 
 	go endpointcontroller.NewEndpointController(sharedInformers.Pods().Informer(), client("endpoint-controller")).
 		Run(int(s.ConcurrentEndpointSyncs), wait.NeverStop)
@@ -211,7 +255,7 @@ func StartControllers(s *options.CMServer, kubeconfig *restclient.Config, stop <
 
 	go replicationcontroller.NewReplicationManager(
 		sharedInformers.Pods().Informer(),
-		client("replication-controller"),
+		clientBuilder.ClientOrDie("replication-controller"),
 		ResyncPeriod(s),
 		replicationcontroller.BurstReplicas,
 		int(s.LookupCacheSizeForRC),
@@ -473,36 +517,6 @@ func StartControllers(s *options.CMServer, kubeconfig *restclient.Config, stop <
 			} else {
 				go certController.Run(1, wait.NeverStop)
 			}
-			time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
-		}
-	}
-
-	var rootCA []byte
-
-	if s.RootCAFile != "" {
-		rootCA, err = ioutil.ReadFile(s.RootCAFile)
-		if err != nil {
-			return fmt.Errorf("error reading root-ca-file at %s: %v", s.RootCAFile, err)
-		}
-		if _, err := certutil.ParseCertsPEM(rootCA); err != nil {
-			return fmt.Errorf("error parsing root-ca-file at %s: %v", s.RootCAFile, err)
-		}
-	} else {
-		rootCA = kubeconfig.CAData
-	}
-
-	if len(s.ServiceAccountKeyFile) > 0 {
-		privateKey, err := serviceaccount.ReadPrivateKey(s.ServiceAccountKeyFile)
-		if err != nil {
-			glog.Errorf("Error reading key for service account token controller: %v", err)
-		} else {
-			go serviceaccountcontroller.NewTokensController(
-				client("tokens-controller"),
-				serviceaccountcontroller.TokensControllerOptions{
-					TokenGenerator: serviceaccount.JWTTokenGenerator(privateKey),
-					RootCA:         rootCA,
-				},
-			).Run(int(s.ConcurrentSATokenSyncs), wait.NeverStop)
 			time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 		}
 	}
