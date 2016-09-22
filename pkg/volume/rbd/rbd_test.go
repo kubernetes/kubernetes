@@ -66,20 +66,20 @@ func (fake *fakeDiskManager) Cleanup() {
 	os.RemoveAll(fake.tmpDir)
 }
 
-func (fake *fakeDiskManager) MakeGlobalPDName(disk rbd) string {
+func (fake *fakeDiskManager) makeGlobalPDName() string {
 	return fake.tmpDir
 }
-func (fake *fakeDiskManager) AttachDisk(b rbdMounter) error {
-	globalPath := b.manager.MakeGlobalPDName(*b.rbd)
+func (fake *fakeDiskManager) AttachDisk(b rbdMounter) (string, error) {
+	globalPath := fake.makeGlobalPDName()
 	err := os.MkdirAll(globalPath, 0750)
 	if err != nil {
-		return err
+		return "", err
 	}
-	return nil
+	return "", nil
 }
 
-func (fake *fakeDiskManager) DetachDisk(c rbdUnmounter, mntPath string) error {
-	globalPath := c.manager.MakeGlobalPDName(*c.rbd)
+func (fake *fakeDiskManager) DetachDisk(plugin *rbdPlugin, mntPath string) error {
+	globalPath := fake.makeGlobalPDName()
 	err := os.RemoveAll(globalPath)
 	if err != nil {
 		return err
