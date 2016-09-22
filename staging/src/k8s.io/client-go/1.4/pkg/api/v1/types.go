@@ -1749,8 +1749,13 @@ const (
 	PodInitContainersAnnotationKey = "pod.alpha.kubernetes.io/init-containers"
 	// This annotation key will be used to contain an array of v1 JSON encoded
 	// ContainerStatuses for init containers. The annotation will be placed into the internal
-	// type and cleared.
-	PodInitContainerStatusesAnnotationKey = "pod.beta.kubernetes.io/init-container-statuses"
+	// type and cleared. This key is only recognized by version >= 1.4.
+	PodInitContainerStatusesBetaAnnotationKey = "pod.beta.kubernetes.io/init-container-statuses"
+	// This annotation key will be used to contain an array of v1 JSON encoded
+	// ContainerStatuses for init containers. The annotation will be placed into the internal
+	// type and cleared. This key is recognized by version >= 1.3. For version 1.4 code,
+	// this key will have its value copied to the beta key.
+	PodInitContainerStatusesAnnotationKey = "pod.alpha.kubernetes.io/init-container-statuses"
 )
 
 // PodSpec is a description of a pod.
@@ -2465,9 +2470,13 @@ type NodeDaemonEndpoints struct {
 
 // NodeSystemInfo is a set of ids/uuids to uniquely identify the node.
 type NodeSystemInfo struct {
-	// Machine ID reported by the node.
+	// MachineID reported by the node. For unique machine identification
+	// in the cluster this field is prefered. Learn more from man(5)
+	// machine-id: http://man7.org/linux/man-pages/man5/machine-id.5.html
 	MachineID string `json:"machineID" protobuf:"bytes,1,opt,name=machineID"`
-	// System UUID reported by the node.
+	// SystemUUID reported by the node. For unique machine identification
+	// MachineID is prefered. This field is specific to Red Hat hosts
+	// https://access.redhat.com/documentation/en-US/Red_Hat_Subscription_Management/1/html/RHSM/getting-system-uuid.html
 	SystemUUID string `json:"systemUUID" protobuf:"bytes,2,opt,name=systemUUID"`
 	// Boot ID reported by the node.
 	BootID string `json:"bootID" protobuf:"bytes,3,opt,name=bootID"`

@@ -21,6 +21,8 @@ import (
 	"k8s.io/client-go/1.4/pkg/api/unversioned"
 )
 
+// +genclient=true
+
 // PetSet represents a set of pods with consistent identities.
 // Identities are defined as:
 //  - Network: A single stable DNS and hostname.

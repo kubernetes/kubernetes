@@ -110,6 +110,28 @@ func RequireKeyUnchanged(key string) PreconditionFunc {
 	}
 }
 
+// RequireMetadataKeyUnchanged creates a precondition function that fails
+// if the metadata.key is present in the patch (indicating its value
+// has changed).
+func RequireMetadataKeyUnchanged(key string) PreconditionFunc {
+	return func(patch interface{}) bool {
+		patchMap, ok := patch.(map[string]interface{})
+		if !ok {
+			return true
+		}
+		patchMap1, ok := patchMap["metadata"]
+		if !ok {
+			return true
+		}
+		patchMap2, ok := patchMap1.(map[string]interface{})
+		if !ok {
+			return true
+		}
+		_, ok = patchMap2[key]
+		return !ok
+	}
+}
+
 // Deprecated: Use the synonym CreateTwoWayMergePatch, instead.
 func CreateStrategicMergePatch(original, modified []byte, dataStruct interface{}) ([]byte, error) {
 	return CreateTwoWayMergePatch(original, modified, dataStruct)

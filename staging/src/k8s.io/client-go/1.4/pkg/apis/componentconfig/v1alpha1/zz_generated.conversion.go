@@ -233,6 +233,8 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_componentconfig_KubeletConfigu
 	out.VolumeStatsAggPeriod = in.VolumeStatsAggPeriod
 	out.NetworkPluginName = in.NetworkPluginName
 	out.NetworkPluginDir = in.NetworkPluginDir
+	out.CNIConfDir = in.CNIConfDir
+	out.CNIBinDir = in.CNIBinDir
 	out.NetworkPluginMTU = in.NetworkPluginMTU
 	out.VolumePluginDir = in.VolumePluginDir
 	out.CloudProvider = in.CloudProvider
@@ -333,6 +335,7 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_componentconfig_KubeletConfigu
 		return err
 	}
 	out.AllowedUnsafeSysctls = in.AllowedUnsafeSysctls
+	out.ExperimentalRuntimeIntegrationType = in.ExperimentalRuntimeIntegrationType
 	return nil
 }
 
@@ -412,6 +415,8 @@ func autoConvert_componentconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigu
 	out.NetworkPluginName = in.NetworkPluginName
 	out.NetworkPluginMTU = in.NetworkPluginMTU
 	out.NetworkPluginDir = in.NetworkPluginDir
+	out.CNIConfDir = in.CNIConfDir
+	out.CNIBinDir = in.CNIBinDir
 	out.VolumePluginDir = in.VolumePluginDir
 	out.CloudProvider = in.CloudProvider
 	out.CloudConfigFile = in.CloudConfigFile
@@ -511,6 +516,7 @@ func autoConvert_componentconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigu
 		return err
 	}
 	out.AllowedUnsafeSysctls = in.AllowedUnsafeSysctls
+	out.ExperimentalRuntimeIntegrationType = in.ExperimentalRuntimeIntegrationType
 	return nil
 }
 

@@ -75,7 +75,7 @@ type ClusterCondition struct {
 type ClusterStatus struct {
 	// Conditions is an array of current cluster conditions.
 	Conditions []ClusterCondition `json:"conditions,omitempty" protobuf:"bytes,1,rep,name=conditions"`
-	// Zones is the list of avaliability zones in which the nodes of the cluster exist, e.g. 'us-east1-a'.
+	// Zones is the list of availability zones in which the nodes of the cluster exist, e.g. 'us-east1-a'.
 	// These will always be in the same region.
 	Zones []string `json:"zones,omitempty" protobuf:"bytes,5,rep,name=zones"`
 	// Region is the name of the region in which all of the nodes in the cluster exist.  e.g. 'us-east1'.

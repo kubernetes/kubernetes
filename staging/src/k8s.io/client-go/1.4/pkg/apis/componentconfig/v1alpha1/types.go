@@ -308,8 +308,14 @@ type KubeletConfiguration struct {
 	// various events in kubelet/pod lifecycle
 	NetworkPluginName string `json:"networkPluginName"`
 	// networkPluginDir is the full path of the directory in which to search
-	// for network plugins
+	// for network plugins (and, for backwards-compat, CNI config files)
 	NetworkPluginDir string `json:"networkPluginDir"`
+	// CNIConfDir is the full path of the directory in which to search for
+	// CNI config files
+	CNIConfDir string `json:"cniConfDir"`
+	// CNIBinDir is the full path of the directory in which to search for
+	// CNI plugin binaries
+	CNIBinDir string `json:"cniBinDir"`
 	// networkPluginMTU is the MTU to be passed to the network plugin,
 	// and overrides the default MTU for cases where it cannot be automatically
 	// computed (such as IPSEC).
@@ -477,4 +483,7 @@ type KubeletConfiguration struct {
 	// Whitelist of unsafe sysctls or sysctl patterns (ending in *). Use these at your own risk.
 	// Resource isolation might be lacking and pod might influence each other on the same node.
 	AllowedUnsafeSysctls []string `json:"allowedUnsafeSysctls,omitempty"`
+	// How to integrate with runtime. If set to CRI, kubelet will switch to
+	// using the new Container Runtine Interface.
+	ExperimentalRuntimeIntegrationType string `json:"experimentalRuntimeIntegrationType,omitempty"`
 }

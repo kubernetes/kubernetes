@@ -239,6 +239,8 @@ func DeepCopy_v1alpha1_KubeletConfiguration(in interface{}, out interface{}, c *
 		out.VolumeStatsAggPeriod = in.VolumeStatsAggPeriod
 		out.NetworkPluginName = in.NetworkPluginName
 		out.NetworkPluginDir = in.NetworkPluginDir
+		out.CNIConfDir = in.CNIConfDir
+		out.CNIBinDir = in.CNIBinDir
 		out.NetworkPluginMTU = in.NetworkPluginMTU
 		out.VolumePluginDir = in.VolumePluginDir
 		out.CloudProvider = in.CloudProvider
@@ -409,6 +411,7 @@ func DeepCopy_v1alpha1_KubeletConfiguration(in interface{}, out interface{}, c *
 		} else {
 			out.AllowedUnsafeSysctls = nil
 		}
+		out.ExperimentalRuntimeIntegrationType = in.ExperimentalRuntimeIntegrationType
 		return nil
 	}
 }

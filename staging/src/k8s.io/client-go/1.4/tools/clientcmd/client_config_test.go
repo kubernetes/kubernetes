@@ -20,10 +20,10 @@ import (
 	"io/ioutil"
 	"os"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/imdario/mergo"
-	"k8s.io/client-go/1.4/rest"
 	clientcmdapi "k8s.io/client-go/1.4/tools/clientcmd/api"
 )
 
@@ -293,8 +293,6 @@ func TestCreateCleanWithPrefix(t *testing.T) {
 		{"anything", "anything"},
 	}
 
-	// WARNING: EnvVarCluster.Server is set during package loading time and can not be overridden by os.Setenv inside this test
-	EnvVarCluster.Server = ""
 	tt = append(tt, struct{ server, host string }{"", "http://localhost:8080"})
 
 	for _, tc := range tt {
@@ -305,7 +303,7 @@ func TestCreateCleanWithPrefix(t *testing.T) {
 		config.Clusters["clean"] = cleanConfig
 
 		clientBuilder := NewNonInteractiveClientConfig(*config, "clean", &ConfigOverrides{
-			ClusterDefaults: DefaultCluster,
+			ClusterDefaults: clientcmdapi.Cluster{Server: "http://localhost:8080"},
 		}, nil)
 
 		clientConfig, err := clientBuilder.ClientConfig()
@@ -334,7 +332,7 @@ func TestCreateCleanDefault(t *testing.T) {
 func TestCreateCleanDefaultCluster(t *testing.T) {
 	config := createValidTestConfig()
 	clientBuilder := NewDefaultClientConfig(*config, &ConfigOverrides{
-		ClusterDefaults: DefaultCluster,
+		ClusterDefaults: clientcmdapi.Cluster{Server: "http://localhost:8080"},
 	})
 
 	clientConfig, err := clientBuilder.ClientConfig()
@@ -357,22 +355,20 @@ func TestCreateMissingContextNoDefault(t *testing.T) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 }
+
 func TestCreateMissingContext(t *testing.T) {
-	const expectedErrorContains = "Context was not found for specified context"
+	const expectedErrorContains = "context was not found for specified context: not-present"
 	config := createValidTestConfig()
 	clientBuilder := NewNonInteractiveClientConfig(*config, "not-present", &ConfigOverrides{
-		ClusterDefaults: DefaultCluster,
+		ClusterDefaults: clientcmdapi.Cluster{Server: "http://localhost:8080"},
 	}, nil)
 
-	clientConfig, err := clientBuilder.ClientConfig()
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
+	_, err := clientBuilder.ClientConfig()
+	if err == nil {
+		t.Fatalf("Expected error: %v", expectedErrorContains)
 	}
-
-	expectedConfig := &rest.Config{Host: clientConfig.Host}
-
-	if !reflect.DeepEqual(expectedConfig, clientConfig) {
-		t.Errorf("Expected %#v, got %#v", expectedConfig, clientConfig)
+	if !strings.Contains(err.Error(), expectedErrorContains) {
+		t.Fatalf("Expected error: %v, but got %v", expectedErrorContains, err)
 	}
 }
 

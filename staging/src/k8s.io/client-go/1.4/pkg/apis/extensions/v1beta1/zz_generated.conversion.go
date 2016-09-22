@@ -163,10 +163,6 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 		Convert_extensions_ScaleSpec_To_v1beta1_ScaleSpec,
 		Convert_v1beta1_ScaleStatus_To_extensions_ScaleStatus,
 		Convert_extensions_ScaleStatus_To_v1beta1_ScaleStatus,
-		Convert_v1beta1_StorageClass_To_extensions_StorageClass,
-		Convert_extensions_StorageClass_To_v1beta1_StorageClass,
-		Convert_v1beta1_StorageClassList_To_extensions_StorageClassList,
-		Convert_extensions_StorageClassList_To_v1beta1_StorageClassList,
 		Convert_v1beta1_SupplementalGroupsStrategyOptions_To_extensions_SupplementalGroupsStrategyOptions,
 		Convert_extensions_SupplementalGroupsStrategyOptions_To_v1beta1_SupplementalGroupsStrategyOptions,
 		Convert_v1beta1_ThirdPartyResource_To_extensions_ThirdPartyResource,
@@ -2422,90 +2418,6 @@ func autoConvert_extensions_ScaleSpec_To_v1beta1_ScaleSpec(in *extensions.ScaleS
 
 func Convert_extensions_ScaleSpec_To_v1beta1_ScaleSpec(in *extensions.ScaleSpec, out *ScaleSpec, s conversion.Scope) error {
 	return autoConvert_extensions_ScaleSpec_To_v1beta1_ScaleSpec(in, out, s)
-}
-
-func autoConvert_v1beta1_StorageClass_To_extensions_StorageClass(in *StorageClass, out *extensions.StorageClass, s conversion.Scope) error {
-	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
-		return err
-	}
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
-		return err
-	}
-	out.Provisioner = in.Provisioner
-	out.Parameters = in.Parameters
-	return nil
-}
-
-func Convert_v1beta1_StorageClass_To_extensions_StorageClass(in *StorageClass, out *extensions.StorageClass, s conversion.Scope) error {
-	return autoConvert_v1beta1_StorageClass_To_extensions_StorageClass(in, out, s)
-}
-
-func autoConvert_extensions_StorageClass_To_v1beta1_StorageClass(in *extensions.StorageClass, out *StorageClass, s conversion.Scope) error {
-	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
-		return err
-	}
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
-		return err
-	}
-	out.Provisioner = in.Provisioner
-	out.Parameters = in.Parameters
-	return nil
-}
-
-func Convert_extensions_StorageClass_To_v1beta1_StorageClass(in *extensions.StorageClass, out *StorageClass, s conversion.Scope) error {
-	return autoConvert_extensions_StorageClass_To_v1beta1_StorageClass(in, out, s)
-}
-
-func autoConvert_v1beta1_StorageClassList_To_extensions_StorageClassList(in *StorageClassList, out *extensions.StorageClassList, s conversion.Scope) error {
-	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
-		return err
-	}
-	if err := api.Convert_unversioned_ListMeta_To_unversioned_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
-		return err
-	}
-	if in.Items != nil {
-		in, out := &in.Items, &out.Items
-		*out = make([]extensions.StorageClass, len(*in))
-		for i := range *in {
-			if err := Convert_v1beta1_StorageClass_To_extensions_StorageClass(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Items = nil
-	}
-	return nil
-}
-
-func Convert_v1beta1_StorageClassList_To_extensions_StorageClassList(in *StorageClassList, out *extensions.StorageClassList, s conversion.Scope) error {
-	return autoConvert_v1beta1_StorageClassList_To_extensions_StorageClassList(in, out, s)
-}
-
-func autoConvert_extensions_StorageClassList_To_v1beta1_StorageClassList(in *extensions.StorageClassList, out *StorageClassList, s conversion.Scope) error {
-	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
-		return err
-	}
-	if err := api.Convert_unversioned_ListMeta_To_unversioned_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
-		return err
-	}
-	if in.Items != nil {
-		in, out := &in.Items, &out.Items
-		*out = make([]StorageClass, len(*in))
-		for i := range *in {
-			if err := Convert_extensions_StorageClass_To_v1beta1_StorageClass(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Items = nil
-	}
-	return nil
-}
-
-func Convert_extensions_StorageClassList_To_v1beta1_StorageClassList(in *extensions.StorageClassList, out *StorageClassList, s conversion.Scope) error {
-	return autoConvert_extensions_StorageClassList_To_v1beta1_StorageClassList(in, out, s)
 }
 
 func autoConvert_v1beta1_SupplementalGroupsStrategyOptions_To_extensions_SupplementalGroupsStrategyOptions(in *SupplementalGroupsStrategyOptions, out *extensions.SupplementalGroupsStrategyOptions, s conversion.Scope) error {

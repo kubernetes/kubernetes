@@ -27,6 +27,8 @@ import (
 	v1alpha1policy "k8s.io/client-go/1.4/kubernetes/typed/policy/v1alpha1"
 	"k8s.io/client-go/1.4/pkg/util/flowcontrol"
 	rest "k8s.io/client-go/1.4/rest"
+	// Import solely to initialize client auth plugins.
+	_ "k8s.io/client-go/1.4/plugin/pkg/client/auth"
 )
 
 type Interface interface {

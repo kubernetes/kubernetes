@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cache
+package testing
 
 import (
 	"errors"
@@ -519,6 +519,18 @@ func (f *DeltaFIFO) syncKey(key string) error {
 		return nil
 	} else if !exists {
 		glog.Infof("Key %v does not exist in known objects store, unable to queue object for sync", key)
+		return nil
+	}
+
+	// If we are doing Resync() and there is already an event queued for that object,
+	// we ignore the Resync for it. This is to avoid the race, in which the resync
+	// comes with the previous value of object (since queueing an event for the object
+	// doesn't trigger changing the underlying store <knownObjects>.
+	id, err := f.KeyOf(obj)
+	if err != nil {
+		return KeyError{obj, err}
+	}
+	if len(f.items[id]) > 0 {
 		return nil
 	}
 

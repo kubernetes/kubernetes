@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cache
+package testing
 
 // UndeltaStore listens to incremental updates and sends complete state on every change.
 // It implements the Store interface so that it can receive a stream of mirrored objects
@@ -31,7 +31,7 @@ type UndeltaStore struct {
 // Assert that it implements the Store interface.
 var _ Store = &UndeltaStore{}
 
-// Note about thread safety.  The Store implementation (cache.cache) uses a lock for all methods.
+// Note about thread safety.  The Store implementation (testing.cache) uses a lock for all methods.
 // In the functions below, the lock gets released and reacquired betweend the {Add,Delete,etc}
 // and the List.  So, the following can happen, resulting in two identical calls to PushFunc.
 // time            thread 1                  thread 2

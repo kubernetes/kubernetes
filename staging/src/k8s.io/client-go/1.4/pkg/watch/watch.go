@@ -20,6 +20,8 @@ import (
 	"sync"
 
 	"k8s.io/client-go/1.4/pkg/runtime"
+
+	"github.com/golang/glog"
 )
 
 // Interface can be implemented by anything that knows how to watch and report changes.
@@ -89,14 +91,27 @@ func NewFake() *FakeWatcher {
 	}
 }
 
+func NewFakeWithChanSize(size int) *FakeWatcher {
+	return &FakeWatcher{
+		result: make(chan Event, size),
+	}
+}
+
 // Stop implements Interface.Stop().
 func (f *FakeWatcher) Stop() {
 	f.Lock()
 	defer f.Unlock()
 	if !f.Stopped {
+		glog.V(4).Infof("Stopping fake watcher.")
 		close(f.result)
 		f.Stopped = true
 	}
+}
+
+func (f *FakeWatcher) IsStopped() bool {
+	f.Lock()
+	defer f.Unlock()
+	return f.Stopped
 }
 
 // Reset prepares the watcher to be reused.

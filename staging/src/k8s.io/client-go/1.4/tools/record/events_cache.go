@@ -148,7 +148,7 @@ func (e *EventAggregator) EventAggregate(newEvent *v1.Event) (*v1.Event, error) 
 	record := aggregateRecord{localKeys: sets.NewString(), lastTimestamp: now}
 	e.Lock()
 	defer e.Unlock()
-	value, found := e.cache.Get(aggregateKey)
+	value, found := e.testing.Get(aggregateKey)
 	if found {
 		record = value.(aggregateRecord)
 	}
@@ -161,7 +161,7 @@ func (e *EventAggregator) EventAggregate(newEvent *v1.Event) (*v1.Event, error) 
 	}
 	record.localKeys.Insert(localKey)
 	record.lastTimestamp = now
-	e.cache.Add(aggregateKey, record)
+	e.testing.Add(aggregateKey, record)
 
 	if record.localKeys.Len() < e.maxEvents {
 		return newEvent, nil
@@ -248,7 +248,7 @@ func (e *eventLogger) eventObserve(newEvent *v1.Event) (*v1.Event, []byte, error
 	}
 
 	// record our new observation
-	e.cache.Add(
+	e.testing.Add(
 		key,
 		eventLog{
 			count:           int(event.Count),
@@ -266,7 +266,7 @@ func (e *eventLogger) updateState(event *v1.Event) {
 	e.Lock()
 	defer e.Unlock()
 	// record our new observation
-	e.cache.Add(
+	e.testing.Add(
 		key,
 		eventLog{
 			count:           int(event.Count),
@@ -279,7 +279,7 @@ func (e *eventLogger) updateState(event *v1.Event) {
 
 // lastEventObservationFromCache returns the event from the cache, reads must be protected via external lock
 func (e *eventLogger) lastEventObservationFromCache(key string) eventLog {
-	value, ok := e.cache.Get(key)
+	value, ok := e.testing.Get(key)
 	if ok {
 		observationValue, ok := value.(eventLog)
 		if ok {
