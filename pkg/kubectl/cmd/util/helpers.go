@@ -43,7 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/strategicpatch"
 
-	"github.com/evanphx/json-patch"
+	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 )
@@ -290,7 +290,7 @@ func isWatch(cmd *cobra.Command) bool {
 func GetFlagString(cmd *cobra.Command, flag string) string {
 	s, err := cmd.Flags().GetString(flag)
 	if err != nil {
-		glog.Fatalf("err accessing flag %s for command %s: %v", flag, cmd.Name(), err)
+		glog.Fatalf("error accessing flag %s for command %s: %v", flag, cmd.Name(), err)
 	}
 	return s
 }
@@ -299,7 +299,7 @@ func GetFlagString(cmd *cobra.Command, flag string) string {
 func GetFlagStringSlice(cmd *cobra.Command, flag string) []string {
 	s, err := cmd.Flags().GetStringSlice(flag)
 	if err != nil {
-		glog.Fatalf("err accessing flag %s for command %s: %v", flag, cmd.Name(), err)
+		glog.Fatalf("error accessing flag %s for command %s: %v", flag, cmd.Name(), err)
 	}
 	return s
 }
@@ -316,7 +316,7 @@ func GetWideFlag(cmd *cobra.Command) bool {
 func GetFlagBool(cmd *cobra.Command, flag string) bool {
 	b, err := cmd.Flags().GetBool(flag)
 	if err != nil {
-		glog.Fatalf("err accessing flag %s for command %s: %v", flag, cmd.Name(), err)
+		glog.Fatalf("error accessing flag %s for command %s: %v", flag, cmd.Name(), err)
 	}
 	return b
 }
@@ -325,7 +325,7 @@ func GetFlagBool(cmd *cobra.Command, flag string) bool {
 func GetFlagInt(cmd *cobra.Command, flag string) int {
 	i, err := cmd.Flags().GetInt(flag)
 	if err != nil {
-		glog.Fatalf("err accessing flag %s for command %s: %v", flag, cmd.Name(), err)
+		glog.Fatalf("error accessing flag %s for command %s: %v", flag, cmd.Name(), err)
 	}
 	return i
 }
@@ -334,7 +334,16 @@ func GetFlagInt(cmd *cobra.Command, flag string) int {
 func GetFlagInt64(cmd *cobra.Command, flag string) int64 {
 	i, err := cmd.Flags().GetInt64(flag)
 	if err != nil {
-		glog.Fatalf("err accessing flag %s for command %s: %v", flag, cmd.Name(), err)
+		glog.Fatalf("error accessing flag %s for command %s: %v", flag, cmd.Name(), err)
+	}
+	return i
+}
+
+// Assumes the flag has a default value.
+func GetFlagInt32(cmd *cobra.Command, flag string) int32 {
+	i, err := cmd.Flags().GetInt32(flag)
+	if err != nil {
+		glog.Fatalf("error accessing flag %s for command %s: %v", flag, cmd.Name(), err)
 	}
 	return i
 }
@@ -342,7 +351,7 @@ func GetFlagInt64(cmd *cobra.Command, flag string) int64 {
 func GetFlagDuration(cmd *cobra.Command, flag string) time.Duration {
 	d, err := cmd.Flags().GetDuration(flag)
 	if err != nil {
-		glog.Fatalf("err accessing flag %s for command %s: %v", flag, cmd.Name(), err)
+		glog.Fatalf("error accessing flag %s for command %s: %v", flag, cmd.Name(), err)
 	}
 	return d
 }
