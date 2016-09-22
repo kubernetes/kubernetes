@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package certificates
+package cert
 
 import (
 	"crypto/ecdsa"
@@ -31,8 +31,8 @@ import (
 	"k8s.io/kubernetes/pkg/apis/certificates"
 )
 
-// ParseCertificateRequestObject extracts the CSR from the API object and decodes it.
-func ParseCertificateRequestObject(obj *certificates.CertificateSigningRequest) (*x509.CertificateRequest, error) {
+// ParseCSR extracts the CSR from the API object and decodes it.
+func ParseCSR(obj *certificates.CertificateSigningRequest) (*x509.CertificateRequest, error) {
 	// extract PEM from request object
 	pemBytes := obj.Spec.Request
 	block, _ := pem.Decode(pemBytes)
@@ -46,48 +46,9 @@ func ParseCertificateRequestObject(obj *certificates.CertificateSigningRequest) 
 	return csr, nil
 }
 
-// GeneratePrivateKey returns PEM data containing a generated ECDSA private key
-func GeneratePrivateKey() ([]byte, error) {
-	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), cryptorand.Reader)
-	if err != nil {
-		return nil, err
-	}
-
-	derBytes, err := x509.MarshalECPrivateKey(privateKey)
-	if err != nil {
-		return nil, err
-	}
-
-	privateKeyPemBlock := &pem.Block{
-		Type:  "EC PRIVATE KEY",
-		Bytes: derBytes,
-	}
-	return pem.EncodeToMemory(privateKeyPemBlock), nil
-}
-
-// ParsePrivateKey returns a private key parsed from a PEM block in the supplied data.
-// Recognizes PEM blocks for "EC PRIVATE KEY" and "RSA PRIVATE KEY"
-func ParsePrivateKey(keyData []byte) (interface{}, error) {
-	for {
-		var privateKeyPemBlock *pem.Block
-		privateKeyPemBlock, keyData = pem.Decode(keyData)
-		if privateKeyPemBlock == nil {
-			// we read all the PEM blocks and didn't recognize one
-			return nil, fmt.Errorf("no private key PEM block found")
-		}
-
-		switch privateKeyPemBlock.Type {
-		case "EC PRIVATE KEY":
-			return x509.ParseECPrivateKey(privateKeyPemBlock.Bytes)
-		case "RSA PRIVATE KEY":
-			return x509.ParsePKCS1PrivateKey(privateKeyPemBlock.Bytes)
-		}
-	}
-}
-
-// NewCertificateRequest generates a PEM-encoded CSR using the supplied private key, subject, and SANs.
+// MakeCSR generates a PEM-encoded CSR using the supplied private key, subject, and SANs.
 // privateKey must be a *ecdsa.PrivateKey or *rsa.PrivateKey.
-func NewCertificateRequest(privateKey interface{}, subject *pkix.Name, dnsSANs []string, ipSANs []net.IP) (csr []byte, err error) {
+func MakeCSR(privateKey interface{}, subject *pkix.Name, dnsSANs []string, ipSANs []net.IP) (csr []byte, err error) {
 	var sigType x509.SignatureAlgorithm
 
 	switch privateKey := privateKey.(type) {

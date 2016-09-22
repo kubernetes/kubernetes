@@ -47,7 +47,7 @@ import (
 	"k8s.io/kubernetes/pkg/genericapiserver/options"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/crypto"
+	certutil "k8s.io/kubernetes/pkg/util/cert"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -302,7 +302,7 @@ func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
 		}
 
 		if len(options.ClientCAFile) > 0 {
-			clientCAs, err := crypto.CertPoolFromFile(options.ClientCAFile)
+			clientCAs, err := certutil.NewPool(options.ClientCAFile)
 			if err != nil {
 				glog.Fatalf("Unable to load client CA file: %v", err)
 			}
@@ -322,8 +322,8 @@ func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
 			alternateDNS := []string{"kubernetes.default.svc", "kubernetes.default", "kubernetes"}
 			// It would be nice to set a fqdn subject alt name, but only the kubelets know, the apiserver is clueless
 			// alternateDNS = append(alternateDNS, "kubernetes.default.svc.CLUSTER.DNS.NAME")
-			if !crypto.FoundCertOrKey(options.TLSCertFile, options.TLSPrivateKeyFile) {
-				if err := crypto.GenerateSelfSignedCert(s.ClusterIP.String(), options.TLSCertFile, options.TLSPrivateKeyFile, alternateIPs, alternateDNS); err != nil {
+			if !certutil.CanReadCertOrKey(options.TLSCertFile, options.TLSPrivateKeyFile) {
+				if err := certutil.GenerateSelfSignedCert(s.ClusterIP.String(), options.TLSCertFile, options.TLSPrivateKeyFile, alternateIPs, alternateDNS); err != nil {
 					glog.Errorf("Unable to generate self signed cert: %v", err)
 				} else {
 					glog.Infof("Using self-signed cert (%s, %s)", options.TLSCertFile, options.TLSPrivateKeyFile)

@@ -48,7 +48,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/types"
-	utilcertificates "k8s.io/kubernetes/pkg/util/certificates"
+	certutil "k8s.io/kubernetes/pkg/util/cert"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/sets"
 
@@ -1965,7 +1965,7 @@ func (p *CertificateSigningRequestDescriber) Describe(namespace, name string, de
 		return "", err
 	}
 
-	cr, err := utilcertificates.ParseCertificateRequestObject(csr)
+	cr, err := certutil.ParseCSR(csr)
 	if err != nil {
 		return "", fmt.Errorf("Error parsing CSR: %v", err)
 	}

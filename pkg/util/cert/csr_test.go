@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package certificates
+package cert
 
 import (
 	"crypto/x509/pkix"
@@ -23,7 +23,7 @@ import (
 	"testing"
 )
 
-func TestNewCertificateRequest(t *testing.T) {
+func TestMakeCSR(t *testing.T) {
 	keyFile := "testdata/dontUseThisKey.pem"
 	subject := &pkix.Name{
 		CommonName: "kube-worker",
@@ -35,11 +35,11 @@ func TestNewCertificateRequest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	key, err := ParsePrivateKey(keyData)
+	key, err := ParsePrivateKeyPEM(keyData)
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = NewCertificateRequest(key, subject, dnsSANs, ipSANs)
+	_, err = MakeCSR(key, subject, dnsSANs, ipSANs)
 	if err != nil {
 		t.Error(err)
 	}
