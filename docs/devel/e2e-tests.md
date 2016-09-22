@@ -125,12 +125,6 @@ go run hack/e2e.go -v --build
 # Create a fresh cluster.  Deletes a cluster first, if it exists
 go run hack/e2e.go -v --up
 
-# Push code to an existing cluster
-go run hack/e2e.go -v --push
-
-# Push to an existing cluster, or bring up a cluster if it's down.
-go run hack/e2e.go -v --pushup
-
 # Run all tests
 go run hack/e2e.go -v --test
 
@@ -144,12 +138,12 @@ go run hack/e2e.go -v --test --test_args="--ginkgo.skip=Pods.*env"
 GINKGO_PARALLEL=y go run hack/e2e.go --v --test --test_args="--ginkgo.skip=\[Serial\]"
 
 # Flags can be combined, and their actions will take place in this order:
-# --build, --push|--up|--pushup, --test, --down
+# --build, --up, --test, --down
 #
 # You can also specify an alternative provider, such as 'aws'
 #
 # e.g.:
-KUBERNETES_PROVIDER=aws go run hack/e2e.go -v --build --pushup --test --down
+KUBERNETES_PROVIDER=aws go run hack/e2e.go -v --build --up --test --down
 
 # -ctl can be used to quickly call kubectl against your e2e cluster. Useful for
 # cleaning up after a failed test or viewing logs. Use -v to avoid suppressing
