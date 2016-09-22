@@ -133,6 +133,7 @@ func NewCmdCreateServiceNodePort(f *cmdutil.Factory, cmdOut io.Writer) *cobra.Co
 	cmdutil.AddValidateFlags(cmd)
 	cmdutil.AddPrinterFlags(cmd)
 	cmdutil.AddGeneratorFlags(cmd, cmdutil.ServiceNodePortGeneratorV1Name)
+	cmd.Flags().Int("node-port", 0, "Port used to expose the service on each node in a cluster.")
 	addPortFlags(cmd)
 	return cmd
 }
@@ -151,6 +152,7 @@ func CreateServiceNodePort(f *cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Comm
 			TCP:       cmdutil.GetFlagStringSlice(cmd, "tcp"),
 			Type:      api.ServiceTypeNodePort,
 			ClusterIP: "",
+			NodePort:  cmdutil.GetFlagInt(cmd, "node-port"),
 		}
 	default:
 		return cmdutil.UsageError(cmd, fmt.Sprintf("Generator: %s not supported.", generatorName))
