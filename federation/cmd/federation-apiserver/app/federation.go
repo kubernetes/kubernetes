@@ -47,7 +47,7 @@ func installFederationAPIs(s *options.ServerRunOptions, g *genericapiserver.Gene
 		ParameterCodec:         api.ParameterCodec,
 		NegotiatedSerializer:   api.Codecs,
 	}
-	if err := g.InstallAPIGroup(&apiGroupInfo); err != nil {
+	if err := g.InstallAPIGroups(&apiGroupInfo); err != nil {
 		glog.Fatalf("Error in registering group versions: %v", err)
 	}
 }

@@ -138,7 +138,7 @@ func TestInstallAPIGroups(t *testing.T) {
 			NegotiatedSerializer:         api.Codecs,
 		},
 	}
-	s.InstallAPIGroups(apiGroupsInfo)
+	s.InstallAPIGroups(apiGroupsInfo...)
 
 	server := httptest.NewServer(s.HandlerContainer.ServeMux)
 	defer server.Close()
