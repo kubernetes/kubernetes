@@ -99,7 +99,6 @@ func TestIngressController(t *testing.T) {
 			Name:      "test-ingress",
 			Namespace: "mynamespace",
 			SelfLink:  "/api/v1/namespaces/mynamespace/ingress/test-ingress",
-			// TODO: Remove: Annotations: map[string]string{},
 		},
 		Status: extensions_v1beta1.IngressStatus{
 			LoadBalancer: api_v1.LoadBalancerStatus{
@@ -200,7 +199,6 @@ func NewConfigMap(uid string) *api_v1.ConfigMap {
 			Name:      uidConfigMapName,
 			Namespace: uidConfigMapNamespace,
 			SelfLink:  "/api/v1/namespaces/" + uidConfigMapNamespace + "/configmap/" + uidConfigMapName,
-			// TODO: Remove: Annotations: map[string]string{},
 		},
 		Data: map[string]string{
 			uidKey: uid,
