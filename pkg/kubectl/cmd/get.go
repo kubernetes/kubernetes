@@ -257,7 +257,6 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 
 		first := true
 		intr := interrupt.New(nil, w.Stop)
-		defer intr.Close()
 		intr.Run(func() error {
 			_, err := watch.Until(0, w, func(e watch.Event) (bool, error) {
 				if !isList && first {
