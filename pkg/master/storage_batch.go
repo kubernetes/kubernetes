@@ -22,8 +22,8 @@ import (
 	batchapiv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
 	batchapiv2alpha1 "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
 	"k8s.io/kubernetes/pkg/genericapiserver"
-	jobetcd "k8s.io/kubernetes/pkg/registry/job/etcd"
-	scheduledjobetcd "k8s.io/kubernetes/pkg/registry/scheduledjob/etcd"
+	jobetcd "k8s.io/kubernetes/pkg/registry/batch/job/etcd"
+	scheduledjobetcd "k8s.io/kubernetes/pkg/registry/batch/scheduledjob/etcd"
 )
 
 type BatchRESTStorageProvider struct{}

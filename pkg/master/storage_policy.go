@@ -21,7 +21,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/policy"
 	policyapiv1alpha1 "k8s.io/kubernetes/pkg/apis/policy/v1alpha1"
 	"k8s.io/kubernetes/pkg/genericapiserver"
-	poddisruptionbudgetetcd "k8s.io/kubernetes/pkg/registry/poddisruptionbudget/etcd"
+	poddisruptionbudgetetcd "k8s.io/kubernetes/pkg/registry/policy/poddisruptionbudget/etcd"
 )
 
 type PolicyRESTStorageProvider struct{}
