@@ -433,7 +433,7 @@ func waitForPodRunning(podClient coreclient.PodsGetter, ns, name string, out io.
 		}
 	})
 
-	// fix generic not found error with empty name in client.PodRunningAndReady
+	// fix generic not found error with empty name in PodRunningAndReady
 	if err != nil && errors.IsNotFound(err) {
 		return nil, errors.NewNotFound(api.Resource("pods"), name)
 	}
@@ -442,11 +442,18 @@ func waitForPodRunning(podClient coreclient.PodsGetter, ns, name string, out io.
 }
 
 func waitForPodTerminated(podClient coreclient.PodsGetter, ns, name string, out io.Writer, quiet bool) (*api.Pod, error) {
-	return waitForPod(podClient, ns, name, conditions.PodCompleted, func(pod *api.Pod) {
+	pod, err := waitForPod(podClient, ns, name, conditions.PodCompleted, func(pod *api.Pod) {
 		if !quiet {
 			fmt.Fprintf(out, "Waiting for pod %s/%s to terminate, status is %s\n", pod.Namespace, pod.Name, pod.Status.Phase)
 		}
 	})
+
+	// fix generic not found error with empty name in PodCompleted
+	if err != nil && errors.IsNotFound(err) {
+		return nil, errors.NewNotFound(api.Resource("pods"), name)
+	}
+
+	return pod, err
 }
 
 func handleAttachPod(f *cmdutil.Factory, podClient coreclient.PodsGetter, ns, name string, opts *AttachOptions, quiet bool) error {
