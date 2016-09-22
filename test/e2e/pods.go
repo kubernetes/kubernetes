@@ -719,13 +719,6 @@ var _ = framework.KubeDescribe("Pods", func() {
 		_, init := api.GetPodCondition(&endPod.Status, api.PodInitialized)
 		Expect(init).NotTo(BeNil())
 		Expect(init.Status).To(Equal(api.ConditionTrue))
-
-		Expect(len(endPod.Status.InitContainerStatuses)).To(Equal(2))
-		for _, status := range endPod.Status.InitContainerStatuses {
-			Expect(status.Ready).To(BeTrue())
-			Expect(status.State.Terminated).NotTo(BeNil())
-			Expect(status.State.Terminated.ExitCode).To(BeZero())
-		}
 	})
 
 	It("should invoke init containers on a RestartAlways pod", func() {
@@ -788,13 +781,6 @@ var _ = framework.KubeDescribe("Pods", func() {
 		_, init := api.GetPodCondition(&endPod.Status, api.PodInitialized)
 		Expect(init).NotTo(BeNil())
 		Expect(init.Status).To(Equal(api.ConditionTrue))
-
-		Expect(len(endPod.Status.InitContainerStatuses)).To(Equal(2))
-		for _, status := range endPod.Status.InitContainerStatuses {
-			Expect(status.Ready).To(BeTrue())
-			Expect(status.State.Terminated).NotTo(BeNil())
-			Expect(status.State.Terminated.ExitCode).To(BeZero())
-		}
 	})
 
 	It("should not start app containers if init containers fail on a RestartAlways pod", func() {
