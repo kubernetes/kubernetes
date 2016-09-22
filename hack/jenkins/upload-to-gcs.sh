@@ -46,8 +46,22 @@ if [[ ! ${JENKINS_UPLOAD_TO_GCS:-y} =~ ^[yY]$ ]]; then
   exit 0
 fi
 
+GCS_SUBDIR=""
+readonly remote_git_repo=$(git config --get remote.remote.url | sed 's:.*github.com/::' || true)
+if [[ -n "${remote_git_repo}" ]]; then
+  case "${remote_git_repo}" in
+    kubernetes/kubernetes) GCS_SUBDIR="" ;;
+    kubernetes/*) GCS_SUBDIR="${remote_git_repo#kubernetes/}/" ;;
+    *) GCS_SUBDIR="${remote_git_repo/\//_}/" ;;
+  esac
+  if [[ "${remote_git_repo}" != "kubernetes/kubernetes" ]]; then
+    # also store the repo in started.json, so Gubernator can link it properly.
+    export BUILD_METADATA_REPO="${remote_git_repo}"
+  fi
+fi
+
 if [[ ${JOB_NAME} =~ -pull- ]]; then
-  : ${JENKINS_GCS_LOGS_PATH:="gs://kubernetes-jenkins/pr-logs/pull/${ghprbPullId:-unknown}"}
+  : ${JENKINS_GCS_LOGS_PATH:="gs://kubernetes-jenkins/pr-logs/pull/${GCS_SUBDIR}${ghprbPullId:-unknown}"}
   : ${JENKINS_GCS_LATEST_PATH:="gs://kubernetes-jenkins/pr-logs/directory"}
   : ${JENKINS_GCS_LOGS_INDIRECT:="gs://kubernetes-jenkins/pr-logs/directory/${JOB_NAME}"}
 else
