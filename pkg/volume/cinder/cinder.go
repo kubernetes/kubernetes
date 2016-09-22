@@ -51,6 +51,7 @@ type CinderProvider interface {
 	GetAttachmentDiskPath(instanceID string, diskName string) (string, error)
 	DiskIsAttached(diskName, instanceID string) (bool, error)
 	DisksAreAttached(diskNames []string, instanceID string) (map[string]bool, error)
+	ShouldTrustDevicePath() bool
 	Instances() (cloudprovider.Instances, bool)
 }
 
