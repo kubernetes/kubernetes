@@ -131,7 +131,7 @@ function mvfolder {
     # the first rule is to convert import lines like `restclient "k8s.io/client-go/pkg/client/restclient"`,
     # where a package alias is the same the package name.
     find "${CLIENT_REPO}" -type f -name "*.go" -print0 | \
-        xargs -0 sed -i "s,${src_package} \"${CLIENT_REPO_FROM_SRC}/${src},${dst_package} \"${CLIENT_REPO_FROM_SRC}/${dst},g"
+        xargs -0 sed -i "s,\<${src_package} \"${CLIENT_REPO_FROM_SRC}/${src},${dst_package} \"${CLIENT_REPO_FROM_SRC}/${dst},g"
     find "${CLIENT_REPO}" -type f -name "*.go" -print0 | \
         xargs -0 sed -i "s,\"${CLIENT_REPO_FROM_SRC}/${src},\"${CLIENT_REPO_FROM_SRC}/${dst},g"
     # rewrite import invocation
