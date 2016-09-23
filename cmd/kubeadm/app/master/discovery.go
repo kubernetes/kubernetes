@@ -18,7 +18,6 @@ package master
 
 import (
 	"crypto/x509"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -52,7 +51,7 @@ func encodeKubeDiscoverySecretData(s *kubeadmapi.KubeadmConfig, caCert *x509.Cer
 		endpointList = append(endpointList, fmt.Sprintf("https://%s:443", addr.String()))
 	}
 
-	tokenMap[s.Secrets.TokenID] = hex.EncodeToString(s.Secrets.Token)
+	tokenMap[s.Secrets.TokenID] = s.Secrets.BearerToken
 
 	data["endpoint-list.json"], _ = json.Marshal(endpointList)
 	data["token-map.json"], _ = json.Marshal(tokenMap)
