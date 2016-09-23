@@ -15,6 +15,7 @@ cmd/kube-discovery
 cmd/kube-dns
 cmd/kube-proxy
 cmd/kubeadm
+cmd/kubeadm
 cmd/kubectl
 cmd/kubelet
 cmd/kubernetes-discovery
@@ -243,4 +244,3 @@ test/integration/openshift
 test/soak/cauldron
 test/soak/serve_hostnames
 third_party/forked/golang/expansion
-cmd/kubeadm
