@@ -130,6 +130,13 @@ func (i *indexedWatchers) terminateAll(objectType reflect.Type) {
 // Cacher implements storage.Interface (although most of the calls are just
 // delegated to the underlying storage).
 type Cacher struct {
+	// HighWaterMarks for performance debugging.
+	// Important: Since HighWaterMark is using sync/atomic, it has to be at the top of the struct due to a bug on 32-bit platforms
+	// See: https://golang.org/pkg/sync/atomic/ for more information
+	incomingHWM HighWaterMark
+	// Incoming events that should be dispatched to watchers.
+	incoming chan watchCacheEvent
+
 	sync.RWMutex
 
 	// Before accessing the cacher's cache, wait for the ready to be ok.
@@ -163,10 +170,6 @@ type Cacher struct {
 	// watcher is interested into the watchers
 	watcherIdx int
 	watchers   indexedWatchers
-
-	// Incoming events that should be dispatched to watchers.
-	incoming    chan watchCacheEvent
-	incomingHWM HighWaterMark
 
 	// Handling graceful termination.
 	stopLock sync.RWMutex
