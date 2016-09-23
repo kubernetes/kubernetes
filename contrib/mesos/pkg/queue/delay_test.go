@@ -125,9 +125,9 @@ func TestDQ_sanity_check(t *testing.T) {
 
 	dq := NewDelayQueue()
 	delay := 2 * time.Second
-	dq.Add(&testjob{d: delay})
 
 	before := time.Now()
+	dq.Add(&testjob{d: delay})
 	x := dq.Pop()
 
 	now := time.Now()
