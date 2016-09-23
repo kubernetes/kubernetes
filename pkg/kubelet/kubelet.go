@@ -1311,7 +1311,14 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 	kl.statusManager.SetPodStatus(pod, apiPodStatus)
 
 	// Kill pod if it should not be running
-	if errOuter := canRunPod(pod); errOuter != nil || pod.DeletionTimestamp != nil || apiPodStatus.Phase == api.PodFailed {
+	errOuter := canRunPod(pod)
+	if errOuter == nil {
+		rs := kl.runtimeState.networkErrors()
+		if len(rs) != 0 && !podUsesHostNetwork(pod) {
+			errOuter = fmt.Errorf("Network is not ready: %v", rs)
+		}
+	}
+	if errOuter != nil || pod.DeletionTimestamp != nil || apiPodStatus.Phase == api.PodFailed {
 		if errInner := kl.killPod(pod, nil, podStatus, nil); errInner != nil {
 			errOuter = fmt.Errorf("error killing pod: %v", errInner)
 			utilruntime.HandleError(errOuter)
@@ -1532,7 +1539,7 @@ func (kl *Kubelet) syncLoop(updates <-chan kubetypes.PodUpdate, handler SyncHand
 	defer housekeepingTicker.Stop()
 	plegCh := kl.pleg.Watch()
 	for {
-		if rs := kl.runtimeState.errors(); len(rs) != 0 {
+		if rs := kl.runtimeState.runtimeErrors(); len(rs) != 0 {
 			glog.Infof("skipping pod synchronization - %v", rs)
 			time.Sleep(5 * time.Second)
 			continue
