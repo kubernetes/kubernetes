@@ -220,7 +220,7 @@ func componentPod(container api.Container, volumes ...api.Volume) api.Pod {
 
 func getComponentCommand(component string, s *kubeadmapi.KubeadmConfig) (command []string) {
 	baseFlags := map[string][]string{
-		apiServer: []string{
+		apiServer: {
 			"--address=127.0.0.1",
 			"--etcd-servers=http://127.0.0.1:2379",
 			"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota",
@@ -233,7 +233,7 @@ func getComponentCommand(component string, s *kubeadmapi.KubeadmConfig) (command
 			"--secure-port=443",
 			"--allow-privileged",
 		},
-		controllerManager: []string{
+		controllerManager: {
 			// TODO(phase1+): consider adding --address=127.0.0.1 in order to not expose the cm port to the rest of the world
 			"--leader-elect",
 			"--master=127.0.0.1:8080",
@@ -244,12 +244,12 @@ func getComponentCommand(component string, s *kubeadmapi.KubeadmConfig) (command
 			"--cluster-signing-key-file=" + pkiDir + "/ca-key.pem",
 			"--insecure-experimental-approve-all-kubelet-csrs-for-group=system:kubelet-bootstrap",
 		},
-		scheduler: []string{
+		scheduler: {
 			// TODO(phase1+): consider adding --address=127.0.0.1 in order to not expose the scheduler port to the rest of the world
 			"--leader-elect",
 			"--master=127.0.0.1:8080",
 		},
-		proxy: []string{},
+		proxy: {},
 	}
 
 	if s.EnvParams["hyperkube_image"] != "" {
