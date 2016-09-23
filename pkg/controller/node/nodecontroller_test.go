@@ -17,6 +17,7 @@ limitations under the License.
 package node
 
 import (
+	"net"
 	"strings"
 	"testing"
 	"time"
@@ -26,8 +27,12 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/cache"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
+	"k8s.io/kubernetes/pkg/cloudprovider"
 	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
+	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -41,6 +46,34 @@ const (
 	testLargeClusterThreshold  = 20
 	testUnhealtyThreshold      = float32(0.55)
 )
+
+func NewNodeControllerFromClient(
+	cloud cloudprovider.Interface,
+	kubeClient clientset.Interface,
+	podEvictionTimeout time.Duration,
+	evictionLimiterQPS float32,
+	secondaryEvictionLimiterQPS float32,
+	largeClusterThreshold int32,
+	unhealthyZoneThreshold float32,
+	nodeMonitorGracePeriod time.Duration,
+	nodeStartupGracePeriod time.Duration,
+	nodeMonitorPeriod time.Duration,
+	clusterCIDR *net.IPNet,
+	serviceCIDR *net.IPNet,
+	nodeCIDRMaskSize int,
+	allocateNodeCIDRs bool) (*NodeController, error) {
+
+	factory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
+
+	nc, err := NewNodeController(factory.Pods(), factory.Nodes(), factory.DaemonSets(), cloud, kubeClient, podEvictionTimeout, evictionLimiterQPS, secondaryEvictionLimiterQPS,
+		largeClusterThreshold, unhealthyZoneThreshold, nodeMonitorGracePeriod, nodeStartupGracePeriod, nodeMonitorPeriod, clusterCIDR,
+		serviceCIDR, nodeCIDRMaskSize, allocateNodeCIDRs)
+	if err != nil {
+		return nil, err
+	}
+
+	return nc, nil
+}
 
 func TestMonitorNodeStatusEvictPods(t *testing.T) {
 	fakeNow := unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC)
@@ -1701,7 +1734,7 @@ func TestCheckPod(t *testing.T) {
 		},
 	}
 
-	nc, _ := NewNodeControllerFromClient(nil, nil, 0, 0, 0, 0, 0, 0, 0, 0, nil, nil, 0, false)
+	nc, _ := NewNodeControllerFromClient(nil, fake.NewSimpleClientset(), 0, 0, 0, 0, 0, 0, 0, 0, nil, nil, 0, false)
 	nc.nodeStore.Store = cache.NewStore(cache.MetaNamespaceKeyFunc)
 	nc.nodeStore.Store.Add(&api.Node{
 		ObjectMeta: api.ObjectMeta{
