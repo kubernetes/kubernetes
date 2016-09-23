@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/dockershim"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/types"
@@ -513,6 +514,13 @@ func (m *kubeGenericRuntimeManager) AttachContainer(id kubecontainer.ContainerID
 
 // GetContainerLogs returns logs of a specific container.
 func (m *kubeGenericRuntimeManager) GetContainerLogs(pod *api.Pod, containerID kubecontainer.ContainerID, logOptions *api.PodLogOptions, stdout, stderr io.Writer) (err error) {
+	// Get logs directly from docker for in-process docker integration for
+	// now to unblock other tests.
+	// TODO: remove this hack after setting down on how to implement log
+	// retrieval/management.
+	if ds, ok := m.runtimeService.(dockershim.DockerLegacyService); ok {
+		return ds.GetContainerLogs(pod, containerID, logOptions, stdout, stderr)
+	}
 	return fmt.Errorf("not implemented")
 }
 
@@ -521,6 +529,12 @@ func (m *kubeGenericRuntimeManager) GetContainerLogs(pod *api.Pod, containerID k
 // tty.
 // TODO: handle terminal resizing, refer https://github.com/kubernetes/kubernetes/issues/29579
 func (m *kubeGenericRuntimeManager) ExecInContainer(containerID kubecontainer.ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size) error {
+	// Use `docker exec` directly for in-process docker integration for
+	// now to unblock other tests.
+	// TODO: remove this hack after exec is defined in CRI.
+	if ds, ok := m.runtimeService.(dockershim.DockerLegacyService); ok {
+		return ds.ExecInContainer(containerID, cmd, stdin, stdout, stderr, tty, resize)
+	}
 	return fmt.Errorf("not implemented")
 }
 
