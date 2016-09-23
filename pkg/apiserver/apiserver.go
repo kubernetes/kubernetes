@@ -210,13 +210,13 @@ func logStackOnRecover(s runtime.NegotiatedSerializer, panicReason interface{}, 
 	errorNegotiated(apierrors.NewGenericServerResponse(http.StatusInternalServerError, "", api.Resource(""), "", "", 0, false), s, unversioned.GroupVersion{}, w, &http.Request{Header: headers})
 }
 
-func InstallServiceErrorHandler(s runtime.NegotiatedSerializer, container *restful.Container, requestResolver *RequestInfoResolver, apiVersions []string) {
+func InstallServiceErrorHandler(s runtime.NegotiatedSerializer, container *restful.Container) {
 	container.ServiceErrorHandler(func(serviceErr restful.ServiceError, request *restful.Request, response *restful.Response) {
-		serviceErrorHandler(s, requestResolver, apiVersions, serviceErr, request, response)
+		serviceErrorHandler(s, serviceErr, request, response)
 	})
 }
 
-func serviceErrorHandler(s runtime.NegotiatedSerializer, requestResolver *RequestInfoResolver, apiVersions []string, serviceErr restful.ServiceError, request *restful.Request, response *restful.Response) {
+func serviceErrorHandler(s runtime.NegotiatedSerializer, serviceErr restful.ServiceError, request *restful.Request, response *restful.Response) {
 	errorNegotiated(
 		apierrors.NewGenericServerResponse(serviceErr.Code, "", api.Resource(""), "", serviceErr.Message, 0, false),
 		s,
