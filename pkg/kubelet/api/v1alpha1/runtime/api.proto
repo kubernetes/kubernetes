@@ -571,14 +571,17 @@ message ContainerStatus {
     // Reference to the image in use. For most runtimes, this should be an
     // image ID
     optional string image_ref = 9;
-    // A string explains why container is in such a status.
+    // A brief CamelCase string explains why container is in such a status.
     optional string reason = 10;
+    // A human-readable message indication details about why container is in
+    // this state.
+    optional string message = 11;
     // Labels are key value pairs that may be used to scope and select individual resources.
-    map<string,string> labels = 11;
+    map<string,string> labels = 12;
     // Annotations is an unstructured key value map.
-    map<string,string> annotations = 12;
+    map<string,string> annotations = 13;
     // Mounts specifies mounts for the container
-    repeated Mount mounts = 13;
+    repeated Mount mounts = 14;
 }
 
 message ContainerStatusResponse {
