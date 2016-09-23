@@ -91,7 +91,7 @@ type Threshold struct {
 	// GracePeriod represents the amount of time that a threshold must be met before eviction is triggered.
 	GracePeriod time.Duration
 	// MinReclaim represents the minimum amount of resource to reclaim if the threshold is met.
-	MinReclaim *resource.Quantity
+	MinReclaim *ThresholdValue
 }
 
 // Manager evaluates when an eviction threshold for node stability has been met on the node.
