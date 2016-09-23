@@ -152,7 +152,8 @@ type GenericAPIServer struct {
 
 	// Map storing information about all groups to be exposed in discovery response.
 	// The map is from name to the group.
-	apiGroupsForDiscovery map[string]unversioned.APIGroup
+	apiGroupsForDiscoveryLock sync.RWMutex
+	apiGroupsForDiscovery     map[string]unversioned.APIGroup
 
 	// See Config.$name for documentation of these flags
 
@@ -228,6 +229,9 @@ func (s *GenericAPIServer) InstallAPIGroups(groupsInfo []APIGroupInfo) error {
 // Installs handler at /apis to list all group versions for discovery
 func (s *GenericAPIServer) installGroupsDiscoveryHandler() {
 	apiserver.AddApisWebService(s.Serializer, s.HandlerContainer, s.apiPrefix, func(req *restful.Request) []unversioned.APIGroup {
+		s.apiGroupsForDiscoveryLock.RLock()
+		defer s.apiGroupsForDiscoveryLock.RUnlock()
+
 		// Return the list of supported groups in sorted order (to have a deterministic order).
 		groups := []unversioned.APIGroup{}
 		groupNames := make([]string, len(s.apiGroupsForDiscovery))
@@ -454,10 +458,16 @@ func (s *GenericAPIServer) InstallAPIGroup(apiGroupInfo *APIGroupInfo) error {
 }
 
 func (s *GenericAPIServer) AddAPIGroupForDiscovery(apiGroup unversioned.APIGroup) {
+	s.apiGroupsForDiscoveryLock.Lock()
+	defer s.apiGroupsForDiscoveryLock.Unlock()
+
 	s.apiGroupsForDiscovery[apiGroup.Name] = apiGroup
 }
 
 func (s *GenericAPIServer) RemoveAPIGroupForDiscovery(groupName string) {
+	s.apiGroupsForDiscoveryLock.Lock()
+	defer s.apiGroupsForDiscoveryLock.Unlock()
+
 	delete(s.apiGroupsForDiscovery, groupName)
 }
 
