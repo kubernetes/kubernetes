@@ -532,6 +532,7 @@ update-period
 upgrade-image
 upgrade-target
 use-kubernetes-cluster-service
+use-kubernetes-version
 user-whitelist
 verify-only
 volume-dir

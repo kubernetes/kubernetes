@@ -54,6 +54,9 @@ type InitFlags struct {
 	PodNetwork struct {
 		CIDR net.IPNet
 	}
+	Versions struct {
+		Kubernetes string
+	}
 	CloudProvider string
 	Schedulable   bool
 }
@@ -61,6 +64,7 @@ type InitFlags struct {
 const (
 	DefaultServiceDNSDomain   = "cluster.local"
 	DefaultServicesCIDRString = "100.64.0.0/12"
+	DefaultKubernetesVersion  = "v1.4.0-beta.10"
 )
 
 var (

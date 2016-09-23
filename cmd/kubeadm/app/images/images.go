@@ -19,6 +19,8 @@ package images
 import (
 	"fmt"
 	"runtime"
+
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/api"
 )
 
 const (
@@ -41,20 +43,17 @@ const (
 	exechealthzVersion = "1.1"
 )
 
-// TODO(phase1): Make this configurable + default to a v1.4 value fetched from: https://storage.googleapis.com/kubernetes-release/release/stable.txt
-var DefaultKubeVersion = "v1.4.0-beta.8"
-
-func GetCoreImage(image string, overrideImage string) string {
+func GetCoreImage(image string, cfg *kubeadmapi.KubeadmConfig, overrideImage string) string {
 	if overrideImage != "" {
 		return overrideImage
 	}
 
 	return map[string]string{
 		KubeEtcdImage:              fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "etcd", runtime.GOARCH, etcdVersion),
-		KubeAPIServerImage:         fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "kube-apiserver", runtime.GOARCH, DefaultKubeVersion),
-		KubeControllerManagerImage: fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "kube-controller-manager", runtime.GOARCH, DefaultKubeVersion),
-		KubeSchedulerImage:         fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "kube-scheduler", runtime.GOARCH, DefaultKubeVersion),
-		KubeProxyImage:             fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "kube-proxy", runtime.GOARCH, DefaultKubeVersion),
+		KubeAPIServerImage:         fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "kube-apiserver", runtime.GOARCH, cfg.Versions.Kubernetes),
+		KubeControllerManagerImage: fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "kube-controller-manager", runtime.GOARCH, cfg.Versions.Kubernetes),
+		KubeSchedulerImage:         fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "kube-scheduler", runtime.GOARCH, cfg.Versions.Kubernetes),
+		KubeProxyImage:             fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "kube-proxy", runtime.GOARCH, cfg.Versions.Kubernetes),
 	}[image]
 }
 

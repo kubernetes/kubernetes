@@ -86,9 +86,12 @@ func NewCmdInit(out io.Writer, s *kubeadmapi.KubeadmConfig) *cobra.Command {
 		&s.InitFlags.Schedulable, "schedule-pods-here", false,
 		`(optional) Allow to schedule workload to the node`,
 	)
+	cmd.PersistentFlags().StringVar(
+		&s.InitFlags.Versions.Kubernetes, "use-kubernetes-version", kubeadmapi.DefaultKubernetesVersion,
+		`(optional) Choose a specific Kubernetes version for the control plane`,
+	)
 
 	// TODO (phase1+) @errordeveloper make the flags below not show up in --help but rather on --advanced-help
-
 	cmd.PersistentFlags().StringSliceVar(
 		&s.InitFlags.API.Etcd.ExternalEndpoints, "external-etcd-endpoints", []string{},
 		`(optional) etcd endpoints to use, in case you have an external cluster.`,
