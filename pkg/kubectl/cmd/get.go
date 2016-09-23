@@ -130,25 +130,7 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 			return err
 		}
 
-		stream, err := restClient.Get().RequestURI(options.Raw).Stream()
-		if err != nil {
-			return err
-		}
-		defer stream.Close()
-
-		for {
-			buffer := make([]byte, 1024, 1024)
-			bytesRead, err := stream.Read(buffer)
-			if bytesRead > 0 {
-				fmt.Printf("%s", string(buffer[:bytesRead]))
-			}
-			if err == io.EOF {
-				return nil
-			}
-			if err != nil {
-				return err
-			}
-		}
+		return cmdutil.PrintRESTClientStream(restClient, options.Raw)
 	}
 
 	selector := cmdutil.GetFlagString(cmd, "selector")
