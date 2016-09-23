@@ -14,11 +14,42 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package discovery
 
 import (
-	_ "github.com/square/go-jose"
+	"net/http"
+
+	"github.com/gorilla/mux"
 )
 
-func main() {
+type Route struct {
+	Name    string
+	Method  string
+	Pattern string
+	Handler http.Handler
+}
+
+type Routes []Route
+
+var routes = Routes{
+	Route{
+		"ClusterInfoIndex",
+		"GET",
+		"/cluster-info/v1/",
+		NewClusterInfoHandler(),
+	},
+}
+
+func NewRouter() *mux.Router {
+
+	router := mux.NewRouter().StrictSlash(true)
+	for _, route := range routes {
+		router.
+			Methods(route.Method).
+			Path(route.Pattern).
+			Name(route.Name).
+			Handler(route.Handler)
+	}
+
+	return router
 }
