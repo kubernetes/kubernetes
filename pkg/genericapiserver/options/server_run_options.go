@@ -401,7 +401,7 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 
 	fs.StringVar(&s.OIDCGroupsClaim, "oidc-groups-claim", "", ""+
 		"If provided, the name of a custom OpenID Connect claim for specifying user groups. "+
-		"The claim value is expected to be an array of strings. This flag is experimental, "+
+		"The claim value is expected to be a string or array of strings. This flag is experimental, "+
 		"please see the authentication documentation for further details.")
 
 	fs.Var(&s.RuntimeConfig, "runtime-config", ""+
