@@ -55,7 +55,7 @@ spec:
             memory: 70Mi
         livenessProbe:
           httpGet:
-            path: /healthz
+            path: /healthz-kubedns
             port: 8080
             scheme: HTTP
           initialDelaySeconds: 60
@@ -96,8 +96,17 @@ spec:
         - containerPort: 53
           name: dns-tcp
           protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: /healthz-dnsmasq
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 60
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 5
       - name: healthz
-        image: gcr.io/google_containers/exechealthz-amd64:1.1
+        image: gcr.io/google_containers/exechealthz-amd64:1.2
         resources:
           limits:
             memory: 50Mi
@@ -109,9 +118,12 @@ spec:
             # net memory requested by the pod constant.
             memory: 50Mi
         args:
-        - -cmd=nslookup kubernetes.default.svc.$DNS_DOMAIN 127.0.0.1 >/dev/null && nslookup kubernetes.default.svc.$DNS_DOMAIN 127.0.0.1:10053 >/dev/null
-        - -port=8080
-        - -quiet
+        - --cmd=nslookup kubernetes.default.svc.$DNS_DOMAIN 127.0.0.1 >/dev/null
+        - --url=/healthz-dnsmasq
+        - --cmd=nslookup kubernetes.default.svc.$DNS_DOMAIN 127.0.0.1:10053 >/dev/null
+        - --url=/healthz-kubedns
+        - --port=8080
+        - --quiet
         ports:
         - containerPort: 8080
           protocol: TCP
