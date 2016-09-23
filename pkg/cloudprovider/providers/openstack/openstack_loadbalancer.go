@@ -377,8 +377,8 @@ func memberExists(members []v2_pools.Member, addr string) (bool) {
 func popListener(existingListeners []listeners.Listener, id string) ([]listeners.Listener) {
 	for i, existingListener := range existingListeners {
 		if existingListener.ID == id {
-			listeners[i] = listeners[len(listeners)-1]
-			listeners = listeners[:len(listeners)-1]
+			existingListeners[i] = existingListeners[len(existingListeners)-1]
+			existingListeners = existingListeners[:len(existingListeners)-1]
 			break
 		}
 	}
