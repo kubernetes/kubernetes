@@ -18,6 +18,7 @@ limitations under the License.
 package main
 
 import (
+	"encoding/xml"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -25,39 +26,31 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 )
 
 var (
 	// TODO(fejta): change all these _ flags to -
-	build          = flag.Bool("build", false, "If true, build a new release. Otherwise, use whatever is there.")
-	checkNodeCount = flag.Bool("check_node_count", true, ""+
-		"By default, verify that the cluster has at least two nodes."+
-		"You can explicitly set to false if you're, e.g., testing single-node clusters "+
-		"for which the node count is supposed to be one.")
+	build            = flag.Bool("build", false, "If true, build a new release. Otherwise, use whatever is there.")
 	checkVersionSkew = flag.Bool("check_version_skew", true, ""+
 		"By default, verify that client and server have exact version match. "+
 		"You can explicitly set to false if you're, e.g., testing client changes "+
 		"for which the server version doesn't make a difference.")
 	checkLeakedResources = flag.Bool("check_leaked_resources", false, "Ensure project ends with the same resources")
-	ctlCmd               = flag.String("ctl", "", "If nonempty, pass this as an argument, and call kubectl. Implies -v.")
 	down                 = flag.Bool("down", false, "If true, tear down the cluster before exiting.")
 	dump                 = flag.String("dump", "", "If set, dump cluster logs to this location on test or cluster-up failure")
 	kubemark             = flag.Bool("kubemark", false, "If true, run kubemark tests.")
-	push                 = flag.Bool("push", false, "If true, push to e2e cluster. Has no effect if -up is true.")
-	pushup               = flag.Bool("pushup", false, "If true, push to e2e cluster if it's up, otherwise start the e2e cluster.")
 	skewTests            = flag.Bool("skew", false, "If true, run tests in another version at ../kubernetes/hack/e2e.go")
 	testArgs             = flag.String("test_args", "", "Space-separated list of arguments to pass to Ginkgo test runner.")
 	test                 = flag.Bool("test", false, "Run Ginkgo tests.")
 	up                   = flag.Bool("up", false, "If true, start the the e2e cluster. If cluster is already up, recreate it.")
 	upgradeArgs          = flag.String("upgrade_args", "", "If set, run upgrade tests before other tests")
 	verbose              = flag.Bool("v", false, "If true, print all command output.")
-)
 
-const (
-	minNodeCount = 2
+	deprecatedPush   = flag.Bool("push", false, "Deprecated. Does nothing.")
+	deprecatedPushup = flag.Bool("pushup", false, "Deprecated. Does nothing.")
+	deprecatedCtlCmd = flag.String("ctl", "", "Deprecated. Does nothing.")
 )
 
 func appendError(errs []error, err error) []error {
@@ -67,125 +60,198 @@ func appendError(errs []error, err error) []error {
 	return errs
 }
 
+func validWorkingDirectory() error {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("could not get pwd: %v", err)
+	}
+	acwd, err := filepath.Abs(cwd)
+	if err != nil {
+		return fmt.Errorf("failed to convert %s to an absolute path: %v", cwd, err)
+	}
+	// This also matches "kubernetes_skew" for upgrades.
+	if !strings.Contains(filepath.Base(acwd), "kubernetes") {
+		return fmt.Errorf("must run from kubernetes directory root: %v", acwd)
+	}
+	return nil
+}
+
+type TestCase struct {
+	XMLName   xml.Name `xml:"testcase"`
+	ClassName string   `xml:"classname,attr"`
+	Name      string   `xml:"name,attr"`
+	Time      float64  `xml:"time,attr"`
+	Failure   string   `xml:"failure,omitempty"`
+}
+
+type TestSuite struct {
+	XMLName  xml.Name `xml:"testsuite"`
+	Failures int      `xml:"failures,attr"`
+	Tests    int      `xml:"tests,attr"`
+	Time     float64  `xml:"time,attr"`
+	Cases    []TestCase
+}
+
+var suite TestSuite
+
+func xmlWrap(name string, f func() error) error {
+	start := time.Now()
+	err := f()
+	duration := time.Since(start)
+	c := TestCase{
+		Name:      name,
+		ClassName: "e2e.go",
+		Time:      duration.Seconds(),
+	}
+	if err != nil {
+		c.Failure = err.Error()
+		suite.Failures++
+	}
+	suite.Cases = append(suite.Cases, c)
+	suite.Tests++
+	return err
+}
+
+func writeXML(start time.Time) {
+	suite.Time = time.Since(start).Seconds()
+	out, err := xml.MarshalIndent(&suite, "", "    ")
+	if err != nil {
+		log.Fatalf("Could not marshal XML: %s", err)
+	}
+	path := filepath.Join(*dump, "junit_runner.xml")
+	f, err := os.Create(path)
+	if err != nil {
+		log.Fatalf("Could not create file: %s", err)
+	}
+	defer f.Close()
+	if _, err := f.WriteString(xml.Header); err != nil {
+		log.Fatalf("Error writing XML header: %s", err)
+	}
+	if _, err := f.Write(out); err != nil {
+		log.Fatalf("Error writing XML data: %s", err)
+	}
+	log.Printf("Saved XML output to %s.", path)
+}
+
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	flag.Parse()
 
-	cwd, err := os.Getwd()
-	if err != nil {
-		log.Fatalf("Could not get pwd: %v", err)
+	if err := validWorkingDirectory(); err != nil {
+		log.Fatalf("Called from invalid working directory: %v", err)
 	}
-	acwd, err := filepath.Abs(cwd)
-	if err != nil {
-		log.Fatalf("Failed to convert to an absolute path: %v", err)
+
+	if err := run(); err != nil {
+		log.Fatalf("Something went wrong: %s", err)
 	}
-	if !strings.Contains(filepath.Base(acwd), "kubernetes") {
-		// TODO(fejta): cd up into  the kubernetes directory
-		log.Fatalf("Must run from kubernetes directory: %v", cwd)
+}
+
+func run() error {
+	if *dump != "" {
+		defer writeXML(time.Now())
 	}
 
 	if *build {
-		// The build-release script needs stdin to ask the user whether
-		// it's OK to download the docker image.
-		cmd := exec.Command("make", "quick-release")
-		cmd.Stdin = os.Stdin
-		if err := finishRunning("build-release", cmd); err != nil {
-			log.Fatalf("error building kubernetes: %v", err)
+		if err := xmlWrap("Build", Build); err != nil {
+			return fmt.Errorf("error building: %s", err)
 		}
+	}
+
+	if *checkVersionSkew {
+		os.Setenv("KUBECTL", "./cluster/kubectl.sh --match-server-version")
+	} else {
+		os.Setenv("KUBECTL", "./cluster/kubectl.sh")
+	}
+	os.Setenv("KUBE_CONFIG_FILE", "config-test.sh")
+	// force having batch/v2alpha1 always on for e2e tests
+	os.Setenv("KUBE_RUNTIME_CONFIG", "batch/v2alpha1=true")
+
+	if *up {
+		if err := xmlWrap("TearDown", TearDown); err != nil {
+			return fmt.Errorf("error tearing down previous cluster: %s", err)
+		}
+	}
+
+	var err error
+	var errs []error
+
+	var (
+		beforeResources []byte
+		upResources     []byte
+		afterResources  []byte
+	)
+
+	if *checkLeakedResources {
+		errs = appendError(errs, xmlWrap("ListResources Before", func() error {
+			beforeResources, err = ListResources()
+			return err
+		}))
 	}
 
 	if *up {
-		if err := TearDown(); err != nil {
-			log.Fatalf("error tearing down previous cluster: %v", err)
+		// Start the cluster using this version.
+		if err := xmlWrap("Up", Up); err != nil {
+			return fmt.Errorf("starting e2e cluster: %s", err)
 		}
 	}
 
-	var errs []error
-
-	var beforeResources []byte
 	if *checkLeakedResources {
-		beforeResources, err = ListResources()
-		errs = appendError(errs, err)
-	}
-
-	os.Setenv("KUBECTL", strings.Join(append([]string{"./cluster/kubectl.sh"}, kubectlArgs()...), " "))
-
-	if *upgradeArgs != "" { // Start the cluster using a previous version.
-		if err := UpgradeUp(); err != nil {
-			log.Fatalf("error starting cluster to upgrade: %v", err)
-		}
-	} else { // Start the cluster using this version.
-		if *pushup {
-			if IsUp() {
-				log.Printf("e2e cluster is up, pushing.")
-				*up = false
-				*push = true
-			} else {
-				log.Printf("e2e cluster is down, creating.")
-				*up = true
-				*push = false
-			}
-		}
-		if *up {
-			if err := Up(); err != nil {
-				log.Fatalf("starting e2e cluster: %v", err)
-			}
-		} else if *push {
-			if err := finishRunning("push", exec.Command("./hack/e2e-internal/e2e-push.sh")); err != nil {
-				log.Fatalf("error pushing e2e clsuter: %v", err)
-			}
-		}
-	}
-
-	var upResources []byte
-	if *checkLeakedResources {
-		upResources, err = ListResources()
-		errs = appendError(errs, err)
-	}
-
-	if *ctlCmd != "" {
-		ctlArgs := strings.Fields(*ctlCmd)
-		os.Setenv("KUBE_CONFIG_FILE", "config-test.sh")
-		errs = appendError(errs, finishRunning("'kubectl "+*ctlCmd+"'", exec.Command("./cluster/kubectl.sh", ctlArgs...)))
+		errs = appendError(errs, xmlWrap("ListResources Up", func() error {
+			upResources, err = ListResources()
+			return err
+		}))
 	}
 
 	if *upgradeArgs != "" {
-		errs = appendError(errs, UpgradeTest(*upgradeArgs))
+		errs = appendError(errs, xmlWrap("UpgradeTest", func() error {
+			return UpgradeTest(*upgradeArgs)
+		}))
 	}
 
 	if *test {
+		errs = appendError(errs, xmlWrap("kubectl version", func() error {
+			return finishRunning("kubectl version", exec.Command("./cluster/kubectl.sh", "version", "--match-server-version=false"))
+		}))
 		if *skewTests {
-			errs = appendError(errs, SkewTest())
+			errs = appendError(errs, xmlWrap("SkewTest", SkewTest))
 		} else {
-			errs = appendError(errs, Test())
+			errs = appendError(errs, xmlWrap("Test", Test))
 		}
 	}
 
 	if *kubemark {
-		errs = appendError(errs, KubemarkTest())
+		errs = appendError(errs, xmlWrap("KubemarkTest", KubemarkTest))
+	}
+
+	if len(errs) > 0 && *dump != "" {
+		errs = appendError(errs, xmlWrap("DumpClusterLogs", func() error {
+			return DumpClusterLogs(*dump)
+		}))
 	}
 
 	if *down {
-		if errs != nil && *dump != "" {
-			DumpClusterLogs(*dump)
-		}
-		errs = appendError(errs, TearDown())
+		errs = appendError(errs, xmlWrap("TearDown", TearDown))
 	}
 
 	if *checkLeakedResources {
 		log.Print("Sleeping for 30 seconds...") // Wait for eventually consistent listing
 		time.Sleep(30 * time.Second)
-		afterResources, err := ListResources()
-		if err != nil {
+		if err := xmlWrap("ListResources After", func() error {
+			afterResources, err = ListResources()
+			return err
+		}); err != nil {
 			errs = append(errs, err)
 		} else {
-			errs = appendError(errs, DiffResources(beforeResources, upResources, afterResources, *dump))
+			errs = appendError(errs, xmlWrap("DiffResources", func() error {
+				return DiffResources(beforeResources, upResources, afterResources, *dump)
+			}))
 		}
 	}
 
 	if len(errs) != 0 {
-		log.Fatalf("Encountered %d errors: %v", len(errs), errs)
+		return fmt.Errorf("encountered %d errors: %v", len(errs), errs)
 	}
+	return nil
 }
 
 func DiffResources(before, clusterUp, after []byte, location string) error {
@@ -255,38 +321,23 @@ func ListResources() ([]byte, error) {
 	return stdout, nil
 }
 
+func Build() error {
+	// The build-release script needs stdin to ask the user whether
+	// it's OK to download the docker image.
+	cmd := exec.Command("make", "quick-release")
+	cmd.Stdin = os.Stdin
+	if err := finishRunning("build-release", cmd); err != nil {
+		return fmt.Errorf("error building kubernetes: %v", err)
+	}
+	return nil
+}
+
 func TearDown() error {
 	return finishRunning("teardown", exec.Command("./hack/e2e-internal/e2e-down.sh"))
 }
 
-// Up brings an e2e cluster up, recreating it if one is already running.
 func Up() error {
-	// force having batch/v2alpha1 always on for e2e tests
-	os.Setenv("KUBE_RUNTIME_CONFIG", "batch/v2alpha1=true")
 	return finishRunning("up", exec.Command("./hack/e2e-internal/e2e-up.sh"))
-}
-
-// Ensure that the cluster is large engough to run the e2e tests.
-func ValidateClusterSize() error {
-	// Check that there are at least minNodeCount nodes running
-	cmd := exec.Command("./hack/e2e-internal/e2e-cluster-size.sh")
-	if *verbose {
-		cmd.Stderr = os.Stderr
-	}
-	stdout, err := cmd.Output()
-	if err != nil {
-		return fmt.Errorf("Could not get nodes to validate cluster size (%s)", err)
-	}
-
-	numNodes, err := strconv.Atoi(strings.TrimSpace(string(stdout)))
-	if err != nil {
-		return fmt.Errorf("Could not count number of nodes to validate cluster size (%s)", err)
-	}
-
-	if numNodes < minNodeCount {
-		return fmt.Errorf("Cluster size (%d) is too small to run e2e tests.  %d Nodes are required.", numNodes, minNodeCount)
-	}
-	return nil
 }
 
 // Is the e2e cluster up?
@@ -345,30 +396,13 @@ func KubemarkTest() error {
 func chdirSkew() (string, error) {
 	old, err := os.Getwd()
 	if err != nil {
-		return "", fmt.Errorf("Failed to os.Getwd(): %v", err)
+		return "", fmt.Errorf("failed to os.Getwd(): %v", err)
 	}
 	err = os.Chdir("../kubernetes_skew")
 	if err != nil {
-		return "", fmt.Errorf("Failed to cd ../kubernetes_skew: %v", err)
+		return "", fmt.Errorf("failed to cd ../kubernetes_skew: %v", err)
 	}
 	return old, nil
-}
-
-func UpgradeUp() error {
-	old, err := chdirSkew()
-	if err != nil {
-		return err
-	}
-	defer os.Chdir(old)
-	return finishRunning("UpgradeUp",
-		exec.Command(
-			"go", "run", "./hack/e2e.go",
-			fmt.Sprintf("--check_version_skew=%t", *checkVersionSkew),
-			fmt.Sprintf("--push=%t", *push),
-			fmt.Sprintf("--pushup=%t", *pushup),
-			fmt.Sprintf("--up=%t", *up),
-			fmt.Sprintf("--v=%t", *verbose),
-		))
 }
 
 func UpgradeTest(args string) error {
@@ -410,16 +444,11 @@ func SkewTest() error {
 
 func Test() error {
 	if !IsUp() {
-		log.Fatal("Testing requested, but e2e cluster not up!")
+		return fmt.Errorf("testing requested, but e2e cluster not up!")
 	}
 
 	// TODO(fejta): add a --federated or something similar
 	if os.Getenv("FEDERATION") != "true" {
-		if *checkNodeCount {
-			if err := ValidateClusterSize(); err != nil {
-				return err
-			}
-		}
 		return finishRunning("Ginkgo tests", exec.Command("./hack/ginkgo-e2e.sh", strings.Fields(*testArgs)...))
 	}
 
@@ -443,13 +472,4 @@ func finishRunning(stepName string, cmd *exec.Cmd) error {
 		return fmt.Errorf("error running %v: %v", stepName, err)
 	}
 	return nil
-}
-
-// returns either "", or a list of args intended for appending with the
-// kubectl command (beginning with a space).
-func kubectlArgs() []string {
-	if !*checkVersionSkew {
-		return []string{}
-	}
-	return []string{"--match-server-version"}
 }
