@@ -22,7 +22,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"k8s.io/kubernetes/cmd/libs/go2idl/args"
+	"k8s.io/gengo/args"
 	clientgenargs "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/args"
 	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/generators"
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -135,6 +135,7 @@ func parseIncludedTypesOverrides() (map[unversioned.GroupVersion][]string, error
 
 func main() {
 	arguments := args.Default()
+	arguments.GoHeaderFilePath = filepath.Join(args.DefaultSourceTree(), "k8s.io/kubernetes/hack/boilerplate/boilerplate.go.txt")
 	flag.Parse()
 	var cmdArgs string
 	flag.VisitAll(func(f *flag.Flag) {

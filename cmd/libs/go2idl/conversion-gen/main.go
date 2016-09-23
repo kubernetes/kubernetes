@@ -35,7 +35,9 @@ limitations under the License.
 package main
 
 import (
-	"k8s.io/kubernetes/cmd/libs/go2idl/args"
+	"path/filepath"
+
+	"k8s.io/gengo/args"
 	"k8s.io/kubernetes/cmd/libs/go2idl/conversion-gen/generators"
 
 	"github.com/golang/glog"
@@ -47,6 +49,7 @@ func main() {
 
 	// Override defaults.
 	arguments.OutputFileBaseName = "conversion_generated"
+	arguments.GoHeaderFilePath = filepath.Join(args.DefaultSourceTree(), "k8s.io/kubernetes/hack/boilerplate/boilerplate.go.txt")
 
 	// Custom args.
 	customArgs := &generators.CustomArgs{
