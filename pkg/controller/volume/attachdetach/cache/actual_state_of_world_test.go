@@ -851,7 +851,7 @@ func Test_RemoveVolumeFromReportAsAttached_AddVolumeToReportAsAttached_Positive(
 	reportAsAttachedVolumesMap := asw.GetVolumesToReportAttached()
 	volumes, exists := reportAsAttachedVolumesMap[nodeName]
 	if !exists {
-		t.Fatalf("MarkDesireToDetach_UnmarkDesireToDetach failed. Expected: <node %q exist> Actual: <node does not exist in the reportedAsAttached map", nodeName)
+		t.Fatalf("Test_RemoveVolumeFromReportAsAttached_AddVolumeToReportAsAttached_Positive failed. Expected: <node %q exist> Actual: <node does not exist in the reportedAsAttached map", nodeName)
 	}
 	if len(volumes) > 0 {
 		t.Fatalf("len(reportAsAttachedVolumes) Expected: <0> Actual: <%v>", len(volumes))
@@ -861,7 +861,7 @@ func Test_RemoveVolumeFromReportAsAttached_AddVolumeToReportAsAttached_Positive(
 	reportAsAttachedVolumesMap = asw.GetVolumesToReportAttached()
 	volumes, exists = reportAsAttachedVolumesMap[nodeName]
 	if !exists {
-		t.Fatalf("MarkDesireToDetach_UnmarkDesireToDetach failed. Expected: <node %q exist> Actual: <node does not exist in the reportedAsAttached map", nodeName)
+		t.Fatalf("Test_RemoveVolumeFromReportAsAttached_AddVolumeToReportAsAttached_Positive failed. Expected: <node %q exist> Actual: <node does not exist in the reportedAsAttached map", nodeName)
 	}
 	if len(volumes) != 1 {
 		t.Fatalf("len(reportAsAttachedVolumes) Expected: <1> Actual: <%v>", len(volumes))
@@ -871,9 +871,9 @@ func Test_RemoveVolumeFromReportAsAttached_AddVolumeToReportAsAttached_Positive(
 // Populates data struct with one volume/node entry.
 // Calls RemoveVolumeFromReportAsAttached
 // Calls DeleteVolumeNode
-// Calls AddVolumeToReportAsAttached
+// Calls AddVolumeNode
 // Verifyies there is no volume as reported as attached
-func Test_RemoveVolumeFromReportAsAttached_AddVolumeToReportAsAttached_Negative(t *testing.T) {
+func Test_RemoveVolumeFromReportAsAttached_Delete_AddVolumeNode(t *testing.T) {
 	// Arrange
 	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
 	asw := NewActualStateOfWorld(volumePluginMgr)
@@ -894,22 +894,23 @@ func Test_RemoveVolumeFromReportAsAttached_AddVolumeToReportAsAttached_Negative(
 	reportAsAttachedVolumesMap := asw.GetVolumesToReportAttached()
 	volumes, exists := reportAsAttachedVolumesMap[nodeName]
 	if !exists {
-		t.Fatalf("MarkDesireToDetach_UnmarkDesireToDetach failed. Expected: <node %q exist> Actual: <node does not exist in the reportedAsAttached map", nodeName)
+		t.Fatalf("Test_RemoveVolumeFromReportAsAttached_Delete_AddVolumeNode failed. Expected: <node %q exists> Actual: <node does not exist in the reportedAsAttached map", nodeName)
 	}
 	if len(volumes) > 0 {
 		t.Fatalf("len(reportAsAttachedVolumes) Expected: <0> Actual: <%v>", len(volumes))
 	}
 
 	asw.DeleteVolumeNode(generatedVolumeName, nodeName)
-	asw.AddVolumeToReportAsAttached(generatedVolumeName, nodeName)
+
+	asw.AddVolumeNode(volumeSpec, nodeName, "" /*device path*/)
 
 	reportAsAttachedVolumesMap = asw.GetVolumesToReportAttached()
 	volumes, exists = reportAsAttachedVolumesMap[nodeName]
 	if !exists {
-		t.Fatalf("MarkDesireToDetach_UnmarkDesireToDetach failed. Expected: <node %q exist> Actual: <node does not exist in the reportedAsAttached map", nodeName)
+		t.Fatalf("Test_RemoveVolumeFromReportAsAttached_Delete_AddVolumeNode failed. Expected: <node %q exists> Actual: <node does not exist in the reportedAsAttached map", nodeName)
 	}
-	if len(volumes) > 0 {
-		t.Fatalf("len(reportAsAttachedVolumes) Expected: <0> Actual: <%v>", len(volumes))
+	if len(volumes) != 1 {
+		t.Fatalf("len(reportAsAttachedVolumes) Expected: <1> Actual: <%v>", len(volumes))
 	}
 }
 
