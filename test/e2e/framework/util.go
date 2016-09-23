@@ -1456,6 +1456,7 @@ func waitForPodTerminatedInNamespace(c *client.Client, podName, reason, namespac
 func waitForPodSuccessInNamespaceTimeout(c *client.Client, podName string, contName string, namespace string, timeout time.Duration) error {
 	return waitForPodCondition(c, namespace, podName, "success or failure", timeout, func(pod *api.Pod) (bool, error) {
 		// Cannot use pod.Status.Phase == api.PodSucceeded/api.PodFailed due to #2632
+		// TODO: This was not true from long time ago. We can use api.PodSucceeded now.
 		ci, ok := api.GetContainerStatus(pod.Status.ContainerStatuses, contName)
 		if !ok {
 			Logf("No Status.Info for container '%s' in pod '%s' yet", contName, podName)
