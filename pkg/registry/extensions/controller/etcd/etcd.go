@@ -23,8 +23,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/registry/controller"
-	"k8s.io/kubernetes/pkg/registry/controller/etcd"
+	"k8s.io/kubernetes/pkg/registry/core/controller"
+	"k8s.io/kubernetes/pkg/registry/core/controller/etcd"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/runtime"
 
