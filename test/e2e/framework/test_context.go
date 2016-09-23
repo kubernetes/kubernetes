@@ -79,6 +79,7 @@ type TestContextType struct {
 	NodeTestContextType
 
 	// Viper-only parameters.  These will in time replace all flags.
+
 	// Example: Create a file 'e2e.json' with the following:
 	// 	"Cadvisor":{
 	// 		"MaxRetries":"6"
@@ -88,6 +89,11 @@ type TestContextType struct {
 	Cadvisor struct {
 		MaxRetries      int
 		SleepDurationMS int
+	}
+
+	LoggingSoak struct {
+		Scale                    int
+		MilliSecondsBetweenWaves int
 	}
 }
 
@@ -205,7 +211,6 @@ func RegisterNodeFlags() {
 
 // Enable viper configuration management of flags.
 func ViperizeFlags() {
-
 	// TODO @jayunit100: Maybe a more elegant viper-flag integration for the future?
 	// For now, we layer it on top, because 'flag' deps of 'go test' make pflag wrappers
 	// fragile, seeming to force 'flag' to have deep awareness of pflag params.
