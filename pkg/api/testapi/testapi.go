@@ -115,8 +115,10 @@ func init() {
 
 	kubeTestAPI := os.Getenv("KUBE_TEST_API")
 	if len(kubeTestAPI) != 0 {
+		// priority is "first in list preferred", so this has to run in reverse order
 		testGroupVersions := strings.Split(kubeTestAPI, ",")
-		for _, gvString := range testGroupVersions {
+		for i := len(testGroupVersions) - 1; i >= 0; i-- {
+			gvString := testGroupVersions[i]
 			groupVersion, err := unversioned.ParseGroupVersion(gvString)
 			if err != nil {
 				panic(fmt.Sprintf("Error parsing groupversion %v: %v", gvString, err))

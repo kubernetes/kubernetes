@@ -35,11 +35,37 @@ setgen=$(kube::util::find-binary "set-gen")
 # Please do not add any logic to this shell script. Add logic to the go code
 # that generates the set-gen program.
 #
+
+GROUP_VERSIONS=(${KUBE_AVAILABLE_GROUP_VERSIONS})
+GV_DIRS=()
+SEEN_GROUPS=","
+for gv in "${GROUP_VERSIONS[@]}"; do
+	# add items, but strip off any leading apis/ you find to match command expectations
+	api_dir=$(kube::util::group-version-to-pkg-path "${gv}")
+	pkg_dir=${api_dir#apis/}
+
+	# don't add a version for a group you've already seen
+	group=${pkg_dir%%/*}
+	if [[ "${SEEN_GROUPS}" == *",${group}."* ]]; then
+		continue
+	fi
+	SEEN_GROUPS="${SEEN_GROUPS},${group}."
+
+	# skip groups that aren't being served, clients for these don't matter
+    if [[ " ${KUBE_NONSERVER_GROUP_VERSIONS} " == *" ${gv} "* ]]; then
+      continue
+    fi
+
+	GV_DIRS+=("${pkg_dir}")
+done
+# delimit by commas for the command
+GV_DIRS_CSV=$(IFS=',';echo "${GV_DIRS[*]// /,}";IFS=$)
+
 # This can be called with one flag, --verify-only, so it works for both the
 # update- and verify- scripts.
 ${clientgen} "$@"
 ${clientgen} -t "$@"
-${clientgen} --clientset-name="release_1_5" --input="api/v1,authorization/v1beta1,autoscaling/v1,batch/v1,extensions/v1beta1,policy/v1alpha1,storage/v1beta1" "$@"
+${clientgen} --clientset-name="release_1_5" --input="${GV_DIRS_CSV}" "$@"
 # Clientgen for federation clientset.
 ${clientgen} --clientset-name=federation_internalclientset --clientset-path=k8s.io/kubernetes/federation/client/clientset_generated --input="../../federation/apis/federation/","api/","extensions/" --included-types-overrides="api/Service,api/Namespace,extensions/ReplicaSet,api/Secret,extensions/Ingress,api/Event"   "$@"
 ${clientgen} --clientset-name=federation_release_1_5 --clientset-path=k8s.io/kubernetes/federation/client/clientset_generated --input="../../federation/apis/federation/v1beta1","api/v1","extensions/v1beta1" --included-types-overrides="api/v1/Service,api/v1/Namespace,extensions/v1beta1/ReplicaSet,api/v1/Secret,extensions/v1beta1/Ingress,api/v1/Event"   "$@"
