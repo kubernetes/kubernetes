@@ -2083,8 +2083,8 @@
 		},
 		{
 			"ImportPath": "github.com/robfig/cron",
-			"Comment": "v1-16-g0f39cf7",
-			"Rev": "0f39cf7ebc65a602f45692f9894bd6a193faf8fa"
+			"Comment": "v1-40-g783cfcb",
+			"Rev": "783cfcb01fb00c48f740c9de79122bd410294149"
 		},
 		{
 			"ImportPath": "github.com/russross/blackfriday",
