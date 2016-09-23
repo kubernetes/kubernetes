@@ -46,24 +46,14 @@ sed -i'' -e "s/\"//g" "${RESOURCE_DIRECTORY}/controllers_flags"
 
 MAKE_DIR="${KUBE_ROOT}/cluster/images/kubemark"
 
-echo "Copying kubemark to ${MAKE_DIR}"
-if [[ -f "${KUBE_ROOT}/_output/release-tars/kubernetes-server-linux-amd64.tar.gz" ]]; then
-  # Running from distro
-  SERVER_TARBALL="${KUBE_ROOT}/_output/release-tars/kubernetes-server-linux-amd64.tar.gz"
-  echo "Using server tarball: ${SERVER_TARBALL}"
-  cp "${KUBE_ROOT}/_output/release-stage/server/linux-amd64/kubernetes/server/bin/kubemark" "${MAKE_DIR}"
-elif [[ -f "${KUBE_ROOT}/server/kubernetes-server-linux-amd64.tar.gz" ]]; then
-  # Running from an extracted release tarball (kubernetes.tar.gz)
-  SERVER_TARBALL="${KUBE_ROOT}/server/kubernetes-server-linux-amd64.tar.gz"
-  echo "Using server tarball: ${SERVER_TARBALL}"
-  tar \
-    --strip-components=3 \
-    -xzf "${SERVER_TARBALL}" \
-    -C "${MAKE_DIR}" 'kubernetes/server/bin/kubemark' || exit 1
-else
-  echo 'Cannot find kubernetes/server/bin/kubemark binary'
+KUBEMARK_BIN="$(kube::util::find-binary-for-platform kubemark linux/amd64)"
+if [[ -z "${KUBEMARK_BIN}" ]]; then
+  echo 'Cannot find cmd/kubemark binary'
   exit 1
 fi
+
+echo "Copying kubemark to ${MAKE_DIR}"
+cp "${KUBEMARK_BIN}" "${MAKE_DIR}"
 
 CURR_DIR=`pwd`
 cd "${MAKE_DIR}"
@@ -146,7 +136,7 @@ gcloud compute ssh --zone="${ZONE}" --project="${PROJECT}" "${MASTER_NAME}" \
 writeEnvironmentFiles
 
 gcloud compute copy-files --zone="${ZONE}" --project="${PROJECT}" \
-  "${SERVER_TARBALL}" \
+  "${SERVER_BINARY_TAR}" \
   "${KUBEMARK_DIRECTORY}/start-kubemark-master.sh" \
   "${KUBEMARK_DIRECTORY}/configure-kubectl.sh" \
   "${RESOURCE_DIRECTORY}/apiserver_flags" \
