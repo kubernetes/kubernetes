@@ -335,13 +335,22 @@ func (s *ProxyServer) Run() error {
 }
 
 func getConntrackMax(config *options.ProxyServerConfig) (int, error) {
-	if config.ConntrackMax > 0 && config.ConntrackMaxPerCore > 0 {
-		return -1, fmt.Errorf("invalid config: ConntrackMax and ConntrackMaxPerCore are mutually exclusive")
-	}
 	if config.ConntrackMax > 0 {
+		if config.ConntrackMaxPerCore > 0 {
+			return -1, fmt.Errorf("invalid config: ConntrackMax and ConntrackMaxPerCore are mutually exclusive")
+		}
+		glog.V(3).Infof("getConntrackMax: using absolute conntrax-max (deprecated)")
 		return int(config.ConntrackMax), nil
-	} else if config.ConntrackMaxPerCore > 0 {
-		return (int(config.ConntrackMaxPerCore) * runtime.NumCPU()), nil
+	}
+	if config.ConntrackMaxPerCore > 0 {
+		floor := int(config.ConntrackMin)
+		scaled := int(config.ConntrackMaxPerCore) * runtime.NumCPU()
+		if scaled > floor {
+			glog.V(3).Infof("getConntrackMax: using scaled conntrax-max-per-core")
+			return scaled, nil
+		}
+		glog.V(3).Infof("getConntrackMax: using conntrax-min")
+		return floor, nil
 	}
 	return 0, nil
 }
