@@ -19,10 +19,10 @@ package genericapiserver
 import (
 	"crypto/tls"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"path"
-	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -32,9 +32,9 @@ import (
 	systemd "github.com/coreos/go-systemd/daemon"
 	"github.com/emicklei/go-restful"
 	"github.com/emicklei/go-restful/swagger"
+	"github.com/go-openapi/spec"
 	"github.com/golang/glog"
 
-	"github.com/go-openapi/spec"
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
@@ -51,8 +51,6 @@ import (
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
-
-const globalTimeout = time.Minute
 
 // Info about an API group.
 type APIGroupInfo struct {
@@ -160,6 +158,7 @@ type GenericAPIServer struct {
 	enableOpenAPISupport   bool
 	openAPIInfo            spec.Info
 	openAPIDefaultResponse spec.Response
+	openAPIDefinitions     *common.OpenAPIDefinitions
 
 	// PostStartHooks are each called after the server has started listening, in a separate go func for each
 	// with no guaranteee of ordering between them.  The map key is a name used for error reporting.
@@ -167,7 +166,9 @@ type GenericAPIServer struct {
 	postStartHooks       map[string]PostStartHookFunc
 	postStartHookLock    sync.Mutex
 	postStartHooksCalled bool
-	openAPIDefinitions   *common.OpenAPIDefinitions
+
+	// Writer to write the audit log to.
+	auditWriter io.Writer
 }
 
 // RequestContextMapper is exposed so that third party resource storage can be build in a different location.
@@ -216,66 +217,21 @@ func NewHandlerContainer(mux *http.ServeMux, s runtime.NegotiatedSerializer) *re
 	return container
 }
 
-// Installs handler at /apis to list all group versions for discovery
-func (s *GenericAPIServer) installGroupsDiscoveryHandler() {
-	apiserver.AddApisWebService(s.Serializer, s.HandlerContainer, s.apiPrefix, func(req *restful.Request) []unversioned.APIGroup {
-		s.apiGroupsForDiscoveryLock.RLock()
-		defer s.apiGroupsForDiscoveryLock.RUnlock()
-
-		// Return the list of supported groups in sorted order (to have a deterministic order).
-		groups := []unversioned.APIGroup{}
-		groupNames := make([]string, len(s.apiGroupsForDiscovery))
-		var i int = 0
-		for groupName := range s.apiGroupsForDiscovery {
-			groupNames[i] = groupName
-			i++
-		}
-		sort.Strings(groupNames)
-		for _, groupName := range groupNames {
-			apiGroup := s.apiGroupsForDiscovery[groupName]
-			// Add ServerAddressByClientCIDRs.
-			apiGroup.ServerAddressByClientCIDRs = s.getServerAddressByClientCIDRs(req.Request)
-			groups = append(groups, apiGroup)
-		}
-		return groups
-	})
-}
-
 func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
+	// install APIs which depend on other APIs to be installed
 	if s.enableSwaggerSupport {
 		s.InstallSwaggerAPI()
 	}
 	if s.enableOpenAPISupport {
 		s.InstallOpenAPI()
 	}
-	// We serve on 2 ports. See docs/admin/accessing-the-api.md
-	secureLocation := ""
-	if options.SecurePort != 0 {
-		secureLocation = net.JoinHostPort(options.BindAddress.String(), strconv.Itoa(options.SecurePort))
-	}
-	insecureLocation := net.JoinHostPort(options.InsecureBindAddress.String(), strconv.Itoa(options.InsecurePort))
-
-	var sem chan bool
-	if options.MaxRequestsInFlight > 0 {
-		sem = make(chan bool, options.MaxRequestsInFlight)
-	}
-
-	longRunningRE := regexp.MustCompile(options.LongRunningRequestRE)
-	longRunningRequestCheck := apiserver.BasicLongRunningRequestCheck(longRunningRE, map[string]string{"watch": "true"})
-	longRunningTimeout := func(req *http.Request) (<-chan time.Time, string) {
-		// TODO unify this with apiserver.MaxInFlightLimit
-		if longRunningRequestCheck(req) {
-			return nil, ""
-		}
-		return time.After(globalTimeout), ""
-	}
 
 	secureStartedCh := make(chan struct{})
-	if secureLocation != "" {
-		handler := apiserver.TimeoutHandler(apiserver.RecoverPanics(s.Handler, s.NewRequestInfoResolver()), longRunningTimeout)
+	if options.SecurePort != 0 {
+		secureLocation := net.JoinHostPort(options.BindAddress.String(), strconv.Itoa(options.SecurePort))
 		secureServer := &http.Server{
 			Addr:           secureLocation,
-			Handler:        apiserver.MaxInFlightLimit(sem, longRunningRequestCheck, handler),
+			Handler:        s.Handler,
 			MaxHeaderBytes: 1 << 20,
 			TLSConfig: &tls.Config{
 				// Can't use SSLv3 because of POODLE and BEAST
@@ -320,10 +276,6 @@ func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
 
 			notifyStarted := sync.Once{}
 			for {
-				// err == systemd.SdNotifyNoSocket when not running on a systemd system
-				if err := systemd.SdNotify("READY=1\n"); err != nil && err != systemd.SdNotifyNoSocket {
-					glog.Errorf("Unable to send systemd daemon successful start message: %v\n", err)
-				}
 				if err := secureServer.ListenAndServeTLS(options.TLSCertFile, options.TLSPrivateKeyFile); err != nil {
 					glog.Errorf("Unable to listen for secure (%v); will try again.", err)
 				} else {
@@ -335,20 +287,15 @@ func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
 			}
 		}()
 	} else {
-		// err == systemd.SdNotifyNoSocket when not running on a systemd system
-		if err := systemd.SdNotify("READY=1\n"); err != nil && err != systemd.SdNotifyNoSocket {
-			glog.Errorf("Unable to send systemd daemon successful start message: %v\n", err)
-		}
 		close(secureStartedCh)
 	}
 
-	handler := apiserver.TimeoutHandler(apiserver.RecoverPanics(s.InsecureHandler, s.NewRequestInfoResolver()), longRunningTimeout)
-	http := &http.Server{
+	insecureLocation := net.JoinHostPort(options.InsecureBindAddress.String(), strconv.Itoa(options.InsecurePort))
+	insecureServer := &http.Server{
 		Addr:           insecureLocation,
-		Handler:        handler,
+		Handler:        s.InsecureHandler,
 		MaxHeaderBytes: 1 << 20,
 	}
-
 	insecureStartedCh := make(chan struct{})
 	glog.Infof("Serving insecurely on %s", insecureLocation)
 	go func() {
@@ -356,7 +303,7 @@ func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
 
 		notifyStarted := sync.Once{}
 		for {
-			if err := http.ListenAndServe(); err != nil {
+			if err := insecureServer.ListenAndServe(); err != nil {
 				glog.Errorf("Unable to listen for insecure (%v); will try again.", err)
 			} else {
 				notifyStarted.Do(func() {
@@ -370,6 +317,11 @@ func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
 	<-secureStartedCh
 	<-insecureStartedCh
 	s.RunPostStartHooks(PostStartHookContext{})
+
+	// err == systemd.SdNotifyNoSocket when not running on a systemd system
+	if err := systemd.SdNotify("READY=1\n"); err != nil && err != systemd.SdNotifyNoSocket {
+		glog.Errorf("Unable to send systemd daemon successful start message: %v\n", err)
+	}
 
 	select {}
 }
@@ -441,7 +393,7 @@ func (s *GenericAPIServer) InstallAPIGroup(apiGroupInfo *APIGroupInfo) error {
 		}
 
 		s.AddAPIGroupForDiscovery(apiGroup)
-		apiserver.AddGroupWebService(s.Serializer, s.HandlerContainer, apiPrefix+"/"+apiGroup.Name, apiGroup)
+		s.HandlerContainer.Add(apiserver.NewGroupWebService(s.Serializer, apiPrefix+"/"+apiGroup.Name, apiGroup))
 	}
 	apiserver.InstallServiceErrorHandler(s.Serializer, s.HandlerContainer, s.NewRequestInfoResolver(), apiVersions)
 	return nil
@@ -464,8 +416,7 @@ func (s *GenericAPIServer) RemoveAPIGroupForDiscovery(groupName string) {
 func (s *GenericAPIServer) getServerAddressByClientCIDRs(req *http.Request) []unversioned.ServerAddressByClientCIDR {
 	addressCIDRMap := []unversioned.ServerAddressByClientCIDR{
 		{
-			ClientCIDR: "0.0.0.0/0",
-
+			ClientCIDR:    "0.0.0.0/0",
 			ServerAddress: s.ExternalAddress,
 		},
 	}
@@ -580,6 +531,34 @@ func (s *GenericAPIServer) InstallOpenAPI() {
 	if err != nil {
 		glog.Fatalf("Failed to register open api spec for root: %v", err)
 	}
+}
+
+// DynamicApisDiscovery returns a webservice serving api group discovery.
+// Note: during the server runtime apiGroupsForDiscovery might change.
+func (s *GenericAPIServer) DynamicApisDiscovery() *restful.WebService {
+	return apiserver.NewApisWebService(s.Serializer, s.apiPrefix, func(req *restful.Request) []unversioned.APIGroup {
+		s.apiGroupsForDiscoveryLock.RLock()
+		defer s.apiGroupsForDiscoveryLock.RUnlock()
+
+		// sort to have a deterministic order
+		sortedGroups := []unversioned.APIGroup{}
+		groupNames := make([]string, 0, len(s.apiGroupsForDiscovery))
+		for groupName := range s.apiGroupsForDiscovery {
+			groupNames = append(groupNames, groupName)
+		}
+		sort.Strings(groupNames)
+		for _, groupName := range groupNames {
+			sortedGroups = append(sortedGroups, s.apiGroupsForDiscovery[groupName])
+		}
+
+		serverCIDR := s.getServerAddressByClientCIDRs(req.Request)
+		groups := make([]unversioned.APIGroup, len(sortedGroups))
+		for i := range sortedGroups {
+			groups[i] = sortedGroups[i]
+			groups[i].ServerAddressByClientCIDRs = serverCIDR
+		}
+		return groups
+	})
 }
 
 // NewDefaultAPIGroupInfo returns an APIGroupInfo stubbed with "normal" values

@@ -105,6 +105,8 @@ pkg/controller/volume/reconciler
 pkg/controller/volume/statusupdater
 pkg/conversion/queryparams
 pkg/credentialprovider/aws
+pkg/genericapiserver/filters
+pkg/genericapiserver/routes
 pkg/hyperkube
 pkg/kubelet/api
 pkg/kubelet/container
