@@ -63,14 +63,14 @@ func (hr *HandlerRunner) Run(containerID kubecontainer.ContainerID, pod *api.Pod
 		output := ioutils.WriteCloserWrapper(&buffer)
 		err := hr.commandRunner.ExecInContainer(containerID, handler.Exec.Command, nil, output, output, false, nil)
 		if err != nil {
-			msg := fmt.Sprintf("Exec lifecycle hook (%v) for Container %q in Pod %q failed - %q", handler.Exec.Command, container.Name, format.Pod(pod), buffer.String())
+			msg := fmt.Sprintf("Exec lifecycle hook (%v) for Container %q in Pod %q failed - error: %v, message: %q", handler.Exec.Command, container.Name, format.Pod(pod), err, buffer.String())
 			glog.V(1).Infof(msg)
 		}
 		return msg, err
 	case handler.HTTPGet != nil:
 		msg, err := hr.runHTTPHandler(pod, container, handler)
 		if err != nil {
-			msg := fmt.Sprintf("Http lifecycle hook (%s) for Container %q in Pod %q failed - %q", handler.HTTPGet.Path, container.Name, format.Pod(pod), msg)
+			msg := fmt.Sprintf("Http lifecycle hook (%s) for Container %q in Pod %q failed - error: %v, message: %q", handler.HTTPGet.Path, container.Name, format.Pod(pod), err, msg)
 			glog.V(1).Infof(msg)
 		}
 		return msg, err
