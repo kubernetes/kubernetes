@@ -18,6 +18,7 @@ package kuberuntime
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
@@ -159,4 +160,12 @@ func milliCPUToQuota(milliCPU int64) (quota int64, period int64) {
 	}
 
 	return
+}
+
+// getStableKey generates a key (string) to uniquely identify a
+// (pod, container) tuple. The key should include the content of the
+// container, so that any change to the container generates a new key.
+func getStableKey(pod *api.Pod, container *api.Container) string {
+	hash := strconv.FormatUint(kubecontainer.HashContainer(container), 16)
+	return fmt.Sprintf("%s_%s_%s_%s_%s", pod.Name, pod.Namespace, string(pod.UID), container.Name, hash)
 }
