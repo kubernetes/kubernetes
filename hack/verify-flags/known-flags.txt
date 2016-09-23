@@ -250,8 +250,9 @@ included-types-overrides
 include-extended-apis
 input-base
 input-dirs
-insecure-experimental-approve-all-kubelet-csrs-for-group
+insecure-allow-any-token
 insecure-bind-address
+insecure-experimental-approve-all-kubelet-csrs-for-group
 insecure-port
 insecure-skip-tls-verify
 instance-metadata

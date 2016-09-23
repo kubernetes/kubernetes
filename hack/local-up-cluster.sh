@@ -280,6 +280,10 @@ function start_apiserver {
     CERT_DIR=/var/run/kubernetes
     ROOT_CA_FILE=$CERT_DIR/apiserver.crt
 
+    anytoken_arg=""
+    if [[ -n "${ALLOW_ANY_TOKEN:-}" ]]; then
+      anytoken_arg="--insecure-allow-any-token "
+    fi
     priv_arg=""
     if [[ -n "${ALLOW_PRIVILEGED}" ]]; then
       priv_arg="--allow-privileged "
@@ -297,7 +301,7 @@ function start_apiserver {
     fi
 
     APISERVER_LOG=/tmp/kube-apiserver.log
-    sudo -E "${GO_OUT}/hyperkube" apiserver ${priv_arg} ${runtime_config}\
+    sudo -E "${GO_OUT}/hyperkube" apiserver ${anytoken_arg} ${priv_arg} ${runtime_config}\
       ${advertise_address} \
       --v=${LOG_LEVEL} \
       --cert-dir="${CERT_DIR}" \
