@@ -69,7 +69,7 @@ const (
 	KubeAPIQPS    = 20.0
 	KubeAPIBurst  = 30
 
-	maxNoOfClusters = 256
+	maxNoOfClusters = 100
 )
 
 type cachedService struct {
