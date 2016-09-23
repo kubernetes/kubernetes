@@ -73,7 +73,7 @@ type OIDCOptions struct {
 
 	// GroupsClaim, if specified, causes the OIDCAuthenticator to try to populate the user's
 	// groups with a ID Token field. If the GrouppClaim field is present in a ID Token the value
-	// must be a list of strings.
+	// must be a string or list of strings.
 	GroupsClaim string
 }
 
@@ -251,10 +251,14 @@ func (a *OIDCAuthenticator) AuthenticateToken(value string) (user.Info, bool, er
 	if a.groupsClaim != "" {
 		groups, found, err := claims.StringsClaim(a.groupsClaim)
 		if err != nil {
-			// Custom claim is present, but isn't an array of strings.
-			return nil, false, fmt.Errorf("custom group claim contains invalid object: %v", err)
-		}
-		if found {
+			// Groups type is present but is not an array of strings, try to decode as a string.
+			group, _, err := claims.StringClaim(a.groupsClaim)
+			if err != nil {
+				// Custom claim is present, but isn't an array of strings or a string.
+				return nil, false, fmt.Errorf("custom group claim contains invalid type: %T", claims[a.groupsClaim])
+			}
+			info.Groups = []string{group}
+		} else if found {
 			info.Groups = groups
 		}
 	}
