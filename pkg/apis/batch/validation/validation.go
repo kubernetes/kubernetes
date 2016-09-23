@@ -199,12 +199,7 @@ func validateConcurrencyPolicy(concurrencyPolicy *batch.ConcurrencyPolicy, fldPa
 
 func validateScheduleFormat(schedule string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	// TODO soltysh: this should be removed when https://github.com/robfig/cron/issues/58 is fixed
-	tmpSchedule := schedule
-	if len(schedule) > 0 && schedule[0] != '@' {
-		tmpSchedule = "0 " + schedule
-	}
-	if _, err := cron.Parse(tmpSchedule); err != nil {
+	if _, err := cron.ParseStandard(schedule); err != nil {
 		allErrs = append(allErrs, field.Invalid(fldPath, schedule, err.Error()))
 	}
 
