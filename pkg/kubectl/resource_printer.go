@@ -449,10 +449,6 @@ func (h *HumanReadablePrinter) HandledResources() []string {
 }
 
 func (h *HumanReadablePrinter) AfterPrint(output io.Writer, res string) error {
-	if !h.options.NoHeaders && !h.options.ShowAll && h.hiddenObjNum > 0 {
-		_, err := fmt.Fprintf(output, "\ninfo: %d completed %s were not shown in the list. Pass --show-all to see all.\n\n", h.hiddenObjNum, res)
-		return err
-	}
 	return nil
 }
 
@@ -500,12 +496,6 @@ var (
 )
 
 func (h *HumanReadablePrinter) printPod(pod *api.Pod, w io.Writer, options PrintOptions) error {
-	reason := string(pod.Status.Phase)
-	// if not printing all pods, skip terminated pods (default)
-	if !options.ShowAll && (reason == string(api.PodSucceeded) || reason == string(api.PodFailed)) {
-		h.hiddenObjNum++
-		return nil
-	}
 	if err := printPodBase(pod, w, options); err != nil {
 		return err
 	}
@@ -515,13 +505,6 @@ func (h *HumanReadablePrinter) printPod(pod *api.Pod, w io.Writer, options Print
 
 func (h *HumanReadablePrinter) printPodList(podList *api.PodList, w io.Writer, options PrintOptions) error {
 	for _, pod := range podList.Items {
-		reason := string(pod.Status.Phase)
-		// if not printing all pods, skip terminated pods (default)
-		if !options.ShowAll && (reason == string(api.PodSucceeded) || reason == string(api.PodFailed)) {
-			h.hiddenObjNum++
-			continue
-		}
-
 		if err := printPodBase(&pod, w, options); err != nil {
 			return err
 		}
