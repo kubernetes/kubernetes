@@ -1116,7 +1116,7 @@ __EOF__
   ]
 }
 __EOF__
-  
+
   # Post-Condition: assertion object exist
   kube::test::get_object_assert thirdpartyresources "{{range.items}}{{$id_field}}:{{end}}" 'bar.company.com:foo.company.com:'
 
@@ -2057,6 +2057,23 @@ __EOF__
   # Clean up
   kubectl delete deployment nginx-deployment "${kube_flags[@]}"
 
+  ######################
+  # View commands      #
+  ######################
+  ### View image of deployments
+  # Pre-condition: no deployment exists
+  kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Create a deployment
+  kubectl create -f hack/testdata/deployment-multicontainer.yaml "${kube_flags[@]}"
+  kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" 'nginx-deployment:'
+  kube::test::get_object_assert deployment "{{range.items}}{{$deployment_image_field}}:{{end}}" "${IMAGE_DEPLOYMENT_R1}:"
+  kube::test::get_object_assert deployment "{{range.items}}{{$deployment_second_image_field}}:{{end}}" "${IMAGE_PERL}:"
+  # Get image of a deployment
+  output_message=$(! kubectl view image 'nginx-deployment')
+  # Post condition: both images are listed
+  kube::test::if_has_string "${output_message}" "${IMAGE_DEPLOYMENT_R1}\n${IMAGE_PERL}"
+  # Clean up
+  kubectl delete deployment nginx-deployment "${kube_flags[@]}"
 
   ######################
   # Replica Sets       #
