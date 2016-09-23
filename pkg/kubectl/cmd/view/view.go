@@ -34,7 +34,7 @@ var (
 func NewCmdView(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "view SUBCOMMAND",
-		Short: "View specific fetures on objects",
+		Short: "View specific fields on objects",
 		Long:  view_long,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmd.Help()
