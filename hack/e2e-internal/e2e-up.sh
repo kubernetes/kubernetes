@@ -29,6 +29,9 @@ source "${KUBE_ROOT}/cluster/kube-util.sh"
 
 prepare-e2e
 
+echo "MUAHAHA: DO NOT MERGE"
+exit 1
+
 if [[ "${FEDERATION:-}" == "true" ]]; then
     cur_ip_octet2=180
     # TODO(colhom): the last cluster that was created in the loop above is the current context.
