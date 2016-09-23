@@ -144,7 +144,7 @@ func New(federationClient federation_release_1_4.Interface, dns dnsprovider.Inte
 		queue:            workqueue.New(),
 		knownClusterSet:  make(sets.String),
 	}
-	s.serviceStore.Store, s.serviceController = cache.NewInformer(
+	s.serviceStore.Indexer, s.serviceController = cache.NewIndexerInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (pkg_runtime.Object, error) {
 				return s.federationClient.Core().Services(v1.NamespaceAll).List(options)
@@ -165,6 +165,7 @@ func New(federationClient federation_release_1_4.Interface, dns dnsprovider.Inte
 			},
 			DeleteFunc: s.enqueueService,
 		},
+		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)
 	s.clusterStore.Store, s.clusterController = cache.NewInformer(
 		&cache.ListWatch{
@@ -816,7 +817,7 @@ func (s *ServiceController) syncService(key string) error {
 		glog.V(4).Infof("Finished syncing service %q (%v)", key, time.Now().Sub(startTime))
 	}()
 	// obj holds the latest service info from apiserver
-	obj, exists, err := s.serviceStore.Store.GetByKey(key)
+	obj, exists, err := s.serviceStore.Indexer.GetByKey(key)
 	if err != nil {
 		glog.Errorf("Unable to retrieve service %v from store: %v", key, err)
 		s.queue.Add(key)
