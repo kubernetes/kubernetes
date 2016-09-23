@@ -52,8 +52,8 @@ func NewCmdJoin(out io.Writer, s *kubeadmapi.KubeadmConfig) *cobra.Command {
 		},
 	}
 
-	cmd.PersistentFlags().StringVarP(
-		&s.Secrets.GivenToken, "token", "", "",
+	cmd.PersistentFlags().StringVar(
+		&s.Secrets.GivenToken, "token", "",
 		`Shared secret used to secure bootstrap. Must match the output of 'kubeadm init'.`,
 	)
 

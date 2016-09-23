@@ -59,7 +59,7 @@ func WriteStaticPodManifests(s *kubeadmapi.KubeadmConfig) error {
 	staticPodSpecs := map[string]api.Pod{
 		kubeAPIServer: componentPod(api.Container{
 			Name:          kubeAPIServer,
-			Image:         images.GetCoreImage(images.KubeAPIServerImage, s.EnvParams["hyperkube_image"]),
+			Image:         images.GetCoreImage(images.KubeAPIServerImage, s, s.EnvParams["hyperkube_image"]),
 			Command:       getComponentCommand(apiServer, s),
 			VolumeMounts:  []api.VolumeMount{certsVolumeMount(), k8sVolumeMount()},
 			LivenessProbe: componentProbe(8080, "/healthz"),
@@ -67,7 +67,7 @@ func WriteStaticPodManifests(s *kubeadmapi.KubeadmConfig) error {
 		}, certsVolume(s), k8sVolume(s)),
 		kubeControllerManager: componentPod(api.Container{
 			Name:          kubeControllerManager,
-			Image:         images.GetCoreImage(images.KubeControllerManagerImage, s.EnvParams["hyperkube_image"]),
+			Image:         images.GetCoreImage(images.KubeControllerManagerImage, s, s.EnvParams["hyperkube_image"]),
 			Command:       getComponentCommand(controllerManager, s),
 			VolumeMounts:  []api.VolumeMount{k8sVolumeMount()},
 			LivenessProbe: componentProbe(10252, "/healthz"),
@@ -75,7 +75,7 @@ func WriteStaticPodManifests(s *kubeadmapi.KubeadmConfig) error {
 		}, k8sVolume(s)),
 		kubeScheduler: componentPod(api.Container{
 			Name:          kubeScheduler,
-			Image:         images.GetCoreImage(images.KubeSchedulerImage, s.EnvParams["hyperkube_image"]),
+			Image:         images.GetCoreImage(images.KubeSchedulerImage, s, s.EnvParams["hyperkube_image"]),
 			Command:       getComponentCommand(scheduler, s),
 			LivenessProbe: componentProbe(10251, "/healthz"),
 			Resources:     componentResources("100m"),
@@ -93,7 +93,7 @@ func WriteStaticPodManifests(s *kubeadmapi.KubeadmConfig) error {
 				"--data-dir=/var/etcd/data",
 			},
 			VolumeMounts:  []api.VolumeMount{certsVolumeMount(), etcdVolumeMount(), k8sVolumeMount()},
-			Image:         images.GetCoreImage(images.KubeEtcdImage, s.EnvParams["etcd_image"]),
+			Image:         images.GetCoreImage(images.KubeEtcdImage, s, s.EnvParams["etcd_image"]),
 			LivenessProbe: componentProbe(2379, "/health"),
 			Resources:     componentResources("200m"),
 			SecurityContext: &api.SecurityContext{
