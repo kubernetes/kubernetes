@@ -23,6 +23,7 @@ import (
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
+	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -156,6 +157,8 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 	showKind := cmdutil.GetFlagBool(cmd, "show-kind")
 	mapper, typer := f.Object()
 	printAll := false
+	filterFuncs := f.DefaultResourceFilterFunc()
+	filterOpts := f.DefaultResourceFilterOptions(cmd, allNamespaces)
 
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
@@ -239,11 +242,13 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 		}
 
 		// print the current object
+		filteredResourceCount := 0
 		if !isWatchOnly {
 			if err := printer.PrintObj(obj, out); err != nil {
 				return fmt.Errorf("unable to output the provided object: %v", err)
 			}
-			printer.AfterPrint(errOut, mapping.Resource)
+			filteredResourceCount++
+			cmdutil.PrintFilterCount(filteredResourceCount, mapping.Resource, errOut, filterOpts)
 		}
 
 		// print watched changes
@@ -253,6 +258,7 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 		}
 
 		first := true
+		filteredResourceCount = 0
 		kubectl.WatchLoop(w, func(e watch.Event) error {
 			if !isList && first {
 				// drop the initial watch event in the single resource case
@@ -261,7 +267,8 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 			}
 			err := printer.PrintObj(e.Object, out)
 			if err == nil {
-				printer.AfterPrint(errOut, mapping.Resource)
+				filteredResourceCount++
+				cmdutil.PrintFilterCount(filteredResourceCount, mapping.Resource, errOut, filterOpts)
 			}
 			return err
 		})
@@ -320,10 +327,36 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 			return err
 		}
 
-		if err := printer.PrintObj(obj, out); err != nil {
-			allErrs = append(allErrs, err)
+		isList := meta.IsListType(obj)
+		if isList {
+			filteredResourceCount, items, errs := cmdutil.FilterResourceList(obj, filterFuncs, filterOpts)
+			if errs != nil {
+				return errs
+			}
+			filteredObj, err := cmdutil.ObjectListToVersionedObject(items, version)
+			if err != nil {
+				return err
+			}
+			if err := printer.PrintObj(filteredObj, out); err != nil {
+				allErrs = append(allErrs, err)
+			}
+
+			cmdutil.PrintFilterCount(filteredResourceCount, res, errOut, filterOpts)
+			return utilerrors.NewAggregate(allErrs)
 		}
-		printer.AfterPrint(errOut, res)
+
+		filteredResourceCount := 0
+		if isFiltered, err := filterFuncs.Filter(obj, filterOpts); !isFiltered {
+			if err != nil {
+				glog.V(2).Infof("Unable to filter resource: %v", err)
+			} else if err := printer.PrintObj(obj, out); err != nil {
+				allErrs = append(allErrs, err)
+			}
+		} else if isFiltered {
+			filteredResourceCount++
+		}
+
+		cmdutil.PrintFilterCount(filteredResourceCount, res, errOut, filterOpts)
 		return utilerrors.NewAggregate(allErrs)
 	}
 
@@ -372,8 +405,9 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 	printer = nil
 	var lastMapping *meta.RESTMapping
 	w := kubectl.GetNewTabWriter(out)
+	filteredResourceCount := 0
 
-	if mustPrintWithKinds(objs, infos, sorter, printAll) {
+	if cmdutil.MustPrintWithKinds(objs, infos, sorter, printAll) {
 		showKind = true
 	}
 
@@ -390,7 +424,7 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 		if printer == nil || lastMapping == nil || mapping == nil || mapping.Resource != lastMapping.Resource {
 			if printer != nil {
 				w.Flush()
-				printer.AfterPrint(errOut, lastMapping.Resource)
+				cmdutil.PrintFilterCount(filteredResourceCount, lastMapping.Resource, errOut, filterOpts)
 			}
 			printer, err = f.PrinterForMapping(cmd, mapping, allNamespaces)
 			if err != nil {
@@ -399,6 +433,16 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 			}
 			lastMapping = mapping
 		}
+
+		// filter objects if filter has been defined for current object
+		if isFiltered, err := filterFuncs.Filter(original, filterOpts); isFiltered {
+			if err == nil {
+				filteredResourceCount++
+				continue
+			}
+			allErrs = append(allErrs, err)
+		}
+
 		if resourcePrinter, found := printer.(*kubectl.HumanReadablePrinter); found {
 			resourceName := resourcePrinter.GetResourceKind()
 			if mapping != nil {
@@ -429,37 +473,8 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 		}
 	}
 	w.Flush()
-	if printer != nil {
-		printer.AfterPrint(errOut, lastMapping.Resource)
+	if printer != nil && lastMapping != nil {
+		cmdutil.PrintFilterCount(filteredResourceCount, lastMapping.Resource, errOut, filterOpts)
 	}
 	return utilerrors.NewAggregate(allErrs)
-}
-
-// mustPrintWithKinds determines if printer is dealing
-// with multiple resource kinds, in which case it will
-// return true, indicating resource kind will be
-// included as part of printer output
-func mustPrintWithKinds(objs []runtime.Object, infos []*resource.Info, sorter *kubectl.RuntimeSort, printAll bool) bool {
-	var lastMap *meta.RESTMapping
-
-	if len(infos) == 1 && printAll {
-		return true
-	}
-
-	for ix := range objs {
-		var mapping *meta.RESTMapping
-		if sorter != nil {
-			mapping = infos[sorter.OriginalPosition(ix)].Mapping
-		} else {
-			mapping = infos[ix].Mapping
-		}
-
-		// display "kind" only if we have mixed resources
-		if lastMap != nil && mapping.Resource != lastMap.Resource {
-			return true
-		}
-		lastMap = mapping
-	}
-
-	return false
 }
