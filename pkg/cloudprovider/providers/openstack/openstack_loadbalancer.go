@@ -518,17 +518,12 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *api.Ser
 		return nil, fmt.Errorf("Source range restrictions are not supported for openstack load balancers")
 	}
 
-	glog.V(2).Infof("Checking if openstack load balancer already exists: %s", cloudprovider.GetLoadBalancerName(apiService))
-	_, exists, err := lbaas.GetLoadBalancer(clusterName, apiService)
-	if err != nil {
-		return nil, fmt.Errorf("error checking if openstack load balancer already exists: %v", err)
-	}
-
-
-	var loadbalancer *loadbalancers.LoadBalancer
 	name := cloudprovider.GetLoadBalancerName(apiService)
-
-	if !exists {
+	loadbalancer, err := getLoadbalancerByName(lbaas.network, name)
+	if err != nil {
+		if err != ErrNotFound {
+			return nil, fmt.Errorf("Error getting loadbalancer %s: %v", name, err)
+		}
 		glog.V(2).Infof("Creating loadbalancer %s", name)
 		loadbalancer, err = lbaas.createLoadBalancer(apiService, name)
 		if err != nil {
@@ -537,11 +532,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *api.Ser
 			return nil, fmt.Errorf("Error creating loadbalancer %s: %v", name, err)
 		}
 	} else {
-		glog.V(2).Infof("LoadBalancer %s already exists.")
-		loadbalancer, err = getLoadbalancerByName(lbaas.network, name)
-		if err != nil {
-			return nil, fmt.Errorf("Error getting loadbalancer %s: %v", name, err)
-		}
+		glog.V(2).Infof("LoadBalancer %s already exists", name)
 	}
 
 	lbmethod := v2_pools.LBMethod(lbaas.opts.LBMethod)
