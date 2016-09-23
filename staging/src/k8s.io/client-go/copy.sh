@@ -136,7 +136,7 @@ function mvfolder {
         xargs -0 sed -i "s,\"${CLIENT_REPO_FROM_SRC}/${src},\"${CLIENT_REPO_FROM_SRC}/${dst},g"
     # rewrite import invocation
     if [ "${src_package}" != "${dst_package}" ]; then
-        find "${CLIENT_REPO}" -type f -name "*.go" -print0 | xargs -0 sed -i "s,\<${src_package}\.\([a-zA-Z]\),${dst_package}\.\1,g"
+        find "${CLIENT_REPO}" -type f -name "*.go" -print0 | xargs -0 sed -i "s,\^${src_package}\.\([a-zA-Z]\),${dst_package}\.\1,g"
     fi
 }
 
