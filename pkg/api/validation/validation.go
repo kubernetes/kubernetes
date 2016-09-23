@@ -2568,6 +2568,9 @@ func ValidateServiceUpdate(service, oldService *api.Service) field.ErrorList {
 		allErrs = append(allErrs, ValidateImmutableField(service.Spec.ClusterIP, oldService.Spec.ClusterIP, field.NewPath("spec", "clusterIP"))...)
 	}
 
+	// TODO(freehan): allow user to update loadbalancerSourceRanges
+	allErrs = append(allErrs, ValidateImmutableField(service.Spec.LoadBalancerSourceRanges, oldService.Spec.LoadBalancerSourceRanges, field.NewPath("spec", "loadBalancerSourceRanges"))...)
+
 	allErrs = append(allErrs, ValidateService(service)...)
 	return allErrs
 }
