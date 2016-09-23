@@ -19,7 +19,8 @@ set -o nounset
 set -o pipefail
 
 # PREREQUISITES: run `godep restore` in the main repo before calling this script.
-RELEASE="1.4"
+RELEASE="1.5"
+CLIENTSET="release_1_5"
 MAIN_REPO_FROM_SRC="${1:-"k8s.io/kubernetes"}"
 MAIN_REPO="${GOPATH%:*}/src/${MAIN_REPO_FROM_SRC}"
 CLIENT_REPO_FROM_SRC="${2:-"k8s.io/client-go/${RELEASE}"}"
@@ -39,7 +40,7 @@ function mkcp() {
 }
 
 echo "copying client packages"
-mkcp "pkg/client/clientset_generated/release_1_4" "pkg/client/clientset_generated"
+mkcp "pkg/client/clientset_generated/${CLIENTSET}" "pkg/client/clientset_generated"
 mkcp "/pkg/client/record/" "/pkg/client"
 mkcp "/pkg/client/cache/" "/pkg/client"
 # TODO: make this test file not depending on pkg/client/unversioned
@@ -64,7 +65,7 @@ popd > /dev/null
 
 echo "move to the client repo"
 # clean the ${CLIENT_REPO}
-ls "${CLIENT_REPO}" | grep -v '_tmp' | xargs rm -r
+ls "${CLIENT_REPO}" | { grep -v '_tmp' || true; } | xargs rm -rf
 mv "${CLIENT_REPO_TEMP}"/* "${CLIENT_REPO}"
 rm -r "${CLIENT_REPO_TEMP}"
 
@@ -108,7 +109,7 @@ sed -i "s/request_status_codes/request_status_codes_copy/g" "${CLIENT_REPO}"/pkg
 sed -i "s/kubernetes_build_info/kubernetes_build_info_copy/g" "${CLIENT_REPO}"/pkg/version/version.go
 
 echo "rewrite proto names in proto.RegisterType"
-find "${CLIENT_REPO}" -type f -name "generated.pb.go" -print0 | xargs -0 sed -i "s/k8s\.io\.kubernetes/k8s.io.client-go.1.4/g"
+find "${CLIENT_REPO}" -type f -name "generated.pb.go" -print0 | xargs -0 sed -i "s/k8s\.io\.kubernetes/k8s.io.client-go.${RELEASE}/g"
 
 echo "rearranging directory layout"
 # $1 and $2 are relative to ${CLIENT_REPO}
@@ -138,7 +139,7 @@ function mvfolder {
     fi
 }
 
-mvfolder pkg/client/clientset_generated/release_1_4 kubernetes
+mvfolder "pkg/client/clientset_generated/${CLIENTSET}" kubernetes
 mvfolder pkg/client/typed/discovery discovery
 mvfolder pkg/client/typed/dynamic dynamic
 mvfolder pkg/client/transport transport
