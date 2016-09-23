@@ -42,7 +42,7 @@ func makeAndSetFakeEvictablePod(m *kubeGenericRuntimeManager, fakeRuntime *apite
 			return err
 		}
 
-		fakeContainers, err := makeFakeContainers(m, pod.apiPod, pod.apiPod.Spec.Containers, pod.createdAt)
+		fakeContainers, err := makeFakeContainers(m, pod.apiPod, pod.apiPod.Spec.Containers, pod.createdAt, runtimeApi.ContainerState_EXITED)
 		if err != nil {
 			return err
 		}

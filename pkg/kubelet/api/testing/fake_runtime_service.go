@@ -197,11 +197,12 @@ func (r *FakeRuntimeService) ListPodSandbox(filter *runtimeApi.PodSandboxFilter)
 		}
 
 		result = append(result, &runtimeApi.PodSandbox{
-			Id:        s.Id,
-			Metadata:  s.Metadata,
-			State:     s.State,
-			CreatedAt: s.CreatedAt,
-			Labels:    s.Labels,
+			Id:          s.Id,
+			Metadata:    s.Metadata,
+			State:       s.State,
+			CreatedAt:   s.CreatedAt,
+			Labels:      s.Labels,
+			Annotations: s.Annotations,
 		})
 	}
 
@@ -321,6 +322,7 @@ func (r *FakeRuntimeService) ListContainers(filter *runtimeApi.ContainerFilter) 
 			Image:        s.Image,
 			ImageRef:     s.ImageRef,
 			Labels:       s.Labels,
+			Annotations:  s.Annotations,
 		})
 	}
 
