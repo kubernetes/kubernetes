@@ -444,7 +444,7 @@ func checkPreconditions(key string, preconditions *storage.Preconditions, out ru
 		return storage.NewInternalErrorf("can't enforce preconditions %v on un-introspectable object %v, got error: %v", *preconditions, out, err)
 	}
 	if preconditions.UID != nil && *preconditions.UID != objMeta.UID {
-		errMsg := fmt.Sprintf("Precondition failed: UID in precondition: %v, UID in object meta: %v", preconditions.UID, objMeta.UID)
+		errMsg := fmt.Sprintf("Precondition failed: UID in precondition: %v, UID in object meta: %v", *preconditions.UID, objMeta.UID)
 		return storage.NewInvalidObjError(key, errMsg)
 	}
 	return nil
