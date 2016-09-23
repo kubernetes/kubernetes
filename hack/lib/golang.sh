@@ -35,7 +35,6 @@ kube::golang::server_targets() {
     cmd/kube-apiserver
     cmd/kube-controller-manager
     cmd/kubelet
-    cmd/kubemark
     cmd/hyperkube
     plugin/cmd/kube-scheduler
   )
@@ -146,9 +145,11 @@ readonly KUBE_TEST_PORTABLE=(
   hack/lib
 )
 
-# Node test has built-in etcd and kube-apiserver, it can only be built on the
-# same platforms with kube-apiserver.
+# Test targets which run on the Kubernetes clusters directly, so we only
+# need to target server platforms.
+# These binaries will be distributed in the kubernetes-test tarball.
 readonly KUBE_NODE_TEST_TARGETS=(
+  cmd/kubemark
   vendor/github.com/onsi/ginkgo/ginkgo
   test/e2e_node/e2e_node.test
 )

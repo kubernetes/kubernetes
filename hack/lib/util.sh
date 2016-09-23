@@ -164,17 +164,21 @@ kube::util::host_platform() {
   echo "${host_os}/${host_arch}"
 }
 
-kube::util::find-binary() {
-  local lookfor="${1}"
-  local host_platform="$(kube::util::host_platform)"
-  local locations=(
+kube::util::find-binary-for-platform() {
+  local -r lookfor="$1"
+  local -r platform="$2"
+  local -r locations=(
     "${KUBE_ROOT}/_output/bin/${lookfor}"
-    "${KUBE_ROOT}/_output/dockerized/bin/${host_platform}/${lookfor}"
-    "${KUBE_ROOT}/_output/local/bin/${host_platform}/${lookfor}"
-    "${KUBE_ROOT}/platforms/${host_platform}/${lookfor}"
+    "${KUBE_ROOT}/_output/dockerized/bin/${platform}/${lookfor}"
+    "${KUBE_ROOT}/_output/local/bin/${platform}/${lookfor}"
+    "${KUBE_ROOT}/platforms/${platform}/${lookfor}"
   )
-  local bin=$( (ls -t "${locations[@]}" 2>/dev/null || true) | head -1 )
+  local -r bin=$( (ls -t "${locations[@]}" 2>/dev/null || true) | head -1 )
   echo -n "${bin}"
+}
+
+kube::util::find-binary() {
+  kube::util::find-binary-for-platform "$1" "$(kube::util::host_platform)"
 }
 
 # Run all known doc generators (today gendocs and genman for kubectl)
