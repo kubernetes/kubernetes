@@ -40,8 +40,9 @@ func Until(timeout time.Duration, watcher Interface, conditions ...ConditionFunc
 	if timeout > 0 {
 		after = time.After(timeout)
 	} else {
-		after := make(chan time.Time)
-		defer close(after)
+		ch := make(chan time.Time)
+		defer close(ch)
+		after = ch
 	}
 	var lastEvent *Event
 	for _, condition := range conditions {
