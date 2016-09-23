@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package master
+package rest
 
 import (
 	"time"
@@ -39,14 +39,14 @@ import (
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
-type ExtensionsRESTStorageProvider struct {
-	ResourceInterface                     resourceInterface
+type RESTStorageProvider struct {
+	ResourceInterface                     ResourceInterface
 	DisableThirdPartyControllerForTesting bool
 }
 
-var _ genericapiserver.RESTStorageProvider = &ExtensionsRESTStorageProvider{}
+var _ genericapiserver.RESTStorageProvider = &RESTStorageProvider{}
 
-func (p ExtensionsRESTStorageProvider) NewRESTStorage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter genericapiserver.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool) {
+func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter genericapiserver.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool) {
 	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(extensions.GroupName)
 
 	if apiResourceConfigSource.AnyResourcesForVersionEnabled(extensionsapiv1beta1.SchemeGroupVersion) {
@@ -57,7 +57,7 @@ func (p ExtensionsRESTStorageProvider) NewRESTStorage(apiResourceConfigSource ge
 	return apiGroupInfo, true
 }
 
-func (p ExtensionsRESTStorageProvider) v1beta1Storage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter genericapiserver.RESTOptionsGetter) map[string]rest.Storage {
+func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter genericapiserver.RESTOptionsGetter) map[string]rest.Storage {
 	version := extensionsapiv1beta1.SchemeGroupVersion
 
 	storage := map[string]rest.Storage{}

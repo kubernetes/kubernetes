@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package master
+package rest
 
 import (
 	"k8s.io/kubernetes/pkg/api/rest"
@@ -25,13 +25,13 @@ import (
 	"k8s.io/kubernetes/pkg/registry/authentication/tokenreview"
 )
 
-type AuthenticationRESTStorageProvider struct {
+type RESTStorageProvider struct {
 	Authenticator authenticator.Request
 }
 
-var _ genericapiserver.RESTStorageProvider = &AuthenticationRESTStorageProvider{}
+var _ genericapiserver.RESTStorageProvider = &RESTStorageProvider{}
 
-func (p AuthenticationRESTStorageProvider) NewRESTStorage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter genericapiserver.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool) {
+func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter genericapiserver.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool) {
 	// TODO figure out how to make the swagger generation stable, while allowing this endpoint to be disabled.
 	// if p.Authenticator == nil {
 	// 	return genericapiserver.APIGroupInfo{}, false
@@ -47,7 +47,7 @@ func (p AuthenticationRESTStorageProvider) NewRESTStorage(apiResourceConfigSourc
 	return apiGroupInfo, true
 }
 
-func (p AuthenticationRESTStorageProvider) v1beta1Storage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter genericapiserver.RESTOptionsGetter) map[string]rest.Storage {
+func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter genericapiserver.RESTOptionsGetter) map[string]rest.Storage {
 	version := authenticationv1beta1.SchemeGroupVersion
 
 	storage := map[string]rest.Storage{}
