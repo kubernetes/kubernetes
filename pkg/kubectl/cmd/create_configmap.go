@@ -27,6 +27,11 @@ import (
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
+const (
+	configMapFileFlag = "Key files can be specified using their file path, in which case a default name will be given to them, or optionally with a name and file path, in which case the given name will be used.  Specifying a directory will iterate each named file in the directory that is a valid configmap key."
+	configMapLiteralFlag = "Specify a key and literal value to insert in configmap (i.e. mykey=somevalue)"
+)
+
 var (
 	configMapLong = dedent.Dedent(`
 		Create a configmap based on a file, directory, or specified literal value.
@@ -55,7 +60,7 @@ var (
 // ConfigMap is a command to ease creating ConfigMaps.
 func NewCmdCreateConfigMap(f *cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "configmap NAME [--from-file=[key=]source] [--from-literal=key1=value1] [--dry-run]",
+		Use:     "configmap NAME [--from-file=[key=]source] [--from-binary-file=[key=]source] [--from-literal=key1=value1] [--dry-run]",
 		Aliases: []string{"cm"},
 		Short:   "Create a configmap from a local file, directory or literal value",
 		Long:    configMapLong,
@@ -69,8 +74,9 @@ func NewCmdCreateConfigMap(f *cmdutil.Factory, cmdOut io.Writer) *cobra.Command 
 	cmdutil.AddValidateFlags(cmd)
 	cmdutil.AddPrinterFlags(cmd)
 	cmdutil.AddGeneratorFlags(cmd, cmdutil.ConfigMapV1GeneratorName)
-	cmd.Flags().StringSlice("from-file", []string{}, "Key files can be specified using their file path, in which case a default name will be given to them, or optionally with a name and file path, in which case the given name will be used.  Specifying a directory will iterate each named file in the directory that is a valid configmap key.")
-	cmd.Flags().StringSlice("from-literal", []string{}, "Specify a key and literal value to insert in configmap (i.e. mykey=somevalue)")
+	cmd.Flags().StringSlice("from-file", []string{}, configMapFileFlag)
+	cmd.Flags().StringSlice("from-binary-file", []string{}, configMapFileFlag)
+	cmd.Flags().StringSlice("from-literal", []string{}, configMapLiteralFlag)
 	return cmd
 }
 
@@ -84,9 +90,10 @@ func CreateConfigMap(f *cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, a
 	switch generatorName := cmdutil.GetFlagString(cmd, "generator"); generatorName {
 	case cmdutil.ConfigMapV1GeneratorName:
 		generator = &kubectl.ConfigMapGeneratorV1{
-			Name:           name,
-			FileSources:    cmdutil.GetFlagStringSlice(cmd, "from-file"),
-			LiteralSources: cmdutil.GetFlagStringSlice(cmd, "from-literal"),
+			Name:           	name,
+			FileSources:    	cmdutil.GetFlagStringSlice(cmd, "from-file"),
+			BinaryFileSources:    	cmdutil.GetFlagStringSlice(cmd, "from-binary-file"),
+			LiteralSources: 	cmdutil.GetFlagStringSlice(cmd, "from-literal"),
 		}
 	default:
 		return cmdutil.UsageError(cmd, fmt.Sprintf("Generator: %s not supported.", generatorName))

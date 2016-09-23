@@ -3112,10 +3112,25 @@ func ValidateConfigMap(cfg *api.ConfigMap) field.ErrorList {
 		for _, msg := range validation.IsConfigMapKey(key) {
 			allErrs = append(allErrs, field.Invalid(field.NewPath("data").Key(key), key, msg))
 		}
+		if _, isValue := cfg.BinaryData[key]; isValue {
+			allErrs = append(allErrs, field.Duplicate(field.NewPath("data").Key(key), key))
+		}
 		totalSize += len(value)
 	}
 	if totalSize > api.MaxSecretSize {
 		allErrs = append(allErrs, field.TooLong(field.NewPath("data"), "", api.MaxSecretSize))
+	}
+
+	totalSize = 0
+	for key, value := range cfg.BinaryData {
+		for _, msg := range validation.IsConfigMapKey(key) {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("binarydata").Key(key), key, msg))
+		}
+		totalSize += len(value)
+	}
+
+	if totalSize > api.MaxSecretSize {
+		allErrs = append(allErrs, field.TooLong(field.NewPath("binarydata"), "", api.MaxSecretSize))
 	}
 
 	return allErrs

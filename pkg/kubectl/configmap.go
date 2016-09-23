@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/validation"
+	"unicode/utf8"
 )
 
 // ConfigMapGeneratorV1 supports stable generation of a configMap.
@@ -36,6 +37,8 @@ type ConfigMapGeneratorV1 struct {
 	Type string
 	// FileSources to derive the configMap from (optional)
 	FileSources []string
+	// BinaryFileSources to derive the configMap from (optional)
+	BinaryFileSources []string
 	// LiteralSources to derive the configMap from (optional)
 	LiteralSources []string
 }
@@ -61,6 +64,15 @@ func (s ConfigMapGeneratorV1) Generate(genericParams map[string]interface{}) (ru
 		}
 		delegate.FileSources = fromFileArray
 		delete(genericParams, "from-file")
+	}
+	fromBinaryFileStrings, found := genericParams["from-binary-file"]
+	if found {
+		fromBinaryFileArray, isArray := fromBinaryFileStrings.([]string)
+		if !isArray {
+			return nil, fmt.Errorf("expected []string, found :%v", fromBinaryFileStrings)
+		}
+		delegate.BinaryFileSources = fromBinaryFileArray
+		delete(genericParams, "from-binary-file")
 	}
 	fromLiteralStrings, found := genericParams["from-literal"]
 	if found {
@@ -90,6 +102,7 @@ func (s ConfigMapGeneratorV1) ParamNames() []GeneratorParam {
 		{"name", true},
 		{"type", false},
 		{"from-file", false},
+		{"from-binary-file", false},
 		{"from-literal", false},
 		{"force", false},
 	}
@@ -103,8 +116,14 @@ func (s ConfigMapGeneratorV1) StructuredGenerate() (runtime.Object, error) {
 	configMap := &api.ConfigMap{}
 	configMap.Name = s.Name
 	configMap.Data = map[string]string{}
+	configMap.BinaryData = map[string][]byte{}
 	if len(s.FileSources) > 0 {
-		if err := handleConfigMapFromFileSources(configMap, s.FileSources); err != nil {
+		if err := handleConfigMapFromFileSources(configMap, s.FileSources, false); err != nil {
+			return nil, err
+		}
+	}
+	if len(s.BinaryFileSources) > 0 {
+		if err := handleConfigMapFromFileSources(configMap, s.BinaryFileSources, true); err != nil {
 			return nil, err
 		}
 	}
@@ -142,7 +161,7 @@ func handleConfigMapFromLiteralSources(configMap *api.ConfigMap, literalSources 
 
 // handleConfigMapFromFileSources adds the specified file source information
 // into the provided configMap
-func handleConfigMapFromFileSources(configMap *api.ConfigMap, fileSources []string) error {
+func handleConfigMapFromFileSources(configMap *api.ConfigMap, fileSources []string, isBinary bool) error {
 	for _, fileSource := range fileSources {
 		keyName, filePath, err := parseFileSource(fileSource)
 		if err != nil {
@@ -169,14 +188,14 @@ func handleConfigMapFromFileSources(configMap *api.ConfigMap, fileSources []stri
 				itemPath := path.Join(filePath, item.Name())
 				if item.Mode().IsRegular() {
 					keyName = item.Name()
-					err = addKeyFromFileToConfigMap(configMap, keyName, itemPath)
+					err = addKeyFromFileToConfigMap(configMap, keyName, itemPath, isBinary)
 					if err != nil {
 						return err
 					}
 				}
 			}
 		} else {
-			err = addKeyFromFileToConfigMap(configMap, keyName, filePath)
+			err = addKeyFromFileToConfigMap(configMap, keyName, filePath, isBinary)
 			if err != nil {
 				return err
 			}
@@ -188,24 +207,52 @@ func handleConfigMapFromFileSources(configMap *api.ConfigMap, fileSources []stri
 
 // addKeyFromFileToConfigMap adds a key with the given name to a ConfigMap, populating
 // the value with the content of the given file path, or returns an error.
-func addKeyFromFileToConfigMap(configMap *api.ConfigMap, keyName, filePath string) error {
+func addKeyFromFileToConfigMap(configMap *api.ConfigMap, keyName, filePath string, isBinary bool) error {
 	data, err := ioutil.ReadFile(filePath)
 	if err != nil {
 		return err
 	}
+
+	if isBinary {
+		err = validateConfigMap(configMap, keyName)
+		if err != nil {
+			return err
+		}
+		configMap.BinaryData[keyName] = data
+		return nil
+	}
+
 	return addKeyFromLiteralToConfigMap(configMap, keyName, string(data))
 }
 
 // addKeyFromLiteralToConfigMap adds the given key and data to the given config map,
 // returning an error if the key is not valid or if the key already exists.
 func addKeyFromLiteralToConfigMap(configMap *api.ConfigMap, keyName, data string) error {
+
+	err := validateConfigMap(configMap, keyName)
+	if err != nil {
+		return err
+	}
+
+	if isValidString := utf8.ValidString(data); !isValidString {
+		return fmt.Errorf("cannot add data for key %s, invalid data", keyName)
+	}
+
+	configMap.Data[keyName] = data
+	return nil
+}
+
+func validateConfigMap(configMap *api.ConfigMap, keyName string) error{
 	// Note, the rules for ConfigMap keys are the exact same as the ones for SecretKeys.
 	if errs := validation.IsConfigMapKey(keyName); len(errs) != 0 {
 		return fmt.Errorf("%q is not a valid key name for a ConfigMap: %s", keyName, strings.Join(errs, ";"))
 	}
-	if _, entryExists := configMap.Data[keyName]; entryExists {
-		return fmt.Errorf("cannot add key %s, another key by that name already exists: %v.", keyName, configMap.Data)
+
+	_, dataEntryExists := configMap.Data[keyName];
+	_, binaryDataEntryExists := configMap.BinaryData[keyName];
+
+	if  dataEntryExists || binaryDataEntryExists {
+		return fmt.Errorf("cannot add key %s, another key by that name already exists: %v.", keyName, configMap)
 	}
-	configMap.Data[keyName] = data
 	return nil
 }

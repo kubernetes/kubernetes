@@ -2890,6 +2890,10 @@ type ConfigMap struct {
 	// Data contains the configuration data.
 	// Each key must be a valid DNS_SUBDOMAIN with an optional leading dot.
 	Data map[string]string `json:"data,omitempty"`
+
+	// Data contains the binary data.
+	// Each key must be a valid DNS_SUBDOMAIN with an optional leading dot.
+	BinaryData map[string][]byte `json:"binaryData,omitempty"`
 }
 
 // ConfigMapList is a resource containing a list of ConfigMap objects.
