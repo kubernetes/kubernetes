@@ -346,6 +346,8 @@ func (c Config) New() (*GenericAPIServer, error) {
 	// makes it into all of our supported go versions (only in v1.7.1 now).
 	mime.AddExtensionType(".svg", "image/svg+xml")
 
+	apiserver.InstallServiceErrorHandler(s.Serializer, s.HandlerContainer)
+
 	s.installAPI(&c)
 	s.Handler, s.InsecureHandler = s.buildHandlerChains(&c, http.Handler(s.Mux.BaseMux().(*http.ServeMux)))
 
