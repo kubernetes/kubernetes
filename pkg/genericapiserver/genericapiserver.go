@@ -258,7 +258,7 @@ func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
 			options.TLSPrivateKeyFile = path.Join(options.CertDirectory, "apiserver.key")
 			// TODO (cjcullen): Is ClusterIP the right address to sign a cert with?
 			alternateIPs := []net.IP{s.ServiceReadWriteIP}
-			alternateDNS := []string{"kubernetes.default.svc", "kubernetes.default", "kubernetes"}
+			alternateDNS := []string{"kubernetes.default.svc", "kubernetes.default", "kubernetes", "localhost"}
 			// It would be nice to set a fqdn subject alt name, but only the kubelets know, the apiserver is clueless
 			// alternateDNS = append(alternateDNS, "kubernetes.default.svc.CLUSTER.DNS.NAME")
 			if !certutil.CanReadCertOrKey(options.TLSCertFile, options.TLSPrivateKeyFile) {
