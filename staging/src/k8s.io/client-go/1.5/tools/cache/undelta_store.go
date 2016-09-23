@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cache
+package testing
 
 // UndeltaStore listens to incremental updates and sends complete state on every change.
 // It implements the Store interface so that it can receive a stream of mirrored objects

@@ -31,7 +31,7 @@ import (
 	"k8s.io/client-go/1.5/pkg/api"
 	"k8s.io/client-go/1.5/pkg/api/unversioned"
 	"k8s.io/client-go/1.5/pkg/runtime"
-	"k8s.io/client-go/1.5/pkg/util/crypto"
+	certutil "k8s.io/client-go/1.5/pkg/util/cert"
 	"k8s.io/client-go/1.5/pkg/util/flowcontrol"
 	"k8s.io/client-go/1.5/pkg/version"
 	clientcmdapi "k8s.io/client-go/1.5/tools/clientcmd/api"
@@ -261,7 +261,7 @@ func InClusterConfig() (*Config, error) {
 	}
 	tlsClientConfig := TLSClientConfig{}
 	rootCAFile := "/var/run/secrets/kubernetes.io/serviceaccount/" + api.ServiceAccountRootCAKey
-	if _, err := crypto.CertPoolFromFile(rootCAFile); err != nil {
+	if _, err := certutil.NewPool(rootCAFile); err != nil {
 		glog.Errorf("Expected to load root CA config from %s, but got err: %v", rootCAFile, err)
 	} else {
 		tlsClientConfig.CAFile = rootCAFile
@@ -277,7 +277,7 @@ func InClusterConfig() (*Config, error) {
 
 // IsConfigTransportTLS returns true if and only if the provided
 // config will result in a protected connection to the server when it
-// is passed to rest.RESTClientFor().  Use to determine when to
+// is passed to restclient.RESTClientFor().  Use to determine when to
 // send credentials over the wire.
 //
 // Note: the Insecure flag is ignored when testing for this value, so MITM attacks are

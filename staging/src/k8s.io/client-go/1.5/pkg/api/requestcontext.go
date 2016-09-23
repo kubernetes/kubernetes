@@ -20,6 +20,8 @@ import (
 	"errors"
 	"net/http"
 	"sync"
+
+	"github.com/golang/glog"
 )
 
 // RequestContextMapper keeps track of the context associated with a particular request
@@ -89,21 +91,21 @@ func (c *requestContextMap) remove(req *http.Request) {
 	delete(c.contexts, req)
 }
 
-// NewRequestContextFilter ensures there is a Context object associated with the request before calling the passed handler.
+// WithRequestContext ensures there is a Context object associated with the request before calling the passed handler.
 // After the passed handler runs, the context is cleaned up.
-func NewRequestContextFilter(mapper RequestContextMapper, handler http.Handler) (http.Handler, error) {
-	if mapper, ok := mapper.(*requestContextMap); ok {
-		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			if mapper.init(req, NewContext()) {
-				// If we were the ones to successfully initialize, pair with a remove
-				defer mapper.remove(req)
-			}
-			handler.ServeHTTP(w, req)
-		}), nil
-	} else {
-		return handler, errors.New("Unknown RequestContextMapper implementation.")
+func WithRequestContext(handler http.Handler, mapper RequestContextMapper) http.Handler {
+	rcMap, ok := mapper.(*requestContextMap)
+	if !ok {
+		glog.Fatal("Unknown RequestContextMapper implementation.")
 	}
 
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if rcMap.init(req, NewContext()) {
+			// If we were the ones to successfully initialize, pair with a remove
+			defer rcMap.remove(req)
+		}
+		handler.ServeHTTP(w, req)
+	})
 }
 
 // IsEmpty returns true if there are no contexts registered, or an error if it could not be determined. Intended for use by tests.
