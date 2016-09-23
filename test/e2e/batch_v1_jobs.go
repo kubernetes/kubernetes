@@ -108,7 +108,7 @@ var _ = framework.KubeDescribe("V1Job", func() {
 
 		By("Ensuring job shows many failures")
 		err = wait.Poll(framework.Poll, v1JobTimeout, func() (bool, error) {
-			curr, err := f.Client.Batch().Jobs(f.Namespace.Name).Get(job.Name)
+			curr, err := getV1Job(f.Client, f.Namespace.Name, job.Name)
 			if err != nil {
 				return false, err
 			}
@@ -184,12 +184,12 @@ var _ = framework.KubeDescribe("V1Job", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring job was deleted")
-		_, err = f.Client.Batch().Jobs(f.Namespace.Name).Get(job.Name)
+		_, err = getV1Job(f.Client, f.Namespace.Name, job.Name)
 		Expect(err).To(HaveOccurred())
 		Expect(errors.IsNotFound(err)).To(BeTrue())
 	})
 
-	It("should fail a job [Slow]", func() {
+	It("should fail a job", func() {
 		By("Creating a job")
 		job := newTestV1Job("notTerminate", "foo", api.RestartPolicyNever, parallelism, completions)
 		activeDeadlineSeconds := int64(10)
@@ -198,7 +198,18 @@ var _ = framework.KubeDescribe("V1Job", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring job was failed")
-		err = waitForV1JobFail(f.Client, f.Namespace.Name, job.Name)
+		err = waitForV1JobFail(f.Client, f.Namespace.Name, job.Name, 20*time.Second)
+		if err == wait.ErrWaitTimeout {
+			job, err = getV1Job(f.Client, f.Namespace.Name, job.Name)
+			Expect(err).NotTo(HaveOccurred())
+			// the job stabilized and won't be synced until modification or full
+			// resync happens, we don't want to wait for the latter so we force
+			// sync modifying it
+			job.Spec.Parallelism = &completions
+			job, err = updateV1Job(f.Client, f.Namespace.Name, job)
+			Expect(err).NotTo(HaveOccurred())
+			err = waitForV1JobFail(f.Client, f.Namespace.Name, job.Name, v1JobTimeout)
+		}
 		Expect(err).NotTo(HaveOccurred())
 	})
 })
@@ -265,8 +276,16 @@ func newTestV1Job(behavior, name string, rPol api.RestartPolicy, parallelism, co
 	return job
 }
 
+func getV1Job(c *client.Client, ns, name string) (*batch.Job, error) {
+	return c.Batch().Jobs(ns).Get(name)
+}
+
 func createV1Job(c *client.Client, ns string, job *batch.Job) (*batch.Job, error) {
 	return c.Batch().Jobs(ns).Create(job)
+}
+
+func updateV1Job(c *client.Client, ns string, job *batch.Job) (*batch.Job, error) {
+	return c.Batch().Jobs(ns).Update(job)
 }
 
 func deleteV1Job(c *client.Client, ns, name string) error {
@@ -304,8 +323,8 @@ func waitForV1JobFinish(c *client.Client, ns, jobName string, completions int32)
 }
 
 // Wait for job fail.
-func waitForV1JobFail(c *client.Client, ns, jobName string) error {
-	return wait.Poll(framework.Poll, v1JobTimeout, func() (bool, error) {
+func waitForV1JobFail(c *client.Client, ns, jobName string, timeout time.Duration) error {
+	return wait.Poll(framework.Poll, timeout, func() (bool, error) {
 		curr, err := c.Batch().Jobs(ns).Get(jobName)
 		if err != nil {
 			return false, err
