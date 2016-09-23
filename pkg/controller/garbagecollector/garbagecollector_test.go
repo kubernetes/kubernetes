@@ -23,17 +23,19 @@ import (
 	"sync"
 	"testing"
 
-	_ "k8s.io/kubernetes/pkg/api/install"
-	"k8s.io/kubernetes/pkg/controller/garbagecollector/metaonly"
-	"k8s.io/kubernetes/pkg/runtime/serializer"
-
 	"github.com/stretchr/testify/assert"
+
+	_ "k8s.io/kubernetes/pkg/api/install"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta/metatypes"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
+	"k8s.io/kubernetes/pkg/controller/garbagecollector/metaonly"
+	"k8s.io/kubernetes/pkg/runtime/serializer"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/clock"
 	"k8s.io/kubernetes/pkg/util/json"
@@ -44,11 +46,11 @@ import (
 func TestNewGarbageCollector(t *testing.T) {
 	config := &restclient.Config{}
 	config.ContentConfig.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: metaonly.NewMetadataCodecFactory()}
-	metaOnlyClientPool := dynamic.NewClientPool(config, dynamic.LegacyAPIPathResolverFunc)
+	metaOnlyClientPool := dynamic.NewClientPool(config, registered.RESTMapper(), dynamic.LegacyAPIPathResolverFunc)
 	config.ContentConfig.NegotiatedSerializer = nil
-	clientPool := dynamic.NewClientPool(config, dynamic.LegacyAPIPathResolverFunc)
+	clientPool := dynamic.NewClientPool(config, registered.RESTMapper(), dynamic.LegacyAPIPathResolverFunc)
 	podResource := []unversioned.GroupVersionResource{{Version: "v1", Resource: "pods"}}
-	gc, err := NewGarbageCollector(metaOnlyClientPool, clientPool, podResource)
+	gc, err := NewGarbageCollector(metaOnlyClientPool, clientPool, registered.RESTMapper(), podResource)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -107,11 +109,11 @@ func testServerAndClientConfig(handler func(http.ResponseWriter, *http.Request))
 
 func setupGC(t *testing.T, config *restclient.Config) *GarbageCollector {
 	config.ContentConfig.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: metaonly.NewMetadataCodecFactory()}
-	metaOnlyClientPool := dynamic.NewClientPool(config, dynamic.LegacyAPIPathResolverFunc)
+	metaOnlyClientPool := dynamic.NewClientPool(config, registered.RESTMapper(), dynamic.LegacyAPIPathResolverFunc)
 	config.ContentConfig.NegotiatedSerializer = nil
-	clientPool := dynamic.NewClientPool(config, dynamic.LegacyAPIPathResolverFunc)
+	clientPool := dynamic.NewClientPool(config, registered.RESTMapper(), dynamic.LegacyAPIPathResolverFunc)
 	podResource := []unversioned.GroupVersionResource{{Version: "v1", Resource: "pods"}}
-	gc, err := NewGarbageCollector(metaOnlyClientPool, clientPool, podResource)
+	gc, err := NewGarbageCollector(metaOnlyClientPool, clientPool, registered.RESTMapper(), podResource)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -340,9 +342,9 @@ func TestGCListWatcher(t *testing.T) {
 	testHandler := &fakeActionHandler{}
 	srv, clientConfig := testServerAndClientConfig(testHandler.ServeHTTP)
 	defer srv.Close()
-	clientPool := dynamic.NewClientPool(clientConfig, dynamic.LegacyAPIPathResolverFunc)
+	clientPool := dynamic.NewClientPool(clientConfig, registered.RESTMapper(), dynamic.LegacyAPIPathResolverFunc)
 	podResource := unversioned.GroupVersionResource{Version: "v1", Resource: "pods"}
-	client, err := clientPool.ClientForGroupVersion(podResource.GroupVersion())
+	client, err := clientPool.ClientForGroupVersionResource(podResource)
 	if err != nil {
 		t.Fatal(err)
 	}
