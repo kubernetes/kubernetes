@@ -17,15 +17,12 @@ limitations under the License.
 package cert
 
 import (
-	"crypto/ecdsa"
-	"crypto/elliptic"
 	cryptorand "crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"errors"
-	"fmt"
 	"net"
 
 	"k8s.io/kubernetes/pkg/apis/certificates"
@@ -47,23 +44,11 @@ func ParseCSR(obj *certificates.CertificateSigningRequest) (*x509.CertificateReq
 }
 
 // MakeCSR generates a PEM-encoded CSR using the supplied private key, subject, and SANs.
-// privateKey must be a *ecdsa.PrivateKey or *rsa.PrivateKey.
+// All key types that are implemented via crypto.Signer are supported (This includes *rsa.PrivateKey and *ecdsa.PrivateKey.)
 func MakeCSR(privateKey interface{}, subject *pkix.Name, dnsSANs []string, ipSANs []net.IP) (csr []byte, err error) {
+	// Customize the signature for RSA keys, depending on the key size
 	var sigType x509.SignatureAlgorithm
-
-	switch privateKey := privateKey.(type) {
-	case *ecdsa.PrivateKey:
-		switch privateKey.Curve {
-		case elliptic.P224(), elliptic.P256():
-			sigType = x509.ECDSAWithSHA256
-		case elliptic.P384():
-			sigType = x509.ECDSAWithSHA384
-		case elliptic.P521():
-			sigType = x509.ECDSAWithSHA512
-		default:
-			return nil, fmt.Errorf("unknown elliptic curve: %v", privateKey.Curve)
-		}
-	case *rsa.PrivateKey:
+	if privateKey, ok := privateKey.(*rsa.PrivateKey); ok {
 		keySize := privateKey.N.BitLen()
 		switch {
 		case keySize >= 4096:
@@ -73,9 +58,6 @@ func MakeCSR(privateKey interface{}, subject *pkix.Name, dnsSANs []string, ipSAN
 		default:
 			sigType = x509.SHA256WithRSA
 		}
-
-	default:
-		return nil, fmt.Errorf("unsupported key type: %T", privateKey)
 	}
 
 	template := &x509.CertificateRequest{
