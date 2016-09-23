@@ -15,6 +15,12 @@ limitations under the License.
 */
 
 // Package testapi provides a helper for retrieving the KUBE_TEST_API environment variable.
+//
+// TODO(lavalamp): this package is a huge disaster at the moment. I intend to
+// refactor. All code currently using this package should change:
+// 1. Declare your own registered.APIGroupRegistrationManager in your own test code.
+// 2. Import the relevant install packages.
+// 3. Register the types you need, from the announced.APIGroupAnnouncementManager.
 package testapi
 
 import (
@@ -109,8 +115,10 @@ func init() {
 
 	kubeTestAPI := os.Getenv("KUBE_TEST_API")
 	if len(kubeTestAPI) != 0 {
+		// priority is "first in list preferred", so this has to run in reverse order
 		testGroupVersions := strings.Split(kubeTestAPI, ",")
-		for _, gvString := range testGroupVersions {
+		for i := len(testGroupVersions) - 1; i >= 0; i-- {
+			gvString := testGroupVersions[i]
 			groupVersion, err := unversioned.ParseGroupVersion(gvString)
 			if err != nil {
 				panic(fmt.Sprintf("Error parsing groupversion %v: %v", gvString, err))
