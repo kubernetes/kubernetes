@@ -295,7 +295,6 @@ func Run(s *options.APIServer) error {
 
 	genericConfig := genericapiserver.NewConfig(s.ServerRunOptions)
 	// TODO: Move the following to generic api server as well.
-	genericConfig.StorageFactory = storageFactory
 	genericConfig.Authenticator = apiAuthenticator
 	genericConfig.SupportsBasicAuth = len(s.BasicAuthFile) > 0
 	genericConfig.Authorizer = apiAuthorizer
@@ -311,7 +310,10 @@ func Run(s *options.APIServer) error {
 	genericConfig.EnableOpenAPISupport = true
 
 	config := &master.Config{
-		Config:                  genericConfig,
+		Config: genericConfig,
+
+		StorageFactory:          storageFactory,
+		EnableWatchCache:        s.EnableWatchCache,
 		EnableCoreControllers:   true,
 		DeleteCollectionWorkers: s.DeleteCollectionWorkers,
 		EventTTL:                s.EventTTL,
