@@ -144,7 +144,7 @@ func (h *HeapsterMetricsClient) GetCpuConsumptionAndRequestInMillis(namespace st
 		return 0, 0, time.Time{}, fmt.Errorf("some pods do not have request for cpu")
 	}
 	glog.V(4).Infof("%s %s - sum of CPU requested: %d", namespace, selector, requestSum)
-	requestAvg := requestSum / int64(len(podList.Items))
+	requestAvg := requestSum / int64(len(podNames))
 	// Consumption is already averaged and in millis.
 	consumption, timestamp, err := h.getCpuUtilizationForPods(namespace, selector, podNames)
 	if err != nil {
