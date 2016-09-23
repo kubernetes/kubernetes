@@ -3810,6 +3810,10 @@ type ConfigMap struct {
 	// Each key must be a valid DNS_SUBDOMAIN with an optional leading dot.
 	// +optional
 	Data map[string]string `json:"data,omitempty" protobuf:"bytes,2,rep,name=data"`
+
+	// Data contains the binary data.
+	// Each key must be a valid DNS_SUBDOMAIN with an optional leading dot.
+	BinaryData map[string][]byte `json:"binaryData,omitempty" protobuf:"bytes,3,rep,name=binaryData"`
 }
 
 // ConfigMapList is a resource containing a list of ConfigMap objects.

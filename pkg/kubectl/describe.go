@@ -2285,7 +2285,9 @@ func describeConfigMap(configMap *api.ConfigMap) (string, error) {
 		for k, v := range configMap.Data {
 			fmt.Fprintf(out, "%s:\t%d bytes\n", k, len(v))
 		}
-
+		for k, v := range configMap.BinaryData {
+			fmt.Fprintf(out, "%s:\t%d bytes\n", k, len(v))
+		}
 		return nil
 	})
 }

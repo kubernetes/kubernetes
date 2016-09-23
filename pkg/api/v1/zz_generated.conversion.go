@@ -845,6 +845,7 @@ func autoConvert_v1_ConfigMap_To_api_ConfigMap(in *ConfigMap, out *api.ConfigMap
 		return err
 	}
 	out.Data = in.Data
+	out.BinaryData = in.BinaryData
 	return nil
 }
 
@@ -860,6 +861,7 @@ func autoConvert_api_ConfigMap_To_v1_ConfigMap(in *api.ConfigMap, out *ConfigMap
 		return err
 	}
 	out.Data = in.Data
+	out.BinaryData = in.BinaryData
 	return nil
 }
 

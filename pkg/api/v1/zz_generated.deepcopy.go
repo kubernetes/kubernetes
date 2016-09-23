@@ -459,6 +459,19 @@ func DeepCopy_v1_ConfigMap(in interface{}, out interface{}, c *conversion.Cloner
 		} else {
 			out.Data = nil
 		}
+		if in.BinaryData != nil {
+			in, out := &in.BinaryData, &out.BinaryData
+			*out = make(map[string][]byte)
+			for key, val := range *in {
+				if newVal, err := c.DeepCopy(&val); err != nil {
+					return err
+				} else {
+					(*out)[key] = *newVal.(*[]byte)
+				}
+			}
+		} else {
+			out.BinaryData = nil
+		}
 		return nil
 	}
 }

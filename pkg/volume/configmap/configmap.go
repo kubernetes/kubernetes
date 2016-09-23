@@ -172,7 +172,7 @@ func (b *configMapVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	glog.V(3).Infof("Received configMap %v/%v containing (%v) pieces of data, %v total bytes",
 		b.pod.Namespace,
 		b.source.Name,
-		len(configMap.Data),
+		len(configMap.Data) + len(configMap.BinaryData),
 		totalBytes)
 
 	payload, err := makePayload(b.source.Items, configMap, b.source.DefaultMode)
@@ -207,7 +207,7 @@ func makePayload(mappings []api.KeyToPath, configMap *api.ConfigMap, defaultMode
 		return nil, fmt.Errorf("No defaultMode used, not even the default value for it")
 	}
 
-	payload := make(map[string]volumeutil.FileProjection, len(configMap.Data))
+	payload := make(map[string]volumeutil.FileProjection, (len(configMap.Data) + len(configMap.BinaryData)))
 	var fileProjection volumeutil.FileProjection
 
 	if len(mappings) == 0 {
@@ -216,16 +216,28 @@ func makePayload(mappings []api.KeyToPath, configMap *api.ConfigMap, defaultMode
 			fileProjection.Mode = *defaultMode
 			payload[name] = fileProjection
 		}
+		for name, data := range configMap.BinaryData {
+			fileProjection.Data = data
+			fileProjection.Mode = *defaultMode
+			payload[name] = fileProjection
+		}
 	} else {
 		for _, ktp := range mappings {
-			content, ok := configMap.Data[ktp.Key]
-			if !ok {
+			contentData, okData := configMap.Data[ktp.Key]
+			contentBinaryData, okBinaryData := configMap.BinaryData[ktp.Key]
+			if (!okData && !okBinaryData) {
 				err_msg := "references non-existent config key"
 				glog.Errorf(err_msg)
 				return nil, fmt.Errorf(err_msg)
 			}
 
-			fileProjection.Data = []byte(content)
+			if okData {
+				fileProjection.Data = []byte(contentData)
+			} else {
+
+				fileProjection.Data = contentBinaryData
+			}
+
 			if ktp.Mode != nil {
 				fileProjection.Mode = *ktp.Mode
 			} else {
@@ -241,6 +253,9 @@ func makePayload(mappings []api.KeyToPath, configMap *api.ConfigMap, defaultMode
 func totalBytes(configMap *api.ConfigMap) int {
 	totalSize := 0
 	for _, value := range configMap.Data {
+		totalSize += len(value)
+	}
+	for _, value := range configMap.BinaryData {
 		totalSize += len(value)
 	}
 
