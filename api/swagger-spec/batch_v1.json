@@ -643,7 +643,7 @@
       "type": "v1.JobList",
       "method": "GET",
       "summary": "list or watch objects of kind Job",
-      "nickname": "listNamespacedJob",
+      "nickname": "listJobForAllNamespaces",
       "parameters": [
        {
         "type": "string",
@@ -720,7 +720,7 @@
       "type": "versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of Job",
-      "nickname": "watchNamespacedJobList",
+      "nickname": "watchJobListForAllNamespaces",
       "parameters": [
        {
         "type": "string",

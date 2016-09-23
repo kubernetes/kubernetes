@@ -643,7 +643,7 @@
       "type": "v1alpha1.PetSetList",
       "method": "GET",
       "summary": "list or watch objects of kind PetSet",
-      "nickname": "listNamespacedPetSet",
+      "nickname": "listPetSetForAllNamespaces",
       "parameters": [
        {
         "type": "string",
@@ -720,7 +720,7 @@
       "type": "versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of PetSet",
-      "nickname": "watchNamespacedPetSetList",
+      "nickname": "watchPetSetListForAllNamespaces",
       "parameters": [
        {
         "type": "string",
