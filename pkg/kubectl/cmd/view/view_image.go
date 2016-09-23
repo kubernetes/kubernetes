@@ -63,7 +63,7 @@ func NewCmdImage(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 		},
 	}
 
-	usage := "Filename, directory, or URL to a file identifying the resource to get from a server."
+	usage := "identifying the resource to get from a server."
 	cmd.Flags().BoolVar(&options.all, "all", false, "select all resources in the namespace of the specified resource types")
 	cmd.Flags().StringVarP(&options.selector, "selector", "l", "", "Selector (label query) to filter on")
 	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
