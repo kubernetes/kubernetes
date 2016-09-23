@@ -1114,15 +1114,35 @@ func (kl *Kubelet) listPodsFromDisk() ([]types.UID, error) {
 
 // Starts garbage collection threads.
 func (kl *Kubelet) StartGarbageCollection() {
+	loggedContainerGCFailure := false
 	go wait.Until(func() {
 		if err := kl.containerGC.GarbageCollect(kl.sourcesReady.AllReady()); err != nil {
 			glog.Errorf("Container garbage collection failed: %v", err)
+			loggedContainerGCFailure = true
+		} else {
+			var vLevel glog.Level = 4
+			if loggedContainerGCFailure {
+				vLevel = 1
+				loggedContainerGCFailure = false
+			}
+
+			glog.V(vLevel).Infof("Container garbage collection succeeded")
 		}
 	}, ContainerGCPeriod, wait.NeverStop)
 
+	loggedImageGCFailure := false
 	go wait.Until(func() {
 		if err := kl.imageManager.GarbageCollect(); err != nil {
 			glog.Errorf("Image garbage collection failed: %v", err)
+			loggedImageGCFailure = true
+		} else {
+			var vLevel glog.Level = 4
+			if loggedImageGCFailure {
+				vLevel = 1
+				loggedImageGCFailure = false
+			}
+
+			glog.V(vLevel).Infof("Image garbage collection succeeded")
 		}
 	}, ImageGCPeriod, wait.NeverStop)
 }
