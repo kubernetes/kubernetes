@@ -25,7 +25,7 @@ import (
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 
-	clientreporestclient "k8s.io/client-go/1.4/rest"
+	clientreporestclient "k8s.io/client-go/1.5/rest"
 	"k8s.io/kubernetes/pkg/client/restclient"
 )
 
