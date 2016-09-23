@@ -17,6 +17,7 @@ limitations under the License.
 package validation
 
 import (
+	"bytes"
 	"fmt"
 	"math"
 	"reflect"
@@ -11800,48 +11801,65 @@ func TestValidPodLogOptions(t *testing.T) {
 }
 
 func TestValidateConfigMap(t *testing.T) {
-	newConfigMap := func(name, namespace string, data map[string]string) core.ConfigMap {
+	newConfigMap := func(name, namespace string, data map[string]string, binaryData map[string][]byte) core.ConfigMap {
 		return core.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      name,
 				Namespace: namespace,
 			},
-			Data: data,
+			Data:       data,
+			BinaryData: binaryData,
 		}
 	}
 
 	var (
-		validConfigMap = newConfigMap("validname", "validns", map[string]string{"key": "value"})
-		maxKeyLength   = newConfigMap("validname", "validns", map[string]string{strings.Repeat("a", 253): "value"})
+		validConfigMap = newConfigMap("validname", "validns", map[string]string{"key": "value"}, map[string][]byte{"bin": []byte("value")})
+		maxKeyLength   = newConfigMap("validname", "validns", map[string]string{strings.Repeat("a", 253): "value"}, nil)
 
-		emptyName        = newConfigMap("", "validns", nil)
-		invalidName      = newConfigMap("NoUppercaseOrSpecialCharsLike=Equals", "validns", nil)
-		emptyNs          = newConfigMap("validname", "", nil)
-		invalidNs        = newConfigMap("validname", "NoUppercaseOrSpecialCharsLike=Equals", nil)
-		invalidKey       = newConfigMap("validname", "validns", map[string]string{"a*b": "value"})
-		leadingDotKey    = newConfigMap("validname", "validns", map[string]string{".ab": "value"})
-		dotKey           = newConfigMap("validname", "validns", map[string]string{".": "value"})
-		doubleDotKey     = newConfigMap("validname", "validns", map[string]string{"..": "value"})
-		overMaxKeyLength = newConfigMap("validname", "validns", map[string]string{strings.Repeat("a", 254): "value"})
-		overMaxSize      = newConfigMap("validname", "validns", map[string]string{"key": strings.Repeat("a", core.MaxSecretSize+1)})
+		emptyName               = newConfigMap("", "validns", nil, nil)
+		invalidName             = newConfigMap("NoUppercaseOrSpecialCharsLike=Equals", "validns", nil, nil)
+		emptyNs                 = newConfigMap("validname", "", nil, nil)
+		invalidNs               = newConfigMap("validname", "NoUppercaseOrSpecialCharsLike=Equals", nil, nil)
+		invalidKey              = newConfigMap("validname", "validns", map[string]string{"a*b": "value"}, nil)
+		leadingDotKey           = newConfigMap("validname", "validns", map[string]string{".ab": "value"}, nil)
+		dotKey                  = newConfigMap("validname", "validns", map[string]string{".": "value"}, nil)
+		doubleDotKey            = newConfigMap("validname", "validns", map[string]string{"..": "value"}, nil)
+		overMaxKeyLength        = newConfigMap("validname", "validns", map[string]string{strings.Repeat("a", 254): "value"}, nil)
+		overMaxSize             = newConfigMap("validname", "validns", map[string]string{"key": strings.Repeat("a", v1.MaxSecretSize+1)}, nil)
+		duplicatedKey           = newConfigMap("validname", "validns", map[string]string{"key": "value1"}, map[string][]byte{"key": []byte("value2")})
+		binDataInvalidKey       = newConfigMap("validname", "validns", nil, map[string][]byte{"a*b": []byte("value")})
+		binDataLeadingDotKey    = newConfigMap("validname", "validns", nil, map[string][]byte{".ab": []byte("value")})
+		binDataDotKey           = newConfigMap("validname", "validns", nil, map[string][]byte{".": []byte("value")})
+		binDataDoubleDotKey     = newConfigMap("validname", "validns", nil, map[string][]byte{"..": []byte("value")})
+		binDataOverMaxKeyLength = newConfigMap("validname", "validns", nil, map[string][]byte{strings.Repeat("a", 254): []byte("value")})
+		binDataOverMaxSize      = newConfigMap("validname", "validns", nil, map[string][]byte{"bin": bytes.Repeat([]byte("a"), v1.MaxSecretSize+1)})
+		binNonUtf8Value         = newConfigMap("validname", "validns", nil, map[string][]byte{"key": {0, 0xFE, 0, 0xFF}})
 	)
 
 	tests := map[string]struct {
 		cfg     core.ConfigMap
 		isValid bool
 	}{
-		"valid":               {validConfigMap, true},
-		"max key length":      {maxKeyLength, true},
-		"leading dot key":     {leadingDotKey, true},
-		"empty name":          {emptyName, false},
-		"invalid name":        {invalidName, false},
-		"invalid key":         {invalidKey, false},
-		"empty namespace":     {emptyNs, false},
-		"invalid namespace":   {invalidNs, false},
-		"dot key":             {dotKey, false},
-		"double dot key":      {doubleDotKey, false},
-		"over max key length": {overMaxKeyLength, false},
-		"over max size":       {overMaxSize, false},
+		"valid":                           {validConfigMap, true},
+		"max key length":                  {maxKeyLength, true},
+		"leading dot key":                 {leadingDotKey, true},
+		"empty name":                      {emptyName, false},
+		"invalid name":                    {invalidName, false},
+		"invalid key":                     {invalidKey, false},
+		"empty namespace":                 {emptyNs, false},
+		"invalid namespace":               {invalidNs, false},
+		"dot key":                         {dotKey, false},
+		"double dot key":                  {doubleDotKey, false},
+		"over max key length":             {overMaxKeyLength, false},
+		"over max size":                   {overMaxSize, false},
+		"duplicated key":                  {duplicatedKey, false},
+		"binary data invalid key":         {binDataInvalidKey, false},
+		"binary data leading dot key":     {binDataLeadingDotKey, true},
+		"binary data dot key":             {binDataDotKey, false},
+		"binary data double dot key":      {binDataDoubleDotKey, false},
+		"binary data over max key length": {binDataOverMaxKeyLength, false},
+		"binary data max size":            {binDataOverMaxSize, false},
+		"binary data non utf-8 bytes":     {binNonUtf8Value, true},
 	}
 
 	for name, tc := range tests {

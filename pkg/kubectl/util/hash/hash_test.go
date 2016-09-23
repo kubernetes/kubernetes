@@ -148,7 +148,7 @@ not their metadata (e.g. the Data of a ConfigMap, but nothing in ObjectMeta).
 		obj      interface{}
 		expect   int
 	}{
-		{"ConfigMap", v1.ConfigMap{}, 3},
+		{"ConfigMap", v1.ConfigMap{}, 4},
 		{"Secret", v1.Secret{}, 5},
 	}
 	for _, c := range cases {

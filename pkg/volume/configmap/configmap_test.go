@@ -63,6 +63,38 @@ func TestMakePayload(t *testing.T) {
 			success: true,
 		},
 		{
+			name: "no overrides binary data",
+			configMap: &v1.ConfigMap{
+				BinaryData: map[string][]byte{
+					"foo": []byte("foo"),
+					"bar": []byte("bar"),
+				},
+			},
+			mode: 0644,
+			payload: map[string]util.FileProjection{
+				"foo": {Data: []byte("foo"), Mode: 0644},
+				"bar": {Data: []byte("bar"), Mode: 0644},
+			},
+			success: true,
+		},
+		{
+			name: "no overrides mixed data",
+			configMap: &v1.ConfigMap{
+				BinaryData: map[string][]byte{
+					"foo": []byte("foo"),
+				},
+				Data: map[string]string{
+					"bar": "bar",
+				},
+			},
+			mode: 0644,
+			payload: map[string]util.FileProjection{
+				"foo": {Data: []byte("foo"), Mode: 0644},
+				"bar": {Data: []byte("bar"), Mode: 0644},
+			},
+			success: true,
+		},
+		{
 			name: "basic 1",
 			mappings: []v1.KeyToPath{
 				{

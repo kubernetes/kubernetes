@@ -4356,10 +4356,22 @@ func ValidateConfigMap(cfg *core.ConfigMap) field.ErrorList {
 		for _, msg := range validation.IsConfigMapKey(key) {
 			allErrs = append(allErrs, field.Invalid(field.NewPath("data").Key(key), key, msg))
 		}
+		// check if we have a duplicate key in the other bag
+		if _, isValue := cfg.BinaryData[key]; isValue {
+			msg := "duplicate of key present in binaryData"
+			allErrs = append(allErrs, field.Invalid(field.NewPath("data").Key(key), key, msg))
+		}
+		totalSize += len(value)
+	}
+	for key, value := range cfg.BinaryData {
+		for _, msg := range validation.IsConfigMapKey(key) {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("binaryData").Key(key), key, msg))
+		}
 		totalSize += len(value)
 	}
 	if totalSize > core.MaxSecretSize {
-		allErrs = append(allErrs, field.TooLong(field.NewPath("data"), "", core.MaxSecretSize))
+		// pass back "" to indicate that the error refers to the whole object.
+		allErrs = append(allErrs, field.TooLong(field.NewPath(""), cfg, core.MaxSecretSize))
 	}
 
 	return allErrs
