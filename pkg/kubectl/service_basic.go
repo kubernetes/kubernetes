@@ -31,7 +31,7 @@ type ServiceCommonGeneratorV1 struct {
 	TCP       []string
 	Type      api.ServiceType
 	ClusterIP string
-	NodePort  int32
+	NodePort  int
 }
 
 type ServiceClusterIPGeneratorV1 struct {
@@ -183,7 +183,7 @@ func (s ServiceCommonGeneratorV1) StructuredGenerate() (runtime.Object, error) {
 			Port:       port,
 			TargetPort: targetPort,
 			Protocol:   api.Protocol("TCP"),
-			NodePort:   s.NodePort,
+			NodePort:   int32(s.NodePort),
 		})
 	}
 
