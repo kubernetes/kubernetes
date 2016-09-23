@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/types"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
+	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/term"
 )
 
@@ -544,6 +545,7 @@ func (m *kubeGenericRuntimeManager) killContainersWithSyncResult(pod *api.Pod, r
 		go func(container *kubecontainer.Container) {
 			defer utilruntime.HandleCrash()
 			defer wg.Done()
+
 			killContainerResult := kubecontainer.NewSyncResult(kubecontainer.KillContainer, container.Name)
 			if err := m.killContainer(pod, container.ID, container.Name, "Need to kill Pod", gracePeriodOverride); err != nil {
 				killContainerResult.Fail(kubecontainer.ErrKillContainer, err.Error())
@@ -558,6 +560,83 @@ func (m *kubeGenericRuntimeManager) killContainersWithSyncResult(pod *api.Pod, r
 		syncResults = append(syncResults, containerResult)
 	}
 	return
+}
+
+// pruneInitContainers ensures that before we begin creating init containers, we have reduced the number
+// of outstanding init containers still present. This reduces load on the container garbage collector
+// by only preserving the most recent terminated init container.
+func (m *kubeGenericRuntimeManager) pruneInitContainersBeforeStart(pod *api.Pod, podStatus *kubecontainer.PodStatus, initContainersToKeep map[kubecontainer.ContainerID]int) {
+	// only the last execution of each init container should be preserved, and only preserve it if it is in the
+	// list of init containers to keep.
+	initContainerNames := sets.NewString()
+	for _, container := range pod.Spec.InitContainers {
+		initContainerNames.Insert(container.Name)
+	}
+	for name := range initContainerNames {
+		count := 0
+		for _, status := range podStatus.ContainerStatuses {
+			if status.Name != name || !initContainerNames.Has(status.Name) || status.State != kubecontainer.ContainerStateExited {
+				continue
+			}
+			count++
+			// keep the first init container for this name
+			if count == 1 {
+				continue
+			}
+			// if there is a reason to preserve the older container, do so
+			if _, ok := initContainersToKeep[status.ID]; ok {
+				continue
+			}
+
+			// prune all other init containers that match this container name
+			glog.V(4).Infof("Removing init container %q instance %q %d", status.Name, status.ID.ID, count)
+			if err := m.runtimeService.RemoveContainer(status.ID.ID); err != nil {
+				utilruntime.HandleError(fmt.Errorf("failed to remove pod init container %q: %v; Skipping pod %q", status.Name, err, format.Pod(pod)))
+				continue
+			}
+
+			// remove any references to this container
+			if _, ok := m.containerRefManager.GetRef(status.ID); ok {
+				m.containerRefManager.ClearRef(status.ID)
+			} else {
+				glog.Warningf("No ref for container '%q'", status.ID)
+			}
+		}
+	}
+}
+
+// findActiveInitContainer returns the status of the last failed container, the next init container to
+// start, or done if there are no further init containers. Status is only returned if an init container
+// failed, in which case next will point to the current container.
+func findActiveInitContainer(pod *api.Pod, podStatus *kubecontainer.PodStatus) (next *api.Container, status *kubecontainer.ContainerStatus, done bool) {
+	if len(pod.Spec.InitContainers) == 0 {
+		return nil, nil, true
+	}
+
+	for i := len(pod.Spec.InitContainers) - 1; i >= 0; i-- {
+		container := &pod.Spec.InitContainers[i]
+		status := podStatus.FindContainerStatusByName(container.Name)
+		switch {
+		case status == nil:
+			continue
+		case status.State == kubecontainer.ContainerStateRunning:
+			return nil, nil, false
+		case status.State == kubecontainer.ContainerStateExited:
+			switch {
+			// the container has failed, we'll have to retry
+			case status.ExitCode != 0:
+				return &pod.Spec.InitContainers[i], status, false
+			// all init containers successful
+			case i == (len(pod.Spec.InitContainers) - 1):
+				return nil, nil, true
+			// all containers up to i successful, go to i+1
+			default:
+				return &pod.Spec.InitContainers[i+1], nil, false
+			}
+		}
+	}
+
+	return &pod.Spec.InitContainers[0], nil, false
 }
 
 // AttachContainer attaches to the container's console
