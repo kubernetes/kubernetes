@@ -163,7 +163,7 @@ type GenericAPIServer struct {
 	// PostStartHooks are each called after the server has started listening, in a separate go func for each
 	// with no guaranteee of ordering between them.  The map key is a name used for error reporting.
 	// It may kill the process with a panic if it wishes to by returning an error
-	PostStartHooks       map[string]PostStartHookFunc
+	postStartHooks       map[string]PostStartHookFunc
 	postStartHookLock    sync.Mutex
 	postStartHooksCalled bool
 	openAPIDefinitions   *common.OpenAPIDefinitions
