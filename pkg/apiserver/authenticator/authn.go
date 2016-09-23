@@ -30,12 +30,14 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/basicauth"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/union"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/x509"
+	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/anytoken"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/oidc"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/tokenfile"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/webhook"
 )
 
 type AuthenticatorConfig struct {
+	AnyToken                    bool
 	BasicAuthFile               string
 	ClientCAFile                string
 	TokenAuthFile               string
@@ -117,6 +119,11 @@ func New(config AuthenticatorConfig) (authenticator.Request, error) {
 			return nil, err
 		}
 		authenticators = append(authenticators, webhookTokenAuth)
+	}
+
+	// always add anytoken last, so that every other token authenticator gets to try first
+	if config.AnyToken {
+		authenticators = append(authenticators, bearertoken.New(anytoken.AnyTokenAuthenticator{}))
 	}
 
 	switch len(authenticators) {
