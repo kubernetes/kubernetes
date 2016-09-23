@@ -127,17 +127,20 @@ function mvfolder {
     local src_package="${src##*/}"
     local dst_package="${dst##*/}"
     find "${CLIENT_REPO}" -type f -name "*.go" -print0 | xargs -0 sed -i "s,package ${src_package},package ${dst_package},g"
-    # rewrite imports
-    # the first rule is to convert import lines like `restclient "k8s.io/client-go/pkg/client/restclient"`,
-    # where a package alias is the same the package name.
-    find "${CLIENT_REPO}" -type f -name "*.go" -print0 | \
-        xargs -0 sed -i "s,\<${src_package} \"${CLIENT_REPO_FROM_SRC}/${src},${dst_package} \"${CLIENT_REPO_FROM_SRC}/${dst},g"
-    find "${CLIENT_REPO}" -type f -name "*.go" -print0 | \
-        xargs -0 sed -i "s,\"${CLIENT_REPO_FROM_SRC}/${src},\"${CLIENT_REPO_FROM_SRC}/${dst},g"
-    # rewrite import invocation
-    if [ "${src_package}" != "${dst_package}" ]; then
-        find "${CLIENT_REPO}" -type f -name "*.go" -print0 | xargs -0 sed -i "s,\^${src_package}\.\([a-zA-Z]\),${dst_package}\.\1,g"
-    fi
+
+    set -x
+    grep -Rl "\"${CLIENT_REPO_FROM_SRC}/${src}\"" "${CLIENT_REPO}" | while read target ; do
+        # rewrite imports
+        # the first rule is to convert import lines like `restclient "k8s.io/client-go/pkg/client/restclient"`,
+        # where a package alias is the same the package name.
+        sed -i "s,\^${src_package} \"${CLIENT_REPO_FROM_SRC}/${src},${dst_package} \"${CLIENT_REPO_FROM_SRC}/${dst},g" ${target}
+        sed -i "s,\"${CLIENT_REPO_FROM_SRC}/${src},\"${CLIENT_REPO_FROM_SRC}/${dst},g" ${target}
+        # rewrite import invocation
+        if [ "${src_package}" != "${dst_package}" ]; then
+            sed -i "s,\<${src_package}\.\([a-zA-Z]\),${dst_package}\.\1,g" ${target}
+        fi
+    done
+    set +x
 }
 
 mvfolder pkg/client/clientset_generated/release_1_4 kubernetes
