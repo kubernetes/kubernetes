@@ -149,3 +149,19 @@ func (c *PodClient) mungeSpec(pod *api.Pod) {
 }
 
 // TODO(random-liu): Move pod wait function into this file
+// WaitForSuccess waits for pod to success.
+func (c *PodClient) WaitForSuccess(name string, timeout time.Duration) {
+	f := c.f
+	Expect(waitForPodCondition(f.Client, f.Namespace.Name, name, "success or failure", timeout,
+		func(pod *api.Pod) (bool, error) {
+			switch pod.Status.Phase {
+			case api.PodFailed:
+				return true, fmt.Errorf("pod %q failed with reason: %q, message: %q", name, pod.Status.Reason, pod.Status.Message)
+			case api.PodSucceeded:
+				return true, nil
+			default:
+				return false, nil
+			}
+		},
+	)).To(Succeed(), "wait for pod %q to success", name)
+}
