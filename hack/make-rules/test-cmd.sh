@@ -2069,7 +2069,7 @@ __EOF__
   kube::test::get_object_assert deployment "{{range.items}}{{$deployment_image_field}}:{{end}}" "${IMAGE_DEPLOYMENT_R1}:"
   kube::test::get_object_assert deployment "{{range.items}}{{$deployment_second_image_field}}:{{end}}" "${IMAGE_PERL}:"
   # Get image of a deployment
-  output_message=$(! kubectl view image 'nginx-deployment')
+  output_message=$(! kubectl view image deployment/nginx-deployment)
   # Post condition: both images are listed
   kube::test::if_has_string "${output_message}" "${IMAGE_DEPLOYMENT_R1}\n${IMAGE_PERL}"
   # Clean up
