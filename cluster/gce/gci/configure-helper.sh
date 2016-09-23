@@ -1120,6 +1120,13 @@ function start-rescheduler {
   fi
 }
 
+# Setup working directory for kubelet.
+function setup-kubelet-dir {
+    echo "Making /var/lib/kubelet executable for kubelet"
+    mount --bind /var/lib/kubelet /var/lib/kubelet/
+    mount -B -o remount,exec,suid,dev /var/lib/kubelet    
+}
+
 function reset-motd {
   # kubelet is installed both on the master and nodes, and the version is easy to parse (unlike kubectl)
   local -r version="$("${KUBE_HOME}"/bin/kubelet --version=true | cut -f2 -d " ")"
@@ -1177,6 +1184,7 @@ fi
 
 config-ip-firewall
 create-dirs
+setup-kubelet-dir
 ensure-local-ssds
 setup-logrotate
 if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
