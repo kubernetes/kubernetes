@@ -248,10 +248,7 @@ func getListenersByLoadBalancerID(client *gophercloud.ServiceClient, id string) 
 		if err != nil {
 			return false, err
 		}
-
-		for _, listener := range listenerList {
-			existingListeners = append(existingListeners, listener)
-		}
+		existingListeners = append(existingListeners, listenerList...)
 
 		return true, nil
 	})
@@ -316,10 +313,7 @@ func getMembersByPoolID(client *gophercloud.ServiceClient, id string) ([]v2_pool
 		if err != nil {
 			return false, err
 		}
-
-		for _, member := range membersList {
-			members = append(members, member)
-		}
+		members = append(members, membersList...)
 
 		return true, nil
 	})
@@ -383,11 +377,9 @@ func memberExists(members []v2_pools.Member, addr string) (bool) {
 func popListener(existingListeners []listeners.Listener, id string) ([]listeners.Listener) {
 	for i, existingListener := range existingListeners {
 		if existingListener.ID == id {
-			if i == len(existingListeners) {
-				existingListeners = existingListeners[:i]
-			} else {
-				existingListeners = append(existingListeners[:i], existingListeners[i+1:]...)
-			}
+			listeners[i] = listeners[len(listeners)-1]
+			listeners = listeners[:len(listeners)-1]
+			break
 		}
 	}
 
@@ -397,11 +389,8 @@ func popListener(existingListeners []listeners.Listener, id string) ([]listeners
 func popMember(members []v2_pools.Member, addr string) ([]v2_pools.Member) {
 	for i, member := range members {
 		if member.Address == addr {
-			if i == len(members) {
-				members = members[:i]
-			} else {
-				members = append(members[:i], members[i+1:]...)
-			}
+			members[i] = members[len(members)-1]
+			members = members[:len(members)-1]
 		}
 	}
 
