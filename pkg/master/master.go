@@ -348,8 +348,10 @@ func (m *Master) InstallAPIs(c *Config) {
 		apiGroupsInfo = append(apiGroupsInfo, apiGroupInfo)
 	}
 
-	if err := m.InstallAPIGroups(apiGroupsInfo); err != nil {
-		glog.Fatalf("Error in registering group versions: %v", err)
+	for i := range apiGroupsInfo {
+		if err := m.InstallAPIGroup(&apiGroupsInfo[i]); err != nil {
+			glog.Fatalf("Error in registering group versions: %v", err)
+		}
 	}
 }
 
