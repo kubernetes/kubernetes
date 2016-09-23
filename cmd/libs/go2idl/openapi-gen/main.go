@@ -20,7 +20,9 @@ limitations under the License.
 package main
 
 import (
-	"k8s.io/kubernetes/cmd/libs/go2idl/args"
+	"path/filepath"
+
+	"k8s.io/gengo/args"
 	"k8s.io/kubernetes/cmd/libs/go2idl/openapi-gen/generators"
 
 	"github.com/golang/glog"
@@ -31,6 +33,7 @@ func main() {
 
 	// Override defaults.
 	arguments.OutputFileBaseName = "openapi_generated"
+	arguments.GoHeaderFilePath = filepath.Join(args.DefaultSourceTree(), "k8s.io/kubernetes/hack/boilerplate/boilerplate.go.txt")
 
 	// Run it.
 	if err := arguments.Execute(
