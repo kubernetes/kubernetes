@@ -455,7 +455,7 @@ runtime-config
 runtime-integration-type
 runtime-request-timeout
 save-config
-schedule-workload
+schedule-pods-here
 scheduler-config
 scheduler-name
 schema-cache-dir

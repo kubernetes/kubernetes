@@ -29,10 +29,10 @@ default behaviour. The flags used for said purpose are described below.
 
   By default, `kubeadm` sets `cluster.local` as the cluster DNS domain. If you would like to set a different one, use `--service-dns-domain`.
 
-- `--schedule-workload=<bool>` (default: "false")
+- `--schedule-pods-here=<bool>` (default: "false")
 
   By default, `kubeadm` sets the master node kubelet as non-schedulable for workloads. This means the master node won't run your pods. If you want to change that,
-  use `--schedule-workload=true`.
+  use `--schedule-pods-here=true`.
 
 - `--cloud-provider=<cloud provider>`
 

@@ -83,7 +83,7 @@ func NewCmdInit(out io.Writer, s *kubeadmapi.KubeadmConfig) *cobra.Command {
 		`(optional) Enable a specific cloud provider features (external load-balancers, storage, etc), e.g. "gce"`,
 	)
 	cmd.PersistentFlags().BoolVar(
-		&s.InitFlags.Schedulable, "schedule-workload", false,
+		&s.InitFlags.Schedulable, "schedule-pods-here", false,
 		`(optional) Allow to schedule workload to the node`,
 	)
 
