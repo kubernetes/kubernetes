@@ -55,6 +55,31 @@ import (
 	"k8s.io/kubernetes/pkg/healthz"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master/ports"
+
+	"k8s.io/kubernetes/pkg/registry/generic"
+	"k8s.io/kubernetes/pkg/registry/generic/registry"
+	"k8s.io/kubernetes/pkg/routes"
+	"k8s.io/kubernetes/pkg/runtime"
+	etcdutil "k8s.io/kubernetes/pkg/storage/etcd/util"
+	"k8s.io/kubernetes/pkg/storage/storagebackend"
+	"k8s.io/kubernetes/pkg/util/sets"
+
+	"github.com/golang/glog"
+	"github.com/prometheus/client_golang/prometheus"
+
+	// RESTStorage installers
+	appsrest "k8s.io/kubernetes/pkg/registry/apps/rest"
+	authenticationrest "k8s.io/kubernetes/pkg/registry/authentication/rest"
+	authorizationrest "k8s.io/kubernetes/pkg/registry/authorization/rest"
+	autoscalingrest "k8s.io/kubernetes/pkg/registry/autoscaling/rest"
+	batchrest "k8s.io/kubernetes/pkg/registry/batch/rest"
+	certificatesrest "k8s.io/kubernetes/pkg/registry/certificates/rest"
+	extensionsrest "k8s.io/kubernetes/pkg/registry/extensions/rest"
+	policyrest "k8s.io/kubernetes/pkg/registry/policy/rest"
+	rbacrest "k8s.io/kubernetes/pkg/registry/rbac/rest"
+	storagerest "k8s.io/kubernetes/pkg/registry/storage/rest"
+
+	// direct etcd registry dependencies
 	controlleretcd "k8s.io/kubernetes/pkg/registry/controller/etcd"
 	"k8s.io/kubernetes/pkg/registry/core/componentstatus"
 	configmapetcd "k8s.io/kubernetes/pkg/registry/core/configmap/etcd"
@@ -82,17 +107,6 @@ import (
 	serviceaccountetcd "k8s.io/kubernetes/pkg/registry/core/serviceaccount/etcd"
 	"k8s.io/kubernetes/pkg/registry/extensions/thirdpartyresourcedata"
 	thirdpartyresourcedataetcd "k8s.io/kubernetes/pkg/registry/extensions/thirdpartyresourcedata/etcd"
-	"k8s.io/kubernetes/pkg/registry/generic"
-	"k8s.io/kubernetes/pkg/registry/generic/registry"
-	rbacstorage "k8s.io/kubernetes/pkg/registry/rbac/storage"
-	"k8s.io/kubernetes/pkg/routes"
-	"k8s.io/kubernetes/pkg/runtime"
-	etcdutil "k8s.io/kubernetes/pkg/storage/etcd/util"
-	"k8s.io/kubernetes/pkg/storage/storagebackend"
-	"k8s.io/kubernetes/pkg/util/sets"
-
-	"github.com/golang/glog"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 const (
@@ -224,19 +238,19 @@ func New(c *Config) (*Master, error) {
 	if c.RESTStorageProviders == nil {
 		c.RESTStorageProviders = map[string]genericapiserver.RESTStorageProvider{}
 	}
-	c.RESTStorageProviders[appsapi.GroupName] = AppsRESTStorageProvider{}
-	c.RESTStorageProviders[autoscaling.GroupName] = AutoscalingRESTStorageProvider{}
-	c.RESTStorageProviders[batch.GroupName] = BatchRESTStorageProvider{}
-	c.RESTStorageProviders[certificates.GroupName] = CertificatesRESTStorageProvider{}
-	c.RESTStorageProviders[extensions.GroupName] = ExtensionsRESTStorageProvider{
+	c.RESTStorageProviders[appsapi.GroupName] = appsrest.RESTStorageProvider{}
+	c.RESTStorageProviders[authenticationv1beta1.GroupName] = authenticationrest.RESTStorageProvider{Authenticator: c.Authenticator}
+	c.RESTStorageProviders[authorization.GroupName] = authorizationrest.RESTStorageProvider{Authorizer: c.Authorizer}
+	c.RESTStorageProviders[autoscaling.GroupName] = autoscalingrest.RESTStorageProvider{}
+	c.RESTStorageProviders[batch.GroupName] = batchrest.RESTStorageProvider{}
+	c.RESTStorageProviders[certificates.GroupName] = certificatesrest.RESTStorageProvider{}
+	c.RESTStorageProviders[extensions.GroupName] = extensionsrest.RESTStorageProvider{
 		ResourceInterface:                     m,
 		DisableThirdPartyControllerForTesting: m.disableThirdPartyControllerForTesting,
 	}
-	c.RESTStorageProviders[policy.GroupName] = PolicyRESTStorageProvider{}
-	c.RESTStorageProviders[rbac.GroupName] = &rbacstorage.RESTStorageProvider{AuthorizerRBACSuperUser: c.AuthorizerRBACSuperUser}
-	c.RESTStorageProviders[storage.GroupName] = StorageRESTStorageProvider{}
-	c.RESTStorageProviders[authenticationv1beta1.GroupName] = AuthenticationRESTStorageProvider{Authenticator: c.Authenticator}
-	c.RESTStorageProviders[authorization.GroupName] = AuthorizationRESTStorageProvider{Authorizer: c.Authorizer}
+	c.RESTStorageProviders[policy.GroupName] = policyrest.RESTStorageProvider{}
+	c.RESTStorageProviders[rbac.GroupName] = &rbacrest.RESTStorageProvider{AuthorizerRBACSuperUser: c.AuthorizerRBACSuperUser}
+	c.RESTStorageProviders[storage.GroupName] = storagerest.RESTStorageProvider{}
 	m.InstallAPIs(c)
 
 	// TODO: Attempt clean shutdown?
@@ -566,7 +580,7 @@ func (m *Master) HasThirdPartyResource(rsrc *extensions.ThirdPartyResource) (boo
 	if err != nil {
 		return false, err
 	}
-	path := makeThirdPartyPath(group)
+	path := extensionsrest.MakeThirdPartyPath(group)
 	m.thirdPartyResourcesLock.Lock()
 	defer m.thirdPartyResourcesLock.Unlock()
 	entry := m.thirdPartyResources[path]
@@ -599,7 +613,7 @@ func (m *Master) removeThirdPartyStorage(path, resource string) error {
 	delete(entry.storage, resource)
 	if len(entry.storage) == 0 {
 		delete(m.thirdPartyResources, path)
-		m.RemoveAPIGroupForDiscovery(getThirdPartyGroupName(path))
+		m.RemoveAPIGroupForDiscovery(extensionsrest.GetThirdPartyGroupName(path))
 	} else {
 		m.thirdPartyResources[path] = entry
 	}
@@ -720,7 +734,7 @@ func (m *Master) InstallThirdPartyResource(rsrc *extensions.ThirdPartyResource) 
 		Version: rsrc.Versions[0].Name,
 		Kind:    kind,
 	})
-	path := makeThirdPartyPath(group)
+	path := extensionsrest.MakeThirdPartyPath(group)
 
 	groupVersion := unversioned.GroupVersionForDiscovery{
 		GroupVersion: group + "/" + rsrc.Versions[0].Name,
@@ -770,7 +784,7 @@ func (m *Master) thirdpartyapi(group, kind, version, pluralResource string) *api
 	internalVersion := unversioned.GroupVersion{Group: group, Version: runtime.APIVersionInternal}
 	externalVersion := unversioned.GroupVersion{Group: group, Version: version}
 
-	apiRoot := makeThirdPartyPath("")
+	apiRoot := extensionsrest.MakeThirdPartyPath("")
 	return &apiserver.APIGroupVersion{
 		Root:                apiRoot,
 		GroupVersion:        externalVersion,
@@ -793,7 +807,7 @@ func (m *Master) thirdpartyapi(group, kind, version, pluralResource string) *api
 
 		MinRequestTimeout: m.MinRequestTimeout(),
 
-		ResourceLister: dynamicLister{m, makeThirdPartyPath(group)},
+		ResourceLister: dynamicLister{m, extensionsrest.MakeThirdPartyPath(group)},
 	}
 }
 
