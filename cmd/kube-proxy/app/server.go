@@ -71,6 +71,7 @@ const (
 	proxyModeIPTables               = "iptables"
 	experimentalProxyModeAnnotation = options.ExperimentalProxyModeAnnotation
 	betaProxyModeAnnotation         = "net.beta.kubernetes.io/proxy-mode"
+	minConntrackMax                 = 256 * 1024
 )
 
 func checkKnownProxyMode(proxyMode string) bool {
@@ -338,10 +339,16 @@ func getConntrackMax(config *options.ProxyServerConfig) (int, error) {
 	if config.ConntrackMax > 0 && config.ConntrackMaxPerCore > 0 {
 		return -1, fmt.Errorf("invalid config: ConntrackMax and ConntrackMaxPerCore are mutually exclusive")
 	}
+
 	if config.ConntrackMax > 0 {
+		// Always respect specified conntrackMax
 		return int(config.ConntrackMax), nil
 	} else if config.ConntrackMaxPerCore > 0 {
-		return (int(config.ConntrackMaxPerCore) * runtime.NumCPU()), nil
+		conntrackMax := (int(config.ConntrackMaxPerCore) * runtime.NumCPU())
+		if conntrackMax < minConntrackMax {
+			conntrackMax = minConntrackMax
+		}
+		return conntrackMax, nil
 	}
 	return 0, nil
 }
