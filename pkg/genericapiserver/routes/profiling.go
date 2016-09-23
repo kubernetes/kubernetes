@@ -26,6 +26,7 @@ import (
 // Profiling adds handlers for pprof under /debug/pprof.
 type Profiling struct{}
 
+// Install adds the Profiling webservice to the given mux.
 func (d Profiling) Install(mux *apiserver.PathRecorderMux, c *restful.Container) {
 	mux.BaseMux().HandleFunc("/debug/pprof/", pprof.Index)
 	mux.BaseMux().HandleFunc("/debug/pprof/profile", pprof.Profile)

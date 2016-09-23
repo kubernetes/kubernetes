@@ -41,12 +41,15 @@ func init() {
 	prometheus.MustRegister(authenticatedUserCounter)
 }
 
-// NewRequestAuthenticator creates an http handler that tries to authenticate the given request as a user, and then
+// WithAuthentication creates an http handler that tries to authenticate the given request as a user, and then
 // stores any such user found onto the provided context for the request. If authentication fails or returns an error
 // the failed handler is used. On success, handler is invoked to serve the request.
-func NewRequestAuthenticator(mapper api.RequestContextMapper, auth authenticator.Request, failed http.Handler, handler http.Handler) (http.Handler, error) {
-	return api.NewRequestContextFilter(
-		mapper,
+func WithAuthentication(handler http.Handler, mapper api.RequestContextMapper, auth authenticator.Request, failed http.Handler) http.Handler {
+	if auth == nil {
+		glog.Warningf("Authentication is disabled")
+		return handler
+	}
+	return api.WithRequestContext(
 		http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			user, ok, err := auth.AuthenticateRequest(req)
 			if err != nil || !ok {
@@ -65,6 +68,7 @@ func NewRequestAuthenticator(mapper api.RequestContextMapper, auth authenticator
 
 			handler.ServeHTTP(w, req)
 		}),
+		mapper,
 	)
 }
 
