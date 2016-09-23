@@ -239,7 +239,7 @@ func (ds *dockerService) ContainerStatus(containerID string) (*runtimeApi.Contai
 	}
 	// Interpret container states.
 	var state runtimeApi.ContainerState
-	var reason string
+	var reason, message string
 	if r.State.Running {
 		// Container is running.
 		state = runtimeApi.ContainerState_RUNNING
@@ -261,7 +261,8 @@ func (ds *dockerService) ContainerStatus(containerID string) (*runtimeApi.Contai
 			case r.State.ExitCode == 0:
 				reason = "Completed"
 			default:
-				reason = fmt.Sprintf("Error: %s", r.State.Error)
+				reason = "Error"
+				message = r.State.Error
 			}
 		} else if !finishedAt.IsZero() && r.State.ExitCode != 0 { // Case 2
 			state = runtimeApi.ContainerState_EXITED
@@ -296,6 +297,7 @@ func (ds *dockerService) ContainerStatus(containerID string) (*runtimeApi.Contai
 		StartedAt:   &st,
 		FinishedAt:  &ft,
 		Reason:      &reason,
+		Message:     &message,
 		Labels:      labels,
 		Annotations: annotations,
 	}, nil
