@@ -77,54 +77,6 @@ func toKubeContainerState(state runtimeApi.ContainerState) kubecontainer.Contain
 	return kubecontainer.ContainerStateUnknown
 }
 
-// sandboxToKubeContainerState converts runtimeApi.PodSandboxState to
-// kubecontainer.ContainerState.
-// This is only needed because we need to return sandboxes as if they were
-// kubecontainer.Containers to avoid substantial changes to PLEG.
-// TODO: Remove this once it becomes obsolete.
-func sandboxToKubeContainerState(state runtimeApi.PodSandBoxState) kubecontainer.ContainerState {
-	switch state {
-	case runtimeApi.PodSandBoxState_READY:
-		return kubecontainer.ContainerStateRunning
-	case runtimeApi.PodSandBoxState_NOTREADY:
-		return kubecontainer.ContainerStateExited
-	}
-	return kubecontainer.ContainerStateUnknown
-}
-
-// TODO(random-liu): Convert PodStatus to running Pod, should be deprecated soon
-func ConvertPodStatusToRunningPod(runtimeName string, podStatus *kubecontainer.PodStatus) kubecontainer.Pod {
-	runningPod := kubecontainer.Pod{
-		ID:        podStatus.ID,
-		Name:      podStatus.Name,
-		Namespace: podStatus.Namespace,
-	}
-	for _, containerStatus := range podStatus.ContainerStatuses {
-		if containerStatus.State != kubecontainer.ContainerStateRunning {
-			continue
-		}
-		container := &kubecontainer.Container{
-			ID:      containerStatus.ID,
-			Name:    containerStatus.Name,
-			Image:   containerStatus.Image,
-			ImageID: containerStatus.ImageID,
-			Hash:    containerStatus.Hash,
-			State:   containerStatus.State,
-		}
-		runningPod.Containers = append(runningPod.Containers, container)
-	}
-
-	// Need to place a sandbox in the Pod as well.
-	for _, sandbox := range podStatus.SandboxStatuses {
-		runningPod.Sandboxes = append(runningPod.Sandboxes, &kubecontainer.Container{
-			ID:    kubecontainer.ContainerID{Type: runtimeName, ID: *sandbox.Id},
-			State: sandboxToKubeContainerState(*sandbox.State),
-		})
-	}
-
-	return runningPod
-}
-
 // toRuntimeProtocol converts api.Protocol to runtimeApi.Protocol.
 func toRuntimeProtocol(protocol api.Protocol) runtimeApi.Protocol {
 	switch protocol {
@@ -166,7 +118,7 @@ func (m *kubeGenericRuntimeManager) sandboxToKubeContainer(s *runtimeApi.PodSand
 
 	return &kubecontainer.Container{
 		ID:    kubecontainer.ContainerID{Type: m.runtimeName, ID: s.GetId()},
-		State: sandboxToKubeContainerState(s.GetState()),
+		State: kubecontainer.SandboxToContainerState(s.GetState()),
 	}, nil
 }
 
