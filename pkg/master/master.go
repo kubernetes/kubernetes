@@ -80,9 +80,9 @@ import (
 	storagerest "k8s.io/kubernetes/pkg/registry/storage/rest"
 
 	// direct etcd registry dependencies
-	controlleretcd "k8s.io/kubernetes/pkg/registry/controller/etcd"
 	"k8s.io/kubernetes/pkg/registry/core/componentstatus"
 	configmapetcd "k8s.io/kubernetes/pkg/registry/core/configmap/etcd"
+	controlleretcd "k8s.io/kubernetes/pkg/registry/core/controller/etcd"
 	"k8s.io/kubernetes/pkg/registry/core/endpoint"
 	endpointsetcd "k8s.io/kubernetes/pkg/registry/core/endpoint/etcd"
 	eventetcd "k8s.io/kubernetes/pkg/registry/core/event/etcd"
