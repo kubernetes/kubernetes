@@ -22,6 +22,7 @@ import (
 
 	_ "k8s.io/client-go/1.5/pkg/api/install"
 	"k8s.io/client-go/1.5/pkg/apimachinery/registered"
+	_ "k8s.io/client-go/1.5/pkg/apis/apps/install"
 	_ "k8s.io/client-go/1.5/pkg/apis/authorization/install"
 	_ "k8s.io/client-go/1.5/pkg/apis/autoscaling/install"
 	_ "k8s.io/client-go/1.5/pkg/apis/batch/install"
