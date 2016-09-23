@@ -21,11 +21,11 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/workqueue"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
+	priorityutil "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities/util"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
@@ -41,20 +41,17 @@ const zoneWeighting = 2.0 / 3.0
 type SelectorSpread struct {
 	podLister        algorithm.PodLister
 	serviceLister    algorithm.ServiceLister
-	controllerLister algorithm.ControllerLister
-	replicaSetLister algorithm.ReplicaSetLister
+	useControllerRef bool
 }
 
 func NewSelectorSpreadPriority(
 	podLister algorithm.PodLister,
 	serviceLister algorithm.ServiceLister,
-	controllerLister algorithm.ControllerLister,
-	replicaSetLister algorithm.ReplicaSetLister) algorithm.PriorityFunction {
+	useControllerRef bool) algorithm.PriorityFunction {
 	selectorSpread := &SelectorSpread{
 		podLister:        podLister,
 		serviceLister:    serviceLister,
-		controllerLister: controllerLister,
-		replicaSetLister: replicaSetLister,
+		useControllerRef: useControllerRef,
 	}
 	return selectorSpread.CalculateSpreadPriority
 }
@@ -72,16 +69,16 @@ func (s *SelectorSpread) CalculateSpreadPriority(pod *api.Pod, nodeNameToInfo ma
 			selectors = append(selectors, labels.SelectorFromSet(service.Spec.Selector))
 		}
 	}
-	if rcs, err := s.controllerLister.GetPodControllers(pod); err == nil {
-		for _, rc := range rcs {
-			selectors = append(selectors, labels.SelectorFromSet(rc.Spec.Selector))
+	controllerRef := priorityutil.GetControllerRef(pod)
+	if controllerRef != nil {
+		// Ignore pods that are owned by other controller than ReplicationController
+		// or ReplicaSet.
+		if controllerRef.Kind != "ReplicationController" && controllerRef.Kind != "ReplicaSet" {
+			controllerRef = nil
 		}
-	}
-	if rss, err := s.replicaSetLister.GetPodReplicaSets(pod); err == nil {
-		for _, rs := range rss {
-			if selector, err := unversioned.LabelSelectorAsSelector(rs.Spec.Selector); err == nil {
-				selectors = append(selectors, selector)
-			}
+		// Ignore controllers is useControllerRef is not set.
+		if !s.useControllerRef {
+			controllerRef = nil
 		}
 	}
 
@@ -91,7 +88,7 @@ func (s *SelectorSpread) CalculateSpreadPriority(pod *api.Pod, nodeNameToInfo ma
 	maxCountByNodeName := float32(0)
 	countsByNodeNameLock := sync.Mutex{}
 
-	if len(selectors) > 0 {
+	if len(selectors) > 0 || controllerRef != nil {
 		processNodeFunc := func(i int) {
 			nodeName := nodes[i].Name
 			count := float32(0)
@@ -107,11 +104,23 @@ func (s *SelectorSpread) CalculateSpreadPriority(pod *api.Pod, nodeNameToInfo ma
 					glog.V(4).Infof("skipping pending-deleted pod: %s/%s", nodePod.Namespace, nodePod.Name)
 					continue
 				}
+
 				matches := false
-				for _, selector := range selectors {
-					if selector.Matches(labels.Set(nodePod.ObjectMeta.Labels)) {
+				existingControllerRef := priorityutil.GetControllerRef(nodePod)
+				if controllerRef != nil && existingControllerRef != nil {
+					// If both pods are controller by the same controller, they match.
+					if controllerRef.Kind == existingControllerRef.Kind &&
+						controllerRef.Name == existingControllerRef.Name &&
+						controllerRef.UID == existingControllerRef.UID {
 						matches = true
-						break
+					}
+				}
+				if !matches {
+					for _, selector := range selectors {
+						if selector.Matches(labels.Set(nodePod.ObjectMeta.Labels)) {
+							matches = true
+							break
+						}
 					}
 				}
 				if matches {
