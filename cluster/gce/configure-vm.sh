@@ -954,7 +954,6 @@ EOF
   if [[ ! -z "${KUBELET_APISERVER:-}" ]] && [[ ! -z "${KUBELET_CERT:-}" ]] && [[ ! -z "${KUBELET_KEY:-}" ]]; then
     cat <<EOF >>/etc/salt/minion.d/grains.conf
   kubelet_api_servers: '${KUBELET_APISERVER}'
-  cbr-cidr: 10.123.45.0/29
 EOF
   else
     # If the kubelet is running disconnected from a master, give it a fixed
@@ -973,7 +972,6 @@ function salt-node-role() {
 grains:
   roles:
     - kubernetes-pool
-  cbr-cidr: 10.123.45.0/29
   cloud: gce
   api_servers: '${KUBERNETES_MASTER_NAME}'
 EOF
