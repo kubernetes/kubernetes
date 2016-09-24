@@ -111,10 +111,10 @@ func CreateDiscoveryDeploymentAndSecret(s *kubeadmapi.KubeadmConfig, client *cli
 	kd := newKubeDiscovery(s, caCert)
 
 	if _, err := client.Extensions().Deployments(api.NamespaceSystem).Create(kd.Deployment); err != nil {
-		return fmt.Errorf("<master/discovery> failed to create %q deployment [%s]", kubeDiscoveryName, err)
+		return fmt.Errorf("<master/discovery> failed to create %q deployment [%v]", kubeDiscoveryName, err)
 	}
 	if _, err := client.Secrets(api.NamespaceSystem).Create(kd.Secret); err != nil {
-		return fmt.Errorf("<master/discovery> failed to create %q secret [%s]", kubeDiscoverySecretName, err)
+		return fmt.Errorf("<master/discovery> failed to create %q secret [%v]", kubeDiscoverySecretName, err)
 	}
 
 	fmt.Println("<master/discovery> created essential addon: kube-discovery, waiting for it to become ready")

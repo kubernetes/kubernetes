@@ -54,7 +54,7 @@ func NewCmdJoin(out io.Writer, s *kubeadmapi.KubeadmConfig) *cobra.Command {
 
 	cmd.PersistentFlags().StringVar(
 		&s.Secrets.GivenToken, "token", "",
-		`Shared secret used to secure bootstrap. Must match the output of 'kubeadm init'.`,
+		"(required) Shared secret used to secure bootstrap. Must match the output of 'kubeadm init'",
 	)
 
 	return cmd
@@ -77,7 +77,7 @@ func RunJoin(out io.Writer, cmd *cobra.Command, args []string, s *kubeadmapi.Kub
 	ok, err := kubeadmutil.UseGivenTokenIfValid(s)
 	if !ok {
 		if err != nil {
-			return fmt.Errorf("<cmd/join> %s (see --help)\n", err)
+			return fmt.Errorf("<cmd/join> %v (see --help)\n", err)
 		}
 		return fmt.Errorf("Must specify --token (see --help)\n")
 	}

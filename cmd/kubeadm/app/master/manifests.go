@@ -33,8 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
-// Static pod definitions in golang form are included below so that `kubeadm
-// init master` and `kubeadm manual bootstrap master` can get going.
+// Static pod definitions in golang form are included below so that `kubeadm init` can get going.
 
 const (
 	DefaultClusterName     = "kubernetes"
@@ -110,16 +109,16 @@ func WriteStaticPodManifests(s *kubeadmapi.KubeadmConfig) error {
 
 	manifestsPath := path.Join(s.EnvParams["kubernetes_dir"], "manifests")
 	if err := os.MkdirAll(manifestsPath, 0700); err != nil {
-		return fmt.Errorf("<master/manifests> failed to create directory %q [%s]", manifestsPath, err)
+		return fmt.Errorf("<master/manifests> failed to create directory %q [%v]", manifestsPath, err)
 	}
 	for name, spec := range staticPodSpecs {
 		filename := path.Join(manifestsPath, name+".json")
 		serialized, err := json.MarshalIndent(spec, "", "  ")
 		if err != nil {
-			return fmt.Errorf("<master/manifests> failed to marshall manifest for %q to JSON [%s]", name, err)
+			return fmt.Errorf("<master/manifests> failed to marshall manifest for %q to JSON [%v]", name, err)
 		}
 		if err := cmdutil.DumpReaderToFile(bytes.NewReader(serialized), filename); err != nil {
-			return fmt.Errorf("<master/manifests> failed to create static pod manifest file for %q (%q) [%s]", name, filename, err)
+			return fmt.Errorf("<master/manifests> failed to create static pod manifest file for %q (%q) [%v]", name, filename, err)
 		}
 	}
 	return nil

@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"strings"
 
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
@@ -43,10 +44,10 @@ var (
 
 // NewCmdInit returns "kubeadm init" command.
 func NewCmdInit(out io.Writer, s *kubeadmapi.KubeadmConfig) *cobra.Command {
-	advertiseAddrs := &[]string{}
+	advertiseAddrs := &[]string{} // TODO(pahse1+) make it work somehow else, custom flag or whatever
 	cmd := &cobra.Command{
 		Use:   "init",
-		Short: "Run this on the first machine.",
+		Short: "Run this in order to set up the Kubernetes master.",
 		Run: func(cmd *cobra.Command, args []string) {
 			err := RunInit(out, cmd, args, s, advertiseAddrs)
 			cmdutil.CheckErr(err)
@@ -55,58 +56,58 @@ func NewCmdInit(out io.Writer, s *kubeadmapi.KubeadmConfig) *cobra.Command {
 
 	cmd.PersistentFlags().StringVar(
 		&s.Secrets.GivenToken, "token", "",
-		`(optional) Shared secret used to secure cluster bootstrap. If none is provided, one will be generated for you.`,
+		"Shared secret used to secure cluster bootstrap; if none is provided, one will be generated for you",
 	)
 	cmd.PersistentFlags().StringSliceVar(
 		advertiseAddrs, "api-advertise-addresses", []string{},
-		`(optional) The IP addresses to advertise, in case autodetection fails.`,
+		"The IP addresses to advertise, in case autodetection fails",
 	)
 	cmd.PersistentFlags().StringSliceVar(
 		&s.InitFlags.API.ExternalDNSNames, "api-external-dns-names", []string{},
-		`(optional) The DNS names to advertise, in case you have configured them yourself.`,
+		"The DNS names to advertise, in case you have configured them yourself",
 	)
 	cmd.PersistentFlags().IPNetVar(
 		&s.InitFlags.Services.CIDR, "service-cidr", *kubeadmapi.DefaultServicesCIDR,
-		`(optional) Use alterantive range of IP address for service VIPs, defaults to `+
+		`Use alterantive range of IP address for service VIPs, defaults to `+
 			kubeadmapi.DefaultServicesCIDRString,
 	)
 	cmd.PersistentFlags().IPNetVar(
 		&s.InitFlags.PodNetwork.CIDR, "pod-network-cidr", net.IPNet{},
-		`(optional) Specify range of IP addresses for the pod network. If set, the control plane will automatically allocate CIDRs for every node.`,
+		"Specify range of IP addresses for the pod network; if set, the control plane will automatically allocate CIDRs for every node",
 	)
 	cmd.PersistentFlags().StringVar(
 		&s.InitFlags.Services.DNSDomain, "service-dns-domain", kubeadmapi.DefaultServiceDNSDomain,
-		`(optional) Use alternative domain for services, e.g. "myorg.internal"`,
+		`Use alternative domain for services, e.g. "myorg.internal"`,
 	)
 	cmd.PersistentFlags().StringVar(
 		&s.InitFlags.CloudProvider, "cloud-provider", "",
-		`(optional) Enable a specific cloud provider features (external load-balancers, storage, etc), e.g. "gce"`,
+		`Enable cloud provider features (external load-balancers, storage, etc), e.g. "gce"`,
 	)
 	cmd.PersistentFlags().BoolVar(
 		&s.InitFlags.Schedulable, "schedule-pods-here", false,
-		`(optional) Allow to schedule workload to the node`,
+		`Allow to schedule workload to the node`,
 	)
 	cmd.PersistentFlags().StringVar(
 		&s.InitFlags.Versions.Kubernetes, "use-kubernetes-version", kubeadmapi.DefaultKubernetesVersion,
-		`(optional) Choose a specific Kubernetes version for the control plane`,
+		`Choose a specific Kubernetes version for the control plane`,
 	)
 
 	// TODO (phase1+) @errordeveloper make the flags below not show up in --help but rather on --advanced-help
 	cmd.PersistentFlags().StringSliceVar(
 		&s.InitFlags.API.Etcd.ExternalEndpoints, "external-etcd-endpoints", []string{},
-		`(optional) etcd endpoints to use, in case you have an external cluster.`,
+		"etcd endpoints to use, in case you have an external cluster",
 	)
 	cmd.PersistentFlags().StringVar(
 		&s.InitFlags.API.Etcd.ExternalCAFile, "external-etcd-cafile", "",
-		`(optional) etcd certificate authority certificate file."`,
+		"etcd certificate authority certificate file",
 	)
 	cmd.PersistentFlags().StringVar(
 		&s.InitFlags.API.Etcd.ExternalCertFile, "external-etcd-certfile", "",
-		`(optional) etcd client certificate file."`,
+		"etcd client certificate file",
 	)
 	cmd.PersistentFlags().StringVar(
 		&s.InitFlags.API.Etcd.ExternalKeyFile, "external-etcd-keyfile", "",
-		`(optional) etcd client key file."`,
+		"etcd client key file",
 	)
 
 	return cmd
@@ -126,14 +127,15 @@ func RunInit(out io.Writer, cmd *cobra.Command, args []string, s *kubeadmapi.Kub
 		for _, i := range *advertiseAddrs {
 			addr := net.ParseIP(i)
 			if addr == nil {
-				return fmt.Errorf("<cmd/init> failed to parse flag (%q) as an IP address", "--api-advertise-addresses="+i)
+				// TODO(phase1+) custom flag will help to get this error message into a better place
+				return fmt.Errorf("<cmd/init> failed to parse %q (in %q) as an IP address", "--api-advertise-addresses="+strings.Join(*advertiseAddrs, ","))
 			}
 			s.InitFlags.API.AdvertiseAddrs = append(s.InitFlags.API.AdvertiseAddrs, addr)
 		}
 	}
 
+	// TODO(phase1+) create a custom flag
 	if s.InitFlags.CloudProvider != "" {
-		// TODO(phase2) we should be able to auto-detect it and check whether things like IAM roles are correct
 		if _, ok := kubeadmapi.SupportedCloudProviders[s.InitFlags.CloudProvider]; !ok {
 			return fmt.Errorf("<cmd/init> cloud provider %q is not supported, you can use any of %v, or leave it unset", s.InitFlags.CloudProvider, kubeadmapi.ListOfCloudProviders)
 		}
