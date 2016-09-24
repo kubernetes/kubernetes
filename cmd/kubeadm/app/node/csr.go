@@ -49,12 +49,12 @@ func PerformTLSBootstrap(s *kubeadmapi.KubeadmConfig, apiEndpoint string, caCert
 		&clientcmd.ConfigOverrides{},
 	).ClientConfig()
 	if err != nil {
-		return nil, fmt.Errorf("<node/csr> failed to create API client configuration [%s]", err)
+		return nil, fmt.Errorf("<node/csr> failed to create API client configuration [%v]", err)
 	}
 
 	client, err := unversionedcertificates.NewForConfig(bootstrapClientConfig)
 	if err != nil {
-		return nil, fmt.Errorf("<node/csr> failed to create API client [%s]", err)
+		return nil, fmt.Errorf("<node/csr> failed to create API client [%v]", err)
 	}
 	csrClient := client.CertificateSigningRequests()
 
@@ -63,19 +63,19 @@ func PerformTLSBootstrap(s *kubeadmapi.KubeadmConfig, apiEndpoint string, caCert
 	// (for example user may be bringing up machines in parallel and for some reasons master is slow to boot)
 
 	if err := checkCertsAPI(bootstrapClientConfig); err != nil {
-		return nil, fmt.Errorf("<node/csr> fialed to proceed due to API compatibility issue - %s", err)
+		return nil, fmt.Errorf("<node/csr> fialed to proceed due to API compatibility issue - %v", err)
 	}
 
 	fmt.Println("<node/csr> created API client to obtain unique certificate for this node, generating keys and certificate signing request")
 
 	key, err := certutil.MakeEllipticPrivateKeyPEM()
 	if err != nil {
-		return nil, fmt.Errorf("<node/csr> failed to generating private key [%s]", err)
+		return nil, fmt.Errorf("<node/csr> failed to generating private key [%v]", err)
 	}
 
 	cert, err := csr.RequestNodeCertificate(csrClient, key, nodeName)
 	if err != nil {
-		return nil, fmt.Errorf("<node/csr> failed to request signed certificate from the API server [%s]", err)
+		return nil, fmt.Errorf("<node/csr> failed to request signed certificate from the API server [%v]", err)
 	}
 
 	// TODO(phase1+) print some basic info about the cert
@@ -93,13 +93,13 @@ func checkCertsAPI(config *restclient.Config) error {
 	discoveryClient, err := discovery.NewDiscoveryClientForConfig(config)
 
 	if err != nil {
-		return fmt.Errorf("failed to create API discovery client [%s]", err)
+		return fmt.Errorf("failed to create API discovery client [%v]", err)
 	}
 
 	serverGroups, err := discoveryClient.ServerGroups()
 
 	if err != nil {
-		return fmt.Errorf("failed to retrieve a list of supported API objects [%s]", err)
+		return fmt.Errorf("failed to retrieve a list of supported API objects [%v]", err)
 	}
 
 	for _, group := range serverGroups.Groups {
@@ -110,7 +110,7 @@ func checkCertsAPI(config *restclient.Config) error {
 
 	version, err := discoveryClient.ServerVersion()
 	if err != nil {
-		return fmt.Errorf("unable to obtain API version [%s]", err)
+		return fmt.Errorf("unable to obtain API version [%v]", err)
 	}
 
 	return fmt.Errorf("API version %s does not support certificates API, use v1.4.0 or newer", version.String())

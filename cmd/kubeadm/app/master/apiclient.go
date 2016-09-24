@@ -39,14 +39,14 @@ func CreateClientAndWaitForAPI(adminConfig *clientcmdapi.Config) (*clientset.Cli
 		&clientcmd.ConfigOverrides{},
 	).ClientConfig()
 	if err != nil {
-		return nil, fmt.Errorf("<master/apiclient> failed to create API client configuration [%s]", err)
+		return nil, fmt.Errorf("<master/apiclient> failed to create API client configuration [%v]", err)
 	}
 
 	fmt.Println("<master/apiclient> created API client configuration")
 
 	client, err := clientset.NewForConfig(adminClientConfig)
 	if err != nil {
-		return nil, fmt.Errorf("<master/apiclient> failed to create API client [%s]", err)
+		return nil, fmt.Errorf("<master/apiclient> failed to create API client [%v]", err)
 	}
 
 	fmt.Println("<master/apiclient> created API client, waiting for the control plane to become ready")
@@ -151,7 +151,7 @@ func NewDeployment(deploymentName string, replicas int32, podSpec api.PodSpec) *
 func findMyself(client *clientset.Clientset) (*api.Node, error) {
 	nodeList, err := client.Nodes().List(api.ListOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("unable to list nodes [%s]", err)
+		return nil, fmt.Errorf("unable to list nodes [%v]", err)
 	}
 	if len(nodeList.Items) < 1 {
 		return nil, fmt.Errorf("no nodes found")
@@ -187,9 +187,10 @@ func attemptToUpdateMasterRoleLabelsAndTaints(client *clientset.Clientset, sched
 }
 
 func UpdateMasterRoleLabelsAndTaints(client *clientset.Clientset, schedulable bool) error {
+	// TODO(phase1+) use iterate instead of recursion
 	err := attemptToUpdateMasterRoleLabelsAndTaints(client, schedulable)
 	if err != nil {
-		return fmt.Errorf("<master/apiclient> failed to update master node - %s", err)
+		return fmt.Errorf("<master/apiclient> failed to update master node - %v", err)
 	}
 	return nil
 }

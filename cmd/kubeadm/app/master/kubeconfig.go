@@ -44,7 +44,7 @@ func CreateCertsAndConfigForClients(s *kubeadmapi.KubeadmConfig, clientNames []s
 	for _, client := range clientNames {
 		key, cert, err := newClientKeyAndCert(caCert, caKey)
 		if err != nil {
-			return nil, fmt.Errorf("<master/kubeconfig> failure while creating %s client certificate - %s", client, err)
+			return nil, fmt.Errorf("<master/kubeconfig> failure while creating %s client certificate - %v", client, err)
 		}
 		config := kubeadmutil.MakeClientConfigWithCerts(
 			basicClientConfig,

@@ -21,6 +21,7 @@ import (
 )
 
 // KubeadmConfig TODO add description
+// TODO(phase1+) @krousey: Please don't embed structs. It obfuscates the source of the fields and doesn't really buy you anything.
 type KubeadmConfig struct {
 	InitFlags
 	JoinFlags
@@ -34,6 +35,11 @@ type KubeadmConfig struct {
 }
 
 // TODO(phase2) should we add validation functions for these structs?
+
+// TODO(phase1+) refactor token handling
+// - https://github.com/kubernetes/kubernetes/pull/33262/files#r80333662
+// - https://github.com/kubernetes/kubernetes/pull/33262/files#r80336374
+// - https://github.com/kubernetes/kubernetes/pull/33262/files#r80333982
 
 // InitFlags holds values for "kubeadm init" command flags.
 type InitFlags struct {
@@ -63,7 +69,7 @@ type InitFlags struct {
 
 const (
 	DefaultServiceDNSDomain   = "cluster.local"
-	DefaultServicesCIDRString = "100.64.0.0/12"
+	DefaultServicesCIDRString = "100.64.0.0/12" // Carrier-grade NAT range (RFC 6598)
 	DefaultKubernetesVersion  = "v1.4.0-beta.10"
 )
 

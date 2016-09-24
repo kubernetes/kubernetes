@@ -56,8 +56,8 @@ func createKubeProxyPodSpec(s *kubeadmapi.KubeadmConfig, architecture string) ap
 					// and accepts `--master` at the same time
 					//
 					// clever options include:
-					//  - do CSR dance and create kubeconfig and mount it as secrete
-					//  - create a service account with a second secret enconding kubeconfig
+					//  - do CSR dance and create kubeconfig and mount it as a secret
+					//  - create a service account with a second secret encoding kubeconfig
 					//  - use init container to convert known information to kubeconfig
 					//  - ...whatever
 					Name:      "kubeconfig",
@@ -215,7 +215,7 @@ func createKubeDNSPodSpec(s *kubeadmapi.KubeadmConfig) api.PodSpec {
 func createKubeDNSServiceSpec(s *kubeadmapi.KubeadmConfig) (*api.ServiceSpec, error) {
 	ip, err := ipallocator.GetIndexedIP(&s.InitFlags.Services.CIDR, 10)
 	if err != nil {
-		return nil, fmt.Errorf("unable to allocate IP address for kube-dns addon from the given CIDR (%q) [%s]", s.InitFlags.Services.CIDR, err)
+		return nil, fmt.Errorf("unable to allocate IP address for kube-dns addon from the given CIDR (%q) [%v]", s.InitFlags.Services.CIDR, err)
 	}
 
 	svc := &api.ServiceSpec{
@@ -238,7 +238,7 @@ func CreateEssentialAddons(s *kubeadmapi.KubeadmConfig, client *clientset.Client
 		SetMasterTaintTolerations(&kubeProxyDaemonSet.Spec.Template.ObjectMeta)
 
 		if _, err := client.Extensions().DaemonSets(api.NamespaceSystem).Create(kubeProxyDaemonSet); err != nil {
-			return fmt.Errorf("<master/addons> failed creating essential kube-proxy addon [%s]", err)
+			return fmt.Errorf("<master/addons> failed creating essential kube-proxy addon [%v]", err)
 		}
 	}
 
@@ -248,17 +248,17 @@ func CreateEssentialAddons(s *kubeadmapi.KubeadmConfig, client *clientset.Client
 	SetMasterTaintTolerations(&kubeDNSDeployment.Spec.Template.ObjectMeta)
 
 	if _, err := client.Extensions().Deployments(api.NamespaceSystem).Create(kubeDNSDeployment); err != nil {
-		return fmt.Errorf("<master/addons> failed creating essential kube-dns addon [%s]", err)
+		return fmt.Errorf("<master/addons> failed creating essential kube-dns addon [%v]", err)
 	}
 
 	kubeDNSServiceSpec, err := createKubeDNSServiceSpec(s)
 	if err != nil {
-		return fmt.Errorf("<master/addons> failed creating essential kube-dns addon - %s", err)
+		return fmt.Errorf("<master/addons> failed creating essential kube-dns addon - %v", err)
 	}
 
 	kubeDNSService := NewService("kube-dns", *kubeDNSServiceSpec)
 	if _, err := client.Services(api.NamespaceSystem).Create(kubeDNSService); err != nil {
-		return fmt.Errorf("<master/addons> failed creating essential kube-dns addon [%s]", err)
+		return fmt.Errorf("<master/addons> failed creating essential kube-dns addon [%v]", err)
 	}
 
 	fmt.Println("<master/addons> created essential addon: kube-dns")

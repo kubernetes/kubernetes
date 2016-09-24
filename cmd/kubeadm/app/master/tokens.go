@@ -30,6 +30,7 @@ import (
 
 func generateTokenIfNeeded(s *kubeadmapi.KubeadmConfig) error {
 	ok, err := kubeadmutil.UseGivenTokenIfValid(s)
+	// TODO(phase1+) @krousey: I know it won't happen with the way it is currently implemented, but this doesn't handle case where ok is true and err is non-nil.
 	if !ok {
 		if err != nil {
 			return err
@@ -49,14 +50,15 @@ func generateTokenIfNeeded(s *kubeadmapi.KubeadmConfig) error {
 func CreateTokenAuthFile(s *kubeadmapi.KubeadmConfig) error {
 	tokenAuthFilePath := path.Join(s.EnvParams["host_pki_path"], "tokens.csv")
 	if err := generateTokenIfNeeded(s); err != nil {
-		return fmt.Errorf("<master/tokens> failed to generate token(s) [%s]", err)
+		return fmt.Errorf("<master/tokens> failed to generate token(s) [%v]", err)
 	}
 	if err := os.MkdirAll(s.EnvParams["host_pki_path"], 0700); err != nil {
-		return fmt.Errorf("<master/tokens> failed to create directory %q [%s]", s.EnvParams["host_pki_path"], err)
+		return fmt.Errorf("<master/tokens> failed to create directory %q [%v]", s.EnvParams["host_pki_path"], err)
 	}
 	serialized := []byte(fmt.Sprintf("%s,kubeadm-node-csr,%s,system:kubelet-bootstrap\n", s.Secrets.BearerToken, uuid.NewUUID()))
+	// DumpReaderToFile create a file with mode 0600
 	if err := cmdutil.DumpReaderToFile(bytes.NewReader(serialized), tokenAuthFilePath); err != nil {
-		return fmt.Errorf("<master/tokens> failed to save token auth file (%q) [%s]", tokenAuthFilePath, err)
+		return fmt.Errorf("<master/tokens> failed to save token auth file (%q) [%v]", tokenAuthFilePath, err)
 	}
 	return nil
 }
