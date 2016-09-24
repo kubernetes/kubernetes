@@ -186,6 +186,7 @@ test-e2e-node: ginkgo generated_files
 .PHONY: test-cmd
 test-cmd: generated_files
 	hack/make-rules/test-cmd.sh
+	hack/make-rules/test-federation-cmd.sh
 
 # Remove all build artifacts.
 #
