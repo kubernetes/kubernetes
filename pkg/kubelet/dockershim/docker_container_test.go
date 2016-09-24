@@ -104,7 +104,7 @@ func TestContainerStatus(t *testing.T) {
 	// The following variables are not set in FakeDockerClient.
 	imageRef := ""
 	exitCode := int32(0)
-	reason := ""
+	var reason, message string
 
 	expected := &runtimeApi.ContainerStatus{
 		State:       &state,
@@ -116,6 +116,7 @@ func TestContainerStatus(t *testing.T) {
 		ImageRef:    &imageRef,
 		ExitCode:    &exitCode,
 		Reason:      &reason,
+		Message:     &message,
 		Mounts:      []*runtimeApi.Mount{},
 		Labels:      config.Labels,
 		Annotations: config.Annotations,
