@@ -158,9 +158,9 @@ func TestOfferStorage(t *testing.T) {
 	}
 
 	offer.Release()
-	time.Sleep(3 * ttl)
+	time.Sleep(4 * ttl)
 	if getDeclinedNum() <= declinedNumBefore {
-		t.Error("released offer is not declined after 2*ttl")
+		t.Error("released offer is not declined after 4*ttl")
 	}
 
 	// Added offer should be expired after ttl, but lingering
