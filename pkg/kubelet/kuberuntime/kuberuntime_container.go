@@ -377,11 +377,16 @@ func (m *kubeGenericRuntimeManager) getKubeletContainerStatuses(podSandboxID str
 			cStatus.StartedAt = time.Unix(status.GetStartedAt(), 0)
 		} else {
 			cStatus.Reason = status.GetReason()
+			cStatus.Message = status.GetMessage()
 			cStatus.ExitCode = int(status.GetExitCode())
 			cStatus.FinishedAt = time.Unix(status.GetFinishedAt(), 0)
 		}
 
-		cStatus.Message = getTerminationMessage(status, cStatus, annotatedInfo.TerminationMessagePath)
+		tMessage := getTerminationMessage(status, cStatus, annotatedInfo.TerminationMessagePath)
+		// Use the termination message written by the application is not empty
+		if len(tMessage) != 0 {
+			cStatus.Message = tMessage
+		}
 		statuses[i] = cStatus
 	}
 
