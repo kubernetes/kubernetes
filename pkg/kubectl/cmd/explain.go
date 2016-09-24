@@ -35,7 +35,10 @@ var (
 		kubectl explain pods
 
 		# Get the documentation of a specific field of a resource
-		kubectl explain pods.spec.containers`)
+		kubectl explain pods.spec.containers
+
+		For more info, please visit: http://kubernetes.io/docs/user-guide/kubectl/kubectl_explain/
+		`)
 
 	explainLong = dedent.Dedent(`
 		Documentation of resources.
@@ -63,7 +66,7 @@ func NewCmdExplain(f *cmdutil.Factory, out, cmdErr io.Writer) *cobra.Command {
 // RunExplain executes the appropriate steps to print a model's documentation
 func RunExplain(f *cmdutil.Factory, out, cmdErr io.Writer, cmd *cobra.Command, args []string) error {
 	if len(args) == 0 {
-		fmt.Fprint(cmdErr, "You must specify the type of resource to explain. ", valid_resources)
+		fmt.Fprint(cmdErr, "You must specify the type of resource to explain", valid_resources)
 		return cmdutil.UsageError(cmd, "Required resource not specified.")
 	}
 	if len(args) > 1 {

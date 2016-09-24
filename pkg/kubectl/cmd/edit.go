@@ -75,7 +75,10 @@ var (
 		  KUBE_EDITOR="nano" kubectl edit svc/docker-registry
 
 		  # Edit the service 'docker-registry' in JSON using the v1 API format:
-		  kubectl edit svc/docker-registry --output-version=v1 -o json`)
+		  kubectl edit svc/docker-registry --output-version=v1 -o json
+
+		  For more info, please visit: http://kubernetes.io/docs/user-guide/kubectl/kubectl_edit/
+		  `)
 )
 
 var errExit = fmt.Errorf("exit directly")
