@@ -53,9 +53,8 @@ type RuntimeHelper interface {
 
 // ShouldContainerBeRestarted checks whether a container needs to be restarted.
 // TODO(yifan): Think about how to refactor this.
-func ShouldContainerBeRestarted(container *api.Container, pod *api.Pod, podStatus *PodStatus) bool {
-	// Get latest container status.
-	status := podStatus.FindContainerStatusByName(container.Name)
+// Change the parameters to make it clean
+func ShouldContainerBeRestarted(status *ContainerStatus, pod *api.Pod) bool {
 	// If the container was never started before, we should start it.
 	// NOTE(random-liu): If all historical containers were GC'd, we'll also return true here.
 	if status == nil {
@@ -71,13 +70,13 @@ func ShouldContainerBeRestarted(container *api.Container, pod *api.Pod, podStatu
 	}
 	// Check RestartPolicy for dead container
 	if pod.Spec.RestartPolicy == api.RestartPolicyNever {
-		glog.V(4).Infof("Already ran container %q of pod %q, do nothing", container.Name, format.Pod(pod))
+		glog.V(4).Infof("Already ran container %q of pod %q, do nothing", status.Name, format.Pod(pod))
 		return false
 	}
 	if pod.Spec.RestartPolicy == api.RestartPolicyOnFailure {
 		// Check the exit code.
 		if status.ExitCode == 0 {
-			glog.V(4).Infof("Already successfully ran container %q of pod %q, do nothing", container.Name, format.Pod(pod))
+			glog.V(4).Infof("Already successfully ran container %q of pod %q, do nothing", status.Name, format.Pod(pod))
 			return false
 		}
 	}
