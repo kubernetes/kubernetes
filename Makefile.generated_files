@@ -296,6 +296,7 @@ $(DEEPCOPY_GEN):
 # The result file, in each pkg, of open-api generation.
 OPENAPI_BASENAME := $(GENERATED_FILE_PREFIX)openapi
 OPENAPI_FILENAME := $(OPENAPI_BASENAME).go
+OPENAPI_OUTPUT_PKG := pkg/generated/openapi
 
 # The tool used to generate open apis.
 OPENAPI_GEN := $(BIN_DIR)/openapi-gen
@@ -321,6 +322,7 @@ gen_openapi: $(OPENAPI_FILES)
 	        --v $(KUBE_VERBOSE)                                         \
 	        --logtostderr                                               \
 	        -i $$(cat $(META_DIR)/$(OPENAPI_GEN).todo | paste -sd, -)   \
+	        -p $(PRJ_SRC_PATH)/$(OPENAPI_OUTPUT_PKG)                    \
 	        -O $(OPENAPI_BASENAME);                                     \
 	fi
 
