@@ -430,6 +430,7 @@ type KubeletConfiguration struct {
 	// How to integrate with runtime. If set to cri, kubelet will switch to
 	// using the new Container Runtine Interface.
 	ExperimentalRuntimeIntegrationType string `json:"experimentalRuntimeIntegrationType,omitempty"`
+	Standalone                         bool   `json:"standalone"`
 }
 
 type KubeSchedulerConfiguration struct {
