@@ -625,10 +625,7 @@ func (ic *IngressController) reconcileIngress(ingress types.NamespacedName) {
 			ic.deliverIngress(ingress, 0, true)
 			return
 		}
-		desiredIngress := &extensions_v1beta1.Ingress{
-			ObjectMeta: baseIngress.ObjectMeta,
-			Spec:       baseIngress.Spec,
-		}
+		desiredIngress := &extensions_v1beta1.Ingress{}
 		objMeta, err := conversion.NewCloner().DeepCopy(baseIngress.ObjectMeta)
 		if err != nil {
 			glog.Errorf("Error deep copying ObjectMeta: %v", err)
@@ -650,8 +647,7 @@ func (ic *IngressController) reconcileIngress(ingress types.NamespacedName) {
 		if !clusterIngressFound {
 			glog.V(4).Infof("No existing Ingress %s in cluster %s - checking if appropriate to queue a create operation", ingress, cluster.Name)
 			// We can't supply server-created fields when creating a new object.
-			desiredIngress.ObjectMeta.ResourceVersion = ""
-			desiredIngress.ObjectMeta.UID = ""
+			desiredIngress.ObjectMeta = util.DeepCopyObjectMeta(baseIngress.ObjectMeta)
 			ic.eventRecorder.Eventf(baseIngress, api.EventTypeNormal, "CreateInCluster",
 				"Creating ingress in cluster %s", cluster.Name)
 
@@ -708,29 +704,43 @@ func (ic *IngressController) reconcileIngress(ingress types.NamespacedName) {
 				glog.V(4).Infof(logStr, "Not transferring")
 			}
 			// Update existing cluster ingress, if needed.
-			if util.ObjectMetaEquivalent(desiredIngress.ObjectMeta, clusterIngress.ObjectMeta) &&
-				reflect.DeepEqual(desiredIngress.Spec, clusterIngress.Spec) &&
-				reflect.DeepEqual(baseIngress.Status.LoadBalancer.Ingress, clusterIngress.Status.LoadBalancer.Ingress) {
+			if util.ObjectMetaEquivalent(baseIngress.ObjectMeta, clusterIngress.ObjectMeta) &&
+				reflect.DeepEqual(baseIngress.Spec, clusterIngress.Spec) {
 				glog.V(4).Infof("Ingress %q in cluster %q does not need an update: cluster ingress is equivalent to federated ingress", ingress, cluster.Name)
 			} else {
 				glog.V(4).Infof("Ingress %s in cluster %s needs an update: cluster ingress %v is not equivalent to federated ingress %v", ingress, cluster.Name, clusterIngress, desiredIngress)
-				if !util.ObjectMetaEquivalent(desiredIngress.ObjectMeta, clusterIngress.ObjectMeta) {
-					// Merge any annotations on the federated ingress onto the underlying cluster ingress,
-					// overwriting duplicates.
-					for key, val := range baseIngress.ObjectMeta.Annotations {
-						desiredIngress.ObjectMeta.Annotations[key] = val
-					}
-					ic.eventRecorder.Eventf(baseIngress, api.EventTypeNormal, "UpdateInCluster",
-						"Updating ingress in cluster %s", cluster.Name)
-
-					operations = append(operations, util.FederatedOperation{
-						Type:        util.OperationTypeUpdate,
-						Obj:         desiredIngress,
-						ClusterName: cluster.Name,
-					})
-					// TODO: Transfer any readonly (target-proxy, url-map etc) annotations from the master cluster to the federation, if this is the master cluster.
-					// This is only for consistency, so that the federation ingress metadata matches the underlying clusters.  It's not actually required.
+				objMeta, err := conversion.NewCloner().DeepCopy(clusterIngress.ObjectMeta)
+				if err != nil {
+					glog.Errorf("Error deep copying ObjectMeta: %v", err)
 				}
+				desiredIngress.ObjectMeta, ok = objMeta.(v1.ObjectMeta)
+				if !ok {
+					glog.Errorf("Internal error: Failed to cast to v1.ObjectMeta: %v", objMeta)
+				}
+				// Merge any annotations and labels on the federated ingress onto the underlying cluster ingress,
+				// overwriting duplicates.
+				if desiredIngress.ObjectMeta.Annotations == nil {
+					desiredIngress.ObjectMeta.Annotations = make(map[string]string)
+				}
+				for key, val := range baseIngress.ObjectMeta.Annotations {
+					desiredIngress.ObjectMeta.Annotations[key] = val
+				}
+				if desiredIngress.ObjectMeta.Labels == nil {
+					desiredIngress.ObjectMeta.Labels = make(map[string]string)
+				}
+				for key, val := range baseIngress.ObjectMeta.Labels {
+					desiredIngress.ObjectMeta.Labels[key] = val
+				}
+				ic.eventRecorder.Eventf(baseIngress, api.EventTypeNormal, "UpdateInCluster",
+					"Updating ingress in cluster %s", cluster.Name)
+
+				operations = append(operations, util.FederatedOperation{
+					Type:        util.OperationTypeUpdate,
+					Obj:         desiredIngress,
+					ClusterName: cluster.Name,
+				})
+				// TODO: Transfer any readonly (target-proxy, url-map etc) annotations from the master cluster to the federation, if this is the master cluster.
+				// This is only for consistency, so that the federation ingress metadata matches the underlying clusters.  It's not actually required				}
 			}
 		}
 	}
