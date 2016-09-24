@@ -173,7 +173,7 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 		fmt.Fprint(errOut, "You must specify the type of resource to get. ", valid_resources)
 		message := dedent.Dedent(`
 			Required resource not specified.
-			For more info on 'get' please visit: http://kubernetes.io/docs/user-guide/kubectl/kubectl_get/
+			For more info please visit: http://kubernetes.io/docs/user-guide/kubectl/kubectl_get/
 		`)
 		return cmdutil.UsageError(cmd, message)
 	}

@@ -63,7 +63,11 @@ func NewCmdExplain(f *cmdutil.Factory, out, cmdErr io.Writer) *cobra.Command {
 // RunExplain executes the appropriate steps to print a model's documentation
 func RunExplain(f *cmdutil.Factory, out, cmdErr io.Writer, cmd *cobra.Command, args []string) error {
 	if len(args) == 0 {
-		fmt.Fprint(cmdErr, "You must specify the type of resource to explain. ", valid_resources)
+		message := dedent.Dedent(`
+			You must specify the type of resource to explain.
+			For more info please visit: http://kubernetes.io/docs/user-guide/kubectl/kubectl_explain/
+		`)
+		fmt.Fprint(cmdErr, message, valid_resources)
 		return cmdutil.UsageError(cmd, "Required resource not specified.")
 	}
 	if len(args) > 1 {
