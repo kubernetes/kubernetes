@@ -83,7 +83,7 @@ type (
 		// CreationTime() string // TODO: Add as needed
 		// Description() string // TODO: Add as needed
 		DnsName() string
-		// Id()  uint64 // TODO: Add as needed
+		Id() uint64
 		// Kind() string // TODO: Add as needed
 		Name() string
 		// NameServerSet() string // TODO: Add as needed

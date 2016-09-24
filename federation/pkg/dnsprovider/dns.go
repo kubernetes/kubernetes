@@ -43,6 +43,8 @@ type Zones interface {
 type Zone interface {
 	// Name returns the name of the zone, e.g. "example.com"
 	Name() string
+	// ID returns the unique provider identifier for the zone
+	ID() string
 	// ResourceRecordsets returns the provider's ResourceRecordSets interface, or false if not supported.
 	ResourceRecordSets() (ResourceRecordSets, bool)
 }
