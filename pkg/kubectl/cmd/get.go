@@ -171,7 +171,11 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 
 	if len(args) == 0 && cmdutil.IsFilenameEmpty(options.Filenames) {
 		fmt.Fprint(errOut, "You must specify the type of resource to get. ", valid_resources)
-		return cmdutil.UsageError(cmd, "Required resource not specified.")
+		message := dedent.Dedent(`
+			Required resource not specified.
+			For more info on 'get' please visit: http://kubernetes.io/docs/user-guide/kubectl/kubectl_get/
+		`)
+		return cmdutil.UsageError(cmd, message)
 	}
 
 	// determine if args contains "all"
