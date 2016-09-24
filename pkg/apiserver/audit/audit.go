@@ -49,7 +49,7 @@ func (a *auditResponseWriter) WriteHeader(code int) {
 }
 
 // fancyResponseWriterDelegator implements http.CloseNotifier, http.Flusher and
-// http.Hijacker which are needed to make certain http operation (eg. watch, rsh, etc)
+// http.Hijacker which are needed to make certain http operation (e.g. watch, rsh, etc)
 // working.
 type fancyResponseWriterDelegator struct {
 	*auditResponseWriter
