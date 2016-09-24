@@ -31,6 +31,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/vishvananda/netlink"
 	"github.com/vishvananda/netlink/nl"
+	"io/ioutil"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -552,15 +553,14 @@ func (plugin *kubenetNetworkPlugin) checkCNIPlugin() bool {
 
 // checkCNIPluginInDir returns if all required cni plugins are placed in dir
 func (plugin *kubenetNetworkPlugin) checkCNIPluginInDir(dir string) bool {
-	output, err := plugin.execer.Command("ls", dir).CombinedOutput()
+	files, err := ioutil.ReadDir(dir)
 	if err != nil {
 		return false
 	}
-	fields := strings.Fields(string(output))
 	for _, cniPlugin := range requiredCNIPlugins {
 		found := false
-		for _, file := range fields {
-			if strings.TrimSpace(file) == cniPlugin {
+		for _, file := range files {
+			if strings.TrimSpace(file.Name()) == cniPlugin {
 				found = true
 				break
 			}
