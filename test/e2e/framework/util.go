@@ -1370,7 +1370,7 @@ func CheckInvariants(events []watch.Event, fns ...InvariantFunc) error {
 // Returns an error if timeout occurs first, or pod goes in to failed state.
 func WaitForPodRunningInNamespace(c *client.Client, pod *api.Pod) error {
 	// this short-cicuit is needed for cases when we pass a list of pods instead
-	// of newly created pod (eg. VerifyPods) which means we are getting already
+	// of newly created pod (e.g. VerifyPods) which means we are getting already
 	// running pod for which waiting does not make sense and will always fail
 	if pod.Status.Phase == api.PodRunning {
 		return nil
