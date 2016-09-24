@@ -137,7 +137,7 @@ if [[ "${ENABLE_CLUSTER_AUTOSCALER}" == "true" ]]; then
 fi
 
 # Admission Controllers to invoke prior to persisting objects in cluster
-# If we included ResourceQuota, we should keep it at the end of the list to prevent incremeting quota usage prematurely.
+# If we included ResourceQuota, we should keep it at the end of the list to prevent incrementing quota usage prematurely.
 ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota
 
 # Optional: Enable/disable public IP assignment for minions.
