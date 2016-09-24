@@ -209,7 +209,7 @@ This is the first release tracked via the use of the [kubernetes/features](https
 - **Apps**
   - [alpha] Introducing 'ScheduledJobs', which allow running time based Jobs, namely once at a specified time or repeatedly at specified point in time. ([docs](http://kubernetes.io/docs/user-guide/scheduled-jobs/)) ([kubernetes/features#19](https://github.com/kubernetes/features/issues/19)) 
 - **Auth**
-  - [alpha] Container Image Policy allows an access controller to determine whether a pod may be schdeuled based on a policy ([docs](http://kubernetes.io/docs/admin/admission-controllers/#imagepolicywebhook)) ([kubernetes/features#59](https://github.com/kubernetes/features/issues/59))
+  - [alpha] Container Image Policy allows an access controller to determine whether a pod may be scheduled based on a policy ([docs](http://kubernetes.io/docs/admin/admission-controllers/#imagepolicywebhook)) ([kubernetes/features#59](https://github.com/kubernetes/features/issues/59))
   - [alpha] Access Review APIs expose authorization engine to external inquiries for delgation, inspection, and debugging ([docs](http://kubernetes.io/docs/admin/authorization/)) ([kubernetes/features#37](https://github.com/kubernetes/features/issues/37))
 - **Cluster Lifecycle**
   - [alpha] Ensure critical cluster infrastructure pods (Heapster, DNS, etc.) can schedule by evicting regular pods when necessary to make the critical pods schedule. ([docs](http://kubernetes.io/docs/admin/rescheduler/#guaranteed-scheduling-of-critical-add-on-pods)) ([kubernetes/features#62](https://github.com/kubernetes/features/issues/62)) 
