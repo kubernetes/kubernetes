@@ -31,7 +31,7 @@ import (
 
 var _ = framework.KubeDescribe("Downward API volume", func() {
 	// How long to wait for a log pod to be displayed
-	const podLogTimeout = 45 * time.Second
+	const podLogTimeout = 65 * time.Second
 	f := framework.NewDefaultFramework("downward-api")
 	var podClient *framework.PodClient
 	BeforeEach(func() {
@@ -81,9 +81,7 @@ var _ = framework.KubeDescribe("Downward API volume", func() {
 		})
 	})
 
-	// Mark the following 2 tests as [Flaky] because of https://github.com/kubernetes/kubernetes/issues/29633,
-	// we should re-enable these tests when the issue is fixed.
-	It("should update labels on modification [Conformance] [Flaky]", func() {
+	It("should update labels on modification [Conformance]", func() {
 		labels := map[string]string{}
 		labels["key1"] = "value1"
 		labels["key2"] = "value2"
@@ -114,7 +112,7 @@ var _ = framework.KubeDescribe("Downward API volume", func() {
 			podLogTimeout, framework.Poll).Should(ContainSubstring("key3=\"value3\"\n"))
 	})
 
-	It("should update annotations on modification [Conformance] [Flaky]", func() {
+	It("should update annotations on modification [Conformance]", func() {
 		annotations := map[string]string{}
 		annotations["builder"] = "bar"
 		podName := "annotationupdate" + string(uuid.NewUUID())
