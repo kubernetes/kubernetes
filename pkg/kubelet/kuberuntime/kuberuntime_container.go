@@ -209,8 +209,8 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerConfig(container *api.
 		securityContext := container.SecurityContext
 		if securityContext.Capabilities != nil {
 			linuxConfig.Capabilities = &runtimeApi.Capability{
-				AddCapabilities:  make([]string, 0, len(securityContext.Capabilities.Add)),
-				DropCapabilities: make([]string, 0, len(securityContext.Capabilities.Drop)),
+				AddCapabilities:  make([]string, len(securityContext.Capabilities.Add)),
+				DropCapabilities: make([]string, len(securityContext.Capabilities.Drop)),
 			}
 			for index, value := range securityContext.Capabilities.Add {
 				linuxConfig.Capabilities.AddCapabilities[index] = string(value)
