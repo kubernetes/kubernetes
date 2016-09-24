@@ -174,7 +174,7 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 
 	if len(args) == 0 && cmdutil.IsFilenameEmpty(options.Filenames) {
 		fmt.Fprint(errOut, "You must specify the type of resource to get. ", valid_resources)
-		return cmdutil.UsageError(cmd, "Required resource not specified")
+		return cmdutil.UsageError(cmd, "Required resource not specified.")
 	}
 
 	// determine if args contains "all"
