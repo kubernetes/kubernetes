@@ -37,7 +37,8 @@ var (
 		# Get the documentation of a specific field of a resource
 		kubectl explain pods.spec.containers
 
-		For more info, please visit: http://kubernetes.io/docs/user-guide/kubectl/kubectl_explain/`)
+		For more info, please visit: http://kubernetes.io/docs/user-guide/kubectl/kubectl_explain/
+		`)
 
 	explainLong = dedent.Dedent(`
 		Documentation of resources.
