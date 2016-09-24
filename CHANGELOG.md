@@ -185,7 +185,7 @@
 
 binary | sha256 hash
 ------ | -----------
-TODO [kubernetes.tar.gz](TODO) | `TODO`
+kubernetes.tar.gz | `TODO`
 
 ## Major Themes
 
@@ -217,14 +217,14 @@ This is the first release tracked via the use of the [kubernetes/features](https
 - **Cluster Lifecycle**
   - [alpha] Ensure critical cluster infrastructure pods (Heapster, DNS, etc.) can schedule by evicting regular pods when necessary to make the critical pods schedule. ([docs](http://kubernetes.io/docs/admin/rescheduler/#guaranteed-scheduling-of-critical-add-on-pods)) ([kubernetes/features#62](https://github.com/kubernetes/features/issues/62)) 
   - [alpha] Simplifies bootstrapping of TLS secured communication between the API server and kubelet. ([docs](http://kubernetes.io/docs/admin/master-node-communication/#kubelet-tls-bootstrap)) ([kubernetes/features#43](https://github.com/kubernetes/features/issues/43)) 
-  - [alpha] `kubeadm` tool makes install much easier. TODO: https://github.com/kubernetes/kubernetes.github.io/pull/1265#issuecomment-249300887 ([docs](http://kubernetes.io/docs/kubeadm/)) ([kubernetes/features#11](https://github.com/kubernetes/features/issues/11))
+  - [alpha] `kubeadm` tool makes install much easier.  ([docs](http://kubernetes.io/docs/kubeadm/)) ([kubernetes/features#11](https://github.com/kubernetes/features/issues/11))
 - **Federation**
-  - [alpha] Creating a `Federated Ingress` is as simple as submitting an `Ingress` config/manifest to the Federation API Server. Federation then creates a single global VIP to load balance the incoming L7 traffic across all the registered clusters no matter in what regions the clusters are. GCE L7 LoadBalancer is the only supported implementation in this release. TODO: ([docs](http://kubernetes.io/docs/user-guide/federation/federated-ingress/)) ([kubernetes/features#82](https://github.com/kubernetes/features/issues/82))
+  - [alpha] Creating a `Federated Ingress` is as simple as submitting an `Ingress` config/manifest to the Federation API Server. Federation then creates a single global VIP to load balance the incoming L7 traffic across all the registered clusters no matter in what regions the clusters are. GCE L7 LoadBalancer is the only supported implementation in this release. ([kubernetes/features#82](https://github.com/kubernetes/features/issues/82))
   - [alpha] Creating a `Namespace` in federation causes matching `Namespace`s to be created in all the clusters registered with that federation. ([docs](http://kubernetes.io/docs/user-guide/federation/namespaces)) ([kubernetes/features#69](https://github.com/kubernetes/features/issues/69))
   - [alpha] ingress has alpha support for a single master multi zone cluster ([docs](http://kubernetes.io/docs/user-guide/ingress.md#failing-across-availability-zones)) ([kubernetes/features#52](https://github.com/kubernetes/features/issues/52))
   - [beta] Federation API server gained support for events and many federation controllers now report important events. ([docs](http://kubernetes.io/docs/user-guide/federation/events)) ([kubernetes/features#70](https://github.com/kubernetes/features/issues/70))
-  - [beta] `Secret` created in federation are distributed to all the clusters in that federation. TODO @quinton-hoole @pwittrock ([docs](TODO)) ([kubernetes/features#68](https://github.com/kubernetes/features/issues/68))
-  - [beta] Submitting a `Replica Set` to the Federation API Server creates matching `Replica Set`s in the underlying clusters with the desired replica count distributed across all the clusters. TODO @quinton-hoole @pwittrock ([docs](TODO)) ([kubernetes/features#46](https://github.com/kubernetes/features/issues/46))
+  - [beta] `Secret` created in federation are distributed to all the clusters in that federation.  ([kubernetes/features#68](https://github.com/kubernetes/features/issues/68))
+  - [beta] Submitting a `Replica Set` to the Federation API Server creates matching `Replica Set`s in the underlying clusters with the desired replica count distributed across all the clusters. ([kubernetes/features#46](https://github.com/kubernetes/features/issues/46))
 - **Network**
   - [alpha] Service LB now has alpha support for preserving client source IP ([docs](http://kubernetes.io/docs/user-guide/load-balancer/)) ([kubernetes/features#27](https://github.com/kubernetes/features/issues/27))
 - **Node**
