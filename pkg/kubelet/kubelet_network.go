@@ -124,6 +124,9 @@ func (kl *Kubelet) providerRequiresNetworkingConfiguration() bool {
 	if kl.cloud == nil || kl.cloud.ProviderName() != "gce" || kl.flannelExperimentalOverlay {
 		return false
 	}
+	if kl.networkPlugin != nil && !kl.networkPlugin.Capabilities().Has(network.NET_PLUGIN_CAPABILITY_CLOUD_BASED) {
+		return false
+	}
 	_, supported := kl.cloud.Routes()
 	return supported
 }
