@@ -1725,7 +1725,8 @@ func (r *Runtime) SyncPod(pod *api.Pod, podStatus api.PodStatus, internalPodStat
 
 		c := runningPod.FindContainerByName(container.Name)
 		if c == nil {
-			if kubecontainer.ShouldContainerBeRestarted(&container, pod, internalPodStatus) {
+			containerStatus := internalPodStatus.FindContainerStatusByName(container.Name)
+			if kubecontainer.ShouldContainerBeRestarted(containerStatus, pod) {
 				glog.V(3).Infof("Container %+v is dead, but RestartPolicy says that we should restart it.", container)
 				// TODO(yifan): Containers in one pod are fate-sharing at this moment, see:
 				// https://github.com/appc/spec/issues/276.
