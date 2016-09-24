@@ -128,7 +128,7 @@ func TestStoreToReplicationControllerLister(t *testing.T) {
 	testCases := []struct {
 		description              string
 		inRCs                    []*api.ReplicationController
-		list                     func(StoreToReplicationControllerLister) ([]api.ReplicationController, error)
+		list                     func(StoreToReplicationControllerLister) ([]*api.ReplicationController, error)
 		outRCNames               sets.String
 		expectErr                bool
 		onlyIfIndexedByNamespace bool
@@ -143,7 +143,7 @@ func TestStoreToReplicationControllerLister(t *testing.T) {
 					ObjectMeta: api.ObjectMeta{Name: "hmm", Namespace: "hmm"},
 				},
 			},
-			list: func(lister StoreToReplicationControllerLister) ([]api.ReplicationController, error) {
+			list: func(lister StoreToReplicationControllerLister) ([]*api.ReplicationController, error) {
 				return lister.ReplicationControllers(api.NamespaceAll).List(labels.Set{}.AsSelectorPreValidated())
 			},
 			outRCNames: sets.NewString("hmm", "foo"),
@@ -158,7 +158,7 @@ func TestStoreToReplicationControllerLister(t *testing.T) {
 					ObjectMeta: api.ObjectMeta{Name: "hmm", Namespace: "hmm"},
 				},
 			},
-			list: func(lister StoreToReplicationControllerLister) ([]api.ReplicationController, error) {
+			list: func(lister StoreToReplicationControllerLister) ([]*api.ReplicationController, error) {
 				return lister.ReplicationControllers("hmm").List(labels.Set{}.AsSelectorPreValidated())
 			},
 			outRCNames: sets.NewString("hmm"),
@@ -168,8 +168,8 @@ func TestStoreToReplicationControllerLister(t *testing.T) {
 			inRCs: []*api.ReplicationController{
 				{ObjectMeta: api.ObjectMeta{Name: "basic"}},
 			},
-			list: func(lister StoreToReplicationControllerLister) ([]api.ReplicationController, error) {
-				return lister.List()
+			list: func(lister StoreToReplicationControllerLister) ([]*api.ReplicationController, error) {
+				return lister.List(labels.Everything())
 			},
 			outRCNames: sets.NewString("basic"),
 		},
@@ -183,7 +183,7 @@ func TestStoreToReplicationControllerLister(t *testing.T) {
 					},
 				},
 			},
-			list: func(lister StoreToReplicationControllerLister) ([]api.ReplicationController, error) {
+			list: func(lister StoreToReplicationControllerLister) ([]*api.ReplicationController, error) {
 				pod := &api.Pod{
 					ObjectMeta: api.ObjectMeta{Name: "pod1", Namespace: "ns"},
 				}
@@ -199,7 +199,7 @@ func TestStoreToReplicationControllerLister(t *testing.T) {
 					ObjectMeta: api.ObjectMeta{Name: "basic", Namespace: "ns"},
 				},
 			},
-			list: func(lister StoreToReplicationControllerLister) ([]api.ReplicationController, error) {
+			list: func(lister StoreToReplicationControllerLister) ([]*api.ReplicationController, error) {
 				pod := &api.Pod{
 					ObjectMeta: api.ObjectMeta{
 						Name:      "pod1",
@@ -228,7 +228,7 @@ func TestStoreToReplicationControllerLister(t *testing.T) {
 					},
 				},
 			},
-			list: func(lister StoreToReplicationControllerLister) ([]api.ReplicationController, error) {
+			list: func(lister StoreToReplicationControllerLister) ([]*api.ReplicationController, error) {
 				pod := &api.Pod{
 					ObjectMeta: api.ObjectMeta{
 						Name:      "pod1",
