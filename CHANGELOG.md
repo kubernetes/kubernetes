@@ -242,15 +242,15 @@ This is the first release tracked via the use of the [kubernetes/features](https
 
 ## Known Issues
 
-- Completed pods lose logs across node upgrade (#32324)
-- Pods are deleted across node upgrade (#32323)
-- Secure master -> node communication (#11816)
-- upgrading master doesn't upgrade kubectl (#32538)
-- Specific error message on failed rolling update issued by older kubectl against 1.4 master (#32751)
-- bump master cidr range from /30 to /29 (#32886)
-- non-hostNetwork daemonsets will almost always have a pod that fails to schedule (#32900)
-- Service loadBalancerSourceRanges doesn't respect updates (#33033)
-- disallow user to update loadbalancerSourceRanges (#33346)
+- Completed pods lose logs across node upgrade ([#32324](https://github.com/kubernetes/kubernetes/issues/32324))
+- Pods are deleted across node upgrade ([#32323](https://github.com/kubernetes/kubernetes/issues/32323))
+- Secure master -> node communication ([#11816](https://github.com/kubernetes/kubernetes/issues/11816))
+- upgrading master doesn't upgrade kubectl ([#32538](https://github.com/kubernetes/kubernetes/issues/32538))
+- Specific error message on failed rolling update issued by older kubectl against 1.4 master ([#32751](https://github.com/kubernetes/kubernetes/issues/32751))
+- bump master cidr range from /30 to /29 ([#32886](https://github.com/kubernetes/kubernetes/issues/32886))
+- non-hostNetwork daemonsets will almost always have a pod that fails to schedule ([#32900](https://github.com/kubernetes/kubernetes/issues/32900))
+- Service loadBalancerSourceRanges doesn't respect updates ([#33033](https://github.com/kubernetes/kubernetes/issues/33033))
+- disallow user to update loadbalancerSourceRanges ([#33346](https://github.com/kubernetes/kubernetes/issues/33346))
 
 ## Notable Changes to Existing Behavior
 
