@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -75,7 +75,10 @@ var (
 		kubectl get rc,services
 
 		# List one or more resources by their type and names.
-		kubectl get rc/web service/frontend pods/web-pod-13je7`)
+		kubectl get rc/web service/frontend pods/web-pod-13je7
+
+		For more info, please visit: http://kubernetes.io/docs/user-guide/kubectl/kubectl_get/
+		`)
 )
 
 // NewCmdGet creates a command object for the generic "get" action, which
@@ -171,11 +174,7 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 
 	if len(args) == 0 && cmdutil.IsFilenameEmpty(options.Filenames) {
 		fmt.Fprint(errOut, "You must specify the type of resource to get. ", valid_resources)
-		message := dedent.Dedent(`
-			Required resource not specified.
-			For more info please visit: http://kubernetes.io/docs/user-guide/kubectl/kubectl_get/
-		`)
-		return cmdutil.UsageError(cmd, message)
+		return cmdutil.UsageError(cmd, "Required resource not specified")
 	}
 
 	// determine if args contains "all"
