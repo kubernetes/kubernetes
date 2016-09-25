@@ -139,7 +139,7 @@ func NewCmdCreateServiceNodePort(f cmdutil.Factory, cmdOut io.Writer) *cobra.Com
 }
 
 // CreateServiceNodePort is the implementation of the create service nodeport command
-func CreateServiceNodePort(f *cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, args []string) error {
+func CreateServiceNodePort(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
 		return err

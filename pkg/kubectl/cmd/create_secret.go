@@ -28,7 +28,7 @@ import (
 )
 
 // NewCmdCreateSecret groups subcommands to create various types of secrets
-func NewCmdCreateSecret(f *cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
+func NewCmdCreateSecret(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "secret",
 		Short: "Create a secret using specified subcommand",
