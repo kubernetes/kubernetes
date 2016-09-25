@@ -1702,7 +1702,7 @@ func (r *Runtime) Status() error {
 }
 
 // SyncPod syncs the running pod to match the specified desired pod.
-func (r *Runtime) SyncPod(pod *api.Pod, podStatus api.PodStatus, internalPodStatus *kubecontainer.PodStatus, pullSecrets []api.Secret, backOff *flowcontrol.Backoff) (result kubecontainer.PodSyncResult) {
+func (r *Runtime) SyncPod(pod *api.Pod, _ api.PodStatus, podStatus *kubecontainer.PodStatus, pullSecrets []api.Secret, backOff *flowcontrol.Backoff) (result kubecontainer.PodSyncResult) {
 	var err error
 	defer func() {
 		if err != nil {
@@ -1710,9 +1710,7 @@ func (r *Runtime) SyncPod(pod *api.Pod, podStatus api.PodStatus, internalPodStat
 		}
 	}()
 	// TODO: (random-liu) Stop using running pod in SyncPod()
-	// TODO: (random-liu) Rename podStatus to apiPodStatus, rename internalPodStatus to podStatus, and use new pod status as much as possible,
-	// we may stop using apiPodStatus someday.
-	runningPod := kubecontainer.ConvertPodStatusToRunningPod(r.Type(), internalPodStatus)
+	runningPod := kubecontainer.ConvertPodStatusToRunningPod(r.Type(), podStatus)
 	// Add references to all containers.
 	unidentifiedContainers := make(map[kubecontainer.ContainerID]*kubecontainer.Container)
 	for _, c := range runningPod.Containers {
@@ -1725,7 +1723,7 @@ func (r *Runtime) SyncPod(pod *api.Pod, podStatus api.PodStatus, internalPodStat
 
 		c := runningPod.FindContainerByName(container.Name)
 		if c == nil {
-			if kubecontainer.ShouldContainerBeRestarted(&container, pod, internalPodStatus) {
+			if kubecontainer.ShouldContainerBeRestarted(&container, pod, podStatus) {
 				glog.V(3).Infof("Container %+v is dead, but RestartPolicy says that we should restart it.", container)
 				// TODO(yifan): Containers in one pod are fate-sharing at this moment, see:
 				// https://github.com/appc/spec/issues/276.
