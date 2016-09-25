@@ -56,7 +56,7 @@ func init() {
 		panic(err)
 	}
 	yamlSerializer := json.NewYAMLSerializer(json.DefaultMetaFactory, Scheme, Scheme)
-	Codec = versioning.NewCodecForScheme(
+	Codec = versioning.NewDefaultingCodecForScheme(
 		Scheme,
 		yamlSerializer,
 		yamlSerializer,

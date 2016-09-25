@@ -64,7 +64,7 @@ func (d *testNestedDecodable) DecodeNestedObjects(_ runtime.Decoder) error {
 func TestNestedDecode(t *testing.T) {
 	n := &testNestedDecodable{nestedErr: fmt.Errorf("unable to decode")}
 	decoder := &mockSerializer{obj: n}
-	codec := NewCodec(nil, decoder, nil, nil, nil, nil, nil, nil)
+	codec := NewCodec(nil, decoder, nil, nil, nil, nil, nil, nil, nil)
 	if _, _, err := codec.Decode([]byte(`{}`), nil, n); err != n.nestedErr {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -82,6 +82,7 @@ func TestNestedEncode(t *testing.T) {
 		&checkConvertor{obj: n2, groupVersion: unversioned.GroupVersion{Group: "other"}},
 		nil, nil,
 		&mockTyper{gvks: []unversioned.GroupVersionKind{{Kind: "test"}}},
+		nil,
 		unversioned.GroupVersion{Group: "other"}, nil,
 	)
 	if err := codec.Encode(n, ioutil.Discard); err != n2.nestedErr {
@@ -105,6 +106,7 @@ func TestDecode(t *testing.T) {
 		creater    runtime.ObjectCreater
 		copier     runtime.ObjectCopier
 		typer      runtime.ObjectTyper
+		defaulter  runtime.ObjectDefaulter
 		yaml       bool
 		pretty     bool
 
@@ -235,7 +237,7 @@ func TestDecode(t *testing.T) {
 
 	for i, test := range testCases {
 		t.Logf("%d", i)
-		s := NewCodec(test.serializer, test.serializer, test.convertor, test.creater, test.copier, test.typer, test.encodes, test.decodes)
+		s := NewCodec(test.serializer, test.serializer, test.convertor, test.creater, test.copier, test.typer, test.defaulter, test.encodes, test.decodes)
 		obj, gvk, err := s.Decode([]byte(`{}`), test.defaultGVK, test.into)
 
 		if !reflect.DeepEqual(test.expectedGVK, gvk) {
