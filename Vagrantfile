@@ -123,12 +123,13 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
     config.proxy.no_proxy = $no_proxy
   end
 
-  # this corrects a bug in 1.8.5 where an invalid SSH key is inserted.
-  if Vagrant::VERSION == "1.8.5"
-    config.ssh.insert_key = false
-  end
-
   def setvmboxandurl(config, provider)
+    
+    # this corrects a bug in 1.8.5 where an invalid SSH key is inserted.
+    if Vagrant::VERSION == "1.8.5"
+      config.ssh.insert_key = false
+    end
+    
     if ENV['KUBERNETES_BOX_NAME'] then
       config.vm.box = ENV['KUBERNETES_BOX_NAME']
 
