@@ -84,6 +84,7 @@ func NewKubeadmCommand(f *cmdutil.Factory, in io.Reader, out, err io.Writer, env
 
 	cmds.AddCommand(NewCmdInit(out, s))
 	cmds.AddCommand(NewCmdJoin(out, s))
+	cmds.AddCommand(NewCmdVersion(out))
 
 	return cmds
 }

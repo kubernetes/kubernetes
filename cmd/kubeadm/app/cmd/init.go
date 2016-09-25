@@ -83,10 +83,6 @@ func NewCmdInit(out io.Writer, s *kubeadmapi.KubeadmConfig) *cobra.Command {
 		&s.InitFlags.CloudProvider, "cloud-provider", "",
 		`Enable cloud provider features (external load-balancers, storage, etc), e.g. "gce"`,
 	)
-	cmd.PersistentFlags().BoolVar(
-		&s.InitFlags.Schedulable, "schedule-pods-here", false,
-		`Allow to schedule workload to the node`,
-	)
 	cmd.PersistentFlags().StringVar(
 		&s.InitFlags.Versions.Kubernetes, "use-kubernetes-version", kubeadmapi.DefaultKubernetesVersion,
 		`Choose a specific Kubernetes version for the control plane`,
@@ -99,15 +95,15 @@ func NewCmdInit(out io.Writer, s *kubeadmapi.KubeadmConfig) *cobra.Command {
 	)
 	cmd.PersistentFlags().StringVar(
 		&s.InitFlags.API.Etcd.ExternalCAFile, "external-etcd-cafile", "",
-		"etcd certificate authority certificate file",
+		"etcd certificate authority certificate file. Note: The path must be in /etc/ssl/certs",
 	)
 	cmd.PersistentFlags().StringVar(
 		&s.InitFlags.API.Etcd.ExternalCertFile, "external-etcd-certfile", "",
-		"etcd client certificate file",
+		"etcd client certificate file. Note: The path must be in /etc/ssl/certs",
 	)
 	cmd.PersistentFlags().StringVar(
 		&s.InitFlags.API.Etcd.ExternalKeyFile, "external-etcd-keyfile", "",
-		"etcd client key file",
+		"etcd client key file. Note: The path must be in /etc/ssl/certs",
 	)
 
 	return cmd
@@ -136,8 +132,18 @@ func RunInit(out io.Writer, cmd *cobra.Command, args []string, s *kubeadmapi.Kub
 
 	// TODO(phase1+) create a custom flag
 	if s.InitFlags.CloudProvider != "" {
-		if _, ok := kubeadmapi.SupportedCloudProviders[s.InitFlags.CloudProvider]; !ok {
-			return fmt.Errorf("<cmd/init> cloud provider %q is not supported, you can use any of %v, or leave it unset", s.InitFlags.CloudProvider, kubeadmapi.ListOfCloudProviders)
+		found := false
+		for _, provider := range kubeadmapi.ListOfCloudProviders {
+			if provider == s.InitFlags.CloudProvider {
+				found = true
+				break
+			}
+		}
+
+		if found {
+			fmt.Printf("<cmd/init> cloud provider %q initialized for the control plane. Remember to set the same cloud provider flag on the kubelet.\n", s.InitFlags.CloudProvider)
+		} else {
+			return fmt.Errorf("<cmd/init> cloud provider %q is not supported, you can use any of %v, or leave it unset.\n", s.InitFlags.CloudProvider, kubeadmapi.ListOfCloudProviders)
 		}
 	}
 
@@ -179,7 +185,8 @@ func RunInit(out io.Writer, cmd *cobra.Command, args []string, s *kubeadmapi.Kub
 		return err
 	}
 
-	if err := kubemaster.UpdateMasterRoleLabelsAndTaints(client, s.Schedulable); err != nil {
+	schedulePodsOnMaster := false
+	if err := kubemaster.UpdateMasterRoleLabelsAndTaints(client, schedulePodsOnMaster); err != nil {
 		return err
 	}
 
