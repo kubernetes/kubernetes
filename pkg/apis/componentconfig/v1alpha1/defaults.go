@@ -51,6 +51,7 @@ const (
 var zeroDuration = unversioned.Duration{}
 
 func addDefaultingFuncs(scheme *kruntime.Scheme) error {
+	RegisterDefaults(scheme)
 	return scheme.AddDefaultingFuncs(
 		SetDefaults_KubeProxyConfiguration,
 		SetDefaults_KubeSchedulerConfiguration,
