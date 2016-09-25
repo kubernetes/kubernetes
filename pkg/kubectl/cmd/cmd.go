@@ -224,7 +224,7 @@ Use "{{.CommandPath}} [command] --help" for more information about a command.{{e
 )
 
 // NewKubectlCommand creates the `kubectl` command and its nested children.
-func NewKubectlCommand(f *cmdutil.Factory, in io.Reader, out, err io.Writer) *cobra.Command {
+func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cobra.Command {
 	// Parent command to which all subcommands are added.
 	cmds := &cobra.Command{
 		Use:   "kubectl",
