@@ -254,33 +254,6 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 			getManualDefaultingFunctions(context, context.Universe[pp], manualDefaults)
 		}
 
-		pkgNeedsGeneration := false
-		for _, t := range pkg.Types {
-			// Check whether this type can be auto-converted to the peer
-			// package type.
-			peerType := getPeerTypeFor(context, t, peerPkgs)
-			if peerType == nil {
-				// We did not find a corresponding type.
-				continue
-			}
-			if namer.IsPrivateGoName(peerType.Name.Name) {
-				// We won't be able to convert to a private type.
-				glog.V(5).Infof("  found a peer type %v, but it is a private name", t)
-				continue
-			}
-
-			// If we can generate conversion in any direction, we should
-			// generate this package.
-			if isConvertible(t, peerType, manualConversions) || isConvertible(peerType, t, manualConversions) {
-				pkgNeedsGeneration = true
-				break
-			}
-		}
-		if !pkgNeedsGeneration {
-			glog.V(5).Infof("  no viable conversions, not generating for this package")
-			continue
-		}
-
 		packages = append(packages,
 			&generator.DefaultPackage{
 				PackageName: filepath.Base(pkg.Path),
