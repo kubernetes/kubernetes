@@ -220,7 +220,7 @@ func componentPod(container api.Container, volumes ...api.Volume) api.Pod {
 func getComponentCommand(component string, s *kubeadmapi.KubeadmConfig) (command []string) {
 	baseFlags := map[string][]string{
 		apiServer: {
-			"--address=127.0.0.1",
+			"--insecure-bind-address=127.0.0.1",
 			"--etcd-servers=http://127.0.0.1:2379",
 			"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota",
 			"--service-cluster-ip-range=" + s.InitFlags.Services.CIDR.String(),
@@ -233,7 +233,7 @@ func getComponentCommand(component string, s *kubeadmapi.KubeadmConfig) (command
 			"--allow-privileged",
 		},
 		controllerManager: {
-			// TODO(phase1+): consider adding --address=127.0.0.1 in order to not expose the cm port to the rest of the world
+			"--address=127.0.0.1",
 			"--leader-elect",
 			"--master=127.0.0.1:8080",
 			"--cluster-name=" + DefaultClusterName,
@@ -244,7 +244,7 @@ func getComponentCommand(component string, s *kubeadmapi.KubeadmConfig) (command
 			"--insecure-experimental-approve-all-kubelet-csrs-for-group=system:kubelet-bootstrap",
 		},
 		scheduler: {
-			// TODO(phase1+): consider adding --address=127.0.0.1 in order to not expose the scheduler port to the rest of the world
+			"--address=127.0.0.1",
 			"--leader-elect",
 			"--master=127.0.0.1:8080",
 		},

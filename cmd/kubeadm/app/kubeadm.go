@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"runtime"
 
 	"github.com/renstrom/dedent"
 	"github.com/spf13/pflag"
@@ -46,7 +47,7 @@ func getEnvParams() map[string]string {
 		"host_pki_path":      "/etc/kubernetes/pki",
 		"host_etcd_path":     "/var/lib/etcd",
 		"hyperkube_image":    "",
-		"discovery_image":    "dgoodwin/kubediscovery:latest", // TODO(phase1): fmt.Sprintf("gcr.io/google_containers/kube-discovery-%s:%s", runtime.GOARCH, "1.0"),
+		"discovery_image":    fmt.Sprintf("gcr.io/google_containers/kube-discovery-%s:%s", runtime.GOARCH, "1.0"),
 		"etcd_image":         "",
 		"component_loglevel": "--v=4",
 	}

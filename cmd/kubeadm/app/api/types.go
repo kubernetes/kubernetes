@@ -64,13 +64,12 @@ type InitFlags struct {
 		Kubernetes string
 	}
 	CloudProvider string
-	Schedulable   bool
 }
 
 const (
 	DefaultServiceDNSDomain   = "cluster.local"
 	DefaultServicesCIDRString = "100.64.0.0/12" // Carrier-grade NAT range (RFC 6598)
-	DefaultKubernetesVersion  = "v1.4.0-beta.10"
+	DefaultKubernetesVersion  = "v1.4.0"
 )
 
 var (
@@ -86,15 +85,10 @@ var (
 		"rackspace",
 		"vsphere",
 	}
-	SupportedCloudProviders map[string]bool
 )
 
 func init() {
 	_, DefaultServicesCIDR, _ = net.ParseCIDR(DefaultServicesCIDRString)
-	SupportedCloudProviders = make(map[string]bool, len(ListOfCloudProviders))
-	for _, v := range ListOfCloudProviders {
-		SupportedCloudProviders[v] = true
-	}
 }
 
 // JoinFlags holds values for "kubeadm join" command flags.
