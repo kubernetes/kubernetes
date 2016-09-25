@@ -34,6 +34,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim"
 	"k8s.io/kubernetes/pkg/kubelet/events"
+	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/types"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
@@ -144,7 +145,7 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(container *api.Conta
 		Stdin:       &container.Stdin,
 		StdinOnce:   &container.StdinOnce,
 		Tty:         &container.TTY,
-		Linux:       m.generateLinuxContainerConfig(container),
+		Linux:       m.generateLinuxContainerConfig(container, pod),
 	}
 
 	// set privileged and readonlyRootfs
@@ -173,7 +174,7 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(container *api.Conta
 }
 
 // generateLinuxContainerConfig generates linux container config for kubelet runtime api.
-func (m *kubeGenericRuntimeManager) generateLinuxContainerConfig(container *api.Container) *runtimeApi.LinuxContainerConfig {
+func (m *kubeGenericRuntimeManager) generateLinuxContainerConfig(container *api.Container, pod *api.Pod) *runtimeApi.LinuxContainerConfig {
 	linuxConfig := &runtimeApi.LinuxContainerConfig{
 		Resources: &runtimeApi.LinuxContainerResources{},
 	}
@@ -183,6 +184,8 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerConfig(container *api.
 	cpuRequest := container.Resources.Requests.Cpu()
 	cpuLimit := container.Resources.Limits.Cpu()
 	memoryLimit := container.Resources.Limits.Memory().Value()
+	oomScoreAdj := int64(qos.GetContainerOOMScoreAdjust(pod, container,
+		int64(m.machineInfo.MemoryCapacity)))
 	// If request is not specified, but limit is, we want request to default to limit.
 	// API server does this for new containers, but we repeat this logic in Kubelet
 	// for containers running on existing Kubernetes clusters.
@@ -197,6 +200,10 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerConfig(container *api.
 	if memoryLimit != 0 {
 		linuxConfig.Resources.MemoryLimitInBytes = &memoryLimit
 	}
+	// Set OOM score of the container based on qos policy. Processes in lower-priority pods should
+	// be killed first if the system runs out of memory.
+	linuxConfig.Resources.OomScoreAdj = &oomScoreAdj
+
 	if m.cpuCFSQuota {
 		// if cpuLimit.Amount is nil, then the appropriate default value is returned
 		// to allow full usage of cpu resource.

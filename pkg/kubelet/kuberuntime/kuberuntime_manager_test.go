@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
@@ -42,6 +43,10 @@ var (
 func createTestRuntimeManager() (*apitest.FakeRuntimeService, *apitest.FakeImageService, *kubeGenericRuntimeManager, error) {
 	fakeRuntimeService := apitest.NewFakeRuntimeService()
 	fakeImageService := apitest.NewFakeImageService()
+	// Only an empty machineInfo is needed here, because in unit test all containers are besteffort,
+	// data in machineInfo is not used. If burstable containers are used in unit test in the future,
+	// we may want to set memory capacity.
+	machineInfo := &cadvisorapi.MachineInfo{}
 	networkPlugin, _ := network.InitNetworkPlugin(
 		[]network.NetworkPlugin{},
 		"",
@@ -51,7 +56,7 @@ func createTestRuntimeManager() (*apitest.FakeRuntimeService, *apitest.FakeImage
 		network.UseDefaultMTU,
 	)
 	osInterface := &containertest.FakeOS{}
-	manager, err := NewFakeKubeRuntimeManager(fakeRuntimeService, fakeImageService, networkPlugin, osInterface)
+	manager, err := NewFakeKubeRuntimeManager(fakeRuntimeService, fakeImageService, machineInfo, networkPlugin, osInterface)
 	return fakeRuntimeService, fakeImageService, manager, err
 }
 
