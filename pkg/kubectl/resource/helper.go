@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/watch"
@@ -61,12 +62,12 @@ func (m *Helper) Get(namespace, name string, export bool) (runtime.Object, error
 	return req.Do().Get()
 }
 
-// TODO: add field selector
-func (m *Helper) List(namespace, apiVersion string, selector labels.Selector, export bool) (runtime.Object, error) {
+func (m *Helper) List(namespace, apiVersion string, selector labels.Selector, fieldSelector fields.Selector, export bool) (runtime.Object, error) {
 	req := m.RESTClient.Get().
 		NamespaceIfScoped(namespace, m.NamespaceScoped).
 		Resource(m.Resource).
-		LabelsSelectorParam(selector)
+		LabelsSelectorParam(selector).
+		FieldsSelectorParam(fieldSelector)
 	if export {
 		req.Param("export", strconv.FormatBool(export))
 	}
