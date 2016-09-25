@@ -359,7 +359,7 @@ func isDirectlyConvertible(in, out *types.Type, manualConversions conversionFunc
 			// Check if there is an out member with that name.
 			outMember, found := findMember(out, inMember.Name)
 			if !found {
-				glog.V(5).Infof("%s.%s is not directly convertible to %s because the destination struct field did not exist", in.Name, inMember.Name, out.Name)
+				glog.V(5).Infof("%s is not directly convertible to %s because the destination field %q did not exist", in.Name, out.Name, inMember.Name)
 				return false
 			}
 			convertible = convertible && isConvertible(inMember.Type, outMember.Type, manualConversions)
