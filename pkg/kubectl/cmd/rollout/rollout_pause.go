@@ -58,7 +58,7 @@ var (
 		kubectl rollout pause deployment/nginx`)
 )
 
-func NewCmdRolloutPause(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+func NewCmdRolloutPause(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &PauseConfig{}
 
 	validArgs := []string{"deployment"}
@@ -90,7 +90,7 @@ func NewCmdRolloutPause(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func (o *PauseConfig) CompletePause(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []string) error {
+func (o *PauseConfig) CompletePause(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []string) error {
 	if len(args) == 0 && cmdutil.IsFilenameEmpty(o.Filenames) {
 		return cmdutil.UsageError(cmd, cmd.Use)
 	}

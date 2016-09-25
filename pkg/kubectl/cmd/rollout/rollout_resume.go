@@ -56,7 +56,7 @@ var (
 		kubectl rollout resume deployment/nginx`)
 )
 
-func NewCmdRolloutResume(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+func NewCmdRolloutResume(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &ResumeConfig{}
 
 	validArgs := []string{"deployment"}
@@ -88,7 +88,7 @@ func NewCmdRolloutResume(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func (o *ResumeConfig) CompleteResume(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []string) error {
+func (o *ResumeConfig) CompleteResume(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []string) error {
 	if len(args) == 0 && cmdutil.IsFilenameEmpty(o.Filenames) {
 		return cmdutil.UsageError(cmd, cmd.Use)
 	}
