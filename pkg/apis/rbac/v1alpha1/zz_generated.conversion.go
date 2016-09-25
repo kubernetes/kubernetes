@@ -113,7 +113,6 @@ func Convert_rbac_ClusterRole_To_v1alpha1_ClusterRole(in *rbac.ClusterRole, out 
 }
 
 func autoConvert_v1alpha1_ClusterRoleBinding_To_rbac_ClusterRoleBinding(in *ClusterRoleBinding, out *rbac.ClusterRoleBinding, s conversion.Scope) error {
-	SetDefaults_ClusterRoleBinding(in)
 	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
 	}
@@ -356,7 +355,6 @@ func Convert_rbac_Role_To_v1alpha1_Role(in *rbac.Role, out *Role, s conversion.S
 }
 
 func autoConvert_v1alpha1_RoleBinding_To_rbac_RoleBinding(in *RoleBinding, out *rbac.RoleBinding, s conversion.Scope) error {
-	SetDefaults_RoleBinding(in)
 	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
 	}
