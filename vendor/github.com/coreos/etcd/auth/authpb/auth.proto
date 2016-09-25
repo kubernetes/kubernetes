@@ -1,0 +1,37 @@
+syntax = "proto3";
+package authpb;
+
+import "gogoproto/gogo.proto";
+
+option (gogoproto.marshaler_all) = true;
+option (gogoproto.sizer_all) = true;
+option (gogoproto.unmarshaler_all) = true;
+option (gogoproto.goproto_getters_all) = false;
+option (gogoproto.goproto_enum_prefix_all) = false;
+
+// User is a single entry in the bucket authUsers
+message User {
+  bytes name = 1;
+  bytes password = 2;
+  repeated string roles = 3;
+}
+
+// Permission is a single entity
+message Permission {
+  enum Type {
+    READ = 0;
+    WRITE = 1;
+    READWRITE = 2;
+  }
+  Type permType = 1;
+
+  bytes key = 2;
+  bytes range_end = 3;
+}
+
+// Role is a single entry in the bucket authRoles
+message Role {
+  bytes name = 1;
+
+  repeated Permission keyPermission = 2;
+}

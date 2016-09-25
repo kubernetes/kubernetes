@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,13 +18,14 @@ package keymutex
 
 import (
 	"fmt"
-	"github.com/golang/glog"
 	"sync"
+
+	"github.com/golang/glog"
 )
 
-// KeyMutex is a thread-safe interface for aquiring locks on arbitrary strings.
+// KeyMutex is a thread-safe interface for acquiring locks on arbitrary strings.
 type KeyMutex interface {
-	// Aquires a lock associated with the specified ID, creates the lock if one doesn't already exist.
+	// Acquires a lock associated with the specified ID, creates the lock if one doesn't already exist.
 	LockKey(id string)
 
 	// Releases the lock associated with the specified ID.
@@ -44,7 +45,7 @@ type keyMutex struct {
 	mutexMap map[string]*sync.Mutex
 }
 
-// Aquires a lock associated with the specified ID (creates the lock if one doesn't already exist).
+// Acquires a lock associated with the specified ID (creates the lock if one doesn't already exist).
 func (km *keyMutex) LockKey(id string) {
 	glog.V(5).Infof("LockKey(...) called for id %q\r\n", id)
 	mutex := km.getOrCreateLock(id)

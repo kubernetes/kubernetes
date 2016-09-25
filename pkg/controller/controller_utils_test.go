@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -30,18 +30,21 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/record"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/securitycontext"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/clock"
 	"k8s.io/kubernetes/pkg/util/sets"
+	utiltesting "k8s.io/kubernetes/pkg/util/testing"
+	"k8s.io/kubernetes/pkg/util/uuid"
 )
 
 // NewFakeControllerExpectationsLookup creates a fake store for PodExpectations.
-func NewFakeControllerExpectationsLookup(ttl time.Duration) (*ControllerExpectations, *util.FakeClock) {
+func NewFakeControllerExpectationsLookup(ttl time.Duration) (*ControllerExpectations, *clock.FakeClock) {
 	fakeTime := time.Date(2009, time.November, 10, 23, 0, 0, 0, time.UTC)
-	fakeClock := &util.FakeClock{Time: fakeTime}
+	fakeClock := clock.NewFakeClock(fakeTime)
 	ttlPolicy := &cache.TTLPolicy{Ttl: ttl, Clock: fakeClock}
 	ttlStore := cache.NewFakeExpirationStore(
 		ExpKeyFunc, nil, ttlPolicy, fakeClock)
@@ -50,15 +53,15 @@ func NewFakeControllerExpectationsLookup(ttl time.Duration) (*ControllerExpectat
 
 func newReplicationController(replicas int) *api.ReplicationController {
 	rc := &api.ReplicationController{
-		TypeMeta: unversioned.TypeMeta{APIVersion: testapi.Default.Version()},
+		TypeMeta: unversioned.TypeMeta{APIVersion: testapi.Default.GroupVersion().String()},
 		ObjectMeta: api.ObjectMeta{
-			UID:             util.NewUUID(),
+			UID:             uuid.NewUUID(),
 			Name:            "foobar",
 			Namespace:       api.NamespaceDefault,
 			ResourceVersion: "18",
 		},
 		Spec: api.ReplicationControllerSpec{
-			Replicas: replicas,
+			Replicas: int32(replicas),
 			Selector: map[string]string{"foo": "bar"},
 			Template: &api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
@@ -122,7 +125,7 @@ func TestControllerExpectations(t *testing.T) {
 	// RC fires off adds and deletes at apiserver, then sets expectations
 	rcKey, err := KeyFunc(rc)
 	if err != nil {
-		t.Errorf("Couldn't get key for object %+v: %v", rc, err)
+		t.Errorf("Couldn't get key for object %#v: %v", rc, err)
 	}
 	e.SetExpectations(rcKey, adds, dels)
 	var wg sync.WaitGroup
@@ -175,32 +178,85 @@ func TestControllerExpectations(t *testing.T) {
 	}
 
 	// Expectations have expired because of ttl
-	fakeClock.Time = fakeClock.Time.Add(ttl + 1)
+	fakeClock.Step(ttl + 1)
 	if !e.SatisfiedExpectations(rcKey) {
 		t.Errorf("Expectations should have expired but didn't")
+	}
+}
+
+func TestUIDExpectations(t *testing.T) {
+	uidExp := NewUIDTrackingControllerExpectations(NewControllerExpectations())
+	rcList := []*api.ReplicationController{
+		newReplicationController(2),
+		newReplicationController(1),
+		newReplicationController(0),
+		newReplicationController(5),
+	}
+	rcToPods := map[string][]string{}
+	rcKeys := []string{}
+	for i := range rcList {
+		rc := rcList[i]
+		rcName := fmt.Sprintf("rc-%v", i)
+		rc.Name = rcName
+		rc.Spec.Selector[rcName] = rcName
+		podList := newPodList(nil, 5, api.PodRunning, rc)
+		rcKey, err := KeyFunc(rc)
+		if err != nil {
+			t.Fatalf("Couldn't get key for object %#v: %v", rc, err)
+		}
+		rcKeys = append(rcKeys, rcKey)
+		rcPodNames := []string{}
+		for i := range podList.Items {
+			p := &podList.Items[i]
+			p.Name = fmt.Sprintf("%v-%v", p.Name, rc.Name)
+			rcPodNames = append(rcPodNames, PodKey(p))
+		}
+		rcToPods[rcKey] = rcPodNames
+		uidExp.ExpectDeletions(rcKey, rcPodNames)
+	}
+	for i := range rcKeys {
+		j := rand.Intn(i + 1)
+		rcKeys[i], rcKeys[j] = rcKeys[j], rcKeys[i]
+	}
+	for _, rcKey := range rcKeys {
+		if uidExp.SatisfiedExpectations(rcKey) {
+			t.Errorf("Controller %v satisfied expectations before deletion", rcKey)
+		}
+		for _, p := range rcToPods[rcKey] {
+			uidExp.DeletionObserved(rcKey, p)
+		}
+		if !uidExp.SatisfiedExpectations(rcKey) {
+			t.Errorf("Controller %v didn't satisfy expectations after deletion", rcKey)
+		}
+		uidExp.DeleteExpectations(rcKey)
+		if uidExp.GetUIDs(rcKey) != nil {
+			t.Errorf("Failed to delete uid expectations for %v", rcKey)
+		}
 	}
 }
 
 func TestCreatePods(t *testing.T) {
 	ns := api.NamespaceDefault
 	body := runtime.EncodeOrDie(testapi.Default.Codec(), &api.Pod{ObjectMeta: api.ObjectMeta{Name: "empty_pod"}})
-	fakeHandler := util.FakeHandler{
+	fakeHandler := utiltesting.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(body),
 	}
 	testServer := httptest.NewServer(&fakeHandler)
 	defer testServer.Close()
-	client := client.NewOrDie(&client.Config{Host: testServer.URL, GroupVersion: testapi.Default.GroupVersion()})
+	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 
 	podControl := RealPodControl{
-		KubeClient: client,
+		KubeClient: clientset,
 		Recorder:   &record.FakeRecorder{},
 	}
 
 	controllerSpec := newReplicationController(1)
 
 	// Make sure createReplica sends a POST to the apiserver with a pod from the controllers pod template
-	podControl.CreatePods(ns, controllerSpec.Spec.Template, controllerSpec)
+	if err := podControl.CreatePods(ns, controllerSpec.Spec.Template, controllerSpec); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	expectedPod := api.Pod{
 		ObjectMeta: api.ObjectMeta{
@@ -210,9 +266,9 @@ func TestCreatePods(t *testing.T) {
 		Spec: controllerSpec.Spec.Template.Spec,
 	}
 	fakeHandler.ValidateRequest(t, testapi.Default.ResourcePath("pods", api.NamespaceDefault, ""), "POST", nil)
-	actualPod, err := client.Codec.Decode([]byte(fakeHandler.RequestBody))
+	actualPod, err := runtime.Decode(testapi.Default.Codec(), []byte(fakeHandler.RequestBody))
 	if err != nil {
-		t.Errorf("Unexpected error: %#v", err)
+		t.Fatalf("Unexpected error: %v", err)
 	}
 	if !api.Semantic.DeepDerivative(&expectedPod, actualPod) {
 		t.Logf("Body: %s", fakeHandler.RequestBody)
@@ -231,7 +287,11 @@ func TestActivePodFiltering(t *testing.T) {
 		expectedNames.Insert(pod.Name)
 	}
 
-	got := FilterActivePods(podList.Items)
+	var podPointers []*api.Pod
+	for i := range podList.Items {
+		podPointers = append(podPointers, &podList.Items[i])
+	}
+	got := FilterActivePods(podPointers)
 	gotNames := sets.NewString()
 	for _, pod := range got {
 		gotNames.Insert(pod.Name)
@@ -242,7 +302,7 @@ func TestActivePodFiltering(t *testing.T) {
 }
 
 func TestSortingActivePods(t *testing.T) {
-	numPods := 5
+	numPods := 9
 	// This rc is not needed by the test, only the newPodList to give the pods labels/a namespace.
 	rc := newReplicationController(0)
 	podList := newPodList(nil, numPods, api.PodRunning, rc)
@@ -263,10 +323,35 @@ func TestSortingActivePods(t *testing.T) {
 	// pods[3] is running but not ready.
 	pods[3].Spec.NodeName = "foo"
 	pods[3].Status.Phase = api.PodRunning
-	// pods[4] is running and ready.
+	// pods[4] is running and ready but without LastTransitionTime.
+	now := unversioned.Now()
 	pods[4].Spec.NodeName = "foo"
 	pods[4].Status.Phase = api.PodRunning
 	pods[4].Status.Conditions = []api.PodCondition{{Type: api.PodReady, Status: api.ConditionTrue}}
+	pods[4].Status.ContainerStatuses = []api.ContainerStatus{{RestartCount: 3}, {RestartCount: 0}}
+	// pods[5] is running and ready and with LastTransitionTime.
+	pods[5].Spec.NodeName = "foo"
+	pods[5].Status.Phase = api.PodRunning
+	pods[5].Status.Conditions = []api.PodCondition{{Type: api.PodReady, Status: api.ConditionTrue, LastTransitionTime: now}}
+	pods[5].Status.ContainerStatuses = []api.ContainerStatus{{RestartCount: 3}, {RestartCount: 0}}
+	// pods[6] is running ready for a longer time than pods[5].
+	then := unversioned.Time{Time: now.AddDate(0, -1, 0)}
+	pods[6].Spec.NodeName = "foo"
+	pods[6].Status.Phase = api.PodRunning
+	pods[6].Status.Conditions = []api.PodCondition{{Type: api.PodReady, Status: api.ConditionTrue, LastTransitionTime: then}}
+	pods[6].Status.ContainerStatuses = []api.ContainerStatus{{RestartCount: 3}, {RestartCount: 0}}
+	// pods[7] has lower container restart count than pods[6].
+	pods[7].Spec.NodeName = "foo"
+	pods[7].Status.Phase = api.PodRunning
+	pods[7].Status.Conditions = []api.PodCondition{{Type: api.PodReady, Status: api.ConditionTrue, LastTransitionTime: then}}
+	pods[7].Status.ContainerStatuses = []api.ContainerStatus{{RestartCount: 2}, {RestartCount: 1}}
+	pods[7].CreationTimestamp = now
+	// pods[8] is older than pods[7].
+	pods[8].Spec.NodeName = "foo"
+	pods[8].Status.Phase = api.PodRunning
+	pods[8].Status.Conditions = []api.PodCondition{{Type: api.PodReady, Status: api.ConditionTrue, LastTransitionTime: then}}
+	pods[8].Status.ContainerStatuses = []api.ContainerStatus{{RestartCount: 2}, {RestartCount: 1}}
+	pods[8].CreationTimestamp = then
 
 	getOrder := func(pods []*api.Pod) []string {
 		names := make([]string, len(pods))

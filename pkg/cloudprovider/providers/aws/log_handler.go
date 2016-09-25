@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ import (
 
 // Handler for aws-sdk-go that logs all requests
 func awsHandlerLogger(req *request.Request) {
-	service := req.Service.ServiceName
+	service := req.ClientInfo.ServiceName
 
 	name := "?"
 	if req.Operation != nil {

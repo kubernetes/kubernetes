@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,9 +24,10 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/util"
+	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 )
 
 func parseSelectorOrDie(s string) fields.Selector {
@@ -55,7 +56,7 @@ func buildLocation(resourcePath string, query url.Values) string {
 }
 
 func TestListWatchesCanList(t *testing.T) {
-	fieldSelectorQueryParamName := unversioned.FieldSelectorQueryParam(testapi.Default.Version())
+	fieldSelectorQueryParamName := unversioned.FieldSelectorQueryParam(testapi.Default.GroupVersion().String())
 	table := []struct {
 		location      string
 		resource      string
@@ -89,23 +90,23 @@ func TestListWatchesCanList(t *testing.T) {
 		},
 	}
 	for _, item := range table {
-		handler := util.FakeHandler{
+		handler := utiltesting.FakeHandler{
 			StatusCode:   500,
 			ResponseBody: "",
 			T:            t,
 		}
 		server := httptest.NewServer(&handler)
 		defer server.Close()
-		client := client.NewOrDie(&client.Config{Host: server.URL, GroupVersion: testapi.Default.GroupVersion()})
+		client := client.NewOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 		lw := NewListWatchFromClient(client, item.resource, item.namespace, item.fieldSelector)
 		// This test merely tests that the correct request is made.
-		lw.List()
+		lw.List(api.ListOptions{})
 		handler.ValidateRequest(t, item.location, "GET", nil)
 	}
 }
 
 func TestListWatchesCanWatch(t *testing.T) {
-	fieldSelectorQueryParamName := unversioned.FieldSelectorQueryParam(testapi.Default.Version())
+	fieldSelectorQueryParamName := unversioned.FieldSelectorQueryParam(testapi.Default.GroupVersion().String())
 	table := []struct {
 		rv            string
 		location      string
@@ -155,17 +156,17 @@ func TestListWatchesCanWatch(t *testing.T) {
 	}
 
 	for _, item := range table {
-		handler := util.FakeHandler{
+		handler := utiltesting.FakeHandler{
 			StatusCode:   500,
 			ResponseBody: "",
 			T:            t,
 		}
 		server := httptest.NewServer(&handler)
 		defer server.Close()
-		client := client.NewOrDie(&client.Config{Host: server.URL, GroupVersion: testapi.Default.GroupVersion()})
+		client := client.NewOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 		lw := NewListWatchFromClient(client, item.resource, item.namespace, item.fieldSelector)
 		// This test merely tests that the correct request is made.
-		lw.Watch(unversioned.ListOptions{ResourceVersion: item.rv})
+		lw.Watch(api.ListOptions{ResourceVersion: item.rv})
 		handler.ValidateRequest(t, item.location, "GET", nil)
 	}
 }

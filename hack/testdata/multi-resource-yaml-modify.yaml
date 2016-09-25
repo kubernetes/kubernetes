@@ -19,6 +19,8 @@ metadata:
   name: mock
 spec:
   replicas: 1
+  selector:
+    app: mock
   template:
     metadata:
       labels:
@@ -27,7 +29,7 @@ spec:
     spec:
       containers:
       - name: mock-container
-        image: kubernetes/pause
+        image: gcr.io/google-containers/pause:2.0
         ports:
         - containerPort: 9949
           protocol: TCP

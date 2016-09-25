@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 The Kubernetes Authors All rights reserved.
+# Copyright 2015 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -31,7 +31,7 @@ TEST_ARGS="$@"
 
 KUBE_ROOT=$(cd "$(dirname "${BASH_SOURCE}")/../../.." && pwd)
 
-TEST_CMD="KUBECONFIG=~/.kube/config hack/conformance-test.sh"
+TEST_CMD="KUBERNETES_CONFORMANCE_TEST=y KUBECONFIG=~/.kube/config go run hack/e2e.go --test --test_args=\"--ginkgo.focus=\\[Conformance\\]\""
 if [ -n "${CONFORMANCE_BRANCH}" ]; then
 	# create a CONFORMANCE_BRANCH clone in a subdirectory
 	TEST_CMD="

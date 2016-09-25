@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,31 +23,32 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/wait"
+	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Mesos", func() {
-	framework := NewFramework("pods")
+var _ = framework.KubeDescribe("Mesos", func() {
+	f := framework.NewDefaultFramework("pods")
 	var c *client.Client
 	var ns string
 
 	BeforeEach(func() {
-		SkipUnlessProviderIs("mesos/docker")
-		c = framework.Client
-		ns = framework.Namespace.Name
+		framework.SkipUnlessProviderIs("mesos/docker")
+		c = f.Client
+		ns = f.Namespace.Name
 	})
 
 	It("applies slave attributes as labels", func() {
-		nodeClient := framework.Client.Nodes()
+		nodeClient := f.Client.Nodes()
 
 		rackA := labels.SelectorFromSet(map[string]string{"k8s.mesosphere.io/attribute-rack": "1"})
-		options := unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{rackA}}
+		options := api.ListOptions{LabelSelector: rackA}
 		nodes, err := nodeClient.List(options)
 		if err != nil {
-			Failf("Failed to query for node: %v", err)
+			framework.Failf("Failed to query for node: %v", err)
 		}
 		Expect(len(nodes.Items)).To(Equal(1))
 
@@ -61,19 +62,18 @@ var _ = Describe("Mesos", func() {
 	})
 
 	It("starts static pods on every node in the mesos cluster", func() {
-		client := framework.Client
-		expectNoError(allNodesReady(client, util.ForeverTestTimeout), "all nodes ready")
+		client := f.Client
+		framework.ExpectNoError(framework.AllNodesReady(client, wait.ForeverTestTimeout), "all nodes ready")
 
-		nodelist, err := client.Nodes().List(unversioned.ListOptions{})
-		expectNoError(err, "nodes fetched from apiserver")
+		nodelist := framework.GetReadySchedulableNodesOrDie(f.Client)
 
 		const ns = "static-pods"
-		numpods := len(nodelist.Items)
-		expectNoError(waitForPodsRunningReady(ns, numpods, util.ForeverTestTimeout),
+		numpods := int32(len(nodelist.Items))
+		framework.ExpectNoError(framework.WaitForPodsRunningReady(client, ns, numpods, wait.ForeverTestTimeout, map[string]string{}),
 			fmt.Sprintf("number of static pods in namespace %s is %d", ns, numpods))
 	})
 
-	It("schedules pods labelled with roles on correct slaves", func() {
+	It("schedules pods annotated with roles on correct slaves", func() {
 		// launch a pod to find a node which can launch a pod. We intentionally do
 		// not just take the node list and choose the first of them. Depending on the
 		// cluster and the scheduler it might be that a "normal" pod cannot be
@@ -86,32 +86,34 @@ var _ = Describe("Mesos", func() {
 			},
 			ObjectMeta: api.ObjectMeta{
 				Name: podName,
-				Labels: map[string]string{
-					"k8s.mesosphere.io/roles": "role1",
+				Annotations: map[string]string{
+					"k8s.mesosphere.io/roles": "public",
 				},
 			},
 			Spec: api.PodSpec{
 				Containers: []api.Container{
 					{
 						Name:  podName,
-						Image: "beta.gcr.io/google_containers/pause:2.0",
+						Image: framework.GetPauseImageName(f.Client),
 					},
 				},
 			},
 		})
-		expectNoError(err)
+		framework.ExpectNoError(err)
 
-		expectNoError(waitForPodRunningInNamespace(c, podName, ns))
+		framework.ExpectNoError(framework.WaitForPodNameRunningInNamespace(c, podName, ns))
 		pod, err := c.Pods(ns).Get(podName)
-		expectNoError(err)
+		framework.ExpectNoError(err)
 
-		nodeClient := framework.Client.Nodes()
-		role1 := labels.SelectorFromSet(map[string]string{
-			"k8s.mesosphere.io/attribute-role": "role1",
+		nodeClient := f.Client.Nodes()
+
+		// schedule onto node with rack=2 being assigned to the "public" role
+		rack2 := labels.SelectorFromSet(map[string]string{
+			"k8s.mesosphere.io/attribute-rack": "2",
 		})
-		options := unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{role1}}
+		options := api.ListOptions{LabelSelector: rack2}
 		nodes, err := nodeClient.List(options)
-		expectNoError(err)
+		framework.ExpectNoError(err)
 
 		Expect(nodes.Items[0].Name).To(Equal(pod.Spec.NodeName))
 	})

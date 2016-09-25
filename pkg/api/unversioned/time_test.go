@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package unversioned
 
 import (
 	"encoding/json"
+	"reflect"
 	"testing"
 	"time"
 
@@ -142,6 +143,31 @@ func TestTimeMarshalJSONUnmarshalYAML(t *testing.T) {
 
 		if input.T.UnixNano() != result.T.UnixNano() {
 			t.Errorf("%d-4: Failed to marshal input '%#v': got %#v", i, input, result)
+		}
+	}
+}
+
+func TestTimeProto(t *testing.T) {
+	cases := []struct {
+		input Time
+	}{
+		{Time{}},
+		{Date(1998, time.May, 5, 1, 5, 5, 50, time.Local)},
+		{Date(1998, time.May, 5, 5, 5, 5, 0, time.Local)},
+	}
+
+	for _, c := range cases {
+		input := c.input
+		data, err := input.Marshal()
+		if err != nil {
+			t.Fatalf("Failed to marshal input: '%v': %v", input, err)
+		}
+		time := Time{}
+		if err := time.Unmarshal(data); err != nil {
+			t.Fatalf("Failed to unmarshal output: '%v': %v", input, err)
+		}
+		if !reflect.DeepEqual(input, time) {
+			t.Errorf("Marshal->Unmarshal is not idempotent: '%v' vs '%v'", input, time)
 		}
 	}
 }

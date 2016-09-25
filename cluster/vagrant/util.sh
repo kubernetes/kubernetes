@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2014 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -25,7 +25,7 @@ function detect-master () {
   echo "KUBE_MASTER_IP: ${KUBE_MASTER_IP}" 1>&2
 }
 
-# Get minion IP addresses and store in KUBE_NODE_IP_ADDRESSES[]
+# Get node IP addresses and store in KUBE_NODE_IP_ADDRESSES[]
 function detect-nodes {
   echo "Nodes already detected" 1>&2
   KUBE_NODE_IP_ADDRESSES=("${NODE_IPS[@]}")
@@ -53,6 +53,7 @@ function verify-prereqs {
       prlctl parallels vagrant-parallels
       VBoxManage virtualbox ''
       virsh libvirt vagrant-libvirt
+      '' vsphere vagrant-vsphere
   )
   local provider_found=''
   local provider_bin
@@ -82,7 +83,7 @@ function verify-prereqs {
   done
 
   if [ -z "${provider_found}" ]; then
-    if [ -n "${VAGRANT_DEFAULT_PROVIDER}" ]; then
+    if [ -n "${VAGRANT_DEFAULT_PROVIDER:-}" ]; then
       echo "Can't find the necessary components for the ${VAGRANT_DEFAULT_PROVIDER} vagrant provider."
       echo "Possible reasons could be: "
       echo -e "\t- vmrun utility is not in your path"
@@ -114,7 +115,7 @@ function ensure-temp-dir {
   fi
 }
 
-# Create a set of provision scripts for the master and each of the minions
+# Create a set of provision scripts for the master and each of the nodes
 function create-provision-scripts {
   ensure-temp-dir
 
@@ -139,9 +140,9 @@ function create-provision-scripts {
       echo "CONTAINER_ADDR='${NODE_CONTAINER_ADDRS[$i]}'"
       echo "CONTAINER_NETMASK='${NODE_CONTAINER_NETMASKS[$i]}'"
       awk '!/^#/' "${KUBE_ROOT}/cluster/vagrant/provision-utils.sh"
-      awk '!/^#/' "${KUBE_ROOT}/cluster/vagrant/provision-network-minion.sh"
-      awk '!/^#/' "${KUBE_ROOT}/cluster/vagrant/provision-minion.sh"
-    ) > "${KUBE_TEMP}/minion-start-${i}.sh"
+      awk '!/^#/' "${KUBE_ROOT}/cluster/vagrant/provision-network-node.sh"
+      awk '!/^#/' "${KUBE_ROOT}/cluster/vagrant/provision-node.sh"
+    ) > "${KUBE_TEMP}/node-start-${i}.sh"
   done
 }
 
@@ -153,6 +154,7 @@ function echo-kube-env() {
   echo "NODE_NAMES=(${NODE_NAMES[@]})"
   echo "NODE_IPS=(${NODE_IPS[@]})"
   echo "CONTAINER_SUBNET='${CONTAINER_SUBNET}'"
+  echo "CLUSTER_IP_RANGE='${CLUSTER_IP_RANGE}'"
   echo "MASTER_CONTAINER_SUBNET='${MASTER_CONTAINER_SUBNET}'"
   echo "NODE_CONTAINER_NETMASKS='${NODE_CONTAINER_NETMASKS[@]}'"
   echo "NODE_CONTAINER_SUBNETS=(${NODE_CONTAINER_SUBNETS[@]})"
@@ -161,11 +163,13 @@ function echo-kube-env() {
   echo "MASTER_PASSWD='${MASTER_PASSWD}'"
   echo "KUBE_USER='${KUBE_USER}'"
   echo "KUBE_PASSWORD='${KUBE_PASSWORD}'"
+  echo "KUBE_BEARER_TOKEN='${KUBE_BEARER_TOKEN}'"
   echo "ENABLE_CLUSTER_MONITORING='${ENABLE_CLUSTER_MONITORING}'"
   echo "ENABLE_CLUSTER_LOGGING='${ENABLE_CLUSTER_LOGGING:-false}'"
   echo "ELASTICSEARCH_LOGGING_REPLICAS='${ELASTICSEARCH_LOGGING_REPLICAS:-1}'"
   echo "ENABLE_NODE_LOGGING='${ENABLE_NODE_LOGGING:-false}'"
   echo "ENABLE_CLUSTER_UI='${ENABLE_CLUSTER_UI}'"
+  echo "ENABLE_HOSTPATH_PROVISIONER='${ENABLE_HOSTPATH_PROVISIONER:-false}'"
   echo "LOGGING_DESTINATION='${LOGGING_DESTINATION:-}'"
   echo "ENABLE_CLUSTER_DNS='${ENABLE_CLUSTER_DNS:-false}'"
   echo "DNS_SERVER_IP='${DNS_SERVER_IP:-}'"
@@ -184,6 +188,8 @@ function echo-kube-env() {
   echo "OPENCONTRAIL_KUBERNETES_TAG='${OPENCONTRAIL_KUBERNETES_TAG:-}'"
   echo "OPENCONTRAIL_PUBLIC_SUBNET='${OPENCONTRAIL_PUBLIC_SUBNET:-}'"
   echo "E2E_STORAGE_TEST_ENVIRONMENT='${E2E_STORAGE_TEST_ENVIRONMENT:-}'"
+  echo "CUSTOM_FEDORA_REPOSITORY_URL='${CUSTOM_FEDORA_REPOSITORY_URL:-}'"
+  echo "EVICTION_HARD='${EVICTION_HARD:-}'"
 }
 
 function verify-cluster {
@@ -211,7 +217,7 @@ function verify-cluster {
     done
   done
 
-  # verify each minion has all required daemons
+  # verify each node has all required daemons
   local i
   for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
     echo "Validating ${VAGRANT_NODE_NAMES[$i]}"
@@ -231,12 +237,12 @@ function verify-cluster {
   done
 
   echo
-  echo "Waiting for each minion to be registered with cloud provider"
+  echo "Waiting for each node to be registered with cloud provider"
   for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
     local validated="0"
     until [[ "$validated" == "1" ]]; do
-      local minions=$("${KUBE_ROOT}/cluster/kubectl.sh" get nodes -o name --api-version=v1)
-      validated=$(echo $minions | grep -c "${NODE_NAMES[i]}") || {
+      local nodes=$("${KUBE_ROOT}/cluster/kubectl.sh" get nodes -o name --api-version=v1)
+      validated=$(echo $nodes | grep -c "${NODE_NAMES[i]}") || {
         printf "."
         sleep 2
         validated="0"
@@ -253,6 +259,7 @@ function verify-cluster {
   (
     # ensures KUBECONFIG is set
     get-kubeconfig-basicauth
+    get-kubeconfig-bearertoken
     echo
     echo "Kubernetes cluster is running."
     echo
@@ -274,6 +281,7 @@ function verify-cluster {
 # Instantiate a kubernetes cluster
 function kube-up {
   load-or-gen-kube-basicauth
+  load-or-gen-kube-bearertoken
   get-tokens
   create-provision-scripts
 
@@ -290,7 +298,10 @@ function kube-up {
    vagrant ssh master -- sudo cat /srv/kubernetes/kubecfg.key >"${KUBE_KEY}" 2>/dev/null
    vagrant ssh master -- sudo cat /srv/kubernetes/ca.crt >"${CA_CERT}" 2>/dev/null
 
+   # Update the user's kubeconfig to include credentials for this apiserver.
    create-kubeconfig
+
+   create-kubeconfig-for-federation
   )
 
   verify-cluster
@@ -304,6 +315,7 @@ function kube-down {
 # Update a kubernetes cluster with latest source
 function kube-push {
   get-kubeconfig-basicauth
+  get-kubeconfig-bearertoken
   create-provision-scripts
   vagrant provision
 }
@@ -316,6 +328,7 @@ function test-build-release {
 
 # Execute prior to running tests to initialize required structure
 function test-setup {
+  "${KUBE_ROOT}/cluster/kube-up.sh"
   echo "Vagrant test setup complete" 1>&2
 }
 
@@ -324,34 +337,34 @@ function test-teardown {
   kube-down
 }
 
-# Find the minion name based on the IP address
+# Find the node name based on the IP address
 function find-vagrant-name-by-ip {
   local ip="$1"
   local ip_pattern="${NODE_IP_BASE}(.*)"
 
-  # This is subtle.  We map 10.245.2.2 -> minion-1.  We do this by matching a
+  # This is subtle.  We map 10.245.2.2 -> node-1.  We do this by matching a
   # regexp and using the capture to construct the name.
   [[ $ip =~ $ip_pattern ]] || {
     return 1
   }
 
-  echo "minion-$((${BASH_REMATCH[1]} - 1))"
+  echo "node-$((${BASH_REMATCH[1]} - 1))"
 }
 
-# Find the vagrant machine name based on the host name of the minion
-function find-vagrant-name-by-minion-name {
+# Find the vagrant machine name based on the host name of the node
+function find-vagrant-name-by-node-name {
   local ip="$1"
   if [[ "$ip" == "${INSTANCE_PREFIX}-master" ]]; then
     echo "master"
     return $?
   fi
-  local ip_pattern="${INSTANCE_PREFIX}-minion-(.*)"
+  local ip_pattern="${INSTANCE_PREFIX}-node-(.*)"
 
   [[ $ip =~ $ip_pattern ]] || {
     return 1
   }
 
-  echo "minion-${BASH_REMATCH[1]}"
+  echo "node-${BASH_REMATCH[1]}"
 }
 
 
@@ -362,23 +375,13 @@ function ssh-to-node {
   local machine
 
   machine=$(find-vagrant-name-by-ip $node) || true
-  [[ -n ${machine-} ]] || machine=$(find-vagrant-name-by-minion-name $node) || true
+  [[ -n ${machine-} ]] || machine=$(find-vagrant-name-by-node-name $node) || true
   [[ -n ${machine-} ]] || {
     echo "Cannot find machine to ssh to: $1"
     return 1
   }
 
   vagrant ssh "${machine}" -c "${cmd}"
-}
-
-# Restart the kube-proxy on a node ($1)
-function restart-kube-proxy {
-  ssh-to-node "$1" "sudo systemctl restart kube-proxy"
-}
-
-# Restart the apiserver
-function restart-apiserver {
-  ssh-to-node "$1" "sudo systemctl restart kube-apiserver"
 }
 
 # Perform preparations required to run e2e tests

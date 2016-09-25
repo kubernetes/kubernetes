@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,32 +23,38 @@ import (
 	"os"
 	"time"
 
+	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
+var (
+	logs_example = dedent.Dedent(`
+		# Return snapshot logs from pod nginx with only one container
+		kubectl logs nginx
+
+		# Return snapshot of previous terminated ruby container logs from pod web-1
+		kubectl logs -p -c ruby web-1
+
+		# Begin streaming the logs of the ruby container in pod web-1
+		kubectl logs -f -c ruby web-1
+
+		# Display only the most recent 20 lines of output in pod nginx
+		kubectl logs --tail=20 nginx
+
+		# Show all logs from pod nginx written in the last hour
+		kubectl logs --since=1h nginx`)
+)
+
 const (
-	logs_example = `# Return snapshot logs from pod nginx with only one container
-$ kubectl logs nginx
-
-# Return snapshot of previous terminated ruby container logs from pod web-1
-$ kubectl logs -p -c ruby web-1
-
-# Begin streaming the logs of the ruby container in pod web-1
-$ kubectl logs -f -c ruby web-1
-
-# Display only the most recent 20 lines of output in pod nginx
-$ kubectl logs --tail=20 nginx
-
-# Show all logs from pod nginx written in the last hour
-$ kubectl logs --since=1h nginx`
+	logsUsageStr = "expected 'logs POD_NAME [CONTAINER_NAME]'.\nPOD_NAME is a required argument for the logs command"
 )
 
 type LogsOptions struct {
@@ -59,8 +65,10 @@ type LogsOptions struct {
 	Mapper       meta.RESTMapper
 	Typer        runtime.ObjectTyper
 	ClientMapper resource.ClientMapper
+	Decoder      runtime.Decoder
 
-	LogsForObject func(object, options runtime.Object) (*client.Request, error)
+	Object        runtime.Object
+	LogsForObject func(object, options runtime.Object) (*restclient.Request, error)
 
 	Out io.Writer
 }
@@ -70,7 +78,7 @@ func NewCmdLogs(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	o := &LogsOptions{}
 	cmd := &cobra.Command{
 		Use:     "logs [-f] [-p] POD [-c CONTAINER]",
-		Short:   "Print the logs for a container in a pod.",
+		Short:   "Print the logs for a container in a pod",
 		Long:    "Print the logs for a container in a pod. If the pod has only one container, the container name is optional.",
 		Example: logs_example,
 		PreRun: func(cmd *cobra.Command, args []string) {
@@ -99,6 +107,7 @@ func NewCmdLogs(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 
 	cmd.Flags().Bool("interactive", false, "If true, prompt the user for input when required.")
 	cmd.Flags().MarkDeprecated("interactive", "This flag is no longer respected and there is no replacement.")
+	cmdutil.AddInclude3rdPartyFlags(cmd)
 	return cmd
 }
 
@@ -106,17 +115,17 @@ func (o *LogsOptions) Complete(f *cmdutil.Factory, out io.Writer, cmd *cobra.Com
 	containerName := cmdutil.GetFlagString(cmd, "container")
 	switch len(args) {
 	case 0:
-		return cmdutil.UsageError(cmd, "POD is required for logs")
+		return cmdutil.UsageError(cmd, logsUsageStr)
 	case 1:
 		o.ResourceArg = args[0]
 	case 2:
 		if cmd.Flag("container").Changed {
-			return cmdutil.UsageError(cmd, "only one of -c, [CONTAINER] arg is allowed")
+			return cmdutil.UsageError(cmd, "only one of -c or an inline [CONTAINER] arg is allowed")
 		}
 		o.ResourceArg = args[0]
 		containerName = args[1]
 	default:
-		return cmdutil.UsageError(cmd, "logs POD [-c CONTAINER]")
+		return cmdutil.UsageError(cmd, logsUsageStr)
 	}
 	var err error
 	o.Namespace, _, err = f.DefaultNamespace()
@@ -149,12 +158,26 @@ func (o *LogsOptions) Complete(f *cmdutil.Factory, out io.Writer, cmd *cobra.Com
 		logOptions.SinceSeconds = &sec
 	}
 	o.Options = logOptions
-
-	o.Mapper, o.Typer = f.Object()
-	o.ClientMapper = f.ClientMapperForCommand()
 	o.LogsForObject = f.LogsForObject
-
+	o.ClientMapper = resource.ClientMapperFunc(f.ClientForMapping)
 	o.Out = out
+
+	mapper, typer := f.Object()
+	decoder := f.Decoder(true)
+	if o.Object == nil {
+		infos, err := resource.NewBuilder(mapper, typer, o.ClientMapper, decoder).
+			NamespaceParam(o.Namespace).DefaultNamespace().
+			ResourceNames("pods", o.ResourceArg).
+			SingleResourceType().
+			Do().Infos()
+		if err != nil {
+			return err
+		}
+		if len(infos) != 1 {
+			return errors.New("expected a resource")
+		}
+		o.Object = infos[0].Object
+	}
 
 	return nil
 }
@@ -176,20 +199,7 @@ func (o LogsOptions) Validate() error {
 
 // RunLogs retrieves a pod log
 func (o LogsOptions) RunLogs() (int64, error) {
-	infos, err := resource.NewBuilder(o.Mapper, o.Typer, o.ClientMapper).
-		NamespaceParam(o.Namespace).DefaultNamespace().
-		ResourceNames("pods", o.ResourceArg).
-		SingleResourceType().
-		Do().Infos()
-	if err != nil {
-		return 0, err
-	}
-	if len(infos) != 1 {
-		return 0, errors.New("expected a resource")
-	}
-	info := infos[0]
-
-	req, err := o.LogsForObject(info.Object, o.Options)
+	req, err := o.LogsForObject(o.Object, o.Options)
 	if err != nil {
 		return 0, err
 	}

@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,10 +17,9 @@ limitations under the License.
 package storage
 
 import (
-	"time"
-
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -30,7 +29,7 @@ type Versioner interface {
 	// UpdateObject sets storage metadata into an API object. Returns an error if the object
 	// cannot be updated correctly. May return nil if the requested object does not need metadata
 	// from database.
-	UpdateObject(obj runtime.Object, expiration *time.Time, resourceVersion uint64) error
+	UpdateObject(obj runtime.Object, resourceVersion uint64) error
 	// UpdateList sets the resource version into an API list object. Returns an error if the object
 	// cannot be updated correctly. May return nil if the requested object does not need metadata
 	// from database.
@@ -48,20 +47,49 @@ type ResponseMeta struct {
 	// zero or negative in some cases (objects may be expired after the requested
 	// expiration time due to server lag).
 	TTL int64
-	// Expiration is the time at which the node that contained the returned object will expire and be deleted.
-	// This can be nil if there is no expiration time set for the node.
-	Expiration *time.Time
 	// The resource version of the node that contained the returned object.
 	ResourceVersion uint64
 }
 
-// FilterFunc is a predicate which takes an API object and returns true
-// if and only if the object should remain in the set.
-type FilterFunc func(obj runtime.Object) bool
+// MatchValue defines a pair (<index name>, <value for that index>).
+type MatchValue struct {
+	IndexName string
+	Value     string
+}
 
-// Everything is a FilterFunc which accepts all objects.
-func Everything(runtime.Object) bool {
+// TriggerPublisherFunc is a function that takes an object, and returns a list of pairs
+// (<index name>, <index value for the given object>) for all indexes known
+// to that function.
+type TriggerPublisherFunc func(obj runtime.Object) []MatchValue
+
+// Filter is interface that is used to pass filtering mechanism.
+type Filter interface {
+	// Filter is a predicate which takes an API object and returns true
+	// if and only if the object should remain in the set.
+	Filter(obj runtime.Object) bool
+	// For any triggers known to the Filter, if Filter() can return only
+	// (a subset of) objects for which indexing function returns <value>,
+	// (<index name>, <value> pair would be returned.
+	//
+	// This is optimization to avoid computing Filter() function (which are
+	// usually relatively expensive) in case we are sure they will return
+	// false anyway.
+	Trigger() []MatchValue
+}
+
+// Everything is a Filter which accepts all objects.
+var Everything Filter = everything{}
+
+// everything is implementation of Everything.
+type everything struct {
+}
+
+func (e everything) Filter(runtime.Object) bool {
 	return true
+}
+
+func (e everything) Trigger() []MatchValue {
+	return nil
 }
 
 // Pass an UpdateFunc to Interface.GuaranteedUpdate to make an update
@@ -69,14 +97,21 @@ func Everything(runtime.Object) bool {
 // See the comment for GuaranteedUpdate for more details.
 type UpdateFunc func(input runtime.Object, res ResponseMeta) (output runtime.Object, ttl *uint64, err error)
 
-// Interface offers a common interface for object marshaling/unmarshling operations and
+// Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.
+type Preconditions struct {
+	// Specifies the target UID.
+	UID *types.UID `json:"uid,omitempty"`
+}
+
+// NewUIDPreconditions returns a Preconditions with UID set.
+func NewUIDPreconditions(uid string) *Preconditions {
+	u := types.UID(uid)
+	return &Preconditions{UID: &u}
+}
+
+// Interface offers a common interface for object marshaling/unmarshaling operations and
 // hides all the storage-related operations behind it.
 type Interface interface {
-	// Returns list of servers addresses of the underyling database.
-	// TODO: This method is used only in a single place. Consider refactoring and getting rid
-	// of this method from the interface.
-	Backends(ctx context.Context) []string
-
 	// Returns Versioner associated with this interface.
 	Versioner() Versioner
 
@@ -85,25 +120,23 @@ type Interface interface {
 	// set to the read value from database.
 	Create(ctx context.Context, key string, obj, out runtime.Object, ttl uint64) error
 
-	// Set marshals obj via json and stores in database under key. Will do an atomic update
-	// if obj's ResourceVersion field is set. 'ttl' is time-to-live in seconds (0 means forever).
-	// If no error is returned and out is not nil, out will be set to the read value from database.
-	Set(ctx context.Context, key string, obj, out runtime.Object, ttl uint64) error
-
 	// Delete removes the specified key and returns the value that existed at that spot.
-	Delete(ctx context.Context, key string, out runtime.Object) error
+	// If key didn't exist, it will return NotFound storage error.
+	Delete(ctx context.Context, key string, out runtime.Object, preconditions *Preconditions) error
 
 	// Watch begins watching the specified key. Events are decoded into API objects,
 	// and any items passing 'filter' are sent down to returned watch.Interface.
-	// resourceVersion may be used to specify what version to begin watching
+	// resourceVersion may be used to specify what version to begin watching,
+	// which should be the current resourceVersion, and no longer rv+1
 	// (e.g. reconnecting without missing any updates).
-	Watch(ctx context.Context, key string, resourceVersion uint64, filter FilterFunc) (watch.Interface, error)
+	Watch(ctx context.Context, key string, resourceVersion string, filter Filter) (watch.Interface, error)
 
 	// WatchList begins watching the specified key's items. Items are decoded into API
 	// objects and any item passing 'filter' are sent down to returned watch.Interface.
-	// resourceVersion may be used to specify what version to begin watching
+	// resourceVersion may be used to specify what version to begin watching,
+	// which should be the current resourceVersion, and no longer rv+1
 	// (e.g. reconnecting without missing any updates).
-	WatchList(ctx context.Context, key string, resourceVersion uint64, filter FilterFunc) (watch.Interface, error)
+	WatchList(ctx context.Context, key string, resourceVersion string, filter Filter) (watch.Interface, error)
 
 	// Get unmarshals json found at key into objPtr. On a not found error, will either
 	// return a zero object of the requested type, or an error, depending on ignoreNotFound.
@@ -112,19 +145,23 @@ type Interface interface {
 
 	// GetToList unmarshals json found at key and opaque it into *List api object
 	// (an object that satisfies the runtime.IsList definition).
-	GetToList(ctx context.Context, key string, filter FilterFunc, listObj runtime.Object) error
+	GetToList(ctx context.Context, key string, filter Filter, listObj runtime.Object) error
 
 	// List unmarshalls jsons found at directory defined by key and opaque them
 	// into *List api object (an object that satisfies runtime.IsList definition).
 	// The returned contents may be delayed, but it is guaranteed that they will
 	// be have at least 'resourceVersion'.
-	List(ctx context.Context, key string, resourceVersion uint64, filter FilterFunc, listObj runtime.Object) error
+	List(ctx context.Context, key string, resourceVersion string, filter Filter, listObj runtime.Object) error
 
 	// GuaranteedUpdate keeps calling 'tryUpdate()' to update key 'key' (of type 'ptrToType')
 	// retrying the update until success if there is index conflict.
-	// Note that object passed to tryUpdate may change acress incovations of tryUpdate() if
-	// other writers are simultaneously updateing it, to tryUpdate() needs to take into account
+	// Note that object passed to tryUpdate may change across invocations of tryUpdate() if
+	// other writers are simultaneously updating it, so tryUpdate() needs to take into account
 	// the current contents of the object when deciding how the update object should look.
+	// If the key doesn't exist, it will return NotFound storage error if ignoreNotFound=false
+	// or zero value in 'ptrToType' parameter otherwise.
+	// If the object to update has the same value as previous, it won't do any update
+	// but will return the object in 'ptrToType' parameter.
 	//
 	// Example:
 	//
@@ -144,8 +181,5 @@ type Interface interface {
 	//       return cur, nil, nil
 	//    }
 	// })
-	GuaranteedUpdate(ctx context.Context, key string, ptrToType runtime.Object, ignoreNotFound bool, tryUpdate UpdateFunc) error
-
-	// Codec provides access to the underlying codec being used by the implementation.
-	Codec() runtime.Codec
+	GuaranteedUpdate(ctx context.Context, key string, ptrToType runtime.Object, ignoreNotFound bool, precondtions *Preconditions, tryUpdate UpdateFunc) error
 }

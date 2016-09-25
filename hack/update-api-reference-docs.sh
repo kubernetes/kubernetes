@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 The Kubernetes Authors All rights reserved.
+# Copyright 2016 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,78 +21,32 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+echo "Note: This assumes that swagger spec has been updated. Please run hack/update-swagger-spec.sh to ensure that."
+
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
+source "${KUBE_ROOT}/hack/lib/swagger.sh"
 kube::golang::setup_env
 
-DEFAULT_OUTPUT="${KUBE_ROOT}/docs/api-reference"
-OUTPUT=${1:-${DEFAULT_OUTPUT}}
-# Use REPO_DIR if provided so we can set it to the host-resolvable path
-# to the repo root if we are running this script from a container with
-# docker mounted in as a volume.
-# We pass the host output dir as the source dir to `docker run -v`, but use
-# the regular one to compute diff (they will be the same if running this
-# test on the host, potentially different if running in a container).
 REPO_DIR=${REPO_DIR:-"${KUBE_ROOT}"}
-TMP_SUBPATH="_output/generated_html"
-OUTPUT_TMP_IN_HOST="${REPO_DIR}/${TMP_SUBPATH}"
-OUTPUT_TMP="${KUBE_ROOT}/${TMP_SUBPATH}"
+DEFAULT_OUTPUT="${REPO_DIR}/docs/api-reference"
+OUTPUT=${1:-${DEFAULT_OUTPUT}}
 
-echo "Generating api reference docs at ${OUTPUT_TMP}"
+SWAGGER_SPEC_PATH="${REPO_DIR}/api/swagger-spec"
 
-V1_TMP_IN_HOST="${OUTPUT_TMP_IN_HOST}/v1/"
-V1_TMP="${OUTPUT_TMP}/v1/"
-mkdir -p ${V1_TMP}
-V1BETA1_TMP_IN_HOST="${OUTPUT_TMP_IN_HOST}/extensions/v1beta1/"
-V1BETA1_TMP="${OUTPUT_TMP}/extensions/v1beta1/"
-mkdir -p ${V1BETA1_TMP}
-SWAGGER_PATH="${REPO_DIR}/api/swagger-spec/"
-
-echo "Reading swagger spec from: ${SWAGGER_PATH}"
-
-user_flags="-u $(id -u)"
-if [[ $(uname) == "Darwin" ]]; then
-  # mapping in a uid from OS X doesn't make any sense
-  user_flags=""
-fi 
-
-docker run ${user_flags} --rm -v $V1_TMP_IN_HOST:/output:z -v ${SWAGGER_PATH}:/swagger-source:z gcr.io/google_containers/gen-swagger-docs:v4.1 \
-    v1 \
-    https://raw.githubusercontent.com/kubernetes/kubernetes/master/pkg/api/v1/register.go
-
-docker run ${user_flags} --rm -v $V1BETA1_TMP_IN_HOST:/output:z -v ${SWAGGER_PATH}:/swagger-source:z gcr.io/google_containers/gen-swagger-docs:v4.1 \
-    v1beta1 \
-    https://raw.githubusercontent.com/kubernetes/kubernetes/master/pkg/apis/extensions/v1beta1/register.go
-
-# Check if we actually changed anything
-pushd "${OUTPUT_TMP}" > /dev/null
-touch .generated_html
-find . -type f | cut -sd / -f 2- | LC_ALL=C sort > .generated_html
-popd > /dev/null
-
-while read file; do
-  if [[ -e "${OUTPUT}/${file}" && -e "${OUTPUT_TMP}/${file}" ]]; then
-    echo "comparing ${OUTPUT}/${file} with ${OUTPUT_TMP}/${file}"
-    # Filter all munges from original content.
-    original=$(cat "${OUTPUT}/${file}")
-    generated=$(cat "${OUTPUT_TMP}/${file}")
-
-    # Filter out meaningless lines with timestamps
-    original=$(echo "${original}" | grep -v "Last updated" || :)
-    generated=$(echo "${generated}" | grep -v "Last updated" || :)
-
-    # By now, the contents should be normalized and stripped of any
-    # auto-managed content.  
-    if diff -Bw >/dev/null <(echo "${original}") <(echo "${generated}"); then
-      # actual contents same, overwrite generated with original.
-      cp "${OUTPUT}/${file}" "${OUTPUT_TMP}/${file}"
+ALL_GROUP_VERSIONS=(${KUBE_AVAILABLE_GROUP_VERSIONS})
+INTERESTING_GROUP_VERSIONS=()
+GV_DIRS=()
+for gv in "${ALL_GROUP_VERSIONS[@]}"; do
+	# skip groups that aren't being served, clients for these don't matter
+    if [[ " ${KUBE_NONSERVER_GROUP_VERSIONS} " == *" ${gv} "* ]]; then
+		continue
     fi
-  fi
-done <"${OUTPUT_TMP}/.generated_html"
 
-echo "Moving api reference docs from ${OUTPUT_TMP} to ${OUTPUT}"
+	INTERESTING_GROUP_VERSIONS+=(${gv})
+	GV_DIRS+=("${REPO_DIR}/pkg/$(kube::util::group-version-to-pkg-path "${gv}")")
+done
 
-cp -af "${OUTPUT_TMP}"/* "${OUTPUT}"
-rm -r ${OUTPUT_TMP}
+GROUP_VERSIONS="${INTERESTING_GROUP_VERSIONS[@]}" GV_DIRS="${GV_DIRS[@]}" kube::swagger::gen_api_ref_docs "${SWAGGER_SPEC_PATH}" "${OUTPUT}"
 
 # ex: ts=2 sw=2 et filetype=sh

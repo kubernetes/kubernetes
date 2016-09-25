@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,4 +17,4 @@ limitations under the License.
 // Package integration provides integration tests for Kubernetes.  Use the integration
 // build tag during `go test` to start the tests.  Some tests require a running etcd
 // or Docker installation on the system which you can skip with no-docker and no-etcd.
-package integration
+package integration // import "k8s.io/kubernetes/test/integration"

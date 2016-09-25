@@ -1,0 +1,134 @@
+# http://kubernetes.io/docs/getting-started-guides/docker/
+
+# # Start kubelet and then start master components as pods
+# docker run \
+#     --net=host \
+#     --pid=host \
+#     --privileged \
+#     --restart=on-failure \
+#     -d \
+#     -v /sys:/sys:ro \
+#     -v /var/run:/var/run:rw \
+#     -v /:/rootfs:ro \
+#     -v /var/lib/docker/:/var/lib/docker:rw \
+#     -v /var/lib/kubelet/:/var/lib/kubelet:rw \
+#     gcr.io/google_containers/hyperkube-${ARCH}:v${K8S_VERSION} \
+#     /hyperkube kubelet \
+#         --address=0.0.0.0 \
+#         --allow-privileged=true \
+#         --enable-server \
+#         --api-servers=http://localhost:8080 \
+#         --config=/etc/kubernetes/manifests-multi \
+#         --cluster-dns=10.0.0.10 \
+#         --cluster-domain=cluster.local \
+#         --containerized \
+#         --v=2
+
+master:
+  image: gcr.io/google_containers/hyperkube-{{ arch }}:{{ version }}
+  net: host
+  pid: host
+  privileged: true
+  restart: always
+  volumes:
+    - /:/rootfs:ro
+    - /sys:/sys:ro
+    - /var/lib/docker/:/var/lib/docker:rw
+    - /var/lib/kubelet/:/var/lib/kubelet:rw
+    - /var/run:/var/run:rw
+    - {{ manifest_directory }}:/etc/kubernetes/manifests:rw
+    - /srv/kubernetes:/srv/kubernetes
+  command: |
+    /hyperkube kubelet
+    --address="0.0.0.0"
+    --allow-privileged=true
+    --api-servers=http://localhost:8080
+    --cluster-dns={{ pillar['dns_server'] }}
+    --cluster-domain={{ pillar['dns_domain'] }}
+    --config=/etc/kubernetes/manifests
+    --containerized
+    --hostname-override="{{ private_address }}"
+    --tls-cert-file="/srv/kubernetes/server.crt"
+    --tls-private-key-file="/srv/kubernetes/server.key"
+    --v=2
+
+# Start kubelet without the config option and only kubelet starts.
+# kubelet gets the tls credentials from /var/lib/kubelet/kubeconfig
+# docker run \
+#     --net=host \
+#     --pid=host \
+#     --privileged \
+#     --restart=on-failure \
+#     -d \
+#     -v /sys:/sys:ro \
+#     -v /var/run:/var/run:rw  \
+#     -v /:/rootfs:ro \
+#     -v /var/lib/docker/:/var/lib/docker:rw \
+#     -v /var/lib/kubelet/:/var/lib/kubelet:rw \
+#     gcr.io/google_containers/hyperkube-${ARCH}:v${K8S_VERSION} \
+#     /hyperkube kubelet \
+#         --allow-privileged=true \
+#         --api-servers=http://${MASTER_IP}:8080 \
+#         --address=0.0.0.0 \
+#         --enable-server \
+#         --cluster-dns=10.0.0.10 \
+#         --cluster-domain=cluster.local \
+#         --containerized \
+#         --v=2
+
+
+kubelet:
+  image: gcr.io/google_containers/hyperkube-{{ arch }}:{{ version }}
+  net: host
+  pid: host
+  privileged: true
+  restart: always
+  volumes:
+    - /:/rootfs:ro
+    - /sys:/sys:ro
+    - /var/lib/docker/:/var/lib/docker:rw
+    - /var/lib/kubelet/:/var/lib/kubelet:rw
+    - /var/run:/var/run:rw
+    - /srv/kubernetes:/srv/kubernetes
+  command: |
+    /hyperkube kubelet
+    --address="0.0.0.0"
+    --allow-privileged=true
+    --api-servers=https://{{ master_address }}:6443
+    --cluster-dns={{ pillar['dns_server'] }}
+    --cluster-domain={{ pillar['dns_domain'] }}
+    --containerized
+    --hostname-override="{{ private_address }}"
+    --v=2
+
+# docker run \
+#     -d \
+#     --net=host \
+#     --privileged \
+#     --restart=on-failure \
+#     gcr.io/google_containers/hyperkube-${ARCH}:v${K8S_VERSION} \
+#     /hyperkube proxy \
+#         --master=http://${MASTER_IP}:8080 \
+#         --v=2
+proxy:
+  net: host
+  privileged: true
+  restart: always
+  image: gcr.io/google_containers/hyperkube-{{ arch }}:{{ version }}
+  command: |
+    /hyperkube proxy
+    --master=http://{{ master_address }}:8080
+    --v=2
+
+# cAdvisor (Container Advisor) provides container users an understanding of
+# the resource usage and performance characteristics of their running containers.
+cadvisor:
+  image: google/cadvisor:latest
+  volumes:
+    - /:/rootfs:ro
+    - /var/run:/var/run:rw
+    - /sys:/sys:ro
+    - /var/lib/docker:/var/lib/docker:ro
+  ports:
+    - 8088:8080
+  restart: always

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2014 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,8 +23,27 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
 
-"${KUBE_ROOT}/hack/build-go.sh" cmd/hyperkube
+make -C "${KUBE_ROOT}" WHAT=cmd/hyperkube
 
-"${KUBE_ROOT}/hack/after-build/verify-symbols.sh"
+# add other BADSYMBOLS here.
+BADSYMBOLS=(
+  "httptest"
+  "testify"
+  "testing[.]"
+)
+
+# b/c hyperkube binds everything simply check that for bad symbols
+SYMBOLS="$(nm ${KUBE_OUTPUT_HOSTBIN}/hyperkube)"
+
+RESULT=0
+for BADSYMBOL in "${BADSYMBOLS[@]}"; do
+  if FOUND=$(echo "$SYMBOLS" | grep "$BADSYMBOL"); then
+    echo "Found bad symbol '${BADSYMBOL}':"
+    echo "$FOUND"
+    RESULT=1
+  fi
+done
+
+exit $RESULT
 
 # ex: ts=2 sw=2 et filetype=sh

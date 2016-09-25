@@ -2,15 +2,15 @@
 
 <!-- BEGIN STRIP_FOR_RELEASE -->
 
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
 
 <h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
@@ -18,9 +18,10 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.1/examples/selenium/README.md).
+[here](http://releases.k8s.io/release-1.4/examples/selenium/README.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -81,7 +82,7 @@ export PODNAME=`kubectl get pods --selector="app=selenium-hub" --output=template
 kubectl port-forward --pod=$PODNAME 4444:4444
 ```
 
-In a seperate terminal, you can now check the status.
+In a separate terminal, you can now check the status.
 
 ```console
 curl http://localhost:4444
@@ -201,7 +202,7 @@ You now have 10 Firefox and 10 Chrome nodes, happy Seleniuming!
 
 ### Debugging
 
-Sometimes it is neccessary to check on a hung test. Each pod is running VNC. To check on one of the browser nodes via VNC, it's reccomended that you proxy, since we don't want to expose a service for every pod, and the containers have a weak VNC password. Replace POD_NAME with the name of the pod you want to connect to.
+Sometimes it is neccessary to check on a hung test. Each pod is running VNC. To check on one of the browser nodes via VNC, it's recommended that you proxy, since we don't want to expose a service for every pod, and the containers have a weak VNC password. Replace POD_NAME with the name of the pod you want to connect to.
 
 ```console
 kubectl port-forward --pod=POD_NAME 5900:5900
@@ -221,7 +222,7 @@ To remove all created resources, run the following:
 kubectl delete rc selenium-hub
 kubectl delete rc selenium-node-chrome
 kubectl delete rc selenium-node-firefox
-kubectl delete rc selenium-python
+kubectl delete deployment selenium-python
 kubectl delete svc selenium-hub
 kubectl delete svc selenium-hub-external
 ```

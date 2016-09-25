@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2014 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -34,12 +34,10 @@ fi
 # Dynamically set the master size by the number of nodes, these are guesses
 # TODO: gather some data
 if [[ -z ${MASTER_SIZE} ]]; then
-  if (( ${NUM_NODES} < 50 )); then
-    MASTER_SIZE="t2.micro"
-  elif (( ${NUM_NODES} < 150 )); then
-    MASTER_SIZE="t2.small"
+  if (( ${NUM_NODES} < 150 )); then
+    MASTER_SIZE="m3.medium"
   else
-    MASTER_SIZE="t2.medium"
+    MASTER_SIZE="m3.large"
   fi
 fi
 
@@ -50,8 +48,13 @@ AWS_S3_REGION=${AWS_S3_REGION:-us-east-1}
 # Which docker storage mechanism to use.
 DOCKER_STORAGE=${DOCKER_STORAGE:-aufs}
 
+# Extra docker options for nodes.
+EXTRA_DOCKER_OPTS="${EXTRA_DOCKER_OPTS:-}"
+
 INSTANCE_PREFIX="${KUBE_AWS_INSTANCE_PREFIX:-e2e-test-${USER}}"
+CONFIG_CONTEXT="${KUBE_CONFIG_CONTEXT:-aws_${INSTANCE_PREFIX}}"
 CLUSTER_ID=${INSTANCE_PREFIX}
+VPC_NAME=${VPC_NAME:-kubernetes-vpc}
 AWS_SSH_KEY=${AWS_SSH_KEY:-$HOME/.ssh/kube_aws_rsa}
 IAM_PROFILE_MASTER="kubernetes-master"
 IAM_PROFILE_NODE="kubernetes-minion"
@@ -71,19 +74,17 @@ MASTER_NAME="${INSTANCE_PREFIX}-master"
 MASTER_TAG="${INSTANCE_PREFIX}-master"
 NODE_TAG="${INSTANCE_PREFIX}-minion"
 NODE_SCOPES=""
-POLL_SLEEP_INTERVAL=3
-SERVICE_CLUSTER_IP_RANGE="10.0.0.0/16"  # formerly PORTAL_NET
+NON_MASQUERADE_CIDR="${NON_MASQUERADE_CIDR:-10.0.0.0/8}" # Traffic to IPs outside this range will use IP masquerade
+SERVICE_CLUSTER_IP_RANGE="${SERVICE_CLUSTER_IP_RANGE:-10.0.0.0/16}"  # formerly PORTAL_NET
 CLUSTER_IP_RANGE="${CLUSTER_IP_RANGE:-10.245.0.0/16}"
 MASTER_IP_RANGE="${MASTER_IP_RANGE:-10.246.0.0/24}"
-# If set to Elastic IP, master instance will be associated with this IP.
-# If set to auto, a new Elastic IP will be acquired
-# Otherwise amazon-given public ip will be used (it'll change with reboot).
+SSH_CIDR="${SSH_CIDR:-0.0.0.0/0}" # IP to restrict ssh access to nodes/master
+HTTP_API_CIDR="${HTTP_API_CIDR:-0.0.0.0/0}" # IP to restrict HTTP API access
+# If set to an Elastic IP address, the master instance will be associated with this IP.
+# Otherwise a new Elastic IP will be acquired
+# (We used to accept 'auto' to mean 'allocate elastic ip', but that is now the default)
 MASTER_RESERVED_IP="${MASTER_RESERVED_IP:-}"
 RUNTIME_CONFIG="${KUBE_RUNTIME_CONFIG:-}"
-
-# Enable various v1beta1 features
-ENABLE_DEPLOYMENTS="${KUBE_ENABLE_DEPLOYMENTS:-}"
-ENABLE_DAEMONSETS="${KUBE_ENABLE_DAEMONSETS:-}"
 
 # Optional: Cluster monitoring to setup as part of the cluster bring up:
 #   none     - No cluster monitoring setup
@@ -100,12 +101,12 @@ ELASTICSEARCH_LOGGING_REPLICAS=1
 
 # Optional: Don't require https for registries in our local RFC1918 network
 if [[ ${KUBE_ENABLE_INSECURE_REGISTRY:-false} == "true" ]]; then
-  EXTRA_DOCKER_OPTS="--insecure-registry 10.0.0.0/8"
+  EXTRA_DOCKER_OPTS="${EXTRA_DOCKER_OPTS} --insecure-registry ${NON_MASQUERADE_CIDR}"
 fi
 
 # Optional: Install cluster DNS.
 ENABLE_CLUSTER_DNS="${KUBE_ENABLE_CLUSTER_DNS:-true}"
-DNS_SERVER_IP="10.0.0.10"
+DNS_SERVER_IP="${DNS_SERVER_IP:-10.0.0.10}"
 DNS_DOMAIN="cluster.local"
 DNS_REPLICAS=1
 
@@ -113,8 +114,8 @@ DNS_REPLICAS=1
 ENABLE_CLUSTER_UI="${KUBE_ENABLE_CLUSTER_UI:-true}"
 
 # Optional: Create autoscaler for cluster's nodes.
-ENABLE_NODE_AUTOSCALER="${KUBE_ENABLE_NODE_AUTOSCALER:-false}"
-if [[ "${ENABLE_NODE_AUTOSCALER}" == "true" ]]; then
+ENABLE_CLUSTER_AUTOSCALER="${KUBE_ENABLE_CLUSTER_AUTOSCALER:-false}"
+if [[ "${ENABLE_CLUSTER_AUTOSCALER}" == "true" ]]; then
   # TODO: actually configure ASG or similar
   AUTOSCALER_MIN_NODES="${KUBE_AUTOSCALER_MIN_NODES:-1}"
   AUTOSCALER_MAX_NODES="${KUBE_AUTOSCALER_MAX_NODES:-${NUM_NODES}}"
@@ -122,18 +123,28 @@ if [[ "${ENABLE_NODE_AUTOSCALER}" == "true" ]]; then
 fi
 
 # Admission Controllers to invoke prior to persisting objects in cluster
-ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota
+# If we included ResourceQuota, we should keep it at the end of the list to prevent incremeting quota usage prematurely.
+ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota
 
 # Optional: Enable/disable public IP assignment for minions.
 # Important Note: disable only if you have setup a NAT instance for internet access and configured appropriate routes!
 ENABLE_NODE_PUBLIC_IP=${KUBE_ENABLE_NODE_PUBLIC_IP:-true}
 
 # OS options for minions
-KUBE_OS_DISTRIBUTION="${KUBE_OS_DISTRIBUTION:-vivid}"
+KUBE_OS_DISTRIBUTION="${KUBE_OS_DISTRIBUTION:-jessie}"
+MASTER_OS_DISTRIBUTION="${KUBE_OS_DISTRIBUTION}"
+NODE_OS_DISTRIBUTION="${KUBE_OS_DISTRIBUTION}"
 KUBE_NODE_IMAGE="${KUBE_NODE_IMAGE:-}"
 COREOS_CHANNEL="${COREOS_CHANNEL:-alpha}"
 CONTAINER_RUNTIME="${KUBE_CONTAINER_RUNTIME:-docker}"
-RKT_VERSION="${KUBE_RKT_VERSION:-0.5.5}"
+RKT_VERSION="${KUBE_RKT_VERSION:-1.14.0}"
+
+NETWORK_PROVIDER="${NETWORK_PROVIDER:-kubenet}" # kubenet, opencontrail, flannel
+
+# OpenContrail networking plugin specific settings
+OPENCONTRAIL_TAG="${OPENCONTRAIL_TAG:-R2.20}"
+OPENCONTRAIL_KUBERNETES_TAG="${OPENCONTRAIL_KUBERNETES_TAG:-master}"
+OPENCONTRAIL_PUBLIC_SUBNET="${OPENCONTRAIL_PUBLIC_SUBNET:-10.1.0.0/16}"
 
 # Optional: if set to true, kube-up will configure the cluster to run e2e tests.
 E2E_STORAGE_TEST_ENVIRONMENT=${KUBE_E2E_STORAGE_TEST_ENVIRONMENT:-false}

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -28,7 +28,11 @@ type Config struct {
 	// Legacy field from pkg/api/types.go TypeMeta.
 	// TODO(jlowdermilk): remove this after eliminating downstream dependencies.
 	Kind string `json:"kind,omitempty"`
-	// Version of the schema for this config object.
+	// DEPRECATED: APIVersion is the preferred api version for communicating with the kubernetes cluster (v1, v2, etc).
+	// Because a cluster can run multiple API groups and potentially multiple versions of each, it no longer makes sense to specify
+	// a single value for the cluster version.
+	// This field isn't really needed anyway, so we are deprecating it without replacement.
+	// It will be ignored if it is present.
 	APIVersion string `json:"apiVersion,omitempty"`
 	// Preferences holds general information to be use for cli interactions
 	Preferences Preferences `json:"preferences"`
@@ -78,10 +82,16 @@ type AuthInfo struct {
 	ClientKeyData []byte `json:"client-key-data,omitempty"`
 	// Token is the bearer token for authentication to the kubernetes cluster.
 	Token string `json:"token,omitempty"`
+	// TokenFile is a pointer to a file that contains a bearer token (as described above).  If both Token and TokenFile are present, Token takes precedence.
+	TokenFile string `json:"tokenFile,omitempty"`
+	// Impersonate is the username to imperonate.  The name matches the flag.
+	Impersonate string `json:"as,omitempty"`
 	// Username is the username for basic authentication to the kubernetes cluster.
 	Username string `json:"username,omitempty"`
 	// Password is the password for basic authentication to the kubernetes cluster.
 	Password string `json:"password,omitempty"`
+	// AuthProvider specifies a custom authentication plugin for the kubernetes cluster.
+	AuthProvider *AuthProviderConfig `json:"auth-provider,omitempty"`
 	// Extensions holds additional information. This is useful for extenders so that reads and writes don't clobber unknown fields
 	Extensions []NamedExtension `json:"extensions,omitempty"`
 }
@@ -128,4 +138,10 @@ type NamedExtension struct {
 	Name string `json:"name"`
 	// Extension holds the extension information
 	Extension runtime.RawExtension `json:"extension"`
+}
+
+// AuthProviderConfig holds the configuration for a specified auth provider.
+type AuthProviderConfig struct {
+	Name   string            `json:"name"`
+	Config map[string]string `json:"config"`
 }

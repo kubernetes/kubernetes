@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,117 +19,65 @@ package validation
 import (
 	"fmt"
 	"net"
+	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	unversionedvalidation "k8s.io/kubernetes/pkg/api/unversioned/validation"
 	apivalidation "k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/security/apparmor"
+	psputil "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/validation"
+	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
-// ValidateHorizontalPodAutoscaler can be used to check whether the given autoscaler name is valid.
-// Prefix indicates this name will be used as part of generation, in which case trailing dashes are allowed.
-func ValidateHorizontalPodAutoscalerName(name string, prefix bool) (bool, string) {
-	// TODO: finally move it to pkg/api/validation and use nameIsDNSSubdomain function
-	return apivalidation.ValidateReplicationControllerName(name, prefix)
-}
-
-func validateHorizontalPodAutoscalerSpec(autoscaler extensions.HorizontalPodAutoscalerSpec) validation.ErrorList {
-	allErrs := validation.ErrorList{}
-	if autoscaler.MinReplicas != nil && *autoscaler.MinReplicas < 1 {
-		allErrs = append(allErrs, validation.NewInvalidError("minReplicas", autoscaler.MinReplicas, `must be bigger or equal to 1`))
-	}
-	if autoscaler.MaxReplicas < 1 {
-		allErrs = append(allErrs, validation.NewInvalidError("maxReplicas", autoscaler.MaxReplicas, `must be bigger or equal to 1`))
-	}
-	if autoscaler.MinReplicas != nil && autoscaler.MaxReplicas < *autoscaler.MinReplicas {
-		allErrs = append(allErrs, validation.NewInvalidError("maxReplicas", autoscaler.MaxReplicas, `must be bigger or equal to minReplicas`))
-	}
-	if autoscaler.CPUUtilization != nil && autoscaler.CPUUtilization.TargetPercentage < 1 {
-		allErrs = append(allErrs, validation.NewInvalidError("cpuUtilization.targetPercentage", autoscaler.CPUUtilization.TargetPercentage, `must be bigger or equal to 1`))
-	}
-	if refErrs := ValidateSubresourceReference(autoscaler.ScaleRef); len(refErrs) > 0 {
-		allErrs = append(allErrs, refErrs.Prefix("scaleRef")...)
-	} else if autoscaler.ScaleRef.Subresource != "scale" {
-		allErrs = append(allErrs, validation.NewNotSupportedError("scaleRef.subresource", autoscaler.ScaleRef.Subresource, []string{"scale"}))
-	}
-	return allErrs
-}
-
-func ValidateSubresourceReference(ref extensions.SubresourceReference) validation.ErrorList {
-	allErrs := validation.ErrorList{}
-	if len(ref.Kind) == 0 {
-		allErrs = append(allErrs, validation.NewRequiredError("kind"))
-	} else if ok, msg := apivalidation.IsValidPathSegmentName(ref.Kind); !ok {
-		allErrs = append(allErrs, validation.NewInvalidError("kind", ref.Kind, msg))
-	}
-
-	if len(ref.Name) == 0 {
-		allErrs = append(allErrs, validation.NewRequiredError("name"))
-	} else if ok, msg := apivalidation.IsValidPathSegmentName(ref.Name); !ok {
-		allErrs = append(allErrs, validation.NewInvalidError("name", ref.Name, msg))
-	}
-
-	if len(ref.Subresource) == 0 {
-		allErrs = append(allErrs, validation.NewRequiredError("subresource"))
-	} else if ok, msg := apivalidation.IsValidPathSegmentName(ref.Subresource); !ok {
-		allErrs = append(allErrs, validation.NewInvalidError("subresource", ref.Subresource, msg))
-	}
-	return allErrs
-}
-
-func ValidateHorizontalPodAutoscaler(autoscaler *extensions.HorizontalPodAutoscaler) validation.ErrorList {
-	allErrs := validation.ErrorList{}
-	allErrs = append(allErrs, apivalidation.ValidateObjectMeta(&autoscaler.ObjectMeta, true, ValidateHorizontalPodAutoscalerName).Prefix("metadata")...)
-	allErrs = append(allErrs, validateHorizontalPodAutoscalerSpec(autoscaler.Spec)...)
-	return allErrs
-}
-
-func ValidateHorizontalPodAutoscalerUpdate(newAutoscler, oldAutoscaler *extensions.HorizontalPodAutoscaler) validation.ErrorList {
-	allErrs := validation.ErrorList{}
-	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&newAutoscler.ObjectMeta, &oldAutoscaler.ObjectMeta).Prefix("metadata")...)
-	allErrs = append(allErrs, validateHorizontalPodAutoscalerSpec(newAutoscler.Spec)...)
-	return allErrs
-}
-
-func ValidateHorizontalPodAutoscalerStatusUpdate(controller, oldController *extensions.HorizontalPodAutoscaler) validation.ErrorList {
-	allErrs := validation.ErrorList{}
-	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&controller.ObjectMeta, &oldController.ObjectMeta).Prefix("metadata")...)
-
-	status := controller.Status
-	allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(status.CurrentReplicas), "currentReplicas")...)
-	allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(status.DesiredReplicas), "desiredReplicas")...)
-	return allErrs
-}
-
-func ValidateThirdPartyResourceUpdate(update, old *extensions.ThirdPartyResource) validation.ErrorList {
-	allErrs := validation.ErrorList{}
-	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&update.ObjectMeta, &old.ObjectMeta).Prefix("metadata")...)
+func ValidateThirdPartyResourceUpdate(update, old *extensions.ThirdPartyResource) field.ErrorList {
+	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&update.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata"))...)
 	allErrs = append(allErrs, ValidateThirdPartyResource(update)...)
 	return allErrs
 }
 
-func ValidateThirdPartyResourceName(name string, prefix bool) (bool, string) {
-	return apivalidation.NameIsDNSSubdomain(name, prefix)
+func ValidateThirdPartyResourceName(name string, prefix bool) []string {
+	// Make sure it's a valid DNS subdomain
+	if msgs := apivalidation.NameIsDNSSubdomain(name, prefix); len(msgs) != 0 {
+		return msgs
+	}
+
+	// Make sure it's at least three segments (kind + two-segment group name)
+	if !prefix {
+		parts := strings.Split(name, ".")
+		if len(parts) < 3 {
+			return []string{"must be at least three segments long: <kind>.<domain>.<tld>"}
+		}
+	}
+
+	return nil
 }
 
-func ValidateThirdPartyResource(obj *extensions.ThirdPartyResource) validation.ErrorList {
-	allErrs := validation.ErrorList{}
-	allErrs = append(allErrs, apivalidation.ValidateObjectMeta(&obj.ObjectMeta, true, ValidateThirdPartyResourceName).Prefix("metadata")...)
+func ValidateThirdPartyResource(obj *extensions.ThirdPartyResource) field.ErrorList {
+	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, apivalidation.ValidateObjectMeta(&obj.ObjectMeta, false, ValidateThirdPartyResourceName, field.NewPath("metadata"))...)
 
 	versions := sets.String{}
 	for ix := range obj.Versions {
 		version := &obj.Versions[ix]
 		if len(version.Name) == 0 {
-			allErrs = append(allErrs, validation.NewInvalidError("name", version, "name can not be empty"))
+			allErrs = append(allErrs, field.Invalid(field.NewPath("versions").Index(ix).Child("name"), version, "must not be empty"))
+		} else {
+			for _, msg := range validation.IsDNS1123Label(version.Name) {
+				allErrs = append(allErrs, field.Invalid(field.NewPath("versions").Index(ix).Child("name"), version, msg))
+			}
 		}
 		if versions.Has(version.Name) {
-			allErrs = append(allErrs, validation.NewDuplicateError("version", version))
+			allErrs = append(allErrs, field.Duplicate(field.NewPath("versions").Index(ix).Child("name"), version))
 		}
 		versions.Insert(version.Name)
 	}
@@ -137,107 +85,87 @@ func ValidateThirdPartyResource(obj *extensions.ThirdPartyResource) validation.E
 }
 
 // ValidateDaemonSet tests if required fields in the DaemonSet are set.
-func ValidateDaemonSet(controller *extensions.DaemonSet) validation.ErrorList {
-	allErrs := validation.ErrorList{}
-	allErrs = append(allErrs, apivalidation.ValidateObjectMeta(&controller.ObjectMeta, true, ValidateDaemonSetName).Prefix("metadata")...)
-	allErrs = append(allErrs, ValidateDaemonSetSpec(&controller.Spec).Prefix("spec")...)
+func ValidateDaemonSet(ds *extensions.DaemonSet) field.ErrorList {
+	allErrs := apivalidation.ValidateObjectMeta(&ds.ObjectMeta, true, ValidateDaemonSetName, field.NewPath("metadata"))
+	allErrs = append(allErrs, ValidateDaemonSetSpec(&ds.Spec, field.NewPath("spec"))...)
 	return allErrs
 }
 
 // ValidateDaemonSetUpdate tests if required fields in the DaemonSet are set.
-func ValidateDaemonSetUpdate(controller, oldController *extensions.DaemonSet) validation.ErrorList {
-	allErrs := validation.ErrorList{}
-	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&controller.ObjectMeta, &oldController.ObjectMeta).Prefix("metadata")...)
-	allErrs = append(allErrs, ValidateDaemonSetSpec(&controller.Spec).Prefix("spec")...)
-	allErrs = append(allErrs, ValidateDaemonSetTemplateUpdate(controller.Spec.Template, oldController.Spec.Template).Prefix("spec.template")...)
+func ValidateDaemonSetUpdate(ds, oldDS *extensions.DaemonSet) field.ErrorList {
+	allErrs := apivalidation.ValidateObjectMetaUpdate(&ds.ObjectMeta, &oldDS.ObjectMeta, field.NewPath("metadata"))
+	allErrs = append(allErrs, ValidateDaemonSetSpec(&ds.Spec, field.NewPath("spec"))...)
 	return allErrs
 }
 
 // validateDaemonSetStatus validates a DaemonSetStatus
-func validateDaemonSetStatus(status *extensions.DaemonSetStatus) validation.ErrorList {
-	allErrs := validation.ErrorList{}
-	allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(status.CurrentNumberScheduled), "currentNumberScheduled")...)
-	allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(status.NumberMisscheduled), "numberMisscheduled")...)
-	allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(status.DesiredNumberScheduled), "desiredNumberScheduled")...)
+func validateDaemonSetStatus(status *extensions.DaemonSetStatus, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.CurrentNumberScheduled), fldPath.Child("currentNumberScheduled"))...)
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.NumberMisscheduled), fldPath.Child("numberMisscheduled"))...)
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.DesiredNumberScheduled), fldPath.Child("desiredNumberScheduled"))...)
 	return allErrs
 }
 
 // ValidateDaemonSetStatus validates tests if required fields in the DaemonSet Status section
-func ValidateDaemonSetStatusUpdate(controller, oldController *extensions.DaemonSet) validation.ErrorList {
-	allErrs := validation.ErrorList{}
-	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&controller.ObjectMeta, &oldController.ObjectMeta).Prefix("metadata")...)
-	allErrs = append(allErrs, validateDaemonSetStatus(&controller.Status)...)
-	return allErrs
-}
-
-// ValidateDaemonSetTemplateUpdate tests that certain fields in the daemon set's pod template are not updated.
-func ValidateDaemonSetTemplateUpdate(podTemplate, oldPodTemplate *api.PodTemplateSpec) validation.ErrorList {
-	allErrs := validation.ErrorList{}
-	podSpec := podTemplate.Spec
-	// podTemplate.Spec is not a pointer, so we can modify NodeSelector and NodeName directly.
-	podSpec.NodeSelector = oldPodTemplate.Spec.NodeSelector
-	podSpec.NodeName = oldPodTemplate.Spec.NodeName
-	// In particular, we do not allow updates to container images at this point.
-	if !api.Semantic.DeepEqual(oldPodTemplate.Spec, podSpec) {
-		// TODO: Pinpoint the specific field that causes the invalid error after we have strategic merge diff
-		allErrs = append(allErrs, validation.NewInvalidError("spec", "content of spec is not printed out, please refer to the \"details\"", "may not update fields other than spec.nodeSelector"))
-	}
+func ValidateDaemonSetStatusUpdate(ds, oldDS *extensions.DaemonSet) field.ErrorList {
+	allErrs := apivalidation.ValidateObjectMetaUpdate(&ds.ObjectMeta, &oldDS.ObjectMeta, field.NewPath("metadata"))
+	allErrs = append(allErrs, validateDaemonSetStatus(&ds.Status, field.NewPath("status"))...)
 	return allErrs
 }
 
 // ValidateDaemonSetSpec tests if required fields in the DaemonSetSpec are set.
-func ValidateDaemonSetSpec(spec *extensions.DaemonSetSpec) validation.ErrorList {
-	allErrs := validation.ErrorList{}
+func ValidateDaemonSetSpec(spec *extensions.DaemonSetSpec, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
 
-	allErrs = append(allErrs, ValidatePodSelector(spec.Selector)...)
+	allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(spec.Selector, fldPath.Child("selector"))...)
 
-	if spec.Template == nil {
-		allErrs = append(allErrs, validation.NewRequiredError("template"))
-		return allErrs
-	}
-
-	selector, err := extensions.PodSelectorAsSelector(spec.Selector)
+	selector, err := unversioned.LabelSelectorAsSelector(spec.Selector)
 	if err == nil && !selector.Matches(labels.Set(spec.Template.Labels)) {
-		allErrs = append(allErrs, validation.NewInvalidError("template.metadata.labels", spec.Template.Labels, "selector does not match template"))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("template", "metadata", "labels"), spec.Template.Labels, "`selector` does not match template `labels`"))
+	}
+	if spec.Selector != nil && len(spec.Selector.MatchLabels)+len(spec.Selector.MatchExpressions) == 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("selector"), spec.Selector, "empty selector is not valid for daemonset."))
 	}
 
-	allErrs = append(allErrs, apivalidation.ValidatePodTemplateSpec(spec.Template).Prefix("template")...)
+	allErrs = append(allErrs, apivalidation.ValidatePodTemplateSpec(&spec.Template, fldPath.Child("template"))...)
 	// Daemons typically run on more than one node, so mark Read-Write persistent disks as invalid.
-	allErrs = append(allErrs, apivalidation.ValidateReadOnlyPersistentDisks(spec.Template.Spec.Volumes).Prefix("template.spec.volumes")...)
+	allErrs = append(allErrs, apivalidation.ValidateReadOnlyPersistentDisks(spec.Template.Spec.Volumes, fldPath.Child("template", "spec", "volumes"))...)
 	// RestartPolicy has already been first-order validated as per ValidatePodTemplateSpec().
 	if spec.Template.Spec.RestartPolicy != api.RestartPolicyAlways {
-		allErrs = append(allErrs, validation.NewNotSupportedError("template.spec.restartPolicy", spec.Template.Spec.RestartPolicy, []string{string(api.RestartPolicyAlways)}))
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("template", "spec", "restartPolicy"), spec.Template.Spec.RestartPolicy, []string{string(api.RestartPolicyAlways)}))
 	}
-
 	return allErrs
 }
 
 // ValidateDaemonSetName can be used to check whether the given daemon set name is valid.
 // Prefix indicates this name will be used as part of generation, in which case
 // trailing dashes are allowed.
-func ValidateDaemonSetName(name string, prefix bool) (bool, string) {
-	return apivalidation.NameIsDNSSubdomain(name, prefix)
-}
+var ValidateDaemonSetName = apivalidation.NameIsDNSSubdomain
 
 // Validates that the given name can be used as a deployment name.
-func ValidateDeploymentName(name string, prefix bool) (bool, string) {
-	return apivalidation.NameIsDNSSubdomain(name, prefix)
-}
+var ValidateDeploymentName = apivalidation.NameIsDNSSubdomain
 
-func ValidatePositiveIntOrPercent(intOrPercent intstr.IntOrString, fieldName string) validation.ErrorList {
-	allErrs := validation.ErrorList{}
-	if intOrPercent.Type == intstr.String {
-		if !validation.IsValidPercent(intOrPercent.StrVal) {
-			allErrs = append(allErrs, validation.NewInvalidError(fieldName, intOrPercent, "value should be int(5) or percentage(5%)"))
+func ValidatePositiveIntOrPercent(intOrPercent intstr.IntOrString, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	switch intOrPercent.Type {
+	case intstr.String:
+		for _, msg := range validation.IsValidPercent(intOrPercent.StrVal) {
+			allErrs = append(allErrs, field.Invalid(fldPath, intOrPercent, msg))
 		}
-	} else if intOrPercent.Type == intstr.Int {
-		allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(intOrPercent.IntVal), fieldName)...)
+	case intstr.Int:
+		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(intOrPercent.IntValue()), fldPath)...)
+	default:
+		allErrs = append(allErrs, field.Invalid(fldPath, intOrPercent, "must be an integer or percentage (e.g '5%%')"))
 	}
 	return allErrs
 }
 
 func getPercentValue(intOrStringValue intstr.IntOrString) (int, bool) {
-	if intOrStringValue.Type != intstr.String || !validation.IsValidPercent(intOrStringValue.StrVal) {
+	if intOrStringValue.Type != intstr.String {
+		return 0, false
+	}
+	if len(validation.IsValidPercent(intOrStringValue.StrVal)) != 0 {
 		return 0, false
 	}
 	value, _ := strconv.Atoi(intOrStringValue.StrVal[:len(intOrStringValue.StrVal)-1])
@@ -252,242 +180,243 @@ func getIntOrPercentValue(intOrStringValue intstr.IntOrString) int {
 	return intOrStringValue.IntValue()
 }
 
-func IsNotMoreThan100Percent(intOrStringValue intstr.IntOrString, fieldName string) validation.ErrorList {
-	allErrs := validation.ErrorList{}
+func IsNotMoreThan100Percent(intOrStringValue intstr.IntOrString, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
 	value, isPercent := getPercentValue(intOrStringValue)
 	if !isPercent || value <= 100 {
 		return nil
 	}
-	allErrs = append(allErrs, validation.NewInvalidError(fieldName, intOrStringValue, "should not be more than 100%"))
+	allErrs = append(allErrs, field.Invalid(fldPath, intOrStringValue, "must not be greater than 100%"))
 	return allErrs
 }
 
-func ValidateRollingUpdateDeployment(rollingUpdate *extensions.RollingUpdateDeployment, fieldName string) validation.ErrorList {
-	allErrs := validation.ErrorList{}
-	allErrs = append(allErrs, ValidatePositiveIntOrPercent(rollingUpdate.MaxUnavailable, fieldName+"maxUnavailable")...)
-	allErrs = append(allErrs, ValidatePositiveIntOrPercent(rollingUpdate.MaxSurge, fieldName+".maxSurge")...)
+func ValidateRollingUpdateDeployment(rollingUpdate *extensions.RollingUpdateDeployment, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, ValidatePositiveIntOrPercent(rollingUpdate.MaxUnavailable, fldPath.Child("maxUnavailable"))...)
+	allErrs = append(allErrs, ValidatePositiveIntOrPercent(rollingUpdate.MaxSurge, fldPath.Child("maxSurge"))...)
 	if getIntOrPercentValue(rollingUpdate.MaxUnavailable) == 0 && getIntOrPercentValue(rollingUpdate.MaxSurge) == 0 {
 		// Both MaxSurge and MaxUnavailable cannot be zero.
-		allErrs = append(allErrs, validation.NewInvalidError(fieldName+".maxUnavailable", rollingUpdate.MaxUnavailable, "cannot be 0 when maxSurge is 0 as well"))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("maxUnavailable"), rollingUpdate.MaxUnavailable, "may not be 0 when `maxSurge` is 0"))
 	}
 	// Validate that MaxUnavailable is not more than 100%.
-	allErrs = append(allErrs, IsNotMoreThan100Percent(rollingUpdate.MaxUnavailable, fieldName+".maxUnavailable")...)
-	allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(rollingUpdate.MinReadySeconds), fieldName+".minReadySeconds")...)
+	allErrs = append(allErrs, IsNotMoreThan100Percent(rollingUpdate.MaxUnavailable, fldPath.Child("maxUnavailable"))...)
 	return allErrs
 }
 
-func ValidateDeploymentStrategy(strategy *extensions.DeploymentStrategy, fieldName string) validation.ErrorList {
-	allErrs := validation.ErrorList{}
-	if strategy.RollingUpdate == nil {
-		return allErrs
-	}
+func ValidateDeploymentStrategy(strategy *extensions.DeploymentStrategy, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
 	switch strategy.Type {
 	case extensions.RecreateDeploymentStrategyType:
-		allErrs = append(allErrs, validation.NewForbiddenError("rollingUpdate", "rollingUpdate should be nil when strategy type is "+extensions.RecreateDeploymentStrategyType))
+		if strategy.RollingUpdate != nil {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("rollingUpdate"), "may not be specified when strategy `type` is '"+string(extensions.RecreateDeploymentStrategyType+"'")))
+		}
 	case extensions.RollingUpdateDeploymentStrategyType:
-		allErrs = append(allErrs, ValidateRollingUpdateDeployment(strategy.RollingUpdate, "rollingUpdate")...)
+		// This should never happen since it's set and checked in defaults.go
+		if strategy.RollingUpdate == nil {
+			allErrs = append(allErrs, field.Required(fldPath.Child("rollingUpdate"), "this should be defaulted and never be nil"))
+		} else {
+			allErrs = append(allErrs, ValidateRollingUpdateDeployment(strategy.RollingUpdate, fldPath.Child("rollingUpdate"))...)
+		}
+	default:
+		validValues := []string{string(extensions.RecreateDeploymentStrategyType), string(extensions.RollingUpdateDeploymentStrategyType)}
+		allErrs = append(allErrs, field.NotSupported(fldPath, strategy, validValues))
 	}
+	return allErrs
+}
+
+func ValidateRollback(rollback *extensions.RollbackConfig, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	v := rollback.Revision
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(v), fldPath.Child("version"))...)
 	return allErrs
 }
 
 // Validates given deployment spec.
-func ValidateDeploymentSpec(spec *extensions.DeploymentSpec) validation.ErrorList {
-	allErrs := validation.ErrorList{}
-	allErrs = append(allErrs, apivalidation.ValidateNonEmptySelector(spec.Selector, "selector")...)
-	allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(spec.Replicas), "replicas")...)
-	allErrs = append(allErrs, apivalidation.ValidatePodTemplateSpecForRC(&spec.Template, spec.Selector, spec.Replicas, "template")...)
-	allErrs = append(allErrs, ValidateDeploymentStrategy(&spec.Strategy, "strategy")...)
-	// empty string is a valid UniqueLabelKey
-	if len(spec.UniqueLabelKey) > 0 {
-		allErrs = append(allErrs, apivalidation.ValidateLabelName(spec.UniqueLabelKey, "uniqueLabel")...)
-	}
-	return allErrs
-}
+func ValidateDeploymentSpec(spec *extensions.DeploymentSpec, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(spec.Replicas), fldPath.Child("replicas"))...)
 
-func ValidateDeploymentUpdate(update, old *extensions.Deployment) validation.ErrorList {
-	allErrs := validation.ErrorList{}
-	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&update.ObjectMeta, &old.ObjectMeta).Prefix("metadata")...)
-	allErrs = append(allErrs, ValidateDeploymentSpec(&update.Spec).Prefix("spec")...)
-	return allErrs
-}
-
-func ValidateDeployment(obj *extensions.Deployment) validation.ErrorList {
-	allErrs := validation.ErrorList{}
-	allErrs = append(allErrs, apivalidation.ValidateObjectMeta(&obj.ObjectMeta, true, ValidateDeploymentName).Prefix("metadata")...)
-	allErrs = append(allErrs, ValidateDeploymentSpec(&obj.Spec).Prefix("spec")...)
-	return allErrs
-}
-
-func ValidateThirdPartyResourceDataUpdate(update, old *extensions.ThirdPartyResourceData) validation.ErrorList {
-	return ValidateThirdPartyResourceData(update)
-}
-
-func ValidateThirdPartyResourceData(obj *extensions.ThirdPartyResourceData) validation.ErrorList {
-	allErrs := validation.ErrorList{}
-	if len(obj.Name) == 0 {
-		allErrs = append(allErrs, validation.NewInvalidError("name", obj.Name, "name must be non-empty"))
-	}
-	return allErrs
-}
-
-func ValidateJob(job *extensions.Job) validation.ErrorList {
-	allErrs := validation.ErrorList{}
-	// Jobs and rcs have the same name validation
-	allErrs = append(allErrs, apivalidation.ValidateObjectMeta(&job.ObjectMeta, true, apivalidation.ValidateReplicationControllerName).Prefix("metadata")...)
-	allErrs = append(allErrs, ValidateJobSpec(&job.Spec).Prefix("spec")...)
-	return allErrs
-}
-
-func ValidateJobSpec(spec *extensions.JobSpec) validation.ErrorList {
-	allErrs := validation.ErrorList{}
-
-	if spec.Parallelism != nil {
-		allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(*spec.Parallelism), "parallelism")...)
-	}
-	if spec.Completions != nil {
-		allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(*spec.Completions), "completions")...)
-	}
 	if spec.Selector == nil {
-		allErrs = append(allErrs, validation.NewRequiredError("selector"))
+		allErrs = append(allErrs, field.Required(fldPath.Child("selector"), ""))
 	} else {
-		allErrs = append(allErrs, ValidatePodSelector(spec.Selector).Prefix("selector")...)
-	}
-
-	if selector, err := extensions.PodSelectorAsSelector(spec.Selector); err == nil {
-		labels := labels.Set(spec.Template.Labels)
-		if !selector.Matches(labels) {
-			allErrs = append(allErrs, validation.NewInvalidError("template.metadata.labels", spec.Template.Labels, "selector does not match template"))
+		allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(spec.Selector, fldPath.Child("selector"))...)
+		if len(spec.Selector.MatchLabels)+len(spec.Selector.MatchExpressions) == 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("selector"), spec.Selector, "empty selector is not valid for deployment."))
 		}
 	}
 
-	allErrs = append(allErrs, apivalidation.ValidatePodTemplateSpec(&spec.Template).Prefix("template")...)
-	if spec.Template.Spec.RestartPolicy != api.RestartPolicyOnFailure &&
-		spec.Template.Spec.RestartPolicy != api.RestartPolicyNever {
-		allErrs = append(allErrs, validation.NewNotSupportedError("template.spec.restartPolicy",
-			spec.Template.Spec.RestartPolicy, []string{string(api.RestartPolicyOnFailure), string(api.RestartPolicyNever)}))
+	selector, err := unversioned.LabelSelectorAsSelector(spec.Selector)
+	if err != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("selector"), spec.Selector, "invalid label selector."))
+	} else {
+		allErrs = append(allErrs, ValidatePodTemplateSpecForReplicaSet(&spec.Template, selector, spec.Replicas, fldPath.Child("template"))...)
+	}
+
+	allErrs = append(allErrs, ValidateDeploymentStrategy(&spec.Strategy, fldPath.Child("strategy"))...)
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(spec.MinReadySeconds), fldPath.Child("minReadySeconds"))...)
+	if spec.RevisionHistoryLimit != nil {
+		// zero is a valid RevisionHistoryLimit
+		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*spec.RevisionHistoryLimit), fldPath.Child("revisionHistoryLimit"))...)
+	}
+	if spec.RollbackTo != nil {
+		allErrs = append(allErrs, ValidateRollback(spec.RollbackTo, fldPath.Child("rollback"))...)
 	}
 	return allErrs
 }
 
-func ValidateJobStatus(status *extensions.JobStatus) validation.ErrorList {
-	allErrs := validation.ErrorList{}
-	allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(status.Active), "active")...)
-	allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(status.Succeeded), "succeeded")...)
-	allErrs = append(allErrs, apivalidation.ValidatePositiveField(int64(status.Failed), "failed")...)
+// Validates given deployment status.
+func ValidateDeploymentStatus(status *extensions.DeploymentStatus, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(status.ObservedGeneration, fldPath.Child("observedGeneration"))...)
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.Replicas), fldPath.Child("replicas"))...)
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.UpdatedReplicas), fldPath.Child("updatedReplicas"))...)
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.AvailableReplicas), fldPath.Child("availableReplicas"))...)
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.UnavailableReplicas), fldPath.Child("unavailableReplicas"))...)
 	return allErrs
 }
 
-func ValidateJobUpdate(job, oldJob *extensions.Job) validation.ErrorList {
-	allErrs := validation.ErrorList{}
-	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&oldJob.ObjectMeta, &job.ObjectMeta).Prefix("metadata")...)
-	allErrs = append(allErrs, ValidateJobSpecUpdate(job.Spec, oldJob.Spec).Prefix("spec")...)
+func ValidateDeploymentUpdate(update, old *extensions.Deployment) field.ErrorList {
+	allErrs := apivalidation.ValidateObjectMetaUpdate(&update.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata"))
+	allErrs = append(allErrs, ValidateDeploymentSpec(&update.Spec, field.NewPath("spec"))...)
 	return allErrs
 }
 
-func ValidateJobUpdateStatus(job, oldJob *extensions.Job) validation.ErrorList {
-	allErrs := validation.ErrorList{}
-	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&oldJob.ObjectMeta, &job.ObjectMeta).Prefix("metadata")...)
-	allErrs = append(allErrs, ValidateJobStatusUpdate(job.Status, oldJob.Status).Prefix("status")...)
+func ValidateDeploymentStatusUpdate(update, old *extensions.Deployment) field.ErrorList {
+	allErrs := apivalidation.ValidateObjectMetaUpdate(&update.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata"))
+	allErrs = append(allErrs, ValidateDeploymentStatus(&update.Status, field.NewPath("status"))...)
 	return allErrs
 }
 
-func ValidateJobSpecUpdate(spec, oldSpec extensions.JobSpec) validation.ErrorList {
-	allErrs := validation.ErrorList{}
-	allErrs = append(allErrs, ValidateJobSpec(&spec)...)
-	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.Completions, oldSpec.Completions, "completions")...)
-	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.Selector, oldSpec.Selector, "selector")...)
-	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.Template, oldSpec.Template, "template")...)
+func ValidateDeployment(obj *extensions.Deployment) field.ErrorList {
+	allErrs := apivalidation.ValidateObjectMeta(&obj.ObjectMeta, true, ValidateDeploymentName, field.NewPath("metadata"))
+	allErrs = append(allErrs, ValidateDeploymentSpec(&obj.Spec, field.NewPath("spec"))...)
 	return allErrs
 }
 
-func ValidateJobStatusUpdate(status, oldStatus extensions.JobStatus) validation.ErrorList {
-	allErrs := validation.ErrorList{}
-	allErrs = append(allErrs, ValidateJobStatus(&status)...)
+func ValidateDeploymentRollback(obj *extensions.DeploymentRollback) field.ErrorList {
+	allErrs := apivalidation.ValidateAnnotations(obj.UpdatedAnnotations, field.NewPath("updatedAnnotations"))
+	if len(obj.Name) == 0 {
+		allErrs = append(allErrs, field.Required(field.NewPath("name"), "name is required"))
+	}
+	allErrs = append(allErrs, ValidateRollback(&obj.RollbackTo, field.NewPath("rollback"))...)
 	return allErrs
+}
+
+func ValidateThirdPartyResourceDataUpdate(update, old *extensions.ThirdPartyResourceData) field.ErrorList {
+	return apivalidation.ValidateObjectMetaUpdate(&update.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata"))
+}
+
+func ValidateThirdPartyResourceData(obj *extensions.ThirdPartyResourceData) field.ErrorList {
+	return apivalidation.ValidateObjectMeta(&obj.ObjectMeta, true, apivalidation.NameIsDNSLabel, field.NewPath("metadata"))
 }
 
 // ValidateIngress tests if required fields in the Ingress are set.
-func ValidateIngress(ingress *extensions.Ingress) validation.ErrorList {
-	allErrs := validation.ErrorList{}
-	allErrs = append(allErrs, apivalidation.ValidateObjectMeta(&ingress.ObjectMeta, true, ValidateIngressName).Prefix("metadata")...)
-	allErrs = append(allErrs, ValidateIngressSpec(&ingress.Spec).Prefix("spec")...)
+func ValidateIngress(ingress *extensions.Ingress) field.ErrorList {
+	allErrs := apivalidation.ValidateObjectMeta(&ingress.ObjectMeta, true, ValidateIngressName, field.NewPath("metadata"))
+	allErrs = append(allErrs, ValidateIngressSpec(&ingress.Spec, field.NewPath("spec"))...)
 	return allErrs
 }
 
 // ValidateIngressName validates that the given name can be used as an Ingress name.
-func ValidateIngressName(name string, prefix bool) (bool, string) {
-	return apivalidation.NameIsDNSSubdomain(name, prefix)
+var ValidateIngressName = apivalidation.NameIsDNSSubdomain
+
+func validateIngressTLS(spec *extensions.IngressSpec, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	// TODO: Perform a more thorough validation of spec.TLS.Hosts that takes
+	// the wildcard spec from RFC 6125 into account.
+	for _, itls := range spec.TLS {
+		for i, host := range itls.Hosts {
+			if strings.Contains(host, "*") {
+				for _, msg := range validation.IsWildcardDNS1123Subdomain(host) {
+					allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("hosts"), host, msg))
+				}
+				continue
+			}
+			for _, msg := range validation.IsDNS1123Subdomain(host) {
+				allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("hosts"), host, msg))
+			}
+		}
+	}
+
+	return allErrs
 }
 
 // ValidateIngressSpec tests if required fields in the IngressSpec are set.
-func ValidateIngressSpec(spec *extensions.IngressSpec) validation.ErrorList {
-	allErrs := validation.ErrorList{}
+func ValidateIngressSpec(spec *extensions.IngressSpec, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
 	// TODO: Is a default backend mandatory?
 	if spec.Backend != nil {
-		allErrs = append(allErrs, validateIngressBackend(spec.Backend).Prefix("backend")...)
+		allErrs = append(allErrs, validateIngressBackend(spec.Backend, fldPath.Child("backend"))...)
 	} else if len(spec.Rules) == 0 {
-		allErrs = append(allErrs, validation.NewInvalidError("rules", spec.Rules, "Either a default backend or a set of host rules are required for ingress."))
+		allErrs = append(allErrs, field.Invalid(fldPath, spec.Rules, "either `backend` or `rules` must be specified"))
 	}
 	if len(spec.Rules) > 0 {
-		allErrs = append(allErrs, validateIngressRules(spec.Rules).Prefix("rules")...)
+		allErrs = append(allErrs, validateIngressRules(spec.Rules, fldPath.Child("rules"))...)
+	}
+	if len(spec.TLS) > 0 {
+		allErrs = append(allErrs, validateIngressTLS(spec, fldPath.Child("tls"))...)
 	}
 	return allErrs
 }
 
 // ValidateIngressUpdate tests if required fields in the Ingress are set.
-func ValidateIngressUpdate(ingress, oldIngress *extensions.Ingress) validation.ErrorList {
-	allErrs := validation.ErrorList{}
-	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&ingress.ObjectMeta, &oldIngress.ObjectMeta).Prefix("metadata")...)
-	allErrs = append(allErrs, ValidateIngressSpec(&ingress.Spec).Prefix("spec")...)
+func ValidateIngressUpdate(ingress, oldIngress *extensions.Ingress) field.ErrorList {
+	allErrs := apivalidation.ValidateObjectMetaUpdate(&ingress.ObjectMeta, &oldIngress.ObjectMeta, field.NewPath("metadata"))
+	allErrs = append(allErrs, ValidateIngressSpec(&ingress.Spec, field.NewPath("spec"))...)
 	return allErrs
 }
 
 // ValidateIngressStatusUpdate tests if required fields in the Ingress are set when updating status.
-func ValidateIngressStatusUpdate(ingress, oldIngress *extensions.Ingress) validation.ErrorList {
-	allErrs := validation.ErrorList{}
-	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&ingress.ObjectMeta, &oldIngress.ObjectMeta).Prefix("metadata")...)
-	allErrs = append(allErrs, apivalidation.ValidateLoadBalancerStatus(&ingress.Status.LoadBalancer).Prefix("status.loadBalancer")...)
+func ValidateIngressStatusUpdate(ingress, oldIngress *extensions.Ingress) field.ErrorList {
+	allErrs := apivalidation.ValidateObjectMetaUpdate(&ingress.ObjectMeta, &oldIngress.ObjectMeta, field.NewPath("metadata"))
+	allErrs = append(allErrs, apivalidation.ValidateLoadBalancerStatus(&ingress.Status.LoadBalancer, field.NewPath("status", "loadBalancer"))...)
 	return allErrs
 }
 
-func validateIngressRules(IngressRules []extensions.IngressRule) validation.ErrorList {
-	allErrs := validation.ErrorList{}
-	if len(IngressRules) == 0 {
-		return append(allErrs, validation.NewRequiredError("IngressRules"))
+func validateIngressRules(ingressRules []extensions.IngressRule, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if len(ingressRules) == 0 {
+		return append(allErrs, field.Required(fldPath, ""))
 	}
-	for _, ih := range IngressRules {
+	for i, ih := range ingressRules {
 		if len(ih.Host) > 0 {
+			if isIP := (net.ParseIP(ih.Host) != nil); isIP {
+				allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("host"), ih.Host, "must be a DNS name, not an IP address"))
+			}
 			// TODO: Ports and ips are allowed in the host part of a url
 			// according to RFC 3986, consider allowing them.
-			if valid, errMsg := apivalidation.NameIsDNSSubdomain(ih.Host, false); !valid {
-				allErrs = append(allErrs, validation.NewInvalidError("host", ih.Host, errMsg))
+			if strings.Contains(ih.Host, "*") {
+				for _, msg := range validation.IsWildcardDNS1123Subdomain(ih.Host) {
+					allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("host"), ih.Host, msg))
+				}
+				continue
 			}
-			if isIP := (net.ParseIP(ih.Host) != nil); isIP {
-				allErrs = append(allErrs, validation.NewInvalidError("host", ih.Host, "Host must be a DNS name, not ip address"))
+			for _, msg := range validation.IsDNS1123Subdomain(ih.Host) {
+				allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("host"), ih.Host, msg))
 			}
 		}
-		allErrs = append(allErrs, validateIngressRuleValue(&ih.IngressRuleValue).Prefix("ingressRule")...)
+		allErrs = append(allErrs, validateIngressRuleValue(&ih.IngressRuleValue, fldPath.Index(0))...)
 	}
 	return allErrs
 }
 
-func validateIngressRuleValue(ingressRule *extensions.IngressRuleValue) validation.ErrorList {
-	allErrs := validation.ErrorList{}
+func validateIngressRuleValue(ingressRule *extensions.IngressRuleValue, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
 	if ingressRule.HTTP != nil {
-		allErrs = append(allErrs, validateHTTPIngressRuleValue(ingressRule.HTTP).Prefix("http")...)
+		allErrs = append(allErrs, validateHTTPIngressRuleValue(ingressRule.HTTP, fldPath.Child("http"))...)
 	}
 	return allErrs
 }
 
-func validateHTTPIngressRuleValue(httpIngressRuleValue *extensions.HTTPIngressRuleValue) validation.ErrorList {
-	allErrs := validation.ErrorList{}
+func validateHTTPIngressRuleValue(httpIngressRuleValue *extensions.HTTPIngressRuleValue, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
 	if len(httpIngressRuleValue.Paths) == 0 {
-		allErrs = append(allErrs, validation.NewRequiredError("paths"))
+		allErrs = append(allErrs, field.Required(fldPath.Child("paths"), ""))
 	}
-	for _, rule := range httpIngressRuleValue.Paths {
+	for i, rule := range httpIngressRuleValue.Paths {
 		if len(rule.Path) > 0 {
 			if !strings.HasPrefix(rule.Path, "/") {
-				allErrs = append(allErrs, validation.NewInvalidError("path", rule.Path, "path must begin with /"))
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("paths").Index(i).Child("path"), rule.Path, "must be an absolute path"))
 			}
 			// TODO: More draconian path regex validation.
 			// Path must be a valid regex. This is the basic requirement.
@@ -500,111 +429,396 @@ func validateHTTPIngressRuleValue(httpIngressRuleValue *extensions.HTTPIngressRu
 			// the user is confusing url regexes with path regexes.
 			_, err := regexp.CompilePOSIX(rule.Path)
 			if err != nil {
-				allErrs = append(allErrs, validation.NewInvalidError("path", rule.Path, "httpIngressRuleValue.path must be a valid regex."))
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("paths").Index(i).Child("path"), rule.Path, "must be a valid regex"))
 			}
 		}
-		allErrs = append(allErrs, validateIngressBackend(&rule.Backend).Prefix("backend")...)
+		allErrs = append(allErrs, validateIngressBackend(&rule.Backend, fldPath.Child("backend"))...)
 	}
 	return allErrs
 }
 
 // validateIngressBackend tests if a given backend is valid.
-func validateIngressBackend(backend *extensions.IngressBackend) validation.ErrorList {
-	allErrs := validation.ErrorList{}
+func validateIngressBackend(backend *extensions.IngressBackend, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
 
 	// All backends must reference a single local service by name, and a single service port by name or number.
 	if len(backend.ServiceName) == 0 {
-		return append(allErrs, validation.NewRequiredError("serviceName"))
-	} else if ok, errMsg := apivalidation.ValidateServiceName(backend.ServiceName, false); !ok {
-		allErrs = append(allErrs, validation.NewInvalidError("serviceName", backend.ServiceName, errMsg))
-	}
-	if backend.ServicePort.Type == intstr.String {
-		if !validation.IsDNS1123Label(backend.ServicePort.StrVal) {
-			allErrs = append(allErrs, validation.NewInvalidError("servicePort", backend.ServicePort.StrVal, apivalidation.DNS1123LabelErrorMsg))
+		return append(allErrs, field.Required(fldPath.Child("serviceName"), ""))
+	} else {
+		for _, msg := range apivalidation.ValidateServiceName(backend.ServiceName, false) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("serviceName"), backend.ServiceName, msg))
 		}
-		if !validation.IsValidPortName(backend.ServicePort.StrVal) {
-			allErrs = append(allErrs, validation.NewInvalidError("servicePort", backend.ServicePort.StrVal, apivalidation.PortNameErrorMsg))
-		}
-	} else if !validation.IsValidPortNum(backend.ServicePort.IntValue()) {
-		allErrs = append(allErrs, validation.NewInvalidError("servicePort", backend.ServicePort, apivalidation.PortRangeErrorMsg))
 	}
+	allErrs = append(allErrs, apivalidation.ValidatePortNumOrName(backend.ServicePort, fldPath.Child("servicePort"))...)
 	return allErrs
 }
 
-func validateClusterAutoscalerSpec(spec extensions.ClusterAutoscalerSpec) validation.ErrorList {
-	allErrs := validation.ErrorList{}
-	if spec.MinNodes < 0 {
-		allErrs = append(allErrs, validation.NewInvalidError("minNodes", spec.MinNodes, `must be non-negative`))
-	}
-	if spec.MaxNodes < spec.MinNodes {
-		allErrs = append(allErrs, validation.NewInvalidError("maxNodes", spec.MaxNodes, `must be bigger or equal to minNodes`))
-	}
-	if len(spec.TargetUtilization) == 0 {
-		allErrs = append(allErrs, validation.NewRequiredError("targetUtilization"))
-	}
-	for _, target := range spec.TargetUtilization {
-		if len(target.Resource) == 0 {
-			allErrs = append(allErrs, validation.NewRequiredError("targetUtilization.resource"))
-		}
-		if target.Value <= 0 {
-			allErrs = append(allErrs, validation.NewInvalidError("targetUtilization.value", target.Value, "must be greater than 0"))
-		}
-		if target.Value > 1 {
-			allErrs = append(allErrs, validation.NewInvalidError("targetUtilization.value", target.Value, "must be less or equal 1"))
-		}
-	}
-	return allErrs
-}
-
-func ValidateClusterAutoscaler(autoscaler *extensions.ClusterAutoscaler) validation.ErrorList {
-	allErrs := validation.ErrorList{}
-	if autoscaler.Name != "ClusterAutoscaler" {
-		allErrs = append(allErrs, validation.NewInvalidError("name", autoscaler.Name, `name must be ClusterAutoscaler`))
-	}
-	if autoscaler.Namespace != api.NamespaceDefault {
-		allErrs = append(allErrs, validation.NewInvalidError("namespace", autoscaler.Namespace, `namespace must be default`))
-	}
-	allErrs = append(allErrs, validateClusterAutoscalerSpec(autoscaler.Spec)...)
-	return allErrs
-}
-
-func ValidatePodSelector(ps *extensions.PodSelector) validation.ErrorList {
-	allErrs := validation.ErrorList{}
-	if ps == nil {
-		return allErrs
-	}
-	allErrs = append(allErrs, apivalidation.ValidateLabels(ps.MatchLabels, "matchLabels")...)
-	for i, expr := range ps.MatchExpressions {
-		allErrs = append(allErrs, ValidatePodSelectorRequirement(expr).Prefix(fmt.Sprintf("matchExpressions.[%v]", i))...)
-	}
-	return allErrs
-}
-
-func ValidatePodSelectorRequirement(sr extensions.PodSelectorRequirement) validation.ErrorList {
-	allErrs := validation.ErrorList{}
-	switch sr.Operator {
-	case extensions.PodSelectorOpIn, extensions.PodSelectorOpNotIn:
-		if len(sr.Values) == 0 {
-			allErrs = append(allErrs, validation.NewInvalidError("values", sr.Values, "must be non-empty when operator is In or NotIn"))
-		}
-	case extensions.PodSelectorOpExists, extensions.PodSelectorOpDoesNotExist:
-		if len(sr.Values) > 0 {
-			allErrs = append(allErrs, validation.NewInvalidError("values", sr.Values, "must be empty when operator is Exists or DoesNotExist"))
-		}
-	default:
-		allErrs = append(allErrs, validation.NewInvalidError("operator", sr.Operator, "not a valid pod selector operator"))
-	}
-	allErrs = append(allErrs, apivalidation.ValidateLabelName(sr.Key, "key")...)
-	return allErrs
-}
-
-func ValidateScale(scale *extensions.Scale) validation.ErrorList {
-	allErrs := validation.ErrorList{}
-	allErrs = append(allErrs, apivalidation.ValidateObjectMeta(&scale.ObjectMeta, true, apivalidation.NameIsDNSSubdomain).Prefix("metadata")...)
+func ValidateScale(scale *extensions.Scale) field.ErrorList {
+	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, apivalidation.ValidateObjectMeta(&scale.ObjectMeta, true, apivalidation.NameIsDNSSubdomain, field.NewPath("metadata"))...)
 
 	if scale.Spec.Replicas < 0 {
-		allErrs = append(allErrs, validation.NewInvalidError("spec.replicas", scale.Spec.Replicas, "must be non-negative"))
+		allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "replicas"), scale.Spec.Replicas, "must be greater than or equal to 0"))
 	}
 
+	return allErrs
+}
+
+// ValidateReplicaSetName can be used to check whether the given ReplicaSet
+// name is valid.
+// Prefix indicates this name will be used as part of generation, in which case
+// trailing dashes are allowed.
+var ValidateReplicaSetName = apivalidation.NameIsDNSSubdomain
+
+// ValidateReplicaSet tests if required fields in the ReplicaSet are set.
+func ValidateReplicaSet(rs *extensions.ReplicaSet) field.ErrorList {
+	allErrs := apivalidation.ValidateObjectMeta(&rs.ObjectMeta, true, ValidateReplicaSetName, field.NewPath("metadata"))
+	allErrs = append(allErrs, ValidateReplicaSetSpec(&rs.Spec, field.NewPath("spec"))...)
+	return allErrs
+}
+
+// ValidateReplicaSetUpdate tests if required fields in the ReplicaSet are set.
+func ValidateReplicaSetUpdate(rs, oldRs *extensions.ReplicaSet) field.ErrorList {
+	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&rs.ObjectMeta, &oldRs.ObjectMeta, field.NewPath("metadata"))...)
+	allErrs = append(allErrs, ValidateReplicaSetSpec(&rs.Spec, field.NewPath("spec"))...)
+	return allErrs
+}
+
+// ValidateReplicaSetStatusUpdate tests if required fields in the ReplicaSet are set.
+func ValidateReplicaSetStatusUpdate(rs, oldRs *extensions.ReplicaSet) field.ErrorList {
+	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&rs.ObjectMeta, &oldRs.ObjectMeta, field.NewPath("metadata"))...)
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(rs.Status.Replicas), field.NewPath("status", "replicas"))...)
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(rs.Status.FullyLabeledReplicas), field.NewPath("status", "fullyLabeledReplicas"))...)
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(rs.Status.ObservedGeneration), field.NewPath("status", "observedGeneration"))...)
+	return allErrs
+}
+
+// ValidateReplicaSetSpec tests if required fields in the ReplicaSet spec are set.
+func ValidateReplicaSetSpec(spec *extensions.ReplicaSetSpec, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(spec.Replicas), fldPath.Child("replicas"))...)
+
+	if spec.Selector == nil {
+		allErrs = append(allErrs, field.Required(fldPath.Child("selector"), ""))
+	} else {
+		allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(spec.Selector, fldPath.Child("selector"))...)
+		if len(spec.Selector.MatchLabels)+len(spec.Selector.MatchExpressions) == 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("selector"), spec.Selector, "empty selector is not valid for deployment."))
+		}
+	}
+
+	selector, err := unversioned.LabelSelectorAsSelector(spec.Selector)
+	if err != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("selector"), spec.Selector, "invalid label selector."))
+	} else {
+		allErrs = append(allErrs, ValidatePodTemplateSpecForReplicaSet(&spec.Template, selector, spec.Replicas, fldPath.Child("template"))...)
+	}
+	return allErrs
+}
+
+// Validates the given template and ensures that it is in accordance with the desired selector and replicas.
+func ValidatePodTemplateSpecForReplicaSet(template *api.PodTemplateSpec, selector labels.Selector, replicas int32, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if template == nil {
+		allErrs = append(allErrs, field.Required(fldPath, ""))
+	} else {
+		if !selector.Empty() {
+			// Verify that the ReplicaSet selector matches the labels in template.
+			labels := labels.Set(template.Labels)
+			if !selector.Matches(labels) {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("metadata", "labels"), template.Labels, "`selector` does not match template `labels`"))
+			}
+		}
+		allErrs = append(allErrs, apivalidation.ValidatePodTemplateSpec(template, fldPath)...)
+		if replicas > 1 {
+			allErrs = append(allErrs, apivalidation.ValidateReadOnlyPersistentDisks(template.Spec.Volumes, fldPath.Child("spec", "volumes"))...)
+		}
+		// RestartPolicy has already been first-order validated as per ValidatePodTemplateSpec().
+		if template.Spec.RestartPolicy != api.RestartPolicyAlways {
+			allErrs = append(allErrs, field.NotSupported(fldPath.Child("spec", "restartPolicy"), template.Spec.RestartPolicy, []string{string(api.RestartPolicyAlways)}))
+		}
+	}
+	return allErrs
+}
+
+// ValidatePodSecurityPolicyName can be used to check whether the given
+// pod security policy name is valid.
+// Prefix indicates this name will be used as part of generation, in which case
+// trailing dashes are allowed.
+var ValidatePodSecurityPolicyName = apivalidation.NameIsDNSSubdomain
+
+func ValidatePodSecurityPolicy(psp *extensions.PodSecurityPolicy) field.ErrorList {
+	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, apivalidation.ValidateObjectMeta(&psp.ObjectMeta, false, ValidatePodSecurityPolicyName, field.NewPath("metadata"))...)
+	allErrs = append(allErrs, ValidatePodSecurityPolicySpecificAnnotations(psp.Annotations, field.NewPath("metadata").Child("annotations"))...)
+	allErrs = append(allErrs, ValidatePodSecurityPolicySpec(&psp.Spec, field.NewPath("spec"))...)
+	return allErrs
+}
+
+func ValidatePodSecurityPolicySpec(spec *extensions.PodSecurityPolicySpec, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	allErrs = append(allErrs, validatePSPRunAsUser(fldPath.Child("runAsUser"), &spec.RunAsUser)...)
+	allErrs = append(allErrs, validatePSPSELinux(fldPath.Child("seLinux"), &spec.SELinux)...)
+	allErrs = append(allErrs, validatePSPSupplementalGroup(fldPath.Child("supplementalGroups"), &spec.SupplementalGroups)...)
+	allErrs = append(allErrs, validatePSPFSGroup(fldPath.Child("fsGroup"), &spec.FSGroup)...)
+	allErrs = append(allErrs, validatePodSecurityPolicyVolumes(fldPath, spec.Volumes)...)
+	allErrs = append(allErrs, validatePSPCapsAgainstDrops(spec.RequiredDropCapabilities, spec.DefaultAddCapabilities, field.NewPath("defaultAddCapabilities"))...)
+	allErrs = append(allErrs, validatePSPCapsAgainstDrops(spec.RequiredDropCapabilities, spec.AllowedCapabilities, field.NewPath("allowedCapabilities"))...)
+
+	return allErrs
+}
+
+func ValidatePodSecurityPolicySpecificAnnotations(annotations map[string]string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if p := annotations[apparmor.DefaultProfileAnnotationKey]; p != "" {
+		if err := apparmor.ValidateProfileFormat(p); err != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath.Key(apparmor.DefaultProfileAnnotationKey), p, err.Error()))
+		}
+	}
+	if allowed := annotations[apparmor.AllowedProfilesAnnotationKey]; allowed != "" {
+		for _, p := range strings.Split(allowed, ",") {
+			if err := apparmor.ValidateProfileFormat(p); err != nil {
+				allErrs = append(allErrs, field.Invalid(fldPath.Key(apparmor.AllowedProfilesAnnotationKey), allowed, err.Error()))
+			}
+		}
+	}
+
+	sysctlAnnotation := annotations[extensions.SysctlsPodSecurityPolicyAnnotationKey]
+	sysctlFldPath := fldPath.Key(extensions.SysctlsPodSecurityPolicyAnnotationKey)
+	sysctls, err := extensions.SysctlsFromPodSecurityPolicyAnnotation(sysctlAnnotation)
+	if err != nil {
+		allErrs = append(allErrs, field.Invalid(sysctlFldPath, sysctlAnnotation, err.Error()))
+	} else {
+		allErrs = append(allErrs, validatePodSecurityPolicySysctls(sysctlFldPath, sysctls)...)
+	}
+
+	return allErrs
+}
+
+// validatePSPSELinux validates the SELinux fields of PodSecurityPolicy.
+func validatePSPSELinux(fldPath *field.Path, seLinux *extensions.SELinuxStrategyOptions) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	// ensure the selinux strategy has a valid rule
+	supportedSELinuxRules := sets.NewString(string(extensions.SELinuxStrategyMustRunAs),
+		string(extensions.SELinuxStrategyRunAsAny))
+	if !supportedSELinuxRules.Has(string(seLinux.Rule)) {
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("rule"), seLinux.Rule, supportedSELinuxRules.List()))
+	}
+
+	return allErrs
+}
+
+// validatePSPRunAsUser validates the RunAsUser fields of PodSecurityPolicy.
+func validatePSPRunAsUser(fldPath *field.Path, runAsUser *extensions.RunAsUserStrategyOptions) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	// ensure the user strategy has a valid rule
+	supportedRunAsUserRules := sets.NewString(string(extensions.RunAsUserStrategyMustRunAs),
+		string(extensions.RunAsUserStrategyMustRunAsNonRoot),
+		string(extensions.RunAsUserStrategyRunAsAny))
+	if !supportedRunAsUserRules.Has(string(runAsUser.Rule)) {
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("rule"), runAsUser.Rule, supportedRunAsUserRules.List()))
+	}
+
+	// validate range settings
+	for idx, rng := range runAsUser.Ranges {
+		allErrs = append(allErrs, validateIDRanges(fldPath.Child("ranges").Index(idx), rng)...)
+	}
+
+	return allErrs
+}
+
+// validatePSPFSGroup validates the FSGroupStrategyOptions fields of the PodSecurityPolicy.
+func validatePSPFSGroup(fldPath *field.Path, groupOptions *extensions.FSGroupStrategyOptions) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	supportedRules := sets.NewString(
+		string(extensions.FSGroupStrategyMustRunAs),
+		string(extensions.FSGroupStrategyRunAsAny),
+	)
+	if !supportedRules.Has(string(groupOptions.Rule)) {
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("rule"), groupOptions.Rule, supportedRules.List()))
+	}
+
+	for idx, rng := range groupOptions.Ranges {
+		allErrs = append(allErrs, validateIDRanges(fldPath.Child("ranges").Index(idx), rng)...)
+	}
+	return allErrs
+}
+
+// validatePSPSupplementalGroup validates the SupplementalGroupsStrategyOptions fields of the PodSecurityPolicy.
+func validatePSPSupplementalGroup(fldPath *field.Path, groupOptions *extensions.SupplementalGroupsStrategyOptions) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	supportedRules := sets.NewString(
+		string(extensions.SupplementalGroupsStrategyRunAsAny),
+		string(extensions.SupplementalGroupsStrategyMustRunAs),
+	)
+	if !supportedRules.Has(string(groupOptions.Rule)) {
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("rule"), groupOptions.Rule, supportedRules.List()))
+	}
+
+	for idx, rng := range groupOptions.Ranges {
+		allErrs = append(allErrs, validateIDRanges(fldPath.Child("ranges").Index(idx), rng)...)
+	}
+	return allErrs
+}
+
+// validatePodSecurityPolicyVolumes validates the volume fields of PodSecurityPolicy.
+func validatePodSecurityPolicyVolumes(fldPath *field.Path, volumes []extensions.FSType) field.ErrorList {
+	allErrs := field.ErrorList{}
+	allowed := psputil.GetAllFSTypesAsSet()
+	// add in the * value since that is a pseudo type that is not included by default
+	allowed.Insert(string(extensions.All))
+	for _, v := range volumes {
+		if !allowed.Has(string(v)) {
+			allErrs = append(allErrs, field.NotSupported(fldPath.Child("volumes"), v, allowed.List()))
+		}
+	}
+
+	return allErrs
+}
+
+const sysctlPatternSegmentFmt string = "([a-z0-9][-_a-z0-9]*)?[a-z0-9*]"
+const SysctlPatternFmt string = "(" + apivalidation.SysctlSegmentFmt + "\\.)*" + sysctlPatternSegmentFmt
+
+var sysctlPatternRegexp = regexp.MustCompile("^" + SysctlPatternFmt + "$")
+
+func IsValidSysctlPattern(name string) bool {
+	if len(name) > apivalidation.SysctlMaxLength {
+		return false
+	}
+	return sysctlPatternRegexp.MatchString(name)
+}
+
+// validatePodSecurityPolicySysctls validates the sysctls fields of PodSecurityPolicy.
+func validatePodSecurityPolicySysctls(fldPath *field.Path, sysctls []string) field.ErrorList {
+	allErrs := field.ErrorList{}
+	for i, s := range sysctls {
+		if !IsValidSysctlPattern(string(s)) {
+			allErrs = append(
+				allErrs,
+				field.Invalid(fldPath.Index(i), sysctls[i], fmt.Sprintf("must have at most %d characters and match regex %s",
+					apivalidation.SysctlMaxLength,
+					SysctlPatternFmt,
+				)),
+			)
+		}
+	}
+
+	return allErrs
+}
+
+// validateIDRanges ensures the range is valid.
+func validateIDRanges(fldPath *field.Path, rng extensions.IDRange) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	// if 0 <= Min <= Max then we do not need to validate max.  It is always greater than or
+	// equal to 0 and Min.
+	if rng.Min < 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("min"), rng.Min, "min cannot be negative"))
+	}
+	if rng.Max < 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("max"), rng.Max, "max cannot be negative"))
+	}
+	if rng.Min > rng.Max {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("min"), rng.Min, "min cannot be greater than max"))
+	}
+
+	return allErrs
+}
+
+// validatePSPCapsAgainstDrops ensures an allowed cap is not listed in the required drops.
+func validatePSPCapsAgainstDrops(requiredDrops []api.Capability, capsToCheck []api.Capability, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if requiredDrops == nil {
+		return allErrs
+	}
+	for _, cap := range capsToCheck {
+		if hasCap(cap, requiredDrops) {
+			allErrs = append(allErrs, field.Invalid(fldPath, cap,
+				fmt.Sprintf("capability is listed in %s and requiredDropCapabilities", fldPath.String())))
+		}
+	}
+	return allErrs
+}
+
+// hasCap checks for needle in haystack.
+func hasCap(needle api.Capability, haystack []api.Capability) bool {
+	for _, c := range haystack {
+		if needle == c {
+			return true
+		}
+	}
+	return false
+}
+
+// ValidatePodSecurityPolicyUpdate validates a PSP for updates.
+func ValidatePodSecurityPolicyUpdate(old *extensions.PodSecurityPolicy, new *extensions.PodSecurityPolicy) field.ErrorList {
+	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&new.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata"))...)
+	allErrs = append(allErrs, ValidatePodSecurityPolicySpecificAnnotations(new.Annotations, field.NewPath("metadata").Child("annotations"))...)
+	allErrs = append(allErrs, ValidatePodSecurityPolicySpec(&new.Spec, field.NewPath("spec"))...)
+	return allErrs
+}
+
+// ValidateNetworkPolicyName can be used to check whether the given networkpolicy
+// name is valid.
+func ValidateNetworkPolicyName(name string, prefix bool) []string {
+	return apivalidation.NameIsDNSSubdomain(name, prefix)
+}
+
+// ValidateNetworkPolicySpec tests if required fields in the networkpolicy spec are set.
+func ValidateNetworkPolicySpec(spec *extensions.NetworkPolicySpec, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(&spec.PodSelector, fldPath.Child("podSelector"))...)
+
+	// Validate ingress rules.
+	for _, i := range spec.Ingress {
+		// TODO: Update From to be a pointer to slice as soon as auto-generation supports it.
+		for _, f := range i.From {
+			numFroms := 0
+			if f.PodSelector != nil {
+				numFroms++
+				allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(f.PodSelector, fldPath.Child("podSelector"))...)
+			}
+			if f.NamespaceSelector != nil {
+				if numFroms > 0 {
+					allErrs = append(allErrs, field.Forbidden(fldPath, "may not specify more than 1 from type"))
+				} else {
+					numFroms++
+					allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(f.NamespaceSelector, fldPath.Child("namespaces"))...)
+				}
+			}
+
+			if numFroms == 0 {
+				// At least one of PodSelector and NamespaceSelector must be defined.
+				allErrs = append(allErrs, field.Required(fldPath, "must specify a from type"))
+			}
+		}
+	}
+	return allErrs
+}
+
+// ValidateNetworkPolicy validates a networkpolicy.
+func ValidateNetworkPolicy(np *extensions.NetworkPolicy) field.ErrorList {
+	allErrs := apivalidation.ValidateObjectMeta(&np.ObjectMeta, true, ValidateNetworkPolicyName, field.NewPath("metadata"))
+	allErrs = append(allErrs, ValidateNetworkPolicySpec(&np.Spec, field.NewPath("spec"))...)
+	return allErrs
+}
+
+// ValidateNetworkPolicyUpdate tests if an update to a NetworkPolicy is valid.
+func ValidateNetworkPolicyUpdate(update, old *extensions.NetworkPolicy) field.ErrorList {
+	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&update.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata"))...)
+	if !reflect.DeepEqual(update.Spec, old.Spec) {
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "updates to networkpolicy spec are forbidden."))
+	}
 	return allErrs
 }

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,11 +19,14 @@ package main
 import (
 	"fmt"
 	"os"
-	"runtime"
 
 	"k8s.io/kubernetes/cmd/kube-proxy/app"
+	"k8s.io/kubernetes/cmd/kube-proxy/app/options"
+	_ "k8s.io/kubernetes/pkg/client/metrics/prometheus" // for client metric registration
 	"k8s.io/kubernetes/pkg/healthz"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/flag"
+	"k8s.io/kubernetes/pkg/util/logs"
+	_ "k8s.io/kubernetes/pkg/version/prometheus" // for version metric registration
 	"k8s.io/kubernetes/pkg/version/verflag"
 
 	"github.com/spf13/pflag"
@@ -34,13 +37,12 @@ func init() {
 }
 
 func main() {
-	runtime.GOMAXPROCS(runtime.NumCPU())
-	config := app.NewProxyConfig()
+	config := options.NewProxyConfig()
 	config.AddFlags(pflag.CommandLine)
 
-	util.InitFlags()
-	util.InitLogs()
-	defer util.FlushLogs()
+	flag.InitFlags()
+	logs.InitLogs()
+	defer logs.FlushLogs()
 
 	verflag.PrintAndExitIfRequested()
 
@@ -50,7 +52,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = s.Run(pflag.CommandLine.Args()); err != nil {
+	if err = s.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)
 	}

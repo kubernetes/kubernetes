@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,10 +18,9 @@ package etcd
 
 import (
 	"strconv"
-	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 )
@@ -31,19 +30,16 @@ import (
 type APIObjectVersioner struct{}
 
 // UpdateObject implements Versioner
-func (a APIObjectVersioner) UpdateObject(obj runtime.Object, expiration *time.Time, resourceVersion uint64) error {
-	objectMeta, err := api.ObjectMetaFor(obj)
+func (a APIObjectVersioner) UpdateObject(obj runtime.Object, resourceVersion uint64) error {
+	accessor, err := meta.Accessor(obj)
 	if err != nil {
 		return err
-	}
-	if expiration != nil {
-		objectMeta.DeletionTimestamp = &unversioned.Time{Time: *expiration}
 	}
 	versionString := ""
 	if resourceVersion != 0 {
 		versionString = strconv.FormatUint(resourceVersion, 10)
 	}
-	objectMeta.ResourceVersion = versionString
+	accessor.SetResourceVersion(versionString)
 	return nil
 }
 
@@ -63,11 +59,11 @@ func (a APIObjectVersioner) UpdateList(obj runtime.Object, resourceVersion uint6
 
 // ObjectResourceVersion implements Versioner
 func (a APIObjectVersioner) ObjectResourceVersion(obj runtime.Object) (uint64, error) {
-	meta, err := api.ObjectMetaFor(obj)
+	accessor, err := meta.Accessor(obj)
 	if err != nil {
 		return 0, err
 	}
-	version := meta.ResourceVersion
+	version := accessor.GetResourceVersion()
 	if len(version) == 0 {
 		return 0, nil
 	}
@@ -75,4 +71,28 @@ func (a APIObjectVersioner) ObjectResourceVersion(obj runtime.Object) (uint64, e
 }
 
 // APIObjectVersioner implements Versioner
-var _ storage.Versioner = APIObjectVersioner{}
+var Versioner storage.Versioner = APIObjectVersioner{}
+
+// CompareResourceVersion compares etcd resource versions.  Outside this API they are all strings,
+// but etcd resource versions are special, they're actually ints, so we can easily compare them.
+func (a APIObjectVersioner) CompareResourceVersion(lhs, rhs runtime.Object) int {
+	lhsVersion, err := Versioner.ObjectResourceVersion(lhs)
+	if err != nil {
+		// coder error
+		panic(err)
+	}
+	rhsVersion, err := Versioner.ObjectResourceVersion(rhs)
+	if err != nil {
+		// coder error
+		panic(err)
+	}
+
+	if lhsVersion == rhsVersion {
+		return 0
+	}
+	if lhsVersion < rhsVersion {
+		return -1
+	}
+
+	return 1
+}

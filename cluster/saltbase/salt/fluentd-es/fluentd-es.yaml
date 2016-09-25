@@ -3,15 +3,18 @@ kind: Pod
 metadata:
   name: fluentd-elasticsearch
   namespace: kube-system
+  labels:
+    k8s-app: fluentd-logging
 spec:
   containers:
   - name: fluentd-elasticsearch
-    image: gcr.io/google_containers/fluentd-elasticsearch:1.12
+    image: gcr.io/google_containers/fluentd-elasticsearch:1.19
     resources:
       limits:
+        memory: 200Mi
+      requests:
         cpu: 100m
-    args:
-    - -q
+        memory: 200Mi
     volumeMounts:
     - name: varlog
       mountPath: /var/log

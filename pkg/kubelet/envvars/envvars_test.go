@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,63 +25,61 @@ import (
 )
 
 func TestFromServices(t *testing.T) {
-	sl := api.ServiceList{
-		Items: []api.Service{
-			{
-				ObjectMeta: api.ObjectMeta{Name: "foo-bar"},
-				Spec: api.ServiceSpec{
-					Selector:  map[string]string{"bar": "baz"},
-					ClusterIP: "1.2.3.4",
-					Ports: []api.ServicePort{
-						{Port: 8080, Protocol: "TCP"},
-					},
+	sl := []*api.Service{
+		{
+			ObjectMeta: api.ObjectMeta{Name: "foo-bar"},
+			Spec: api.ServiceSpec{
+				Selector:  map[string]string{"bar": "baz"},
+				ClusterIP: "1.2.3.4",
+				Ports: []api.ServicePort{
+					{Port: 8080, Protocol: "TCP"},
 				},
 			},
-			{
-				ObjectMeta: api.ObjectMeta{Name: "abc-123"},
-				Spec: api.ServiceSpec{
-					Selector:  map[string]string{"bar": "baz"},
-					ClusterIP: "5.6.7.8",
-					Ports: []api.ServicePort{
-						{Name: "u-d-p", Port: 8081, Protocol: "UDP"},
-						{Name: "t-c-p", Port: 8081, Protocol: "TCP"},
-					},
+		},
+		{
+			ObjectMeta: api.ObjectMeta{Name: "abc-123"},
+			Spec: api.ServiceSpec{
+				Selector:  map[string]string{"bar": "baz"},
+				ClusterIP: "5.6.7.8",
+				Ports: []api.ServicePort{
+					{Name: "u-d-p", Port: 8081, Protocol: "UDP"},
+					{Name: "t-c-p", Port: 8081, Protocol: "TCP"},
 				},
 			},
-			{
-				ObjectMeta: api.ObjectMeta{Name: "q-u-u-x"},
-				Spec: api.ServiceSpec{
-					Selector:  map[string]string{"bar": "baz"},
-					ClusterIP: "9.8.7.6",
-					Ports: []api.ServicePort{
-						{Port: 8082, Protocol: "TCP"},
-						{Name: "8083", Port: 8083, Protocol: "TCP"},
-					},
+		},
+		{
+			ObjectMeta: api.ObjectMeta{Name: "q-u-u-x"},
+			Spec: api.ServiceSpec{
+				Selector:  map[string]string{"bar": "baz"},
+				ClusterIP: "9.8.7.6",
+				Ports: []api.ServicePort{
+					{Port: 8082, Protocol: "TCP"},
+					{Name: "8083", Port: 8083, Protocol: "TCP"},
 				},
 			},
-			{
-				ObjectMeta: api.ObjectMeta{Name: "svrc-clusterip-none"},
-				Spec: api.ServiceSpec{
-					Selector:  map[string]string{"bar": "baz"},
-					ClusterIP: "None",
-					Ports: []api.ServicePort{
-						{Port: 8082, Protocol: "TCP"},
-					},
+		},
+		{
+			ObjectMeta: api.ObjectMeta{Name: "svrc-clusterip-none"},
+			Spec: api.ServiceSpec{
+				Selector:  map[string]string{"bar": "baz"},
+				ClusterIP: "None",
+				Ports: []api.ServicePort{
+					{Port: 8082, Protocol: "TCP"},
 				},
 			},
-			{
-				ObjectMeta: api.ObjectMeta{Name: "svrc-clusterip-empty"},
-				Spec: api.ServiceSpec{
-					Selector:  map[string]string{"bar": "baz"},
-					ClusterIP: "",
-					Ports: []api.ServicePort{
-						{Port: 8082, Protocol: "TCP"},
-					},
+		},
+		{
+			ObjectMeta: api.ObjectMeta{Name: "svrc-clusterip-empty"},
+			Spec: api.ServiceSpec{
+				Selector:  map[string]string{"bar": "baz"},
+				ClusterIP: "",
+				Ports: []api.ServicePort{
+					{Port: 8082, Protocol: "TCP"},
 				},
 			},
 		},
 	}
-	vars := envvars.FromServices(&sl)
+	vars := envvars.FromServices(sl)
 	expected := []api.EnvVar{
 		{Name: "FOO_BAR_SERVICE_HOST", Value: "1.2.3.4"},
 		{Name: "FOO_BAR_SERVICE_PORT", Value: "8080"},

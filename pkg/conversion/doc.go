@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,18 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package conversion provides go object versioning and encoding/decoding
-// mechanisms.
+// Package conversion provides go object versioning.
 //
 // Specifically, conversion provides a way for you to define multiple versions
 // of the same object. You may write functions which implement conversion logic,
 // but for the fields which did not change, copying is automated. This makes it
 // easy to modify the structures you use in memory without affecting the format
 // you store on disk or respond to in your external API calls.
-//
-// The second offering of this package is automated encoding/decoding. The version
-// and type of the object is recorded in the output, so it can be recreated upon
-// reading. Currently, conversion writes JSON output, and interprets both JSON
-// and YAML input.
-//
-package conversion
+package conversion // import "k8s.io/kubernetes/pkg/conversion"

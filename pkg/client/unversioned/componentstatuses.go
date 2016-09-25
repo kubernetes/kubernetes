@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,7 +18,6 @@ package unversioned
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
 type ComponentStatusesInterface interface {
@@ -27,11 +26,11 @@ type ComponentStatusesInterface interface {
 
 // ComponentStatusInterface contains methods to retrieve ComponentStatus
 type ComponentStatusInterface interface {
-	List(opts unversioned.ListOptions) (*api.ComponentStatusList, error)
+	List(opts api.ListOptions) (*api.ComponentStatusList, error)
 	Get(name string) (*api.ComponentStatus, error)
 
 	// TODO: It'd be nice to have watch support at some point
-	//Watch(opts unversioned.ListOptions) (watch.Interface, error)
+	//Watch(opts api.ListOptions) (watch.Interface, error)
 }
 
 // componentStatuses implements ComponentStatusesInterface
@@ -43,11 +42,11 @@ func newComponentStatuses(c *Client) *componentStatuses {
 	return &componentStatuses{c}
 }
 
-func (c *componentStatuses) List(opts unversioned.ListOptions) (result *api.ComponentStatusList, err error) {
+func (c *componentStatuses) List(opts api.ListOptions) (result *api.ComponentStatusList, err error) {
 	result = &api.ComponentStatusList{}
 	err = c.client.Get().
 		Resource("componentStatuses").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Do().
 		Into(result)
 

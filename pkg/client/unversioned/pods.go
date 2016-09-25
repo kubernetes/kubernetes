@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ package unversioned
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -29,15 +29,15 @@ type PodsNamespacer interface {
 
 // PodInterface has methods to work with Pod resources.
 type PodInterface interface {
-	List(opts unversioned.ListOptions) (*api.PodList, error)
+	List(opts api.ListOptions) (*api.PodList, error)
 	Get(name string) (*api.Pod, error)
 	Delete(name string, options *api.DeleteOptions) error
 	Create(pod *api.Pod) (*api.Pod, error)
 	Update(pod *api.Pod) (*api.Pod, error)
-	Watch(opts unversioned.ListOptions) (watch.Interface, error)
+	Watch(opts api.ListOptions) (watch.Interface, error)
 	Bind(binding *api.Binding) error
 	UpdateStatus(pod *api.Pod) (*api.Pod, error)
-	GetLogs(name string, opts *api.PodLogOptions) *Request
+	GetLogs(name string, opts *api.PodLogOptions) *restclient.Request
 }
 
 // pods implements PodsNamespacer interface
@@ -55,9 +55,9 @@ func newPods(c *Client, namespace string) *pods {
 }
 
 // List takes label and field selectors, and returns the list of pods that match those selectors.
-func (c *pods) List(opts unversioned.ListOptions) (result *api.PodList, err error) {
+func (c *pods) List(opts api.ListOptions) (result *api.PodList, err error) {
 	result = &api.PodList{}
-	err = c.r.Get().Namespace(c.ns).Resource("pods").VersionedParams(&opts, api.Scheme).Do().Into(result)
+	err = c.r.Get().Namespace(c.ns).Resource("pods").VersionedParams(&opts, api.ParameterCodec).Do().Into(result)
 	return
 }
 
@@ -70,15 +70,7 @@ func (c *pods) Get(name string) (result *api.Pod, err error) {
 
 // Delete takes the name of the pod, and returns an error if one occurs
 func (c *pods) Delete(name string, options *api.DeleteOptions) error {
-	// TODO: to make this reusable in other client libraries
-	if options == nil {
-		return c.r.Delete().Namespace(c.ns).Resource("pods").Name(name).Do().Error()
-	}
-	body, err := api.Scheme.EncodeToVersion(options, c.r.APIVersion())
-	if err != nil {
-		return err
-	}
-	return c.r.Delete().Namespace(c.ns).Resource("pods").Name(name).Body(body).Do().Error()
+	return c.r.Delete().Namespace(c.ns).Resource("pods").Name(name).Body(options).Do().Error()
 }
 
 // Create takes the representation of a pod.  Returns the server's representation of the pod, and an error, if it occurs.
@@ -96,12 +88,12 @@ func (c *pods) Update(pod *api.Pod) (result *api.Pod, err error) {
 }
 
 // Watch returns a watch.Interface that watches the requested pods.
-func (c *pods) Watch(opts unversioned.ListOptions) (watch.Interface, error) {
+func (c *pods) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.r.Get().
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("pods").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Watch()
 }
 
@@ -118,6 +110,6 @@ func (c *pods) UpdateStatus(pod *api.Pod) (result *api.Pod, err error) {
 }
 
 // Get constructs a request for getting the logs for a pod
-func (c *pods) GetLogs(name string, opts *api.PodLogOptions) *Request {
-	return c.r.Get().Namespace(c.ns).Name(name).Resource("pods").SubResource("log").VersionedParams(opts, api.Scheme)
+func (c *pods) GetLogs(name string, opts *api.PodLogOptions) *restclient.Request {
+	return c.r.Get().Namespace(c.ns).Name(name).Resource("pods").SubResource("log").VersionedParams(opts, api.ParameterCodec)
 }

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -30,6 +30,7 @@ import (
 
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	clientcmdlatest "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api/latest"
+	"k8s.io/kubernetes/pkg/runtime"
 )
 
 var (
@@ -375,7 +376,23 @@ func TestMigratingFileSourceMissingSkip(t *testing.T) {
 	}
 }
 
-func ExampleNoMergingOnExplicitPaths() {
+func TestFileLocking(t *testing.T) {
+	f, _ := ioutil.TempFile("", "")
+	defer os.Remove(f.Name())
+
+	err := lockFile(f.Name())
+	if err != nil {
+		t.Errorf("unexpected error while locking file: %v", err)
+	}
+	defer unlockFile(f.Name())
+
+	err = lockFile(f.Name())
+	if err == nil {
+		t.Error("expected error while locking file.")
+	}
+}
+
+func Example_noMergingOnExplicitPaths() {
 	commandLineFile, _ := ioutil.TempFile("", "")
 	defer os.Remove(commandLineFile.Name())
 	envVarFile, _ := ioutil.TempFile("", "")
@@ -391,7 +408,7 @@ func ExampleNoMergingOnExplicitPaths() {
 
 	mergedConfig, err := loadingRules.Load()
 
-	json, err := clientcmdlatest.Codec.Encode(mergedConfig)
+	json, err := runtime.Encode(clientcmdlatest.Codec, mergedConfig)
 	if err != nil {
 		fmt.Printf("Unexpected error: %v", err)
 	}
@@ -422,7 +439,7 @@ func ExampleNoMergingOnExplicitPaths() {
 	//     token: red-token
 }
 
-func ExampleMergingSomeWithConflict() {
+func Example_mergingSomeWithConflict() {
 	commandLineFile, _ := ioutil.TempFile("", "")
 	defer os.Remove(commandLineFile.Name())
 	envVarFile, _ := ioutil.TempFile("", "")
@@ -437,7 +454,7 @@ func ExampleMergingSomeWithConflict() {
 
 	mergedConfig, err := loadingRules.Load()
 
-	json, err := clientcmdlatest.Codec.Encode(mergedConfig)
+	json, err := runtime.Encode(clientcmdlatest.Codec, mergedConfig)
 	if err != nil {
 		fmt.Printf("Unexpected error: %v", err)
 	}
@@ -475,7 +492,7 @@ func ExampleMergingSomeWithConflict() {
 	//     token: yellow-token
 }
 
-func ExampleMergingEverythingNoConflicts() {
+func Example_mergingEverythingNoConflicts() {
 	commandLineFile, _ := ioutil.TempFile("", "")
 	defer os.Remove(commandLineFile.Name())
 	envVarFile, _ := ioutil.TempFile("", "")
@@ -496,7 +513,7 @@ func ExampleMergingEverythingNoConflicts() {
 
 	mergedConfig, err := loadingRules.Load()
 
-	json, err := clientcmdlatest.Codec.Encode(mergedConfig)
+	json, err := runtime.Encode(clientcmdlatest.Codec, mergedConfig)
 	if err != nil {
 		fmt.Printf("Unexpected error: %v", err)
 	}

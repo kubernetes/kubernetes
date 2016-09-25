@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,20 +14,26 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// If you make changes to this file, you should also make the corresponding change in ReplicaSet.
+
 package replication
 
 import (
+	"fmt"
+
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
 )
 
 // updateReplicaCount attempts to update the Status.Replicas of the given controller, with a single GET/PUT retry.
-func updateReplicaCount(rcClient client.ReplicationControllerInterface, controller api.ReplicationController, numReplicas int) (updateErr error) {
+func updateReplicaCount(rcClient unversionedcore.ReplicationControllerInterface, controller api.ReplicationController, numReplicas, numFullyLabeledReplicas, numReadyReplicas int) (updateErr error) {
 	// This is the steady state. It happens when the rc doesn't have any expectations, since
 	// we do a periodic relist every 30s. If the generations differ but the replicas are
 	// the same, a caller might've resized to the same replica count.
-	if controller.Status.Replicas == numReplicas &&
+	if int(controller.Status.Replicas) == numReplicas &&
+		int(controller.Status.FullyLabeledReplicas) == numFullyLabeledReplicas &&
+		int(controller.Status.ReadyReplicas) == numReadyReplicas &&
 		controller.Generation == controller.Status.ObservedGeneration {
 		return nil
 	}
@@ -39,10 +45,18 @@ func updateReplicaCount(rcClient client.ReplicationControllerInterface, controll
 
 	var getErr error
 	for i, rc := 0, &controller; ; i++ {
-		glog.V(4).Infof("Updating replica count for rc: %v, %d->%d (need %d), sequence No: %v->%v",
-			controller.Name, controller.Status.Replicas, numReplicas, controller.Spec.Replicas, controller.Status.ObservedGeneration, generation)
+		glog.V(4).Infof(fmt.Sprintf("Updating replica count for rc: %s/%s, ", controller.Namespace, controller.Name) +
+			fmt.Sprintf("replicas %d->%d (need %d), ", controller.Status.Replicas, numReplicas, controller.Spec.Replicas) +
+			fmt.Sprintf("fullyLabeledReplicas %d->%d, ", controller.Status.FullyLabeledReplicas, numFullyLabeledReplicas) +
+			fmt.Sprintf("readyReplicas %d->%d, ", controller.Status.ReadyReplicas, numReadyReplicas) +
+			fmt.Sprintf("sequence No: %v->%v", controller.Status.ObservedGeneration, generation))
 
-		rc.Status = api.ReplicationControllerStatus{Replicas: numReplicas, ObservedGeneration: generation}
+		rc.Status = api.ReplicationControllerStatus{
+			Replicas:             int32(numReplicas),
+			FullyLabeledReplicas: int32(numFullyLabeledReplicas),
+			ReadyReplicas:        int32(numReadyReplicas),
+			ObservedGeneration:   generation,
+		}
 		_, updateErr = rcClient.UpdateStatus(rc)
 		if updateErr == nil || i >= statusUpdateRetries {
 			return updateErr
@@ -57,12 +71,12 @@ func updateReplicaCount(rcClient client.ReplicationControllerInterface, controll
 }
 
 // OverlappingControllers sorts a list of controllers by creation timestamp, using their names as a tie breaker.
-type overlappingControllers []api.ReplicationController
+type OverlappingControllers []*api.ReplicationController
 
-func (o overlappingControllers) Len() int      { return len(o) }
-func (o overlappingControllers) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
+func (o OverlappingControllers) Len() int      { return len(o) }
+func (o OverlappingControllers) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
 
-func (o overlappingControllers) Less(i, j int) bool {
+func (o OverlappingControllers) Less(i, j int) bool {
 	if o[i].CreationTimestamp.Equal(o[j].CreationTimestamp) {
 		return o[i].Name < o[j].Name
 	}

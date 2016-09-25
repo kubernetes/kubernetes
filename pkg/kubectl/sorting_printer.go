@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,10 +22,11 @@ import (
 	"reflect"
 	"sort"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util/integer"
 	"k8s.io/kubernetes/pkg/util/jsonpath"
 
 	"github.com/golang/glog"
@@ -36,6 +37,11 @@ import (
 type SortingPrinter struct {
 	SortField string
 	Delegate  ResourcePrinter
+	Decoder   runtime.Decoder
+}
+
+func (s *SortingPrinter) AfterPrint(w io.Writer, res string) error {
+	return nil
 }
 
 func (s *SortingPrinter) PrintObj(obj runtime.Object, out io.Writer) error {
@@ -63,7 +69,7 @@ func (s *SortingPrinter) sortObj(obj runtime.Object) error {
 		return nil
 	}
 
-	sorter, err := SortObjects(objs, s.SortField)
+	sorter, err := SortObjects(s.Decoder, objs, s.SortField)
 	if err != nil {
 		return err
 	}
@@ -80,7 +86,7 @@ func (s *SortingPrinter) sortObj(obj runtime.Object) error {
 	return meta.SetList(obj, objs)
 }
 
-func SortObjects(objs []runtime.Object, fieldInput string) (*RuntimeSort, error) {
+func SortObjects(decoder runtime.Decoder, objs []runtime.Object, fieldInput string) (*RuntimeSort, error) {
 	parser := jsonpath.New("sorting")
 
 	field, err := massageJSONPath(fieldInput)
@@ -97,7 +103,7 @@ func SortObjects(objs []runtime.Object, fieldInput string) (*RuntimeSort, error)
 		switch u := item.(type) {
 		case *runtime.Unknown:
 			var err error
-			if objs[ix], err = api.Codec.Decode(u.RawJSON); err != nil {
+			if objs[ix], _, err = decoder.Decode(u.Raw, nil, nil); err != nil {
 				return nil, err
 			}
 		}
@@ -153,6 +159,29 @@ func isLess(i, j reflect.Value) (bool, error) {
 		return i.String() < j.String(), nil
 	case reflect.Ptr:
 		return isLess(i.Elem(), j.Elem())
+	case reflect.Struct:
+		// sort unversioned.Time
+		in := i.Interface()
+		if t, ok := in.(unversioned.Time); ok {
+			return t.Before(j.Interface().(unversioned.Time)), nil
+		}
+		// fallback to the fields comparison
+		for idx := 0; idx < i.NumField(); idx++ {
+			less, err := isLess(i.Field(idx), j.Field(idx))
+			if err != nil || !less {
+				return less, err
+			}
+		}
+		return true, nil
+	case reflect.Array, reflect.Slice:
+		// note: the length of i and j may be different
+		for idx := 0; idx < integer.IntMin(i.Len(), j.Len()); idx++ {
+			less, err := isLess(i.Index(idx), j.Index(idx))
+			if err != nil || !less {
+				return less, err
+			}
+		}
+		return true, nil
 	default:
 		return false, fmt.Errorf("unsortable type: %v", i.Kind())
 	}

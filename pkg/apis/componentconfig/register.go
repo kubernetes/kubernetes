@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,27 +17,41 @@ limitations under the License.
 package componentconfig
 
 import (
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/runtime"
 )
 
-func init() {
-	addKnownTypes()
-}
+var (
+	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)
+	AddToScheme   = SchemeBuilder.AddToScheme
+)
+
+// GroupName is the group name use in this package
+const GroupName = "componentconfig"
 
 // SchemeGroupVersion is group version used to register these objects
-var SchemeGroupVersion = unversioned.GroupVersion{Group: "componentconfig", Version: ""}
+var SchemeGroupVersion = unversioned.GroupVersion{Group: GroupName, Version: runtime.APIVersionInternal}
 
-// Kind takes an unqualified kind and returns back a Group qualified GroupKind
+// Kind takes an unqualified kind and returns a Group qualified GroupKind
 func Kind(kind string) unversioned.GroupKind {
 	return SchemeGroupVersion.WithKind(kind).GroupKind()
 }
 
-func addKnownTypes() {
-	// TODO this will get cleaned up with the scheme types are fixed
-	api.Scheme.AddKnownTypes(SchemeGroupVersion,
-		&KubeProxyConfiguration{},
-	)
+// Resource takes an unqualified resource and returns a Group qualified GroupResource
+func Resource(resource string) unversioned.GroupResource {
+	return SchemeGroupVersion.WithResource(resource).GroupResource()
 }
 
-func (_ *KubeProxyConfiguration) IsAnAPIObject() {}
+func addKnownTypes(scheme *runtime.Scheme) error {
+	// TODO this will get cleaned up with the scheme types are fixed
+	scheme.AddKnownTypes(SchemeGroupVersion,
+		&KubeProxyConfiguration{},
+		&KubeSchedulerConfiguration{},
+		&KubeletConfiguration{},
+	)
+	return nil
+}
+
+func (obj *KubeProxyConfiguration) GetObjectKind() unversioned.ObjectKind     { return &obj.TypeMeta }
+func (obj *KubeSchedulerConfiguration) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
+func (obj *KubeletConfiguration) GetObjectKind() unversioned.ObjectKind       { return &obj.TypeMeta }

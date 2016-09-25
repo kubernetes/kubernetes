@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 The Kubernetes Authors All rights reserved.
+# Copyright 2015 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@
 # exit on any error
 set -e
 
-SSH_OPTS="-oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oLogLevel=ERROR"
+SSH_OPTS="-oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oLogLevel=ERROR -C"
 
 # Use the config file specified in $KUBE_CONFIG_FILE, or default to
 # config-default.sh.
@@ -293,10 +293,10 @@ function kube-scp() {
 #   KUBE_USER
 #   KUBE_PASSWORD
 function get-password {
-  get-kubeconfig-basicauth
+  load-or-gen-kube-basicauth
   if [[ -z "${KUBE_USER}" || -z "${KUBE_PASSWORD}" ]]; then
     KUBE_USER=admin
     KUBE_PASSWORD=$(python -c 'import string,random; \
-      print "".join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(16))')
+      print("".join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(16)))')
   fi
 }

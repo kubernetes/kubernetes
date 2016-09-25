@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ package kubelet
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
@@ -32,7 +32,7 @@ func (nh *networkHost) GetPodByName(name, namespace string) (*api.Pod, bool) {
 	return nh.kubelet.GetPodByName(name, namespace)
 }
 
-func (nh *networkHost) GetKubeClient() client.Interface {
+func (nh *networkHost) GetKubeClient() clientset.Interface {
 	return nh.kubelet.kubeClient
 }
 

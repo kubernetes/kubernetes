@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -15,4 +15,4 @@ limitations under the License.
 */
 
 // Package minion contains the executor and proxy bootstrap code for a Mesos slave
-package minion
+package minion // import "k8s.io/kubernetes/contrib/mesos/pkg/minion"

@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,29 +17,29 @@ limitations under the License.
 package v1beta1
 
 import (
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/runtime"
+	versionedwatch "k8s.io/kubernetes/pkg/watch/versioned"
 )
 
+// GroupName is the group name use in this package
+const GroupName = "extensions"
+
 // SchemeGroupVersion is group version used to register these objects
-var SchemeGroupVersion = unversioned.GroupVersion{Group: "extensions", Version: "v1beta1"}
+var SchemeGroupVersion = unversioned.GroupVersion{Group: GroupName, Version: "v1beta1"}
 
-var Codec = runtime.CodecFor(api.Scheme, SchemeGroupVersion.String())
-
-func init() {
-	addKnownTypes()
-	addDefaultingFuncs()
-	addConversionFuncs()
-}
+var (
+	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes, addDefaultingFuncs, addConversionFuncs)
+	AddToScheme   = SchemeBuilder.AddToScheme
+)
 
 // Adds the list of known types to api.Scheme.
-func addKnownTypes() {
-	api.Scheme.AddKnownTypes(SchemeGroupVersion,
-		&ClusterAutoscaler{},
-		&ClusterAutoscalerList{},
+func addKnownTypes(scheme *runtime.Scheme) error {
+	scheme.AddKnownTypes(SchemeGroupVersion,
 		&Deployment{},
 		&DeploymentList{},
+		&DeploymentRollback{},
 		&HorizontalPodAutoscaler{},
 		&HorizontalPodAutoscalerList{},
 		&Job{},
@@ -54,28 +54,16 @@ func addKnownTypes() {
 		&ThirdPartyResourceDataList{},
 		&Ingress{},
 		&IngressList{},
+		&ListOptions{},
+		&v1.DeleteOptions{},
+		&ReplicaSet{},
+		&ReplicaSetList{},
+		&PodSecurityPolicy{},
+		&PodSecurityPolicyList{},
+		&NetworkPolicy{},
+		&NetworkPolicyList{},
 	)
-
-	// Register Unversioned types
-	// TODO this should not be done here
-	api.Scheme.AddKnownTypes(SchemeGroupVersion, &unversioned.ListOptions{})
+	// Add the watch version that applies
+	versionedwatch.AddToGroupVersion(scheme, SchemeGroupVersion)
+	return nil
 }
-
-func (*ClusterAutoscaler) IsAnAPIObject()           {}
-func (*ClusterAutoscalerList) IsAnAPIObject()       {}
-func (*Deployment) IsAnAPIObject()                  {}
-func (*DeploymentList) IsAnAPIObject()              {}
-func (*HorizontalPodAutoscaler) IsAnAPIObject()     {}
-func (*HorizontalPodAutoscalerList) IsAnAPIObject() {}
-func (*Job) IsAnAPIObject()                         {}
-func (*JobList) IsAnAPIObject()                     {}
-func (*ReplicationControllerDummy) IsAnAPIObject()  {}
-func (*Scale) IsAnAPIObject()                       {}
-func (*ThirdPartyResource) IsAnAPIObject()          {}
-func (*ThirdPartyResourceList) IsAnAPIObject()      {}
-func (*DaemonSet) IsAnAPIObject()                   {}
-func (*DaemonSetList) IsAnAPIObject()               {}
-func (*ThirdPartyResourceData) IsAnAPIObject()      {}
-func (*ThirdPartyResourceDataList) IsAnAPIObject()  {}
-func (*Ingress) IsAnAPIObject()                     {}
-func (*IngressList) IsAnAPIObject()                 {}

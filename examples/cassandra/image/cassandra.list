@@ -1,3 +1,0 @@
-deb http://www.apache.org/dist/cassandra/debian 21x main
-deb-src http://www.apache.org/dist/cassandra/debian 21x main
-

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -35,17 +35,177 @@ func TestValidateEvent(t *testing.T) {
 				},
 				InvolvedObject: api.ObjectReference{
 					Namespace: "bar",
+					Kind:      "Pod",
 				},
 			},
 			false,
 		}, {
 			&api.Event{
 				ObjectMeta: api.ObjectMeta{
-					Name:      "test1",
+					Name:      "test2",
 					Namespace: "aoeu-_-aoeu",
 				},
 				InvolvedObject: api.ObjectReference{
 					Namespace: "aoeu-_-aoeu",
+					Kind:      "Pod",
+				},
+			},
+			false,
+		}, {
+			&api.Event{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "test3",
+					Namespace: api.NamespaceDefault,
+				},
+				InvolvedObject: api.ObjectReference{
+					APIVersion: "v1",
+					Kind:       "Node",
+				},
+			},
+			true,
+		}, {
+			&api.Event{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "test4",
+					Namespace: api.NamespaceDefault,
+				},
+				InvolvedObject: api.ObjectReference{
+					APIVersion: "v1",
+					Kind:       "Namespace",
+				},
+			},
+			true,
+		}, {
+			&api.Event{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "test5",
+					Namespace: api.NamespaceDefault,
+				},
+				InvolvedObject: api.ObjectReference{
+					APIVersion: "extensions/v1beta1",
+					Kind:       "NoKind",
+					Namespace:  api.NamespaceDefault,
+				},
+			},
+			true,
+		}, {
+			&api.Event{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "test6",
+					Namespace: api.NamespaceDefault,
+				},
+				InvolvedObject: api.ObjectReference{
+					APIVersion: "extensions/v1beta1",
+					Kind:       "Job",
+					Namespace:  "foo",
+				},
+			},
+			false,
+		}, {
+			&api.Event{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "test7",
+					Namespace: api.NamespaceDefault,
+				},
+				InvolvedObject: api.ObjectReference{
+					APIVersion: "extensions/v1beta1",
+					Kind:       "Job",
+					Namespace:  api.NamespaceDefault,
+				},
+			},
+			true,
+		}, {
+			&api.Event{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "test8",
+					Namespace: api.NamespaceDefault,
+				},
+				InvolvedObject: api.ObjectReference{
+					APIVersion: "other/v1beta1",
+					Kind:       "Job",
+					Namespace:  "foo",
+				},
+			},
+			false,
+		}, {
+			&api.Event{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "test9",
+					Namespace: "foo",
+				},
+				InvolvedObject: api.ObjectReference{
+					APIVersion: "other/v1beta1",
+					Kind:       "Job",
+					Namespace:  "foo",
+				},
+			},
+			true,
+		}, {
+			&api.Event{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "test10",
+					Namespace: api.NamespaceDefault,
+				},
+				InvolvedObject: api.ObjectReference{
+					APIVersion: "extensions",
+					Kind:       "Job",
+					Namespace:  "foo",
+				},
+			},
+			false,
+		}, {
+			&api.Event{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "test11",
+					Namespace: "foo",
+				},
+				InvolvedObject: api.ObjectReference{
+					// must register in v1beta1 to be true
+					APIVersion: "extensions/v1beta1",
+					Kind:       "Job",
+					Namespace:  "foo",
+				},
+			},
+			true,
+		},
+		{
+			&api.Event{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "test12",
+					Namespace: "foo",
+				},
+				InvolvedObject: api.ObjectReference{
+					APIVersion: "other/v1beta1",
+					Kind:       "FooBar",
+					Namespace:  "bar",
+				},
+			},
+			false,
+		},
+		{
+			&api.Event{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "test13",
+					Namespace: "",
+				},
+				InvolvedObject: api.ObjectReference{
+					APIVersion: "other/v1beta1",
+					Kind:       "FooBar",
+					Namespace:  "bar",
+				},
+			},
+			false,
+		},
+		{
+			&api.Event{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "test14",
+					Namespace: "foo",
+				},
+				InvolvedObject: api.ObjectReference{
+					APIVersion: "other/v1beta1",
+					Kind:       "FooBar",
+					Namespace:  "",
 				},
 			},
 			false,

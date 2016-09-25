@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,7 +24,8 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
@@ -42,31 +43,55 @@ func (f roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) {
 
 // RESTClient provides a fake RESTClient interface.
 type RESTClient struct {
-	Client *http.Client
-	Codec  runtime.Codec
-	Req    *http.Request
-	Resp   *http.Response
-	Err    error
+	Client               *http.Client
+	NegotiatedSerializer runtime.NegotiatedSerializer
+
+	Req  *http.Request
+	Resp *http.Response
+	Err  error
 }
 
-func (c *RESTClient) Get() *unversioned.Request {
-	return unversioned.NewRequest(c, "GET", &url.URL{Host: "localhost"}, testapi.Default.Version(), c.Codec)
+func (c *RESTClient) Get() *restclient.Request {
+	return c.request("GET")
 }
 
-func (c *RESTClient) Put() *unversioned.Request {
-	return unversioned.NewRequest(c, "PUT", &url.URL{Host: "localhost"}, testapi.Default.Version(), c.Codec)
+func (c *RESTClient) Put() *restclient.Request {
+	return c.request("PUT")
 }
 
-func (c *RESTClient) Patch(_ api.PatchType) *unversioned.Request {
-	return unversioned.NewRequest(c, "PATCH", &url.URL{Host: "localhost"}, testapi.Default.Version(), c.Codec)
+func (c *RESTClient) Patch(_ api.PatchType) *restclient.Request {
+	return c.request("PATCH")
 }
 
-func (c *RESTClient) Post() *unversioned.Request {
-	return unversioned.NewRequest(c, "POST", &url.URL{Host: "localhost"}, testapi.Default.Version(), c.Codec)
+func (c *RESTClient) Post() *restclient.Request {
+	return c.request("POST")
 }
 
-func (c *RESTClient) Delete() *unversioned.Request {
-	return unversioned.NewRequest(c, "DELETE", &url.URL{Host: "localhost"}, testapi.Default.Version(), c.Codec)
+func (c *RESTClient) Delete() *restclient.Request {
+	return c.request("DELETE")
+}
+
+func (c *RESTClient) request(verb string) *restclient.Request {
+	config := restclient.ContentConfig{
+		ContentType:          runtime.ContentTypeJSON,
+		GroupVersion:         testapi.Default.GroupVersion(),
+		NegotiatedSerializer: c.NegotiatedSerializer,
+	}
+	ns := c.NegotiatedSerializer
+	serializer, _ := ns.SerializerForMediaType(runtime.ContentTypeJSON, nil)
+	streamingSerializer, _ := ns.StreamingSerializerForMediaType(runtime.ContentTypeJSON, nil)
+	internalVersion := unversioned.GroupVersion{
+		Group:   testapi.Default.GroupVersion().Group,
+		Version: runtime.APIVersionInternal,
+	}
+	internalVersion.Version = runtime.APIVersionInternal
+	serializers := restclient.Serializers{
+		Encoder:             ns.EncoderForVersion(serializer, *testapi.Default.GroupVersion()),
+		Decoder:             ns.DecoderToVersion(serializer, internalVersion),
+		StreamingSerializer: streamingSerializer,
+		Framer:              streamingSerializer.Framer,
+	}
+	return restclient.NewRequest(c, verb, &url.URL{Host: "localhost"}, "", config, serializers, nil, nil)
 }
 
 func (c *RESTClient) Do(req *http.Request) (*http.Response, error) {

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2014 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,4 +20,8 @@ set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 
-KUBE_COVER="" KUBE_RACE=" " "${KUBE_ROOT}/hack/test-go.sh" -- -test.run="^X" -benchtime=1s -bench=. -benchmem $@
+make test \
+    WHAT="$*"
+    KUBE_COVER="" \
+    KUBE_RACE=" " \
+    KUBE_TEST_ARGS="-- -test.run='^X' -benchtime=1s -bench=. -benchmem" \

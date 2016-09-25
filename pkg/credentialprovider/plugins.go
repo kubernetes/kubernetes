@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -38,7 +38,7 @@ func RegisterCredentialProvider(name string, provider DockerConfigProvider) {
 	if found {
 		glog.Fatalf("Credential provider %q was registered twice", name)
 	}
-	glog.V(1).Infof("Registered credential provider %q", name)
+	glog.V(4).Infof("Registered credential provider %q", name)
 	providers[name] = provider
 }
 
@@ -53,7 +53,7 @@ func NewDockerKeyring() DockerKeyring {
 	// introduce the notion of priorities for conflict resolution.
 	for name, provider := range providers {
 		if provider.Enabled() {
-			glog.Infof("Registering credential provider: %v", name)
+			glog.V(4).Infof("Registering credential provider: %v", name)
 			keyring.Providers = append(keyring.Providers, provider)
 		}
 	}

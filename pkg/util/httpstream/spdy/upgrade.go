@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,8 +21,8 @@ import (
 	"net/http"
 	"strings"
 
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/httpstream"
+	"k8s.io/kubernetes/pkg/util/runtime"
 )
 
 const HeaderSpdy31 = "SPDY/3.1"
@@ -64,13 +64,13 @@ func (u responseUpgrader) UpgradeResponse(w http.ResponseWriter, req *http.Reque
 
 	conn, _, err := hijacker.Hijack()
 	if err != nil {
-		util.HandleError(fmt.Errorf("unable to upgrade: error hijacking response: %v", err))
+		runtime.HandleError(fmt.Errorf("unable to upgrade: error hijacking response: %v", err))
 		return nil
 	}
 
 	spdyConn, err := NewServerConnection(conn, newStreamHandler)
 	if err != nil {
-		util.HandleError(fmt.Errorf("unable to upgrade: error creating SPDY server connection: %v", err))
+		runtime.HandleError(fmt.Errorf("unable to upgrade: error creating SPDY server connection: %v", err))
 		return nil
 	}
 

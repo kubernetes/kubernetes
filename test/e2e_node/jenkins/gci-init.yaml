@@ -1,0 +1,5 @@
+#cloud-config
+
+runcmd:
+  - mount /tmp /tmp -o remount,exec,suid
+  - usermod -a -G docker jenkins

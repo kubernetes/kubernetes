@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package unversioned
+package unversioned_test
 
 import (
 	"net/url"
@@ -22,7 +22,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/client/unversioned/testclient/simple"
 )
 
 func getPodTemplatesResoureName() string {
@@ -38,17 +38,18 @@ func TestPodTemplateCreate(t *testing.T) {
 		},
 		Template: api.PodTemplateSpec{},
 	}
-	c := &testClient{
-		Request: testRequest{
+	c := &simple.Client{
+		Request: simple.Request{
 			Method: "POST",
 			Path:   testapi.Default.ResourcePath(getPodTemplatesResoureName(), ns, ""),
-			Query:  buildQueryValues(nil),
+			Query:  simple.BuildQueryValues(nil),
 			Body:   &podTemplate,
 		},
-		Response: Response{StatusCode: 200, Body: &podTemplate},
+		Response: simple.Response{StatusCode: 200, Body: &podTemplate},
 	}
 
 	response, err := c.Setup(t).PodTemplates(ns).Create(&podTemplate)
+	defer c.Close()
 	c.Validate(t, response, err)
 }
 
@@ -61,17 +62,18 @@ func TestPodTemplateGet(t *testing.T) {
 		},
 		Template: api.PodTemplateSpec{},
 	}
-	c := &testClient{
-		Request: testRequest{
+	c := &simple.Client{
+		Request: simple.Request{
 			Method: "GET",
 			Path:   testapi.Default.ResourcePath(getPodTemplatesResoureName(), ns, "abc"),
-			Query:  buildQueryValues(nil),
+			Query:  simple.BuildQueryValues(nil),
 			Body:   nil,
 		},
-		Response: Response{StatusCode: 200, Body: podTemplate},
+		Response: simple.Response{StatusCode: 200, Body: podTemplate},
 	}
 
 	response, err := c.Setup(t).PodTemplates(ns).Get("abc")
+	defer c.Close()
 	c.Validate(t, response, err)
 }
 
@@ -87,16 +89,17 @@ func TestPodTemplateList(t *testing.T) {
 			},
 		},
 	}
-	c := &testClient{
-		Request: testRequest{
+	c := &simple.Client{
+		Request: simple.Request{
 			Method: "GET",
 			Path:   testapi.Default.ResourcePath(getPodTemplatesResoureName(), ns, ""),
-			Query:  buildQueryValues(nil),
+			Query:  simple.BuildQueryValues(nil),
 			Body:   nil,
 		},
-		Response: Response{StatusCode: 200, Body: podTemplateList},
+		Response: simple.Response{StatusCode: 200, Body: podTemplateList},
 	}
-	response, err := c.Setup(t).PodTemplates(ns).List(unversioned.ListOptions{})
+	response, err := c.Setup(t).PodTemplates(ns).List(api.ListOptions{})
+	defer c.Close()
 	c.Validate(t, response, err)
 }
 
@@ -110,32 +113,35 @@ func TestPodTemplateUpdate(t *testing.T) {
 		},
 		Template: api.PodTemplateSpec{},
 	}
-	c := &testClient{
-		Request:  testRequest{Method: "PUT", Path: testapi.Default.ResourcePath(getPodTemplatesResoureName(), ns, "abc"), Query: buildQueryValues(nil)},
-		Response: Response{StatusCode: 200, Body: podTemplate},
+	c := &simple.Client{
+		Request:  simple.Request{Method: "PUT", Path: testapi.Default.ResourcePath(getPodTemplatesResoureName(), ns, "abc"), Query: simple.BuildQueryValues(nil)},
+		Response: simple.Response{StatusCode: 200, Body: podTemplate},
 	}
 	response, err := c.Setup(t).PodTemplates(ns).Update(podTemplate)
+	defer c.Close()
 	c.Validate(t, response, err)
 }
 
 func TestPodTemplateDelete(t *testing.T) {
 	ns := api.NamespaceDefault
-	c := &testClient{
-		Request:  testRequest{Method: "DELETE", Path: testapi.Default.ResourcePath(getPodTemplatesResoureName(), ns, "foo"), Query: buildQueryValues(nil)},
-		Response: Response{StatusCode: 200},
+	c := &simple.Client{
+		Request:  simple.Request{Method: "DELETE", Path: testapi.Default.ResourcePath(getPodTemplatesResoureName(), ns, "foo"), Query: simple.BuildQueryValues(nil)},
+		Response: simple.Response{StatusCode: 200},
 	}
 	err := c.Setup(t).PodTemplates(ns).Delete("foo", nil)
+	defer c.Close()
 	c.Validate(t, nil, err)
 }
 
 func TestPodTemplateWatch(t *testing.T) {
-	c := &testClient{
-		Request: testRequest{
+	c := &simple.Client{
+		Request: simple.Request{
 			Method: "GET",
 			Path:   testapi.Default.ResourcePathWithPrefix("watch", getPodTemplatesResoureName(), "", ""),
 			Query:  url.Values{"resourceVersion": []string{}}},
-		Response: Response{StatusCode: 200},
+		Response: simple.Response{StatusCode: 200},
 	}
-	_, err := c.Setup(t).PodTemplates(api.NamespaceAll).Watch(unversioned.ListOptions{})
+	_, err := c.Setup(t).PodTemplates(api.NamespaceAll).Watch(api.ListOptions{})
+	defer c.Close()
 	c.Validate(t, nil, err)
 }

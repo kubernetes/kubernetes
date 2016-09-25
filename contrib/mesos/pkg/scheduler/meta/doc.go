@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,4 +19,4 @@ limitations under the License.
 // for reconciliation upon failover. Other annotations are used as part of
 // the host-to-pod port-mapping implementation understood by the k8s-mesos
 // scheduler and custom endpoints-controller implementation.
-package meta
+package meta // import "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/meta"

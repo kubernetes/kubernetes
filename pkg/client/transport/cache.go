@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,6 +22,8 @@ import (
 	"net/http"
 	"sync"
 	"time"
+
+	utilnet "k8s.io/kubernetes/pkg/util/net"
 )
 
 // TlsTransportCache caches TLS http.RoundTrippers different configurations. The
@@ -31,6 +33,8 @@ type tlsTransportCache struct {
 	mu         sync.Mutex
 	transports map[string]*http.Transport
 }
+
+const idleConnsPerHost = 25
 
 var tlsCache = &tlsTransportCache{transports: make(map[string]*http.Transport)}
 
@@ -60,15 +64,16 @@ func (c *tlsTransportCache) get(config *Config) (http.RoundTripper, error) {
 	}
 
 	// Cache a single transport for these options
-	c.transports[key] = &http.Transport{
+	c.transports[key] = utilnet.SetTransportDefaults(&http.Transport{
 		Proxy:               http.ProxyFromEnvironment,
 		TLSHandshakeTimeout: 10 * time.Second,
 		TLSClientConfig:     tlsConfig,
+		MaxIdleConnsPerHost: idleConnsPerHost,
 		Dial: (&net.Dialer{
 			Timeout:   30 * time.Second,
 			KeepAlive: 30 * time.Second,
 		}).Dial,
-	}
+	})
 	return c.transports[key], nil
 }
 

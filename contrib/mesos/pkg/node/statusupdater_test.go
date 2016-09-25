@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,8 +21,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"k8s.io/kubernetes/cmd/kube-controller-manager/app"
-	kubeletapp "k8s.io/kubernetes/cmd/kubelet/app"
+	cmoptions "k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
+	kubeletoptions "k8s.io/kubernetes/cmd/kubelet/app/options"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 )
@@ -39,36 +39,36 @@ func Test_nodeWithUpdatedStatus(t *testing.T) {
 					Status:             s,
 					Reason:             r,
 					Message:            "some message we don't care about here",
-					LastTransitionTime: unversioned.Time{now.Add(-time.Minute)},
-					LastHeartbeatTime:  unversioned.Time{now.Add(d)},
+					LastTransitionTime: unversioned.Time{Time: now.Add(-time.Minute)},
+					LastHeartbeatTime:  unversioned.Time{Time: now.Add(d)},
 				}},
 			},
 		}
 	}
 
-	cm := app.NewCMServer()
-	kubecfg := kubeletapp.NewKubeletServer()
-	assert.True(t, kubecfg.NodeStatusUpdateFrequency*3 < cm.NodeMonitorGracePeriod) // sanity check for defaults
+	cm := cmoptions.NewCMServer()
+	kubecfg := kubeletoptions.NewKubeletServer()
+	assert.True(t, kubecfg.NodeStatusUpdateFrequency.Duration*3 < cm.NodeMonitorGracePeriod.Duration) // sanity check for defaults
 
 	n := testNode(0, api.ConditionTrue, "KubeletReady")
-	su := NewStatusUpdater(nil, cm.NodeMonitorPeriod, func() time.Time { return now })
+	su := NewStatusUpdater(nil, cm.NodeMonitorPeriod.Duration, func() time.Time { return now })
 	_, updated, err := su.nodeWithUpdatedStatus(n)
 	assert.NoError(t, err)
 	assert.False(t, updated, "no update expected b/c kubelet updated heartbeat just now")
 
-	n = testNode(-cm.NodeMonitorGracePeriod, api.ConditionTrue, "KubeletReady")
+	n = testNode(-cm.NodeMonitorGracePeriod.Duration, api.ConditionTrue, "KubeletReady")
 	n2, updated, err := su.nodeWithUpdatedStatus(n)
 	assert.NoError(t, err)
 	assert.True(t, updated, "update expected b/c kubelet's update is older than DefaultNodeMonitorGracePeriod")
 	assert.Equal(t, getCondition(&n2.Status, api.NodeReady).Reason, slaveReadyReason)
 	assert.Equal(t, getCondition(&n2.Status, api.NodeReady).Message, slaveReadyMessage)
 
-	n = testNode(-kubecfg.NodeStatusUpdateFrequency, api.ConditionTrue, "KubeletReady")
+	n = testNode(-kubecfg.NodeStatusUpdateFrequency.Duration, api.ConditionTrue, "KubeletReady")
 	n2, updated, err = su.nodeWithUpdatedStatus(n)
 	assert.NoError(t, err)
 	assert.False(t, updated, "no update expected b/c kubelet's update was missed only once")
 
-	n = testNode(-kubecfg.NodeStatusUpdateFrequency*3, api.ConditionTrue, "KubeletReady")
+	n = testNode(-kubecfg.NodeStatusUpdateFrequency.Duration*3, api.ConditionTrue, "KubeletReady")
 	n2, updated, err = su.nodeWithUpdatedStatus(n)
 	assert.NoError(t, err)
 	assert.True(t, updated, "update expected b/c kubelet's update is older than 3*DefaultNodeStatusUpdateFrequency")

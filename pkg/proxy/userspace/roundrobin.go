@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -82,6 +82,7 @@ func NewLoadBalancerRR() *LoadBalancerRR {
 }
 
 func (lb *LoadBalancerRR) NewService(svcPort proxy.ServicePortName, affinityType api.ServiceAffinity, ttlMinutes int) error {
+	glog.V(4).Infof("LoadBalancerRR NewService %q", svcPort)
 	lb.lock.Lock()
 	defer lb.lock.Unlock()
 	lb.newServiceInternal(svcPort, affinityType, ttlMinutes)
@@ -103,6 +104,13 @@ func (lb *LoadBalancerRR) newServiceInternal(svcPort proxy.ServicePortName, affi
 	return lb.services[svcPort]
 }
 
+func (lb *LoadBalancerRR) DeleteService(svcPort proxy.ServicePortName) {
+	glog.V(4).Infof("LoadBalancerRR DeleteService %q", svcPort)
+	lb.lock.Lock()
+	defer lb.lock.Unlock()
+	delete(lb.services, svcPort)
+}
+
 // return true if this service is using some form of session affinity.
 func isSessionAffinity(affinity *affinityPolicy) bool {
 	// Should never be empty string, but checking for it to be safe.
@@ -114,7 +122,7 @@ func isSessionAffinity(affinity *affinityPolicy) bool {
 
 // NextEndpoint returns a service endpoint.
 // The service endpoint is chosen using the round-robin algorithm.
-func (lb *LoadBalancerRR) NextEndpoint(svcPort proxy.ServicePortName, srcAddr net.Addr) (string, error) {
+func (lb *LoadBalancerRR) NextEndpoint(svcPort proxy.ServicePortName, srcAddr net.Addr, sessionAffinityReset bool) (string, error) {
 	// Coarse locking is simple.  We can get more fine-grained if/when we
 	// can prove it matters.
 	lb.lock.Lock()
@@ -139,13 +147,15 @@ func (lb *LoadBalancerRR) NextEndpoint(svcPort proxy.ServicePortName, srcAddr ne
 		if err != nil {
 			return "", fmt.Errorf("malformed source address %q: %v", srcAddr.String(), err)
 		}
-		sessionAffinity, exists := state.affinity.affinityMap[ipaddr]
-		if exists && int(time.Now().Sub(sessionAffinity.lastUsed).Minutes()) < state.affinity.ttlMinutes {
-			// Affinity wins.
-			endpoint := sessionAffinity.endpoint
-			sessionAffinity.lastUsed = time.Now()
-			glog.V(4).Infof("NextEndpoint for service %q from IP %s with sessionAffinity %+v: %s", svcPort, ipaddr, sessionAffinity, endpoint)
-			return endpoint, nil
+		if !sessionAffinityReset {
+			sessionAffinity, exists := state.affinity.affinityMap[ipaddr]
+			if exists && int(time.Now().Sub(sessionAffinity.lastUsed).Minutes()) < state.affinity.ttlMinutes {
+				// Affinity wins.
+				endpoint := sessionAffinity.endpoint
+				sessionAffinity.lastUsed = time.Now()
+				glog.V(4).Infof("NextEndpoint for service %q from IP %s with sessionAffinity %#v: %s", svcPort, ipaddr, sessionAffinity, endpoint)
+				return endpoint, nil
+			}
 		}
 	}
 	// Take the next endpoint.
@@ -162,7 +172,7 @@ func (lb *LoadBalancerRR) NextEndpoint(svcPort proxy.ServicePortName, srcAddr ne
 		affinity.lastUsed = time.Now()
 		affinity.endpoint = endpoint
 		affinity.clientIP = ipaddr
-		glog.V(4).Infof("Updated affinity key %s: %+v", ipaddr, state.affinity.affinityMap[ipaddr])
+		glog.V(4).Infof("Updated affinity key %s: %#v", ipaddr, state.affinity.affinityMap[ipaddr])
 	}
 
 	return endpoint, nil
@@ -244,7 +254,7 @@ func (lb *LoadBalancerRR) OnEndpointsUpdate(allEndpoints []api.Endpoints) {
 				port := &ss.Ports[i]
 				for i := range ss.Addresses {
 					addr := &ss.Addresses[i]
-					portsToEndpoints[port.Name] = append(portsToEndpoints[port.Name], hostPortPair{addr.IP, port.Port})
+					portsToEndpoints[port.Name] = append(portsToEndpoints[port.Name], hostPortPair{addr.IP, int(port.Port)})
 					// Ignore the protocol field - we'll get that from the Service objects.
 				}
 			}
@@ -279,7 +289,11 @@ func (lb *LoadBalancerRR) OnEndpointsUpdate(allEndpoints []api.Endpoints) {
 	for k := range lb.services {
 		if _, exists := registeredEndpoints[k]; !exists {
 			glog.V(2).Infof("LoadBalancerRR: Removing endpoints for %s", k)
-			delete(lb.services, k)
+			// Reset but don't delete.
+			state := lb.services[k]
+			state.endpoints = []string{}
+			state.index = 0
+			state.affinity.affinityMap = map[string]*affinityState{}
 		}
 	}
 }

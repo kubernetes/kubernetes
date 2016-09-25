@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,19 +21,20 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/kubernetes/pkg/volume"
 )
 
 // Abstract interface to disk operations.
 type diskManager interface {
 	MakeGlobalPDName(disk iscsiDisk) string
 	// Attaches the disk to the kubelet's host machine.
-	AttachDisk(b iscsiDiskBuilder) error
+	AttachDisk(b iscsiDiskMounter) error
 	// Detaches the disk from the kubelet's host machine.
-	DetachDisk(disk iscsiDiskCleaner, mntPath string) error
+	DetachDisk(disk iscsiDiskUnmounter, mntPath string) error
 }
 
 // utility to mount a disk based filesystem
-func diskSetUp(manager diskManager, b iscsiDiskBuilder, volPath string, mounter mount.Interface) error {
+func diskSetUp(manager diskManager, b iscsiDiskMounter, volPath string, mounter mount.Interface, fsGroup *int64) error {
 	globalPDPath := manager.MakeGlobalPDName(*b.iscsiDisk)
 	// TODO: handle failed mounts here.
 	notMnt, err := mounter.IsLikelyNotMountPoint(volPath)
@@ -64,11 +65,16 @@ func diskSetUp(manager diskManager, b iscsiDiskBuilder, volPath string, mounter 
 		glog.Errorf("failed to bind mount:%s", globalPDPath)
 		return err
 	}
+
+	if !b.readOnly {
+		volume.SetVolumeOwnership(&b, fsGroup)
+	}
+
 	return nil
 }
 
 // utility to tear down a disk based filesystem
-func diskTearDown(manager diskManager, c iscsiDiskCleaner, volPath string, mounter mount.Interface) error {
+func diskTearDown(manager diskManager, c iscsiDiskUnmounter, volPath string, mounter mount.Interface) error {
 	notMnt, err := mounter.IsLikelyNotMountPoint(volPath)
 	if err != nil {
 		glog.Errorf("cannot validate mountpoint %s", volPath)

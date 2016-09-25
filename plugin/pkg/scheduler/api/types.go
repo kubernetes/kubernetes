@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/restclient"
 )
 
 type Policy struct {
@@ -124,7 +124,7 @@ type ExtenderConfig struct {
 	// EnableHttps specifies whether https should be used to communicate with the extender
 	EnableHttps bool `json:"enableHttps,omitempty"`
 	// TLSConfig specifies the transport layer security config
-	TLSConfig *client.TLSClientConfig `json:"tlsConfig,omitempty"`
+	TLSConfig *restclient.TLSClientConfig `json:"tlsConfig,omitempty"`
 	// HTTPTimeout specifies the timeout duration for a call to the extender. Filter timeout fails the scheduling of the pod. Prioritize
 	// timeout is ignored, k8s/other extenders priorities are used to select the node.
 	HTTPTimeout time.Duration `json:"httpTimeout,omitempty"`
@@ -139,10 +139,15 @@ type ExtenderArgs struct {
 	Nodes api.NodeList `json:"nodes"`
 }
 
+// FailedNodesMap represents the filtered out nodes, with node names and failure messages
+type FailedNodesMap map[string]string
+
 // ExtenderFilterResult represents the results of a filter call to an extender
 type ExtenderFilterResult struct {
 	// Filtered set of nodes where the pod can be scheduled
 	Nodes api.NodeList `json:"nodes,omitempty"`
+	// Filtered out nodes where the pod can't be scheduled and the failure messages
+	FailedNodes FailedNodesMap `json:"failedNodes,omitempty"`
 	// Error message indicating failure
 	Error string `json:"error,omitempty"`
 }

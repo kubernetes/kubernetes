@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// If you make changes to this file, you should also make the corresponding change in ReplicaSet.
+
 package controller
 
 import (
@@ -22,12 +24,13 @@ import (
 	"strconv"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/runtime"
-	utilvalidation "k8s.io/kubernetes/pkg/util/validation"
+	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
 // rcStrategy implements verification logic for Replication Controllers.
@@ -39,13 +42,19 @@ type rcStrategy struct {
 // Strategy is the default logic that applies when creating and updating Replication Controller objects.
 var Strategy = rcStrategy{api.Scheme, api.SimpleNameGenerator}
 
+// DefaultGarbageCollectionPolicy returns Orphan because that was the default
+// behavior before the server-side garbage collection was implemented.
+func (rcStrategy) DefaultGarbageCollectionPolicy() rest.GarbageCollectionPolicy {
+	return rest.OrphanDependents
+}
+
 // NamespaceScoped returns true because all Replication Controllers need to be within a namespace.
 func (rcStrategy) NamespaceScoped() bool {
 	return true
 }
 
 // PrepareForCreate clears the status of a replication controller before creation.
-func (rcStrategy) PrepareForCreate(obj runtime.Object) {
+func (rcStrategy) PrepareForCreate(ctx api.Context, obj runtime.Object) {
 	controller := obj.(*api.ReplicationController)
 	controller.Status = api.ReplicationControllerStatus{}
 
@@ -53,7 +62,7 @@ func (rcStrategy) PrepareForCreate(obj runtime.Object) {
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
-func (rcStrategy) PrepareForUpdate(obj, old runtime.Object) {
+func (rcStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
 	newController := obj.(*api.ReplicationController)
 	oldController := old.(*api.ReplicationController)
 	// update is not allowed to set status
@@ -67,16 +76,13 @@ func (rcStrategy) PrepareForUpdate(obj, old runtime.Object) {
 	// status its own object, and even if we don't, writes may be the result of a
 	// read-update-write loop, so the contents of spec may not actually be the spec that
 	// the controller has *seen*.
-	//
-	// TODO: Any changes to a part of the object that represents desired state (labels,
-	// annotations etc) should also increment the generation.
 	if !reflect.DeepEqual(oldController.Spec, newController.Spec) {
 		newController.Generation = oldController.Generation + 1
 	}
 }
 
 // Validate validates a new replication controller.
-func (rcStrategy) Validate(ctx api.Context, obj runtime.Object) utilvalidation.ErrorList {
+func (rcStrategy) Validate(ctx api.Context, obj runtime.Object) field.ErrorList {
 	controller := obj.(*api.ReplicationController)
 	return validation.ValidateReplicationController(controller)
 }
@@ -92,7 +98,7 @@ func (rcStrategy) AllowCreateOnUpdate() bool {
 }
 
 // ValidateUpdate is the default update validation for an end user.
-func (rcStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) utilvalidation.ErrorList {
+func (rcStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) field.ErrorList {
 	validationErrorList := validation.ValidateReplicationController(obj.(*api.ReplicationController))
 	updateErrorList := validation.ValidateReplicationControllerUpdate(obj.(*api.ReplicationController), old.(*api.ReplicationController))
 	return append(validationErrorList, updateErrorList...)
@@ -104,9 +110,9 @@ func (rcStrategy) AllowUnconditionalUpdate() bool {
 
 // ControllerToSelectableFields returns a field set that represents the object.
 func ControllerToSelectableFields(controller *api.ReplicationController) fields.Set {
-	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(controller.ObjectMeta, true)
+	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(&controller.ObjectMeta, true)
 	controllerSpecificFieldsSet := fields.Set{
-		"status.replicas": strconv.Itoa(controller.Status.Replicas),
+		"status.replicas": strconv.Itoa(int(controller.Status.Replicas)),
 	}
 	return generic.MergeFieldsSets(objectMetaFieldsSet, controllerSpecificFieldsSet)
 }
@@ -114,7 +120,7 @@ func ControllerToSelectableFields(controller *api.ReplicationController) fields.
 // MatchController is the filter used by the generic etcd backend to route
 // watch events from etcd to clients of the apiserver only interested in specific
 // labels/fields.
-func MatchController(label labels.Selector, field fields.Selector) generic.Matcher {
+func MatchController(label labels.Selector, field fields.Selector) *generic.SelectionPredicate {
 	return &generic.SelectionPredicate{
 		Label: label,
 		Field: field,
@@ -134,13 +140,13 @@ type rcStatusStrategy struct {
 
 var StatusStrategy = rcStatusStrategy{Strategy}
 
-func (rcStatusStrategy) PrepareForUpdate(obj, old runtime.Object) {
+func (rcStatusStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
 	newRc := obj.(*api.ReplicationController)
 	oldRc := old.(*api.ReplicationController)
 	// update is not allowed to set spec
 	newRc.Spec = oldRc.Spec
 }
 
-func (rcStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) utilvalidation.ErrorList {
+func (rcStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateReplicationControllerStatusUpdate(obj.(*api.ReplicationController), old.(*api.ReplicationController))
 }

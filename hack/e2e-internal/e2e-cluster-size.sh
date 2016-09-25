@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 The Kubernetes Authors All rights reserved.
+# Copyright 2015 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,15 +20,14 @@ set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 
-: ${KUBE_VERSION_ROOT:=${KUBE_ROOT}}
-: ${KUBECTL:=${KUBE_VERSION_ROOT}/cluster/kubectl.sh}
+: ${KUBECTL:=${KUBE_ROOT}/cluster/kubectl.sh}
 : ${KUBE_CONFIG_FILE:="config-test.sh"}
 
 export KUBECTL KUBE_CONFIG_FILE
 
-source "${KUBE_ROOT}/cluster/kube-env.sh"
-source "${KUBE_VERSION_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh"
+source "${KUBE_ROOT}/cluster/kube-util.sh"
 
 prepare-e2e
 
+#TODO(colhom): spec and implement federated version of this
 ${KUBECTL} get nodes --no-headers | wc -l

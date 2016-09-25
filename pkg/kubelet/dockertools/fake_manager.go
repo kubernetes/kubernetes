@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,12 +18,15 @@ package dockertools
 
 import (
 	cadvisorapi "github.com/google/cadvisor/info/v1"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/record"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/kubelet/util/cache"
+	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/util/procfs"
 )
@@ -40,14 +43,36 @@ func NewFakeDockerManager(
 	containerLogsDir string,
 	osInterface kubecontainer.OSInterface,
 	networkPlugin network.NetworkPlugin,
-	generator kubecontainer.RunContainerOptionsGenerator,
-	httpClient kubetypes.HttpGetter, imageBackOff *util.Backoff) *DockerManager {
+	runtimeHelper kubecontainer.RuntimeHelper,
+	httpClient kubetypes.HttpGetter, imageBackOff *flowcontrol.Backoff) *DockerManager {
 
 	fakeOOMAdjuster := oom.NewFakeOOMAdjuster()
 	fakeProcFs := procfs.NewFakeProcFS()
-	dm := NewDockerManager(client, recorder, livenessManager, containerRefManager, machineInfo, podInfraContainerImage, qps,
-		burst, containerLogsDir, osInterface, networkPlugin, generator, httpClient, &NativeExecHandler{},
-		fakeOOMAdjuster, fakeProcFs, false, imageBackOff, true)
+	fakePodGetter := &fakePodGetter{}
+	dm := NewDockerManager(client, recorder, livenessManager, containerRefManager, fakePodGetter, machineInfo, podInfraContainerImage, qps,
+		burst, containerLogsDir, osInterface, networkPlugin, runtimeHelper, httpClient, &NativeExecHandler{},
+		fakeOOMAdjuster, fakeProcFs, false, imageBackOff, false, false, true, "/var/lib/kubelet/seccomp")
 	dm.dockerPuller = &FakeDockerPuller{}
+
+	// ttl of version cache is set to 0 so we always call version api directly in tests.
+	dm.versionCache = cache.NewObjectCache(
+		func() (interface{}, error) {
+			return dm.getVersionInfo()
+		},
+		0,
+	)
 	return dm
+}
+
+type fakePodGetter struct {
+	pods map[types.UID]*api.Pod
+}
+
+func newFakePodGetter() *fakePodGetter {
+	return &fakePodGetter{make(map[types.UID]*api.Pod)}
+}
+
+func (f *fakePodGetter) GetPodByUID(uid types.UID) (*api.Pod, bool) {
+	pod, found := f.pods[uid]
+	return pod, found
 }

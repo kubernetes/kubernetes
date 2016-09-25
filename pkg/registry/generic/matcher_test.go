@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ import (
 	"errors"
 	"testing"
 
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -33,8 +34,8 @@ type IgnoredList struct {
 	Items []Ignored
 }
 
-func (*Ignored) IsAnAPIObject()     {}
-func (*IgnoredList) IsAnAPIObject() {}
+func (obj *Ignored) GetObjectKind() unversioned.ObjectKind     { return unversioned.EmptyObjectKind }
+func (obj *IgnoredList) GetObjectKind() unversioned.ObjectKind { return unversioned.EmptyObjectKind }
 
 func TestSelectionPredicate(t *testing.T) {
 	table := map[string]struct {
@@ -114,16 +115,5 @@ func TestSelectionPredicate(t *testing.T) {
 				t.Errorf("%v: expected %v, got %v", name, e, a)
 			}
 		}
-	}
-}
-
-func TestSingleMatch(t *testing.T) {
-	m := MatchOnKey("pod-name-here", func(obj runtime.Object) (bool, error) { return true, nil })
-	got, ok := m.MatchesSingle()
-	if !ok {
-		t.Errorf("Expected MatchesSingle to return true")
-	}
-	if e, a := "pod-name-here", got; e != a {
-		t.Errorf("Expected %#v, got %#v", e, a)
 	}
 }

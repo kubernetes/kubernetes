@@ -1,4 +1,4 @@
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2016 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,46 +13,31 @@
 # limitations under the License.
 
 # This file creates a standard build environment for building Kubernetes
-
-FROM kube-build:cross
-MAINTAINER  Joe Beda <jbeda@google.com>
-
-# (set an explicit GOARM of 5 for maximum compatibility)
-ENV GOARM 5
-ENV GOOS    linux
-ENV GOARCH  amd64
-
-# work around 64MB tmpfs size in Docker 1.6
-ENV TMPDIR /tmp.k8s
-
-# Get the code coverage tool and godep
-RUN mkdir $TMPDIR && \
-    go get golang.org/x/tools/cmd/cover github.com/tools/godep
-
-# We use rsync to copy some binaries around.  It is faster (0.3s vs. 1.1s) on my
-# machine vs. `install`
-RUN rm -rf /var/lib/apt/lists/
-RUN apt-get -o Acquire::Check-Valid-Until=false update && apt-get install -y rsync
-
-# Download and symlink etcd.  We need this for our integration tests.
-RUN export ETCD_VERSION=v2.2.1; \
-    mkdir -p /usr/local/src/etcd &&\
-    cd /usr/local/src/etcd &&\
-    curl -fsSLO https://github.com/coreos/etcd/releases/download/$ETCD_VERSION/etcd-$ETCD_VERSION-linux-amd64.tar.gz &&\
-    tar xzf etcd-$ETCD_VERSION-linux-amd64.tar.gz &&\
-    ln -s ../src/etcd/etcd-$ETCD_VERSION-linux-amd64/etcd /usr/local/bin/
+FROM gcr.io/google_containers/kube-cross:KUBE_BUILD_IMAGE_CROSS_TAG
 
 # Mark this as a kube-build container
 RUN touch /kube-build-image
 
-WORKDIR /go/src/k8s.io/kubernetes
+# To run as non-root we sometimes need to rebuild go stdlib packages.
+RUN chmod -R a+rwx /usr/local/go/pkg ${K8S_PATCHED_GOROOT}/pkg
+
+# The kubernetes source is expected to be mounted here.  This will be the base
+# of operations.
+ENV HOME /go/src/k8s.io/kubernetes
+WORKDIR ${HOME}
+# We have to mkdir the dirs we need, or else Docker will create them when we
+# mount volumes, and it will create them with root-only permissions.  The
+# explicit chmod of _output is required, but I can't really explain why.
+RUN mkdir -p ${HOME} ${HOME}/_output \
+    && chmod -R a+rwx ${HOME} ${HOME}/_output
 
 # Propagate the git tree version into the build image
 ADD kube-version-defs /kube-version-defs
+RUN chmod a+r /kube-version-defs
 ENV KUBE_GIT_VERSION_FILE /kube-version-defs
 
 # Make output from the dockerized build go someplace else
 ENV KUBE_OUTPUT_SUBPATH _output/dockerized
 
 # Upload Kubernetes source
-ADD kube-source.tar.gz /go/src/k8s.io/kubernetes
+ADD kube-source.tar.gz /go/src/k8s.io/kubernetes/

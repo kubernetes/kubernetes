@@ -137,7 +137,7 @@ coreos:
       content: |
         [Unit]
         Description=Kubernetes Kubelet
-        Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+        Documentation=https://github.com/kubernetes/kubernetes
         After=network-online.target
         Requires=network-online.target
         After=docker.service
@@ -159,12 +159,13 @@ coreos:
         --v=2
         Restart=always
         RestartSec=5
+        KillMode=process
     - name: kube-proxy.service
       command: start
       content: |
         [Unit]
         Description=Kubernetes Proxy
-        Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+        Documentation=https://github.com/kubernetes/kubernetes
         After=network-online.target
         Requires=network-online.target
         After=docker.service

@@ -2,15 +2,15 @@
 
 <!-- BEGIN STRIP_FOR_RELEASE -->
 
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
 
 <h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
@@ -18,9 +18,10 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.1/docs/README.md).
+[here](http://releases.k8s.io/release-1.4/docs/README.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -46,7 +47,7 @@ Documentation for other releases can be found at
 * The [Kubectl Command Line Interface](user-guide/kubectl/kubectl.md) is a detailed reference on
   the `kubectl` CLI.
 
-* The [API object documentation](http://kubernetes.io/third_party/swagger-ui/)
+* The [API object documentation](api-reference/README.md)
   is a detailed description of all fields found in core API objects.
 
 * An overview of the [Design of Kubernetes](design/)
@@ -55,7 +56,7 @@ Documentation for other releases can be found at
   folder.
 
 * If something went wrong, see the [troubleshooting](troubleshooting.md) document for how to debug.
-You should also check the [known issues](user-guide/known-issues.md) for the release you're using.
+You should also check the [known issues for the release](../CHANGELOG.md) you're using.
 
 * To report a security issue, see [Reporting a Security Issue](reporting-security-issues.md).
 

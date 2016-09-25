@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,11 +23,12 @@ import (
 	"fmt"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/validation"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/hash"
 	utilyaml "k8s.io/kubernetes/pkg/util/yaml"
 
 	"github.com/golang/glog"
@@ -47,7 +48,7 @@ func applyDefaults(pod *api.Pod, source string, isFile bool, nodeName string) er
 		} else {
 			fmt.Fprintf(hasher, "url:%s", source)
 		}
-		util.DeepHashObject(hasher, pod)
+		hash.DeepHashObject(hasher, pod)
 		pod.UID = types.UID(hex.EncodeToString(hasher.Sum(nil)[0:]))
 		glog.V(5).Infof("Generated UID %q pod %q from %s", pod.UID, pod.Name, source)
 	}
@@ -70,6 +71,9 @@ func applyDefaults(pod *api.Pod, source string, isFile bool, nodeName string) er
 	}
 	// The generated UID is the hash of the file.
 	pod.Annotations[kubetypes.ConfigHashAnnotationKey] = string(pod.UID)
+
+	// Set the default status to pending.
+	pod.Status.Phase = api.PodPending
 	return nil
 }
 
@@ -78,7 +82,7 @@ func getSelfLink(name, namespace string) string {
 	if len(namespace) == 0 {
 		namespace = api.NamespaceDefault
 	}
-	selfLink = fmt.Sprintf("/api/"+latest.GroupOrDie("").GroupVersion.Version+"/pods/namespaces/%s/%s", name, namespace)
+	selfLink = fmt.Sprintf("/api/"+registered.GroupOrDie(api.GroupName).GroupVersion.Version+"/pods/namespaces/%s/%s", name, namespace)
 	return selfLink
 }
 
@@ -90,13 +94,13 @@ func tryDecodeSinglePod(data []byte, defaultFn defaultFunc) (parsed bool, pod *a
 	if err != nil {
 		return false, nil, err
 	}
-	obj, err := api.Scheme.Decode(json)
+	obj, err := runtime.Decode(api.Codecs.UniversalDecoder(), json)
 	if err != nil {
 		return false, pod, err
 	}
 	// Check whether the object could be converted to single pod.
 	if _, ok := obj.(*api.Pod); !ok {
-		err = fmt.Errorf("invalid pod: %+v", obj)
+		err = fmt.Errorf("invalid pod: %#v", obj)
 		return false, pod, err
 	}
 	newPod := obj.(*api.Pod)
@@ -112,17 +116,13 @@ func tryDecodeSinglePod(data []byte, defaultFn defaultFunc) (parsed bool, pod *a
 }
 
 func tryDecodePodList(data []byte, defaultFn defaultFunc) (parsed bool, pods api.PodList, err error) {
-	json, err := utilyaml.ToJSON(data)
-	if err != nil {
-		return false, api.PodList{}, err
-	}
-	obj, err := api.Scheme.Decode(json)
+	obj, err := runtime.Decode(api.Codecs.UniversalDecoder(), data)
 	if err != nil {
 		return false, pods, err
 	}
 	// Check whether the object could be converted to list of pods.
 	if _, ok := obj.(*api.PodList); !ok {
-		err = fmt.Errorf("invalid pods list: %+v", obj)
+		err = fmt.Errorf("invalid pods list: %#v", obj)
 		return false, pods, err
 	}
 	newPods := obj.(*api.PodList)

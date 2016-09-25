@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,12 +17,12 @@ limitations under the License.
 package election
 
 import (
-	"reflect"
 	"testing"
 
-	"github.com/coreos/go-etcd/etcd"
+	etcd "github.com/coreos/etcd/client"
+	"golang.org/x/net/context"
+
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
-	"k8s.io/kubernetes/pkg/tools"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -31,7 +31,8 @@ func TestEtcdMasterOther(t *testing.T) {
 	defer server.Terminate(t)
 
 	path := "foo"
-	if _, err := server.Client.Set(path, "baz", 0); err != nil {
+	keysAPI := etcd.NewKeysAPI(server.Client)
+	if _, err := keysAPI.Set(context.TODO(), path, "baz", nil); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	master := NewEtcdMasterElector(server.Client)
@@ -57,77 +58,21 @@ func TestEtcdMasterNoOther(t *testing.T) {
 	w.Stop()
 }
 
-// MockClient is wrapper aroung tools.EtcdClient.
-type MockClient struct {
-	client tools.EtcdClient
-	t      *testing.T
-	// afterGetFunc is called after each Get() call.
-	afterGetFunc func()
-	calls        []string
-}
-
-func (m *MockClient) GetCluster() []string {
-	return m.client.GetCluster()
-}
-
-func (m *MockClient) Get(key string, sort, recursive bool) (*etcd.Response, error) {
-	m.calls = append(m.calls, "get")
-	defer m.afterGetFunc()
-	response, err := m.client.Get(key, sort, recursive)
-	return response, err
-}
-
-func (m *MockClient) Set(key, value string, ttl uint64) (*etcd.Response, error) {
-	return m.client.Set(key, value, ttl)
-}
-
-func (m *MockClient) Create(key, value string, ttl uint64) (*etcd.Response, error) {
-	m.calls = append(m.calls, "create")
-	return m.client.Create(key, value, ttl)
-}
-
-func (m *MockClient) CompareAndSwap(key, value string, ttl uint64, prevValue string, prevIndex uint64) (*etcd.Response, error) {
-	return m.client.CompareAndSwap(key, value, ttl, prevValue, prevIndex)
-}
-
-func (m *MockClient) Delete(key string, recursive bool) (*etcd.Response, error) {
-	return m.client.Delete(key, recursive)
-}
-
-func (m *MockClient) Watch(prefix string, waitIndex uint64, recursive bool, receiver chan *etcd.Response, stop chan bool) (*etcd.Response, error) {
-	return m.client.Watch(prefix, waitIndex, recursive, receiver, stop)
-}
-
 func TestEtcdMasterNoOtherThenConflict(t *testing.T) {
 	server := etcdtesting.NewEtcdTestClientServer(t)
 	defer server.Terminate(t)
 
-	// We set up the following scenario:
-	// - after each Get() call, we write "baz" to a path
-	// - this is simulating someone else writing a data
-	// - the value written by someone else is the new value
 	path := "foo"
-	client := &MockClient{
-		client: server.Client,
-		t:      t,
-		afterGetFunc: func() {
-			if _, err := server.Client.Set(path, "baz", 0); err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
-		},
-		calls: make([]string, 0),
-	}
+	master := NewEtcdMasterElector(server.Client)
+	leader := NewEtcdMasterElector(server.Client)
 
-	master := NewEtcdMasterElector(client)
+	w_ldr := leader.Elect(path, "baz")
+	result := <-w_ldr.ResultChan()
 	w := master.Elect(path, "bar")
-	result := <-w.ResultChan()
+	result = <-w.ResultChan()
 	if result.Type != watch.Modified || result.Object.(Master) != "baz" {
 		t.Errorf("unexpected event: %#v", result)
 	}
 	w.Stop()
-
-	expectedCalls := []string{"get", "create", "get"}
-	if !reflect.DeepEqual(client.calls, expectedCalls) {
-		t.Errorf("unexpected calls: %#v", client.calls)
-	}
+	w_ldr.Stop()
 }

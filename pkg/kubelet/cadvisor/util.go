@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -28,7 +28,7 @@ func CapacityFromMachineInfo(info *cadvisorApi.MachineInfo) api.ResourceList {
 			int64(info.NumCores*1000),
 			resource.DecimalSI),
 		api.ResourceMemory: *resource.NewQuantity(
-			info.MemoryCapacity,
+			int64(info.MemoryCapacity),
 			resource.BinarySI),
 	}
 	return c

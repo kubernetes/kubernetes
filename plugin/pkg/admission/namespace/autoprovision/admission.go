@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,19 +19,19 @@ package autoprovision
 import (
 	"io"
 
+	"k8s.io/kubernetes/pkg/client/cache"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+
+	"fmt"
+
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/client/cache"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/watch"
+	"k8s.io/kubernetes/pkg/controller/informers"
 )
 
 func init() {
-	admission.RegisterPlugin("NamespaceAutoProvision", func(client client.Interface, config io.Reader) (admission.Interface, error) {
+	admission.RegisterPlugin("NamespaceAutoProvision", func(client clientset.Interface, config io.Reader) (admission.Interface, error) {
 		return NewProvision(client), nil
 	})
 }
@@ -41,21 +41,22 @@ func init() {
 // It is useful in deployments that do not want to restrict creation of a namespace prior to its usage.
 type provision struct {
 	*admission.Handler
-	client client.Interface
-	store  cache.Store
+	client            clientset.Interface
+	namespaceInformer cache.SharedIndexInformer
 }
 
+var _ = admission.WantsInformerFactory(&provision{})
+
 func (p *provision) Admit(a admission.Attributes) (err error) {
-	gvk, err := api.RESTMapper.KindFor(a.GetResource())
-	if err != nil {
-		return admission.NewForbidden(a, err)
-	}
-	mapping, err := api.RESTMapper.RESTMapping(gvk.GroupKind(), gvk.Version)
-	if err != nil {
-		return admission.NewForbidden(a, err)
-	}
-	if mapping.Scope.Name() != meta.RESTScopeNameNamespace {
+	// if we're here, then we've already passed authentication, so we're allowed to do what we're trying to do
+	// if we're here, then the API server has found a route, which means that if we have a non-empty namespace
+	// its a namespaced resource.
+	if len(a.GetNamespace()) == 0 || a.GetKind().GroupKind() == api.Kind("Namespace") {
 		return nil
+	}
+	// we need to wait for our caches to warm
+	if !p.WaitForReady() {
+		return admission.NewForbidden(a, fmt.Errorf("not yet ready to handle request"))
 	}
 	namespace := &api.Namespace{
 		ObjectMeta: api.ObjectMeta{
@@ -64,14 +65,14 @@ func (p *provision) Admit(a admission.Attributes) (err error) {
 		},
 		Status: api.NamespaceStatus{},
 	}
-	_, exists, err := p.store.Get(namespace)
+	_, exists, err := p.namespaceInformer.GetStore().Get(namespace)
 	if err != nil {
 		return admission.NewForbidden(a, err)
 	}
 	if exists {
 		return nil
 	}
-	_, err = p.client.Namespaces().Create(namespace)
+	_, err = p.client.Core().Namespaces().Create(namespace)
 	if err != nil && !errors.IsAlreadyExists(err) {
 		return admission.NewForbidden(a, err)
 	}
@@ -79,29 +80,21 @@ func (p *provision) Admit(a admission.Attributes) (err error) {
 }
 
 // NewProvision creates a new namespace provision admission control handler
-func NewProvision(c client.Interface) admission.Interface {
-	store := cache.NewStore(cache.MetaNamespaceKeyFunc)
-	reflector := cache.NewReflector(
-		&cache.ListWatch{
-			ListFunc: func() (runtime.Object, error) {
-				return c.Namespaces().List(unversioned.ListOptions{})
-			},
-			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
-				return c.Namespaces().Watch(options)
-			},
-		},
-		&api.Namespace{},
-		store,
-		0,
-	)
-	reflector.Run()
-	return createProvision(c, store)
-}
-
-func createProvision(c client.Interface, store cache.Store) admission.Interface {
+func NewProvision(c clientset.Interface) admission.Interface {
 	return &provision{
 		Handler: admission.NewHandler(admission.Create),
 		client:  c,
-		store:   store,
 	}
+}
+
+func (p *provision) SetInformerFactory(f informers.SharedInformerFactory) {
+	p.namespaceInformer = f.Namespaces().Informer()
+	p.SetReadyFunc(p.namespaceInformer.HasSynced)
+}
+
+func (p *provision) Validate() error {
+	if p.namespaceInformer == nil {
+		return fmt.Errorf("missing namespaceInformer")
+	}
+	return nil
 }

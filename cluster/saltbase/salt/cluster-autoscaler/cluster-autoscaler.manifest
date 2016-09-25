@@ -1,0 +1,76 @@
+{% if pillar.get('enable_cluster_autoscaler', '').lower() == 'true' %}
+{% set cloud_config = "" -%}
+{% set cloud_config_mount = "" -%}
+{% set cloud_config_volume = "" -%}
+{% if grains.cloud == 'gce' and grains.cloud_config is defined -%}
+  {% set cloud_config = "--cloud-config=" + grains.cloud_config -%}
+  {% set cloud_config_mount = "{\"name\": \"cloudconfigmount\",\"mountPath\": \"" + grains.cloud_config + "\", \"readOnly\": true}," -%}
+  {% set cloud_config_volume = "{\"name\": \"cloudconfigmount\",\"hostPath\": {\"path\": \"" + grains.cloud_config + "\"}}," -%}
+{% endif -%}
+{% set params = pillar['autoscaler_mig_config'] + " " + cloud_config -%}
+
+{
+    "kind": "Pod",
+    "apiVersion": "v1",
+    "metadata": {
+        "name": "cluster-autoscaler",
+        "namespace": "kube-system",
+        "labels": {
+            "tier": "cluster-management",
+            "component": "cluster-autoscaler"
+        }
+    },
+    "spec": {
+        "hostNetwork": true,
+        "containers": [
+            {
+                "name": "cluster-autoscaler",
+                "image": "gcr.io/google_containers/cluster-autoscaler:v0.3.0",
+                "command": [
+                    "/bin/sh",
+                    "-c",
+                    "./cluster-autoscaler --kubernetes=http://127.0.0.1:8080?inClusterConfig=f --v=4 {{params}} 1>>/var/log/cluster-autoscaler.log 2>&1"
+                ],
+                # TODO: Make resource requirements depend on the size of the cluster
+                "resources": {
+                    "requests": {
+                        "cpu": "20m",
+                        "memory": "300Mi"
+                    }
+                },
+                "volumeMounts": [
+                    {{cloud_config_mount}}
+                    {
+                        "name": "ssl-certs",
+                        "readOnly": true,
+                        "mountPath": "/etc/ssl/certs"
+                    },
+                    {
+                        "name": "logfile",
+                        "mountPath": "/var/log/cluster-autoscaler.log",
+                        "readOnly": false
+                    }
+                ],
+                "terminationMessagePath": "/dev/termination-log",
+                "imagePullPolicy": "IfNotPresent"
+            }
+        ],
+        "volumes": [
+            {{cloud_config_volume}}
+            {
+                "name": "ssl-certs",
+                "hostPath": {
+                    "path": "/etc/ssl/certs"
+                }
+            },
+            {
+                "name": "logfile",
+                "hostPath": {
+                    "path": "/var/log/cluster-autoscaler.log"
+                }
+            }
+        ],
+        "restartPolicy": "Always"
+    }
+}
+{% endif %}

@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,10 +23,10 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 
+	gce "cloud.google.com/go/compute/metadata"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	gcm "google.golang.org/api/cloudmonitoring/v2beta2"
-	gce "google.golang.org/cloud/compute/metadata"
 )
 
 const (
@@ -79,7 +79,7 @@ func (s *gcmSource) query(metric, oldest, youngest string, labels []string, page
 func retrieveRawSamples(res *gcm.ListTimeseriesResponse, output *[]int) {
 	for _, ts := range res.Timeseries {
 		for _, p := range ts.Points {
-			*output = append(*output, int(p.DoubleValue))
+			*output = append(*output, int(*p.DoubleValue))
 		}
 	}
 }

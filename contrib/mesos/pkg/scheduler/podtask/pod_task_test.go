@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,6 +26,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"k8s.io/kubernetes/contrib/mesos/pkg/node"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/meta"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask/hostport"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/resources"
 	"k8s.io/kubernetes/pkg/api"
 )
 
@@ -34,18 +36,21 @@ const (
 	t_min_mem = 128
 )
 
-func fakePodTask(id string, roles ...string) *T {
+func fakePodTask(id string, allowedRoles, defaultRoles []string) *T {
 	t, _ := New(
 		api.NewDefaultContext(),
-		"",
+		Config{
+			Prototype:        &mesos.ExecutorInfo{},
+			FrameworkRoles:   allowedRoles,
+			DefaultPodRoles:  defaultRoles,
+			HostPortStrategy: hostport.StrategyWildcard,
+		},
 		&api.Pod{
 			ObjectMeta: api.ObjectMeta{
 				Name:      id,
 				Namespace: api.NamespaceDefault,
 			},
 		},
-		&mesos.ExecutorInfo{},
-		roles,
 	)
 
 	return t
@@ -55,19 +60,19 @@ func TestRoles(t *testing.T) {
 	assert := assert.New(t)
 
 	for i, tt := range []struct {
-		labels         map[string]string
+		annotations    map[string]string
 		frameworkRoles []string
 		want           []string
 	}{
 		{
 			map[string]string{},
 			nil,
-			defaultRoles,
+			starRole,
 		},
 		{
 			map[string]string{"other": "label"},
 			nil,
-			defaultRoles,
+			starRole,
 		},
 		{
 			map[string]string{meta.RolesKey: ""},
@@ -100,11 +105,11 @@ func TestRoles(t *testing.T) {
 		{
 			map[string]string{},
 			[]string{"role1"},
-			[]string{"role1"},
+			[]string{"*"},
 		},
 	} {
-		task := fakePodTask("test", tt.frameworkRoles...)
-		task.Pod.ObjectMeta.Labels = tt.labels
+		task := fakePodTask("test", tt.frameworkRoles, starRole)
+		task.Pod.ObjectMeta.Annotations = tt.annotations
 		assert.True(reflect.DeepEqual(task.Roles(), tt.want), "test #%d got %#v want %#v", i, task.Roles(), tt.want)
 	}
 }
@@ -127,7 +132,7 @@ func (mr mockRegistry) Invalidate(hostname string) {
 
 func TestEmptyOffer(t *testing.T) {
 	t.Parallel()
-	task := fakePodTask("foo")
+	task := fakePodTask("foo", nil, nil)
 
 	task.Pod.Spec = api.PodSpec{
 		Containers: []api.Container{{
@@ -156,7 +161,7 @@ func TestEmptyOffer(t *testing.T) {
 
 func TestNoPortsInPodOrOffer(t *testing.T) {
 	t.Parallel()
-	task := fakePodTask("foo")
+	task := fakePodTask("foo", nil, nil)
 
 	task.Pod.Spec = api.PodSpec{
 		Containers: []api.Container{{
@@ -206,7 +211,7 @@ func TestNoPortsInPodOrOffer(t *testing.T) {
 
 func TestAcceptOfferPorts(t *testing.T) {
 	t.Parallel()
-	task := fakePodTask("foo")
+	task := fakePodTask("foo", nil, nil)
 	pod := &task.Pod
 
 	defaultProc := NewDefaultProcurement(
@@ -218,7 +223,7 @@ func TestAcceptOfferPorts(t *testing.T) {
 		Resources: []*mesos.Resource{
 			mutil.NewScalarResource("cpus", t_min_cpu),
 			mutil.NewScalarResource("mem", t_min_mem),
-			newPortsResource("*", 1, 1),
+			resources.NewPorts("*", 1, 1),
 		},
 	}
 
@@ -298,14 +303,14 @@ func TestGeneratePodName(t *testing.T) {
 		},
 	}
 	name := generateTaskName(p)
-	expected := "foo.bar.pods"
+	expected := "foo.bar.pod"
 	if name != expected {
 		t.Fatalf("expected %q instead of %q", expected, name)
 	}
 
 	p.Namespace = ""
 	name = generateTaskName(p)
-	expected = "foo.default.pods"
+	expected = "foo.default.pod"
 	if name != expected {
 		t.Fatalf("expected %q instead of %q", expected, name)
 	}
@@ -376,7 +381,7 @@ func TestNodeSelector(t *testing.T) {
 	)
 
 	for _, ts := range tests {
-		task := fakePodTask("foo")
+		task := fakePodTask("foo", nil, nil)
 		task.Pod.Spec.NodeSelector = ts.selector
 		offer := &mesos.Offer{
 			Resources: []*mesos.Resource{
@@ -412,14 +417,5 @@ func newScalarAttribute(name string, val float64) *mesos.Attribute {
 		Name:   proto.String(name),
 		Type:   mesos.Value_SCALAR.Enum(),
 		Scalar: &mesos.Value_Scalar{Value: proto.Float64(val)},
-	}
-}
-
-func newPortsResource(role string, ports ...uint64) *mesos.Resource {
-	return &mesos.Resource{
-		Name:   proto.String("ports"),
-		Type:   mesos.Value_RANGES.Enum(),
-		Ranges: newRanges(ports),
-		Role:   stringPtrTo(role),
 	}
 }

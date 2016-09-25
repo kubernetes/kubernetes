@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2016 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,83 +14,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This script is a vestigial redirection.  Please do not add "real" logic.
+
 set -o errexit
 set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
-source "${KUBE_ROOT}/cluster/kube-env.sh"
 
-SILENT=true
-
-function is-excluded {
-  for e in $EXCLUDE; do
-    if [[ $1 -ef ${BASH_SOURCE} ]]; then
-      return
-    fi
-    if [[ $1 -ef "$KUBE_ROOT/hack/$e" ]]; then
-      return
-    fi
-  done
-  return 1
-}
-
-function run-cmd() {
-  if ${SILENT}; then
-    "$@" &> /dev/null
-  else
-    "$@"
-  fi
-}
-
-while getopts ":v" opt; do
-  case $opt in
-    v)
-      SILENT=false
-      ;;
-    \?)
-      echo "Invalid flag: -$OPTARG" >&2
-      exit 1
-      ;;
-  esac
-done
-
-if $SILENT ; then
-  echo "Running in the silent mode, run with -v if you want to see script logs."
+# For help output
+ARGHELP=""
+if [[ -n "${KUBE_VERIFY_GIT_BRANCH:-}" ]]; then
+    ARGHELP="BRANCH=${KUBE_VERIFY_GIT_BRANCH}"
 fi
 
-EXCLUDE="verify-godeps.sh"
-
-ret=0
-for t in `ls $KUBE_ROOT/hack/verify-*.sh`
-do
-  if is-excluded $t ; then
-    echo "Skipping $t"
-    continue
-  fi
-  echo -e "Verifying $t"
-  if run-cmd bash "$t"; then
-    echo -e "${color_green}SUCCESS${color_norm}"
-  else
-    echo -e "${color_red}FAILED${color_norm}"
-    ret=1
-  fi
-done
-
-for t in `ls $KUBE_ROOT/hack/verify-*.py`
-do
-  if is-excluded $t ; then
-    echo "Skipping $t"
-    continue
-  fi
-  echo -e "Verifying $t"
-  if run-cmd python "$t"; then
-    echo -e "${color_green}SUCCESS${color_norm}"
-  else
-    echo -e "${color_red}FAILED${color_norm}"
-    ret=1
-  fi
-done
-exit $ret
-
-# ex: ts=2 sw=2 et filetype=sh
+echo "NOTE: $0 has been replaced by 'make verify'"
+echo
+echo "The equivalent of this invocation is: "
+echo "    make verify ${ARGHELP}"
+echo
+echo
+make --no-print-directory -C "${KUBE_ROOT}" verify BRANCH="${KUBE_VERIFY_GIT_BRANCH:-}"

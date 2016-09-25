@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2014 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -28,7 +28,7 @@ ETCD_DATA_DIR="${etcd_data_dir}/default.etcd"
 #ETCD_HEARTBEAT_INTERVAL="100"
 #ETCD_ELECTION_TIMEOUT="1000"
 #ETCD_LISTEN_PEER_URLS="http://localhost:2380,http://localhost:7001"
-ETCD_LISTEN_CLIENT_URLS="http://0.0.0.0:4001"
+ETCD_LISTEN_CLIENT_URLS="http://0.0.0.0:2379"
 #ETCD_MAX_SNAPSHOTS="5"
 #ETCD_MAX_WALS="5"
 #ETCD_CORS=""
@@ -40,7 +40,7 @@ ETCD_LISTEN_CLIENT_URLS="http://0.0.0.0:4001"
 #ETCD_INITIAL_CLUSTER="default=http://localhost:2380,default=http://localhost:7001"
 #ETCD_INITIAL_CLUSTER_STATE="new"
 #ETCD_INITIAL_CLUSTER_TOKEN="etcd-cluster"
-ETCD_ADVERTISE_CLIENT_URLS="http://localhost:2379,http://localhost:4001"
+ETCD_ADVERTISE_CLIENT_URLS="http://localhost:2379"
 #ETCD_DISCOVERY=""
 #ETCD_DISCOVERY_SRV=""
 #ETCD_DISCOVERY_FALLBACK="proxy"

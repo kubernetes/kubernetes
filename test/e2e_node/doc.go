@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,4 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e_node
+// e2e_node contains e2e tests specific to the node
+// TODO: rename this package e2e-node
+package e2e_node // import "k8s.io/kubernetes/test/e2e_node"

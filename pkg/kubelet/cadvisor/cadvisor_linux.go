@@ -1,7 +1,7 @@
 // +build cgo,linux
 
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,24 +19,28 @@ limitations under the License.
 package cadvisor
 
 import (
+	"flag"
 	"fmt"
 	"net/http"
-	"regexp"
 	"time"
 
 	"github.com/golang/glog"
 	"github.com/google/cadvisor/cache/memory"
+	cadvisorMetrics "github.com/google/cadvisor/container"
 	"github.com/google/cadvisor/events"
 	cadvisorfs "github.com/google/cadvisor/fs"
 	cadvisorhttp "github.com/google/cadvisor/http"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/google/cadvisor/manager"
+	"github.com/google/cadvisor/metrics"
 	"github.com/google/cadvisor/utils/sysfs"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/util/runtime"
 )
 
 type cadvisorClient struct {
+	runtime string
 	manager.Manager
 }
 
@@ -46,22 +50,63 @@ var _ Interface = new(cadvisorClient)
 // The amount of time for which to keep stats in memory.
 const statsCacheDuration = 2 * time.Minute
 const maxHousekeepingInterval = 15 * time.Second
+const defaultHousekeepingInterval = 10 * time.Second
 const allowDynamicHousekeeping = true
 
-// Creates a cAdvisor and exports its API on the specified port if port > 0.
-func New(port uint) (Interface, error) {
+func init() {
+	// Override cAdvisor flag defaults.
+	flagOverrides := map[string]string{
+		// Override the default cAdvisor housekeeping interval.
+		"housekeeping_interval": defaultHousekeepingInterval.String(),
+		// Disable event storage by default.
+		"event_storage_event_limit": "default=0",
+		"event_storage_age_limit":   "default=0",
+	}
+	for name, defaultValue := range flagOverrides {
+		if f := flag.Lookup(name); f != nil {
+			f.DefValue = defaultValue
+			f.Value.Set(defaultValue)
+		} else {
+			glog.Errorf("Expected cAdvisor flag %q not found", name)
+		}
+	}
+}
+
+func containerLabels(c *cadvisorapi.ContainerInfo) map[string]string {
+	set := map[string]string{metrics.LabelID: c.Name}
+	if len(c.Aliases) > 0 {
+		set[metrics.LabelName] = c.Aliases[0]
+	}
+	if image := c.Spec.Image; len(image) > 0 {
+		set[metrics.LabelImage] = image
+	}
+	if v, ok := c.Spec.Labels[types.KubernetesPodNameLabel]; ok {
+		set["pod_name"] = v
+	}
+	if v, ok := c.Spec.Labels[types.KubernetesPodNamespaceLabel]; ok {
+		set["namespace"] = v
+	}
+	if v, ok := c.Spec.Labels[types.KubernetesContainerNameLabel]; ok {
+		set["container_name"] = v
+	}
+	return set
+}
+
+// New creates a cAdvisor and exports its API on the specified port if port > 0.
+func New(port uint, runtime string) (Interface, error) {
 	sysFs, err := sysfs.NewRealSysFs()
 	if err != nil {
 		return nil, err
 	}
 
 	// Create and start the cAdvisor container manager.
-	m, err := manager.New(memory.New(statsCacheDuration, nil), sysFs, maxHousekeepingInterval, allowDynamicHousekeeping)
+	m, err := manager.New(memory.New(statsCacheDuration, nil), sysFs, maxHousekeepingInterval, allowDynamicHousekeeping, cadvisorMetrics.MetricSet{cadvisorMetrics.NetworkTcpUsageMetrics: struct{}{}}, http.DefaultClient)
 	if err != nil {
 		return nil, err
 	}
 
 	cadvisorClient := &cadvisorClient{
+		runtime: runtime,
 		Manager: m,
 	}
 
@@ -85,18 +130,7 @@ func (cc *cadvisorClient) exportHTTP(port uint) error {
 		return err
 	}
 
-	re := regexp.MustCompile(`^k8s_(?P<kubernetes_container_name>[^_\.]+)[^_]+_(?P<kubernetes_pod_name>[^_]+)_(?P<kubernetes_namespace>[^_]+)`)
-	reCaptureNames := re.SubexpNames()
-	cadvisorhttp.RegisterPrometheusHandler(mux, cc, "/metrics", func(name string) map[string]string {
-		extraLabels := map[string]string{}
-		matches := re.FindStringSubmatch(name)
-		for i, match := range matches {
-			if len(reCaptureNames[i]) > 0 {
-				extraLabels[re.SubexpNames()[i]] = match
-			}
-		}
-		return extraLabels
-	})
+	cadvisorhttp.RegisterPrometheusHandler(mux, cc, "/metrics", containerLabels)
 
 	// Only start the http server if port > 0
 	if port > 0 {
@@ -109,7 +143,7 @@ func (cc *cadvisorClient) exportHTTP(port uint) error {
 		// If export failed, retry in the background until we are able to bind.
 		// This allows an existing cAdvisor to be killed before this one registers.
 		go func() {
-			defer util.HandleCrash()
+			defer runtime.HandleCrash()
 
 			err := serv.ListenAndServe()
 			for err != nil {
@@ -127,13 +161,17 @@ func (cc *cadvisorClient) ContainerInfo(name string, req *cadvisorapi.ContainerI
 	return cc.GetContainerInfo(name, req)
 }
 
+func (cc *cadvisorClient) ContainerInfoV2(name string, options cadvisorapiv2.RequestOptions) (map[string]cadvisorapiv2.ContainerInfo, error) {
+	return cc.GetContainerInfoV2(name, options)
+}
+
 func (cc *cadvisorClient) VersionInfo() (*cadvisorapi.VersionInfo, error) {
 	return cc.GetVersionInfo()
 }
 
 func (cc *cadvisorClient) SubcontainerInfo(name string, req *cadvisorapi.ContainerInfoRequest) (map[string]*cadvisorapi.ContainerInfo, error) {
 	infos, err := cc.SubcontainersInfo(name, req)
-	if err != nil {
+	if err != nil && len(infos) == 0 {
 		return nil, err
 	}
 
@@ -141,15 +179,26 @@ func (cc *cadvisorClient) SubcontainerInfo(name string, req *cadvisorapi.Contain
 	for _, info := range infos {
 		result[info.Name] = info
 	}
-	return result, nil
+	return result, err
 }
 
 func (cc *cadvisorClient) MachineInfo() (*cadvisorapi.MachineInfo, error) {
 	return cc.GetMachineInfo()
 }
 
-func (cc *cadvisorClient) DockerImagesFsInfo() (cadvisorapiv2.FsInfo, error) {
-	return cc.getFsInfo(cadvisorfs.LabelDockerImages)
+func (cc *cadvisorClient) ImagesFsInfo() (cadvisorapiv2.FsInfo, error) {
+	var label string
+
+	switch cc.runtime {
+	case "docker":
+		label = cadvisorfs.LabelDockerImages
+	case "rkt":
+		label = cadvisorfs.LabelRktImages
+	default:
+		return cadvisorapiv2.FsInfo{}, fmt.Errorf("ImagesFsInfo: unknown runtime: %v", cc.runtime)
+	}
+
+	return cc.getFsInfo(label)
 }
 
 func (cc *cadvisorClient) RootFsInfo() (cadvisorapiv2.FsInfo, error) {

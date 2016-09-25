@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -34,6 +34,8 @@ spec:
     ports:
     - containerPort: 80
 `
+	var textExample = `some text
+`
 	var cases = []struct {
 		in       string
 		expected string
@@ -46,6 +48,10 @@ spec:
 		{
 			"<!-- BEGIN MUNGE: EXAMPLE ../mungedocs/testdata/pod.yaml -->\n<!-- END MUNGE: EXAMPLE ../mungedocs/testdata/pod.yaml -->\n",
 			"<!-- BEGIN MUNGE: EXAMPLE ../mungedocs/testdata/pod.yaml -->\n\n```yaml\n" + podExample + "```\n\n[Download example](../mungedocs/testdata/pod.yaml?raw=true)\n<!-- END MUNGE: EXAMPLE ../mungedocs/testdata/pod.yaml -->\n",
+		},
+		{
+			"<!-- BEGIN MUNGE: EXAMPLE testdata/example.txt -->\n<!-- END MUNGE: EXAMPLE testdata/example.txt -->\n",
+			"<!-- BEGIN MUNGE: EXAMPLE testdata/example.txt -->\n\n```\n" + textExample + "```\n\n[Download example](testdata/example.txt?raw=true)\n<!-- END MUNGE: EXAMPLE testdata/example.txt -->\n",
 		},
 	}
 	repoRoot = ""

@@ -1,0 +1,4 @@
+This dir can not be named "testdata" because of the way ugorji gnerates code.
+Specifically, it emits a .go file and then calls `go run` on it.  Because
+"testdata" is a special name to Go, it decides NOT to find the vendor dir, and
+therefore fails to compile.  Just name it something else.

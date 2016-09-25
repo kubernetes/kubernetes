@@ -1,4 +1,0 @@
-language: go
-
-script:
-  - make test testrace

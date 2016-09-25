@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,13 +24,18 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	_ "k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/resource"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
+	_ "k8s.io/kubernetes/pkg/apimachinery/registered"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
+	"k8s.io/kubernetes/pkg/client/restclient"
+	"k8s.io/kubernetes/pkg/client/testing/core"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 
-	heapster "k8s.io/heapster/api/v1/types"
+	heapster "k8s.io/heapster/metrics/api/v1/types"
+	metrics_api "k8s.io/heapster/metrics/apis/metrics/v1alpha1"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -61,140 +66,281 @@ type metricPoint struct {
 
 type testCase struct {
 	replicas              int
-	desiredValue          int64
+	desiredValue          float64
 	desiredError          error
-	targetResource        api.ResourceName
+	targetResource        string
 	targetTimestamp       int
 	reportedMetricsPoints [][]metricPoint
+	reportedPodMetrics    [][]int64
 	namespace             string
-	selector              map[string]string
+	podListOverride       *api.PodList
+	selector              labels.Selector
+	useMetricsApi         bool
 }
 
-func (tc *testCase) prepareTestClient(t *testing.T) *testclient.Fake {
+func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 	namespace := "test-namespace"
 	tc.namespace = namespace
 	podNamePrefix := "test-pod"
-	selector := map[string]string{"name": podNamePrefix}
-	tc.selector = selector
+	podLabels := map[string]string{"name": podNamePrefix}
+	tc.selector = labels.SelectorFromSet(podLabels)
 
-	fakeClient := &testclient.Fake{}
+	fakeClient := &fake.Clientset{}
 
-	fakeClient.AddReactor("list", "pods", func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
+	fakeClient.AddReactor("list", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		if tc.podListOverride != nil {
+			return true, tc.podListOverride, nil
+		}
 		obj := &api.PodList{}
 		for i := 0; i < tc.replicas; i++ {
 			podName := fmt.Sprintf("%s-%d", podNamePrefix, i)
-			pod := api.Pod{
-				ObjectMeta: api.ObjectMeta{
-					Name:      podName,
-					Namespace: namespace,
-					Labels:    selector,
-				},
-				Spec: api.PodSpec{
-					Containers: []api.Container{
-						{
-							Resources: api.ResourceRequirements{
-								Requests: api.ResourceList{
-									tc.targetResource: resource.MustParse("10"),
-								},
-							},
-						},
-					},
-				},
-				Status: api.PodStatus{
-					Phase: api.PodRunning,
-				},
-			}
+			pod := buildPod(namespace, podName, podLabels, api.PodRunning)
 			obj.Items = append(obj.Items, pod)
 		}
 		return true, obj, nil
 	})
 
-	fakeClient.AddProxyReactor("services", func(action testclient.Action) (handled bool, ret client.ResponseWrapper, err error) {
-		metrics := heapster.MetricResultList{}
-		var latestTimestamp time.Time
-		for _, reportedMetricPoints := range tc.reportedMetricsPoints {
-			var heapsterMetricPoints []heapster.MetricPoint
-			for _, reportedMetricPoint := range reportedMetricPoints {
-				timestamp := fixedTimestamp.Add(time.Duration(reportedMetricPoint.timestamp) * time.Minute)
-				if latestTimestamp.Before(timestamp) {
-					latestTimestamp = timestamp
+	if tc.useMetricsApi {
+		fakeClient.AddProxyReactor("services", func(action core.Action) (handled bool, ret restclient.ResponseWrapper, err error) {
+			metrics := metrics_api.PodMetricsList{}
+			for i, containers := range tc.reportedPodMetrics {
+				metric := metrics_api.PodMetrics{
+					ObjectMeta: v1.ObjectMeta{
+						Name:      fmt.Sprintf("%s-%d", podNamePrefix, i),
+						Namespace: namespace,
+					},
+					Timestamp:  unversioned.Time{Time: fixedTimestamp.Add(time.Duration(tc.targetTimestamp) * time.Minute)},
+					Containers: []metrics_api.ContainerMetrics{},
 				}
-				heapsterMetricPoint := heapster.MetricPoint{timestamp, reportedMetricPoint.level}
-				heapsterMetricPoints = append(heapsterMetricPoints, heapsterMetricPoint)
+				for j, cpu := range containers {
+					cm := metrics_api.ContainerMetrics{
+						Name: fmt.Sprintf("%s-%d-container-%d", podNamePrefix, i, j),
+						Usage: v1.ResourceList{
+							v1.ResourceCPU: *resource.NewMilliQuantity(
+								cpu,
+								resource.DecimalSI),
+							v1.ResourceMemory: *resource.NewQuantity(
+								int64(1024*1024),
+								resource.BinarySI),
+						},
+					}
+					metric.Containers = append(metric.Containers, cm)
+				}
+				metrics.Items = append(metrics.Items, metric)
 			}
-			metric := heapster.MetricResult{
-				Metrics:         heapsterMetricPoints,
-				LatestTimestamp: latestTimestamp,
+			heapsterRawMemResponse, _ := json.Marshal(&metrics)
+			return true, newFakeResponseWrapper(heapsterRawMemResponse), nil
+		})
+	} else {
+		fakeClient.AddProxyReactor("services", func(action core.Action) (handled bool, ret restclient.ResponseWrapper, err error) {
+			metrics := heapster.MetricResultList{}
+			var latestTimestamp time.Time
+			for _, reportedMetricPoints := range tc.reportedMetricsPoints {
+				var heapsterMetricPoints []heapster.MetricPoint
+				for _, reportedMetricPoint := range reportedMetricPoints {
+					timestamp := fixedTimestamp.Add(time.Duration(reportedMetricPoint.timestamp) * time.Minute)
+					if latestTimestamp.Before(timestamp) {
+						latestTimestamp = timestamp
+					}
+					heapsterMetricPoint := heapster.MetricPoint{Timestamp: timestamp, Value: reportedMetricPoint.level, FloatValue: nil}
+					heapsterMetricPoints = append(heapsterMetricPoints, heapsterMetricPoint)
+				}
+				metric := heapster.MetricResult{
+					Metrics:         heapsterMetricPoints,
+					LatestTimestamp: latestTimestamp,
+				}
+				metrics.Items = append(metrics.Items, metric)
 			}
-			metrics.Items = append(metrics.Items, metric)
-		}
-		heapsterRawMemResponse, _ := json.Marshal(&metrics)
-		return true, newFakeResponseWrapper(heapsterRawMemResponse), nil
-	})
+			heapsterRawMemResponse, _ := json.Marshal(&metrics)
+			return true, newFakeResponseWrapper(heapsterRawMemResponse), nil
+		})
+	}
 
 	return fakeClient
 }
 
-func (tc *testCase) verifyResults(t *testing.T, val *ResourceConsumption, timestamp time.Time, err error) {
-	assert.Equal(t, tc.desiredError, err)
+func buildPod(namespace, podName string, podLabels map[string]string, phase api.PodPhase) api.Pod {
+	return api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			Name:      podName,
+			Namespace: namespace,
+			Labels:    podLabels,
+		},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{
+					Resources: api.ResourceRequirements{
+						Requests: api.ResourceList{
+							api.ResourceCPU: resource.MustParse("10"),
+						},
+					},
+				},
+			},
+		},
+		Status: api.PodStatus{
+			Phase: phase,
+		},
+	}
+}
+
+func (tc *testCase) verifyResults(t *testing.T, val *float64, timestamp time.Time, err error) {
 	if tc.desiredError != nil {
+		assert.Error(t, err)
+		assert.Contains(t, fmt.Sprintf("%v", err), fmt.Sprintf("%v", tc.desiredError))
 		return
 	}
-	if tc.targetResource == api.ResourceCPU {
-		assert.Equal(t, tc.desiredValue, val.Quantity.MilliValue())
-	}
-	if tc.targetResource == api.ResourceMemory {
-		assert.Equal(t, tc.desiredValue, val.Quantity.Value())
-	}
+	assert.NoError(t, err)
+	assert.NotNil(t, val)
+	assert.True(t, tc.desiredValue-0.001 < *val)
+	assert.True(t, tc.desiredValue+0.001 > *val)
+
 	targetTimestamp := fixedTimestamp.Add(time.Duration(tc.targetTimestamp) * time.Minute)
-	assert.Equal(t, targetTimestamp, timestamp)
+	assert.True(t, targetTimestamp.Equal(timestamp))
 }
 
 func (tc *testCase) runTest(t *testing.T) {
 	testClient := tc.prepareTestClient(t)
 	metricsClient := NewHeapsterMetricsClient(testClient, DefaultHeapsterNamespace, DefaultHeapsterScheme, DefaultHeapsterService, DefaultHeapsterPort)
-	val, _, timestamp, err := metricsClient.GetResourceConsumptionAndRequest(tc.targetResource, tc.namespace, tc.selector)
-	tc.verifyResults(t, val, timestamp, err)
+	if tc.targetResource == "cpu-usage" {
+		val, _, timestamp, err := metricsClient.GetCpuConsumptionAndRequestInMillis(tc.namespace, tc.selector)
+		fval := float64(val)
+		tc.verifyResults(t, &fval, timestamp, err)
+	} else {
+		val, timestamp, err := metricsClient.GetCustomMetric(tc.targetResource, tc.namespace, tc.selector)
+		tc.verifyResults(t, val, timestamp, err)
+	}
 }
 
 func TestCPU(t *testing.T) {
 	tc := testCase{
-		replicas:              3,
-		desiredValue:          5000,
-		targetResource:        api.ResourceCPU,
-		targetTimestamp:       1,
-		reportedMetricsPoints: [][]metricPoint{{{5000, 1}}, {{5000, 1}}, {{5000, 1}}},
+		replicas:           3,
+		desiredValue:       5000,
+		targetResource:     "cpu-usage",
+		targetTimestamp:    1,
+		reportedPodMetrics: [][]int64{{5000}, {5000}, {5000}},
+		useMetricsApi:      true,
 	}
 	tc.runTest(t)
 }
 
-func TestMemory(t *testing.T) {
+func TestCPUPending(t *testing.T) {
+	tc := testCase{
+		replicas:           4,
+		desiredValue:       5000,
+		targetResource:     "cpu-usage",
+		targetTimestamp:    1,
+		reportedPodMetrics: [][]int64{{5000}, {5000}, {5000}},
+		useMetricsApi:      true,
+		podListOverride:    &api.PodList{},
+	}
+
+	namespace := "test-namespace"
+	podNamePrefix := "test-pod"
+	podLabels := map[string]string{"name": podNamePrefix}
+	for i := 0; i < tc.replicas; i++ {
+		podName := fmt.Sprintf("%s-%d", podNamePrefix, i)
+		pod := buildPod(namespace, podName, podLabels, api.PodRunning)
+		tc.podListOverride.Items = append(tc.podListOverride.Items, pod)
+	}
+	tc.podListOverride.Items[3].Status.Phase = api.PodPending
+
+	tc.runTest(t)
+}
+
+func TestCPUAllPending(t *testing.T) {
+	tc := testCase{
+		replicas:           4,
+		targetResource:     "cpu-usage",
+		targetTimestamp:    1,
+		reportedPodMetrics: [][]int64{},
+		useMetricsApi:      true,
+		podListOverride:    &api.PodList{},
+		desiredError:       fmt.Errorf("no running pods"),
+	}
+
+	namespace := "test-namespace"
+	podNamePrefix := "test-pod"
+	podLabels := map[string]string{"name": podNamePrefix}
+	for i := 0; i < tc.replicas; i++ {
+		podName := fmt.Sprintf("%s-%d", podNamePrefix, i)
+		pod := buildPod(namespace, podName, podLabels, api.PodPending)
+		tc.podListOverride.Items = append(tc.podListOverride.Items, pod)
+	}
+	tc.runTest(t)
+}
+
+func TestQPS(t *testing.T) {
 	tc := testCase{
 		replicas:              3,
-		desiredValue:          5000,
-		targetResource:        api.ResourceMemory,
+		desiredValue:          13.33333,
+		targetResource:        "qps",
 		targetTimestamp:       1,
-		reportedMetricsPoints: [][]metricPoint{{{5000, 1}}, {{5000, 2}}, {{5000, 4}}},
+		reportedMetricsPoints: [][]metricPoint{{{10, 1}}, {{20, 1}}, {{10, 1}}},
 	}
+	tc.runTest(t)
+}
+
+func TestQPSPending(t *testing.T) {
+	tc := testCase{
+		replicas:              4,
+		desiredValue:          13.33333,
+		targetResource:        "qps",
+		targetTimestamp:       1,
+		reportedMetricsPoints: [][]metricPoint{{{10, 1}}, {{20, 1}}, {{10, 1}}},
+		podListOverride:       &api.PodList{},
+	}
+
+	namespace := "test-namespace"
+	podNamePrefix := "test-pod"
+	podLabels := map[string]string{"name": podNamePrefix}
+	for i := 0; i < tc.replicas; i++ {
+		podName := fmt.Sprintf("%s-%d", podNamePrefix, i)
+		pod := buildPod(namespace, podName, podLabels, api.PodRunning)
+		tc.podListOverride.Items = append(tc.podListOverride.Items, pod)
+	}
+	tc.podListOverride.Items[0].Status.Phase = api.PodPending
+	tc.runTest(t)
+}
+
+func TestQPSAllPending(t *testing.T) {
+	tc := testCase{
+		replicas:              4,
+		desiredError:          fmt.Errorf("no running pods"),
+		targetResource:        "qps",
+		targetTimestamp:       1,
+		reportedMetricsPoints: [][]metricPoint{},
+		podListOverride:       &api.PodList{},
+	}
+
+	namespace := "test-namespace"
+	podNamePrefix := "test-pod"
+	podLabels := map[string]string{"name": podNamePrefix}
+	for i := 0; i < tc.replicas; i++ {
+		podName := fmt.Sprintf("%s-%d", podNamePrefix, i)
+		pod := buildPod(namespace, podName, podLabels, api.PodPending)
+		tc.podListOverride.Items = append(tc.podListOverride.Items, pod)
+	}
+	tc.podListOverride.Items[0].Status.Phase = api.PodPending
 	tc.runTest(t)
 }
 
 func TestCPUSumEqualZero(t *testing.T) {
 	tc := testCase{
-		replicas:              3,
-		desiredValue:          0,
-		targetResource:        api.ResourceCPU,
-		targetTimestamp:       0,
-		reportedMetricsPoints: [][]metricPoint{{{0, 0}}, {{0, 0}}, {{0, 0}}},
+		replicas:           3,
+		desiredValue:       0,
+		targetResource:     "cpu-usage",
+		targetTimestamp:    0,
+		reportedPodMetrics: [][]int64{{0}, {0}, {0}},
+		useMetricsApi:      true,
 	}
 	tc.runTest(t)
 }
 
-func TestMemorySumEqualZero(t *testing.T) {
+func TestQpsSumEqualZero(t *testing.T) {
 	tc := testCase{
 		replicas:              3,
 		desiredValue:          0,
-		targetResource:        api.ResourceMemory,
+		targetResource:        "qps",
 		targetTimestamp:       0,
 		reportedMetricsPoints: [][]metricPoint{{{0, 0}}, {{0, 0}}, {{0, 0}}},
 	}
@@ -203,109 +349,31 @@ func TestMemorySumEqualZero(t *testing.T) {
 
 func TestCPUMoreMetrics(t *testing.T) {
 	tc := testCase{
-		replicas:        5,
-		desiredValue:    5000,
-		targetResource:  api.ResourceCPU,
-		targetTimestamp: 10,
-		reportedMetricsPoints: [][]metricPoint{
-			{{0, 3}, {0, 6}, {5, 4}, {9000, 10}},
-			{{5000, 2}, {10, 5}, {66, 1}, {0, 10}},
-			{{5000, 3}, {80, 5}, {6000, 10}},
-			{{5000, 3}, {40, 3}, {0, 9}, {200, 2}, {8000, 10}},
-			{{5000, 2}, {20, 2}, {2000, 10}}},
-	}
-	tc.runTest(t)
-}
-
-func TestMemoryMoreMetrics(t *testing.T) {
-	tc := testCase{
-		replicas:        5,
-		desiredValue:    5000,
-		targetResource:  api.ResourceMemory,
-		targetTimestamp: 10,
-		reportedMetricsPoints: [][]metricPoint{
-			{{0, 3}, {0, 6}, {5, 4}, {9000, 10}},
-			{{5000, 2}, {10, 5}, {66, 1}, {0, 10}},
-			{{5000, 3}, {80, 5}, {6000, 10}},
-			{{5000, 3}, {40, 3}, {0, 9}, {200, 2}, {8000, 10}},
-			{{5000, 2}, {20, 2}, {2000, 10}}},
-	}
-	tc.runTest(t)
-}
-
-func TestCPUResultIsFloat(t *testing.T) {
-	tc := testCase{
-		replicas:              6,
-		desiredValue:          4783,
-		targetResource:        api.ResourceCPU,
-		targetTimestamp:       4,
-		reportedMetricsPoints: [][]metricPoint{{{4000, 4}}, {{9500, 4}}, {{3000, 4}}, {{7000, 4}}, {{3200, 4}}, {{2000, 4}}},
-	}
-	tc.runTest(t)
-}
-
-func TestMemoryResultIsFloat(t *testing.T) {
-	tc := testCase{
-		replicas:              6,
-		desiredValue:          4783,
-		targetResource:        api.ResourceMemory,
-		targetTimestamp:       4,
-		reportedMetricsPoints: [][]metricPoint{{{4000, 4}}, {{9500, 4}}, {{3000, 4}}, {{7000, 4}}, {{3200, 4}}, {{2000, 4}}},
-	}
-	tc.runTest(t)
-}
-
-func TestCPUSamplesWithRandomTimestamps(t *testing.T) {
-	tc := testCase{
-		replicas:        3,
-		desiredValue:    3000,
-		targetResource:  api.ResourceCPU,
-		targetTimestamp: 3,
-		reportedMetricsPoints: [][]metricPoint{
-			{{1, 1}, {3000, 5}, {2, 2}},
-			{{2, 2}, {1, 1}, {3000, 3}},
-			{{3000, 4}, {1, 1}, {2, 2}}},
-	}
-	tc.runTest(t)
-}
-
-func TestMemorySamplesWithRandomTimestamps(t *testing.T) {
-	tc := testCase{
-		replicas:        3,
-		desiredValue:    3000,
-		targetResource:  api.ResourceMemory,
-		targetTimestamp: 3,
-		reportedMetricsPoints: [][]metricPoint{
-			{{1, 1}, {3000, 3}, {2, 2}},
-			{{2, 2}, {1, 1}, {3000, 3}},
-			{{3000, 3}, {1, 1}, {2, 2}}},
-	}
-	tc.runTest(t)
-}
-
-func TestErrorMetricNotDefined(t *testing.T) {
-	tc := testCase{
-		replicas:              1,
-		desiredError:          fmt.Errorf("heapster metric not defined for "),
-		reportedMetricsPoints: [][]metricPoint{{{4000, 4}}},
+		replicas:           5,
+		desiredValue:       5000,
+		targetResource:     "cpu-usage",
+		targetTimestamp:    10,
+		reportedPodMetrics: [][]int64{{1000, 2000, 2000}, {5000}, {1000, 1000, 1000, 2000}, {4000, 1000}, {5000}},
+		useMetricsApi:      true,
 	}
 	tc.runTest(t)
 }
 
 func TestCPUMissingMetrics(t *testing.T) {
 	tc := testCase{
-		replicas:              3,
-		targetResource:        api.ResourceCPU,
-		desiredError:          fmt.Errorf("metrics obtained for 1/3 of pods"),
-		reportedMetricsPoints: [][]metricPoint{{{4000, 4}}},
+		replicas:           3,
+		targetResource:     "cpu-usage",
+		desiredError:       fmt.Errorf("metrics obtained for 1/3 of pods"),
+		reportedPodMetrics: [][]int64{{4000}},
+		useMetricsApi:      true,
 	}
 	tc.runTest(t)
 }
 
-func TestMemoryMissingMetrics(t *testing.T) {
+func TestQpsMissingMetrics(t *testing.T) {
 	tc := testCase{
 		replicas:              3,
-		targetResource:        api.ResourceMemory,
+		targetResource:        "qps",
 		desiredError:          fmt.Errorf("metrics obtained for 1/3 of pods"),
 		reportedMetricsPoints: [][]metricPoint{{{4000, 4}}},
 	}
@@ -314,18 +382,19 @@ func TestMemoryMissingMetrics(t *testing.T) {
 
 func TestCPUSuperfluousMetrics(t *testing.T) {
 	tc := testCase{
-		replicas:              3,
-		targetResource:        api.ResourceCPU,
-		desiredError:          fmt.Errorf("metrics obtained for 6/3 of pods"),
-		reportedMetricsPoints: [][]metricPoint{{{1000, 1}}, {{2000, 4}}, {{2000, 1}}, {{4000, 5}}, {{2000, 1}}, {{4000, 4}}},
+		replicas:           3,
+		targetResource:     "cpu-usage",
+		desiredError:       fmt.Errorf("metrics obtained for 6/3 of pods"),
+		reportedPodMetrics: [][]int64{{1000}, {2000}, {4000}, {4000}, {2000}, {4000}},
+		useMetricsApi:      true,
 	}
 	tc.runTest(t)
 }
 
-func TestMemorySuperfluousMetrics(t *testing.T) {
+func TestQpsSuperfluousMetrics(t *testing.T) {
 	tc := testCase{
 		replicas:              3,
-		targetResource:        api.ResourceMemory,
+		targetResource:        "qps",
 		desiredError:          fmt.Errorf("metrics obtained for 6/3 of pods"),
 		reportedMetricsPoints: [][]metricPoint{{{1000, 1}}, {{2000, 4}}, {{2000, 1}}, {{4000, 5}}, {{2000, 1}}, {{4000, 4}}},
 	}
@@ -335,61 +404,73 @@ func TestMemorySuperfluousMetrics(t *testing.T) {
 func TestCPUEmptyMetrics(t *testing.T) {
 	tc := testCase{
 		replicas:              3,
-		targetResource:        api.ResourceCPU,
+		targetResource:        "cpu-usage",
 		desiredError:          fmt.Errorf("metrics obtained for 0/3 of pods"),
 		reportedMetricsPoints: [][]metricPoint{},
-	}
-	tc.runTest(t)
-}
-
-func TestMemoryEmptyMetrics(t *testing.T) {
-	tc := testCase{
-		replicas:              3,
-		targetResource:        api.ResourceMemory,
-		desiredError:          fmt.Errorf("metrics obtained for 0/3 of pods"),
-		reportedMetricsPoints: [][]metricPoint{},
+		reportedPodMetrics:    [][]int64{},
+		useMetricsApi:         true,
 	}
 	tc.runTest(t)
 }
 
 func TestCPUZeroReplicas(t *testing.T) {
 	tc := testCase{
-		replicas:              0,
-		targetResource:        api.ResourceCPU,
-		desiredError:          fmt.Errorf("some pods do not have request for cpu"),
-		reportedMetricsPoints: [][]metricPoint{},
-	}
-	tc.runTest(t)
-}
-
-func TestMemoryZeroReplicas(t *testing.T) {
-	tc := testCase{
-		replicas:              0,
-		targetResource:        api.ResourceMemory,
-		desiredError:          fmt.Errorf("some pods do not have request for memory"),
-		reportedMetricsPoints: [][]metricPoint{},
+		replicas:           0,
+		targetResource:     "cpu-usage",
+		desiredError:       fmt.Errorf("some pods do not have request for cpu"),
+		reportedPodMetrics: [][]int64{},
+		useMetricsApi:      true,
 	}
 	tc.runTest(t)
 }
 
 func TestCPUEmptyMetricsForOnePod(t *testing.T) {
 	tc := testCase{
-		replicas:              3,
-		targetResource:        api.ResourceCPU,
-		desiredError:          fmt.Errorf("metrics obtained for 2/3 of pods"),
-		reportedMetricsPoints: [][]metricPoint{{}, {{100, 1}}, {{400, 2}, {300, 3}}},
+		replicas:           3,
+		targetResource:     "cpu-usage",
+		desiredError:       fmt.Errorf("metrics obtained for 2/3 of pods (sample missing pod: test-namespace/test-pod-2)"),
+		reportedPodMetrics: [][]int64{{100}, {300, 400}},
+		useMetricsApi:      true,
 	}
 	tc.runTest(t)
 }
 
-func TestMemoryEmptyMetricsForOnePod(t *testing.T) {
-	tc := testCase{
-		replicas:              3,
-		targetResource:        api.ResourceMemory,
-		desiredError:          fmt.Errorf("metrics obtained for 2/3 of pods"),
-		reportedMetricsPoints: [][]metricPoint{{}, {{100, 1}}, {{400, 2}, {300, 3}}},
+func TestAggregateSum(t *testing.T) {
+	//calculateSumFromTimeSample(metrics heapster.MetricResultList, duration time.Duration) (sum intAndFloat, count int, timestamp time.Time) {
+	now := time.Now()
+	result := heapster.MetricResultList{
+		Items: []heapster.MetricResult{
+			{
+				Metrics: []heapster.MetricPoint{
+					{Timestamp: now, Value: 50, FloatValue: nil},
+					{Timestamp: now.Add(-15 * time.Second), Value: 100, FloatValue: nil},
+					{Timestamp: now.Add(-60 * time.Second), Value: 100000, FloatValue: nil}},
+				LatestTimestamp: now,
+			},
+		},
 	}
-	tc.runTest(t)
+	sum, cnt, _ := calculateSumFromTimeSample(result, time.Minute)
+	assert.Equal(t, int64(75), sum.intValue)
+	assert.InEpsilon(t, 75.0, sum.floatValue, 0.1)
+	assert.Equal(t, 1, cnt)
+}
+
+func TestAggregateSumSingle(t *testing.T) {
+	now := time.Now()
+	result := heapster.MetricResultList{
+		Items: []heapster.MetricResult{
+			{
+				Metrics: []heapster.MetricPoint{
+					{Timestamp: now, Value: 50, FloatValue: nil},
+					{Timestamp: now.Add(-65 * time.Second), Value: 100000, FloatValue: nil}},
+				LatestTimestamp: now,
+			},
+		},
+	}
+	sum, cnt, _ := calculateSumFromTimeSample(result, time.Minute)
+	assert.Equal(t, int64(50), sum.intValue)
+	assert.InEpsilon(t, 50.0, sum.floatValue, 0.1)
+	assert.Equal(t, 1, cnt)
 }
 
 // TODO: add proper tests for request

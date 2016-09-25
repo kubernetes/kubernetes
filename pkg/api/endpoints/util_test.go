@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -64,6 +64,16 @@ func TestPackSubsets(t *testing.T) {
 			}},
 			expect: []api.EndpointSubset{{
 				Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}},
+				Ports:     []api.EndpointPort{{Port: 111}},
+			}},
+		}, {
+			name: "one set, one ip, one port (IPv6)",
+			given: []api.EndpointSubset{{
+				Addresses: []api.EndpointAddress{{IP: "beef::1:2:3:4"}},
+				Ports:     []api.EndpointPort{{Port: 111}},
+			}},
+			expect: []api.EndpointSubset{{
+				Addresses: []api.EndpointAddress{{IP: "beef::1:2:3:4"}},
 				Ports:     []api.EndpointPort{{Port: 111}},
 			}},
 		}, {
@@ -167,6 +177,16 @@ func TestPackSubsets(t *testing.T) {
 			}},
 			expect: []api.EndpointSubset{{
 				Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}},
+				Ports:     []api.EndpointPort{{Port: 111}},
+			}},
+		}, {
+			name: "one set, dup ips, one port (IPv6)",
+			given: []api.EndpointSubset{{
+				Addresses: []api.EndpointAddress{{IP: "beef::1"}, {IP: "beef::1"}},
+				Ports:     []api.EndpointPort{{Port: 111}},
+			}},
+			expect: []api.EndpointSubset{{
+				Addresses: []api.EndpointAddress{{IP: "beef::1"}},
 				Ports:     []api.EndpointPort{{Port: 111}},
 			}},
 		}, {

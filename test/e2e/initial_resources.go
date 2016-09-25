@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,28 +20,25 @@ import (
 	"fmt"
 	"time"
 
-	influxdb "github.com/influxdb/influxdb/client"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/test/e2e/framework"
 )
 
-var _ = Describe("Initial Resources [Skipped] ", func() {
-	f := NewFramework("initial-resources")
+// [Feature:InitialResources]: Initial resources is an experimental feature, so
+// these tests are not run by default.
+//
+// Flaky issue #20272
+var _ = framework.KubeDescribe("Initial Resources [Feature:InitialResources] [Flaky]", func() {
+	f := framework.NewDefaultFramework("initial-resources")
 
 	It("should set initial resources based on historical data", func() {
-		// Cleanup data in InfluxDB that left from previous tests.
-		influxdbClient, err := getInfluxdbClient(f.Client)
-		expectNoError(err, "failed to create influxdb client")
-		_, err = influxdbClient.Query("drop series autoscaling.cpu.usage.2m", influxdb.Second)
-		expectNoError(err)
-		_, err = influxdbClient.Query("drop series autoscaling.memory.usage.2m", influxdb.Second)
-		expectNoError(err)
-
+		// TODO(piosz): Add cleanup data in InfluxDB that left from previous tests.
 		cpu := 100
 		mem := 200
 		for i := 0; i < 10; i++ {
-			rc := NewStaticResourceConsumer(fmt.Sprintf("ir-%d", i), 1, cpu, mem, int64(2*cpu), int64(2*mem), f)
+			rc := NewStaticResourceConsumer(fmt.Sprintf("ir-%d", i), 1, cpu, mem, 0, int64(2*cpu), int64(2*mem), f)
 			defer rc.CleanUp()
 		}
 		// Wait some time to make sure usage data is gathered.
@@ -54,7 +51,7 @@ var _ = Describe("Initial Resources [Skipped] ", func() {
 	})
 })
 
-func runPod(f *Framework, name, image string) *api.Pod {
+func runPod(f *framework.Framework, name, image string) *api.Pod {
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name: name,
@@ -69,7 +66,7 @@ func runPod(f *Framework, name, image string) *api.Pod {
 		},
 	}
 	createdPod, err := f.Client.Pods(f.Namespace.Name).Create(pod)
-	expectNoError(err)
-	expectNoError(waitForPodRunningInNamespace(f.Client, name, f.Namespace.Name))
+	framework.ExpectNoError(err)
+	framework.ExpectNoError(framework.WaitForPodRunningInNamespace(f.Client, createdPod))
 	return createdPod
 }

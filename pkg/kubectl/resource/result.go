@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,9 +21,10 @@ import (
 	"reflect"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/runtime"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -210,8 +211,8 @@ func (r *Result) Watch(resourceVersion string) (watch.Interface, error) {
 // the objects as children, or if only a single Object is present, as that object. The provided
 // version will be preferred as the conversion target, but the Object's mapping version will be
 // used if that version is not present.
-func AsVersionedObject(infos []*Info, forceList bool, version string) (runtime.Object, error) {
-	objects, err := AsVersionedObjects(infos, version)
+func AsVersionedObject(infos []*Info, forceList bool, version unversioned.GroupVersion, encoder runtime.Encoder) (runtime.Object, error) {
+	objects, err := AsVersionedObjects(infos, version, encoder)
 	if err != nil {
 		return nil, err
 	}
@@ -221,7 +222,7 @@ func AsVersionedObject(infos []*Info, forceList bool, version string) (runtime.O
 		object = objects[0]
 	} else {
 		object = &api.List{Items: objects}
-		converted, err := tryConvert(api.Scheme, object, version, latest.GroupOrDie("").GroupVersion.Version)
+		converted, err := TryConvert(api.Scheme, object, version, registered.GroupOrDie(api.GroupName).GroupVersion)
 		if err != nil {
 			return nil, err
 		}
@@ -233,28 +234,36 @@ func AsVersionedObject(infos []*Info, forceList bool, version string) (runtime.O
 // AsVersionedObjects converts a list of infos into versioned objects. The provided
 // version will be preferred as the conversion target, but the Object's mapping version will be
 // used if that version is not present.
-func AsVersionedObjects(infos []*Info, version string) ([]runtime.Object, error) {
+func AsVersionedObjects(infos []*Info, version unversioned.GroupVersion, encoder runtime.Encoder) ([]runtime.Object, error) {
 	objects := []runtime.Object{}
 	for _, info := range infos {
 		if info.Object == nil {
 			continue
 		}
 
+		// TODO: use info.VersionedObject as the value?
+		switch obj := info.Object.(type) {
+		case *extensions.ThirdPartyResourceData:
+			objects = append(objects, &runtime.Unknown{Raw: obj.Data})
+			continue
+		}
+
 		// objects that are not part of api.Scheme must be converted to JSON
 		// TODO: convert to map[string]interface{}, attach to runtime.Unknown?
-		if len(version) > 0 {
-			if _, _, err := api.Scheme.ObjectVersionAndKind(info.Object); runtime.IsNotRegisteredError(err) {
+		if !version.Empty() {
+			if _, _, err := api.Scheme.ObjectKinds(info.Object); runtime.IsNotRegisteredError(err) {
 				// TODO: ideally this would encode to version, but we don't expose multiple codecs here.
-				data, err := info.Mapping.Codec.Encode(info.Object)
+				data, err := runtime.Encode(encoder, info.Object)
 				if err != nil {
 					return nil, err
 				}
-				objects = append(objects, &runtime.Unknown{RawJSON: data})
+				// TODO: Set ContentEncoding and ContentType.
+				objects = append(objects, &runtime.Unknown{Raw: data})
 				continue
 			}
 		}
 
-		converted, err := tryConvert(info.Mapping.ObjectConvertor, info.Object, version, info.Mapping.GroupVersionKind.GroupVersion().String())
+		converted, err := TryConvert(info.Mapping.ObjectConvertor, info.Object, version, info.Mapping.GroupVersionKind.GroupVersion())
 		if err != nil {
 			return nil, err
 		}
@@ -263,15 +272,15 @@ func AsVersionedObjects(infos []*Info, version string) ([]runtime.Object, error)
 	return objects, nil
 }
 
-// tryConvert attempts to convert the given object to the provided versions in order. This function assumes
+// TryConvert attempts to convert the given object to the provided versions in order. This function assumes
 // the object is in internal version.
-func tryConvert(convertor runtime.ObjectConvertor, object runtime.Object, versions ...string) (runtime.Object, error) {
+func TryConvert(converter runtime.ObjectConvertor, object runtime.Object, versions ...unversioned.GroupVersion) (runtime.Object, error) {
 	var last error
 	for _, version := range versions {
-		if len(version) == 0 {
+		if version.Empty() {
 			return object, nil
 		}
-		obj, err := convertor.ConvertToVersion(object, version)
+		obj, err := converter.ConvertToVersion(object, version)
 		if err != nil {
 			last = err
 			continue

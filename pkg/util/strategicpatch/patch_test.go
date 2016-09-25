@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
@@ -230,7 +231,7 @@ func TestSortMergeLists(t *testing.T) {
 	tc := SortMergeListTestCases{}
 	err := yaml.Unmarshal(sortMergeListTestCaseData, &tc)
 	if err != nil {
-		t.Errorf("can't unmarshal test cases:%s\n", err)
+		t.Errorf("can't unmarshal test cases: %s\n", err)
 		return
 	}
 
@@ -238,7 +239,7 @@ func TestSortMergeLists(t *testing.T) {
 		original := testObjectToJSONOrFail(t, c.Original, c.Description)
 		sorted := testObjectToJSONOrFail(t, c.Sorted, c.Description)
 		if !reflect.DeepEqual(original, sorted) {
-			t.Errorf("error in test case: %s\ncannot sort object:\n%s\n%sexpected:\n%s\ngot:\n%s\n",
+			t.Errorf("error in test case: %s\ncannot sort object:\n%s\nexpected:\n%s\ngot:\n%s\n",
 				c.Description, toYAMLOrError(c.Original), toYAMLOrError(c.Sorted), jsonToYAMLOrError(original))
 		}
 	}
@@ -263,6 +264,17 @@ testCases:
         - 1
         - 2
         - 3
+  - description: delete map from nested map
+    original:
+      simpleMap:
+        key1: 1
+        key2: 1
+    twoWay:
+      simpleMap:
+        $patch: delete
+    modified:
+      simpleMap:
+        {}
   - description: delete all items from merging list
     original:
       mergingList:
@@ -302,7 +314,7 @@ func TestCustomStrategicMergePatch(t *testing.T) {
 	tc := StrategicMergePatchTestCases{}
 	err := yaml.Unmarshal(customStrategicMergePatchTestCaseData, &tc)
 	if err != nil {
-		t.Errorf("can't unmarshal test cases:%v\n", err)
+		t.Errorf("can't unmarshal test cases: %v\n", err)
 		return
 	}
 
@@ -319,6 +331,35 @@ func TestCustomStrategicMergePatch(t *testing.T) {
 //
 var createStrategicMergePatchTestCaseData = []byte(`
 testCases:
+  - description: nil original
+    twoWay:
+      name: 1
+      value: 1
+    modified:
+      name: 1
+      value: 1
+    current:
+      name: 1
+      other: a
+    threeWay:
+      value: 1
+    result:
+      name: 1
+      value: 1
+      other: a
+  - description: nil patch
+    original:
+      name: 1
+    twoWay:
+      {}
+    modified:
+      name: 1
+    current:
+      name: 1
+    threeWay:
+      {}
+    result:
+      name: 1
   - description: add field to map
     original:
       name: 1
@@ -364,6 +405,23 @@ testCases:
       value: 1
     current:
       name: 1
+      other: a
+    threeWay:
+      name: null
+      value: 1
+    result:
+      value: 1
+      other: a
+  - description: add field and delete field from map with conflict
+    original:
+      name: 1
+    twoWay:
+      name: null
+      value: 1
+    modified:
+      value: 1
+    current:
+      name: a
       other: a
     threeWay:
       name: null
@@ -435,6 +493,23 @@ testCases:
       value: null
     result: 
       other: a
+  - description: delete all fields from map with conflict
+    original:
+      name: 1
+      value: 1
+    twoWay:
+      name: null
+      value: null
+    modified: {}
+    current:
+      name: 1
+      value: a
+      other: a
+    threeWay:
+      name: null
+      value: null
+    result: 
+      other: a
   - description: add field and delete all fields from map
     original:
       name: 1
@@ -447,7 +522,26 @@ testCases:
       other: a
     current:
       name: 1
-      value: a
+      value: 1
+      other: a
+    threeWay:
+      name: null
+      value: null
+    result:
+      other: a
+  - description: add field and delete all fields from map with conflict
+    original:
+      name: 1
+      value: 1
+    twoWay:
+      name: null
+      value: null
+      other: a
+    modified:
+      other: a
+    current:
+      name: 1
+      value: 1
       other: b
     threeWay:
       name: null
@@ -471,6 +565,32 @@ testCases:
     current:
       nonMergingIntList:
         - 1
+        - 2
+    threeWay:
+      nonMergingIntList:
+        - 2
+        - 3
+    result:
+      nonMergingIntList:
+        - 2
+        - 3
+  - description: replace list of scalars with conflict
+    original:
+      nonMergingIntList:
+        - 1
+        - 2
+    twoWay:
+      nonMergingIntList:
+        - 2
+        - 3
+    modified:
+      nonMergingIntList:
+        - 2
+        - 3
+    current:
+      nonMergingIntList:
+        - 1
+        - 4
     threeWay:
       nonMergingIntList:
         - 2
@@ -516,8 +636,12 @@ testCases:
       mergingList:
         - name: 3
           value: 3
+        - name: 4 
+          value: 4 
     modified:
       mergingList:
+        - name: 4 
+          value: 4 
         - name: 1
         - name: 2
           value: 2
@@ -532,6 +656,49 @@ testCases:
           other: b
     threeWay:
       mergingList:
+        - name: 3
+          value: 3
+        - name: 4 
+          value: 4 
+    result:
+      mergingList:
+        - name: 1
+          other: a
+        - name: 2
+          value: 2
+          other: b
+        - name: 3
+          value: 3
+        - name: 4 
+          value: 4 
+  - description: merge lists of maps with conflict
+    original:
+      mergingList:
+        - name: 1
+        - name: 2
+          value: 2
+    twoWay:
+      mergingList:
+        - name: 3
+          value: 3
+    modified:
+      mergingList:
+        - name: 1
+        - name: 2
+          value: 2
+        - name: 3
+          value: 3
+    current:
+      mergingList:
+        - name: 1
+          other: a
+        - name: 2
+          value: 3
+          other: b
+    threeWay:
+      mergingList:
+        - name: 2
+          value: 2
         - name: 3
           value: 3
     result:
@@ -578,6 +745,45 @@ testCases:
         - name: 2
           value: 2
           other: b
+  - description: add field to map in merging list with conflict
+    original:
+      mergingList:
+        - name: 1
+        - name: 2
+          value: 2
+    twoWay:
+      mergingList:
+        - name: 1
+          value: 1
+    modified:
+      mergingList:
+        - name: 1
+          value: 1
+        - name: 2
+          value: 2
+    current:
+      mergingList:
+        - name: 1
+          other: a
+        - name: 3
+          value: 2
+          other: b
+    threeWay:
+      mergingList:
+        - name: 1
+          value: 1
+        - name: 2
+          value: 2
+    result:
+      mergingList:
+        - name: 1
+          value: 1
+          other: a
+        - name: 2
+          value: 2
+        - name: 3
+          value: 2
+          other: b
   - description: add duplicate field to map in merging list
     original:
       mergingList:
@@ -604,6 +810,42 @@ testCases:
           other: b
     threeWay:
       {}
+    result:
+      mergingList:
+        - name: 1
+          value: 1
+          other: a
+        - name: 2
+          value: 2
+          other: b
+  - description: add duplicate field to map in merging list with conflict
+    original:
+      mergingList:
+        - name: 1
+        - name: 2
+          value: 2
+    twoWay:
+      mergingList:
+        - name: 1
+          value: 1
+    modified:
+      mergingList:
+        - name: 1
+          value: 1
+        - name: 2
+          value: 2
+    current:
+      mergingList:
+        - name: 1
+          value: 1
+          other: a
+        - name: 2
+          value: 3
+          other: b
+    threeWay:
+      mergingList:
+        - name: 2
+          value: 2
     result:
       mergingList:
         - name: 1
@@ -669,17 +911,15 @@ testCases:
     current:
       mergingList:
         - name: 1
-          value: 1
+          value: 3
           other: a
         - name: 2
-          value: b
+          value: 2
           other: b
     threeWay:
       mergingList:
         - name: 1
           value: a
-        - name: 2
-          value: 2
     result:
       mergingList:
         - name: 1
@@ -689,6 +929,31 @@ testCases:
           value: 2
           other: b
   - description: delete map from merging list
+    original:
+      mergingList:
+        - name: 1
+        - name: 2
+    twoWay:
+      mergingList:
+        - name: 1
+          $patch: delete
+    modified:
+      mergingList:
+        - name: 2
+    current:
+      mergingList:
+        - name: 1
+        - name: 2
+          other: b
+    threeWay:
+      mergingList:
+        - name: 1
+          $patch: delete
+    result:
+      mergingList:
+        - name: 2
+          other: b
+  - description: delete map from merging list with conflict
     original:
       mergingList:
         - name: 1
@@ -738,7 +1003,7 @@ testCases:
       mergingList:
         - name: 2
           other: b
-  - description: delete map from merging list with conflict
+  - description: delete missing map from merging list with conflict
     original:
       mergingList:
         - name: 1
@@ -752,7 +1017,7 @@ testCases:
         - name: 2
     current:
       mergingList:
-        - name: 1
+        - name: 3
           other: a
     threeWay:
       mergingList:
@@ -762,6 +1027,8 @@ testCases:
     result:
       mergingList:
         - name: 2
+        - name: 3
+          other: a
   - description: add map and delete map from merging list
     original:
       merginglist:
@@ -779,7 +1046,6 @@ testCases:
     current:
       merginglist:
         - name: 1
-          other: a
         - name: 2
           other: b
         - name: 4
@@ -844,9 +1110,7 @@ testCases:
     current:
       mergingList:
         - name: 1
-          other: a
         - name: 2
-          other: b
     threeWay:
       mergingList:
         - name: 1
@@ -855,7 +1119,7 @@ testCases:
           $patch: delete
     result:
       mergingList: []
-  - description: delete all maps from partially empty merging list
+  - description: delete all maps from merging list with conflict
     original:
       mergingList:
         - name: 1
@@ -872,6 +1136,8 @@ testCases:
       mergingList:
         - name: 1
           other: a
+        - name: 2
+          other: b
     threeWay:
       mergingList:
         - name: 1
@@ -925,13 +1191,12 @@ testCases:
           value: 1
           other: a
         - name: 2
+          value: 2
           other: b
     threeWay:
       mergingList:
         - name: 1
           value: null
-        - name: 2
-          value: 2
     result:
       mergingList:
         - name: 1
@@ -960,6 +1225,74 @@ testCases:
         - name: 1
           value: a
           other: a
+        - name: 2
+          value: 2
+    threeWay:
+      mergingList:
+        - name: 1
+          value: null
+    result:
+      mergingList:
+        - name: 1
+          other: a
+        - name: 2
+          value: 2
+  - description: delete missing field from map in merging list
+    original:
+      mergingList:
+        - name: 1
+          value: 1
+        - name: 2
+          value: 2
+    twoWay:
+      mergingList:
+        - name: 1
+          value: null
+    modified:
+      mergingList:
+        - name: 1
+        - name: 2
+          value: 2
+    current:
+      mergingList:
+        - name: 1
+          other: a
+        - name: 2
+          value: 2
+          other: b
+    threeWay:
+      mergingList:
+        - name: 1
+          value: null
+    result:
+      mergingList:
+        - name: 1
+          other: a
+        - name: 2
+          value: 2
+          other: b
+  - description: delete missing field from map in merging list with conflict
+    original:
+      mergingList:
+        - name: 1
+          value: 1
+        - name: 2
+          value: 2
+    twoWay:
+      mergingList:
+        - name: 1
+          value: null
+    modified:
+      mergingList:
+        - name: 1
+        - name: 2
+          value: 2
+    current:
+      mergingList:
+        - name: 1
+          other: a
+        - name: 2
+          other: b
     threeWay:
       mergingList:
         - name: 1
@@ -972,6 +1305,7 @@ testCases:
           other: a
         - name: 2
           value: 2
+          other: b
   - description: replace non merging list nested in merging list
     original:
       mergingList:
@@ -1000,6 +1334,98 @@ testCases:
           other: a
           nonMergingList:
             - name: 1
+            - name: 2
+              value: 2
+        - name: 2
+          other: b
+    threeWay:
+      mergingList:
+        - name: 1
+          nonMergingList:
+            - name: 1
+              value: 1
+    result:
+      mergingList:
+        - name: 1
+          other: a
+          nonMergingList:
+            - name: 1
+              value: 1
+        - name: 2
+          other: b
+  - description: replace non merging list nested in merging list with value conflict
+    original:
+      mergingList:
+        - name: 1
+          nonMergingList:
+            - name: 1
+            - name: 2
+              value: 2
+        - name: 2
+    twoWay:
+      mergingList:
+        - name: 1
+          nonMergingList:
+            - name: 1
+              value: 1
+    modified:
+      mergingList:
+        - name: 1
+          nonMergingList:
+            - name: 1
+              value: 1
+        - name: 2
+    current:
+      mergingList:
+        - name: 1
+          other: a
+          nonMergingList:
+            - name: 1
+              value: c
+        - name: 2
+          other: b
+    threeWay:
+      mergingList:
+        - name: 1
+          nonMergingList:
+            - name: 1
+              value: 1
+    result:
+      mergingList:
+        - name: 1
+          other: a
+          nonMergingList:
+            - name: 1
+              value: 1
+        - name: 2
+          other: b
+  - description: replace non merging list nested in merging list with deletion conflict
+    original:
+      mergingList:
+        - name: 1
+          nonMergingList:
+            - name: 1
+            - name: 2
+              value: 2
+        - name: 2
+    twoWay:
+      mergingList:
+        - name: 1
+          nonMergingList:
+            - name: 1
+              value: 1
+    modified:
+      mergingList:
+        - name: 1
+          nonMergingList:
+            - name: 1
+              value: 1
+        - name: 2
+    current:
+      mergingList:
+        - name: 1
+          other: a
+          nonMergingList:
             - name: 2
               value: 2
         - name: 2
@@ -1101,8 +1527,10 @@ testCases:
           mergingList:
             - name: 1
               value: a
+              other: c
             - name: 2
               value: b
+              other: d
         - name: 2
           other: b
     threeWay:
@@ -1120,8 +1548,10 @@ testCases:
           mergingList:
             - name: 1
               value: 1
+              other: c
             - name: 2
               value: 2
+              other: d
         - name: 2
           other: b
   - description: add field to map in merging list nested in merging list with deletion conflict
@@ -1155,6 +1585,7 @@ testCases:
           mergingList:
             - name: 2
               value: 2
+              other: d
         - name: 2
           other: b
     threeWay:
@@ -1172,6 +1603,7 @@ testCases:
               value: 1
             - name: 2
               value: 2
+              other: d
         - name: 2
           other: b
   - description: merge empty merging lists
@@ -1210,6 +1642,29 @@ testCases:
       mergeItemPtr:
         - name: 1
           other: a
+        - name: 2
+        - name: 3
+  - description: add map to merging list by pointer with conflict
+    original:
+      mergeItemPtr:
+        - name: 1
+    twoWay:
+      mergeItemPtr:
+        - name: 2
+    modified:
+      mergeItemPtr:
+        - name: 1
+        - name: 2
+    current:
+      mergeItemPtr:
+        - name: 3
+    threeWay:
+      mergeItemPtr:
+        - name: 1
+        - name: 2
+    result:
+      mergeItemPtr:
+        - name: 1
         - name: 2
         - name: 3
   - description: add field to map in merging list by pointer
@@ -1267,13 +1722,76 @@ testCases:
               other: b
         - name: 2
           other: b
+  - description: add field to map in merging list by pointer with conflict
+    original:
+      mergeItemPtr:
+        - name: 1
+          mergeItemPtr:
+            - name: 1
+            - name: 2
+              value: 2
+        - name: 2
+    twoWay:
+      mergeItemPtr:
+        - name: 1
+          mergeItemPtr:
+            - name: 1
+              value: 1
+    modified:
+      mergeItemPtr:
+        - name: 1
+          mergeItemPtr:
+            - name: 1
+              value: 1
+            - name: 2
+              value: 2
+        - name: 2
+    current:
+      mergeItemPtr:
+        - name: 1
+          other: a
+          mergeItemPtr:
+            - name: 1
+              value: a
+            - name: 2
+              value: 2
+              other: b
+        - name: 2
+          other: b
+    threeWay:
+      mergeItemPtr:
+        - name: 1
+          mergeItemPtr:
+            - name: 1
+              value: 1
+    result:
+      mergeItemPtr:
+        - name: 1
+          other: a
+          mergeItemPtr:
+            - name: 1
+              value: 1
+            - name: 2
+              value: 2
+              other: b
+        - name: 2
+          other: b
 `)
 
 func TestStrategicMergePatch(t *testing.T) {
+	testStrategicMergePatchWithCustomArguments(t, "bad original",
+		"<THIS IS NOT JSON>", "{}", mergeItem, errBadJSONDoc)
+	testStrategicMergePatchWithCustomArguments(t, "bad patch",
+		"{}", "<THIS IS NOT JSON>", mergeItem, errBadJSONDoc)
+	testStrategicMergePatchWithCustomArguments(t, "bad struct",
+		"{}", "{}", []byte("<THIS IS NOT A STRUCT>"), fmt.Errorf(errBadArgTypeFmt, "struct", "slice"))
+	testStrategicMergePatchWithCustomArguments(t, "nil struct",
+		"{}", "{}", nil, fmt.Errorf(errBadArgTypeFmt, "struct", "nil"))
+
 	tc := StrategicMergePatchTestCases{}
 	err := yaml.Unmarshal(createStrategicMergePatchTestCaseData, &tc)
 	if err != nil {
-		t.Errorf("can't unmarshal test cases:%s\n", err)
+		t.Errorf("can't unmarshal test cases: %s\n", err)
 		return
 	}
 
@@ -1283,13 +1801,29 @@ func TestStrategicMergePatch(t *testing.T) {
 	}
 }
 
+func testStrategicMergePatchWithCustomArguments(t *testing.T, description, original, patch string, dataStruct interface{}, err error) {
+	_, err2 := StrategicMergePatch([]byte(original), []byte(patch), dataStruct)
+	if err2 != err {
+		if err2 == nil {
+			t.Errorf("expected error: %s\ndid not occur in test case: %s", err, description)
+			return
+		}
+
+		if err == nil || err2.Error() != err.Error() {
+			t.Errorf("unexpected error: %s\noccurred in test case: %s", err2, description)
+			return
+		}
+	}
+}
+
 func testTwoWayPatch(t *testing.T, c StrategicMergePatchTestCase) {
 	original, expected, modified := twoWayTestCaseToJSONOrFail(t, c)
 
 	actual, err := CreateTwoWayMergePatch(original, modified, mergeItem)
 	if err != nil {
-		t.Errorf("error: %s in test case: %s\ncannot create two way patch:%s:\n%s\n",
-			err, c.Description, toYAMLOrError(c.StrategicMergePatchTestCaseData))
+		t.Errorf("error: %s\nin test case: %s\ncannot create two way patch: %s:\n%s\n",
+			err, c.Description, original, toYAMLOrError(c.StrategicMergePatchTestCaseData))
+		return
 	}
 
 	testPatchCreation(t, expected, actual, c.Description)
@@ -1304,25 +1838,39 @@ func twoWayTestCaseToJSONOrFail(t *testing.T, c StrategicMergePatchTestCase) ([]
 
 func testThreeWayPatch(t *testing.T, c StrategicMergePatchTestCase) {
 	original, modified, current, expected, result := threeWayTestCaseToJSONOrFail(t, c)
-
 	actual, err := CreateThreeWayMergePatch(original, modified, current, mergeItem, false)
 	if err != nil {
-		if IsConflict(err) {
-			if len(c.Result) > 0 {
-				t.Errorf("error in test case: %s\nunexpected conflict occurred:\n%s\n",
-					c.Description, toYAMLOrError(c.StrategicMergePatchTestCaseData))
-			}
-
+		if !IsConflict(err) {
+			t.Errorf("error: %s\nin test case: %s\ncannot create three way patch:\n%s\n",
+				err, c.Description, toYAMLOrError(c.StrategicMergePatchTestCaseData))
 			return
 		}
 
-		t.Errorf("error: %s in test case: %s\ncannot create three way patch:\n%s\n",
-			err, c.Description, toYAMLOrError(c.StrategicMergePatchTestCaseData))
+		if !strings.Contains(c.Description, "conflict") {
+			t.Errorf("unexpected conflict: %s\nin test case: %s\ncannot create three way patch:\n%s\n",
+				err, c.Description, toYAMLOrError(c.StrategicMergePatchTestCaseData))
+			return
+		}
+
+		if len(c.Result) > 0 {
+			actual, err := CreateThreeWayMergePatch(original, modified, current, mergeItem, true)
+			if err != nil {
+				t.Errorf("error: %s\nin test case: %s\ncannot force three way patch application:\n%s\n",
+					err, c.Description, toYAMLOrError(c.StrategicMergePatchTestCaseData))
+				return
+			}
+
+			testPatchCreation(t, expected, actual, c.Description)
+			testPatchApplication(t, current, actual, result, c.Description)
+		}
+
+		return
 	}
 
-	if len(c.Result) < 1 {
+	if strings.Contains(c.Description, "conflict") || len(c.Result) < 1 {
 		t.Errorf("error in test case: %s\nexpected conflict did not occur:\n%s\n",
 			c.Description, toYAMLOrError(c.StrategicMergePatchTestCaseData))
+		return
 	}
 
 	testPatchCreation(t, expected, actual, c.Description)
@@ -1340,27 +1888,31 @@ func threeWayTestCaseToJSONOrFail(t *testing.T, c StrategicMergePatchTestCase) (
 func testPatchCreation(t *testing.T, expected, actual []byte, description string) {
 	sorted, err := sortMergeListsByName(actual, mergeItem)
 	if err != nil {
-		t.Errorf("error: %s in test case: %s\ncannot sort patch:\n%s\n",
+		t.Errorf("error: %s\nin test case: %s\ncannot sort patch:\n%s\n",
 			err, description, jsonToYAMLOrError(actual))
+		return
 	}
 
 	if !reflect.DeepEqual(sorted, expected) {
 		t.Errorf("error in test case: %s\nexpected patch:\n%s\ngot:\n%s\n",
 			description, jsonToYAMLOrError(expected), jsonToYAMLOrError(sorted))
+		return
 	}
 }
 
 func testPatchApplication(t *testing.T, original, patch, expected []byte, description string) {
 	result, err := StrategicMergePatch(original, patch, mergeItem)
 	if err != nil {
-		t.Errorf("error: %s in test case: %s\ncannot apply patch:\n%s\nto original:\n%s\n",
+		t.Errorf("error: %s\nin test case: %s\ncannot apply patch:\n%s\nto original:\n%s\n",
 			err, description, jsonToYAMLOrError(patch), jsonToYAMLOrError(original))
+		return
 	}
 
 	sorted, err := sortMergeListsByName(result, mergeItem)
 	if err != nil {
-		t.Errorf("error: %s in test case: %s\ncannot sort result object:\n%s\n",
+		t.Errorf("error: %s\nin test case: %s\ncannot sort result object:\n%s\n",
 			err, description, jsonToYAMLOrError(result))
+		return
 	}
 
 	if !reflect.DeepEqual(sorted, expected) {
@@ -1368,10 +1920,15 @@ func testPatchApplication(t *testing.T, original, patch, expected []byte, descri
 		t.Errorf(format, description,
 			jsonToYAMLOrError(original), jsonToYAMLOrError(patch),
 			jsonToYAMLOrError(expected), jsonToYAMLOrError(sorted))
+		return
 	}
 }
 
 func testObjectToJSONOrFail(t *testing.T, o map[string]interface{}, description string) []byte {
+	if o == nil {
+		return nil
+	}
+
 	j, err := toJSON(o)
 	if err != nil {
 		t.Error(err)
@@ -1379,19 +1936,11 @@ func testObjectToJSONOrFail(t *testing.T, o map[string]interface{}, description 
 
 	r, err := sortMergeListsByName(j, mergeItem)
 	if err != nil {
-		t.Errorf("error: %s in test case: %s\ncannot sort object:\n%s\n", err, description, j)
+		t.Errorf("error: %s\nin test case: %s\ncannot sort object:\n%s\n", err, description, j)
+		return nil
 	}
 
 	return r
-}
-
-func toYAMLOrError(v interface{}) string {
-	y, err := toYAML(v)
-	if err != nil {
-		return err.Error()
-	}
-
-	return y
 }
 
 func jsonToYAMLOrError(j []byte) string {
@@ -1403,19 +1952,10 @@ func jsonToYAMLOrError(j []byte) string {
 	return string(y)
 }
 
-func toYAML(v interface{}) (string, error) {
-	y, err := yaml.Marshal(v)
-	if err != nil {
-		return "", fmt.Errorf("yaml marshal failed:%v\n%v\n", err, spew.Sdump(v))
-	}
-
-	return string(y), nil
-}
-
 func toJSON(v interface{}) ([]byte, error) {
 	j, err := json.Marshal(v)
 	if err != nil {
-		return nil, fmt.Errorf("json marshal failed:%v\n%v\n", err, spew.Sdump(v))
+		return nil, fmt.Errorf("json marshal failed: %v\n%v\n", err, spew.Sdump(v))
 	}
 
 	return j, nil
@@ -1424,7 +1964,7 @@ func toJSON(v interface{}) ([]byte, error) {
 func jsonToYAML(j []byte) ([]byte, error) {
 	y, err := yaml.JSONToYAML(j)
 	if err != nil {
-		return nil, fmt.Errorf("json to yaml failed:%v\n%v\n", err, j)
+		return nil, fmt.Errorf("json to yaml failed: %v\n%v\n", err, j)
 	}
 
 	return y, nil
@@ -1489,6 +2029,90 @@ func TestHasConflicts(t *testing.T) {
 		}
 		if out != testCase.Ret {
 			t.Errorf("%d: expected reversed %t got %t", i, testCase.Ret, out)
+		}
+	}
+}
+
+type PrecisionItem struct {
+	Name    string
+	Int32   int32
+	Int64   int64
+	Float32 float32
+	Float64 float64
+}
+
+var precisionItem PrecisionItem
+
+func TestNumberConversion(t *testing.T) {
+	testcases := map[string]struct {
+		Old            string
+		New            string
+		ExpectedPatch  string
+		ExpectedResult string
+	}{
+		"empty": {
+			Old:            `{}`,
+			New:            `{}`,
+			ExpectedPatch:  `{}`,
+			ExpectedResult: `{}`,
+		},
+		"int32 medium": {
+			Old:            `{"int32":1000000}`,
+			New:            `{"int32":1000000,"name":"newname"}`,
+			ExpectedPatch:  `{"name":"newname"}`,
+			ExpectedResult: `{"int32":1000000,"name":"newname"}`,
+		},
+		"int32 max": {
+			Old:            `{"int32":2147483647}`,
+			New:            `{"int32":2147483647,"name":"newname"}`,
+			ExpectedPatch:  `{"name":"newname"}`,
+			ExpectedResult: `{"int32":2147483647,"name":"newname"}`,
+		},
+		"int64 medium": {
+			Old:            `{"int64":1000000}`,
+			New:            `{"int64":1000000,"name":"newname"}`,
+			ExpectedPatch:  `{"name":"newname"}`,
+			ExpectedResult: `{"int64":1000000,"name":"newname"}`,
+		},
+		"int64 max": {
+			Old:            `{"int64":9223372036854775807}`,
+			New:            `{"int64":9223372036854775807,"name":"newname"}`,
+			ExpectedPatch:  `{"name":"newname"}`,
+			ExpectedResult: `{"int64":9223372036854775807,"name":"newname"}`,
+		},
+		"float32 max": {
+			Old:            `{"float32":3.4028234663852886e+38}`,
+			New:            `{"float32":3.4028234663852886e+38,"name":"newname"}`,
+			ExpectedPatch:  `{"name":"newname"}`,
+			ExpectedResult: `{"float32":3.4028234663852886e+38,"name":"newname"}`,
+		},
+		"float64 max": {
+			Old:            `{"float64":1.7976931348623157e+308}`,
+			New:            `{"float64":1.7976931348623157e+308,"name":"newname"}`,
+			ExpectedPatch:  `{"name":"newname"}`,
+			ExpectedResult: `{"float64":1.7976931348623157e+308,"name":"newname"}`,
+		},
+	}
+
+	for k, tc := range testcases {
+		patch, err := CreateTwoWayMergePatch([]byte(tc.Old), []byte(tc.New), precisionItem)
+		if err != nil {
+			t.Errorf("%s: unexpected error %v", k, err)
+			continue
+		}
+		if tc.ExpectedPatch != string(patch) {
+			t.Errorf("%s: expected %s, got %s", k, tc.ExpectedPatch, string(patch))
+			continue
+		}
+
+		result, err := StrategicMergePatch([]byte(tc.Old), patch, precisionItem)
+		if err != nil {
+			t.Errorf("%s: unexpected error %v", k, err)
+			continue
+		}
+		if tc.ExpectedResult != string(result) {
+			t.Errorf("%s: expected %s, got %s", k, tc.ExpectedResult, string(result))
+			continue
 		}
 	}
 }

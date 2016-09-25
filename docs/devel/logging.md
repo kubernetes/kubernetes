@@ -2,15 +2,15 @@
 
 <!-- BEGIN STRIP_FOR_RELEASE -->
 
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
 
 <h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
@@ -18,9 +18,10 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.1/docs/devel/logging.md).
+[here](http://releases.k8s.io/release-1.4/docs/devel/logging.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -30,13 +31,17 @@ Documentation for other releases can be found at
 <!-- END STRIP_FOR_RELEASE -->
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
-Logging Conventions
-===================
 
-The following conventions for the glog levels to use.  [glog](http://godoc.org/github.com/golang/glog) is globally preferred to [log](http://golang.org/pkg/log/) for better runtime control.
+## Logging Conventions
+
+The following conventions for the glog levels to use.
+[glog](http://godoc.org/github.com/golang/glog) is globally preferred to
+[log](http://golang.org/pkg/log/) for better runtime control.
 
 * glog.Errorf() - Always an error
+
 * glog.Warningf() - Something unexpected, but probably not an error
+
 * glog.Infof() has multiple levels:
   * glog.V(0) - Generally useful for this to ALWAYS be visible to an operator
     * Programmer errors
@@ -55,7 +60,9 @@ The following conventions for the glog levels to use.  [glog](http://godoc.org/g
   * glog.V(4) - Debug level verbosity (for now)
     * Logging in particularly thorny parts of code where you may want to come back later and check it
 
-As per the comments, the practical default level is V(2).  Developers and QE environments may wish to run at V(3) or V(4). If you wish to change the log level, you can pass in `-v=X` where X is the desired maximum level to log.
+As per the comments, the practical default level is V(2). Developers and QE
+environments may wish to run at V(3) or V(4). If you wish to change the log
+level, you can pass in `-v=X` where X is the desired maximum level to log.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

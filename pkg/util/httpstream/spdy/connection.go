@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -78,11 +78,15 @@ const createStreamResponseTimeout = 30 * time.Second
 func (c *connection) Close() error {
 	c.streamLock.Lock()
 	for _, s := range c.streams {
-		s.Close()
+		// calling Reset instead of Close ensures that all streams are fully torn down
+		s.Reset()
 	}
 	c.streams = make([]httpstream.Stream, 0)
 	c.streamLock.Unlock()
 
+	// now that all streams are fully torn down, it's safe to call close on the underlying connection,
+	// which should be able to terminate immediately at this point, instead of waiting for any
+	// remaining graceful stream termination.
 	return c.conn.Close()
 }
 
@@ -120,7 +124,8 @@ func (c *connection) CloseChan() <-chan bool {
 // the stream. If newStreamHandler returns an error, the stream is rejected. If not, the
 // stream is accepted and registered with the connection.
 func (c *connection) newSpdyStream(stream *spdystream.Stream) {
-	err := c.newStreamHandler(stream)
+	replySent := make(chan struct{})
+	err := c.newStreamHandler(stream, replySent)
 	rejectStream := (err != nil)
 	if rejectStream {
 		glog.Warningf("Stream rejected: %v", err)
@@ -130,6 +135,7 @@ func (c *connection) newSpdyStream(stream *spdystream.Stream) {
 
 	c.registerStream(stream)
 	stream.SendReply(http.Header{}, rejectStream)
+	close(replySent)
 }
 
 // SetIdleTimeout sets the amount of time the connection may remain idle before

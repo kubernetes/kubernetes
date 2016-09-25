@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,14 +20,33 @@ import (
 	"encoding/json"
 	"time"
 
+	"k8s.io/kubernetes/pkg/genericapiserver/openapi/common"
+
+	"github.com/go-openapi/spec"
 	"github.com/google/gofuzz"
 )
 
 // Time is a wrapper around time.Time which supports correct
 // marshaling to YAML and JSON.  Wrappers are provided for many
 // of the factory methods that the time package offers.
+//
+// +protobuf.options.marshal=false
+// +protobuf.as=Timestamp
+// +protobuf.options.(gogoproto.goproto_stringer)=false
 type Time struct {
-	time.Time
+	time.Time `protobuf:"-"`
+}
+
+// DeepCopy returns a deep-copy of the Time value.  The underlying time.Time
+// type is effectively immutable in the time API, so it is safe to
+// copy-by-assign, despite the presence of (unexported) Pointer fields.
+func (t Time) DeepCopy() Time {
+	return t
+}
+
+// String returns the representation of the time.
+func (t Time) String() string {
+	return t.Time.String()
 }
 
 // NewTime returns a wrapped instance of the provided time
@@ -95,6 +114,27 @@ func (t *Time) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+// UnmarshalQueryParameter converts from a URL query parameter value to an object
+func (t *Time) UnmarshalQueryParameter(str string) error {
+	if len(str) == 0 {
+		t.Time = time.Time{}
+		return nil
+	}
+	// Tolerate requests from older clients that used JSON serialization to build query params
+	if len(str) == 4 && str == "null" {
+		t.Time = time.Time{}
+		return nil
+	}
+
+	pt, err := time.Parse(time.RFC3339, str)
+	if err != nil {
+		return err
+	}
+
+	t.Time = pt.Local()
+	return nil
+}
+
 // MarshalJSON implements the json.Marshaler interface.
 func (t Time) MarshalJSON() ([]byte, error) {
 	if t.IsZero() {
@@ -103,6 +143,27 @@ func (t Time) MarshalJSON() ([]byte, error) {
 	}
 
 	return json.Marshal(t.UTC().Format(time.RFC3339))
+}
+
+func (_ Time) OpenAPIDefinition() common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Type:   []string{"string"},
+				Format: "date-time",
+			},
+		},
+	}
+}
+
+// MarshalQueryParameter converts to a URL query parameter value
+func (t Time) MarshalQueryParameter() (string, error) {
+	if t.IsZero() {
+		// Encode unset/nil objects as an empty string
+		return "", nil
+	}
+
+	return t.UTC().Format(time.RFC3339), nil
 }
 
 // Fuzz satisfies fuzz.Interface.

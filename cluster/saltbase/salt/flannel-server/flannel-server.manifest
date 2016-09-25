@@ -19,7 +19,9 @@
             },
             {
                 "name": "etcdstorage",
-                "emptyDir": {}
+                "hostPath": {
+                    "path": "/var/etcd-flannel"
+                }
             },
             {
                 "name": "networkconfig",
@@ -35,7 +37,7 @@
                 "args": [
                     "--network-config=/etc/kubernetes/network.json",
                     "--etcd-prefix=/kubernetes.io/network",
-                    "--etcd-server=http://127.0.0.1:4001"
+                    "--etcd-server=http://127.0.0.1:{{ etcd_port }}"
                 ],
                 "volumeMounts": [
                     {
@@ -51,7 +53,7 @@
                 "command": [
                     "/bin/sh",
                     "-c",
-                    "/opt/bin/flanneld -listen 0.0.0.0:10253 -etcd-endpoints http://127.0.0.1:4001 -etcd-prefix /kubernetes.io/network 1>>/var/log/flannel_server.log 2>&1"
+                    "/opt/bin/flanneld -listen 0.0.0.0:10253 -etcd-endpoints http://127.0.0.1:{{ etcd_port }} -etcd-prefix /kubernetes.io/network 1>>/var/log/flannel_server.log 2>&1"
                 ],
                 "ports": [
                     {
@@ -60,8 +62,8 @@
                     }
                 ],
                 "resources": {
-                    "limits": {
-                        "cpu": "100m"
+                    "requests": {
+                        "cpu": {{ cpulimit }}
                     }
                 },
                 "volumeMounts": [
@@ -77,18 +79,30 @@
                 "command": [
                     "/bin/sh",
                     "-c",
-                    "/opt/bin/etcd --listen-peer-urls http://127.0.0.1:4001 --addr http://127.0.0.1:4001 --bind-addr 127.0.0.1:4001 --data-dir /var/etcd/data 1>>/var/log/etcd_flannel.log 2>&1"
+                    "/usr/local/bin/etcd --listen-peer-urls http://127.0.0.1:{{ etcd_peer_port }} --advertise-client-urls http://127.0.0.1:{{ etcd_port }} --listen-client-urls http://127.0.0.1:{{ etcd_port }} --data-dir /var/etcd-flannel/data 1>>/var/log/etcd_flannel.log 2>&1"
                 ],
+                "livenessProbe": {
+                    "httpGet": {
+                        "host": "127.0.0.1",
+                        "port": {{ etcd_port }},
+                        "path": "/health"
+                    },
+                    "initialDelaySeconds": 15,
+                    "timeoutSeconds": 15
+                },
                 "resources": {
-                    "limits": {
-                        "cpu": "100m",
-                        "memory": "50Mi"
+                    "requests": {
+                        "cpu": {{ cpulimit }}
                     }
                 },
                 "volumeMounts": [
                     {
+                        "name": "varlog",
+                        "mountPath": "/var/log"
+                    },
+                    {
                         "name": "etcdstorage",
-                        "mountPath": "/var/etcd/data"
+                        "mountPath": "/var/etcd-flannel"
                     }
                 ]
             }
@@ -96,4 +110,3 @@
         "hostNetwork": true
     }
 }
-

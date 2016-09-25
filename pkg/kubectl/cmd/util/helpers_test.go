@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"net/http/httptest"
 	"reflect"
 	"strings"
 	"syscall"
@@ -28,10 +27,15 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/validation"
+	uexec "k8s.io/kubernetes/pkg/util/exec"
+	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
 func TestMerge(t *testing.T) {
@@ -50,7 +54,7 @@ func TestMerge(t *testing.T) {
 					Name: "foo",
 				},
 			},
-			fragment: fmt.Sprintf(`{ "apiVersion": "%s" }`, testapi.Default.Version()),
+			fragment: fmt.Sprintf(`{ "apiVersion": "%s" }`, testapi.Default.GroupVersion().String()),
 			expected: &api.Pod{
 				ObjectMeta: api.ObjectMeta{
 					Name: "foo",
@@ -79,7 +83,7 @@ func TestMerge(t *testing.T) {
 					},
 				},
 			},
-			fragment: fmt.Sprintf(`{ "apiVersion": "%s", "spec": { "containers": [ { "name": "c1", "image": "green-image" } ] } }`, testapi.Default.Version()),
+			fragment: fmt.Sprintf(`{ "apiVersion": "%s", "spec": { "containers": [ { "name": "c1", "image": "green-image" } ] } }`, testapi.Default.GroupVersion().String()),
 			expected: &api.Pod{
 				ObjectMeta: api.ObjectMeta{
 					Name: "foo",
@@ -105,7 +109,7 @@ func TestMerge(t *testing.T) {
 					Name: "foo",
 				},
 			},
-			fragment: fmt.Sprintf(`{ "apiVersion": "%s", "spec": { "volumes": [ {"name": "v1"}, {"name": "v2"} ] } }`, testapi.Default.Version()),
+			fragment: fmt.Sprintf(`{ "apiVersion": "%s", "spec": { "volumes": [ {"name": "v1"}, {"name": "v2"} ] } }`, testapi.Default.GroupVersion().String()),
 			expected: &api.Pod{
 				ObjectMeta: api.ObjectMeta{
 					Name: "foo",
@@ -146,7 +150,7 @@ func TestMerge(t *testing.T) {
 			obj: &api.Service{
 				Spec: api.ServiceSpec{},
 			},
-			fragment: fmt.Sprintf(`{ "apiVersion": "%s", "spec": { "ports": [ { "port": 0 } ] } }`, testapi.Default.Version()),
+			fragment: fmt.Sprintf(`{ "apiVersion": "%s", "spec": { "ports": [ { "port": 0 } ] } }`, testapi.Default.GroupVersion().String()),
 			expected: &api.Service{
 				Spec: api.ServiceSpec{
 					SessionAffinity: "None",
@@ -169,7 +173,7 @@ func TestMerge(t *testing.T) {
 					},
 				},
 			},
-			fragment: fmt.Sprintf(`{ "apiVersion": "%s", "spec": { "selector": { "version": "v2" } } }`, testapi.Default.Version()),
+			fragment: fmt.Sprintf(`{ "apiVersion": "%s", "spec": { "selector": { "version": "v2" } } }`, testapi.Default.GroupVersion().String()),
 			expected: &api.Service{
 				Spec: api.ServiceSpec{
 					SessionAffinity: "None",
@@ -183,7 +187,7 @@ func TestMerge(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		out, err := Merge(test.obj, test.fragment, test.kind)
+		out, err := Merge(testapi.Default.Codec(), test.obj, test.fragment, test.kind)
 		if !test.expectErr {
 			if err != nil {
 				t.Errorf("testcase[%d], unexpected error: %v", i, err)
@@ -210,93 +214,88 @@ func (f *fileHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 	res.Write(f.data)
 }
 
-func TestReadConfigData(t *testing.T) {
-	httpData := []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
-	server := httptest.NewServer(&fileHandler{data: httpData})
-
-	fileData := []byte{11, 12, 13, 14, 15, 16, 17, 18, 19}
-	f, err := ioutil.TempFile("", "config")
-	if err != nil {
-		t.Errorf("unexpected error setting up config file")
-		t.Fail()
-	}
-	defer syscall.Unlink(f.Name())
-	ioutil.WriteFile(f.Name(), fileData, 0644)
-	// TODO: test TLS here, requires making it possible to inject the HTTP client.
-
-	tests := []struct {
-		config    string
-		data      []byte
-		expectErr bool
-	}{
-		{
-			config: server.URL,
-			data:   httpData,
-		},
-		{
-			config:    server.URL + "/error",
-			expectErr: true,
-		},
-		{
-			config:    "http://some.non.existent.foobar",
-			expectErr: true,
-		},
-		{
-			config: f.Name(),
-			data:   fileData,
-		},
-		{
-			config:    "some-non-existent-file",
-			expectErr: true,
-		},
-		{
-			config:    "",
-			expectErr: true,
-		},
-	}
-	for _, test := range tests {
-		dataOut, err := ReadConfigData(test.config)
-		if err != nil && !test.expectErr {
-			t.Errorf("unexpected err: %v for %s", err, test.config)
-		}
-		if err == nil && test.expectErr {
-			t.Errorf("unexpected non-error for %s", test.config)
-		}
-		if !test.expectErr && !reflect.DeepEqual(test.data, dataOut) {
-			t.Errorf("unexpected data: %v, expected %v", dataOut, test.data)
-		}
-	}
+type checkErrTestCase struct {
+	err          error
+	expectedErr  string
+	expectedCode int
 }
 
 func TestCheckInvalidErr(t *testing.T) {
-	tests := []struct {
-		err      error
-		expected string
-	}{
+	testCheckError(t, []checkErrTestCase{
 		{
-			errors.NewInvalid("Invalid1", "invalidation", validation.ErrorList{validation.NewInvalidError("Cause", "single", "details")}),
-			`Error from server: Invalid1 "invalidation" is invalid: Cause: invalid value 'single', Details: details`,
+			errors.NewInvalid(api.Kind("Invalid1"), "invalidation", field.ErrorList{field.Invalid(field.NewPath("field"), "single", "details")}),
+			"The Invalid1 \"invalidation\" is invalid: field: Invalid value: \"single\": details\n",
+			DefaultErrorExitCode,
 		},
 		{
-			errors.NewInvalid("Invalid2", "invalidation", validation.ErrorList{validation.NewInvalidError("Cause", "multi1", "details"), validation.NewInvalidError("Cause", "multi2", "details")}),
-			`Error from server: Invalid2 "invalidation" is invalid: [Cause: invalid value 'multi1', Details: details, Cause: invalid value 'multi2', Details: details]`,
+			errors.NewInvalid(api.Kind("Invalid2"), "invalidation", field.ErrorList{field.Invalid(field.NewPath("field1"), "multi1", "details"), field.Invalid(field.NewPath("field2"), "multi2", "details")}),
+			"The Invalid2 \"invalidation\" is invalid: \n* field1: Invalid value: \"multi1\": details\n* field2: Invalid value: \"multi2\": details\n",
+			DefaultErrorExitCode,
 		},
 		{
-			errors.NewInvalid("Invalid3", "invalidation", validation.ErrorList{}),
-			`Error from server: Invalid3 "invalidation" is invalid: <nil>`,
+			errors.NewInvalid(api.Kind("Invalid3"), "invalidation", field.ErrorList{}),
+			"The Invalid3 \"invalidation\" is invalid",
+			DefaultErrorExitCode,
 		},
-	}
+		{
+			errors.NewInvalid(api.Kind("Invalid4"), "invalidation", field.ErrorList{field.Invalid(field.NewPath("field4"), "multi4", "details"), field.Invalid(field.NewPath("field4"), "multi4", "details")}),
+			"The Invalid4 \"invalidation\" is invalid: field4: Invalid value: \"multi4\": details\n",
+			DefaultErrorExitCode,
+		},
+	})
+}
 
+func TestCheckNoResourceMatchError(t *testing.T) {
+	testCheckError(t, []checkErrTestCase{
+		{
+			&meta.NoResourceMatchError{PartialResource: unversioned.GroupVersionResource{Resource: "foo"}},
+			`the server doesn't have a resource type "foo"`,
+			DefaultErrorExitCode,
+		},
+		{
+			&meta.NoResourceMatchError{PartialResource: unversioned.GroupVersionResource{Version: "theversion", Resource: "foo"}},
+			`the server doesn't have a resource type "foo" in version "theversion"`,
+			DefaultErrorExitCode,
+		},
+		{
+			&meta.NoResourceMatchError{PartialResource: unversioned.GroupVersionResource{Group: "thegroup", Version: "theversion", Resource: "foo"}},
+			`the server doesn't have a resource type "foo" in group "thegroup" and version "theversion"`,
+			DefaultErrorExitCode,
+		},
+		{
+			&meta.NoResourceMatchError{PartialResource: unversioned.GroupVersionResource{Group: "thegroup", Resource: "foo"}},
+			`the server doesn't have a resource type "foo" in group "thegroup"`,
+			DefaultErrorExitCode,
+		},
+	})
+}
+
+func TestCheckExitError(t *testing.T) {
+	testCheckError(t, []checkErrTestCase{
+		{
+			uexec.CodeExitError{Err: fmt.Errorf("pod foo/bar terminated"), Code: 42},
+			"",
+			42,
+		},
+	})
+}
+
+func testCheckError(t *testing.T, tests []checkErrTestCase) {
 	var errReturned string
-	errHandle := func(err string) {
+	var codeReturned int
+	errHandle := func(err string, code int) {
 		errReturned = err
+		codeReturned = code
 	}
 
 	for _, test := range tests {
-		checkErr(test.err, errHandle)
+		checkErr("", test.err, errHandle)
 
-		if errReturned != test.expected {
-			t.Fatalf("Got: %s, expected: %s", errReturned, test.expected)
+		if errReturned != test.expectedErr {
+			t.Fatalf("Got: %s, expected: %s", errReturned, test.expectedErr)
+		}
+		if codeReturned != test.expectedCode {
+			t.Fatalf("Got: %d, expected: %d", codeReturned, test.expectedCode)
 		}
 	}
 }
@@ -320,5 +319,55 @@ func TestDumpReaderToFile(t *testing.T) {
 	stringData := string(data)
 	if stringData != testString {
 		t.Fatalf("Wrong file content %s != %s", testString, stringData)
+	}
+}
+
+func TestMaybeConvert(t *testing.T) {
+	tests := []struct {
+		input    runtime.Object
+		gv       unversioned.GroupVersion
+		expected runtime.Object
+	}{
+		{
+			input: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Name: "foo",
+				},
+			},
+			gv: unversioned.GroupVersion{Group: "", Version: "v1"},
+			expected: &v1.Pod{
+				TypeMeta: unversioned.TypeMeta{
+					APIVersion: "v1",
+					Kind:       "Pod",
+				},
+				ObjectMeta: v1.ObjectMeta{
+					Name: "foo",
+				},
+			},
+		},
+		{
+			input: &extensions.ThirdPartyResourceData{
+				ObjectMeta: api.ObjectMeta{
+					Name: "foo",
+				},
+				Data: []byte("this is some data"),
+			},
+			expected: &extensions.ThirdPartyResourceData{
+				ObjectMeta: api.ObjectMeta{
+					Name: "foo",
+				},
+				Data: []byte("this is some data"),
+			},
+		},
+	}
+
+	for _, test := range tests {
+		obj, err := MaybeConvertObject(test.input, test.gv, testapi.Default.Converter())
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if !reflect.DeepEqual(test.expected, obj) {
+			t.Errorf("expected:\n%#v\nsaw:\n%#v\n", test.expected, obj)
+		}
 	}
 }

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -84,6 +84,10 @@ func compareContexts(name string, ex, ac *api.SELinuxOptions, t *testing.T) {
 	}
 }
 
+func containerWithUser(ptr *int64) *api.Container {
+	return &api.Container{SecurityContext: &api.SecurityContext{RunAsUser: ptr}}
+}
+
 func TestHaRootUID(t *testing.T) {
 	var nonRoot int64 = 1
 	var root int64 = 0
@@ -96,26 +100,14 @@ func TestHaRootUID(t *testing.T) {
 			container: &api.Container{SecurityContext: nil},
 		},
 		"nil runAsuser": {
-			container: &api.Container{
-				SecurityContext: &api.SecurityContext{
-					RunAsUser: nil,
-				},
-			},
+			container: containerWithUser(nil),
 		},
 		"runAsUser non-root": {
-			container: &api.Container{
-				SecurityContext: &api.SecurityContext{
-					RunAsUser: &nonRoot,
-				},
-			},
+			container: containerWithUser(&nonRoot),
 		},
 		"runAsUser root": {
-			container: &api.Container{
-				SecurityContext: &api.SecurityContext{
-					RunAsUser: &root,
-				},
-			},
-			expect: true,
+			container: containerWithUser(&root),
+			expect:    true,
 		},
 	}
 
@@ -138,19 +130,11 @@ func TestHasRunAsUser(t *testing.T) {
 			container: &api.Container{SecurityContext: nil},
 		},
 		"nil runAsUser": {
-			container: &api.Container{
-				SecurityContext: &api.SecurityContext{
-					RunAsUser: nil,
-				},
-			},
+			container: containerWithUser(nil),
 		},
 		"valid runAsUser": {
-			container: &api.Container{
-				SecurityContext: &api.SecurityContext{
-					RunAsUser: &runAsUser,
-				},
-			},
-			expect: true,
+			container: containerWithUser(&runAsUser),
+			expect:    true,
 		},
 	}
 
@@ -174,26 +158,14 @@ func TestHasRootRunAsUser(t *testing.T) {
 			container: &api.Container{SecurityContext: nil},
 		},
 		"nil runAsuser": {
-			container: &api.Container{
-				SecurityContext: &api.SecurityContext{
-					RunAsUser: nil,
-				},
-			},
+			container: containerWithUser(nil),
 		},
 		"runAsUser non-root": {
-			container: &api.Container{
-				SecurityContext: &api.SecurityContext{
-					RunAsUser: &nonRoot,
-				},
-			},
+			container: containerWithUser(&nonRoot),
 		},
 		"runAsUser root": {
-			container: &api.Container{
-				SecurityContext: &api.SecurityContext{
-					RunAsUser: &root,
-				},
-			},
-			expect: true,
+			container: containerWithUser(&root),
+			expect:    true,
 		},
 	}
 

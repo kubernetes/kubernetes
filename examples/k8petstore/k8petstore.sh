@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 The Kubernetes Authors All rights reserved.
+# Copyright 2015 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -28,8 +28,8 @@ _SECONDS=1000          # number of seconds to measure throughput.
 FE="1"                # amount of Web server  
 LG="1"                # amount of load generators
 SLAVE="1"             # amount of redis slaves 
-TEST="1"              # 0 = Dont run tests, 1 = Do run tests.
-NS="default"       # namespace
+TEST="1"              # 0 = Don't run tests, 1 = Do run tests.
+NS="k8petstore"       # namespace
 
 kubectl="${1:-$kubectl}"
 VERSION="${2:-$VERSION}"
@@ -38,10 +38,34 @@ _SECONDS="${4:-$_SECONDS}"   # number of seconds to measure throughput.
 FE="${5:-$FE}"       # amount of Web server  
 LG="${6:-$LG}"        # amount of load generators
 SLAVE="${7:-$SLAVE}"     # amount of redis slaves 
-TEST="${8:-$TEST}"      # 0 = Dont run tests, 1 = Do run tests.
+TEST="${8:-$TEST}"      # 0 = Don't run tests, 1 = Do run tests.
 NS="${9:-$NS}"          # namespace
 
 echo "Running w/ args: kubectl $kubectl version $VERSION ip $PUBLIC_IP sec $_SECONDS fe $FE lg $LG slave $SLAVE test $TEST NAMESPACE $NS"
+
+function create_ns {
+
+case "$NS" in
+"default" )
+    ;;
+"kube-system" )
+    ;;
+* )
+cat << EOF > ns.json
+{
+  "apiVersion": "v1",
+  "kind": "Namespace",
+  "metadata": {
+    "name": "$NS"
+  }
+}
+EOF
+
+$kubectl create -f ns.json
+
+esac
+}
+
 function create { 
 
 cat << EOF > fe-rc.json
@@ -218,6 +242,9 @@ cat << EOF > slave-rc.json
   }
 }
 EOF
+
+create_ns
+
 $kubectl create -f rm.json --namespace=$NS
 $kubectl create -f rm-s.json --namespace=$NS
 sleep 3 # precaution to prevent fe from spinning up too soon.
@@ -233,7 +260,7 @@ function pollfor {
   pass_http=0
 
   ### Test HTTP Server comes up.
-  for i in `seq 1 150`;
+  for i in {1..150};
   do
       ### Just testing that the front end comes up.  Not sure how to test total entries etc... (yet)
       echo "Trying curl ... $PUBLIC_IP:3000 , attempt $i . expect a few failures while pulling images... "

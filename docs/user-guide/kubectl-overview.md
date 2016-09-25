@@ -2,15 +2,15 @@
 
 <!-- BEGIN STRIP_FOR_RELEASE -->
 
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
 
 <h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
@@ -18,9 +18,10 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.1/docs/user-guide/kubectl-overview.md).
+[here](http://releases.k8s.io/release-1.4/docs/user-guide/kubectl-overview.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -44,13 +45,13 @@ Use this overview of the `kubectl` command line interface to help you start runn
   - [Resource types](#resource-types)
   - [Output options](#output-options)
     - [Formatting output](#formatting-output)
-      - [Syntax](#syntax)
+      - [Syntax](#syntax-1)
         - [Example](#example)
       - [Custom columns](#custom-columns)
         - [Examples](#examples)
     - [Sorting list objects](#sorting-list-objects)
-      - [Syntax](#syntax)
-        - [Example](#example)
+      - [Syntax](#syntax-2)
+        - [Example](#example-1)
   - [Examples: Common operations](#examples-common-operations)
   - [Next steps](#next-steps)
 
@@ -81,12 +82,12 @@ where `command`, `TYPE`, `NAME`, and `flags` are:
 
    When performing an operation on multiple resources, you can specify each resource by type and name or specify one or more files:
    * To specify resources by type and name:
-	    * To group resources if they are all the same type: `TYPE1 name1 name2 name<#>`<br/>
+        * To group resources if they are all the same type: `TYPE1 name1 name2 name<#>`<br/>
         Example: `$ kubectl get pod example-pod1 example-pod2`
         * To specify multiple resource types individually: `TYPE1/name1 TYPE1/name2 TYPE2/name3 TYPE<#>/name<#>`<br/>
         Example: `$ kubectl get pod/example-pod1 replicationcontroller/example-rc1`
    * To specify resources with one or more files: `-f file1 -f file2 -f file<#>`
-	 [Use YAML rather than JSON](config-best-practices.md) since YAML tends to be more user-friendly, especially for configuration files.<br/>
+     [Use YAML rather than JSON](config-best-practices.md#general-config-tips) since YAML tends to be more user-friendly, especially for configuration files.<br/>
      Example: `$ kubectl get pod -f ./pod.yaml`
 * `flags`: Specifies optional flags. For example, you can use the `-s` or `--server` flags to specify the address and port of the Kubernetes API server.<br/>
 **Important**: Flags that you specify from the command line override default values and any corresponding environment variables.
@@ -111,7 +112,7 @@ Operation       | Syntax	|       Description
 `describe`	| `kubectl describe (-f FILENAME | TYPE [NAME_PREFIX | /NAME | -l label]) [flags]` | Display the detailed state of one or more resources.
 `edit`		| `kubectl edit (-f FILENAME | TYPE NAME | TYPE/NAME) [flags]` | Edit and update the definition of one or more resources on the server by using the default editor.
 `exec`		| `kubectl exec POD [-c CONTAINER] [-i] [-t] [flags] [-- COMMAND [args...]]` | Execute a command against a container in a pod.
-`expose`		| `kubectl expose (-f FILENAME | TYPE NAME | TYPE/NAME) [--port=port] [--protocol=TCP|UDP] [--target-port=number-or-name] [--name=name] [----external-ip=external-ip-of-service] [--type=type] [flags]` | Expose a replication controller, service, or pod as a new Kubernetes service.
+`expose`		| `kubectl expose (-f FILENAME | TYPE NAME | TYPE/NAME) [--port=port] [--protocol=TCP|UDP] [--target-port=number-or-name] [--name=name] [----external-ip=external-ip-of-service] [--type=type] [flags]` | Expose a replication controller, service, deployment or pod as a new Kubernetes service.
 `get`		| `kubectl get (-f FILENAME | TYPE [NAME | /NAME | -l label]) [--watch] [--sort-by=FIELD] [[-o | --output]=OUTPUT_FORMAT] [flags]` | List one or more resources.
 `label`		| `kubectl label (-f FILENAME | TYPE NAME | TYPE/NAME) KEY_1=VAL_1 ... KEY_N=VAL_N [--overwrite] [--all] [--resource-version=version] [flags]` | Add or update the labels of one or more resources.
 `logs`		| `kubectl logs POD [-c CONTAINER] [--follow] [flags]` | Print the logs for a container in a pod.
@@ -134,21 +135,24 @@ The following table includes a list of all the supported resource types and thei
 Resource type	| Abbreviated alias
 -------------------- | --------------------
 `componentstatuses`	|	`cs`
-`events`	|	`ev`
-`endpoints`	|	`ep`
-`horizontalpodautoscalers`	|	`hpa`
-`limitranges`	|	`limits`
-`nodes`	|	`no`
-`namespaces`	|	`ns`
-`pods`	|	`po`
-`persistentvolumes`	|	`pv`
-`persistentvolumeclaims`	|	`pvc`
-`resourcequotas`	|	`quota`
-`replicationcontrollers`	|	`rc`
-`secrets`	|
-`serviceaccounts`	|
-`services`	|	`svc`
-`ingress`		|	`ing`
+`daemonsets` | `ds`
+`deployments` |
+`events` | `ev`
+`endpoints` | `ep`
+`horizontalpodautoscalers` | `hpa`
+`ingresses` | `ing`
+`jobs` |
+`limitranges` | `limits`
+`nodes` | `no`
+`namespaces` | `ns`
+`pods` | `po`
+`persistentvolumes` | `pv`
+`persistentvolumeclaims` | `pvc`
+`resourcequotas` | `quota`
+`replicationcontrollers` | `rc`
+`secrets` |
+`serviceaccounts` |
+`services` | `svc`
 
 ## Output options
 
@@ -301,7 +305,7 @@ Use the following set of examples to help you familiarize yourself with running 
 		// Return a snapshot of the logs from pod <pod-name>.
 		$ kubectl logs <pod-name>
 
-		// Start streaming the logs from pod <pod-name>. This is similiar to the 'tail -f' Linux command.
+		// Start streaming the logs from pod <pod-name>. This is similar to the 'tail -f' Linux command.
 		$ kubectl logs -f <pod-name>
 
 

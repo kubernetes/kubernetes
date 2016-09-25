@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -34,7 +34,7 @@ type schedulerTester struct {
 func (st *schedulerTester) expectSchedule(pod *api.Pod, expected string) {
 	actual, err := st.scheduler.Schedule(pod, st.nodeLister)
 	if err != nil {
-		st.t.Errorf("Unexpected error %v\nTried to scheduler: %#v", err, pod)
+		st.t.Errorf("Unexpected error %v\nTried to schedule: %#v", err, pod)
 		return
 	}
 	if actual != expected {
@@ -46,7 +46,7 @@ func (st *schedulerTester) expectSchedule(pod *api.Pod, expected string) {
 func (st *schedulerTester) expectSuccess(pod *api.Pod) {
 	_, err := st.scheduler.Schedule(pod, st.nodeLister)
 	if err != nil {
-		st.t.Errorf("Unexpected error %v\nTried to scheduler: %#v", err, pod)
+		st.t.Errorf("Unexpected error %v\nTried to schedule: %#v", err, pod)
 		return
 	}
 }

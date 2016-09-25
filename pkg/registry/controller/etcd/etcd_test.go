@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,18 +20,28 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/rest"
+	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/runtime"
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
+	"k8s.io/kubernetes/pkg/util/diff"
 )
 
-func newStorage(t *testing.T) (*REST, *StatusREST, *etcdtesting.EtcdTestServer) {
+const (
+	namespace = api.NamespaceDefault
+	name      = "foo"
+)
+
+func newStorage(t *testing.T) (ControllerStorage, *etcdtesting.EtcdTestServer) {
 	etcdStorage, server := registrytest.NewEtcdStorage(t, "")
-	controllerStorage, statusStorage := NewREST(etcdStorage, generic.UndecoratedStorage)
-	return controllerStorage, statusStorage, server
+	restOptions := generic.RESTOptions{StorageConfig: etcdStorage, Decorator: generic.UndecoratedStorage, DeleteCollectionWorkers: 1}
+	storage := NewStorage(restOptions)
+	return storage, server
 }
 
 // createController is a helper function that returns a controller with the updated resource version.
@@ -48,8 +58,8 @@ func createController(storage *REST, rc api.ReplicationController, t *testing.T)
 func validNewController() *api.ReplicationController {
 	return &api.ReplicationController{
 		ObjectMeta: api.ObjectMeta{
-			Name:      "foo",
-			Namespace: api.NamespaceDefault,
+			Name:      name,
+			Namespace: namespace,
 		},
 		Spec: api.ReplicationControllerSpec{
 			Selector: map[string]string{"a": "b"},
@@ -76,9 +86,10 @@ func validNewController() *api.ReplicationController {
 var validController = validNewController()
 
 func TestCreate(t *testing.T) {
-	storage, _, server := newStorage(t)
+	storage, server := newStorage(t)
 	defer server.Terminate(t)
-	test := registrytest.New(t, storage.Etcd)
+	defer storage.Controller.Store.DestroyFunc()
+	test := registrytest.New(t, storage.Controller.Store)
 	controller := validNewController()
 	controller.ObjectMeta = api.ObjectMeta{}
 	test.TestCreate(
@@ -96,9 +107,10 @@ func TestCreate(t *testing.T) {
 }
 
 func TestUpdate(t *testing.T) {
-	storage, _, server := newStorage(t)
+	storage, server := newStorage(t)
 	defer server.Terminate(t)
-	test := registrytest.New(t, storage.Etcd)
+	defer storage.Controller.Store.DestroyFunc()
+	test := registrytest.New(t, storage.Controller.Store)
 	test.TestUpdate(
 		// valid
 		validNewController(),
@@ -109,11 +121,6 @@ func TestUpdate(t *testing.T) {
 			return object
 		},
 		// invalid updateFunc
-		func(obj runtime.Object) runtime.Object {
-			object := obj.(*api.ReplicationController)
-			object.UID = "newUID"
-			return object
-		},
 		func(obj runtime.Object) runtime.Object {
 			object := obj.(*api.ReplicationController)
 			object.Name = ""
@@ -128,21 +135,23 @@ func TestUpdate(t *testing.T) {
 }
 
 func TestDelete(t *testing.T) {
-	storage, _, server := newStorage(t)
+	storage, server := newStorage(t)
 	defer server.Terminate(t)
-	test := registrytest.New(t, storage.Etcd)
+	defer storage.Controller.Store.DestroyFunc()
+	test := registrytest.New(t, storage.Controller.Store)
 	test.TestDelete(validNewController())
 }
 
 func TestGenerationNumber(t *testing.T) {
-	storage, _, server := newStorage(t)
+	storage, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.Controller.Store.DestroyFunc()
 	modifiedSno := *validNewController()
 	modifiedSno.Generation = 100
 	modifiedSno.Status.ObservedGeneration = 10
 	ctx := api.NewDefaultContext()
-	rc, err := createController(storage, modifiedSno, t)
-	ctrl, err := storage.Get(ctx, rc.Name)
+	rc, err := createController(storage.Controller, modifiedSno, t)
+	ctrl, err := storage.Controller.Get(ctx, rc.Name)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -155,11 +164,11 @@ func TestGenerationNumber(t *testing.T) {
 
 	// Updates to spec should increment the generation number
 	controller.Spec.Replicas += 1
-	storage.Update(ctx, controller)
+	storage.Controller.Update(ctx, controller.Name, rest.DefaultUpdatedObjectInfo(controller, api.Scheme))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	ctrl, err = storage.Get(ctx, rc.Name)
+	ctrl, err = storage.Controller.Get(ctx, rc.Name)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -170,11 +179,11 @@ func TestGenerationNumber(t *testing.T) {
 
 	// Updates to status should not increment either spec or status generation numbers
 	controller.Status.Replicas += 1
-	storage.Update(ctx, controller)
+	storage.Controller.Update(ctx, controller.Name, rest.DefaultUpdatedObjectInfo(controller, api.Scheme))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	ctrl, err = storage.Get(ctx, rc.Name)
+	ctrl, err = storage.Controller.Get(ctx, rc.Name)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -185,23 +194,26 @@ func TestGenerationNumber(t *testing.T) {
 }
 
 func TestGet(t *testing.T) {
-	storage, _, server := newStorage(t)
+	storage, server := newStorage(t)
 	defer server.Terminate(t)
-	test := registrytest.New(t, storage.Etcd)
+	defer storage.Controller.Store.DestroyFunc()
+	test := registrytest.New(t, storage.Controller.Store)
 	test.TestGet(validNewController())
 }
 
 func TestList(t *testing.T) {
-	storage, _, server := newStorage(t)
+	storage, server := newStorage(t)
 	defer server.Terminate(t)
-	test := registrytest.New(t, storage.Etcd)
+	defer storage.Controller.Store.DestroyFunc()
+	test := registrytest.New(t, storage.Controller.Store)
 	test.TestList(validNewController())
 }
 
 func TestWatch(t *testing.T) {
-	storage, _, server := newStorage(t)
+	storage, server := newStorage(t)
 	defer server.Terminate(t)
-	test := registrytest.New(t, storage.Etcd)
+	defer storage.Controller.Store.DestroyFunc()
+	test := registrytest.New(t, storage.Controller.Store)
 	test.TestWatch(
 		validController,
 		// matching labels
@@ -231,3 +243,78 @@ func TestWatch(t *testing.T) {
 }
 
 //TODO TestUpdateStatus
+
+func TestScaleGet(t *testing.T) {
+	storage, server := newStorage(t)
+	defer server.Terminate(t)
+	defer storage.Controller.Store.DestroyFunc()
+
+	ctx := api.WithNamespace(api.NewContext(), namespace)
+	rc, err := createController(storage.Controller, *validController, t)
+	if err != nil {
+		t.Fatalf("error setting new replication controller %v: %v", *validController, err)
+	}
+
+	want := &autoscaling.Scale{
+		ObjectMeta: api.ObjectMeta{
+			Name:              name,
+			Namespace:         namespace,
+			UID:               rc.UID,
+			ResourceVersion:   rc.ResourceVersion,
+			CreationTimestamp: rc.CreationTimestamp,
+		},
+		Spec: autoscaling.ScaleSpec{
+			Replicas: validController.Spec.Replicas,
+		},
+		Status: autoscaling.ScaleStatus{
+			Replicas: validController.Status.Replicas,
+			Selector: labels.SelectorFromSet(validController.Spec.Template.Labels).String(),
+		},
+	}
+	obj, err := storage.Scale.Get(ctx, name)
+	if err != nil {
+		t.Fatalf("error fetching scale for %s: %v", name, err)
+	}
+	got := obj.(*autoscaling.Scale)
+	if !api.Semantic.DeepEqual(want, got) {
+		t.Errorf("unexpected scale: %s", diff.ObjectDiff(want, got))
+	}
+}
+
+func TestScaleUpdate(t *testing.T) {
+	storage, server := newStorage(t)
+	defer server.Terminate(t)
+	defer storage.Controller.Store.DestroyFunc()
+
+	ctx := api.WithNamespace(api.NewContext(), namespace)
+	rc, err := createController(storage.Controller, *validController, t)
+	if err != nil {
+		t.Fatalf("error setting new replication controller %v: %v", *validController, err)
+	}
+	replicas := int32(12)
+	update := autoscaling.Scale{
+		ObjectMeta: api.ObjectMeta{Name: name, Namespace: namespace},
+		Spec: autoscaling.ScaleSpec{
+			Replicas: replicas,
+		},
+	}
+
+	if _, _, err := storage.Scale.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(&update, api.Scheme)); err != nil {
+		t.Fatalf("error updating scale %v: %v", update, err)
+	}
+	obj, err := storage.Scale.Get(ctx, name)
+	if err != nil {
+		t.Fatalf("error fetching scale for %s: %v", name, err)
+	}
+	scale := obj.(*autoscaling.Scale)
+	if scale.Spec.Replicas != replicas {
+		t.Errorf("wrong replicas count expected: %d got: %d", replicas, rc.Spec.Replicas)
+	}
+
+	update.ResourceVersion = rc.ResourceVersion
+	update.Spec.Replicas = 15
+
+	if _, _, err = storage.Scale.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(&update, api.Scheme)); err != nil && !errors.IsConflict(err) {
+		t.Fatalf("unexpected error, expecting an update conflict but got %v", err)
+	}
+}

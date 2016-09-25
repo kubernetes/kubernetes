@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,12 +20,14 @@ import (
 	"reflect"
 	"testing"
 
+	internal "k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	api "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
 func encodeOrDie(obj runtime.Object) []byte {
-	data, err := api.Codec.Encode(obj)
+	data, err := runtime.Encode(internal.Codecs.LegacyCodec(api.SchemeGroupVersion), obj)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -144,6 +146,48 @@ func TestSortingPrinter(t *testing.T) {
 			field: "{.metadata.name}",
 		},
 		{
+			name: "random-order-timestamp",
+			obj: &api.PodList{
+				Items: []api.Pod{
+					{
+						ObjectMeta: api.ObjectMeta{
+							CreationTimestamp: unversioned.Unix(300, 0),
+						},
+					},
+					{
+						ObjectMeta: api.ObjectMeta{
+							CreationTimestamp: unversioned.Unix(100, 0),
+						},
+					},
+					{
+						ObjectMeta: api.ObjectMeta{
+							CreationTimestamp: unversioned.Unix(200, 0),
+						},
+					},
+				},
+			},
+			sort: &api.PodList{
+				Items: []api.Pod{
+					{
+						ObjectMeta: api.ObjectMeta{
+							CreationTimestamp: unversioned.Unix(100, 0),
+						},
+					},
+					{
+						ObjectMeta: api.ObjectMeta{
+							CreationTimestamp: unversioned.Unix(200, 0),
+						},
+					},
+					{
+						ObjectMeta: api.ObjectMeta{
+							CreationTimestamp: unversioned.Unix(300, 0),
+						},
+					},
+				},
+			},
+			field: "{.metadata.creationTimestamp}",
+		},
+		{
 			name: "random-order-numbers",
 			obj: &api.ReplicationControllerList{
 				Items: []api.ReplicationController{
@@ -189,16 +233,16 @@ func TestSortingPrinter(t *testing.T) {
 			name: "v1.List in order",
 			obj: &api.List{
 				Items: []runtime.RawExtension{
-					{RawJSON: encodeOrDie(a)},
-					{RawJSON: encodeOrDie(b)},
-					{RawJSON: encodeOrDie(c)},
+					{Raw: encodeOrDie(a)},
+					{Raw: encodeOrDie(b)},
+					{Raw: encodeOrDie(c)},
 				},
 			},
 			sort: &api.List{
 				Items: []runtime.RawExtension{
-					{RawJSON: encodeOrDie(a)},
-					{RawJSON: encodeOrDie(b)},
-					{RawJSON: encodeOrDie(c)},
+					{Raw: encodeOrDie(a)},
+					{Raw: encodeOrDie(b)},
+					{Raw: encodeOrDie(c)},
 				},
 			},
 			field: "{.metadata.name}",
@@ -207,23 +251,23 @@ func TestSortingPrinter(t *testing.T) {
 			name: "v1.List in reverse",
 			obj: &api.List{
 				Items: []runtime.RawExtension{
-					{RawJSON: encodeOrDie(c)},
-					{RawJSON: encodeOrDie(b)},
-					{RawJSON: encodeOrDie(a)},
+					{Raw: encodeOrDie(c)},
+					{Raw: encodeOrDie(b)},
+					{Raw: encodeOrDie(a)},
 				},
 			},
 			sort: &api.List{
 				Items: []runtime.RawExtension{
-					{RawJSON: encodeOrDie(a)},
-					{RawJSON: encodeOrDie(b)},
-					{RawJSON: encodeOrDie(c)},
+					{Raw: encodeOrDie(a)},
+					{Raw: encodeOrDie(b)},
+					{Raw: encodeOrDie(c)},
 				},
 			},
 			field: "{.metadata.name}",
 		},
 	}
 	for _, test := range tests {
-		sort := &SortingPrinter{SortField: test.field}
+		sort := &SortingPrinter{SortField: test.field, Decoder: internal.Codecs.UniversalDecoder()}
 		if err := sort.sortObj(test.obj); err != nil {
 			t.Errorf("unexpected error: %v (%s)", err, test.name)
 			continue

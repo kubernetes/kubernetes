@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"k8s.io/kubernetes/contrib/mesos/pkg/podutil"
-	mresource "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/resource"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/resources"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/service"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
@@ -143,7 +143,7 @@ func containers(ct ...api.Container) podOpt {
 	})
 }
 
-func resourceLimits(cpu mresource.CPUShares, mem mresource.MegaBytes) ctOpt {
+func resourceLimits(cpu resources.CPUShares, mem resources.MegaBytes) ctOpt {
 	return ctOpt(func(c *api.Container) {
 		if c.Resources.Limits == nil {
 			c.Resources.Limits = make(api.ResourceList)

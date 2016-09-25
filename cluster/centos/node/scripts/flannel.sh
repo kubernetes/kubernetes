@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2014 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@
 # limitations under the License.
 
 
-ETCD_SERVERS=${1:-"http://8.8.8.18:4001"}
+ETCD_SERVERS=${1:-"http://8.8.8.18:2379"}
 FLANNEL_NET=${2:-"172.16.0.0/16"}
 
 
@@ -32,7 +32,8 @@ Before=docker.service
 
 [Service]
 EnvironmentFile=-/opt/kubernetes/cfg/flannel
-ExecStart=/opt/kubernetes/bin/flanneld \${FLANNEL_ETCD} \${FLANNEL_ETCD_KEY}
+ExecStartPre=/opt/kubernetes/bin/remove-docker0.sh
+ExecStart=/opt/kubernetes/bin/flanneld --ip-masq \${FLANNEL_ETCD} \${FLANNEL_ETCD_KEY}
 ExecStartPost=/opt/kubernetes/bin/mk-docker-opts.sh -d /run/flannel/docker
 
 Type=notify

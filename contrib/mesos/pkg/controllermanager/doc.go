@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,4 +17,4 @@ limitations under the License.
 // Package controllermanager is largely a clone of the upstream implementation,
 // with additional functionality to select between stock or a customized
 // endpoints controller.
-package controllermanager
+package controllermanager // import "k8s.io/kubernetes/contrib/mesos/pkg/controllermanager"

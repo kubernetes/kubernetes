@@ -15,7 +15,7 @@ seqdiag {
 
   user ->> kubelet [label="start\n- bootstrap-cluster-uri"];
   kubelet => bootstrap [label="get-master", return="returns\n- master-location\n- master-ca"];
-  kubelet ->> master [label="signCert\n- unsigned-kubelet-cert", return="retuns\n- kubelet-cert"];
+  kubelet ->> master [label="signCert\n- unsigned-kubelet-cert", return="returns\n- kubelet-cert"];
   user => master [label="getSignRequests"];
   user => master [label="approveSignRequests"];
   kubelet <<-- master [label="returns\n- kubelet-cert"];

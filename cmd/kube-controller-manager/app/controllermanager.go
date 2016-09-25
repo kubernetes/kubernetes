@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -29,31 +29,54 @@ import (
 	"net"
 	"net/http"
 	"net/http/pprof"
+	"os"
 	"strconv"
 	"time"
 
+	"k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	"k8s.io/kubernetes/pkg/apis/batch"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
+	"k8s.io/kubernetes/pkg/client/leaderelection"
+	"k8s.io/kubernetes/pkg/client/record"
+	"k8s.io/kubernetes/pkg/client/restclient"
+	"k8s.io/kubernetes/pkg/client/typed/dynamic"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/controller"
+	certcontroller "k8s.io/kubernetes/pkg/controller/certificates"
 	"k8s.io/kubernetes/pkg/controller/daemon"
 	"k8s.io/kubernetes/pkg/controller/deployment"
+	"k8s.io/kubernetes/pkg/controller/disruption"
 	endpointcontroller "k8s.io/kubernetes/pkg/controller/endpoint"
-	"k8s.io/kubernetes/pkg/controller/gc"
+	"k8s.io/kubernetes/pkg/controller/garbagecollector"
+	"k8s.io/kubernetes/pkg/controller/garbagecollector/metaonly"
+	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/pkg/controller/job"
 	namespacecontroller "k8s.io/kubernetes/pkg/controller/namespace"
 	nodecontroller "k8s.io/kubernetes/pkg/controller/node"
-	persistentvolumecontroller "k8s.io/kubernetes/pkg/controller/persistentvolume"
+	petset "k8s.io/kubernetes/pkg/controller/petset"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
+	"k8s.io/kubernetes/pkg/controller/podgc"
+	replicaset "k8s.io/kubernetes/pkg/controller/replicaset"
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
 	resourcequotacontroller "k8s.io/kubernetes/pkg/controller/resourcequota"
 	routecontroller "k8s.io/kubernetes/pkg/controller/route"
+	"k8s.io/kubernetes/pkg/controller/scheduledjob"
 	servicecontroller "k8s.io/kubernetes/pkg/controller/service"
-	"k8s.io/kubernetes/pkg/controller/serviceaccount"
+	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
+	"k8s.io/kubernetes/pkg/controller/volume/attachdetach"
+	persistentvolumecontroller "k8s.io/kubernetes/pkg/controller/volume/persistentvolume"
 	"k8s.io/kubernetes/pkg/healthz"
-	"k8s.io/kubernetes/pkg/master/ports"
-	"k8s.io/kubernetes/pkg/util"
+	quotainstall "k8s.io/kubernetes/pkg/quota/install"
+	"k8s.io/kubernetes/pkg/runtime/serializer"
+	"k8s.io/kubernetes/pkg/serviceaccount"
+	certutil "k8s.io/kubernetes/pkg/util/cert"
+	"k8s.io/kubernetes/pkg/util/configz"
 	"k8s.io/kubernetes/pkg/util/wait"
 
 	"github.com/golang/glog"
@@ -62,88 +85,14 @@ import (
 	"github.com/spf13/pflag"
 )
 
-// CMServer is the main context object for the controller manager.
-type CMServer struct {
-	Port                              int
-	Address                           net.IP
-	CloudProvider                     string
-	CloudConfigFile                   string
-	ConcurrentEndpointSyncs           int
-	ConcurrentRCSyncs                 int
-	ConcurrentDSCSyncs                int
-	ConcurrentJobSyncs                int
-	ServiceSyncPeriod                 time.Duration
-	NodeSyncPeriod                    time.Duration
-	ResourceQuotaSyncPeriod           time.Duration
-	NamespaceSyncPeriod               time.Duration
-	PVClaimBinderSyncPeriod           time.Duration
-	VolumeConfigFlags                 VolumeConfigFlags
-	TerminatedPodGCThreshold          int
-	HorizontalPodAutoscalerSyncPeriod time.Duration
-	DeploymentControllerSyncPeriod    time.Duration
-	MinResyncPeriod                   time.Duration
-	RegisterRetryCount                int
-	NodeMonitorGracePeriod            time.Duration
-	NodeStartupGracePeriod            time.Duration
-	NodeMonitorPeriod                 time.Duration
-	NodeStatusUpdateRetry             int
-	PodEvictionTimeout                time.Duration
-	DeletingPodsQps                   float32
-	DeletingPodsBurst                 int
-	ServiceAccountKeyFile             string
-	RootCAFile                        string
-
-	ClusterName       string
-	ClusterCIDR       net.IPNet
-	AllocateNodeCIDRs bool
-	EnableProfiling   bool
-
-	Master       string
-	Kubeconfig   string
-	KubeAPIQPS   float32
-	KubeAPIBurst int
-}
-
-// NewCMServer creates a new CMServer with a default config.
-func NewCMServer() *CMServer {
-	s := CMServer{
-		Port:                              ports.ControllerManagerPort,
-		Address:                           net.ParseIP("127.0.0.1"),
-		ConcurrentEndpointSyncs:           5,
-		ConcurrentRCSyncs:                 5,
-		ConcurrentDSCSyncs:                2,
-		ConcurrentJobSyncs:                5,
-		ServiceSyncPeriod:                 5 * time.Minute,
-		NodeSyncPeriod:                    10 * time.Second,
-		ResourceQuotaSyncPeriod:           10 * time.Second,
-		NamespaceSyncPeriod:               5 * time.Minute,
-		PVClaimBinderSyncPeriod:           10 * time.Minute,
-		HorizontalPodAutoscalerSyncPeriod: 30 * time.Second,
-		DeploymentControllerSyncPeriod:    30 * time.Second,
-		MinResyncPeriod:                   12 * time.Hour,
-		RegisterRetryCount:                10,
-		PodEvictionTimeout:                5 * time.Minute,
-		NodeMonitorGracePeriod:            40 * time.Second,
-		NodeStartupGracePeriod:            60 * time.Second,
-		NodeMonitorPeriod:                 5 * time.Second,
-		ClusterName:                       "kubernetes",
-		TerminatedPodGCThreshold:          12500,
-		VolumeConfigFlags: VolumeConfigFlags{
-			// default values here
-			PersistentVolumeRecyclerMinimumTimeoutNFS:        300,
-			PersistentVolumeRecyclerIncrementTimeoutNFS:      30,
-			PersistentVolumeRecyclerMinimumTimeoutHostPath:   60,
-			PersistentVolumeRecyclerIncrementTimeoutHostPath: 30,
-		},
-		KubeAPIQPS:   20.0,
-		KubeAPIBurst: 30,
-	}
-	return &s
-}
+const (
+	// Jitter used when starting controller managers
+	ControllerStartJitter = 1.0
+)
 
 // NewControllerManagerCommand creates a *cobra.Command object with default parameters
 func NewControllerManagerCommand() *cobra.Command {
-	s := NewCMServer()
+	s := options.NewCMServer()
 	s.AddFlags(pflag.CommandLine)
 	cmd := &cobra.Command{
 		Use: "kube-controller-manager",
@@ -162,87 +111,30 @@ controller, and serviceaccounts controller.`,
 	return cmd
 }
 
-// VolumeConfigFlags is used to bind CLI flags to variables.  This top-level struct contains *all* enumerated
-// CLI flags meant to configure all volume plugins.  From this config, the binary will create many instances
-// of volume.VolumeConfig which are then passed to the appropriate plugin. The ControllerManager binary is the only
-// part of the code which knows what plugins are supported and which CLI flags correspond to each plugin.
-type VolumeConfigFlags struct {
-	PersistentVolumeRecyclerMinimumTimeoutNFS           int
-	PersistentVolumeRecyclerPodTemplateFilePathNFS      string
-	PersistentVolumeRecyclerIncrementTimeoutNFS         int
-	PersistentVolumeRecyclerPodTemplateFilePathHostPath string
-	PersistentVolumeRecyclerMinimumTimeoutHostPath      int
-	PersistentVolumeRecyclerIncrementTimeoutHostPath    int
-}
-
-// AddFlags adds flags for a specific CMServer to the specified FlagSet
-func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
-	fs.IntVar(&s.Port, "port", s.Port, "The port that the controller-manager's http service runs on")
-	fs.IPVar(&s.Address, "address", s.Address, "The IP address to serve on (set to 0.0.0.0 for all interfaces)")
-	fs.StringVar(&s.CloudProvider, "cloud-provider", s.CloudProvider, "The provider for cloud services.  Empty string for no provider.")
-	fs.StringVar(&s.CloudConfigFile, "cloud-config", s.CloudConfigFile, "The path to the cloud provider configuration file.  Empty string for no configuration file.")
-	fs.IntVar(&s.ConcurrentEndpointSyncs, "concurrent-endpoint-syncs", s.ConcurrentEndpointSyncs, "The number of endpoint syncing operations that will be done concurrently. Larger number = faster endpoint updating, but more CPU (and network) load")
-	fs.IntVar(&s.ConcurrentRCSyncs, "concurrent_rc_syncs", s.ConcurrentRCSyncs, "The number of replication controllers that are allowed to sync concurrently. Larger number = more reponsive replica management, but more CPU (and network) load")
-	fs.DurationVar(&s.ServiceSyncPeriod, "service-sync-period", s.ServiceSyncPeriod, "The period for syncing services with their external load balancers")
-	fs.DurationVar(&s.NodeSyncPeriod, "node-sync-period", s.NodeSyncPeriod, ""+
-		"The period for syncing nodes from cloudprovider. Longer periods will result in "+
-		"fewer calls to cloud provider, but may delay addition of new nodes to cluster.")
-	fs.DurationVar(&s.ResourceQuotaSyncPeriod, "resource-quota-sync-period", s.ResourceQuotaSyncPeriod, "The period for syncing quota usage status in the system")
-	fs.DurationVar(&s.NamespaceSyncPeriod, "namespace-sync-period", s.NamespaceSyncPeriod, "The period for syncing namespace life-cycle updates")
-	fs.DurationVar(&s.PVClaimBinderSyncPeriod, "pvclaimbinder-sync-period", s.PVClaimBinderSyncPeriod, "The period for syncing persistent volumes and persistent volume claims")
-	fs.DurationVar(&s.MinResyncPeriod, "min-resync-period", s.MinResyncPeriod, "The resync period in reflectors will be random between MinResyncPeriod and 2*MinResyncPeriod")
-	fs.StringVar(&s.VolumeConfigFlags.PersistentVolumeRecyclerPodTemplateFilePathNFS, "pv-recycler-pod-template-filepath-nfs", s.VolumeConfigFlags.PersistentVolumeRecyclerPodTemplateFilePathNFS, "The file path to a pod definition used as a template for NFS persistent volume recycling")
-	fs.IntVar(&s.VolumeConfigFlags.PersistentVolumeRecyclerMinimumTimeoutNFS, "pv-recycler-minimum-timeout-nfs", s.VolumeConfigFlags.PersistentVolumeRecyclerMinimumTimeoutNFS, "The minimum ActiveDeadlineSeconds to use for an NFS Recycler pod")
-	fs.IntVar(&s.VolumeConfigFlags.PersistentVolumeRecyclerIncrementTimeoutNFS, "pv-recycler-increment-timeout-nfs", s.VolumeConfigFlags.PersistentVolumeRecyclerIncrementTimeoutNFS, "the increment of time added per Gi to ActiveDeadlineSeconds for an NFS scrubber pod")
-	fs.StringVar(&s.VolumeConfigFlags.PersistentVolumeRecyclerPodTemplateFilePathHostPath, "pv-recycler-pod-template-filepath-hostpath", s.VolumeConfigFlags.PersistentVolumeRecyclerPodTemplateFilePathHostPath, "The file path to a pod definition used as a template for HostPath persistent volume recycling. This is for development and testing only and will not work in a multi-node cluster.")
-	fs.IntVar(&s.VolumeConfigFlags.PersistentVolumeRecyclerMinimumTimeoutHostPath, "pv-recycler-minimum-timeout-hostpath", s.VolumeConfigFlags.PersistentVolumeRecyclerMinimumTimeoutHostPath, "The minimum ActiveDeadlineSeconds to use for a HostPath Recycler pod.  This is for development and testing only and will not work in a multi-node cluster.")
-	fs.IntVar(&s.VolumeConfigFlags.PersistentVolumeRecyclerIncrementTimeoutHostPath, "pv-recycler-timeout-increment-hostpath", s.VolumeConfigFlags.PersistentVolumeRecyclerIncrementTimeoutHostPath, "the increment of time added per Gi to ActiveDeadlineSeconds for a HostPath scrubber pod.  This is for development and testing only and will not work in a multi-node cluster.")
-	fs.IntVar(&s.TerminatedPodGCThreshold, "terminated-pod-gc-threshold", s.TerminatedPodGCThreshold, "Number of terminated pods that can exist before the terminated pod garbage collector starts deleting terminated pods. If <= 0, the terminated pod garbage collector is disabled.")
-	fs.DurationVar(&s.HorizontalPodAutoscalerSyncPeriod, "horizontal-pod-autoscaler-sync-period", s.HorizontalPodAutoscalerSyncPeriod, "The period for syncing the number of pods in horizontal pod autoscaler.")
-	fs.DurationVar(&s.DeploymentControllerSyncPeriod, "deployment-controller-sync-period", s.DeploymentControllerSyncPeriod, "Period for syncing the deployments.")
-	fs.DurationVar(&s.PodEvictionTimeout, "pod-eviction-timeout", s.PodEvictionTimeout, "The grace period for deleting pods on failed nodes.")
-	fs.Float32Var(&s.DeletingPodsQps, "deleting-pods-qps", 0.1, "Number of nodes per second on which pods are deleted in case of node failure.")
-	fs.IntVar(&s.DeletingPodsBurst, "deleting-pods-burst", 10, "Number of nodes on which pods are bursty deleted in case of node failure. For more details look into RateLimiter.")
-	fs.IntVar(&s.RegisterRetryCount, "register-retry-count", s.RegisterRetryCount, ""+
-		"The number of retries for initial node registration.  Retry interval equals node-sync-period.")
-	fs.MarkDeprecated("register-retry-count", "This flag is currently no-op and will be deleted.")
-	fs.DurationVar(&s.NodeMonitorGracePeriod, "node-monitor-grace-period", s.NodeMonitorGracePeriod,
-		"Amount of time which we allow running Node to be unresponsive before marking it unhealty. "+
-			"Must be N times more than kubelet's nodeStatusUpdateFrequency, "+
-			"where N means number of retries allowed for kubelet to post node status.")
-	fs.DurationVar(&s.NodeStartupGracePeriod, "node-startup-grace-period", s.NodeStartupGracePeriod,
-		"Amount of time which we allow starting Node to be unresponsive before marking it unhealty.")
-	fs.DurationVar(&s.NodeMonitorPeriod, "node-monitor-period", s.NodeMonitorPeriod,
-		"The period for syncing NodeStatus in NodeController.")
-	fs.StringVar(&s.ServiceAccountKeyFile, "service-account-private-key-file", s.ServiceAccountKeyFile, "Filename containing a PEM-encoded private RSA key used to sign service account tokens.")
-	fs.BoolVar(&s.EnableProfiling, "profiling", true, "Enable profiling via web interface host:port/debug/pprof/")
-	fs.StringVar(&s.ClusterName, "cluster-name", s.ClusterName, "The instance prefix for the cluster")
-	fs.IPNetVar(&s.ClusterCIDR, "cluster-cidr", s.ClusterCIDR, "CIDR Range for Pods in cluster.")
-	fs.BoolVar(&s.AllocateNodeCIDRs, "allocate-node-cidrs", false, "Should CIDRs for Pods be allocated and set on the cloud provider.")
-	fs.StringVar(&s.Master, "master", s.Master, "The address of the Kubernetes API server (overrides any value in kubeconfig)")
-	fs.StringVar(&s.Kubeconfig, "kubeconfig", s.Kubeconfig, "Path to kubeconfig file with authorization and master location information.")
-	fs.StringVar(&s.RootCAFile, "root-ca-file", s.RootCAFile, "If set, this root certificate authority will be included in service account's token secret. This must be a valid PEM-encoded CA bundle.")
-	fs.Float32Var(&s.KubeAPIQPS, "kube-api-qps", s.KubeAPIQPS, "QPS to use while talking with kubernetes apiserver")
-	fs.IntVar(&s.KubeAPIBurst, "kube-api-burst", s.KubeAPIBurst, "Burst to use while talking with kubernetes apiserver")
-}
-
-func (s *CMServer) ResyncPeriod() time.Duration {
-	factor := rand.Float64() + 1
-	return time.Duration(float64(s.MinResyncPeriod.Nanoseconds()) * factor)
+func ResyncPeriod(s *options.CMServer) func() time.Duration {
+	return func() time.Duration {
+		factor := rand.Float64() + 1
+		return time.Duration(float64(s.MinResyncPeriod.Nanoseconds()) * factor)
+	}
 }
 
 // Run runs the CMServer.  This should never exit.
-func (s *CMServer) Run(_ []string) error {
+func Run(s *options.CMServer) error {
+	if c, err := configz.New("componentconfig"); err == nil {
+		c.Set(s.KubeControllerManagerConfiguration)
+	} else {
+		glog.Errorf("unable to register configz: %s", err)
+	}
 	kubeconfig, err := clientcmd.BuildConfigFromFlags(s.Master, s.Kubeconfig)
 	if err != nil {
 		return err
 	}
 
+	kubeconfig.ContentConfig.ContentType = s.ContentType
 	// Override kubeconfig qps/burst settings from flags
 	kubeconfig.QPS = s.KubeAPIQPS
-	kubeconfig.Burst = s.KubeAPIBurst
-
-	kubeClient, err := client.New(kubeconfig)
+	kubeconfig.Burst = int(s.KubeAPIBurst)
+	kubeClient, err := clientset.NewForConfig(restclient.AddUserAgent(kubeconfig, "controller-manager"))
 	if err != nil {
 		glog.Fatalf("Invalid API configuration: %v", err)
 	}
@@ -255,24 +147,83 @@ func (s *CMServer) Run(_ []string) error {
 			mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
 			mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
 		}
+		configz.InstallHandler(mux)
 		mux.Handle("/metrics", prometheus.Handler())
 
 		server := &http.Server{
-			Addr:    net.JoinHostPort(s.Address.String(), strconv.Itoa(s.Port)),
+			Addr:    net.JoinHostPort(s.Address, strconv.Itoa(int(s.Port))),
 			Handler: mux,
 		}
 		glog.Fatal(server.ListenAndServe())
 	}()
 
-	go endpointcontroller.NewEndpointController(kubeClient, s.ResyncPeriod).
-		Run(s.ConcurrentEndpointSyncs, util.NeverStop)
+	eventBroadcaster := record.NewBroadcaster()
+	eventBroadcaster.StartLogging(glog.Infof)
+	eventBroadcaster.StartRecordingToSink(&unversionedcore.EventSinkImpl{Interface: kubeClient.Core().Events("")})
+	recorder := eventBroadcaster.NewRecorder(api.EventSource{Component: "controller-manager"})
 
-	go replicationcontroller.NewReplicationManager(kubeClient, s.ResyncPeriod, replicationcontroller.BurstReplicas).
-		Run(s.ConcurrentRCSyncs, util.NeverStop)
+	run := func(stop <-chan struct{}) {
+		err := StartControllers(s, kubeconfig, stop, recorder)
+		glog.Fatalf("error running controllers: %v", err)
+		panic("unreachable")
+	}
+
+	if !s.LeaderElection.LeaderElect {
+		run(nil)
+		panic("unreachable")
+	}
+
+	id, err := os.Hostname()
+	if err != nil {
+		return err
+	}
+
+	leaderelection.RunOrDie(leaderelection.LeaderElectionConfig{
+		EndpointsMeta: api.ObjectMeta{
+			Namespace: "kube-system",
+			Name:      "kube-controller-manager",
+		},
+		EndpointsClient: kubeClient,
+		Identity:        id,
+		EventRecorder:   recorder,
+		LeaseDuration:   s.LeaderElection.LeaseDuration.Duration,
+		RenewDeadline:   s.LeaderElection.RenewDeadline.Duration,
+		RetryPeriod:     s.LeaderElection.RetryPeriod.Duration,
+		Callbacks: leaderelection.LeaderCallbacks{
+			OnStartedLeading: run,
+			OnStoppedLeading: func() {
+				glog.Fatalf("leaderelection lost")
+			},
+		},
+	})
+	panic("unreachable")
+}
+
+func StartControllers(s *options.CMServer, kubeconfig *restclient.Config, stop <-chan struct{}, recorder record.EventRecorder) error {
+	client := func(userAgent string) clientset.Interface {
+		return clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, userAgent))
+	}
+	discoveryClient := client("controller-discovery").Discovery()
+	sharedInformers := informers.NewSharedInformerFactory(client("shared-informers"), ResyncPeriod(s)())
+
+	go endpointcontroller.NewEndpointController(sharedInformers.Pods().Informer(), client("endpoint-controller")).
+		Run(int(s.ConcurrentEndpointSyncs), wait.NeverStop)
+	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
+
+	go replicationcontroller.NewReplicationManager(
+		sharedInformers.Pods().Informer(),
+		client("replication-controller"),
+		ResyncPeriod(s),
+		replicationcontroller.BurstReplicas,
+		int(s.LookupCacheSizeForRC),
+		s.EnableGarbageCollector,
+	).Run(int(s.ConcurrentRCSyncs), wait.NeverStop)
+	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 
 	if s.TerminatedPodGCThreshold > 0 {
-		go gc.New(kubeClient, s.ResyncPeriod, s.TerminatedPodGCThreshold).
-			Run(util.NeverStop)
+		go podgc.New(client("pod-garbage-collector"), ResyncPeriod(s), int(s.TerminatedPodGCThreshold)).
+			Run(wait.NeverStop)
+		time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 	}
 
 	cloud, err := cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
@@ -280,37 +231,72 @@ func (s *CMServer) Run(_ []string) error {
 		glog.Fatalf("Cloud provider could not be initialized: %v", err)
 	}
 
-	nodeController := nodecontroller.NewNodeController(cloud, kubeClient,
-		s.PodEvictionTimeout, util.NewTokenBucketRateLimiter(s.DeletingPodsQps, s.DeletingPodsBurst),
-		util.NewTokenBucketRateLimiter(s.DeletingPodsQps, s.DeletingPodsBurst),
-		s.NodeMonitorGracePeriod, s.NodeStartupGracePeriod, s.NodeMonitorPeriod, &s.ClusterCIDR, s.AllocateNodeCIDRs)
-	nodeController.Run(s.NodeSyncPeriod)
-
-	serviceController := servicecontroller.New(cloud, kubeClient, s.ClusterName)
-	if err := serviceController.Run(s.ServiceSyncPeriod, s.NodeSyncPeriod); err != nil {
-		glog.Errorf("Failed to start service controller: %v", err)
+	_, clusterCIDR, err := net.ParseCIDR(s.ClusterCIDR)
+	if err != nil {
+		glog.Warningf("Unsuccessful parsing of cluster CIDR %v: %v", s.ClusterCIDR, err)
 	}
+	_, serviceCIDR, err := net.ParseCIDR(s.ServiceCIDR)
+	if err != nil {
+		glog.Warningf("Unsuccessful parsing of service CIDR %v: %v", s.ServiceCIDR, err)
+	}
+	nodeController, err := nodecontroller.NewNodeController(sharedInformers.Pods().Informer(), cloud, client("node-controller"),
+		s.PodEvictionTimeout.Duration, s.NodeEvictionRate, s.SecondaryNodeEvictionRate, s.LargeClusterSizeThreshold, s.UnhealthyZoneThreshold, s.NodeMonitorGracePeriod.Duration,
+		s.NodeStartupGracePeriod.Duration, s.NodeMonitorPeriod.Duration, clusterCIDR, serviceCIDR,
+		int(s.NodeCIDRMaskSize), s.AllocateNodeCIDRs)
+	if err != nil {
+		glog.Fatalf("Failed to initialize nodecontroller: %v", err)
+	}
+	nodeController.Run()
+	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 
-	if s.AllocateNodeCIDRs {
+	serviceController, err := servicecontroller.New(cloud, client("service-controller"), s.ClusterName)
+	if err != nil {
+		glog.Errorf("Failed to start service controller: %v", err)
+	} else {
+		serviceController.Run(int(s.ConcurrentServiceSyncs))
+	}
+	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
+
+	if s.AllocateNodeCIDRs && s.ConfigureCloudRoutes {
 		if cloud == nil {
-			glog.Warning("allocate-node-cidrs is set, but no cloud provider specified. Will not manage routes.")
+			glog.Warning("configure-cloud-routes is set, but no cloud provider specified. Will not configure cloud provider routes.")
 		} else if routes, ok := cloud.Routes(); !ok {
-			glog.Warning("allocate-node-cidrs is set, but cloud provider does not support routes. Will not manage routes.")
+			glog.Warning("configure-cloud-routes is set, but cloud provider does not support routes. Will not configure cloud provider routes.")
 		} else {
-			routeController := routecontroller.New(routes, kubeClient, s.ClusterName, &s.ClusterCIDR)
-			routeController.Run(s.NodeSyncPeriod)
+			routeController := routecontroller.New(routes, client("route-controller"), s.ClusterName, clusterCIDR)
+			routeController.Run(s.RouteReconciliationPeriod.Duration)
+			time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 		}
 	} else {
-		glog.Infof("allocate-node-cidrs set to %v, node controller not creating routes", s.AllocateNodeCIDRs)
+		glog.Infof("Will not configure cloud provider routes for allocate-node-cidrs: %v, configure-cloud-routes: %v.", s.AllocateNodeCIDRs, s.ConfigureCloudRoutes)
 	}
 
-	resourcequotacontroller.NewResourceQuotaController(kubeClient).Run(s.ResourceQuotaSyncPeriod)
+	resourceQuotaControllerClient := client("resourcequota-controller")
+	resourceQuotaRegistry := quotainstall.NewRegistry(resourceQuotaControllerClient)
+	groupKindsToReplenish := []unversioned.GroupKind{
+		api.Kind("Pod"),
+		api.Kind("Service"),
+		api.Kind("ReplicationController"),
+		api.Kind("PersistentVolumeClaim"),
+		api.Kind("Secret"),
+		api.Kind("ConfigMap"),
+	}
+	resourceQuotaControllerOptions := &resourcequotacontroller.ResourceQuotaControllerOptions{
+		KubeClient:                resourceQuotaControllerClient,
+		ResyncPeriod:              controller.StaticResyncPeriodFunc(s.ResourceQuotaSyncPeriod.Duration),
+		Registry:                  resourceQuotaRegistry,
+		ControllerFactory:         resourcequotacontroller.NewReplenishmentControllerFactory(sharedInformers.Pods().Informer(), resourceQuotaControllerClient),
+		ReplenishmentResyncPeriod: ResyncPeriod(s),
+		GroupKindsToReplenish:     groupKindsToReplenish,
+	}
+	go resourcequotacontroller.NewResourceQuotaController(resourceQuotaControllerOptions).Run(int(s.ConcurrentResourceQuotaSyncs), wait.NeverStop)
+	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 
 	// If apiserver is not running we should wait for some time and fail only then. This is particularly
 	// important when we start apiserver and controller manager at the same time.
 	var versionStrings []string
 	err = wait.PollImmediate(time.Second, 10*time.Second, func() (bool, error) {
-		if versionStrings, err = client.ServerAPIVersions(kubeconfig); err == nil {
+		if versionStrings, err = restclient.ServerAPIVersions(kubeconfig); err == nil {
 			return true, nil
 		}
 		glog.Errorf("Failed to get api versions from server: %v", err)
@@ -321,12 +307,24 @@ func (s *CMServer) Run(_ []string) error {
 	}
 	versions := &unversioned.APIVersions{Versions: versionStrings}
 
-	resourceMap, err := kubeClient.Discovery().ServerResources()
+	resourceMap, err := discoveryClient.ServerResources()
 	if err != nil {
 		glog.Fatalf("Failed to get supported resources from server: %v", err)
 	}
 
-	namespacecontroller.NewNamespaceController(kubeClient, versions, s.NamespaceSyncPeriod).Run()
+	// TODO: should use a dynamic RESTMapper built from the discovery results.
+	restMapper := registered.RESTMapper()
+
+	// Find the list of namespaced resources via discovery that the namespace controller must manage
+	namespaceKubeClient := client("namespace-controller")
+	namespaceClientPool := dynamic.NewClientPool(restclient.AddUserAgent(kubeconfig, "namespace-controller"), restMapper, dynamic.LegacyAPIPathResolverFunc)
+	groupVersionResources, err := namespaceKubeClient.Discovery().ServerPreferredNamespacedResources()
+	if err != nil {
+		glog.Fatalf("Failed to get supported resources from server: %v", err)
+	}
+	namespaceController := namespacecontroller.NewNamespaceController(namespaceKubeClient, namespaceClientPool, groupVersionResources, s.NamespaceSyncPeriod.Duration, api.FinalizerKubernetes)
+	go namespaceController.Run(int(s.ConcurrentNamespaceSyncs), wait.NeverStop)
+	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 
 	groupVersion := "extensions/v1beta1"
 	resources, found := resourceMap[groupVersion]
@@ -335,38 +333,153 @@ func (s *CMServer) Run(_ []string) error {
 		glog.Infof("Starting %s apis", groupVersion)
 		if containsResource(resources, "horizontalpodautoscalers") {
 			glog.Infof("Starting horizontal pod controller.")
-			metricsClient := metrics.NewHeapsterMetricsClient(kubeClient, metrics.DefaultHeapsterNamespace, metrics.DefaultHeapsterScheme, metrics.DefaultHeapsterService, metrics.DefaultHeapsterPort)
-			podautoscaler.NewHorizontalController(kubeClient, metricsClient).
-				Run(s.HorizontalPodAutoscalerSyncPeriod)
+			hpaClient := client("horizontal-pod-autoscaler")
+			metricsClient := metrics.NewHeapsterMetricsClient(
+				hpaClient,
+				metrics.DefaultHeapsterNamespace,
+				metrics.DefaultHeapsterScheme,
+				metrics.DefaultHeapsterService,
+				metrics.DefaultHeapsterPort,
+			)
+			go podautoscaler.NewHorizontalController(hpaClient.Core(), hpaClient.Extensions(), hpaClient.Autoscaling(), metricsClient, s.HorizontalPodAutoscalerSyncPeriod.Duration).
+				Run(wait.NeverStop)
+			time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 		}
 
 		if containsResource(resources, "daemonsets") {
 			glog.Infof("Starting daemon set controller")
-			go daemon.NewDaemonSetsController(kubeClient, s.ResyncPeriod).
-				Run(s.ConcurrentDSCSyncs, util.NeverStop)
+			go daemon.NewDaemonSetsController(sharedInformers.DaemonSets(), sharedInformers.Pods(), sharedInformers.Nodes(), client("daemon-set-controller"), int(s.LookupCacheSizeForDaemonSet)).
+				Run(int(s.ConcurrentDaemonSetSyncs), wait.NeverStop)
+			time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 		}
 
 		if containsResource(resources, "jobs") {
 			glog.Infof("Starting job controller")
-			go job.NewJobController(kubeClient, s.ResyncPeriod).
-				Run(s.ConcurrentJobSyncs, util.NeverStop)
+			go job.NewJobController(sharedInformers.Pods().Informer(), client("job-controller")).
+				Run(int(s.ConcurrentJobSyncs), wait.NeverStop)
+			time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 		}
 
 		if containsResource(resources, "deployments") {
 			glog.Infof("Starting deployment controller")
-			deployment.New(kubeClient).
-				Run(s.DeploymentControllerSyncPeriod)
+			go deployment.NewDeploymentController(client("deployment-controller"), ResyncPeriod(s)).
+				Run(int(s.ConcurrentDeploymentSyncs), wait.NeverStop)
+			time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
+		}
+
+		if containsResource(resources, "replicasets") {
+			glog.Infof("Starting ReplicaSet controller")
+			go replicaset.NewReplicaSetController(sharedInformers.Pods().Informer(), client("replicaset-controller"), ResyncPeriod(s), replicaset.BurstReplicas, int(s.LookupCacheSizeForRS), s.EnableGarbageCollector).
+				Run(int(s.ConcurrentRSSyncs), wait.NeverStop)
+			time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 		}
 	}
 
-	pvclaimBinder := persistentvolumecontroller.NewPersistentVolumeClaimBinder(kubeClient, s.PVClaimBinderSyncPeriod)
-	pvclaimBinder.Run()
-
-	pvRecycler, err := persistentvolumecontroller.NewPersistentVolumeRecycler(kubeClient, s.PVClaimBinderSyncPeriod, ProbeRecyclableVolumePlugins(s.VolumeConfigFlags))
-	if err != nil {
-		glog.Fatalf("Failed to start persistent volume recycler: %+v", err)
+	groupVersion = "policy/v1alpha1"
+	resources, found = resourceMap[groupVersion]
+	glog.Infof("Attempting to start disruption controller, full resource map %+v", resourceMap)
+	if containsVersion(versions, groupVersion) && found {
+		glog.Infof("Starting %s apis", groupVersion)
+		if containsResource(resources, "poddisruptionbudgets") {
+			glog.Infof("Starting disruption controller")
+			go disruption.NewDisruptionController(sharedInformers.Pods().Informer(), client("disruption-controller")).Run(wait.NeverStop)
+			time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
+		}
 	}
-	pvRecycler.Run()
+
+	groupVersion = "apps/v1alpha1"
+	resources, found = resourceMap[groupVersion]
+	glog.Infof("Attempting to start petset, full resource map %+v", resourceMap)
+	if containsVersion(versions, groupVersion) && found {
+		glog.Infof("Starting %s apis", groupVersion)
+		if containsResource(resources, "petsets") {
+			glog.Infof("Starting PetSet controller")
+			resyncPeriod := ResyncPeriod(s)()
+			go petset.NewPetSetController(
+				sharedInformers.Pods().Informer(),
+				client("petset-controller"),
+				resyncPeriod,
+			).Run(1, wait.NeverStop)
+			time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
+		}
+	}
+
+	groupVersion = "batch/v2alpha1"
+	resources, found = resourceMap[groupVersion]
+	if containsVersion(versions, groupVersion) && found {
+		glog.Infof("Starting %s apis", groupVersion)
+		if containsResource(resources, "scheduledjobs") {
+			glog.Infof("Starting scheduledjob controller")
+			// // TODO: this is a temp fix for allowing kubeClient list v2alpha1 sj, should switch to using clientset
+			kubeconfig.ContentConfig.GroupVersion = &unversioned.GroupVersion{Group: batch.GroupName, Version: "v2alpha1"}
+			go scheduledjob.NewScheduledJobController(client("scheduledjob-controller")).
+				Run(wait.NeverStop)
+			time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
+			time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
+		}
+	} else {
+		glog.Infof("Not starting %s apis", groupVersion)
+	}
+
+	alphaProvisioner, err := NewAlphaVolumeProvisioner(cloud, s.VolumeConfiguration)
+	if err != nil {
+		glog.Fatalf("An backward-compatible provisioner could not be created: %v, but one was expected. Provisioning will not work. This functionality is considered an early Alpha version.", err)
+	}
+	volumeController := persistentvolumecontroller.NewPersistentVolumeController(
+		client("persistent-volume-binder"),
+		s.PVClaimBinderSyncPeriod.Duration,
+		alphaProvisioner,
+		ProbeControllerVolumePlugins(cloud, s.VolumeConfiguration),
+		cloud,
+		s.ClusterName,
+		nil, // volumeSource
+		nil, // claimSource
+		nil, // classSource
+		nil, // eventRecorder
+		s.VolumeConfiguration.EnableDynamicProvisioning,
+	)
+	volumeController.Run(wait.NeverStop)
+	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
+
+	attachDetachController, attachDetachControllerErr :=
+		attachdetach.NewAttachDetachController(
+			client("attachdetach-controller"),
+			sharedInformers.Pods().Informer(),
+			sharedInformers.Nodes().Informer(),
+			sharedInformers.PersistentVolumeClaims().Informer(),
+			sharedInformers.PersistentVolumes().Informer(),
+			cloud,
+			ProbeAttachableVolumePlugins(s.VolumeConfiguration),
+			recorder)
+	if attachDetachControllerErr != nil {
+		glog.Fatalf("Failed to start attach/detach controller: %v", attachDetachControllerErr)
+	}
+	go attachDetachController.Run(wait.NeverStop)
+	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
+
+	groupVersion = "certificates.k8s.io/v1alpha1"
+	resources, found = resourceMap[groupVersion]
+	glog.Infof("Attempting to start certificates, full resource map %+v", resourceMap)
+	if containsVersion(versions, groupVersion) && found {
+		glog.Infof("Starting %s apis", groupVersion)
+		if containsResource(resources, "certificatesigningrequests") {
+			glog.Infof("Starting certificate request controller")
+			resyncPeriod := ResyncPeriod(s)()
+			certController, err := certcontroller.NewCertificateController(
+				client("certificate-controller"),
+				resyncPeriod,
+				s.ClusterSigningCertFile,
+				s.ClusterSigningKeyFile,
+				s.ApproveAllKubeletCSRsForGroup,
+			)
+			if err != nil {
+				glog.Errorf("Failed to start certificate controller: %v", err)
+			} else {
+				go certController.Run(1, wait.NeverStop)
+			}
+			time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
+		}
+	}
 
 	var rootCA []byte
 
@@ -375,7 +488,7 @@ func (s *CMServer) Run(_ []string) error {
 		if err != nil {
 			return fmt.Errorf("error reading root-ca-file at %s: %v", s.RootCAFile, err)
 		}
-		if _, err := util.CertsFromPEM(rootCA); err != nil {
+		if _, err := certutil.ParseCertsPEM(rootCA); err != nil {
 			return fmt.Errorf("error parsing root-ca-file at %s: %v", s.RootCAFile, err)
 		}
 	} else {
@@ -387,20 +500,45 @@ func (s *CMServer) Run(_ []string) error {
 		if err != nil {
 			glog.Errorf("Error reading key for service account token controller: %v", err)
 		} else {
-			serviceaccount.NewTokensController(
-				kubeClient,
-				serviceaccount.TokensControllerOptions{
+			go serviceaccountcontroller.NewTokensController(
+				client("tokens-controller"),
+				serviceaccountcontroller.TokensControllerOptions{
 					TokenGenerator: serviceaccount.JWTTokenGenerator(privateKey),
 					RootCA:         rootCA,
 				},
-			).Run()
+			).Run(int(s.ConcurrentSATokenSyncs), wait.NeverStop)
+			time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 		}
 	}
 
-	serviceaccount.NewServiceAccountsController(
-		kubeClient,
-		serviceaccount.DefaultServiceAccountsControllerOptions(),
+	serviceaccountcontroller.NewServiceAccountsController(
+		client("service-account-controller"),
+		serviceaccountcontroller.DefaultServiceAccountsControllerOptions(),
 	).Run()
+	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
+
+	if s.EnableGarbageCollector {
+		gcClientset := client("generic-garbage-collector")
+		groupVersionResources, err := gcClientset.Discovery().ServerPreferredResources()
+		if err != nil {
+			glog.Fatalf("Failed to get supported resources from server: %v", err)
+		}
+
+		config := restclient.AddUserAgent(kubeconfig, "generic-garbage-collector")
+		config.ContentConfig.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: metaonly.NewMetadataCodecFactory()}
+		metaOnlyClientPool := dynamic.NewClientPool(config, restMapper, dynamic.LegacyAPIPathResolverFunc)
+		config.ContentConfig.NegotiatedSerializer = nil
+		clientPool := dynamic.NewClientPool(config, restMapper, dynamic.LegacyAPIPathResolverFunc)
+		garbageCollector, err := garbagecollector.NewGarbageCollector(metaOnlyClientPool, clientPool, restMapper, groupVersionResources)
+		if err != nil {
+			glog.Errorf("Failed to start the generic garbage collector: %v", err)
+		} else {
+			workers := int(s.ConcurrentGCSyncs)
+			go garbageCollector.Run(workers, wait.NeverStop)
+		}
+	}
+
+	sharedInformers.Start(stop)
 
 	select {}
 }

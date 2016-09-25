@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -28,7 +28,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
 )
 
@@ -47,17 +47,17 @@ func TestLog(t *testing.T) {
 	}
 	for _, test := range tests {
 		logContent := "test log content"
-		f, tf, codec := NewAPIFactory()
+		f, tf, codec, ns := NewAPIFactory()
 		tf.Client = &fake.RESTClient{
-			Codec: codec,
+			NegotiatedSerializer: ns,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				switch p, m := req.URL.Path, req.Method; {
 				case p == test.podPath && m == "GET":
 					body := objBody(codec, test.pod)
-					return &http.Response{StatusCode: 200, Body: body}, nil
+					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
 				case p == test.logPath && m == "GET":
 					body := ioutil.NopCloser(bytes.NewBufferString(logContent))
-					return &http.Response{StatusCode: 200, Body: body}, nil
+					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
 				default:
 					// Ensures no GET is performed when deleting by name
 					t.Errorf("%s: unexpected request: %#v\n%#v", test.name, req.URL, req)
@@ -66,7 +66,7 @@ func TestLog(t *testing.T) {
 			}),
 		}
 		tf.Namespace = "test"
-		tf.ClientConfig = &client.Config{GroupVersion: &unversioned.GroupVersion{Version: test.version}}
+		tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &unversioned.GroupVersion{Version: test.version}}}
 		buf := bytes.NewBuffer([]byte{})
 
 		cmd := NewCmdLogs(f, buf)
@@ -95,7 +95,7 @@ func testPod() *api.Pod {
 }
 
 func TestValidateLogFlags(t *testing.T) {
-	f, _, _ := NewAPIFactory()
+	f, _, _, _ := NewAPIFactory()
 
 	tests := []struct {
 		name     string
@@ -105,17 +105,17 @@ func TestValidateLogFlags(t *testing.T) {
 		{
 			name:     "since & since-time",
 			flags:    map[string]string{"since": "1h", "since-time": "2006-01-02T15:04:05Z"},
-			expected: "only one of sinceTime or sinceSeconds can be provided",
+			expected: "at most one of `sinceTime` or `sinceSeconds` may be specified",
 		},
 		{
 			name:     "negative limit-bytes",
 			flags:    map[string]string{"limit-bytes": "-100"},
-			expected: "limitBytes must be a positive integer or nil",
+			expected: "must be greater than 0",
 		},
 		{
 			name:     "negative tail",
 			flags:    map[string]string{"tail": "-100"},
-			expected: "tailLines must be a non-negative integer or nil",
+			expected: "must be greater than or equal to 0",
 		},
 	}
 	for _, test := range tests {
@@ -130,7 +130,6 @@ func TestValidateLogFlags(t *testing.T) {
 		cmd.Run = func(cmd *cobra.Command, args []string) {
 			o.Complete(f, os.Stdout, cmd, args)
 			out = o.Validate().Error()
-			o.RunLogs()
 		}
 		cmd.Run(cmd, []string{"foo"})
 

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ package watch
 import (
 	"sync"
 
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
@@ -80,7 +81,9 @@ const internalRunFunctionMarker = "internal-do-function"
 // a function type we can shoehorn into the queue.
 type functionFakeRuntimeObject func()
 
-func (functionFakeRuntimeObject) IsAnAPIObject() {}
+func (obj functionFakeRuntimeObject) GetObjectKind() unversioned.ObjectKind {
+	return unversioned.EmptyObjectKind
+}
 
 // Execute f, blocking the incoming queue (and waiting for it to drain first).
 // The purpose of this terrible hack is so that watchers added after an event

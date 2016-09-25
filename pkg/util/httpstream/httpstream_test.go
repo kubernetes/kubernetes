@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,6 +20,8 @@ import (
 	"net/http"
 	"reflect"
 	"testing"
+
+	"k8s.io/kubernetes/pkg/api"
 )
 
 type responseWriter struct {
@@ -46,8 +48,6 @@ func (r *responseWriter) Write([]byte) (int, error) {
 }
 
 func TestHandshake(t *testing.T) {
-	defaultProtocol := "default"
-
 	tests := map[string]struct {
 		clientProtocols  []string
 		serverProtocols  []string
@@ -57,7 +57,7 @@ func TestHandshake(t *testing.T) {
 		"no client protocols": {
 			clientProtocols:  []string{},
 			serverProtocols:  []string{"a", "b"},
-			expectedProtocol: defaultProtocol,
+			expectedProtocol: "",
 		},
 		"no common protocol": {
 			clientProtocols:  []string{"c"},
@@ -83,7 +83,7 @@ func TestHandshake(t *testing.T) {
 		}
 
 		w := newResponseWriter()
-		negotiated, err := Handshake(req, w, test.serverProtocols, defaultProtocol)
+		negotiated, err := Handshake(req, w, test.serverProtocols)
 
 		// verify negotiated protocol
 		if e, a := test.expectedProtocol, negotiated; e != a {
@@ -109,11 +109,18 @@ func TestHandshake(t *testing.T) {
 			continue
 		}
 		if w.statusCode != nil {
-			t.Errorf("%s: unexpected non-nil w.statusCode: %d", w.statusCode)
+			t.Errorf("%s: unexpected non-nil w.statusCode: %d", name, w.statusCode)
+		}
+
+		if len(test.expectedProtocol) == 0 {
+			if len(w.Header()[HeaderProtocolVersion]) > 0 {
+				t.Errorf("%s: unexpected protocol version response header: %s", name, w.Header()[HeaderProtocolVersion])
+			}
+			continue
 		}
 
 		// verify response headers
-		if e, a := []string{test.expectedProtocol}, w.Header()[HeaderProtocolVersion]; !reflect.DeepEqual(e, a) {
+		if e, a := []string{test.expectedProtocol}, w.Header()[HeaderProtocolVersion]; !api.Semantic.DeepEqual(e, a) {
 			t.Errorf("%s: protocol response header: expected %v, got %v", name, e, a)
 		}
 	}

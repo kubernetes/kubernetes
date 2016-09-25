@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2014 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -30,8 +30,7 @@ set -o pipefail
 # echo "-=-=-=-=-=-=-=-=-=-="
 
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
-source "${KUBE_ROOT}/cluster/kube-env.sh"
+KUBE_ROOT=${KUBE_ROOT:-$(dirname "${BASH_SOURCE}")/..}
 source "${KUBE_ROOT}/cluster/kube-util.sh"
 
 # Get the absolute path of the directory component of a file, i.e. the
@@ -73,8 +72,11 @@ case "$(uname -m)" in
   s390x*)
     host_arch=s390x
     ;;
+  ppc64le*)
+    host_arch=ppc64le
+    ;;
   *)
-    echo "Unsupported host arch. Must be x86_64, 386, arm or s390x." >&2
+    echo "Unsupported host arch. Must be x86_64, 386, arm, s390x or ppc64le." >&2
     exit 1
     ;;
 esac
@@ -83,6 +85,7 @@ esac
 # to find the latest one.
 if [[ -z "${KUBECTL_PATH:-}" ]]; then
   locations=(
+    "${KUBE_ROOT}/_output/bin/kubectl"
     "${KUBE_ROOT}/_output/dockerized/bin/${host_os}/${host_arch}/kubectl"
     "${KUBE_ROOT}/_output/local/bin/${host_os}/${host_arch}/kubectl"
     "${KUBE_ROOT}/platforms/${host_os}/${host_arch}/kubectl"
@@ -94,7 +97,7 @@ if [[ -z "${KUBECTL_PATH:-}" ]]; then
       echo "It looks as if you don't have a compiled kubectl binary"
       echo
       echo "If you are running from a clone of the git repo, please run"
-      echo "'./build/run.sh hack/build-cross.sh'. Note that this requires having"
+      echo "'./build/run.sh make cross'. Note that this requires having"
       echo "Docker installed."
       echo
       echo "If you are running from a binary release tarball, something is wrong. "
@@ -114,7 +117,7 @@ kubectl="${KUBECTL_PATH:-${kubectl}}"
 
 if [[ "$KUBERNETES_PROVIDER" == "gke" ]]; then
   detect-project &> /dev/null
-elif [[ "$KUBERNETES_PROVIDER" == "ubuntu" || "$KUBERNETES_PROVIDER" == "juju" ]]; then
+elif [[ "$KUBERNETES_PROVIDER" == "ubuntu" ]]; then
   detect-master > /dev/null
   config=(
     "--server=http://${KUBE_MASTER_IP}:8080"

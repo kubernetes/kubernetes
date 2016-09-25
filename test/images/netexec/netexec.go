@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -30,14 +30,37 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
+
+	utilnet "k8s.io/kubernetes/pkg/util/net"
 )
 
 var (
-	httpPort  = 8080
-	udpPort   = 8081
-	shellPath = "/bin/sh"
+	httpPort    = 8080
+	udpPort     = 8081
+	shellPath   = "/bin/sh"
+	serverReady = &atomicBool{0}
 )
+
+// atomicBool uses load/store operations on an int32 to simulate an atomic boolean.
+type atomicBool struct {
+	v int32
+}
+
+// set sets the int32 to the given boolean.
+func (a *atomicBool) set(value bool) {
+	if value {
+		atomic.StoreInt32(&a.v, 1)
+		return
+	}
+	atomic.StoreInt32(&a.v, 0)
+}
+
+// get returns true if the int32 == 1
+func (a *atomicBool) get() bool {
+	return atomic.LoadInt32(&a.v) == 1
+}
 
 type output struct {
 	responses []string
@@ -56,15 +79,63 @@ func main() {
 }
 
 func startHTTPServer(httpPort int) {
-	http.HandleFunc("/shutdown", shutdownHandler)
-	http.HandleFunc("/hostName", hostNameHandler)
+	http.HandleFunc("/", rootHandler)
+	http.HandleFunc("/clientip", clientIpHandler)
+	http.HandleFunc("/echo", echoHandler)
+	http.HandleFunc("/exit", exitHandler)
+	http.HandleFunc("/hostname", hostnameHandler)
 	http.HandleFunc("/shell", shellHandler)
 	http.HandleFunc("/upload", uploadHandler)
 	http.HandleFunc("/dial", dialHandler)
+	// older handlers
+	http.HandleFunc("/hostName", hostNameHandler)
+	http.HandleFunc("/shutdown", shutdownHandler)
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", httpPort), nil))
 }
 
+func rootHandler(w http.ResponseWriter, r *http.Request) {
+	log.Printf("GET /")
+	fmt.Fprintf(w, "NOW: %v", time.Now())
+}
+
+func echoHandler(w http.ResponseWriter, r *http.Request) {
+	log.Printf("GET /echo?msg=%s", r.FormValue("msg"))
+	fmt.Fprintf(w, "%s", r.FormValue("msg"))
+}
+
+func clientIpHandler(w http.ResponseWriter, r *http.Request) {
+	log.Printf("GET /clientip")
+	fmt.Fprintf(w, r.RemoteAddr)
+}
+
+func exitHandler(w http.ResponseWriter, r *http.Request) {
+	log.Printf("GET /exit?code=%s", r.FormValue("code"))
+	code, err := strconv.Atoi(r.FormValue("code"))
+	if err == nil || r.FormValue("code") == "" {
+		os.Exit(code)
+	}
+	fmt.Fprintf(w, "argument 'code' must be an integer [0-127] or empty, got %q", r.FormValue("code"))
+}
+
+func hostnameHandler(w http.ResponseWriter, r *http.Request) {
+	log.Printf("GET /hostname")
+	fmt.Fprintf(w, getHostName())
+	http.HandleFunc("/healthz", healthzHandler)
+	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", httpPort), nil))
+}
+
+// healthHandler response with a 200 if the UDP server is ready. It also serves
+// as a health check of the HTTP server by virtue of being a HTTP handler.
+func healthzHandler(w http.ResponseWriter, r *http.Request) {
+	if serverReady.get() {
+		w.WriteHeader(200)
+		return
+	}
+	w.WriteHeader(http.StatusPreconditionFailed)
+}
+
 func shutdownHandler(w http.ResponseWriter, r *http.Request) {
+	log.Printf("GET /shutdown")
 	os.Exit(0)
 }
 
@@ -80,6 +151,7 @@ func dialHandler(w http.ResponseWriter, r *http.Request) {
 	request := values.Query().Get("request") // hostName
 	protocol := values.Query().Get("protocol")
 	tryParam := values.Query().Get("tries")
+	log.Printf("GET /dial?host=%s&protocol=%s&port=%s&request=%s&tries=%s", host, protocol, port, request, tryParam)
 	tries := 1
 	if len(tryParam) > 0 {
 		tries, err = strconv.Atoi(tryParam)
@@ -148,7 +220,7 @@ func dialHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func dialHTTP(request, hostPort string) (string, error) {
-	transport := &http.Transport{}
+	transport := utilnet.SetTransportDefaults(&http.Transport{})
 	httpClient := createHTTPClient(transport)
 	resp, err := httpClient.Get(fmt.Sprintf("http://%s/%s", hostPort, request))
 	defer transport.CloseIdleConnections()
@@ -192,9 +264,12 @@ func dialUDP(request string, remoteAddress *net.UDPAddr) (string, error) {
 }
 
 func shellHandler(w http.ResponseWriter, r *http.Request) {
-	log.Println(r.FormValue("shellCommand"))
-	log.Printf("%s %s %s\n", shellPath, "-c", r.FormValue("shellCommand"))
-	cmdOut, err := exec.Command(shellPath, "-c", r.FormValue("shellCommand")).CombinedOutput()
+	cmd := r.FormValue("shellCommand")
+	if cmd == "" {
+		cmd = r.FormValue("cmd")
+	}
+	log.Printf("GET /shell?cmd=%s", cmd)
+	cmdOut, err := exec.Command(shellPath, "-c", cmd).CombinedOutput()
 	output := map[string]string{}
 	if len(cmdOut) > 0 {
 		output["output"] = string(cmdOut)
@@ -212,6 +287,7 @@ func shellHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func uploadHandler(w http.ResponseWriter, r *http.Request) {
+	log.Printf("GET /upload")
 	result := map[string]string{}
 	file, _, err := r.FormFile("file")
 	if err != nil {
@@ -275,7 +351,7 @@ func hostNameHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, getHostName())
 }
 
-// udp server only supports the hostName command.
+// udp server supports the hostName, echo and clientIP commands.
 func startUDPServer(udpPort int) {
 	serverAddress, err := net.ResolveUDPAddr("udp", fmt.Sprintf(":%d", udpPort))
 	assertNoError(err)
@@ -283,16 +359,36 @@ func startUDPServer(udpPort int) {
 	defer serverConn.Close()
 	buf := make([]byte, 1024)
 
+	log.Printf("Started UDP server")
+	// Start responding to readiness probes.
+	serverReady.set(true)
+	defer func() {
+		log.Printf("UDP server exited")
+		serverReady.set(false)
+	}()
 	for {
 		n, clientAddress, err := serverConn.ReadFromUDP(buf)
 		assertNoError(err)
-		receivedText := strings.TrimSpace(string(buf[0:n]))
-		if receivedText == "hostName" {
+		receivedText := strings.ToLower(strings.TrimSpace(string(buf[0:n])))
+		if receivedText == "hostname" {
 			log.Println("Sending udp hostName response")
 			_, err = serverConn.WriteToUDP([]byte(getHostName()), clientAddress)
 			assertNoError(err)
+		} else if strings.HasPrefix(receivedText, "echo ") {
+			parts := strings.SplitN(receivedText, " ", 2)
+			resp := ""
+			if len(parts) == 2 {
+				resp = parts[1]
+			}
+			log.Printf("Echoing %v\n", resp)
+			_, err = serverConn.WriteToUDP([]byte(resp), clientAddress)
+			assertNoError(err)
+		} else if receivedText == "clientip" {
+			log.Printf("Sending back clientip to %s", clientAddress.String())
+			_, err = serverConn.WriteToUDP([]byte(clientAddress.String()), clientAddress)
+			assertNoError(err)
 		} else if len(receivedText) > 0 {
-			log.Println("Unknown udp command received. ", receivedText)
+			log.Printf("Unknown udp command received: %v\n", receivedText)
 		}
 	}
 }

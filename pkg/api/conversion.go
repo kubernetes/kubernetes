@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,145 +17,229 @@ limitations under the License.
 package api
 
 import (
+	"fmt"
+
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util/intstr"
+	utillabels "k8s.io/kubernetes/pkg/util/labels"
+	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
-// Codec is the identity codec for this package - it can only convert itself
-// to itself.
-var Codec = runtime.CodecFor(Scheme, "")
+func addConversionFuncs(scheme *runtime.Scheme) error {
+	return scheme.AddConversionFuncs(
+		Convert_unversioned_TypeMeta_To_unversioned_TypeMeta,
 
-func init() {
-	Scheme.AddDefaultingFuncs(
-		func(obj *unversioned.ListOptions) {
-			if obj.LabelSelector.Selector == nil {
-				obj.LabelSelector = unversioned.LabelSelector{labels.Everything()}
-			}
-			if obj.FieldSelector.Selector == nil {
-				obj.FieldSelector = unversioned.FieldSelector{fields.Everything()}
-			}
-		},
+		Convert_unversioned_ListMeta_To_unversioned_ListMeta,
+
+		Convert_intstr_IntOrString_To_intstr_IntOrString,
+
+		Convert_unversioned_Time_To_unversioned_Time,
+
+		Convert_Slice_string_To_unversioned_Time,
+
+		Convert_resource_Quantity_To_resource_Quantity,
+
+		Convert_string_To_labels_Selector,
+		Convert_labels_Selector_To_string,
+
+		Convert_string_To_fields_Selector,
+		Convert_fields_Selector_To_string,
+
+		Convert_Pointer_bool_To_bool,
+		Convert_bool_To_Pointer_bool,
+
+		Convert_Pointer_string_To_string,
+		Convert_string_To_Pointer_string,
+
+		Convert_Pointer_int64_To_int,
+		Convert_int_To_Pointer_int64,
+
+		Convert_Pointer_int32_To_int32,
+		Convert_int32_To_Pointer_int32,
+
+		Convert_Pointer_float64_To_float64,
+		Convert_float64_To_Pointer_float64,
+
+		Convert_map_to_unversioned_LabelSelector,
+		Convert_unversioned_LabelSelector_to_map,
 	)
-	Scheme.AddConversionFuncs(
-		func(in *unversioned.Time, out *unversioned.Time, s conversion.Scope) error {
-			// Cannot deep copy these, because time.Time has unexported fields.
-			*out = *in
-			return nil
-		},
-		func(in *string, out *labels.Selector, s conversion.Scope) error {
-			selector, err := labels.Parse(*in)
-			if err != nil {
-				return err
-			}
-			*out = selector
-			return nil
-		},
-		func(in *string, out *fields.Selector, s conversion.Scope) error {
-			selector, err := fields.ParseSelector(*in)
-			if err != nil {
-				return err
-			}
-			*out = selector
-			return nil
-		},
-		func(in *labels.Selector, out *string, s conversion.Scope) error {
-			if *in == nil {
-				return nil
-			}
-			*out = (*in).String()
-			return nil
-		},
-		func(in *fields.Selector, out *string, s conversion.Scope) error {
-			if *in == nil {
-				return nil
-			}
-			*out = (*in).String()
-			return nil
-		},
-		func(in *string, out *unversioned.LabelSelector, s conversion.Scope) error {
-			selector, err := labels.Parse(*in)
-			if err != nil {
-				return err
-			}
-			*out = unversioned.LabelSelector{selector}
-			return nil
-		},
-		func(in *string, out *unversioned.FieldSelector, s conversion.Scope) error {
-			selector, err := fields.ParseSelector(*in)
-			if err != nil {
-				return err
-			}
-			*out = unversioned.FieldSelector{selector}
-			return nil
-		},
-		func(in *[]string, out *unversioned.LabelSelector, s conversion.Scope) error {
-			selectorString := ""
-			if len(*in) > 0 {
-				selectorString = (*in)[0]
-			}
-			selector, err := labels.Parse(selectorString)
-			if err != nil {
-				return err
-			}
-			*out = unversioned.LabelSelector{selector}
-			return nil
-		},
-		func(in *[]string, out *unversioned.FieldSelector, s conversion.Scope) error {
-			selectorString := ""
-			if len(*in) > 0 {
-				selectorString = (*in)[0]
-			}
-			selector, err := fields.ParseSelector(selectorString)
-			if err != nil {
-				return err
-			}
-			*out = unversioned.FieldSelector{selector}
-			return nil
-		},
-		func(in *unversioned.LabelSelector, out *string, s conversion.Scope) error {
-			if in.Selector == nil {
-				return nil
-			}
-			*out = in.Selector.String()
-			return nil
-		},
-		func(in *unversioned.FieldSelector, out *string, s conversion.Scope) error {
-			if in.Selector == nil {
-				return nil
-			}
-			*out = in.Selector.String()
-			return nil
-		},
-		func(in *unversioned.LabelSelector, out *unversioned.LabelSelector, s conversion.Scope) error {
-			if in.Selector == nil {
-				return nil
-			}
-			selector, err := labels.Parse(in.Selector.String())
-			if err != nil {
-				return err
-			}
-			out.Selector = selector
-			return nil
-		},
-		func(in *unversioned.FieldSelector, out *unversioned.FieldSelector, s conversion.Scope) error {
-			if in.Selector == nil {
-				return nil
-			}
-			selector, err := fields.ParseSelector(in.Selector.String())
-			if err != nil {
-				return err
-			}
-			out.Selector = selector
-			return nil
-		},
-		func(in *resource.Quantity, out *resource.Quantity, s conversion.Scope) error {
-			// Cannot deep copy these, because inf.Dec has unexported fields.
-			*out = *in.Copy()
-			return nil
-		},
-	)
+}
+
+func Convert_Pointer_float64_To_float64(in **float64, out *float64, s conversion.Scope) error {
+	if *in == nil {
+		*out = 0
+		return nil
+	}
+	*out = float64(**in)
+	return nil
+}
+
+func Convert_float64_To_Pointer_float64(in *float64, out **float64, s conversion.Scope) error {
+	temp := float64(*in)
+	*out = &temp
+	return nil
+}
+
+func Convert_Pointer_int32_To_int32(in **int32, out *int32, s conversion.Scope) error {
+	if *in == nil {
+		*out = 0
+		return nil
+	}
+	*out = int32(**in)
+	return nil
+}
+
+func Convert_int32_To_Pointer_int32(in *int32, out **int32, s conversion.Scope) error {
+	temp := int32(*in)
+	*out = &temp
+	return nil
+}
+
+func Convert_Pointer_int64_To_int(in **int64, out *int, s conversion.Scope) error {
+	if *in == nil {
+		*out = 0
+		return nil
+	}
+	*out = int(**in)
+	return nil
+}
+
+func Convert_int_To_Pointer_int64(in *int, out **int64, s conversion.Scope) error {
+	temp := int64(*in)
+	*out = &temp
+	return nil
+}
+
+func Convert_Pointer_string_To_string(in **string, out *string, s conversion.Scope) error {
+	if *in == nil {
+		*out = ""
+		return nil
+	}
+	*out = **in
+	return nil
+}
+
+func Convert_string_To_Pointer_string(in *string, out **string, s conversion.Scope) error {
+	if in == nil {
+		stringVar := ""
+		*out = &stringVar
+		return nil
+	}
+	*out = in
+	return nil
+}
+
+func Convert_Pointer_bool_To_bool(in **bool, out *bool, s conversion.Scope) error {
+	if *in == nil {
+		*out = false
+		return nil
+	}
+	*out = **in
+	return nil
+}
+
+func Convert_bool_To_Pointer_bool(in *bool, out **bool, s conversion.Scope) error {
+	if in == nil {
+		boolVar := false
+		*out = &boolVar
+		return nil
+	}
+	*out = in
+	return nil
+}
+
+func Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(in, out *unversioned.TypeMeta, s conversion.Scope) error {
+	// These values are explicitly not copied
+	//out.APIVersion = in.APIVersion
+	//out.Kind = in.Kind
+	return nil
+}
+
+func Convert_unversioned_ListMeta_To_unversioned_ListMeta(in, out *unversioned.ListMeta, s conversion.Scope) error {
+	*out = *in
+	return nil
+}
+
+func Convert_intstr_IntOrString_To_intstr_IntOrString(in, out *intstr.IntOrString, s conversion.Scope) error {
+	*out = *in
+	return nil
+}
+
+func Convert_unversioned_Time_To_unversioned_Time(in *unversioned.Time, out *unversioned.Time, s conversion.Scope) error {
+	// Cannot deep copy these, because time.Time has unexported fields.
+	*out = *in
+	return nil
+}
+
+// Convert_Slice_string_To_unversioned_Time allows converting a URL query parameter value
+func Convert_Slice_string_To_unversioned_Time(input *[]string, out *unversioned.Time, s conversion.Scope) error {
+	str := ""
+	if len(*input) > 0 {
+		str = (*input)[0]
+	}
+	return out.UnmarshalQueryParameter(str)
+}
+
+func Convert_string_To_labels_Selector(in *string, out *labels.Selector, s conversion.Scope) error {
+	selector, err := labels.Parse(*in)
+	if err != nil {
+		return err
+	}
+	*out = selector
+	return nil
+}
+
+func Convert_string_To_fields_Selector(in *string, out *fields.Selector, s conversion.Scope) error {
+	selector, err := fields.ParseSelector(*in)
+	if err != nil {
+		return err
+	}
+	*out = selector
+	return nil
+}
+
+func Convert_labels_Selector_To_string(in *labels.Selector, out *string, s conversion.Scope) error {
+	if *in == nil {
+		return nil
+	}
+	*out = (*in).String()
+	return nil
+}
+
+func Convert_fields_Selector_To_string(in *fields.Selector, out *string, s conversion.Scope) error {
+	if *in == nil {
+		return nil
+	}
+	*out = (*in).String()
+	return nil
+}
+
+func Convert_resource_Quantity_To_resource_Quantity(in *resource.Quantity, out *resource.Quantity, s conversion.Scope) error {
+	*out = *in
+	return nil
+}
+
+func Convert_map_to_unversioned_LabelSelector(in *map[string]string, out *unversioned.LabelSelector, s conversion.Scope) error {
+	if in == nil {
+		return nil
+	}
+	out = new(unversioned.LabelSelector)
+	for labelKey, labelValue := range *in {
+		utillabels.AddLabelToSelector(out, labelKey, labelValue)
+	}
+	return nil
+}
+
+func Convert_unversioned_LabelSelector_to_map(in *unversioned.LabelSelector, out *map[string]string, s conversion.Scope) error {
+	var err error
+	*out, err = unversioned.LabelSelectorAsMap(in)
+	if err != nil {
+		err = field.Invalid(field.NewPath("labelSelector"), *in, fmt.Sprintf("cannot convert to old selector: %v", err))
+	}
+	return err
 }

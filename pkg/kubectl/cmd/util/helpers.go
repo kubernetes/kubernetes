@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,33 +19,39 @@ package util
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
-	"net/http"
 	"net/url"
 	"os"
 	"strings"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/latest"
+	"k8s.io/kubernetes/pkg/api"
+	kerrors "k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/client/typed/discovery"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
+	utilexec "k8s.io/kubernetes/pkg/util/exec"
+	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/util/strategicpatch"
 
-	"github.com/evanphx/json-patch"
+	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 )
 
 const (
 	ApplyAnnotationsFlag = "save-config"
+	DefaultErrorExitCode = 1
 )
 
 type debugError interface {
@@ -54,13 +60,13 @@ type debugError interface {
 
 // AddSourceToErr adds handleResourcePrefix and source string to error message.
 // verb is the string like "creating", "deleting" etc.
-// souce is the filename or URL to the template file(*.json or *.yaml), or stdin to use to handle the resource.
+// source is the filename or URL to the template file(*.json or *.yaml), or stdin to use to handle the resource.
 func AddSourceToErr(verb string, source string, err error) error {
 	if source != "" {
-		if statusError, ok := err.(*errors.StatusError); ok {
+		if statusError, ok := err.(kerrors.APIStatus); ok {
 			status := statusError.Status()
 			status.Message = fmt.Sprintf("error when %s %q: %v", verb, source, status.Message)
-			return &errors.StatusError{ErrStatus: status}
+			return &kerrors.StatusError{ErrStatus: status}
 		}
 		return fmt.Errorf("error when %s %q: %v", verb, source, err)
 	}
@@ -70,25 +76,33 @@ func AddSourceToErr(verb string, source string, err error) error {
 var fatalErrHandler = fatal
 
 // BehaviorOnFatal allows you to override the default behavior when a fatal
-// error occurs, which is call os.Exit(1). You can pass 'panic' as a function
+// error occurs, which is to call os.Exit(code). You can pass 'panic' as a function
 // here if you prefer the panic() over os.Exit(1).
-func BehaviorOnFatal(f func(string)) {
+func BehaviorOnFatal(f func(string, int)) {
 	fatalErrHandler = f
 }
 
-// fatal prints the message and then exits. If V(2) or greater, glog.Fatal
-// is invoked for extended information.
-func fatal(msg string) {
-	// add newline if needed
-	if !strings.HasSuffix(msg, "\n") {
-		msg += "\n"
-	}
+// DefaultBehaviorOnFatal allows you to undo any previous override.  Useful in
+// tests.
+func DefaultBehaviorOnFatal() {
+	fatalErrHandler = fatal
+}
 
-	if glog.V(2) {
-		glog.FatalDepth(2, msg)
+// fatal prints the message if set and then exits. If V(2) or greater, glog.Fatal
+// is invoked for extended information.
+func fatal(msg string, code int) {
+	if len(msg) > 0 {
+		// add newline if needed
+		if !strings.HasSuffix(msg, "\n") {
+			msg += "\n"
+		}
+
+		if glog.V(2) {
+			glog.FatalDepth(2, msg)
+		}
+		fmt.Fprint(os.Stderr, msg)
 	}
-	fmt.Fprint(os.Stderr, msg)
-	os.Exit(1)
+	os.Exit(code)
 }
 
 // CheckErr prints a user friendly error to STDERR and exits with a non-zero
@@ -97,40 +111,73 @@ func fatal(msg string) {
 // This method is generic to the command in use and may be used by non-Kubectl
 // commands.
 func CheckErr(err error) {
-	checkErr(err, fatalErrHandler)
+	checkErr("", err, fatalErrHandler)
 }
 
-func checkErr(err error, handleErr func(string)) {
-	if err == nil {
+// checkErrWithPrefix works like CheckErr, but adds a caller-defined prefix to non-nil errors
+func checkErrWithPrefix(prefix string, err error) {
+	checkErr(prefix, err, fatalErrHandler)
+}
+
+// checkErr formats a given error as a string and calls the passed handleErr
+// func with that string and an kubectl exit code.
+func checkErr(prefix string, err error, handleErr func(string, int)) {
+	switch {
+	case err == nil:
 		return
+	case kerrors.IsInvalid(err):
+		details := err.(*kerrors.StatusError).Status().Details
+		s := fmt.Sprintf("%sThe %s %q is invalid", prefix, details.Kind, details.Name)
+		if len(details.Causes) > 0 {
+			errs := statusCausesToAggrError(details.Causes)
+			handleErr(MultilineError(s+": ", errs), DefaultErrorExitCode)
+		} else {
+			handleErr(s, DefaultErrorExitCode)
+		}
+	case clientcmd.IsConfigurationInvalid(err):
+		handleErr(MultilineError(fmt.Sprintf("%sError in configuration: ", prefix), err), DefaultErrorExitCode)
+	default:
+		switch err := err.(type) {
+		case *meta.NoResourceMatchError:
+			switch {
+			case len(err.PartialResource.Group) > 0 && len(err.PartialResource.Version) > 0:
+				handleErr(fmt.Sprintf("%sthe server doesn't have a resource type %q in group %q and version %q", prefix, err.PartialResource.Resource, err.PartialResource.Group, err.PartialResource.Version), DefaultErrorExitCode)
+			case len(err.PartialResource.Group) > 0:
+				handleErr(fmt.Sprintf("%sthe server doesn't have a resource type %q in group %q", prefix, err.PartialResource.Resource, err.PartialResource.Group), DefaultErrorExitCode)
+			case len(err.PartialResource.Version) > 0:
+				handleErr(fmt.Sprintf("%sthe server doesn't have a resource type %q in version %q", prefix, err.PartialResource.Resource, err.PartialResource.Version), DefaultErrorExitCode)
+			default:
+				handleErr(fmt.Sprintf("%sthe server doesn't have a resource type %q", prefix, err.PartialResource.Resource), DefaultErrorExitCode)
+			}
+		case utilerrors.Aggregate:
+			handleErr(MultipleErrors(prefix, err.Errors()), DefaultErrorExitCode)
+		case utilexec.ExitError:
+			// do not print anything, only terminate with given error
+			handleErr("", err.ExitStatus())
+		default: // for any other error type
+			msg, ok := StandardErrorMessage(err)
+			if !ok {
+				msg = err.Error()
+				if !strings.HasPrefix(msg, "error: ") {
+					msg = fmt.Sprintf("error: %s", msg)
+				}
+			}
+			handleErr(msg, DefaultErrorExitCode)
+		}
 	}
-
-	if errors.IsInvalid(err) {
-		details := err.(*errors.StatusError).Status().Details
-		prefix := fmt.Sprintf("The %s %q is invalid.\n", details.Kind, details.Name)
-		errs := statusCausesToAggrError(details.Causes)
-		handleErr(MultilineError(prefix, errs))
-	}
-
-	// handle multiline errors
-	if clientcmd.IsConfigurationInvalid(err) {
-		handleErr(MultilineError("Error in configuration: ", err))
-	}
-	if agg, ok := err.(utilerrors.Aggregate); ok && len(agg.Errors()) > 0 {
-		handleErr(MultipleErrors("", agg.Errors()))
-	}
-
-	msg, ok := StandardErrorMessage(err)
-	if !ok {
-		msg = fmt.Sprintf("error: %s", err.Error())
-	}
-	handleErr(msg)
 }
 
 func statusCausesToAggrError(scs []unversioned.StatusCause) utilerrors.Aggregate {
-	errs := make([]error, len(scs))
-	for i, sc := range scs {
-		errs[i] = fmt.Errorf("%s: %s", sc.Field, sc.Message)
+	errs := make([]error, 0, len(scs))
+	errorMsgs := sets.NewString()
+	for _, sc := range scs {
+		// check for duplicate error messages and skip them
+		msg := fmt.Sprintf("%s: %s", sc.Field, sc.Message)
+		if errorMsgs.Has(msg) {
+			continue
+		}
+		errorMsgs.Insert(msg)
+		errs = append(errs, errors.New(msg))
 	}
 	return utilerrors.NewAggregate(errs)
 }
@@ -145,11 +192,18 @@ func StandardErrorMessage(err error) (string, bool) {
 	if debugErr, ok := err.(debugError); ok {
 		glog.V(4).Infof(debugErr.DebugError())
 	}
-	_, isStatus := err.(client.APIStatus)
+	status, isStatus := err.(kerrors.APIStatus)
 	switch {
 	case isStatus:
-		return fmt.Sprintf("Error from server: %s", err.Error()), true
-	case errors.IsUnexpectedObjectError(err):
+		switch s := status.Status(); {
+		case s.Reason == unversioned.StatusReasonUnauthorized:
+			return fmt.Sprintf("error: You must be logged in to the server (%s)", s.Message), true
+		case len(s.Reason) > 0:
+			return fmt.Sprintf("Error from server (%s): %s", s.Reason, err.Error()), true
+		default:
+			return fmt.Sprintf("Error from server: %s", err.Error()), true
+		}
+	case kerrors.IsUnexpectedObjectError(err):
 		return fmt.Sprintf("Server returned an unexpected response: %s", err.Error()), true
 	}
 	switch t := err.(type) {
@@ -214,12 +268,24 @@ func UsageError(cmd *cobra.Command, format string, args ...interface{}) error {
 	return fmt.Errorf("%s\nSee '%s -h' for help and examples.", msg, cmd.CommandPath())
 }
 
-func getFlag(cmd *cobra.Command, flag string) *pflag.Flag {
-	f := cmd.Flags().Lookup(flag)
-	if f == nil {
-		glog.Fatalf("flag accessed but not defined for command %s: %s", cmd.Name(), flag)
+func IsFilenameEmpty(filenames []string) bool {
+	if len(filenames) == 0 {
+		return true
 	}
-	return f
+	return false
+}
+
+// Whether this cmd need watching objects.
+func isWatch(cmd *cobra.Command) bool {
+	if w, err := cmd.Flags().GetBool("watch"); w && err == nil {
+		return true
+	}
+
+	if wo, err := cmd.Flags().GetBool("watch-only"); wo && err == nil {
+		return true
+	}
+
+	return false
 }
 
 func GetFlagString(cmd *cobra.Command, flag string) string {
@@ -285,10 +351,28 @@ func GetFlagDuration(cmd *cobra.Command, flag string) time.Duration {
 func AddValidateFlags(cmd *cobra.Command) {
 	cmd.Flags().Bool("validate", true, "If true, use a schema to validate the input before sending it")
 	cmd.Flags().String("schema-cache-dir", fmt.Sprintf("~/%s/%s", clientcmd.RecommendedHomeDir, clientcmd.RecommendedSchemaName), fmt.Sprintf("If non-empty, load/store cached API schemas in this directory, default is '$HOME/%s/%s'", clientcmd.RecommendedHomeDir, clientcmd.RecommendedSchemaName))
+	cmd.MarkFlagFilename("schema-cache-dir")
+}
+
+func AddFilenameOptionFlags(cmd *cobra.Command, options *resource.FilenameOptions, usage string) {
+	kubectl.AddJsonFilenameFlag(cmd, &options.Filenames, "Filename, directory, or URL to files "+usage)
+	cmd.Flags().BoolVarP(&options.Recursive, "recursive", "R", options.Recursive, "Process the directory used in -f, --filename recursively. Useful when you want to manage related manifests organized within the same directory.")
+}
+
+// AddDryRunFlag adds dry-run flag to a command. Usually used by mutations.
+func AddDryRunFlag(cmd *cobra.Command) {
+	cmd.Flags().Bool("dry-run", false, "If true, only print the object that would be sent, without sending it.")
 }
 
 func AddApplyAnnotationFlags(cmd *cobra.Command) {
 	cmd.Flags().Bool(ApplyAnnotationsFlag, false, "If true, the configuration of current object will be saved in its annotation. This is useful when you want to perform kubectl apply on this object in the future.")
+}
+
+// AddGeneratorFlags adds flags common to resource generation commands
+// TODO: need to take a pass at other generator commands to use this set of flags
+func AddGeneratorFlags(cmd *cobra.Command, defaultGenerator string) {
+	cmd.Flags().String("generator", defaultGenerator, "The name of the API generator to use.")
+	AddDryRunFlag(cmd)
 }
 
 func ReadConfigDataFromReader(reader io.Reader, source string) ([]byte, error) {
@@ -298,78 +382,17 @@ func ReadConfigDataFromReader(reader io.Reader, source string) ([]byte, error) {
 	}
 
 	if len(data) == 0 {
-		return nil, fmt.Errorf(`Read from %s but no data found`, source)
+		return nil, fmt.Errorf("Read from %s but no data found", source)
 	}
 
 	return data, nil
 }
 
-// ReadConfigData reads the bytes from the specified filesytem or network
-// location or from stdin if location == "-".
-// TODO: replace with resource.Builder
-func ReadConfigData(location string) ([]byte, error) {
-	if len(location) == 0 {
-		return nil, fmt.Errorf("location given but empty")
-	}
-
-	if location == "-" {
-		// Read from stdin.
-		return ReadConfigDataFromReader(os.Stdin, "stdin ('-')")
-	}
-
-	// Use the location as a file path or URL.
-	return ReadConfigDataFromLocation(location)
-}
-
-// TODO: replace with resource.Builder
-func ReadConfigDataFromLocation(location string) ([]byte, error) {
-	// we look for http:// or https:// to determine if valid URL, otherwise do normal file IO
-	if strings.Index(location, "http://") == 0 || strings.Index(location, "https://") == 0 {
-		resp, err := http.Get(location)
-		if err != nil {
-			return nil, fmt.Errorf("unable to access URL %s: %v\n", location, err)
-		}
-		defer resp.Body.Close()
-		if resp.StatusCode != 200 {
-			return nil, fmt.Errorf("unable to read URL, server reported %d %s", resp.StatusCode, resp.Status)
-		}
-		return ReadConfigDataFromReader(resp.Body, location)
-	} else {
-		file, err := os.Open(location)
-		if err != nil {
-			return nil, fmt.Errorf("unable to read %s: %v\n", location, err)
-		}
-		return ReadConfigDataFromReader(file, location)
-	}
-}
-
-func Merge(dst runtime.Object, fragment, kind string) (runtime.Object, error) {
-	// Ok, this is a little hairy, we'd rather not force the user to specify a kind for their JSON
-	// So we pull it into a map, add the Kind field, and then reserialize.
-	// We also pull the apiVersion for proper parsing
-	var intermediate interface{}
-	if err := json.Unmarshal([]byte(fragment), &intermediate); err != nil {
-		return nil, err
-	}
-	dataMap, ok := intermediate.(map[string]interface{})
-	if !ok {
-		return nil, fmt.Errorf("Expected a map, found something else: %s", fragment)
-	}
-	version, found := dataMap["apiVersion"]
-	if !found {
-		return nil, fmt.Errorf("Inline JSON requires an apiVersion field")
-	}
-	versionString, ok := version.(string)
-	if !ok {
-		return nil, fmt.Errorf("apiVersion must be a string")
-	}
-	i, err := latest.GroupOrDie("").InterfacesFor(versionString)
-	if err != nil {
-		return nil, err
-	}
-
+// Merge requires JSON serialization
+// TODO: merge assumes JSON serialization, and does not properly abstract API retrieval
+func Merge(codec runtime.Codec, dst runtime.Object, fragment, kind string) (runtime.Object, error) {
 	// encode dst into versioned json and apply fragment directly too it
-	target, err := i.Codec.Encode(dst)
+	target, err := runtime.Encode(codec, dst)
 	if err != nil {
 		return nil, err
 	}
@@ -377,7 +400,7 @@ func Merge(dst runtime.Object, fragment, kind string) (runtime.Object, error) {
 	if err != nil {
 		return nil, err
 	}
-	out, err := i.Codec.Decode(patched)
+	out, err := runtime.Decode(codec, patched)
 	if err != nil {
 		return nil, err
 	}
@@ -410,7 +433,7 @@ func DumpReaderToFile(reader io.Reader, filename string) error {
 }
 
 // UpdateObject updates resource object with updateFn
-func UpdateObject(info *resource.Info, updateFn func(runtime.Object) error) (runtime.Object, error) {
+func UpdateObject(info *resource.Info, codec runtime.Codec, updateFn func(runtime.Object) error) (runtime.Object, error) {
 	helper := resource.NewHelper(info.Client, info.Mapping)
 
 	if err := updateFn(info.Object); err != nil {
@@ -418,7 +441,7 @@ func UpdateObject(info *resource.Info, updateFn func(runtime.Object) error) (run
 	}
 
 	// Update the annotation used by kubectl apply
-	if err := kubectl.UpdateApplyAnnotation(info); err != nil {
+	if err := kubectl.UpdateApplyAnnotation(info, codec); err != nil {
 		return nil, err
 	}
 
@@ -427,4 +450,255 @@ func UpdateObject(info *resource.Info, updateFn func(runtime.Object) error) (run
 	}
 
 	return info.Object, nil
+}
+
+// AddCmdRecordFlag adds --record flag to command
+func AddRecordFlag(cmd *cobra.Command) {
+	cmd.Flags().Bool("record", false, "Record current kubectl command in the resource annotation. If set to false, do not record the command. If set to true, record the command. If not set, default to updating the existing annotation value only if one already exists.")
+}
+
+func GetRecordFlag(cmd *cobra.Command) bool {
+	return GetFlagBool(cmd, "record")
+}
+
+func GetDryRunFlag(cmd *cobra.Command) bool {
+	return GetFlagBool(cmd, "dry-run")
+}
+
+// RecordChangeCause annotate change-cause to input runtime object.
+func RecordChangeCause(obj runtime.Object, changeCause string) error {
+	accessor, err := meta.Accessor(obj)
+	if err != nil {
+		return err
+	}
+	annotations := accessor.GetAnnotations()
+	if annotations == nil {
+		annotations = make(map[string]string)
+	}
+	annotations[kubectl.ChangeCauseAnnotation] = changeCause
+	accessor.SetAnnotations(annotations)
+	return nil
+}
+
+// ChangeResourcePatch creates a strategic merge patch between the origin input resource info
+// and the annotated with change-cause input resource info.
+func ChangeResourcePatch(info *resource.Info, changeCause string) ([]byte, error) {
+	oldData, err := json.Marshal(info.Object)
+	if err != nil {
+		return nil, err
+	}
+	if err := RecordChangeCause(info.Object, changeCause); err != nil {
+		return nil, err
+	}
+	newData, err := json.Marshal(info.Object)
+	if err != nil {
+		return nil, err
+	}
+	return strategicpatch.CreateTwoWayMergePatch(oldData, newData, info.Object)
+}
+
+// containsChangeCause checks if input resource info contains change-cause annotation.
+func ContainsChangeCause(info *resource.Info) bool {
+	annotations, err := info.Mapping.MetadataAccessor.Annotations(info.Object)
+	if err != nil {
+		return false
+	}
+	return len(annotations[kubectl.ChangeCauseAnnotation]) > 0
+}
+
+// ShouldRecord checks if we should record current change cause
+func ShouldRecord(cmd *cobra.Command, info *resource.Info) bool {
+	return GetRecordFlag(cmd) || (ContainsChangeCause(info) && !cmd.Flags().Changed("record"))
+}
+
+// GetThirdPartyGroupVersions returns the thirdparty "group/versions"s and
+// resources supported by the server. A user may delete a thirdparty resource
+// when this function is running, so this function may return a "NotFound" error
+// due to the race.
+func GetThirdPartyGroupVersions(discovery discovery.DiscoveryInterface) ([]unversioned.GroupVersion, []unversioned.GroupVersionKind, error) {
+	result := []unversioned.GroupVersion{}
+	gvks := []unversioned.GroupVersionKind{}
+
+	groupList, err := discovery.ServerGroups()
+	if err != nil {
+		// On forbidden or not found, just return empty lists.
+		if kerrors.IsForbidden(err) || kerrors.IsNotFound(err) {
+			return result, gvks, nil
+		}
+
+		return nil, nil, err
+	}
+
+	for ix := range groupList.Groups {
+		group := &groupList.Groups[ix]
+		for jx := range group.Versions {
+			gv, err2 := unversioned.ParseGroupVersion(group.Versions[jx].GroupVersion)
+			if err2 != nil {
+				return nil, nil, err
+			}
+			// Skip GroupVersionKinds that have been statically registered.
+			if registered.IsRegisteredVersion(gv) {
+				continue
+			}
+			result = append(result, gv)
+
+			resourceList, err := discovery.ServerResourcesForGroupVersion(group.Versions[jx].GroupVersion)
+			if err != nil {
+				return nil, nil, err
+			}
+			for kx := range resourceList.APIResources {
+				gvks = append(gvks, gv.WithKind(resourceList.APIResources[kx].Kind))
+			}
+		}
+	}
+	return result, gvks, nil
+}
+
+func AddInclude3rdPartyFlags(cmd *cobra.Command) {
+	cmd.Flags().Bool("include-extended-apis", true, "If true, include definitions of new APIs via calls to the API server. [default true]")
+	cmd.Flags().MarkDeprecated("include-extended-apis", "No longer required.")
+}
+
+// GetResourcesAndPairs retrieves resources and "KEY=VALUE or KEY-" pair args from given args
+func GetResourcesAndPairs(args []string, pairType string) (resources []string, pairArgs []string, err error) {
+	foundPair := false
+	for _, s := range args {
+		nonResource := strings.Contains(s, "=") || strings.HasSuffix(s, "-")
+		switch {
+		case !foundPair && nonResource:
+			foundPair = true
+			fallthrough
+		case foundPair && nonResource:
+			pairArgs = append(pairArgs, s)
+		case !foundPair && !nonResource:
+			resources = append(resources, s)
+		case foundPair && !nonResource:
+			err = fmt.Errorf("all resources must be specified before %s changes: %s", pairType, s)
+			return
+		}
+	}
+	return
+}
+
+// ParsePairs retrieves new and remove pairs (if supportRemove is true) from "KEY=VALUE or KEY-" pair args
+func ParsePairs(pairArgs []string, pairType string, supportRemove bool) (newPairs map[string]string, removePairs []string, err error) {
+	newPairs = map[string]string{}
+	if supportRemove {
+		removePairs = []string{}
+	}
+	var invalidBuf bytes.Buffer
+
+	for _, pairArg := range pairArgs {
+		if strings.Index(pairArg, "=") != -1 {
+			parts := strings.SplitN(pairArg, "=", 2)
+			if len(parts) != 2 || len(parts[1]) == 0 {
+				if invalidBuf.Len() > 0 {
+					invalidBuf.WriteString(", ")
+				}
+				invalidBuf.WriteString(fmt.Sprintf(pairArg))
+			} else {
+				newPairs[parts[0]] = parts[1]
+			}
+		} else if supportRemove && strings.HasSuffix(pairArg, "-") {
+			removePairs = append(removePairs, pairArg[:len(pairArg)-1])
+		} else {
+			if invalidBuf.Len() > 0 {
+				invalidBuf.WriteString(", ")
+			}
+			invalidBuf.WriteString(fmt.Sprintf(pairArg))
+		}
+	}
+	if invalidBuf.Len() > 0 {
+		err = fmt.Errorf("invalid %s format: %s", pairType, invalidBuf.String())
+		return
+	}
+
+	return
+}
+
+// MaybeConvertObject attempts to convert an object to a specific group/version.  If the object is
+// a third party resource it is simply passed through.
+func MaybeConvertObject(obj runtime.Object, gv unversioned.GroupVersion, converter runtime.ObjectConvertor) (runtime.Object, error) {
+	switch obj.(type) {
+	case *extensions.ThirdPartyResourceData:
+		// conversion is not supported for 3rd party objects
+		return obj, nil
+	default:
+		return converter.ConvertToVersion(obj, gv)
+	}
+}
+
+// MustPrintWithKinds determines if printer is dealing
+// with multiple resource kinds, in which case it will
+// return true, indicating resource kind will be
+// included as part of printer output
+func MustPrintWithKinds(objs []runtime.Object, infos []*resource.Info, sorter *kubectl.RuntimeSort, printAll bool) bool {
+	var lastMap *meta.RESTMapping
+
+	if len(infos) == 1 && printAll {
+		return true
+	}
+
+	for ix := range objs {
+		var mapping *meta.RESTMapping
+		if sorter != nil {
+			mapping = infos[sorter.OriginalPosition(ix)].Mapping
+		} else {
+			mapping = infos[ix].Mapping
+		}
+
+		// display "kind" only if we have mixed resources
+		if lastMap != nil && mapping.Resource != lastMap.Resource {
+			return true
+		}
+		lastMap = mapping
+	}
+
+	return false
+}
+
+// FilterResourceList receives a list of runtime objects.
+// If any objects are filtered, that number is returned along with a modified list.
+func FilterResourceList(obj runtime.Object, filterFuncs kubectl.Filters, filterOpts *kubectl.PrintOptions) (int, []runtime.Object, error) {
+	items, err := meta.ExtractList(obj)
+	if err != nil {
+		return 0, []runtime.Object{obj}, utilerrors.NewAggregate([]error{err})
+	}
+	if errs := runtime.DecodeList(items, api.Codecs.UniversalDecoder(), runtime.UnstructuredJSONScheme); len(errs) > 0 {
+		return 0, []runtime.Object{obj}, utilerrors.NewAggregate(errs)
+	}
+
+	filterCount := 0
+	list := make([]runtime.Object, 0, len(items))
+	for _, obj := range items {
+		if isFiltered, err := filterFuncs.Filter(obj, filterOpts); !isFiltered {
+			if err != nil {
+				glog.V(2).Infof("Unable to filter resource: %v", err)
+				continue
+			}
+			list = append(list, obj)
+		} else if isFiltered {
+			filterCount++
+		}
+	}
+	return filterCount, list, nil
+}
+
+func PrintFilterCount(hiddenObjNum int, resource string, out io.Writer, options *kubectl.PrintOptions) error {
+	if !options.NoHeaders && !options.ShowAll && hiddenObjNum > 0 {
+		_, err := fmt.Fprintf(out, "  info: %d completed object(s) was(were) not shown in %s list. Pass --show-all to see all objects.\n\n", hiddenObjNum, resource)
+		return err
+	}
+	return nil
+}
+
+// ObjectListToVersionedObject receives a list of api objects and a group version
+// and squashes the list's items into a single versioned runtime.Object.
+func ObjectListToVersionedObject(objects []runtime.Object, version unversioned.GroupVersion) (runtime.Object, error) {
+	objectList := &api.List{Items: objects}
+	converted, err := resource.TryConvert(api.Scheme, objectList, version, registered.GroupOrDie(api.GroupName).GroupVersion)
+	if err != nil {
+		return nil, err
+	}
+	return converted, nil
 }

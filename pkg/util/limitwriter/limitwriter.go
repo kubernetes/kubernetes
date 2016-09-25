@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -42,7 +42,7 @@ func (w *limitWriter) Write(p []byte) (n int, err error) {
 	if int64(len(p)) > w.n {
 		p = p[:w.n]
 	}
-	if len(p) > 0 {
+	if w.n > 0 {
 		n, err = w.w.Write(p)
 		w.n -= int64(n)
 	}

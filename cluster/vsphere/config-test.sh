@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2014 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -27,7 +27,8 @@ MASTER_MEMORY_MB=1024
 MASTER_CPU=1
 
 NODE_NAMES=($(eval echo ${INSTANCE_PREFIX}-minion-{1..${NUM_NODES}}))
-NODE_IP_RANGES=($(eval echo "10.244.{1..${NUM_NODES}}.0/24"))
+NODE_IP_RANGES="10.244.0.0/16"
+MASTER_IP_RANGE="${MASTER_IP_RANGE:-10.246.0.0/24}"
 NODE_MEMORY_MB=1024
 NODE_CPU=1
 

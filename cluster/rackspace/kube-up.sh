@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2014 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,8 +23,7 @@
 # exit on any error
 set -e
 
-source $(dirname $0)/../kube-env.sh
-source $(dirname $0)/../$KUBERNETES_PROVIDER/util.sh
+source $(dirname $0)/../kube-util.sh
 
 echo "Starting cluster using provider: $KUBERNETES_PROVIDER"
 

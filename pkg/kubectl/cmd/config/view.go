@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/golang/glog"
+	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
@@ -29,36 +29,38 @@ import (
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api/latest"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/flag"
 )
 
 type ViewOptions struct {
-	ConfigAccess ConfigAccess
-	Merge        util.BoolFlag
+	ConfigAccess clientcmd.ConfigAccess
+	Merge        flag.Tristate
 	Flatten      bool
 	Minify       bool
 	RawByteData  bool
 }
 
-const (
-	view_long = `Displays merged kubeconfig settings or a specified kubeconfig file.
+var (
+	view_long = dedent.Dedent(`
+		Display merged kubeconfig settings or a specified kubeconfig file.
 
-You can use --output=template --template=TEMPLATE to extract specific values.`
-	view_example = `# Show Merged kubeconfig settings.
-$ kubectl config view
+		You can use --output jsonpath={...} to extract specific values using a jsonpath expression.`)
+	view_example = dedent.Dedent(`
+		# Show Merged kubeconfig settings.
+		kubectl config view
 
-# Get the password for the e2e user
-$ kubectl config view -o template --template='{{range .users}}{{ if eq .name "e2e" }}{{ index .user.password }}{{end}}{{end}}'`
+		# Get the password for the e2e user
+		kubectl config view -o jsonpath='{.users[?(@.name == "e2e")].user.password}'`)
 )
 
-func NewCmdConfigView(out io.Writer, ConfigAccess ConfigAccess) *cobra.Command {
+func NewCmdConfigView(out io.Writer, ConfigAccess clientcmd.ConfigAccess) *cobra.Command {
 	options := &ViewOptions{ConfigAccess: ConfigAccess}
 	// Default to yaml
 	defaultOutputFormat := "yaml"
 
 	cmd := &cobra.Command{
 		Use:     "view",
-		Short:   "Displays merged kubeconfig settings or a specified kubeconfig file.",
+		Short:   "Display merged kubeconfig settings or a specified kubeconfig file",
 		Long:    view_long,
 		Example: view_example,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -68,18 +70,18 @@ func NewCmdConfigView(out io.Writer, ConfigAccess ConfigAccess) *cobra.Command {
 				fmt.Printf("--output wide is not available in kubectl config view; reset to default output format (%s)\n\n", defaultOutputFormat)
 				cmd.Flags().Set("output", defaultOutputFormat)
 			}
+			if outputFormat == "" {
+				fmt.Printf("Reset to default output format (%s) as --output is empty\n", defaultOutputFormat)
+				cmd.Flags().Set("output", defaultOutputFormat)
+			}
 
 			printer, _, err := cmdutil.PrinterForCommand(cmd)
-			if err != nil {
-				glog.FatalDepth(1, err)
-			}
-			version := cmdutil.OutputVersion(cmd, latest.Version)
-			printer = kubectl.NewVersionedPrinter(printer, clientcmdapi.Scheme, version)
+			cmdutil.CheckErr(err)
+			version, err := cmdutil.OutputVersion(cmd, &latest.ExternalVersion)
+			cmdutil.CheckErr(err)
+			printer = kubectl.NewVersionedPrinter(printer, latest.Scheme, version)
 
-			if err := options.Run(out, printer); err != nil {
-				glog.FatalDepth(1, err)
-			}
-
+			cmdutil.CheckErr(options.Run(out, printer))
 		},
 	}
 
@@ -87,9 +89,10 @@ func NewCmdConfigView(out io.Writer, ConfigAccess ConfigAccess) *cobra.Command {
 	cmd.Flags().Set("output", defaultOutputFormat)
 
 	options.Merge.Default(true)
-	cmd.Flags().Var(&options.Merge, "merge", "merge together the full hierarchy of kubeconfig files")
+	f := cmd.Flags().VarPF(&options.Merge, "merge", "", "merge the full hierarchy of kubeconfig files")
+	f.NoOptDefVal = "true"
 	cmd.Flags().BoolVar(&options.RawByteData, "raw", false, "display raw byte data")
-	cmd.Flags().BoolVar(&options.Flatten, "flatten", false, "flatten the resulting kubeconfig file into self contained output (useful for creating portable kubeconfig files)")
+	cmd.Flags().BoolVar(&options.Flatten, "flatten", false, "flatten the resulting kubeconfig file into self-contained output (useful for creating portable kubeconfig files)")
 	cmd.Flags().BoolVar(&options.Minify, "minify", false, "remove all information not used by current-context from the output")
 	return cmd
 }

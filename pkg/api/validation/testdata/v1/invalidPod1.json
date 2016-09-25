@@ -11,7 +11,7 @@
     "containers": [
       {
         "name": "master",
-        "image": "redis",
+	"image": "gcr.io/fake_project/fake_image:fake_tag",
         "args": "this is a bad command"
       }
     ]

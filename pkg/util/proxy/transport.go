@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -31,7 +31,7 @@ import (
 	"golang.org/x/net/html"
 	"golang.org/x/net/html/atom"
 
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
@@ -123,7 +123,7 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	return t.rewriteResponse(req, resp)
 }
 
-var _ = util.RoundTripperWrapper(&Transport{})
+var _ = net.RoundTripperWrapper(&Transport{})
 
 func (rt *Transport) WrappedRoundTripper() http.RoundTripper {
 	return rt.RoundTripper

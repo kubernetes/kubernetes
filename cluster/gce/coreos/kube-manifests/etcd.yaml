@@ -1,0 +1,55 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: etcd-server
+  namespace: kube-system
+spec:
+  containers:
+  - command:
+    - /bin/sh
+    - -c
+    - /usr/local/bin/etcd
+      --listen-peer-urls=http://127.0.0.1:2380
+      --advertise-client-urls=http://127.0.0.1:2379
+      --listen-client-urls=http://127.0.0.1:2379
+      --data-dir=/var/etcd/data
+      1>>/var/log/etcd.log 2>&1
+    image: gcr.io/google_containers/etcd:2.2.1
+    imagePullPolicy: IfNotPresent
+    livenessProbe:
+      httpGet:
+        host: 127.0.0.1
+        path: /health
+        port: 2379
+        scheme: HTTP
+      initialDelaySeconds: 15
+      timeoutSeconds: 15
+    name: etcd-container
+    ports:
+    - containerPort: 2380
+      hostPort: 2380
+      name: serverport
+      protocol: TCP
+    - containerPort: 2379
+      hostPort: 2379
+      name: clientport
+      protocol: TCP
+    resources:
+      requests:
+        cpu: 200m
+    volumeMounts:
+    - mountPath: /var/etcd
+      name: varetcd
+    - mountPath: /var/log/etcd.log
+      name: varlogetcd
+  dnsPolicy: ClusterFirst
+  hostNetwork: true
+  restartPolicy: Always
+  terminationGracePeriodSeconds: 30
+  volumes:
+  - hostPath:
+      path: /mnt/master-pd/var/etcd
+    name: varetcd
+  - hostPath:
+      path: /var/log/etcd.log
+    name: varlogetcd

@@ -1,15 +1,16 @@
 # Kubernetes
 
-[![GoDoc Widget]][GoDoc] [![Travis Widget]][Travis] [![Coverage Status Widget]][Coverage Status]
+[![Submit Queue Widget]][Submit Queue] [![GoDoc Widget]][GoDoc] [![Coverage Status Widget]][Coverage Status]
 
+[Submit Queue]: http://submit-queue.k8s.io/#/e2e
+[Submit Queue Widget]: http://submit-queue.k8s.io/health.svg?v=1
 [GoDoc]: https://godoc.org/k8s.io/kubernetes
-[GoDoc Widget]: https://godoc.org/k8s.io/kubernetes?status.png
-[Travis]: https://travis-ci.org/kubernetes/kubernetes
-[Travis Widget]: https://travis-ci.org/kubernetes/kubernetes.svg?branch=master
+[GoDoc Widget]: https://godoc.org/k8s.io/kubernetes?status.svg
 [Coverage Status]: https://coveralls.io/r/kubernetes/kubernetes
 [Coverage Status Widget]: https://coveralls.io/repos/kubernetes/kubernetes/badge.svg
 
 ### Are you ...
+
   * Interested in learning more about using Kubernetes?  Please see our user-facing documentation on [kubernetes.io](http://kubernetes.io)
   * Interested in hacking on the core Kubernetes code base?  Keep reading!
 
@@ -29,19 +30,20 @@ Kubernetes builds upon a [decade and a half of experience at Google running prod
 
 <hr>
 
-### Kubernetes can run anywhere!
-However, initial development was done on GCE and so our instructions and scripts are built around that.  If you make it work on other infrastructure please let us know and contribute instructions/code.
-
 ### Kubernetes is ready for Production!
+
 With the [1.0.1 release](https://github.com/kubernetes/kubernetes/releases/tag/v1.0.1) Kubernetes is ready to serve your production workloads.
 
+### Kubernetes can run anywhere!
+
+You can run Kubernetes on your local workstation under Vagrant, cloud providers (e.g. GCE, AWS, Azure), and physical hardware. Essentially, anywhere Linux runs you can run Kubernetes. Checkout the [Getting Started Guides](http://kubernetes.io/docs/getting-started-guides/) for details.
 
 ## Concepts
 
 Kubernetes works with the following concepts:
 
 [**Cluster**](docs/admin/README.md)
-: A cluster is a set of physical or virtual machines and other infrastructure resources used by Kubernetes to run your applications. Kubernetes can run anywhere! See the [Getting Started Guides](docs/getting-started-guides) for instructions for a variety of services.
+: A cluster is a set of physical or virtual machines and other infrastructure resources used by Kubernetes to run your applications. Kubernetes can run anywhere! See the [Getting Started Guides](docs/getting-started-guides/) for instructions for a variety of services.
 
 [**Node**](docs/admin/node.md)
 : A node is a physical or virtual machine running Kubernetes, onto which pods can be scheduled.
@@ -71,7 +73,7 @@ Kubernetes documentation is organized into several categories.
       - in [Getting Started from Scratch](docs/getting-started-guides/scratch.md)
   - **User documentation**
     - for people who want to run programs on an existing Kubernetes cluster
-    - in the [Kubernetes User Guide: Managing Applications](docs/user-guide/README.md)  
+    - in the [Kubernetes User Guide: Managing Applications](docs/user-guide/README.md)
 	*Tip: You can also view help documentation out on [http://kubernetes.io/docs/](http://kubernetes.io/docs/).*
     - the [Kubectl Command Line Interface](docs/user-guide/kubectl/kubectl.md) is a detailed reference on
       the `kubectl` CLI
@@ -84,8 +86,8 @@ Kubernetes documentation is organized into several categories.
       or extensions, or modify the core Kubernetes code
     - in the [Kubernetes Developer Guide](docs/devel/README.md)
     - see also [notes on the API](docs/api.md)
-    - see also the [API object documentation](http://kubernetes.io/third_party/swagger-ui/), a
-      detailed description of all fields found in the core API objects 
+    - see also the [API object documentation](docs/api-reference/README.md), a
+      detailed description of all fields found in the core API objects
   - **Walkthroughs and examples**
     - hands-on introduction and example config files
     - in the [user guide](docs/user-guide/README.md#quick-walkthrough)
@@ -112,32 +114,47 @@ You should consider joining the [Cloud Native Computing Foundation](https://cncf
 
 Participation in the Kubernetes community is governed by the [Kubernetes Code of Conduct](code-of-conduct.md).
 
-#### Are you ready to add to the discussion?
+### Are you ready to add to the discussion?
 
 We have presence on:
 
  * [Twitter](https://twitter.com/kubernetesio)
  * [Google+](https://plus.google.com/u/0/b/116512812300813784482/116512812300813784482)
  * [Blogger](http://blog.kubernetes.io/)
- 
+
 You can also view recordings of past events and presentations on our [Media page](http://kubernetes.io/media/).
 
 For Q&A, our threads are at:
 
  * [Stack Overflow](http://stackoverflow.com/questions/tagged/kubernetes)
- * [Slack](/docs/troubleshooting.md#slack)
+ * [Slack](http://slack.k8s.io/)
 
-#### Want to do more than just 'discuss' Kubernetes?
+### Want to contribute to Kubernetes?
 
 If you're interested in being a contributor and want to get involved in developing Kubernetes, start in the [Kubernetes Developer Guide](docs/devel/README.md) and also review the [contributor guidelines](CONTRIBUTING.md).
 
-#### Support
- 
+Or, if you just have an idea for a new feature, see the [Kubernetes Features](https://github.com/kubernetes/features) repository for details on how to propose it.
+
+### Support
+
 While there are many different channels that you can use to get ahold of us, you can help make sure that we are efficient in getting you the help that you need.
 
 If you need support, start with the [troubleshooting guide](docs/troubleshooting.md#getting-help) and work your way through the process that we've outlined.
 
 That said, if you have questions, reach out to us one way or another.  We don't bite!
 
+### Community resources
+
+* **Awesome-kubernetes** - [http://ramitsurana.github.io/awesome-kubernetes](http://ramitsurana.github.io/awesome-kubernetes)
+
+You can find more projects, tools and articles related to Kubernetes on the  [awesome-kubernetes](https://github.com/ramitsurana/awesome-kubernetes) list. Add your project there and help us make it better.
+
+* **CoreKube** - [https://corekube.com](https://corekube.com):
+
+Instructive & educational resources for the Kubernetes community. By the community.
+
+* **Community Documentation**
+
+Here you can learn more about the current happenings in the [kubernetes community](https://github.com/kubernetes/community).
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/README.md?pixel)]()

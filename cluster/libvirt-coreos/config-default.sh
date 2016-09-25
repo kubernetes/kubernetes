@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2014 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -46,7 +46,8 @@ for ((i=0; i < NUM_NODES; i++)) do
 done
 NODE_CONTAINER_SUBNETS[$NUM_NODES]=$MASTER_CONTAINER_SUBNET
 
-SERVICE_CLUSTER_IP_RANGE=10.11.0.0/16  # formerly PORTAL_NET
+SERVICE_CLUSTER_IP_RANGE="${SERVICE_CLUSTER_IP_RANGE:-10.11.0.0/16}"  # formerly PORTAL_NET
+
 
 # Optional: Enable node logging.
 ENABLE_NODE_LOGGING=false
@@ -54,6 +55,10 @@ LOGGING_DESTINATION=elasticsearch
 
 # Optional: Install cluster DNS.
 ENABLE_CLUSTER_DNS="${KUBE_ENABLE_CLUSTER_DNS:-true}"
-DNS_SERVER_IP="10.11.0.254"
+DNS_SERVER_IP="${SERVICE_CLUSTER_IP_RANGE%.*}.254"
 DNS_DOMAIN="cluster.local"
 DNS_REPLICAS=1
+
+#Generate dns files
+sed -f "${KUBE_ROOT}/cluster/addons/dns/transforms2sed.sed" < "${KUBE_ROOT}/cluster/addons/dns/skydns-rc.yaml.base" | sed -f "${KUBE_ROOT}/cluster/libvirt-coreos/forShellEval.sed"  > "${KUBE_ROOT}/cluster/libvirt-coreos/skydns-rc.yaml"
+sed -f "${KUBE_ROOT}/cluster/addons/dns/transforms2sed.sed" < "${KUBE_ROOT}/cluster/addons/dns/skydns-svc.yaml.base" | sed -f "${KUBE_ROOT}/cluster/libvirt-coreos/forShellEval.sed"  > "${KUBE_ROOT}/cluster/libvirt-coreos/skydns-svc.yaml"

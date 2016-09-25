@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -32,7 +32,7 @@ const (
 	SCHEDULER_SERVICE_NAME = "k8sm-scheduler"
 )
 
-func (m *SchedulerServer) newServiceWriter(stop <-chan struct{}) func() {
+func (m *SchedulerServer) newServiceWriter(publishedAddress net.IP, stop <-chan struct{}) func() {
 	return func() {
 		for {
 			// Update service & endpoint records.
@@ -42,7 +42,10 @@ func (m *SchedulerServer) newServiceWriter(stop <-chan struct{}) func() {
 				glog.Errorf("Can't create scheduler service: %v", err)
 			}
 
-			if err := m.setEndpoints(SCHEDULER_SERVICE_NAME, net.IP(m.address), m.port); err != nil {
+			if publishedAddress == nil {
+				publishedAddress = net.IP(m.address)
+			}
+			if err := m.setEndpoints(SCHEDULER_SERVICE_NAME, publishedAddress, m.port); err != nil {
 				glog.Errorf("Can't create scheduler endpoints: %v", err)
 			}
 
@@ -59,7 +62,7 @@ func (m *SchedulerServer) newServiceWriter(stop <-chan struct{}) func() {
 // doesn't already exist.
 func (m *SchedulerServer) createSchedulerServiceIfNeeded(serviceName string, servicePort int) error {
 	ctx := api.NewDefaultContext()
-	if _, err := m.client.Services(api.NamespaceValue(ctx)).Get(serviceName); err == nil {
+	if _, err := m.client.Core().Services(api.NamespaceValue(ctx)).Get(serviceName); err == nil {
 		// The service already exists.
 		return nil
 	}
@@ -70,7 +73,7 @@ func (m *SchedulerServer) createSchedulerServiceIfNeeded(serviceName string, ser
 			Labels:    map[string]string{"provider": "k8sm", "component": "scheduler"},
 		},
 		Spec: api.ServiceSpec{
-			Ports: []api.ServicePort{{Port: servicePort, Protocol: api.ProtocolTCP}},
+			Ports: []api.ServicePort{{Port: int32(servicePort), Protocol: api.ProtocolTCP}},
 			// maintained by this code, not by the pod selector
 			Selector:        nil,
 			SessionAffinity: api.ServiceAffinityNone,
@@ -79,7 +82,7 @@ func (m *SchedulerServer) createSchedulerServiceIfNeeded(serviceName string, ser
 	if m.serviceAddress != nil {
 		svc.Spec.ClusterIP = m.serviceAddress.String()
 	}
-	_, err := m.client.Services(api.NamespaceValue(ctx)).Create(svc)
+	_, err := m.client.Core().Services(api.NamespaceValue(ctx)).Create(svc)
 	if err != nil && errors.IsAlreadyExists(err) {
 		err = nil
 	}
@@ -93,7 +96,7 @@ func (m *SchedulerServer) setEndpoints(serviceName string, ip net.IP, port int) 
 	// The setting we want to find.
 	want := []api.EndpointSubset{{
 		Addresses: []api.EndpointAddress{{IP: ip.String()}},
-		Ports:     []api.EndpointPort{{Port: port, Protocol: api.ProtocolTCP}},
+		Ports:     []api.EndpointPort{{Port: int32(port), Protocol: api.ProtocolTCP}},
 	}}
 
 	ctx := api.NewDefaultContext()

@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -33,9 +33,10 @@ type jsonpathTest struct {
 	expect   string
 }
 
-func testJSONPath(tests []jsonpathTest, t *testing.T) {
+func testJSONPath(tests []jsonpathTest, allowMissingKeys bool, t *testing.T) {
 	for _, test := range tests {
 		j := New(test.name)
+		j.AllowMissingKeys(allowMissingKeys)
 		err := j.Parse(test.template)
 		if err != nil {
 			t.Errorf("in %s, parse %s error %v", test.name, test.template, err)
@@ -93,7 +94,7 @@ func testFailJSONPath(tests []jsonpathTest, t *testing.T) {
 			out = err.Error()
 		}
 		if out != test.expect {
-			t.Errorf("in %s, expect to get error %s, got %s", test.name, test.expect, out)
+			t.Errorf("in %s, expect to get error %q, got %q", test.name, test.expect, out)
 		}
 	}
 }
@@ -114,11 +115,14 @@ type bicycle struct {
 	Price float32
 }
 
+type empName string
+type job string
 type store struct {
-	Book    []book
-	Bicycle bicycle
-	Name    string
-	Labels  map[string]int
+	Book      []book
+	Bicycle   bicycle
+	Name      string
+	Labels    map[string]int
+	Employees map[empName]job
 }
 
 func TestStructInput(t *testing.T) {
@@ -136,6 +140,10 @@ func TestStructInput(t *testing.T) {
 			"web/html": 15,
 			"k8s-app":  20,
 		},
+		Employees: map[empName]job{
+			"jason": "manager",
+			"dan":   "clerk",
+		},
 	}
 
 	storeTests := []jsonpathTest{
@@ -147,6 +155,8 @@ func TestStructInput(t *testing.T) {
 		{"array", "{[0:2]}", []string{"Monday", "Tudesday"}, "Monday Tudesday"},
 		{"variable", "hello {.Name}", storeData, "hello jsonpath"},
 		{"dict/", "{$.Labels.web/html}", storeData, "15"},
+		{"dict/", "{$.Employees.jason}", storeData, "manager"},
+		{"dict/", "{$.Employees.dan}", storeData, "clerk"},
 		{"dict-", "{.Labels.k8s-app}", storeData, "20"},
 		{"nest", "{.Bicycle.Color}", storeData, "red"},
 		{"allarray", "{.Book[*].Author}", storeData, "Nigel Rees Evelyn Waugh Herman Melville"},
@@ -157,10 +167,15 @@ func TestStructInput(t *testing.T) {
 		{"recurarray", "{..Book[2]}", storeData,
 			"{Category: fiction, Author: Herman Melville, Title: Moby Dick, Price: 8.99}"},
 	}
-	testJSONPath(storeTests, t)
+	testJSONPath(storeTests, false, t)
+
+	missingKeyTests := []jsonpathTest{
+		{"nonexistent field", "{.hello}", storeData, ""},
+	}
+	testJSONPath(missingKeyTests, true, t)
 
 	failStoreTests := []jsonpathTest{
-		{"invalid identfier", "{hello}", storeData, "unrecongnized identifier hello"},
+		{"invalid identifier", "{hello}", storeData, "unrecognized identifier hello"},
 		{"nonexistent field", "{.hello}", storeData, "hello is not found"},
 		{"invalid array", "{.Labels[0]}", storeData, "map[string]int is not array or slice"},
 		{"invalid filter operator", "{.Book[?(@.Price<>10)]}", storeData, "unrecognized filter operator <>"},
@@ -187,7 +202,7 @@ func TestJSONInput(t *testing.T) {
 		{"exists filter", "{[?(@.z)].id}", pointsData, "i2 i5"},
 		{"bracket key", "{[0]['id']}", pointsData, "i1"},
 	}
-	testJSONPath(pointsTests, t)
+	testJSONPath(pointsTests, false, t)
 }
 
 // TestKubernetes tests some use cases from kubernetes
@@ -246,7 +261,7 @@ func TestKubernetes(t *testing.T) {
 			"[127.0.0.1, map[cpu:4]] [127.0.0.2, map[cpu:8]] "},
 		{"user password", `{.users[?(@.name=="e2e")].user.password}`, &nodesData, "secret"},
 	}
-	testJSONPath(nodesTests, t)
+	testJSONPath(nodesTests, false, t)
 
 	randomPrintOrderTests := []jsonpathTest{
 		{"recursive name", "{..name}", nodesData, `127.0.0.1 127.0.0.2 myself e2e`},

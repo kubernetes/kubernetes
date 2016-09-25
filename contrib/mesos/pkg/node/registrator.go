@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,12 +20,13 @@ import (
 	"fmt"
 	"time"
 
+	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
+
 	log "github.com/golang/glog"
 	"k8s.io/kubernetes/contrib/mesos/pkg/queue"
 	"k8s.io/kubernetes/contrib/mesos/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 )
 
 type Registrator interface {
@@ -62,11 +63,11 @@ type LookupFunc func(hostName string) *api.Node
 
 type clientRegistrator struct {
 	lookupNode LookupFunc
-	client     *client.Client
+	client     unversionedcore.NodesGetter
 	queue      *queue.HistoricalFIFO
 }
 
-func NewRegistrator(client *client.Client, lookupNode LookupFunc) *clientRegistrator {
+func NewRegistrator(client unversionedcore.NodesGetter, lookupNode LookupFunc) *clientRegistrator {
 	return &clientRegistrator{
 		lookupNode: lookupNode,
 		client:     client,
@@ -78,7 +79,8 @@ func (r *clientRegistrator) Run(terminate <-chan struct{}) error {
 	loop := func() {
 	RegistrationLoop:
 		for {
-			obj := r.queue.CancelablePop(terminate)
+			obj := r.queue.Pop(terminate)
+			log.V(3).Infof("registration event observed")
 			if obj == nil {
 				break RegistrationLoop
 			}
@@ -91,6 +93,7 @@ func (r *clientRegistrator) Run(terminate <-chan struct{}) error {
 			rg := obj.(*registration)
 			n, needsUpdate := r.updateNecessary(rg.hostName, rg.labels)
 			if !needsUpdate {
+				log.V(2).Infof("no update needed, skipping for %s: %v", rg.hostName, rg.labels)
 				continue
 			}
 

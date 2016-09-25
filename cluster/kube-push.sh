@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2014 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,13 +23,15 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+echo "kube-push.sh is currently broken; see https://github.com/kubernetes/kubernetes/issues/17397"
+exit 1
+
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 
 if [ -f "${KUBE_ROOT}/cluster/env.sh" ]; then
     source "${KUBE_ROOT}/cluster/env.sh"
 fi
 
-source "${KUBE_ROOT}/cluster/kube-env.sh"
 source "${KUBE_ROOT}/cluster/kube-util.sh"
 
 function usage() {

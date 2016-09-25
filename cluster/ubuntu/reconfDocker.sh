@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 The Kubernetes Authors All rights reserved.
+# Copyright 2015 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,16 +16,14 @@
 
 # reconfigure docker network setting
 
-if [ "$(id -u)" != "0" ]; then
+source "$HOME/kube/${KUBE_CONFIG_FILE##*/}"
+
+if [[ "$(id -u)" != "0" ]]; then
   echo >&2 "Please run as root"
   exit 1
 fi
 
-
 function config_etcd {
-
-  source ~/kube/config-default.sh
-
   attempt=0
   while true; do
     /opt/bin/etcdctl get /coreos.com/network/config
@@ -38,7 +36,7 @@ function config_etcd {
         exit 2
       fi
 
-      /opt/bin/etcdctl mk /coreos.com/network/config "{\"Network\":\"${FLANNEL_NET}\"}"
+      /opt/bin/etcdctl mk /coreos.com/network/config "{\"Network\":\"${FLANNEL_NET}\", \"Backend\": {\"Type\": \"vxlan\"}${FLANNEL_OTHER_NET_CONFIG}}"
       attempt=$((attempt+1))
       sleep 3
     fi
@@ -46,7 +44,6 @@ function config_etcd {
 }
 
 function restart_docker {
-  
   attempt=0
   while [[ ! -f /run/flannel/subnet.env ]]; do 
     if (( attempt > 200 )); then
@@ -61,8 +58,8 @@ function restart_docker {
   sudo brctl delbr docker0
 
   source /run/flannel/subnet.env
-
-  echo DOCKER_OPTS=\"${DOCKER_OPTS} -H tcp://127.0.0.1:4243 -H unix:///var/run/docker.sock \
+  source /etc/default/docker
+  echo DOCKER_OPTS=\" -H tcp://127.0.0.1:4243 -H unix:///var/run/docker.sock \
        --bip=${FLANNEL_SUBNET} --mtu=${FLANNEL_MTU}\" > /etc/default/docker
   sudo service docker restart
 }
@@ -74,4 +71,7 @@ elif [[ $1 == "ai" ]]; then
   restart_docker
 elif [[ $1 == "a" ]]; then
   config_etcd
-fi
+else
+  echo "Another argument is required."
+  exit 1
+fi 

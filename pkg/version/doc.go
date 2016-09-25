@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,4 +16,5 @@ limitations under the License.
 
 // Package version supplies version information collected at build time to
 // kubernetes components.
-package version
+// +k8s:openapi-gen=true
+package version // import "k8s.io/kubernetes/pkg/version"

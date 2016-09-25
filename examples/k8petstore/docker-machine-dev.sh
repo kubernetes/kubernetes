@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 The Kubernetes Authors All rights reserved.
+# Copyright 2015 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -64,7 +64,7 @@ function build_containers() {
 function runk8petstore() {
 
     ### Finally, run the application.
-    ### This app is gauranteed to be a clean run using all the source.
+    ### This app is guaranteed to be a clean run using all the source.
     ### You can use it to iteratively test/deploy k8petstore and make new changes.
 
     ### TODO, add slaves.

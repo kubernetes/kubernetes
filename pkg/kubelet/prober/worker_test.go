@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,20 +23,20 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/client/record"
-	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	"k8s.io/kubernetes/pkg/probe"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/exec"
+	"k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 func init() {
-	util.ReallyCrash = true
+	runtime.ReallyCrash = true
 }
 
 func TestDoProbe(t *testing.T) {
@@ -117,7 +117,7 @@ func TestDoProbe(t *testing.T) {
 			}
 
 			// Clean up.
-			m.statusManager = status.NewManager(&testclient.Fake{}, kubepod.NewBasicPodManager(nil))
+			m.statusManager = status.NewManager(&fake.Clientset{}, kubepod.NewBasicPodManager(nil))
 			resultsManager(m, probeType).Remove(testContainerID)
 		}
 	}
@@ -231,12 +231,14 @@ func TestCleanUp(t *testing.T) {
 			return ready == results.Success, nil
 		}
 		if ready, _ := condition(); !ready {
-			if err := wait.Poll(100*time.Millisecond, util.ForeverTestTimeout, condition); err != nil {
+			if err := wait.Poll(100*time.Millisecond, wait.ForeverTestTimeout, condition); err != nil {
 				t.Fatalf("[%s] Error waiting for worker ready: %v", probeType, err)
 			}
 		}
 
-		close(w.stop)
+		for i := 0; i < 10; i++ {
+			w.stop() // Stop should be callable multiple times without consequence.
+		}
 		if err := waitForWorkerExit(m, []probeKey{key}); err != nil {
 			t.Fatalf("[%s] error waiting for worker exit: %v", probeType, err)
 		}
@@ -251,7 +253,7 @@ func TestCleanUp(t *testing.T) {
 }
 
 func TestHandleCrash(t *testing.T) {
-	util.ReallyCrash = false // Test that we *don't* really crash.
+	runtime.ReallyCrash = false // Test that we *don't* really crash.
 
 	m := newTestManager()
 	w := newTestWorker(m, readiness, api.Probe{})
@@ -273,7 +275,7 @@ func TestHandleCrash(t *testing.T) {
 }
 
 func expectResult(t *testing.T, w *worker, expectedResult results.Result, msg string) {
-	result, ok := resultsManager(w.probeManager, w.probeType).Get(testContainerID)
+	result, ok := resultsManager(w.probeManager, w.probeType).Get(w.containerID)
 	if !ok {
 		t.Errorf("[%s - %s] Expected result to be set, but was not set", w.probeType, msg)
 	} else if result != expectedResult {
@@ -302,4 +304,39 @@ type crashingExecProber struct{}
 
 func (p crashingExecProber) Probe(_ exec.Cmd) (probe.Result, string, error) {
 	panic("Intentional Probe crash.")
+}
+
+func TestOnHoldOnLivenessCheckFailure(t *testing.T) {
+	m := newTestManager()
+	w := newTestWorker(m, liveness, api.Probe{SuccessThreshold: 1, FailureThreshold: 1})
+	status := getTestRunningStatus()
+	m.statusManager.SetPodStatus(w.pod, getTestRunningStatus())
+
+	// First probe should fail.
+	m.prober.exec = fakeExecProber{probe.Failure, nil}
+	msg := "first probe"
+	expectContinue(t, w, w.doProbe(), msg)
+	expectResult(t, w, results.Failure, msg)
+	if !w.onHold {
+		t.Errorf("Prober should be on hold due to liveness check failure")
+	}
+	// Set fakeExecProber to return success. However, the result will remain
+	// failure because the worker is on hold and won't probe.
+	m.prober.exec = fakeExecProber{probe.Success, nil}
+	msg = "while on hold"
+	expectContinue(t, w, w.doProbe(), msg)
+	expectResult(t, w, results.Failure, msg)
+	if !w.onHold {
+		t.Errorf("Prober should be on hold due to liveness check failure")
+	}
+
+	// Set a new container ID to lift the hold. The next probe will succeed.
+	status.ContainerStatuses[0].ContainerID = "test://newCont_ID"
+	m.statusManager.SetPodStatus(w.pod, status)
+	msg = "hold lifted"
+	expectContinue(t, w, w.doProbe(), msg)
+	expectResult(t, w, results.Success, msg)
+	if w.onHold {
+		t.Errorf("Prober should not be on hold anymore")
+	}
 }

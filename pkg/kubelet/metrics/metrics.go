@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -32,9 +32,13 @@ const (
 	PodStartLatencyKey            = "pod_start_latency_microseconds"
 	PodStatusLatencyKey           = "generate_pod_status_latency_microseconds"
 	ContainerManagerOperationsKey = "container_manager_latency_microseconds"
-	DockerOperationsKey           = "docker_operations_latency_microseconds"
-	DockerErrorsKey               = "docker_errors"
+	DockerOperationsLatencyKey    = "docker_operations_latency_microseconds"
+	DockerOperationsKey           = "docker_operations"
+	DockerOperationsErrorsKey     = "docker_operations_errors"
+	DockerOperationsTimeoutKey    = "docker_operations_timeout"
 	PodWorkerStartLatencyKey      = "pod_worker_start_latency_microseconds"
+	PLEGRelistLatencyKey          = "pleg_relist_latency_microseconds"
+	PLEGRelistIntervalKey         = "pleg_relist_interval_microseconds"
 )
 
 var (
@@ -92,18 +96,48 @@ var (
 	DockerOperationsLatency = prometheus.NewSummaryVec(
 		prometheus.SummaryOpts{
 			Subsystem: KubeletSubsystem,
-			Name:      DockerOperationsKey,
+			Name:      DockerOperationsLatencyKey,
 			Help:      "Latency in microseconds of Docker operations. Broken down by operation type.",
 		},
 		[]string{"operation_type"},
 	)
-	DockerErrors = prometheus.NewCounterVec(
+	DockerOperations = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Subsystem: KubeletSubsystem,
-			Name:      DockerErrorsKey,
-			Help:      "Cumulative number of Docker errors by operation type.",
+			Name:      DockerOperationsKey,
+			Help:      "Cumulative number of Docker operations by operation type.",
 		},
 		[]string{"operation_type"},
+	)
+	DockerOperationsErrors = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Subsystem: KubeletSubsystem,
+			Name:      DockerOperationsErrorsKey,
+			Help:      "Cumulative number of Docker operation errors by operation type.",
+		},
+		[]string{"operation_type"},
+	)
+	DockerOperationsTimeout = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Subsystem: KubeletSubsystem,
+			Name:      DockerOperationsTimeoutKey,
+			Help:      "Cumulative number of Docker operation timeout by operation type.",
+		},
+		[]string{"operation_type"},
+	)
+	PLEGRelistLatency = prometheus.NewSummary(
+		prometheus.SummaryOpts{
+			Subsystem: KubeletSubsystem,
+			Name:      PLEGRelistLatencyKey,
+			Help:      "Latency in microseconds for relisting pods in PLEG.",
+		},
+	)
+	PLEGRelistInterval = prometheus.NewSummary(
+		prometheus.SummaryOpts{
+			Subsystem: KubeletSubsystem,
+			Name:      PLEGRelistIntervalKey,
+			Help:      "Interval in microseconds between relisting in PLEG.",
+		},
 	)
 )
 
@@ -121,8 +155,12 @@ func Register(containerCache kubecontainer.RuntimeCache) {
 		prometheus.MustRegister(SyncPodsLatency)
 		prometheus.MustRegister(PodWorkerStartLatency)
 		prometheus.MustRegister(ContainersPerPodCount)
-		prometheus.MustRegister(DockerErrors)
+		prometheus.MustRegister(DockerOperations)
+		prometheus.MustRegister(DockerOperationsErrors)
+		prometheus.MustRegister(DockerOperationsTimeout)
 		prometheus.MustRegister(newPodAndContainerCollector(containerCache))
+		prometheus.MustRegister(PLEGRelistLatency)
+		prometheus.MustRegister(PLEGRelistInterval)
 	})
 }
 

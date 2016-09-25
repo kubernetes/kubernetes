@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,10 +17,7 @@ limitations under the License.
 package unversioned
 
 import (
-	"fmt"
-
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -32,11 +29,11 @@ type EndpointsNamespacer interface {
 // EndpointsInterface has methods to work with Endpoints resources
 type EndpointsInterface interface {
 	Create(endpoints *api.Endpoints) (*api.Endpoints, error)
-	List(opts unversioned.ListOptions) (*api.EndpointsList, error)
+	List(opts api.ListOptions) (*api.EndpointsList, error)
 	Get(name string) (*api.Endpoints, error)
 	Delete(name string) error
 	Update(endpoints *api.Endpoints) (*api.Endpoints, error)
-	Watch(opts unversioned.ListOptions) (watch.Interface, error)
+	Watch(opts api.ListOptions) (watch.Interface, error)
 }
 
 // endpoints implements EndpointsInterface
@@ -58,12 +55,12 @@ func (c *endpoints) Create(endpoints *api.Endpoints) (*api.Endpoints, error) {
 }
 
 // List takes a selector, and returns the list of endpoints that match that selector
-func (c *endpoints) List(opts unversioned.ListOptions) (result *api.EndpointsList, err error) {
+func (c *endpoints) List(opts api.ListOptions) (result *api.EndpointsList, err error) {
 	result = &api.EndpointsList{}
 	err = c.r.Get().
 		Namespace(c.ns).
 		Resource("endpoints").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Do().
 		Into(result)
 	return
@@ -82,20 +79,17 @@ func (c *endpoints) Delete(name string) error {
 }
 
 // Watch returns a watch.Interface that watches the requested endpoints for a service.
-func (c *endpoints) Watch(opts unversioned.ListOptions) (watch.Interface, error) {
+func (c *endpoints) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.r.Get().
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("endpoints").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Watch()
 }
 
 func (c *endpoints) Update(endpoints *api.Endpoints) (*api.Endpoints, error) {
 	result := &api.Endpoints{}
-	if len(endpoints.ResourceVersion) == 0 {
-		return nil, fmt.Errorf("invalid update object, missing resource version: %v", endpoints)
-	}
 	err := c.r.Put().
 		Namespace(c.ns).
 		Resource("endpoints").

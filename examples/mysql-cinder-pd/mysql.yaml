@@ -2,20 +2,23 @@ apiVersion: v1
 kind: Pod
 metadata:
   name: mysql
-  labels: 
+  labels:
     name: mysql
-spec: 
-  containers: 
+spec:
+  containers:
     - resources:
         limits :
           cpu: 0.5
       image: mysql
       name: mysql
+      args:
+        - "--ignore-db-dir"
+        - "lost+found"
       env:
         - name: MYSQL_ROOT_PASSWORD
           # change this
           value: yourpassword
-      ports: 
+      ports:
         - containerPort: 3306
           name: mysql
       volumeMounts:

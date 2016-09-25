@@ -1,0 +1,53 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: l7-lb-controller-v0.7.1
+  namespace: kube-system
+  labels:
+    k8s-app: glbc
+    version: v0.7.1
+    kubernetes.io/cluster-service: "true"
+    kubernetes.io/name: "GLBC"
+spec:
+  terminationGracePeriodSeconds: 600
+  hostNetwork: true
+  containers:
+  - image: gcr.io/google_containers/glbc:0.7.1
+    livenessProbe:
+      httpGet:
+        path: /healthz
+        port: 8086
+        scheme: HTTP
+      initialDelaySeconds: 30
+      # healthz reaches out to GCE
+      periodSeconds: 30
+      timeoutSeconds: 15
+      successThreshold: 1
+      failureThreshold: 5
+    name: l7-lb-controller
+    volumeMounts:
+    - mountPath: /etc/gce.conf
+      name: cloudconfig
+      readOnly: true
+    - mountPath: /var/log/glbc.log
+      name: logfile
+      readOnly: false
+    resources:
+      # Request is set to accomodate this pod alongside the other
+      # master components on a single core master.
+      # TODO: Make resource requirements depend on the size of the cluster
+      requests:
+        cpu: 10m
+        memory: 50Mi
+    command:
+    # TODO: split this out into args when we no longer need to pipe stdout to a file #6428
+    - sh
+    - -c
+    - '/glbc --default-backend-service=kube-system/default-http-backend --sync-period=60s --running-in-cluster=false --use-real-cloud=true --config-file-path=/etc/gce.conf --healthz-port=8086 1>>/var/log/glbc.log 2>&1'
+  volumes:
+  - hostPath:
+      path: /etc/gce.conf
+    name: cloudconfig
+  - hostPath:
+      path: /var/log/glbc.log
+    name: logfile

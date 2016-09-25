@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,7 +24,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	unversioned_client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
@@ -33,7 +33,7 @@ func NewCmdApiVersions(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 		Use: "api-versions",
 		// apiversions is deprecated.
 		Aliases: []string{"apiversions"},
-		Short:   "Print the supported API versions on the server, in the form of \"group/version\".",
+		Short:   "Print the supported API versions on the server, in the form of \"group/version\"",
 		Run: func(cmd *cobra.Command, args []string) {
 			err := RunApiVersions(f, out)
 			cmdutil.CheckErr(err)
@@ -47,16 +47,16 @@ func RunApiVersions(f *cmdutil.Factory, w io.Writer) error {
 		printDeprecationWarning("api-versions", "apiversions")
 	}
 
-	client, err := f.Client()
+	clientset, err := f.ClientSet()
 	if err != nil {
 		return err
 	}
 
-	groupList, err := client.Discovery().ServerGroups()
+	groupList, err := clientset.Discovery().ServerGroups()
 	if err != nil {
 		return fmt.Errorf("Couldn't get available api versions from server: %v\n", err)
 	}
-	apiVersions := unversioned_client.ExtractGroupVersions(groupList)
+	apiVersions := unversioned.ExtractGroupVersions(groupList)
 	sort.Strings(apiVersions)
 	for _, v := range apiVersions {
 		fmt.Fprintln(w, v)

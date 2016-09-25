@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,29 +17,30 @@ limitations under the License.
 package admission
 
 import (
-	"k8s.io/kubernetes/pkg/api"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 )
 
-func extractKindName(a Attributes) (name, kind string, err error) {
+func extractResourceName(a Attributes) (name string, resource unversioned.GroupResource, err error) {
 	name = "Unknown"
-	kind = a.GetKind()
+	resource = a.GetResource().GroupResource()
 	obj := a.GetObject()
 	if obj != nil {
-		objectMeta, err := api.ObjectMetaFor(obj)
+		accessor, err := meta.Accessor(obj)
 		if err != nil {
-			return "", "", err
+			return "", unversioned.GroupResource{}, err
 		}
 
 		// this is necessary because name object name generation has not occurred yet
-		if len(objectMeta.Name) > 0 {
-			name = objectMeta.Name
-		} else if len(objectMeta.GenerateName) > 0 {
-			name = objectMeta.GenerateName
+		if len(accessor.GetName()) > 0 {
+			name = accessor.GetName()
+		} else if len(accessor.GetGenerateName()) > 0 {
+			name = accessor.GetGenerateName()
 		}
 	}
-	return name, kind, nil
+	return name, resource, nil
 }
 
 // NewForbidden is a utility function to return a well-formatted admission control error response
@@ -48,18 +49,18 @@ func NewForbidden(a Attributes, internalError error) error {
 	if apierrors.IsForbidden(internalError) {
 		return internalError
 	}
-	name, kind, err := extractKindName(a)
+	name, resource, err := extractResourceName(a)
 	if err != nil {
 		return apierrors.NewInternalError(utilerrors.NewAggregate([]error{internalError, err}))
 	}
-	return apierrors.NewForbidden(kind, name, internalError)
+	return apierrors.NewForbidden(resource, name, internalError)
 }
 
 // NewNotFound is a utility function to return a well-formatted admission control error response
 func NewNotFound(a Attributes) error {
-	name, kind, err := extractKindName(a)
+	name, resource, err := extractResourceName(a)
 	if err != nil {
 		return apierrors.NewInternalError(err)
 	}
-	return apierrors.NewNotFound(kind, name)
+	return apierrors.NewNotFound(resource, name)
 }

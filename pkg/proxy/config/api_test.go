@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/watch"
@@ -32,11 +31,11 @@ type fakeLW struct {
 	watchResp watch.Interface
 }
 
-func (lw fakeLW) List() (runtime.Object, error) {
+func (lw fakeLW) List(options api.ListOptions) (runtime.Object, error) {
 	return lw.listResp, nil
 }
 
-func (lw fakeLW) Watch(options unversioned.ListOptions) (watch.Interface, error) {
+func (lw fakeLW) Watch(options api.ListOptions) (watch.Interface, error) {
 	return lw.watchResp, nil
 }
 
@@ -62,7 +61,7 @@ func TestNewServicesSourceApi_UpdatesAndMultipleServices(t *testing.T) {
 
 	ch := make(chan ServiceUpdate)
 
-	newServicesSourceApiFromLW(lw, 30*time.Second, ch)
+	cache.NewReflector(lw, &api.Service{}, NewServiceStore(nil, ch), 30*time.Second).Run()
 
 	got, ok := <-ch
 	if !ok {
@@ -173,7 +172,7 @@ func TestNewEndpointsSourceApi_UpdatesAndMultipleEndpoints(t *testing.T) {
 
 	ch := make(chan EndpointsUpdate)
 
-	newEndpointsSourceApiFromLW(lw, 30*time.Second, ch)
+	cache.NewReflector(lw, &api.Endpoints{}, NewEndpointsStore(nil, ch), 30*time.Second).Run()
 
 	got, ok := <-ch
 	if !ok {

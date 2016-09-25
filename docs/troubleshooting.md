@@ -2,15 +2,15 @@
 
 <!-- BEGIN STRIP_FOR_RELEASE -->
 
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
 
 <h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
@@ -18,9 +18,10 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.1/docs/troubleshooting.md).
+[here](http://releases.k8s.io/release-1.4/docs/troubleshooting.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -37,7 +38,7 @@ Sometimes things go wrong.  This guide is aimed at making them right.  It has tw
    * [Troubleshooting your application](user-guide/application-troubleshooting.md) - Useful for users who are deploying code into Kubernetes and wondering why it is not working.
    * [Troubleshooting your cluster](admin/cluster-troubleshooting.md) - Useful for cluster administrators and people whose Kubernetes cluster is unhappy.
 
-You should also check the [known issues](user-guide/known-issues.md) for the release you're using.
+You should also check the [known issues for the release](../CHANGELOG.md) you're using.
 
 # Getting help
 
@@ -68,7 +69,7 @@ The Kubernetes team hangs out on Slack in the `#kubernetes-users` channel.  You 
 
 ## Mailing List
 
-The Google Container Engine mailing list is [google-containers@googlegroups.com](https://groups.google.com/forum/#!forum/google-containers)
+The Google Container Engine mailing list is [kubernetes-users@googlegroups.com](https://groups.google.com/forum/#!forum/kubernetes-users)
 
 ## Bugs and Feature requests
 

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,9 +19,11 @@ package rest
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
+	path "k8s.io/kubernetes/pkg/api/validation/path"
 	"k8s.io/kubernetes/pkg/runtime"
-	utilvalidation "k8s.io/kubernetes/pkg/util/validation"
+	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
 // RESTCreateStrategy defines the minimum validation, accepted input, and
@@ -39,10 +41,10 @@ type RESTCreateStrategy interface {
 	// the object.  For example: remove fields that are not to be persisted,
 	// sort order-insensitive list fields, etc.  This should not remove fields
 	// whose presence would be considered a validation error.
-	PrepareForCreate(obj runtime.Object)
+	PrepareForCreate(ctx api.Context, obj runtime.Object)
 	// Validate is invoked after default fields in the object have been filled in before
 	// the object is persisted.  This method should not mutate the object.
-	Validate(ctx api.Context, obj runtime.Object) utilvalidation.ErrorList
+	Validate(ctx api.Context, obj runtime.Object) field.ErrorList
 	// Canonicalize is invoked after validation has succeeded but before the
 	// object has been persisted.  This method may mutate the object.
 	Canonicalize(obj runtime.Object)
@@ -66,19 +68,22 @@ func BeforeCreate(strategy RESTCreateStrategy, ctx api.Context, obj runtime.Obje
 	}
 	objectMeta.DeletionTimestamp = nil
 	objectMeta.DeletionGracePeriodSeconds = nil
-	strategy.PrepareForCreate(obj)
+	strategy.PrepareForCreate(ctx, obj)
 	api.FillObjectMetaSystemFields(ctx, objectMeta)
 	api.GenerateName(strategy, objectMeta)
 
+	// ClusterName is ignored and should not be saved
+	objectMeta.ClusterName = ""
+
 	if errs := strategy.Validate(ctx, obj); len(errs) > 0 {
-		return errors.NewInvalid(kind, objectMeta.Name, errs)
+		return errors.NewInvalid(kind.GroupKind(), objectMeta.Name, errs)
 	}
 
 	// Custom validation (including name validation) passed
 	// Now run common validation on object meta
 	// Do this *after* custom validation so that specific error messages are shown whenever possible
-	if errs := validation.ValidateObjectMeta(objectMeta, strategy.NamespaceScoped(), validation.ValidatePathSegmentName); len(errs) > 0 {
-		return errors.NewInvalid(kind, objectMeta.Name, errs)
+	if errs := validation.ValidateObjectMeta(objectMeta, strategy.NamespaceScoped(), path.ValidatePathSegmentName, field.NewPath("metadata")); len(errs) > 0 {
+		return errors.NewInvalid(kind.GroupKind(), objectMeta.Name, errs)
 	}
 
 	strategy.Canonicalize(obj)
@@ -102,18 +107,24 @@ func CheckGeneratedNameError(strategy RESTCreateStrategy, err error, obj runtime
 		return err
 	}
 
-	return errors.NewServerTimeout(kind, "POST", 0)
+	return errors.NewServerTimeoutForKind(kind.GroupKind(), "POST", 0)
 }
 
 // objectMetaAndKind retrieves kind and ObjectMeta from a runtime object, or returns an error.
-func objectMetaAndKind(typer runtime.ObjectTyper, obj runtime.Object) (*api.ObjectMeta, string, error) {
+func objectMetaAndKind(typer runtime.ObjectTyper, obj runtime.Object) (*api.ObjectMeta, unversioned.GroupVersionKind, error) {
 	objectMeta, err := api.ObjectMetaFor(obj)
 	if err != nil {
-		return nil, "", errors.NewInternalError(err)
+		return nil, unversioned.GroupVersionKind{}, errors.NewInternalError(err)
 	}
-	_, kind, err := typer.ObjectVersionAndKind(obj)
+	kinds, _, err := typer.ObjectKinds(obj)
 	if err != nil {
-		return nil, "", errors.NewInternalError(err)
+		return nil, unversioned.GroupVersionKind{}, errors.NewInternalError(err)
 	}
-	return objectMeta, kind, nil
+	return objectMeta, kinds[0], nil
+}
+
+// NamespaceScopedStrategy has a method to tell if the object must be in a namespace.
+type NamespaceScopedStrategy interface {
+	// NamespaceScoped returns if the object must be in a namespace.
+	NamespaceScoped() bool
 }

@@ -1,0 +1,20 @@
+This is a work-in-progress HTTP/2 implementation for Go.
+
+It will eventually live in the Go standard library and won't require
+any changes to your code to use.  It will just be automatic.
+
+Status:
+
+* The server support is pretty good. A few things are missing
+  but are being worked on.
+* The client work has just started but shares a lot of code
+  is coming along much quicker.
+
+Docs are at https://godoc.org/golang.org/x/net/http2
+
+Demo test server at https://http2.golang.org/
+
+Help & bug reports welcome!
+
+Contributing: https://golang.org/doc/contribute.html
+Bugs:         https://golang.org/issue/new?title=x/net/http2:+

@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -80,25 +80,4 @@ func inRoles(roles ...string) rolePredicate {
 		_, ok := roleSet[r]
 		return ok
 	}
-}
-
-// starredRole returns a "*" if the given role is empty else the role itself
-func starredRole(name string) string {
-	if name == "" {
-		return "*"
-	}
-
-	return name
-}
-
-// stringPtrTo returns a pointer to the given string
-// or nil if it is empty string.
-func stringPtrTo(s string) *string {
-	var protos *string
-
-	if s != "" {
-		protos = &s
-	}
-
-	return protos
 }

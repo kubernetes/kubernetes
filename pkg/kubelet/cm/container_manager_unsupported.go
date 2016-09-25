@@ -1,7 +1,7 @@
 // +build !linux
 
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -31,14 +31,34 @@ type unsupportedContainerManager struct {
 
 var _ ContainerManager = &unsupportedContainerManager{}
 
-func (unsupportedContainerManager) Start(_ NodeConfig) error {
+func (unsupportedContainerManager) Start(_ *api.Node) error {
 	return fmt.Errorf("Container Manager is unsupported in this build")
 }
 
-func (unsupportedContainerManager) SystemContainersLimit() api.ResourceList {
+func (unsupportedContainerManager) SystemCgroupsLimit() api.ResourceList {
 	return api.ResourceList{}
 }
 
-func NewContainerManager(mounter mount.Interface, cadvisorInterface cadvisor.Interface) (ContainerManager, error) {
+func (unsupportedContainerManager) GetNodeConfig() NodeConfig {
+	return NodeConfig{}
+}
+
+func (unsupportedContainerManager) GetMountedSubsystems() *CgroupSubsystems {
+	return &CgroupSubsystems{}
+}
+
+func (unsupportedContainerManager) GetQOSContainersInfo() QOSContainersInfo {
+	return QOSContainersInfo{}
+}
+
+func (cm *unsupportedContainerManager) Status() Status {
+	return Status{}
+}
+
+func (cm *unsupportedContainerManager) NewPodContainerManager() PodContainerManager {
+	return &unsupportedPodContainerManager{}
+}
+
+func NewContainerManager(_ mount.Interface, _ cadvisor.Interface, _ NodeConfig) (ContainerManager, error) {
 	return &unsupportedContainerManager{}, nil
 }

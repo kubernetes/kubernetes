@@ -48,5 +48,4 @@ spec:
           name: storage
       volumes:
       - name: storage
-        source:
-          emptyDir: {}
+        emptyDir: {}

@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -72,7 +72,7 @@ type Registry interface {
 }
 
 // callback that is invoked during a walk through a series of live offers,
-// returning with stop=true (or err != nil) if the walk should stop permaturely.
+// returning with stop=true (or err != nil) if the walk should stop prematurely.
 type Walker func(offer Perishable) (stop bool, err error)
 
 type RegistryConfig struct {
@@ -271,7 +271,7 @@ func (s *offerStorage) Delete(offerId string, reason metrics.OfferDeclinedReason
 				s.declineOffer(offerId, offer.Host(), reason)
 			} else {
 				// some pod has acquired this and may attempt to launch a task with it
-				// failed schedule/launch attempts are requried to Release() any claims on the offer
+				// failed schedule/launch attempts are required to Release() any claims on the offer
 
 				// TODO(jdef): not sure what a good value is here. the goal is to provide a
 				// launchTasks (driver) operation enough time to complete so that we don't end
@@ -441,7 +441,7 @@ func (s *offerStorage) ageOffers() {
 }
 
 func (s *offerStorage) nextListener() *offerListener {
-	obj := s.listeners.Pop()
+	obj := s.listeners.Pop(queue.WithoutCancel())
 	if listen, ok := obj.(*offerListener); !ok {
 		//programming error
 		panic(fmt.Sprintf("unexpected listener object %v", obj))

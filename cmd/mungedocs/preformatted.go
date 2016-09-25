@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -45,7 +45,7 @@ func updatePreformatted(filePath string, mlines mungeLines) (mungeLines, error) 
 // If the file ends on a preformatted line, there must have been an imbalance.
 func checkPreformatBalance(filePath string, mlines mungeLines) (mungeLines, error) {
 	if len(mlines) > 0 && mlines[len(mlines)-1].preformatted {
-		return nil, fmt.Errorf("file ends in preformatted block")
+		return mlines, fmt.Errorf("unbalanced triple backtick delimiters")
 	}
 	return mlines, nil
 }

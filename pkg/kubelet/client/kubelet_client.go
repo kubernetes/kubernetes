@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,14 +18,17 @@ package client
 
 import (
 	"errors"
+	"fmt"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/validation"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/transport"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/util"
+	utilnet "k8s.io/kubernetes/pkg/util/net"
 )
 
 type KubeletClientConfig struct {
@@ -34,7 +37,7 @@ type KubeletClientConfig struct {
 	EnableHttps bool
 
 	// TLSClientConfig contains settings to enable transport layer security
-	client.TLSClientConfig
+	restclient.TLSClientConfig
 
 	// Server requires Bearer authentication
 	BearerToken string
@@ -69,7 +72,7 @@ func MakeTransport(config *KubeletClientConfig) (http.RoundTripper, error) {
 
 	rt := http.DefaultTransport
 	if config.Dial != nil || tlsConfig != nil {
-		rt = util.SetTransportDefaults(&http.Transport{
+		rt = utilnet.SetOldTransportDefaults(&http.Transport{
 			Dial:            config.Dial,
 			TLSClientConfig: tlsConfig,
 		})
@@ -96,6 +99,9 @@ func NewStaticKubeletClient(config *KubeletClientConfig) (KubeletClient, error) 
 
 // In default HTTPKubeletClient ctx is unused.
 func (c *HTTPKubeletClient) GetConnectionInfo(ctx api.Context, nodeName string) (string, uint, http.RoundTripper, error) {
+	if errs := validation.ValidateNodeName(nodeName, false); len(errs) != 0 {
+		return "", 0, nil, fmt.Errorf("invalid node name: %s", strings.Join(errs, ";"))
+	}
 	scheme := "http"
 	if c.Config.EnableHttps {
 		scheme = "https"

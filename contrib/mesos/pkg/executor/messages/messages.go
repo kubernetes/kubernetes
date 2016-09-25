@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -29,7 +29,7 @@ const (
 	TaskKilled               = "task-killed"
 	TaskLost                 = "task-lost"
 	UnmarshalTaskDataFailure = "unmarshal-task-data-failure"
-	TaskLostAck              = "task-lost-ack" // executor acknowledgement of forwarded TASK_LOST framework message
+	TaskLostAck              = "task-lost-ack" // executor acknowledgment of forwarded TASK_LOST framework message
 	Kamikaze                 = "kamikaze"
 	WrongSlaveFailure        = "pod-for-wrong-slave-failure"
 	AnnotationUpdateFailure  = "annotation-update-failure"

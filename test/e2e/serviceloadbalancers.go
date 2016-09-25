@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,37 +20,37 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"path/filepath"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/wait"
 	utilyaml "k8s.io/kubernetes/pkg/util/yaml"
+	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
 // getLoadBalancerControllers returns a list of LBCtesters.
-func getLoadBalancerControllers(repoRoot string, client *client.Client) []LBCTester {
+func getLoadBalancerControllers(client *client.Client) []LBCTester {
 	return []LBCTester{
 		&haproxyControllerTester{
 			name:   "haproxy",
-			cfg:    filepath.Join(repoRoot, "test", "e2e", "testing-manifests", "haproxyrc.yaml"),
+			cfg:    "test/e2e/testing-manifests/serviceloadbalancer/haproxyrc.yaml",
 			client: client,
 		},
 	}
 }
 
 // getIngManagers returns a list of ingManagers.
-func getIngManagers(repoRoot string, client *client.Client) []*ingManager {
+func getIngManagers(client *client.Client) []*ingManager {
 	return []*ingManager{
 		{
 			name:        "netexec",
-			rcCfgPaths:  []string{filepath.Join(repoRoot, "test", "e2e", "testing-manifests", "netexecrc.yaml")},
-			svcCfgPaths: []string{filepath.Join(repoRoot, "test", "e2e", "testing-manifests", "netexecsvc.yaml")},
+			rcCfgPaths:  []string{"test/e2e/testing-manifests/serviceloadbalancer/netexecrc.yaml"},
+			svcCfgPaths: []string{"test/e2e/testing-manifests/serviceloadbalancer/netexecsvc.yaml"},
 			svcNames:    []string{},
 			client:      client,
 		},
@@ -95,14 +95,14 @@ func (h *haproxyControllerTester) start(namespace string) (err error) {
 	for i, c := range rc.Spec.Template.Spec.Containers {
 		rc.Spec.Template.Spec.Containers[i].Args = append(
 			c.Args, fmt.Sprintf("--namespace=%v", namespace))
-		Logf("Container args %+v", rc.Spec.Template.Spec.Containers[i].Args)
+		framework.Logf("Container args %+v", rc.Spec.Template.Spec.Containers[i].Args)
 	}
 
 	rc, err = h.client.ReplicationControllers(rc.Namespace).Create(rc)
 	if err != nil {
 		return
 	}
-	if err = waitForRCPodsRunning(h.client, namespace, rc.Name); err != nil {
+	if err = framework.WaitForRCPodsRunning(h.client, namespace, rc.Name); err != nil {
 		return
 	}
 	h.rcName = rc.Name
@@ -111,7 +111,7 @@ func (h *haproxyControllerTester) start(namespace string) (err error) {
 	// Find the pods of the rc we just created.
 	labelSelector := labels.SelectorFromSet(
 		labels.Set(map[string]string{"name": h.rcName}))
-	options := unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{labelSelector}}
+	options := api.ListOptions{LabelSelector: labelSelector}
 	pods, err := h.client.Pods(h.rcNamespace).List(options)
 	if err != nil {
 		return err
@@ -119,10 +119,10 @@ func (h *haproxyControllerTester) start(namespace string) (err error) {
 
 	// Find the external addresses of the nodes the pods are running on.
 	for _, p := range pods.Items {
-		wait.Poll(pollInterval, serviceRespondingTimeout, func() (bool, error) {
-			address, err := getHostExternalAddress(h.client, &p)
+		wait.Poll(pollInterval, framework.ServiceRespondingTimeout, func() (bool, error) {
+			address, err := framework.GetHostExternalAddress(h.client, &p)
 			if err != nil {
-				Logf("%v", err)
+				framework.Logf("%v", err)
 				return false, nil
 			}
 			h.address = append(h.address, address)
@@ -136,7 +136,7 @@ func (h *haproxyControllerTester) start(namespace string) (err error) {
 }
 
 func (h *haproxyControllerTester) stop() error {
-	return h.client.ReplicationControllers(h.rcNamespace).Delete(h.rcName)
+	return h.client.ReplicationControllers(h.rcNamespace).Delete(h.rcName, nil)
 }
 
 func (h *haproxyControllerTester) lookup(ingressKey string) string {
@@ -169,7 +169,7 @@ func (s *ingManager) start(namespace string) (err error) {
 		if err != nil {
 			return
 		}
-		if err = waitForRCPodsRunning(s.client, rc.Namespace, rc.Name); err != nil {
+		if err = framework.WaitForRCPodsRunning(s.client, rc.Namespace, rc.Name); err != nil {
 			return
 		}
 	}
@@ -194,42 +194,40 @@ func (s *ingManager) start(namespace string) (err error) {
 func (s *ingManager) test(path string) error {
 	url := fmt.Sprintf("%v/hostName", path)
 	httpClient := &http.Client{}
-	return wait.Poll(pollInterval, serviceRespondingTimeout, func() (bool, error) {
+	return wait.Poll(pollInterval, framework.ServiceRespondingTimeout, func() (bool, error) {
 		body, err := simpleGET(httpClient, url, "")
 		if err != nil {
-			Logf("%v\n%v\n%v", url, body, err)
+			framework.Logf("%v\n%v\n%v", url, body, err)
 			return false, nil
 		}
 		return true, nil
 	})
 }
 
-var _ = Describe("ServiceLoadBalancer", func() {
+var _ = framework.KubeDescribe("ServiceLoadBalancer [Feature:ServiceLoadBalancer]", func() {
 	// These variables are initialized after framework's beforeEach.
 	var ns string
-	var repoRoot string
 	var client *client.Client
 
-	framework := NewFramework("servicelb")
+	f := framework.NewDefaultFramework("servicelb")
 
 	BeforeEach(func() {
-		client = framework.Client
-		ns = framework.Namespace.Name
-		repoRoot = testContext.RepoRoot
+		client = f.Client
+		ns = f.Namespace.Name
 	})
 
 	It("should support simple GET on Ingress ips", func() {
-		for _, t := range getLoadBalancerControllers(repoRoot, client) {
+		for _, t := range getLoadBalancerControllers(client) {
 			By(fmt.Sprintf("Starting loadbalancer controller %v in namespace %v", t.getName(), ns))
 			Expect(t.start(ns)).NotTo(HaveOccurred())
 
-			for _, s := range getIngManagers(repoRoot, client) {
+			for _, s := range getIngManagers(client) {
 				By(fmt.Sprintf("Starting ingress manager %v in namespace %v", s.getName(), ns))
 				Expect(s.start(ns)).NotTo(HaveOccurred())
 
 				for _, sName := range s.svcNames {
 					path := t.lookup(sName)
-					Logf("Testing path %v", path)
+					framework.Logf("Testing path %v", path)
 					Expect(s.test(path)).NotTo(HaveOccurred())
 				}
 			}
@@ -266,27 +264,25 @@ func simpleGET(c *http.Client, url, host string) (string, error) {
 // rcFromManifest reads a .json/yaml file and returns the rc in it.
 func rcFromManifest(fileName string) *api.ReplicationController {
 	var controller api.ReplicationController
-	Logf("Parsing rc from %v", fileName)
-	data, err := ioutil.ReadFile(fileName)
-	Expect(err).NotTo(HaveOccurred())
+	framework.Logf("Parsing rc from %v", fileName)
+	data := framework.ReadOrDie(fileName)
 
 	json, err := utilyaml.ToJSON(data)
 	Expect(err).NotTo(HaveOccurred())
 
-	Expect(api.Scheme.DecodeInto(json, &controller)).NotTo(HaveOccurred())
+	Expect(runtime.DecodeInto(api.Codecs.UniversalDecoder(), json, &controller)).NotTo(HaveOccurred())
 	return &controller
 }
 
 // svcFromManifest reads a .json/yaml file and returns the rc in it.
 func svcFromManifest(fileName string) *api.Service {
 	var svc api.Service
-	Logf("Parsing service from %v", fileName)
-	data, err := ioutil.ReadFile(fileName)
-	Expect(err).NotTo(HaveOccurred())
+	framework.Logf("Parsing service from %v", fileName)
+	data := framework.ReadOrDie(fileName)
 
 	json, err := utilyaml.ToJSON(data)
 	Expect(err).NotTo(HaveOccurred())
 
-	Expect(api.Scheme.DecodeInto(json, &svc)).NotTo(HaveOccurred())
+	Expect(runtime.DecodeInto(api.Codecs.UniversalDecoder(), json, &svc)).NotTo(HaveOccurred())
 	return &svc
 }

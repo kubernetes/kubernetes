@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,13 +19,19 @@ limitations under the License.
 package main
 
 import (
-	kubeproxy "k8s.io/kubernetes/cmd/kube-proxy/app"
+	"k8s.io/kubernetes/cmd/kube-proxy/app"
+	"k8s.io/kubernetes/cmd/kube-proxy/app/options"
+	"k8s.io/kubernetes/pkg/healthz"
 )
+
+func init() {
+	healthz.DefaultHealthz()
+}
 
 // NewKubeProxy creates a new hyperkube Server object that includes the
 // description and flags.
 func NewKubeProxy() *Server {
-	config := kubeproxy.NewProxyConfig()
+	config := options.NewProxyConfig()
 
 	hks := Server{
 		SimpleUsage: "proxy",
@@ -37,13 +43,13 @@ func NewKubeProxy() *Server {
 
 	config.AddFlags(hks.Flags())
 
-	hks.Run = func(_ *Server, args []string) error {
-		s, err := kubeproxy.NewProxyServerDefault(config)
+	hks.Run = func(_ *Server, _ []string) error {
+		s, err := app.NewProxyServerDefault(config)
 		if err != nil {
 			return err
 		}
 
-		return s.Run(args)
+		return s.Run()
 	}
 
 	return &hks

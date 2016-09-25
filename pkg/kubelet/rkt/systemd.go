@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,7 +18,6 @@ package rkt
 
 import (
 	"fmt"
-	"os/exec"
 	"strconv"
 	"strings"
 
@@ -57,11 +56,11 @@ type systemdInterface interface {
 	// ListUnits lists all the loaded units.
 	ListUnits() ([]dbus.UnitStatus, error)
 	// StopUnits stops the unit with the given name.
-	StopUnit(name, mode string) (string, error)
+	StopUnit(name string, mode string, ch chan<- string) (int, error)
 	// StopUnits restarts the unit with the given name.
-	RestartUnit(name, mode string) (string, error)
-	// Reload is equivalent to 'systemctl daemon-reload'.
-	Reload() error
+	RestartUnit(name string, mode string, ch chan<- string) (int, error)
+	// ResetFailedUnit resets the "failed" state of a specific unit.
+	ResetFailedUnit(name string) error
 }
 
 // systemd implements the systemdInterface using dbus and systemctl.
@@ -81,21 +80,11 @@ func newSystemd() (*systemd, error) {
 
 // Version returns the version of the systemd.
 func (s *systemd) Version() (systemdVersion, error) {
-	output, err := exec.Command("systemctl", "--version").Output()
+	versionStr, err := s.Conn.GetManagerProperty("Version")
 	if err != nil {
 		return -1, err
 	}
-	// Example output of 'systemctl --version':
-	//
-	// systemd 215
-	// +PAM +AUDIT +SELINUX +IMA +SYSVINIT +LIBCRYPTSETUP +GCRYPT +ACL +XZ -SECCOMP -APPARMOR
-	//
-	lines := strings.Split(string(output), "\n")
-	tuples := strings.Split(lines[0], " ")
-	if len(tuples) != 2 {
-		return -1, fmt.Errorf("rkt: Failed to parse version %v", lines)
-	}
-	result, err := strconv.Atoi(string(tuples[1]))
+	result, err := strconv.Atoi(strings.Trim(versionStr, "\""))
 	if err != nil {
 		return -1, err
 	}

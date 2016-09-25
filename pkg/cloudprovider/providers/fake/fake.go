@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -31,26 +31,26 @@ const ProviderName = "fake"
 
 // FakeBalancer is a fake storage of balancer information
 type FakeBalancer struct {
-	Name       string
-	Region     string
-	ExternalIP net.IP
-	Ports      []*api.ServicePort
-	Hosts      []string
+	Name           string
+	Region         string
+	LoadBalancerIP string
+	Ports          []api.ServicePort
+	Hosts          []string
 }
 
 type FakeUpdateBalancerCall struct {
-	Name   string
-	Region string
-	Hosts  []string
+	Service *api.Service
+	Hosts   []string
 }
 
-// FakeCloud is a test-double implementation of Interface, TCPLoadBalancer, Instances, and Routes. It is useful for testing.
+// FakeCloud is a test-double implementation of Interface, LoadBalancer, Instances, and Routes. It is useful for testing.
 type FakeCloud struct {
 	Exists        bool
 	Err           error
 	Calls         []string
 	Addresses     []api.NodeAddress
 	ExtID         map[string]string
+	InstanceTypes map[string]string
 	Machines      []string
 	NodeResources *api.NodeResources
 	ClusterList   []string
@@ -99,9 +99,9 @@ func (f *FakeCloud) ScrubDNS(nameservers, searches []string) (nsOut, srchOut []s
 	return nameservers, searches
 }
 
-// TCPLoadBalancer returns a fake implementation of TCPLoadBalancer.
+// LoadBalancer returns a fake implementation of LoadBalancer.
 // Actually it just returns f itself.
-func (f *FakeCloud) TCPLoadBalancer() (cloudprovider.TCPLoadBalancer, bool) {
+func (f *FakeCloud) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
 	return f, true
 }
 
@@ -120,22 +120,32 @@ func (f *FakeCloud) Routes() (cloudprovider.Routes, bool) {
 	return f, true
 }
 
-// GetTCPLoadBalancer is a stub implementation of TCPLoadBalancer.GetTCPLoadBalancer.
-func (f *FakeCloud) GetTCPLoadBalancer(name, region string) (*api.LoadBalancerStatus, bool, error) {
+// GetLoadBalancer is a stub implementation of LoadBalancer.GetLoadBalancer.
+func (f *FakeCloud) GetLoadBalancer(clusterName string, service *api.Service) (*api.LoadBalancerStatus, bool, error) {
 	status := &api.LoadBalancerStatus{}
 	status.Ingress = []api.LoadBalancerIngress{{IP: f.ExternalIP.String()}}
 
 	return status, f.Exists, f.Err
 }
 
-// EnsureTCPLoadBalancer is a test-spy implementation of TCPLoadBalancer.EnsureTCPLoadBalancer.
+// EnsureLoadBalancer is a test-spy implementation of LoadBalancer.EnsureLoadBalancer.
 // It adds an entry "create" into the internal method call record.
-func (f *FakeCloud) EnsureTCPLoadBalancer(name, region string, externalIP net.IP, ports []*api.ServicePort, hosts []string, affinityType api.ServiceAffinity) (*api.LoadBalancerStatus, error) {
+func (f *FakeCloud) EnsureLoadBalancer(clusterName string, service *api.Service, hosts []string) (*api.LoadBalancerStatus, error) {
 	f.addCall("create")
 	if f.Balancers == nil {
 		f.Balancers = make(map[string]FakeBalancer)
 	}
-	f.Balancers[name] = FakeBalancer{name, region, externalIP, ports, hosts}
+
+	name := cloudprovider.GetLoadBalancerName(service)
+	spec := service.Spec
+
+	zone, err := f.GetZone()
+	if err != nil {
+		return nil, err
+	}
+	region := zone.Region
+
+	f.Balancers[name] = FakeBalancer{name, region, spec.LoadBalancerIP, spec.Ports, hosts}
 
 	status := &api.LoadBalancerStatus{}
 	status.Ingress = []api.LoadBalancerIngress{{IP: f.ExternalIP.String()}}
@@ -143,17 +153,17 @@ func (f *FakeCloud) EnsureTCPLoadBalancer(name, region string, externalIP net.IP
 	return status, f.Err
 }
 
-// UpdateTCPLoadBalancer is a test-spy implementation of TCPLoadBalancer.UpdateTCPLoadBalancer.
+// UpdateLoadBalancer is a test-spy implementation of LoadBalancer.UpdateLoadBalancer.
 // It adds an entry "update" into the internal method call record.
-func (f *FakeCloud) UpdateTCPLoadBalancer(name, region string, hosts []string) error {
+func (f *FakeCloud) UpdateLoadBalancer(clusterName string, service *api.Service, hosts []string) error {
 	f.addCall("update")
-	f.UpdateCalls = append(f.UpdateCalls, FakeUpdateBalancerCall{name, region, hosts})
+	f.UpdateCalls = append(f.UpdateCalls, FakeUpdateBalancerCall{service, hosts})
 	return f.Err
 }
 
-// EnsureTCPLoadBalancerDeleted is a test-spy implementation of TCPLoadBalancer.EnsureTCPLoadBalancerDeleted.
+// EnsureLoadBalancerDeleted is a test-spy implementation of LoadBalancer.EnsureLoadBalancerDeleted.
 // It adds an entry "delete" into the internal method call record.
-func (f *FakeCloud) EnsureTCPLoadBalancerDeleted(name, region string) error {
+func (f *FakeCloud) EnsureLoadBalancerDeleted(clusterName string, service *api.Service) error {
 	f.addCall("delete")
 	return f.Err
 }
@@ -186,6 +196,12 @@ func (f *FakeCloud) ExternalID(instance string) (string, error) {
 func (f *FakeCloud) InstanceID(instance string) (string, error) {
 	f.addCall("instance-id")
 	return f.ExtID[instance], nil
+}
+
+// InstanceType returns the type of the specified instance.
+func (f *FakeCloud) InstanceType(instance string) (string, error) {
+	f.addCall("instance-type")
+	return f.InstanceTypes[instance], nil
 }
 
 // List is a test-spy implementation of Instances.List.

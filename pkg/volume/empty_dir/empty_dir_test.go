@@ -1,5 +1,7 @@
+// +build linux
+
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,7 +19,6 @@ limitations under the License.
 package empty_dir
 
 import (
-	"io/ioutil"
 	"os"
 	"path"
 	"testing"
@@ -25,14 +26,16 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/mount"
+	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 	"k8s.io/kubernetes/pkg/volume"
+	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
 )
 
 // Construct an instance of a plugin, by name.
-func makePluginUnderTest(t *testing.T, plugName, basePath string) volume.VolumePlugin {
+func makePluginUnderTest(t *testing.T, plugName, basePath, rootContext string) volume.VolumePlugin {
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost(basePath, nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), volumetest.NewFakeVolumeHost(basePath, nil, nil, rootContext))
 
 	plug, err := plugMgr.FindPluginByName(plugName)
 	if err != nil {
@@ -42,15 +45,15 @@ func makePluginUnderTest(t *testing.T, plugName, basePath string) volume.VolumeP
 }
 
 func TestCanSupport(t *testing.T) {
-	tmpDir, err := ioutil.TempDir(os.TempDir(), "emptydirTest")
+	tmpDir, err := utiltesting.MkTmpdir("emptydirTest")
 	if err != nil {
 		t.Fatalf("can't make a temp dir: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
-	plug := makePluginUnderTest(t, "kubernetes.io/empty-dir", tmpDir)
+	plug := makePluginUnderTest(t, "kubernetes.io/empty-dir", tmpDir, "" /* rootContext */)
 
-	if plug.Name() != "kubernetes.io/empty-dir" {
-		t.Errorf("Wrong name: %s", plug.Name())
+	if plug.GetPluginName() != "kubernetes.io/empty-dir" {
+		t.Errorf("Wrong name: %s", plug.GetPluginName())
 	}
 	if !plug.CanSupport(&volume.Spec{Volume: &api.Volume{VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}}) {
 		t.Errorf("Expected true")
@@ -85,7 +88,7 @@ func TestPluginRootContextSet(t *testing.T) {
 	doTestPlugin(t, pluginTestConfig{
 		medium:                 api.StorageMediumDefault,
 		rootContext:            "user:role:type:range",
-		expectedSELinuxContext: "user:role:type:range",
+		expectedSELinux:        "user:role:type:range",
 		expectedSetupMounts:    0,
 		expectedTeardownMounts: 0})
 }
@@ -98,7 +101,7 @@ func TestPluginTmpfs(t *testing.T) {
 	doTestPlugin(t, pluginTestConfig{
 		medium:                        api.StorageMediumMemory,
 		rootContext:                   "user:role:type:range",
-		expectedSELinuxContext:        "user:role:type:range",
+		expectedSELinux:               "user:role:type:range",
 		expectedSetupMounts:           1,
 		shouldBeMountedBeforeTeardown: true,
 		expectedTeardownMounts:        1})
@@ -109,7 +112,7 @@ type pluginTestConfig struct {
 	rootContext                   string
 	SELinuxOptions                *api.SELinuxOptions
 	idempotent                    bool
-	expectedSELinuxContext        string
+	expectedSELinux               string
 	expectedSetupMounts           int
 	shouldBeMountedBeforeTeardown bool
 	expectedTeardownMounts        int
@@ -117,7 +120,7 @@ type pluginTestConfig struct {
 
 // doTestPlugin sets up a volume and tears it back down.
 func doTestPlugin(t *testing.T, config pluginTestConfig) {
-	basePath, err := ioutil.TempDir(os.TempDir(), "emptydir_volume_test")
+	basePath, err := utiltesting.MkTmpdir("emptydir_volume_test")
 	if err != nil {
 		t.Fatalf("can't make a temp rootdir: %v", err)
 	}
@@ -127,16 +130,16 @@ func doTestPlugin(t *testing.T, config pluginTestConfig) {
 		volumePath  = path.Join(basePath, "pods/poduid/volumes/kubernetes.io~empty-dir/test-volume")
 		metadataDir = path.Join(basePath, "pods/poduid/plugins/kubernetes.io~empty-dir/test-volume")
 
-		plug       = makePluginUnderTest(t, "kubernetes.io/empty-dir", basePath)
+		plug       = makePluginUnderTest(t, "kubernetes.io/empty-dir", basePath, config.rootContext)
 		volumeName = "test-volume"
 		spec       = &api.Volume{
 			Name:         volumeName,
 			VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{Medium: config.medium}},
 		}
 
-		mounter       = mount.FakeMounter{}
-		mountDetector = fakeMountDetector{}
-		pod           = &api.Pod{ObjectMeta: api.ObjectMeta{UID: types.UID("poduid")}}
+		physicalMounter = mount.FakeMounter{}
+		mountDetector   = fakeMountDetector{}
+		pod             = &api.Pod{ObjectMeta: api.ObjectMeta{UID: types.UID("poduid")}}
 	)
 
 	// Set up the SELinux options on the pod
@@ -158,7 +161,7 @@ func doTestPlugin(t *testing.T, config pluginTestConfig) {
 	}
 
 	if config.idempotent {
-		mounter.MountPoints = []mount.MountPoint{
+		physicalMounter.MountPoints = []mount.MountPoint{
 			{
 				Path: volumePath,
 			},
@@ -166,24 +169,24 @@ func doTestPlugin(t *testing.T, config pluginTestConfig) {
 		util.SetReady(metadataDir)
 	}
 
-	builder, err := plug.(*emptyDirPlugin).newBuilderInternal(volume.NewSpecFromVolume(spec),
+	mounter, err := plug.(*emptyDirPlugin).newMounterInternal(volume.NewSpecFromVolume(spec),
 		pod,
-		&mounter,
+		&physicalMounter,
 		&mountDetector,
-		volume.VolumeOptions{RootContext: config.rootContext})
+		volume.VolumeOptions{})
 	if err != nil {
-		t.Errorf("Failed to make a new Builder: %v", err)
+		t.Errorf("Failed to make a new Mounter: %v", err)
 	}
-	if builder == nil {
-		t.Errorf("Got a nil Builder")
+	if mounter == nil {
+		t.Errorf("Got a nil Mounter")
 	}
 
-	volPath := builder.GetPath()
+	volPath := mounter.GetPath()
 	if volPath != volumePath {
 		t.Errorf("Got unexpected path: %s", volPath)
 	}
 
-	if err := builder.SetUp(); err != nil {
+	if err := mounter.SetUp(nil); err != nil {
 		t.Errorf("Expected success, got: %v", err)
 	}
 
@@ -207,30 +210,30 @@ func doTestPlugin(t *testing.T, config pluginTestConfig) {
 	}
 
 	// Check the number of mounts performed during setup
-	if e, a := config.expectedSetupMounts, len(mounter.Log); e != a {
-		t.Errorf("Expected %v mounter calls during setup, got %v", e, a)
+	if e, a := config.expectedSetupMounts, len(physicalMounter.Log); e != a {
+		t.Errorf("Expected %v physicalMounter calls during setup, got %v", e, a)
 	} else if config.expectedSetupMounts == 1 &&
-		(mounter.Log[0].Action != mount.FakeActionMount || mounter.Log[0].FSType != "tmpfs") {
-		t.Errorf("Unexpected mounter action during setup: %#v", mounter.Log[0])
+		(physicalMounter.Log[0].Action != mount.FakeActionMount || physicalMounter.Log[0].FSType != "tmpfs") {
+		t.Errorf("Unexpected physicalMounter action during setup: %#v", physicalMounter.Log[0])
 	}
-	mounter.ResetLog()
+	physicalMounter.ResetLog()
 
-	// Make a cleaner for the volume
+	// Make a unmounter for the volume
 	teardownMedium := mediumUnknown
 	if config.medium == api.StorageMediumMemory {
 		teardownMedium = mediumMemory
 	}
-	cleanerMountDetector := &fakeMountDetector{medium: teardownMedium, isMount: config.shouldBeMountedBeforeTeardown}
-	cleaner, err := plug.(*emptyDirPlugin).newCleanerInternal(volumeName, types.UID("poduid"), &mounter, cleanerMountDetector)
+	unmounterMountDetector := &fakeMountDetector{medium: teardownMedium, isMount: config.shouldBeMountedBeforeTeardown}
+	unmounter, err := plug.(*emptyDirPlugin).newUnmounterInternal(volumeName, types.UID("poduid"), &physicalMounter, unmounterMountDetector)
 	if err != nil {
-		t.Errorf("Failed to make a new Cleaner: %v", err)
+		t.Errorf("Failed to make a new Unmounter: %v", err)
 	}
-	if cleaner == nil {
-		t.Errorf("Got a nil Cleaner")
+	if unmounter == nil {
+		t.Errorf("Got a nil Unmounter")
 	}
 
 	// Tear down the volume
-	if err := cleaner.TearDown(); err != nil {
+	if err := unmounter.TearDown(); err != nil {
 		t.Errorf("Expected success, got: %v", err)
 	}
 	if _, err := os.Stat(volPath); err == nil {
@@ -239,38 +242,82 @@ func doTestPlugin(t *testing.T, config pluginTestConfig) {
 		t.Errorf("SetUp() failed: %v", err)
 	}
 
-	// Check the number of mounter calls during tardown
-	if e, a := config.expectedTeardownMounts, len(mounter.Log); e != a {
-		t.Errorf("Expected %v mounter calls during teardown, got %v", e, a)
-	} else if config.expectedTeardownMounts == 1 && mounter.Log[0].Action != mount.FakeActionUnmount {
-		t.Errorf("Unexpected mounter action during teardown: %#v", mounter.Log[0])
+	// Check the number of physicalMounter calls during tardown
+	if e, a := config.expectedTeardownMounts, len(physicalMounter.Log); e != a {
+		t.Errorf("Expected %v physicalMounter calls during teardown, got %v", e, a)
+	} else if config.expectedTeardownMounts == 1 && physicalMounter.Log[0].Action != mount.FakeActionUnmount {
+		t.Errorf("Unexpected physicalMounter action during teardown: %#v", physicalMounter.Log[0])
 	}
-	mounter.ResetLog()
+	physicalMounter.ResetLog()
 }
 
 func TestPluginBackCompat(t *testing.T) {
-	basePath, err := ioutil.TempDir(os.TempDir(), "emptydirTest")
+	basePath, err := utiltesting.MkTmpdir("emptydirTest")
 	if err != nil {
 		t.Fatalf("can't make a temp dir： %v", err)
 	}
 	defer os.RemoveAll(basePath)
 
-	plug := makePluginUnderTest(t, "kubernetes.io/empty-dir", basePath)
+	plug := makePluginUnderTest(t, "kubernetes.io/empty-dir", basePath, "" /* rootContext */)
 
 	spec := &api.Volume{
 		Name: "vol1",
 	}
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: types.UID("poduid")}}
-	builder, err := plug.NewBuilder(volume.NewSpecFromVolume(spec), pod, volume.VolumeOptions{RootContext: ""})
+	mounter, err := plug.NewMounter(volume.NewSpecFromVolume(spec), pod, volume.VolumeOptions{})
 	if err != nil {
-		t.Errorf("Failed to make a new Builder: %v", err)
+		t.Errorf("Failed to make a new Mounter: %v", err)
 	}
-	if builder == nil {
-		t.Errorf("Got a nil Builder")
+	if mounter == nil {
+		t.Errorf("Got a nil Mounter")
 	}
 
-	volPath := builder.GetPath()
+	volPath := mounter.GetPath()
 	if volPath != path.Join(basePath, "pods/poduid/volumes/kubernetes.io~empty-dir/vol1") {
 		t.Errorf("Got unexpected path: %s", volPath)
+	}
+}
+
+// TestMetrics tests that MetricProvider methods return sane values.
+func TestMetrics(t *testing.T) {
+	// Create an empty temp directory for the volume
+	tmpDir, err := utiltesting.MkTmpdir("empty_dir_test")
+	if err != nil {
+		t.Fatalf("Can't make a tmp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	plug := makePluginUnderTest(t, "kubernetes.io/empty-dir", tmpDir, "" /* rootContext */)
+
+	spec := &api.Volume{
+		Name: "vol1",
+	}
+	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: types.UID("poduid")}}
+	mounter, err := plug.NewMounter(volume.NewSpecFromVolume(spec), pod, volume.VolumeOptions{})
+	if err != nil {
+		t.Errorf("Failed to make a new Mounter: %v", err)
+	}
+
+	// Need to create the subdirectory
+	os.MkdirAll(mounter.GetPath(), 0755)
+
+	expectedEmptyDirUsage, err := volumetest.FindEmptyDirectoryUsageOnTmpfs()
+	if err != nil {
+		t.Errorf("Unexpected error finding expected empty directory usage on tmpfs: %v", err)
+	}
+
+	// TODO(pwittroc): Move this into a reusable testing utility
+	metrics, err := mounter.GetMetrics()
+	if err != nil {
+		t.Errorf("Unexpected error when calling GetMetrics %v", err)
+	}
+	if e, a := expectedEmptyDirUsage.Value(), metrics.Used.Value(); e != a {
+		t.Errorf("Unexpected value for empty directory; expected %v, got %v", e, a)
+	}
+	if metrics.Capacity.Value() <= 0 {
+		t.Errorf("Expected Capacity to be greater than 0")
+	}
+	if metrics.Available.Value() <= 0 {
+		t.Errorf("Expected Available to be greater than 0")
 	}
 }

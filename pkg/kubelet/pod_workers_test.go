@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,7 +18,6 @@ package kubelet
 
 import (
 	"reflect"
-	"sort"
 	"sync"
 	"testing"
 	"time"
@@ -26,10 +25,44 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/record"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
 	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/util/clock"
 )
+
+// fakePodWorkers runs sync pod function in serial, so we can have
+// deterministic behaviour in testing.
+type fakePodWorkers struct {
+	syncPodFn syncPodFnType
+	cache     kubecontainer.Cache
+	t         TestingInterface
+}
+
+func (f *fakePodWorkers) UpdatePod(options *UpdatePodOptions) {
+	status, err := f.cache.Get(options.Pod.UID)
+	if err != nil {
+		f.t.Errorf("Unexpected error: %v", err)
+	}
+	if err := f.syncPodFn(syncPodOptions{
+		mirrorPod:      options.MirrorPod,
+		pod:            options.Pod,
+		podStatus:      status,
+		updateType:     options.UpdateType,
+		killPodOptions: options.KillPodOptions,
+	}); err != nil {
+		f.t.Errorf("Unexpected error: %v", err)
+	}
+}
+
+func (f *fakePodWorkers) ForgetNonExistingPodWorkers(desiredPods map[types.UID]empty) {}
+
+func (f *fakePodWorkers) ForgetWorker(uid types.UID) {}
+
+type TestingInterface interface {
+	Errorf(format string, args ...interface{})
+}
 
 func newPod(uid, name string) *api.Pod {
 	return &api.Pod{
@@ -40,26 +73,36 @@ func newPod(uid, name string) *api.Pod {
 	}
 }
 
-func createPodWorkers() (*podWorkers, map[types.UID][]string) {
+// syncPodRecord is a record of a sync pod call
+type syncPodRecord struct {
+	name       string
+	updateType kubetypes.SyncPodType
+}
+
+func createPodWorkers() (*podWorkers, map[types.UID][]syncPodRecord) {
 	lock := sync.Mutex{}
-	processed := make(map[types.UID][]string)
+	processed := make(map[types.UID][]syncPodRecord)
 	fakeRecorder := &record.FakeRecorder{}
-	fakeRuntime := &kubecontainer.FakeRuntime{}
-	fakeRuntimeCache := kubecontainer.NewFakeRuntimeCache(fakeRuntime)
+	fakeRuntime := &containertest.FakeRuntime{}
+	fakeCache := containertest.NewFakeCache(fakeRuntime)
 	podWorkers := newPodWorkers(
-		fakeRuntimeCache,
-		func(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecontainer.Pod, updateType kubetypes.SyncPodType) error {
+		func(options syncPodOptions) error {
 			func() {
 				lock.Lock()
 				defer lock.Unlock()
-				processed[pod.UID] = append(processed[pod.UID], pod.Name)
+				pod := options.pod
+				processed[pod.UID] = append(processed[pod.UID], syncPodRecord{
+					name:       pod.Name,
+					updateType: options.updateType,
+				})
 			}()
 			return nil
 		},
 		fakeRecorder,
-		queue.NewBasicWorkQueue(),
+		queue.NewBasicWorkQueue(&clock.RealClock{}),
 		time.Second,
 		time.Second,
+		fakeCache,
 	)
 	return podWorkers, processed
 }
@@ -88,12 +131,15 @@ func TestUpdatePod(t *testing.T) {
 	numPods := 20
 	for i := 0; i < numPods; i++ {
 		for j := i; j < numPods; j++ {
-			podWorkers.UpdatePod(newPod(string(j), string(i)), nil, kubetypes.SyncPodCreate, func() {})
+			podWorkers.UpdatePod(&UpdatePodOptions{
+				Pod:        newPod(string(j), string(i)),
+				UpdateType: kubetypes.SyncPodCreate,
+			})
 		}
 	}
 	drainWorkers(podWorkers, numPods)
 
-	if len(processed) != 20 {
+	if len(processed) != numPods {
 		t.Errorf("Not all pods processed: %v", len(processed))
 		return
 	}
@@ -106,12 +152,52 @@ func TestUpdatePod(t *testing.T) {
 
 		first := 0
 		last := len(processed[uid]) - 1
-		if processed[uid][first] != string(0) {
+		if processed[uid][first].name != string(0) {
 			t.Errorf("Pod %v: incorrect order %v, %v", i, first, processed[uid][first])
 
 		}
-		if processed[uid][last] != string(i) {
+		if processed[uid][last].name != string(i) {
 			t.Errorf("Pod %v: incorrect order %v, %v", i, last, processed[uid][last])
+		}
+	}
+}
+
+func TestUpdatePodDoesNotForgetSyncPodKill(t *testing.T) {
+	podWorkers, processed := createPodWorkers()
+	numPods := 20
+	for i := 0; i < numPods; i++ {
+		pod := newPod(string(i), string(i))
+		podWorkers.UpdatePod(&UpdatePodOptions{
+			Pod:        pod,
+			UpdateType: kubetypes.SyncPodCreate,
+		})
+		podWorkers.UpdatePod(&UpdatePodOptions{
+			Pod:        pod,
+			UpdateType: kubetypes.SyncPodKill,
+		})
+		podWorkers.UpdatePod(&UpdatePodOptions{
+			Pod:        pod,
+			UpdateType: kubetypes.SyncPodUpdate,
+		})
+	}
+	drainWorkers(podWorkers, numPods)
+	if len(processed) != numPods {
+		t.Errorf("Not all pods processed: %v", len(processed))
+		return
+	}
+	for i := 0; i < numPods; i++ {
+		uid := types.UID(i)
+		// each pod should be processed two times (create, kill, but not update)
+		syncPodRecords := processed[uid]
+		if len(syncPodRecords) < 2 {
+			t.Errorf("Pod %v processed %v times, but expected at least 2", i, len(syncPodRecords))
+			continue
+		}
+		if syncPodRecords[0].updateType != kubetypes.SyncPodCreate {
+			t.Errorf("Pod %v event was %v, but expected %v", i, syncPodRecords[0].updateType, kubetypes.SyncPodCreate)
+		}
+		if syncPodRecords[1].updateType != kubetypes.SyncPodKill {
+			t.Errorf("Pod %v event was %v, but expected %v", i, syncPodRecords[1].updateType, kubetypes.SyncPodKill)
 		}
 	}
 }
@@ -121,7 +207,10 @@ func TestForgetNonExistingPodWorkers(t *testing.T) {
 
 	numPods := 20
 	for i := 0; i < numPods; i++ {
-		podWorkers.UpdatePod(newPod(string(i), "name"), nil, kubetypes.SyncPodUpdate, func() {})
+		podWorkers.UpdatePod(&UpdatePodOptions{
+			Pod:        newPod(string(i), "name"),
+			UpdateType: kubetypes.SyncPodUpdate,
+		})
 	}
 	drainWorkers(podWorkers, numPods)
 
@@ -150,19 +239,19 @@ func TestForgetNonExistingPodWorkers(t *testing.T) {
 }
 
 type simpleFakeKubelet struct {
-	pod        *api.Pod
-	mirrorPod  *api.Pod
-	runningPod kubecontainer.Pod
-	wg         sync.WaitGroup
+	pod       *api.Pod
+	mirrorPod *api.Pod
+	podStatus *kubecontainer.PodStatus
+	wg        sync.WaitGroup
 }
 
-func (kl *simpleFakeKubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecontainer.Pod, updateType kubetypes.SyncPodType) error {
-	kl.pod, kl.mirrorPod, kl.runningPod = pod, mirrorPod, runningPod
+func (kl *simpleFakeKubelet) syncPod(options syncPodOptions) error {
+	kl.pod, kl.mirrorPod, kl.podStatus = options.pod, options.mirrorPod, options.podStatus
 	return nil
 }
 
-func (kl *simpleFakeKubelet) syncPodWithWaitGroup(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecontainer.Pod, updateType kubetypes.SyncPodType) error {
-	kl.pod, kl.mirrorPod, kl.runningPod = pod, mirrorPod, runningPod
+func (kl *simpleFakeKubelet) syncPodWithWaitGroup(options syncPodOptions) error {
+	kl.pod, kl.mirrorPod, kl.podStatus = options.pod, options.mirrorPod, options.podStatus
 	kl.wg.Done()
 	return nil
 }
@@ -184,119 +273,45 @@ func (b byContainerName) Less(i, j int) bool {
 // for their invocation of the syncPodFn.
 func TestFakePodWorkers(t *testing.T) {
 	fakeRecorder := &record.FakeRecorder{}
-	fakeRuntime := &kubecontainer.FakeRuntime{}
-	fakeRuntimeCache := kubecontainer.NewFakeRuntimeCache(fakeRuntime)
+	fakeRuntime := &containertest.FakeRuntime{}
+	fakeCache := containertest.NewFakeCache(fakeRuntime)
 
 	kubeletForRealWorkers := &simpleFakeKubelet{}
 	kubeletForFakeWorkers := &simpleFakeKubelet{}
 
-	realPodWorkers := newPodWorkers(fakeRuntimeCache, kubeletForRealWorkers.syncPodWithWaitGroup, fakeRecorder, queue.NewBasicWorkQueue(), time.Second, time.Second)
-	fakePodWorkers := &fakePodWorkers{kubeletForFakeWorkers.syncPod, fakeRuntimeCache, t}
+	realPodWorkers := newPodWorkers(kubeletForRealWorkers.syncPodWithWaitGroup, fakeRecorder, queue.NewBasicWorkQueue(&clock.RealClock{}), time.Second, time.Second, fakeCache)
+	fakePodWorkers := &fakePodWorkers{kubeletForFakeWorkers.syncPod, fakeCache, t}
 
 	tests := []struct {
-		pod                    *api.Pod
-		mirrorPod              *api.Pod
-		podList                []*kubecontainer.Pod
-		containersInRunningPod int
+		pod       *api.Pod
+		mirrorPod *api.Pod
 	}{
 		{
 			&api.Pod{},
 			&api.Pod{},
-			[]*kubecontainer.Pod{},
-			0,
 		},
 		{
-			&api.Pod{
-				ObjectMeta: api.ObjectMeta{
-					UID:       "12345678",
-					Name:      "foo",
-					Namespace: "new",
-				},
-			},
-			&api.Pod{
-				ObjectMeta: api.ObjectMeta{
-					UID:       "12345678",
-					Name:      "fooMirror",
-					Namespace: "new",
-				},
-			},
-			[]*kubecontainer.Pod{
-				{
-					ID:        "12345678",
-					Name:      "foo",
-					Namespace: "new",
-					Containers: []*kubecontainer.Container{
-						{
-							Name: "fooContainer",
-						},
-					},
-				},
-				{
-					ID:        "12345678",
-					Name:      "fooMirror",
-					Namespace: "new",
-					Containers: []*kubecontainer.Container{
-						{
-							Name: "fooContainerMirror",
-						},
-					},
-				},
-			},
-			1,
+			podWithUidNameNs("12345678", "foo", "new"),
+			podWithUidNameNs("12345678", "fooMirror", "new"),
 		},
 		{
-			&api.Pod{
-				ObjectMeta: api.ObjectMeta{
-					UID:       "98765",
-					Name:      "bar",
-					Namespace: "new",
-				},
-			},
-			&api.Pod{
-				ObjectMeta: api.ObjectMeta{
-					UID:       "98765",
-					Name:      "barMirror",
-					Namespace: "new",
-				},
-			},
-			[]*kubecontainer.Pod{
-				{
-					ID:        "98765",
-					Name:      "bar",
-					Namespace: "new",
-					Containers: []*kubecontainer.Container{
-						{
-							Name: "barContainer0",
-						},
-						{
-							Name: "barContainer1",
-						},
-					},
-				},
-				{
-					ID:        "98765",
-					Name:      "barMirror",
-					Namespace: "new",
-					Containers: []*kubecontainer.Container{
-						{
-							Name: "barContainerMirror0",
-						},
-						{
-							Name: "barContainerMirror1",
-						},
-					},
-				},
-			},
-			2,
+			podWithUidNameNs("98765", "bar", "new"),
+			podWithUidNameNs("98765", "barMirror", "new"),
 		},
 	}
 
 	for i, tt := range tests {
 		kubeletForRealWorkers.wg.Add(1)
-
-		fakeRuntime.PodList = tt.podList
-		realPodWorkers.UpdatePod(tt.pod, tt.mirrorPod, kubetypes.SyncPodUpdate, func() {})
-		fakePodWorkers.UpdatePod(tt.pod, tt.mirrorPod, kubetypes.SyncPodUpdate, func() {})
+		realPodWorkers.UpdatePod(&UpdatePodOptions{
+			Pod:        tt.pod,
+			MirrorPod:  tt.mirrorPod,
+			UpdateType: kubetypes.SyncPodUpdate,
+		})
+		fakePodWorkers.UpdatePod(&UpdatePodOptions{
+			Pod:        tt.pod,
+			MirrorPod:  tt.mirrorPod,
+			UpdateType: kubetypes.SyncPodUpdate,
+		})
 
 		kubeletForRealWorkers.wg.Wait()
 
@@ -308,14 +323,32 @@ func TestFakePodWorkers(t *testing.T) {
 			t.Errorf("%d: Expected: %#v, Actual: %#v", i, kubeletForRealWorkers.mirrorPod, kubeletForFakeWorkers.mirrorPod)
 		}
 
-		if tt.containersInRunningPod != len(kubeletForFakeWorkers.runningPod.Containers) {
-			t.Errorf("%d: Expected: %#v, Actual: %#v", i, tt.containersInRunningPod, len(kubeletForFakeWorkers.runningPod.Containers))
+		if !reflect.DeepEqual(kubeletForRealWorkers.podStatus, kubeletForFakeWorkers.podStatus) {
+			t.Errorf("%d: Expected: %#v, Actual: %#v", i, kubeletForRealWorkers.podStatus, kubeletForFakeWorkers.podStatus)
 		}
+	}
+}
 
-		sort.Sort(byContainerName(kubeletForRealWorkers.runningPod))
-		sort.Sort(byContainerName(kubeletForFakeWorkers.runningPod))
-		if !reflect.DeepEqual(kubeletForRealWorkers.runningPod, kubeletForFakeWorkers.runningPod) {
-			t.Errorf("%d: Expected: %#v, Actual: %#v", i, kubeletForRealWorkers.runningPod, kubeletForFakeWorkers.runningPod)
-		}
+// TestKillPodNowFunc tests the blocking kill pod function works with pod workers as expected.
+func TestKillPodNowFunc(t *testing.T) {
+	fakeRecorder := &record.FakeRecorder{}
+	podWorkers, processed := createPodWorkers()
+	killPodFunc := killPodNow(podWorkers, fakeRecorder)
+	pod := newPod("test", "test")
+	gracePeriodOverride := int64(0)
+	err := killPodFunc(pod, api.PodStatus{Phase: api.PodFailed, Reason: "reason", Message: "message"}, &gracePeriodOverride)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if len(processed) != 1 {
+		t.Errorf("len(processed) expected: %v, actual: %v", 1, len(processed))
+		return
+	}
+	syncPodRecords := processed[pod.UID]
+	if len(syncPodRecords) != 1 {
+		t.Errorf("Pod processed %v times, but expected %v", len(syncPodRecords), 1)
+	}
+	if syncPodRecords[0].updateType != kubetypes.SyncPodKill {
+		t.Errorf("Pod update type was %v, but expected %v", syncPodRecords[0].updateType, kubetypes.SyncPodKill)
 	}
 }

@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/scalingdata/gcfg"
+	"gopkg.in/gcfg.v1"
 )
 
 const (
@@ -56,8 +56,8 @@ type Config struct {
 	UpdatesBacklog                     int             `gcfg:"updates-backlog"`
 	FrameworkIdRefreshInterval         WrappedDuration `gcfg:"framework-id-refresh-interval"`
 	InitialImplicitReconciliationDelay WrappedDuration `gcfg:"initial-implicit-reconciliation-delay"`
-	ExplicitReconciliationMaxBackoff   WrappedDuration `gcfg:"explicit-reconciliantion-max-backoff"`
-	ExplicitReconciliationAbortTimeout WrappedDuration `gcfg:"explicit-reconciliantion-abort-timeout"`
+	ExplicitReconciliationMaxBackoff   WrappedDuration `gcfg:"explicit-reconciliation-max-backoff"`
+	ExplicitReconciliationAbortTimeout WrappedDuration `gcfg:"explicit-reconciliation-abort-timeout"`
 	InitialPodBackoff                  WrappedDuration `gcfg:"initial-pod-backoff"`
 	MaxPodBackoff                      WrappedDuration `gcfg:"max-pod-backoff"`
 	HttpHandlerTimeout                 WrappedDuration `gcfg:"http-handler-timeout"`

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 The Kubernetes Authors All rights reserved.
+# Copyright 2015 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,65 +17,30 @@
 
 # A library of helper functions for Jessie.
 
-source "${KUBE_ROOT}/cluster/aws/trusty/common.sh"
+source "${KUBE_ROOT}/cluster/aws/common/common.sh"
 
 SSH_USER=admin
 
 # Detects the AMI to use for jessie (considering the region)
-# Source: https://wiki.debian.org/Cloud/AmazonEC2Image/Jessie
 #
 # Vars set:
 #   AWS_IMAGE
 function detect-jessie-image () {
   if [[ -z "${AWS_IMAGE-}" ]]; then
-    case "${AWS_REGION}" in
-      ap-northeast-1)
-        AWS_IMAGE=ami-e624fbe6
-        ;;
+    # These images are built using the imagebuilder tool, in the kube-deploy github repo
+    # https://github.com/kubernetes/kube-deploy/tree/master/imagebuilder
 
-      ap-southeast-1)
-        AWS_IMAGE=ami-ac360cfe
-        ;;
-
-      ap-southeast-2)
-        AWS_IMAGE=ami-bbc5bd81
-        ;;
-
-      eu-central-1)
-        AWS_IMAGE=ami-02b78e1f
-        ;;
-
-      eu-west-1)
-        AWS_IMAGE=ami-e31a6594
-        ;;
-
-      sa-east-1)
-        AWS_IMAGE=ami-0972f214
-        ;;
-
-      us-east-1)
-        AWS_IMAGE=ami-116d857a
-        ;;
-
-      us-west-1)
-        AWS_IMAGE=ami-05cf2541
-        ;;
-
-      us-west-2)
-        AWS_IMAGE=ami-818eb7b1
-        ;;
-
-      cn-north-1)
-        AWS_IMAGE=ami-888815b1
-        ;;
-
-      us-gov-west-1)
-        AWS_IMAGE=ami-35b5d516
-        ;;
-
-      *)
-        echo "Please specify AWS_IMAGE directly (region ${AWS_REGION} not recognized)"
-        exit 1
-    esac
+    # 282335181503: images published by kope.io
+    aws_account="282335181503"
+    # TODO: we could use a tag for the latest image, instead of bumping it every time
+    # e.g. family = k8s-1.3-debian-jessie-amd64-hvm-ebs latest/1.3=true
+    if [[ -z "${AWS_IMAGE_NAME:-}" ]]; then
+      AWS_IMAGE_NAME="k8s-1.3-debian-jessie-amd64-hvm-ebs-2016-06-18"
+    fi
+    AWS_IMAGE=`aws ec2 describe-images --owner ${aws_account} --filters Name=name,Values=${AWS_IMAGE_NAME} --query Images[].ImageId --output text`
+    if [[ -z "${AWS_IMAGE-}" ]]; then
+      echo "Please specify AWS_IMAGE directly (image ${AWS_IMAGE_NAME} not found in region ${AWS_REGION})"
+      exit 1
+    fi
   fi
 }

@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,38 +18,41 @@ package e2e
 
 import (
 	"fmt"
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
-	"k8s.io/kubernetes/pkg/api/unversioned"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
 	"syscall"
 	"time"
+
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/test/e2e/framework"
+
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
 const (
-	k8bpsContainerVersion = "r.2.8.19"       // Container version, see the examples/k8petstore dockerfiles for details.
-	k8bpsThroughputDummy  = "0"              // Polling time = 0, since we poll in ginkgo rather than using the shell script tests.
-	k8bpsRedisSlaves      = "1"              // Number of redis slaves.
-	k8bpsDontRunTest      = "0"              // Don't bother embedded test.
-	k8bpsStartupTimeout   = 30 * time.Second // Amount of elapsed time before petstore transactions are being stored.
+	k8bpsContainerVersion         = "r.2.8.19"       // Container version, see the examples/k8petstore dockerfiles for details.
+	k8bpsThroughputDummy          = "0"              // Polling time = 0, since we framework.Poll in ginkgo rather than using the shell script tests.
+	k8bpsRedisSlaves              = "1"              // Number of redis slaves.
+	k8bpsDontRunTest              = "0"              // Don't bother embedded test.
+	k8bpsStartupTimeout           = 30 * time.Second // Amount of elapsed time before petstore transactions are being stored.
+	k8bpsMinTransactionsOnStartup = 3                // Amount of transactions we expect we should have before data generator starts.
 
 	// Constants for the first test. We can make this a hashmap once we add scale tests to it.
-	k8bpsSmokeTestTransactions = 50
-	k8bpsSmokeTestTimeout      = 60 * time.Second
+	k8bpsSmokeTestFinalTransactions = 50
+	k8bpsSmokeTestTimeout           = 60 * time.Second
 )
 
 // readTransactions reads # of transactions from the k8petstore web server endpoint.
 // for more details see the source of the k8petstore web server.
 func readTransactions(c *client.Client, ns string) (error, int) {
-	body, err := c.Get().
-		Namespace(ns).
-		Prefix("proxy").
-		Resource("services").
+	proxyRequest, errProxy := framework.GetServicesProxyRequest(c, c.Get())
+	if errProxy != nil {
+		return errProxy, -1
+	}
+	body, err := proxyRequest.Namespace(ns).
 		Name("frontend").
 		Suffix("llen").
 		DoRaw()
@@ -62,15 +65,15 @@ func readTransactions(c *client.Client, ns string) (error, int) {
 }
 
 // runK8petstore runs the k8petstore application, bound to external nodeport, and
-// polls until minExpected transactions are acquired, in a maximum of maxSeconds.
-func runK8petstore(restServers int, loadGenerators int, c *client.Client, ns string, minExpected int, maxTime time.Duration) {
+// polls until finalTransactionsExpected transactions are acquired, in a maximum of maxSeconds.
+func runK8petstore(restServers int, loadGenerators int, c *client.Client, ns string, finalTransactionsExpected int, maxTime time.Duration) {
 
 	var err error = nil
-	k8bpsScriptLocation := filepath.Join(testContext.RepoRoot, "examples/k8petstore/k8petstore-nodeport.sh")
+	k8bpsScriptLocation := filepath.Join(framework.TestContext.RepoRoot, "examples/k8petstore/k8petstore-nodeport.sh")
 
 	cmd := exec.Command(
 		k8bpsScriptLocation,
-		testContext.KubectlPath,
+		framework.TestContext.KubectlPath,
 		k8bpsContainerVersion,
 		k8bpsThroughputDummy,
 		strconv.Itoa(restServers),
@@ -83,25 +86,25 @@ func runK8petstore(restServers int, loadGenerators int, c *client.Client, ns str
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
-	Logf("Starting k8petstore application....")
+	framework.Logf("Starting k8petstore application....")
 	// Run the k8petstore app, and log / fail if it returns any errors.
 	// This should return quickly, assuming containers are downloaded.
 	if err = cmd.Start(); err != nil {
-		log.Fatal(err)
+		framework.Failf("%v", err)
 	}
 	// Make sure there are no command errors.
 	if err = cmd.Wait(); err != nil {
 		if exiterr, ok := err.(*exec.ExitError); ok {
 			if status, ok := exiterr.Sys().(syscall.WaitStatus); ok {
-				log.Printf("Exit Status: %d", status.ExitStatus())
+				framework.Logf("Exit Status: %d", status.ExitStatus())
 			}
 		}
 	}
 	Expect(err).NotTo(HaveOccurred())
-	Logf("... Done starting k8petstore ")
+	framework.Logf("... Done starting k8petstore ")
 
 	totalTransactions := 0
-	Logf("Start polling, timeout is %v seconds", maxTime)
+	framework.Logf("Start polling, timeout is %v seconds", maxTime)
 
 	// How long until the FIRST transactions are created.
 	startupTimeout := time.After(time.Duration(k8bpsStartupTimeout))
@@ -111,59 +114,64 @@ func runK8petstore(restServers int, loadGenerators int, c *client.Client, ns str
 	tick := time.Tick(2 * time.Second)
 	var ready = false
 
-	Logf("Now waiting %v seconds to see progress (transactions  > 3)", k8bpsStartupTimeout)
+	framework.Logf("Now waiting %v seconds to see progress (transactions  > 3)", k8bpsStartupTimeout)
 T:
 	for {
 		select {
 		case <-transactionsCompleteTimeout:
-			Logf("Timeout %v reached, transactions not complete.  Breaking!", tick)
+			framework.Logf("Completion timeout %v reached, %v transactions not complete.  Breaking!", time.Duration(maxTime), finalTransactionsExpected)
 			break T
-		case <-startupTimeout:
-			err, totalTransactions = readTransactions(c, ns)
-			Logf("Timeout %v reached.  Checking if transactions have occured.", startupTimeout)
-			// If we don't have 3 transactions, fail the test.
-			if err != nil {
-				Logf("Failed : Error %v", err)
-				break T
-			}
-			if totalTransactions < 3 {
-				break T
-			}
-			ready = true
 		case <-tick:
-			// Pass if we've collected enough transactions
+			// Don't fail if there's an error.  We expect a few failures might happen in the cloud.
 			err, totalTransactions = readTransactions(c, ns)
-			if ready {
-				Expect(err).NotTo(HaveOccurred())
+			if err == nil {
+				framework.Logf("PetStore : Time: %v, %v = total petstore transactions stored into redis.", time.Now(), totalTransactions)
+				if totalTransactions >= k8bpsMinTransactionsOnStartup {
+					ready = true
+				}
+				if totalTransactions >= finalTransactionsExpected {
+					break T
+				}
+			} else {
+				if ready {
+					framework.Logf("Blip: during polling: %v", err)
+				} else {
+					framework.Logf("Not ready yet: %v", err)
+				}
 			}
-			if totalTransactions > minExpected {
+		case <-startupTimeout:
+			if !ready {
+				framework.Logf("Startup Timeout %v reached: Its been too long and we still haven't started accumulating %v transactions!", startupTimeout, k8bpsMinTransactionsOnStartup)
 				break T
 			}
-			Logf("Time: %v, %v = total petstore transactions stored into redis.", time.Now(), totalTransactions)
 		}
 	}
 
-	// We should have exceeded the minExpected num of transactions.
+	// We should have exceeded the finalTransactionsExpected num of transactions.
 	// If this fails, but there are transactions being created, we may need to recalibrate
-	// the minExpected value - or else - your cluster is broken/slow !
-	Ω(totalTransactions).Should(BeNumerically(">", minExpected))
+	// the finalTransactionsExpected value - or else - your cluster is broken/slow !
+	Ω(totalTransactions).Should(BeNumerically(">", finalTransactionsExpected))
 }
 
-var _ = Describe("[Example] Pet Store [Skipped]", func() {
+var _ = framework.KubeDescribe("Pet Store [Feature:Example]", func() {
 
-	// The number of minions dictates total number of generators/transaction expectations.
-	var minionCount int
-	f := NewFramework("petstore")
+	BeforeEach(func() {
+		// The shell scripts in k8petstore break on jenkins... Pure golang rewrite is in progress.
+		framework.SkipUnlessProviderIs("local")
+	})
 
-	It(fmt.Sprintf("should scale to persist a nominal number ( %v ) of transactions in %v seconds", k8bpsSmokeTestTransactions, k8bpsSmokeTestTimeout), func() {
-		minions, err := f.Client.Nodes().List(unversioned.ListOptions{})
-		Expect(err).NotTo(HaveOccurred())
-		minionCount = len(minions.Items)
+	// The number of nodes dictates total number of generators/transaction expectations.
+	var nodeCount int
+	f := framework.NewDefaultFramework("petstore")
 
-		loadGenerators := minionCount
-		restServers := minionCount
+	It(fmt.Sprintf("should scale to persist a nominal number ( %v ) of transactions in %v seconds", k8bpsSmokeTestFinalTransactions, k8bpsSmokeTestTimeout), func() {
+		nodes := framework.GetReadySchedulableNodesOrDie(f.Client)
+		nodeCount = len(nodes.Items)
+
+		loadGenerators := nodeCount
+		restServers := nodeCount
 		fmt.Printf("load generators / rest servers [ %v  /  %v ] ", loadGenerators, restServers)
-		runK8petstore(restServers, loadGenerators, f.Client, f.Namespace.Name, k8bpsSmokeTestTransactions, k8bpsSmokeTestTimeout)
+		runK8petstore(restServers, loadGenerators, f.Client, f.Namespace.Name, k8bpsSmokeTestFinalTransactions, k8bpsSmokeTestTimeout)
 	})
 
 })

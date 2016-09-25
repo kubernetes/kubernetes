@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,11 +20,12 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/admission"
+	"k8s.io/kubernetes/pkg/api"
 )
 
 func TestAdmission(t *testing.T) {
 	handler := NewAlwaysDeny()
-	err := handler.Admit(admission.NewAttributesRecord(nil, "kind", "namespace", "name", "resource", "subresource", admission.Create, nil))
+	err := handler.Admit(admission.NewAttributesRecord(nil, nil, api.Kind("kind").WithVersion("version"), "namespace", "name", api.Resource("resource").WithVersion("version"), "subresource", admission.Create, nil))
 	if err == nil {
 		t.Errorf("Expected error returned from admission handler")
 	}

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,8 +24,8 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
@@ -54,12 +54,28 @@ const (
 	emptyDirPluginName = "kubernetes.io/empty-dir"
 )
 
-func (plugin *emptyDirPlugin) Init(host volume.VolumeHost) {
-	plugin.host = host
+func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
+	return host.GetPodVolumeDir(uid, strings.EscapeQualifiedNameForDisk(emptyDirPluginName), volName)
 }
 
-func (plugin *emptyDirPlugin) Name() string {
+func (plugin *emptyDirPlugin) Init(host volume.VolumeHost) error {
+	plugin.host = host
+
+	return nil
+}
+
+func (plugin *emptyDirPlugin) GetPluginName() string {
 	return emptyDirPluginName
+}
+
+func (plugin *emptyDirPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
+	volumeSource, _ := getVolumeSource(spec)
+	if volumeSource == nil {
+		return "", fmt.Errorf("Spec does not reference an EmptyDir volume type")
+	}
+
+	// Return user defined volume name, since this is an ephemeral volume type
+	return spec.Name(), nil
 }
 
 func (plugin *emptyDirPlugin) CanSupport(spec *volume.Spec) bool {
@@ -69,41 +85,57 @@ func (plugin *emptyDirPlugin) CanSupport(spec *volume.Spec) bool {
 	return false
 }
 
-func (plugin *emptyDirPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions) (volume.Builder, error) {
-	return plugin.newBuilderInternal(spec, pod, plugin.host.GetMounter(), &realMountDetector{plugin.host.GetMounter()}, opts)
+func (plugin *emptyDirPlugin) RequiresRemount() bool {
+	return false
 }
 
-func (plugin *emptyDirPlugin) newBuilderInternal(spec *volume.Spec, pod *api.Pod, mounter mount.Interface, mountDetector mountDetector, opts volume.VolumeOptions) (volume.Builder, error) {
+func (plugin *emptyDirPlugin) NewMounter(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
+	return plugin.newMounterInternal(spec, pod, plugin.host.GetMounter(), &realMountDetector{plugin.host.GetMounter()}, opts)
+}
+
+func (plugin *emptyDirPlugin) newMounterInternal(spec *volume.Spec, pod *api.Pod, mounter mount.Interface, mountDetector mountDetector, opts volume.VolumeOptions) (volume.Mounter, error) {
 	medium := api.StorageMediumDefault
 	if spec.Volume.EmptyDir != nil { // Support a non-specified source as EmptyDir.
 		medium = spec.Volume.EmptyDir.Medium
 	}
 	return &emptyDir{
-		pod:           pod,
-		volName:       spec.Name(),
-		medium:        medium,
-		mounter:       mounter,
-		mountDetector: mountDetector,
-		plugin:        plugin,
-		rootContext:   opts.RootContext,
+		pod:             pod,
+		volName:         spec.Name(),
+		medium:          medium,
+		mounter:         mounter,
+		mountDetector:   mountDetector,
+		plugin:          plugin,
+		rootContext:     plugin.host.GetRootContext(),
+		MetricsProvider: volume.NewMetricsDu(getPath(pod.UID, spec.Name(), plugin.host)),
 	}, nil
 }
 
-func (plugin *emptyDirPlugin) NewCleaner(volName string, podUID types.UID) (volume.Cleaner, error) {
+func (plugin *emptyDirPlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
 	// Inject real implementations here, test through the internal function.
-	return plugin.newCleanerInternal(volName, podUID, plugin.host.GetMounter(), &realMountDetector{plugin.host.GetMounter()})
+	return plugin.newUnmounterInternal(volName, podUID, plugin.host.GetMounter(), &realMountDetector{plugin.host.GetMounter()})
 }
 
-func (plugin *emptyDirPlugin) newCleanerInternal(volName string, podUID types.UID, mounter mount.Interface, mountDetector mountDetector) (volume.Cleaner, error) {
+func (plugin *emptyDirPlugin) newUnmounterInternal(volName string, podUID types.UID, mounter mount.Interface, mountDetector mountDetector) (volume.Unmounter, error) {
 	ed := &emptyDir{
-		pod:           &api.Pod{ObjectMeta: api.ObjectMeta{UID: podUID}},
-		volName:       volName,
-		medium:        api.StorageMediumDefault, // might be changed later
-		mounter:       mounter,
-		mountDetector: mountDetector,
-		plugin:        plugin,
+		pod:             &api.Pod{ObjectMeta: api.ObjectMeta{UID: podUID}},
+		volName:         volName,
+		medium:          api.StorageMediumDefault, // might be changed later
+		mounter:         mounter,
+		mountDetector:   mountDetector,
+		plugin:          plugin,
+		MetricsProvider: volume.NewMetricsDu(getPath(podUID, volName, plugin.host)),
 	}
 	return ed, nil
+}
+
+func (plugin *emptyDirPlugin) ConstructVolumeSpec(volName, mountPath string) (*volume.Spec, error) {
+	emptyDirVolume := &api.Volume{
+		Name: volName,
+		VolumeSource: api.VolumeSource{
+			EmptyDir: &api.EmptyDirVolumeSource{},
+		},
+	}
+	return volume.NewSpecFromVolume(emptyDirVolume), nil
 }
 
 // mountDetector abstracts how to find what kind of mount a path is backed by.
@@ -133,24 +165,24 @@ type emptyDir struct {
 	mountDetector mountDetector
 	plugin        *emptyDirPlugin
 	rootContext   string
+	volume.MetricsProvider
 }
 
 func (ed *emptyDir) GetAttributes() volume.Attributes {
 	return volume.Attributes{
-		ReadOnly:                    false,
-		Managed:                     true,
-		SupportsOwnershipManagement: true,
-		SupportsSELinux:             true,
+		ReadOnly:        false,
+		Managed:         true,
+		SupportsSELinux: true,
 	}
 }
 
 // SetUp creates new directory.
-func (ed *emptyDir) SetUp() error {
-	return ed.SetUpAt(ed.GetPath())
+func (ed *emptyDir) SetUp(fsGroup *int64) error {
+	return ed.SetUpAt(ed.GetPath(), fsGroup)
 }
 
 // SetUpAt creates new directory.
-func (ed *emptyDir) SetUpAt(dir string) error {
+func (ed *emptyDir) SetUpAt(dir string, fsGroup *int64) error {
 	notMnt, err := ed.mounter.IsLikelyNotMountPoint(dir)
 	// Getting an os.IsNotExist err from is a contingency; the directory
 	// may not exist yet, in which case, setup should run.
@@ -185,6 +217,8 @@ func (ed *emptyDir) SetUpAt(dir string) error {
 		err = fmt.Errorf("unknown storage medium %q", ed.medium)
 	}
 
+	volume.SetVolumeOwnership(ed, fsGroup)
+
 	if err == nil {
 		volumeutil.SetReady(ed.getMetaDir())
 	}
@@ -194,7 +228,7 @@ func (ed *emptyDir) SetUpAt(dir string) error {
 
 // setupTmpfs creates a tmpfs mount at the specified directory with the
 // specified SELinux context.
-func (ed *emptyDir) setupTmpfs(dir string, selinuxContext string) error {
+func (ed *emptyDir) setupTmpfs(dir string, selinux string) error {
 	if ed.mounter == nil {
 		return fmt.Errorf("memory storage requested, but mounter is nil")
 	}
@@ -215,8 +249,8 @@ func (ed *emptyDir) setupTmpfs(dir string, selinuxContext string) error {
 	// By default a tmpfs mount will receive a different SELinux context
 	// which is not readable from the SELinux context of a docker container.
 	var opts []string
-	if selinuxContext != "" {
-		opts = []string{fmt.Sprintf("rootcontext=\"%v\"", selinuxContext)}
+	if selinux != "" {
+		opts = []string{fmt.Sprintf("rootcontext=\"%v\"", selinux)}
 	} else {
 		opts = []string{}
 	}
@@ -265,8 +299,7 @@ func (ed *emptyDir) setupDir(dir string) error {
 }
 
 func (ed *emptyDir) GetPath() string {
-	name := emptyDirPluginName
-	return ed.plugin.host.GetPodVolumeDir(ed.pod.UID, util.EscapeQualifiedNameForDisk(name), ed.volName)
+	return getPath(ed.pod.UID, ed.volName, ed.plugin.host)
 }
 
 // TearDown simply discards everything in the directory.
@@ -315,5 +348,17 @@ func (ed *emptyDir) teardownTmpfs(dir string) error {
 }
 
 func (ed *emptyDir) getMetaDir() string {
-	return path.Join(ed.plugin.host.GetPodPluginDir(ed.pod.UID, util.EscapeQualifiedNameForDisk(emptyDirPluginName)), ed.volName)
+	return path.Join(ed.plugin.host.GetPodPluginDir(ed.pod.UID, strings.EscapeQualifiedNameForDisk(emptyDirPluginName)), ed.volName)
+}
+
+func getVolumeSource(spec *volume.Spec) (*api.EmptyDirVolumeSource, bool) {
+	var readOnly bool
+	var volumeSource *api.EmptyDirVolumeSource
+
+	if spec.Volume != nil && spec.Volume.EmptyDir != nil {
+		volumeSource = spec.Volume.EmptyDir
+		readOnly = spec.ReadOnly
+	}
+
+	return volumeSource, readOnly
 }

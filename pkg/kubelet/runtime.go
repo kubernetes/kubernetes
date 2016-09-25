@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,14 +23,13 @@ import (
 )
 
 type runtimeState struct {
-	sync.Mutex
+	sync.RWMutex
 	lastBaseRuntimeSync      time.Time
 	baseRuntimeSyncThreshold time.Duration
 	networkError             error
 	internalError            error
 	cidr                     string
 	initError                error
-	runtimeCompatibility     func() error
 }
 
 func (s *runtimeState) setRuntimeSync(t time.Time) {
@@ -58,8 +57,8 @@ func (s *runtimeState) setPodCIDR(cidr string) {
 }
 
 func (s *runtimeState) podCIDR() string {
-	s.Lock()
-	defer s.Unlock()
+	s.RLock()
+	defer s.RUnlock()
 	return s.cidr
 }
 
@@ -70,8 +69,8 @@ func (s *runtimeState) setInitError(err error) {
 }
 
 func (s *runtimeState) errors() []string {
-	s.Lock()
-	defer s.Unlock()
+	s.RLock()
+	defer s.RUnlock()
 	var ret []string
 	if s.initError != nil {
 		ret = append(ret, s.initError.Error())
@@ -85,28 +84,16 @@ func (s *runtimeState) errors() []string {
 	if s.internalError != nil {
 		ret = append(ret, s.internalError.Error())
 	}
-	if err := s.runtimeCompatibility(); err != nil {
-		ret = append(ret, err.Error())
-	}
 	return ret
 }
 
 func newRuntimeState(
 	runtimeSyncThreshold time.Duration,
-	configureNetwork bool,
-	cidr string,
-	runtimeCompatibility func() error,
 ) *runtimeState {
-	var networkError error = nil
-	if configureNetwork {
-		networkError = fmt.Errorf("network state unknown")
-	}
 	return &runtimeState{
 		lastBaseRuntimeSync:      time.Time{},
 		baseRuntimeSyncThreshold: runtimeSyncThreshold,
-		networkError:             networkError,
-		cidr:                     cidr,
+		networkError:             fmt.Errorf("network state unknown"),
 		internalError:            nil,
-		runtimeCompatibility:     runtimeCompatibility,
 	}
 }

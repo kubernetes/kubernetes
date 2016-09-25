@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -35,7 +35,9 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/intstr"
+	e2e "k8s.io/kubernetes/test/e2e/framework"
 )
 
 var (
@@ -87,7 +89,7 @@ func main() {
 
 	var nodes *api.NodeList
 	for start := time.Now(); time.Since(start) < nodeListTimeout; time.Sleep(2 * time.Second) {
-		nodes, err = c.Nodes().List(unversioned.ListOptions{})
+		nodes, err = c.Nodes().List(api.ListOptions{})
 		if err == nil {
 			break
 		}
@@ -198,7 +200,7 @@ func main() {
 						Containers: []api.Container{
 							{
 								Name:  "serve-hostname",
-								Image: "gcr.io/google_containers/serve_hostname:1.1",
+								Image: "gcr.io/google_containers/serve_hostname:v1.4",
 								Ports: []api.ContainerPort{{ContainerPort: 9376}},
 							},
 						},
@@ -251,12 +253,16 @@ func main() {
 		}
 	}
 
+	proxyRequest, errProxy := e2e.GetServicesProxyRequest(c, c.Get())
+	if errProxy != nil {
+		glog.Warningf("Get services proxy request failed: %v", errProxy)
+		return
+	}
+
 	// Wait for the endpoints to propagate.
 	for start := time.Now(); time.Since(start) < endpointTimeout; time.Sleep(10 * time.Second) {
-		hostname, err := c.Get().
+		hostname, err := proxyRequest.
 			Namespace(ns).
-			Prefix("proxy").
-			Resource("services").
 			Name("serve-hostnames").
 			DoRaw()
 		if err != nil {
@@ -264,7 +270,7 @@ func main() {
 			continue
 		}
 		var r unversioned.Status
-		if err := api.Scheme.DecodeInto(hostname, &r); err != nil {
+		if err := runtime.DecodeInto(api.Codecs.UniversalDecoder(), hostname, &r); err != nil {
 			break
 		}
 		if r.Status == unversioned.StatusFailure {
@@ -285,10 +291,8 @@ func main() {
 			go func(i int, query int) {
 				inFlight <- struct{}{}
 				t := time.Now()
-				hostname, err := c.Get().
+				hostname, err := proxyRequest.
 					Namespace(ns).
-					Prefix("proxy").
-					Resource("services").
 					Name("serve-hostnames").
 					DoRaw()
 				glog.V(4).Infof("Proxy call in namespace %s took %v", ns, time.Since(t))

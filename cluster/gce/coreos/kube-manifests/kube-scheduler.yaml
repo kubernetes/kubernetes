@@ -1,0 +1,40 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: kube-scheduler
+  namespace: kube-system
+spec:
+  containers:
+  - command:
+    - /bin/sh
+    - -c
+    - /usr/local/bin/kube-scheduler
+      --master=127.0.0.1:8080
+      --v=2
+      1>>/var/log/kube-scheduler.log 2>&1
+    image: gcr.io/google_containers/kube-scheduler:${KUBE_SCHEDULER_DOCKER_TAG}
+    imagePullPolicy: IfNotPresent
+    livenessProbe:
+      httpGet:
+        host: 127.0.0.1
+        path: /healthz
+        port: 10251
+        scheme: HTTP
+      initialDelaySeconds: 15
+      timeoutSeconds: 15
+    name: kube-scheduler
+    resources:
+      requests:
+        cpu: 100m
+    volumeMounts:
+    - mountPath: /var/log/kube-scheduler.log
+      name: logfile
+  dnsPolicy: ClusterFirst
+  hostNetwork: true
+  nodeName: ${INSTANCE_PREFIX}-master
+  restartPolicy: Always
+  terminationGracePeriodSeconds: 30
+  volumes:
+  - hostPath:
+      path: /var/log/kube-scheduler.log
+    name: logfile

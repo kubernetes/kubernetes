@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,8 +26,8 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/httpstream"
+	"k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/util/proxy"
 
 	"github.com/golang/glog"
@@ -114,6 +114,10 @@ func (h *UpgradeAwareProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Re
 		return
 	}
 	newReq.Header = req.Header
+	newReq.ContentLength = req.ContentLength
+	// Copy the TransferEncoding is for future-proofing. Currently Go only supports "chunked" and
+	// it can determine the TransferEncoding based on ContentLength and the Body.
+	newReq.TransferEncoding = req.TransferEncoding
 
 	proxy := httputil.NewSingleHostReverseProxy(&url.URL{Scheme: h.Location.Scheme, Host: h.Location.Host})
 	proxy.Transport = h.Transport
@@ -222,7 +226,7 @@ func (p *corsRemovingTransport) RoundTrip(req *http.Request) (*http.Response, er
 	return resp, nil
 }
 
-var _ = util.RoundTripperWrapper(&corsRemovingTransport{})
+var _ = net.RoundTripperWrapper(&corsRemovingTransport{})
 
 func (rt *corsRemovingTransport) WrappedRoundTripper() http.RoundTripper {
 	return rt.RoundTripper

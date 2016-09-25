@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -27,10 +27,10 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/validation"
-
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
 // Based on: https://github.com/openshift/origin/blob/master/pkg/api/compatibility_test.go
@@ -40,16 +40,16 @@ import (
 // keys in the resulting JSON.
 func TestCompatibility(
 	t *testing.T,
-	version string,
+	version unversioned.GroupVersion,
 	input []byte,
-	validator func(obj runtime.Object) validation.ErrorList,
+	validator func(obj runtime.Object) field.ErrorList,
 	expectedKeys map[string]string,
 	absentKeys []string,
 ) {
 
 	// Decode
-	codec := runtime.CodecFor(api.Scheme, version)
-	obj, err := codec.Decode(input)
+	codec := api.Codecs.LegacyCodec(version)
+	obj, err := runtime.Decode(codec, input)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -61,7 +61,7 @@ func TestCompatibility(
 	}
 
 	// Encode
-	output, err := codec.Encode(obj)
+	output, err := runtime.Encode(codec, obj)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -88,7 +88,7 @@ func TestCompatibility(
 		keys := strings.Split(absentKey, ".")
 		actualValue, ok, err := getJSONValue(generic, keys...)
 		if err == nil || ok {
-			t.Errorf("Unexpected value found for for key %s: %v", absentKey, actualValue)
+			t.Errorf("Unexpected value found for key %s: %v", absentKey, actualValue)
 			hasError = true
 		}
 	}

@@ -1,0 +1,15 @@
+box: wercker/golang
+build:
+  steps:
+    - setup-go-workspace
+
+    - script:
+        name: go get
+        code: |
+          go version
+          go get -t ./...
+
+    - script:
+        name: go test
+        code: |
+          go test -race ./...

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2014 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,13 +21,9 @@ set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+source "${KUBE_ROOT}/hack/lib/init.sh"
 
-GO_VERSION=($(go version))
-
-if [[ -z $(echo "${GO_VERSION[2]}" | grep -E 'go1.2|go1.3|go1.4|go1.5') ]]; then
-  echo "Unknown go version '${GO_VERSION}', skipping gofmt."
-  exit 0
-fi
+kube::golang::verify_go_version
 
 cd "${KUBE_ROOT}"
 
@@ -40,12 +36,13 @@ find_files() {
         -o -wholename './release' \
         -o -wholename './target' \
         -o -wholename '*/third_party/*' \
-        -o -wholename '*/Godeps/*' \
+        -o -wholename '*/vendor/*' \
+        -o -wholename './staging' \
       \) -prune \
     \) -name '*.go'
 }
 
-GOFMT="gofmt -s"
+GOFMT="gofmt -s -w"
 bad_files=$(find_files | xargs $GOFMT -l)
 if [[ -n "${bad_files}" ]]; then
   echo "!!! '$GOFMT' needs to be run on the following files: "

@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -27,7 +27,8 @@ import (
 
 	"github.com/golang/glog"
 	"golang.org/x/net/websocket"
-	"k8s.io/kubernetes/pkg/util"
+
+	"k8s.io/kubernetes/pkg/util/runtime"
 )
 
 // The Websocket subprotocol "channel.k8s.io" prepends each binary message with a byte indicating
@@ -44,7 +45,7 @@ import (
 //    READ  []byte{1, 10}                # receive "\n" on channel 1 (STDOUT)
 //    CLOSE
 //
-const channelWebSocketProtocol = "channel.k8s.io"
+const ChannelWebSocketProtocol = "channel.k8s.io"
 
 // The Websocket subprotocol "base64.channel.k8s.io" base64 encodes each message with a character
 // indicating the channel number (zero indexed) the message was sent on. Messages in both directions
@@ -60,7 +61,7 @@ const channelWebSocketProtocol = "channel.k8s.io"
 //    READ  []byte{49, 67, 103, 61, 61} # receive "\n" (base64: "Cg==") on channel '1' (STDOUT)
 //    CLOSE
 //
-const base64ChannelWebSocketProtocol = "base64.channel.k8s.io"
+const Base64ChannelWebSocketProtocol = "base64.channel.k8s.io"
 
 type codecType int
 
@@ -89,10 +90,10 @@ func IsWebSocketRequest(req *http.Request) bool {
 	return connectionUpgradeRegex.MatchString(strings.ToLower(req.Header.Get("Connection"))) && strings.ToLower(req.Header.Get("Upgrade")) == "websocket"
 }
 
-// ignoreReceives reads from a WebSocket until it is closed, then returns. If timeout is set, the
+// IgnoreReceives reads from a WebSocket until it is closed, then returns. If timeout is set, the
 // read and write deadlines are pushed every time a new message is received.
-func ignoreReceives(ws *websocket.Conn, timeout time.Duration) {
-	defer util.HandleCrash()
+func IgnoreReceives(ws *websocket.Conn, timeout time.Duration) {
+	defer runtime.HandleCrash()
 	var data []byte
 	for {
 		resetTimeout(ws, timeout)
@@ -107,8 +108,9 @@ func ignoreReceives(ws *websocket.Conn, timeout time.Duration) {
 func handshake(config *websocket.Config, req *http.Request, allowed []string) error {
 	protocols := config.Protocol
 	if len(protocols) == 0 {
-		return nil
+		protocols = []string{""}
 	}
+
 	for _, protocol := range protocols {
 		for _, allow := range allowed {
 			if allow == protocol {
@@ -117,30 +119,87 @@ func handshake(config *websocket.Config, req *http.Request, allowed []string) er
 			}
 		}
 	}
+
 	return fmt.Errorf("requested protocol(s) are not supported: %v; supports %v", config.Protocol, allowed)
 }
 
+// ChannelProtocolConfig describes a websocket subprotocol with channels.
+type ChannelProtocolConfig struct {
+	Binary   bool
+	Channels []ChannelType
+}
+
+// NewDefaultChannelProtocols returns a channel protocol map with the
+// subprotocols "", "channel.k8s.io", "base64.channel.k8s.io" and the given
+// channels.
+func NewDefaultChannelProtocols(channels []ChannelType) map[string]ChannelProtocolConfig {
+	return map[string]ChannelProtocolConfig{
+		"": {Binary: true, Channels: channels},
+		ChannelWebSocketProtocol:       {Binary: true, Channels: channels},
+		Base64ChannelWebSocketProtocol: {Binary: false, Channels: channels},
+	}
+}
+
 // Conn supports sending multiple binary channels over a websocket connection.
-// Supports only the "channel.k8s.io" subprotocol.
 type Conn struct {
-	channels []*websocketChannel
-	codec    codecType
-	ready    chan struct{}
-	ws       *websocket.Conn
-	timeout  time.Duration
+	protocols        map[string]ChannelProtocolConfig
+	selectedProtocol string
+	channels         []*websocketChannel
+	codec            codecType
+	ready            chan struct{}
+	ws               *websocket.Conn
+	timeout          time.Duration
 }
 
 // NewConn creates a WebSocket connection that supports a set of channels. Channels begin each
 // web socket message with a single byte indicating the channel number (0-N). 255 is reserved for
 // future use. The channel types for each channel are passed as an array, supporting the different
 // duplex modes. Read and Write refer to whether the channel can be used as a Reader or Writer.
-func NewConn(channels ...ChannelType) *Conn {
-	conn := &Conn{
-		ready:    make(chan struct{}),
-		channels: make([]*websocketChannel, len(channels)),
+//
+// The protocols parameter maps subprotocol names to ChannelProtocols. The empty string subprotocol
+// name is used if websocket.Config.Protocol is empty.
+func NewConn(protocols map[string]ChannelProtocolConfig) *Conn {
+	return &Conn{
+		ready:     make(chan struct{}),
+		protocols: protocols,
 	}
+}
+
+// SetIdleTimeout sets the interval for both reads and writes before timeout. If not specified,
+// there is no timeout on the connection.
+func (conn *Conn) SetIdleTimeout(duration time.Duration) {
+	conn.timeout = duration
+}
+
+// Open the connection and create channels for reading and writing. It returns
+// the selected subprotocol, a slice of channels and an error.
+func (conn *Conn) Open(w http.ResponseWriter, req *http.Request) (string, []io.ReadWriteCloser, error) {
+	go func() {
+		defer runtime.HandleCrash()
+		defer conn.Close()
+		websocket.Server{Handshake: conn.handshake, Handler: conn.handle}.ServeHTTP(w, req)
+	}()
+	<-conn.ready
+	rwc := make([]io.ReadWriteCloser, len(conn.channels))
 	for i := range conn.channels {
-		switch channels[i] {
+		rwc[i] = conn.channels[i]
+	}
+	return conn.selectedProtocol, rwc, nil
+}
+
+func (conn *Conn) initialize(ws *websocket.Conn) {
+	negotiated := ws.Config().Protocol
+	conn.selectedProtocol = negotiated[0]
+	p := conn.protocols[conn.selectedProtocol]
+	if p.Binary {
+		conn.codec = rawCodec
+	} else {
+		conn.codec = base64Codec
+	}
+	conn.ws = ws
+	conn.channels = make([]*websocketChannel, len(p.Channels))
+	for i, t := range p.Channels {
+		switch t {
 		case ReadChannel:
 			conn.channels[i] = newWebsocketChannel(conn, byte(i), true, false)
 		case WriteChannel:
@@ -151,44 +210,16 @@ func NewConn(channels ...ChannelType) *Conn {
 			conn.channels[i] = newWebsocketChannel(conn, byte(i), false, false)
 		}
 	}
-	return conn
-}
 
-// SetIdleTimeout sets the interval for both reads and writes before timeout. If not specified,
-// there is no timeout on the connection.
-func (conn *Conn) SetIdleTimeout(duration time.Duration) {
-	conn.timeout = duration
-}
-
-// Open the connection and create channels for reading and writing.
-func (conn *Conn) Open(w http.ResponseWriter, req *http.Request) ([]io.ReadWriteCloser, error) {
-	go func() {
-		defer util.HandleCrash()
-		defer conn.Close()
-		websocket.Server{Handshake: conn.handshake, Handler: conn.handle}.ServeHTTP(w, req)
-	}()
-	<-conn.ready
-	rwc := make([]io.ReadWriteCloser, len(conn.channels))
-	for i := range conn.channels {
-		rwc[i] = conn.channels[i]
-	}
-	return rwc, nil
-}
-
-func (conn *Conn) initialize(ws *websocket.Conn) {
-	protocols := ws.Config().Protocol
-	switch {
-	case len(protocols) == 0, protocols[0] == channelWebSocketProtocol:
-		conn.codec = rawCodec
-	case protocols[0] == base64ChannelWebSocketProtocol:
-		conn.codec = base64Codec
-	}
-	conn.ws = ws
 	close(conn.ready)
 }
 
 func (conn *Conn) handshake(config *websocket.Config, req *http.Request) error {
-	return handshake(config, req, []string{channelWebSocketProtocol, base64ChannelWebSocketProtocol})
+	supportedProtocols := make([]string, 0, len(conn.protocols))
+	for p := range conn.protocols {
+		supportedProtocols = append(supportedProtocols, p)
+	}
+	return handshake(config, req, supportedProtocols)
 }
 
 func (conn *Conn) resetTimeout() {

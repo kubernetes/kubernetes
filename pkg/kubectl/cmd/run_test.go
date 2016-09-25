@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -28,9 +28,10 @@ import (
 	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
@@ -148,17 +149,18 @@ func TestRunArgsFollowDashRules(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		f, tf, codec := NewAPIFactory()
+		f, tf, codec, ns := NewAPIFactory()
 		tf.Client = &fake.RESTClient{
-			Codec: codec,
+			NegotiatedSerializer: ns,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-				return &http.Response{StatusCode: 201, Body: objBody(codec, &rc.Items[0])}, nil
+				return &http.Response{StatusCode: 201, Header: defaultHeader(), Body: objBody(codec, &rc.Items[0])}, nil
 			}),
 		}
 		tf.Namespace = "test"
-		tf.ClientConfig = &client.Config{}
+		tf.ClientConfig = &restclient.Config{}
 		cmd := NewCmdRun(f, os.Stdin, os.Stdout, os.Stderr)
 		cmd.Flags().Set("image", "nginx")
+		cmd.Flags().Set("generator", "run/v1")
 		err := Run(f, os.Stdin, os.Stdout, os.Stderr, cmd, test.args, test.argsLenAtDash)
 		if test.expectError && err == nil {
 			t.Errorf("unexpected non-error (%s)", test.name)
@@ -262,10 +264,11 @@ func TestGenerateService(t *testing.T) {
 	}
 	for _, test := range tests {
 		sawPOST := false
-		f, tf, codec := NewAPIFactory()
-		tf.ClientConfig = &client.Config{GroupVersion: testapi.Default.GroupVersion()}
+		f, tf, codec, ns := NewAPIFactory()
+		tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}}
+		tf.Printer = &testPrinter{}
 		tf.Client = &fake.RESTClient{
-			Codec: codec,
+			NegotiatedSerializer: ns,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				switch p, m := req.URL.Path, req.Method; {
 				case test.expectPOST && m == "POST" && p == "/namespaces/namespace/services":
@@ -278,7 +281,7 @@ func TestGenerateService(t *testing.T) {
 					}
 					defer req.Body.Close()
 					svc := &api.Service{}
-					if err := codec.DecodeInto(data, svc); err != nil {
+					if err := runtime.DecodeInto(codec, data, svc); err != nil {
 						t.Errorf("unexpected error: %v", err)
 						t.FailNow()
 					}
@@ -288,7 +291,7 @@ func TestGenerateService(t *testing.T) {
 					if !reflect.DeepEqual(&test.service, svc) {
 						t.Errorf("expected:\n%v\nsaw:\n%v\n", &test.service, svc)
 					}
-					return &http.Response{StatusCode: 200, Body: body}, nil
+					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
 				default:
 					// Ensures no GET is performed when deleting by name
 					t.Errorf("%s: unexpected request: %s %#v\n%#v", test.name, req.Method, req.URL, req)
@@ -297,8 +300,10 @@ func TestGenerateService(t *testing.T) {
 			}),
 		}
 		cmd := &cobra.Command{}
-		cmd.Flags().String("output", "", "")
 		cmd.Flags().Bool(cmdutil.ApplyAnnotationsFlag, false, "")
+		cmd.Flags().Bool("record", false, "Record current kubectl command in the resource annotation. If set to false, do not record the command. If set to true, record the command. If not set, default to updating the existing annotation value only if one already exists.")
+		cmdutil.AddPrinterFlags(cmd)
+		cmdutil.AddInclude3rdPartyFlags(cmd)
 		addRunFlags(cmd)
 
 		if !test.expectPOST {
@@ -322,7 +327,7 @@ func TestGenerateService(t *testing.T) {
 			t.Errorf("unexpected error: %v", err)
 		}
 		if test.expectPOST != sawPOST {
-			t.Error("expectPost: %v, sawPost: %v", test.expectPOST, sawPOST)
+			t.Errorf("expectPost: %v, sawPost: %v", test.expectPOST, sawPOST)
 		}
 	}
 }

@@ -1,0 +1,9 @@
+#cloud-config
+merge_how: dict(recurse_array)+list(append)
+
+write_files:
+  - path: /etc/cloud/cloud.cfg.d/99_hostname.cfg
+    owner: "root:root"
+    permissions: "0644"
+    content: |
+      preserve_hostname: true

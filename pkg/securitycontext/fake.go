@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ package securitycontext
 import (
 	"k8s.io/kubernetes/pkg/api"
 
-	docker "github.com/fsouza/go-dockerclient"
+	dockercontainer "github.com/docker/engine-api/types/container"
 )
 
 // ValidSecurityContextWithContainerDefaults creates a valid security context provider based on
@@ -39,7 +39,7 @@ func NewFakeSecurityContextProvider() SecurityContextProvider {
 
 type FakeSecurityContextProvider struct{}
 
-func (p FakeSecurityContextProvider) ModifyContainerConfig(pod *api.Pod, container *api.Container, config *docker.Config) {
+func (p FakeSecurityContextProvider) ModifyContainerConfig(pod *api.Pod, container *api.Container, config *dockercontainer.Config) {
 }
-func (p FakeSecurityContextProvider) ModifyHostConfig(pod *api.Pod, container *api.Container, hostConfig *docker.HostConfig) {
+func (p FakeSecurityContextProvider) ModifyHostConfig(pod *api.Pod, container *api.Container, hostConfig *dockercontainer.HostConfig, supplementalGids []int64) {
 }

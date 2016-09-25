@@ -1,0 +1,83 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: kube-apiserver
+  namespace: kube-system
+spec:
+  containers:
+  - command:
+    - /bin/sh
+    - -c
+    - /usr/local/bin/kube-apiserver
+      --address=127.0.0.1
+      --etcd-servers=http://127.0.0.1:2379
+      --etcd-servers-overrides=/events#http://127.0.0.1:4002 
+      --cloud-provider=gce
+      --admission-control=${ADMISSION_CONTROL}
+      --service-cluster-ip-range=${SERVICE_CLUSTER_IP_RANGE}
+      --client-ca-file=/srv/kubernetes/ca.crt
+      --basic-auth-file=/srv/kubernetes/basic_auth.csv
+      --tls-cert-file=/srv/kubernetes/server.cert
+      --tls-private-key-file=/srv/kubernetes/server.key
+      --secure-port=443
+      --token-auth-file=/srv/kubernetes/known_tokens.csv
+      --v=2
+      --allow-privileged=True
+      1>>/var/log/kube-apiserver.log 2>&1
+    image: gcr.io/google_containers/kube-apiserver:${KUBE_APISERVER_DOCKER_TAG}
+    imagePullPolicy: IfNotPresent
+    livenessProbe:
+      httpGet:
+        host: 127.0.0.1
+        path: /healthz
+        port: 8080
+        scheme: HTTP
+      initialDelaySeconds: 15
+      timeoutSeconds: 15
+    name: kube-apiserver
+    ports:
+    - containerPort: 443
+      hostPort: 443
+      name: https
+      protocol: TCP
+    - containerPort: 8080
+      hostPort: 8080
+      name: local
+      protocol: TCP
+    resources:
+      requests:
+        cpu: 250m
+    volumeMounts:
+    - mountPath: /srv/kubernetes
+      name: srvkube
+      readOnly: true
+    - mountPath: /var/log/kube-apiserver.log
+      name: logfile
+    - mountPath: /etc/ssl
+      name: etcssl
+      readOnly: true
+    - mountPath: /usr/share/ca-certificates
+      name: usrsharecacerts
+      readOnly: true
+    - mountPath: /srv/sshproxy
+      name: srvsshproxy
+  dnsPolicy: ClusterFirst
+  hostNetwork: true
+  restartPolicy: Always
+  terminationGracePeriodSeconds: 30
+  volumes:
+  - hostPath:
+      path: /srv/kubernetes
+    name: srvkube
+  - hostPath:
+      path: /var/log/kube-apiserver.log
+    name: logfile
+  - hostPath:
+      path: /etc/ssl
+    name: etcssl
+  - hostPath:
+      path: /usr/share/ca-certificates
+    name: usrsharecacerts
+  - hostPath:
+      path: /srv/sshproxy
+    name: srvsshproxy

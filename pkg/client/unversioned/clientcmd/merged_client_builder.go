@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,52 +18,73 @@ package clientcmd
 
 import (
 	"io"
-	"reflect"
+	"sync"
 
 	"github.com/golang/glog"
 
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 )
 
-// DeferredLoadingClientConfig is a ClientConfig interface that is backed by a set of loading rules
+// DeferredLoadingClientConfig is a ClientConfig interface that is backed by a client config loader.
 // It is used in cases where the loading rules may change after you've instantiated them and you want to be sure that
 // the most recent rules are used.  This is useful in cases where you bind flags to loading rule parameters before
 // the parse happens and you want your calling code to be ignorant of how the values are being mutated to avoid
 // passing extraneous information down a call stack
 type DeferredLoadingClientConfig struct {
-	loadingRules   *ClientConfigLoadingRules
+	loader         ClientConfigLoader
 	overrides      *ConfigOverrides
 	fallbackReader io.Reader
+
+	clientConfig ClientConfig
+	loadingLock  sync.Mutex
+
+	// provided for testing
+	icc InClusterConfig
+}
+
+// InClusterConfig abstracts details of whether the client is running in a cluster for testing.
+type InClusterConfig interface {
+	ClientConfig
+	Possible() bool
 }
 
 // NewNonInteractiveDeferredLoadingClientConfig creates a ConfigClientClientConfig using the passed context name
-func NewNonInteractiveDeferredLoadingClientConfig(loadingRules *ClientConfigLoadingRules, overrides *ConfigOverrides) ClientConfig {
-	return DeferredLoadingClientConfig{loadingRules, overrides, nil}
+func NewNonInteractiveDeferredLoadingClientConfig(loader ClientConfigLoader, overrides *ConfigOverrides) ClientConfig {
+	return &DeferredLoadingClientConfig{loader: loader, overrides: overrides, icc: inClusterClientConfig{}}
 }
 
 // NewInteractiveDeferredLoadingClientConfig creates a ConfigClientClientConfig using the passed context name and the fallback auth reader
-func NewInteractiveDeferredLoadingClientConfig(loadingRules *ClientConfigLoadingRules, overrides *ConfigOverrides, fallbackReader io.Reader) ClientConfig {
-	return DeferredLoadingClientConfig{loadingRules, overrides, fallbackReader}
+func NewInteractiveDeferredLoadingClientConfig(loader ClientConfigLoader, overrides *ConfigOverrides, fallbackReader io.Reader) ClientConfig {
+	return &DeferredLoadingClientConfig{loader: loader, overrides: overrides, icc: inClusterClientConfig{}, fallbackReader: fallbackReader}
 }
 
-func (config DeferredLoadingClientConfig) createClientConfig() (ClientConfig, error) {
-	mergedConfig, err := config.loadingRules.Load()
-	if err != nil {
-		return nil, err
+func (config *DeferredLoadingClientConfig) createClientConfig() (ClientConfig, error) {
+	if config.clientConfig == nil {
+		config.loadingLock.Lock()
+		defer config.loadingLock.Unlock()
+
+		if config.clientConfig == nil {
+			mergedConfig, err := config.loader.Load()
+			if err != nil {
+				return nil, err
+			}
+
+			var mergedClientConfig ClientConfig
+			if config.fallbackReader != nil {
+				mergedClientConfig = NewInteractiveClientConfig(*mergedConfig, config.overrides.CurrentContext, config.overrides, config.fallbackReader, config.loader)
+			} else {
+				mergedClientConfig = NewNonInteractiveClientConfig(*mergedConfig, config.overrides.CurrentContext, config.overrides, config.loader)
+			}
+
+			config.clientConfig = mergedClientConfig
+		}
 	}
 
-	var mergedClientConfig ClientConfig
-	if config.fallbackReader != nil {
-		mergedClientConfig = NewInteractiveClientConfig(*mergedConfig, config.overrides.CurrentContext, config.overrides, config.fallbackReader)
-	} else {
-		mergedClientConfig = NewNonInteractiveClientConfig(*mergedConfig, config.overrides.CurrentContext, config.overrides)
-	}
-
-	return mergedClientConfig, nil
+	return config.clientConfig, nil
 }
 
-func (config DeferredLoadingClientConfig) RawConfig() (clientcmdapi.Config, error) {
+func (config *DeferredLoadingClientConfig) RawConfig() (clientcmdapi.Config, error) {
 	mergedConfig, err := config.createClientConfig()
 	if err != nil {
 		return clientcmdapi.Config{}, err
@@ -73,32 +94,61 @@ func (config DeferredLoadingClientConfig) RawConfig() (clientcmdapi.Config, erro
 }
 
 // ClientConfig implements ClientConfig
-func (config DeferredLoadingClientConfig) ClientConfig() (*client.Config, error) {
+func (config *DeferredLoadingClientConfig) ClientConfig() (*restclient.Config, error) {
 	mergedClientConfig, err := config.createClientConfig()
 	if err != nil {
 		return nil, err
 	}
+
+	// load the configuration and return on non-empty errors and if the
+	// content differs from the default config
 	mergedConfig, err := mergedClientConfig.ClientConfig()
-	if err != nil {
-		return nil, err
-	}
-	// Are we running in a cluster and were no other configs found? If so, use the in-cluster-config.
-	icc := inClusterClientConfig{}
-	defaultConfig, err := DefaultClientConfig.ClientConfig()
-	if icc.Possible() && err == nil && reflect.DeepEqual(mergedConfig, defaultConfig) {
-		glog.V(2).Info("No kubeconfig could be created, falling back to service account.")
-		return icc.ClientConfig()
+	switch {
+	case err != nil:
+		if !IsEmptyConfig(err) {
+			// return on any error except empty config
+			return nil, err
+		}
+	case mergedConfig != nil:
+		// the configuration is valid, but if this is equal to the defaults we should try
+		// in-cluster configuration
+		if !config.loader.IsDefaultConfig(mergedConfig) {
+			return mergedConfig, nil
+		}
 	}
 
-	return mergedConfig, nil
+	// check for in-cluster configuration and use it
+	if config.icc.Possible() {
+		glog.V(4).Infof("Using in-cluster configuration")
+		return config.icc.ClientConfig()
+	}
+
+	// return the result of the merged client config
+	return mergedConfig, err
 }
 
 // Namespace implements KubeConfig
-func (config DeferredLoadingClientConfig) Namespace() (string, bool, error) {
+func (config *DeferredLoadingClientConfig) Namespace() (string, bool, error) {
 	mergedKubeConfig, err := config.createClientConfig()
 	if err != nil {
 		return "", false, err
 	}
 
-	return mergedKubeConfig.Namespace()
+	ns, ok, err := mergedKubeConfig.Namespace()
+	// if we get an error and it is not empty config, or if the merged config defined an explicit namespace, or
+	// if in-cluster config is not possible, return immediately
+	if (err != nil && !IsEmptyConfig(err)) || ok || !config.icc.Possible() {
+		// return on any error except empty config
+		return ns, ok, err
+	}
+
+	glog.V(4).Infof("Using in-cluster namespace")
+
+	// allow the namespace from the service account token directory to be used.
+	return config.icc.Namespace()
+}
+
+// ConfigAccess implements ClientConfig
+func (config *DeferredLoadingClientConfig) ConfigAccess() ConfigAccess {
+	return config.loader
 }

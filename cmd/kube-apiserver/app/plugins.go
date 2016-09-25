@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,14 +25,20 @@ import (
 
 	// Admission policies
 	_ "k8s.io/kubernetes/plugin/pkg/admission/admit"
+	_ "k8s.io/kubernetes/plugin/pkg/admission/alwayspullimages"
+	_ "k8s.io/kubernetes/plugin/pkg/admission/antiaffinity"
 	_ "k8s.io/kubernetes/plugin/pkg/admission/deny"
 	_ "k8s.io/kubernetes/plugin/pkg/admission/exec"
+	_ "k8s.io/kubernetes/plugin/pkg/admission/imagepolicy"
 	_ "k8s.io/kubernetes/plugin/pkg/admission/initialresources"
 	_ "k8s.io/kubernetes/plugin/pkg/admission/limitranger"
 	_ "k8s.io/kubernetes/plugin/pkg/admission/namespace/autoprovision"
 	_ "k8s.io/kubernetes/plugin/pkg/admission/namespace/exists"
 	_ "k8s.io/kubernetes/plugin/pkg/admission/namespace/lifecycle"
+	_ "k8s.io/kubernetes/plugin/pkg/admission/persistentvolume/label"
 	_ "k8s.io/kubernetes/plugin/pkg/admission/resourcequota"
+	_ "k8s.io/kubernetes/plugin/pkg/admission/security/podsecuritypolicy"
 	_ "k8s.io/kubernetes/plugin/pkg/admission/securitycontext/scdeny"
 	_ "k8s.io/kubernetes/plugin/pkg/admission/serviceaccount"
+	_ "k8s.io/kubernetes/plugin/pkg/admission/storageclass/default"
 )

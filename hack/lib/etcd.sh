@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2014 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,10 +16,11 @@
 
 # A set of helpers for starting/running etcd for tests
 
-kube::etcd::start() {
-  local host=${ETCD_HOST:-127.0.0.1}
-  local port=${ETCD_PORT:-4001}
+ETCD_VERSION=${ETCD_VERSION:-2.2.1}
+ETCD_HOST=${ETCD_HOST:-127.0.0.1}
+ETCD_PORT=${ETCD_PORT:-2379}
 
+kube::etcd::start() {
   which etcd >/dev/null || {
     kube::log::usage "etcd must be in your PATH"
     exit 1
@@ -31,21 +32,27 @@ kube::etcd::start() {
     exit 1
   fi
 
-  version=$(etcd -version | cut -d " " -f 3)
-  if [[ "${version}" < "2.0.0" ]]; then
-   kube::log::usage "etcd version 2.0.0 or greater required."
+  version=$(etcd --version | head -n 1 | cut -d " " -f 3)
+  if [[ "${version}" < "${ETCD_VERSION}" ]]; then
+   kube::log::usage "etcd version ${ETCD_VERSION} or greater required."
+   kube::log::info "You can use 'hack/install-etcd.sh' to install a copy in third_party/."
    exit 1
   fi
 
   # Start etcd
-  ETCD_DIR=$(mktemp -d 2>/dev/null || mktemp -d -t test-etcd.XXXXXX)
-  kube::log::info "etcd -data-dir ${ETCD_DIR} --bind-addr ${host}:${port} >/dev/null 2>/dev/null"
-  etcd -data-dir ${ETCD_DIR} --bind-addr ${host}:${port} >/dev/null 2>/dev/null &
+  ETCD_DIR=${ETCD_DIR:-$(mktemp -d 2>/dev/null || mktemp -d -t test-etcd.XXXXXX)}
+  if [[ -d "${ARTIFACTS_DIR:-}" ]]; then
+    ETCD_LOGFILE="${ARTIFACTS_DIR}/etcd.$(uname -n).$(id -un).log.DEBUG.$(date +%Y%m%d-%H%M%S).$$"
+  else
+    ETCD_LOGFILE=/dev/null
+  fi
+  kube::log::info "etcd --advertise-client-urls http://${ETCD_HOST}:${ETCD_PORT} --data-dir ${ETCD_DIR} --listen-client-urls http://${ETCD_HOST}:${ETCD_PORT} --debug > \"${ETCD_LOGFILE}\" 2>/dev/null"
+  etcd --advertise-client-urls http://${ETCD_HOST}:${ETCD_PORT} --data-dir ${ETCD_DIR} --listen-client-urls http://${ETCD_HOST}:${ETCD_PORT} --debug 2> "${ETCD_LOGFILE}" >/dev/null &
   ETCD_PID=$!
 
   echo "Waiting for etcd to come up."
-  kube::util::wait_for_url "http://${host}:${port}/v2/machines" "etcd: " 0.25 80
-  curl -fs -X PUT "http://${host}:${port}/v2/keys/_test"
+  kube::util::wait_for_url "http://${ETCD_HOST}:${ETCD_PORT}/v2/machines" "etcd: " 0.25 80
+  curl -fs -X PUT "http://${ETCD_HOST}:${ETCD_PORT}/v2/keys/_test"
 }
 
 kube::etcd::stop() {
@@ -60,4 +67,22 @@ kube::etcd::clean_etcd_dir() {
 kube::etcd::cleanup() {
   kube::etcd::stop
   kube::etcd::clean_etcd_dir
+}
+
+kube::etcd::install() {
+  (
+    cd "${KUBE_ROOT}/third_party"
+    if [[ $(uname) == "Darwin" ]]; then
+      download_file="etcd-v${ETCD_VERSION}-darwin-amd64.zip"
+      curl -fsSLO --retry 3 --keepalive-time 2 https://github.com/coreos/etcd/releases/download/v${ETCD_VERSION}/"${download_file}"
+      unzip -o "${download_file}"
+      ln -fns "etcd-v${ETCD_VERSION}-darwin-amd64" etcd
+      rm "${download_file}"
+    else
+      curl -fsSL --retry 3 --keepalive-time 2 https://github.com/coreos/etcd/releases/download/v${ETCD_VERSION}/etcd-v${ETCD_VERSION}-linux-amd64.tar.gz | tar xzf -
+      ln -fns "etcd-v${ETCD_VERSION}-linux-amd64" etcd
+    fi
+    kube::log::info "etcd v${ETCD_VERSION} installed. To use:"
+    kube::log::info "export PATH=\${PATH}:$(pwd)/etcd"
+  )
 }

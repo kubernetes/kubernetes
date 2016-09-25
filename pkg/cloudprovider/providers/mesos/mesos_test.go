@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -121,15 +121,15 @@ func Test_Instances(t *testing.T) {
 	}
 }
 
-// test mesos.TCPLoadBalancer
+// test mesos.LoadBalancer
 func Test_TcpLoadBalancer(t *testing.T) {
 	defer log.Flush()
 	mesosCloud, _ := newMesosCloud(nil)
 
-	lb, supports_lb := mesosCloud.TCPLoadBalancer()
+	lb, supports_lb := mesosCloud.LoadBalancer()
 
 	if supports_lb || lb != nil {
-		t.Fatalf("MesosCloud does not provide an implementation of TCPLoadBalancer")
+		t.Fatalf("MesosCloud does not provide an implementation of LoadBalancer")
 	}
 }
 
@@ -219,7 +219,7 @@ func Test_Master(t *testing.T) {
 	expectedMaster := unpackIPv4(TEST_MASTER_IP)
 
 	if master != expectedMaster {
-		t.Fatalf("Master returns the expected value: (expected: %#v, actual: %#v", expectedMaster, master)
+		t.Fatalf("Master returns the unexpected value: (expected: %#v, actual: %#v", expectedMaster, master)
 	}
 }
 

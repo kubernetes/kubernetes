@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,25 +22,25 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/util/wait"
+	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Events", func() {
-	framework := NewFramework("events")
+var _ = framework.KubeDescribe("Events", func() {
+	f := framework.NewDefaultFramework("events")
 
 	It("should be sent by kubelets and the scheduler about pods scheduling and running [Conformance]", func() {
 
-		podClient := framework.Client.Pods(framework.Namespace.Name)
+		podClient := f.Client.Pods(f.Namespace.Name)
 
 		By("creating the pod")
-		name := "send-events-" + string(util.NewUUID())
+		name := "send-events-" + string(uuid.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())
 		pod := &api.Pod{
 			ObjectMeta: api.ObjectMeta{
@@ -54,7 +54,7 @@ var _ = Describe("Events", func() {
 				Containers: []api.Container{
 					{
 						Name:  "p",
-						Image: "gcr.io/google_containers/serve_hostname:1.1",
+						Image: "gcr.io/google_containers/serve_hostname:v1.4",
 						Ports: []api.ContainerPort{{ContainerPort: 80}},
 					},
 				},
@@ -67,35 +67,35 @@ var _ = Describe("Events", func() {
 			podClient.Delete(pod.Name, nil)
 		}()
 		if _, err := podClient.Create(pod); err != nil {
-			Failf("Failed to create pod: %v", err)
+			framework.Failf("Failed to create pod: %v", err)
 		}
 
-		expectNoError(framework.WaitForPodRunning(pod.Name))
+		framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
 
 		By("verifying the pod is in kubernetes")
 		selector := labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
-		options := unversioned.ListOptions{LabelSelector: unversioned.LabelSelector{selector}}
+		options := api.ListOptions{LabelSelector: selector}
 		pods, err := podClient.List(options)
 		Expect(len(pods.Items)).To(Equal(1))
 
 		By("retrieving the pod")
 		podWithUid, err := podClient.Get(pod.Name)
 		if err != nil {
-			Failf("Failed to get pod: %v", err)
+			framework.Failf("Failed to get pod: %v", err)
 		}
 		fmt.Printf("%+v\n", podWithUid)
 		var events *api.EventList
 		// Check for scheduler event about the pod.
 		By("checking for scheduler event about the pod")
-		expectNoError(wait.Poll(time.Second*2, time.Second*60, func() (bool, error) {
+		framework.ExpectNoError(wait.Poll(time.Second*2, time.Second*60, func() (bool, error) {
 			selector := fields.Set{
 				"involvedObject.kind":      "Pod",
 				"involvedObject.uid":       string(podWithUid.UID),
-				"involvedObject.namespace": framework.Namespace.Name,
-				"source":                   "scheduler",
+				"involvedObject.namespace": f.Namespace.Name,
+				"source":                   api.DefaultSchedulerName,
 			}.AsSelector()
-			options := unversioned.ListOptions{FieldSelector: unversioned.FieldSelector{selector}}
-			events, err := framework.Client.Events(framework.Namespace.Name).List(options)
+			options := api.ListOptions{FieldSelector: selector}
+			events, err := f.Client.Events(f.Namespace.Name).List(options)
 			if err != nil {
 				return false, err
 			}
@@ -107,15 +107,15 @@ var _ = Describe("Events", func() {
 		}))
 		// Check for kubelet event about the pod.
 		By("checking for kubelet event about the pod")
-		expectNoError(wait.Poll(time.Second*2, time.Second*60, func() (bool, error) {
+		framework.ExpectNoError(wait.Poll(time.Second*2, time.Second*60, func() (bool, error) {
 			selector := fields.Set{
 				"involvedObject.uid":       string(podWithUid.UID),
 				"involvedObject.kind":      "Pod",
-				"involvedObject.namespace": framework.Namespace.Name,
+				"involvedObject.namespace": f.Namespace.Name,
 				"source":                   "kubelet",
 			}.AsSelector()
-			options := unversioned.ListOptions{FieldSelector: unversioned.FieldSelector{selector}}
-			events, err = framework.Client.Events(framework.Namespace.Name).List(options)
+			options := api.ListOptions{FieldSelector: selector}
+			events, err = f.Client.Events(f.Namespace.Name).List(options)
 			if err != nil {
 				return false, err
 			}

@@ -1,0 +1,18 @@
+# A headless service to create DNS records
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    service.alpha.kubernetes.io/tolerate-unready-endpoints: "true"
+  name: redis
+  labels:
+    app: redis
+spec:
+  ports:
+  - port: 6379
+    name: peer
+  # *.redis.default.svc.cluster.local
+  clusterIP: None
+  selector:
+    app: redis
+

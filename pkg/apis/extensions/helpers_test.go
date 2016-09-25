@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,65 +19,44 @@ package extensions
 import (
 	"reflect"
 	"testing"
-
-	"k8s.io/kubernetes/pkg/labels"
 )
 
-func TestPodSelectorAsSelector(t *testing.T) {
-	matchLabels := map[string]string{"foo": "bar"}
-	matchExpressions := []PodSelectorRequirement{{
-		Key:      "baz",
-		Operator: PodSelectorOpIn,
-		Values:   []string{"qux", "norf"},
-	}}
-	mustParse := func(s string) labels.Selector {
-		out, e := labels.Parse(s)
-		if e != nil {
-			panic(e)
+func TestPodAnnotationsFromSysctls(t *testing.T) {
+	type Test struct {
+		sysctls       []string
+		expectedValue string
+	}
+	for _, test := range []Test{
+		{sysctls: []string{"a.b"}, expectedValue: "a.b"},
+		{sysctls: []string{"a.b", "c.d"}, expectedValue: "a.b,c.d"},
+		{sysctls: []string{"a.b", "a.b"}, expectedValue: "a.b,a.b"},
+		{sysctls: []string{}, expectedValue: ""},
+		{sysctls: nil, expectedValue: ""},
+	} {
+		a := PodAnnotationsFromSysctls(test.sysctls)
+		if a != test.expectedValue {
+			t.Errorf("wrong value for %v: got=%q wanted=%q", test.sysctls, a, test.expectedValue)
 		}
-		return out
 	}
-	tc := []struct {
-		in        *PodSelector
-		out       labels.Selector
-		expectErr bool
-	}{
-		{in: nil, out: labels.Nothing()},
-		{in: &PodSelector{}, out: labels.Everything()},
-		{
-			in:  &PodSelector{MatchLabels: matchLabels},
-			out: mustParse("foo in (bar)"),
-		},
-		{
-			in:  &PodSelector{MatchExpressions: matchExpressions},
-			out: mustParse("baz in (norf,qux)"),
-		},
-		{
-			in:  &PodSelector{MatchLabels: matchLabels, MatchExpressions: matchExpressions},
-			out: mustParse("foo in (bar),baz in (norf,qux)"),
-		},
-		{
-			in: &PodSelector{
-				MatchExpressions: []PodSelectorRequirement{{
-					Key:      "baz",
-					Operator: PodSelectorOpExists,
-					Values:   []string{"qux", "norf"},
-				}},
-			},
-			expectErr: true,
-		},
-	}
+}
 
-	for i, tc := range tc {
-		out, err := PodSelectorAsSelector(tc.in)
-		if err == nil && tc.expectErr {
-			t.Errorf("[%v]expected error but got none.", i)
+func TestSysctlsFromPodSecurityPolicyAnnotation(t *testing.T) {
+	type Test struct {
+		expectedValue []string
+		annotation    string
+	}
+	for _, test := range []Test{
+		{annotation: "a.b", expectedValue: []string{"a.b"}},
+		{annotation: "a.b,c.d", expectedValue: []string{"a.b", "c.d"}},
+		{annotation: "a.b,a.b", expectedValue: []string{"a.b", "a.b"}},
+		{annotation: "", expectedValue: []string{}},
+	} {
+		sysctls, err := SysctlsFromPodSecurityPolicyAnnotation(test.annotation)
+		if err != nil {
+			t.Errorf("error for %q: %v", test.annotation, err)
 		}
-		if err != nil && !tc.expectErr {
-			t.Errorf("[%v]did not expect error but got: %v", i, err)
-		}
-		if !reflect.DeepEqual(out, tc.out) {
-			t.Errorf("[%v]expected:\n\t%+v\nbut got:\n\t%+v", i, tc.out, out)
+		if !reflect.DeepEqual(sysctls, test.expectedValue) {
+			t.Errorf("wrong value for %q: got=%v wanted=%v", test.annotation, sysctls, test.expectedValue)
 		}
 	}
 }

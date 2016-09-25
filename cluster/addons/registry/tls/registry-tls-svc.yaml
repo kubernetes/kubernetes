@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: kube-registry
+  namespace: kube-system
+  labels:
+    k8s-app: kube-registry
+#    kubernetes.io/cluster-service: "true"
+    kubernetes.io/name: "KubeRegistry"
+spec:
+  selector:
+    k8s-app: kube-registry
+  type: LoadBalancer
+  ports:
+  - name: registry
+    port: 5000
+    protocol: TCP

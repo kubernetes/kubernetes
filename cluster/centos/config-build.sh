@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 The Kubernetes Authors All rights reserved.
+# Copyright 2015 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,14 +19,20 @@
 # Directory to store release packages that will be downloaded.
 RELEASES_DIR=${RELEASES_DIR:-/tmp/downloads}
 
+# Define docker version to use.
+DOCKER_VERSION=${DOCKER_VERSION:-"1.12.0"}
+
 # Define flannel version to use.
-FLANNEL_VERSION=${FLANNEL_VERSION:-"0.5.3"}
+FLANNEL_VERSION=${FLANNEL_VERSION:-"0.5.5"}
 
 # Define etcd version to use.
 ETCD_VERSION=${ETCD_VERSION:-"2.2.1"}
 
 # Define k8s version to use.
-K8S_VERSION=${K8S_VERSION:-"1.0.4"}
+K8S_VERSION=${K8S_VERSION:-"1.3.5"}
+
+DOCKER_DOWNLOAD_URL=\
+"https://get.docker.com/builds/Linux/x86_64/docker-${DOCKER_VERSION}.tgz"
 
 FLANNEL_DOWNLOAD_URL=\
 "https://github.com/coreos/flannel/releases/download/v${FLANNEL_VERSION}/flannel-${FLANNEL_VERSION}-linux-amd64.tar.gz"

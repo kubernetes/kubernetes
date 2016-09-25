@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,30 +21,29 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/clock"
 )
 
-// WorkQueue allows queueing items with a timestamp. An item is
+// WorkQueue allows queuing items with a timestamp. An item is
 // considered ready to process if the timestamp has expired.
 type WorkQueue interface {
 	// GetWork dequeues and returns all ready items.
 	GetWork() []types.UID
-	// Enqueue inserts a new item or overwrites an existing item with the
-	// new timestamp (time.Now() + delay) if it is greater.
+	// Enqueue inserts a new item or overwrites an existing item.
 	Enqueue(item types.UID, delay time.Duration)
 }
 
 type basicWorkQueue struct {
-	clock util.Clock
+	clock clock.Clock
 	lock  sync.Mutex
 	queue map[types.UID]time.Time
 }
 
 var _ WorkQueue = &basicWorkQueue{}
 
-func NewBasicWorkQueue() WorkQueue {
+func NewBasicWorkQueue(clock clock.Clock) WorkQueue {
 	queue := make(map[types.UID]time.Time)
-	return &basicWorkQueue{queue: queue, clock: util.RealClock{}}
+	return &basicWorkQueue{queue: queue, clock: clock}
 }
 
 func (q *basicWorkQueue) GetWork() []types.UID {
@@ -64,10 +63,5 @@ func (q *basicWorkQueue) GetWork() []types.UID {
 func (q *basicWorkQueue) Enqueue(item types.UID, delay time.Duration) {
 	q.lock.Lock()
 	defer q.lock.Unlock()
-	now := q.clock.Now()
-	timestamp := now.Add(delay)
-	existing, ok := q.queue[item]
-	if !ok || (ok && existing.Before(timestamp)) {
-		q.queue[item] = timestamp
-	}
+	q.queue[item] = q.clock.Now().Add(delay)
 }

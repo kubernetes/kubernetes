@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,13 +17,8 @@ limitations under the License.
 package unversioned
 
 import (
-	"encoding/json"
-	"fmt"
-	"strings"
-
-	"k8s.io/kubernetes/pkg/api/latest"
-	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/version"
+	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/client/restclient"
 )
 
 // Interface holds the experimental methods for clients of Kubernetes
@@ -31,53 +26,26 @@ import (
 // Features of Extensions group are not supported and may be changed or removed in
 // incompatible ways at any time.
 type ExtensionsInterface interface {
-	VersionInterface
-	HorizontalPodAutoscalersNamespacer
 	ScaleNamespacer
 	DaemonSetsNamespacer
 	DeploymentsNamespacer
 	JobsNamespacer
 	IngressNamespacer
+	NetworkPolicyNamespacer
+	ThirdPartyResourceNamespacer
+	ReplicaSetsNamespacer
+	PodSecurityPoliciesInterface
 }
 
 // ExtensionsClient is used to interact with experimental Kubernetes features.
 // Features of Extensions group are not supported and may be changed or removed in
 // incompatible ways at any time.
 type ExtensionsClient struct {
-	*RESTClient
+	*restclient.RESTClient
 }
 
-// ServerVersion retrieves and parses the server's version.
-func (c *ExtensionsClient) ServerVersion() (*version.Info, error) {
-	body, err := c.Get().AbsPath("/version").Do().Raw()
-	if err != nil {
-		return nil, err
-	}
-	var info version.Info
-	err = json.Unmarshal(body, &info)
-	if err != nil {
-		return nil, fmt.Errorf("got '%s': %v", string(body), err)
-	}
-	return &info, nil
-}
-
-// ServerAPIVersions retrieves and parses the list of experimental API versions the
-// server supports.
-func (c *ExtensionsClient) ServerAPIVersions() (*unversioned.APIVersions, error) {
-	body, err := c.Get().AbsPath("/apis/extensions").Do().Raw()
-	if err != nil {
-		return nil, err
-	}
-	var v unversioned.APIVersions
-	err = json.Unmarshal(body, &v)
-	if err != nil {
-		return nil, fmt.Errorf("got '%s': %v", string(body), err)
-	}
-	return &v, nil
-}
-
-func (c *ExtensionsClient) HorizontalPodAutoscalers(namespace string) HorizontalPodAutoscalerInterface {
-	return newHorizontalPodAutoscalers(c, namespace)
+func (c *ExtensionsClient) PodSecurityPolicies() PodSecurityPolicyInterface {
+	return newPodSecurityPolicy(c)
 }
 
 func (c *ExtensionsClient) Scales(namespace string) ScaleInterface {
@@ -100,16 +68,28 @@ func (c *ExtensionsClient) Ingress(namespace string) IngressInterface {
 	return newIngress(c, namespace)
 }
 
+func (c *ExtensionsClient) NetworkPolicies(namespace string) NetworkPolicyInterface {
+	return newNetworkPolicies(c, namespace)
+}
+
+func (c *ExtensionsClient) ThirdPartyResources() ThirdPartyResourceInterface {
+	return newThirdPartyResources(c)
+}
+
+func (c *ExtensionsClient) ReplicaSets(namespace string) ReplicaSetInterface {
+	return newReplicaSets(c, namespace)
+}
+
 // NewExtensions creates a new ExtensionsClient for the given config. This client
 // provides access to experimental Kubernetes features.
 // Features of Extensions group are not supported and may be changed or removed in
 // incompatible ways at any time.
-func NewExtensions(c *Config) (*ExtensionsClient, error) {
+func NewExtensions(c *restclient.Config) (*ExtensionsClient, error) {
 	config := *c
-	if err := setExtensionsDefaults(&config); err != nil {
+	if err := setGroupDefaults(extensions.GroupName, &config); err != nil {
 		return nil, err
 	}
-	client, err := RESTClientFor(&config)
+	client, err := restclient.RESTClientFor(&config)
 	if err != nil {
 		return nil, err
 	}
@@ -120,41 +100,10 @@ func NewExtensions(c *Config) (*ExtensionsClient, error) {
 // panics if there is an error in the config.
 // Features of Extensions group are not supported and may be changed or removed in
 // incompatible ways at any time.
-func NewExtensionsOrDie(c *Config) *ExtensionsClient {
+func NewExtensionsOrDie(c *restclient.Config) *ExtensionsClient {
 	client, err := NewExtensions(c)
 	if err != nil {
 		panic(err)
 	}
 	return client
-}
-
-func setExtensionsDefaults(config *Config) error {
-	// if experimental group is not registered, return an error
-	g, err := latest.Group("extensions")
-	if err != nil {
-		return err
-	}
-	config.Prefix = "apis/"
-	if config.UserAgent == "" {
-		config.UserAgent = DefaultKubernetesUserAgent()
-	}
-	// TODO: Unconditionally set the config.Version, until we fix the config.
-	//if config.Version == "" {
-	copyGroupVersion := g.GroupVersion
-	config.GroupVersion = &copyGroupVersion
-	//}
-
-	versionInterfaces, err := g.InterfacesFor(config.GroupVersion.String())
-	if err != nil {
-		return fmt.Errorf("Extensions API group/version '%v' is not recognized (valid values: %s)",
-			config.GroupVersion, strings.Join(latest.GroupOrDie("extensions").Versions, ", "))
-	}
-	config.Codec = versionInterfaces.Codec
-	if config.QPS == 0 {
-		config.QPS = 5
-	}
-	if config.Burst == 0 {
-		config.Burst = 10
-	}
-	return nil
 }

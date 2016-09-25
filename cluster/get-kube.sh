@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2014 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -30,15 +30,22 @@
 #   * export KUBERNETES_PROVIDER=aws; wget -q -O - https://get.k8s.io | bash
 #  Libvirt (with CoreOS as a guest operating system)
 #   * export KUBERNETES_PROVIDER=libvirt-coreos; wget -q -O - https://get.k8s.io | bash
+#  Microsoft Azure
+#   * export KUBERNETES_PROVIDER=azure-legacy; wget -q -O - https://get.k8s.io | bash
 #  Vagrant (local virtual machines)
 #   * export KUBERNETES_PROVIDER=vagrant; wget -q -O - https://get.k8s.io | bash
 #  VMWare VSphere
 #   * export KUBERNETES_PROVIDER=vsphere; wget -q -O - https://get.k8s.io | bash
+#  VMWare Photon Controller
+#   * export KUBERNETES_PROVIDER=photon-controller; wget -q -O - https://get.k8s.io | bash
 #  Rackspace
 #   * export KUBERNETES_PROVIDER=rackspace; wget -q -O - https://get.k8s.io | bash
+#  OpenStack-Heat
+#   * export KUBERNETES_PROVIDER=openstack-heat; wget -q -O - https://get.k8s.io | bash
 #
 #  Set KUBERNETES_SKIP_DOWNLOAD to non-empty to skip downloading a release.
 #  Set KUBERNETES_SKIP_CONFIRM to skip the installation confirmation prompt.
+#  Set KUBERNETES_RELEASE to the release you want to use (e.g. 'v1.2.0'). See https://github.com/kubernetes/kubernetes/releases for release options
 set -o errexit
 set -o nounset
 set -o pipefail
@@ -62,6 +69,18 @@ if [[ "${KUBERNETES_SKIP_DOWNLOAD-}" ]]; then
   exit 0
 fi
 
+if [[ -d "./kubernetes" ]]; then
+  if [[ -n "${KUBERNETES_SKIP_CONFIRM-}" ]]; then
+    echo "'kubernetes' directory already exist. Should we skip download step and start to create cluster based on it? [Y]/n"
+    read confirm
+    if [[ "$confirm" == "y" ]]; then
+      echo "Skipping download step."
+      create_cluster
+      exit 0
+    fi
+  fi
+fi
+
 function get_latest_version_number {
   local -r latest_url="https://storage.googleapis.com/kubernetes-release/release/stable.txt"
   if [[ $(which wget) ]]; then
@@ -69,12 +88,12 @@ function get_latest_version_number {
   elif [[ $(which curl) ]]; then
     curl -Ss ${latest_url}
   else
-    echo "Couldn't find curl or wget.  Bailing out."
+    echo "Couldn't find curl or wget.  Bailing out." >&2
     exit 4
   fi
 }
 
-release=$(get_latest_version_number)
+release=${KUBERNETES_RELEASE:-$(get_latest_version_number)}
 release_url=https://storage.googleapis.com/kubernetes-release/release/${release}/kubernetes.tar.gz
 
 uname=$(uname)
@@ -98,9 +117,11 @@ elif [[ "${machine}" == "arm*" ]]; then
   arch="arm"
 elif [[ "${machine}" == "s390x*" ]]; then
   arch="s390x"
+elif [[ "${machine}" == "ppc64le" ]]; then
+  arch="ppc64le"
 else
   echo "Unknown, unsupported architecture (${machine})."
-  echo "Supported architectures x86_64, i686, arm, s390x."
+  echo "Supported architectures x86_64, i686, arm, s390x, ppc64le."
   echo "Bailing out."
   exit 3
 fi
@@ -118,9 +139,9 @@ if [[ -n "${KUBERNETES_SKIP_CONFIRM-}" ]]; then
 fi
 
 if [[ $(which wget) ]]; then
-  wget -O ${file} ${release_url}
+  wget -N ${release_url}
 elif [[ $(which curl) ]]; then
-  curl -L -o ${file} ${release_url}
+  curl -L -z ${file} ${release_url} -o ${file}
 else
   echo "Couldn't find curl or wget.  Bailing out."
   exit 1
@@ -128,6 +149,5 @@ fi
 
 echo "Unpacking kubernetes release ${release}"
 tar -xzf ${file}
-rm ${file}
 
 create_cluster

@@ -2,15 +2,15 @@
 
 <!-- BEGIN STRIP_FOR_RELEASE -->
 
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
 
 <h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
@@ -18,9 +18,10 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.1/docs/proposals/job.md).
+[here](http://releases.k8s.io/release-1.4/docs/proposals/job.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -178,12 +179,13 @@ Job controller will be emitting the following events:
 ## Future evolution
 
 Below are the possible future extensions to the Job controller:
-* Be able to limit the execution time for a job, similarly to ActiveDeadlineSeconds for Pods.
-* Be able to create a chain of jobs dependent one on another.
+* Be able to limit the execution time for a job, similarly to ActiveDeadlineSeconds for Pods. *now implemented*
+* Be able to create a chain of jobs dependent one on another. *will be implemented in a separate type called Workflow*
 * Be able to specify the work each of the workers should execute (see type 1 from
   [this comment](https://github.com/kubernetes/kubernetes/issues/1624#issuecomment-97622142))
 * Be able to inspect Pods running a Job, especially after a Job has finished, e.g.
   by providing pointers to Pods in the JobStatus ([see comment](https://github.com/kubernetes/kubernetes/pull/11746/files#r37142628)).
+* help users avoid non-unique label selectors ([see this proposal](../../docs/design/selector-generation.md))
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

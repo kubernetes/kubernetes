@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 The Kubernetes Authors All rights reserved.
+# Copyright 2015 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@
 PROJECT=${PROJECT:-kubernetes-jenkins}
 REGION=${REGION:-us-central1}
 
-LIST=$(gcloud --project=${PROJECT} compute target-pools list | sed 1d | awk '{print $1}')
+LIST=$(gcloud --project=${PROJECT} compute target-pools list --format='value(name)')
 
 result=0
 for x in ${LIST}; do

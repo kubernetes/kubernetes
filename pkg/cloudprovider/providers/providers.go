@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,10 +19,12 @@ package cloudprovider
 import (
 	// Cloud providers
 	_ "k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
+	_ "k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
+	_ "k8s.io/kubernetes/pkg/cloudprovider/providers/cloudstack"
 	_ "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	_ "k8s.io/kubernetes/pkg/cloudprovider/providers/mesos"
 	_ "k8s.io/kubernetes/pkg/cloudprovider/providers/openstack"
 	_ "k8s.io/kubernetes/pkg/cloudprovider/providers/ovirt"
 	_ "k8s.io/kubernetes/pkg/cloudprovider/providers/rackspace"
-	_ "k8s.io/kubernetes/pkg/cloudprovider/providers/vagrant"
+	_ "k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
 )

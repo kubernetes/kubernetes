@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,6 +26,8 @@ import (
 	annotation "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/meta"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/runtime"
 )
 
 type Binder interface {
@@ -138,7 +140,7 @@ func (b *binder) prepareTaskForLaunch(ctx api.Context, machine string, task *pod
 		oemPorts := pod.Spec.Containers[entry.ContainerIdx].Ports
 		ports := append([]api.ContainerPort{}, oemPorts...)
 		p := &ports[entry.PortIdx]
-		p.HostPort = int(entry.OfferPort)
+		p.HostPort = int32(entry.OfferPort)
 		op := strconv.FormatUint(entry.OfferPort, 10)
 		pod.Annotations[fmt.Sprintf(annotation.PortMappingKeyFormat, p.Protocol, p.ContainerPort)] = op
 		if p.Name != "" {
@@ -150,7 +152,7 @@ func (b *binder) prepareTaskForLaunch(ctx api.Context, machine string, task *pod
 	// the kubelet-executor uses this to instantiate the pod
 	log.V(3).Infof("prepared pod spec: %+v", pod)
 
-	data, err := api.Codec.Encode(&pod)
+	data, err := runtime.Encode(api.Codecs.LegacyCodec(v1.SchemeGroupVersion), &pod)
 	if err != nil {
 		log.V(2).Infof("Failed to marshal the pod spec: %v", err)
 		return err

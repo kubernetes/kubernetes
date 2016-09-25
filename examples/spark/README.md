@@ -2,15 +2,15 @@
 
 <!-- BEGIN STRIP_FOR_RELEASE -->
 
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
 
 <h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
@@ -18,9 +18,10 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.1/examples/spark/README.md).
+[here](http://releases.k8s.io/release-1.4/examples/spark/README.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -37,25 +38,51 @@ Following this example, you will create a functional [Apache
 Spark](http://spark.apache.org/) cluster using Kubernetes and
 [Docker](http://docker.io).
 
-You will setup a Spark master service and a set of
-Spark workers using Spark's [standalone mode](http://spark.apache.org/docs/latest/spark-standalone.html).
+You will setup a Spark master service and a set of Spark workers using Spark's [standalone mode](http://spark.apache.org/docs/latest/spark-standalone.html).
 
 For the impatient expert, jump straight to the [tl;dr](#tldr)
 section.
 
 ### Sources
 
-The Docker images are heavily based on https://github.com/mattf/docker-spark
+The Docker images are heavily based on https://github.com/mattf/docker-spark.
+And are curated in https://github.com/kubernetes/application-images/tree/master/spark
 
 ## Step Zero: Prerequisites
 
-This example assumes you have a Kubernetes cluster installed and
-running, and that you have installed the ```kubectl``` command line
-tool somewhere in your path. Please see the [getting
-started](../../docs/getting-started-guides/) for installation
-instructions for your platform.
+This example assumes
 
-## Step One: Start your Master service
+- You have a Kubernetes cluster installed and running.
+- That you have installed the ```kubectl``` command line tool somewhere in your path.
+- That a spark-master service which spins up will be automatically discoverable by your kube DNS impl, as 'spark-master'
+
+For details, you can look at the Dockerfiles in the Sources section.
+
+## Step One: Create namespace
+
+```sh
+$ kubectl create -f examples/spark/namespace-spark-cluster.yaml
+```
+
+Now list all namespaces:
+
+```sh
+$ kubectl get namespaces
+NAME          LABELS             STATUS
+default       <none>             Active
+spark-cluster name=spark-cluster Active
+```
+
+For kubectl client to work with namespace, we define one context and use it:
+
+```sh
+$ kubectl config set-context spark --namespace=spark-cluster --cluster=${CLUSTER_NAME} --user=${USER_NAME}
+$ kubectl config use-context spark
+```
+
+You can view your cluster name and user name in kubernetes config at ~/.kube/config.
+
+## Step Two: Start your Master service
 
 The Master [service](../../docs/user-guide/services.md) is the master service
 for a Spark cluster.
@@ -68,7 +95,7 @@ running the Spark Master service.
 
 ```console
 $ kubectl create -f examples/spark/spark-master-controller.yaml
-replicationcontrollers/spark-master-controller
+replicationcontroller "spark-master-controller" created
 ```
 
 Then, use the
@@ -78,14 +105,14 @@ Master pod.
 
 ```console
 $ kubectl create -f examples/spark/spark-master-service.yaml
-services/spark-master
+service "spark-master" created
 ```
 
 You can then create a service for the Spark Master WebUI:
 
 ```console
 $ kubectl create -f examples/spark/spark-webui.yaml
-services/spark-webui
+service "spark-webui" created
 ```
 
 ### Check to see if Master is running and accessible
@@ -129,9 +156,9 @@ kubectl proxy --port=8001
 ```
 
 At which point the UI will be available at
-[http://localhost:8001/api/v1/proxy/namespaces/default/services/spark-webui/](http://localhost:8001/api/v1/proxy/namespaces/default/services/spark-webui/).
+[http://localhost:8001/api/v1/proxy/namespaces/spark-cluster/services/spark-webui/](http://localhost:8001/api/v1/proxy/namespaces/spark-cluster/services/spark-webui/).
 
-## Step Two: Start your Spark workers
+## Step Three: Start your Spark workers
 
 The Spark workers do the heavy lifting in a Spark cluster. They
 provide execution resources and data cache capabilities for your
@@ -144,6 +171,7 @@ Use the [`examples/spark/spark-worker-controller.yaml`](spark-worker-controller.
 
 ```console
 $ kubectl create -f examples/spark/spark-worker-controller.yaml
+replicationcontroller "spark-worker-controller" created
 ```
 
 ### Check to see if the workers are running
@@ -172,7 +200,7 @@ you should now see the workers in the UI as well. *Note:* The UI will have links
 to worker Web UIs. The worker UI links do not work (the links will attempt to
 connect to cluster IPs, which Kubernetes won't proxy automatically).
 
-## Step Three: Start the Zeppelin UI to launch jobs on your Spark cluster
+## Step Four: Start the Zeppelin UI to launch jobs on your Spark cluster
 
 The Zeppelin UI pod can be used to launch jobs into the Spark cluster either via
 a web notebook frontend or the traditional Spark command line. See
@@ -182,7 +210,7 @@ for more details.
 
 ```console
 $ kubectl create -f examples/spark/zeppelin-controller.yaml
-replicationcontrollers/zeppelin-controller
+replicationcontroller "zeppelin-controller" created
 ```
 
 Zeppelin needs the Master service to be running.
@@ -190,12 +218,12 @@ Zeppelin needs the Master service to be running.
 ### Check to see if Zeppelin is running
 
 ```console
-$ kubectl get pods -lcomponent=zeppelin
+$ kubectl get pods -l component=zeppelin
 NAME                        READY     STATUS    RESTARTS   AGE
 zeppelin-controller-ja09s   1/1       Running   0          53s
 ```
 
-## Step Four: Do something with the cluster
+## Step Five: Do something with the cluster
 
 Now you have two choices, depending on your predilections. You can do something
 graphical with the Spark cluster, or you can stay in the CLI.
@@ -234,7 +262,7 @@ $ kubectl port-forward zeppelin-controller-ja09s 8080:8080
 ```
 
 This forwards `localhost` 8080 to container port 8080. You can then find
-Zeppelin at (https://localhost:8080/)[https://localhost:8080/].
+Zeppelin at [https://localhost:8080/](https://localhost:8080/).
 
 Create a "New Notebook". In there, type:
 
@@ -266,7 +294,7 @@ kubectl get pods -lcomponent=zeppelin # Get the driver pod to interact with.
 ```
 
 At which point the Master UI will be available at
-[http://localhost:8001/api/v1/proxy/namespaces/default/services/spark-webui/](http://localhost:8001/api/v1/proxy/namespaces/default/services/spark-webui/).
+[http://localhost:8001/api/v1/proxy/namespaces/spark-cluster/services/spark-webui/](http://localhost:8001/api/v1/proxy/namespaces/default/services/spark-webui/).
 
 You can either interact with the Spark cluster the traditional `spark-shell` /
 `spark-subsubmit` / `pyspark` commands by using `kubectl exec` against the

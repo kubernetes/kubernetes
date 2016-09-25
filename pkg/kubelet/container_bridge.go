@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package kubelet
 
 import (
 	"bytes"
+	"fmt"
 	"net"
 	"os"
 	"os/exec"
@@ -25,11 +26,14 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/iptables"
+	"k8s.io/kubernetes/pkg/util/procfs"
+	"syscall"
 )
 
 var cidrRegexp = regexp.MustCompile(`inet ([0-9a-fA-F.:]*/[0-9]*)`)
 
-func createCBR0(wantCIDR *net.IPNet) error {
+func createCBR0(wantCIDR *net.IPNet, babysitDaemons bool) error {
 	// recreate cbr0 with wantCIDR
 	if err := exec.Command("brctl", "addbr", "cbr0").Run(); err != nil {
 		glog.Error(err)
@@ -43,10 +47,19 @@ func createCBR0(wantCIDR *net.IPNet) error {
 		glog.Error(err)
 		return err
 	}
-	// restart docker
+	// Stop docker so that babysitter process can restart it again with proper configurations and
+	// checkpoint file (https://github.com/docker/docker/issues/18283). It is safe to kill docker
+	// process here since CIDR can be changed only once for a given node object, and node is marked
+	// as NotReady until the docker daemon is restarted with the newly configured custom bridge.
+	// TODO (dawnchen): Remove this once corrupted checkpoint issue is fixed.
+	//
 	// For now just log the error. The containerRuntime check will catch docker failures.
 	// TODO (dawnchen) figure out what we should do for rkt here.
-	if util.UsingSystemdInitSystem() {
+	if babysitDaemons {
+		if err := procfs.PKill("docker", syscall.SIGKILL); err != nil {
+			glog.Error(err)
+		}
+	} else if util.UsingSystemdInitSystem() {
 		if err := exec.Command("systemctl", "restart", "docker").Run(); err != nil {
 			glog.Error(err)
 		}
@@ -59,14 +72,14 @@ func createCBR0(wantCIDR *net.IPNet) error {
 	return nil
 }
 
-func ensureCbr0(wantCIDR *net.IPNet) error {
+func ensureCbr0(wantCIDR *net.IPNet, promiscuous, babysitDaemons bool) error {
 	exists, err := cbr0Exists()
 	if err != nil {
 		return err
 	}
 	if !exists {
 		glog.V(2).Infof("CBR0 doesn't exist, attempting to create it with range: %s", wantCIDR)
-		return createCBR0(wantCIDR)
+		return createCBR0(wantCIDR, babysitDaemons)
 	}
 	if !cbr0CidrCorrect(wantCIDR) {
 		glog.V(2).Infof("Attempting to recreate cbr0 with address range: %s", wantCIDR)
@@ -80,7 +93,20 @@ func ensureCbr0(wantCIDR *net.IPNet) error {
 			glog.Error(err)
 			return err
 		}
-		return createCBR0(wantCIDR)
+		if err := createCBR0(wantCIDR, babysitDaemons); err != nil {
+			glog.Error(err)
+			return err
+		}
+	}
+	// Put the container bridge into promiscuous mode to force it to accept hairpin packets.
+	// TODO: Remove this once the kernel bug (#20096) is fixed.
+	if promiscuous {
+		// Checking if the bridge is in promiscuous mode is as expensive and more brittle than
+		// simply setting the flag every time.
+		if err := exec.Command("ip", "link", "set", "cbr0", "promisc", "on").Run(); err != nil {
+			glog.Error(err)
+			return err
+		}
 	}
 	return nil
 }
@@ -118,27 +144,17 @@ func cbr0CidrCorrect(wantCIDR *net.IPNet) bool {
 	return wantCIDR.IP.Equal(cbr0IP) && bytes.Equal(wantCIDR.Mask, cbr0CIDR.Mask)
 }
 
-// TODO(dawnchen): Using pkg/util/iptables
-func ensureIPTablesMasqRule() error {
-	// Check if the MASQUERADE rule exist or not
-	if err := exec.Command("iptables",
-		"-t", "nat",
-		"-C", "POSTROUTING",
-		"!", "-d", "10.0.0.0/8",
+// nonMasqueradeCIDR is the CIDR for our internal IP range; traffic to IPs
+// outside this range will use IP masquerade.
+func ensureIPTablesMasqRule(client iptables.Interface, nonMasqueradeCIDR string) error {
+	if _, err := client.EnsureRule(iptables.Append, iptables.TableNAT,
+		iptables.ChainPostrouting,
+		"-m", "comment", "--comment", "kubelet: SNAT outbound cluster traffic",
 		"-m", "addrtype", "!", "--dst-type", "LOCAL",
-		"-j", "MASQUERADE").Run(); err == nil {
-		// The MASQUERADE rule exists
-		return nil
-	}
-
-	glog.Infof("MASQUERADE rule doesn't exist, recreate it")
-	if err := exec.Command("iptables",
-		"-t", "nat",
-		"-A", "POSTROUTING",
-		"!", "-d", "10.0.0.0/8",
-		"-m", "addrtype", "!", "--dst-type", "LOCAL",
-		"-j", "MASQUERADE").Run(); err != nil {
-		return err
+		"!", "-d", nonMasqueradeCIDR,
+		"-j", "MASQUERADE"); err != nil {
+		return fmt.Errorf("Failed to ensure masquerading for %s chain %s: %v",
+			iptables.TableNAT, iptables.ChainPostrouting, err)
 	}
 	return nil
 }

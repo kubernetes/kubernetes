@@ -1,0 +1,134 @@
+/*
+Copyright 2016 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package poddisruptionbudget
+
+import (
+	"testing"
+
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apis/policy"
+	"k8s.io/kubernetes/pkg/util/intstr"
+)
+
+func TestPodDisruptionBudgetStrategy(t *testing.T) {
+	ctx := api.NewDefaultContext()
+	if !Strategy.NamespaceScoped() {
+		t.Errorf("PodDisruptionBudget must be namespace scoped")
+	}
+	if Strategy.AllowCreateOnUpdate() {
+		t.Errorf("PodDisruptionBudget should not allow create on update")
+	}
+
+	validSelector := map[string]string{"a": "b"}
+	pdb := &policy.PodDisruptionBudget{
+		ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+		Spec: policy.PodDisruptionBudgetSpec{
+			MinAvailable: intstr.FromInt(3),
+			Selector:     &unversioned.LabelSelector{MatchLabels: validSelector},
+		},
+	}
+
+	Strategy.PrepareForCreate(ctx, pdb)
+	errs := Strategy.Validate(ctx, pdb)
+	if len(errs) != 0 {
+		t.Errorf("Unexpected error validating %v", errs)
+	}
+
+	newPdb := &policy.PodDisruptionBudget{
+		ObjectMeta: api.ObjectMeta{Name: pdb.Name, Namespace: pdb.Namespace},
+		Spec:       pdb.Spec,
+		Status: policy.PodDisruptionBudgetStatus{
+			PodDisruptionAllowed: true,
+			CurrentHealthy:       3,
+			DesiredHealthy:       3,
+			ExpectedPods:         3,
+		},
+	}
+
+	// Nothing in Spec changes: OK
+	Strategy.PrepareForUpdate(ctx, newPdb, pdb)
+	errs = Strategy.ValidateUpdate(ctx, newPdb, pdb)
+	if len(errs) != 0 {
+		t.Errorf("Unexpected error updating PodDisruptionBudget.")
+	}
+
+	// Changing the selector?  No.
+	newPdb.Spec.Selector = &unversioned.LabelSelector{MatchLabels: map[string]string{"a": "bar"}}
+	Strategy.PrepareForUpdate(ctx, newPdb, pdb)
+	errs = Strategy.ValidateUpdate(ctx, newPdb, pdb)
+	if len(errs) == 0 {
+		t.Errorf("Expected a validation error since updates are disallowed on poddisruptionbudgets.")
+	}
+	newPdb.Spec.Selector = pdb.Spec.Selector
+
+	// Changing MinAvailable?  Also no.
+	newPdb.Spec.MinAvailable = intstr.FromString("28%")
+	Strategy.PrepareForUpdate(ctx, newPdb, pdb)
+	errs = Strategy.ValidateUpdate(ctx, newPdb, pdb)
+	if len(errs) == 0 {
+		t.Errorf("Expected a validation error since updates are disallowed on poddisruptionbudgets.")
+	}
+}
+
+func TestPodDisruptionBudgetStatusStrategy(t *testing.T) {
+	ctx := api.NewDefaultContext()
+	if !StatusStrategy.NamespaceScoped() {
+		t.Errorf("PodDisruptionBudgetStatus must be namespace scoped")
+	}
+	if StatusStrategy.AllowCreateOnUpdate() {
+		t.Errorf("PodDisruptionBudgetStatus should not allow create on update")
+	}
+	validSelector := map[string]string{"a": "b"}
+	oldPdb := &policy.PodDisruptionBudget{
+		ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault, ResourceVersion: "10"},
+		Spec: policy.PodDisruptionBudgetSpec{
+			Selector:     &unversioned.LabelSelector{MatchLabels: validSelector},
+			MinAvailable: intstr.FromInt(3),
+		},
+		Status: policy.PodDisruptionBudgetStatus{
+			PodDisruptionAllowed: true,
+			CurrentHealthy:       3,
+			DesiredHealthy:       3,
+			ExpectedPods:         3,
+		},
+	}
+	newPdb := &policy.PodDisruptionBudget{
+		ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault, ResourceVersion: "9"},
+		Spec: policy.PodDisruptionBudgetSpec{
+			Selector:     &unversioned.LabelSelector{MatchLabels: validSelector},
+			MinAvailable: intstr.FromInt(2),
+		},
+		Status: policy.PodDisruptionBudgetStatus{
+			PodDisruptionAllowed: false,
+			CurrentHealthy:       2,
+			DesiredHealthy:       3,
+			ExpectedPods:         3,
+		},
+	}
+	StatusStrategy.PrepareForUpdate(ctx, newPdb, oldPdb)
+	if newPdb.Status.CurrentHealthy != 2 {
+		t.Errorf("PodDisruptionBudget status updates should allow change of CurrentHealthy: %v", newPdb.Status.CurrentHealthy)
+	}
+	if newPdb.Spec.MinAvailable.IntValue() != 3 {
+		t.Errorf("PodDisruptionBudget status updates should not clobber spec: %v", newPdb.Spec)
+	}
+	errs := StatusStrategy.ValidateUpdate(ctx, newPdb, oldPdb)
+	if len(errs) != 0 {
+		t.Errorf("Unexpected error %v", errs)
+	}
+}

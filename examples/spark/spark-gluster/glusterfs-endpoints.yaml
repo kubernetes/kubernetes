@@ -2,6 +2,7 @@ kind: Endpoints
 apiVersion: v1
 metadata:
   name: glusterfs-cluster
+  namespace: spark-cluster
 subsets:
   - addresses:
       - ip: 192.168.30.104

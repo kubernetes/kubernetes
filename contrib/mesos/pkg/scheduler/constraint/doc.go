@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,4 +18,4 @@ limitations under the License.
 // Incomplete.
 // TODO(jdef) We need better alignment between k8s-mesos and k8s scheduling
 // constraints (read: a common constraints API).
-package constraint
+package constraint // import "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/constraint"

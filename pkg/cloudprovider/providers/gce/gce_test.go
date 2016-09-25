@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,8 +22,17 @@ import (
 )
 
 func TestGetRegion(t *testing.T) {
+	zoneName := "us-central1-b"
+	regionName, err := GetGCERegion(zoneName)
+	if err != nil {
+		t.Fatalf("unexpected error from GetGCERegion: %v", err)
+	}
+	if regionName != "us-central1" {
+		t.Errorf("Unexpected region from GetGCERegion: %s", regionName)
+	}
 	gce := &GCECloud{
-		zone: "us-central1-b",
+		localZone: zoneName,
+		region:    regionName,
 	}
 	zones, ok := gce.Zones()
 	if !ok {
@@ -91,7 +100,11 @@ func TestComparingHostURLs(t *testing.T) {
 
 	for _, test := range tests {
 		link1 := hostURLToComparablePath(test.host1)
-		link2 := makeComparableHostPath(test.zone, test.name)
+		testInstance := &gceInstance{
+			Name: canonicalizeInstanceName(test.name),
+			Zone: test.zone,
+		}
+		link2 := testInstance.makeComparableHostPath()
 		if test.expectEqual && link1 != link2 {
 			t.Errorf("expected link1 and link2 to be equal, got %s and %s", link1, link2)
 		} else if !test.expectEqual && link1 == link2 {
@@ -133,5 +146,15 @@ func TestScrubDNS(t *testing.T) {
 		if !reflect.DeepEqual(s, tcs[i].searchesOut) {
 			t.Errorf("Expected %v, got %v", tcs[i].searchesOut, s)
 		}
+	}
+}
+
+func TestCreateFirewallFails(t *testing.T) {
+	name := "loadbalancer"
+	region := "us-central1"
+	desc := "description"
+	gce := &GCECloud{}
+	if err := gce.createFirewall(name, region, desc, nil, nil, nil); err == nil {
+		t.Errorf("error expected when creating firewall without any tags found")
 	}
 }

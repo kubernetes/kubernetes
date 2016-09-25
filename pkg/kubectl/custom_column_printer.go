@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,7 +26,6 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/jsonpath"
@@ -74,7 +73,7 @@ func massageJSONPath(pathExpression string) (string, error) {
 //
 //      NAME               API_VERSION
 //      foo                bar
-func NewCustomColumnsPrinterFromSpec(spec string) (*CustomColumnsPrinter, error) {
+func NewCustomColumnsPrinterFromSpec(spec string, decoder runtime.Decoder, noHeaders bool) (*CustomColumnsPrinter, error) {
 	if len(spec) == 0 {
 		return nil, fmt.Errorf("custom-columns format specified but no custom columns given")
 	}
@@ -91,7 +90,7 @@ func NewCustomColumnsPrinterFromSpec(spec string) (*CustomColumnsPrinter, error)
 		}
 		columns[ix] = Column{Header: colSpec[0], FieldSpec: spec}
 	}
-	return &CustomColumnsPrinter{Columns: columns}, nil
+	return &CustomColumnsPrinter{Columns: columns, Decoder: decoder, NoHeaders: noHeaders}, nil
 }
 
 func splitOnWhitespace(line string) []string {
@@ -106,10 +105,10 @@ func splitOnWhitespace(line string) []string {
 
 // NewCustomColumnsPrinterFromTemplate creates a custom columns printer from a template stream.  The template is expected
 // to consist of two lines, whitespace separated.  The first line is the header line, the second line is the jsonpath field spec
-// For example the template below:
+// For example, the template below:
 // NAME               API_VERSION
 // {metadata.name}    {apiVersion}
-func NewCustomColumnsPrinterFromTemplate(templateReader io.Reader) (*CustomColumnsPrinter, error) {
+func NewCustomColumnsPrinterFromTemplate(templateReader io.Reader, decoder runtime.Decoder) (*CustomColumnsPrinter, error) {
 	scanner := bufio.NewScanner(templateReader)
 	if !scanner.Scan() {
 		return nil, fmt.Errorf("invalid template, missing header line. Expected format is one line of space separated headers, one line of space separated column specs.")
@@ -136,7 +135,7 @@ func NewCustomColumnsPrinterFromTemplate(templateReader io.Reader) (*CustomColum
 			FieldSpec: spec,
 		}
 	}
-	return &CustomColumnsPrinter{Columns: columns}, nil
+	return &CustomColumnsPrinter{Columns: columns, Decoder: decoder, NoHeaders: false}, nil
 }
 
 // Column represents a user specified column
@@ -151,16 +150,25 @@ type Column struct {
 // CustomColumnPrinter is a printer that knows how to print arbitrary columns
 // of data from templates specified in the `Columns` array
 type CustomColumnsPrinter struct {
-	Columns []Column
+	Columns   []Column
+	Decoder   runtime.Decoder
+	NoHeaders bool
+}
+
+func (s *CustomColumnsPrinter) AfterPrint(w io.Writer, res string) error {
+	return nil
 }
 
 func (s *CustomColumnsPrinter) PrintObj(obj runtime.Object, out io.Writer) error {
 	w := tabwriter.NewWriter(out, columnwidth, tabwidth, padding, padding_character, flags)
-	headers := make([]string, len(s.Columns))
-	for ix := range s.Columns {
-		headers[ix] = s.Columns[ix].Header
+
+	if !s.NoHeaders {
+		headers := make([]string, len(s.Columns))
+		for ix := range s.Columns {
+			headers[ix] = s.Columns[ix].Header
+		}
+		fmt.Fprintln(w, strings.Join(headers, "\t"))
 	}
-	fmt.Fprintln(w, strings.Join(headers, "\t"))
 	parsers := make([]*jsonpath.JSONPath, len(s.Columns))
 	for ix := range s.Columns {
 		parsers[ix] = jsonpath.New(fmt.Sprintf("column%d", ix))
@@ -191,9 +199,11 @@ func (s *CustomColumnsPrinter) printOneObject(obj runtime.Object, parsers []*jso
 	columns := make([]string, len(parsers))
 	switch u := obj.(type) {
 	case *runtime.Unknown:
-		var err error
-		if obj, err = api.Codec.Decode(u.RawJSON); err != nil {
-			return err
+		if len(u.Raw) > 0 {
+			var err error
+			if obj, err = runtime.Decode(s.Decoder, u.Raw); err != nil {
+				return fmt.Errorf("can't decode object for printing: %v (%s)", err, u.Raw)
+			}
 		}
 	}
 	for ix := range parsers {

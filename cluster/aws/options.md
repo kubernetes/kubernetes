@@ -38,9 +38,8 @@ export MASTER_SIZE=c4.large
 export NODE_SIZE=r3.large
 ```
 
-If you don't specify master and minion sizes, the scripts will attempt to guess the correct size of the master and worker nodes based on `${NUM_NODES}`.
-In particular for clusters less than 50 nodes it will 
-use a `t2.micro` for clusters between 50 and 150 nodes it will use a `t2.small` and for clusters with greater than 150 nodes it will use a `t2.medium`.
+If you don't specify master and minion sizes, the scripts will attempt to guess the correct size of the master and worker
+nodes based on `${NUM_NODES}`. See [Getting started on AWS EC2](../../docs/getting-started-guides/aws.md) for details.
 
 Please note: `kube-up` utilizes ephemeral storage available on instances for docker storage. EBS-only instance types do not
 support ephemeral storage and will default to docker storage on the root disk which is usually only 8GB.
@@ -80,13 +79,79 @@ If your machines don't have any ephemeral disks, this will default to the aufs d
 
 **KUBE_OS_DISTRIBUTION**
 
-The distribution to use.  Valid options: `trusty`, `vivid`, `coreos`, `wheezy`, `jessie`
+The distribution to use.  Defaults to `jessie`
 
-Defaults to vivid (Ubuntu Vivid Vervet), which has a modern kernel and does not require updating or a reboot.
+Supported options:
 
-`coreos` is also a good option.
+* `jessie`: Debian Jessie, running a custom kubernetes-optimized image.  Should
+  be supported until 2018 by the debian-security team, and until 2020 by the
+  debian-LTS team.
+* `wily`: Ubuntu Wily.  Wily is not an LTS release, and OS support is due to
+  end in July 2016.
 
-Other options may require reboots, updates or configuration, and should be used only if you have a compelling
-requirement to do so.
+No longer supported as of 1.3:
+
+* `vivid`: Ubuntu Vivid.  Vivid OS support ended in early February 2016.
+  Docker no longer provides packages for vivid.
+
+Given the support situation, we recommend using Debian Jessie.  In Kubernetes
+1.3 Ubuntu should have their next LTS release out, so we should be able to
+recommend Ubuntu again at that time.
+
+Using kube-up with other operating systems is neither supported nor
+recommended.  But we would welcome increased OS support for kube-up, so please
+contribute!
+
+**NON_MASQUERADE_CIDR**
+
+The 'internal' IP range which Kubernetes will use, which will therefore not
+use IP masquerade.  By default kubernetes runs an internal network for traffic
+between pods (and between pods and services), and by default this uses the
+`10.0.0.0/8` range.  However, this sometimes overlaps with a range that you may
+want to use; in particular the range cannot be used with EC2 ClassicLink.  You
+may also want to run kubernetes in an existing VPC where you have chosen a CIDR
+in the `10.0.0.0/8` range.
+
+Setting this flag allows you to change this internal network CIDR.  Note that
+you must set other values consistently within the CIDR that you choose.
+
+For example, you might choose `172.16.0.0/14`; and you could then choose to
+configure like this:
+
+```
+export NON_MASQUERADE_CIDR="172.16.0.0/14"
+export SERVICE_CLUSTER_IP_RANGE="172.16.0.0/16"
+export DNS_SERVER_IP="172.16.0.10"
+export MASTER_IP_RANGE="172.17.0.0/24"
+export CLUSTER_IP_RANGE="172.18.0.0/16"
+```
+
+When choosing a CIDR in the 172.20/12 reserved range you should be careful not
+to choose a CIDR that overlaps your VPC CIDR (the kube-up script sets the VPC
+CIDR to 172.20.0.0/16 by default, so you should not overlap that).  If you want
+to allow inter-VPC traffic you should be careful to avoid your other VPCs as
+well.
+
+There is also a 100.64/10 address block which is reserved for "Carrier Grade
+NAT", and which some users have reported success using.  While we haven't seen
+any problems, or conflicts with any AWS networks, we can't guarantee it.  If you
+decide you are comfortable using 100.64, you might use:
+
+```
+export NON_MASQUERADE_CIDR="100.64.0.0/10"
+export SERVICE_CLUSTER_IP_RANGE="100.64.0.0/16"
+export DNS_SERVER_IP="100.64.0.10"
+export MASTER_IP_RANGE="100.65.0.0/24"
+export CLUSTER_IP_RANGE="100.66.0.0/16"
+```
+
+**KUBE_VPC_CIDR_BASE**
+
+By default `kube-up.sh` will create a VPC with CIDR 172.20.0.0/16. `KUBE_VPC_CIDR_BASE` allows to configure
+this CIDR. For example you may choose to use `172.21.0.0/16`:
+
+```
+export KUBE_VPC_CIDR_BASE=172.21
+```
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/cluster/aws/options.md?pixel)]()

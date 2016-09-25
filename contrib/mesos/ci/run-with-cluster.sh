@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 The Kubernetes Authors All rights reserved.
+# Copyright 2015 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -56,7 +56,7 @@ echo "${DOCKER_BIN_PATH}"
 
 # Clean (k8s output & images), Build, Kube-Up, Test, Kube-Down
 cd "${KUBE_ROOT}"
-exec docker run \
+docker run \
   --rm \
   -v "${KUBE_ROOT}:/go/src/github.com/GoogleCloudPlatform/kubernetes" \
   -v "/var/run/docker.sock:/var/run/docker.sock" \
@@ -67,6 +67,7 @@ exec docker run \
   -v "${MESOS_DOCKER_WORK_DIR}/mesosslave2/mesos:${MESOS_DOCKER_WORK_DIR}/mesosslave2/mesos" \
   -v "${MESOS_DOCKER_WORK_DIR}/overlay:${MESOS_DOCKER_WORK_DIR}/overlay" \
   -v "${MESOS_DOCKER_WORK_DIR}/reports:${MESOS_DOCKER_WORK_DIR}/reports" \
+  $(test -d /teamcity/system/git && echo "-v /teamcity/system/git:/teamcity/system/git" || true) \
   -e "MESOS_DOCKER_WORK_DIR=${MESOS_DOCKER_WORK_DIR}" \
   -e "MESOS_DOCKER_IMAGE_DIR=/var/tmp/kubernetes" \
   -e "MESOS_DOCKER_OVERLAY_DIR=${MESOS_DOCKER_WORK_DIR}/overlay" \

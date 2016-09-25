@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -40,13 +40,13 @@ func JSONKeyMapper(key string, sourceTag, destTag reflect.StructTag) (string, st
 
 // DefaultStringConversions are helpers for converting []string and string to real values.
 var DefaultStringConversions = []interface{}{
-	convertStringSliceToString,
-	convertStringSliceToInt,
-	convertStringSliceToBool,
-	convertStringSliceToInt64,
+	Convert_Slice_string_To_string,
+	Convert_Slice_string_To_int,
+	Convert_Slice_string_To_bool,
+	Convert_Slice_string_To_int64,
 }
 
-func convertStringSliceToString(input *[]string, out *string, s conversion.Scope) error {
+func Convert_Slice_string_To_string(input *[]string, out *string, s conversion.Scope) error {
 	if len(*input) == 0 {
 		*out = ""
 	}
@@ -54,7 +54,7 @@ func convertStringSliceToString(input *[]string, out *string, s conversion.Scope
 	return nil
 }
 
-func convertStringSliceToInt(input *[]string, out *int, s conversion.Scope) error {
+func Convert_Slice_string_To_int(input *[]string, out *int, s conversion.Scope) error {
 	if len(*input) == 0 {
 		*out = 0
 	}
@@ -67,10 +67,10 @@ func convertStringSliceToInt(input *[]string, out *int, s conversion.Scope) erro
 	return nil
 }
 
-// converStringSliceToBool will convert a string parameter to boolean.
+// Conver_Slice_string_To_bool will convert a string parameter to boolean.
 // Only the absence of a value, a value of "false", or a value of "0" resolve to false.
 // Any other value (including empty string) resolves to true.
-func convertStringSliceToBool(input *[]string, out *bool, s conversion.Scope) error {
+func Convert_Slice_string_To_bool(input *[]string, out *bool, s conversion.Scope) error {
 	if len(*input) == 0 {
 		*out = false
 		return nil
@@ -84,7 +84,7 @@ func convertStringSliceToBool(input *[]string, out *bool, s conversion.Scope) er
 	return nil
 }
 
-func convertStringSliceToInt64(input *[]string, out *int64, s conversion.Scope) error {
+func Convert_Slice_string_To_int64(input *[]string, out *int64, s conversion.Scope) error {
 	if len(*input) == 0 {
 		*out = 0
 	}

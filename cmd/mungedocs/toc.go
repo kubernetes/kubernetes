@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -51,6 +51,7 @@ func updateTOC(filePath string, mlines mungeLines) (mungeLines, error) {
 
 func buildTOC(mlines mungeLines) mungeLines {
 	var out mungeLines
+	bookmarks := map[string]int{}
 
 	for _, mline := range mlines {
 		if mline.preformatted || !mline.header {
@@ -69,6 +70,12 @@ func buildTOC(mlines mungeLines) mungeLines {
 			bookmark := strings.Replace(strings.ToLower(heading), " ", "-", -1)
 			// remove symbols (except for -) in bookmarks
 			bookmark = r.ReplaceAllString(bookmark, "")
+			// Incremental counter for duplicate bookmarks
+			next := bookmarks[bookmark]
+			bookmarks[bookmark] = next + 1
+			if next > 0 {
+				bookmark = fmt.Sprintf("%s-%d", bookmark, next)
+			}
 			tocLine := fmt.Sprintf("%s- [%s](#%s)", indent, heading, bookmark)
 			out = append(out, newMungeLine(tocLine))
 		}

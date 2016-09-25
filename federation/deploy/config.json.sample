@@ -1,0 +1,83 @@
+[
+  {
+    "phase1": {
+      "num_nodes": 3,
+      "cluster_name": "cluster1-kubernetes",
+      "cloud_provider": "gce",
+      "cluster_cidr": "10.180.0.0/14",
+      "gce": {
+        "os_image": "ubuntu-1604-xenial-v20160420c",
+        "instance_type": "n1-standard-2",
+        "project": "",
+        "region": "us-central1",
+        "zone": "us-central1-a",
+        "network": "federation"
+      }
+    },
+    "phase2": {
+      "docker_registry": "gcr.io/google-containers",
+      "kubernetes_version": "v1.4.0"
+    },
+    "phase3": {
+      "run_addons": true,
+      "kube_proxy": true,
+      "dashboard": true,
+      "heapster": true,
+      "kube_dns": true
+    }
+  },
+  {
+    "phase1": {
+      "num_nodes": 3,
+      "cluster_name": "cluster2-kubernetes",
+      "cloud_provider": "gce",
+      "cluster_cidr": "10.184.0.0/14",
+      "gce": {
+        "os_image": "ubuntu-1604-xenial-v20160420c",
+        "instance_type": "n1-standard-2",
+        "project": "",
+        "region": "us-central1",
+        "zone": "us-central1-b",
+        "network": "federation"
+      }
+    },
+    "phase2": {
+      "docker_registry": "gcr.io/google-containers",
+      "kubernetes_version": "v1.4.0"
+    },
+    "phase3": {
+      "run_addons": true,
+      "kube_proxy": true,
+      "dashboard": true,
+      "heapster": true,
+      "kube_dns": true
+    }
+  },
+  {
+    "phase1": {
+      "num_nodes": 3,
+      "cluster_name": "cluster3-kubernetes",
+      "cloud_provider": "gce",
+      "cluster_cidr": "10.188.0.0/14",
+      "gce": {
+        "os_image": "ubuntu-1604-xenial-v20160420c",
+        "instance_type": "n1-standard-2",
+        "project": "",
+        "region": "us-central1",
+        "zone": "us-central1-f",
+        "network": "federation"
+      }
+    },
+    "phase2": {
+      "docker_registry": "gcr.io/google-containers",
+      "kubernetes_version": "v1.4.0"
+    },
+    "phase3": {
+      "run_addons": true,
+      "kube_proxy": true,
+      "dashboard": true,
+      "heapster": true,
+      "kube_dns": true
+    }
+  }
+]

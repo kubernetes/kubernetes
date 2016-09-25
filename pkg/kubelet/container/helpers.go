@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,53 +20,65 @@ import (
 	"hash/adler32"
 	"strings"
 
+	"github.com/golang/glog"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/record"
+	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
-	"k8s.io/kubernetes/third_party/golang/expansion"
-
-	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/types"
+	hashutil "k8s.io/kubernetes/pkg/util/hash"
+	"k8s.io/kubernetes/third_party/forked/golang/expansion"
 )
 
 // HandlerRunner runs a lifecycle handler for a container.
 type HandlerRunner interface {
-	Run(containerID ContainerID, pod *api.Pod, container *api.Container, handler *api.Handler) error
+	Run(containerID ContainerID, pod *api.Pod, container *api.Container, handler *api.Handler) (string, error)
 }
 
-// RunContainerOptionsGenerator generates the options that necessary for
-// container runtime to run a container.
-type RunContainerOptionsGenerator interface {
-	GenerateRunContainerOptions(pod *api.Pod, container *api.Container) (*RunContainerOptions, error)
+// RuntimeHelper wraps kubelet to make container runtime
+// able to get necessary informations like the RunContainerOptions, DNS settings.
+type RuntimeHelper interface {
+	GenerateRunContainerOptions(pod *api.Pod, container *api.Container, podIP string) (*RunContainerOptions, error)
+	GetClusterDNS(pod *api.Pod) (dnsServers []string, dnsSearches []string, err error)
+	GetPodDir(podUID types.UID) string
+	GeneratePodHostNameAndDomain(pod *api.Pod) (hostname string, hostDomain string, err error)
+	// GetExtraSupplementalGroupsForPod returns a list of the extra
+	// supplemental groups for the Pod. These extra supplemental groups come
+	// from annotations on persistent volumes that the pod depends on.
+	GetExtraSupplementalGroupsForPod(pod *api.Pod) []int64
 }
 
 // ShouldContainerBeRestarted checks whether a container needs to be restarted.
 // TODO(yifan): Think about how to refactor this.
-func ShouldContainerBeRestarted(container *api.Container, pod *api.Pod, podStatus *api.PodStatus) bool {
-	podFullName := GetPodFullName(pod)
-
-	// Get all dead container status.
-	var resultStatus []*api.ContainerStatus
-	for i, containerStatus := range podStatus.ContainerStatuses {
-		if containerStatus.Name == container.Name && containerStatus.State.Terminated != nil {
-			resultStatus = append(resultStatus, &podStatus.ContainerStatuses[i])
-		}
+func ShouldContainerBeRestarted(container *api.Container, pod *api.Pod, podStatus *PodStatus) bool {
+	// Get latest container status.
+	status := podStatus.FindContainerStatusByName(container.Name)
+	// If the container was never started before, we should start it.
+	// NOTE(random-liu): If all historical containers were GC'd, we'll also return true here.
+	if status == nil {
+		return true
 	}
-
-	// Check RestartPolicy for dead container.
-	if len(resultStatus) > 0 {
-		if pod.Spec.RestartPolicy == api.RestartPolicyNever {
-			glog.V(4).Infof("Already ran container %q of pod %q, do nothing", container.Name, podFullName)
+	// Check whether container is running
+	if status.State == ContainerStateRunning {
+		return false
+	}
+	// Always restart container in unknown state now
+	if status.State == ContainerStateUnknown {
+		return true
+	}
+	// Check RestartPolicy for dead container
+	if pod.Spec.RestartPolicy == api.RestartPolicyNever {
+		glog.V(4).Infof("Already ran container %q of pod %q, do nothing", container.Name, format.Pod(pod))
+		return false
+	}
+	if pod.Spec.RestartPolicy == api.RestartPolicyOnFailure {
+		// Check the exit code.
+		if status.ExitCode == 0 {
+			glog.V(4).Infof("Already successfully ran container %q of pod %q, do nothing", container.Name, format.Pod(pod))
 			return false
-		}
-		if pod.Spec.RestartPolicy == api.RestartPolicyOnFailure {
-			// Check the exit code of last run. Note: This assumes the result is sorted
-			// by the created time in reverse order.
-			if resultStatus[0].State.Terminated.ExitCode == 0 {
-				glog.V(4).Infof("Already successfully ran container %q of pod %q, do nothing", container.Name, podFullName)
-				return false
-			}
 		}
 	}
 	return true
@@ -76,7 +88,7 @@ func ShouldContainerBeRestarted(container *api.Container, pod *api.Pod, podStatu
 // the running container with its desired spec.
 func HashContainer(container *api.Container) uint64 {
 	hash := adler32.New()
-	util.DeepHashObject(hash, *container)
+	hashutil.DeepHashObject(hash, *container)
 	return uint64(hash.Sum32())
 }
 
@@ -149,4 +161,56 @@ func (irecorder *innerEventRecorder) PastEventf(object runtime.Object, timestamp
 	if ref, ok := irecorder.shouldRecordEvent(object); ok {
 		irecorder.recorder.PastEventf(ref, timestamp, eventtype, reason, messageFmt, args...)
 	}
+}
+
+// Pod must not be nil.
+func IsHostNetworkPod(pod *api.Pod) bool {
+	return pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.HostNetwork
+}
+
+// TODO(random-liu): Convert PodStatus to running Pod, should be deprecated soon
+func ConvertPodStatusToRunningPod(runtimeName string, podStatus *PodStatus) Pod {
+	runningPod := Pod{
+		ID:        podStatus.ID,
+		Name:      podStatus.Name,
+		Namespace: podStatus.Namespace,
+	}
+	for _, containerStatus := range podStatus.ContainerStatuses {
+		if containerStatus.State != ContainerStateRunning {
+			continue
+		}
+		container := &Container{
+			ID:      containerStatus.ID,
+			Name:    containerStatus.Name,
+			Image:   containerStatus.Image,
+			ImageID: containerStatus.ImageID,
+			Hash:    containerStatus.Hash,
+			State:   containerStatus.State,
+		}
+		runningPod.Containers = append(runningPod.Containers, container)
+	}
+
+	// Populate sandboxes in kubecontainer.Pod
+	for _, sandbox := range podStatus.SandboxStatuses {
+		runningPod.Sandboxes = append(runningPod.Sandboxes, &Container{
+			ID:    ContainerID{Type: runtimeName, ID: *sandbox.Id},
+			State: SandboxToContainerState(*sandbox.State),
+		})
+	}
+	return runningPod
+}
+
+// sandboxToContainerState converts runtimeApi.PodSandboxState to
+// kubecontainer.ContainerState.
+// This is only needed because we need to return sandboxes as if they were
+// kubecontainer.Containers to avoid substantial changes to PLEG.
+// TODO: Remove this once it becomes obsolete.
+func SandboxToContainerState(state runtimeApi.PodSandBoxState) ContainerState {
+	switch state {
+	case runtimeApi.PodSandBoxState_READY:
+		return ContainerStateRunning
+	case runtimeApi.PodSandBoxState_NOTREADY:
+		return ContainerStateExited
+	}
+	return ContainerStateUnknown
 }

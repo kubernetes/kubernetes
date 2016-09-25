@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,14 +25,14 @@ import (
 
 	"github.com/golang/glog"
 
-	"k8s.io/kubernetes/pkg/util"
-	"k8s.io/kubernetes/third_party/golang/netutil"
+	utilnet "k8s.io/kubernetes/pkg/util/net"
+	"k8s.io/kubernetes/third_party/forked/golang/netutil"
 )
 
 func DialURL(url *url.URL, transport http.RoundTripper) (net.Conn, error) {
 	dialAddr := netutil.CanonicalAddr(url)
 
-	dialer, _ := util.Dialer(transport)
+	dialer, _ := utilnet.Dialer(transport)
 
 	switch url.Scheme {
 	case "http":
@@ -45,7 +45,7 @@ func DialURL(url *url.URL, transport http.RoundTripper) (net.Conn, error) {
 		var tlsConfig *tls.Config
 		var tlsConn *tls.Conn
 		var err error
-		tlsConfig, _ = util.TLSClientConfig(transport)
+		tlsConfig, _ = utilnet.TLSClientConfig(transport)
 
 		if dialer != nil {
 			// We have a dialer; use it to open the connection, then
@@ -69,9 +69,9 @@ func DialURL(url *url.URL, transport http.RoundTripper) (net.Conn, error) {
 					inferredHost = host
 				}
 				// Make a copy to avoid polluting the provided config
-				tlsConfigCopy := *tlsConfig
+				tlsConfigCopy := utilnet.CloneTLSConfig(tlsConfig)
 				tlsConfigCopy.ServerName = inferredHost
-				tlsConfig = &tlsConfigCopy
+				tlsConfig = tlsConfigCopy
 			}
 			tlsConn = tls.Client(netConn, tlsConfig)
 			if err := tlsConn.Handshake(); err != nil {

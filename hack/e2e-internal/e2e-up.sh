@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 The Kubernetes Authors All rights reserved.
+# Copyright 2015 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,16 +20,37 @@ set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 
-: ${KUBE_VERSION_ROOT:=${KUBE_ROOT}}
-: ${KUBECTL:=${KUBE_VERSION_ROOT}/cluster/kubectl.sh}
+: ${KUBECTL:=${KUBE_ROOT}/cluster/kubectl.sh}
 : ${KUBE_CONFIG_FILE:="config-test.sh"}
 
 export KUBECTL KUBE_CONFIG_FILE
 
-source "${KUBE_ROOT}/cluster/kube-env.sh"
-source "${KUBE_VERSION_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh"
+source "${KUBE_ROOT}/cluster/kube-util.sh"
 
 prepare-e2e
 
-"${KUBE_VERSION_ROOT}/cluster/kube-up.sh"
-test-setup
+if [[ "${FEDERATION:-}" == "true" ]]; then
+    cur_ip_octet2=180
+    # TODO(colhom): the last cluster that was created in the loop above is the current context.
+    # Hence, it will be the cluster that hosts the federated components.
+    # In the future, we will want to loop through the all the federated contexts,
+    # select each one and call federated-up
+    for zone in ${E2E_ZONES};do
+        (
+        export CLUSTER_IP_RANGE="10.${cur_ip_octet2}.0.0/16"
+        set-federation-zone-vars "$zone"
+        test-setup
+        )
+        cur_ip_octet2="$((cur_ip_octet2 + 1))"
+    done
+    tagfile="${KUBE_ROOT}/federation/manifests/federated-image.tag"
+    if [[ ! -f "$tagfile" ]]; then
+        echo "FATAL: tagfile ${tagfile} does not exist. Make sure that you have run build/push-federation-images.sh"
+        exit 1
+    fi
+    export FEDERATION_IMAGE_TAG="$(cat "${KUBE_ROOT}/federation/manifests/federated-image.tag")"
+
+    "${KUBE_ROOT}/federation/cluster/federation-up.sh"
+else
+    test-setup
+fi

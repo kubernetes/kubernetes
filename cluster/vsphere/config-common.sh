@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2014 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,15 +14,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-SSH_OPTS="-oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oLogLevel=ERROR"
+SSH_OPTS="-oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oLogLevel=ERROR -C"
 
 # These need to be set
 #export GOVC_URL=
 #export GOVC_DATACENTER=
 #export GOVC_DATASTORE=
-#export GOVC_RESOURCE_POOL=
 #export GOVC_NETWORK=
-#export GOVC_GUEST_LOGIN='kube:kube'
+#export GOVC_GUEST_LOGIN=
 
 # Set GOVC_INSECURE if the host in GOVC_URL is using a certificate that cannot
 # be verified (i.e. a self-signed certificate), but IS trusted.

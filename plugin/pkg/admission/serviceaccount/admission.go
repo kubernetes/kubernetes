@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,18 +20,20 @@ import (
 	"fmt"
 	"io"
 	"math/rand"
+	"strconv"
 	"time"
+
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/fields"
 	kubelet "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/serviceaccount"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -39,12 +41,19 @@ import (
 // DefaultServiceAccountName is the name of the default service account to set on pods which do not specify a service account
 const DefaultServiceAccountName = "default"
 
+// EnforceMountableSecretsAnnotation is a default annotation that indicates that a service account should enforce mountable secrets.
+// The value must be true to have this annotation take effect
+const EnforceMountableSecretsAnnotation = "kubernetes.io/enforce-mountable-secrets"
+
 // DefaultAPITokenMountPath is the path that ServiceAccountToken secrets are automounted to.
 // The token file would then be accessible at /var/run/secrets/kubernetes.io/serviceaccount
 const DefaultAPITokenMountPath = "/var/run/secrets/kubernetes.io/serviceaccount"
 
+// PluginName is the name of this admission plugin
+const PluginName = "ServiceAccount"
+
 func init() {
-	admission.RegisterPlugin("ServiceAccount", func(client client.Interface, config io.Reader) (admission.Interface, error) {
+	admission.RegisterPlugin(PluginName, func(client clientset.Interface, config io.Reader) (admission.Interface, error) {
 		serviceAccountAdmission := NewServiceAccount(client)
 		serviceAccountAdmission.Run()
 		return serviceAccountAdmission, nil
@@ -63,7 +72,7 @@ type serviceAccount struct {
 	// MountServiceAccountToken creates Volume and VolumeMounts for the first referenced ServiceAccountToken for the pod's service account
 	MountServiceAccountToken bool
 
-	client client.Interface
+	client clientset.Interface
 
 	serviceAccounts cache.Indexer
 	secrets         cache.Indexer
@@ -79,30 +88,30 @@ type serviceAccount struct {
 // 3. If LimitSecretReferences is true, it rejects the pod if the pod references Secret objects which the pod's ServiceAccount does not reference
 // 4. If the pod does not contain any ImagePullSecrets, the ImagePullSecrets of the service account are added.
 // 5. If MountServiceAccountToken is true, it adds a VolumeMount with the pod's ServiceAccount's api token secret to containers
-func NewServiceAccount(cl client.Interface) *serviceAccount {
+func NewServiceAccount(cl clientset.Interface) *serviceAccount {
 	serviceAccountsIndexer, serviceAccountsReflector := cache.NewNamespaceKeyedIndexerAndReflector(
 		&cache.ListWatch{
-			ListFunc: func() (runtime.Object, error) {
-				return cl.ServiceAccounts(api.NamespaceAll).List(unversioned.ListOptions{})
+			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+				return cl.Core().ServiceAccounts(api.NamespaceAll).List(options)
 			},
-			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
-				return cl.ServiceAccounts(api.NamespaceAll).Watch(options)
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+				return cl.Core().ServiceAccounts(api.NamespaceAll).Watch(options)
 			},
 		},
 		&api.ServiceAccount{},
 		0,
 	)
 
-	tokenSelector := fields.SelectorFromSet(map[string]string{client.SecretType: string(api.SecretTypeServiceAccountToken)})
+	tokenSelector := fields.SelectorFromSet(map[string]string{api.SecretTypeField: string(api.SecretTypeServiceAccountToken)})
 	secretsIndexer, secretsReflector := cache.NewNamespaceKeyedIndexerAndReflector(
 		&cache.ListWatch{
-			ListFunc: func() (runtime.Object, error) {
-				options := unversioned.ListOptions{FieldSelector: unversioned.FieldSelector{tokenSelector}}
-				return cl.Secrets(api.NamespaceAll).List(options)
+			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+				options.FieldSelector = tokenSelector
+				return cl.Core().Secrets(api.NamespaceAll).List(options)
 			},
-			WatchFunc: func(options unversioned.ListOptions) (watch.Interface, error) {
-				options.FieldSelector.Selector = tokenSelector
-				return cl.Secrets(api.NamespaceAll).Watch(options)
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+				options.FieldSelector = tokenSelector
+				return cl.Core().Secrets(api.NamespaceAll).Watch(options)
 			},
 		},
 		&api.Secret{},
@@ -141,7 +150,7 @@ func (s *serviceAccount) Stop() {
 }
 
 func (s *serviceAccount) Admit(a admission.Attributes) (err error) {
-	if a.GetResource() != string(api.ResourcePods) {
+	if a.GetResource().GroupResource() != api.Resource("pods") {
 		return nil
 	}
 	obj := a.GetObject()
@@ -158,11 +167,11 @@ func (s *serviceAccount) Admit(a admission.Attributes) (err error) {
 	// That said, don't allow mirror pods to reference ServiceAccounts or SecretVolumeSources either
 	if _, isMirrorPod := pod.Annotations[kubelet.ConfigMirrorAnnotationKey]; isMirrorPod {
 		if len(pod.Spec.ServiceAccountName) != 0 {
-			return admission.NewForbidden(a, fmt.Errorf("A mirror pod may not reference service accounts"))
+			return admission.NewForbidden(a, fmt.Errorf("a mirror pod may not reference service accounts"))
 		}
 		for _, volume := range pod.Spec.Volumes {
 			if volume.VolumeSource.Secret != nil {
-				return admission.NewForbidden(a, fmt.Errorf("A mirror pod may not reference secrets"))
+				return admission.NewForbidden(a, fmt.Errorf("a mirror pod may not reference secrets"))
 			}
 		}
 		return nil
@@ -176,14 +185,14 @@ func (s *serviceAccount) Admit(a admission.Attributes) (err error) {
 	// Ensure the referenced service account exists
 	serviceAccount, err := s.getServiceAccount(a.GetNamespace(), pod.Spec.ServiceAccountName)
 	if err != nil {
-		return admission.NewForbidden(a, fmt.Errorf("Error looking up service account %s/%s: %v", a.GetNamespace(), pod.Spec.ServiceAccountName, err))
+		return admission.NewForbidden(a, fmt.Errorf("error looking up service account %s/%s: %v", a.GetNamespace(), pod.Spec.ServiceAccountName, err))
 	}
 	if serviceAccount == nil {
 		// TODO: convert to a ServerTimeout error (or other error that sends a Retry-After header)
 		return admission.NewForbidden(a, fmt.Errorf("service account %s/%s was not found, retry after the service account is created", a.GetNamespace(), pod.Spec.ServiceAccountName))
 	}
 
-	if s.LimitSecretReferences {
+	if s.enforceMountableSecrets(serviceAccount) {
 		if err := s.limitSecretReferences(serviceAccount, pod); err != nil {
 			return admission.NewForbidden(a, err)
 		}
@@ -191,6 +200,9 @@ func (s *serviceAccount) Admit(a admission.Attributes) (err error) {
 
 	if s.MountServiceAccountToken {
 		if err := s.mountServiceAccountToken(serviceAccount, pod); err != nil {
+			if _, ok := err.(errors.APIStatus); ok {
+				return err
+			}
 			return admission.NewForbidden(a, err)
 		}
 	}
@@ -201,6 +213,21 @@ func (s *serviceAccount) Admit(a admission.Attributes) (err error) {
 	}
 
 	return nil
+}
+
+// enforceMountableSecrets indicates whether mountable secrets should be enforced for a particular service account
+// A global setting of true will override any flag set on the individual service account
+func (s *serviceAccount) enforceMountableSecrets(serviceAccount *api.ServiceAccount) bool {
+	if s.LimitSecretReferences {
+		return true
+	}
+
+	if value, ok := serviceAccount.Annotations[EnforceMountableSecretsAnnotation]; ok {
+		enforceMountableSecretCheck, _ := strconv.ParseBool(value)
+		return enforceMountableSecretCheck
+	}
+
+	return false
 }
 
 // getServiceAccount returns the ServiceAccount for the given namespace and name if it exists
@@ -229,7 +256,7 @@ func (s *serviceAccount) getServiceAccount(namespace string, name string) (*api.
 		if i != 0 {
 			time.Sleep(retryInterval)
 		}
-		serviceAccount, err := s.client.ServiceAccounts(namespace).Get(name)
+		serviceAccount, err := s.client.Core().ServiceAccounts(namespace).Get(name)
 		if err == nil {
 			return serviceAccount, nil
 		}
@@ -297,7 +324,27 @@ func (s *serviceAccount) limitSecretReferences(serviceAccount *api.ServiceAccoun
 		}
 		secretName := source.Secret.SecretName
 		if !mountableSecrets.Has(secretName) {
-			return fmt.Errorf("Volume with secret.secretName=\"%s\" is not allowed because service account %s does not reference that secret", secretName, serviceAccount.Name)
+			return fmt.Errorf("volume with secret.secretName=\"%s\" is not allowed because service account %s does not reference that secret", secretName, serviceAccount.Name)
+		}
+	}
+
+	for _, container := range pod.Spec.InitContainers {
+		for _, env := range container.Env {
+			if env.ValueFrom != nil && env.ValueFrom.SecretKeyRef != nil {
+				if !mountableSecrets.Has(env.ValueFrom.SecretKeyRef.Name) {
+					return fmt.Errorf("init container %s with envVar %s referencing secret.secretName=\"%s\" is not allowed because service account %s does not reference that secret", container.Name, env.Name, env.ValueFrom.SecretKeyRef.Name, serviceAccount.Name)
+				}
+			}
+		}
+	}
+
+	for _, container := range pod.Spec.Containers {
+		for _, env := range container.Env {
+			if env.ValueFrom != nil && env.ValueFrom.SecretKeyRef != nil {
+				if !mountableSecrets.Has(env.ValueFrom.SecretKeyRef.Name) {
+					return fmt.Errorf("container %s with envVar %s referencing secret.secretName=\"%s\" is not allowed because service account %s does not reference that secret", container.Name, env.Name, env.ValueFrom.SecretKeyRef.Name, serviceAccount.Name)
+				}
+			}
 		}
 	}
 
@@ -324,8 +371,9 @@ func (s *serviceAccount) mountServiceAccountToken(serviceAccount *api.ServiceAcc
 		// We don't have an API token to mount, so return
 		if s.RequireAPIToken {
 			// If a token is required, this is considered an error
-			// TODO: convert to a ServerTimeout error (or other error that sends a Retry-After header)
-			return fmt.Errorf("no API token found for service account %s/%s, retry after the token is automatically created and added to the service account", serviceAccount.Namespace, serviceAccount.Name)
+			err := errors.NewServerTimeout(unversioned.GroupResource{Resource: "serviceaccounts"}, "create pod", 1)
+			err.ErrStatus.Message = fmt.Sprintf("No API token found for service account %q, retry after the token is automatically created and added to the service account", serviceAccount.Name)
+			return err
 		}
 		return nil
 	}
@@ -361,6 +409,20 @@ func (s *serviceAccount) mountServiceAccountToken(serviceAccount *api.ServiceAcc
 
 	// Ensure every container mounts the APISecret volume
 	needsTokenVolume := false
+	for i, container := range pod.Spec.InitContainers {
+		existingContainerMount := false
+		for _, volumeMount := range container.VolumeMounts {
+			// Existing mounts at the default mount path prevent mounting of the API token
+			if volumeMount.MountPath == DefaultAPITokenMountPath {
+				existingContainerMount = true
+				break
+			}
+		}
+		if !existingContainerMount {
+			pod.Spec.InitContainers[i].VolumeMounts = append(pod.Spec.InitContainers[i].VolumeMounts, volumeMount)
+			needsTokenVolume = true
+		}
+	}
 	for i, container := range pod.Spec.Containers {
 		existingContainerMount := false
 		for _, volumeMount := range container.VolumeMounts {

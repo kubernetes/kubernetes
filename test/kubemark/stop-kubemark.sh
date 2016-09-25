@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 The Kubernetes Authors All rights reserved.
+# Copyright 2015 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,8 +19,10 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 
 source "${KUBE_ROOT}/test/kubemark/common.sh"
 
-kubectl delete -f ${KUBE_ROOT}/test/kubemark/hollow-kubelet.json &> /dev/null || true
-kubectl delete -f ${KUBE_ROOT}/test/kubemark/kubemark-ns.json &> /dev/null || true
+"${KUBECTL}" delete -f "${RESOURCE_DIRECTORY}/hollow-kubelet.json" &> /dev/null || true
+"${KUBECTL}" delete -f "${RESOURCE_DIRECTORY}/addons" &> /dev/null || true
+"${KUBECTL}" delete -f "${RESOURCE_DIRECTORY}/kubemark-ns.json" &> /dev/null || true
+rm -rf "${RESOURCE_DIRECTORY}/addons"
 
 GCLOUD_COMMON_ARGS="--project ${PROJECT} --zone ${ZONE} --quiet"
 
@@ -29,6 +31,11 @@ gcloud compute instances delete "${MASTER_NAME}" \
 
 gcloud compute disks delete "${MASTER_NAME}-pd" \
     ${GCLOUD_COMMON_ARGS} || true
+
+gcloud compute addresses delete "${MASTER_NAME}-ip" \
+    --project "${PROJECT}" \
+    --region "${REGION}" \
+    --quiet || true
 
 gcloud compute firewall-rules delete "${INSTANCE_PREFIX}-kubemark-master-https" \
 	--project "${PROJECT}" \
@@ -42,4 +49,11 @@ if [ "${SEPARATE_EVENT_MACHINE:-false}" == "true" ]; then
     	${GCLOUD_COMMON_ARGS} || true
 fi
 
-rm -rf "${KUBE_ROOT}/test/kubemark/kubeconfig.loc" &> /dev/null || true
+rm -rf "${RESOURCE_DIRECTORY}/addons" "${RESOURCE_DIRECTORY}/kubeconfig.kubemark" &> /dev/null || true
+rm "${RESOURCE_DIRECTORY}/ca.crt" \
+	"${RESOURCE_DIRECTORY}/kubecfg.crt" \
+	"${RESOURCE_DIRECTORY}/kubecfg.key" \
+	"${RESOURCE_DIRECTORY}/hollow-node.json" \
+	"${RESOURCE_DIRECTORY}/apiserver_flags" \
+	"${RESOURCE_DIRECTORY}/controllers_flags" \
+	"${RESOURCE_DIRECTORY}/scheduler_flags" &> /dev/null || true

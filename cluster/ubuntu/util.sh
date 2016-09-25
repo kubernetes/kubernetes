@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 The Kubernetes Authors All rights reserved.
+# Copyright 2015 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@
 # must implement to use cluster/kube-*.sh scripts.
 set -e
 
-SSH_OPTS="-oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oLogLevel=ERROR"
+SSH_OPTS="-oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oLogLevel=ERROR -C"
 
 MASTER=""
 MASTER_IP=""
@@ -44,27 +44,53 @@ function setClusterInfo() {
   for i in $nodes; do
     nodeIP=${i#*@}
 
-    if [[ "${roles[${ii}]}" == "ai" ]]; then
+    if [[ "${roles_array[${ii}]}" == "ai" ]]; then
       MASTER_IP=$nodeIP
       MASTER=$i
       NODE_IPS="$nodeIP"
-    elif [[ "${roles[${ii}]}" == "a" ]]; then
+    elif [[ "${roles_array[${ii}]}" == "a" ]]; then
       MASTER_IP=$nodeIP
       MASTER=$i
-    elif [[ "${roles[${ii}]}" == "i" ]]; then
+    elif [[ "${roles_array[${ii}]}" == "i" ]]; then
       if [[ -z "${NODE_IPS}" ]];then
         NODE_IPS="$nodeIP"
       else
         NODE_IPS="$NODE_IPS,$nodeIP"
       fi
     else
-      echo "unsupported role for ${i}. please check"
+      echo "unsupported role for ${i}. Please check"
       exit 1
     fi
 
     ((ii=ii+1))
   done
 
+}
+
+# Sanity check on $CNI_PLUGIN_CONF and $CNI_PLUGIN_EXES
+function check-CNI-config() {
+  if [ -z "$CNI_PLUGIN_CONF" ] && [ -n "$CNI_PLUGIN_EXES" ]; then
+    echo "Warning: CNI_PLUGIN_CONF is emtpy but CNI_PLUGIN_EXES is not (it is $CNI_PLUGIN_EXES); Flannel will be used" >& 2
+  elif [ -n "$CNI_PLUGIN_CONF" ] && [ -z "$CNI_PLUGIN_EXES" ]; then
+    echo "Warning: CNI_PLUGIN_EXES is empty but CNI_PLUGIN_CONF is not (it is $CNI_PLUGIN_CONF); Flannel will be used" & 2
+  elif [ -n "$CNI_PLUGIN_CONF" ] && [ -n "$CNI_PLUGIN_EXES" ]; then
+    local problems=0
+    if ! [ -r "$CNI_PLUGIN_CONF" ]; then
+      echo "ERROR: CNI_PLUGIN_CONF is set to $CNI_PLUGIN_CONF but that is not a readable existing file!" >& 2
+      let problems=1
+    fi
+    local ii=0
+    for exe in $CNI_PLUGIN_EXES; do
+      if ! [ -x "$exe" ]; then
+        echo "ERROR: CNI_PLUGIN_EXES[$ii], which is $exe, is not an existing executable file!" >& 2
+        let problems=problems+1
+      fi
+      let ii=ii+1
+    done
+    if (( problems > 0 )); then
+      exit 1
+    fi
+  fi
 }
 
 
@@ -95,6 +121,14 @@ function verify-prereqs() {
   fi
 }
 
+# Check if /tmp is mounted noexec
+function check-tmp-noexec() {
+  if ssh $SSH_OPTS "$MASTER" "grep '/tmp' /proc/mounts | grep -q 'noexec'" >/dev/null 2>&1; then
+    echo "/tmp is mounted noexec on $MASTER_IP, deploying master failed"
+    exit 1
+  fi
+}
+
 # Install handler for signal trap
 function trap-add() {
   local handler="$1"
@@ -114,15 +148,15 @@ function verify-cluster() {
 
   for i in ${nodes}
   do
-    if [ "${roles[${ii}]}" == "a" ]; then
+    if [ "${roles_array[${ii}]}" == "a" ]; then
       verify-master
-    elif [ "${roles[${ii}]}" == "i" ]; then
+    elif [ "${roles_array[${ii}]}" == "i" ]; then
       verify-node "$i"
-    elif [ "${roles[${ii}]}" == "ai" ]; then
+    elif [ "${roles_array[${ii}]}" == "ai" ]; then
       verify-master
       verify-node "$i"
     else
-      echo "unsupported role for ${i}. please check"
+      echo "unsupported role for ${i}. Please check"
       exit 1
     fi
 
@@ -184,6 +218,8 @@ function verify-node() {
   echo
 }
 
+# Create ~/kube/default/etcd with proper contents.
+# $1: The one IP address where the etcd leader listens.
 function create-etcd-opts() {
   cat <<EOF > ~/kube/default/etcd
 ETCD_OPTS="\
@@ -193,6 +229,12 @@ ETCD_OPTS="\
 EOF
 }
 
+# Create ~/kube/default/kube-apiserver with proper contents.
+# $1: CIDR block for service addresses.
+# $2: Admission Controllers to invoke in the API server.
+# $3: A port range to reserve for services with NodePort visibility.
+# $4: The IP address on which to advertise the apiserver to members of the cluster.
+# $5: Tells kube-api to run in privileged mode
 function create-kube-apiserver-opts() {
   cat <<EOF > ~/kube/default/kube-apiserver
 KUBE_APISERVER_OPTS="\
@@ -203,12 +245,15 @@ KUBE_APISERVER_OPTS="\
  --service-cluster-ip-range=${1}\
  --admission-control=${2}\
  --service-node-port-range=${3}\
+ --advertise-address=${4}\
+ --allow-privileged=${5}\
  --client-ca-file=/srv/kubernetes/ca.crt\
  --tls-cert-file=/srv/kubernetes/server.cert\
  --tls-private-key-file=/srv/kubernetes/server.key"
 EOF
 }
 
+# Create ~/kube/default/kube-controller-manager with proper contents.
 function create-kube-controller-manager-opts() {
   cat <<EOF > ~/kube/default/kube-controller-manager
 KUBE_CONTROLLER_MANAGER_OPTS="\
@@ -220,6 +265,7 @@ EOF
 
 }
 
+# Create ~/kube/default/kube-scheduler with proper contents.
 function create-kube-scheduler-opts() {
   cat <<EOF > ~/kube/default/kube-scheduler
 KUBE_SCHEDULER_OPTS="\
@@ -229,33 +275,55 @@ EOF
 
 }
 
+# Create ~/kube/default/kubelet with proper contents.
+# $1: The hostname or IP address by which the kubelet will identify itself.
+# $2: The one hostname or IP address at which the API server is reached (insecurely).
+# $3: If non-empty then the DNS server IP to configure in each pod.
+# $4: If non-empty then added to each pod's domain search list.
+# $5: Pathname of the kubelet config file or directory.
+# $6: Whether or not we run kubelet in privileged mode
+# $7: If empty then flannel is used otherwise CNI is used.
 function create-kubelet-opts() {
+  if [ -n "$7" ] ; then
+      cni_opts=" --network-plugin=cni --network-plugin-dir=/etc/cni/net.d"
+  else
+      cni_opts=""
+  fi
   cat <<EOF > ~/kube/default/kubelet
 KUBELET_OPTS="\
- --address=0.0.0.0\
- --port=10250 \
  --hostname-override=${1} \
  --api-servers=http://${2}:8080 \
  --logtostderr=true \
- --cluster-dns=$3 \
- --cluster-domain=$4"
+ --cluster-dns=${3} \
+ --cluster-domain=${4} \
+ --config=${5} \
+ --allow-privileged=${6}
+ $cni_opts"
 EOF
-
 }
 
+# Create ~/kube/default/kube-proxy with proper contents.
+# $1: The hostname or IP address by which the node is identified.
+# $2: The one hostname or IP address at which the API server is reached (insecurely).
 function create-kube-proxy-opts() {
   cat <<EOF > ~/kube/default/kube-proxy
 KUBE_PROXY_OPTS="\
  --hostname-override=${1} \
  --master=http://${2}:8080 \
- --logtostderr=true"
+ --logtostderr=true \
+ ${3}"
 EOF
 
 }
 
+# Create ~/kube/default/flanneld with proper contents.
+# $1: The one hostname or IP address at which the etcd leader listens.
+# $2: The IP address or network interface for the local Flannel daemon to use
 function create-flanneld-opts() {
   cat <<EOF > ~/kube/default/flanneld
-FLANNEL_OPTS="--etcd-endpoints=http://${1}:4001"
+FLANNEL_OPTS="--etcd-endpoints=http://${1}:4001 \
+ --ip-masq \
+ --iface=${2}"
 EOF
 }
 
@@ -266,7 +334,7 @@ EOF
 # Vars set:
 #   KUBE_MASTER_IP
 function detect-master() {
-  source "${KUBE_ROOT}/cluster/ubuntu/${KUBE_CONFIG_FILE:-config-default.sh}"
+  source "${KUBE_CONFIG_FILE}"
   setClusterInfo
   export KUBE_MASTER="${MASTER}"
   export KUBE_MASTER_IP="${MASTER_IP}"
@@ -280,7 +348,7 @@ function detect-master() {
 # Vars set:
 #   KUBE_NODE_IP_ADDRESS (array)
 function detect-nodes() {
-  source "${KUBE_ROOT}/cluster/ubuntu/${KUBE_CONFIG_FILE:-config-default.sh}"
+  source "${KUBE_CONFIG_FILE}"
 
   KUBE_NODE_IP_ADDRESSES=()
   setClusterInfo
@@ -288,7 +356,7 @@ function detect-nodes() {
   local ii=0
   for i in ${nodes}
   do
-    if [ "${roles[${ii}]}" == "i" ] || [ "${roles[${ii}]}" == "ai" ]; then
+    if [ "${roles_array[${ii}]}" == "i" ] || [ "${roles_array[${ii}]}" == "ai" ]; then
       KUBE_NODE_IP_ADDRESSES+=("${i#*@}")
     fi
 
@@ -304,13 +372,18 @@ function detect-nodes() {
 
 # Instantiate a kubernetes cluster on ubuntu
 function kube-up() {
-  source "${KUBE_ROOT}/cluster/ubuntu/${KUBE_CONFIG_FILE:-config-default.sh}"
+  export KUBE_CONFIG_FILE=${KUBE_CONFIG_FILE:-${KUBE_ROOT}/cluster/ubuntu/config-default.sh}
+  source "${KUBE_CONFIG_FILE}"
 
   # downloading tarball release
-  if [[ -d "${KUBE_ROOT}/cluster/ubuntu/binaries" ]]; then
-    rm -rf "${KUBE_ROOT}/cluster/ubuntu/binaries"
-  fi
   "${KUBE_ROOT}/cluster/ubuntu/download-release.sh"
+
+  # Fetch the hacked easyrsa that make-ca-cert.sh will use
+  curl -L -O https://storage.googleapis.com/kubernetes-release/easy-rsa/easy-rsa.tar.gz > /dev/null 2>&1
+
+  if ! check-CNI-config; then
+    return
+  fi
 
   setClusterInfo
   local ii=0
@@ -318,11 +391,11 @@ function kube-up() {
   for i in ${nodes}
   do
     {
-      if [ "${roles[${ii}]}" == "a" ]; then
+      if [ "${roles_array[${ii}]}" == "a" ]; then
         provision-master
-      elif [ "${roles[${ii}]}" == "ai" ]; then
+      elif [ "${roles_array[${ii}]}" == "ai" ]; then
         provision-masterandnode
-      elif [ "${roles[${ii}]}" == "i" ]; then
+      elif [ "${roles_array[${ii}]}" == "i" ]; then
         provision-node "$i"
       else
         echo "unsupported role for ${i}. Please check"
@@ -352,17 +425,29 @@ function provision-master() {
 
   echo -e "\nDeploying master on machine ${MASTER_IP}"
 
+  check-tmp-noexec
+
   ssh $SSH_OPTS "$MASTER" "mkdir -p ~/kube/default"
 
   # copy the binaries and scripts to the ~/kube directory on the master
   scp -r $SSH_OPTS \
     saltbase/salt/generate-cert/make-ca-cert.sh \
+    easy-rsa.tar.gz \
     ubuntu/reconfDocker.sh \
-    ubuntu/${KUBE_CONFIG_FILE:-config-default.sh} \
+    "${KUBE_CONFIG_FILE}" \
     ubuntu/util.sh \
     ubuntu/master/* \
     ubuntu/binaries/master/ \
     "${MASTER}:~/kube"
+
+  if [ -z "$CNI_PLUGIN_CONF" ] || [ -z "$CNI_PLUGIN_EXES" ]; then
+    # Flannel is being used: copy the flannel binaries and scripts, set reconf flag
+    scp -r $SSH_OPTS ubuntu/master-flannel/* "${MASTER}:~/kube"
+    NEED_RECONFIG_DOCKER=true
+  else
+    # CNI is being used: set reconf flag
+    NEED_RECONFIG_DOCKER=false
+  fi
 
   EXTRA_SANS=(
     IP:$MASTER_IP
@@ -375,8 +460,15 @@ function provision-master() {
 
   EXTRA_SANS=$(echo "${EXTRA_SANS[@]}" | tr ' ' ,)
 
+  BASH_DEBUG_FLAGS=""
+  if [[ "$DEBUG" == "true" ]] ; then
+    BASH_DEBUG_FLAGS="set -x"
+  fi
+
   # remote login to MASTER and configue k8s master
   ssh $SSH_OPTS -t "${MASTER}" "
+    set +e
+    ${BASH_DEBUG_FLAGS}
     source ~/kube/util.sh
 
     setClusterInfo
@@ -384,21 +476,25 @@ function provision-master() {
     create-kube-apiserver-opts \
       '${SERVICE_CLUSTER_IP_RANGE}' \
       '${ADMISSION_CONTROL}' \
-      '${SERVICE_NODE_PORT_RANGE}'
+      '${SERVICE_NODE_PORT_RANGE}' \
+      '${MASTER_IP}' \
+      '${ALLOW_PRIVILEGED}'
     create-kube-controller-manager-opts '${NODE_IPS}'
     create-kube-scheduler-opts
-    create-flanneld-opts '127.0.0.1'
-    sudo -E -p '[sudo] password to start master: ' -- /bin/bash -c '
+    create-flanneld-opts '127.0.0.1' '${MASTER_IP}'
+    FLANNEL_OTHER_NET_CONFIG='${FLANNEL_OTHER_NET_CONFIG}' sudo -E -p '[sudo] password to start master: ' -- /bin/bash -ce '
+      ${BASH_DEBUG_FLAGS}
+
       cp ~/kube/default/* /etc/default/
       cp ~/kube/init_conf/* /etc/init/
       cp ~/kube/init_scripts/* /etc/init.d/
 
       groupadd -f -r kube-cert
-      ${PROXY_SETTING} ~/kube/make-ca-cert.sh \"${MASTER_IP}\" \"${EXTRA_SANS}\"
+      ${PROXY_SETTING} DEBUG='${DEBUG}' ~/kube/make-ca-cert.sh \"${MASTER_IP}\" \"${EXTRA_SANS}\"
       mkdir -p /opt/bin/
       cp ~/kube/master/* /opt/bin/
       service etcd start
-      FLANNEL_NET=\"${FLANNEL_NET}\" ~/kube/reconfDocker.sh a
+      if ${NEED_RECONFIG_DOCKER}; then FLANNEL_NET=\"${FLANNEL_NET}\" KUBE_CONFIG_FILE=\"${KUBE_CONFIG_FILE}\" DOCKER_OPTS=\"${DOCKER_OPTS}\" ~/kube/reconfDocker.sh a; fi
       '" || {
       echo "Deploying master on machine ${MASTER_IP} failed"
       exit 1
@@ -413,15 +509,47 @@ function provision-node() {
 
   # copy the binaries and scripts to the ~/kube directory on the node
   scp -r $SSH_OPTS \
-    ubuntu/${KUBE_CONFIG_FILE:-config-default.sh} \
+    "${KUBE_CONFIG_FILE}" \
     ubuntu/util.sh \
     ubuntu/reconfDocker.sh \
     ubuntu/minion/* \
     ubuntu/binaries/minion \
     "${1}:~/kube"
 
+  if [ -z "$CNI_PLUGIN_CONF" ] || [ -z "$CNI_PLUGIN_EXES" ]; then
+    # Prep for Flannel use: copy the flannel binaries and scripts, set reconf flag
+    scp -r $SSH_OPTS ubuntu/minion-flannel/* "${1}:~/kube"
+    SERVICE_STARTS="service flanneld start"
+    NEED_RECONFIG_DOCKER=true
+    CNI_PLUGIN_CONF=''
+
+  else
+    # Prep for CNI use: copy the CNI config and binaries, adjust upstart config, set reconf flag
+    ssh $SSH_OPTS "${1}" "rm -rf tmp-cni; mkdir -p tmp-cni/exes tmp-cni/conf"
+    scp    $SSH_OPTS "$CNI_PLUGIN_CONF" "${1}:tmp-cni/conf/"
+    scp -p $SSH_OPTS  $CNI_PLUGIN_EXES  "${1}:tmp-cni/exes/"
+    ssh $SSH_OPTS -t "${1}" '
+      sudo -p "[sudo] password to prep node %h: " -- /bin/bash -ce "
+        mkdir -p /opt/cni/bin /etc/cni/net.d
+        cp ~$(id -un)/tmp-cni/conf/* /etc/cni/net.d/
+        cp --preserve=mode ~$(id -un)/tmp-cni/exes/* /opt/cni/bin/
+        '"sed -i.bak -e 's/start on started flanneld/start on started ${CNI_KUBELET_TRIGGER}/' -e 's/stop on stopping flanneld/stop on stopping ${CNI_KUBELET_TRIGGER}/' "'~$(id -un)/kube/init_conf/kubelet.conf
+        '"sed -i.bak -e 's/start on started flanneld/start on started networking/' -e 's/stop on stopping flanneld/stop on stopping networking/' "'~$(id -un)/kube/init_conf/kube-proxy.conf
+        "'
+    SERVICE_STARTS='service kubelet    start
+                    service kube-proxy start'
+    NEED_RECONFIG_DOCKER=false
+  fi
+
+  BASH_DEBUG_FLAGS=""
+  if [[ "$DEBUG" == "true" ]] ; then
+    BASH_DEBUG_FLAGS="set -x"
+  fi
+
   # remote login to node and configue k8s node
   ssh $SSH_OPTS -t "$1" "
+    set +e
+    ${BASH_DEBUG_FLAGS}
     source ~/kube/util.sh
 
     setClusterInfo
@@ -429,20 +557,25 @@ function provision-node() {
       '${1#*@}' \
       '${MASTER_IP}' \
       '${DNS_SERVER_IP}' \
-      '${DNS_DOMAIN}'
+      '${DNS_DOMAIN}' \
+      '${KUBELET_CONFIG}' \
+      '${ALLOW_PRIVILEGED}' \
+      '${CNI_PLUGIN_CONF}'
     create-kube-proxy-opts \
-	  '${1#*@}' \
-	  '${MASTER_IP}'
-    create-flanneld-opts '${MASTER_IP}'
+      '${1#*@}' \
+      '${MASTER_IP}' \
+      '${KUBE_PROXY_EXTRA_OPTS}'
+    create-flanneld-opts '${MASTER_IP}' '${1#*@}'
 
-    sudo -E -p '[sudo] password to start node: ' -- /bin/bash -c '
+    sudo -E -p '[sudo] password to start node: ' -- /bin/bash -ce '
+      ${BASH_DEBUG_FLAGS}
       cp ~/kube/default/* /etc/default/
       cp ~/kube/init_conf/* /etc/init/
       cp ~/kube/init_scripts/* /etc/init.d/
       mkdir -p /opt/bin/
       cp ~/kube/minion/* /opt/bin
-      service flanneld start
-      ~/kube/reconfDocker.sh i
+      ${SERVICE_STARTS}
+      if ${NEED_RECONFIG_DOCKER}; then KUBE_CONFIG_FILE=\"${KUBE_CONFIG_FILE}\" DOCKER_OPTS=\"${DOCKER_OPTS}\" ~/kube/reconfDocker.sh i; fi
       '" || {
       echo "Deploying node on machine ${1#*@} failed"
       exit 1
@@ -459,7 +592,8 @@ function provision-masterandnode() {
   # scp order matters
   scp -r $SSH_OPTS \
     saltbase/salt/generate-cert/make-ca-cert.sh \
-    ubuntu/${KUBE_CONFIG_FILE:-config-default.sh} \
+    easy-rsa.tar.gz \
+    "${KUBE_CONFIG_FILE}" \
     ubuntu/util.sh \
     ubuntu/minion/* \
     ubuntu/master/* \
@@ -467,6 +601,27 @@ function provision-masterandnode() {
     ubuntu/binaries/master/ \
     ubuntu/binaries/minion \
     "${MASTER}:~/kube"
+
+  if [ -z "$CNI_PLUGIN_CONF" ] || [ -z "$CNI_PLUGIN_EXES" ]; then
+    # Prep for Flannel use: copy the flannel binaries and scripts, set reconf flag
+    scp -r $SSH_OPTS ubuntu/minion-flannel/* ubuntu/master-flannel/* "${MASTER}:~/kube"
+    NEED_RECONFIG_DOCKER=true
+    CNI_PLUGIN_CONF=''
+
+  else
+    # Prep for CNI use: copy the CNI config and binaries, adjust upstart config, set reconf flag
+    ssh $SSH_OPTS "${MASTER}" "rm -rf tmp-cni; mkdir -p tmp-cni/exes tmp-cni/conf"
+    scp    $SSH_OPTS "$CNI_PLUGIN_CONF" "${MASTER}:tmp-cni/conf/"
+    scp -p $SSH_OPTS  $CNI_PLUGIN_EXES  "${MASTER}:tmp-cni/exes/"
+    ssh $SSH_OPTS -t "${MASTER}" '
+      sudo -p "[sudo] password to prep master %h: " -- /bin/bash -ce "
+        mkdir -p /opt/cni/bin /etc/cni/net.d
+        cp ~$(id -un)/tmp-cni/conf/* /etc/cni/net.d/
+        cp --preserve=mode ~$(id -un)/tmp-cni/exes/* /opt/cni/bin/
+        '"sed -i.bak -e 's/start on started flanneld/start on started etcd/' -e 's/stop on stopping flanneld/stop on stopping etcd/' "'~$(id -un)/kube/init_conf/kube*.conf
+        "'
+    NEED_RECONFIG_DOCKER=false
+  fi
 
   EXTRA_SANS=(
     IP:${MASTER_IP}
@@ -479,8 +634,15 @@ function provision-masterandnode() {
 
   EXTRA_SANS=$(echo "${EXTRA_SANS[@]}" | tr ' ' ,)
 
+  BASH_DEBUG_FLAGS=""
+  if [[ "$DEBUG" == "true" ]] ; then
+    BASH_DEBUG_FLAGS="set -x"
+  fi
+
   # remote login to the master/node and configue k8s
   ssh $SSH_OPTS -t "$MASTER" "
+    set +e
+    ${BASH_DEBUG_FLAGS}
     source ~/kube/util.sh
 
     setClusterInfo
@@ -488,32 +650,39 @@ function provision-masterandnode() {
     create-kube-apiserver-opts \
       '${SERVICE_CLUSTER_IP_RANGE}' \
       '${ADMISSION_CONTROL}' \
-      '${SERVICE_NODE_PORT_RANGE}'
+      '${SERVICE_NODE_PORT_RANGE}' \
+      '${MASTER_IP}' \
+      '${ALLOW_PRIVILEGED}'
     create-kube-controller-manager-opts '${NODE_IPS}'
     create-kube-scheduler-opts
     create-kubelet-opts \
       '${MASTER_IP}' \
       '${MASTER_IP}' \
       '${DNS_SERVER_IP}' \
-      '${DNS_DOMAIN}'
+      '${DNS_DOMAIN}' \
+      '${KUBELET_CONFIG}' \
+      '${ALLOW_PRIVILEGED}' \
+      '${CNI_PLUGIN_CONF}'
     create-kube-proxy-opts \
-	  '${MASTER_IP}' \
-	  '${MASTER_IP}'
-    create-flanneld-opts '127.0.0.1'
+      '${MASTER_IP}' \
+      '${MASTER_IP}' \
+      '${KUBE_PROXY_EXTRA_OPTS}'
+    create-flanneld-opts '127.0.0.1' '${MASTER_IP}'
 
-    sudo -E -p '[sudo] password to start master: ' -- /bin/bash -c '
+    FLANNEL_OTHER_NET_CONFIG='${FLANNEL_OTHER_NET_CONFIG}' sudo -E -p '[sudo] password to start master: ' -- /bin/bash -ce '
+      ${BASH_DEBUG_FLAGS}
       cp ~/kube/default/* /etc/default/
       cp ~/kube/init_conf/* /etc/init/
       cp ~/kube/init_scripts/* /etc/init.d/
 
       groupadd -f -r kube-cert
-      ${PROXY_SETTING} ~/kube/make-ca-cert.sh \"${MASTER_IP}\" \"${EXTRA_SANS}\"
+      ${PROXY_SETTING} DEBUG='${DEBUG}' ~/kube/make-ca-cert.sh \"${MASTER_IP}\" \"${EXTRA_SANS}\"
       mkdir -p /opt/bin/
       cp ~/kube/master/* /opt/bin/
       cp ~/kube/minion/* /opt/bin/
 
       service etcd start
-      FLANNEL_NET=\"${FLANNEL_NET}\" ~/kube/reconfDocker.sh ai
+      if ${NEED_RECONFIG_DOCKER}; then FLANNEL_NET=\"${FLANNEL_NET}\" KUBE_CONFIG_FILE=\"${KUBE_CONFIG_FILE}\" DOCKER_OPTS=\"${DOCKER_OPTS}\" ~/kube/reconfDocker.sh ai; fi
       '" || {
       echo "Deploying master and node on machine ${MASTER_IP} failed"
       exit 1
@@ -524,7 +693,7 @@ function provision-masterandnode() {
 function check-pods-torn-down() {
   local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
   local attempt=0
-  while [[ ! -z "$(kubectl get pods | tail -n +2)" ]]; do
+  while [[ ! -z "$(kubectl get pods --show-all --all-namespaces| tail -n +2)" ]]; do
     if (( attempt > 120 )); then
       echo "timeout waiting for tearing down pods" >> ~/kube/err.log
     fi
@@ -536,9 +705,11 @@ function check-pods-torn-down() {
 
 # Delete a kubernetes cluster
 function kube-down() {
-
   export KUBECTL_PATH="${KUBE_ROOT}/cluster/ubuntu/binaries/kubectl"
-  source "${KUBE_ROOT}/cluster/ubuntu/${KUBE_CONFIG_FILE:-config-default.sh}"
+
+  export KUBE_CONFIG_FILE=${KUBE_CONFIG_FILE:-${KUBE_ROOT}/cluster/ubuntu/config-default.sh}
+  source "${KUBE_CONFIG_FILE}"
+
   source "${KUBE_ROOT}/cluster/common.sh"
 
   tear_down_alive_resources
@@ -546,7 +717,7 @@ function kube-down() {
 
   local ii=0
   for i in ${nodes}; do
-      if [[ "${roles[${ii}]}" == "ai" || "${roles[${ii}]}" == "a" ]]; then
+      if [[ "${roles_array[${ii}]}" == "ai" || "${roles_array[${ii}]}" == "a" ]]; then
         echo "Cleaning on master ${i#*@}"
         ssh $SSH_OPTS -t "$i" "
           pgrep etcd && \
@@ -564,11 +735,11 @@ function kube-down() {
             '
         " || echo "Cleaning on master ${i#*@} failed"
 
-        if [[ "${roles[${ii}]}" == "ai" ]]; then
+        if [[ "${roles_array[${ii}]}" == "ai" ]]; then
           ssh $SSH_OPTS -t "$i" "sudo rm -rf /var/lib/kubelet"
         fi
 
-      elif [[ "${roles[${ii}]}" == "i" ]]; then
+      elif [[ "${roles_array[${ii}]}" == "i" ]]; then
         echo "Cleaning on node ${i#*@}"
         ssh $SSH_OPTS -t "$i" "
           pgrep flanneld && \
@@ -621,7 +792,8 @@ function prepare-push() {
 
 # Update a kubernetes master with expected release
 function push-master() {
-  source "${KUBE_ROOT}/cluster/ubuntu/${KUBE_CONFIG_FILE:-config-default.sh}"
+  export KUBE_CONFIG_FILE=${KUBE_CONFIG_FILE:-${KUBE_ROOT}/cluster/ubuntu/config-default.sh}
+  source "${KUBE_CONFIG_FILE}"
 
   if [[ ! -f "${KUBE_ROOT}/cluster/ubuntu/binaries/master/kube-apiserver" ]]; then
     echo "There is no required release of kubernetes, please check first"
@@ -633,7 +805,7 @@ function push-master() {
 
   local ii=0
   for i in ${nodes}; do
-    if [[ "${roles[${ii}]}" == "a" || "${roles[${ii}]}" == "ai" ]]; then
+    if [[ "${roles_array[${ii}]}" == "a" || "${roles_array[${ii}]}" == "ai" ]]; then
       echo "Cleaning master ${i#*@}"
       ssh $SSH_OPTS -t "$i" "
         pgrep etcd && sudo -p '[sudo] stop the all process: ' -- /bin/bash -c '
@@ -658,11 +830,11 @@ function push-master() {
       '" || echo "Cleaning master ${i#*@} failed"
     fi
 
-    if [[ "${roles[${ii}]}" == "a" ]]; then
+    if [[ "${roles_array[${ii}]}" == "a" ]]; then
       provision-master
-    elif [[ "${roles[${ii}]}" == "ai" ]]; then
+    elif [[ "${roles_array[${ii}]}" == "ai" ]]; then
       provision-masterandnode
-    elif [[ "${roles[${ii}]}" == "i" ]]; then
+    elif [[ "${roles_array[${ii}]}" == "i" ]]; then
       ((ii=ii+1))
       continue
     else
@@ -676,7 +848,8 @@ function push-master() {
 
 # Update a kubernetes node with expected release
 function push-node() {
-  source "${KUBE_ROOT}/cluster/ubuntu/${KUBE_CONFIG_FILE:-config-default.sh}"
+  export KUBE_CONFIG_FILE=${KUBE_CONFIG_FILE:-${KUBE_ROOT}/cluster/ubuntu/config-default.sh}
+  source "${KUBE_CONFIG_FILE}"
 
   if [[ ! -f "${KUBE_ROOT}/cluster/ubuntu/binaries/minion/kubelet" ]]; then
     echo "There is no required release of kubernetes, please check first"
@@ -692,7 +865,7 @@ function push-node() {
   local existing=false
 
   for i in ${nodes}; do
-    if [[ "${roles[${ii}]}" == "i" && ${i#*@} == "$node_ip" ]]; then
+    if [[ "${roles_array[${ii}]}" == "i" && ${i#*@} == "$node_ip" ]]; then
       echo "Cleaning node ${i#*@}"
       ssh $SSH_OPTS -t "$i" "
         sudo -p '[sudo] stop the all process: ' -- /bin/bash -c '
@@ -715,10 +888,10 @@ function push-node() {
         '" || echo "Cleaning node ${i#*@} failed"
       provision-node "$i"
       existing=true
-    elif [[ "${roles[${ii}]}" == "a" || "${roles[${ii}]}" == "ai" ]] && [[ ${i#*@} == "$node_ip" ]]; then
+    elif [[ "${roles_array[${ii}]}" == "a" || "${roles_array[${ii}]}" == "ai" ]] && [[ ${i#*@} == "$node_ip" ]]; then
       echo "${i} is master node, please try ./kube-push -m instead"
       existing=true
-    elif [[ "${roles[${ii}]}" == "i" || "${roles[${ii}]}" == "a" || "${roles[${ii}]}" == "ai" ]]; then
+    elif [[ "${roles_array[${ii}]}" == "i" || "${roles_array[${ii}]}" == "a" || "${roles_array[${ii}]}" == "ai" ]]; then
       ((ii=ii+1))
       continue
     else
@@ -738,7 +911,8 @@ function push-node() {
 # Update a kubernetes cluster with expected source
 function kube-push() {
   prepare-push
-  source "${KUBE_ROOT}/cluster/ubuntu/${KUBE_CONFIG_FILE:-config-default.sh}"
+  export KUBE_CONFIG_FILE=${KUBE_CONFIG_FILE:-${KUBE_ROOT}/cluster/ubuntu/config-default.sh}
+  source "${KUBE_CONFIG_FILE}"
 
   if [[ ! -f "${KUBE_ROOT}/cluster/ubuntu/binaries/master/kube-apiserver" ]]; then
     echo "There is no required release of kubernetes, please check first"
@@ -749,7 +923,7 @@ function kube-push() {
   #stop all the kube's process & etcd
   local ii=0
   for i in ${nodes}; do
-     if [[ "${roles[${ii}]}" == "ai" || "${roles[${ii}]}" == "a" ]]; then
+     if [[ "${roles_array[${ii}]}" == "ai" || "${roles_array[${ii}]}" == "a" ]]; then
        echo "Cleaning on master ${i#*@}"
        ssh $SSH_OPTS -t "$i" "
         pgrep etcd && \
@@ -762,7 +936,7 @@ function kube-push() {
             /etc/init.d/etcd \
             /etc/default/etcd
         '" || echo "Cleaning on master ${i#*@} failed"
-      elif [[ "${roles[${ii}]}" == "i" ]]; then
+      elif [[ "${roles_array[${ii}]}" == "i" ]]; then
         echo "Cleaning on node ${i#*@}"
         ssh $SSH_OPTS -t $i "
         pgrep flanneld && \
@@ -797,14 +971,14 @@ function kube-push() {
 
   local ii=0
   for i in ${nodes}; do
-    if [[ "${roles[${ii}]}" == "a" ]]; then
+    if [[ "${roles_array[${ii}]}" == "a" ]]; then
       provision-master
-    elif [[ "${roles[${ii}]}" == "i" ]]; then
+    elif [[ "${roles_array[${ii}]}" == "i" ]]; then
       provision-node "$i"
-    elif [[ "${roles[${ii}]}" == "ai" ]]; then
+    elif [[ "${roles_array[${ii}]}" == "ai" ]]; then
       provision-masterandnode
     else
-      echo "unsupported role for ${i}. please check"
+      echo "unsupported role for ${i}. Please check"
       exit 1
     fi
     ((ii=ii+1))

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/spf13/cobra"
+	"github.com/spf13/cobra/doc"
 	"k8s.io/kubernetes/cmd/genutils"
 	apiservapp "k8s.io/kubernetes/cmd/kube-apiserver/app"
 	cmapp "k8s.io/kubernetes/cmd/kube-controller-manager/app"
@@ -51,23 +51,23 @@ func main() {
 	case "kube-apiserver":
 		// generate docs for kube-apiserver
 		apiserver := apiservapp.NewAPIServerCommand()
-		cobra.GenMarkdownTree(apiserver, outDir)
+		doc.GenMarkdownTree(apiserver, outDir)
 	case "kube-controller-manager":
 		// generate docs for kube-controller-manager
 		controllermanager := cmapp.NewControllerManagerCommand()
-		cobra.GenMarkdownTree(controllermanager, outDir)
+		doc.GenMarkdownTree(controllermanager, outDir)
 	case "kube-proxy":
 		// generate docs for kube-proxy
 		proxy := proxyapp.NewProxyCommand()
-		cobra.GenMarkdownTree(proxy, outDir)
+		doc.GenMarkdownTree(proxy, outDir)
 	case "kube-scheduler":
 		// generate docs for kube-scheduler
 		scheduler := schapp.NewSchedulerCommand()
-		cobra.GenMarkdownTree(scheduler, outDir)
+		doc.GenMarkdownTree(scheduler, outDir)
 	case "kubelet":
 		// generate docs for kubelet
 		kubelet := kubeletapp.NewKubeletCommand()
-		cobra.GenMarkdownTree(kubelet, outDir)
+		doc.GenMarkdownTree(kubelet, outDir)
 	default:
 		fmt.Fprintf(os.Stderr, "Module %s is not supported", module)
 		os.Exit(1)

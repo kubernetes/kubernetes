@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,7 +26,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/wait"
 
 	"github.com/golang/glog"
 )
@@ -38,6 +38,7 @@ type sourceURL struct {
 	updates     chan<- interface{}
 	data        []byte
 	failureLogs int
+	client      *http.Client
 }
 
 func NewSourceURL(url string, header http.Header, nodeName string, period time.Duration, updates chan<- interface{}) {
@@ -47,9 +48,12 @@ func NewSourceURL(url string, header http.Header, nodeName string, period time.D
 		nodeName: nodeName,
 		updates:  updates,
 		data:     nil,
+		// Timing out requests leads to retries. This client is only used to
+		// read the manifest URL passed to kubelet.
+		client: &http.Client{Timeout: 10 * time.Second},
 	}
 	glog.V(1).Infof("Watching URL %s", url)
-	go util.Until(config.run, period, util.NeverStop)
+	go wait.Until(config.run, period, wait.NeverStop)
 }
 
 func (s *sourceURL) run() {
@@ -59,7 +63,9 @@ func (s *sourceURL) run() {
 		if s.failureLogs < 3 {
 			glog.Warningf("Failed to read pods from URL: %v", err)
 		} else if s.failureLogs == 3 {
-			glog.Warningf("Failed to read pods from URL. Won't log this message anymore: %v", err)
+			glog.Warningf("Failed to read pods from URL. Dropping verbosity of this message to V(4): %v", err)
+		} else {
+			glog.V(4).Infof("Failed to read pods from URL: %v", err)
 		}
 		s.failureLogs++
 	} else {
@@ -80,8 +86,7 @@ func (s *sourceURL) extractFromURL() error {
 		return err
 	}
 	req.Header = s.header
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	resp, err := s.client.Do(req)
 	if err != nil {
 		return err
 	}

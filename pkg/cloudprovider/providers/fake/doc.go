@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -15,5 +15,5 @@ limitations under the License.
 */
 
 // Package fake is a test-double implementation of cloudprovider
-// Interface, TCPLoadBalancer and Instances. It is useful for testing.
-package fake
+// Interface, LoadBalancer and Instances. It is useful for testing.
+package fake // import "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"

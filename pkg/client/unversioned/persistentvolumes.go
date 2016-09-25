@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,10 +17,7 @@ limitations under the License.
 package unversioned
 
 import (
-	"fmt"
-
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -30,13 +27,13 @@ type PersistentVolumesInterface interface {
 
 // PersistentVolumeInterface has methods to work with PersistentVolume resources.
 type PersistentVolumeInterface interface {
-	List(opts unversioned.ListOptions) (*api.PersistentVolumeList, error)
+	List(opts api.ListOptions) (*api.PersistentVolumeList, error)
 	Get(name string) (*api.PersistentVolume, error)
 	Create(volume *api.PersistentVolume) (*api.PersistentVolume, error)
 	Update(volume *api.PersistentVolume) (*api.PersistentVolume, error)
 	UpdateStatus(persistentVolume *api.PersistentVolume) (*api.PersistentVolume, error)
 	Delete(name string) error
-	Watch(opts unversioned.ListOptions) (watch.Interface, error)
+	Watch(opts api.ListOptions) (watch.Interface, error)
 }
 
 // persistentVolumes implements PersistentVolumesInterface
@@ -48,11 +45,11 @@ func newPersistentVolumes(c *Client) *persistentVolumes {
 	return &persistentVolumes{c}
 }
 
-func (c *persistentVolumes) List(opts unversioned.ListOptions) (result *api.PersistentVolumeList, err error) {
+func (c *persistentVolumes) List(opts api.ListOptions) (result *api.PersistentVolumeList, err error) {
 	result = &api.PersistentVolumeList{}
 	err = c.client.Get().
 		Resource("persistentVolumes").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Do().
 		Into(result)
 
@@ -73,10 +70,6 @@ func (c *persistentVolumes) Create(volume *api.PersistentVolume) (result *api.Pe
 
 func (c *persistentVolumes) Update(volume *api.PersistentVolume) (result *api.PersistentVolume, err error) {
 	result = &api.PersistentVolume{}
-	if len(volume.ResourceVersion) == 0 {
-		err = fmt.Errorf("invalid update object, missing resource version: %v", volume)
-		return
-	}
 	err = c.client.Put().Resource("persistentVolumes").Name(volume.Name).Body(volume).Do().Into(result)
 	return
 }
@@ -91,10 +84,10 @@ func (c *persistentVolumes) Delete(name string) error {
 	return c.client.Delete().Resource("persistentVolumes").Name(name).Do().Error()
 }
 
-func (c *persistentVolumes) Watch(opts unversioned.ListOptions) (watch.Interface, error) {
+func (c *persistentVolumes) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Resource("persistentVolumes").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Watch()
 }

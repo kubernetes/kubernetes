@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 The Kubernetes Authors All rights reserved.
+# Copyright 2015 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -26,52 +26,66 @@ function cleanup {
 }
 trap cleanup SIGHUP SIGINT SIGTERM
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
-pushd ${KUBE_ROOT}/cluster/ubuntu
-
+pushd $(dirname $0)
 mkdir -p binaries/master
 mkdir -p binaries/minion
 
 # flannel
-FLANNEL_VERSION=${FLANNEL_VERSION:-"0.5.3"}
+FLANNEL_VERSION=${FLANNEL_VERSION:-"0.5.5"}
 echo "Prepare flannel ${FLANNEL_VERSION} release ..."
-if [ ! -f flannel.tar.gz ] ; then
+grep -q "^${FLANNEL_VERSION}\$" binaries/.flannel 2>/dev/null || {
   curl -L  https://github.com/coreos/flannel/releases/download/v${FLANNEL_VERSION}/flannel-${FLANNEL_VERSION}-linux-amd64.tar.gz -o flannel.tar.gz
   tar xzf flannel.tar.gz
-fi
-cp flannel-${FLANNEL_VERSION}/flanneld binaries/master
-cp flannel-${FLANNEL_VERSION}/flanneld binaries/minion
+  cp flannel-${FLANNEL_VERSION}/flanneld binaries/master
+  cp flannel-${FLANNEL_VERSION}/flanneld binaries/minion
+  echo ${FLANNEL_VERSION} > binaries/.flannel
+}
 
 # ectd
-ETCD_VERSION=${ETCD_VERSION:-"2.2.1"}
+ETCD_VERSION=${ETCD_VERSION:-"2.3.1"}
 ETCD="etcd-v${ETCD_VERSION}-linux-amd64"
 echo "Prepare etcd ${ETCD_VERSION} release ..."
-if [ ! -f etcd.tar.gz ] ; then
+grep -q "^${ETCD_VERSION}\$" binaries/.etcd 2>/dev/null || {
   curl -L https://github.com/coreos/etcd/releases/download/v${ETCD_VERSION}/${ETCD}.tar.gz -o etcd.tar.gz
   tar xzf etcd.tar.gz
+  cp ${ETCD}/etcd ${ETCD}/etcdctl binaries/master
+  echo ${ETCD_VERSION} > binaries/.etcd
+}
+
+function get_latest_version_number {
+  local -r latest_url="https://storage.googleapis.com/kubernetes-release/release/stable.txt"
+  if [[ $(which wget) ]]; then
+    wget -qO- ${latest_url}
+  elif [[ $(which curl) ]]; then
+    curl -Ss ${latest_url}
+  else
+    echo "Couldn't find curl or wget.  Bailing out." >&2
+    exit 4
+  fi
+}
+
+if [ -z "$KUBE_VERSION" ]; then
+  KUBE_VERSION=$(get_latest_version_number | sed 's/^v//')
 fi
-cp $ETCD/etcd $ETCD/etcdctl binaries/master
 
 # k8s
-KUBE_VERSION=${KUBE_VERSION:-"1.1.2"}
 echo "Prepare kubernetes ${KUBE_VERSION} release ..."
-if [ ! -f kubernetes.tar.gz ] ; then
-  curl -L https://github.com/GoogleCloudPlatform/kubernetes/releases/download/v${KUBE_VERSION}/kubernetes.tar.gz -o kubernetes.tar.gz
+grep -q "^${KUBE_VERSION}\$" binaries/.kubernetes 2>/dev/null || {
+  curl -L https://github.com/kubernetes/kubernetes/releases/download/v${KUBE_VERSION}/kubernetes.tar.gz -o kubernetes.tar.gz
   tar xzf kubernetes.tar.gz
-fi
-pushd kubernetes/server
-tar xzf kubernetes-server-linux-amd64.tar.gz
-popd
-cp kubernetes/server/kubernetes/server/bin/kube-apiserver \
-   kubernetes/server/kubernetes/server/bin/kube-controller-manager \
-   kubernetes/server/kubernetes/server/bin/kube-scheduler binaries/master
-
-cp kubernetes/server/kubernetes/server/bin/kubelet \
-   kubernetes/server/kubernetes/server/bin/kube-proxy binaries/minion
-
-cp kubernetes/server/kubernetes/server/bin/kubectl binaries/
+  pushd kubernetes/server
+  tar xzf kubernetes-server-linux-amd64.tar.gz
+  popd
+  cp kubernetes/server/kubernetes/server/bin/kube-apiserver \
+     kubernetes/server/kubernetes/server/bin/kube-controller-manager \
+     kubernetes/server/kubernetes/server/bin/kube-scheduler binaries/master
+  cp kubernetes/server/kubernetes/server/bin/kubelet \
+     kubernetes/server/kubernetes/server/bin/kube-proxy binaries/minion
+  cp kubernetes/server/kubernetes/server/bin/kubectl binaries/
+  echo ${KUBE_VERSION} > binaries/.kubernetes
+}
 
 rm -rf flannel* kubernetes* etcd*
 
-echo "Done! All your commands locate in kubernetes/cluster/ubuntu/binaries dir"
+echo "Done! All your binaries locate in kubernetes/cluster/ubuntu/binaries directory"
 popd

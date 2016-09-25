@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -65,7 +65,12 @@ func TestTcpHealthChecker(t *testing.T) {
 		// A connection is made and probing would succeed
 		{tHost, tPort, probe.Success, nil, []string{""}},
 		// No connection can be made and probing would fail
-		{tHost, -1, probe.Failure, nil, []string{"unknown port", "Servname not supported for ai_socktype", "nodename nor servname provided, or not known"}},
+		{tHost, -1, probe.Failure, nil, []string{
+			"unknown port",
+			"Servname not supported for ai_socktype",
+			"nodename nor servname provided, or not known",
+			"dial tcp: invalid port",
+		}},
 	}
 
 	prober := New()
@@ -78,7 +83,7 @@ func TestTcpHealthChecker(t *testing.T) {
 			t.Errorf("#%d: expected error=%v, get=%v", i, tt.expectedError, err)
 		}
 		if !containsAny(output, tt.expectedOutputs) {
-			t.Errorf("#%d: expected output=one of %#v, get=%s", tt.expectedOutputs, output)
+			t.Errorf("#%d: expected output=one of %#v, get=%s", i, tt.expectedOutputs, output)
 		}
 	}
 }

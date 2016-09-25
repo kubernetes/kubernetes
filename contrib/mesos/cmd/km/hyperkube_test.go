@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -48,7 +48,7 @@ func testServerError(n string) *Server {
 		Long:        fmt.Sprintf("A simple server named %s that returns an error", n),
 		Run: func(s *Server, args []string) error {
 			s.hk.Printf("%s Run\n", s.Name())
-			return errors.New("Server returning error")
+			return errors.New("server returning error")
 		},
 	}
 }
@@ -90,7 +90,7 @@ func TestLinkRun(t *testing.T) {
 
 func TestTopNoArgs(t *testing.T) {
 	x := runFull(t, "hyperkube")
-	assert.EqualError(t, x.err, "No server specified")
+	assert.EqualError(t, x.err, "no server specified")
 }
 
 func TestBadServer(t *testing.T) {
@@ -125,7 +125,7 @@ func TestServerHelp(t *testing.T) {
 	x := runFull(t, "hyperkube test1 --help")
 	assert.NoError(t, x.err)
 	assert.Contains(t, x.output, "A simple server named test1")
-	assert.Contains(t, x.output, "--help[=false]: help for hyperkube")
+	assert.Contains(t, x.output, "-h, --help                                               help for hyperkube")
 	assert.NotContains(t, x.output, "test1 Run")
 }
 
@@ -133,12 +133,12 @@ func TestServerFlagsBad(t *testing.T) {
 	x := runFull(t, "hyperkube test1 --bad-flag")
 	assert.EqualError(t, x.err, "unknown flag: --bad-flag")
 	assert.Contains(t, x.output, "A simple server named test1")
-	assert.Contains(t, x.output, "--help[=false]: help for hyperkube")
+	assert.Contains(t, x.output, "-h, --help                                               help for hyperkube")
 	assert.NotContains(t, x.output, "test1 Run")
 }
 
 func TestServerError(t *testing.T) {
 	x := runFull(t, "hyperkube test-error")
 	assert.Contains(t, x.output, "test-error Run")
-	assert.EqualError(t, x.err, "Server returning error")
+	assert.EqualError(t, x.err, "server returning error")
 }

@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,20 +17,18 @@ limitations under the License.
 package downwardapi
 
 import (
-	"io/ioutil"
-	"os"
+	"fmt"
 	"path"
-	"path/filepath"
 	"sort"
 	"strings"
-	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/fieldpath"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
+	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
+	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 
 	"github.com/golang/glog"
 )
@@ -51,69 +49,101 @@ type downwardAPIPlugin struct {
 
 var _ volume.VolumePlugin = &downwardAPIPlugin{}
 
-func (plugin *downwardAPIPlugin) Init(host volume.VolumeHost) {
-	plugin.host = host
+func wrappedVolumeSpec() volume.Spec {
+	return volume.Spec{
+		Volume: &api.Volume{VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{Medium: api.StorageMediumMemory}}},
+	}
 }
 
-func (plugin *downwardAPIPlugin) Name() string {
+func (plugin *downwardAPIPlugin) Init(host volume.VolumeHost) error {
+	plugin.host = host
+	return nil
+}
+
+func (plugin *downwardAPIPlugin) GetPluginName() string {
 	return downwardAPIPluginName
+}
+
+func (plugin *downwardAPIPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
+	volumeSource, _ := getVolumeSource(spec)
+	if volumeSource == nil {
+		return "", fmt.Errorf("Spec does not reference a DownwardAPI volume type")
+	}
+
+	// Return user defined volume name, since this is an ephemeral volume type
+	return spec.Name(), nil
 }
 
 func (plugin *downwardAPIPlugin) CanSupport(spec *volume.Spec) bool {
 	return spec.Volume != nil && spec.Volume.DownwardAPI != nil
 }
 
-func (plugin *downwardAPIPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions) (volume.Builder, error) {
+func (plugin *downwardAPIPlugin) RequiresRemount() bool {
+	return true
+}
+
+func (plugin *downwardAPIPlugin) NewMounter(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
 	v := &downwardAPIVolume{
 		volName: spec.Name(),
+		items:   spec.Volume.DownwardAPI.Items,
 		pod:     pod,
 		podUID:  pod.UID,
 		plugin:  plugin,
 	}
-	v.fieldReferenceFileNames = make(map[string]string)
-	for _, fileInfo := range spec.Volume.DownwardAPI.Items {
-		v.fieldReferenceFileNames[fileInfo.FieldRef.FieldPath] = path.Clean(fileInfo.Path)
-	}
-	return &downwardAPIVolumeBuilder{
+	return &downwardAPIVolumeMounter{
 		downwardAPIVolume: v,
-		opts:              &opts}, nil
+		source:            *spec.Volume.DownwardAPI,
+		opts:              &opts,
+	}, nil
 }
 
-func (plugin *downwardAPIPlugin) NewCleaner(volName string, podUID types.UID) (volume.Cleaner, error) {
-	return &downwardAPIVolumeCleaner{&downwardAPIVolume{volName: volName, podUID: podUID, plugin: plugin}}, nil
+func (plugin *downwardAPIPlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
+	return &downwardAPIVolumeUnmounter{
+		&downwardAPIVolume{
+			volName: volName,
+			podUID:  podUID,
+			plugin:  plugin,
+		},
+	}, nil
+}
+
+func (plugin *downwardAPIPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
+	downwardAPIVolume := &api.Volume{
+		Name: volumeName,
+		VolumeSource: api.VolumeSource{
+			DownwardAPI: &api.DownwardAPIVolumeSource{},
+		},
+	}
+	return volume.NewSpecFromVolume(downwardAPIVolume), nil
 }
 
 // downwardAPIVolume retrieves downward API data and placing them into the volume on the host.
 type downwardAPIVolume struct {
-	volName                 string
-	fieldReferenceFileNames map[string]string
-	pod                     *api.Pod
-	podUID                  types.UID // TODO: remove this redundancy as soon NewCleaner func will have *api.POD and not only types.UID
-	plugin                  *downwardAPIPlugin
+	volName string
+	items   []api.DownwardAPIVolumeFile
+	pod     *api.Pod
+	podUID  types.UID // TODO: remove this redundancy as soon NewUnmounter func will have *api.POD and not only types.UID
+	plugin  *downwardAPIPlugin
+	volume.MetricsNil
 }
 
-// This is the spec for the volume that this plugin wraps.
-var wrappedVolumeSpec = &volume.Spec{
-	Volume: &api.Volume{VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{Medium: api.StorageMediumMemory}}},
-}
-
-// downwardAPIVolumeBuilder fetches info from downward API from the pod
+// downwardAPIVolumeMounter fetches info from downward API from the pod
 // and dumps it in files
-type downwardAPIVolumeBuilder struct {
+type downwardAPIVolumeMounter struct {
 	*downwardAPIVolume
-	opts *volume.VolumeOptions
+	source api.DownwardAPIVolumeSource
+	opts   *volume.VolumeOptions
 }
 
-// downwardAPIVolumeBuilder implements volume.Builder interface
-var _ volume.Builder = &downwardAPIVolumeBuilder{}
+// downwardAPIVolumeMounter implements volume.Mounter interface
+var _ volume.Mounter = &downwardAPIVolumeMounter{}
 
 // downward API volumes are always ReadOnlyManaged
 func (d *downwardAPIVolume) GetAttributes() volume.Attributes {
 	return volume.Attributes{
-		ReadOnly:                    true,
-		Managed:                     true,
-		SupportsOwnershipManagement: true,
-		SupportsSELinux:             true,
+		ReadOnly:        true,
+		Managed:         true,
+		SupportsSELinux: true,
 	}
 }
 
@@ -121,217 +151,93 @@ func (d *downwardAPIVolume) GetAttributes() volume.Attributes {
 // This function is not idempotent by design. We want the data to be refreshed periodically.
 // The internal sync interval of kubelet will drive the refresh of data.
 // TODO: Add volume specific ticker and refresh loop
-func (b *downwardAPIVolumeBuilder) SetUp() error {
-	return b.SetUpAt(b.GetPath())
+func (b *downwardAPIVolumeMounter) SetUp(fsGroup *int64) error {
+	return b.SetUpAt(b.GetPath(), fsGroup)
 }
 
-func (b *downwardAPIVolumeBuilder) SetUpAt(dir string) error {
+func (b *downwardAPIVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	glog.V(3).Infof("Setting up a downwardAPI volume %v for pod %v/%v at %v", b.volName, b.pod.Namespace, b.pod.Name, dir)
 	// Wrap EmptyDir. Here we rely on the idempotency of the wrapped plugin to avoid repeatedly mounting
-	wrapped, err := b.plugin.host.NewWrapperBuilder(wrappedVolumeSpec, b.pod, *b.opts)
+	wrapped, err := b.plugin.host.NewWrapperMounter(b.volName, wrappedVolumeSpec(), b.pod, *b.opts)
 	if err != nil {
 		glog.Errorf("Couldn't setup downwardAPI volume %v for pod %v/%v: %s", b.volName, b.pod.Namespace, b.pod.Name, err.Error())
 		return err
 	}
-	if err := wrapped.SetUpAt(dir); err != nil {
+	if err := wrapped.SetUpAt(dir, fsGroup); err != nil {
 		glog.Errorf("Unable to setup downwardAPI volume %v for pod %v/%v: %s", b.volName, b.pod.Namespace, b.pod.Name, err.Error())
 		return err
 	}
 
-	data, err := b.collectData()
+	data, err := b.collectData(b.source.DefaultMode)
 	if err != nil {
 		glog.Errorf("Error preparing data for downwardAPI volume %v for pod %v/%v: %s", b.volName, b.pod.Namespace, b.pod.Name, err.Error())
 		return err
 	}
 
-	if !b.isDataChanged(data) {
-		// No data changed: nothing to write
-		return nil
-	}
-
-	if err := b.writeData(data); err != nil {
-		glog.Errorf("Unable to dump files for downwardAPI volume %v for pod %v/%v: %s", b.volName, b.pod.Namespace, b.pod.Name, err.Error())
+	writerContext := fmt.Sprintf("pod %v/%v volume %v", b.pod.Namespace, b.pod.Name, b.volName)
+	writer, err := volumeutil.NewAtomicWriter(dir, writerContext)
+	if err != nil {
+		glog.Errorf("Error creating atomic writer: %v", err)
 		return err
 	}
 
-	glog.V(3).Infof("Data dumped for downwardAPI volume %v for pod %v/%v", b.volName, b.pod.Namespace, b.pod.Name)
+	err = writer.Write(data)
+	if err != nil {
+		glog.Errorf("Error writing payload to dir: %v", err)
+		return err
+	}
+
+	err = volume.SetVolumeOwnership(b, fsGroup)
+	if err != nil {
+		glog.Errorf("Error applying volume ownership settings for group: %v", fsGroup)
+		return err
+	}
+
 	return nil
 }
 
 // collectData collects requested downwardAPI in data map.
 // Map's key is the requested name of file to dump
 // Map's value is the (sorted) content of the field to be dumped in the file.
-func (d *downwardAPIVolume) collectData() (map[string]string, error) {
+func (d *downwardAPIVolume) collectData(defaultMode *int32) (map[string]volumeutil.FileProjection, error) {
+	if defaultMode == nil {
+		return nil, fmt.Errorf("No defaultMode used, not even the default value for it")
+	}
+
 	errlist := []error{}
-	data := make(map[string]string)
-	for fieldReference, fileName := range d.fieldReferenceFileNames {
-		if values, err := fieldpath.ExtractFieldPathAsString(d.pod, fieldReference); err != nil {
-			glog.Errorf("Unable to extract field %s: %s", fieldReference, err.Error())
-			errlist = append(errlist, err)
+	data := make(map[string]volumeutil.FileProjection)
+	for _, fileInfo := range d.items {
+		var fileProjection volumeutil.FileProjection
+		fPath := path.Clean(fileInfo.Path)
+		if fileInfo.Mode != nil {
+			fileProjection.Mode = *fileInfo.Mode
 		} else {
-			data[fileName] = sortLines(values)
+			fileProjection.Mode = *defaultMode
 		}
+		if fileInfo.FieldRef != nil {
+			// TODO: unify with Kubelet.podFieldSelectorRuntimeValue
+			if values, err := fieldpath.ExtractFieldPathAsString(d.pod, fileInfo.FieldRef.FieldPath); err != nil {
+				glog.Errorf("Unable to extract field %s: %s", fileInfo.FieldRef.FieldPath, err.Error())
+				errlist = append(errlist, err)
+			} else {
+				fileProjection.Data = []byte(sortLines(values))
+			}
+		} else if fileInfo.ResourceFieldRef != nil {
+			containerName := fileInfo.ResourceFieldRef.ContainerName
+			nodeAllocatable, err := d.plugin.host.GetNodeAllocatable()
+			if err != nil {
+				errlist = append(errlist, err)
+			} else if values, err := fieldpath.ExtractResourceValueByContainerNameAndNodeAllocatable(fileInfo.ResourceFieldRef, d.pod, containerName, nodeAllocatable); err != nil {
+				glog.Errorf("Unable to extract field %s: %s", fileInfo.ResourceFieldRef.Resource, err.Error())
+				errlist = append(errlist, err)
+			} else {
+				fileProjection.Data = []byte(sortLines(values))
+			}
+		}
+
+		data[fPath] = fileProjection
 	}
 	return data, utilerrors.NewAggregate(errlist)
-}
-
-// isDataChanged iterate over all the entries to check whether at least one
-// file needs to be updated.
-func (d *downwardAPIVolume) isDataChanged(data map[string]string) bool {
-	for fileName, values := range data {
-		if isFileToGenerate(path.Join(d.GetPath(), fileName), values) {
-			return true
-		}
-	}
-	return false
-}
-
-// isFileToGenerate compares actual file with the new values. If
-// different (or the file does not exist) return true
-func isFileToGenerate(fileName, values string) bool {
-	if _, err := os.Lstat(fileName); os.IsNotExist(err) {
-		return true
-	}
-	return readFile(fileName) != values
-}
-
-const (
-	downwardAPIDir    = "..downwardapi"
-	downwardAPITmpDir = "..downwardapi_tmp"
-	// It seems reasonable to allow dot-files in the config, so we reserved double-dot-files for the implementation".
-)
-
-// writeData writes requested downwardAPI in specified files.
-//
-// The file visible in this volume are symlinks to files in the '..downwardapi'
-// directory. Actual files are stored in an hidden timestamped directory which is
-// symlinked to by '..downwardapi'. The timestamped directory and '..downwardapi' symlink
-// are created in the plugin root dir.  This scheme allows the files to be
-// atomically updated by changing the target of the '..downwardapi' symlink.  When new
-// data is available:
-//
-// 1.  A new timestamped dir is created by writeDataInTimestampDir and requested data
-//     is written inside new timestamped directory
-// 2.  Symlinks and directory for new files are created (if needed).
-//     For example for files:
-//       <volume-dir>/user_space/labels
-//       <volume-dir>/k8s_space/annotations
-//       <volume-dir>/podName
-//     This structure is created:
-//       <volume-dir>/podName               -> ..downwardapi/podName
-//       <volume-dir>/user_space/labels     -> ../..downwardapi/user_space/labels
-//       <volume-dir>/k8s_space/annotations -> ../..downwardapi/k8s_space/annotations
-//       <volume-dir>/..downwardapi         -> ..downwardapi.12345678
-//     where ..downwardapi.12345678 is a randomly generated directory which contains
-//     the real data. If a file has to be dumped in subdirectory (for example <volume-dir>/user_space/labels)
-//     plugin builds a relative symlink (<volume-dir>/user_space/labels -> ../..downwardapi/user_space/labels)
-// 3.  The previous timestamped directory is detected reading the '..downwardapi' symlink
-// 4.  In case no symlink exists then it's created
-// 5.  In case symlink exists a new temporary symlink is created ..downwardapi_tmp
-// 6.  ..downwardapi_tmp is renamed to ..downwardapi
-// 7.  The previous timestamped directory is removed
-
-func (d *downwardAPIVolume) writeData(data map[string]string) error {
-	timestampDir, err := d.writeDataInTimestampDir(data)
-	if err != nil {
-		glog.Errorf("Unable to write data in temporary directory: %s", err.Error())
-		return err
-	}
-	// update symbolic links for relative paths
-	if err = d.updateSymlinksToCurrentDir(); err != nil {
-		os.RemoveAll(timestampDir)
-		glog.Errorf("Unable to create symlinks and/or directory: %s", err.Error())
-		return err
-	}
-
-	_, timestampDirBaseName := filepath.Split(timestampDir)
-	var oldTimestampDirectory string
-	oldTimestampDirectory, err = os.Readlink(path.Join(d.GetPath(), downwardAPIDir))
-
-	if err = os.Symlink(timestampDirBaseName, path.Join(d.GetPath(), downwardAPITmpDir)); err != nil {
-		os.RemoveAll(timestampDir)
-		glog.Errorf("Unable to create symolic link: %s", err.Error())
-		return err
-	}
-
-	// Rename the symbolic link downwardAPITmpDir to downwardAPIDir
-	if err = os.Rename(path.Join(d.GetPath(), downwardAPITmpDir), path.Join(d.GetPath(), downwardAPIDir)); err != nil {
-		// in case of error remove latest data and downwardAPITmpDir
-		os.Remove(path.Join(d.GetPath(), downwardAPITmpDir))
-		os.RemoveAll(timestampDir)
-		glog.Errorf("Unable to rename symbolic link: %s", err.Error())
-		return err
-	}
-	// Remove oldTimestampDirectory
-	if len(oldTimestampDirectory) > 0 {
-		if err := os.RemoveAll(path.Join(d.GetPath(), oldTimestampDirectory)); err != nil {
-			glog.Errorf("Unable to remove directory: %s", err.Error())
-			return err
-		}
-	}
-	return nil
-}
-
-// writeDataInTimestampDir writes the latest data into a new temporary directory with a timestamp.
-func (d *downwardAPIVolume) writeDataInTimestampDir(data map[string]string) (string, error) {
-	errlist := []error{}
-	timestampDir, err := ioutil.TempDir(d.GetPath(), ".."+time.Now().Format("2006_01_02_15_04_05"))
-	for fileName, values := range data {
-		fullPathFile := path.Join(timestampDir, fileName)
-		dir, _ := filepath.Split(fullPathFile)
-		if err = os.MkdirAll(dir, os.ModePerm); err != nil {
-			glog.Errorf("Unable to create directory `%s`: %s", dir, err.Error())
-			return "", err
-		}
-		if err := ioutil.WriteFile(fullPathFile, []byte(values), 0644); err != nil {
-			glog.Errorf("Unable to write file `%s`: %s", fullPathFile, err.Error())
-			errlist = append(errlist, err)
-		}
-	}
-	return timestampDir, utilerrors.NewAggregate(errlist)
-}
-
-// updateSymlinksToCurrentDir creates the relative symlinks for all the files configured in this volume.
-// If the directory in a file path does not exist, it is created.
-//
-// For example for files: "bar", "foo/bar", "baz/bar", "foo/baz/blah"
-// the following symlinks and subdirectory are created:
-// bar          -> ..downwardapi/bar
-// baz/bar      -> ../..downwardapi/baz/bar
-// foo/bar      -> ../..downwardapi/foo/bar
-// foo/baz/blah -> ../../..downwardapi/foo/baz/blah
-func (d *downwardAPIVolume) updateSymlinksToCurrentDir() error {
-	for _, f := range d.fieldReferenceFileNames {
-		dir, _ := filepath.Split(f)
-		nbOfSubdir := 0
-		if len(dir) > 0 {
-			// if dir is not empty f contains at least a subdirectory (for example: f="foo/bar")
-			// since filepath.Split leaves a trailing '/'  we have dir="foo/"
-			// and since len(strings.Split"foo/")=2 to count the number
-			// of sub directory you need to remove 1
-			nbOfSubdir = len(strings.Split(dir, "/")) - 1
-			if err := os.MkdirAll(path.Join(d.GetPath(), dir), os.ModePerm); err != nil {
-				return err
-			}
-		}
-		if _, err := os.Readlink(path.Join(d.GetPath(), f)); err != nil {
-			// link does not exist create it
-			presentedFile := path.Join(strings.Repeat("../", nbOfSubdir), downwardAPIDir, f)
-			actualFile := path.Join(d.GetPath(), f)
-			if err := os.Symlink(presentedFile, actualFile); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-// readFile reads the file at the given path and returns the content as a string.
-func readFile(path string) string {
-	if data, err := ioutil.ReadFile(path); err == nil {
-		return string(data)
-	}
-	return ""
 }
 
 // sortLines sorts the strings generated from map based data
@@ -343,32 +249,44 @@ func sortLines(values string) string {
 }
 
 func (d *downwardAPIVolume) GetPath() string {
-	return d.plugin.host.GetPodVolumeDir(d.podUID, util.EscapeQualifiedNameForDisk(downwardAPIPluginName), d.volName)
+	return d.plugin.host.GetPodVolumeDir(d.podUID, utilstrings.EscapeQualifiedNameForDisk(downwardAPIPluginName), d.volName)
 }
 
-// downwardAPIVolumeCleander handles cleaning up downwardAPI volumes
-type downwardAPIVolumeCleaner struct {
+// downwardAPIVolumeCleaner handles cleaning up downwardAPI volumes
+type downwardAPIVolumeUnmounter struct {
 	*downwardAPIVolume
 }
 
-// downwardAPIVolumeCleaner implements volume.Cleaner interface
-var _ volume.Cleaner = &downwardAPIVolumeCleaner{}
+// downwardAPIVolumeUnmounter implements volume.Unmounter interface
+var _ volume.Unmounter = &downwardAPIVolumeUnmounter{}
 
-func (c *downwardAPIVolumeCleaner) TearDown() error {
+func (c *downwardAPIVolumeUnmounter) TearDown() error {
 	return c.TearDownAt(c.GetPath())
 }
 
-func (c *downwardAPIVolumeCleaner) TearDownAt(dir string) error {
+func (c *downwardAPIVolumeUnmounter) TearDownAt(dir string) error {
 	glog.V(3).Infof("Tearing down volume %v for pod %v at %v", c.volName, c.podUID, dir)
 
 	// Wrap EmptyDir, let it do the teardown.
-	wrapped, err := c.plugin.host.NewWrapperCleaner(wrappedVolumeSpec, c.podUID)
+	wrapped, err := c.plugin.host.NewWrapperUnmounter(c.volName, wrappedVolumeSpec(), c.podUID)
 	if err != nil {
 		return err
 	}
 	return wrapped.TearDownAt(dir)
 }
 
-func (b *downwardAPIVolumeBuilder) getMetaDir() string {
-	return path.Join(b.plugin.host.GetPodPluginDir(b.podUID, util.EscapeQualifiedNameForDisk(downwardAPIPluginName)), b.volName)
+func (b *downwardAPIVolumeMounter) getMetaDir() string {
+	return path.Join(b.plugin.host.GetPodPluginDir(b.podUID, utilstrings.EscapeQualifiedNameForDisk(downwardAPIPluginName)), b.volName)
+}
+
+func getVolumeSource(spec *volume.Spec) (*api.DownwardAPIVolumeSource, bool) {
+	var readOnly bool
+	var volumeSource *api.DownwardAPIVolumeSource
+
+	if spec.Volume != nil && spec.Volume.DownwardAPI != nil {
+		volumeSource = spec.Volume.DownwardAPI
+		readOnly = spec.ReadOnly
+	}
+
+	return volumeSource, readOnly
 }

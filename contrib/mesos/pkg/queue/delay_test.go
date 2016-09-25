@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -125,9 +125,9 @@ func TestDQ_sanity_check(t *testing.T) {
 
 	dq := NewDelayQueue()
 	delay := 2 * time.Second
-	dq.Add(&testjob{d: delay})
 
 	before := time.Now()
+	dq.Add(&testjob{d: delay})
 	x := dq.Pop()
 
 	now := time.Now()
@@ -358,7 +358,7 @@ func TestDFIFO_sanity_check(t *testing.T) {
 
 	// pop last
 	before := time.Now()
-	x := df.Pop()
+	x := df.Pop(WithoutCancel())
 	assert.Equal(a.(*testjob).instance, 2)
 
 	now := time.Now()
@@ -395,7 +395,7 @@ func TestDFIFO_Offer(t *testing.T) {
 	}
 
 	before := time.Now()
-	x := dq.Pop()
+	x := dq.Pop(WithoutCancel())
 
 	now := time.Now()
 	waitPeriod := now.Sub(before)

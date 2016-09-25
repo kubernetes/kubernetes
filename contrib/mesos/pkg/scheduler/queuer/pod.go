@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,16 +25,44 @@ import (
 	"k8s.io/kubernetes/pkg/client/cache"
 )
 
+// functional Pod option
+type PodOpt func(*Pod)
+
 // wrapper for the k8s pod type so that we can define additional methods on a "pod"
 type Pod struct {
 	*api.Pod
 	deadline *time.Time
-	Delay    *time.Duration
-	Notify   queue.BreakChan
+	delay    *time.Duration
+	notify   queue.BreakChan
 }
 
-func NewPodWithDeadline(pod *api.Pod, deadline *time.Time) *Pod {
-	return &Pod{Pod: pod, deadline: deadline}
+func NewPod(pod *api.Pod, opt ...PodOpt) *Pod {
+	p := &Pod{Pod: pod}
+	for _, f := range opt {
+		f(p)
+	}
+	return p
+}
+
+// Deadline sets the deadline for a Pod
+func Deadline(deadline time.Time) PodOpt {
+	return func(pod *Pod) {
+		pod.deadline = &deadline
+	}
+}
+
+// Delay sets the delay for a Pod
+func Delay(delay time.Duration) PodOpt {
+	return func(pod *Pod) {
+		pod.delay = &delay
+	}
+}
+
+// Notify sets the breakout notification channel for a Pod
+func Notify(notify queue.BreakChan) PodOpt {
+	return func(pod *Pod) {
+		pod.notify = notify
+	}
 }
 
 // implements Copyable
@@ -58,21 +86,21 @@ func (p *Pod) GetUID() string {
 
 // implements Deadlined
 func (dp *Pod) Deadline() (time.Time, bool) {
-	if dp.Deadline != nil {
+	if dp.deadline != nil {
 		return *(dp.deadline), true
 	}
 	return time.Time{}, false
 }
 
 func (dp *Pod) GetDelay() time.Duration {
-	if dp.Delay != nil {
-		return *(dp.Delay)
+	if dp.delay != nil {
+		return *(dp.delay)
 	}
 	return 0
 }
 
 func (p *Pod) Breaker() queue.BreakChan {
-	return p.Notify
+	return p.notify
 }
 
 func (p *Pod) String() string {

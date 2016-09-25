@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,8 +17,11 @@ limitations under the License.
 package prober
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"net"
+	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
@@ -27,7 +30,10 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/record"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
+	"k8s.io/kubernetes/pkg/kubelet/util/format"
+	"k8s.io/kubernetes/pkg/kubelet/util/ioutils"
 	"k8s.io/kubernetes/pkg/probe"
 	execprobe "k8s.io/kubernetes/pkg/probe/exec"
 	httprobe "k8s.io/kubernetes/pkg/probe/http"
@@ -80,7 +86,7 @@ func (pb *prober) probe(probeType probeType, pod *api.Pod, status api.PodStatus,
 		return results.Failure, fmt.Errorf("Unknown probe type: %q", probeType)
 	}
 
-	ctrName := fmt.Sprintf("%s:%s", kubecontainer.GetPodFullName(pod), container.Name)
+	ctrName := fmt.Sprintf("%s:%s", format.Pod(pod), container.Name)
 	if probeSpec == nil {
 		glog.Warningf("%s probe for %s is nil", probeType, ctrName)
 		return results.Success, nil
@@ -96,12 +102,12 @@ func (pb *prober) probe(probeType probeType, pod *api.Pod, status api.PodStatus,
 		if err != nil {
 			glog.V(1).Infof("%s probe for %q errored: %v", probeType, ctrName, err)
 			if hasRef {
-				pb.recorder.Eventf(ref, api.EventTypeWarning, kubecontainer.ContainerUnhealthy, "%s probe errored: %v", probeType, err)
+				pb.recorder.Eventf(ref, api.EventTypeWarning, events.ContainerUnhealthy, "%s probe errored: %v", probeType, err)
 			}
 		} else { // result != probe.Success
 			glog.V(1).Infof("%s probe for %q failed (%v): %s", probeType, ctrName, result, output)
 			if hasRef {
-				pb.recorder.Eventf(ref, api.EventTypeWarning, kubecontainer.ContainerUnhealthy, "%s probe failed: %s", probeType, output)
+				pb.recorder.Eventf(ref, api.EventTypeWarning, events.ContainerUnhealthy, "%s probe failed: %s", probeType, output)
 			}
 		}
 		return results.Failure, err
@@ -125,6 +131,16 @@ func (pb *prober) runProbeWithRetries(p *api.Probe, pod *api.Pod, status api.Pod
 	return result, output, err
 }
 
+// buildHeaderMap takes a list of HTTPHeader <name, value> string
+// pairs and returns a populated string->[]string http.Header map.
+func buildHeader(headerList []api.HTTPHeader) http.Header {
+	headers := make(http.Header)
+	for _, header := range headerList {
+		headers[header.Name] = append(headers[header.Name], header.Value)
+	}
+	return headers
+}
+
 func (pb *prober) runProbe(p *api.Probe, pod *api.Pod, status api.PodStatus, container api.Container, containerID kubecontainer.ContainerID) (probe.Result, string, error) {
 	timeout := time.Duration(p.TimeoutSeconds) * time.Second
 	if p.Exec != nil {
@@ -144,7 +160,9 @@ func (pb *prober) runProbe(p *api.Probe, pod *api.Pod, status api.PodStatus, con
 		path := p.HTTPGet.Path
 		glog.V(4).Infof("HTTP-Probe Host: %v://%v, Port: %v, Path: %v", scheme, host, port, path)
 		url := formatURL(scheme, host, port, path)
-		return pb.http.Probe(url, timeout)
+		headers := buildHeader(p.HTTPGet.HTTPHeaders)
+		glog.V(4).Infof("HTTP-Probe Headers: %v", headers)
+		return pb.http.Probe(url, headers, timeout)
 	}
 	if p.TCPSocket != nil {
 		port, err := extractPort(p.TCPSocket.Port, container)
@@ -155,7 +173,7 @@ func (pb *prober) runProbe(p *api.Probe, pod *api.Pod, status api.PodStatus, con
 		return pb.tcp.Probe(status.PodIP, port, timeout)
 	}
 	glog.Warningf("Failed to find probe builder for container: %v", container)
-	return probe.Unknown, "", fmt.Errorf("Missing probe handler for %s:%s", kubecontainer.GetPodFullName(pod), container.Name)
+	return probe.Unknown, "", fmt.Errorf("Missing probe handler for %s:%s", format.Pod(pod), container.Name)
 }
 
 func extractPort(param intstr.IntOrString, container api.Container) (int, error) {
@@ -184,7 +202,7 @@ func extractPort(param intstr.IntOrString, container api.Container) (int, error)
 func findPortByName(container api.Container, portName string) (int, error) {
 	for _, port := range container.Ports {
 		if port.Name == portName {
-			return port.ContainerPort, nil
+			return int(port.ContainerPort), nil
 		}
 	}
 	return 0, fmt.Errorf("port %s not found", portName)
@@ -192,20 +210,33 @@ func findPortByName(container api.Container, portName string) (int, error) {
 
 // formatURL formats a URL from args.  For testability.
 func formatURL(scheme string, host string, port int, path string) *url.URL {
-	return &url.URL{
-		Scheme: scheme,
-		Host:   net.JoinHostPort(host, strconv.Itoa(port)),
-		Path:   path,
+	u, err := url.Parse(path)
+	// Something is busted with the path, but it's too late to reject it. Pass it along as is.
+	if err != nil {
+		u = &url.URL{
+			Path: path,
+		}
 	}
+	u.Scheme = scheme
+	u.Host = net.JoinHostPort(host, strconv.Itoa(port))
+	return u
 }
 
 type execInContainer struct {
+	// run executes a command in a container. Combined stdout and stderr output is always returned. An
+	// error is returned if one occurred.
 	run func() ([]byte, error)
 }
 
 func (p *prober) newExecInContainer(container api.Container, containerID kubecontainer.ContainerID, cmd []string) exec.Cmd {
 	return execInContainer{func() ([]byte, error) {
-		return p.runner.RunInContainer(containerID, cmd)
+		var buffer bytes.Buffer
+		output := ioutils.WriteCloserWrapper(&buffer)
+		err := p.runner.ExecInContainer(containerID, cmd, nil, output, output, false, nil)
+		// Even if err is non-nil, there still may be output (e.g. the exec wrote to stdout or stderr but
+		// the command returned a nonzero exit code). Therefore, always return the output along with the
+		// error.
+		return buffer.Bytes(), err
 	}}
 }
 
@@ -213,6 +244,18 @@ func (eic execInContainer) CombinedOutput() ([]byte, error) {
 	return eic.run()
 }
 
+func (eic execInContainer) Output() ([]byte, error) {
+	return nil, fmt.Errorf("unimplemented")
+}
+
 func (eic execInContainer) SetDir(dir string) {
+	//unimplemented
+}
+
+func (eic execInContainer) SetStdin(in io.Reader) {
+	//unimplemented
+}
+
+func (eic execInContainer) SetStdout(out io.Writer) {
 	//unimplemented
 }

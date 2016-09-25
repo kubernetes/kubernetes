@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -47,16 +47,16 @@ func HasCapabilitiesRequest(container *api.Container) bool {
 	return len(container.SecurityContext.Capabilities.Add) > 0 || len(container.SecurityContext.Capabilities.Drop) > 0
 }
 
-const expectedSELinuxContextFields = 4
+const expectedSELinuxFields = 4
 
 // ParseSELinuxOptions parses a string containing a full SELinux context
 // (user, role, type, and level) into an SELinuxOptions object.  If the
 // context is malformed, an error is returned.
 func ParseSELinuxOptions(context string) (*api.SELinuxOptions, error) {
-	fields := strings.SplitN(context, ":", expectedSELinuxContextFields)
+	fields := strings.SplitN(context, ":", expectedSELinuxFields)
 
-	if len(fields) != expectedSELinuxContextFields {
-		return nil, fmt.Errorf("expected %v fields in selinuxcontext; got %v (context: %v)", expectedSELinuxContextFields, len(fields), context)
+	if len(fields) != expectedSELinuxFields {
+		return nil, fmt.Errorf("expected %v fields in selinux; got %v (context: %v)", expectedSELinuxFields, len(fields), context)
 	}
 
 	return &api.SELinuxOptions{

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,18 +18,38 @@ package handlers
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/golang/glog"
+	"github.com/prometheus/client_golang/prometheus"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/auth/authenticator"
 )
 
-// NewRequestAuthenticator creates an http handler that tries to authenticate the given request as a user, and then
+var (
+	authenticatedUserCounter = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "authenticated_user_requests",
+			Help: "Counter of authenticated requests broken out by username.",
+		},
+		[]string{"username"},
+	)
+)
+
+func init() {
+	prometheus.MustRegister(authenticatedUserCounter)
+}
+
+// WithAuthentication creates an http handler that tries to authenticate the given request as a user, and then
 // stores any such user found onto the provided context for the request. If authentication fails or returns an error
 // the failed handler is used. On success, handler is invoked to serve the request.
-func NewRequestAuthenticator(mapper api.RequestContextMapper, auth authenticator.Request, failed http.Handler, handler http.Handler) (http.Handler, error) {
-	return api.NewRequestContextFilter(
-		mapper,
+func WithAuthentication(handler http.Handler, mapper api.RequestContextMapper, auth authenticator.Request, failed http.Handler) http.Handler {
+	if auth == nil {
+		glog.Warningf("Authentication is disabled")
+		return handler
+	}
+	return api.WithRequestContext(
 		http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			user, ok, err := auth.AuthenticateRequest(req)
 			if err != nil || !ok {
@@ -44,8 +64,11 @@ func NewRequestAuthenticator(mapper api.RequestContextMapper, auth authenticator
 				mapper.Update(req, api.WithUser(ctx, user))
 			}
 
+			authenticatedUserCounter.WithLabelValues(compressUsername(user.GetName())).Inc()
+
 			handler.ServeHTTP(w, req)
 		}),
+		mapper,
 	)
 }
 
@@ -65,4 +88,26 @@ func unauthorizedBasicAuth(w http.ResponseWriter, req *http.Request) {
 // unauthorized serves an unauthorized message to clients.
 func unauthorized(w http.ResponseWriter, req *http.Request) {
 	http.Error(w, "Unauthorized", http.StatusUnauthorized)
+}
+
+// compressUsername maps all possible usernames onto a small set of categories
+// of usernames. This is done both to limit the cardinality of the
+// authorized_user_requests metric, and to avoid pushing actual usernames in the
+// metric.
+func compressUsername(username string) string {
+	switch {
+	// Known internal identities.
+	case username == "admin" ||
+		username == "client" ||
+		username == "kube_proxy" ||
+		username == "kubelet" ||
+		username == "system:serviceaccount:kube-system:default":
+		return username
+	// Probably an email address.
+	case strings.Contains(username, "@"):
+		return "email_id"
+	// Anything else (custom service accounts, custom external identities, etc.)
+	default:
+		return "other"
+	}
 }

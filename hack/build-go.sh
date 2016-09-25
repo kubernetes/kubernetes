@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2016 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,14 +14,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This script sets up a go workspace locally and builds all go components.
+# This script is a vestigial redirection.  Please do not add "real" logic.
 
 set -o errexit
 set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
-source "${KUBE_ROOT}/hack/lib/init.sh"
 
-kube::golang::build_binaries "$@"
-kube::golang::place_bins
+# For help output
+ARGHELP=""
+if [[ "$#" -gt 0 ]]; then
+    ARGHELP="WHAT='$@'"
+fi
+
+echo "NOTE: $0 has been replaced by 'make' or 'make all'"
+echo
+echo "The equivalent of this invocation is: "
+echo "    make ${ARGHELP}"
+echo
+echo
+make --no-print-directory -C "${KUBE_ROOT}" all WHAT="$*"

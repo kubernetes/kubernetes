@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,29 +25,31 @@ import (
 
 const schedulerSubsystem = "scheduler"
 
+var BindingSaturationReportInterval = 1 * time.Second
+
 var (
-	E2eSchedulingLatency = prometheus.NewSummary(
-		prometheus.SummaryOpts{
+	E2eSchedulingLatency = prometheus.NewHistogram(
+		prometheus.HistogramOpts{
 			Subsystem: schedulerSubsystem,
 			Name:      "e2e_scheduling_latency_microseconds",
 			Help:      "E2e scheduling latency (scheduling algorithm + binding)",
-			MaxAge:    time.Hour,
+			Buckets:   prometheus.ExponentialBuckets(1000, 2, 15),
 		},
 	)
-	SchedulingAlgorithmLatency = prometheus.NewSummary(
-		prometheus.SummaryOpts{
+	SchedulingAlgorithmLatency = prometheus.NewHistogram(
+		prometheus.HistogramOpts{
 			Subsystem: schedulerSubsystem,
 			Name:      "scheduling_algorithm_latency_microseconds",
 			Help:      "Scheduling algorithm latency",
-			MaxAge:    time.Hour,
+			Buckets:   prometheus.ExponentialBuckets(1000, 2, 15),
 		},
 	)
-	BindingLatency = prometheus.NewSummary(
-		prometheus.SummaryOpts{
+	BindingLatency = prometheus.NewHistogram(
+		prometheus.HistogramOpts{
 			Subsystem: schedulerSubsystem,
 			Name:      "binding_latency_microseconds",
 			Help:      "Binding latency",
-			MaxAge:    time.Hour,
+			Buckets:   prometheus.ExponentialBuckets(1000, 2, 15),
 		},
 	)
 )

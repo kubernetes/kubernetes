@@ -1,7 +1,7 @@
 // +build linux
 
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -37,8 +37,8 @@ import (
 // In general, using this requires that the caller posses the NET_CAP_ADMIN capability, though if you
 // do this within an container, it only requires the NS_CAPABLE capability for manipulations to that
 // container's network namespace.
-// Uses the hierarchical token bucket queueing discipline (htb), this requires Linux 2.4.20 or newer
-// or a custom kernel with that queueing discipline backported.
+// Uses the hierarchical token bucket queuing discipline (htb), this requires Linux 2.4.20 or newer
+// or a custom kernel with that queuing discipline backported.
 type tcShaper struct {
 	e     exec.Interface
 	iface string
@@ -224,6 +224,12 @@ func (t *tcShaper) interfaceExists() (bool, string, error) {
 	if len(value) == 0 {
 		return false, "", nil
 	}
+	// Newer versions of tc and/or the kernel return the following instead of nothing:
+	// qdisc noqueue 0: root refcnt 2
+	fields := strings.Fields(value)
+	if len(fields) > 1 && fields[1] == "noqueue" {
+		return false, "", nil
+	}
 	return true, value, nil
 }
 
@@ -249,7 +255,7 @@ func (t *tcShaper) ReconcileInterface() error {
 		return t.initializeInterface()
 	}
 	fields := strings.Split(output, " ")
-	if len(fields) != 12 || fields[1] != "htb" || fields[2] != "1:" {
+	if len(fields) < 12 || fields[1] != "htb" || fields[2] != "1:" {
 		if err := t.deleteInterface(fields[2]); err != nil {
 			return err
 		}

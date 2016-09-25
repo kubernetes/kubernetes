@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,4 +23,4 @@ limitations under the License.
 //  * Multiple consumers and producers. In particular, it is allowed for an
 //      item to be reenqueued while it is being processed.
 //  * Shutdown notifications.
-package workqueue
+package workqueue // import "k8s.io/kubernetes/pkg/util/workqueue"

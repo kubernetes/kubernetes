@@ -1,8 +1,14 @@
 # Contributing guidelines
 
+Want to hack on kubernetes? Yay!
+
+## Developer Guide
+
+We have a [Developer's Guide](docs/devel/README.md) that outlines everything you need to know from setting up your dev environment to how to get faster Pull Request reviews. If you find something undocumented or incorrect along the way, please feel free to send a Pull Request.
+
 ## Filing issues
 
-If you have a question about Kubernetes or have a problem using Kubernetes, before filing an issue, please read the [troubleshooting guide](docs/troubleshooting.md).
+If you have a question about Kubernetes or have a problem using it, please read the [troubleshooting guide](docs/troubleshooting.md) before filing an issue.
 
 ## How to become a contributor and submit your own code
 
@@ -17,7 +23,7 @@ Please fill out either the individual or corporate Contributor License Agreement
 
 Follow either of the two links above to access the appropriate CLA and instructions for how to sign and return it. Once we receive it, we'll be able to accept your pull requests.
 
-***NOTE***: Only original source code from you and other people that have signed the CLA can be accepted into the main repository. This policy does not apply to [third_party](https://github.com/kubernetes/kubernetes/tree/master/third_party).
+***NOTE***: Only original source code from you and other people that have signed the CLA can be accepted into the main repository. This policy does not apply to [third_party](third_party/).
 
 ### Contributing A Patch
 

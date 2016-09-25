@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ import (
 	"testing"
 
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/diff"
 )
 
 type stepParserTest struct {
@@ -90,7 +90,7 @@ func (test stepParserTest) run(t *testing.T) {
 	}
 
 	if !reflect.DeepEqual(test.expectedNavigationSteps, *actualSteps) {
-		t.Errorf("diff: %v", util.ObjectDiff(test.expectedNavigationSteps, *actualSteps))
+		t.Errorf("diff: %v", diff.ObjectDiff(test.expectedNavigationSteps, *actualSteps))
 		t.Errorf("expected: %#v\n actual:   %#v", test.expectedNavigationSteps, *actualSteps)
 	}
 }

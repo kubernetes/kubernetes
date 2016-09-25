@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,54 +18,54 @@ package integration
 
 import (
 	"fmt"
-	"io/ioutil"
 	"math/rand"
-	"os"
+	"testing"
 
-	"github.com/coreos/go-etcd/etcd"
+	etcd "github.com/coreos/etcd/client"
 	"github.com/golang/glog"
+	"golang.org/x/net/context"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/test/integration/framework"
 )
 
-func newEtcdClient() *etcd.Client {
-	return etcd.NewClient([]string{})
+func newEtcdClient() etcd.Client {
+	cfg := etcd.Config{
+		Endpoints: []string{framework.GetEtcdURLFromEnv()},
+	}
+	client, err := etcd.New(cfg)
+	if err != nil {
+		glog.Fatalf("unable to connect to etcd for testing: %v", err)
+	}
+	return client
 }
 
-func requireEtcd() {
-	if _, err := newEtcdClient().Get("/", false, false); err != nil {
+func RequireEtcd() {
+	if _, err := etcd.NewKeysAPI(newEtcdClient()).Get(context.TODO(), "/", nil); err != nil {
 		glog.Fatalf("unable to connect to etcd for integration testing: %v", err)
 	}
 }
 
 func withEtcdKey(f func(string)) {
 	prefix := fmt.Sprintf("/test-%d", rand.Int63())
-	defer newEtcdClient().Delete(prefix, true)
+	defer etcd.NewKeysAPI(newEtcdClient()).Delete(context.TODO(), prefix, &etcd.DeleteOptions{Recursive: true})
 	f(prefix)
 }
 
-func deleteAllEtcdKeys() {
-	client := newEtcdClient()
-	keys, err := client.Get("/", false, false)
-	if err != nil {
-		glog.Fatalf("Unable to list root etcd keys: %v", err)
+func DeletePodOrErrorf(t *testing.T, c *client.Client, ns, name string) {
+	if err := c.Pods(ns).Delete(name, nil); err != nil {
+		t.Errorf("unable to delete pod %v: %v", name, err)
 	}
-	for _, node := range keys.Node.Nodes {
-		if _, err := client.Delete(node.Key, true); err != nil {
-			glog.Fatalf("Unable delete key: %v", err)
-		}
-	}
-
 }
 
-func MakeTempDirOrDie(prefix string, baseDir string) string {
-	if baseDir == "" {
-		baseDir = "/tmp"
-	}
-	tempDir, err := ioutil.TempDir(baseDir, prefix)
-	if err != nil {
-		glog.Fatalf("Can't make a temp rootdir: %v", err)
-	}
-	if err = os.MkdirAll(tempDir, 0750); err != nil {
-		glog.Fatalf("Can't mkdir(%q): %v", tempDir, err)
-	}
-	return tempDir
-}
+// Requests to try.  Each one should be forbidden or not forbidden
+// depending on the authentication and authorization setup of the master.
+var Code200 = map[int]bool{200: true}
+var Code201 = map[int]bool{201: true}
+var Code400 = map[int]bool{400: true}
+var Code403 = map[int]bool{403: true}
+var Code404 = map[int]bool{404: true}
+var Code405 = map[int]bool{405: true}
+var Code409 = map[int]bool{409: true}
+var Code422 = map[int]bool{422: true}
+var Code500 = map[int]bool{500: true}
+var Code503 = map[int]bool{503: true}

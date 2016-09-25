@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,22 +17,17 @@ limitations under the License.
 package apiserver
 
 import (
-	"bufio"
-	"encoding/json"
 	"fmt"
-	"net"
 	"net/http"
-	"regexp"
 	"runtime/debug"
 	"strings"
-	"sync"
-	"time"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/httplog"
+	"k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
@@ -45,9 +40,12 @@ var specialVerbs = sets.NewString("proxy", "redirect", "watch")
 // specialVerbsNoSubresources contains root verbs which do not allow subresources
 var specialVerbsNoSubresources = sets.NewString("proxy", "redirect")
 
-// Constant for the retry-after interval on rate limiting.
-// TODO: maybe make this dynamic? or user-adjustable?
-const RetryAfter = "1"
+// namespaceSubresources contains subresources of namespace
+// this list allows the parser to distinguish between a namespace subresource, and a namespaced resource
+var namespaceSubresources = sets.NewString("status", "finalize")
+
+// NamespaceSubResourcesForTest exports namespaceSubresources for testing in pkg/master/master_test.go, so we never drift
+var NamespaceSubResourcesForTest = sets.NewString(namespaceSubresources.List()...)
 
 // IsReadOnlyReq() is true for any (or at least many) request which has no observable
 // side effects on state of apiserver (though there may be internal side effects like
@@ -72,266 +70,37 @@ func ReadOnly(handler http.Handler) http.Handler {
 	})
 }
 
-// MaxInFlight limits the number of in-flight requests to buffer size of the passed in channel.
-func MaxInFlightLimit(c chan bool, longRunningRequestRE *regexp.Regexp, handler http.Handler) http.Handler {
-	if c == nil {
-		return handler
-	}
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if longRunningRequestRE.MatchString(r.URL.Path) {
-			// Skip tracking long running events.
-			handler.ServeHTTP(w, r)
-			return
-		}
-		select {
-		case c <- true:
-			defer func() { <-c }()
-			handler.ServeHTTP(w, r)
-		default:
-			tooManyRequests(w)
-		}
-	})
-}
-
-func tooManyRequests(w http.ResponseWriter) {
-	// Return a 429 status indicating "Too Many Requests"
-	w.Header().Set("Retry-After", RetryAfter)
-	http.Error(w, "Too many requests, please try again later.", errors.StatusTooManyRequests)
-}
-
 // RecoverPanics wraps an http Handler to recover and log panics.
-func RecoverPanics(handler http.Handler) http.Handler {
+func RecoverPanics(handler http.Handler, resolver *RequestInfoResolver) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		defer func() {
-			if x := recover(); x != nil {
-				http.Error(w, "apis panic. Look in log for details.", http.StatusInternalServerError)
-				glog.Errorf("APIServer panic'd on %v %v: %v\n%s\n", req.Method, req.RequestURI, x, debug.Stack())
-			}
-		}()
-		defer httplog.NewLogged(req, &w).StacktraceWhen(
-			httplog.StatusIsNot(
-				http.StatusOK,
-				http.StatusCreated,
-				http.StatusAccepted,
-				http.StatusBadRequest,
-				http.StatusMovedPermanently,
-				http.StatusTemporaryRedirect,
-				http.StatusConflict,
-				http.StatusNotFound,
-				http.StatusUnauthorized,
-				http.StatusForbidden,
-				errors.StatusUnprocessableEntity,
-				http.StatusSwitchingProtocols,
-			),
-		).Log()
+		defer runtime.HandleCrash(func(err interface{}) {
+			http.Error(w, "This request caused apisever to panic. Look in log for details.", http.StatusInternalServerError)
+			glog.Errorf("APIServer panic'd on %v %v: %v\n%s\n", req.Method, req.RequestURI, err, debug.Stack())
+		})
 
+		logger := httplog.NewLogged(req, &w)
+		requestInfo, err := resolver.GetRequestInfo(req)
+		if err != nil || requestInfo.Verb != "proxy" {
+			logger.StacktraceWhen(
+				httplog.StatusIsNot(
+					http.StatusOK,
+					http.StatusCreated,
+					http.StatusAccepted,
+					http.StatusBadRequest,
+					http.StatusMovedPermanently,
+					http.StatusTemporaryRedirect,
+					http.StatusConflict,
+					http.StatusNotFound,
+					http.StatusUnauthorized,
+					http.StatusForbidden,
+					http.StatusNotModified,
+					errors.StatusUnprocessableEntity,
+					http.StatusSwitchingProtocols,
+				),
+			)
+		}
+		defer logger.Log()
 		// Dispatch to the internal handler
-		handler.ServeHTTP(w, req)
-	})
-}
-
-// TimeoutHandler returns an http.Handler that runs h with a timeout
-// determined by timeoutFunc. The new http.Handler calls h.ServeHTTP to handle
-// each request, but if a call runs for longer than its time limit, the
-// handler responds with a 503 Service Unavailable error and the message
-// provided. (If msg is empty, a suitable default message with be sent.) After
-// the handler times out, writes by h to its http.ResponseWriter will return
-// http.ErrHandlerTimeout. If timeoutFunc returns a nil timeout channel, no
-// timeout will be enforced.
-func TimeoutHandler(h http.Handler, timeoutFunc func(*http.Request) (timeout <-chan time.Time, msg string)) http.Handler {
-	return &timeoutHandler{h, timeoutFunc}
-}
-
-type timeoutHandler struct {
-	handler http.Handler
-	timeout func(*http.Request) (<-chan time.Time, string)
-}
-
-func (t *timeoutHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	after, msg := t.timeout(r)
-	if after == nil {
-		t.handler.ServeHTTP(w, r)
-		return
-	}
-
-	done := make(chan struct{}, 1)
-	tw := newTimeoutWriter(w)
-	go func() {
-		t.handler.ServeHTTP(tw, r)
-		done <- struct{}{}
-	}()
-	select {
-	case <-done:
-		return
-	case <-after:
-		tw.timeout(msg)
-	}
-}
-
-type timeoutWriter interface {
-	http.ResponseWriter
-	timeout(string)
-}
-
-func newTimeoutWriter(w http.ResponseWriter) timeoutWriter {
-	base := &baseTimeoutWriter{w: w}
-
-	_, notifiable := w.(http.CloseNotifier)
-	_, hijackable := w.(http.Hijacker)
-
-	switch {
-	case notifiable && hijackable:
-		return &closeHijackTimeoutWriter{base}
-	case notifiable:
-		return &closeTimeoutWriter{base}
-	case hijackable:
-		return &hijackTimeoutWriter{base}
-	default:
-		return base
-	}
-}
-
-type baseTimeoutWriter struct {
-	w http.ResponseWriter
-
-	mu          sync.Mutex
-	timedOut    bool
-	wroteHeader bool
-	hijacked    bool
-}
-
-func (tw *baseTimeoutWriter) Header() http.Header {
-	return tw.w.Header()
-}
-
-func (tw *baseTimeoutWriter) Write(p []byte) (int, error) {
-	tw.mu.Lock()
-	defer tw.mu.Unlock()
-	tw.wroteHeader = true
-	if tw.hijacked {
-		return 0, http.ErrHijacked
-	}
-	if tw.timedOut {
-		return 0, http.ErrHandlerTimeout
-	}
-	return tw.w.Write(p)
-}
-
-func (tw *baseTimeoutWriter) Flush() {
-	tw.mu.Lock()
-	defer tw.mu.Unlock()
-
-	if flusher, ok := tw.w.(http.Flusher); ok {
-		flusher.Flush()
-	}
-}
-
-func (tw *baseTimeoutWriter) WriteHeader(code int) {
-	tw.mu.Lock()
-	defer tw.mu.Unlock()
-	if tw.timedOut || tw.wroteHeader || tw.hijacked {
-		return
-	}
-	tw.wroteHeader = true
-	tw.w.WriteHeader(code)
-}
-
-func (tw *baseTimeoutWriter) timeout(msg string) {
-	tw.mu.Lock()
-	defer tw.mu.Unlock()
-	if !tw.wroteHeader && !tw.hijacked {
-		tw.w.WriteHeader(http.StatusGatewayTimeout)
-		if msg != "" {
-			tw.w.Write([]byte(msg))
-		} else {
-			enc := json.NewEncoder(tw.w)
-			enc.Encode(errors.NewServerTimeout("", "", 0))
-		}
-	}
-	tw.timedOut = true
-}
-
-func (tw *baseTimeoutWriter) closeNotify() <-chan bool {
-	return tw.w.(http.CloseNotifier).CloseNotify()
-}
-
-func (tw *baseTimeoutWriter) hijack() (net.Conn, *bufio.ReadWriter, error) {
-	tw.mu.Lock()
-	defer tw.mu.Unlock()
-	if tw.timedOut {
-		return nil, nil, http.ErrHandlerTimeout
-	}
-	conn, rw, err := tw.w.(http.Hijacker).Hijack()
-	if err == nil {
-		tw.hijacked = true
-	}
-	return conn, rw, err
-}
-
-type closeTimeoutWriter struct {
-	*baseTimeoutWriter
-}
-
-func (tw *closeTimeoutWriter) CloseNotify() <-chan bool {
-	return tw.closeNotify()
-}
-
-type hijackTimeoutWriter struct {
-	*baseTimeoutWriter
-}
-
-func (tw *hijackTimeoutWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
-	return tw.hijack()
-}
-
-type closeHijackTimeoutWriter struct {
-	*baseTimeoutWriter
-}
-
-func (tw *closeHijackTimeoutWriter) CloseNotify() <-chan bool {
-	return tw.closeNotify()
-}
-
-func (tw *closeHijackTimeoutWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
-	return tw.hijack()
-}
-
-// TODO: use restful.CrossOriginResourceSharing
-// Simple CORS implementation that wraps an http Handler
-// For a more detailed implementation use https://github.com/martini-contrib/cors
-// or implement CORS at your proxy layer
-// Pass nil for allowedMethods and allowedHeaders to use the defaults
-func CORS(handler http.Handler, allowedOriginPatterns []*regexp.Regexp, allowedMethods []string, allowedHeaders []string, allowCredentials string) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		origin := req.Header.Get("Origin")
-		if origin != "" {
-			allowed := false
-			for _, pattern := range allowedOriginPatterns {
-				if allowed = pattern.MatchString(origin); allowed {
-					break
-				}
-			}
-			if allowed {
-				w.Header().Set("Access-Control-Allow-Origin", origin)
-				// Set defaults for methods and headers if nothing was passed
-				if allowedMethods == nil {
-					allowedMethods = []string{"POST", "GET", "OPTIONS", "PUT", "DELETE"}
-				}
-				if allowedHeaders == nil {
-					allowedHeaders = []string{"Content-Type", "Content-Length", "Accept-Encoding", "X-CSRF-Token", "Authorization", "X-Requested-With", "If-Modified-Since"}
-				}
-				w.Header().Set("Access-Control-Allow-Methods", strings.Join(allowedMethods, ", "))
-				w.Header().Set("Access-Control-Allow-Headers", strings.Join(allowedHeaders, ", "))
-				w.Header().Set("Access-Control-Allow-Credentials", allowCredentials)
-
-				// Stop here if its a preflight OPTIONS request
-				if req.Method == "OPTIONS" {
-					w.WriteHeader(http.StatusNoContent)
-					return
-				}
-			}
-		}
-		// Dispatch to the next handler
 		handler.ServeHTTP(w, req)
 	})
 }
@@ -362,32 +131,41 @@ func (r *requestAttributeGetter) GetAttribs(req *http.Request) authorizer.Attrib
 		}
 	}
 
-	apiRequestInfo, _ := r.requestInfoResolver.GetRequestInfo(req)
+	requestInfo, _ := r.requestInfoResolver.GetRequestInfo(req)
 
-	attribs.APIGroup = apiRequestInfo.APIGroup
-	attribs.Verb = apiRequestInfo.Verb
+	// Start with common attributes that apply to resource and non-resource requests
+	attribs.ResourceRequest = requestInfo.IsResourceRequest
+	attribs.Path = requestInfo.Path
+	attribs.Verb = requestInfo.Verb
 
-	// If a path follows the conventions of the REST object store, then
-	// we can extract the resource.  Otherwise, not.
-	attribs.Resource = apiRequestInfo.Resource
-
-	// If the request specifies a namespace, then the namespace is filled in.
-	// Assumes there is no empty string namespace.  Unspecified results
-	// in empty (does not understand defaulting rules.)
-	attribs.Namespace = apiRequestInfo.Namespace
+	attribs.APIGroup = requestInfo.APIGroup
+	attribs.APIVersion = requestInfo.APIVersion
+	attribs.Resource = requestInfo.Resource
+	attribs.Subresource = requestInfo.Subresource
+	attribs.Namespace = requestInfo.Namespace
+	attribs.Name = requestInfo.Name
 
 	return &attribs
 }
 
 // WithAuthorizationCheck passes all authorized requests on to handler, and returns a forbidden error otherwise.
-func WithAuthorizationCheck(handler http.Handler, getAttribs RequestAttributeGetter, a authorizer.Authorizer) http.Handler {
+func WithAuthorization(handler http.Handler, getAttribs RequestAttributeGetter, a authorizer.Authorizer) http.Handler {
+	if a == nil {
+		glog.Warningf("Authorization is disabled")
+		return handler
+	}
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		err := a.Authorize(getAttribs.GetAttribs(req))
-		if err == nil {
-			handler.ServeHTTP(w, req)
+		authorized, reason, err := a.Authorize(getAttribs.GetAttribs(req))
+		if err != nil {
+			internalError(w, req, err)
 			return
 		}
-		forbidden(w, req)
+		if !authorized {
+			glog.V(4).Infof("Forbidden: %#v, Reason: %s", req.RequestURI, reason)
+			forbidden(w, req)
+			return
+		}
+		handler.ServeHTTP(w, req)
 	})
 }
 
@@ -522,7 +300,7 @@ func (r *RequestInfoResolver) GetRequestInfo(req *http.Request) (RequestInfo, er
 
 			// if there is another step after the namespace name and it is not a known namespace subresource
 			// move currentParts to include it as a resource in its own right
-			if len(currentParts) > 2 {
+			if len(currentParts) > 2 && !namespaceSubresources.Has(currentParts[2]) {
 				currentParts = currentParts[2:]
 			}
 		}
@@ -548,6 +326,10 @@ func (r *RequestInfoResolver) GetRequestInfo(req *http.Request) (RequestInfo, er
 	// if there's no name on the request and we thought it was a get before, then the actual verb is a list
 	if len(requestInfo.Name) == 0 && requestInfo.Verb == "get" {
 		requestInfo.Verb = "list"
+	}
+	// if there's no name on the request and we thought it was a delete before, then the actual verb is deletecollection
+	if len(requestInfo.Name) == 0 && requestInfo.Verb == "delete" {
+		requestInfo.Verb = "deletecollection"
 	}
 
 	return requestInfo, nil

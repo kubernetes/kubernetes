@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,11 +18,13 @@ package watch
 
 import (
 	"testing"
+
+	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
 type testType string
 
-func (testType) IsAnAPIObject() {}
+func (obj testType) GetObjectKind() unversioned.ObjectKind { return unversioned.EmptyObjectKind }
 
 func TestFake(t *testing.T) {
 	f := NewFake()

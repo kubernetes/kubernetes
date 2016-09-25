@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,7 +25,8 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/restclient"
+	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 )
@@ -45,7 +46,7 @@ type HTTPExtender struct {
 }
 
 func makeTransport(config *schedulerapi.ExtenderConfig) (http.RoundTripper, error) {
-	var cfg client.Config
+	var cfg restclient.Config
 	if config.TLSConfig != nil {
 		cfg.TLSClientConfig = *config.TLSConfig
 	}
@@ -55,16 +56,16 @@ func makeTransport(config *schedulerapi.ExtenderConfig) (http.RoundTripper, erro
 			cfg.Insecure = true
 		}
 	}
-	tlsConfig, err := client.TLSConfigFor(&cfg)
+	tlsConfig, err := restclient.TLSConfigFor(&cfg)
 	if err != nil {
 		return nil, err
 	}
 	if tlsConfig != nil {
-		return &http.Transport{
+		return utilnet.SetTransportDefaults(&http.Transport{
 			TLSClientConfig: tlsConfig,
-		}, nil
+		}), nil
 	}
-	return http.DefaultTransport, nil
+	return utilnet.SetTransportDefaults(&http.Transport{}), nil
 }
 
 func NewHTTPExtender(config *schedulerapi.ExtenderConfig, apiVersion string) (algorithm.SchedulerExtender, error) {
@@ -91,45 +92,59 @@ func NewHTTPExtender(config *schedulerapi.ExtenderConfig, apiVersion string) (al
 }
 
 // Filter based on extender implemented predicate functions. The filtered list is
-// expected to be a subset of the supplied list.
-func (h *HTTPExtender) Filter(pod *api.Pod, nodes *api.NodeList) (*api.NodeList, error) {
+// expected to be a subset of the supplied list. failedNodesMap optionally contains
+// the list of failed nodes and failure reasons.
+func (h *HTTPExtender) Filter(pod *api.Pod, nodes []*api.Node) ([]*api.Node, schedulerapi.FailedNodesMap, error) {
 	var result schedulerapi.ExtenderFilterResult
 
 	if h.filterVerb == "" {
-		return nodes, nil
+		return nodes, schedulerapi.FailedNodesMap{}, nil
 	}
 
+	nodeItems := make([]api.Node, 0, len(nodes))
+	for _, node := range nodes {
+		nodeItems = append(nodeItems, *node)
+	}
 	args := schedulerapi.ExtenderArgs{
 		Pod:   *pod,
-		Nodes: *nodes,
+		Nodes: api.NodeList{Items: nodeItems},
 	}
 
 	if err := h.send(h.filterVerb, &args, &result); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if result.Error != "" {
-		return nil, fmt.Errorf(result.Error)
+		return nil, nil, fmt.Errorf(result.Error)
 	}
-	return &result.Nodes, nil
+
+	nodeResult := make([]*api.Node, 0, len(result.Nodes.Items))
+	for i := range result.Nodes.Items {
+		nodeResult = append(nodeResult, &result.Nodes.Items[i])
+	}
+	return nodeResult, result.FailedNodes, nil
 }
 
 // Prioritize based on extender implemented priority functions. Weight*priority is added
 // up for each such priority function. The returned score is added to the score computed
 // by Kubernetes scheduler. The total score is used to do the host selection.
-func (h *HTTPExtender) Prioritize(pod *api.Pod, nodes *api.NodeList) (*schedulerapi.HostPriorityList, int, error) {
+func (h *HTTPExtender) Prioritize(pod *api.Pod, nodes []*api.Node) (*schedulerapi.HostPriorityList, int, error) {
 	var result schedulerapi.HostPriorityList
 
 	if h.prioritizeVerb == "" {
 		result := schedulerapi.HostPriorityList{}
-		for _, node := range nodes.Items {
+		for _, node := range nodes {
 			result = append(result, schedulerapi.HostPriority{Host: node.Name, Score: 0})
 		}
 		return &result, 0, nil
 	}
 
+	nodeItems := make([]api.Node, 0, len(nodes))
+	for _, node := range nodes {
+		nodeItems = append(nodeItems, *node)
+	}
 	args := schedulerapi.ExtenderArgs{
 		Pod:   *pod,
-		Nodes: *nodes,
+		Nodes: api.NodeList{Items: nodeItems},
 	}
 
 	if err := h.send(h.prioritizeVerb, &args, &result); err != nil {

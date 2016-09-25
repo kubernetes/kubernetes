@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Copyright 2015 The Kubernetes Authors All rights reserved.
+# Copyright 2015 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -26,14 +26,20 @@ import sys
 
 parser = argparse.ArgumentParser()
 parser.add_argument("filenames", help="list of files to check, all files if unspecified", nargs='*')
-args = parser.parse_args()
 
 rootdir = os.path.dirname(__file__) + "/../../"
 rootdir = os.path.abspath(rootdir)
+parser.add_argument("--rootdir", default=rootdir, help="root directory to examine")
+
+default_boilerplate_dir = os.path.join(rootdir, "hack/boilerplate")
+parser.add_argument("--boilerplate-dir", default=default_boilerplate_dir)
+args = parser.parse_args()
+
 
 def get_refs():
     refs = {}
-    for path in glob.glob(os.path.join(rootdir, "hack/boilerplate/boilerplate.*.txt")):
+
+    for path in glob.glob(os.path.join(args.boilerplate_dir, "boilerplate.*.txt")):
         extension = os.path.basename(path).split(".")[1]
 
         ref_file = open(path, 'r')
@@ -52,8 +58,12 @@ def file_passes(filename, refs, regexs):
     data = f.read()
     f.close()
 
+    basename = os.path.basename(filename)
     extension = file_extension(filename)
-    ref = refs[extension]
+    if extension != "":
+        ref = refs[extension]
+    else:
+        ref = refs[basename]
 
     # remove build tags from the top of Go files
     if extension == "go":
@@ -79,7 +89,7 @@ def file_passes(filename, refs, regexs):
         if p.search(d):
             return False
 
-    # Replace all occurrences of the regex "2015|2014" with "YEAR"
+    # Replace all occurrences of the regex "2016|2015|2014" with "YEAR"
     p = regexs["date"]
     for i, d in enumerate(data):
         (data[i], found) = p.subn('YEAR', d)
@@ -95,7 +105,8 @@ def file_passes(filename, refs, regexs):
 def file_extension(filename):
     return os.path.splitext(filename)[1].split(".")[-1].lower()
 
-skipped_dirs = ['Godeps', 'third_party', '_gopath', '_output', '.git']
+skipped_dirs = ['Godeps', 'third_party', '_gopath', '_output', '.git', 'cluster/env.sh', "vendor", "test/e2e/generated/bindata.go"]
+
 def normalize_files(files):
     newfiles = []
     for pathname in files:
@@ -104,7 +115,7 @@ def normalize_files(files):
         newfiles.append(pathname)
     for i, pathname in enumerate(newfiles):
         if not os.path.isabs(pathname):
-            newfiles[i] = os.path.join(rootdir, pathname)
+            newfiles[i] = os.path.join(args.rootdir, pathname)
     return newfiles
 
 def get_files(extensions):
@@ -112,7 +123,7 @@ def get_files(extensions):
     if len(args.filenames) > 0:
         files = args.filenames
     else:
-        for root, dirs, walkfiles in os.walk(rootdir):
+        for root, dirs, walkfiles in os.walk(args.rootdir):
             # don't visit certain dirs. This is just a performance improvement
             # as we would prune these later in normalize_files(). But doing it
             # cuts down the amount of filesystem walking we do and cuts down
@@ -128,8 +139,9 @@ def get_files(extensions):
     files = normalize_files(files)
     outfiles = []
     for pathname in files:
+        basename = os.path.basename(pathname)
         extension = file_extension(pathname)
-        if extension in extensions:
+        if extension in extensions or basename in extensions:
             outfiles.append(pathname)
     return outfiles
 
@@ -137,8 +149,8 @@ def get_regexs():
     regexs = {}
     # Search for "YEAR" which exists in the boilerplate, but shouldn't in the real thing
     regexs["year"] = re.compile( 'YEAR' )
-    # dates can be 2014 or 2015, company holder names can be anything
-    regexs["date"] = re.compile( '(2014|2015)' )
+    # dates can be 2014, 2015 or 2016, company holder names can be anything
+    regexs["date"] = re.compile( '(2014|2015|2016)' )
     # strip // +build \n\n build constraints
     regexs["go_build_constraints"] = re.compile(r"^(// \+build.*\n)+\n", re.MULTILINE)
     # strip #!.* from shell scripts

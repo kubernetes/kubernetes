@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2014 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
 
 
 MASTER_ADDRESS=${1:-"8.8.8.18"}
-ETCD_SERVERS=${2:-"http://8.8.8.18:4001"}
+ETCD_SERVERS=${2:-"http://8.8.8.18:2379"}
 SERVICE_CLUSTER_IP_RANGE=${3:-"10.10.10.0/24"}
 ADMISSION_CONTROL=${4:-""}
 
@@ -31,14 +31,18 @@ KUBE_LOG_LEVEL="--v=4"
 # comma separated. Mutually exclusive with -etcd-config
 KUBE_ETCD_SERVERS="--etcd-servers=${ETCD_SERVERS}"
 
-# --address=127.0.0.1: DEPRECATED: see --insecure-bind-address instead
-KUBE_API_ADDRESS="--address=${MASTER_ADDRESS}"
+# --insecure-bind-address=127.0.0.1: The IP address on which to serve the --insecure-port.
+KUBE_API_ADDRESS="--insecure-bind-address=${MASTER_ADDRESS}"
 
-# --port=8080: DEPRECATED: see --insecure-port instead
-KUBE_API_PORT="--port=8080"
+# --insecure-port=8080: The port on which to serve unsecured, unauthenticated access.
+KUBE_API_PORT="--insecure-port=8080"
 
 # --kubelet-port=10250: Kubelet port
 NODE_PORT="--kubelet-port=10250"
+
+# --advertise-address=<nil>: The IP address on which to advertise 
+# the apiserver to members of the cluster.
+KUBE_ADVERTISE_ADDR="--advertise-address=${MASTER_ADDRESS}"
 
 # --allow-privileged=false: If true, allow privileged containers.
 KUBE_ALLOW_PRIV="--allow-privileged=false"
@@ -52,7 +56,7 @@ KUBE_SERVICE_ADDRESSES="--service-cluster-ip-range=${SERVICE_CLUSTER_IP_RANGE}"
 # Comma-delimited list of: 
 #   LimitRanger, AlwaysDeny, SecurityContextDeny, NamespaceExists, 
 #   NamespaceLifecycle, NamespaceAutoProvision,
-#   AlwaysAdmit, ServiceAccount, ResourceQuota
+#   AlwaysAdmit, ServiceAccount, ResourceQuota, DefaultStorageClass
 KUBE_ADMISSION_CONTROL="--admission-control=${ADMISSION_CONTROL}"
 
 # --client-ca-file="": If set, any request presenting a client certificate signed
@@ -75,7 +79,8 @@ KUBE_APISERVER_OPTS="   \${KUBE_LOGTOSTDERR}         \\
                         \${KUBE_ETCD_SERVERS}        \\
                         \${KUBE_API_ADDRESS}         \\
                         \${KUBE_API_PORT}            \\
-                        \${NODE_PORT}              \\
+                        \${NODE_PORT}                \\
+                        \${KUBE_ADVERTISE_ADDR}      \\
                         \${KUBE_ALLOW_PRIV}          \\
                         \${KUBE_SERVICE_ADDRESSES}   \\
                         \${KUBE_ADMISSION_CONTROL}   \\
@@ -87,7 +92,7 @@ KUBE_APISERVER_OPTS="   \${KUBE_LOGTOSTDERR}         \\
 cat <<EOF >/usr/lib/systemd/system/kube-apiserver.service
 [Unit]
 Description=Kubernetes API Server
-Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+Documentation=https://github.com/kubernetes/kubernetes
 
 [Service]
 EnvironmentFile=-/opt/kubernetes/cfg/kube-apiserver

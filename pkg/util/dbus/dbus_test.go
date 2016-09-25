@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -213,7 +213,7 @@ func TestFakeDBus(t *testing.T) {
 			if method == "org.freedesktop.DBus.GetNameOwner" {
 				checkName := args[0].(string)
 				if checkName != ownedName {
-					return nil, godbus.Error{"org.freedesktop.DBus.Error.NameHasNoOwner", nil}
+					return nil, godbus.Error{Name: "org.freedesktop.DBus.Error.NameHasNoOwner", Body: nil}
 				} else {
 					return []interface{}{uniqueName}, nil
 				}

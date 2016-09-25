@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -39,7 +39,7 @@ type ContainerGCPolicy struct {
 // Implementation is thread-compatible.
 type ContainerGC interface {
 	// Garbage collect containers.
-	GarbageCollect() error
+	GarbageCollect(allSourcesReady bool) error
 }
 
 // TODO(vmarmol): Preferentially remove pod infra containers.
@@ -63,6 +63,6 @@ func NewContainerGC(runtime Runtime, policy ContainerGCPolicy) (ContainerGC, err
 	}, nil
 }
 
-func (cgc *realContainerGC) GarbageCollect() error {
-	return cgc.runtime.GarbageCollect(cgc.policy)
+func (cgc *realContainerGC) GarbageCollect(allSourcesReady bool) error {
+	return cgc.runtime.GarbageCollect(cgc.policy, allSourcesReady)
 }

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -28,8 +28,8 @@ func TestIsDNS1123Label(t *testing.T) {
 		strings.Repeat("a", 63),
 	}
 	for _, val := range goodValues {
-		if !IsDNS1123Label(val) {
-			t.Errorf("expected true for '%s'", val)
+		if msgs := IsDNS1123Label(val); len(msgs) != 0 {
+			t.Errorf("expected true for '%s': %v", val, msgs)
 		}
 	}
 
@@ -42,7 +42,7 @@ func TestIsDNS1123Label(t *testing.T) {
 		strings.Repeat("a", 64),
 	}
 	for _, val := range badValues {
-		if IsDNS1123Label(val) {
+		if msgs := IsDNS1123Label(val); len(msgs) == 0 {
 			t.Errorf("expected false for '%s'", val)
 		}
 	}
@@ -60,8 +60,8 @@ func TestIsDNS1123Subdomain(t *testing.T) {
 		strings.Repeat("a", 253),
 	}
 	for _, val := range goodValues {
-		if !IsDNS1123Subdomain(val) {
-			t.Errorf("expected true for '%s'", val)
+		if msgs := IsDNS1123Subdomain(val); len(msgs) != 0 {
+			t.Errorf("expected true for '%s': %v", val, msgs)
 		}
 	}
 
@@ -80,20 +80,20 @@ func TestIsDNS1123Subdomain(t *testing.T) {
 		strings.Repeat("a", 254),
 	}
 	for _, val := range badValues {
-		if IsDNS1123Subdomain(val) {
+		if msgs := IsDNS1123Subdomain(val); len(msgs) == 0 {
 			t.Errorf("expected false for '%s'", val)
 		}
 	}
 }
 
-func TestIsDNS952Label(t *testing.T) {
+func TestIsDNS1035Label(t *testing.T) {
 	goodValues := []string{
 		"a", "ab", "abc", "a1", "a-1", "a--1--2--b",
-		strings.Repeat("a", 24),
+		strings.Repeat("a", 63),
 	}
 	for _, val := range goodValues {
-		if !IsDNS952Label(val) {
-			t.Errorf("expected true for '%s'", val)
+		if msgs := IsDNS1035Label(val); len(msgs) != 0 {
+			t.Errorf("expected true for '%s': %v", val, msgs)
 		}
 	}
 
@@ -104,10 +104,10 @@ func TestIsDNS952Label(t *testing.T) {
 		"_", "a_", "_a", "a_b", "1_", "_1", "1_2",
 		".", "a.", ".a", "a.b", "1.", ".1", "1.2",
 		" ", "a ", " a", "a b", "1 ", " 1", "1 2",
-		strings.Repeat("a", 25),
+		strings.Repeat("a", 64),
 	}
 	for _, val := range badValues {
-		if IsDNS952Label(val) {
+		if msgs := IsDNS1035Label(val); len(msgs) == 0 {
 			t.Errorf("expected false for '%s'", val)
 		}
 	}
@@ -119,8 +119,8 @@ func TestIsCIdentifier(t *testing.T) {
 		"A", "AB", "AbC", "A1", "_A", "A_", "A_B", "A_1", "A__1__2__B", "__123_ABC",
 	}
 	for _, val := range goodValues {
-		if !IsCIdentifier(val) {
-			t.Errorf("expected true for '%s'", val)
+		if msgs := IsCIdentifier(val); len(msgs) != 0 {
+			t.Errorf("expected true for '%s': %v", val, msgs)
 		}
 	}
 
@@ -132,7 +132,7 @@ func TestIsCIdentifier(t *testing.T) {
 		"#a#",
 	}
 	for _, val := range badValues {
-		if IsCIdentifier(val) {
+		if msgs := IsCIdentifier(val); len(msgs) == 0 {
 			t.Errorf("expected false for '%s'", val)
 		}
 	}
@@ -141,14 +141,46 @@ func TestIsCIdentifier(t *testing.T) {
 func TestIsValidPortNum(t *testing.T) {
 	goodValues := []int{1, 2, 1000, 16384, 32768, 65535}
 	for _, val := range goodValues {
-		if !IsValidPortNum(val) {
-			t.Errorf("expected true for '%d'", val)
+		if msgs := IsValidPortNum(val); len(msgs) != 0 {
+			t.Errorf("expected true for %d, got %v", val, msgs)
 		}
 	}
 
 	badValues := []int{0, -1, 65536, 100000}
 	for _, val := range badValues {
-		if IsValidPortNum(val) {
+		if msgs := IsValidPortNum(val); len(msgs) == 0 {
+			t.Errorf("expected false for %d", val)
+		}
+	}
+}
+
+func TestIsValidGroupId(t *testing.T) {
+	goodValues := []int64{0, 1, 1000, 65535, 2147483647}
+	for _, val := range goodValues {
+		if msgs := IsValidGroupId(val); len(msgs) != 0 {
+			t.Errorf("expected true for '%d': %v", val, msgs)
+		}
+	}
+
+	badValues := []int64{-1, -1003, 2147483648, 4147483647}
+	for _, val := range badValues {
+		if msgs := IsValidGroupId(val); len(msgs) == 0 {
+			t.Errorf("expected false for '%d'", val)
+		}
+	}
+}
+
+func TestIsValidUserId(t *testing.T) {
+	goodValues := []int64{0, 1, 1000, 65535, 2147483647}
+	for _, val := range goodValues {
+		if msgs := IsValidUserId(val); len(msgs) != 0 {
+			t.Errorf("expected true for '%d': %v", val, msgs)
+		}
+	}
+
+	badValues := []int64{-1, -1003, 2147483648, 4147483647}
+	for _, val := range badValues {
+		if msgs := IsValidUserId(val); len(msgs) == 0 {
 			t.Errorf("expected false for '%d'", val)
 		}
 	}
@@ -157,14 +189,14 @@ func TestIsValidPortNum(t *testing.T) {
 func TestIsValidPortName(t *testing.T) {
 	goodValues := []string{"telnet", "re-mail-ck", "pop3", "a", "a-1", "1-a", "a-1-b-2-c", "1-a-2-b-3"}
 	for _, val := range goodValues {
-		if !IsValidPortName(val) {
-			t.Errorf("expected true for %q", val)
+		if msgs := IsValidPortName(val); len(msgs) != 0 {
+			t.Errorf("expected true for %q: %v", val, msgs)
 		}
 	}
 
-	badValues := []string{"longerthan15characters", "", "12345", "1-2-3-4", "-begin", "end-", "two--hyphens", "1-2", "whois++"}
+	badValues := []string{"longerthan15characters", "", strings.Repeat("a", 16), "12345", "1-2-3-4", "-begin", "end-", "two--hyphens", "whois++"}
 	for _, val := range badValues {
-		if IsValidPortName(val) {
+		if msgs := IsValidPortName(val); len(msgs) == 0 {
 			t.Errorf("expected false for %q", val)
 		}
 	}
@@ -190,8 +222,8 @@ func TestIsQualifiedName(t *testing.T) {
 		strings.Repeat("a", 253) + "/" + strings.Repeat("b", 63),
 	}
 	for i := range successCases {
-		if !IsQualifiedName(successCases[i]) {
-			t.Errorf("case[%d]: %q: expected success", i, successCases[i])
+		if errs := IsQualifiedName(successCases[i]); len(errs) != 0 {
+			t.Errorf("case[%d]: %q: expected success: %v", i, successCases[i], errs)
 		}
 	}
 
@@ -208,7 +240,7 @@ func TestIsQualifiedName(t *testing.T) {
 		strings.Repeat("a", 254) + "/abc",
 	}
 	for i := range errorCases {
-		if IsQualifiedName(errorCases[i]) {
+		if errs := IsQualifiedName(errorCases[i]); len(errs) == 0 {
 			t.Errorf("case[%d]: %q: expected failure", i, errorCases[i])
 		}
 	}
@@ -225,8 +257,8 @@ func TestIsValidLabelValue(t *testing.T) {
 		"", // empty value
 	}
 	for i := range successCases {
-		if !IsValidLabelValue(successCases[i]) {
-			t.Errorf("case %s expected success", successCases[i])
+		if errs := IsValidLabelValue(successCases[i]); len(errs) != 0 {
+			t.Errorf("case %s expected success: %v", successCases[i], errs)
 		}
 	}
 
@@ -241,7 +273,7 @@ func TestIsValidLabelValue(t *testing.T) {
 		strings.Repeat("a", 64), // over the limit
 	}
 	for i := range errorCases {
-		if IsValidLabelValue(errorCases[i]) {
+		if errs := IsValidLabelValue(errorCases[i]); len(errs) == 0 {
 			t.Errorf("case[%d] expected failure", i)
 		}
 	}
@@ -249,6 +281,11 @@ func TestIsValidLabelValue(t *testing.T) {
 
 func TestIsValidIP(t *testing.T) {
 	goodValues := []string{
+		"::1",
+		"2a00:79e0:2:0:f1c3:e797:93c1:df80",
+		"::",
+		"2001:4860:4860::8888",
+		"::fff:1.1.1.1",
 		"1.1.1.1",
 		"1.1.1.01",
 		"255.0.0.1",
@@ -256,23 +293,143 @@ func TestIsValidIP(t *testing.T) {
 		"0.0.0.0",
 	}
 	for _, val := range goodValues {
-		if !IsValidIPv4(val) {
-			t.Errorf("expected true for %q", val)
+		if msgs := IsValidIP(val); len(msgs) != 0 {
+			t.Errorf("expected true for %q: %v", val, msgs)
 		}
 	}
 
 	badValues := []string{
-		"2a00:79e0:2:0:f1c3:e797:93c1:df80", // This is valid IPv6
-		"a",
+		"[2001:db8:0:1]:80",
 		"myhost.mydomain",
 		"-1.0.0.0",
-		"1.0.0.256",
-		"1.0.0.1.1",
-		"1.0.0.1.",
+		"[2001:db8:0:1]",
+		"a",
 	}
 	for _, val := range badValues {
-		if IsValidIPv4(val) {
+		if msgs := IsValidIP(val); len(msgs) == 0 {
 			t.Errorf("expected false for %q", val)
+		}
+	}
+}
+
+func TestIsHTTPHeaderName(t *testing.T) {
+	goodValues := []string{
+		// Common ones
+		"Accept-Encoding", "Host", "If-Modified-Since", "X-Forwarded-For",
+		// Weirdo, but still conforming names
+		"a", "ab", "abc", "a1", "-a", "a-", "a-b", "a-1", "a--1--2--b", "--abc-123",
+		"A", "AB", "AbC", "A1", "-A", "A-", "A-B", "A-1", "A--1--2--B", "--123-ABC",
+	}
+	for _, val := range goodValues {
+		if msgs := IsHTTPHeaderName(val); len(msgs) != 0 {
+			t.Errorf("expected true for '%s': %v", val, msgs)
+		}
+	}
+
+	badValues := []string{
+		"Host:", "X-Forwarded-For:", "X-@Home",
+		"", "_", "a_", "_a", "1_", "1_2", ".", "a.", ".a", "a.b", "1.", ".1", "1.2",
+		" ", "a ", " a", "a b", "1 ", " 1", "1 2", "#a#", "^", ",", ";", "=", "<",
+		"?", "@", "{",
+	}
+	for _, val := range badValues {
+		if msgs := IsHTTPHeaderName(val); len(msgs) == 0 {
+			t.Errorf("expected false for '%s'", val)
+		}
+	}
+}
+
+func TestIsValidPercent(t *testing.T) {
+	goodValues := []string{
+		"0%",
+		"00000%",
+		"1%",
+		"01%",
+		"99%",
+		"100%",
+		"101%",
+	}
+	for _, val := range goodValues {
+		if msgs := IsValidPercent(val); len(msgs) != 0 {
+			t.Errorf("expected true for %q: %v", val, msgs)
+		}
+	}
+
+	badValues := []string{
+		"",
+		"0",
+		"100",
+		"0.0%",
+		"99.9%",
+		"hundred",
+		" 1%",
+		"1% ",
+		"-0%",
+		"-1%",
+		"+1%",
+	}
+	for _, val := range badValues {
+		if msgs := IsValidPercent(val); len(msgs) == 0 {
+			t.Errorf("expected false for %q", val)
+		}
+	}
+}
+
+func TestIsConfigMapKey(t *testing.T) {
+	successCases := []string{
+		"a",
+		"good",
+		"good-good",
+		"still.good",
+		"this.is.also.good",
+		".so.is.this",
+		"THIS_IS_GOOD",
+		"so_is_this_17",
+	}
+
+	for i := range successCases {
+		if errs := IsConfigMapKey(successCases[i]); len(errs) != 0 {
+			t.Errorf("[%d] expected success: %v", i, errs)
+		}
+	}
+
+	failureCases := []string{
+		".",
+		"..",
+		"..bad",
+		"b*d",
+		"bad!&bad",
+	}
+
+	for i := range failureCases {
+		if errs := IsConfigMapKey(failureCases[i]); len(errs) == 0 {
+			t.Errorf("[%d] expected failure", i)
+		}
+	}
+}
+
+func TestIsWildcardDNS1123Subdomain(t *testing.T) {
+	goodValues := []string{
+		"*.example.com",
+		"*.bar.com",
+		"*.foo.bar.com",
+	}
+	for _, val := range goodValues {
+		if errs := IsWildcardDNS1123Subdomain(val); len(errs) != 0 {
+			t.Errorf("expected no errors for %q: %v", val, errs)
+		}
+	}
+
+	badValues := []string{
+		"*.*.bar.com",
+		"*.foo.*.com",
+		"*bar.com",
+		"f*.bar.com",
+		"*",
+	}
+	for _, val := range badValues {
+		if errs := IsWildcardDNS1123Subdomain(val); len(errs) == 0 {
+			t.Errorf("expected errors for %q", val)
 		}
 	}
 }

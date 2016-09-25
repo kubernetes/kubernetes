@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2014 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@
 # The intent is to allow experimentation/advanced functionality before we
 # are ready to commit to supporting it.
 # Experimental functionality:
-#   KUBE_SHARE_MASTER=true
+#   KUBE_USE_EXISTING_MASTER=true
 #     Detect and reuse an existing master; useful if you want to
 #     create more nodes, perhaps with a different instance type or in
 #     a different subnet/AZ
@@ -34,6 +34,7 @@
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source "${KUBE_ROOT}/cluster/aws/${KUBE_CONFIG_FILE-"config-default.sh"}"
 source "${KUBE_ROOT}/cluster/common.sh"
+source "${KUBE_ROOT}/cluster/lib/util.sh"
 
 ALLOCATE_NODE_CIDRS=true
 
@@ -45,37 +46,75 @@ ASG_NAME="${NODE_INSTANCE_PREFIX}-group-${ZONE}"
 # We could allow the master disk volume id to be specified in future
 MASTER_DISK_ID=
 
-# Defaults: ubuntu -> vivid
-if [[ "${KUBE_OS_DISTRIBUTION}" == "ubuntu" ]]; then
-  KUBE_OS_DISTRIBUTION=vivid
+# Well known tags
+TAG_KEY_MASTER_IP="kubernetes.io/master-ip"
+
+OS_DISTRIBUTION=${KUBE_OS_DISTRIBUTION}
+
+# Defaults: ubuntu -> wily
+if [[ "${OS_DISTRIBUTION}" == "ubuntu" ]]; then
+  OS_DISTRIBUTION=wily
 fi
 
-case "${KUBE_OS_DISTRIBUTION}" in
-  trusty|wheezy|jessie|vivid|coreos)
-    source "${KUBE_ROOT}/cluster/aws/${KUBE_OS_DISTRIBUTION}/util.sh"
+# Loads the distro-specific utils script.
+# If the distro is not recommended, prints warnings or exits.
+function load_distro_utils () {
+case "${OS_DISTRIBUTION}" in
+  jessie)
+    ;;
+  wily)
+    ;;
+  vivid)
+    echo "vivid is no longer supported by kube-up; please use jessie instead" >&2
+    exit 2
+    ;;
+  coreos)
+    echo "coreos is no longer supported by kube-up; please use jessie instead" >&2
+    exit 2
+    ;;
+  trusty)
+    echo "trusty is no longer supported by kube-up; please use jessie or wily instead" >&2
+    exit 2
+    ;;
+  wheezy)
+    echo "wheezy is no longer supported by kube-up; please use jessie instead" >&2
+    exit 2
     ;;
   *)
-    echo "Cannot start cluster using os distro: ${KUBE_OS_DISTRIBUTION}" >&2
+    echo "Cannot start cluster using os distro: ${OS_DISTRIBUTION}" >&2
+    echo "The current recommended distro is jessie" >&2
     exit 2
     ;;
 esac
 
+source "${KUBE_ROOT}/cluster/aws/${OS_DISTRIBUTION}/util.sh"
+}
+
+load_distro_utils
+
 # This removes the final character in bash (somehow)
-AWS_REGION=${ZONE%?}
+re='[a-zA-Z]'
+if [[ ${ZONE: -1} =~ $re  ]]; then 
+  AWS_REGION=${ZONE%?}
+else 
+  AWS_REGION=$ZONE
+fi
 
 export AWS_DEFAULT_REGION=${AWS_REGION}
 export AWS_DEFAULT_OUTPUT=text
 AWS_CMD="aws ec2"
 AWS_ASG_CMD="aws autoscaling"
 
-VPC_CIDR_BASE=172.20
+VPC_CIDR_BASE=${KUBE_VPC_CIDR_BASE:-172.20}
 MASTER_IP_SUFFIX=.9
-MASTER_INTERNAL_IP=${VPC_CIDR_BASE}.0${MASTER_IP_SUFFIX}
 VPC_CIDR=${VPC_CIDR_BASE}.0.0/16
 SUBNET_CIDR=${VPC_CIDR_BASE}.0.0/24
 if [[ -n "${KUBE_SUBNET_CIDR:-}" ]]; then
   echo "Using subnet CIDR override: ${KUBE_SUBNET_CIDR}"
   SUBNET_CIDR=${KUBE_SUBNET_CIDR}
+fi
+if [[ -z "${MASTER_INTERNAL_IP-}" ]]; then
+  MASTER_INTERNAL_IP="${SUBNET_CIDR%.*}${MASTER_IP_SUFFIX}"
 fi
 
 MASTER_SG_NAME="kubernetes-master-${CLUSTER_ID}"
@@ -84,15 +123,20 @@ NODE_SG_NAME="kubernetes-minion-${CLUSTER_ID}"
 # Be sure to map all the ephemeral drives.  We can specify more than we actually have.
 # TODO: Actually mount the correct number (especially if we have more), though this is non-trivial, and
 #  only affects the big storage instance types, which aren't a typical use case right now.
-BLOCK_DEVICE_MAPPINGS_BASE="{\"DeviceName\": \"/dev/sdc\",\"VirtualName\":\"ephemeral0\"},{\"DeviceName\": \"/dev/sdd\",\"VirtualName\":\"ephemeral1\"},{\"DeviceName\": \"/dev/sde\",\"VirtualName\":\"ephemeral2\"},{\"DeviceName\": \"/dev/sdf\",\"VirtualName\":\"ephemeral3\"}"
-MASTER_BLOCK_DEVICE_MAPPINGS="[{\"DeviceName\":\"/dev/sda1\",\"Ebs\":{\"DeleteOnTermination\":true,\"VolumeSize\":${MASTER_ROOT_DISK_SIZE},\"VolumeType\":\"${MASTER_ROOT_DISK_TYPE}\"}}, ${BLOCK_DEVICE_MAPPINGS_BASE}]"
-NODE_BLOCK_DEVICE_MAPPINGS="[{\"DeviceName\":\"/dev/sda1\",\"Ebs\":{\"DeleteOnTermination\":true,\"VolumeSize\":${NODE_ROOT_DISK_SIZE},\"VolumeType\":\"${NODE_ROOT_DISK_TYPE}\"}}, ${BLOCK_DEVICE_MAPPINGS_BASE}]"
+EPHEMERAL_BLOCK_DEVICE_MAPPINGS=",{\"DeviceName\": \"/dev/sdc\",\"VirtualName\":\"ephemeral0\"},{\"DeviceName\": \"/dev/sdd\",\"VirtualName\":\"ephemeral1\"},{\"DeviceName\": \"/dev/sde\",\"VirtualName\":\"ephemeral2\"},{\"DeviceName\": \"/dev/sdf\",\"VirtualName\":\"ephemeral3\"}"
+
+# Experimental: If the user sets KUBE_AWS_STORAGE to ebs, use ebs storage
+# in preference to local instance storage We do this by not mounting any
+# instance storage.  We could do this better in future (e.g. making instance
+# storage available for other purposes)
+if [[ "${KUBE_AWS_STORAGE:-}" == "ebs" ]]; then
+  EPHEMERAL_BLOCK_DEVICE_MAPPINGS=""
+fi
 
 # TODO (bburns) Parameterize this for multiple cluster per project
-
 function get_vpc_id {
   $AWS_CMD describe-vpcs \
-           --filters Name=tag:Name,Values=kubernetes-vpc \
+           --filters Name=tag:Name,Values=${VPC_NAME} \
                      Name=tag:KubernetesCluster,Values=${CLUSTER_ID} \
            --query Vpcs[].VpcId
 }
@@ -117,7 +161,7 @@ function get_igw_id {
 function get_elbs_in_vpc {
   # ELB doesn't seem to be on the same platform as the rest of AWS; doesn't support filtering
   aws elb --output json describe-load-balancers  | \
-    python -c "import json,sys; lst = [str(lb['LoadBalancerName']) for lb in json.load(sys.stdin)['LoadBalancerDescriptions'] if lb['VPCId'] == '$1']; print '\n'.join(lst)"
+    python -c "import json,sys; lst = [str(lb['LoadBalancerName']) for lb in json.load(sys.stdin)['LoadBalancerDescriptions'] if 'VPCId' in lb and lb['VPCId'] == '$1']; print('\n'.join(lst))"
 }
 
 function get_instanceid_from_name {
@@ -154,23 +198,44 @@ function get_security_group_id {
   | tr "\t" "\n"
 }
 
-function detect-master () {
+# Finds the master ip, if it is saved (tagged on the master disk)
+# Sets KUBE_MASTER_IP
+function find-tagged-master-ip {
+  find-master-pd
+  if [[ -n "${MASTER_DISK_ID:-}" ]]; then
+    KUBE_MASTER_IP=$(get-tag ${MASTER_DISK_ID} ${TAG_KEY_MASTER_IP})
+  fi
+}
+
+# Gets a tag value from an AWS resource
+# usage: get-tag <resource-id> <tag-name>
+# outputs: the tag value, or "" if no tag
+function get-tag {
+  $AWS_CMD describe-tags --filters Name=resource-id,Values=${1} \
+                                   Name=key,Values=${2} \
+                         --query Tags[].Value
+}
+
+# Gets an existing master, exiting if not found
+# Note that this is called directly by the e2e tests
+function detect-master() {
+  find-tagged-master-ip
   KUBE_MASTER=${MASTER_NAME}
-  if [[ -z "${KUBE_MASTER_ID-}" ]]; then
-    KUBE_MASTER_ID=$(get_instanceid_from_name ${MASTER_NAME})
-  fi
-  if [[ -z "${KUBE_MASTER_ID-}" ]]; then
-    echo "Could not detect Kubernetes master node.  Make sure you've launched a cluster with 'kube-up.sh'"
-    exit 1
-  fi
-  if [[ -z "${KUBE_MASTER_IP-}" ]]; then
-    KUBE_MASTER_IP=$(get_instance_public_ip ${KUBE_MASTER_ID})
-  fi
-  if [[ -z "${KUBE_MASTER_IP-}" ]]; then
+  if [[ -z "${KUBE_MASTER_IP:-}" ]]; then
     echo "Could not detect Kubernetes master node IP.  Make sure you've launched a cluster with 'kube-up.sh'"
     exit 1
   fi
   echo "Using master: $KUBE_MASTER (external IP: $KUBE_MASTER_IP)"
+}
+
+# Reads kube-env metadata from master
+#
+# Assumed vars:
+#   KUBE_MASTER_IP
+#   AWS_SSH_KEY
+#   SSH_USER
+function get-master-env() {
+  ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ${SSH_USER}@${KUBE_MASTER_IP} sudo cat /etc/kubernetes/kube_env.yaml
 }
 
 
@@ -185,7 +250,13 @@ function query-running-minions () {
            --query ${query}
 }
 
-function find-running-minions () {
+function detect-node-names () {
+  # If this is called directly, VPC_ID might not be set
+  # (this is case from cluster/log-dump.sh)
+  if [[ -z "${VPC_ID:-}" ]]; then
+    VPC_ID=$(get_vpc_id)
+  fi
+
   NODE_IDS=()
   NODE_NAMES=()
   for id in $(query-running-minions "Reservations[].Instances[].InstanceId"); do
@@ -196,8 +267,14 @@ function find-running-minions () {
   done
 }
 
+# Called to detect the project on GCE
+# Not needed on AWS
+function detect-project() {
+  :
+}
+
 function detect-nodes () {
-  find-running-minions
+  detect-node-names
 
   # This is inefficient, but we want NODE_NAMES / NODE_IDS to be ordered the same as KUBE_NODE_IP_ADDRESSES
   KUBE_NODE_IP_ADDRESSES=()
@@ -248,86 +325,39 @@ function detect-security-groups {
 # Vars set:
 #   AWS_IMAGE
 function detect-image () {
-case "${KUBE_OS_DISTRIBUTION}" in
-  trusty|coreos)
-    detect-trusty-image
-    ;;
-  vivid)
-    detect-vivid-image
-    ;;
-  wheezy)
-    detect-wheezy-image
+case "${OS_DISTRIBUTION}" in
+  wily)
+    detect-wily-image
     ;;
   jessie)
     detect-jessie-image
     ;;
   *)
-    echo "Please specify AWS_IMAGE directly (distro ${KUBE_OS_DISTRIBUTION} not recognized)"
+    echo "Please specify AWS_IMAGE directly (distro ${OS_DISTRIBUTION} not recognized)"
     exit 2
     ;;
 esac
 }
 
-# Detects the AMI to use for trusty (considering the region)
-# Used by CoreOS & Ubuntu
+# Detects the RootDevice to use in the Block Device Mapping (considering the AMI)
 #
 # Vars set:
-#   AWS_IMAGE
-function detect-trusty-image () {
-  # This is the ubuntu 14.04 image for <region>, amd64, hvm:ebs-ssd
-  # See here: http://cloud-images.ubuntu.com/locator/ec2/ for other images
-  # This will need to be updated from time to time as amis are deprecated
-  if [[ -z "${AWS_IMAGE-}" ]]; then
-    case "${AWS_REGION}" in
-      ap-northeast-1)
-        AWS_IMAGE=ami-93876e93
-        ;;
+#   MASTER_BLOCK_DEVICE_MAPPINGS
+#   NODE_BLOCK_DEVICE_MAPPINGS
+#
+function detect-root-device {
+  local master_image=${AWS_IMAGE}
+  local node_image=${KUBE_NODE_IMAGE}
 
-      ap-southeast-1)
-        AWS_IMAGE=ami-66546234
-        ;;
-
-      eu-central-1)
-        AWS_IMAGE=ami-e2a694ff
-        ;;
-
-      eu-west-1)
-        AWS_IMAGE=ami-d7fd6ea0
-        ;;
-
-      sa-east-1)
-        AWS_IMAGE=ami-a357eebe
-        ;;
-
-      us-east-1)
-        AWS_IMAGE=ami-6089d208
-        ;;
-
-      us-west-1)
-        AWS_IMAGE=ami-cf7d998b
-        ;;
-
-      cn-north-1)
-        AWS_IMAGE=ami-d436a4ed
-        ;;
-
-      us-gov-west-1)
-        AWS_IMAGE=ami-01523322
-        ;;
-
-      ap-southeast-2)
-        AWS_IMAGE=ami-cd4e3ff7
-        ;;
-
-      us-west-2)
-        AWS_IMAGE=ami-3b14370b
-        ;;
-
-      *)
-        echo "Please specify AWS_IMAGE directly (region ${AWS_REGION} not recognized)"
-        exit 1
-    esac
+  ROOT_DEVICE_MASTER=$($AWS_CMD describe-images --image-ids ${master_image} --query 'Images[].RootDeviceName')
+  if [[ "${master_image}" == "${node_image}" ]]; then
+      ROOT_DEVICE_NODE=${ROOT_DEVICE_MASTER}
+    else
+      ROOT_DEVICE_NODE=$($AWS_CMD describe-images --image-ids ${node_image} --query 'Images[].RootDeviceName')
   fi
+
+  MASTER_BLOCK_DEVICE_MAPPINGS="[{\"DeviceName\":\"${ROOT_DEVICE_MASTER}\",\"Ebs\":{\"DeleteOnTermination\":true,\"VolumeSize\":${MASTER_ROOT_DISK_SIZE},\"VolumeType\":\"${MASTER_ROOT_DISK_TYPE}\"}} ${EPHEMERAL_BLOCK_DEVICE_MAPPINGS}]"
+  NODE_BLOCK_DEVICE_MAPPINGS="[{\"DeviceName\":\"${ROOT_DEVICE_NODE}\",\"Ebs\":{\"DeleteOnTermination\":true,\"VolumeSize\":${NODE_ROOT_DISK_SIZE},\"VolumeType\":\"${NODE_ROOT_DISK_TYPE}\"}} ${EPHEMERAL_BLOCK_DEVICE_MAPPINGS}]"
 }
 
 # Computes the AWS fingerprint for a public key file ($1)
@@ -412,8 +442,14 @@ function authorize-security-group-ingress {
 function find-master-pd {
   local name=${MASTER_NAME}-pd
   if [[ -z "${MASTER_DISK_ID}" ]]; then
+    local zone_filter="Name=availability-zone,Values=${ZONE}"
+    if [[ "${KUBE_USE_EXISTING_MASTER:-}" == "true" ]]; then
+      # If we're reusing an existing master, it is likely to be in another zone
+      # If running multizone, your cluster must be uniquely named across zones
+      zone_filter=""
+    fi
     MASTER_DISK_ID=`$AWS_CMD describe-volumes \
-                             --filters Name=availability-zone,Values=${ZONE} \
+                             --filters ${zone_filter} \
                                        Name=tag:Name,Values=${name} \
                                        Name=tag:KubernetesCluster,Values=${CLUSTER_ID} \
                              --query Volumes[].VolumeId`
@@ -435,22 +471,88 @@ function ensure-master-pd {
   fi
 }
 
-# Creates a new DHCP option set configured correctly for Kubernetes
+# Configures a CloudWatch alarm to reboot the instance on failure
+function reboot-on-failure {
+  local instance_id=$1
+
+  echo "Creating Cloudwatch alarm to reboot instance ${instance_id} on failure"
+
+  local aws_owner_id=`aws ec2 describe-instances --instance-ids ${instance_id} --query Reservations[0].OwnerId`
+  if [[ -z "${aws_owner_id}" ]]; then
+    echo "Unable to determinate AWS account id for ${instance_id}"
+    exit 1
+  fi
+
+  aws cloudwatch put-metric-alarm \
+                 --alarm-name k8s-${instance_id}-statuscheckfailure-reboot \
+                 --alarm-description "Reboot ${instance_id} on status check failure" \
+                 --namespace "AWS/EC2" \
+                 --dimensions Name=InstanceId,Value=${instance_id} \
+                 --statistic Minimum \
+                 --metric-name StatusCheckFailed \
+                 --comparison-operator GreaterThanThreshold \
+                 --threshold 0 \
+                 --period 60 \
+                 --evaluation-periods 3 \
+                 --alarm-actions arn:aws:swf:${AWS_REGION}:${aws_owner_id}:action/actions/AWS_EC2.InstanceId.Reboot/1.0 > $LOG
+
+  # TODO: The IAM role EC2ActionsAccess must have been created
+  # See e.g. http://docs.aws.amazon.com/AmazonCloudWatch/latest/DeveloperGuide/UsingIAM.html
+}
+
+function delete-instance-alarms {
+  local instance_id=$1
+
+  alarm_names=`aws cloudwatch describe-alarms --alarm-name-prefix k8s-${instance_id}- --query MetricAlarms[].AlarmName`
+  for alarm_name in ${alarm_names}; do
+    aws cloudwatch delete-alarms --alarm-names ${alarm_name} > $LOG
+  done
+}
+
+# Finds the existing master IP, or creates/reuses an Elastic IP
+# If MASTER_RESERVED_IP looks like an IP address, we will use it;
+# otherwise we will create a new elastic IP
+# Sets KUBE_MASTER_IP
+function ensure-master-ip {
+  find-tagged-master-ip
+
+  if [[ -z "${KUBE_MASTER_IP:-}" ]]; then
+    # Check if MASTER_RESERVED_IP looks like an IPv4 address
+    # Note that we used to only allocate an elastic IP when MASTER_RESERVED_IP=auto
+    # So be careful changing the IPV4 test, to be sure that 'auto' => 'allocate'
+    if [[ "${MASTER_RESERVED_IP}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+      KUBE_MASTER_IP="${MASTER_RESERVED_IP}"
+    else
+      KUBE_MASTER_IP=`$AWS_CMD allocate-address --domain vpc --query PublicIp`
+      echo "Allocated Elastic IP for master: ${KUBE_MASTER_IP}"
+    fi
+
+    # We can't tag elastic ips.  Instead we put the tag on the persistent disk.
+    # It is a little weird, perhaps, but it sort of makes sense...
+    # The master mounts the master PD, and whoever mounts the master PD should also
+    # have the master IP
+    add-tag ${MASTER_DISK_ID} ${TAG_KEY_MASTER_IP} ${KUBE_MASTER_IP}
+  fi
+}
+
+# Creates a new DHCP option set configured correctly for Kubernetes when DHCP_OPTION_SET_ID is not specified
 # Sets DHCP_OPTION_SET_ID
 function create-dhcp-option-set () {
-  case "${AWS_REGION}" in
-    us-east-1)
-      OPTION_SET_DOMAIN=ec2.internal
-      ;;
+  if [[ -z ${DHCP_OPTION_SET_ID-} ]]; then
+    case "${AWS_REGION}" in
+      us-east-1)
+        OPTION_SET_DOMAIN=ec2.internal
+        ;;
 
-    *)
-      OPTION_SET_DOMAIN="${AWS_REGION}.compute.internal"
-  esac
+      *)
+        OPTION_SET_DOMAIN="${AWS_REGION}.compute.internal"
+    esac
 
-  DHCP_OPTION_SET_ID=$($AWS_CMD create-dhcp-options --dhcp-configuration Key=domain-name,Values=${OPTION_SET_DOMAIN} Key=domain-name-servers,Values=AmazonProvidedDNS --query DhcpOptions.DhcpOptionsId)
+    DHCP_OPTION_SET_ID=$($AWS_CMD create-dhcp-options --dhcp-configuration Key=domain-name,Values=${OPTION_SET_DOMAIN} Key=domain-name-servers,Values=AmazonProvidedDNS --query DhcpOptions.DhcpOptionsId)
 
-  add-tag ${DHCP_OPTION_SET_ID} Name kubernetes-dhcp-option-set
-  add-tag ${DHCP_OPTION_SET_ID} KubernetesCluster ${CLUSTER_ID}
+    add-tag ${DHCP_OPTION_SET_ID} Name kubernetes-dhcp-option-set
+    add-tag ${DHCP_OPTION_SET_ID} KubernetesCluster ${CLUSTER_ID}
+  fi
 
   $AWS_CMD associate-dhcp-options --dhcp-options-id ${DHCP_OPTION_SET_ID} --vpc-id ${VPC_ID} > $LOG
 
@@ -459,8 +561,6 @@ function create-dhcp-option-set () {
 
 # Verify prereqs
 function verify-prereqs {
-  build-runtime-config
-
   if [[ "$(which aws)" == "" ]]; then
     echo "Can't find aws in PATH, please fix and retry."
     exit 1
@@ -490,9 +590,17 @@ function ensure-temp-dir {
 #   SALT_TAR_URL
 function upload-server-tars() {
   SERVER_BINARY_TAR_URL=
+  SERVER_BINARY_TAR_HASH=
   SALT_TAR_URL=
+  SALT_TAR_HASH=
+  BOOTSTRAP_SCRIPT_URL=
+  BOOTSTRAP_SCRIPT_HASH=
 
   ensure-temp-dir
+
+  SERVER_BINARY_TAR_HASH=$(sha1sum-file "${SERVER_BINARY_TAR}")
+  SALT_TAR_HASH=$(sha1sum-file "${SALT_TAR}")
+  BOOTSTRAP_SCRIPT_HASH=$(sha1sum-file "${BOOTSTRAP_SCRIPT}")
 
   if [[ -z ${AWS_S3_BUCKET-} ]]; then
       local project_hash=
@@ -551,12 +659,13 @@ function upload-server-tars() {
   mkdir ${local_dir}
 
   echo "+++ Staging server tars to S3 Storage: ${AWS_S3_BUCKET}/${staging_path}"
-  local server_binary_path="${staging_path}/${SERVER_BINARY_TAR##*/}"
   cp -a "${SERVER_BINARY_TAR}" ${local_dir}
   cp -a "${SALT_TAR}" ${local_dir}
+  cp -a "${BOOTSTRAP_SCRIPT}" ${local_dir}
 
   aws s3 sync --region ${s3_bucket_location} --exact-timestamps ${local_dir} "s3://${AWS_S3_BUCKET}/${staging_path}/"
 
+  local server_binary_path="${staging_path}/${SERVER_BINARY_TAR##*/}"
   aws s3api put-object-acl --region ${s3_bucket_location} --bucket ${AWS_S3_BUCKET} --key "${server_binary_path}" --grant-read 'uri="http://acs.amazonaws.com/groups/global/AllUsers"'
   SERVER_BINARY_TAR_URL="${s3_url_base}/${AWS_S3_BUCKET}/${server_binary_path}"
 
@@ -564,9 +673,14 @@ function upload-server-tars() {
   aws s3api put-object-acl --region ${s3_bucket_location} --bucket ${AWS_S3_BUCKET} --key "${salt_tar_path}" --grant-read 'uri="http://acs.amazonaws.com/groups/global/AllUsers"'
   SALT_TAR_URL="${s3_url_base}/${AWS_S3_BUCKET}/${salt_tar_path}"
 
+  local bootstrap_script_path="${staging_path}/${BOOTSTRAP_SCRIPT##*/}"
+  aws s3api put-object-acl --region ${s3_bucket_location} --bucket ${AWS_S3_BUCKET} --key "${bootstrap_script_path}" --grant-read 'uri="http://acs.amazonaws.com/groups/global/AllUsers"'
+  BOOTSTRAP_SCRIPT_URL="${s3_url_base}/${AWS_S3_BUCKET}/${bootstrap_script_path}"
+
   echo "Uploaded server tars:"
   echo "  SERVER_BINARY_TAR_URL: ${SERVER_BINARY_TAR_URL}"
   echo "  SALT_TAR_URL: ${SALT_TAR_URL}"
+  echo "  BOOTSTRAP_SCRIPT_URL: ${BOOTSTRAP_SCRIPT_URL}"
 }
 
 # Adds a tag to an AWS resource
@@ -640,7 +754,8 @@ function allocate-elastic-ip {
   $AWS_CMD allocate-address --domain vpc --query PublicIp
 }
 
-function assign-ip-to-instance {
+# Attaches an elastic IP to the specified instance
+function attach-ip-to-instance {
   local ip_address=$1
   local instance_id=$2
 
@@ -649,22 +764,35 @@ function assign-ip-to-instance {
   $AWS_CMD associate-address --instance-id ${instance_id} --allocation-id ${elastic_ip_allocation_id} > $LOG
 }
 
-# If MASTER_RESERVED_IP looks like IP address, will try to assign it to master instance
-# If MASTER_RESERVED_IP is "auto", will allocate new elastic ip and assign that
-# If none of the above or something fails, will output originally assigne IP
-# Output: assigned IP address
-function assign-elastic-ip {
-  local assigned_public_ip=$1
-  local master_instance_id=$2
+# Releases an elastic IP
+function release-elastic-ip {
+  local ip_address=$1
 
-  # Check that MASTER_RESERVED_IP looks like an IPv4 address
-  if [[ "${MASTER_RESERVED_IP}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-    assign-ip-to-instance "${MASTER_RESERVED_IP}" "${master_instance_id}" "${assigned_public_ip}"
-  elif [[ "${MASTER_RESERVED_IP}" = "auto" ]]; then
-    assign-ip-to-instance $(allocate-elastic-ip) "${master_instance_id}" "${assigned_public_ip}"
+  echo "Releasing Elastic IP: ${ip_address}"
+  elastic_ip_allocation_id=$($AWS_CMD describe-addresses --public-ips $ip_address --query Addresses[].AllocationId 2> $LOG) || true
+  if [[ -z "${elastic_ip_allocation_id}" ]]; then
+    echo "Elastic IP already released"
   else
-    echo "${assigned_public_ip}"
+    $AWS_CMD release-address --allocation-id ${elastic_ip_allocation_id} > $LOG
   fi
+}
+
+# Deletes a security group
+# usage: delete_security_group <sgid>
+function delete_security_group {
+  local -r sg_id=${1}
+
+  echo "Deleting security group: ${sg_id}"
+
+  # We retry in case there's a dependent resource - typically an ELB
+  n=0
+  until [ $n -ge 20 ]; do
+    $AWS_CMD delete-security-group --group-id ${sg_id} > $LOG && return
+    n=$[$n+1]
+    sleep 3
+  done
+  echo "Unable to delete security group: ${sg_id}"
+  exit 1
 }
 
 function ssh-key-setup {
@@ -691,7 +819,7 @@ function vpc-setup {
 	  VPC_ID=$($AWS_CMD create-vpc --cidr-block ${VPC_CIDR} --query Vpc.VpcId)
 	  $AWS_CMD modify-vpc-attribute --vpc-id $VPC_ID --enable-dns-support '{"Value": true}' > $LOG
 	  $AWS_CMD modify-vpc-attribute --vpc-id $VPC_ID --enable-dns-hostnames '{"Value": true}' > $LOG
-	  add-tag $VPC_ID Name kubernetes-vpc
+	  add-tag $VPC_ID Name ${VPC_NAME}
 	  add-tag $VPC_ID KubernetesCluster ${CLUSTER_ID}
   fi
 
@@ -710,33 +838,37 @@ function subnet-setup {
   else
     EXISTING_CIDR=$($AWS_CMD describe-subnets --subnet-ids ${SUBNET_ID} --query Subnets[].CidrBlock)
     echo "Using existing subnet with CIDR $EXISTING_CIDR"
-    VPC_CIDR=$($AWS_CMD describe-vpcs --vpc-ids ${VPC_ID} --query Vpcs[].CidrBlock)
-    echo "VPC CIDR is $VPC_CIDR"
-    VPC_CIDR_BASE=${VPC_CIDR%.*.*}
-    MASTER_INTERNAL_IP=${VPC_CIDR_BASE}.0${MASTER_IP_SUFFIX}
-    echo "Assuming MASTER_INTERNAL_IP=${MASTER_INTERNAL_IP}"
+    if [ ! $SUBNET_CIDR = $EXISTING_CIDR ]; then
+      MASTER_INTERNAL_IP="${EXISTING_CIDR%.*}${MASTER_IP_SUFFIX}"
+      echo "Assuming MASTER_INTERNAL_IP=${MASTER_INTERNAL_IP}"
+    fi
   fi
 
   echo "Using subnet $SUBNET_ID"
 }
 
 function kube-up {
-  echo "Starting cluster using os distro: ${KUBE_OS_DISTRIBUTION}" >&2
+  echo "Starting cluster using os distro: ${OS_DISTRIBUTION}" >&2
 
   get-tokens
 
   detect-image
   detect-minion-image
 
+  detect-root-device
+
   find-release-tars
 
   ensure-temp-dir
+
+  create-bootstrap-script
 
   upload-server-tars
 
   ensure-iam-profiles
 
   load-or-gen-kube-basicauth
+  load-or-gen-kube-bearertoken
 
   ssh-key-setup
 
@@ -799,19 +931,17 @@ function kube-up {
   authorize-security-group-ingress "${MASTER_SG_ID}" "--source-group ${NODE_SG_ID} --protocol all"
   authorize-security-group-ingress "${NODE_SG_ID}" "--source-group ${MASTER_SG_ID} --protocol all"
 
-  # TODO(justinsb): Would be fairly easy to replace 0.0.0.0/0 in these rules
-
   # SSH is open to the world
-  authorize-security-group-ingress "${MASTER_SG_ID}" "--protocol tcp --port 22 --cidr 0.0.0.0/0"
-  authorize-security-group-ingress "${NODE_SG_ID}" "--protocol tcp --port 22 --cidr 0.0.0.0/0"
+  authorize-security-group-ingress "${MASTER_SG_ID}" "--protocol tcp --port 22 --cidr ${SSH_CIDR}"
+  authorize-security-group-ingress "${NODE_SG_ID}" "--protocol tcp --port 22 --cidr ${SSH_CIDR}"
 
   # HTTPS to the master is allowed (for API access)
-  authorize-security-group-ingress "${MASTER_SG_ID}" "--protocol tcp --port 443 --cidr 0.0.0.0/0"
+  authorize-security-group-ingress "${MASTER_SG_ID}" "--protocol tcp --port 443 --cidr ${HTTP_API_CIDR}"
 
-  # KUBE_SHARE_MASTER is used to add minions to an existing master
-  if [[ "${KUBE_SHARE_MASTER:-}" == "true" ]]; then
-    # Detect existing master
+  # KUBE_USE_EXISTING_MASTER is used to add minions to an existing master
+  if [[ "${KUBE_USE_EXISTING_MASTER:-}" == "true" ]]; then
     detect-master
+    parse-master-env
 
     # Start minions
     start-minions
@@ -820,78 +950,90 @@ function kube-up {
     # Create the master
     start-master
 
+    # Build ~/.kube/config
+    build-config
+
     # Start minions
     start-minions
     wait-minions
 
     # Wait for the master to be ready
     wait-master
-
-    # Build ~/.kube/config
-    build-config
   fi
 
   # Check the cluster is OK
   check-cluster
 }
 
+# Builds the bootstrap script and saves it to a local temp file
+# Sets BOOTSTRAP_SCRIPT to the path of the script
+function create-bootstrap-script() {
+  ensure-temp-dir
+
+  BOOTSTRAP_SCRIPT="${KUBE_TEMP}/bootstrap-script"
+
+  (
+    # Include the default functions from the GCE configure-vm script
+    sed '/^#+AWS_OVERRIDES_HERE/,$d' "${KUBE_ROOT}/cluster/gce/configure-vm.sh"
+    # Include the AWS override functions
+    cat "${KUBE_ROOT}/cluster/aws/templates/configure-vm-aws.sh"
+    cat "${KUBE_ROOT}/cluster/aws/templates/format-disks.sh"
+    # Include the GCE configure-vm directly-executed code
+    sed -e '1,/^#+AWS_OVERRIDES_HERE/d' "${KUBE_ROOT}/cluster/gce/configure-vm.sh"
+  ) > "${BOOTSTRAP_SCRIPT}"
+}
+
 # Starts the master node
 function start-master() {
+  # Ensure RUNTIME_CONFIG is populated
+  build-runtime-config
+
   # Get or create master persistent volume
   ensure-master-pd
 
-  # Determine extra certificate names for master
-  octets=($(echo "$SERVICE_CLUSTER_IP_RANGE" | sed -e 's|/.*||' -e 's/\./ /g'))
-  ((octets[3]+=1))
-  service_ip=$(echo "${octets[*]}" | sed 's/ /./g')
-  MASTER_EXTRA_SANS="IP:${service_ip},DNS:kubernetes,DNS:kubernetes.default,DNS:kubernetes.default.svc,DNS:kubernetes.default.svc.${DNS_DOMAIN},DNS:${MASTER_NAME}"
+  # Get or create master elastic IP
+  ensure-master-ip
 
+  # We have to make sure that the cert is valid for API_SERVERS
+  # i.e. we likely have to pass ELB name / elastic IP in future
+  create-certs "${KUBE_MASTER_IP}" "${MASTER_INTERNAL_IP}"
+
+  # This key is no longer needed, and this enables us to get under the 16KB size limit
+  KUBECFG_CERT_BASE64=""
+  KUBECFG_KEY_BASE64=""
+
+  write-master-env
 
   (
     # We pipe this to the ami as a startup script in the user-data field.  Requires a compatible ami
     echo "#! /bin/bash"
     echo "mkdir -p /var/cache/kubernetes-install"
     echo "cd /var/cache/kubernetes-install"
-    echo "readonly SALT_MASTER='${MASTER_INTERNAL_IP}'"
-    echo "readonly INSTANCE_PREFIX='${INSTANCE_PREFIX}'"
-    echo "readonly NODE_INSTANCE_PREFIX='${NODE_INSTANCE_PREFIX}'"
-    echo "readonly CLUSTER_IP_RANGE='${CLUSTER_IP_RANGE}'"
-    echo "readonly ALLOCATE_NODE_CIDRS='${ALLOCATE_NODE_CIDRS}'"
-    echo "readonly SERVER_BINARY_TAR_URL='${SERVER_BINARY_TAR_URL}'"
-    echo "readonly SALT_TAR_URL='${SALT_TAR_URL}'"
-    echo "readonly ZONE='${ZONE}'"
-    echo "readonly KUBE_USER='${KUBE_USER}'"
-    echo "readonly KUBE_PASSWORD='${KUBE_PASSWORD}'"
-    echo "readonly SERVICE_CLUSTER_IP_RANGE='${SERVICE_CLUSTER_IP_RANGE}'"
-    echo "readonly ENABLE_CLUSTER_MONITORING='${ENABLE_CLUSTER_MONITORING:-none}'"
-    echo "readonly ENABLE_CLUSTER_LOGGING='${ENABLE_CLUSTER_LOGGING:-false}'"
-    echo "readonly ENABLE_NODE_LOGGING='${ENABLE_NODE_LOGGING:-false}'"
-    echo "readonly LOGGING_DESTINATION='${LOGGING_DESTINATION:-}'"
-    echo "readonly ELASTICSEARCH_LOGGING_REPLICAS='${ELASTICSEARCH_LOGGING_REPLICAS:-}'"
-    echo "readonly ENABLE_CLUSTER_DNS='${ENABLE_CLUSTER_DNS:-false}'"
-    echo "readonly ENABLE_CLUSTER_UI='${ENABLE_CLUSTER_UI:-false}'"
-    echo "readonly RUNTIME_CONFIG='${RUNTIME_CONFIG}'"
-    echo "readonly DNS_REPLICAS='${DNS_REPLICAS:-}'"
-    echo "readonly DNS_SERVER_IP='${DNS_SERVER_IP:-}'"
-    echo "readonly DNS_DOMAIN='${DNS_DOMAIN:-}'"
-    echo "readonly ADMISSION_CONTROL='${ADMISSION_CONTROL:-}'"
-    echo "readonly MASTER_IP_RANGE='${MASTER_IP_RANGE:-}'"
-    echo "readonly KUBELET_TOKEN='${KUBELET_TOKEN}'"
-    echo "readonly KUBE_PROXY_TOKEN='${KUBE_PROXY_TOKEN}'"
-    echo "readonly DOCKER_STORAGE='${DOCKER_STORAGE:-}'"
-    echo "readonly MASTER_EXTRA_SANS='${MASTER_EXTRA_SANS:-}'"
-    echo "readonly NETWORK_PROVIDER='${NETWORK_PROVIDER:-}'"
-    echo "readonly OPENCONTRAIL_TAG='${OPENCONTRAIL_TAG:-}'"
-    echo "readonly OPENCONTRAIL_KUBERNETES_TAG='${OPENCONTRAIL_KUBERNETES_TAG:-}'"
-    echo "readonly OPENCONTRAIL_PUBLIC_SUBNET='${OPENCONTRAIL_PUBLIC_SUBNET:-}'"
-    echo "readonly E2E_STORAGE_TEST_ENVIRONMENT='${E2E_STORAGE_TEST_ENVIRONMENT:-}'"
-    grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/common.sh"
-    grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/format-disks.sh"
-    grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/setup-master-pd.sh"
-    grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/create-dynamic-salt-files.sh"
-    grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/download-release.sh"
-    grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/salt-master.sh"
-  ) > "${KUBE_TEMP}/master-start.sh"
+
+    echo "cat > kube_env.yaml << __EOF_MASTER_KUBE_ENV_YAML"
+    cat ${KUBE_TEMP}/master-kube-env.yaml
+    echo "AUTO_UPGRADE: 'true'"
+    # TODO: get rid of these exceptions / harmonize with common or GCE
+    echo "DOCKER_STORAGE: $(yaml-quote ${DOCKER_STORAGE:-})"
+    echo "API_SERVERS: $(yaml-quote ${MASTER_INTERNAL_IP:-})"
+    echo "__EOF_MASTER_KUBE_ENV_YAML"
+    echo ""
+    echo "wget -O bootstrap ${BOOTSTRAP_SCRIPT_URL}"
+    echo "chmod +x bootstrap"
+    echo "mkdir -p /etc/kubernetes"
+    echo "mv kube_env.yaml /etc/kubernetes"
+    echo "mv bootstrap /etc/kubernetes/"
+    echo "cat > /etc/rc.local << EOF_RC_LOCAL"
+    echo "#!/bin/sh -e"
+    # We want to be sure that we don't pass an argument to bootstrap
+    echo "/etc/kubernetes/bootstrap"
+    echo "exit 0"
+    echo "EOF_RC_LOCAL"
+    echo "/etc/kubernetes/bootstrap"
+  ) > "${KUBE_TEMP}/master-user-data"
+
+  # Compress the data to fit under the 16KB limit (cloud-init accepts compressed data)
+  gzip "${KUBE_TEMP}/master-user-data"
 
   echo "Starting Master"
   master_id=$($AWS_CMD run-instances \
@@ -904,7 +1046,7 @@ function start-master() {
     --security-group-ids ${MASTER_SG_ID} \
     --associate-public-ip-address \
     --block-device-mappings "${MASTER_BLOCK_DEVICE_MAPPINGS}" \
-    --user-data file://${KUBE_TEMP}/master-start.sh \
+    --user-data fileb://${KUBE_TEMP}/master-user-data.gz \
     --query Instances[].InstanceId)
   add-tag $master_id Name $MASTER_NAME
   add-tag $master_id Role $MASTER_TAG
@@ -929,8 +1071,9 @@ function start-master() {
       wait-for-instance-state ${master_id} "running"
 
       KUBE_MASTER=${MASTER_NAME}
-      KUBE_MASTER_IP=$(assign-elastic-ip $ip $master_id)
-      echo -e " ${color_green}[master running @${KUBE_MASTER_IP}]${color_norm}"
+      echo -e " ${color_green}[master running]${color_norm}"
+
+      attach-ip-to-instance ${KUBE_MASTER_IP} ${master_id}
 
       # This is a race between instance start and volume attachment.  There appears to be no way to start an AWS instance with a volume attached.
       # To work around this, we wait for volume to be ready in setup-master-pd.sh
@@ -946,69 +1089,58 @@ function start-master() {
     attempt=$(($attempt+1))
     sleep 10
   done
-
-  # Check for SSH connectivity
-  attempt=0
-  while true; do
-    echo -n Attempt "$(($attempt+1))" to check for SSH to master
-    local output
-    local ok=1
-    output=$(ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ${SSH_USER}@${KUBE_MASTER_IP} uptime 2> $LOG) || ok=0
-    if [[ ${ok} == 0 ]]; then
-      if (( attempt > 30 )); then
-        echo
-        echo "(Failed) output was: ${output}"
-        echo
-        echo -e "${color_red}Unable to ssh to master on ${KUBE_MASTER_IP}. Your cluster is unlikely" >&2
-        echo "to work correctly. Please run ./cluster/kube-down.sh and re-create the" >&2
-        echo -e "cluster. (sorry!)${color_norm}" >&2
-        exit 1
-      fi
-    else
-      echo -e " ${color_green}[ssh to master working]${color_norm}"
-      break
-    fi
-    echo -e " ${color_yellow}[ssh to master not working yet]${color_norm}"
-    attempt=$(($attempt+1))
-    sleep 10
-  done
-
-  # We need the salt-master to be up for the minions to work
-  attempt=0
-  while true; do
-    echo -n Attempt "$(($attempt+1))" to check for salt-master
-    local output
-    local ok=1
-    output=$(ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ${SSH_USER}@${KUBE_MASTER_IP} pgrep salt-master 2> $LOG) || ok=0
-    if [[ ${ok} == 0 ]]; then
-      if (( attempt > 30 )); then
-        echo
-        echo "(Failed) output was: ${output}"
-        echo
-        echo -e "${color_red}salt-master failed to start on ${KUBE_MASTER_IP}. Your cluster is unlikely" >&2
-        echo "to work correctly. Please run ./cluster/kube-down.sh and re-create the" >&2
-        echo -e "cluster. (sorry!)${color_norm}" >&2
-        exit 1
-      fi
-    else
-      echo -e " ${color_green}[salt-master running]${color_norm}"
-      break
-    fi
-    echo -e " ${color_yellow}[salt-master not working yet]${color_norm}"
-    attempt=$(($attempt+1))
-    sleep 10
-  done
 }
 
 # Creates an ASG for the minion nodes
 function start-minions() {
+  # Minions don't currently use runtime config, but call it anyway for sanity
+  build-runtime-config
+
   echo "Creating minion configuration"
-  generate-minion-user-data > "${KUBE_TEMP}/minion-user-data"
+
+  write-node-env
+
+  (
+    # We pipe this to the ami as a startup script in the user-data field.  Requires a compatible ami
+    echo "#! /bin/bash"
+    echo "mkdir -p /var/cache/kubernetes-install"
+    echo "cd /var/cache/kubernetes-install"
+    echo "cat > kube_env.yaml << __EOF_KUBE_ENV_YAML"
+    cat ${KUBE_TEMP}/node-kube-env.yaml
+    echo "AUTO_UPGRADE: 'true'"
+    # TODO: get rid of these exceptions / harmonize with common or GCE
+    echo "DOCKER_STORAGE: $(yaml-quote ${DOCKER_STORAGE:-})"
+    echo "API_SERVERS: $(yaml-quote ${MASTER_INTERNAL_IP:-})"
+    echo "__EOF_KUBE_ENV_YAML"
+    echo ""
+    echo "wget -O bootstrap ${BOOTSTRAP_SCRIPT_URL}"
+    echo "chmod +x bootstrap"
+    echo "mkdir -p /etc/kubernetes"
+    echo "mv kube_env.yaml /etc/kubernetes"
+    echo "mv bootstrap /etc/kubernetes/"
+    echo "cat > /etc/rc.local << EOF_RC_LOCAL"
+    echo "#!/bin/sh -e"
+    # We want to be sure that we don't pass an argument to bootstrap
+    echo "/etc/kubernetes/bootstrap"
+    echo "exit 0"
+    echo "EOF_RC_LOCAL"
+    echo "/etc/kubernetes/bootstrap"
+  ) > "${KUBE_TEMP}/node-user-data"
+
+  # Compress the data to fit under the 16KB limit (cloud-init accepts compressed data)
+  gzip "${KUBE_TEMP}/node-user-data"
+
   local public_ip_option
   if [[ "${ENABLE_NODE_PUBLIC_IP}" == "true" ]]; then
     public_ip_option="--associate-public-ip-address"
   else
     public_ip_option="--no-associate-public-ip-address"
+  fi
+  local spot_price_option
+  if [[ -n "${NODE_SPOT_PRICE:-}" ]]; then
+    spot_price_option="--spot-price ${NODE_SPOT_PRICE}"
+  else
+    spot_price_option=""
   fi
   ${AWS_ASG_CMD} create-launch-configuration \
       --launch-configuration-name ${ASG_NAME} \
@@ -1018,8 +1150,9 @@ function start-minions() {
       --key-name ${AWS_SSH_KEY_NAME} \
       --security-groups ${NODE_SG_ID} \
       ${public_ip_option} \
+      ${spot_price_option} \
       --block-device-mappings "${NODE_BLOCK_DEVICE_MAPPINGS}" \
-      --user-data "file://${KUBE_TEMP}/minion-user-data"
+      --user-data "fileb://${KUBE_TEMP}/node-user-data.gz"
 
   echo "Creating autoscaling group"
   ${AWS_ASG_CMD} create-auto-scaling-group \
@@ -1036,15 +1169,20 @@ function start-minions() {
 function wait-minions {
   # Wait for the minions to be running
   # TODO(justinsb): This is really not needed any more
-  attempt=0
+  local attempt=0
+  local max_attempts=30
+  # Spot instances are slower to launch
+  if [[ -n "${NODE_SPOT_PRICE:-}" ]]; then
+    max_attempts=90
+  fi
   while true; do
-    find-running-minions > $LOG
+    detect-node-names > $LOG
     if [[ ${#NODE_IDS[@]} == ${NUM_NODES} ]]; then
       echo -e " ${color_green}${#NODE_IDS[@]} minions started; ready${color_norm}"
       break
     fi
 
-    if (( attempt > 30 )); then
+    if (( attempt > max_attempts )); then
       echo
       echo "Expected number of minions did not start in time"
       echo
@@ -1064,19 +1202,6 @@ function wait-minions {
 function wait-master() {
   detect-master > $LOG
 
-  # TODO(justinsb): This is really not necessary any more
-  # Wait 3 minutes for cluster to come up.  We hit it with a "highstate" after that to
-  # make sure that everything is well configured.
-  # TODO: Can we poll here?
-  echo "Waiting 3 minutes for cluster to settle"
-  local i
-  for (( i=0; i < 6*3; i++)); do
-    printf "."
-    sleep 10
-  done
-  echo "Re-running salt highstate"
-  ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ${SSH_USER}@${KUBE_MASTER_IP} sudo salt '*' state.highstate > $LOG
-
   echo "Waiting for cluster initialization."
   echo
   echo "  This will continually check to see if the API for kubernetes is reachable."
@@ -1094,25 +1219,19 @@ function wait-master() {
 }
 
 # Creates the ~/.kube/config file, getting the information from the master
-# The master much be running and set in KUBE_MASTER_IP
+# The master must be running and set in KUBE_MASTER_IP
 function build-config() {
-  # TODO use token instead of kube_auth
-  export KUBE_CERT="/tmp/$RANDOM-kubecfg.crt"
-  export KUBE_KEY="/tmp/$RANDOM-kubecfg.key"
-  export CA_CERT="/tmp/$RANDOM-kubernetes.ca.crt"
-  export CONTEXT="aws_${INSTANCE_PREFIX}"
-
-  local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
-
-  # TODO: generate ADMIN (and KUBELET) tokens and put those in the master's
-  # config file.  Distribute the same way the htpasswd is done.
+  export KUBE_CERT="${CERT_DIR}/pki/issued/kubecfg.crt"
+  export KUBE_KEY="${CERT_DIR}/pki/private/kubecfg.key"
+  export CA_CERT="${CERT_DIR}/pki/ca.crt"
+  export CONTEXT="${CONFIG_CONTEXT}"
   (
-    umask 077
-    ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" "${SSH_USER}@${KUBE_MASTER_IP}" sudo cat /srv/kubernetes/kubecfg.crt >"${KUBE_CERT}" 2>"$LOG"
-    ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" "${SSH_USER}@${KUBE_MASTER_IP}" sudo cat /srv/kubernetes/kubecfg.key >"${KUBE_KEY}" 2>"$LOG"
-    ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" "${SSH_USER}@${KUBE_MASTER_IP}" sudo cat /srv/kubernetes/ca.crt >"${CA_CERT}" 2>"$LOG"
+   umask 077
 
-    create-kubeconfig
+   # Update the user's kubeconfig to include credentials for this apiserver.
+   create-kubeconfig
+
+   create-kubeconfig-for-federation
   )
 }
 
@@ -1139,7 +1258,7 @@ function check-cluster() {
         local output=`check-minion ${minion_ip}`
         echo $output
         if [[ "${output}" != "working" ]]; then
-          if (( attempt > 9 )); then
+          if (( attempt > 20 )); then
             echo
             echo -e "${color_red}Your cluster is unlikely to work correctly." >&2
             echo "Please run ./cluster/kube-down.sh and re-create the" >&2
@@ -1189,6 +1308,13 @@ function kube-down {
       done
     fi
 
+    if [[ -z "${KUBE_MASTER_ID-}" ]]; then
+      KUBE_MASTER_ID=$(get_instanceid_from_name ${MASTER_NAME})
+    fi
+    if [[ -n "${KUBE_MASTER_ID-}" ]]; then
+      delete-instance-alarms ${KUBE_MASTER_ID}
+    fi
+
     echo "Deleting instances in VPC: ${vpc_id}"
     instance_ids=$($AWS_CMD describe-instances \
                             --filters Name=vpc-id,Values=${vpc_id} \
@@ -1216,6 +1342,23 @@ function kube-down {
         wait-for-instance-state ${instance_id} "terminated"
       done
       echo "All instances deleted"
+    fi
+    if [[ -n $(${AWS_ASG_CMD} describe-launch-configurations --launch-configuration-names ${ASG_NAME} --query LaunchConfigurations[].LaunchConfigurationName) ]]; then
+      echo "Warning: default auto-scaling launch configuration ${ASG_NAME} still exists, attempting to delete"
+      echo "  (This may happen if kube-up leaves just the launch configuration but no auto-scaling group.)"
+      ${AWS_ASG_CMD} delete-launch-configuration --launch-configuration-name ${ASG_NAME} || true
+    fi
+
+    find-master-pd
+    find-tagged-master-ip
+
+    if [[ -n "${KUBE_MASTER_IP:-}" ]]; then
+      release-elastic-ip ${KUBE_MASTER_IP}
+    fi
+
+    if [[ -n "${MASTER_DISK_ID:-}" ]]; then
+      echo "Deleting volume ${MASTER_DISK_ID}"
+      $AWS_CMD delete-volume --volume-id ${MASTER_DISK_ID} > $LOG
     fi
 
     echo "Cleaning up resources in VPC: ${vpc_id}"
@@ -1250,8 +1393,7 @@ function kube-down {
         continue
       fi
 
-      echo "Deleting security group: ${sg_id}"
-      $AWS_CMD delete-security-group --group-id ${sg_id} > $LOG
+      delete_security_group ${sg_id}
     done
 
     subnet_ids=$($AWS_CMD describe-subnets \
@@ -1289,7 +1431,20 @@ function kube-down {
       $AWS_CMD delete-route-table --route-table-id $route_table_id > $LOG
     done
 
+    echo "Deleting VPC: ${vpc_id}"
     $AWS_CMD delete-vpc --vpc-id $vpc_id > $LOG
+  else
+    echo "" >&2
+    echo -e "${color_red}Cluster NOT deleted!${color_norm}" >&2
+    echo "" >&2
+    echo "No VPC was found with tag KubernetesCluster=${CLUSTER_ID}" >&2
+    echo "" >&2
+    echo "If you are trying to delete a cluster in a shared VPC," >&2
+    echo "please consider using one of the methods in the kube-deploy repo." >&2
+    echo "See: https://github.com/kubernetes/kube-deploy/blob/master/docs/delete_cluster.md" >&2
+    echo "" >&2
+    echo "Note: You may be seeing this message may be because the cluster was already deleted, or" >&2
+    echo "has a name other than '${CLUSTER_ID}'." >&2
   fi
 }
 
@@ -1299,6 +1454,7 @@ function kube-push {
 
   # Make sure we have the tar files staged on Google Storage
   find-release-tars
+  create-bootstrap-script
   upload-server-tars
 
   (
@@ -1325,7 +1481,7 @@ function kube-push {
 }
 
 # -----------------------------------------------------------------------------
-# Cluster specific test helpers used from hack/e2e-test.sh
+# Cluster specific test helpers used from hack/e2e.go
 
 # Execute prior to running tests to build a release if required for env.
 #
@@ -1337,11 +1493,13 @@ function test-build-release {
 }
 
 # Execute prior to running tests to initialize required structure. This is
-# called from hack/e2e.go only when running -up (it is run after kube-up).
+# called from hack/e2e.go only when running -up.
 #
 # Assumed vars:
 #   Variables from config.sh
 function test-setup {
+  "${KUBE_ROOT}/cluster/kube-up.sh"
+
   VPC_ID=$(get_vpc_id)
   detect-security-groups
 
@@ -1366,40 +1524,41 @@ function test-teardown {
 }
 
 
-# SSH to a node by name ($1) and run a command ($2).
-function ssh-to-node {
+# Gets the hostname (or IP) that we should SSH to for the given nodename
+# For the master, we use the nodename, for the nodes we use their instanceids
+function get_ssh_hostname {
   local node="$1"
-  local cmd="$2"
 
   if [[ "${node}" == "${MASTER_NAME}" ]]; then
     node=$(get_instanceid_from_name ${MASTER_NAME})
     if [[ -z "${node-}" ]]; then
-      echo "Could not detect Kubernetes master node.  Make sure you've launched a cluster with 'kube-up.sh'"
+      echo "Could not detect Kubernetes master node.  Make sure you've launched a cluster with 'kube-up.sh'" 1>&2
       exit 1
     fi
   fi
 
   local ip=$(get_instance_public_ip ${node})
   if [[ -z "$ip" ]]; then
-    echo "Could not detect IP for ${node}."
+    echo "Could not detect IP for ${node}." 1>&2
     exit 1
   fi
+  echo ${ip}
+}
 
-  for try in $(seq 1 5); do
-    if ssh -oLogLevel=quiet -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ${SSH_USER}@${ip} "${cmd}"; then
+# SSH to a node by name ($1) and run a command ($2).
+function ssh-to-node {
+  local node="$1"
+  local cmd="$2"
+
+  local ip=$(get_ssh_hostname ${node})
+
+  for try in {1..5}; do
+    if ssh -oLogLevel=quiet -oConnectTimeout=30 -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ${SSH_USER}@${ip} "echo test > /dev/null"; then
       break
     fi
+    sleep 5
   done
-}
-
-# Restart the kube-proxy on a node ($1)
-function restart-kube-proxy {
-  ssh-to-node "$1" "sudo /etc/init.d/kube-proxy restart"
-}
-
-# Restart the kube-apiserver on a node ($1)
-function restart-apiserver {
-  ssh-to-node "$1" "sudo /etc/init.d/kube-apiserver restart"
+  ssh -oLogLevel=quiet -oConnectTimeout=30 -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ${SSH_USER}@${ip} "${cmd}"
 }
 
 # Perform preparations required to run e2e tests
@@ -1412,26 +1571,4 @@ function prepare-e2e() {
 function get-tokens() {
   KUBELET_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
   KUBE_PROXY_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
-}
-
-# Builds the RUNTIME_CONFIG var from other feature enable options
-function build-runtime-config() {
-  if [[ "${ENABLE_DEPLOYMENTS}" == "true" ]]; then
-      if [[ -z "${RUNTIME_CONFIG}" ]]; then
-          RUNTIME_CONFIG="extensions/v1beta1/deployments=true"
-      else
-          if echo "${RUNTIME_CONFIG}" | grep -q -v "extensions/v1beta1/deployments=true"; then
-            RUNTIME_CONFIG="${RUNTIME_CONFIG},extensions/v1beta1/deployments=true"
-          fi
-      fi
-  fi
-  if [[ "${ENABLE_DAEMONSETS}" == "true" ]]; then
-      if [[ -z "${RUNTIME_CONFIG}" ]]; then
-          RUNTIME_CONFIG="extensions/v1beta1/daemonsets=true"
-      else
-          if echo "${RUNTIME_CONFIG}" | grep -q -v "extensions/v1beta1/daemonsets=true"; then
-            RUNTIME_CONFIG="${RUNTIME_CONFIG},extensions/v1beta1/daemonsets=true"
-          fi
-      fi
-  fi
 }

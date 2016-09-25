@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@ limitations under the License.
 package cmd
 
 import (
+	"fmt"
 	"io"
 
 	"github.com/spf13/cobra"
@@ -28,7 +29,7 @@ import (
 func NewCmdVersion(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "version",
-		Short: "Print the client and server version information.",
+		Short: "Print the client and server version information",
 		Run: func(cmd *cobra.Command, args []string) {
 			err := RunVersion(f, out, cmd)
 			cmdutil.CheckErr(err)
@@ -45,11 +46,16 @@ func RunVersion(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
 		return nil
 	}
 
-	client, err := f.Client()
+	clientset, err := f.ClientSet()
 	if err != nil {
 		return err
 	}
 
-	kubectl.GetServerVersion(out, client)
+	serverVersion, err := clientset.Discovery().ServerVersion()
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprintf(out, "Server Version: %#v\n", *serverVersion)
 	return nil
 }

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,7 +19,6 @@ package cloudprovider
 import (
 	"errors"
 	"fmt"
-	"net"
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -27,8 +26,8 @@ import (
 
 // Interface is an abstract, pluggable interface for cloud providers.
 type Interface interface {
-	// TCPLoadBalancer returns a balancer interface. Also returns true if the interface is supported, false otherwise.
-	TCPLoadBalancer() (TCPLoadBalancer, bool)
+	// LoadBalancer returns a balancer interface. Also returns true if the interface is supported, false otherwise.
+	LoadBalancer() (LoadBalancer, bool)
 	// Instances returns an instances interface. Also returns true if the interface is supported, false otherwise.
 	Instances() (Instances, bool)
 	// Zones returns a zones interface. Also returns true if the interface is supported, false otherwise.
@@ -76,23 +75,31 @@ func GetInstanceProviderID(cloud Interface, nodeName string) (string, error) {
 	return cloud.ProviderName() + "://" + instanceID, nil
 }
 
-// TCPLoadBalancer is an abstract, pluggable interface for TCP load balancers.
-type TCPLoadBalancer interface {
+// LoadBalancer is an abstract, pluggable interface for load balancers.
+type LoadBalancer interface {
 	// TODO: Break this up into different interfaces (LB, etc) when we have more than one type of service
-	// GetTCPLoadBalancer returns whether the specified load balancer exists, and
+	// GetLoadBalancer returns whether the specified load balancer exists, and
 	// if so, what its status is.
-	GetTCPLoadBalancer(name, region string) (status *api.LoadBalancerStatus, exists bool, err error)
-	// EnsureTCPLoadBalancer creates a new tcp load balancer, or updates an existing one. Returns the status of the balancer
-	EnsureTCPLoadBalancer(name, region string, loadBalancerIP net.IP, ports []*api.ServicePort, hosts []string, affinityType api.ServiceAffinity) (*api.LoadBalancerStatus, error)
-	// UpdateTCPLoadBalancer updates hosts under the specified load balancer.
-	UpdateTCPLoadBalancer(name, region string, hosts []string) error
-	// EnsureTCPLoadBalancerDeleted deletes the specified load balancer if it
+	// Implementations must treat the *api.Service parameter as read-only and not modify it.
+	// Parameter 'clusterName' is the name of the cluster as presented to kube-controller-manager
+	GetLoadBalancer(clusterName string, service *api.Service) (status *api.LoadBalancerStatus, exists bool, err error)
+	// EnsureLoadBalancer creates a new load balancer 'name', or updates the existing one. Returns the status of the balancer
+	// Implementations must treat the *api.Service parameter as read-only and not modify it.
+	// Parameter 'clusterName' is the name of the cluster as presented to kube-controller-manager
+	EnsureLoadBalancer(clusterName string, service *api.Service, hosts []string) (*api.LoadBalancerStatus, error)
+	// UpdateLoadBalancer updates hosts under the specified load balancer.
+	// Implementations must treat the *api.Service parameter as read-only and not modify it.
+	// Parameter 'clusterName' is the name of the cluster as presented to kube-controller-manager
+	UpdateLoadBalancer(clusterName string, service *api.Service, hosts []string) error
+	// EnsureLoadBalancerDeleted deletes the specified load balancer if it
 	// exists, returning nil if the load balancer specified either didn't exist or
 	// was successfully deleted.
 	// This construction is useful because many cloud providers' load balancers
 	// have multiple underlying components, meaning a Get could say that the LB
 	// doesn't exist even if some part of it is still laying around.
-	EnsureTCPLoadBalancerDeleted(name, region string) error
+	// Implementations must treat the *api.Service parameter as read-only and not modify it.
+	// Parameter 'clusterName' is the name of the cluster as presented to kube-controller-manager
+	EnsureLoadBalancerDeleted(clusterName string, service *api.Service) error
 }
 
 // Instances is an abstract, pluggable interface for sets of instances.
@@ -103,10 +110,12 @@ type Instances interface {
 	// make this clearer.
 	NodeAddresses(name string) ([]api.NodeAddress, error)
 	// ExternalID returns the cloud provider ID of the specified instance (deprecated).
+	// Note that if the instance does not exist or is no longer running, we must return ("", cloudprovider.InstanceNotFound)
 	ExternalID(name string) (string, error)
 	// InstanceID returns the cloud provider ID of the specified instance.
-	// Note that if the instance does not exist or is no longer running, we must return ("", cloudprovider.InstanceNotFound)
 	InstanceID(name string) (string, error)
+	// InstanceType returns the type of the specified instance.
+	InstanceType(name string) (string, error)
 	// List lists instances that match 'filter' which is a regular expression which must match the entire instance name (fqdn)
 	List(filter string) ([]string, error)
 	// AddSSHKeyToAllInstances adds an SSH public key as a legal identity for all instances

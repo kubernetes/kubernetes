@@ -2,15 +2,15 @@
 
 <!-- BEGIN STRIP_FOR_RELEASE -->
 
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
 
 <h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
@@ -18,9 +18,10 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.1/docs/design/command_execution_port_forwarding.md).
+[here](http://releases.k8s.io/release-1.4/docs/design/command_execution_port_forwarding.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -35,14 +36,13 @@ Documentation for other releases can be found at
 
 ## Abstract
 
-This describes an approach for providing support for:
-
-- executing commands in containers, with stdin/stdout/stderr streams attached
-- port forwarding to containers
+This document describes how to use Kubernetes to execute commands in containers,
+with stdin/stdout/stderr streams attached and how to implement port forwarding
+to the containers.
 
 ## Background
 
-There are several related issues/PRs:
+See the following related issues/PRs:
 
 - [Support attach](http://issue.k8s.io/1521)
 - [Real container ssh](http://issue.k8s.io/1513)
@@ -76,34 +76,39 @@ won't be able to work with this mechanism, unless adapters can be written.
 
 ## Constraints and Assumptions
 
-- SSH support is not currently in scope
-- CGroup confinement is ultimately desired, but implementing that support is not currently in scope
-- SELinux confinement is ultimately desired, but implementing that support is not currently in scope
+- SSH support is not currently in scope.
+- CGroup confinement is ultimately desired, but implementing that support is not
+currently in scope.
+- SELinux confinement is ultimately desired, but implementing that support is
+not currently in scope.
 
 ## Use Cases
 
-- As a user of a Kubernetes cluster, I want to run arbitrary commands in a container, attaching my local stdin/stdout/stderr to the container
-- As a user of a Kubernetes cluster, I want to be able to connect to local ports on my computer and have them forwarded to ports in the container
+- A user of a Kubernetes cluster wants to run arbitrary commands in a
+container with local stdin/stdout/stderr attached to the container.
+- A user of a Kubernetes cluster wants to connect to local ports on his computer
+and have them forwarded to ports in a container.
 
 ## Process Flow
 
 ### Remote Command Execution Flow
 
-1. The client connects to the Kubernetes Master to initiate a remote command execution
-request
-2. The Master proxies the request to the Kubelet where the container lives
-3. The Kubelet executes nsenter + the requested command and streams stdin/stdout/stderr back and forth between the client and the container
+1. The client connects to the Kubernetes Master to initiate a remote command
+execution request.
+2. The Master proxies the request to the Kubelet where the container lives.
+3. The Kubelet executes nsenter + the requested command and streams
+stdin/stdout/stderr back and forth between the client and the container.
 
 ### Port Forwarding Flow
 
-1. The client connects to the Kubernetes Master to initiate a remote command execution
-request
-2. The Master proxies the request to the Kubelet where the container lives
-3. The client listens on each specified local port, awaiting local connections
-4. The client connects to one of the local listening ports
-4. The client notifies the Kubelet of the new connection
-5. The Kubelet executes nsenter + socat and streams data back and forth between the client and the port in the container
-
+1. The client connects to the Kubernetes Master to initiate a remote command
+execution request.
+2. The Master proxies the request to the Kubelet where the container lives.
+3. The client listens on each specified local port, awaiting local connections.
+4. The client connects to one of the local listening ports.
+4. The client notifies the Kubelet of the new connection.
+5. The Kubelet executes nsenter + socat and streams data back and forth between
+the client and the port in the container.
 
 ## Design Considerations
 
@@ -176,7 +181,10 @@ functionality. We need to make sure that users are not allowed to execute
 remote commands or do port forwarding to containers they aren't allowed to
 access.
 
-Additional work is required to ensure that multiple command execution or port forwarding connections from different clients are not able to see each other's data. This can most likely be achieved via SELinux labeling and unique process contexts.
+Additional work is required to ensure that multiple command execution or port
+forwarding connections from different clients are not able to see each other's
+data. This can most likely be achieved via SELinux labeling and unique process
+ contexts.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

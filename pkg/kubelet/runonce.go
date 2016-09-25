@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,13 +18,14 @@ package kubelet
 
 import (
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/kubelet/container"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/kubelet/util/format"
 )
 
 const (
@@ -41,6 +42,18 @@ type RunPodResult struct {
 
 // RunOnce polls from one configuration update and run the associated pods.
 func (kl *Kubelet) RunOnce(updates <-chan kubetypes.PodUpdate) ([]RunPodResult, error) {
+	// Setup filesystem directories.
+	if err := kl.setupDataDirs(); err != nil {
+		return nil, err
+	}
+
+	// If the container logs directory does not exist, create it.
+	if _, err := os.Stat(containerLogsDir); err != nil {
+		if err := kl.os.MkdirAll(containerLogsDir, 0755); err != nil {
+			glog.Errorf("Failed to create directory %q: %v", containerLogsDir, err)
+		}
+	}
+
 	select {
 	case u := <-updates:
 		glog.Infof("processing manifest with %d pods", len(u.Pods))
@@ -58,28 +71,30 @@ func (kl *Kubelet) runOnce(pods []*api.Pod, retryDelay time.Duration) (results [
 	admitted := []*api.Pod{}
 	for _, pod := range pods {
 		// Check if we can admit the pod.
-		if ok, reason, message := kl.canAdmitPod(append(admitted, pod), pod); !ok {
+		if ok, reason, message := kl.canAdmitPod(admitted, pod); !ok {
 			kl.rejectPod(pod, reason, message)
-		} else {
-			admitted = append(admitted, pod)
+			results = append(results, RunPodResult{pod, nil})
+			continue
 		}
+
+		admitted = append(admitted, pod)
 		go func(pod *api.Pod) {
 			err := kl.runPod(pod, retryDelay)
 			ch <- RunPodResult{pod, err}
 		}(pod)
 	}
 
-	glog.Infof("waiting for %d pods", len(pods))
+	glog.Infof("Waiting for %d pods", len(admitted))
 	failedPods := []string{}
-	for i := 0; i < len(pods); i++ {
+	for i := 0; i < len(admitted); i++ {
 		res := <-ch
 		results = append(results, res)
 		if res.Err != nil {
 			// TODO(proppy): report which containers failed the pod.
-			glog.Infof("failed to start pod %q: %v", res.Pod.Name, res.Err)
-			failedPods = append(failedPods, res.Pod.Name)
+			glog.Infof("failed to start pod %q: %v", format.Pod(res.Pod), res.Err)
+			failedPods = append(failedPods, format.Pod(res.Pod))
 		} else {
-			glog.Infof("started pod %q", res.Pod.Name)
+			glog.Infof("started pod %q", format.Pod(res.Pod))
 		}
 	}
 	if len(failedPods) > 0 {
@@ -94,36 +109,35 @@ func (kl *Kubelet) runPod(pod *api.Pod, retryDelay time.Duration) error {
 	delay := retryDelay
 	retry := 0
 	for {
-		pods, err := kl.containerRuntime.GetPods(false)
+		status, err := kl.containerRuntime.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
 		if err != nil {
-			return fmt.Errorf("failed to get kubelet pods: %v", err)
+			return fmt.Errorf("Unable to get status for pod %q: %v", format.Pod(pod), err)
 		}
-		p := container.Pods(pods).FindPodByID(pod.UID)
-		running, err := kl.isPodRunning(pod, p)
-		if err != nil {
-			return fmt.Errorf("failed to check pod status: %v", err)
-		}
-		if running {
-			glog.Infof("pod %q containers running", pod.Name)
+
+		if kl.isPodRunning(pod, status) {
+			glog.Infof("pod %q containers running", format.Pod(pod))
 			return nil
 		}
-		glog.Infof("pod %q containers not running: syncing", pod.Name)
+		glog.Infof("pod %q containers not running: syncing", format.Pod(pod))
 
-		podFullName := kubecontainer.GetPodFullName(pod)
-		glog.Infof("Creating a mirror pod for static pod %q", podFullName)
+		glog.Infof("Creating a mirror pod for static pod %q", format.Pod(pod))
 		if err := kl.podManager.CreateMirrorPod(pod); err != nil {
-			glog.Errorf("Failed creating a mirror pod %q: %v", podFullName, err)
+			glog.Errorf("Failed creating a mirror pod %q: %v", format.Pod(pod), err)
 		}
 		mirrorPod, _ := kl.podManager.GetMirrorPodByPod(pod)
-
-		if err = kl.syncPod(pod, mirrorPod, p, kubetypes.SyncPodUpdate); err != nil {
-			return fmt.Errorf("error syncing pod: %v", err)
+		if err = kl.syncPod(syncPodOptions{
+			pod:        pod,
+			mirrorPod:  mirrorPod,
+			podStatus:  status,
+			updateType: kubetypes.SyncPodUpdate,
+		}); err != nil {
+			return fmt.Errorf("error syncing pod %q: %v", format.Pod(pod), err)
 		}
 		if retry >= runOnceMaxRetries {
-			return fmt.Errorf("timeout error: pod %q containers not running after %d retries", pod.Name, runOnceMaxRetries)
+			return fmt.Errorf("timeout error: pod %q containers not running after %d retries", format.Pod(pod), runOnceMaxRetries)
 		}
 		// TODO(proppy): health checking would be better than waiting + checking the state at the next iteration.
-		glog.Infof("pod %q containers synced, waiting for %v", pod.Name, delay)
+		glog.Infof("pod %q containers synced, waiting for %v", format.Pod(pod), delay)
 		time.Sleep(delay)
 		retry++
 		delay *= runOnceRetryDelayBackoff
@@ -131,17 +145,13 @@ func (kl *Kubelet) runPod(pod *api.Pod, retryDelay time.Duration) error {
 }
 
 // isPodRunning returns true if all containers of a manifest are running.
-func (kl *Kubelet) isPodRunning(pod *api.Pod, runningPod container.Pod) (bool, error) {
-	status, err := kl.containerRuntime.GetPodStatus(pod)
-	if err != nil {
-		glog.Infof("Failed to get the status of pod %q: %v", kubecontainer.GetPodFullName(pod), err)
-		return false, err
-	}
-	for _, st := range status.ContainerStatuses {
-		if st.State.Running == nil {
-			glog.Infof("Container %q not running: %#v", st.Name, st.State)
-			return false, nil
+func (kl *Kubelet) isPodRunning(pod *api.Pod, status *kubecontainer.PodStatus) bool {
+	for _, c := range pod.Spec.Containers {
+		cs := status.FindContainerStatusByName(c.Name)
+		if cs == nil || cs.State != kubecontainer.ContainerStateRunning {
+			glog.Infof("Container %q for pod %q not running", c.Name, format.Pod(pod))
+			return false
 		}
 	}
-	return true, nil
+	return true
 }

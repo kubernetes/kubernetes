@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,6 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package podreconciler implements pod reconcilation of pods which failed
+// Package podreconciler implements pod reconciliation of pods which failed
 // to launch, i.e. before binding by the executor took place.
-package podreconciler
+package podreconciler // import "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/components/podreconciler"

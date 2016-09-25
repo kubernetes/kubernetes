@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,20 +21,9 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
 // TODO: Reconcile custom types in kubelet/types and this subpackage
-
-// DockerID is an ID of docker container. It is a type to make it clear when we're working with docker container Ids
-type DockerID string
-
-func (id DockerID) ContainerID() kubecontainer.ContainerID {
-	return kubecontainer.ContainerID{
-		Type: "docker",
-		ID:   string(id),
-	}
-}
 
 type HttpGetter interface {
 	Get(url string) (*http.Response, error)
@@ -77,4 +66,28 @@ func (s SortedContainerStatuses) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
 
 func (s SortedContainerStatuses) Less(i, j int) bool {
 	return s[i].Name < s[j].Name
+}
+
+// SortInitContainerStatuses ensures that statuses are in the order that their
+// init container appears in the pod spec
+func SortInitContainerStatuses(p *api.Pod, statuses []api.ContainerStatus) {
+	containers := p.Spec.InitContainers
+	current := 0
+	for _, container := range containers {
+		for j := current; j < len(statuses); j++ {
+			if container.Name == statuses[j].Name {
+				statuses[current], statuses[j] = statuses[j], statuses[current]
+				current++
+				break
+			}
+		}
+	}
+}
+
+// Reservation represents reserved resources for non-pod components.
+type Reservation struct {
+	// System represents resources reserved for non-kubernetes components.
+	System api.ResourceList
+	// Kubernetes represents resources reserved for kubernetes system components.
+	Kubernetes api.ResourceList
 }

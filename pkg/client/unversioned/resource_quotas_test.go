@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package unversioned
+package unversioned_test
 
 import (
 	"net/url"
@@ -23,7 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/client/unversioned/testclient/simple"
 )
 
 func getResourceQuotasResoureName() string {
@@ -48,17 +48,18 @@ func TestResourceQuotaCreate(t *testing.T) {
 			},
 		},
 	}
-	c := &testClient{
-		Request: testRequest{
+	c := &simple.Client{
+		Request: simple.Request{
 			Method: "POST",
 			Path:   testapi.Default.ResourcePath(getResourceQuotasResoureName(), ns, ""),
-			Query:  buildQueryValues(nil),
+			Query:  simple.BuildQueryValues(nil),
 			Body:   resourceQuota,
 		},
-		Response: Response{StatusCode: 200, Body: resourceQuota},
+		Response: simple.Response{StatusCode: 200, Body: resourceQuota},
 	}
 
 	response, err := c.Setup(t).ResourceQuotas(ns).Create(resourceQuota)
+	defer c.Close()
 	c.Validate(t, response, err)
 }
 
@@ -80,17 +81,18 @@ func TestResourceQuotaGet(t *testing.T) {
 			},
 		},
 	}
-	c := &testClient{
-		Request: testRequest{
+	c := &simple.Client{
+		Request: simple.Request{
 			Method: "GET",
 			Path:   testapi.Default.ResourcePath(getResourceQuotasResoureName(), ns, "abc"),
-			Query:  buildQueryValues(nil),
+			Query:  simple.BuildQueryValues(nil),
 			Body:   nil,
 		},
-		Response: Response{StatusCode: 200, Body: resourceQuota},
+		Response: simple.Response{StatusCode: 200, Body: resourceQuota},
 	}
 
 	response, err := c.Setup(t).ResourceQuotas(ns).Get("abc")
+	defer c.Close()
 	c.Validate(t, response, err)
 }
 
@@ -104,16 +106,17 @@ func TestResourceQuotaList(t *testing.T) {
 			},
 		},
 	}
-	c := &testClient{
-		Request: testRequest{
+	c := &simple.Client{
+		Request: simple.Request{
 			Method: "GET",
 			Path:   testapi.Default.ResourcePath(getResourceQuotasResoureName(), ns, ""),
-			Query:  buildQueryValues(nil),
+			Query:  simple.BuildQueryValues(nil),
 			Body:   nil,
 		},
-		Response: Response{StatusCode: 200, Body: resourceQuotaList},
+		Response: simple.Response{StatusCode: 200, Body: resourceQuotaList},
 	}
-	response, err := c.Setup(t).ResourceQuotas(ns).List(unversioned.ListOptions{})
+	response, err := c.Setup(t).ResourceQuotas(ns).List(api.ListOptions{})
+	defer c.Close()
 	c.Validate(t, response, err)
 }
 
@@ -136,11 +139,12 @@ func TestResourceQuotaUpdate(t *testing.T) {
 			},
 		},
 	}
-	c := &testClient{
-		Request:  testRequest{Method: "PUT", Path: testapi.Default.ResourcePath(getResourceQuotasResoureName(), ns, "abc"), Query: buildQueryValues(nil)},
-		Response: Response{StatusCode: 200, Body: resourceQuota},
+	c := &simple.Client{
+		Request:  simple.Request{Method: "PUT", Path: testapi.Default.ResourcePath(getResourceQuotasResoureName(), ns, "abc"), Query: simple.BuildQueryValues(nil)},
+		Response: simple.Response{StatusCode: 200, Body: resourceQuota},
 	}
 	response, err := c.Setup(t).ResourceQuotas(ns).Update(resourceQuota)
+	defer c.Close()
 	c.Validate(t, response, err)
 }
 
@@ -163,35 +167,38 @@ func TestResourceQuotaStatusUpdate(t *testing.T) {
 			},
 		},
 	}
-	c := &testClient{
-		Request: testRequest{
+	c := &simple.Client{
+		Request: simple.Request{
 			Method: "PUT",
 			Path:   testapi.Default.ResourcePath(getResourceQuotasResoureName(), ns, "abc") + "/status",
-			Query:  buildQueryValues(nil)},
-		Response: Response{StatusCode: 200, Body: resourceQuota},
+			Query:  simple.BuildQueryValues(nil)},
+		Response: simple.Response{StatusCode: 200, Body: resourceQuota},
 	}
 	response, err := c.Setup(t).ResourceQuotas(ns).UpdateStatus(resourceQuota)
+	defer c.Close()
 	c.Validate(t, response, err)
 }
 
 func TestResourceQuotaDelete(t *testing.T) {
 	ns := api.NamespaceDefault
-	c := &testClient{
-		Request:  testRequest{Method: "DELETE", Path: testapi.Default.ResourcePath(getResourceQuotasResoureName(), ns, "foo"), Query: buildQueryValues(nil)},
-		Response: Response{StatusCode: 200},
+	c := &simple.Client{
+		Request:  simple.Request{Method: "DELETE", Path: testapi.Default.ResourcePath(getResourceQuotasResoureName(), ns, "foo"), Query: simple.BuildQueryValues(nil)},
+		Response: simple.Response{StatusCode: 200},
 	}
 	err := c.Setup(t).ResourceQuotas(ns).Delete("foo")
+	defer c.Close()
 	c.Validate(t, nil, err)
 }
 
 func TestResourceQuotaWatch(t *testing.T) {
-	c := &testClient{
-		Request: testRequest{
+	c := &simple.Client{
+		Request: simple.Request{
 			Method: "GET",
 			Path:   testapi.Default.ResourcePathWithPrefix("watch", getResourceQuotasResoureName(), "", ""),
 			Query:  url.Values{"resourceVersion": []string{}}},
-		Response: Response{StatusCode: 200},
+		Response: simple.Response{StatusCode: 200},
 	}
-	_, err := c.Setup(t).ResourceQuotas(api.NamespaceAll).Watch(unversioned.ListOptions{})
+	_, err := c.Setup(t).ResourceQuotas(api.NamespaceAll).Watch(api.ListOptions{})
+	defer c.Close()
 	c.Validate(t, nil, err)
 }

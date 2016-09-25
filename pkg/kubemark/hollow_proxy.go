@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,11 +20,13 @@ import (
 	"time"
 
 	proxyapp "k8s.io/kubernetes/cmd/kube-proxy/app"
+	"k8s.io/kubernetes/cmd/kube-proxy/app/options"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	proxyconfig "k8s.io/kubernetes/pkg/proxy/config"
 	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/util"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 
 	"github.com/golang/glog"
@@ -57,8 +59,8 @@ func NewHollowProxyOrDie(
 	recorder record.EventRecorder,
 ) *HollowProxy {
 	// Create and start Hollow Proxy
-	config := proxyapp.NewProxyConfig()
-	config.OOMScoreAdj = 0
+	config := options.NewProxyConfig()
+	config.OOMScoreAdj = util.Int32Ptr(0)
 	config.ResourceContainer = ""
 	config.NodeRef = &api.ObjectReference{
 		Kind:      "Node",
@@ -73,7 +75,7 @@ func NewHollowProxyOrDie(
 		endpointsConfig.Channel("api"),
 	)
 
-	hollowProxy, err := proxyapp.NewProxyServer(client, config, iptInterface, &FakeProxier{}, broadcaster, recorder)
+	hollowProxy, err := proxyapp.NewProxyServer(client, config, iptInterface, &FakeProxier{}, broadcaster, recorder, nil, "fake")
 	if err != nil {
 		glog.Fatalf("Error while creating ProxyServer: %v\n", err)
 	}
@@ -83,7 +85,7 @@ func NewHollowProxyOrDie(
 }
 
 func (hp *HollowProxy) Run() {
-	if err := hp.ProxyServer.Run(make([]string, 0)); err != nil {
+	if err := hp.ProxyServer.Run(); err != nil {
 		glog.Fatalf("Error while running proxy: %v\n", err)
 	}
 }

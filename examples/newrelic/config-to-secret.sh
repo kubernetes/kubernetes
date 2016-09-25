@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2014 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,5 +16,5 @@
 
 # Encodes the environment variables into a Kubernetes secret.
 
-BASE64_ENC=$(cat nrconfig.env | base64 --wrap=0)
+BASE64_ENC=$(cat nrconfig.env | base64 | tr -d '\n')
 sed -e "s#{{config_data}}#${BASE64_ENC}#g" ./newrelic-config-template.yaml > newrelic-config.yaml

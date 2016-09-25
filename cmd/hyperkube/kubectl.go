@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,21 +19,23 @@ package main
 import (
 	"os"
 
-	"k8s.io/kubernetes/cmd/kubectl/app"
+	"k8s.io/kubernetes/pkg/kubectl/cmd"
+	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
 func NewKubectlServer() *Server {
+	cmd := cmd.NewKubectlCommand(cmdutil.NewFactory(nil), os.Stdin, os.Stdout, os.Stderr)
+	localFlags := cmd.LocalFlags()
+	localFlags.SetInterspersed(false)
+
 	return &Server{
 		name:        "kubectl",
 		SimpleUsage: "Kubernetes command line client",
 		Long:        "Kubernetes command line client",
 		Run: func(s *Server, args []string) error {
-			os.Args = os.Args[1:]
-			if err := app.Run(); err != nil {
-				os.Exit(1)
-			}
-			os.Exit(0)
-			return nil
+			cmd.SetArgs(args)
+			return cmd.Execute()
 		},
+		flags: localFlags,
 	}
 }

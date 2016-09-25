@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2014 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,6 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This file is not intended to be run automatically. It is meant to be run
+# immediately before exporting docs. We do not want to check these documents in
+# by default.
+
 set -o errexit
 set -o nounset
 set -o pipefail
@@ -23,8 +27,31 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
 
-"${KUBE_ROOT}/hack/build-go.sh" cmd/gendocs cmd/genkubedocs cmd/genman cmd/genbashcomp cmd/mungedocs
+BINS=(
+	cmd/gendocs
+	cmd/genkubedocs
+	cmd/genman
+	cmd/genyaml
+	federation/cmd/genfeddocs
+)
+make -C "${KUBE_ROOT}" WHAT="${BINS[*]}"
 
-"${KUBE_ROOT}/hack/after-build/update-generated-docs.sh" "$@"
+kube::util::ensure-temp-dir
 
-# ex: ts=2 sw=2 et filetype=sh
+kube::util::gen-docs "${KUBE_TEMP}"
+
+# remove all of the old docs
+kube::util::remove-gen-docs
+
+# Copy fresh docs into the repo.
+# the shopt is so that we get .generated_docs from the glob.
+shopt -s dotglob
+cp -af "${KUBE_TEMP}"/* "${KUBE_ROOT}"
+shopt -u dotglob
+
+# Replace with placeholder docs
+kube::util::set-placeholder-gen-docs
+
+echo "Generated docs have been placed in the repository tree. Running hack/update-munge-docs.sh."
+
+"${KUBE_ROOT}/hack/update-munge-docs.sh"

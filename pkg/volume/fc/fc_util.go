@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -51,6 +51,8 @@ func (handler *osIOHandler) WriteFile(filename string, data []byte, perm os.File
 }
 
 // given a disk path like /dev/sdx, find the devicemapper parent
+// TODO #23192 Convert this code to use the generic code in ../util
+// which is used by the iSCSI implementation
 func findMultipathDeviceMapper(disk string, io ioHandler) string {
 	sys_path := "/sys/block/"
 	if dirs, err := io.ReadDir(sys_path); err == nil {
@@ -155,7 +157,7 @@ func searchDisk(wwns []string, lun string, io ioHandler) (string, string) {
 	return disk, dm
 }
 
-func (util *FCUtil) AttachDisk(b fcDiskBuilder) error {
+func (util *FCUtil) AttachDisk(b fcDiskMounter) error {
 	devicePath := ""
 	wwns := b.wwns
 	lun := b.lun
@@ -184,7 +186,7 @@ func (util *FCUtil) AttachDisk(b fcDiskBuilder) error {
 		return fmt.Errorf("fc: failed to mkdir %s, error", globalPDPath)
 	}
 
-	err = b.mounter.Mount(devicePath, globalPDPath, b.fsType, nil)
+	err = b.mounter.FormatAndMount(devicePath, globalPDPath, b.fsType, nil)
 	if err != nil {
 		return fmt.Errorf("fc: failed to mount fc volume %s [%s] to %s, error %v", devicePath, b.fsType, globalPDPath, err)
 	}
@@ -192,7 +194,7 @@ func (util *FCUtil) AttachDisk(b fcDiskBuilder) error {
 	return err
 }
 
-func (util *FCUtil) DetachDisk(c fcDiskCleaner, mntPath string) error {
+func (util *FCUtil) DetachDisk(c fcDiskUnmounter, mntPath string) error {
 	if err := c.mounter.Unmount(mntPath); err != nil {
 		return fmt.Errorf("fc detach disk: failed to unmount: %s\nError: %v", mntPath, err)
 	}

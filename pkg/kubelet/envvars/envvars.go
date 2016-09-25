@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -27,10 +27,10 @@ import (
 // FromServices builds environment variables that a container is started with,
 // which tell the container where to find the services it may need, which are
 // provided as an argument.
-func FromServices(services *api.ServiceList) []api.EnvVar {
+func FromServices(services []*api.Service) []api.EnvVar {
 	var result []api.EnvVar
-	for i := range services.Items {
-		service := &services.Items[i]
+	for i := range services {
+		service := services[i]
 
 		// ignore services where ClusterIP is "None" or empty
 		// the services passed to this method should be pre-filtered
@@ -44,13 +44,13 @@ func FromServices(services *api.ServiceList) []api.EnvVar {
 		result = append(result, api.EnvVar{Name: name, Value: service.Spec.ClusterIP})
 		// First port - give it the backwards-compatible name
 		name = makeEnvVariableName(service.Name) + "_SERVICE_PORT"
-		result = append(result, api.EnvVar{Name: name, Value: strconv.Itoa(service.Spec.Ports[0].Port)})
+		result = append(result, api.EnvVar{Name: name, Value: strconv.Itoa(int(service.Spec.Ports[0].Port))})
 		// All named ports (only the first may be unnamed, checked in validation)
 		for i := range service.Spec.Ports {
 			sp := &service.Spec.Ports[i]
 			if sp.Name != "" {
 				pn := name + "_" + makeEnvVariableName(sp.Name)
-				result = append(result, api.EnvVar{Name: pn, Value: strconv.Itoa(sp.Port)})
+				result = append(result, api.EnvVar{Name: pn, Value: strconv.Itoa(int(sp.Port))})
 			}
 		}
 		// Docker-compatible vars.
@@ -96,7 +96,7 @@ func makeLinkVariables(service *api.Service) []api.EnvVar {
 			},
 			{
 				Name:  portPrefix + "_PORT",
-				Value: strconv.Itoa(sp.Port),
+				Value: strconv.Itoa(int(sp.Port)),
 			},
 			{
 				Name:  portPrefix + "_ADDR",

@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,21 +20,22 @@ import (
 	"fmt"
 	"io"
 
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/rest"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 )
 
 func init() {
-	admission.RegisterPlugin("DenyEscalatingExec", func(client client.Interface, config io.Reader) (admission.Interface, error) {
+	admission.RegisterPlugin("DenyEscalatingExec", func(client clientset.Interface, config io.Reader) (admission.Interface, error) {
 		return NewDenyEscalatingExec(client), nil
 	})
 
 	// This is for legacy support of the DenyExecOnPrivileged admission controller.  Most
 	// of the time DenyEscalatingExec should be preferred.
-	admission.RegisterPlugin("DenyExecOnPrivileged", func(client client.Interface, config io.Reader) (admission.Interface, error) {
+	admission.RegisterPlugin("DenyExecOnPrivileged", func(client clientset.Interface, config io.Reader) (admission.Interface, error) {
 		return NewDenyExecOnPrivileged(client), nil
 	})
 }
@@ -43,7 +44,7 @@ func init() {
 // a pod using host based configurations.
 type denyExec struct {
 	*admission.Handler
-	client client.Interface
+	client clientset.Interface
 
 	// these flags control which items will be checked to deny exec/attach
 	hostIPC    bool
@@ -53,7 +54,7 @@ type denyExec struct {
 
 // NewDenyEscalatingExec creates a new admission controller that denies an exec operation on a pod
 // using host based configurations.
-func NewDenyEscalatingExec(client client.Interface) admission.Interface {
+func NewDenyEscalatingExec(client clientset.Interface) admission.Interface {
 	return &denyExec{
 		Handler:    admission.NewHandler(admission.Connect),
 		client:     client,
@@ -66,7 +67,7 @@ func NewDenyEscalatingExec(client client.Interface) admission.Interface {
 // NewDenyExecOnPrivileged creates a new admission controller that is only checking the privileged
 // option.  This is for legacy support of the DenyExecOnPrivileged admission controller.  Most
 // of the time NewDenyEscalatingExec should be preferred.
-func NewDenyExecOnPrivileged(client client.Interface) admission.Interface {
+func NewDenyExecOnPrivileged(client clientset.Interface) admission.Interface {
 	return &denyExec{
 		Handler:    admission.NewHandler(admission.Connect),
 		client:     client,
@@ -85,21 +86,21 @@ func (d *denyExec) Admit(a admission.Attributes) (err error) {
 	if connectRequest.ResourcePath != "pods/exec" && connectRequest.ResourcePath != "pods/attach" {
 		return nil
 	}
-	pod, err := d.client.Pods(a.GetNamespace()).Get(connectRequest.Name)
+	pod, err := d.client.Core().Pods(a.GetNamespace()).Get(connectRequest.Name)
 	if err != nil {
 		return admission.NewForbidden(a, err)
 	}
 
 	if d.hostPID && pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.HostPID {
-		return admission.NewForbidden(a, fmt.Errorf("Cannot exec into or attach to a container using host pid"))
+		return admission.NewForbidden(a, fmt.Errorf("cannot exec into or attach to a container using host pid"))
 	}
 
 	if d.hostIPC && pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.HostIPC {
-		return admission.NewForbidden(a, fmt.Errorf("Cannot exec into or attach to a container using host ipc"))
+		return admission.NewForbidden(a, fmt.Errorf("cannot exec into or attach to a container using host ipc"))
 	}
 
 	if d.privileged && isPrivileged(pod) {
-		return admission.NewForbidden(a, fmt.Errorf("Cannot exec into or attach to a privileged container"))
+		return admission.NewForbidden(a, fmt.Errorf("cannot exec into or attach to a privileged container"))
 	}
 
 	return nil
@@ -107,6 +108,14 @@ func (d *denyExec) Admit(a admission.Attributes) (err error) {
 
 // isPrivileged will return true a pod has any privileged containers
 func isPrivileged(pod *api.Pod) bool {
+	for _, c := range pod.Spec.InitContainers {
+		if c.SecurityContext == nil {
+			continue
+		}
+		if *c.SecurityContext.Privileged {
+			return true
+		}
+	}
 	for _, c := range pod.Spec.Containers {
 		if c.SecurityContext == nil {
 			continue

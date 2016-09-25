@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -27,7 +27,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/clock"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/strategicpatch"
 )
@@ -116,12 +116,12 @@ type EventAggregator struct {
 	maxIntervalInSeconds int
 
 	// clock is used to allow for testing over a time interval
-	clock util.Clock
+	clock clock.Clock
 }
 
 // NewEventAggregator returns a new instance of an EventAggregator
 func NewEventAggregator(lruCacheSize int, keyFunc EventAggregatorKeyFunc, messageFunc EventAggregatorMessageFunc,
-	maxEvents int, maxIntervalInSeconds int, clock util.Clock) *EventAggregator {
+	maxEvents int, maxIntervalInSeconds int, clock clock.Clock) *EventAggregator {
 	return &EventAggregator{
 		cache:                lru.New(lruCacheSize),
 		keyFunc:              keyFunc,
@@ -207,11 +207,11 @@ type eventLog struct {
 type eventLogger struct {
 	sync.RWMutex
 	cache *lru.Cache
-	clock util.Clock
+	clock clock.Clock
 }
 
 // newEventLogger observes events and counts their frequencies
-func newEventLogger(lruCacheEntries int, clock util.Clock) *eventLogger {
+func newEventLogger(lruCacheEntries int, clock clock.Clock) *eventLogger {
 	return &eventLogger{cache: lru.New(lruCacheEntries), clock: clock}
 }
 
@@ -236,7 +236,7 @@ func (e *eventLogger) eventObserve(newEvent *api.Event) (*api.Event, []byte, err
 		event.Name = lastObservation.name
 		event.ResourceVersion = lastObservation.resourceVersion
 		event.FirstTimestamp = lastObservation.firstTimestamp
-		event.Count = lastObservation.count + 1
+		event.Count = int32(lastObservation.count) + 1
 
 		eventCopy2 := *event
 		eventCopy2.Count = 0
@@ -251,7 +251,7 @@ func (e *eventLogger) eventObserve(newEvent *api.Event) (*api.Event, []byte, err
 	e.cache.Add(
 		key,
 		eventLog{
-			count:           event.Count,
+			count:           int(event.Count),
 			firstTimestamp:  event.FirstTimestamp,
 			name:            event.Name,
 			resourceVersion: event.ResourceVersion,
@@ -269,7 +269,7 @@ func (e *eventLogger) updateState(event *api.Event) {
 	e.cache.Add(
 		key,
 		eventLog{
-			count:           event.Count,
+			count:           int(event.Count),
 			firstTimestamp:  event.FirstTimestamp,
 			name:            event.Name,
 			resourceVersion: event.ResourceVersion,
@@ -326,7 +326,7 @@ type EventCorrelateResult struct {
 //     the same reason.
 //   * Events are incrementally counted if the exact same event is encountered multiple
 //     times.
-func NewEventCorrelator(clock util.Clock) *EventCorrelator {
+func NewEventCorrelator(clock clock.Clock) *EventCorrelator {
 	cacheSize := maxLruCacheEntries
 	return &EventCorrelator{
 		filterFunc: DefaultEventFilterFunc,

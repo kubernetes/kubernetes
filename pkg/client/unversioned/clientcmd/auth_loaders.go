@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@ import (
 	"io/ioutil"
 	"os"
 
+	"github.com/howeyc/gopass"
 	clientauth "k8s.io/kubernetes/pkg/client/unversioned/auth"
 )
 
@@ -46,10 +47,13 @@ type PromptingAuthLoader struct {
 
 // LoadAuth parses an AuthInfo object from a file path. It prompts user and creates file if it doesn't exist.
 func (a *PromptingAuthLoader) LoadAuth(path string) (*clientauth.Info, error) {
-	var auth clientauth.Info
 	// Prompt for user/pass and write a file if none exists.
 	if _, err := os.Stat(path); os.IsNotExist(err) {
-		auth = *a.Prompt()
+		authPtr, err := a.Prompt()
+		auth := *authPtr
+		if err != nil {
+			return nil, err
+		}
 		data, err := json.Marshal(auth)
 		if err != nil {
 			return &auth, err
@@ -65,19 +69,30 @@ func (a *PromptingAuthLoader) LoadAuth(path string) (*clientauth.Info, error) {
 }
 
 // Prompt pulls the user and password from a reader
-func (a *PromptingAuthLoader) Prompt() *clientauth.Info {
+func (a *PromptingAuthLoader) Prompt() (*clientauth.Info, error) {
+	var err error
 	auth := &clientauth.Info{}
-	auth.User = promptForString("Username", a.reader)
-	auth.Password = promptForString("Password", a.reader)
-
-	return auth
+	auth.User, err = promptForString("Username", a.reader, true)
+	if err != nil {
+		return nil, err
+	}
+	auth.Password, err = promptForString("Password", nil, false)
+	if err != nil {
+		return nil, err
+	}
+	return auth, nil
 }
 
-func promptForString(field string, r io.Reader) string {
+func promptForString(field string, r io.Reader, show bool) (result string, err error) {
 	fmt.Printf("Please enter %s: ", field)
-	var result string
-	fmt.Fscan(r, &result)
-	return result
+	if show {
+		_, err = fmt.Fscan(r, &result)
+	} else {
+		var data []byte
+		data, err = gopass.GetPasswdMasked()
+		result = string(data)
+	}
+	return result, err
 }
 
 // NewPromptingAuthLoader is an AuthLoader that parses an AuthInfo object from a file path. It prompts user and creates file if it doesn't exist.

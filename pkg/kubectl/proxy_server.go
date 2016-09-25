@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -28,14 +28,14 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/util"
 )
 
 const (
 	DefaultHostAcceptRE   = "^localhost$,^127\\.0\\.0\\.1$,^\\[::1\\]$"
 	DefaultPathAcceptRE   = "^/.*"
-	DefaultPathRejectRE   = "^/api/.*/exec,^/api/.*/run,^/api/.*/attach"
+	DefaultPathRejectRE   = "^/api/.*/pods/.*/exec,^/api/.*/pods/.*/attach"
 	DefaultMethodRejectRE = "POST,PUT,PATCH"
 )
 
@@ -63,7 +63,7 @@ type FilterServer struct {
 	delegate http.Handler
 }
 
-// Splits a comma separated list of regexps into a array of Regexp objects.
+// Splits a comma separated list of regexps into an array of Regexp objects.
 func MakeRegexpArray(str string) ([]*regexp.Regexp, error) {
 	parts := strings.Split(str, ",")
 	result := make([]*regexp.Regexp, len(parts))
@@ -146,7 +146,7 @@ type ProxyServer struct {
 // NewProxyServer creates and installs a new ProxyServer.
 // It automatically registers the created ProxyServer to http.DefaultServeMux.
 // 'filter', if non-nil, protects requests to the api only.
-func NewProxyServer(filebase string, apiProxyPrefix string, staticPrefix string, filter *FilterServer, cfg *client.Config) (*ProxyServer, error) {
+func NewProxyServer(filebase string, apiProxyPrefix string, staticPrefix string, filter *FilterServer, cfg *restclient.Config) (*ProxyServer, error) {
 	host := cfg.Host
 	if !strings.HasSuffix(host, "/") {
 		host = host + "/"
@@ -156,7 +156,7 @@ func NewProxyServer(filebase string, apiProxyPrefix string, staticPrefix string,
 		return nil, err
 	}
 	proxy := newProxy(target)
-	if proxy.Transport, err = client.TransportFor(cfg); err != nil {
+	if proxy.Transport, err = restclient.TransportFor(cfg); err != nil {
 		return nil, err
 	}
 	proxyServer := http.Handler(proxy)

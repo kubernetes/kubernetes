@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,25 +17,30 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
+// GroupName is the group name use in this package
+const GroupName = "componentconfig"
+
 // SchemeGroupVersion is group version used to register these objects
-var SchemeGroupVersion = unversioned.GroupVersion{Group: "componentconfig", Version: "v1alpha1"}
+var SchemeGroupVersion = unversioned.GroupVersion{Group: GroupName, Version: "v1alpha1"}
 
-var Codec = runtime.CodecFor(api.Scheme, SchemeGroupVersion.String())
+var (
+	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes, addDefaultingFuncs)
+	AddToScheme   = SchemeBuilder.AddToScheme
+)
 
-func init() {
-	addKnownTypes()
-	addDefaultingFuncs()
-}
-
-func addKnownTypes() {
-	api.Scheme.AddKnownTypes(SchemeGroupVersion,
+func addKnownTypes(scheme *runtime.Scheme) error {
+	scheme.AddKnownTypes(SchemeGroupVersion,
 		&KubeProxyConfiguration{},
+		&KubeSchedulerConfiguration{},
+		&KubeletConfiguration{},
 	)
+	return nil
 }
 
-func (_ *KubeProxyConfiguration) IsAnAPIObject() {}
+func (obj *KubeProxyConfiguration) GetObjectKind() unversioned.ObjectKind     { return &obj.TypeMeta }
+func (obj *KubeSchedulerConfiguration) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
+func (obj *KubeletConfiguration) GetObjectKind() unversioned.ObjectKind       { return &obj.TypeMeta }

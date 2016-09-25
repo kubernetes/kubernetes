@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,6 +25,7 @@ import (
 	types "k8s.io/kubernetes/contrib/mesos/pkg/scheduler"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/errors"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask"
+	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/podtask/hostport"
 	"k8s.io/kubernetes/contrib/mesos/pkg/scheduler/queuer"
 	"k8s.io/kubernetes/pkg/api"
 )
@@ -63,10 +64,12 @@ func TestDeleteOne_PendingPod(t *testing.T) {
 		}}}
 	task, err := podtask.New(
 		api.NewDefaultContext(),
-		"bar",
+		podtask.Config{
+			ID:               "bar",
+			Prototype:        &mesosproto.ExecutorInfo{},
+			HostPortStrategy: hostport.StrategyWildcard,
+		},
 		pod.Pod,
-		&mesosproto.ExecutorInfo{},
-		nil,
 	)
 	if err != nil {
 		t.Fatalf("failed to create task: %v", err)
@@ -109,10 +112,12 @@ func TestDeleteOne_Running(t *testing.T) {
 		}}}
 	task, err := podtask.New(
 		api.NewDefaultContext(),
-		"bar",
+		podtask.Config{
+			ID:               "bar",
+			Prototype:        &mesosproto.ExecutorInfo{},
+			HostPortStrategy: hostport.StrategyWildcard,
+		},
 		pod.Pod,
-		&mesosproto.ExecutorInfo{},
-		nil,
 	)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

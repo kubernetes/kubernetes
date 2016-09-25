@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Copyright 2015 The Kubernetes Authors All rights reserved.
+# Copyright 2015 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -53,24 +53,26 @@ def get_all_files(rootdir):
     all_files = []
     for root, dirs, files in os.walk(rootdir):
         # don't visit certain dirs
-        if 'Godeps' in dirs:
-            dirs.remove('Godeps')
+        if 'vendor' in dirs:
+            dirs.remove('vendor')
+        if 'staging' in dirs:
+            dirs.remove('staging')
+        if '_output' in dirs:
+            dirs.remove('_output')
         if '_gopath' in dirs:
             dirs.remove('_gopath')
         if 'third_party' in dirs:
             dirs.remove('third_party')
         if '.git' in dirs:
             dirs.remove('.git')
+        if '.make' in dirs:
+            dirs.remove('.make')
         if 'exceptions.txt' in files:
             files.remove('exceptions.txt')
         if 'known-flags.txt' in files:
             files.remove('known-flags.txt')
 
         for name in files:
-            if name.endswith(".svg"):
-                continue
-            if name.endswith(".gliffy"):
-                continue
             pathname = os.path.join(root, name)
             if is_binary(pathname):
                 continue
@@ -86,6 +88,10 @@ def normalize_files(rootdir, files):
         if f.endswith(".svg"):
             continue
         if f.endswith(".gliffy"):
+            continue
+        if f.endswith(".md"):
+            continue
+        if f.endswith(".yaml"):
             continue
         newfiles.append(f)
     for i, f in enumerate(newfiles):
@@ -105,9 +111,6 @@ def line_has_bad_flag(line, flagre):
         if "pillar[" + result + "]" in line:
             return False
         if "grains" + result in line:
-            return False
-        # These are usually yaml definitions
-        if result.endswith(":"):
             return False
          # something common in juju variables...
         if "template_data[" + result + "]" in line:
@@ -234,7 +237,7 @@ def main():
 
     if len(bad_lines) != 0:
         if not args.skip_exceptions:
-            print("Found illegal 'flag' usage. If these are false positives you should run `hack/verify-flags-underscore.py -e > hack/verify-flags/exceptions.txt` to update the list.")
+            print("Found illegal 'flag' usage. If these are false negatives you should run `hack/verify-flags-underscore.py -e > hack/verify-flags/exceptions.txt` to update the list.")
         bad_lines.sort()
         for (relname, line) in bad_lines:
             print("%s:%s" % (relname, line))

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2014 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -37,7 +37,7 @@ readonly SWAGGER_PKG="swagger"
 function kube::hack::build_ui() {
   local pkg="$1"
   local src="$2"
-  local output_file="pkg/ui/data/${pkg}/datafile.go"
+  local output_file="pkg/genericapiserver/routes/data/${pkg}/datafile.go"
 
   go-bindata -nocompress -o "${output_file}" -prefix ${PWD} -pkg "${pkg}" "${src}"
 

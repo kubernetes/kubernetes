@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -105,6 +105,15 @@ func gotDashF(lineNum int, fields []string, fieldNum int) error {
 	if strings.HasPrefix(target, "/") {
 		// Absolute paths tend to be /tmp/* and created in the same example.
 		return nil
+	}
+	if strings.HasPrefix(target, "$") {
+		// Allow the start of the target to be an environment
+		// variable that points to the root of the kubernetes
+		// repo.
+		split := strings.SplitN(target, "/", 2)
+		if len(split) == 2 {
+			target = split[1]
+		}
 	}
 
 	// If we got here we expect the file to exist.

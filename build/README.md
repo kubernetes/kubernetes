@@ -6,7 +6,7 @@ Building Kubernetes is easy if you take advantage of the containerized build env
 
 1. Docker, using one of the two following configurations:
   1. **Mac OS X** You can either use docker-machine or boot2docker. See installation instructions [here](https://docs.docker.com/installation/mac/).  
-  * **Note**: You will want to set the boot2docker vm to have at least 3GB of initial memory or building will likely fail. (See: [#11852]( http://issue.k8s.io/11852)) and do not `make quick-release` from `/tmp/` (See: [#14773]( https://github.com/kubernetes/kubernetes/issues/14773))
+     **Note**: You will want to set the boot2docker vm to have at least 3GB of initial memory or building will likely fail. (See: [#11852]( http://issue.k8s.io/11852)) and do not `make quick-release` from `/tmp/` (See: [#14773]( https://github.com/kubernetes/kubernetes/issues/14773))
   2. **Linux with local Docker**  Install Docker according to the [instructions](https://docs.docker.com/installation/#installation) for your OS.  The scripts here assume that they are using a local Docker server and that they can "reach around" docker and grab results directly from the file system.
 2. [Python](https://www.python.org)
 3. **Optional** [Google Cloud SDK](https://developers.google.com/cloud/sdk/)
@@ -21,19 +21,22 @@ There is also early support for building Docker "run" containers
 
 ## Key scripts
 
-* `run.sh`: Run a command in a build docker container.  Common invocations:
-  *  `run.sh hack/build-go.sh`: Build just linux binaries in the container.  Pass options and packages as necessary.
-  *  `run.sh hack/build-cross.sh`: Build all binaries for all platforms
-  *  `run.sh hack/test-go.sh`: Run all unit tests
-  *  `run.sh hack/test-integration.sh`: Run integration test
-* `copy-output.sh`: This will copy the contents of `_output/dockerized/bin` from any remote Docker container to the local `_output/dockerized/bin`.  Right now this is only necessary on Mac OS X with `boot2docker` when your git repo isn't under `/Users`.
-* `make-clean.sh`: Clean out the contents of `_output/dockerized` and remove any local built container images.
-* `shell.sh`: Drop into a `bash` shell in a build container with a snapshot of the current repo code.
-* `release.sh`: Build everything, test it, and (optionally) upload the results to a GCS bucket.
+The following scripts are found in the `build/` directory. Note that all scripts must be run from the Kubernetes root directory.
+
+* `build/run.sh`: Run a command in a build docker container.  Common invocations:
+  *  `build/run.sh make`: Build just linux binaries in the container.  Pass options and packages as necessary.
+  *  `build/run.sh make cross`: Build all binaries for all platforms
+  *  `build/run.sh make test`: Run all unit tests
+  *  `build/run.sh make test-integration`: Run integration test
+  *  `build/run.sh make test-cmd`: Run CLI tests
+* `build/copy-output.sh`: This will copy the contents of `_output/dockerized/bin` from any remote Docker container to the local `_output/dockerized/bin`.  Right now this is only necessary on Mac OS X with `boot2docker` when your git repo isn't under `/Users`.
+* `build/make-clean.sh`: Clean out the contents of `_output/dockerized` and remove any local built container images.
+* `build/shell.sh`: Drop into a `bash` shell in a build container with a snapshot of the current repo code.
+* `build/release.sh`: Build everything, test it, and (optionally) upload the results to a GCS bucket.
 
 ## Releasing
 
-The `release.sh` script will build a release.  It will build binaries, run tests, (optionally) build runtime Docker images and then (optionally) upload all build artifacts to a GCS bucket.
+The `build/release.sh` script will build a release.  It will build binaries, run tests, (optionally) build runtime Docker images and then (optionally) upload all build artifacts to a GCS bucket.
 
 The main output is a tar file: `kubernetes.tar.gz`.  This includes:
 * Cross compiled client utilities.
@@ -73,17 +76,20 @@ When building final release tars, they are first staged into `_output/release-st
 ## Proxy Settings
 
 
-If you are behind a proxy, you need to edit `build/build-image/Dockerfile` and add proxy settings to execute command in that container correctly.
+If you are behind a proxy, you need to export proxy settings for kubernetes build, the following environment variables should be defined.
 
-example:
+```
+export KUBERNETES_HTTP_PROXY=http://username:password@proxyaddr:proxyport
+export KUBERNETES_HTTPS_PROXY=https://username:password@proxyaddr:proxyport
+```
 
-`ENV http_proxy http://username:password@proxyaddr:proxyport`
+Optionally, you can specify addresses of no proxy for kubernetes build, for example
 
-`ENV https_proxy http://username:password@proxyaddr:proxyport`
+```
+export KUBERNETES_NO_PROXY=127.0.0.1
+```
 
-Besides, to avoid integration test touch the proxy while connecting to local etcd service, you need to set
-
-`ENV no_proxy 127.0.0.1`
+If you are using sudo to make kubernetes build for example make quick-release, you need run `sudo -E make quick-release` to pass the environment variables.
 
 ## TODOs
 

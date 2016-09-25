@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,11 +25,12 @@ import (
 	"strings"
 	"testing"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 )
 
 func TestGenericHttpResponseChecker(t *testing.T) {
-	responseChecker := NewGenericHttpResponseChecker("Pod", "foo")
+	responseChecker := NewGenericHttpResponseChecker(api.Resource("pods"), "foo")
 	tests := []struct {
 		resp        *http.Response
 		expectError bool
@@ -78,7 +79,7 @@ func TestGenericHttpResponseChecker(t *testing.T) {
 }
 
 func TestGenericHttpResponseCheckerLimitReader(t *testing.T) {
-	responseChecker := NewGenericHttpResponseChecker("Pod", "foo")
+	responseChecker := NewGenericHttpResponseChecker(api.Resource("pods"), "foo")
 	excessedString := strings.Repeat("a", (maxReadLength + 10000))
 	resp := &http.Response{
 		Body:       ioutil.NopCloser(bytes.NewBufferString(excessedString)),

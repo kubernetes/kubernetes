@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package unversioned
+package unversioned_test
+
+import (
+	. "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/unversioned/testclient/simple"
+)
 
 import (
 	"net/url"
@@ -27,20 +32,20 @@ import (
 )
 
 func TestEventSearch(t *testing.T) {
-	c := &testClient{
-		Request: testRequest{
+	c := &simple.Client{
+		Request: simple.Request{
 			Method: "GET",
 			Path:   testapi.Default.ResourcePath("events", "baz", ""),
 			Query: url.Values{
-				unversioned.FieldSelectorQueryParam(testapi.Default.Version()): []string{
-					getInvolvedObjectNameFieldLabel(testapi.Default.Version()) + "=foo,",
+				unversioned.FieldSelectorQueryParam(testapi.Default.GroupVersion().String()): []string{
+					GetInvolvedObjectNameFieldLabel(testapi.Default.GroupVersion().String()) + "=foo,",
 					"involvedObject.namespace=baz,",
 					"involvedObject.kind=Pod",
 				},
-				unversioned.LabelSelectorQueryParam(testapi.Default.Version()): []string{},
+				unversioned.LabelSelectorQueryParam(testapi.Default.GroupVersion().String()): []string{},
 			},
 		},
-		Response: Response{StatusCode: 200, Body: &api.EventList{}},
+		Response: simple.Response{StatusCode: 200, Body: &api.EventList{}},
 	}
 	eventList, err := c.Setup(t).Events("baz").Search(
 		&api.Pod{
@@ -51,6 +56,7 @@ func TestEventSearch(t *testing.T) {
 			},
 		},
 	)
+	defer c.Close()
 	c.Validate(t, eventList, err)
 }
 
@@ -74,16 +80,17 @@ func TestEventCreate(t *testing.T) {
 		Count:          1,
 		Type:           api.EventTypeNormal,
 	}
-	c := &testClient{
-		Request: testRequest{
+	c := &simple.Client{
+		Request: simple.Request{
 			Method: "POST",
 			Path:   testapi.Default.ResourcePath("events", api.NamespaceDefault, ""),
 			Body:   event,
 		},
-		Response: Response{StatusCode: 200, Body: event},
+		Response: simple.Response{StatusCode: 200, Body: event},
 	}
 
 	response, err := c.Setup(t).Events(api.NamespaceDefault).Create(event)
+	defer c.Close()
 
 	if err != nil {
 		t.Fatalf("%v should be nil.", err)
@@ -114,16 +121,17 @@ func TestEventGet(t *testing.T) {
 		Count:          1,
 		Type:           api.EventTypeNormal,
 	}
-	c := &testClient{
-		Request: testRequest{
+	c := &simple.Client{
+		Request: simple.Request{
 			Method: "GET",
 			Path:   testapi.Default.ResourcePath("events", "other", "1"),
 			Body:   nil,
 		},
-		Response: Response{StatusCode: 200, Body: event},
+		Response: simple.Response{StatusCode: 200, Body: event},
 	}
 
 	response, err := c.Setup(t).Events("other").Get("1")
+	defer c.Close()
 
 	if err != nil {
 		t.Fatalf("%v should be nil.", err)
@@ -156,15 +164,16 @@ func TestEventList(t *testing.T) {
 			},
 		},
 	}
-	c := &testClient{
-		Request: testRequest{
+	c := &simple.Client{
+		Request: simple.Request{
 			Method: "GET",
 			Path:   testapi.Default.ResourcePath("events", ns, ""),
 			Body:   nil,
 		},
-		Response: Response{StatusCode: 200, Body: eventList},
+		Response: simple.Response{StatusCode: 200, Body: eventList},
 	}
-	response, err := c.Setup(t).Events(ns).List(unversioned.ListOptions{})
+	response, err := c.Setup(t).Events(ns).List(api.ListOptions{})
+	defer c.Close()
 
 	if err != nil {
 		t.Errorf("%#v should be nil.", err)
@@ -183,13 +192,14 @@ func TestEventList(t *testing.T) {
 
 func TestEventDelete(t *testing.T) {
 	ns := api.NamespaceDefault
-	c := &testClient{
-		Request: testRequest{
+	c := &simple.Client{
+		Request: simple.Request{
 			Method: "DELETE",
 			Path:   testapi.Default.ResourcePath("events", ns, "foo"),
 		},
-		Response: Response{StatusCode: 200},
+		Response: simple.Response{StatusCode: 200},
 	}
 	err := c.Setup(t).Events(ns).Delete("foo")
+	defer c.Close()
 	c.Validate(t, nil, err)
 }

@@ -6,7 +6,10 @@
   {% if grains.cloud == 'aws' %}
     {% set cert_ip='_use_aws_external_ip_' %}
   {% endif %}
-  {% if grains.cloud == 'vsphere' %}
+  {% if grains.cloud == 'azure-legacy' %}
+    {% set cert_ip='_use_azure_dns_name_' %}
+  {% endif %}
+  {% if grains.cloud == 'vsphere' or grains.cloud == 'photon-controller' %}
     {% set cert_ip=grains.ip_interfaces.eth0[0] %}
   {% endif %}
 {% endif %}
@@ -20,6 +23,9 @@
 {% if cert_ip is defined %}
   {% set certgen="make-ca-cert.sh" %}
 {% endif %}
+
+openssl:
+  pkg.installed: []
 
 kube-cert:
   group.present:
@@ -38,3 +44,5 @@ kubernetes-cert:
     - user: root
     - group: root
     - shell: /bin/bash
+    - require:
+      - pkg: openssl

@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,65 +17,263 @@ limitations under the License.
 package e2e
 
 import (
+	"fmt"
 	"time"
-
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
+	"k8s.io/kubernetes/pkg/metrics"
+	"k8s.io/kubernetes/pkg/util/wait"
+	"k8s.io/kubernetes/test/e2e/framework"
+
+	. "github.com/onsi/ginkgo"
 )
 
-// This test requires that --terminated-pod-gc-threshold=100 be set on the controller manager
-var _ = Describe("Garbage collector", func() {
-	f := NewFramework("garbage-collector")
-	It("should handle the creation of 1000 pods", func() {
-		SkipUnlessProviderIs("gce")
+func getOrphanOptions() *api.DeleteOptions {
+	var trueVar = true
+	return &api.DeleteOptions{OrphanDependents: &trueVar}
+}
 
-		var count int
-		for count < 1000 {
-			pod, err := createTerminatingPod(f)
-			pod.ResourceVersion = ""
-			pod.Status.Phase = api.PodFailed
-			pod, err = f.Client.Pods(f.Namespace.Name).UpdateStatus(pod)
-			if err != nil {
-				Failf("err failing pod: %v", err)
-			}
+func getNonOrphanOptions() *api.DeleteOptions {
+	var falseVar = false
+	return &api.DeleteOptions{OrphanDependents: &falseVar}
+}
 
-			count++
-			if count%50 == 0 {
-				Logf("count: %v", count)
-			}
-		}
-
-		Logf("created: %v", count)
-		// This sleep has to be longer than the gcCheckPeriod defined
-		// in pkg/controller/gc/gc_controller.go which is currently
-		// 20 seconds.
-		time.Sleep(30 * time.Second)
-
-		pods, err := f.Client.Pods(f.Namespace.Name).List(unversioned.ListOptions{})
-		Expect(err).NotTo(HaveOccurred())
-		Expect(len(pods.Items)).To(BeNumerically("==", 100))
-	})
-})
-
-func createTerminatingPod(f *Framework) (*api.Pod, error) {
-	uuid := util.NewUUID()
-	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
-			Name: string(uuid),
+func newOwnerRC(f *framework.Framework, name string) *v1.ReplicationController {
+	var replicas int32
+	replicas = 2
+	return &v1.ReplicationController{
+		TypeMeta: unversioned.TypeMeta{
+			Kind:       "ReplicationController",
+			APIVersion: "v1",
 		},
-		Spec: api.PodSpec{
-			NodeName: "nonexistant-node",
-			Containers: []api.Container{
-				{
-					Name:  string(uuid),
-					Image: "gcr.io/google_containers/busybox",
+		ObjectMeta: v1.ObjectMeta{
+			Namespace: f.Namespace.Name,
+			Name:      name,
+		},
+		Spec: v1.ReplicationControllerSpec{
+			Replicas: &replicas,
+			Selector: map[string]string{"app": "gc-test"},
+			Template: &v1.PodTemplateSpec{
+				ObjectMeta: v1.ObjectMeta{
+					Labels: map[string]string{"app": "gc-test"},
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:  "nginx",
+							Image: "gcr.io/google_containers/nginx:1.7.9",
+						},
+					},
 				},
 			},
 		},
 	}
-	return f.Client.Pods(f.Namespace.Name).Create(pod)
 }
+
+// verifyRemainingObjects verifies if the number of the remaining replication
+// controllers and pods are rcNum and podNum. It returns error if the
+// communication with the API server fails.
+func verifyRemainingObjects(f *framework.Framework, clientSet clientset.Interface, rcNum, podNum int) (bool, error) {
+	rcClient := clientSet.Core().ReplicationControllers(f.Namespace.Name)
+	pods, err := clientSet.Core().Pods(f.Namespace.Name).List(api.ListOptions{})
+	if err != nil {
+		return false, fmt.Errorf("Failed to list pods: %v", err)
+	}
+	var ret = true
+	if len(pods.Items) != podNum {
+		ret = false
+		By(fmt.Sprintf("expected %d pods, got %d pods", podNum, len(pods.Items)))
+	}
+	rcs, err := rcClient.List(api.ListOptions{})
+	if err != nil {
+		return false, fmt.Errorf("Failed to list replication controllers: %v", err)
+	}
+	if len(rcs.Items) != rcNum {
+		ret = false
+		By(fmt.Sprintf("expected %d RCs, got %d RCs", rcNum, len(rcs.Items)))
+	}
+	return ret, nil
+}
+
+func gatherMetrics(f *framework.Framework) {
+	By("Gathering metrics")
+	var summary framework.TestDataSummary
+	grabber, err := metrics.NewMetricsGrabber(f.Client, false, false, true, false)
+	if err != nil {
+		framework.Logf("Failed to create MetricsGrabber. Skipping metrics gathering.")
+	} else {
+		received, err := grabber.Grab()
+		if err != nil {
+			framework.Logf("MetricsGrabber failed grab metrics. Skipping metrics gathering.")
+		} else {
+			summary = (*framework.MetricsForE2E)(&received)
+			framework.Logf(summary.PrintHumanReadable())
+		}
+	}
+}
+
+var _ = framework.KubeDescribe("Garbage collector", func() {
+	f := framework.NewDefaultFramework("gc")
+	It("[Feature:GarbageCollector] should delete pods created by rc when not orphaning", func() {
+		clientSet := f.Clientset_1_5
+		rcClient := clientSet.Core().ReplicationControllers(f.Namespace.Name)
+		podClient := clientSet.Core().Pods(f.Namespace.Name)
+		rcName := "simpletest.rc"
+		rc := newOwnerRC(f, rcName)
+		By("create the rc")
+		rc, err := rcClient.Create(rc)
+		if err != nil {
+			framework.Failf("Failed to create replication controller: %v", err)
+		}
+		// wait for rc to create some pods
+		if err := wait.Poll(5*time.Second, 30*time.Second, func() (bool, error) {
+			pods, err := podClient.List(api.ListOptions{})
+			if err != nil {
+				return false, fmt.Errorf("Failed to list pods: %v", err)
+			}
+			// We intentionally don't wait the number of pods to reach
+			// rc.Spec.Replicas. We want to see if the garbage collector and the
+			// rc manager work properly if the rc is deleted before it reaches
+			// stasis.
+			if len(pods.Items) > 0 {
+				return true, nil
+			} else {
+				return false, nil
+			}
+		}); err != nil {
+			framework.Failf("failed to wait for the rc to create some pods: %v", err)
+		}
+		By("delete the rc")
+		deleteOptions := getNonOrphanOptions()
+		deleteOptions.Preconditions = api.NewUIDPreconditions(string(rc.UID))
+		if err := rcClient.Delete(rc.ObjectMeta.Name, deleteOptions); err != nil {
+			framework.Failf("failed to delete the rc: %v", err)
+		}
+		By("wait for all pods to be garbage collected")
+		// wait for the RCs and Pods to reach the expected numbers.
+		if err := wait.Poll(5*time.Second, 60*time.Second, func() (bool, error) {
+			return verifyRemainingObjects(f, clientSet, 0, 0)
+		}); err != nil {
+			framework.Failf("failed to wait for all pods to be deleted: %v", err)
+			remainingPods, err := podClient.List(api.ListOptions{})
+			if err != nil {
+				framework.Failf("failed to list pods post mortem: %v", err)
+			} else {
+				framework.Failf("remaining pods are: %#v", remainingPods)
+			}
+		}
+		gatherMetrics(f)
+	})
+
+	It("[Feature:GarbageCollector] should orphan pods created by rc if delete options say so", func() {
+		clientSet := f.Clientset_1_5
+		rcClient := clientSet.Core().ReplicationControllers(f.Namespace.Name)
+		podClient := clientSet.Core().Pods(f.Namespace.Name)
+		rcName := "simpletest.rc"
+		rc := newOwnerRC(f, rcName)
+		replicas := int32(100)
+		rc.Spec.Replicas = &replicas
+		By("create the rc")
+		rc, err := rcClient.Create(rc)
+		if err != nil {
+			framework.Failf("Failed to create replication controller: %v", err)
+		}
+		// wait for rc to create pods
+		if err := wait.Poll(5*time.Second, 30*time.Second, func() (bool, error) {
+			rc, err := rcClient.Get(rc.Name)
+			if err != nil {
+				return false, fmt.Errorf("Failed to get rc: %v", err)
+			}
+			if rc.Status.Replicas == *rc.Spec.Replicas {
+				return true, nil
+			} else {
+				return false, nil
+			}
+		}); err != nil {
+			framework.Failf("failed to wait for the rc.Status.Replicas to reach rc.Spec.Replicas: %v", err)
+		}
+		By("delete the rc")
+		deleteOptions := getOrphanOptions()
+		deleteOptions.Preconditions = api.NewUIDPreconditions(string(rc.UID))
+		if err := rcClient.Delete(rc.ObjectMeta.Name, deleteOptions); err != nil {
+			framework.Failf("failed to delete the rc: %v", err)
+		}
+		By("wait for the rc to be deleted")
+		if err := wait.Poll(5*time.Second, 30*time.Second, func() (bool, error) {
+			rcs, err := rcClient.List(api.ListOptions{})
+			if err != nil {
+				return false, fmt.Errorf("Failed to list rcs: %v", err)
+			}
+			if len(rcs.Items) != 0 {
+				return false, nil
+			}
+			return true, nil
+		}); err != nil && err != wait.ErrWaitTimeout {
+			framework.Failf("%v", err)
+		}
+		By("wait for 30 seconds to see if the garbage collector mistakenly deletes the pods")
+		if err := wait.Poll(5*time.Second, 30*time.Second, func() (bool, error) {
+			pods, err := podClient.List(api.ListOptions{})
+			if err != nil {
+				return false, fmt.Errorf("Failed to list pods: %v", err)
+			}
+			if e, a := int(*(rc.Spec.Replicas)), len(pods.Items); e != a {
+				return false, fmt.Errorf("expect %d pods, got %d pods", e, a)
+			}
+			return false, nil
+		}); err != nil && err != wait.ErrWaitTimeout {
+			framework.Failf("%v", err)
+		}
+		gatherMetrics(f)
+	})
+
+	It("[Feature:GarbageCollector] should orphan pods created by rc if deleteOptions.OrphanDependents is nil", func() {
+		clientSet := f.Clientset_1_5
+		rcClient := clientSet.Core().ReplicationControllers(f.Namespace.Name)
+		podClient := clientSet.Core().Pods(f.Namespace.Name)
+		rcName := "simpletest.rc"
+		rc := newOwnerRC(f, rcName)
+		By("create the rc")
+		rc, err := rcClient.Create(rc)
+		if err != nil {
+			framework.Failf("Failed to create replication controller: %v", err)
+		}
+		// wait for rc to create some pods
+		if err := wait.Poll(5*time.Second, 30*time.Second, func() (bool, error) {
+			rc, err := rcClient.Get(rc.Name)
+			if err != nil {
+				return false, fmt.Errorf("Failed to get rc: %v", err)
+			}
+			if rc.Status.Replicas == *rc.Spec.Replicas {
+				return true, nil
+			} else {
+				return false, nil
+			}
+		}); err != nil {
+			framework.Failf("failed to wait for the rc.Status.Replicas to reach rc.Spec.Replicas: %v", err)
+		}
+		By("delete the rc")
+		deleteOptions := &api.DeleteOptions{}
+		deleteOptions.Preconditions = api.NewUIDPreconditions(string(rc.UID))
+		if err := rcClient.Delete(rc.ObjectMeta.Name, deleteOptions); err != nil {
+			framework.Failf("failed to delete the rc: %v", err)
+		}
+		By("wait for 30 seconds to see if the garbage collector mistakenly deletes the pods")
+		if err := wait.Poll(5*time.Second, 30*time.Second, func() (bool, error) {
+			pods, err := podClient.List(api.ListOptions{})
+			if err != nil {
+				return false, fmt.Errorf("Failed to list pods: %v", err)
+			}
+			if e, a := int(*(rc.Spec.Replicas)), len(pods.Items); e != a {
+				return false, fmt.Errorf("expect %d pods, got %d pods", e, a)
+			}
+			return false, nil
+		}); err != nil && err != wait.ErrWaitTimeout {
+			framework.Failf("%v", err)
+		}
+		gatherMetrics(f)
+	})
+})

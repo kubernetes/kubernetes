@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,6 +23,11 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/apis/batch"
+	batchv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
+	batchv2alpha1 "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/validation"
@@ -37,6 +42,7 @@ func (DeploymentV1Beta1) ParamNames() []GeneratorParam {
 		{"name", true},
 		{"replicas", true},
 		{"image", true},
+		{"image-pull-policy", false},
 		{"port", false},
 		{"hostport", false},
 		{"stdin", false},
@@ -85,7 +91,8 @@ func (DeploymentV1Beta1) Generate(genericParams map[string]interface{}) (runtime
 		return nil, err
 	}
 
-	if err = updatePodContainers(params, args, envs, podSpec); err != nil {
+	imagePullPolicy := api.PullPolicy(params["image-pull-policy"])
+	if err = updatePodContainers(params, args, envs, imagePullPolicy, podSpec); err != nil {
 		return nil, err
 	}
 
@@ -101,15 +108,14 @@ func (DeploymentV1Beta1) Generate(genericParams map[string]interface{}) (runtime
 			Labels: labels,
 		},
 		Spec: extensions.DeploymentSpec{
-			Replicas: count,
-			Selector: labels,
+			Replicas: int32(count),
+			Selector: &unversioned.LabelSelector{MatchLabels: labels},
 			Template: api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
 					Labels: labels,
 				},
 				Spec: *podSpec,
 			},
-			UniqueLabelKey: "deployment.kubernetes.io/podTemplateHash",
 		},
 	}
 	return &deployment, nil
@@ -187,6 +193,24 @@ func getEnvs(genericParams map[string]interface{}) ([]api.EnvVar, error) {
 	return envs, nil
 }
 
+func getV1Envs(genericParams map[string]interface{}) ([]v1.EnvVar, error) {
+	var envs []v1.EnvVar
+	envStrings, found := genericParams["env"]
+	if found {
+		if envStringArray, isArray := envStrings.([]string); isArray {
+			var err error
+			envs, err = parseV1Envs(envStringArray)
+			if err != nil {
+				return nil, err
+			}
+			delete(genericParams, "env")
+		} else {
+			return nil, fmt.Errorf("expected []string, found: %v", envStrings)
+		}
+	}
+	return envs, nil
+}
+
 type JobV1Beta1 struct{}
 
 func (JobV1Beta1) ParamNames() []GeneratorParam {
@@ -195,6 +219,7 @@ func (JobV1Beta1) ParamNames() []GeneratorParam {
 		{"default-name", false},
 		{"name", true},
 		{"image", true},
+		{"image-pull-policy", false},
 		{"port", false},
 		{"hostport", false},
 		{"stdin", false},
@@ -240,7 +265,8 @@ func (JobV1Beta1) Generate(genericParams map[string]interface{}) (runtime.Object
 		return nil, err
 	}
 
-	if err = updatePodContainers(params, args, envs, podSpec); err != nil {
+	imagePullPolicy := api.PullPolicy(params["image-pull-policy"])
+	if err = updatePodContainers(params, args, envs, imagePullPolicy, podSpec); err != nil {
 		return nil, err
 	}
 
@@ -256,19 +282,20 @@ func (JobV1Beta1) Generate(genericParams map[string]interface{}) (runtime.Object
 
 	restartPolicy := api.RestartPolicy(params["restart"])
 	if len(restartPolicy) == 0 {
-		restartPolicy = api.RestartPolicyAlways
+		restartPolicy = api.RestartPolicyNever
 	}
 	podSpec.RestartPolicy = restartPolicy
 
-	job := extensions.Job{
+	job := batch.Job{
 		ObjectMeta: api.ObjectMeta{
 			Name:   name,
 			Labels: labels,
 		},
-		Spec: extensions.JobSpec{
-			Selector: &extensions.PodSelector{
+		Spec: batch.JobSpec{
+			Selector: &unversioned.LabelSelector{
 				MatchLabels: labels,
 			},
+			ManualSelector: newBool(true),
 			Template: api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
 					Labels: labels,
@@ -281,6 +308,199 @@ func (JobV1Beta1) Generate(genericParams map[string]interface{}) (runtime.Object
 	return &job, nil
 }
 
+type JobV1 struct{}
+
+func (JobV1) ParamNames() []GeneratorParam {
+	return []GeneratorParam{
+		{"labels", false},
+		{"default-name", false},
+		{"name", true},
+		{"image", true},
+		{"image-pull-policy", false},
+		{"port", false},
+		{"hostport", false},
+		{"stdin", false},
+		{"leave-stdin-open", false},
+		{"tty", false},
+		{"command", false},
+		{"args", false},
+		{"env", false},
+		{"requests", false},
+		{"limits", false},
+		{"restart", false},
+	}
+}
+
+func (JobV1) Generate(genericParams map[string]interface{}) (runtime.Object, error) {
+	args, err := getArgs(genericParams)
+	if err != nil {
+		return nil, err
+	}
+
+	envs, err := getV1Envs(genericParams)
+	if err != nil {
+		return nil, err
+	}
+
+	params, err := getParams(genericParams)
+	if err != nil {
+		return nil, err
+	}
+
+	name, err := getName(params)
+	if err != nil {
+		return nil, err
+	}
+
+	labels, err := getLabels(params, true, name)
+	if err != nil {
+		return nil, err
+	}
+
+	podSpec, err := makeV1PodSpec(params, name)
+	if err != nil {
+		return nil, err
+	}
+
+	imagePullPolicy := v1.PullPolicy(params["image-pull-policy"])
+	if err = updateV1PodContainers(params, args, envs, imagePullPolicy, podSpec); err != nil {
+		return nil, err
+	}
+
+	leaveStdinOpen, err := GetBool(params, "leave-stdin-open", false)
+	if err != nil {
+		return nil, err
+	}
+	podSpec.Containers[0].StdinOnce = !leaveStdinOpen && podSpec.Containers[0].Stdin
+
+	if err := updateV1PodPorts(params, podSpec); err != nil {
+		return nil, err
+	}
+
+	restartPolicy := v1.RestartPolicy(params["restart"])
+	if len(restartPolicy) == 0 {
+		restartPolicy = v1.RestartPolicyNever
+	}
+	podSpec.RestartPolicy = restartPolicy
+
+	job := batchv1.Job{
+		ObjectMeta: v1.ObjectMeta{
+			Name:   name,
+			Labels: labels,
+		},
+		Spec: batchv1.JobSpec{
+			Template: v1.PodTemplateSpec{
+				ObjectMeta: v1.ObjectMeta{
+					Labels: labels,
+				},
+				Spec: *podSpec,
+			},
+		},
+	}
+
+	return &job, nil
+}
+
+type ScheduledJobV2Alpha1 struct{}
+
+func (ScheduledJobV2Alpha1) ParamNames() []GeneratorParam {
+	return []GeneratorParam{
+		{"labels", false},
+		{"default-name", false},
+		{"name", true},
+		{"image", true},
+		{"image-pull-policy", false},
+		{"port", false},
+		{"hostport", false},
+		{"stdin", false},
+		{"leave-stdin-open", false},
+		{"tty", false},
+		{"command", false},
+		{"args", false},
+		{"env", false},
+		{"requests", false},
+		{"limits", false},
+		{"restart", false},
+		{"schedule", true},
+	}
+}
+
+func (ScheduledJobV2Alpha1) Generate(genericParams map[string]interface{}) (runtime.Object, error) {
+	args, err := getArgs(genericParams)
+	if err != nil {
+		return nil, err
+	}
+
+	envs, err := getV1Envs(genericParams)
+	if err != nil {
+		return nil, err
+	}
+
+	params, err := getParams(genericParams)
+	if err != nil {
+		return nil, err
+	}
+
+	name, err := getName(params)
+	if err != nil {
+		return nil, err
+	}
+
+	labels, err := getLabels(params, true, name)
+	if err != nil {
+		return nil, err
+	}
+
+	podSpec, err := makeV1PodSpec(params, name)
+	if err != nil {
+		return nil, err
+	}
+
+	imagePullPolicy := v1.PullPolicy(params["image-pull-policy"])
+	if err = updateV1PodContainers(params, args, envs, imagePullPolicy, podSpec); err != nil {
+		return nil, err
+	}
+
+	leaveStdinOpen, err := GetBool(params, "leave-stdin-open", false)
+	if err != nil {
+		return nil, err
+	}
+	podSpec.Containers[0].StdinOnce = !leaveStdinOpen && podSpec.Containers[0].Stdin
+
+	if err := updateV1PodPorts(params, podSpec); err != nil {
+		return nil, err
+	}
+
+	restartPolicy := v1.RestartPolicy(params["restart"])
+	if len(restartPolicy) == 0 {
+		restartPolicy = v1.RestartPolicyNever
+	}
+	podSpec.RestartPolicy = restartPolicy
+
+	scheduledJob := batchv2alpha1.ScheduledJob{
+		ObjectMeta: v1.ObjectMeta{
+			Name:   name,
+			Labels: labels,
+		},
+		Spec: batchv2alpha1.ScheduledJobSpec{
+			Schedule:          params["schedule"],
+			ConcurrencyPolicy: batchv2alpha1.AllowConcurrent,
+			JobTemplate: batchv2alpha1.JobTemplateSpec{
+				Spec: batchv2alpha1.JobSpec{
+					Template: v1.PodTemplateSpec{
+						ObjectMeta: v1.ObjectMeta{
+							Labels: labels,
+						},
+						Spec: *podSpec,
+					},
+				},
+			},
+		},
+	}
+
+	return &scheduledJob, nil
+}
+
 type BasicReplicationController struct{}
 
 func (BasicReplicationController) ParamNames() []GeneratorParam {
@@ -290,6 +510,7 @@ func (BasicReplicationController) ParamNames() []GeneratorParam {
 		{"name", true},
 		{"replicas", true},
 		{"image", true},
+		{"image-pull-policy", false},
 		{"port", false},
 		{"hostport", false},
 		{"stdin", false},
@@ -321,7 +542,31 @@ func populateResourceList(spec string) (api.ResourceList, error) {
 		if err != nil {
 			return nil, err
 		}
-		result[resourceName] = *resourceQuantity
+		result[resourceName] = resourceQuantity
+	}
+	return result, nil
+}
+
+// populateResourceList takes strings of form <resourceName1>=<value1>,<resourceName1>=<value2>
+func populateV1ResourceList(spec string) (v1.ResourceList, error) {
+	// empty input gets a nil response to preserve generator test expected behaviors
+	if spec == "" {
+		return nil, nil
+	}
+
+	result := v1.ResourceList{}
+	resourceStatements := strings.Split(spec, ",")
+	for _, resourceStatement := range resourceStatements {
+		parts := strings.Split(resourceStatement, "=")
+		if len(parts) != 2 {
+			return nil, fmt.Errorf("Invalid argument syntax %v, expected <resource>=<value>", resourceStatement)
+		}
+		resourceName := v1.ResourceName(parts[0])
+		resourceQuantity, err := resource.ParseQuantity(parts[1])
+		if err != nil {
+			return nil, err
+		}
+		result[resourceName] = resourceQuantity
 	}
 	return result, nil
 }
@@ -335,6 +580,22 @@ func HandleResourceRequirements(params map[string]string) (api.ResourceRequireme
 	}
 	result.Limits = limits
 	requests, err := populateResourceList(params["requests"])
+	if err != nil {
+		return result, err
+	}
+	result.Requests = requests
+	return result, nil
+}
+
+// HandleResourceRequirements parses the limits and requests parameters if specified
+func handleV1ResourceRequirements(params map[string]string) (v1.ResourceRequirements, error) {
+	result := v1.ResourceRequirements{}
+	limits, err := populateV1ResourceList(params["limits"])
+	if err != nil {
+		return result, err
+	}
+	result.Limits = limits
+	requests, err := populateV1ResourceList(params["requests"])
 	if err != nil {
 		return result, err
 	}
@@ -360,6 +621,36 @@ func makePodSpec(params map[string]string, name string) (*api.PodSpec, error) {
 
 	spec := api.PodSpec{
 		Containers: []api.Container{
+			{
+				Name:      name,
+				Image:     params["image"],
+				Stdin:     stdin,
+				TTY:       tty,
+				Resources: resourceRequirements,
+			},
+		},
+	}
+	return &spec, nil
+}
+
+func makeV1PodSpec(params map[string]string, name string) (*v1.PodSpec, error) {
+	stdin, err := GetBool(params, "stdin", false)
+	if err != nil {
+		return nil, err
+	}
+
+	tty, err := GetBool(params, "tty", false)
+	if err != nil {
+		return nil, err
+	}
+
+	resourceRequirements, err := handleV1ResourceRequirements(params)
+	if err != nil {
+		return nil, err
+	}
+
+	spec := v1.PodSpec{
+		Containers: []v1.Container{
 			{
 				Name:      name,
 				Image:     params["image"],
@@ -408,7 +699,8 @@ func (BasicReplicationController) Generate(genericParams map[string]interface{})
 		return nil, err
 	}
 
-	if err = updatePodContainers(params, args, envs, podSpec); err != nil {
+	imagePullPolicy := api.PullPolicy(params["image-pull-policy"])
+	if err = updatePodContainers(params, args, envs, imagePullPolicy, podSpec); err != nil {
 		return nil, err
 	}
 
@@ -422,7 +714,7 @@ func (BasicReplicationController) Generate(genericParams map[string]interface{})
 			Labels: labels,
 		},
 		Spec: api.ReplicationControllerSpec{
-			Replicas: count,
+			Replicas: int32(count),
 			Selector: labels,
 			Template: &api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
@@ -435,7 +727,7 @@ func (BasicReplicationController) Generate(genericParams map[string]interface{})
 	return &controller, nil
 }
 
-func updatePodContainers(params map[string]string, args []string, envs []api.EnvVar, podSpec *api.PodSpec) error {
+func updatePodContainers(params map[string]string, args []string, envs []api.EnvVar, imagePullPolicy api.PullPolicy, podSpec *api.PodSpec) error {
 	if len(args) > 0 {
 		command, err := GetBool(params, "command", false)
 		if err != nil {
@@ -450,6 +742,35 @@ func updatePodContainers(params map[string]string, args []string, envs []api.Env
 
 	if len(envs) > 0 {
 		podSpec.Containers[0].Env = envs
+	}
+
+	if len(imagePullPolicy) > 0 {
+		// imagePullPolicy should be valid here since we have verified it before.
+		podSpec.Containers[0].ImagePullPolicy = imagePullPolicy
+	}
+	return nil
+}
+
+func updateV1PodContainers(params map[string]string, args []string, envs []v1.EnvVar, imagePullPolicy v1.PullPolicy, podSpec *v1.PodSpec) error {
+	if len(args) > 0 {
+		command, err := GetBool(params, "command", false)
+		if err != nil {
+			return err
+		}
+		if command {
+			podSpec.Containers[0].Command = args
+		} else {
+			podSpec.Containers[0].Args = args
+		}
+	}
+
+	if len(envs) > 0 {
+		podSpec.Containers[0].Env = envs
+	}
+
+	if len(imagePullPolicy) > 0 {
+		// imagePullPolicy should be valid here since we have verified it before.
+		podSpec.Containers[0].ImagePullPolicy = imagePullPolicy
 	}
 	return nil
 }
@@ -478,11 +799,45 @@ func updatePodPorts(params map[string]string, podSpec *api.PodSpec) (err error) 
 	if port > 0 {
 		podSpec.Containers[0].Ports = []api.ContainerPort{
 			{
-				ContainerPort: port,
+				ContainerPort: int32(port),
 			},
 		}
 		if hostPort > 0 {
-			podSpec.Containers[0].Ports[0].HostPort = hostPort
+			podSpec.Containers[0].Ports[0].HostPort = int32(hostPort)
+		}
+	}
+	return nil
+}
+
+func updateV1PodPorts(params map[string]string, podSpec *v1.PodSpec) (err error) {
+	port := -1
+	hostPort := -1
+	if len(params["port"]) > 0 {
+		port, err = strconv.Atoi(params["port"])
+		if err != nil {
+			return err
+		}
+	}
+
+	if len(params["hostport"]) > 0 {
+		hostPort, err = strconv.Atoi(params["hostport"])
+		if err != nil {
+			return err
+		}
+		if hostPort > 0 && port < 0 {
+			return fmt.Errorf("--hostport requires --port to be specified")
+		}
+	}
+
+	// Don't include the port if it was not specified.
+	if port > 0 {
+		podSpec.Containers[0].Ports = []v1.ContainerPort{
+			{
+				ContainerPort: int32(port),
+			},
+		}
+		if hostPort > 0 {
+			podSpec.Containers[0].Ports[0].HostPort = int32(hostPort)
 		}
 	}
 	return nil
@@ -496,6 +851,7 @@ func (BasicPod) ParamNames() []GeneratorParam {
 		{"default-name", false},
 		{"name", true},
 		{"image", true},
+		{"image-pull-policy", false},
 		{"port", false},
 		{"hostport", false},
 		{"stdin", false},
@@ -559,6 +915,8 @@ func (BasicPod) Generate(genericParams map[string]interface{}) (runtime.Object, 
 	if len(restartPolicy) == 0 {
 		restartPolicy = api.RestartPolicyAlways
 	}
+	// TODO: Figure out why we set ImagePullPolicy here, whether we can make it
+	// consistent with the other places imagePullPolicy is set using flag.
 	pod := api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name:   name,
@@ -580,7 +938,8 @@ func (BasicPod) Generate(genericParams map[string]interface{}) (runtime.Object, 
 			RestartPolicy: restartPolicy,
 		},
 	}
-	if err = updatePodContainers(params, args, envs, &pod.Spec); err != nil {
+	imagePullPolicy := api.PullPolicy(params["image-pull-policy"])
+	if err = updatePodContainers(params, args, envs, imagePullPolicy, &pod.Spec); err != nil {
 		return nil, err
 	}
 
@@ -591,14 +950,46 @@ func (BasicPod) Generate(genericParams map[string]interface{}) (runtime.Object, 
 }
 
 func parseEnvs(envArray []string) ([]api.EnvVar, error) {
-	envs := []api.EnvVar{}
+	envs := make([]api.EnvVar, 0, len(envArray))
 	for _, env := range envArray {
-		parts := strings.Split(env, "=")
-		if len(parts) != 2 || !validation.IsCIdentifier(parts[0]) || len(parts[1]) == 0 {
+		pos := strings.Index(env, "=")
+		if pos == -1 {
 			return nil, fmt.Errorf("invalid env: %v", env)
 		}
-		envVar := api.EnvVar{Name: parts[0], Value: parts[1]}
+		name := env[:pos]
+		value := env[pos+1:]
+		if len(name) == 0 {
+			return nil, fmt.Errorf("invalid env: %v", env)
+		}
+		if len(validation.IsCIdentifier(name)) != 0 {
+			return nil, fmt.Errorf("invalid env: %v", env)
+		}
+		envVar := api.EnvVar{Name: name, Value: value}
 		envs = append(envs, envVar)
 	}
 	return envs, nil
+}
+
+func parseV1Envs(envArray []string) ([]v1.EnvVar, error) {
+	envs := []v1.EnvVar{}
+	for _, env := range envArray {
+		pos := strings.Index(env, "=")
+		if pos == -1 {
+			return nil, fmt.Errorf("invalid env: %v", env)
+		}
+		name := env[:pos]
+		value := env[pos+1:]
+		if len(name) == 0 || len(validation.IsCIdentifier(name)) != 0 {
+			return nil, fmt.Errorf("invalid env: %v", env)
+		}
+		envVar := v1.EnvVar{Name: name, Value: value}
+		envs = append(envs, envVar)
+	}
+	return envs, nil
+}
+
+func newBool(val bool) *bool {
+	p := new(bool)
+	*p = val
+	return p
 }

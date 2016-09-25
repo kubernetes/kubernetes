@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -105,6 +105,27 @@ func configFromEnv() (cfg Config, ok bool) {
 			cfg.Global.DomainId != "" || cfg.Global.DomainName != ""))
 
 	return
+}
+
+func TestParseMetaData(t *testing.T) {
+	_, err := parseMetaData(strings.NewReader(""))
+	if err == nil {
+		t.Errorf("Should fail when invalid meta data is provided: %s", err)
+	}
+
+	id, err := parseMetaData(strings.NewReader(`
+	{
+		"UUID":"someuuid",
+		"name":"somename",
+		"project_id":"someprojectid"
+	}
+	`))
+	if err != nil {
+		t.Fatalf("Should succeed when valid meta data is provided: %s", err)
+	}
+	if id != "someuuid" {
+		t.Errorf("incorrect uuid: %s", id)
+	}
 }
 
 func TestNewRackspace(t *testing.T) {

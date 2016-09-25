@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,33 +19,33 @@ package cinder
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
-	"path"
 	"strings"
 	"time"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/openstack"
 	"k8s.io/kubernetes/pkg/util/exec"
-	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/kubernetes/pkg/volume"
 )
 
 type CinderDiskUtil struct{}
 
 // Attaches a disk specified by a volume.CinderPersistenDisk to the current kubelet.
 // Mounts the disk to it's global path.
-func (util *CinderDiskUtil) AttachDisk(b *cinderVolumeBuilder, globalPDPath string) error {
+func (util *CinderDiskUtil) AttachDisk(b *cinderVolumeMounter, globalPDPath string) error {
 	options := []string{}
 	if b.readOnly {
 		options = append(options, "ro")
 	}
-	cloud := b.plugin.host.GetCloudProvider()
-	if cloud == nil {
-		glog.Errorf("Cloud provider not initialized properly")
-		return errors.New("Cloud provider not initialized properly")
+	cloud, err := b.plugin.getCloudProvider()
+	if err != nil {
+		return err
 	}
-	diskid, err := cloud.(*openstack.OpenStack).AttachDisk(b.pdName)
+	instanceid, err := cloud.InstanceID()
+	if err != nil {
+		return err
+	}
+	diskid, err := cloud.AttachDisk(instanceid, b.pdName)
 	if err != nil {
 		return err
 	}
@@ -53,8 +53,7 @@ func (util *CinderDiskUtil) AttachDisk(b *cinderVolumeBuilder, globalPDPath stri
 	var devicePath string
 	numTries := 0
 	for {
-		devicePath = makeDevicePath(diskid)
-		// probe the attached vol so that symlink in /dev/disk/by-id is created
+		devicePath = cloud.GetDevicePath(diskid)
 		probeAttachedVolume()
 
 		_, err := os.Stat(devicePath)
@@ -70,7 +69,6 @@ func (util *CinderDiskUtil) AttachDisk(b *cinderVolumeBuilder, globalPDPath stri
 		}
 		time.Sleep(time.Second * 6)
 	}
-
 	notmnt, err := b.mounter.IsLikelyNotMountPoint(globalPDPath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -83,7 +81,7 @@ func (util *CinderDiskUtil) AttachDisk(b *cinderVolumeBuilder, globalPDPath stri
 		}
 	}
 	if notmnt {
-		err = b.blockDeviceMounter.Mount(devicePath, globalPDPath, b.fsType, options)
+		err = b.blockDeviceMounter.FormatAndMount(devicePath, globalPDPath, b.fsType, options)
 		if err != nil {
 			os.Remove(globalPDPath)
 			return err
@@ -93,23 +91,8 @@ func (util *CinderDiskUtil) AttachDisk(b *cinderVolumeBuilder, globalPDPath stri
 	return nil
 }
 
-func makeDevicePath(diskid string) string {
-	files, _ := ioutil.ReadDir("/dev/disk/by-id/")
-	for _, f := range files {
-		if strings.Contains(f.Name(), "virtio-") {
-			devid_prefix := f.Name()[len("virtio-"):len(f.Name())]
-			if strings.Contains(diskid, devid_prefix) {
-				glog.V(4).Infof("Found disk attached as %q; full devicepath: %s\n", f.Name(), path.Join("/dev/disk/by-id/", f.Name()))
-				return path.Join("/dev/disk/by-id/", f.Name())
-			}
-		}
-	}
-	glog.Warningf("Failed to find device for the diskid: %q\n", diskid)
-	return ""
-}
-
 // Unmounts the device and detaches the disk from the kubelet's host machine.
-func (util *CinderDiskUtil) DetachDisk(cd *cinderVolumeCleaner) error {
+func (util *CinderDiskUtil) DetachDisk(cd *cinderVolumeUnmounter) error {
 	globalPDPath := makeGlobalPDName(cd.plugin.host, cd.pdName)
 	if err := cd.mounter.Unmount(globalPDPath); err != nil {
 		return err
@@ -119,83 +102,71 @@ func (util *CinderDiskUtil) DetachDisk(cd *cinderVolumeCleaner) error {
 	}
 	glog.V(2).Infof("Successfully unmounted main device: %s\n", globalPDPath)
 
-	cloud := cd.plugin.host.GetCloudProvider()
-	if cloud == nil {
-		glog.Errorf("Cloud provider not initialized properly")
-		return errors.New("Cloud provider not initialized properly")
+	cloud, err := cd.plugin.getCloudProvider()
+	if err != nil {
+		return err
 	}
-
-	if err := cloud.(*openstack.OpenStack).DetachDisk(cd.pdName); err != nil {
+	instanceid, err := cloud.InstanceID()
+	if err != nil {
+		return err
+	}
+	if err = cloud.DetachDisk(instanceid, cd.pdName); err != nil {
 		return err
 	}
 	glog.V(2).Infof("Successfully detached cinder volume %s", cd.pdName)
 	return nil
 }
 
-type cinderSafeFormatAndMount struct {
-	mount.Interface
-	runner exec.Interface
+func (util *CinderDiskUtil) DeleteVolume(cd *cinderVolumeDeleter) error {
+	cloud, err := cd.plugin.getCloudProvider()
+	if err != nil {
+		return err
+	}
+
+	if err = cloud.DeleteVolume(cd.pdName); err != nil {
+		glog.V(2).Infof("Error deleting cinder volume %s: %v", cd.pdName, err)
+		return err
+	}
+	glog.V(2).Infof("Successfully deleted cinder volume %s", cd.pdName)
+	return nil
 }
 
-/*
-The functions below depend on the following executables; This will have to be ported to more generic implementations
-/bin/lsblk
-/sbin/mkfs.ext3 or /sbin/mkfs.ext4
-/usr/bin/udevadm
-*/
-func (diskmounter *cinderSafeFormatAndMount) Mount(device string, target string, fstype string, options []string) error {
-	fmtRequired, err := isFormatRequired(device, fstype, diskmounter)
+func (util *CinderDiskUtil) CreateVolume(c *cinderVolumeProvisioner) (volumeID string, volumeSizeGB int, err error) {
+	cloud, err := c.plugin.getCloudProvider()
 	if err != nil {
-		glog.Warningf("Failed to determine if formating is required: %v\n", err)
-		//return err
+		return "", 0, err
 	}
-	if fmtRequired {
-		glog.V(2).Infof("Formatting of the vol required")
-		if _, err := formatVolume(device, fstype, diskmounter); err != nil {
-			glog.Warningf("Failed to format volume: %v\n", err)
-			return err
+
+	volSizeBytes := c.options.Capacity.Value()
+	// Cinder works with gigabytes, convert to GiB with rounding up
+	volSizeGB := int(volume.RoundUpSize(volSizeBytes, 1024*1024*1024))
+	name := volume.GenerateVolumeName(c.options.ClusterName, c.options.PVName, 255) // Cinder volume name can have up to 255 characters
+	vtype := ""
+	availability := ""
+	// Apply ProvisionerParameters (case-insensitive). We leave validation of
+	// the values to the cloud provider.
+	for k, v := range c.options.Parameters {
+		switch strings.ToLower(k) {
+		case "type":
+			vtype = v
+		case "availability":
+			availability = v
+		default:
+			return "", 0, fmt.Errorf("invalid option %q for volume plugin %s", k, c.plugin.GetPluginName())
 		}
 	}
-	return diskmounter.Interface.Mount(device, target, fstype, options)
-}
+	// TODO: implement c.options.ProvisionerSelector parsing
+	if c.options.Selector != nil {
+		return "", 0, fmt.Errorf("claim.Spec.Selector is not supported for dynamic provisioning on Cinder")
+	}
 
-func isFormatRequired(devicePath string, fstype string, exec *cinderSafeFormatAndMount) (bool, error) {
-	args := []string{"-f", devicePath}
-	glog.V(4).Infof("exec-ing: /bin/lsblk %v\n", args)
-	cmd := exec.runner.Command("/bin/lsblk", args...)
-	dataOut, err := cmd.CombinedOutput()
+	name, err = cloud.CreateVolume(name, volSizeGB, vtype, availability, c.options.CloudTags)
 	if err != nil {
-		glog.Warningf("error running /bin/lsblk\n%s", string(dataOut))
-		return false, err
+		glog.V(2).Infof("Error creating cinder volume: %v", err)
+		return "", 0, err
 	}
-	if len(string(dataOut)) > 0 {
-		if strings.Contains(string(dataOut), fstype) {
-			return false, nil
-		} else {
-			return true, nil
-		}
-	} else {
-		glog.Warningf("Failed to get any response from /bin/lsblk")
-		return false, errors.New("Failed to get reponse from /bin/lsblk")
-	}
-	glog.Warningf("Unknown error occured executing /bin/lsblk")
-	return false, errors.New("Unknown error occured executing /bin/lsblk")
-}
-
-func formatVolume(devicePath string, fstype string, exec *cinderSafeFormatAndMount) (bool, error) {
-	if "ext4" != fstype && "ext3" != fstype {
-		glog.Warningf("Unsupported format type: %q\n", fstype)
-		return false, errors.New(fmt.Sprint("Unsupported format type: %q\n", fstype))
-	}
-	args := []string{devicePath}
-	cmd := exec.runner.Command(fmt.Sprintf("/sbin/mkfs.%s", fstype), args...)
-	dataOut, err := cmd.CombinedOutput()
-	if err != nil {
-		glog.Warningf("error running /sbin/mkfs for fstype: %q \n%s", fstype, string(dataOut))
-		return false, err
-	}
-	glog.V(2).Infof("Successfully formated device: %q with fstype %q; output:\n %q\n,", devicePath, fstype, string(dataOut))
-	return true, err
+	glog.V(2).Infof("Successfully created cinder volume %s", name)
+	return name, volSizeGB, nil
 }
 
 func probeAttachedVolume() error {

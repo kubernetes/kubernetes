@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package queue
 
 import (
 	"container/heap"
+	"runtime"
 	"sync"
 	"time"
 
@@ -138,6 +139,29 @@ func (q *DelayQueue) Pop() interface{} {
 	}, nil)
 }
 
+func finishWaiting(cond *sync.Cond, waitFinished <-chan struct{}) {
+	runtime.Gosched()
+	select {
+	// avoid creating a timer if we can help it...
+	case <-waitFinished:
+		return
+	default:
+		const spinTimeout = 100 * time.Millisecond
+		t := time.NewTimer(spinTimeout)
+		defer t.Stop()
+		for {
+			runtime.Gosched()
+			cond.Broadcast()
+			select {
+			case <-waitFinished:
+				return
+			case <-t.C:
+				t.Reset(spinTimeout)
+			}
+		}
+	}
+}
+
 // returns a non-nil value from the queue, or else nil if/when cancelled; if cancel
 // is nil then cancellation is disabled and this func must return a non-nil value.
 func (q *DelayQueue) pop(next func() *qitem, cancel <-chan struct{}) interface{} {
@@ -164,6 +188,7 @@ func (q *DelayQueue) pop(next func() *qitem, cancel <-chan struct{}) interface{}
 			select {
 			case <-cancel:
 				item.readd(item)
+				finishWaiting(&q.cond, ch)
 				return nil
 			case <-ch:
 				// we may no longer have the earliest deadline, re-try
@@ -302,12 +327,18 @@ func (f *DelayFIFO) Get(id string) (UniqueID, bool) {
 
 // Variant of DelayQueue.Pop() for UniqueDelayed items
 func (q *DelayFIFO) Await(timeout time.Duration) UniqueID {
-	cancel := make(chan struct{})
-	ch := make(chan interface{}, 1)
+	var (
+		cancel = make(chan struct{})
+		ch     = make(chan interface{}, 1)
+		t      = time.NewTimer(timeout)
+	)
+	defer t.Stop()
+
 	go func() { ch <- q.pop(cancel) }()
+
 	var x interface{}
 	select {
-	case <-time.After(timeout):
+	case <-t.C:
 		close(cancel)
 		x = <-ch
 	case x = <-ch:
@@ -319,13 +350,19 @@ func (q *DelayFIFO) Await(timeout time.Duration) UniqueID {
 	return nil
 }
 
-// Variant of DelayQueue.Pop() for UniqueDelayed items
-func (q *DelayFIFO) Pop() UniqueID {
-	return q.pop(nil).(UniqueID)
+// Pop blocks until either there is an item available to dequeue or else the specified
+// cancel chan is closed. Callers that have no interest in providing a cancel chan
+// should specify nil, or else WithoutCancel() (for readability).
+func (q *DelayFIFO) Pop(cancel <-chan struct{}) UniqueID {
+	x := q.pop(cancel)
+	if x == nil {
+		return nil
+	}
+	return x.(UniqueID)
 }
 
 // variant of DelayQueue.Pop that implements optional cancellation
-func (q *DelayFIFO) pop(cancel chan struct{}) interface{} {
+func (q *DelayFIFO) pop(cancel <-chan struct{}) interface{} {
 	next := func() *qitem {
 		q.lock()
 		defer q.unlock()
@@ -341,8 +378,7 @@ func (q *DelayFIFO) pop(cancel chan struct{}) interface{} {
 					// we may not have the lock yet, so
 					// broadcast to abort Wait, then
 					// return after lock re-acquisition
-					q.cond().Broadcast()
-					<-signal
+					finishWaiting(q.cond(), signal)
 					return nil
 				case <-signal:
 					// we have the lock, re-check

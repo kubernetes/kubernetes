@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,9 +22,9 @@ import (
 	"net/url"
 	"testing"
 
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/probe"
-	"k8s.io/kubernetes/pkg/util"
+	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 )
 
 func TestHTTPKubeletClient(t *testing.T) {
@@ -34,7 +34,7 @@ func TestHTTPKubeletClient(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	fakeHandler := util.FakeHandler{
+	fakeHandler := utiltesting.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(body),
 	}
@@ -64,7 +64,7 @@ func TestNewKubeletClientTLSInvalid(t *testing.T) {
 	config := &KubeletClientConfig{
 		EnableHttps: true,
 		//Invalid certificate and key path
-		TLSClientConfig: client.TLSClientConfig{
+		TLSClientConfig: restclient.TLSClientConfig{
 			CertFile: "../../client/testdata/mycertinvalid.cer",
 			KeyFile:  "../../client/testdata/mycertinvalid.key",
 			CAFile:   "../../client/testdata/myCA.cer",
@@ -82,8 +82,9 @@ func TestNewKubeletClientTLSInvalid(t *testing.T) {
 
 func TestNewKubeletClientTLSValid(t *testing.T) {
 	config := &KubeletClientConfig{
+		Port:        1234,
 		EnableHttps: true,
-		TLSClientConfig: client.TLSClientConfig{
+		TLSClientConfig: restclient.TLSClientConfig{
 			CertFile: "../../client/testdata/mycertvalid.cer",
 			// TLS Configuration, only applies if EnableHttps is true.
 			KeyFile: "../../client/testdata/mycertvalid.key",
@@ -98,5 +99,28 @@ func TestNewKubeletClientTLSValid(t *testing.T) {
 	}
 	if client == nil {
 		t.Error("client should not be nil")
+	}
+
+	{
+		scheme, port, transport, err := client.GetConnectionInfo(nil, "foo")
+		if err != nil {
+			t.Errorf("Error getting info: %v", err)
+		}
+		if scheme != "https" {
+			t.Errorf("Expected https, got %s", scheme)
+		}
+		if port != 1234 {
+			t.Errorf("Expected 1234, got %d", port)
+		}
+		if transport == nil {
+			t.Errorf("Expected transport, got nil")
+		}
+	}
+
+	{
+		_, _, _, err := client.GetConnectionInfo(nil, "foo bar")
+		if err == nil {
+			t.Errorf("Expected error getting connection info for invalid node name, got none")
+		}
 	}
 }

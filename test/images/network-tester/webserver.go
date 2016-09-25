@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -36,7 +36,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
-	"math/rand"
 	"net/http"
 	"os"
 	"os/signal"
@@ -44,6 +43,7 @@ import (
 	"syscall"
 	"time"
 
+	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
@@ -90,7 +90,8 @@ func (s *State) serveStatus(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "running")
 		return
 	}
-	s.Logf("Declaring failure for %s/%s with %d sent and %d received and %d peers", *namespace, *service, len(s.Sent), len(s.Received), *peerCount)
+	// Logf can't be called while holding the lock, so defer using a goroutine
+	go s.Logf("Declaring failure for %s/%s with %d sent and %d received and %d peers", *namespace, *service, len(s.Sent), len(s.Received), *peerCount)
 	fmt.Fprintf(w, "fail")
 }
 
@@ -214,42 +215,73 @@ func main() {
 
 // Find all sibling pods in the service and post to their /write handler.
 func contactOthers(state *State) {
+	sleepTime := 5 * time.Second
+	// In large cluster getting all endpoints is pretty expensive.
+	// Thus, we will limit ourselves to send on average at most 10 such
+	// requests per second
+	if sleepTime < time.Duration(*peerCount/10)*time.Second {
+		sleepTime = time.Duration(*peerCount/10) * time.Second
+	}
+	timeout := 5 * time.Minute
+	// Similarly we need to bump timeout so that it is reasonable in large
+	// clusters.
+	if timeout < time.Duration(*peerCount)*time.Second {
+		timeout = time.Duration(*peerCount) * time.Second
+	}
 	defer state.doneContactingPeers()
-	client, err := client.NewInCluster()
+
+	config, err := restclient.InClusterConfig()
+	if err != nil {
+		log.Fatalf("Unable to create config; error: %v\n", err)
+	}
+	config.ContentType = "application/vnd.kubernetes.protobuf"
+	client, err := client.New(config)
 	if err != nil {
 		log.Fatalf("Unable to create client; error: %v\n", err)
 	}
 	// Double check that that worked by getting the server version.
-	if v, err := client.ServerVersion(); err != nil {
+	if v, err := client.Discovery().ServerVersion(); err != nil {
 		log.Fatalf("Unable to get server version: %v\n", err)
 	} else {
 		log.Printf("Server version: %#v\n", v)
 	}
 
+	for start := time.Now(); time.Since(start) < timeout; time.Sleep(sleepTime) {
+		eps := getWebserverEndpoints(client)
+		if eps.Len() >= *peerCount {
+			break
+		}
+		state.Logf("%v/%v has %v endpoints (%v), which is less than %v as expected. Waiting for all endpoints to come up.", *namespace, *service, len(eps), eps.List(), *peerCount)
+	}
+
 	// Do this repeatedly, in case there's some propagation delay with getting
 	// newly started pods into the endpoints list.
 	for i := 0; i < 15; i++ {
-		endpoints, err := client.Endpoints(*namespace).Get(*service)
-		if err != nil {
-			state.Logf("Unable to read the endpoints for %v/%v: %v; will try again.", *namespace, *service, err)
-			time.Sleep(time.Duration(1+rand.Intn(10)) * time.Second)
-		}
-
-		eps := sets.String{}
-		for _, ss := range endpoints.Subsets {
-			for _, a := range ss.Addresses {
-				for _, p := range ss.Ports {
-					eps.Insert(fmt.Sprintf("http://%s:%d", a.IP, p.Port))
-				}
-			}
-		}
+		eps := getWebserverEndpoints(client)
 		for ep := range eps {
 			state.Logf("Attempting to contact %s", ep)
 			contactSingle(ep, state)
 		}
-
-		time.Sleep(5 * time.Second)
+		time.Sleep(sleepTime)
 	}
+}
+
+//getWebserverEndpoints returns the webserver endpoints as a set of String, each in the format like "http://{ip}:{port}"
+func getWebserverEndpoints(client *client.Client) sets.String {
+	endpoints, err := client.Endpoints(*namespace).Get(*service)
+	eps := sets.String{}
+	if err != nil {
+		state.Logf("Unable to read the endpoints for %v/%v: %v.", *namespace, *service, err)
+		return eps
+	}
+	for _, ss := range endpoints.Subsets {
+		for _, a := range ss.Addresses {
+			for _, p := range ss.Ports {
+				eps.Insert(fmt.Sprintf("http://%s:%d", a.IP, p.Port))
+			}
+		}
+	}
+	return eps
 }
 
 // contactSingle dials the address 'e' and tries to POST to its /write address.

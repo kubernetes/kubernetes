@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,18 +18,16 @@ package flocker
 
 import (
 	"fmt"
-	"path"
-	"strconv"
 	"time"
 
-	flockerclient "github.com/ClusterHQ/flocker-go"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/env"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
-	volumeutil "k8s.io/kubernetes/pkg/volume/util"
+
+	flockerclient "github.com/ClusterHQ/flocker-go"
 )
 
 const (
@@ -61,17 +59,31 @@ type flocker struct {
 	plugin      *flockerPlugin
 }
 
-func (p *flockerPlugin) Init(host volume.VolumeHost) {
+func (p *flockerPlugin) Init(host volume.VolumeHost) error {
 	p.host = host
+	return nil
 }
 
-func (p flockerPlugin) Name() string {
+func (p *flockerPlugin) GetPluginName() string {
 	return flockerPluginName
 }
 
-func (p flockerPlugin) CanSupport(spec *volume.Spec) bool {
+func (p *flockerPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
+	volumeSource, _, err := getVolumeSource(spec)
+	if err != nil {
+		return "", err
+	}
+
+	return volumeSource.DatasetName, nil
+}
+
+func (p *flockerPlugin) CanSupport(spec *volume.Spec) bool {
 	return (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.Flocker != nil) ||
 		(spec.Volume != nil && spec.Volume.Flocker != nil)
+}
+
+func (p *flockerPlugin) RequiresRemount() bool {
+	return false
 }
 
 func (p *flockerPlugin) getFlockerVolumeSource(spec *volume.Spec) (*api.FlockerVolumeSource, bool) {
@@ -84,9 +96,9 @@ func (p *flockerPlugin) getFlockerVolumeSource(spec *volume.Spec) (*api.FlockerV
 	return spec.PersistentVolume.Spec.Flocker, readOnly
 }
 
-func (p *flockerPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions) (volume.Builder, error) {
+func (p *flockerPlugin) NewMounter(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
 	source, readOnly := p.getFlockerVolumeSource(spec)
-	builder := flockerBuilder{
+	mounter := flockerMounter{
 		flocker: &flocker{
 			datasetName: source.DatasetName,
 			pod:         pod,
@@ -97,62 +109,70 @@ func (p *flockerPlugin) NewBuilder(spec *volume.Spec, pod *api.Pod, opts volume.
 		opts:     opts,
 		readOnly: readOnly,
 	}
-	return &builder, nil
+	return &mounter, nil
 }
 
-func (p *flockerPlugin) NewCleaner(datasetName string, podUID types.UID) (volume.Cleaner, error) {
+func (p *flockerPlugin) NewUnmounter(datasetName string, podUID types.UID) (volume.Unmounter, error) {
 	// Flocker agent will take care of this, there is nothing we can do here
 	return nil, nil
 }
 
-type flockerBuilder struct {
+func (p *flockerPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
+	flockerVolume := &api.Volume{
+		Name: volumeName,
+		VolumeSource: api.VolumeSource{
+			Flocker: &api.FlockerVolumeSource{
+				DatasetName: volumeName,
+			},
+		},
+	}
+	return volume.NewSpecFromVolume(flockerVolume), nil
+}
+
+type flockerMounter struct {
 	*flocker
 	client   flockerclient.Clientable
 	exe      exec.Interface
 	opts     volume.VolumeOptions
 	readOnly bool
+	volume.MetricsNil
 }
 
-func (b flockerBuilder) GetAttributes() volume.Attributes {
+func (b flockerMounter) GetAttributes() volume.Attributes {
 	return volume.Attributes{
-		ReadOnly:                    b.readOnly,
-		Managed:                     false,
-		SupportsOwnershipManagement: false,
-		SupportsSELinux:             false,
+		ReadOnly:        b.readOnly,
+		Managed:         false,
+		SupportsSELinux: false,
 	}
 }
-func (b flockerBuilder) GetPath() string {
+func (b flockerMounter) GetPath() string {
 	return b.flocker.path
 }
 
-func (b flockerBuilder) SetUp() error {
-	return b.SetUpAt(b.flocker.datasetName)
+func (b flockerMounter) SetUp(fsGroup *int64) error {
+	return b.SetUpAt(b.flocker.datasetName, fsGroup)
 }
 
 // newFlockerClient uses environment variables and pod attributes to return a
 // flocker client capable of talking with the Flocker control service.
-func (b flockerBuilder) newFlockerClient() (*flockerclient.Client, error) {
-	host := getenvOrFallback("FLOCKER_CONTROL_SERVICE_HOST", defaultHost)
-	portConfig := getenvOrFallback("FLOCKER_CONTROL_SERVICE_PORT", strconv.Itoa(defaultPort))
-	port, err := strconv.Atoi(portConfig)
+func (b flockerMounter) newFlockerClient() (*flockerclient.Client, error) {
+	host := env.GetEnvAsStringOrFallback("FLOCKER_CONTROL_SERVICE_HOST", defaultHost)
+	port, err := env.GetEnvAsIntOrFallback("FLOCKER_CONTROL_SERVICE_PORT", defaultPort)
+
 	if err != nil {
 		return nil, err
 	}
-	caCertPath := getenvOrFallback("FLOCKER_CONTROL_SERVICE_CA_FILE", defaultCACertFile)
-	keyPath := getenvOrFallback("FLOCKER_CONTROL_SERVICE_CLIENT_KEY_FILE", defaultClientKeyFile)
-	certPath := getenvOrFallback("FLOCKER_CONTROL_SERVICE_CLIENT_CERT_FILE", defaultClientCertFile)
+	caCertPath := env.GetEnvAsStringOrFallback("FLOCKER_CONTROL_SERVICE_CA_FILE", defaultCACertFile)
+	keyPath := env.GetEnvAsStringOrFallback("FLOCKER_CONTROL_SERVICE_CLIENT_KEY_FILE", defaultClientKeyFile)
+	certPath := env.GetEnvAsStringOrFallback("FLOCKER_CONTROL_SERVICE_CLIENT_CERT_FILE", defaultClientCertFile)
 
-	c, err := flockerclient.NewClient(host, port, b.flocker.pod.Status.HostIP, caCertPath, keyPath, certPath)
+	hostIP, err := b.plugin.host.GetHostIP()
+	if err != nil {
+		return nil, err
+	}
+
+	c, err := flockerclient.NewClient(host, port, hostIP.String(), caCertPath, keyPath, certPath)
 	return c, err
-}
-
-func (b *flockerBuilder) getMetaDir() string {
-	return path.Join(
-		b.plugin.host.GetPodPluginDir(
-			b.flocker.pod.UID, util.EscapeQualifiedNameForDisk(flockerPluginName),
-		),
-		b.datasetName,
-	)
 }
 
 /*
@@ -166,11 +186,7 @@ control service:
    need to update the Primary UUID for this volume.
 5. Wait until the Primary UUID was updated or timeout.
 */
-func (b flockerBuilder) SetUpAt(dir string) error {
-	if volumeutil.IsReady(b.getMetaDir()) {
-		return nil
-	}
-
+func (b flockerMounter) SetUpAt(dir string, fsGroup *int64) error {
 	if b.client == nil {
 		c, err := b.newFlockerClient()
 		if err != nil {
@@ -198,24 +214,31 @@ func (b flockerBuilder) SetUpAt(dir string) error {
 		if err := b.updateDatasetPrimary(datasetID, primaryUUID); err != nil {
 			return err
 		}
+		newState, err := b.client.GetDatasetState(datasetID)
+		if err != nil {
+			return fmt.Errorf("The volume '%s' migrated unsuccessfully.", datasetID)
+		}
+		b.flocker.path = newState.Path
+	} else {
+		b.flocker.path = s.Path
 	}
 
-	b.flocker.path = s.Path
-	volumeutil.SetReady(b.getMetaDir())
 	return nil
 }
 
 // updateDatasetPrimary will update the primary in Flocker and wait for it to
 // be ready. If it never gets to ready state it will timeout and error.
-func (b flockerBuilder) updateDatasetPrimary(datasetID, primaryUUID string) error {
+func (b flockerMounter) updateDatasetPrimary(datasetID, primaryUUID string) error {
 	// We need to update the primary and wait for it to be ready
 	_, err := b.client.UpdatePrimaryForDataset(primaryUUID, datasetID)
 	if err != nil {
 		return err
 	}
 
-	timeoutChan := time.NewTimer(timeoutWaitingForVolume).C
-	tickChan := time.NewTicker(tickerWaitingForVolume).C
+	timeoutChan := time.NewTimer(timeoutWaitingForVolume)
+	defer timeoutChan.Stop()
+	tickChan := time.NewTicker(tickerWaitingForVolume)
+	defer tickChan.Stop()
 
 	for {
 		if s, err := b.client.GetDatasetState(datasetID); err == nil && s.Primary == primaryUUID {
@@ -223,14 +246,25 @@ func (b flockerBuilder) updateDatasetPrimary(datasetID, primaryUUID string) erro
 		}
 
 		select {
-		case <-timeoutChan:
+		case <-timeoutChan.C:
 			return fmt.Errorf(
 				"Timed out waiting for the dataset_id: '%s' to be moved to the primary: '%s'\n%v",
 				datasetID, primaryUUID, err,
 			)
-		case <-tickChan:
+		case <-tickChan.C:
 			break
 		}
 	}
 
+}
+
+func getVolumeSource(spec *volume.Spec) (*api.FlockerVolumeSource, bool, error) {
+	if spec.Volume != nil && spec.Volume.Flocker != nil {
+		return spec.Volume.Flocker, spec.ReadOnly, nil
+	} else if spec.PersistentVolume != nil &&
+		spec.PersistentVolume.Spec.Flocker != nil {
+		return spec.PersistentVolume.Spec.Flocker, spec.ReadOnly, nil
+	}
+
+	return nil, false, fmt.Errorf("Spec does not reference a Flocker volume type")
 }

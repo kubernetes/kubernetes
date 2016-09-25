@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package unversioned
+package unversioned_test
 
 import (
 	"net/url"
@@ -22,7 +22,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/client/unversioned/testclient/simple"
 )
 
 func TestNamespaceCreate(t *testing.T) {
@@ -30,17 +30,18 @@ func TestNamespaceCreate(t *testing.T) {
 	namespace := &api.Namespace{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 	}
-	c := &testClient{
-		Request: testRequest{
+	c := &simple.Client{
+		Request: simple.Request{
 			Method: "POST",
 			Path:   testapi.Default.ResourcePath("namespaces", "", ""),
 			Body:   namespace,
 		},
-		Response: Response{StatusCode: 200, Body: namespace},
+		Response: simple.Response{StatusCode: 200, Body: namespace},
 	}
 
 	// from the source ns, provision a new global namespace "foo"
 	response, err := c.Setup(t).Namespaces().Create(namespace)
+	defer c.Close()
 
 	if err != nil {
 		t.Errorf("%#v should be nil.", err)
@@ -55,16 +56,17 @@ func TestNamespaceGet(t *testing.T) {
 	namespace := &api.Namespace{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 	}
-	c := &testClient{
-		Request: testRequest{
+	c := &simple.Client{
+		Request: simple.Request{
 			Method: "GET",
 			Path:   testapi.Default.ResourcePath("namespaces", "", "foo"),
 			Body:   nil,
 		},
-		Response: Response{StatusCode: 200, Body: namespace},
+		Response: simple.Response{StatusCode: 200, Body: namespace},
 	}
 
 	response, err := c.Setup(t).Namespaces().Get("foo")
+	defer c.Close()
 
 	if err != nil {
 		t.Errorf("%#v should be nil.", err)
@@ -83,15 +85,16 @@ func TestNamespaceList(t *testing.T) {
 			},
 		},
 	}
-	c := &testClient{
-		Request: testRequest{
+	c := &simple.Client{
+		Request: simple.Request{
 			Method: "GET",
 			Path:   testapi.Default.ResourcePath("namespaces", "", ""),
 			Body:   nil,
 		},
-		Response: Response{StatusCode: 200, Body: namespaceList},
+		Response: simple.Response{StatusCode: 200, Body: namespaceList},
 	}
-	response, err := c.Setup(t).Namespaces().List(unversioned.ListOptions{})
+	response, err := c.Setup(t).Namespaces().List(api.ListOptions{})
+	defer c.Close()
 
 	if err != nil {
 		t.Errorf("%#v should be nil.", err)
@@ -121,13 +124,14 @@ func TestNamespaceUpdate(t *testing.T) {
 			Finalizers: []api.FinalizerName{api.FinalizerKubernetes},
 		},
 	}
-	c := &testClient{
-		Request: testRequest{
+	c := &simple.Client{
+		Request: simple.Request{
 			Method: "PUT",
 			Path:   testapi.Default.ResourcePath("namespaces", "", "foo")},
-		Response: Response{StatusCode: 200, Body: requestNamespace},
+		Response: simple.Response{StatusCode: 200, Body: requestNamespace},
 	}
 	receivedNamespace, err := c.Setup(t).Namespaces().Update(requestNamespace)
+	defer c.Close()
 	c.Validate(t, receivedNamespace, err)
 }
 
@@ -145,34 +149,37 @@ func TestNamespaceFinalize(t *testing.T) {
 			Finalizers: []api.FinalizerName{api.FinalizerKubernetes},
 		},
 	}
-	c := &testClient{
-		Request: testRequest{
+	c := &simple.Client{
+		Request: simple.Request{
 			Method: "PUT",
 			Path:   testapi.Default.ResourcePath("namespaces", "", "foo") + "/finalize",
 		},
-		Response: Response{StatusCode: 200, Body: requestNamespace},
+		Response: simple.Response{StatusCode: 200, Body: requestNamespace},
 	}
 	receivedNamespace, err := c.Setup(t).Namespaces().Finalize(requestNamespace)
+	defer c.Close()
 	c.Validate(t, receivedNamespace, err)
 }
 
 func TestNamespaceDelete(t *testing.T) {
-	c := &testClient{
-		Request:  testRequest{Method: "DELETE", Path: testapi.Default.ResourcePath("namespaces", "", "foo")},
-		Response: Response{StatusCode: 200},
+	c := &simple.Client{
+		Request:  simple.Request{Method: "DELETE", Path: testapi.Default.ResourcePath("namespaces", "", "foo")},
+		Response: simple.Response{StatusCode: 200},
 	}
 	err := c.Setup(t).Namespaces().Delete("foo")
+	defer c.Close()
 	c.Validate(t, nil, err)
 }
 
 func TestNamespaceWatch(t *testing.T) {
-	c := &testClient{
-		Request: testRequest{
+	c := &simple.Client{
+		Request: simple.Request{
 			Method: "GET",
 			Path:   testapi.Default.ResourcePathWithPrefix("watch", "namespaces", "", ""),
 			Query:  url.Values{"resourceVersion": []string{}}},
-		Response: Response{StatusCode: 200},
+		Response: simple.Response{StatusCode: 200},
 	}
-	_, err := c.Setup(t).Namespaces().Watch(unversioned.ListOptions{})
+	_, err := c.Setup(t).Namespaces().Watch(api.ListOptions{})
+	defer c.Close()
 	c.Validate(t, nil, err)
 }

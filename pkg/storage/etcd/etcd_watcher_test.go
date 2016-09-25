@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,7 +20,6 @@ import (
 	rt "runtime"
 	"testing"
 
-	"github.com/coreos/go-etcd/etcd"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -29,6 +28,7 @@ import (
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
 	"k8s.io/kubernetes/pkg/watch"
 
+	etcd "github.com/coreos/etcd/client"
 	"golang.org/x/net/context"
 )
 
@@ -37,7 +37,7 @@ var versioner = APIObjectVersioner{}
 // Implements etcdCache interface as empty methods (i.e. does not cache any objects)
 type fakeEtcdCache struct{}
 
-func (f *fakeEtcdCache) getFromCache(index uint64, filter storage.FilterFunc) (runtime.Object, bool) {
+func (f *fakeEtcdCache) getFromCache(index uint64, filter storage.Filter) (runtime.Object, bool) {
 	return nil, false
 }
 
@@ -46,17 +46,26 @@ func (f *fakeEtcdCache) addToCache(index uint64, obj runtime.Object) {
 
 var _ etcdCache = &fakeEtcdCache{}
 
+// firstLetterIsB implements storage.Filter interface.
+type firstLetterIsB struct {
+}
+
+func (f *firstLetterIsB) Filter(obj runtime.Object) bool {
+	return obj.(*api.Pod).Name[0] == 'b'
+}
+
+func (f *firstLetterIsB) Trigger() []storage.MatchValue {
+	return nil
+}
+
 func TestWatchInterpretations(t *testing.T) {
 	codec := testapi.Default.Codec()
 	// Declare some pods to make the test cases compact.
 	podFoo := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 	podBar := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "bar"}}
 	podBaz := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "baz"}}
-	firstLetterIsB := func(obj runtime.Object) bool {
-		return obj.(*api.Pod).Name[0] == 'b'
-	}
 
-	// All of these test cases will be run with the firstLetterIsB FilterFunc.
+	// All of these test cases will be run with the firstLetterIsB Filter.
 	table := map[string]struct {
 		actions       []string // Run this test item for every action here.
 		prevNodeValue string
@@ -129,7 +138,7 @@ func TestWatchInterpretations(t *testing.T) {
 
 	for name, item := range table {
 		for _, action := range item.actions {
-			w := newEtcdWatcher(true, nil, firstLetterIsB, codec, versioner, nil, &fakeEtcdCache{})
+			w := newEtcdWatcher(true, false, nil, &firstLetterIsB{}, codec, versioner, nil, &fakeEtcdCache{})
 			emitCalled := false
 			w.emit = func(event watch.Event) {
 				emitCalled = true
@@ -167,7 +176,8 @@ func TestWatchInterpretations(t *testing.T) {
 }
 
 func TestWatchInterpretation_ResponseNotSet(t *testing.T) {
-	w := newEtcdWatcher(false, nil, storage.Everything, codec, versioner, nil, &fakeEtcdCache{})
+	_, codec := testScheme(t)
+	w := newEtcdWatcher(false, false, nil, storage.Everything, codec, versioner, nil, &fakeEtcdCache{})
 	w.emit = func(e watch.Event) {
 		t.Errorf("Unexpected emit: %v", e)
 	}
@@ -179,9 +189,10 @@ func TestWatchInterpretation_ResponseNotSet(t *testing.T) {
 }
 
 func TestWatchInterpretation_ResponseNoNode(t *testing.T) {
+	_, codec := testScheme(t)
 	actions := []string{"create", "set", "compareAndSwap", "delete"}
 	for _, action := range actions {
-		w := newEtcdWatcher(false, nil, storage.Everything, codec, versioner, nil, &fakeEtcdCache{})
+		w := newEtcdWatcher(false, false, nil, storage.Everything, codec, versioner, nil, &fakeEtcdCache{})
 		w.emit = func(e watch.Event) {
 			t.Errorf("Unexpected emit: %v", e)
 		}
@@ -193,9 +204,10 @@ func TestWatchInterpretation_ResponseNoNode(t *testing.T) {
 }
 
 func TestWatchInterpretation_ResponseBadData(t *testing.T) {
+	_, codec := testScheme(t)
 	actions := []string{"create", "set", "compareAndSwap", "delete"}
 	for _, action := range actions {
-		w := newEtcdWatcher(false, nil, storage.Everything, codec, versioner, nil, &fakeEtcdCache{})
+		w := newEtcdWatcher(false, false, nil, storage.Everything, codec, versioner, nil, &fakeEtcdCache{})
 		w.emit = func(e watch.Event) {
 			t.Errorf("Unexpected emit: %v", e)
 		}
@@ -215,26 +227,74 @@ func TestWatchInterpretation_ResponseBadData(t *testing.T) {
 	}
 }
 
-/* TODO: So believe it or not... but this test is flakey with the go-etcd client library
- * which I'm surprised by.  Apprently you can close the client that is performing the watch
- * and the watch *never returns.*  I would like to still keep this test here and re-enable
- * with the new 2.2+ client library.
-func TestWatchEtcdError(t *testing.T) {
+func TestSendResultDeleteEventHaveLatestIndex(t *testing.T) {
 	codec := testapi.Default.Codec()
-	server := etcdtesting.NewEtcdTestClientServer(t)
-	h := newEtcdHelper(server.Client, codec, etcdtest.PathPrefix())
-	watching, err := h.Watch(context.TODO(), "/some/key", 4, storage.Everything)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
+	filterFunc := func(obj runtime.Object) bool {
+		return obj.(*api.Pod).Name != "bar"
 	}
-	server.Terminate(t)
+	filter := storage.NewSimpleFilter(filterFunc, storage.NoTriggerFunc)
+	w := newEtcdWatcher(false, false, nil, filter, codec, versioner, nil, &fakeEtcdCache{})
 
-	got := <-watching.ResultChan()
-	if got.Type != watch.Error {
-		t.Fatalf("Unexpected non-error")
+	eventChan := make(chan watch.Event, 1)
+	w.emit = func(e watch.Event) {
+		eventChan <- e
 	}
-	watching.Stop()
-} */
+
+	fooPod := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
+	barPod := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "bar"}}
+	fooBytes, err := runtime.Encode(codec, fooPod)
+	if err != nil {
+		t.Fatalf("Encode failed: %v", err)
+	}
+	barBytes, err := runtime.Encode(codec, barPod)
+	if err != nil {
+		t.Fatalf("Encode failed: %v", err)
+	}
+
+	tests := []struct {
+		response *etcd.Response
+		expRV    string
+	}{{ // Delete event
+		response: &etcd.Response{
+			Action: EtcdDelete,
+			Node: &etcd.Node{
+				ModifiedIndex: 2,
+			},
+			PrevNode: &etcd.Node{
+				Value:         string(fooBytes),
+				ModifiedIndex: 1,
+			},
+		},
+		expRV: "2",
+	}, { // Modify event with uninterested data
+		response: &etcd.Response{
+			Action: EtcdSet,
+			Node: &etcd.Node{
+				Value:         string(barBytes),
+				ModifiedIndex: 2,
+			},
+			PrevNode: &etcd.Node{
+				Value:         string(fooBytes),
+				ModifiedIndex: 1,
+			},
+		},
+		expRV: "2",
+	}}
+
+	for i, tt := range tests {
+		w.sendResult(tt.response)
+		ev := <-eventChan
+		if ev.Type != watch.Deleted {
+			t.Errorf("#%d: event type want=Deleted, get=%s", i, ev.Type)
+			return
+		}
+		rv := ev.Object.(*api.Pod).ResourceVersion
+		if rv != tt.expRV {
+			t.Errorf("#%d: resource version want=%s, get=%s", i, tt.expRV, rv)
+		}
+	}
+	w.Stop()
+}
 
 func TestWatch(t *testing.T) {
 	codec := testapi.Default.Codec()
@@ -243,15 +303,16 @@ func TestWatch(t *testing.T) {
 	key := "/some/key"
 	h := newEtcdHelper(server.Client, codec, etcdtest.PathPrefix())
 
-	watching, err := h.Watch(context.TODO(), key, 0, storage.Everything)
+	watching, err := h.Watch(context.TODO(), key, "0", storage.Everything)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
+	// watching is explicitly closed below.
 
 	// Test normal case
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 	returnObj := &api.Pod{}
-	err = h.Set(context.TODO(), key, pod, returnObj, 0)
+	err = h.Create(context.TODO(), key, pod, returnObj, 0)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -266,8 +327,15 @@ func TestWatch(t *testing.T) {
 
 	watching.Stop()
 
-	if _, open := <-watching.ResultChan(); open {
-		t.Errorf("An injected error did not cause a graceful shutdown")
+	// There is a race in etcdWatcher so that after calling Stop() one of
+	// two things can happen:
+	// - ResultChan() may be closed (triggered by closing userStop channel)
+	// - an Error "context cancelled" may be emitted (triggered by cancelling request
+	//   to etcd and putting that error to etcdError channel)
+	// We need to be prepared for both here.
+	event, open := <-watching.ResultChan()
+	if open && event.Type != watch.Error {
+		t.Errorf("Unexpected event from stopped watcher: %#v", event)
 	}
 }
 
@@ -278,7 +346,7 @@ func emptySubsets() []api.EndpointSubset {
 func makeSubsets(ip string, port int) []api.EndpointSubset {
 	return []api.EndpointSubset{{
 		Addresses: []api.EndpointAddress{{IP: ip}},
-		Ports:     []api.EndpointPort{{Port: port}},
+		Ports:     []api.EndpointPort{{Port: int32(port)}},
 	}}
 }
 
@@ -289,17 +357,18 @@ func TestWatchEtcdState(t *testing.T) {
 	defer server.Terminate(t)
 
 	h := newEtcdHelper(server.Client, codec, etcdtest.PathPrefix())
-	watching, err := h.Watch(context.TODO(), key, 0, storage.Everything)
+	watching, err := h.Watch(context.TODO(), key, "0", storage.Everything)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
+	defer watching.Stop()
 
 	endpoint := &api.Endpoints{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 		Subsets:    emptySubsets(),
 	}
 
-	err = h.Set(context.TODO(), key, endpoint, endpoint, 0)
+	err = h.Create(context.TODO(), key, endpoint, endpoint, 0)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -311,9 +380,18 @@ func TestWatchEtcdState(t *testing.T) {
 
 	subset := makeSubsets("127.0.0.1", 9000)
 	endpoint.Subsets = subset
+	endpoint.ResourceVersion = ""
 
 	// CAS the previous value
-	err = h.Set(context.TODO(), key, endpoint, endpoint, 0)
+	updateFn := func(input runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
+		newObj, err := api.Scheme.DeepCopy(endpoint)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+			return nil, nil, err
+		}
+		return newObj.(*api.Endpoints), nil, nil
+	}
+	err = h.GuaranteedUpdate(context.TODO(), key, &api.Endpoints{}, false, nil, updateFn)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -324,10 +402,8 @@ func TestWatchEtcdState(t *testing.T) {
 	}
 
 	if e, a := endpoint, event.Object; !api.Semantic.DeepDerivative(e, a) {
-		t.Errorf("%s: expected %v, got %v", e, a)
+		t.Errorf("Unexpected error: expected %#v, got %#v", e, a)
 	}
-
-	watching.Stop()
 }
 
 func TestWatchFromZeroIndex(t *testing.T) {
@@ -341,22 +417,28 @@ func TestWatchFromZeroIndex(t *testing.T) {
 	h := newEtcdHelper(server.Client, codec, etcdtest.PathPrefix())
 
 	// set before the watch and verify events
-	err := h.Set(context.TODO(), key, pod, pod, 0)
+	err := h.Create(context.TODO(), key, pod, pod, 0)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
+	pod.ResourceVersion = ""
 
 	// check for concatenation on watch event with CAS
-	pod.Name = "bar"
-	err = h.Set(context.TODO(), key, pod, pod, 0)
+	updateFn := func(input runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
+		pod := input.(*api.Pod)
+		pod.Name = "bar"
+		return pod, nil, nil
+	}
+	err = h.GuaranteedUpdate(context.TODO(), key, &api.Pod{}, false, nil, updateFn)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	watching, err := h.Watch(context.TODO(), key, 0, storage.Everything)
+	watching, err := h.Watch(context.TODO(), key, "0", storage.Everything)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
+	defer watching.Stop()
 
 	// marked as modified b/c of concatenation
 	event := <-watching.ResultChan()
@@ -364,7 +446,13 @@ func TestWatchFromZeroIndex(t *testing.T) {
 		t.Errorf("Unexpected event %#v", event)
 	}
 
-	err = h.Set(context.TODO(), key, pod, pod, 0)
+	pod.Name = "baz"
+	updateFn = func(input runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
+		pod := input.(*api.Pod)
+		pod.Name = "baz"
+		return pod, nil, nil
+	}
+	err = h.GuaranteedUpdate(context.TODO(), key, &api.Pod{}, false, nil, updateFn)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -375,10 +463,8 @@ func TestWatchFromZeroIndex(t *testing.T) {
 	}
 
 	if e, a := pod, event.Object; !api.Semantic.DeepDerivative(e, a) {
-		t.Errorf("%s: expected %v, got %v", e, a)
+		t.Errorf("Unexpected error: expected %#v, got %#v", e, a)
 	}
-
-	watching.Stop()
 }
 
 func TestWatchListFromZeroIndex(t *testing.T) {
@@ -388,10 +474,11 @@ func TestWatchListFromZeroIndex(t *testing.T) {
 	defer server.Terminate(t)
 	h := newEtcdHelper(server.Client, codec, key)
 
-	watching, err := h.WatchList(context.TODO(), key, 0, storage.Everything)
+	watching, err := h.WatchList(context.TODO(), key, "0", storage.Everything)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
+	defer watching.Stop()
 
 	// creates key/foo which should trigger the WatchList for "key"
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
@@ -406,10 +493,8 @@ func TestWatchListFromZeroIndex(t *testing.T) {
 	}
 
 	if e, a := pod, event.Object; !api.Semantic.DeepDerivative(e, a) {
-		t.Errorf("%s: expected %v, got %v", e, a)
+		t.Errorf("Unexpected error: expected %v, got %v", e, a)
 	}
-
-	watching.Stop()
 }
 
 func TestWatchListIgnoresRootKey(t *testing.T) {
@@ -420,10 +505,11 @@ func TestWatchListIgnoresRootKey(t *testing.T) {
 	defer server.Terminate(t)
 	h := newEtcdHelper(server.Client, codec, key)
 
-	watching, err := h.WatchList(context.TODO(), key, 0, storage.Everything)
+	watching, err := h.WatchList(context.TODO(), key, "0", storage.Everything)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
+	defer watching.Stop()
 
 	// creates key/foo which should trigger the WatchList for "key"
 	err = h.Create(context.TODO(), key, pod, pod, 0)
@@ -440,18 +526,17 @@ func TestWatchListIgnoresRootKey(t *testing.T) {
 	default:
 		// fall through, expected behavior
 	}
-
-	watching.Stop()
 }
 
 func TestWatchPurposefulShutdown(t *testing.T) {
+	_, codec := testScheme(t)
 	server := etcdtesting.NewEtcdTestClientServer(t)
 	defer server.Terminate(t)
 	key := "/some/key"
 	h := newEtcdHelper(server.Client, codec, etcdtest.PathPrefix())
 
 	// Test purposeful shutdown
-	watching, err := h.Watch(context.TODO(), key, 0, storage.Everything)
+	watching, err := h.Watch(context.TODO(), key, "0", storage.Everything)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -459,7 +544,14 @@ func TestWatchPurposefulShutdown(t *testing.T) {
 	watching.Stop()
 	rt.Gosched()
 
-	if _, open := <-watching.ResultChan(); open {
-		t.Errorf("Channel should be closed")
+	// There is a race in etcdWatcher so that after calling Stop() one of
+	// two things can happen:
+	// - ResultChan() may be closed (triggered by closing userStop channel)
+	// - an Error "context cancelled" may be emitted (triggered by cancelling request
+	//   to etcd and putting that error to etcdError channel)
+	// We need to be prepared for both here.
+	event, open := <-watching.ResultChan()
+	if open && event.Type != watch.Error {
+		t.Errorf("Unexpected event from stopped watcher: %#v", event)
 	}
 }

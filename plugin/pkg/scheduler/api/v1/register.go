@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,13 +26,23 @@ import (
 // TODO this should be in the "scheduler" group
 var SchemeGroupVersion = unversioned.GroupVersion{Group: "", Version: "v1"}
 
-// Codec encodes internal objects to the v1 scheme
-var Codec = runtime.CodecFor(api.Scheme, SchemeGroupVersion.String())
-
 func init() {
-	api.Scheme.AddKnownTypes(SchemeGroupVersion,
-		&Policy{},
-	)
+	if err := addKnownTypes(api.Scheme); err != nil {
+		// Programmer error.
+		panic(err)
+	}
 }
 
-func (*Policy) IsAnAPIObject() {}
+var (
+	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)
+	AddToScheme   = SchemeBuilder.AddToScheme
+)
+
+func addKnownTypes(scheme *runtime.Scheme) error {
+	scheme.AddKnownTypes(SchemeGroupVersion,
+		&Policy{},
+	)
+	return nil
+}
+
+func (obj *Policy) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }

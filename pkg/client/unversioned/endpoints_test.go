@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,21 +14,21 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package unversioned
+package unversioned_test
 
 import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/client/unversioned/testclient/simple"
 )
 
 func TestListEndpoints(t *testing.T) {
 	ns := api.NamespaceDefault
-	c := &testClient{
-		Request: testRequest{Method: "GET", Path: testapi.Default.ResourcePath("endpoints", ns, ""), Query: buildQueryValues(nil)},
-		Response: Response{StatusCode: 200,
+	c := &simple.Client{
+		Request: simple.Request{Method: "GET", Path: testapi.Default.ResourcePath("endpoints", ns, ""), Query: simple.BuildQueryValues(nil)},
+		Response: simple.Response{StatusCode: 200,
 			Body: &api.EndpointsList{
 				Items: []api.Endpoints{
 					{
@@ -42,26 +42,29 @@ func TestListEndpoints(t *testing.T) {
 			},
 		},
 	}
-	receivedEndpointsList, err := c.Setup(t).Endpoints(ns).List(unversioned.ListOptions{})
+	receivedEndpointsList, err := c.Setup(t).Endpoints(ns).List(api.ListOptions{})
+	defer c.Close()
 	c.Validate(t, receivedEndpointsList, err)
 }
 
 func TestGetEndpoints(t *testing.T) {
 	ns := api.NamespaceDefault
-	c := &testClient{
-		Request:  testRequest{Method: "GET", Path: testapi.Default.ResourcePath("endpoints", ns, "endpoint-1"), Query: buildQueryValues(nil)},
-		Response: Response{StatusCode: 200, Body: &api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "endpoint-1"}}},
+	c := &simple.Client{
+		Request:  simple.Request{Method: "GET", Path: testapi.Default.ResourcePath("endpoints", ns, "endpoint-1"), Query: simple.BuildQueryValues(nil)},
+		Response: simple.Response{StatusCode: 200, Body: &api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "endpoint-1"}}},
 	}
 	response, err := c.Setup(t).Endpoints(ns).Get("endpoint-1")
+	defer c.Close()
 	c.Validate(t, response, err)
 }
 
 func TestGetEndpointWithNoName(t *testing.T) {
 	ns := api.NamespaceDefault
-	c := &testClient{Error: true}
+	c := &simple.Client{Error: true}
 	receivedPod, err := c.Setup(t).Endpoints(ns).Get("")
-	if (err != nil) && (err.Error() != nameRequiredError) {
-		t.Errorf("Expected error: %v, but got %v", nameRequiredError, err)
+	defer c.Close()
+	if (err != nil) && (err.Error() != simple.NameRequiredError) {
+		t.Errorf("Expected error: %v, but got %v", simple.NameRequiredError, err)
 	}
 
 	c.Validate(t, receivedPod, err)

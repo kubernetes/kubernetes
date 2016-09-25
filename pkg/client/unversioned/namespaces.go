@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,7 +20,6 @@ import (
 	"fmt"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -31,10 +30,10 @@ type NamespacesInterface interface {
 type NamespaceInterface interface {
 	Create(item *api.Namespace) (*api.Namespace, error)
 	Get(name string) (result *api.Namespace, err error)
-	List(opts unversioned.ListOptions) (*api.NamespaceList, error)
+	List(opts api.ListOptions) (*api.NamespaceList, error)
 	Delete(name string) error
 	Update(item *api.Namespace) (*api.Namespace, error)
-	Watch(opts unversioned.ListOptions) (watch.Interface, error)
+	Watch(opts api.ListOptions) (watch.Interface, error)
 	Finalize(item *api.Namespace) (*api.Namespace, error)
 	Status(item *api.Namespace) (*api.Namespace, error)
 }
@@ -57,11 +56,11 @@ func (c *namespaces) Create(namespace *api.Namespace) (*api.Namespace, error) {
 }
 
 // List lists all the namespaces in the cluster.
-func (c *namespaces) List(opts unversioned.ListOptions) (*api.NamespaceList, error) {
+func (c *namespaces) List(opts api.ListOptions) (*api.NamespaceList, error) {
 	result := &api.NamespaceList{}
 	err := c.r.Get().
 		Resource("namespaces").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Do().Into(result)
 	return result, err
 }
@@ -69,10 +68,6 @@ func (c *namespaces) List(opts unversioned.ListOptions) (*api.NamespaceList, err
 // Update takes the representation of a namespace to update.  Returns the server's representation of the namespace, and an error, if it occurs.
 func (c *namespaces) Update(namespace *api.Namespace) (result *api.Namespace, err error) {
 	result = &api.Namespace{}
-	if len(namespace.ResourceVersion) == 0 {
-		err = fmt.Errorf("invalid update object, missing resource version: %v", namespace)
-		return
-	}
 	err = c.r.Put().Resource("namespaces").Name(namespace.Name).Body(namespace).Do().Into(result)
 	return
 }
@@ -112,10 +107,10 @@ func (c *namespaces) Delete(name string) error {
 }
 
 // Watch returns a watch.Interface that watches the requested namespaces.
-func (c *namespaces) Watch(opts unversioned.ListOptions) (watch.Interface, error) {
+func (c *namespaces) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.r.Get().
 		Prefix("watch").
 		Resource("namespaces").
-		VersionedParams(&opts, api.Scheme).
+		VersionedParams(&opts, api.ParameterCodec).
 		Watch()
 }

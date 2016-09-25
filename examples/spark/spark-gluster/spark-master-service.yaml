@@ -2,6 +2,7 @@ kind: Service
 apiVersion: v1
 metadata:
   name: spark-master
+  namespace: spark-cluster
   labels:
     component: spark-master-service
 spec:

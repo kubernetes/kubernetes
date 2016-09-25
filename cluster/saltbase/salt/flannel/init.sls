@@ -6,7 +6,7 @@ flannel-tar:
     - user: root
     - name: /usr/local/src
     - makedirs: True
-    - source: https://github.com/coreos/flannel/releases/download/v0.5.5/flannel-0.5.5-linux-amd64.tar.gz
+    - source: https://storage.googleapis.com/kubernetes-release/flannel/flannel-0.5.5-linux-amd64.tar.gz
     - tar_options: v
     - source_hash: md5=972c717254775bef528f040af804f2cc
     - archive_format: tar

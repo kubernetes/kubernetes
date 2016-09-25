@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ import (
 	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/runtime"
 )
 
 const (
@@ -42,6 +42,6 @@ var registerMetrics sync.Once
 func Register() {
 	registerMetrics.Do(func() {
 		prometheus.MustRegister(panicCounter)
-		util.PanicHandlers = append(util.PanicHandlers, func(interface{}) { panicCounter.Inc() })
+		runtime.PanicHandlers = append(runtime.PanicHandlers, func(interface{}) { panicCounter.Inc() })
 	})
 }

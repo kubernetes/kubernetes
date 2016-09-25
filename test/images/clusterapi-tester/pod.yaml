@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: clusterapi-tester
+spec:
+  containers:
+  - image: gcr.io/google_containers/clusterapi-tester:1.0
+    name: clusterapi-tester
+    readinessProbe:
+      httpGet:
+        path: /healthz
+        port: 8080
+        scheme: HTTP
+      initialDelaySeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 3
+      periodSeconds: 10
+      successThreshold: 1
+  restartPolicy: OnFailure

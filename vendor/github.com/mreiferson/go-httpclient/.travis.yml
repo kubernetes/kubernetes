@@ -1,0 +1,11 @@
+language: go
+go:
+  - 1.1
+install:
+  - go get github.com/bmizerany/assert
+script:
+  - pushd $TRAVIS_BUILD_DIR
+  - go test
+  - popd
+notifications:
+  email: false

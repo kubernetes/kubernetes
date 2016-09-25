@@ -2,15 +2,15 @@
 
 <!-- BEGIN STRIP_FOR_RELEASE -->
 
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
 
 <h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
@@ -18,9 +18,10 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.1/docs/devel/README.md).
+[here](http://releases.k8s.io/release-1.4/docs/devel/README.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -47,6 +48,8 @@ Guide](../admin/README.md).
 
 * **Pull Request Process** ([pull-requests.md](pull-requests.md)): When and why pull requests are closed.
 
+* **Kubernetes On-Call Rotations** ([on-call-rotations.md](on-call-rotations.md)): Descriptions of on-call rotations for build and end-user support.
+
 * **Faster PR reviews** ([faster_reviews.md](faster_reviews.md)): How to get faster PR reviews.
 
 * **Getting Recent Builds** ([getting-builds.md](getting-builds.md)): How to get recent builds including the latest builds that pass CI.
@@ -61,7 +64,7 @@ Guide](../admin/README.md).
 * **Hunting flaky tests** ([flaky-tests.md](flaky-tests.md)): We have a goal of 99.9% flake free tests.
   Here's how to run your tests many times.
 
-* **Logging Conventions** ([logging.md](logging.md)]: Glog levels.
+* **Logging Conventions** ([logging.md](logging.md)): Glog levels.
 
 * **Profiling Kubernetes** ([profiling.md](profiling.md)): How to plug in go pprof profiler to Kubernetes.
 
@@ -72,10 +75,16 @@ Guide](../admin/README.md).
 * **Coding Conventions** ([coding-conventions.md](coding-conventions.md)):
   Coding style advice for contributors.
 
+* **Document Conventions** ([how-to-doc.md](how-to-doc.md))
+  Document style advice for contributors.
+
+* **Running a cluster locally** ([running-locally.md](running-locally.md)):
+  A fast and lightweight local cluster deployment for development.
 
 ## Developing against the Kubernetes API
 
-* API objects are explained at [http://kubernetes.io/third_party/swagger-ui/](http://kubernetes.io/third_party/swagger-ui/).
+* The [REST API documentation](../api-reference/README.md) explains the REST
+  API exposed by apiserver.
 
 * **Annotations** ([docs/user-guide/annotations.md](../user-guide/annotations.md)): are for attaching arbitrary non-identifying metadata to objects.
   Programs that automate Kubernetes objects may use annotations to store small amounts of their state.
@@ -101,11 +110,7 @@ Guide](../admin/README.md).
 
 ## Building releases
 
-* **Making release notes** ([making-release-notes.md](making-release-notes.md)): Generating release nodes for a new release.
-
-* **Releasing Kubernetes** ([releasing.md](releasing.md)): How to create a Kubernetes release (as in version)
-  and how the version information gets embedded into the built binaries.
-
+See the [kubernetes/release](https://github.com/kubernetes/release) repository for details on creating releases and related tools and helper scripts.
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/README.md?pixel)]()

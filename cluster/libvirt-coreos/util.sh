@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2014 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,15 +16,20 @@
 
 # A library of helper functions that each provider hosting Kubernetes must implement to use cluster/kube-*.sh scripts.
 
+[ ! -z ${UTIL_SH_DEBUG+x} ] && set -x
+
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 readonly ROOT=$(dirname "${BASH_SOURCE}")
 source "$ROOT/${KUBE_CONFIG_FILE:-"config-default.sh"}"
 source "$KUBE_ROOT/cluster/common.sh"
 
 export LIBVIRT_DEFAULT_URI=qemu:///system
-
+export SERVICE_ACCOUNT_LOOKUP=${SERVICE_ACCOUNT_LOOKUP:-false}
+export ADMISSION_CONTROL=${ADMISSION_CONTROL:-NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,ResourceQuota}
 readonly POOL=kubernetes
-readonly POOL_PATH="$(cd $ROOT && pwd)/libvirt_storage_pool"
+readonly POOL_PATH=/var/lib/libvirt/images/kubernetes
+
+[ ! -d "${POOL_PATH}" ] && (echo "$POOL_PATH" does not exist ; exit 1 )
 
 # join <delim> <list...>
 # Concatenates the list elements with the delimiter passed as first parameter
@@ -50,6 +55,41 @@ function detect-master {
 function detect-nodes {
   KUBE_NODE_IP_ADDRESSES=("${NODE_IPS[@]}")
 }
+
+function generate_certs {
+    node_names=("${@}")
+    #Root-CA
+    tempdir=$(mktemp -d)
+    CA_KEY=${CA_KEY:-"$tempdir/ca-key.pem"}
+    CA_CERT=${CA_CERT:-"$tempdir/ca.pem"}
+    openssl genrsa -out "${CA_KEY}" 2048 2>/dev/null
+    openssl req -x509 -new -nodes -key "${CA_KEY}" -days 10000 -out "${CA_CERT}" -subj "/CN=kube-ca"  2>/dev/null
+
+    #API server key pair
+    KUBE_KEY=${KUBE_KEY:-"$tempdir/apiserver-key.pem"}
+    API_SERVER_CERT_REQ=${API_SERVER_CERT_REQ:-"$tempdir/apiserver.csr"}
+    openssl genrsa -out "${KUBE_KEY}" 2048 2>/dev/null
+    KUBERNETES_SVC=${SERVICE_CLUSTER_IP_RANGE%.*}.1 openssl req -new -key "${KUBE_KEY}" -out "${API_SERVER_CERT_REQ}" -subj "/CN=kube-apiserver" -config cluster/libvirt-coreos/openssl.cnf 2>/dev/null
+    KUBE_CERT=${KUBE_CERT:-"$tempdir/apiserver.pem"}
+    KUBERNETES_SVC=${SERVICE_CLUSTER_IP_RANGE%.*}.1 openssl x509 -req -in "${API_SERVER_CERT_REQ}" -CA "${CA_CERT}" -CAkey "${CA_KEY}" -CAcreateserial -out "${KUBE_CERT}" -days 365 -extensions v3_req -extfile  cluster/libvirt-coreos/openssl.cnf 2>/dev/null
+
+    #Copy apiserver and controller tsl assets
+    mkdir -p  "$POOL_PATH/kubernetes/certs"
+    cp "${KUBE_CERT}" "$POOL_PATH/kubernetes/certs"
+    cp "${KUBE_KEY}"  "$POOL_PATH/kubernetes/certs"
+    cp "${CA_CERT}" "$POOL_PATH/kubernetes/certs"
+
+    #Generate nodes certificate
+    for (( i = 0 ; i < $NUM_NODES ; i++ )); do
+        openssl genrsa -out $tempdir/${node_names[$i]}-node-key.pem 2048 2>/dev/null
+        cp "$tempdir/${node_names[$i]}-node-key.pem" "$POOL_PATH/kubernetes/certs"
+        WORKER_IP=${NODE_IPS[$i]} openssl req -new -key $tempdir/${node_names[$i]}-node-key.pem -out $tempdir/${node_names[$i]}-node.csr -subj "/CN=${node_names[$i]}" -config  cluster/libvirt-coreos/node-openssl.cnf 2>/dev/null
+        WORKER_IP=${NODE_IPS[$i]} openssl x509 -req -in $tempdir/${node_names[$i]}-node.csr -CA "${CA_CERT}" -CAkey "${CA_KEY}" -CAcreateserial -out $tempdir/${node_names[$i]}-node.pem -days 365 -extensions v3_req -extfile  cluster/libvirt-coreos/node-openssl.cnf 2>/dev/null
+        cp "$tempdir/${node_names[$i]}-node.pem" "$POOL_PATH/kubernetes/certs"
+    done
+    echo "TLS assets generated..."
+}
+
 
 # Verify prereqs on host machine
 function verify-prereqs {
@@ -116,12 +156,11 @@ function initialize-pool {
   if [[ "$ROOT/coreos_production_qemu_image.img.bz2" -nt "$POOL_PATH/coreos_base.img" ]]; then
       bunzip2 -f -k "$ROOT/coreos_production_qemu_image.img.bz2"
       virsh vol-delete coreos_base.img --pool $POOL 2> /dev/null || true
-      mv "$ROOT/coreos_production_qemu_image.img" "$POOL_PATH/coreos_base.img"
   fi
-  # if ! virsh vol-list $POOL | grep -q coreos_base.img; then
-  #     virsh vol-create-as $POOL coreos_base.img 10G --format qcow2
-  #     virsh vol-upload coreos_base.img "$ROOT/coreos_production_qemu_image.img" --pool $POOL
-  # fi
+  if ! virsh vol-list $POOL | grep -q coreos_base.img; then
+      virsh vol-create-as $POOL coreos_base.img 10G --format qcow2
+      virsh vol-upload coreos_base.img "$ROOT/coreos_production_qemu_image.img" --pool $POOL
+  fi
 
   mkdir -p "$POOL_PATH/kubernetes"
   kube-push-internal
@@ -137,6 +176,7 @@ function initialize-pool {
 
   mkdir -p "$POOL_PATH/kubernetes/addons"
   if [[ "$ENABLE_CLUSTER_DNS" == "true" ]]; then
+      render-template "$ROOT/namespace.yaml" > "$POOL_PATH/kubernetes/addons/namespace.yaml"
       render-template "$ROOT/skydns-svc.yaml" > "$POOL_PATH/kubernetes/addons/skydns-svc.yaml"
       render-template "$ROOT/skydns-rc.yaml"  > "$POOL_PATH/kubernetes/addons/skydns-rc.yaml"
   fi
@@ -183,11 +223,12 @@ function wait-cluster-readiness {
 function kube-up {
   detect-master
   detect-nodes
-  load-or-gen-kube-bearertoken
   initialize-pool keep_base_image
+  generate_certs "${NODE_NAMES[@]}"
   initialize-network
 
-  readonly ssh_keys="$(cat ~/.ssh/id_*.pub | sed 's/^/  - /')"
+
+  readonly ssh_keys="$(cat ~/.ssh/*.pub | sed 's/^/  - /')"
   readonly kubernetes_dir="$POOL_PATH/kubernetes"
 
   local i
@@ -298,7 +339,7 @@ function test-build-release {
 
 # Execute prior to running tests to initialize required structure
 function test-setup {
-  echo "TODO"
+  "${KUBE_ROOT}/cluster/kube-up.sh"
 }
 
 # Execute after running tests to perform any required clean-up
@@ -327,17 +368,7 @@ function ssh-to-node {
   if [[ -z "$machine" ]]; then
       echo "$node is an unknown machine to ssh to" >&2
   fi
-  ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ControlMaster=no "core@$machine" "$cmd"
-}
-
-# Restart the kube-proxy on a node ($1)
-function restart-kube-proxy {
-  ssh-to-node "$1" "sudo systemctl restart kube-proxy"
-}
-
-# Restart the apiserver
-function restart-apiserver {
-  ssh-to-node "$1" "sudo systemctl restart kube-apiserver"
+  ssh -o ConnectTimeout=30 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ControlMaster=no "core@$machine" "$cmd"
 }
 
 # Perform preparations required to run e2e tests
