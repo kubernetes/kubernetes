@@ -25,6 +25,7 @@ import (
 	"github.com/golang/glog"
 
 	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	"k8s.io/kubernetes/pkg/kubelet/qos"
 )
 
 const (
@@ -32,7 +33,6 @@ const (
 
 	// Various default sandbox resources requests/limits.
 	defaultSandboxCPUshares int64 = 2
-	defaultSandboxOOMScore  int   = -999
 
 	// Termination grace period
 	defaultSandboxGracePeriod int = 10
@@ -263,5 +263,6 @@ func setSandboxResources(hc *dockercontainer.HostConfig) {
 		CPUShares:  defaultSandboxCPUshares,
 		// Use docker's default cpu quota/period.
 	}
-	hc.OomScoreAdj = defaultSandboxOOMScore
+	// TODO: Get rid of the dependency on kubelet internal package.
+	hc.OomScoreAdj = qos.PodInfraOOMAdj
 }

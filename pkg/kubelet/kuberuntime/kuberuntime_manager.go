@@ -24,6 +24,7 @@ import (
 
 	"github.com/coreos/go-semver/semver"
 	"github.com/golang/glog"
+	cadvisorapi "github.com/google/cadvisor/info/v1"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/record"
@@ -68,6 +69,9 @@ type kubeGenericRuntimeManager struct {
 	osInterface         kubecontainer.OSInterface
 	containerRefManager *kubecontainer.RefManager
 
+	// machineInfo contains the machine information.
+	machineInfo *cadvisorapi.MachineInfo
+
 	// Container GC manager
 	containerGC *containerGC
 
@@ -102,6 +106,7 @@ func NewKubeGenericRuntimeManager(
 	recorder record.EventRecorder,
 	livenessManager proberesults.Manager,
 	containerRefManager *kubecontainer.RefManager,
+	machineInfo *cadvisorapi.MachineInfo,
 	podGetter podGetter,
 	osInterface kubecontainer.OSInterface,
 	networkPlugin network.NetworkPlugin,
@@ -120,6 +125,7 @@ func NewKubeGenericRuntimeManager(
 		cpuCFSQuota:         cpuCFSQuota,
 		livenessManager:     livenessManager,
 		containerRefManager: containerRefManager,
+		machineInfo:         machineInfo,
 		osInterface:         osInterface,
 		networkPlugin:       networkPlugin,
 		runtimeHelper:       runtimeHelper,
