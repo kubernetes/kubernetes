@@ -62,7 +62,7 @@ var (
 
 // NewCmdConvert creates a command object for the generic "convert" action, which
 // translates the config file into a given version.
-func NewCmdConvert(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+func NewCmdConvert(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &ConvertOptions{}
 
 	cmd := &cobra.Command{
@@ -103,7 +103,7 @@ type ConvertOptions struct {
 }
 
 // Complete collects information required to run Convert command from command line.
-func (o *ConvertOptions) Complete(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) (err error) {
+func (o *ConvertOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) (err error) {
 	o.outputVersion, err = cmdutil.OutputVersion(cmd, &registered.EnabledVersionsForGroup(api.GroupName)[0])
 	if err != nil {
 		return err
