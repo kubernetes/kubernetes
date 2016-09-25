@@ -107,21 +107,34 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(pod *api.Pod, attem
 		// TODO: refactor kubelet to get cgroup parent for pod instead of containers
 		cgroupParent = opts.CgroupParent
 	}
-	podSandboxConfig.Linux = generatePodSandboxLinuxConfig(pod, cgroupParent)
 	if len(portMappings) > 0 {
 		podSandboxConfig.PortMappings = portMappings
 	}
+
+	linuxOpts, err := generatePodSandboxLinuxConfig(pod, cgroupParent, m.seccompProfileRoot)
+	if err != nil {
+		return nil, err
+	}
+	podSandboxConfig.Linux = linuxOpts
 
 	return podSandboxConfig, nil
 }
 
 // generatePodSandboxLinuxConfig generates LinuxPodSandboxConfig from api.Pod.
-func generatePodSandboxLinuxConfig(pod *api.Pod, cgroupParent string) *runtimeApi.LinuxPodSandboxConfig {
+func generatePodSandboxLinuxConfig(pod *api.Pod, cgroupParent, seccompProfileRoot string) (*runtimeApi.LinuxPodSandboxConfig, error) {
 	if pod.Spec.SecurityContext == nil && cgroupParent == "" {
-		return nil
+		return nil, nil
 	}
 
 	linuxPodSandboxConfig := &runtimeApi.LinuxPodSandboxConfig{}
+	if profile, ok := pod.Annotations[api.SeccompPodAnnotationKey]; ok {
+		seccompProfile, err := getSeccompProfile(profile, seccompProfileRoot)
+		if err != nil {
+			return nil, err
+		}
+		linuxPodSandboxConfig.SeccompProfile = &seccompProfile
+	}
+
 	if pod.Spec.SecurityContext != nil {
 		securityContext := pod.Spec.SecurityContext
 		linuxPodSandboxConfig.NamespaceOptions = &runtimeApi.NamespaceOption{
@@ -135,7 +148,7 @@ func generatePodSandboxLinuxConfig(pod *api.Pod, cgroupParent string) *runtimeAp
 		linuxPodSandboxConfig.CgroupParent = &cgroupParent
 	}
 
-	return linuxPodSandboxConfig
+	return linuxPodSandboxConfig, nil
 }
 
 // getKubeletSandboxes lists all (or just the running) sandboxes managed by kubelet.

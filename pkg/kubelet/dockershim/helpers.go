@@ -26,8 +26,8 @@ import (
 	dockerapiversion "github.com/docker/engine-api/types/versions"
 	dockernat "github.com/docker/go-connections/nat"
 	"github.com/golang/glog"
-
 	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	"k8s.io/kubernetes/pkg/security/apparmor"
 )
 
 const (
@@ -179,12 +179,28 @@ func makePortsAndBindings(pm []*runtimeApi.PortMapping) (map[dockernat.Port]stru
 	return exposedPorts, portBindings
 }
 
-// TODO: Seccomp support. Need to figure out how to pass seccomp options
-// through the runtime API (annotations?).See dockerManager.getSecurityOpts()
-// for the details. Always set the default seccomp profile for now.
-// Also need to support syntax for different docker versions.
-func getSeccompOpts() string {
-	return fmt.Sprintf("%s=%s", "seccomp", defaultSeccompProfile)
+// getSeccompOpts gets seccomp options for docker container.
+func getSeccompOpts(profile *string) string {
+	if profile == nil || *profile == "" || *profile == "unconfined" {
+		return fmt.Sprintf("%s=%s", "seccomp", defaultSeccompProfile)
+	}
+
+	if *profile == "docker/default" {
+		// return null so docker will load the default seccomp profile
+		return ""
+	}
+
+	return fmt.Sprintf("%s=%s", "seccomp", *profile)
+}
+
+// getApparmorOpts gets apparmor options for docker container.
+func getApparmorOpts(profile *string) string {
+	if profile == nil || *profile == "" || *profile == apparmor.ProfileRuntimeDefault {
+		// The docker applies the default profile by default.
+		return ""
+	}
+
+	return fmt.Sprintf("%s=%s", "apparmor", *profile)
 }
 
 func getNetworkNamespace(c *dockertypes.ContainerJSON) string {

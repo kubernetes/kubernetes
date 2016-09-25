@@ -163,10 +163,17 @@ func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeApi
 			}
 			hc.OomScoreAdj = int(rOpts.GetOomScoreAdj())
 		}
+
+		if seccompOpts := getSeccompOpts(lc.SeccompProfile); seccompOpts != "" {
+			hc.SecurityOpt = append(hc.SecurityOpt, seccompOpts)
+		}
+		if apparmorOpts := getApparmorOpts(lc.ApparmorProfile); apparmorOpts != "" {
+			hc.SecurityOpt = append(hc.SecurityOpt, apparmorOpts)
+		}
+
 		// Note: ShmSize is handled in kube_docker_client.go
 	}
 
-	hc.SecurityOpt = []string{getSeccompOpts()}
 	// TODO: Add or drop capabilities.
 
 	createConfig.HostConfig = hc
