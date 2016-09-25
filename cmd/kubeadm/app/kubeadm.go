@@ -19,8 +19,8 @@ package app
 import (
 	"fmt"
 	"os"
-	"strings"
 	"runtime"
+	"strings"
 
 	"github.com/renstrom/dedent"
 	"github.com/spf13/pflag"
