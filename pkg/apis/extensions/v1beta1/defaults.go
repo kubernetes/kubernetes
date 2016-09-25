@@ -71,7 +71,7 @@ func SetDefaults_Deployment(obj *Deployment) {
 	if strategy.Type == "" {
 		strategy.Type = RollingUpdateDeploymentStrategyType
 	}
-	if strategy.Type == RollingUpdateDeploymentStrategyType {
+	if strategy.Type == RollingUpdateDeploymentStrategyType || strategy.RollingUpdate != nil {
 		if strategy.RollingUpdate == nil {
 			rollingUpdate := RollingUpdateDeployment{}
 			strategy.RollingUpdate = &rollingUpdate
