@@ -60,7 +60,7 @@ var (
 		cat pod.json | kubectl apply -f -`)
 )
 
-func NewCmdApply(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+func NewCmdApply(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &resource.FilenameOptions{}
 
 	cmd := &cobra.Command{
@@ -94,7 +94,7 @@ func validateArgs(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func RunApply(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *resource.FilenameOptions) error {
+func RunApply(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *resource.FilenameOptions) error {
 	shortOutput := cmdutil.GetFlagString(cmd, "output") == "name"
 	schema, err := f.Validator(cmdutil.GetFlagBool(cmd, "validate"), cmdutil.GetFlagString(cmd, "schema-cache-dir"))
 	if err != nil {
