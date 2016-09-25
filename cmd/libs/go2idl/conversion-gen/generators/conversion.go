@@ -36,6 +36,10 @@ import (
 // generator.
 type CustomArgs struct {
 	ExtraPeerDirs []string // Always consider these as last-ditch possibilities for conversions.
+	// SkipDefaulters indicates whether defaulter functions should be a part of conversion
+	// This field was introduced to ease the transition to removing defaulters from conversion.
+	// It will be removed in 1.6.
+	SkipDefaulters bool
 }
 
 // This is the comment tag that carries parameters for conversion generation.
@@ -242,10 +246,12 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 			glog.V(5).Infof("  no tag")
 			continue
 		}
+		skipDefaulters := false
 		if customArgs, ok := arguments.CustomArgs.(*CustomArgs); ok {
 			if len(customArgs.ExtraPeerDirs) > 0 {
 				peerPkgs = append(peerPkgs, customArgs.ExtraPeerDirs...)
 			}
+			skipDefaulters = customArgs.SkipDefaulters
 		}
 		// Make sure our peer-packages are added and fully parsed.
 		for _, pp := range peerPkgs {
@@ -261,7 +267,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 				HeaderText:  header,
 				GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {
 					return []generator.Generator{
-						NewGenConversion(arguments.OutputFileBaseName, pkg.Path, manualConversions, manualDefaults, peerPkgs),
+						NewGenConversion(arguments.OutputFileBaseName, pkg.Path, manualConversions, manualDefaults, peerPkgs, !skipDefaulters),
 					}
 				},
 				FilterFunc: func(c *generator.Context, t *types.Type) bool {
@@ -307,9 +313,10 @@ type genConversion struct {
 	imports           namer.ImportTracker
 	types             []*types.Type
 	skippedFields     map[*types.Type][]string
+	includeDefaulters bool
 }
 
-func NewGenConversion(sanitizedName, targetPackage string, manualConversions conversionFuncMap, manualDefaulters defaulterFuncMap, peerPkgs []string) generator.Generator {
+func NewGenConversion(sanitizedName, targetPackage string, manualConversions conversionFuncMap, manualDefaulters defaulterFuncMap, peerPkgs []string, includeDefaulters bool) generator.Generator {
 	return &genConversion{
 		DefaultGen: generator.DefaultGen{
 			OptionalName: sanitizedName,
@@ -321,6 +328,7 @@ func NewGenConversion(sanitizedName, targetPackage string, manualConversions con
 		imports:           generator.NewImportTracker(),
 		types:             []*types.Type{},
 		skippedFields:     map[*types.Type][]string{},
+		includeDefaulters: includeDefaulters,
 	}
 }
 
@@ -470,7 +478,7 @@ func (g *genConversion) generateConversion(inType, outType *types.Type, sw *gene
 
 	sw.Do("func auto"+nameTmpl+"(in *$.inType|raw$, out *$.outType|raw$, s $.Scope|raw$) error {\n", args)
 	// if no defaulter of form SetDefaults_XXX is defined, do not inline a check for defaulting.
-	if function, ok := g.manualDefaulters[inType]; ok {
+	if function, ok := g.manualDefaulters[inType]; ok && g.includeDefaulters {
 		sw.Do("$.|raw$(in)\n", function)
 	}
 	g.generateFor(inType, outType, sw)
