@@ -124,7 +124,7 @@ func RunInit(out io.Writer, cmd *cobra.Command, args []string, s *kubeadmapi.Kub
 			addr := net.ParseIP(i)
 			if addr == nil {
 				// TODO(phase1+) custom flag will help to get this error message into a better place
-				return fmt.Errorf("<cmd/init> failed to parse %q (in %q) as an IP address", "--api-advertise-addresses="+strings.Join(*advertiseAddrs, ","))
+				return fmt.Errorf("<cmd/init> failed to parse %q (in %q) as an IP address", i, "--api-advertise-addresses="+strings.Join(*advertiseAddrs, ","))
 			}
 			s.InitFlags.API.AdvertiseAddrs = append(s.InitFlags.API.AdvertiseAddrs, addr)
 		}
