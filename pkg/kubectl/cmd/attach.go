@@ -48,7 +48,7 @@ var (
 		kubectl attach 123456-7890 -c ruby-container -i -t`)
 )
 
-func NewCmdAttach(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *cobra.Command {
+func NewCmdAttach(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *cobra.Command {
 	options := &AttachOptions{
 		StreamOptions: StreamOptions{
 			In:  cmdIn,
@@ -113,7 +113,7 @@ type AttachOptions struct {
 }
 
 // Complete verifies command line arguments and loads data from the command environment
-func (p *AttachOptions) Complete(f *cmdutil.Factory, cmd *cobra.Command, argsIn []string) error {
+func (p *AttachOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, argsIn []string) error {
 	if len(argsIn) == 0 {
 		return cmdutil.UsageError(cmd, "POD is required for attach")
 	}
