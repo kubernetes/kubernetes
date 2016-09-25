@@ -69,7 +69,7 @@ var (
 		kubectl patch pod valid-pod --type='json' -p='[{"op": "replace", "path": "/spec/containers/0/image", "value":"new image"}]'`)
 )
 
-func NewCmdPatch(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+func NewCmdPatch(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &PatchOptions{}
 
 	// retrieve a list of handled resources from printer as valid args
@@ -111,7 +111,7 @@ func NewCmdPatch(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func RunPatch(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, options *PatchOptions) error {
+func RunPatch(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, options *PatchOptions) error {
 	switch {
 	case options.Local && len(args) != 0:
 		return fmt.Errorf("cannot specify --local and server resources")
