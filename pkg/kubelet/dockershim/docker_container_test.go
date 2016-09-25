@@ -123,7 +123,7 @@ func TestContainerStatus(t *testing.T) {
 	}
 
 	// Create the container.
-	fClock.SetTime(time.Now())
+	fClock.SetTime(time.Now().Add(-1 * time.Hour))
 	*expected.CreatedAt = fClock.Now().Unix()
 	id, err := ds.CreateContainer("sandboxid", config, sConfig)
 	// Set the id manually since we don't know the id until it's created.
@@ -144,7 +144,7 @@ func TestContainerStatus(t *testing.T) {
 	assert.Equal(t, expected, status)
 
 	// Advance the clock and stop the container.
-	fClock.SetTime(time.Now())
+	fClock.SetTime(time.Now().Add(1 * time.Hour))
 	*expected.FinishedAt = fClock.Now().Unix()
 	*expected.State = runtimeApi.ContainerState_EXITED
 	*expected.Reason = "Completed"
