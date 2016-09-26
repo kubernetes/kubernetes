@@ -77,6 +77,22 @@ func (ds *dockerService) ListContainers(filter *runtimeApi.ContainerFilter) ([]*
 	return result, nil
 }
 
+// getContainerSecurityOpts gets security options from container config. (seccomp and apparmor)
+func (ds *dockerService) getContainerSecurityOpts(config *runtimeApi.ContainerConfig) ([]string, error) {
+	var opts []string
+	if seccompOpts, err := generateContainerSeccompOpts(config, ds.seccompProfileRoot); err != nil {
+		return nil, err
+	} else {
+		opts = append(opts, seccompOpts...)
+	}
+	if appArmorOpts, err := generateContainerAppArmorOpts(config); err != nil {
+		return nil, err
+	} else {
+		opts = append(opts, appArmorOpts...)
+	}
+	return opts, nil
+}
+
 // CreateContainer creates a new container in the given PodSandbox
 // Note: docker doesn't use LogPath yet.
 // TODO: check if the default values returned by the runtime API are ok.
@@ -166,7 +182,11 @@ func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeApi
 		// Note: ShmSize is handled in kube_docker_client.go
 	}
 
-	hc.SecurityOpt = []string{getSeccompOpts()}
+	var err error
+	hc.SecurityOpt, err = ds.getContainerSecurityOpts(config)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate container security options: %v", err)
+	}
 	// TODO: Add or drop capabilities.
 
 	createConfig.HostConfig = hc

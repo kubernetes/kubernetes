@@ -53,9 +53,10 @@ const (
 
 var internalLabelKeys []string = []string{containerTypeLabelKey, sandboxIDLabelKey}
 
-func NewDockerService(client dockertools.DockerInterface) DockerLegacyService {
+func NewDockerService(client dockertools.DockerInterface, seccompProfileRoot string) DockerLegacyService {
 	return &dockerService{
-		client: dockertools.NewInstrumentedDockerInterface(client),
+		seccompProfileRoot: seccompProfileRoot,
+		client:             dockertools.NewInstrumentedDockerInterface(client),
 	}
 }
 
@@ -76,7 +77,10 @@ type DockerLegacyService interface {
 }
 
 type dockerService struct {
-	client dockertools.DockerInterface
+	// TODO: Current seccomp implementation is very docker specific. Move this somewhere else
+	// after we define more general seccomp api.
+	seccompProfileRoot string
+	client             dockertools.DockerInterface
 }
 
 // Version returns the runtime name, runtime version and runtime API version

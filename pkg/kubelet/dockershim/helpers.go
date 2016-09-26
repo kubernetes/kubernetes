@@ -27,7 +27,10 @@ import (
 	dockernat "github.com/docker/go-connections/nat"
 	"github.com/golang/glog"
 
+	"k8s.io/kubernetes/pkg/api"
 	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	"k8s.io/kubernetes/pkg/kubelet/dockertools"
+	"k8s.io/kubernetes/pkg/security/apparmor"
 )
 
 const (
@@ -179,12 +182,44 @@ func makePortsAndBindings(pm []*runtimeApi.PortMapping) (map[dockernat.Port]stru
 	return exposedPorts, portBindings
 }
 
-// TODO: Seccomp support. Need to figure out how to pass seccomp options
-// through the runtime API (annotations?).See dockerManager.getSecurityOpts()
-// for the details. Always set the default seccomp profile for now.
-// Also need to support syntax for different docker versions.
-func getSeccompOpts() string {
-	return fmt.Sprintf("%s=%s", "seccomp", defaultSeccompProfile)
+// generateContainerAppArmorOpts generates container apparmor profile from container config.
+func generateContainerAppArmorOpts(config *runtimeApi.ContainerConfig) ([]string, error) {
+	annotations := config.GetAnnotations()
+	profile := annotations[apparmor.ContainerAnnotationKeyPrefix+config.Metadata.GetName()]
+	if profile == "" || profile == apparmor.ProfileRuntimeDefault {
+		// docker applies the default profile by default.
+		return nil, nil
+	}
+	// Assume validation has already happened.
+	profileName := strings.TrimPrefix(profile, apparmor.ProfileNamePrefix)
+	return []string{fmt.Sprintf("apparmor=%s", profileName)}, nil
+}
+
+// generateContainerSeccompOpts generates container seccomp profile from container config.
+func generateContainerSeccompOpts(config *runtimeApi.ContainerConfig, seccompProfileRoot string) ([]string, error) {
+	annotations := config.GetAnnotations()
+	profile := annotations[api.SeccompContainerAnnotationKeyPrefix+config.Metadata.GetName()]
+	return generateSeccompOpts(profile, seccompProfileRoot)
+}
+
+// generateSandboxSeccompOpts generates pod seccomp profile from pod sandbox config.
+func generateSandboxSeccompOpts(config *runtimeApi.PodSandboxConfig, seccompProfileRoot string) ([]string, error) {
+	annotations := config.GetAnnotations()
+	profile := annotations[api.SeccompPodAnnotationKey]
+	return generateSeccompOpts(profile, seccompProfileRoot)
+}
+
+func generateSeccompOpts(profile, seccompProfileRoot string) ([]string, error) {
+	dockerOpts, err := dockertools.GetSeccompOpts(profile, seccompProfileRoot)
+	if err != nil {
+		return nil, err
+	}
+	var opts []string
+	for _, dockerOpt := range dockerOpts {
+		k, v := dockerOpt.GetKV()
+		opts = append(opts, fmt.Sprintf("%s=%s", k, v))
+	}
+	return opts, nil
 }
 
 func getNetworkNamespace(c *dockertypes.ContainerJSON) string {

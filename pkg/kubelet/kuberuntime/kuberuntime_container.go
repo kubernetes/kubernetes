@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/dockershim"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
+	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/pkg/types"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/term"
@@ -117,6 +118,25 @@ func getContainerLogsPath(containerName string, podUID types.UID) string {
 	return path.Join(podLogsRootDirectory, string(podUID), fmt.Sprintf("%s.log", containerName))
 }
 
+// applyContainerConfigAnnotations applies some container configurations into annotations. These configurations
+// are usually experimental features. They'll be promoted to official runtime api in the future.
+func applyContainerConfigAnnotations(annotations map[string]string, pod *api.Pod, container *api.Container) {
+	// Apply apparmor annotation
+	apparmorAnnotationKey := apparmor.ContainerAnnotationKeyPrefix + container.Name
+	if profile, ok := pod.Annotations[apparmorAnnotationKey]; ok {
+		annotations[apparmorAnnotationKey] = profile
+	}
+	// Apply seccomp annotation
+	seccompAnnotationKey := api.SeccompContainerAnnotationKeyPrefix + container.Name
+	if profile, ok := pod.Annotations[seccompAnnotationKey]; ok {
+		annotations[seccompAnnotationKey] = profile
+	} else {
+		if profile, ok := pod.Annotations[api.SeccompPodAnnotationKey]; ok {
+			annotations[seccompAnnotationKey] = profile
+		}
+	}
+}
+
 // generateContainerConfig generates container config for kubelet runtime api.
 func (m *kubeGenericRuntimeManager) generateContainerConfig(container *api.Container, pod *api.Pod, restartCount int, podIP string) (*runtimeApi.ContainerConfig, error) {
 	opts, err := m.runtimeHelper.GenerateRunContainerOptions(pod, container, podIP)
@@ -146,6 +166,8 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(container *api.Conta
 		Tty:         &container.TTY,
 		Linux:       m.generateLinuxContainerConfig(container),
 	}
+
+	applyContainerConfigAnnotations(config.Annotations, pod, container)
 
 	// set privileged and readonlyRootfs
 	if container.SecurityContext != nil {

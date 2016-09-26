@@ -48,6 +48,16 @@ func (m *kubeGenericRuntimeManager) createPodSandbox(pod *api.Pod, attempt uint3
 	return podSandBoxID, "", nil
 }
 
+// applyPodConfigAnnotations applies some pod configurations into annotations. These configurations
+// are usually experimental features. They'll be promoted to official runtime api in the future.
+func applySandboxConfigAnnotations(annotations map[string]string, pod *api.Pod) {
+	// Apply pod seccomp annotation
+	seccompAnnotationKey := api.SeccompPodAnnotationKey
+	if profile, ok := pod.Annotations[seccompAnnotationKey]; ok {
+		annotations[seccompAnnotationKey] = profile
+	}
+}
+
 // generatePodSandboxConfig generates pod sandbox config from api.Pod.
 func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(pod *api.Pod, attempt uint32) (*runtimeApi.PodSandboxConfig, error) {
 	// TODO: deprecating podsandbox resource requirements in favor of the pod level cgroup
@@ -63,6 +73,8 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(pod *api.Pod, attem
 		Labels:      newPodLabels(pod),
 		Annotations: newPodAnnotations(pod),
 	}
+
+	applySandboxConfigAnnotations(podSandboxConfig.Annotations, pod)
 
 	if !kubecontainer.IsHostNetworkPod(pod) {
 		dnsServers, dnsSearches, err := m.runtimeHelper.GetClusterDNS(pod)

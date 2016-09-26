@@ -1126,6 +1126,11 @@ type dockerOpt struct {
 	msg string
 }
 
+// Expose key/value from dockertools
+func (d dockerOpt) GetKV() (string, string) {
+	return d.key, d.value
+}
+
 // Get the docker security options for seccomp.
 func (dm *DockerManager) getSeccompOpts(pod *api.Pod, ctrName string) ([]dockerOpt, error) {
 	version, err := dm.APIVersion()
@@ -1150,7 +1155,13 @@ func (dm *DockerManager) getSeccompOpts(pod *api.Pod, ctrName string) ([]dockerO
 		}
 	}
 
-	if profile == "unconfined" {
+	return GetSeccompOpts(profile, dm.seccompProfileRoot)
+}
+
+// Temporarily export this function to share with dockershim.
+// TODO: clean this up.
+func GetSeccompOpts(profile, profileRoot string) ([]dockerOpt, error) {
+	if profile == "" || profile == "unconfined" {
 		// return early the default
 		return defaultSeccompOpt, nil
 	}
@@ -1165,7 +1176,7 @@ func (dm *DockerManager) getSeccompOpts(pod *api.Pod, ctrName string) ([]dockerO
 	}
 
 	name := strings.TrimPrefix(profile, "localhost/") // by pod annotation validation, name is a valid subpath
-	fname := filepath.Join(dm.seccompProfileRoot, filepath.FromSlash(name))
+	fname := filepath.Join(profileRoot, filepath.FromSlash(name))
 	file, err := ioutil.ReadFile(fname)
 	if err != nil {
 		return nil, fmt.Errorf("cannot load seccomp profile %q: %v", name, err)
