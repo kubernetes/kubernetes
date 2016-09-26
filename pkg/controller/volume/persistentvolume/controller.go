@@ -1070,11 +1070,20 @@ func (ctrl *PersistentVolumeController) deleteVolumeOperation(arg interface{}) {
 	if err != nil {
 		// Delete failed, update the volume and emit an event.
 		glog.V(3).Infof("deletion of volume %q failed: %v", volume.Name, err)
-		if _, err = ctrl.updateVolumePhaseWithEvent(volume, api.VolumeFailed, api.EventTypeWarning, "VolumeFailedDelete", err.Error()); err != nil {
-			glog.V(4).Infof("deleteVolumeOperation [%s]: failed to mark volume as failed: %v", volume.Name, err)
-			// Save failed, retry on the next deletion attempt
-			return
+		if vol.IsDeletedVolumeInUse(err) {
+			// The plugin needs more time, don't mark the volume as Failed
+			// and send Normal event only
+			ctrl.eventRecorder.Event(volume, api.EventTypeNormal, "VolumeDelete", err.Error())
+		} else {
+			// The plugin failed, mark the volume as Failed and send Warning
+			// event
+			if _, err = ctrl.updateVolumePhaseWithEvent(volume, api.VolumeFailed, api.EventTypeWarning, "VolumeFailedDelete", err.Error()); err != nil {
+				glog.V(4).Infof("deleteVolumeOperation [%s]: failed to mark volume as failed: %v", volume.Name, err)
+				// Save failed, retry on the next deletion attempt
+				return
+			}
 		}
+
 		// Despite the volume being Failed, the controller will retry deleting
 		// the volume in every syncVolume() call.
 		return
@@ -1168,7 +1177,7 @@ func (ctrl *PersistentVolumeController) doDeleteVolume(volume *api.PersistentVol
 
 	if err = deleter.Delete(); err != nil {
 		// Deleter failed
-		return false, fmt.Errorf("Delete of volume %q failed: %v", volume.Name, err)
+		return false, err
 	}
 
 	glog.V(2).Infof("volume %q deleted", volume.Name)
