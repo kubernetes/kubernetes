@@ -290,6 +290,7 @@ If you use an old version kubectl to delete a replication controller or replicas
 ## Action Required Before Upgrading
 
 - If you are using Kubernetes to manage `docker` containers, please be aware Kubernetes has been validated to work with docker 1.9.1, docker 1.11.2 (#23397), and docker 1.12.0 (#28698)
+- If you upgrade your apiserver to 1.4.x but leave your kubelets at 1.3.x, they will not report init container status, but init containers will work properly.  Upgrading kubelets to 1.4.x fixes this.
 - The NamespaceExists and NamespaceAutoProvision admission controllers have been removed, use the NamespaceLifecycle admission controller instead (#31250, @derekwaynecarr)
 - If upgrading Cluster Federation components from 1.3.x, the `federation-apiserver` and `federation-controller-manager` binaries have been folded into `hyperkube`.  Please switch to using that instead.  (#29929, @madhusudancs)
 - If you are using the PodSecurityPolicy feature (eg: `kubectl get podsecuritypolicy` does not error, and returns one or more objects), be aware that init containers have moved from alpha to beta.  If there are any pods with the key `pods.beta.kubernetes.io/init-containers`, then that pod may not have been filtered by the PodSecurityPolicy. You should find such pods and either delete them or audit them to ensure they do not use features that you intend to be blocked by PodSecurityPolicy. (#31026, @erictune)
