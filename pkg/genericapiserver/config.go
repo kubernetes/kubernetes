@@ -364,7 +364,7 @@ func (s *GenericAPIServer) buildHandlerChains(c *Config, handler http.Handler) (
 	// insecure filters
 	insecure = handler
 	insecure = api.WithRequestContext(insecure, c.RequestContextMapper)
-	insecure = apiserver.RecoverPanics(insecure, s.NewRequestInfoResolver())
+	insecure = genericfilters.WithPanicRecovery(insecure, s.NewRequestInfoResolver())
 	insecure = genericfilters.WithTimeoutForNonLongRunningRequests(insecure, longRunningFunc)
 
 	// secure filters
@@ -375,7 +375,7 @@ func (s *GenericAPIServer) buildHandlerChains(c *Config, handler http.Handler) (
 	secure = audit.WithAudit(secure, attributeGetter, s.auditWriter) // before impersonation to read original user
 	secure = authhandlers.WithAuthentication(secure, c.RequestContextMapper, c.Authenticator, authhandlers.Unauthorized(c.SupportsBasicAuth))
 	secure = api.WithRequestContext(secure, c.RequestContextMapper)
-	secure = apiserver.RecoverPanics(secure, s.NewRequestInfoResolver())
+	secure = genericfilters.WithPanicRecovery(secure, s.NewRequestInfoResolver())
 	secure = genericfilters.WithTimeoutForNonLongRunningRequests(secure, longRunningFunc)
 	secure = genericfilters.WithMaxInFlightLimit(secure, c.MaxRequestsInFlight, longRunningFunc)
 

@@ -19,15 +19,11 @@ package apiserver
 import (
 	"fmt"
 	"net/http"
-	"runtime/debug"
 	"strings"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
-	"k8s.io/kubernetes/pkg/httplog"
-	"k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
@@ -67,41 +63,6 @@ func ReadOnly(handler http.Handler) http.Handler {
 		}
 		w.WriteHeader(http.StatusForbidden)
 		fmt.Fprintf(w, "This is a read-only endpoint.")
-	})
-}
-
-// RecoverPanics wraps an http Handler to recover and log panics.
-func RecoverPanics(handler http.Handler, resolver *RequestInfoResolver) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		defer runtime.HandleCrash(func(err interface{}) {
-			http.Error(w, "This request caused apisever to panic. Look in log for details.", http.StatusInternalServerError)
-			glog.Errorf("APIServer panic'd on %v %v: %v\n%s\n", req.Method, req.RequestURI, err, debug.Stack())
-		})
-
-		logger := httplog.NewLogged(req, &w)
-		requestInfo, err := resolver.GetRequestInfo(req)
-		if err != nil || requestInfo.Verb != "proxy" {
-			logger.StacktraceWhen(
-				httplog.StatusIsNot(
-					http.StatusOK,
-					http.StatusCreated,
-					http.StatusAccepted,
-					http.StatusBadRequest,
-					http.StatusMovedPermanently,
-					http.StatusTemporaryRedirect,
-					http.StatusConflict,
-					http.StatusNotFound,
-					http.StatusUnauthorized,
-					http.StatusForbidden,
-					http.StatusNotModified,
-					errors.StatusUnprocessableEntity,
-					http.StatusSwitchingProtocols,
-				),
-			)
-		}
-		defer logger.Log()
-		// Dispatch to the internal handler
-		handler.ServeHTTP(w, req)
 	})
 }
 
