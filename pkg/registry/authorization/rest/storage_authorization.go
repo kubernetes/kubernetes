@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package master
+package rest
 
 import (
 	"k8s.io/kubernetes/pkg/api/rest"
@@ -27,13 +27,13 @@ import (
 	"k8s.io/kubernetes/pkg/registry/authorization/subjectaccessreview"
 )
 
-type AuthorizationRESTStorageProvider struct {
+type RESTStorageProvider struct {
 	Authorizer authorizer.Authorizer
 }
 
-var _ genericapiserver.RESTStorageProvider = &AuthorizationRESTStorageProvider{}
+var _ genericapiserver.RESTStorageProvider = &RESTStorageProvider{}
 
-func (p AuthorizationRESTStorageProvider) NewRESTStorage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter genericapiserver.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool) {
+func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter genericapiserver.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool) {
 	if p.Authorizer == nil {
 		return genericapiserver.APIGroupInfo{}, false
 	}
@@ -48,7 +48,7 @@ func (p AuthorizationRESTStorageProvider) NewRESTStorage(apiResourceConfigSource
 	return apiGroupInfo, true
 }
 
-func (p AuthorizationRESTStorageProvider) v1beta1Storage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter genericapiserver.RESTOptionsGetter) map[string]rest.Storage {
+func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter genericapiserver.RESTOptionsGetter) map[string]rest.Storage {
 	version := authorizationv1beta1.SchemeGroupVersion
 
 	storage := map[string]rest.Storage{}
