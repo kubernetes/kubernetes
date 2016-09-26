@@ -633,13 +633,10 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *api.Ser
 			waitLoadbalancerActiveProvisioningStatus(lbaas.network, loadbalancer.ID)
 		}
 
-		monitor, err := getMonitorByPoolID(lbaas.network, pool.ID)
-		if err != nil && err != ErrNotFound {
-			return nil, fmt.Errorf("Error getting monitor for pool %s: %v", pool.ID, err)
-		}
-		if monitor == nil && lbaas.opts.CreateMonitor {
+		monitorID := pool.MonitorID
+		if monitorID == "" && lbaas.opts.CreateMonitor {
 			glog.V(4).Infof("Creating monitor for pool %s", pool.ID)
-			monitor, err = v2_monitors.Create(lbaas.network, v2_monitors.CreateOpts{
+			monitor, err := v2_monitors.Create(lbaas.network, v2_monitors.CreateOpts{
 				PoolID:     pool.ID,
 				Type:       string(port.Protocol),
 				Delay:      int(lbaas.opts.MonitorDelay.Duration.Seconds()),
@@ -650,9 +647,10 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *api.Ser
 				return nil, fmt.Errorf("Error creating LB pool healthmonitor: %v", err)
 			}
 			waitLoadbalancerActiveProvisioningStatus(lbaas.network, loadbalancer.ID)
+			monitorID = monitor.ID
 		}
 
-		glog.V(4).Infof("Monitor for pool %s: %s", pool.ID, monitor.ID)
+		glog.V(4).Infof("Monitor for pool %s: %s", pool.ID, monitorID)
 	}
 
 	// All remaining listeners are obsolete, delete
@@ -665,15 +663,12 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *api.Ser
 		}
 		if pool != nil {
 			// get and delete monitor
-			monitor, err := getMonitorByPoolID(lbaas.network, pool.ID)
-			if err != nil && err != ErrNotFound {
-				return nil, fmt.Errorf("Error getting monitor for obsolete pool %s: %v", pool.ID, err)
-			}
-			if monitor != nil {
-				glog.V(4).Infof("Deleting obsolete monitor %s for pool %s", monitor.ID, pool.ID)
-				err = v2_monitors.Delete(lbaas.network, monitor.ID).ExtractErr()
+			monitorID := pool.MonitorID
+			if monitorID != "" {
+				glog.V(4).Infof("Deleting obsolete monitor %s for pool %s", monitorID, pool.ID)
+				err = v2_monitors.Delete(lbaas.network, monitorID).ExtractErr()
 				if err != nil && !isNotFound(err) {
-					return nil, fmt.Errorf("Error deleting obsolete monitor %s for pool %s: %v", monitor.ID, pool.ID, err)
+					return nil, fmt.Errorf("Error deleting obsolete monitor %s for pool %s: %v", monitorID, pool.ID, err)
 				}
 				waitLoadbalancerActiveProvisioningStatus(lbaas.network, loadbalancer.ID)
 			}
@@ -719,7 +714,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *api.Ser
 	}
 	floatIP, err := getFloatingIPByPortID(lbaas.network, portID)
 	if err != nil && err != ErrNotFound {
-		return nil, fmt.Errorf("Error getting flaoting ip for port %s: %v", portID, err)
+		return nil, fmt.Errorf("Error getting floating ip for port %s: %v", portID, err)
 	}
 	if floatIP == nil && lbaas.opts.FloatingNetworkId != "" {
 		glog.V(4).Infof("Creating floating ip for loadbalancer %s port %s", loadbalancer.ID, portID)
