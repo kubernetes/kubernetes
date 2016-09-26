@@ -79,6 +79,12 @@ func exceptKey(except string) includeFunc {
 
 // etcdWatcher converts a native etcd watch to a watch.Interface.
 type etcdWatcher struct {
+	// HighWaterMarks for performance debugging.
+	// Important: Since HighWaterMark is using sync/atomic, it has to be at the top of the struct due to a bug on 32-bit platforms
+	// See: https://golang.org/pkg/sync/atomic/ for more information
+	incomingHWM HighWaterMark
+	outgoingHWM HighWaterMark
+
 	encoding runtime.Codec
 	// Note that versioner is required for etcdWatcher to work correctly.
 	// There is no public constructor of it, so be careful when manipulating
@@ -107,10 +113,6 @@ type etcdWatcher struct {
 
 	// Injectable for testing. Send the event down the outgoing channel.
 	emit func(watch.Event)
-
-	// HighWaterMarks for performance debugging.
-	incomingHWM HighWaterMark
-	outgoingHWM HighWaterMark
 
 	cache etcdCache
 }
