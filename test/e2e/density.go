@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -54,6 +55,7 @@ var MaxContainerFailures = 0
 type DensityTestConfig struct {
 	Configs      []framework.RCConfig
 	Client       *client.Client
+	ClientSet    internalclientset.Interface
 	Namespace    string
 	PollInterval time.Duration
 	PodCount     int
@@ -328,7 +330,7 @@ func cleanupDensityTest(dtc DensityTestConfig) {
 				framework.ExpectNoError(err)
 			} else {
 				By("Cleaning up the replication controller and pods")
-				err := framework.DeleteRCAndPods(dtc.Client, dtc.Namespace, rcName)
+				err := framework.DeleteRCAndPods(dtc.Client, dtc.ClientSet, dtc.Namespace, rcName)
 				framework.ExpectNoError(err)
 			}
 		}
@@ -487,7 +489,9 @@ var _ = framework.KubeDescribe("Density", func() {
 				}
 			}
 
-			dConfig := DensityTestConfig{Client: c,
+			dConfig := DensityTestConfig{
+				Client:       c,
+				ClientSet:    f.ClientSet,
 				Configs:      RCConfigs,
 				PodCount:     totalPods,
 				Namespace:    ns,
@@ -705,7 +709,9 @@ var _ = framework.KubeDescribe("Density", func() {
 				Silent:               true,
 			}
 		}
-		dConfig := DensityTestConfig{Client: c,
+		dConfig := DensityTestConfig{
+			Client:       c,
+			ClientSet:    f.ClientSet,
 			Configs:      RCConfigs,
 			PodCount:     totalPods,
 			Namespace:    ns,

@@ -30,7 +30,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	adapter "k8s.io/kubernetes/pkg/client/unversioned/adapters/internalclientset"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/labels"
@@ -160,7 +159,7 @@ func newDeploymentRollback(name string, annotations map[string]string, revision 
 }
 
 // checkDeploymentRevision checks if the input deployment's and its new replica set's revision and images are as expected.
-func checkDeploymentRevision(c *clientset.Clientset, ns, deploymentName, revision, imageName, image string) (*extensions.Deployment, *extensions.ReplicaSet) {
+func checkDeploymentRevision(c clientset.Interface, ns, deploymentName, revision, imageName, image string) (*extensions.Deployment, *extensions.ReplicaSet) {
 	deployment, err := c.Extensions().Deployments(ns).Get(deploymentName)
 	Expect(err).NotTo(HaveOccurred())
 	// Check revision of the new replica set of this deployment
@@ -182,15 +181,15 @@ func checkDeploymentRevision(c *clientset.Clientset, ns, deploymentName, revisio
 	return deployment, newRS
 }
 
-func stopDeploymentOverlap(c *clientset.Clientset, oldC client.Interface, ns, deploymentName, overlapWith string) {
+func stopDeploymentOverlap(c clientset.Interface, oldC client.Interface, ns, deploymentName, overlapWith string) {
 	stopDeploymentMaybeOverlap(c, oldC, ns, deploymentName, overlapWith)
 }
 
-func stopDeployment(c *clientset.Clientset, oldC client.Interface, ns, deploymentName string) {
+func stopDeployment(c clientset.Interface, oldC client.Interface, ns, deploymentName string) {
 	stopDeploymentMaybeOverlap(c, oldC, ns, deploymentName, "")
 }
 
-func stopDeploymentMaybeOverlap(c *clientset.Clientset, oldC client.Interface, ns, deploymentName, overlapWith string) {
+func stopDeploymentMaybeOverlap(c clientset.Interface, oldC client.Interface, ns, deploymentName, overlapWith string) {
 	deployment, err := c.Extensions().Deployments(ns).Get(deploymentName)
 	Expect(err).NotTo(HaveOccurred())
 
@@ -254,7 +253,7 @@ func testNewDeployment(f *framework.Framework) {
 	ns := f.Namespace.Name
 	// TODO: remove unversionedClient when the refactoring is done. Currently some
 	// functions like verifyPod still expects a unversioned#Client.
-	c := adapter.FromUnversionedClient(f.Client)
+	c := f.ClientSet
 
 	deploymentName := "test-new-deployment"
 	podLabels := map[string]string{"name": nginxImageName}
@@ -289,7 +288,7 @@ func testRollingUpdateDeployment(f *framework.Framework) {
 	// TODO: remove unversionedClient when the refactoring is done. Currently some
 	// functions like verifyPod still expects a unversioned#Client.
 	unversionedClient := f.Client
-	c := adapter.FromUnversionedClient(unversionedClient)
+	c := f.ClientSet
 	// Create nginx pods.
 	deploymentPodLabels := map[string]string{"name": "sample-pod"}
 	rsPodLabels := map[string]string{
@@ -339,7 +338,7 @@ func testRollingUpdateDeploymentEvents(f *framework.Framework) {
 	// TODO: remove unversionedClient when the refactoring is done. Currently some
 	// functions like verifyPod still expects a unversioned#Client.
 	unversionedClient := f.Client
-	c := adapter.FromUnversionedClient(unversionedClient)
+	c := f.ClientSet
 	// Create nginx pods.
 	deploymentPodLabels := map[string]string{"name": "sample-pod-2"}
 	rsPodLabels := map[string]string{
@@ -401,7 +400,7 @@ func testRecreateDeployment(f *framework.Framework) {
 	// TODO: remove unversionedClient when the refactoring is done. Currently some
 	// functions like verifyPod still expects a unversioned#Client.
 	unversionedClient := f.Client
-	c := adapter.FromUnversionedClient(unversionedClient)
+	c := f.ClientSet
 	// Create nginx pods.
 	deploymentPodLabels := map[string]string{"name": "sample-pod-3"}
 	rsPodLabels := map[string]string{
@@ -456,7 +455,7 @@ func testRecreateDeployment(f *framework.Framework) {
 func testDeploymentCleanUpPolicy(f *framework.Framework) {
 	ns := f.Namespace.Name
 	unversionedClient := f.Client
-	c := adapter.FromUnversionedClient(unversionedClient)
+	c := f.ClientSet
 	// Create nginx pods.
 	deploymentPodLabels := map[string]string{"name": "cleanup-pod"}
 	rsPodLabels := map[string]string{
@@ -480,7 +479,7 @@ func testDeploymentCleanUpPolicy(f *framework.Framework) {
 	deploymentName := "test-cleanup-deployment"
 	framework.Logf("Creating deployment %s", deploymentName)
 
-	pods, err := c.Pods(ns).List(api.ListOptions{LabelSelector: labels.Everything()})
+	pods, err := c.Core().Pods(ns).List(api.ListOptions{LabelSelector: labels.Everything()})
 	if err != nil {
 		Expect(err).NotTo(HaveOccurred(), "Failed to query for pods: %v", err)
 	}
@@ -488,7 +487,7 @@ func testDeploymentCleanUpPolicy(f *framework.Framework) {
 		ResourceVersion: pods.ListMeta.ResourceVersion,
 	}
 	stopCh := make(chan struct{})
-	w, err := c.Pods(ns).Watch(options)
+	w, err := c.Core().Pods(ns).Watch(options)
 	go func() {
 		// There should be only one pod being created, which is the pod with the redis image.
 		// The old RS shouldn't create new pod when deployment controller adding pod template hash label to its selector.
@@ -531,7 +530,7 @@ func testRolloverDeployment(f *framework.Framework) {
 	// TODO: remove unversionedClient when the refactoring is done. Currently some
 	// functions like verifyPod still expects a unversioned#Client.
 	unversionedClient := f.Client
-	c := adapter.FromUnversionedClient(unversionedClient)
+	c := f.ClientSet
 	podName := "rollover-pod"
 	deploymentPodLabels := map[string]string{"name": podName}
 	rsPodLabels := map[string]string{
@@ -599,8 +598,7 @@ func testPausedDeployment(f *framework.Framework) {
 	ns := f.Namespace.Name
 	// TODO: remove unversionedClient when the refactoring is done. Currently some
 	// functions like verifyPod still expects a unversioned#Client.
-	unversionedClient := f.Client
-	c := adapter.FromUnversionedClient(unversionedClient)
+	c := f.ClientSet
 	deploymentName := "test-paused-deployment"
 	podLabels := map[string]string{"name": nginxImageName}
 	d := newDeployment(deploymentName, 1, podLabels, nginxImageName, nginxImage, extensions.RollingUpdateDeploymentStrategyType, nil)
@@ -697,8 +695,7 @@ func testPausedDeployment(f *framework.Framework) {
 // and then rollback to last revision.
 func testRollbackDeployment(f *framework.Framework) {
 	ns := f.Namespace.Name
-	unversionedClient := f.Client
-	c := adapter.FromUnversionedClient(unversionedClient)
+	c := f.ClientSet
 	podName := "nginx"
 	deploymentPodLabels := map[string]string{"name": podName}
 
@@ -806,7 +803,7 @@ func testRollbackDeployment(f *framework.Framework) {
 // TODO: When we finished reporting rollback status in deployment status, check the rollback status here in each case.
 func testRollbackDeploymentRSNoRevision(f *framework.Framework) {
 	ns := f.Namespace.Name
-	c := adapter.FromUnversionedClient(f.Client)
+	c := f.ClientSet
 	podName := "nginx"
 	deploymentPodLabels := map[string]string{"name": podName}
 	rsPodLabels := map[string]string{
@@ -943,7 +940,7 @@ func testDeploymentLabelAdopted(f *framework.Framework) {
 	// TODO: remove unversionedClient when the refactoring is done. Currently some
 	// functions like verifyPod still expects a unversioned#Client.
 	unversionedClient := f.Client
-	c := adapter.FromUnversionedClient(unversionedClient)
+	c := f.ClientSet
 	// Create nginx pods.
 	podName := "nginx"
 	podLabels := map[string]string{"name": podName}
@@ -998,7 +995,7 @@ func testDeploymentLabelAdopted(f *framework.Framework) {
 
 func testScalePausedDeployment(f *framework.Framework) {
 	ns := f.Namespace.Name
-	c := adapter.FromUnversionedClient(f.Client)
+	c := f.ClientSet
 
 	podLabels := map[string]string{"name": nginxImageName}
 	replicas := int32(3)
@@ -1049,7 +1046,7 @@ func testScalePausedDeployment(f *framework.Framework) {
 
 func testScaledRolloutDeployment(f *framework.Framework) {
 	ns := f.Namespace.Name
-	c := adapter.FromUnversionedClient(f.Client)
+	c := f.ClientSet
 
 	podLabels := map[string]string{"name": nginxImageName}
 	replicas := int32(10)
@@ -1216,7 +1213,7 @@ func testOverlappingDeployment(f *framework.Framework) {
 	ns := f.Namespace.Name
 	// TODO: remove unversionedClient when the refactoring is done. Currently some
 	// functions like verifyPod still expects a unversioned#Client.
-	c := adapter.FromUnversionedClient(f.Client)
+	c := f.ClientSet
 
 	deploymentName := "first-deployment"
 	podLabels := map[string]string{"name": redisImageName}
