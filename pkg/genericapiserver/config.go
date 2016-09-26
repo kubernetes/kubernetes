@@ -158,11 +158,15 @@ type Config struct {
 
 	// MaxRequestsInFlight is the maximum number of parallel non-long-running requests. Every further
 	// request has to wait.
-	MaxRequestsInFlight  int
-	LongRunningRequestRE string
+	MaxRequestsInFlight int
+
+	// Predicate which is true for paths of long-running http requests
+	LongRunningFunc genericfilters.LongRunningRequestCheck
 }
 
 func NewConfig(options *options.ServerRunOptions) *Config {
+	longRunningRE := regexp.MustCompile(options.LongRunningRequestRE)
+
 	var auditWriter io.Writer
 	if len(options.AuditLogPath) != 0 {
 		auditWriter = &lumberjack.Logger{
@@ -201,8 +205,8 @@ func NewConfig(options *options.ServerRunOptions) *Config {
 				Version: "unversioned",
 			},
 		},
-		MaxRequestsInFlight:  options.MaxRequestsInFlight,
-		LongRunningRequestRE: options.LongRunningRequestRE,
+		MaxRequestsInFlight: options.MaxRequestsInFlight,
+		LongRunningFunc:     genericfilters.BasicLongRunningRequestCheck(longRunningRE, map[string]string{"watch": "true"}),
 	}
 }
 
@@ -338,9 +342,6 @@ func (c Config) New() (*GenericAPIServer, error) {
 		})
 	}
 
-	longRunningRE := regexp.MustCompile(c.LongRunningRequestRE)
-	s.longRunningFunc = genericfilters.BasicLongRunningRequestCheck(longRunningRE, map[string]string{"watch": "true"})
-
 	s.installAPI(&c)
 	s.Handler, s.InsecureHandler = s.buildHandlerChains(&c, http.Handler(s.Mux.BaseMux().(*http.ServeMux)))
 
@@ -348,9 +349,6 @@ func (c Config) New() (*GenericAPIServer, error) {
 }
 
 func (s *GenericAPIServer) buildHandlerChains(c *Config, handler http.Handler) (secure http.Handler, insecure http.Handler) {
-	longRunningRE := regexp.MustCompile(c.LongRunningRequestRE)
-	longRunningFunc := genericfilters.BasicLongRunningRequestCheck(longRunningRE, map[string]string{"watch": "true"})
-
 	// filters which insecure and secure have in common
 	handler = genericfilters.WithCORS(handler, c.CorsAllowedOriginList, nil, nil, "true")
 
@@ -359,7 +357,7 @@ func (s *GenericAPIServer) buildHandlerChains(c *Config, handler http.Handler) (
 	insecure = genericfilters.WithPanicRecovery(insecure, c.RequestContextMapper)
 	insecure = apiserverfilters.WithRequestInfo(insecure, s.NewRequestInfoResolver(), c.RequestContextMapper)
 	insecure = api.WithRequestContext(insecure, c.RequestContextMapper)
-	insecure = genericfilters.WithTimeoutForNonLongRunningRequests(insecure, longRunningFunc)
+	insecure = genericfilters.WithTimeoutForNonLongRunningRequests(insecure, c.LongRunningFunc)
 
 	// secure filters
 	attributeGetter := apiserverfilters.NewRequestAttributeGetter(c.RequestContextMapper)
@@ -371,8 +369,8 @@ func (s *GenericAPIServer) buildHandlerChains(c *Config, handler http.Handler) (
 	secure = genericfilters.WithPanicRecovery(secure, c.RequestContextMapper)
 	secure = apiserverfilters.WithRequestInfo(secure, s.NewRequestInfoResolver(), c.RequestContextMapper)
 	secure = api.WithRequestContext(secure, c.RequestContextMapper)
-	secure = genericfilters.WithTimeoutForNonLongRunningRequests(secure, longRunningFunc)
-	secure = genericfilters.WithMaxInFlightLimit(secure, c.MaxRequestsInFlight, longRunningFunc)
+	secure = genericfilters.WithTimeoutForNonLongRunningRequests(secure, c.LongRunningFunc)
+	secure = genericfilters.WithMaxInFlightLimit(secure, c.MaxRequestsInFlight, c.LongRunningFunc)
 
 	return
 }
