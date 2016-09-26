@@ -693,68 +693,68 @@ func (g *genConversion) doSlice(inType, outType *types.Type, sw *generator.Snipp
 }
 
 func (g *genConversion) doStruct(inType, outType *types.Type, sw *generator.SnippetWriter) {
-	for _, m := range inType.Members {
+	for _, inMember := range inType.Members {
 		// Check if this member is excluded from conversion
-		if tagvals := extractTag(m.CommentLines); tagvals != nil && tagvals[0] == "false" {
+		if tagvals := extractTag(inMember.CommentLines); tagvals != nil && tagvals[0] == "false" {
 			continue
 		}
-		outMember, isOutMember := findMember(outType, m.Name)
-		if !isOutMember {
+		outMember, found := findMember(outType, inMember.Name)
+		if !found {
 			// Since this object wasn't filtered out, this means that
 			// this field has "+k8s:conversion-gen=false" comment to ignore it.
 			continue
 		}
-		t, outT := m.Type, outMember.Type
+		inMemberType, outMemberType := inMember.Type, outMember.Type
 		// create a copy of both underlying types but give them the top level alias name (since aliases
 		// are assignable)
-		if underlying := unwrapAlias(t); underlying != t {
+		if underlying := unwrapAlias(inMemberType); underlying != inMemberType {
 			copied := *underlying
-			copied.Name = t.Name
-			t = &copied
+			copied.Name = inMemberType.Name
+			inMemberType = &copied
 		}
-		if underlying := unwrapAlias(outT); underlying != outT {
+		if underlying := unwrapAlias(outMemberType); underlying != outMemberType {
 			copied := *underlying
-			copied.Name = outT.Name
-			outT = &copied
+			copied.Name = outMemberType.Name
+			outMemberType = &copied
 		}
 		args := map[string]interface{}{
-			"inType":  t,
-			"outType": outT,
-			"name":    m.Name,
+			"inType":  inMemberType,
+			"outType": outMemberType,
+			"name":    inMember.Name,
 		}
 		// check based on the top level name, not the underlying names
-		if function, ok := g.preexists(m.Type, outMember.Type); ok {
+		if function, ok := g.preexists(inMember.Type, outMember.Type); ok {
 			args["function"] = function
 			sw.Do("if err := $.function|raw$(&in.$.name$, &out.$.name$, s); err != nil {\n", args)
 			sw.Do("return err\n", nil)
 			sw.Do("}\n", nil)
 			continue
 		}
-		switch t.Kind {
+		switch inMemberType.Kind {
 		case types.Builtin:
-			if t == outT {
+			if inMemberType == outMemberType {
 				sw.Do("out.$.name$ = in.$.name$\n", args)
 			} else {
 				sw.Do("out.$.name$ = $.outType|raw$(in.$.name$)\n", args)
 			}
 		case types.Map, types.Slice, types.Pointer:
-			if g.isDirectlyAssignable(t, outT) {
+			if g.isDirectlyAssignable(inMemberType, outMemberType) {
 				sw.Do("out.$.name$ = in.$.name$\n", args)
 				continue
 			}
 
 			sw.Do("if in.$.name$ != nil {\n", args)
 			sw.Do("in, out := &in.$.name$, &out.$.name$\n", args)
-			g.generateFor(t, outT, sw)
+			g.generateFor(inMemberType, outMemberType, sw)
 			sw.Do("} else {\n", nil)
 			sw.Do("out.$.name$ = nil\n", args)
 			sw.Do("}\n", nil)
 		case types.Struct:
-			if g.isDirectlyAssignable(t, outT) {
+			if g.isDirectlyAssignable(inMemberType, outMemberType) {
 				sw.Do("out.$.name$ = in.$.name$\n", args)
 				continue
 			}
-			if g.convertibleOnlyWithinPackage(t, outT) {
+			if g.convertibleOnlyWithinPackage(inMemberType, outMemberType) {
 				sw.Do("if err := "+nameTmpl+"(&in.$.name$, &out.$.name$, s); err != nil {\n", args)
 			} else {
 				sw.Do("// TODO: Inefficient conversion - can we improve it?\n", nil)
@@ -763,14 +763,14 @@ func (g *genConversion) doStruct(inType, outType *types.Type, sw *generator.Snip
 			sw.Do("return err\n", nil)
 			sw.Do("}\n", nil)
 		case types.Alias:
-			if isDirectlyAssignable(t, outT) {
-				if t == outT {
+			if isDirectlyAssignable(inMemberType, outMemberType) {
+				if inMemberType == outMemberType {
 					sw.Do("out.$.name$ = in.$.name$\n", args)
 				} else {
 					sw.Do("out.$.name$ = $.outType|raw$(in.$.name$)\n", args)
 				}
 			} else {
-				if g.convertibleOnlyWithinPackage(t, outT) {
+				if g.convertibleOnlyWithinPackage(inMemberType, outMemberType) {
 					sw.Do("if err := "+nameTmpl+"(&in.$.name$, &out.$.name$, s); err != nil {\n", args)
 				} else {
 					sw.Do("// TODO: Inefficient conversion - can we improve it?\n", nil)
@@ -780,7 +780,7 @@ func (g *genConversion) doStruct(inType, outType *types.Type, sw *generator.Snip
 				sw.Do("}\n", nil)
 			}
 		default:
-			if g.convertibleOnlyWithinPackage(t, outT) {
+			if g.convertibleOnlyWithinPackage(inMemberType, outMemberType) {
 				sw.Do("if err := "+nameTmpl+"(&in.$.name$, &out.$.name$, s); err != nil {\n", args)
 			} else {
 				sw.Do("// TODO: Inefficient conversion - can we improve it?\n", nil)
