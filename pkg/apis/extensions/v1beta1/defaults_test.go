@@ -765,6 +765,41 @@ func TestDefaultRequestIsNotSetForReplicaSet(t *testing.T) {
 	}
 }
 
+func TestSetDefaultHorizontalPodAutoscaler(t *testing.T) {
+	tests := []struct {
+		hpa             HorizontalPodAutoscaler
+		expectReplicas int32
+	}{
+		{
+			hpa: HorizontalPodAutoscaler{},
+			expectReplicas: 1,
+		},
+		{
+			hpa: HorizontalPodAutoscaler{
+				Spec: HorizontalPodAutoscalerSpec {
+					MinReplicas: newInt32(3),
+				},
+			},
+			expectReplicas: 3,
+		},
+	}
+
+	for _, test := range tests {
+		hpa := &test.hpa
+		obj2 := roundTrip(t, runtime.Object(hpa))
+		hpa2, ok := obj2.(*HorizontalPodAutoscaler)
+		if !ok {
+			t.Errorf("unexpected object: %v", hpa2)
+			t.FailNow()
+		}
+		if hpa2.Spec.MinReplicas == nil {
+			t.Errorf("unexpected nil MinReplicas")
+		} else if test.expectReplicas != *hpa2.Spec.MinReplicas {
+			t.Errorf("expected: %d MinReplicas, got: %d", test.expectReplicas, *hpa2.Spec.MinReplicas)
+		}
+	}
+}
+
 func roundTrip(t *testing.T, obj runtime.Object) runtime.Object {
 	data, err := runtime.Encode(api.Codecs.LegacyCodec(SchemeGroupVersion), obj)
 	if err != nil {
