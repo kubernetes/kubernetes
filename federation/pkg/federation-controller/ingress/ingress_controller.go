@@ -679,6 +679,16 @@ func (ic *IngressController) reconcileIngress(ingress types.NamespacedName) {
 				glog.V(4).Infof(logStr, "Transferring")
 				if !baseIPAnnotationExists && clusterIPNameExists {
 					baseIngress.ObjectMeta.Annotations[staticIPNameKeyWritable] = clusterIPName
+					glog.V(4).Infof("Attempting to update base federated ingress annotations: %v", baseIngress)
+					if updatedFedIngress, err := ic.federatedApiClient.Extensions().Ingresses(baseIngress.Namespace).Update(baseIngress); err != nil {
+						glog.Errorf("Failed to add static IP annotation to federated ingress %q, will try again later: %v", ingress, err)
+						ic.deliverIngress(ingress, ic.ingressReviewDelay, true)
+						return
+					} else {
+						glog.V(4).Infof("Successfully updated federated ingress %q (added IP annotation), after update: %q", ingress, updatedFedIngress)
+						ic.deliverIngress(ingress, ic.smallDelay, false)
+						return
+					}
 				}
 				if !baseLBStatusExists && clusterLBStatusExists {
 					lbstatusObj, lbErr := conversion.NewCloner().DeepCopy(&clusterIngress.Status.LoadBalancer)
@@ -689,16 +699,16 @@ func (ic *IngressController) reconcileIngress(ingress types.NamespacedName) {
 						return
 					}
 					baseIngress.Status.LoadBalancer = *lbstatus
-				}
-				glog.V(4).Infof("Attempting to update base federated ingress: %v", baseIngress)
-				if updatedFedIngress, err := ic.federatedApiClient.Extensions().Ingresses(baseIngress.Namespace).Update(baseIngress); err != nil {
-					glog.Errorf("Failed to add static IP annotation to federated ingress %q, will try again later: %v", ingress, err)
-					ic.deliverIngress(ingress, ic.ingressReviewDelay, true)
-					return
-				} else {
-					glog.V(4).Infof("Successfully updated federated ingress %q (added IP), after update: %q", ingress, updatedFedIngress)
-					ic.deliverIngress(ingress, ic.smallDelay, false)
-					return
+					glog.V(4).Infof("Attempting to update base federated ingress status: %v", baseIngress)
+					if updatedFedIngress, err := ic.federatedApiClient.Extensions().Ingresses(baseIngress.Namespace).UpdateStatus(baseIngress); err != nil {
+						glog.Errorf("Failed to update federated ingress status of %q (loadbalancer status), will try again later: %v", ingress, err)
+						ic.deliverIngress(ingress, ic.ingressReviewDelay, true)
+						return
+					} else {
+						glog.V(4).Infof("Successfully updated federated ingress status of %q (added loadbalancer status), after update: %q", ingress, updatedFedIngress)
+						ic.deliverIngress(ingress, ic.smallDelay, false)
+						return
+					}
 				}
 			} else {
 				glog.V(4).Infof(logStr, "Not transferring")
