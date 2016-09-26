@@ -2748,6 +2748,10 @@ func ValidateNodeUpdate(node, oldNode *api.Node) field.ErrorList {
 	// 	allErrs = append(allErrs, field.Invalid("status", node.Status, "must be empty"))
 	// }
 
+	// Validate opaque integer resources.
+	allErrs = append(allErrs, ValidateOpaqueIntQuants(node.Status.Capacity, field.NewPath("status", "capacity"))...)
+	allErrs = append(allErrs, ValidateOpaqueIntQuants(node.Status.Allocatable, field.NewPath("status", "allocatable"))...)
+
 	// Validte no duplicate addresses in node status.
 	addresses := make(map[api.NodeAddress]bool)
 	for i, address := range node.Status.Addresses {
@@ -2781,6 +2785,18 @@ func ValidateNodeUpdate(node, oldNode *api.Node) field.ErrorList {
 		allErrs = append(allErrs, field.Forbidden(field.NewPath(""), "node updates may only change labels or capacity"))
 	}
 
+	return allErrs
+}
+
+// Validate that opaque integer resource quantities in a resource list are
+// indeed integers.
+func ValidateOpaqueIntQuants(rs api.ResourceList, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	for rName, rQuant := range rs {
+		if strings.HasPrefix(string(rName), api.ResourceOpaqueIntPrefix) && rQuant.MilliValue() != 1000*rQuant.Value() {
+			allErrs = append(allErrs, field.Invalid(fldPath, rQuant.String(), "fractional values are not allowed for opaque integer resources"))
+		}
+	}
 	return allErrs
 }
 
@@ -3150,6 +3166,9 @@ func ValidateResourceRequirements(requirements *api.ResourceRequirements, fldPat
 			allErrs = append(allErrs, validateBasicResource(quantity, fldPath.Key(string(resourceName)))...)
 		}
 	}
+	// Validate opaque integer resources.
+	allErrs = append(allErrs, ValidateOpaqueIntQuants(requirements.Requests, reqPath)...)
+	allErrs = append(allErrs, ValidateOpaqueIntQuants(requirements.Limits, limPath)...)
 	return allErrs
 }
 
