@@ -18,6 +18,8 @@ package storage
 
 import (
 	"golang.org/x/net/context"
+	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/watch"
@@ -62,34 +64,14 @@ type MatchValue struct {
 // to that function.
 type TriggerPublisherFunc func(obj runtime.Object) []MatchValue
 
-// Filter is interface that is used to pass filtering mechanism.
-type Filter interface {
-	// Filter is a predicate which takes an API object and returns true
-	// if and only if the object should remain in the set.
-	Filter(obj runtime.Object) bool
-	// For any triggers known to the Filter, if Filter() can return only
-	// (a subset of) objects for which indexing function returns <value>,
-	// (<index name>, <value> pair would be returned.
-	//
-	// This is optimization to avoid computing Filter() function (which are
-	// usually relatively expensive) in case we are sure they will return
-	// false anyway.
-	Trigger() []MatchValue
-}
+// FilterFunc takes an API object and returns true if the object satisfies some requirements.
+// TODO: We will remove this type and use SelectionPredicate everywhere.
+type FilterFunc func(obj runtime.Object) bool
 
-// Everything is a Filter which accepts all objects.
-var Everything Filter = everything{}
-
-// everything is implementation of Everything.
-type everything struct {
-}
-
-func (e everything) Filter(runtime.Object) bool {
-	return true
-}
-
-func (e everything) Trigger() []MatchValue {
-	return nil
+// Everything accepts all objects.
+var Everything = SelectionPredicate{
+	Label: labels.Everything(),
+	Field: fields.Everything(),
 }
 
 // Pass an UpdateFunc to Interface.GuaranteedUpdate to make an update
@@ -125,18 +107,18 @@ type Interface interface {
 	Delete(ctx context.Context, key string, out runtime.Object, preconditions *Preconditions) error
 
 	// Watch begins watching the specified key. Events are decoded into API objects,
-	// and any items passing 'filter' are sent down to returned watch.Interface.
+	// and any items selected by 'p' are sent down to returned watch.Interface.
 	// resourceVersion may be used to specify what version to begin watching,
 	// which should be the current resourceVersion, and no longer rv+1
 	// (e.g. reconnecting without missing any updates).
-	Watch(ctx context.Context, key string, resourceVersion string, filter Filter) (watch.Interface, error)
+	Watch(ctx context.Context, key string, resourceVersion string, p SelectionPredicate) (watch.Interface, error)
 
 	// WatchList begins watching the specified key's items. Items are decoded into API
-	// objects and any item passing 'filter' are sent down to returned watch.Interface.
+	// objects and any item selected by 'p' are sent down to returned watch.Interface.
 	// resourceVersion may be used to specify what version to begin watching,
 	// which should be the current resourceVersion, and no longer rv+1
 	// (e.g. reconnecting without missing any updates).
-	WatchList(ctx context.Context, key string, resourceVersion string, filter Filter) (watch.Interface, error)
+	WatchList(ctx context.Context, key string, resourceVersion string, p SelectionPredicate) (watch.Interface, error)
 
 	// Get unmarshals json found at key into objPtr. On a not found error, will either
 	// return a zero object of the requested type, or an error, depending on ignoreNotFound.
@@ -145,13 +127,13 @@ type Interface interface {
 
 	// GetToList unmarshals json found at key and opaque it into *List api object
 	// (an object that satisfies the runtime.IsList definition).
-	GetToList(ctx context.Context, key string, filter Filter, listObj runtime.Object) error
+	GetToList(ctx context.Context, key string, p SelectionPredicate, listObj runtime.Object) error
 
 	// List unmarshalls jsons found at directory defined by key and opaque them
 	// into *List api object (an object that satisfies runtime.IsList definition).
 	// The returned contents may be delayed, but it is guaranteed that they will
 	// be have at least 'resourceVersion'.
-	List(ctx context.Context, key string, resourceVersion string, filter Filter, listObj runtime.Object) error
+	List(ctx context.Context, key string, resourceVersion string, p SelectionPredicate, listObj runtime.Object) error
 
 	// GuaranteedUpdate keeps calling 'tryUpdate()' to update key 'key' (of type 'ptrToType')
 	// retrying the update until success if there is index conflict.
