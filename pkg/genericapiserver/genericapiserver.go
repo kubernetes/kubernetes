@@ -19,7 +19,6 @@ package genericapiserver
 import (
 	"crypto/tls"
 	"fmt"
-	"io"
 	"net"
 	"net/http"
 	"path"
@@ -166,9 +165,6 @@ type GenericAPIServer struct {
 	postStartHooks       map[string]PostStartHookFunc
 	postStartHookLock    sync.Mutex
 	postStartHooksCalled bool
-
-	// Writer to write the audit log to.
-	auditWriter io.Writer
 }
 
 // RequestContextMapper is exposed so that third party resource storage can be build in a different location.

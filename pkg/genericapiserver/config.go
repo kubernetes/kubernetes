@@ -19,6 +19,7 @@ package genericapiserver
 import (
 	"crypto/tls"
 	"fmt"
+	"io"
 	"mime"
 	"net"
 	"net/http"
@@ -53,10 +54,8 @@ import (
 
 // Config is a structure used to configure a GenericAPIServer.
 type Config struct {
-	AuditLogPath       string
-	AuditLogMaxAge     int
-	AuditLogMaxBackups int
-	AuditLogMaxSize    int
+	// Destination for audit logs
+	AuditWriter io.Writer
 	// Allow downstream consumers to disable swagger.
 	// This includes returning the generated swagger spec at /swaggerapi and swagger ui at /swagger-ui.
 	EnableSwaggerSupport bool
@@ -165,14 +164,21 @@ type Config struct {
 }
 
 func NewConfig(options *options.ServerRunOptions) *Config {
+	var auditWriter io.Writer
+	if len(options.AuditLogPath) != 0 {
+		auditWriter = &lumberjack.Logger{
+			Filename:   options.AuditLogPath,
+			MaxAge:     options.AuditLogMaxAge,
+			MaxBackups: options.AuditLogMaxBackups,
+			MaxSize:    options.AuditLogMaxSize,
+		}
+	}
+
 	return &Config{
 		APIGroupPrefix:            options.APIGroupPrefix,
 		APIPrefix:                 options.APIPrefix,
 		CorsAllowedOriginList:     options.CorsAllowedOriginList,
-		AuditLogPath:              options.AuditLogPath,
-		AuditLogMaxAge:            options.AuditLogMaxAge,
-		AuditLogMaxBackups:        options.AuditLogMaxBackups,
-		AuditLogMaxSize:           options.AuditLogMaxSize,
+		AuditWriter:               auditWriter,
 		EnableGarbageCollection:   options.EnableGarbageCollection,
 		EnableIndex:               true,
 		EnableProfiling:           options.EnableProfiling,
@@ -332,15 +338,6 @@ func (c Config) New() (*GenericAPIServer, error) {
 		})
 	}
 
-	if len(c.AuditLogPath) != 0 {
-		s.auditWriter = &lumberjack.Logger{
-			Filename:   c.AuditLogPath,
-			MaxAge:     c.AuditLogMaxAge,
-			MaxBackups: c.AuditLogMaxBackups,
-			MaxSize:    c.AuditLogMaxSize,
-		}
-	}
-
 	// Send correct mime type for .svg files.
 	// TODO: remove when https://github.com/golang/go/commit/21e47d831bafb59f22b1ea8098f709677ec8ce33
 	// makes it into all of our supported go versions (only in v1.7.1 now).
@@ -371,7 +368,7 @@ func (s *GenericAPIServer) buildHandlerChains(c *Config, handler http.Handler) (
 	secure = handler
 	secure = apiserverfilters.WithAuthorization(secure, attributeGetter, c.Authorizer)
 	secure = apiserverfilters.WithImpersonation(secure, c.RequestContextMapper, c.Authorizer)
-	secure = apiserverfilters.WithAudit(secure, attributeGetter, s.auditWriter) // before impersonation to read original user
+	secure = apiserverfilters.WithAudit(secure, attributeGetter, c.AuditWriter) // before impersonation to read original user
 	secure = authhandlers.WithAuthentication(secure, c.RequestContextMapper, c.Authenticator, authhandlers.Unauthorized(c.SupportsBasicAuth))
 	secure = genericfilters.WithPanicRecovery(secure, s.NewRequestInfoResolver())
 	secure = genericfilters.WithTimeoutForNonLongRunningRequests(secure, longRunningFunc)
