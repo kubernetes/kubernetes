@@ -23,9 +23,12 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -38,6 +41,7 @@ var (
 		"You can explicitly set to false if you're, e.g., testing client changes "+
 		"for which the server version doesn't make a difference.")
 	checkLeakedResources = flag.Bool("check_leaked_resources", false, "Ensure project ends with the same resources")
+	deployment           = flag.String("deployment", "bash", "up/down mechanism (defaults to cluster/kube-{up,down}.sh) (choices: bash/kops)")
 	down                 = flag.Bool("down", false, "If true, tear down the cluster before exiting.")
 	dump                 = flag.String("dump", "", "If set, dump cluster logs to this location on test or cluster-up failure")
 	kubemark             = flag.Bool("kubemark", false, "If true, run kubemark tests.")
@@ -157,6 +161,12 @@ func run() error {
 		}
 	}
 
+	deploy, err := getDeployer()
+	if err != nil {
+		return fmt.Errorf("error creating deployer: %v", err)
+	}
+	defer deploy.Destroy()
+
 	if *checkVersionSkew {
 		os.Setenv("KUBECTL", "./cluster/kubectl.sh --match-server-version")
 	} else {
@@ -167,12 +177,11 @@ func run() error {
 	os.Setenv("KUBE_RUNTIME_CONFIG", "batch/v2alpha1=true")
 
 	if *up {
-		if err := xmlWrap("TearDown", TearDown); err != nil {
+		if err := xmlWrap("TearDown", deploy.Down); err != nil {
 			return fmt.Errorf("error tearing down previous cluster: %s", err)
 		}
 	}
 
-	var err error
 	var errs []error
 
 	var (
@@ -190,7 +199,7 @@ func run() error {
 
 	if *up {
 		// Start the cluster using this version.
-		if err := xmlWrap("Up", Up); err != nil {
+		if err := xmlWrap("Up", deploy.Up); err != nil {
 			return fmt.Errorf("starting e2e cluster: %s", err)
 		}
 	}
@@ -209,13 +218,19 @@ func run() error {
 	}
 
 	if *test {
+		var err error
+		errs = appendError(errs, xmlWrap("get kubeconfig", deploy.SetupKubecfg))
 		errs = appendError(errs, xmlWrap("kubectl version", func() error {
-			return finishRunning("kubectl version", exec.Command("./cluster/kubectl.sh", "version", "--match-server-version=false"))
+			err = finishRunning("kubectl version", exec.Command("./cluster/kubectl.sh", "version", "--match-server-version=false"))
+			return err
 		}))
-		if *skewTests {
-			errs = appendError(errs, xmlWrap("SkewTest", SkewTest))
-		} else {
-			errs = appendError(errs, xmlWrap("Test", Test))
+		// Only run tests if we can reach the server, which "kubectl version" briefly checks.
+		if err == nil {
+			if *skewTests {
+				errs = appendError(errs, xmlWrap("SkewTest", SkewTest))
+			} else {
+				errs = appendError(errs, xmlWrap("Test", Test))
+			}
 		}
 	}
 
@@ -230,7 +245,7 @@ func run() error {
 	}
 
 	if *down {
-		errs = appendError(errs, xmlWrap("TearDown", TearDown))
+		errs = appendError(errs, xmlWrap("TearDown", deploy.Down))
 	}
 
 	if *checkLeakedResources {
@@ -332,17 +347,215 @@ func Build() error {
 	return nil
 }
 
-func TearDown() error {
-	return finishRunning("teardown", exec.Command("./hack/e2e-internal/e2e-down.sh"))
+type deployer interface {
+	Up() error
+	IsUp() bool
+	SetupKubecfg() error
+	Down() error
+	Destroy()
 }
 
-func Up() error {
+func getDeployer() (deployer, error) {
+	switch *deployment {
+	case "bash":
+		return bash{}, nil
+	case "kops":
+		return NewKops()
+	default:
+		return nil, fmt.Errorf("Unknown deployment strategy %q", *deployment)
+	}
+}
+
+type bash struct{}
+
+func (b bash) Up() error {
 	return finishRunning("up", exec.Command("./hack/e2e-internal/e2e-up.sh"))
 }
 
-// Is the e2e cluster up?
-func IsUp() bool {
+func (b bash) IsUp() bool {
 	return finishRunning("get status", exec.Command("./hack/e2e-internal/e2e-status.sh")) == nil
+}
+
+func (b bash) SetupKubecfg() error {
+	return nil
+}
+
+func (b bash) Down() error {
+	return finishRunning("teardown", exec.Command("./hack/e2e-internal/e2e-down.sh"))
+}
+
+func (b bash) Destroy() {}
+
+type kops struct {
+	binary    string
+	tmpBinary bool
+	zones     []string
+	nodes     int
+	cluster   string
+	kubecfg   string
+}
+
+func NewKops() (*kops, error) {
+	if os.Getenv("KOPS_STATE_STORE") == "" {
+		return nil, fmt.Errorf("KOPS_STATE_STORE must be set to a valid S3 path for kops deployment")
+	}
+	// Presume the kops binary was supplied to us.
+	binary := os.Getenv("KOPS_BINARY")
+	tmpBinary := false
+	if binary == "" {
+		var err error
+		binaryURL := os.Getenv("KOPS_BINARY_DIR_URL")
+		if binaryURL == "" {
+			binaryURL, err = download("https://storage.googleapis.com/kops-ci/bin/latest-ci.txt")
+			binaryURL = strings.TrimSpace(binaryURL)
+			if err != nil {
+				return nil, err
+			}
+		}
+		log.Printf("Downloading Kops from %s", binaryURL)
+		binary, err = downloadToTmp(fmt.Sprintf("%s/%s/%s/kops", binaryURL, runtime.GOOS, runtime.GOARCH), "kops", 0700)
+		if err != nil {
+			return nil, err
+		}
+		tmpBinary = true
+
+		if os.Getenv("NODEUP_URL") == "" {
+			os.Setenv("NODEUP_URL", fmt.Sprintf("%s/linux/amd64/nodeup", binaryURL))
+		}
+	} else {
+		log.Printf("Using existing kops binary at %s", binary)
+	}
+	zones := strings.Split(getenvDefault("KOPS_AWS_ZONES", "us-west-2a"), ",")
+	nodesStr := getenvDefault("KOPS_AWS_NODES", "2")
+	nodes, err := strconv.Atoi(nodesStr)
+	if err != nil {
+		return nil, fmt.Errorf("KOPS_AWS_NODES set to invalid integer %q", nodesStr)
+	}
+	cluster := os.Getenv("KOPS_CLUSTER_NAME")
+	if cluster == "" {
+		return nil, fmt.Errorf("KOPS_CLUSTER_NAME must be set for kops deployment")
+	}
+	f, err := ioutil.TempFile("", "kops-kubecfg")
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	kubecfg := f.Name()
+	if err := f.Chmod(0600); err != nil {
+		return nil, err
+	}
+	if err := os.Setenv("KUBECONFIG", kubecfg); err != nil {
+		return nil, err
+	}
+	// Set KUBERNETES_CONFORMANCE_TEST so the auth info is picked up
+	// from kubectl instead of bash inference.
+	if err := os.Setenv("KUBERNETES_CONFORMANCE_TEST", "yes"); err != nil {
+		return nil, err
+	}
+	// Set KUBERNETES_CONFORMANCE_PROVIDER to override the
+	// cloudprovider for KUBERNETES_CONFORMANCE_TEST.
+	if err := os.Setenv("KUBERNETES_CONFORMANCE_PROVIDER", "aws"); err != nil {
+		return nil, err
+	}
+	// ZONE is required by the AWS e2e tests
+	if err := os.Setenv("ZONE", zones[0]); err != nil {
+		return nil, err
+	}
+	return &kops{
+		binary:    binary,
+		tmpBinary: tmpBinary,
+		zones:     zones,
+		nodes:     nodes,
+		cluster:   cluster,
+		kubecfg:   kubecfg,
+	}, nil
+}
+
+func (k kops) Up() error {
+	if err := finishRunning("kops config", exec.Command(
+		k.binary, "create", "cluster",
+		"--name", k.cluster,
+		"--node-count", strconv.Itoa(k.nodes),
+		"--zones", strings.Join(k.zones, ","))); err != nil {
+		return fmt.Errorf("kops configuration failed: %v", err)
+	}
+	if err := finishRunning("kops update", exec.Command(k.binary, "update", "cluster", k.cluster, "--yes")); err != nil {
+		return fmt.Errorf("kops bringup failed: %v", err)
+	}
+	// TODO(zmerlynn): More cluster validation. This should perhaps be
+	// added to kops and not here, but this is a fine place to loop
+	// for now.
+	for stop := time.Now().Add(10 * time.Minute); time.Now().Before(stop); time.Sleep(30 * time.Second) {
+		n, err := k.ClusterSize()
+		if err != nil {
+			log.Printf("Can't get cluster size, sleeping: %v", err)
+			continue
+		}
+		if n < k.nodes {
+			log.Printf("%d (current nodes) < %d (requested), sleeping", n, k.nodes)
+			continue
+		}
+		return nil
+	}
+	return fmt.Errorf("kops bringup timed out")
+}
+
+func (k kops) IsUp() bool {
+	n, err := k.ClusterSize()
+	if err != nil {
+		log.Printf("IsUp: false: %v", err)
+		return false
+	}
+	log.Printf("IsUp: %v (%d > 0)", n > 0, n)
+	return n > 0
+}
+
+func (k kops) SetupKubecfg() error {
+	info, err := os.Stat(k.kubecfg)
+	if err != nil {
+		return err
+	}
+	if info.Size() > 0 {
+		// Assume that if we already have it, it's good.
+		return nil
+	}
+	if err := finishRunning("kops export", exec.Command(k.binary, "export", "kubecfg", k.cluster)); err != nil {
+		return fmt.Errorf("Failure exporting kops kubecfg: %v", err)
+	}
+	return nil
+}
+
+func (k kops) ClusterSize() (int, error) {
+	if err := k.SetupKubecfg(); err != nil {
+		return -1, err
+	}
+	o, err := exec.Command("kubectl", "get", "nodes", "--no-headers").Output()
+	if err != nil {
+		log.Printf("kubectl get nodes failed: %v", err)
+		return -1, err
+	}
+	stdout := strings.TrimSpace(string(o))
+	log.Printf("Cluster nodes:\n%s", stdout)
+	return len(strings.Split(stdout, "\n")), nil
+}
+
+func (k kops) Down() error {
+	// We do a "kops get" first so the exit status of "kops delete" is
+	// more sensical in the case of a non-existant cluster. ("kops
+	// delete" will exit with status 1 on a non-existant cluster)
+	err := finishRunning("kops get", exec.Command(k.binary, "get", "clusters", k.cluster))
+	if err != nil {
+		// This is expected if the cluster doesn't exist.
+		return nil
+	}
+	return finishRunning("kops delete", exec.Command(k.binary, "delete", "cluster", k.cluster, "--yes"))
+}
+
+func (k kops) Destroy() {
+	if k.tmpBinary {
+		os.Remove(k.binary)
+	}
+	os.Remove(k.kubecfg)
 }
 
 func DumpClusterLogs(location string) error {
@@ -443,10 +656,6 @@ func SkewTest() error {
 }
 
 func Test() error {
-	if !IsUp() {
-		return fmt.Errorf("testing requested, but e2e cluster not up!")
-	}
-
 	// TODO(fejta): add a --federated or something similar
 	if os.Getenv("FEDERATION") != "true" {
 		return finishRunning("Ginkgo tests", exec.Command("./hack/ginkgo-e2e.sh", strings.Fields(*testArgs)...))
@@ -472,4 +681,47 @@ func finishRunning(stepName string, cmd *exec.Cmd) error {
 		return fmt.Errorf("error running %v: %v", stepName, err)
 	}
 	return nil
+}
+
+func getenvDefault(env string, def string) string {
+	val := os.Getenv(env)
+	if val == "" {
+		return def
+	}
+	return val
+}
+
+func download(url string) (string, error) {
+	resp, err := http.Get(url)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("Error downloading %s: %s", url, resp.Status)
+	}
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+	return string(body), nil
+}
+
+func downloadToTmp(url, prefix string, mode os.FileMode) (string, error) {
+	data, err := download(url)
+	if err != nil {
+		return "", err
+	}
+	tmp, err := ioutil.TempFile("", prefix)
+	if err != nil {
+		return "", err
+	}
+	defer tmp.Close()
+	if _, err = tmp.WriteString(data); err != nil {
+		return "", err
+	}
+	if err = tmp.Chmod(mode); err != nil {
+		return "", err
+	}
+	return tmp.Name(), nil
 }
