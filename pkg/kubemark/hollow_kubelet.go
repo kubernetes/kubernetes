@@ -124,7 +124,7 @@ func GetHollowKubeletConfig(
 	c.EvictionPressureTransitionPeriod.Duration = 5 * time.Minute
 	c.MaxPods = int32(maxPods)
 	c.PodsPerCore = int32(podsPerCore)
-	c.ClusterDNS = ""
+	c.ClusterDNS = []string{}
 	c.DockerExecHandlerName = "native"
 	c.ImageGCHighThresholdPercent = 90
 	c.ImageGCLowThresholdPercent = 80

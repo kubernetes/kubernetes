@@ -268,7 +268,13 @@ func DeepCopy_v1alpha1_KubeletConfiguration(in interface{}, out interface{}, c *
 		}
 		out.ClusterDomain = in.ClusterDomain
 		out.MasterServiceNamespace = in.MasterServiceNamespace
-		out.ClusterDNS = in.ClusterDNS
+		if in.ClusterDNS != nil {
+			in, out := &in.ClusterDNS, &out.ClusterDNS
+			*out = make([]string, len(*in))
+			copy(*out, *in)
+		} else {
+			out.ClusterDNS = nil
+		}
 		out.StreamingConnectionIdleTimeout = in.StreamingConnectionIdleTimeout
 		out.NodeStatusUpdateFrequency = in.NodeStatusUpdateFrequency
 		out.ImageMinimumGCAge = in.ImageMinimumGCAge
