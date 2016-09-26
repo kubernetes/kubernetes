@@ -254,7 +254,7 @@ In the Enterprise Profile:
 In the Simple Profile:
    - There is a single `namespace` used by the single user.
 
-Namespaces versus userAccount vs Labels:
+Namespaces versus userAccount vs. Labels:
 - `userAccount`s are intended for audit logging (both name and UID should be
 logged), and to define who has access to `namespace`s.
 - `labels` (see [docs/user-guide/labels.md](../../docs/user-guide/labels.md))
