@@ -19,6 +19,8 @@ package node
 import (
 	"fmt"
 	"os"
+	"sync"
+	"time"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
@@ -26,6 +28,7 @@ import (
 	certclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/certificates/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 // ConnectionDetails represents a master API endpoint connection
@@ -36,7 +39,14 @@ type ConnectionDetails struct {
 	NodeName   types.NodeName
 }
 
-// EstablishMasterConnection establishes a connection with exactly one of the provided API endpoints or errors.
+// retryTimeout between the subsequent attempts to connect
+// to an API endpoint
+const retryTimeout = 5
+
+// EstablishMasterConnection establishes a connection with exactly one of the provided API endpoints.
+// The function builds a client for every endpoint and concurrently keeps trying to connect to any one
+// of the provided endpoints. Blocks until at least one connection is established, then it stops the
+// connection attempts for other endpoints.
 func EstablishMasterConnection(s *kubeadmapi.NodeConfiguration, clusterInfo *kubeadmapi.ClusterInfo) (*ConnectionDetails, error) {
 	hostName, err := os.Hostname()
 	if err != nil {
@@ -48,35 +58,49 @@ func EstablishMasterConnection(s *kubeadmapi.NodeConfiguration, clusterInfo *kub
 	endpoints := clusterInfo.Endpoints
 	caCert := []byte(clusterInfo.CertificateAuthorities[0])
 
-	var establishedConnection *ConnectionDetails
-	// TODO: add a wait mechanism for the API endpoints (retrying to connect to at least one)
+	stopChan := make(chan struct{})
+	result := make(chan *ConnectionDetails)
+	var wg sync.WaitGroup
 	for _, endpoint := range endpoints {
 		clientSet, err := createClients(caCert, endpoint, s.Secrets.BearerToken, nodeName)
 		if err != nil {
 			fmt.Printf("<node/bootstrap> warning: %s. Skipping endpoint %s\n", err, endpoint)
 			continue
 		}
-		fmt.Printf("<node/bootstrap> trying to connect to endpoint %s\n", endpoint)
-
-		// TODO: add a simple GET /version request to fail early if needed before attempting
-		// to connect with a discovery client.
-		if err := checkCertsAPI(clientSet.DiscoveryClient); err != nil {
-			fmt.Printf("<node/bootstrap> warning: failed to connect to %s: %v\n", endpoint, err)
-			continue
-		}
-
-		fmt.Printf("<node/bootstrap> successfully established connection with endpoint %s\n", endpoint)
-		// connection established
-		establishedConnection = &ConnectionDetails{
-			CertClient: clientSet.CertificatesClient,
-			Endpoint:   endpoint,
-			CACert:     caCert,
-			NodeName:   nodeName,
-		}
-		break
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			wait.Until(func() {
+				fmt.Printf("<node/bootstrap> trying to connect to endpoint %s\n", endpoint)
+				if err := clientSet.CoreClient.Get().AbsPath("version").Do().Error(); err != nil {
+					fmt.Printf("<node/bootstrap> failed to connect to %s: %v\n", endpoint, err)
+					return
+				}
+				if err := checkCertsAPI(clientSet.DiscoveryClient); err != nil {
+					fmt.Printf("<node/bootstrap> certificate API check failed %s: %v\n", endpoint, err)
+					return
+				}
+				fmt.Printf("<node/bootstrap> successfully established connection with endpoint %s\n", endpoint)
+				// connection established, stop all wait threads
+				close(stopChan)
+				result <- &ConnectionDetails{
+					CertClient: clientSet.CertificatesClient,
+					Endpoint:   endpoint,
+					CACert:     caCert,
+					NodeName:   nodeName,
+				}
+			}, retryTimeout*time.Second, stopChan)
+		}()
 	}
 
-	if establishedConnection == nil {
+	go func() {
+		wg.Wait()
+		// all wait.Until() calls have finished now
+		close(result)
+	}()
+
+	establishedConnection, ok := <-result
+	if !ok {
 		return nil, fmt.Errorf("<node/bootstrap> failed to create bootstrap clients " +
 			"for any of the provided API endpoints")
 	}
