@@ -115,7 +115,7 @@ func runResourceTrackingTest(f *framework.Framework, podsPerNode int, nodeNames 
 	verifyCPULimits(expectedCPU, cpuSummary)
 
 	By("Deleting the RC")
-	framework.DeleteRCAndPods(f.Client, f.Namespace.Name, rcName)
+	framework.DeleteRCAndPods(f.Client, f.ClientSet, f.Namespace.Name, rcName)
 }
 
 func verifyMemoryLimits(c *client.Client, expected framework.ResourceUsagePerContainer, actual framework.ResourceUsagePerNode) {

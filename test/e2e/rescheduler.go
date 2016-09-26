@@ -48,7 +48,7 @@ var _ = framework.KubeDescribe("Rescheduler [Serial]", func() {
 	It("should ensure that critical pod is scheduled in case there is no resources available", func() {
 		By("reserving all available cpu")
 		err := reserveAllCpu(f, "reserve-all-cpu", totalMillicores)
-		defer framework.DeleteRCAndPods(f.Client, ns, "reserve-all-cpu")
+		defer framework.DeleteRCAndPods(f.Client, f.ClientSet, ns, "reserve-all-cpu")
 		framework.ExpectNoError(err)
 
 		By("creating a new instance of DNS and waiting for DNS to be scheduled")
@@ -61,8 +61,8 @@ var _ = framework.KubeDescribe("Rescheduler [Serial]", func() {
 		rc := rcs.Items[0]
 		replicas := uint(rc.Spec.Replicas)
 
-		err = framework.ScaleRC(f.Client, api.NamespaceSystem, rc.Name, replicas+1, true)
-		defer framework.ExpectNoError(framework.ScaleRC(f.Client, api.NamespaceSystem, rc.Name, replicas, true))
+		err = framework.ScaleRC(f.Client, f.ClientSet, api.NamespaceSystem, rc.Name, replicas+1, true)
+		defer framework.ExpectNoError(framework.ScaleRC(f.Client, f.ClientSet, api.NamespaceSystem, rc.Name, replicas, true))
 		framework.ExpectNoError(err)
 	})
 })
@@ -72,7 +72,7 @@ func reserveAllCpu(f *framework.Framework, id string, millicores int) error {
 	replicas := millicores / 100
 
 	ReserveCpu(f, id, 1, 100)
-	framework.ExpectNoError(framework.ScaleRC(f.Client, f.Namespace.Name, id, uint(replicas), false))
+	framework.ExpectNoError(framework.ScaleRC(f.Client, f.ClientSet, f.Namespace.Name, id, uint(replicas), false))
 
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(10 * time.Second) {
 		pods, err := framework.GetPodsInNamespace(f.Client, f.Namespace.Name, framework.ImagePullerLabels)

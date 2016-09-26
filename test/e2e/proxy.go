@@ -154,7 +154,7 @@ func proxyContext(version string) {
 			CreatedPods: &pods,
 		}
 		Expect(framework.RunRC(cfg)).NotTo(HaveOccurred())
-		defer framework.DeleteRCAndPods(f.Client, f.Namespace.Name, cfg.Name)
+		defer framework.DeleteRCAndPods(f.Client, f.ClientSet, f.Namespace.Name, cfg.Name)
 
 		Expect(f.WaitForAnEndpoint(service.Name)).NotTo(HaveOccurred())
 

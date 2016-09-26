@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
@@ -59,8 +60,13 @@ const (
 type Framework struct {
 	BaseName string
 
-	Client        *client.Client
-	Clientset_1_5 *release_1_5.Clientset
+	// Client is manually created and should not be used unless absolutely necessary. Use ClientSet_1_5
+	// where possible.
+	Client *client.Client
+	// ClientSet uses internal objects, you should use ClientSet_1_5 where possible.
+	ClientSet internalclientset.Interface
+
+	ClientSet_1_5 *release_1_5.Clientset
 	StagingClient *staging.Clientset
 	ClientPool    dynamic.ClientPool
 
@@ -193,7 +199,9 @@ func (f *Framework) BeforeEach() {
 		c, err := loadClientFromConfig(config)
 		Expect(err).NotTo(HaveOccurred())
 		f.Client = c
-		f.Clientset_1_5, err = release_1_5.NewForConfig(config)
+		f.ClientSet, err = internalclientset.NewForConfig(config)
+		Expect(err).NotTo(HaveOccurred())
+		f.ClientSet_1_5, err = release_1_5.NewForConfig(config)
 		Expect(err).NotTo(HaveOccurred())
 		clientRepoConfig := getClientRepoConfig(config)
 		f.StagingClient, err = staging.NewForConfig(clientRepoConfig)
@@ -358,7 +366,7 @@ func (f *Framework) AfterEach() {
 	// Print events if the test failed.
 	if CurrentGinkgoTestDescription().Failed && TestContext.DumpLogsOnFailure {
 		// Pass both unversioned client and and versioned clientset, till we have removed all uses of the unversioned client.
-		DumpAllNamespaceInfo(f.Client, f.Clientset_1_5, f.Namespace.Name)
+		DumpAllNamespaceInfo(f.Client, f.ClientSet_1_5, f.Namespace.Name)
 		By(fmt.Sprintf("Dumping a list of prepulled images on each node"))
 		LogContainersInPodsWithLabels(f.Client, api.NamespaceSystem, ImagePullerLabels, "image-puller")
 		if f.federated {

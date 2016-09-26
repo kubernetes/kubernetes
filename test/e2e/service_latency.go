@@ -126,7 +126,7 @@ func runServiceLatencies(f *framework.Framework, inParallel, total int) (output 
 	if err := framework.RunRC(cfg); err != nil {
 		return nil, err
 	}
-	defer framework.DeleteRCAndPods(f.Client, f.Namespace.Name, cfg.Name)
+	defer framework.DeleteRCAndPods(f.Client, f.ClientSet, f.Namespace.Name, cfg.Name)
 
 	// Run a single watcher, to reduce the number of API calls we have to
 	// make; this is to minimize the timing error. It's how kube-proxy

@@ -26,6 +26,8 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/intstr"
@@ -321,7 +323,7 @@ func scaleRC(wg *sync.WaitGroup, config *framework.RCConfig, scalingTime time.Du
 
 	sleepUpTo(scalingTime)
 	newSize := uint(rand.Intn(config.Replicas) + config.Replicas/2)
-	framework.ExpectNoError(framework.ScaleRC(config.Client, config.Namespace, config.Name, newSize, true),
+	framework.ExpectNoError(framework.ScaleRC(config.Client, coreClientSetFromUnversioned(config.Client), config.Namespace, config.Name, newSize, true),
 		fmt.Sprintf("scaling rc %s for the first time", config.Name))
 	selector := labels.SelectorFromSet(labels.Set(map[string]string{"name": config.Name}))
 	options := api.ListOptions{
@@ -349,6 +351,17 @@ func deleteRC(wg *sync.WaitGroup, config *framework.RCConfig, deletingTime time.
 	if framework.TestContext.GarbageCollectorEnabled {
 		framework.ExpectNoError(framework.DeleteRCAndWaitForGC(config.Client, config.Namespace, config.Name), fmt.Sprintf("deleting rc %s", config.Name))
 	} else {
-		framework.ExpectNoError(framework.DeleteRCAndPods(config.Client, config.Namespace, config.Name), fmt.Sprintf("deleting rc %s", config.Name))
+		framework.ExpectNoError(framework.DeleteRCAndPods(config.Client, coreClientSetFromUnversioned(config.Client), config.Namespace, config.Name), fmt.Sprintf("deleting rc %s", config.Name))
 	}
+}
+
+// coreClientSetFromUnversioned adapts just enough of a a unversioned.Client to work with the scale RC function
+func coreClientSetFromUnversioned(c *client.Client) internalclientset.Interface {
+	var clientset internalclientset.Clientset
+	if c != nil {
+		clientset.CoreClient = unversionedcore.New(c.RESTClient)
+	} else {
+		clientset.CoreClient = unversionedcore.New(nil)
+	}
+	return &clientset
 }

@@ -42,10 +42,8 @@ import (
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	clientsetadapter "k8s.io/kubernetes/pkg/client/unversioned/adapters/internalclientset"
 	"k8s.io/kubernetes/pkg/controller"
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
-	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/genericapiserver/authorizer"
 	"k8s.io/kubernetes/pkg/kubectl"
@@ -300,8 +298,8 @@ func RCFromManifest(fileName string) *api.ReplicationController {
 }
 
 // StopRC stops the rc via kubectl's stop library
-func StopRC(rc *api.ReplicationController, restClient *client.Client) error {
-	reaper, err := kubectl.ReaperFor(api.Kind("ReplicationController"), clientsetadapter.FromUnversionedClient(restClient))
+func StopRC(rc *api.ReplicationController, clientset clientset.Interface) error {
+	reaper, err := kubectl.ReaperFor(api.Kind("ReplicationController"), clientset)
 	if err != nil || reaper == nil {
 		return err
 	}
@@ -313,8 +311,8 @@ func StopRC(rc *api.ReplicationController, restClient *client.Client) error {
 }
 
 // ScaleRC scales the given rc to the given replicas.
-func ScaleRC(name, ns string, replicas int32, restClient *client.Client) (*api.ReplicationController, error) {
-	scaler, err := kubectl.ScalerFor(api.Kind("ReplicationController"), clientsetadapter.FromUnversionedClient(restClient))
+func ScaleRC(name, ns string, replicas int32, clientset clientset.Interface) (*api.ReplicationController, error) {
+	scaler, err := kubectl.ScalerFor(api.Kind("ReplicationController"), clientset)
 	if err != nil {
 		return nil, err
 	}
@@ -324,62 +322,11 @@ func ScaleRC(name, ns string, replicas int32, restClient *client.Client) (*api.R
 	if err != nil {
 		return nil, err
 	}
-	scaled, err := restClient.ReplicationControllers(ns).Get(name)
+	scaled, err := clientset.Core().ReplicationControllers(ns).Get(name)
 	if err != nil {
 		return nil, err
 	}
 	return scaled, nil
-}
-
-// StartRC creates given rc if it doesn't already exist, then updates it via kubectl's scaler.
-func StartRC(controller *api.ReplicationController, restClient *client.Client) (*api.ReplicationController, error) {
-	created, err := restClient.ReplicationControllers(controller.Namespace).Get(controller.Name)
-	if err != nil {
-		glog.Infof("Rc %v doesn't exist, creating", controller.Name)
-		created, err = restClient.ReplicationControllers(controller.Namespace).Create(controller)
-		if err != nil {
-			return nil, err
-		}
-	}
-	// If we just created an rc, wait till it creates its replicas.
-	return ScaleRC(created.Name, created.Namespace, controller.Spec.Replicas, restClient)
-}
-
-// StartPods check for numPods in namespace. If they exist, it no-ops, otherwise it starts up
-// a temp rc, scales it to match numPods, then deletes the rc leaving behind the pods.
-func StartPods(namespace string, numPods int, host string, restClient *client.Client) error {
-	start := time.Now()
-	defer func() {
-		glog.Infof("StartPods took %v with numPods %d", time.Since(start), numPods)
-	}()
-	hostField := fields.OneTermEqualSelector(api.PodHostField, host)
-	options := api.ListOptions{FieldSelector: hostField}
-	pods, err := restClient.Pods(namespace).List(options)
-	if err != nil || len(pods.Items) == numPods {
-		return err
-	}
-	glog.Infof("Found %d pods that match host %v, require %d", len(pods.Items), hostField, numPods)
-	// For the sake of simplicity, assume all pods in namespace have selectors matching TestRCManifest.
-	controller := RCFromManifest(TestRCManifest)
-
-	// Overwrite namespace
-	controller.ObjectMeta.Namespace = namespace
-	controller.Spec.Template.ObjectMeta.Namespace = namespace
-
-	// Make the rc unique to the given host.
-	controller.Spec.Replicas = int32(numPods)
-	controller.Spec.Template.Spec.NodeName = host
-	controller.Name = controller.Name + host
-	controller.Spec.Selector["host"] = host
-	controller.Spec.Template.Labels["host"] = host
-
-	if rc, err := StartRC(controller, restClient); err != nil {
-		return err
-	} else {
-		// Delete the rc, otherwise when we restart master components for the next benchmark
-		// the rc controller will race with the pods controller in the rc manager.
-		return restClient.ReplicationControllers(namespace).Delete(rc.Name, nil)
-	}
 }
 
 func RunAMaster(masterConfig *master.Config) (*master.Master, *httptest.Server) {
