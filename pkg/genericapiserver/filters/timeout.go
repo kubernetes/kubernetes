@@ -35,6 +35,9 @@ var errConnKilled = fmt.Errorf("kill connection/stream")
 
 // WithTimeoutForNonLongRunningRequests times out non-long-running requests after the time given by globalTimeout.
 func WithTimeoutForNonLongRunningRequests(handler http.Handler, longRunning LongRunningRequestCheck) http.Handler {
+	if longRunning == nil {
+		return handler
+	}
 	timeoutFunc := func(req *http.Request) (<-chan time.Time, string) {
 		// TODO unify this with apiserver.MaxInFlightLimit
 		if longRunning(req) {
