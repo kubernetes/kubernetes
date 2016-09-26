@@ -568,6 +568,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 				klet.cpuCFSQuota,
 				dockerService,
 				dockerService,
+				kubeCfg.PodInfraContainerImage,
 			)
 			if err != nil {
 				return nil, err
@@ -663,6 +664,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 			klet.cpuCFSQuota,
 			remoteRuntimeService,
 			remoteImageService,
+			kubeCfg.PodInfraContainerImage,
 		)
 		if err != nil {
 			return nil, err

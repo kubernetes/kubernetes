@@ -45,9 +45,18 @@ const (
 // Note: docker doesn't use LogDirectory (yet).
 func (ds *dockerService) RunPodSandbox(config *runtimeApi.PodSandboxConfig) (string, error) {
 	// Step 1: Pull the image for the sandbox.
+	var (
+		image string
+	)
+	infraContainerImage := config.GetPodInfraContainerImage()
+	if len(infraContainerImage) != 0 {
+		image = infraContainerImage
+	} else {
+		image = defaultSandboxImage
+	}
+
 	// TODO: How should we handle pulling custom pod infra container image
 	// (with credentials)?
-	image := defaultSandboxImage
 	if err := ds.client.PullImage(image, dockertypes.AuthConfig{}, dockertypes.ImagePullOptions{}); err != nil {
 		return "", fmt.Errorf("unable to pull image for the sandbox container: %v", err)
 	}

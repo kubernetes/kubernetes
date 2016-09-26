@@ -99,6 +99,9 @@ type kubeGenericRuntimeManager struct {
 	// gRPC service clients
 	runtimeService internalApi.RuntimeService
 	imageService   internalApi.ImageManagerService
+
+	// custom infra container image
+	podInfraContainerImage string
 }
 
 // NewKubeGenericRuntimeManager creates a new kubeGenericRuntimeManager
@@ -119,19 +122,21 @@ func NewKubeGenericRuntimeManager(
 	cpuCFSQuota bool,
 	runtimeService internalApi.RuntimeService,
 	imageService internalApi.ImageManagerService,
+	podInfraContainerImage string,
 ) (kubecontainer.Runtime, error) {
 	kubeRuntimeManager := &kubeGenericRuntimeManager{
-		recorder:            recorder,
-		cpuCFSQuota:         cpuCFSQuota,
-		livenessManager:     livenessManager,
-		containerRefManager: containerRefManager,
-		machineInfo:         machineInfo,
-		osInterface:         osInterface,
-		networkPlugin:       networkPlugin,
-		runtimeHelper:       runtimeHelper,
-		runtimeService:      runtimeService,
-		imageService:        imageService,
-		keyring:             credentialprovider.NewDockerKeyring(),
+		recorder:               recorder,
+		cpuCFSQuota:            cpuCFSQuota,
+		livenessManager:        livenessManager,
+		containerRefManager:    containerRefManager,
+		machineInfo:            machineInfo,
+		osInterface:            osInterface,
+		networkPlugin:          networkPlugin,
+		runtimeHelper:          runtimeHelper,
+		runtimeService:         runtimeService,
+		imageService:           imageService,
+		keyring:                credentialprovider.NewDockerKeyring(),
+		podInfraContainerImage: podInfraContainerImage,
 	}
 
 	typedVersion, err := kubeRuntimeManager.runtimeService.Version(kubeRuntimeAPIVersion)
