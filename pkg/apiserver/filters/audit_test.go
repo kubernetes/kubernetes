@@ -29,9 +29,8 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apiserver"
+	"k8s.io/kubernetes/pkg/apiserver/request"
 	"k8s.io/kubernetes/pkg/auth/user"
-	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 type simpleResponseWriter struct {
@@ -72,22 +71,14 @@ func (*fakeHTTPHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	w.WriteHeader(200)
 }
 
-type fakeRequestContextMapper struct{}
-
-func (*fakeRequestContextMapper) Get(req *http.Request) (api.Context, bool) {
-	return api.WithUser(api.NewContext(), &user.DefaultInfo{Name: "admin"}), true
-
-}
-
-func (*fakeRequestContextMapper) Update(req *http.Request, context api.Context) error {
-	return nil
-}
-
 func TestAudit(t *testing.T) {
 	var buf bytes.Buffer
-	attributeGetter := NewRequestAttributeGetter(&fakeRequestContextMapper{},
-		&apiserver.RequestInfoResolver{APIPrefixes: sets.NewString("api", "apis"), GrouplessAPIPrefixes: sets.NewString("api")})
+
+	attributeGetter := NewRequestAttributeGetter(&fakeRequestContextMapper{
+		user: &user.DefaultInfo{Name: "admin"},
+	})
 	handler := WithAudit(&fakeHTTPHandler{}, attributeGetter, &buf)
+
 	req, _ := http.NewRequest("GET", "/api/v1/namespaces/default/pods", nil)
 	req.RemoteAddr = "127.0.0.1"
 	handler.ServeHTTP(httptest.NewRecorder(), req)
@@ -109,4 +100,27 @@ func TestAudit(t *testing.T) {
 	if !match {
 		t.Errorf("Unexpected second line of audit: %s", line[1])
 	}
+}
+
+type fakeRequestContextMapper struct {
+	user *user.DefaultInfo
+}
+
+func (m *fakeRequestContextMapper) Get(req *http.Request) (api.Context, bool) {
+	ctx := api.NewContext()
+	if m.user != nil {
+		ctx = api.WithUser(ctx, m.user)
+	}
+
+	resolver := newTestRequestInfoResolver()
+	info, err := resolver.GetRequestInfo(req)
+	if err == nil {
+		ctx = request.WithRequestInfo(ctx, info)
+	}
+
+	return ctx, true
+}
+
+func (*fakeRequestContextMapper) Update(req *http.Request, context api.Context) error {
+	return nil
 }

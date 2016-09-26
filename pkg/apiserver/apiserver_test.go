@@ -39,11 +39,14 @@ import (
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/apiserver/filters"
+	"k8s.io/kubernetes/pkg/apiserver/request"
 	apiservertesting "k8s.io/kubernetes/pkg/apiserver/testing"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/diff"
+	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/watch"
 	"k8s.io/kubernetes/pkg/watch/versioned"
 	"k8s.io/kubernetes/plugin/pkg/admission/admit"
@@ -258,8 +261,6 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 
 	template := APIGroupVersion{
 		Storage: storage,
-
-		RequestInfoResolver: newTestRequestInfoResolver(),
 
 		Creater:   api.Scheme,
 		Convertor: api.Scheme,
@@ -2386,14 +2387,13 @@ func TestCreateChecksDecode(t *testing.T) {
 func TestUpdateREST(t *testing.T) {
 	makeGroup := func(storage map[string]rest.Storage) *APIGroupVersion {
 		return &APIGroupVersion{
-			Storage:             storage,
-			Root:                "/" + prefix,
-			RequestInfoResolver: newTestRequestInfoResolver(),
-			Creater:             api.Scheme,
-			Convertor:           api.Scheme,
-			Copier:              api.Scheme,
-			Typer:               api.Scheme,
-			Linker:              selfLinker,
+			Storage:   storage,
+			Root:      "/" + prefix,
+			Creater:   api.Scheme,
+			Convertor: api.Scheme,
+			Copier:    api.Scheme,
+			Typer:     api.Scheme,
+			Linker:    selfLinker,
 
 			Admit:   admissionControl,
 			Context: requestContextMapper,
@@ -2472,13 +2472,12 @@ func TestParentResourceIsRequired(t *testing.T) {
 		Storage: map[string]rest.Storage{
 			"simple/sub": storage,
 		},
-		Root:                "/" + prefix,
-		RequestInfoResolver: newTestRequestInfoResolver(),
-		Creater:             api.Scheme,
-		Convertor:           api.Scheme,
-		Copier:              api.Scheme,
-		Typer:               api.Scheme,
-		Linker:              selfLinker,
+		Root:      "/" + prefix,
+		Creater:   api.Scheme,
+		Convertor: api.Scheme,
+		Copier:    api.Scheme,
+		Typer:     api.Scheme,
+		Linker:    selfLinker,
 
 		Admit:   admissionControl,
 		Context: requestContextMapper,
@@ -2504,13 +2503,12 @@ func TestParentResourceIsRequired(t *testing.T) {
 			"simple":     &SimpleRESTStorage{},
 			"simple/sub": storage,
 		},
-		Root:                "/" + prefix,
-		RequestInfoResolver: newTestRequestInfoResolver(),
-		Creater:             api.Scheme,
-		Convertor:           api.Scheme,
-		Copier:              api.Scheme,
-		Typer:               api.Scheme,
-		Linker:              selfLinker,
+		Root:      "/" + prefix,
+		Creater:   api.Scheme,
+		Convertor: api.Scheme,
+		Copier:    api.Scheme,
+		Typer:     api.Scheme,
+		Linker:    selfLinker,
 
 		Admit:   admissionControl,
 		Context: requestContextMapper,
@@ -3131,8 +3129,6 @@ func TestXGSubresource(t *testing.T) {
 	group := APIGroupVersion{
 		Storage: storage,
 
-		RequestInfoResolver: newTestRequestInfoResolver(),
-
 		Creater:   api.Scheme,
 		Convertor: api.Scheme,
 		Copier:    api.Scheme,
@@ -3159,8 +3155,7 @@ func TestXGSubresource(t *testing.T) {
 		panic(fmt.Sprintf("unable to install container %s: %v", group.GroupVersion, err))
 	}
 
-	handler := defaultAPIServer{mux, container}
-	server := httptest.NewServer(handler)
+	server := newTestServer(defaultAPIServer{mux, container})
 	defer server.Close()
 
 	resp, err := http.Get(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/" + itemID + "/subsimple")
@@ -3248,4 +3243,17 @@ func BenchmarkUpdateProtobuf(b *testing.B) {
 		response.Body.Close()
 	}
 	b.StopTimer()
+}
+
+func newTestServer(handler http.Handler) *httptest.Server {
+	handler = filters.WithRequestInfo(handler, newTestRequestInfoResolver(), requestContextMapper)
+	handler = api.WithRequestContext(handler, requestContextMapper)
+	return httptest.NewServer(handler)
+}
+
+func newTestRequestInfoResolver() *request.RequestInfoResolver {
+	return &request.RequestInfoResolver{
+		APIPrefixes:          sets.NewString("api", "apis"),
+		GrouplessAPIPrefixes: sets.NewString("api"),
+	}
 }

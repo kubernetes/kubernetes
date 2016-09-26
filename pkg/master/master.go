@@ -785,9 +785,8 @@ func (m *Master) thirdpartyapi(group, kind, version, pluralResource string) *api
 
 	apiRoot := extensionsrest.MakeThirdPartyPath("")
 	return &apiserver.APIGroupVersion{
-		Root:                apiRoot,
-		GroupVersion:        externalVersion,
-		RequestInfoResolver: m.NewRequestInfoResolver(),
+		Root:         apiRoot,
+		GroupVersion: externalVersion,
 
 		Creater:   thirdpartyresourcedata.NewObjectCreator(group, version, api.Scheme),
 		Convertor: api.Scheme,
