@@ -354,17 +354,21 @@ func (s *GenericAPIServer) buildHandlerChains(c *Config, handler http.Handler) (
 
 	// insecure filters
 	insecure = handler
-	insecure = genericfilters.WithPanicRecovery(insecure, s.NewRequestInfoResolver())
+	insecure = genericfilters.WithPanicRecovery(insecure, c.RequestContextMapper)
+	insecure = apiserverfilters.WithRequestInfo(insecure, s.NewRequestInfoResolver(), c.RequestContextMapper)
+	insecure = api.WithRequestContext(insecure, c.RequestContextMapper)
 	insecure = genericfilters.WithTimeoutForNonLongRunningRequests(insecure, c.LongRunningFunc)
 
 	// secure filters
-	attributeGetter := apiserverfilters.NewRequestAttributeGetter(c.RequestContextMapper, s.NewRequestInfoResolver())
+	attributeGetter := apiserverfilters.NewRequestAttributeGetter(c.RequestContextMapper)
 	secure = handler
 	secure = apiserverfilters.WithAuthorization(secure, attributeGetter, c.Authorizer)
 	secure = apiserverfilters.WithImpersonation(secure, c.RequestContextMapper, c.Authorizer)
 	secure = apiserverfilters.WithAudit(secure, attributeGetter, c.AuditWriter) // before impersonation to read original user
 	secure = authhandlers.WithAuthentication(secure, c.RequestContextMapper, c.Authenticator, authhandlers.Unauthorized(c.SupportsBasicAuth))
-	secure = genericfilters.WithPanicRecovery(secure, s.NewRequestInfoResolver())
+	secure = genericfilters.WithPanicRecovery(secure, c.RequestContextMapper)
+	secure = apiserverfilters.WithRequestInfo(secure, s.NewRequestInfoResolver(), c.RequestContextMapper)
+	secure = api.WithRequestContext(secure, c.RequestContextMapper)
 	secure = genericfilters.WithTimeoutForNonLongRunningRequests(secure, c.LongRunningFunc)
 	secure = genericfilters.WithMaxInFlightLimit(secure, c.MaxRequestsInFlight, c.LongRunningFunc)
 

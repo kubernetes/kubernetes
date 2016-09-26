@@ -89,7 +89,11 @@ func WithAudit(handler http.Handler, attributeGetter RequestAttributeGetter, out
 		return handler
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		attribs := attributeGetter.GetAttribs(req)
+		attribs, err := attributeGetter.GetAttribs(req)
+		if err != nil {
+			internalError(w, req, err)
+			return
+		}
 		asuser := req.Header.Get("Impersonate-User")
 		if len(asuser) == 0 {
 			asuser = "<self>"
