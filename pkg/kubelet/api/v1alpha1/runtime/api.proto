@@ -456,7 +456,10 @@ message CreateContainerRequest {
     optional string pod_sandbox_id = 1;
     // The config of the container
     optional ContainerConfig config = 2;
-    // The config of the PodSandbox
+    // The config of the PodSandbox. This is the same config that was passed
+    // to RunPodSandboxRequest to create the PodSandbox. It is passed again
+    // here just for easy reference. The PodSandboxConfig is immutable and
+    // remains the same throughout the lifetime of the pod.
     optional PodSandboxConfig sandbox_config = 3;
 }
 
