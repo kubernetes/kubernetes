@@ -43,77 +43,84 @@ import (
 // process PV/PVC added/updated/deleted events. The real binding, provisioning,
 // recycling and deleting is done in pv_controller.go
 
-// NewPersistentVolumeController creates a new PersistentVolumeController
-func NewPersistentVolumeController(
-	kubeClient clientset.Interface,
-	syncPeriod time.Duration,
-	alphaProvisioner vol.ProvisionableVolumePlugin,
-	volumePlugins []vol.VolumePlugin,
-	cloud cloudprovider.Interface,
-	clusterName string,
-	volumeSource, claimSource, classSource cache.ListerWatcher,
-	eventRecorder record.EventRecorder,
-	enableDynamicProvisioning bool,
-) *PersistentVolumeController {
+// ControllerParameters contains arguments for creation of a new
+// PersistentVolume controller.
+type ControllerParameters struct {
+	KubeClient                             clientset.Interface
+	SyncPeriod                             time.Duration
+	AlphaProvisioner                       vol.ProvisionableVolumePlugin
+	VolumePlugins                          []vol.VolumePlugin
+	Cloud                                  cloudprovider.Interface
+	ClusterName                            string
+	VolumeSource, ClaimSource, ClassSource cache.ListerWatcher
+	EventRecorder                          record.EventRecorder
+	EnableDynamicProvisioning              bool
+}
 
+// NewController creates a new PersistentVolume controller
+func NewController(p ControllerParameters) *PersistentVolumeController {
+	eventRecorder := p.EventRecorder
 	if eventRecorder == nil {
 		broadcaster := record.NewBroadcaster()
-		broadcaster.StartRecordingToSink(&unversioned_core.EventSinkImpl{Interface: kubeClient.Core().Events("")})
+		broadcaster.StartRecordingToSink(&unversioned_core.EventSinkImpl{Interface: p.KubeClient.Core().Events("")})
 		eventRecorder = broadcaster.NewRecorder(api.EventSource{Component: "persistentvolume-controller"})
 	}
 
 	controller := &PersistentVolumeController{
 		volumes:           newPersistentVolumeOrderedIndex(),
 		claims:            cache.NewStore(cache.DeletionHandlingMetaNamespaceKeyFunc),
-		kubeClient:        kubeClient,
+		kubeClient:        p.KubeClient,
 		eventRecorder:     eventRecorder,
 		runningOperations: goroutinemap.NewGoRoutineMap(false /* exponentialBackOffOnError */),
-		cloud:             cloud,
-		enableDynamicProvisioning:     enableDynamicProvisioning,
-		clusterName:                   clusterName,
+		cloud:             p.Cloud,
+		enableDynamicProvisioning:     p.EnableDynamicProvisioning,
+		clusterName:                   p.ClusterName,
 		createProvisionedPVRetryCount: createProvisionedPVRetryCount,
 		createProvisionedPVInterval:   createProvisionedPVInterval,
-		alphaProvisioner:              alphaProvisioner,
+		alphaProvisioner:              p.AlphaProvisioner,
 	}
 
-	controller.volumePluginMgr.InitPlugins(volumePlugins, controller)
+	controller.volumePluginMgr.InitPlugins(p.VolumePlugins, controller)
 	if controller.alphaProvisioner != nil {
 		if err := controller.alphaProvisioner.Init(controller); err != nil {
 			glog.Errorf("PersistentVolumeController: error initializing alpha provisioner plugin: %v", err)
 		}
 	}
 
+	volumeSource := p.VolumeSource
 	if volumeSource == nil {
 		volumeSource = &cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return kubeClient.Core().PersistentVolumes().List(options)
+				return p.KubeClient.Core().PersistentVolumes().List(options)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return kubeClient.Core().PersistentVolumes().Watch(options)
+				return p.KubeClient.Core().PersistentVolumes().Watch(options)
 			},
 		}
 	}
 	controller.volumeSource = volumeSource
 
+	claimSource := p.ClaimSource
 	if claimSource == nil {
 		claimSource = &cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return kubeClient.Core().PersistentVolumeClaims(api.NamespaceAll).List(options)
+				return p.KubeClient.Core().PersistentVolumeClaims(api.NamespaceAll).List(options)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return kubeClient.Core().PersistentVolumeClaims(api.NamespaceAll).Watch(options)
+				return p.KubeClient.Core().PersistentVolumeClaims(api.NamespaceAll).Watch(options)
 			},
 		}
 	}
 	controller.claimSource = claimSource
 
+	classSource := p.ClassSource
 	if classSource == nil {
 		classSource = &cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return kubeClient.Storage().StorageClasses().List(options)
+				return p.KubeClient.Storage().StorageClasses().List(options)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return kubeClient.Storage().StorageClasses().Watch(options)
+				return p.KubeClient.Storage().StorageClasses().Watch(options)
 			},
 		}
 	}
@@ -122,7 +129,7 @@ func NewPersistentVolumeController(
 	_, controller.volumeController = cache.NewIndexerInformer(
 		volumeSource,
 		&api.PersistentVolume{},
-		syncPeriod,
+		p.SyncPeriod,
 		cache.ResourceEventHandlerFuncs{
 			AddFunc:    controller.addVolume,
 			UpdateFunc: controller.updateVolume,
@@ -133,7 +140,7 @@ func NewPersistentVolumeController(
 	_, controller.claimController = cache.NewInformer(
 		claimSource,
 		&api.PersistentVolumeClaim{},
-		syncPeriod,
+		p.SyncPeriod,
 		cache.ResourceEventHandlerFuncs{
 			AddFunc:    controller.addClaim,
 			UpdateFunc: controller.updateClaim,
@@ -148,7 +155,7 @@ func NewPersistentVolumeController(
 		classSource,
 		&storage.StorageClass{},
 		controller.classes,
-		syncPeriod,
+		p.SyncPeriod,
 	)
 	return controller
 }
