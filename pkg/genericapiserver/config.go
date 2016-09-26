@@ -20,7 +20,6 @@ import (
 	"crypto/tls"
 	"fmt"
 	"io"
-	"mime"
 	"net"
 	"net/http"
 	"os"
@@ -337,11 +336,6 @@ func (c Config) New() (*GenericAPIServer, error) {
 			TLSClientConfig: c.ProxyTLSClientConfig,
 		})
 	}
-
-	// Send correct mime type for .svg files.
-	// TODO: remove when https://github.com/golang/go/commit/21e47d831bafb59f22b1ea8098f709677ec8ce33
-	// makes it into all of our supported go versions (only in v1.7.1 now).
-	mime.AddExtensionType(".svg", "image/svg+xml")
 
 	apiserver.InstallServiceErrorHandler(s.Serializer, s.HandlerContainer)
 
