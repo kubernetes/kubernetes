@@ -29,7 +29,13 @@ Documentation for other releases can be found at
 
 # Overview
 
-Some users of the server-side garbage collection need to tell if the garbage collection is done ([example](https://github.com/kubernetes/kubernetes/issues/19701#issuecomment-236997077)). Synchronous Garbage Collection is a best-effort (see [unhandled cases](#unhandled-cases)) mechanism to enable such use cases: after the API server receives a deletion request of an owning object, the object keeps existing in the key-value store until all its dependents are deleted from the key-value store by the garbage collector.
+Users of the server-side garbage collection need to determine if the garbage collection is done. For example:
+* Currently `kubectl delete rc` blocks until all the pods are terminating. To convert to use server-side garbage collection, kubectl has to be able to determine if the garbage collection is done.
+* [#19701](https://github.com/kubernetes/kubernetes/issues/19701#issuecomment-236997077) is a use case where the user needs to wait for all service dependencies garbage collected and their names released, before she recreates the dependencies.
+
+We define the garbage collection as "done" when all the dependents are deleted from the key-value store, rather than merely in the terminating state. There are two reasons: *i)* for `Pod`s, the most usual garbage, only when they are deleted from the key-value store, we know kubelet has released their resources; *ii)* some users need to recreate objects with the same names, they need to wait for the old objects to be deleted from the key-value store. (This limitation is because we index objects by their names in the key-value store today.)
+
+Synchronous Garbage Collection is a best-effort (see [unhandled cases](#unhandled-cases)) mechanism that allows user to determine if the garbage collection is done: after the API server receives a deletion request of an owning object, the object keeps existing in the key-value store until all its dependents are deleted from the key-value store by the garbage collector.
 
 Tracking issue: https://github.com/kubernetes/kubernetes/issues/29891
 
@@ -42,23 +48,23 @@ We need to make changes in the API, the API Server, and the garbage collector to
 ```go
 DeleteOptions {
   …
-  // If SynchronousGarbageCollection is set, the object will not be deleted immediately. Instead, a GarbageCollectionInProgress finalizer will be placed on the object. The garbage collector will remove the finalizer from the object when all depdendents are deleted.
+  // If SynchronousGarbageCollection is set, the object will not be deleted immediately. Instead, a CollectingGarbage finalizer will be placed on the object. The garbage collector will remove the finalizer from the object when all depdendents are deleted.
   // SynchronousGarbageCollection and OrphanDependents are exclusive.
-  // SynchronousGarbageCollection default to false.
+  // SynchronousGarbageCollection defaults to false.
   // SynchronousGarbageCollection is cascading, i.e., the object’s dependents will be deleted with the same SynchronousGarbageCollection.
   SynchronousGarbageCollection *bool
 }
 ```
 
-We will introduce a new standard finalizer: const GCFinalizer string = “GarbageCollectionInProgress”
+We will introduce a new standard finalizer: const GCFinalizer string = “CollectingGarbage”
 
 ## Components changes
 
 ### API Server
 
-Delete() function needs to check the DeleteOptions.SynchronousGarbageCollection.
+Delete() function needs to check the `DeleteOptions.SynchronousGarbageCollection`.
 
-* The option is ignored if DeleteOptions.OrphanDependents is true or nil.
+* The request is rejected with 400 if both `DeleteOptions.SynchronousGarbageCollection` and `DeleteOptions.OrphanDependents` are true (or default to true, see [DefaultGarbageCollectionPolicy](https://github.com/kubernetes/kubernetes/blob/release-1.4/pkg/registry/generic/registry/store.go#L500)).
 * If the option is set, the API server will update the object instead of deleting it, add the finalizer, and set the `ObjectMeta.DeletionTimestamp`.
 
 ### Garbage Collector
@@ -85,11 +91,15 @@ Delete() function needs to check the DeleteOptions.SynchronousGarbageCollection.
 
 * treat an owner as "not exist" if `owner.DeletionTimestamp != nil && !owner.Finalizers.Has(OrphanFinalizer)`, otherwise Synchronous GC will not progress because the owner keeps existing in the key-value store.
 * when deleting dependents, it should use the same `DeleteOptions.SynchronousGC` as the owner’s finalizers suggest.
-* if an object has multiple owners, some owners still exit while other owners are in the synchronous GC stage, then according to the existing logic of GC, the object wouldn't be deleted. To unblock the synchronous GC of those owners, `processItem()` has to remove the ownerReferences pointing to them.
+* if an object has multiple owners, some owners still exist while other owners are in the synchronous GC stage, then according to the existing logic of GC, the object wouldn't be deleted. To unblock the synchronous GC of owners, `processItem()` has to remove the ownerReferences pointing to them.
 
-**Handling circular dependencies**
+## Handling circular dependencies
 
-SynchronousGC will enter a deadlock in the presence of circular dependencies. The garbage collector can break the circle by lazily detecting circular dependencies: when `processItem()` processes an object, if it finds the object and all of its owners have the `GCFinalizer`, it searches the internal owner-dependency relationship graph (`uidToNode`) to check if the object and any of its owner are in a circle where all objects have the `GCFinalizer`. If so, it removes the `GCFinzlier` from the object to break the circle.
+SynchronousGC will enter a deadlock in the presence of circular dependencies. The garbage collector can break the circle by lazily breaking circular dependencies: when `processItem()` processes an object, if it finds the object and all of its owners have the `GCFinalizer`, it removes the `GCFinalizer` from the object.
+
+Note that the approach is not rigorous and thus having false positives. For example, if a user first sends a SynchronousGC delete request for an object, then sends the delete request for its owner, then `processItem()` will be fooled to believe there is a circle. We expect user not to do this. We can make the circle detection more rigorous if needed.
+
+Circular dependencies are regarded as user error. If needed, we can add more guarantees to handle such cases later.
 
 ## Unhandled cases
 
@@ -106,15 +116,19 @@ Finalizer breaks an assumption that many Kubernetes components have: a deletion 
 
 **Node controller** forcefully deletes pod if the pod is scheduled to a node that does not exist ([code](../../pkg/controller/node/nodecontroller.go#L474)). The pod will continue to exist if it has pending finalizers. The node controller will futilely retry the deletion. Also, the `node controller` forcefully deletes pods before deleting the node ([code](../../pkg/controller/node/nodecontroller.go#L592)). If the pods have pending finalizers, the `node controller` will go ahead deleting the node, leaving those pods behind. These pods will be deleted from the key-value store when the pending finalizers are removed.
 
-**Podgc** deletes terminated pods if there are too many of them in the cluster. `Podgc` should remove any pending finalizers to make sure the pods are deleted.
+**Podgc** deletes terminated pods if there are too many of them in the cluster. We need to make sure finalizers on Pods are taken off quickly enough so that the progress of `Podgc` is not affected.
 
-**Deployment controller** adopts existing `ReplicaSet` (RS) if its template matches. If a matching RS has a pending `GCFinalizer`, deployment shouldn't adopt it, because the RS controller will not scale up/down a RS that's being deleted. Hence, `deployment controller` needs to check if a RS is being deleted before adopting it. If the RS is being deleted, then the `deployment controller` should wait for the status of the RS to show 0 replicas to avoid creating extra pods, then create a new RS.
+**Deployment controller** adopts existing `ReplicaSet` (RS) if its template matches. If a matching RS has a pending `GCFinalizer`, deployment should adopt it, take its pods into account, but shouldn't try to mutate it, because the RS controller will ignore a RS that's being deleted. Hence, `deployment controller` should wait for the RS to be deleted, and then create a new one.
 
 **Replication controller manager**, **Job controller**, and **ReplicaSet controller** ignore pods in terminated phase, so pods with pending finalizers will not block these controllers.
 
 **PetSet controller** will be blocked by a pod with pending finalizers, so Synchronous GC might slow down its progress.
 
-**kubectl**: synchronous GC can replace the **kubectl delete** reapers. Currently `kubectl delete` blocks until all dependents and the owner are deleted. To maintain this behavior, after switched to using synchronous GC, *kubectl delete* needs to poll on the removal of the owner object.
+**kubectl**: synchronous GC can simplify the **kubectl delete** reapers. Let's take the `deployment reaper` as an example, since it's the most complicated one. Currently, the reaper finds all `RS` with matching labels, scales them down, polls until `RS.Status.Replica` reaches 0, deletes the `RS`es, and finally deletes the `deployment`. If using the synchronous GC, `kubectl delete deployment` is as easy as sending a synchronous GC delete request for the deployment, and polls until the deployment is deleted from the key-value store.
+
+Note that this **changes the behavior** of `kubectl delete`. The command will be blocked until all pods are deleted from the key-value store, instead of being blocked until pods are in the terminating state. This means `kubectl delete` blocks for longer time, but it has the benefit that the resources used by the pods are released when the `kubectl delete` returns.
+
+Old kubectl is not affected, because `DeleteOptions.SynchronousGarbageCollection` defaults to false.
 
 ## Security implications
 
