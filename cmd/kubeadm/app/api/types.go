@@ -16,7 +16,11 @@ limitations under the License.
 
 package api
 
-import "k8s.io/kubernetes/pkg/api/unversioned"
+import (
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	certclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/certificates/unversioned"
+	"k8s.io/kubernetes/pkg/types"
+)
 
 type MasterConfiguration struct {
 	unversioned.TypeMeta
@@ -67,4 +71,12 @@ type ClusterInfo struct {
 	// TODO(phase1+) this may become simply `api.Config`
 	CertificateAuthorities []string `json:"certificateAuthorities"`
 	Endpoints              []string `json:"endpoints"`
+}
+
+// Master API endpoint connection
+type ConnectionDetails struct {
+	CertClient *certclient.CertificatesClient
+	Endpoint   string
+	CACert     []byte
+	NodeName   types.NodeName
 }

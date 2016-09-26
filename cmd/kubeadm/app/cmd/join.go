@@ -76,7 +76,17 @@ func RunJoin(out io.Writer, cmd *cobra.Command, args []string, s *kubeadmapi.Nod
 		return fmt.Errorf("Must specify --token (see --help)\n")
 	}
 
-	kubeconfig, err := kubenode.RetrieveTrustedClusterInfo(s)
+	clusterInfo, err := kubenode.RetrieveTrustedClusterInfo(s)
+	if err != nil {
+		return err
+	}
+
+	connectionDetails, err := kubenode.EstablishMasterConnection(s, clusterInfo)
+	if err != nil {
+		return err
+	}
+
+	kubeconfig, err := kubenode.PerformTLSBootstrap(connectionDetails)
 	if err != nil {
 		return err
 	}
