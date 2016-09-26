@@ -207,8 +207,8 @@ kubernetes.tar.gz | `TODO`
   - Enhanced persistence capabilities (eg: `StorageClasses`, new volume plugins)
   - New resources and scheduler features (eg: `ScheduledJob` resource, pod/node affinity/anti-affinity)
 - **Cluster Federation**
-  - Multi-Zone Ingress
-  - Expanded support for resources such as Namespaces, Events, ReplicaSets
+  - Global Multi-cluster HTTP(S) Ingress across GCE and GKE clusters.
+  - Expanded support for federated hybrid-cloud resources including ReplicaSets, Secrets, Namespaces and Events.
 - **Security**
   - Increased pod-level security granularity (eg: Container Image Policies, AppArmor and `sysctl` support)
   - Increased cluster-level security granularity (eg: Access Review API)
@@ -230,12 +230,31 @@ This is the first release tracked via the use of the [kubernetes/features](https
   - [alpha] Simplifies bootstrapping of TLS secured communication between the API server and kubelet. ([docs](http://kubernetes.io/docs/admin/master-node-communication/#kubelet-tls-bootstrap)) ([kubernetes/features#43](https://github.com/kubernetes/features/issues/43))
   - [alpha] The `kubeadm` tool makes it much easier to bootstrap Kubernetes. ([docs](http://kubernetes.io/docs/getting-started-guides/kubeadm/)) ([kubernetes/features#11](https://github.com/kubernetes/features/issues/11))
 - **Federation**
-  - [alpha] Creating a `Federated Ingress` is as simple as submitting an `Ingress` config/manifest to the Federation API Server. Federation then creates a single global VIP to load balance the incoming L7 traffic across all the registered clusters no matter in what regions the clusters are. GCE L7 LoadBalancer is the only supported implementation in this release. ([kubernetes/features#82](https://github.com/kubernetes/features/issues/82))
-  - [alpha] Creating a `Namespace` in federation causes matching `Namespace`s to be created in all the clusters registered with that federation. ([docs](http://kubernetes.io/docs/user-guide/federation/namespaces)) ([kubernetes/features#69](https://github.com/kubernetes/features/issues/69))
+  - [alpha] Creating a `Federated Ingress` is as simple as submitting
+    an `Ingress` creation request to the Federation API Server. The
+    Federation control system then creates and maintains a single
+    global virtual IP to load balance incoming HTTP(S) traffic across
+    some or all the registered clusters, across all regions. Google's
+    GCE L7 LoadBalancer is the first supported implementation, and
+	is available in this release.
+	([docs](http://kubernetes.io/docs/user-guide/federation/federated-ingress.md))
+	([kubernetes/features#82](https://github.com/kubernetes/features/issues/82))
+  - [beta] `Federated Replica Sets` create and maintain matching
+    `Replica Set`s in some or all clusters in a federation, with the
+    desired replica count distributed equally or according to
+    specified per-cluster weights.
+	([docs](http://kubernetes.io/docs/user-guide/federation/federated-replicasets.md))
+	([kubernetes/features#46](https://github.com/kubernetes/features/issues/46))
+  - [beta] `Federated Secrets` are created and kept consistent across all clusters in a federation.
+    ([docs](http://kubernetes.io/docs/user-guide/federation/federated-secrets.md))
+    ([kubernetes/features#68](https://github.com/kubernetes/features/issues/68))
+  - [beta] Federation API server gained support for events and many
+    federation controllers now report important events.
+    ([docs](http://kubernetes.io/docs/user-guide/federation/events))
+    ([kubernetes/features#70](https://github.com/kubernetes/features/issues/70))
+  - [alpha] Creating a `Federated Namespace` causes matching
+    `Namespace`s to be created and maintained in all the clusters registered with that federation. ([docs](http://kubernetes.io/docs/user-guide/federation/federated-namespaces.md)) ([kubernetes/features#69](https://github.com/kubernetes/features/issues/69))
   - [alpha] ingress has alpha support for a single master multi zone cluster ([docs](http://kubernetes.io/docs/user-guide/ingress.md#failing-across-availability-zones)) ([kubernetes/features#52](https://github.com/kubernetes/features/issues/52))
-  - [beta] Federation API server gained support for events and many federation controllers now report important events. ([docs](http://kubernetes.io/docs/user-guide/federation/events)) ([kubernetes/features#70](https://github.com/kubernetes/features/issues/70))
-  - [beta] `Secret` created in federation are distributed to all the clusters in that federation.  ([kubernetes/features#68](https://github.com/kubernetes/features/issues/68))
-  - [beta] Submitting a `Replica Set` to the Federation API Server creates matching `Replica Set`s in the underlying clusters with the desired replica count distributed across all the clusters. ([kubernetes/features#46](https://github.com/kubernetes/features/issues/46))
 - **Network**
   - [alpha] Service LB now has alpha support for preserving client source IP ([docs](http://kubernetes.io/docs/user-guide/load-balancer/)) ([kubernetes/features#27](https://github.com/kubernetes/features/issues/27))
 - **Node**
