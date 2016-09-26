@@ -19,8 +19,6 @@ limitations under the License.
 package auth
 
 import (
-	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -35,10 +33,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/api/v1"
 	rbacapi "k8s.io/kubernetes/pkg/apis/rbac"
-	"k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"
 	"k8s.io/kubernetes/pkg/auth/authenticator"
 	"k8s.io/kubernetes/pkg/auth/authenticator/bearertoken"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
@@ -80,6 +75,12 @@ func clientForUser(user string) *http.Client {
 	}
 }
 
+func clientsetForUser(user string, config *restclient.Config) clientset.Interface {
+	configCopy := *config
+	configCopy.BearerToken = user
+	return clientset.NewForConfigOrDie(&configCopy)
+}
+
 func newRBACAuthorizer(t *testing.T, superUser string, config *master.Config) authorizer.Authorizer {
 	newRESTOptions := func(resource string) generic.RESTOptions {
 		storageConfig, err := config.StorageFactory.NewConfig(rbacapi.Resource(resource))
@@ -98,72 +99,41 @@ func newRBACAuthorizer(t *testing.T, superUser string, config *master.Config) au
 
 // bootstrapRoles are a set of RBAC roles which will be populated before the test.
 type bootstrapRoles struct {
-	roles               []v1alpha1.Role
-	roleBindings        []v1alpha1.RoleBinding
-	clusterRoles        []v1alpha1.ClusterRole
-	clusterRoleBindings []v1alpha1.ClusterRoleBinding
+	roles               []rbacapi.Role
+	roleBindings        []rbacapi.RoleBinding
+	clusterRoles        []rbacapi.ClusterRole
+	clusterRoleBindings []rbacapi.ClusterRoleBinding
 }
 
 // bootstrap uses the provided client to create the bootstrap roles and role bindings.
 //
 // client should be authenticated as the RBAC super user.
-func (b bootstrapRoles) bootstrap(client *http.Client, serverURL string) error {
-	newReq := func(resource, name, namespace string, v interface{}) *http.Request {
-		body, err := json.Marshal(v)
-		if err != nil {
-			panic(err)
-		}
-		path := testapi.Rbac.ResourcePath(resource, namespace, name)
-		req, err := http.NewRequest("PUT", serverURL+path, bytes.NewReader(body))
-		if err != nil {
-			panic(err)
-		}
-		req.Header.Set("Content-Type", "application/json")
-		req.ContentLength = int64(len(body))
-		return req
-	}
-
-	apiVersion := v1alpha1.SchemeGroupVersion.String()
-
-	var requests []*http.Request
+func (b bootstrapRoles) bootstrap(client clientset.Interface) error {
 	for _, r := range b.clusterRoles {
-		r.TypeMeta = unversioned.TypeMeta{Kind: "ClusterRole", APIVersion: apiVersion}
-		requests = append(requests, newReq("clusterroles", r.Name, r.Namespace, r))
+		_, err := client.Rbac().ClusterRoles().Create(&r)
+		if err != nil {
+			return fmt.Errorf("failed to make request: %v", err)
+		}
 	}
 	for _, r := range b.roles {
-		r.TypeMeta = unversioned.TypeMeta{Kind: "Role", APIVersion: apiVersion}
-		requests = append(requests, newReq("roles", r.Name, r.Namespace, r))
-	}
-	for _, r := range b.clusterRoleBindings {
-		r.TypeMeta = unversioned.TypeMeta{Kind: "ClusterRoleBinding", APIVersion: apiVersion}
-		requests = append(requests, newReq("clusterrolebindings", r.Name, r.Namespace, r))
-	}
-	for _, r := range b.roleBindings {
-		r.TypeMeta = unversioned.TypeMeta{Kind: "RoleBinding", APIVersion: apiVersion}
-		requests = append(requests, newReq("rolebindings", r.Name, r.Namespace, r))
-	}
-
-	for _, req := range requests {
-		err := func() error {
-			resp, err := client.Do(req)
-			if err != nil {
-				return fmt.Errorf("failed to make request: %v", err)
-			}
-			defer resp.Body.Close()
-
-			if resp.StatusCode != http.StatusCreated {
-				body, err := ioutil.ReadAll(resp.Body)
-				if err != nil {
-					return fmt.Errorf("failed to read body: %v", err)
-				}
-				return fmt.Errorf("POST %s: expected %d got %s\n%s", req.URL, resp.Status, body)
-			}
-			return nil
-		}()
+		_, err := client.Rbac().Roles(r.Namespace).Create(&r)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to make request: %v", err)
 		}
 	}
+	for _, r := range b.clusterRoleBindings {
+		_, err := client.Rbac().ClusterRoleBindings().Create(&r)
+		if err != nil {
+			return fmt.Errorf("failed to make request: %v", err)
+		}
+	}
+	for _, r := range b.roleBindings {
+		_, err := client.Rbac().RoleBindings(r.Namespace).Create(&r)
+		if err != nil {
+			return fmt.Errorf("failed to make request: %v", err)
+		}
+	}
+
 	return nil
 }
 
@@ -263,23 +233,9 @@ var (
 
 // Declare some PolicyRules beforehand.
 var (
-	ruleAllowAll = v1alpha1.PolicyRule{
-		Verbs:     []string{"*"},
-		APIGroups: []string{"*"},
-		Resources: []string{"*"},
-	}
-
-	ruleReadPods = v1alpha1.PolicyRule{
-		Verbs:     []string{"list", "get", "watch"},
-		APIGroups: []string{""},
-		Resources: []string{"pods"},
-	}
-
-	ruleWriteJobs = v1alpha1.PolicyRule{
-		Verbs:     []string{"*"},
-		APIGroups: []string{"batch"},
-		Resources: []string{"*"},
-	}
+	ruleAllowAll  = rbacapi.NewRule("*").Groups("*").Resources("*").RuleOrDie()
+	ruleReadPods  = rbacapi.NewRule("list", "get", "watch").Groups("").Resources("pods").RuleOrDie()
+	ruleWriteJobs = rbacapi.NewRule("*").Groups("batch").Resources("*").RuleOrDie()
 )
 
 func TestRBAC(t *testing.T) {
@@ -292,23 +248,23 @@ func TestRBAC(t *testing.T) {
 	}{
 		{
 			bootstrapRoles: bootstrapRoles{
-				clusterRoles: []v1alpha1.ClusterRole{
+				clusterRoles: []rbacapi.ClusterRole{
 					{
-						ObjectMeta: v1.ObjectMeta{Name: "allow-all"},
-						Rules:      []v1alpha1.PolicyRule{ruleAllowAll},
+						ObjectMeta: api.ObjectMeta{Name: "allow-all"},
+						Rules:      []rbacapi.PolicyRule{ruleAllowAll},
 					},
 					{
-						ObjectMeta: v1.ObjectMeta{Name: "read-pods"},
-						Rules:      []v1alpha1.PolicyRule{ruleReadPods},
+						ObjectMeta: api.ObjectMeta{Name: "read-pods"},
+						Rules:      []rbacapi.PolicyRule{ruleReadPods},
 					},
 				},
-				clusterRoleBindings: []v1alpha1.ClusterRoleBinding{
+				clusterRoleBindings: []rbacapi.ClusterRoleBinding{
 					{
-						ObjectMeta: v1.ObjectMeta{Name: "read-pods"},
-						Subjects: []v1alpha1.Subject{
+						ObjectMeta: api.ObjectMeta{Name: "read-pods"},
+						Subjects: []rbacapi.Subject{
 							{Kind: "User", Name: "pod-reader"},
 						},
-						RoleRef: v1alpha1.RoleRef{Kind: "ClusterRole", Name: "read-pods"},
+						RoleRef: rbacapi.RoleRef{Kind: "ClusterRole", Name: "read-pods"},
 					},
 				},
 			},
@@ -330,24 +286,24 @@ func TestRBAC(t *testing.T) {
 		},
 		{
 			bootstrapRoles: bootstrapRoles{
-				clusterRoles: []v1alpha1.ClusterRole{
+				clusterRoles: []rbacapi.ClusterRole{
 					{
-						ObjectMeta: v1.ObjectMeta{Name: "write-jobs"},
-						Rules:      []v1alpha1.PolicyRule{ruleWriteJobs},
+						ObjectMeta: api.ObjectMeta{Name: "write-jobs"},
+						Rules:      []rbacapi.PolicyRule{ruleWriteJobs},
 					},
 				},
-				clusterRoleBindings: []v1alpha1.ClusterRoleBinding{
+				clusterRoleBindings: []rbacapi.ClusterRoleBinding{
 					{
-						ObjectMeta: v1.ObjectMeta{Name: "write-jobs"},
-						Subjects:   []v1alpha1.Subject{{Kind: "User", Name: "job-writer"}},
-						RoleRef:    v1alpha1.RoleRef{Kind: "ClusterRole", Name: "write-jobs"},
+						ObjectMeta: api.ObjectMeta{Name: "write-jobs"},
+						Subjects:   []rbacapi.Subject{{Kind: "User", Name: "job-writer"}},
+						RoleRef:    rbacapi.RoleRef{Kind: "ClusterRole", Name: "write-jobs"},
 					},
 				},
-				roleBindings: []v1alpha1.RoleBinding{
+				roleBindings: []rbacapi.RoleBinding{
 					{
-						ObjectMeta: v1.ObjectMeta{Name: "write-jobs", Namespace: "job-namespace"},
-						Subjects:   []v1alpha1.Subject{{Kind: "User", Name: "job-writer-namespace"}},
-						RoleRef:    v1alpha1.RoleRef{Kind: "ClusterRole", Name: "write-jobs"},
+						ObjectMeta: api.ObjectMeta{Name: "write-jobs", Namespace: "job-namespace"},
+						Subjects:   []rbacapi.Subject{{Kind: "User", Name: "job-writer-namespace"}},
+						RoleRef:    rbacapi.RoleRef{Kind: "ClusterRole", Name: "write-jobs"},
 					},
 				},
 			},
@@ -388,8 +344,10 @@ func TestRBAC(t *testing.T) {
 		_, s := framework.RunAMaster(masterConfig)
 		defer s.Close()
 
+		clientConfig := &restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{NegotiatedSerializer: api.Codecs}}
+
 		// Bootstrap the API Server with the test case's initial roles.
-		if err := tc.bootstrapRoles.bootstrap(clientForUser(superUser), s.URL); err != nil {
+		if err := tc.bootstrapRoles.bootstrap(clientsetForUser(superUser, clientConfig)); err != nil {
 			t.Errorf("case %d: failed to apply initial roles: %v", i, err)
 			continue
 		}
