@@ -18,6 +18,9 @@ package api
 
 import (
 	"net"
+
+	certclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/certificates/unversioned"
+	"k8s.io/kubernetes/pkg/types"
 )
 
 // KubeadmConfig TODO add description
@@ -102,4 +105,12 @@ type ClusterInfo struct {
 	// TODO(phase1+) this may become simply `api.Config`
 	CertificateAuthorities []string `json:"certificateAuthorities"`
 	Endpoints              []string `json:"endpoints"`
+}
+
+// Master API endpoint connection
+type ConnectionDetails struct {
+	CertClient *certclient.CertificatesClient
+	Endpoint   string
+	CACert     []byte
+	NodeName   types.NodeName
 }
