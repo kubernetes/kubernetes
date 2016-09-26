@@ -35,10 +35,6 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-const (
-	kubeletProcessname = "kubelet"
-)
-
 func getOOMScoreForPid(pid int) (int, error) {
 	procfsPath := path.Join("/proc", strconv.Itoa(pid), "oom_score_adj")
 	out, err := exec.Command("sudo", "cat", procfsPath).CombinedOutput()
