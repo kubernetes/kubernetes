@@ -141,7 +141,7 @@ func Convert_apps_PetSetList_To_v1alpha1_PetSetList(in *apps.PetSetList, out *Pe
 }
 
 func autoConvert_v1alpha1_PetSetSpec_To_apps_PetSetSpec(in *PetSetSpec, out *apps.PetSetSpec, s conversion.Scope) error {
-	// WARNING: field 'Replicas' requires manual conversion
+	// WARNING: in.Replicas requires manual conversion: inconvertible types (*int32 vs int)
 	out.Selector = in.Selector
 	if err := v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
@@ -163,7 +163,7 @@ func autoConvert_v1alpha1_PetSetSpec_To_apps_PetSetSpec(in *PetSetSpec, out *app
 }
 
 func autoConvert_apps_PetSetSpec_To_v1alpha1_PetSetSpec(in *apps.PetSetSpec, out *PetSetSpec, s conversion.Scope) error {
-	// WARNING: field 'Replicas' requires manual conversion
+	// WARNING: in.Replicas requires manual conversion: inconvertible types (int vs *int32)
 	out.Selector = in.Selector
 	if err := v1.Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err

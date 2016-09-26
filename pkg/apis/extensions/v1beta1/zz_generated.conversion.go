@@ -942,14 +942,18 @@ func Convert_autoscaling_HorizontalPodAutoscalerList_To_v1beta1_HorizontalPodAut
 }
 
 func autoConvert_v1beta1_HorizontalPodAutoscalerSpec_To_autoscaling_HorizontalPodAutoscalerSpec(in *HorizontalPodAutoscalerSpec, out *autoscaling.HorizontalPodAutoscalerSpec, s conversion.Scope) error {
+	// WARNING: in.ScaleRef requires manual conversion: does not exist in peer-type
 	out.MinReplicas = in.MinReplicas
 	out.MaxReplicas = in.MaxReplicas
+	// WARNING: in.CPUUtilization requires manual conversion: does not exist in peer-type
 	return nil
 }
 
 func autoConvert_autoscaling_HorizontalPodAutoscalerSpec_To_v1beta1_HorizontalPodAutoscalerSpec(in *autoscaling.HorizontalPodAutoscalerSpec, out *HorizontalPodAutoscalerSpec, s conversion.Scope) error {
+	// WARNING: in.ScaleTargetRef requires manual conversion: does not exist in peer-type
 	out.MinReplicas = in.MinReplicas
 	out.MaxReplicas = in.MaxReplicas
+	// WARNING: in.TargetCPUUtilizationPercentage requires manual conversion: does not exist in peer-type
 	return nil
 }
 
@@ -1457,6 +1461,7 @@ func autoConvert_v1beta1_JobSpec_To_batch_JobSpec(in *JobSpec, out *batch.JobSpe
 	} else {
 		out.Selector = nil
 	}
+	// WARNING: in.AutoSelector requires manual conversion: does not exist in peer-type
 	if err := v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
@@ -1476,6 +1481,7 @@ func autoConvert_batch_JobSpec_To_v1beta1_JobSpec(in *batch.JobSpec, out *JobSpe
 	} else {
 		out.Selector = nil
 	}
+	// WARNING: in.ManualSelector requires manual conversion: does not exist in peer-type
 	if err := v1.Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
@@ -2333,14 +2339,14 @@ func Convert_extensions_RollbackConfig_To_v1beta1_RollbackConfig(in *extensions.
 }
 
 func autoConvert_v1beta1_RollingUpdateDeployment_To_extensions_RollingUpdateDeployment(in *RollingUpdateDeployment, out *extensions.RollingUpdateDeployment, s conversion.Scope) error {
-	// WARNING: field 'MaxUnavailable' requires manual conversion
-	// WARNING: field 'MaxSurge' requires manual conversion
+	// WARNING: in.MaxUnavailable requires manual conversion: inconvertible types (*k8s.io/kubernetes/pkg/util/intstr.IntOrString vs k8s.io/kubernetes/pkg/util/intstr.IntOrString)
+	// WARNING: in.MaxSurge requires manual conversion: inconvertible types (*k8s.io/kubernetes/pkg/util/intstr.IntOrString vs k8s.io/kubernetes/pkg/util/intstr.IntOrString)
 	return nil
 }
 
 func autoConvert_extensions_RollingUpdateDeployment_To_v1beta1_RollingUpdateDeployment(in *extensions.RollingUpdateDeployment, out *RollingUpdateDeployment, s conversion.Scope) error {
-	// WARNING: field 'MaxUnavailable' requires manual conversion
-	// WARNING: field 'MaxSurge' requires manual conversion
+	// WARNING: in.MaxUnavailable requires manual conversion: inconvertible types (k8s.io/kubernetes/pkg/util/intstr.IntOrString vs *k8s.io/kubernetes/pkg/util/intstr.IntOrString)
+	// WARNING: in.MaxSurge requires manual conversion: inconvertible types (k8s.io/kubernetes/pkg/util/intstr.IntOrString vs *k8s.io/kubernetes/pkg/util/intstr.IntOrString)
 	return nil
 }
 
@@ -2484,13 +2490,14 @@ func Convert_extensions_ScaleSpec_To_v1beta1_ScaleSpec(in *extensions.ScaleSpec,
 
 func autoConvert_v1beta1_ScaleStatus_To_extensions_ScaleStatus(in *ScaleStatus, out *extensions.ScaleStatus, s conversion.Scope) error {
 	out.Replicas = in.Replicas
-	// WARNING: field 'Selector' requires manual conversion
+	// WARNING: in.Selector requires manual conversion: inconvertible types (map[string]string vs *k8s.io/kubernetes/pkg/api/unversioned.LabelSelector)
+	// WARNING: in.TargetSelector requires manual conversion: does not exist in peer-type
 	return nil
 }
 
 func autoConvert_extensions_ScaleStatus_To_v1beta1_ScaleStatus(in *extensions.ScaleStatus, out *ScaleStatus, s conversion.Scope) error {
 	out.Replicas = in.Replicas
-	// WARNING: field 'Selector' requires manual conversion
+	// WARNING: in.Selector requires manual conversion: inconvertible types (*k8s.io/kubernetes/pkg/api/unversioned.LabelSelector vs map[string]string)
 	return nil
 }
 
