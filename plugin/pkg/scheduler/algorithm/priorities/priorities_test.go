@@ -990,7 +990,7 @@ func TestPrioritiesRegistered(t *testing.T) {
 		if err == nil {
 			functions = append(functions, fileFunctions...)
 		} else {
-			t.Errorf("unexpected error when parsing %s", filePath)
+			t.Errorf("unexpected error when parsing %s: %v", filePath, err)
 		}
 	}
 
