@@ -212,10 +212,15 @@ func run() error {
 		errs = appendError(errs, xmlWrap("kubectl version", func() error {
 			return finishRunning("kubectl version", exec.Command("./cluster/kubectl.sh", "version", "--match-server-version=false"))
 		}))
+		// Individual tests will create their own JUnit, so don't xmlWrap.
 		if *skewTests {
-			errs = appendError(errs, xmlWrap("SkewTest", SkewTest))
+			errs = appendError(errs, SkewTest())
 		} else {
-			errs = appendError(errs, xmlWrap("Test", Test))
+			if err := xmlWrap("IsUp", IsUp); err != nil {
+				errs = appendError(errs, err)
+			} else {
+				errs = appendError(errs, Test())
+			}
 		}
 	}
 
@@ -341,8 +346,8 @@ func Up() error {
 }
 
 // Is the e2e cluster up?
-func IsUp() bool {
-	return finishRunning("get status", exec.Command("./hack/e2e-internal/e2e-status.sh")) == nil
+func IsUp() error {
+	return finishRunning("get status", exec.Command("./hack/e2e-internal/e2e-status.sh"))
 }
 
 func DumpClusterLogs(location string) error {
@@ -443,10 +448,6 @@ func SkewTest() error {
 }
 
 func Test() error {
-	if !IsUp() {
-		return fmt.Errorf("testing requested, but e2e cluster not up!")
-	}
-
 	// TODO(fejta): add a --federated or something similar
 	if os.Getenv("FEDERATION") != "true" {
 		return finishRunning("Ginkgo tests", exec.Command("./hack/ginkgo-e2e.sh", strings.Fields(*testArgs)...))
