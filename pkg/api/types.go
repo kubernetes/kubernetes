@@ -2262,6 +2262,11 @@ const (
 	// Number of Pods that may be running on this Node: see ResourcePods
 )
 
+const (
+	// Namespace prefix for opaque counted resources (alpha).
+	ResourceOpaqueIntPrefix = "pod.alpha.kubernetes.io/opaque-int-resource-"
+)
+
 // ResourceList is a set of (resource name, quantity) pairs.
 type ResourceList map[ResourceName]resource.Quantity
 
