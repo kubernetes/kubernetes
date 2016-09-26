@@ -76,6 +76,13 @@ func notFound(w http.ResponseWriter, req *http.Request) {
 	fmt.Fprintf(w, "Not Found: %#v", req.RequestURI)
 }
 
+// internalError renders a simple internal error
+func internalError(w http.ResponseWriter, req *http.Request, err error) {
+	w.WriteHeader(http.StatusInternalServerError)
+	fmt.Fprintf(w, "Internal Server Error: %#v", req.RequestURI)
+	runtime.HandleError(err)
+}
+
 // errAPIPrefixNotFound indicates that a RequestInfo resolution failed because the request isn't under
 // any known API prefixes
 type errAPIPrefixNotFound struct {

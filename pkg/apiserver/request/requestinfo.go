@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package apiserver
+package request
 
 import (
 	"fmt"
@@ -68,8 +68,8 @@ var namespaceSubresources = sets.NewString("status", "finalize")
 var NamespaceSubResourcesForTest = sets.NewString(namespaceSubresources.List()...)
 
 type RequestInfoResolver struct {
-	APIPrefixes          sets.String
-	GrouplessAPIPrefixes sets.String
+	APIPrefixes          sets.String // without leading and trailing slashes
+	GrouplessAPIPrefixes sets.String // without leading and trailing slashes
 }
 
 // TODO write an integration test against the swagger doc to test the RequestInfo and match up behavior to responses
@@ -103,7 +103,7 @@ type RequestInfoResolver struct {
 // /api
 // /healthz
 // /
-func (r *RequestInfoResolver) GetRequestInfo(req *http.Request) (RequestInfo, error) {
+func (r *RequestInfoResolver) GetRequestInfo(req *http.Request) (*RequestInfo, error) {
 	// start with a non-resource request until proven otherwise
 	requestInfo := RequestInfo{
 		IsResourceRequest: false,
@@ -114,12 +114,12 @@ func (r *RequestInfoResolver) GetRequestInfo(req *http.Request) (RequestInfo, er
 	currentParts := splitPath(req.URL.Path)
 	if len(currentParts) < 3 {
 		// return a non-resource request
-		return requestInfo, nil
+		return &requestInfo, nil
 	}
 
 	if !r.APIPrefixes.Has(currentParts[0]) {
 		// return a non-resource request
-		return requestInfo, nil
+		return &requestInfo, nil
 	}
 	requestInfo.APIPrefix = currentParts[0]
 	currentParts = currentParts[1:]
@@ -128,7 +128,7 @@ func (r *RequestInfoResolver) GetRequestInfo(req *http.Request) (RequestInfo, er
 		// one part (APIPrefix) has already been consumed, so this is actually "do we have four parts?"
 		if len(currentParts) < 3 {
 			// return a non-resource request
-			return requestInfo, nil
+			return &requestInfo, nil
 		}
 
 		requestInfo.APIGroup = currentParts[0]
@@ -142,7 +142,7 @@ func (r *RequestInfoResolver) GetRequestInfo(req *http.Request) (RequestInfo, er
 	// handle input of form /{specialVerb}/*
 	if specialVerbs.Has(currentParts[0]) {
 		if len(currentParts) < 2 {
-			return requestInfo, fmt.Errorf("unable to determine kind and namespace from url, %v", req.URL)
+			return &requestInfo, fmt.Errorf("unable to determine kind and namespace from url, %v", req.URL)
 		}
 
 		requestInfo.Verb = currentParts[0]
@@ -204,7 +204,25 @@ func (r *RequestInfoResolver) GetRequestInfo(req *http.Request) (RequestInfo, er
 		requestInfo.Verb = "deletecollection"
 	}
 
-	return requestInfo, nil
+	return &requestInfo, nil
+}
+
+type requestInfoKeyType int
+
+// requestInfoKey is the RequestInfo key for the context. It's of private type here. Because
+// keys are interfaces and interfaces are equal when the type and the value is equal, this
+// does not conflict with the keys defined in pkg/api.
+const requestInfoKey requestInfoKeyType = iota
+
+// WithRequestInfo returns a copy of parent in which the request info value is set
+func WithRequestInfo(parent api.Context, info *RequestInfo) api.Context {
+	return api.WithValue(parent, requestInfoKey, info)
+}
+
+// RequestInfoFrom returns the value of the RequestInfo key on the ctx
+func RequestInfoFrom(ctx api.Context) (*RequestInfo, bool) {
+	info, ok := ctx.Value(requestInfoKey).(*RequestInfo)
+	return info, ok
 }
 
 // splitPath returns the segments for a URL path.
