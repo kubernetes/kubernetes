@@ -35,6 +35,7 @@ kube::golang::server_targets() {
     cmd/kube-apiserver
     cmd/kube-controller-manager
     cmd/kubelet
+    cmd/kubeadm
     cmd/kubemark
     cmd/hyperkube
     plugin/cmd/kube-scheduler
