@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/network"
+	"k8s.io/kubernetes/pkg/kubelet/podip"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
@@ -228,12 +229,7 @@ func (plugin *cniNetworkPlugin) TearDownPod(namespace string, name string, id ku
 // TODO: Use the addToNetwork function to obtain the IP of the Pod. That will assume idempotent ADD call to the plugin.
 // Also fix the runtime's call to Status function to be done only in the case that the IP is lost, no need to do periodic calls
 func (plugin *cniNetworkPlugin) GetPodNetworkStatus(namespace string, name string, id kubecontainer.ContainerID) (*network.PodNetworkStatus, error) {
-	netnsPath, err := plugin.host.GetRuntime().GetNetNS(id)
-	if err != nil {
-		return nil, fmt.Errorf("CNI failed to retrieve network namespace path: %v", err)
-	}
-
-	ip, err := network.GetPodIP(plugin.execer, plugin.nsenterPath, netnsPath, network.DefaultInterfaceName)
+	ip, err := podip.GetPodIP(plugin.host.GetRuntime(), id, network.DefaultInterfaceName)
 	if err != nil {
 		return nil, err
 	}

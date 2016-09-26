@@ -49,6 +49,7 @@ import (
 	"strconv"
 
 	"k8s.io/kubernetes/pkg/kubelet/network/hostport"
+	"k8s.io/kubernetes/pkg/kubelet/util/podip"
 )
 
 const (
@@ -518,11 +519,7 @@ func (plugin *kubenetNetworkPlugin) GetPodNetworkStatus(namespace string, name s
 		return &network.PodNetworkStatus{IP: net.ParseIP(podIP)}, nil
 	}
 
-	netnsPath, err := plugin.host.GetRuntime().GetNetNS(id)
-	if err != nil {
-		return nil, fmt.Errorf("Kubenet failed to retrieve network namespace path: %v", err)
-	}
-	ip, err := network.GetPodIP(plugin.execer, plugin.nsenterPath, netnsPath, network.DefaultInterfaceName)
+	ip, err := podip.GetPodIP(plugin.host.GetRuntime(), id, network.DefaultInterfaceName)
 	if err != nil {
 		return nil, err
 	}
