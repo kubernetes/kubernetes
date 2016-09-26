@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/apis/batch"
 	rbacapi "k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"
 	"k8s.io/kubernetes/pkg/auth/authenticator"
@@ -280,6 +281,26 @@ var (
 		APIGroups: []string{"batch"},
 		Resources: []string{"*"},
 	}
+
+	// Pin API groups used for tests to a specific version because the default values for the
+	// testapi package may change. For example, if a new version of the batch API is enabled
+	// by default, the API path will differ from the "apiVerison" field of the object.
+	//
+	// See #30079
+	testGroups = map[string]testapi.TestGroup{
+		"": testapi.NewTestGroup(
+			unversioned.GroupVersion{Group: "", Version: "v1"},
+			unversioned.GroupVersion{Group: "", Version: "v1"},
+			api.Scheme.KnownTypes(api.SchemeGroupVersion),
+			api.Scheme.KnownTypes(unversioned.GroupVersion{Group: "", Version: "v1"}),
+		),
+		"batch": testapi.NewTestGroup(
+			unversioned.GroupVersion{Group: "batch", Version: "v1"},
+			batch.SchemeGroupVersion,
+			api.Scheme.KnownTypes(batch.SchemeGroupVersion),
+			api.Scheme.KnownTypes(unversioned.GroupVersion{Group: "batch", Version: "v1"}),
+		),
+	}
 )
 
 func TestRBAC(t *testing.T) {
@@ -396,7 +417,7 @@ func TestRBAC(t *testing.T) {
 		previousResourceVersion := make(map[string]float64)
 
 		for j, r := range tc.requests {
-			testGroup, ok := testapi.Groups[r.apiGroup]
+			testGroup, ok := testGroups[r.apiGroup]
 			if !ok {
 				t.Errorf("case %d %d: unknown api group %q, %s", i, j, r.apiGroup, r)
 				continue
