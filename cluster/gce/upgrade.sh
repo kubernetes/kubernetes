@@ -263,7 +263,21 @@ function do-node-upgrade() {
         --instance-startup-timeout=300s \
         --max-num-concurrent-instances=1 \
         --max-num-failed-instances=0 \
-        --min-instance-update-time=0s 2>&1)
+        --min-instance-update-time=0s 2>&1) && update_rc=$? || update_rc=$?
+
+    if [[ "${update_rc}" != 0 ]]; then
+      echo "== FAILED to start rolling-update: =="
+      echo "${update}"
+      echo "  This may be due to a preexisting rolling-update;"
+      echo "  see https://github.com/kubernetes/kubernetes/issues/33113 for details."
+      echo "  All rolling-updates in project ${PROJECT} zone ${ZONE}:"
+      gcloud alpha compute rolling-updates \
+        --project="${PROJECT}" \
+        --zone="${ZONE}" \
+        list || true
+      return ${update_rc}
+    fi
+
     id=$(echo "${update}" | grep "Started" | cut -d '/' -f 11 | cut -d ']' -f 1)
     updates+=("${id}")
   done
@@ -288,6 +302,7 @@ function do-node-upgrade() {
   done
 
   # Remove the old templates.
+  echo "== Deleting old templates in ${PROJECT}. ==" >&2
   for tmpl in ${old_templates[@]}; do
     gcloud compute instance-templates delete \
         --quiet \
