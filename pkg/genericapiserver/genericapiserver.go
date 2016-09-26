@@ -42,6 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/apimachinery"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apiserver"
+	"k8s.io/kubernetes/pkg/apiserver/request"
 	"k8s.io/kubernetes/pkg/genericapiserver/openapi"
 	"k8s.io/kubernetes/pkg/genericapiserver/openapi/common"
 	"k8s.io/kubernetes/pkg/genericapiserver/options"
@@ -183,8 +184,8 @@ func (s *GenericAPIServer) MinRequestTimeout() time.Duration {
 	return s.minRequestTimeout
 }
 
-func (s *GenericAPIServer) NewRequestInfoResolver() *apiserver.RequestInfoResolver {
-	return &apiserver.RequestInfoResolver{
+func (s *GenericAPIServer) NewRequestInfoResolver() *request.RequestInfoResolver {
+	return &request.RequestInfoResolver{
 		APIPrefixes:          sets.NewString(strings.Trim(s.legacyAPIPrefix, "/"), strings.Trim(s.apiPrefix, "/")), // all possible API prefixes
 		GrouplessAPIPrefixes: sets.NewString(strings.Trim(s.legacyAPIPrefix, "/")),                                 // APIPrefixes that won't have groups (legacy)
 	}
@@ -395,7 +396,7 @@ func (s *GenericAPIServer) InstallAPIGroup(apiGroupInfo *APIGroupInfo) error {
 		s.AddAPIGroupForDiscovery(apiGroup)
 		s.HandlerContainer.Add(apiserver.NewGroupWebService(s.Serializer, apiPrefix+"/"+apiGroup.Name, apiGroup))
 	}
-	apiserver.InstallServiceErrorHandler(s.Serializer, s.HandlerContainer, s.NewRequestInfoResolver(), apiVersions)
+	apiserver.InstallServiceErrorHandler(s.Serializer, s.HandlerContainer, apiVersions)
 	return nil
 }
 
@@ -446,8 +447,6 @@ func (s *GenericAPIServer) getAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupV
 
 func (s *GenericAPIServer) newAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupVersion unversioned.GroupVersion) (*apiserver.APIGroupVersion, error) {
 	return &apiserver.APIGroupVersion{
-		RequestInfoResolver: s.NewRequestInfoResolver(),
-
 		GroupVersion: groupVersion,
 
 		ParameterCodec: apiGroupInfo.ParameterCodec,

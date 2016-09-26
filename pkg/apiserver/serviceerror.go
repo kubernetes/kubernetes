@@ -25,13 +25,13 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
-func InstallServiceErrorHandler(s runtime.NegotiatedSerializer, container *restful.Container, requestResolver *RequestInfoResolver, apiVersions []string) {
+func InstallServiceErrorHandler(s runtime.NegotiatedSerializer, container *restful.Container, apiVersions []string) {
 	container.ServiceErrorHandler(func(serviceErr restful.ServiceError, request *restful.Request, response *restful.Response) {
-		serviceErrorHandler(s, requestResolver, apiVersions, serviceErr, request, response)
+		serviceErrorHandler(s, apiVersions, serviceErr, request, response)
 	})
 }
 
-func serviceErrorHandler(s runtime.NegotiatedSerializer, requestResolver *RequestInfoResolver, apiVersions []string, serviceErr restful.ServiceError, request *restful.Request, response *restful.Response) {
+func serviceErrorHandler(s runtime.NegotiatedSerializer, apiVersions []string, serviceErr restful.ServiceError, request *restful.Request, response *restful.Response) {
 	errorNegotiated(
 		apierrors.NewGenericServerResponse(serviceErr.Code, "", api.Resource(""), "", serviceErr.Message, 0, false),
 		s,
