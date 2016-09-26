@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package master
+package rest
 
 import (
 	"k8s.io/kubernetes/pkg/api/rest"
@@ -24,11 +24,11 @@ import (
 	petsetetcd "k8s.io/kubernetes/pkg/registry/apps/petset/etcd"
 )
 
-type AppsRESTStorageProvider struct{}
+type RESTStorageProvider struct{}
 
-var _ genericapiserver.RESTStorageProvider = &AppsRESTStorageProvider{}
+var _ genericapiserver.RESTStorageProvider = &RESTStorageProvider{}
 
-func (p AppsRESTStorageProvider) NewRESTStorage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter genericapiserver.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool) {
+func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter genericapiserver.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool) {
 	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(apps.GroupName)
 
 	if apiResourceConfigSource.AnyResourcesForVersionEnabled(appsapiv1alpha1.SchemeGroupVersion) {
@@ -39,7 +39,7 @@ func (p AppsRESTStorageProvider) NewRESTStorage(apiResourceConfigSource generica
 	return apiGroupInfo, true
 }
 
-func (p AppsRESTStorageProvider) v1alpha1Storage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter genericapiserver.RESTOptionsGetter) map[string]rest.Storage {
+func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter genericapiserver.RESTOptionsGetter) map[string]rest.Storage {
 	version := appsapiv1alpha1.SchemeGroupVersion
 
 	storage := map[string]rest.Storage{}

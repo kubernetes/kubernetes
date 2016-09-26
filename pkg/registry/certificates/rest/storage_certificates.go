@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package master
+package rest
 
 import (
 	"k8s.io/kubernetes/pkg/api/rest"
@@ -24,11 +24,11 @@ import (
 	certificateetcd "k8s.io/kubernetes/pkg/registry/certificates/certificates/etcd"
 )
 
-type CertificatesRESTStorageProvider struct{}
+type RESTStorageProvider struct{}
 
-var _ genericapiserver.RESTStorageProvider = &CertificatesRESTStorageProvider{}
+var _ genericapiserver.RESTStorageProvider = &RESTStorageProvider{}
 
-func (p CertificatesRESTStorageProvider) NewRESTStorage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter genericapiserver.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool) {
+func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter genericapiserver.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool) {
 	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(certificates.GroupName)
 
 	if apiResourceConfigSource.AnyResourcesForVersionEnabled(certificatesapiv1alpha1.SchemeGroupVersion) {
@@ -39,7 +39,7 @@ func (p CertificatesRESTStorageProvider) NewRESTStorage(apiResourceConfigSource 
 	return apiGroupInfo, true
 }
 
-func (p CertificatesRESTStorageProvider) v1alpha1Storage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter genericapiserver.RESTOptionsGetter) map[string]rest.Storage {
+func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter genericapiserver.RESTOptionsGetter) map[string]rest.Storage {
 	version := certificatesapiv1alpha1.SchemeGroupVersion
 
 	storage := map[string]rest.Storage{}

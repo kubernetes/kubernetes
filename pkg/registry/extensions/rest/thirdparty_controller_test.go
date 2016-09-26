@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package master
+package rest
 
 import (
 	"testing"
@@ -40,7 +40,7 @@ func (f *FakeAPIInterface) RemoveThirdPartyResource(path string) error {
 func (f *FakeAPIInterface) InstallThirdPartyResource(rsrc *expapi.ThirdPartyResource) error {
 	f.installed = append(f.installed, rsrc)
 	_, group, _ := thirdpartyresourcedata.ExtractApiGroupAndKind(rsrc)
-	f.apis = append(f.apis, makeThirdPartyPath(group))
+	f.apis = append(f.apis, MakeThirdPartyPath(group))
 	return nil
 }
 
@@ -49,7 +49,7 @@ func (f *FakeAPIInterface) HasThirdPartyResource(rsrc *expapi.ThirdPartyResource
 		return false, nil
 	}
 	_, group, _ := thirdpartyresourcedata.ExtractApiGroupAndKind(rsrc)
-	path := makeThirdPartyPath(group)
+	path := MakeThirdPartyPath(group)
 	for _, api := range f.apis {
 		if api == path {
 			return true, nil
