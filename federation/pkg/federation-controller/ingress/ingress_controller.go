@@ -691,12 +691,12 @@ func (ic *IngressController) reconcileIngress(ingress types.NamespacedName) {
 					baseIngress.Status.LoadBalancer = *lbstatus
 				}
 				glog.V(4).Infof("Attempting to update base federated ingress: %v", baseIngress)
-				if _, err = ic.federatedApiClient.Extensions().Ingresses(baseIngress.Namespace).Update(baseIngress); err != nil {
+				if updatedFedIngress, err := ic.federatedApiClient.Extensions().Ingresses(baseIngress.Namespace).Update(baseIngress); err != nil {
 					glog.Errorf("Failed to add static IP annotation to federated ingress %q, will try again later: %v", ingress, err)
 					ic.deliverIngress(ingress, ic.ingressReviewDelay, true)
 					return
 				} else {
-					glog.V(4).Infof("Successfully added static IP annotation to federated ingress: %q", ingress)
+					glog.V(4).Infof("Successfully updated federated ingress %q (added IP), after update: %q", ingress, updatedFedIngress)
 					ic.deliverIngress(ingress, ic.smallDelay, false)
 					return
 				}
