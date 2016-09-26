@@ -603,16 +603,19 @@ func (g *genConversion) doSlice(inType, outType *types.Type, sw *generator.Snipp
 
 func (g *genConversion) doStruct(inType, outType *types.Type, sw *generator.SnippetWriter) {
 	for _, inMember := range inType.Members {
-		// Check if this member is excluded from conversion
 		if tagvals := extractTag(inMember.CommentLines); tagvals != nil && tagvals[0] == "false" {
+			// This field is excluded from conversion.
+			sw.Do("// INFO: in."+inMember.Name+" opted out of conversion generation\n", nil)
 			continue
 		}
 		outMember, found := findMember(outType, inMember.Name)
 		if !found {
-			// Since this object wasn't filtered out, this means that
-			// this field has "+k8s:conversion-gen=false" comment to ignore it.
+			// This field doesn't exist in the peer.
+			sw.Do("// WARNING: in."+inMember.Name+" requires manual conversion: does not exist in peer-type\n", nil)
+			g.skippedFields[inType] = append(g.skippedFields[inType], inMember.Name)
 			continue
 		}
+
 		inMemberType, outMemberType := inMember.Type, outMember.Type
 		// create a copy of both underlying types but give them the top level alias name (since aliases
 		// are assignable)
@@ -643,7 +646,8 @@ func (g *genConversion) doStruct(inType, outType *types.Type, sw *generator.Snip
 
 		// If we can't auto-convert, punt before we emit any code.
 		if inMemberType.Kind != outMemberType.Kind {
-			sw.Do("// WARNING: field '"+inMember.Name+"' requires manual conversion\n", nil)
+			sw.Do("// WARNING: in."+inMember.Name+" requires manual conversion: inconvertible types ("+
+				inMemberType.String()+" vs "+outMemberType.String()+")\n", nil)
 			g.skippedFields[inType] = append(g.skippedFields[inType], inMember.Name)
 			continue
 		}
