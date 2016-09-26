@@ -26,11 +26,15 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/metrics"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/wait"
+	"k8s.io/kubernetes/pkg/watch"
 )
 
 const (
@@ -48,21 +52,42 @@ type RouteController struct {
 	kubeClient  clientset.Interface
 	clusterName string
 	clusterCIDR *net.IPNet
+	// Node framework and store
+	nodeController *cache.Controller
+	nodeStore      cache.StoreToNodeLister
 }
 
 func New(routes cloudprovider.Routes, kubeClient clientset.Interface, clusterName string, clusterCIDR *net.IPNet) *RouteController {
 	if kubeClient != nil && kubeClient.Core().GetRESTClient().GetRateLimiter() != nil {
 		metrics.RegisterMetricAndTrackRateLimiterUsage("route_controller", kubeClient.Core().GetRESTClient().GetRateLimiter())
 	}
-	return &RouteController{
+	rc := &RouteController{
 		routes:      routes,
 		kubeClient:  kubeClient,
 		clusterName: clusterName,
 		clusterCIDR: clusterCIDR,
 	}
+
+	rc.nodeStore.Store, rc.nodeController = cache.NewInformer(
+		&cache.ListWatch{
+			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+				return rc.kubeClient.Core().Nodes().List(options)
+			},
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+				return rc.kubeClient.Core().Nodes().Watch(options)
+			},
+		},
+		&api.Node{},
+		controller.NoResyncPeriodFunc(),
+		cache.ResourceEventHandlerFuncs{},
+	)
+
+	return rc
 }
 
 func (rc *RouteController) Run(syncPeriod time.Duration) {
+	go rc.nodeController.Run(wait.NeverStop)
+
 	// TODO: If we do just the full Resync every 5 minutes (default value)
 	// that means that we may wait up to 5 minutes before even starting
 	// creating a route for it. This is bad.
@@ -80,9 +105,10 @@ func (rc *RouteController) reconcileNodeRoutes() error {
 	if err != nil {
 		return fmt.Errorf("error listing routes: %v", err)
 	}
-	// TODO (cjcullen): use pkg/controller/cache.NewInformer to watch this
-	// and reduce the number of lists needed.
-	nodeList, err := rc.kubeClient.Core().Nodes().List(api.ListOptions{})
+	if !rc.nodeController.HasSynced() {
+		return fmt.Errorf("nodeController is not yet synced")
+	}
+	nodeList, err := rc.nodeStore.List()
 	if err != nil {
 		return fmt.Errorf("error listing nodes: %v", err)
 	}
