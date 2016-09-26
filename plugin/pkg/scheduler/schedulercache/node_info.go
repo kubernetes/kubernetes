@@ -18,7 +18,6 @@ package schedulercache
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/golang/glog"
 
@@ -266,7 +265,7 @@ func calculateResource(pod *api.Pod) (res Resource, non0_cpu int64, non0_mem int
 			case api.ResourceNvidiaGPU:
 				res.NvidiaGPU += rQuant.Value()
 			default:
-				if strings.HasPrefix(string(rName), api.ResourceOpaqueIntPrefix) {
+				if api.IsOpaqueIntResourceName(rName) {
 					// Lazily allocate opaque resource map.
 					if res.OpaqueIntResources == nil {
 						res.OpaqueIntResources = map[api.ResourceName]int64{}
@@ -298,7 +297,7 @@ func (n *NodeInfo) SetNode(node *api.Node) error {
 		case api.ResourcePods:
 			n.allowedPodNumber = int(rQuant.Value())
 		default:
-			if strings.HasPrefix(string(rName), api.ResourceOpaqueIntPrefix) {
+			if api.IsOpaqueIntResourceName(rName) {
 				// Lazily allocate opaque resource map.
 				if n.allocatableResource.OpaqueIntResources == nil {
 					n.allocatableResource.OpaqueIntResources = map[api.ResourceName]int64{}

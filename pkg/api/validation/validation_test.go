@@ -17,7 +17,6 @@ limitations under the License.
 package validation
 
 import (
-	"fmt"
 	"math/rand"
 	"reflect"
 	"strings"
@@ -3586,10 +3585,10 @@ func TestValidatePod(t *testing.T) {
 						ImagePullPolicy: "IfNotPresent",
 						Resources: api.ResourceRequirements{
 							Requests: api.ResourceList{
-								api.ResourceName(fmt.Sprintf("%sopaque-A", api.ResourceOpaqueIntPrefix)): resource.MustParse("10"),
+								api.OpaqueIntResourceName("A"): resource.MustParse("10"),
 							},
 							Limits: api.ResourceList{
-								api.ResourceName(fmt.Sprintf("%sopaque-A", api.ResourceOpaqueIntPrefix)): resource.MustParse("20"),
+								api.OpaqueIntResourceName("A"): resource.MustParse("20"),
 							},
 						},
 					},
@@ -3610,10 +3609,10 @@ func TestValidatePod(t *testing.T) {
 						ImagePullPolicy: "IfNotPresent",
 						Resources: api.ResourceRequirements{
 							Requests: api.ResourceList{
-								api.ResourceName(fmt.Sprintf("%sopaque-A", api.ResourceOpaqueIntPrefix)): resource.MustParse("10"),
+								api.OpaqueIntResourceName("A"): resource.MustParse("10"),
 							},
 							Limits: api.ResourceList{
-								api.ResourceName(fmt.Sprintf("%sopaque-A", api.ResourceOpaqueIntPrefix)): resource.MustParse("20"),
+								api.OpaqueIntResourceName("A"): resource.MustParse("20"),
 							},
 						},
 					},
@@ -4122,10 +4121,10 @@ func TestValidatePod(t *testing.T) {
 						ImagePullPolicy: "IfNotPresent",
 						Resources: api.ResourceRequirements{
 							Requests: api.ResourceList{
-								api.ResourceName(fmt.Sprintf("%sopaque-A", api.ResourceOpaqueIntPrefix)): resource.MustParse("2"),
+								api.OpaqueIntResourceName("A"): resource.MustParse("2"),
 							},
 							Limits: api.ResourceList{
-								api.ResourceName(fmt.Sprintf("%sopaque-A", api.ResourceOpaqueIntPrefix)): resource.MustParse("1"),
+								api.OpaqueIntResourceName("A"): resource.MustParse("1"),
 							},
 						},
 					},
@@ -4144,7 +4143,7 @@ func TestValidatePod(t *testing.T) {
 						ImagePullPolicy: "IfNotPresent",
 						Resources: api.ResourceRequirements{
 							Requests: api.ResourceList{
-								api.ResourceName(fmt.Sprintf("%sopaque-A", api.ResourceOpaqueIntPrefix)): resource.MustParse("500m"),
+								api.OpaqueIntResourceName("A"): resource.MustParse("500m"),
 							},
 						},
 					},
@@ -4163,7 +4162,7 @@ func TestValidatePod(t *testing.T) {
 						ImagePullPolicy: "IfNotPresent",
 						Resources: api.ResourceRequirements{
 							Requests: api.ResourceList{
-								api.ResourceName(fmt.Sprintf("%sopaque-A", api.ResourceOpaqueIntPrefix)): resource.MustParse("500m"),
+								api.OpaqueIntResourceName("A"): resource.MustParse("500m"),
 							},
 						},
 					},
@@ -4183,10 +4182,10 @@ func TestValidatePod(t *testing.T) {
 						ImagePullPolicy: "IfNotPresent",
 						Resources: api.ResourceRequirements{
 							Requests: api.ResourceList{
-								api.ResourceName(fmt.Sprintf("%sopaque-A", api.ResourceOpaqueIntPrefix)): resource.MustParse("5"),
+								api.OpaqueIntResourceName("A"): resource.MustParse("5"),
 							},
 							Limits: api.ResourceList{
-								api.ResourceName(fmt.Sprintf("%sopaque-A", api.ResourceOpaqueIntPrefix)): resource.MustParse("2.5"),
+								api.OpaqueIntResourceName("A"): resource.MustParse("2.5"),
 							},
 						},
 					},
@@ -4205,10 +4204,10 @@ func TestValidatePod(t *testing.T) {
 						ImagePullPolicy: "IfNotPresent",
 						Resources: api.ResourceRequirements{
 							Requests: api.ResourceList{
-								api.ResourceName(fmt.Sprintf("%sopaque-A", api.ResourceOpaqueIntPrefix)): resource.MustParse("5"),
+								api.OpaqueIntResourceName("A"): resource.MustParse("5"),
 							},
 							Limits: api.ResourceList{
-								api.ResourceName(fmt.Sprintf("%sopaque-A", api.ResourceOpaqueIntPrefix)): resource.MustParse("2.5"),
+								api.OpaqueIntResourceName("A"): resource.MustParse("2.5"),
 							},
 						},
 					},
@@ -6405,10 +6404,10 @@ func TestValidateNodeUpdate(t *testing.T) {
 			},
 			Status: api.NodeStatus{
 				Capacity: api.ResourceList{
-					api.ResourceName(api.ResourceCPU):                                                 resource.MustParse("10"),
-					api.ResourceName(api.ResourceMemory):                                              resource.MustParse("10G"),
-					api.ResourceName(fmt.Sprintf("%sopaque-resource-A", api.ResourceOpaqueIntPrefix)): resource.MustParse("5"),
-					api.ResourceName(fmt.Sprintf("%sopaque-resource-B", api.ResourceOpaqueIntPrefix)): resource.MustParse("10"),
+					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
+					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
+					api.OpaqueIntResourceName("A"):       resource.MustParse("5"),
+					api.OpaqueIntResourceName("B"):       resource.MustParse("10"),
 				},
 			},
 		}, true},
@@ -6422,9 +6421,9 @@ func TestValidateNodeUpdate(t *testing.T) {
 			},
 			Status: api.NodeStatus{
 				Capacity: api.ResourceList{
-					api.ResourceName(api.ResourceCPU):                                                 resource.MustParse("10"),
-					api.ResourceName(api.ResourceMemory):                                              resource.MustParse("10G"),
-					api.ResourceName(fmt.Sprintf("%sopaque-resource-A", api.ResourceOpaqueIntPrefix)): resource.MustParse("500m"),
+					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
+					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
+					api.OpaqueIntResourceName("A"):       resource.MustParse("500m"),
 				},
 			},
 		}, false},
@@ -6438,14 +6437,14 @@ func TestValidateNodeUpdate(t *testing.T) {
 			},
 			Status: api.NodeStatus{
 				Capacity: api.ResourceList{
-					api.ResourceName(api.ResourceCPU):                                                 resource.MustParse("10"),
-					api.ResourceName(api.ResourceMemory):                                              resource.MustParse("10G"),
-					api.ResourceName(fmt.Sprintf("%sopaque-resource-A", api.ResourceOpaqueIntPrefix)): resource.MustParse("5"),
+					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
+					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
+					api.OpaqueIntResourceName("A"):       resource.MustParse("5"),
 				},
 				Allocatable: api.ResourceList{
-					api.ResourceName(api.ResourceCPU):                                                 resource.MustParse("10"),
-					api.ResourceName(api.ResourceMemory):                                              resource.MustParse("10G"),
-					api.ResourceName(fmt.Sprintf("%sopaque-resource-A", api.ResourceOpaqueIntPrefix)): resource.MustParse("4.5"),
+					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
+					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
+					api.OpaqueIntResourceName("A"):       resource.MustParse("4.5"),
 				},
 			},
 		}, false},

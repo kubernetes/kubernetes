@@ -75,8 +75,8 @@ func (pvs FakePersistentVolumeInfo) GetPersistentVolumeInfo(pvID string) (*api.P
 }
 
 var (
-	opaqueResourceA = api.ResourceName(fmt.Sprintf("%sAAA", api.ResourceOpaqueIntPrefix))
-	opaqueResourceB = api.ResourceName(fmt.Sprintf("%sBBB", api.ResourceOpaqueIntPrefix))
+	opaqueResourceA = api.OpaqueIntResourceName("AAA")
+	opaqueResourceB = api.OpaqueIntResourceName("BBB")
 )
 
 func makeResources(milliCPU, memory, nvidiaGPUs, pods, opaqueA int64) api.NodeResources {

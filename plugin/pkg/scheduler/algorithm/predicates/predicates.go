@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"math/rand"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -430,7 +429,7 @@ func getResourceRequest(pod *api.Pod) *schedulercache.Resource {
 			case api.ResourceNvidiaGPU:
 				result.NvidiaGPU += rQuantity.Value()
 			default:
-				if strings.HasPrefix(string(rName), api.ResourceOpaqueIntPrefix) {
+				if api.IsOpaqueIntResourceName(rName) {
 					// Lazily allocate this map only if required.
 					if result.OpaqueIntResources == nil {
 						result.OpaqueIntResources = map[api.ResourceName]int64{}
@@ -457,7 +456,7 @@ func getResourceRequest(pod *api.Pod) *schedulercache.Resource {
 					result.NvidiaGPU = gpu
 				}
 			default:
-				if strings.HasPrefix(string(rName), api.ResourceOpaqueIntPrefix) {
+				if api.IsOpaqueIntResourceName(rName) {
 					// Lazily allocate this map only if required.
 					if result.OpaqueIntResources == nil {
 						result.OpaqueIntResources = map[api.ResourceName]int64{}

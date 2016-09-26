@@ -2793,7 +2793,7 @@ func ValidateNodeUpdate(node, oldNode *api.Node) field.ErrorList {
 func ValidateOpaqueIntQuants(rs api.ResourceList, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for rName, rQuant := range rs {
-		if strings.HasPrefix(string(rName), api.ResourceOpaqueIntPrefix) && rQuant.MilliValue() != 1000*rQuant.Value() {
+		if api.IsOpaqueIntResourceName(rName) && rQuant.MilliValue() != 1000*rQuant.Value() {
 			allErrs = append(allErrs, field.Invalid(fldPath, rQuant.String(), "fractional values are not allowed for opaque integer resources"))
 		}
 	}
