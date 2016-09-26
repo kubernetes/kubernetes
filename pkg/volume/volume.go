@@ -129,6 +129,12 @@ type Provisioner interface {
 type Deleter interface {
 	Volume
 	// This method should block until completion.
+	// deletedVolumeInUseError returned from this function will not be reported
+	// as error and it will be sent as "Info" event to the PV being deleted. The
+	// volume controller will retry deleting the volume in the next periodic
+	// sync. This can be used to postpone deletion of a volume that is being
+	// dettached from a node. Deletion of such volume would fail anyway and such
+	// error would confuse users.
 	Delete() error
 }
 
@@ -169,6 +175,31 @@ type Detacher interface {
 	// should only be called once all bind mounts have been
 	// unmounted.
 	UnmountDevice(deviceMountPath string) error
+}
+
+// NewDeletedVolumeInUseError returns a new instance of DeletedVolumeInUseError
+// error.
+func NewDeletedVolumeInUseError(message string) error {
+	return deletedVolumeInUseError(message)
+}
+
+type deletedVolumeInUseError string
+
+var _ error = deletedVolumeInUseError("")
+
+// IsDeletedVolumeInUse returns true if an error returned from Delete() is
+// deletedVolumeInUseError
+func IsDeletedVolumeInUse(err error) bool {
+	switch err.(type) {
+	case deletedVolumeInUseError:
+		return true
+	default:
+		return false
+	}
+}
+
+func (err deletedVolumeInUseError) Error() string {
+	return string(err)
 }
 
 func RenameDirectory(oldPath, newName string) (string, error) {
