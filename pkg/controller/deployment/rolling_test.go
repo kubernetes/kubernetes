@@ -80,18 +80,20 @@ func TestDeploymentController_reconcileNewReplicaSet(t *testing.T) {
 		},
 	}
 
-	for i, test := range tests {
+	for i := range tests {
+		test := tests[i]
 		t.Logf("executing scenario %d", i)
 		newRS := rs("foo-v2", test.newReplicas, nil, noTimestamp)
 		oldRS := rs("foo-v2", test.oldReplicas, nil, noTimestamp)
 		allRSs := []*exp.ReplicaSet{newRS, oldRS}
-		deployment := deployment("foo", test.deploymentReplicas, test.maxSurge, intstr.FromInt(0), nil)
+		maxUnavailable := intstr.FromInt(0)
+		deployment := newDeployment("foo", test.deploymentReplicas, nil, &test.maxSurge, &maxUnavailable, map[string]string{"foo": "bar"})
 		fake := fake.Clientset{}
 		controller := &DeploymentController{
 			client:        &fake,
 			eventRecorder: &record.FakeRecorder{},
 		}
-		scaled, err := controller.reconcileNewReplicaSet(allRSs, newRS, &deployment)
+		scaled, err := controller.reconcileNewReplicaSet(allRSs, newRS, deployment)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 			continue
@@ -178,7 +180,8 @@ func TestDeploymentController_reconcileOldReplicaSets(t *testing.T) {
 			scaleExpected:      false,
 		},
 	}
-	for i, test := range tests {
+	for i := range tests {
+		test := tests[i]
 		t.Logf("executing scenario %d", i)
 
 		newSelector := map[string]string{"foo": "new"}
@@ -187,8 +190,8 @@ func TestDeploymentController_reconcileOldReplicaSets(t *testing.T) {
 		oldRS := rs("foo-old", test.oldReplicas, oldSelector, noTimestamp)
 		oldRSs := []*exp.ReplicaSet{oldRS}
 		allRSs := []*exp.ReplicaSet{oldRS, newRS}
-
-		deployment := deployment("foo", test.deploymentReplicas, intstr.FromInt(0), test.maxUnavailable, newSelector)
+		maxSurge := intstr.FromInt(0)
+		deployment := newDeployment("foo", test.deploymentReplicas, nil, &maxSurge, &test.maxUnavailable, newSelector)
 		fakeClientset := fake.Clientset{}
 		fakeClientset.AddReactor("list", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 			switch action.(type) {
@@ -267,7 +270,7 @@ func TestDeploymentController_reconcileOldReplicaSets(t *testing.T) {
 			eventRecorder: &record.FakeRecorder{},
 		}
 
-		scaled, err := controller.reconcileOldReplicaSets(allRSs, oldRSs, newRS, &deployment)
+		scaled, err := controller.reconcileOldReplicaSets(allRSs, oldRSs, newRS, deployment)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 			continue
@@ -325,7 +328,9 @@ func TestDeploymentController_cleanupUnhealthyReplicas(t *testing.T) {
 		t.Logf("executing scenario %d", i)
 		oldRS := rs("foo-v2", test.oldReplicas, nil, noTimestamp)
 		oldRSs := []*exp.ReplicaSet{oldRS}
-		deployment := deployment("foo", 10, intstr.FromInt(2), intstr.FromInt(2), nil)
+		maxSurge := intstr.FromInt(2)
+		maxUnavailable := intstr.FromInt(2)
+		deployment := newDeployment("foo", 10, nil, &maxSurge, &maxUnavailable, nil)
 		fakeClientset := fake.Clientset{}
 		fakeClientset.AddReactor("list", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 			switch action.(type) {
@@ -370,7 +375,7 @@ func TestDeploymentController_cleanupUnhealthyReplicas(t *testing.T) {
 			client:        &fakeClientset,
 			eventRecorder: &record.FakeRecorder{},
 		}
-		_, cleanupCount, err := controller.cleanupUnhealthyReplicas(oldRSs, &deployment, 0, int32(test.maxCleanupCount))
+		_, cleanupCount, err := controller.cleanupUnhealthyReplicas(oldRSs, deployment, 0, int32(test.maxCleanupCount))
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 			continue
@@ -436,12 +441,14 @@ func TestDeploymentController_scaleDownOldReplicaSetsForRollingUpdate(t *testing
 		},
 	}
 
-	for i, test := range tests {
+	for i := range tests {
+		test := tests[i]
 		t.Logf("executing scenario %d", i)
 		oldRS := rs("foo-v2", test.oldReplicas, nil, noTimestamp)
 		allRSs := []*exp.ReplicaSet{oldRS}
 		oldRSs := []*exp.ReplicaSet{oldRS}
-		deployment := deployment("foo", test.deploymentReplicas, intstr.FromInt(0), test.maxUnavailable, map[string]string{"foo": "bar"})
+		maxSurge := intstr.FromInt(0)
+		deployment := newDeployment("foo", test.deploymentReplicas, nil, &maxSurge, &test.maxUnavailable, map[string]string{"foo": "bar"})
 		fakeClientset := fake.Clientset{}
 		fakeClientset.AddReactor("list", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 			switch action.(type) {
@@ -471,7 +478,7 @@ func TestDeploymentController_scaleDownOldReplicaSetsForRollingUpdate(t *testing
 			client:        &fakeClientset,
 			eventRecorder: &record.FakeRecorder{},
 		}
-		scaled, err := controller.scaleDownOldReplicaSetsForRollingUpdate(allRSs, oldRSs, &deployment)
+		scaled, err := controller.scaleDownOldReplicaSetsForRollingUpdate(allRSs, oldRSs, deployment)
 		if !test.errorExpected && err != nil {
 			t.Errorf("unexpected error: %v", err)
 			continue
