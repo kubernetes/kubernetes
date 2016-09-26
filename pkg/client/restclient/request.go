@@ -794,7 +794,6 @@ func (r *Request) request(fn func(*http.Request, *http.Response)) error {
 	}
 
 	// Right now we make about ten retry attempts if we get a Retry-After response.
-	// TODO: Change to a timeout based approach.
 	maxRetries := 10
 	retries := 0
 	for {

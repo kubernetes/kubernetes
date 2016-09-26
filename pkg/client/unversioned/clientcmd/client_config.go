@@ -124,6 +124,7 @@ func (config *DirectClientConfig) ClientConfig() (*restclient.Config, error) {
 
 	clientConfig := &restclient.Config{}
 	clientConfig.Host = configClusterInfo.Server
+	clientConfig.Timeout = config.overrides.Timeout
 	if u, err := url.ParseRequestURI(clientConfig.Host); err == nil && u.Opaque == "" && len(u.Path) > 1 {
 		u.RawQuery = ""
 		u.Fragment = ""
