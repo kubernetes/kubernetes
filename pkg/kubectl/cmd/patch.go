@@ -185,7 +185,7 @@ func RunPatch(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 			count++
 
 			if options.OutputFormat == "name" || len(options.OutputFormat) == 0 {
-				cmdutil.PrintSuccess(mapper, options.OutputFormat == "name", out, "", name, "patched")
+				cmdutil.PrintSuccess(mapper, options.OutputFormat == "name", out, "", name, false, "patched")
 			}
 			return nil
 		}

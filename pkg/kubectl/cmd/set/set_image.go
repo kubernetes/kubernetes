@@ -219,7 +219,7 @@ func (o *ImageOptions) Run() error {
 		}
 
 		info.Refresh(obj, true)
-		cmdutil.PrintSuccess(o.Mapper, o.ShortOutput, o.Out, info.Mapping.Resource, info.Name, "image updated")
+		cmdutil.PrintSuccess(o.Mapper, o.ShortOutput, o.Out, info.Mapping.Resource, info.Name, false, "image updated")
 	}
 	return utilerrors.NewAggregate(allErrs)
 }

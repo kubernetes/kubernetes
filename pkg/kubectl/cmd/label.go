@@ -294,7 +294,7 @@ func RunLabel(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 		if outputFormat != "" {
 			return f.PrintObject(cmd, mapper, outputObj, out)
 		}
-		cmdutil.PrintSuccess(mapper, false, out, info.Mapping.Resource, info.Name, dataChangeMsg)
+		cmdutil.PrintSuccess(mapper, false, out, info.Mapping.Resource, info.Name, cmdutil.GetDryRunFlag(cmd), dataChangeMsg)
 		return nil
 	})
 }
