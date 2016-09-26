@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package apiserver
+package request
 
 import (
 	"net/http"
@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/auth/user"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
@@ -191,6 +192,29 @@ func TestGetNonAPIRequestInfo(t *testing.T) {
 			t.Errorf("%s: expected %v, actual %v", testName, e, a)
 		}
 	}
+}
+
+type FakeRequestInfoContextMapper struct {
+	user *user.DefaultInfo
+}
+
+func (m *FakeRequestInfoContextMapper) Get(req *http.Request) (api.Context, bool) {
+	ctx := api.NewContext()
+
+	if m.user != nil {
+		ctx = api.WithUser(ctx, m.user)
+	}
+
+	info, err := newTestRequestInfoResolver().GetRequestInfo(req)
+	if err == nil {
+		ctx = WithRequestInfo(ctx, info)
+	}
+
+	return ctx, true
+}
+
+func (*FakeRequestInfoContextMapper) Update(req *http.Request, context api.Context) error {
+	return nil
 }
 
 func newTestRequestInfoResolver() *RequestInfoResolver {
