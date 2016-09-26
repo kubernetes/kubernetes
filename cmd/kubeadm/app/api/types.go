@@ -18,6 +18,9 @@ package api
 
 import (
 	"net"
+	"time"
+
+	certclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/certificates/unversioned"
 )
 
 // KubeadmConfig TODO add description
@@ -93,7 +96,8 @@ func init() {
 
 // JoinFlags holds values for "kubeadm join" command flags.
 type JoinFlags struct {
-	MasterAddrs []net.IP
+	MasterAddrs  []net.IP
+	RetryTimeout time.Duration
 	// TODO(phase1+) add manual mode flags here, e.g. RootCACertPath
 }
 
@@ -102,4 +106,12 @@ type ClusterInfo struct {
 	// TODO(phase1+) this may become simply `api.Config`
 	CertificateAuthorities []string `json:"certificateAuthorities"`
 	Endpoints              []string `json:"endpoints"`
+}
+
+// Master connection
+type ConnectionDetails struct {
+	CertClient *certclient.CertificatesClient
+	Endpoint   string
+	CACert     []byte
+	NodeName   string
 }

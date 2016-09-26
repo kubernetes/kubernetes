@@ -56,6 +56,9 @@ func NewCmdJoin(out io.Writer, s *kubeadmapi.KubeadmConfig) *cobra.Command {
 		&s.Secrets.GivenToken, "token", "",
 		"(required) Shared secret used to secure bootstrap. Must match the output of 'kubeadm init'",
 	)
+	cmd.PersistentFlags().DurationVar(&s.JoinFlags.RetryTimeout, "retry-timeout", 5,
+		"(optional) Amount of time that kubeadm should wait for "+
+			"between each attempt to connect to the API server. Specified in seconds.")
 
 	return cmd
 }
@@ -82,7 +85,17 @@ func RunJoin(out io.Writer, cmd *cobra.Command, args []string, s *kubeadmapi.Kub
 		return fmt.Errorf("Must specify --token (see --help)\n")
 	}
 
-	kubeconfig, err := kubenode.RetrieveTrustedClusterInfo(s)
+	clusterInfo, err := kubenode.RetrieveTrustedClusterInfo(s)
+	if err != nil {
+		return err
+	}
+
+	connectionDetails, err := kubenode.EstablishMasterConnection(s, clusterInfo)
+	if err != nil {
+		return err
+	}
+
+	kubeconfig, err := kubenode.PerformTLSBootstrap(connectionDetails)
 	if err != nil {
 		return err
 	}
