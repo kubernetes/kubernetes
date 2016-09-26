@@ -205,6 +205,21 @@ type KubeletConfiguration struct {
 	MaxContainerCount int32 `json:"maxContainerCount"`
 	// cAdvisorPort is the port of the localhost cAdvisor endpoint
 	CAdvisorPort int32 `json:"cAdvisorPort"`
+	// customMetricsCollectorClientCertFile is the file containing a x509 Certificate (CA cert, if any,
+	// concatenated after server cert). This is used by the custom metrics collectors when accessing
+	// a custom metric endpoint which require certificate based authentication.
+	// If CustomMetricsCollectorClientCertFile and CustomMetricsCollectorClientPrivateKeyFile are not provided,
+	// the default HTTP.client will be used.
+	CustomMetricsCollectorClientCertFile string `json:"customMetricsCollectorClientCertFile"`
+	// customMetricsCollectorClientPrivateKeyFile is the file containing x509 private key matching
+	// customMetricsCollectorClientCertFile.
+	CustomMetricsCollectorClientPrivateKeyFile string `json:"customMetricsCollectorClientPrivateKeyFile"`
+	// customMetricsInsecureSkipVerify enable connecting to insecure tls metric endpoints
+	CustomMetricsInsecureSkipVerify bool `json:"customMetricsInsecureSkipVerify"`
+	// customMetricsRootCAFile enables specifying the root certificate authority will be used to verify
+	// custom metric endpoints. This must be a valid PEM-encoded CA bundle. If not set, the system's default root
+	// CA bundle is used instead.
+	CustomMetricsRootCAFile string `json:"customMetricsRootCAFile"`
 	// healthzPort is the port of the localhost healthz endpoint
 	HealthzPort int32 `json:"healthzPort"`
 	// healthzBindAddress is the IP address for the healthz server to serve

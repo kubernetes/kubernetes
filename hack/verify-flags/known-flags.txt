@@ -101,6 +101,10 @@ cpu-percent
 create-external-load-balancer
 current-release-pr
 current-replicas
+custom-metrics-collector-client-cert-file
+custom-metrics-collector-client-private-key-file
+custom-metrics-insecure-skip-tls-verify
+custom-metrics-root-ca-file
 daemonset-lookup-cache-size
 data-dir
 default-container-cpu-limit

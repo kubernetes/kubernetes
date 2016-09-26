@@ -199,6 +199,10 @@ func DeepCopy_v1alpha1_KubeletConfiguration(in interface{}, out interface{}, c *
 			out.MaxContainerCount = nil
 		}
 		out.CAdvisorPort = in.CAdvisorPort
+		out.CustomMetricsCollectorClientCertFile = in.CustomMetricsCollectorClientCertFile
+		out.CustomMetricsCollectorClientPrivateKeyFile = in.CustomMetricsCollectorClientPrivateKeyFile
+		out.CustomMetricsInsecureSkipVerify = in.CustomMetricsInsecureSkipVerify
+		out.CustomMetricsRootCAFile = in.CustomMetricsRootCAFile
 		out.HealthzPort = in.HealthzPort
 		out.HealthzBindAddress = in.HealthzBindAddress
 		if in.OOMScoreAdj != nil {

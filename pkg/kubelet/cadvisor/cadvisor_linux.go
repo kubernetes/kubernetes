@@ -24,6 +24,8 @@ import (
 	"net/http"
 	"time"
 
+	"crypto/tls"
+	"crypto/x509"
 	"github.com/golang/glog"
 	"github.com/google/cadvisor/cache/memory"
 	cadvisorMetrics "github.com/google/cadvisor/container"
@@ -35,6 +37,7 @@ import (
 	"github.com/google/cadvisor/manager"
 	"github.com/google/cadvisor/metrics"
 	"github.com/google/cadvisor/utils/sysfs"
+	"io/ioutil"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/util/runtime"
 )
@@ -92,15 +95,28 @@ func containerLabels(c *cadvisorapi.ContainerInfo) map[string]string {
 	return set
 }
 
+type CAdvisorCustomMetricsConfig struct {
+	CollectorClientCertFile       string
+	CollectorClientPrivateKeyFile string
+	InsecureSkipVerify            bool
+	RootCAFile                    string
+}
+
 // New creates a cAdvisor and exports its API on the specified port if port > 0.
-func New(port uint, runtime string) (Interface, error) {
+func New(port uint, runtime string, config CAdvisorCustomMetricsConfig) (Interface, error) {
 	sysFs, err := sysfs.NewRealSysFs()
 	if err != nil {
 		return nil, err
 	}
 
+	//generate the http.Client to be used by the cAdvisor custom metric providers
+	httpClient, err := generateCollectorHttpClient(config)
+	if err != nil {
+		return nil, err
+	}
+
 	// Create and start the cAdvisor container manager.
-	m, err := manager.New(memory.New(statsCacheDuration, nil), sysFs, maxHousekeepingInterval, allowDynamicHousekeeping, cadvisorMetrics.MetricSet{cadvisorMetrics.NetworkTcpUsageMetrics: struct{}{}}, http.DefaultClient)
+	m, err := manager.New(memory.New(statsCacheDuration, nil), sysFs, maxHousekeepingInterval, allowDynamicHousekeeping, cadvisorMetrics.MetricSet{cadvisorMetrics.NetworkTcpUsageMetrics: struct{}{}}, httpClient)
 	if err != nil {
 		return nil, err
 	}
@@ -115,6 +131,48 @@ func New(port uint, runtime string) (Interface, error) {
 		return nil, err
 	}
 	return cadvisorClient, nil
+}
+
+func generateCollectorHttpClient(config CAdvisorCustomMetricsConfig) (*http.Client, error) {
+	tlsConfig := &tls.Config{}
+	// if configured, set insecureSkipVerify when connecting to insecure tls metric endpoints
+	if config.InsecureSkipVerify {
+		tlsConfig.InsecureSkipVerify = true
+	}
+
+	// if the customMetricsRootCAFile is empty we just use the system defaults.
+	// if it is specified, we use the certificates contained within this file
+	if config.RootCAFile != "" {
+		rootCAs := x509.NewCertPool()
+
+		pem, err := ioutil.ReadFile(config.RootCAFile)
+		if err != nil {
+			return nil, fmt.Errorf("Error trying to load the custom metrics root CA file: %v", err)
+		}
+
+		rootCAs.AppendCertsFromPEM(pem)
+
+		tlsConfig.RootCAs = rootCAs
+	}
+
+	if config.CollectorClientCertFile != "" {
+		if config.CollectorClientPrivateKeyFile == "" {
+			return nil, fmt.Errorf("invalid configuration: customMetricsCollectorClientCertFile was specified and customMetricsCollectorClientPrivateKeyFile was not specified.")
+		}
+		cert, err := tls.LoadX509KeyPair(config.CollectorClientCertFile, config.CollectorClientPrivateKeyFile)
+		if err != nil {
+			return nil, fmt.Errorf("Error loading the cAdvisor client certificates: %v", err)
+		}
+		tlsConfig.Certificates = []tls.Certificate{cert}
+	}
+
+	transport := &http.Transport{
+		TLSClientConfig: tlsConfig,
+	}
+
+	httpClient := http.Client{Transport: transport}
+
+	return &httpClient, nil
 }
 
 func (cc *cadvisorClient) Start() error {
