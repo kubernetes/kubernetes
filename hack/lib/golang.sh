@@ -145,6 +145,7 @@ readonly KUBE_TEST_PORTABLE=(
   hack/ginkgo-e2e.sh
   hack/federated-ginkgo-e2e.sh
   hack/lib
+  hack/jenkins
 )
 
 # Node test has built-in etcd and kube-apiserver, it can only be built on the
