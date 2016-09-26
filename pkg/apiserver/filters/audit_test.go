@@ -29,6 +29,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/apiserver/request"
 	"k8s.io/kubernetes/pkg/auth/user"
 )
 
@@ -73,14 +74,10 @@ func (*fakeHTTPHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 func TestAudit(t *testing.T) {
 	var buf bytes.Buffer
 
-	mapper := &fakeRequestContextMapper{
+	attributeGetter := NewRequestAttributeGetter(&fakeRequestContextMapper{
 		user: &user.DefaultInfo{Name: "admin"},
-	}
-	attributeGetter := NewRequestAttributeGetter(mapper)
-
+	})
 	handler := WithAudit(&fakeHTTPHandler{}, attributeGetter, &buf)
-	handler = WithRequestInfo(handler, newTestRequestInfoResolver(), mapper)
-	handler = api.WithRequestContext(handler, mapper)
 
 	req, _ := http.NewRequest("GET", "/api/v1/namespaces/default/pods", nil)
 	req.RemoteAddr = "127.0.0.1"
@@ -114,6 +111,13 @@ func (m *fakeRequestContextMapper) Get(req *http.Request) (api.Context, bool) {
 	if m.user != nil {
 		ctx = api.WithUser(ctx, m.user)
 	}
+
+	resolver := newTestRequestInfoResolver()
+	info, err := resolver.GetRequestInfo(req)
+	if err == nil {
+		ctx = request.WithRequestInfo(ctx, info)
+	}
+	
 	return ctx, true
 }
 
