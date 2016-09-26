@@ -251,6 +251,9 @@ func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
 			secureServer.TLSConfig.ClientAuth = tls.RequestClientCert
 			// Specify allowed CAs for client certificates
 			secureServer.TLSConfig.ClientCAs = clientCAs
+			// "h2" NextProtos is necessary for enabling HTTP2 for go's 1.7 HTTP Server
+			secureServer.TLSConfig.NextProtos = []string{"h2"}
+
 		}
 
 		glog.Infof("Serving securely on %s", secureLocation)
