@@ -53,7 +53,10 @@ func (ds *dockerService) RunPodSandbox(config *runtimeApi.PodSandboxConfig) (str
 	}
 
 	// Step 2: Create the sandbox container.
-	createConfig := makeSandboxDockerConfig(config, image)
+	createConfig, err := ds.makeSandboxDockerConfig(config, image)
+	if err != nil {
+		return "", fmt.Errorf("failed to make sandbox docker config for pod %q: %v", config.Metadata.GetName(), err)
+	}
 	createResp, err := ds.client.CreateContainer(*createConfig)
 	if err != nil || createResp == nil {
 		return "", fmt.Errorf("failed to create a sandbox for pod %q: %v", config.Metadata.GetName(), err)
@@ -194,7 +197,7 @@ func (ds *dockerService) ListPodSandbox(filter *runtimeApi.PodSandboxFilter) ([]
 	return result, nil
 }
 
-func makeSandboxDockerConfig(c *runtimeApi.PodSandboxConfig, image string) *dockertypes.ContainerCreateConfig {
+func (ds *dockerService) makeSandboxDockerConfig(c *runtimeApi.PodSandboxConfig, image string) (*dockertypes.ContainerCreateConfig, error) {
 	// Merge annotations and labels because docker supports only labels.
 	labels := makeLabels(c.GetLabels(), c.GetAnnotations())
 	// Apply a label to distinguish sandboxes from regular containers.
@@ -252,9 +255,12 @@ func makeSandboxDockerConfig(c *runtimeApi.PodSandboxConfig, image string) *dock
 	setSandboxResources(hc)
 
 	// Set security options.
-	hc.SecurityOpt = []string{getSeccompOpts()}
-
-	return createConfig
+	var err error
+	hc.SecurityOpt, err = getSandboxSecurityOpts(c, ds.seccompProfileRoot)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate sandbox security options for sandbox %q: %v", c.Metadata.GetName(), err)
+	}
+	return createConfig, nil
 }
 
 func setSandboxResources(hc *dockercontainer.HostConfig) {
