@@ -640,7 +640,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *api.Ser
 			return nil, err
 		}
 
-		update_opts := neutron_ports.UpdateOpts{SecurityGroups: append(port.SecurityGroups, lbSecGroup.ID)}
+		update_opts := neutron_ports.UpdateOpts{SecurityGroups: []string{lbSecGroup.ID}}
 
 		res := neutron_ports.Update(lbaas.network, port.ID, update_opts)
 
