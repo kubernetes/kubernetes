@@ -712,10 +712,13 @@ func (ic *IngressController) reconcileIngress(ingress types.NamespacedName) {
 				objMeta, err := conversion.NewCloner().DeepCopy(clusterIngress.ObjectMeta)
 				if err != nil {
 					glog.Errorf("Error deep copying ObjectMeta: %v", err)
+					ic.deliverIngress(ingress, ic.ingressReviewDelay, true)
+
 				}
 				desiredIngress.ObjectMeta, ok = objMeta.(v1.ObjectMeta)
 				if !ok {
 					glog.Errorf("Internal error: Failed to cast to v1.ObjectMeta: %v", objMeta)
+					ic.deliverIngress(ingress, ic.ingressReviewDelay, true)
 				}
 				// Merge any annotations and labels on the federated ingress onto the underlying cluster ingress,
 				// overwriting duplicates.
@@ -748,6 +751,7 @@ func (ic *IngressController) reconcileIngress(ingress types.NamespacedName) {
 	if len(operations) == 0 {
 		// Everything is in order
 		glog.V(4).Infof("Ingress %q is up-to-date in all clusters - no propagation to clusters required.", ingress)
+		ic.deliverIngress(ingress, ic.ingressReviewDelay, false)
 		return
 	}
 	glog.V(4).Infof("Calling federatedUpdater.Update() - operations: %v", operations)
@@ -760,4 +764,6 @@ func (ic *IngressController) reconcileIngress(ingress types.NamespacedName) {
 		ic.deliverIngress(ingress, ic.ingressReviewDelay, true)
 		return
 	}
+	// Schedule another periodic reconciliation, only to account for possible bugs in watch processing.
+	ic.deliverIngress(ingress, ic.ingressReviewDelay, false)
 }
