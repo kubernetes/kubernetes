@@ -29,14 +29,20 @@ import (
 	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util/clock"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 // newHandlerForTest returns a configured handler for testing.
 func newHandlerForTest(c clientset.Interface) (admission.Interface, informers.SharedInformerFactory, error) {
+	return newHandlerForTestWithClock(c, clock.RealClock{})
+}
+
+// newHandlerForTestWithClock returns a configured handler for testing.
+func newHandlerForTestWithClock(c clientset.Interface, cacheClock clock.Clock) (admission.Interface, informers.SharedInformerFactory, error) {
 	f := informers.NewSharedInformerFactory(c, 5*time.Minute)
-	handler, err := NewLifecycle(c, sets.NewString(api.NamespaceDefault, api.NamespaceSystem))
+	handler, err := newLifecycleWithClock(c, sets.NewString(api.NamespaceDefault, api.NamespaceSystem), cacheClock)
 	if err != nil {
 		return nil, f, err
 	}
@@ -172,4 +178,81 @@ func TestAdmissionNamespaceTerminating(t *testing.T) {
 	if err != nil {
 		t.Errorf("Did not expect an error %v", err)
 	}
+}
+
+// TestAdmissionNamespaceForceLiveLookup verifies live lookups are done after deleting a namespace
+func TestAdmissionNamespaceForceLiveLookup(t *testing.T) {
+	namespace := "test"
+	getCalls := int64(0)
+	phases := map[string]api.NamespacePhase{namespace: api.NamespaceActive}
+	mockClient := newMockClientForTest(phases)
+	mockClient.AddReactor("get", "namespaces", func(action core.Action) (bool, runtime.Object, error) {
+		getCalls++
+		return true, &api.Namespace{ObjectMeta: api.ObjectMeta{Name: namespace}, Status: api.NamespaceStatus{Phase: phases[namespace]}}, nil
+	})
+
+	fakeClock := clock.NewFakeClock(time.Now())
+
+	handler, informerFactory, err := newHandlerForTestWithClock(mockClient, fakeClock)
+	if err != nil {
+		t.Errorf("unexpected error initializing handler: %v", err)
+	}
+	informerFactory.Start(wait.NeverStop)
+
+	pod := newPod(namespace)
+	// verify create operations in the namespace is allowed
+	err = handler.Admit(admission.NewAttributesRecord(&pod, nil, api.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
+	if err != nil {
+		t.Errorf("Unexpected error rejecting creates in an active namespace")
+	}
+	if getCalls != 0 {
+		t.Errorf("Expected no live lookups of the namespace, got %d", getCalls)
+	}
+	getCalls = 0
+
+	// verify delete of namespace can proceed
+	err = handler.Admit(admission.NewAttributesRecord(nil, nil, api.Kind("Namespace").WithVersion("version"), "", namespace, api.Resource("namespaces").WithVersion("version"), "", admission.Delete, nil))
+	if err != nil {
+		t.Errorf("Expected namespace deletion to be allowed")
+	}
+	if getCalls != 0 {
+		t.Errorf("Expected no live lookups of the namespace, got %d", getCalls)
+	}
+	getCalls = 0
+
+	// simulate the phase changing
+	phases[namespace] = api.NamespaceTerminating
+
+	// verify create operations in the namespace cause an error
+	err = handler.Admit(admission.NewAttributesRecord(&pod, nil, api.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
+	if err == nil {
+		t.Errorf("Expected error rejecting creates in a namespace right after deleting it")
+	}
+	if getCalls != 1 {
+		t.Errorf("Expected a live lookup of the namespace at t=0, got %d", getCalls)
+	}
+	getCalls = 0
+
+	// Ensure the live lookup is still forced up to forceLiveLookupTTL
+	fakeClock.Step(forceLiveLookupTTL)
+
+	// verify create operations in the namespace cause an error
+	err = handler.Admit(admission.NewAttributesRecord(&pod, nil, api.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
+	if err == nil {
+		t.Errorf("Expected error rejecting creates in a namespace right after deleting it")
+	}
+	if getCalls != 1 {
+		t.Errorf("Expected a live lookup of the namespace at t=forceLiveLookupTTL, got %d", getCalls)
+	}
+	getCalls = 0
+
+	// Ensure the live lookup expires
+	fakeClock.Step(time.Millisecond)
+
+	// verify create operations in the namespace don't force a live lookup after the timeout
+	handler.Admit(admission.NewAttributesRecord(&pod, nil, api.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
+	if getCalls != 0 {
+		t.Errorf("Expected no live lookup of the namespace at t=forceLiveLookupTTL+1ms, got %d", getCalls)
+	}
+	getCalls = 0
 }
