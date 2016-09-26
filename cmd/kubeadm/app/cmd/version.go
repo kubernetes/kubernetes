@@ -14,11 +14,31 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package cmd
 
 import (
-	_ "github.com/square/go-jose"
+	"fmt"
+	"io"
+
+	"github.com/spf13/cobra"
+
+	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/version"
 )
 
-func main() {
+func NewCmdVersion(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "version",
+		Short: "Print the version of kubeadm",
+		Run: func(cmd *cobra.Command, args []string) {
+			err := RunVersion(out, cmd)
+			cmdutil.CheckErr(err)
+		},
+	}
+	return cmd
+}
+
+func RunVersion(out io.Writer, cmd *cobra.Command) error {
+	fmt.Fprintf(out, "kubeadm version: %#v\n", version.Get())
+	return nil
 }
