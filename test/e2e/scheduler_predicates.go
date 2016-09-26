@@ -507,18 +507,8 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 
 	// test when the pod anti affinity rule is not satisfied, the pod would stay pending.
 	It("validates that InterPodAntiAffinity is respected if matching 2", func() {
-		// launch pods to find nodes which can launch a pod. We intentionally do
-		// not just take the node list and choose the first and the second of them.
-		// Depending on the cluster and the scheduler it might be that a "normal" pod
-		// cannot be scheduled onto it.
-		By("Launching two pods on two distinct nodes to get two node names")
-		CreateHostPortPods(f, "host-port", 2, true)
-		defer framework.DeleteRCAndPods(c, f.ClientSet, ns, "host-port")
-		podList, err := c.Pods(ns).List(api.ListOptions{})
-		ExpectNoError(err)
-		Expect(len(podList.Items)).To(Equal(2))
-		nodeNames := []string{podList.Items[0].Spec.NodeName, podList.Items[1].Spec.NodeName}
-		Expect(nodeNames[0]).ToNot(Equal(nodeNames[1]))
+		nodeNames, cleanupPods := getTwoNodesByCreatingTwoPods(f)
+		defer cleanupPods()
 
 		By("Applying a random label to both nodes.")
 		k := "e2e.inter-pod-affinity.kubernetes.io/zone"
@@ -954,4 +944,21 @@ func getNodeThatCanRunPod(f *framework.Framework) string {
 func getNodeThatCanRunPodWithoutToleration(f *framework.Framework) string {
 	By("Trying to launch a pod without a toleration to get a node which can launch it.")
 	return runPodAndGetNodeName(f, pausePodConfig{Name: "without-toleration"})
+}
+
+func getTwoNodesByCreatingTwoPods(f *framework.Framework) ([]string, func()) {
+	// launch pods to find nodes which can launch a pod. We intentionally do
+	// not just take the node list and choose the first and the second of them.
+	// Depending on the cluster and the scheduler it might be that a "normal" pod
+	// cannot be scheduled onto it.
+	By("Launching two pods on two distinct nodes to get two node names")
+	CreateHostPortPods(f, "host-port", 2, true)
+	podList, err := f.Client.Pods(f.Namespace.Name).List(api.ListOptions{})
+	ExpectNoError(err)
+	Expect(len(podList.Items)).To(Equal(2))
+	nodeNames := []string{podList.Items[0].Spec.NodeName, podList.Items[1].Spec.NodeName}
+	Expect(nodeNames[0]).ToNot(Equal(nodeNames[1]))
+	return nodeNames, func() {
+		framework.DeleteRCAndPods(f.Client, f.ClientSet, f.Namespace.Name, "host-port")
+	}
 }

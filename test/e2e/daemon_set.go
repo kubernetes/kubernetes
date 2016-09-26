@@ -79,6 +79,7 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 
 	var ns string
 	var c *client.Client
+	ignoreLabels := framework.ImagePullerLabels
 
 	BeforeEach(func() {
 		ns = f.Namespace.Name
@@ -268,6 +269,115 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 		By("We should now be able to delete the daemon set.")
 		Expect(c.DaemonSets(ns).Delete(dsName)).NotTo(HaveOccurred())
 
+	})
+
+	It("should respect InterPodAffinity", func() {
+		nodeNames, cleanupPods := getTwoNodesByCreatingTwoPods(f)
+		cleanupPods()
+
+		By("Trying to create a DaemonSet that runs on one of the nodes but not another")
+		node0Affinity := map[string]string{
+			api.AffinityAnnotationKey: `{
+				"nodeAffinity": {
+					"requiredDuringSchedulingIgnoredDuringExecution": {
+						"nodeSelectorTerms": [{
+							"matchExpressions": [{
+								"key": "kubernetes.io/hostname",
+								"operator": "In",
+								"values": ["` + nodeNames[0] + `"]
+							}]
+						}]
+					}
+				}
+			}`,
+		}
+		_, err := c.DaemonSets(ns).Create(&extensions.DaemonSet{
+			ObjectMeta: api.ObjectMeta{
+				Name: "ds1",
+			},
+			Spec: extensions.DaemonSetSpec{
+				Template: api.PodTemplateSpec{
+					ObjectMeta: api.ObjectMeta{
+						Labels:      map[string]string{"e2e-ds-antiaffinity-test": "true"},
+						Annotations: node0Affinity,
+					},
+					Spec: api.PodSpec{
+						Containers: []api.Container{
+							{
+								Name:  "ds1",
+								Image: framework.GetPauseImageName(f.Client),
+							},
+						},
+					},
+				},
+			},
+		})
+		ExpectNoError(err)
+
+		err = framework.WaitForPodsRunningReady(c, ns, 1, framework.PodReadyBeforeTimeout, ignoreLabels)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Trying to create a DaemonSet that attempts to run on both nodes but can only run on one of them due to PodAntiAffinity")
+		node01AffinityAndPodAntiAffinity := map[string]string{
+			api.AffinityAnnotationKey: `{
+				"nodeAffinity": {
+					"requiredDuringSchedulingIgnoredDuringExecution": {
+						"nodeSelectorTerms": [{
+							"matchExpressions": [{
+								"key": "kubernetes.io/hostname",
+								"operator": "In",
+								"values": ["` + nodeNames[0] + `", "` + nodeNames[1] + `"]
+							}]
+						}]
+					}
+				},
+				"podAntiAffinity": {
+						"requiredDuringSchedulingIgnoredDuringExecution": [{
+						"labelSelector": {
+							"matchLabels": {
+								"e2e-ds-antiaffinity-test": "true"
+							}
+						},
+						"topologyKey": "kubernetes.io/hostname"
+					}]
+				}
+			}`,
+		}
+		_, err = c.DaemonSets(ns).Create(&extensions.DaemonSet{
+			ObjectMeta: api.ObjectMeta{
+				Name: "ds2",
+			},
+			Spec: extensions.DaemonSetSpec{
+				Template: api.PodTemplateSpec{
+					ObjectMeta: api.ObjectMeta{
+						Labels:      map[string]string{"e2e-foo": "bar"},
+						Annotations: node01AffinityAndPodAntiAffinity,
+					},
+					Spec: api.PodSpec{
+						Containers: []api.Container{
+							{
+								Name:  "ds2",
+								Image: framework.GetPauseImageName(f.Client),
+							},
+						},
+					},
+				},
+			},
+		})
+		ExpectNoError(err)
+
+		err = framework.WaitForPodsRunningReady(c, ns, 2, framework.PodReadyBeforeTimeout, ignoreLabels)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Waiting 10 seconds")
+		time.Sleep(time.Duration(10 * time.Second))
+
+		By("Verifying daemon pods")
+		ds, err := c.DaemonSets(ns).Get("ds2")
+		framework.ExpectNoError(err)
+
+		Expect(ds.Status.DesiredNumberScheduled).To(Equal(int32(1)))
+		Expect(ds.Status.CurrentNumberScheduled).To(Equal(int32(1)))
 	})
 })
 
