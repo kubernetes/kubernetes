@@ -121,7 +121,7 @@ If a third-party wants to track additional resources, it must follow the
 resource naming conventions prescribed by Kubernetes. This means the resource
 must have a fully-qualified name (i.e. mycompany.org/shinynewresource)
 
-## Resource Requirements: Requests vs Limits
+## Resource Requirements: Requests vs. Limits
 
 If a resource supports the ability to distinguish between a request and a limit
 for a resource, the quota tracking system will only cost the request value

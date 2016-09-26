@@ -117,7 +117,7 @@ resembles:
   reduce the amount of memory garbage created during serialization and
   deserialization.
 * More efficient formats like Msgpack were considered, but they only offer
-  2x speed up vs the 10x observed for Protobuf
+  2x speed up vs. the 10x observed for Protobuf
 * gRPC was considered, but is a larger change that requires more core
   refactoring. This approach does not eliminate the possibility of switching
   to gRPC in the future.
@@ -356,7 +356,7 @@ deserialization of the remaining bytes into the `runtime.Unknown` type.
 ## Streaming wire format
 
 While the majority of Kubernetes APIs return single objects that can vary
-in type (Pod vs Status, PodList vs Status), the watch APIs return a stream
+in type (Pod vs. Status, PodList vs. Status), the watch APIs return a stream
 of identical objects (Events). At the time of this writing, this is the only
 current or anticipated streaming RESTful protocol (logging, port-forwarding,
 and exec protocols use a binary protocol over Websockets or SPDY).
