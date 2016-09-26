@@ -45,9 +45,18 @@ const (
 // Note: docker doesn't use LogDirectory (yet).
 func (ds *dockerService) RunPodSandbox(config *runtimeApi.PodSandboxConfig) (string, error) {
 	// Step 1: Pull the image for the sandbox.
-	// TODO: How should we handle pulling custom pod infra container image
-	// (with credentials)?
-	image := defaultSandboxImage
+	var (
+		image string
+	)
+	infraContainerImage := ds.podInfraContainerImage
+	if len(infraContainerImage) != 0 {
+		image = infraContainerImage
+	} else {
+		image = defaultSandboxImage
+	}
+
+	// NOTE(harryz) Assume user to handle custom pod infra container image pulling by following:
+	//  http://kubernetes.io/docs/user-guide/images/#configuring-nodes-to-authenticate-to-a-private-repository
 	if err := ds.client.PullImage(image, dockertypes.AuthConfig{}, dockertypes.ImagePullOptions{}); err != nil {
 		return "", fmt.Errorf("unable to pull image for the sandbox container: %v", err)
 	}

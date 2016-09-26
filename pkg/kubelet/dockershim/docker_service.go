@@ -53,9 +53,10 @@ const (
 
 var internalLabelKeys []string = []string{containerTypeLabelKey, sandboxIDLabelKey}
 
-func NewDockerService(client dockertools.DockerInterface) DockerLegacyService {
+func NewDockerService(client dockertools.DockerInterface, podInfraContainerImage string) DockerLegacyService {
 	return &dockerService{
-		client: dockertools.NewInstrumentedDockerInterface(client),
+		client:                 dockertools.NewInstrumentedDockerInterface(client),
+		podInfraContainerImage: podInfraContainerImage,
 	}
 }
 
@@ -76,7 +77,8 @@ type DockerLegacyService interface {
 }
 
 type dockerService struct {
-	client dockertools.DockerInterface
+	client                 dockertools.DockerInterface
+	podInfraContainerImage string
 }
 
 // Version returns the runtime name, runtime version and runtime API version
