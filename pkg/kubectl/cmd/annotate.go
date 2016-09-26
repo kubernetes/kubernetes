@@ -256,7 +256,7 @@ func (o AnnotateOptions) RunAnnotate() error {
 			return o.f.PrintObject(o.cmd, mapper, outputObj, o.out)
 		}
 
-		cmdutil.PrintSuccess(mapper, false, o.out, info.Mapping.Resource, info.Name, "annotated")
+		cmdutil.PrintSuccess(mapper, false, o.out, info.Mapping.Resource, info.Name, false, "annotated")
 		return nil
 	})
 }
