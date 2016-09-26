@@ -188,6 +188,8 @@ message PodSandboxConfig {
     map<string, string> annotations = 7;
     // Optional configurations specific to Linux hosts.
     optional LinuxPodSandboxConfig linux = 8;
+    // Optional custom image of pod's infra container
+    optional string podInfraContainerImage  = 9;
 }
 
 message RunPodSandboxRequest {
