@@ -36,7 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apiserver"
-	"k8s.io/kubernetes/pkg/apiserver/audit"
+	apiserverfilters "k8s.io/kubernetes/pkg/apiserver/filters"
 	"k8s.io/kubernetes/pkg/auth/authenticator"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	authhandlers "k8s.io/kubernetes/pkg/auth/handlers"
@@ -363,18 +363,16 @@ func (s *GenericAPIServer) buildHandlerChains(c *Config, handler http.Handler) (
 
 	// insecure filters
 	insecure = handler
-	insecure = api.WithRequestContext(insecure, c.RequestContextMapper)
 	insecure = genericfilters.WithPanicRecovery(insecure, s.NewRequestInfoResolver())
 	insecure = genericfilters.WithTimeoutForNonLongRunningRequests(insecure, longRunningFunc)
 
 	// secure filters
-	attributeGetter := apiserver.NewRequestAttributeGetter(c.RequestContextMapper, s.NewRequestInfoResolver())
+	attributeGetter := apiserverfilters.NewRequestAttributeGetter(c.RequestContextMapper, s.NewRequestInfoResolver())
 	secure = handler
-	secure = apiserver.WithAuthorization(secure, attributeGetter, c.Authorizer)
-	secure = apiserver.WithImpersonation(secure, c.RequestContextMapper, c.Authorizer)
-	secure = audit.WithAudit(secure, attributeGetter, s.auditWriter) // before impersonation to read original user
+	secure = apiserverfilters.WithAuthorization(secure, attributeGetter, c.Authorizer)
+	secure = apiserverfilters.WithImpersonation(secure, c.RequestContextMapper, c.Authorizer)
+	secure = apiserverfilters.WithAudit(secure, attributeGetter, s.auditWriter) // before impersonation to read original user
 	secure = authhandlers.WithAuthentication(secure, c.RequestContextMapper, c.Authenticator, authhandlers.Unauthorized(c.SupportsBasicAuth))
-	secure = api.WithRequestContext(secure, c.RequestContextMapper)
 	secure = genericfilters.WithPanicRecovery(secure, s.NewRequestInfoResolver())
 	secure = genericfilters.WithTimeoutForNonLongRunningRequests(secure, longRunningFunc)
 	secure = genericfilters.WithMaxInFlightLimit(secure, c.MaxRequestsInFlight, longRunningFunc)

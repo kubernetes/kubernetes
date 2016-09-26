@@ -27,7 +27,6 @@ import (
 	"path"
 	rt "runtime"
 	"strconv"
-	"strings"
 	"time"
 
 	"k8s.io/kubernetes/pkg/admission"
@@ -208,22 +207,6 @@ func logStackOnRecover(s runtime.NegotiatedSerializer, panicReason interface{}, 
 		headers.Set("Accept", ct)
 	}
 	errorNegotiated(apierrors.NewGenericServerResponse(http.StatusInternalServerError, "", api.Resource(""), "", "", 0, false), s, unversioned.GroupVersion{}, w, &http.Request{Header: headers})
-}
-
-func InstallServiceErrorHandler(s runtime.NegotiatedSerializer, container *restful.Container) {
-	container.ServiceErrorHandler(func(serviceErr restful.ServiceError, request *restful.Request, response *restful.Response) {
-		serviceErrorHandler(s, serviceErr, request, response)
-	})
-}
-
-func serviceErrorHandler(s runtime.NegotiatedSerializer, serviceErr restful.ServiceError, request *restful.Request, response *restful.Response) {
-	errorNegotiated(
-		apierrors.NewGenericServerResponse(serviceErr.Code, "", api.Resource(""), "", serviceErr.Message, 0, false),
-		s,
-		unversioned.GroupVersion{},
-		response.ResponseWriter,
-		request.Request,
-	)
 }
 
 // Adds a service to return the supported api versions at the legacy /api.
@@ -500,13 +483,4 @@ func parseTimeout(str string) time.Duration {
 func readBody(req *http.Request) ([]byte, error) {
 	defer req.Body.Close()
 	return ioutil.ReadAll(req.Body)
-}
-
-// splitPath returns the segments for a URL path.
-func splitPath(path string) []string {
-	path = strings.Trim(path, "/")
-	if path == "" {
-		return []string{}
-	}
-	return strings.Split(path, "/")
 }
