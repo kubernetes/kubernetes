@@ -284,85 +284,12 @@ func findMember(t *types.Type, name string) (types.Member, bool) {
 	return types.Member{}, false
 }
 
-func isConvertible(in, out *types.Type, manualConversions conversionFuncMap) bool {
-	// If there is pre-existing conversion function, return true immediately.
-	if _, ok := manualConversions[conversionPair{in, out}]; ok {
-		return true
-	}
-	return isDirectlyConvertible(in, out, manualConversions)
-}
-
-func isDirectlyConvertible(in, out *types.Type, manualConversions conversionFuncMap) bool {
-	// If one of the types is Alias, resolve it.
-	if in.Kind == types.Alias {
-		return isConvertible(in.Underlying, out, manualConversions)
-	}
-	if out.Kind == types.Alias {
-		return isConvertible(in, out.Underlying, manualConversions)
-	}
-
-	if in == out {
-		return true
-	}
-	if in.Kind != out.Kind {
-		return false
-	}
-	switch in.Kind {
-	case types.Builtin, types.Struct, types.Map, types.Slice, types.Pointer:
-	default:
-		// We don't support conversion of other types yet.
-		return false
-	}
-
-	switch in.Kind {
-	case types.Builtin:
-		// TODO: Support more conversion types.
-		return types.IsInteger(in) && types.IsInteger(out)
-	case types.Struct:
-		convertible := true
-		for _, inMember := range in.Members {
-			// Check if this member is excluded from conversion
-			if tagvals := extractTag(inMember.CommentLines); tagvals != nil && tagvals[0] == "false" {
-				continue
-			}
-			// Check if there is an out member with that name.
-			outMember, found := findMember(out, inMember.Name)
-			if !found {
-				glog.V(5).Infof("%s is not directly convertible to %s because the destination field %q did not exist", in.Name, out.Name, inMember.Name)
-				return false
-			}
-			convertible = convertible && isConvertible(inMember.Type, outMember.Type, manualConversions)
-		}
-		return convertible
-	case types.Map:
-		return isConvertible(in.Key, out.Key, manualConversions) && isConvertible(in.Elem, out.Elem, manualConversions)
-	case types.Slice:
-		return isConvertible(in.Elem, out.Elem, manualConversions)
-	case types.Pointer:
-		return isConvertible(in.Elem, out.Elem, manualConversions)
-	}
-	glog.Fatalf("All other types should be filtered before")
-	return false
-}
-
 // unwrapAlias recurses down aliased types to find the bedrock type.
 func unwrapAlias(in *types.Type) *types.Type {
-	if in.Kind == types.Alias {
-		return unwrapAlias(in.Underlying)
+	for in.Kind == types.Alias {
+		in = in.Underlying
 	}
 	return in
-}
-
-func areTypesAliased(in, out *types.Type) bool {
-	// If one of the types is Alias, resolve it.
-	if in.Kind == types.Alias {
-		return areTypesAliased(in.Underlying, out)
-	}
-	if out.Kind == types.Alias {
-		return areTypesAliased(in, out.Underlying)
-	}
-
-	return in == out
 }
 
 const (
@@ -378,7 +305,8 @@ type genConversion struct {
 	manualConversions conversionFuncMap
 	manualDefaulters  defaulterFuncMap
 	imports           namer.ImportTracker
-	typesForInit      []conversionPair
+	types             []*types.Type
+	skippedFields     map[*types.Type][]string
 }
 
 func NewGenConversion(sanitizedName, targetPackage string, manualConversions conversionFuncMap, manualDefaulters defaulterFuncMap, peerPkgs []string) generator.Generator {
@@ -391,7 +319,8 @@ func NewGenConversion(sanitizedName, targetPackage string, manualConversions con
 		manualConversions: manualConversions,
 		manualDefaulters:  manualDefaulters,
 		imports:           generator.NewImportTracker(),
-		typesForInit:      make([]conversionPair, 0),
+		types:             []*types.Type{},
+		skippedFields:     map[*types.Type][]string{},
 	}
 }
 
@@ -456,18 +385,9 @@ func (g *genConversion) Filter(c *generator.Context, t *types.Type) bool {
 	if !g.convertibleOnlyWithinPackage(t, peerType) {
 		return false
 	}
-	// We explicitly return true if any conversion is possible - this needs
-	// to be checked again while generating code for that type.
-	convertible := false
-	if isConvertible(t, peerType, g.manualConversions) {
-		g.typesForInit = append(g.typesForInit, conversionPair{t, peerType})
-		convertible = true
-	}
-	if isConvertible(peerType, t, g.manualConversions) {
-		g.typesForInit = append(g.typesForInit, conversionPair{peerType, t})
-		convertible = true
-	}
-	return convertible
+
+	g.types = append(g.types, t)
+	return true
 }
 
 func (g *genConversion) isOtherPackage(pkg string) bool {
@@ -525,8 +445,10 @@ func (g *genConversion) Init(c *generator.Context, w io.Writer) error {
 	sw.Do("// Public to allow building arbitrary schemes.\n", nil)
 	sw.Do("func RegisterConversions(scheme $.|raw$) error {\n", schemePtr)
 	sw.Do("return scheme.AddGeneratedConversionFuncs(\n", nil)
-	for _, conv := range g.typesForInit {
-		sw.Do(nameTmpl+",\n", argsFromType(conv.inType, conv.outType))
+	for _, t := range g.types {
+		peerType := getPeerTypeFor(c, t, g.peerPackages)
+		sw.Do(nameTmpl+",\n", argsFromType(t, peerType))
+		sw.Do(nameTmpl+",\n", argsFromType(peerType, t))
 	}
 	sw.Do(")\n", nil)
 	sw.Do("}\n\n", nil)
@@ -535,33 +457,10 @@ func (g *genConversion) Init(c *generator.Context, w io.Writer) error {
 
 func (g *genConversion) GenerateType(c *generator.Context, t *types.Type, w io.Writer) error {
 	glog.V(5).Infof("generating for type %v", t)
-	sw := generator.NewSnippetWriter(w, c, "$", "$")
 	peerType := getPeerTypeFor(c, t, g.peerPackages)
-	didForward, didBackward := false, false
-	if isDirectlyConvertible(t, peerType, g.manualConversions) {
-		didForward = true
-		g.generateConversion(t, peerType, sw)
-	}
-	if isDirectlyConvertible(peerType, t, g.manualConversions) {
-		didBackward = true
-		g.generateConversion(peerType, t, sw)
-	}
-	if didForward != didBackward {
-		if didForward {
-			glog.Fatalf("Could only generate one direction of conversion for %v -> %v", t, peerType)
-		} else {
-			glog.Fatalf("Could only generate one direction of conversion for %v <- %v", t, peerType)
-		}
-	}
-	if !didForward && !didBackward {
-		// TODO: This should be fatal but we have at least 8 types that
-		// currently fail this.  The right thing to do is to figure out why they
-		// can't be generated and mark those fields as
-		// +k8s:conversion-gen=false, and ONLY do manual conversions for those
-		// fields, with the manual Convert_...() calling autoConvert_...()
-		// first.
-		glog.Errorf("Warning: could not generate autoConvert functions for %v <-> %v", t, peerType)
-	}
+	sw := generator.NewSnippetWriter(w, c, "$", "$")
+	g.generateConversion(t, peerType, sw)
+	g.generateConversion(peerType, t, sw)
 	return sw.Error()
 }
 
@@ -578,8 +477,17 @@ func (g *genConversion) generateConversion(inType, outType *types.Type, sw *gene
 	sw.Do("return nil\n", nil)
 	sw.Do("}\n\n", nil)
 
-	// If there is no public manual Conversion method, generate it.
-	if _, ok := g.preexists(inType, outType); !ok {
+	if _, found := g.preexists(inType, outType); found {
+		// There is a public manual Conversion method: use it.
+	} else if skipped := g.skippedFields[inType]; len(skipped) != 0 {
+		// The inType had some fields we could not generate.
+		glog.Errorf("Warning: could not find nor generate a final Conversion function for %v -> %v", inType, outType)
+		glog.Errorf("  the following fields need manual conversion:")
+		for _, f := range skipped {
+			glog.Errorf("      - %v", f)
+		}
+	} else {
+		// Emit a public conversion function.
 		sw.Do("func "+nameTmpl+"(in *$.inType|raw$, out *$.outType|raw$, s $.Scope|raw$) error {\n", args)
 		sw.Do("return auto"+nameTmpl+"(in, out, s)\n", args)
 		sw.Do("}\n\n", nil)
@@ -590,6 +498,7 @@ func (g *genConversion) generateConversion(inType, outType *types.Type, sw *gene
 // at any nesting level. This makes the autogenerator easy to understand, and
 // the compiler shouldn't care.
 func (g *genConversion) generateFor(inType, outType *types.Type, sw *generator.SnippetWriter) {
+	glog.V(5).Infof("generating %v -> %v", inType, outType)
 	var f func(*types.Type, *types.Type, *generator.SnippetWriter)
 	switch inType.Kind {
 	case types.Builtin:
@@ -717,6 +626,7 @@ func (g *genConversion) doStruct(inType, outType *types.Type, sw *generator.Snip
 			copied.Name = outMemberType.Name
 			outMemberType = &copied
 		}
+
 		args := map[string]interface{}{
 			"inType":  inMemberType,
 			"outType": outMemberType,
@@ -730,6 +640,14 @@ func (g *genConversion) doStruct(inType, outType *types.Type, sw *generator.Snip
 			sw.Do("}\n", nil)
 			continue
 		}
+
+		// If we can't auto-convert, punt before we emit any code.
+		if inMemberType.Kind != outMemberType.Kind {
+			sw.Do("// WARNING: field '"+inMember.Name+"' requires manual conversion\n", nil)
+			g.skippedFields[inType] = append(g.skippedFields[inType], inMember.Name)
+			continue
+		}
+
 		switch inMemberType.Kind {
 		case types.Builtin:
 			if inMemberType == outMemberType {
@@ -793,7 +711,7 @@ func (g *genConversion) doStruct(inType, outType *types.Type, sw *generator.Snip
 }
 
 func (g *genConversion) isDirectlyAssignable(inType, outType *types.Type) bool {
-	return inType == outType || areTypesAliased(inType, outType)
+	return unwrapAlias(inType) == unwrapAlias(outType)
 }
 
 func (g *genConversion) doPointer(inType, outType *types.Type, sw *generator.SnippetWriter) {
