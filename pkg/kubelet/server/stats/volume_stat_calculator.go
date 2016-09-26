@@ -23,11 +23,8 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
-	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/volume"
-
-	"github.com/golang/glog"
 )
 
 // volumeStatCalculator calculates volume metrics for a given pod periodically in the background and caches the result
@@ -86,24 +83,20 @@ func (s *volumeStatCalculator) GetLatest() (PodVolumeStats, bool) {
 
 // calcAndStoreStats calculates PodVolumeStats for a given pod and writes the result to the s.latest cache.
 func (s *volumeStatCalculator) calcAndStoreStats() {
-	// Find all Volumes for the Pod
-	volumes, found := s.statsProvider.ListVolumesForPod(s.pod.UID)
+	// Get all Volumes Metrics for the Pod from cache
+	metrics, found := s.statsProvider.GetVolumesMetricsForPod(s.pod.UID)
 	if !found {
 		return
 	}
 
-	// Call GetMetrics on each Volume and copy the result to a new VolumeStats.FsStats
-	stats := make([]stats.VolumeStats, 0, len(volumes))
-	for name, v := range volumes {
-		metric, err := v.GetMetrics()
-		if err != nil {
-			// Expected for Volumes that don't support Metrics
-			if !volume.IsNotSupported(err) {
-				glog.V(4).Infof("Failed to calculate volume metrics for pod %s volume %s: %+v", format.Pod(s.pod), name, err)
-			}
+	// Copy the result to a new VolumeStats.FsStats
+	stats := make([]stats.VolumeStats, 0, len(metrics))
+	for outerVolumeSpecName, metric := range metrics {
+		if metric == nil {
+			//Volume Metrics has not been in cache
 			continue
 		}
-		stats = append(stats, s.parsePodVolumeStats(name, metric))
+		stats = append(stats, s.parsePodVolumeStats(outerVolumeSpecName, metric))
 	}
 
 	// Store the new stats

@@ -227,6 +227,29 @@ func (_m *MockStatsProvider) ListVolumesForPod(podUID types.UID) (map[string]vol
 	return r0, r1
 }
 
+// GetVolumesMetricsForPod provides a mock function with given fields: podUID
+func (_m *MockStatsProvider) GetVolumesMetricsForPod(podUID types.UID) (map[string]*volume.Metrics, bool) {
+	ret := _m.Called(podUID)
+
+	var r0 map[string]*volume.Metrics
+	if rf, ok := ret.Get(0).(func(types.UID) map[string]*volume.Metrics); ok {
+		r0 = rf(podUID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(map[string]*volume.Metrics)
+		}
+	}
+
+	var r1 bool
+	if rf, ok := ret.Get(1).(func(types.UID) bool); ok {
+		r1 = rf(podUID)
+	} else {
+		r1 = ret.Get(1).(bool)
+	}
+
+	return r0, r1
+}
+
 // GetPods provides a mock function with given fields:
 func (_m *MockStatsProvider) GetPods() []*v1.Pod {
 	ret := _m.Called()
