@@ -13,7 +13,6 @@ cluster/gce/configure-vm.sh:  api_servers: '${KUBERNETES_MASTER_NAME}'
 cluster/gce/configure-vm.sh:  cloud_config: ${CLOUD_CONFIG}
 cluster/gce/configure-vm.sh:  env-to-grains "runtime_config"
 cluster/gce/configure-vm.sh:  kubelet_api_servers: '${KUBELET_APISERVER}'
-cluster/gce/coreos/node-helper.sh:# cloud_config yaml file should be passed
 cluster/gce/gci/configure-helper.sh:      reconcile_cidr="false"
 cluster/gce/gci/configure-helper.sh:  local api_servers="--master=https://${KUBERNETES_MASTER_NAME}"
 cluster/gce/gci/configure-helper.sh:  local reconcile_cidr="true"
@@ -79,6 +78,8 @@ hack/test-update-storage-objects.sh:  local storage_media_type=${2:-""}
 hack/test-update-storage-objects.sh:  local storage_versions=${1:-""}
 hack/test-update-storage-objects.sh:  source_file=${test_data[0]}
 hack/test-update-storage-objects.sh:# source_file,resource,namespace,name,old_version,new_version
+pkg/kubelet/cm/container_manager_linux.go:		glog.V(3).Infof("Failed to apply oom_score_adj %d for pid %d: %v", oomScoreAdj, pid, err)
+pkg/kubelet/cm/container_manager_linux.go:	glog.V(5).Infof("attempting to apply oom_score_adj of %d to pid %d", oomScoreAdj, pid)
 pkg/kubelet/network/hairpin/hairpin.go:	hairpinModeRelativePath = "hairpin_mode"
 pkg/kubelet/qos/policy_test.go:			t.Errorf("oom_score_adj should be between %d and %d, but was %d", test.lowOOMScoreAdj, test.highOOMScoreAdj, oomScoreAdj)
 pkg/kubelet/qos/policy_test.go:	highOOMScoreAdj int // The min oom_score_adj score the container should be assigned.
