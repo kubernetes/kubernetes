@@ -444,7 +444,7 @@ including discussion of:
 
 1. admission control
 1. initial placement of instances of a new
-service vs scheduling new instances of an existing service in response
+service vs. scheduling new instances of an existing service in response
 to auto-scaling
 1. rescheduling pods due to failure (response might be
 different depending on if it's failure of a node, rack, or whole AZ)
