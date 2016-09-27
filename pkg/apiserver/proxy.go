@@ -69,6 +69,12 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	requestInfo, ok := request.RequestInfoFrom(ctx)
 	if !ok {
 		internalError(w, req, errors.New("Error getting RequestInfo from context"))
+		httpCode = http.StatusInternalServerError
+		return
+	}
+	if !requestInfo.IsResourceRequest {
+		notFound(w, req)
+		httpCode = http.StatusNotFound
 		return
 	}
 	verb = requestInfo.Verb
