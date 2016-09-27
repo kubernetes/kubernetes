@@ -233,6 +233,7 @@ func IsServiceIPRequested(service *Service) bool {
 var standardFinalizers = sets.NewString(
 	string(FinalizerKubernetes),
 	FinalizerOrphan,
+	FinalizerSynchronousGC,
 )
 
 func IsStandardFinalizerName(str string) bool {

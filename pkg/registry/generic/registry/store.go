@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/api/validation/path"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -501,10 +502,15 @@ var (
 // shouldUpdateFinalizers returns if we need to update the finalizers of the
 // object, and the desired list of finalizers.
 // When deciding whether to add the OrphanDependent finalizer, factors in the
-// order of highest to lowest priority are: options.OrphanDependents, existing
-// finalizers of the object, e.DeleteStrategy.DefaultGarbageCollectionPolicy.
+// order of highest to lowest priority are: options.OrphanDependents,
+// options.SynchronousGC, existing finalizers of the object,
+// e.DeleteStrategy.DefaultGarbageCollectionPolicy.
+// When deciding whether to add the SynchronousGC finalizer, factors in the
+// order of highest to lowest priority are: options.SynchronousGC, existing
+// finalizers of the object, default to false.
 func shouldUpdateFinalizers(e *Store, accessor meta.Object, options *api.DeleteOptions) (shouldUpdate bool, newFinalizers []string) {
 	shouldOrphan := false
+	shouldSynchronousGC := false
 	// Get default orphan policy from this REST object type
 	if gcStrategy, ok := e.DeleteStrategy.(rest.GarbageCollectionDeleteStrategy); ok {
 		if gcStrategy.DefaultGarbageCollectionPolicy() == rest.OrphanDependents {
@@ -513,12 +519,16 @@ func shouldUpdateFinalizers(e *Store, accessor meta.Object, options *api.DeleteO
 	}
 	// If a finalizer is set in the object, it overrides the default
 	hasOrphanFinalizer := false
+	hasSynchronousGCFinalizer := false
 	finalizers := accessor.GetFinalizers()
 	for _, f := range finalizers {
 		if f == api.FinalizerOrphan {
 			shouldOrphan = true
 			hasOrphanFinalizer = true
-			break
+		}
+		if f == api.FinalizerSynchronousGC {
+			shouldSynchronousGC = true
+			hasSynchronousGCFinalizer = true
 		}
 		// TODO: update this when we add a finalizer indicating a preference for the other behavior
 	}
@@ -526,21 +536,37 @@ func shouldUpdateFinalizers(e *Store, accessor meta.Object, options *api.DeleteO
 	if options != nil && options.OrphanDependents != nil {
 		shouldOrphan = *options.OrphanDependents
 	}
+	if options != nil && options.SynchronousGarbageCollection != nil {
+		shouldSynchronousGC = *options.SynchronousGarbageCollection
+		if *options.SynchronousGarbageCollection && options.OrphanDependents == nil {
+			//default to not orphan if the option is nil, regardless of the
+			//existing finalizers or the DefaultGarbageCollectionPolicy().
+			shouldOrphan = false
+		}
+	}
+	// compute shouldUpdate and newFinalizers
+	shouldUpdate = (shouldOrphan != hasOrphanFinalizer) || (shouldSynchronousGC != hasSynchronousGCFinalizer)
 	if shouldOrphan && !hasOrphanFinalizer {
 		finalizers = append(finalizers, api.FinalizerOrphan)
-		return true, finalizers
 	}
-	if !shouldOrphan && hasOrphanFinalizer {
+	if shouldSynchronousGC && !hasSynchronousGCFinalizer {
+		finalizers = append(finalizers, api.FinalizerSynchronousGC)
+	}
+	if (!shouldOrphan && hasOrphanFinalizer) || (!shouldSynchronousGC && hasSynchronousGCFinalizer) {
 		var newFinalizers []string
 		for _, f := range finalizers {
-			if f == api.FinalizerOrphan {
+			if !shouldOrphan && f == api.FinalizerOrphan {
+				continue
+			}
+			if !shouldSynchronousGC && f == api.FinalizerSynchronousGC {
 				continue
 			}
 			newFinalizers = append(newFinalizers, f)
 		}
-		return true, newFinalizers
+		return shouldUpdate, newFinalizers
+	} else {
+		return shouldUpdate, finalizers
 	}
-	return false, finalizers
 }
 
 // markAsDeleting sets the obj's DeletionGracePeriodSeconds to 0, and sets the
@@ -634,6 +660,9 @@ func (e *Store) updateForGracefulDeletionAndFinalizers(ctx api.Context, name, ke
 				return nil, err
 			}
 			shouldUpdate, newFinalizers := shouldUpdateFinalizers(e, existingAccessor, options)
+			if errList := validation.ValidateFinalizers(newFinalizers, nil); len(errList) > 0 {
+				return nil, kubeerr.NewInvalid(api.Kind(e.QualifiedResource.Resource), existingAccessor.GetName(), errList)
+			}
 			if shouldUpdate {
 				existingAccessor.SetFinalizers(newFinalizers)
 			}

@@ -2794,6 +2794,12 @@ type DeleteOptions struct {
 	// Should the dependent objects be orphaned. If true/false, the "orphan"
 	// finalizer will be added to/removed from the object's finalizers list.
 	OrphanDependents *bool `json:"orphanDependents,omitempty" protobuf:"varint,3,opt,name=orphanDependents"`
+
+	// Should the owner object keep existing in the key-value store until all dependents are removed.
+	// The option is cascading, i.e., the object’s dependents will be deleted with the same SynchronousGarbageCollection option.
+	// This option and OrphanDependents are exclusive.
+	// Defaults to false.
+	SynchronousGarbageCollection *bool
 }
 
 // ExportOptions is the query options to the standard REST get call.
