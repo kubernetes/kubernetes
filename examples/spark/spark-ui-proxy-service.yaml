@@ -1,12 +1,12 @@
 kind: Service
 apiVersion: v1
 metadata:
-  name: zeppelin
+  name: spark-ui-proxy
   namespace: spark-cluster
 spec:
   ports:
     - port: 80
-      targetPort: 8080
+      targetPort: 80
   selector:
-    component: zeppelin
+    component: spark-ui-proxy
   type: LoadBalancer

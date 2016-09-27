@@ -48,15 +48,19 @@ section.
 The Docker images are heavily based on https://github.com/mattf/docker-spark.
 And are curated in https://github.com/kubernetes/application-images/tree/master/spark
 
+The Spark UI Proxy is taken from https://github.com/aseigneurin/spark-ui-proxy.
+
+The PySpark examples are taken from http://stackoverflow.com/questions/4114167/checking-if-a-number-is-a-prime-number-in-python/27946768#27946768
+
 ## Step Zero: Prerequisites
 
 This example assumes
 
 - You have a Kubernetes cluster installed and running.
-- That you have installed the ```kubectl``` command line tool somewhere in your path.
-- That a spark-master service which spins up will be automatically discoverable by your kube DNS impl, as 'spark-master'
+- That you have installed the ```kubectl``` command line tool installed in your path and configured to talk to your Kubernetes cluster
+- That your Kubernetes cluster is running [kube-dns](../../build/kube-dns/) or an equivalent integration.
 
-For details, you can look at the Dockerfiles in the Sources section.
+Optionally, your Kubernetes cluster should be configured with a Loadbalancer integration (automatically configured via kube-up or GKE)
 
 ## Step One: Create namespace
 
@@ -73,14 +77,15 @@ default       <none>             Active
 spark-cluster name=spark-cluster Active
 ```
 
-For kubectl client to work with namespace, we define one context and use it:
+To configure kubectl to work with our namespace, we will create a new context using our current context as a base:
 
 ```sh
+$ CURRENT_CONTEXT=$(kubectl config view -o jsonpath='{.current-context}')
+$ USER_NAME=$(kubectl config view -o jsonpath='{.contexts[?(@.name == "'"${CURRENT_CONTEXT}"'")].context.user}')
+$ CLUSTER_NAME=$(kubectl config view -o jsonpath='{.contexts[?(@.name == "'"${CURRENT_CONTEXT}"'")].context.cluster}')
 $ kubectl config set-context spark --namespace=spark-cluster --cluster=${CLUSTER_NAME} --user=${USER_NAME}
 $ kubectl config use-context spark
 ```
-
-You can view your cluster name and user name in kubernetes config at ~/.kube/config.
 
 ## Step Two: Start your Master service
 
@@ -101,18 +106,11 @@ replicationcontroller "spark-master-controller" created
 Then, use the
 [`examples/spark/spark-master-service.yaml`](spark-master-service.yaml) file to
 create a logical service endpoint that Spark workers can use to access the
-Master pod.
+Master pod:
 
 ```console
 $ kubectl create -f examples/spark/spark-master-service.yaml
 service "spark-master" created
-```
-
-You can then create a service for the Spark Master WebUI:
-
-```console
-$ kubectl create -f examples/spark/spark-webui.yaml
-service "spark-webui" created
 ```
 
 ### Check to see if Master is running and accessible
@@ -147,8 +145,33 @@ Spark Command: /usr/lib/jvm/java-8-openjdk-amd64/jre/bin/java -cp /opt/spark-1.5
 15/10/27 21:25:07 INFO Master: I have been elected leader! New state: ALIVE
 ```
 
-After you know the master is running, you can use the [cluster
-proxy](../../docs/user-guide/accessing-the-cluster.md#using-kubectl-proxy) to
+Once the master is started, we'll want to check the Spark WebUI. In order to access the Spark WebUI, we will deploy a [specialized proxy](https://github.com/aseigneurin/spark-ui-proxy). This proxy is neccessary to access worker logs from the Spark UI.
+
+Deploy the proxy controller with [`examples/spark/spark-ui-proxy-controller.yaml`](spark-ui-proxy-controller.yaml):
+
+```console
+$ kubectl create -f examples/spark/spark-ui-proxy-controller.yaml
+replicationcontroller "spark-ui-proxy-controller" created
+```
+
+We'll also need a corresponding Loadbalanced service for our Spark Proxy [`examples/spark/spark-ui-proxy-service.yaml`](spark-ui-proxy-service.yaml):
+
+```console
+$ kubectl create -f examples/spark/spark-ui-proxy-service.yaml
+service "spark-ui-proxy" created
+```
+
+After creating the service, you should eventually get a loadbalanced endpoint:
+
+```console
+$ kubectl get svc spark-ui-proxy -o wide
+ NAME             CLUSTER-IP    EXTERNAL-IP                                                              PORT(S)   AGE       SELECTOR
+spark-ui-proxy   10.0.51.107   aad59283284d611e6839606c214502b5-833417581.us-east-1.elb.amazonaws.com   80/TCP    9m        component=spark-ui-proxy
+```
+
+The Spark UI in the above example output will be available at http://aad59283284d611e6839606c214502b5-833417581.us-east-1.elb.amazonaws.com
+
+If your Kubernetes cluster is not equipped with a Loadbalancer integration, you will need to use the [kubectl proxy](../../docs/user-guide/accessing-the-cluster.md#using-kubectl-proxy) to
 connect to the Spark WebUI:
 
 ```console
@@ -156,7 +179,7 @@ kubectl proxy --port=8001
 ```
 
 At which point the UI will be available at
-[http://localhost:8001/api/v1/proxy/namespaces/spark-cluster/services/spark-webui/](http://localhost:8001/api/v1/proxy/namespaces/spark-cluster/services/spark-webui/).
+[http://localhost:8001/api/v1/proxy/namespaces/spark-cluster/services/spark-master:8080/](http://localhost:8001/api/v1/proxy/namespaces/spark-cluster/services/spark-master:8080/).
 
 ## Step Three: Start your Spark workers
 
@@ -195,11 +218,6 @@ $ kubectl logs spark-master-controller-5u0q5
 15/10/26 18:20:14 INFO Master: Registering worker 10.244.3.8:39926 with 2 cores, 6.3 GB RAM
 ```
 
-Assuming you still have the `kubectl proxy` running from the previous section,
-you should now see the workers in the UI as well. *Note:* The UI will have links
-to worker Web UIs. The worker UI links do not work (the links will attempt to
-connect to cluster IPs, which Kubernetes won't proxy automatically).
-
 ## Step Four: Start the Zeppelin UI to launch jobs on your Spark cluster
 
 The Zeppelin UI pod can be used to launch jobs into the Spark cluster either via
@@ -208,12 +226,21 @@ a web notebook frontend or the traditional Spark command line. See
 [Spark architecture](https://spark.apache.org/docs/latest/cluster-overview.html)
 for more details.
 
+Deploy Zeppelin:
+
 ```console
 $ kubectl create -f examples/spark/zeppelin-controller.yaml
 replicationcontroller "zeppelin-controller" created
 ```
 
-Zeppelin needs the Master service to be running.
+And the corresponding service:
+
+```console
+$ kubectl create -f examples/spark/zeppelin-service.yaml
+service "zeppelin" created
+```
+
+Zeppelin needs the spark-master service to be running.
 
 ### Check to see if Zeppelin is running
 
@@ -228,9 +255,21 @@ zeppelin-controller-ja09s   1/1       Running   0          53s
 Now you have two choices, depending on your predilections. You can do something
 graphical with the Spark cluster, or you can stay in the CLI.
 
+For both choices, we will be working with this Python snippet:
+
+```python
+from math import sqrt; from itertools import count, islice
+
+def isprime(n):
+    return n > 1 and all(n%i for i in islice(count(2), int(sqrt(n)-1)))
+
+nums = sc.parallelize(xrange(10000000))
+print nums.filter(isprime).count()
+```
+
 ### Do something fast with pyspark!
 
-Use the kubectl exec to connect to the Zeppelin driver and run a pipeline.
+Simply copy and paste the python snippet into pyspark from within the zeppelin pod:
 
 ```console
 $ kubectl exec zeppelin-controller-ja09s -it pyspark
@@ -246,30 +285,54 @@ Welcome to
 
 Using Python version 2.7.9 (default, Mar  1 2015 12:57:24)
 SparkContext available as sc, HiveContext available as sqlContext.
->>> sc.textFile("gs://dataflow-samples/shakespeare/*").map(lambda s: len(s.split())).sum()
-939193
+>>> from math import sqrt; from itertools import count, islice
+>>>
+>>> def isprime(n):
+...     return n > 1 and all(n%i for i in islice(count(2), int(sqrt(n)-1)))
+...
+>>> nums = sc.parallelize(xrange(10000000))
+
+>>> print nums.filter(isprime).count()
+664579
 ```
 
-Congratulations, you just counted all of the words in all of the plays of
-Shakespeare.
+Congratulations, you now know how many prime numbers there are within the first 10 million numbers!
 
 ### Do something graphical and shiny!
 
-Take the Zeppelin pod from above and port-forward the WebUI port:
+Creating the Zeppelin service should have yielded you a Loadbalancer endpoint:
+
+```console
+$ kubectl get svc zeppelin -o wide
+ NAME       CLUSTER-IP   EXTERNAL-IP                                                              PORT(S)   AGE       SELECTOR
+zeppelin   10.0.154.1   a596f143884da11e6839506c114532b5-121893930.us-east-1.elb.amazonaws.com   80/TCP    3m        component=zeppelin
+```
+
+If your Kubernetes cluster does not have a Loadbalancer integration, then we will have to use port forwarding.
+
+Take the Zeppelin pod from before and port-forward the WebUI port:
 
 ```console
 $ kubectl port-forward zeppelin-controller-ja09s 8080:8080
 ```
 
 This forwards `localhost` 8080 to container port 8080. You can then find
-Zeppelin at [https://localhost:8080/](https://localhost:8080/).
+Zeppelin at [http://localhost:8080/](http://localhost:8080/).
 
-Create a "New Notebook". In there, type:
+Once you've loaded up the Zeppelin UI, create a "New Notebook". In there we will paste our python snippet, but we need to add a `%pyspark` hint for Zeppelin to understand it:
 
 ```
 %pyspark
-print sc.textFile("gs://dataflow-samples/shakespeare/*").map(lambda s: len(s.split())).sum()
+from math import sqrt; from itertools import count, islice
+
+def isprime(n):
+    return n > 1 and all(n%i for i in islice(count(2), int(sqrt(n)-1)))
+
+nums = sc.parallelize(xrange(10000000))
+print nums.filter(isprime).count()
 ```
+
+After pasting in our code, press shift+enter or click the play icon to the right of our snippet. The Spark job will run and once again we'll have our result!
 
 ## Result
 
@@ -289,16 +352,26 @@ After it's setup:
 
 ```console
 kubectl get pods # Make sure everything is running
-kubectl proxy --port=8001 # Start an application proxy, if you want to see the Spark Master WebUI
-kubectl get pods -lcomponent=zeppelin # Get the driver pod to interact with.
+kubectl get svc -o wide # Get the Loadbalancer endpoints for spark-ui-proxy and zeppelin
 ```
 
-At which point the Master UI will be available at
-[http://localhost:8001/api/v1/proxy/namespaces/spark-cluster/services/spark-webui/](http://localhost:8001/api/v1/proxy/namespaces/default/services/spark-webui/).
+At which point the Master UI and Zeppelin will be available at the URLs under the `EXTERNAL-IP` field.
 
-You can either interact with the Spark cluster the traditional `spark-shell` /
+You can also interact with the Spark cluster using the traditional `spark-shell` /
 `spark-subsubmit` / `pyspark` commands by using `kubectl exec` against the
-`zeppelin-controller` pod, or if you want to interact with Zeppelin:
+`zeppelin-controller` pod.
+
+If your Kubernetes cluster does not have a Loadbalancer integration, use `kubectl proxy` and `kubectl port-forward` to access the Spark UI and Zeppelin.
+
+For Spark UI:
+
+```console
+kubectl proxy --port=8001
+```
+
+Then visit [http://localhost:8001/api/v1/proxy/namespaces/spark-cluster/services/spark-ui-proxy/](http://localhost:8001/api/v1/proxy/namespaces/spark-cluster/services/spark-ui-proxy/).
+
+For Zeppelin:
 
 ```console
 kubectl port-forward zeppelin-controller-abc123 8080:8080 &
