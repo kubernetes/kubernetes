@@ -194,7 +194,7 @@ type RESTStorageProvider interface {
 // Certain config fields will be set to a default value if unset.
 // Certain config fields must be specified, including:
 //   KubeletClient
-func New(c *Config) (*Master, error) {
+func (c *Config) New() (*Master, error) {
 	if c.KubeletClient == nil {
 		return nil, fmt.Errorf("Master.New() called with config.KubeletClient == nil")
 	}

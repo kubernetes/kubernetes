@@ -330,7 +330,7 @@ func Run(s *options.APIServer) error {
 		cachesize.SetWatchCacheSizes(s.WatchCacheSizes)
 	}
 
-	m, err := master.New(config)
+	m, err := config.New()
 	if err != nil {
 		return err
 	}
