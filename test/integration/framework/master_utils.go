@@ -149,7 +149,7 @@ func startMasterOrDie(masterConfig *master.Config) (*master.Master, *httptest.Se
 			},
 		}
 	}
-	m, err := masterConfig.New()
+	m, err := masterConfig.Complete().New()
 	if err != nil {
 		glog.Fatalf("error in bringing up the master: %v", err)
 	}
