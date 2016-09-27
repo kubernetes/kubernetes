@@ -22,11 +22,13 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"os"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/selection"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/validation"
+	"sync"
 )
 
 // Requirements is AND of all requirements.
@@ -156,7 +158,7 @@ func NewRequirement(key string, op selection.Operator, vals sets.String) (*Requi
 //     Requirement's key.
 // (5) The operator is GreaterThanOperator or LessThanOperator, and Labels has
 //     the Requirement's key and the corresponding value satisfies mathematical inequality.
-func (r *Requirement) Matches(ls Labels) bool {
+func matches(r *Requirement, ls Labels) bool {
 	switch r.operator {
 	case selection.In, selection.Equals, selection.DoubleEquals:
 		if !ls.Has(r.key) {
@@ -178,13 +180,17 @@ func (r *Requirement) Matches(ls Labels) bool {
 		}
 		lsValue, err := strconv.ParseInt(ls.Get(r.key), 10, 64)
 		if err != nil {
-			glog.V(10).Infof("ParseInt failed for value %+v in label %+v, %+v", ls.Get(r.key), ls, err)
+			if glog.V(10) {
+				glog.V(10).Infof("ParseInt failed for value %+v in label %+v, %+v", ls.Get(r.key), ls, err)
+			}
 			return false
 		}
 
 		// There should be only one strValue in r.strValues, and can be converted to a integer.
 		if len(r.strValues) != 1 {
-			glog.V(10).Infof("Invalid values count %+v of requirement %#v, for 'Gt', 'Lt' operators, exactly one value is required", len(r.strValues), r)
+			if glog.V(10) {
+				glog.V(10).Infof("Invalid values count %+v of requirement %#v, for 'Gt', 'Lt' operators, exactly one value is required", len(r.strValues), r)
+			}
 			return false
 		}
 
@@ -192,7 +198,9 @@ func (r *Requirement) Matches(ls Labels) bool {
 		for strValue := range r.strValues {
 			rValue, err = strconv.ParseInt(strValue, 10, 64)
 			if err != nil {
-				glog.V(10).Infof("ParseInt failed for value %+v in requirement %#v, for 'Gt', 'Lt' operators, the value must be an integer", strValue, r)
+				if glog.V(10) {
+					glog.V(10).Infof("ParseInt failed for value %+v in requirement %#v, for 'Gt', 'Lt' operators, the value must be an integer", strValue, r)
+				}
 				return false
 			}
 		}
@@ -200,6 +208,49 @@ func (r *Requirement) Matches(ls Labels) bool {
 	default:
 		return false
 	}
+}
+
+// Cached Matches implementation: Needs a mutex to avoid concurrent writes + matchCache.
+// Map of requirements (as string) -> label:bool .
+// string -> {string -> bool}
+var mutex = &sync.Mutex{}
+var matchCache = make(map[string](map[string]bool))
+
+// Cached matching implementation for speed when lots of degenerate checks are happening.
+func (r *Requirement) Matches(ls Labels) bool {
+
+	// TODO remove this env. its just for regression comparison that
+	// the cache speeds things up.
+	if os.Getenv("MATCH_CACHE") != "true" {
+		return matches(r, ls)
+	}
+
+	rString := r.String()
+	lString := ls.String()
+
+	if matchCache[rString] != nil {
+		if matchCache[rString][lString] {
+			fmt.Println("Cache hit ! ", rString, "[", lString, "]")
+			return matchCache[rString][lString]
+		}
+	}
+
+	isMatching := matches(r,ls)
+
+	mutex.Lock()
+	defer mutex.Unlock()
+	if matchCache[rString] == nil {
+		matchCache[rString] = make(map[string]bool)
+	}
+
+	matchCache[rString][lString] = isMatching
+
+	// Clear the cache every once in a while to avoid too much memory consumption.
+	// TODO Make this not so dumb, or pick a meaningful  number (10k,100k,...?)
+	if len(matchCache) == 10000 {
+		matchCache = make(map[string](map[string]bool))
+	}
+	return matchCache[rString][lString]
 }
 
 func (r *Requirement) Key() string {
