@@ -758,11 +758,12 @@ func (oe *operationExecutor) generateMountVolumeFunc(
 			}
 
 			glog.Infof(
-				"MountVolume.MountDevice succeeded for volume %q (spec.Name: %q) pod %q (UID: %q).",
+				"MountVolume.MountDevice succeeded for volume %q (spec.Name: %q) pod %q (UID: %q) device mount path %q",
 				volumeToMount.VolumeName,
 				volumeToMount.VolumeSpec.Name(),
 				volumeToMount.PodName,
-				volumeToMount.Pod.UID)
+				volumeToMount.Pod.UID,
+				deviceMountPath)
 
 			// Update actual state of world to reflect volume is globally mounted
 			markDeviceMountedErr := actualStateOfWorld.MarkDeviceAsMounted(

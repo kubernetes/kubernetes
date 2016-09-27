@@ -323,7 +323,7 @@ func (asw *actualStateOfWorld) SetVolumeMountedByNode(
 
 	nodeObj.mountedByNode = mounted
 	volumeObj.nodesAttachedTo[nodeName] = nodeObj
-	glog.V(4).Infof("SetVolumeMountedByNode volume %v to the node %q mounted %q",
+	glog.V(4).Infof("SetVolumeMountedByNode volume %v to the node %q mounted %t",
 		volumeName,
 		nodeName,
 		mounted)

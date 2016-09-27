@@ -341,6 +341,8 @@ func (kl *Kubelet) tryUpdateNodeStatus() error {
 	}
 	// Update the current status on the API server
 	updatedNode, err := kl.kubeClient.Core().Nodes().UpdateStatus(node)
+	// If update finishes sucessfully, mark the volumeInUse as reportedInUse to indicate
+	// those volumes are already updated in the node's status
 	if err == nil {
 		kl.volumeManager.MarkVolumesAsReportedInUse(
 			updatedNode.Status.VolumesInUse)
@@ -801,9 +803,13 @@ func (kl *Kubelet) recordNodeSchedulableEvent(node *api.Node) {
 	}
 }
 
-// Update VolumesInUse field in Node Status
+// Update VolumesInUse field in Node Status only after states are synced up at least once
+// in volume reconciler.
 func (kl *Kubelet) setNodeVolumesInUseStatus(node *api.Node) {
-	node.Status.VolumesInUse = kl.volumeManager.GetVolumesInUse()
+	// Make sure to only update node status after reconciler starts syncing up states
+	if kl.volumeManager.ReconcilerStatesHasBeenSynced() {
+		node.Status.VolumesInUse = kl.volumeManager.GetVolumesInUse()
+	}
 }
 
 // setNodeStatus fills in the Status fields of the given Node, overwriting
