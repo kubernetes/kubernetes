@@ -11,7 +11,7 @@
 
 ### Are you ...
 
-  * Interested in learning more about using Kubernetes?  Please see our user-facing documentation on [kubernetes.io](http://kubernetes.io)
+  * Interested in learning more about using Kubernetes?  Please see our user-facing documentation on [kubernetes.io](http://kubernetes.io) or try the [Scalable Microservices with Kubernetes](https://www.udacity.com/course/scalable-microservices-with-kubernetes--ud615) course
   * Interested in hacking on the core Kubernetes code base?  Keep reading!
 
 <hr>
