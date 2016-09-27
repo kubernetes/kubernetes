@@ -425,19 +425,16 @@ func StartControllers(s *options.CMServer, kubeconfig *restclient.Config, stop <
 	if err != nil {
 		glog.Fatalf("An backward-compatible provisioner could not be created: %v, but one was expected. Provisioning will not work. This functionality is considered an early Alpha version.", err)
 	}
-	volumeController := persistentvolumecontroller.NewPersistentVolumeController(
-		client("persistent-volume-binder"),
-		s.PVClaimBinderSyncPeriod.Duration,
-		alphaProvisioner,
-		ProbeControllerVolumePlugins(cloud, s.VolumeConfiguration),
-		cloud,
-		s.ClusterName,
-		nil, // volumeSource
-		nil, // claimSource
-		nil, // classSource
-		nil, // eventRecorder
-		s.VolumeConfiguration.EnableDynamicProvisioning,
-	)
+	params := persistentvolumecontroller.ControllerParameters{
+		KubeClient:                client("persistent-volume-binder"),
+		SyncPeriod:                s.PVClaimBinderSyncPeriod.Duration,
+		AlphaProvisioner:          alphaProvisioner,
+		VolumePlugins:             ProbeControllerVolumePlugins(cloud, s.VolumeConfiguration),
+		Cloud:                     cloud,
+		ClusterName:               s.ClusterName,
+		EnableDynamicProvisioning: s.VolumeConfiguration.EnableDynamicProvisioning,
+	}
+	volumeController := persistentvolumecontroller.NewController(params)
 	volumeController.Run(wait.NeverStop)
 	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 
