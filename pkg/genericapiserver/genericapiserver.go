@@ -42,7 +42,6 @@ import (
 	"k8s.io/kubernetes/pkg/apimachinery"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apiserver"
-	"k8s.io/kubernetes/pkg/apiserver/request"
 	"k8s.io/kubernetes/pkg/genericapiserver/openapi"
 	"k8s.io/kubernetes/pkg/genericapiserver/openapi/common"
 	"k8s.io/kubernetes/pkg/genericapiserver/options"
@@ -50,7 +49,6 @@ import (
 	certutil "k8s.io/kubernetes/pkg/util/cert"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
-	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 // Info about an API group.
@@ -186,13 +184,6 @@ func (s *GenericAPIServer) RequestContextMapper() api.RequestContextMapper {
 // TODO refactor third party resource storage
 func (s *GenericAPIServer) MinRequestTimeout() time.Duration {
 	return s.minRequestTimeout
-}
-
-func (s *GenericAPIServer) NewRequestInfoResolver() *request.RequestInfoResolver {
-	return &request.RequestInfoResolver{
-		APIPrefixes:          sets.NewString(strings.Trim(s.legacyAPIPrefix, "/"), strings.Trim(s.apiPrefix, "/")), // all possible API prefixes
-		GrouplessAPIPrefixes: sets.NewString(strings.Trim(s.legacyAPIPrefix, "/")),                                 // APIPrefixes that won't have groups (legacy)
-	}
 }
 
 // HandleWithAuth adds an http.Handler for pattern to an http.ServeMux

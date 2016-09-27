@@ -37,6 +37,7 @@ func WithRequestInfo(handler http.Handler, resolver *request.RequestInfoResolver
 		info, err := resolver.GetRequestInfo(req)
 		if err != nil {
 			internalError(w, req, fmt.Errorf("failed to create RequestInfo: %v", err))
+			return
 		}
 
 		requestContextMapper.Update(req, request.WithRequestInfo(ctx, info))
