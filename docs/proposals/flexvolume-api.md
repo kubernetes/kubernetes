@@ -61,10 +61,22 @@ This call probes the plugin for it’s capabilities and supported options. Suppo
 
 ###### New API Types:
 ```go
+type AttachmentPolicy string
+
+const (
+	// No attach/detach to do.
+ 	AttachNone AttachmentPolicy = ""
+ 	// Attach/detach calls issued from the controller.
+ 	AttachRemote AttachmentPolicy = "Remote"
+ 	// Attach/detach calls issued from the target/kubelet node.
+ 	AttachLocal AttachmentPolicy = "Local"
+ )
+
 type FlexVolumeDriverCapabilities struct {
 	ReadWrite api.PersistentVolumeAccessMode
 	DynamicProvisioning bool
-	Attachment bool        // Do we need separate capability for remote & local attachments support? Some drivers like ISCSI do not support attachment from remote node (controller manager).
+	Attachment AttachmentPolicy
+	CustomMount bool
 	SELinux bool
 	OwnershipManagement bool
 	Metrics bool
@@ -177,7 +189,6 @@ type FlexVolumeAttachment struct {
     v1.ObjectMeta
     Host string
     Device string
-    MountPath string
 }
 ```
 
