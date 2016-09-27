@@ -33,7 +33,7 @@ Users of the server-side garbage collection need to determine if the garbage col
 * Currently `kubectl delete rc` blocks until all the pods are terminating. To convert to use server-side garbage collection, kubectl has to be able to determine if the garbage collection is done.
 * [#19701](https://github.com/kubernetes/kubernetes/issues/19701#issuecomment-236997077) is a use case where the user needs to wait for all service dependencies garbage collected and their names released, before she recreates the dependencies.
 
-We define the garbage collection as "done" when all the dependents are deleted from the key-value store, rather than merely in the terminating state. There are two reasons: *i)* for `Pod`s, the most usual garbage, only when they are deleted from the key-value store, we know kubelet has released their resources; *ii)* some users need to recreate objects with the same names, they need to wait for the old objects to be deleted from the key-value store. (This limitation is because we index objects by their names in the key-value store today.)
+We define the garbage collection as "done" when all the dependents are deleted from the key-value store, rather than merely in the terminating state. There are two reasons: *i)* for `Pod`s, the most usual garbage, only when they are deleted from the key-value store, we know kubelet has released resources they occupy; *ii)* some users need to recreate objects with the same names, they need to wait for the old objects to be deleted from the key-value store. (This limitation is because we index objects by their names in the key-value store today.)
 
 Synchronous Garbage Collection is a best-effort (see [unhandled cases](#unhandled-cases)) mechanism that allows user to determine if the garbage collection is done: after the API server receives a deletion request of an owning object, the object keeps existing in the key-value store until all its dependents are deleted from the key-value store by the garbage collector.
 
@@ -64,34 +64,33 @@ We will introduce a new standard finalizer: const GCFinalizer string = “Collec
 
 Delete() function needs to check the `DeleteOptions.SynchronousGarbageCollection`.
 
-* The request is rejected with 400 if both `DeleteOptions.SynchronousGarbageCollection` and `DeleteOptions.OrphanDependents` are true (or default to true, see [DefaultGarbageCollectionPolicy](https://github.com/kubernetes/kubernetes/blob/release-1.4/pkg/registry/generic/registry/store.go#L500)).
+* The request is rejected with 400 if both `DeleteOptions.SynchronousGarbageCollection` and `DeleteOptions.OrphanDependents` are true.
+* If `DeleteOptions.SynchronousGarbageCollection` is explicitly set to true and `DeleteOptions.OrphanDependents` is nil, the API server will default `DeleteOptions.OrphanDependents` to false, regardless of the [default orphaning policy](https://github.com/kubernetes/kubernetes/blob/release-1.4/pkg/registry/generic/registry/store.go#L500) of the resource.
 * If the option is set, the API server will update the object instead of deleting it, add the finalizer, and set the `ObjectMeta.DeletionTimestamp`.
 
 ### Garbage Collector
 
 **Modifications to processEvent()**
 
-`processEvent()` manages GC’s internal owner-dependency relationship graph, `uidToNode`. It updates `uidToNode` according to the Add/Update/Delete events in the cluster. To support synchronous GC, it has to:
+Currently `processEvent()` manages GC’s internal owner-dependency relationship graph, `uidToNode`. It updates `uidToNode` according to the Add/Update/Delete events in the cluster. To support synchronous GC, it has to:
 
-* handle Add or Update events where `obj.Finalizers.Has(GCFinalizer) && obj.DeletionTimestamp != nil`. The object will be added into the `synchronousGC queue`. The object will be marked as “GC in progress” in `uidToNode`.
-* Upon receiving the deletion event of an object, put its owner into the `synchronousGC queue`. This is to force the `GCFinalizer` (described next) to re-check if all dependents of the owner is deleted.
-
-**Addition of GCFinalizer() routine**
-
-* Pops an object from the `synchronousGC queue`.
-* Ignores the object if it doesn’t exist in `uidToNode`, or if the object is not marked as “GC in progress” in `uidToNode`.
-* To avoid racing with another controller, it requeues the object if `observedGeneration < Generation`. This is best-effort, see [unhandled cases](#unhandled-cases).
-* Checks if the object has dependents
-  * If not, send a PUT request to remove the `GCFinalizer`
-  * If so, then add all dependents to the `dirtryQueue`; we need bookkeeping to avoid adding the dependents repeatedly if the owner gets in the `synchronousGC queue` multiple times.
+* handle Add or Update events where `obj.Finalizers.Has(GCFinalizer) && obj.DeletionTimestamp != nil`. The object will be added into the `dirtyQueue`. The object will be marked as “GC in progress” in `uidToNode`.
+* Upon receiving the deletion event of an object, put its owner into the `dirtyQueue` if the owner node is marked as "GC in progress". This is to force the `processItem()` (described next) to re-check if all dependents of the owner is deleted.
 
 **Modifications to processItem()**
 
-`processItem()` consumes the `dirtyQueue`, requests the API server to delete an item if all of its owners do not exist. To support synchronous GC, it has to:
+Currently `processItem()` consumes the `dirtyQueue`, requests the API server to delete an item if all of its owners do not exist. To support synchronous GC, it has to:
 
 * treat an owner as "not exist" if `owner.DeletionTimestamp != nil && !owner.Finalizers.Has(OrphanFinalizer)`, otherwise Synchronous GC will not progress because the owner keeps existing in the key-value store.
 * when deleting dependents, it should use the same `DeleteOptions.SynchronousGC` as the owner’s finalizers suggest.
 * if an object has multiple owners, some owners still exist while other owners are in the synchronous GC stage, then according to the existing logic of GC, the object wouldn't be deleted. To unblock the synchronous GC of owners, `processItem()` has to remove the ownerReferences pointing to them.
+
+In addition, if an object popped from `dirtyQueue` is marked as "GC in progress", `processItem()` treats it specially:
+
+* To avoid racing with another controller, it requeues the object if `observedGeneration < Generation`. This is best-effort, see [unhandled cases](#unhandled-cases).
+* Checks if the object has dependents
+  * If not, send a PUT request to remove the `GCFinalizer`;
+  * If so, then add all dependents to the `dirtryQueue`; we need bookkeeping to avoid adding the dependents repeatedly if the owner gets in the `synchronousGC queue` multiple times.
 
 ## Handling circular dependencies
 
@@ -128,7 +127,9 @@ Finalizer breaks an assumption that many Kubernetes components have: a deletion 
 
 Note that this **changes the behavior** of `kubectl delete`. The command will be blocked until all pods are deleted from the key-value store, instead of being blocked until pods are in the terminating state. This means `kubectl delete` blocks for longer time, but it has the benefit that the resources used by the pods are released when the `kubectl delete` returns.
 
-Old kubectl is not affected, because `DeleteOptions.SynchronousGarbageCollection` defaults to false.
+To make the new kubectl compatible with the 1.4 and earlier masters, kubectl needs to switch to use the old reaper logic if it finds Synchronous GC is not supported by the master.
+
+Old kubectl is compatible with new master, because `DeleteOptions.SynchronousGarbageCollection` defaults to false.
 
 ## Security implications
 
