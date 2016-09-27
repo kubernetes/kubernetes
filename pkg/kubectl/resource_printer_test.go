@@ -691,6 +691,55 @@ func TestPrintNodeStatus(t *testing.T) {
 	}
 }
 
+func TestPrintNodeExternalIP(t *testing.T) {
+	printer := NewHumanReadablePrinter(PrintOptions{
+		ColumnLabels: []string{},
+		Wide:         true,
+	})
+	table := []struct {
+		node       api.Node
+		externalIP string
+	}{
+		{
+			node: api.Node{
+				ObjectMeta: api.ObjectMeta{Name: "foo1"},
+				Status:     api.NodeStatus{Addresses: []api.NodeAddress{{Type: api.NodeExternalIP, Address: "1.1.1.1"}}},
+			},
+			externalIP: "1.1.1.1",
+		},
+		{
+			node: api.Node{
+				ObjectMeta: api.ObjectMeta{Name: "foo2"},
+				Status:     api.NodeStatus{Addresses: []api.NodeAddress{{Type: api.NodeInternalIP, Address: "1.1.1.1"}}},
+			},
+			externalIP: "<none>",
+		},
+		{
+			node: api.Node{
+				ObjectMeta: api.ObjectMeta{Name: "foo3"},
+				Status: api.NodeStatus{Addresses: []api.NodeAddress{
+					{Type: api.NodeLegacyHostIP, Address: "1.1.1.1"},
+					{Type: api.NodeExternalIP, Address: "2.2.2.2"},
+					{Type: api.NodeInternalIP, Address: "3.3.3.3"},
+					{Type: api.NodeExternalIP, Address: "4.4.4.4"},
+				}},
+			},
+			externalIP: "2.2.2.2",
+		},
+	}
+
+	for _, test := range table {
+		buffer := &bytes.Buffer{}
+		err := printer.PrintObj(&test.node, buffer)
+		if err != nil {
+			t.Fatalf("An error occurred printing Node: %#v", err)
+		}
+		if !contains(strings.Fields(buffer.String()), test.externalIP) {
+			t.Fatalf("Expect printing node %s with external ip %#v, got: %#v", test.node.Name, test.externalIP, buffer.String())
+		}
+	}
+}
+
 func contains(fields []string, field string) bool {
 	for _, v := range fields {
 		if v == field {
