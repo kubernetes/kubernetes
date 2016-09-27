@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package apiserver
+package filters
 
 import (
 	"fmt"
@@ -264,7 +264,7 @@ func TestImpersonationFilter(t *testing.T) {
 		},
 	}
 
-	requestContextMapper = api.NewRequestContextMapper()
+	requestContextMapper := api.NewRequestContextMapper()
 	var ctx api.Context
 	var actualUser user.Info
 	var lock sync.Mutex

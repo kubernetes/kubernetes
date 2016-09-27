@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package audit
+package filters
 
 import (
 	"bufio"
@@ -85,7 +85,7 @@ func (*fakeRequestContextMapper) Update(req *http.Request, context api.Context) 
 
 func TestAudit(t *testing.T) {
 	var buf bytes.Buffer
-	attributeGetter := apiserver.NewRequestAttributeGetter(&fakeRequestContextMapper{},
+	attributeGetter := NewRequestAttributeGetter(&fakeRequestContextMapper{},
 		&apiserver.RequestInfoResolver{APIPrefixes: sets.NewString("api", "apis"), GrouplessAPIPrefixes: sets.NewString("api")})
 	handler := WithAudit(&fakeHTTPHandler{}, attributeGetter, &buf)
 	req, _ := http.NewRequest("GET", "/api/v1/namespaces/default/pods", nil)
