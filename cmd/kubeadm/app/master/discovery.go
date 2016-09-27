@@ -81,6 +81,15 @@ func newKubeDiscoveryPodSpec(s *kubeadmapi.KubeadmConfig) api.PodSpec {
 				// `HostIP: s.API.AdvertiseAddrs[0]`, if there is only one address`
 				{Name: "http", ContainerPort: 9898, HostPort: 9898},
 			},
+			SecurityContext: &api.SecurityContext{
+				SELinuxOptions: &api.SELinuxOptions{
+					// TODO: This implies our discovery container is not being restricted by
+					// SELinux. This is not optimal and would be nice to adjust in future
+					// so it can read /tmp/secret, but for now this avoids recommending
+					// setenforce 0 system-wide.
+					Type: "unconfined_t",
+				},
+			},
 		}},
 		Volumes: []api.Volume{{
 			Name: kubeDiscoverySecretName,
