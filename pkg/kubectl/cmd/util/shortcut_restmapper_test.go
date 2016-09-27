@@ -37,16 +37,16 @@ func TestReplaceAliases(t *testing.T) {
 		{
 			name:     "all-replacement",
 			arg:      "all",
-			expected: "rc,svc,pods,pvc",
+			expected: "pods,replicationcontrollers,services,petsets,horizontalpodautoscalers,jobs,deployments,replicasets",
 		},
 		{
 			name:     "alias-in-comma-separated-arg",
 			arg:      "all,secrets",
-			expected: "rc,svc,pods,pvc,secrets",
+			expected: "pods,replicationcontrollers,services,petsets,horizontalpodautoscalers,jobs,deployments,replicasets,secrets",
 		},
 	}
 
-	mapper := NewShortcutExpander(testapi.Default.RESTMapper())
+	mapper := NewShortcutExpander(testapi.Default.RESTMapper(), nil)
 
 	for _, test := range tests {
 		resources := []string{}

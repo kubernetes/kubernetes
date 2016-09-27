@@ -164,17 +164,21 @@ kube::util::host_platform() {
   echo "${host_os}/${host_arch}"
 }
 
-kube::util::find-binary() {
-  local lookfor="${1}"
-  local host_platform="$(kube::util::host_platform)"
-  local locations=(
+kube::util::find-binary-for-platform() {
+  local -r lookfor="$1"
+  local -r platform="$2"
+  local -r locations=(
     "${KUBE_ROOT}/_output/bin/${lookfor}"
-    "${KUBE_ROOT}/_output/dockerized/bin/${host_platform}/${lookfor}"
-    "${KUBE_ROOT}/_output/local/bin/${host_platform}/${lookfor}"
-    "${KUBE_ROOT}/platforms/${host_platform}/${lookfor}"
+    "${KUBE_ROOT}/_output/dockerized/bin/${platform}/${lookfor}"
+    "${KUBE_ROOT}/_output/local/bin/${platform}/${lookfor}"
+    "${KUBE_ROOT}/platforms/${platform}/${lookfor}"
   )
-  local bin=$( (ls -t "${locations[@]}" 2>/dev/null || true) | head -1 )
+  local -r bin=$( (ls -t "${locations[@]}" 2>/dev/null || true) | head -1 )
   echo -n "${bin}"
+}
+
+kube::util::find-binary() {
+  kube::util::find-binary-for-platform "$1" "$(kube::util::host_platform)"
 }
 
 # Run all known doc generators (today gendocs and genman for kubectl)
@@ -205,7 +209,13 @@ kube::util::gen-docs() {
   "${genfeddocs}" "${dest}/docs/admin/" "federation-controller-manager"
 
   mkdir -p "${dest}/docs/man/man1/"
-  "${genman}" "${dest}/docs/man/man1/"
+  "${genman}" "${dest}/docs/man/man1/" "kube-apiserver"
+  "${genman}" "${dest}/docs/man/man1/" "kube-controller-manager"
+  "${genman}" "${dest}/docs/man/man1/" "kube-proxy"
+  "${genman}" "${dest}/docs/man/man1/" "kube-scheduler"
+  "${genman}" "${dest}/docs/man/man1/" "kubelet"
+  "${genman}" "${dest}/docs/man/man1/" "kubectl"
+
   mkdir -p "${dest}/docs/yaml/kubectl/"
   "${genyaml}" "${dest}/docs/yaml/kubectl/"
 
@@ -312,10 +322,10 @@ kube::util::group-version-to-pkg-path() {
       echo "api/unversioned"
       ;;
     *.k8s.io)
-      echo "apis/${group_version%.k8s.io}"
+      echo "apis/${group_version%.*k8s.io}"
       ;;
     *.k8s.io/*)
-      echo "apis/${group_version/.k8s.io/}"
+      echo "apis/${group_version/.*k8s.io/}"
       ;;
     *)
       echo "apis/${group_version%__internal}"
@@ -347,6 +357,9 @@ kube::util::gv-to-swagger-name() {
 # VERSIONS: Array of group versions to include in swagger spec.
 kube::util::fetch-swagger-spec() {
   for ver in ${VERSIONS}; do
+    if [[ " ${KUBE_NONSERVER_GROUP_VERSIONS} " == *" ${ver} "* ]]; then
+      continue
+    fi
     # fetch the swagger spec for each group version.
     if [[ ${ver} == "v1" ]]; then
       SUBPATH="api"

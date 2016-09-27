@@ -34,6 +34,11 @@ func getResourceList(cpu, memory string) api.ResourceList {
 	return res
 }
 
+func addResource(rName, value string, rl api.ResourceList) api.ResourceList {
+	rl[api.ResourceName(rName)] = resource.MustParse(value)
+	return rl
+}
+
 func getResourceRequirements(requests, limits api.ResourceList) api.ResourceRequirements {
 	res := api.ResourceRequirements{}
 	res.Requests = requests
@@ -71,8 +76,21 @@ func TestGetPodQOS(t *testing.T) {
 			expected: Guaranteed,
 		},
 		{
+			pod: newPod("guaranteed-with-gpu", []api.Container{
+				newContainer("guaranteed", getResourceList("100m", "100Mi"), addResource("nvidia-gpu", "2", getResourceList("100m", "100Mi"))),
+			}),
+			expected: Guaranteed,
+		},
+		{
 			pod: newPod("guaranteed-guaranteed", []api.Container{
 				newContainer("guaranteed", getResourceList("100m", "100Mi"), getResourceList("100m", "100Mi")),
+				newContainer("guaranteed", getResourceList("100m", "100Mi"), getResourceList("100m", "100Mi")),
+			}),
+			expected: Guaranteed,
+		},
+		{
+			pod: newPod("guaranteed-guaranteed-with-gpu", []api.Container{
+				newContainer("guaranteed", getResourceList("100m", "100Mi"), addResource("nvidia-gpu", "2", getResourceList("100m", "100Mi"))),
 				newContainer("guaranteed", getResourceList("100m", "100Mi"), getResourceList("100m", "100Mi")),
 			}),
 			expected: Guaranteed,
@@ -85,21 +103,28 @@ func TestGetPodQOS(t *testing.T) {
 			expected: BestEffort,
 		},
 		{
-			pod: newPod("best-effort", []api.Container{
+			pod: newPod("best-effort-best-effort-with-gpu", []api.Container{
+				newContainer("best-effort", getResourceList("", ""), addResource("nvidia-gpu", "2", getResourceList("", ""))),
 				newContainer("best-effort", getResourceList("", ""), getResourceList("", "")),
 			}),
 			expected: BestEffort,
 		},
 		{
+			pod: newPod("best-effort-with-gpu", []api.Container{
+				newContainer("best-effort", getResourceList("", ""), addResource("nvidia-gpu", "2", getResourceList("", ""))),
+			}),
+			expected: BestEffort,
+		},
+		{
 			pod: newPod("best-effort-burstable", []api.Container{
-				newContainer("best-effort", getResourceList("", ""), getResourceList("", "")),
+				newContainer("best-effort", getResourceList("", ""), addResource("nvidia-gpu", "2", getResourceList("", ""))),
 				newContainer("burstable", getResourceList("1", ""), getResourceList("2", "")),
 			}),
 			expected: Burstable,
 		},
 		{
 			pod: newPod("best-effort-guaranteed", []api.Container{
-				newContainer("best-effort", getResourceList("", ""), getResourceList("", "")),
+				newContainer("best-effort", getResourceList("", ""), addResource("nvidia-gpu", "2", getResourceList("", ""))),
 				newContainer("guaranteed", getResourceList("10m", "100Mi"), getResourceList("10m", "100Mi")),
 			}),
 			expected: Burstable,
@@ -118,21 +143,21 @@ func TestGetPodQOS(t *testing.T) {
 			expected: Burstable,
 		},
 		{
-			pod: newPod("burstable", []api.Container{
+			pod: newPod("burstable-1", []api.Container{
 				newContainer("burstable", getResourceList("10m", "100Mi"), getResourceList("100m", "200Mi")),
 			}),
 			expected: Burstable,
 		},
 		{
-			pod: newPod("burstable", []api.Container{
-				newContainer("burstable", getResourceList("0", "0"), getResourceList("100m", "200Mi")),
+			pod: newPod("burstable-2", []api.Container{
+				newContainer("burstable", getResourceList("0", "0"), addResource("nvidia-gpu", "2", getResourceList("100m", "200Mi"))),
 			}),
 			expected: Burstable,
 		},
 	}
-	for _, testCase := range testCases {
+	for id, testCase := range testCases {
 		if actual := GetPodQOS(testCase.pod); testCase.expected != actual {
-			t.Errorf("invalid qos pod %s, expected: %s, actual: %s", testCase.pod.Name, testCase.expected, actual)
+			t.Errorf("[%d]: invalid qos pod %s, expected: %s, actual: %s", id, testCase.pod.Name, testCase.expected, actual)
 		}
 	}
 }

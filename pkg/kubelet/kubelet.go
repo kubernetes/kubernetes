@@ -51,6 +51,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/dockershim"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/envvars"
 	"k8s.io/kubernetes/pkg/kubelet/events"
@@ -76,6 +77,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
 	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/pkg/types"
@@ -157,9 +159,6 @@ const (
 	// Period for performing image garbage collection.
 	ImageGCPeriod = 5 * time.Minute
 
-	// maxImagesInStatus is the number of max images we store in image status.
-	maxImagesInNodeStatus = 50
-
 	// Minimum number of dead containers to keep in a pod
 	minDeadContainerInPod = 1
 )
@@ -236,6 +235,8 @@ type KubeletDeps struct {
 	TLSOptions        *server.TLSOptions
 }
 
+// makePodSourceConfig creates a config.PodConfig from the given
+// KubeletConfiguration or returns an error.
 func makePodSourceConfig(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *KubeletDeps, nodeName string) (*config.PodConfig, error) {
 	manifestURLHeader := make(http.Header)
 	if kubeCfg.ManifestURLHeader != "" {
@@ -371,7 +372,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		dockerExecHandler = &dockertools.NativeExecHandler{}
 	}
 
-	serviceStore := cache.NewStore(cache.MetaNamespaceKeyFunc)
+	serviceStore := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 	if kubeClient != nil {
 		// TODO: cache.NewListWatchFromClient is limited as it takes a client implementation rather
 		// than an interface. There is no way to construct a list+watcher using resource name.
@@ -385,7 +386,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		}
 		cache.NewReflector(listWatch, &api.Service{}, serviceStore, 0).Run()
 	}
-	serviceLister := &cache.StoreToServiceLister{Store: serviceStore}
+	serviceLister := &cache.StoreToServiceLister{Indexer: serviceStore}
 
 	nodeStore := cache.NewStore(cache.MetaNamespaceKeyFunc)
 	if kubeClient != nil {
@@ -545,39 +546,67 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 	// Initialize the runtime.
 	switch kubeCfg.ContainerRuntime {
 	case "docker":
-		// Only supported one for now, continue.
-		klet.containerRuntime = dockertools.NewDockerManager(
-			kubeDeps.DockerClient,
-			kubecontainer.FilterEventRecorder(kubeDeps.Recorder),
-			klet.livenessManager,
-			containerRefManager,
-			klet.podManager,
-			machineInfo,
-			kubeCfg.PodInfraContainerImage,
-			float32(kubeCfg.RegistryPullQPS),
-			int(kubeCfg.RegistryBurst),
-			containerLogsDir,
-			kubeDeps.OSInterface,
-			klet.networkPlugin,
-			klet,
-			klet.httpClient,
-			dockerExecHandler,
-			kubeDeps.OOMAdjuster,
-			procFs,
-			klet.cpuCFSQuota,
-			imageBackOff,
-			kubeCfg.SerializeImagePulls,
-			kubeCfg.EnableCustomMetrics,
-			// If using "kubenet", the Kubernetes network plugin that wraps
-			// CNI's bridge plugin, it knows how to set the hairpin veth flag
-			// so we tell the container runtime to back away from setting it.
-			// If the kubelet is started with any other plugin we can't be
-			// sure it handles the hairpin case so we instruct the docker
-			// runtime to set the flag instead.
-			klet.hairpinMode == componentconfig.HairpinVeth && kubeCfg.NetworkPluginName != "kubenet",
-			kubeCfg.SeccompProfileRoot,
-			kubeDeps.ContainerRuntimeOptions...,
-		)
+		switch kubeCfg.ExperimentalRuntimeIntegrationType {
+		case "cri":
+			// Use the new CRI shim for docker. This is need for testing the
+			// docker integration through CRI, and may be removed in the future.
+			dockerService := dockershim.NewDockerService(klet.dockerClient)
+			klet.containerRuntime, err = kuberuntime.NewKubeGenericRuntimeManager(
+				kubecontainer.FilterEventRecorder(kubeDeps.Recorder),
+				klet.livenessManager,
+				containerRefManager,
+				machineInfo,
+				klet.podManager,
+				kubeDeps.OSInterface,
+				klet.networkPlugin,
+				klet,
+				klet.httpClient,
+				imageBackOff,
+				kubeCfg.SerializeImagePulls,
+				float32(kubeCfg.RegistryPullQPS),
+				int(kubeCfg.RegistryBurst),
+				klet.cpuCFSQuota,
+				dockerService,
+				dockerService,
+			)
+			if err != nil {
+				return nil, err
+			}
+		default:
+			// Only supported one for now, continue.
+			klet.containerRuntime = dockertools.NewDockerManager(
+				kubeDeps.DockerClient,
+				kubecontainer.FilterEventRecorder(kubeDeps.Recorder),
+				klet.livenessManager,
+				containerRefManager,
+				klet.podManager,
+				machineInfo,
+				kubeCfg.PodInfraContainerImage,
+				float32(kubeCfg.RegistryPullQPS),
+				int(kubeCfg.RegistryBurst),
+				containerLogsDir,
+				kubeDeps.OSInterface,
+				klet.networkPlugin,
+				klet,
+				klet.httpClient,
+				dockerExecHandler,
+				kubeDeps.OOMAdjuster,
+				procFs,
+				klet.cpuCFSQuota,
+				imageBackOff,
+				kubeCfg.SerializeImagePulls,
+				kubeCfg.EnableCustomMetrics,
+				// If using "kubenet", the Kubernetes network plugin that wraps
+				// CNI's bridge plugin, it knows how to set the hairpin veth flag
+				// so we tell the container runtime to back away from setting it.
+				// If the kubelet is started with any other plugin we can't be
+				// sure it handles the hairpin case so we instruct the docker
+				// runtime to set the flag instead.
+				klet.hairpinMode == componentconfig.HairpinVeth && kubeCfg.NetworkPluginName != "kubenet",
+				kubeCfg.SeccompProfileRoot,
+				kubeDeps.ContainerRuntimeOptions...,
+			)
+		}
 	case "rkt":
 		// TODO: Include hairpin mode settings in rkt?
 		conf := &rkt.Config{
@@ -600,6 +629,8 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 			kubecontainer.RealOS{},
 			imageBackOff,
 			kubeCfg.SerializeImagePulls,
+			float32(kubeCfg.RegistryPullQPS),
+			int(kubeCfg.RegistryBurst),
 			kubeCfg.RuntimeRequestTimeout.Duration,
 		)
 		if err != nil {
@@ -619,6 +650,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 			kubecontainer.FilterEventRecorder(kubeDeps.Recorder),
 			klet.livenessManager,
 			containerRefManager,
+			machineInfo,
 			klet.podManager,
 			kubeDeps.OSInterface,
 			klet.networkPlugin,
@@ -626,6 +658,8 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 			klet.httpClient,
 			imageBackOff,
 			kubeCfg.SerializeImagePulls,
+			float32(kubeCfg.RegistryPullQPS),
+			int(kubeCfg.RegistryBurst),
 			klet.cpuCFSQuota,
 			remoteRuntimeService,
 			remoteImageService,
@@ -752,7 +786,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 }
 
 type serviceLister interface {
-	List() (api.ServiceList, error)
+	List(labels.Selector) ([]*api.Service, error)
 }
 
 type nodeLister interface {
@@ -1083,15 +1117,35 @@ func (kl *Kubelet) listPodsFromDisk() ([]types.UID, error) {
 
 // Starts garbage collection threads.
 func (kl *Kubelet) StartGarbageCollection() {
+	loggedContainerGCFailure := false
 	go wait.Until(func() {
 		if err := kl.containerGC.GarbageCollect(kl.sourcesReady.AllReady()); err != nil {
 			glog.Errorf("Container garbage collection failed: %v", err)
+			loggedContainerGCFailure = true
+		} else {
+			var vLevel glog.Level = 4
+			if loggedContainerGCFailure {
+				vLevel = 1
+				loggedContainerGCFailure = false
+			}
+
+			glog.V(vLevel).Infof("Container garbage collection succeeded")
 		}
 	}, ContainerGCPeriod, wait.NeverStop)
 
+	loggedImageGCFailure := false
 	go wait.Until(func() {
 		if err := kl.imageManager.GarbageCollect(); err != nil {
 			glog.Errorf("Image garbage collection failed: %v", err)
+			loggedImageGCFailure = true
+		} else {
+			var vLevel glog.Level = 4
+			if loggedImageGCFailure {
+				vLevel = 1
+				loggedImageGCFailure = false
+			}
+
+			glog.V(vLevel).Infof("Image garbage collection succeeded")
 		}
 	}, ImageGCPeriod, wait.NeverStop)
 }
@@ -1322,6 +1376,8 @@ func makePortMappings(container *api.Container) (ports []kubecontainer.PortMappi
 	return
 }
 
+// GeneratePodHostNameAndDomain creates a hostname and domain name for a pod,
+// given that pod's spec and annotations or returns an error.
 func (kl *Kubelet) GeneratePodHostNameAndDomain(pod *api.Pod) (string, string, error) {
 	// TODO(vmarmol): Handle better.
 	// Cap hostname at 63 chars (specification is 64bytes which is 63 chars and the null terminating char).
@@ -1416,10 +1472,11 @@ func (kl *Kubelet) GenerateRunContainerOptions(pod *api.Pod, container *api.Cont
 
 var masterServices = sets.NewString("kubernetes")
 
-// getServiceEnvVarMap makes a map[string]string of env vars for services a pod in namespace ns should see
+// getServiceEnvVarMap makes a map[string]string of env vars for services a
+// pod in namespace ns should see.
 func (kl *Kubelet) getServiceEnvVarMap(ns string) (map[string]string, error) {
 	var (
-		serviceMap = make(map[string]api.Service)
+		serviceMap = make(map[string]*api.Service)
 		m          = make(map[string]string)
 	)
 
@@ -1429,15 +1486,16 @@ func (kl *Kubelet) getServiceEnvVarMap(ns string) (map[string]string, error) {
 		// Kubelets without masters (e.g. plain GCE ContainerVM) don't set env vars.
 		return m, nil
 	}
-	services, err := kl.serviceLister.List()
+	services, err := kl.serviceLister.List(labels.Everything())
 	if err != nil {
 		return m, fmt.Errorf("failed to list services when setting up env vars.")
 	}
 
 	// project the services in namespace ns onto the master services
-	for _, service := range services.Items {
+	for i := range services {
+		service := services[i]
 		// ignore services where ClusterIP is "None" or empty
-		if !api.IsServiceIPSet(&service) {
+		if !api.IsServiceIPSet(service) {
 			continue
 		}
 		serviceName := service.Name
@@ -1457,12 +1515,13 @@ func (kl *Kubelet) getServiceEnvVarMap(ns string) (map[string]string, error) {
 			}
 		}
 	}
-	services.Items = []api.Service{}
-	for _, service := range serviceMap {
-		services.Items = append(services.Items, service)
+
+	mappedServices := []*api.Service{}
+	for key := range serviceMap {
+		mappedServices = append(mappedServices, serviceMap[key])
 	}
 
-	for _, e := range envvars.FromServices(&services) {
+	for _, e := range envvars.FromServices(mappedServices) {
 		m[e.Name] = e.Value
 	}
 	return m, nil
@@ -1675,7 +1734,7 @@ func (kl *Kubelet) killPod(pod *api.Pod, runningPod *kubecontainer.Pod, status *
 	if runningPod != nil {
 		p = *runningPod
 	} else if status != nil {
-		p = kubecontainer.ConvertPodStatusToRunningPod(status)
+		p = kubecontainer.ConvertPodStatusToRunningPod(kl.GetRuntime().Type(), status)
 	}
 	return kl.containerRuntime.KillPod(pod, p, gracePeriodOverride)
 }
@@ -2260,7 +2319,7 @@ func (kl *Kubelet) syncLoopIteration(configCh <-chan kubetypes.PodUpdate, handle
 			glog.V(2).Infof("SyncLoop (ADD, %q): %q", u.Source, format.Pods(u.Pods))
 			// After restarting, kubelet will get all existing pods through
 			// ADD as if they are new pods. These pods will then go through the
-			// admission process and *may* be rejcted. This can be resolved
+			// admission process and *may* be rejected. This can be resolved
 			// once we have checkpointing.
 			handler.HandlePodAdditions(u.Pods)
 		case kubetypes.UPDATE:
@@ -2798,6 +2857,8 @@ func (kl *Kubelet) convertStatusToAPIStatus(pod *api.Pod, podStatus *kubecontain
 	return &apiPodStatus
 }
 
+// convertToAPIContainerStatuses converts the given internal container
+// statuses into API container statuses.
 func (kl *Kubelet) convertToAPIContainerStatuses(pod *api.Pod, podStatus *kubecontainer.PodStatus, previousStatus []api.ContainerStatus, containers []api.Container, hasInitContainers, isInitContainer bool) []api.ContainerStatus {
 	convertContainerStatus := func(cs *kubecontainer.ContainerStatus) *api.ContainerStatus {
 		cid := cs.ID.String()
@@ -3060,6 +3121,8 @@ func isSyncPodWorthy(event *pleg.PodLifecycleEvent) bool {
 	return event.Type != pleg.ContainerRemoved
 }
 
+// parseResourceList parses the given configuration map into an API
+// ResourceList or returns an error.
 func parseResourceList(m utilconfig.ConfigurationMap) (api.ResourceList, error) {
 	rl := make(api.ResourceList)
 	for k, v := range m {
@@ -3081,6 +3144,9 @@ func parseResourceList(m utilconfig.ConfigurationMap) (api.ResourceList, error) 
 	return rl, nil
 }
 
+// ParseReservation parses the given kubelet- and system- reservations
+// configuration maps into an internal Reservation instance or returns an
+// error.
 func ParseReservation(kubeReserved, systemReserved utilconfig.ConfigurationMap) (*kubetypes.Reservation, error) {
 	reservation := new(kubetypes.Reservation)
 	if rl, err := parseResourceList(kubeReserved); err != nil {

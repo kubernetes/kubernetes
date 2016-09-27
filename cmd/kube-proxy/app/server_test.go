@@ -313,9 +313,24 @@ func TestGetConntrackMax(t *testing.T) {
 		},
 		{
 			config: componentconfig.KubeProxyConfiguration{
-				ConntrackMaxPerCore: 67890, // use this if other is 0
+				ConntrackMaxPerCore: 67890, // use this if Max is 0
+				ConntrackMin:        1,     // avoid 0 default
 			},
 			expected: 67890 * ncores,
+		},
+		{
+			config: componentconfig.KubeProxyConfiguration{
+				ConntrackMaxPerCore: 1, // ensure that Min is considered
+				ConntrackMin:        123456,
+			},
+			expected: 123456,
+		},
+		{
+			config: componentconfig.KubeProxyConfiguration{
+				ConntrackMaxPerCore: 0, // leave system setting
+				ConntrackMin:        123456,
+			},
+			expected: 0,
 		},
 	}
 

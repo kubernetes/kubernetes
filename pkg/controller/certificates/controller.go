@@ -30,7 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/runtime"
-	utilcertificates "k8s.io/kubernetes/pkg/util/certificates"
+	certutil "k8s.io/kubernetes/pkg/util/cert"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/util/workqueue"
@@ -49,15 +49,13 @@ type CertificateController struct {
 	csrController *cache.Controller
 	csrStore      cache.StoreToCertificateRequestLister
 
-	// To allow injection of updateCertificateRequestStatus for testing.
-	updateHandler func(csr *certificates.CertificateSigningRequest) error
-	syncHandler   func(csrKey string) error
+	syncHandler func(csrKey string) error
 
 	approveAllKubeletCSRsForGroup string
 
 	signer *local.Signer
 
-	queue *workqueue.Type
+	queue workqueue.RateLimitingInterface
 }
 
 func NewCertificateController(kubeClient clientset.Interface, syncPeriod time.Duration, caCertFile, caKeyFile string, approveAllKubeletCSRsForGroup string) (*CertificateController, error) {
@@ -78,7 +76,7 @@ func NewCertificateController(kubeClient clientset.Interface, syncPeriod time.Du
 
 	cc := &CertificateController{
 		kubeClient: kubeClient,
-		queue:      workqueue.NewNamed("certificate"),
+		queue:      workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "certificate"),
 		signer:     ca,
 		approveAllKubeletCSRsForGroup: approveAllKubeletCSRsForGroup,
 	}
@@ -107,7 +105,19 @@ func NewCertificateController(kubeClient clientset.Interface, syncPeriod time.Du
 				cc.enqueueCertificateRequest(new)
 			},
 			DeleteFunc: func(obj interface{}) {
-				csr := obj.(*certificates.CertificateSigningRequest)
+				csr, ok := obj.(*certificates.CertificateSigningRequest)
+				if !ok {
+					tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
+					if !ok {
+						glog.V(2).Infof("Couldn't get object from tombstone %#v", obj)
+						return
+					}
+					csr, ok = tombstone.Obj.(*certificates.CertificateSigningRequest)
+					if !ok {
+						glog.V(2).Infof("Tombstone contained object that is not a CSR: %#v", obj)
+						return
+					}
+				}
 				glog.V(4).Infof("Deleting certificate request %s", csr.Name)
 				cc.enqueueCertificateRequest(obj)
 			},
@@ -120,52 +130,50 @@ func NewCertificateController(kubeClient clientset.Interface, syncPeriod time.Du
 // Run the main goroutine responsible for watching and syncing jobs.
 func (cc *CertificateController) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
+	defer cc.queue.ShutDown()
+
 	go cc.csrController.Run(stopCh)
+
 	glog.Infof("Starting certificate controller manager")
 	for i := 0; i < workers; i++ {
 		go wait.Until(cc.worker, time.Second, stopCh)
 	}
 	<-stopCh
 	glog.Infof("Shutting down certificate controller")
-	cc.queue.ShutDown()
 }
 
 // worker runs a thread that dequeues CSRs, handles them, and marks them done.
 func (cc *CertificateController) worker() {
-	for {
-		func() {
-			key, quit := cc.queue.Get()
-			if quit {
-				return
-			}
-			defer cc.queue.Done(key)
-			err := cc.syncHandler(key.(string))
-			if err != nil {
-				glog.Errorf("Error syncing CSR: %v", err)
-			}
-		}()
+	for cc.processNextWorkItem() {
 	}
+}
+
+// processNextWorkItem deals with one key off the queue.  It returns false when it's time to quit.
+func (cc *CertificateController) processNextWorkItem() bool {
+	cKey, quit := cc.queue.Get()
+	if quit {
+		return false
+	}
+	defer cc.queue.Done(cKey)
+
+	err := cc.syncHandler(cKey.(string))
+	if err == nil {
+		cc.queue.Forget(cKey)
+		return true
+	}
+
+	cc.queue.AddRateLimited(cKey)
+	utilruntime.HandleError(fmt.Errorf("Sync %v failed with : %v", cKey, err))
+	return true
 }
 
 func (cc *CertificateController) enqueueCertificateRequest(obj interface{}) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
-		glog.Errorf("Couldn't get key for object %+v: %v", obj, err)
+		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", obj, err))
 		return
 	}
 	cc.queue.Add(key)
-}
-
-func (cc *CertificateController) updateCertificateRequestStatus(csr *certificates.CertificateSigningRequest) error {
-	_, updateErr := cc.kubeClient.Certificates().CertificateSigningRequests().UpdateStatus(csr)
-	if updateErr == nil {
-		// success!
-		return nil
-	}
-
-	// retry on failure
-	cc.enqueueCertificateRequest(csr)
-	return updateErr
 }
 
 // maybeSignCertificate will inspect the certificate request and, if it has
@@ -179,7 +187,6 @@ func (cc *CertificateController) maybeSignCertificate(key string) error {
 	}()
 	obj, exists, err := cc.csrStore.Store.GetByKey(key)
 	if err != nil {
-		cc.queue.Add(key)
 		return err
 	}
 	if !exists {
@@ -208,7 +215,8 @@ func (cc *CertificateController) maybeSignCertificate(key string) error {
 		csr.Status.Certificate = certBytes
 	}
 
-	return cc.updateCertificateRequestStatus(csr)
+	_, err = cc.kubeClient.Certificates().CertificateSigningRequests().UpdateStatus(csr)
+	return err
 }
 
 func (cc *CertificateController) maybeAutoApproveCSR(csr *certificates.CertificateSigningRequest) (*certificates.CertificateSigningRequest, error) {
@@ -232,9 +240,9 @@ func (cc *CertificateController) maybeAutoApproveCSR(csr *certificates.Certifica
 		return csr, nil
 	}
 
-	x509cr, err := utilcertificates.ParseCertificateRequestObject(csr)
+	x509cr, err := certutil.ParseCSR(csr)
 	if err != nil {
-		glog.Errorf("unable to parse csr %q: %v", csr.ObjectMeta.Name, err)
+		utilruntime.HandleError(fmt.Errorf("unable to parse csr %q: %v", csr.Name, err))
 		return csr, nil
 	}
 	if !reflect.DeepEqual([]string{"system:nodes"}, x509cr.Subject.Organization) {

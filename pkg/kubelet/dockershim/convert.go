@@ -55,14 +55,15 @@ func toRuntimeAPIContainer(c *dockertypes.Container) (*runtimeApi.Container, err
 	if err != nil {
 		return nil, err
 	}
+	labels, annotations := extractLabels(c.Labels)
 	return &runtimeApi.Container{
-		Id:       &c.ID,
-		Metadata: metadata,
-		Image:    &runtimeApi.ImageSpec{Image: &c.Image},
-		ImageRef: &c.ImageID,
-		State:    &state,
-		// TODO: Extract annotations from labels.
-		Labels: c.Labels,
+		Id:          &c.ID,
+		Metadata:    metadata,
+		Image:       &runtimeApi.ImageSpec{Image: &c.Image},
+		ImageRef:    &c.ImageID,
+		State:       &state,
+		Labels:      labels,
+		Annotations: annotations,
 	}, nil
 }
 
@@ -113,11 +114,13 @@ func toRuntimeAPISandbox(c *dockertypes.Container) (*runtimeApi.PodSandbox, erro
 	if err != nil {
 		return nil, err
 	}
+	labels, annotations := extractLabels(c.Labels)
 	return &runtimeApi.PodSandbox{
-		Id:        &c.ID,
-		Metadata:  metadata,
-		State:     &state,
-		CreatedAt: &c.Created,
-		Labels:    c.Labels, // TODO: Need to disthinguish annotaions and labels.
+		Id:          &c.ID,
+		Metadata:    metadata,
+		State:       &state,
+		CreatedAt:   &c.Created,
+		Labels:      labels,
+		Annotations: annotations,
 	}, nil
 }

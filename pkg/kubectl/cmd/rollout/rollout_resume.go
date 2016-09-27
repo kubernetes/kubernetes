@@ -33,14 +33,14 @@ import (
 // ResumeConfig is the start of the data required to perform the operation.  As new fields are added, add them here instead of
 // referencing the cmd.Flags()
 type ResumeConfig struct {
+	resource.FilenameOptions
+
 	ResumeObject func(object runtime.Object) (bool, error)
 	Mapper       meta.RESTMapper
 	Typer        runtime.ObjectTyper
 	Infos        []*resource.Info
 
-	Out       io.Writer
-	Filenames []string
-	Recursive bool
+	Out io.Writer
 }
 
 var (
@@ -57,7 +57,7 @@ var (
 )
 
 func NewCmdRolloutResume(f *cmdutil.Factory, out io.Writer) *cobra.Command {
-	opts := &ResumeConfig{}
+	options := &ResumeConfig{}
 
 	validArgs := []string{"deployment"}
 	argAliases := kubectl.ResourceAliases(validArgs)
@@ -69,11 +69,11 @@ func NewCmdRolloutResume(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 		Example: resume_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			allErrs := []error{}
-			err := opts.CompleteResume(f, cmd, out, args)
+			err := options.CompleteResume(f, cmd, out, args)
 			if err != nil {
 				allErrs = append(allErrs, err)
 			}
-			err = opts.RunResume()
+			err = options.RunResume()
 			if err != nil {
 				allErrs = append(allErrs, err)
 			}
@@ -83,18 +83,17 @@ func NewCmdRolloutResume(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 		ArgAliases: argAliases,
 	}
 
-	usage := "Filename, directory, or URL to a file identifying the resource to get from a server."
-	kubectl.AddJsonFilenameFlag(cmd, &opts.Filenames, usage)
-	cmdutil.AddRecursiveFlag(cmd, &opts.Recursive)
+	usage := "identifying the resource to get from a server."
+	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
 	return cmd
 }
 
 func (o *ResumeConfig) CompleteResume(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []string) error {
-	if len(args) == 0 && len(o.Filenames) == 0 {
+	if len(args) == 0 && cmdutil.IsFilenameEmpty(o.Filenames) {
 		return cmdutil.UsageError(cmd, cmd.Use)
 	}
 
-	o.Mapper, o.Typer = f.Object(false)
+	o.Mapper, o.Typer = f.Object()
 	o.ResumeObject = f.ResumeObject
 	o.Out = out
 
@@ -105,7 +104,7 @@ func (o *ResumeConfig) CompleteResume(f *cmdutil.Factory, cmd *cobra.Command, ou
 
 	r := resource.NewBuilder(o.Mapper, o.Typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 		NamespaceParam(cmdNamespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, o.Recursive, o.Filenames...).
+		FilenameParam(enforceNamespace, &o.FilenameOptions).
 		ResourceTypeOrNameArgs(true, args...).
 		ContinueOnError().
 		Latest().
@@ -138,10 +137,10 @@ func (o ResumeConfig) RunResume() error {
 			continue
 		}
 		if isAlreadyResumed {
-			cmdutil.PrintSuccess(o.Mapper, false, o.Out, info.Mapping.Resource, info.Name, "already resumed")
+			cmdutil.PrintSuccess(o.Mapper, false, o.Out, info.Mapping.Resource, info.Name, false, "already resumed")
 			continue
 		}
-		cmdutil.PrintSuccess(o.Mapper, false, o.Out, info.Mapping.Resource, info.Name, "resumed")
+		cmdutil.PrintSuccess(o.Mapper, false, o.Out, info.Mapping.Resource, info.Name, false, "resumed")
 	}
 	return utilerrors.NewAggregate(allErrs)
 }

@@ -22,8 +22,9 @@ import (
 
 	"k8s.io/kubernetes/pkg/auth/authenticator"
 	"k8s.io/kubernetes/pkg/auth/authenticator/bearertoken"
+	"k8s.io/kubernetes/pkg/auth/user"
 	"k8s.io/kubernetes/pkg/serviceaccount"
-	"k8s.io/kubernetes/pkg/util/crypto"
+	certutil "k8s.io/kubernetes/pkg/util/cert"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/password/keystone"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/password/passwordfile"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/basicauth"
@@ -154,6 +155,11 @@ func newAuthenticatorFromTokenFile(tokenAuthFile string) (authenticator.Request,
 	return bearertoken.New(tokenAuthenticator), nil
 }
 
+// newAuthenticatorFromToken returns an authenticator.Request or an error
+func NewAuthenticatorFromTokens(tokens map[string]*user.DefaultInfo) authenticator.Request {
+	return bearertoken.New(tokenfile.New(tokens))
+}
+
 // newAuthenticatorFromOIDCIssuerURL returns an authenticator.Request or an error.
 func newAuthenticatorFromOIDCIssuerURL(issuerURL, clientID, caFile, usernameClaim, groupsClaim string) (authenticator.Request, error) {
 	tokenAuthenticator, err := oidc.New(oidc.OIDCOptions{
@@ -183,7 +189,7 @@ func newServiceAccountAuthenticator(keyfile string, lookup bool, serviceAccountG
 
 // newAuthenticatorFromClientCAFile returns an authenticator.Request or an error
 func newAuthenticatorFromClientCAFile(clientCAFile string) (authenticator.Request, error) {
-	roots, err := crypto.CertPoolFromFile(clientCAFile)
+	roots, err := certutil.NewPool(clientCAFile)
 	if err != nil {
 		return nil, err
 	}

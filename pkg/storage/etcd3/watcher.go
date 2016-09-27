@@ -31,8 +31,6 @@ import (
 	etcdrpc "github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes"
 	"github.com/golang/glog"
 	"golang.org/x/net/context"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
 )
 
 const (
@@ -53,7 +51,7 @@ type watchChan struct {
 	key               string
 	initialRev        int64
 	recursive         bool
-	filter            storage.Filter
+	filter            storage.FilterFunc
 	ctx               context.Context
 	cancel            context.CancelFunc
 	incomingEventChan chan *event
@@ -76,7 +74,7 @@ func newWatcher(client *clientv3.Client, codec runtime.Codec, versioner storage.
 // If recursive is false, it watches on given key.
 // If recursive is true, it watches any children and directories under the key, excluding the root key itself.
 // filter must be non-nil. Only if filter returns true will the changes be returned.
-func (w *watcher) Watch(ctx context.Context, key string, rev int64, recursive bool, filter storage.Filter) (watch.Interface, error) {
+func (w *watcher) Watch(ctx context.Context, key string, rev int64, recursive bool, filter storage.FilterFunc) (watch.Interface, error) {
 	if recursive && !strings.HasSuffix(key, "/") {
 		key += "/"
 	}
@@ -85,7 +83,7 @@ func (w *watcher) Watch(ctx context.Context, key string, rev int64, recursive bo
 	return wc, nil
 }
 
-func (w *watcher) createWatchChan(ctx context.Context, key string, rev int64, recursive bool, filter storage.Filter) *watchChan {
+func (w *watcher) createWatchChan(ctx context.Context, key string, rev int64, recursive bool, filter storage.FilterFunc) *watchChan {
 	wc := &watchChan{
 		watcher:           w,
 		key:               key,
@@ -101,7 +99,8 @@ func (w *watcher) createWatchChan(ctx context.Context, key string, rev int64, re
 }
 
 func (wc *watchChan) run() {
-	go wc.startWatching()
+	watchClosedCh := make(chan struct{})
+	go wc.startWatching(watchClosedCh)
 
 	var resultChanWG sync.WaitGroup
 	resultChanWG.Add(1)
@@ -109,6 +108,9 @@ func (wc *watchChan) run() {
 
 	select {
 	case err := <-wc.errChan:
+		if err == context.Canceled {
+			break
+		}
 		errResult := parseError(err)
 		if errResult != nil {
 			// error result is guaranteed to be received by user before closing ResultChan.
@@ -117,10 +119,15 @@ func (wc *watchChan) run() {
 			case <-wc.ctx.Done(): // user has given up all results
 			}
 		}
-		wc.cancel()
-	case <-wc.ctx.Done():
+	case <-watchClosedCh:
+	case <-wc.ctx.Done(): // user cancel
 	}
-	// we need to wait until resultChan wouldn't be sent to anymore
+
+	// We use wc.ctx to reap all goroutines. Under whatever condition, we should stop them all.
+	// It's fine to double cancel.
+	wc.cancel()
+
+	// we need to wait until resultChan wouldn't be used anymore
 	resultChanWG.Wait()
 	close(wc.resultChan)
 }
@@ -155,7 +162,7 @@ func (wc *watchChan) sync() error {
 // startWatching does:
 // - get current objects if initialRev=0; set initialRev to current rev
 // - watch on given key and send events to process.
-func (wc *watchChan) startWatching() {
+func (wc *watchChan) startWatching(watchClosedCh chan struct{}) {
 	if wc.initialRev == 0 {
 		if err := wc.sync(); err != nil {
 			glog.Errorf("failed to sync with latest state: %v", err)
@@ -180,6 +187,11 @@ func (wc *watchChan) startWatching() {
 			wc.sendEvent(parseEvent(e))
 		}
 	}
+	// When we come to this point, it's only possible that client side ends the watch.
+	// e.g. cancel the context, close the client.
+	// If this watch chan is broken and context isn't cancelled, other goroutines will still hang.
+	// We should notify the main thread that this goroutine has exited.
+	close(watchClosedCh)
 }
 
 // processEvent processes events from etcd watcher and sends results to resultChan.
@@ -229,7 +241,7 @@ func (wc *watchChan) transform(e *event) (res *watch.Event) {
 
 	switch {
 	case e.isDeleted:
-		if !wc.filter.Filter(oldObj) {
+		if !wc.filter(oldObj) {
 			return nil
 		}
 		res = &watch.Event{
@@ -237,7 +249,7 @@ func (wc *watchChan) transform(e *event) (res *watch.Event) {
 			Object: oldObj,
 		}
 	case e.isCreated:
-		if !wc.filter.Filter(curObj) {
+		if !wc.filter(curObj) {
 			return nil
 		}
 		res = &watch.Event{
@@ -245,8 +257,8 @@ func (wc *watchChan) transform(e *event) (res *watch.Event) {
 			Object: curObj,
 		}
 	default:
-		curObjPasses := wc.filter.Filter(curObj)
-		oldObjPasses := wc.filter.Filter(oldObj)
+		curObjPasses := wc.filter(curObj)
+		oldObjPasses := wc.filter(oldObj)
 		switch {
 		case curObjPasses && oldObjPasses:
 			res = &watch.Event{
@@ -294,12 +306,6 @@ func parseError(err error) *watch.Event {
 }
 
 func (wc *watchChan) sendError(err error) {
-	// Context.canceled is an expected behavior.
-	// We should just stop all goroutines in watchChan without returning error.
-	// TODO: etcd client should return context.Canceled instead of grpc specific error.
-	if grpc.Code(err) == codes.Canceled || err == context.Canceled {
-		return
-	}
 	select {
 	case wc.errChan <- err:
 	case <-wc.ctx.Done():

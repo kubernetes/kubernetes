@@ -35,13 +35,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/strategicpatch"
 )
 
-// ApplyOptions stores cmd.Flag values for apply.  As new fields are added,
-// add them here instead of referencing the cmd.Flags()
-type ApplyOptions struct {
-	Filenames []string
-	Recursive bool
-}
-
 const (
 	// maxPatchRetry is the maximum number of conflicts retry for during a patch operation before returning failure
 	maxPatchRetry = 5
@@ -68,7 +61,7 @@ var (
 )
 
 func NewCmdApply(f *cmdutil.Factory, out io.Writer) *cobra.Command {
-	options := &ApplyOptions{}
+	options := &resource.FilenameOptions{}
 
 	cmd := &cobra.Command{
 		Use:     "apply -f FILENAME",
@@ -82,12 +75,11 @@ func NewCmdApply(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 		},
 	}
 
-	usage := "Filename, directory, or URL to file that contains the configuration to apply"
-	kubectl.AddJsonFilenameFlag(cmd, &options.Filenames, usage)
+	usage := "that contains the configuration to apply"
+	cmdutil.AddFilenameOptionFlags(cmd, options, usage)
 	cmd.MarkFlagRequired("filename")
 	cmd.Flags().Bool("overwrite", true, "Automatically resolve conflicts between the modified and live configuration by using values from the modified configuration")
 	cmdutil.AddValidateFlags(cmd)
-	cmdutil.AddRecursiveFlag(cmd, &options.Recursive)
 	cmdutil.AddOutputFlagsForMutation(cmd)
 	cmdutil.AddRecordFlag(cmd)
 	cmdutil.AddInclude3rdPartyFlags(cmd)
@@ -102,7 +94,7 @@ func validateArgs(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func RunApply(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *ApplyOptions) error {
+func RunApply(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *resource.FilenameOptions) error {
 	shortOutput := cmdutil.GetFlagString(cmd, "output") == "name"
 	schema, err := f.Validator(cmdutil.GetFlagBool(cmd, "validate"), cmdutil.GetFlagString(cmd, "schema-cache-dir"))
 	if err != nil {
@@ -114,12 +106,12 @@ func RunApply(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *Ap
 		return err
 	}
 
-	mapper, typer := f.Object(cmdutil.GetIncludeThirdPartyAPIs(cmd))
+	mapper, typer := f.Object()
 	r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 		Schema(schema).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, options.Recursive, options.Filenames...).
+		FilenameParam(enforceNamespace, options).
 		Flatten().
 		Do()
 	err = r.Err()
@@ -167,7 +159,7 @@ func RunApply(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *Ap
 				return cmdutil.AddSourceToErr("creating", info.Source, err)
 			}
 			count++
-			cmdutil.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, "created")
+			cmdutil.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, false, "created")
 			return nil
 		}
 
@@ -192,7 +184,7 @@ func RunApply(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *Ap
 		}
 
 		count++
-		cmdutil.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, "configured")
+		cmdutil.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, false, "configured")
 		return nil
 	})
 

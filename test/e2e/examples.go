@@ -21,6 +21,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -28,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -225,19 +227,92 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 			Expect(err).NotTo(HaveOccurred())
 			forEachPod("app", "cassandra", func(pod api.Pod) {
 				framework.Logf("Verifying pod %v ", pod.Name)
-				_, err = framework.LookForStringInLog(ns, pod.Name, "cassandra", "Listening for thrift clients", serverStartTimeout)
-				Expect(err).NotTo(HaveOccurred())
-				_, err = framework.LookForStringInLog(ns, pod.Name, "cassandra", "Handshaking version", serverStartTimeout)
+				// TODO how do we do this better?  Ready Probe?
+				_, err = framework.LookForStringInLog(ns, pod.Name, "cassandra", "Starting listening for CQL clients", serverStartTimeout)
 				Expect(err).NotTo(HaveOccurred())
 			})
 
 			By("Finding each node in the nodetool status lines")
 			forEachPod("app", "cassandra", func(pod api.Pod) {
 				output := framework.RunKubectlOrDie("exec", pod.Name, nsFlag, "--", "nodetool", "status")
-				if !strings.Contains(output, pod.Status.PodIP) {
-					framework.Failf("Pod ip %s not found in nodetool status", pod.Status.PodIP)
+				matched, _ := regexp.MatchString("UN.*"+pod.Status.PodIP, output)
+				if matched != true {
+					framework.Failf("Cassandra pod ip %s is not reporting Up and Normal 'UN' via nodetool status", pod.Status.PodIP)
 				}
 			})
+		})
+	})
+
+	framework.KubeDescribe("CassandraPetSet", func() {
+		It("should create petset", func() {
+			mkpath := func(file string) string {
+				return filepath.Join(framework.TestContext.RepoRoot, "examples/storage/cassandra", file)
+			}
+			serviceYaml := mkpath("cassandra-service.yaml")
+			nsFlag := fmt.Sprintf("--namespace=%v", ns)
+
+			// have to change dns prefix because of the dynamic namespace
+			input, err := ioutil.ReadFile(mkpath("cassandra-petset.yaml"))
+			Expect(err).NotTo(HaveOccurred())
+
+			output := strings.Replace(string(input), "cassandra-0.cassandra.default.svc.cluster.local", "cassandra-0.cassandra."+ns+".svc.cluster.local", -1)
+
+			petSetYaml := "/tmp/cassandra-petset.yaml"
+
+			err = ioutil.WriteFile(petSetYaml, []byte(output), 0644)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("Starting the cassandra service")
+			framework.RunKubectlOrDie("create", "-f", serviceYaml, nsFlag)
+			framework.Logf("wait for service")
+			err = framework.WaitForService(c, ns, "cassandra", true, framework.Poll, framework.ServiceRespondingTimeout)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Create an PetSet with n nodes in it.  Each node will then be verified.
+			By("Creating a Cassandra PetSet")
+
+			framework.RunKubectlOrDie("create", "-f", petSetYaml, nsFlag)
+
+			petsetPoll := 30 * time.Second
+			petsetTimeout := 10 * time.Minute
+			// TODO - parse this number out of the yaml
+			numPets := 3
+			label := labels.SelectorFromSet(labels.Set(map[string]string{"app": "cassandra"}))
+			err = wait.PollImmediate(petsetPoll, petsetTimeout,
+				func() (bool, error) {
+					podList, err := c.Pods(ns).List(api.ListOptions{LabelSelector: label})
+					if err != nil {
+						return false, fmt.Errorf("Unable to get list of pods in petset %s", label)
+					}
+					ExpectNoError(err)
+					if len(podList.Items) < numPets {
+						framework.Logf("Found %d pets, waiting for %d", len(podList.Items), numPets)
+						return false, nil
+					}
+					if len(podList.Items) > numPets {
+						return false, fmt.Errorf("Too many pods scheduled, expected %d got %d", numPets, len(podList.Items))
+					}
+					for _, p := range podList.Items {
+						isReady := api.IsPodReady(&p)
+						if p.Status.Phase != api.PodRunning || !isReady {
+							framework.Logf("Waiting for pod %v to enter %v - Ready=True, currently %v - Ready=%v", p.Name, api.PodRunning, p.Status.Phase, isReady)
+							return false, nil
+						}
+					}
+					return true, nil
+				})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("Finding each node in the nodetool status lines")
+			forEachPod("app", "cassandra", func(pod api.Pod) {
+				output := framework.RunKubectlOrDie("exec", pod.Name, nsFlag, "--", "nodetool", "status")
+				matched, _ := regexp.MatchString("UN.*"+pod.Status.PodIP, output)
+				if matched != true {
+					framework.Failf("Cassandra pod ip %s is not reporting Up and Normal 'UN' via nodetool status", pod.Status.PodIP)
+				}
+			})
+			// using out of petset e2e as deleting pvc is a pain
+			deleteAllPetSets(c, ns)
 		})
 	})
 
@@ -428,7 +503,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			By("scaling rethinkdb")
-			framework.ScaleRC(c, ns, "rethinkdb-rc", 2, true)
+			framework.ScaleRC(c, f.ClientSet, ns, "rethinkdb-rc", 2, true)
 			checkDbInstances()
 
 			By("starting admin")
@@ -471,7 +546,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			By("scaling hazelcast")
-			framework.ScaleRC(c, ns, "hazelcast", 2, true)
+			framework.ScaleRC(c, f.ClientSet, ns, "hazelcast", 2, true)
 			forEachPod("name", "hazelcast", func(pod api.Pod) {
 				_, err := framework.LookForStringInLog(ns, pod.Name, "hazelcast", "Members [2]", serverStartTimeout)
 				Expect(err).NotTo(HaveOccurred())

@@ -33,7 +33,7 @@ import (
 	oidctesting "k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/oidc/testing"
 )
 
-func generateToken(t *testing.T, op *oidctesting.OIDCProvider, iss, sub, aud string, usernameClaim, value, groupsClaim string, groups []string, iat, exp time.Time) string {
+func generateToken(t *testing.T, op *oidctesting.OIDCProvider, iss, sub, aud string, usernameClaim, value, groupsClaim string, groups interface{}, iat, exp time.Time) string {
 	signer := op.PrivKey.Signer()
 	claims := oidc.NewClaims(iss, sub, aud, iat, exp)
 	claims.Add(usernameClaim, value)
@@ -49,15 +49,15 @@ func generateToken(t *testing.T, op *oidctesting.OIDCProvider, iss, sub, aud str
 	return jwt.Encode()
 }
 
-func generateGoodToken(t *testing.T, op *oidctesting.OIDCProvider, iss, sub, aud string, usernameClaim, value, groupsClaim string, groups []string) string {
+func generateGoodToken(t *testing.T, op *oidctesting.OIDCProvider, iss, sub, aud string, usernameClaim, value, groupsClaim string, groups interface{}) string {
 	return generateToken(t, op, iss, sub, aud, usernameClaim, value, groupsClaim, groups, time.Now(), time.Now().Add(time.Hour))
 }
 
-func generateMalformedToken(t *testing.T, op *oidctesting.OIDCProvider, iss, sub, aud string, usernameClaim, value, groupsClaim string, groups []string) string {
+func generateMalformedToken(t *testing.T, op *oidctesting.OIDCProvider, iss, sub, aud string, usernameClaim, value, groupsClaim string, groups interface{}) string {
 	return generateToken(t, op, iss, sub, aud, usernameClaim, value, groupsClaim, groups, time.Now(), time.Now().Add(time.Hour)) + "randombits"
 }
 
-func generateExpiredToken(t *testing.T, op *oidctesting.OIDCProvider, iss, sub, aud string, usernameClaim, value, groupsClaim string, groups []string) string {
+func generateExpiredToken(t *testing.T, op *oidctesting.OIDCProvider, iss, sub, aud string, usernameClaim, value, groupsClaim string, groups interface{}) string {
 	return generateToken(t, op, iss, sub, aud, usernameClaim, value, groupsClaim, groups, time.Now().Add(-2*time.Hour), time.Now().Add(-1*time.Hour))
 }
 
@@ -238,6 +238,24 @@ func TestOIDCAuthentication(t *testing.T) {
 				&user.DefaultInfo{Name: "foo@example.com", Groups: []string{"group1", "group2"}},
 				true,
 				"",
+			},
+			{
+				// Group claim is a string rather than an array. Map that string to a single group.
+				"email",
+				"groups",
+				generateGoodToken(t, op, srv.URL, "client-foo", "client-foo", "email", "foo@example.com", "groups", "group1"),
+				&user.DefaultInfo{Name: "foo@example.com", Groups: []string{"group1"}},
+				true,
+				"",
+			},
+			{
+				// Group claim is not a string or array of strings. Throw out this as invalid.
+				"email",
+				"groups",
+				generateGoodToken(t, op, srv.URL, "client-foo", "client-foo", "email", "foo@example.com", "groups", 1),
+				nil,
+				false,
+				"custom group claim contains invalid type: float64",
 			},
 			{
 				"sub",

@@ -71,6 +71,13 @@ function usage() {
 function upgrade-master() {
   echo "== Upgrading master to '${SERVER_BINARY_TAR_URL}'. Do not interrupt, deleting master instance. =="
 
+  # Tries to figure out KUBE_USER/KUBE_PASSWORD by first looking under
+  # kubeconfig:username, and then under kubeconfig:username-basic-auth.
+  # TODO: KUBE_USER is used in generating ABAC policy which the
+  # apiserver may not have enabled. If it's enabled, we must have a user
+  # to generate a valid ABAC policy. If the username changes, should
+  # the script fail? Should we generate a default username and password
+  # if the section is missing in kubeconfig? Handle this better in 1.5.
   get-kubeconfig-basicauth
   get-kubeconfig-bearertoken
 
@@ -246,6 +253,7 @@ function do-node-upgrade() {
         --zones="${ZONE}" \
         --regexp="${group}" \
         --format='value(instanceTemplate)' || true))
+    echo "== Calling rolling-update for ${group}. ==" >&2
     update=$(gcloud alpha compute rolling-updates \
         --project="${PROJECT}" \
         --zone="${ZONE}" \
@@ -255,11 +263,26 @@ function do-node-upgrade() {
         --instance-startup-timeout=300s \
         --max-num-concurrent-instances=1 \
         --max-num-failed-instances=0 \
-        --min-instance-update-time=0s 2>&1)
+        --min-instance-update-time=0s 2>&1) && update_rc=$? || update_rc=$?
+
+    if [[ "${update_rc}" != 0 ]]; then
+      echo "== FAILED to start rolling-update: =="
+      echo "${update}"
+      echo "  This may be due to a preexisting rolling-update;"
+      echo "  see https://github.com/kubernetes/kubernetes/issues/33113 for details."
+      echo "  All rolling-updates in project ${PROJECT} zone ${ZONE}:"
+      gcloud alpha compute rolling-updates \
+        --project="${PROJECT}" \
+        --zone="${ZONE}" \
+        list || true
+      return ${update_rc}
+    fi
+
     id=$(echo "${update}" | grep "Started" | cut -d '/' -f 11 | cut -d ']' -f 1)
     updates+=("${id}")
   done
 
+  echo "== Waiting for Upgrading nodes to be finished. ==" >&2
   # Wait until rolling updates are finished.
   for update in ${updates[@]}; do
     while true; do
@@ -279,6 +302,7 @@ function do-node-upgrade() {
   done
 
   # Remove the old templates.
+  echo "== Deleting old templates in ${PROJECT}. ==" >&2
   for tmpl in ${old_templates[@]}; do
     gcloud compute instance-templates delete \
         --quiet \

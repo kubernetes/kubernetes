@@ -20,6 +20,7 @@ import (
 	"sync"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -28,46 +29,72 @@ import (
 
 // ClientPool manages a pool of dynamic clients.
 type ClientPool interface {
-	// ClientForGroupVersion returns a client configured for the specified groupVersion.
-	ClientForGroupVersion(groupVersion unversioned.GroupVersion) (*Client, error)
+	// ClientForGroupVersionKind returns a client configured for the specified groupVersionResource.
+	// Resource may be empty.
+	ClientForGroupVersionResource(resource unversioned.GroupVersionResource) (*Client, error)
+	// ClientForGroupVersionKind returns a client configured for the specified groupVersionKind.
+	// Kind may be empty.
+	ClientForGroupVersionKind(kind unversioned.GroupVersionKind) (*Client, error)
 }
 
-// APIPathResolverFunc knows how to convert a groupVersion to its API path.
-type APIPathResolverFunc func(groupVersion unversioned.GroupVersion) string
+// APIPathResolverFunc knows how to convert a groupVersion to its API path. The Kind field is
+// optional.
+type APIPathResolverFunc func(kind unversioned.GroupVersionKind) string
 
 // LegacyAPIPathResolverFunc can resolve paths properly with the legacy API.
-func LegacyAPIPathResolverFunc(groupVersion unversioned.GroupVersion) string {
-	if len(groupVersion.Group) == 0 {
+func LegacyAPIPathResolverFunc(kind unversioned.GroupVersionKind) string {
+	if len(kind.Group) == 0 {
 		return "/api"
 	}
 	return "/apis"
 }
 
-// clientPoolImpl implements Factory
+// clientPoolImpl implements ClientPool and caches clients for the resource group versions
+// is asked to retrieve. This type is thread safe.
 type clientPoolImpl struct {
 	lock                sync.RWMutex
 	config              *restclient.Config
 	clients             map[unversioned.GroupVersion]*Client
 	apiPathResolverFunc APIPathResolverFunc
+	mapper              meta.RESTMapper
 }
 
-// NewClientPool returns a ClientPool from the specified config
-func NewClientPool(config *restclient.Config, apiPathResolverFunc APIPathResolverFunc) ClientPool {
+// NewClientPool returns a ClientPool from the specified config. It reuses clients for the the same
+// group version. It is expected this type may be wrapped by specific logic that special cases certain
+// resources or groups.
+func NewClientPool(config *restclient.Config, mapper meta.RESTMapper, apiPathResolverFunc APIPathResolverFunc) ClientPool {
 	confCopy := *config
 	return &clientPoolImpl{
 		config:              &confCopy,
 		clients:             map[unversioned.GroupVersion]*Client{},
 		apiPathResolverFunc: apiPathResolverFunc,
+		mapper:              mapper,
 	}
 }
 
-// ClientForGroupVersion returns a client for the specified groupVersion, creates one if none exists
-func (c *clientPoolImpl) ClientForGroupVersion(groupVersion unversioned.GroupVersion) (*Client, error) {
+// ClientForGroupVersionResource uses the provided RESTMapper to identify the appropriate resource. Resource may
+// be empty. If no matching kind is found the underlying client for that group is still returned.
+func (c *clientPoolImpl) ClientForGroupVersionResource(resource unversioned.GroupVersionResource) (*Client, error) {
+	kinds, err := c.mapper.KindsFor(resource)
+	if err != nil {
+		if meta.IsNoMatchError(err) {
+			return c.ClientForGroupVersionKind(unversioned.GroupVersionKind{Group: resource.Group, Version: resource.Version})
+		}
+		return nil, err
+	}
+	return c.ClientForGroupVersionKind(kinds[0])
+}
+
+// ClientForGroupVersion returns a client for the specified groupVersion, creates one if none exists. Kind
+// in the GroupVersionKind may be empty.
+func (c *clientPoolImpl) ClientForGroupVersionKind(kind unversioned.GroupVersionKind) (*Client, error) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
+	gv := kind.GroupVersion()
+
 	// do we have a client already configured?
-	if existingClient, found := c.clients[groupVersion]; found {
+	if existingClient, found := c.clients[gv]; found {
 		return existingClient, nil
 	}
 
@@ -76,10 +103,10 @@ func (c *clientPoolImpl) ClientForGroupVersion(groupVersion unversioned.GroupVer
 	conf := &confCopy
 
 	// we need to set the api path based on group version, if no group, default to legacy path
-	conf.APIPath = c.apiPathResolverFunc(groupVersion)
+	conf.APIPath = c.apiPathResolverFunc(kind)
 
 	// we need to make a client
-	conf.GroupVersion = &groupVersion
+	conf.GroupVersion = &gv
 
 	if conf.NegotiatedSerializer == nil {
 		streamingInfo, _ := api.Codecs.StreamingSerializerForMediaType("application/json;stream=watch", nil)
@@ -90,6 +117,6 @@ func (c *clientPoolImpl) ClientForGroupVersion(groupVersion unversioned.GroupVer
 	if err != nil {
 		return nil, err
 	}
-	c.clients[groupVersion] = dynamicClient
+	c.clients[gv] = dynamicClient
 	return dynamicClient, nil
 }

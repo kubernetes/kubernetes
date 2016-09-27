@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/service"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller/endpoint"
 	"k8s.io/kubernetes/pkg/labels"
@@ -309,7 +310,7 @@ var _ = framework.KubeDescribe("Services", func() {
 
 		// Stop service 1 and make sure it is gone.
 		By("stopping service1")
-		framework.ExpectNoError(stopServeHostnameService(c, ns, "service1"))
+		framework.ExpectNoError(stopServeHostnameService(c, f.ClientSet, ns, "service1"))
 
 		By("verifying service1 is not up")
 		framework.ExpectNoError(verifyServeHostnameServiceDown(c, host, svc1IP, servicePort))
@@ -342,11 +343,11 @@ var _ = framework.KubeDescribe("Services", func() {
 		svc1 := "service1"
 		svc2 := "service2"
 
-		defer func() { framework.ExpectNoError(stopServeHostnameService(c, ns, svc1)) }()
+		defer func() { framework.ExpectNoError(stopServeHostnameService(c, f.ClientSet, ns, svc1)) }()
 		podNames1, svc1IP, err := startServeHostnameService(c, ns, svc1, servicePort, numPods)
 		Expect(err).NotTo(HaveOccurred())
 
-		defer func() { framework.ExpectNoError(stopServeHostnameService(c, ns, svc2)) }()
+		defer func() { framework.ExpectNoError(stopServeHostnameService(c, f.ClientSet, ns, svc2)) }()
 		podNames2, svc2IP, err := startServeHostnameService(c, ns, svc2, servicePort, numPods)
 		Expect(err).NotTo(HaveOccurred())
 
@@ -391,7 +392,7 @@ var _ = framework.KubeDescribe("Services", func() {
 		ns := f.Namespace.Name
 		numPods, servicePort := 3, 80
 
-		defer func() { framework.ExpectNoError(stopServeHostnameService(c, ns, "service1")) }()
+		defer func() { framework.ExpectNoError(stopServeHostnameService(c, f.ClientSet, ns, "service1")) }()
 		podNames1, svc1IP, err := startServeHostnameService(c, ns, "service1", servicePort, numPods)
 		Expect(err).NotTo(HaveOccurred())
 
@@ -416,7 +417,7 @@ var _ = framework.KubeDescribe("Services", func() {
 		framework.ExpectNoError(verifyServeHostnameServiceUp(c, ns, host, podNames1, svc1IP, servicePort))
 
 		// Create a new service and check if it's not reusing IP.
-		defer func() { framework.ExpectNoError(stopServeHostnameService(c, ns, "service2")) }()
+		defer func() { framework.ExpectNoError(stopServeHostnameService(c, f.ClientSet, ns, "service2")) }()
 		podNames2, svc2IP, err := startServeHostnameService(c, ns, "service2", servicePort, numPods)
 		Expect(err).NotTo(HaveOccurred())
 
@@ -1647,8 +1648,8 @@ func startServeHostnameService(c *client.Client, ns, name string, port, replicas
 	return podNames, serviceIP, nil
 }
 
-func stopServeHostnameService(c *client.Client, ns, name string) error {
-	if err := framework.DeleteRCAndPods(c, ns, name); err != nil {
+func stopServeHostnameService(c *client.Client, clientset internalclientset.Interface, ns, name string) error {
+	if err := framework.DeleteRCAndPods(c, clientset, ns, name); err != nil {
 		return err
 	}
 	if err := c.Services(ns).Delete(name); err != nil {

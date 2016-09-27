@@ -40,6 +40,7 @@ import (
 	netsets "k8s.io/kubernetes/pkg/util/net/sets"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
+	"k8s.io/kubernetes/pkg/volume"
 
 	"cloud.google.com/go/compute/metadata"
 	"github.com/golang/glog"
@@ -2459,7 +2460,7 @@ func (gce *GCECloud) CreateDisk(name string, diskType string, zone string, sizeG
 	return gce.waitForZoneOp(createOp, zone)
 }
 
-func (gce *GCECloud) DeleteDisk(diskToDelete string) error {
+func (gce *GCECloud) doDeleteDisk(diskToDelete string) error {
 	disk, err := gce.getDiskByNameUnknownZone(diskToDelete)
 	if err != nil {
 		return err
@@ -2471,6 +2472,30 @@ func (gce *GCECloud) DeleteDisk(diskToDelete string) error {
 	}
 
 	return gce.waitForZoneOp(deleteOp, disk.Zone)
+}
+
+func (gce *GCECloud) DeleteDisk(diskToDelete string) error {
+	err := gce.doDeleteDisk(diskToDelete)
+	if isGCEError(err, "resourceInUseByAnotherResource") {
+		return volume.NewDeletedVolumeInUseError(err.Error())
+	}
+	return err
+}
+
+// isGCEError returns true if given error is a googleapi.Error with given
+// reason (e.g. "resourceInUseByAnotherResource")
+func isGCEError(err error, reason string) bool {
+	apiErr, ok := err.(*googleapi.Error)
+	if !ok {
+		return false
+	}
+
+	for _, e := range apiErr.Errors {
+		if e.Reason == reason {
+			return true
+		}
+	}
+	return false
 }
 
 // Builds the labels that should be automatically added to a PersistentVolume backed by a GCE PD

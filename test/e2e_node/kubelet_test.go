@@ -55,7 +55,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 					RestartPolicy: api.RestartPolicyNever,
 					Containers: []api.Container{
 						{
-							Image:   ImageRegistry[busyBoxImage],
+							Image:   "gcr.io/google_containers/busybox:1.24",
 							Name:    podName,
 							Command: []string{"sh", "-c", "echo 'Hello World' ; sleep 240"},
 						},
@@ -75,7 +75,54 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 			}, time.Minute, time.Second*4).Should(Equal("Hello World\n"))
 		})
 	})
+	Context("when scheduling a busybox command that always fails in a pod", func() {
+		var podName string
 
+		BeforeEach(func() {
+			podName = "bin-false" + string(uuid.NewUUID())
+			podClient.Create(&api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Name: podName,
+				},
+				Spec: api.PodSpec{
+					// Don't restart the Pod since it is expected to exit
+					RestartPolicy: api.RestartPolicyNever,
+					Containers: []api.Container{
+						{
+							Image:   "gcr.io/google_containers/busybox:1.24",
+							Name:    podName,
+							Command: []string{"/bin/false"},
+						},
+					},
+				},
+			})
+		})
+
+		It("should have an error terminated reason", func() {
+			Eventually(func() error {
+				podData, err := podClient.Get(podName)
+				if err != nil {
+					return err
+				}
+				if len(podData.Status.ContainerStatuses) != 1 {
+					return fmt.Errorf("expected only one container in the pod %q", podName)
+				}
+				contTerminatedState := podData.Status.ContainerStatuses[0].State.Terminated
+				if contTerminatedState == nil {
+					return fmt.Errorf("expected state to be terminated. Got pod status: %+v", podData.Status)
+				}
+				if contTerminatedState.Reason != "Error" {
+					return fmt.Errorf("expected terminated state reason to be error. Got %+v", contTerminatedState)
+				}
+				return nil
+			}, time.Minute, time.Second*4).Should(BeNil())
+		})
+
+		It("should be possible to delete", func() {
+			err := podClient.Delete(podName, &api.DeleteOptions{})
+			Expect(err).To(BeNil(), fmt.Sprintf("Error deleting Pod %v", err))
+		})
+	})
 	Context("when scheduling a read only busybox container", func() {
 		podName := "busybox-readonly-fs" + string(uuid.NewUUID())
 		It("it should not write to root filesystem", func() {
@@ -89,7 +136,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 					RestartPolicy: api.RestartPolicyNever,
 					Containers: []api.Container{
 						{
-							Image:   ImageRegistry[busyBoxImage],
+							Image:   "gcr.io/google_containers/busybox:1.24",
 							Name:    podName,
 							Command: []string{"sh", "-c", "echo test > /file; sleep 240"},
 							SecurityContext: &api.SecurityContext{
@@ -174,7 +221,7 @@ func createSummaryTestPods(podClient *framework.PodClient, podNamePrefix string,
 				RestartPolicy: api.RestartPolicyNever,
 				Containers: []api.Container{
 					{
-						Image:   ImageRegistry[busyBoxImage],
+						Image:   "gcr.io/google_containers/busybox:1.24",
 						Command: []string{"sh", "-c", "while true; do echo 'hello world' | tee /test-empty-dir-mnt/file ; sleep 1; done"},
 						Name:    podName + containerSuffix,
 						VolumeMounts: []api.VolumeMount{

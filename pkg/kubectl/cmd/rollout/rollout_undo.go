@@ -33,6 +33,8 @@ import (
 // UndoOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
 // referencing the cmd.Flags()
 type UndoOptions struct {
+	resource.FilenameOptions
+
 	Rollbackers []kubectl.Rollbacker
 	Mapper      meta.RESTMapper
 	Typer       runtime.ObjectTyper
@@ -40,9 +42,7 @@ type UndoOptions struct {
 	ToRevision  int64
 	DryRun      bool
 
-	Out       io.Writer
-	Filenames []string
-	Recursive bool
+	Out io.Writer
 }
 
 var (
@@ -60,7 +60,7 @@ var (
 )
 
 func NewCmdRolloutUndo(f *cmdutil.Factory, out io.Writer) *cobra.Command {
-	opts := &UndoOptions{}
+	options := &UndoOptions{}
 
 	validArgs := []string{"deployment"}
 	argAliases := kubectl.ResourceAliases(validArgs)
@@ -72,11 +72,11 @@ func NewCmdRolloutUndo(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 		Example: undo_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			allErrs := []error{}
-			err := opts.CompleteUndo(f, cmd, out, args)
+			err := options.CompleteUndo(f, cmd, out, args)
 			if err != nil {
 				allErrs = append(allErrs, err)
 			}
-			err = opts.RunUndo()
+			err = options.RunUndo()
 			if err != nil {
 				allErrs = append(allErrs, err)
 			}
@@ -87,20 +87,19 @@ func NewCmdRolloutUndo(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	}
 
 	cmd.Flags().Int64("to-revision", 0, "The revision to rollback to. Default to 0 (last revision).")
-	usage := "Filename, directory, or URL to a file identifying the resource to get from a server."
-	kubectl.AddJsonFilenameFlag(cmd, &opts.Filenames, usage)
+	usage := "identifying the resource to get from a server."
+	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
 	cmdutil.AddDryRunFlag(cmd)
-	cmdutil.AddRecursiveFlag(cmd, &opts.Recursive)
 	return cmd
 }
 
 func (o *UndoOptions) CompleteUndo(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []string) error {
-	if len(args) == 0 && len(o.Filenames) == 0 {
+	if len(args) == 0 && cmdutil.IsFilenameEmpty(o.Filenames) {
 		return cmdutil.UsageError(cmd, "Required resource not specified.")
 	}
 
 	o.ToRevision = cmdutil.GetFlagInt64(cmd, "to-revision")
-	o.Mapper, o.Typer = f.Object(false)
+	o.Mapper, o.Typer = f.Object()
 	o.Out = out
 	o.DryRun = cmdutil.GetFlagBool(cmd, "dry-run")
 
@@ -111,7 +110,7 @@ func (o *UndoOptions) CompleteUndo(f *cmdutil.Factory, cmd *cobra.Command, out i
 
 	r := resource.NewBuilder(o.Mapper, o.Typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 		NamespaceParam(cmdNamespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, o.Recursive, o.Filenames...).
+		FilenameParam(enforceNamespace, &o.FilenameOptions).
 		ResourceTypeOrNameArgs(true, args...).
 		ContinueOnError().
 		Latest().
@@ -145,7 +144,7 @@ func (o *UndoOptions) RunUndo() error {
 			allErrs = append(allErrs, cmdutil.AddSourceToErr("undoing", info.Source, err))
 			continue
 		}
-		cmdutil.PrintSuccess(o.Mapper, false, o.Out, info.Mapping.Resource, info.Name, result)
+		cmdutil.PrintSuccess(o.Mapper, false, o.Out, info.Mapping.Resource, info.Name, false, result)
 	}
 	return utilerrors.NewAggregate(allErrs)
 }

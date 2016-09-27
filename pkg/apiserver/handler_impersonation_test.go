@@ -302,7 +302,7 @@ func TestImpersonationFilter(t *testing.T) {
 			delegate.ServeHTTP(w, req)
 		})
 	}(WithImpersonation(doNothingHandler, requestContextMapper, impersonateAuthorizer{}))
-	handler, _ = api.NewRequestContextFilter(requestContextMapper, handler)
+	handler = api.WithRequestContext(handler, requestContextMapper)
 
 	server := httptest.NewServer(handler)
 	defer server.Close()

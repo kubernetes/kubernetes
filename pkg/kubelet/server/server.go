@@ -370,7 +370,7 @@ func (s *Server) InstallDebuggingHandlers() {
 		}
 	}
 
-	// Setup pporf handlers.
+	// Setup pprof handlers.
 	ws = new(restful.WebService).Path(pprofBasePath)
 	ws.Route(ws.GET("/{subpath:*}").To(func(req *restful.Request, resp *restful.Response) {
 		handlePprofEndpoint(req, resp)

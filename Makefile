@@ -156,7 +156,7 @@ test-e2e: ginkgo generated_files
 #  DELETE_INSTANCES: For REMOTE=true only.  Delete any instances created as
 #    part of this test run.  Defaults to false.
 #  ARTIFACTS: For REMOTE=true only.  Local directory to scp test artifacts into
-#    from the remote hosts.  Defaults to ""/tmp/_artifacts".
+#    from the remote hosts.  Defaults to "/tmp/_artifacts".
 #  REPORT: For REMOTE=false only.  Local directory to write juntil xml results
 #    to.  Defaults to "/tmp/".
 #  CLEANUP: For REMOTE=true only.  If false, do not stop processes or delete
@@ -168,6 +168,7 @@ test-e2e: ginkgo generated_files
 #  INSTANCE_METADATA: For REMOTE=true and running on GCE only.
 #  GUBERNATOR: For REMOTE=true only. Produce link to Gubernator to view logs.
 #	 Defaults to false.
+#  PARALLELISM: The number of gingko nodes to run.  Defaults to 8.
 #
 # Example:
 #   make test-e2e-node FOCUS=Kubelet SKIP=container

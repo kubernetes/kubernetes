@@ -46,14 +46,17 @@ type Tunneler interface {
 }
 
 type SSHTunneler struct {
+	// Important: Since these two int64 fields are using sync/atomic, they have to be at the top of the struct due to a bug on 32-bit platforms
+	// See: https://golang.org/pkg/sync/atomic/ for more information
+	lastSync       int64 // Seconds since Epoch
+	lastSSHKeySync int64 // Seconds since Epoch
+
 	SSHUser        string
 	SSHKeyfile     string
 	InstallSSHKey  InstallSSHKey
 	HealthCheckURL *url.URL
 
 	tunnels        *ssh.SSHTunnelList
-	lastSync       int64 // Seconds since Epoch
-	lastSSHKeySync int64 // Seconds since Epoch
 	lastSyncMetric prometheus.GaugeFunc
 	clock          clock.Clock
 
@@ -159,13 +162,13 @@ func (c *SSHTunneler) installSSHKeySyncLoop(user, publicKeyfile string) {
 	}, 5*time.Minute, c.stopChan)
 }
 
-// nodesSyncLoop lists nodes ever 15 seconds, calling Update() on the TunnelList
+// nodesSyncLoop lists nodes every 15 seconds, calling Update() on the TunnelList
 // each time (Update() is a noop if no changes are necessary).
 func (c *SSHTunneler) nodesSyncLoop() {
 	// TODO (cjcullen) make this watch.
 	go wait.Until(func() {
 		addrs, err := c.getAddresses()
-		glog.Infof("Calling update w/ addrs: %v", addrs)
+		glog.V(4).Infof("Calling update w/ addrs: %v", addrs)
 		if err != nil {
 			glog.Errorf("Failed to getAddresses: %v", err)
 		}

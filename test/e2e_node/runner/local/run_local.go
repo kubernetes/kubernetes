@@ -47,6 +47,7 @@ func main() {
 	if err != nil {
 		glog.Fatalf("Failed to get build output directory: %v", err)
 	}
+	glog.Infof("Got build output dir: %v", outputDir)
 	ginkgo := filepath.Join(outputDir, "ginkgo")
 	test := filepath.Join(outputDir, "e2e_node.test")
 	runCommand(ginkgo, *ginkgoFlags, test, "--", *testFlags)
@@ -54,6 +55,7 @@ func main() {
 }
 
 func runCommand(name string, args ...string) error {
+	glog.Infof("Running command: %v %v", name, strings.Join(args, " "))
 	cmd := exec.Command("sh", "-c", strings.Join(append([]string{name}, args...), " "))
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr

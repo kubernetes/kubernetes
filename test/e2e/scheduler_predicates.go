@@ -186,18 +186,17 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 	var totalPodCapacity int64
 	var RCName string
 	var ns string
+	f := framework.NewDefaultFramework("sched-pred")
 	ignoreLabels := framework.ImagePullerLabels
 
 	AfterEach(func() {
 		rc, err := c.ReplicationControllers(ns).Get(RCName)
 		if err == nil && rc.Spec.Replicas != 0 {
 			By("Cleaning up the replication controller")
-			err := framework.DeleteRCAndPods(c, ns, RCName)
+			err := framework.DeleteRCAndPods(c, f.ClientSet, ns, RCName)
 			framework.ExpectNoError(err)
 		}
 	})
-
-	f := framework.NewDefaultFramework("sched-pred")
 
 	BeforeEach(func() {
 		c = f.Client
@@ -957,7 +956,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		// cannot be scheduled onto it.
 		By("Launching two pods on two distinct nodes to get two node names")
 		CreateHostPortPods(f, "host-port", 2, true)
-		defer framework.DeleteRCAndPods(f.Client, f.Namespace.Name, "host-port")
+		defer framework.DeleteRCAndPods(f.Client, f.ClientSet, f.Namespace.Name, "host-port")
 		podList, err := c.Pods(ns).List(api.ListOptions{})
 		ExpectNoError(err)
 		Expect(len(podList.Items)).To(Equal(2))

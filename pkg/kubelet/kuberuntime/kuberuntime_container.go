@@ -32,7 +32,9 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/dockershim"
 	"k8s.io/kubernetes/pkg/kubelet/events"
+	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/types"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
@@ -103,7 +105,7 @@ func (m *kubeGenericRuntimeManager) startContainer(podSandboxID string, podSandb
 		if handlerErr != nil {
 			err := fmt.Errorf("PostStart handler: %v", handlerErr)
 			m.generateContainerEvent(kubeContainerID, api.EventTypeWarning, events.FailedPostStartHook, msg)
-			m.killContainer(pod, kubeContainerID, container, "FailedPostStartHook", nil)
+			m.killContainer(pod, kubeContainerID, container.Name, "FailedPostStartHook", nil)
 			return "PostStart Hook Failed", err
 		}
 	}
@@ -143,7 +145,7 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(container *api.Conta
 		Stdin:       &container.Stdin,
 		StdinOnce:   &container.StdinOnce,
 		Tty:         &container.TTY,
-		Linux:       m.generateLinuxContainerConfig(container),
+		Linux:       m.generateLinuxContainerConfig(container, pod),
 	}
 
 	// set privileged and readonlyRootfs
@@ -172,7 +174,7 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(container *api.Conta
 }
 
 // generateLinuxContainerConfig generates linux container config for kubelet runtime api.
-func (m *kubeGenericRuntimeManager) generateLinuxContainerConfig(container *api.Container) *runtimeApi.LinuxContainerConfig {
+func (m *kubeGenericRuntimeManager) generateLinuxContainerConfig(container *api.Container, pod *api.Pod) *runtimeApi.LinuxContainerConfig {
 	linuxConfig := &runtimeApi.LinuxContainerConfig{
 		Resources: &runtimeApi.LinuxContainerResources{},
 	}
@@ -182,6 +184,8 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerConfig(container *api.
 	cpuRequest := container.Resources.Requests.Cpu()
 	cpuLimit := container.Resources.Limits.Cpu()
 	memoryLimit := container.Resources.Limits.Memory().Value()
+	oomScoreAdj := int64(qos.GetContainerOOMScoreAdjust(pod, container,
+		int64(m.machineInfo.MemoryCapacity)))
 	// If request is not specified, but limit is, we want request to default to limit.
 	// API server does this for new containers, but we repeat this logic in Kubelet
 	// for containers running on existing Kubernetes clusters.
@@ -196,6 +200,10 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerConfig(container *api.
 	if memoryLimit != 0 {
 		linuxConfig.Resources.MemoryLimitInBytes = &memoryLimit
 	}
+	// Set OOM score of the container based on qos policy. Processes in lower-priority pods should
+	// be killed first if the system runs out of memory.
+	linuxConfig.Resources.OomScoreAdj = &oomScoreAdj
+
 	if m.cpuCFSQuota {
 		// if cpuLimit.Amount is nil, then the appropriate default value is returned
 		// to allow full usage of cpu resource.
@@ -209,8 +217,8 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerConfig(container *api.
 		securityContext := container.SecurityContext
 		if securityContext.Capabilities != nil {
 			linuxConfig.Capabilities = &runtimeApi.Capability{
-				AddCapabilities:  make([]string, 0, len(securityContext.Capabilities.Add)),
-				DropCapabilities: make([]string, 0, len(securityContext.Capabilities.Drop)),
+				AddCapabilities:  make([]string, len(securityContext.Capabilities.Add)),
+				DropCapabilities: make([]string, len(securityContext.Capabilities.Drop)),
 			}
 			for index, value := range securityContext.Capabilities.Add {
 				linuxConfig.Capabilities.AddCapabilities[index] = string(value)
@@ -376,11 +384,16 @@ func (m *kubeGenericRuntimeManager) getKubeletContainerStatuses(podSandboxID str
 			cStatus.StartedAt = time.Unix(status.GetStartedAt(), 0)
 		} else {
 			cStatus.Reason = status.GetReason()
+			cStatus.Message = status.GetMessage()
 			cStatus.ExitCode = int(status.GetExitCode())
 			cStatus.FinishedAt = time.Unix(status.GetFinishedAt(), 0)
 		}
 
-		cStatus.Message = getTerminationMessage(status, cStatus, annotatedInfo.TerminationMessagePath)
+		tMessage := getTerminationMessage(status, cStatus, annotatedInfo.TerminationMessagePath)
+		// Use the termination message written by the application is not empty
+		if len(tMessage) != 0 {
+			cStatus.Message = tMessage
+		}
 		statuses[i] = cStatus
 	}
 
@@ -423,24 +436,83 @@ func (m *kubeGenericRuntimeManager) executePreStopHook(pod *api.Pod, containerID
 	return int64(unversioned.Now().Sub(start.Time).Seconds())
 }
 
+// restoreSpecsFromContainerLabels restores all information needed for killing a container. In some
+// case we may not have pod and container spec when killing a container, e.g. pod is deleted during
+// kubelet restart.
+// To solve this problem, we've already written necessary information into container labels. Here we
+// just need to retrieve them from container labels and restore the specs.
+// TODO(random-liu): Add a node e2e test to test this behaviour.
+// TODO(random-liu): Change the lifecycle handler to just accept information needed, so that we can
+// just pass the needed function not create the fake object.
+func (m *kubeGenericRuntimeManager) restoreSpecsFromContainerLabels(containerID kubecontainer.ContainerID) (*api.Pod, *api.Container, error) {
+	var pod *api.Pod
+	var container *api.Container
+	s, err := m.runtimeService.ContainerStatus(containerID.ID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	l := getContainerInfoFromLabels(s.Labels)
+	a := getContainerInfoFromAnnotations(s.Annotations)
+	// Notice that the followings are not full spec. The container killing code should not use
+	// un-restored fields.
+	pod = &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			UID:                        l.PodUID,
+			Name:                       l.PodName,
+			Namespace:                  l.PodNamespace,
+			DeletionGracePeriodSeconds: a.PodDeletionGracePeriod,
+		},
+		Spec: api.PodSpec{
+			TerminationGracePeriodSeconds: a.PodTerminationGracePeriod,
+		},
+	}
+	container = &api.Container{
+		Name:  l.ContainerName,
+		Ports: a.ContainerPorts,
+		TerminationMessagePath: a.TerminationMessagePath,
+	}
+	if a.PreStopHandler != nil {
+		container.Lifecycle = &api.Lifecycle{
+			PreStop: a.PreStopHandler,
+		}
+	}
+	return pod, container, nil
+}
+
 // killContainer kills a container through the following steps:
 // * Run the pre-stop lifecycle hooks (if applicable).
 // * Stop the container.
-func (m *kubeGenericRuntimeManager) killContainer(pod *api.Pod, containerID kubecontainer.ContainerID, containerSpec *api.Container, reason string, gracePeriodOverride *int64) error {
-	gracePeriod := int64(minimumGracePeriodInSeconds)
+func (m *kubeGenericRuntimeManager) killContainer(pod *api.Pod, containerID kubecontainer.ContainerID, containerName string, reason string, gracePeriodOverride *int64) error {
+	var containerSpec *api.Container
 	if pod != nil {
-		switch {
-		case pod.DeletionGracePeriodSeconds != nil:
-			gracePeriod = *pod.DeletionGracePeriodSeconds
-		case pod.Spec.TerminationGracePeriodSeconds != nil:
-			gracePeriod = *pod.Spec.TerminationGracePeriodSeconds
+		for i, c := range pod.Spec.Containers {
+			if containerName == c.Name {
+				containerSpec = &pod.Spec.Containers[i]
+				break
+			}
 		}
+	} else {
+		// Restore necessary information if one of the specs is nil.
+		restoredPod, restoredContainer, err := m.restoreSpecsFromContainerLabels(containerID)
+		if err != nil {
+			return err
+		}
+		pod, containerSpec = restoredPod, restoredContainer
+	}
+	// From this point , pod and container must be non-nil.
+	gracePeriod := int64(minimumGracePeriodInSeconds)
+	switch {
+	case pod.DeletionGracePeriodSeconds != nil:
+		gracePeriod = *pod.DeletionGracePeriodSeconds
+	case pod.Spec.TerminationGracePeriodSeconds != nil:
+		gracePeriod = *pod.Spec.TerminationGracePeriodSeconds
 	}
 
 	glog.V(2).Infof("Killing container %q with %d second grace period", containerID.String(), gracePeriod)
 
 	// Run the pre-stop lifecycle hooks if applicable.
-	if pod != nil && containerSpec != nil && containerSpec.Lifecycle != nil && containerSpec.Lifecycle.PreStop != nil {
+	if containerSpec.Lifecycle != nil && containerSpec.Lifecycle.PreStop != nil {
 		gracePeriod = gracePeriod - m.executePreStopHook(pod, containerID, containerSpec, gracePeriod)
 	}
 	// always give containers a minimal shutdown window to avoid unnecessary SIGKILLs
@@ -479,19 +551,8 @@ func (m *kubeGenericRuntimeManager) killContainersWithSyncResult(pod *api.Pod, r
 		go func(container *kubecontainer.Container) {
 			defer utilruntime.HandleCrash()
 			defer wg.Done()
-
-			var containerSpec *api.Container
-			if pod != nil {
-				for i, c := range pod.Spec.Containers {
-					if container.Name == c.Name {
-						containerSpec = &pod.Spec.Containers[i]
-						break
-					}
-				}
-			}
-
 			killContainerResult := kubecontainer.NewSyncResult(kubecontainer.KillContainer, container.Name)
-			if err := m.killContainer(pod, container.ID, containerSpec, "Need to kill Pod", gracePeriodOverride); err != nil {
+			if err := m.killContainer(pod, container.ID, container.Name, "Need to kill Pod", gracePeriodOverride); err != nil {
 				killContainerResult.Fail(kubecontainer.ErrKillContainer, err.Error())
 			}
 			containerResults <- killContainerResult
@@ -513,6 +574,13 @@ func (m *kubeGenericRuntimeManager) AttachContainer(id kubecontainer.ContainerID
 
 // GetContainerLogs returns logs of a specific container.
 func (m *kubeGenericRuntimeManager) GetContainerLogs(pod *api.Pod, containerID kubecontainer.ContainerID, logOptions *api.PodLogOptions, stdout, stderr io.Writer) (err error) {
+	// Get logs directly from docker for in-process docker integration for
+	// now to unblock other tests.
+	// TODO: remove this hack after setting down on how to implement log
+	// retrieval/management.
+	if ds, ok := m.runtimeService.(dockershim.DockerLegacyService); ok {
+		return ds.GetContainerLogs(pod, containerID, logOptions, stdout, stderr)
+	}
 	return fmt.Errorf("not implemented")
 }
 
@@ -521,6 +589,12 @@ func (m *kubeGenericRuntimeManager) GetContainerLogs(pod *api.Pod, containerID k
 // tty.
 // TODO: handle terminal resizing, refer https://github.com/kubernetes/kubernetes/issues/29579
 func (m *kubeGenericRuntimeManager) ExecInContainer(containerID kubecontainer.ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size) error {
+	// Use `docker exec` directly for in-process docker integration for
+	// now to unblock other tests.
+	// TODO: remove this hack after exec is defined in CRI.
+	if ds, ok := m.runtimeService.(dockershim.DockerLegacyService); ok {
+		return ds.ExecInContainer(containerID, cmd, stdin, stdout, stderr, tty, resize)
+	}
 	return fmt.Errorf("not implemented")
 }
 

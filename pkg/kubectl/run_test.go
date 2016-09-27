@@ -39,7 +39,7 @@ func TestGenerate(t *testing.T) {
 				"image":             "someimage",
 				"image-pull-policy": "Always",
 				"replicas":          "1",
-				"port":              "-1",
+				"port":              "",
 			},
 			expected: &api.ReplicationController{
 				ObjectMeta: api.ObjectMeta{
@@ -72,7 +72,7 @@ func TestGenerate(t *testing.T) {
 				"name":     "foo",
 				"image":    "someimage",
 				"replicas": "1",
-				"port":     "-1",
+				"port":     "",
 				"env":      []string{"a=b", "c=d"},
 			},
 			expected: &api.ReplicationController{
@@ -116,7 +116,7 @@ func TestGenerate(t *testing.T) {
 				"image":             "someimage",
 				"image-pull-policy": "Never",
 				"replicas":          "1",
-				"port":              "-1",
+				"port":              "",
 				"args":              []string{"bar", "baz", "blah"},
 			},
 			expected: &api.ReplicationController{
@@ -150,7 +150,7 @@ func TestGenerate(t *testing.T) {
 				"name":     "foo",
 				"image":    "someimage",
 				"replicas": "1",
-				"port":     "-1",
+				"port":     "",
 				"args":     []string{"bar", "baz", "blah"},
 				"command":  "true",
 			},
@@ -410,7 +410,7 @@ func TestGeneratePod(t *testing.T) {
 			params: map[string]interface{}{
 				"name":  "foo",
 				"image": "someimage",
-				"port":  "-1",
+				"port":  "",
 			},
 			expected: &api.Pod{
 				ObjectMeta: api.ObjectMeta{

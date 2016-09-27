@@ -35,8 +35,9 @@ kube::golang::server_targets() {
     cmd/kube-apiserver
     cmd/kube-controller-manager
     cmd/kubelet
-    cmd/kubemark
+    cmd/kubeadm
     cmd/hyperkube
+    cmd/kube-discovery
     plugin/cmd/kube-scheduler
   )
   if [ -n "${KUBERNETES_CONTRIB:-}" ]; then
@@ -106,7 +107,6 @@ else
     linux/amd64
     darwin/amd64
     windows/amd64
-    linux/arm
   )
 fi
 
@@ -131,7 +131,6 @@ kube::golang::test_targets() {
     federation/cmd/genfeddocs
     vendor/github.com/onsi/ginkgo/ginkgo
     test/e2e/e2e.test
-    test/e2e_node/e2e_node.test
   )
   if [ -n "${KUBERNETES_CONTRIB:-}" ]; then
     for contrib in "${KUBERNETES_CONTRIB}"; do
@@ -154,6 +153,17 @@ readonly KUBE_TEST_PORTABLE=(
   hack/lib
 )
 
+# Test targets which run on the Kubernetes clusters directly, so we only
+# need to target server platforms.
+# These binaries will be distributed in the kubernetes-test tarball.
+readonly KUBE_TEST_SERVER_TARGETS=(
+  cmd/kubemark
+  vendor/github.com/onsi/ginkgo/ginkgo
+  test/e2e_node/e2e_node.test
+)
+readonly KUBE_TEST_SERVER_BINARIES=("${KUBE_TEST_SERVER_TARGETS[@]##*/}")
+readonly KUBE_TEST_SERVER_PLATFORMS=("${KUBE_SERVER_PLATFORMS[@]}")
+
 # Gigabytes desired for parallel platform builds. 11 is fairly
 # arbitrary, but is a reasonable splitting point for 2015
 # laptops-versus-not.
@@ -169,6 +179,7 @@ readonly KUBE_ALL_TARGETS=(
   "${KUBE_SERVER_TARGETS[@]}"
   "${KUBE_CLIENT_TARGETS[@]}"
   "${KUBE_TEST_TARGETS[@]}"
+  "${KUBE_TEST_SERVER_TARGETS[@]}"
 )
 readonly KUBE_ALL_BINARIES=("${KUBE_ALL_TARGETS[@]##*/}")
 
@@ -178,6 +189,8 @@ readonly KUBE_STATIC_LIBRARIES=(
   kube-dns
   kube-scheduler
   kube-proxy
+  kube-discovery
+  kubeadm
   kubectl
 )
 
@@ -232,7 +245,7 @@ kube::golang::current_platform() {
 # for that platform.
 kube::golang::set_platform_envs() {
   [[ -n ${1-} ]] || {
-    kube::log::error_exit "!!! Internal error.  No platform set in kube::golang::set_platform_envs"
+    kube::log::error_exit "!!! Internal error. No platform set in kube::golang::set_platform_envs"
   }
 
   export GOOS=${platform%/*}
@@ -246,6 +259,7 @@ kube::golang::set_platform_envs() {
     if [[ ${platform} == "linux/arm" ]]; then
       export CGO_ENABLED=1
       export CC=arm-linux-gnueabi-gcc
+      export GOROOT=${K8S_PATCHED_GOROOT}
     elif [[ ${platform} == "linux/arm64" ]]; then
       export CGO_ENABLED=1
       export CC=aarch64-linux-gnu-gcc
@@ -262,6 +276,7 @@ kube::golang::set_platform_envs() {
 kube::golang::unset_platform_envs() {
   unset GOOS
   unset GOARCH
+  unset GOROOT
   unset CGO_ENABLED
   unset CC
 }
@@ -484,6 +499,11 @@ kube::golang::build_binaries_for_platform() {
 
   if [[ "${#statics[@]}" != 0 ]]; then
       kube::golang::fallback_if_stdlib_not_installable;
+  fi
+
+  # TODO: Remove this temporary workaround when we have the official golang linker working
+  if [[ ${platform} == "linux/arm" ]]; then
+    gogcflags="${gogcflags} -largemodel"
   fi
 
   if [[ -n ${use_go_build:-} ]]; then

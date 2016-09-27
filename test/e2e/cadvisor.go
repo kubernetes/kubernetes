@@ -27,11 +27,6 @@ import (
 	. "github.com/onsi/ginkgo"
 )
 
-const (
-	maxRetries    = 6
-	sleepDuration = 10 * time.Second
-)
-
 var _ = framework.KubeDescribe("Cadvisor", func() {
 
 	f := framework.NewDefaultFramework("cadvisor")
@@ -47,7 +42,26 @@ func CheckCadvisorHealthOnAllNodes(c *client.Client, timeout time.Duration) {
 	nodeList, err := c.Nodes().List(api.ListOptions{})
 	framework.ExpectNoError(err)
 	var errors []error
-	retries := maxRetries
+
+	// returns maxRetries, sleepDuration
+	readConfig := func() (int, time.Duration) {
+		// Read in configuration settings, reasonable defaults.
+		retry := framework.TestContext.Cadvisor.MaxRetries
+		if framework.TestContext.Cadvisor.MaxRetries == 0 {
+			retry = 6
+			framework.Logf("Overriding default retry value of zero to %d", retry)
+		}
+
+		sleepDurationMS := framework.TestContext.Cadvisor.SleepDurationMS
+		if sleepDurationMS == 0 {
+			sleepDurationMS = 10000
+			framework.Logf("Overriding default milliseconds value of zero to %d", sleepDurationMS)
+		}
+
+		return retry, time.Duration(sleepDurationMS) * time.Millisecond
+	}
+
+	maxRetries, sleepDuration := readConfig()
 	for {
 		errors = []error{}
 		for _, node := range nodeList.Items {
@@ -63,7 +77,7 @@ func CheckCadvisorHealthOnAllNodes(c *client.Client, timeout time.Duration) {
 		if len(errors) == 0 {
 			return
 		}
-		if retries--; retries <= 0 {
+		if maxRetries--; maxRetries <= 0 {
 			break
 		}
 		framework.Logf("failed to retrieve kubelet stats -\n %v", errors)

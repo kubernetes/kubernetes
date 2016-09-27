@@ -23,6 +23,8 @@ import (
 
 	"github.com/golang/glog"
 
+	"k8s.io/kubernetes/pkg/util/sets"
+	commontest "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
@@ -31,57 +33,33 @@ const (
 	maxImagePullRetries = 5
 	// Sleep duration between image pull retry attempts.
 	imagePullRetryDelay = time.Second
-
-	busyBoxImage = iota
-	epTestImage
-	hostExecImage
-	livenessImage
-	mountTestImage5
-	mountTestImage6
-	mountTestImage7
-	mountTestUserImage
-	netExecImage
-	nginxImage
-	pauseImage
-	serveHostnameImage
-	testWebServer
-
-	// Images just used for explicitly testing pulling of images
-	pullTestAlpine
-	pullTestAlpineWithBash
-	pullTestAuthenticatedAlpine
-	pullTestExecHealthz
 )
 
-var ImageRegistry = map[int]string{
-	busyBoxImage:       "gcr.io/google_containers/busybox:1.24",
-	epTestImage:        "gcr.io/google_containers/eptest:0.1",
-	hostExecImage:      "gcr.io/google_containers/hostexec:1.2",
-	livenessImage:      "gcr.io/google_containers/liveness:e2e",
-	mountTestImage7:    "gcr.io/google_containers/mounttest:0.7",
-	mountTestUserImage: "gcr.io/google_containers/mounttest-user:0.3",
-	netExecImage:       "gcr.io/google_containers/netexec:1.4",
-	nginxImage:         "gcr.io/google_containers/nginx-slim:0.7",
-	pauseImage:         framework.GetPauseImageNameForHostArch(),
-	serveHostnameImage: "gcr.io/google_containers/serve_hostname:v1.4",
-	testWebServer:      "gcr.io/google_containers/test-webserver:e2e",
+// NodeImageWhiteList is a list of images used in node e2e test. These images will be prepulled
+// before test running so that the image pulling won't fail in actual test.
+var NodeImageWhiteList = sets.NewString(
+	"google/cadvisor:latest",
+	"gcr.io/google-containers/stress:v1",
+	"gcr.io/google_containers/busybox:1.24",
+	"gcr.io/google_containers/nginx-slim:0.7",
+	"gcr.io/google_containers/serve_hostname:v1.4",
+	framework.GetPauseImageNameForHostArch(),
+)
+
+func init() {
+	// Union NodeImageWhiteList and CommonImageWhiteList into the framework image white list.
+	framework.ImageWhiteList = NodeImageWhiteList.Union(commontest.CommonImageWhiteList)
 }
 
-// These are used by tests that explicitly test the ability to pull images
-var NoPullImageRegistry = map[int]string{
-	pullTestExecHealthz:         "gcr.io/google_containers/exechealthz:1.0",
-	pullTestAlpine:              "alpine:3.1",
-	pullTestAlpineWithBash:      "gcr.io/google_containers/alpine-with-bash:1.0",
-	pullTestAuthenticatedAlpine: "gcr.io/authenticated-image-pulling/alpine:3.1",
-}
-
-// Pre-fetch all images tests depend on so that we don't fail in an actual test
+// Pre-fetch all images tests depend on so that we don't fail in an actual test.
 func PrePullAllImages() error {
 	usr, err := user.Current()
 	if err != nil {
 		return err
 	}
-	for _, image := range ImageRegistry {
+	images := framework.ImageWhiteList.List()
+	glog.V(4).Infof("Pre-pulling images %+v", images)
+	for _, image := range images {
 		var (
 			err    error
 			output []byte
@@ -90,6 +68,7 @@ func PrePullAllImages() error {
 			if i > 0 {
 				time.Sleep(imagePullRetryDelay)
 			}
+			// TODO(random-liu): Use docker client to get rid of docker binary dependency.
 			if output, err = exec.Command("docker", "pull", image).CombinedOutput(); err == nil {
 				break
 			}

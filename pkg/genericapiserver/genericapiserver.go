@@ -19,21 +19,22 @@ package genericapiserver
 import (
 	"crypto/tls"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"path"
-	"regexp"
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	systemd "github.com/coreos/go-systemd/daemon"
 	"github.com/emicklei/go-restful"
 	"github.com/emicklei/go-restful/swagger"
+	"github.com/go-openapi/spec"
 	"github.com/golang/glog"
 
-	"github.com/go-openapi/spec"
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
@@ -42,16 +43,14 @@ import (
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/genericapiserver/openapi"
+	"k8s.io/kubernetes/pkg/genericapiserver/openapi/common"
 	"k8s.io/kubernetes/pkg/genericapiserver/options"
-	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/crypto"
+	certutil "k8s.io/kubernetes/pkg/util/cert"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
-
-const globalTimeout = time.Minute
 
 // Info about an API group.
 type APIGroupInfo struct {
@@ -118,13 +117,7 @@ type GenericAPIServer struct {
 	// requestContextMapper provides a way to get the context for a request.  It may be nil.
 	requestContextMapper api.RequestContextMapper
 
-	// storageDecorator provides a decoration function for storage.  It will never be nil.
-	// TODO: this may be an abstraction at the wrong layer.  It doesn't seem like a genericAPIServer
-	// should be determining the backing storage for the RESTStorage interfaces
-	storageDecorator generic.StorageDecorator
-
-	mux              apiserver.Mux
-	MuxHelper        *apiserver.MuxHelper
+	Mux              *apiserver.PathRecorderMux
 	HandlerContainer *restful.Container
 	MasterCount      int
 
@@ -157,17 +150,25 @@ type GenericAPIServer struct {
 
 	// Map storing information about all groups to be exposed in discovery response.
 	// The map is from name to the group.
-	apiGroupsForDiscovery map[string]unversioned.APIGroup
+	apiGroupsForDiscoveryLock sync.RWMutex
+	apiGroupsForDiscovery     map[string]unversioned.APIGroup
 
 	// See Config.$name for documentation of these flags
 
 	enableOpenAPISupport   bool
 	openAPIInfo            spec.Info
 	openAPIDefaultResponse spec.Response
-}
+	openAPIDefinitions     *common.OpenAPIDefinitions
 
-func (s *GenericAPIServer) StorageDecorator() generic.StorageDecorator {
-	return s.storageDecorator
+	// PostStartHooks are each called after the server has started listening, in a separate go func for each
+	// with no guaranteee of ordering between them.  The map key is a name used for error reporting.
+	// It may kill the process with a panic if it wishes to by returning an error
+	postStartHooks       map[string]PostStartHookFunc
+	postStartHookLock    sync.Mutex
+	postStartHooksCalled bool
+
+	// Writer to write the audit log to.
+	auditWriter io.Writer
 }
 
 // RequestContextMapper is exposed so that third party resource storage can be build in a different location.
@@ -198,7 +199,7 @@ func (s *GenericAPIServer) HandleWithAuth(pattern string, handler http.Handler) 
 	// sensible policy defaults for plugged-in endpoints.  This will be different
 	// for generic endpoints versus REST object endpoints.
 	// TODO: convert to go-restful
-	s.MuxHelper.Handle(pattern, handler)
+	s.Mux.Handle(pattern, handler)
 }
 
 // HandleFuncWithAuth adds an http.Handler for pattern to an http.ServeMux
@@ -206,7 +207,7 @@ func (s *GenericAPIServer) HandleWithAuth(pattern string, handler http.Handler) 
 // to the request is used for the GenericAPIServer's built-in endpoints.
 func (s *GenericAPIServer) HandleFuncWithAuth(pattern string, handler func(http.ResponseWriter, *http.Request)) {
 	// TODO: convert to go-restful
-	s.MuxHelper.HandleFunc(pattern, handler)
+	s.Mux.HandleFunc(pattern, handler)
 }
 
 func NewHandlerContainer(mux *http.ServeMux, s runtime.NegotiatedSerializer) *restful.Container {
@@ -216,72 +217,21 @@ func NewHandlerContainer(mux *http.ServeMux, s runtime.NegotiatedSerializer) *re
 	return container
 }
 
-// Exposes the given group versions in API. Helper method to install multiple group versions at once.
-func (s *GenericAPIServer) InstallAPIGroups(groupsInfo []APIGroupInfo) error {
-	for _, apiGroupInfo := range groupsInfo {
-		if err := s.InstallAPIGroup(&apiGroupInfo); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// Installs handler at /apis to list all group versions for discovery
-func (s *GenericAPIServer) installGroupsDiscoveryHandler() {
-	apiserver.AddApisWebService(s.Serializer, s.HandlerContainer, s.apiPrefix, func(req *restful.Request) []unversioned.APIGroup {
-		// Return the list of supported groups in sorted order (to have a deterministic order).
-		groups := []unversioned.APIGroup{}
-		groupNames := make([]string, len(s.apiGroupsForDiscovery))
-		var i int = 0
-		for groupName := range s.apiGroupsForDiscovery {
-			groupNames[i] = groupName
-			i++
-		}
-		sort.Strings(groupNames)
-		for _, groupName := range groupNames {
-			apiGroup := s.apiGroupsForDiscovery[groupName]
-			// Add ServerAddressByClientCIDRs.
-			apiGroup.ServerAddressByClientCIDRs = s.getServerAddressByClientCIDRs(req.Request)
-			groups = append(groups, apiGroup)
-		}
-		return groups
-	})
-}
-
 func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
+	// install APIs which depend on other APIs to be installed
 	if s.enableSwaggerSupport {
 		s.InstallSwaggerAPI()
 	}
 	if s.enableOpenAPISupport {
 		s.InstallOpenAPI()
 	}
-	// We serve on 2 ports. See docs/admin/accessing-the-api.md
-	secureLocation := ""
+
+	secureStartedCh := make(chan struct{})
 	if options.SecurePort != 0 {
-		secureLocation = net.JoinHostPort(options.BindAddress.String(), strconv.Itoa(options.SecurePort))
-	}
-	insecureLocation := net.JoinHostPort(options.InsecureBindAddress.String(), strconv.Itoa(options.InsecurePort))
-
-	var sem chan bool
-	if options.MaxRequestsInFlight > 0 {
-		sem = make(chan bool, options.MaxRequestsInFlight)
-	}
-
-	longRunningRE := regexp.MustCompile(options.LongRunningRequestRE)
-	longRunningRequestCheck := apiserver.BasicLongRunningRequestCheck(longRunningRE, map[string]string{"watch": "true"})
-	longRunningTimeout := func(req *http.Request) (<-chan time.Time, string) {
-		// TODO unify this with apiserver.MaxInFlightLimit
-		if longRunningRequestCheck(req) {
-			return nil, ""
-		}
-		return time.After(globalTimeout), ""
-	}
-
-	if secureLocation != "" {
-		handler := apiserver.TimeoutHandler(apiserver.RecoverPanics(s.Handler), longRunningTimeout)
+		secureLocation := net.JoinHostPort(options.BindAddress.String(), strconv.Itoa(options.SecurePort))
 		secureServer := &http.Server{
 			Addr:           secureLocation,
-			Handler:        apiserver.MaxInFlightLimit(sem, longRunningRequestCheck, handler),
+			Handler:        s.Handler,
 			MaxHeaderBytes: 1 << 20,
 			TLSConfig: &tls.Config{
 				// Can't use SSLv3 because of POODLE and BEAST
@@ -292,7 +242,7 @@ func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
 		}
 
 		if len(options.ClientCAFile) > 0 {
-			clientCAs, err := crypto.CertPoolFromFile(options.ClientCAFile)
+			clientCAs, err := certutil.NewPool(options.ClientCAFile)
 			if err != nil {
 				glog.Fatalf("Unable to load client CA file: %v", err)
 			}
@@ -301,6 +251,9 @@ func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
 			secureServer.TLSConfig.ClientAuth = tls.RequestClientCert
 			// Specify allowed CAs for client certificates
 			secureServer.TLSConfig.ClientCAs = clientCAs
+			// "h2" NextProtos is necessary for enabling HTTP2 for go's 1.7 HTTP Server
+			secureServer.TLSConfig.NextProtos = []string{"h2"}
+
 		}
 
 		glog.Infof("Serving securely on %s", secureLocation)
@@ -312,8 +265,8 @@ func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
 			alternateDNS := []string{"kubernetes.default.svc", "kubernetes.default", "kubernetes"}
 			// It would be nice to set a fqdn subject alt name, but only the kubelets know, the apiserver is clueless
 			// alternateDNS = append(alternateDNS, "kubernetes.default.svc.CLUSTER.DNS.NAME")
-			if !crypto.FoundCertOrKey(options.TLSCertFile, options.TLSPrivateKeyFile) {
-				if err := crypto.GenerateSelfSignedCert(s.ClusterIP.String(), options.TLSCertFile, options.TLSPrivateKeyFile, alternateIPs, alternateDNS); err != nil {
+			if !certutil.CanReadCertOrKey(options.TLSCertFile, options.TLSPrivateKeyFile) {
+				if err := certutil.GenerateSelfSignedCert(s.ClusterIP.String(), options.TLSCertFile, options.TLSPrivateKeyFile, alternateIPs, alternateDNS); err != nil {
 					glog.Errorf("Unable to generate self signed cert: %v", err)
 				} else {
 					glog.Infof("Using self-signed cert (%s, %s)", options.TLSCertFile, options.TLSPrivateKeyFile)
@@ -323,45 +276,60 @@ func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
 
 		go func() {
 			defer utilruntime.HandleCrash()
+
+			notifyStarted := sync.Once{}
 			for {
-				// err == systemd.SdNotifyNoSocket when not running on a systemd system
-				if err := systemd.SdNotify("READY=1\n"); err != nil && err != systemd.SdNotifyNoSocket {
-					glog.Errorf("Unable to send systemd daemon successful start message: %v\n", err)
-				}
 				if err := secureServer.ListenAndServeTLS(options.TLSCertFile, options.TLSPrivateKeyFile); err != nil {
 					glog.Errorf("Unable to listen for secure (%v); will try again.", err)
+				} else {
+					notifyStarted.Do(func() {
+						close(secureStartedCh)
+					})
 				}
 				time.Sleep(15 * time.Second)
 			}
 		}()
 	} else {
-		// err == systemd.SdNotifyNoSocket when not running on a systemd system
-		if err := systemd.SdNotify("READY=1\n"); err != nil && err != systemd.SdNotifyNoSocket {
-			glog.Errorf("Unable to send systemd daemon successful start message: %v\n", err)
-		}
+		close(secureStartedCh)
 	}
 
-	handler := apiserver.TimeoutHandler(apiserver.RecoverPanics(s.InsecureHandler), longRunningTimeout)
-	http := &http.Server{
+	insecureLocation := net.JoinHostPort(options.InsecureBindAddress.String(), strconv.Itoa(options.InsecurePort))
+	insecureServer := &http.Server{
 		Addr:           insecureLocation,
-		Handler:        handler,
+		Handler:        s.InsecureHandler,
 		MaxHeaderBytes: 1 << 20,
 	}
-
+	insecureStartedCh := make(chan struct{})
 	glog.Infof("Serving insecurely on %s", insecureLocation)
 	go func() {
 		defer utilruntime.HandleCrash()
+
+		notifyStarted := sync.Once{}
 		for {
-			if err := http.ListenAndServe(); err != nil {
+			if err := insecureServer.ListenAndServe(); err != nil {
 				glog.Errorf("Unable to listen for insecure (%v); will try again.", err)
+			} else {
+				notifyStarted.Do(func() {
+					close(insecureStartedCh)
+				})
 			}
 			time.Sleep(15 * time.Second)
 		}
 	}()
+
+	<-secureStartedCh
+	<-insecureStartedCh
+	s.RunPostStartHooks(PostStartHookContext{})
+
+	// err == systemd.SdNotifyNoSocket when not running on a systemd system
+	if err := systemd.SdNotify("READY=1\n"); err != nil && err != systemd.SdNotifyNoSocket {
+		glog.Errorf("Unable to send systemd daemon successful start message: %v\n", err)
+	}
+
 	select {}
 }
 
-// Exposes the given group version in API.
+// Exposes the given api group in the API.
 func (s *GenericAPIServer) InstallAPIGroup(apiGroupInfo *APIGroupInfo) error {
 	apiPrefix := s.apiPrefix
 	if apiGroupInfo.IsLegacyGroup {
@@ -428,25 +396,29 @@ func (s *GenericAPIServer) InstallAPIGroup(apiGroupInfo *APIGroupInfo) error {
 		}
 
 		s.AddAPIGroupForDiscovery(apiGroup)
-		apiserver.AddGroupWebService(s.Serializer, s.HandlerContainer, apiPrefix+"/"+apiGroup.Name, apiGroup)
+		s.HandlerContainer.Add(apiserver.NewGroupWebService(s.Serializer, apiPrefix+"/"+apiGroup.Name, apiGroup))
 	}
-	apiserver.InstallServiceErrorHandler(s.Serializer, s.HandlerContainer, s.NewRequestInfoResolver(), apiVersions)
 	return nil
 }
 
 func (s *GenericAPIServer) AddAPIGroupForDiscovery(apiGroup unversioned.APIGroup) {
+	s.apiGroupsForDiscoveryLock.Lock()
+	defer s.apiGroupsForDiscoveryLock.Unlock()
+
 	s.apiGroupsForDiscovery[apiGroup.Name] = apiGroup
 }
 
 func (s *GenericAPIServer) RemoveAPIGroupForDiscovery(groupName string) {
+	s.apiGroupsForDiscoveryLock.Lock()
+	defer s.apiGroupsForDiscoveryLock.Unlock()
+
 	delete(s.apiGroupsForDiscovery, groupName)
 }
 
 func (s *GenericAPIServer) getServerAddressByClientCIDRs(req *http.Request) []unversioned.ServerAddressByClientCIDR {
 	addressCIDRMap := []unversioned.ServerAddressByClientCIDR{
 		{
-			ClientCIDR: "0.0.0.0/0",
-
+			ClientCIDR:    "0.0.0.0/0",
 			ServerAddress: s.ExternalAddress,
 		},
 	}
@@ -522,7 +494,6 @@ func (s *GenericAPIServer) getSwaggerConfig() *swagger.Config {
 // register their own web services into the Kubernetes mux prior to initialization
 // of swagger, so that other resource types show up in the documentation.
 func (s *GenericAPIServer) InstallSwaggerAPI() {
-
 	// Enable swagger UI and discovery API
 	swagger.RegisterSwaggerService(*s.getSwaggerConfig(), s.HandlerContainer)
 }
@@ -538,28 +509,58 @@ func (s *GenericAPIServer) InstallOpenAPI() {
 		info := s.openAPIInfo
 		info.Title = info.Title + " " + w.RootPath()
 		err := openapi.RegisterOpenAPIService(&openapi.Config{
-			OpenAPIServePath: w.RootPath() + "/swagger.json",
-			WebServices:      []*restful.WebService{w},
-			ProtocolList:     []string{"https"},
-			IgnorePrefixes:   []string{"/swaggerapi"},
-			Info:             &info,
-			DefaultResponse:  &s.openAPIDefaultResponse,
+			OpenAPIServePath:   w.RootPath() + "/swagger.json",
+			WebServices:        []*restful.WebService{w},
+			ProtocolList:       []string{"https"},
+			IgnorePrefixes:     []string{"/swaggerapi"},
+			Info:               &info,
+			DefaultResponse:    &s.openAPIDefaultResponse,
+			OpenAPIDefinitions: s.openAPIDefinitions,
 		}, s.HandlerContainer)
 		if err != nil {
 			glog.Fatalf("Failed to register open api spec for %v: %v", w.RootPath(), err)
 		}
 	}
 	err := openapi.RegisterOpenAPIService(&openapi.Config{
-		OpenAPIServePath: "/swagger.json",
-		WebServices:      s.HandlerContainer.RegisteredWebServices(),
-		ProtocolList:     []string{"https"},
-		IgnorePrefixes:   []string{"/swaggerapi"},
-		Info:             &s.openAPIInfo,
-		DefaultResponse:  &s.openAPIDefaultResponse,
+		OpenAPIServePath:   "/swagger.json",
+		WebServices:        s.HandlerContainer.RegisteredWebServices(),
+		ProtocolList:       []string{"https"},
+		IgnorePrefixes:     []string{"/swaggerapi"},
+		Info:               &s.openAPIInfo,
+		DefaultResponse:    &s.openAPIDefaultResponse,
+		OpenAPIDefinitions: s.openAPIDefinitions,
 	}, s.HandlerContainer)
 	if err != nil {
 		glog.Fatalf("Failed to register open api spec for root: %v", err)
 	}
+}
+
+// DynamicApisDiscovery returns a webservice serving api group discovery.
+// Note: during the server runtime apiGroupsForDiscovery might change.
+func (s *GenericAPIServer) DynamicApisDiscovery() *restful.WebService {
+	return apiserver.NewApisWebService(s.Serializer, s.apiPrefix, func(req *restful.Request) []unversioned.APIGroup {
+		s.apiGroupsForDiscoveryLock.RLock()
+		defer s.apiGroupsForDiscoveryLock.RUnlock()
+
+		// sort to have a deterministic order
+		sortedGroups := []unversioned.APIGroup{}
+		groupNames := make([]string, 0, len(s.apiGroupsForDiscovery))
+		for groupName := range s.apiGroupsForDiscovery {
+			groupNames = append(groupNames, groupName)
+		}
+		sort.Strings(groupNames)
+		for _, groupName := range groupNames {
+			sortedGroups = append(sortedGroups, s.apiGroupsForDiscovery[groupName])
+		}
+
+		serverCIDR := s.getServerAddressByClientCIDRs(req.Request)
+		groups := make([]unversioned.APIGroup, len(sortedGroups))
+		for i := range sortedGroups {
+			groups[i] = sortedGroups[i]
+			groups[i].ServerAddressByClientCIDRs = serverCIDR
+		}
+		return groups
+	})
 }
 
 // NewDefaultAPIGroupInfo returns an APIGroupInfo stubbed with "normal" values

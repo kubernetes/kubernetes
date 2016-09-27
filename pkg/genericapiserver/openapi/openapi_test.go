@@ -24,7 +24,7 @@ import (
 	"github.com/emicklei/go-restful"
 	"github.com/go-openapi/spec"
 	"github.com/stretchr/testify/assert"
-	"k8s.io/kubernetes/cmd/libs/go2idl/openapi-gen/generators/common"
+	"k8s.io/kubernetes/pkg/genericapiserver/openapi/common"
 	"sort"
 )
 
@@ -41,10 +41,6 @@ func setUp(t *testing.T, fullMethods bool) (openAPI, *assert.Assertions) {
 				Paths:       &spec.Paths{Paths: map[string]spec.PathItem{}},
 				Info:        config.Info,
 			},
-		},
-		openAPIDefinitions: &common.OpenAPIDefinitions{
-			"openapi.TestInput":  *TestInput{}.OpenAPIDefinition(),
-			"openapi.TestOutput": *TestOutput{}.OpenAPIDefinition(),
 		},
 	}, assert
 }
@@ -192,6 +188,10 @@ func getConfig(fullMethods bool) *Config {
 				Title:       "TestAPI",
 				Description: "Test API",
 			},
+		},
+		OpenAPIDefinitions: &common.OpenAPIDefinitions{
+			"openapi.TestInput":  *TestInput{}.OpenAPIDefinition(),
+			"openapi.TestOutput": *TestOutput{}.OpenAPIDefinition(),
 		},
 	}
 }

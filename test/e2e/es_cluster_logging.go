@@ -301,9 +301,6 @@ func ClusterLevelLoggingWithElasticsearch(f *framework.Framework) {
 		Expect(err).NotTo(HaveOccurred())
 	}
 
-	// Wait a bit for the log information to make it into Elasticsearch.
-	time.Sleep(30 * time.Second)
-
 	// Make several attempts to observe the logs ingested into Elasticsearch.
 	By("Checking all the log lines were ingested into Elasticsearch")
 	totalMissing := 0

@@ -27,13 +27,15 @@ import (
 )
 
 // A helper to create a basic config.
-func makeContainerConfig(sConfig *runtimeApi.PodSandboxConfig, name, image string, attempt uint32) *runtimeApi.ContainerConfig {
+func makeContainerConfig(sConfig *runtimeApi.PodSandboxConfig, name, image string, attempt uint32, labels, annotations map[string]string) *runtimeApi.ContainerConfig {
 	return &runtimeApi.ContainerConfig{
 		Metadata: &runtimeApi.ContainerMetadata{
 			Name:    &name,
 			Attempt: &attempt,
 		},
-		Image: &runtimeApi.ImageSpec{Image: &image},
+		Image:       &runtimeApi.ImageSpec{Image: &image},
+		Labels:      labels,
+		Annotations: annotations,
 	}
 }
 
@@ -49,8 +51,10 @@ func TestListContainers(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		s := makeSandboxConfig(fmt.Sprintf("%s%d", podName, i),
 			fmt.Sprintf("%s%d", namespace, i), fmt.Sprintf("%d", i), 0)
+		labels := map[string]string{"abc.xyz": fmt.Sprintf("label%d", i)}
+		annotations := map[string]string{"foo.bar.baz": fmt.Sprintf("annotaion%d", i)}
 		c := makeContainerConfig(s, fmt.Sprintf("%s%d", containerName, i),
-			fmt.Sprintf("%s:v%d", image, i), uint32(i))
+			fmt.Sprintf("%s:v%d", image, i), uint32(i), labels, annotations)
 		sConfigs = append(sConfigs, s)
 		configs = append(configs, c)
 	}
@@ -69,12 +73,13 @@ func TestListContainers(t *testing.T) {
 		// Prepend to the expected list because ListContainers returns
 		// the most recent containers first.
 		expected = append([]*runtimeApi.Container{{
-			Metadata: configs[i].Metadata,
-			Id:       &id,
-			State:    &state,
-			Image:    configs[i].Image,
-			ImageRef: &imageRef,
-			Labels:   map[string]string{containerTypeLabelKey: containerTypeLabelContainer},
+			Metadata:    configs[i].Metadata,
+			Id:          &id,
+			State:       &state,
+			Image:       configs[i].Image,
+			ImageRef:    &imageRef,
+			Labels:      configs[i].Labels,
+			Annotations: configs[i].Annotations,
 		}}, expected...)
 	}
 	containers, err := ds.ListContainers(nil)
@@ -88,7 +93,9 @@ func TestListContainers(t *testing.T) {
 func TestContainerStatus(t *testing.T) {
 	ds, _, fClock := newTestDockerSevice()
 	sConfig := makeSandboxConfig("foo", "bar", "1", 0)
-	config := makeContainerConfig(sConfig, "pause", "iamimage", 0)
+	labels := map[string]string{"abc.xyz": "foo"}
+	annotations := map[string]string{"foo.bar.baz": "abc"}
+	config := makeContainerConfig(sConfig, "pause", "iamimage", 0, labels, annotations)
 
 	var defaultTime time.Time
 	dt := defaultTime.Unix()
@@ -97,24 +104,26 @@ func TestContainerStatus(t *testing.T) {
 	// The following variables are not set in FakeDockerClient.
 	imageRef := ""
 	exitCode := int32(0)
-	reason := ""
+	var reason, message string
 
 	expected := &runtimeApi.ContainerStatus{
-		State:      &state,
-		CreatedAt:  &ct,
-		StartedAt:  &st,
-		FinishedAt: &ft,
-		Metadata:   config.Metadata,
-		Image:      config.Image,
-		ImageRef:   &imageRef,
-		ExitCode:   &exitCode,
-		Reason:     &reason,
-		Mounts:     []*runtimeApi.Mount{},
-		Labels:     map[string]string{containerTypeLabelKey: containerTypeLabelContainer},
+		State:       &state,
+		CreatedAt:   &ct,
+		StartedAt:   &st,
+		FinishedAt:  &ft,
+		Metadata:    config.Metadata,
+		Image:       config.Image,
+		ImageRef:    &imageRef,
+		ExitCode:    &exitCode,
+		Reason:      &reason,
+		Message:     &message,
+		Mounts:      []*runtimeApi.Mount{},
+		Labels:      config.Labels,
+		Annotations: config.Annotations,
 	}
 
 	// Create the container.
-	fClock.SetTime(time.Now())
+	fClock.SetTime(time.Now().Add(-1 * time.Hour))
 	*expected.CreatedAt = fClock.Now().Unix()
 	id, err := ds.CreateContainer("sandboxid", config, sConfig)
 	// Set the id manually since we don't know the id until it's created.
@@ -135,7 +144,7 @@ func TestContainerStatus(t *testing.T) {
 	assert.Equal(t, expected, status)
 
 	// Advance the clock and stop the container.
-	fClock.SetTime(time.Now())
+	fClock.SetTime(time.Now().Add(1 * time.Hour))
 	*expected.FinishedAt = fClock.Now().Unix()
 	*expected.State = runtimeApi.ContainerState_EXITED
 	*expected.Reason = "Completed"

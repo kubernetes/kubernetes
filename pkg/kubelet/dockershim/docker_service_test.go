@@ -24,7 +24,7 @@ import (
 )
 
 func newTestDockerSevice() (*dockerService, *dockertools.FakeDockerClient, *clock.FakeClock) {
-	c := dockertools.NewFakeDockerClient()
 	fakeClock := clock.NewFakeClock(time.Time{})
+	c := dockertools.NewFakeDockerClientWithClock(fakeClock)
 	return &dockerService{client: c}, c, fakeClock
 }

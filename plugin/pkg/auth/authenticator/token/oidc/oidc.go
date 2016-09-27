@@ -40,7 +40,7 @@ import (
 	"github.com/coreos/go-oidc/oidc"
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/auth/user"
-	"k8s.io/kubernetes/pkg/util/crypto"
+	certutil "k8s.io/kubernetes/pkg/util/cert"
 	"k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/util/runtime"
 )
@@ -73,7 +73,7 @@ type OIDCOptions struct {
 
 	// GroupsClaim, if specified, causes the OIDCAuthenticator to try to populate the user's
 	// groups with a ID Token field. If the GrouppClaim field is present in a ID Token the value
-	// must be a list of strings.
+	// must be a string or list of strings.
 	GroupsClaim string
 }
 
@@ -112,7 +112,7 @@ func New(opts OIDCOptions) (*OIDCAuthenticator, error) {
 
 	var roots *x509.CertPool
 	if opts.CAFile != "" {
-		roots, err = crypto.CertPoolFromFile(opts.CAFile)
+		roots, err = certutil.NewPool(opts.CAFile)
 		if err != nil {
 			return nil, fmt.Errorf("Failed to read the CA file: %v", err)
 		}
@@ -251,10 +251,14 @@ func (a *OIDCAuthenticator) AuthenticateToken(value string) (user.Info, bool, er
 	if a.groupsClaim != "" {
 		groups, found, err := claims.StringsClaim(a.groupsClaim)
 		if err != nil {
-			// Custom claim is present, but isn't an array of strings.
-			return nil, false, fmt.Errorf("custom group claim contains invalid object: %v", err)
-		}
-		if found {
+			// Groups type is present but is not an array of strings, try to decode as a string.
+			group, _, err := claims.StringClaim(a.groupsClaim)
+			if err != nil {
+				// Custom claim is present, but isn't an array of strings or a string.
+				return nil, false, fmt.Errorf("custom group claim contains invalid type: %T", claims[a.groupsClaim])
+			}
+			info.Groups = []string{group}
+		} else if found {
 			info.Groups = groups
 		}
 	}

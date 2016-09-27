@@ -55,8 +55,8 @@ func (f *Framework) ExecCommandInContainer(podName, containerName string, cmd ..
 	}, api.ParameterCodec)
 
 	err = execute("POST", req.URL(), config, stdin, &stdout, &stderr, tty)
-	Expect(err).NotTo(HaveOccurred(), "post request failed")
 	Logf("Exec stderr: %q", stderr.String())
+	Expect(err).NotTo(HaveOccurred(), "post request failed")
 	return strings.TrimSpace(stdout.String())
 }
 

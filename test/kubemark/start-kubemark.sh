@@ -46,24 +46,14 @@ sed -i'' -e "s/\"//g" "${RESOURCE_DIRECTORY}/controllers_flags"
 
 MAKE_DIR="${KUBE_ROOT}/cluster/images/kubemark"
 
-echo "Copying kubemark to ${MAKE_DIR}"
-if [[ -f "${KUBE_ROOT}/_output/release-tars/kubernetes-server-linux-amd64.tar.gz" ]]; then
-  # Running from distro
-  SERVER_TARBALL="${KUBE_ROOT}/_output/release-tars/kubernetes-server-linux-amd64.tar.gz"
-  echo "Using server tarball: ${SERVER_TARBALL}"
-  cp "${KUBE_ROOT}/_output/release-stage/server/linux-amd64/kubernetes/server/bin/kubemark" "${MAKE_DIR}"
-elif [[ -f "${KUBE_ROOT}/server/kubernetes-server-linux-amd64.tar.gz" ]]; then
-  # Running from an extracted release tarball (kubernetes.tar.gz)
-  SERVER_TARBALL="${KUBE_ROOT}/server/kubernetes-server-linux-amd64.tar.gz"
-  echo "Using server tarball: ${SERVER_TARBALL}"
-  tar \
-    --strip-components=3 \
-    -xzf "${SERVER_TARBALL}" \
-    -C "${MAKE_DIR}" 'kubernetes/server/bin/kubemark' || exit 1
-else
-  echo 'Cannot find kubernetes/server/bin/kubemark binary'
+KUBEMARK_BIN="$(kube::util::find-binary-for-platform kubemark linux/amd64)"
+if [[ -z "${KUBEMARK_BIN}" ]]; then
+  echo 'Cannot find cmd/kubemark binary'
   exit 1
 fi
+
+echo "Copying kubemark to ${MAKE_DIR}"
+cp "${KUBEMARK_BIN}" "${MAKE_DIR}"
 
 CURR_DIR=`pwd`
 cd "${MAKE_DIR}"
@@ -146,7 +136,7 @@ gcloud compute ssh --zone="${ZONE}" --project="${PROJECT}" "${MASTER_NAME}" \
 writeEnvironmentFiles
 
 gcloud compute copy-files --zone="${ZONE}" --project="${PROJECT}" \
-  "${SERVER_TARBALL}" \
+  "${SERVER_BINARY_TAR}" \
   "${KUBEMARK_DIRECTORY}/start-kubemark-master.sh" \
   "${KUBEMARK_DIRECTORY}/configure-kubectl.sh" \
   "${RESOURCE_DIRECTORY}/apiserver_flags" \
@@ -261,16 +251,20 @@ until [[ "${ready}" -ge "${NUM_NODES}" ]]; do
   echo -n .
   sleep 1
   now=$(date +%s)
-  # Fail it if it already took more than 15 minutes.
-  if [ $((now - start)) -gt 900 ]; then
+  # Fail it if it already took more than 30 minutes.
+  if [ $((now - start)) -gt 1800 ]; then
     echo ""
     echo "Timeout waiting for all HollowNodes to become Running"
     # Try listing nodes again - if it fails it means that API server is not responding
     if "${KUBECTL}" --kubeconfig="${LOCAL_KUBECONFIG}" get node &> /dev/null; then
       echo "Found only ${ready} ready Nodes while waiting for ${NUM_NODES}."
-      exit 1
+    else
+      echo "Got error while trying to list Nodes. Probably API server is down."
     fi
-    echo "Got error while trying to list Nodes. Probably API server is down."
+    pods=$("${KUBECTL}" get pods --namespace=kubemark) || true
+    not_running=$(($(echo "${pods}" | grep -v "Running" | wc -l) - 1))
+    echo "${not_running} HollowNode pods are reported as not running"
+    echo $(echo "${pods}" | grep -v "Running")
     exit 1
   fi
   nodes=$("${KUBECTL}" --kubeconfig="${LOCAL_KUBECONFIG}" get node) || true

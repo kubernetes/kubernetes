@@ -19,7 +19,8 @@ set -o nounset
 set -o pipefail
 
 # PREREQUISITES: run `godep restore` in the main repo before calling this script.
-RELEASE="1.4"
+RELEASE="1.5"
+CLIENTSET="release_1_5"
 MAIN_REPO_FROM_SRC="${1:-"k8s.io/kubernetes"}"
 MAIN_REPO="${GOPATH%:*}/src/${MAIN_REPO_FROM_SRC}"
 CLIENT_REPO_FROM_SRC="${2:-"k8s.io/client-go/${RELEASE}"}"
@@ -39,7 +40,7 @@ function mkcp() {
 }
 
 echo "copying client packages"
-mkcp "pkg/client/clientset_generated/release_1_4" "pkg/client/clientset_generated"
+mkcp "pkg/client/clientset_generated/${CLIENTSET}" "pkg/client/clientset_generated"
 mkcp "/pkg/client/record/" "/pkg/client"
 mkcp "/pkg/client/cache/" "/pkg/client"
 # TODO: make this test file not depending on pkg/client/unversioned
@@ -54,6 +55,8 @@ mkcp "/pkg/client/typed" "/pkg/client"
 mkcp "/pkg/client/unversioned/auth" "/pkg/client/unversioned"
 mkcp "/pkg/client/unversioned/clientcmd" "/pkg/client/unversioned"
 mkcp "/pkg/client/unversioned/portforward" "/pkg/client/unversioned"
+
+mkcp "/plugin/pkg/client/auth" "/plugin/pkg/client"
 # remove this test because it imports the internal clientset
 rm "${CLIENT_REPO_TEMP}"/pkg/client/unversioned/portforward/portforward_test.go
 
@@ -64,7 +67,7 @@ popd > /dev/null
 
 echo "move to the client repo"
 # clean the ${CLIENT_REPO}
-ls "${CLIENT_REPO}" | grep -v '_tmp' | xargs rm -r
+ls "${CLIENT_REPO}" | { grep -v '_tmp' || true; } | xargs rm -rf
 mv "${CLIENT_REPO_TEMP}"/* "${CLIENT_REPO}"
 rm -r "${CLIENT_REPO_TEMP}"
 
@@ -108,7 +111,7 @@ sed -i "s/request_status_codes/request_status_codes_copy/g" "${CLIENT_REPO}"/pkg
 sed -i "s/kubernetes_build_info/kubernetes_build_info_copy/g" "${CLIENT_REPO}"/pkg/version/version.go
 
 echo "rewrite proto names in proto.RegisterType"
-find "${CLIENT_REPO}" -type f -name "generated.pb.go" -print0 | xargs -0 sed -i "s/k8s\.io\.kubernetes/k8s.io.client-go.1.4/g"
+find "${CLIENT_REPO}" -type f -name "generated.pb.go" -print0 | xargs -0 sed -i "s/k8s\.io\.kubernetes/k8s.io.client-go.${RELEASE}/g"
 
 echo "rearranging directory layout"
 # $1 and $2 are relative to ${CLIENT_REPO}
@@ -125,20 +128,21 @@ function mvfolder {
     local src_package="${src##*/}"
     local dst_package="${dst##*/}"
     find "${CLIENT_REPO}" -type f -name "*.go" -print0 | xargs -0 sed -i "s,package ${src_package},package ${dst_package},g"
-    # rewrite imports
-    # the first rule is to convert import lines like `restclient "k8s.io/client-go/pkg/client/restclient"`,
-    # where a package alias is the same the package name.
-    find "${CLIENT_REPO}" -type f -name "*.go" -print0 | \
-        xargs -0 sed -i "s,${src_package} \"${CLIENT_REPO_FROM_SRC}/${src},${dst_package} \"${CLIENT_REPO_FROM_SRC}/${dst},g"
-    find "${CLIENT_REPO}" -type f -name "*.go" -print0 | \
-        xargs -0 sed -i "s,\"${CLIENT_REPO_FROM_SRC}/${src},\"${CLIENT_REPO_FROM_SRC}/${dst},g"
-    # rewrite import invocation
-    if [ "${src_package}" != "${dst_package}" ]; then
-        find "${CLIENT_REPO}" -type f -name "*.go" -print0 | xargs -0 sed -i "s,\<${src_package}\.\([a-zA-Z]\),${dst_package}\.\1,g"
-    fi
+
+    { grep -Rl "\"${CLIENT_REPO_FROM_SRC}/${src}" "${CLIENT_REPO}" || true ; } | while read -r target ; do
+        # rewrite imports
+        # the first rule is to convert import lines like `restclient "k8s.io/client-go/pkg/client/restclient"`,
+        # where a package alias is the same the package name.
+        sed -i "s,\<${src_package} \"${CLIENT_REPO_FROM_SRC}/${src},${dst_package} \"${CLIENT_REPO_FROM_SRC}/${dst},g" "${target}"
+        sed -i "s,\"${CLIENT_REPO_FROM_SRC}/${src},\"${CLIENT_REPO_FROM_SRC}/${dst},g" "${target}"
+        # rewrite import invocation
+        if [ "${src_package}" != "${dst_package}" ]; then
+            sed -i "s,\<${src_package}\.\([a-zA-Z]\),${dst_package}\.\1,g" "${target}"
+        fi
+    done
 }
 
-mvfolder pkg/client/clientset_generated/release_1_4 kubernetes
+mvfolder "pkg/client/clientset_generated/${CLIENTSET}" kubernetes
 mvfolder pkg/client/typed/discovery discovery
 mvfolder pkg/client/typed/dynamic dynamic
 mvfolder pkg/client/transport transport
@@ -150,6 +154,7 @@ mvfolder pkg/client/unversioned/clientcmd tools/clientcmd
 mvfolder pkg/client/unversioned/portforward tools/portforward
 mvfolder pkg/client/metrics tools/metrics
 mvfolder pkg/client/testing/core testing
+mvfolder pkg/client/testing/cache tools/cache/testing
 if [ "$(find "${CLIENT_REPO}"/pkg/client -type f -name "*.go")" ]; then
     echo "${CLIENT_REPO}/pkg/client is expected to be empty"
     exit 1

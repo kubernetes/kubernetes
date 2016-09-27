@@ -89,14 +89,14 @@ if [ $remote = true ] ; then
   # Get the compute zone
   zone=$(gcloud info --format='value(config.properties.compute.zone)')
   if [[ $zone == "" ]]; then
-    echo "Could not find gcloud compute/zone when running:\ngcloud info --format='value(config.properties.compute.zone)'"
+    echo "Could not find gcloud compute/zone when running: \`gcloud info --format='value(config.properties.compute.zone)'\`"
     exit 1
   fi
 
   # Get the compute project
   project=$(gcloud info --format='value(config.project)')
   if [[ $project == "" ]]; then
-    echo "Could not find gcloud project when running:\ngcloud info --format='value(config.project)'"
+    echo "Could not find gcloud project when running: \`gcloud info --format='value(config.project)'\`"
     exit 1
   fi
 
@@ -141,8 +141,9 @@ if [ $remote = true ] ; then
   exit $?
 
 else
-  # Refresh sudo credentials if not running on GCE.
+  # Refresh sudo credentials for local run
   if ! ping -c 1 -q metadata.google.internal &> /dev/null; then
+    echo "Updating sudo credentials"
     sudo -v || exit 1
   fi
 

@@ -19,105 +19,25 @@ limitations under the License.
 package install
 
 import (
-	"fmt"
-
-	"github.com/golang/glog"
-
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/apimachinery"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	"k8s.io/kubernetes/pkg/apimachinery/announced"
 	"k8s.io/kubernetes/pkg/apis/imagepolicy"
 	"k8s.io/kubernetes/pkg/apis/imagepolicy/v1alpha1"
-	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
-const importPrefix = "k8s.io/kubernetes/pkg/apis/imagepolicy"
-
-var accessor = meta.NewAccessor()
-
-// availableVersions lists all known external versions for this group from most preferred to least preferred
-var availableVersions = []unversioned.GroupVersion{v1alpha1.SchemeGroupVersion}
-
 func init() {
-	registered.RegisterVersions(availableVersions)
-	externalVersions := []unversioned.GroupVersion{}
-	for _, v := range availableVersions {
-		if registered.IsAllowedVersion(v) {
-			externalVersions = append(externalVersions, v)
-		}
-	}
-	if len(externalVersions) == 0 {
-		glog.V(4).Infof("No version is registered for group %v", imagepolicy.GroupName)
-		return
-	}
-
-	if err := registered.EnableVersions(externalVersions...); err != nil {
-		glog.V(4).Infof("%v", err)
-		return
-	}
-	if err := enableVersions(externalVersions); err != nil {
-		glog.V(4).Infof("%v", err)
-		return
-	}
-}
-
-// TODO: enableVersions should be centralized rather than spread in each API
-// group.
-// We can combine registered.RegisterVersions, registered.EnableVersions and
-// registered.RegisterGroup once we have moved enableVersions there.
-func enableVersions(externalVersions []unversioned.GroupVersion) error {
-	addVersionsToScheme(externalVersions...)
-	preferredExternalVersion := externalVersions[0]
-
-	groupMeta := apimachinery.GroupMeta{
-		GroupVersion:  preferredExternalVersion,
-		GroupVersions: externalVersions,
-		RESTMapper:    newRESTMapper(externalVersions),
-		SelfLinker:    runtime.SelfLinker(accessor),
-		InterfacesFor: interfacesFor,
-	}
-
-	if err := registered.RegisterGroup(groupMeta); err != nil {
-		return err
-	}
-	api.RegisterRESTMapper(groupMeta.RESTMapper)
-	return nil
-}
-
-func addVersionsToScheme(externalVersions ...unversioned.GroupVersion) {
-	// add the internal version to Scheme
-	imagepolicy.AddToScheme(api.Scheme)
-	// add the enabled external versions to Scheme
-	for _, v := range externalVersions {
-		if !registered.IsEnabledVersion(v) {
-			glog.Errorf("Version %s is not enabled, so it will not be added to the Scheme.", v)
-			continue
-		}
-		switch v {
-		case v1alpha1.SchemeGroupVersion:
-			v1alpha1.AddToScheme(api.Scheme)
-		}
-	}
-}
-
-func newRESTMapper(externalVersions []unversioned.GroupVersion) meta.RESTMapper {
-	rootScoped := sets.NewString("ImageReview")
-	ignoredKinds := sets.NewString()
-	return api.NewDefaultRESTMapper(externalVersions, interfacesFor, importPrefix, ignoredKinds, rootScoped)
-}
-
-func interfacesFor(version unversioned.GroupVersion) (*meta.VersionInterfaces, error) {
-	switch version {
-	case v1alpha1.SchemeGroupVersion:
-		return &meta.VersionInterfaces{
-			ObjectConvertor:  api.Scheme,
-			MetadataAccessor: accessor,
-		}, nil
-	default:
-		g, _ := registered.Group(imagepolicy.GroupName)
-		return nil, fmt.Errorf("unsupported storage version: %s (valid: %v)", version, g.GroupVersions)
+	if err := announced.NewGroupMetaFactory(
+		&announced.GroupMetaFactoryArgs{
+			GroupName:                  imagepolicy.GroupName,
+			VersionPreferenceOrder:     []string{v1alpha1.SchemeGroupVersion.Version},
+			ImportPrefix:               "k8s.io/kubernetes/pkg/apis/imagepolicy",
+			RootScopedKinds:            sets.NewString("ImageReview"),
+			AddInternalObjectsToScheme: imagepolicy.AddToScheme,
+		},
+		announced.VersionToSchemeFunc{
+			v1alpha1.SchemeGroupVersion.Version: v1alpha1.AddToScheme,
+		},
+	).Announce().RegisterAndEnable(); err != nil {
+		panic(err)
 	}
 }

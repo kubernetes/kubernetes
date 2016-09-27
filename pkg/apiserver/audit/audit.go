@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/golang/glog"
 	"github.com/pborman/uuid"
 
 	"k8s.io/kubernetes/pkg/apiserver"
@@ -39,12 +40,16 @@ type auditResponseWriter struct {
 }
 
 func (a *auditResponseWriter) WriteHeader(code int) {
-	fmt.Fprintf(a.out, "%s AUDIT: id=%q response=\"%d\"\n", time.Now().Format(time.RFC3339Nano), a.id, code)
+	line := fmt.Sprintf("%s AUDIT: id=%q response=\"%d\"\n", time.Now().Format(time.RFC3339Nano), a.id, code)
+	if _, err := fmt.Fprint(a.out, line); err != nil {
+		glog.Errorf("Unable to write audit log: %s, the error is: %v", line, err)
+	}
+
 	a.ResponseWriter.WriteHeader(code)
 }
 
 // fancyResponseWriterDelegator implements http.CloseNotifier, http.Flusher and
-// http.Hijacker which are needed to make certain http operation (eg. watch, rsh, etc)
+// http.Hijacker which are needed to make certain http operation (e.g. watch, rsh, etc)
 // working.
 type fancyResponseWriterDelegator struct {
 	*auditResponseWriter
@@ -67,7 +72,8 @@ var _ http.Flusher = &fancyResponseWriterDelegator{}
 var _ http.Hijacker = &fancyResponseWriterDelegator{}
 
 // WithAudit decorates a http.Handler with audit logging information for all the
-// requests coming to the server. Each audit log contains two entries:
+// requests coming to the server. If out is nil, no decoration takes place.
+// Each audit log contains two entries:
 // 1. the request line containing:
 //    - unique id allowing to match the response line (see 2)
 //    - source ip of the request
@@ -80,6 +86,9 @@ var _ http.Hijacker = &fancyResponseWriterDelegator{}
 //    - the unique id from 1
 //    - response code
 func WithAudit(handler http.Handler, attributeGetter apiserver.RequestAttributeGetter, out io.Writer) http.Handler {
+	if out == nil {
+		return handler
+	}
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		attribs := attributeGetter.GetAttribs(req)
 		asuser := req.Header.Get("Impersonate-User")
@@ -92,8 +101,11 @@ func WithAudit(handler http.Handler, attributeGetter apiserver.RequestAttributeG
 		}
 		id := uuid.NewRandom().String()
 
-		fmt.Fprintf(out, "%s AUDIT: id=%q ip=%q method=%q user=%q as=%q namespace=%q uri=%q\n",
+		line := fmt.Sprintf("%s AUDIT: id=%q ip=%q method=%q user=%q as=%q namespace=%q uri=%q\n",
 			time.Now().Format(time.RFC3339Nano), id, utilnet.GetClientIP(req), req.Method, attribs.GetUser().GetName(), asuser, namespace, req.URL)
+		if _, err := fmt.Fprint(out, line); err != nil {
+			glog.Errorf("Unable to write audit log: %s, the error is: %v", line, err)
+		}
 		respWriter := decorateResponseWriter(w, out, id)
 		handler.ServeHTTP(respWriter, req)
 	})

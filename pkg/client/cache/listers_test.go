@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -127,7 +128,7 @@ func TestStoreToReplicationControllerLister(t *testing.T) {
 	testCases := []struct {
 		description              string
 		inRCs                    []*api.ReplicationController
-		list                     func(StoreToReplicationControllerLister) ([]api.ReplicationController, error)
+		list                     func(StoreToReplicationControllerLister) ([]*api.ReplicationController, error)
 		outRCNames               sets.String
 		expectErr                bool
 		onlyIfIndexedByNamespace bool
@@ -142,7 +143,7 @@ func TestStoreToReplicationControllerLister(t *testing.T) {
 					ObjectMeta: api.ObjectMeta{Name: "hmm", Namespace: "hmm"},
 				},
 			},
-			list: func(lister StoreToReplicationControllerLister) ([]api.ReplicationController, error) {
+			list: func(lister StoreToReplicationControllerLister) ([]*api.ReplicationController, error) {
 				return lister.ReplicationControllers(api.NamespaceAll).List(labels.Set{}.AsSelectorPreValidated())
 			},
 			outRCNames: sets.NewString("hmm", "foo"),
@@ -157,7 +158,7 @@ func TestStoreToReplicationControllerLister(t *testing.T) {
 					ObjectMeta: api.ObjectMeta{Name: "hmm", Namespace: "hmm"},
 				},
 			},
-			list: func(lister StoreToReplicationControllerLister) ([]api.ReplicationController, error) {
+			list: func(lister StoreToReplicationControllerLister) ([]*api.ReplicationController, error) {
 				return lister.ReplicationControllers("hmm").List(labels.Set{}.AsSelectorPreValidated())
 			},
 			outRCNames: sets.NewString("hmm"),
@@ -167,8 +168,8 @@ func TestStoreToReplicationControllerLister(t *testing.T) {
 			inRCs: []*api.ReplicationController{
 				{ObjectMeta: api.ObjectMeta{Name: "basic"}},
 			},
-			list: func(lister StoreToReplicationControllerLister) ([]api.ReplicationController, error) {
-				return lister.List()
+			list: func(lister StoreToReplicationControllerLister) ([]*api.ReplicationController, error) {
+				return lister.List(labels.Everything())
 			},
 			outRCNames: sets.NewString("basic"),
 		},
@@ -182,7 +183,7 @@ func TestStoreToReplicationControllerLister(t *testing.T) {
 					},
 				},
 			},
-			list: func(lister StoreToReplicationControllerLister) ([]api.ReplicationController, error) {
+			list: func(lister StoreToReplicationControllerLister) ([]*api.ReplicationController, error) {
 				pod := &api.Pod{
 					ObjectMeta: api.ObjectMeta{Name: "pod1", Namespace: "ns"},
 				}
@@ -198,7 +199,7 @@ func TestStoreToReplicationControllerLister(t *testing.T) {
 					ObjectMeta: api.ObjectMeta{Name: "basic", Namespace: "ns"},
 				},
 			},
-			list: func(lister StoreToReplicationControllerLister) ([]api.ReplicationController, error) {
+			list: func(lister StoreToReplicationControllerLister) ([]*api.ReplicationController, error) {
 				pod := &api.Pod{
 					ObjectMeta: api.ObjectMeta{
 						Name:      "pod1",
@@ -227,7 +228,7 @@ func TestStoreToReplicationControllerLister(t *testing.T) {
 					},
 				},
 			},
-			list: func(lister StoreToReplicationControllerLister) ([]api.ReplicationController, error) {
+			list: func(lister StoreToReplicationControllerLister) ([]*api.ReplicationController, error) {
 				pod := &api.Pod{
 					ObjectMeta: api.ObjectMeta{
 						Name:      "pod1",
@@ -700,8 +701,9 @@ func TestStoreToPodLister(t *testing.T) {
 		for _, id := range ids {
 			store.Add(&api.Pod{
 				ObjectMeta: api.ObjectMeta{
-					Name:   id,
-					Labels: map[string]string{"name": id},
+					Namespace: "other",
+					Name:      id,
+					Labels:    map[string]string{"name": id},
 				},
 			})
 		}
@@ -739,27 +741,20 @@ func TestStoreToPodLister(t *testing.T) {
 				continue
 			}
 
-			exists, err := spl.Exists(&api.Pod{ObjectMeta: api.ObjectMeta{Name: id}})
+			_, err = spl.Pods("other").Get(id)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
-			if !exists {
-				t.Errorf("exists returned false for %v", id)
-			}
 		}
 
-		exists, err := spl.Exists(&api.Pod{ObjectMeta: api.ObjectMeta{Name: "qux"}})
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		if exists {
+		if _, err := spl.Pods("").Get("qux"); !apierrors.IsNotFound(err) {
 			t.Error("Unexpected pod exists")
 		}
 	}
 }
 
 func TestStoreToServiceLister(t *testing.T) {
-	store := NewStore(MetaNamespaceKeyFunc)
+	store := NewIndexer(MetaNamespaceKeyFunc, Indexers{NamespaceIndex: MetaNamespaceIndexFunc})
 	store.Add(&api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 		Spec: api.ServiceSpec{

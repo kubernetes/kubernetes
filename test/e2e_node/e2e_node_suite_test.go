@@ -47,7 +47,6 @@ import (
 
 var e2es *services.E2EServices
 
-var prePullImages = flag.Bool("prepull-images", true, "If true, prepull images so image pull failures do not cause test failures.")
 var runServicesMode = flag.Bool("run-services-mode", false, "If true, only run services (etcd, apiserver) in current process, and not run test.")
 
 func init() {
@@ -56,10 +55,19 @@ func init() {
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 	// Mark the run-services-mode flag as hidden to prevent user from using it.
 	pflag.CommandLine.MarkHidden("run-services-mode")
+	// It's weird that if I directly use pflag in TestContext, it will report error.
+	// It seems that someone is using flag.Parse() after init() and TestMain().
+	// TODO(random-liu): Find who is using flag.Parse() and cause errors and move the following logic
+	// into TestContext.
+	pflag.CommandLine.MarkHidden("runtime-integration-type")
+}
+
+func TestMain(m *testing.M) {
+	pflag.Parse()
+	os.Exit(m.Run())
 }
 
 func TestE2eNode(t *testing.T) {
-	pflag.Parse()
 	if *runServicesMode {
 		// If run-services-mode is specified, only run services in current process.
 		services.RunE2EServices()
@@ -94,7 +102,7 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 	}
 	// Pre-pull the images tests depend on so we can fail immediately if there is an image pull issue
 	// This helps with debugging test flakes since it is hard to tell when a test failure is due to image pulling.
-	if *prePullImages {
+	if framework.TestContext.PrepullImages {
 		glog.Infof("Pre-pulling images so that they are cached for the tests.")
 		err := PrePullAllImages()
 		Expect(err).ShouldNot(HaveOccurred())
@@ -106,7 +114,9 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 	maskLocksmithdOnCoreos()
 
 	if *startServices {
-		e2es = services.NewE2EServices()
+		// If the services are expected to stop after test, they should monitor the test process.
+		// If the services are expected to keep running after test, they should not monitor the test process.
+		e2es = services.NewE2EServices(*stopServices)
 		Expect(e2es.Start()).To(Succeed(), "should be able to start node services.")
 		glog.Infof("Node services started.  Running tests...")
 	} else {

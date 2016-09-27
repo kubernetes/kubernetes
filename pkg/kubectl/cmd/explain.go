@@ -74,7 +74,7 @@ func RunExplain(f *cmdutil.Factory, out, cmdErr io.Writer, cmd *cobra.Command, a
 	apiVersionString := cmdutil.GetFlagString(cmd, "api-version")
 	apiVersion := unversioned.GroupVersion{}
 
-	mapper, _ := f.Object(cmdutil.GetIncludeThirdPartyAPIs(cmd))
+	mapper, _ := f.Object()
 	// TODO: After we figured out the new syntax to separate group and resource, allow
 	// the users to use it in explain (kubectl explain <group><syntax><resource>).
 	// Refer to issue #16039 for why we do this. Refer to PR #15808 that used "/" syntax.

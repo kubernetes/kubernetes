@@ -37,6 +37,8 @@ func (ds *dockerService) ListContainers(filter *runtimeApi.ContainerFilter) ([]*
 
 	opts.Filter = dockerfilters.NewArgs()
 	f := newDockerFilter(&opts.Filter)
+	// Add filter to get *only* (non-sandbox) containers.
+	f.AddLabel(containerTypeLabelKey, containerTypeLabelContainer)
 
 	if filter != nil {
 		if filter.Id != nil {
@@ -46,7 +48,7 @@ func (ds *dockerService) ListContainers(filter *runtimeApi.ContainerFilter) ([]*
 			f.Add("status", toDockerContainerStatus(filter.GetState()))
 		}
 		if filter.PodSandboxId != nil {
-			// TODO: implement this after sandbox functions are implemented.
+			f.AddLabel(sandboxIDLabelKey, *filter.PodSandboxId)
 		}
 
 		if filter.LabelSelector != nil {
@@ -54,8 +56,6 @@ func (ds *dockerService) ListContainers(filter *runtimeApi.ContainerFilter) ([]*
 				f.AddLabel(k, v)
 			}
 		}
-		// Filter out sandbox containers.
-		f.AddLabel(containerTypeLabelKey, containerTypeLabelContainer)
 	}
 	containers, err := ds.client.ListContainers(opts)
 	if err != nil {
@@ -88,12 +88,11 @@ func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeApi
 		return "", fmt.Errorf("sandbox config is nil for container %q", config.Metadata.GetName())
 	}
 
-	// Merge annotations and labels because docker supports only labels.
-	// TODO: add a prefix to annotations so that we can distinguish labels and
-	// annotations when reading back them from the docker container.
 	labels := makeLabels(config.GetLabels(), config.GetAnnotations())
 	// Apply a the container type label.
 	labels[containerTypeLabelKey] = containerTypeLabelContainer
+	// Write the sandbox ID in the labels.
+	labels[sandboxIDLabelKey] = podSandboxID
 
 	image := ""
 	if iSpec := config.GetImage(); iSpec != nil {
@@ -240,7 +239,7 @@ func (ds *dockerService) ContainerStatus(containerID string) (*runtimeApi.Contai
 	}
 	// Interpret container states.
 	var state runtimeApi.ContainerState
-	var reason string
+	var reason, message string
 	if r.State.Running {
 		// Container is running.
 		state = runtimeApi.ContainerState_RUNNING
@@ -262,9 +261,9 @@ func (ds *dockerService) ContainerStatus(containerID string) (*runtimeApi.Contai
 			case r.State.ExitCode == 0:
 				reason = "Completed"
 			default:
-				reason = fmt.Sprintf("Error: %s", r.State.Error)
+				reason = "Error"
 			}
-		} else if !finishedAt.IsZero() && r.State.ExitCode != 0 { // Case 2
+		} else if r.State.ExitCode != 0 { // Case 2
 			state = runtimeApi.ContainerState_EXITED
 			// Adjust finshedAt and startedAt time to createdAt time to avoid
 			// the confusion.
@@ -273,6 +272,7 @@ func (ds *dockerService) ContainerStatus(containerID string) (*runtimeApi.Contai
 		} else { // Case 3
 			state = runtimeApi.ContainerState_CREATED
 		}
+		message = r.State.Error
 	}
 
 	// Convert to unix timestamps.
@@ -284,21 +284,22 @@ func (ds *dockerService) ContainerStatus(containerID string) (*runtimeApi.Contai
 		return nil, err
 	}
 
+	labels, annotations := extractLabels(r.Config.Labels)
 	return &runtimeApi.ContainerStatus{
-		Id:         &r.ID,
-		Metadata:   metadata,
-		Image:      &runtimeApi.ImageSpec{Image: &r.Config.Image},
-		ImageRef:   &r.Image,
-		Mounts:     mounts,
-		ExitCode:   &exitCode,
-		State:      &state,
-		CreatedAt:  &ct,
-		StartedAt:  &st,
-		FinishedAt: &ft,
-		Reason:     &reason,
-		// TODO: We write annotations as labels on the docker containers. All
-		// these annotations will be read back as labels. Need to fix this.
-		Labels: r.Config.Labels,
+		Id:          &r.ID,
+		Metadata:    metadata,
+		Image:       &runtimeApi.ImageSpec{Image: &r.Config.Image},
+		ImageRef:    &r.Image,
+		Mounts:      mounts,
+		ExitCode:    &exitCode,
+		State:       &state,
+		CreatedAt:   &ct,
+		StartedAt:   &st,
+		FinishedAt:  &ft,
+		Reason:      &reason,
+		Message:     &message,
+		Labels:      labels,
+		Annotations: annotations,
 	}, nil
 }
 

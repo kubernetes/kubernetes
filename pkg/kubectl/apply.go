@@ -25,10 +25,6 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
-type debugError interface {
-	DebugError() (msg string, args []interface{})
-}
-
 // GetOriginalConfiguration retrieves the original configuration of the object
 // from the annotation, or nil if no annotation was found.
 func GetOriginalConfiguration(mapping *meta.RESTMapping, obj runtime.Object) ([]byte, error) {

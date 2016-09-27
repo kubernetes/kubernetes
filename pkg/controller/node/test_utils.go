@@ -107,6 +107,12 @@ func (m *FakeNodeHandler) Get(name string) (*api.Node, error) {
 		m.RequestCount++
 		m.lock.Unlock()
 	}()
+	for i := range m.UpdatedNodes {
+		if m.UpdatedNodes[i].Name == name {
+			nodeCopy := *m.UpdatedNodes[i]
+			return &nodeCopy, nil
+		}
+	}
 	for i := range m.Existing {
 		if m.Existing[i].Name == name {
 			nodeCopy := *m.Existing[i]
@@ -169,6 +175,12 @@ func (m *FakeNodeHandler) Update(node *api.Node) (*api.Node, error) {
 		m.lock.Unlock()
 	}()
 	nodeCopy := *node
+	for i, updateNode := range m.UpdatedNodes {
+		if updateNode.Name == nodeCopy.Name {
+			m.UpdatedNodes[i] = &nodeCopy
+			return node, nil
+		}
+	}
 	m.UpdatedNodes = append(m.UpdatedNodes, &nodeCopy)
 	return node, nil
 }

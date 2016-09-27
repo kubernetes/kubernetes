@@ -796,7 +796,7 @@ func updatePodPorts(params map[string]string, podSpec *api.PodSpec) (err error) 
 	}
 
 	// Don't include the port if it was not specified.
-	if port > 0 {
+	if len(params["port"]) > 0 {
 		podSpec.Containers[0].Ports = []api.ContainerPort{
 			{
 				ContainerPort: int32(port),

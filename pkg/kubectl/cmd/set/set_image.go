@@ -24,7 +24,6 @@ import (
 	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -34,6 +33,8 @@ import (
 // ImageOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
 // referencing the cmd.Flags()
 type ImageOptions struct {
+	resource.FilenameOptions
+
 	Mapper      meta.RESTMapper
 	Typer       runtime.ObjectTyper
 	Infos       []*resource.Info
@@ -41,8 +42,6 @@ type ImageOptions struct {
 	Selector    string
 	Out         io.Writer
 	Err         io.Writer
-	Filenames   []string
-	Recursive   bool
 	ShortOutput bool
 	All         bool
 	Record      bool
@@ -97,18 +96,17 @@ func NewCmdImage(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	}
 
 	cmdutil.AddPrinterFlags(cmd)
-	usage := "Filename, directory, or URL to a file identifying the resource to get from a server."
-	kubectl.AddJsonFilenameFlag(cmd, &options.Filenames, usage)
+	usage := "identifying the resource to get from a server."
+	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
 	cmd.Flags().BoolVar(&options.All, "all", false, "select all resources in the namespace of the specified resource types")
 	cmd.Flags().StringVarP(&options.Selector, "selector", "l", "", "Selector (label query) to filter on")
 	cmd.Flags().BoolVar(&options.Local, "local", false, "If true, set image will NOT contact api-server but run locally.")
 	cmdutil.AddRecordFlag(cmd)
-	cmdutil.AddRecursiveFlag(cmd, &options.Recursive)
 	return cmd
 }
 
 func (o *ImageOptions) Complete(f *cmdutil.Factory, cmd *cobra.Command, args []string) error {
-	o.Mapper, o.Typer = f.Object(cmdutil.GetIncludeThirdPartyAPIs(cmd))
+	o.Mapper, o.Typer = f.Object()
 	o.UpdatePodSpecForObject = f.UpdatePodSpecForObject
 	o.Encoder = f.JSONEncoder()
 	o.ShortOutput = cmdutil.GetFlagString(cmd, "output") == "name"
@@ -130,7 +128,7 @@ func (o *ImageOptions) Complete(f *cmdutil.Factory, cmd *cobra.Command, args []s
 	builder := resource.NewBuilder(o.Mapper, o.Typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, o.Recursive, o.Filenames...).
+		FilenameParam(enforceNamespace, &o.FilenameOptions).
 		Flatten()
 	if !o.Local {
 		builder = builder.
@@ -148,7 +146,7 @@ func (o *ImageOptions) Complete(f *cmdutil.Factory, cmd *cobra.Command, args []s
 
 func (o *ImageOptions) Validate() error {
 	errors := []error{}
-	if len(o.Resources) < 1 && len(o.Filenames) == 0 {
+	if len(o.Resources) < 1 && cmdutil.IsFilenameEmpty(o.Filenames) {
 		errors = append(errors, fmt.Errorf("one or more resources must be specified as <resource> <name> or <resource>/<name>"))
 	}
 	if len(o.ContainerImages) < 1 {
@@ -221,7 +219,7 @@ func (o *ImageOptions) Run() error {
 		}
 
 		info.Refresh(obj, true)
-		cmdutil.PrintSuccess(o.Mapper, o.ShortOutput, o.Out, info.Mapping.Resource, info.Name, "image updated")
+		cmdutil.PrintSuccess(o.Mapper, o.ShortOutput, o.Out, info.Mapping.Resource, info.Name, false, "image updated")
 	}
 	return utilerrors.NewAggregate(allErrs)
 }

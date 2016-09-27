@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"time"
 
+	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/credentialprovider"
@@ -90,13 +91,14 @@ func (f *fakePodGetter) GetPodByUID(uid types.UID) (*api.Pod, bool) {
 	return pod, found
 }
 
-func NewFakeKubeRuntimeManager(runtimeService internalApi.RuntimeService, imageService internalApi.ImageManagerService, networkPlugin network.NetworkPlugin, osInterface kubecontainer.OSInterface) (*kubeGenericRuntimeManager, error) {
+func NewFakeKubeRuntimeManager(runtimeService internalApi.RuntimeService, imageService internalApi.ImageManagerService, machineInfo *cadvisorapi.MachineInfo, networkPlugin network.NetworkPlugin, osInterface kubecontainer.OSInterface) (*kubeGenericRuntimeManager, error) {
 	recorder := &record.FakeRecorder{}
 	kubeRuntimeManager := &kubeGenericRuntimeManager{
 		recorder:            recorder,
 		cpuCFSQuota:         false,
 		livenessManager:     proberesults.NewManager(),
 		containerRefManager: kubecontainer.NewRefManager(),
+		machineInfo:         machineInfo,
 		osInterface:         osInterface,
 		networkPlugin:       networkPlugin,
 		runtimeHelper:       &fakeRuntimeHelper{},
@@ -116,7 +118,10 @@ func NewFakeKubeRuntimeManager(runtimeService internalApi.RuntimeService, imageS
 		kubecontainer.FilterEventRecorder(recorder),
 		kubeRuntimeManager,
 		flowcontrol.NewBackOff(time.Second, 300*time.Second),
-		false)
+		false,
+		0, // Disable image pull throttling by setting QPS to 0,
+		0,
+	)
 	kubeRuntimeManager.runner = lifecycle.NewHandlerRunner(
 		&fakeHTTP{},
 		kubeRuntimeManager,

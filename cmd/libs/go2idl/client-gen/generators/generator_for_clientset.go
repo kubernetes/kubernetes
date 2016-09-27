@@ -21,10 +21,10 @@ import (
 	"io"
 	"path/filepath"
 
+	"k8s.io/gengo/generator"
+	"k8s.io/gengo/namer"
+	"k8s.io/gengo/types"
 	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/generators/normalization"
-	"k8s.io/kubernetes/cmd/libs/go2idl/generator"
-	"k8s.io/kubernetes/cmd/libs/go2idl/namer"
-	"k8s.io/kubernetes/cmd/libs/go2idl/types"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
@@ -64,6 +64,8 @@ func (g *genClientset) Imports(c *generator.Context) (imports []string) {
 	}
 	imports = append(imports, "github.com/golang/glog")
 	imports = append(imports, "k8s.io/kubernetes/pkg/util/flowcontrol")
+	// import solely to initialize client auth plugins.
+	imports = append(imports, "_ \"k8s.io/kubernetes/plugin/pkg/client/auth\"")
 	return
 }
 

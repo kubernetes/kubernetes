@@ -6,6 +6,10 @@ docs/admin/kube-controller-manager.md
 docs/admin/kube-proxy.md
 docs/admin/kube-scheduler.md
 docs/admin/kubelet.md
+docs/man/man1/kube-apiserver.1
+docs/man/man1/kube-controller-manager.1
+docs/man/man1/kube-proxy.1
+docs/man/man1/kube-scheduler.1
 docs/man/man1/kubectl-annotate.1
 docs/man/man1/kubectl-api-versions.1
 docs/man/man1/kubectl-apply.1
@@ -53,7 +57,6 @@ docs/man/man1/kubectl-expose.1
 docs/man/man1/kubectl-get.1
 docs/man/man1/kubectl-label.1
 docs/man/man1/kubectl-logs.1
-docs/man/man1/kubectl-namespace.1
 docs/man/man1/kubectl-options.1
 docs/man/man1/kubectl-patch.1
 docs/man/man1/kubectl-port-forward.1
@@ -78,6 +81,7 @@ docs/man/man1/kubectl-top.1
 docs/man/man1/kubectl-uncordon.1
 docs/man/man1/kubectl-version.1
 docs/man/man1/kubectl.1
+docs/man/man1/kubelet.1
 docs/user-guide/kubectl/kubectl.md
 docs/user-guide/kubectl/kubectl_annotate.md
 docs/user-guide/kubectl/kubectl_api-versions.md
@@ -126,7 +130,6 @@ docs/user-guide/kubectl/kubectl_expose.md
 docs/user-guide/kubectl/kubectl_get.md
 docs/user-guide/kubectl/kubectl_label.md
 docs/user-guide/kubectl/kubectl_logs.md
-docs/user-guide/kubectl/kubectl_namespace.md
 docs/user-guide/kubectl/kubectl_options.md
 docs/user-guide/kubectl/kubectl_patch.md
 docs/user-guide/kubectl/kubectl_port-forward.md
@@ -171,7 +174,6 @@ docs/yaml/kubectl/kubectl_expose.yaml
 docs/yaml/kubectl/kubectl_get.yaml
 docs/yaml/kubectl/kubectl_label.yaml
 docs/yaml/kubectl/kubectl_logs.yaml
-docs/yaml/kubectl/kubectl_namespace.yaml
 docs/yaml/kubectl/kubectl_options.yaml
 docs/yaml/kubectl/kubectl_patch.yaml
 docs/yaml/kubectl/kubectl_port-forward.yaml

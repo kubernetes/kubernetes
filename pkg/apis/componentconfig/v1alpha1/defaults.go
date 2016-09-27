@@ -89,6 +89,9 @@ func SetDefaults_KubeProxyConfiguration(obj *KubeProxyConfiguration) {
 		if obj.ConntrackMaxPerCore == 0 {
 			obj.ConntrackMaxPerCore = 32 * 1024
 		}
+		if obj.ConntrackMin == 0 {
+			obj.ConntrackMin = 128 * 1024
+		}
 	}
 	if obj.IPTablesMasqueradeBit == nil {
 		temp := int32(14)

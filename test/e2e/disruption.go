@@ -22,13 +22,13 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	release_1_4 "k8s.io/client-go/1.4/kubernetes"
-	apiapi "k8s.io/client-go/1.4/pkg/api"
-	"k8s.io/client-go/1.4/pkg/api/unversioned"
-	api "k8s.io/client-go/1.4/pkg/api/v1"
-	extensions "k8s.io/client-go/1.4/pkg/apis/extensions/v1beta1"
-	policy "k8s.io/client-go/1.4/pkg/apis/policy/v1alpha1"
-	"k8s.io/client-go/1.4/pkg/util/intstr"
+	"k8s.io/client-go/1.5/kubernetes"
+	apiapi "k8s.io/client-go/1.5/pkg/api"
+	"k8s.io/client-go/1.5/pkg/api/unversioned"
+	api "k8s.io/client-go/1.5/pkg/api/v1"
+	extensions "k8s.io/client-go/1.5/pkg/apis/extensions/v1beta1"
+	policy "k8s.io/client-go/1.5/pkg/apis/policy/v1alpha1"
+	"k8s.io/client-go/1.5/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
@@ -39,12 +39,12 @@ const timeout = 60 * time.Second
 // schedulingTimeout is longer specifically because sometimes we need to wait
 // awhile to guarantee that we've been patient waiting for something ordinary
 // to happen: a pod to get scheduled and move into Ready
-const schedulingTimeout = 5 * time.Minute
+const schedulingTimeout = 10 * time.Minute
 
 var _ = framework.KubeDescribe("DisruptionController", func() {
 	f := framework.NewDefaultFramework("disruption")
 	var ns string
-	var cs *release_1_4.Clientset
+	var cs *kubernetes.Clientset
 
 	BeforeEach(func() {
 		// skip on GKE since alpha features are disabled
@@ -61,7 +61,7 @@ var _ = framework.KubeDescribe("DisruptionController", func() {
 	It("should update PodDisruptionBudget status", func() {
 		createPodDisruptionBudgetOrDie(cs, ns, intstr.FromInt(2))
 
-		createPodsOrDie(cs, ns, 2)
+		createPodsOrDie(cs, ns, 3)
 
 		// Since disruptionAllowed starts out false, if we see it ever become true,
 		// that means the controller is working.
@@ -92,28 +92,29 @@ var _ = framework.KubeDescribe("DisruptionController", func() {
 		}, {
 			description:  "too few pods, absolute",
 			minAvailable: intstr.FromInt(2),
-			podCount:     1,
+			podCount:     2,
 			shouldDeny:   true,
 		}, {
 			description:  "enough pods, absolute",
 			minAvailable: intstr.FromInt(2),
-			podCount:     2,
+			podCount:     3,
 			shouldDeny:   false,
 		}, {
 			description:    "enough pods, replicaSet, percentage",
-			minAvailable:   intstr.FromString("100%"),
+			minAvailable:   intstr.FromString("90%"),
 			replicaSetSize: 10,
 			exclusive:      false,
 			shouldDeny:     false,
 		}, {
 			description:    "too few pods, replicaSet, percentage",
-			minAvailable:   intstr.FromString("100%"),
+			minAvailable:   intstr.FromString("90%"),
 			replicaSetSize: 10,
 			exclusive:      true,
 			shouldDeny:     true,
 		},
 	}
-	for _, c := range evictionCases {
+	for i := range evictionCases {
+		c := evictionCases[i]
 		expectation := "should allow an eviction"
 		if c.shouldDeny {
 			expectation = "should not allow an eviction"
@@ -179,7 +180,7 @@ var _ = framework.KubeDescribe("DisruptionController", func() {
 
 })
 
-func createPodDisruptionBudgetOrDie(cs *release_1_4.Clientset, ns string, minAvailable intstr.IntOrString) {
+func createPodDisruptionBudgetOrDie(cs *kubernetes.Clientset, ns string, minAvailable intstr.IntOrString) {
 	pdb := policy.PodDisruptionBudget{
 		ObjectMeta: api.ObjectMeta{
 			Name:      "foo",
@@ -194,7 +195,7 @@ func createPodDisruptionBudgetOrDie(cs *release_1_4.Clientset, ns string, minAva
 	Expect(err).NotTo(HaveOccurred())
 }
 
-func createPodsOrDie(cs *release_1_4.Clientset, ns string, n int) {
+func createPodsOrDie(cs *kubernetes.Clientset, ns string, n int) {
 	for i := 0; i < n; i++ {
 		pod := &api.Pod{
 			ObjectMeta: api.ObjectMeta{
@@ -218,7 +219,7 @@ func createPodsOrDie(cs *release_1_4.Clientset, ns string, n int) {
 	}
 }
 
-func createReplicaSetOrDie(cs *release_1_4.Clientset, ns string, size int32, exclusive bool) {
+func createReplicaSetOrDie(cs *kubernetes.Clientset, ns string, size int32, exclusive bool) {
 	container := api.Container{
 		Name:  "busybox",
 		Image: "gcr.io/google_containers/echoserver:1.4",

@@ -9,6 +9,8 @@ all-namespaces
 allocate-node-cidrs
 allow-privileged
 allowed-not-ready-nodes
+api-advertise-addresses
+api-external-dns-names
 api-burst
 api-prefix
 api-rate
@@ -86,6 +88,7 @@ configure-cbr0
 configure-cloud-routes
 conntrack-max
 conntrack-max-per-core
+conntrack-min
 conntrack-tcp-timeout-established
 consumer-port
 consumer-service-name
@@ -175,6 +178,11 @@ experimental-flannel-overlay
 experimental-keystone-url
 experimental-nvidia-gpus
 experimental-prefix
+experimental-runtime-integration-type
+external-etcd-cafile
+external-etcd-certfile
+external-etcd-endpoints
+external-etcd-keyfile
 external-hostname
 external-ip
 extra-peer-dirs
@@ -384,6 +392,7 @@ pod-cidr
 pod-eviction-timeout
 pod-infra-container-image
 pod-manifest-path
+pod-network-cidr
 pod-running
 pods-per-core
 policy-config-file
@@ -444,8 +453,10 @@ run-proxy
 run-services-mode
 runtime-cgroups
 runtime-config
+runtime-integration-type
 runtime-request-timeout
 save-config
+schedule-pods-here
 scheduler-config
 scheduler-name
 schema-cache-dir
@@ -460,6 +471,8 @@ service-account-lookup
 service-account-private-key-file
 service-address
 service-cluster-ip-range
+service-cidr
+service-dns-domain
 service-generator
 service-node-port-range
 service-node-ports
@@ -504,6 +517,7 @@ tcp-services
 terminated-pod-gc-threshold
 test-flags
 test-timeout
+tls-ca-file
 tls-cert-file
 tls-private-key-file
 to-version
@@ -519,6 +533,7 @@ update-period
 upgrade-image
 upgrade-target
 use-kubernetes-cluster-service
+use-kubernetes-version
 user-whitelist
 verify-only
 volume-dir
@@ -532,3 +547,4 @@ windows-line-endings
 www-prefix
 zone-name
 garbage-collector-enabled
+viper-config

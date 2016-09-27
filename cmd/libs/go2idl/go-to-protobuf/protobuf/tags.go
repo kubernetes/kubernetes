@@ -18,7 +18,7 @@ package protobuf
 
 import (
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/cmd/libs/go2idl/types"
+	"k8s.io/gengo/types"
 )
 
 // extractBoolTagOrDie gets the comment-tags for the key and asserts that, if

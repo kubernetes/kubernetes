@@ -23,7 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/client/cache"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	appsclientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/apps/unversioned"
 	"k8s.io/kubernetes/pkg/controller"
 
 	"github.com/golang/glog"
@@ -44,35 +44,24 @@ func (o overlappingPetSets) Less(i, j int) bool {
 }
 
 // updatePetCount attempts to update the Status.Replicas of the given PetSet, with a single GET/PUT retry.
-func updatePetCount(kubeClient *client.Client, ps apps.PetSet, numPets int) (updateErr error) {
-	if ps.Status.Replicas == numPets || kubeClient == nil {
+func updatePetCount(psClient appsclientset.PetSetsGetter, ps apps.PetSet, numPets int) (updateErr error) {
+	if ps.Status.Replicas == numPets || psClient == nil {
 		return nil
 	}
-	psClient := kubeClient.Apps().PetSets(ps.Namespace)
 	var getErr error
 	for i, ps := 0, &ps; ; i++ {
 		glog.V(4).Infof(fmt.Sprintf("Updating replica count for PetSet: %s/%s, ", ps.Namespace, ps.Name) +
 			fmt.Sprintf("replicas %d->%d (need %d), ", ps.Status.Replicas, numPets, ps.Spec.Replicas))
 
 		ps.Status = apps.PetSetStatus{Replicas: numPets}
-		_, updateErr = psClient.UpdateStatus(ps)
+		_, updateErr = psClient.PetSets(ps.Namespace).UpdateStatus(ps)
 		if updateErr == nil || i >= statusUpdateRetries {
 			return updateErr
 		}
-		if ps, getErr = psClient.Get(ps.Name); getErr != nil {
+		if ps, getErr = psClient.PetSets(ps.Namespace).Get(ps.Name); getErr != nil {
 			return getErr
 		}
 	}
-}
-
-// claimClient returns the pvcClient for the given kubeClient/ns.
-func claimClient(kubeClient *client.Client, ns string) client.PersistentVolumeClaimInterface {
-	return kubeClient.PersistentVolumeClaims(ns)
-}
-
-// podClient returns the given podClient for the given kubeClient/ns.
-func podClient(kubeClient *client.Client, ns string) client.PodInterface {
-	return kubeClient.Pods(ns)
 }
 
 // unhealthyPetTracker tracks unhealthy pets for petsets.

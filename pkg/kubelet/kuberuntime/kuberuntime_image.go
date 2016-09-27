@@ -17,8 +17,6 @@ limitations under the License.
 package kuberuntime
 
 import (
-	"fmt"
-
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/credentialprovider"
@@ -30,7 +28,6 @@ import (
 
 // PullImage pulls an image from the network to local storage using the supplied
 // secrets if necessary.
-// TODO: pull image with qps and burst, ref https://github.com/kubernetes/kubernetes/blob/master/pkg/kubelet/dockertools/docker.go#L120
 func (m *kubeGenericRuntimeManager) PullImage(image kubecontainer.ImageSpec, pullSecrets []api.Secret) error {
 	img := image.Image
 	repoToPull, _, _, err := parsers.ParseImageName(img)
@@ -130,7 +127,8 @@ func (m *kubeGenericRuntimeManager) RemoveImage(image kubecontainer.ImageSpec) e
 }
 
 // ImageStats returns the statistics of the image.
+// TODO: Implement this function.
 func (m *kubeGenericRuntimeManager) ImageStats() (*kubecontainer.ImageStats, error) {
-	// TODO: support image stats in new runtime interface
-	return nil, fmt.Errorf("not implemented")
+	var usageBytes uint64 = 0
+	return &kubecontainer.ImageStats{TotalStorageBytes: usageBytes}, nil
 }

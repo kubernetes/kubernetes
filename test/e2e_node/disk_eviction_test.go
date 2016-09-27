@@ -18,12 +18,10 @@ package e2e_node
 
 import (
 	"fmt"
-	"os/exec"
 	"strings"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -35,6 +33,14 @@ import (
 const (
 	// podCheckInterval is the interval seconds between pod status checks.
 	podCheckInterval = time.Second * 2
+
+	// podDisappearTimeout is the timeout to wait node disappear.
+	podDisappearTimeout = time.Minute * 2
+
+	// containerGCPeriod is the period of container garbage collect loop. It should be the same
+	// with ContainerGCPeriod in kubelet.go. However we don't want to include kubelet package
+	// directly which will introduce a lot more dependencies.
+	containerGCPeriod = time.Minute * 1
 
 	dummyFile = "dummy."
 )
@@ -53,28 +59,18 @@ var _ = framework.KubeDescribe("Kubelet Eviction Manager [Serial] [Disruptive]",
 	Describe("hard eviction test", func() {
 		Context("pod using the most disk space gets evicted when the node disk usage is above the eviction hard threshold", func() {
 			var busyPodName, idlePodName, verifyPodName string
-			var containersToCleanUp map[string]bool
-
-			AfterEach(func() {
-				podClient.Delete(busyPodName, &api.DeleteOptions{})
-				podClient.Delete(idlePodName, &api.DeleteOptions{})
-				podClient.Delete(verifyPodName, &api.DeleteOptions{})
-				for container := range containersToCleanUp {
-					// TODO: to be container implementation agnostic
-					cmd := exec.Command("docker", "rm", "-f", strings.Trim(container, dockertools.DockerPrefix))
-					cmd.Run()
-				}
-			})
 
 			BeforeEach(func() {
-				if !isImageSupported() || !evictionOptionIsSet() {
-					return
+				if !isImageSupported() {
+					framework.Skipf("test skipped because the image is not supported by the test")
+				}
+				if !evictionOptionIsSet() {
+					framework.Skipf("test skipped because eviction option is not set")
 				}
 
 				busyPodName = "to-evict" + string(uuid.NewUUID())
 				idlePodName = "idle" + string(uuid.NewUUID())
 				verifyPodName = "verify" + string(uuid.NewUUID())
-				containersToCleanUp = make(map[string]bool)
 				createIdlePod(idlePodName, podClient)
 				podClient.Create(&api.Pod{
 					ObjectMeta: api.ObjectMeta{
@@ -84,7 +80,7 @@ var _ = framework.KubeDescribe("Kubelet Eviction Manager [Serial] [Disruptive]",
 						RestartPolicy: api.RestartPolicyNever,
 						Containers: []api.Container{
 							{
-								Image: ImageRegistry[busyBoxImage],
+								Image: "gcr.io/google_containers/busybox:1.24",
 								Name:  busyPodName,
 								// Filling the disk
 								Command: []string{"sh", "-c",
@@ -96,16 +92,27 @@ var _ = framework.KubeDescribe("Kubelet Eviction Manager [Serial] [Disruptive]",
 				})
 			})
 
-			It("should evict the pod using the most disk space [Slow]", func() {
-				if !isImageSupported() {
-					framework.Logf("test skipped because the image is not supported by the test")
+			AfterEach(func() {
+				if !isImageSupported() || !evictionOptionIsSet() { // Skip the after each
 					return
 				}
-				if !evictionOptionIsSet() {
-					framework.Logf("test skipped because eviction option is not set")
-					return
-				}
+				podClient.DeleteSync(busyPodName, &api.DeleteOptions{}, podDisappearTimeout)
+				podClient.DeleteSync(idlePodName, &api.DeleteOptions{}, podDisappearTimeout)
+				podClient.DeleteSync(verifyPodName, &api.DeleteOptions{}, podDisappearTimeout)
 
+				// Wait for 2 container gc loop to ensure that the containers are deleted. The containers
+				// created in this test consume a lot of disk, we don't want them to trigger disk eviction
+				// again after the test.
+				time.Sleep(containerGCPeriod * 2)
+
+				if framework.TestContext.PrepullImages {
+					// The disk eviction test may cause the prepulled images to be evicted,
+					// prepull those images again to ensure this test not affect following tests.
+					PrePullAllImages()
+				}
+			})
+
+			It("should evict the pod using the most disk space [Slow]", func() {
 				evictionOccurred := false
 				nodeDiskPressureCondition := false
 				podRescheduleable := false
@@ -122,7 +129,6 @@ var _ = framework.KubeDescribe("Kubelet Eviction Manager [Serial] [Disruptive]",
 						if err != nil {
 							return err
 						}
-						recordContainerId(containersToCleanUp, podData.Status.ContainerStatuses)
 
 						err = verifyPodEviction(podData)
 						if err != nil {
@@ -133,7 +139,6 @@ var _ = framework.KubeDescribe("Kubelet Eviction Manager [Serial] [Disruptive]",
 						if err != nil {
 							return err
 						}
-						recordContainerId(containersToCleanUp, podData.Status.ContainerStatuses)
 
 						if podData.Status.Phase != api.PodRunning {
 							err = verifyPodEviction(podData)
@@ -169,7 +174,6 @@ var _ = framework.KubeDescribe("Kubelet Eviction Manager [Serial] [Disruptive]",
 					if err != nil {
 						return err
 					}
-					recordContainerId(containersToCleanUp, podData.Status.ContainerStatuses)
 					if podData.Status.Phase != api.PodRunning {
 						return fmt.Errorf("waiting for the new pod to be running")
 					}
@@ -190,7 +194,7 @@ func createIdlePod(podName string, podClient *framework.PodClient) {
 			RestartPolicy: api.RestartPolicyNever,
 			Containers: []api.Container{
 				{
-					Image: ImageRegistry[pauseImage],
+					Image: framework.GetPauseImageNameForHostArch(),
 					Name:  podName,
 				},
 			},
@@ -218,16 +222,11 @@ func nodeHasDiskPressure(c *client.Client) bool {
 	return false
 }
 
-func recordContainerId(containersToCleanUp map[string]bool, containerStatuses []api.ContainerStatus) {
-	for _, status := range containerStatuses {
-		containersToCleanUp[status.ContainerID] = true
-	}
-}
-
 func evictionOptionIsSet() bool {
 	return len(framework.TestContext.EvictionHard) > 0
 }
 
+// TODO(random-liu): Use OSImage in node status to do the check.
 func isImageSupported() bool {
 	// TODO: Only images with image fs is selected for testing for now. When the kubelet settings can be dynamically updated,
 	// instead of skipping images the eviction thresholds should be adjusted based on the images.

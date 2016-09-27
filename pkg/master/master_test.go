@@ -50,12 +50,13 @@ import (
 	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/kubelet/client"
-	"k8s.io/kubernetes/pkg/registry/endpoint"
+	"k8s.io/kubernetes/pkg/registry/core/endpoint"
+	"k8s.io/kubernetes/pkg/registry/core/namespace"
+	ipallocator "k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
+	extensionsrest "k8s.io/kubernetes/pkg/registry/extensions/rest"
+	"k8s.io/kubernetes/pkg/registry/extensions/thirdpartyresourcedata"
 	"k8s.io/kubernetes/pkg/registry/generic"
-	"k8s.io/kubernetes/pkg/registry/namespace"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
-	ipallocator "k8s.io/kubernetes/pkg/registry/service/ipallocator"
-	"k8s.io/kubernetes/pkg/registry/thirdpartyresourcedata"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
@@ -63,6 +64,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/intstr"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/version"
 
 	"github.com/go-openapi/loads"
 	"github.com/go-openapi/spec"
@@ -70,6 +72,7 @@ import (
 	"github.com/go-openapi/validate"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
+	"k8s.io/kubernetes/pkg/generated/openapi"
 )
 
 // setUp is a convience function for setting up for (most) tests.
@@ -104,6 +107,7 @@ func setUp(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.
 	config.ProxyDialer = func(network, addr string) (net.Conn, error) { return nil, nil }
 	config.ProxyTLSClientConfig = &tls.Config{}
 	config.RequestContextMapper = api.NewRequestContextMapper()
+	config.Config.EnableVersion = true
 
 	// TODO: this is kind of hacky.  The trouble is that the sync loop
 	// runs in a go-routine and there is no way to validate in the test
@@ -200,6 +204,29 @@ func TestNamespaceSubresources(t *testing.T) {
 
 	if !reflect.DeepEqual(expectedSubresources.List(), foundSubresources.List()) {
 		t.Errorf("Expected namespace subresources %#v, got %#v. Update apiserver/handlers.go#namespaceSubresources", expectedSubresources.List(), foundSubresources.List())
+	}
+}
+
+// TestVersion tests /version
+func TestVersion(t *testing.T) {
+	s, etcdserver, _, _ := newMaster(t)
+	defer etcdserver.Terminate(t)
+
+	req, _ := http.NewRequest("GET", "/version", nil)
+	resp := httptest.NewRecorder()
+	s.InsecureHandler.ServeHTTP(resp, req)
+	if resp.Code != 200 {
+		t.Fatalf("expected http 200, got: %d", resp.Code)
+	}
+
+	var info version.Info
+	err := json.NewDecoder(resp.Body).Decode(&info)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	if !reflect.DeepEqual(version.Get(), info) {
+		t.Errorf("Expected %#v, Got %#v", version.Get(), info)
 	}
 }
 
@@ -1101,7 +1128,7 @@ func testInstallThirdPartyResourceRemove(t *testing.T, version string) {
 		t.Errorf("expected:\n%v\nsaw:\n%v\n", expectedObj, item)
 	}
 
-	path := makeThirdPartyPath("company.com")
+	path := extensionsrest.MakeThirdPartyPath("company.com")
 	master.RemoveThirdPartyResource(path + "/foos")
 
 	resp, err = http.Get(server.URL + "/apis/company.com/" + version + "/namespaces/default/foos/test")
@@ -1226,6 +1253,7 @@ func TestValidOpenAPISpec(t *testing.T) {
 	_, etcdserver, config, assert := setUp(t)
 	defer etcdserver.Terminate(t)
 
+	config.OpenAPIDefinitions = openapi.OpenAPIDefinitions
 	config.EnableOpenAPISupport = true
 	config.EnableIndex = true
 	config.OpenAPIInfo = spec.Info{

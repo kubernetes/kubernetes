@@ -28,6 +28,7 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/kubernetes/pkg/api"
 	kerrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -43,10 +44,9 @@ import (
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/strategicpatch"
 
-	"github.com/evanphx/json-patch"
+	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 )
 
 const (
@@ -60,7 +60,7 @@ type debugError interface {
 
 // AddSourceToErr adds handleResourcePrefix and source string to error message.
 // verb is the string like "creating", "deleting" etc.
-// souce is the filename or URL to the template file(*.json or *.yaml), or stdin to use to handle the resource.
+// source is the filename or URL to the template file(*.json or *.yaml), or stdin to use to handle the resource.
 func AddSourceToErr(verb string, source string, err error) error {
 	if source != "" {
 		if statusError, ok := err.(kerrors.APIStatus); ok {
@@ -122,6 +122,11 @@ func checkErrWithPrefix(prefix string, err error) {
 // checkErr formats a given error as a string and calls the passed handleErr
 // func with that string and an kubectl exit code.
 func checkErr(prefix string, err error, handleErr func(string, int)) {
+	// unwrap aggregates of 1
+	if agg, ok := err.(utilerrors.Aggregate); ok && len(agg.Errors()) == 1 {
+		err = agg.Errors()[0]
+	}
+
 	switch {
 	case err == nil:
 		return
@@ -268,6 +273,13 @@ func UsageError(cmd *cobra.Command, format string, args ...interface{}) error {
 	return fmt.Errorf("%s\nSee '%s -h' for help and examples.", msg, cmd.CommandPath())
 }
 
+func IsFilenameEmpty(filenames []string) bool {
+	if len(filenames) == 0 {
+		return true
+	}
+	return false
+}
+
 // Whether this cmd need watching objects.
 func isWatch(cmd *cobra.Command) bool {
 	if w, err := cmd.Flags().GetBool("watch"); w && err == nil {
@@ -279,14 +291,6 @@ func isWatch(cmd *cobra.Command) bool {
 	}
 
 	return false
-}
-
-func getFlag(cmd *cobra.Command, flag string) *pflag.Flag {
-	f := cmd.Flags().Lookup(flag)
-	if f == nil {
-		glog.Fatalf("flag accessed but not defined for command %s: %s", cmd.Name(), flag)
-	}
-	return f
 }
 
 func GetFlagString(cmd *cobra.Command, flag string) string {
@@ -355,8 +359,9 @@ func AddValidateFlags(cmd *cobra.Command) {
 	cmd.MarkFlagFilename("schema-cache-dir")
 }
 
-func AddRecursiveFlag(cmd *cobra.Command, value *bool) {
-	cmd.Flags().BoolVarP(value, "recursive", "R", *value, "Process the directory used in -f, --filename recursively. Useful when you want to manage related manifests organized within the same directory.")
+func AddFilenameOptionFlags(cmd *cobra.Command, options *resource.FilenameOptions, usage string) {
+	kubectl.AddJsonFilenameFlag(cmd, &options.Filenames, "Filename, directory, or URL to files "+usage)
+	cmd.Flags().BoolVarP(&options.Recursive, "recursive", "R", options.Recursive, "Process the directory used in -f, --filename recursively. Useful when you want to manage related manifests organized within the same directory.")
 }
 
 // AddDryRunFlag adds dry-run flag to a command. Usually used by mutations.
@@ -554,15 +559,9 @@ func GetThirdPartyGroupVersions(discovery discovery.DiscoveryInterface) ([]unver
 	return result, gvks, nil
 }
 
-func GetIncludeThirdPartyAPIs(cmd *cobra.Command) bool {
-	if cmd.Flags().Lookup("include-extended-apis") == nil {
-		return false
-	}
-	return GetFlagBool(cmd, "include-extended-apis")
-}
-
 func AddInclude3rdPartyFlags(cmd *cobra.Command) {
 	cmd.Flags().Bool("include-extended-apis", true, "If true, include definitions of new APIs via calls to the API server. [default true]")
+	cmd.Flags().MarkDeprecated("include-extended-apis", "No longer required.")
 }
 
 // GetResourcesAndPairs retrieves resources and "KEY=VALUE or KEY-" pair args from given args
@@ -632,4 +631,79 @@ func MaybeConvertObject(obj runtime.Object, gv unversioned.GroupVersion, convert
 	default:
 		return converter.ConvertToVersion(obj, gv)
 	}
+}
+
+// MustPrintWithKinds determines if printer is dealing
+// with multiple resource kinds, in which case it will
+// return true, indicating resource kind will be
+// included as part of printer output
+func MustPrintWithKinds(objs []runtime.Object, infos []*resource.Info, sorter *kubectl.RuntimeSort, printAll bool) bool {
+	var lastMap *meta.RESTMapping
+
+	if len(infos) == 1 && printAll {
+		return true
+	}
+
+	for ix := range objs {
+		var mapping *meta.RESTMapping
+		if sorter != nil {
+			mapping = infos[sorter.OriginalPosition(ix)].Mapping
+		} else {
+			mapping = infos[ix].Mapping
+		}
+
+		// display "kind" only if we have mixed resources
+		if lastMap != nil && mapping.Resource != lastMap.Resource {
+			return true
+		}
+		lastMap = mapping
+	}
+
+	return false
+}
+
+// FilterResourceList receives a list of runtime objects.
+// If any objects are filtered, that number is returned along with a modified list.
+func FilterResourceList(obj runtime.Object, filterFuncs kubectl.Filters, filterOpts *kubectl.PrintOptions) (int, []runtime.Object, error) {
+	items, err := meta.ExtractList(obj)
+	if err != nil {
+		return 0, []runtime.Object{obj}, utilerrors.NewAggregate([]error{err})
+	}
+	if errs := runtime.DecodeList(items, api.Codecs.UniversalDecoder(), runtime.UnstructuredJSONScheme); len(errs) > 0 {
+		return 0, []runtime.Object{obj}, utilerrors.NewAggregate(errs)
+	}
+
+	filterCount := 0
+	list := make([]runtime.Object, 0, len(items))
+	for _, obj := range items {
+		if isFiltered, err := filterFuncs.Filter(obj, filterOpts); !isFiltered {
+			if err != nil {
+				glog.V(2).Infof("Unable to filter resource: %v", err)
+				continue
+			}
+			list = append(list, obj)
+		} else if isFiltered {
+			filterCount++
+		}
+	}
+	return filterCount, list, nil
+}
+
+func PrintFilterCount(hiddenObjNum int, resource string, out io.Writer, options *kubectl.PrintOptions) error {
+	if !options.NoHeaders && !options.ShowAll && hiddenObjNum > 0 {
+		_, err := fmt.Fprintf(out, "  info: %d completed object(s) was(were) not shown in %s list. Pass --show-all to see all objects.\n\n", hiddenObjNum, resource)
+		return err
+	}
+	return nil
+}
+
+// ObjectListToVersionedObject receives a list of api objects and a group version
+// and squashes the list's items into a single versioned runtime.Object.
+func ObjectListToVersionedObject(objects []runtime.Object, version unversioned.GroupVersion) (runtime.Object, error) {
+	objectList := &api.List{Items: objects}
+	converted, err := resource.TryConvert(api.Scheme, objectList, version, registered.GroupOrDie(api.GroupName).GroupVersion)
+	if err != nil {
+		return nil, err
+	}
+	return converted, nil
 }

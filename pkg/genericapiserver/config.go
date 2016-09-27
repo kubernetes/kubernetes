@@ -19,12 +19,12 @@ package genericapiserver
 import (
 	"crypto/tls"
 	"fmt"
+	"mime"
 	"net"
 	"net/http"
-	"net/http/pprof"
 	"os"
+	"regexp"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/emicklei/go-restful"
@@ -39,42 +39,36 @@ import (
 	"k8s.io/kubernetes/pkg/apiserver/audit"
 	"k8s.io/kubernetes/pkg/auth/authenticator"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
-	"k8s.io/kubernetes/pkg/auth/handlers"
+	authhandlers "k8s.io/kubernetes/pkg/auth/handlers"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	genericfilters "k8s.io/kubernetes/pkg/genericapiserver/filters"
+	"k8s.io/kubernetes/pkg/genericapiserver/openapi/common"
 	"k8s.io/kubernetes/pkg/genericapiserver/options"
+	"k8s.io/kubernetes/pkg/genericapiserver/routes"
 	genericvalidation "k8s.io/kubernetes/pkg/genericapiserver/validation"
-	"k8s.io/kubernetes/pkg/registry/generic"
-	"k8s.io/kubernetes/pkg/registry/generic/registry"
-	ipallocator "k8s.io/kubernetes/pkg/registry/service/ipallocator"
+	ipallocator "k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/ui"
-	"k8s.io/kubernetes/pkg/util"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 )
 
 // Config is a structure used to configure a GenericAPIServer.
 type Config struct {
-	// The storage factory for other objects
-	StorageFactory     StorageFactory
 	AuditLogPath       string
 	AuditLogMaxAge     int
 	AuditLogMaxBackups int
 	AuditLogMaxSize    int
-	// allow downstream consumers to disable the core controller loops
-	EnableLogsSupport bool
-	EnableUISupport   bool
 	// Allow downstream consumers to disable swagger.
 	// This includes returning the generated swagger spec at /swaggerapi and swagger ui at /swagger-ui.
 	EnableSwaggerSupport bool
 	// Allow downstream consumers to disable swagger ui.
-	// Note that this is ignored if either EnableSwaggerSupport or EnableUISupport is false.
+	// Note that this is ignored if EnableSwaggerSupport is false
 	EnableSwaggerUI bool
 	// Allows api group versions or specific resources to be conditionally enabled/disabled.
 	APIResourceConfigSource APIResourceConfigSource
 	// allow downstream consumers to disable the index route
 	EnableIndex             bool
 	EnableProfiling         bool
-	EnableWatchCache        bool
+	EnableVersion           bool
 	EnableGarbageCollection bool
 	APIPrefix               string
 	APIGroupPrefix          string
@@ -159,6 +153,15 @@ type Config struct {
 
 	// OpenAPIDefaultResponse will be used if an web service operation does not have any responses listed.
 	OpenAPIDefaultResponse spec.Response
+
+	// OpenAPIDefinitions is a map of type to OpenAPI spec for all types used in this API server. Failure to provide
+	// this map or any of the models used by the server APIs will result in spec generation failure.
+	OpenAPIDefinitions *common.OpenAPIDefinitions
+
+	// MaxRequestsInFlight is the maximum number of parallel non-long-running requests. Every further
+	// request has to wait.
+	MaxRequestsInFlight  int
+	LongRunningRequestRE string
 }
 
 func NewConfig(options *options.ServerRunOptions) *Config {
@@ -172,12 +175,10 @@ func NewConfig(options *options.ServerRunOptions) *Config {
 		AuditLogMaxSize:           options.AuditLogMaxSize,
 		EnableGarbageCollection:   options.EnableGarbageCollection,
 		EnableIndex:               true,
-		EnableLogsSupport:         options.EnableLogsSupport,
 		EnableProfiling:           options.EnableProfiling,
 		EnableSwaggerSupport:      true,
 		EnableSwaggerUI:           options.EnableSwaggerUI,
-		EnableUISupport:           true,
-		EnableWatchCache:          options.EnableWatchCache,
+		EnableVersion:             true,
 		ExternalHost:              options.ExternalHost,
 		KubernetesServiceNodePort: options.KubernetesServiceNodePort,
 		MasterCount:               options.MasterCount,
@@ -186,7 +187,6 @@ func NewConfig(options *options.ServerRunOptions) *Config {
 		ReadWritePort:             options.SecurePort,
 		ServiceClusterIPRange:     &options.ServiceClusterIPRange,
 		ServiceNodePortRange:      options.ServiceNodePortRange,
-		EnableOpenAPISupport:      true,
 		OpenAPIDefaultResponse: spec.Response{
 			ResponseProps: spec.ResponseProps{
 				Description: "Default Response."}},
@@ -196,6 +196,8 @@ func NewConfig(options *options.ServerRunOptions) *Config {
 				Version: "unversioned",
 			},
 		},
+		MaxRequestsInFlight:  options.MaxRequestsInFlight,
+		LongRunningRequestRE: options.LongRunningRequestRE,
 	}
 }
 
@@ -311,25 +313,17 @@ func (c Config) New() (*GenericAPIServer, error) {
 		enableOpenAPISupport:   c.EnableOpenAPISupport,
 		openAPIInfo:            c.OpenAPIInfo,
 		openAPIDefaultResponse: c.OpenAPIDefaultResponse,
-	}
-
-	if c.EnableWatchCache {
-		s.storageDecorator = registry.StorageWithCacher
-	} else {
-		s.storageDecorator = generic.UndecoratedStorage
+		openAPIDefinitions:     c.OpenAPIDefinitions,
 	}
 
 	if c.RestfulContainer != nil {
-		s.mux = c.RestfulContainer.ServeMux
 		s.HandlerContainer = c.RestfulContainer
 	} else {
-		mux := http.NewServeMux()
-		s.mux = mux
-		s.HandlerContainer = NewHandlerContainer(mux, c.Serializer)
+		s.HandlerContainer = NewHandlerContainer(http.NewServeMux(), c.Serializer)
 	}
 	// Use CurlyRouter to be able to use regular expressions in paths. Regular expressions are required in paths for example for proxy (where the path is proxy/{kind}/{name}/{*})
 	s.HandlerContainer.Router(restful.CurlyRouter{})
-	s.MuxHelper = &apiserver.MuxHelper{Mux: s.mux, RegisteredPaths: []string{}}
+	s.Mux = apiserver.NewPathRecorderMux(s.HandlerContainer.ServeMux)
 
 	if c.ProxyDialer != nil || c.ProxyTLSClientConfig != nil {
 		s.ProxyTransport = utilnet.SetTransportDefaults(&http.Transport{
@@ -338,88 +332,70 @@ func (c Config) New() (*GenericAPIServer, error) {
 		})
 	}
 
-	// Register root handler.
-	// We do not register this using restful Webservice since we do not want to surface this in api docs.
-	// Allow GenericAPIServer to be embedded in contexts which already have something registered at the root
-	if c.EnableIndex {
-		s.mux.HandleFunc("/", apiserver.IndexHandler(s.HandlerContainer, s.MuxHelper))
-	}
-
-	if c.EnableLogsSupport {
-		apiserver.InstallLogsSupport(s.MuxHelper, s.HandlerContainer)
-	}
-	if c.EnableUISupport {
-		ui.InstallSupport(s.MuxHelper, c.EnableSwaggerSupport && c.EnableSwaggerUI)
-	}
-
-	if c.EnableProfiling {
-		s.mux.HandleFunc("/debug/pprof/", pprof.Index)
-		s.mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
-		s.mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
-	}
-
-	apiserver.InstallVersionHandler(s.MuxHelper, s.HandlerContainer)
-
-	handler := http.Handler(s.mux.(*http.ServeMux))
-
-	// TODO: handle CORS and auth using go-restful
-	// See github.com/emicklei/go-restful/blob/master/examples/restful-CORS-filter.go, and
-	// github.com/emicklei/go-restful/blob/master/examples/restful-basic-authentication.go
-
-	if len(c.CorsAllowedOriginList) > 0 {
-		allowedOriginRegexps, err := util.CompileRegexps(c.CorsAllowedOriginList)
-		if err != nil {
-			glog.Fatalf("Invalid CORS allowed origin, --cors-allowed-origins flag was set to %v - %v", strings.Join(c.CorsAllowedOriginList, ","), err)
-		}
-		handler = apiserver.CORS(handler, allowedOriginRegexps, nil, nil, "true")
-	}
-
-	s.InsecureHandler = handler
-
-	attributeGetter := apiserver.NewRequestAttributeGetter(c.RequestContextMapper, s.NewRequestInfoResolver())
-	handler = apiserver.WithAuthorizationCheck(handler, attributeGetter, c.Authorizer)
 	if len(c.AuditLogPath) != 0 {
-		// audit handler must comes before the impersonationFilter to read the original user
-		writer := &lumberjack.Logger{
+		s.auditWriter = &lumberjack.Logger{
 			Filename:   c.AuditLogPath,
 			MaxAge:     c.AuditLogMaxAge,
 			MaxBackups: c.AuditLogMaxBackups,
 			MaxSize:    c.AuditLogMaxSize,
 		}
-		handler = audit.WithAudit(handler, attributeGetter, writer)
-		defer writer.Close()
-	}
-	handler = apiserver.WithImpersonation(handler, c.RequestContextMapper, c.Authorizer)
-
-	// Install Authenticator
-	if c.Authenticator != nil {
-		authenticatedHandler, err := handlers.NewRequestAuthenticator(c.RequestContextMapper, c.Authenticator, handlers.Unauthorized(c.SupportsBasicAuth), handler)
-		if err != nil {
-			glog.Fatalf("Could not initialize authenticator: %v", err)
-		}
-		handler = authenticatedHandler
 	}
 
-	// TODO: Make this optional?  Consumers of GenericAPIServer depend on this currently.
-	s.Handler = handler
+	// Send correct mime type for .svg files.
+	// TODO: remove when https://github.com/golang/go/commit/21e47d831bafb59f22b1ea8098f709677ec8ce33
+	// makes it into all of our supported go versions (only in v1.7.1 now).
+	mime.AddExtensionType(".svg", "image/svg+xml")
 
-	// After all wrapping is done, put a context filter around both handlers
-	var err error
-	handler, err = api.NewRequestContextFilter(c.RequestContextMapper, s.Handler)
-	if err != nil {
-		glog.Fatalf("Could not initialize request context filter for s.Handler: %v", err)
-	}
-	s.Handler = handler
+	apiserver.InstallServiceErrorHandler(s.Serializer, s.HandlerContainer)
 
-	handler, err = api.NewRequestContextFilter(c.RequestContextMapper, s.InsecureHandler)
-	if err != nil {
-		glog.Fatalf("Could not initialize request context filter for s.InsecureHandler: %v", err)
-	}
-	s.InsecureHandler = handler
-
-	s.installGroupsDiscoveryHandler()
+	s.installAPI(&c)
+	s.Handler, s.InsecureHandler = s.buildHandlerChains(&c, http.Handler(s.Mux.BaseMux().(*http.ServeMux)))
 
 	return s, nil
+}
+
+func (s *GenericAPIServer) buildHandlerChains(c *Config, handler http.Handler) (secure http.Handler, insecure http.Handler) {
+	longRunningRE := regexp.MustCompile(c.LongRunningRequestRE)
+	longRunningFunc := genericfilters.BasicLongRunningRequestCheck(longRunningRE, map[string]string{"watch": "true"})
+
+	// filters which insecure and secure have in common
+	handler = genericfilters.WithCORS(handler, c.CorsAllowedOriginList, nil, nil, "true")
+
+	// insecure filters
+	insecure = handler
+	insecure = api.WithRequestContext(insecure, c.RequestContextMapper)
+	insecure = apiserver.RecoverPanics(insecure, s.NewRequestInfoResolver())
+	insecure = genericfilters.WithTimeoutForNonLongRunningRequests(insecure, longRunningFunc)
+
+	// secure filters
+	attributeGetter := apiserver.NewRequestAttributeGetter(c.RequestContextMapper, s.NewRequestInfoResolver())
+	secure = handler
+	secure = apiserver.WithAuthorization(secure, attributeGetter, c.Authorizer)
+	secure = apiserver.WithImpersonation(secure, c.RequestContextMapper, c.Authorizer)
+	secure = audit.WithAudit(secure, attributeGetter, s.auditWriter) // before impersonation to read original user
+	secure = authhandlers.WithAuthentication(secure, c.RequestContextMapper, c.Authenticator, authhandlers.Unauthorized(c.SupportsBasicAuth))
+	secure = api.WithRequestContext(secure, c.RequestContextMapper)
+	secure = apiserver.RecoverPanics(secure, s.NewRequestInfoResolver())
+	secure = genericfilters.WithTimeoutForNonLongRunningRequests(secure, longRunningFunc)
+	secure = genericfilters.WithMaxInFlightLimit(secure, c.MaxRequestsInFlight, longRunningFunc)
+
+	return
+}
+
+func (s *GenericAPIServer) installAPI(c *Config) {
+	if c.EnableIndex {
+		routes.Index{}.Install(s.Mux, s.HandlerContainer)
+	}
+	if c.EnableSwaggerSupport && c.EnableSwaggerUI {
+		routes.SwaggerUI{}.Install(s.Mux, s.HandlerContainer)
+	}
+	if c.EnableProfiling {
+		routes.Profiling{}.Install(s.Mux, s.HandlerContainer)
+	}
+	if c.EnableVersion {
+		routes.Version{}.Install(s.Mux, s.HandlerContainer)
+	}
+	s.HandlerContainer.Add(s.DynamicApisDiscovery())
 }
 
 func DefaultAndValidateRunOptions(options *options.ServerRunOptions) {

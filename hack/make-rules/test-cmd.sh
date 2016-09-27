@@ -1048,6 +1048,19 @@ __EOF__
     exit 1
   fi
 
+  ### Test kubectl get all
+  output_message=$(kubectl --v=6 --namespace default get all 2>&1 "${kube_flags[@]}")
+  # Post-condition: Check if we get 200 OK from all the url(s)
+  kube::test::if_has_string "${output_message}" "/api/v1/namespaces/default/pods 200 OK"
+  kube::test::if_has_string "${output_message}" "/api/v1/namespaces/default/replicationcontrollers 200 OK"
+  kube::test::if_has_string "${output_message}" "/api/v1/namespaces/default/services 200 OK"
+  kube::test::if_has_string "${output_message}" "/apis/apps/v1alpha1/namespaces/default/petsets 200 OK"
+  kube::test::if_has_string "${output_message}" "/apis/autoscaling/v1/namespaces/default/horizontalpodautoscalers 200"
+  kube::test::if_has_string "${output_message}" "/apis/batch/v1/namespaces/default/jobs 200 OK"
+  kube::test::if_has_string "${output_message}" "/apis/extensions/v1beta1/namespaces/default/deployments 200 OK"
+  kube::test::if_has_string "${output_message}" "/apis/extensions/v1beta1/namespaces/default/replicasets 200 OK"
+
+
   #####################################
   # Third Party Resources             #
   #####################################
