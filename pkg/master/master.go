@@ -190,6 +190,16 @@ type RESTStorageProvider interface {
 	NewRESTStorage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter RESTOptionsGetter) (groupInfo genericapiserver.APIGroupInfo, enabled bool)
 }
 
+// Complete fills in any fields not set that are required to have valid data. It's mutating the receiver.
+func (c *Config) Complete() *Config {
+	c.Config.Complete()
+
+	// enable swagger UI only if general UI support is on
+	c.Config.EnableSwaggerUI = c.Config.EnableSwaggerUI && c.EnableUISupport
+
+	return c
+}
+
 // New returns a new instance of Master from the given config.
 // Certain config fields will be set to a default value if unset.
 // Certain config fields must be specified, including:
@@ -199,9 +209,7 @@ func (c *Config) New() (*Master, error) {
 		return nil, fmt.Errorf("Master.New() called with config.KubeletClient == nil")
 	}
 
-	gc := *c.Config                                              // copy before mutations
-	gc.EnableSwaggerUI = gc.EnableSwaggerUI && c.EnableUISupport // disable swagger UI if general UI supports it
-	s, err := gc.New()
+	s, err := c.Config.New()
 	if err != nil {
 		return nil, err
 	}
