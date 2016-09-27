@@ -77,17 +77,18 @@ type testCase struct {
 	desiredReplicas int32
 
 	// CPU target utilization as a percentage of the requested resources.
-	CPUTarget           int32
-	CPUCurrent          int32
-	verifyCPUCurrent    bool
-	reportedLevels      []uint64
-	reportedCPURequests []resource.Quantity
-	cmTarget            *extensions.CustomMetricTargetList
-	scaleUpdated        bool
-	statusUpdated       bool
-	eventCreated        bool
-	verifyEvents        bool
-	useMetricsApi       bool
+	CPUTarget            int32
+	CPUCurrent           int32
+	verifyCPUCurrent     bool
+	reportedLevels       []uint64
+	reportedCPURequests  []resource.Quantity
+	reportedPodReadiness []api.ConditionStatus
+	cmTarget             *extensions.CustomMetricTargetList
+	scaleUpdated         bool
+	statusUpdated        bool
+	eventCreated         bool
+	verifyEvents         bool
+	useMetricsApi        bool
 	// Channel with names of HPA objects which we have reconciled.
 	processed chan string
 
@@ -125,7 +126,9 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 	tc.statusUpdated = false
 	tc.eventCreated = false
 	tc.processed = make(chan string, 100)
-	tc.computeCPUCurrent()
+	if tc.CPUCurrent == 0 {
+		tc.computeCPUCurrent()
+	}
 
 	// TODO(madhusudancs): HPA only supports resources in extensions/v1beta1 right now. Add
 	// tests for "v1" replicationcontrollers when HPA adds support for cross-group scale.
@@ -248,10 +251,20 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 
 		obj := &api.PodList{}
 		for i := 0; i < len(tc.reportedCPURequests); i++ {
+			podReadiness := api.ConditionTrue
+			if tc.reportedPodReadiness != nil {
+				podReadiness = tc.reportedPodReadiness[i]
+			}
 			podName := fmt.Sprintf("%s-%d", podNamePrefix, i)
 			pod := api.Pod{
 				Status: api.PodStatus{
 					Phase: api.PodRunning,
+					Conditions: []api.PodCondition{
+						{
+							Type:   api.PodReady,
+							Status: podReadiness,
+						},
+					},
 				},
 				ObjectMeta: api.ObjectMeta{
 					Name:      podName,
@@ -505,6 +518,40 @@ func TestScaleUp(t *testing.T) {
 		reportedLevels:      []uint64{300, 500, 700},
 		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
 		useMetricsApi:       true,
+	}
+	tc.runTest(t)
+}
+
+func TestScaleUpUnreadyLessScale(t *testing.T) {
+	tc := testCase{
+		minReplicas:          2,
+		maxReplicas:          6,
+		initialReplicas:      3,
+		desiredReplicas:      4,
+		CPUTarget:            30,
+		CPUCurrent:           40,
+		verifyCPUCurrent:     true,
+		reportedLevels:       []uint64{300, 500, 700},
+		reportedCPURequests:  []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+		reportedPodReadiness: []api.ConditionStatus{api.ConditionFalse, api.ConditionTrue, api.ConditionTrue},
+		useMetricsApi:        true,
+	}
+	tc.runTest(t)
+}
+
+func TestScaleUpUnreadyNoScale(t *testing.T) {
+	tc := testCase{
+		minReplicas:          2,
+		maxReplicas:          6,
+		initialReplicas:      3,
+		desiredReplicas:      3,
+		CPUTarget:            30,
+		CPUCurrent:           30,
+		verifyCPUCurrent:     true,
+		reportedLevels:       []uint64{300, 500, 700},
+		reportedCPURequests:  []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+		reportedPodReadiness: []api.ConditionStatus{api.ConditionTrue, api.ConditionFalse, api.ConditionFalse},
+		useMetricsApi:        true,
 	}
 	tc.runTest(t)
 }

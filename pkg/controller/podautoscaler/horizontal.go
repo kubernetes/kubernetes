@@ -148,7 +148,7 @@ func (a *HorizontalController) computeReplicasForCPUUtilization(hpa *autoscaling
 		a.eventRecorder.Event(hpa, api.EventTypeWarning, "InvalidSelector", errMsg)
 		return 0, nil, time.Time{}, fmt.Errorf(errMsg)
 	}
-	currentUtilization, timestamp, err := a.metricsClient.GetCPUUtilization(hpa.Namespace, selector)
+	currentUtilization, utilizationInfo, err := a.metricsClient.GetCPUUtilization(hpa.Namespace, selector)
 
 	// TODO: what to do on partial errors (like metrics obtained for 75% of pods).
 	if err != nil {
@@ -159,11 +159,31 @@ func (a *HorizontalController) computeReplicasForCPUUtilization(hpa *autoscaling
 	utilization := int32(*currentUtilization)
 
 	usageRatio := float64(utilization) / float64(targetUtilization)
-	if math.Abs(1.0-usageRatio) > tolerance {
-		return int32(math.Ceil(usageRatio * float64(currentReplicas))), &utilization, timestamp, nil
+	if math.Abs(1.0-usageRatio) <= tolerance {
+		// if the change was too small, ignore it
+		return currentReplicas, &utilization, utilizationInfo.OldestTimestamp, nil
 	}
 
-	return currentReplicas, &utilization, timestamp, nil
+	// for unready pods, in the case of scale up, check to see if treating those pods as having a mock
+	// CPU utilization would change things
+	if utilizationInfo.UnreadyPodsCount > 0 && usageRatio > 1.0 {
+		// check if treating unready pods as having 0 CPU usage would change things
+		newUtilization := (*currentUtilization * utilizationInfo.ReadyPodsCount) / (utilizationInfo.ReadyPodsCount + utilizationInfo.UnreadyPodsCount)
+		newUsageRatio := float64(newUtilization) / float64(targetUtilization)
+
+		// simply don't scale if the new usage ratio would mean a downscale or no scale
+		if newUsageRatio < 0 || math.Abs(1.0-newUsageRatio) <= tolerance {
+			return currentReplicas, &utilization, utilizationInfo.OldestTimestamp, nil
+		}
+
+		// set the usage ratio to scale by to our new usage ratio (which may be a bit more conservative)
+		usageRatio = newUsageRatio
+
+		// TODO: do we want the HPA to report the actual utilization, or the rectified utilization we compute here?
+		utilization = int32(newUtilization)
+	}
+
+	return int32(math.Ceil(usageRatio * float64(currentReplicas))), &utilization, utilizationInfo.OldestTimestamp, nil
 }
 
 // Computes the desired number of replicas based on the CustomMetrics passed in cmAnnotation as json-serialized
@@ -205,7 +225,7 @@ func (a *HorizontalController) computeReplicasForCustomMetrics(hpa *autoscaling.
 			a.eventRecorder.Event(hpa, api.EventTypeWarning, "InvalidSelector", errMsg)
 			return 0, "", "", time.Time{}, fmt.Errorf("couldn't convert selector string to a corresponding selector object: %v", err)
 		}
-		value, currentTimestamp, err := a.metricsClient.GetCustomMetric(customMetricTarget.Name, hpa.Namespace, selector)
+		value, utilizationInfo, err := a.metricsClient.GetCustomMetric(customMetricTarget.Name, hpa.Namespace, selector)
 		// TODO: what to do on partial errors (like metrics obtained for 75% of pods).
 		if err != nil {
 			a.eventRecorder.Event(hpa, api.EventTypeWarning, "FailedGetCustomMetrics", err.Error())
@@ -221,7 +241,7 @@ func (a *HorizontalController) computeReplicasForCustomMetrics(hpa *autoscaling.
 			replicaCountProposal = currentReplicas
 		}
 		if replicaCountProposal > replicas {
-			timestamp = currentTimestamp
+			timestamp = utilizationInfo.OldestTimestamp
 			replicas = replicaCountProposal
 			metric = fmt.Sprintf("Custom metric %s", customMetricTarget.Name)
 		}
