@@ -21,20 +21,22 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apiserver/request"
+	"errors"
+	"fmt"
 )
 
 // WithRequestInfo attaches a RequestInfo to the context.
 func WithRequestInfo(handler http.Handler, resolver *request.RequestInfoResolver, requestContextMapper api.RequestContextMapper) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		info, err := resolver.GetRequestInfo(req)
-		if err == nil {
-
+		ctx, ok := requestContextMapper.Get(req)
+		if !ok {
+			internalError(w, req, errors.New("no context found for request"))
+			return
 		}
 
-		ctx, exist := requestContextMapper.Get(req)
-		if !exist {
-			forbidden(w, req)
-			return
+		info, err := resolver.GetRequestInfo(req)
+		if err != nil {
+			internalError(w, req, fmt.Errorf("failed to create RequestInfo: %v", err))
 		}
 
 		requestContextMapper.Update(req, request.WithRequestInfo(ctx, info))
