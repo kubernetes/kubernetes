@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cache
+package testing
 
 import (
 	"fmt"
@@ -22,6 +22,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/client-go/1.5/pkg/api"
 	"k8s.io/client-go/1.5/pkg/api/errors"
+	"k8s.io/client-go/1.5/pkg/api/meta"
 	"k8s.io/client-go/1.5/pkg/api/unversioned"
 	"k8s.io/client-go/1.5/pkg/apis/apps"
 	"k8s.io/client-go/1.5/pkg/apis/batch"
@@ -31,104 +32,66 @@ import (
 	"k8s.io/client-go/1.5/pkg/labels"
 )
 
-//  TODO: generate these classes and methods for all resources of interest using
-// a script.  Can use "go generate" once 1.4 is supported by all users.
+type AppendFunc func(interface{})
 
-// StoreToPodLister makes a Store have the List method of the client.PodInterface
-// The Store must contain (only) Pods.
-//
-// Example:
-// s := cache.NewStore()
-// lw := cache.ListWatch{Client: c, FieldSelector: sel, Resource: "pods"}
-// r := cache.NewReflector(lw, &api.Pod{}, s).Run()
-// l := StoreToPodLister{s}
-// l.List()
-type StoreToPodLister struct {
-	Indexer
-}
-
-// Please note that selector is filtering among the pods that have gotten into
-// the store; there may have been some filtering that already happened before
-// that.
-// We explicitly don't return api.PodList, to avoid expensive allocations, which
-// in most cases are unnecessary.
-func (s *StoreToPodLister) List(selector labels.Selector) (pods []*api.Pod, err error) {
-	for _, m := range s.Indexer.List() {
-		pod := m.(*api.Pod)
-		if selector.Matches(labels.Set(pod.Labels)) {
-			pods = append(pods, pod)
+func ListAll(store Store, selector labels.Selector, appendFn AppendFunc) error {
+	for _, m := range store.List() {
+		metadata, err := meta.Accessor(m)
+		if err != nil {
+			return err
+		}
+		if selector.Matches(labels.Set(metadata.GetLabels())) {
+			appendFn(m)
 		}
 	}
-	return pods, nil
+	return nil
 }
 
-// Pods is taking baby steps to be more like the api in pkg/client
-func (s *StoreToPodLister) Pods(namespace string) storePodsNamespacer {
-	return storePodsNamespacer{s.Indexer, namespace}
-}
-
-type storePodsNamespacer struct {
-	indexer   Indexer
-	namespace string
-}
-
-// Please note that selector is filtering among the pods that have gotten into
-// the store; there may have been some filtering that already happened before
-// that.
-// We explicitly don't return api.PodList, to avoid expensive allocations, which
-// in most cases are unnecessary.
-func (s storePodsNamespacer) List(selector labels.Selector) (pods []*api.Pod, err error) {
-	if s.namespace == api.NamespaceAll {
-		for _, m := range s.indexer.List() {
-			pod := m.(*api.Pod)
-			if selector.Matches(labels.Set(pod.Labels)) {
-				pods = append(pods, pod)
+func ListAllByNamespace(indexer Indexer, namespace string, selector labels.Selector, appendFn AppendFunc) error {
+	if namespace == api.NamespaceAll {
+		for _, m := range indexer.List() {
+			metadata, err := meta.Accessor(m)
+			if err != nil {
+				return err
+			}
+			if selector.Matches(labels.Set(metadata.GetLabels())) {
+				appendFn(m)
 			}
 		}
-		return pods, nil
+		return nil
 	}
 
-	key := &api.Pod{ObjectMeta: api.ObjectMeta{Namespace: s.namespace}}
-	items, err := s.indexer.Index(NamespaceIndex, key)
+	items, err := indexer.Index(NamespaceIndex, api.ObjectMeta{Namespace: namespace})
 	if err != nil {
 		// Ignore error; do slow search without index.
 		glog.Warningf("can not retrieve list of objects using index : %v", err)
-		for _, m := range s.indexer.List() {
-			pod := m.(*api.Pod)
-			if s.namespace == pod.Namespace && selector.Matches(labels.Set(pod.Labels)) {
-				pods = append(pods, pod)
+		for _, m := range indexer.List() {
+			metadata, err := meta.Accessor(m)
+			if err != nil {
+				return err
 			}
+			if metadata.GetNamespace() == namespace && selector.Matches(labels.Set(metadata.GetLabels())) {
+				appendFn(m)
+			}
+
 		}
-		return pods, nil
+		return nil
 	}
 	for _, m := range items {
-		pod := m.(*api.Pod)
-		if selector.Matches(labels.Set(pod.Labels)) {
-			pods = append(pods, pod)
+		metadata, err := meta.Accessor(m)
+		if err != nil {
+			return err
+		}
+		if selector.Matches(labels.Set(metadata.GetLabels())) {
+			appendFn(m)
 		}
 	}
-	return pods, nil
+
+	return nil
 }
 
-func (s storePodsNamespacer) Get(name string) (*api.Pod, error) {
-	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(api.Resource("pod"), name)
-	}
-	return obj.(*api.Pod), nil
-}
-
-// Exists returns true if a pod matching the namespace/name of the given pod exists in the store.
-func (s *StoreToPodLister) Exists(pod *api.Pod) (bool, error) {
-	_, exists, err := s.Indexer.Get(pod)
-	if err != nil {
-		return false, err
-	}
-	return exists, nil
-}
+//  TODO: generate these classes and methods for all resources of interest using
+// a script.  Can use "go generate" once 1.4 is supported by all users.
 
 // NodeConditionPredicate is a function that indicates whether the given node's conditions meet
 // some set of criteria defined by the function.
@@ -552,47 +515,6 @@ func (s *StoreToDaemonSetLister) GetPodDaemonSets(pod *api.Pod) (daemonSets []ex
 	if len(daemonSets) == 0 {
 		err = fmt.Errorf("could not find daemon set for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
 	}
-	return
-}
-
-// StoreToServiceLister makes a Store that has the List method of the client.ServiceInterface
-// The Store must contain (only) Services.
-type StoreToServiceLister struct {
-	Store
-}
-
-func (s *StoreToServiceLister) List() (services api.ServiceList, err error) {
-	for _, m := range s.Store.List() {
-		services.Items = append(services.Items, *(m.(*api.Service)))
-	}
-	return services, nil
-}
-
-// TODO: Move this back to scheduler as a helper function that takes a Store,
-// rather than a method of StoreToServiceLister.
-func (s *StoreToServiceLister) GetPodServices(pod *api.Pod) (services []api.Service, err error) {
-	var selector labels.Selector
-	var service api.Service
-
-	for _, m := range s.Store.List() {
-		service = *m.(*api.Service)
-		// consider only services that are in the same namespace as the pod
-		if service.Namespace != pod.Namespace {
-			continue
-		}
-		if service.Spec.Selector == nil {
-			// services with nil selectors match nothing, not everything.
-			continue
-		}
-		selector = labels.Set(service.Spec.Selector).AsSelectorPreValidated()
-		if selector.Matches(labels.Set(pod.Labels)) {
-			services = append(services, service)
-		}
-	}
-	if len(services) == 0 {
-		err = fmt.Errorf("could not find service for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
-	}
-
 	return
 }
 

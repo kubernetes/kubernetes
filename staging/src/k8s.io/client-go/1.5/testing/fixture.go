@@ -60,7 +60,7 @@ type ObjectScheme interface {
 	runtime.ObjectTyper
 }
 
-// ObjectReaction returns a ReactionFunc that applies testing.Action to
+// ObjectReaction returns a ReactionFunc that applies core.Action to
 // the given tracker.
 func ObjectReaction(tracker ObjectTracker, mapper meta.RESTMapper) ReactionFunc {
 	return func(action Action) (bool, runtime.Object, error) {

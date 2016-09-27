@@ -25,16 +25,6 @@ import (
 	"k8s.io/client-go/1.5/pkg/util/sets"
 )
 
-var RESTMapper meta.RESTMapper
-
-func init() {
-	RESTMapper = meta.MultiRESTMapper{}
-}
-
-func RegisterRESTMapper(m meta.RESTMapper) {
-	RESTMapper = append(RESTMapper.(meta.MultiRESTMapper), m)
-}
-
 // Instantiates a DefaultRESTMapper based on types registered in api.Scheme
 func NewDefaultRESTMapper(defaultGroupVersions []unversioned.GroupVersion, interfacesFunc meta.VersionInterfacesFunc,
 	importPathPrefix string, ignoredKinds, rootScoped sets.String) *meta.DefaultRESTMapper {

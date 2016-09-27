@@ -54,7 +54,7 @@ type RESTClient struct {
 	// contentConfig is the information used to communicate with the server.
 	contentConfig ContentConfig
 
-	// serializers contain all serializers for undelying content type.
+	// serializers contain all serializers for underlying content type.
 	serializers Serializers
 
 	// creates BackoffManager that is passed to requests.

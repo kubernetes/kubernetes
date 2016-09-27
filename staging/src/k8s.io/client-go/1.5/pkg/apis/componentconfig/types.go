@@ -427,6 +427,9 @@ type KubeletConfiguration struct {
 	IPTablesDropBit int32 `json:"iptablesDropBit"`
 	// Whitelist of unsafe sysctls or sysctl patterns (ending in *).
 	AllowedUnsafeSysctls []string `json:"experimentalAllowedUnsafeSysctls,omitempty"`
+	// How to integrate with runtime. If set to cri, kubelet will switch to
+	// using the new Container Runtine Interface.
+	ExperimentalRuntimeIntegrationType string `json:"experimentalRuntimeIntegrationType,omitempty"`
 }
 
 type KubeSchedulerConfiguration struct {
