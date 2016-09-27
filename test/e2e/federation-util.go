@@ -296,13 +296,20 @@ func cleanupServiceShardsAndProviderResources(namespace string, service *v1.Serv
 		err := wait.PollImmediate(framework.Poll, FederatedServiceTimeout, func() (bool, error) {
 			var err error
 			cSvc, err = c.Clientset.Services(namespace).Get(service.Name)
-			if err != nil && !errors.IsNotFound(err) {
-				// Get failed with an error, try again.
-				framework.Logf("Failed to find service %q in namespace %q, in cluster %q: %v. Trying again in %s", service.Name, namespace, name, err, framework.Poll)
+			if err == nil {
+				By(fmt.Sprintf("Service %q in namespace %q in cluster %q found", service.Name, namespace, name))
+				return true, nil
+			} else if errors.IsNotFound(err) {
+				// Not found yet try again.
+				framework.Logf("Service %q in namespace %q in cluster %q not found, trying again in %s: %v.", service.Name, namespace, name, framework.Poll, err)
+				cSvc = nil
 				return false, nil
+			} else {
+				// Get failed with some other error, fail.
+				framework.Logf("Failed to find service %q in namespace %q, in cluster %q: %v.", service.Name, namespace, name, err)
+				cSvc = nil
+				return false, err
 			}
-			By(fmt.Sprintf("Service %q in namespace %q in cluster %q found", service.Name, namespace, name))
-			return true, nil
 		})
 
 		if err != nil || cSvc == nil {
