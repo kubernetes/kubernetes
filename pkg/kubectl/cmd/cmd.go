@@ -255,7 +255,7 @@ Find more information at https://github.com/kubernetes/kubernetes.`,
 		{
 			Message: "Basic Commands (Intermediate):",
 			Commands: []*cobra.Command{
-				NewCmdGet(cmds.Root().CommandPath(), f, out, err),
+				NewCmdGet(f, out, err),
 				NewCmdExplain(f, out, err),
 				NewCmdEdit(f, out, err),
 				NewCmdDelete(f, out),
