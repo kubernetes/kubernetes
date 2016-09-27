@@ -115,7 +115,7 @@ Resources can be divided between first-class resources (memory, cpu, disk, etc.)
 
 Other resource types can include (e.g. see [resource types](../../docs/design/resources.md#resource-types)):
 
-* Network bandwith (a.k.a NIC b/w)
+* Network bandwidth (a.k.a NIC b/w)
 * Network operations
 * Network packets per second
 * Storage space
@@ -192,7 +192,7 @@ For instance, Kubelet admission controller can have more knowledge not reported 
 
 ### Future aspects to consider
 
-One could take into account [shared resources](http://kubernetes.io/docs/user-guide/compute-resources/#planned-improvements) when predicting free capacity (with fragmenation) as well.
+One could take into account [shared resources](http://kubernetes.io/docs/user-guide/compute-resources/#planned-improvements) when predicting free capacity (with fragmentation) as well.
 Currently, limit and requests are supported for cpu and memory resource types only.
 In future, the types can be extended to node disk space resources and custom [resource types](../../docs/design/resources.md#resource-types).
 
@@ -206,7 +206,7 @@ Allow cluster resources to be subdivided (https://github.com/kubernetes/kubernet
 #### Resource quota
 
 [Resource quota](http://kubernetes.io/docs/admin/resourcequota/) can influence number of pods that can be scheduled [per namespace](http://kubernetes.io/docs/admin/resourcequota/#object-count-quota) as well.
-Though, this limitation is artifical and independent of limitation of the underlying system (e.g. amount of cores or memory of each node,
+Though, this limitation is artificial and independent of limitation of the underlying system (e.g. amount of cores or memory of each node,
 maximal number of GCE persistent disks per cloud), it can be taken into account in future implementations.
 
 Example: In a cluster with a capacity of 32 GiB RAM, and 16 cores, let team A use 20 Gib and 10 cores, let B use 10GiB and 4 cores, and hold 2GiB and 2 cores in reserve for future allocation.
@@ -214,7 +214,7 @@ Example: In a cluster with a capacity of 32 GiB RAM, and 16 cores, let team A us
 #### Federated scheduling
 
 Out of scope of the document.
-Can be implemented as an agreggation of cluster capacities of individual subclusters.
+Can be implemented as an aggregation of cluster capacities of individual sub-clusters.
 
 #### Multiple schedulers
 
@@ -226,7 +226,7 @@ For that reason, Kubernetes allows to specify [multiple schedulers](https://gith
 Scheduler can extend its predicates/priority functions by delegating to [external processes](https://github.com/kubernetes/kubernetes/blob/master/docs/design/scheduler_extender.md).
 As the extensions are part of a scheduling algorithm, there is no need to consider them.
 
-## Implemenation
+## Implementation
 
 Goals:
 
@@ -254,7 +254,7 @@ Scheduling itself (``Schedule``) consists of the following [steps](../../plugin/
 1. pick the most suitable node ``g.selectHost``
 
 Scheduler keeps a number of caches which capture the current state of the cluster.
-Pod cache is continuosly updated [outside](../../plugin/pkg/scheduler/factory/factory.go#L128) the scheduler.
+Pod cache is continuously updated [outside](../../plugin/pkg/scheduler/factory/factory.go#L128) the scheduler.
 The same holds for the [list of nodes](../../plugin/pkg/scheduler/factory/factory.go#L140).
 
 As the individual predicates and priority functions need to query other objects such as services, controllers, etc.,
@@ -266,7 +266,7 @@ other caches are populated as well:
 * Controller cache
 * ReplicaSet cache
 
-All caches are continuosly updated via [reflectors](../../plugin/pkg/scheduler/factory/factory.go#L387).
+All caches are continuously updated via [reflectors](../../plugin/pkg/scheduler/factory/factory.go#L387).
 
 Once the reflectors are destroyed, no cache is updated anymore.
 
@@ -295,7 +295,7 @@ At this point the prediction starts:
 
 #### Scheduler
 
-For purposes of the prediction we need lightweighted version of the [scheduler](../../plugin/pkg/scheduler/scheduler.go).
+For purposes of the prediction we need light-weighted version of the [scheduler](../../plugin/pkg/scheduler/scheduler.go).
 No need for metrics, event recorder or pod updater.
 The binding can hide the actual computation of consumed resources.
 
@@ -371,11 +371,11 @@ It is possible to use the same scheduler and use empty event recorder and metric
 #### Binding and local client
 
 When a pod is scheduled, scheduler's caches are populated with the current state of the cluster.
-The population is done through client quering the Apiserver.
+The population is done through client querying the Apiserver.
 Once a pod is scheduled it is bind back to the Apiserver.
 Kubelet acknowledge the pod and makes sure all containers specified in the pod are running.
 Kubelet reflects the new pod and reports the state back to the Apiserver.
-As scheduler's caches are continuosly updated (through functions implementing ``Watch`` and ``List`` interface),
+As scheduler's caches are continuously updated (through functions implementing ``Watch`` and ``List`` interface),
 node statuses (consumed resources, volume claims, etc.) are updated and the process starts over.
 
 As the prediction works with the caches captured before prediction,
@@ -383,7 +383,7 @@ there is no communication with the Apiserver nor with the Kubelet.
 Thus, the client implementing the same API has to be introduced.
 Aim of the client is to provide:
 
-* lister and watcher for each affected object so the caches can be continuosly updated the same way
+* lister and watcher for each affected object so the caches can be continuously updated the same way
 * recomputation of the cluster state simulating the Kubelet's behaviour (e.g. increasing node's cpu or memory)
 
 At the same time, all operations are carried over local caches (different from the scheduler ones).
@@ -442,10 +442,10 @@ PodRequirements:
 The cluster can schedule 23 instance(s) of the pod.
 ```
 
-Optionaly, list of nodes individual pods get scheduled on can be returned.
+Optionally, list of nodes individual pods get scheduled on can be returned.
 Or report a reason which prevented the next pod from being scheduled.
 
-Additionaly, it may be useful to put boundaries on the number of scheduling iterations depending on cluster size or performance cost.
+Additionally, it may be useful to put boundaries on the number of scheduling iterations depending on cluster size or performance cost.
 In some situation it is sufficient to simulate scheduling of ``N`` instances of the pod and stop.
 
 ## Roadmap
