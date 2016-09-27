@@ -404,12 +404,14 @@ func (m *kubeGenericRuntimeManager) computePodContainerChanges(pod *api.Pod, pod
 		// keep all successfully completed containers up to and including the first failing container
 		for i, container := range pod.Spec.InitContainers {
 			containerStatus := podStatus.FindContainerStatusByName(container.Name)
-			switch {
-			case containerStatus == nil:
+			if containerStatus == nil {
 				continue
-			case containerStatus.State == kubecontainer.ContainerStateRunning:
+			}
+
+			switch containerStatus.State {
+			case kubecontainer.ContainerStateRunning:
 				changes.InitContainersToKeep[containerStatus.ID] = i
-			case containerStatus.State == kubecontainer.ContainerStateExited:
+			case kubecontainer.ContainerStateExited:
 				changes.InitContainersToKeep[containerStatus.ID] = i
 				if containerStatus.ExitCode != 0 {
 					initFailed = true
@@ -479,7 +481,7 @@ func (m *kubeGenericRuntimeManager) computePodContainerChanges(pod *api.Pod, pod
 		changes.InitContainersToKeep = make(map[kubecontainer.ContainerID]int)
 	}
 
-	// compute containers that to be killed
+	// compute containers to be killed
 	runningContainerStatuses := podStatus.GetRunningContainerStatuses()
 	for _, containerStatus := range runningContainerStatuses {
 		_, keep := changes.ContainersToKeep[containerStatus.ID]
@@ -642,18 +644,16 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *api.Pod, _ api.PodStatus, podSt
 
 	// Step 5: start init containers.
 	next, status, done := findActiveInitContainer(pod, podStatus)
-	if status != nil {
-		if status.ExitCode != 0 {
-			// container initialization has failed, flag the pod as failed
-			initContainerResult := kubecontainer.NewSyncResult(kubecontainer.InitContainer, status.Name)
-			initContainerResult.Fail(kubecontainer.ErrRunInitContainer, fmt.Sprintf("init container %q exited with %d", status.Name, status.ExitCode))
-			result.AddSyncResult(initContainerResult)
-			if pod.Spec.RestartPolicy == api.RestartPolicyNever {
-				utilruntime.HandleError(fmt.Errorf("error running pod %q init container %q, restart=Never: %#v", format.Pod(pod), status.Name, status))
-				return
-			}
-			utilruntime.HandleError(fmt.Errorf("Error running pod %q init container %q, restarting: %#v", format.Pod(pod), status.Name, status))
+	if status != nil && status.ExitCode != 0 {
+		// container initialization has failed, flag the pod as failed
+		initContainerResult := kubecontainer.NewSyncResult(kubecontainer.InitContainer, status.Name)
+		initContainerResult.Fail(kubecontainer.ErrRunInitContainer, fmt.Sprintf("init container %q exited with %d", status.Name, status.ExitCode))
+		result.AddSyncResult(initContainerResult)
+		if pod.Spec.RestartPolicy == api.RestartPolicyNever {
+			utilruntime.HandleError(fmt.Errorf("error running pod %q init container %q, restart=Never: %#v", format.Pod(pod), status.Name, status))
+			return
 		}
+		utilruntime.HandleError(fmt.Errorf("Error running pod %q init container %q, restarting: %#v", format.Pod(pod), status.Name, status))
 	}
 	if next != nil {
 		if len(podContainerChanges.ContainersToStart) == 0 {

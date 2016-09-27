@@ -123,6 +123,27 @@ func (m *kubeGenericRuntimeManager) sandboxToKubeContainer(s *runtimeApi.PodSand
 	}, nil
 }
 
+func getContainerSpec(pod *api.Pod, containerName string) *api.Container {
+	var containerSpec *api.Container
+
+	for i, c := range pod.Spec.Containers {
+		if containerName == c.Name {
+			containerSpec = &pod.Spec.Containers[i]
+			break
+		}
+	}
+	if containerSpec == nil {
+		for i, c := range pod.Spec.InitContainers {
+			if containerName == c.Name {
+				containerSpec = &pod.Spec.InitContainers[i]
+				break
+			}
+		}
+	}
+
+	return containerSpec
+}
+
 // milliCPUToShares converts milliCPU to CPU shares
 func milliCPUToShares(milliCPU int64) int64 {
 	if milliCPU == 0 {

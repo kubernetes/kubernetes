@@ -480,12 +480,7 @@ func (m *kubeGenericRuntimeManager) restoreSpecsFromContainerLabels(containerID 
 func (m *kubeGenericRuntimeManager) killContainer(pod *api.Pod, containerID kubecontainer.ContainerID, containerName string, reason string, gracePeriodOverride *int64) error {
 	var containerSpec *api.Container
 	if pod != nil {
-		for i, c := range pod.Spec.Containers {
-			if containerName == c.Name {
-				containerSpec = &pod.Spec.Containers[i]
-				break
-			}
-		}
+		containerSpec = getContainerSpec(pod, containerName)
 	} else {
 		// Restore necessary information if one of the specs is nil.
 		restoredPod, restoredContainer, err := m.restoreSpecsFromContainerLabels(containerID)
@@ -616,12 +611,13 @@ func findActiveInitContainer(pod *api.Pod, podStatus *kubecontainer.PodStatus) (
 	for i := len(pod.Spec.InitContainers) - 1; i >= 0; i-- {
 		container := &pod.Spec.InitContainers[i]
 		status := podStatus.FindContainerStatusByName(container.Name)
-		switch {
-		case status == nil:
+		if status == nil {
 			continue
-		case status.State == kubecontainer.ContainerStateRunning:
+		}
+		switch status.State {
+		case kubecontainer.ContainerStateRunning:
 			return nil, nil, false
-		case status.State == kubecontainer.ContainerStateExited:
+		case kubecontainer.ContainerStateExited:
 			switch {
 			// the container has failed, we'll have to retry
 			case status.ExitCode != 0:
