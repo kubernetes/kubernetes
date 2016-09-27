@@ -313,12 +313,7 @@ func (s *store) List(ctx context.Context, key, resourceVersion string, pred stor
 }
 
 // Watch implements storage.Interface.Watch.
-func (s *store) Watch(ctx context.Context, key string, resourceVersion string, pred storage.SelectionPredicate) (watch.Interface, error) {
-	return s.watch(ctx, key, resourceVersion, storage.SimpleFilter(pred), false)
-}
-
-// WatchList implements storage.Interface.WatchList.
-func (s *store) WatchList(ctx context.Context, key string, resourceVersion string, pred storage.SelectionPredicate) (watch.Interface, error) {
+func (s *store) Watch(ctx context.Context, key string, resourceVersion string, pred storage.SelectionPredicate, _ storage.KeyFunc) (watch.Interface, error) {
 	return s.watch(ctx, key, resourceVersion, storage.SimpleFilter(pred), true)
 }
 

@@ -18,6 +18,7 @@ package storage
 
 import (
 	"golang.org/x/net/context"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -91,6 +92,10 @@ func NewUIDPreconditions(uid string) *Preconditions {
 	return &Preconditions{UID: &u}
 }
 
+// KeyFunc is used to get single object key from ctx and name.
+// TODO: We will remove this type and use generic indexing in optimization path.
+type KeyFunc func(ctx api.Context, name string) (string, error)
+
 // Interface offers a common interface for object marshaling/unmarshaling operations and
 // hides all the storage-related operations behind it.
 type Interface interface {
@@ -106,19 +111,17 @@ type Interface interface {
 	// If key didn't exist, it will return NotFound storage error.
 	Delete(ctx context.Context, key string, out runtime.Object, preconditions *Preconditions) error
 
-	// Watch begins watching the specified key. Events are decoded into API objects,
-	// and any items selected by 'p' are sent down to returned watch.Interface.
+	// Watch begins watching the specified key's items. Items are decoded into API
+	// objects and any item selected by given predicate are sent down to returned watch.Interface.
 	// resourceVersion may be used to specify what version to begin watching,
 	// which should be the current resourceVersion, and no longer rv+1
 	// (e.g. reconnecting without missing any updates).
-	Watch(ctx context.Context, key string, resourceVersion string, p SelectionPredicate) (watch.Interface, error)
-
-	// WatchList begins watching the specified key's items. Items are decoded into API
-	// objects and any item selected by 'p' are sent down to returned watch.Interface.
-	// resourceVersion may be used to specify what version to begin watching,
-	// which should be the current resourceVersion, and no longer rv+1
-	// (e.g. reconnecting without missing any updates).
-	WatchList(ctx context.Context, key string, resourceVersion string, p SelectionPredicate) (watch.Interface, error)
+	// Optimization: if we are only interested in one item, internally we would do optimization
+	// to only deal with that specific item instead of selecting based on all items. KeyFunc parameter
+	// will be used in such case. The optimization is optional up to implementation.
+	// TODO: We will remove KeyFunc and use generic indexing in optimization path. We will also
+	// make the optimization default once we make storage layer always have caching.
+	Watch(ctx context.Context, key string, resourceVersion string, p SelectionPredicate, f KeyFunc) (watch.Interface, error)
 
 	// Get unmarshals json found at key into objPtr. On a not found error, will either
 	// return a zero object of the requested type, or an error, depending on ignoreNotFound.
