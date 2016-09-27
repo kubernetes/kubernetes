@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
+	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
@@ -50,8 +51,9 @@ type Builder struct {
 	stream bool
 	dir    bool
 
-	selector  labels.Selector
-	selectAll bool
+	selector      labels.Selector
+	fieldSelector fields.Selector
+	selectAll     bool
 
 	resources []string
 
@@ -597,7 +599,7 @@ func (b *Builder) visitBySelector() *Result {
 		if mapping.Scope.Name() != meta.RESTScopeNameNamespace {
 			selectorNamespace = ""
 		}
-		visitors = append(visitors, NewSelector(client, mapping, selectorNamespace, b.selector, b.export))
+		visitors = append(visitors, NewSelector(client, mapping, selectorNamespace, b.selector, b.fieldSelector, b.export))
 	}
 	if b.continueOnError {
 		return &Result{visitor: EagerVisitorList(visitors), sources: visitors}
