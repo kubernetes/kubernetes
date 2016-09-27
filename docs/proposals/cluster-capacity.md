@@ -43,29 +43,32 @@ Or, carry different steps that lead to increase of available resources.
 Cluster capacity consists of capacities of individual cluster nodes.
 Capacity covers cpu, memory, disk space and other resources.
 
+Goal is to analyse remaining allocatable resources and estimate available capacity that is still consumable.
+
 ## Motivation and use cases
 
-Scheduler decides which node a pod gets scheduled on.
-The decision depends on many factors such as: available cpu, memory, disk, volumes, etc.
+Scheduler decides on which node a pod gets scheduled.
+The decision depends on many factors such as available cpu, memory, disk, volumes, etc.
 As long as enough resources is available, pods are scheduled.
 On the other hand, when a pod can not be scheduled due to insufficient resources,
 admin is usually made aware too late.
 With knowledge of the current cluster capacity admin can be warned in advance.
-Resulting in addition of new nodes (horizontal scaling) or increase of resources of existing nodes (vertical scaling) before any pod becomes pending.
+Which can result in addition of new nodes (horizontal scaling) or increase of resources of existing nodes (vertical scaling) before any pod becomes pending.
 
 With introduction of ``kubectl top`` command (https://github.com/kubernetes/kubernetes/pull/28844),
-an admin can see the current usage (cpu, memory, storage) of individual nodes.
+an admin can see the actual utilization (cpu, memory, storage) of individual nodes.
 The command can answer question such as:
 
-* How many cpu/memory for a given node is used
+* How many cpu/memory for a given node is utilized
 * How many pods are running and how many resources they consume
 
-Similar usage can be retrieved with `kubectl describe node` (look for `Capacity` and `Allocated resources`).
+Allocated and overall resources of a node can be retrieved with `kubectl describe node` (look for `Capacity` and `Allocated resources`).
 `Pod` section shows individual pods and their resource consumption.
 
 Still, information about total amount of remaining capacity is not sufficient.
-As cluster capacity consists of capacities of individual nodes, the entire resource space is fragmented.
-At the same time as the Pod is the minimal schedulable unit, the cluster capacity is quantised.
+Cluster capacity consists of capacities of individual nodes and thus the entire resource space is fragmented.
+As the Pod is the minimal schedulable unit, entire cluster space can be seen as a collection of pods.
+Each pod corresponds to a quantum of resources causing the cluster capacity to be quantised.
 
 Thus, in order to get more precise estimation of remaining capacity,
 admin needs to be able to ask the cluster question "How many pods of given requirements can be scheduled".
@@ -114,7 +117,7 @@ Other resource types can include (e.g. see [resource types](../../docs/design/re
 
 * Network bandwith (a.k.a NIC b/w)
 * Network operations
-* Network packates per second
+* Network packets per second
 * Storage space
 * Storage time
 * Storage operations
@@ -175,7 +178,7 @@ I.e. simulate the pod scheduling and binding. The simulation consists of (not ex
 * update of scheduler caches based on scheduled pod
 
 Some consumed resources do not have to be specified in the pod (e.g. volume claims).
-These kind of consumed resources must be simulated accordingaly.
+These kind of consumed resources must be simulated accordingly.
 
 Once the current state is captured, prediction is no longer dependent on the cluster state.
 Thus, the estimation does not have to correspond to the real scheduling since:
@@ -183,6 +186,9 @@ Thus, the estimation does not have to correspond to the real scheduling since:
 * some nodes can be deleted, some nodes can be evacuated, some nodes can be re-labeled/re-annotated
 * some pods can get evicted in the time of analysis
 * remaining capacity of nodes can increase/decrease
+
+Scheduler does not have to be aware of all node constraints.
+For instance, Kubelet admission controller can have more knowledge not reported in node status.
 
 ### Future aspects to consider
 
@@ -200,7 +206,8 @@ Allow cluster resources to be subdivided (https://github.com/kubernetes/kubernet
 #### Resource quota
 
 [Resource quota](http://kubernetes.io/docs/admin/resourcequota/) can influence number of pods that can be scheduled [per namespace](http://kubernetes.io/docs/admin/resourcequota/#object-count-quota) as well.
-Though, this limitation is not hardware specific, it can be taken into account in future implementations.
+Though, this limitation is artifical and independent of limitation of the underlying system (e.g. amount of cores or memory of each node,
+maximal number of GCE persistent disks per cloud), it can be taken into account in future implementations.
 
 Example: In a cluster with a capacity of 32 GiB RAM, and 16 cores, let team A use 20 Gib and 10 cores, let B use 10GiB and 4 cores, and hold 2GiB and 2 cores in reserve for future allocation.
 
@@ -211,8 +218,13 @@ Can be implemented as an agreggation of cluster capacities of individual subclus
 
 #### Multiple schedulers
 
-Different workloads may requires different schedulers.
+Different workloads may require different schedulers.
 For that reason, Kubernetes allows to specify [multiple schedulers](https://github.com/kubernetes/kubernetes/blob/master/docs/proposals/multiple-schedulers.md) and annotate each pod with one of the schedulers.
+
+#### Scheduler extensions
+
+Scheduler can extend its predicates/priority functions by delegating to [external processes](https://github.com/kubernetes/kubernetes/blob/master/docs/design/scheduler_extender.md).
+As the extensions are part of a scheduling algorithm, there is no need to consider them.
 
 ## Implemenation
 
@@ -225,7 +237,7 @@ Goals:
 
 ### Code analysis
 
-Currently, each iteration of the scheduler consists of the following [steps](../../plugin/pkg/scheduler/scheduler.go#L93):
+Currently, each iteration of the default scheduler implementation consists of the following [steps](../../plugin/pkg/scheduler/scheduler.go#L93):
 
 1. ask for the next pod ``s.config.NextPod``
 1. schedule the pod ``s.config.Algorithm.Schedule``
@@ -269,10 +281,10 @@ The node info is then reflected in the scheduler cache and the process is repeat
 
 As all the caches are outside of any scheduling algorithm, the prediction is scheduling algorithm independent.
 Thus, based on the configuration, administrator can use various algorithms while keeping the same predictive framework.
-The only requirements for any scheduling algoritm is to implement ``ScheduleAlgorithm`` [interface](../../plugin/pkg/scheduler/algorithm/scheduler_interface.go).
+The only requirements for any scheduling algorithm is to implement ``ScheduleAlgorithm`` [interface](../../plugin/pkg/scheduler/algorithm/scheduler_interface.go).
 
 As all the caches are populated via reflectors and informers, the current state can be captured the same way as is done in the scheduler factory.
-Once populated, all reflectors and informeres are stopped since the predication is done independently of the cluster state.
+Once populated, all reflectors and informers are stopped since the predication is done independently of the cluster state.
 
 At this point the prediction starts:
 
@@ -431,6 +443,10 @@ The cluster can schedule 23 instance(s) of the pod.
 ```
 
 Optionaly, list of nodes individual pods get scheduled on can be returned.
+Or report a reason which prevented the next pod from being scheduled.
+
+Additionaly, it may be useful to put boundaries on the number of scheduling iterations depending on cluster size or performance cost.
+In some situation it is sufficient to simulate scheduling of ``N`` instances of the pod and stop.
 
 ## Roadmap
 
