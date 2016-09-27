@@ -36,7 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/volume"
+	volumepkg "k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/nestedpendingoperations"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
@@ -58,6 +58,10 @@ type Reconciler interface {
 	// volumes that should be attached are attached and volumes that should
 	// be detached are detached and trigger attach/detach operations as needed.
 	Run(sourcesReady config.SourcesReady, stopCh <-chan struct{})
+
+	// StatesHasBeenSynced returns true only after syncStates process starts to sync
+	// states at least once after kubelet starts
+	StatesHasBeenSynced() bool
 }
 
 // NewReconciler returns a new instance of Reconciler.
@@ -67,7 +71,7 @@ type Reconciler interface {
 //   this node, and therefore the volume manager should not
 // loopSleepDuration - the amount of time the reconciler loop sleeps between
 //   successive executions
-//   reconstructDuration - the amount of time the reconstruct sleeps between
+//   syncDuration - the amount of time the syncStates sleeps between
 //   successive executions
 // waitForAttachTimeout - the amount of time the Mount function will wait for
 //   the volume to be attached
@@ -83,20 +87,20 @@ func NewReconciler(
 	kubeClient internalclientset.Interface,
 	controllerAttachDetachEnabled bool,
 	loopSleepDuration time.Duration,
-	reconstructDuration time.Duration,
+	syncDuration time.Duration,
 	waitForAttachTimeout time.Duration,
 	hostName string,
 	desiredStateOfWorld cache.DesiredStateOfWorld,
 	actualStateOfWorld cache.ActualStateOfWorld,
 	operationExecutor operationexecutor.OperationExecutor,
 	mounter mount.Interface,
-	volumePluginMgr *volume.VolumePluginMgr,
+	volumePluginMgr *volumepkg.VolumePluginMgr,
 	kubeletPodsDir string) Reconciler {
 	return &reconciler{
 		kubeClient:                    kubeClient,
 		controllerAttachDetachEnabled: controllerAttachDetachEnabled,
 		loopSleepDuration:             loopSleepDuration,
-		reconstructDuration:           reconstructDuration,
+		syncDuration:                  syncDuration,
 		waitForAttachTimeout:          waitForAttachTimeout,
 		hostName:                      hostName,
 		desiredStateOfWorld:           desiredStateOfWorld,
@@ -105,7 +109,7 @@ func NewReconciler(
 		mounter:                       mounter,
 		volumePluginMgr:               volumePluginMgr,
 		kubeletPodsDir:                kubeletPodsDir,
-		timeOfLastReconstruct:         time.Now(),
+		timeOfLastSync:                time.Time{},
 	}
 }
 
@@ -113,16 +117,16 @@ type reconciler struct {
 	kubeClient                    internalclientset.Interface
 	controllerAttachDetachEnabled bool
 	loopSleepDuration             time.Duration
-	reconstructDuration           time.Duration
+	syncDuration                  time.Duration
 	waitForAttachTimeout          time.Duration
 	hostName                      string
 	desiredStateOfWorld           cache.DesiredStateOfWorld
 	actualStateOfWorld            cache.ActualStateOfWorld
 	operationExecutor             operationexecutor.OperationExecutor
 	mounter                       mount.Interface
-	volumePluginMgr               *volume.VolumePluginMgr
+	volumePluginMgr               *volumepkg.VolumePluginMgr
 	kubeletPodsDir                string
-	timeOfLastReconstruct         time.Time
+	timeOfLastSync                time.Time
 }
 
 func (rc *reconciler) Run(sourcesReady config.SourcesReady, stopCh <-chan struct{}) {
@@ -138,9 +142,9 @@ func (rc *reconciler) reconciliationLoopFunc(sourcesReady config.SourcesReady) f
 		// reconciler's reconstruct process may add incomplete volume information and cause confusion.
 		// In addition, if some sources are not ready, the reconstruct process may clean up pods' volumes
 		// that are still in use because desired states could not get a complete list of pods.
-		if sourcesReady.AllReady() && time.Since(rc.timeOfLastReconstruct) > rc.reconstructDuration {
+		if sourcesReady.AllReady() && time.Since(rc.timeOfLastSync) > rc.syncDuration {
 			glog.V(5).Infof("Sources are all ready, starting reconstruct state function")
-			rc.reconstruct()
+			rc.sync()
 		}
 	}
 }
@@ -291,12 +295,17 @@ func (rc *reconciler) reconcile() {
 					err)
 			}
 			if err == nil {
-				glog.Infof("MountVolume operation started for volume %q (spec.Name: %q) to pod %q (UID: %q). %s",
+				logMsg := fmt.Sprintf("MountVolume operation started for volume %q (spec.Name: %q) to pod %q (UID: %q). %s",
 					volumeToMount.VolumeName,
 					volumeToMount.VolumeSpec.Name(),
 					volumeToMount.PodName,
 					volumeToMount.Pod.UID,
 					remountingLogStr)
+				if remountingLogStr == "" {
+					glog.V(1).Infof(logMsg)
+				} else {
+					glog.V(5).Infof(logMsg)
+				}
 			}
 		}
 	}
@@ -365,18 +374,22 @@ func (rc *reconciler) reconcile() {
 	}
 }
 
-// reconstruct process tries to observe the real world by scanning all pods' volume directories from the disk.
+// sync process tries to observe the real world by scanning all pods' volume directories from the disk.
 // If the actual and desired state of worlds are not consistent with the observed world, it means that some
 // mounted volumes are left out probably during kubelet restart. This process will reconstruct
 // the volumes and udpate the actual and desired states. In the following reconciler loop, those volumes will
 // be cleaned up.
-func (rc *reconciler) reconstruct() {
-	defer rc.updateReconstructTime()
-	rc.reconstructStates(rc.kubeletPodsDir)
+func (rc *reconciler) sync() {
+	defer rc.updateLastSyncTime()
+	rc.syncStates(rc.kubeletPodsDir)
 }
 
-func (rc *reconciler) updateReconstructTime() {
-	rc.timeOfLastReconstruct = time.Now()
+func (rc *reconciler) updateLastSyncTime() {
+	rc.timeOfLastSync = time.Now()
+}
+
+func (rc *reconciler) StatesHasBeenSynced() bool {
+	return !rc.timeOfLastSync.IsZero()
 }
 
 type podVolume struct {
@@ -386,25 +399,39 @@ type podVolume struct {
 	pluginName     string
 }
 
+type reconstructedVolume struct {
+	volumeName          api.UniqueVolumeName
+	podName             volumetypes.UniquePodName
+	volumeSpec          *volumepkg.Spec
+	outerVolumeSpecName string
+	pod                 *api.Pod
+	pluginIsAttachable  bool
+	volumeGidValue      string
+	devicePath          string
+	reportedInUse       bool
+	mounter             volumepkg.Mounter
+}
+
 // reconstructFromDisk scans the volume directories under the given pod directory. If the volume is not
 // in either actual or desired state of world, or pending operation, this function will reconstruct
 // the volume spec and put it in both the actual and desired state of worlds. If no running
 // container is mounting the volume, the volume will be removed by desired state of world's populator and
 // cleaned up by the reconciler.
-func (rc *reconciler) reconstructStates(podsDir string) {
+func (rc *reconciler) syncStates(podsDir string) {
 	// Get volumes information by reading the pod's directory
 	podVolumes, err := getVolumesFromPodDir(podsDir)
 	if err != nil {
 		glog.Errorf("Cannot get volumes from disk %v", err)
 		return
 	}
+
+	volumesNeedUpdate := make(map[api.UniqueVolumeName]*reconstructedVolume)
 	for _, volume := range podVolumes {
-		volumeToMount, err := rc.reconstructVolume(volume)
+		reconstructedVolume, err := rc.reconstructVolume(volume)
 		if err != nil {
 			glog.Errorf("Could not construct volume information: %v", err)
 			continue
 		}
-
 		// Check if there is an pending operation for the given pod and volume.
 		// Need to check pending operation before checking the actual and desired
 		// states to avoid race condition during checking. For example, the following
@@ -412,26 +439,50 @@ func (rc *reconciler) reconstructStates(podsDir string) {
 		// 1. Checking the pod and it does not exist in either actual or desired state.
 		// 2. An operation for the given pod finishes and the actual state is updated.
 		// 3. Checking and there is no pending operation for the given pod.
-		if rc.operationExecutor.IsOperationPending(volumeToMount.VolumeName, volumeToMount.PodName) {
-			continue
-		}
-		desiredPods := rc.desiredStateOfWorld.GetPods()
-		actualPods := rc.actualStateOfWorld.GetPods()
-		if desiredPods[volume.podName] || actualPods[volume.podName] {
-			continue
+		// During state reconstruction period, no new volume operations could be issued. If the
+		// mounted path is not in either pending operation, or actual or desired states, this
+		// volume needs to be reconstructed back to the states.
+		pending := rc.operationExecutor.IsOperationPending(reconstructedVolume.volumeName, reconstructedVolume.podName)
+		dswExist := rc.desiredStateOfWorld.PodExistsInVolume(reconstructedVolume.podName, reconstructedVolume.volumeName)
+		aswExist, _, _ := rc.actualStateOfWorld.PodExistsInVolume(reconstructedVolume.podName, reconstructedVolume.volumeName)
+
+		if !rc.StatesHasBeenSynced() {
+			// In case this is the first time to reconstruct state after kubelet starts, for a persistant volume, it must have
+			// been mounted before kubelet restarts because no mount operations could be started at this time (node
+			// status has not yet been updated before this very first syncStates finishes, so that VerifyControllerAttachedVolume will fail),
+			// In this case, the volume state should be put back to actual state now no matter desired state has it or not.
+			// This is to prevent node status from being updated to empty for attachable volumes. This might happen because
+			// in the case that a volume is discovered on disk, and it is part of desired state, but is then quickly deleted
+			// from the desired state. If in such situation, the volume is not added to the actual state, the node status updater will
+			// not get this volume from either actual or desired state. In turn, this might cause master controller
+			// detaching while the volume is still mounted.
+			if aswExist || !reconstructedVolume.pluginIsAttachable {
+				continue
+			}
+		} else {
+			// Check pending first since no new operations could be started at this point.
+			// Otherwise there might a race condition in checking actual states and pending operations
+			if pending || dswExist || aswExist {
+				continue
+			}
 		}
 
-		glog.V(3).Infof(
-			"Could not find pod information in desired or actual states or pending operation, update it in both states: %+v",
-			volumeToMount)
-		if err = rc.updateStates(volumeToMount); err != nil {
+		glog.V(2).Infof(
+			"Reconciler sync states: could not find pod information in desired or actual states or pending operation, update it in both states: %+v",
+			reconstructedVolume)
+		volumesNeedUpdate[reconstructedVolume.volumeName] = reconstructedVolume
+
+	}
+	if len(volumesNeedUpdate) > 0 {
+		if err = rc.updateStates(volumesNeedUpdate); err != nil {
 			glog.Errorf("Error occurred during reconstruct volume from disk: %v", err)
 		}
 	}
+
 }
 
-// Reconstruct Volume object and volumeToMount data structure by reading the pod's volume directories
-func (rc *reconciler) reconstructVolume(volume podVolume) (*operationexecutor.VolumeToMount, error) {
+// Reconstruct Volume object and reconstructedVolume data structure by reading the pod's volume directories
+func (rc *reconciler) reconstructVolume(volume podVolume) (*reconstructedVolume, error) {
 	plugin, err := rc.volumePluginMgr.FindPluginByName(volume.pluginName)
 	if err != nil {
 		return nil, err
@@ -460,48 +511,83 @@ func (rc *reconciler) reconstructVolume(volume podVolume) (*operationexecutor.Vo
 		uniqueVolumeName = volumehelper.GetUniqueVolumeNameForNonAttachableVolume(volume.podName, plugin, volumeSpec)
 	}
 
-	volumeToMount := &operationexecutor.VolumeToMount{
-		VolumeName:          uniqueVolumeName,
-		PodName:             volume.podName,
-		VolumeSpec:          volumeSpec,
-		OuterVolumeSpecName: volumeName, /*volumeName is InnerVolumeSpecName. But this information will not be used for cleanup*/
-		Pod:                 pod,
-		PluginIsAttachable:  attachablePlugin != nil,
-		VolumeGidValue:      "",
-		DevicePath:          "",
+	volumeMounter, newMounterErr := plugin.NewMounter(
+		volumeSpec,
+		pod,
+		volumepkg.VolumeOptions{})
+	if newMounterErr != nil {
+		return nil, fmt.Errorf(
+			"MountVolume.NewMounter failed for volume %q (spec.Name: %q) pod %q (UID: %q) with: %v",
+			uniqueVolumeName,
+			volumeSpec.Name(),
+			volume.podName,
+			pod.UID,
+			newMounterErr)
 	}
-	return volumeToMount, nil
+
+	reconstructedVolume := &reconstructedVolume{
+		volumeName:          uniqueVolumeName,
+		podName:             volume.podName,
+		volumeSpec:          volumeSpec,
+		outerVolumeSpecName: volumeName, /* volumeName is InnerVolumeSpecName. But this information will not be used for cleanup */
+		pod:                 pod,
+		pluginIsAttachable:  attachablePlugin != nil,
+		volumeGidValue:      "",
+		devicePath:          "",
+		mounter:             volumeMounter,
+	}
+	return reconstructedVolume, nil
 }
 
-func (rc *reconciler) updateStates(volumeToMount *operationexecutor.VolumeToMount) error {
-	err := rc.actualStateOfWorld.MarkVolumeAsAttached(
-		volumeToMount.VolumeName, volumeToMount.VolumeSpec, "", volumeToMount.DevicePath)
-	if err != nil {
-		return fmt.Errorf("Could not add volume information to actual state of world: %v", err)
-	}
-	err = rc.actualStateOfWorld.AddPodToVolume(
-		volumeToMount.PodName,
-		types.UID(volumeToMount.PodName),
-		volumeToMount.VolumeName,
-		nil,
-		volumeToMount.OuterVolumeSpecName,
-		volumeToMount.DevicePath)
-	if err != nil {
-		return fmt.Errorf("Could not add pod to volume information to actual state of world: %v", err)
-	}
-	if volumeToMount.PluginIsAttachable {
-		err = rc.actualStateOfWorld.MarkDeviceAsMounted(volumeToMount.VolumeName)
-		if err != nil {
-			return fmt.Errorf("Could not mark device is mounted to actual state of world: %v", err)
+func (rc *reconciler) updateStates(volumesNeedUpdate map[api.UniqueVolumeName]*reconstructedVolume) error {
+	// Get the node status to retrieve volume device path information.
+	node, fetchErr := rc.kubeClient.Core().Nodes().Get(rc.hostName)
+	if fetchErr != nil {
+		glog.Errorf("updateStates in reconciler: could not get node status with error %v", fetchErr)
+	} else {
+		for _, attachedVolume := range node.Status.VolumesAttached {
+			if volume, exists := volumesNeedUpdate[attachedVolume.Name]; exists {
+				volume.devicePath = attachedVolume.DevicePath
+				volumesNeedUpdate[attachedVolume.Name] = volume
+				glog.V(4).Infof("Get devicePath from node status for volume (%q): %q", attachedVolume.Name, volume.devicePath)
+			}
 		}
 	}
-	_, err = rc.desiredStateOfWorld.AddPodToVolume(volumeToMount.PodName,
-		volumeToMount.Pod,
-		volumeToMount.VolumeSpec,
-		volumeToMount.OuterVolumeSpecName,
-		volumeToMount.VolumeGidValue)
-	if err != nil {
-		return fmt.Errorf("Could not add pod to volume information to desired state of world: %v", err)
+
+	for _, volume := range volumesNeedUpdate {
+		err := rc.actualStateOfWorld.MarkVolumeAsAttached(
+			volume.volumeName, volume.volumeSpec, "" /* nodeName */, volume.devicePath)
+		if err != nil {
+			glog.Errorf("Could not add volume information to actual state of world: %v", err)
+			continue
+		}
+
+		err = rc.actualStateOfWorld.AddPodToVolume(
+			volume.podName,
+			types.UID(volume.podName),
+			volume.volumeName,
+			volume.mounter,
+			volume.outerVolumeSpecName,
+			volume.devicePath)
+		if err != nil {
+			glog.Errorf("Could not add pod to volume information to actual state of world: %v", err)
+			continue
+		}
+		if volume.pluginIsAttachable {
+			err = rc.actualStateOfWorld.MarkDeviceAsMounted(volume.volumeName)
+			if err != nil {
+				glog.Errorf("Could not mark device is mounted to actual state of world: %v", err)
+				continue
+			}
+		}
+		_, err = rc.desiredStateOfWorld.AddPodToVolume(volume.podName,
+			volume.pod,
+			volume.volumeSpec,
+			volume.outerVolumeSpecName,
+			volume.volumeGidValue)
+		if err != nil {
+			glog.Errorf("Could not add pod to volume information to desired state of world: %v", err)
+		}
 	}
 	return nil
 }

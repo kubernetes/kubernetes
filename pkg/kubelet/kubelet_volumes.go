@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/securitycontext"
 	"k8s.io/kubernetes/pkg/types"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/selinux"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/volume"
@@ -153,8 +154,20 @@ func (kl *Kubelet) cleanupOrphanedPodDirs(
 			continue
 		}
 		// Check whether volume is still mounted on disk. If so, do not delete directory
-		if volumeNames, err := kl.getPodVolumeNameListFromDisk(uid); err != nil || len(volumeNames) != 0 {
-			glog.V(3).Infof("Orphaned pod %q found, but volumes are still mounted; err: %v, volumes: %v ", uid, err, volumeNames)
+		volumePaths, err := kl.getPodVolumePathListFromDisk(uid)
+		if err != nil {
+			glog.Errorf("Orphaned pod %q found, but error %v occured during reading volume dir from disk", uid, err)
+			continue
+		} else if len(volumePaths) > 0 {
+			for _, path := range volumePaths {
+				notMount, err := mount.IsNotMountPoint(path)
+				if err == nil && notMount {
+					glog.V(2).Infof("Volume path %q is no longer mounted, remove it", path)
+					os.Remove(path)
+				} else {
+					glog.Errorf("Orphaned pod %q found, but it might still mounted with error %v", uid, err)
+				}
+			}
 			continue
 		}
 

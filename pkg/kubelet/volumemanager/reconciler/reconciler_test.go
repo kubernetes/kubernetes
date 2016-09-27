@@ -41,8 +41,8 @@ import (
 const (
 	// reconcilerLoopSleepDuration is the amount of time the reconciler loop
 	// waits between successive executions
-	reconcilerLoopSleepDuration      time.Duration = 0 * time.Millisecond
-	reconcilerReconstructSleepPeriod time.Duration = 10 * time.Minute
+	reconcilerLoopSleepDuration     time.Duration = 0 * time.Millisecond
+	reconcilerSyncStatesSleepPeriod time.Duration = 10 * time.Minute
 	// waitForAttachTimeout is the maximum amount of time a
 	// operationexecutor.Mount call will wait for a volume to be attached.
 	waitForAttachTimeout time.Duration = 1 * time.Second
@@ -64,7 +64,7 @@ func Test_Run_Positive_DoNothing(t *testing.T) {
 		kubeClient,
 		false, /* controllerAttachDetachEnabled */
 		reconcilerLoopSleepDuration,
-		reconcilerReconstructSleepPeriod,
+		reconcilerSyncStatesSleepPeriod,
 		waitForAttachTimeout,
 		nodeName,
 		dsw,
@@ -101,7 +101,7 @@ func Test_Run_Positive_VolumeAttachAndMount(t *testing.T) {
 		kubeClient,
 		false, /* controllerAttachDetachEnabled */
 		reconcilerLoopSleepDuration,
-		reconcilerReconstructSleepPeriod,
+		reconcilerSyncStatesSleepPeriod,
 		waitForAttachTimeout,
 		nodeName,
 		dsw,
@@ -172,7 +172,7 @@ func Test_Run_Positive_VolumeMountControllerAttachEnabled(t *testing.T) {
 		kubeClient,
 		true, /* controllerAttachDetachEnabled */
 		reconcilerLoopSleepDuration,
-		reconcilerReconstructSleepPeriod,
+		reconcilerSyncStatesSleepPeriod,
 		waitForAttachTimeout,
 		nodeName,
 		dsw,
@@ -244,7 +244,7 @@ func Test_Run_Positive_VolumeAttachMountUnmountDetach(t *testing.T) {
 		kubeClient,
 		false, /* controllerAttachDetachEnabled */
 		reconcilerLoopSleepDuration,
-		reconcilerReconstructSleepPeriod,
+		reconcilerSyncStatesSleepPeriod,
 		waitForAttachTimeout,
 		nodeName,
 		dsw,
@@ -327,7 +327,7 @@ func Test_Run_Positive_VolumeUnmountControllerAttachEnabled(t *testing.T) {
 		kubeClient,
 		true, /* controllerAttachDetachEnabled */
 		reconcilerLoopSleepDuration,
-		reconcilerReconstructSleepPeriod,
+		reconcilerSyncStatesSleepPeriod,
 		waitForAttachTimeout,
 		nodeName,
 		dsw,

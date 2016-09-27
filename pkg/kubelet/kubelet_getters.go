@@ -239,9 +239,9 @@ func (kl *Kubelet) GetExtraSupplementalGroupsForPod(pod *api.Pod) []int64 {
 	return kl.volumeManager.GetExtraSupplementalGroupsForPod(pod)
 }
 
-// getPodVolumeNameListFromDisk returns a list of the volume names by reading the
+// getPodVolumePathListFromDisk returns a list of the volume paths by reading the
 // volume directories for the given pod from the disk.
-func (kl *Kubelet) getPodVolumeNameListFromDisk(podUID types.UID) ([]string, error) {
+func (kl *Kubelet) getPodVolumePathListFromDisk(podUID types.UID) ([]string, error) {
 	volumes := []string{}
 	podVolDir := kl.getPodVolumesDir(podUID)
 	volumePluginDirs, err := ioutil.ReadDir(podVolDir)
@@ -258,11 +258,10 @@ func (kl *Kubelet) getPodVolumeNameListFromDisk(podUID types.UID) ([]string, err
 		}
 		for i, volumeDir := range volumeDirs {
 			if volumeDir != nil {
-				volumes = append(volumes, volumeDir.Name())
+				volumes = append(volumes, path.Join(volumePluginPath, volumeDir.Name()))
 				continue
 			}
 			glog.Errorf("Could not read directory %s: %v", podVolDir, volumeDirsStatErrs[i])
-
 		}
 	}
 	return volumes, nil
