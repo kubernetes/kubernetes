@@ -117,15 +117,22 @@ func (kl *Kubelet) validateNodeIP() error {
 // providerRequiresNetworkingConfiguration returns whether the cloud provider
 // requires special networking configuration.
 func (kl *Kubelet) providerRequiresNetworkingConfiguration() bool {
-	// TODO: We should have a mechanism to say whether native cloud provider
-	// is used or whether we are using overlay networking. We should return
-	// true for cloud providers if they implement Routes() interface and
-	// we are not using overlay networking.
-	if kl.cloud == nil || kl.cloud.ProviderName() != "gce" || kl.flannelExperimentalOverlay {
+	if kl.cloud == nil || kl.flannelExperimentalOverlay {
 		return false
 	}
-	_, supported := kl.cloud.Routes()
-	return supported
+
+	// This is a per-platform requirement on whether we require networking plugins
+	// to mark nodes with NodeNetworkUnavailable.
+	// In GCE it is required on 1.3 onwards
+	// In AWS it is required on 1.5 onwards
+	switch kl.cloud.ProviderName() {
+	case "gce":
+		return true
+	case "aws":
+		return true
+	default:
+		return false
+	}
 }
 
 // Returns the list of DNS servers and DNS search domains.
