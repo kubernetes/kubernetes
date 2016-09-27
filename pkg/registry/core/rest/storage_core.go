@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package master
+package rest
 
 import (
 	"fmt"
@@ -29,7 +29,6 @@ import (
 	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
-
 	"k8s.io/kubernetes/pkg/registry/core/componentstatus"
 	configmapetcd "k8s.io/kubernetes/pkg/registry/core/configmap/etcd"
 	controlleretcd "k8s.io/kubernetes/pkg/registry/core/controller/etcd"
@@ -58,7 +57,8 @@ import (
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 )
 
-// LegacyRESTStorageProvider does NOT implement the "normal" RESTStorageProvider (yet!)
+// LegacyRESTStorageProvider provides information needed to build RESTStorage for core, but
+// does NOT implement the "normal" RESTStorageProvider (yet!)
 type LegacyRESTStorageProvider struct {
 	StorageFactory genericapiserver.StorageFactory
 	// Used for custom proxy dialing, and proxy TLS options
@@ -76,9 +76,9 @@ type LegacyRESTStorageProvider struct {
 
 type ComponentStatusServerFunc func() map[string]apiserver.Server
 
-// LegacyRESTStorage cannot be cleanly broken into a RESTStorageProvider (yet!)
-// because it returns stateful information about particular instances of REST storage.
-// This struct returns those bits for master.go
+// LegacyRESTStorage returns stateful information about particular instances of REST storage to
+// master.go for wiring controllers.
+// TODO remove this by running the controller as a poststarthook
 type LegacyRESTStorage struct {
 	NodeRegistry              node.Registry
 	NamespaceRegistry         namespace.Registry
@@ -88,7 +88,7 @@ type LegacyRESTStorage struct {
 	ServiceNodePortAllocator  rangeallocation.RangeRegistry
 }
 
-func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter genericapiserver.RESTOptionsGetter) (*LegacyRESTStorage, genericapiserver.APIGroupInfo, error) {
+func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter genericapiserver.RESTOptionsGetter) (LegacyRESTStorage, genericapiserver.APIGroupInfo, error) {
 	apiGroupInfo := genericapiserver.APIGroupInfo{
 		GroupMeta:                    *registered.GroupOrDie(api.GroupName),
 		VersionedResourcesStorageMap: map[string]map[string]rest.Storage{},
@@ -104,7 +104,7 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 	if policyGroupVersion := (unversioned.GroupVersion{Group: "policy", Version: "v1alpha1"}); registered.IsEnabledVersion(policyGroupVersion) {
 		apiGroupInfo.SubresourceGroupVersionKind["pods/eviction"] = policyGroupVersion.WithKind("Eviction")
 	}
-	restStorage := &LegacyRESTStorage{}
+	restStorage := LegacyRESTStorage{}
 
 	podTemplateStorage := podtemplateetcd.NewREST(restOptionsGetter(api.Resource("podTemplates")))
 
@@ -139,12 +139,12 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 	var serviceClusterIPRegistry rangeallocation.RangeRegistry
 	serviceClusterIPRange := c.ServiceClusterIPRange
 	if serviceClusterIPRange == nil {
-		return nil, genericapiserver.APIGroupInfo{}, fmt.Errorf("service clusterIPRange is nil")
+		return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, fmt.Errorf("service clusterIPRange is nil")
 	}
 
 	serviceStorageConfig, err := c.StorageFactory.NewConfig(api.Resource("services"))
 	if err != nil {
-		return nil, genericapiserver.APIGroupInfo{}, err
+		return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
 	}
 
 	ServiceClusterIPAllocator := ipallocator.NewAllocatorCIDRRange(serviceClusterIPRange, func(max int, rangeSpec string) allocator.Interface {

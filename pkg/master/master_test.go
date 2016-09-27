@@ -28,7 +28,6 @@ import (
 	"reflect"
 	"strings"
 	"testing"
-	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
@@ -47,11 +46,9 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	extensionsapiv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/apis/rbac"
-	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/genericapiserver"
+	"k8s.io/kubernetes/pkg/genericapiserver/options"
 	"k8s.io/kubernetes/pkg/kubelet/client"
-	"k8s.io/kubernetes/pkg/registry/core/endpoint"
-	"k8s.io/kubernetes/pkg/registry/core/namespace"
 	ipallocator "k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	extensionsrest "k8s.io/kubernetes/pkg/registry/extensions/rest"
 	"k8s.io/kubernetes/pkg/registry/extensions/thirdpartyresourcedata"
@@ -61,7 +58,6 @@ import (
 	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
-	"k8s.io/kubernetes/pkg/util/intstr"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/version"
@@ -75,15 +71,20 @@ import (
 	"k8s.io/kubernetes/pkg/generated/openapi"
 )
 
+func parseCIDROrDie(cidr string) *net.IPNet {
+	_, parsed, err := net.ParseCIDR(cidr)
+	if err != nil {
+		panic(err)
+	}
+	return parsed
+}
+
 // setUp is a convience function for setting up for (most) tests.
 func setUp(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.Assertions) {
 	server, storageConfig := etcdtesting.NewUnsecuredEtcd3TestClientServer(t)
 
-	master := &Master{
-		GenericAPIServer: &genericapiserver.GenericAPIServer{},
-	}
-	config := Config{
-		Config: &genericapiserver.Config{},
+	config := &Config{
+		Config: genericapiserver.NewConfig(options.NewServerRunOptions()),
 	}
 
 	resourceEncoding := genericapiserver.NewDefaultResourceEncodingConfig()
@@ -96,6 +97,7 @@ func setUp(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.
 	resourceEncoding.SetVersionEncoding(certificates.GroupName, *testapi.Certificates.GroupVersion(), unversioned.GroupVersion{Group: certificates.GroupName, Version: runtime.APIVersionInternal})
 	storageFactory := genericapiserver.NewDefaultStorageFactory(*storageConfig, testapi.StorageMediaType(), api.Codecs, resourceEncoding, DefaultAPIResourceConfigSource())
 
+	config.Config.ServiceClusterIPRange = parseCIDROrDie("10.0.0.0/24")
 	config.StorageFactory = storageFactory
 	config.APIResourceConfigSource = DefaultAPIResourceConfigSource()
 	config.PublicAddress = net.ParseIP("192.168.10.4")
@@ -117,9 +119,14 @@ func setUp(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.
 	// run the sync routine and register types manually.
 	config.disableThirdPartyControllerForTesting = true
 
-	master.nodeRegistry = registrytest.NewNodeRegistry([]string{"node1", "node2"}, api.NodeResources{})
+	master, err := New(config)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	return master, server, config, assert.New(t)
+	master.legacyRESTStorage.NodeRegistry = registrytest.NewNodeRegistry([]string{"node1", "node2"}, api.NodeResources{})
+
+	return master, server, *config, assert.New(t)
 }
 
 func newMaster(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.Assertions) {
@@ -187,26 +194,6 @@ func TestNew(t *testing.T) {
 	assert.Equal(master.ProxyTransport.(*http.Transport).TLSClientConfig, config.ProxyTLSClientConfig)
 }
 
-// TestNamespaceSubresources ensures the namespace subresource parsing in apiserver/handlers.go doesn't drift
-func TestNamespaceSubresources(t *testing.T) {
-	master, etcdserver, _, _ := newMaster(t)
-	defer etcdserver.Terminate(t)
-
-	expectedSubresources := apiserver.NamespaceSubResourcesForTest
-	foundSubresources := sets.NewString()
-
-	for k := range master.v1ResourcesStorage {
-		parts := strings.Split(k, "/")
-		if len(parts) == 2 && parts[0] == "namespaces" {
-			foundSubresources.Insert(parts[1])
-		}
-	}
-
-	if !reflect.DeepEqual(expectedSubresources.List(), foundSubresources.List()) {
-		t.Errorf("Expected namespace subresources %#v, got %#v. Update apiserver/handlers.go#namespaceSubresources", expectedSubresources.List(), foundSubresources.List())
-	}
-}
-
 // TestVersion tests /version
 func TestVersion(t *testing.T) {
 	s, etcdserver, _, _ := newMaster(t)
@@ -232,10 +219,10 @@ func TestVersion(t *testing.T) {
 
 // TestGetServersToValidate verifies the unexported getServersToValidate function
 func TestGetServersToValidate(t *testing.T) {
-	master, etcdserver, config, assert := setUp(t)
+	_, etcdserver, config, assert := setUp(t)
 	defer etcdserver.Terminate(t)
 
-	servers := master.getServersToValidate(&config)
+	servers := getServersToValidate(config.StorageFactory)
 
 	// Expected servers to validate: scheduler, controller-manager and etcd.
 	assert.Equal(3, len(servers), "unexpected server list: %#v", servers)
@@ -276,74 +263,6 @@ func (*fakeEndpointReconciler) ReconcileEndpoints(serviceName string, ip net.IP,
 	return nil
 }
 
-// TestNewBootstrapController verifies master fields are properly copied into controller
-func TestNewBootstrapController(t *testing.T) {
-	// Tests a subset of inputs to ensure they are set properly in the controller
-	master, etcdserver, _, assert := setUp(t)
-	defer etcdserver.Terminate(t)
-
-	portRange := utilnet.PortRange{Base: 10, Size: 10}
-
-	master.namespaceRegistry = namespace.NewRegistry(nil)
-	master.serviceRegistry = registrytest.NewServiceRegistry()
-	master.endpointRegistry = endpoint.NewRegistry(nil)
-
-	master.ServiceNodePortRange = portRange
-	master.MasterCount = 1
-	master.ServiceReadWritePort = 1000
-	master.PublicReadWritePort = 1010
-
-	// test with an empty EndpointReconcilerConfig to ensure the defaults are applied
-	controller := master.NewBootstrapController(EndpointReconcilerConfig{})
-
-	assert.Equal(controller.NamespaceRegistry, master.namespaceRegistry)
-	assert.Equal(controller.EndpointReconciler, NewMasterCountEndpointReconciler(master.MasterCount, master.endpointRegistry))
-	assert.Equal(controller.EndpointInterval, DefaultEndpointReconcilerInterval)
-	assert.Equal(controller.ServiceRegistry, master.serviceRegistry)
-	assert.Equal(controller.ServiceNodePortRange, portRange)
-	assert.Equal(controller.ServicePort, master.ServiceReadWritePort)
-	assert.Equal(controller.PublicServicePort, master.PublicReadWritePort)
-
-	// test with a filled-in EndpointReconcilerConfig to make sure its values are used
-	controller = master.NewBootstrapController(EndpointReconcilerConfig{
-		Reconciler: &fakeEndpointReconciler{},
-		Interval:   5 * time.Second,
-	})
-	assert.Equal(controller.EndpointReconciler, &fakeEndpointReconciler{})
-	assert.Equal(controller.EndpointInterval, 5*time.Second)
-}
-
-// TestControllerServicePorts verifies master extraServicePorts are
-// correctly copied into controller
-func TestControllerServicePorts(t *testing.T) {
-	master, etcdserver, _, assert := setUp(t)
-	defer etcdserver.Terminate(t)
-
-	master.namespaceRegistry = namespace.NewRegistry(nil)
-	master.serviceRegistry = registrytest.NewServiceRegistry()
-	master.endpointRegistry = endpoint.NewRegistry(nil)
-
-	master.ExtraServicePorts = []api.ServicePort{
-		{
-			Name:       "additional-port-1",
-			Port:       1000,
-			Protocol:   api.ProtocolTCP,
-			TargetPort: intstr.FromInt(1000),
-		},
-		{
-			Name:       "additional-port-2",
-			Port:       1010,
-			Protocol:   api.ProtocolTCP,
-			TargetPort: intstr.FromInt(1010),
-		},
-	}
-
-	controller := master.NewBootstrapController(EndpointReconcilerConfig{})
-
-	assert.Equal(int32(1000), controller.ExtraServicePorts[0].Port)
-	assert.Equal(int32(1010), controller.ExtraServicePorts[1].Port)
-}
-
 // TestGetNodeAddresses verifies that proper results are returned
 // when requesting node addresses.
 func TestGetNodeAddresses(t *testing.T) {
@@ -351,14 +270,14 @@ func TestGetNodeAddresses(t *testing.T) {
 	defer etcdserver.Terminate(t)
 
 	// Fail case (no addresses associated with nodes)
-	nodes, _ := master.nodeRegistry.ListNodes(api.NewDefaultContext(), nil)
+	nodes, _ := master.legacyRESTStorage.NodeRegistry.ListNodes(api.NewDefaultContext(), nil)
 	addrs, err := master.getNodeAddresses()
 
 	assert.Error(err, "getNodeAddresses should have caused an error as there are no addresses.")
 	assert.Equal([]string(nil), addrs)
 
 	// Pass case with External type IP
-	nodes, _ = master.nodeRegistry.ListNodes(api.NewDefaultContext(), nil)
+	nodes, _ = master.legacyRESTStorage.NodeRegistry.ListNodes(api.NewDefaultContext(), nil)
 	for index := range nodes.Items {
 		nodes.Items[index].Status.Addresses = []api.NodeAddress{{Type: api.NodeExternalIP, Address: "127.0.0.1"}}
 	}
@@ -367,7 +286,7 @@ func TestGetNodeAddresses(t *testing.T) {
 	assert.Equal([]string{"127.0.0.1", "127.0.0.1"}, addrs)
 
 	// Pass case with LegacyHost type IP
-	nodes, _ = master.nodeRegistry.ListNodes(api.NewDefaultContext(), nil)
+	nodes, _ = master.legacyRESTStorage.NodeRegistry.ListNodes(api.NewDefaultContext(), nil)
 	for index := range nodes.Items {
 		nodes.Items[index].Status.Addresses = []api.NodeAddress{{Type: api.NodeLegacyHostIP, Address: "127.0.0.2"}}
 	}

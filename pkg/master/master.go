@@ -123,11 +123,8 @@ type EndpointReconcilerConfig struct {
 type Master struct {
 	*genericapiserver.GenericAPIServer
 
-	// legacyRESTStorageProvider contains the information required to build the legacy group's storage
 	legacyRESTStorageProvider corerest.LegacyRESTStorageProvider
-	// LegacyRESTStorage holds the results of building the legacy storage. Several direct etcd registries
-	// are effectively returned back through here
-	legacyRESTStorage *corerest.LegacyRESTStorage
+	legacyRESTStorage         corerest.LegacyRESTStorage
 
 	enableCoreControllers   bool
 	deleteCollectionWorkers int
