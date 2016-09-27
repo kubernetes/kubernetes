@@ -744,23 +744,11 @@ func (r *Request) Stream() (io.ReadCloser, error) {
 		// ensure we close the body before returning the error
 		defer resp.Body.Close()
 
-		// we have a decent shot at taking the object returned, parsing it as a status object and returning a more normal error
-		bodyBytes, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			return nil, fmt.Errorf("%v while accessing %v", resp.Status, url)
+		result := r.transformResponse(resp, req)
+		if result.err != nil {
+			return nil, result.err
 		}
-
-		// TODO: Check ContentType.
-		if runtimeObject, err := runtime.Decode(r.serializers.Decoder, bodyBytes); err == nil {
-			statusError := errors.FromObject(runtimeObject)
-
-			if _, ok := statusError.(errors.APIStatus); ok {
-				return nil, statusError
-			}
-		}
-
-		bodyText := string(bodyBytes)
-		return nil, fmt.Errorf("%s while accessing %v: %s", resp.Status, url, bodyText)
+		return nil, fmt.Errorf("%d while accessing %v: %s", result.statusCode, url, string(result.body))
 	}
 }
 

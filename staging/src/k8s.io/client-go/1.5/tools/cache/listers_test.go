@@ -14,12 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cache
+package testing
 
 import (
 	"testing"
 
 	"k8s.io/client-go/1.5/pkg/api"
+	apierrors "k8s.io/client-go/1.5/pkg/api/errors"
 	"k8s.io/client-go/1.5/pkg/api/unversioned"
 	"k8s.io/client-go/1.5/pkg/apis/batch"
 	"k8s.io/client-go/1.5/pkg/apis/extensions"
@@ -700,8 +701,9 @@ func TestStoreToPodLister(t *testing.T) {
 		for _, id := range ids {
 			store.Add(&api.Pod{
 				ObjectMeta: api.ObjectMeta{
-					Name:   id,
-					Labels: map[string]string{"name": id},
+					Namespace: "other",
+					Name:      id,
+					Labels:    map[string]string{"name": id},
 				},
 			})
 		}
@@ -739,27 +741,20 @@ func TestStoreToPodLister(t *testing.T) {
 				continue
 			}
 
-			exists, err := spl.Exists(&api.Pod{ObjectMeta: api.ObjectMeta{Name: id}})
+			_, err = spl.Pods("other").Get(id)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
-			if !exists {
-				t.Errorf("exists returned false for %v", id)
-			}
 		}
 
-		exists, err := spl.Exists(&api.Pod{ObjectMeta: api.ObjectMeta{Name: "qux"}})
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		if exists {
+		if _, err := spl.Pods("").Get("qux"); !apierrors.IsNotFound(err) {
 			t.Error("Unexpected pod exists")
 		}
 	}
 }
 
 func TestStoreToServiceLister(t *testing.T) {
-	store := NewStore(MetaNamespaceKeyFunc)
+	store := NewIndexer(MetaNamespaceKeyFunc, Indexers{NamespaceIndex: MetaNamespaceIndexFunc})
 	store.Add(&api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 		Spec: api.ServiceSpec{
