@@ -2349,7 +2349,7 @@ func (gce *GCECloud) ListRoutes(clusterName string) ([]*cloudprovider.Route, err
 			}
 
 			target := path.Base(r.NextHopInstance)
-			routes = append(routes, &cloudprovider.Route{Name: r.Name, TargetInstance: target, DestinationCIDR: r.DestRange})
+			routes = append(routes, &cloudprovider.Route{Name: r.Name, TargetInstance: cloudprovider.Instance{Name: target}, DestinationCIDR: r.DestRange})
 		}
 	}
 	if page >= maxPages {
@@ -2365,7 +2365,7 @@ func gceNetworkURL(project, network string) string {
 func (gce *GCECloud) CreateRoute(clusterName string, nameHint string, route *cloudprovider.Route) error {
 	routeName := truncateClusterName(clusterName) + "-" + nameHint
 
-	targetInstance, err := gce.getInstanceByName(route.TargetInstance)
+	targetInstance, err := gce.getInstanceByName(route.TargetInstance.Name)
 	if err != nil {
 		return err
 	}

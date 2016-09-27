@@ -121,7 +121,7 @@ func (rc *RouteController) reconcile(nodes []api.Node, routes []*cloudprovider.R
 	// routeMap maps routeTargetInstance->route
 	routeMap := make(map[string]*cloudprovider.Route)
 	for _, route := range routes {
-		routeMap[route.TargetInstance] = route
+		routeMap[route.TargetInstance.Name] = route
 	}
 
 	wg := sync.WaitGroup{}
@@ -137,7 +137,10 @@ func (rc *RouteController) reconcile(nodes []api.Node, routes []*cloudprovider.R
 		if r == nil || r.DestinationCIDR != node.Spec.PodCIDR {
 			// If not, create the route.
 			route := &cloudprovider.Route{
-				TargetInstance:  node.Name,
+				TargetInstance: cloudprovider.Instance{
+					Name:     node.Name,
+					ID:       node.Spec.ProviderID,
+				},
 				DestinationCIDR: node.Spec.PodCIDR,
 			}
 			nameHint := string(node.UID)
@@ -174,7 +177,7 @@ func (rc *RouteController) reconcile(nodes []api.Node, routes []*cloudprovider.R
 	for _, route := range routes {
 		if rc.isResponsibleForRoute(route) {
 			// Check if this route applies to a node we know about & has correct CIDR.
-			if nodeCIDRs[route.TargetInstance] != route.DestinationCIDR {
+			if nodeCIDRs[route.TargetInstance.Name] != route.DestinationCIDR {
 				wg.Add(1)
 				// Delete the route.
 				go func(route *cloudprovider.Route, startTime time.Time) {

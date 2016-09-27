@@ -88,7 +88,7 @@ func (c *Cloud) ListRoutes(clusterName string) ([]*cloudprovider.Route, error) {
 		}
 		instanceName := orEmpty(instance.PrivateDnsName)
 		routeName := clusterName + "-" + destinationCIDR
-		routes = append(routes, &cloudprovider.Route{Name: routeName, TargetInstance: instanceName, DestinationCIDR: destinationCIDR})
+		routes = append(routes, &cloudprovider.Route{Name: routeName, TargetInstance: cloudprovider.Instance{Name: instanceName}, DestinationCIDR: destinationCIDR})
 	}
 
 	return routes, nil
@@ -110,7 +110,7 @@ func (c *Cloud) configureInstanceSourceDestCheck(instanceID string, sourceDestCh
 // CreateRoute implements Routes.CreateRoute
 // Create the described route
 func (c *Cloud) CreateRoute(clusterName string, nameHint string, route *cloudprovider.Route) error {
-	instance, err := c.getInstanceByNodeName(route.TargetInstance)
+	instance, err := c.getInstanceByNodeName(route.TargetInstance.Name)
 	if err != nil {
 		return err
 	}

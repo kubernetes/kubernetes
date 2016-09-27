@@ -126,6 +126,14 @@ type Instances interface {
 	CurrentNodeName(hostname string) (string, error)
 }
 
+type Instance struct {
+	// Name is the name of the instance as Kubernetes understands it. Usually the hostname
+	Name string
+
+	// ID is the instance ID. To be used for clouds that don't have a mapping of hostname to instance
+	ID string
+}
+
 // Route is a representation of an advanced routing rule.
 type Route struct {
 	// Name is the name of the routing rule in the cloud-provider.
@@ -133,7 +141,7 @@ type Route struct {
 	Name string
 	// TargetInstance is the name of the instance as specified in routing rules
 	// for the cloud-provider (in gce: the Instance Name).
-	TargetInstance string
+	TargetInstance Instance
 	// DestinationCIDR is the CIDR format IP range that this routing rule
 	// applies to.
 	DestinationCIDR string
