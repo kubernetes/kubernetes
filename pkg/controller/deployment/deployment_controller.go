@@ -508,7 +508,8 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 
 	// Handle overlapping deployments by deterministically avoid syncing deployments that fight over ReplicaSets.
 	if err = dc.handleOverlap(d); err != nil {
-		return err
+		dc.eventRecorder.Eventf(deployment, api.EventTypeWarning, "SelectorOverlap", err.Error())
+		return nil
 	}
 
 	if d.Spec.Paused {
