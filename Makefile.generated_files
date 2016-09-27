@@ -216,6 +216,7 @@ gen_deepcopy: $(DEEPCOPY_FILES)
 	if [[ -f $(META_DIR)/$(DEEPCOPY_GEN).todo ]]; then                  \
 	    ./hack/run-in-gopath.sh $(DEEPCOPY_GEN)                         \
 	        --v $(KUBE_VERBOSE)                                         \
+	        --logtostderr                                               \
 	        -i $$(cat $(META_DIR)/$(DEEPCOPY_GEN).todo | paste -sd, -)  \
 	        --bounding-dirs $(PRJ_SRC_PATH)                             \
 	        -O $(DEEPCOPY_BASENAME);                                    \
@@ -318,6 +319,7 @@ gen_openapi: $(OPENAPI_FILES)
 	if [[ -f $(META_DIR)/$(OPENAPI_GEN).todo ]]; then                   \
 	    ./hack/run-in-gopath.sh $(OPENAPI_GEN)                          \
 	        --v $(KUBE_VERBOSE)                                         \
+	        --logtostderr                                               \
 	        -i $$(cat $(META_DIR)/$(OPENAPI_GEN).todo | paste -sd, -)   \
 	        -O $(OPENAPI_BASENAME);                                     \
 	fi
@@ -432,6 +434,7 @@ gen_conversion: $(CONVERSION_FILES)
 	if [[ -f $(META_DIR)/$(CONVERSION_GEN).todo ]]; then                  \
 	    ./hack/run-in-gopath.sh $(CONVERSION_GEN)                         \
 	        --v $(KUBE_VERBOSE)                                           \
+	        --logtostderr                                               \
 	        -i $$(cat $(META_DIR)/$(CONVERSION_GEN).todo | paste -sd, -)  \
 	        -O $(CONVERSION_BASENAME);                                    \
 	fi
