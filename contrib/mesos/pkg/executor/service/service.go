@@ -239,6 +239,7 @@ func (s *KubeletExecutorServer) runKubelet(
 		containerOptions = append(containerOptions, podsource.ContainerEnvOverlay([]api.EnvVar{
 			{Name: envContainerID, Value: s.containerID},
 		}))
+		// TODO(harryz) change this to use kuberuntime#SetPodInfraContainerEnv when CRI is fully implemented
 		kubeDeps.ContainerRuntimeOptions = append(kubeDeps.ContainerRuntimeOptions,
 			dockertools.PodInfraContainerEnv(map[string]string{
 				envContainerID: s.containerID,

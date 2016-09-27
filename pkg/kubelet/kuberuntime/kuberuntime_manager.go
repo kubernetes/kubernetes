@@ -95,6 +95,9 @@ type kubeGenericRuntimeManager struct {
 	// gRPC service clients
 	runtimeService internalApi.RuntimeService
 	imageService   internalApi.ImageManagerService
+
+	// Additional environment variables to be set for the pod infra container.
+	podInfraContainerEnv []kubecontainer.EnvVar
 }
 
 // NewKubeGenericRuntimeManager creates a new kubeGenericRuntimeManager
@@ -114,6 +117,7 @@ func NewKubeGenericRuntimeManager(
 	cpuCFSQuota bool,
 	runtimeService internalApi.RuntimeService,
 	imageService internalApi.ImageManagerService,
+	options ...kubecontainer.Option,
 ) (kubecontainer.Runtime, error) {
 	kubeRuntimeManager := &kubeGenericRuntimeManager{
 		recorder:            recorder,
@@ -168,7 +172,26 @@ func NewKubeGenericRuntimeManager(
 	kubeRuntimeManager.runner = lifecycle.NewHandlerRunner(httpClient, kubeRuntimeManager, kubeRuntimeManager)
 	kubeRuntimeManager.containerGC = NewContainerGC(runtimeService, podGetter, kubeRuntimeManager)
 
+	// apply optional settings to manager
+	for _, optFunc := range options {
+		optFunc(kubeRuntimeManager)
+	}
+
 	return kubeRuntimeManager, nil
+}
+
+// SetPodInfraContainerEnv set given env map into manager's podInfraContainerEnv
+// This is currently only used in mesos integration
+func SetPodInfraContainerEnv(env map[string]string) kubecontainer.Option {
+	return func(rt kubecontainer.Runtime) {
+		km := rt.(*kubeGenericRuntimeManager)
+		for k, v := range env {
+			km.podInfraContainerEnv = append(km.podInfraContainerEnv, kubecontainer.EnvVar{
+				Name:  k,
+				Value: v,
+			})
+		}
+	}
 }
 
 // Type returns the type of the container runtime.

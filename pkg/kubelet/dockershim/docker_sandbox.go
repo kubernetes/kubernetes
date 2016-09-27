@@ -194,6 +194,15 @@ func (ds *dockerService) ListPodSandbox(filter *runtimeApi.PodSandboxFilter) ([]
 	return result, nil
 }
 
+// makeEnvList converts EnvVar list to a list of strings, in the form of
+// '<key>=<value>', which can be understood by docker.
+func makeEnvList(envs []*runtimeApi.KeyValue) (result []string) {
+	for _, env := range envs {
+		result = append(result, fmt.Sprintf("%s=%s", env.GetKey(), env.GetValue()))
+	}
+	return
+}
+
 func makeSandboxDockerConfig(c *runtimeApi.PodSandboxConfig, image string) *dockertypes.ContainerCreateConfig {
 	// Merge annotations and labels because docker supports only labels.
 	labels := makeLabels(c.GetLabels(), c.GetAnnotations())
@@ -201,13 +210,15 @@ func makeSandboxDockerConfig(c *runtimeApi.PodSandboxConfig, image string) *dock
 	labels[containerTypeLabelKey] = containerTypeLabelSandbox
 
 	hc := &dockercontainer.HostConfig{}
+	// Handle environment variables.
+	podInfraContainerEnvs := c.GetPodInfraContainerEnv()
 	createConfig := &dockertypes.ContainerCreateConfig{
 		Name: makeSandboxName(c),
 		Config: &dockercontainer.Config{
 			Hostname: c.GetHostname(),
-			// TODO: Handle environment variables.
-			Image:  image,
-			Labels: labels,
+			Env:      makeEnvList(podInfraContainerEnvs),
+			Image:    image,
+			Labels:   labels,
 		},
 		HostConfig: hc,
 	}
