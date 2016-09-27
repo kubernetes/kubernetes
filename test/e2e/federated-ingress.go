@@ -40,7 +40,7 @@ import (
 
 const (
 	MaxRetriesOnFederatedApiserver = 3
-	FederatedIngressTimeout        = 60 * time.Second
+	FederatedIngressTimeout        = 120 * time.Second
 	FederatedIngressName           = "federated-ingress"
 	FederatedIngressServiceName    = "federated-ingress-service"
 	FederatedIngressServicePodName = "federated-ingress-service-test-pod"
