@@ -6,11 +6,21 @@ import (
 
 // Probe plugin
 
+type AttachmentPolicy string
+
+const (
+	// No attach/detach to do.
+	AttachNone AttachmentPolicy = ""
+	// Attach/detach calls issued from the controller.
+	AttachRemote AttachmentPolicy = "Remote"
+	// Attach/detach calls issued from the target node.
+	AttachLocal AttachmentPolicy = "Local"
+)
+
 type FlexVolumeDriverCapabilities struct {
 	AccessMode          api.PersistentVolumeAccessMode
 	DynamicProvisioning bool
-	Attachment          bool
-	LocalAttachment     bool // When Attachement is true, issue the attach/detach calls from the target host, not the controller.
+	Attachment          AttachmentPolicy
 	CustomMount         bool // This driver has a custom mount/unmount logic. Mount/Unmount must be called.
 	SELinux             bool
 	OwnershipManagement bool
