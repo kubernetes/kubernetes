@@ -1,3 +1,32 @@
+<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
+
+<!-- BEGIN STRIP_FOR_RELEASE -->
+
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
+     width="25" height="25">
+
+<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
+
+If you are using a released version of Kubernetes, you should
+refer to the docs that go with that version.
+
+Documentation for other releases can be found at
+[releases.k8s.io](http://releases.k8s.io).
+</strong>
+--
+
+<!-- END STRIP_FOR_RELEASE -->
+
+<!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Linux Capabilities in Container Runtime Interface
 
 The following proposal summarizes the current state and problems for runtime to implement Linux Capabilities.
@@ -19,7 +48,7 @@ If a user wants to launch a container with required capabilities, he will go thr
 There are several issues here:
 
 - The default capability set heavily depends on Docker's implementation, Kubernetes has no control over that.
-When Docker changes the default capability set across versions (hopefull it should not happen), users of Dockers get surprise,
+When Docker changes the default capability set across versions (hopefull it should not happen), users of Docker get surprise,
 users of Kubernetes get surprise, too.
 - Even worse, to implement the same semantics as today's Docker runtime, it will require other runtimes (e.g. rkt) to depend
 on the default capability set as well. And if Docker changes the default capability set, then consistency is not guaranteed.
@@ -40,6 +69,7 @@ So in the proposed solution here. We will:
 - Define a default capability list inside k8s, and document about it.
 - Make CRI expose the whitelist based capability interface, and put the burden on the runtime to implement that.
 - Make the final capability set **visible** through the container status, for example:
+
 ```shell
 $ kubectl get pod -o yaml
 apiVersion: v1
@@ -97,3 +127,8 @@ items:
 - Modify CRI to replace the `Add`, `Drop` capability list with a capability whitelist .
 - Modify runtimes to support the new interface.
 - Make the container status to reflect the final capability set.
+
+
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/proposals/container-runtime-interface/capabilities.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->
