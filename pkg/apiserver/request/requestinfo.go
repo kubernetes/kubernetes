@@ -209,6 +209,9 @@ func (r *RequestInfoResolver) GetRequestInfo(req *http.Request) (*RequestInfo, e
 
 type requestInfoKeyType int
 
+// requestInfoKey is the RequestInfo key for the context. It's of private type here. Because
+// keys are interfaces and interfaces are equal when the type and the value is equal, this
+// does not conflict with the keys defined in pkg/api.
 const requestInfoKey requestInfoKeyType = iota
 
 // WithRequestInfo returns a copy of parent in which the request info value is set
