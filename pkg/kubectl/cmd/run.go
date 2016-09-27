@@ -112,7 +112,7 @@ func addRunFlags(cmd *cobra.Command) {
 	cmd.Flags().Bool("rm", false, "If true, delete resources created in this command for attached containers.")
 	cmd.Flags().String("overrides", "", "An inline JSON override for the generated object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.")
 	cmd.Flags().StringSlice("env", []string{}, "Environment variables to set in the container")
-	cmd.Flags().Int("port", -1, "The port that this container exposes.  If --expose is true, this is also the port used by the service that is created.")
+	cmd.Flags().String("port", "", "The port that this container exposes.  If --expose is true, this is also the port used by the service that is created.")
 	cmd.Flags().Int("hostport", -1, "The host port mapping for the container port. To demonstrate a single-machine container.")
 	cmd.Flags().StringP("labels", "l", "", "Labels to apply to the pod(s).")
 	cmd.Flags().BoolP("stdin", "i", false, "Keep stdin open on the container(s) in the pod, even if nothing is attached.")
@@ -540,9 +540,9 @@ func generateService(f *cmdutil.Factory, cmd *cobra.Command, args []string, serv
 	}
 	names := generator.ParamNames()
 
-	port := cmdutil.GetFlagInt(cmd, "port")
-	if port < 1 {
-		return fmt.Errorf("--port must be a positive integer when exposing a service")
+	port := cmdutil.GetFlagString(cmd, "port")
+	if len(port) == 0 {
+		return fmt.Errorf("--port must be set when exposing a service")
 	}
 
 	params := map[string]interface{}{}
