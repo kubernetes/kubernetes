@@ -834,6 +834,7 @@ func (lb *LbaasV1) EnsureLoadBalancer(clusterName string, apiService *api.Servic
 	for _, host := range hosts {
 		addr, err := getAddressByName(lb.compute, host)
 		if err != nil {
+			pools.Delete(lb.network, pool.ID)
 			return nil, err
 		}
 
