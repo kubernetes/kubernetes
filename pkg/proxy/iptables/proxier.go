@@ -177,6 +177,7 @@ type Proxier struct {
 	clusterCIDR    string
 	hostname       string
 	nodeIP         net.IP
+	portMapper     portOpener
 }
 
 type localPort struct {
@@ -192,6 +193,20 @@ func (lp *localPort) String() string {
 
 type closeable interface {
 	Close() error
+}
+
+// portOpener is an interface around port opening/closing.
+// Abstracted out for testing.
+type portOpener interface {
+	OpenLocalPort(lp *localPort) (closeable, error)
+}
+
+// listenPortOpener opens ports by calling bind() and listen().
+type listenPortOpener struct{}
+
+// OpenLocalPort holds the given local port open.
+func (l *listenPortOpener) OpenLocalPort(lp *localPort) (closeable, error) {
+	return openLocalPort(lp)
 }
 
 // Proxier implements ProxyProvider
@@ -241,6 +256,7 @@ func NewProxier(ipt utiliptables.Interface, sysctl utilsysctl.Interface, exec ut
 		clusterCIDR:    clusterCIDR,
 		hostname:       hostname,
 		nodeIP:         nodeIP,
+		portMapper:     &listenPortOpener{},
 	}, nil
 }
 
@@ -941,7 +957,7 @@ func (proxier *Proxier) syncProxyRules() {
 					glog.V(4).Infof("Port %s was open before and is still needed", lp.String())
 					replacementPortsMap[lp] = proxier.portsMap[lp]
 				} else {
-					socket, err := openLocalPort(&lp)
+					socket, err := proxier.portMapper.OpenLocalPort(&lp)
 					if err != nil {
 						glog.Errorf("can't open %s, skipping this externalIP: %v", lp.String(), err)
 						continue
@@ -1056,7 +1072,7 @@ func (proxier *Proxier) syncProxyRules() {
 				glog.V(4).Infof("Port %s was open before and is still needed", lp.String())
 				replacementPortsMap[lp] = proxier.portsMap[lp]
 			} else {
-				socket, err := openLocalPort(&lp)
+				socket, err := proxier.portMapper.OpenLocalPort(&lp)
 				if err != nil {
 					glog.Errorf("can't open %s, skipping this nodePort: %v", lp.String(), err)
 					continue
@@ -1076,6 +1092,8 @@ func (proxier *Proxier) syncProxyRules() {
 				// Jump to the service chain.
 				writeLine(natRules, append(args, "-j", string(svcChain))...)
 			} else {
+				// TODO: Make all nodePorts jump to the firewall chain.
+				// Currently we only create it for loadbalancers (#33586).
 				writeLine(natRules, append(args, "-j", string(svcXlbChain))...)
 			}
 		}
