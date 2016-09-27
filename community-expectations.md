@@ -1,17 +1,18 @@
 ## Community Expectations
 
-Kubernetes is a community project and, as such, it is wholly dependent on
+Kubernetes is a community project. Consequently, it is wholly dependent on
 its community to provide a productive, friendly and collaborative environment.
 
 The first and foremost goal of the Kubernetes community to develop orchestration
 technology that radically simplifies the process of creating reliable
-distributed systems, however a second, equally important goal is the creation
-of a community that fosters easy, agile development of such an orcheastration
+distributed systems. However a second, equally important goal is the creation
+of a community that fosters easy, agile development of such an orchestration
 systems.
 
-This document describes the community expectations for
-members of the Kubernetes community.  It is intended to be a living document
-that evolves as the community evolves.  It currently covers the expectations
+We the community therefore describe the expectations for
+members of the Kubernetes community.  This document is intended to be a living one
+that evolves as the community evolves via the same PR and code review process
+that shapes the rest of the project.  It currently covers the expectations
 of conduct that govern all members of the community as well as the expectations
 around code review that govern all active contributors to Kubernetes.
 
@@ -32,12 +33,11 @@ However, the code review process can also introduce latency for contributors
 and additional work for reviewers that can frustrate both parties.
 
 Consequently, as a community we expect that all active participants in the
-community will also be active reviewers.  To that end, we have set out the
-following expectations for code review:
+community will also be active reviewers.
 
 Any *active contributor* to the Kubernetes project is expected to be available
 to review code in areas where that contributor has expertise.  Active
-contributors or considered to be anyone who meets any of the following criteria:
+contributors are considered to be anyone who meets any of the following criteria:
    * Sent more than two pull requests (PRs) in the previous one month, or more
    than 20 PRs in the previous year.
    * Filed more than 3 issues in the previous month, or more than 30 issues in
@@ -67,9 +67,7 @@ Kubernetes community.
 Reviewers are expected to respond in a timely fashion to PRs that are assigned
 to them.  Reviewers are expected to respond to an *active* PRs with reasonable
 latency, and if reviewers fail to respond, those PRs may be assigned to other
-reviewers.  If reviewers repeatedly fail to respond, then their own PRs (if
-they exist) will also suffer increased latency to provide an incentive for
-those reviewers to remain good stewards of a low-latency review process.
+reviewers.
 
 *Active* PRs are considered those which have a proper CLA (`cla:yes`) label
 and do not need rebase to be merged.  PRs that do not have a proper CLA, or
