@@ -1,3 +1,32 @@
+<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
+
+<!-- BEGIN STRIP_FOR_RELEASE -->
+
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
+     width="25" height="25">
+
+<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
+
+If you are using a released version of Kubernetes, you should
+refer to the docs that go with that version.
+
+Documentation for other releases can be found at
+[releases.k8s.io](http://releases.k8s.io).
+</strong>
+--
+
+<!-- END STRIP_FOR_RELEASE -->
+
+<!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Huge Page Support
 
 ## Abstract
@@ -50,7 +79,7 @@ virtual-to-physical page mappings.  If the virtual address passed in a hardware
 instruction can be found in the TLB, the mapping can be determined quickly.  If
 not, a TLB miss occurs and the hardware must walk the in-memory page table to
 discover a physical mapping for the virtual address.
- 
+
 Take a program that operates on a large 2MB structure as an example.  If the
 program accesses that space in such a way that one byte in each regular 4k page
 is accessed, 2M/4k = 512 TLB entries are needed to map the address range.  Each
@@ -58,7 +87,7 @@ TLB miss results in an expensive walk of the page table.  However, if the
 allocation is backed by a 2M huge page by, only 1 TLB entry is required
 resulting in a highly likelihood that entry will remain in the cache and hit on
 accesses to the entire 2M structure.
- 
+
 On x86_64, there are two huge page sizes: 2MB and 1G.  1G huge pages are also
 called gigantic pages.  1G must be enabled on kernel boot line with
 ```hugepagesz=1G```. Huge pages, especially 1G ones, should to be allocated
@@ -73,7 +102,7 @@ The class of applications that benefit from huge pages are typically have
 - A sensitivity to memory access latency
 
 Example applications include:
-- Java applications can back the heap with huge pages using the ```-XX:+UseLargePages``` option.  
+- Java applications can back the heap with huge pages using the ```-XX:+UseLargePages``` option.
 - In-memory databases
 
 Applications can generally use huge pages by calling
@@ -138,6 +167,7 @@ avoids, at least temporarily, the need for 1) docker to support the
 Container Runtime Interface (CRI)
 
 pkg/api/types.go (and v1/types.go)
+
 ```
 const (
 	// CPU, in cores. (500m = .5 cores)
@@ -159,6 +189,7 @@ The kubelet will also need to create the ```alpha.kubernetes.io/huge-page-size``
 label for its node resource (if self registering).
 
 pkg/aip/unversioned/well_known_labels.go
+
 ```
 const (
 ...
@@ -170,13 +201,14 @@ const (
 The scheduler will need to ensure any huge page request defined in the pod spec can be fulfilled by a candidate node.
 
 cAdvisor will need to be modified to return the number of available huge pages.
-This is already supported in [runc/libcontainer](https://github.com/kubernetes/kubernetes/blob/master/vendor/github.com/opencontainers/runc/libcontainer/cgroups/utils.go)
+This is already supported in [runc/libcontainer](../../vendor/github.com/opencontainers/runc/libcontainer/cgroups/utils.go)
 
 ### Phase 2: Expose huge pages in CRI
 
 *WIP*
 
 info/v1/machine.go
+
 ```
 type MachineInfo struct {
 ...
@@ -187,6 +219,7 @@ type MachineInfo struct {
 Add ```hugetlb``` cgroup controller support to docker (TODO: add docker/docker issue/PR) and expose it via the engine-api
 
 engine-api/types/container/host_config.go
+
 ```
 type Resources struct {
 ...
@@ -209,3 +242,8 @@ There are several issues here:
 - The user's memlock ulimits must allow the size of the shared memory segment
 
 ```vm.huge_tlb_shm_group``` is not namespaced.
+
+
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/proposals/hugepages.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->
