@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	lru "github.com/hashicorp/golang-lru"
 
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
@@ -31,6 +30,8 @@ import (
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
+	utilcache "k8s.io/kubernetes/pkg/util/cache"
+	"k8s.io/kubernetes/pkg/util/clock"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
@@ -62,7 +63,7 @@ type lifecycle struct {
 	namespaceInformer  cache.SharedIndexInformer
 	// forceLiveLookupCache holds a list of entries for namespaces that we have a strong reason to believe are stale in our local cache.
 	// if a namespace is in this cache, then we will ignore our local state and always fetch latest from api server.
-	forceLiveLookupCache *lru.Cache
+	forceLiveLookupCache *utilcache.LRUExpireCache
 }
 
 type forceLiveLookupEntry struct {
@@ -95,10 +96,7 @@ func (l *lifecycle) Admit(a admission.Attributes) error {
 		// is slow to update, we add the namespace into a force live lookup list to ensure
 		// we are not looking at stale state.
 		if a.GetOperation() == admission.Delete {
-			newEntry := forceLiveLookupEntry{
-				expiry: time.Now().Add(forceLiveLookupTTL),
-			}
-			l.forceLiveLookupCache.Add(a.GetName(), newEntry)
+			l.forceLiveLookupCache.Add(a.GetName(), true, forceLiveLookupTTL)
 		}
 		return nil
 	}
@@ -135,8 +133,7 @@ func (l *lifecycle) Admit(a admission.Attributes) error {
 
 	// forceLiveLookup if true will skip looking at local cache state and instead always make a live call to server.
 	forceLiveLookup := false
-	lruItemObj, ok := l.forceLiveLookupCache.Get(a.GetNamespace())
-	if ok && lruItemObj.(forceLiveLookupEntry).expiry.Before(time.Now()) {
+	if _, ok := l.forceLiveLookupCache.Get(a.GetNamespace()); ok {
 		// we think the namespace was marked for deletion, but our current local cache says otherwise, we will force a live lookup.
 		forceLiveLookup = exists && namespaceObj.(*api.Namespace).Status.Phase == api.NamespaceActive
 	}
@@ -170,10 +167,11 @@ func (l *lifecycle) Admit(a admission.Attributes) error {
 
 // NewLifecycle creates a new namespace lifecycle admission control handler
 func NewLifecycle(c clientset.Interface, immortalNamespaces sets.String) (admission.Interface, error) {
-	forceLiveLookupCache, err := lru.New(100)
-	if err != nil {
-		panic(err)
-	}
+	return newLifecycleWithClock(c, immortalNamespaces, clock.RealClock{})
+}
+
+func newLifecycleWithClock(c clientset.Interface, immortalNamespaces sets.String, clock utilcache.Clock) (admission.Interface, error) {
+	forceLiveLookupCache := utilcache.NewLRUExpireCacheWithClock(100, clock)
 	return &lifecycle{
 		Handler:              admission.NewHandler(admission.Create, admission.Update, admission.Delete),
 		client:               c,
