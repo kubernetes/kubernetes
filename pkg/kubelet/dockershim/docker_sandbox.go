@@ -236,6 +236,10 @@ func makeSandboxDockerConfig(c *runtimeApi.PodSandboxConfig, image string) *dock
 				hc.PidMode = namespaceModeHost
 			}
 		}
+
+		if seccompOpts := getSeccompOpts(lc.SeccompProfile); seccompOpts != "" {
+			hc.SecurityOpt = append(hc.SecurityOpt, seccompOpts)
+		}
 	}
 	// Set port mappings.
 	exposedPorts, portBindings := makePortsAndBindings(c.GetPortMappings())
@@ -250,9 +254,6 @@ func makeSandboxDockerConfig(c *runtimeApi.PodSandboxConfig, image string) *dock
 
 	// Apply resource options.
 	setSandboxResources(hc)
-
-	// Set security options.
-	hc.SecurityOpt = []string{getSeccompOpts()}
 
 	return createConfig
 }

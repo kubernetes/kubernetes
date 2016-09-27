@@ -89,6 +89,9 @@ type kubeGenericRuntimeManager struct {
 	// Network plugin.
 	networkPlugin network.NetworkPlugin
 
+	// Directory to host local seccomp profiles.
+	seccompProfileRoot string
+
 	// wrapped image puller.
 	imagePuller images.ImageManager
 
@@ -112,6 +115,7 @@ func NewKubeGenericRuntimeManager(
 	imagePullQPS float32,
 	imagePullBurst int,
 	cpuCFSQuota bool,
+	seccompProfileRoot string,
 	runtimeService internalApi.RuntimeService,
 	imageService internalApi.ImageManagerService,
 ) (kubecontainer.Runtime, error) {
@@ -125,6 +129,7 @@ func NewKubeGenericRuntimeManager(
 		runtimeHelper:       runtimeHelper,
 		runtimeService:      runtimeService,
 		imageService:        imageService,
+		seccompProfileRoot:  seccompProfileRoot,
 		keyring:             credentialprovider.NewDockerKeyring(),
 	}
 

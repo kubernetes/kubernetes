@@ -17,8 +17,13 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
@@ -168,4 +173,30 @@ func milliCPUToQuota(milliCPU int64) (quota int64, period int64) {
 func getStableKey(pod *api.Pod, container *api.Container) string {
 	hash := strconv.FormatUint(kubecontainer.HashContainer(container), 16)
 	return fmt.Sprintf("%s_%s_%s_%s_%s", pod.Name, pod.Namespace, string(pod.UID), container.Name, hash)
+}
+
+// getSeccompProfile gets seccomp profile for sandboxes and containers.
+func getSeccompProfile(profile, seccompProfileRoot string) (string, error) {
+	// TODO: rename docker/default to runtime/default
+	if profile == "" || profile == "unconfined" || profile == "docker/default" {
+		return profile, nil
+	}
+
+	if !strings.HasPrefix(profile, "localhost/") {
+		return "", fmt.Errorf("unknown seccomp profile option: %s", profile)
+	}
+
+	name := strings.TrimPrefix(profile, "localhost/") // by pod annotation validation, name is a valid subpath
+	fname := filepath.Join(seccompProfileRoot, filepath.FromSlash(name))
+	file, err := ioutil.ReadFile(fname)
+	if err != nil {
+		return "", fmt.Errorf("cannot load seccomp profile %q: %v", name, err)
+	}
+
+	b := bytes.NewBuffer(nil)
+	if err := json.Compact(b, file); err != nil {
+		return "", err
+	}
+
+	return b.String(), nil
 }

@@ -24,6 +24,7 @@ import (
 	"os"
 	"path"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -35,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/dockershim"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
+	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/pkg/types"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/term"
@@ -144,8 +146,13 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(container *api.Conta
 		Stdin:       &container.Stdin,
 		StdinOnce:   &container.StdinOnce,
 		Tty:         &container.TTY,
-		Linux:       m.generateLinuxContainerConfig(container),
 	}
+
+	linuxOpts, err := m.generateLinuxContainerConfig(pod, container)
+	if err != nil {
+		return nil, err
+	}
+	config.Linux = linuxOpts
 
 	// set privileged and readonlyRootfs
 	if container.SecurityContext != nil {
@@ -173,9 +180,27 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(container *api.Conta
 }
 
 // generateLinuxContainerConfig generates linux container config for kubelet runtime api.
-func (m *kubeGenericRuntimeManager) generateLinuxContainerConfig(container *api.Container) *runtimeApi.LinuxContainerConfig {
+func (m *kubeGenericRuntimeManager) generateLinuxContainerConfig(pod *api.Pod, container *api.Container) (*runtimeApi.LinuxContainerConfig, error) {
 	linuxConfig := &runtimeApi.LinuxContainerConfig{
 		Resources: &runtimeApi.LinuxContainerResources{},
+	}
+
+	// set seccomp and apparmor options
+	seccompProfile, profileOK := pod.Annotations[api.SeccompContainerAnnotationKeyPrefix+container.Name]
+	if !profileOK {
+		// try the pod profile
+		seccompProfile, profileOK = pod.Annotations[api.SeccompPodAnnotationKey]
+	}
+	if profileOK {
+		seccompProfile, err := getSeccompProfile(seccompProfile, m.seccompProfileRoot)
+		if err != nil {
+			return nil, err
+		}
+		linuxConfig.SeccompProfile = &seccompProfile
+	}
+	if apparmorProfile := apparmor.GetProfileName(pod, container.Name); apparmorProfile != "" {
+		profileName := strings.TrimPrefix(apparmorProfile, apparmor.ProfileNamePrefix)
+		linuxConfig.ApparmorProfile = &profileName
 	}
 
 	// set linux container resources
@@ -231,7 +256,7 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerConfig(container *api.
 		}
 	}
 
-	return linuxConfig
+	return linuxConfig, nil
 }
 
 // makeMounts generates container volume mounts for kubelet runtime api.

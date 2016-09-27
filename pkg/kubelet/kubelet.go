@@ -565,6 +565,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 				float32(kubeCfg.RegistryPullQPS),
 				int(kubeCfg.RegistryBurst),
 				klet.cpuCFSQuota,
+				kubeCfg.SeccompProfileRoot,
 				dockerService,
 				dockerService,
 			)
@@ -659,6 +660,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 			float32(kubeCfg.RegistryPullQPS),
 			int(kubeCfg.RegistryBurst),
 			klet.cpuCFSQuota,
+			kubeCfg.SeccompProfileRoot,
 			remoteRuntimeService,
 			remoteImageService,
 		)
