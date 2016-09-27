@@ -834,7 +834,7 @@ func (oe *operationExecutor) generateUnmountVolumeFunc(
 		return nil, fmt.Errorf(
 			"UnmountVolume.FindPluginByName failed for volume %q (volume.spec.Name: %q) pod %q (UID: %q) err=%v",
 			volumeToUnmount.VolumeName,
-			volumeToUnmount.OuterVolumeSpecName,
+			volumeToUnmount.InnerVolumeSpecName,
 			volumeToUnmount.PodName,
 			volumeToUnmount.PodUID,
 			err)
@@ -846,7 +846,7 @@ func (oe *operationExecutor) generateUnmountVolumeFunc(
 		return nil, fmt.Errorf(
 			"UnmountVolume.NewUnmounter failed for volume %q (volume.spec.Name: %q) pod %q (UID: %q) err=%v",
 			volumeToUnmount.VolumeName,
-			volumeToUnmount.OuterVolumeSpecName,
+			volumeToUnmount.InnerVolumeSpecName,
 			volumeToUnmount.PodName,
 			volumeToUnmount.PodUID,
 			newUnmounterErr)
@@ -860,7 +860,7 @@ func (oe *operationExecutor) generateUnmountVolumeFunc(
 			return fmt.Errorf(
 				"UnmountVolume.TearDown failed for volume %q (volume.spec.Name: %q) pod %q (UID: %q) with: %v",
 				volumeToUnmount.VolumeName,
-				volumeToUnmount.OuterVolumeSpecName,
+				volumeToUnmount.InnerVolumeSpecName,
 				volumeToUnmount.PodName,
 				volumeToUnmount.PodUID,
 				unmountErr)
@@ -884,7 +884,7 @@ func (oe *operationExecutor) generateUnmountVolumeFunc(
 			glog.Errorf(
 				"UnmountVolume.MarkVolumeAsUnmounted failed for volume %q (volume.spec.Name: %q) pod %q (UID: %q) with: %v",
 				volumeToUnmount.VolumeName,
-				volumeToUnmount.OuterVolumeSpecName,
+				volumeToUnmount.InnerVolumeSpecName,
 				volumeToUnmount.PodName,
 				volumeToUnmount.PodUID,
 				unmountErr)
