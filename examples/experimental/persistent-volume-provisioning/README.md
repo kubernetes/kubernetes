@@ -123,6 +123,8 @@ parameters:
 
 Reference : ([How to configure Heketi](https://github.com/heketi/heketi/wiki/Setting-up-the-topology))
 
+By default the GlusterFS provisioner creates Distributed Replica 3 volumes and the minimum volume size is 8G.
+
 Create endpoints
 
 As in example [glusterfs-endpoints.json](../../volumes/glusterfs/glusterfs-endpoints.json) file, the "IP" field should be filled with the address of a node in the Glusterfs server cluster. It is fine to give any valid value (from 1 to 65535) to the "port" field.
