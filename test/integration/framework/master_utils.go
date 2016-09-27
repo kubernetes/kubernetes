@@ -221,7 +221,7 @@ func NewMasterConfig() *master.Config {
 		NewSingleContentTypeSerializer(api.Scheme, testapi.Storage.Codec(), runtime.ContentTypeJSON))
 
 	return &master.Config{
-		Config: &genericapiserver.Config{
+		Config: genericapiserver.Config{
 			APIResourceConfigSource: master.DefaultAPIResourceConfigSource(),
 			APIPrefix:               "/api",
 			APIGroupPrefix:          "/apis",

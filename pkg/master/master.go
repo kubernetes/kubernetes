@@ -116,7 +116,7 @@ const (
 )
 
 type Config struct {
-	*genericapiserver.Config
+	genericapiserver.Config
 
 	StorageFactory           genericapiserver.StorageFactory
 	EnableWatchCache         bool
@@ -194,14 +194,15 @@ type RESTStorageProvider interface {
 // Certain config fields will be set to a default value if unset.
 // Certain config fields must be specified, including:
 //   KubeletClient
-func New(c *Config) (*Master, error) {
+func New(c Config) (*Master, error) {
 	if c.KubeletClient == nil {
 		return nil, fmt.Errorf("Master.New() called with config.KubeletClient == nil")
 	}
 
-	gc := *c.Config                                              // copy before mutations
-	gc.EnableSwaggerUI = gc.EnableSwaggerUI && c.EnableUISupport // disable swagger UI if general UI supports it
-	s, err := gc.New()
+	c.EnableSwaggerUI = c.EnableSwaggerUI && c.EnableUISupport // disable swagger UI if general UI supports it
+	withDefaults := c.WithDefaults()
+	c.Config = *(*genericapiserver.Config)(withDefaults) // write back to use defaults below
+	s, err := withDefaults.New()
 	if err != nil {
 		return nil, err
 	}
@@ -251,7 +252,7 @@ func New(c *Config) (*Master, error) {
 	c.RESTStorageProviders[policy.GroupName] = policyrest.RESTStorageProvider{}
 	c.RESTStorageProviders[rbac.GroupName] = &rbacrest.RESTStorageProvider{AuthorizerRBACSuperUser: c.AuthorizerRBACSuperUser}
 	c.RESTStorageProviders[storage.GroupName] = storagerest.RESTStorageProvider{}
-	m.InstallAPIs(c)
+	m.InstallAPIs(&c)
 
 	// TODO: Attempt clean shutdown?
 	if m.enableCoreControllers {

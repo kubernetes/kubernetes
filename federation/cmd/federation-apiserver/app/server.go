@@ -219,7 +219,7 @@ func Run(s *options.ServerRunOptions) error {
 		cachesize.SetWatchCacheSizes(s.WatchCacheSizes)
 	}
 
-	m, err := genericConfig.New()
+	m, err := genericConfig.WithDefaults().New()
 	if err != nil {
 		return err
 	}

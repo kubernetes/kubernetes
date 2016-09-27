@@ -201,8 +201,10 @@ func NewConfig(options *options.ServerRunOptions) *Config {
 	}
 }
 
+type defaultedConfig Config
+
 // setDefaults fills in any fields not set that are required to have valid data.
-func (c *Config) setDefaults() {
+func (c Config) WithDefaults() *defaultedConfig {
 	if c.ServiceClusterIPRange == nil {
 		defaultNet := "10.0.0.0/24"
 		glog.Warningf("Network range for service cluster IPs is unspecified. Defaulting to %v.", defaultNet)
@@ -255,6 +257,8 @@ func (c *Config) setDefaults() {
 		}
 		c.ExternalHost = hostAndPort
 	}
+
+	return (*defaultedConfig)(&c)
 }
 
 // New returns a new instance of GenericAPIServer from the given config.
@@ -279,12 +283,10 @@ func (c *Config) setDefaults() {
 //   If the caller wants to add additional endpoints not using the GenericAPIServer's
 //   auth, then the caller should create a handler for those endpoints, which delegates the
 //   any unhandled paths to "Handler".
-func (c Config) New() (*GenericAPIServer, error) {
+func (c *defaultedConfig) New() (*GenericAPIServer, error) {
 	if c.Serializer == nil {
 		return nil, fmt.Errorf("Genericapiserver.New() called with config.Serializer == nil")
 	}
-
-	c.setDefaults()
 
 	s := &GenericAPIServer{
 		ServiceClusterIPRange: c.ServiceClusterIPRange,
@@ -348,8 +350,8 @@ func (c Config) New() (*GenericAPIServer, error) {
 
 	apiserver.InstallServiceErrorHandler(s.Serializer, s.HandlerContainer)
 
-	s.installAPI(&c)
-	s.Handler, s.InsecureHandler = s.buildHandlerChains(&c, http.Handler(s.Mux.BaseMux().(*http.ServeMux)))
+	s.installAPI((*Config)(c))
+	s.Handler, s.InsecureHandler = s.buildHandlerChains((*Config)(c), http.Handler(s.Mux.BaseMux().(*http.ServeMux)))
 
 	return s, nil
 }

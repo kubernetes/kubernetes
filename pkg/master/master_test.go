@@ -83,7 +83,7 @@ func setUp(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.
 		GenericAPIServer: &genericapiserver.GenericAPIServer{},
 	}
 	config := Config{
-		Config: &genericapiserver.Config{},
+		Config: genericapiserver.Config{},
 	}
 
 	resourceEncoding := genericapiserver.NewDefaultResourceEncodingConfig()
