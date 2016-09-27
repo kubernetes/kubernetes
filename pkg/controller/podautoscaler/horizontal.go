@@ -148,7 +148,7 @@ func (a *HorizontalController) computeReplicasForCPUUtilization(hpa *autoscaling
 		a.eventRecorder.Event(hpa, api.EventTypeWarning, "InvalidSelector", errMsg)
 		return 0, nil, time.Time{}, fmt.Errorf(errMsg)
 	}
-	currentUtilization, timestamp, err := a.metricsClient.GetCPUUtilization(hpa.Namespace, selector)
+	utilizationInfo, err := a.metricsClient.GetCPUUtilization(hpa.Namespace, selector)
 
 	// TODO: what to do on partial errors (like metrics obtained for 75% of pods).
 	if err != nil {
@@ -156,14 +156,33 @@ func (a *HorizontalController) computeReplicasForCPUUtilization(hpa *autoscaling
 		return 0, nil, time.Time{}, fmt.Errorf("failed to get CPU utilization: %v", err)
 	}
 
-	utilization := int32(*currentUtilization)
+	utilization := int32(utilizationInfo.Utilization)
 
-	usageRatio := float64(utilization) / float64(targetUtilization)
-	if math.Abs(1.0-usageRatio) > tolerance {
-		return int32(math.Ceil(usageRatio * float64(currentReplicas))), &utilization, timestamp, nil
+	usageRatio := utilizationInfo.Utilization / float64(targetUtilization)
+	if math.Abs(1.0-usageRatio) <= tolerance {
+		// if the change was too small, ignore it
+		return currentReplicas, &utilization, utilizationInfo.OldestTimestamp, nil
 	}
 
-	return currentReplicas, &utilization, timestamp, nil
+	// for unready pods, in the case of scale up, check to see if treating those pods as having
+	// a mock CPU utilization of zero would change things
+	if utilizationInfo.UnreadyPodsCount > 0 && usageRatio > 1.0 {
+		// check if treating unready pods as having 0 CPU usage would change things
+		newUtilization := (utilizationInfo.Utilization * float64(utilizationInfo.ReadyPodsCount)) / float64(utilizationInfo.ReadyPodsCount+utilizationInfo.UnreadyPodsCount)
+		newUsageRatio := newUtilization / float64(targetUtilization)
+
+		// simply don't scale if the new usage ratio would mean a downscale or no scale
+		if newUsageRatio < 1.0 || math.Abs(1.0-newUsageRatio) <= tolerance {
+			return currentReplicas, &utilization, utilizationInfo.OldestTimestamp, nil
+		}
+
+		// set the usage ratio to scale by to our new usage ratio (which may be a bit more conservative)
+		usageRatio = newUsageRatio
+
+		// keep the reported utilization to be whatever we retrieved from the the ready pods
+	}
+
+	return int32(math.Ceil(usageRatio * float64(currentReplicas))), &utilization, utilizationInfo.OldestTimestamp, nil
 }
 
 // Computes the desired number of replicas based on the CustomMetrics passed in cmAnnotation as json-serialized
@@ -205,14 +224,35 @@ func (a *HorizontalController) computeReplicasForCustomMetrics(hpa *autoscaling.
 			a.eventRecorder.Event(hpa, api.EventTypeWarning, "InvalidSelector", errMsg)
 			return 0, "", "", time.Time{}, fmt.Errorf("couldn't convert selector string to a corresponding selector object: %v", err)
 		}
-		value, currentTimestamp, err := a.metricsClient.GetCustomMetric(customMetricTarget.Name, hpa.Namespace, selector)
+		utilizationInfo, err := a.metricsClient.GetCustomMetric(customMetricTarget.Name, hpa.Namespace, selector)
 		// TODO: what to do on partial errors (like metrics obtained for 75% of pods).
 		if err != nil {
 			a.eventRecorder.Event(hpa, api.EventTypeWarning, "FailedGetCustomMetrics", err.Error())
 			return 0, "", "", time.Time{}, fmt.Errorf("failed to get custom metric value: %v", err)
 		}
 		floatTarget := float64(customMetricTarget.TargetValue.MilliValue()) / 1000.0
-		usageRatio := *value / floatTarget
+		usageRatio := utilizationInfo.Utilization / floatTarget
+
+		// for unready pods, in the case of scale up, check to see if treating those pods
+		// as having a mock custom metric value of zero would change things
+		if utilizationInfo.UnreadyPodsCount > 0 && usageRatio > 1.0 {
+			// check if treating unready pods as having 0 CPU usage would change things
+			newValue := utilizationInfo.Utilization * float64(utilizationInfo.ReadyPodsCount) / float64(utilizationInfo.ReadyPodsCount+utilizationInfo.UnreadyPodsCount)
+			newUsageRatio := newValue / floatTarget
+
+			if newUsageRatio < 1.0 || math.Abs(1.0-newUsageRatio) <= tolerance {
+				// simply don't scale if the new usage ratio would mean a downscale or no scale
+				usageRatio = 1.0
+
+				// keep the reported value as whatever we retrieved from the running pods
+			} else {
+				// otherwise, set the usage ratio to scale by to our new usage ratio
+				// (which may be a bit more conservative)
+				usageRatio = newUsageRatio
+
+				// keep the reported value as whatever we retrieved from the running pods
+			}
+		}
 
 		replicaCountProposal := int32(0)
 		if math.Abs(1.0-usageRatio) > tolerance {
@@ -221,11 +261,11 @@ func (a *HorizontalController) computeReplicasForCustomMetrics(hpa *autoscaling.
 			replicaCountProposal = currentReplicas
 		}
 		if replicaCountProposal > replicas {
-			timestamp = currentTimestamp
+			timestamp = utilizationInfo.OldestTimestamp
 			replicas = replicaCountProposal
 			metric = fmt.Sprintf("Custom metric %s", customMetricTarget.Name)
 		}
-		quantity, err := resource.ParseQuantity(fmt.Sprintf("%.3f", *value))
+		quantity, err := resource.ParseQuantity(fmt.Sprintf("%.3f", utilizationInfo.Utilization))
 		if err != nil {
 			return 0, "", "", time.Time{}, fmt.Errorf("failed to set custom metric value: %v", err)
 		}

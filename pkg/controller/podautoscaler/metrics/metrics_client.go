@@ -42,16 +42,33 @@ const (
 
 var heapsterQueryStart = -5 * time.Minute
 
+// UtilizationInfo contains extra metadata about the returned metric values
+type UtilizationInfo struct {
+	// ReadyPodsCount is the total number of pods factored into the computation of the returned metric value
+	ReadyPodsCount int
+
+	// UnreadyPodsCount is the total number of running pods not factored into the computation of the returned metric value (due to being unready)
+	UnreadyPodsCount int
+
+	// OldestTimestamp is the time of generation of the oldest of the utilization reports for the pods
+	OldestTimestamp time.Time
+
+	// Utiliziation is the metric utilization for the requested metric (may be CPU as a percentage of request,
+	// or a raw custom metric value)
+	Utilization float64
+}
+
 // MetricsClient is an interface for getting metrics for pods.
 type MetricsClient interface {
 	// GetCPUUtilization returns the average utilization over all pods represented as a percent of requested CPU
-	// (e.g. 70 means that an average pod uses 70% of the requested CPU)
-	// and the time of generation of the oldest of utilization reports for pods.
-	GetCPUUtilization(namespace string, selector labels.Selector) (*int, time.Time, error)
+	// (e.g. 70 means that an average pod uses 70% of the requested CPU), as well as associated information about
+	// the computation.
+	GetCPUUtilization(namespace string, selector labels.Selector) (*UtilizationInfo, error)
 
 	// GetCustomMetric returns the average value of the given custom metrics from the
-	// pods picked using the namespace and selector passed as arguments.
-	GetCustomMetric(customMetricName string, namespace string, selector labels.Selector) (*float64, time.Time, error)
+	// pods picked using the namespace and selector passed as arguments, as well as associated information about
+	// the computation.
+	GetCustomMetric(customMetricName string, namespace string, selector labels.Selector) (*UtilizationInfo, error)
 }
 
 type intAndFloat struct {
@@ -101,25 +118,27 @@ func NewHeapsterMetricsClient(client clientset.Interface, namespace, scheme, ser
 	}
 }
 
-func (h *HeapsterMetricsClient) GetCPUUtilization(namespace string, selector labels.Selector) (*int, time.Time, error) {
-	avgConsumption, avgRequest, timestamp, err := h.GetCpuConsumptionAndRequestInMillis(namespace, selector)
+func (h *HeapsterMetricsClient) GetCPUUtilization(namespace string, selector labels.Selector) (*UtilizationInfo, error) {
+	avgConsumption, avgRequest, info, err := h.GetCpuConsumptionAndRequestInMillis(namespace, selector)
 	if err != nil {
-		return nil, time.Time{}, fmt.Errorf("failed to get CPU consumption and request: %v", err)
+		return nil, fmt.Errorf("failed to get CPU consumption and request: %v", err)
 	}
-	utilization := int((avgConsumption * 100) / avgRequest)
-	return &utilization, timestamp, nil
+	info.Utilization = float64((avgConsumption * 100) / avgRequest)
+
+	return info, nil
 }
 
 func (h *HeapsterMetricsClient) GetCpuConsumptionAndRequestInMillis(namespace string, selector labels.Selector) (avgConsumption int64,
-	avgRequest int64, timestamp time.Time, err error) {
+	avgRequest int64, utilizationInfo *UtilizationInfo, err error) {
 
 	podList, err := h.client.Core().Pods(namespace).
 		List(api.ListOptions{LabelSelector: selector})
 
 	if err != nil {
-		return 0, 0, time.Time{}, fmt.Errorf("failed to get pod list: %v", err)
+		return 0, 0, nil, fmt.Errorf("failed to get pod list: %v", err)
 	}
-	podNames := map[string]struct{}{}
+	readyPods := sets.NewString()
+	unreadyPods := sets.NewString()
 	requestSum := int64(0)
 	missing := false
 	for _, pod := range podList.Items {
@@ -128,7 +147,14 @@ func (h *HeapsterMetricsClient) GetCpuConsumptionAndRequestInMillis(namespace st
 			continue
 		}
 
-		podNames[pod.Name] = struct{}{}
+		if !api.IsPodReady(&pod) {
+			// don't perform the normal logic on unready pods
+			unreadyPods.Insert(pod.Name)
+			continue
+		}
+
+		readyPods.Insert(pod.Name)
+
 		for _, container := range pod.Spec.Containers {
 			if containerRequest, ok := container.Resources.Requests[api.ResourceCPU]; ok {
 				requestSum += containerRequest.MilliValue()
@@ -137,23 +163,30 @@ func (h *HeapsterMetricsClient) GetCpuConsumptionAndRequestInMillis(namespace st
 			}
 		}
 	}
-	if len(podNames) == 0 && len(podList.Items) > 0 {
-		return 0, 0, time.Time{}, fmt.Errorf("no running pods")
+	if readyPods.Len() == 0 {
+		return 0, 0, nil, fmt.Errorf("no running and ready pods")
 	}
 	if missing || requestSum == 0 {
-		return 0, 0, time.Time{}, fmt.Errorf("some pods do not have request for cpu")
+		return 0, 0, nil, fmt.Errorf("some pods do not have request for cpu")
 	}
 	glog.V(4).Infof("%s %s - sum of CPU requested: %d", namespace, selector, requestSum)
-	requestAvg := requestSum / int64(len(podNames))
+	requestAvg := requestSum / int64(readyPods.Len())
 	// Consumption is already averaged and in millis.
-	consumption, timestamp, err := h.getCpuUtilizationForPods(namespace, selector, podNames)
+	consumption, timestamp, err := h.getCpuUtilizationForPods(namespace, selector, readyPods, unreadyPods)
 	if err != nil {
-		return 0, 0, time.Time{}, err
+		return 0, 0, nil, err
 	}
-	return consumption, requestAvg, timestamp, nil
+
+	info := &UtilizationInfo{
+		ReadyPodsCount:   readyPods.Len(),
+		UnreadyPodsCount: unreadyPods.Len(),
+		OldestTimestamp:  timestamp,
+	}
+
+	return consumption, requestAvg, info, nil
 }
 
-func (h *HeapsterMetricsClient) getCpuUtilizationForPods(namespace string, selector labels.Selector, podNames map[string]struct{}) (int64, time.Time, error) {
+func (h *HeapsterMetricsClient) getCpuUtilizationForPods(namespace string, selector labels.Selector, readyPods sets.String, unreadyPods sets.String) (int64, time.Time, error) {
 	metricPath := fmt.Sprintf("/apis/metrics/v1alpha1/namespaces/%s/pods", namespace)
 	params := map[string]string{"labelSelector": selector.String()}
 
@@ -172,27 +205,10 @@ func (h *HeapsterMetricsClient) getCpuUtilizationForPods(namespace string, selec
 		return 0, time.Time{}, fmt.Errorf("failed to unmarshall heapster response: %v", err)
 	}
 
-	if len(metrics.Items) != len(podNames) {
-		present := sets.NewString()
-		for _, m := range metrics.Items {
-			present.Insert(m.Name)
-		}
-		missing := make([]string, 0)
-		for expected := range podNames {
-			if !present.Has(expected) {
-				missing = append(missing, expected)
-			}
-		}
-		hint := ""
-		if len(missing) > 0 {
-			hint = fmt.Sprintf(" (sample missing pod: %s/%s)", namespace, missing[0])
-		}
-		return 0, time.Time{}, fmt.Errorf("metrics obtained for %d/%d of pods%s", len(metrics.Items), len(podNames), hint)
-	}
-
 	sum := int64(0)
+	count := int64(0)
 	for _, m := range metrics.Items {
-		if _, found := podNames[m.Name]; found {
+		if readyPods.Has(m.Name) {
 			for _, c := range m.Containers {
 				cpu, found := c.Usage[v1.ResourceCPU]
 				if !found {
@@ -200,41 +216,73 @@ func (h *HeapsterMetricsClient) getCpuUtilizationForPods(namespace string, selec
 				}
 				sum += cpu.MilliValue()
 			}
-		} else {
-			return 0, time.Time{}, fmt.Errorf("not expected metrics for pod %v/%v", namespace, m.Name)
+
+			count++
 		}
 	}
 
-	return sum / int64(len(metrics.Items)), metrics.Items[0].Timestamp.Time, nil
+	// we got the wrong number of metrics (we're probably missing some), so report an error
+	if int(count) != readyPods.Len() {
+		hint := ""
+		if int(count) < readyPods.Len() {
+			present := sets.NewString()
+			for _, m := range metrics.Items {
+				present.Insert(m.Name)
+			}
+			for expected := range readyPods {
+				if !present.Has(expected) {
+					hint = fmt.Sprintf(", sample missing pod: %s/%s", namespace, expected)
+					break
+				}
+			}
+		}
+		return 0, time.Time{}, fmt.Errorf("metrics obtained for %d/%d of ready pods (metrics obtained for %d pods total%s)", count, readyPods.Len(), len(metrics.Items), hint)
+	}
+
+	return sum / count, metrics.Items[0].Timestamp.Time, nil
 }
 
 // GetCustomMetric returns the average value of the given custom metric from the
 // pods picked using the namespace and selector passed as arguments.
-func (h *HeapsterMetricsClient) GetCustomMetric(customMetricName string, namespace string, selector labels.Selector) (*float64, time.Time, error) {
+func (h *HeapsterMetricsClient) GetCustomMetric(customMetricName string, namespace string, selector labels.Selector) (*UtilizationInfo, error) {
 	metricSpec := getHeapsterCustomMetricDefinition(customMetricName)
 
 	podList, err := h.client.Core().Pods(namespace).List(api.ListOptions{LabelSelector: selector})
 
 	if err != nil {
-		return nil, time.Time{}, fmt.Errorf("failed to get pod list: %v", err)
+		return nil, fmt.Errorf("failed to get pod list: %v", err)
 	}
-	podNames := []string{}
+	readyPods := []string{}
+	unreadyPodsCount := 0
 	for _, pod := range podList.Items {
 		if pod.Status.Phase == api.PodPending {
 			// Skip pending pods.
 			continue
 		}
-		podNames = append(podNames, pod.Name)
+		if !api.IsPodReady(&pod) {
+			// skip unready pods
+			unreadyPodsCount++
+			continue
+		}
+		readyPods = append(readyPods, pod.Name)
 	}
-	if len(podNames) == 0 && len(podList.Items) > 0 {
-		return nil, time.Time{}, fmt.Errorf("no running pods")
+	if len(readyPods) == 0 && len(podList.Items) > 0 {
+		return nil, fmt.Errorf("no running and ready pods")
 	}
 
-	value, timestamp, err := h.getCustomMetricForPods(metricSpec, namespace, podNames)
+	value, timestamp, err := h.getCustomMetricForPods(metricSpec, namespace, readyPods)
 	if err != nil {
-		return nil, time.Time{}, err
+		return nil, err
 	}
-	return &value.floatValue, timestamp, nil
+
+	info := &UtilizationInfo{
+		ReadyPodsCount:   len(readyPods),
+		UnreadyPodsCount: unreadyPodsCount,
+		OldestTimestamp:  timestamp,
+		Utilization:      value.floatValue,
+	}
+
+	return info, nil
 }
 
 func (h *HeapsterMetricsClient) getCustomMetricForPods(metricSpec metricDefinition, namespace string, podNames []string) (*intAndFloat, time.Time, error) {

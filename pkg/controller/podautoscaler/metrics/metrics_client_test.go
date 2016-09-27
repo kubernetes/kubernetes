@@ -180,11 +180,17 @@ func buildPod(namespace, podName string, podLabels map[string]string, phase api.
 		},
 		Status: api.PodStatus{
 			Phase: phase,
+			Conditions: []api.PodCondition{
+				{
+					Type:   api.PodReady,
+					Status: api.ConditionTrue,
+				},
+			},
 		},
 	}
 }
 
-func (tc *testCase) verifyResults(t *testing.T, val *float64, req *float64, timestamp time.Time, err error) {
+func (tc *testCase) verifyResults(t *testing.T, val *float64, req *float64, utilizationInfo *UtilizationInfo, err error) {
 	if tc.desiredError != nil {
 		assert.Error(t, err)
 		assert.Contains(t, fmt.Sprintf("%v", err), fmt.Sprintf("%v", tc.desiredError))
@@ -200,21 +206,27 @@ func (tc *testCase) verifyResults(t *testing.T, val *float64, req *float64, time
 		assert.True(t, *tc.desiredRequest+0.001 > *req)
 	}
 
+	assert.True(t, utilizationInfo.ReadyPodsCount > 0)
+
 	targetTimestamp := fixedTimestamp.Add(time.Duration(tc.targetTimestamp) * time.Minute)
-	assert.True(t, targetTimestamp.Equal(timestamp))
+	assert.True(t, targetTimestamp.Equal(utilizationInfo.OldestTimestamp))
 }
 
 func (tc *testCase) runTest(t *testing.T) {
 	testClient := tc.prepareTestClient(t)
 	metricsClient := NewHeapsterMetricsClient(testClient, DefaultHeapsterNamespace, DefaultHeapsterScheme, DefaultHeapsterService, DefaultHeapsterPort)
 	if tc.targetResource == "cpu-usage" {
-		val, req, timestamp, err := metricsClient.GetCpuConsumptionAndRequestInMillis(tc.namespace, tc.selector)
+		val, req, info, err := metricsClient.GetCpuConsumptionAndRequestInMillis(tc.namespace, tc.selector)
 		fval := float64(val)
 		freq := float64(req)
-		tc.verifyResults(t, &fval, &freq, timestamp, err)
+		tc.verifyResults(t, &fval, &freq, info, err)
 	} else {
-		val, timestamp, err := metricsClient.GetCustomMetric(tc.targetResource, tc.namespace, tc.selector)
-		tc.verifyResults(t, val, nil, timestamp, err)
+		info, err := metricsClient.GetCustomMetric(tc.targetResource, tc.namespace, tc.selector)
+		var val *float64 = nil
+		if info != nil {
+			val = &info.Utilization
+		}
+		tc.verifyResults(t, val, nil, info, err)
 	}
 }
 
@@ -258,6 +270,30 @@ func TestCPUPending(t *testing.T) {
 	tc.runTest(t)
 }
 
+func TestCPUUnready(t *testing.T) {
+	tc := testCase{
+		replicas:           4,
+		desiredValue:       4000,
+		targetResource:     "cpu-usage",
+		targetTimestamp:    1,
+		reportedPodMetrics: [][]int64{{5000}, {5000}, {2000}, {2000}},
+		useMetricsApi:      true,
+		podListOverride:    &api.PodList{},
+	}
+
+	namespace := "test-namespace"
+	podNamePrefix := "test-pod"
+	podLabels := map[string]string{"name": podNamePrefix}
+	for i := 0; i < tc.replicas; i++ {
+		podName := fmt.Sprintf("%s-%d", podNamePrefix, i)
+		pod := buildPod(namespace, podName, podLabels, api.PodRunning, "10")
+		tc.podListOverride.Items = append(tc.podListOverride.Items, pod)
+	}
+	tc.podListOverride.Items[3].Status.Conditions[0].Status = api.ConditionFalse
+
+	tc.runTest(t)
+}
+
 func TestCPUAllPending(t *testing.T) {
 	tc := testCase{
 		replicas:           4,
@@ -266,7 +302,7 @@ func TestCPUAllPending(t *testing.T) {
 		reportedPodMetrics: [][]int64{},
 		useMetricsApi:      true,
 		podListOverride:    &api.PodList{},
-		desiredError:       fmt.Errorf("no running pods"),
+		desiredError:       fmt.Errorf("no running and ready pods"),
 	}
 
 	namespace := "test-namespace"
@@ -275,6 +311,29 @@ func TestCPUAllPending(t *testing.T) {
 	for i := 0; i < tc.replicas; i++ {
 		podName := fmt.Sprintf("%s-%d", podNamePrefix, i)
 		pod := buildPod(namespace, podName, podLabels, api.PodPending, "2048")
+		tc.podListOverride.Items = append(tc.podListOverride.Items, pod)
+	}
+	tc.runTest(t)
+}
+
+func TestCPUAllUnready(t *testing.T) {
+	tc := testCase{
+		replicas:           4,
+		targetResource:     "cpu-usage",
+		targetTimestamp:    1,
+		reportedPodMetrics: [][]int64{},
+		useMetricsApi:      true,
+		podListOverride:    &api.PodList{},
+		desiredError:       fmt.Errorf("no running and ready pods"),
+	}
+
+	namespace := "test-namespace"
+	podNamePrefix := "test-pod"
+	podLabels := map[string]string{"name": podNamePrefix}
+	for i := 0; i < tc.replicas; i++ {
+		podName := fmt.Sprintf("%s-%d", podNamePrefix, i)
+		pod := buildPod(namespace, podName, podLabels, api.PodRunning, "10")
+		pod.Status.Conditions[0].Status = api.ConditionFalse
 		tc.podListOverride.Items = append(tc.podListOverride.Items, pod)
 	}
 	tc.runTest(t)
@@ -316,7 +375,7 @@ func TestQPSPending(t *testing.T) {
 func TestQPSAllPending(t *testing.T) {
 	tc := testCase{
 		replicas:              4,
-		desiredError:          fmt.Errorf("no running pods"),
+		desiredError:          fmt.Errorf("no running and ready pods"),
 		targetResource:        "qps",
 		targetTimestamp:       1,
 		reportedMetricsPoints: [][]metricPoint{},
@@ -374,7 +433,7 @@ func TestCPUMissingMetrics(t *testing.T) {
 	tc := testCase{
 		replicas:           3,
 		targetResource:     "cpu-usage",
-		desiredError:       fmt.Errorf("metrics obtained for 1/3 of pods"),
+		desiredError:       fmt.Errorf("metrics obtained for 1/3 of ready pods (metrics obtained for 1 pods total, sample missing pod: test-namespace/test-pod-1)"),
 		reportedPodMetrics: [][]int64{{4000}},
 		useMetricsApi:      true,
 	}
@@ -387,17 +446,6 @@ func TestQpsMissingMetrics(t *testing.T) {
 		targetResource:        "qps",
 		desiredError:          fmt.Errorf("metrics obtained for 1/3 of pods"),
 		reportedMetricsPoints: [][]metricPoint{{{4000, 4}}},
-	}
-	tc.runTest(t)
-}
-
-func TestCPUSuperfluousMetrics(t *testing.T) {
-	tc := testCase{
-		replicas:           3,
-		targetResource:     "cpu-usage",
-		desiredError:       fmt.Errorf("metrics obtained for 6/3 of pods"),
-		reportedPodMetrics: [][]int64{{1000}, {2000}, {4000}, {4000}, {2000}, {4000}},
-		useMetricsApi:      true,
 	}
 	tc.runTest(t)
 }
@@ -416,7 +464,7 @@ func TestCPUEmptyMetrics(t *testing.T) {
 	tc := testCase{
 		replicas:              3,
 		targetResource:        "cpu-usage",
-		desiredError:          fmt.Errorf("metrics obtained for 0/3 of pods"),
+		desiredError:          fmt.Errorf("metrics obtained for 0/3 of ready pods (metrics obtained for 0 pods total, sample missing pod: test-namespace/test-pod-0)"),
 		reportedMetricsPoints: [][]metricPoint{},
 		reportedPodMetrics:    [][]int64{},
 		useMetricsApi:         true,
@@ -428,7 +476,7 @@ func TestCPUZeroReplicas(t *testing.T) {
 	tc := testCase{
 		replicas:           0,
 		targetResource:     "cpu-usage",
-		desiredError:       fmt.Errorf("some pods do not have request for cpu"),
+		desiredError:       fmt.Errorf("no running and ready pods"),
 		reportedPodMetrics: [][]int64{},
 		useMetricsApi:      true,
 	}
@@ -439,7 +487,7 @@ func TestCPUEmptyMetricsForOnePod(t *testing.T) {
 	tc := testCase{
 		replicas:           3,
 		targetResource:     "cpu-usage",
-		desiredError:       fmt.Errorf("metrics obtained for 2/3 of pods (sample missing pod: test-namespace/test-pod-2)"),
+		desiredError:       fmt.Errorf("metrics obtained for 2/3 of ready pods (metrics obtained for 2 pods total, sample missing pod: test-namespace/test-pod-2)"),
 		reportedPodMetrics: [][]int64{{100}, {300, 400}},
 		useMetricsApi:      true,
 	}
