@@ -55,8 +55,9 @@ type Builder struct {
 
 	resources []string
 
-	namespace string
-	names     []string
+	namespace    string
+	allNamespace bool
+	names        []string
 
 	resourceTuples []resourceTuple
 
@@ -296,6 +297,7 @@ func (b *Builder) AllNamespaces(allNamespace bool) *Builder {
 	if allNamespace {
 		b.namespace = api.NamespaceAll
 	}
+	b.allNamespace = allNamespace
 	return b
 }
 
@@ -644,7 +646,11 @@ func (b *Builder) visitByResource() *Result {
 			selectorNamespace = ""
 		} else {
 			if len(b.namespace) == 0 {
-				return &Result{singular: isSingular, err: fmt.Errorf("namespace may not be empty when retrieving a resource by name")}
+				errMsg := "namespace may not be empty when retrieving a resource by name"
+				if b.allNamespace {
+					errMsg = "a resource cannot be retrieved by name across all namespaces"
+				}
+				return &Result{singular: isSingular, err: fmt.Errorf(errMsg)}
 			}
 		}
 
@@ -690,7 +696,11 @@ func (b *Builder) visitByName() *Result {
 		selectorNamespace = ""
 	} else {
 		if len(b.namespace) == 0 {
-			return &Result{singular: isSingular, err: fmt.Errorf("namespace may not be empty when retrieving a resource by name")}
+			errMsg := "namespace may not be empty when retrieving a resource by name"
+			if b.allNamespace {
+				errMsg = "a resource cannot be retrieved by name across all namespaces"
+			}
+			return &Result{singular: isSingular, err: fmt.Errorf(errMsg)}
 		}
 	}
 
