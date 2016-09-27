@@ -42,7 +42,7 @@ func makeContainerConfig(sConfig *runtimeApi.PodSandboxConfig, name, image strin
 // TestListContainers creates several containers and then list them to check
 // whether the correct metadatas, states, and labels are returned.
 func TestListContainers(t *testing.T) {
-	ds, _, _ := newTestDockerSevice()
+	ds, _, _ := newTestDockerService()
 	podName, namespace := "foo", "bar"
 	containerName, image := "sidecar", "logger"
 
@@ -91,7 +91,7 @@ func TestListContainers(t *testing.T) {
 // TestContainerStatus tests the basic lifecycle operations and verify that
 // the status returned reflects the operations performed.
 func TestContainerStatus(t *testing.T) {
-	ds, _, fClock := newTestDockerSevice()
+	ds, _, fClock := newTestDockerService()
 	sConfig := makeSandboxConfig("foo", "bar", "1", 0)
 	labels := map[string]string{"abc.xyz": "foo"}
 	annotations := map[string]string{"foo.bar.baz": "abc"}
