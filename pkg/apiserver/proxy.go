@@ -63,6 +63,7 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	ctx, ok := r.mapper.Get(req)
 	if !ok {
 		internalError(w, req, errors.New("Error getting request context"))
+		httpCode = http.StatusInternalServerError
 		return
 	}
 
