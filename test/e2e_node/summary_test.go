@@ -194,14 +194,10 @@ var _ = framework.KubeDescribe("Summary API [Flaky]", func() {
 			})
 
 			By("Validating /stats/summary")
-			Eventually(func() *stats.Summary {
-				summary, err := getNodeSummary()
-				if err != nil {
-					framework.Logf("Error retrieving /stats/summary: %v", err)
-					return nil
-				}
-				return summary
-			}, 1*time.Minute, time.Second*15).Should(matchExpectations)
+			// Give pods a minute to actually start up.
+			Eventually(getNodeSummary, 1*time.Minute, 15*time.Second).Should(matchExpectations)
+			// Then the summary should match the expectations a few more times.
+			Consistently(getNodeSummary, 30*time.Second, 15*time.Second).Should(matchExpectations)
 		})
 	})
 })
