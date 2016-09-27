@@ -329,6 +329,7 @@ func (c Config) New() (*GenericAPIServer, error) {
 	// Use CurlyRouter to be able to use regular expressions in paths. Regular expressions are required in paths for example for proxy (where the path is proxy/{kind}/{name}/{*})
 	s.HandlerContainer.Router(restful.CurlyRouter{})
 	s.Mux = apiserver.NewPathRecorderMux(s.HandlerContainer.ServeMux)
+	apiserver.InstallServiceErrorHandler(s.Serializer, s.HandlerContainer)
 
 	if c.ProxyDialer != nil || c.ProxyTLSClientConfig != nil {
 		s.ProxyTransport = utilnet.SetTransportDefaults(&http.Transport{
@@ -336,8 +337,6 @@ func (c Config) New() (*GenericAPIServer, error) {
 			TLSClientConfig: c.ProxyTLSClientConfig,
 		})
 	}
-
-	apiserver.InstallServiceErrorHandler(s.Serializer, s.HandlerContainer)
 
 	s.installAPI(&c)
 	s.Handler, s.InsecureHandler = s.buildHandlerChains(&c, http.Handler(s.Mux.BaseMux().(*http.ServeMux)))
