@@ -78,8 +78,6 @@ type DockerLegacyService interface {
 }
 
 type dockerService struct {
-	// TODO: Current seccomp implementation is very docker specific. Move this somewhere else
-	// after we define more general seccomp api.
 	seccompProfileRoot string
 	client             dockertools.DockerInterface
 }
