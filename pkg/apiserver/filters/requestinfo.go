@@ -17,12 +17,12 @@ limitations under the License.
 package filters
 
 import (
+	"errors"
+	"fmt"
 	"net/http"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apiserver/request"
-	"errors"
-	"fmt"
 )
 
 // WithRequestInfo attaches a RequestInfo to the context.

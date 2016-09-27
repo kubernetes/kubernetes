@@ -117,7 +117,7 @@ func (m *fakeRequestContextMapper) Get(req *http.Request) (api.Context, bool) {
 	if err == nil {
 		ctx = request.WithRequestInfo(ctx, info)
 	}
-	
+
 	return ctx, true
 }
 
