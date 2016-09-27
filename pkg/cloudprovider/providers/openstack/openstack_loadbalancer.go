@@ -658,8 +658,9 @@ func (lbaas *LbaasV2) EnsureLoadBalancerDeleted(clusterName string, service *api
 		return err
 	}
 
-	// get all pools associated with this loadbalancer
+	// get all pools (and health monitors) associated with this loadbalancer
 	var poolIDs []string
+	var monitorIDs []string
 	err = v2_pools.List(lbaas.network, v2_pools.ListOpts{LoadbalancerID: loadbalancer.ID}).EachPage(func(page pagination.Page) (bool, error) {
 		poolsList, err := v2_pools.ExtractPools(page)
 		if err != nil {
@@ -668,6 +669,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancerDeleted(clusterName string, service *api
 
 		for _, pool := range poolsList {
 			poolIDs = append(poolIDs, pool.ID)
+			monitorIDs = append(monitorIDs, pool.MonitorID)
 		}
 
 		return true, nil
@@ -687,26 +689,6 @@ func (lbaas *LbaasV2) EnsureLoadBalancerDeleted(clusterName string, service *api
 
 			for _, member := range membersList {
 				memberIDs = append(memberIDs, member.ID)
-			}
-
-			return true, nil
-		})
-		if err != nil {
-			return err
-		}
-	}
-
-	// get all monitors associated with each poolIDs
-	var monitorIDs []string
-	for _, poolID := range poolIDs {
-		err = v2_monitors.List(lbaas.network, v2_monitors.ListOpts{PoolID: poolID}).EachPage(func(page pagination.Page) (bool, error) {
-			monitorsList, err := v2_monitors.ExtractMonitors(page)
-			if err != nil {
-				return false, err
-			}
-
-			for _, monitor := range monitorsList {
-				monitorIDs = append(monitorIDs, monitor.ID)
 			}
 
 			return true, nil
