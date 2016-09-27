@@ -32,10 +32,18 @@ var (
 func ClusterRoles() []rbac.ClusterRole {
 	return []rbac.ClusterRole{
 		{
+			// a "root" role which can do absolutely anything
 			ObjectMeta: api.ObjectMeta{Name: "cluster-admin"},
 			Rules: []rbac.PolicyRule{
 				rbac.NewRule("*").Groups("*").Resources("*").RuleOrDie(),
 				rbac.NewRule("*").URLs("*").RuleOrDie(),
+			},
+		},
+		{
+			// a role which provides just enough power to discovery API versions for negotiation
+			ObjectMeta: api.ObjectMeta{Name: "system:discovery"},
+			Rules: []rbac.PolicyRule{
+				rbac.NewRule("get").URLs("/version", "/api", "/api/*", "/apis", "/apis/*").RuleOrDie(),
 			},
 		},
 	}
