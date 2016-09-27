@@ -100,14 +100,14 @@ message DaemonSetSpec {
   // Selector is a label query over pods that are managed by the daemon set.
   // Must match in order to be controlled.
   // If empty, defaulted to labels on Pod template.
-  // More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors
+  // More info: http://kubernetes.io/docs/user-guide/labels#label-selectors
   optional LabelSelector selector = 1;
 
   // Template is the object that describes the pod that will be created.
   // The DaemonSet will create exactly one copy of this pod on every node
   // that matches the template's node selector (or on every node if no node
   // selector is specified).
-  // More info: http://releases.k8s.io/HEAD/docs/user-guide/replication-controller.md#pod-template
+  // More info: http://kubernetes.io/docs/user-guide/replication-controller#pod-template
   optional k8s.io.kubernetes.pkg.api.v1.PodTemplateSpec template = 2;
 }
 
@@ -514,7 +514,7 @@ message JobSpec {
   // run at any given time. The actual number of pods running in steady state will
   // be less than this number when ((.spec.completions - .status.successful) < .spec.parallelism),
   // i.e. when the work left to do is less than max parallelism.
-  // More info: http://releases.k8s.io/HEAD/docs/user-guide/jobs.md
+  // More info: http://kubernetes.io/docs/user-guide/jobs
   optional int32 parallelism = 1;
 
   // Completions specifies the desired number of successfully finished pods the
@@ -522,7 +522,7 @@ message JobSpec {
   // pod signals the success of all pods, and allows parallelism to have any positive
   // value.  Setting to 1 means that parallelism is limited to 1 and the success of that
   // pod signals the success of the job.
-  // More info: http://releases.k8s.io/HEAD/docs/user-guide/jobs.md
+  // More info: http://kubernetes.io/docs/user-guide/jobs
   optional int32 completions = 2;
 
   // Optional duration in seconds relative to the startTime that the job may be active
@@ -531,7 +531,7 @@ message JobSpec {
 
   // Selector is a label query over pods that should match the pod count.
   // Normally, the system sets this field for you.
-  // More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors
+  // More info: http://kubernetes.io/docs/user-guide/labels#label-selectors
   optional LabelSelector selector = 4;
 
   // AutoSelector controls generation of pod labels and pod selectors.
@@ -543,14 +543,14 @@ message JobSpec {
 
   // Template is the object that describes the pod that will be created when
   // executing a job.
-  // More info: http://releases.k8s.io/HEAD/docs/user-guide/jobs.md
+  // More info: http://kubernetes.io/docs/user-guide/jobs
   optional k8s.io.kubernetes.pkg.api.v1.PodTemplateSpec template = 6;
 }
 
 // JobStatus represents the current state of a Job.
 message JobStatus {
   // Conditions represent the latest available observations of an object's current state.
-  // More info: http://releases.k8s.io/HEAD/docs/user-guide/jobs.md
+  // More info: http://kubernetes.io/docs/user-guide/jobs
   repeated JobCondition conditions = 1;
 
   // StartTime represents time when the job was acknowledged by the Job Manager.
@@ -814,7 +814,7 @@ message ReplicaSetList {
   optional k8s.io.kubernetes.pkg.api.unversioned.ListMeta metadata = 1;
 
   // List of ReplicaSets.
-  // More info: http://releases.k8s.io/HEAD/docs/user-guide/replication-controller.md
+  // More info: http://kubernetes.io/docs/user-guide/replication-controller
   repeated ReplicaSet items = 2;
 }
 
@@ -823,7 +823,7 @@ message ReplicaSetSpec {
   // Replicas is the number of desired replicas.
   // This is a pointer to distinguish between explicit zero and unspecified.
   // Defaults to 1.
-  // More info: http://releases.k8s.io/HEAD/docs/user-guide/replication-controller.md#what-is-a-replication-controller
+  // More info: http://kubernetes.io/docs/user-guide/replication-controller#what-is-a-replication-controller
   optional int32 replicas = 1;
 
   // Minimum number of seconds for which a newly created pod should be ready
@@ -834,19 +834,19 @@ message ReplicaSetSpec {
   // Selector is a label query over pods that should match the replica count.
   // If the selector is empty, it is defaulted to the labels present on the pod template.
   // Label keys and values that must match in order to be controlled by this replica set.
-  // More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors
+  // More info: http://kubernetes.io/docs/user-guide/labels#label-selectors
   optional LabelSelector selector = 2;
 
   // Template is the object that describes the pod that will be created if
   // insufficient replicas are detected.
-  // More info: http://releases.k8s.io/HEAD/docs/user-guide/replication-controller.md#pod-template
+  // More info: http://kubernetes.io/docs/user-guide/replication-controller#pod-template
   optional k8s.io.kubernetes.pkg.api.v1.PodTemplateSpec template = 3;
 }
 
 // ReplicaSetStatus represents the current status of a ReplicaSet.
 message ReplicaSetStatus {
   // Replicas is the most recently oberved number of replicas.
-  // More info: http://releases.k8s.io/HEAD/docs/user-guide/replication-controller.md#what-is-a-replication-controller
+  // More info: http://kubernetes.io/docs/user-guide/replication-controller#what-is-a-replication-controller
   optional int32 replicas = 1;
 
   // The number of pods that have labels matching the labels of the pod template of the replicaset.
@@ -941,7 +941,7 @@ message ScaleStatus {
   // actual number of observed instances of the scaled object.
   optional int32 replicas = 1;
 
-  // label query over pods that should match the replicas count. More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors
+  // label query over pods that should match the replicas count. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors
   map<string, string> selector = 2;
 
   // label selector for pods that should match the replicas count. This is a serializated
@@ -949,7 +949,7 @@ message ScaleStatus {
   // avoid introspection in the clients. The string will be in the same format as the
   // query-param syntax. If the target type only supports map-based selectors, both this
   // field and map-based selector field are populated.
-  // More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors
+  // More info: http://kubernetes.io/docs/user-guide/labels#label-selectors
   optional string targetSelector = 3;
 }
 
@@ -958,7 +958,7 @@ message SubresourceReference {
   // Kind of the referent; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
   optional string kind = 1;
 
-  // Name of the referent; More info: http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#names
+  // Name of the referent; More info: http://kubernetes.io/docs/user-guide/identifiers#names
   optional string name = 2;
 
   // API version of the referent
