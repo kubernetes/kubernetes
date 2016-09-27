@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/selection"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/validation"
+	"sync"
 )
 
 // Requirements is AND of all requirements.
@@ -145,6 +146,11 @@ func NewRequirement(key string, op selection.Operator, vals sets.String) (*Requi
 	return &Requirement{key: key, operator: op, strValues: vals}, nil
 }
 
+// Map of requirements (as string) -> label:bool .
+// string -> {string -> bool}
+var mutex = &sync.Mutex{}
+var matchCache = make(map[string](map[string]bool))
+
 // Matches returns true if the Requirement matches the input Labels.
 // There is a match in the following cases:
 // (1) The operator is Exists and Labels has the Requirement's key.
@@ -157,49 +163,82 @@ func NewRequirement(key string, op selection.Operator, vals sets.String) (*Requi
 // (5) The operator is GreaterThanOperator or LessThanOperator, and Labels has
 //     the Requirement's key and the corresponding value satisfies mathematical inequality.
 func (r *Requirement) Matches(ls Labels) bool {
-	switch r.operator {
-	case selection.In, selection.Equals, selection.DoubleEquals:
-		if !ls.Has(r.key) {
-			return false
+	rString := r.String()
+	lString := ls.String()
+	if matchCache[rString] != nil {
+		if matchCache[rString][lString] {
+			fmt.Println("Cache hit ! ", rString, "[", lString, "]")
+			return matchCache[rString][lString]
 		}
-		return r.strValues.Has(ls.Get(r.key))
-	case selection.NotIn, selection.NotEquals:
-		if !ls.Has(r.key) {
-			return true
-		}
-		return !r.strValues.Has(ls.Get(r.key))
-	case selection.Exists:
-		return ls.Has(r.key)
-	case selection.DoesNotExist:
-		return !ls.Has(r.key)
-	case selection.GreaterThan, selection.LessThan:
-		if !ls.Has(r.key) {
-			return false
-		}
-		lsValue, err := strconv.ParseInt(ls.Get(r.key), 10, 64)
-		if err != nil {
-			glog.V(10).Infof("ParseInt failed for value %+v in label %+v, %+v", ls.Get(r.key), ls, err)
-			return false
-		}
+	}
 
-		// There should be only one strValue in r.strValues, and can be converted to a integer.
-		if len(r.strValues) != 1 {
-			glog.V(10).Infof("Invalid values count %+v of requirement %#v, for 'Gt', 'Lt' operators, exactly one value is required", len(r.strValues), r)
-			return false
-		}
-
-		var rValue int64
-		for strValue := range r.strValues {
-			rValue, err = strconv.ParseInt(strValue, 10, 64)
-			if err != nil {
-				glog.V(10).Infof("ParseInt failed for value %+v in requirement %#v, for 'Gt', 'Lt' operators, the value must be an integer", strValue, r)
+	matches := func() bool {
+		//fmt.Println("MATCH SELECTOR ALG")
+		switch r.operator {
+		case selection.In, selection.Equals, selection.DoubleEquals:
+			if !ls.Has(r.key) {
 				return false
 			}
+			return r.strValues.Has(ls.Get(r.key))
+		case selection.NotIn, selection.NotEquals:
+			if !ls.Has(r.key) {
+				return true
+			}
+			return !r.strValues.Has(ls.Get(r.key))
+		case selection.Exists:
+			return ls.Has(r.key)
+		case selection.DoesNotExist:
+			return !ls.Has(r.key)
+		case selection.GreaterThan, selection.LessThan:
+			if !ls.Has(r.key) {
+				return false
+			}
+			lsValue, err := strconv.ParseInt(ls.Get(r.key), 10, 64)
+			if err != nil {
+				if glog.V(10) {
+					glog.V(10).Infof("ParseInt failed for value %+v in label %+v, %+v", ls.Get(r.key), ls, err)
+				}
+				return false
+			}
+
+			// There should be only one strValue in r.strValues, and can be converted to a integer.
+			if len(r.strValues) != 1 {
+				if glog.V(10) {
+					glog.V(10).Infof("Invalid values count %+v of requirement %#v, for 'Gt', 'Lt' operators, exactly one value is required", len(r.strValues), r)
+				}
+				return false
+			}
+
+			var rValue int64
+			for strValue := range r.strValues {
+				rValue, err = strconv.ParseInt(strValue, 10, 64)
+				if err != nil {
+					if glog.V(10) {
+						glog.V(10).Infof("ParseInt failed for value %+v in requirement %#v, for 'Gt', 'Lt' operators, the value must be an integer", strValue, r)
+					}
+					return false
+				}
+			}
+			return (r.operator == selection.GreaterThan && lsValue > rValue) || (r.operator == selection.LessThan && lsValue < rValue)
+		default:
+			return false
 		}
-		return (r.operator == selection.GreaterThan && lsValue > rValue) || (r.operator == selection.LessThan && lsValue < rValue)
-	default:
-		return false
 	}
+
+	mutex.Lock()
+	defer mutex.Unlock()
+	if matchCache[rString] == nil {
+		matchCache[rString] = make(map[string]bool)
+	}
+
+	matchCache[rString][lString] = matches()
+
+	// Clear the cache every once in a while to avoid too much memory consumption.
+	// TODO Make this not so dumb, or pick a meaningful  number (10k,100k,...?)
+	if len(matchCache) == 10000 {
+		matchCache = make(map[string](map[string]bool))
+	}
+	return matchCache[rString][lString]
 }
 
 func (r *Requirement) Key() string {

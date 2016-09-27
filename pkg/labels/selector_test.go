@@ -103,6 +103,8 @@ func TestEverything(t *testing.T) {
 	}
 }
 
+// TODO Write TestLargeMatching function and confirm speedup w/ the new cache.
+
 func TestSelectorMatches(t *testing.T) {
 	expectMatch(t, "", Set{"x": "y"})
 	expectMatch(t, "x=y", Set{"x": "y"})
