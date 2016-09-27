@@ -49,9 +49,9 @@ const (
 	// between successive executions
 	reconcilerLoopSleepPeriod time.Duration = 100 * time.Millisecond
 
-	// reconcilerReconstructSleepPeriod is the amount of time the reconciler reconstruct process
+	// reconcilerSyncStatesSleepPeriod is the amount of time the reconciler reconstruct process
 	// waits between successive executions
-	reconcilerReconstructSleepPeriod time.Duration = 3 * time.Minute
+	reconcilerSyncStatesSleepPeriod time.Duration = 3 * time.Minute
 
 	// desiredStateOfWorldPopulatorLoopSleepPeriod is the amount of time the
 	// DesiredStateOfWorldPopulator loop waits between successive executions
@@ -115,7 +115,7 @@ type VolumeManager interface {
 	// from annotations on persistent volumes that the pod depends on.
 	GetExtraSupplementalGroupsForPod(pod *api.Pod) []int64
 
-	// Returns a list of all volumes that implement the volume.Attacher
+	// GetVolumesInUse returns a list of all volumes that implement the volume.Attacher
 	// interface and are currently in use according to the actual and desired
 	// state of the world caches. A volume is considered "in use" as soon as it
 	// is added to the desired state of world, indicating it *should* be
@@ -125,6 +125,10 @@ type VolumeManager interface {
 	// TODO(#27653): VolumesInUse should be handled gracefully on kubelet'
 	// restarts.
 	GetVolumesInUse() []api.UniqueVolumeName
+
+	// ReconcilerSyncStatesStarted returns true only after sync state process starts
+	// in reconciler
+	ReconcilerSyncStatesStarted() bool
 
 	// VolumeIsAttached returns true if the given volume is attached to this
 	// node.
@@ -168,7 +172,7 @@ func NewVolumeManager(
 		kubeClient,
 		controllerAttachDetachEnabled,
 		reconcilerLoopSleepPeriod,
-		reconcilerReconstructSleepPeriod,
+		reconcilerSyncStatesSleepPeriod,
 		waitForAttachTimeout,
 		nodeName,
 		vm.desiredStateOfWorld,
@@ -303,6 +307,10 @@ func (vm *volumeManager) GetVolumesInUse() []api.UniqueVolumeName {
 	}
 
 	return volumesToReportInUse
+}
+
+func (vm *volumeManager) ReconcilerSyncStatesStarted() bool {
+	return vm.reconciler.SyncStatesStarted()
 }
 
 func (vm *volumeManager) VolumeIsAttached(
