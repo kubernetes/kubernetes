@@ -35,7 +35,7 @@ message CrossVersionObjectReference {
   // Kind of the referent; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
   optional string kind = 1;
 
-  // Name of the referent; More info: http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#names
+  // Name of the referent; More info: http://kubernetes.io/docs/user-guide/identifiers#names
   optional string name = 2;
 
   // API version of the referent
@@ -126,7 +126,7 @@ message ScaleStatus {
   // label query over pods that should match the replicas count. This is same
   // as the label selector but in the string format to avoid introspection
   // by clients. The string will be in the same format as the query-param syntax.
-  // More info about label selectors: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors
+  // More info about label selectors: http://kubernetes.io/docs/user-guide/labels#label-selectors
   optional string selector = 2;
 }
 

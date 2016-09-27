@@ -82,7 +82,7 @@ message JobSpec {
   // run at any given time. The actual number of pods running in steady state will
   // be less than this number when ((.spec.completions - .status.successful) < .spec.parallelism),
   // i.e. when the work left to do is less than max parallelism.
-  // More info: http://releases.k8s.io/HEAD/docs/user-guide/jobs.md
+  // More info: http://kubernetes.io/docs/user-guide/jobs
   optional int32 parallelism = 1;
 
   // Completions specifies the desired number of successfully finished pods the
@@ -90,7 +90,7 @@ message JobSpec {
   // pod signals the success of all pods, and allows parallelism to have any positive
   // value.  Setting to 1 means that parallelism is limited to 1 and the success of that
   // pod signals the success of the job.
-  // More info: http://releases.k8s.io/HEAD/docs/user-guide/jobs.md
+  // More info: http://kubernetes.io/docs/user-guide/jobs
   optional int32 completions = 2;
 
   // Optional duration in seconds relative to the startTime that the job may be active
@@ -99,7 +99,7 @@ message JobSpec {
 
   // Selector is a label query over pods that should match the pod count.
   // Normally, the system sets this field for you.
-  // More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors
+  // More info: http://kubernetes.io/docs/user-guide/labels#label-selectors
   optional LabelSelector selector = 4;
 
   // ManualSelector controls generation of pod labels and pod selectors.
@@ -116,14 +116,14 @@ message JobSpec {
 
   // Template is the object that describes the pod that will be created when
   // executing a job.
-  // More info: http://releases.k8s.io/HEAD/docs/user-guide/jobs.md
+  // More info: http://kubernetes.io/docs/user-guide/jobs
   optional k8s.io.kubernetes.pkg.api.v1.PodTemplateSpec template = 6;
 }
 
 // JobStatus represents the current state of a Job.
 message JobStatus {
   // Conditions represent the latest available observations of an object's current state.
-  // More info: http://releases.k8s.io/HEAD/docs/user-guide/jobs.md
+  // More info: http://kubernetes.io/docs/user-guide/jobs
   repeated JobCondition conditions = 1;
 
   // StartTime represents time when the job was acknowledged by the Job Manager.

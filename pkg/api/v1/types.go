@@ -71,7 +71,7 @@ type ObjectMeta struct {
 	// automatically. Name is primarily intended for creation idempotence and configuration
 	// definition.
 	// Cannot be updated.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#names
+	// More info: http://kubernetes.io/docs/user-guide/identifiers#names
 	Name string `json:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
 
 	// GenerateName is an optional prefix, used by the server, to generate a unique
@@ -98,7 +98,7 @@ type ObjectMeta struct {
 	//
 	// Must be a DNS_LABEL.
 	// Cannot be updated.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/namespaces.md
+	// More info: http://kubernetes.io/docs/user-guide/namespaces
 	Namespace string `json:"namespace,omitempty" protobuf:"bytes,3,opt,name=namespace"`
 
 	// SelfLink is a URL representing this object.
@@ -112,7 +112,7 @@ type ObjectMeta struct {
 	//
 	// Populated by the system.
 	// Read-only.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#uids
+	// More info: http://kubernetes.io/docs/user-guide/identifiers#uids
 	UID types.UID `json:"uid,omitempty" protobuf:"bytes,5,opt,name=uid,casttype=k8s.io/kubernetes/pkg/types.UID"`
 
 	// An opaque value that represents the internal version of this object that can
@@ -166,13 +166,13 @@ type ObjectMeta struct {
 	// Map of string keys and values that can be used to organize and categorize
 	// (scope and select) objects. May match selectors of replication controllers
 	// and services.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md
+	// More info: http://kubernetes.io/docs/user-guide/labels
 	Labels map[string]string `json:"labels,omitempty" protobuf:"bytes,11,rep,name=labels"`
 
 	// Annotations is an unstructured key value map stored with a resource that may be
 	// set by external tools to store and retrieve arbitrary metadata. They are not
 	// queryable and should be preserved when modifying objects.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/annotations.md
+	// More info: http://kubernetes.io/docs/user-guide/annotations
 	Annotations map[string]string `json:"annotations,omitempty" protobuf:"bytes,12,rep,name=annotations"`
 
 	// List of objects depended by this object. If ALL objects in the list have
@@ -204,7 +204,7 @@ const (
 type Volume struct {
 	// Volume's name.
 	// Must be a DNS_LABEL and unique within the pod.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#names
+	// More info: http://kubernetes.io/docs/user-guide/identifiers#names
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 	// VolumeSource represents the location and type of the mounted volume.
 	// If not specified, the Volume is implied to be an EmptyDir.
@@ -219,29 +219,29 @@ type VolumeSource struct {
 	// machine that is directly exposed to the container. This is generally
 	// used for system agents or other privileged things that are allowed
 	// to see the host machine. Most containers will NOT need this.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#hostpath
+	// More info: http://kubernetes.io/docs/user-guide/volumes#hostpath
 	// ---
 	// TODO(jonesdl) We need to restrict who can use host directory mounts and who can/can not
 	// mount host directories as read/write.
 	HostPath *HostPathVolumeSource `json:"hostPath,omitempty" protobuf:"bytes,1,opt,name=hostPath"`
 	// EmptyDir represents a temporary directory that shares a pod's lifetime.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#emptydir
+	// More info: http://kubernetes.io/docs/user-guide/volumes#emptydir
 	EmptyDir *EmptyDirVolumeSource `json:"emptyDir,omitempty" protobuf:"bytes,2,opt,name=emptyDir"`
 	// GCEPersistentDisk represents a GCE Disk resource that is attached to a
 	// kubelet's host machine and then exposed to the pod.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#gcepersistentdisk
+	// More info: http://kubernetes.io/docs/user-guide/volumes#gcepersistentdisk
 	GCEPersistentDisk *GCEPersistentDiskVolumeSource `json:"gcePersistentDisk,omitempty" protobuf:"bytes,3,opt,name=gcePersistentDisk"`
 	// AWSElasticBlockStore represents an AWS Disk resource that is attached to a
 	// kubelet's host machine and then exposed to the pod.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#awselasticblockstore
+	// More info: http://kubernetes.io/docs/user-guide/volumes#awselasticblockstore
 	AWSElasticBlockStore *AWSElasticBlockStoreVolumeSource `json:"awsElasticBlockStore,omitempty" protobuf:"bytes,4,opt,name=awsElasticBlockStore"`
 	// GitRepo represents a git repository at a particular revision.
 	GitRepo *GitRepoVolumeSource `json:"gitRepo,omitempty" protobuf:"bytes,5,opt,name=gitRepo"`
 	// Secret represents a secret that should populate this volume.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#secrets
+	// More info: http://kubernetes.io/docs/user-guide/volumes#secrets
 	Secret *SecretVolumeSource `json:"secret,omitempty" protobuf:"bytes,6,opt,name=secret"`
 	// NFS represents an NFS mount on the host that shares a pod's lifetime
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#nfs
+	// More info: http://kubernetes.io/docs/user-guide/volumes#nfs
 	NFS *NFSVolumeSource `json:"nfs,omitempty" protobuf:"bytes,7,opt,name=nfs"`
 	// ISCSI represents an ISCSI Disk resource that is attached to a
 	// kubelet's host machine and then exposed to the pod.
@@ -252,7 +252,7 @@ type VolumeSource struct {
 	Glusterfs *GlusterfsVolumeSource `json:"glusterfs,omitempty" protobuf:"bytes,9,opt,name=glusterfs"`
 	// PersistentVolumeClaimVolumeSource represents a reference to a
 	// PersistentVolumeClaim in the same namespace.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#persistentvolumeclaims
+	// More info: http://kubernetes.io/docs/user-guide/persistent-volumes#persistentvolumeclaims
 	PersistentVolumeClaim *PersistentVolumeClaimVolumeSource `json:"persistentVolumeClaim,omitempty" protobuf:"bytes,10,opt,name=persistentVolumeClaim"`
 	// RBD represents a Rados Block Device mount on the host that shares a pod's lifetime.
 	// More info: http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md
@@ -290,7 +290,7 @@ type VolumeSource struct {
 // type of volume that is owned by someone else (the system).
 type PersistentVolumeClaimVolumeSource struct {
 	// ClaimName is the name of a PersistentVolumeClaim in the same namespace as the pod using this volume.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#persistentvolumeclaims
+	// More info: http://kubernetes.io/docs/user-guide/persistent-volumes#persistentvolumeclaims
 	ClaimName string `json:"claimName" protobuf:"bytes,1,opt,name=claimName"`
 	// Will force the ReadOnly setting in VolumeMounts.
 	// Default false.
@@ -302,24 +302,24 @@ type PersistentVolumeClaimVolumeSource struct {
 type PersistentVolumeSource struct {
 	// GCEPersistentDisk represents a GCE Disk resource that is attached to a
 	// kubelet's host machine and then exposed to the pod. Provisioned by an admin.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#gcepersistentdisk
+	// More info: http://kubernetes.io/docs/user-guide/volumes#gcepersistentdisk
 	GCEPersistentDisk *GCEPersistentDiskVolumeSource `json:"gcePersistentDisk,omitempty" protobuf:"bytes,1,opt,name=gcePersistentDisk"`
 	// AWSElasticBlockStore represents an AWS Disk resource that is attached to a
 	// kubelet's host machine and then exposed to the pod.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#awselasticblockstore
+	// More info: http://kubernetes.io/docs/user-guide/volumes#awselasticblockstore
 	AWSElasticBlockStore *AWSElasticBlockStoreVolumeSource `json:"awsElasticBlockStore,omitempty" protobuf:"bytes,2,opt,name=awsElasticBlockStore"`
 	// HostPath represents a directory on the host.
 	// Provisioned by a developer or tester.
 	// This is useful for single-node development and testing only!
 	// On-host storage is not supported in any way and WILL NOT WORK in a multi-node cluster.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#hostpath
+	// More info: http://kubernetes.io/docs/user-guide/volumes#hostpath
 	HostPath *HostPathVolumeSource `json:"hostPath,omitempty" protobuf:"bytes,3,opt,name=hostPath"`
 	// Glusterfs represents a Glusterfs volume that is attached to a host and
 	// exposed to the pod. Provisioned by an admin.
 	// More info: http://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md
 	Glusterfs *GlusterfsVolumeSource `json:"glusterfs,omitempty" protobuf:"bytes,4,opt,name=glusterfs"`
 	// NFS represents an NFS mount on the host. Provisioned by an admin.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#nfs
+	// More info: http://kubernetes.io/docs/user-guide/volumes#nfs
 	NFS *NFSVolumeSource `json:"nfs,omitempty" protobuf:"bytes,5,opt,name=nfs"`
 	// RBD represents a Rados Block Device mount on the host that shares a pod's lifetime.
 	// More info: http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md
@@ -355,7 +355,7 @@ type PersistentVolumeSource struct {
 
 // PersistentVolume (PV) is a storage resource provisioned by an administrator.
 // It is analogous to a node.
-// More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md
+// More info: http://kubernetes.io/docs/user-guide/persistent-volumes
 type PersistentVolume struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard object's metadata.
@@ -364,35 +364,35 @@ type PersistentVolume struct {
 
 	// Spec defines a specification of a persistent volume owned by the cluster.
 	// Provisioned by an administrator.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#persistent-volumes
+	// More info: http://kubernetes.io/docs/user-guide/persistent-volumes#persistent-volumes
 	Spec PersistentVolumeSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 
 	// Status represents the current information/status for the persistent volume.
 	// Populated by the system.
 	// Read-only.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#persistent-volumes
+	// More info: http://kubernetes.io/docs/user-guide/persistent-volumes#persistent-volumes
 	Status PersistentVolumeStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
 
 // PersistentVolumeSpec is the specification of a persistent volume.
 type PersistentVolumeSpec struct {
 	// A description of the persistent volume's resources and capacity.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#capacity
+	// More info: http://kubernetes.io/docs/user-guide/persistent-volumes#capacity
 	Capacity ResourceList `json:"capacity,omitempty" protobuf:"bytes,1,rep,name=capacity,casttype=ResourceList,castkey=ResourceName"`
 	// The actual volume backing the persistent volume.
 	PersistentVolumeSource `json:",inline" protobuf:"bytes,2,opt,name=persistentVolumeSource"`
 	// AccessModes contains all ways the volume can be mounted.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#access-modes
+	// More info: http://kubernetes.io/docs/user-guide/persistent-volumes#access-modes
 	AccessModes []PersistentVolumeAccessMode `json:"accessModes,omitempty" protobuf:"bytes,3,rep,name=accessModes,casttype=PersistentVolumeAccessMode"`
 	// ClaimRef is part of a bi-directional binding between PersistentVolume and PersistentVolumeClaim.
 	// Expected to be non-nil when bound.
 	// claim.VolumeName is the authoritative bind between PV and PVC.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#binding
+	// More info: http://kubernetes.io/docs/user-guide/persistent-volumes#binding
 	ClaimRef *ObjectReference `json:"claimRef,omitempty" protobuf:"bytes,4,opt,name=claimRef"`
 	// What happens to a persistent volume when released from its claim.
 	// Valid options are Retain (default) and Recycle.
 	// Recycling must be supported by the volume plugin underlying this persistent volume.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#recycling-policy
+	// More info: http://kubernetes.io/docs/user-guide/persistent-volumes#recycling-policy
 	PersistentVolumeReclaimPolicy PersistentVolumeReclaimPolicy `json:"persistentVolumeReclaimPolicy,omitempty" protobuf:"bytes,5,opt,name=persistentVolumeReclaimPolicy,casttype=PersistentVolumeReclaimPolicy"`
 }
 
@@ -414,7 +414,7 @@ const (
 // PersistentVolumeStatus is the current status of a persistent volume.
 type PersistentVolumeStatus struct {
 	// Phase indicates if a volume is available, bound to a claim, or released by a claim.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#phase
+	// More info: http://kubernetes.io/docs/user-guide/persistent-volumes#phase
 	Phase PersistentVolumePhase `json:"phase,omitempty" protobuf:"bytes,1,opt,name=phase,casttype=PersistentVolumePhase"`
 	// A human-readable message indicating details about why the volume is in this state.
 	Message string `json:"message,omitempty" protobuf:"bytes,2,opt,name=message"`
@@ -430,7 +430,7 @@ type PersistentVolumeList struct {
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
 	unversioned.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 	// List of persistent volumes.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md
+	// More info: http://kubernetes.io/docs/user-guide/persistent-volumes
 	Items []PersistentVolume `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
@@ -444,12 +444,12 @@ type PersistentVolumeClaim struct {
 	ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Spec defines the desired characteristics of a volume requested by a pod author.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#persistentvolumeclaims
+	// More info: http://kubernetes.io/docs/user-guide/persistent-volumes#persistentvolumeclaims
 	Spec PersistentVolumeClaimSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 
 	// Status represents the current information/status of a persistent volume claim.
 	// Read-only.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#persistentvolumeclaims
+	// More info: http://kubernetes.io/docs/user-guide/persistent-volumes#persistentvolumeclaims
 	Status PersistentVolumeClaimStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
 
@@ -460,7 +460,7 @@ type PersistentVolumeClaimList struct {
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
 	unversioned.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 	// A list of persistent volume claims.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#persistentvolumeclaims
+	// More info: http://kubernetes.io/docs/user-guide/persistent-volumes#persistentvolumeclaims
 	Items []PersistentVolumeClaim `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
@@ -468,12 +468,12 @@ type PersistentVolumeClaimList struct {
 // and allows a Source for provider-specific attributes
 type PersistentVolumeClaimSpec struct {
 	// AccessModes contains the desired access modes the volume should have.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#access-modes-1
+	// More info: http://kubernetes.io/docs/user-guide/persistent-volumes#access-modes-1
 	AccessModes []PersistentVolumeAccessMode `json:"accessModes,omitempty" protobuf:"bytes,1,rep,name=accessModes,casttype=PersistentVolumeAccessMode"`
 	// A label query over volumes to consider for binding.
 	Selector *unversioned.LabelSelector `json:"selector,omitempty" protobuf:"bytes,4,opt,name=selector"`
 	// Resources represents the minimum resources the volume should have.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#resources
+	// More info: http://kubernetes.io/docs/user-guide/persistent-volumes#resources
 	Resources ResourceRequirements `json:"resources,omitempty" protobuf:"bytes,2,opt,name=resources"`
 	// VolumeName is the binding reference to the PersistentVolume backing this claim.
 	VolumeName string `json:"volumeName,omitempty" protobuf:"bytes,3,opt,name=volumeName"`
@@ -484,7 +484,7 @@ type PersistentVolumeClaimStatus struct {
 	// Phase represents the current phase of PersistentVolumeClaim.
 	Phase PersistentVolumeClaimPhase `json:"phase,omitempty" protobuf:"bytes,1,opt,name=phase,casttype=PersistentVolumeClaimPhase"`
 	// AccessModes contains the actual access modes the volume backing the PVC has.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#access-modes-1
+	// More info: http://kubernetes.io/docs/user-guide/persistent-volumes#access-modes-1
 	AccessModes []PersistentVolumeAccessMode `json:"accessModes,omitempty" protobuf:"bytes,2,rep,name=accessModes,casttype=PersistentVolumeAccessMode"`
 	// Represents the actual resources of the underlying volume.
 	Capacity ResourceList `json:"capacity,omitempty" protobuf:"bytes,3,rep,name=capacity,casttype=ResourceList,castkey=ResourceName"`
@@ -536,7 +536,7 @@ const (
 // Host path volumes do not support ownership management or SELinux relabeling.
 type HostPathVolumeSource struct {
 	// Path of the directory on the host.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#hostpath
+	// More info: http://kubernetes.io/docs/user-guide/volumes#hostpath
 	Path string `json:"path" protobuf:"bytes,1,opt,name=path"`
 }
 
@@ -546,7 +546,7 @@ type EmptyDirVolumeSource struct {
 	// What type of storage medium should back this directory.
 	// The default is "" which means to use the node's default medium.
 	// Must be an empty string (default) or Memory.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#emptydir
+	// More info: http://kubernetes.io/docs/user-guide/volumes#emptydir
 	Medium StorageMedium `json:"medium,omitempty" protobuf:"bytes,1,opt,name=medium,casttype=StorageMedium"`
 }
 
@@ -579,7 +579,7 @@ type RBDVolumeSource struct {
 	// Filesystem type of the volume that you want to mount.
 	// Tip: Ensure that the filesystem type is supported by the host operating system.
 	// Examples: "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#rbd
+	// More info: http://kubernetes.io/docs/user-guide/volumes#rbd
 	// TODO: how do we prevent errors in the filesystem from compromising the machine
 	FSType string `json:"fsType,omitempty" protobuf:"bytes,3,opt,name=fsType"`
 	// The rados pool name.
@@ -684,23 +684,23 @@ const (
 // PDs support ownership management and SELinux relabeling.
 type GCEPersistentDiskVolumeSource struct {
 	// Unique name of the PD resource in GCE. Used to identify the disk in GCE.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#gcepersistentdisk
+	// More info: http://kubernetes.io/docs/user-guide/volumes#gcepersistentdisk
 	PDName string `json:"pdName" protobuf:"bytes,1,opt,name=pdName"`
 	// Filesystem type of the volume that you want to mount.
 	// Tip: Ensure that the filesystem type is supported by the host operating system.
 	// Examples: "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#gcepersistentdisk
+	// More info: http://kubernetes.io/docs/user-guide/volumes#gcepersistentdisk
 	// TODO: how do we prevent errors in the filesystem from compromising the machine
 	FSType string `json:"fsType,omitempty" protobuf:"bytes,2,opt,name=fsType"`
 	// The partition in the volume that you want to mount.
 	// If omitted, the default is to mount by volume name.
 	// Examples: For volume /dev/sda1, you specify the partition as "1".
 	// Similarly, the volume partition for /dev/sda is "0" (or you can leave the property empty).
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#gcepersistentdisk
+	// More info: http://kubernetes.io/docs/user-guide/volumes#gcepersistentdisk
 	Partition int32 `json:"partition,omitempty" protobuf:"varint,3,opt,name=partition"`
 	// ReadOnly here will force the ReadOnly setting in VolumeMounts.
 	// Defaults to false.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#gcepersistentdisk
+	// More info: http://kubernetes.io/docs/user-guide/volumes#gcepersistentdisk
 	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,4,opt,name=readOnly"`
 }
 
@@ -758,12 +758,12 @@ type FlexVolumeSource struct {
 // ownership management and SELinux relabeling.
 type AWSElasticBlockStoreVolumeSource struct {
 	// Unique ID of the persistent disk resource in AWS (Amazon EBS volume).
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#awselasticblockstore
+	// More info: http://kubernetes.io/docs/user-guide/volumes#awselasticblockstore
 	VolumeID string `json:"volumeID" protobuf:"bytes,1,opt,name=volumeID"`
 	// Filesystem type of the volume that you want to mount.
 	// Tip: Ensure that the filesystem type is supported by the host operating system.
 	// Examples: "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#awselasticblockstore
+	// More info: http://kubernetes.io/docs/user-guide/volumes#awselasticblockstore
 	// TODO: how do we prevent errors in the filesystem from compromising the machine
 	FSType string `json:"fsType,omitempty" protobuf:"bytes,2,opt,name=fsType"`
 	// The partition in the volume that you want to mount.
@@ -773,7 +773,7 @@ type AWSElasticBlockStoreVolumeSource struct {
 	Partition int32 `json:"partition,omitempty" protobuf:"varint,3,opt,name=partition"`
 	// Specify "true" to force and set the ReadOnly property in VolumeMounts to "true".
 	// If omitted, the default is "false".
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#awselasticblockstore
+	// More info: http://kubernetes.io/docs/user-guide/volumes#awselasticblockstore
 	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,4,opt,name=readOnly"`
 }
 
@@ -799,7 +799,7 @@ type GitRepoVolumeSource struct {
 // Secret volumes support ownership management and SELinux relabeling.
 type SecretVolumeSource struct {
 	// Name of the secret in the pod's namespace to use.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#secrets
+	// More info: http://kubernetes.io/docs/user-guide/volumes#secrets
 	SecretName string `json:"secretName,omitempty" protobuf:"bytes,1,opt,name=secretName"`
 	// If unspecified, each key-value pair in the Data field of the referenced
 	// Secret will be projected into the volume as a file whose name is the
@@ -825,17 +825,17 @@ const (
 // NFS volumes do not support ownership management or SELinux relabeling.
 type NFSVolumeSource struct {
 	// Server is the hostname or IP address of the NFS server.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#nfs
+	// More info: http://kubernetes.io/docs/user-guide/volumes#nfs
 	Server string `json:"server" protobuf:"bytes,1,opt,name=server"`
 
 	// Path that is exported by the NFS server.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#nfs
+	// More info: http://kubernetes.io/docs/user-guide/volumes#nfs
 	Path string `json:"path" protobuf:"bytes,2,opt,name=path"`
 
 	// ReadOnly here will force
 	// the NFS export to be mounted with read-only permissions.
 	// Defaults to false.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#nfs
+	// More info: http://kubernetes.io/docs/user-guide/volumes#nfs
 	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,3,opt,name=readOnly"`
 }
 
@@ -855,7 +855,7 @@ type ISCSIVolumeSource struct {
 	// Filesystem type of the volume that you want to mount.
 	// Tip: Ensure that the filesystem type is supported by the host operating system.
 	// Examples: "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#iscsi
+	// More info: http://kubernetes.io/docs/user-guide/volumes#iscsi
 	// TODO: how do we prevent errors in the filesystem from compromising the machine
 	FSType string `json:"fsType,omitempty" protobuf:"bytes,5,opt,name=fsType"`
 	// ReadOnly here will force the ReadOnly setting in VolumeMounts.
@@ -1135,11 +1135,11 @@ type Probe struct {
 	// The action taken to determine the health of a container
 	Handler `json:",inline" protobuf:"bytes,1,opt,name=handler"`
 	// Number of seconds after the container has started before liveness probes are initiated.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-probes
+	// More info: http://kubernetes.io/docs/user-guide/pod-states#container-probes
 	InitialDelaySeconds int32 `json:"initialDelaySeconds,omitempty" protobuf:"varint,2,opt,name=initialDelaySeconds"`
 	// Number of seconds after which the probe times out.
 	// Defaults to 1 second. Minimum value is 1.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-probes
+	// More info: http://kubernetes.io/docs/user-guide/pod-states#container-probes
 	TimeoutSeconds int32 `json:"timeoutSeconds,omitempty" protobuf:"varint,3,opt,name=timeoutSeconds"`
 	// How often (in seconds) to perform the probe.
 	// Default to 10 seconds. Minimum value is 1.
@@ -1199,7 +1199,7 @@ type Container struct {
 	// Cannot be updated.
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 	// Docker image name.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/images.md
+	// More info: http://kubernetes.io/docs/user-guide/images
 	Image string `json:"image,omitempty" protobuf:"bytes,2,opt,name=image"`
 	// Entrypoint array. Not executed within a shell.
 	// The docker image's ENTRYPOINT is used if this is not provided.
@@ -1208,7 +1208,7 @@ type Container struct {
 	// can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded,
 	// regardless of whether the variable exists or not.
 	// Cannot be updated.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/containers.md#containers-and-commands
+	// More info: http://kubernetes.io/docs/user-guide/containers#containers-and-commands
 	Command []string `json:"command,omitempty" protobuf:"bytes,3,rep,name=command"`
 	// Arguments to the entrypoint.
 	// The docker image's CMD is used if this is not provided.
@@ -1217,7 +1217,7 @@ type Container struct {
 	// can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded,
 	// regardless of whether the variable exists or not.
 	// Cannot be updated.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/containers.md#containers-and-commands
+	// More info: http://kubernetes.io/docs/user-guide/containers#containers-and-commands
 	Args []string `json:"args,omitempty" protobuf:"bytes,4,rep,name=args"`
 	// Container's working directory.
 	// If not specified, the container runtime's default will be used, which
@@ -1237,7 +1237,7 @@ type Container struct {
 	Env []EnvVar `json:"env,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,7,rep,name=env"`
 	// Compute Resources required by this container.
 	// Cannot be updated.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#resources
+	// More info: http://kubernetes.io/docs/user-guide/persistent-volumes#resources
 	Resources ResourceRequirements `json:"resources,omitempty" protobuf:"bytes,8,opt,name=resources"`
 	// Pod volumes to mount into the container's filesystem.
 	// Cannot be updated.
@@ -1245,12 +1245,12 @@ type Container struct {
 	// Periodic probe of container liveness.
 	// Container will be restarted if the probe fails.
 	// Cannot be updated.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-probes
+	// More info: http://kubernetes.io/docs/user-guide/pod-states#container-probes
 	LivenessProbe *Probe `json:"livenessProbe,omitempty" protobuf:"bytes,10,opt,name=livenessProbe"`
 	// Periodic probe of container service readiness.
 	// Container will be removed from service endpoints if the probe fails.
 	// Cannot be updated.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-probes
+	// More info: http://kubernetes.io/docs/user-guide/pod-states#container-probes
 	ReadinessProbe *Probe `json:"readinessProbe,omitempty" protobuf:"bytes,11,opt,name=readinessProbe"`
 	// Actions that the management system should take in response to container lifecycle events.
 	// Cannot be updated.
@@ -1265,7 +1265,7 @@ type Container struct {
 	// One of Always, Never, IfNotPresent.
 	// Defaults to Always if :latest tag is specified, or IfNotPresent otherwise.
 	// Cannot be updated.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/images.md#updating-images
+	// More info: http://kubernetes.io/docs/user-guide/images#updating-images
 	ImagePullPolicy PullPolicy `json:"imagePullPolicy,omitempty" protobuf:"bytes,14,opt,name=imagePullPolicy,casttype=PullPolicy"`
 	// Security options the pod should run with.
 	// More info: http://releases.k8s.io/HEAD/docs/design/security_context.md
@@ -1312,14 +1312,14 @@ type Lifecycle struct {
 	// PostStart is called immediately after a container is created. If the handler fails,
 	// the container is terminated and restarted according to its restart policy.
 	// Other management of the container blocks until the hook completes.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/container-environment.md#hook-details
+	// More info: http://kubernetes.io/docs/user-guide/container-environment#hook-details
 	PostStart *Handler `json:"postStart,omitempty" protobuf:"bytes,1,opt,name=postStart"`
 	// PreStop is called immediately before a container is terminated.
 	// The container is terminated after the handler completes.
 	// The reason for termination is passed to the handler.
 	// Regardless of the outcome of the handler, the container is eventually terminated.
 	// Other management of the container blocks until the hook completes.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/container-environment.md#hook-details
+	// More info: http://kubernetes.io/docs/user-guide/container-environment#hook-details
 	PreStop *Handler `json:"preStop,omitempty" protobuf:"bytes,2,opt,name=preStop"`
 }
 
@@ -1396,13 +1396,13 @@ type ContainerStatus struct {
 	// garbage collection. This value will get capped at 5 by GC.
 	RestartCount int32 `json:"restartCount" protobuf:"varint,5,opt,name=restartCount"`
 	// The image the container is running.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/images.md
+	// More info: http://kubernetes.io/docs/user-guide/images
 	// TODO(dchen1107): Which image the container is running with?
 	Image string `json:"image" protobuf:"bytes,6,opt,name=image"`
 	// ImageID of the container's image.
 	ImageID string `json:"imageID" protobuf:"bytes,7,opt,name=imageID"`
 	// Container's ID in the format 'docker://<container_id>'.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/container-environment.md#container-information
+	// More info: http://kubernetes.io/docs/user-guide/container-environment#container-information
 	ContainerID string `json:"containerID,omitempty" protobuf:"bytes,8,opt,name=containerID"`
 }
 
@@ -1445,11 +1445,11 @@ const (
 type PodCondition struct {
 	// Type is the type of the condition.
 	// Currently only Ready.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#pod-conditions
+	// More info: http://kubernetes.io/docs/user-guide/pod-states#pod-conditions
 	Type PodConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=PodConditionType"`
 	// Status is the status of the condition.
 	// Can be True, False, Unknown.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#pod-conditions
+	// More info: http://kubernetes.io/docs/user-guide/pod-states#pod-conditions
 	Status ConditionStatus `json:"status" protobuf:"bytes,2,opt,name=status,casttype=ConditionStatus"`
 	// Last time we probed the condition.
 	LastProbeTime unversioned.Time `json:"lastProbeTime,omitempty" protobuf:"bytes,3,opt,name=lastProbeTime"`
@@ -1765,7 +1765,7 @@ const (
 // PodSpec is a description of a pod.
 type PodSpec struct {
 	// List of volumes that can be mounted by containers belonging to the pod.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md
+	// More info: http://kubernetes.io/docs/user-guide/volumes
 	Volumes []Volume `json:"volumes,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,1,rep,name=volumes"`
 	// List of initialization containers belonging to the pod.
 	// Init containers are executed in order prior to containers being started. If any
@@ -1780,18 +1780,18 @@ type PodSpec struct {
 	// Init containers cannot currently be added or removed.
 	// Init containers are in alpha state and may change without notice.
 	// Cannot be updated.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/containers.md
+	// More info: http://kubernetes.io/docs/user-guide/containers
 	InitContainers []Container `json:"-"  patchStrategy:"merge" patchMergeKey:"name"`
 	// List of containers belonging to the pod.
 	// Containers cannot currently be added or removed.
 	// There must be at least one container in a Pod.
 	// Cannot be updated.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/containers.md
+	// More info: http://kubernetes.io/docs/user-guide/containers
 	Containers []Container `json:"containers" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,2,rep,name=containers"`
 	// Restart policy for all containers within the pod.
 	// One of Always, OnFailure, Never.
 	// Default to Always.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#restartpolicy
+	// More info: http://kubernetes.io/docs/user-guide/pod-states#restartpolicy
 	RestartPolicy RestartPolicy `json:"restartPolicy,omitempty" protobuf:"bytes,3,opt,name=restartPolicy,casttype=RestartPolicy"`
 	// Optional duration in seconds the pod needs to terminate gracefully. May be decreased in delete request.
 	// Value must be non-negative integer. The value zero indicates delete immediately.
@@ -1811,7 +1811,7 @@ type PodSpec struct {
 	DNSPolicy DNSPolicy `json:"dnsPolicy,omitempty" protobuf:"bytes,6,opt,name=dnsPolicy,casttype=DNSPolicy"`
 	// NodeSelector is a selector which must be true for the pod to fit on a node.
 	// Selector which must match a node's labels for the pod to be scheduled on that node.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/node-selection/README.md
+	// More info: http://kubernetes.io/docs/user-guide/node-selection/README
 	NodeSelector map[string]string `json:"nodeSelector,omitempty" protobuf:"bytes,7,rep,name=nodeSelector"`
 
 	// ServiceAccountName is the name of the ServiceAccount to use to run this pod.
@@ -1845,7 +1845,7 @@ type PodSpec struct {
 	// ImagePullSecrets is an optional list of references to secrets in the same namespace to use for pulling any of the images used by this PodSpec.
 	// If specified, these secrets will be passed to individual puller implementations for them to use. For example,
 	// in the case of docker, only DockerConfig type secrets are honored.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/images.md#specifying-imagepullsecrets-on-a-pod
+	// More info: http://kubernetes.io/docs/user-guide/images#specifying-imagepullsecrets-on-a-pod
 	ImagePullSecrets []LocalObjectReference `json:"imagePullSecrets,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,15,rep,name=imagePullSecrets"`
 	// Specifies the hostname of the Pod
 	// If not specified, the pod's hostname will be set to a system-defined value.
@@ -1898,10 +1898,10 @@ type PodSecurityContext struct {
 // state of a system.
 type PodStatus struct {
 	// Current condition of the pod.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#pod-phase
+	// More info: http://kubernetes.io/docs/user-guide/pod-states#pod-phase
 	Phase PodPhase `json:"phase,omitempty" protobuf:"bytes,1,opt,name=phase,casttype=PodPhase"`
 	// Current service state of pod.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#pod-conditions
+	// More info: http://kubernetes.io/docs/user-guide/pod-states#pod-conditions
 	Conditions []PodCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,2,rep,name=conditions"`
 	// A human readable message indicating details about why the pod is in this condition.
 	Message string `json:"message,omitempty" protobuf:"bytes,3,opt,name=message"`
@@ -1923,11 +1923,11 @@ type PodStatus struct {
 	// init container will have ready = true, the most recently started container will have
 	// startTime set.
 	// Init containers are in alpha state and may change without notice.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-statuses
+	// More info: http://kubernetes.io/docs/user-guide/pod-states#container-statuses
 	InitContainerStatuses []ContainerStatus `json:"-"`
 	// The list has one entry per container in the manifest. Each entry is currently the output
 	// of `docker inspect`.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-statuses
+	// More info: http://kubernetes.io/docs/user-guide/pod-states#container-statuses
 	ContainerStatuses []ContainerStatus `json:"containerStatuses,omitempty" protobuf:"bytes,8,rep,name=containerStatuses"`
 }
 
@@ -1975,7 +1975,7 @@ type PodList struct {
 	unversioned.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// List of pods.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/pods.md
+	// More info: http://kubernetes.io/docs/user-guide/pods
 	Items []Pod `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
@@ -2020,7 +2020,7 @@ type ReplicationControllerSpec struct {
 	// Replicas is the number of desired replicas.
 	// This is a pointer to distinguish between explicit zero and unspecified.
 	// Defaults to 1.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/replication-controller.md#what-is-a-replication-controller
+	// More info: http://kubernetes.io/docs/user-guide/replication-controller#what-is-a-replication-controller
 	Replicas *int32 `json:"replicas,omitempty" protobuf:"varint,1,opt,name=replicas"`
 
 	// Minimum number of seconds for which a newly created pod should be ready
@@ -2032,7 +2032,7 @@ type ReplicationControllerSpec struct {
 	// If Selector is empty, it is defaulted to the labels present on the Pod template.
 	// Label keys and values that must match in order to be controlled by this replication
 	// controller, if empty defaulted to labels on Pod template.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors
+	// More info: http://kubernetes.io/docs/user-guide/labels#label-selectors
 	Selector map[string]string `json:"selector,omitempty" protobuf:"bytes,2,rep,name=selector"`
 
 	// TemplateRef is a reference to an object that describes the pod that will be created if
@@ -2042,7 +2042,7 @@ type ReplicationControllerSpec struct {
 
 	// Template is the object that describes the pod that will be created if
 	// insufficient replicas are detected. This takes precedence over a TemplateRef.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/replication-controller.md#pod-template
+	// More info: http://kubernetes.io/docs/user-guide/replication-controller#pod-template
 	Template *PodTemplateSpec `json:"template,omitempty" protobuf:"bytes,3,opt,name=template"`
 }
 
@@ -2050,7 +2050,7 @@ type ReplicationControllerSpec struct {
 // controller.
 type ReplicationControllerStatus struct {
 	// Replicas is the most recently oberved number of replicas.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/replication-controller.md#what-is-a-replication-controller
+	// More info: http://kubernetes.io/docs/user-guide/replication-controller#what-is-a-replication-controller
 	Replicas int32 `json:"replicas" protobuf:"varint,1,opt,name=replicas"`
 
 	// The number of pods that have labels matching the labels of the pod template of the replication controller.
@@ -2097,7 +2097,7 @@ type ReplicationControllerList struct {
 	unversioned.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// List of replication controllers.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/replication-controller.md
+	// More info: http://kubernetes.io/docs/user-guide/replication-controller
 	Items []ReplicationController `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
@@ -2164,7 +2164,7 @@ type LoadBalancerIngress struct {
 // ServiceSpec describes the attributes that a user creates on a service.
 type ServiceSpec struct {
 	// The list of ports that are exposed by this service.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/services.md#virtual-ips-and-service-proxies
+	// More info: http://kubernetes.io/docs/user-guide/services#virtual-ips-and-service-proxies
 	Ports []ServicePort `json:"ports" patchStrategy:"merge" patchMergeKey:"port" protobuf:"bytes,1,rep,name=ports"`
 
 	// Route service traffic to pods with label keys and values matching this
@@ -2172,7 +2172,7 @@ type ServiceSpec struct {
 	// external process managing its endpoints, which Kubernetes will not
 	// modify. Only applies to types ClusterIP, NodePort, and LoadBalancer.
 	// Ignored if type is ExternalName.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/services.md#overview
+	// More info: http://kubernetes.io/docs/user-guide/services#overview
 	Selector map[string]string `json:"selector,omitempty" protobuf:"bytes,2,rep,name=selector"`
 
 	// clusterIP is the IP address of the service and is usually assigned
@@ -2183,7 +2183,7 @@ type ServiceSpec struct {
 	// can be specified for headless services when proxying is not required.
 	// Only applies to types ClusterIP, NodePort, and LoadBalancer. Ignored if
 	// type is ExternalName.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/services.md#virtual-ips-and-service-proxies
+	// More info: http://kubernetes.io/docs/user-guide/services#virtual-ips-and-service-proxies
 	ClusterIP string `json:"clusterIP,omitempty" protobuf:"bytes,3,opt,name=clusterIP"`
 
 	// type determines how the Service is exposed. Defaults to ClusterIP. Valid
@@ -2199,7 +2199,7 @@ type ServiceSpec struct {
 	// "LoadBalancer" builds on NodePort and creates an
 	// external load-balancer (if supported in the current cloud) which routes
 	// to the clusterIP.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/services.md#overview
+	// More info: http://kubernetes.io/docs/user-guide/services#overview
 	Type ServiceType `json:"type,omitempty" protobuf:"bytes,4,opt,name=type,casttype=ServiceType"`
 
 	// externalIPs is a list of IP addresses for which nodes in the cluster
@@ -2223,7 +2223,7 @@ type ServiceSpec struct {
 	// Enable client IP based session affinity.
 	// Must be ClientIP or None.
 	// Defaults to None.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/services.md#virtual-ips-and-service-proxies
+	// More info: http://kubernetes.io/docs/user-guide/services#virtual-ips-and-service-proxies
 	SessionAffinity ServiceAffinity `json:"sessionAffinity,omitempty" protobuf:"bytes,7,opt,name=sessionAffinity,casttype=ServiceAffinity"`
 
 	// Only applies to Service Type: LoadBalancer
@@ -2236,7 +2236,7 @@ type ServiceSpec struct {
 	// If specified and supported by the platform, this will restrict traffic through the cloud-provider
 	// load-balancer will be restricted to the specified client IPs. This field will be ignored if the
 	// cloud-provider does not support the feature."
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/services-firewalls.md
+	// More info: http://kubernetes.io/docs/user-guide/services-firewalls
 	LoadBalancerSourceRanges []string `json:"loadBalancerSourceRanges,omitempty" protobuf:"bytes,9,opt,name=loadBalancerSourceRanges"`
 
 	// externalName is the external reference that kubedns or equivalent will
@@ -2267,14 +2267,14 @@ type ServicePort struct {
 	// of the 'port' field is used (an identity map).
 	// This field is ignored for services with clusterIP=None, and should be
 	// omitted or set equal to the 'port' field.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/services.md#defining-a-service
+	// More info: http://kubernetes.io/docs/user-guide/services#defining-a-service
 	TargetPort intstr.IntOrString `json:"targetPort,omitempty" protobuf:"bytes,4,opt,name=targetPort"`
 
 	// The port on each node on which this service is exposed when type=NodePort or LoadBalancer.
 	// Usually assigned by the system. If specified, it will be allocated to the service
 	// if unused or else creation of the service will fail.
 	// Default is to auto-allocate a port if the ServiceType of this Service requires one.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/services.md#type--nodeport
+	// More info: http://kubernetes.io/docs/user-guide/services#type--nodeport
 	NodePort int32 `json:"nodePort,omitempty" protobuf:"varint,5,opt,name=nodePort"`
 }
 
@@ -2330,13 +2330,13 @@ type ServiceAccount struct {
 	ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Secrets is the list of secrets allowed to be used by pods running using this ServiceAccount.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/secrets.md
+	// More info: http://kubernetes.io/docs/user-guide/secrets
 	Secrets []ObjectReference `json:"secrets,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,2,rep,name=secrets"`
 
 	// ImagePullSecrets is a list of references to secrets in the same namespace to use for pulling any images
 	// in pods that reference this ServiceAccount. ImagePullSecrets are distinct from Secrets because Secrets
 	// can be mounted in the pod, but ImagePullSecrets are only accessed by the kubelet.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/secrets.md#manually-specifying-an-imagepullsecret
+	// More info: http://kubernetes.io/docs/user-guide/secrets#manually-specifying-an-imagepullsecret
 	ImagePullSecrets []LocalObjectReference `json:"imagePullSecrets,omitempty" protobuf:"bytes,3,rep,name=imagePullSecrets"`
 }
 
@@ -2511,7 +2511,7 @@ type NodeSystemInfo struct {
 // NodeStatus is information about the current status of a node.
 type NodeStatus struct {
 	// Capacity represents the total resources of a node.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#capacity for more details.
+	// More info: http://kubernetes.io/docs/user-guide/persistent-volumes#capacity for more details.
 	Capacity ResourceList `json:"capacity,omitempty" protobuf:"bytes,1,rep,name=capacity,casttype=ResourceList,castkey=ResourceName"`
 	// Allocatable represents the resources of a node that are available for scheduling.
 	// Defaults to Capacity.
@@ -2767,7 +2767,7 @@ type NamespaceList struct {
 	unversioned.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Items is the list of Namespace objects in the list.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/namespaces.md
+	// More info: http://kubernetes.io/docs/user-guide/namespaces
 	Items []Namespace `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
@@ -2969,10 +2969,10 @@ type OwnerReference struct {
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
 	Kind string `json:"kind" protobuf:"bytes,1,opt,name=kind"`
 	// Name of the referent.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#names
+	// More info: http://kubernetes.io/docs/user-guide/identifiers#names
 	Name string `json:"name" protobuf:"bytes,3,opt,name=name"`
 	// UID of the referent.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#uids
+	// More info: http://kubernetes.io/docs/user-guide/identifiers#uids
 	UID types.UID `json:"uid" protobuf:"bytes,4,opt,name=uid,casttype=k8s.io/kubernetes/pkg/types.UID"`
 	// If true, this reference points to the managing controller.
 	Controller *bool `json:"controller,omitempty" protobuf:"varint,6,opt,name=controller"`
@@ -2984,13 +2984,13 @@ type ObjectReference struct {
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
 	Kind string `json:"kind,omitempty" protobuf:"bytes,1,opt,name=kind"`
 	// Namespace of the referent.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/namespaces.md
+	// More info: http://kubernetes.io/docs/user-guide/namespaces
 	Namespace string `json:"namespace,omitempty" protobuf:"bytes,2,opt,name=namespace"`
 	// Name of the referent.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#names
+	// More info: http://kubernetes.io/docs/user-guide/identifiers#names
 	Name string `json:"name,omitempty" protobuf:"bytes,3,opt,name=name"`
 	// UID of the referent.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#uids
+	// More info: http://kubernetes.io/docs/user-guide/identifiers#uids
 	UID types.UID `json:"uid,omitempty" protobuf:"bytes,4,opt,name=uid,casttype=k8s.io/kubernetes/pkg/types.UID"`
 	// API version of the referent.
 	APIVersion string `json:"apiVersion,omitempty" protobuf:"bytes,5,opt,name=apiVersion"`
@@ -3013,7 +3013,7 @@ type ObjectReference struct {
 // referenced object inside the same namespace.
 type LocalObjectReference struct {
 	// Name of the referent.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#names
+	// More info: http://kubernetes.io/docs/user-guide/identifiers#names
 	// TODO: Add other useful fields. apiVersion, kind, uid?
 	Name string `json:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
 }
@@ -3344,7 +3344,7 @@ type SecretList struct {
 	unversioned.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Items is a list of secret objects.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/secrets.md
+	// More info: http://kubernetes.io/docs/user-guide/secrets
 	Items []Secret `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
