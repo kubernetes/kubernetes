@@ -25,6 +25,7 @@ source "${KUBE_ROOT}/test/kubemark/common.sh"
 function writeEnvironmentFiles() {
   cat > "${RESOURCE_DIRECTORY}/apiserver_flags" <<EOF
 ${APISERVER_TEST_ARGS}
+--storage-backend=${STORAGE_BACKEND}
 --service-cluster-ip-range="${SERVICE_CLUSTER_IP_RANGE}"
 EOF
 sed -i'' -e "s/\"//g" "${RESOURCE_DIRECTORY}/apiserver_flags"
@@ -145,7 +146,8 @@ gcloud compute copy-files --zone="${ZONE}" --project="${PROJECT}" \
   "${MASTER_NAME}":~
 
 gcloud compute ssh "${MASTER_NAME}" --zone="${ZONE}" --project="${PROJECT}" \
-  --command="chmod a+x configure-kubectl.sh && chmod a+x start-kubemark-master.sh && sudo ./start-kubemark-master.sh ${EVENT_STORE_IP:-127.0.0.1} ${NUM_NODES:-0}"
+  --command="chmod a+x configure-kubectl.sh && chmod a+x start-kubemark-master.sh && \
+             sudo ./start-kubemark-master.sh ${EVENT_STORE_IP:-127.0.0.1} ${NUM_NODES:-0} ${TEST_ETCD_VERSION:-}"
 
 # create kubeconfig for Kubelet:
 KUBECONFIG_CONTENTS=$(echo "apiVersion: v1
