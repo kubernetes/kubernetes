@@ -149,10 +149,7 @@ func startMasterOrDie(masterConfig *master.Config) (*master.Master, *httptest.Se
 			},
 		}
 	}
-	m, err := masterConfig.New()
-	if err != nil {
-		glog.Fatalf("error in bringing up the master: %v", err)
-	}
+	m := masterConfig.New()
 
 	// TODO have this start method actually use the normal start sequence for the API server
 	// this method never actually calls the `Run` method for the API server

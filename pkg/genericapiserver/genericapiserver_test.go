@@ -65,11 +65,7 @@ func newMaster(t *testing.T) (*GenericAPIServer, *etcdtesting.EtcdTestServer, Co
 	config.APIPrefix = "/api"
 	config.APIGroupPrefix = "/apis"
 
-	s, err := config.WithDefaults().New()
-	if err != nil {
-		t.Fatalf("Error in bringing up the server: %v", err)
-	}
-	return s, etcdserver, config, assert
+	return config.WithDefaults().New(), etcdserver, config, assert
 }
 
 // TestNew verifies that the New function returns a GenericAPIServer
@@ -113,10 +109,7 @@ func TestInstallAPIGroups(t *testing.T) {
 	config.APIGroupPrefix = "/apiGroupPrefix"
 	config.Serializer = api.Codecs
 
-	s, err := config.WithDefaults().New()
-	if err != nil {
-		t.Fatalf("Error in bringing up the server: %v", err)
-	}
+	s := config.WithDefaults().New()
 
 	apiGroupMeta := registered.GroupOrDie(api.GroupName)
 	extensionsGroupMeta := registered.GroupOrDie(extensions.GroupName)
@@ -217,10 +210,7 @@ func TestNotRestRoutesHaveAuth(t *testing.T) {
 	config.EnableSwaggerSupport = true
 	config.EnableVersion = true
 
-	s, err := config.WithDefaults().New()
-	if err != nil {
-		t.Fatalf("Error in bringing up the server: %v", err)
-	}
+	s := config.WithDefaults().New()
 
 	for _, test := range []struct {
 		route string

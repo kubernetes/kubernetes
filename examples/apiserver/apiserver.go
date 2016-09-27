@@ -70,10 +70,8 @@ func Run(serverOptions *genericoptions.ServerRunOptions) error {
 	config := genericapiserver.NewConfig(serverOptions)
 	config.Authorizer = authorizer.NewAlwaysAllowAuthorizer()
 	config.Serializer = api.Codecs
-	s, err := config.WithDefaults().New()
-	if err != nil {
-		return fmt.Errorf("Error in bringing up the server: %v", err)
-	}
+
+	s := config.WithDefaults().New()
 
 	groupVersion := v1.SchemeGroupVersion
 	groupName := groupVersion.Group

@@ -212,16 +212,12 @@ func Run(s *options.ServerRunOptions) error {
 	genericConfig.Serializer = api.Codecs
 	genericConfig.OpenAPIDefinitions = openapi.OpenAPIDefinitions
 	genericConfig.EnableOpenAPISupport = true
+	m := genericConfig.WithDefaults().New()
 
 	// TODO: Move this to generic api server (Need to move the command line flag).
 	if s.EnableWatchCache {
 		cachesize.InitializeWatchCacheSizes(s.TargetRAMMB)
 		cachesize.SetWatchCacheSizes(s.WatchCacheSizes)
-	}
-
-	m, err := genericConfig.WithDefaults().New()
-	if err != nil {
-		return err
 	}
 
 	routes.UIRedirect{}.Install(m.Mux, m.HandlerContainer)

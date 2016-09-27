@@ -412,10 +412,7 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclie
 	masterConfig.AdmissionControl = serviceAccountAdmission
 
 	// Create a master and install handlers into mux.
-	m, err := masterConfig.New()
-	if err != nil {
-		t.Fatalf("Error in bringing up the master: %v", err)
-	}
+	m := masterConfig.New()
 
 	// Start the service account and service account token controllers
 	stopCh := make(chan struct{})

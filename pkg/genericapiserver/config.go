@@ -18,7 +18,6 @@ package genericapiserver
 
 import (
 	"crypto/tls"
-	"fmt"
 	"mime"
 	"net"
 	"net/http"
@@ -283,9 +282,9 @@ func (c Config) WithDefaults() *defaultedConfig {
 //   If the caller wants to add additional endpoints not using the GenericAPIServer's
 //   auth, then the caller should create a handler for those endpoints, which delegates the
 //   any unhandled paths to "Handler".
-func (c *defaultedConfig) New() (*GenericAPIServer, error) {
+func (c *defaultedConfig) New() *GenericAPIServer {
 	if c.Serializer == nil {
-		return nil, fmt.Errorf("Genericapiserver.New() called with config.Serializer == nil")
+		glog.Fatal("Genericapiserver.New() called with config.Serializer == nil")
 	}
 
 	s := &GenericAPIServer{
@@ -353,7 +352,7 @@ func (c *defaultedConfig) New() (*GenericAPIServer, error) {
 	s.installAPI((*Config)(c))
 	s.Handler, s.InsecureHandler = s.buildHandlerChains((*Config)(c), http.Handler(s.Mux.BaseMux().(*http.ServeMux)))
 
-	return s, nil
+	return s
 }
 
 func (s *GenericAPIServer) buildHandlerChains(c *Config, handler http.Handler) (secure http.Handler, insecure http.Handler) {

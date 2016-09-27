@@ -194,18 +194,15 @@ type RESTStorageProvider interface {
 // Certain config fields will be set to a default value if unset.
 // Certain config fields must be specified, including:
 //   KubeletClient
-func (c Config) New() (*Master, error) {
+func (c Config) New() *Master {
 	if c.KubeletClient == nil {
-		return nil, fmt.Errorf("Master.New() called with config.KubeletClient == nil")
+		glog.Error("Master.New() called with config.KubeletClient == nil")
 	}
 
 	c.EnableSwaggerUI = c.EnableSwaggerUI && c.EnableUISupport // disable swagger UI if general UI supports it
 	withDefaults := c.WithDefaults()
 	c.Config = *(*genericapiserver.Config)(withDefaults) // write back to use defaults below
-	s, err := withDefaults.New()
-	if err != nil {
-		return nil, err
-	}
+	s := withDefaults.New()
 
 	if c.EnableUISupport {
 		routes.UIRedirect{}.Install(s.Mux, s.HandlerContainer)
@@ -259,7 +256,7 @@ func (c Config) New() (*Master, error) {
 		m.NewBootstrapController(c.EndpointReconcilerConfig).Start()
 	}
 
-	return m, nil
+	return m
 }
 
 func (m *Master) InstallAPIs(c *Config) {

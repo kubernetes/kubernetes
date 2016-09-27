@@ -124,13 +124,7 @@ func setUp(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.
 
 func newMaster(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.Assertions) {
 	_, etcdserver, config, assert := setUp(t)
-
-	master, err := config.New()
-	if err != nil {
-		t.Fatalf("Error in bringing up the master: %v", err)
-	}
-
-	return master, etcdserver, config, assert
+	return config.New(), etcdserver, config, assert
 }
 
 // limitedAPIResourceConfigSource only enables the core group, the extensions group, the batch group, and the autoscaling group.
@@ -151,12 +145,7 @@ func limitedAPIResourceConfigSource() *genericapiserver.ResourceConfig {
 func newLimitedMaster(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.Assertions) {
 	_, etcdserver, config, assert := setUp(t)
 	config.APIResourceConfigSource = limitedAPIResourceConfigSource()
-	master, err := config.New()
-	if err != nil {
-		t.Fatalf("Error in bringing up the master: %v", err)
-	}
-
-	return master, etcdserver, config, assert
+	return config.New(), etcdserver, config, assert
 }
 
 // TestNew verifies that the New function returns a Master
@@ -1262,10 +1251,7 @@ func TestValidOpenAPISpec(t *testing.T) {
 			Version: "unversioned",
 		},
 	}
-	master, err := config.New()
-	if err != nil {
-		t.Fatalf("Error in bringing up the master: %v", err)
-	}
+	master := config.New()
 
 	// make sure swagger.json is not registered before calling install api.
 	server := httptest.NewServer(master.HandlerContainer.ServeMux)
