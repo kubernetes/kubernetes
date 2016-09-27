@@ -527,8 +527,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *api.Ser
 		glog.V(2).Infof("Creating loadbalancer %s", name)
 		loadbalancer, err = lbaas.createLoadBalancer(apiService, name)
 		if err != nil {
-			// cleanup what was created so far
-			_ = lbaas.EnsureLoadBalancerDeleted(clusterName, apiService)
+			// Unknown error, retry later
 			return nil, fmt.Errorf("Error creating loadbalancer %s: %v", name, err)
 		}
 	} else {
