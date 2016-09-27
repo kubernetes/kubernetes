@@ -167,6 +167,13 @@ type GenericAPIServer struct {
 	postStartHooksCalled bool
 }
 
+func init() {
+	// Send correct mime type for .svg files.
+	// TODO: remove when https://github.com/golang/go/commit/21e47d831bafb59f22b1ea8098f709677ec8ce33
+	// makes it into all of our supported go versions (only in v1.7.1 now).
+	mime.AddExtensionType(".svg", "image/svg+xml")
+}
+
 // RequestContextMapper is exposed so that third party resource storage can be build in a different location.
 // TODO refactor third party resource storage
 func (s *GenericAPIServer) RequestContextMapper() api.RequestContextMapper {
@@ -214,11 +221,6 @@ func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
 	if s.enableOpenAPISupport {
 		s.InstallOpenAPI()
 	}
-
-	// Send correct mime type for .svg files.
-	// TODO: remove when https://github.com/golang/go/commit/21e47d831bafb59f22b1ea8098f709677ec8ce33
-	// makes it into all of our supported go versions (only in v1.7.1 now).
-	mime.AddExtensionType(".svg", "image/svg+xml")
 
 	secureStartedCh := make(chan struct{})
 	if options.SecurePort != 0 {
