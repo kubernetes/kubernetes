@@ -180,12 +180,13 @@ func TestDQ_ordered_add_pop(t *testing.T) {
 	t.Parallel()
 
 	dq := NewDelayQueue()
+
+	before := time.Now()
 	dq.Add(&testjob{d: 2 * time.Second})
 	dq.Add(&testjob{d: 1 * time.Second})
 	dq.Add(&testjob{d: 3 * time.Second})
 
 	var finished [3]*testjob
-	before := time.Now()
 	idx := int32(-1)
 	ch := make(chan bool, 3)
 	//TODO: replace with `for range finished` once Go 1.3 support is dropped
