@@ -125,7 +125,7 @@ func setUp(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.
 func newMaster(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.Assertions) {
 	_, etcdserver, config, assert := setUp(t)
 
-	master, err := New(&config)
+	master, err := config.New()
 	if err != nil {
 		t.Fatalf("Error in bringing up the master: %v", err)
 	}
@@ -151,7 +151,7 @@ func limitedAPIResourceConfigSource() *genericapiserver.ResourceConfig {
 func newLimitedMaster(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.Assertions) {
 	_, etcdserver, config, assert := setUp(t)
 	config.APIResourceConfigSource = limitedAPIResourceConfigSource()
-	master, err := New(&config)
+	master, err := config.New()
 	if err != nil {
 		t.Fatalf("Error in bringing up the master: %v", err)
 	}
@@ -1262,7 +1262,7 @@ func TestValidOpenAPISpec(t *testing.T) {
 			Version: "unversioned",
 		},
 	}
-	master, err := New(&config)
+	master, err := config.New()
 	if err != nil {
 		t.Fatalf("Error in bringing up the master: %v", err)
 	}
