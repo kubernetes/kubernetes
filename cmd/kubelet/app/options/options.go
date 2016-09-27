@@ -212,6 +212,13 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&s.OutOfDiskTransitionFrequency.Duration, "outofdisk-transition-frequency", s.OutOfDiskTransitionFrequency.Duration, "Duration for which the kubelet has to wait before transitioning out of out-of-disk node condition status. Default: 5m0s")
 	fs.StringVar(&s.NodeIP, "node-ip", s.NodeIP, "IP address of the node. If set, kubelet will use this IP address for the node")
 	fs.BoolVar(&s.EnableCustomMetrics, "enable-custom-metrics", s.EnableCustomMetrics, "Support for gathering custom metrics.")
+	fs.StringVar(&s.CustomMetricsCollectorClientCertFile, "custom-metrics-collector-client-cert-file", s.CustomMetricsCollectorClientCertFile, ""+
+		"File containing an x509 Certificate used for client identification by the cAdvisor custom metric collectors (CA cert, if any, concatenated after server cert). "+
+		"If --custom-metrics-collector-client-cert-file and --custom-metrics-collector-client-private-key-file are not provided, the default empty certificate will be presented for client verification "+
+		"to the custom metric endpoints.")
+	fs.StringVar(&s.CustomMetricsCollectorClientPrivateKeyFile, "custom-metrics-collector-client-private-key-file", s.CustomMetricsCollectorClientPrivateKeyFile, "File containing x509 private key matching --custom-metrics-collector-client-cert-file.")
+	fs.BoolVar(&s.CustomMetricsInsecureSkipVerify, "custom-metrics-insecure-skip-tls-verify", s.CustomMetricsInsecureSkipVerify, "Support accessing insecure metric endpoints.")
+	fs.StringVar(&s.CustomMetricsRootCAFile, "custom-metrics-root-ca-file", s.CustomMetricsRootCAFile, "If set, this root certificate authority will be used to verify custom metric endpoints. This must be a valid PEM-encoded CA bundle. If not set, the system's default root CA bundle is used instead.")
 	fs.StringVar(&s.RuntimeCgroups, "runtime-cgroups", s.RuntimeCgroups, "Optional absolute name of cgroups to create and run the runtime in.")
 	fs.StringVar(&s.EvictionHard, "eviction-hard", s.EvictionHard, "A set of eviction thresholds (e.g. memory.available<1Gi) that if met would trigger a pod eviction.")
 	fs.StringVar(&s.EvictionSoft, "eviction-soft", s.EvictionSoft, "A set of eviction thresholds (e.g. memory.available<1.5Gi) that if met over a corresponding grace period would trigger a pod eviction.")

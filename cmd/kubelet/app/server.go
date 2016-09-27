@@ -398,7 +398,15 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 	}
 
 	if kubeDeps.CAdvisorInterface == nil {
-		kubeDeps.CAdvisorInterface, err = cadvisor.New(uint(s.CAdvisorPort), s.ContainerRuntime)
+
+		customMetricsConfig := cadvisor.CAdvisorCustomMetricsConfig{
+			CollectorClientCertFile:       s.CustomMetricsCollectorClientCertFile,
+			CollectorClientPrivateKeyFile: s.CustomMetricsCollectorClientPrivateKeyFile,
+			RootCAFile:                    s.CustomMetricsRootCAFile,
+			InsecureSkipVerify:            s.CustomMetricsInsecureSkipVerify,
+		}
+
+		kubeDeps.CAdvisorInterface, err = cadvisor.New(uint(s.CAdvisorPort), s.ContainerRuntime, customMetricsConfig)
 		if err != nil {
 			return err
 		}

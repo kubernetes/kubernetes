@@ -40,6 +40,7 @@ import (
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/kubelet"
+	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kconfig "k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
@@ -209,7 +210,15 @@ func (s *KubeletExecutorServer) runKubelet(
 
 	// create custom cAdvisor interface which return the resource values that Mesos reports
 	ni := <-nodeInfos
-	cAdvisorInterface, err := NewMesosCadvisor(ni.Cores, ni.Mem, uint(s.CAdvisorPort), s.ContainerRuntime)
+
+	customMetricsConfig := cadvisor.CAdvisorCustomMetricsConfig{
+		CollectorClientCertFile:       s.CustomMetricsCollectorClientCertFile,
+		CollectorClientPrivateKeyFile: s.CustomMetricsCollectorClientPrivateKeyFile,
+		RootCAFile:                    s.CustomMetricsRootCAFile,
+		InsecureSkipVerify:            s.CustomMetricsInsecureSkipVerify,
+	}
+
+	cAdvisorInterface, err := NewMesosCadvisor(ni.Cores, ni.Mem, uint(s.CAdvisorPort), s.ContainerRuntime, customMetricsConfig)
 	if err != nil {
 		return err
 	}
