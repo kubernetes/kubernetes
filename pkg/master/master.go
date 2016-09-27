@@ -199,9 +199,8 @@ func (c *Config) New() (*Master, error) {
 		return nil, fmt.Errorf("Master.New() called with config.KubeletClient == nil")
 	}
 
-	gc := *c.Config                                              // copy before mutations
-	gc.EnableSwaggerUI = gc.EnableSwaggerUI && c.EnableUISupport // disable swagger UI if general UI supports it
-	s, err := gc.New()
+	c.EnableSwaggerUI = c.EnableSwaggerUI && c.EnableUISupport // disable swagger UI if general UI supports it
+	s, err := c.Complete().New()
 	if err != nil {
 		return nil, err
 	}

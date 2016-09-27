@@ -64,7 +64,7 @@ func setUp(t *testing.T) (*etcdtesting.EtcdTestServer, Config, *assert.Assertion
 func newMaster(t *testing.T) (*GenericAPIServer, *etcdtesting.EtcdTestServer, Config, *assert.Assertions) {
 	etcdserver, config, assert := setUp(t)
 
-	s, err := config.New()
+	s, err := config.Complete().New()
 	if err != nil {
 		t.Fatalf("Error in bringing up the server: %v", err)
 	}
@@ -109,7 +109,7 @@ func TestInstallAPIGroups(t *testing.T) {
 	config.APIPrefix = "/apiPrefix"
 	config.APIGroupPrefix = "/apiGroupPrefix"
 
-	s, err := config.New()
+	s, err := config.Complete().New()
 	if err != nil {
 		t.Fatalf("Error in bringing up the server: %v", err)
 	}
@@ -212,7 +212,7 @@ func TestNotRestRoutesHaveAuth(t *testing.T) {
 	config.EnableSwaggerSupport = true
 	config.EnableVersion = true
 
-	s, err := config.New()
+	s, err := config.Complete().New()
 	if err != nil {
 		t.Fatalf("Error in bringing up the server: %v", err)
 	}
