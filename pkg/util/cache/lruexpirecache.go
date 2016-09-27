@@ -23,6 +23,7 @@ import (
 	"github.com/golang/groupcache/lru"
 )
 
+// 1. ttlcache 2. 同时是个lru cache 3.ttl时间不能修改
 type LRUExpireCache struct {
 	cache *lru.Cache
 	lock  sync.Mutex
@@ -41,8 +42,6 @@ func (c *LRUExpireCache) Add(key lru.Key, value interface{}, ttl time.Duration) 
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	c.cache.Add(key, &cacheEntry{value, time.Now().Add(ttl)})
-	// Remove entry from cache after ttl.
-	time.AfterFunc(ttl, func() { c.remove(key) })
 }
 
 func (c *LRUExpireCache) Get(key lru.Key) (interface{}, bool) {
