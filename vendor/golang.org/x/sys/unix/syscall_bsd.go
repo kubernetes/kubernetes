@@ -450,16 +450,34 @@ func Kevent(kq int, changes, events []Kevent_t, timeout *Timespec) (n int, err e
 
 //sys	sysctl(mib []_C_int, old *byte, oldlen *uintptr, new *byte, newlen uintptr) (err error) = SYS___SYSCTL
 
-func Sysctl(name string) (value string, err error) {
+// sysctlmib translates name to mib number and appends any additional args.
+func sysctlmib(name string, args ...int) ([]_C_int, error) {
 	// Translate name to mib number.
 	mib, err := nametomib(name)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, a := range args {
+		mib = append(mib, _C_int(a))
+	}
+
+	return mib, nil
+}
+
+func Sysctl(name string) (string, error) {
+	return SysctlArgs(name)
+}
+
+func SysctlArgs(name string, args ...int) (string, error) {
+	mib, err := sysctlmib(name, args...)
 	if err != nil {
 		return "", err
 	}
 
 	// Find size.
 	n := uintptr(0)
-	if err = sysctl(mib, nil, &n, nil, 0); err != nil {
+	if err := sysctl(mib, nil, &n, nil, 0); err != nil {
 		return "", err
 	}
 	if n == 0 {
@@ -468,7 +486,7 @@ func Sysctl(name string) (value string, err error) {
 
 	// Read into buffer of that size.
 	buf := make([]byte, n)
-	if err = sysctl(mib, &buf[0], &n, nil, 0); err != nil {
+	if err := sysctl(mib, &buf[0], &n, nil, 0); err != nil {
 		return "", err
 	}
 
@@ -479,23 +497,68 @@ func Sysctl(name string) (value string, err error) {
 	return string(buf[0:n]), nil
 }
 
-func SysctlUint32(name string) (value uint32, err error) {
-	// Translate name to mib number.
-	mib, err := nametomib(name)
+func SysctlUint32(name string) (uint32, error) {
+	return SysctlUint32Args(name)
+}
+
+func SysctlUint32Args(name string, args ...int) (uint32, error) {
+	mib, err := sysctlmib(name, args...)
 	if err != nil {
 		return 0, err
 	}
 
-	// Read into buffer of that size.
 	n := uintptr(4)
 	buf := make([]byte, 4)
-	if err = sysctl(mib, &buf[0], &n, nil, 0); err != nil {
+	if err := sysctl(mib, &buf[0], &n, nil, 0); err != nil {
 		return 0, err
 	}
 	if n != 4 {
 		return 0, EIO
 	}
 	return *(*uint32)(unsafe.Pointer(&buf[0])), nil
+}
+
+func SysctlUint64(name string, args ...int) (uint64, error) {
+	mib, err := sysctlmib(name, args...)
+	if err != nil {
+		return 0, err
+	}
+
+	n := uintptr(8)
+	buf := make([]byte, 8)
+	if err := sysctl(mib, &buf[0], &n, nil, 0); err != nil {
+		return 0, err
+	}
+	if n != 8 {
+		return 0, EIO
+	}
+	return *(*uint64)(unsafe.Pointer(&buf[0])), nil
+}
+
+func SysctlRaw(name string, args ...int) ([]byte, error) {
+	mib, err := sysctlmib(name, args...)
+	if err != nil {
+		return nil, err
+	}
+
+	// Find size.
+	n := uintptr(0)
+	if err := sysctl(mib, nil, &n, nil, 0); err != nil {
+		return nil, err
+	}
+	if n == 0 {
+		return nil, nil
+	}
+
+	// Read into buffer of that size.
+	buf := make([]byte, n)
+	if err := sysctl(mib, &buf[0], &n, nil, 0); err != nil {
+		return nil, err
+	}
+
+	// The actual call may return less than the original reported required
+	// size so ensure we deal with that.
+	return buf[:n], nil
 }
 
 //sys	utimes(path string, timeval *[2]Timeval) (err error)

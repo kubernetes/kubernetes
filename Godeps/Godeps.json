@@ -2410,7 +2410,7 @@
 		},
 		{
 			"ImportPath": "golang.org/x/sys/unix",
-			"Rev": "9c60d1c508f5134d1ca726b4641db998f2523357"
+			"Rev": "8f0908ab3b2457e2e15403d3697c9ef5cb4b57a9"
 		},
 		{
 			"ImportPath": "golang.org/x/text/cases",

@@ -1,7 +1,6 @@
+// +build arm64,linux
 // Created by cgo -godefs - DO NOT EDIT
 // cgo -godefs -- -fsigned-char types_linux.go
-
-// +build arm64,linux
 
 package unix
 
@@ -201,6 +200,12 @@ type RawSockaddrNetlink struct {
 	Groups uint32
 }
 
+type RawSockaddrHCI struct {
+	Family  uint16
+	Dev     uint16
+	Channel uint16
+}
+
 type RawSockaddr struct {
 	Family uint16
 	Data   [14]int8
@@ -325,6 +330,7 @@ const (
 	SizeofSockaddrUnix      = 0x6e
 	SizeofSockaddrLinklayer = 0x14
 	SizeofSockaddrNetlink   = 0xc
+	SizeofSockaddrHCI       = 0x6
 	SizeofLinger            = 0x8
 	SizeofIPMreq            = 0x8
 	SizeofIPMreqn           = 0xc
@@ -574,6 +580,7 @@ type Ustat_t struct {
 
 type EpollEvent struct {
 	Events uint32
+	PadFd  int32
 	Fd     int32
 	Pad    int32
 }
@@ -581,17 +588,37 @@ type EpollEvent struct {
 const (
 	AT_FDCWD            = -0x64
 	AT_REMOVEDIR        = 0x200
+	AT_SYMLINK_FOLLOW   = 0x400
 	AT_SYMLINK_NOFOLLOW = 0x100
 )
 
+type PollFd struct {
+	Fd      int32
+	Events  int16
+	Revents int16
+}
+
+const (
+	POLLIN    = 0x1
+	POLLPRI   = 0x2
+	POLLOUT   = 0x4
+	POLLRDHUP = 0x2000
+	POLLERR   = 0x8
+	POLLHUP   = 0x10
+	POLLNVAL  = 0x20
+)
+
+type Sigset_t struct {
+	X__val [16]uint64
+}
+
 type Termios struct {
-	Iflag     uint32
-	Oflag     uint32
-	Cflag     uint32
-	Lflag     uint32
-	Line      uint8
-	Cc        [32]uint8
-	Pad_cgo_0 [3]byte
-	Ispeed    uint32
-	Ospeed    uint32
+	Iflag  uint32
+	Oflag  uint32
+	Cflag  uint32
+	Lflag  uint32
+	Line   uint8
+	Cc     [19]uint8
+	Ispeed uint32
+	Ospeed uint32
 }

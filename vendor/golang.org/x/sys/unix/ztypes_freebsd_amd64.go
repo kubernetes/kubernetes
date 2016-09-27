@@ -1,7 +1,6 @@
+// +build amd64,freebsd
 // Created by cgo -godefs - DO NOT EDIT
 // cgo -godefs types_freebsd.go
-
-// +build amd64,freebsd
 
 package unix
 
@@ -139,6 +138,15 @@ type Dirent struct {
 type Fsid struct {
 	Val [2]int32
 }
+
+const (
+	FADV_NORMAL     = 0x0
+	FADV_RANDOM     = 0x1
+	FADV_SEQUENTIAL = 0x2
+	FADV_WILLNEED   = 0x3
+	FADV_DONTNEED   = 0x4
+	FADV_NOREUSE    = 0x5
+)
 
 type RawSockaddrInet4 struct {
 	Len    uint8
