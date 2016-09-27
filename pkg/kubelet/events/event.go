@@ -55,6 +55,8 @@ const (
 	HostNetworkNotSupported = "HostNetworkNotSupported"
 	UndefinedShaper         = "NilShaper"
 	NodeRebooted            = "Rebooted"
+	ContainerGCFailed       = "ContainerGCFailed"
+	ImageGCFailed           = "ImageGCFailed"
 
 	// Image manager event reason list
 	InvalidDiskCapacity = "InvalidDiskCapacity"
