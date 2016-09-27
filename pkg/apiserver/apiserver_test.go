@@ -3252,5 +3252,8 @@ func newTestServer(handler http.Handler) *httptest.Server {
 }
 
 func newTestRequestInfoResolver() *request.RequestInfoResolver {
-	return &request.RequestInfoResolver{sets.NewString(grouplessPrefix, prefix), sets.NewString(grouplessPrefix)}
+	return &request.RequestInfoResolver{
+		APIPrefixes:          sets.NewString("api", "apis"),
+		GrouplessAPIPrefixes: sets.NewString("api"),
+	}
 }

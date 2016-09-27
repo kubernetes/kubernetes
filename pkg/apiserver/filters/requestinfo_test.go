@@ -22,5 +22,8 @@ import (
 )
 
 func newTestRequestInfoResolver() *request.RequestInfoResolver {
-	return &request.RequestInfoResolver{sets.NewString("api", "apis"), sets.NewString("api")}
+	return &request.RequestInfoResolver{
+		APIPrefixes:          sets.NewString("api", "apis"),
+		GrouplessAPIPrefixes: sets.NewString("api"),
+	}
 }
