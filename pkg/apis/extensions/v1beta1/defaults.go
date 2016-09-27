@@ -128,6 +128,9 @@ func SetDefaults_HorizontalPodAutoscaler(obj *HorizontalPodAutoscaler) {
 		minReplicas := int32(1)
 		obj.Spec.MinReplicas = &minReplicas
 	}
+	if obj.Spec.CPUUtilization == nil {
+		obj.Spec.CPUUtilization = &CPUTargetUtilization{TargetPercentage: 80}
+	}
 }
 
 func SetDefaults_ReplicaSet(obj *ReplicaSet) {
