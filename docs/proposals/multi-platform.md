@@ -227,7 +227,7 @@ These addons should also be converted to multiple platforms:
 
 ### Conflicts
 
-What should we do if there's a conflict between keeping e.g. `linux/ppc64le` builds vs merging a release blocker?
+What should we do if there's a conflict between keeping e.g. `linux/ppc64le` builds vs. merging a release blocker?
 
 In fact, we faced this problem while this proposal was being written; in [#25243](https://github.com/kubernetes/kubernetes/pull/25243). It is quite obvious that the release blocker is of higher priority.
 
