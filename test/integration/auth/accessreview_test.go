@@ -67,7 +67,7 @@ func TestSubjectAccessReview(t *testing.T) {
 	masterConfig.Authenticator = authenticator.RequestFunc(alwaysAlice)
 	masterConfig.Authorizer = sarAuthorizer{}
 	masterConfig.AdmissionControl = admit.NewAlwaysAdmit()
-	m, err := master.New(masterConfig)
+	m, err := masterConfig.New()
 	if err != nil {
 		t.Fatalf("error in bringing up the master: %v", err)
 	}
@@ -169,7 +169,7 @@ func TestSelfSubjectAccessReview(t *testing.T) {
 	})
 	masterConfig.Authorizer = sarAuthorizer{}
 	masterConfig.AdmissionControl = admit.NewAlwaysAdmit()
-	m, err := master.New(masterConfig)
+	m, err := masterConfig.New()
 	if err != nil {
 		t.Fatalf("error in bringing up the master: %v", err)
 	}
@@ -257,7 +257,7 @@ func TestLocalSubjectAccessReview(t *testing.T) {
 	masterConfig.Authenticator = authenticator.RequestFunc(alwaysAlice)
 	masterConfig.Authorizer = sarAuthorizer{}
 	masterConfig.AdmissionControl = admit.NewAlwaysAdmit()
-	m, err := master.New(masterConfig)
+	m, err := masterConfig.New()
 	if err != nil {
 		t.Fatalf("error in bringing up the master: %v", err)
 	}
