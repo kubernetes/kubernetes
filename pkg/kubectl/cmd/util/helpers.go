@@ -296,9 +296,18 @@ func GetFlagString(cmd *cobra.Command, flag string) string {
 	return s
 }
 
-// GetFlagStringList can be used to accept multiple argument with flag repetition (e.g. -f arg1 -f arg2 ...)
+// GetFlagStringSlice can be used to accept multiple argument with flag repetition (e.g. -f arg1,arg2 -f arg3 ...)
 func GetFlagStringSlice(cmd *cobra.Command, flag string) []string {
 	s, err := cmd.Flags().GetStringSlice(flag)
+	if err != nil {
+		glog.Fatalf("err accessing flag %s for command %s: %v", flag, cmd.Name(), err)
+	}
+	return s
+}
+
+// GetFlagStringArray can be used to accept multiple argument with flag repetition (e.g. -f arg1 -f arg2 ...)
+func GetFlagStringArray(cmd *cobra.Command, flag string) []string {
+	s, err := cmd.Flags().GetStringArray(flag)
 	if err != nil {
 		glog.Fatalf("err accessing flag %s for command %s: %v", flag, cmd.Name(), err)
 	}
