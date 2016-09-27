@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
 
@@ -108,6 +109,17 @@ func (c *PodClient) Update(name string, updateFn func(pod *api.Pod)) {
 	}))
 }
 
+// DeleteSync deletes the pod and wait for the pod to disappear for `timeout`. If the pod doesn't
+// disappear before the timeout, it will fail the test.
+func (c *PodClient) DeleteSync(name string, options *api.DeleteOptions, timeout time.Duration) {
+	err := c.Delete(name, options)
+	if err != nil && !errors.IsNotFound(err) {
+		Failf("Failed to delete pod %q: %v", name, err)
+	}
+	Expect(WaitForPodToDisappear(c.f.Client, c.f.Namespace.Name, name, labels.Everything(),
+		2*time.Second, timeout)).To(Succeed(), "wait for pod %q to disappear", name)
+}
+
 // mungeSpec apply test-suite specific transformations to the pod spec.
 func (c *PodClient) mungeSpec(pod *api.Pod) {
 	if TestContext.NodeName != "" {
@@ -137,3 +149,19 @@ func (c *PodClient) mungeSpec(pod *api.Pod) {
 }
 
 // TODO(random-liu): Move pod wait function into this file
+// WaitForSuccess waits for pod to success.
+func (c *PodClient) WaitForSuccess(name string, timeout time.Duration) {
+	f := c.f
+	Expect(waitForPodCondition(f.Client, f.Namespace.Name, name, "success or failure", timeout,
+		func(pod *api.Pod) (bool, error) {
+			switch pod.Status.Phase {
+			case api.PodFailed:
+				return true, fmt.Errorf("pod %q failed with reason: %q, message: %q", name, pod.Status.Reason, pod.Status.Message)
+			case api.PodSucceeded:
+				return true, nil
+			default:
+				return false, nil
+			}
+		},
+	)).To(Succeed(), "wait for pod %q to success", name)
+}

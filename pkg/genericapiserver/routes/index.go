@@ -26,9 +26,12 @@ import (
 	"k8s.io/kubernetes/pkg/apiserver"
 )
 
+// Index provides a webservice for the http root / listing all known paths.
 type Index struct{}
 
+// Install adds the Index webservice to the given mux.
 func (i Index) Install(mux *apiserver.PathRecorderMux, c *restful.Container) {
+	// do not register this using restful Webservice since we do not want to surface this in api docs.
 	mux.BaseMux().HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		status := http.StatusOK
 		if r.URL.Path != "/" && r.URL.Path != "/index.html" {

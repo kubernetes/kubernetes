@@ -133,10 +133,10 @@ func (o PauseConfig) RunPause() error {
 			continue
 		}
 		if isAlreadyPaused {
-			cmdutil.PrintSuccess(o.Mapper, false, o.Out, info.Mapping.Resource, info.Name, "already paused")
+			cmdutil.PrintSuccess(o.Mapper, false, o.Out, info.Mapping.Resource, info.Name, false, "already paused")
 			continue
 		}
-		cmdutil.PrintSuccess(o.Mapper, false, o.Out, info.Mapping.Resource, info.Name, "paused")
+		cmdutil.PrintSuccess(o.Mapper, false, o.Out, info.Mapping.Resource, info.Name, false, "paused")
 	}
 	return utilerrors.NewAggregate(allErrs)
 }

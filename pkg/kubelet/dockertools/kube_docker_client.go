@@ -87,10 +87,21 @@ func newKubeDockerClient(dockerClient *dockerapi.Client, requestTimeout time.Dur
 	if requestTimeout == 0 {
 		requestTimeout = defaultTimeout
 	}
-	return &kubeDockerClient{
+
+	k := &kubeDockerClient{
 		client:  dockerClient,
 		timeout: requestTimeout,
 	}
+	// Notice that this assumes that docker is running before kubelet is started.
+	v, err := k.Version()
+	if err != nil {
+		glog.Errorf("failed to retrieve docker version: %v", err)
+		glog.Warningf("Using empty version for docker client, this may sometimes cause compatibility issue.")
+	} else {
+		// Update client version with real api version.
+		dockerClient.UpdateClientVersion(v.APIVersion)
+	}
+	return k
 }
 
 func (d *kubeDockerClient) ListContainers(options dockertypes.ContainerListOptions) ([]dockertypes.Container, error) {

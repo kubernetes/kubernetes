@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 )
 
+// AppendFunc is used to add a matching item to whatever list the caller is using
 type AppendFunc func(interface{})
 
 func ListAll(store Store, selector labels.Selector, appendFn AppendFunc) error {
@@ -132,116 +133,6 @@ func (s storeToNodeConditionLister) List() (nodes []*api.Node, err error) {
 		} else {
 			glog.V(5).Infof("Node %s matches none of the conditions", node.Name)
 		}
-	}
-	return
-}
-
-// StoreToReplicationControllerLister gives a store List and Exists methods. The store must contain only ReplicationControllers.
-type StoreToReplicationControllerLister struct {
-	Indexer
-}
-
-// Exists checks if the given rc exists in the store.
-func (s *StoreToReplicationControllerLister) Exists(controller *api.ReplicationController) (bool, error) {
-	_, exists, err := s.Indexer.Get(controller)
-	if err != nil {
-		return false, err
-	}
-	return exists, nil
-}
-
-// StoreToReplicationControllerLister lists all controllers in the store.
-// TODO: converge on the interface in pkg/client
-func (s *StoreToReplicationControllerLister) List() (controllers []api.ReplicationController, err error) {
-	for _, c := range s.Indexer.List() {
-		controllers = append(controllers, *(c.(*api.ReplicationController)))
-	}
-	return controllers, nil
-}
-
-func (s *StoreToReplicationControllerLister) ReplicationControllers(namespace string) storeReplicationControllersNamespacer {
-	return storeReplicationControllersNamespacer{s.Indexer, namespace}
-}
-
-type storeReplicationControllersNamespacer struct {
-	indexer   Indexer
-	namespace string
-}
-
-func (s storeReplicationControllersNamespacer) List(selector labels.Selector) ([]api.ReplicationController, error) {
-	controllers := []api.ReplicationController{}
-
-	if s.namespace == api.NamespaceAll {
-		for _, m := range s.indexer.List() {
-			rc := *(m.(*api.ReplicationController))
-			if selector.Matches(labels.Set(rc.Labels)) {
-				controllers = append(controllers, rc)
-			}
-		}
-		return controllers, nil
-	}
-
-	key := &api.ReplicationController{ObjectMeta: api.ObjectMeta{Namespace: s.namespace}}
-	items, err := s.indexer.Index(NamespaceIndex, key)
-	if err != nil {
-		// Ignore error; do slow search without index.
-		glog.Warningf("can not retrieve list of objects using index : %v", err)
-		for _, m := range s.indexer.List() {
-			rc := *(m.(*api.ReplicationController))
-			if s.namespace == rc.Namespace && selector.Matches(labels.Set(rc.Labels)) {
-				controllers = append(controllers, rc)
-			}
-		}
-		return controllers, nil
-	}
-	for _, m := range items {
-		rc := *(m.(*api.ReplicationController))
-		if selector.Matches(labels.Set(rc.Labels)) {
-			controllers = append(controllers, rc)
-		}
-	}
-	return controllers, nil
-}
-
-func (s storeReplicationControllersNamespacer) Get(name string) (*api.ReplicationController, error) {
-	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(api.Resource("replicationcontroller"), name)
-	}
-	return obj.(*api.ReplicationController), nil
-}
-
-// GetPodControllers returns a list of replication controllers managing a pod. Returns an error only if no matching controllers are found.
-func (s *StoreToReplicationControllerLister) GetPodControllers(pod *api.Pod) (controllers []api.ReplicationController, err error) {
-	var selector labels.Selector
-	var rc api.ReplicationController
-
-	if len(pod.Labels) == 0 {
-		err = fmt.Errorf("no controllers found for pod %v because it has no labels", pod.Name)
-		return
-	}
-
-	key := &api.ReplicationController{ObjectMeta: api.ObjectMeta{Namespace: pod.Namespace}}
-	items, err := s.Indexer.Index(NamespaceIndex, key)
-	if err != nil {
-		return
-	}
-
-	for _, m := range items {
-		rc = *m.(*api.ReplicationController)
-		selector = labels.Set(rc.Spec.Selector).AsSelectorPreValidated()
-
-		// If an rc with a nil or empty selector creeps in, it should match nothing, not everything.
-		if selector.Empty() || !selector.Matches(labels.Set(pod.Labels)) {
-			continue
-		}
-		controllers = append(controllers, rc)
-	}
-	if len(controllers) == 0 {
-		err = fmt.Errorf("could not find controller for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
 	}
 	return
 }
@@ -515,47 +406,6 @@ func (s *StoreToDaemonSetLister) GetPodDaemonSets(pod *api.Pod) (daemonSets []ex
 	if len(daemonSets) == 0 {
 		err = fmt.Errorf("could not find daemon set for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
 	}
-	return
-}
-
-// StoreToServiceLister makes a Store that has the List method of the client.ServiceInterface
-// The Store must contain (only) Services.
-type StoreToServiceLister struct {
-	Store
-}
-
-func (s *StoreToServiceLister) List() (services api.ServiceList, err error) {
-	for _, m := range s.Store.List() {
-		services.Items = append(services.Items, *(m.(*api.Service)))
-	}
-	return services, nil
-}
-
-// TODO: Move this back to scheduler as a helper function that takes a Store,
-// rather than a method of StoreToServiceLister.
-func (s *StoreToServiceLister) GetPodServices(pod *api.Pod) (services []api.Service, err error) {
-	var selector labels.Selector
-	var service api.Service
-
-	for _, m := range s.Store.List() {
-		service = *m.(*api.Service)
-		// consider only services that are in the same namespace as the pod
-		if service.Namespace != pod.Namespace {
-			continue
-		}
-		if service.Spec.Selector == nil {
-			// services with nil selectors match nothing, not everything.
-			continue
-		}
-		selector = labels.Set(service.Spec.Selector).AsSelectorPreValidated()
-		if selector.Matches(labels.Set(pod.Labels)) {
-			services = append(services, service)
-		}
-	}
-	if len(services) == 0 {
-		err = fmt.Errorf("could not find service for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
-	}
-
 	return
 }
 

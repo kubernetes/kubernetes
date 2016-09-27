@@ -109,6 +109,8 @@ func NewKubeGenericRuntimeManager(
 	httpClient types.HttpGetter,
 	imageBackOff *flowcontrol.Backoff,
 	serializeImagePulls bool,
+	imagePullQPS float32,
+	imagePullBurst int,
 	cpuCFSQuota bool,
 	runtimeService internalApi.RuntimeService,
 	imageService internalApi.ImageManagerService,
@@ -160,7 +162,9 @@ func NewKubeGenericRuntimeManager(
 		kubecontainer.FilterEventRecorder(recorder),
 		kubeRuntimeManager,
 		imageBackOff,
-		serializeImagePulls)
+		serializeImagePulls,
+		imagePullQPS,
+		imagePullBurst)
 	kubeRuntimeManager.runner = lifecycle.NewHandlerRunner(httpClient, kubeRuntimeManager, kubeRuntimeManager)
 	kubeRuntimeManager.containerGC = NewContainerGC(runtimeService, podGetter, kubeRuntimeManager)
 
@@ -483,7 +487,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *api.Pod, _ api.PodStatus, podSt
 			glog.V(4).Infof("Stopping PodSandbox for %q, will start new one", format.Pod(pod))
 		}
 
-		killResult := m.killPodWithSyncResult(pod, ConvertPodStatusToRunningPod(m.runtimeName, podStatus), nil)
+		killResult := m.killPodWithSyncResult(pod, kubecontainer.ConvertPodStatusToRunningPod(m.runtimeName, podStatus), nil)
 		result.AddPodSyncResult(killResult)
 		if killResult.Error() != nil {
 			glog.Errorf("killPodWithSyncResult failed: %v", killResult.Error())
@@ -495,7 +499,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *api.Pod, _ api.PodStatus, podSt
 			glog.V(3).Infof("Killing unwanted container %q(id=%q) for pod %q", containerInfo.name, containerID, format.Pod(pod))
 			killContainerResult := kubecontainer.NewSyncResult(kubecontainer.KillContainer, containerInfo.name)
 			result.AddSyncResult(killContainerResult)
-			if err := m.killContainer(pod, containerID, containerInfo.container, containerInfo.message, nil); err != nil {
+			if err := m.killContainer(pod, containerID, containerInfo.name, containerInfo.message, nil); err != nil {
 				killContainerResult.Fail(kubecontainer.ErrKillContainer, err.Error())
 				glog.Errorf("killContainer %q(id=%q) for pod %q failed: %v", containerInfo.name, containerID, format.Pod(pod), err)
 				return
@@ -623,18 +627,18 @@ func (m *kubeGenericRuntimeManager) doBackOff(pod *api.Pod, container *api.Conta
 	glog.Infof("checking backoff for container %q in pod %q", container.Name, format.Pod(pod))
 	// Use the finished time of the latest exited container as the start point to calculate whether to do back-off.
 	ts := cStatus.FinishedAt
-	// backOff requires a unique id to identify the container
-	stableName := fmt.Sprintf("%s_%s_%s_%s", pod.Name, pod.Namespace, string(pod.UID), container.Name)
-	if backOff.IsInBackOffSince(stableName, ts) {
+	// backOff requires a unique key to identify the container.
+	key := getStableKey(pod, container)
+	if backOff.IsInBackOffSince(key, ts) {
 		if ref, err := kubecontainer.GenerateContainerRef(pod, container); err == nil {
 			m.recorder.Eventf(ref, api.EventTypeWarning, events.BackOffStartContainer, "Back-off restarting failed container")
 		}
-		err := fmt.Errorf("Back-off %s restarting failed container=%s pod=%s", backOff.Get(stableName), container.Name, format.Pod(pod))
+		err := fmt.Errorf("Back-off %s restarting failed container=%s pod=%s", backOff.Get(key), container.Name, format.Pod(pod))
 		glog.Infof("%s", err.Error())
 		return true, err.Error(), kubecontainer.ErrCrashLoopBackOff
 	}
 
-	backOff.Next(stableName, ts)
+	backOff.Next(key, ts)
 	return false, "", nil
 }
 

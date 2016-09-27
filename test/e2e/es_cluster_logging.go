@@ -219,11 +219,6 @@ func ClusterLevelLoggingWithElasticsearch(f *framework.Framework) {
 	}
 	framework.Logf("Found %d healthy nodes.", len(nodes.Items))
 
-	// TODO: Figure out why initialization time influences
-	// results of the test and remove this step
-	By("Wait some more time to ensure ES and fluentd are ready")
-	time.Sleep(2 * time.Minute)
-
 	// Wait for the Fluentd pods to enter the running state.
 	By("Checking to make sure the Fluentd pod are running on each healthy node")
 	label = labels.SelectorFromSet(labels.Set(map[string]string{k8sAppKey: fluentdValue}))
@@ -305,9 +300,6 @@ func ClusterLevelLoggingWithElasticsearch(f *framework.Framework) {
 		err = framework.WaitForPodSuccessInNamespace(f.Client, pod, "synth-logger", ns)
 		Expect(err).NotTo(HaveOccurred())
 	}
-
-	// Wait a bit for the log information to make it into Elasticsearch.
-	time.Sleep(30 * time.Second)
 
 	// Make several attempts to observe the logs ingested into Elasticsearch.
 	By("Checking all the log lines were ingested into Elasticsearch")

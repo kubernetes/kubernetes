@@ -52,11 +52,11 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/typed/discovery"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	clientsetadapter "k8s.io/kubernetes/pkg/client/unversioned/adapters/internalclientset"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
@@ -436,7 +436,7 @@ func SkipUnlessFederated(c *client.Client) {
 }
 
 func SkipIfMissingResource(clientPool dynamic.ClientPool, gvr unversioned.GroupVersionResource, namespace string) {
-	dynamicClient, err := clientPool.ClientForGroupVersion(gvr.GroupVersion())
+	dynamicClient, err := clientPool.ClientForGroupVersionResource(gvr)
 	if err != nil {
 		Failf("Unexpected error getting dynamic client for %v: %v", gvr.GroupVersion(), err)
 	}
@@ -1229,7 +1229,7 @@ func hasRemainingContent(c *client.Client, clientPool dynamic.ClientPool, namesp
 	// dump how many of resource type is on the server in a log.
 	for _, gvr := range groupVersionResources {
 		// get a client for this group version...
-		dynamicClient, err := clientPool.ClientForGroupVersion(gvr.GroupVersion())
+		dynamicClient, err := clientPool.ClientForGroupVersionResource(gvr)
 		if err != nil {
 			// not all resource types support list, so some errors here are normal depending on the resource type.
 			Logf("namespace: %s, unable to get client - gvr: %v, error: %v", namespace, gvr, err)
@@ -1369,7 +1369,7 @@ func CheckInvariants(events []watch.Event, fns ...InvariantFunc) error {
 // Returns an error if timeout occurs first, or pod goes in to failed state.
 func WaitForPodRunningInNamespace(c *client.Client, pod *api.Pod) error {
 	// this short-cicuit is needed for cases when we pass a list of pods instead
-	// of newly created pod (eg. VerifyPods) which means we are getting already
+	// of newly created pod (e.g. VerifyPods) which means we are getting already
 	// running pod for which waiting does not make sense and will always fail
 	if pod.Status.Phase == api.PodRunning {
 		return nil
@@ -1455,6 +1455,7 @@ func waitForPodTerminatedInNamespace(c *client.Client, podName, reason, namespac
 func waitForPodSuccessInNamespaceTimeout(c *client.Client, podName string, contName string, namespace string, timeout time.Duration) error {
 	return waitForPodCondition(c, namespace, podName, "success or failure", timeout, func(pod *api.Pod) (bool, error) {
 		// Cannot use pod.Status.Phase == api.PodSucceeded/api.PodFailed due to #2632
+		// TODO: This was not true from long time ago. We can use api.PodSucceeded now.
 		ci, ok := api.GetContainerStatus(pod.Status.ContainerStatuses, contName)
 		if !ok {
 			Logf("No Status.Info for container '%s' in pod '%s' yet", contName, podName)
@@ -1549,6 +1550,7 @@ func WaitForPodToDisappear(c *client.Client, ns, podName string, label labels.Se
 			if pod.Name == podName {
 				Logf("Pod %s still exists", podName)
 				found = true
+				break
 			}
 		}
 		if !found {
@@ -1976,6 +1978,14 @@ func LoadClient() (*client.Client, error) {
 		return nil, fmt.Errorf("error creating client: %v", err.Error())
 	}
 	return loadClientFromConfig(config)
+}
+
+func LoadClientset() (*release_1_5.Clientset, error) {
+	config, err := LoadConfig()
+	if err != nil {
+		return nil, fmt.Errorf("error creating client: %v", err.Error())
+	}
+	return release_1_5.NewForConfig(config)
 }
 
 // randomSuffix provides a random string to append to pods,services,rcs.
@@ -2815,9 +2825,11 @@ func dumpPodDebugInfo(c *client.Client, pods []*api.Pod) {
 	DumpNodeDebugInfo(c, badNodes.List())
 }
 
-func DumpAllNamespaceInfo(c *client.Client, namespace string) {
+type EventsLister func(opts api.ListOptions, ns string) (*v1.EventList, error)
+
+func DumpEventsInNamespace(eventsLister EventsLister, namespace string) {
 	By(fmt.Sprintf("Collecting events from namespace %q.", namespace))
-	events, err := c.Events(namespace).List(api.ListOptions{})
+	events, err := eventsLister(api.ListOptions{}, namespace)
 	Expect(err).NotTo(HaveOccurred())
 
 	// Sort events by their first timestamp
@@ -2831,6 +2843,12 @@ func DumpAllNamespaceInfo(c *client.Client, namespace string) {
 	// Note that we don't wait for any Cleanup to propagate, which means
 	// that if you delete a bunch of pods right before ending your test,
 	// you may or may not see the killing/deletion/Cleanup events.
+}
+
+func DumpAllNamespaceInfo(c *client.Client, cs *release_1_5.Clientset, namespace string) {
+	DumpEventsInNamespace(func(opts api.ListOptions, ns string) (*v1.EventList, error) {
+		return cs.Core().Events(ns).List(opts)
+	}, namespace)
 
 	// If cluster is large, then the following logs are basically useless, because:
 	// 1. it takes tens of minutes or hours to grab all of them
@@ -2850,7 +2868,7 @@ func DumpAllNamespaceInfo(c *client.Client, namespace string) {
 }
 
 // byFirstTimestamp sorts a slice of events by first timestamp, using their involvedObject's name as a tie breaker.
-type byFirstTimestamp []api.Event
+type byFirstTimestamp []v1.Event
 
 func (o byFirstTimestamp) Len() int      { return len(o) }
 func (o byFirstTimestamp) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
@@ -3206,9 +3224,9 @@ func RemoveTaintOffNode(c *client.Client, nodeName string, taint api.Taint) {
 	}
 }
 
-func ScaleRC(c *client.Client, ns, name string, size uint, wait bool) error {
+func ScaleRC(c *client.Client, clientset clientset.Interface, ns, name string, size uint, wait bool) error {
 	By(fmt.Sprintf("Scaling replication controller %s in namespace %s to %d", name, ns, size))
-	scaler, err := kubectl.ScalerFor(api.Kind("ReplicationController"), clientsetadapter.FromUnversionedClient(c))
+	scaler, err := kubectl.ScalerFor(api.Kind("ReplicationController"), clientset)
 	if err != nil {
 		return err
 	}
@@ -3315,7 +3333,7 @@ func WaitForPodsWithLabel(c *client.Client, ns string, label labels.Selector) (p
 }
 
 // DeleteRCAndPods a Replication Controller and all pods it spawned
-func DeleteRCAndPods(c *client.Client, ns, name string) error {
+func DeleteRCAndPods(c *client.Client, clientset clientset.Interface, ns, name string) error {
 	By(fmt.Sprintf("deleting replication controller %s in namespace %s", name, ns))
 	rc, err := c.ReplicationControllers(ns).Get(name)
 	if err != nil {
@@ -3325,7 +3343,7 @@ func DeleteRCAndPods(c *client.Client, ns, name string) error {
 		}
 		return err
 	}
-	reaper, err := kubectl.ReaperForReplicationController(clientsetadapter.FromUnversionedClient(c).Core(), 10*time.Minute)
+	reaper, err := kubectl.ReaperForReplicationController(clientset.Core(), 10*time.Minute)
 	if err != nil {
 		if apierrs.IsNotFound(err) {
 			Logf("RC %s was already deleted: %v", name, err)
@@ -3463,7 +3481,7 @@ func waitForPodsGone(ps *PodStore, interval, timeout time.Duration) error {
 }
 
 // Delete a ReplicaSet and all pods it spawned
-func DeleteReplicaSet(c *client.Client, ns, name string) error {
+func DeleteReplicaSet(c *client.Client, clientset clientset.Interface, ns, name string) error {
 	By(fmt.Sprintf("deleting ReplicaSet %s in namespace %s", name, ns))
 	rc, err := c.Extensions().ReplicaSets(ns).Get(name)
 	if err != nil {
@@ -3473,7 +3491,7 @@ func DeleteReplicaSet(c *client.Client, ns, name string) error {
 		}
 		return err
 	}
-	reaper, err := kubectl.ReaperFor(extensions.Kind("ReplicaSet"), clientsetadapter.FromUnversionedClient(c))
+	reaper, err := kubectl.ReaperFor(extensions.Kind("ReplicaSet"), clientset)
 	if err != nil {
 		if apierrs.IsNotFound(err) {
 			Logf("ReplicaSet %s was already deleted: %v", name, err)
@@ -3752,11 +3770,11 @@ func CheckNewRSAnnotations(c clientset.Interface, ns, deploymentName string, exp
 	return nil
 }
 
-func WaitForPodsReady(c *clientset.Clientset, ns, name string, minReadySeconds int) error {
+func WaitForPodsReady(c clientset.Interface, ns, name string, minReadySeconds int) error {
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
 	options := api.ListOptions{LabelSelector: label}
 	return wait.Poll(Poll, 5*time.Minute, func() (bool, error) {
-		pods, err := c.Pods(ns).List(options)
+		pods, err := c.Core().Pods(ns).List(options)
 		if err != nil {
 			return false, nil
 		}
@@ -3770,7 +3788,7 @@ func WaitForPodsReady(c *clientset.Clientset, ns, name string, minReadySeconds i
 }
 
 // Waits for the deployment to clean up old rcs.
-func WaitForDeploymentOldRSsNum(c *clientset.Clientset, ns, deploymentName string, desiredRSNum int) error {
+func WaitForDeploymentOldRSsNum(c clientset.Interface, ns, deploymentName string, desiredRSNum int) error {
 	return wait.Poll(Poll, 5*time.Minute, func() (bool, error) {
 		deployment, err := c.Extensions().Deployments(ns).Get(deploymentName)
 		if err != nil {
@@ -3796,7 +3814,7 @@ func logReplicaSetsOfDeployment(deployment *extensions.Deployment, allOldRSs []*
 	}
 }
 
-func WaitForObservedDeployment(c *clientset.Clientset, ns, deploymentName string, desiredGeneration int64) error {
+func WaitForObservedDeployment(c clientset.Interface, ns, deploymentName string, desiredGeneration int64) error {
 	return deploymentutil.WaitForObservedDeployment(func() (*extensions.Deployment, error) { return c.Extensions().Deployments(ns).Get(deploymentName) }, desiredGeneration, Poll, 1*time.Minute)
 }
 
@@ -3857,7 +3875,7 @@ func WaitForPartialEvents(c *client.Client, ns string, objOrRef runtime.Object, 
 
 type updateDeploymentFunc func(d *extensions.Deployment)
 
-func UpdateDeploymentWithRetries(c *clientset.Clientset, namespace, name string, applyUpdate updateDeploymentFunc) (deployment *extensions.Deployment, err error) {
+func UpdateDeploymentWithRetries(c clientset.Interface, namespace, name string, applyUpdate updateDeploymentFunc) (deployment *extensions.Deployment, err error) {
 	deployments := c.Extensions().Deployments(namespace)
 	err = wait.Poll(10*time.Millisecond, 1*time.Minute, func() (bool, error) {
 		if deployment, err = deployments.Get(name); err != nil {
@@ -4704,7 +4722,7 @@ func GetNodePortURL(client *client.Client, ns, name string, svcPort int) (string
 
 // ScaleRCByLabels scales an RC via ns/label lookup. If replicas == 0 it waits till
 // none are running, otherwise it does what a synchronous scale operation would do.
-func ScaleRCByLabels(client *client.Client, ns string, l map[string]string, replicas uint) error {
+func ScaleRCByLabels(client *client.Client, clientset clientset.Interface, ns string, l map[string]string, replicas uint) error {
 	listOpts := api.ListOptions{LabelSelector: labels.SelectorFromSet(labels.Set(l))}
 	rcs, err := client.ReplicationControllers(ns).List(listOpts)
 	if err != nil {
@@ -4716,7 +4734,7 @@ func ScaleRCByLabels(client *client.Client, ns string, l map[string]string, repl
 	Logf("Scaling %v RCs with labels %v in ns %v to %v replicas.", len(rcs.Items), l, ns, replicas)
 	for _, labelRC := range rcs.Items {
 		name := labelRC.Name
-		if err := ScaleRC(client, ns, name, replicas, false); err != nil {
+		if err := ScaleRC(client, clientset, ns, name, replicas, false); err != nil {
 			return err
 		}
 		rc, err := client.ReplicationControllers(ns).Get(name)

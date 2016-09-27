@@ -96,10 +96,10 @@ func TestIngressController(t *testing.T) {
 
 	ing1 := extensions_v1beta1.Ingress{
 		ObjectMeta: api_v1.ObjectMeta{
-			Name:        "test-ingress",
-			Namespace:   "mynamespace",
-			SelfLink:    "/api/v1/namespaces/mynamespace/ingress/test-ingress",
-			Annotations: map[string]string{},
+			Name:      "test-ingress",
+			Namespace: "mynamespace",
+			SelfLink:  "/api/v1/namespaces/mynamespace/ingress/test-ingress",
+			// TODO: Remove: Annotations: map[string]string{},
 		},
 		Status: extensions_v1beta1.IngressStatus{
 			LoadBalancer: api_v1.LoadBalancerStatus{
@@ -139,6 +139,9 @@ func TestIngressController(t *testing.T) {
 	}
 
 	// Test update federated ingress.
+	if updatedIngress.ObjectMeta.Annotations == nil {
+		updatedIngress.ObjectMeta.Annotations = make(map[string]string)
+	}
 	updatedIngress.ObjectMeta.Annotations["A"] = "B"
 	t.Log("Modifying Federated Ingress")
 	fedIngressWatch.Modify(updatedIngress)
@@ -146,7 +149,7 @@ func TestIngressController(t *testing.T) {
 	updatedIngress2 := GetIngressFromChan(t, cluster1IngressUpdateChan)
 	assert.NotNil(t, updatedIngress2)
 	assert.True(t, reflect.DeepEqual(updatedIngress2.Spec, updatedIngress.Spec), "Spec of updated ingress is not equal")
-	assert.True(t, util.ObjectMetaEquivalent(updatedIngress2.ObjectMeta, updatedIngress.ObjectMeta), "Metadata of updated object is not equivalent")
+	assert.Equal(t, updatedIngress2.ObjectMeta.Annotations["A"], updatedIngress.ObjectMeta.Annotations["A"], "Updated annotation not transferred from federated to cluster ingress.")
 	// Test add cluster
 	t.Log("Adding a second cluster")
 	ing1.Annotations[staticIPNameKeyWritable] = "foo" // Make sure that the base object has a static IP name first.
@@ -194,10 +197,10 @@ func GetClusterFromChan(c chan runtime.Object) *federation_api.Cluster {
 func NewConfigMap(uid string) *api_v1.ConfigMap {
 	return &api_v1.ConfigMap{
 		ObjectMeta: api_v1.ObjectMeta{
-			Name:        uidConfigMapName,
-			Namespace:   uidConfigMapNamespace,
-			SelfLink:    "/api/v1/namespaces/" + uidConfigMapNamespace + "/configmap/" + uidConfigMapName,
-			Annotations: map[string]string{},
+			Name:      uidConfigMapName,
+			Namespace: uidConfigMapNamespace,
+			SelfLink:  "/api/v1/namespaces/" + uidConfigMapNamespace + "/configmap/" + uidConfigMapName,
+			// TODO: Remove: Annotations: map[string]string{},
 		},
 		Data: map[string]string{
 			uidKey: uid,

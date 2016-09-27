@@ -48,7 +48,6 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/images"
-	"k8s.io/kubernetes/pkg/kubelet/kuberuntime"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/network"
@@ -250,7 +249,7 @@ func NewDockerManager(
 		os:                     osInterface,
 		machineInfo:            machineInfo,
 		podInfraContainerImage: podInfraContainerImage,
-		dockerPuller:           newDockerPuller(client, qps, burst),
+		dockerPuller:           newDockerPuller(client),
 		dockerRoot:             dockerRoot,
 		containerLogsDir:       containerLogsDir,
 		networkPlugin:          networkPlugin,
@@ -266,7 +265,7 @@ func NewDockerManager(
 		seccompProfileRoot:     seccompProfileRoot,
 	}
 	dm.runner = lifecycle.NewHandlerRunner(httpClient, dm, dm)
-	dm.imagePuller = images.NewImageManager(kubecontainer.FilterEventRecorder(recorder), dm, imageBackOff, serializeImagePulls)
+	dm.imagePuller = images.NewImageManager(kubecontainer.FilterEventRecorder(recorder), dm, imageBackOff, serializeImagePulls, qps, burst)
 	dm.containerGC = NewContainerGC(client, podGetter, containerLogsDir)
 
 	dm.versionCache = cache.NewObjectCache(
@@ -2052,7 +2051,7 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, _ api.PodStatus, podStatus *kubec
 
 		// Killing phase: if we want to start new infra container, or nothing is running kill everything (including infra container)
 		// TODO(random-liu): We'll use pod status directly in the future
-		killResult := dm.killPodWithSyncResult(pod, kuberuntime.ConvertPodStatusToRunningPod(dm.Type(), podStatus), nil)
+		killResult := dm.killPodWithSyncResult(pod, kubecontainer.ConvertPodStatusToRunningPod(dm.Type(), podStatus), nil)
 		result.AddPodSyncResult(killResult)
 		if killResult.Error() != nil {
 			return

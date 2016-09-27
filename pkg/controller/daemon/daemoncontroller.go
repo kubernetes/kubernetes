@@ -650,6 +650,7 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *api.Node, ds *exte
 	}
 
 	newPod := &api.Pod{Spec: ds.Spec.Template.Spec, ObjectMeta: ds.Spec.Template.ObjectMeta}
+	newPod.Namespace = ds.Namespace
 	newPod.Spec.NodeName = node.Name
 
 	pods := []*api.Pod{}

@@ -32,6 +32,7 @@ import (
 	fed_clientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/events"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/apps"
@@ -48,7 +49,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/types"
-	utilcertificates "k8s.io/kubernetes/pkg/util/certificates"
+	certutil "k8s.io/kubernetes/pkg/util/cert"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/sets"
 
@@ -1965,7 +1966,7 @@ func (p *CertificateSigningRequestDescriber) Describe(namespace, name string, de
 		return "", err
 	}
 
-	cr, err := utilcertificates.ParseCertificateRequestObject(csr)
+	cr, err := certutil.ParseCSR(csr)
 	if err != nil {
 		return "", fmt.Errorf("Error parsing CSR: %v", err)
 	}
@@ -2166,8 +2167,8 @@ func DescribeEvents(el *api.EventList, w io.Writer) {
 		fmt.Fprint(w, "No events.\n")
 		return
 	}
-	sort.Sort(SortableEvents(el.Items))
-	fmt.Fprint(w, "Events:\n  FirstSeen\tLastSeen\tCount\tFrom\tSubobjectPath\tType\tReason\tMessage\n")
+	sort.Sort(events.SortableEvents(el.Items))
+	fmt.Fprint(w, "Events:\n  FirstSeen\tLastSeen\tCount\tFrom\tSubObjectPath\tType\tReason\tMessage\n")
 	fmt.Fprint(w, "  ---------\t--------\t-----\t----\t-------------\t--------\t------\t-------\n")
 	for _, e := range el.Items {
 		fmt.Fprintf(w, "  %s\t%s\t%d\t%v\t%v\t%v\t%v\t%v\n",

@@ -116,7 +116,10 @@ func NewFakeKubeRuntimeManager(runtimeService internalApi.RuntimeService, imageS
 		kubecontainer.FilterEventRecorder(recorder),
 		kubeRuntimeManager,
 		flowcontrol.NewBackOff(time.Second, 300*time.Second),
-		false)
+		false,
+		0, // Disable image pull throttling by setting QPS to 0,
+		0,
+	)
 	kubeRuntimeManager.runner = lifecycle.NewHandlerRunner(
 		&fakeHTTP{},
 		kubeRuntimeManager,

@@ -24,7 +24,7 @@ import (
 	"github.com/emicklei/go-restful"
 	"github.com/go-openapi/spec"
 	"github.com/stretchr/testify/assert"
-	"k8s.io/kubernetes/cmd/libs/go2idl/openapi-gen/generators/common"
+	"k8s.io/kubernetes/pkg/genericapiserver/openapi/common"
 	"sort"
 )
 

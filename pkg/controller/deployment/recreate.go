@@ -17,10 +17,11 @@ limitations under the License.
 package deployment
 
 import (
+	"fmt"
+
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	unversionedclient "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller"
-	rsutil "k8s.io/kubernetes/pkg/util/replicaset"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
@@ -78,16 +79,18 @@ func (dc *DeploymentController) rolloutRecreate(deployment *extensions.Deploymen
 // scaleDownOldReplicaSetsForRecreate scales down old replica sets when deployment strategy is "Recreate"
 func (dc *DeploymentController) scaleDownOldReplicaSetsForRecreate(oldRSs []*extensions.ReplicaSet, deployment *extensions.Deployment) (bool, error) {
 	scaled := false
-	for _, rs := range oldRSs {
+	for i := range oldRSs {
+		rs := oldRSs[i]
 		// Scaling not required.
 		if rs.Spec.Replicas == 0 {
 			continue
 		}
-		scaledRS, _, err := dc.scaleReplicaSetAndRecordEvent(rs, 0, deployment)
+		scaledRS, updatedRS, err := dc.scaleReplicaSetAndRecordEvent(rs, 0, deployment)
 		if err != nil {
 			return false, err
 		}
 		if scaledRS {
+			oldRSs[i] = updatedRS
 			scaled = true
 		}
 	}
@@ -99,9 +102,29 @@ func (dc *DeploymentController) scaleDownOldReplicaSetsForRecreate(oldRSs []*ext
 func (dc *DeploymentController) waitForInactiveReplicaSets(oldRSs []*extensions.ReplicaSet) error {
 	for i := range oldRSs {
 		rs := oldRSs[i]
+		desiredGeneration := rs.Generation
+		observedGeneration := rs.Status.ObservedGeneration
+		specReplicas := rs.Spec.Replicas
+		statusReplicas := rs.Status.Replicas
 
-		condition := rsutil.ReplicaSetIsInactive(dc.client.Extensions(), rs)
-		if err := wait.ExponentialBackoff(unversionedclient.DefaultRetry, condition); err != nil {
+		if err := wait.ExponentialBackoff(unversionedclient.DefaultRetry, func() (bool, error) {
+			replicaSet, err := dc.rsStore.ReplicaSets(rs.Namespace).Get(rs.Name)
+			if err != nil {
+				return false, err
+			}
+
+			specReplicas = replicaSet.Spec.Replicas
+			statusReplicas = replicaSet.Status.Replicas
+			observedGeneration = replicaSet.Status.ObservedGeneration
+
+			// TODO: We also need to wait for terminating replicas to actually terminate.
+			// See https://github.com/kubernetes/kubernetes/issues/32567
+			return observedGeneration >= desiredGeneration && replicaSet.Spec.Replicas == 0 && replicaSet.Status.Replicas == 0, nil
+		}); err != nil {
+			if err == wait.ErrWaitTimeout {
+				err = fmt.Errorf("replica set %q never became inactive: synced=%t, spec.replicas=%d, status.replicas=%d",
+					rs.Name, observedGeneration >= desiredGeneration, specReplicas, statusReplicas)
+			}
 			return err
 		}
 	}

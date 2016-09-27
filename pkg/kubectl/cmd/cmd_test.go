@@ -749,16 +749,25 @@ func Example_printPodHideTerminated() {
 	}
 	cmd := NewCmdRun(f, os.Stdin, os.Stdout, os.Stderr)
 	podList := newAllPhasePodList()
-	mapper, _ := f.Object()
-	err := f.PrintObject(cmd, mapper, podList, os.Stdout)
-	if err != nil {
-		fmt.Printf("Unexpected error: %v", err)
+	// filter pods
+	filterFuncs := f.DefaultResourceFilterFunc()
+	filterOpts := f.DefaultResourceFilterOptions(cmd, false)
+	_, filteredPodList, errs := cmdutil.FilterResourceList(podList, filterFuncs, filterOpts)
+	if errs != nil {
+		fmt.Printf("Unexpected filter error: %v\n", errs)
+	}
+	for _, pod := range filteredPodList {
+		mapper, _ := f.Object()
+		err := f.PrintObject(cmd, mapper, pod, os.Stdout)
+		if err != nil {
+			fmt.Printf("Unexpected error: %v", err)
+		}
 	}
 	// Output:
 	// NAME      READY     STATUS    RESTARTS   AGE
 	// test1     1/2       Pending   6          10y
-	// test2     1/2       Running   6          10y
-	// test5     1/2       Unknown   6          10y
+	// test2     1/2       Running   6         10y
+	// test5     1/2       Unknown   6         10y
 }
 
 func Example_printPodShowAll() {

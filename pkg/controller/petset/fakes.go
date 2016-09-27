@@ -248,7 +248,7 @@ func (f *fakePetClient) deletePetAtIndex(index int) {
 }
 
 func (f *fakePetClient) setHealthy(index int) error {
-	if len(f.pets) < index {
+	if len(f.pets) <= index {
 		return fmt.Errorf("Index out of range, len %v index %v", len(f.pets), index)
 	}
 	f.pets[index].pod.Status.Phase = api.PodRunning
@@ -270,7 +270,7 @@ func (f *fakePetClient) isHealthy(pod *api.Pod) bool {
 }
 
 func (f *fakePetClient) setDeletionTimestamp(index int) error {
-	if len(f.pets) < index {
+	if len(f.pets) <= index {
 		return fmt.Errorf("Index out of range, len %v index %v", len(f.pets), index)
 	}
 	f.pets[index].pod.DeletionTimestamp = &unversioned.Time{Time: time.Now()}

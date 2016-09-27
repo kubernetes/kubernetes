@@ -19,6 +19,7 @@
 # This is where the result of the go build goes
 /output*/
 /_output*/
+/_output
 
 # Emacs save files
 *~

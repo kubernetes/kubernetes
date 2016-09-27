@@ -77,8 +77,10 @@ func SetOldTransportDefaults(t *http.Transport) *http.Transport {
 // for the Proxy, Dial, and TLSHandshakeTimeout fields if unset
 func SetTransportDefaults(t *http.Transport) *http.Transport {
 	t = SetOldTransportDefaults(t)
-	// Allow HTTP2 clients but default off for now
-	if s := os.Getenv("ENABLE_HTTP2"); len(s) > 0 {
+	// Allow clients to disable http2 if needed.
+	if s := os.Getenv("DISABLE_HTTP2"); len(s) > 0 {
+		glog.Infof("HTTP2 has been explicitly disabled")
+	} else {
 		if err := http2.ConfigureTransport(t); err != nil {
 			glog.Warningf("Transport failed http2 configuration: %v", err)
 		}
@@ -105,6 +107,34 @@ func Dialer(transport http.RoundTripper) (DialFunc, error) {
 		return Dialer(transport.WrappedRoundTripper())
 	default:
 		return nil, fmt.Errorf("unknown transport type: %v", transport)
+	}
+}
+
+// CloneTLSConfig returns a tls.Config with all exported fields except SessionTicketsDisabled and SessionTicketKey copied.
+// This makes it safe to call CloneTLSConfig on a config in active use by a server.
+// TODO: replace with tls.Config#Clone when we move to go1.8
+func CloneTLSConfig(cfg *tls.Config) *tls.Config {
+	if cfg == nil {
+		return &tls.Config{}
+	}
+	return &tls.Config{
+		Rand:                     cfg.Rand,
+		Time:                     cfg.Time,
+		Certificates:             cfg.Certificates,
+		NameToCertificate:        cfg.NameToCertificate,
+		GetCertificate:           cfg.GetCertificate,
+		RootCAs:                  cfg.RootCAs,
+		NextProtos:               cfg.NextProtos,
+		ServerName:               cfg.ServerName,
+		ClientAuth:               cfg.ClientAuth,
+		ClientCAs:                cfg.ClientCAs,
+		InsecureSkipVerify:       cfg.InsecureSkipVerify,
+		CipherSuites:             cfg.CipherSuites,
+		PreferServerCipherSuites: cfg.PreferServerCipherSuites,
+		ClientSessionCache:       cfg.ClientSessionCache,
+		MinVersion:               cfg.MinVersion,
+		MaxVersion:               cfg.MaxVersion,
+		CurvePreferences:         cfg.CurvePreferences,
 	}
 }
 

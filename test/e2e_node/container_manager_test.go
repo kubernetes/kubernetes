@@ -1,3 +1,5 @@
+// +build linux
+
 /*
 Copyright 2016 The Kubernetes Authors.
 
@@ -31,10 +33,6 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-)
-
-const (
-	kubeletProcessname = "kubelet"
 )
 
 func getOOMScoreForPid(pid int) (int, error) {

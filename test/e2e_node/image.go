@@ -40,7 +40,7 @@ func NewConformanceImage(containerRuntime string, image string) (ci ConformanceI
 
 //TODO: do not expose kubelet implementation details after we refactor the runtime API.
 func dockerRuntime() kubecontainer.Runtime {
-	dockerClient := dockertools.CreateDockerClientOrDie("", 0)
+	dockerClient := dockertools.ConnectToDockerOrDie("", 0)
 	pm := kubepod.NewBasicPodManager(nil)
 	dm := dockertools.NewDockerManager(
 		dockerClient,

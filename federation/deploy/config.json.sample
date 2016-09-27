@@ -16,7 +16,7 @@
     },
     "phase2": {
       "docker_registry": "gcr.io/google-containers",
-      "kubernetes_version": "v1.3.0"
+      "kubernetes_version": "v1.4.0"
     },
     "phase3": {
       "run_addons": true,
@@ -43,7 +43,7 @@
     },
     "phase2": {
       "docker_registry": "gcr.io/google-containers",
-      "kubernetes_version": "v1.3.0"
+      "kubernetes_version": "v1.4.0"
     },
     "phase3": {
       "run_addons": true,
@@ -70,7 +70,7 @@
     },
     "phase2": {
       "docker_registry": "gcr.io/google-containers",
-      "kubernetes_version": "v1.3.0"
+      "kubernetes_version": "v1.4.0"
     },
     "phase3": {
       "run_addons": true,

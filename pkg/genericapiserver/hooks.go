@@ -61,14 +61,14 @@ func (s *GenericAPIServer) AddPostStartHook(name string, hook PostStartHookFunc)
 	if s.postStartHooksCalled {
 		return fmt.Errorf("unable to add %q because PostStartHooks have already been called", name)
 	}
-	if s.PostStartHooks == nil {
-		s.PostStartHooks = map[string]PostStartHookFunc{}
+	if s.postStartHooks == nil {
+		s.postStartHooks = map[string]PostStartHookFunc{}
 	}
-	if _, exists := s.PostStartHooks[name]; exists {
+	if _, exists := s.postStartHooks[name]; exists {
 		return fmt.Errorf("unable to add %q because it is already registered", name)
 	}
 
-	s.PostStartHooks[name] = hook
+	s.postStartHooks[name] = hook
 
 	return nil
 }
@@ -79,7 +79,7 @@ func (s *GenericAPIServer) RunPostStartHooks(context PostStartHookContext) {
 	defer s.postStartHookLock.Unlock()
 	s.postStartHooksCalled = true
 
-	for hookName, hook := range s.PostStartHooks {
+	for hookName, hook := range s.postStartHooks {
 		go runPostStartHook(hookName, hook, context)
 	}
 }

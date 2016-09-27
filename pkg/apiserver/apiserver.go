@@ -210,13 +210,13 @@ func logStackOnRecover(s runtime.NegotiatedSerializer, panicReason interface{}, 
 	errorNegotiated(apierrors.NewGenericServerResponse(http.StatusInternalServerError, "", api.Resource(""), "", "", 0, false), s, unversioned.GroupVersion{}, w, &http.Request{Header: headers})
 }
 
-func InstallServiceErrorHandler(s runtime.NegotiatedSerializer, container *restful.Container, requestResolver *RequestInfoResolver, apiVersions []string) {
+func InstallServiceErrorHandler(s runtime.NegotiatedSerializer, container *restful.Container) {
 	container.ServiceErrorHandler(func(serviceErr restful.ServiceError, request *restful.Request, response *restful.Response) {
-		serviceErrorHandler(s, requestResolver, apiVersions, serviceErr, request, response)
+		serviceErrorHandler(s, serviceErr, request, response)
 	})
 }
 
-func serviceErrorHandler(s runtime.NegotiatedSerializer, requestResolver *RequestInfoResolver, apiVersions []string, serviceErr restful.ServiceError, request *restful.Request, response *restful.Response) {
+func serviceErrorHandler(s runtime.NegotiatedSerializer, serviceErr restful.ServiceError, request *restful.Request, response *restful.Response) {
 	errorNegotiated(
 		apierrors.NewGenericServerResponse(serviceErr.Code, "", api.Resource(""), "", serviceErr.Message, 0, false),
 		s,
@@ -293,8 +293,8 @@ func keepUnversioned(group string) bool {
 	return group == "" || group == "extensions"
 }
 
-// Adds a service to return the supported api versions at /apis.
-func AddApisWebService(s runtime.NegotiatedSerializer, container *restful.Container, apiPrefix string, f func(req *restful.Request) []unversioned.APIGroup) {
+// NewApisWebService returns a webservice serving the available api version under /apis.
+func NewApisWebService(s runtime.NegotiatedSerializer, apiPrefix string, f func(req *restful.Request) []unversioned.APIGroup) *restful.WebService {
 	// Because in release 1.1, /apis returns response with empty APIVersion, we
 	// use StripVersionNegotiatedSerializer to keep the response backwards
 	// compatible.
@@ -309,12 +309,12 @@ func AddApisWebService(s runtime.NegotiatedSerializer, container *restful.Contai
 		Produces(s.SupportedMediaTypes()...).
 		Consumes(s.SupportedMediaTypes()...).
 		Writes(unversioned.APIGroupList{}))
-	container.Add(ws)
+	return ws
 }
 
-// Adds a service to return the supported versions, preferred version, and name
-// of a group. E.g., a such web service will be registered at /apis/extensions.
-func AddGroupWebService(s runtime.NegotiatedSerializer, container *restful.Container, path string, group unversioned.APIGroup) {
+// NewGroupWebService returns a webservice serving the supported versions, preferred version, and name
+// of a group. E.g., such a web service will be registered at /apis/extensions.
+func NewGroupWebService(s runtime.NegotiatedSerializer, path string, group unversioned.APIGroup) *restful.WebService {
 	ss := s
 	if keepUnversioned(group.Name) {
 		// Because in release 1.1, /apis/extensions returns response with empty
@@ -332,7 +332,7 @@ func AddGroupWebService(s runtime.NegotiatedSerializer, container *restful.Conta
 		Produces(s.SupportedMediaTypes()...).
 		Consumes(s.SupportedMediaTypes()...).
 		Writes(unversioned.APIGroup{}))
-	container.Add(ws)
+	return ws
 }
 
 // Adds a service to return the supported resources, E.g., a such web service

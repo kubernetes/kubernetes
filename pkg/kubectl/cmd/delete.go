@@ -184,7 +184,7 @@ func ReapResult(r *resource.Result, f *cmdutil.Factory, out io.Writer, isDefault
 			return cmdutil.AddSourceToErr("stopping", info.Source, err)
 		}
 		if !quiet {
-			cmdutil.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, "deleted")
+			cmdutil.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, false, "deleted")
 		}
 		return nil
 	})
@@ -222,6 +222,6 @@ func deleteResource(info *resource.Info, out io.Writer, shortOutput bool, mapper
 	if err := resource.NewHelper(info.Client, info.Mapping).Delete(info.Namespace, info.Name); err != nil {
 		return cmdutil.AddSourceToErr("deleting", info.Source, err)
 	}
-	cmdutil.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, "deleted")
+	cmdutil.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, false, "deleted")
 	return nil
 }

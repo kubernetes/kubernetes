@@ -25,13 +25,13 @@ import (
 	"os"
 	"testing"
 
-	"github.com/ghodss/yaml"
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/annotations"
 	kubeerr "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -79,8 +79,7 @@ func readBytesFromFile(t *testing.T, filename string) []byte {
 func readReplicationControllerFromFile(t *testing.T, filename string) *api.ReplicationController {
 	data := readBytesFromFile(t, filename)
 	rc := api.ReplicationController{}
-	// TODO(jackgr): Replace with a call to testapi.Codec().Decode().
-	if err := yaml.Unmarshal(data, &rc); err != nil {
+	if err := runtime.DecodeInto(testapi.Default.Codec(), data, &rc); err != nil {
 		t.Fatal(err)
 	}
 
@@ -90,8 +89,7 @@ func readReplicationControllerFromFile(t *testing.T, filename string) *api.Repli
 func readServiceFromFile(t *testing.T, filename string) *api.Service {
 	data := readBytesFromFile(t, filename)
 	svc := api.Service{}
-	// TODO(jackgr): Replace with a call to testapi.Codec().Decode().
-	if err := yaml.Unmarshal(data, &svc); err != nil {
+	if err := runtime.DecodeInto(testapi.Default.Codec(), data, &svc); err != nil {
 		t.Fatal(err)
 	}
 
@@ -107,7 +105,7 @@ func annotateRuntimeObject(t *testing.T, originalObj, currentObj runtime.Object,
 	originalLabels := originalAccessor.GetLabels()
 	originalLabels["DELETE_ME"] = "DELETE_ME"
 	originalAccessor.SetLabels(originalLabels)
-	original, err := json.Marshal(originalObj)
+	original, err := runtime.Encode(testapi.Default.Codec(), originalObj)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -123,7 +121,7 @@ func annotateRuntimeObject(t *testing.T, originalObj, currentObj runtime.Object,
 	}
 	currentAnnotations[annotations.LastAppliedConfigAnnotation] = string(original)
 	currentAccessor.SetAnnotations(currentAnnotations)
-	current, err := json.Marshal(currentObj)
+	current, err := runtime.Encode(testapi.Default.Codec(), currentObj)
 	if err != nil {
 		t.Fatal(err)
 	}

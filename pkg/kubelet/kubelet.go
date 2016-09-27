@@ -77,6 +77,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
 	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/pkg/types"
@@ -371,7 +372,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		dockerExecHandler = &dockertools.NativeExecHandler{}
 	}
 
-	serviceStore := cache.NewStore(cache.MetaNamespaceKeyFunc)
+	serviceStore := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 	if kubeClient != nil {
 		// TODO: cache.NewListWatchFromClient is limited as it takes a client implementation rather
 		// than an interface. There is no way to construct a list+watcher using resource name.
@@ -385,7 +386,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		}
 		cache.NewReflector(listWatch, &api.Service{}, serviceStore, 0).Run()
 	}
-	serviceLister := &cache.StoreToServiceLister{Store: serviceStore}
+	serviceLister := &cache.StoreToServiceLister{Indexer: serviceStore}
 
 	nodeStore := cache.NewStore(cache.MetaNamespaceKeyFunc)
 	if kubeClient != nil {
@@ -561,6 +562,8 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 				klet.httpClient,
 				imageBackOff,
 				kubeCfg.SerializeImagePulls,
+				float32(kubeCfg.RegistryPullQPS),
+				int(kubeCfg.RegistryBurst),
 				klet.cpuCFSQuota,
 				dockerService,
 				dockerService,
@@ -625,6 +628,8 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 			kubecontainer.RealOS{},
 			imageBackOff,
 			kubeCfg.SerializeImagePulls,
+			float32(kubeCfg.RegistryPullQPS),
+			int(kubeCfg.RegistryBurst),
 			kubeCfg.RuntimeRequestTimeout.Duration,
 		)
 		if err != nil {
@@ -651,6 +656,8 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 			klet.httpClient,
 			imageBackOff,
 			kubeCfg.SerializeImagePulls,
+			float32(kubeCfg.RegistryPullQPS),
+			int(kubeCfg.RegistryBurst),
 			klet.cpuCFSQuota,
 			remoteRuntimeService,
 			remoteImageService,
@@ -777,7 +784,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 }
 
 type serviceLister interface {
-	List() (api.ServiceList, error)
+	List(labels.Selector) ([]*api.Service, error)
 }
 
 type nodeLister interface {
@@ -1108,15 +1115,35 @@ func (kl *Kubelet) listPodsFromDisk() ([]types.UID, error) {
 
 // Starts garbage collection threads.
 func (kl *Kubelet) StartGarbageCollection() {
+	loggedContainerGCFailure := false
 	go wait.Until(func() {
 		if err := kl.containerGC.GarbageCollect(kl.sourcesReady.AllReady()); err != nil {
 			glog.Errorf("Container garbage collection failed: %v", err)
+			loggedContainerGCFailure = true
+		} else {
+			var vLevel glog.Level = 4
+			if loggedContainerGCFailure {
+				vLevel = 1
+				loggedContainerGCFailure = false
+			}
+
+			glog.V(vLevel).Infof("Container garbage collection succeeded")
 		}
 	}, ContainerGCPeriod, wait.NeverStop)
 
+	loggedImageGCFailure := false
 	go wait.Until(func() {
 		if err := kl.imageManager.GarbageCollect(); err != nil {
 			glog.Errorf("Image garbage collection failed: %v", err)
+			loggedImageGCFailure = true
+		} else {
+			var vLevel glog.Level = 4
+			if loggedImageGCFailure {
+				vLevel = 1
+				loggedImageGCFailure = false
+			}
+
+			glog.V(vLevel).Infof("Image garbage collection succeeded")
 		}
 	}, ImageGCPeriod, wait.NeverStop)
 }
@@ -1447,7 +1474,7 @@ var masterServices = sets.NewString("kubernetes")
 // pod in namespace ns should see.
 func (kl *Kubelet) getServiceEnvVarMap(ns string) (map[string]string, error) {
 	var (
-		serviceMap = make(map[string]api.Service)
+		serviceMap = make(map[string]*api.Service)
 		m          = make(map[string]string)
 	)
 
@@ -1457,15 +1484,16 @@ func (kl *Kubelet) getServiceEnvVarMap(ns string) (map[string]string, error) {
 		// Kubelets without masters (e.g. plain GCE ContainerVM) don't set env vars.
 		return m, nil
 	}
-	services, err := kl.serviceLister.List()
+	services, err := kl.serviceLister.List(labels.Everything())
 	if err != nil {
 		return m, fmt.Errorf("failed to list services when setting up env vars.")
 	}
 
 	// project the services in namespace ns onto the master services
-	for _, service := range services.Items {
+	for i := range services {
+		service := services[i]
 		// ignore services where ClusterIP is "None" or empty
-		if !api.IsServiceIPSet(&service) {
+		if !api.IsServiceIPSet(service) {
 			continue
 		}
 		serviceName := service.Name
@@ -1485,12 +1513,13 @@ func (kl *Kubelet) getServiceEnvVarMap(ns string) (map[string]string, error) {
 			}
 		}
 	}
-	services.Items = []api.Service{}
-	for _, service := range serviceMap {
-		services.Items = append(services.Items, service)
+
+	mappedServices := []*api.Service{}
+	for key := range serviceMap {
+		mappedServices = append(mappedServices, serviceMap[key])
 	}
 
-	for _, e := range envvars.FromServices(&services) {
+	for _, e := range envvars.FromServices(mappedServices) {
 		m[e.Name] = e.Value
 	}
 	return m, nil
@@ -1703,7 +1732,7 @@ func (kl *Kubelet) killPod(pod *api.Pod, runningPod *kubecontainer.Pod, status *
 	if runningPod != nil {
 		p = *runningPod
 	} else if status != nil {
-		p = kuberuntime.ConvertPodStatusToRunningPod(kl.GetRuntime().Type(), status)
+		p = kubecontainer.ConvertPodStatusToRunningPod(kl.GetRuntime().Type(), status)
 	}
 	return kl.containerRuntime.KillPod(pod, p, gracePeriodOverride)
 }
@@ -2288,7 +2317,7 @@ func (kl *Kubelet) syncLoopIteration(configCh <-chan kubetypes.PodUpdate, handle
 			glog.V(2).Infof("SyncLoop (ADD, %q): %q", u.Source, format.Pods(u.Pods))
 			// After restarting, kubelet will get all existing pods through
 			// ADD as if they are new pods. These pods will then go through the
-			// admission process and *may* be rejcted. This can be resolved
+			// admission process and *may* be rejected. This can be resolved
 			// once we have checkpointing.
 			handler.HandlePodAdditions(u.Pods)
 		case kubetypes.UPDATE:

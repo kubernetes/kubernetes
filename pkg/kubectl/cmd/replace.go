@@ -158,7 +158,7 @@ func RunReplace(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []st
 
 		info.Refresh(obj, true)
 		f.PrintObjectSpecificMessage(obj, out)
-		cmdutil.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, "replaced")
+		cmdutil.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, false, "replaced")
 		return nil
 	})
 }
@@ -271,7 +271,7 @@ func forceReplace(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []
 		count++
 		info.Refresh(obj, true)
 		f.PrintObjectSpecificMessage(obj, out)
-		cmdutil.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, "replaced")
+		cmdutil.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, false, "replaced")
 		return nil
 	})
 	if err != nil {

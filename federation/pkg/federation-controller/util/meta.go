@@ -23,7 +23,7 @@ import (
 )
 
 // Copies cluster-independent, user provided data from the given ObjectMeta struct. If in
-// the future the ObjectMeta structure is expanded then any field that is not populared
+// the future the ObjectMeta structure is expanded then any field that is not populated
 // by the api server should be included here.
 func CopyObjectMeta(obj api_v1.ObjectMeta) api_v1.ObjectMeta {
 	return api_v1.ObjectMeta{
@@ -34,8 +34,28 @@ func CopyObjectMeta(obj api_v1.ObjectMeta) api_v1.ObjectMeta {
 	}
 }
 
+// Deep copies cluster-independent, user provided data from the given ObjectMeta struct. If in
+// the future the ObjectMeta structure is expanded then any field that is not populated
+// by the api server should be included here.
+func DeepCopyObjectMeta(obj api_v1.ObjectMeta) api_v1.ObjectMeta {
+	copyMeta := CopyObjectMeta(obj)
+	if obj.Labels != nil {
+		copyMeta.Labels = make(map[string]string)
+		for key, val := range obj.Labels {
+			copyMeta.Labels[key] = val
+		}
+	}
+	if obj.Annotations != nil {
+		copyMeta.Annotations = make(map[string]string)
+		for key, val := range obj.Annotations {
+			copyMeta.Annotations[key] = val
+		}
+	}
+	return copyMeta
+}
+
 // Checks if cluster-independed, user provided data in two given ObjectMeta are eqaul. If in
-// the future the ObjectMeta structure is expanded then any field that is not populared
+// the future the ObjectMeta structure is expanded then any field that is not populated
 // by the api server should be included here.
 func ObjectMetaEquivalent(a, b api_v1.ObjectMeta) bool {
 	if a.Name != b.Name {

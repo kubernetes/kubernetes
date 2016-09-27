@@ -22,9 +22,9 @@ package openapi
 
 import (
 	spec "github.com/go-openapi/spec"
-	common "k8s.io/kubernetes/cmd/libs/go2idl/openapi-gen/generators/common"
 	resource "k8s.io/kubernetes/pkg/api/resource"
 	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
+	common "k8s.io/kubernetes/pkg/genericapiserver/openapi/common"
 	intstr "k8s.io/kubernetes/pkg/util/intstr"
 )
 
@@ -5141,6 +5141,23 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		},
 		Dependencies: []string{
 			"runtime.Object"},
+	},
+	"rbac.PolicyRuleBuilder": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "PolicyRuleBuilder let's us attach methods.  A no-no for API types. We use it to construct rules in code.  It's more compact than trying to write them out in a literal and allows us to perform some basic checking during construction",
+				Properties: map[string]spec.Schema{
+					"PolicyRule": {
+						SchemaProps: spec.SchemaProps{
+							Ref: spec.MustCreateRef("#/definitions/rbac.PolicyRule"),
+						},
+					},
+				},
+				Required: []string{"PolicyRule"},
+			},
+		},
+		Dependencies: []string{
+			"rbac.PolicyRule"},
 	},
 	"rbac.Role": {
 		Schema: spec.Schema{

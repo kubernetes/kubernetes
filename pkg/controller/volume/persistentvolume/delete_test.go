@@ -77,7 +77,7 @@ func TestDeleteSync(t *testing.T) {
 			// delete failure - delete() returns error
 			"8-5 - delete returns error",
 			newVolumeArray("volume8-5", "1Gi", "uid8-5", "claim8-5", api.VolumeBound, api.PersistentVolumeReclaimDelete),
-			withMessage("Delete of volume \"volume8-5\" failed: Mock delete error", newVolumeArray("volume8-5", "1Gi", "uid8-5", "claim8-5", api.VolumeFailed, api.PersistentVolumeReclaimDelete)),
+			withMessage("Mock delete error", newVolumeArray("volume8-5", "1Gi", "uid8-5", "claim8-5", api.VolumeFailed, api.PersistentVolumeReclaimDelete)),
 			noclaims,
 			noclaims,
 			[]string{"Warning VolumeFailedDelete"}, noerrors,

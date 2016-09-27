@@ -86,7 +86,7 @@ func ReplicaSetServeImageOrFail(f *framework.Framework, test string, image strin
 	// Cleanup the ReplicaSet when we are done.
 	defer func() {
 		// Resize the ReplicaSet to zero to get rid of pods.
-		if err := framework.DeleteReplicaSet(f.Client, f.Namespace.Name, rs.Name); err != nil {
+		if err := framework.DeleteReplicaSet(f.Client, f.ClientSet, f.Namespace.Name, rs.Name); err != nil {
 			framework.Logf("Failed to cleanup ReplicaSet %v: %v.", rs.Name, err)
 		}
 	}()

@@ -50,12 +50,13 @@ import (
 	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/kubelet/client"
-	"k8s.io/kubernetes/pkg/registry/endpoint"
+	"k8s.io/kubernetes/pkg/registry/core/endpoint"
+	"k8s.io/kubernetes/pkg/registry/core/namespace"
+	ipallocator "k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
+	extensionsrest "k8s.io/kubernetes/pkg/registry/extensions/rest"
+	"k8s.io/kubernetes/pkg/registry/extensions/thirdpartyresourcedata"
 	"k8s.io/kubernetes/pkg/registry/generic"
-	"k8s.io/kubernetes/pkg/registry/namespace"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
-	ipallocator "k8s.io/kubernetes/pkg/registry/service/ipallocator"
-	"k8s.io/kubernetes/pkg/registry/thirdpartyresourcedata"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
@@ -1127,7 +1128,7 @@ func testInstallThirdPartyResourceRemove(t *testing.T, version string) {
 		t.Errorf("expected:\n%v\nsaw:\n%v\n", expectedObj, item)
 	}
 
-	path := makeThirdPartyPath("company.com")
+	path := extensionsrest.MakeThirdPartyPath("company.com")
 	master.RemoveThirdPartyResource(path + "/foos")
 
 	resp, err = http.Get(server.URL + "/apis/company.com/" + version + "/namespaces/default/foos/test")
