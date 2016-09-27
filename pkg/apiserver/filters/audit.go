@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package audit
+package filters
 
 import (
 	"bufio"
@@ -27,7 +27,6 @@ import (
 	"github.com/golang/glog"
 	"github.com/pborman/uuid"
 
-	"k8s.io/kubernetes/pkg/apiserver"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 )
 
@@ -85,7 +84,7 @@ var _ http.Hijacker = &fancyResponseWriterDelegator{}
 // 2. the response line containing:
 //    - the unique id from 1
 //    - response code
-func WithAudit(handler http.Handler, attributeGetter apiserver.RequestAttributeGetter, out io.Writer) http.Handler {
+func WithAudit(handler http.Handler, attributeGetter RequestAttributeGetter, out io.Writer) http.Handler {
 	if out == nil {
 		return handler
 	}

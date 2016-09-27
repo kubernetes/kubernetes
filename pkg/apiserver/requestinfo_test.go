@@ -18,14 +18,11 @@ package apiserver
 
 import (
 	"net/http"
-	"net/http/httptest"
 	"reflect"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
@@ -41,106 +38,6 @@ func getPath(resource, namespace, name string) string {
 
 func pathWithPrefix(prefix, resource, namespace, name string) string {
 	return testapi.Default.ResourcePathWithPrefix(prefix, resource, namespace, name)
-}
-
-func TestReadOnly(t *testing.T) {
-	server := httptest.NewServer(ReadOnly(http.HandlerFunc(
-		func(w http.ResponseWriter, req *http.Request) {
-			if req.Method != "GET" {
-				t.Errorf("Unexpected call: %v", req.Method)
-			}
-		},
-	)))
-	defer server.Close()
-	for _, verb := range []string{"GET", "POST", "PUT", "DELETE", "CREATE"} {
-		req, err := http.NewRequest(verb, server.URL, nil)
-		if err != nil {
-			t.Fatalf("Couldn't make request: %v", err)
-		}
-		http.DefaultClient.Do(req)
-	}
-}
-
-func TestGetAttribs(t *testing.T) {
-	r := &requestAttributeGetter{api.NewRequestContextMapper(), &RequestInfoResolver{sets.NewString("api", "apis"), sets.NewString("api")}}
-
-	testcases := map[string]struct {
-		Verb               string
-		Path               string
-		ExpectedAttributes *authorizer.AttributesRecord
-	}{
-		"non-resource root": {
-			Verb: "POST",
-			Path: "/",
-			ExpectedAttributes: &authorizer.AttributesRecord{
-				Verb: "post",
-				Path: "/",
-			},
-		},
-		"non-resource api prefix": {
-			Verb: "GET",
-			Path: "/api/",
-			ExpectedAttributes: &authorizer.AttributesRecord{
-				Verb: "get",
-				Path: "/api/",
-			},
-		},
-		"non-resource group api prefix": {
-			Verb: "GET",
-			Path: "/apis/extensions/",
-			ExpectedAttributes: &authorizer.AttributesRecord{
-				Verb: "get",
-				Path: "/apis/extensions/",
-			},
-		},
-
-		"resource": {
-			Verb: "POST",
-			Path: "/api/v1/nodes/mynode",
-			ExpectedAttributes: &authorizer.AttributesRecord{
-				Verb:            "create",
-				Path:            "/api/v1/nodes/mynode",
-				ResourceRequest: true,
-				Resource:        "nodes",
-				APIVersion:      "v1",
-				Name:            "mynode",
-			},
-		},
-		"namespaced resource": {
-			Verb: "PUT",
-			Path: "/api/v1/namespaces/myns/pods/mypod",
-			ExpectedAttributes: &authorizer.AttributesRecord{
-				Verb:            "update",
-				Path:            "/api/v1/namespaces/myns/pods/mypod",
-				ResourceRequest: true,
-				Namespace:       "myns",
-				Resource:        "pods",
-				APIVersion:      "v1",
-				Name:            "mypod",
-			},
-		},
-		"API group resource": {
-			Verb: "GET",
-			Path: "/apis/extensions/v1beta1/namespaces/myns/jobs",
-			ExpectedAttributes: &authorizer.AttributesRecord{
-				Verb:            "list",
-				Path:            "/apis/extensions/v1beta1/namespaces/myns/jobs",
-				ResourceRequest: true,
-				APIGroup:        extensions.GroupName,
-				APIVersion:      "v1beta1",
-				Namespace:       "myns",
-				Resource:        "jobs",
-			},
-		},
-	}
-
-	for k, tc := range testcases {
-		req, _ := http.NewRequest(tc.Verb, tc.Path, nil)
-		attribs := r.GetAttribs(req)
-		if !reflect.DeepEqual(attribs, tc.ExpectedAttributes) {
-			t.Errorf("%s: expected\n\t%#v\ngot\n\t%#v", k, tc.ExpectedAttributes, attribs)
-		}
-	}
 }
 
 func TestGetAPIRequestInfo(t *testing.T) {
@@ -202,12 +99,12 @@ func TestGetAPIRequestInfo(t *testing.T) {
 		{"POST", "/apis/extensions/v1beta3/namespaces/other/pods", "create", "api", "extensions", "v1beta3", "other", "pods", "", "", []string{"pods"}},
 	}
 
-	requestInfoResolver := newTestRequestInfoResolver()
+	resolver := newTestRequestInfoResolver()
 
 	for _, successCase := range successCases {
 		req, _ := http.NewRequest(successCase.method, successCase.url, nil)
 
-		apiRequestInfo, err := requestInfoResolver.GetRequestInfo(req)
+		apiRequestInfo, err := resolver.GetRequestInfo(req)
 		if err != nil {
 			t.Errorf("Unexpected error for url: %s %v", successCase.url, err)
 		}
@@ -250,7 +147,7 @@ func TestGetAPIRequestInfo(t *testing.T) {
 		if err != nil {
 			t.Errorf("Unexpected error %v", err)
 		}
-		apiRequestInfo, err := requestInfoResolver.GetRequestInfo(req)
+		apiRequestInfo, err := resolver.GetRequestInfo(req)
 		if err != nil {
 			t.Errorf("%s: Unexpected error %v", k, err)
 		}
@@ -281,12 +178,12 @@ func TestGetNonAPIRequestInfo(t *testing.T) {
 		"empty":                        {"", false},
 	}
 
-	requestInfoResolver := newTestRequestInfoResolver()
+	resolver := newTestRequestInfoResolver()
 
 	for testName, tc := range tests {
 		req, _ := http.NewRequest("GET", tc.url, nil)
 
-		apiRequestInfo, err := requestInfoResolver.GetRequestInfo(req)
+		apiRequestInfo, err := resolver.GetRequestInfo(req)
 		if err != nil {
 			t.Errorf("%s: Unexpected error %v", testName, err)
 		}
@@ -294,4 +191,8 @@ func TestGetNonAPIRequestInfo(t *testing.T) {
 			t.Errorf("%s: expected %v, actual %v", testName, e, a)
 		}
 	}
+}
+
+func newTestRequestInfoResolver() *RequestInfoResolver {
+	return &RequestInfoResolver{sets.NewString("api", "apis"), sets.NewString("api")}
 }

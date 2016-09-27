@@ -76,25 +76,6 @@ func notFound(w http.ResponseWriter, req *http.Request) {
 	fmt.Fprintf(w, "Not Found: %#v", req.RequestURI)
 }
 
-// badGatewayError renders a simple bad gateway error.
-func badGatewayError(w http.ResponseWriter, req *http.Request) {
-	w.WriteHeader(http.StatusBadGateway)
-	fmt.Fprintf(w, "Bad Gateway: %#v", req.RequestURI)
-}
-
-// forbidden renders a simple forbidden error
-func forbidden(w http.ResponseWriter, req *http.Request) {
-	w.WriteHeader(http.StatusForbidden)
-	fmt.Fprintf(w, "Forbidden: %#v", req.RequestURI)
-}
-
-// internalError renders a simple internal error
-func internalError(w http.ResponseWriter, req *http.Request, err error) {
-	w.WriteHeader(http.StatusInternalServerError)
-	fmt.Fprintf(w, "Internal Server Error: %#v", req.RequestURI)
-	runtime.HandleError(err)
-}
-
 // errAPIPrefixNotFound indicates that a RequestInfo resolution failed because the request isn't under
 // any known API prefixes
 type errAPIPrefixNotFound struct {

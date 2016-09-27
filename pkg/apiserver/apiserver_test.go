@@ -44,7 +44,6 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/diff"
-	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/watch"
 	"k8s.io/kubernetes/pkg/watch/versioned"
 	"k8s.io/kubernetes/plugin/pkg/admission/admit"
@@ -250,10 +249,6 @@ func handleNamespaced(storage map[string]rest.Storage) http.Handler {
 // tests using a custom self linker
 func handleLinker(storage map[string]rest.Storage, selfLinker runtime.SelfLinker) http.Handler {
 	return handleInternal(storage, admissionControl, selfLinker)
-}
-
-func newTestRequestInfoResolver() *RequestInfoResolver {
-	return &RequestInfoResolver{sets.NewString("api", "apis"), sets.NewString("api")}
 }
 
 func handleInternal(storage map[string]rest.Storage, admissionControl admission.Interface, selfLinker runtime.SelfLinker) http.Handler {
