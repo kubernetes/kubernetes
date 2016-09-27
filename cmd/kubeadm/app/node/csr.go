@@ -63,7 +63,7 @@ func PerformTLSBootstrap(s *kubeadmapi.KubeadmConfig, apiEndpoint string, caCert
 	// (for example user may be bringing up machines in parallel and for some reasons master is slow to boot)
 
 	if err := checkCertsAPI(bootstrapClientConfig); err != nil {
-		return nil, fmt.Errorf("<node/csr> fialed to proceed due to API compatibility issue - %v", err)
+		return nil, fmt.Errorf("<node/csr> failed to proceed due to API compatibility issue - %v", err)
 	}
 
 	fmt.Println("<node/csr> created API client to obtain unique certificate for this node, generating keys and certificate signing request")
