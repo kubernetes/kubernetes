@@ -301,22 +301,23 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 			return err
 		}
 
-		allErrs := []error{}
-		singular := false
-		infos, err := r.IntoSingular(&singular).Infos()
-		if err != nil {
-			if singular {
-				return err
-			}
-			allErrs = append(allErrs, err)
-		}
-
 		// the outermost object will be converted to the output-version, but inner
 		// objects can use their mappings
 		version, err := cmdutil.OutputVersion(cmd, clientConfig.GroupVersion)
 		if err != nil {
 			return err
 		}
+
+		var errs []error
+		singular := false
+		infos, err := r.IntoSingular(&singular).Infos()
+		if err != nil {
+			if singular {
+				return err
+			}
+			errs = append(errs, err)
+		}
+
 		res := ""
 		if len(infos) > 0 {
 			res = infos[0].ResourceMapping().Resource
@@ -329,20 +330,20 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 
 		isList := meta.IsListType(obj)
 		if isList {
-			filteredResourceCount, items, errs := cmdutil.FilterResourceList(obj, filterFuncs, filterOpts)
-			if errs != nil {
-				return errs
+			filteredResourceCount, items, err := cmdutil.FilterResourceList(obj, filterFuncs, filterOpts)
+			if err != nil {
+				return err
 			}
 			filteredObj, err := cmdutil.ObjectListToVersionedObject(items, version)
 			if err != nil {
 				return err
 			}
 			if err := printer.PrintObj(filteredObj, out); err != nil {
-				allErrs = append(allErrs, err)
+				errs = append(errs, err)
 			}
 
 			cmdutil.PrintFilterCount(filteredResourceCount, res, errOut, filterOpts)
-			return utilerrors.NewAggregate(allErrs)
+			return utilerrors.Reduce(utilerrors.Flatten(utilerrors.NewAggregate(errs)))
 		}
 
 		filteredResourceCount := 0
@@ -350,14 +351,14 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 			if err != nil {
 				glog.V(2).Infof("Unable to filter resource: %v", err)
 			} else if err := printer.PrintObj(obj, out); err != nil {
-				allErrs = append(allErrs, err)
+				errs = append(errs, err)
 			}
 		} else if isFiltered {
 			filteredResourceCount++
 		}
 
 		cmdutil.PrintFilterCount(filteredResourceCount, res, errOut, filterOpts)
-		return utilerrors.NewAggregate(allErrs)
+		return utilerrors.Reduce(utilerrors.Flatten(utilerrors.NewAggregate(errs)))
 	}
 
 	allErrs := []error{}
