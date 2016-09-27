@@ -56,11 +56,8 @@ type FlexVolume struct {
 // Attach a volume
 
 type FlexVolumeAttachment struct {
-	unversioned.TypeMeta
-	v1.ObjectMeta
-	Host      string
-	Device    string
-	MountPath string
+	Host   string
+	Device string
 }
 
 // Detach a volume
