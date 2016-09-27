@@ -76,7 +76,7 @@ NAME                ENDPOINTS
 glusterfs-cluster   10.240.106.152:1,10.240.79.157:1
 ```
 
-We need also create a service for this endpoints, so that the endpoints will be persistented. We will add this service without a selector to tell Kubernetes we want to add its endpoints manually. You can see [glusterfs-service.json](glusterfs-service.json) for details.
+We need also create a service for this endpoints, so that the endpoints will be persisted. We will add this service without a selector to tell Kubernetes we want to add its endpoints manually. You can see [glusterfs-service.json](glusterfs-service.json) for details.
 
 Use this command to create the service:
 
@@ -94,6 +94,7 @@ The following *volume* spec in [glusterfs-pod.json](glusterfs-pod.json) illustra
      "name": "glusterfsvol",
      "glusterfs": {
         "endpoints": "glusterfs-cluster",
+        "endpointNamespace": "default",
         "path": "kube_vol",
         "readOnly": true
     }
@@ -103,6 +104,7 @@ The following *volume* spec in [glusterfs-pod.json](glusterfs-pod.json) illustra
 The parameters are explained as the followings.
 
 - **endpoints** is endpoints name that represents a Gluster cluster configuration. *kubelet* is optimized to avoid mount storm, it will randomly pick one from the endpoints to mount. If this host is unresponsive, the next Gluster host in the endpoints is automatically selected.
+- **endpointNamespace** is the namespace name for the above mentioned endpoint. It is an optional parameter.If not mentioned, by default it is the pod's namespace.
 - **path** is the Glusterfs volume name.
 - **readOnly** is the boolean that sets the mountpoint readOnly or readWrite.
 
