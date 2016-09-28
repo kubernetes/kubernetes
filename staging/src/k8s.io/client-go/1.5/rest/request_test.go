@@ -1209,6 +1209,7 @@ func TestDoRequestNewWayFile(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	defer file.Close()
+	defer os.Remove(file.Name())
 
 	_, err = file.Write(reqBodyExpected)
 	if err != nil {
@@ -1402,6 +1403,7 @@ func TestBody(t *testing.T) {
 		t.Fatalf("TempFile.WriteString error: %v", err)
 	}
 	f.Close()
+	defer os.Remove(f.Name())
 
 	var nilObject *api.DeleteOptions
 	typedObject := interface{}(nilObject)
