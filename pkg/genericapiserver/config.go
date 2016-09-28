@@ -165,6 +165,9 @@ type Config struct {
 
 	// Predicate which is true for paths of long-running http requests
 	LongRunningFunc genericfilters.LongRunningRequestCheck
+
+	// Builds the handler chain around the restful API container
+	BuildHandlerChainFunc func(handler http.Handler, c *Config, secure bool) http.Handler
 }
 
 func NewConfig(options *options.ServerRunOptions) *Config {
@@ -267,6 +270,9 @@ func (c *Config) setDefaults() {
 		}
 		c.ExternalHost = hostAndPort
 	}
+	if c.BuildHandlerChainFunc == nil {
+		c.BuildHandlerChainFunc = DefaultHandlerChain
+	}
 }
 
 // New returns a new instance of GenericAPIServer from the given config.
@@ -346,36 +352,31 @@ func (c Config) New() (*GenericAPIServer, error) {
 	}
 
 	s.installAPI(&c)
-	s.Handler, s.InsecureHandler = s.buildHandlerChains(&c, http.Handler(s.Mux.BaseMux().(*http.ServeMux)))
+	s.Handler = c.BuildHandlerChainFunc(http.Handler(s.Mux.BaseMux().(*http.ServeMux)), &c, true)
+	s.InsecureHandler = c.BuildHandlerChainFunc(http.Handler(s.Mux.BaseMux().(*http.ServeMux)), &c, false)
 
 	return s, nil
 }
 
-func (s *GenericAPIServer) buildHandlerChains(c *Config, handler http.Handler) (secure http.Handler, insecure http.Handler) {
-	// filters which insecure and secure have in common
-	handler = genericfilters.WithCORS(handler, c.CorsAllowedOriginList, nil, nil, "true")
-
-	// insecure filters
-	insecure = handler
-	insecure = genericfilters.WithPanicRecovery(insecure, c.RequestContextMapper)
-	insecure = apiserverfilters.WithRequestInfo(insecure, NewRequestInfoResolver(c), c.RequestContextMapper)
-	insecure = api.WithRequestContext(insecure, c.RequestContextMapper)
-	insecure = genericfilters.WithTimeoutForNonLongRunningRequests(insecure, c.LongRunningFunc)
-
-	// secure filters
+func DefaultHandlerChain(handler http.Handler, c *Config, secure bool) http.Handler {
 	attributeGetter := apiserverfilters.NewRequestAttributeGetter(c.RequestContextMapper)
-	secure = handler
-	secure = apiserverfilters.WithAuthorization(secure, attributeGetter, c.Authorizer)
-	secure = apiserverfilters.WithImpersonation(secure, c.RequestContextMapper, c.Authorizer)
-	secure = apiserverfilters.WithAudit(secure, attributeGetter, c.AuditWriter) // before impersonation to read original user
-	secure = authhandlers.WithAuthentication(secure, c.RequestContextMapper, c.Authenticator, authhandlers.Unauthorized(c.SupportsBasicAuth))
-	secure = genericfilters.WithPanicRecovery(secure, c.RequestContextMapper)
-	secure = apiserverfilters.WithRequestInfo(secure, NewRequestInfoResolver(c), c.RequestContextMapper)
-	secure = api.WithRequestContext(secure, c.RequestContextMapper)
-	secure = genericfilters.WithTimeoutForNonLongRunningRequests(secure, c.LongRunningFunc)
-	secure = genericfilters.WithMaxInFlightLimit(secure, c.MaxRequestsInFlight, c.LongRunningFunc)
 
-	return
+	handler = genericfilters.WithCORS(handler, c.CorsAllowedOriginList, nil, nil, "true")
+	if secure {
+		handler = apiserverfilters.WithAuthorization(handler, attributeGetter, c.Authorizer)
+		handler = apiserverfilters.WithImpersonation(handler, c.RequestContextMapper, c.Authorizer)
+	}
+	handler = apiserverfilters.WithAudit(handler, attributeGetter, c.AuditWriter) // before impersonation to read original user
+	if secure {
+		handler = authhandlers.WithAuthentication(handler, c.RequestContextMapper, c.Authenticator, authhandlers.Unauthorized(c.SupportsBasicAuth))
+	}
+	handler = genericfilters.WithPanicRecovery(handler, c.RequestContextMapper)
+	handler = apiserverfilters.WithRequestInfo(handler, NewRequestInfoResolver(c), c.RequestContextMapper)
+	handler = api.WithRequestContext(handler, c.RequestContextMapper)
+	handler = genericfilters.WithTimeoutForNonLongRunningRequests(handler, c.LongRunningFunc)
+	handler = genericfilters.WithMaxInFlightLimit(handler, c.MaxRequestsInFlight, c.LongRunningFunc)
+
+	return handler
 }
 
 func (s *GenericAPIServer) installAPI(c *Config) {

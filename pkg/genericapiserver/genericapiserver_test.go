@@ -20,6 +20,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -99,6 +100,46 @@ func TestNew(t *testing.T) {
 	assert.Equal(serverDialerFunc, configDialerFunc)
 
 	assert.Equal(s.ProxyTransport.(*http.Transport).TLSClientConfig, config.ProxyTLSClientConfig)
+}
+
+// TestCustomHandlerChain verifies that the custom handler chain is applied.
+func TestCustomHandlerChain(t *testing.T) {
+	_, etcdserver, config, _ := setUp(t)
+	defer etcdserver.Terminate(t)
+
+	var recordedSecure bool
+	var called bool
+
+	config.Serializer = api.Codecs
+	config.BuildHandlerChainFunc = func(handler http.Handler, c *Config, secure bool) http.Handler {
+		return http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+			recordedSecure = secure
+			called = true
+		})
+	}
+	s, err := config.New()
+	if err != nil {
+		t.Fatalf("Error in bringing up the server: %v", err)
+	}
+
+	var body io.Reader = nil
+	req := httptest.NewRequest("GET", "/foo", body)
+
+	called = false
+	s.Handler.ServeHTTP(httptest.NewRecorder(), req)
+	if !called {
+		t.Error("Expected secure handler chain to be called, but: called=false")
+	} else if !recordedSecure {
+		t.Error("Expected secure handler chain to be secure, but: secure=false")
+	}
+
+	called = false
+	s.InsecureHandler.ServeHTTP(httptest.NewRecorder(), req)
+	if !called {
+		t.Error("Expected insecure handler chain to be called, but: called=false")
+	} else if recordedSecure {
+		t.Error("Expected insecure handler chain to be insecure, but: secure=true")
+	}
 }
 
 // Verifies that AddGroupVersions works as expected.
