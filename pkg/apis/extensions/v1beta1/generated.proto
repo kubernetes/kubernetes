@@ -826,6 +826,11 @@ message ReplicaSetSpec {
   // More info: http://releases.k8s.io/HEAD/docs/user-guide/replication-controller.md#what-is-a-replication-controller
   optional int32 replicas = 1;
 
+  // Minimum number of seconds for which a newly created pod should be ready
+  // without any of its container crashing, for it to be considered available.
+  // Defaults to 0 (pod will be considered available as soon as it is ready)
+  optional int32 minReadySeconds = 4;
+
   // Selector is a label query over pods that should match the replica count.
   // If the selector is empty, it is defaulted to the labels present on the pod template.
   // Label keys and values that must match in order to be controlled by this replica set.
@@ -849,6 +854,9 @@ message ReplicaSetStatus {
 
   // The number of ready replicas for this replica set.
   optional int32 readyReplicas = 4;
+
+  // The number of available replicas (ready for at least minReadySeconds) for this replica set.
+  optional int32 availableReplicas = 5;
 
   // ObservedGeneration reflects the generation of the most recently observed ReplicaSet.
   optional int64 observedGeneration = 3;

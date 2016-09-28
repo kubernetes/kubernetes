@@ -18,8 +18,10 @@ package api
 
 import (
 	"testing"
+	"time"
 
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
 func TestResourceHelpers(t *testing.T) {
@@ -59,5 +61,60 @@ func TestDefaultResourceHelpers(t *testing.T) {
 	}
 	if resourceList.Memory().Format != resource.BinarySI {
 		t.Errorf("expected %v, actual %v", resource.BinarySI, resourceList.Memory().Format)
+	}
+}
+
+func newPod(now unversioned.Time, ready bool, beforeSec int) *Pod {
+	conditionStatus := ConditionFalse
+	if ready {
+		conditionStatus = ConditionTrue
+	}
+	return &Pod{
+		Status: PodStatus{
+			Conditions: []PodCondition{
+				{
+					Type:               PodReady,
+					LastTransitionTime: unversioned.NewTime(now.Time.Add(-1 * time.Duration(beforeSec) * time.Second)),
+					Status:             conditionStatus,
+				},
+			},
+		},
+	}
+}
+
+func TestIsPodAvailable(t *testing.T) {
+	now := unversioned.Now()
+	tests := []struct {
+		pod             *Pod
+		minReadySeconds int32
+		expected        bool
+	}{
+		{
+			pod:             newPod(now, false, 0),
+			minReadySeconds: 0,
+			expected:        false,
+		},
+		{
+			pod:             newPod(now, true, 0),
+			minReadySeconds: 1,
+			expected:        false,
+		},
+		{
+			pod:             newPod(now, true, 0),
+			minReadySeconds: 0,
+			expected:        true,
+		},
+		{
+			pod:             newPod(now, true, 51),
+			minReadySeconds: 50,
+			expected:        true,
+		},
+	}
+
+	for i, test := range tests {
+		isAvailable := IsPodAvailable(test.pod, test.minReadySeconds, now)
+		if isAvailable != test.expected {
+			t.Errorf("[tc #%d] expected available pod: %t, got: %t", i, test.expected, isAvailable)
+		}
 	}
 }
