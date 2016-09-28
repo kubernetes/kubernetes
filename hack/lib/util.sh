@@ -388,6 +388,44 @@ kube::util::fetch-swagger-spec() {
 }
 
 
+# Fetches openapi spec from apiserver.
+# Assumed vars:
+# OPENAPI_API_PATH: Base path for openapi on apiserver. normally APIServer root. i.e., http://localhost:8080/
+# OPENAPI_ROOT_DIR: Root dir where we want to to save the fetched spec.
+# VERSIONS: Array of group versions to include in swagger spec.
+kube::util::fetch-openapi-spec() {
+  for ver in ${VERSIONS}; do
+    if [[ " ${KUBE_NONSERVER_GROUP_VERSIONS} " == *" ${ver} "* ]]; then
+      continue
+    fi
+    # fetch the openapi spec for each group version.
+    if [[ ${ver} == "v1" ]]; then
+      SUBPATH="api"
+    else
+      SUBPATH="apis"
+    fi
+    SUBPATH="${SUBPATH}/${ver}"
+    OPENAPI_JSON_NAME="$(kube::util::gv-to-swagger-name ${ver}).json"
+    curl -w "\n" -fs "${OPENAPI_PATH}${SUBPATH}/swagger.json" > "${OPENAPI_ROOT_DIR}/${OPENAPI_JSON_NAME}"
+
+    # fetch the openapi spec for the discovery mechanism at group level.
+    if [[ ${ver} == "v1" ]]; then
+      continue
+    fi
+    SUBPATH="apis/"${ver%/*}
+    OPEAN_JSON_NAME="${ver%/*}.json"
+    curl -w "\n" -fs "${OPENAPI_PATH}${SUBPATH}/swagger.json" > "${OPENAPI_ROOT_DIR}/${OPENAPI_JSON_NAME}"
+  done
+
+  # fetch openapi specs for other discovery mechanism.
+  curl -w "\n" -fs "${OPENAPI_PATH}swagger.json" > "${OPENAPI_ROOT_DIR}/root_swagger.json"
+  curl -w "\n" -fs "${OPENAPI_PATH}version/swagger.json" > "${OPENAPI_ROOT_DIR}/version.json"
+  curl -w "\n" -fs "${OPENAPI_PATH}api/swagger.json" > "${OPENAPI_ROOT_DIR}/api.json"
+  curl -w "\n" -fs "${OPENAPI_PATH}apis/swagger.json" > "${OPENAPI_ROOT_DIR}/apis.json"
+  curl -w "\n" -fs "${OPENAPI_PATH}logs/swagger.json" > "${OPENAPI_ROOT_DIR}/logs.json"
+}
+
+
 # Returns the name of the upstream remote repository name for the local git
 # repo, e.g. "upstream" or "origin".
 kube::util::git_upstream_remote_name() {
