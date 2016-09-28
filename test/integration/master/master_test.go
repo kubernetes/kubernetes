@@ -424,7 +424,7 @@ func TestServiceAlloc(t *testing.T) {
 	if err != nil {
 		t.Fatalf("bad cidr: %v", err)
 	}
-	cfg.ServiceClusterIPRange = cidr
+	cfg.GenericConfig.ServiceClusterIPRange = cidr
 	_, s := framework.RunAMaster(cfg)
 	defer s.Close()
 

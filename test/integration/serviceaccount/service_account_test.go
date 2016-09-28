@@ -406,10 +406,10 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclie
 	serviceAccountAdmission := serviceaccountadmission.NewServiceAccount(rootClientset)
 
 	masterConfig := framework.NewMasterConfig()
-	masterConfig.EnableIndex = true
-	masterConfig.Authenticator = authenticator
-	masterConfig.Authorizer = authorizer
-	masterConfig.AdmissionControl = serviceAccountAdmission
+	masterConfig.GenericConfig.EnableIndex = true
+	masterConfig.GenericConfig.Authenticator = authenticator
+	masterConfig.GenericConfig.Authorizer = authorizer
+	masterConfig.GenericConfig.AdmissionControl = serviceAccountAdmission
 
 	// Create a master and install handlers into mux.
 	m, err := masterConfig.Complete().New()
