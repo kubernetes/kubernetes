@@ -122,18 +122,13 @@ type GenericAPIServer struct {
 
 	Mux              *apiserver.PathRecorderMux
 	HandlerContainer *restful.Container
-	MasterCount      int
 
 	// ExternalAddress is the address (hostname or IP and port) that should be used in
 	// external (public internet) URLs for this GenericAPIServer.
 	ExternalAddress string
+
 	// ClusterIP is the IP address of the GenericAPIServer within the cluster.
-	ClusterIP            net.IP
-	PublicReadWritePort  int
-	ServiceReadWriteIP   net.IP
-	ServiceReadWritePort int
-	ExtraServicePorts    []api.ServicePort
-	ExtraEndpointPorts   []api.EndpointPort
+	ClusterIP net.IP
 
 	// storage contains the RESTful endpoints exposed by this GenericAPIServer
 	storage map[string]rest.Storage
@@ -149,19 +144,10 @@ type GenericAPIServer struct {
 	// Used for custom proxy dialing, and proxy TLS options
 	ProxyTransport http.RoundTripper
 
-	KubernetesServiceNodePort int
-
 	// Map storing information about all groups to be exposed in discovery response.
 	// The map is from name to the group.
 	apiGroupsForDiscoveryLock sync.RWMutex
 	apiGroupsForDiscovery     map[string]unversioned.APIGroup
-
-	// See Config.$name for documentation of these flags
-
-	enableOpenAPISupport   bool
-	openAPIInfo            spec.Info
-	openAPIDefaultResponse spec.Response
-	openAPIDefinitions     *common.OpenAPIDefinitions
 
 	// PostStartHooks are each called after the server has started listening, in a separate go func for each
 	// with no guaranteee of ordering between them.  The map key is a name used for error reporting.
@@ -169,6 +155,20 @@ type GenericAPIServer struct {
 	postStartHooks       map[string]PostStartHookFunc
 	postStartHookLock    sync.Mutex
 	postStartHooksCalled bool
+
+	// See Config.$name for documentation of these flags:
+
+	enableOpenAPISupport      bool
+	openAPIInfo               spec.Info
+	openAPIDefaultResponse    spec.Response
+	openAPIDefinitions        *common.OpenAPIDefinitions
+	MasterCount               int
+	KubernetesServiceNodePort int // TODO(sttts): move into master
+	PublicReadWritePort       int
+	ServiceReadWriteIP        net.IP
+	ServiceReadWritePort      int
+	ExtraServicePorts         []api.ServicePort
+	ExtraEndpointPorts        []api.EndpointPort
 }
 
 func init() {
