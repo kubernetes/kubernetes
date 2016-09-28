@@ -127,7 +127,7 @@ function mvfolder {
     # rewrite package
     local src_package="${src##*/}"
     local dst_package="${dst##*/}"
-    find "${CLIENT_REPO}" -type f -name "*.go" -print0 | xargs -0 sed -i "s,package ${src_package},package ${dst_package},g"
+    find "${CLIENT_REPO}/${dst}" -type f -name "*.go" -print0 | xargs -0 sed -i "s,package ${src_package},package ${dst_package},g"
 
     { grep -Rl "\"${CLIENT_REPO_FROM_SRC}/${src}" "${CLIENT_REPO}" || true ; } | while read -r target ; do
         # rewrite imports
