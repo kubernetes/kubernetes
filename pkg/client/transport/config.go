@@ -20,6 +20,10 @@ import "net/http"
 
 // Config holds various options for establishing a transport.
 type Config struct {
+	// UnixSocket is a path to the unix socket that the (proxy) apiserver
+	// is listening on.
+	UnixSocket string
+
 	// UserAgent is an optional field that specifies the caller of this
 	// request.
 	UserAgent string

@@ -41,6 +41,11 @@ func TransportFor(config *Config) (http.RoundTripper, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	if config.UnixSocket != "" {
+		cfg.UnixSocket = config.UnixSocket
+	}
+
 	return transport.New(cfg)
 }
 

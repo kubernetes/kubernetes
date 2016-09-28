@@ -28,25 +28,31 @@ import (
 // to use with a Client at a given API version following the standard conventions for a
 // Kubernetes API.
 func DefaultServerURL(host, apiPath string, groupVersion unversioned.GroupVersion, defaultTLS bool) (*url.URL, string, error) {
+	var hostURL *url.URL
+	var err error
+
 	if host == "" {
-		return nil, "", fmt.Errorf("host must be a URL or a host:port pair")
-	}
-	base := host
-	hostURL, err := url.Parse(base)
-	if err != nil {
-		return nil, "", err
-	}
-	if hostURL.Scheme == "" || hostURL.Host == "" {
-		scheme := "http://"
-		if defaultTLS {
-			scheme = "https://"
-		}
-		hostURL, err = url.Parse(scheme + base)
+		hostURL, err = url.Parse("http:/")
 		if err != nil {
 			return nil, "", err
 		}
-		if hostURL.Path != "" && hostURL.Path != "/" {
-			return nil, "", fmt.Errorf("host must be a URL or a host:port pair: %q", base)
+	} else {
+		hostURL, err = url.Parse(host)
+		if err != nil {
+			return nil, "", err
+		}
+		if hostURL.Scheme == "" || hostURL.Host == "" {
+			scheme := "http://"
+			if defaultTLS {
+				scheme = "https://"
+			}
+			hostURL, err = url.Parse(scheme + host)
+			if err != nil {
+				return nil, "", err
+			}
+			if hostURL.Path != "" && hostURL.Path != "/" {
+				return nil, "", fmt.Errorf("host must be a URL or a host:port pair: %q", host)
+			}
 		}
 	}
 

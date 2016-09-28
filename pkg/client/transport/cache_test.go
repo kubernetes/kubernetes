@@ -18,8 +18,38 @@ package transport
 
 import (
 	"net/http"
+	"reflect"
 	"testing"
 )
+
+func TestGet(t *testing.T) {
+	tests := []struct {
+		config            *Config
+		expectedTransport http.RoundTripper
+	}{
+		{
+			config:            &Config{},
+			expectedTransport: http.DefaultTransport,
+		},
+		{
+			config: &Config{
+				UnixSocket: "/var/run/k8s.sock",
+			},
+			expectedTransport: defaultUnixSocketTransport,
+		},
+	}
+
+	for _, tc := range tests {
+		transport, err := tlsCache.get(tc.config)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if !reflect.DeepEqual(transport, tc.expectedTransport) {
+			t.Errorf("Expected %#v, got %#v", tc.expectedTransport, transport)
+		}
+	}
+}
 
 func TestTLSConfigKey(t *testing.T) {
 	// Make sure config fields that don't affect the tls config don't affect the cache key

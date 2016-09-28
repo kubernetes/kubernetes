@@ -38,6 +38,7 @@ func TestValidatesHostParameter(t *testing.T) {
 		{"http://host", "", "http://host/" + testapi.Default.GroupVersion().Version, false},
 		{"http://host", "/", "http://host/" + testapi.Default.GroupVersion().Version, false},
 		{"http://host", "/other", "http://host/other/" + testapi.Default.GroupVersion().Version, false},
+		{"", "", "http:///" + testapi.Default.GroupVersion().Version, false},
 		{"host/server", "", "", true},
 	}
 	for i, testCase := range testCases {

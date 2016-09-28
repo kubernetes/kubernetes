@@ -38,6 +38,14 @@ const idleConnsPerHost = 25
 
 var tlsCache = &tlsTransportCache{transports: make(map[string]*http.Transport)}
 
+var defaultUnixSocketTransport http.RoundTripper = &http.Transport{
+	Proxy:               http.ProxyFromEnvironment,
+	MaxIdleConnsPerHost: idleConnsPerHost,
+	Dial: func(proto, addr string) (net.Conn, error) {
+		return net.Dial("unix", addr)
+	},
+}
+
 func (c *tlsTransportCache) get(config *Config) (http.RoundTripper, error) {
 	key, err := tlsConfigKey(config)
 	if err != nil {
@@ -51,6 +59,11 @@ func (c *tlsTransportCache) get(config *Config) (http.RoundTripper, error) {
 	// See if we already have a custom transport for this config
 	if t, ok := c.transports[key]; ok {
 		return t, nil
+	}
+
+	// Check whether unix socket has to be used
+	if config.UnixSocket != "" {
+		return defaultUnixSocketTransport, nil
 	}
 
 	// Get the TLS options for this client config

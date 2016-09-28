@@ -50,6 +50,8 @@ type Config struct {
 	// be appended to all request URIs used to access the apiserver. This allows a frontend
 	// proxy to easily relocate all of the apiserver endpoints.
 	Host string
+	// UnixSocket is a path to the unix socket that the (proxy) apiserver is listening on.
+	UnixSocket string
 	// APIPath is a sub-path that points to an API root.
 	APIPath string
 	// Prefix is the sub path of the server. If not specified, the client will set
