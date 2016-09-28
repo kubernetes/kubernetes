@@ -496,7 +496,7 @@ function start-kubelet {
     fi
   else # For nodes
     flags+=" --enable-debugging-handlers=true"
-    flags+=" --api-servers=https://${KUBERNETES_MASTER_NAME}"
+    flags+=" --api-servers=https://${MASTER_RESERVED_IP}"
     if [[ "${HAIRPIN_MODE:-}" == "promiscuous-bridge" ]] || \
        [[ "${HAIRPIN_MODE:-}" == "hairpin-veth" ]] || \
        [[ "${HAIRPIN_MODE:-}" == "none" ]]; then
@@ -584,7 +584,7 @@ function start-kube-proxy {
     kube_docker_registry=${KUBE_DOCKER_REGISTRY}
   fi
   local -r kube_proxy_docker_tag=$(cat /home/kubernetes/kube-docker-files/kube-proxy.docker_tag)
-  local api_servers="--master=https://${KUBERNETES_MASTER_NAME}"
+  local api_servers="--master=https://${MASTER_RESERVED_IP}"
   local params="${KUBEPROXY_TEST_LOG_LEVEL:-"--v=2"}"
   if [[ -n "${FEATURE_GATES:-}" ]]; then
     params+=" --feature-gates=${FEATURE_GATES}"
