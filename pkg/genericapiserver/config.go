@@ -353,7 +353,7 @@ func (c Config) New() (*GenericAPIServer, error) {
 
 func (s *GenericAPIServer) buildHandlerChains(c *Config, handler http.Handler) (secure http.Handler, insecure http.Handler) {
 	// filters which insecure and secure have in common
-	handler = genericfilters.WithCORS(handler, c.CorsAllowedOriginList, nil, nil, "true")
+	handler = genericfilters.WithCORS(handler, c.CorsAllowedOriginList, nil, nil, nil, "true")
 
 	// insecure filters
 	insecure = handler

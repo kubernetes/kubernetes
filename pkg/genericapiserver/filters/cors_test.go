@@ -39,7 +39,7 @@ func TestCORSAllowedOrigins(t *testing.T) {
 	for _, item := range table {
 		handler := WithCORS(
 			http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}),
-			item.allowedOrigins, nil, nil, "true",
+			item.allowedOrigins, nil, nil, nil, "true",
 		)
 		server := httptest.NewServer(handler)
 		defer server.Close()
@@ -72,6 +72,9 @@ func TestCORSAllowedOrigins(t *testing.T) {
 			if response.Header.Get("Access-Control-Allow-Methods") == "" {
 				t.Errorf("Expected Access-Control-Allow-Methods header to be set")
 			}
+			if response.Header.Get("Access-Control-Expose-Headers") != "Date" {
+				t.Errorf("Expected Date in Access-Control-Expose-Headers header")
+			}
 		} else {
 			if response.Header.Get("Access-Control-Allow-Origin") != "" {
 				t.Errorf("Expected Access-Control-Allow-Origin header to not be set")
@@ -87,6 +90,9 @@ func TestCORSAllowedOrigins(t *testing.T) {
 
 			if response.Header.Get("Access-Control-Allow-Methods") != "" {
 				t.Errorf("Expected Access-Control-Allow-Methods header to not be set")
+			}
+			if response.Header.Get("Access-Control-Expose-Headers") == "Date" {
+				t.Errorf("Expected Date in Access-Control-Expose-Headers header")
 			}
 		}
 	}
