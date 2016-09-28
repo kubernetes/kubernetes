@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/runtime"
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
+	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
 func newStorage(t *testing.T) (*REST, *StatusREST, *etcdtesting.EtcdTestServer) {
@@ -59,6 +60,12 @@ func newValidDaemonSet() *extensions.DaemonSet {
 					},
 					RestartPolicy: api.RestartPolicyAlways,
 					DNSPolicy:     api.DNSClusterFirst,
+				},
+			},
+			UpdateStrategy: extensions.DaemonSetUpdateStrategy{
+				Type: extensions.RollingUpdateDaemonSetStrategyType,
+				RollingUpdate: &extensions.RollingUpdateDaemonSet{
+					MaxUnavailable: intstr.FromInt(1),
 				},
 			},
 		},
@@ -118,6 +125,16 @@ func TestUpdate(t *testing.T) {
 		func(obj runtime.Object) runtime.Object {
 			object := obj.(*extensions.DaemonSet)
 			object.Spec.Template.Spec.RestartPolicy = api.RestartPolicyOnFailure
+			return object
+		},
+		func(obj runtime.Object) runtime.Object {
+			object := obj.(*extensions.DaemonSet)
+			object.Spec.Selector = &unversioned.LabelSelector{MatchLabels: map[string]string{}}
+			return object
+		},
+		func(obj runtime.Object) runtime.Object {
+			object := obj.(*extensions.DaemonSet)
+			object.Spec.UpdateStrategy = extensions.DaemonSetUpdateStrategy{}
 			return object
 		},
 	)

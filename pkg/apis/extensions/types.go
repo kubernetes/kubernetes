@@ -288,8 +288,6 @@ type DeploymentList struct {
 	Items []Deployment `json:"items"`
 }
 
-// TODO(madhusudancs): Uncomment while implementing DaemonSet updates.
-/* Commenting out for v1.2. We are planning to bring these types back with a more robust DaemonSet update implementation in v1.3, hence not deleting but just commenting the types out.
 type DaemonSetUpdateStrategy struct {
 	// Type of daemon set update. Only "RollingUpdate" is supported at this time. Default is RollingUpdate.
 	Type DaemonSetUpdateStrategyType `json:"type,omitempty"`
@@ -325,14 +323,7 @@ type RollingUpdateDaemonSet struct {
 	// 70% of original number of DaemonSet pods are available at all times
 	// during the update.
 	MaxUnavailable intstr.IntOrString `json:"maxUnavailable,omitempty"`
-
-	// Minimum number of seconds for which a newly created DaemonSet pod should
-	// be ready without any of its container crashing, for it to be considered
-	// available. Defaults to 0 (pod will be considered available as soon as it
-	// is ready).
-	MinReadySeconds int `json:"minReadySeconds,omitempty"`
 }
-*/
 
 // DaemonSetSpec is the specification of a daemon set.
 type DaemonSetSpec struct {
@@ -349,31 +340,35 @@ type DaemonSetSpec struct {
 	// More info: http://kubernetes.io/docs/user-guide/replication-controller#pod-template
 	Template api.PodTemplateSpec `json:"template"`
 
-	// TODO(madhusudancs): Uncomment while implementing DaemonSet updates.
-	/* Commenting out for v1.2. We are planning to bring these fields back with a more robust DaemonSet update implementation in v1.3, hence not deleting but just commenting these fields out.
+	// Indicates that the DaemonSet is paused and will not be processed by the
+	// DaemonSet controller.
+	Paused bool `json:"paused,omitempty"`
+
+	// Indicates that the DaemonSet will automaticly update pods when DaemonSet Spec was changed.
+	AutoUpdate bool `json:"autoUpdate,omitempty"`
+
+	// Minimum number of seconds for which a newly created DaemonSet pod should
+	// be ready without any of its container crashing, for it to be considered
+	// available. Defaults to 0 (pod will be considered available as soon as it
+	// is ready).
+	MinReadySeconds int `json:"minReadySeconds,omitempty"`
+
 	// Update strategy to replace existing DaemonSet pods with new pods.
 	UpdateStrategy DaemonSetUpdateStrategy `json:"updateStrategy,omitempty"`
-
-	// Label key that is added to DaemonSet pods to distinguish between old and
-	// new pod templates during DaemonSet update.
-	// Users can set this to an empty string to indicate that the system should
-	// not add any label. If unspecified, system uses
-	// DefaultDaemonSetUniqueLabelKey("daemonset.kubernetes.io/podTemplateHash").
-	// Value of this key is hash of DaemonSetSpec.PodTemplateSpec.
-	// No label is added if this is set to empty string.
-	UniqueLabelKey string `json:"uniqueLabelKey,omitempty"`
-	*/
 }
 
 const (
 	// DefaultDaemonSetUniqueLabelKey is the default key of the labels that is added
 	// to daemon set pods to distinguish between old and new pod templates during
 	// DaemonSet update. See DaemonSetSpec's UniqueLabelKey field for more information.
-	DefaultDaemonSetUniqueLabelKey string = "daemonset.kubernetes.io/podTemplateHash"
+	DefaultDaemonSetUniqueLabelKey string = "pod-template-hash"
 )
 
 // DaemonSetStatus represents the current status of a daemon set.
 type DaemonSetStatus struct {
+	// The generation observed by the daemonset controller.
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+
 	// CurrentNumberScheduled is the number of nodes that are running at least 1
 	// daemon pod and are supposed to run the daemon pod.
 	CurrentNumberScheduled int32 `json:"currentNumberScheduled"`
@@ -385,6 +380,10 @@ type DaemonSetStatus struct {
 	// DesiredNumberScheduled is the total number of nodes that should be running the daemon
 	// pod (including nodes correctly running the daemon pod).
 	DesiredNumberScheduled int32 `json:"desiredNumberScheduled"`
+
+	// UpdatedNumberScheduled is the total number of nodes that are running updated
+	// daemon pod
+	UpdatedNumberScheduled int32 `json:"updatedNumberScheduled"`
 }
 
 // +genclient=true
