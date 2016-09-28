@@ -17,6 +17,8 @@ limitations under the License.
 package priorities
 
 import (
+	"fmt"
+
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/labels"
@@ -29,55 +31,75 @@ import (
 // it will a get an add of preferredSchedulingTerm.Weight. Thus, the more preferredSchedulingTerms
 // the node satisfies and the more the preferredSchedulingTerm that is satisfied weights, the higher
 // score the node gets.
-func CalculateNodeAffinityPriority(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodes []*api.Node) (schedulerapi.HostPriorityList, error) {
-	var maxCount float64
-	counts := make(map[string]float64, len(nodes))
-
-	affinity, err := api.GetAffinityFromPodAnnotations(pod.Annotations)
-	if err != nil {
-		return nil, err
+func CalculateNodeAffinityPriorityMap(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (schedulerapi.HostPriority, error) {
+	node := nodeInfo.Node()
+	if node == nil {
+		return schedulerapi.HostPriority{}, fmt.Errorf("node not found")
 	}
 
+	var affinity *api.Affinity
+	if priorityMeta, ok := meta.(*priorityMetadata); ok {
+		affinity = priorityMeta.affinity
+	} else {
+		// We couldn't parse metadata - fallback to computing it.
+		var err error
+		affinity, err = api.GetAffinityFromPodAnnotations(pod.Annotations)
+		if err != nil {
+			return schedulerapi.HostPriority{}, err
+		}
+	}
+
+	var count int32
 	// A nil element of PreferredDuringSchedulingIgnoredDuringExecution matches no objects.
 	// An element of PreferredDuringSchedulingIgnoredDuringExecution that refers to an
 	// empty PreferredSchedulingTerm matches all objects.
 	if affinity != nil && affinity.NodeAffinity != nil && affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution != nil {
 		// Match PreferredDuringSchedulingIgnoredDuringExecution term by term.
-		for _, preferredSchedulingTerm := range affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution {
+		for i := range affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution {
+			preferredSchedulingTerm := &affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution[i]
 			if preferredSchedulingTerm.Weight == 0 {
 				continue
 			}
 
+			// TODO: Avoid computing it for all nodes if this becomes a performance problem.
 			nodeSelector, err := api.NodeSelectorRequirementsAsSelector(preferredSchedulingTerm.Preference.MatchExpressions)
 			if err != nil {
-				return nil, err
+				return schedulerapi.HostPriority{}, err
 			}
-
-			for _, node := range nodes {
-				if nodeSelector.Matches(labels.Set(node.Labels)) {
-					counts[node.Name] += float64(preferredSchedulingTerm.Weight)
-				}
-
-				if counts[node.Name] > maxCount {
-					maxCount = counts[node.Name]
-				}
+			if nodeSelector.Matches(labels.Set(node.Labels)) {
+				count += preferredSchedulingTerm.Weight
 			}
 		}
 	}
 
-	result := make(schedulerapi.HostPriorityList, 0, len(nodes))
-	for _, node := range nodes {
+	return schedulerapi.HostPriority{
+		Host:  node.Name,
+		Score: int(count),
+	}, nil
+}
+
+func CalculateNodeAffinityPriorityReduce(pod *api.Pod, result schedulerapi.HostPriorityList) error {
+	var maxCount int
+	for i := range result {
+		if result[i].Score > maxCount {
+			maxCount = result[i].Score
+		}
+	}
+	maxCountFloat := float64(maxCount)
+
+	var fScore float64
+	for i := range result {
 		if maxCount > 0 {
-			fScore := 10 * (counts[node.Name] / maxCount)
-			result = append(result, schedulerapi.HostPriority{Host: node.Name, Score: int(fScore)})
-			if glog.V(10) {
-				// We explicitly don't do glog.V(10).Infof() to avoid computing all the parameters if this is
-				// not logged. There is visible performance gain from it.
-				glog.Infof("%v -> %v: NodeAffinityPriority, Score: (%d)", pod.Name, node.Name, int(fScore))
-			}
+			fScore = 10 * (float64(result[i].Score) / maxCountFloat)
 		} else {
-			result = append(result, schedulerapi.HostPriority{Host: node.Name, Score: 0})
+			fScore = 0
 		}
+		if glog.V(10) {
+			// We explicitly don't do glog.V(10).Infof() to avoid computing all the parameters if this is
+			// not logged. There is visible performance gain from it.
+			glog.Infof("%v -> %v: NodeAffinityPriority, Score: (%d)", pod.Name, result[i].Host, int(fScore))
+		}
+		result[i].Score = int(fScore)
 	}
-	return result, nil
+	return nil
 }
