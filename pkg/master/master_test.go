@@ -44,7 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	extensionsapiv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/apis/rbac"
-	"k8s.io/kubernetes/pkg/generated/openapi"
+	openapigen "k8s.io/kubernetes/pkg/generated/openapi"
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/kubelet/client"
 	ipallocator "k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
@@ -60,6 +60,8 @@ import (
 	"github.com/go-openapi/strfmt"
 	"github.com/go-openapi/validate"
 	"github.com/stretchr/testify/assert"
+	"k8s.io/kubernetes/pkg/apiserver/openapi"
+	"k8s.io/kubernetes/pkg/genericapiserver/openapi/common"
 )
 
 // setUp is a convience function for setting up for (most) tests.
@@ -70,7 +72,9 @@ func setUp(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.
 		GenericAPIServer: &genericapiserver.GenericAPIServer{},
 	}
 	config := &Config{
-		GenericConfig: &genericapiserver.Config{},
+		GenericConfig: &genericapiserver.Config{
+			OpenAPIConfig: &common.Config{},
+		},
 	}
 
 	resourceEncoding := genericapiserver.NewDefaultResourceEncodingConfig()
@@ -530,15 +534,16 @@ func TestValidOpenAPISpec(t *testing.T) {
 	_, etcdserver, config, assert := setUp(t)
 	defer etcdserver.Terminate(t)
 
-	config.GenericConfig.OpenAPIDefinitions = openapi.OpenAPIDefinitions
+	config.GenericConfig.OpenAPIConfig.Definitions = openapigen.OpenAPIDefinitions
 	config.GenericConfig.EnableOpenAPISupport = true
 	config.GenericConfig.EnableIndex = true
-	config.GenericConfig.OpenAPIInfo = spec.Info{
+	config.GenericConfig.OpenAPIConfig.Info = &spec.Info{
 		InfoProps: spec.InfoProps{
 			Title:   "Kubernetes",
 			Version: "unversioned",
 		},
 	}
+	config.GenericConfig.OpenAPIConfig.GetOperationID = openapi.GetOperationID
 	master, err := config.Complete().New()
 	if err != nil {
 		t.Fatalf("Error in bringing up the master: %v", err)
@@ -623,7 +628,7 @@ func TestValidOpenAPISpec(t *testing.T) {
 						t.Logf("Open API spec on %v has some warnings : %v", path, warns)
 					}
 				} else {
-					t.Logf("Validation is disabled because it is timing out on jenkins put passing locally.")
+					t.Logf("Validation is disabled because it is timing out on jenkins but passing locally.")
 				}
 			}
 
