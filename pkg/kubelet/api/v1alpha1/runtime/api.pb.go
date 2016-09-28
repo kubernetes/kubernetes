@@ -1523,7 +1523,10 @@ type CreateContainerRequest struct {
 	PodSandboxId *string `protobuf:"bytes,1,opt,name=pod_sandbox_id,json=podSandboxId" json:"pod_sandbox_id,omitempty"`
 	// The config of the container
 	Config *ContainerConfig `protobuf:"bytes,2,opt,name=config" json:"config,omitempty"`
-	// The config of the PodSandbox
+	// The config of the PodSandbox. This is the same config that was passed
+	// to RunPodSandboxRequest to create the PodSandbox. It is passed again
+	// here just for easy reference. The PodSandboxConfig is immutable and
+	// remains the same throughout the lifetime of the pod.
 	SandboxConfig    *PodSandboxConfig `protobuf:"bytes,3,opt,name=sandbox_config,json=sandboxConfig" json:"sandbox_config,omitempty"`
 	XXX_unrecognized []byte            `json:"-"`
 }
