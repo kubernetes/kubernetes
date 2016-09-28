@@ -241,7 +241,7 @@ func run(deploy deployer) error {
 	}
 
 	if *kubemark {
-		errs = appendError(errs, xmlWrap("KubemarkTest", KubemarkTest))
+		errs = appendError(errs, KubemarkTest())
 	}
 
 	if len(errs) > 0 && *dump != "" {
