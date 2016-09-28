@@ -18,13 +18,6 @@
 readonly KUBE_GO_PACKAGE=k8s.io/kubernetes
 readonly KUBE_GOPATH="${KUBE_OUTPUT}/go"
 
-# Load contrib target functions
-if [ -n "${KUBERNETES_CONTRIB:-}" ]; then
-  for contrib in "${KUBERNETES_CONTRIB}"; do
-    source "${KUBE_ROOT}/contrib/${contrib}/target.sh"
-  done
-fi
-
 # The set of server targets that we are only building for Linux
 # Note: if you are adding something here, you might need to add it to
 # kube::build::source_targets in build/common.sh as well.
@@ -40,11 +33,6 @@ kube::golang::server_targets() {
     cmd/kube-discovery
     plugin/cmd/kube-scheduler
   )
-  if [ -n "${KUBERNETES_CONTRIB:-}" ]; then
-    for contrib in "${KUBERNETES_CONTRIB}"; do
-      targets+=($(eval "kube::contrib::${contrib}::server_targets"))
-    done
-  fi
   echo "${targets[@]}"
 }
 
@@ -126,11 +114,6 @@ kube::golang::test_targets() {
     vendor/github.com/onsi/ginkgo/ginkgo
     test/e2e/e2e.test
   )
-  if [ -n "${KUBERNETES_CONTRIB:-}" ]; then
-    for contrib in "${KUBERNETES_CONTRIB}"; do
-      targets+=($(eval "kube::contrib::${contrib}::test_targets"))
-    done
-  fi
   echo "${targets[@]}"
 }
 readonly KUBE_TEST_TARGETS=($(kube::golang::test_targets))

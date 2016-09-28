@@ -566,10 +566,6 @@ function kube::build::run_build_command() {
     "${DOCKER_MOUNT_ARGS[@]}"
   )
 
-  if [ -n "${KUBERNETES_CONTRIB:-}" ]; then
-    docker_run_opts+=(-e "KUBERNETES_CONTRIB=${KUBERNETES_CONTRIB}")
-  fi
-
   docker_run_opts+=(
     --env "KUBE_FASTBUILD=${KUBE_FASTBUILD:-false}"
     --env "KUBE_BUILDER_OS=${OSTYPE:-notdetected}"
