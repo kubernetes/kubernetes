@@ -161,6 +161,14 @@ const (
 	BRKINT                        = 0x2
 	CFLUSH                        = 0xf
 	CLOCAL                        = 0x800
+	CLOCK_HIGHRES                 = 0x4
+	CLOCK_LEVEL                   = 0xa
+	CLOCK_MONOTONIC               = 0x4
+	CLOCK_PROCESS_CPUTIME_ID      = 0x5
+	CLOCK_PROF                    = 0x2
+	CLOCK_REALTIME                = 0x3
+	CLOCK_THREAD_CPUTIME_ID       = 0x2
+	CLOCK_VIRTUAL                 = 0x1
 	CREAD                         = 0x80
 	CS5                           = 0x0
 	CS6                           = 0x10
@@ -168,6 +176,7 @@ const (
 	CS8                           = 0x30
 	CSIZE                         = 0x30
 	CSTART                        = 0x11
+	CSTATUS                       = 0x14
 	CSTOP                         = 0x13
 	CSTOPB                        = 0x40
 	CSUSP                         = 0x1a
@@ -757,9 +766,7 @@ const (
 	SIOCDARP                      = -0x7fdb96e0
 	SIOCDELMULTI                  = -0x7fdf96ce
 	SIOCDELRT                     = -0x7fcf8df5
-	SIOCDIPSECONFIG               = -0x7ffb9669
 	SIOCDXARP                     = -0x7fff9658
-	SIOCFIPSECONFIG               = -0x7ffb966b
 	SIOCGARP                      = -0x3fdb96e1
 	SIOCGDSTINFO                  = -0x3fff965c
 	SIOCGENADDR                   = -0x3fdf96ab
@@ -821,7 +828,6 @@ const (
 	SIOCLIFGETND                  = -0x3f879672
 	SIOCLIFREMOVEIF               = -0x7f879692
 	SIOCLIFSETND                  = -0x7f879671
-	SIOCLIPSECONFIG               = -0x7ffb9668
 	SIOCLOWER                     = -0x7fdf96d7
 	SIOCSARP                      = -0x7fdb96e2
 	SIOCSCTPGOPT                  = -0x3fef9653
@@ -844,7 +850,6 @@ const (
 	SIOCSIFNETMASK                = -0x7fdf96e6
 	SIOCSIP6ADDRPOLICY            = -0x7fff965d
 	SIOCSIPMSFILTER               = -0x7ffb964b
-	SIOCSIPSECONFIG               = -0x7ffb966a
 	SIOCSLGETREQ                  = -0x3fdf96b9
 	SIOCSLIFADDR                  = -0x7f879690
 	SIOCSLIFBRDADDR               = -0x7f879684
@@ -951,6 +956,8 @@ const (
 	SO_VRRP                       = 0x1017
 	SO_WROFF                      = 0x2
 	TCFLSH                        = 0x5407
+	TCGETA                        = 0x5401
+	TCGETS                        = 0x540d
 	TCIFLUSH                      = 0x0
 	TCIOFLUSH                     = 0x2
 	TCOFLUSH                      = 0x1
@@ -977,6 +984,14 @@ const (
 	TCP_RTO_MAX                   = 0x1b
 	TCP_RTO_MIN                   = 0x1a
 	TCSAFLUSH                     = 0x5410
+	TCSBRK                        = 0x5405
+	TCSETA                        = 0x5402
+	TCSETAF                       = 0x5404
+	TCSETAW                       = 0x5403
+	TCSETS                        = 0x540e
+	TCSETSF                       = 0x5410
+	TCSETSW                       = 0x540f
+	TCXONC                        = 0x5406
 	TIOC                          = 0x5400
 	TIOCCBRK                      = 0x747a
 	TIOCCDTR                      = 0x7478
@@ -1052,6 +1067,7 @@ const (
 	VQUIT                         = 0x1
 	VREPRINT                      = 0xc
 	VSTART                        = 0x8
+	VSTATUS                       = 0x10
 	VSTOP                         = 0x9
 	VSUSP                         = 0xa
 	VSWTCH                        = 0x7
@@ -1215,6 +1231,7 @@ const (
 	SIGFREEZE  = syscall.Signal(0x22)
 	SIGHUP     = syscall.Signal(0x1)
 	SIGILL     = syscall.Signal(0x4)
+	SIGINFO    = syscall.Signal(0x29)
 	SIGINT     = syscall.Signal(0x2)
 	SIGIO      = syscall.Signal(0x16)
 	SIGIOT     = syscall.Signal(0x6)
@@ -1415,4 +1432,5 @@ var signals = [...]string{
 	38: "resource Control Exceeded",
 	39: "reserved for JVM 1",
 	40: "reserved for JVM 2",
+	41: "information Request",
 }
