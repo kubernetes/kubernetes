@@ -38,6 +38,16 @@ const idleConnsPerHost = 25
 
 var tlsCache = &tlsTransportCache{transports: make(map[string]*http.Transport)}
 
+func defaultUnixSocketTransport(c *Config) http.RoundTripper {
+	return &http.Transport{
+		Proxy:               http.ProxyFromEnvironment,
+		MaxIdleConnsPerHost: idleConnsPerHost,
+		Dial: func(proto, addr string) (net.Conn, error) {
+			return net.Dial("unix", c.Host)
+		},
+	}
+}
+
 func (c *tlsTransportCache) get(config *Config) (http.RoundTripper, error) {
 	key, err := tlsConfigKey(config)
 	if err != nil {
@@ -53,28 +63,35 @@ func (c *tlsTransportCache) get(config *Config) (http.RoundTripper, error) {
 		return t, nil
 	}
 
-	// Get the TLS options for this client config
-	tlsConfig, err := TLSConfigFor(config)
-	if err != nil {
-		return nil, err
-	}
-	// The options didn't require a custom TLS config
-	if tlsConfig == nil {
-		return http.DefaultTransport, nil
+	switch config.Scheme {
+	case "http", "":
+		// Get the TLS options for this client config
+		tlsConfig, err := TLSConfigFor(config)
+		if err != nil {
+			return nil, err
+		}
+		// The options didn't require a custom TLS config
+		if tlsConfig == nil {
+			return http.DefaultTransport, nil
+		}
+
+		// Cache a single transport for these options
+		c.transports[key] = utilnet.SetTransportDefaults(&http.Transport{
+			Proxy:               http.ProxyFromEnvironment,
+			TLSHandshakeTimeout: 10 * time.Second,
+			TLSClientConfig:     tlsConfig,
+			MaxIdleConnsPerHost: idleConnsPerHost,
+			Dial: (&net.Dialer{
+				Timeout:   30 * time.Second,
+				KeepAlive: 30 * time.Second,
+			}).Dial,
+		})
+		return c.transports[key], nil
+	case "unix":
+		return defaultUnixSocketTransport(config), nil
 	}
 
-	// Cache a single transport for these options
-	c.transports[key] = utilnet.SetTransportDefaults(&http.Transport{
-		Proxy:               http.ProxyFromEnvironment,
-		TLSHandshakeTimeout: 10 * time.Second,
-		TLSClientConfig:     tlsConfig,
-		MaxIdleConnsPerHost: idleConnsPerHost,
-		Dial: (&net.Dialer{
-			Timeout:   30 * time.Second,
-			KeepAlive: 30 * time.Second,
-		}).Dial,
-	})
-	return c.transports[key], nil
+	return nil, fmt.Errorf("Protocol %s is not supported", config.Scheme)
 }
 
 // tlsConfigKey returns a unique key for tls.Config objects returned from TLSConfigFor

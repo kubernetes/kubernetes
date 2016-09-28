@@ -24,29 +24,48 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
+// defaultVersionedAPIPath returns a path relative to baseURL.Path, points to a versioned API base.
+func defaultVersionedApiPath(apiPath string, groupVersion unversioned.GroupVersion) string {
+	versionedAPIPath := path.Join("/", apiPath)
+
+	// Add the version to the end of the path
+	if len(groupVersion.Group) > 0 {
+		versionedAPIPath = path.Join(versionedAPIPath, groupVersion.Group, groupVersion.Version)
+
+	} else {
+		versionedAPIPath = path.Join(versionedAPIPath, groupVersion.Version)
+
+	}
+
+	return versionedAPIPath
+}
+
 // DefaultServerURL converts a host, host:port, or URL string to the default base server API path
 // to use with a Client at a given API version following the standard conventions for a
 // Kubernetes API.
 func DefaultServerURL(host, apiPath string, groupVersion unversioned.GroupVersion, defaultTLS bool) (*url.URL, string, error) {
+	var hostURL *url.URL
+	var err error
+
 	if host == "" {
 		return nil, "", fmt.Errorf("host must be a URL or a host:port pair")
-	}
-	base := host
-	hostURL, err := url.Parse(base)
-	if err != nil {
-		return nil, "", err
-	}
-	if hostURL.Scheme == "" || hostURL.Host == "" {
-		scheme := "http://"
-		if defaultTLS {
-			scheme = "https://"
-		}
-		hostURL, err = url.Parse(scheme + base)
+	} else {
+		hostURL, err = url.Parse(host)
 		if err != nil {
 			return nil, "", err
 		}
-		if hostURL.Path != "" && hostURL.Path != "/" {
-			return nil, "", fmt.Errorf("host must be a URL or a host:port pair: %q", base)
+		if hostURL.Scheme == "" || hostURL.Host == "" {
+			scheme := "http://"
+			if defaultTLS {
+				scheme = "https://"
+			}
+			hostURL, err = url.Parse(scheme + host)
+			if err != nil {
+				return nil, "", err
+			}
+			if hostURL.Path != "" && hostURL.Path != "/" {
+				return nil, "", fmt.Errorf("host must be a URL or a host:port pair: %q", host)
+			}
 		}
 	}
 
@@ -58,17 +77,8 @@ func DefaultServerURL(host, apiPath string, groupVersion unversioned.GroupVersio
 	// if running without a frontend proxy (that changes the location of the apiserver), then
 	// hostURL.Path should be blank.
 	//
-	// versionedAPIPath, a path relative to baseURL.Path, points to a versioned API base
-	versionedAPIPath := path.Join("/", apiPath)
 
-	// Add the version to the end of the path
-	if len(groupVersion.Group) > 0 {
-		versionedAPIPath = path.Join(versionedAPIPath, groupVersion.Group, groupVersion.Version)
-
-	} else {
-		versionedAPIPath = path.Join(versionedAPIPath, groupVersion.Version)
-
-	}
+	versionedAPIPath := defaultVersionedApiPath(apiPath, groupVersion)
 
 	return hostURL, versionedAPIPath, nil
 }
@@ -90,4 +100,19 @@ func defaultServerUrlFor(config *Config) (*url.URL, string, error) {
 		return DefaultServerURL(host, config.APIPath, *config.GroupVersion, defaultTLS)
 	}
 	return DefaultServerURL(host, config.APIPath, unversioned.GroupVersion{}, defaultTLS)
+}
+
+func DefaultServerUnixSocketPath(apiPath string, groupVersion unversioned.GroupVersion) (*url.URL, string, error) {
+	versionedAPIPath := defaultVersionedApiPath(apiPath, groupVersion)
+
+	// The Scheme which is set there has no impact on the protocol that transport will be using.
+	// Please treat this "http://" like "curl --unix-socket=something.sock http:/some-resource".
+	return &url.URL{Host: "localhost", Scheme: "http"}, versionedAPIPath, nil
+}
+
+func defaultServerUnixSocketPathFor(config *Config) (*url.URL, string, error) {
+	if config.GroupVersion != nil {
+		return DefaultServerUnixSocketPath(config.APIPath, *config.GroupVersion)
+	}
+	return DefaultServerUnixSocketPath(config.APIPath, unversioned.GroupVersion{})
 }
