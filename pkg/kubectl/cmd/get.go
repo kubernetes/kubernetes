@@ -173,11 +173,11 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 		fmt.Fprint(errOut, "You must specify the type of resource to get. ", valid_resources)
 
 		fullCmdName := cmd.Parent().CommandPath()
-		if fullCmdName == "" {
-			fullCmdName = "kubectl"
+		usageString := "Required resource not specified."
+		if len(fullCmdName) > 0 && cmdutil.IsCommandExists(cmd, "explain") {
+			usageString = fmt.Sprintf("%s\nUse \"%s explain <resource>\" for a detailed description of that resource (e.g. %[2]s explain pods).", usageString, fullCmdName)
 		}
 
-		usageString := fmt.Sprintf("Required resource not specified.\nUse \"%s explain <resource>\" for a detailed description of that resource (e.g. %[1]s explain pods).", fullCmdName)
 		return cmdutil.UsageError(cmd, usageString)
 	}
 
