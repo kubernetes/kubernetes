@@ -267,6 +267,11 @@ func (o *DrainOptions) getPodCreator(pod api.Pod) (*api.SerializedReference, err
 }
 
 func (o *DrainOptions) unreplicatedFilter(pod api.Pod) (bool, *warning, *fatal) {
+	// any finished pod can be removed
+	if pod.Status.Phase == api.PodSucceeded || pod.Status.Phase == api.PodFailed {
+		return true, nil, nil
+	}
+
 	sr, err := o.getPodCreator(pod)
 	if err != nil {
 		return false, nil, &fatal{err.Error()}
