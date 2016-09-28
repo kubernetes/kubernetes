@@ -75,7 +75,7 @@ func verifyNumberOfMasterReplicas(expected int) {
 	}
 }
 
-var _ = framework.KubeDescribe("HA-master [Disruptive]", func() {
+var _ = framework.KubeDescribe("HA-master [Feature:HAMaster]", func() {
 	f := framework.NewDefaultFramework("ha-master")
 	var c *client.Client
 	var ns string
