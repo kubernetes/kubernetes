@@ -223,6 +223,7 @@ func (cc *clusterClientCache) processServiceUpdate(cachedService *cachedService,
 			for _, fed := range cachedFedServiceStatus.Ingress {
 				if new.IP == fed.IP && new.Hostname == fed.Hostname {
 					found = true
+					break
 				}
 			}
 			if !found {
