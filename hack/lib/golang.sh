@@ -421,7 +421,7 @@ kube::golang::fallback_if_stdlib_not_installable() {
 # TODO: This builds only the `teststale` binary right now. As we expand
 # this function's capabilities we need to find this a right home.
 # Ideally, not a shell script because testing shell scripts is painful.
-kube::golang::build_kube_toolchain() {
+kube::golang::install_kube_toolchain() {
   local targets=(
     hack/cmd/teststale
   )
@@ -481,6 +481,7 @@ kube::golang::build_binaries_for_platform() {
   fi
 
   if [[ -n ${use_go_build:-} ]]; then
+    echo "use_go_build: ${use_go_build:-}"
     kube::log::progress "    "
     for binary in "${statics[@]:+${statics[@]}}"; do
       local outfile=$(kube::golang::output_filename_for_binary "${binary}" "${platform}")
@@ -536,17 +537,19 @@ kube::golang::build_binaries_for_platform() {
       continue
     fi
 
-    # `go test -c` below directly builds the binary. It builds the packages,
-    # but it never installs them. `go test -i` only installs the dependencies
-    # of the test, but not the test package itself. So neither `go test -c`
-    # nor `go test -i` installs, for example, test/e2e.a. And without that,
-    # doing a staleness check on k8s.io/kubernetes/test/e2e package always
-    # returns true (always stale). And that's why we need to install the
-    # test package.
-    go install "${goflags[@]:+${goflags[@]}}" \
-        -gcflags "${gogcflags}" \
-        -ldflags "${goldflags}" \
-        "${testpkg}"
+    if [[ ! -n ${use_go_build:-} ]]; then
+      # `go test -c` below directly builds the binary. It builds the packages,
+      # but it never installs them. `go test -i` only installs the dependencies
+      # of the test, but not the test package itself. So neither `go test -c`
+      # nor `go test -i` installs, for example, test/e2e.a. And without that,
+      # doing a staleness check on k8s.io/kubernetes/test/e2e package always
+      # returns true (always stale). And that's why we need to install the
+      # test package.
+      go install "${goflags[@]:+${goflags[@]}}" \
+          -gcflags "${gogcflags}" \
+          -ldflags "${goldflags}" \
+          "${testpkg}"
+    fi
 
     mkdir -p "$(dirname ${outfile})"
     go test -c \
@@ -662,8 +665,12 @@ kube::golang::build_binaries() {
       fi
     fi
 
-    # First build the toolchain before building any other targets
-    kube::golang::build_kube_toolchain
+    # First install the toolchain before building any other targets.
+    # We are only using this toolchain when installing packages, so
+    # it is not necessary to install them when we are just building
+    if [[ ! -n ${use_go_build:-} ]]; then
+      kube::golang::install_kube_toolchain
+    fi
 
     if [[ "${parallel}" == "true" ]]; then
       kube::log::status "Building go targets for {${platforms[*]}} in parallel (output will appear in a burst when complete):" "${targets[@]}"
