@@ -168,7 +168,6 @@ function prepare-e2e {
 # Execute prior to running tests to build a release if required for env
 function test-build-release {
   # Make a release
-  export KUBERNETES_CONTRIB=mesos
   export KUBE_RELEASE_RUN_TESTS=N
   "${KUBE_ROOT}/build/release.sh"
 }
