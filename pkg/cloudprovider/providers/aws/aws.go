@@ -1254,7 +1254,11 @@ func (c *Cloud) endAttaching(i *awsInstance, volumeID string, mountDevice mountD
 		return false
 	}
 	if volumeID != existingVolumeID {
-		glog.Errorf("endAttaching on device assigned to different volume")
+		// This actually can happen, because getMountDevice combines the attaching map with the volumes
+		// attached to the instance (as reported by the EC2 API).  So if endAttaching comes after
+		// a 10 second poll delay, we might well have had a concurrent request to allocate a mountpoint,
+		// which because we allocate sequentially is _very_ likely to get the immediately freed volume
+		glog.Infof("endAttaching on device %q assigned to different volume: %q vs %q", mountDevice, volumeID, existingVolumeID)
 		return false
 	}
 	glog.V(2).Infof("Releasing in-process attachment entry: %s -> volume %s", mountDevice, volumeID)
@@ -1318,13 +1322,13 @@ func (d *awsDisk) describeVolume() (*ec2.Volume, error) {
 
 	volumes, err := d.ec2.DescribeVolumes(request)
 	if err != nil {
-		return nil, fmt.Errorf("error querying ec2 for volume info: %v", err)
+		return nil, fmt.Errorf("error querying ec2 for volume %q: %v", volumeID, err)
 	}
 	if len(volumes) == 0 {
-		return nil, fmt.Errorf("no volumes found for volume: %s", d.awsID)
+		return nil, fmt.Errorf("no volumes found for volume %q", volumeID)
 	}
 	if len(volumes) > 1 {
-		return nil, fmt.Errorf("multiple volumes found for volume: %s", d.awsID)
+		return nil, fmt.Errorf("multiple volumes found for volume %q", volumeID)
 	}
 	return volumes[0], nil
 }
@@ -1357,21 +1361,21 @@ func (d *awsDisk) waitForAttachmentStatus(status string) (*ec2.VolumeAttachment,
 		}
 		if len(info.Attachments) > 1 {
 			// Shouldn't happen; log so we know if it is
-			glog.Warningf("Found multiple attachments for volume: %v", info)
+			glog.Warningf("Found multiple attachments for volume %q: %v", d.awsID, info)
 		}
 		var attachment *ec2.VolumeAttachment
 		attachmentStatus := ""
 		for _, a := range info.Attachments {
 			if attachmentStatus != "" {
 				// Shouldn't happen; log so we know if it is
-				glog.Warningf("Found multiple attachments: %v", info)
+				glog.Warningf("Found multiple attachments for volume %q: %v", d.awsID, info)
 			}
 			if a.State != nil {
 				attachment = a
 				attachmentStatus = *a.State
 			} else {
 				// Shouldn't happen; log so we know if it is
-				glog.Warningf("Ignoring nil attachment state: %v", a)
+				glog.Warningf("Ignoring nil attachment state for volume %q: %v", d.awsID, a)
 			}
 		}
 		if attachmentStatus == "" {
@@ -1382,11 +1386,11 @@ func (d *awsDisk) waitForAttachmentStatus(status string) (*ec2.VolumeAttachment,
 		}
 
 		if time.Now().Unix() > timeoutAt {
-			glog.Warningf("Timeout waiting for volume state: actual=%s, desired=%s", attachmentStatus, status)
-			return nil, fmt.Errorf("Timeout waiting for volume state: actual=%s, desired=%s", attachmentStatus, status)
+			glog.Warningf("Timeout waiting for volume %q state: actual=%s, desired=%s", d.awsID, attachmentStatus, status)
+			return nil, fmt.Errorf("Timeout waiting for volume %q state: actual=%s, desired=%s", d.awsID, attachmentStatus, status)
 		}
 
-		glog.V(2).Infof("Waiting for volume state: actual=%s, desired=%s", attachmentStatus, status)
+		glog.V(2).Infof("Waiting for volume %q state: actual=%s, desired=%s", d.awsID, attachmentStatus, status)
 
 		time.Sleep(volumeAttachmentStatusPollInterval)
 	}
@@ -1405,7 +1409,7 @@ func (d *awsDisk) deleteVolume() (bool, error) {
 				return false, volume.NewDeletedVolumeInUseError(err.Error())
 			}
 		}
-		return false, fmt.Errorf("error deleting EBS volumes: %v", err)
+		return false, fmt.Errorf("error deleting EBS volume %q: %v", d.awsID, err)
 	}
 	return true, nil
 }
@@ -1482,7 +1486,7 @@ func (c *Cloud) AttachDisk(diskName string, nodeName types.NodeName, readOnly bo
 	defer func() {
 		if attachEnded {
 			if !c.endAttaching(awsInstance, disk.awsID, mountDevice) {
-				glog.Errorf("endAttaching called when attach not in progress")
+				glog.Errorf("endAttaching called for disk %q when attach not in progress", disk.awsID)
 			}
 		}
 	}()
@@ -1509,10 +1513,10 @@ func (c *Cloud) AttachDisk(diskName string, nodeName types.NodeName, readOnly bo
 		if err != nil {
 			attachEnded = true
 			// TODO: Check if the volume was concurrently attached?
-			return "", fmt.Errorf("Error attaching EBS volume: %v", err)
+			return "", fmt.Errorf("Error attaching EBS volume %q to instance %q: %v", disk.awsID, awsInstance.awsID, err)
 		}
 
-		glog.V(2).Infof("AttachVolume request returned %v", attachResponse)
+		glog.V(2).Infof("AttachVolume volume=%q instance=%q request returned %v", disk.awsID, awsInstance.awsID, attachResponse)
 	}
 
 	attachment, err := disk.waitForAttachmentStatus("attached")
@@ -1578,7 +1582,7 @@ func (c *Cloud) DetachDisk(diskName string, nodeName types.NodeName) (string, er
 
 	response, err := c.ec2.DetachVolume(&request)
 	if err != nil {
-		return "", fmt.Errorf("error detaching EBS volume: %v", err)
+		return "", fmt.Errorf("error detaching EBS volume %q from %q: %v", disk.awsID, awsInstance.awsID, err)
 	}
 	if response == nil {
 		return "", errors.New("no response from DetachVolume")
