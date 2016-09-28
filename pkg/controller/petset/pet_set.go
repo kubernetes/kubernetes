@@ -348,7 +348,14 @@ func (psc *PetSetController) syncPetSet(ps *apps.PetSet, pets []*api.Pod) (int, 
 		case deletePet:
 			err = petManager.Delete(pet)
 		}
-		if err != nil {
+		switch err.(type) {
+		case errUnhealthyPet:
+			// We are not passing this error up, but we don't increment numPets if we encounter it,
+			// since numPets directly translates to petset.status.replicas
+			continue
+		case nil:
+			continue
+		default:
 			it.errs = append(it.errs, err)
 		}
 	}
