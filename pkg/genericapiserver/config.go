@@ -19,7 +19,7 @@ package genericapiserver
 import (
 	"crypto/tls"
 	"fmt"
-	"mime"
+	"io"
 	"net"
 	"net/http"
 	"os"
@@ -53,10 +53,8 @@ import (
 
 // Config is a structure used to configure a GenericAPIServer.
 type Config struct {
-	AuditLogPath       string
-	AuditLogMaxAge     int
-	AuditLogMaxBackups int
-	AuditLogMaxSize    int
+	// Destination for audit logs
+	AuditWriter io.Writer
 	// Allow downstream consumers to disable swagger.
 	// This includes returning the generated swagger spec at /swaggerapi and swagger ui at /swagger-ui.
 	EnableSwaggerSupport bool
@@ -160,19 +158,30 @@ type Config struct {
 
 	// MaxRequestsInFlight is the maximum number of parallel non-long-running requests. Every further
 	// request has to wait.
-	MaxRequestsInFlight  int
-	LongRunningRequestRE string
+	MaxRequestsInFlight int
+
+	// Predicate which is true for paths of long-running http requests
+	LongRunningFunc genericfilters.LongRunningRequestCheck
 }
 
 func NewConfig(options *options.ServerRunOptions) *Config {
+	longRunningRE := regexp.MustCompile(options.LongRunningRequestRE)
+
+	var auditWriter io.Writer
+	if len(options.AuditLogPath) != 0 {
+		auditWriter = &lumberjack.Logger{
+			Filename:   options.AuditLogPath,
+			MaxAge:     options.AuditLogMaxAge,
+			MaxBackups: options.AuditLogMaxBackups,
+			MaxSize:    options.AuditLogMaxSize,
+		}
+	}
+
 	return &Config{
 		APIGroupPrefix:            options.APIGroupPrefix,
 		APIPrefix:                 options.APIPrefix,
 		CorsAllowedOriginList:     options.CorsAllowedOriginList,
-		AuditLogPath:              options.AuditLogPath,
-		AuditLogMaxAge:            options.AuditLogMaxAge,
-		AuditLogMaxBackups:        options.AuditLogMaxBackups,
-		AuditLogMaxSize:           options.AuditLogMaxSize,
+		AuditWriter:               auditWriter,
 		EnableGarbageCollection:   options.EnableGarbageCollection,
 		EnableIndex:               true,
 		EnableProfiling:           options.EnableProfiling,
@@ -196,8 +205,8 @@ func NewConfig(options *options.ServerRunOptions) *Config {
 				Version: "unversioned",
 			},
 		},
-		MaxRequestsInFlight:  options.MaxRequestsInFlight,
-		LongRunningRequestRE: options.LongRunningRequestRE,
+		MaxRequestsInFlight: options.MaxRequestsInFlight,
+		LongRunningFunc:     genericfilters.BasicLongRunningRequestCheck(longRunningRE, map[string]string{"watch": "true"}),
 	}
 }
 
@@ -324,6 +333,7 @@ func (c Config) New() (*GenericAPIServer, error) {
 	// Use CurlyRouter to be able to use regular expressions in paths. Regular expressions are required in paths for example for proxy (where the path is proxy/{kind}/{name}/{*})
 	s.HandlerContainer.Router(restful.CurlyRouter{})
 	s.Mux = apiserver.NewPathRecorderMux(s.HandlerContainer.ServeMux)
+	apiserver.InstallServiceErrorHandler(s.Serializer, s.HandlerContainer)
 
 	if c.ProxyDialer != nil || c.ProxyTLSClientConfig != nil {
 		s.ProxyTransport = utilnet.SetTransportDefaults(&http.Transport{
@@ -332,22 +342,6 @@ func (c Config) New() (*GenericAPIServer, error) {
 		})
 	}
 
-	if len(c.AuditLogPath) != 0 {
-		s.auditWriter = &lumberjack.Logger{
-			Filename:   c.AuditLogPath,
-			MaxAge:     c.AuditLogMaxAge,
-			MaxBackups: c.AuditLogMaxBackups,
-			MaxSize:    c.AuditLogMaxSize,
-		}
-	}
-
-	// Send correct mime type for .svg files.
-	// TODO: remove when https://github.com/golang/go/commit/21e47d831bafb59f22b1ea8098f709677ec8ce33
-	// makes it into all of our supported go versions (only in v1.7.1 now).
-	mime.AddExtensionType(".svg", "image/svg+xml")
-
-	apiserver.InstallServiceErrorHandler(s.Serializer, s.HandlerContainer)
-
 	s.installAPI(&c)
 	s.Handler, s.InsecureHandler = s.buildHandlerChains(&c, http.Handler(s.Mux.BaseMux().(*http.ServeMux)))
 
@@ -355,27 +349,24 @@ func (c Config) New() (*GenericAPIServer, error) {
 }
 
 func (s *GenericAPIServer) buildHandlerChains(c *Config, handler http.Handler) (secure http.Handler, insecure http.Handler) {
-	longRunningRE := regexp.MustCompile(c.LongRunningRequestRE)
-	longRunningFunc := genericfilters.BasicLongRunningRequestCheck(longRunningRE, map[string]string{"watch": "true"})
-
 	// filters which insecure and secure have in common
 	handler = genericfilters.WithCORS(handler, c.CorsAllowedOriginList, nil, nil, "true")
 
 	// insecure filters
 	insecure = handler
 	insecure = genericfilters.WithPanicRecovery(insecure, s.NewRequestInfoResolver())
-	insecure = genericfilters.WithTimeoutForNonLongRunningRequests(insecure, longRunningFunc)
+	insecure = genericfilters.WithTimeoutForNonLongRunningRequests(insecure, c.LongRunningFunc)
 
 	// secure filters
 	attributeGetter := apiserverfilters.NewRequestAttributeGetter(c.RequestContextMapper, s.NewRequestInfoResolver())
 	secure = handler
 	secure = apiserverfilters.WithAuthorization(secure, attributeGetter, c.Authorizer)
 	secure = apiserverfilters.WithImpersonation(secure, c.RequestContextMapper, c.Authorizer)
-	secure = apiserverfilters.WithAudit(secure, attributeGetter, s.auditWriter) // before impersonation to read original user
+	secure = apiserverfilters.WithAudit(secure, attributeGetter, c.AuditWriter) // before impersonation to read original user
 	secure = authhandlers.WithAuthentication(secure, c.RequestContextMapper, c.Authenticator, authhandlers.Unauthorized(c.SupportsBasicAuth))
 	secure = genericfilters.WithPanicRecovery(secure, s.NewRequestInfoResolver())
-	secure = genericfilters.WithTimeoutForNonLongRunningRequests(secure, longRunningFunc)
-	secure = genericfilters.WithMaxInFlightLimit(secure, c.MaxRequestsInFlight, longRunningFunc)
+	secure = genericfilters.WithTimeoutForNonLongRunningRequests(secure, c.LongRunningFunc)
+	secure = genericfilters.WithMaxInFlightLimit(secure, c.MaxRequestsInFlight, c.LongRunningFunc)
 
 	return
 }
