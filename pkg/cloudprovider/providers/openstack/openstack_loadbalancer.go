@@ -592,7 +592,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *api.Ser
 			return nil, fmt.Errorf("Error getting pool members %s: %v", pool.ID, err)
 		}
 		for _, nodeName := range nodeNames {
-			addr, err := getAddressByName(lbaas.compute, types.NodeName)
+			addr, err := getAddressByName(lbaas.compute, types.NodeName(nodeName))
 			if err != nil {
 				if err == ErrNotFound {
 					// Node failure, do not create member
