@@ -1,0 +1,46 @@
+{
+  "swagger": "2.0",
+  "info": {
+   "title": "Kubernetes /logs",
+   "version": "unversioned"
+  },
+  "paths": {
+   "/logs/": {
+    "get": {
+     "schemes": [
+      "https"
+     ],
+     "operationId": "logFileListHandler",
+     "responses": {
+      "default": {
+       "description": "Default Response."
+      }
+     }
+    }
+   },
+   "/logs/{logpath}": {
+    "get": {
+     "schemes": [
+      "https"
+     ],
+     "operationId": "logFileHandler",
+     "responses": {
+      "default": {
+       "description": "Default Response."
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "path to the log",
+      "name": "logpath",
+      "in": "path",
+      "required": true
+     }
+    ]
+   }
+  },
+  "definitions": {}
+ }
