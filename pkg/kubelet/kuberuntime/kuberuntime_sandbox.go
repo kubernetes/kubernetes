@@ -48,6 +48,18 @@ func (m *kubeGenericRuntimeManager) createPodSandbox(pod *api.Pod, attempt uint3
 	return podSandBoxID, "", nil
 }
 
+// Convert runtime manager ENV to runtime api KeyValue
+func kubeEnvToRuntimeEnv(envs []kubecontainer.EnvVar) []*runtimeApi.KeyValue {
+	keyValues := make([]*runtimeApi.KeyValue, len(envs))
+	for _, env := range envs {
+		keyValues = append(keyValues, &runtimeApi.KeyValue{
+			Key:   &env.Name,
+			Value: &env.Value,
+		})
+	}
+	return keyValues
+}
+
 // generatePodSandboxConfig generates pod sandbox config from api.Pod.
 func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(pod *api.Pod, attempt uint32) (*runtimeApi.PodSandboxConfig, error) {
 	// TODO: deprecating podsandbox resource requirements in favor of the pod level cgroup
@@ -60,8 +72,9 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(pod *api.Pod, attem
 			Uid:       &podUID,
 			Attempt:   &attempt,
 		},
-		Labels:      newPodLabels(pod),
-		Annotations: newPodAnnotations(pod),
+		Labels:               newPodLabels(pod),
+		Annotations:          newPodAnnotations(pod),
+		PodInfraContainerEnv: kubeEnvToRuntimeEnv(m.podInfraContainerEnv),
 	}
 
 	if !kubecontainer.IsHostNetworkPod(pod) {

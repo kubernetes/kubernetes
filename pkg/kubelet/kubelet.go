@@ -553,6 +553,8 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 				klet.cpuCFSQuota,
 				dockerService,
 				dockerService,
+				// NOTE(harryz) this is only needed by sandbox ENVs
+				kubeDeps.ContainerRuntimeOptions...,
 			)
 			if err != nil {
 				return nil, err
