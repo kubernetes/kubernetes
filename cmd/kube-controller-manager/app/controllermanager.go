@@ -341,6 +341,7 @@ func StartControllers(s *options.CMServer, kubeconfig *restclient.Config, stop <
 				metrics.DefaultHeapsterScheme,
 				metrics.DefaultHeapsterService,
 				metrics.DefaultHeapsterPort,
+				s.MetricSourceUrl,
 			)
 			go podautoscaler.NewHorizontalController(hpaClient.Core(), hpaClient.Extensions(), hpaClient.Autoscaling(), metricsClient, s.HorizontalPodAutoscalerSyncPeriod.Duration).
 				Run(wait.NeverStop)

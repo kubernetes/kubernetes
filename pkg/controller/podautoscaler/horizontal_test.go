@@ -408,7 +408,7 @@ func (tc *testCase) verifyResults(t *testing.T) {
 
 func (tc *testCase) runTest(t *testing.T) {
 	testClient := tc.prepareTestClient(t)
-	metricsClient := metrics.NewHeapsterMetricsClient(testClient, metrics.DefaultHeapsterNamespace, metrics.DefaultHeapsterScheme, metrics.DefaultHeapsterService, metrics.DefaultHeapsterPort)
+	metricsClient := metrics.NewHeapsterMetricsClient(testClient, metrics.DefaultHeapsterNamespace, metrics.DefaultHeapsterScheme, metrics.DefaultHeapsterService, metrics.DefaultHeapsterPort, "")
 
 	broadcaster := record.NewBroadcasterForTests(0)
 	broadcaster.StartRecordingToSink(&unversionedcore.EventSinkImpl{Interface: testClient.Core().Events("")})

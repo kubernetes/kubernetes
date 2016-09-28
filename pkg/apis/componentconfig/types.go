@@ -578,6 +578,8 @@ type KubeControllerManagerConfiguration struct {
 	// horizontalPodAutoscalerSyncPeriod is the period for syncing the number of
 	// pods in horizontal pod autoscaler.
 	HorizontalPodAutoscalerSyncPeriod unversioned.Duration `json:"horizontalPodAutoscalerSyncPeriod"`
+	// URL to a metrics backend.
+	MetricSourceUrl string `json:"metricSourceUrl"`
 	// deploymentControllerSyncPeriod is the period for syncing the deployments.
 	DeploymentControllerSyncPeriod unversioned.Duration `json:"deploymentControllerSyncPeriod"`
 	// podEvictionTimeout is the grace period for deleting pods on failed nodes.

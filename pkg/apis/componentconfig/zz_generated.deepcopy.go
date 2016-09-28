@@ -93,6 +93,7 @@ func DeepCopy_componentconfig_KubeControllerManagerConfiguration(in interface{},
 		out.MinResyncPeriod = in.MinResyncPeriod
 		out.TerminatedPodGCThreshold = in.TerminatedPodGCThreshold
 		out.HorizontalPodAutoscalerSyncPeriod = in.HorizontalPodAutoscalerSyncPeriod
+		out.MetricSourceUrl = in.MetricSourceUrl
 		out.DeploymentControllerSyncPeriod = in.DeploymentControllerSyncPeriod
 		out.PodEvictionTimeout = in.PodEvictionTimeout
 		out.DeletingPodsQps = in.DeletingPodsQps

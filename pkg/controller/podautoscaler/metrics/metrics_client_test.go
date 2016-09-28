@@ -200,7 +200,7 @@ func (tc *testCase) verifyResults(t *testing.T, val *float64, timestamp time.Tim
 
 func (tc *testCase) runTest(t *testing.T) {
 	testClient := tc.prepareTestClient(t)
-	metricsClient := NewHeapsterMetricsClient(testClient, DefaultHeapsterNamespace, DefaultHeapsterScheme, DefaultHeapsterService, DefaultHeapsterPort)
+	metricsClient := NewHeapsterMetricsClient(testClient, DefaultHeapsterNamespace, DefaultHeapsterScheme, DefaultHeapsterService, DefaultHeapsterPort, "")
 	if tc.targetResource == "cpu-usage" {
 		val, _, timestamp, err := metricsClient.GetCpuConsumptionAndRequestInMillis(tc.namespace, tc.selector)
 		fval := float64(val)

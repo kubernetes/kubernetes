@@ -19,6 +19,8 @@ package metrics
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"net/http"
 	"strings"
 	"time"
 
@@ -74,6 +76,7 @@ type HeapsterMetricsClient struct {
 	heapsterScheme    string
 	heapsterService   string
 	heapsterPort      string
+	heapsterUrl       string
 }
 
 var averageFunction = func(metrics heapster.MetricResultList) (intAndFloat, int, time.Time) {
@@ -91,13 +94,14 @@ func getHeapsterCustomMetricDefinition(metricName string) metricDefinition {
 }
 
 // NewHeapsterMetricsClient returns a new instance of Heapster-based implementation of MetricsClient interface.
-func NewHeapsterMetricsClient(client clientset.Interface, namespace, scheme, service, port string) *HeapsterMetricsClient {
+func NewHeapsterMetricsClient(client clientset.Interface, namespace, scheme, service, port, url string) *HeapsterMetricsClient {
 	return &HeapsterMetricsClient{
 		client:            client,
 		heapsterNamespace: namespace,
 		heapsterScheme:    scheme,
 		heapsterService:   service,
 		heapsterPort:      port,
+		heapsterUrl:       url,
 	}
 }
 
@@ -154,12 +158,7 @@ func (h *HeapsterMetricsClient) GetCpuConsumptionAndRequestInMillis(namespace st
 }
 
 func (h *HeapsterMetricsClient) getCpuUtilizationForPods(namespace string, selector labels.Selector, podNames map[string]struct{}) (int64, time.Time, error) {
-	metricPath := fmt.Sprintf("/apis/metrics/v1alpha1/namespaces/%s/pods", namespace)
-	params := map[string]string{"labelSelector": selector.String()}
-
-	resultRaw, err := h.client.Core().Services(h.heapsterNamespace).
-		ProxyGet(h.heapsterScheme, h.heapsterService, h.heapsterPort, metricPath, params).
-		DoRaw()
+	resultRaw, err := queryMetricsSource(h, fmt.Sprintf("/apis/metrics/v1alpha1/namespaces/%s/pods", namespace), map[string]string{"labelSelector": selector.String()})
 	if err != nil {
 		return 0, time.Time{}, fmt.Errorf("failed to get pods metrics: %v", err)
 	}
@@ -247,10 +246,7 @@ func (h *HeapsterMetricsClient) getCustomMetricForPods(metricSpec metricDefiniti
 		strings.Join(podNames, ","),
 		metricSpec.name)
 
-	resultRaw, err := h.client.Core().Services(h.heapsterNamespace).
-		ProxyGet(h.heapsterScheme, h.heapsterService, h.heapsterPort, metricPath, map[string]string{"start": startTime.Format(time.RFC3339)}).
-		DoRaw()
-
+	resultRaw, err := queryMetricsSource(h, metricPath, map[string]string{"start": startTime.Format(time.RFC3339)})
 	if err != nil {
 		return nil, time.Time{}, fmt.Errorf("failed to get pods metrics: %v", err)
 	}
@@ -330,4 +326,31 @@ func calculateSumFromTimeSample(metrics heapster.MetricResultList, duration time
 		timestamp = *oldest
 	}
 	return sum, count, timestamp
+}
+
+func queryMetricsSource(h *HeapsterMetricsClient, path string, params map[string]string) ([]byte, error) {
+	// Use service proxy discovery.
+	if h.heapsterUrl == "" {
+		return h.client.Core().Services(h.heapsterNamespace).
+			ProxyGet(h.heapsterScheme, h.heapsterService, h.heapsterPort, path, params).
+			DoRaw()
+	}
+
+	req, _ := http.NewRequest("GET", h.heapsterUrl+path, nil)
+
+	if len(params) > 0 {
+		q := req.URL.Query()
+		for k, v := range params {
+			q.Add(k, v)
+		}
+		req.URL.RawQuery = q.Encode()
+	}
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return []byte{}, err
+	}
+
+	return ioutil.ReadAll(resp.Body)
 }

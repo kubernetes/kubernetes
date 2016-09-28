@@ -255,6 +255,7 @@ func (s *CMServer) Run(_ []string) error {
 				metrics.DefaultHeapsterScheme,
 				metrics.DefaultHeapsterService,
 				metrics.DefaultHeapsterPort,
+				"",
 			)
 			go podautoscaler.NewHorizontalController(hpaClient.Core(), hpaClient.Extensions(), hpaClient, metricsClient, s.HorizontalPodAutoscalerSyncPeriod.Duration).
 				Run(wait.NeverStop)
