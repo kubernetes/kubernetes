@@ -66,10 +66,6 @@
 			"Rev": "2492d97b402e00797833c03ac5fa1c572c7bb29a"
 		},
 		{
-			"ImportPath": "github.com/ClusterHQ/flocker-go",
-			"Rev": "1c0a791b33bdc01d062b376612aa04e27eed7eb3"
-		},
-		{
 			"ImportPath": "github.com/Microsoft/go-winio",
 			"Comment": "v0.1.0",
 			"Rev": "8f9387ea7efabb228a981b9c381142be7667967f"
@@ -330,6 +326,10 @@
 			"ImportPath": "github.com/cloudflare/cfssl/signer/local",
 			"Comment": "1.2.0",
 			"Rev": "db0d0650b6496bfe8061ec56a92edd32d8e75c30"
+		},
+		{
+			"ImportPath": "github.com/clusterhq/flocker-go",
+			"Rev": "2b8b7259d3139c96c4a6871031355808ab3fd3b3"
 		},
 		{
 			"ImportPath": "github.com/codegangsta/negroni",
@@ -2158,7 +2158,7 @@
 		},
 		{
 			"ImportPath": "github.com/spf13/pflag",
-			"Rev": "1560c1005499d61b80f865c04d39ca7505bf7f0b"
+			"Rev": "c7e63cf4530bcd3ba943729cee0efeff2ebea63f"
 		},
 		{
 			"ImportPath": "github.com/spf13/viper",
@@ -2410,7 +2410,7 @@
 		},
 		{
 			"ImportPath": "golang.org/x/sys/unix",
-			"Rev": "9c60d1c508f5134d1ca726b4641db998f2523357"
+			"Rev": "8f0908ab3b2457e2e15403d3697c9ef5cb4b57a9"
 		},
 		{
 			"ImportPath": "golang.org/x/text/cases",

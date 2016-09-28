@@ -61,7 +61,7 @@ func priorityFunction(mapFn algorithm.PriorityMapFunction, reduceFn algorithm.Pr
 			result = append(result, hostResult)
 		}
 		if reduceFn != nil {
-			if err := reduceFn(result); err != nil {
+			if err := reduceFn(pod, result); err != nil {
 				return nil, err
 			}
 		}

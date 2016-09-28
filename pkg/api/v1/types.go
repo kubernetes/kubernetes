@@ -648,10 +648,14 @@ type CephFSVolumeSource struct {
 }
 
 // Represents a Flocker volume mounted by the Flocker agent.
+// One and only one of datasetName and datasetUUID should be set.
 // Flocker volumes do not support ownership management or SELinux relabeling.
 type FlockerVolumeSource struct {
-	// Required: the volume name. This is going to be store on metadata -> name on the payload for Flocker
-	DatasetName string `json:"datasetName" protobuf:"bytes,1,opt,name=datasetName"`
+	// Name of the dataset stored as metadata -> name on the dataset for Flocker
+	// should be considered as deprecated
+	DatasetName string `json:"datasetName,omitempty" protobuf:"bytes,1,opt,name=datasetName"`
+	// UUID of the dataset. This is unique identifier of a Flocker dataset
+	DatasetUUID string `json:"datasetUUID,omitempty" protobuf:"bytes,2,opt,name=datasetUUID"`
 }
 
 // StorageMedium defines ways that storage can be allocated to a volume.
@@ -2019,6 +2023,11 @@ type ReplicationControllerSpec struct {
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/replication-controller.md#what-is-a-replication-controller
 	Replicas *int32 `json:"replicas,omitempty" protobuf:"varint,1,opt,name=replicas"`
 
+	// Minimum number of seconds for which a newly created pod should be ready
+	// without any of its container crashing, for it to be considered available.
+	// Defaults to 0 (pod will be considered available as soon as it is ready)
+	MinReadySeconds int32 `json:"minReadySeconds,omitempty" protobuf:"varint,4,opt,name=minReadySeconds"`
+
 	// Selector is a label query over pods that should match the Replicas count.
 	// If Selector is empty, it is defaulted to the labels present on the Pod template.
 	// Label keys and values that must match in order to be controlled by this replication
@@ -2049,6 +2058,9 @@ type ReplicationControllerStatus struct {
 
 	// The number of ready replicas for this replication controller.
 	ReadyReplicas int32 `json:"readyReplicas,omitempty" protobuf:"varint,4,opt,name=readyReplicas"`
+
+	// The number of available replicas (ready for at least minReadySeconds) for this replication controller.
+	AvailableReplicas int32 `json:"availableReplicas,omitempty" protobuf:"varint,5,opt,name=availableReplicas"`
 
 	// ObservedGeneration reflects the generation of the most recently observed replication controller.
 	ObservedGeneration int64 `json:"observedGeneration,omitempty" protobuf:"varint,3,opt,name=observedGeneration"`
@@ -3017,7 +3029,7 @@ type SerializedReference struct {
 type EventSource struct {
 	// Component from which the event is generated.
 	Component string `json:"component,omitempty" protobuf:"bytes,1,opt,name=component"`
-	// Host name on which the event is generated.
+	// Node name on which the event is generated.
 	Host string `json:"host,omitempty" protobuf:"bytes,2,opt,name=host"`
 }
 

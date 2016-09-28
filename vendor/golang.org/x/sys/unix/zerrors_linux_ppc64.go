@@ -150,6 +150,7 @@ const (
 	B75                              = 0x2
 	B921600                          = 0x16
 	B9600                            = 0xd
+	BOTHER                           = 0x1f
 	BPF_A                            = 0x10
 	BPF_ABS                          = 0x20
 	BPF_ADD                          = 0x0
@@ -193,7 +194,13 @@ const (
 	BPF_X                            = 0x8
 	BPF_XOR                          = 0xa0
 	BRKINT                           = 0x2
+	BS0                              = 0x0
+	BS1                              = 0x8000
+	BSDLY                            = 0x8000
+	CBAUD                            = 0xff
+	CBAUDEX                          = 0x0
 	CFLUSH                           = 0xf
+	CIBAUD                           = 0xff0000
 	CLOCAL                           = 0x8000
 	CLOCK_BOOTTIME                   = 0x7
 	CLOCK_BOOTTIME_ALARM             = 0x9
@@ -216,6 +223,7 @@ const (
 	CLONE_FILES                      = 0x400
 	CLONE_FS                         = 0x200
 	CLONE_IO                         = 0x80000000
+	CLONE_NEWCGROUP                  = 0x2000000
 	CLONE_NEWIPC                     = 0x8000000
 	CLONE_NEWNET                     = 0x40000000
 	CLONE_NEWNS                      = 0x20000
@@ -232,7 +240,14 @@ const (
 	CLONE_UNTRACED                   = 0x800000
 	CLONE_VFORK                      = 0x4000
 	CLONE_VM                         = 0x100
+	CMSPAR                           = 0x40000000
+	CR0                              = 0x0
+	CR1                              = 0x1000
+	CR2                              = 0x2000
+	CR3                              = 0x3000
+	CRDLY                            = 0x3000
 	CREAD                            = 0x800
+	CRTSCTS                          = 0x80000000
 	CS5                              = 0x0
 	CS6                              = 0x100
 	CS7                              = 0x200
@@ -369,6 +384,9 @@ const (
 	EXTPROC                          = 0x10000000
 	FD_CLOEXEC                       = 0x1
 	FD_SETSIZE                       = 0x400
+	FF0                              = 0x0
+	FF1                              = 0x4000
+	FFDLY                            = 0x4000
 	FLUSHO                           = 0x800000
 	F_DUPFD                          = 0x0
 	F_DUPFD_CLOEXEC                  = 0x406
@@ -407,6 +425,7 @@ const (
 	F_UNLCK                          = 0x2
 	F_WRLCK                          = 0x1
 	HUPCL                            = 0x4000
+	IBSHIFT                          = 0x10
 	ICANON                           = 0x100
 	ICMPV6_FILTER                    = 0x1
 	ICRNL                            = 0x100
@@ -635,6 +654,7 @@ const (
 	IP_XFRM_POLICY                   = 0x11
 	ISIG                             = 0x80
 	ISTRIP                           = 0x20
+	IUCLC                            = 0x1000
 	IUTF8                            = 0x4000
 	IXANY                            = 0x800
 	IXOFF                            = 0x400
@@ -772,10 +792,15 @@ const (
 	NETLINK_UNUSED                   = 0x1
 	NETLINK_USERSOCK                 = 0x2
 	NETLINK_XFRM                     = 0x6
+	NL0                              = 0x0
+	NL1                              = 0x100
+	NL2                              = 0x200
+	NL3                              = 0x300
 	NLA_ALIGNTO                      = 0x4
 	NLA_F_NESTED                     = 0x8000
 	NLA_F_NET_BYTEORDER              = 0x4000
 	NLA_HDRLEN                       = 0x4
+	NLDLY                            = 0x300
 	NLMSG_ALIGNTO                    = 0x4
 	NLMSG_DONE                       = 0x3
 	NLMSG_ERROR                      = 0x2
@@ -800,6 +825,7 @@ const (
 	OCRNL                            = 0x8
 	OFDEL                            = 0x80
 	OFILL                            = 0x40
+	OLCUC                            = 0x4
 	ONLCR                            = 0x2
 	ONLRET                           = 0x20
 	ONOCR                            = 0x10
@@ -1398,10 +1424,21 @@ const (
 	S_IXGRP                          = 0x8
 	S_IXOTH                          = 0x1
 	S_IXUSR                          = 0x40
+	TAB0                             = 0x0
+	TAB1                             = 0x400
+	TAB2                             = 0x800
+	TAB3                             = 0xc00
+	TABDLY                           = 0xc00
 	TCFLSH                           = 0x2000741f
+	TCGETA                           = 0x40147417
+	TCGETS                           = 0x402c7413
 	TCIFLUSH                         = 0x0
+	TCIOFF                           = 0x2
 	TCIOFLUSH                        = 0x2
+	TCION                            = 0x3
 	TCOFLUSH                         = 0x1
+	TCOOFF                           = 0x0
+	TCOON                            = 0x1
 	TCP_CONGESTION                   = 0xd
 	TCP_COOKIE_IN_ALWAYS             = 0x1
 	TCP_COOKIE_MAX                   = 0x10
@@ -1440,6 +1477,15 @@ const (
 	TCP_USER_TIMEOUT                 = 0x12
 	TCP_WINDOW_CLAMP                 = 0xa
 	TCSAFLUSH                        = 0x2
+	TCSBRK                           = 0x2000741d
+	TCSBRKP                          = 0x5425
+	TCSETA                           = 0x80147418
+	TCSETAF                          = 0x8014741c
+	TCSETAW                          = 0x80147419
+	TCSETS                           = 0x802c7414
+	TCSETSF                          = 0x802c7416
+	TCSETSW                          = 0x802c7415
+	TCXONC                           = 0x2000741e
 	TIOCCBRK                         = 0x5428
 	TIOCCONS                         = 0x541d
 	TIOCEXCL                         = 0x540c
@@ -1571,6 +1617,8 @@ const (
 	WORDSIZE                         = 0x40
 	WSTOPPED                         = 0x2
 	WUNTRACED                        = 0x2
+	XCASE                            = 0x4000
+	XTABS                            = 0xc00
 )
 
 // Errors

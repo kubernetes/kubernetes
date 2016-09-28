@@ -22,6 +22,7 @@ package v1alpha1
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
+	v1 "k8s.io/kubernetes/pkg/api/v1"
 	apps "k8s.io/kubernetes/pkg/apis/apps"
 	conversion "k8s.io/kubernetes/pkg/conversion"
 	runtime "k8s.io/kubernetes/pkg/runtime"
@@ -137,6 +138,50 @@ func autoConvert_apps_PetSetList_To_v1alpha1_PetSetList(in *apps.PetSetList, out
 
 func Convert_apps_PetSetList_To_v1alpha1_PetSetList(in *apps.PetSetList, out *PetSetList, s conversion.Scope) error {
 	return autoConvert_apps_PetSetList_To_v1alpha1_PetSetList(in, out, s)
+}
+
+func autoConvert_v1alpha1_PetSetSpec_To_apps_PetSetSpec(in *PetSetSpec, out *apps.PetSetSpec, s conversion.Scope) error {
+	// WARNING: in.Replicas requires manual conversion: inconvertible types (*int32 vs int)
+	out.Selector = in.Selector
+	if err := v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+		return err
+	}
+	if in.VolumeClaimTemplates != nil {
+		in, out := &in.VolumeClaimTemplates, &out.VolumeClaimTemplates
+		*out = make([]api.PersistentVolumeClaim, len(*in))
+		for i := range *in {
+			// TODO: Inefficient conversion - can we improve it?
+			if err := s.Convert(&(*in)[i], &(*out)[i], 0); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.VolumeClaimTemplates = nil
+	}
+	out.ServiceName = in.ServiceName
+	return nil
+}
+
+func autoConvert_apps_PetSetSpec_To_v1alpha1_PetSetSpec(in *apps.PetSetSpec, out *PetSetSpec, s conversion.Scope) error {
+	// WARNING: in.Replicas requires manual conversion: inconvertible types (int vs *int32)
+	out.Selector = in.Selector
+	if err := v1.Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+		return err
+	}
+	if in.VolumeClaimTemplates != nil {
+		in, out := &in.VolumeClaimTemplates, &out.VolumeClaimTemplates
+		*out = make([]v1.PersistentVolumeClaim, len(*in))
+		for i := range *in {
+			// TODO: Inefficient conversion - can we improve it?
+			if err := s.Convert(&(*in)[i], &(*out)[i], 0); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.VolumeClaimTemplates = nil
+	}
+	out.ServiceName = in.ServiceName
+	return nil
 }
 
 func autoConvert_v1alpha1_PetSetStatus_To_apps_PetSetStatus(in *PetSetStatus, out *apps.PetSetStatus, s conversion.Scope) error {

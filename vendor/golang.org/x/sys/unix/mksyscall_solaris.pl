@@ -110,9 +110,9 @@ while(<>) {
 	$sysname =~ y/A-Z/a-z/; # All libc functions are lowercase.
 
 	# Runtime import of function to allow cross-platform builds.
-	$dynimports .= "//go:cgo_import_dynamic ${modname}_${sysname} ${sysname} \"$modname.so\"\n";
+	$dynimports .= "//go:cgo_import_dynamic libc_${sysname} ${sysname} \"$modname.so\"\n";
 	# Link symbol to proc address variable.
-	$linknames .= "//go:linkname ${sysvarname} ${modname}_${sysname}\n";
+	$linknames .= "//go:linkname ${sysvarname} libc_${sysname}\n";
 	# Library proc address variable.
 	push @vars, $sysvarname;
 

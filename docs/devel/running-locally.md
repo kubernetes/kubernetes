@@ -57,7 +57,7 @@ Getting started locally
 
 #### Linux
 
-Not running Linux? Consider running Linux in a local virtual machine with [Vagrant](../getting-started-guides/vagrant.md), or on a cloud provider like [Google Compute Engine](../getting-started-guides/gce.md).
+Not running Linux? Consider running [Minikube](http://kubernetes.io/docs/getting-started-guides/minikube/), or on a cloud provider like [Google Compute Engine](../getting-started-guides/gce.md).
 
 #### Docker
 

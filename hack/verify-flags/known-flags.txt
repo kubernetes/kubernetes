@@ -266,6 +266,10 @@ k8s-bin-dir
 k8s-build-output
 keep-gogoproto
 km-path
+kops-cluster
+kops-nodes
+kops-state
+kops-zones
 kube-api-burst
 kube-api-content-type
 kube-api-qps

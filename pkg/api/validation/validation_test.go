@@ -1520,7 +1520,18 @@ func TestValidateVolumes(t *testing.T) {
 		},
 		// Flocker
 		{
-			name: "valid Flocker",
+			name: "valid Flocker -- datasetUUID",
+			vol: api.Volume{
+				Name: "flocker",
+				VolumeSource: api.VolumeSource{
+					Flocker: &api.FlockerVolumeSource{
+						DatasetUUID: "d846b09d-223d-43df-ab5b-d6db2206a0e4",
+					},
+				},
+			},
+		},
+		{
+			name: "valid Flocker -- datasetName",
 			vol: api.Volume{
 				Name: "flocker",
 				VolumeSource: api.VolumeSource{
@@ -1531,7 +1542,7 @@ func TestValidateVolumes(t *testing.T) {
 			},
 		},
 		{
-			name: "empty flocker datasetName",
+			name: "both empty",
 			vol: api.Volume{
 				Name: "flocker",
 				VolumeSource: api.VolumeSource{
@@ -1541,7 +1552,21 @@ func TestValidateVolumes(t *testing.T) {
 				},
 			},
 			errtype:  field.ErrorTypeRequired,
-			errfield: "flocker.datasetName",
+			errfield: "flocker",
+		},
+		{
+			name: "both specified",
+			vol: api.Volume{
+				Name: "flocker",
+				VolumeSource: api.VolumeSource{
+					Flocker: &api.FlockerVolumeSource{
+						DatasetName: "datasetName",
+						DatasetUUID: "d846b09d-223d-43df-ab5b-d6db2206a0e4",
+					},
+				},
+			},
+			errtype:  field.ErrorTypeInvalid,
+			errfield: "flocker",
 		},
 		{
 			name: "slash in flocker datasetName",

@@ -181,8 +181,8 @@ func defaultPriorities() sets.String {
 		// Set this weight large enough to override all other priority functions.
 		// TODO: Figure out a better way to do this, maybe at same time as fixing #24720.
 		factory.RegisterPriorityFunction2("NodePreferAvoidPodsPriority", priorities.CalculateNodePreferAvoidPodsPriorityMap, nil, 10000),
-		factory.RegisterPriorityFunction("NodeAffinityPriority", priorities.CalculateNodeAffinityPriority, 1),
-		factory.RegisterPriorityFunction("TaintTolerationPriority", priorities.ComputeTaintTolerationPriority, 1),
+		factory.RegisterPriorityFunction2("NodeAffinityPriority", priorities.CalculateNodeAffinityPriorityMap, priorities.CalculateNodeAffinityPriorityReduce, 1),
+		factory.RegisterPriorityFunction2("TaintTolerationPriority", priorities.ComputeTaintTolerationPriorityMap, priorities.ComputeTaintTolerationPriorityReduce, 1),
 		// pods should be placed in the same topological domain (e.g. same node, same rack, same zone, same power domain, etc.)
 		// as some other pods, or, conversely, should not be placed in the same topological domain as some other pods.
 		factory.RegisterPriorityConfigFactory(

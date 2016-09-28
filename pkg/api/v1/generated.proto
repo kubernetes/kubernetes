@@ -769,7 +769,7 @@ message EventSource {
   // Component from which the event is generated.
   optional string component = 1;
 
-  // Host name on which the event is generated.
+  // Node name on which the event is generated.
   optional string host = 2;
 }
 
@@ -840,10 +840,15 @@ message FlexVolumeSource {
 }
 
 // Represents a Flocker volume mounted by the Flocker agent.
+// One and only one of datasetName and datasetUUID should be set.
 // Flocker volumes do not support ownership management or SELinux relabeling.
 message FlockerVolumeSource {
-  // Required: the volume name. This is going to be store on metadata -> name on the payload for Flocker
+  // Name of the dataset stored as metadata -> name on the dataset for Flocker
+  // should be considered as deprecated
   optional string datasetName = 1;
+
+  // UUID of the dataset. This is unique identifier of a Flocker dataset
+  optional string datasetUUID = 2;
 }
 
 // Represents a Persistent Disk resource in Google Compute Engine.
@@ -2474,6 +2479,11 @@ message ReplicationControllerSpec {
   // More info: http://releases.k8s.io/HEAD/docs/user-guide/replication-controller.md#what-is-a-replication-controller
   optional int32 replicas = 1;
 
+  // Minimum number of seconds for which a newly created pod should be ready
+  // without any of its container crashing, for it to be considered available.
+  // Defaults to 0 (pod will be considered available as soon as it is ready)
+  optional int32 minReadySeconds = 4;
+
   // Selector is a label query over pods that should match the Replicas count.
   // If Selector is empty, it is defaulted to the labels present on the Pod template.
   // Label keys and values that must match in order to be controlled by this replication
@@ -2499,6 +2509,9 @@ message ReplicationControllerStatus {
 
   // The number of ready replicas for this replication controller.
   optional int32 readyReplicas = 4;
+
+  // The number of available replicas (ready for at least minReadySeconds) for this replication controller.
+  optional int32 availableReplicas = 5;
 
   // ObservedGeneration reflects the generation of the most recently observed replication controller.
   optional int64 observedGeneration = 3;

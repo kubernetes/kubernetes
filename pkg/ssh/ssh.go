@@ -217,7 +217,7 @@ func runSSHCommand(dialer sshDialer, cmd, user, host string, signer ssh.Signer, 
 		err = wait.Poll(5*time.Second, 20*time.Second, func() (bool, error) {
 			fmt.Printf("error dialing %s@%s: '%v', retrying\n", user, host, err)
 			if client, err = dialer.Dial("tcp", host, config); err != nil {
-				return false, nil
+				return false, err
 			}
 			return true, nil
 		})

@@ -2353,7 +2353,7 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <div class="sect2">
 <h3 id="_v1_flockervolumesource">v1.FlockerVolumeSource</h3>
 <div class="paragraph">
-<p>Represents a Flocker volume mounted by the Flocker agent. Flocker volumes do not support ownership management or SELinux relabeling.</p>
+<p>Represents a Flocker volume mounted by the Flocker agent. One and only one of datasetName and datasetUUID should be set. Flocker volumes do not support ownership management or SELinux relabeling.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -2375,8 +2375,15 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">datasetName</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Required: the volume name. This is going to be store on metadata &#8594; name on the payload for Flocker</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Name of the dataset stored as metadata &#8594; name on the dataset for Flocker should be considered as deprecated</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">datasetUUID</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">UUID of the dataset. This is unique identifier of a Flocker dataset</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
@@ -4389,7 +4396,7 @@ The PetSet guarantees that a given network identity will always map to the same 
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2016-09-22 17:28:35 UTC
+Last updated 2016-09-24 08:31:55 UTC
 </div>
 </div>
 </body>

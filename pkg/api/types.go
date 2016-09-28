@@ -741,10 +741,14 @@ type CephFSVolumeSource struct {
 }
 
 // Represents a Flocker volume mounted by the Flocker agent.
+// One and only one of datasetName and datasetUUID should be set.
 // Flocker volumes do not support ownership management or SELinux relabeling.
 type FlockerVolumeSource struct {
-	// Required: the volume name. This is going to be store on metadata -> name on the payload for Flocker
-	DatasetName string `json:"datasetName"`
+	// Name of the dataset stored as metadata -> name on the dataset for Flocker
+	// should be considered as deprecated
+	DatasetName string `json:"datasetName,omitempty"`
+	// UUID of the dataset. This is unique identifier of a Flocker dataset
+	DatasetUUID string `json:"datasetUUID,omitempty"`
 }
 
 // Represents a volume containing downward API info.
@@ -1713,6 +1717,11 @@ type ReplicationControllerSpec struct {
 	// Replicas is the number of desired replicas.
 	Replicas int32 `json:"replicas"`
 
+	// Minimum number of seconds for which a newly created pod should be ready
+	// without any of its container crashing, for it to be considered available.
+	// Defaults to 0 (pod will be considered available as soon as it is ready)
+	MinReadySeconds int32 `json:"minReadySeconds,omitempty"`
+
 	// Selector is a label query over pods that should match the Replicas count.
 	Selector map[string]string `json:"selector"`
 
@@ -1738,6 +1747,9 @@ type ReplicationControllerStatus struct {
 
 	// The number of ready replicas for this replication controller.
 	ReadyReplicas int32 `json:"readyReplicas,omitempty"`
+
+	// The number of available replicas (ready for at least minReadySeconds) for this replication controller.
+	AvailableReplicas int32 `json:"availableReplicas,omitempty"`
 
 	// ObservedGeneration is the most recent generation observed by the controller.
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
@@ -2568,7 +2580,7 @@ type SerializedReference struct {
 type EventSource struct {
 	// Component from which the event is generated.
 	Component string `json:"component,omitempty"`
-	// Host name on which the event is generated.
+	// Node name on which the event is generated.
 	Host string `json:"host,omitempty"`
 }
 

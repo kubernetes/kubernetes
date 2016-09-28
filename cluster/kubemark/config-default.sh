@@ -45,6 +45,11 @@ CLUSTER_IP_RANGE="${CLUSTER_IP_RANGE:-10.240.0.0/13}"
 RUNTIME_CONFIG="${KUBE_RUNTIME_CONFIG:-}"
 TERMINATED_POD_GC_THRESHOLD=${TERMINATED_POD_GC_THRESHOLD:-100}
 
+# Set etcd version (e.g. 3.0.4-migration.1) if you need non-default version.
+TEST_ETCD_VERSION="${TEST_ETCD_VERSION:-}"
+# Storage backend. 'etcd2' supported, 'etcd3' experimental.
+STORAGE_BACKEND=${STORAGE_BACKEND:-etcd2}
+
 # Default Log level for all components in test clusters and variables to override it in specific components.
 TEST_CLUSTER_LOG_LEVEL="${TEST_CLUSTER_LOG_LEVEL:---v=2}"
 KUBELET_TEST_LOG_LEVEL="${KUBELET_TEST_LOG_LEVEL:-$TEST_CLUSTER_LOG_LEVEL}"

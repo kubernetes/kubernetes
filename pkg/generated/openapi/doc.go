@@ -15,5 +15,4 @@ limitations under the License.
 */
 
 // openapi generated definitions.
-// +k8s:openapi-gen=target
 package openapi

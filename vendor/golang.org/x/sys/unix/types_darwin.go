@@ -241,3 +241,10 @@ type BpfHdr C.struct_bpf_hdr
 // Terminal handling
 
 type Termios C.struct_termios
+
+// fchmodat-like syscalls.
+
+const (
+	AT_FDCWD            = C.AT_FDCWD
+	AT_SYMLINK_NOFOLLOW = C.AT_SYMLINK_NOFOLLOW
+)

@@ -16549,7 +16549,7 @@
      },
      "host": {
       "type": "string",
-      "description": "Host name on which the event is generated."
+      "description": "Node name on which the event is generated."
      }
     }
    },
@@ -17638,14 +17638,15 @@
    },
    "v1.FlockerVolumeSource": {
     "id": "v1.FlockerVolumeSource",
-    "description": "Represents a Flocker volume mounted by the Flocker agent. Flocker volumes do not support ownership management or SELinux relabeling.",
-    "required": [
-     "datasetName"
-    ],
+    "description": "Represents a Flocker volume mounted by the Flocker agent. One and only one of datasetName and datasetUUID should be set. Flocker volumes do not support ownership management or SELinux relabeling.",
     "properties": {
      "datasetName": {
       "type": "string",
-      "description": "Required: the volume name. This is going to be store on metadata -\u003e name on the payload for Flocker"
+      "description": "Name of the dataset stored as metadata -\u003e name on the dataset for Flocker should be considered as deprecated"
+     },
+     "datasetUUID": {
+      "type": "string",
+      "description": "UUID of the dataset. This is unique identifier of a Flocker dataset"
      }
     }
    },
@@ -19088,6 +19089,11 @@
       "format": "int32",
       "description": "Replicas is the number of desired replicas. This is a pointer to distinguish between explicit zero and unspecified. Defaults to 1. More info: http://releases.k8s.io/HEAD/docs/user-guide/replication-controller.md#what-is-a-replication-controller"
      },
+     "minReadySeconds": {
+      "type": "integer",
+      "format": "int32",
+      "description": "Minimum number of seconds for which a newly created pod should be ready without any of its container crashing, for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready)"
+     },
      "selector": {
       "type": "object",
       "description": "Selector is a label query over pods that should match the Replicas count. If Selector is empty, it is defaulted to the labels present on the Pod template. Label keys and values that must match in order to be controlled by this replication controller, if empty defaulted to labels on Pod template. More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors"
@@ -19119,6 +19125,11 @@
       "type": "integer",
       "format": "int32",
       "description": "The number of ready replicas for this replication controller."
+     },
+     "availableReplicas": {
+      "type": "integer",
+      "format": "int32",
+      "description": "The number of available replicas (ready for at least minReadySeconds) for this replication controller."
      },
      "observedGeneration": {
       "type": "integer",

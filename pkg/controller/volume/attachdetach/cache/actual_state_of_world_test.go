@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	controllervolumetesting "k8s.io/kubernetes/pkg/controller/volume/attachdetach/testing"
+	"k8s.io/kubernetes/pkg/types"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
 )
 
@@ -34,7 +35,7 @@ func Test_AddVolumeNode_Positive_NewVolumeNewNode(t *testing.T) {
 	volumeName := api.UniqueVolumeName("volume-name")
 	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
 
-	nodeName := "node-name"
+	nodeName := types.NodeName("node-name")
 	devicePath := "fake/device/path"
 
 	// Act
@@ -66,8 +67,8 @@ func Test_AddVolumeNode_Positive_ExistingVolumeNewNode(t *testing.T) {
 	asw := NewActualStateOfWorld(volumePluginMgr)
 	volumeName := api.UniqueVolumeName("volume-name")
 	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
-	node1Name := "node1-name"
-	node2Name := "node2-name"
+	node1Name := types.NodeName("node1-name")
+	node2Name := types.NodeName("node2-name")
 	devicePath := "fake/device/path"
 
 	// Act
@@ -116,7 +117,7 @@ func Test_AddVolumeNode_Positive_ExistingVolumeExistingNode(t *testing.T) {
 	asw := NewActualStateOfWorld(volumePluginMgr)
 	volumeName := api.UniqueVolumeName("volume-name")
 	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
-	nodeName := "node-name"
+	nodeName := types.NodeName("node-name")
 	devicePath := "fake/device/path"
 
 	// Act
@@ -160,7 +161,7 @@ func Test_DeleteVolumeNode_Positive_VolumeExistsNodeExists(t *testing.T) {
 	asw := NewActualStateOfWorld(volumePluginMgr)
 	volumeName := api.UniqueVolumeName("volume-name")
 	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
-	nodeName := "node-name"
+	nodeName := types.NodeName("node-name")
 	devicePath := "fake/device/path"
 	generatedVolumeName, addErr := asw.AddVolumeNode(volumeSpec, nodeName, devicePath)
 	if addErr != nil {
@@ -189,7 +190,7 @@ func Test_DeleteVolumeNode_Positive_VolumeDoesntExistNodeDoesntExist(t *testing.
 	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
 	asw := NewActualStateOfWorld(volumePluginMgr)
 	volumeName := api.UniqueVolumeName("volume-name")
-	nodeName := "node-name"
+	nodeName := types.NodeName("node-name")
 
 	// Act
 	asw.DeleteVolumeNode(volumeName, nodeName)
@@ -216,8 +217,8 @@ func Test_DeleteVolumeNode_Positive_TwoNodesOneDeleted(t *testing.T) {
 	asw := NewActualStateOfWorld(volumePluginMgr)
 	volumeName := api.UniqueVolumeName("volume-name")
 	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
-	node1Name := "node1-name"
-	node2Name := "node2-name"
+	node1Name := types.NodeName("node1-name")
+	node2Name := types.NodeName("node2-name")
 	devicePath := "fake/device/path"
 	generatedVolumeName1, add1Err := asw.AddVolumeNode(volumeSpec, node1Name, devicePath)
 	if add1Err != nil {
@@ -265,7 +266,7 @@ func Test_VolumeNodeExists_Positive_VolumeExistsNodeExists(t *testing.T) {
 	asw := NewActualStateOfWorld(volumePluginMgr)
 	volumeName := api.UniqueVolumeName("volume-name")
 	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
-	nodeName := "node-name"
+	nodeName := types.NodeName("node-name")
 	devicePath := "fake/device/path"
 	generatedVolumeName, addErr := asw.AddVolumeNode(volumeSpec, nodeName, devicePath)
 	if addErr != nil {
@@ -297,8 +298,8 @@ func Test_VolumeNodeExists_Positive_VolumeExistsNodeDoesntExist(t *testing.T) {
 	asw := NewActualStateOfWorld(volumePluginMgr)
 	volumeName := api.UniqueVolumeName("volume-name")
 	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
-	node1Name := "node1-name"
-	node2Name := "node2-name"
+	node1Name := types.NodeName("node1-name")
+	node2Name := types.NodeName("node2-name")
 	devicePath := "fake/device/path"
 	generatedVolumeName, addErr := asw.AddVolumeNode(volumeSpec, node1Name, devicePath)
 	if addErr != nil {
@@ -328,7 +329,7 @@ func Test_VolumeNodeExists_Positive_VolumeAndNodeDontExist(t *testing.T) {
 	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
 	asw := NewActualStateOfWorld(volumePluginMgr)
 	volumeName := api.UniqueVolumeName("volume-name")
-	nodeName := "node-name"
+	nodeName := types.NodeName("node-name")
 
 	// Act
 	volumeNodeComboExists := asw.VolumeNodeExists(volumeName, nodeName)
@@ -369,7 +370,7 @@ func Test_GetAttachedVolumes_Positive_OneVolumeOneNode(t *testing.T) {
 	asw := NewActualStateOfWorld(volumePluginMgr)
 	volumeName := api.UniqueVolumeName("volume-name")
 	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
-	nodeName := "node-name"
+	nodeName := types.NodeName("node-name")
 	devicePath := "fake/device/path"
 	generatedVolumeName, addErr := asw.AddVolumeNode(volumeSpec, nodeName, devicePath)
 	if addErr != nil {
@@ -396,7 +397,7 @@ func Test_GetAttachedVolumes_Positive_TwoVolumeTwoNodes(t *testing.T) {
 	asw := NewActualStateOfWorld(volumePluginMgr)
 	volume1Name := api.UniqueVolumeName("volume1-name")
 	volume1Spec := controllervolumetesting.GetTestVolumeSpec(string(volume1Name), volume1Name)
-	node1Name := "node1-name"
+	node1Name := types.NodeName("node1-name")
 	devicePath := "fake/device/path"
 	generatedVolumeName1, add1Err := asw.AddVolumeNode(volume1Spec, node1Name, devicePath)
 	if add1Err != nil {
@@ -404,7 +405,7 @@ func Test_GetAttachedVolumes_Positive_TwoVolumeTwoNodes(t *testing.T) {
 	}
 	volume2Name := api.UniqueVolumeName("volume2-name")
 	volume2Spec := controllervolumetesting.GetTestVolumeSpec(string(volume2Name), volume2Name)
-	node2Name := "node2-name"
+	node2Name := types.NodeName("node2-name")
 	generatedVolumeName2, add2Err := asw.AddVolumeNode(volume2Spec, node2Name, devicePath)
 	if add2Err != nil {
 		t.Fatalf("AddVolumeNode failed. Expected: <no error> Actual: <%v>", add2Err)
@@ -431,13 +432,13 @@ func Test_GetAttachedVolumes_Positive_OneVolumeTwoNodes(t *testing.T) {
 	asw := NewActualStateOfWorld(volumePluginMgr)
 	volumeName := api.UniqueVolumeName("volume-name")
 	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
-	node1Name := "node1-name"
+	node1Name := types.NodeName("node1-name")
 	devicePath := "fake/device/path"
 	generatedVolumeName1, add1Err := asw.AddVolumeNode(volumeSpec, node1Name, devicePath)
 	if add1Err != nil {
 		t.Fatalf("AddVolumeNode failed. Expected: <no error> Actual: <%v>", add1Err)
 	}
-	node2Name := "node2-name"
+	node2Name := types.NodeName("node2-name")
 	generatedVolumeName2, add2Err := asw.AddVolumeNode(volumeSpec, node2Name, devicePath)
 	if add2Err != nil {
 		t.Fatalf("AddVolumeNode failed. Expected: <no error> Actual: <%v>", add2Err)
@@ -470,7 +471,7 @@ func Test_SetVolumeMountedByNode_Positive_Set(t *testing.T) {
 	asw := NewActualStateOfWorld(volumePluginMgr)
 	volumeName := api.UniqueVolumeName("volume-name")
 	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
-	nodeName := "node-name"
+	nodeName := types.NodeName("node-name")
 	devicePath := "fake/device/path"
 	generatedVolumeName, addErr := asw.AddVolumeNode(volumeSpec, nodeName, devicePath)
 	if addErr != nil {
@@ -497,7 +498,7 @@ func Test_SetVolumeMountedByNode_Positive_UnsetWithInitialSet(t *testing.T) {
 	asw := NewActualStateOfWorld(volumePluginMgr)
 	volumeName := api.UniqueVolumeName("volume-name")
 	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
-	nodeName := "node-name"
+	nodeName := types.NodeName("node-name")
 	devicePath := "fake/device/path"
 	generatedVolumeName, addErr := asw.AddVolumeNode(volumeSpec, nodeName, devicePath)
 	if addErr != nil {
@@ -533,7 +534,7 @@ func Test_SetVolumeMountedByNode_Positive_UnsetWithoutInitialSet(t *testing.T) {
 	asw := NewActualStateOfWorld(volumePluginMgr)
 	volumeName := api.UniqueVolumeName("volume-name")
 	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
-	nodeName := "node-name"
+	nodeName := types.NodeName("node-name")
 	devicePath := "fake/device/path"
 	generatedVolumeName, addErr := asw.AddVolumeNode(volumeSpec, nodeName, devicePath)
 	if addErr != nil {
@@ -566,7 +567,7 @@ func Test_SetVolumeMountedByNode_Positive_UnsetWithInitialSetAddVolumeNodeNotRes
 	asw := NewActualStateOfWorld(volumePluginMgr)
 	volumeName := api.UniqueVolumeName("volume-name")
 	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
-	nodeName := "node-name"
+	nodeName := types.NodeName("node-name")
 	devicePath := "fake/device/path"
 	generatedVolumeName, addErr := asw.AddVolumeNode(volumeSpec, nodeName, devicePath)
 	if addErr != nil {
@@ -607,7 +608,7 @@ func Test_SetVolumeMountedByNode_Positive_UnsetWithInitialSetVerifyDetachRequest
 	asw := NewActualStateOfWorld(volumePluginMgr)
 	volumeName := api.UniqueVolumeName("volume-name")
 	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
-	nodeName := "node-name"
+	nodeName := types.NodeName("node-name")
 	devicePath := "fake/device/path"
 	generatedVolumeName, addErr := asw.AddVolumeNode(volumeSpec, nodeName, devicePath)
 	if addErr != nil {
@@ -655,7 +656,7 @@ func Test_RemoveVolumeFromReportAsAttached_Positive_Set(t *testing.T) {
 	volumeName := api.UniqueVolumeName("volume-name")
 	devicePath := "fake/device/path"
 	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
-	nodeName := "node-name"
+	nodeName := types.NodeName("node-name")
 	generatedVolumeName, addErr := asw.AddVolumeNode(volumeSpec, nodeName, devicePath)
 	if addErr != nil {
 		t.Fatalf("AddVolumeNode failed. Expected: <no error> Actual: <%v>", addErr)
@@ -681,7 +682,7 @@ func Test_RemoveVolumeFromReportAsAttached_Positive_Marked(t *testing.T) {
 	asw := NewActualStateOfWorld(volumePluginMgr)
 	volumeName := api.UniqueVolumeName("volume-name")
 	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
-	nodeName := "node-name"
+	nodeName := types.NodeName("node-name")
 	devicePath := "fake/device/path"
 	generatedVolumeName, addErr := asw.AddVolumeNode(volumeSpec, nodeName, devicePath)
 	if addErr != nil {
@@ -717,7 +718,7 @@ func Test_MarkDesireToDetach_Positive_MarkedAddVolumeNodeReset(t *testing.T) {
 	asw := NewActualStateOfWorld(volumePluginMgr)
 	volumeName := api.UniqueVolumeName("volume-name")
 	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
-	nodeName := "node-name"
+	nodeName := types.NodeName("node-name")
 	devicePath := "fake/device/path"
 	generatedVolumeName, addErr := asw.AddVolumeNode(volumeSpec, nodeName, devicePath)
 	if addErr != nil {
@@ -760,7 +761,7 @@ func Test_RemoveVolumeFromReportAsAttached_Positive_UnsetWithInitialSetVolumeMou
 	asw := NewActualStateOfWorld(volumePluginMgr)
 	volumeName := api.UniqueVolumeName("volume-name")
 	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
-	nodeName := "node-name"
+	nodeName := types.NodeName("node-name")
 	devicePath := "fake/device/path"
 	generatedVolumeName, addErr := asw.AddVolumeNode(volumeSpec, nodeName, devicePath)
 	if addErr != nil {
@@ -803,7 +804,7 @@ func Test_RemoveVolumeFromReportAsAttached(t *testing.T) {
 	asw := NewActualStateOfWorld(volumePluginMgr)
 	volumeName := api.UniqueVolumeName("volume-name")
 	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
-	nodeName := "node-name"
+	nodeName := types.NodeName("node-name")
 	devicePath := "fake/device/path"
 	generatedVolumeName, addErr := asw.AddVolumeNode(volumeSpec, nodeName, devicePath)
 	if addErr != nil {
@@ -836,7 +837,7 @@ func Test_RemoveVolumeFromReportAsAttached_AddVolumeToReportAsAttached_Positive(
 	asw := NewActualStateOfWorld(volumePluginMgr)
 	volumeName := api.UniqueVolumeName("volume-name")
 	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
-	nodeName := "node-name"
+	nodeName := types.NodeName("node-name")
 	devicePath := "fake/device/path"
 	generatedVolumeName, addErr := asw.AddVolumeNode(volumeSpec, nodeName, devicePath)
 	if addErr != nil {
@@ -879,7 +880,7 @@ func Test_RemoveVolumeFromReportAsAttached_Delete_AddVolumeNode(t *testing.T) {
 	asw := NewActualStateOfWorld(volumePluginMgr)
 	volumeName := api.UniqueVolumeName("volume-name")
 	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
-	nodeName := "node-name"
+	nodeName := types.NodeName("node-name")
 	devicePath := "fake/device/path"
 	generatedVolumeName, addErr := asw.AddVolumeNode(volumeSpec, nodeName, devicePath)
 	if addErr != nil {
@@ -924,7 +925,7 @@ func Test_SetDetachRequestTime_Positive(t *testing.T) {
 	asw := NewActualStateOfWorld(volumePluginMgr)
 	volumeName := api.UniqueVolumeName("volume-name")
 	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
-	nodeName := "node-name"
+	nodeName := types.NodeName("node-name")
 	devicePath := "fake/device/path"
 	generatedVolumeName, addErr := asw.AddVolumeNode(volumeSpec, nodeName, devicePath)
 	if addErr != nil {
@@ -955,7 +956,7 @@ func verifyAttachedVolume(
 	attachedVolumes []AttachedVolume,
 	expectedVolumeName api.UniqueVolumeName,
 	expectedVolumeSpecName string,
-	expectedNodeName string,
+	expectedNodeName types.NodeName,
 	expectedMountedByNode,
 	expectNonZeroDetachRequestedTime bool) {
 	for _, attachedVolume := range attachedVolumes {
@@ -981,7 +982,7 @@ func Test_GetAttachedVolumesForNode_Positive_NoVolumesOrNodes(t *testing.T) {
 	// Arrange
 	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
 	asw := NewActualStateOfWorld(volumePluginMgr)
-	node := "random"
+	node := types.NodeName("random")
 
 	// Act
 	attachedVolumes := asw.GetAttachedVolumesForNode(node)
@@ -998,7 +999,7 @@ func Test_GetAttachedVolumesForNode_Positive_OneVolumeOneNode(t *testing.T) {
 	asw := NewActualStateOfWorld(volumePluginMgr)
 	volumeName := api.UniqueVolumeName("volume-name")
 	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
-	nodeName := "node-name"
+	nodeName := types.NodeName("node-name")
 	devicePath := "fake/device/path"
 	generatedVolumeName, addErr := asw.AddVolumeNode(volumeSpec, nodeName, devicePath)
 	if addErr != nil {
@@ -1022,7 +1023,7 @@ func Test_GetAttachedVolumesForNode_Positive_TwoVolumeTwoNodes(t *testing.T) {
 	asw := NewActualStateOfWorld(volumePluginMgr)
 	volume1Name := api.UniqueVolumeName("volume1-name")
 	volume1Spec := controllervolumetesting.GetTestVolumeSpec(string(volume1Name), volume1Name)
-	node1Name := "node1-name"
+	node1Name := types.NodeName("node1-name")
 	devicePath := "fake/device/path"
 	_, add1Err := asw.AddVolumeNode(volume1Spec, node1Name, devicePath)
 	if add1Err != nil {
@@ -1030,7 +1031,7 @@ func Test_GetAttachedVolumesForNode_Positive_TwoVolumeTwoNodes(t *testing.T) {
 	}
 	volume2Name := api.UniqueVolumeName("volume2-name")
 	volume2Spec := controllervolumetesting.GetTestVolumeSpec(string(volume2Name), volume2Name)
-	node2Name := "node2-name"
+	node2Name := types.NodeName("node2-name")
 	generatedVolumeName2, add2Err := asw.AddVolumeNode(volume2Spec, node2Name, devicePath)
 	if add2Err != nil {
 		t.Fatalf("AddVolumeNode failed. Expected: <no error> Actual: <%v>", add2Err)
@@ -1053,13 +1054,13 @@ func Test_GetAttachedVolumesForNode_Positive_OneVolumeTwoNodes(t *testing.T) {
 	asw := NewActualStateOfWorld(volumePluginMgr)
 	volumeName := api.UniqueVolumeName("volume-name")
 	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
-	node1Name := "node1-name"
+	node1Name := types.NodeName("node1-name")
 	devicePath := "fake/device/path"
 	generatedVolumeName1, add1Err := asw.AddVolumeNode(volumeSpec, node1Name, devicePath)
 	if add1Err != nil {
 		t.Fatalf("AddVolumeNode failed. Expected: <no error> Actual: <%v>", add1Err)
 	}
-	node2Name := "node2-name"
+	node2Name := types.NodeName("node2-name")
 	generatedVolumeName2, add2Err := asw.AddVolumeNode(volumeSpec, node2Name, devicePath)
 	if add2Err != nil {
 		t.Fatalf("AddVolumeNode failed. Expected: <no error> Actual: <%v>", add2Err)

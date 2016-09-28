@@ -138,6 +138,7 @@ func Run(s *options.CMServer) error {
 	if err != nil {
 		glog.Fatalf("Invalid API configuration: %v", err)
 	}
+	leaderElectionClient := clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "leader-election"))
 
 	go func() {
 		mux := http.NewServeMux()
@@ -183,12 +184,12 @@ func Run(s *options.CMServer) error {
 			Namespace: "kube-system",
 			Name:      "kube-controller-manager",
 		},
-		EndpointsClient: kubeClient,
-		Identity:        id,
-		EventRecorder:   recorder,
-		LeaseDuration:   s.LeaderElection.LeaseDuration.Duration,
-		RenewDeadline:   s.LeaderElection.RenewDeadline.Duration,
-		RetryPeriod:     s.LeaderElection.RetryPeriod.Duration,
+		Client:        leaderElectionClient,
+		Identity:      id,
+		EventRecorder: recorder,
+		LeaseDuration: s.LeaderElection.LeaseDuration.Duration,
+		RenewDeadline: s.LeaderElection.RenewDeadline.Duration,
+		RetryPeriod:   s.LeaderElection.RetryPeriod.Duration,
 		Callbacks: leaderelection.LeaderCallbacks{
 			OnStartedLeading: run,
 			OnStoppedLeading: func() {
@@ -221,8 +222,8 @@ func StartControllers(s *options.CMServer, kubeconfig *restclient.Config, stop <
 	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 
 	if s.TerminatedPodGCThreshold > 0 {
-		go podgc.New(client("pod-garbage-collector"), ResyncPeriod(s), int(s.TerminatedPodGCThreshold)).
-			Run(wait.NeverStop)
+		go podgc.NewPodGC(client("pod-garbage-collector"), sharedInformers.Pods().Informer(),
+			int(s.TerminatedPodGCThreshold)).Run(wait.NeverStop)
 		time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 	}
 
@@ -425,19 +426,16 @@ func StartControllers(s *options.CMServer, kubeconfig *restclient.Config, stop <
 	if err != nil {
 		glog.Fatalf("An backward-compatible provisioner could not be created: %v, but one was expected. Provisioning will not work. This functionality is considered an early Alpha version.", err)
 	}
-	volumeController := persistentvolumecontroller.NewPersistentVolumeController(
-		client("persistent-volume-binder"),
-		s.PVClaimBinderSyncPeriod.Duration,
-		alphaProvisioner,
-		ProbeControllerVolumePlugins(cloud, s.VolumeConfiguration),
-		cloud,
-		s.ClusterName,
-		nil, // volumeSource
-		nil, // claimSource
-		nil, // classSource
-		nil, // eventRecorder
-		s.VolumeConfiguration.EnableDynamicProvisioning,
-	)
+	params := persistentvolumecontroller.ControllerParameters{
+		KubeClient:                client("persistent-volume-binder"),
+		SyncPeriod:                s.PVClaimBinderSyncPeriod.Duration,
+		AlphaProvisioner:          alphaProvisioner,
+		VolumePlugins:             ProbeControllerVolumePlugins(cloud, s.VolumeConfiguration),
+		Cloud:                     cloud,
+		ClusterName:               s.ClusterName,
+		EnableDynamicProvisioning: s.VolumeConfiguration.EnableDynamicProvisioning,
+	}
+	volumeController := persistentvolumecontroller.NewController(params)
 	volumeController.Run(wait.NeverStop)
 	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 

@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
@@ -59,7 +60,7 @@ func (plugin *cinderPlugin) GetDeviceMountRefs(deviceMountPath string) ([]string
 	return mount.GetMountRefs(mounter, deviceMountPath)
 }
 
-func (attacher *cinderDiskAttacher) Attach(spec *volume.Spec, hostName string) (string, error) {
+func (attacher *cinderDiskAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string, error) {
 	volumeSource, _, err := getVolumeSource(spec)
 	if err != nil {
 		return "", err
@@ -71,7 +72,7 @@ func (attacher *cinderDiskAttacher) Attach(spec *volume.Spec, hostName string) (
 	if !res {
 		return "", fmt.Errorf("failed to list openstack instances")
 	}
-	instanceid, err := instances.InstanceID(hostName)
+	instanceid, err := instances.InstanceID(nodeName)
 	if err != nil {
 		return "", err
 	}
@@ -208,13 +209,13 @@ func (plugin *cinderPlugin) NewDetacher() (volume.Detacher, error) {
 	}, nil
 }
 
-func (detacher *cinderDiskDetacher) Detach(deviceMountPath string, hostName string) error {
+func (detacher *cinderDiskDetacher) Detach(deviceMountPath string, nodeName types.NodeName) error {
 	volumeID := path.Base(deviceMountPath)
 	instances, res := detacher.cinderProvider.Instances()
 	if !res {
 		return fmt.Errorf("failed to list openstack instances")
 	}
-	instanceid, err := instances.InstanceID(hostName)
+	instanceid, err := instances.InstanceID(nodeName)
 	if ind := strings.LastIndex(instanceid, "/"); ind >= 0 {
 		instanceid = instanceid[(ind + 1):]
 	}
@@ -224,12 +225,12 @@ func (detacher *cinderDiskDetacher) Detach(deviceMountPath string, hostName stri
 		// Log error and continue with detach
 		glog.Errorf(
 			"Error checking if volume (%q) is already attached to current node (%q). Will continue and try detach anyway. err=%v",
-			volumeID, hostName, err)
+			volumeID, nodeName, err)
 	}
 
 	if err == nil && !attached {
 		// Volume is already detached from node.
-		glog.Infof("detach operation was successful. volume %q is already detached from node %q.", volumeID, hostName)
+		glog.Infof("detach operation was successful. volume %q is already detached from node %q.", volumeID, nodeName)
 		return nil
 	}
 

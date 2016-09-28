@@ -63,7 +63,7 @@ resources](../user-guide/working-with-resources.md).*
     - [List Operations](#list-operations)
     - [Map Operations](#map-operations)
   - [Idempotency](#idempotency)
-  - [Optional vs Required](#optional-vs-required)
+  - [Optional vs. Required](#optional-vs-required)
   - [Defaulting](#defaulting)
   - [Late Initialization](#late-initialization)
   - [Concurrency Control and Consistency](#concurrency-control-and-consistency)
@@ -658,7 +658,7 @@ exists - instead, it will either return 201 Created or 504 with Reason
 allotted, and the client should retry (optionally after the time indicated in
 the Retry-After header).
 
-## Optional vs Required
+## Optional vs. Required
 
 Fields must be either optional or required.
 

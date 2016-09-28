@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/certificates"
 	unversionedcertificates "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/certificates/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/types"
 	certutil "k8s.io/kubernetes/pkg/util/cert"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -33,7 +34,7 @@ import (
 // then it will watch the object's status, once approved by API server, it will return the API
 // server's issued certificate (pem-encoded). If there is any errors, or the watch timeouts,
 // it will return an error. This is intended for use on nodes (kubelet and kubeadm).
-func RequestNodeCertificate(client unversionedcertificates.CertificateSigningRequestInterface, privateKeyData []byte, nodeName string) (certData []byte, err error) {
+func RequestNodeCertificate(client unversionedcertificates.CertificateSigningRequestInterface, privateKeyData []byte, nodeName types.NodeName) (certData []byte, err error) {
 	subject := &pkix.Name{
 		Organization: []string{"system:nodes"},
 		CommonName:   fmt.Sprintf("system:node:%s", nodeName),

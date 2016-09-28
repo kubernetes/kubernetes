@@ -216,6 +216,7 @@ gen_deepcopy: $(DEEPCOPY_FILES)
 	if [[ -f $(META_DIR)/$(DEEPCOPY_GEN).todo ]]; then                  \
 	    ./hack/run-in-gopath.sh $(DEEPCOPY_GEN)                         \
 	        --v $(KUBE_VERBOSE)                                         \
+	        --logtostderr                                               \
 	        -i $$(cat $(META_DIR)/$(DEEPCOPY_GEN).todo | paste -sd, -)  \
 	        --bounding-dirs $(PRJ_SRC_PATH)                             \
 	        -O $(DEEPCOPY_BASENAME);                                    \
@@ -295,6 +296,7 @@ $(DEEPCOPY_GEN):
 # The result file, in each pkg, of open-api generation.
 OPENAPI_BASENAME := $(GENERATED_FILE_PREFIX)openapi
 OPENAPI_FILENAME := $(OPENAPI_BASENAME).go
+OPENAPI_OUTPUT_PKG := pkg/generated/openapi
 
 # The tool used to generate open apis.
 OPENAPI_GEN := $(BIN_DIR)/openapi-gen
@@ -309,18 +311,11 @@ OPENAPI_DIRS := $(shell                                             \
         | sort -u                                                   \
 )
 
-OPENAPI_FILES := $(addsuffix /$(OPENAPI_FILENAME), $(OPENAPI_DIRS))
+OPENAPI_OUTFILE := $(OPENAPI_OUTPUT_PKG)/$(OPENAPI_FILENAME)
 
-# This rule aggregates the set of files to generate and then generates them all
-# in a single run of the tool.
+# This rule is the user-friendly entrypoint for openapi generation.
 .PHONY: gen_openapi
-gen_openapi: $(OPENAPI_FILES)
-	if [[ -f $(META_DIR)/$(OPENAPI_GEN).todo ]]; then                   \
-	    ./hack/run-in-gopath.sh $(OPENAPI_GEN)                          \
-	        --v $(KUBE_VERBOSE)                                         \
-	        -i $$(cat $(META_DIR)/$(OPENAPI_GEN).todo | paste -sd, -)   \
-	        -O $(OPENAPI_BASENAME);                                     \
-	fi
+gen_openapi: $(OPENAPI_OUTFILE)
 
 # For each dir in OPENAPI_DIRS, this establishes a dependency between the
 # output file and the input files that should trigger a rebuild.
@@ -335,18 +330,18 @@ gen_openapi: $(OPENAPI_FILES)
 # We depend on the $(GOFILES_META).stamp to detect when the set of input files
 # has changed.  This allows us to detect deleted input files.
 $(foreach dir, $(OPENAPI_DIRS), $(eval                                     \
-    $(dir)/$(OPENAPI_FILENAME): $(META_DIR)/$(dir)/$(GOFILES_META).stamp   \
+    $(OPENAPI_OUTFILE): $(META_DIR)/$(dir)/$(GOFILES_META).stamp           \
                                  $(gofiles__$(dir))                        \
 ))
 
-# Unilaterally remove any leftovers from previous runs.
-$(shell rm -f $(META_DIR)/$(OPENAPI_GEN)*.todo)
-
-# How to regenerate open-api code.  We need to collect these up and trigger one
-# single run to generate definition for all types.
-$(OPENAPI_FILES): $(OPENAPI_GEN)
-	mkdir -p $$(dirname $(META_DIR)/$(OPENAPI_GEN))
-	echo $(PRJ_SRC_PATH)/$(@D) >> $(META_DIR)/$(OPENAPI_GEN).todo
+# How to regenerate open-api code.  This emits a single file for all results.
+$(OPENAPI_OUTFILE): $(OPENAPI_GEN)
+	./hack/run-in-gopath.sh $(OPENAPI_GEN)                                          \
+	    --v $(KUBE_VERBOSE)                                                         \
+	    --logtostderr                                                               \
+	    -i $$(echo $(addprefix $(PRJ_SRC_PATH)/, $(OPENAPI_DIRS)) | sed 's/ /,/g')  \
+	    -p $(PRJ_SRC_PATH)/$(OPENAPI_OUTPUT_PKG)                                    \
+	    -O $(OPENAPI_BASENAME)
 
 # This calculates the dependencies for the generator tool, so we only rebuild
 # it when needed.  It is PHONY so that it always runs, but it only updates the
@@ -432,6 +427,7 @@ gen_conversion: $(CONVERSION_FILES)
 	if [[ -f $(META_DIR)/$(CONVERSION_GEN).todo ]]; then                  \
 	    ./hack/run-in-gopath.sh $(CONVERSION_GEN)                         \
 	        --v $(KUBE_VERBOSE)                                           \
+	        --logtostderr                                               \
 	        -i $$(cat $(META_DIR)/$(CONVERSION_GEN).todo | paste -sd, -)  \
 	        -O $(CONVERSION_BASENAME);                                    \
 	fi

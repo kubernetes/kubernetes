@@ -717,6 +717,7 @@ func (rm *ReplicationManager) syncReplicationController(key string) error {
 	// matching pods must be part of the filteredPods.
 	fullyLabeledReplicasCount := 0
 	readyReplicasCount := 0
+	availableReplicasCount := 0
 	templateLabel := labels.Set(rc.Spec.Template.Labels).AsSelectorPreValidated()
 	for _, pod := range filteredPods {
 		if templateLabel.Matches(labels.Set(pod.Labels)) {
@@ -724,11 +725,21 @@ func (rm *ReplicationManager) syncReplicationController(key string) error {
 		}
 		if api.IsPodReady(pod) {
 			readyReplicasCount++
+			if api.IsPodAvailable(pod, rc.Spec.MinReadySeconds, unversioned.Now()) {
+				availableReplicasCount++
+			}
 		}
 	}
 
 	// Always updates status as pods come up or die.
-	if err := updateReplicaCount(rm.kubeClient.Core().ReplicationControllers(rc.Namespace), rc, len(filteredPods), fullyLabeledReplicasCount, readyReplicasCount); err != nil {
+	if err := updateReplicaCount(
+		rm.kubeClient.Core().ReplicationControllers(rc.Namespace),
+		rc,
+		len(filteredPods),
+		fullyLabeledReplicasCount,
+		readyReplicasCount,
+		availableReplicasCount,
+	); err != nil {
 		// Multiple things could lead to this update failing.  Returning an error causes a requeue without forcing a hotloop
 		return err
 	}

@@ -594,19 +594,18 @@ func newTestController(kubeClient clientset.Interface, volumeSource, claimSource
 	if classSource == nil {
 		classSource = fcache.NewFakeControllerSource()
 	}
-	ctrl := NewPersistentVolumeController(
-		kubeClient,
-		5*time.Second,        // sync period
-		nil,                  // alpha provisioner
-		[]vol.VolumePlugin{}, // recyclers
-		nil,                  // cloud
-		"",
-		volumeSource,
-		claimSource,
-		classSource,
-		record.NewFakeRecorder(1000), // event recorder
-		enableDynamicProvisioning,
-	)
+
+	params := ControllerParameters{
+		KubeClient:                kubeClient,
+		SyncPeriod:                5 * time.Second,
+		VolumePlugins:             []vol.VolumePlugin{},
+		VolumeSource:              volumeSource,
+		ClaimSource:               claimSource,
+		ClassSource:               classSource,
+		EventRecorder:             record.NewFakeRecorder(1000),
+		EnableDynamicProvisioning: enableDynamicProvisioning,
+	}
+	ctrl := NewController(params)
 
 	// Speed up the test
 	ctrl.createProvisionedPVInterval = 5 * time.Millisecond

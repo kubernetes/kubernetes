@@ -22,13 +22,13 @@ import (
 	"time"
 
 	federation_api "k8s.io/kubernetes/federation/apis/federation/v1beta1"
-	fake_federation_release_1_4 "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_4/fake"
+	fake_fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5/fake"
 	. "k8s.io/kubernetes/federation/pkg/federation-controller/util/test"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	extensionsv1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	kube_release_1_4 "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4"
-	fake_kube_release_1_4 "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4/fake"
+	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
+	fake_kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/fake"
 	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/runtime"
 
@@ -45,19 +45,19 @@ func TestNamespaceController(t *testing.T) {
 		},
 	}
 
-	fakeClient := &fake_federation_release_1_4.Clientset{}
+	fakeClient := &fake_fedclientset.Clientset{}
 	RegisterFakeList("clusters", &fakeClient.Fake, &federation_api.ClusterList{Items: []federation_api.Cluster{*cluster1}})
 	RegisterFakeList("namespaces", &fakeClient.Fake, &api_v1.NamespaceList{Items: []api_v1.Namespace{}})
 	namespaceWatch := RegisterFakeWatch("namespaces", &fakeClient.Fake)
 	clusterWatch := RegisterFakeWatch("clusters", &fakeClient.Fake)
 
-	cluster1Client := &fake_kube_release_1_4.Clientset{}
+	cluster1Client := &fake_kubeclientset.Clientset{}
 	cluster1Watch := RegisterFakeWatch("namespaces", &cluster1Client.Fake)
 	RegisterFakeList("namespaces", &cluster1Client.Fake, &api_v1.NamespaceList{Items: []api_v1.Namespace{}})
 	cluster1CreateChan := RegisterFakeCopyOnCreate("namespaces", &cluster1Client.Fake, cluster1Watch)
 	cluster1UpdateChan := RegisterFakeCopyOnUpdate("namespaces", &cluster1Client.Fake, cluster1Watch)
 
-	cluster2Client := &fake_kube_release_1_4.Clientset{}
+	cluster2Client := &fake_kubeclientset.Clientset{}
 	cluster2Watch := RegisterFakeWatch("namespaces", &cluster2Client.Fake)
 	RegisterFakeList("namespaces", &cluster2Client.Fake, &api_v1.NamespaceList{Items: []api_v1.Namespace{}})
 	cluster2CreateChan := RegisterFakeCopyOnCreate("namespaces", &cluster2Client.Fake, cluster2Watch)
@@ -87,7 +87,7 @@ func TestNamespaceController(t *testing.T) {
 
 	namespaceController := NewNamespaceController(fakeClient)
 	informer := ToFederatedInformerForTestOnly(namespaceController.namespaceFederatedInformer)
-	informer.SetClientFactory(func(cluster *federation_api.Cluster) (kube_release_1_4.Interface, error) {
+	informer.SetClientFactory(func(cluster *federation_api.Cluster) (kubeclientset.Interface, error) {
 		switch cluster.Name {
 		case cluster1.Name:
 			return cluster1Client, nil

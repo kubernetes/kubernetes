@@ -40,22 +40,6 @@ const (
 	LargeClusterThreshold = 20
 )
 
-// cleanupOrphanedPods deletes pods that are bound to nodes that don't
-// exist.
-func cleanupOrphanedPods(pods []*api.Pod, nodeStore cache.Store, forcefulDeletePodFunc func(*api.Pod) error) {
-	for _, pod := range pods {
-		if pod.Spec.NodeName == "" {
-			continue
-		}
-		if _, exists, _ := nodeStore.GetByKey(pod.Spec.NodeName); exists {
-			continue
-		}
-		if err := forcefulDeletePodFunc(pod); err != nil {
-			utilruntime.HandleError(err)
-		}
-	}
-}
-
 // deletePods will delete all pods from master running on given node, and return true
 // if any pods were deleted, or were found pending deletion.
 func deletePods(kubeClient clientset.Interface, recorder record.EventRecorder, nodeName, nodeUID string, daemonStore cache.StoreToDaemonSetLister) (bool, error) {
@@ -244,7 +228,7 @@ func nodeRunningOutdatedKubelet(node *api.Node) bool {
 	return false
 }
 
-func nodeExistsInCloudProvider(cloud cloudprovider.Interface, nodeName string) (bool, error) {
+func nodeExistsInCloudProvider(cloud cloudprovider.Interface, nodeName types.NodeName) (bool, error) {
 	instances, ok := cloud.Instances()
 	if !ok {
 		return false, fmt.Errorf("%v", ErrCloudInstance)

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,155 +19,11 @@ package apiserver
 import (
 	"fmt"
 	"net/http"
-	"runtime/debug"
 	"strings"
 
-	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/auth/authorizer"
-	"k8s.io/kubernetes/pkg/httplog"
-	"k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
-
-// specialVerbs contains just strings which are used in REST paths for special actions that don't fall under the normal
-// CRUDdy GET/POST/PUT/DELETE actions on REST objects.
-// TODO: find a way to keep this up to date automatically.  Maybe dynamically populate list as handlers added to
-// master's Mux.
-var specialVerbs = sets.NewString("proxy", "redirect", "watch")
-
-// specialVerbsNoSubresources contains root verbs which do not allow subresources
-var specialVerbsNoSubresources = sets.NewString("proxy", "redirect")
-
-// namespaceSubresources contains subresources of namespace
-// this list allows the parser to distinguish between a namespace subresource, and a namespaced resource
-var namespaceSubresources = sets.NewString("status", "finalize")
-
-// NamespaceSubResourcesForTest exports namespaceSubresources for testing in pkg/master/master_test.go, so we never drift
-var NamespaceSubResourcesForTest = sets.NewString(namespaceSubresources.List()...)
-
-// IsReadOnlyReq() is true for any (or at least many) request which has no observable
-// side effects on state of apiserver (though there may be internal side effects like
-// caching and logging).
-func IsReadOnlyReq(req http.Request) bool {
-	if req.Method == "GET" {
-		// TODO: add OPTIONS and HEAD if we ever support those.
-		return true
-	}
-	return false
-}
-
-// ReadOnly passes all GET requests on to handler, and returns an error on all other requests.
-func ReadOnly(handler http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		if IsReadOnlyReq(*req) {
-			handler.ServeHTTP(w, req)
-			return
-		}
-		w.WriteHeader(http.StatusForbidden)
-		fmt.Fprintf(w, "This is a read-only endpoint.")
-	})
-}
-
-// RecoverPanics wraps an http Handler to recover and log panics.
-func RecoverPanics(handler http.Handler, resolver *RequestInfoResolver) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		defer runtime.HandleCrash(func(err interface{}) {
-			http.Error(w, "This request caused apisever to panic. Look in log for details.", http.StatusInternalServerError)
-			glog.Errorf("APIServer panic'd on %v %v: %v\n%s\n", req.Method, req.RequestURI, err, debug.Stack())
-		})
-
-		logger := httplog.NewLogged(req, &w)
-		requestInfo, err := resolver.GetRequestInfo(req)
-		if err != nil || requestInfo.Verb != "proxy" {
-			logger.StacktraceWhen(
-				httplog.StatusIsNot(
-					http.StatusOK,
-					http.StatusCreated,
-					http.StatusAccepted,
-					http.StatusBadRequest,
-					http.StatusMovedPermanently,
-					http.StatusTemporaryRedirect,
-					http.StatusConflict,
-					http.StatusNotFound,
-					http.StatusUnauthorized,
-					http.StatusForbidden,
-					http.StatusNotModified,
-					errors.StatusUnprocessableEntity,
-					http.StatusSwitchingProtocols,
-				),
-			)
-		}
-		defer logger.Log()
-		// Dispatch to the internal handler
-		handler.ServeHTTP(w, req)
-	})
-}
-
-// RequestAttributeGetter is a function that extracts authorizer.Attributes from an http.Request
-type RequestAttributeGetter interface {
-	GetAttribs(req *http.Request) (attribs authorizer.Attributes)
-}
-
-type requestAttributeGetter struct {
-	requestContextMapper api.RequestContextMapper
-	requestInfoResolver  *RequestInfoResolver
-}
-
-// NewAttributeGetter returns an object which implements the RequestAttributeGetter interface.
-func NewRequestAttributeGetter(requestContextMapper api.RequestContextMapper, requestInfoResolver *RequestInfoResolver) RequestAttributeGetter {
-	return &requestAttributeGetter{requestContextMapper, requestInfoResolver}
-}
-
-func (r *requestAttributeGetter) GetAttribs(req *http.Request) authorizer.Attributes {
-	attribs := authorizer.AttributesRecord{}
-
-	ctx, ok := r.requestContextMapper.Get(req)
-	if ok {
-		user, ok := api.UserFrom(ctx)
-		if ok {
-			attribs.User = user
-		}
-	}
-
-	requestInfo, _ := r.requestInfoResolver.GetRequestInfo(req)
-
-	// Start with common attributes that apply to resource and non-resource requests
-	attribs.ResourceRequest = requestInfo.IsResourceRequest
-	attribs.Path = requestInfo.Path
-	attribs.Verb = requestInfo.Verb
-
-	attribs.APIGroup = requestInfo.APIGroup
-	attribs.APIVersion = requestInfo.APIVersion
-	attribs.Resource = requestInfo.Resource
-	attribs.Subresource = requestInfo.Subresource
-	attribs.Namespace = requestInfo.Namespace
-	attribs.Name = requestInfo.Name
-
-	return &attribs
-}
-
-// WithAuthorizationCheck passes all authorized requests on to handler, and returns a forbidden error otherwise.
-func WithAuthorization(handler http.Handler, getAttribs RequestAttributeGetter, a authorizer.Authorizer) http.Handler {
-	if a == nil {
-		glog.Warningf("Authorization is disabled")
-		return handler
-	}
-	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		authorized, reason, err := a.Authorize(getAttribs.GetAttribs(req))
-		if err != nil {
-			internalError(w, req, err)
-			return
-		}
-		if !authorized {
-			glog.V(4).Infof("Forbidden: %#v, Reason: %s", req.RequestURI, reason)
-			forbidden(w, req)
-			return
-		}
-		handler.ServeHTTP(w, req)
-	})
-}
 
 // RequestInfo holds information parsed from the http.Request
 type RequestInfo struct {
@@ -194,6 +50,22 @@ type RequestInfo struct {
 	// Parts are the path parts for the request, always starting with /{resource}/{name}
 	Parts []string
 }
+
+// specialVerbs contains just strings which are used in REST paths for special actions that don't fall under the normal
+// CRUDdy GET/POST/PUT/DELETE actions on REST objects.
+// TODO: find a way to keep this up to date automatically.  Maybe dynamically populate list as handlers added to
+// master's Mux.
+var specialVerbs = sets.NewString("proxy", "redirect", "watch")
+
+// specialVerbsNoSubresources contains root verbs which do not allow subresources
+var specialVerbsNoSubresources = sets.NewString("proxy", "redirect")
+
+// namespaceSubresources contains subresources of namespace
+// this list allows the parser to distinguish between a namespace subresource, and a namespaced resource
+var namespaceSubresources = sets.NewString("status", "finalize")
+
+// NamespaceSubResourcesForTest exports namespaceSubresources for testing in pkg/master/master_test.go, so we never drift
+var NamespaceSubResourcesForTest = sets.NewString(namespaceSubresources.List()...)
 
 type RequestInfoResolver struct {
 	APIPrefixes          sets.String
@@ -333,4 +205,13 @@ func (r *RequestInfoResolver) GetRequestInfo(req *http.Request) (RequestInfo, er
 	}
 
 	return requestInfo, nil
+}
+
+// splitPath returns the segments for a URL path.
+func splitPath(path string) []string {
+	path = strings.Trim(path, "/")
+	if path == "" {
+		return []string{}
+	}
+	return strings.Split(path, "/")
 }

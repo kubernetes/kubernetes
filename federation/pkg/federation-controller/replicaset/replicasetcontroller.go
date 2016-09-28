@@ -28,7 +28,7 @@ import (
 
 	fed "k8s.io/kubernetes/federation/apis/federation"
 	fedv1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
-	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_4"
+	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5"
 	planner "k8s.io/kubernetes/federation/pkg/federation-controller/replicaset/planner"
 	fedutil "k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/eventsink"
@@ -36,7 +36,7 @@ import (
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	extensionsv1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/cache"
-	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4"
+	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/runtime"
