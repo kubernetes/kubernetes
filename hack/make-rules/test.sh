@@ -32,7 +32,6 @@ kube::test::find_dirs() {
           -o -path './_output/*' \
           -o -path './_gopath/*' \
           -o -path './contrib/podex/*' \
-          -o -path './contrib/mesos/*' \
           -o -path './output/*' \
           -o -path './release/*' \
           -o -path './target/*' \
