@@ -43,12 +43,33 @@
 #  OpenStack-Heat
 #   * export KUBERNETES_PROVIDER=openstack-heat; wget -q -O - https://get.k8s.io | bash
 #
-#  Set KUBERNETES_SKIP_DOWNLOAD to non-empty to skip downloading a release.
+#  Set KUBERNETES_RELEASE to choose a specific release instead of the current
+#    stable release, (e.g. 'v1.3.7').
+#    See https://github.com/kubernetes/kubernetes/releases for release options.
+#
+#  Set KUBERNETES_SERVER_ARCH to choose the server (Kubernetes cluster)
+#  architecture to download:
+#    * amd64 [default]
+#    * arm
+#    * arm64
+#
+#  Set KUBERNETES_SKIP_DOWNLOAD to skip downloading a release.
 #  Set KUBERNETES_SKIP_CONFIRM to skip the installation confirmation prompt.
-#  Set KUBERNETES_RELEASE to the release you want to use (e.g. 'v1.2.0'). See https://github.com/kubernetes/kubernetes/releases for release options
+
 set -o errexit
 set -o nounset
 set -o pipefail
+
+# Use the script from inside the Kubernetes tarball to fetch the client and
+# server binaries (if not included in kubernetes.tar.gz).
+function download_kube_binaries {
+  (
+    cd kubernetes
+    if [[ -x ./cluster/get-kube-binaries.sh ]]; then
+      ./cluster/get-kube-binaries.sh
+    fi
+  )
+}
 
 function create_cluster {
   echo "Creating a kubernetes on ${KUBERNETES_PROVIDER:-gce}..."
@@ -64,13 +85,13 @@ function create_cluster {
   )
 }
 
-if [[ "${KUBERNETES_SKIP_DOWNLOAD-}" ]]; then
+if [[ -n "${KUBERNETES_SKIP_DOWNLOAD-}" ]]; then
   create_cluster
   exit 0
 fi
 
 if [[ -d "./kubernetes" ]]; then
-  if [[ -n "${KUBERNETES_SKIP_CONFIRM-}" ]]; then
+  if [[ -z "${KUBERNETES_SKIP_CONFIRM-}" ]]; then
     echo "'kubernetes' directory already exist. Should we skip download step and start to create cluster based on it? [Y]/n"
     read confirm
     if [[ "$confirm" == "y" ]]; then
@@ -96,6 +117,8 @@ function get_latest_version_number {
 release=${KUBERNETES_RELEASE:-$(get_latest_version_number)}
 release_url=https://storage.googleapis.com/kubernetes-release/release/${release}/kubernetes.tar.gz
 
+# TODO: remove client checks once kubernetes.tar.gz no longer includes client
+# binaries by default.
 uname=$(uname)
 if [[ "${uname}" == "Darwin" ]]; then
   platform="darwin"
@@ -115,13 +138,9 @@ elif [[ "${machine}" == "i686" ]]; then
   arch="386"
 elif [[ "${machine}" == "arm*" ]]; then
   arch="arm"
-elif [[ "${machine}" == "s390x*" ]]; then
-  arch="s390x"
-elif [[ "${machine}" == "ppc64le" ]]; then
-  arch="ppc64le"
 else
   echo "Unknown, unsupported architecture (${machine})."
-  echo "Supported architectures x86_64, i686, arm, s390x, ppc64le."
+  echo "Supported architectures x86_64, i686, arm."
   echo "Bailing out."
   exit 3
 fi
@@ -129,7 +148,7 @@ fi
 file=kubernetes.tar.gz
 
 echo "Downloading kubernetes release ${release} to ${PWD}/kubernetes.tar.gz"
-if [[ -n "${KUBERNETES_SKIP_CONFIRM-}" ]]; then
+if [[ -z "${KUBERNETES_SKIP_CONFIRM-}" ]]; then
   echo "Is this ok? [Y]/n"
   read confirm
   if [[ "$confirm" == "n" ]]; then
@@ -150,4 +169,5 @@ fi
 echo "Unpacking kubernetes release ${release}"
 tar -xzf ${file}
 
+download_kube_binaries
 create_cluster
