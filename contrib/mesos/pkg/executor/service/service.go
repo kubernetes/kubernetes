@@ -44,6 +44,7 @@ import (
 	kconfig "k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/types"
 )
 
 // TODO(jdef): passing the value of envContainerID to all docker containers instantiated
