@@ -32,20 +32,15 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
-// Data type to track PVs as keys and their bound PVCs as values.  All PVs should be stored in the map regardless of their status.
-// Unbound PVs keys have nil values. PVCs are mutually exclusive between the pvclist and the bindmap. One or the other
-// will track a PVC, but never both at once.  Once a PV is identified as bound, the respective PVC should be assigned to that
-// PV's value and set to nil in the pvclist object
-// NOTE: When working with PV keys, it is safe to delete them from the map using the delete() built-in.  However, you cannot
-// update the key itself.  For example, if you Get() a new instance of a PV, you must delete original PV key while adding the
-// new version to the map.  WARNING: It's unsafe to add keys to a map in a loop.  Their insertion in the map is unpredictable
-// and can result in the same pv.Name being iterated over again.
-type bindmap map[*api.PersistentVolume]*api.PersistentVolumeClaim
+// Map of PV Names as keys to boolean values representing bound state (false for unbound, true for bound).  All PVs
+// should be stored in the map regardless of their status.
+// NOTE: When working with PV keys, it is safest to delete them from the map using the delete() built-in.
+// WARNING: It's unsafe to add keys to a map in a loop.  Their insertion in the map is unpredictable
+// and can result in the same key being iterated over again.
+type pvmap map[string]bool
 
-// Data type to store PVCs prior to testing their status.  As noted above, when a PV status becomes "Bound" and the bound PVC identified,
-// assign the PVC as the value of the PV and set to nil in the pvclist.  It is important to maintain the mutual exclusivity of each PVC
-// between the bindmap and the pvclist be.  When removing a PVC, the element should be nil-ed.
-type pvclist []*api.PersistentVolumeClaim
+// Map to store PVCs similar to pvmap: pvc.Name string : isBound bool (false for unbound, true for bound)
+type pvcmap map[string]bool
 
 // Delete the nfs-server pod.
 func nfsServerPodCleanup(c *client.Client, config VolumeTestConfig) {
@@ -102,18 +97,28 @@ func deletePVCandValidatePV(c *client.Client, ns string, pvc *api.PersistentVolu
 	return
 }
 
-// Takes a map of PV:PVC bound pairs. Wraps deletePVCandValidatePV by calling the function in a loop over
-// the supplied map. Each call deletes a PVC and validates the paired PV for phase "Available".
-func deletePVCandValidatePVGroup(c *client.Client, ns string, pvPvcBindMap bindmap) {
+// Wraps deletePVCandValidatePV by calling the function in a loop over PV map.
+// On detecting a bound PV, call deletes a PVC and validates the paired PV for phase "Available".
+func deletePVCandValidatePVGroup(c *client.Client, ns string, pvols pvmap, claims pvcmap) {
 
-	var pairCountIn int = len(pvPvcBindMap)
+	var pairCountIn int = len(pvols)
 	var pairCountOut int
 
-	for pv, pvc := range pvPvcBindMap {
-		if pvc != nil {
-			framework.Logf("Deleting PVC %v", pvc.Name)
+	for pvName := range pvols {
+		pv, err := c.PersistentVolumes().Get(pvName)
+		Expect(apierrs.IsNotFound(err)).To(BeFalse())
+		// Execute on bound PVs only
+		if cr := pv.Spec.ClaimRef; cr != nil && len(cr.Name) > 0 {
+			// Assert bound PVC is tracked in this test.  Failing this might indicate external PVCs interfering
+			// with the test.
+			_, isTestResource := claims[cr.Name]
+			Expect(isTestResource).To(BeTrue())
+			pvc, err := c.PersistentVolumeClaims(ns).Get(cr.Name)
+			Expect(apierrs.IsNotFound(err)).To(BeFalse())
+			framework.Logf("Deleting PVC %v", pv)
 			deletePVCandValidatePV(c, ns, pvc, pv)
-			pvPvcBindMap[pv] = nil
+			pvols[pvName] = false
+			delete(claims, cr.Name)
 			pairCountOut++
 		}
 	}
@@ -234,57 +239,38 @@ func waitOnPVandPVC(c *client.Client, ns string, pv *api.PersistentVolume, pvc *
 	return
 }
 
-// Generate a bindmap according the new state of binds.  When a PV key has a nil PVC value, find
-// the bound PVC in the pvcList and assign it to the PV value. Then remove it from the list to preserve
-// mutual exclusivity of the PVC.  If testExpected == true, compare the actual count of bound PVs and
-// bound PVCs against their respective expected values.
-// NOTE:  Each iteration waits for a maximum of 3 minutes per PV and, if the PV is bound, up to 3 minute limit
+// Search for bound PVs and PVCs by examining the pvmap for non-nil claimRefs and flip isBound bool map value according to
+// their phase (true for bound, false for unbound).
+// NOTE:  Each iteration waits for a maximum of 3 minutes per PV and, if the PV is bound, up to 3 minutes
 //        for the PVC.  When the number of PVs != number of PVCs, this can lead to situations where the
-//        maximum wait times are repeatedly reached, extending test time. Thus, it is recommended to keep
-//        the delta between PVs and PVCs low.
-func waitAndAggregatePairs(c *client.Client, ns string, pvPvcBindMap bindmap, pvcList pvclist, testExpected bool, expectedPVsBound, expectedPVCsBound int) {
+//        maximum wait times are reached several times in succession, extending test time. Thus, it is recommended to keep
+//        the delta between PVs and PVCs small.
+func waitAndVerifyBinds(c *client.Client, ns string, pvols pvmap, claims pvcmap, testExpected bool, expectedBinds int) {
 
-	var err error
-	var actualPVsBound, actualPVCsBound int
+	var actualBinds int
 
-	for pv, pvc := range pvPvcBindMap {
-		// Wait for the PV Phase to establish
-		err = framework.WaitForPersistentVolumePhase(api.VolumeBound, c, pv.Name, 3*time.Second, 180*time.Second)
+	for pvName := range pvols {
+		// Operate only on bound PVs
+		err := framework.WaitForPersistentVolumePhase(api.VolumeBound, c, pvName, 3*time.Second, 180*time.Second)
 		Expect(err).NotTo(HaveOccurred())
-		actualPVsBound++
+		pv, err := c.PersistentVolumes().Get(pvName)
+		Expect(apierrs.IsNotFound(err)).To(BeFalse())
+		if cr := pv.Spec.ClaimRef; cr != nil && len(cr.Name) > 0 {
+			// Assert bound pvc is a test resource.  Failing assertion could indicate non-test PVC interference
+			_, isTestResource := claims[cr.Name]
+			Expect(isTestResource).To(BeTrue())
 
-		// Get fresh PV state and claimRef
-		newpv, err := c.PersistentVolumes().Get(pv.Name)
-		Expect(err).NotTo(HaveOccurred())
-
-		// Examine bound PVs; update their paired PVC.  If unpaired, search the PVC list.
-		if cr := newpv.Spec.ClaimRef; cr != nil && len(cr.Name) > 0 {
-			// Where is the PVC?
-			if pvc == nil {
-				// Delete pvc from pvcList. This slice is a list of unbound pvcs.
-				err = framework.WaitForPersistentVolumeClaimPhase(api.ClaimBound, c, ns, cr.Name, 3*time.Second, 180*time.Second)
-				Expect(err).NotTo(HaveOccurred())
-				for i, pvcTarget := range pvcList {
-					if pvcTarget != nil && cr.Name == pvcTarget.Name && cr.Namespace == pvcTarget.Namespace {
-						pvPvcBindMap[pv] = pvcTarget
-						pvcList[i] = nil
-						actualPVCsBound++
-						break
-					}
-				}
-			} else { // check that the claim is bound
-				err = framework.WaitForPersistentVolumeClaimPhase(api.ClaimBound, c, ns, pvc.Name, 3*time.Second, 180*time.Second)
-				Expect(err).NotTo(HaveOccurred())
-				actualPVCsBound++
-			}
+			err = framework.WaitForPersistentVolumeClaimPhase(api.ClaimBound, c, ns, cr.Name, 3*time.Second, 180*time.Second)
+			pvols[pvName] = true
+			claims[cr.Name] = true
+			actualBinds++
+		} else {
+			pvols[pvName] = false
 		}
 	}
-
 	if testExpected {
-		Expect(actualPVsBound).To(Equal(expectedPVsBound))
-		Expect(actualPVCsBound).To(Equal(expectedPVCsBound))
+		Expect(actualBinds).To(Equal(expectedBinds))
 	}
-
 	return
 }
 
@@ -359,20 +345,20 @@ func completeTest(f *framework.Framework, c *client.Client, ns string, pv *api.P
 
 // Validate pairs of PVs and PVCs, create and verify writer pod, delete PVC and validate PV.
 // Ensure each step succeeds.
-func completeMultiTest(f *framework.Framework, c *client.Client, ns string, pvPvcBindMap bindmap) {
+func completeMultiTest(f *framework.Framework, c *client.Client, ns string, pvols pvmap, claims pvcmap) {
 
 	// 1. Verify each PV permits write access to a client pod
 	By("Checking pod has write access to PersistentVolumes")
-	for _, pvc := range pvPvcBindMap {
-		if pvc != nil {
+	for pvcName, isBound := range claims {
+		if isBound {
 			// TODO Currently a serialized test of each PV.  Consider goroutine + channel
-			createWaitAndDeletePod(f, c, ns, pvc.Name)
+			createWaitAndDeletePod(f, c, ns, pvcName)
 		}
 	}
 
 	// 2.  Delete each PVC, wait for its bound PV to become "Available"
 	By("Deleting PVCs to invoke recycler")
-	deletePVCandValidatePVGroup(c, ns, pvPvcBindMap)
+	deletePVCandValidatePVGroup(c, ns, pvols, claims)
 
 	return
 }
@@ -503,53 +489,42 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 
 	// NOTE:  Though designed to instantiate multple PVs and PVCs, this context supports only 1 namespace, defined by the
 	//        PVC spec in makePersistentVolumeClaim.
-	// NOTE:  waitAndAggregate waits for a maximum of 20 seconds per PV and, if the PV is bound, up to 20 seconds for the PVC.
+
+	// NOTE:  waitAndVerifyBinds waits for a maximum of 180 seconds per PV and, if the PV is bound, up to 180 seconds for the PVC.
 	//        When the number of PVs != number of PVCs, this can lead to situations where the maximum wait times are repeatedly
-	//        reached, extending test time.  Thus, it is recommended to keep the delta between PVs and PVCs low.
+	//        reached, extending test time.  Thus, it is recommended to keep the delta between PVs and PVCs small.
 	Context("with multiple PVs and PVCs", func() {
 
 		var (
-			pvcList      pvclist
-			pvPvcBindMap bindmap
+			claims pvcmap
+			pvols  pvmap
 		)
 
 		AfterEach(func() {
 			if c != nil && len(ns) > 0 {
-
-				if len(pvcList) > 0 {
+				if len(claims) > 0 {
 					framework.Logf("Deleting remaing PVCs from pvclist")
-					for _, pvc := range pvcList {
-						if pvc != nil && len(pvc.Name) > 0 {
-							if _, errmsg := c.PersistentVolumeClaims(ns).Get(pvc.Name); !apierrs.IsNotFound(errmsg) {
-								err := c.PersistentVolumeClaims(ns).Delete(pvc.Name)
-								Expect(err).NotTo(HaveOccurred())
-								framework.Logf("Deleted PersistentVolumeClaim: %v", pvc.Name)
-							}
+					for pvcName := range claims {
+						if _, errmsg := c.PersistentVolumeClaims(ns).Get(pvcName); !apierrs.IsNotFound(errmsg) {
+							err := c.PersistentVolumeClaims(ns).Delete(pvcName)
+							Expect(err).NotTo(HaveOccurred())
+							framework.Logf("Deleted PersistentVolumeClaim: %v", pvcName)
 						}
 					}
-					pvcList = nil
+					claims = nil
 				}
 
 				// Delete PVs/PVCs that were remove from their lists and added to the map
-				if len(pvPvcBindMap) > 0 {
+				if len(pvols) > 0 {
 					framework.Logf("Deleting remaining PVs & PVCs in the bindMap")
-					for pv, pvc := range pvPvcBindMap {
-						if pv != nil {
-							if _, errmsg := c.PersistentVolumes().Get(pv.Name); !apierrs.IsNotFound(errmsg) {
-								err := c.PersistentVolumes().Delete(pv.Name)
-								Expect(err).NotTo(HaveOccurred())
-								framework.Logf("Deleted PersistentVolume: %v", pv.Name)
-							}
-						}
-						if pvc != nil {
-							if _, errmsg := c.PersistentVolumeClaims(ns).Get(pvc.Name); !apierrs.IsNotFound(errmsg) {
-								err := c.PersistentVolumeClaims(ns).Delete(pvc.Name)
-								Expect(err).NotTo(HaveOccurred())
-								framework.Logf("Deleted PersistentVolumeClaim: %v", pvc.Name)
-							}
+					for pvName := range pvols {
+						if _, errmsg := c.PersistentVolumes().Get(pvName); !apierrs.IsNotFound(errmsg) {
+							err := c.PersistentVolumes().Delete(pvName)
+							Expect(err).NotTo(HaveOccurred())
+							framework.Logf("Deleted PersistentVolume: %v", pvName)
 						}
 					}
-					pvPvcBindMap = nil
+					pvols = nil
 				}
 			}
 		})
@@ -560,18 +535,19 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 		It("should create 3 PVs and 3 PVCs: test write access[Flaky]", func() {
 
 			pairs := 3
-			pvPvcBindMap = make(bindmap, pairs)
-			pvcList = make(pvclist, pairs)
+			pvols = make(pvmap, pairs)
+			claims = make(pvcmap, pairs)
 
 			for i := 0; i < pairs; i++ {
 				pv := createAndAddPV(c, serverIP, nil)
-				pvPvcBindMap[pv] = nil
-				pvcList[i] = createAndAddPVC(c, ns)
+				pvols[pv.Name] = false
+				pvc := createAndAddPVC(c, ns)
+				claims[pvc.Name] = false
 			}
 
 			// Then aggregate the pairs
-			waitAndAggregatePairs(c, ns, pvPvcBindMap, pvcList, true, pairs, pairs)
-			completeMultiTest(f, c, ns, pvPvcBindMap)
+			waitAndVerifyBinds(c, ns, pvols, claims, true, pairs)
+			completeMultiTest(f, c, ns, pvols, claims)
 		})
 	})
 })
