@@ -68,7 +68,7 @@ type InitFlags struct {
 
 const (
 	DefaultServiceDNSDomain   = "cluster.local"
-	DefaultServicesCIDRString = "100.64.0.0/12" // Carrier-grade NAT range (RFC 6598)
+	DefaultServicesCIDRString = "10.12.0.0/12"
 	DefaultKubernetesVersion  = "v1.4.0"
 )
 
