@@ -481,7 +481,6 @@ kube::golang::build_binaries_for_platform() {
   fi
 
   if [[ -n ${use_go_build:-} ]]; then
-    echo "use_go_build: ${use_go_build:-}"
     kube::log::progress "    "
     for binary in "${statics[@]:+${statics[@]}}"; do
       local outfile=$(kube::golang::output_filename_for_binary "${binary}" "${platform}")
@@ -551,13 +550,28 @@ kube::golang::build_binaries_for_platform() {
           "${testpkg}"
     fi
 
-    mkdir -p "$(dirname ${outfile})"
-    go test -c \
-      "${goflags[@]:+${goflags[@]}}" \
-      -gcflags "${gogcflags}" \
-      -ldflags "${goldflags}" \
-      -o "${outfile}" \
-      "${testpkg}"
+    test_install=false
+    for goflag in "${goflags[@]:+${goflags[@]}}"; do
+      if [[ "${goflag}" == "-i" ]]; then
+        test_install=true
+      fi
+    done
+
+    if ${test_install}; then
+      go test \
+        "${goflags[@]:+${goflags[@]}}" \
+        -gcflags "${gogcflags}" \
+        -ldflags "${goldflags}" \
+        "${testpkg}"
+    else
+      mkdir -p "$(dirname ${outfile})"
+      go test -c \
+        "${goflags[@]:+${goflags[@]}}" \
+        -gcflags "${gogcflags}" \
+        -ldflags "${goldflags}" \
+        -o "${outfile}" \
+        "${testpkg}"
+    fi
   done
 }
 
@@ -614,6 +628,7 @@ kube::golang::build_binaries() {
     gogcflags="${KUBE_GOGCFLAGS:-}"
 
     local use_go_build
+    local -a all_targets=()
     local -a targets=()
     local arg
 
