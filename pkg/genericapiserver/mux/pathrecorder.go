@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package apiserver
+package mux
 
 import (
 	"net/http"
@@ -26,13 +26,13 @@ type Mux interface {
 	HandleFunc(pattern string, handler func(http.ResponseWriter, *http.Request))
 }
 
-// PathRecorderMux wraps a mux object and records the registered paths. It is _not_ go routine safe.
+// PathRecorderMux wraps a mux object and records the registered paths. It is _no
 type PathRecorderMux struct {
 	mux   Mux
 	paths []string
 }
 
-// NewPathRecorderMux creates a new PathRecorderMux with the given mux as the base mux.
+// NewPathRecorderMux creates a new PathRecorderMux with the given mux as the bas
 func NewPathRecorderMux(mux Mux) *PathRecorderMux {
 	return &PathRecorderMux{
 		mux: mux,

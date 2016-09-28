@@ -18,6 +18,7 @@ package genericapiserver
 
 import (
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -28,7 +29,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/emicklei/go-restful"
 	"github.com/go-openapi/spec"
 	"github.com/golang/glog"
 	"gopkg.in/natefinch/lumberjack.v2"
@@ -44,6 +44,7 @@ import (
 	authhandlers "k8s.io/kubernetes/pkg/auth/handlers"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	genericfilters "k8s.io/kubernetes/pkg/genericapiserver/filters"
+	"k8s.io/kubernetes/pkg/genericapiserver/mux"
 	"k8s.io/kubernetes/pkg/genericapiserver/openapi/common"
 	"k8s.io/kubernetes/pkg/genericapiserver/options"
 	"k8s.io/kubernetes/pkg/genericapiserver/routes"
@@ -51,7 +52,6 @@ import (
 	ipallocator "k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/runtime"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
-	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
@@ -341,17 +341,8 @@ func (c Config) New() (*GenericAPIServer, error) {
 		openAPIDefinitions:     c.OpenAPIDefinitions,
 	}
 
-	s.ProtectedContainer = NewHandlerContainer(http.NewServeMux(), c.Serializer)
-	s.UnprotectedContainer = NewHandlerContainer(http.NewServeMux(), c.Serializer)
-
-	// Use CurlyRouter to be able to use regular expressions in paths, e.g. for proxy/{kind}/{name}/{*}
-	s.ProtectedContainer.Router(restful.CurlyRouter{})
-	s.UnprotectedContainer.Router(restful.CurlyRouter{})
-
-	apiserver.InstallServiceErrorHandler(s.Serializer, s.ProtectedContainer)
-	apiserver.InstallServiceErrorHandler(s.Serializer, s.UnprotectedContainer)
-
-	s.Mux = apiserver.NewPathRecorderMux(s.ProtectedContainer.ServeMux)
+	s.ProtectedContainer = mux.NewAPIContainer(http.NewServeMux(), c.Serializer)
+	s.UnprotectedContainer = mux.NewAPIContainer(http.NewServeMux(), c.Serializer)
 
 	if c.ProxyDialer != nil || c.ProxyTLSClientConfig != nil {
 		s.ProxyTransport = utilnet.SetTransportDefaults(&http.Transport{
@@ -369,47 +360,34 @@ func (c Config) New() (*GenericAPIServer, error) {
 	//   * if skipAuth is found in the context, the request goes directly to the ProtectedContainer
 	//   * if skipAuth is not found in the context, the request goes through authn/authz and then
 	//     to the ProtectedContainer
-	protectedHandler := c.ProtectHandlerFunc(s.ProtectedContainer.ServeMux, c)
-	s.UnprotectedContainer.ServeMux.Handle("/", func(w http.ResponseWriter, req *http.Request) {
-		ctx, err := c.RequestContextMapper.Get(req)
-		if err != nil {
-			internalError(w, req, err)
+	protectedHandler := c.ProtectHandlerFunc(s.ProtectedContainer.ServeMux, &c)
+	s.UnprotectedContainer.ServeMux.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
+		ctx, ok := c.RequestContextMapper.Get(req)
+		if !ok {
+			internalError(w, req, errors.New("No context found for request"))
 			return
 		}
 		if skipAuthFrom(ctx) {
-			s.ProtectedContainer.ServeMux
+			s.ProtectedContainer.ServeHTTP(w, req)
 		} else {
-			protectedHandler
+			protectedHandler.ServeHTTP(w, req)
 		}
 	})
-	s.Handler = c.GenericDecorateHandlerFunc(s.UnprotectedContainer.ServeMux, c)
+	s.Handler = c.GenericDecorateHandlerFunc(s.UnprotectedContainer.ServeMux, &c)
 	s.InsecureHandler = c.GenericDecorateHandlerFunc(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		ctx, err := c.RequestContextMapper.Get(req)
-		if err != nil {
-			internalError(w, req, err)
+		ctx, ok := c.RequestContextMapper.Get(req)
+		if !ok {
+			internalError(w, req, errors.New("No context found for request"))
 			return
 		}
 		c.RequestContextMapper.Update(req, withSkipAuth(ctx))
-		s.UnprotectedContainer.ServeMux(w, req)
-	}), c)
+		s.UnprotectedContainer.ServeHTTP(w, req)
+	}), &c)
 
 	return s, nil
 }
 
-type requestContextType int
-
-const skipAuthContextKey requestContextType = iota
-
-func withSkipAuth(parent api.Context) api.Context {
-	return api.WithValue(parent, skipAuthContextKey, true)
-}
-
-func skipAuthFrom(ctx api.Context) bool {
-	v := ctx.Value(skipAuthContextKey)
-	return v != nil
-}
-
-func DefaultProtectHandler(handler http.Handler, c *Config, secure bool) http.Handler {
+func DefaultProtectHandler(handler http.Handler, c *Config) http.Handler {
 	attributeGetter := apiserverfilters.NewRequestAttributeGetter(c.RequestContextMapper)
 
 	handler = apiserverfilters.WithAuthorization(handler, attributeGetter, c.Authorizer)
@@ -420,7 +398,7 @@ func DefaultProtectHandler(handler http.Handler, c *Config, secure bool) http.Ha
 	return handler
 }
 
-func DefaultGenericDecorateHandler(handler http.Handler, c *Config, secure bool) http.Handler {
+func DefaultGenericDecorateHandler(handler http.Handler, c *Config) http.Handler {
 	handler = genericfilters.WithCORS(handler, c.CorsAllowedOriginList, nil, nil, "true")
 	handler = genericfilters.WithPanicRecovery(handler, c.RequestContextMapper)
 	handler = apiserverfilters.WithRequestInfo(handler, NewRequestInfoResolver(c), c.RequestContextMapper)
@@ -433,16 +411,16 @@ func DefaultGenericDecorateHandler(handler http.Handler, c *Config, secure bool)
 
 func (s *GenericAPIServer) installAPI(c *Config) {
 	if c.EnableIndex {
-		routes.Index{}.Install(s.Mux, s.ProtectedContainer)
+		routes.Index{}.Install(s.ProtectedContainer)
 	}
 	if c.EnableSwaggerSupport && c.EnableSwaggerUI {
-		routes.SwaggerUI{}.Install(s.Mux, s.ProtectedContainer)
+		routes.SwaggerUI{}.Install(s.ProtectedContainer)
 	}
 	if c.EnableProfiling {
-		routes.Profiling{}.Install(s.Mux, s.ProtectedContainer)
+		routes.Profiling{}.Install(s.ProtectedContainer)
 	}
 	if c.EnableVersion {
-		routes.Version{}.Install(s.Mux, s.ProtectedContainer)
+		routes.Version{}.Install(s.ProtectedContainer)
 	}
 	s.ProtectedContainer.Add(s.DynamicApisDiscovery())
 }
@@ -502,10 +480,4 @@ func NewRequestInfoResolver(c *Config) *request.RequestInfoResolver {
 		APIPrefixes:          sets.NewString(strings.Trim(c.APIPrefix, "/"), strings.Trim(c.APIGroupPrefix, "/")), // all possible API prefixes
 		GrouplessAPIPrefixes: sets.NewString(strings.Trim(c.APIPrefix, "/")),                                      // APIPrefixes that won't have groups (legacy)
 	}
-}
-
-func internalError(w http.ResponseWriter, req *http.Request, err error) {
-	w.WriteHeader(http.StatusInternalServerError)
-	fmt.Fprintf(w, "Internal Server Error: %#v", req.RequestURI)
-	utilruntime.HandleError(err)
 }
