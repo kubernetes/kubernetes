@@ -121,7 +121,7 @@ func newOwnerRC(name, namespace string) *v1.ReplicationController {
 func setup(t *testing.T) (*httptest.Server, *garbagecollector.GarbageCollector, clientset.Interface) {
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	masterConfig.EnableCoreControllers = false
-	masterConfig.EnableGarbageCollection = true
+	masterConfig.GenericConfig.EnableGarbageCollection = true
 	_, s := framework.RunAMaster(masterConfig)
 
 	clientSet, err := clientset.NewForConfig(&restclient.Config{Host: s.URL})
