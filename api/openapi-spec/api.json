@@ -1,0 +1,78 @@
+{
+  "swagger": "2.0",
+  "info": {
+   "title": "Kubernetes /api",
+   "version": "unversioned"
+  },
+  "paths": {
+   "/api/": {
+    "get": {
+     "description": "get available API versions",
+     "consumes": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "operationId": "getAPIVersions",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/unversioned.APIVersions"
+       }
+      }
+     }
+    }
+   }
+  },
+  "definitions": {
+   "unversioned.APIVersions": {
+    "description": "APIVersions lists the versions that are available, to allow clients to discover the API at /api, which is the root path of the legacy v1 API.",
+    "required": [
+     "versions",
+     "serverAddressByClientCIDRs"
+    ],
+    "properties": {
+     "serverAddressByClientCIDRs": {
+      "description": "a map of client CIDR to server address that is serving this group. This is to help clients reach servers in the most network-efficient way possible. Clients can use the appropriate server address as per the CIDR that they match. In case of multiple matches, clients should use the longest matching CIDR. The server returns only those CIDRs that it thinks that the client can match. For example: the master will return an internal IP CIDR only, if the client reaches the server using an internal IP. Server looks at X-Forwarded-For header or X-Real-Ip header or request.RemoteAddr (in that order) to get the client IP.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/unversioned.ServerAddressByClientCIDR"
+      }
+     },
+     "versions": {
+      "description": "versions are the api versions that are available.",
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     }
+    }
+   },
+   "unversioned.ServerAddressByClientCIDR": {
+    "description": "ServerAddressByClientCIDR helps the client to determine the server address that they should use, depending on the clientCIDR that they match.",
+    "required": [
+     "clientCIDR",
+     "serverAddress"
+    ],
+    "properties": {
+     "clientCIDR": {
+      "description": "The CIDR with which clients can match their IP to figure out the server address that they should use.",
+      "type": "string"
+     },
+     "serverAddress": {
+      "description": "Address of this server, suitable for a client that matches the above CIDR. This can be a hostname, hostname:port, IP or IP:port.",
+      "type": "string"
+     }
+    }
+   }
+  }
+ }
