@@ -716,3 +716,15 @@ func ObjectListToVersionedObject(objects []runtime.Object, version unversioned.G
 	}
 	return converted, nil
 }
+
+// IsSiblingCommandExists receives a pointer to a cobra command and a target string.
+// Returns true if the target string is found in the list of sibling commands.
+func IsSiblingCommandExists(cmd *cobra.Command, targetCmdName string) bool {
+	for _, c := range cmd.Parent().Commands() {
+		if c.Name() == targetCmdName {
+			return true
+		}
+	}
+
+	return false
+}
