@@ -17,7 +17,7 @@ limitations under the License.
 package eventsink
 
 import (
-	federation_release_1_4 "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_4"
+	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5"
 	api "k8s.io/kubernetes/pkg/api"
 	api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/record"
@@ -25,13 +25,13 @@ import (
 
 // Implemnts k8s.io/kubernetes/pkg/client/record.EventSink.
 type FederatedEventSink struct {
-	clientset federation_release_1_4.Interface
+	clientset fedclientset.Interface
 }
 
 // To check if all required functions are implemented.
 var _ record.EventSink = &FederatedEventSink{}
 
-func NewFederatedEventSink(clientset federation_release_1_4.Interface) *FederatedEventSink {
+func NewFederatedEventSink(clientset fedclientset.Interface) *FederatedEventSink {
 	return &FederatedEventSink{
 		clientset: clientset,
 	}

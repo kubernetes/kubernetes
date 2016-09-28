@@ -23,8 +23,8 @@ import (
 
 	federation_api "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	api_v1 "k8s.io/kubernetes/pkg/api/v1"
-	kube_release_1_4 "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4"
-	fake_kube_release_1_4 "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4/fake"
+	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
+	fake_kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/fake"
 	pkg_runtime "k8s.io/kubernetes/pkg/runtime"
 
 	"github.com/stretchr/testify/assert"
@@ -34,8 +34,8 @@ import (
 type fakeFederationView struct {
 }
 
-func (f fakeFederationView) GetClientsetForCluster(clusterName string) (kube_release_1_4.Interface, error) {
-	return &fake_kube_release_1_4.Clientset{}, nil
+func (f fakeFederationView) GetClientsetForCluster(clusterName string) (kubeclientset.Interface, error) {
+	return &fake_kubeclientset.Clientset{}, nil
 }
 
 func (f *fakeFederationView) GetReadyClusters() ([]*federation_api.Cluster, error) {
@@ -55,12 +55,12 @@ func TestFederatedUpdaterOK(t *testing.T) {
 	updateChan := make(chan string, 5)
 
 	updater := NewFederatedUpdater(&fakeFederationView{},
-		func(_ kube_release_1_4.Interface, obj pkg_runtime.Object) error {
+		func(_ kubeclientset.Interface, obj pkg_runtime.Object) error {
 			service := obj.(*api_v1.Service)
 			addChan <- service.Name
 			return nil
 		},
-		func(_ kube_release_1_4.Interface, obj pkg_runtime.Object) error {
+		func(_ kubeclientset.Interface, obj pkg_runtime.Object) error {
 			service := obj.(*api_v1.Service)
 			updateChan <- service.Name
 			return nil
@@ -86,7 +86,7 @@ func TestFederatedUpdaterOK(t *testing.T) {
 
 func TestFederatedUpdaterError(t *testing.T) {
 	updater := NewFederatedUpdater(&fakeFederationView{},
-		func(_ kube_release_1_4.Interface, obj pkg_runtime.Object) error {
+		func(_ kubeclientset.Interface, obj pkg_runtime.Object) error {
 			return fmt.Errorf("boom")
 		}, noop, noop)
 
@@ -106,7 +106,7 @@ func TestFederatedUpdaterError(t *testing.T) {
 func TestFederatedUpdaterTimeout(t *testing.T) {
 	start := time.Now()
 	updater := NewFederatedUpdater(&fakeFederationView{},
-		func(_ kube_release_1_4.Interface, obj pkg_runtime.Object) error {
+		func(_ kubeclientset.Interface, obj pkg_runtime.Object) error {
 			time.Sleep(time.Minute)
 			return nil
 		},
@@ -136,6 +136,6 @@ func makeService(cluster, name string) *api_v1.Service {
 	}
 }
 
-func noop(_ kube_release_1_4.Interface, _ pkg_runtime.Object) error {
+func noop(_ kubeclientset.Interface, _ pkg_runtime.Object) error {
 	return nil
 }
