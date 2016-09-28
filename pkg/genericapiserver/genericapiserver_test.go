@@ -46,24 +46,23 @@ import (
 )
 
 // setUp is a convience function for setting up for (most) tests.
-func setUp(t *testing.T) (*GenericAPIServer, *etcdtesting.EtcdTestServer, Config, *assert.Assertions) {
+func setUp(t *testing.T) (*etcdtesting.EtcdTestServer, Config, *assert.Assertions) {
 	etcdServer, _ := etcdtesting.NewUnsecuredEtcd3TestClientServer(t)
 
-	genericapiserver := &GenericAPIServer{}
 	config := Config{}
 	config.PublicAddress = net.ParseIP("192.168.10.4")
 	config.RequestContextMapper = api.NewRequestContextMapper()
-	return genericapiserver, etcdServer, config, assert.New(t)
-}
-
-func newMaster(t *testing.T) (*GenericAPIServer, *etcdtesting.EtcdTestServer, Config, *assert.Assertions) {
-	_, etcdserver, config, assert := setUp(t)
-
 	config.ProxyDialer = func(network, addr string) (net.Conn, error) { return nil, nil }
 	config.ProxyTLSClientConfig = &tls.Config{}
 	config.Serializer = api.Codecs
 	config.APIPrefix = "/api"
 	config.APIGroupPrefix = "/apis"
+
+	return etcdServer, config, assert.New(t)
+}
+
+func newMaster(t *testing.T) (*GenericAPIServer, *etcdtesting.EtcdTestServer, Config, *assert.Assertions) {
+	etcdserver, config, assert := setUp(t)
 
 	s, err := config.New()
 	if err != nil {
@@ -104,14 +103,11 @@ func TestNew(t *testing.T) {
 
 // Verifies that AddGroupVersions works as expected.
 func TestInstallAPIGroups(t *testing.T) {
-	_, etcdserver, config, assert := setUp(t)
+	etcdserver, config, assert := setUp(t)
 	defer etcdserver.Terminate(t)
 
-	config.ProxyDialer = func(network, addr string) (net.Conn, error) { return nil, nil }
-	config.ProxyTLSClientConfig = &tls.Config{}
 	config.APIPrefix = "/apiPrefix"
 	config.APIGroupPrefix = "/apiGroupPrefix"
-	config.Serializer = api.Codecs
 
 	s, err := config.New()
 	if err != nil {
@@ -174,9 +170,10 @@ func TestNewHandlerContainer(t *testing.T) {
 // TestHandleWithAuth verifies HandleWithAuth adds the path
 // to the MuxHelper.RegisteredPaths.
 func TestHandleWithAuth(t *testing.T) {
-	server, etcdserver, _, assert := setUp(t)
+	etcdserver, _, assert := setUp(t)
 	defer etcdserver.Terminate(t)
 
+	server := &GenericAPIServer{}
 	server.Mux = apiserver.NewPathRecorderMux(http.NewServeMux())
 	handler := func(r http.ResponseWriter, w *http.Request) { w.Write(nil) }
 	server.HandleWithAuth("/test", http.HandlerFunc(handler))
@@ -187,9 +184,10 @@ func TestHandleWithAuth(t *testing.T) {
 // TestHandleFuncWithAuth verifies HandleFuncWithAuth adds the path
 // to the MuxHelper.RegisteredPaths.
 func TestHandleFuncWithAuth(t *testing.T) {
-	server, etcdserver, _, assert := setUp(t)
+	etcdserver, _, assert := setUp(t)
 	defer etcdserver.Terminate(t)
 
+	server := &GenericAPIServer{}
 	server.Mux = apiserver.NewPathRecorderMux(http.NewServeMux())
 	handler := func(r http.ResponseWriter, w *http.Request) { w.Write(nil) }
 	server.HandleFuncWithAuth("/test", handler)
@@ -199,16 +197,13 @@ func TestHandleFuncWithAuth(t *testing.T) {
 
 // TestNotRestRoutesHaveAuth checks that special non-routes are behind authz/authn.
 func TestNotRestRoutesHaveAuth(t *testing.T) {
-	_, etcdserver, config, _ := setUp(t)
+	etcdserver, config, _ := setUp(t)
 	defer etcdserver.Terminate(t)
 
 	authz := mockAuthorizer{}
 
-	config.ProxyDialer = func(network, addr string) (net.Conn, error) { return nil, nil }
-	config.ProxyTLSClientConfig = &tls.Config{}
 	config.APIPrefix = "/apiPrefix"
 	config.APIGroupPrefix = "/apiGroupPrefix"
-	config.Serializer = api.Codecs
 	config.Authorizer = &authz
 
 	config.EnableSwaggerUI = true
@@ -267,10 +262,11 @@ func (authn *mockAuthenticator) AuthenticateRequest(req *http.Request) (user.Inf
 // TestInstallSwaggerAPI verifies that the swagger api is added
 // at the proper endpoint.
 func TestInstallSwaggerAPI(t *testing.T) {
-	server, etcdserver, _, assert := setUp(t)
+	etcdserver, _, assert := setUp(t)
 	defer etcdserver.Terminate(t)
 
 	mux := http.NewServeMux()
+	server := &GenericAPIServer{}
 	server.HandlerContainer = NewHandlerContainer(mux, nil)
 
 	// Ensure swagger isn't installed without the call
