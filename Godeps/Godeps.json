@@ -1504,31 +1504,6 @@
 			"Rev": "fc2b8d3a73c4867e51861bbdd5ae3c1f0869dd6a"
 		},
 		{
-			"ImportPath": "github.com/mesos/mesos-go/auth",
-			"Comment": "before-0.26-protos-33-g45c8b08",
-			"Rev": "45c8b08e9af666add36a6f93ff8c1c75812367b0"
-		},
-		{
-			"ImportPath": "github.com/mesos/mesos-go/auth/callback",
-			"Comment": "before-0.26-protos-33-g45c8b08",
-			"Rev": "45c8b08e9af666add36a6f93ff8c1c75812367b0"
-		},
-		{
-			"ImportPath": "github.com/mesos/mesos-go/auth/sasl",
-			"Comment": "before-0.26-protos-33-g45c8b08",
-			"Rev": "45c8b08e9af666add36a6f93ff8c1c75812367b0"
-		},
-		{
-			"ImportPath": "github.com/mesos/mesos-go/auth/sasl/mech",
-			"Comment": "before-0.26-protos-33-g45c8b08",
-			"Rev": "45c8b08e9af666add36a6f93ff8c1c75812367b0"
-		},
-		{
-			"ImportPath": "github.com/mesos/mesos-go/auth/sasl/mech/crammd5",
-			"Comment": "before-0.26-protos-33-g45c8b08",
-			"Rev": "45c8b08e9af666add36a6f93ff8c1c75812367b0"
-		},
-		{
 			"ImportPath": "github.com/mesos/mesos-go/detector",
 			"Comment": "before-0.26-protos-33-g45c8b08",
 			"Rev": "45c8b08e9af666add36a6f93ff8c1c75812367b0"
@@ -1539,42 +1514,12 @@
 			"Rev": "45c8b08e9af666add36a6f93ff8c1c75812367b0"
 		},
 		{
-			"ImportPath": "github.com/mesos/mesos-go/executor",
-			"Comment": "before-0.26-protos-33-g45c8b08",
-			"Rev": "45c8b08e9af666add36a6f93ff8c1c75812367b0"
-		},
-		{
 			"ImportPath": "github.com/mesos/mesos-go/mesosproto",
 			"Comment": "before-0.26-protos-33-g45c8b08",
 			"Rev": "45c8b08e9af666add36a6f93ff8c1c75812367b0"
 		},
 		{
-			"ImportPath": "github.com/mesos/mesos-go/mesosproto/scheduler",
-			"Comment": "before-0.26-protos-33-g45c8b08",
-			"Rev": "45c8b08e9af666add36a6f93ff8c1c75812367b0"
-		},
-		{
 			"ImportPath": "github.com/mesos/mesos-go/mesosutil",
-			"Comment": "before-0.26-protos-33-g45c8b08",
-			"Rev": "45c8b08e9af666add36a6f93ff8c1c75812367b0"
-		},
-		{
-			"ImportPath": "github.com/mesos/mesos-go/mesosutil/process",
-			"Comment": "before-0.26-protos-33-g45c8b08",
-			"Rev": "45c8b08e9af666add36a6f93ff8c1c75812367b0"
-		},
-		{
-			"ImportPath": "github.com/mesos/mesos-go/messenger",
-			"Comment": "before-0.26-protos-33-g45c8b08",
-			"Rev": "45c8b08e9af666add36a6f93ff8c1c75812367b0"
-		},
-		{
-			"ImportPath": "github.com/mesos/mesos-go/messenger/sessionid",
-			"Comment": "before-0.26-protos-33-g45c8b08",
-			"Rev": "45c8b08e9af666add36a6f93ff8c1c75812367b0"
-		},
-		{
-			"ImportPath": "github.com/mesos/mesos-go/scheduler",
 			"Comment": "before-0.26-protos-33-g45c8b08",
 			"Rev": "45c8b08e9af666add36a6f93ff8c1c75812367b0"
 		},
