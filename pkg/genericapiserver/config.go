@@ -210,8 +210,12 @@ func NewConfig(options *options.ServerRunOptions) *Config {
 	}
 }
 
+type completedConfig struct {
+	*Config
+}
+
 // Complete fills in any fields not set that are required to have valid data. It's mutating the receiver.
-func (c *Config) Complete() *Config {
+func (c *Config) Complete() completedConfig {
 	if c.ServiceClusterIPRange == nil {
 		defaultNet := "10.0.0.0/24"
 		glog.Warningf("Network range for service cluster IPs is unspecified. Defaulting to %v.", defaultNet)
@@ -264,7 +268,12 @@ func (c *Config) Complete() *Config {
 		}
 		c.ExternalHost = hostAndPort
 	}
-	return c
+	return completedConfig{c}
+}
+
+// SkipComplete provides a way to construct a server instance without config completion.
+func (c *Config) SkipComplete() completedConfig {
+	return completedConfig{c}
 }
 
 // New returns a new instance of GenericAPIServer from the given config.
@@ -289,7 +298,7 @@ func (c *Config) Complete() *Config {
 //   If the caller wants to add additional endpoints not using the GenericAPIServer's
 //   auth, then the caller should create a handler for those endpoints, which delegates the
 //   any unhandled paths to "Handler".
-func (c *Config) New() (*GenericAPIServer, error) {
+func (c completedConfig) New() (*GenericAPIServer, error) {
 	if c.Serializer == nil {
 		return nil, fmt.Errorf("Genericapiserver.New() called with config.Serializer == nil")
 	}
@@ -341,8 +350,8 @@ func (c *Config) New() (*GenericAPIServer, error) {
 		})
 	}
 
-	s.installAPI(c)
-	s.Handler, s.InsecureHandler = s.buildHandlerChains(c, http.Handler(s.Mux.BaseMux().(*http.ServeMux)))
+	s.installAPI(c.Config)
+	s.Handler, s.InsecureHandler = s.buildHandlerChains(c.Config, http.Handler(s.Mux.BaseMux().(*http.ServeMux)))
 
 	return s, nil
 }
