@@ -30,11 +30,10 @@ import (
 	"github.com/golang/glog"
 	dto "github.com/prometheus/client_model/go"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_3"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector"
@@ -42,6 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/runtime/serializer"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/wait"
+	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -213,13 +213,6 @@ func TestCascadingDeletion(t *testing.T) {
 	if err := rcClient.Delete(toBeDeletedRCName, getNonOrphanOptions()); err != nil {
 		t.Fatalf("failed to delete replication controller: %v", err)
 	}
-
-	// wait for the garbage collector to drain its queue
-	if err := wait.Poll(10*time.Second, 120*time.Second, func() (bool, error) {
-		return gc.QueuesDrained(), nil
-	}); err != nil {
-		t.Fatal(err)
-	}
 	// sometimes the deletion of the RC takes long time to be observed by
 	// the gc, so wait for the garbage collector to observe the deletion of
 	// the toBeDeletedRC
@@ -228,32 +221,21 @@ func TestCascadingDeletion(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	// wait for the garbage collector to drain its queue again because it's
-	// possible it just processed the delete of the toBeDeletedRC.
-	if err := wait.Poll(10*time.Second, 120*time.Second, func() (bool, error) {
-		return gc.QueuesDrained(), nil
-	}); err != nil {
-		t.Fatal(err)
+	if err := integration.WaitForPodToDisappear(podClient, garbageCollectedPodName, 5*time.Second, 30*time.Second); err != nil {
+		t.Fatalf("expect pod %s to be garbage collected, got err= %v", garbageCollectedPodName, err)
 	}
-
-	t.Logf("garbage collector queues drained")
-	// checks the garbage collect doesn't delete pods it shouldn't do.
+	// checks the garbage collect doesn't delete pods it shouldn't delete.
 	if _, err := podClient.Get(independentPodName); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := podClient.Get(oneValidOwnerPodName); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := podClient.Get(garbageCollectedPodName); err == nil || !errors.IsNotFound(err) {
-		t.Fatalf("expect pod %s to be garbage collected, got err= %v", garbageCollectedPodName, err)
-	}
 }
 
 // This test simulates the case where an object is created with an owner that
 // doesn't exist. It verifies the GC will delete such an object.
 func TestCreateWithNonExistentOwner(t *testing.T) {
-	glog.V(6).Infof("TestCreateWithNonExistentOwner starts")
-	defer glog.V(6).Infof("TestCreateWithNonExistentOwner ends")
 	s, gc, clientSet := setup(t)
 	defer s.Close()
 
@@ -279,15 +261,9 @@ func TestCreateWithNonExistentOwner(t *testing.T) {
 	stopCh := make(chan struct{})
 	go gc.Run(5, stopCh)
 	defer close(stopCh)
-	// wait for the garbage collector to drain its queue
-	if err := wait.Poll(10*time.Second, 120*time.Second, func() (bool, error) {
-		return gc.QueuesDrained(), nil
-	}); err != nil {
-		t.Fatal(err)
-	}
-	t.Logf("garbage collector queues drained")
-	if _, err := podClient.Get(garbageCollectedPodName); err == nil || !errors.IsNotFound(err) {
-		t.Fatalf("expect pod %s to be garbage collected", garbageCollectedPodName)
+	// wait for the garbage collector to delete the pod
+	if err := integration.WaitForPodToDisappear(podClient, garbageCollectedPodName, 5*time.Second, 30*time.Second); err != nil {
+		t.Fatalf("expect pod %s to be garbage collected, got err= %v", garbageCollectedPodName, err)
 	}
 }
 
@@ -382,16 +358,8 @@ func TestStressingCascadingDeletion(t *testing.T) {
 	}
 	wg.Wait()
 	t.Logf("all pods are created, all replications controllers are created then deleted")
-	// wait for the garbage collector to drain its queue
-	if err := wait.Poll(10*time.Second, 300*time.Second, func() (bool, error) {
-		return gc.QueuesDrained(), nil
-	}); err != nil {
-		t.Fatal(err)
-	}
-	t.Logf("garbage collector queues drained")
-	// wait for the RCs and Pods to reach the expected numbers. This shouldn't
-	// take long, because the queues are already drained.
-	if err := wait.Poll(5*time.Second, 30*time.Second, func() (bool, error) {
+	// wait for the RCs and Pods to reach the expected numbers.
+	if err := wait.Poll(5*time.Second, 300*time.Second, func() (bool, error) {
 		podsInEachCollection := 3
 		// see the comments on the calls to setupRCsPods for details
 		remainingGroups := 3
@@ -478,12 +446,19 @@ func TestOrphaning(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to gracefully delete the rc: %v", err)
 	}
-
-	// wait for the garbage collector to drain its queue
-	if err := wait.Poll(10*time.Second, 300*time.Second, func() (bool, error) {
-		return gc.QueuesDrained(), nil
+	// verify the toBeDeleteRC is deleted
+	if err := wait.PollImmediate(5*time.Second, 30*time.Second, func() (bool, error) {
+		rcs, err := rcClient.List(api.ListOptions{})
+		if err != nil {
+			return false, err
+		}
+		if len(rcs.Items) == 0 {
+			t.Logf("Still has %d RCs", len(rcs.Items))
+			return true, nil
+		}
+		return false, nil
 	}); err != nil {
-		t.Fatal(err)
+		t.Errorf("unexpected error: %v", err)
 	}
 
 	// verify pods don't have the ownerPod as an owner anymore
@@ -498,10 +473,5 @@ func TestOrphaning(t *testing.T) {
 		if len(pod.ObjectMeta.OwnerReferences) != 0 {
 			t.Errorf("pod %s still has non-empty OwnerRefereces: %v", pod.ObjectMeta.Name, pod.ObjectMeta.OwnerReferences)
 		}
-	}
-	// verify the toBeDeleteRC is deleted
-	rcs, err := rcClient.List(api.ListOptions{})
-	if len(rcs.Items) != 0 {
-		t.Errorf("Expect RCs to be deleted, but got %#v", rcs.Items)
 	}
 }

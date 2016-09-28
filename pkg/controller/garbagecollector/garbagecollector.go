@@ -786,12 +786,6 @@ func (gc *GarbageCollector) Run(workers int, stopCh <-chan struct{}) {
 	gc.propagator.eventQueue.ShutDown()
 }
 
-// QueueDrained returns if the dirtyQueue and eventQueue are drained. It's
-// useful for debugging. Note that it doesn't guarantee the workers are idle.
-func (gc *GarbageCollector) QueuesDrained() bool {
-	return gc.dirtyQueue.Len() == 0 && gc.propagator.eventQueue.Len() == 0 && gc.orphanQueue.Len() == 0
-}
-
 // *FOR TEST USE ONLY* It's not safe to call this function when the GC is still
 // busy.
 // GraphHasUID returns if the Propagator has a particular UID store in its
