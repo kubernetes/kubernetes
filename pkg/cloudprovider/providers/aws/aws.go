@@ -499,26 +499,25 @@ func (p *awsSDKProvider) Metadata() (EC2Metadata, error) {
 	return client, nil
 }
 
+// stringPointerArray creates a slice of string pointers from a slice of strings
+// Deprecated: consider using aws.StringSlice - but note the slightly different behaviour with a nil input
 func stringPointerArray(orig []string) []*string {
 	if orig == nil {
 		return nil
 	}
-	n := make([]*string, len(orig))
-	for i := range orig {
-		n[i] = &orig[i]
-	}
-	return n
+	return aws.StringSlice(orig)
 }
 
+// isNilOrEmpty returns true if the value is nil or ""
+// Deprecated: prefer aws.StringValue(x) == "" (and elimination of this check altogether whrere possible)
 func isNilOrEmpty(s *string) bool {
 	return s == nil || *s == ""
 }
 
+// orEmpty returns the string value, or "" if the pointer is nil
+// Deprecated: prefer aws.StringValue
 func orEmpty(s *string) string {
-	if s == nil {
-		return ""
-	}
-	return *s
+	return aws.StringValue(s)
 }
 
 func newEc2Filter(name string, value string) *ec2.Filter {
