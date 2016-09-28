@@ -2026,7 +2026,7 @@ type ReplicationControllerSpec struct {
 	// Minimum number of seconds for which a newly created pod should be ready
 	// without any of its container crashing, for it to be considered available.
 	// Defaults to 0 (pod will be considered available as soon as it is ready)
-	MinReadySeconds int32 `json:"minReadySeconds,omitempty"`
+	MinReadySeconds int32 `json:"minReadySeconds,omitempty" protobuf:"varint,4,opt,name=minReadySeconds"`
 
 	// Selector is a label query over pods that should match the Replicas count.
 	// If Selector is empty, it is defaulted to the labels present on the Pod template.
@@ -2060,7 +2060,7 @@ type ReplicationControllerStatus struct {
 	ReadyReplicas int32 `json:"readyReplicas,omitempty" protobuf:"varint,4,opt,name=readyReplicas"`
 
 	// The number of available replicas (ready for at least minReadySeconds) for this replication controller.
-	AvailableReplicas int32 `json:"availableReplicas,omitempty"`
+	AvailableReplicas int32 `json:"availableReplicas,omitempty" protobuf:"varint,5,opt,name=availableReplicas"`
 
 	// ObservedGeneration reflects the generation of the most recently observed replication controller.
 	ObservedGeneration int64 `json:"observedGeneration,omitempty" protobuf:"varint,3,opt,name=observedGeneration"`
