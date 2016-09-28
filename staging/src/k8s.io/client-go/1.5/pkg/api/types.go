@@ -2568,7 +2568,7 @@ type SerializedReference struct {
 type EventSource struct {
 	// Component from which the event is generated.
 	Component string `json:"component,omitempty"`
-	// Host name on which the event is generated.
+	// Node name on which the event is generated.
 	Host string `json:"host,omitempty"`
 }
 

@@ -17,6 +17,7 @@ limitations under the License.
 package rbac
 
 import (
+	"fmt"
 	"strings"
 
 	"k8s.io/client-go/1.5/pkg/api/unversioned"
@@ -93,4 +94,71 @@ func NonResourceURLMatches(rule PolicyRule, requestedURL string) bool {
 	}
 
 	return false
+}
+
+// +k8s:deepcopy-gen=false
+// PolicyRuleBuilder let's us attach methods.  A no-no for API types.
+// We use it to construct rules in code.  It's more compact than trying to write them
+// out in a literal and allows us to perform some basic checking during construction
+type PolicyRuleBuilder struct {
+	PolicyRule PolicyRule
+}
+
+func NewRule(verbs ...string) *PolicyRuleBuilder {
+	return &PolicyRuleBuilder{
+		PolicyRule: PolicyRule{Verbs: verbs},
+	}
+}
+
+func (r *PolicyRuleBuilder) Groups(groups ...string) *PolicyRuleBuilder {
+	r.PolicyRule.APIGroups = append(r.PolicyRule.APIGroups, groups...)
+	return r
+}
+
+func (r *PolicyRuleBuilder) Resources(resources ...string) *PolicyRuleBuilder {
+	r.PolicyRule.Resources = append(r.PolicyRule.Resources, resources...)
+	return r
+}
+
+func (r *PolicyRuleBuilder) Names(names ...string) *PolicyRuleBuilder {
+	r.PolicyRule.ResourceNames = append(r.PolicyRule.ResourceNames, names...)
+	return r
+}
+
+func (r *PolicyRuleBuilder) URLs(urls ...string) *PolicyRuleBuilder {
+	r.PolicyRule.NonResourceURLs = append(r.PolicyRule.NonResourceURLs, urls...)
+	return r
+}
+
+func (r *PolicyRuleBuilder) RuleOrDie() PolicyRule {
+	ret, err := r.Rule()
+	if err != nil {
+		panic(err)
+	}
+	return ret
+}
+
+func (r *PolicyRuleBuilder) Rule() (PolicyRule, error) {
+	if len(r.PolicyRule.Verbs) == 0 {
+		return PolicyRule{}, fmt.Errorf("verbs are required: %#v", r.PolicyRule)
+	}
+
+	switch {
+	case len(r.PolicyRule.NonResourceURLs) > 0:
+		if len(r.PolicyRule.APIGroups) != 0 || len(r.PolicyRule.Resources) != 0 || len(r.PolicyRule.ResourceNames) != 0 {
+			return PolicyRule{}, fmt.Errorf("non-resource rule may not have apiGroups, resources, or resourceNames: %#v", r.PolicyRule)
+		}
+	case len(r.PolicyRule.Resources) > 0:
+		if len(r.PolicyRule.NonResourceURLs) != 0 {
+			return PolicyRule{}, fmt.Errorf("resource rule may not have nonResourceURLs: %#v", r.PolicyRule)
+		}
+		if len(r.PolicyRule.APIGroups) == 0 {
+			// this a common bug
+			return PolicyRule{}, fmt.Errorf("resource rule must have apiGroups: %#v", r.PolicyRule)
+		}
+	default:
+		return PolicyRule{}, fmt.Errorf("a rule must have either nonResourceURLs or resources: %#v", r.PolicyRule)
+	}
+
+	return r.PolicyRule, nil
 }
