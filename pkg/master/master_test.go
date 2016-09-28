@@ -72,7 +72,9 @@ import (
 	"github.com/go-openapi/validate"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
-	"k8s.io/kubernetes/pkg/generated/openapi"
+	"k8s.io/kubernetes/pkg/apiserver/util"
+	openapigen "k8s.io/kubernetes/pkg/generated/openapi"
+	"k8s.io/kubernetes/pkg/genericapiserver/openapi/common"
 )
 
 // setUp is a convience function for setting up for (most) tests.
@@ -83,7 +85,9 @@ func setUp(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.
 		GenericAPIServer: &genericapiserver.GenericAPIServer{},
 	}
 	config := Config{
-		Config: &genericapiserver.Config{},
+		Config: &genericapiserver.Config{
+			OpenAPIConfig: &common.Config{},
+		},
 	}
 
 	resourceEncoding := genericapiserver.NewDefaultResourceEncodingConfig()
@@ -1253,15 +1257,16 @@ func TestValidOpenAPISpec(t *testing.T) {
 	_, etcdserver, config, assert := setUp(t)
 	defer etcdserver.Terminate(t)
 
-	config.OpenAPIDefinitions = openapi.OpenAPIDefinitions
+	config.OpenAPIConfig.Definitions = openapigen.OpenAPIDefinitions
 	config.EnableOpenAPISupport = true
 	config.EnableIndex = true
-	config.OpenAPIInfo = spec.Info{
+	config.OpenAPIConfig.Info = &spec.Info{
 		InfoProps: spec.InfoProps{
 			Title:   "Kubernetes",
 			Version: "unversioned",
 		},
 	}
+	config.OpenAPIConfig.GetOperationID = util.GetOperationID
 	master, err := New(&config)
 	if err != nil {
 		t.Fatalf("Error in bringing up the master: %v", err)
@@ -1346,7 +1351,7 @@ func TestValidOpenAPISpec(t *testing.T) {
 						t.Logf("Open API spec on %v has some warnings : %v", path, warns)
 					}
 				} else {
-					t.Logf("Validation is disabled because it is timing out on jenkins put passing locally.")
+					t.Logf("Validation is disabled because it is timing out on jenkins but passing locally.")
 				}
 			}
 

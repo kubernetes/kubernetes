@@ -42,6 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/apiserver/authenticator"
+	"k8s.io/kubernetes/pkg/apiserver/util"
 	authorizerunion "k8s.io/kubernetes/pkg/auth/authorizer/union"
 	"k8s.io/kubernetes/pkg/auth/user"
 	"k8s.io/kubernetes/pkg/capabilities"
@@ -305,8 +306,9 @@ func Run(s *options.APIServer) error {
 	genericConfig.ProxyDialer = proxyDialerFn
 	genericConfig.ProxyTLSClientConfig = proxyTLSClientConfig
 	genericConfig.Serializer = api.Codecs
-	genericConfig.OpenAPIInfo.Title = "Kubernetes"
-	genericConfig.OpenAPIDefinitions = openapi.OpenAPIDefinitions
+	genericConfig.OpenAPIConfig.Info.Title = "Kubernetes"
+	genericConfig.OpenAPIConfig.Definitions = openapi.OpenAPIDefinitions
+	genericConfig.OpenAPIConfig.GetOperationID = util.GetOperationID
 	genericConfig.EnableOpenAPISupport = true
 
 	config := &master.Config{

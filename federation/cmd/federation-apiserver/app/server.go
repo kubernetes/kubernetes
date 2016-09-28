@@ -210,7 +210,7 @@ func Run(s *options.ServerRunOptions) error {
 	genericConfig.APIResourceConfigSource = storageFactory.APIResourceConfigSource
 	genericConfig.MasterServiceNamespace = s.MasterServiceNamespace
 	genericConfig.Serializer = api.Codecs
-	genericConfig.OpenAPIDefinitions = openapi.OpenAPIDefinitions
+	genericConfig.OpenAPIConfig.Definitions = openapi.OpenAPIDefinitions
 	genericConfig.EnableOpenAPISupport = true
 
 	// TODO: Move this to generic api server (Need to move the command line flag).

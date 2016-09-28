@@ -137,17 +137,18 @@ func startMasterOrDie(masterConfig *master.Config) (*master.Master, *httptest.Se
 		masterConfig.EnableProfiling = true
 		masterConfig.EnableSwaggerSupport = true
 		masterConfig.EnableOpenAPISupport = true
-		masterConfig.OpenAPIInfo = spec.Info{
+		masterConfig.OpenAPIConfig.Info = spec.Info{
 			InfoProps: spec.InfoProps{
 				Title:   "Kubernetes",
 				Version: "unversioned",
 			},
 		}
-		masterConfig.OpenAPIDefaultResponse = spec.Response{
+		masterConfig.OpenAPIConfig.DefaultResponse = spec.Response{
 			ResponseProps: spec.ResponseProps{
 				Description: "Default Response.",
 			},
 		}
+		masterConfig.OpenAPIConfig.Definitions = openapi.OpenAPIDefinitions
 	}
 	m, err := master.New(masterConfig)
 	if err != nil {
@@ -232,7 +233,6 @@ func NewMasterConfig() *master.Config {
 			ServiceClusterIPRange: parseCIDROrDie("10.0.0.0/24"),
 			ServiceNodePortRange:  utilnet.PortRange{Base: 30000, Size: 2768},
 			EnableVersion:         true,
-			OpenAPIDefinitions:    openapi.OpenAPIDefinitions,
 			EnableOpenAPISupport:  true,
 		},
 		StorageFactory:   storageFactory,
