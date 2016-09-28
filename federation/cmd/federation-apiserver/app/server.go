@@ -231,8 +231,8 @@ func Run(s *options.ServerRunOptions) error {
 		return err
 	}
 
-	routes.UIRedirect{}.Install(m.Mux, m.HandlerContainer)
-	routes.Logs{}.Install(m.Mux, m.HandlerContainer)
+	routes.UIRedirect{}.Install(m.HandlerContainer)
+	routes.Logs{}.Install(m.HandlerContainer)
 
 	restOptionsFactory := restOptionsFactory{
 		storageFactory:          storageFactory,
