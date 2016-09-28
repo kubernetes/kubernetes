@@ -25,7 +25,6 @@ import (
 	"github.com/go-openapi/spec"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/kubernetes/pkg/genericapiserver/openapi/common"
-	"sort"
 )
 
 // setUp is a convenience function for setting up for (most) tests.
@@ -322,35 +321,6 @@ func getAdditionalTestParameters() []spec.Parameter {
 	return ret
 }
 
-type Parameters []spec.Parameter
-
-func (s Parameters) Len() int      { return len(s) }
-func (s Parameters) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
-
-type ByName struct {
-	Parameters
-}
-
-func (s ByName) Less(i, j int) bool {
-	return s.Parameters[i].Name < s.Parameters[j].Name
-}
-
-// TODO(mehdy): Consider sort parameters in actual spec generation for more predictable spec generation
-func sortParameters(s *spec.Swagger) *spec.Swagger {
-	for k, p := range s.Paths.Paths {
-		sort.Sort(ByName{p.Parameters})
-		sort.Sort(ByName{p.Get.Parameters})
-		sort.Sort(ByName{p.Put.Parameters})
-		sort.Sort(ByName{p.Post.Parameters})
-		sort.Sort(ByName{p.Head.Parameters})
-		sort.Sort(ByName{p.Delete.Parameters})
-		sort.Sort(ByName{p.Options.Parameters})
-		sort.Sort(ByName{p.Patch.Parameters})
-		s.Paths.Paths[k] = p // Unnecessary?! Magic!!!
-	}
-	return s
-}
-
 func getTestInputDefinition() spec.Schema {
 	return spec.Schema{
 		SchemaProps: spec.SchemaProps{
@@ -434,8 +404,6 @@ func TestBuildSwaggerSpec(t *testing.T) {
 	}
 	err := o.init()
 	if assert.NoError(err) {
-		sortParameters(expected)
-		sortParameters(o.swagger)
 		assert.Equal(expected, o.swagger)
 	}
 }
