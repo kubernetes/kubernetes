@@ -21,6 +21,59 @@ import (
 	"testing"
 )
 
+func TestGet(t *testing.T) {
+	tests := []struct {
+		config              *Config
+		transportToSave     *http.Transport
+		expectedSaveToCache bool
+	}{
+		{
+			config: &Config{
+				TLS: TLSConfig{
+					CAData:   []byte(rootCACert),
+					CertData: []byte(certData),
+					KeyData:  []byte(keyData),
+				},
+			},
+			transportToSave:     &http.Transport{},
+			expectedSaveToCache: true,
+		},
+		{
+			config:              &Config{},
+			transportToSave:     &http.Transport{},
+			expectedSaveToCache: false,
+		},
+		{
+			config:              &Config{Scheme: "unix"},
+			transportToSave:     &http.Transport{},
+			expectedSaveToCache: false,
+		},
+	}
+
+	for _, tc := range tests {
+		key, err := tlsConfigKey(tc.config)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		_, err = tlsCache.get(tc.config)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		_, ok := tlsCache.transports[key]
+
+		if ok && !tc.expectedSaveToCache {
+			t.Errorf("Saving the following config to cache was not expected: %#v", tc.config)
+		}
+
+		if !ok && tc.expectedSaveToCache {
+			t.Errorf("Saving the following config to cache was expected, but didn't happen: %#v", tc.config)
+
+		}
+	}
+}
+
 func TestTLSConfigKey(t *testing.T) {
 	// Make sure config fields that don't affect the tls config don't affect the cache key
 	identicalConfigurations := map[string]*Config{

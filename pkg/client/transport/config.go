@@ -20,6 +20,17 @@ import "net/http"
 
 // Config holds various options for establishing a transport.
 type Config struct {
+	// Scheme is the name of protocol to be used by transport (http
+	// or unix).
+	Scheme string
+
+	// Host must be a host string, a host:port pair, a URL or a path to unix socket to the
+	// base of the apiserver. If a URL is given then the (optional) Path of that URL
+	// represents a prefix that must be appended to all request URIs used to access the
+	// apiserver. This allows a frontend proxy to easily relocate all of the apiserver
+	// endpoints.
+	Host string
+
 	// UserAgent is an optional field that specifies the caller of this
 	// request.
 	UserAgent string
