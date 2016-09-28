@@ -116,7 +116,7 @@ const (
 )
 
 type Config struct {
-	*genericapiserver.Config
+	GenericConfig *genericapiserver.Config
 
 	StorageFactory           genericapiserver.StorageFactory
 	EnableWatchCache         bool
@@ -231,7 +231,7 @@ func (c *Config) New() (*Master, error) {
 
 		restOptionsFactory: restOptionsFactory{
 			deleteCollectionWorkers: c.DeleteCollectionWorkers,
-			enableGarbageCollection: c.EnableGarbageCollection,
+			enableGarbageCollection: c.GenericConfig.EnableGarbageCollection,
 			storageFactory:          c.StorageFactory,
 		},
 	}
@@ -247,8 +247,8 @@ func (c *Config) New() (*Master, error) {
 		c.RESTStorageProviders = map[string]genericapiserver.RESTStorageProvider{}
 	}
 	c.RESTStorageProviders[appsapi.GroupName] = appsrest.RESTStorageProvider{}
-	c.RESTStorageProviders[authenticationv1beta1.GroupName] = authenticationrest.RESTStorageProvider{Authenticator: c.Authenticator}
-	c.RESTStorageProviders[authorization.GroupName] = authorizationrest.RESTStorageProvider{Authorizer: c.Authorizer}
+	c.RESTStorageProviders[authenticationv1beta1.GroupName] = authenticationrest.RESTStorageProvider{Authenticator: c.GenericConfig.Authenticator}
+	c.RESTStorageProviders[authorization.GroupName] = authorizationrest.RESTStorageProvider{Authorizer: c.GenericConfig.Authorizer}
 	c.RESTStorageProviders[autoscaling.GroupName] = autoscalingrest.RESTStorageProvider{}
 	c.RESTStorageProviders[batch.GroupName] = batchrest.RESTStorageProvider{}
 	c.RESTStorageProviders[certificates.GroupName] = certificatesrest.RESTStorageProvider{}
@@ -257,7 +257,7 @@ func (c *Config) New() (*Master, error) {
 		DisableThirdPartyControllerForTesting: m.disableThirdPartyControllerForTesting,
 	}
 	c.RESTStorageProviders[policy.GroupName] = policyrest.RESTStorageProvider{}
-	c.RESTStorageProviders[rbac.GroupName] = &rbacrest.RESTStorageProvider{AuthorizerRBACSuperUser: c.AuthorizerRBACSuperUser}
+	c.RESTStorageProviders[rbac.GroupName] = &rbacrest.RESTStorageProvider{AuthorizerRBACSuperUser: c.GenericConfig.AuthorizerRBACSuperUser}
 	c.RESTStorageProviders[storage.GroupName] = storagerest.RESTStorageProvider{}
 	m.InstallAPIs(c)
 
@@ -273,7 +273,7 @@ func (m *Master) InstallAPIs(c *Config) {
 	apiGroupsInfo := []genericapiserver.APIGroupInfo{}
 
 	// Install v1 unless disabled.
-	if c.APIResourceConfigSource.AnyResourcesForVersionEnabled(apiv1.SchemeGroupVersion) {
+	if c.GenericConfig.APIResourceConfigSource.AnyResourcesForVersionEnabled(apiv1.SchemeGroupVersion) {
 		// Install v1 API.
 		m.initV1ResourcesStorage(c)
 		apiGroupInfo := genericapiserver.APIGroupInfo{
@@ -308,7 +308,7 @@ func (m *Master) InstallAPIs(c *Config) {
 	}
 	healthz.InstallHandler(m.Mux, healthzChecks...)
 
-	if c.EnableProfiling {
+	if c.GenericConfig.EnableProfiling {
 		routes.MetricsWithReset{}.Install(m.Mux, m.HandlerContainer)
 	} else {
 		routes.DefaultMetrics{}.Install(m.Mux, m.HandlerContainer)
@@ -316,7 +316,7 @@ func (m *Master) InstallAPIs(c *Config) {
 
 	// Install third party resource support if requested
 	// TODO seems like this bit ought to be unconditional and the REST API is controlled by the config
-	if c.APIResourceConfigSource.ResourceEnabled(extensionsapiv1beta1.SchemeGroupVersion.WithResource("thirdpartyresources")) {
+	if c.GenericConfig.APIResourceConfigSource.ResourceEnabled(extensionsapiv1beta1.SchemeGroupVersion.WithResource("thirdpartyresources")) {
 		var err error
 		m.thirdPartyStorageConfig, err = c.StorageFactory.NewConfig(extensions.Resource("thirdpartyresources"))
 		if err != nil {
@@ -332,12 +332,12 @@ func (m *Master) InstallAPIs(c *Config) {
 	// stabilize order.
 	// TODO find a better way to configure priority of groups
 	for _, group := range sets.StringKeySet(c.RESTStorageProviders).List() {
-		if !c.APIResourceConfigSource.AnyResourcesForGroupEnabled(group) {
+		if !c.GenericConfig.APIResourceConfigSource.AnyResourcesForGroupEnabled(group) {
 			glog.V(1).Infof("Skipping disabled API group %q.", group)
 			continue
 		}
 		restStorageBuilder := c.RESTStorageProviders[group]
-		apiGroupInfo, enabled := restStorageBuilder.NewRESTStorage(c.APIResourceConfigSource, restOptionsGetter)
+		apiGroupInfo, enabled := restStorageBuilder.NewRESTStorage(c.GenericConfig.APIResourceConfigSource, restOptionsGetter)
 		if !enabled {
 			glog.Warningf("Problem initializing API group %q, skipping.", group)
 			continue

@@ -338,9 +338,9 @@ func TestRBAC(t *testing.T) {
 	for i, tc := range tests {
 		// Create an API Server.
 		masterConfig := framework.NewIntegrationTestMasterConfig()
-		masterConfig.Authorizer = newRBACAuthorizer(t, superUser, masterConfig)
-		masterConfig.Authenticator = newFakeAuthenticator()
-		masterConfig.AuthorizerRBACSuperUser = superUser
+		masterConfig.GenericConfig.Authorizer = newRBACAuthorizer(t, superUser, masterConfig)
+		masterConfig.GenericConfig.Authenticator = newFakeAuthenticator()
+		masterConfig.GenericConfig.AuthorizerRBACSuperUser = superUser
 		_, s := framework.RunAMaster(masterConfig)
 		defer s.Close()
 
@@ -437,9 +437,9 @@ func TestBootstrapping(t *testing.T) {
 	superUser := "admin"
 
 	masterConfig := framework.NewIntegrationTestMasterConfig()
-	masterConfig.Authorizer = newRBACAuthorizer(t, superUser, masterConfig)
-	masterConfig.Authenticator = newFakeAuthenticator()
-	masterConfig.AuthorizerRBACSuperUser = superUser
+	masterConfig.GenericConfig.Authorizer = newRBACAuthorizer(t, superUser, masterConfig)
+	masterConfig.GenericConfig.Authenticator = newFakeAuthenticator()
+	masterConfig.GenericConfig.AuthorizerRBACSuperUser = superUser
 	_, s := framework.RunAMaster(masterConfig)
 	defer s.Close()
 

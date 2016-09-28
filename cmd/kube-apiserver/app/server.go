@@ -310,7 +310,7 @@ func Run(s *options.APIServer) error {
 	genericConfig.EnableOpenAPISupport = true
 
 	config := &master.Config{
-		Config: genericConfig,
+		GenericConfig: genericConfig,
 
 		StorageFactory:          storageFactory,
 		EnableWatchCache:        s.EnableWatchCache,

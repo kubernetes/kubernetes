@@ -64,10 +64,10 @@ func TestSubjectAccessReview(t *testing.T) {
 	defer s.Close()
 
 	masterConfig := framework.NewIntegrationTestMasterConfig()
-	masterConfig.Authenticator = authenticator.RequestFunc(alwaysAlice)
-	masterConfig.Authorizer = sarAuthorizer{}
-	masterConfig.AdmissionControl = admit.NewAlwaysAdmit()
-	m, err := masterConfig.New()
+	masterConfig.GenericConfig.Authenticator = authenticator.RequestFunc(alwaysAlice)
+	masterConfig.GenericConfig.Authorizer = sarAuthorizer{}
+	masterConfig.GenericConfig.AdmissionControl = admit.NewAlwaysAdmit()
+	m, err := masterConfig.Complete().New()
 	if err != nil {
 		t.Fatalf("error in bringing up the master: %v", err)
 	}
@@ -164,12 +164,12 @@ func TestSelfSubjectAccessReview(t *testing.T) {
 
 	username := "alice"
 	masterConfig := framework.NewIntegrationTestMasterConfig()
-	masterConfig.Authenticator = authenticator.RequestFunc(func(req *http.Request) (user.Info, bool, error) {
+	masterConfig.GenericConfig.Authenticator = authenticator.RequestFunc(func(req *http.Request) (user.Info, bool, error) {
 		return &user.DefaultInfo{Name: username}, true, nil
 	})
-	masterConfig.Authorizer = sarAuthorizer{}
-	masterConfig.AdmissionControl = admit.NewAlwaysAdmit()
-	m, err := masterConfig.New()
+	masterConfig.GenericConfig.Authorizer = sarAuthorizer{}
+	masterConfig.GenericConfig.AdmissionControl = admit.NewAlwaysAdmit()
+	m, err := masterConfig.Complete().New()
 	if err != nil {
 		t.Fatalf("error in bringing up the master: %v", err)
 	}
@@ -254,10 +254,10 @@ func TestLocalSubjectAccessReview(t *testing.T) {
 	defer s.Close()
 
 	masterConfig := framework.NewIntegrationTestMasterConfig()
-	masterConfig.Authenticator = authenticator.RequestFunc(alwaysAlice)
-	masterConfig.Authorizer = sarAuthorizer{}
-	masterConfig.AdmissionControl = admit.NewAlwaysAdmit()
-	m, err := masterConfig.New()
+	masterConfig.GenericConfig.Authenticator = authenticator.RequestFunc(alwaysAlice)
+	masterConfig.GenericConfig.Authorizer = sarAuthorizer{}
+	masterConfig.GenericConfig.AdmissionControl = admit.NewAlwaysAdmit()
+	m, err := masterConfig.Complete().New()
 	if err != nil {
 		t.Fatalf("error in bringing up the master: %v", err)
 	}
