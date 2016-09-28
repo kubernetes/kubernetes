@@ -289,10 +289,11 @@ func TestWatch(t *testing.T) {
 	codec := testapi.Default.Codec()
 	server := etcdtesting.NewEtcdTestClientServer(t)
 	defer server.Terminate(t)
-	key := "/some/key"
+	prefix := "/some/"
+	key := path.Join(prefix, "key")
 	h := newEtcdHelper(server.Client, codec, etcdtest.PathPrefix())
 
-	watching, err := h.Watch(context.TODO(), key, "0", storage.Everything)
+	watching, err := h.Watch(context.TODO(), prefix, "0", storage.Everything, nil)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -341,12 +342,13 @@ func makeSubsets(ip string, port int) []api.EndpointSubset {
 
 func TestWatchEtcdState(t *testing.T) {
 	codec := testapi.Default.Codec()
-	key := etcdtest.AddPrefix("/somekey/foo")
+	prefix := etcdtest.AddPrefix("/somekey")
+	key := path.Join(prefix, "foo")
 	server := etcdtesting.NewEtcdTestClientServer(t)
 	defer server.Terminate(t)
 
 	h := newEtcdHelper(server.Client, codec, etcdtest.PathPrefix())
-	watching, err := h.Watch(context.TODO(), key, "0", storage.Everything)
+	watching, err := h.Watch(context.TODO(), prefix, "0", storage.Everything, nil)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -399,7 +401,8 @@ func TestWatchFromZeroIndex(t *testing.T) {
 	codec := testapi.Default.Codec()
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 
-	key := etcdtest.AddPrefix("/somekey/foo")
+	prefix := etcdtest.AddPrefix("/somekey")
+	key := path.Join(prefix, "foo")
 	server := etcdtesting.NewEtcdTestClientServer(t)
 	defer server.Terminate(t)
 
@@ -423,7 +426,7 @@ func TestWatchFromZeroIndex(t *testing.T) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	watching, err := h.Watch(context.TODO(), key, "0", storage.Everything)
+	watching, err := h.Watch(context.TODO(), prefix, "0", storage.Everything, nil)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -456,20 +459,21 @@ func TestWatchFromZeroIndex(t *testing.T) {
 	}
 }
 
-func TestWatchListFromZeroIndex(t *testing.T) {
+func TestWatchFromZeroIndex(t *testing.T) {
 	codec := testapi.Default.Codec()
-	key := etcdtest.AddPrefix("/some/key")
+	prefix := etcdtest.AddPrefix("/somekey")
+	key := path.Join(prefix, "foo")
 	server := etcdtesting.NewEtcdTestClientServer(t)
 	defer server.Terminate(t)
 	h := newEtcdHelper(server.Client, codec, key)
 
-	watching, err := h.WatchList(context.TODO(), key, "0", storage.Everything)
+	watching, err := h.Watch(context.TODO(), prefix, "0", storage.Everything, nil)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 	defer watching.Stop()
 
-	// creates key/foo which should trigger the WatchList for "key"
+	// creates key/foo which should trigger the Watch for "key"
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 	err = h.Create(context.TODO(), pod.Name, pod, pod, 0)
 	if err != nil {
@@ -486,7 +490,7 @@ func TestWatchListFromZeroIndex(t *testing.T) {
 	}
 }
 
-func TestWatchListIgnoresRootKey(t *testing.T) {
+func TestWatchIgnoresRootKey(t *testing.T) {
 	codec := testapi.Default.Codec()
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 	key := etcdtest.AddPrefix("/some/key")
@@ -494,13 +498,13 @@ func TestWatchListIgnoresRootKey(t *testing.T) {
 	defer server.Terminate(t)
 	h := newEtcdHelper(server.Client, codec, key)
 
-	watching, err := h.WatchList(context.TODO(), key, "0", storage.Everything)
+	watching, err := h.Watch(context.TODO(), key, "0", storage.Everything, nil)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 	defer watching.Stop()
 
-	// creates key/foo which should trigger the WatchList for "key"
+	// creates key/foo which should trigger the Watch for "key"
 	err = h.Create(context.TODO(), key, pod, pod, 0)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
@@ -521,11 +525,12 @@ func TestWatchPurposefulShutdown(t *testing.T) {
 	_, codec := testScheme(t)
 	server := etcdtesting.NewEtcdTestClientServer(t)
 	defer server.Terminate(t)
-	key := "/some/key"
+	prefix := etcdtest.AddPrefix("/somekey")
+	key := path.Join(prefix, "foo")
 	h := newEtcdHelper(server.Client, codec, etcdtest.PathPrefix())
 
 	// Test purposeful shutdown
-	watching, err := h.Watch(context.TODO(), key, "0", storage.Everything)
+	watching, err := h.Watch(context.TODO(), prefix, "0", storage.Everything, nil)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}

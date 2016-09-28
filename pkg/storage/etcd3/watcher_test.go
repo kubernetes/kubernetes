@@ -38,19 +38,11 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 )
 
-func TestWatch(t *testing.T) {
-	testWatch(t, false)
-}
-
-func TestWatchList(t *testing.T) {
-	testWatch(t, true)
-}
-
 // It tests that
 // - first occurrence of objects should notify Add event
 // - update should trigger Modified event
 // - update that gets filtered should trigger Deleted event
-func testWatch(t *testing.T, recursive bool) {
+func TestWatch(t *testing.T) {
 	podFoo := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 	podBar := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "bar"}}
 
@@ -91,17 +83,14 @@ func testWatch(t *testing.T, recursive bool) {
 	}}
 	for i, tt := range tests {
 		ctx, store, cluster := testSetup(t)
-		w, err := store.watch(ctx, tt.key, "0", storage.SimpleFilter(tt.pred), recursive)
+		w, err := store.Watch(ctx, tt.key, "0", tt.pred, nil)
 		if err != nil {
 			t.Fatalf("Watch failed: %v", err)
 		}
 		var prevObj *api.Pod
 		for _, watchTest := range tt.watchTests {
 			out := &api.Pod{}
-			key := tt.key
-			if recursive {
-				key = key + "/item"
-			}
+			key := path.Join(tt.key, "/item")
 			err := store.GuaranteedUpdate(ctx, key, out, true, nil, storage.SimpleUpdate(
 				func(runtime.Object) (runtime.Object, error) {
 					return watchTest.obj, nil
@@ -129,7 +118,7 @@ func TestDeleteTriggerWatch(t *testing.T) {
 	ctx, store, cluster := testSetup(t)
 	defer cluster.Terminate(t)
 	key, storedObj := testPropogateStore(t, store, ctx, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}})
-	w, err := store.Watch(ctx, key, storedObj.ResourceVersion, storage.Everything)
+	w, err := store.Watch(ctx, "/", storedObj.ResourceVersion, storage.Everything, nil)
 	if err != nil {
 		t.Fatalf("Watch failed: %v", err)
 	}
@@ -141,13 +130,12 @@ func TestDeleteTriggerWatch(t *testing.T) {
 
 // TestWatchFromZero tests that
 // - watch from 0 should sync up and grab the object added before
-// - watch from non-0 should just watch changes after given version
 func TestWatchFromZero(t *testing.T) {
 	ctx, store, cluster := testSetup(t)
 	defer cluster.Terminate(t)
-	key, storedObj := testPropogateStore(t, store, ctx, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}})
+	_, storedObj := testPropogateStore(t, store, ctx, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}})
 
-	w, err := store.Watch(ctx, key, "0", storage.Everything)
+	w, err := store.Watch(ctx, "/", "0", storage.Everything, nil)
 	if err != nil {
 		t.Fatalf("Watch failed: %v", err)
 	}
@@ -161,7 +149,7 @@ func TestWatchFromNoneZero(t *testing.T) {
 	defer cluster.Terminate(t)
 	key, storedObj := testPropogateStore(t, store, ctx, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}})
 
-	w, err := store.Watch(ctx, key, storedObj.ResourceVersion, storage.Everything)
+	w, err := store.Watch(ctx, "/", storedObj.ResourceVersion, storage.Everything, nil)
 	if err != nil {
 		t.Fatalf("Watch failed: %v", err)
 	}
@@ -176,9 +164,10 @@ func TestWatchFromNoneZero(t *testing.T) {
 func TestWatchError(t *testing.T) {
 	cluster := integration.NewClusterV3(t, &integration.ClusterConfig{Size: 1})
 	defer cluster.Terminate(t)
+	// We use custom codec to return error
 	invalidStore := newStore(cluster.RandClient(), &testCodec{testapi.Default.Codec()}, "")
 	ctx := context.Background()
-	w, err := invalidStore.Watch(ctx, "/abc", "0", storage.Everything)
+	w, err := invalidStore.Watch(ctx, "/", "0", storage.Everything, nil)
 	if err != nil {
 		t.Fatalf("Watch failed: %v", err)
 	}
@@ -197,7 +186,7 @@ func TestWatchContextCancel(t *testing.T) {
 	cancel()
 	// When we watch with a canceled context, we should detect that it's context canceled.
 	// We won't take it as error and also close the watcher.
-	w, err := store.watcher.Watch(canceledCtx, "/abc", 0, false, storage.SimpleFilter(storage.Everything))
+	w, err := store.Watch(canceledCtx, "/", "0", storage.Everything, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -240,7 +229,7 @@ func TestWatchDeleteEventObjectHaveLatestRV(t *testing.T) {
 	defer cluster.Terminate(t)
 	key, storedObj := testPropogateStore(t, store, ctx, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}})
 
-	w, err := store.Watch(ctx, key, storedObj.ResourceVersion, storage.Everything)
+	w, err := store.Watch(ctx, "/", storedObj.ResourceVersion, storage.Everything, nil)
 	if err != nil {
 		t.Fatalf("Watch failed: %v", err)
 	}
