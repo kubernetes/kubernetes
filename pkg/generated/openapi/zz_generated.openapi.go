@@ -7896,17 +7896,23 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 	"v1.FlockerVolumeSource": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "Represents a Flocker volume mounted by the Flocker agent. Flocker volumes do not support ownership management or SELinux relabeling.",
+				Description: "Represents a Flocker volume mounted by the Flocker agent. One and only one of datasetName and datasetUUID should be set. Flocker volumes do not support ownership management or SELinux relabeling.",
 				Properties: map[string]spec.Schema{
 					"datasetName": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Required: the volume name. This is going to be store on metadata -> name on the payload for Flocker",
+							Description: "Name of the dataset stored as metadata -> name on the dataset for Flocker should be considered as deprecated",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"datasetUUID": {
+						SchemaProps: spec.SchemaProps{
+							Description: "UUID of the dataset. This is unique identifier of a Flocker dataset",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 				},
-				Required: []string{"datasetName"},
 			},
 		},
 		Dependencies: []string{},

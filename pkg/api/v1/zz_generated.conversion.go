@@ -2196,6 +2196,7 @@ func Convert_api_FlexVolumeSource_To_v1_FlexVolumeSource(in *api.FlexVolumeSourc
 
 func autoConvert_v1_FlockerVolumeSource_To_api_FlockerVolumeSource(in *FlockerVolumeSource, out *api.FlockerVolumeSource, s conversion.Scope) error {
 	out.DatasetName = in.DatasetName
+	out.DatasetUUID = in.DatasetUUID
 	return nil
 }
 
@@ -2205,6 +2206,7 @@ func Convert_v1_FlockerVolumeSource_To_api_FlockerVolumeSource(in *FlockerVolume
 
 func autoConvert_api_FlockerVolumeSource_To_v1_FlockerVolumeSource(in *api.FlockerVolumeSource, out *FlockerVolumeSource, s conversion.Scope) error {
 	out.DatasetName = in.DatasetName
+	out.DatasetUUID = in.DatasetUUID
 	return nil
 }
 
