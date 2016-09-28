@@ -1498,22 +1498,28 @@ func (c *Cloud) AttachDisk(diskName string, nodeName types.NodeName, readOnly bo
 	// See http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/device_naming.html
 	ec2Device := "/dev/xvd" + string(mountDevice)
 
-	if !alreadyAttached {
-		request := &ec2.AttachVolumeInput{
-			Device:     aws.String(ec2Device),
-			InstanceId: aws.String(awsInstance.awsID),
-			VolumeId:   aws.String(disk.awsID),
+	request := &ec2.AttachVolumeInput{
+		Device:     aws.String(ec2Device),
+		InstanceId: aws.String(awsInstance.awsID),
+		VolumeId:   aws.String(disk.awsID),
+	}
+
+	attachResponse, err := c.ec2.AttachVolume(request)
+	if err != nil {
+		// Only remove the entry from the attachment map if we added it
+		if !alreadyAttached {
+			attachEnded = true
 		}
 
-		attachResponse, err := c.ec2.AttachVolume(request)
-		if err != nil {
-			attachEnded = true
-			// TODO: Check if the volume was concurrently attached?
+		if AWSErrorCode(err) == "VolumeInUse" {
+			// This is the error we get if we call Attach on an attached volume
+			glog.Warningf("Got VolumeInUse error attaching volume %q - will check if volume is attached correctly: %v", disk.awsID, err)
+		} else {
 			return "", fmt.Errorf("Error attaching EBS volume: %v", err)
 		}
-
-		glog.V(2).Infof("AttachVolume request returned %v", attachResponse)
 	}
+
+	glog.V(2).Infof("AttachVolume request returned %v", attachResponse)
 
 	attachment, err := disk.waitForAttachmentStatus("attached")
 	if err != nil {
@@ -1578,7 +1584,12 @@ func (c *Cloud) DetachDisk(diskName string, nodeName types.NodeName) (string, er
 
 	response, err := c.ec2.DetachVolume(&request)
 	if err != nil {
-		return "", fmt.Errorf("error detaching EBS volume: %v", err)
+		if AWSErrorCode(err) == "IncorrectState" {
+			// This is the error we get if the volume was already detached
+			glog.Warningf("Got IncorrectState error detaching volume %q; will ignore and check state: %v", disk.awsID, err)
+		} else {
+			return "", fmt.Errorf("error detaching EBS volume: %v", err)
+		}
 	}
 	if response == nil {
 		return "", errors.New("no response from DetachVolume")
@@ -3249,4 +3260,12 @@ func (c *Cloud) addFilters(filters []*ec2.Filter) []*ec2.Filter {
 // Returns the cluster name or an empty string
 func (c *Cloud) getClusterName() string {
 	return c.filterTags[TagNameKubernetesCluster]
+}
+
+// AWSErrorCode returns the aws error code, if err is an awserr.Error, otherwise ""
+func AWSErrorCode(err error) string {
+	if awsError, ok := err.(awserr.Error); ok {
+		return awsError.Code()
+	}
+	return ""
 }
