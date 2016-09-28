@@ -769,7 +769,7 @@ message EventSource {
   // Component from which the event is generated.
   optional string component = 1;
 
-  // Host name on which the event is generated.
+  // Node name on which the event is generated.
   optional string host = 2;
 }
 

@@ -37,6 +37,7 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	awscloud "k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
+	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
@@ -54,8 +55,8 @@ var _ = framework.KubeDescribe("Pod Disks", func() {
 	var (
 		podClient  client.PodInterface
 		nodeClient client.NodeInterface
-		host0Name  string
-		host1Name  string
+		host0Name  types.NodeName
+		host1Name  types.NodeName
 	)
 	f := framework.NewDefaultFramework("pod-disks")
 
@@ -68,8 +69,8 @@ var _ = framework.KubeDescribe("Pod Disks", func() {
 
 		Expect(len(nodes.Items)).To(BeNumerically(">=", 2), "Requires at least 2 nodes")
 
-		host0Name = nodes.Items[0].ObjectMeta.Name
-		host1Name = nodes.Items[1].ObjectMeta.Name
+		host0Name = types.NodeName(nodes.Items[0].ObjectMeta.Name)
+		host1Name = types.NodeName(nodes.Items[1].ObjectMeta.Name)
 
 		mathrand.Seed(time.Now().UTC().UnixNano())
 	})
@@ -91,7 +92,7 @@ var _ = framework.KubeDescribe("Pod Disks", func() {
 			By("cleaning up PD-RW test environment")
 			podClient.Delete(host0Pod.Name, api.NewDeleteOptions(0))
 			podClient.Delete(host1Pod.Name, api.NewDeleteOptions(0))
-			detachAndDeletePDs(diskName, []string{host0Name, host1Name})
+			detachAndDeletePDs(diskName, []types.NodeName{host0Name, host1Name})
 		}()
 
 		By("submitting host0Pod to kubernetes")
@@ -155,7 +156,7 @@ var _ = framework.KubeDescribe("Pod Disks", func() {
 			By("cleaning up PD-RW test environment")
 			podClient.Delete(host0Pod.Name, &api.DeleteOptions{})
 			podClient.Delete(host1Pod.Name, &api.DeleteOptions{})
-			detachAndDeletePDs(diskName, []string{host0Name, host1Name})
+			detachAndDeletePDs(diskName, []types.NodeName{host0Name, host1Name})
 		}()
 
 		By("submitting host0Pod to kubernetes")
@@ -220,7 +221,7 @@ var _ = framework.KubeDescribe("Pod Disks", func() {
 			podClient.Delete(rwPod.Name, api.NewDeleteOptions(0))
 			podClient.Delete(host0ROPod.Name, api.NewDeleteOptions(0))
 			podClient.Delete(host1ROPod.Name, api.NewDeleteOptions(0))
-			detachAndDeletePDs(diskName, []string{host0Name, host1Name})
+			detachAndDeletePDs(diskName, []types.NodeName{host0Name, host1Name})
 		}()
 
 		By("submitting rwPod to ensure PD is formatted")
@@ -272,7 +273,7 @@ var _ = framework.KubeDescribe("Pod Disks", func() {
 			podClient.Delete(rwPod.Name, &api.DeleteOptions{})
 			podClient.Delete(host0ROPod.Name, &api.DeleteOptions{})
 			podClient.Delete(host1ROPod.Name, &api.DeleteOptions{})
-			detachAndDeletePDs(diskName, []string{host0Name, host1Name})
+			detachAndDeletePDs(diskName, []types.NodeName{host0Name, host1Name})
 		}()
 
 		By("submitting rwPod to ensure PD is formatted")
@@ -322,7 +323,7 @@ var _ = framework.KubeDescribe("Pod Disks", func() {
 			if host0Pod != nil {
 				podClient.Delete(host0Pod.Name, api.NewDeleteOptions(0))
 			}
-			detachAndDeletePDs(diskName, []string{host0Name})
+			detachAndDeletePDs(diskName, []types.NodeName{host0Name})
 		}()
 
 		fileAndContentToVerify := make(map[string]string)
@@ -377,8 +378,8 @@ var _ = framework.KubeDescribe("Pod Disks", func() {
 			if host0Pod != nil {
 				podClient.Delete(host0Pod.Name, api.NewDeleteOptions(0))
 			}
-			detachAndDeletePDs(disk1Name, []string{host0Name})
-			detachAndDeletePDs(disk2Name, []string{host0Name})
+			detachAndDeletePDs(disk1Name, []types.NodeName{host0Name})
+			detachAndDeletePDs(disk2Name, []types.NodeName{host0Name})
 		}()
 
 		containerName := "mycontainer"
@@ -535,16 +536,14 @@ func deletePD(pdName string) error {
 	}
 }
 
-func detachPD(hostName, pdName string) error {
+func detachPD(nodeName types.NodeName, pdName string) error {
 	if framework.TestContext.Provider == "gce" || framework.TestContext.Provider == "gke" {
-		instanceName := strings.Split(hostName, ".")[0]
-
 		gceCloud, err := getGCECloud()
 		if err != nil {
 			return err
 		}
 
-		err = gceCloud.DetachDisk(pdName, instanceName)
+		err = gceCloud.DetachDisk(pdName, nodeName)
 		if err != nil {
 			if gerr, ok := err.(*googleapi.Error); ok && strings.Contains(gerr.Message, "Invalid value for field 'disk'") {
 				// PD already detached, ignore error.
@@ -575,7 +574,7 @@ func detachPD(hostName, pdName string) error {
 	}
 }
 
-func testPDPod(diskNames []string, targetHost string, readOnly bool, numContainers int) *api.Pod {
+func testPDPod(diskNames []string, targetNode types.NodeName, readOnly bool, numContainers int) *api.Pod {
 	containers := make([]api.Container, numContainers)
 	for i := range containers {
 		containers[i].Name = "mycontainer"
@@ -608,7 +607,7 @@ func testPDPod(diskNames []string, targetHost string, readOnly bool, numContaine
 		},
 		Spec: api.PodSpec{
 			Containers: containers,
-			NodeName:   targetHost,
+			NodeName:   string(targetNode),
 		},
 	}
 
@@ -644,31 +643,31 @@ func testPDPod(diskNames []string, targetHost string, readOnly bool, numContaine
 }
 
 // Waits for specified PD to to detach from specified hostName
-func waitForPDDetach(diskName, hostName string) error {
+func waitForPDDetach(diskName string, nodeName types.NodeName) error {
 	if framework.TestContext.Provider == "gce" || framework.TestContext.Provider == "gke" {
-		framework.Logf("Waiting for GCE PD %q to detach from node %q.", diskName, hostName)
+		framework.Logf("Waiting for GCE PD %q to detach from node %q.", diskName, nodeName)
 		gceCloud, err := getGCECloud()
 		if err != nil {
 			return err
 		}
 
 		for start := time.Now(); time.Since(start) < gcePDDetachTimeout; time.Sleep(gcePDDetachPollTime) {
-			diskAttached, err := gceCloud.DiskIsAttached(diskName, hostName)
+			diskAttached, err := gceCloud.DiskIsAttached(diskName, nodeName)
 			if err != nil {
-				framework.Logf("Error waiting for PD %q to detach from node %q. 'DiskIsAttached(...)' failed with %v", diskName, hostName, err)
+				framework.Logf("Error waiting for PD %q to detach from node %q. 'DiskIsAttached(...)' failed with %v", diskName, nodeName, err)
 				return err
 			}
 
 			if !diskAttached {
 				// Specified disk does not appear to be attached to specified node
-				framework.Logf("GCE PD %q appears to have successfully detached from %q.", diskName, hostName)
+				framework.Logf("GCE PD %q appears to have successfully detached from %q.", diskName, nodeName)
 				return nil
 			}
 
-			framework.Logf("Waiting for GCE PD %q to detach from %q.", diskName, hostName)
+			framework.Logf("Waiting for GCE PD %q to detach from %q.", diskName, nodeName)
 		}
 
-		return fmt.Errorf("Gave up waiting for GCE PD %q to detach from %q after %v", diskName, hostName, gcePDDetachTimeout)
+		return fmt.Errorf("Gave up waiting for GCE PD %q to detach from %q after %v", diskName, nodeName, gcePDDetachTimeout)
 	}
 
 	return nil
@@ -684,7 +683,7 @@ func getGCECloud() (*gcecloud.GCECloud, error) {
 	return gceCloud, nil
 }
 
-func detachAndDeletePDs(diskName string, hosts []string) {
+func detachAndDeletePDs(diskName string, hosts []types.NodeName) {
 	for _, host := range hosts {
 		framework.Logf("Detaching GCE PD %q from node %q.", diskName, host)
 		detachPD(host, diskName)
@@ -697,7 +696,8 @@ func detachAndDeletePDs(diskName string, hosts []string) {
 
 func waitForPDInVolumesInUse(
 	nodeClient client.NodeInterface,
-	diskName, nodeName string,
+	diskName string,
+	nodeName types.NodeName,
 	timeout time.Duration,
 	shouldExist bool) error {
 	logStr := "to contain"
@@ -708,7 +708,7 @@ func waitForPDInVolumesInUse(
 		"Waiting for node %s's VolumesInUse Status %s PD %q",
 		nodeName, logStr, diskName)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(nodeStatusPollTime) {
-		nodeObj, err := nodeClient.Get(nodeName)
+		nodeObj, err := nodeClient.Get(string(nodeName))
 		if err != nil || nodeObj == nil {
 			framework.Logf(
 				"Failed to fetch node object %q from API server. err=%v",

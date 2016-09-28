@@ -26,6 +26,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
+	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -60,13 +61,13 @@ func (plugin *gcePersistentDiskPlugin) GetDeviceMountRefs(deviceMountPath string
 }
 
 // Attach checks with the GCE cloud provider if the specified volume is already
-// attached to the specified node. If the volume is attached, it succeeds
-// (returns nil). If it is not, Attach issues a call to the GCE cloud provider
-// to attach it.
-// Callers are responsible for retryinging on failure.
+// attached to the node with the specified Name.
+// If the volume is attached, it succeeds (returns nil).
+// If it is not, Attach issues a call to the GCE cloud provider to attach it.
+// Callers are responsible for retrying on failure.
 // Callers are responsible for thread safety between concurrent attach and
 // detach operations.
-func (attacher *gcePersistentDiskAttacher) Attach(spec *volume.Spec, hostName string) (string, error) {
+func (attacher *gcePersistentDiskAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string, error) {
 	volumeSource, readOnly, err := getVolumeSource(spec)
 	if err != nil {
 		return "", err
@@ -74,20 +75,20 @@ func (attacher *gcePersistentDiskAttacher) Attach(spec *volume.Spec, hostName st
 
 	pdName := volumeSource.PDName
 
-	attached, err := attacher.gceDisks.DiskIsAttached(pdName, hostName)
+	attached, err := attacher.gceDisks.DiskIsAttached(pdName, nodeName)
 	if err != nil {
 		// Log error and continue with attach
 		glog.Errorf(
 			"Error checking if PD (%q) is already attached to current node (%q). Will continue and try attach anyway. err=%v",
-			pdName, hostName, err)
+			pdName, nodeName, err)
 	}
 
 	if err == nil && attached {
 		// Volume is already attached to node.
-		glog.Infof("Attach operation is successful. PD %q is already attached to node %q.", pdName, hostName)
+		glog.Infof("Attach operation is successful. PD %q is already attached to node %q.", pdName, nodeName)
 	} else {
-		if err := attacher.gceDisks.AttachDisk(pdName, hostName, readOnly); err != nil {
-			glog.Errorf("Error attaching PD %q to node %q: %+v", pdName, hostName, err)
+		if err := attacher.gceDisks.AttachDisk(pdName, nodeName, readOnly); err != nil {
+			glog.Errorf("Error attaching PD %q to node %q: %+v", pdName, nodeName, err)
 			return "", err
 		}
 	}
@@ -210,25 +211,25 @@ func (plugin *gcePersistentDiskPlugin) NewDetacher() (volume.Detacher, error) {
 // Callers are responsible for retryinging on failure.
 // Callers are responsible for thread safety between concurrent attach and detach
 // operations.
-func (detacher *gcePersistentDiskDetacher) Detach(deviceMountPath string, hostName string) error {
+func (detacher *gcePersistentDiskDetacher) Detach(deviceMountPath string, nodeName types.NodeName) error {
 	pdName := path.Base(deviceMountPath)
 
-	attached, err := detacher.gceDisks.DiskIsAttached(pdName, hostName)
+	attached, err := detacher.gceDisks.DiskIsAttached(pdName, nodeName)
 	if err != nil {
 		// Log error and continue with detach
 		glog.Errorf(
 			"Error checking if PD (%q) is already attached to current node (%q). Will continue and try detach anyway. err=%v",
-			pdName, hostName, err)
+			pdName, nodeName, err)
 	}
 
 	if err == nil && !attached {
 		// Volume is not attached to node. Success!
-		glog.Infof("Detach operation is successful. PD %q was not attached to node %q.", pdName, hostName)
+		glog.Infof("Detach operation is successful. PD %q was not attached to node %q.", pdName, nodeName)
 		return nil
 	}
 
-	if err = detacher.gceDisks.DetachDisk(pdName, hostName); err != nil {
-		glog.Errorf("Error detaching PD %q from node %q: %v", pdName, hostName, err)
+	if err = detacher.gceDisks.DetachDisk(pdName, nodeName); err != nil {
+		glog.Errorf("Error detaching PD %q from node %q: %v", pdName, nodeName, err)
 		return err
 	}
 

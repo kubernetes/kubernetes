@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/metrics"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -117,11 +118,11 @@ func (rc *RouteController) reconcileNodeRoutes() error {
 
 func (rc *RouteController) reconcile(nodes []api.Node, routes []*cloudprovider.Route) error {
 	// nodeCIDRs maps nodeName->nodeCIDR
-	nodeCIDRs := make(map[string]string)
-	// routeMap maps routeTargetInstance->route
-	routeMap := make(map[string]*cloudprovider.Route)
+	nodeCIDRs := make(map[types.NodeName]string)
+	// routeMap maps routeTargetNode->route
+	routeMap := make(map[types.NodeName]*cloudprovider.Route)
 	for _, route := range routes {
-		routeMap[route.TargetInstance] = route
+		routeMap[route.TargetNode] = route
 	}
 
 	wg := sync.WaitGroup{}
@@ -132,17 +133,18 @@ func (rc *RouteController) reconcile(nodes []api.Node, routes []*cloudprovider.R
 		if node.Spec.PodCIDR == "" {
 			continue
 		}
+		nodeName := types.NodeName(node.Name)
 		// Check if we have a route for this node w/ the correct CIDR.
-		r := routeMap[node.Name]
+		r := routeMap[nodeName]
 		if r == nil || r.DestinationCIDR != node.Spec.PodCIDR {
 			// If not, create the route.
 			route := &cloudprovider.Route{
-				TargetInstance:  node.Name,
+				TargetNode:      nodeName,
 				DestinationCIDR: node.Spec.PodCIDR,
 			}
 			nameHint := string(node.UID)
 			wg.Add(1)
-			go func(nodeName string, nameHint string, route *cloudprovider.Route) {
+			go func(nodeName types.NodeName, nameHint string, route *cloudprovider.Route) {
 				defer wg.Done()
 				for i := 0; i < maxRetries; i++ {
 					startTime := time.Now()
@@ -161,20 +163,20 @@ func (rc *RouteController) reconcile(nodes []api.Node, routes []*cloudprovider.R
 						return
 					}
 				}
-			}(node.Name, nameHint, route)
+			}(nodeName, nameHint, route)
 		} else {
 			// Update condition only if it doesn't reflect the current state.
 			_, condition := api.GetNodeCondition(&node.Status, api.NodeNetworkUnavailable)
 			if condition == nil || condition.Status != api.ConditionFalse {
-				rc.updateNetworkingCondition(node.Name, true)
+				rc.updateNetworkingCondition(types.NodeName(node.Name), true)
 			}
 		}
-		nodeCIDRs[node.Name] = node.Spec.PodCIDR
+		nodeCIDRs[nodeName] = node.Spec.PodCIDR
 	}
 	for _, route := range routes {
 		if rc.isResponsibleForRoute(route) {
 			// Check if this route applies to a node we know about & has correct CIDR.
-			if nodeCIDRs[route.TargetInstance] != route.DestinationCIDR {
+			if nodeCIDRs[route.TargetNode] != route.DestinationCIDR {
 				wg.Add(1)
 				// Delete the route.
 				go func(route *cloudprovider.Route, startTime time.Time) {
@@ -194,7 +196,7 @@ func (rc *RouteController) reconcile(nodes []api.Node, routes []*cloudprovider.R
 	return nil
 }
 
-func (rc *RouteController) updateNetworkingCondition(nodeName string, routeCreated bool) error {
+func (rc *RouteController) updateNetworkingCondition(nodeName types.NodeName, routeCreated bool) error {
 	var err error
 	for i := 0; i < updateNodeStatusMaxRetries; i++ {
 		// Patch could also fail, even though the chance is very slim. So we still do

@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/golang/glog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/api"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/pkg/apis/certificates"
@@ -29,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	"k8s.io/kubernetes/pkg/kubelet/util/csr"
+	"k8s.io/kubernetes/pkg/types"
 	certutil "k8s.io/kubernetes/pkg/util/cert"
 )
 
@@ -37,10 +39,15 @@ func PerformTLSBootstrap(s *kubeadmapi.KubeadmConfig, apiEndpoint string, caCert
 	// TODO(phase1+) try all the api servers until we find one that works
 	bareClientConfig := kubeadmutil.CreateBasicClientConfig("kubernetes", apiEndpoint, caCert)
 
-	nodeName, err := os.Hostname()
+	hostName, err := os.Hostname()
 	if err != nil {
 		return nil, fmt.Errorf("<node/csr> failed to get node hostname [%v]", err)
 	}
+
+	// TODO: hostname == nodename doesn't hold on all clouds (AWS).
+	// But we don't have a cloudprovider, so we're stuck.
+	glog.Errorf("assuming that hostname is the same as NodeName")
+	nodeName := types.NodeName(hostName)
 
 	bootstrapClientConfig, err := clientcmd.NewDefaultClientConfig(
 		*kubeadmutil.MakeClientConfigWithToken(
