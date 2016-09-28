@@ -36,6 +36,7 @@ import (
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/securitycontext"
+	"k8s.io/kubernetes/pkg/types"
 	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
@@ -66,7 +67,7 @@ func TestUpdateOnNonExistentFile(t *testing.T) {
 }
 
 func TestReadPodsFromFileExistAlready(t *testing.T) {
-	hostname := "random-test-hostname"
+	hostname := types.NodeName("random-test-hostname")
 	var testCases = getTestCases(hostname)
 
 	for _, testCase := range testCases {
@@ -163,7 +164,7 @@ type testCase struct {
 	expected kubetypes.PodUpdate
 }
 
-func getTestCases(hostname string) []*testCase {
+func getTestCases(hostname types.NodeName) []*testCase {
 	grace := int64(30)
 	return []*testCase{
 		{
@@ -188,14 +189,14 @@ func getTestCases(hostname string) []*testCase {
 			},
 			expected: CreatePodUpdate(kubetypes.SET, kubetypes.FileSource, &api.Pod{
 				ObjectMeta: api.ObjectMeta{
-					Name:        "test-" + hostname,
+					Name:        "test-" + string(hostname),
 					UID:         "12345",
 					Namespace:   "mynamespace",
 					Annotations: map[string]string{kubetypes.ConfigHashAnnotationKey: "12345"},
-					SelfLink:    getSelfLink("test-"+hostname, "mynamespace"),
+					SelfLink:    getSelfLink("test-"+string(hostname), "mynamespace"),
 				},
 				Spec: api.PodSpec{
-					NodeName:                      hostname,
+					NodeName:                      string(hostname),
 					RestartPolicy:                 api.RestartPolicyAlways,
 					DNSPolicy:                     api.DNSClusterFirst,
 					TerminationGracePeriodSeconds: &grace,
@@ -234,7 +235,7 @@ func (tc *testCase) writeToFile(dir, name string, t *testing.T) string {
 }
 
 func watchFileAdded(watchDir bool, t *testing.T) {
-	hostname := "random-test-hostname"
+	hostname := types.NodeName("random-test-hostname")
 	var testCases = getTestCases(hostname)
 
 	fileNamePre := "test_pod_config"
@@ -291,7 +292,7 @@ func watchFileAdded(watchDir bool, t *testing.T) {
 }
 
 func watchFileChanged(watchDir bool, t *testing.T) {
-	hostname := "random-test-hostname"
+	hostname := types.NodeName("random-test-hostname")
 	var testCases = getTestCases(hostname)
 
 	fileNamePre := "test_pod_config"

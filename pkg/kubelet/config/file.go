@@ -30,24 +30,25 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/cache"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 type sourceFile struct {
 	path           string
-	nodeName       string
+	nodeName       types.NodeName
 	store          cache.Store
 	fileKeyMapping map[string]string
 	updates        chan<- interface{}
 }
 
-func NewSourceFile(path string, nodeName string, period time.Duration, updates chan<- interface{}) {
+func NewSourceFile(path string, nodeName types.NodeName, period time.Duration, updates chan<- interface{}) {
 	config := new(path, nodeName, period, updates)
 	glog.V(1).Infof("Watching path %q", path)
 	go wait.Forever(config.run, period)
 }
 
-func new(path string, nodeName string, period time.Duration, updates chan<- interface{}) *sourceFile {
+func new(path string, nodeName types.NodeName, period time.Duration, updates chan<- interface{}) *sourceFile {
 	send := func(objs []interface{}) {
 		var pods []*api.Pod
 		for _, o := range objs {
