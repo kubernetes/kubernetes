@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"reflect"
 	"strings"
 	"syscall"
@@ -308,6 +309,11 @@ func TestDumpReaderToFile(t *testing.T) {
 	}
 	defer syscall.Unlink(tempFile.Name())
 	defer tempFile.Close()
+	defer func() {
+		if !t.Failed() {
+			os.Remove(tempFile.Name())
+		}
+	}()
 	err = DumpReaderToFile(strings.NewReader(testString), tempFile.Name())
 	if err != nil {
 		t.Errorf("error in DumpReaderToFile: %v", err)
