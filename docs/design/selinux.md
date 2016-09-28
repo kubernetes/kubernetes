@@ -18,11 +18,6 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
-<!-- TAG RELEASE_LINK, added by the munger automatically -->
-<strong>
-The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.4/docs/proposals/selinux.md).
-
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
 </strong>
@@ -131,7 +126,8 @@ Kubernetes volumes can be divided into two broad categories:
     3.  Block device based volumes in `ReadOnlyMany` or `ReadWriteMany` modes are shared because
         they may be used simultaneously by multiple pods.
 
-For unshared storage, SELinux handling for most volumes can be generalized into running a `chcon` operation on the volume directory after running the volume plugin's `Setup` function.  For these
+For unshared storage, SELinux handling for most volumes can be generalized into running a `chcon`
+operation on the volume directory after running the volume plugin's `Setup` function.  For these
 volumes, the Kubelet can perform the `chcon` operation and keep SELinux concerns out of the volume
 plugin code.  Some volume plugins may need to use the SELinux context during a mount operation in
 certain cases.  To account for this, our design must have a way for volume plugins to state that
@@ -343,6 +339,8 @@ to manage labels individually.
 This allows the volume plugins to determine when they do and don't want this type of support from
 the Kubelet, and allows the criteria each plugin uses to evolve without changing the Kubelet.
 
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/proposals/selinux.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/selinux.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
