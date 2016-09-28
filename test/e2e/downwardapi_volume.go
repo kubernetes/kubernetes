@@ -31,7 +31,7 @@ import (
 
 var _ = framework.KubeDescribe("Downward API volume", func() {
 	// How long to wait for a log pod to be displayed
-	const podLogTimeout = 45 * time.Second
+	const podLogTimeout = 2 * time.Minute
 
 	f := framework.NewDefaultFramework("downward-api")
 	It("should provide podname only [Conformance]", func() {
