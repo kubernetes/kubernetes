@@ -27,13 +27,14 @@ import (
 )
 
 // updateReplicaCount attempts to update the Status.Replicas of the given ReplicaSet, with a single GET/PUT retry.
-func updateReplicaCount(rsClient client.ReplicaSetInterface, rs extensions.ReplicaSet, numReplicas, numFullyLabeledReplicas, numReadyReplicas int) (updateErr error) {
+func updateReplicaCount(rsClient client.ReplicaSetInterface, rs extensions.ReplicaSet, numReplicas, numFullyLabeledReplicas, numReadyReplicas, numAvailableReplicas int) (updateErr error) {
 	// This is the steady state. It happens when the ReplicaSet doesn't have any expectations, since
 	// we do a periodic relist every 30s. If the generations differ but the replicas are
 	// the same, a caller might've resized to the same replica count.
 	if int(rs.Status.Replicas) == numReplicas &&
 		int(rs.Status.FullyLabeledReplicas) == numFullyLabeledReplicas &&
 		int(rs.Status.ReadyReplicas) == numReadyReplicas &&
+		int(rs.Status.AvailableReplicas) == numAvailableReplicas &&
 		rs.Generation == rs.Status.ObservedGeneration {
 		return nil
 	}
@@ -49,12 +50,14 @@ func updateReplicaCount(rsClient client.ReplicaSetInterface, rs extensions.Repli
 			fmt.Sprintf("replicas %d->%d (need %d), ", rs.Status.Replicas, numReplicas, rs.Spec.Replicas) +
 			fmt.Sprintf("fullyLabeledReplicas %d->%d, ", rs.Status.FullyLabeledReplicas, numFullyLabeledReplicas) +
 			fmt.Sprintf("readyReplicas %d->%d, ", rs.Status.ReadyReplicas, numReadyReplicas) +
+			fmt.Sprintf("availableReplicas %d->%d, ", rs.Status.AvailableReplicas, numAvailableReplicas) +
 			fmt.Sprintf("sequence No: %v->%v", rs.Status.ObservedGeneration, generation))
 
 		rs.Status = extensions.ReplicaSetStatus{
 			Replicas:             int32(numReplicas),
 			FullyLabeledReplicas: int32(numFullyLabeledReplicas),
 			ReadyReplicas:        int32(numReadyReplicas),
+			AvailableReplicas:    int32(numAvailableReplicas),
 			ObservedGeneration:   generation,
 		}
 		_, updateErr = rsClient.UpdateStatus(rs)
