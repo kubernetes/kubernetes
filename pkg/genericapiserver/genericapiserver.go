@@ -49,7 +49,6 @@ import (
 	certutil "k8s.io/kubernetes/pkg/util/cert"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
-	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 // Info about an API group.
@@ -185,13 +184,6 @@ func (s *GenericAPIServer) RequestContextMapper() api.RequestContextMapper {
 // TODO refactor third party resource storage
 func (s *GenericAPIServer) MinRequestTimeout() time.Duration {
 	return s.minRequestTimeout
-}
-
-func (s *GenericAPIServer) NewRequestInfoResolver() *apiserver.RequestInfoResolver {
-	return &apiserver.RequestInfoResolver{
-		APIPrefixes:          sets.NewString(strings.Trim(s.legacyAPIPrefix, "/"), strings.Trim(s.apiPrefix, "/")), // all possible API prefixes
-		GrouplessAPIPrefixes: sets.NewString(strings.Trim(s.legacyAPIPrefix, "/")),                                 // APIPrefixes that won't have groups (legacy)
-	}
 }
 
 // HandleWithAuth adds an http.Handler for pattern to an http.ServeMux
@@ -452,8 +444,6 @@ func (s *GenericAPIServer) getAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupV
 
 func (s *GenericAPIServer) newAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupVersion unversioned.GroupVersion) (*apiserver.APIGroupVersion, error) {
 	return &apiserver.APIGroupVersion{
-		RequestInfoResolver: s.NewRequestInfoResolver(),
-
 		GroupVersion: groupVersion,
 
 		ParameterCodec: apiGroupInfo.ParameterCodec,

@@ -204,7 +204,7 @@ func TestProxyRequestContentLengthAndTransferEncoding(t *testing.T) {
 			expectedResourceNamespace: "default",
 		}
 		namespaceHandler := handleNamespaced(map[string]rest.Storage{"foo": simpleStorage})
-		server := httptest.NewServer(namespaceHandler)
+		server := newTestServer(namespaceHandler)
 		defer server.Close()
 
 		// Dial the proxy server
@@ -310,7 +310,7 @@ func TestProxy(t *testing.T) {
 		}
 
 		namespaceHandler := handleNamespaced(map[string]rest.Storage{"foo": simpleStorage})
-		namespaceServer := httptest.NewServer(namespaceHandler)
+		namespaceServer := newTestServer(namespaceHandler)
 		defer namespaceServer.Close()
 
 		// test each supported URL pattern for finding the redirection resource in the proxy in a particular namespace
@@ -432,7 +432,7 @@ func TestProxyUpgrade(t *testing.T) {
 
 		namespaceHandler := handleNamespaced(map[string]rest.Storage{"foo": simpleStorage})
 
-		server := httptest.NewServer(namespaceHandler)
+		server := newTestServer(namespaceHandler)
 		defer server.Close()
 
 		ws, err := websocket.Dial("ws://"+server.Listener.Addr().String()+"/"+prefix+"/"+newGroupVersion.Group+"/"+newGroupVersion.Version+"/proxy/namespaces/myns/foo/123", "", "http://127.0.0.1/")
@@ -496,7 +496,7 @@ func TestRedirectOnMissingTrailingSlash(t *testing.T) {
 		}
 
 		handler := handleNamespaced(map[string]rest.Storage{"foo": simpleStorage})
-		server := httptest.NewServer(handler)
+		server := newTestServer(handler)
 		defer server.Close()
 
 		proxyTestPattern := "/" + prefix + "/" + newGroupVersion.Group + "/" + newGroupVersion.Version + "/proxy/namespaces/ns/foo/id" + item.path

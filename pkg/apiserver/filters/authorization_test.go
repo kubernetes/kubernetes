@@ -18,18 +18,18 @@ package filters
 
 import (
 	"net/http"
+	"net/http/httptest"
 	"reflect"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
-	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 func TestGetAttribs(t *testing.T) {
-	r := &requestAttributeGetter{api.NewRequestContextMapper(), &apiserver.RequestInfoResolver{APIPrefixes: sets.NewString("api", "apis"), GrouplessAPIPrefixes: sets.NewString("api")}}
+	mapper := api.NewRequestContextMapper()
+	attributeGetter := NewRequestAttributeGetter(mapper)
 
 	testcases := map[string]struct {
 		Verb               string
@@ -103,8 +103,20 @@ func TestGetAttribs(t *testing.T) {
 
 	for k, tc := range testcases {
 		req, _ := http.NewRequest(tc.Verb, tc.Path, nil)
-		attribs := r.GetAttribs(req)
-		if !reflect.DeepEqual(attribs, tc.ExpectedAttributes) {
+		req.RemoteAddr = "127.0.0.1"
+
+		var attribs authorizer.Attributes
+		var err error
+		var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			attribs, err = attributeGetter.GetAttribs(req)
+		})
+		handler = WithRequestInfo(handler, newTestRequestInfoResolver(), mapper)
+		handler = api.WithRequestContext(handler, mapper)
+		handler.ServeHTTP(httptest.NewRecorder(), req)
+
+		if err != nil {
+			t.Errorf("%s: unexpected error: %v", k, err)
+		} else if !reflect.DeepEqual(attribs, tc.ExpectedAttributes) {
 			t.Errorf("%s: expected\n\t%#v\ngot\n\t%#v", k, tc.ExpectedAttributes, attribs)
 		}
 	}

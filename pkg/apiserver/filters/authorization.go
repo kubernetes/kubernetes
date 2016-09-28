@@ -17,12 +17,13 @@ limitations under the License.
 package filters
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/golang/glog"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apiserver"
+	"k8s.io/kubernetes/pkg/apiserver/request"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 )
 
@@ -33,7 +34,12 @@ func WithAuthorization(handler http.Handler, getAttribs RequestAttributeGetter, 
 		return handler
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		authorized, reason, err := a.Authorize(getAttribs.GetAttribs(req))
+		attrs, err := getAttribs.GetAttribs(req)
+		if err != nil {
+			internalError(w, req, err)
+			return
+		}
+		authorized, reason, err := a.Authorize(attrs)
 		if err != nil {
 			internalError(w, req, err)
 			return
@@ -49,31 +55,35 @@ func WithAuthorization(handler http.Handler, getAttribs RequestAttributeGetter, 
 
 // RequestAttributeGetter is a function that extracts authorizer.Attributes from an http.Request
 type RequestAttributeGetter interface {
-	GetAttribs(req *http.Request) (attribs authorizer.Attributes)
+	GetAttribs(req *http.Request) (authorizer.Attributes, error)
 }
 
 type requestAttributeGetter struct {
 	requestContextMapper api.RequestContextMapper
-	requestInfoResolver  *apiserver.RequestInfoResolver
 }
 
 // NewAttributeGetter returns an object which implements the RequestAttributeGetter interface.
-func NewRequestAttributeGetter(requestContextMapper api.RequestContextMapper, requestInfoResolver *apiserver.RequestInfoResolver) RequestAttributeGetter {
-	return &requestAttributeGetter{requestContextMapper, requestInfoResolver}
+func NewRequestAttributeGetter(requestContextMapper api.RequestContextMapper) RequestAttributeGetter {
+	return &requestAttributeGetter{requestContextMapper}
 }
 
-func (r *requestAttributeGetter) GetAttribs(req *http.Request) authorizer.Attributes {
+func (r *requestAttributeGetter) GetAttribs(req *http.Request) (authorizer.Attributes, error) {
 	attribs := authorizer.AttributesRecord{}
 
 	ctx, ok := r.requestContextMapper.Get(req)
-	if ok {
-		user, ok := api.UserFrom(ctx)
-		if ok {
-			attribs.User = user
-		}
+	if !ok {
+		return nil, errors.New("no context found for request")
 	}
 
-	requestInfo, _ := r.requestInfoResolver.GetRequestInfo(req)
+	user, ok := api.UserFrom(ctx)
+	if ok {
+		attribs.User = user
+	}
+
+	requestInfo, found := request.RequestInfoFrom(ctx)
+	if !found {
+		return nil, errors.New("no RequestInfo found in the context")
+	}
 
 	// Start with common attributes that apply to resource and non-resource requests
 	attribs.ResourceRequest = requestInfo.IsResourceRequest
@@ -87,5 +97,5 @@ func (r *requestAttributeGetter) GetAttribs(req *http.Request) authorizer.Attrib
 	attribs.Namespace = requestInfo.Namespace
 	attribs.Name = requestInfo.Name
 
-	return &attribs
+	return &attribs, nil
 }

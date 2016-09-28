@@ -47,7 +47,8 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	extensionsapiv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/apis/rbac"
-	"k8s.io/kubernetes/pkg/apiserver"
+	"k8s.io/kubernetes/pkg/apiserver/request"
+	"k8s.io/kubernetes/pkg/generated/openapi"
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/registry/core/endpoint"
@@ -72,7 +73,6 @@ import (
 	"github.com/go-openapi/validate"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
-	"k8s.io/kubernetes/pkg/generated/openapi"
 )
 
 // setUp is a convience function for setting up for (most) tests.
@@ -192,7 +192,7 @@ func TestNamespaceSubresources(t *testing.T) {
 	master, etcdserver, _, _ := newMaster(t)
 	defer etcdserver.Terminate(t)
 
-	expectedSubresources := apiserver.NamespaceSubResourcesForTest
+	expectedSubresources := request.NamespaceSubResourcesForTest
 	foundSubresources := sets.NewString()
 
 	for k := range master.v1ResourcesStorage {
