@@ -1,6 +1,6 @@
 # Redis petset e2e tester
 
-The image in this directory is the init container for contrib/pets/redis but for one difference, it bakes a specific verfion of redis into the base image so we get deterministic test results without having to depend on a redis download server. Discussing the tradeoffs to either approach (download the version at runtime, or maintain an image per version) are outside the scope of this document.
+The image in this directory is the init container for contrib/pets/redis but for one difference, it bakes a specific version of redis into the base image so we get deterministic test results without having to depend on a redis download server. Discussing the tradeoffs to either approach (download the version at runtime, or maintain an image per version) are outside the scope of this document.
 
 You can execute the image locally via:
 ```

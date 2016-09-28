@@ -2,7 +2,7 @@
 
 Kubernetes offers a DNS cluster addon, which most of the supported environments
 enable by default.  We use [SkyDNS](https://github.com/skynetservices/skydns)
-as the DNS server, with some custom logic to slave it to the kubernetes API
+as the DNS server, with some custom logic to slave it to the Kubernetes API
 server.
 
 ## What things get DNS names?
@@ -120,7 +120,7 @@ domain also.  This implementation uses a configurable local domain, which can
 also be passed to containers by kubelet as a DNS search suffix.
 
 ## How do I configure it?
-The easiest way to use DNS is to use a supported kubernetes cluster setup,
+The easiest way to use DNS is to use a supported Kubernetes cluster setup,
 which should have the required logic to read some config variables and plumb
 them all the way down to kubelet.
 
@@ -152,7 +152,7 @@ the example files ([ReplicationController](../../cluster/addns/dns/skydns-rc.yam
 [Service](../../cluster/addons/dns/skydns-svc.yaml.in)), but keep in mind that these are templated for
 Salt.  You will need to replace the `{{ <param> }}` blocks with your own values
 for the config variables mentioned above.  Other than the templating, these are
-normal kubernetes objects, and can be instantiated with `kubectl create`.
+normal Kubernetes objects, and can be instantiated with `kubectl create`.
 
 ## How do I test if it is working?
 First deploy DNS as described above.

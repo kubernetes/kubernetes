@@ -36,7 +36,7 @@ Documentation for other releases can be found at
 
 This example shows how to use experimental persistent volume provisioning.
 
-### Pre-requisites
+### Prerequisites
 
 This example assumes that you have an understanding of Kubernetes administration and can modify the
 scripts that launch kube-controller-manager.
@@ -426,7 +426,7 @@ Source:
     Type:		RBD (a Rados Block Device mount on the host that shares a pod's lifetime)
     CephMonitors:	[127.0.0.1:6789]
     RBDImage:		kubernetes-dynamic-pvc-1cfb1862-664b-11e6-9a5d-90b11c09520d
-    FSType:		
+    FSType:
     RBDPool:		kube
     RadosUser:		kube
     Keyring:		/etc/ceph/keyring

@@ -24,14 +24,14 @@ deploy a bundle.
 
 You will need to
 [install the Juju client](https://jujucharms.com/get-started) and
-`juju-quickstart` as pre-requisites.  To deploy the bundle use
+`juju-quickstart` as prerequisites.  To deploy the bundle use
 `juju-quickstart` which runs on Mac OS (`brew install
 juju-quickstart`) or Ubuntu (`apt-get install juju-quickstart`).
 
 ### Deploy a Kubernetes Bundle
 
 Use the 'juju quickstart' command to deploy a Kubernetes cluster to any cloud
-supported by Juju.  
+supported by Juju.
 
 The charm store version of the Kubernetes bundle can be deployed as follows:
 
@@ -174,7 +174,7 @@ for more details of what can be done with the command line tool.
 
 The kubernetes-bundle is open source and available on github.com.  If
 you want to get started developing on the bundle you can clone it from
-github.  
+github.
 
     git clone https://github.com/kubernetes/kubernetes.git
 
@@ -191,7 +191,7 @@ Send us pull requests!  We'll send you a cookie if they include tests and docs.
 The charms and bundles are in the [kubernetes](https://github.com/kubernetes/kubernetes)
 repository in github.
 
- - [kubernetes-master charm on Github](https://github.com/kubernetes/kubernetes/tree/master/cluster/juju/charms/trusty/kubernetes-master)
+ - [kubernetes-master charm on GitHub](https://github.com/kubernetes/kubernetes/tree/master/cluster/juju/charms/trusty/kubernetes-master)
  - [kubernetes charm on GitHub](https://github.com/kubernetes/kubernetes/tree/master/cluster/juju/charms/trusty/kubernetes)
 
 
