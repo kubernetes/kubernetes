@@ -25,6 +25,7 @@ import (
 	"os"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/emicklei/go-restful"
@@ -37,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apiserver"
 	apiserverfilters "k8s.io/kubernetes/pkg/apiserver/filters"
+	"k8s.io/kubernetes/pkg/apiserver/request"
 	"k8s.io/kubernetes/pkg/auth/authenticator"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	authhandlers "k8s.io/kubernetes/pkg/auth/handlers"
@@ -49,6 +51,7 @@ import (
 	ipallocator "k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/runtime"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 // Config is a structure used to configure a GenericAPIServer.
@@ -354,17 +357,21 @@ func (s *GenericAPIServer) buildHandlerChains(c *Config, handler http.Handler) (
 
 	// insecure filters
 	insecure = handler
-	insecure = genericfilters.WithPanicRecovery(insecure, s.NewRequestInfoResolver())
+	insecure = genericfilters.WithPanicRecovery(insecure, c.RequestContextMapper)
+	insecure = apiserverfilters.WithRequestInfo(insecure, NewRequestInfoResolver(c), c.RequestContextMapper)
+	insecure = api.WithRequestContext(insecure, c.RequestContextMapper)
 	insecure = genericfilters.WithTimeoutForNonLongRunningRequests(insecure, c.LongRunningFunc)
 
 	// secure filters
-	attributeGetter := apiserverfilters.NewRequestAttributeGetter(c.RequestContextMapper, s.NewRequestInfoResolver())
+	attributeGetter := apiserverfilters.NewRequestAttributeGetter(c.RequestContextMapper)
 	secure = handler
 	secure = apiserverfilters.WithAuthorization(secure, attributeGetter, c.Authorizer)
 	secure = apiserverfilters.WithImpersonation(secure, c.RequestContextMapper, c.Authorizer)
 	secure = apiserverfilters.WithAudit(secure, attributeGetter, c.AuditWriter) // before impersonation to read original user
 	secure = authhandlers.WithAuthentication(secure, c.RequestContextMapper, c.Authenticator, authhandlers.Unauthorized(c.SupportsBasicAuth))
-	secure = genericfilters.WithPanicRecovery(secure, s.NewRequestInfoResolver())
+	secure = genericfilters.WithPanicRecovery(secure, c.RequestContextMapper)
+	secure = apiserverfilters.WithRequestInfo(secure, NewRequestInfoResolver(c), c.RequestContextMapper)
+	secure = api.WithRequestContext(secure, c.RequestContextMapper)
 	secure = genericfilters.WithTimeoutForNonLongRunningRequests(secure, c.LongRunningFunc)
 	secure = genericfilters.WithMaxInFlightLimit(secure, c.MaxRequestsInFlight, c.LongRunningFunc)
 
@@ -434,5 +441,12 @@ func DefaultAndValidateRunOptions(options *options.ServerRunOptions) {
 				}
 			}
 		}
+	}
+}
+
+func NewRequestInfoResolver(c *Config) *request.RequestInfoResolver {
+	return &request.RequestInfoResolver{
+		APIPrefixes:          sets.NewString(strings.Trim(c.APIPrefix, "/"), strings.Trim(c.APIGroupPrefix, "/")), // all possible API prefixes
+		GrouplessAPIPrefixes: sets.NewString(strings.Trim(c.APIPrefix, "/")),                                      // APIPrefixes that won't have groups (legacy)
 	}
 }

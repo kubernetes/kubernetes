@@ -40,7 +40,6 @@ import (
 
 type APIInstaller struct {
 	group             *APIGroupVersion
-	info              *RequestInfoResolver
 	prefix            string // Path prefix where API resources are to be registered.
 	minRequestTimeout time.Duration
 }
@@ -67,11 +66,10 @@ func (a *APIInstaller) Install(ws *restful.WebService) (apiResources []unversion
 	errors = make([]error, 0)
 
 	proxyHandler := (&ProxyHandler{
-		prefix:              a.prefix + "/proxy/",
-		storage:             a.group.Storage,
-		serializer:          a.group.Serializer,
-		context:             a.group.Context,
-		requestInfoResolver: a.info,
+		prefix:     a.prefix + "/proxy/",
+		storage:    a.group.Storage,
+		serializer: a.group.Serializer,
+		mapper:     a.group.Context,
 	})
 
 	// Register the paths in a deterministic (sorted) order to get a deterministic swagger spec.
