@@ -193,9 +193,9 @@ The only transitions that are possible for a container are described below:
                      // method causes this transition.
 Created -> Running   // The ContainerRuntime.Start method may be applied to a
                      // Created container to move it to Running
-Running -> Exited    // The ContainerRuntime.Stop method may be applied to a running 
+Running -> Exited    // The ContainerRuntime.Stop method may be applied to a running
                      // container to move it to Exited.
-                     // A container may also make this transition under its own volition 
+                     // A container may also make this transition under its own volition
 Exited -> ()         // An exited container can be moved to the terminal empty
                      // state via a ContainerRuntime.Remove call.
 ```
@@ -279,7 +279,7 @@ discussion and may be achieved alternatively:
 **Imperative pod-level interface**
 The interface contains only CreatePod(), StartPod(), StopPod() and RemovePod().
 This implies that the runtime needs to take over container lifecycle
-manangement (i.e., enforce restart policy), lifecycle hooks, liveness checks,
+management (i.e., enforce restart policy), lifecycle hooks, liveness checks,
 etc. Kubelet will mainly be responsible for interfacing with the apiserver, and
 can potentially become a very thin daemon.
  - Pros: Lower maintenance overhead for the Kubernetes maintainers if `Docker`

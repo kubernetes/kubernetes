@@ -1,6 +1,6 @@
 # Contributing guidelines
 
-Want to hack on kubernetes? Yay!
+Want to hack on Kubernetes? Yay!
 
 ## Developer Guide
 

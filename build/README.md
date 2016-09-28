@@ -5,7 +5,7 @@ Building Kubernetes is easy if you take advantage of the containerized build env
 ## Requirements
 
 1. Docker, using one of the two following configurations:
-  1. **Mac OS X** You can either use docker-machine or boot2docker. See installation instructions [here](https://docs.docker.com/installation/mac/).  
+  1. **Mac OS X** You can either use docker-machine or boot2docker. See installation instructions [here](https://docs.docker.com/installation/mac/).
      **Note**: You will want to set the boot2docker vm to have at least 3GB of initial memory or building will likely fail. (See: [#11852]( http://issue.k8s.io/11852)) and do not `make quick-release` from `/tmp/` (See: [#14773]( https://github.com/kubernetes/kubernetes/issues/14773))
   2. **Linux with local Docker**  Install Docker according to the [instructions](https://docs.docker.com/installation/#installation) for your OS.  The scripts here assume that they are using a local Docker server and that they can "reach around" docker and grab results directly from the file system.
 2. [Python](https://www.python.org)
@@ -76,20 +76,20 @@ When building final release tars, they are first staged into `_output/release-st
 ## Proxy Settings
 
 
-If you are behind a proxy, you need to export proxy settings for kubernetes build, the following environment variables should be defined.
+If you are behind a proxy, you need to export proxy settings for Kubernetes build, the following environment variables should be defined.
 
 ```
 export KUBERNETES_HTTP_PROXY=http://username:password@proxyaddr:proxyport
 export KUBERNETES_HTTPS_PROXY=https://username:password@proxyaddr:proxyport
 ```
 
-Optionally, you can specify addresses of no proxy for kubernetes build, for example
+Optionally, you can specify addresses of no proxy for Kubernetes build, for example
 
 ```
 export KUBERNETES_NO_PROXY=127.0.0.1
 ```
 
-If you are using sudo to make kubernetes build for example make quick-release, you need run `sudo -E make quick-release` to pass the environment variables.
+If you are using sudo to make Kubernetes build for example make quick-release, you need run `sudo -E make quick-release` to pass the environment variables.
 
 ## TODOs
 

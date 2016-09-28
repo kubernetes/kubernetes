@@ -6,7 +6,7 @@ It basically does the following:
 - iterate over all files in the given doc root.
 - for each file split it into a slice (mungeLines) of lines (mungeLine)
 - a mungeline has metadata about each line typically determined by a 'fast' regex.
-  - metadata contains things like 'is inside a preformmatted block'
+  - metadata contains things like 'is inside a preformatted block'
   - contains a markdown header
   - has a link to another file
   - etc..

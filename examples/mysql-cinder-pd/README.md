@@ -32,7 +32,7 @@ Documentation for other releases can be found at
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
-# Mysql installation with cinder volume plugin
+# MySQL installation with cinder volume plugin
 
 Cinder is a Block Storage service for OpenStack. This example shows how it can be used as an attachment mounted to a pod in Kubernets.
 

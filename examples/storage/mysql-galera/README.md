@@ -50,9 +50,9 @@ The basic idea is this: three replication controllers with a single pod, corresp
 
 By defaults, there are only three pods (hence replication controllers) for this cluster. This number can be increased using the variable NUM_NODES, specified in the replication controller configuration file. It's important to know the number of nodes must always be odd.
 
-When the replication controller is created, it results in the corresponding container to start, run an entrypoint script that installs the mysql system tables, set up users, and build up a list of servers that is used with the galera parameter ```wsrep_cluster_address```.  This is a list of running nodes that galera uses for election of a node to obtain SST (Single State Transfer) from.
+When the replication controller is created, it results in the corresponding container to start, run an entrypoint script that installs the MySQL system tables, set up users, and build up a list of servers that is used with the galera parameter ```wsrep_cluster_address```.  This is a list of running nodes that galera uses for election of a node to obtain SST (Single State Transfer) from.
 
-Note: Kubernetes best-practices is to pre-create the services for each controller, and the configuration files which contain the service and replication controller for each node, when created, will result in both a service and replication contrller running for the given node. An important thing to know is that it's important that initially pxc-node1.yaml be processed first and no other pxc-nodeN services that don't have corresponding replication controllers should exist. The reason for this is that if there is a node in ```wsrep_clsuter_address``` without a backing galera node there will be nothing to obtain SST from which will cause the node to shut itself down and the container in question to exit (and another soon relaunched, repeatedly).
+Note: Kubernetes best-practices is to pre-create the services for each controller, and the configuration files which contain the service and replication controller for each node, when created, will result in both a service and replication controller running for the given node. An important thing to know is that it's important that initially pxc-node1.yaml be processed first and no other pxc-nodeN services that don't have corresponding replication controllers should exist. The reason for this is that if there is a node in ```wsrep_clsuter_address``` without a backing galera node there will be nothing to obtain SST from which will cause the node to shut itself down and the container in question to exit (and another soon relaunched, repeatedly).
 
 First, create the overall cluster service that will be used to connect to the cluster:
 
@@ -66,7 +66,7 @@ Create the service and replication controller for the first node:
 
 Repeat the same previous steps for ```pxc-node2``` and ```pxc-node3```
 
-When complete, you should be able connect with a mysql client to the IP address
+When complete, you should be able connect with a MySQL client to the IP address
  service ```pxc-cluster``` to find a working cluster
 
 ### An example of creating a cluster
@@ -74,18 +74,18 @@ When complete, you should be able connect with a mysql client to the IP address
 Shown below are examples of Using ```kubectl``` from within the ```./examples/storage/mysql-galera``` directory, the status of the lauched replication controllers and services can be confirmed
 
 ```
-$ kubectl create -f examples/storage/mysql-galera/pxc-cluster-service.yaml 
+$ kubectl create -f examples/storage/mysql-galera/pxc-cluster-service.yaml
 services/pxc-cluster
 
-$ kubectl create -f examples/storage/mysql-galera/pxc-node1.yaml 
+$ kubectl create -f examples/storage/mysql-galera/pxc-node1.yaml
 services/pxc-node1
 replicationcontrollers/pxc-node1
 
-$ kubectl create -f examples/storage/mysql-galera/pxc-node2.yaml 
+$ kubectl create -f examples/storage/mysql-galera/pxc-node2.yaml
 services/pxc-node2
 replicationcontrollers/pxc-node2
 
-$ kubectl create -f examples/storage/mysql-galera/pxc-node3.yaml 
+$ kubectl create -f examples/storage/mysql-galera/pxc-node3.yaml
 services/pxc-node3
 replicationcontrollers/pxc-node3
 
@@ -134,7 +134,7 @@ pxc-node3-0b5mc
 
 $ kubectl exec pxc-node3-0b5mc -i -t -- mysql -u root -p -h pxc-cluster
 
-Enter password: 
+Enter password:
 Welcome to the MySQL monitor.  Commands end with ; or \g.
 Your MySQL connection id is 5
 Server version: 5.6.24-72.2-56-log Percona XtraDB Cluster (GPL), Release rel72.2, Revision 43abf03, WSREP version 25.11, wsrep_25.11

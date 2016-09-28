@@ -57,7 +57,7 @@ If no endpoints are discovered from the API the seeds configured in the cassandr
 
 # Provider limitations
 
-This Cassandra Provider implements `SeedProvider`. and utilizes `SimpleSnitch`.  This limits a Cassandra Ring to a single Cassandra Datacenter and ignores Rack setup.  Datastax provides more documentation on the use of [_SNITCHES_](https://docs.datastax.com/en/cassandra/3.x/cassandra/architecture/archSnitchesAbout.html).  Further development is planned to
+This Cassandra Provider implements `SeedProvider`. and utilizes `SimpleSnitch`.  This limits a Cassandra Ring to a single Cassandra Datacenter and ignores Rack setup. Datastax provides more documentation on the use of [_SNITCHES_](https://docs.datastax.com/en/cassandra/3.x/cassandra/architecture/archSnitchesAbout.html).  Further development is planned to
 expand this capability.
 
 This in affect makes every node a seed provider, which is not a recommended best practice.  This increases maintenance and reduces gossip performance.
