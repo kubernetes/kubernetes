@@ -138,6 +138,7 @@ func Run(s *options.CMServer) error {
 	if err != nil {
 		glog.Fatalf("Invalid API configuration: %v", err)
 	}
+	leaderElectionClient := clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "leader-election"))
 
 	go func() {
 		mux := http.NewServeMux()
@@ -183,12 +184,12 @@ func Run(s *options.CMServer) error {
 			Namespace: "kube-system",
 			Name:      "kube-controller-manager",
 		},
-		EndpointsClient: kubeClient,
-		Identity:        id,
-		EventRecorder:   recorder,
-		LeaseDuration:   s.LeaderElection.LeaseDuration.Duration,
-		RenewDeadline:   s.LeaderElection.RenewDeadline.Duration,
-		RetryPeriod:     s.LeaderElection.RetryPeriod.Duration,
+		Client:        leaderElectionClient,
+		Identity:      id,
+		EventRecorder: recorder,
+		LeaseDuration: s.LeaderElection.LeaseDuration.Duration,
+		RenewDeadline: s.LeaderElection.RenewDeadline.Duration,
+		RetryPeriod:   s.LeaderElection.RetryPeriod.Duration,
 		Callbacks: leaderelection.LeaderCallbacks{
 			OnStartedLeading: run,
 			OnStoppedLeading: func() {
