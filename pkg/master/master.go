@@ -192,10 +192,10 @@ func (c completedConfig) New() (*Master, error) {
 	}
 
 	if c.EnableUISupport {
-		routes.UIRedirect{}.Install(s.Mux, s.HandlerContainer)
+		routes.UIRedirect{}.Install(s.HandlerContainer)
 	}
 	if c.EnableLogsSupport {
-		routes.Logs{}.Install(s.Mux, s.HandlerContainer)
+		routes.Logs{}.Install(s.HandlerContainer)
 	}
 
 	m := &Master{
@@ -284,12 +284,12 @@ func (m *Master) InstallAPIs(c *Config) {
 			Help: "The time since the last successful synchronization of the SSH tunnels for proxy requests.",
 		}, func() float64 { return float64(m.tunneler.SecondsSinceSync()) })
 	}
-	healthz.InstallHandler(m.Mux, healthzChecks...)
+	healthz.InstallHandler(&m.HandlerContainer.NonSwaggerRoutes, healthzChecks...)
 
 	if c.GenericConfig.EnableProfiling {
-		routes.MetricsWithReset{}.Install(m.Mux, m.HandlerContainer)
+		routes.MetricsWithReset{}.Install(m.HandlerContainer)
 	} else {
-		routes.DefaultMetrics{}.Install(m.Mux, m.HandlerContainer)
+		routes.DefaultMetrics{}.Install(m.HandlerContainer)
 	}
 
 	// Install third party resource support if requested
@@ -612,10 +612,10 @@ func (m *Master) InstallThirdPartyResource(rsrc *extensions.ThirdPartyResource) 
 	// the group with the new API
 	if m.hasThirdPartyGroupStorage(path) {
 		m.addThirdPartyResourceStorage(path, plural.Resource, thirdparty.Storage[plural.Resource].(*thirdpartyresourcedataetcd.REST), apiGroup)
-		return thirdparty.UpdateREST(m.HandlerContainer)
+		return thirdparty.UpdateREST(m.HandlerContainer.Container)
 	}
 
-	if err := thirdparty.InstallREST(m.HandlerContainer); err != nil {
+	if err := thirdparty.InstallREST(m.HandlerContainer.Container); err != nil {
 		glog.Errorf("Unable to setup thirdparty api: %v", err)
 	}
 	m.HandlerContainer.Add(apiserver.NewGroupWebService(api.Codecs, path, apiGroup))
