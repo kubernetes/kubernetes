@@ -8277,6 +8277,13 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 							Format:      "",
 						},
 					},
+					"propagation": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Mount the host path with propagation mode specified. Docker only.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 				},
 				Required: []string{"path"},
 			},

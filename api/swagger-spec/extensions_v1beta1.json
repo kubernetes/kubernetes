@@ -8056,6 +8056,10 @@
      "path": {
       "type": "string",
       "description": "Path of the directory on the host. More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#hostpath"
+     },
+     "propagation": {
+      "type": "string",
+      "description": "Mount the host path with propagation mode specified. Docker only."
      }
     }
    },
