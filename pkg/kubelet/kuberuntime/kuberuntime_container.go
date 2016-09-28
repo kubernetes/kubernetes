@@ -600,39 +600,48 @@ func (m *kubeGenericRuntimeManager) pruneInitContainersBeforeStart(pod *api.Pod,
 	}
 }
 
-// findActiveInitContainer returns the status of the last failed container, the next init container to
+// findNextInitContainer returns the status of the last failed container, the next init container to
 // start, or done if there are no further init containers. Status is only returned if an init container
 // failed, in which case next will point to the current container.
-func findActiveInitContainer(pod *api.Pod, podStatus *kubecontainer.PodStatus) (next *api.Container, status *kubecontainer.ContainerStatus, done bool) {
+func findNextInitContainer(pod *api.Pod, podStatus *kubecontainer.PodStatus) (status *kubecontainer.ContainerStatus, next *api.Container, done bool) {
 	if len(pod.Spec.InitContainers) == 0 {
 		return nil, nil, true
 	}
 
+	// If there are failed containers, return the status of the last failed one.
+	for i := len(pod.Spec.InitContainers) - 1; i >= 0; i-- {
+		container := &pod.Spec.InitContainers[i]
+		status := podStatus.FindContainerStatusByName(container.Name)
+		if status != nil && status.State == kubecontainer.ContainerStateExited && status.ExitCode != 0 {
+			return status, container, false
+		}
+	}
+
+	// There are no failed containers now.
 	for i := len(pod.Spec.InitContainers) - 1; i >= 0; i-- {
 		container := &pod.Spec.InitContainers[i]
 		status := podStatus.FindContainerStatusByName(container.Name)
 		if status == nil {
 			continue
 		}
-		switch status.State {
-		case kubecontainer.ContainerStateRunning:
+
+		// container is still running, return not done.
+		if status.State == kubecontainer.ContainerStateRunning {
 			return nil, nil, false
-		case kubecontainer.ContainerStateExited:
-			switch {
-			// the container has failed, we'll have to retry
-			case status.ExitCode != 0:
-				return &pod.Spec.InitContainers[i], status, false
+		}
+
+		if status.State == kubecontainer.ContainerStateExited {
 			// all init containers successful
-			case i == (len(pod.Spec.InitContainers) - 1):
+			if i == (len(pod.Spec.InitContainers) - 1) {
 				return nil, nil, true
-			// all containers up to i successful, go to i+1
-			default:
-				return &pod.Spec.InitContainers[i+1], nil, false
 			}
+
+			// all containers up to i successful, go to i+1
+			return nil, &pod.Spec.InitContainers[i+1], false
 		}
 	}
 
-	return &pod.Spec.InitContainers[0], nil, false
+	return nil, &pod.Spec.InitContainers[0], false
 }
 
 // AttachContainer attaches to the container's console

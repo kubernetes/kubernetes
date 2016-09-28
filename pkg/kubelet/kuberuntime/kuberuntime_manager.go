@@ -401,7 +401,8 @@ func (m *kubeGenericRuntimeManager) computePodContainerChanges(pod *api.Pod, pod
 	// always reset the init containers if the sandbox is changed.
 	if !sandboxChanged {
 	Containers:
-		// keep all successfully completed containers up to and including the first failing container
+		// Keep all successfully completed containers. If there are failing containers,
+		// only keep the first failing one.
 		for i, container := range pod.Spec.InitContainers {
 			containerStatus := podStatus.FindContainerStatusByName(container.Name)
 			if containerStatus == nil {
@@ -643,7 +644,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *api.Pod, _ api.PodStatus, podSt
 	}
 
 	// Step 5: start init containers.
-	next, status, done := findActiveInitContainer(pod, podStatus)
+	status, next, done := findNextInitContainer(pod, podStatus)
 	if status != nil && status.ExitCode != 0 {
 		// container initialization has failed, flag the pod as failed
 		initContainerResult := kubecontainer.NewSyncResult(kubecontainer.InitContainer, status.Name)
