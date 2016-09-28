@@ -68,7 +68,7 @@ var _ = framework.KubeDescribe("Restart [Disruptive]", func() {
 		}
 
 		By("restarting all of the nodes")
-		err = restartNodes(framework.TestContext.Provider, framework.RestartPerNodeTimeout)
+		err = restartNodes(f, nodeNamesBefore)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("ensuring all nodes are ready after the restart")
@@ -125,42 +125,40 @@ func waitForNPods(ps *framework.PodStore, expect int, timeout time.Duration) ([]
 	return podNames, nil
 }
 
-// restartNodes uses provider to do a restart of all nodes in the cluster,
-// allowing up to nt per node.
-func restartNodes(provider string, nt time.Duration) error {
-	switch provider {
-	case "gce", "gke":
-		return migRollingUpdateSelf(nt)
-	default:
-		return fmt.Errorf("restartNodes(...) not implemented for %s", provider)
+func restartNodes(f *framework.Framework, nodeNames []string) error {
+	// List old boot IDs.
+	oldBootIDs := make(map[string]string)
+	for _, name := range nodeNames {
+		node, err := f.Client.Nodes().Get(name)
+		if err != nil {
+			return fmt.Errorf("error getting node info before reboot: %s", err)
+		}
+		oldBootIDs[name] = node.Status.NodeInfo.BootID
 	}
-}
-
-// TODO(marekbiskup): Switch this to MIG recreate-instances. This can be done
-// with the following bash, but needs to be written in Go:
-//
-//   # Step 1: Get instance names.
-//   list=$(gcloud compute instance-groups --project=${PROJECT} --zone=${ZONE} instances --group=${GROUP} list)
-//   i=""
-//   for l in $list; do
-// 	  i="${l##*/},${i}"
-//   done
-//
-//   # Step 2: Start the recreate.
-//   output=$(gcloud compute instance-groups managed --project=${PROJECT} --zone=${ZONE} recreate-instances ${GROUP} --instance="${i}")
-//   op=${output##*:}
-//
-//   # Step 3: Wait until it's complete.
-//   status=""
-//   while [[ "${status}" != "DONE" ]]; do
-// 	  output=$(gcloud compute instance-groups managed --zone="${ZONE}" get-operation ${op} | grep status)
-// 	  status=${output##*:}
-//   done
-func migRollingUpdateSelf(nt time.Duration) error {
-	By("getting the name of the template for the managed instance group")
-	tmpl, err := framework.MigTemplate()
+	// Reboot the nodes.
+	args := []string{
+		"compute",
+		fmt.Sprintf("--project=%s", framework.TestContext.CloudConfig.ProjectID),
+		"instances",
+		"reset",
+	}
+	args = append(args, nodeNames...)
+	args = append(args, fmt.Sprintf("--zone=%s", framework.TestContext.CloudConfig.Zone))
+	stdout, stderr, err := framework.RunCmd("gcloud", args...)
 	if err != nil {
-		return fmt.Errorf("couldn't get MIG template name: %v", err)
+		return fmt.Errorf("error restarting nodes: %s\nstdout: %s\nstderr: %s", err, stdout, stderr)
 	}
-	return framework.MigRollingUpdate(tmpl, nt)
+	// Wait for their boot IDs to change.
+	for _, name := range nodeNames {
+		if err := wait.Poll(30*time.Second, 5*time.Minute, func() (bool, error) {
+			node, err := f.Client.Nodes().Get(name)
+			if err != nil {
+				return false, fmt.Errorf("error getting node info after reboot: %s", err)
+			}
+			return node.Status.NodeInfo.BootID != oldBootIDs[name], nil
+		}); err != nil {
+			return fmt.Errorf("error waiting for node %s boot ID to change: %s", name, err)
+		}
+	}
+	return nil
 }
