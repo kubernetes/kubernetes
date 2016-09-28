@@ -42,16 +42,12 @@ func sortParameters(p []spec.Parameter) {
 	sort.Sort(byNameIn{p})
 }
 
-func groupRoutesByPath(routes []restful.Route) (ret map[string][]restful.Route) {
-	ret = make(map[string][]restful.Route)
+func groupRoutesByPath(routes []restful.Route) map[string][]restful.Route {
+	pathToRoutes := make(map[string][]restful.Route)
 	for _, r := range routes {
-		route, exists := ret[r.Path]
-		if !exists {
-			route = make([]restful.Route, 0, 1)
-		}
-		ret[r.Path] = append(route, r)
+		pathToRoutes[r.Path] = append(pathToRoutes[r.Path], r)
 	}
-	return ret
+	return pathToRoutes
 }
 
 func mapKeyFromParam(param *restful.Parameter) interface{} {
