@@ -1,9 +1,6 @@
 package pflag
 
-import (
-	"fmt"
-	"strconv"
-)
+import "strconv"
 
 // -- uint8 Value
 type uint8Value uint8
@@ -23,7 +20,7 @@ func (i *uint8Value) Type() string {
 	return "uint8"
 }
 
-func (i *uint8Value) String() string { return fmt.Sprintf("%v", *i) }
+func (i *uint8Value) String() string { return strconv.FormatUint(uint64(*i), 10) }
 
 func uint8Conv(sval string) (interface{}, error) {
 	v, err := strconv.ParseUint(sval, 0, 8)
