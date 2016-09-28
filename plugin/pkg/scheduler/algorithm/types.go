@@ -24,16 +24,19 @@ import (
 
 // FitPredicate is a function that indicates if a pod fits into an existing node.
 // The failure information is given by the error.
+// TODO: Change interface{} to a specific type.
 type FitPredicate func(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, []PredicateFailureReason, error)
 
 // PriorityMapFunction is a function that computes per-node results for a given node.
 // TODO: Figure out the exact API of this method.
+// TODO: Change interface{} to a specific type.
 type PriorityMapFunction func(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (schedulerapi.HostPriority, error)
 
 // PriorityReduceFunction is a function that aggregated per-node results and computes
 // final scores for all nodes.
 // TODO: Figure out the exact API of this method.
-type PriorityReduceFunction func(result schedulerapi.HostPriorityList) error
+// TODO: Change interface{} to a specific type.
+type PriorityReduceFunction func(pod *api.Pod, result schedulerapi.HostPriorityList) error
 
 // DEPRECATED
 // Use Map-Reduce pattern for priority functions.
