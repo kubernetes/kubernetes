@@ -125,7 +125,7 @@ func NewNamedReflector(name string, lw ListerWatcher, expectedType interface{}, 
 
 // internalPackages are packages that ignored when creating a default reflector name.  These packages are in the common
 // call chains to NewReflector, so they'd be low entropy names for reflectors
-var internalPackages = []string{"kubernetes/pkg/client/cache/", "kubernetes/pkg/controller/framework/", "/runtime/asm_"}
+var internalPackages = []string{"kubernetes/pkg/client/cache/", "/runtime/asm_"}
 
 // getDefaultReflectorName walks back through the call stack until we find a caller from outside of the ignoredPackages
 // it returns back a shortpath/filename:line to aid in identification of this reflector when it starts logging
