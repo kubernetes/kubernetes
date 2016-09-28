@@ -144,6 +144,8 @@ type Config struct {
 	// Port names should align with ports defined in ExtraServicePorts
 	ExtraEndpointPorts []api.EndpointPort
 
+	// If non-zero, the "kubernetes" services uses this port as NodePort.
+	// TODO(sttts): move into master
 	KubernetesServiceNodePort int
 
 	// EnableOpenAPISupport enables OpenAPI support. Allow downstream customers to disable OpenAPI spec.
