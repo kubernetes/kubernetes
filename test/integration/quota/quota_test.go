@@ -73,7 +73,7 @@ func TestQuota(t *testing.T) {
 
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	masterConfig.AdmissionControl = admission
-	m, err = masterConfig.New()
+	m, err = masterConfig.Complete().New()
 	if err != nil {
 		t.Fatalf("Error in bringing up the master: %v", err)
 	}
