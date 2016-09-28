@@ -1,18 +1,15 @@
 package pflag
 
-import (
-	"fmt"
-	"strconv"
-)
+import "strconv"
 
-// -- uint16 value
+// -- uint32 value
 type uint32Value uint32
 
 func newUint32Value(val uint32, p *uint32) *uint32Value {
 	*p = val
 	return (*uint32Value)(p)
 }
-func (i *uint32Value) String() string { return fmt.Sprintf("%d", *i) }
+
 func (i *uint32Value) Set(s string) error {
 	v, err := strconv.ParseUint(s, 0, 32)
 	*i = uint32Value(v)
@@ -22,6 +19,8 @@ func (i *uint32Value) Set(s string) error {
 func (i *uint32Value) Type() string {
 	return "uint32"
 }
+
+func (i *uint32Value) String() string { return strconv.FormatUint(uint64(*i), 10) }
 
 func uint32Conv(sval string) (interface{}, error) {
 	v, err := strconv.ParseUint(sval, 0, 32)
