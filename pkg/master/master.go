@@ -190,26 +190,35 @@ type RESTStorageProvider interface {
 	NewRESTStorage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter RESTOptionsGetter) (groupInfo genericapiserver.APIGroupInfo, enabled bool)
 }
 
+type completedConfig struct {
+	*Config
+}
+
 // Complete fills in any fields not set that are required to have valid data. It's mutating the receiver.
-func (c *Config) Complete() *Config {
-	c.Config.Complete()
+func (c *Config) Complete() completedConfig {
+	c.GenericConfig.Complete()
 
 	// enable swagger UI only if general UI support is on
-	c.Config.EnableSwaggerUI = c.Config.EnableSwaggerUI && c.EnableUISupport
+	c.GenericConfig.EnableSwaggerUI = c.GenericConfig.EnableSwaggerUI && c.EnableUISupport
 
-	return c
+	return completedConfig{c}
+}
+
+// SkipComplete provides a way to construct a server instance without config completion.
+func (c *Config) SkipComplete() completedConfig {
+	return completedConfig{c}
 }
 
 // New returns a new instance of Master from the given config.
 // Certain config fields will be set to a default value if unset.
 // Certain config fields must be specified, including:
 //   KubeletClient
-func (c *Config) New() (*Master, error) {
+func (c completedConfig) New() (*Master, error) {
 	if c.KubeletClient == nil {
 		return nil, fmt.Errorf("Master.New() called with config.KubeletClient == nil")
 	}
 
-	s, err := c.Config.New()
+	s, err := c.Config.GenericConfig.SkipComplete().New() // completion is done in Complete, no need for a second time
 	if err != nil {
 		return nil, err
 	}
@@ -259,7 +268,7 @@ func (c *Config) New() (*Master, error) {
 	c.RESTStorageProviders[policy.GroupName] = policyrest.RESTStorageProvider{}
 	c.RESTStorageProviders[rbac.GroupName] = &rbacrest.RESTStorageProvider{AuthorizerRBACSuperUser: c.GenericConfig.AuthorizerRBACSuperUser}
 	c.RESTStorageProviders[storage.GroupName] = storagerest.RESTStorageProvider{}
-	m.InstallAPIs(c)
+	m.InstallAPIs(c.Config)
 
 	// TODO: Attempt clean shutdown?
 	if m.enableCoreControllers {
