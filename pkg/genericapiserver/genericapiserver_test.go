@@ -179,7 +179,7 @@ func TestInstallAPIGroups(t *testing.T) {
 		s.InstallAPIGroup(&apiGroupsInfo[i])
 	}
 
-	server := httptest.NewServer(s.HandlerContainer.ServeMux)
+	server := httptest.NewServer(s.ProtectedContainer.ServeMux)
 	defer server.Close()
 	validPaths := []string{
 		// "/api"
@@ -308,10 +308,10 @@ func TestInstallSwaggerAPI(t *testing.T) {
 
 	mux := http.NewServeMux()
 	server := &GenericAPIServer{}
-	server.HandlerContainer = NewHandlerContainer(mux, nil)
+	server.ProtectedContainer = NewHandlerContainer(mux, nil)
 
 	// Ensure swagger isn't installed without the call
-	ws := server.HandlerContainer.RegisteredWebServices()
+	ws := server.ProtectedContainer.RegisteredWebServices()
 	if !assert.Equal(len(ws), 0) {
 		for x := range ws {
 			assert.NotEqual("/swaggerapi", ws[x].RootPath(), "SwaggerAPI was installed without a call to InstallSwaggerAPI()")
@@ -320,14 +320,14 @@ func TestInstallSwaggerAPI(t *testing.T) {
 
 	// Install swagger and test
 	server.InstallSwaggerAPI()
-	ws = server.HandlerContainer.RegisteredWebServices()
+	ws = server.ProtectedContainer.RegisteredWebServices()
 	if assert.NotEqual(0, len(ws), "SwaggerAPI not installed.") {
 		assert.Equal("/swaggerapi/", ws[0].RootPath(), "SwaggerAPI did not install to the proper path. %s != /swaggerapi", ws[0].RootPath())
 	}
 
 	// Empty externalHost verification
 	mux = http.NewServeMux()
-	server.HandlerContainer = NewHandlerContainer(mux, nil)
+	server.ProtectedContainer = NewHandlerContainer(mux, nil)
 	server.ExternalAddress = ""
 	server.ClusterIP = net.IPv4(10, 10, 10, 10)
 	server.PublicReadWritePort = 1010
@@ -369,7 +369,7 @@ func TestDiscoveryAtAPIS(t *testing.T) {
 	master, etcdserver, _, assert := newMaster(t)
 	defer etcdserver.Terminate(t)
 
-	server := httptest.NewServer(master.HandlerContainer.ServeMux)
+	server := httptest.NewServer(master.ProtectedContainer.ServeMux)
 	groupList, err := getGroupList(server)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

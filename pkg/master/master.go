@@ -207,10 +207,10 @@ func New(c *Config) (*Master, error) {
 	}
 
 	if c.EnableUISupport {
-		routes.UIRedirect{}.Install(s.Mux, s.HandlerContainer)
+		routes.UIRedirect{}.Install(s.Mux, s.ProtectedContainer)
 	}
 	if c.EnableLogsSupport {
-		routes.Logs{}.Install(s.Mux, s.HandlerContainer)
+		routes.Logs{}.Install(s.Mux, s.ProtectedContainer)
 	}
 
 	m := &Master{
@@ -301,9 +301,9 @@ func (m *Master) InstallAPIs(c *Config) {
 	healthz.InstallHandler(m.Mux, healthzChecks...)
 
 	if c.EnableProfiling {
-		routes.MetricsWithReset{}.Install(m.Mux, m.HandlerContainer)
+		routes.MetricsWithReset{}.Install(m.Mux, m.ProtectedContainer)
 	} else {
-		routes.DefaultMetrics{}.Install(m.Mux, m.HandlerContainer)
+		routes.DefaultMetrics{}.Install(m.Mux, m.ProtectedContainer)
 	}
 
 	// Install third party resource support if requested
@@ -633,11 +633,11 @@ func (m *Master) RemoveThirdPartyResource(path string) error {
 		return err
 	}
 
-	services := m.HandlerContainer.RegisteredWebServices()
+	services := m.ProtectedContainer.RegisteredWebServices()
 	for ix := range services {
 		root := services[ix].RootPath()
 		if root == path || strings.HasPrefix(root, path+"/") {
-			m.HandlerContainer.Remove(services[ix])
+			m.ProtectedContainer.Remove(services[ix])
 		}
 	}
 	return nil
@@ -752,13 +752,13 @@ func (m *Master) InstallThirdPartyResource(rsrc *extensions.ThirdPartyResource) 
 	// the group with the new API
 	if m.hasThirdPartyGroupStorage(path) {
 		m.addThirdPartyResourceStorage(path, plural.Resource, thirdparty.Storage[plural.Resource].(*thirdpartyresourcedataetcd.REST), apiGroup)
-		return thirdparty.UpdateREST(m.HandlerContainer)
+		return thirdparty.UpdateREST(m.ProtectedContainer)
 	}
 
-	if err := thirdparty.InstallREST(m.HandlerContainer); err != nil {
+	if err := thirdparty.InstallREST(m.ProtectedContainer); err != nil {
 		glog.Errorf("Unable to setup thirdparty api: %v", err)
 	}
-	m.HandlerContainer.Add(apiserver.NewGroupWebService(api.Codecs, path, apiGroup))
+	m.ProtectedContainer.Add(apiserver.NewGroupWebService(api.Codecs, path, apiGroup))
 
 	m.addThirdPartyResourceStorage(path, plural.Resource, thirdparty.Storage[plural.Resource].(*thirdpartyresourcedataetcd.REST), apiGroup)
 	return nil
