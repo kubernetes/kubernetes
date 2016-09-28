@@ -68,6 +68,8 @@ func (tv *Timeval) Nano() int64 {
 	return int64(tv.Sec)*1e9 + int64(tv.Usec)*1000
 }
 
+func TimevalToNsec(tv Timeval) int64 { return int64(tv.Sec)*1e9 + int64(tv.Usec)*1e3 }
+
 // use is a no-op, but the compiler cannot see that it is.
 // Calling use(p) ensures that p is kept live until that point.
 //go:noescape

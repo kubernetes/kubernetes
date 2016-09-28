@@ -12,11 +12,16 @@ export LC_ALL=C
 export LC_CTYPE=C
 
 if test -z "$GOARCH" -o -z "$GOOS"; then
-  echo 1>&2 "GOARCH or GOOS not defined in environment"
-  exit 1
+	echo 1>&2 "GOARCH or GOOS not defined in environment"
+	exit 1
 fi
 
-CC=${CC:-gcc}
+CC=${CC:-cc}
+
+if [[ "$GOOS" -eq "solaris" ]]; then
+	# Assumes GNU versions of utilities in PATH.
+	export PATH=/usr/gnu/bin:$PATH
+fi
 
 uname=$(uname)
 
@@ -123,7 +128,7 @@ includes_Linux='
 #include <linux/wait.h>
 #include <linux/icmpv6.h>
 #include <net/route.h>
-#include <termios.h>
+#include <asm/termbits.h>
 
 #ifndef MSG_FASTOPEN
 #define MSG_FASTOPEN    0x20000000
@@ -200,6 +205,7 @@ includes_OpenBSD='
 '
 
 includes_SunOS='
+#include <limits.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/sockio.h>
@@ -270,21 +276,31 @@ ccflags="$@"
 		$2 !~ /^EXPR_/ &&
 		$2 ~ /^E[A-Z0-9_]+$/ ||
 		$2 ~ /^B[0-9_]+$/ ||
+		$2 == "BOTHER" ||
+		$2 ~ /^CI?BAUD(EX)?$/ ||
+		$2 == "IBSHIFT" ||
 		$2 ~ /^V[A-Z0-9]+$/ ||
 		$2 ~ /^CS[A-Z0-9]/ ||
-		$2 ~ /^I(SIG|CANON|CRNL|EXTEN|MAXBEL|STRIP|UTF8)$/ ||
+		$2 ~ /^I(SIG|CANON|CRNL|UCLC|EXTEN|MAXBEL|STRIP|UTF8)$/ ||
 		$2 ~ /^IGN/ ||
 		$2 ~ /^IX(ON|ANY|OFF)$/ ||
 		$2 ~ /^IN(LCR|PCK)$/ ||
 		$2 ~ /(^FLU?SH)|(FLU?SH$)/ ||
-		$2 ~ /^C(LOCAL|READ)$/ ||
+		$2 ~ /^C(LOCAL|READ|MSPAR|RTSCTS)$/ ||
 		$2 == "BRKINT" ||
 		$2 == "HUPCL" ||
 		$2 == "PENDIN" ||
 		$2 == "TOSTOP" ||
+		$2 == "XCASE" ||
+		$2 == "ALTWERASE" ||
+		$2 == "NOKERNINFO" ||
 		$2 ~ /^PAR/ ||
 		$2 ~ /^SIG[^_]/ ||
-		$2 ~ /^O[CNPFP][A-Z]+[^_][A-Z]+$/ ||
+		$2 ~ /^O[CNPFPL][A-Z]+[^_][A-Z]+$/ ||
+		$2 ~ /^(NL|CR|TAB|BS|VT|FF)DLY$/ ||
+		$2 ~ /^(NL|CR|TAB|BS|VT|FF)[0-9]$/ ||
+		$2 ~ /^O?XTABS$/ ||
+		$2 ~ /^TC[IO](ON|OFF)$/ ||
 		$2 ~ /^IN_/ ||
 		$2 ~ /^LOCK_(SH|EX|NB|UN)$/ ||
 		$2 ~ /^(AF|SOCK|SO|SOL|IPPROTO|IP|IPV6|ICMP6|TCP|EVFILT|NOTE|EV|SHUT|PROT|MAP|PACKET|MSG|SCM|MCL|DT|MADV|PR)_/ ||
@@ -303,6 +319,9 @@ ccflags="$@"
 		$2 ~ /^(NETLINK|NLM|NLMSG|NLA|IFA|IFAN|RT|RTCF|RTN|RTPROT|RTNH|ARPHRD|ETH_P)_/ ||
 		$2 ~ /^SIOC/ ||
 		$2 ~ /^TIOC/ ||
+		$2 ~ /^TCGET/ ||
+		$2 ~ /^TCSET/ ||
+		$2 ~ /^TC(FLSH|SBRKP?|XONC)$/ ||
 		$2 !~ "RTF_BITS" &&
 		$2 ~ /^(IFF|IFT|NET_RT|RTM|RTF|RTV|RTA|RTAX)_/ ||
 		$2 ~ /^BIOC/ ||

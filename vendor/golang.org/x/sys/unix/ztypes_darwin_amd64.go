@@ -455,3 +455,8 @@ type Termios struct {
 	Ispeed    uint64
 	Ospeed    uint64
 }
+
+const (
+	AT_FDCWD            = -0x2
+	AT_SYMLINK_NOFOLLOW = 0x20
+)

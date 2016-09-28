@@ -7,6 +7,8 @@
 
 package unix
 
+//sys	EpollWait(epfd int, events []EpollEvent, msec int) (n int, err error)
+//sys	Dup2(oldfd int, newfd int) (err error)
 //sys	Fchown(fd int, uid int, gid int) (err error)
 //sys	Fstat(fd int, stat *Stat_t) (err error)
 //sys	Fstatfs(fd int, buf *Statfs_t) (err error)
@@ -16,11 +18,13 @@ package unix
 //sysnb	Getgid() (gid int)
 //sysnb	Getrlimit(resource int, rlim *Rlimit) (err error) = SYS_UGETRLIMIT
 //sysnb	Getuid() (uid int)
+//sysnb	InotifyInit() (fd int, err error)
 //sys	Ioperm(from int, num int, on int) (err error)
 //sys	Iopl(level int) (err error)
 //sys	Lchown(path string, uid int, gid int) (err error)
 //sys	Listen(s int, n int) (err error)
 //sys	Lstat(path string, stat *Stat_t) (err error)
+//sys	Pause() (err error)
 //sys	Pread(fd int, p []byte, offset int64) (n int, err error) = SYS_PREAD64
 //sys	Pwrite(fd int, p []byte, offset int64) (n int, err error) = SYS_PWRITE64
 //sys	Seek(fd int, offset int64, whence int) (off int64, err error) = SYS_LSEEK
@@ -62,6 +66,8 @@ func Getpagesize() int { return 65536 }
 //sysnb	Gettimeofday(tv *Timeval) (err error)
 //sysnb	Time(t *Time_t) (tt Time_t, err error)
 
+//sys	Utime(path string, buf *Utimbuf) (err error)
+
 func TimespecToNsec(ts Timespec) int64 { return int64(ts.Sec)*1e9 + int64(ts.Nsec) }
 
 func NsecToTimespec(nsec int64) (ts Timespec) {
@@ -69,8 +75,6 @@ func NsecToTimespec(nsec int64) (ts Timespec) {
 	ts.Nsec = nsec % 1e9
 	return
 }
-
-func TimevalToNsec(tv Timeval) int64 { return int64(tv.Sec)*1e9 + int64(tv.Usec)*1e3 }
 
 func NsecToTimeval(nsec int64) (tv Timeval) {
 	nsec += 999 // round up to microsecond
@@ -93,4 +97,39 @@ func (msghdr *Msghdr) SetControllen(length int) {
 
 func (cmsg *Cmsghdr) SetLen(length int) {
 	cmsg.Len = uint64(length)
+}
+
+//sysnb pipe(p *[2]_C_int) (err error)
+
+func Pipe(p []int) (err error) {
+	if len(p) != 2 {
+		return EINVAL
+	}
+	var pp [2]_C_int
+	err = pipe(&pp)
+	p[0] = int(pp[0])
+	p[1] = int(pp[1])
+	return
+}
+
+//sysnb pipe2(p *[2]_C_int, flags int) (err error)
+
+func Pipe2(p []int, flags int) (err error) {
+	if len(p) != 2 {
+		return EINVAL
+	}
+	var pp [2]_C_int
+	err = pipe2(&pp, flags)
+	p[0] = int(pp[0])
+	p[1] = int(pp[1])
+	return
+}
+
+//sys	poll(fds *PollFd, nfds int, timeout int) (n int, err error)
+
+func Poll(fds []PollFd, timeout int) (n int, err error) {
+	if len(fds) == 0 {
+		return poll(nil, 0, timeout)
+	}
+	return poll(&fds[0], len(fds), timeout)
 }
