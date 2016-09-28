@@ -18,14 +18,24 @@ limitations under the License.
 
 package selinux
 
-type realSelinuxContextRunner struct{}
+// SELinuxEnabled always returns false on non-linux platforms.
+func SELinuxEnabled() bool {
+	return false
+}
 
-func (_ *realSelinuxContextRunner) SetContext(dir, context string) error {
-	// NOP
+// realSELinuxRunner is the NOP implementation of the SELinuxRunner interface.
+type realSELinuxRunner struct{}
+
+var _ SELinuxRunner = &realSELinuxRunner{}
+
+func (_ *realSELinuxRunner) SetContext(dir, context string) error {
 	return nil
 }
 
-func (_ *realSelinuxContextRunner) Getfilecon(path string) (string, error) {
-	// NOP
+func (_ *realSELinuxRunner) Getfilecon(path string) (string, error) {
 	return "", nil
+}
+
+func (_ *realSELinuxRunner) GetLxcContexts() (string, string) {
+	return "", ""
 }
