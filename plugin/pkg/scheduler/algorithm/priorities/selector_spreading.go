@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/workqueue"
+	_ "k8s.io/kubernetes/pkg/util/workqueue/prometheus"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
