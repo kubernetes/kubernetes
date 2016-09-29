@@ -25,7 +25,7 @@ community.
 
 ### Code review
 
-As a community we believe in the value of code review for all contributions.
+As a community we believe in the [value of code review for all contributions](https://github.com/kubernetes/kubernetes/blob/master/docs/devel/collab.md).
 Code review increases both the quality and readability of our codebase, which
 in turn produces high quality software.
 
