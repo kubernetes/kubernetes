@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
@@ -62,6 +63,7 @@ func NewCmdConfigSetContext(out io.Writer, configAccess clientcmd.ConfigAccess) 
 			err := options.run()
 			if err != nil {
 				fmt.Fprintf(out, "%v\n", err)
+				os.Exit(1)
 			} else {
 				fmt.Fprintf(out, "context %q set.\n", options.name)
 			}

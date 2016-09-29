@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -113,6 +114,7 @@ func newCmdConfigSetAuthInfo(out io.Writer, options *createAuthInfoOptions) *cob
 			err := options.run()
 			if err != nil {
 				fmt.Fprintf(out, "%v\n", err)
+				os.Exit(1)
 			} else {
 				fmt.Fprintf(out, "user %q set.\n", options.name)
 			}
