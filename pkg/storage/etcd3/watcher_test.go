@@ -51,6 +51,8 @@ func TestWatchList(t *testing.T) {
 // - update should trigger Modified event
 // - update that gets filtered should trigger Deleted event
 func testWatch(t *testing.T, recursive bool) {
+	ctx, store, cluster := testSetup(t)
+	defer cluster.Terminate(t)
 	podFoo := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 	podBar := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "bar"}}
 
@@ -90,7 +92,6 @@ func testWatch(t *testing.T, recursive bool) {
 		},
 	}}
 	for i, tt := range tests {
-		ctx, store, cluster := testSetup(t)
 		w, err := store.watch(ctx, tt.key, "0", storage.SimpleFilter(tt.pred), recursive)
 		if err != nil {
 			t.Fatalf("Watch failed: %v", err)
@@ -121,7 +122,6 @@ func testWatch(t *testing.T, recursive bool) {
 		}
 		w.Stop()
 		testCheckStop(t, i, w)
-		cluster.Terminate(t)
 	}
 }
 
