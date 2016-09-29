@@ -594,16 +594,17 @@ func (m *kubeGenericRuntimeManager) pruneInitContainersBeforeStart(pod *api.Pod,
 			if _, ok := m.containerRefManager.GetRef(status.ID); ok {
 				m.containerRefManager.ClearRef(status.ID)
 			} else {
-				glog.Warningf("No ref for container '%q'", status.ID)
+				glog.Warningf("No ref for container %q", status.ID)
 			}
 		}
 	}
 }
 
-// findNextInitContainer returns the status of the last failed container, the next init container to
-// start, or done if there are no further init containers. Status is only returned if an init container
-// failed, in which case next will point to the current container.
-func findNextInitContainer(pod *api.Pod, podStatus *kubecontainer.PodStatus) (status *kubecontainer.ContainerStatus, next *api.Container, done bool) {
+// findNextInitContainerToRun returns the status of the last failed container, the
+// next init container to start, or done if there are no further init containers.
+// Status is only returned if an init container is failed, in which case next will
+// point to the current container.
+func findNextInitContainerToRun(pod *api.Pod, podStatus *kubecontainer.PodStatus) (status *kubecontainer.ContainerStatus, next *api.Container, done bool) {
 	if len(pod.Spec.InitContainers) == 0 {
 		return nil, nil, true
 	}
@@ -612,7 +613,7 @@ func findNextInitContainer(pod *api.Pod, podStatus *kubecontainer.PodStatus) (st
 	for i := len(pod.Spec.InitContainers) - 1; i >= 0; i-- {
 		container := &pod.Spec.InitContainers[i]
 		status := podStatus.FindContainerStatusByName(container.Name)
-		if status != nil && status.State == kubecontainer.ContainerStateExited && status.ExitCode != 0 {
+		if status != nil && isContainerFailed(status) {
 			return status, container, false
 		}
 	}

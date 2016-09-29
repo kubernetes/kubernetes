@@ -381,6 +381,34 @@ func (m *kubeGenericRuntimeManager) podSandboxChanged(pod *api.Pod, podStatus *k
 	return false, sandboxStatus.Metadata.GetAttempt(), sandboxStatus.GetId()
 }
 
+// checkAndKeepInitContainers keeps all successfully completed init containers. If there
+// are failing containers, only keep the first failing one.
+func checkAndKeepInitContainers(pod *api.Pod, podStatus *kubecontainer.PodStatus, initContainersToKeep map[kubecontainer.ContainerID]int) bool {
+	initFailed := false
+
+	for i, container := range pod.Spec.InitContainers {
+		containerStatus := podStatus.FindContainerStatusByName(container.Name)
+		if containerStatus == nil {
+			continue
+		}
+
+		if containerStatus.State == kubecontainer.ContainerStateRunning {
+			initContainersToKeep[containerStatus.ID] = i
+			continue
+		}
+
+		if containerStatus.State == kubecontainer.ContainerStateExited {
+			initContainersToKeep[containerStatus.ID] = i
+			if containerStatus.ExitCode != 0 {
+				initFailed = true
+				break
+			}
+		}
+	}
+
+	return initFailed
+}
+
 // computePodContainerChanges checks whether the pod spec has changed and returns the changes if true.
 func (m *kubeGenericRuntimeManager) computePodContainerChanges(pod *api.Pod, podStatus *kubecontainer.PodStatus) podContainerSpecChanges {
 	glog.V(5).Infof("Syncing Pod %q: %+v", format.Pod(pod), pod)
@@ -400,26 +428,9 @@ func (m *kubeGenericRuntimeManager) computePodContainerChanges(pod *api.Pod, pod
 	initFailed := false
 	// always reset the init containers if the sandbox is changed.
 	if !sandboxChanged {
-	Containers:
 		// Keep all successfully completed containers. If there are failing containers,
 		// only keep the first failing one.
-		for i, container := range pod.Spec.InitContainers {
-			containerStatus := podStatus.FindContainerStatusByName(container.Name)
-			if containerStatus == nil {
-				continue
-			}
-
-			switch containerStatus.State {
-			case kubecontainer.ContainerStateRunning:
-				changes.InitContainersToKeep[containerStatus.ID] = i
-			case kubecontainer.ContainerStateExited:
-				changes.InitContainersToKeep[containerStatus.ID] = i
-				if containerStatus.ExitCode != 0 {
-					initFailed = true
-					break Containers
-				}
-			}
-		}
+		initFailed = checkAndKeepInitContainers(pod, podStatus, changes.InitContainersToKeep)
 	}
 	changes.InitFailed = initFailed
 
@@ -644,7 +655,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *api.Pod, _ api.PodStatus, podSt
 	}
 
 	// Step 5: start init containers.
-	status, next, done := findNextInitContainer(pod, podStatus)
+	status, next, done := findNextInitContainerToRun(pod, podStatus)
 	if status != nil && status.ExitCode != 0 {
 		// container initialization has failed, flag the pod as failed
 		initContainerResult := kubecontainer.NewSyncResult(kubecontainer.InitContainer, status.Name)
