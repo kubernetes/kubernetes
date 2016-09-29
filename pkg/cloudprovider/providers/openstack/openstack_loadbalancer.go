@@ -342,6 +342,15 @@ func createNodeSecurityGroup(client *gophercloud.ServiceClient, nodeSecurityGrou
 	return nil
 }
 
+func stringInArray(x string, list []string) bool {
+    for _, y := range list {
+        if y == x {
+            return true
+        }
+    }
+    return false
+}
+
 func (lbaas *LbaasV2) GetLoadBalancer(clusterName string, service *api.Service) (*api.LoadBalancerStatus, bool, error) {
 	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
 	loadbalancer, err := getLoadbalancerByName(lbaas.network, loadBalancerName)
@@ -828,7 +837,13 @@ func (lbaas *LbaasV2) EnsureLoadBalancerDeleted(clusterName string, service *api
 		}
 
 		for _, listener := range listenerList {
-			listenerIDs = append(listenerIDs, listener.ID)
+			for _, lb := range listener.Loadbalancers {
+				// Double check this Listener belongs to the LB we're deleting. Neutron's API filtering
+				// can't be counted on in older releases (i.e Liberty).
+				if loadbalancer.ID == lb.ID {
+					listenerIDs = append(listenerIDs, listener.ID)
+				}
+			}
 		}
 
 		return true, nil
@@ -846,7 +861,13 @@ func (lbaas *LbaasV2) EnsureLoadBalancerDeleted(clusterName string, service *api
 		}
 
 		for _, pool := range poolsList {
-			poolIDs = append(poolIDs, pool.ID)
+			for _, li := range pool.Listeners {
+				// Double check this Pool belongs to the LB we're deleting. Neutron's API filtering
+				// can't be counted on in older releases (i.e Liberty).
+				if stringInArray(li.ID, listenerIDs) {
+					poolIDs = append(poolIDs, pool.ID)
+				}
+			}
 		}
 
 		return true, nil
@@ -885,7 +906,13 @@ func (lbaas *LbaasV2) EnsureLoadBalancerDeleted(clusterName string, service *api
 			}
 
 			for _, monitor := range monitorsList {
-				monitorIDs = append(monitorIDs, monitor.ID)
+				for _, pl := range monitor.Pools {
+					// Double check this Monitor belongs to the LB we're deleting. Neutron's API filtering
+					// can't be counted on in older releases (i.e Liberty).
+					if stringInArray(pl.ID, poolIDs) {
+						monitorIDs = append(monitorIDs, monitor.ID)
+					}
+				}
 			}
 
 			return true, nil
