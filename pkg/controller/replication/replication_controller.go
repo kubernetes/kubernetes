@@ -710,36 +710,10 @@ func (rm *ReplicationManager) syncReplicationController(key string) error {
 	}
 	trace.Step("manageReplicas done")
 
-	// Count the number of pods that have labels matching the labels of the pod
-	// template of the replication controller, the matching pods may have more
-	// labels than are in the template. Because the label of podTemplateSpec is
-	// a superset of the selector of the replication controller, so the possible
-	// matching pods must be part of the filteredPods.
-	fullyLabeledReplicasCount := 0
-	readyReplicasCount := 0
-	availableReplicasCount := 0
-	templateLabel := labels.Set(rc.Spec.Template.Labels).AsSelectorPreValidated()
-	for _, pod := range filteredPods {
-		if templateLabel.Matches(labels.Set(pod.Labels)) {
-			fullyLabeledReplicasCount++
-		}
-		if api.IsPodReady(pod) {
-			readyReplicasCount++
-			if api.IsPodAvailable(pod, rc.Spec.MinReadySeconds, unversioned.Now()) {
-				availableReplicasCount++
-			}
-		}
-	}
+	newStatus := calculateStatus(rc, filteredPods, manageReplicasErr)
 
 	// Always updates status as pods come up or die.
-	if err := updateReplicaCount(
-		rm.kubeClient.Core().ReplicationControllers(rc.Namespace),
-		rc,
-		len(filteredPods),
-		fullyLabeledReplicasCount,
-		readyReplicasCount,
-		availableReplicasCount,
-	); err != nil {
+	if err := updateReplicationControllerStatus(rm.kubeClient.Core().ReplicationControllers(rc.Namespace), rc, newStatus); err != nil {
 		// Multiple things could lead to this update failing.  Returning an error causes a requeue without forcing a hotloop
 		return err
 	}

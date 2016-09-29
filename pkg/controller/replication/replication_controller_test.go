@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -326,6 +327,7 @@ func TestSyncReplicationControllerDormancy(t *testing.T) {
 	fakeHandler := utiltesting.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: "{}",
+		T:            t,
 	}
 	testServer := httptest.NewServer(&fakeHandler)
 	defer testServer.Close()
@@ -378,9 +380,9 @@ func TestSyncReplicationControllerDormancy(t *testing.T) {
 	manager.syncReplicationController(getKey(controllerSpec, t))
 	validateSyncReplication(t, &fakePodControl, 1, 0, 0)
 
-	// 1 PUT for the rc status during dormancy window.
+	// 2 PUT for the rc status during dormancy window.
 	// Note that the pod creates go through pod control so they're not recorded.
-	fakeHandler.ValidateRequestCount(t, 1)
+	fakeHandler.ValidateRequestCount(t, 2)
 }
 
 func TestPodControllerLookup(t *testing.T) {
@@ -641,8 +643,9 @@ func TestControllerUpdateStatusWithFailure(t *testing.T) {
 		return true, &api.ReplicationController{}, fmt.Errorf("Fake error")
 	})
 	fakeRCClient := c.Core().ReplicationControllers("default")
-	numReplicas := 10
-	updateReplicaCount(fakeRCClient, *rc, numReplicas, 0, 0, 0)
+	numReplicas := int32(10)
+	status := api.ReplicationControllerStatus{Replicas: numReplicas}
+	updateReplicationControllerStatus(fakeRCClient, *rc, status)
 	updates, gets := 0, 0
 	for _, a := range c.Actions() {
 		if a.GetResource().Resource != "replicationcontrollers" {
@@ -663,7 +666,7 @@ func TestControllerUpdateStatusWithFailure(t *testing.T) {
 			// returned an rc with replicas=1.
 			if c, ok := action.GetObject().(*api.ReplicationController); !ok {
 				t.Errorf("Expected an rc as the argument to update, got %T", c)
-			} else if c.Status.Replicas != int32(numReplicas) {
+			} else if c.Status.Replicas != numReplicas {
 				t.Errorf("Expected update for rc to contain replicas %v, got %v instead",
 					numReplicas, c.Status.Replicas)
 			}
@@ -1416,4 +1419,164 @@ func TestAvailableReplicas(t *testing.T) {
 	decRc := runtime.EncodeOrDie(testapi.Default.Codec(), rc)
 	fakeHandler.ValidateRequest(t, testapi.Default.ResourcePath(replicationControllerResourceName(), rc.Namespace, rc.Name)+"/status", "PUT", &decRc)
 	validateSyncReplication(t, &fakePodControl, 0, 0, 0)
+}
+
+var (
+	imagePullBackOff api.ReplicationControllerConditionType = "ImagePullBackOff"
+
+	condImagePullBackOff = func() api.ReplicationControllerCondition {
+		return api.ReplicationControllerCondition{
+			Type:   imagePullBackOff,
+			Status: api.ConditionTrue,
+			Reason: "NonExistentImage",
+		}
+	}
+
+	condReplicaFailure = func() api.ReplicationControllerCondition {
+		return api.ReplicationControllerCondition{
+			Type:   api.ReplicationControllerReplicaFailure,
+			Status: api.ConditionTrue,
+			Reason: "OtherFailure",
+		}
+	}
+
+	condReplicaFailure2 = func() api.ReplicationControllerCondition {
+		return api.ReplicationControllerCondition{
+			Type:   api.ReplicationControllerReplicaFailure,
+			Status: api.ConditionTrue,
+			Reason: "AnotherFailure",
+		}
+	}
+
+	status = func() *api.ReplicationControllerStatus {
+		return &api.ReplicationControllerStatus{
+			Conditions: []api.ReplicationControllerCondition{condReplicaFailure()},
+		}
+	}
+)
+
+func TestGetCondition(t *testing.T) {
+	exampleStatus := status()
+
+	tests := []struct {
+		name string
+
+		status     api.ReplicationControllerStatus
+		condType   api.ReplicationControllerConditionType
+		condStatus api.ConditionStatus
+		condReason string
+
+		expected bool
+	}{
+		{
+			name: "condition exists",
+
+			status:   *exampleStatus,
+			condType: api.ReplicationControllerReplicaFailure,
+
+			expected: true,
+		},
+		{
+			name: "condition does not exist",
+
+			status:   *exampleStatus,
+			condType: imagePullBackOff,
+
+			expected: false,
+		},
+	}
+
+	for _, test := range tests {
+		cond := GetCondition(test.status, test.condType)
+		exists := cond != nil
+		if exists != test.expected {
+			t.Errorf("%s: expected condition to exist: %t, got: %t", test.name, test.expected, exists)
+		}
+	}
+}
+
+func TestSetCondition(t *testing.T) {
+	tests := []struct {
+		name string
+
+		status *api.ReplicationControllerStatus
+		cond   api.ReplicationControllerCondition
+
+		expectedStatus *api.ReplicationControllerStatus
+	}{
+		{
+			name: "set for the first time",
+
+			status: &api.ReplicationControllerStatus{},
+			cond:   condReplicaFailure(),
+
+			expectedStatus: &api.ReplicationControllerStatus{Conditions: []api.ReplicationControllerCondition{condReplicaFailure()}},
+		},
+		{
+			name: "simple set",
+
+			status: &api.ReplicationControllerStatus{Conditions: []api.ReplicationControllerCondition{condImagePullBackOff()}},
+			cond:   condReplicaFailure(),
+
+			expectedStatus: &api.ReplicationControllerStatus{Conditions: []api.ReplicationControllerCondition{condImagePullBackOff(), condReplicaFailure()}},
+		},
+		{
+			name: "overwrite",
+
+			status: &api.ReplicationControllerStatus{Conditions: []api.ReplicationControllerCondition{condReplicaFailure()}},
+			cond:   condReplicaFailure2(),
+
+			expectedStatus: &api.ReplicationControllerStatus{Conditions: []api.ReplicationControllerCondition{condReplicaFailure2()}},
+		},
+	}
+
+	for _, test := range tests {
+		SetCondition(test.status, test.cond)
+		if !reflect.DeepEqual(test.status, test.expectedStatus) {
+			t.Errorf("%s: expected status: %v, got: %v", test.name, test.expectedStatus, test.status)
+		}
+	}
+}
+
+func TestRemoveCondition(t *testing.T) {
+	tests := []struct {
+		name string
+
+		status   *api.ReplicationControllerStatus
+		condType api.ReplicationControllerConditionType
+
+		expectedStatus *api.ReplicationControllerStatus
+	}{
+		{
+			name: "remove from empty status",
+
+			status:   &api.ReplicationControllerStatus{},
+			condType: api.ReplicationControllerReplicaFailure,
+
+			expectedStatus: &api.ReplicationControllerStatus{},
+		},
+		{
+			name: "simple remove",
+
+			status:   &api.ReplicationControllerStatus{Conditions: []api.ReplicationControllerCondition{condReplicaFailure()}},
+			condType: api.ReplicationControllerReplicaFailure,
+
+			expectedStatus: &api.ReplicationControllerStatus{},
+		},
+		{
+			name: "doesn't remove anything",
+
+			status:   status(),
+			condType: imagePullBackOff,
+
+			expectedStatus: status(),
+		},
+	}
+
+	for _, test := range tests {
+		RemoveCondition(test.status, test.condType)
+		if !reflect.DeepEqual(test.status, test.expectedStatus) {
+			t.Errorf("%s: expected status: %v, got: %v", test.name, test.expectedStatus, test.status)
+		}
+	}
 }
