@@ -268,6 +268,7 @@ func DeepCopy_componentconfig_KubeletConfiguration(in interface{}, out interface
 		out.CloudConfigFile = in.CloudConfigFile
 		out.KubeletCgroups = in.KubeletCgroups
 		out.CgroupsPerQOS = in.CgroupsPerQOS
+		out.CgroupDriver = in.CgroupDriver
 		out.RuntimeCgroups = in.RuntimeCgroups
 		out.SystemCgroups = in.SystemCgroups
 		out.CgroupRoot = in.CgroupRoot
