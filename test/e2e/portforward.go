@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -217,6 +218,37 @@ var _ = framework.KubeDescribe("Port forwarding", func() {
 			}
 			verifyLogMessage(logOutput, "Accepted client connection")
 			verifyLogMessage(logOutput, "Expected to read 3 bytes from client, but got 0 instead")
+		})
+
+		It("should terminate pods in time", func() {
+			for i := 1; i <= 50; i = i + 1 {
+				pod := &api.Pod{
+					ObjectMeta: api.ObjectMeta{
+						Name: fmt.Sprintf("busybox-terminate-%d", i),
+					},
+					Spec: api.PodSpec{
+						Containers: []api.Container{
+							{
+								Name:    "sleep",
+								Image:   busyboxImage,
+								Command: []string{"/bin/sh", "-c", "sleep 5"},
+							},
+						},
+						RestartPolicy: api.RestartPolicyNever,
+					},
+				}
+				pod = f.PodClient().Create(pod)
+
+				By(fmt.Sprintf("Waiting for the target pod %d to run", i))
+				if err := f.WaitForPodRunning(pod.Name); err != nil && err != unversioned.ErrPodCompleted {
+					framework.Failf("Pod %d did not start running: %v", i, err)
+				}
+
+				By(fmt.Sprintf("Waiting for the target pod %d to stop running", i))
+				if err := f.WaitForPodNoLongerRunning(pod.Name); err != nil {
+					framework.Failf("Pod %d did not stop running: %v", i, err)
+				}
+			}
 		})
 
 		It("should support a client that connects, sends data, and disconnects [Conformance]", func() {
