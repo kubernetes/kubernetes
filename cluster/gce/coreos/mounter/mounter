@@ -1,0 +1,55 @@
+#!/bin/bash
+
+# Copyright 2014 The Kubernetes Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+set -o errexit
+set -o nounset
+set -o pipefail
+
+MOUNTER_VERSION=v2
+MOUNTER_USER=root
+ROOT_DIR=/home/kubernetes/bin
+RKT_BINARY=${ROOT_DIR}/rkt
+STAGE1_ACI=${ROOT_DIR}/stage1-fly.aci
+MOUNTER_ACI=${ROOT_DIR}/gci-mounter-${MOUNTER_VERSION}.aci
+MOUNTER_IMAGE=gcr.io/google_containers/gci-mounter:${MOUNTER_VERSION}
+
+function gc {
+    # Attempt to garbage collect rkt pods with 5 retries.
+    # Rkt pods end up creating new copies of mounts on the host. Hence it is ideal to clean them up right away.
+    attempt=0
+    until [ $attempt -ge 5 ]; do
+	${RKT_BINARY} gc --grace-period=0s &> /dev/null
+	attempt=$[$attempt+1]
+	sleep 1
+    done
+}
+
+# Garbage collect old rkt containers on exit
+trap gc EXIT
+
+if [[ ! $(${RKT_BINARY} image list | grep ${MOUNTER_IMAGE}) ]]; then
+        ${RKT_BINARY} fetch --insecure-options=image file://${MOUNTER_ACI}
+fi
+
+echo "Running mount using a rkt fly container"
+
+${RKT_BINARY} run --stage1-path=${STAGE1_ACI} \
+	--insecure-options=image \
+	--volume=kubelet,kind=host,source=/var/lib/kubelet,readOnly=false,recursive=true \
+	--mount volume=kubelet,target=/var/lib/kubelet \
+	${MOUNTER_IMAGE} --user=${MOUNTER_USER} --exec /bin/mount -- "$@"
+
+echo "Successfully ran mount using a rkt fly container"

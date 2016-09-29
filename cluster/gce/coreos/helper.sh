@@ -15,18 +15,18 @@
 # limitations under the License.
 
 # A library of helper functions and constant for GCI distro
-source "${KUBE_ROOT}/cluster/gce/gci/helper.sh"
 
-# $1: template name (required).
-function create-node-instance-template {
-  local template_name="$1"
-  ensure-gci-metadata-files
-  create-node-template "$template_name" "${scope_flags[*]}" \
-    "kube-env=${KUBE_TEMP}/node-kube-env.yaml" \
-    "user-data=${KUBE_ROOT}/cluster/gce/gci/node.yaml" \
-    "configure-sh=${KUBE_ROOT}/cluster/gce/gci/configure.sh" \
-    "cluster-name=${KUBE_TEMP}/cluster-name.txt" \
-    "gci-update-strategy=${KUBE_TEMP}/gci-update.txt" \
-    "gci-ensure-gke-docker=${KUBE_TEMP}/gci-ensure-gke-docker.txt" \
-    "gci-docker-version=${KUBE_TEMP}/gci-docker-version.txt"
+# Creates the GCI specific metadata files if they do not exit.
+# Assumed var
+#   KUBE_TEMP
+function ensure-gci-metadata-files {
+  if [[ ! -f "${KUBE_TEMP}/gci-update.txt" ]]; then
+    echo -n "update_disabled" > "${KUBE_TEMP}/gci-update.txt"
+  fi
+  if [[ ! -f "${KUBE_TEMP}/gci-ensure-gke-docker.txt" ]]; then
+    echo -n "true" > "${KUBE_TEMP}/gci-ensure-gke-docker.txt"
+  fi
+  if [[ ! -f "${KUBE_TEMP}/gci-docker-version.txt" ]]; then
+    echo -n "${GCI_DOCKER_VERSION:-}" > "${KUBE_TEMP}/gci-docker-version.txt"
+  fi
 }
