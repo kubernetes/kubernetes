@@ -79,6 +79,8 @@ message DNSOption {
     repeated string servers = 1;
     // List of DNS search domains of the cluster.
     repeated string searches = 2;
+    // List of DNS opt strings
+    repeated string opts = 3;
 }
 
 enum Protocol {
