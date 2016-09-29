@@ -1606,6 +1606,34 @@ func (c *Cloud) DetachDisk(diskName string, nodeName types.NodeName) (string, er
 	return hostDevicePath, err
 }
 
+// TestDisk checks that a disk has given properties. This should be used only
+// in e2e tests!
+func (c *Cloud) TestDisk(volumeName, volumeType string, encrypted bool) error {
+	awsDisk, err := newAWSDisk(c, volumeName)
+	if err != nil {
+		return err
+	}
+	info, err := awsDisk.describeVolume()
+	if err != nil {
+		return err
+	}
+
+	if info.VolumeType == nil {
+		return fmt.Errorf("expected volume type %q, got nil", volumeType)
+	}
+	if *info.VolumeType != volumeType {
+		return fmt.Errorf("expected volume type %q, got %q", volumeType, *info.VolumeType)
+	}
+
+	if encrypted && info.Encrypted == nil {
+		return fmt.Errorf("expected encrypted volume, got no encryption")
+	}
+	if encrypted && !*info.Encrypted {
+		return fmt.Errorf("expected encrypted volume, got %v", *info.Encrypted)
+	}
+	return nil
+}
+
 // CreateDisk implements Volumes.CreateDisk
 func (c *Cloud) CreateDisk(volumeOptions *VolumeOptions) (string, error) {
 	allZones, err := c.getAllZones()
