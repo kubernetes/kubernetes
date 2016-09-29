@@ -173,6 +173,10 @@ func Run(s *options.ServerRunOptions) error {
 	admissionControlPluginNames := strings.Split(s.AdmissionControl, ",")
 	privilegedLoopbackToken := uuid.NewRandom().String()
 
+	selfClientConfig, err := s.NewSelfClientConfig(privilegedLoopbackToken)
+	if err != nil {
+		glog.Fatalf("Failed to create clientset: %v", err)
+	}
 	client, err := s.NewSelfClient(privilegedLoopbackToken)
 	if err != nil {
 		glog.Errorf("Failed to create clientset: %v", err)
@@ -204,6 +208,7 @@ func Run(s *options.ServerRunOptions) error {
 	}
 	genericConfig := genericapiserver.NewConfig(s.ServerRunOptions)
 	// TODO: Move the following to generic api server as well.
+	genericConfig.LoopbackClientConfig = selfClientConfig
 	genericConfig.Authenticator = apiAuthenticator
 	genericConfig.SupportsBasicAuth = len(s.BasicAuthFile) > 0
 	genericConfig.Authorizer = apiAuthorizer
