@@ -263,7 +263,14 @@ func getListenersByLoadBalancerID(client *gophercloud.ServiceClient, id string) 
 		if err != nil {
 			return false, err
 		}
-		existingListeners = append(existingListeners, listenerList...)
+		for _, l := range listenerList {
+			for _, lb := range l.Loadbalancers {
+				if lb.ID == id {
+					existingListeners = append(existingListeners, l)
+					break
+				}
+			}
+		}
 
 		return true, nil
 	})
@@ -530,8 +537,16 @@ func (lbaas *LbaasV2) createLoadBalancer(service *api.Service, name string) (*lo
 	if err != nil {
 		return nil, fmt.Errorf("Error creating loadbalancer %v: %v", createOpts, err)
 	}
-
 	return loadbalancer, nil
+}
+
+func stringInArray(x string, list []string) bool {
+	for _, y := range list {
+		if y == x {
+			return true
+		}
+	}
+	return false
 }
 
 func (lbaas *LbaasV2) GetLoadBalancer(clusterName string, service *api.Service) (*api.LoadBalancerStatus, bool, error) {
@@ -954,8 +969,15 @@ func (lbaas *LbaasV2) UpdateLoadBalancer(clusterName string, service *api.Servic
 			return false, err
 		}
 		for _, l := range listenersList {
-			key := portKey{Protocol: l.Protocol, Port: l.ProtocolPort}
-			lbListeners[key] = l
+			for _, lb := range l.Loadbalancers {
+				// Double check this Listener belongs to the LB we're updating. Neutron's API filtering
+				// can't be counted on in older releases (i.e Liberty).
+				if loadbalancer.ID == lb.ID {
+					key := portKey{Protocol: l.Protocol, Port: l.ProtocolPort}
+					lbListeners[key] = l
+					break
+				}
+			}
 		}
 		return true, nil
 	})
@@ -972,7 +994,14 @@ func (lbaas *LbaasV2) UpdateLoadBalancer(clusterName string, service *api.Servic
 		}
 		for _, p := range poolsList {
 			for _, l := range p.Listeners {
-				lbPools[l.ID] = p
+				// Double check this Pool belongs to the LB we're deleting. Neutron's API filtering
+				// can't be counted on in older releases (i.e Liberty).
+				for _, val := range lbListeners {
+					if val.ID == l.ID {
+						lbPools[l.ID] = p
+						break
+					}
+				}
 			}
 		}
 		return true, nil
