@@ -530,10 +530,10 @@ function start-kubelet {
     flags+=" --eviction-hard=${EVICTION_HARD}"
   fi
   if [[ "${ALLOCATE_NODE_CIDRS:-}" == "true" ]]; then
-     flags+=" --configure-cbr0=${ALLOCATE_NODE_CIDRS}"
+    flags+=" --configure-cbr0=${ALLOCATE_NODE_CIDRS}"
   fi
   if [[ -n "${FEATURE_GATES:-}" ]]; then
-     flags+=" --feature-gates=${FEATURE_GATES}"
+    flags+=" --feature-gates=${FEATURE_GATES}"
   fi
 
   local -r kubelet_env_file="/etc/default/kubelet"
