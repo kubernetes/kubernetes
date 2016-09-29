@@ -104,7 +104,7 @@ func TestGetAPIRequestInfo(t *testing.T) {
 	for _, successCase := range successCases {
 		req, _ := http.NewRequest(successCase.method, successCase.url, nil)
 
-		apiRequestInfo, err := resolver.GetRequestInfo(req)
+		apiRequestInfo, err := resolver.NewRequestInfo(req)
 		if err != nil {
 			t.Errorf("Unexpected error for url: %s %v", successCase.url, err)
 		}
@@ -147,7 +147,7 @@ func TestGetAPIRequestInfo(t *testing.T) {
 		if err != nil {
 			t.Errorf("Unexpected error %v", err)
 		}
-		apiRequestInfo, err := resolver.GetRequestInfo(req)
+		apiRequestInfo, err := resolver.NewRequestInfo(req)
 		if err != nil {
 			t.Errorf("%s: Unexpected error %v", k, err)
 		}
@@ -183,7 +183,7 @@ func TestGetNonAPIRequestInfo(t *testing.T) {
 	for testName, tc := range tests {
 		req, _ := http.NewRequest("GET", tc.url, nil)
 
-		apiRequestInfo, err := resolver.GetRequestInfo(req)
+		apiRequestInfo, err := resolver.NewRequestInfo(req)
 		if err != nil {
 			t.Errorf("%s: Unexpected error %v", testName, err)
 		}
@@ -193,8 +193,8 @@ func TestGetNonAPIRequestInfo(t *testing.T) {
 	}
 }
 
-func newTestRequestInfoResolver() *RequestInfoResolver {
-	return &RequestInfoResolver{
+func newTestRequestInfoResolver() *RequestInfoFactory {
+	return &RequestInfoFactory{
 		APIPrefixes:          sets.NewString("api", "apis"),
 		GrouplessAPIPrefixes: sets.NewString("api"),
 	}
