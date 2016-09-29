@@ -15,3 +15,6 @@
 
  ## Version 1.7 (Wed August 24 2016 Zihong Zheng <zihongz@google.com>)
  - Add support for ExternalName services (pr #31159)
+
+ ## Version 1.8 (Thu September 29 2016 Zihong Zheng <zihongz@google.com>)
+ - Add support for graceful termination (issue #31807)
