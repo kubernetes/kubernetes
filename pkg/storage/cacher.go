@@ -277,8 +277,21 @@ func (c *Cacher) Delete(ctx context.Context, key string, out runtime.Object, pre
 	return c.storage.Delete(ctx, key, out, preconditions)
 }
 
+func optimizeToSingleKey(ctx context.Context, pred SelectionPredicate, getKey KeyFunc) (string, bool) {
+	name, ok := pred.MatchesSingle()
+	if !ok {
+		return "", false
+	}
+	k, err := getKey(ctx, name)
+	if err != nil {
+		// if we cannot extract a key based on the current context, the optimization is skipped
+		return "", false
+	}
+	return k, true
+}
+
 // Implements storage.Interface.
-func (c *Cacher) Watch(ctx context.Context, key string, resourceVersion string, pred SelectionPredicate) (watch.Interface, error) {
+func (c *Cacher) Watch(ctx context.Context, key string, resourceVersion string, pred SelectionPredicate, getKey KeyFunc) (watch.Interface, error) {
 	watchRV, err := ParseWatchResourceVersion(resourceVersion)
 	if err != nil {
 		return nil, err
@@ -308,6 +321,9 @@ func (c *Cacher) Watch(ctx context.Context, key string, resourceVersion string, 
 	if matchValues := pred.MatcherIndex(); len(matchValues) > 0 {
 		triggerValue, triggerSupported = matchValues[0].Value, true
 	}
+	if k, ok := optimizeToSingleKey(ctx, pred, getKey); ok {
+		key = k
+	}
 
 	c.Lock()
 	defer c.Unlock()
@@ -317,11 +333,6 @@ func (c *Cacher) Watch(ctx context.Context, key string, resourceVersion string, 
 	c.watchers.addWatcher(watcher, c.watcherIdx, triggerValue, triggerSupported)
 	c.watcherIdx++
 	return watcher, nil
-}
-
-// Implements storage.Interface.
-func (c *Cacher) WatchList(ctx context.Context, key string, resourceVersion string, pred SelectionPredicate) (watch.Interface, error) {
-	return c.Watch(ctx, key, resourceVersion, pred)
 }
 
 // Implements storage.Interface.
@@ -556,7 +567,7 @@ func (lw *cacherListerWatcher) List(options api.ListOptions) (runtime.Object, er
 
 // Implements cache.ListerWatcher interface.
 func (lw *cacherListerWatcher) Watch(options api.ListOptions) (watch.Interface, error) {
-	return lw.storage.WatchList(context.TODO(), lw.resourcePrefix, options.ResourceVersion, Everything)
+	return lw.storage.Watch(context.TODO(), lw.resourcePrefix, options.ResourceVersion, Everything, nil)
 }
 
 // cacherWatch implements watch.Interface to return a single error

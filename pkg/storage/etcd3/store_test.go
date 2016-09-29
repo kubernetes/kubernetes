@@ -86,7 +86,7 @@ func TestCreateWithTTL(t *testing.T) {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	w, err := store.Watch(ctx, key, out.ResourceVersion, storage.Everything)
+	w, err := store.Watch(ctx, "/", out.ResourceVersion, storage.Everything, nil)
 	if err != nil {
 		t.Fatalf("Watch failed: %v", err)
 	}
@@ -394,7 +394,7 @@ func TestGuaranteedUpdateWithTTL(t *testing.T) {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	w, err := store.Watch(ctx, key, out.ResourceVersion, storage.Everything)
+	w, err := store.Watch(ctx, "/", out.ResourceVersion, storage.Everything, nil)
 	if err != nil {
 		t.Fatalf("Watch failed: %v", err)
 	}

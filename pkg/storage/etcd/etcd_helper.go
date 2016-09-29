@@ -202,22 +202,7 @@ func (h *etcdHelper) Delete(ctx context.Context, key string, out runtime.Object,
 }
 
 // Implements storage.Interface.
-func (h *etcdHelper) Watch(ctx context.Context, key string, resourceVersion string, pred storage.SelectionPredicate) (watch.Interface, error) {
-	if ctx == nil {
-		glog.Errorf("Context is nil")
-	}
-	watchRV, err := storage.ParseWatchResourceVersion(resourceVersion)
-	if err != nil {
-		return nil, err
-	}
-	key = h.prefixEtcdKey(key)
-	w := newEtcdWatcher(false, h.quorum, nil, storage.SimpleFilter(pred), h.codec, h.versioner, nil, h)
-	go w.etcdWatch(ctx, h.etcdKeysAPI, key, watchRV)
-	return w, nil
-}
-
-// Implements storage.Interface.
-func (h *etcdHelper) WatchList(ctx context.Context, key string, resourceVersion string, pred storage.SelectionPredicate) (watch.Interface, error) {
+func (h *etcdHelper) Watch(ctx context.Context, key string, resourceVersion string, pred storage.SelectionPredicate, _ storage.KeyFunc) (watch.Interface, error) {
 	if ctx == nil {
 		glog.Errorf("Context is nil")
 	}

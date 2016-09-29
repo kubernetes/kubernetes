@@ -871,24 +871,7 @@ func (e *Store) Watch(ctx api.Context, options *api.ListOptions) (watch.Interfac
 
 // WatchPredicate starts a watch for the items that m matches.
 func (e *Store) WatchPredicate(ctx api.Context, p storage.SelectionPredicate, resourceVersion string) (watch.Interface, error) {
-	if name, ok := p.MatchesSingle(); ok {
-		if key, err := e.KeyFunc(ctx, name); err == nil {
-			if err != nil {
-				return nil, err
-			}
-			w, err := e.Storage.Watch(ctx, key, resourceVersion, p)
-			if err != nil {
-				return nil, err
-			}
-			if e.Decorator != nil {
-				return newDecoratedWatcher(w, e.Decorator), nil
-			}
-			return w, nil
-		}
-		// if we cannot extract a key based on the current context, the optimization is skipped
-	}
-
-	w, err := e.Storage.WatchList(ctx, e.KeyRootFunc(ctx), resourceVersion, p)
+	w, err := e.Storage.Watch(ctx, e.KeyRootFunc(ctx), resourceVersion, p, e.KeyFunc)
 	if err != nil {
 		return nil, err
 	}
