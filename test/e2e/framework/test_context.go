@@ -159,7 +159,7 @@ func RegisterCommonFlags() {
 	flag.StringVar(&TestContext.ReportDir, "report-dir", "", "Path to the directory where the JUnit XML reports should be saved. Default is empty, which doesn't generate these reports.")
 	flag.StringVar(&TestContext.FeatureGates, "feature-gates", "", "A set of key=value pairs that describe feature gates for alpha/experimental features.")
 	flag.StringVar(&TestContext.Viper, "viper-config", "e2e", "The name of the viper config i.e. 'e2e' will read values from 'e2e.json' locally.  All e2e parameters are meant to be configurable by viper.")
-	flag.Var(csv(TestContext.Capabilities), "capabilities", "Comma-separated list of capabilities supported by the testing environment, such as 'AppArmor,Seccomp'")
+	flag.Var((*csv)(&TestContext.Capabilities), "capabilities", "Comma-separated list of capabilities supported by the testing environment, such as 'AppArmor,Seccomp'")
 }
 
 // Register flags specific to the cluster e2e test suite.
@@ -252,11 +252,11 @@ func ViperizeFlags() {
 // Helper for parsing comma separated values into a string set
 type csv sets.String
 
-func (v csv) Set(value string) error {
-	sets.String(v).Insert(strings.Split(value, ",")...)
+func (v *csv) Set(value string) error {
+	*v = csv(sets.NewString(strings.Split(value, ",")...))
 	return nil
 }
 
-func (v csv) String() string {
-	return strings.Join(sets.String(v).List(), ",")
+func (v *csv) String() string {
+	return strings.Join(sets.String(*v).List(), ",")
 }
