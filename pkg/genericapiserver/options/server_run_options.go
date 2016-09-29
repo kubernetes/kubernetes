@@ -71,6 +71,7 @@ type ServerRunOptions struct {
 	AuthorizationWebhookCacheUnauthorizedTTL time.Duration
 	AuthorizationRBACSuperUser               string
 
+	AnonymousAuth             bool
 	BasicAuthFile             string
 	BindAddress               net.IP
 	CertDirectory             string
@@ -127,6 +128,7 @@ func NewServerRunOptions() *ServerRunOptions {
 		APIGroupPrefix:                           "/apis",
 		APIPrefix:                                "/api",
 		AdmissionControl:                         "AlwaysAdmit",
+		AnonymousAuth:                            true,
 		AuthorizationMode:                        "AlwaysAllow",
 		AuthorizationWebhookCacheAuthorizedTTL:   5 * time.Minute,
 		AuthorizationWebhookCacheUnauthorizedTTL: 30 * time.Second,
@@ -268,6 +270,11 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.AuthorizationRBACSuperUser, "authorization-rbac-super-user", s.AuthorizationRBACSuperUser, ""+
 		"If specified, a username which avoids RBAC authorization checks and role binding "+
 		"privilege escalation checks, to be used with --authorization-mode=RBAC.")
+
+	fs.BoolVar(&s.AnonymousAuth, "anonymous-auth", s.AnonymousAuth, ""+
+		"Enables anonymous requests to the secure port of the API server. "+
+		"Requests that are not rejected by another authentication method are treated as anonymous requests. "+
+		"Anonymous requests have a username of system:anonymous, and a group name of system:unauthenticated.")
 
 	fs.StringVar(&s.BasicAuthFile, "basic-auth-file", s.BasicAuthFile, ""+
 		"If set, the file that will be used to admit requests to the secure port of the API server "+
