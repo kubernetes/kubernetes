@@ -93,6 +93,11 @@ type groupResourceOverrides struct {
 	// of exposing one set of concepts.  autoscaling.HPA and extensions.HPA as a for instance
 	// The order of the slice matters!  It is the priority order of lookup for finding a storage location
 	cohabitatingResources []unversioned.GroupResource
+
+	// ignoreCohabitatingStorageVersion controls whether or not a cohabitating resource attempts to serialize into the same
+	// groupVersion as all other cohabitators.  If not, it uses the groupVersion assigned to itself instead of the one being
+	// used by the first enabled cohabitator.
+	ignoreCohabitatingStorageVersion bool
 }
 
 var _ StorageFactory = &DefaultStorageFactory{}
@@ -146,6 +151,16 @@ func (s *DefaultStorageFactory) AddCohabitatingResources(groupResources ...unver
 	for _, groupResource := range groupResources {
 		overrides := s.Overrides[groupResource]
 		overrides.cohabitatingResources = groupResources
+		s.Overrides[groupResource] = overrides
+	}
+}
+
+// IgnoreCohabitingStorageVersion indicates that the cohabitating resource should serialize using its own groupVersion, not the "shared" groupVersion
+// of all cohabitators.  Useful during resource migration/parity cases
+func (s *DefaultStorageFactory) IgnoreCohabitingStorageVersion(groupResources ...unversioned.GroupResource) {
+	for _, groupResource := range groupResources {
+		overrides := s.Overrides[groupResource]
+		overrides.ignoreCohabitatingStorageVersion = true
 		s.Overrides[groupResource] = overrides
 	}
 }
@@ -210,7 +225,12 @@ func (s *DefaultStorageFactory) NewConfig(groupResource unversioned.GroupResourc
 		config.ServerList = overriddenEtcdLocations
 	}
 
-	storageEncodingVersion, err := s.ResourceEncodingConfig.StorageEncodingFor(chosenStorageResource)
+	storageEncodingResource := chosenStorageResource
+	if s.Overrides[groupResource].ignoreCohabitatingStorageVersion {
+		storageEncodingResource = groupResource
+	}
+
+	storageEncodingVersion, err := s.ResourceEncodingConfig.StorageEncodingFor(storageEncodingResource)
 	if err != nil {
 		return nil, err
 	}
