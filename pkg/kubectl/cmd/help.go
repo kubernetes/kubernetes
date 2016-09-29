@@ -25,8 +25,26 @@ import (
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
-const help_long = `Help provides help for any command in the application.
-Simply type kubectl help [path to command] for full details.`
+const (
+	help_long = `Help provides help for any command in the application.
+Simply type kubectl help [path to command] for full details.
+
+# Show usage of kubectl
+kubectl help
+
+# Show a list of global flags
+kubectl help global-flags
+# or
+kubectl help gf
+
+# Show help for help command. Yes, you can do it.
+kubectl help help
+`
+
+	help_long_for_global_flags = `Global flags are top-level flags that affect all commands.
+
+List of global flags:`
+)
 
 func NewCmdHelp(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
@@ -43,12 +61,16 @@ func NewCmdHelp(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 func RunHelp(cmd *cobra.Command, args []string) {
 	foundCmd, _, err := cmd.Root().Find(args)
 
-	// NOTE(andreykurilin): actually, I did not find any cases when foundCmd can be nil,
+	// NOTE(andreykurilin): actually, I did not find any cases when foundCmd can be nil
+	//   (in case of unexisting command search, Find method returns `kubectl` command handler),
 	//   but let's make this check since it is included in original code of initHelpCmd
 	//   from github.com/spf13/cobra
 	if foundCmd == nil {
 		cmd.Printf("Unknown help topic %#q.\n", args)
 		cmd.Root().Usage()
+	} else if len(args) >= 1 && (args[0] == "gf" || args[0] == "global-flags") {
+		cmd.Println(help_long_for_global_flags)
+		cmd.Println(foundCmd.Flags().FlagUsages())
 	} else if err != nil {
 		// print error message at first, since it can contain suggestions
 		cmd.Println(err)
