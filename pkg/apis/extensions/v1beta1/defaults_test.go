@@ -767,16 +767,16 @@ func TestDefaultRequestIsNotSetForReplicaSet(t *testing.T) {
 
 func TestSetDefaultHorizontalPodAutoscalerMinReplicas(t *testing.T) {
 	tests := []struct {
-		hpa             HorizontalPodAutoscaler
+		hpa            HorizontalPodAutoscaler
 		expectReplicas int32
 	}{
 		{
-			hpa: HorizontalPodAutoscaler{},
+			hpa:            HorizontalPodAutoscaler{},
 			expectReplicas: 1,
 		},
 		{
 			hpa: HorizontalPodAutoscaler{
-				Spec: HorizontalPodAutoscalerSpec {
+				Spec: HorizontalPodAutoscalerSpec{
 					MinReplicas: newInt32(3),
 				},
 			},
@@ -802,17 +802,17 @@ func TestSetDefaultHorizontalPodAutoscalerMinReplicas(t *testing.T) {
 
 func TestSetDefaultHorizontalPodAutoscalerCpuUtilization(t *testing.T) {
 	tests := []struct {
-		hpa             HorizontalPodAutoscaler
+		hpa               HorizontalPodAutoscaler
 		expectUtilization int32
 	}{
 		{
-			hpa: HorizontalPodAutoscaler{},
+			hpa:               HorizontalPodAutoscaler{},
 			expectUtilization: 80,
 		},
 		{
 			hpa: HorizontalPodAutoscaler{
-				Spec: HorizontalPodAutoscalerSpec {
-					CPUUtilization: &CPUTargetUtilization {
+				Spec: HorizontalPodAutoscalerSpec{
+					CPUUtilization: &CPUTargetUtilization{
 						TargetPercentage: int32(50),
 					},
 				},
