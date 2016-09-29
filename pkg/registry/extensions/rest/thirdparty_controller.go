@@ -51,7 +51,7 @@ type ThirdPartyController struct {
 	thirdPartyResourceRegistry *thirdpartyresourceetcd.REST
 }
 
-// Synchronize a single resource with RESTful resources on the master
+// SyncOneResource synchronizes a single resource with RESTful resources on the master
 func (t *ThirdPartyController) SyncOneResource(rsrc *extensions.ThirdPartyResource) error {
 	// TODO: we also need to test if the existing installed resource matches the resource we are sync-ing.
 	// Currently, if there is an older, incompatible resource installed, we won't remove it.  We should detect
