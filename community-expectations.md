@@ -45,7 +45,7 @@ contributors are considered to be anyone who meets any of the following criteria
    * Commented on more than pull requests in the previous month, or
    more than 50 pull requests in the previous 12 months.
    * Marked any PR as LGTM in the previous month.
-   * Have *contributor* permissions in the Kubernetes github project.
+   * Have *collaborator* permissions in the Kubernetes github project.
 
 In addition to these community expectations, any community member who wants to
 be an active reviewer can also add their name to an *active reviewer* file
