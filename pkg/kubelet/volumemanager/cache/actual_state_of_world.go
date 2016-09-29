@@ -367,6 +367,10 @@ func (asw *actualStateOfWorld) addVolume(
 			devicePath:         devicePath,
 		}
 		asw.attachedVolumes[volumeName] = volumeObj
+	} else {
+		// If volume object already exists, update the fields such as device path
+		volumeObj.devicePath = devicePath
+		volumeObj.spec = volumeSpec
 	}
 
 	return nil

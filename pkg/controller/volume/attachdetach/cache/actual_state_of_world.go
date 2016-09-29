@@ -279,8 +279,13 @@ func (asw *actualStateOfWorld) AddVolumeNode(
 			nodesAttachedTo: make(map[types.NodeName]nodeAttachedTo),
 			devicePath:      devicePath,
 		}
-		asw.attachedVolumes[volumeName] = volumeObj
+	} else {
+		// If volume object already exists, it indicates that the information would be out of date.
+		// Update the fields for volume object except the nodes attached to the volumes.
+		volumeObj.devicePath = devicePath
+		volumeObj.spec = volumeSpec
 	}
+	asw.attachedVolumes[volumeName] = volumeObj
 
 	_, nodeExists := volumeObj.nodesAttachedTo[nodeName]
 	if !nodeExists {
@@ -323,7 +328,7 @@ func (asw *actualStateOfWorld) SetVolumeMountedByNode(
 
 	nodeObj.mountedByNode = mounted
 	volumeObj.nodesAttachedTo[nodeName] = nodeObj
-	glog.V(4).Infof("SetVolumeMountedByNode volume %v to the node %q mounted %q",
+	glog.V(4).Infof("SetVolumeMountedByNode volume %v to the node %q mounted %t",
 		volumeName,
 		nodeName,
 		mounted)
@@ -569,6 +574,7 @@ func getAttachedVolume(
 			VolumeName:         attachedVolume.volumeName,
 			VolumeSpec:         attachedVolume.spec,
 			NodeName:           nodeAttachedTo.nodeName,
+			DevicePath:         attachedVolume.devicePath,
 			PluginIsAttachable: true,
 		},
 		MountedByNode:       nodeAttachedTo.mountedByNode,
