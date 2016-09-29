@@ -48,7 +48,7 @@ func mustSetupScheduler() (schedulerConfigFactory *factory.ConfigFactory, destro
 
 	var m *master.Master
 	masterConfig := framework.NewIntegrationTestMasterConfig()
-	m, err := master.New(masterConfig)
+	m, err := masterConfig.Complete().New()
 	if err != nil {
 		panic("error in brining up the master: " + err.Error())
 	}

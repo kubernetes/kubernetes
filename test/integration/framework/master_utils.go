@@ -134,22 +134,22 @@ func startMasterOrDie(masterConfig *master.Config) (*master.Master, *httptest.Se
 
 	if masterConfig == nil {
 		masterConfig = NewMasterConfig()
-		masterConfig.EnableProfiling = true
-		masterConfig.EnableSwaggerSupport = true
-		masterConfig.EnableOpenAPISupport = true
-		masterConfig.OpenAPIInfo = spec.Info{
+		masterConfig.GenericConfig.EnableProfiling = true
+		masterConfig.GenericConfig.EnableSwaggerSupport = true
+		masterConfig.GenericConfig.EnableOpenAPISupport = true
+		masterConfig.GenericConfig.OpenAPIInfo = spec.Info{
 			InfoProps: spec.InfoProps{
 				Title:   "Kubernetes",
 				Version: "unversioned",
 			},
 		}
-		masterConfig.OpenAPIDefaultResponse = spec.Response{
+		masterConfig.GenericConfig.OpenAPIDefaultResponse = spec.Response{
 			ResponseProps: spec.ResponseProps{
 				Description: "Default Response.",
 			},
 		}
 	}
-	m, err := master.New(masterConfig)
+	m, err := masterConfig.Complete().New()
 	if err != nil {
 		glog.Fatalf("error in bringing up the master: %v", err)
 	}
@@ -221,7 +221,7 @@ func NewMasterConfig() *master.Config {
 		NewSingleContentTypeSerializer(api.Scheme, testapi.Storage.Codec(), runtime.ContentTypeJSON))
 
 	return &master.Config{
-		Config: &genericapiserver.Config{
+		GenericConfig: &genericapiserver.Config{
 			APIResourceConfigSource: master.DefaultAPIResourceConfigSource(),
 			APIPrefix:               "/api",
 			APIGroupPrefix:          "/apis",
@@ -245,10 +245,10 @@ func NewMasterConfig() *master.Config {
 func NewIntegrationTestMasterConfig() *master.Config {
 	masterConfig := NewMasterConfig()
 	masterConfig.EnableCoreControllers = true
-	masterConfig.EnableIndex = true
-	masterConfig.EnableVersion = true
-	masterConfig.PublicAddress = net.ParseIP("192.168.10.4")
-	masterConfig.APIResourceConfigSource = master.DefaultAPIResourceConfigSource()
+	masterConfig.GenericConfig.EnableIndex = true
+	masterConfig.GenericConfig.EnableVersion = true
+	masterConfig.GenericConfig.PublicAddress = net.ParseIP("192.168.10.4")
+	masterConfig.GenericConfig.APIResourceConfigSource = master.DefaultAPIResourceConfigSource()
 	return masterConfig
 }
 
@@ -332,7 +332,7 @@ func ScaleRC(name, ns string, replicas int32, clientset clientset.Interface) (*a
 func RunAMaster(masterConfig *master.Config) (*master.Master, *httptest.Server) {
 	if masterConfig == nil {
 		masterConfig = NewMasterConfig()
-		masterConfig.EnableProfiling = true
+		masterConfig.GenericConfig.EnableProfiling = true
 	}
 	return startMasterOrDie(masterConfig)
 }

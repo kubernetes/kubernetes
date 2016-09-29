@@ -83,7 +83,7 @@ func setUp(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.
 		GenericAPIServer: &genericapiserver.GenericAPIServer{},
 	}
 	config := Config{
-		Config: &genericapiserver.Config{},
+		GenericConfig: &genericapiserver.Config{},
 	}
 
 	resourceEncoding := genericapiserver.NewDefaultResourceEncodingConfig()
@@ -97,17 +97,17 @@ func setUp(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.
 	storageFactory := genericapiserver.NewDefaultStorageFactory(*storageConfig, testapi.StorageMediaType(), api.Codecs, resourceEncoding, DefaultAPIResourceConfigSource())
 
 	config.StorageFactory = storageFactory
-	config.APIResourceConfigSource = DefaultAPIResourceConfigSource()
-	config.PublicAddress = net.ParseIP("192.168.10.4")
-	config.Serializer = api.Codecs
+	config.GenericConfig.APIResourceConfigSource = DefaultAPIResourceConfigSource()
+	config.GenericConfig.PublicAddress = net.ParseIP("192.168.10.4")
+	config.GenericConfig.Serializer = api.Codecs
 	config.KubeletClient = client.FakeKubeletClient{}
-	config.APIPrefix = "/api"
-	config.APIGroupPrefix = "/apis"
-	config.APIResourceConfigSource = DefaultAPIResourceConfigSource()
-	config.ProxyDialer = func(network, addr string) (net.Conn, error) { return nil, nil }
-	config.ProxyTLSClientConfig = &tls.Config{}
-	config.RequestContextMapper = api.NewRequestContextMapper()
-	config.Config.EnableVersion = true
+	config.GenericConfig.APIPrefix = "/api"
+	config.GenericConfig.APIGroupPrefix = "/apis"
+	config.GenericConfig.APIResourceConfigSource = DefaultAPIResourceConfigSource()
+	config.GenericConfig.ProxyDialer = func(network, addr string) (net.Conn, error) { return nil, nil }
+	config.GenericConfig.ProxyTLSClientConfig = &tls.Config{}
+	config.GenericConfig.RequestContextMapper = api.NewRequestContextMapper()
+	config.GenericConfig.EnableVersion = true
 
 	// TODO: this is kind of hacky.  The trouble is that the sync loop
 	// runs in a go-routine and there is no way to validate in the test
@@ -125,7 +125,7 @@ func setUp(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.
 func newMaster(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.Assertions) {
 	_, etcdserver, config, assert := setUp(t)
 
-	master, err := New(&config)
+	master, err := config.Complete().New()
 	if err != nil {
 		t.Fatalf("Error in bringing up the master: %v", err)
 	}
@@ -150,8 +150,8 @@ func limitedAPIResourceConfigSource() *genericapiserver.ResourceConfig {
 // newLimitedMaster only enables the core group, the extensions group, the batch group, and the autoscaling group.
 func newLimitedMaster(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.Assertions) {
 	_, etcdserver, config, assert := setUp(t)
-	config.APIResourceConfigSource = limitedAPIResourceConfigSource()
-	master, err := New(&config)
+	config.GenericConfig.APIResourceConfigSource = limitedAPIResourceConfigSource()
+	master, err := config.Complete().New()
 	if err != nil {
 		t.Fatalf("Error in bringing up the master: %v", err)
 	}
@@ -168,8 +168,8 @@ func TestNew(t *testing.T) {
 	// Verify many of the variables match their config counterparts
 	assert.Equal(master.enableCoreControllers, config.EnableCoreControllers)
 	assert.Equal(master.tunneler, config.Tunneler)
-	assert.Equal(master.RequestContextMapper(), config.RequestContextMapper)
-	assert.Equal(master.ClusterIP, config.PublicAddress)
+	assert.Equal(master.RequestContextMapper(), config.GenericConfig.RequestContextMapper)
+	assert.Equal(master.ClusterIP, config.GenericConfig.PublicAddress)
 
 	// these values get defaulted
 	_, serviceClusterIPRange, _ := net.ParseCIDR("10.0.0.0/24")
@@ -181,10 +181,10 @@ func TestNew(t *testing.T) {
 	// These functions should point to the same memory location
 	masterDialer, _ := utilnet.Dialer(master.ProxyTransport)
 	masterDialerFunc := fmt.Sprintf("%p", masterDialer)
-	configDialerFunc := fmt.Sprintf("%p", config.ProxyDialer)
+	configDialerFunc := fmt.Sprintf("%p", config.GenericConfig.ProxyDialer)
 	assert.Equal(masterDialerFunc, configDialerFunc)
 
-	assert.Equal(master.ProxyTransport.(*http.Transport).TLSClientConfig, config.ProxyTLSClientConfig)
+	assert.Equal(master.ProxyTransport.(*http.Transport).TLSClientConfig, config.GenericConfig.ProxyTLSClientConfig)
 }
 
 // TestNamespaceSubresources ensures the namespace subresource parsing in apiserver/handlers.go doesn't drift
@@ -1253,16 +1253,16 @@ func TestValidOpenAPISpec(t *testing.T) {
 	_, etcdserver, config, assert := setUp(t)
 	defer etcdserver.Terminate(t)
 
-	config.OpenAPIDefinitions = openapi.OpenAPIDefinitions
-	config.EnableOpenAPISupport = true
-	config.EnableIndex = true
-	config.OpenAPIInfo = spec.Info{
+	config.GenericConfig.OpenAPIDefinitions = openapi.OpenAPIDefinitions
+	config.GenericConfig.EnableOpenAPISupport = true
+	config.GenericConfig.EnableIndex = true
+	config.GenericConfig.OpenAPIInfo = spec.Info{
 		InfoProps: spec.InfoProps{
 			Title:   "Kubernetes",
 			Version: "unversioned",
 		},
 	}
-	master, err := New(&config)
+	master, err := config.Complete().New()
 	if err != nil {
 		t.Fatalf("Error in bringing up the master: %v", err)
 	}
