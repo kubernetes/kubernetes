@@ -33,6 +33,7 @@ type PolicyClient struct {
 	*restclient.RESTClient
 }
 
+// PodDisruptionBudgets returns the object of podDisruptionBudgets for the given namespace.
 func (c *PolicyClient) PodDisruptionBudgets(namespace string) PodDisruptionBudgetInterface {
 	return newPodDisruptionBudgets(c, namespace)
 }
