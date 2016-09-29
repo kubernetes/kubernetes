@@ -233,6 +233,10 @@ type AttachedVolume struct {
 	// PluginIsAttachable indicates that the plugin for this volume implements
 	// the volume.Attacher interface
 	PluginIsAttachable bool
+
+	// DevicePath contains the path on the node where the volume is attached.
+	// For non-attachable volumes this is empty.
+	DevicePath string
 }
 
 // MountedVolume represents a volume that has successfully been mounted to a pod.
