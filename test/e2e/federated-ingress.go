@@ -40,7 +40,7 @@ import (
 
 const (
 	MaxRetriesOnFederatedApiserver = 3
-	FederatedIngressTimeout        = 60 * time.Second
+	FederatedIngressTimeout        = 120 * time.Second
 	FederatedIngressName           = "federated-ingress"
 	FederatedIngressServiceName    = "federated-ingress-service"
 	FederatedIngressServicePodName = "federated-ingress-service-test-pod"
@@ -287,10 +287,10 @@ func createIngressOrFail(clientset *federation_release_1_4.Clientset, namespace 
 		},
 	}
 
-	_, err := clientset.Extensions().Ingresses(namespace).Create(ingress)
+	newIng, err := clientset.Extensions().Ingresses(namespace).Create(ingress)
 	framework.ExpectNoError(err, "Creating ingress %q in namespace %q", ingress.Name, namespace)
 	By(fmt.Sprintf("Successfully created federated ingress %q in namespace %q", FederatedIngressName, namespace))
-	return ingress
+	return newIng
 }
 
 func updateIngressOrFail(clientset *federation_release_1_4.Clientset, namespace string) (newIng *v1beta1.Ingress) {
