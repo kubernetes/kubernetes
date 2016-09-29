@@ -171,7 +171,14 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 
 	if len(args) == 0 && cmdutil.IsFilenameEmpty(options.Filenames) {
 		fmt.Fprint(errOut, "You must specify the type of resource to get. ", valid_resources)
-		return cmdutil.UsageError(cmd, "Required resource not specified.")
+
+		fullCmdName := cmd.Parent().CommandPath()
+		usageString := "Required resource not specified."
+		if len(fullCmdName) > 0 && cmdutil.IsSiblingCommandExists(cmd, "explain") {
+			usageString = fmt.Sprintf("%s\nUse \"%s explain <resource>\" for a detailed description of that resource (e.g. %[2]s explain pods).", usageString, fullCmdName)
+		}
+
+		return cmdutil.UsageError(cmd, usageString)
 	}
 
 	// determine if args contains "all"
