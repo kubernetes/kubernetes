@@ -351,6 +351,13 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 		temp := int32(defaultIPTablesDropBit)
 		obj.IPTablesDropBit = &temp
 	}
+	if obj.CgroupDriver == "" {
+		obj.CgroupDriver = "cgroupfs"
+	}
+	if obj.CgroupsPerQOS == nil {
+		temp := false
+		obj.CgroupsPerQOS = &temp
+	}
 }
 
 func boolVar(b bool) *bool {
