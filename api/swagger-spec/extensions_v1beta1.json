@@ -643,7 +643,7 @@
       "type": "v1beta1.DaemonSetList",
       "method": "GET",
       "summary": "list or watch objects of kind DaemonSet",
-      "nickname": "listNamespacedDaemonSet",
+      "nickname": "listDaemonSetForAllNamespaces",
       "parameters": [
        {
         "type": "string",
@@ -714,7 +714,7 @@
       "type": "v1beta1.DaemonSet",
       "method": "POST",
       "summary": "create a DaemonSet",
-      "nickname": "createNamespacedDaemonSet",
+      "nickname": "createDaemonSetForAllNamespaces",
       "parameters": [
        {
         "type": "string",
@@ -759,7 +759,7 @@
       "type": "*versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of DaemonSet",
-      "nickname": "watchNamespacedDaemonSetList",
+      "nickname": "watchDaemonSetListForAllNamespaces",
       "parameters": [
        {
         "type": "string",
@@ -1629,7 +1629,7 @@
       "type": "v1beta1.DeploymentList",
       "method": "GET",
       "summary": "list or watch objects of kind Deployment",
-      "nickname": "listNamespacedDeployment",
+      "nickname": "listDeploymentForAllNamespaces",
       "parameters": [
        {
         "type": "string",
@@ -1700,7 +1700,7 @@
       "type": "v1beta1.Deployment",
       "method": "POST",
       "summary": "create a Deployment",
-      "nickname": "createNamespacedDeployment",
+      "nickname": "createDeploymentForAllNamespaces",
       "parameters": [
        {
         "type": "string",
@@ -1745,7 +1745,7 @@
       "type": "*versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of Deployment",
-      "nickname": "watchNamespacedDeploymentList",
+      "nickname": "watchDeploymentListForAllNamespaces",
       "parameters": [
        {
         "type": "string",
@@ -2841,7 +2841,7 @@
       "type": "v1beta1.HorizontalPodAutoscalerList",
       "method": "GET",
       "summary": "list or watch objects of kind HorizontalPodAutoscaler",
-      "nickname": "listNamespacedHorizontalPodAutoscaler",
+      "nickname": "listHorizontalPodAutoscalerForAllNamespaces",
       "parameters": [
        {
         "type": "string",
@@ -2912,7 +2912,7 @@
       "type": "v1beta1.HorizontalPodAutoscaler",
       "method": "POST",
       "summary": "create a HorizontalPodAutoscaler",
-      "nickname": "createNamespacedHorizontalPodAutoscaler",
+      "nickname": "createHorizontalPodAutoscalerForAllNamespaces",
       "parameters": [
        {
         "type": "string",
@@ -2957,7 +2957,7 @@
       "type": "*versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of HorizontalPodAutoscaler",
-      "nickname": "watchNamespacedHorizontalPodAutoscalerList",
+      "nickname": "watchHorizontalPodAutoscalerListForAllNamespaces",
       "parameters": [
        {
         "type": "string",
@@ -3827,7 +3827,7 @@
       "type": "v1beta1.IngressList",
       "method": "GET",
       "summary": "list or watch objects of kind Ingress",
-      "nickname": "listNamespacedIngress",
+      "nickname": "listIngressForAllNamespaces",
       "parameters": [
        {
         "type": "string",
@@ -3898,7 +3898,7 @@
       "type": "v1beta1.Ingress",
       "method": "POST",
       "summary": "create a Ingress",
-      "nickname": "createNamespacedIngress",
+      "nickname": "createIngressForAllNamespaces",
       "parameters": [
        {
         "type": "string",
@@ -3943,7 +3943,7 @@
       "type": "*versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of Ingress",
-      "nickname": "watchNamespacedIngressList",
+      "nickname": "watchIngressListForAllNamespaces",
       "parameters": [
        {
         "type": "string",
@@ -4813,7 +4813,7 @@
       "type": "v1beta1.JobList",
       "method": "GET",
       "summary": "list or watch objects of kind Job",
-      "nickname": "listNamespacedJob",
+      "nickname": "listJobForAllNamespaces",
       "parameters": [
        {
         "type": "string",
@@ -4884,7 +4884,7 @@
       "type": "v1beta1.Job",
       "method": "POST",
       "summary": "create a Job",
-      "nickname": "createNamespacedJob",
+      "nickname": "createJobForAllNamespaces",
       "parameters": [
        {
         "type": "string",
@@ -4929,7 +4929,7 @@
       "type": "*versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of Job",
-      "nickname": "watchNamespacedJobList",
+      "nickname": "watchJobListForAllNamespaces",
       "parameters": [
        {
         "type": "string",
@@ -5799,7 +5799,7 @@
       "type": "v1beta1.NetworkPolicyList",
       "method": "GET",
       "summary": "list or watch objects of kind NetworkPolicy",
-      "nickname": "listNamespacedNetworkPolicy",
+      "nickname": "listNetworkPolicyForAllNamespaces",
       "parameters": [
        {
         "type": "string",
@@ -5870,7 +5870,7 @@
       "type": "v1beta1.NetworkPolicy",
       "method": "POST",
       "summary": "create a NetworkPolicy",
-      "nickname": "createNamespacedNetworkPolicy",
+      "nickname": "createNetworkPolicyForAllNamespaces",
       "parameters": [
        {
         "type": "string",
@@ -5915,7 +5915,7 @@
       "type": "*versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of NetworkPolicy",
-      "nickname": "watchNamespacedNetworkPolicyList",
+      "nickname": "watchNetworkPolicyListForAllNamespaces",
       "parameters": [
        {
         "type": "string",
@@ -6620,7 +6620,7 @@
       "type": "v1beta1.ReplicaSetList",
       "method": "GET",
       "summary": "list or watch objects of kind ReplicaSet",
-      "nickname": "listNamespacedReplicaSet",
+      "nickname": "listReplicaSetForAllNamespaces",
       "parameters": [
        {
         "type": "string",
@@ -6691,7 +6691,7 @@
       "type": "v1beta1.ReplicaSet",
       "method": "POST",
       "summary": "create a ReplicaSet",
-      "nickname": "createNamespacedReplicaSet",
+      "nickname": "createReplicaSetForAllNamespaces",
       "parameters": [
        {
         "type": "string",
@@ -6736,7 +6736,7 @@
       "type": "*versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of ReplicaSet",
-      "nickname": "watchNamespacedReplicaSetList",
+      "nickname": "watchReplicaSetListForAllNamespaces",
       "parameters": [
        {
         "type": "string",

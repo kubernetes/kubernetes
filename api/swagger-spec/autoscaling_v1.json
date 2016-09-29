@@ -643,7 +643,7 @@
       "type": "v1.HorizontalPodAutoscalerList",
       "method": "GET",
       "summary": "list or watch objects of kind HorizontalPodAutoscaler",
-      "nickname": "listNamespacedHorizontalPodAutoscaler",
+      "nickname": "listHorizontalPodAutoscalerForAllNamespaces",
       "parameters": [
        {
         "type": "string",
@@ -714,7 +714,7 @@
       "type": "v1.HorizontalPodAutoscaler",
       "method": "POST",
       "summary": "create a HorizontalPodAutoscaler",
-      "nickname": "createNamespacedHorizontalPodAutoscaler",
+      "nickname": "createHorizontalPodAutoscalerForAllNamespaces",
       "parameters": [
        {
         "type": "string",
@@ -759,7 +759,7 @@
       "type": "*versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of HorizontalPodAutoscaler",
-      "nickname": "watchNamespacedHorizontalPodAutoscalerList",
+      "nickname": "watchHorizontalPodAutoscalerListForAllNamespaces",
       "parameters": [
        {
         "type": "string",
