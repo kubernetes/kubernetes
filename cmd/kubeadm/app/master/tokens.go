@@ -28,14 +28,14 @@ import (
 	"k8s.io/kubernetes/pkg/util/uuid"
 )
 
-func generateTokenIfNeeded(s *kubeadmapi.KubeadmConfig) error {
-	ok, err := kubeadmutil.UseGivenTokenIfValid(s)
+func generateTokenIfNeeded(s *kubeadmapi.MasterConfiguration) error {
+	ok, err := kubeadmutil.UseGivenTokenIfValid(s.Secrets)
 	// TODO(phase1+) @krousey: I know it won't happen with the way it is currently implemented, but this doesn't handle case where ok is true and err is non-nil.
 	if !ok {
 		if err != nil {
 			return err
 		}
-		err = kubeadmutil.GenerateToken(s)
+		err = kubeadmutil.GenerateToken(s.Secrets)
 		if err != nil {
 			return err
 		}
@@ -47,13 +47,13 @@ func generateTokenIfNeeded(s *kubeadmapi.KubeadmConfig) error {
 	return nil
 }
 
-func CreateTokenAuthFile(s *kubeadmapi.KubeadmConfig) error {
-	tokenAuthFilePath := path.Join(s.EnvParams["host_pki_path"], "tokens.csv")
+func CreateTokenAuthFile(s *kubeadmapi.MasterConfiguration) error {
+	tokenAuthFilePath := path.Join(kubeadmapi.GetEnvParams()["host_pki_path"], "tokens.csv")
 	if err := generateTokenIfNeeded(s); err != nil {
 		return fmt.Errorf("<master/tokens> failed to generate token(s) [%v]", err)
 	}
-	if err := os.MkdirAll(s.EnvParams["host_pki_path"], 0700); err != nil {
-		return fmt.Errorf("<master/tokens> failed to create directory %q [%v]", s.EnvParams["host_pki_path"], err)
+	if err := os.MkdirAll(kubeadmapi.GetEnvParams()["host_pki_path"], 0700); err != nil {
+		return fmt.Errorf("<master/tokens> failed to create directory %q [%v]", kubeadmapi.GetEnvParams()["host_pki_path"], err)
 	}
 	serialized := []byte(fmt.Sprintf("%s,kubeadm-node-csr,%s,system:kubelet-bootstrap\n", s.Secrets.BearerToken, uuid.NewUUID()))
 	// DumpReaderToFile create a file with mode 0600

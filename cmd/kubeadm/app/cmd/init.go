@@ -19,8 +19,6 @@ package cmd
 import (
 	"fmt"
 	"io"
-	"net"
-	"strings"
 
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
@@ -43,7 +41,8 @@ var (
 )
 
 // NewCmdInit returns "kubeadm init" command.
-func NewCmdInit(out io.Writer, s *kubeadmapi.KubeadmConfig) *cobra.Command {
+func NewCmdInit(out io.Writer) *cobra.Command {
+	s := &kubeadmapi.MasterConfiguration{}
 	advertiseAddrs := &[]string{} // TODO(pahse1+) make it work somehow else, custom flag or whatever
 	cmd := &cobra.Command{
 		Use:   "init",
@@ -63,54 +62,32 @@ func NewCmdInit(out io.Writer, s *kubeadmapi.KubeadmConfig) *cobra.Command {
 		"The IP addresses to advertise, in case autodetection fails",
 	)
 	cmd.PersistentFlags().StringSliceVar(
-		&s.InitFlags.API.ExternalDNSNames, "api-external-dns-names", []string{},
+		&s.API.ExternalDNSNames, "api-external-dns-names", []string{},
 		"The DNS names to advertise, in case you have configured them yourself",
 	)
-	cmd.PersistentFlags().IPNetVar(
-		&s.InitFlags.Services.CIDR, "service-cidr", *kubeadmapi.DefaultServicesCIDR,
+	cmd.PersistentFlags().StringVar(
+		&s.Networking.ServiceSubnet, "service-cidr", "", //*kubeadmapi.DefaultServicesCIDR,
 		`Use alterantive range of IP address for service VIPs, defaults to `+
-			kubeadmapi.DefaultServicesCIDRString,
+			"", //kubeadmapi.DefaultServicesCIDRString,
 	)
-	cmd.PersistentFlags().IPNetVar(
-		&s.InitFlags.PodNetwork.CIDR, "pod-network-cidr", net.IPNet{},
+	cmd.PersistentFlags().StringVar(
+		&s.Networking.PodSubnet, "pod-network-cidr", "", //net.IPNet{},
 		"Specify range of IP addresses for the pod network; if set, the control plane will automatically allocate CIDRs for every node",
 	)
 	cmd.PersistentFlags().StringVar(
-		&s.InitFlags.Services.DNSDomain, "service-dns-domain", kubeadmapi.DefaultServiceDNSDomain,
+		&s.Networking.DNSDomain, "service-dns-domain", "", // kubeadmapi.DefaultServiceDNSDomain,
 		`Use alternative domain for services, e.g. "myorg.internal"`,
 	)
 	cmd.PersistentFlags().StringVar(
-		&s.InitFlags.CloudProvider, "cloud-provider", "",
+		&s.CloudProvider, "cloud-provider", "",
 		`Enable cloud provider features (external load-balancers, storage, etc), e.g. "gce"`,
-	)
-	cmd.PersistentFlags().StringVar(
-		&s.InitFlags.Versions.Kubernetes, "use-kubernetes-version", kubeadmapi.DefaultKubernetesVersion,
-		`Choose a specific Kubernetes version for the control plane`,
-	)
-
-	// TODO (phase1+) @errordeveloper make the flags below not show up in --help but rather on --advanced-help
-	cmd.PersistentFlags().StringSliceVar(
-		&s.InitFlags.API.Etcd.ExternalEndpoints, "external-etcd-endpoints", []string{},
-		"etcd endpoints to use, in case you have an external cluster",
-	)
-	cmd.PersistentFlags().StringVar(
-		&s.InitFlags.API.Etcd.ExternalCAFile, "external-etcd-cafile", "",
-		"etcd certificate authority certificate file. Note: The path must be in /etc/ssl/certs",
-	)
-	cmd.PersistentFlags().StringVar(
-		&s.InitFlags.API.Etcd.ExternalCertFile, "external-etcd-certfile", "",
-		"etcd client certificate file. Note: The path must be in /etc/ssl/certs",
-	)
-	cmd.PersistentFlags().StringVar(
-		&s.InitFlags.API.Etcd.ExternalKeyFile, "external-etcd-keyfile", "",
-		"etcd client key file. Note: The path must be in /etc/ssl/certs",
 	)
 
 	return cmd
 }
 
 // RunInit executes master node provisioning, including certificates, needed static pod manifests, etc.
-func RunInit(out io.Writer, cmd *cobra.Command, args []string, s *kubeadmapi.KubeadmConfig, advertiseAddrs *[]string) error {
+func RunInit(out io.Writer, cmd *cobra.Command, args []string, s *kubeadmapi.MasterConfiguration, advertiseAddrs *[]string) error {
 	// Auto-detect the IP
 	if len(*advertiseAddrs) == 0 {
 		// TODO(phase1+) perhaps we could actually grab eth0 and eth1
@@ -118,34 +95,25 @@ func RunInit(out io.Writer, cmd *cobra.Command, args []string, s *kubeadmapi.Kub
 		if err != nil {
 			return err
 		}
-		s.InitFlags.API.AdvertiseAddrs = []net.IP{ip}
-	} else {
-		for _, i := range *advertiseAddrs {
-			addr := net.ParseIP(i)
-			if addr == nil {
-				// TODO(phase1+) custom flag will help to get this error message into a better place
-				return fmt.Errorf("<cmd/init> failed to parse %q (in %q) as an IP address", i, "--api-advertise-addresses="+strings.Join(*advertiseAddrs, ","))
-			}
-			s.InitFlags.API.AdvertiseAddrs = append(s.InitFlags.API.AdvertiseAddrs, addr)
-		}
+		s.API.AdvertiseAddresses = []string{ip.String()}
 	}
 
 	// TODO(phase1+) create a custom flag
-	if s.InitFlags.CloudProvider != "" {
-		found := false
-		for _, provider := range kubeadmapi.ListOfCloudProviders {
-			if provider == s.InitFlags.CloudProvider {
-				found = true
-				break
-			}
-		}
+	//if s.CloudProvider != "" {
+	//	found := false
+	//	for _, provider := range kubeadmapi.ListOfCloudProviders {
+	//		if provider == s.CloudProvider {
+	//			found = true
+	//			break
+	//		}
+	//	}
 
-		if found {
-			fmt.Printf("<cmd/init> cloud provider %q initialized for the control plane. Remember to set the same cloud provider flag on the kubelet.\n", s.InitFlags.CloudProvider)
-		} else {
-			return fmt.Errorf("<cmd/init> cloud provider %q is not supported, you can use any of %v, or leave it unset.\n", s.InitFlags.CloudProvider, kubeadmapi.ListOfCloudProviders)
-		}
-	}
+	//	if found {
+	//		fmt.Printf("<cmd/init> cloud provider %q initialized for the control plane. Remember to set the same cloud provider flag on the kubelet.\n", s.CloudProvider)
+	//	} else {
+	//		return fmt.Errorf("<cmd/init> cloud provider %q is not supported, you can use any of %v, or leave it unset.\n", s.CloudProvider, kubeadmapi.ListOfCloudProviders)
+	//	}
+	//}
 
 	if err := kubemaster.CreateTokenAuthFile(s); err != nil {
 		return err
@@ -175,7 +143,7 @@ func RunInit(out io.Writer, cmd *cobra.Command, args []string, s *kubeadmapi.Kub
 	// importing existing files, may be we could even make our command idempotant,
 	// or at least allow for external PKI and stuff)
 	for name, kubeconfig := range kubeconfigs {
-		if err := kubeadmutil.WriteKubeconfigIfNotExists(s, name, kubeconfig); err != nil {
+		if err := kubeadmutil.WriteKubeconfigIfNotExists(name, kubeconfig); err != nil {
 			return err
 		}
 	}
@@ -201,7 +169,7 @@ func RunInit(out io.Writer, cmd *cobra.Command, args []string, s *kubeadmapi.Kub
 	// TODO(phase1+) use templates to reference struct fields directly as order of args is fragile
 	fmt.Fprintf(out, initDoneMsgf,
 		s.Secrets.GivenToken,
-		s.InitFlags.API.AdvertiseAddrs[0].String(),
+		s.API.AdvertiseAddresses[0],
 	)
 
 	return nil
