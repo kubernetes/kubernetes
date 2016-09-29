@@ -434,6 +434,22 @@ func SkipUnlessFederated(c *client.Client) {
 	}
 }
 
+func SkipIfMissingResource(clientPool dynamic.ClientPool, gvr unversioned.GroupVersionResource, namespace string) {
+	dynamicClient, err := clientPool.ClientForGroupVersion(gvr.GroupVersion())
+	if err != nil {
+		Failf("Unexpected error getting dynamic client for %v: %v", gvr.GroupVersion(), err)
+	}
+	apiResource := unversioned.APIResource{Name: gvr.Resource, Namespaced: true}
+	_, err = dynamicClient.Resource(&apiResource, namespace).List(&v1.ListOptions{})
+	if err != nil {
+		// not all resources support list, so we ignore those
+		if apierrs.IsMethodNotSupported(err) || apierrs.IsNotFound(err) || apierrs.IsForbidden(err) {
+			Skipf("Could not find %s resource, skipping test: %#v", gvr, err)
+		}
+		Failf("Unexpected error getting %v: %v", gvr, err)
+	}
+}
+
 // ProvidersWithSSH are those providers where each node is accessible with SSH
 var ProvidersWithSSH = []string{"gce", "gke", "aws"}
 
