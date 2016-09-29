@@ -42,6 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/apimachinery"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apiserver"
+	genericmux "k8s.io/kubernetes/pkg/genericapiserver/mux"
 	"k8s.io/kubernetes/pkg/genericapiserver/openapi"
 	"k8s.io/kubernetes/pkg/genericapiserver/openapi/common"
 	"k8s.io/kubernetes/pkg/genericapiserver/options"
@@ -116,20 +117,16 @@ type GenericAPIServer struct {
 	// requestContextMapper provides a way to get the context for a request.  It may be nil.
 	requestContextMapper api.RequestContextMapper
 
-	Mux              *apiserver.PathRecorderMux
-	HandlerContainer *restful.Container
-	MasterCount      int
+	// The registered APIs, split into those protected by authz/authn and those without
+	ProtectedContainer   *genericmux.APIContainer
+	UnprotectedContainer *genericmux.APIContainer
 
 	// ExternalAddress is the address (hostname or IP and port) that should be used in
 	// external (public internet) URLs for this GenericAPIServer.
 	ExternalAddress string
+
 	// ClusterIP is the IP address of the GenericAPIServer within the cluster.
-	ClusterIP            net.IP
-	PublicReadWritePort  int
-	ServiceReadWriteIP   net.IP
-	ServiceReadWritePort int
-	ExtraServicePorts    []api.ServicePort
-	ExtraEndpointPorts   []api.EndpointPort
+	ClusterIP net.IP
 
 	// storage contains the RESTful endpoints exposed by this GenericAPIServer
 	storage map[string]rest.Storage
@@ -145,19 +142,10 @@ type GenericAPIServer struct {
 	// Used for custom proxy dialing, and proxy TLS options
 	ProxyTransport http.RoundTripper
 
-	KubernetesServiceNodePort int
-
 	// Map storing information about all groups to be exposed in discovery response.
 	// The map is from name to the group.
 	apiGroupsForDiscoveryLock sync.RWMutex
 	apiGroupsForDiscovery     map[string]unversioned.APIGroup
-
-	// See Config.$name for documentation of these flags
-
-	enableOpenAPISupport   bool
-	openAPIInfo            spec.Info
-	openAPIDefaultResponse spec.Response
-	openAPIDefinitions     *common.OpenAPIDefinitions
 
 	// PostStartHooks are each called after the server has started listening, in a separate go func for each
 	// with no guaranteee of ordering between them.  The map key is a name used for error reporting.
@@ -165,6 +153,20 @@ type GenericAPIServer struct {
 	postStartHooks       map[string]PostStartHookFunc
 	postStartHookLock    sync.Mutex
 	postStartHooksCalled bool
+
+	// See Config.$name for documentation of these flags:
+
+	enableOpenAPISupport      bool
+	openAPIInfo               spec.Info
+	openAPIDefaultResponse    spec.Response
+	openAPIDefinitions        *common.OpenAPIDefinitions
+	MasterCount               int
+	KubernetesServiceNodePort int // TODO(sttts): move into master
+	PublicReadWritePort       int
+	ServiceReadWriteIP        net.IP
+	ServiceReadWritePort      int
+	ExtraServicePorts         []api.ServicePort
+	ExtraEndpointPorts        []api.EndpointPort
 }
 
 func init() {
@@ -184,33 +186,6 @@ func (s *GenericAPIServer) RequestContextMapper() api.RequestContextMapper {
 // TODO refactor third party resource storage
 func (s *GenericAPIServer) MinRequestTimeout() time.Duration {
 	return s.minRequestTimeout
-}
-
-// HandleWithAuth adds an http.Handler for pattern to an http.ServeMux
-// Applies the same authentication and authorization (if any is configured)
-// to the request is used for the GenericAPIServer's built-in endpoints.
-func (s *GenericAPIServer) HandleWithAuth(pattern string, handler http.Handler) {
-	// TODO: Add a way for plugged-in endpoints to translate their
-	// URLs into attributes that an Authorizer can understand, and have
-	// sensible policy defaults for plugged-in endpoints.  This will be different
-	// for generic endpoints versus REST object endpoints.
-	// TODO: convert to go-restful
-	s.Mux.Handle(pattern, handler)
-}
-
-// HandleFuncWithAuth adds an http.Handler for pattern to an http.ServeMux
-// Applies the same authentication and authorization (if any is configured)
-// to the request is used for the GenericAPIServer's built-in endpoints.
-func (s *GenericAPIServer) HandleFuncWithAuth(pattern string, handler func(http.ResponseWriter, *http.Request)) {
-	// TODO: convert to go-restful
-	s.Mux.HandleFunc(pattern, handler)
-}
-
-func NewHandlerContainer(mux *http.ServeMux, s runtime.NegotiatedSerializer) *restful.Container {
-	container := restful.NewContainer()
-	container.ServeMux = mux
-	apiserver.InstallRecoverHandler(s, container)
-	return container
 }
 
 func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
@@ -345,14 +320,14 @@ func (s *GenericAPIServer) InstallAPIGroup(apiGroupInfo *APIGroupInfo) error {
 			apiGroupVersion.OptionsExternalVersion = apiGroupInfo.OptionsExternalVersion
 		}
 
-		if err := apiGroupVersion.InstallREST(s.HandlerContainer); err != nil {
+		if err := apiGroupVersion.InstallREST(s.ProtectedContainer.Container); err != nil {
 			return fmt.Errorf("Unable to setup API %v: %v", apiGroupInfo, err)
 		}
 	}
 	// Install the version handler.
 	if apiGroupInfo.IsLegacyGroup {
 		// Add a handler at /api to enumerate the supported api versions.
-		apiserver.AddApiWebService(s.Serializer, s.HandlerContainer, apiPrefix, func(req *restful.Request) *unversioned.APIVersions {
+		apiserver.AddApiWebService(s.Serializer, s.ProtectedContainer.Container, apiPrefix, func(req *restful.Request) *unversioned.APIVersions {
 			apiVersionsForDiscovery := unversioned.APIVersions{
 				ServerAddressByClientCIDRs: s.getServerAddressByClientCIDRs(req.Request),
 				Versions:                   apiVersions,
@@ -392,7 +367,7 @@ func (s *GenericAPIServer) InstallAPIGroup(apiGroupInfo *APIGroupInfo) error {
 		}
 
 		s.AddAPIGroupForDiscovery(apiGroup)
-		s.HandlerContainer.Add(apiserver.NewGroupWebService(s.Serializer, apiPrefix+"/"+apiGroup.Name, apiGroup))
+		s.ProtectedContainer.Add(apiserver.NewGroupWebService(s.Serializer, apiPrefix+"/"+apiGroup.Name, apiGroup))
 	}
 	return nil
 }
@@ -469,7 +444,7 @@ func (s *GenericAPIServer) getSwaggerConfig() *swagger.Config {
 	webServicesUrl := protocol + hostAndPort
 	return &swagger.Config{
 		WebServicesUrl:  webServicesUrl,
-		WebServices:     s.HandlerContainer.RegisteredWebServices(),
+		WebServices:     s.ProtectedContainer.RegisteredWebServices(),
 		ApiPath:         "/swaggerapi/",
 		SwaggerPath:     "/swaggerui/",
 		SwaggerFilePath: "/swagger-ui/",
@@ -489,14 +464,14 @@ func (s *GenericAPIServer) getSwaggerConfig() *swagger.Config {
 // of swagger, so that other resource types show up in the documentation.
 func (s *GenericAPIServer) InstallSwaggerAPI() {
 	// Enable swagger UI and discovery API
-	swagger.RegisterSwaggerService(*s.getSwaggerConfig(), s.HandlerContainer)
+	swagger.RegisterSwaggerService(*s.getSwaggerConfig(), s.ProtectedContainer.Container)
 }
 
 // InstallOpenAPI installs spec endpoints for each web service.
 func (s *GenericAPIServer) InstallOpenAPI() {
 	// Install one spec per web service, an ideal client will have a ClientSet containing one client
 	// per each of these specs.
-	for _, w := range s.HandlerContainer.RegisteredWebServices() {
+	for _, w := range s.ProtectedContainer.RegisteredWebServices() {
 		if w.RootPath() == "/swaggerapi" {
 			continue
 		}
@@ -510,20 +485,20 @@ func (s *GenericAPIServer) InstallOpenAPI() {
 			Info:               &info,
 			DefaultResponse:    &s.openAPIDefaultResponse,
 			OpenAPIDefinitions: s.openAPIDefinitions,
-		}, s.HandlerContainer)
+		}, s.ProtectedContainer.Container)
 		if err != nil {
 			glog.Fatalf("Failed to register open api spec for %v: %v", w.RootPath(), err)
 		}
 	}
 	err := openapi.RegisterOpenAPIService(&openapi.Config{
 		OpenAPIServePath:   "/swagger.json",
-		WebServices:        s.HandlerContainer.RegisteredWebServices(),
+		WebServices:        s.ProtectedContainer.RegisteredWebServices(),
 		ProtocolList:       []string{"https"},
 		IgnorePrefixes:     []string{"/swaggerapi"},
 		Info:               &s.openAPIInfo,
 		DefaultResponse:    &s.openAPIDefaultResponse,
 		OpenAPIDefinitions: s.openAPIDefinitions,
-	}, s.HandlerContainer)
+	}, s.ProtectedContainer.Container)
 	if err != nil {
 		glog.Fatalf("Failed to register open api spec for root: %v", err)
 	}

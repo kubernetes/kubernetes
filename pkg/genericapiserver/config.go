@@ -28,7 +28,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/emicklei/go-restful"
 	"github.com/go-openapi/spec"
 	"github.com/golang/glog"
 	"gopkg.in/natefinch/lumberjack.v2"
@@ -44,6 +43,7 @@ import (
 	authhandlers "k8s.io/kubernetes/pkg/auth/handlers"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	genericfilters "k8s.io/kubernetes/pkg/genericapiserver/filters"
+	"k8s.io/kubernetes/pkg/genericapiserver/mux"
 	"k8s.io/kubernetes/pkg/genericapiserver/openapi/common"
 	"k8s.io/kubernetes/pkg/genericapiserver/options"
 	"k8s.io/kubernetes/pkg/genericapiserver/routes"
@@ -88,9 +88,6 @@ type Config struct {
 
 	// Required, the interface for serializing and converting objects to and from the wire
 	Serializer runtime.NegotiatedSerializer
-
-	// If specified, all web services will be registered into this container
-	RestfulContainer *restful.Container
 
 	// If specified, requests will be allocated a random timeout between this value, and twice this value.
 	// Note that it is up to the request handlers to ignore or honor this timeout. In seconds.
@@ -144,6 +141,8 @@ type Config struct {
 	// Port names should align with ports defined in ExtraServicePorts
 	ExtraEndpointPorts []api.EndpointPort
 
+	// If non-zero, the "kubernetes" services uses this port as NodePort.
+	// TODO(sttts): move into master
 	KubernetesServiceNodePort int
 
 	// EnableOpenAPISupport enables OpenAPI support. Allow downstream customers to disable OpenAPI spec.
@@ -165,6 +164,13 @@ type Config struct {
 
 	// Predicate which is true for paths of long-running http requests
 	LongRunningFunc genericfilters.LongRunningRequestCheck
+
+	// Add authz/authn to the handler
+	ProtectHandlerFunc func(handler http.Handler, c *Config) http.Handler
+
+	// Add generic decoration to the handler. The handler might be protected through
+	// ProtectHandlerFunc for the secure port, or it won't for the insecure port.
+	GenericDecorateHandlerFunc func(handler http.Handler, c *Config) http.Handler
 }
 
 func NewConfig(options *options.ServerRunOptions) *Config {
@@ -271,6 +277,12 @@ func (c *Config) Complete() completedConfig {
 		}
 		c.ExternalHost = hostAndPort
 	}
+	if c.ProtectHandlerFunc == nil {
+		c.ProtectHandlerFunc = DefaultProtectHandler
+	}
+	if c.GenericDecorateHandlerFunc == nil {
+		c.GenericDecorateHandlerFunc = DefaultGenericDecorateHandler
+	}
 	return completedConfig{c}
 }
 
@@ -336,15 +348,8 @@ func (c completedConfig) New() (*GenericAPIServer, error) {
 		openAPIDefinitions:     c.OpenAPIDefinitions,
 	}
 
-	if c.RestfulContainer != nil {
-		s.HandlerContainer = c.RestfulContainer
-	} else {
-		s.HandlerContainer = NewHandlerContainer(http.NewServeMux(), c.Serializer)
-	}
-	// Use CurlyRouter to be able to use regular expressions in paths. Regular expressions are required in paths for example for proxy (where the path is proxy/{kind}/{name}/{*})
-	s.HandlerContainer.Router(restful.CurlyRouter{})
-	s.Mux = apiserver.NewPathRecorderMux(s.HandlerContainer.ServeMux)
-	apiserver.InstallServiceErrorHandler(s.Serializer, s.HandlerContainer)
+	s.ProtectedContainer = mux.NewAPIContainer(http.NewServeMux(), c.Serializer)
+	s.UnprotectedContainer = mux.NewAPIContainer(http.NewServeMux(), c.Serializer)
 
 	if c.ProxyDialer != nil || c.ProxyTLSClientConfig != nil {
 		s.ProxyTransport = utilnet.SetTransportDefaults(&http.Transport{
@@ -354,52 +359,52 @@ func (c completedConfig) New() (*GenericAPIServer, error) {
 	}
 
 	s.installAPI(c.Config)
-	s.Handler, s.InsecureHandler = s.buildHandlerChains(c.Config, http.Handler(s.Mux.BaseMux().(*http.ServeMux)))
+
+	// Wire the handler chains
+	unprotected := s.UnprotectedContainer.ServeMux
+	protected := s.ProtectedContainer.ServeMux
+	s.Handler = c.GenericDecorateHandlerFunc(MergeHandlers(unprotected, c.ProtectHandlerFunc(protected, c.Config)), c.Config)
+	s.InsecureHandler = c.GenericDecorateHandlerFunc(MergeHandlers(unprotected, protected), c.Config)
 
 	return s, nil
 }
 
-func (s *GenericAPIServer) buildHandlerChains(c *Config, handler http.Handler) (secure http.Handler, insecure http.Handler) {
-	// filters which insecure and secure have in common
-	handler = genericfilters.WithCORS(handler, c.CorsAllowedOriginList, nil, nil, nil, "true")
-
-	// insecure filters
-	insecure = handler
-	insecure = genericfilters.WithPanicRecovery(insecure, c.RequestContextMapper)
-	insecure = apiserverfilters.WithRequestInfo(insecure, NewRequestInfoResolver(c), c.RequestContextMapper)
-	insecure = api.WithRequestContext(insecure, c.RequestContextMapper)
-	insecure = genericfilters.WithTimeoutForNonLongRunningRequests(insecure, c.LongRunningFunc)
-
-	// secure filters
+func DefaultProtectHandler(handler http.Handler, c *Config) http.Handler {
 	attributeGetter := apiserverfilters.NewRequestAttributeGetter(c.RequestContextMapper)
-	secure = handler
-	secure = apiserverfilters.WithAuthorization(secure, attributeGetter, c.Authorizer)
-	secure = apiserverfilters.WithImpersonation(secure, c.RequestContextMapper, c.Authorizer)
-	secure = apiserverfilters.WithAudit(secure, attributeGetter, c.AuditWriter) // before impersonation to read original user
-	secure = authhandlers.WithAuthentication(secure, c.RequestContextMapper, c.Authenticator, authhandlers.Unauthorized(c.SupportsBasicAuth))
-	secure = genericfilters.WithPanicRecovery(secure, c.RequestContextMapper)
-	secure = apiserverfilters.WithRequestInfo(secure, NewRequestInfoResolver(c), c.RequestContextMapper)
-	secure = api.WithRequestContext(secure, c.RequestContextMapper)
-	secure = genericfilters.WithTimeoutForNonLongRunningRequests(secure, c.LongRunningFunc)
-	secure = genericfilters.WithMaxInFlightLimit(secure, c.MaxRequestsInFlight, c.LongRunningFunc)
 
-	return
+	handler = apiserverfilters.WithAuthorization(handler, attributeGetter, c.Authorizer)
+	handler = apiserverfilters.WithImpersonation(handler, c.RequestContextMapper, c.Authorizer)
+	handler = apiserverfilters.WithAudit(handler, attributeGetter, c.AuditWriter) // before impersonation to read original user
+	handler = authhandlers.WithAuthentication(handler, c.RequestContextMapper, c.Authenticator, authhandlers.Unauthorized(c.SupportsBasicAuth))
+
+	return handler
+}
+
+func DefaultGenericDecorateHandler(handler http.Handler, c *Config) http.Handler {
+	handler = genericfilters.WithCORS(handler, c.CorsAllowedOriginList, nil, nil, nil, "true")
+	handler = genericfilters.WithPanicRecovery(handler, c.RequestContextMapper)
+	handler = apiserverfilters.WithRequestInfo(handler, NewRequestInfoResolver(c), c.RequestContextMapper)
+	handler = api.WithRequestContext(handler, c.RequestContextMapper)
+	handler = genericfilters.WithTimeoutForNonLongRunningRequests(handler, c.LongRunningFunc)
+	handler = genericfilters.WithMaxInFlightLimit(handler, c.MaxRequestsInFlight, c.LongRunningFunc)
+
+	return handler
 }
 
 func (s *GenericAPIServer) installAPI(c *Config) {
 	if c.EnableIndex {
-		routes.Index{}.Install(s.Mux, s.HandlerContainer)
+		routes.Index{}.Install(s.ProtectedContainer)
 	}
 	if c.EnableSwaggerSupport && c.EnableSwaggerUI {
-		routes.SwaggerUI{}.Install(s.Mux, s.HandlerContainer)
+		routes.SwaggerUI{}.Install(s.ProtectedContainer)
 	}
 	if c.EnableProfiling {
-		routes.Profiling{}.Install(s.Mux, s.HandlerContainer)
+		routes.Profiling{}.Install(s.ProtectedContainer)
 	}
 	if c.EnableVersion {
-		routes.Version{}.Install(s.Mux, s.HandlerContainer)
+		routes.Version{}.Install(s.ProtectedContainer)
 	}
-	s.HandlerContainer.Add(s.DynamicApisDiscovery())
+	s.ProtectedContainer.Add(s.DynamicApisDiscovery())
 }
 
 func DefaultAndValidateRunOptions(options *options.ServerRunOptions) {
@@ -452,8 +457,8 @@ func DefaultAndValidateRunOptions(options *options.ServerRunOptions) {
 	}
 }
 
-func NewRequestInfoResolver(c *Config) *request.RequestInfoResolver {
-	return &request.RequestInfoResolver{
+func NewRequestInfoResolver(c *Config) *request.RequestInfoFactory {
+	return &request.RequestInfoFactory{
 		APIPrefixes:          sets.NewString(strings.Trim(c.APIPrefix, "/"), strings.Trim(c.APIGroupPrefix, "/")), // all possible API prefixes
 		GrouplessAPIPrefixes: sets.NewString(strings.Trim(c.APIPrefix, "/")),                                      // APIPrefixes that won't have groups (legacy)
 	}

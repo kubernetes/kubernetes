@@ -20,6 +20,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -32,12 +33,11 @@ import (
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/auth/user"
+	genericmux "k8s.io/kubernetes/pkg/genericapiserver/mux"
 	ipallocator "k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
@@ -138,7 +138,7 @@ func TestInstallAPIGroups(t *testing.T) {
 		s.InstallAPIGroup(&apiGroupsInfo[i])
 	}
 
-	server := httptest.NewServer(s.HandlerContainer.ServeMux)
+	server := httptest.NewServer(s.InsecureHandler)
 	defer server.Close()
 	validPaths := []string{
 		// "/api"
@@ -158,41 +158,76 @@ func TestInstallAPIGroups(t *testing.T) {
 	}
 }
 
-// TestNewHandlerContainer verifies that NewHandlerContainer uses the
-// mux provided
-func TestNewHandlerContainer(t *testing.T) {
-	assert := assert.New(t)
-	mux := http.NewServeMux()
-	container := NewHandlerContainer(mux, nil)
-	assert.Equal(mux, container.ServeMux, "ServerMux's do not match")
-}
-
-// TestHandleWithAuth verifies HandleWithAuth adds the path
-// to the MuxHelper.RegisteredPaths.
-func TestHandleWithAuth(t *testing.T) {
-	etcdserver, _, assert := setUp(t)
+// TestProtectedHandlers verifies the handler chain with custom handler chain builder functions.
+func TestProtectedHandlers(t *testing.T) {
+	etcdserver, config, _ := setUp(t)
 	defer etcdserver.Terminate(t)
 
-	server := &GenericAPIServer{}
-	server.Mux = apiserver.NewPathRecorderMux(http.NewServeMux())
-	handler := func(r http.ResponseWriter, w *http.Request) { w.Write(nil) }
-	server.HandleWithAuth("/test", http.HandlerFunc(handler))
+	var protected, generic, called bool
 
-	assert.Contains(server.Mux.HandledPaths(), "/test", "Path not found in MuxHelper")
-}
+	config.Serializer = api.Codecs
+	config.ProtectHandlerFunc = func(handler http.Handler, c *Config) http.Handler {
+		return http.HandlerFunc(func(r http.ResponseWriter, req *http.Request) {
+			protected = true
+			handler.ServeHTTP(r, req)
+		})
+	}
+	config.GenericDecorateHandlerFunc = func(handler http.Handler, c *Config) http.Handler {
+		return http.HandlerFunc(func(r http.ResponseWriter, req *http.Request) {
+			generic = true
+			DefaultGenericDecorateHandler(handler, &config).ServeHTTP(r, req)
+		})
+	}
+	handler := http.HandlerFunc(func(r http.ResponseWriter, req *http.Request) {
+		called = true
+	})
 
-// TestHandleFuncWithAuth verifies HandleFuncWithAuth adds the path
-// to the MuxHelper.RegisteredPaths.
-func TestHandleFuncWithAuth(t *testing.T) {
-	etcdserver, _, assert := setUp(t)
-	defer etcdserver.Terminate(t)
+	s, err := config.Complete().New()
+	if err != nil {
+		t.Fatalf("Error in bringing up the server: %v", err)
+	}
 
-	server := &GenericAPIServer{}
-	server.Mux = apiserver.NewPathRecorderMux(http.NewServeMux())
-	handler := func(r http.ResponseWriter, w *http.Request) { w.Write(nil) }
-	server.HandleFuncWithAuth("/test", handler)
+	s.ProtectedContainer.NonSwaggerRoutes.Handle("/protected/nonswagger", handler)
+	s.ProtectedContainer.SecretRoutes.Handle("/protected/secret", handler)
+	s.UnprotectedContainer.NonSwaggerRoutes.Handle("/unprotected/nonswagger", handler)
+	s.UnprotectedContainer.SecretRoutes.Handle("/unprotected/secret", handler)
 
-	assert.Contains(server.Mux.HandledPaths(), "/test", "Path not found in MuxHelper")
+	type Test struct {
+		handler   http.Handler
+		path      string
+		protected bool
+	}
+	for i, test := range []Test{
+		{s.Handler, "/protected/nonswagger", true},
+		{s.Handler, "/protected/secret", true},
+		{s.Handler, "/unprotected/nonswagger", false},
+		{s.Handler, "/unprotected/secret", false},
+		{s.InsecureHandler, "/protected/nonswagger", false},
+		{s.InsecureHandler, "/protected/secret", false},
+		{s.InsecureHandler, "/unprotected/nonswagger", false},
+		{s.InsecureHandler, "/unprotected/secret", false},
+	} {
+		protected, generic, called = false, false, false
+
+		var w io.Reader
+		req, err := http.NewRequest("GET", test.path, w)
+		if err != nil {
+			t.Errorf("%d: Unexpected http error: %v", i, err)
+			continue
+		}
+
+		test.handler.ServeHTTP(httptest.NewRecorder(), req)
+
+		if !called {
+			t.Errorf("%d: Expected handler to be called.", i)
+		}
+		if !generic {
+			t.Errorf("%d: Expected generic handler chain to be called.", i)
+		}
+		if test.protected != protected {
+			t.Errorf("%d: Expected protected=%v, got protected=%v.", i, test.protected, protected)
+		}
+	}
 }
 
 // TestNotRestRoutesHaveAuth checks that special non-routes are behind authz/authn.
@@ -267,10 +302,10 @@ func TestInstallSwaggerAPI(t *testing.T) {
 
 	mux := http.NewServeMux()
 	server := &GenericAPIServer{}
-	server.HandlerContainer = NewHandlerContainer(mux, nil)
+	server.ProtectedContainer = genericmux.NewAPIContainer(mux, nil)
 
 	// Ensure swagger isn't installed without the call
-	ws := server.HandlerContainer.RegisteredWebServices()
+	ws := server.ProtectedContainer.RegisteredWebServices()
 	if !assert.Equal(len(ws), 0) {
 		for x := range ws {
 			assert.NotEqual("/swaggerapi", ws[x].RootPath(), "SwaggerAPI was installed without a call to InstallSwaggerAPI()")
@@ -279,14 +314,14 @@ func TestInstallSwaggerAPI(t *testing.T) {
 
 	// Install swagger and test
 	server.InstallSwaggerAPI()
-	ws = server.HandlerContainer.RegisteredWebServices()
+	ws = server.ProtectedContainer.RegisteredWebServices()
 	if assert.NotEqual(0, len(ws), "SwaggerAPI not installed.") {
 		assert.Equal("/swaggerapi/", ws[0].RootPath(), "SwaggerAPI did not install to the proper path. %s != /swaggerapi", ws[0].RootPath())
 	}
 
 	// Empty externalHost verification
 	mux = http.NewServeMux()
-	server.HandlerContainer = NewHandlerContainer(mux, nil)
+	server.ProtectedContainer = genericmux.NewAPIContainer(mux, nil)
 	server.ExternalAddress = ""
 	server.ClusterIP = net.IPv4(10, 10, 10, 10)
 	server.PublicReadWritePort = 1010
@@ -328,7 +363,7 @@ func TestDiscoveryAtAPIS(t *testing.T) {
 	master, etcdserver, _, assert := newMaster(t)
 	defer etcdserver.Terminate(t)
 
-	server := httptest.NewServer(master.HandlerContainer.ServeMux)
+	server := httptest.NewServer(master.InsecureHandler)
 	groupList, err := getGroupList(server)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
