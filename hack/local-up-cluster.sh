@@ -293,7 +293,7 @@ function start_apiserver {
     # is set to 127.0.0.1
     advertise_address=""
     if [[ "${API_HOST}" != "127.0.0.1" ]]; then
-        advertise_address="--advertise_address=${API_HOST}"
+        advertise_address="--advertise_address=${API_HOST_IP}"
     fi
 
     APISERVER_LOG=/tmp/kube-apiserver.log

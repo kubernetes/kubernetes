@@ -85,7 +85,7 @@ federation/deploy/config.json.sample:      "cluster_name": "cluster3-kubernetes"
 federation/deploy/config.json.sample:      "num_nodes": 3,
 federation/deploy/config.json.sample:      "num_nodes": 3,
 federation/deploy/config.json.sample:      "num_nodes": 3,
-hack/local-up-cluster.sh:        advertise_address="--advertise_address=${API_HOST}"
+hack/local-up-cluster.sh:        advertise_address="--advertise_address=${API_HOST_IP}"
 hack/local-up-cluster.sh:      runtime_config="--runtime-config=${RUNTIME_CONFIG}"
 hack/local-up-cluster.sh:    advertise_address=""
 hack/local-up-cluster.sh:    runtime_config=""
