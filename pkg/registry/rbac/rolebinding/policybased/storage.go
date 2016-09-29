@@ -46,6 +46,14 @@ func (s *Storage) Create(ctx api.Context, obj runtime.Object) (runtime.Object, e
 		if s.superUser != "" && user.GetName() == s.superUser {
 			return s.StandardStorage.Create(ctx, obj)
 		}
+
+		// system:masters is special because the API server uses it for privileged loopback connections
+		// therefore we know that a member of system:masters can always do anything
+		for _, group := range user.GetGroups() {
+			if group == "system:masters" {
+				return s.StandardStorage.Create(ctx, obj)
+			}
+		}
 	}
 
 	roleBinding := obj.(*rbac.RoleBinding)
