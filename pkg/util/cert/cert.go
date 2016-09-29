@@ -25,11 +25,13 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
+	"encoding/hex"
 	"fmt"
 	"math"
 	"math/big"
 	"net"
 	"time"
+	"strings"
 )
 
 const (
@@ -187,4 +189,56 @@ func GenerateSelfSignedCert(host, certPath, keyPath string, alternateIPs []net.I
 	}
 
 	return nil
+}
+
+// Recives certificate into bytes array and formats to human-readable format.
+func FormatCert(cert []byte) (string, error) {
+	block, _ := pem.Decode(cert)
+	c, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse certificate [%v]", err)
+	}
+	bytes, err := MarshalPublicKey(c.PublicKey)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal public key [%v]", err)
+	}
+	hexPub := bytesToHex(bytes)
+	hexSig := bytesToHex(c.Signature)
+
+	var ips []string
+	for _, ip := range c.IPAddresses {
+		ips = append(ips, ip.String())
+	}
+	altNames := strings.Join(ips, ",")
+	altNames += strings.Join(c.DNSNames, ",")
+
+	res := fmt.Sprintf(
+		"Version: %d Issuer: CN=%s Subject: CN=%s CA: %t Not before: %s Not After: %s Alternate Names: %s Pub: %s Signature: %s",
+		c.Version, c.Issuer.CommonName, c.Subject.CommonName, c.IsCA, c.NotBefore, c.NotAfter, altNames, hexPub, hexSig)
+
+	return res, nil
+}
+
+// Converts public certificate to bytes array.
+func MarshalPublicKey(pub interface{}) ([]byte, error) {
+	var publicKeyBytes []byte
+	// TODO: add *rsa.PublicKey support
+	switch pub := pub.(type) {
+	case *ecdsa.PublicKey:
+		publicKeyBytes = elliptic.Marshal(pub.Curve, pub.X, pub.Y)
+	default:
+		return nil, fmt.Errorf("only RSA and ECDSA public keys supported")
+	}
+	return publicKeyBytes, nil
+}
+
+func bytesToHex(bytes []byte) string {
+	hexPub := ""
+	for i, v := range hex.EncodeToString(bytes) {
+		if i > 0 && (i % 2) == 0 {
+			hexPub += ":"
+		}
+		hexPub += string(v)
+	}
+	return hexPub
 }
