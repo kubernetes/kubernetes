@@ -305,6 +305,9 @@ type DaemonSetUpdateStrategyType string
 const (
 	// Replace the old daemons by new ones using rolling update i.e replace them on each node one after the other.
 	RollingUpdateDaemonSetStrategyType DaemonSetUpdateStrategyType = "RollingUpdate"
+
+	// Dont touch daemon pods.
+	NoopDaemonSetStrategyType DaemonSetUpdateStrategyType = "Noop"
 )
 
 // Spec to control the desired behavior of daemon set rolling update.
@@ -343,9 +346,6 @@ type DaemonSetSpec struct {
 	// Indicates that the DaemonSet is paused and will not be processed by the
 	// DaemonSet controller.
 	Paused bool `json:"paused,omitempty"`
-
-	// Indicates that the DaemonSet will automaticly update pods when DaemonSet Spec was changed.
-	AutoUpdate bool `json:"autoUpdate,omitempty"`
 
 	// Minimum number of seconds for which a newly created DaemonSet pod should
 	// be ready without any of its container crashing, for it to be considered

@@ -767,10 +767,6 @@ func (dsc *DaemonSetsController) needsRollingUpdate(ds *extensions.DaemonSet, da
 }
 
 func (dsc *DaemonSetsController) needsUpdate(ds *extensions.DaemonSet, daemonPods []*api.Pod, numUnavailable, numNodes int) (*api.Pod, bool) {
-	if !ds.Spec.AutoUpdate {
-		return nil, false
-	}
-
 	if daemonPods == nil {
 		return nil, false
 	}
@@ -778,6 +774,8 @@ func (dsc *DaemonSetsController) needsUpdate(ds *extensions.DaemonSet, daemonPod
 	switch ds.Spec.UpdateStrategy.Type {
 	case extensions.RollingUpdateDaemonSetStrategyType:
 		return dsc.needsRollingUpdate(ds, daemonPods, numUnavailable, numNodes)
+	case extensions.NoopDaemonSetStrategyType:
+		return nil, false
 	}
 	return nil, false
 }

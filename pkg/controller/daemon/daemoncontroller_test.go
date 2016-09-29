@@ -88,7 +88,6 @@ func newDaemonSet(name string) *extensions.DaemonSet {
 					MaxUnavailable: intstr.FromInt(maxUnavailable),
 				},
 			},
-			AutoUpdate: true,
 		},
 	}
 }
@@ -694,8 +693,8 @@ func TestDaemonSetPaused(t *testing.T) {
 	syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0)
 }
 
-// DaemonSet should launch pods and NOT update them when the Spec.AudoUpdate is set to false.
-func TestDaemonAutoUpdate(t *testing.T) {
+// DaemonSet should launch pods and NOT update them when strategyType is NoopDaemonSetStrategyType.
+func TestDaemonNoopStrategy(t *testing.T) {
 	manager, podControl := newTestController()
 	addNodes(manager.nodeStore.Store, 0, 5, nil)
 	ds := newDaemonSet("foo")
@@ -704,7 +703,7 @@ func TestDaemonAutoUpdate(t *testing.T) {
 
 	ds.Spec.Template.Spec.Containers[0].Image = "foo2/bar2"
 	manager.dsStore.Update(ds)
-	ds.Spec.AutoUpdate = false
+	ds.Spec.UpdateStrategy.Type = extensions.NoopDaemonSetStrategyType
 
 	clearExpectations(t, manager, ds, podControl)
 	syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0)

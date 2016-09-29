@@ -49,7 +49,7 @@ func SetDefaults_DaemonSet(obj *DaemonSet) {
 	}
 	updateStrategy := &obj.Spec.UpdateStrategy
 	if updateStrategy.Type == "" {
-		updateStrategy.Type = RollingUpdateDaemonSetStrategyType
+		updateStrategy.Type = NoopDaemonSetStrategyType
 	}
 	if updateStrategy.Type == RollingUpdateDaemonSetStrategyType {
 		if updateStrategy.RollingUpdate == nil {

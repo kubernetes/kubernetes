@@ -161,7 +161,7 @@ func FuzzerFor(t *testing.T, version unversioned.GroupVersion, src rand.Source) 
 		func(j *extensions.DaemonSetUpdateStrategy, c fuzz.Continue) {
 			c.FuzzNoCustom(j) // fuzz self without calling this function again
 			// Ensure that strategyType is one of valid values.
-			strategyTypes := []extensions.DaemonSetUpdateStrategyType{extensions.RollingUpdateDaemonSetStrategyType}
+			strategyTypes := []extensions.DaemonSetUpdateStrategyType{extensions.RollingUpdateDaemonSetStrategyType, extensions.NoopDaemonSetStrategyType}
 			j.Type = strategyTypes[c.Rand.Intn(len(strategyTypes))]
 			if j.Type != extensions.RollingUpdateDaemonSetStrategyType {
 				j.RollingUpdate = nil

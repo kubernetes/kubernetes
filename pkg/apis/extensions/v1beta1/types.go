@@ -301,6 +301,9 @@ const (
 
 	// Replace the old RCs by new one using rolling update i.e gradually scale down the old RCs and scale up the new one.
 	RollingUpdateDeploymentStrategyType DeploymentStrategyType = "RollingUpdate"
+
+	// Dont touch daemon pods.
+	NoopDaemonSetStrategyType DaemonSetUpdateStrategyType = "Noop"
 )
 
 // Spec to control the desired behavior of rolling update.
@@ -420,9 +423,6 @@ type DaemonSetSpec struct {
 	// Indicates that the DaemonSet is paused and will not be processed by the
 	// DaemonSet controller.
 	Paused bool `json:"paused,omitempty" protobuf:"varint,3,opt,name=paused"`
-
-	// Indicates that the DaemonSet will automaticly update pods when DaemonSet Spec was changed.
-	AutoUpdate bool `json:"autoUpdate,omitempty" protobuf:"varint,4,opt,name=autoUpdate"`
 
 	// Minimum number of seconds for which a newly created DaemonSet pod should
 	// be ready without any of its container crashing, for it to be considered

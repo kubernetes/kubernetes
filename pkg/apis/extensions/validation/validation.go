@@ -128,16 +128,18 @@ func ValidateRollingUpdateDaemonSet(rollingUpdate *extensions.RollingUpdateDaemo
 
 func ValidateDaemonSetUpdateStrategy(strategy *extensions.DaemonSetUpdateStrategy, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	// Only rolling update is supported at this time.
-	if strategy.Type != extensions.RollingUpdateDaemonSetStrategyType {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("type"), strategy.Type, "RollingUpdate is the only supported type"))
+	if strategy.Type == extensions.NoopDaemonSetStrategyType {
+		// nothing to do here for now
+	} else if strategy.Type == extensions.RollingUpdateDaemonSetStrategyType {
+		// Make sure RollingUpdate field isn't nil.
+		if strategy.RollingUpdate == nil {
+			allErrs = append(allErrs, field.Required(fldPath.Child("rollingUpdate"), ""))
+			return allErrs
+		}
+		allErrs = append(allErrs, ValidateRollingUpdateDaemonSet(strategy.RollingUpdate, fldPath.Child("rollingUpdate"))...)
+	} else {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("type"), strategy.Type, "RollingUpdate and Noop are only supported types"))
 	}
-	// Make sure RollingUpdate field isn't nil.
-	if strategy.RollingUpdate == nil {
-		allErrs = append(allErrs, field.Required(fldPath.Child("rollingUpdate"), ""))
-		return allErrs
-	}
-	allErrs = append(allErrs, ValidateRollingUpdateDaemonSet(strategy.RollingUpdate, fldPath.Child("rollingUpdate"))...)
 	return allErrs
 }
 

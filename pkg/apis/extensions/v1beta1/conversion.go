@@ -270,7 +270,6 @@ func Convert_extensions_DaemonSetSpec_To_v1beta1_DaemonSetSpec(in *extensions.Da
 	}
 	out.MinReadySeconds = int32(in.MinReadySeconds)
 	out.Paused = in.Paused
-	out.AutoUpdate = in.AutoUpdate
 	return nil
 }
 
@@ -292,7 +291,6 @@ func Convert_v1beta1_DaemonSetSpec_To_extensions_DaemonSetSpec(in *DaemonSetSpec
 	}
 	out.MinReadySeconds = int(in.MinReadySeconds)
 	out.Paused = in.Paused
-	out.AutoUpdate = in.AutoUpdate
 	return nil
 }
 

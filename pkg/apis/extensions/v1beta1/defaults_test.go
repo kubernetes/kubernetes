@@ -54,10 +54,12 @@ func TestSetDefaultDaemonSet(t *testing.T) {
 		},
 	}
 	tests := []struct {
+		name     string
 		original *DaemonSet
 		expected *DaemonSet
 	}{
-		{ // Labels change/defaulting test.
+		{
+			name: "Labels change/defaulting test",
 			original: &DaemonSet{
 				Spec: DaemonSetSpec{
 					Template: defaultTemplate,
@@ -73,15 +75,13 @@ func TestSetDefaultDaemonSet(t *testing.T) {
 					},
 					Template: defaultTemplate,
 					UpdateStrategy: DaemonSetUpdateStrategy{
-						Type: RollingUpdateDaemonSetStrategyType,
-						RollingUpdate: &RollingUpdateDaemonSet{
-							MaxUnavailable: &defaultIntOrString,
-						},
+						Type: NoopDaemonSetStrategyType,
 					},
 				},
 			},
 		},
-		{ // Labels change/defaulting test.
+		{
+			name: "Labels change/defaulting test 2.",
 			original: &DaemonSet{
 				ObjectMeta: v1.ObjectMeta{
 					Labels: map[string]string{
@@ -118,44 +118,24 @@ func TestSetDefaultDaemonSet(t *testing.T) {
 				},
 			},
 		},
-		{ // Update strategy.
+		{
+			name:     "Update strategy.",
 			original: &DaemonSet{},
 			expected: &DaemonSet{
 				Spec: DaemonSetSpec{
 					Template: templateNoLabel,
 					UpdateStrategy: DaemonSetUpdateStrategy{
-						Type: RollingUpdateDaemonSetStrategyType,
-						RollingUpdate: &RollingUpdateDaemonSet{
-							MaxUnavailable: &defaultIntOrString,
-						},
+						Type: NoopDaemonSetStrategyType,
 					},
 				},
 			},
 		},
-		{ // Update strategy.
+		{
+			name: "Paused",
 			original: &DaemonSet{
 				Spec: DaemonSetSpec{
 					UpdateStrategy: DaemonSetUpdateStrategy{
-						RollingUpdate: &RollingUpdateDaemonSet{},
-					},
-				},
-			},
-			expected: &DaemonSet{
-				Spec: DaemonSetSpec{
-					Template: templateNoLabel,
-					UpdateStrategy: DaemonSetUpdateStrategy{
-						Type: RollingUpdateDaemonSetStrategyType,
-						RollingUpdate: &RollingUpdateDaemonSet{
-							MaxUnavailable: &defaultIntOrString,
-						},
-					},
-				},
-			},
-		},
-		{ // Paused
-			original: &DaemonSet{
-				Spec: DaemonSetSpec{
-					UpdateStrategy: DaemonSetUpdateStrategy{
+						Type:          RollingUpdateDaemonSetStrategyType,
 						RollingUpdate: &RollingUpdateDaemonSet{},
 					},
 				},
@@ -173,40 +153,20 @@ func TestSetDefaultDaemonSet(t *testing.T) {
 				},
 			},
 		},
-		{ // AutoUpdate
-			original: &DaemonSet{
-				Spec: DaemonSetSpec{
-					UpdateStrategy: DaemonSetUpdateStrategy{
-						RollingUpdate: &RollingUpdateDaemonSet{},
-					},
-				},
-			},
-			expected: &DaemonSet{
-				Spec: DaemonSetSpec{
-					AutoUpdate: false,
-					Template:   templateNoLabel,
-					UpdateStrategy: DaemonSetUpdateStrategy{
-						Type: RollingUpdateDaemonSetStrategyType,
-						RollingUpdate: &RollingUpdateDaemonSet{
-							MaxUnavailable: &defaultIntOrString,
-						},
-					},
-				},
-			},
-		},
 	}
 
-	for i, test := range tests {
+	for _, test := range tests {
+		name := test.name
 		original := test.original
 		expected := test.expected
 		obj2 := roundTrip(t, runtime.Object(original))
 		got, ok := obj2.(*DaemonSet)
 		if !ok {
-			t.Errorf("(%d) unexpected object: %v", i, got)
+			t.Errorf("(%s) unexpected object: %v", name, got)
 			t.FailNow()
 		}
 		if !reflect.DeepEqual(got.Spec, expected.Spec) {
-			t.Errorf("(%d) got different than expected\ngot:\n\t%+v\nexpected:\n\t%+v", i, got.Spec, expected.Spec)
+			t.Errorf("(%s) got different than expected\ngot:\n\t%+v\nexpected:\n\t%+v", name, got.Spec, expected.Spec)
 		}
 	}
 }
