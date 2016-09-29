@@ -17,10 +17,12 @@ limitations under the License.
 package workqueue
 
 import (
+	"sync"
 	"time"
-
-	"github.com/prometheus/client_golang/prometheus"
 )
+
+// This file provides abstractions for setting the provider (e.g., prometheus)
+// of metrics.
 
 type queueMetrics interface {
 	add(item t)
@@ -28,52 +30,41 @@ type queueMetrics interface {
 	done(item t)
 }
 
-type defaultQueueMetrics struct {
-	depth                prometheus.Gauge
-	adds                 prometheus.Counter
-	latency              prometheus.Summary
-	workDuration         prometheus.Summary
-	addTimes             map[t]time.Time
-	processingStartTimes map[t]time.Time
+// GaugeMetric represents a single numerical value that can arbitrarily go up
+// and down.
+type GaugeMetric interface {
+	Inc()
+	Dec()
 }
 
-func newQueueMetrics(name string) queueMetrics {
-	var ret *defaultQueueMetrics
-	if len(name) == 0 {
-		return ret
-	}
+// CounterMetric represents a single numerical value that only ever
+// goes up.
+type CounterMetric interface {
+	Inc()
+}
 
-	ret = &defaultQueueMetrics{
-		depth: prometheus.NewGauge(prometheus.GaugeOpts{
-			Subsystem: name,
-			Name:      "depth",
-			Help:      "Current depth of workqueue: " + name,
-		}),
-		adds: prometheus.NewCounter(prometheus.CounterOpts{
-			Subsystem: name,
-			Name:      "adds",
-			Help:      "Total number of adds handled by workqueue: " + name,
-		}),
-		latency: prometheus.NewSummary(prometheus.SummaryOpts{
-			Subsystem: name,
-			Name:      "queue_latency",
-			Help:      "How long an item stays in workqueue" + name + " before being requested.",
-		}),
-		workDuration: prometheus.NewSummary(prometheus.SummaryOpts{
-			Subsystem: name,
-			Name:      "work_duration",
-			Help:      "How long processing an item from workqueue" + name + " takes.",
-		}),
-		addTimes:             map[t]time.Time{},
-		processingStartTimes: map[t]time.Time{},
-	}
+// SummaryMetric captures individual observations.
+type SummaryMetric interface {
+	Observe(float64)
+}
 
-	prometheus.Register(ret.depth)
-	prometheus.Register(ret.adds)
-	prometheus.Register(ret.latency)
-	prometheus.Register(ret.workDuration)
+type noopMetric struct{}
 
-	return ret
+func (noopMetric) Inc()            {}
+func (noopMetric) Dec()            {}
+func (noopMetric) Observe(float64) {}
+
+type defaultQueueMetrics struct {
+	// current depth of a workqueue
+	depth GaugeMetric
+	// total number of adds handled by a workqueue
+	adds CounterMetric
+	// how long an item stays in a workqueue
+	latency SummaryMetric
+	// how long processing an item from a workqueue takes
+	workDuration         SummaryMetric
+	addTimes             map[t]time.Time
+	processingStartTimes map[t]time.Time
 }
 
 func (m *defaultQueueMetrics) add(item t) {
@@ -122,26 +113,7 @@ type retryMetrics interface {
 }
 
 type defaultRetryMetrics struct {
-	retries prometheus.Counter
-}
-
-func newRetryMetrics(name string) retryMetrics {
-	var ret *defaultRetryMetrics
-	if len(name) == 0 {
-		return ret
-	}
-
-	ret = &defaultRetryMetrics{
-		retries: prometheus.NewCounter(prometheus.CounterOpts{
-			Subsystem: name,
-			Name:      "retries",
-			Help:      "Total number of retries handled by workqueue: " + name,
-		}),
-	}
-
-	prometheus.Register(ret.retries)
-
-	return ret
+	retries CounterMetric
 }
 
 func (m *defaultRetryMetrics) retry() {
@@ -150,4 +122,74 @@ func (m *defaultRetryMetrics) retry() {
 	}
 
 	m.retries.Inc()
+}
+
+// MetricsProvider generates various metrics used by the queue.
+type MetricsProvider interface {
+	NewDepthMetric(name string) GaugeMetric
+	NewAddsMetric(name string) CounterMetric
+	NewLatencyMetric(name string) SummaryMetric
+	NewWorkDurationMetric(name string) SummaryMetric
+	NewRetriesMetric(name string) CounterMetric
+}
+
+type noopMetricsProvider struct{}
+
+func (_ noopMetricsProvider) NewDepthMetric(name string) GaugeMetric {
+	return noopMetric{}
+}
+
+func (_ noopMetricsProvider) NewAddsMetric(name string) CounterMetric {
+	return noopMetric{}
+}
+
+func (_ noopMetricsProvider) NewLatencyMetric(name string) SummaryMetric {
+	return noopMetric{}
+}
+
+func (_ noopMetricsProvider) NewWorkDurationMetric(name string) SummaryMetric {
+	return noopMetric{}
+}
+
+func (_ noopMetricsProvider) NewRetriesMetric(name string) CounterMetric {
+	return noopMetric{}
+}
+
+var metricsFactory = struct {
+	metricsProvider MetricsProvider
+	setProviders    sync.Once
+}{
+	metricsProvider: noopMetricsProvider{},
+}
+
+func newQueueMetrics(name string) queueMetrics {
+	var ret *defaultQueueMetrics
+	if len(name) == 0 {
+		return ret
+	}
+	return &defaultQueueMetrics{
+		depth:                metricsFactory.metricsProvider.NewDepthMetric(name),
+		adds:                 metricsFactory.metricsProvider.NewAddsMetric(name),
+		latency:              metricsFactory.metricsProvider.NewLatencyMetric(name),
+		workDuration:         metricsFactory.metricsProvider.NewWorkDurationMetric(name),
+		addTimes:             map[t]time.Time{},
+		processingStartTimes: map[t]time.Time{},
+	}
+}
+
+func newRetryMetrics(name string) retryMetrics {
+	var ret *defaultRetryMetrics
+	if len(name) == 0 {
+		return ret
+	}
+	return &defaultRetryMetrics{
+		retries: metricsFactory.metricsProvider.NewRetriesMetric(name),
+	}
+}
+
+// SetProvider sets the metrics provider of the metricsFactory.
+func SetProvider(metricsProvider MetricsProvider) {
+	metricsFactory.setProviders.Do(func() {
+		metricsFactory.metricsProvider = metricsProvider
+	})
 }
