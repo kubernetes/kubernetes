@@ -23,7 +23,7 @@ import (
 	"net"
 	"path"
 
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/api"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	ipallocator "k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	certutil "k8s.io/kubernetes/pkg/util/cert"
 )
