@@ -1,6 +1,4 @@
-#!/bin/bash
-
-# Copyright 2015 The Kubernetes Authors.
+# Copyright 2016 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,20 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set -o errexit
-set -o nounset
-set -o pipefail
+TAG=v2
+REGISTRY=gcr.io/google_containers
+IMAGE=gci-mounter
 
-MANIFESTS_DIR=/opt/kube-manifests/kubernetes
+all: container
 
-echo "Configuring hostname"
-hostnamectl set-hostname $(hostname | cut -f1 -d.)
+container:
+	docker build --pull -t ${REGISTRY}/${IMAGE}:${TAG} .
 
-echo "Configuring kubelet"
-mkdir -p /var/lib/kubelet
-mkdir -p /etc/kubernetes/manifests
-src=${MANIFESTS_DIR}/kubelet-config.yaml
-dst=/var/lib/kubelet/kubeconfig
-cp ${src} ${dst}
-sed -i 's/\"/\\\"/g' ${dst} # eval will remove the double quotes if they are not escaped
-eval "echo \"$(< ${dst})\"" > ${dst}
+push: 
+	gcloud docker -- push ${REGISTRY}/${IMAGE}:${TAG}
+
+upload:
+	./stage-upload.sh ${TAG} ${REGISTRY}/${IMAGE}:${TAG}
+
+.PHONY: all container push

@@ -636,6 +636,50 @@ function kube::build::start_rsyncd_container() {
   kube::log::error "Could not connect to rsync container. See build-tools/README.md for setting up remote Docker engine."
   return 1
 }
+# This will pack kube-system manifests files for distros without using salt
+# such as GCI and Ubuntu Trusty. We directly copy manifests from
+# cluster/addons and cluster/saltbase/salt. The script of cluster initialization
+# will remove the salt configuration and evaluate the variables in the manifests.
+function kube::release::package_kube_manifests_tarball() {
+  kube::log::status "Building tarball: manifests"
+
+  local release_stage="${RELEASE_STAGE}/manifests/kubernetes"
+  rm -rf "${release_stage}"
+  local dst_dir="${release_stage}/gci-trusty"
+  mkdir -p "${dst_dir}"
+
+  local salt_dir="${KUBE_ROOT}/cluster/saltbase/salt"
+  cp "${salt_dir}/cluster-autoscaler/cluster-autoscaler.manifest" "${dst_dir}/"
+  cp "${salt_dir}/fluentd-es/fluentd-es.yaml" "${release_stage}/"
+  cp "${salt_dir}/fluentd-gcp/fluentd-gcp.yaml" "${release_stage}/"
+  cp "${salt_dir}/kube-registry-proxy/kube-registry-proxy.yaml" "${release_stage}/"
+  cp "${salt_dir}/kube-proxy/kube-proxy.manifest" "${release_stage}/"
+  cp "${salt_dir}/etcd/etcd.manifest" "${dst_dir}"
+  cp "${salt_dir}/kube-scheduler/kube-scheduler.manifest" "${dst_dir}"
+  cp "${salt_dir}/kube-apiserver/kube-apiserver.manifest" "${dst_dir}"
+  cp "${salt_dir}/kube-apiserver/abac-authz-policy.jsonl" "${dst_dir}"
+  cp "${salt_dir}/kube-controller-manager/kube-controller-manager.manifest" "${dst_dir}"
+  cp "${salt_dir}/kube-addons/kube-addon-manager.yaml" "${dst_dir}"
+  cp "${salt_dir}/l7-gcp/glbc.manifest" "${dst_dir}"
+  cp "${salt_dir}/rescheduler/rescheduler.manifest" "${dst_dir}/"
+  cp "${salt_dir}/e2e-image-puller/e2e-image-puller.manifest" "${dst_dir}/"
+  cp "${KUBE_ROOT}/cluster/gce/trusty/configure-helper.sh" "${dst_dir}/trusty-configure-helper.sh"
+  cp "${KUBE_ROOT}/cluster/gce/gci/configure-helper.sh" "${dst_dir}/gci-configure-helper.sh"
+  cp "${KUBE_ROOT}/cluster/gce/gci/health-monitor.sh" "${dst_dir}/health-monitor.sh"
+  cp "${KUBE_ROOT}/cluster/gce/coreos/configure-helper.sh" "${dst_dir}/coreos-configure-helper.sh"
+  cp -r "${salt_dir}/kube-admission-controls/limit-range" "${dst_dir}"
+  local objects
+  objects=$(cd "${KUBE_ROOT}/cluster/addons" && find . \( -name \*.yaml -or -name \*.yaml.in -or -name \*.json \) | grep -v demo)
+  tar c -C "${KUBE_ROOT}/cluster/addons" ${objects} | tar x -C "${dst_dir}"
+
+  # This is for coreos only. ContainerVM, GCI, or Trusty does not use it.
+  cp -r "${KUBE_ROOT}/cluster/gce/coreos/kube-manifests"/* "${release_stage}/"
+
+  kube::release::clean_cruft
+
+  local package_name="${RELEASE_DIR}/kubernetes-manifests.tar.gz"
+  kube::release::create_tarball "${package_name}" "${release_stage}/.."
+}
 
 function kube::build::stop_rsyncd_container() {
   V=3 kube::log::status "Stopping any currently running rsyncd container"
