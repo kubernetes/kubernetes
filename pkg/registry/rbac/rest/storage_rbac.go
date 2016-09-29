@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	rbacapiv1alpha1 "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"
 	rbacvalidation "k8s.io/kubernetes/pkg/apis/rbac/validation"
+	rbacclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/rbac/unversioned"
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/registry/rbac/clusterrole"
 	clusterroleetcd "k8s.io/kubernetes/pkg/registry/rbac/clusterrole/etcd"
@@ -46,8 +47,6 @@ import (
 
 type RESTStorageProvider struct {
 	AuthorizerRBACSuperUser string
-
-	postStartHook genericapiserver.PostStartHookFunc
 }
 
 var _ genericapiserver.RESTStorageProvider = &RESTStorageProvider{}
@@ -93,8 +92,6 @@ func (p *RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource genericapi
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("clusterroles")) {
 		clusterRolesStorage := clusterroleetcd.NewREST(restOptionsGetter(rbac.Resource("clusterroles")))
 		storage["clusterroles"] = clusterrolepolicybased.NewStorage(clusterRolesStorage, newRuleValidator(), p.AuthorizerRBACSuperUser)
-
-		p.postStartHook = newPostStartHook(clusterRolesStorage)
 	}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("clusterrolebindings")) {
 		clusterRoleBindingsStorage := clusterrolebindingetcd.NewREST(restOptionsGetter(rbac.Resource("clusterrolebindings")))
@@ -104,33 +101,35 @@ func (p *RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource genericapi
 }
 
 func (p *RESTStorageProvider) PostStartHook() (string, genericapiserver.PostStartHookFunc, error) {
-	return "rbac/bootstrap-roles", p.postStartHook, nil
+	return "rbac/bootstrap-roles", PostStartHook, nil
 }
 
-func newPostStartHook(directClusterRoleAccess *clusterroleetcd.REST) genericapiserver.PostStartHookFunc {
-	return func(genericapiserver.PostStartHookContext) error {
-		ctx := api.NewContext()
-
-		existingClusterRoles, err := directClusterRoleAccess.List(ctx, &api.ListOptions{})
-		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("unable to initialize clusterroles: %v", err))
-			return nil
-		}
-		// if clusterroles already exist, then assume we don't have work to do because we've already
-		// initialized or another API server has started this task
-		if len(existingClusterRoles.(*rbac.ClusterRoleList).Items) > 0 {
-			return nil
-		}
-
-		for _, clusterRole := range append(bootstrappolicy.ClusterRoles(), bootstrappolicy.ControllerRoles()...) {
-			if _, err := directClusterRoleAccess.Create(ctx, &clusterRole); err != nil {
-				// don't fail on failures, try to create as many as you can
-				utilruntime.HandleError(fmt.Errorf("unable to initialize clusterroles: %v", err))
-				continue
-			}
-			glog.Infof("Created clusterrole.%s/%s", rbac.GroupName, clusterRole.Name)
-		}
-
+func PostStartHook(hookContext genericapiserver.PostStartHookContext) error {
+	clientset, err := rbacclient.NewForConfig(hookContext.LoopbackClientConfig)
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("unable to initialize clusterroles: %v", err))
 		return nil
 	}
+
+	existingClusterRoles, err := clientset.ClusterRoles().List(api.ListOptions{})
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("unable to initialize clusterroles: %v", err))
+		return nil
+	}
+	// if clusterroles already exist, then assume we don't have work to do because we've already
+	// initialized or another API server has started this task
+	if len(existingClusterRoles.Items) > 0 {
+		return nil
+	}
+
+	for _, clusterRole := range append(bootstrappolicy.ClusterRoles(), bootstrappolicy.ControllerRoles()...) {
+		if _, err := clientset.ClusterRoles().Create(&clusterRole); err != nil {
+			// don't fail on failures, try to create as many as you can
+			utilruntime.HandleError(fmt.Errorf("unable to initialize clusterroles: %v", err))
+			continue
+		}
+		glog.Infof("Created clusterrole.%s/%s", rbac.GroupName, clusterRole.Name)
+	}
+
+	return nil
 }

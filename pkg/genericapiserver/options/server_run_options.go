@@ -211,6 +211,15 @@ func mergeGroupVersionIntoMap(gvList string, dest map[string]unversioned.GroupVe
 
 // Returns a clientset which can be used to talk to this apiserver.
 func (s *ServerRunOptions) NewSelfClient(token string) (clientset.Interface, error) {
+	clientConfig, err := s.NewSelfClientConfig(token)
+	if err != nil {
+		return nil, err
+	}
+	return clientset.NewForConfig(clientConfig)
+}
+
+// Returns a clientconfig which can be used to talk to this apiserver.
+func (s *ServerRunOptions) NewSelfClientConfig(token string) (*restclient.Config, error) {
 	clientConfig := &restclient.Config{
 		// Increase QPS limits. The client is currently passed to all admission plugins,
 		// and those can be throttled in case of higher load on apiserver - see #22340 and #22422
@@ -228,7 +237,7 @@ func (s *ServerRunOptions) NewSelfClient(token string) (clientset.Interface, err
 		return nil, errors.New("Unable to set url for apiserver local client")
 	}
 
-	return clientset.NewForConfig(clientConfig)
+	return clientConfig, nil
 }
 
 // AddFlags adds flags for a specific APIServer to the specified FlagSet

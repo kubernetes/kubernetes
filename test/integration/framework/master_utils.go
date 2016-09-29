@@ -38,12 +38,16 @@ import (
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/apis/storage"
+	"k8s.io/kubernetes/pkg/apiserver/authenticator"
+	authorizerunion "k8s.io/kubernetes/pkg/auth/authorizer/union"
+	"k8s.io/kubernetes/pkg/auth/user"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller"
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
+	"k8s.io/kubernetes/pkg/generated/openapi"
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/genericapiserver/authorizer"
 	"k8s.io/kubernetes/pkg/kubectl"
@@ -53,10 +57,10 @@ import (
 	"k8s.io/kubernetes/pkg/storage/storagebackend"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/plugin/pkg/admission/admit"
+	authenticatorunion "k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/union"
 
 	"github.com/go-openapi/spec"
 	"github.com/pborman/uuid"
-	"k8s.io/kubernetes/pkg/generated/openapi"
 )
 
 const (
@@ -149,6 +153,32 @@ func startMasterOrDie(masterConfig *master.Config) (*master.Master, *httptest.Se
 			},
 		}
 	}
+
+	// set the loopback client config
+	if masterConfig.GenericConfig.LoopbackClientConfig == nil {
+		masterConfig.GenericConfig.LoopbackClientConfig = &restclient.Config{QPS: 50, Burst: 100}
+	}
+	masterConfig.GenericConfig.LoopbackClientConfig.Host = s.URL
+
+	privilegedLoopbackToken := uuid.NewRandom().String()
+	// wrap any available authorizer
+	if masterConfig.GenericConfig.Authenticator != nil {
+		tokens := make(map[string]*user.DefaultInfo)
+		tokens[privilegedLoopbackToken] = &user.DefaultInfo{
+			Name:   "system:apiserver",
+			UID:    uuid.NewRandom().String(),
+			Groups: []string{"system:masters"},
+		}
+
+		tokenAuthenticator := authenticator.NewAuthenticatorFromTokens(tokens)
+		masterConfig.GenericConfig.Authenticator = authenticatorunion.New(tokenAuthenticator, masterConfig.GenericConfig.Authenticator)
+
+		tokenAuthorizer := authorizer.NewPrivilegedGroups("system:masters")
+		masterConfig.GenericConfig.Authorizer = authorizerunion.New(tokenAuthorizer, masterConfig.GenericConfig.Authorizer)
+
+		masterConfig.GenericConfig.LoopbackClientConfig.BearerToken = privilegedLoopbackToken
+	}
+
 	m, err := masterConfig.Complete().New()
 	if err != nil {
 		glog.Fatalf("error in bringing up the master: %v", err)
@@ -157,7 +187,7 @@ func startMasterOrDie(masterConfig *master.Config) (*master.Master, *httptest.Se
 	// TODO have this start method actually use the normal start sequence for the API server
 	// this method never actually calls the `Run` method for the API server
 	// fire the post hooks ourselves
-	m.GenericAPIServer.RunPostStartHooks(genericapiserver.PostStartHookContext{})
+	m.GenericAPIServer.RunPostStartHooks()
 
 	return m, s
 }
