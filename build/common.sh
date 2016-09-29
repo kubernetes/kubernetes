@@ -678,7 +678,6 @@ function kube::release::package_kube_manifests_tarball() {
   local objects
   objects=$(cd "${KUBE_ROOT}/cluster/addons" && find . \( -name \*.yaml -or -name \*.yaml.in -or -name \*.json \) | grep -v demo)
   tar c -C "${KUBE_ROOT}/cluster/addons" ${objects} | tar x -C "${dst_dir}"
-
   kube::release::clean_cruft
 
   local package_name="${RELEASE_DIR}/kubernetes-manifests.tar.gz"
