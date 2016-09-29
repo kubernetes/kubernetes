@@ -641,8 +641,9 @@ func TestControllerUpdateStatusWithFailure(t *testing.T) {
 		return true, &api.ReplicationController{}, fmt.Errorf("Fake error")
 	})
 	fakeRCClient := c.Core().ReplicationControllers("default")
-	numReplicas := 10
-	updateReplicaCount(fakeRCClient, *rc, numReplicas, 0, 0, 0)
+	numReplicas := int32(10)
+	status := api.ReplicationControllerStatus{Replicas: numReplicas}
+	updateReplicationControllerStatus(fakeRCClient, *rc, status)
 	updates, gets := 0, 0
 	for _, a := range c.Actions() {
 		if a.GetResource().Resource != "replicationcontrollers" {
@@ -663,7 +664,7 @@ func TestControllerUpdateStatusWithFailure(t *testing.T) {
 			// returned an rc with replicas=1.
 			if c, ok := action.GetObject().(*api.ReplicationController); !ok {
 				t.Errorf("Expected an rc as the argument to update, got %T", c)
-			} else if c.Status.Replicas != int32(numReplicas) {
+			} else if c.Status.Replicas != numReplicas {
 				t.Errorf("Expected update for rc to contain replicas %v, got %v instead",
 					numReplicas, c.Status.Replicas)
 			}
