@@ -477,7 +477,7 @@ func (EventList) SwaggerDoc() map[string]string {
 var map_EventSource = map[string]string{
 	"":          "EventSource contains information for an event.",
 	"component": "Component from which the event is generated.",
-	"host":      "Host name on which the event is generated.",
+	"host":      "Node name on which the event is generated.",
 }
 
 func (EventSource) SwaggerDoc() map[string]string {
