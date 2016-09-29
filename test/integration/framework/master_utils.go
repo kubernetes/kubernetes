@@ -165,15 +165,15 @@ func startMasterOrDie(masterConfig *master.Config) (*master.Master, *httptest.Se
 	if masterConfig.GenericConfig.Authenticator != nil {
 		tokens := make(map[string]*user.DefaultInfo)
 		tokens[privilegedLoopbackToken] = &user.DefaultInfo{
-			Name:   "system:apiserver",
+			Name:   user.APIServerUser,
 			UID:    uuid.NewRandom().String(),
-			Groups: []string{"system:masters"},
+			Groups: []string{user.SystemPrivilegedGroup},
 		}
 
 		tokenAuthenticator := authenticator.NewAuthenticatorFromTokens(tokens)
 		masterConfig.GenericConfig.Authenticator = authenticatorunion.New(tokenAuthenticator, masterConfig.GenericConfig.Authenticator)
 
-		tokenAuthorizer := authorizer.NewPrivilegedGroups("system:masters")
+		tokenAuthorizer := authorizer.NewPrivilegedGroups(user.SystemPrivilegedGroup)
 		masterConfig.GenericConfig.Authorizer = authorizerunion.New(tokenAuthorizer, masterConfig.GenericConfig.Authorizer)
 
 		masterConfig.GenericConfig.LoopbackClientConfig.BearerToken = privilegedLoopbackToken

@@ -187,15 +187,15 @@ func Run(s *options.ServerRunOptions) error {
 		var uid = uuid.NewRandom().String()
 		tokens := make(map[string]*user.DefaultInfo)
 		tokens[privilegedLoopbackToken] = &user.DefaultInfo{
-			Name:   "system:apiserver",
+			Name:   user.APIServerUser,
 			UID:    uid,
-			Groups: []string{"system:masters"},
+			Groups: []string{user.SystemPrivilegedGroup},
 		}
 
 		tokenAuthenticator := authenticator.NewAuthenticatorFromTokens(tokens)
 		apiAuthenticator = authenticatorunion.New(tokenAuthenticator, apiAuthenticator)
 
-		tokenAuthorizer := authorizer.NewPrivilegedGroups("system:masters")
+		tokenAuthorizer := authorizer.NewPrivilegedGroups(user.SystemPrivilegedGroup)
 		apiAuthorizer = authorizerunion.New(tokenAuthorizer, apiAuthorizer)
 	}
 

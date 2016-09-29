@@ -141,7 +141,7 @@ func New(config AuthenticatorConfig) (authenticator.Request, error) {
 
 	authenticator := union.New(authenticators...)
 
-	authenticator = group.NewGroupAdder(authenticator, []string{"system:authenticated"})
+	authenticator = group.NewGroupAdder(authenticator, []string{user.AllAuthenticated})
 
 	if config.Anonymous {
 		// If the authenticator chain returns an error, return an error (don't consider a bad bearer token anonymous).
