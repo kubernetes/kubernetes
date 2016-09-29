@@ -49,7 +49,7 @@ func newDelayingQueue(clock clock.Clock, name string) DelayingInterface {
 		stopCh:             make(chan struct{}),
 		waitingTimeByEntry: map[t]time.Time{},
 		waitingForAddCh:    make(chan waitFor, 1000),
-		metrics:            newRetryMetrics(name),
+		metrics:            DefaultMetricsFactory.newRetryMetrics(name),
 	}
 
 	go ret.waitingLoop()

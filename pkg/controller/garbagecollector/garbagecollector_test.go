@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/json"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/workqueue"
+	_ "k8s.io/kubernetes/pkg/util/workqueue/prometheus"
 )
 
 func TestNewGarbageCollector(t *testing.T) {

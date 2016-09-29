@@ -39,7 +39,7 @@ func NewNamed(name string) *Type {
 		dirty:      set{},
 		processing: set{},
 		cond:       sync.NewCond(&sync.Mutex{}),
-		metrics:    newQueueMetrics(name),
+		metrics:    DefaultMetricsFactory.newQueueMetrics(name),
 	}
 }
 
