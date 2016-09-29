@@ -1753,6 +1753,35 @@ type ReplicationControllerStatus struct {
 
 	// ObservedGeneration is the most recent generation observed by the controller.
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+
+	// Represents the latest available observations of a replication controller's current state.
+	Conditions []ReplicationControllerCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
+}
+
+type ReplicationControllerConditionType string
+
+// These are valid conditions of a replication controller.
+const (
+	// ReplicationControllerReplicaFailure is added in a replication controller when one of its pods
+	// fails to be created due to insufficient quota, limit ranges, pod security policy, node selectors,
+	// etc. or deleted due to kubelet being down or finalizers are failing.
+	ReplicationControllerReplicaFailure ReplicationControllerConditionType = "ReplicaFailure"
+)
+
+// ReplicationControllerCondition describes the state of a replication controller at a certain point.
+type ReplicationControllerCondition struct {
+	// Type of replication controller condition.
+	Type ReplicationControllerConditionType `json:"type"`
+	// Status of the condition, one of True, False, Unknown.
+	Status ConditionStatus `json:"status"`
+	// Last time we probed the condition.
+	LastProbeTime unversioned.Time `json:"lastProbeTime,omitempty"`
+	// The last time the condition transitioned from one status to another.
+	LastTransitionTime unversioned.Time `json:"lastTransitionTime,omitempty"`
+	// The reason for the condition's last transition.
+	Reason string `json:"reason,omitempty"`
+	// A human readable message indicating details about the transition.
+	Message string `json:"message,omitempty"`
 }
 
 // +genclient=true
