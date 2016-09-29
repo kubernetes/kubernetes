@@ -28,12 +28,13 @@ import (
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/runtime"
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
+	"k8s.io/kubernetes/pkg/types"
 )
 
 type fakeConnectionInfoGetter struct {
 }
 
-func (fakeConnectionInfoGetter) GetRawConnectionInfo(ctx api.Context, nodeName string) (string, uint, http.RoundTripper, error) {
+func (fakeConnectionInfoGetter) GetRawConnectionInfo(ctx api.Context, nodeName types.NodeName) (string, uint, http.RoundTripper, error) {
 	return "http", 12345, nil, nil
 }
 
