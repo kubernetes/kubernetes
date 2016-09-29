@@ -35,7 +35,7 @@ import (
 // WithCORS is a simple CORS implementation that wraps an http Handler.
 // Pass nil for allowedMethods and allowedHeaders to use the defaults. If allowedOriginPatterns
 // is empty or nil, no CORS support is installed.
-func WithCORS(handler http.Handler, allowedOriginPatterns []string, allowedMethods []string, allowedHeaders []string, allowCredentials string) http.Handler {
+func WithCORS(handler http.Handler, allowedOriginPatterns []string, allowedMethods []string, allowedHeaders []string, exposedHeaders []string, allowCredentials string) http.Handler {
 	if len(allowedOriginPatterns) == 0 {
 		return handler
 	}
@@ -58,8 +58,12 @@ func WithCORS(handler http.Handler, allowedOriginPatterns []string, allowedMetho
 				if allowedHeaders == nil {
 					allowedHeaders = []string{"Content-Type", "Content-Length", "Accept-Encoding", "X-CSRF-Token", "Authorization", "X-Requested-With", "If-Modified-Since"}
 				}
+				if exposedHeaders == nil {
+					exposedHeaders = []string{"Date"}
+				}
 				w.Header().Set("Access-Control-Allow-Methods", strings.Join(allowedMethods, ", "))
 				w.Header().Set("Access-Control-Allow-Headers", strings.Join(allowedHeaders, ", "))
+				w.Header().Set("Access-Control-Expose-Headers", strings.Join(exposedHeaders, ", "))
 				w.Header().Set("Access-Control-Allow-Credentials", allowCredentials)
 
 				// Stop here if its a preflight OPTIONS request
