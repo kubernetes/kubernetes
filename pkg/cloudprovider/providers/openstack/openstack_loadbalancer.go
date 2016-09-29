@@ -456,8 +456,6 @@ func (lbaas *LbaasV2) createLoadBalancer(service *api.Service, name string) (*lo
 		return nil, fmt.Errorf("Error creating loadbalancer %v: %v", createOpts, err)
 	}
 
-	waitLoadbalancerActiveProvisioningStatus(lbaas.network, loadbalancer.ID)
-
 	return loadbalancer, nil
 }
 
@@ -533,6 +531,8 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *api.Ser
 	} else {
 		glog.V(2).Infof("LoadBalancer %s already exists", name)
 	}
+
+	waitLoadbalancerActiveProvisioningStatus(lbaas.network, loadbalancer.ID)
 
 	lbmethod := v2_pools.LBMethod(lbaas.opts.LBMethod)
 	if lbmethod == "" {
