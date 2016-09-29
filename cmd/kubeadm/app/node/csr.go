@@ -34,8 +34,8 @@ import (
 )
 
 // PerformTLSBootstrap creates a RESTful client in order to execute certificate signing request.
-func PerformTLSBootstrap(s *kubeadmapi.KubeadmConfig, apiEndpoint string, caCert []byte) (*clientcmdapi.Config, error) {
-	// TODO(phase2) try all the api servers until we find one that works
+func PerformTLSBootstrap(s *kubeadmapi.NodeConfiguration, apiEndpoint string, caCert []byte) (*clientcmdapi.Config, error) {
+	// TODO(phase1+) try all the api servers until we find one that works
 	bareClientConfig := kubeadmutil.CreateBasicClientConfig("kubernetes", apiEndpoint, caCert)
 
 	hostName, err := os.Hostname()

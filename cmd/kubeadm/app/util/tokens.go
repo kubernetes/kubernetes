@@ -42,7 +42,7 @@ func RandBytes(length int) ([]byte, string, error) {
 	return b, hex.EncodeToString(b), nil
 }
 
-func GenerateToken(s *kubeadmapi.KubeadmConfig) error {
+func GenerateToken(s *kubeadmapi.Secrets) error {
 	_, tokenID, err := RandBytes(TokenIDLen / 2)
 	if err != nil {
 		return err
@@ -53,19 +53,19 @@ func GenerateToken(s *kubeadmapi.KubeadmConfig) error {
 		return err
 	}
 
-	s.Secrets.TokenID = tokenID
-	s.Secrets.BearerToken = token
-	s.Secrets.Token = tokenBytes
-	s.Secrets.GivenToken = fmt.Sprintf("%s.%s", tokenID, token)
+	s.TokenID = tokenID
+	s.BearerToken = token
+	s.Token = tokenBytes
+	s.GivenToken = fmt.Sprintf("%s.%s", tokenID, token)
 	return nil
 }
 
-func UseGivenTokenIfValid(s *kubeadmapi.KubeadmConfig) (bool, error) {
-	if s.Secrets.GivenToken == "" {
+func UseGivenTokenIfValid(s *kubeadmapi.Secrets) (bool, error) {
+	if s.GivenToken == "" {
 		return false, nil // not given
 	}
 	fmt.Println("<util/tokens> validating provided token")
-	givenToken := strings.Split(strings.ToLower(s.Secrets.GivenToken), ".")
+	givenToken := strings.Split(strings.ToLower(s.GivenToken), ".")
 	// TODO(phase1+) print desired format
 	// TODO(phase1+) could also print more specific messages in each case
 	invalidErr := "<util/tokens> provided token is invalid - %s"
@@ -78,8 +78,8 @@ func UseGivenTokenIfValid(s *kubeadmapi.KubeadmConfig) (bool, error) {
 			len(givenToken[0]), TokenIDLen))
 	}
 	tokenBytes := []byte(givenToken[1])
-	s.Secrets.TokenID = givenToken[0]
-	s.Secrets.BearerToken = givenToken[1]
-	s.Secrets.Token = tokenBytes
+	s.TokenID = givenToken[0]
+	s.BearerToken = givenToken[1]
+	s.Token = tokenBytes
 	return true, nil // given and valid
 }

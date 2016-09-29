@@ -17,10 +17,7 @@ limitations under the License.
 package app
 
 import (
-	"fmt"
 	"os"
-	"runtime"
-	"strings"
 
 	"github.com/renstrom/dedent"
 	"github.com/spf13/pflag"
@@ -28,6 +25,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/util/logs"
+	"fmt"
 )
 
 var AlphaWarningOnExit = dedent.Dedent(`
@@ -35,31 +33,6 @@ var AlphaWarningOnExit = dedent.Dedent(`
 	kubeadm: please create issue an using https://github.com/kubernetes/kubernetes/issues/new
 	kubeadm: and make sure to mention @kubernetes/sig-cluster-lifecycle. Thank you!
 `)
-
-// TODO(phase2) use componentconfig
-// we need some params for testing etc, let's keep these hidden for now
-func getEnvParams() map[string]string {
-
-	envParams := map[string]string{
-		// TODO(phase1+): Mode prefix and host_pki_path to another place as constants, and use them everywhere
-		// Right now they're used here and there, but not consequently
-		"kubernetes_dir":     "/etc/kubernetes",
-		"host_pki_path":      "/etc/kubernetes/pki",
-		"host_etcd_path":     "/var/lib/etcd",
-		"hyperkube_image":    "",
-		"discovery_image":    fmt.Sprintf("gcr.io/google_containers/kube-discovery-%s:%s", runtime.GOARCH, "1.0"),
-		"etcd_image":         "",
-		"component_loglevel": "--v=4",
-	}
-
-	for k := range envParams {
-		if v := os.Getenv(fmt.Sprintf("KUBE_%s", strings.ToUpper(k))); v != "" {
-			envParams[k] = v
-		}
-	}
-
-	return envParams
-}
 
 func Run() error {
 	logs.InitLogs()
@@ -69,17 +42,18 @@ func Run() error {
 	pflag.CommandLine.MarkHidden("google-json-key")
 	pflag.CommandLine.MarkHidden("log-flush-frequency")
 
+	// ensure kubeadm to be run as root.
 	if err := checkPermissions(); !err {
 		return err
 	}
 
-	cmd := cmd.NewKubeadmCommand(cmdutil.NewFactory(nil), os.Stdin, os.Stdout, os.Stderr, getEnvParams())
+	cmd := cmd.NewKubeadmCommand(cmdutil.NewFactory(nil), os.Stdin, os.Stdout, os.Stderr)
 	return cmd.Execute()
 }
 
 func checkPermissions() error {
 	if uid := os.Getuid(); uid != 0 {
-		return fmt.Errorf("Kubeadm needs to run as uid `0`. It is being run as %d", uid)
+		return fmt.Errorf("<app/kubeadm> needs to run as root (e.g using sudo kubeadm)")
 	}
 	return nil
 }

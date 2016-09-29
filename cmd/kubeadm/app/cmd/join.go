@@ -19,7 +19,6 @@ package cmd
 import (
 	"fmt"
 	"io"
-	"net"
 
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
@@ -42,18 +41,19 @@ var (
 )
 
 // NewCmdJoin returns "kubeadm join" command.
-func NewCmdJoin(out io.Writer, s *kubeadmapi.KubeadmConfig) *cobra.Command {
+func NewCmdJoin(out io.Writer) *cobra.Command {
+	cfg := &kubeadmapi.NodeConfiguration{}
 	cmd := &cobra.Command{
 		Use:   "join",
 		Short: "Run this on any machine you wish to join an existing cluster.",
 		Run: func(cmd *cobra.Command, args []string) {
-			err := RunJoin(out, cmd, args, s)
+			err := RunJoin(out, cmd, args, cfg)
 			cmdutil.CheckErr(err)
 		},
 	}
 
 	cmd.PersistentFlags().StringVar(
-		&s.Secrets.GivenToken, "token", "",
+		&cfg.Secrets.GivenToken, "token", "",
 		"(required) Shared secret used to secure bootstrap. Must match the output of 'kubeadm init'",
 	)
 
@@ -61,20 +61,14 @@ func NewCmdJoin(out io.Writer, s *kubeadmapi.KubeadmConfig) *cobra.Command {
 }
 
 // RunJoin executes worked node provisioning and tries to join an existing cluster.
-func RunJoin(out io.Writer, cmd *cobra.Command, args []string, s *kubeadmapi.KubeadmConfig) error {
+func RunJoin(out io.Writer, cmd *cobra.Command, args []string, s *kubeadmapi.NodeConfiguration) error {
 	// TODO(phase1+) this we are missing args from the help text, there should be a way to tell cobra about it
 	if len(args) == 0 {
 		return fmt.Errorf("<cmd/join> must specify master IP address (see --help)")
 	}
-	for _, i := range args {
-		addr := net.ParseIP(i) // TODO(phase1+) should allow resolvable names too
-		if addr == nil {
-			return fmt.Errorf("<cmd/join> failed to parse argument (%q) as an IP address", i)
-		}
-		s.JoinFlags.MasterAddrs = append(s.JoinFlags.MasterAddrs, addr)
-	}
+	s.MasterAddresses = append(s.MasterAddresses, args...)
 
-	ok, err := kubeadmutil.UseGivenTokenIfValid(s)
+	ok, err := kubeadmutil.UseGivenTokenIfValid(&s.Secrets)
 	if !ok {
 		if err != nil {
 			return fmt.Errorf("<cmd/join> %v (see --help)\n", err)
@@ -87,7 +81,7 @@ func RunJoin(out io.Writer, cmd *cobra.Command, args []string, s *kubeadmapi.Kub
 		return err
 	}
 
-	err = kubeadmutil.WriteKubeconfigIfNotExists(s, "kubelet", kubeconfig)
+	err = kubeadmutil.WriteKubeconfigIfNotExists("kubelet", kubeconfig)
 	if err != nil {
 		return err
 	}

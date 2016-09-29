@@ -40,15 +40,15 @@ const (
 	kubeDiscoverySecretName = "clusterinfo"
 )
 
-func encodeKubeDiscoverySecretData(s *kubeadmapi.KubeadmConfig, caCert *x509.Certificate) map[string][]byte {
+func encodeKubeDiscoverySecretData(s *kubeadmapi.MasterConfiguration, caCert *x509.Certificate) map[string][]byte {
 	var (
 		data         = map[string][]byte{}
 		endpointList = []string{}
 		tokenMap     = map[string]string{}
 	)
 
-	for _, addr := range s.InitFlags.API.AdvertiseAddrs {
-		endpointList = append(endpointList, fmt.Sprintf("https://%s:443", addr.String()))
+	for _, addr := range s.API.AdvertiseAddresses {
+		endpointList = append(endpointList, fmt.Sprintf("https://%s:443", addr))
 	}
 
 	tokenMap[s.Secrets.TokenID] = s.Secrets.BearerToken
@@ -60,7 +60,8 @@ func encodeKubeDiscoverySecretData(s *kubeadmapi.KubeadmConfig, caCert *x509.Cer
 	return data
 }
 
-func newKubeDiscoveryPodSpec(s *kubeadmapi.KubeadmConfig) api.PodSpec {
+func newKubeDiscoveryPodSpec() api.PodSpec {
+	envParams := kubeadmapi.GetEnvParams()
 	return api.PodSpec{
 		// We have to use host network namespace, as `HostPort`/`HostIP` are Docker's
 		// buisness and CNI support isn't quite there yet (except for kubenet)
@@ -69,7 +70,7 @@ func newKubeDiscoveryPodSpec(s *kubeadmapi.KubeadmConfig) api.PodSpec {
 		SecurityContext: &api.PodSecurityContext{HostNetwork: true},
 		Containers: []api.Container{{
 			Name:    kubeDiscoveryName,
-			Image:   s.EnvParams["discovery_image"],
+			Image:   envParams["discovery_image"],
 			Command: []string{"/usr/local/bin/kube-discovery"},
 			VolumeMounts: []api.VolumeMount{{
 				Name:      kubeDiscoverySecretName,
@@ -100,9 +101,9 @@ func newKubeDiscoveryPodSpec(s *kubeadmapi.KubeadmConfig) api.PodSpec {
 	}
 }
 
-func newKubeDiscovery(s *kubeadmapi.KubeadmConfig, caCert *x509.Certificate) kubeDiscovery {
+func newKubeDiscovery(s *kubeadmapi.MasterConfiguration, caCert *x509.Certificate) kubeDiscovery {
 	kd := kubeDiscovery{
-		Deployment: NewDeployment(kubeDiscoveryName, 1, newKubeDiscoveryPodSpec(s)),
+		Deployment: NewDeployment(kubeDiscoveryName, 1, newKubeDiscoveryPodSpec()),
 		Secret: &api.Secret{
 			ObjectMeta: api.ObjectMeta{Name: kubeDiscoverySecretName},
 			Type:       api.SecretTypeOpaque,
@@ -116,7 +117,7 @@ func newKubeDiscovery(s *kubeadmapi.KubeadmConfig, caCert *x509.Certificate) kub
 	return kd
 }
 
-func CreateDiscoveryDeploymentAndSecret(s *kubeadmapi.KubeadmConfig, client *clientset.Clientset, caCert *x509.Certificate) error {
+func CreateDiscoveryDeploymentAndSecret(s *kubeadmapi.MasterConfiguration, client *clientset.Clientset, caCert *x509.Certificate) error {
 	kd := newKubeDiscovery(s, caCert)
 
 	if _, err := client.Extensions().Deployments(api.NamespaceSystem).Create(kd.Deployment); err != nil {

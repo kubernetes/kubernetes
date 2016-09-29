@@ -16,89 +16,54 @@ limitations under the License.
 
 package api
 
-import (
-	"net"
-)
+import "k8s.io/kubernetes/pkg/api/unversioned"
 
-// KubeadmConfig TODO add description
-// TODO(phase1+) @krousey: Please don't embed structs. It obfuscates the source of the fields and doesn't really buy you anything.
-type KubeadmConfig struct {
-	InitFlags
-	JoinFlags
-	Secrets struct {
-		GivenToken  string // dot-separated `<TokenID>.<Token>` set by the user
-		TokenID     string // optional on master side, will be generated if not specified
-		Token       []byte // optional on master side, will be generated if not specified
-		BearerToken string // set based on Token
-	}
-	EnvParams map[string]string // TODO(phase2) this is likely to be come componentconfig
+type MasterConfiguration struct {
+	unversioned.TypeMeta
+
+	Secrets           Secrets
+	API               API
+	Etcd              Etcd
+	Networking        Networking
+	KubernetesVersion string
+	CloudProvider     string
 }
 
-// TODO(phase2) should we add validation functions for these structs?
-
-// TODO(phase1+) refactor token handling
-// - https://github.com/kubernetes/kubernetes/pull/33262/files#r80333662
-// - https://github.com/kubernetes/kubernetes/pull/33262/files#r80336374
-// - https://github.com/kubernetes/kubernetes/pull/33262/files#r80333982
-
-// InitFlags holds values for "kubeadm init" command flags.
-type InitFlags struct {
-	API struct {
-		AdvertiseAddrs   []net.IP
-		ExternalDNSNames []string
-		Etcd             struct {
-			ExternalEndpoints []string
-			ExternalCAFile    string
-			ExternalCertFile  string
-			ExternalKeyFile   string
-		}
-	}
-	Services struct {
-		CIDR      net.IPNet
-		DNSDomain string
-	}
-	PodNetwork struct {
-		CIDR net.IPNet
-	}
-	Versions struct {
-		Kubernetes string
-	}
-	CloudProvider string
+type API struct {
+	AdvertiseAddresses []string
+	ExternalDNSNames   []string
 }
 
-const (
-	DefaultServiceDNSDomain   = "cluster.local"
-	DefaultServicesCIDRString = "10.12.0.0/12"
-	DefaultKubernetesVersion  = "v1.4.0"
-)
-
-var (
-	DefaultServicesCIDR  *net.IPNet
-	ListOfCloudProviders = []string{
-		"aws",
-		"azure",
-		"cloudstack",
-		"gce",
-		"mesos",
-		"openstack",
-		"ovirt",
-		"rackspace",
-		"vsphere",
-	}
-)
-
-func init() {
-	_, DefaultServicesCIDR, _ = net.ParseCIDR(DefaultServicesCIDRString)
+type Networking struct {
+	ServiceSubnet string
+	PodSubnet     string
+	DNSDomain     string
 }
 
-// JoinFlags holds values for "kubeadm join" command flags.
-type JoinFlags struct {
-	MasterAddrs []net.IP
-	// TODO(phase1+) add manual mode flags here, e.g. RootCACertPath
+type Etcd struct {
+	Endpoints []string
+	CAFile    string
+	CertFile  string
+	KeyFile   string
+}
+
+type Secrets struct {
+	GivenToken  string // dot-separated `<TokenID>.<Token>` set by the user
+	TokenID     string // optional on master side, will be generated if not specified
+	Token       []byte // optional on master side, will be generated if not specified
+	BearerToken string // set based on Token
+}
+
+type NodeConfiguration struct {
+	unversioned.TypeMeta
+
+	MasterAddresses []string
+	Secrets         Secrets
 }
 
 // ClusterInfo TODO add description
 type ClusterInfo struct {
+	unversioned.TypeMeta
 	// TODO(phase1+) this may become simply `api.Config`
 	CertificateAuthorities []string `json:"certificateAuthorities"`
 	Endpoints              []string `json:"endpoints"`

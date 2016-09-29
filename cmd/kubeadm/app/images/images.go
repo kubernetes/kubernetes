@@ -43,17 +43,17 @@ const (
 	exechealthzVersion = "1.1"
 )
 
-func GetCoreImage(image string, cfg *kubeadmapi.KubeadmConfig, overrideImage string) string {
+func GetCoreImage(image string, cfg *kubeadmapi.MasterConfiguration, overrideImage string) string {
 	if overrideImage != "" {
 		return overrideImage
 	}
 
 	return map[string]string{
 		KubeEtcdImage:              fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "etcd", runtime.GOARCH, etcdVersion),
-		KubeAPIServerImage:         fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "kube-apiserver", runtime.GOARCH, cfg.Versions.Kubernetes),
-		KubeControllerManagerImage: fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "kube-controller-manager", runtime.GOARCH, cfg.Versions.Kubernetes),
-		KubeSchedulerImage:         fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "kube-scheduler", runtime.GOARCH, cfg.Versions.Kubernetes),
-		KubeProxyImage:             fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "kube-proxy", runtime.GOARCH, cfg.Versions.Kubernetes),
+		KubeAPIServerImage:         fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "kube-apiserver", runtime.GOARCH, cfg.KubernetesVersion),
+		KubeControllerManagerImage: fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "kube-controller-manager", runtime.GOARCH, cfg.KubernetesVersion),
+		KubeSchedulerImage:         fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "kube-scheduler", runtime.GOARCH, cfg.KubernetesVersion),
+		KubeProxyImage:             fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "kube-proxy", runtime.GOARCH, cfg.KubernetesVersion),
 	}[image]
 }
 
