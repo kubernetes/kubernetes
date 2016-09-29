@@ -25,26 +25,46 @@ import (
 )
 
 // unionAuthRequestHandler authenticates requests using a chain of authenticator.Requests
-type unionAuthRequestHandler []authenticator.Request
-
-// New returns a request authenticator that validates credentials using a chain of authenticator.Request objects
-func New(authRequestHandlers ...authenticator.Request) authenticator.Request {
-	return unionAuthRequestHandler(authRequestHandlers)
+type unionAuthRequestHandler struct {
+	// Handlers is a chain of request authenticators to delegate to
+	Handlers []authenticator.Request
+	// FailOnError determines whether an error returns short-circuits the chain
+	FailOnError bool
 }
 
-// AuthenticateRequest authenticates the request using a chain of authenticator.Request objects.  The first
-// success returns that identity.  Errors are only returned if no matches are found.
-func (authHandler unionAuthRequestHandler) AuthenticateRequest(req *http.Request) (user.Info, bool, error) {
+// New returns a request authenticator that validates credentials using a chain of authenticator.Request objects.
+// The entire chain is tried until one succeeds. If all fail, an aggregate error is returned.
+func New(authRequestHandlers ...authenticator.Request) authenticator.Request {
+	if len(authRequestHandlers) == 1 {
+		return authRequestHandlers[0]
+	}
+	return &unionAuthRequestHandler{Handlers: authRequestHandlers, FailOnError: false}
+}
+
+// NewFailOnError returns a request authenticator that validates credentials using a chain of authenticator.Request objects.
+// The first error short-circuits the chain.
+func NewFailOnError(authRequestHandlers ...authenticator.Request) authenticator.Request {
+	if len(authRequestHandlers) == 1 {
+		return authRequestHandlers[0]
+	}
+	return &unionAuthRequestHandler{Handlers: authRequestHandlers, FailOnError: true}
+}
+
+// AuthenticateRequest authenticates the request using a chain of authenticator.Request objects.
+func (authHandler *unionAuthRequestHandler) AuthenticateRequest(req *http.Request) (user.Info, bool, error) {
 	var errlist []error
-	for _, currAuthRequestHandler := range authHandler {
+	for _, currAuthRequestHandler := range authHandler.Handlers {
 		info, ok, err := currAuthRequestHandler.AuthenticateRequest(req)
 		if err != nil {
+			if authHandler.FailOnError {
+				return info, ok, err
+			}
 			errlist = append(errlist, err)
 			continue
 		}
 
 		if ok {
-			return info, true, nil
+			return info, ok, err
 		}
 	}
 
