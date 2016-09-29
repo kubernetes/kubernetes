@@ -502,3 +502,13 @@ func TestTwoControllers(t *testing.T) {
 	dc.sync(pdbName)
 	ps.VerifyPdbStatus(t, pdbName, true, 1+minimumTwo, minimumTwo, 2*collectionSize)
 }
+
+// Test pdb doesn't exist
+func TestPDBNotExist(t *testing.T) {
+	dc, _ := newFakeDisruptionController()
+	pdb, _ := newPodDisruptionBudget(t, intstr.FromString("67%"))
+	add(t, dc.pdbLister.Store, pdb)
+	if err := dc.sync("notExist"); err != nil {
+		t.Errorf("Unexpected error: %v, expect nil", err)
+	}
+}
