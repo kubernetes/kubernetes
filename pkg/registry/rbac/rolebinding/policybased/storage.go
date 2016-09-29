@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/apis/rbac/validation"
+	"k8s.io/kubernetes/pkg/auth/user"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
@@ -50,7 +51,7 @@ func (s *Storage) Create(ctx api.Context, obj runtime.Object) (runtime.Object, e
 		// system:masters is special because the API server uses it for privileged loopback connections
 		// therefore we know that a member of system:masters can always do anything
 		for _, group := range user.GetGroups() {
-			if group == "system:masters" {
+			if group == user.SystemPrivilegedGroup {
 				return s.StandardStorage.Create(ctx, obj)
 			}
 		}
