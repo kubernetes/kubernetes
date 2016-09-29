@@ -85,6 +85,26 @@ grep -q "^${KUBE_VERSION}\$" binaries/.kubernetes 2>/dev/null || {
   echo ${KUBE_VERSION} > binaries/.kubernetes
 }
 
+# load the necessary images
+echo "load the kubernetes images ..."
+  sudo docker load -i kubernetes/server/kubernetes/server/bin/kube-controller-manager.tar
+  sudo docker load -i kubernetes/server/kubernetes/server/bin/kube-scheduler.tar
+
+
+# load the images and get the imagename
+  CONTROLLERTAG=$(sudo docker images |grep gcr.io/google_containers/kube-controller-manager |awk 'NR==1 {print $2}')
+  SCHEDULERTAG=$(sudo docker images |grep gcr.io/google_containers/kube-scheduler |awk 'NR==1 {print $2}')
+  
+  echo "load image: $CONTROLLERTAG"
+  echo "load image: $SCHEDULERTAG"
+  
+  cat <<EOF > ./imageinfo
+export IMAGECONTROLLER=gcr.io/google_containers/kube-controller-manager:${CONTROLLERTAG}
+export IMAGESCHEDULER=gcr.io/google_containers/kube-scheduler:${SCHEDULERTAG}
+EOF
+
+
+# if you want to reuse the tar files, you could delete following line
 rm -rf flannel* kubernetes* etcd*
 
 echo "Done! All your binaries locate in kubernetes/cluster/ubuntu/binaries directory"

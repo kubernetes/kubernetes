@@ -1,0 +1,44 @@
+{
+    "apiVersion": "v1",
+    "kind": "Pod",
+    "metadata": {
+        "name": "k8s-master"
+    },
+    "spec": {
+        "hostNetwork": true,
+        "containers": [
+            {
+                "name": "kube-controller-manager",
+                "image": "IMAGECONTROLLER",
+                "command": [
+                    "sh",
+                    "-c",
+                    "COMMANDCONTROLLER"
+                ],
+                "volumeMounts": [
+                    {
+                        "mountPath": "/srv/kubernetes",
+                        "name": "certficate"
+                    }
+                ]
+            },
+            {
+                "name": "kube-scheduler",
+                "image": "IMAGESCHEDULER",
+                "command": [
+                    "sh",
+                    "-c",
+                    "COMMANDSCHEDULER"
+                ]
+            }
+        ],
+        "volumes": [
+            {
+                "name": "certficate",
+                "hostPath": {
+                    "path": "/srv/kubernetes"
+                }
+            }
+        ]
+    }
+}

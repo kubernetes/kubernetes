@@ -251,6 +251,7 @@ KUBE_APISERVER_OPTS="\
  --tls-cert-file=/srv/kubernetes/server.cert\
  --tls-private-key-file=/srv/kubernetes/server.key"
 EOF
+
 }
 
 # Create ~/kube/default/kube-controller-manager with proper contents.
@@ -263,6 +264,16 @@ KUBE_CONTROLLER_MANAGER_OPTS="\
  --logtostderr=true"
 EOF
 
+  if [[ "$STARTING_BY_CONTAINER" == "true" ]] ; then
+    echo "replace the command template in pod config file"
+	echo "controller manager image:" ${IMAGECONTROLLER}
+	sed -i "s@IMAGECONTROLLER@${IMAGECONTROLLER}@g" ~/kube/kubeletconfig/master.json
+	
+   COMMANDCONTROLLER="kube-controller-manager --master=127.0.0.1:8080 --root-ca-file=/srv/kubernetes/ca.crt --service-account-private-key-file=/srv/kubernetes/server.key --logtostderr=true"	
+   
+   sed -i "s@COMMANDCONTROLLER@${COMMANDCONTROLLER}@g" ~/kube/kubeletconfig/master.json
+  fi 
+
 }
 
 # Create ~/kube/default/kube-scheduler with proper contents.
@@ -272,6 +283,16 @@ KUBE_SCHEDULER_OPTS="\
  --logtostderr=true\
  --master=127.0.0.1:8080"
 EOF
+
+  if [[ "$STARTING_BY_CONTAINER" == "true" ]] ; then
+    echo "replace the command template in pod config file"
+	echo "kube-scheduler image:" ${IMAGESCHEDULER}
+	sed -i "s@IMAGESCHEDULER@${IMAGESCHEDULER}@g" ~/kube/kubeletconfig/master.json
+	
+   COMMANDSCHEDULER="kube-scheduler --logtostderr=true --master=127.0.0.1:8080"
+		
+	sed -i "s@COMMANDSCHEDULER@${COMMANDSCHEDULER}@g" ~/kube/kubeletconfig/master.json
+  fi
 
 }
 
@@ -498,8 +519,9 @@ function provision-master() {
       '" || {
       echo "Deploying master on machine ${MASTER_IP} failed"
       exit 1
-    }
+   }
 }
+
 
 function provision-node() {
 
@@ -582,6 +604,78 @@ function provision-node() {
   }
 }
 
+
+function start-masterbypod() {
+  # remote login to the master/node and configue k8s
+  ssh $SSH_OPTS -t "$MASTER" "
+    set +e
+    ${BASH_DEBUG_FLAGS}
+    source ~/kube/util.sh
+	source ~/kube/config-default.sh 
+	export STARTING_BY_CONTAINER="true"
+   
+    setClusterInfo
+    create-etcd-opts '${MASTER_IP}'
+	
+	source ~/kube/imageinfo
+    create-kube-apiserver-opts \
+      '${SERVICE_CLUSTER_IP_RANGE}' \
+      '${ADMISSION_CONTROL}' \
+      '${SERVICE_NODE_PORT_RANGE}' \
+      '${MASTER_IP}' \
+      '${ALLOW_PRIVILEGED}'
+    create-kube-controller-manager-opts '${NODE_IPS}'
+    create-kube-scheduler-opts
+
+    create-kubelet-opts \
+      '${MASTER_IP}' \
+      '${MASTER_IP}' \
+      '${DNS_SERVER_IP}' \
+      '${DNS_DOMAIN}' \
+      '${KUBELET_CONFIG}' \
+      '${ALLOW_PRIVILEGED}' \
+      '${CNI_PLUGIN_CONF}'
+    create-kube-proxy-opts \
+      '${MASTER_IP}' \
+      '${MASTER_IP}' \
+      '${KUBE_PROXY_EXTRA_OPTS}'
+    create-flanneld-opts '127.0.0.1' '${MASTER_IP}'
+
+    FLANNEL_OTHER_NET_CONFIG='${FLANNEL_OTHER_NET_CONFIG}' sudo -E -p '[sudo] password to start master: ' -- /bin/bash -ce '
+      ${BASH_DEBUG_FLAGS}
+      cp ~/kube/default/flanneld /etc/default/
+	  cp ~/kube/default/etcd /etc/default/
+	  cp ~/kube/default/kube-proxy /etc/default/
+	  cp ~/kube/default/kube-apiserver /etc/default/
+	  cp ~/kube/default/kubelet /etc/default/
+	
+	  cp -r ~/kube/kubeletconfig /etc/default/
+      cp ~/kube/init_conf/etcd* /etc/init/
+      cp ~/kube/init_scripts/etcd* /etc/init.d/
+	  cp ~/kube/init_conf/flanneld* /etc/init/
+      cp ~/kube/init_scripts/flanneld* /etc/init.d/
+	  cp ~/kube/init_conf/kube-apiserver* /etc/init/
+      cp ~/kube/init_scripts/kube-apiserver* /etc/init.d/
+	  cp ~/kube/init_conf/kubelet* /etc/init/
+      cp ~/kube/init_scripts/kubelet* /etc/init.d/
+	  cp ~/kube/init_conf/kube-proxy* /etc/init/
+      cp ~/kube/init_scripts/kube-proxy* /etc/init.d/
+
+
+      groupadd -f -r kube-cert
+      ${PROXY_SETTING} DEBUG='${DEBUG}' ~/kube/make-ca-cert.sh \"${MASTER_IP}\" \"${EXTRA_SANS}\"
+      mkdir -p /opt/bin/
+      cp ~/kube/master/* /opt/bin/
+      cp ~/kube/minion/* /opt/bin/
+
+      service etcd start
+      if ${NEED_RECONFIG_DOCKER}; then FLANNEL_NET=\"${FLANNEL_NET}\" KUBE_CONFIG_FILE=\"${KUBE_CONFIG_FILE}\" DOCKER_OPTS=\"${DOCKER_OPTS}\" ~/kube/reconfDocker.sh ai; fi
+      '" || {
+      echo "Deploying master and node on machine ${MASTER_IP} failed"
+	  exit 1
+	}
+}
+
 function provision-masterandnode() {
 
   echo -e "\nDeploying master and node on machine ${MASTER_IP}"
@@ -595,6 +689,7 @@ function provision-masterandnode() {
     easy-rsa.tar.gz \
     "${KUBE_CONFIG_FILE}" \
     ubuntu/util.sh \
+    ubuntu/imageinfo \
     ubuntu/minion/* \
     ubuntu/master/* \
     ubuntu/reconfDocker.sh \
@@ -639,6 +734,10 @@ function provision-masterandnode() {
     BASH_DEBUG_FLAGS="set -x"
   fi
 
+  if [[ "$STARTING_BY_CONTAINER" == "true" ]] ; then
+    echo "start the master component by pod"
+	start-masterbypod
+  else
   # remote login to the master/node and configue k8s
   ssh $SSH_OPTS -t "$MASTER" "
     set +e
@@ -685,8 +784,11 @@ function provision-masterandnode() {
       if ${NEED_RECONFIG_DOCKER}; then FLANNEL_NET=\"${FLANNEL_NET}\" KUBE_CONFIG_FILE=\"${KUBE_CONFIG_FILE}\" DOCKER_OPTS=\"${DOCKER_OPTS}\" ~/kube/reconfDocker.sh ai; fi
       '" || {
       echo "Deploying master and node on machine ${MASTER_IP} failed"
-      exit 1
-  }
+	  exit 1      
+    }
+  	
+	fi
+
 }
 
 # check whether kubelet has torn down all of the pods

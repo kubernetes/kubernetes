@@ -71,7 +71,7 @@ FLANNEL_OTHER_NET_CONFIG=''
 export ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,ServiceAccount,SecurityContextDeny,DefaultStorageClass,ResourceQuota
 
 # Path to the config file or directory of files of kubelet
-export KUBELET_CONFIG=${KUBELET_CONFIG:-""}
+export KUBELET_CONFIG=${KUBELET_CONFIG:-"/etc/default/kubeletconfig/master.json"}
 
 # A port range to reserve for services with NodePort visibility
 SERVICE_NODE_PORT_RANGE=${SERVICE_NODE_PORT_RANGE:-"30000-32767"}
@@ -119,3 +119,6 @@ DEBUG=${DEBUG:-"false"}
 
 # Add SSH_OPTS: Add this to config ssh port
 SSH_OPTS="-oPort=22 -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oLogLevel=ERROR"
+
+# Optional: When set to true, the kube-scheduler and kube-controller will started by kubelet in a pod
+STARTING_BY_CONTAINER=${STARTING_BY_CONTAINER:-"true"}
