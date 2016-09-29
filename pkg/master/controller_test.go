@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
@@ -39,6 +40,7 @@ func TestReconcileEndpoints(t *testing.T) {
 		endpointPorts     []api.EndpointPort
 		additionalMasters int
 		endpoints         *api.EndpointsList
+		configmap         *api.ConfigMap
 		expectUpdate      *api.Endpoints // nil means none expected
 	}{
 		{
@@ -112,6 +114,43 @@ func TestReconcileEndpoints(t *testing.T) {
 						Ports: []api.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 					}},
 				}},
+			},
+			expectUpdate: &api.Endpoints{
+				ObjectMeta: om("foo"),
+				Subsets: []api.EndpointSubset{{
+					Addresses: []api.EndpointAddress{
+						{IP: "1.2.3.4"},
+						{IP: "4.3.2.2"},
+						{IP: "4.3.2.3"},
+						{IP: "4.3.2.4"},
+					},
+					Ports: []api.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
+				}},
+			},
+		},
+		{
+			testName:          "existing endpoints satisfy but too many + extra masters from configmap",
+			serviceName:       "foo",
+			ip:                "1.2.3.4",
+			endpointPorts:     []api.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
+			additionalMasters: 1,
+			endpoints: &api.EndpointsList{
+				Items: []api.Endpoints{{
+					ObjectMeta: om("foo"),
+					Subsets: []api.EndpointSubset{{
+						Addresses: []api.EndpointAddress{
+							{IP: "1.2.3.4"},
+							{IP: "4.3.2.1"},
+							{IP: "4.3.2.2"},
+							{IP: "4.3.2.3"},
+							{IP: "4.3.2.4"},
+						},
+						Ports: []api.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
+					}},
+				}},
+			},
+			configmap: &api.ConfigMap{
+				Data: map[string]string{componentconfig.ApiServerConfigMapKey: "{\"numberOfMasterReplicas\": 4}"},
 			},
 			expectUpdate: &api.Endpoints{
 				ObjectMeta: om("foo"),
@@ -374,7 +413,10 @@ func TestReconcileEndpoints(t *testing.T) {
 		registry := &registrytest.EndpointRegistry{
 			Endpoints: test.endpoints,
 		}
-		reconciler := NewMasterCountEndpointReconciler(test.additionalMasters+1, registry)
+		configmap := &registrytest.ConfigMapRegistry{
+			ConfigMap: test.configmap,
+		}
+		reconciler := NewMasterCountEndpointReconciler(test.additionalMasters+1, registry, configmap)
 		err := reconciler.ReconcileEndpoints(test.serviceName, net.ParseIP(test.ip), test.endpointPorts, true)
 		if err != nil {
 			t.Errorf("case %q: unexpected error: %v", test.testName, err)
@@ -463,7 +505,8 @@ func TestReconcileEndpoints(t *testing.T) {
 		registry := &registrytest.EndpointRegistry{
 			Endpoints: test.endpoints,
 		}
-		reconciler := NewMasterCountEndpointReconciler(test.additionalMasters+1, registry)
+		configmap := &registrytest.ConfigMapRegistry{}
+		reconciler := NewMasterCountEndpointReconciler(test.additionalMasters+1, registry, configmap)
 		err := reconciler.ReconcileEndpoints(test.serviceName, net.ParseIP(test.ip), test.endpointPorts, false)
 		if err != nil {
 			t.Errorf("case %q: unexpected error: %v", test.testName, err)
