@@ -19,30 +19,29 @@
 apiVersion: v1
 kind: ReplicationController
 metadata:
-  name: kube-dns-v19
+  name: kube-dns-v20
   namespace: kube-system
   labels:
     k8s-app: kube-dns
-    version: v19
+    version: v20
     kubernetes.io/cluster-service: "true"
 spec:
   replicas: $DNS_REPLICAS
   selector:
     k8s-app: kube-dns
-    version: v19
+    version: v20
   template:
     metadata:
       labels:
         k8s-app: kube-dns
-        version: v19
-        kubernetes.io/cluster-service: "true"
+        version: v20
       annotations:
         scheduler.alpha.kubernetes.io/critical-pod: ''
         scheduler.alpha.kubernetes.io/tolerations: '[{"key":"CriticalAddonsOnly", "operator":"Exists"}]'
     spec:
       containers:
       - name: kubedns
-        image: gcr.io/google_containers/kubedns-amd64:1.7
+        image: gcr.io/google_containers/kubedns-amd64:1.8
         resources:
           # TODO: Set memory limits when we've profiled the container for large
           # clusters, then set request = limit to keep this container in
@@ -83,7 +82,16 @@ spec:
           name: dns-tcp-local
           protocol: TCP
       - name: dnsmasq
-        image: gcr.io/google_containers/kube-dnsmasq-amd64:1.3
+        image: gcr.io/google_containers/kube-dnsmasq-amd64:1.4
+        livenessProbe:
+          httpGet:
+            path: /healthz-dnsmasq
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 60
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 5
         args:
         - --cache-size=1000
         - --no-resolv
@@ -96,15 +104,6 @@ spec:
         - containerPort: 53
           name: dns-tcp
           protocol: TCP
-        livenessProbe:
-          httpGet:
-            path: /healthz-dnsmasq
-            port: 8080
-            scheme: HTTP
-          initialDelaySeconds: 60
-          timeoutSeconds: 5
-          successThreshold: 1
-          failureThreshold: 5
       - name: healthz
         image: gcr.io/google_containers/exechealthz-amd64:1.2
         resources:
