@@ -2885,7 +2885,7 @@ func (c *Cloud) updateInstanceSecurityGroupsForLoadBalancer(lb *elb.LoadBalancer
 
 	// Open the firewall from the load balancer to the instance
 	// We don't actually have a trivial way to know in advance which security group the instance is in
-	// (it is probably the minion security group, but we don't easily have that).
+	// (it is probably the node security group, but we don't easily have that).
 	// However, we _do_ have the list of security groups on the instance records.
 
 	// Map containing the changes we want to make; true to add, false to remove
