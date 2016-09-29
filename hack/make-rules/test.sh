@@ -74,6 +74,9 @@ KUBE_JUNIT_REPORT_DIR=${KUBE_JUNIT_REPORT_DIR:-}
 # Set to 'y' to keep the verbose stdout from tests when KUBE_JUNIT_REPORT_DIR is
 # set.
 KUBE_KEEP_VERBOSE_TEST_OUTPUT=${KUBE_KEEP_VERBOSE_TEST_OUTPUT:-n}
+# Set to 'y' to only install the test dependency packages but not actually run
+# the tests.
+KUBE_TEST_INSTALL_ONLY=${KUBE_TEST_INSTALL_ONLY:-n}
 
 kube::test::usage() {
   kube::log::usage_from_stdin <<EOF
@@ -194,20 +197,24 @@ runTests() {
   # If we're not collecting coverage, run all requested tests with one 'go test'
   # command, which is much faster.
   if [[ ! ${KUBE_COVER} =~ ^[yY]$ ]]; then
-    kube::log::status "Running tests without code coverage"
     # `go test` does not install the things it builds. `go test -i` installs
     # the build artifacts but doesn't run the tests.  The two together provide
     # a large speedup for tests that do not need to be rebuilt.
+    kube::log::status "Installing test dependency packages"
     go test -i "${goflags[@]:+${goflags[@]}}" \
       ${KUBE_RACE} ${KUBE_TIMEOUT} "${@+${@/#/${KUBE_GO_PACKAGE}/}}" \
      "${testargs[@]:+${testargs[@]}}"
-    go test "${goflags[@]:+${goflags[@]}}" \
-      ${KUBE_RACE} ${KUBE_TIMEOUT} "${@+${@/#/${KUBE_GO_PACKAGE}/}}" \
-     "${testargs[@]:+${testargs[@]}}" \
-     | tee ${junit_filename_prefix:+"${junit_filename_prefix}.stdout"} \
-     | grep "${go_test_grep_pattern}" && rc=$? || rc=$?
-    produceJUnitXMLReport "${junit_filename_prefix}"
-    return ${rc}
+    if [[ ! ${KUBE_TEST_INSTALL_ONLY} =~ ^[yY]$ ]]; then
+      kube::log::status "Running tests without code coverage"
+      go test "${goflags[@]:+${goflags[@]}}" \
+        ${KUBE_RACE} ${KUBE_TIMEOUT} "${@+${@/#/${KUBE_GO_PACKAGE}/}}" \
+       "${testargs[@]:+${testargs[@]}}" \
+       | tee ${junit_filename_prefix:+"${junit_filename_prefix}.stdout"} \
+       | grep "${go_test_grep_pattern}" && rc=$? || rc=$?
+      produceJUnitXMLReport "${junit_filename_prefix}"
+      return ${rc}
+    fi
+    return 0
   fi
 
   # Create coverage report directories.
