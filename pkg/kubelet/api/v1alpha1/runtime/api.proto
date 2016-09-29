@@ -73,12 +73,15 @@ message VersionResponse {
     optional string runtime_api_version = 4;
 }
 
-// DNSOption specifies the DNS servers and search domains.
-message DNSOption {
+// DNSConfig specifies the DNS servers and search domains.
+message DNSConfig {
     // List of DNS servers of the cluster.
     repeated string servers = 1;
     // List of DNS search domains of the cluster.
     repeated string searches = 2;
+    // List of DNS options. See https://linux.die.net/man/5/resolv.conf
+    // for all available options.
+    repeated string options = 3;
 }
 
 enum Protocol {
@@ -177,8 +180,8 @@ message PodSandboxConfig {
     // https://issues.k8s.io/24677. There *may* be future change of direction
     // for logging as the discussion carries on.
     optional string log_directory = 3;
-    // The DNS options for the sandbox.
-    optional DNSOption dns_options = 4;
+    // The DNS config for the sandbox.
+    optional DNSConfig dns_config = 4;
     // The port mappings for the sandbox.
     repeated PortMapping port_mappings = 5;
     // Labels are key value pairs that may be used to scope and select individual resources.

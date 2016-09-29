@@ -243,9 +243,10 @@ func makeSandboxDockerConfig(c *runtimeApi.PodSandboxConfig, image string) *dock
 	hc.PortBindings = portBindings
 
 	// Set DNS options.
-	if dnsOpts := c.GetDnsOptions(); dnsOpts != nil {
-		hc.DNS = dnsOpts.GetServers()
-		hc.DNSSearch = dnsOpts.GetSearches()
+	if dnsConfig := c.GetDnsConfig(); dnsConfig != nil {
+		hc.DNS = dnsConfig.GetServers()
+		hc.DNSSearch = dnsConfig.GetSearches()
+		hc.DNSOptions = dnsConfig.GetOptions()
 	}
 
 	// Apply resource options.
