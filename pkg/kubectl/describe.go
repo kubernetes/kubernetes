@@ -1195,7 +1195,9 @@ func (d *ReplicaSetDescriber) Describe(namespace, name string, describerSettings
 
 	running, waiting, succeeded, failed, err := getPodStatusForController(pc, selector)
 	if err != nil {
-		return "", err
+		if !errors.IsNotFound(err) {
+			glog.Warningf("Error in listing pods: %s", err)
+		}
 	}
 
 	var events *api.EventList
