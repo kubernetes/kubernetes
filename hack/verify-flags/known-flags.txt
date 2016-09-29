@@ -56,6 +56,7 @@ cadvisor-port
 cert-dir
 certificate-authority
 cgroup-root
+cgroup-driver
 cgroups-per-qos
 chaos-chance
 clean-start
