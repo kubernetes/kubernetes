@@ -112,6 +112,8 @@ type GCEImage struct {
 	Machine string `json:"machine, omitempty"`
 	// This test is for benchmark (no limit verification, more result log, node name has format 'machine-image-uuid') if 'Tests' is non-empty.
 	Tests []string `json:"tests, omitempty"`
+	// Capabilities that this test image supports (e.g. AppArmor), as a comma-separated list.
+	Capabilities string `json:"capabilities, omitempty"`
 }
 
 type internalImageConfig struct {
@@ -119,11 +121,12 @@ type internalImageConfig struct {
 }
 
 type internalGCEImage struct {
-	image    string
-	project  string
-	metadata *compute.Metadata
-	machine  string
-	tests    []string
+	image        string
+	project      string
+	metadata     *compute.Metadata
+	machine      string
+	tests        []string
+	capabilities string
 }
 
 func main() {
@@ -172,11 +175,12 @@ func main() {
 			}
 			for _, image := range images {
 				gceImage := internalGCEImage{
-					image:    image,
-					project:  imageConfig.Project,
-					metadata: getImageMetadata(imageConfig.Metadata),
-					machine:  imageConfig.Machine,
-					tests:    imageConfig.Tests,
+					image:        image,
+					project:      imageConfig.Project,
+					metadata:     getImageMetadata(imageConfig.Metadata),
+					machine:      imageConfig.Machine,
+					tests:        imageConfig.Tests,
+					capabilities: imageConfig.Capabilities,
 				}
 				if isRegex {
 					name = shortName + "-" + image
@@ -248,7 +252,7 @@ func main() {
 			fmt.Printf("Initializing e2e tests using host %s.\n", host)
 			running++
 			go func(host string, junitFilePrefix string) {
-				results <- testHost(host, *cleanup, junitFilePrefix, *setupNode, *ginkgoFlags)
+				results <- testHost(host, *cleanup, junitFilePrefix, *setupNode, *ginkgoFlags, "")
 			}(host, host)
 		}
 	}
@@ -334,7 +338,7 @@ func getImageMetadata(input string) *compute.Metadata {
 }
 
 // Run tests in archive against host
-func testHost(host string, deleteFiles bool, junitFilePrefix string, setupNode bool, ginkgoFlagsStr string) *TestResult {
+func testHost(host string, deleteFiles bool, junitFilePrefix string, setupNode bool, ginkgoFlagsStr string, capabilities string) *TestResult {
 	instance, err := computeService.Instances.Get(*project, *zone, host).Do()
 	if err != nil {
 		return &TestResult{
@@ -364,7 +368,12 @@ func testHost(host string, deleteFiles bool, junitFilePrefix string, setupNode b
 		}
 	}
 
-	output, exitOk, err := remote.RunRemote(path, host, deleteFiles, junitFilePrefix, setupNode, *testArgs, ginkgoFlagsStr)
+	args := *testArgs
+	if capabilities != "" {
+		args += fmt.Sprintf(" --capabilities=%s", capabilities)
+	}
+
+	output, exitOk, err := remote.RunRemote(path, host, deleteFiles, junitFilePrefix, setupNode, args, ginkgoFlagsStr)
 	return &TestResult{
 		output: output,
 		err:    err,
@@ -449,7 +458,7 @@ func testImage(imageConfig *internalGCEImage, junitFilePrefix string) *TestResul
 	// Only delete the files if we are keeping the instance and want it cleaned up.
 	// If we are going to delete the instance, don't bother with cleaning up the files
 	deleteFiles := !*deleteInstances && *cleanup
-	return testHost(host, deleteFiles, junitFilePrefix, *setupNode, ginkgoFlagsStr)
+	return testHost(host, deleteFiles, junitFilePrefix, *setupNode, ginkgoFlagsStr, imageConfig.capabilities)
 }
 
 // Provision a gce instance using image
