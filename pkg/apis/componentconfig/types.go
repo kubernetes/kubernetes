@@ -279,7 +279,9 @@ type KubeletConfiguration struct {
 	// Enable QoS based Cgroup hierarchy: top level cgroups for QoS Classes
 	// And all Burstable and BestEffort pods are brought up under their
 	// specific top level QoS cgroup.
-	CgroupsPerQOS bool `json:"CgroupsPerQOS,omitempty"`
+	CgroupsPerQOS bool `json:"cgroupsPerQOS,omitempty"`
+	// driver that the kubelet uses to manipulate cgroups on the host (cgroupfs or systemd)
+	CgroupDriver string `json:"cgroupDriver,omitempty"`
 	// Cgroups that container runtime is expected to be isolated in.
 	RuntimeCgroups string `json:"runtimeCgroups,omitempty"`
 	// SystemCgroups is absolute name of cgroups in which to place
