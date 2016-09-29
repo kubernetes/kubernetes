@@ -61,7 +61,7 @@ func TestAuthPluginWrapTransport(t *testing.T) {
 		if len(tc.plugin) != 0 {
 			c.AuthProvider = &clientcmdapi.AuthProviderConfig{Name: tc.plugin}
 		}
-		tConfig, err := c.transportConfig()
+		tConfig, err := c.TransportConfig()
 		if err != nil {
 			// Unknown/bad plugins are expected to fail here.
 			if !tc.expectErr {
