@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -272,8 +273,10 @@ func bounded(lower, upper interface{}) types.GomegaMatcher {
 }
 
 func recent(d time.Duration) types.GomegaMatcher {
-	return And(
+	return WithTransform(func(t unversioned.Time) time.Time {
+		return t.Time
+	}, And(
 		BeTemporally(">=", time.Now().Add(-d)),
 		// Now() is the test start time, not the match time, so permit a few extra minutes.
-		BeTemporally("<", time.Now().Add(2*time.Minute)))
+		BeTemporally("<", time.Now().Add(2*time.Minute))))
 }
