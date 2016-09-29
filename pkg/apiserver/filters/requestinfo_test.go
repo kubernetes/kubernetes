@@ -21,8 +21,8 @@ import (
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
-func newTestRequestInfoResolver() *request.RequestInfoResolver {
-	return &request.RequestInfoResolver{
+func newTestRequestInfoResolver() *request.RequestInfoFactory {
+	return &request.RequestInfoFactory{
 		APIPrefixes:          sets.NewString("api", "apis"),
 		GrouplessAPIPrefixes: sets.NewString("api"),
 	}

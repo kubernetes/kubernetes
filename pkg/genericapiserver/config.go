@@ -507,8 +507,8 @@ func DefaultAndValidateRunOptions(options *options.ServerRunOptions) {
 	}
 }
 
-func NewRequestInfoResolver(c *Config) *request.RequestInfoResolver {
-	return &request.RequestInfoResolver{
+func NewRequestInfoResolver(c *Config) *request.RequestInfoFactory {
+	return &request.RequestInfoFactory{
 		APIPrefixes:          sets.NewString(strings.Trim(c.APIPrefix, "/"), strings.Trim(c.APIGroupPrefix, "/")), // all possible API prefixes
 		GrouplessAPIPrefixes: sets.NewString(strings.Trim(c.APIPrefix, "/")),                                      // APIPrefixes that won't have groups (legacy)
 	}
