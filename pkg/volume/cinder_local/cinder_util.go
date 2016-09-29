@@ -152,6 +152,10 @@ func persistSecret(path string, secret *api.Secret) error {
 	return nil
 }
 
+func unpersistSecret(path string) error {
+	return os.Remove(secretFullname(path))
+}
+
 func loadSecret(path string) (*api.Secret, error) {
 	scheme := runtime.NewScheme()
 	s := json.NewSerializer(json.DefaultMetaFactory, scheme, scheme, true)
@@ -259,8 +263,26 @@ func finalizeDetach(client *gophercloud.ServiceClient, volumeID string, host vol
 		return fmt.Errorf("cinder 'terminate_connection' failed: %v", tcResult.Err)
 	}
 
+	// Query Cinder for the volume information.
+	// We must find its attachmentID if multi-attachment is supported and there is
+	// more than one attachment.
+	attachmentID := ""
+	volume, err := volumes.Get(client, volumeID).Extract()
+	if err != nil {
+		return fmt.Errorf("unable to retrieve volume information for %q: %v", volumeID, err)
+	}
+	if volume.Multiattach {
+		for _, attachment := range volume.Attachments {
+			if attachment.HostName == host.GetHostName() {
+				attachmentID = attachment.AttachmentID
+				break
+			}
+		}
+		return fmt.Errorf("unable to retrieve attachment ID for %q (did kubelet's hostname change?)", volumeID)
+	}
+
 	// Also not sure if it's idempotent
-	detachOpts := volumeactions.DetachOpts{}
+	detachOpts := volumeactions.DetachOpts{AttachmentID: attachmentID}
 	detachResult := volumeactions.Detach(client, volumeID, &detachOpts)
 	if detachResult.Err != nil {
 		return fmt.Errorf("cinder 'detach' failed: %v", detachResult.Err)
@@ -313,6 +335,39 @@ func (util *cinderDiskUtil) AttachDisk(m *cinderVolumeMounter, mntPoint string) 
 		return err
 	}
 
+	// Check whether the volume is already attached or not - and by whom.
+	// Also verify that its status is 'available' or potentially 'in-use' if
+	// the volume supports multi-attachment.
+	volume, err := volumes.Get(client, m.source.VolumeID).Extract()
+	if err != nil {
+		return fmt.Errorf("unable to retrieve volume information for %q: %v", m.source.VolumeID, err)
+	}
+	for _, attachment := range volume.Attachments {
+		if attachment.HostName == m.plugin.host.GetHostName() {
+			glog.V(4).Infof("cinderDiskUtil.AttachDisk: volume is already attached locally, skipping")
+			return nil
+		}
+	}
+	if !volume.Multiattach && len(volume.Attachments) > 0 {
+		return fmt.Errorf("volume is already attached, should be detached before proceeding")
+	}
+	if volume.Status != "available" || (!volume.Multiattach && volume.Status == "in-use") {
+		return fmt.Errorf("volume's status is %q, want 'available', or 'in-use' if multi-attachment is supported, to proceed", volume.Status)
+	}
+
+	// Reserve the volume.
+	glog.V(4).Infof("Calling volumeactions.Reserve(%v)", m.source.VolumeID)
+	rsvResult := volumeactions.Reserve(client, m.source.VolumeID)
+	if rsvResult.Err != nil {
+		return fmt.Errorf("cinder 'reserve' failed: %v", rsvResult.Err)
+	}
+
+	// If we fail along the way, rollback the reservation.
+	unreserve := cancelable(func() {
+		volumeactions.Unreserve(client, m.source.VolumeID)
+	})
+	defer unreserve.call()
+
 	// By detach time, secret might be deleted, persist it into the
 	// mount point directory. The volume will get mounted over it
 	// hiding it from plain view.
@@ -320,30 +375,26 @@ func (util *cinderDiskUtil) AttachDisk(m *cinderVolumeMounter, mntPoint string) 
 		return err
 	}
 
-	glog.V(4).Infof("Calling volumeactions.Reserve(%v)", m.source.VolumeID)
-	rsvResult := volumeactions.Reserve(client, m.source.VolumeID)
-	if rsvResult.Err != nil {
-		return fmt.Errorf("cinder 'reserve' failed: %v", rsvResult.Err)
-	}
-
-	// If we fail along the way, rollback the reservation
-	unreserve := cancelable(func() {
-		volumeactions.Unreserve(client, m.source.VolumeID)
+	// If we fail along the way, unpersist the secret.
+	unpersist := cancelable(func() {
+		unpersistSecret(mntPoint)
 	})
-	defer unreserve.call()
+	defer unpersist.call()
 
+	// Initialize the connection with Cinder.
 	connInfo, err := initializeConnection(client, m.source.VolumeID, m.plugin.host)
 	if err != nil {
 		return err
 	}
 
+	// Determine volume type and handler.
 	volType := strings.ToLower(connInfo.DriverVolumeType)
-
 	volHandler, ok := volTypeHandlers[volType]
 	if !ok {
 		return fmt.Errorf("%q volume type is not supported", volType)
 	}
 
+	// Actually attach and mount the volume using the detected handler.
 	glog.V(4).Infof("cinderDiskUtil.AttachDisk: calling volHandler.AttachDisk")
 	devicePath, err := volHandler.AttachDisk(connInfo)
 	if err != nil {
@@ -356,9 +407,11 @@ func (util *cinderDiskUtil) AttachDisk(m *cinderVolumeMounter, mntPoint string) 
 		return err
 	}
 
+	// Finish the Cinder workflow by finalizing the attachment.
 	glog.V(4).Infof("cinderDiskUtil.AttachDisk: calling finalizeAttach")
 	if err = finalizeAttach(client, m.source.VolumeID, m.readOnly, mntPoint, m.plugin.host); err == nil {
 		unreserve.cancel()
+		unpersist.cancel()
 	}
 
 	return nil
@@ -405,7 +458,7 @@ func (util *cinderDiskUtil) DetachDisk(u *cinderVolumeUnmounter, mntPoint string
 		return fmt.Errorf("%v volume type is not supported", connInfo.DriverVolumeType)
 	}
 
-	if err := volHandler.DetachDisk(connInfo); err != nil {
+	if err = volHandler.DetachDisk(connInfo); err != nil {
 		return err
 	}
 
@@ -413,6 +466,7 @@ func (util *cinderDiskUtil) DetachDisk(u *cinderVolumeUnmounter, mntPoint string
 		return err
 	}
 
+	// Remove the mountpoint, including the persisted secret.
 	if err := os.RemoveAll(mntPoint); err != nil {
 		return fmt.Errorf("could not remove %s: %v", mntPoint, err)
 	}
@@ -445,9 +499,9 @@ func splitSecretRef(secretRef string) (string, string) {
 	parts := strings.SplitN(secretRef, "/", 2)
 	if len(parts) == 1 {
 		return "default", parts[0]
-	} else {
-		return parts[0], parts[1]
 	}
+
+	return parts[0], parts[1]
 }
 
 func (util *cinderDiskUtil) CreateVolume(p *cinderVolumeProvisioner) (volumeID string, volumeSizeGB int, secretRef string, err error) {
