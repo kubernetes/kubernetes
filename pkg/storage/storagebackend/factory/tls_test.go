@@ -34,7 +34,8 @@ import (
 )
 
 func TestTLSConnection(t *testing.T) {
-	certFile, keyFile, caFile := configureTLSCerts(t)
+	tempDir, certFile, keyFile, caFile := configureTLSCerts(t)
+	defer os.RemoveAll(tempDir)
 
 	tlsInfo := &transport.TLSInfo{
 		CertFile: certFile,
@@ -67,7 +68,7 @@ func TestTLSConnection(t *testing.T) {
 	}
 }
 
-func configureTLSCerts(t *testing.T) (certFile, keyFile, caFile string) {
+func configureTLSCerts(t *testing.T) (tmpDir, certFile, keyFile, caFile string) {
 	baseDir := os.TempDir()
 	tempDir, err := ioutil.TempDir(baseDir, "etcd_certificates")
 	if err != nil {
@@ -85,5 +86,5 @@ func configureTLSCerts(t *testing.T) (certFile, keyFile, caFile string) {
 	if err := ioutil.WriteFile(caFile, []byte(testingcert.CAFileContent), 0644); err != nil {
 		t.Fatal(err)
 	}
-	return certFile, keyFile, caFile
+	return tempDir, certFile, keyFile, caFile
 }
