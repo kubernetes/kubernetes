@@ -17,6 +17,7 @@ limitations under the License.
 package e2e
 
 import (
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -30,6 +31,11 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+const (
+	// graceTime is how long to keep retrying requesting elasticsearch for status information.
+	graceTime = 5 * time.Minute
+)
+
 var _ = framework.KubeDescribe("Cluster level logging using Elasticsearch [Feature:Elasticsearch]", func() {
 	f := framework.NewDefaultFramework("es-logging")
 
@@ -40,16 +46,34 @@ var _ = framework.KubeDescribe("Cluster level logging using Elasticsearch [Featu
 		framework.SkipUnlessProviderIs("gce")
 	})
 
-	It("should check that logs from pods on all nodes are ingested into Elasticsearch", func() {
-		ClusterLevelLoggingWithElasticsearch(f)
+	It("should check that logs from containers are ingested into Elasticsearch", func() {
+		err := checkElasticsearchReadiness(f)
+		framework.ExpectNoError(err, "Elasticsearch failed to start")
+
+		synthLoggerPodName := f.Namespace.Name + "-synthlogger-pod"
+
+		By("Creating synthetic logger")
+		createSynthLogger(f, synthLoggerPodName, expectedLinesCount)
+		defer f.PodClient().Delete(synthLoggerPodName, &api.DeleteOptions{})
+
+		By("Waiting for logs to ingest")
+		totalMissing := expectedLinesCount
+		for start := time.Now(); totalMissing > 0 && time.Since(start) < ingestionTimeout; time.Sleep(25 * time.Second) {
+			totalMissing, err = getMissingLinesCountElasticsearch(f, expectedLinesCount)
+			if err != nil {
+				framework.Logf("Failed to get missing lines count due to %v", err)
+				totalMissing = expectedLinesCount
+			} else if totalMissing > 0 {
+				framework.Logf("Still missing %d lines", totalMissing)
+			}
+		}
+
+		Expect(totalMissing).To(Equal(0), "Some log lines are still missing")
 	})
 })
 
-// ClusterLevelLoggingWithElasticsearch is an end to end test for cluster level logging.
-func ClusterLevelLoggingWithElasticsearch(f *framework.Framework) {
-	// graceTime is how long to keep retrying requests for status information.
-	const graceTime = 5 * time.Minute
-
+// Ensures that elasticsearch is running and ready to serve requests
+func checkElasticsearchReadiness(f *framework.Framework) error {
 	// Check for the existence of the Elasticsearch service.
 	By("Checking the Elasticsearch service exists.")
 	s := f.Client.Services(api.NamespaceSystem)
@@ -66,7 +90,7 @@ func ClusterLevelLoggingWithElasticsearch(f *framework.Framework) {
 
 	// Wait for the Elasticsearch pods to enter the running state.
 	By("Checking to make sure the Elasticsearch pods are running")
-	label := labels.SelectorFromSet(labels.Set(map[string]string{k8sAppKey: esValue}))
+	label := labels.SelectorFromSet(labels.Set(map[string]string{"k8s-app": "elasticsearch-logging"}))
 	options := api.ListOptions{LabelSelector: label}
 	pods, err := f.Client.Pods(api.NamespaceSystem).List(options)
 	Expect(err).NotTo(HaveOccurred())
@@ -95,7 +119,7 @@ func ClusterLevelLoggingWithElasticsearch(f *framework.Framework) {
 			framework.Logf("After %v proxy call to elasticsearch-loigging failed: %v", time.Since(start), err)
 			continue
 		}
-		esResponse, err = bodyToJsonObject(body)
+		err = json.Unmarshal(body, &esResponse)
 		if err != nil {
 			framework.Logf("After %v failed to convert Elasticsearch JSON response %v to map[string]interface{}: %v", time.Since(start), string(body), err)
 			continue
@@ -117,17 +141,23 @@ func ClusterLevelLoggingWithElasticsearch(f *framework.Framework) {
 		}
 		break
 	}
-	Expect(err).NotTo(HaveOccurred())
-	if int(statusCode) != 200 {
-		framework.Failf("Elasticsearch cluster has a bad status: %v", statusCode)
+
+	if err != nil {
+		return err
 	}
+
+	if int(statusCode) != 200 {
+		return fmt.Errorf("Elasticsearch cluster has a bad status: %v", statusCode)
+	}
+
 	// Check to see if have a cluster_name field.
 	clusterName, ok := esResponse["cluster_name"]
 	if !ok {
-		framework.Failf("No cluster_name field in Elasticsearch response: %v", esResponse)
+		return fmt.Errorf("No cluster_name field in Elasticsearch response: %v", esResponse)
 	}
+
 	if clusterName != "kubernetes-logging" {
-		framework.Failf("Connected to wrong cluster %q (expecting kubernetes_logging)", clusterName)
+		return fmt.Errorf("Connected to wrong cluster %q (expecting kubernetes_logging)", clusterName)
 	}
 
 	// Now assume we really are talking to an Elasticsearch instance.
@@ -148,7 +178,9 @@ func ClusterLevelLoggingWithElasticsearch(f *framework.Framework) {
 		if err != nil {
 			continue
 		}
-		health, err := bodyToJsonObject(body)
+
+		var health map[string]interface{}
+		err := json.Unmarshal(body, &health)
 		if err != nil {
 			framework.Logf("Bad json response from elasticsearch: %v", err)
 			continue
@@ -168,199 +200,82 @@ func ClusterLevelLoggingWithElasticsearch(f *framework.Framework) {
 			break
 		}
 	}
+
 	if !healthy {
-		framework.Failf("After %v elasticsearch cluster is not healthy", graceTime)
+		return fmt.Errorf("After %v elasticsearch cluster is not healthy", graceTime)
 	}
 
-	// Wait for the Fluentd pods to enter the running state.
-	By("Checking to make sure the Fluentd pod are running on each healthy node")
-	// Obtain a list of healthy nodes so we can place one synthetic logger on each node.
-	nodes := getHealthyNodes(f)
-	fluentdPods, err := getFluentdPods(f)
-	Expect(err).NotTo(HaveOccurred(), "Failed to obtain fluentd pods")
-	err = waitForFluentdPods(f, nodes, fluentdPods)
-	Expect(err).NotTo(HaveOccurred(), "Failed to wait for fluentd pods entering running state")
+	return nil
+}
 
-	By("Creating dummy loggers")
-	taintName, podNames, err := createSynthLoggers(f, nodes)
-	Expect(err).NotTo(HaveOccurred(), "Failed to create dummy loggers")
-
-	// Cleanup the pods when we are done.
-	defer cleanupLoggingPods(f, podNames)
-
-	// Wait for the synthetic logging pods to finish.
-	By("Waiting for the pods to succeed.")
-	err = waitForPodsToSucceed(f, podNames)
-	Expect(err).NotTo(HaveOccurred())
-
-	// Make several attempts to observe the logs ingested into Elasticsearch.
-	By("Checking all the log lines were ingested into Elasticsearch")
-	totalMissing := 0
-	nodeCount := len(nodes.Items)
-	expected := nodeCount * countTo
-	missingPerNode := []int{}
-	for start := time.Now(); time.Since(start) < ingestionTimeout; time.Sleep(25 * time.Second) {
-
-		// Debugging code to report the status of the elasticsearch logging endpoints.
-		selector := labels.Set{k8sAppKey: esValue}.AsSelector()
-		options := api.ListOptions{LabelSelector: selector}
-		esPods, err := f.Client.Pods(api.NamespaceSystem).List(options)
-		if err != nil {
-			framework.Logf("Attempt to list Elasticsearch nodes encountered a problem -- may retry: %v", err)
-			continue
-		} else {
-			for i, pod := range esPods.Items {
-				framework.Logf("pod %d: %s PodIP %s phase %s condition %+v", i, pod.Name, pod.Status.PodIP, pod.Status.Phase,
-					pod.Status.Conditions)
-			}
-		}
-
-		proxyRequest, errProxy := framework.GetServicesProxyRequest(f.Client, f.Client.Get())
-		if errProxy != nil {
-			framework.Logf("After %v failed to get services proxy request: %v", time.Since(start), errProxy)
-			continue
-		}
-		// Ask Elasticsearch to return all the log lines that were tagged with the underscore
-		// version of the name. Ask for twice as many log lines as we expect to check for
-		// duplication bugs.
-		body, err = proxyRequest.Namespace(api.NamespaceSystem).
-			Name("elasticsearch-logging").
-			Suffix("_search").
-			Param("q", fmt.Sprintf("log:%s", taintName)).
-			Param("size", strconv.Itoa(2*expected)).
-			DoRaw()
-		if err != nil {
-			framework.Logf("After %v failed to make proxy call to elasticsearch-logging: %v", time.Since(start), err)
-			continue
-		}
-
-		response, err := bodyToJsonObject(body)
-		if err != nil {
-			framework.Logf("After %v failed to unmarshal response: %v", time.Since(start), err)
-			framework.Logf("Body: %s", string(body))
-			continue
-		}
-		hits, ok := response["hits"].(map[string]interface{})
-		if !ok {
-			framework.Logf("response[hits] not of the expected type: %T", response["hits"])
-			continue
-		}
-		totalF, ok := hits["total"].(float64)
-		if !ok {
-			framework.Logf("After %v hits[total] not of the expected type: %T", time.Since(start), hits["total"])
-			continue
-		}
-		total := int(totalF)
-		if total != expected {
-			framework.Logf("After %v expecting to find %d log lines but saw %d", time.Since(start), expected, total)
-		}
-		h, ok := hits["hits"].([]interface{})
-		if !ok {
-			framework.Logf("After %v hits not of the expected type: %T", time.Since(start), hits["hits"])
-			continue
-		}
-		// Initialize data-structure for observing counts.
-		observed := make([][]int, nodeCount)
-		for i := range observed {
-			observed[i] = make([]int, countTo)
-		}
-		// Iterate over the hits and populate the observed array.
-		for _, e := range h {
-			l, ok := e.(map[string]interface{})
-			if !ok {
-				framework.Logf("element of hit not of expected type: %T", e)
-				continue
-			}
-			source, ok := l["_source"].(map[string]interface{})
-			if !ok {
-				framework.Logf("_source not of the expected type: %T", l["_source"])
-				continue
-			}
-			msg, ok := source["log"].(string)
-			if !ok {
-				framework.Logf("log not of the expected type: %T", source["log"])
-				continue
-			}
-			words := strings.Split(msg, " ")
-			if len(words) != 4 {
-				framework.Logf("Malformed log line: %s", msg)
-				continue
-			}
-			n, err := strconv.ParseUint(words[0], 10, 0)
-			if err != nil {
-				framework.Logf("Expecting numer of node as first field of %s", msg)
-				continue
-			}
-			if n < 0 || int(n) >= nodeCount {
-				framework.Logf("Node count index out of range: %d", nodeCount)
-				continue
-			}
-			index, err := strconv.ParseUint(words[2], 10, 0)
-			if err != nil {
-				framework.Logf("Expecting number as third field of %s", msg)
-				continue
-			}
-			if index < 0 || index >= countTo {
-				framework.Logf("Index value out of range: %d", index)
-				continue
-			}
-			if words[1] != taintName {
-				framework.Logf("Elasticsearch query return unexpected log line: %s", msg)
-				continue
-			}
-			// Record the observation of a log line from node n at the given index.
-			observed[n][index]++
-		}
-		// Make sure we correctly observed the expected log lines from each node.
-		totalMissing = 0
-		missingPerNode = make([]int, nodeCount)
-		incorrectCount := false
-		for n := range observed {
-			for i, c := range observed[n] {
-				if c == 0 {
-					totalMissing++
-					missingPerNode[n]++
-				}
-				if c < 0 || c > 1 {
-					framework.Logf("Got incorrect count for node %d index %d: %d", n, i, c)
-					incorrectCount = true
-				}
-			}
-		}
-		if incorrectCount {
-			framework.Logf("After %v es still return duplicated log lines", time.Since(start))
-			continue
-		}
-		if totalMissing != 0 {
-			framework.Logf("After %v still missing %d log lines", time.Since(start), totalMissing)
-			continue
-		}
-		framework.Logf("After %s found all %d log lines", time.Since(start), expected)
-		return
+func getMissingLinesCountElasticsearch(f *framework.Framework, expectedCount int) (int, error) {
+	proxyRequest, errProxy := framework.GetServicesProxyRequest(f.Client, f.Client.Get())
+	if errProxy != nil {
+		return 0, fmt.Errorf("Failed to get services proxy request: %v", errProxy)
 	}
-	for n := range missingPerNode {
-		if missingPerNode[n] > 0 {
-			framework.Logf("Node %d %s is missing %d logs", n, nodes.Items[n].Name, missingPerNode[n])
-			opts := &api.PodLogOptions{}
-			body, err = f.Client.Pods(f.Namespace.Name).GetLogs(podNames[n], opts).DoRaw()
-			if err != nil {
-				framework.Logf("Cannot get logs from pod %v", podNames[n])
-				continue
-			}
-			framework.Logf("Pod %s has the following logs: %s", podNames[n], body)
 
-			for _, pod := range fluentdPods.Items {
-				if pod.Spec.NodeName == nodes.Items[n].Name {
-					body, err = f.Client.Pods(api.NamespaceSystem).GetLogs(pod.Name, opts).DoRaw()
-					if err != nil {
-						framework.Logf("Cannot get logs from pod %v", pod.Name)
-						break
-					}
-					framework.Logf("Fluentd Pod %s on node %s has the following logs: %s", pod.Name, nodes.Items[n].Name, body)
-					break
-				}
-			}
-		}
+	// Ask Elasticsearch to return all the log lines that were tagged with the underscore
+	// version of the name. Ask for twice as many log lines as we expect to check for
+	// duplication bugs.
+	body, err := proxyRequest.Namespace(api.NamespaceSystem).
+		Name("elasticsearch-logging").
+		Suffix("_search").
+		Param("q", "tag:synthlogger").
+		Param("size", strconv.Itoa(expectedCount)).
+		DoRaw()
+	if err != nil {
+		return 0, fmt.Errorf("Failed to make proxy call to elasticsearch-logging: %v", err)
 	}
-	framework.Failf("Failed to find all %d log lines", expected)
+
+	var response map[string]interface{}
+	err = json.Unmarshal(body, &response)
+	if err != nil {
+		return 0, fmt.Errorf("Failed to unmarshal response: %v", err)
+	}
+
+	hits, ok := response["hits"].(map[string]interface{})
+	if !ok {
+		return 0, fmt.Errorf("response[hits] not of the expected type: %T", response["hits"])
+	}
+
+	h, ok := hits["hits"].([]interface{})
+	if !ok {
+		return 0, fmt.Errorf("Hits not of the expected type: %T", hits["hits"])
+	}
+
+	// Initialize data-structure for observing counts.
+	counts := make(map[int]int)
+
+	// Iterate over the hits and populate the observed array.
+	for _, e := range h {
+		l, ok := e.(map[string]interface{})
+		if !ok {
+			framework.Logf("Element of hit not of expected type: %T", e)
+			continue
+		}
+		source, ok := l["_source"].(map[string]interface{})
+		if !ok {
+			framework.Logf("_source not of the expected type: %T", l["_source"])
+			continue
+		}
+		msg, ok := source["log"].(string)
+		if !ok {
+			framework.Logf("Log not of the expected type: %T", source["log"])
+			continue
+		}
+		lineNumber, err := strconv.Atoi(strings.TrimSpace(msg))
+		if err != nil {
+			framework.Logf("Log line %s is not a number", msg)
+			continue
+		}
+		if lineNumber < 0 || lineNumber >= expectedCount {
+			framework.Logf("Number %d is not valid, expected number from range [0, %d)", lineNumber, expectedCount)
+			continue
+		}
+		// Record the observation of a log line
+		// Duplicates are fine, reliability is more important
+		counts[lineNumber]++
+	}
+
+	return expectedCount - len(counts), nil
 }
