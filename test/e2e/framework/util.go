@@ -3223,6 +3223,29 @@ func UpdateReplicaSetWithRetries(c clientset.Interface, namespace, name string, 
 	return rs, pollErr
 }
 
+type updateRcFunc func(d *api.ReplicationController)
+
+func UpdateReplicationControllerWithRetries(c clientset.Interface, namespace, name string, applyUpdate updateRcFunc) (*api.ReplicationController, error) {
+	var rc *api.ReplicationController
+	pollErr := wait.PollImmediate(10*time.Millisecond, 1*time.Minute, func() (bool, error) {
+		var err error
+		if rc, err = c.Core().ReplicationControllers(namespace).Get(name); err != nil {
+			return false, err
+		}
+		// Apply the update, then attempt to push it to the apiserver.
+		applyUpdate(rc)
+		if rc, err = c.Core().ReplicationControllers(namespace).Update(rc); err == nil {
+			Logf("Updating replication controller %q", name)
+			return true, nil
+		}
+		return false, nil
+	})
+	if pollErr == wait.ErrWaitTimeout {
+		pollErr = fmt.Errorf("couldn't apply the provided updated to replicaset %q", name)
+	}
+	return rc, pollErr
+}
+
 // NodeAddresses returns the first address of the given type of each node.
 func NodeAddresses(nodelist *api.NodeList, addrType api.NodeAddressType) []string {
 	hosts := []string{}
