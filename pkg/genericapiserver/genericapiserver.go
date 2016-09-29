@@ -117,8 +117,9 @@ type GenericAPIServer struct {
 	// requestContextMapper provides a way to get the context for a request.  It may be nil.
 	requestContextMapper api.RequestContextMapper
 
-	// The registered APIs
-	HandlerContainer *genericmux.APIContainer
+	// The registered APIs, split into those protected by authz/authn and those without
+	ProtectedContainer   *genericmux.APIContainer
+	UnprotectedContainer *genericmux.APIContainer
 
 	// ExternalAddress is the address (hostname or IP and port) that should be used in
 	// external (public internet) URLs for this GenericAPIServer.
@@ -319,14 +320,14 @@ func (s *GenericAPIServer) InstallAPIGroup(apiGroupInfo *APIGroupInfo) error {
 			apiGroupVersion.OptionsExternalVersion = apiGroupInfo.OptionsExternalVersion
 		}
 
-		if err := apiGroupVersion.InstallREST(s.HandlerContainer.Container); err != nil {
+		if err := apiGroupVersion.InstallREST(s.ProtectedContainer.Container); err != nil {
 			return fmt.Errorf("Unable to setup API %v: %v", apiGroupInfo, err)
 		}
 	}
 	// Install the version handler.
 	if apiGroupInfo.IsLegacyGroup {
 		// Add a handler at /api to enumerate the supported api versions.
-		apiserver.AddApiWebService(s.Serializer, s.HandlerContainer.Container, apiPrefix, func(req *restful.Request) *unversioned.APIVersions {
+		apiserver.AddApiWebService(s.Serializer, s.ProtectedContainer.Container, apiPrefix, func(req *restful.Request) *unversioned.APIVersions {
 			apiVersionsForDiscovery := unversioned.APIVersions{
 				ServerAddressByClientCIDRs: s.getServerAddressByClientCIDRs(req.Request),
 				Versions:                   apiVersions,
@@ -366,7 +367,7 @@ func (s *GenericAPIServer) InstallAPIGroup(apiGroupInfo *APIGroupInfo) error {
 		}
 
 		s.AddAPIGroupForDiscovery(apiGroup)
-		s.HandlerContainer.Add(apiserver.NewGroupWebService(s.Serializer, apiPrefix+"/"+apiGroup.Name, apiGroup))
+		s.ProtectedContainer.Add(apiserver.NewGroupWebService(s.Serializer, apiPrefix+"/"+apiGroup.Name, apiGroup))
 	}
 	return nil
 }
@@ -443,7 +444,7 @@ func (s *GenericAPIServer) getSwaggerConfig() *swagger.Config {
 	webServicesUrl := protocol + hostAndPort
 	return &swagger.Config{
 		WebServicesUrl:  webServicesUrl,
-		WebServices:     s.HandlerContainer.RegisteredWebServices(),
+		WebServices:     s.ProtectedContainer.RegisteredWebServices(),
 		ApiPath:         "/swaggerapi/",
 		SwaggerPath:     "/swaggerui/",
 		SwaggerFilePath: "/swagger-ui/",
@@ -463,14 +464,14 @@ func (s *GenericAPIServer) getSwaggerConfig() *swagger.Config {
 // of swagger, so that other resource types show up in the documentation.
 func (s *GenericAPIServer) InstallSwaggerAPI() {
 	// Enable swagger UI and discovery API
-	swagger.RegisterSwaggerService(*s.getSwaggerConfig(), s.HandlerContainer.Container)
+	swagger.RegisterSwaggerService(*s.getSwaggerConfig(), s.ProtectedContainer.Container)
 }
 
 // InstallOpenAPI installs spec endpoints for each web service.
 func (s *GenericAPIServer) InstallOpenAPI() {
 	// Install one spec per web service, an ideal client will have a ClientSet containing one client
 	// per each of these specs.
-	for _, w := range s.HandlerContainer.RegisteredWebServices() {
+	for _, w := range s.ProtectedContainer.RegisteredWebServices() {
 		if w.RootPath() == "/swaggerapi" {
 			continue
 		}
@@ -484,20 +485,20 @@ func (s *GenericAPIServer) InstallOpenAPI() {
 			Info:               &info,
 			DefaultResponse:    &s.openAPIDefaultResponse,
 			OpenAPIDefinitions: s.openAPIDefinitions,
-		}, s.HandlerContainer.Container)
+		}, s.ProtectedContainer.Container)
 		if err != nil {
 			glog.Fatalf("Failed to register open api spec for %v: %v", w.RootPath(), err)
 		}
 	}
 	err := openapi.RegisterOpenAPIService(&openapi.Config{
 		OpenAPIServePath:   "/swagger.json",
-		WebServices:        s.HandlerContainer.RegisteredWebServices(),
+		WebServices:        s.ProtectedContainer.RegisteredWebServices(),
 		ProtocolList:       []string{"https"},
 		IgnorePrefixes:     []string{"/swaggerapi"},
 		Info:               &s.openAPIInfo,
 		DefaultResponse:    &s.openAPIDefaultResponse,
 		OpenAPIDefinitions: s.openAPIDefinitions,
-	}, s.HandlerContainer.Container)
+	}, s.ProtectedContainer.Container)
 	if err != nil {
 		glog.Fatalf("Failed to register open api spec for root: %v", err)
 	}

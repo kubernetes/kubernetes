@@ -348,7 +348,8 @@ func (c completedConfig) New() (*GenericAPIServer, error) {
 		openAPIDefinitions:     c.OpenAPIDefinitions,
 	}
 
-	s.HandlerContainer = mux.NewAPIContainer(http.NewServeMux(), c.Serializer)
+	s.ProtectedContainer = mux.NewAPIContainer(http.NewServeMux(), c.Serializer)
+	s.UnprotectedContainer = mux.NewAPIContainer(http.NewServeMux(), c.Serializer)
 
 	if c.ProxyDialer != nil || c.ProxyTLSClientConfig != nil {
 		s.ProxyTransport = utilnet.SetTransportDefaults(&http.Transport{
@@ -360,8 +361,10 @@ func (c completedConfig) New() (*GenericAPIServer, error) {
 	s.installAPI(c.Config)
 
 	// Wire the handler chains
-	s.Handler = c.GenericDecorateHandlerFunc(c.ProtectHandlerFunc(s.HandlerContainer.ServeMux, c.Config), c.Config)
-	s.InsecureHandler = c.GenericDecorateHandlerFunc(s.HandlerContainer.ServeMux, c.Config)
+	unprotected := s.UnprotectedContainer.ServeMux
+	protected := s.ProtectedContainer.ServeMux
+	s.Handler = c.GenericDecorateHandlerFunc(MergeHandlers(unprotected, c.ProtectHandlerFunc(protected, c.Config)), c.Config)
+	s.InsecureHandler = c.GenericDecorateHandlerFunc(MergeHandlers(unprotected, protected), c.Config)
 
 	return s, nil
 }
@@ -390,18 +393,18 @@ func DefaultGenericDecorateHandler(handler http.Handler, c *Config) http.Handler
 
 func (s *GenericAPIServer) installAPI(c *Config) {
 	if c.EnableIndex {
-		routes.Index{}.Install(s.HandlerContainer)
+		routes.Index{}.Install(s.ProtectedContainer)
 	}
 	if c.EnableSwaggerSupport && c.EnableSwaggerUI {
-		routes.SwaggerUI{}.Install(s.HandlerContainer)
+		routes.SwaggerUI{}.Install(s.ProtectedContainer)
 	}
 	if c.EnableProfiling {
-		routes.Profiling{}.Install(s.HandlerContainer)
+		routes.Profiling{}.Install(s.ProtectedContainer)
 	}
 	if c.EnableVersion {
-		routes.Version{}.Install(s.HandlerContainer)
+		routes.Version{}.Install(s.ProtectedContainer)
 	}
-	s.HandlerContainer.Add(s.DynamicApisDiscovery())
+	s.ProtectedContainer.Add(s.DynamicApisDiscovery())
 }
 
 func DefaultAndValidateRunOptions(options *options.ServerRunOptions) {

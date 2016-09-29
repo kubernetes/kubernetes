@@ -187,8 +187,10 @@ func TestProtectedHandlers(t *testing.T) {
 		t.Fatalf("Error in bringing up the server: %v", err)
 	}
 
-	s.HandlerContainer.NonSwaggerRoutes.Handle("/protected/nonswagger", handler)
-	s.HandlerContainer.SecretRoutes.Handle("/protected/secret", handler)
+	s.ProtectedContainer.NonSwaggerRoutes.Handle("/protected/nonswagger", handler)
+	s.ProtectedContainer.SecretRoutes.Handle("/protected/secret", handler)
+	s.UnprotectedContainer.NonSwaggerRoutes.Handle("/unprotected/nonswagger", handler)
+	s.UnprotectedContainer.SecretRoutes.Handle("/unprotected/secret", handler)
 
 	type Test struct {
 		handler   http.Handler
@@ -198,8 +200,12 @@ func TestProtectedHandlers(t *testing.T) {
 	for i, test := range []Test{
 		{s.Handler, "/protected/nonswagger", true},
 		{s.Handler, "/protected/secret", true},
+		{s.Handler, "/unprotected/nonswagger", false},
+		{s.Handler, "/unprotected/secret", false},
 		{s.InsecureHandler, "/protected/nonswagger", false},
 		{s.InsecureHandler, "/protected/secret", false},
+		{s.InsecureHandler, "/unprotected/nonswagger", false},
+		{s.InsecureHandler, "/unprotected/secret", false},
 	} {
 		protected, generic, called = false, false, false
 
@@ -296,10 +302,10 @@ func TestInstallSwaggerAPI(t *testing.T) {
 
 	mux := http.NewServeMux()
 	server := &GenericAPIServer{}
-	server.HandlerContainer = genericmux.NewAPIContainer(mux, nil)
+	server.ProtectedContainer = genericmux.NewAPIContainer(mux, nil)
 
 	// Ensure swagger isn't installed without the call
-	ws := server.HandlerContainer.RegisteredWebServices()
+	ws := server.ProtectedContainer.RegisteredWebServices()
 	if !assert.Equal(len(ws), 0) {
 		for x := range ws {
 			assert.NotEqual("/swaggerapi", ws[x].RootPath(), "SwaggerAPI was installed without a call to InstallSwaggerAPI()")
@@ -308,14 +314,14 @@ func TestInstallSwaggerAPI(t *testing.T) {
 
 	// Install swagger and test
 	server.InstallSwaggerAPI()
-	ws = server.HandlerContainer.RegisteredWebServices()
+	ws = server.ProtectedContainer.RegisteredWebServices()
 	if assert.NotEqual(0, len(ws), "SwaggerAPI not installed.") {
 		assert.Equal("/swaggerapi/", ws[0].RootPath(), "SwaggerAPI did not install to the proper path. %s != /swaggerapi", ws[0].RootPath())
 	}
 
 	// Empty externalHost verification
 	mux = http.NewServeMux()
-	server.HandlerContainer = genericmux.NewAPIContainer(mux, nil)
+	server.ProtectedContainer = genericmux.NewAPIContainer(mux, nil)
 	server.ExternalAddress = ""
 	server.ClusterIP = net.IPv4(10, 10, 10, 10)
 	server.PublicReadWritePort = 1010

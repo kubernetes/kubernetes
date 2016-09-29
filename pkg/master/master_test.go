@@ -382,7 +382,7 @@ func TestAPIVersionOfDiscoveryEndpoints(t *testing.T) {
 	master, etcdserver, _, assert := newMaster(t)
 	defer etcdserver.Terminate(t)
 
-	server := httptest.NewServer(master.HandlerContainer.ServeMux)
+	server := httptest.NewServer(master.ProtectedContainer.ServeMux)
 
 	// /api exists in release-1.1
 	resp, err := http.Get(server.URL + "/api")
@@ -456,7 +456,7 @@ func TestDiscoveryAtAPIS(t *testing.T) {
 	master, etcdserver, _, assert := newLimitedMaster(t)
 	defer etcdserver.Terminate(t)
 
-	server := httptest.NewServer(master.HandlerContainer.ServeMux)
+	server := httptest.NewServer(master.ProtectedContainer.ServeMux)
 	resp, err := http.Get(server.URL + "/apis")
 	if !assert.NoError(err) {
 		t.Errorf("unexpected error: %v", err)
@@ -615,7 +615,7 @@ func initThirdPartyMultiple(t *testing.T, versions, names []string) (*Master, *e
 		}
 	}
 
-	server := httptest.NewServer(master.HandlerContainer.ServeMux)
+	server := httptest.NewServer(master.ProtectedContainer.ServeMux)
 	return master, etcdserver, server, assert
 }
 
@@ -1157,7 +1157,7 @@ func testInstallThirdPartyResourceRemove(t *testing.T, version string) {
 	if len(installed) != 0 {
 		t.Errorf("Resource(s) still installed: %v", installed)
 	}
-	services := master.HandlerContainer.RegisteredWebServices()
+	services := master.ProtectedContainer.RegisteredWebServices()
 	for ix := range services {
 		if strings.HasPrefix(services[ix].RootPath(), "/apis/company.com") {
 			t.Errorf("Web service still installed at %s: %#v", services[ix].RootPath(), services[ix])
@@ -1268,7 +1268,7 @@ func TestValidOpenAPISpec(t *testing.T) {
 	}
 
 	// make sure swagger.json is not registered before calling install api.
-	server := httptest.NewServer(master.HandlerContainer.ServeMux)
+	server := httptest.NewServer(master.ProtectedContainer.ServeMux)
 	resp, err := http.Get(server.URL + "/swagger.json")
 	if !assert.NoError(err) {
 		t.Errorf("unexpected error: %v", err)

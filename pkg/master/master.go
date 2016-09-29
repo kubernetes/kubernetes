@@ -224,10 +224,10 @@ func (c completedConfig) New() (*Master, error) {
 	}
 
 	if c.EnableUISupport {
-		routes.UIRedirect{}.Install(s.HandlerContainer)
+		routes.UIRedirect{}.Install(s.ProtectedContainer)
 	}
 	if c.EnableLogsSupport {
-		routes.Logs{}.Install(s.HandlerContainer)
+		routes.Logs{}.Install(s.ProtectedContainer)
 	}
 
 	m := &Master{
@@ -315,12 +315,12 @@ func (m *Master) InstallAPIs(c *Config) {
 			Help: "The time since the last successful synchronization of the SSH tunnels for proxy requests.",
 		}, func() float64 { return float64(m.tunneler.SecondsSinceSync()) })
 	}
-	healthz.InstallHandler(&m.HandlerContainer.NonSwaggerRoutes, healthzChecks...)
+	healthz.InstallHandler(&m.ProtectedContainer.NonSwaggerRoutes, healthzChecks...)
 
 	if c.GenericConfig.EnableProfiling {
-		routes.MetricsWithReset{}.Install(m.HandlerContainer)
+		routes.MetricsWithReset{}.Install(m.ProtectedContainer)
 	} else {
-		routes.DefaultMetrics{}.Install(m.HandlerContainer)
+		routes.DefaultMetrics{}.Install(m.ProtectedContainer)
 	}
 
 	// Install third party resource support if requested
@@ -650,11 +650,11 @@ func (m *Master) RemoveThirdPartyResource(path string) error {
 		return err
 	}
 
-	services := m.HandlerContainer.RegisteredWebServices()
+	services := m.ProtectedContainer.RegisteredWebServices()
 	for ix := range services {
 		root := services[ix].RootPath()
 		if root == path || strings.HasPrefix(root, path+"/") {
-			m.HandlerContainer.Remove(services[ix])
+			m.ProtectedContainer.Remove(services[ix])
 		}
 	}
 	return nil
@@ -769,13 +769,13 @@ func (m *Master) InstallThirdPartyResource(rsrc *extensions.ThirdPartyResource) 
 	// the group with the new API
 	if m.hasThirdPartyGroupStorage(path) {
 		m.addThirdPartyResourceStorage(path, plural.Resource, thirdparty.Storage[plural.Resource].(*thirdpartyresourcedataetcd.REST), apiGroup)
-		return thirdparty.UpdateREST(m.HandlerContainer.Container)
+		return thirdparty.UpdateREST(m.ProtectedContainer.Container)
 	}
 
-	if err := thirdparty.InstallREST(m.HandlerContainer.Container); err != nil {
+	if err := thirdparty.InstallREST(m.ProtectedContainer.Container); err != nil {
 		glog.Errorf("Unable to setup thirdparty api: %v", err)
 	}
-	m.HandlerContainer.Add(apiserver.NewGroupWebService(api.Codecs, path, apiGroup))
+	m.ProtectedContainer.Add(apiserver.NewGroupWebService(api.Codecs, path, apiGroup))
 
 	m.addThirdPartyResourceStorage(path, plural.Resource, thirdparty.Storage[plural.Resource].(*thirdpartyresourcedataetcd.REST), apiGroup)
 	return nil
