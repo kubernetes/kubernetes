@@ -949,33 +949,6 @@ func Test_SetDetachRequestTime_Positive(t *testing.T) {
 	}
 }
 
-func verifyAttachedVolume(
-	t *testing.T,
-	attachedVolumes []AttachedVolume,
-	expectedVolumeName api.UniqueVolumeName,
-	expectedVolumeSpecName string,
-	expectedNodeName string,
-	expectedMountedByNode,
-	expectNonZeroDetachRequestedTime bool) {
-	for _, attachedVolume := range attachedVolumes {
-		if attachedVolume.VolumeName == expectedVolumeName &&
-			attachedVolume.VolumeSpec.Name() == expectedVolumeSpecName &&
-			attachedVolume.NodeName == expectedNodeName &&
-			attachedVolume.MountedByNode == expectedMountedByNode &&
-			attachedVolume.DetachRequestedTime.IsZero() == !expectNonZeroDetachRequestedTime {
-			return
-		}
-	}
-
-	t.Fatalf(
-		"attachedVolumes (%v) should contain the volume/node combo %q/%q with MountedByNode=%v and NonZeroDetachRequestedTime=%v. It does not.",
-		attachedVolumes,
-		expectedVolumeName,
-		expectedNodeName,
-		expectedMountedByNode,
-		expectNonZeroDetachRequestedTime)
-}
-
 func Test_GetAttachedVolumesForNode_Positive_NoVolumesOrNodes(t *testing.T) {
 	// Arrange
 	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
@@ -1080,4 +1053,68 @@ func Test_GetAttachedVolumesForNode_Positive_OneVolumeTwoNodes(t *testing.T) {
 	}
 
 	verifyAttachedVolume(t, attachedVolumes, generatedVolumeName1, string(volumeName), node1Name, true /* expectedMountedByNode */, false /* expectNonZeroDetachRequestedTime */)
+}
+
+func Test_OneVolumeTwoNodes_TwoDevicePaths(t *testing.T) {
+	// Arrange
+	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
+	asw := NewActualStateOfWorld(volumePluginMgr)
+	volumeName := api.UniqueVolumeName("volume-name")
+	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
+	node1Name := "node1-name"
+	devicePath1 := "fake/device/path1"
+	generatedVolumeName1, add1Err := asw.AddVolumeNode(volumeSpec, node1Name, devicePath1)
+	if add1Err != nil {
+		t.Fatalf("AddVolumeNode failed. Expected: <no error> Actual: <%v>", add1Err)
+	}
+	node2Name := "node2-name"
+	devicePath2 := "fake/device/path2"
+	generatedVolumeName2, add2Err := asw.AddVolumeNode(volumeSpec, node2Name, devicePath2)
+	if add2Err != nil {
+		t.Fatalf("AddVolumeNode failed. Expected: <no error> Actual: <%v>", add2Err)
+	}
+
+	if generatedVolumeName1 != generatedVolumeName2 {
+		t.Fatalf(
+			"Generated volume names for the same volume should be the same but they are not: %q and %q",
+			generatedVolumeName1,
+			generatedVolumeName2)
+	}
+
+	// Act
+	attachedVolumes := asw.GetAttachedVolumesForNode(node2Name)
+
+	// Assert
+	if len(attachedVolumes) != 1 {
+		t.Fatalf("len(attachedVolumes) Expected: <1> Actual: <%v>", len(attachedVolumes))
+	}
+
+	verifyAttachedVolume(t, attachedVolumes, generatedVolumeName2, string(volumeName), node2Name, true /* expectedMountedByNode */, false /* expectNonZeroDetachRequestedTime */)
+}
+
+func verifyAttachedVolume(
+	t *testing.T,
+	attachedVolumes []AttachedVolume,
+	expectedVolumeName api.UniqueVolumeName,
+	expectedVolumeSpecName string,
+	expectedNodeName string,
+	expectedMountedByNode,
+	expectNonZeroDetachRequestedTime bool) {
+	for _, attachedVolume := range attachedVolumes {
+		if attachedVolume.VolumeName == expectedVolumeName &&
+			attachedVolume.VolumeSpec.Name() == expectedVolumeSpecName &&
+			attachedVolume.NodeName == expectedNodeName &&
+			attachedVolume.MountedByNode == expectedMountedByNode &&
+			attachedVolume.DetachRequestedTime.IsZero() == !expectNonZeroDetachRequestedTime {
+			return
+		}
+	}
+
+	t.Fatalf(
+		"attachedVolumes (%v) should contain the volume/node combo %q/%q with MountedByNode=%t and NonZeroDetachRequestedTime=%v. It does not.",
+		attachedVolumes,
+		expectedVolumeName,
+		expectedNodeName,
+		expectedMountedByNode,
+		expectNonZeroDetachRequestedTime)
 }
