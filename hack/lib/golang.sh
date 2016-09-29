@@ -650,13 +650,17 @@ kube::golang::build_binaries() {
         # Assume arguments starting with a dash are flags to pass to go.
         goflags+=("${arg}")
       else
-        targets+=("${arg}")
+        all_targets+=("${arg}")
       fi
     done
 
-    if [[ ${#targets[@]} -eq 0 ]]; then
-      targets=("${KUBE_ALL_TARGETS[@]}")
+    if [[ ${#all_targets[@]} -eq 0 ]]; then
+      all_targets=("${KUBE_ALL_TARGETS[@]}")
     fi
+
+    # Dedup the `all_targets` list.
+    # Credit: http://stackoverflow.com/a/13648438
+    targets=($(echo "${all_targets[@]}" | tr ' ' '\n' | sort -u | tr '\n' ' '))
 
     local -a platforms=(${KUBE_BUILD_PLATFORMS:-})
     if [[ ${#platforms[@]} -eq 0 ]]; then
