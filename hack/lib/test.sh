@@ -61,7 +61,7 @@ kube::test::get_object_jsonpath_assert() {
 
   res=$(eval kubectl get "${kube_flags[@]}" $object -o jsonpath=\"$request\")
 
-  if [[ "$res" =~ ^$expected$ ]]; then
+  if [[ "$res" == "$expected" ]]; then
       echo -n ${green}
       echo "Successful get $object $request: $res"
       echo -n ${reset}

@@ -442,10 +442,10 @@ runTests() {
   kube::test::get_object_assert 'pod/valid-pod' "{{$id_field}}" 'valid-pod'
   kube::test::get_object_assert 'pods/valid-pod' "{{$id_field}}" 'valid-pod'
   # Repeat above test using jsonpath template
-  kube::test::get_object_jsonpath_assert pods "{.items[*]$id_field}" 'valid-pod'
-  kube::test::get_object_jsonpath_assert 'pod valid-pod' "{$id_field}" 'valid-pod'
-  kube::test::get_object_jsonpath_assert 'pod/valid-pod' "{$id_field}" 'valid-pod'
-  kube::test::get_object_jsonpath_assert 'pods/valid-pod' "{$id_field}" 'valid-pod'
+  kube::test::get_object_jsonpath_assert pods "{.items[*]$id_field}" $'[\n    "valid-pod"\n]'
+  kube::test::get_object_jsonpath_assert 'pod valid-pod' "{$id_field}" $'[\n    "valid-pod"\n]'
+  kube::test::get_object_jsonpath_assert 'pod/valid-pod' "{$id_field}" $'[\n    "valid-pod"\n]'
+  kube::test::get_object_jsonpath_assert 'pods/valid-pod' "{$id_field}" $'[\n    "valid-pod"\n]'
   # Describe command should print detailed information
   kube::test::describe_object_assert pods 'valid-pod' "Name:" "Image:" "Node:" "Labels:" "Status:" "Controllers"
   # Describe command should print events information by default
