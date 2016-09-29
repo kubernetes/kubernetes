@@ -120,6 +120,7 @@ type ServerRunOptions struct {
 	TLSCertFile            string
 	TLSPrivateKeyFile      string
 	TokenAuthFile          string
+	EnableAnyToken         bool
 	WatchCacheSizes        []string
 }
 
@@ -472,6 +473,10 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.TokenAuthFile, "token-auth-file", s.TokenAuthFile, ""+
 		"If set, the file that will be used to secure the secure port of the API server "+
 		"via token authentication.")
+
+	fs.BoolVar(&s.EnableAnyToken, "insecure-allow-any-token", s.EnableAnyToken, ""+
+		"If set, your server will be INSECURE.  Any token will be allowed and user information will be parsed "+
+		"from the token as `username/group1,group2`")
 
 	fs.StringSliceVar(&s.WatchCacheSizes, "watch-cache-sizes", s.WatchCacheSizes, ""+
 		"List of watch cache sizes for every resource (pods, nodes, etc.), comma separated. "+
