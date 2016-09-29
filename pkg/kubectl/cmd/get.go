@@ -439,6 +439,14 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 				allErrs = append(allErrs, err)
 				continue
 			}
+
+			// add linebreak between resource groups (if there is more than one)
+			// skip linebreak above first resource group
+			noHeaders := cmdutil.GetFlagBool(cmd, "no-headers")
+			if lastMapping != nil && !noHeaders {
+				fmt.Fprintf(errOut, "%s\n", "")
+			}
+
 			lastMapping = mapping
 		}
 
