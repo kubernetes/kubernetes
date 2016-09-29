@@ -6,10 +6,10 @@ its community to provide a productive, friendly and collaborative environment.
 The first and foremost goal of the Kubernetes community to develop orchestration
 technology that radically simplifies the process of creating reliable
 distributed systems. However a second, equally important goal is the creation
-of a community that fosters easy, agile development of such an orchestration
+of a community that fosters easy, agile development of such orchestration
 systems.
 
-We the community therefore describe the expectations for
+We therefore describe the expectations for
 members of the Kubernetes community.  This document is intended to be a living one
 that evolves as the community evolves via the same PR and code review process
 that shapes the rest of the project.  It currently covers the expectations
@@ -35,15 +35,15 @@ and additional work for reviewers that can frustrate both parties.
 Consequently, as a community we expect that all active participants in the
 community will also be active reviewers.
 
-Any *active contributor* to the Kubernetes project is expected to be available
-to review code in areas where that contributor has expertise.  Active
+We ask that active contributors to the project participate in the code review process
+in areas where that contributor has expertise. Active
 contributors are considered to be anyone who meets any of the following criteria:
    * Sent more than two pull requests (PRs) in the previous one month, or more
    than 20 PRs in the previous year.
-   * Filed more than 3 issues in the previous month, or more than 30 issues in
-   the previous year.
-   * Commented on more than 5 issues or pull requests in the previous month, or
-   more than 50 issues or pull requests in the previous year.
+   * Filed more than three issues in the previous month, or more than 30 issues in
+   the previous 12 months.
+   * Commented on more than pull requests in the previous month, or
+   more than 50 pull requests in the previous 12 months.
    * Marked any PR as LGTM in the previous month.
    * Have *contributor* permissions in the Kubernetes github project.
 
