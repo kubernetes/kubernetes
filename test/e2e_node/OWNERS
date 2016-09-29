@@ -1,4 +1,9 @@
 assignees:
+- vishh
+- timstclair
+- Random-Liu
+to_migrate_to_approvers:
+  approvers:
   - vishh
   - timstclair
-  - Random-Liu 
+  - Random-Liu

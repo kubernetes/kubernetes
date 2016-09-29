@@ -1,4 +1,9 @@
 assignees:
+- saad-ali
+- thockin
+- pmorie
+to_migrate_to_approvers:
+  approvers:
   - saad-ali
   - thockin
   - pmorie

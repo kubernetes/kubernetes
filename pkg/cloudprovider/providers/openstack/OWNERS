@@ -1,3 +1,7 @@
 assignees:
 - anguslees
 - dagnello
+to_migrate_to_approvers:
+  approvers:
+  - anguslees
+  - dagnello

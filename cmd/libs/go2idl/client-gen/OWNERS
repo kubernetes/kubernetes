@@ -1,4 +1,9 @@
 assignees:
+- lavalamp
+- wojtek-t
+- caesarxuchao
+to_migrate_to_approvers:
+  approvers:
   - lavalamp
   - wojtek-t
   - caesarxuchao
