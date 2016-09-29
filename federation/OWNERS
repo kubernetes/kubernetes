@@ -1,13 +1,6 @@
-assignees:
-- quinton-hoole
+approvers:
+- colhom
 - madhusudancs
 - mml
 - nikhiljindal
-- colhom
-to_migrate_to_approvers:
-  approvers:
-  - quinton-hoole
-  - madhusudancs
-  - mml
-  - nikhiljindal
-  - colhom
+- quinton-hoole

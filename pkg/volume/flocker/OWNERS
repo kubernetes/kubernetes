@@ -1,7 +1,3 @@
-maintainers:
+approvers:
 - agonzalezro
 - simonswine
-to_migrate_to_approvers:
-  approvers:
-  - agonzalezro
-  - simonswine

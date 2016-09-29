@@ -1,13 +1,6 @@
-assignees:
+approvers:
 - eparis
 - jbeda
 - mikedanese
 - roberthbailey
 - zmerlynn
-to_migrate_to_approvers:
-  approvers:
-  - eparis
-  - jbeda
-  - mikedanese
-  - roberthbailey
-  - zmerlynn

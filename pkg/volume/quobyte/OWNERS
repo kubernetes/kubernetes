@@ -1,7 +1,3 @@
-maintainers:
+approvers:
 - johscheuer
 - quofelix
-to_migrate_to_approvers:
-  approvers:
-  - johscheuer
-  - quofelix

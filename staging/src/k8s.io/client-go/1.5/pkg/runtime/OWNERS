@@ -1,11 +1,5 @@
-assignees:
+approvers:
 - caesarxuchao
 - deads2k
 - lavalamp
 - smarterclayton
-to_migrate_to_approvers:
-  approvers:
-  - caesarxuchao
-  - deads2k
-  - lavalamp
-  - smarterclayton

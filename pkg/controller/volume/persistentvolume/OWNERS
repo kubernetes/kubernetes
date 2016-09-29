@@ -1,9 +1,4 @@
-assignees:
+approvers:
 - jsafrane
 - saad-ali
 - thockin
-to_migrate_to_approvers:
-  approvers:
-  - jsafrane
-  - saad-ali
-  - thockin

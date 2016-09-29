@@ -1,11 +1,5 @@
-assignees:
+approvers:
 - fejta
 - ixdy
 - rmmh
 - spxtr
-to_migrate_to_approvers:
-  approvers:
-  - fejta
-  - ixdy
-  - rmmh
-  - spxtr

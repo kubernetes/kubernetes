@@ -1,9 +1,4 @@
-assignees:
-- quinton-hoole
-- nikhiljindal
+approvers:
 - madhusundancs
-to_migrate_to_approvers:
-  approvers:
-  - quinton-hoole
-  - nikhiljindal
-  - madhusundancs
+- nikhiljindal
+- quinton-hoole

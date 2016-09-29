@@ -1,11 +1,5 @@
-assignees:
-- lavalamp
-- smarterclayton
-- nikhiljindal
+approvers:
 - krousey
-to_migrate_to_approvers:
-  approvers:
-  - lavalamp
-  - smarterclayton
-  - nikhiljindal
-  - krousey
+- lavalamp
+- nikhiljindal
+- smarterclayton

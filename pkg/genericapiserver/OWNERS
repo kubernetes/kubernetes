@@ -1,9 +1,4 @@
-assignees:
+approvers:
 - lavalamp
 - nikhiljindal
 - smarterclayton
-to_migrate_to_approvers:
-  approvers:
-  - lavalamp
-  - nikhiljindal
-  - smarterclayton
