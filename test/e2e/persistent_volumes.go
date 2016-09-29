@@ -642,6 +642,91 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 			pvols, claims = createPVsPVCs(numPVs, numPVCs, c, ns, serverIP)
 			waitAndVerifyBinds(c, ns, pvols, claims, true)
 			completeMultiTest(f, c, ns, pvols, claims)
+
+	///////////////////////////////////////////////////////////////////////
+	//				GCE PD
+	///////////////////////////////////////////////////////////////////////
+	// Testing configurations of single a PV/PVC pair attached to a GCE PD
+	framework.KubeDescribe("PV:GCEPD", func() {
+
+		pv := &api.PersistentVolume{
+			ObjectMeta: api.ObjectMeta{
+				GenerateName: "gce-",
+				Annotations: map[string]string{
+					volumehelper.VolumeGidAnnotationKey: "777",
+				},
+			},
+			Spec: api.PersistentVolumeSpec{
+				PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimRetain,
+				Capacity: api.ResourceList{
+					api.ResourceName(api.ResourceStorage): resource.MustParse("2Gi"),
+				},
+				PersistentVolumeSource: api.PersistentVolumeSource{
+					GCEPersistentDisk: volume.GCEPersistentDisk,
+				},
+				AccessModes: []api.PersistentVolumeAccessMode{
+					api.ReadWriteOnce,
+					api.ReadOnlyMany,
+				},
+				ClaimRef: &api.ObjectReference{
+					Name:      "",
+					Namespace: "",
+				},
+			},
+		}
+
+		pvc := &api.PersistentVolumeClaim{
+			ObjectMeta: api.ObjectMeta{
+				GenerateName: "gce-pvc-",
+				Namespace:    ns,
+			},
+			Spec: api.PersistentVolumeClaimSpec{
+				AccessModes: []api.PersistentVolumeAccessMode{
+					api.ReadWriteOnce,
+					api.ReadWriteOnce,
+				},
+				Resources: api.ResourceRequirements{
+					Requests: api.ResourceList{
+						api.ResourceName(api.ResourceStorage): resource.MustParse("2Gi"),
+					},
+				},
+			},
+		}
+		config := VolumeTestConfig{
+			namespace: ns,
+			prefix:    "pd",
+		}
+
+		volume := api.VolumeSource{
+			GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{
+				PDName:   volumeName,
+				FSType:   "ext3",
+				ReadOnly: false,
+			},
+		}
+
+		It("should test that deleting a PVC before the Pod does not cause unmount to fail on pod delete", func() {
+			framework.SkipUnlessProviderIs("gce", "gke")
+
+			defer func() {
+				volumeTestCleanup(f, config)
+			}()
+
+			By("creating a test gce pd volume")
+			volumeName, err := createPDWithRetry()
+			Expect(err).NotTo(HaveOccurred())
+
+			defer deletePDWithRetry(volumeName)
+
+			By("Creating the PV and PVC")
+			pv, err = c.PersistentVolumes().Create(pv)
+			Expect(err).NotTo(HaveOccurred())
+			pvc, err = c.PersistentVolumeClaims(ns).Create(pvc)
+			Expect(err).NotTo(HaveOccurred())
+
+			pod := makeClientPod(ns, pvc.Name)
+			pod, err = c.Pods(ns).Create(pod)
+			Expect(err).NotTo(HaveOccurred())
 		})
 	})
 })
