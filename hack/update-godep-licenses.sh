@@ -112,6 +112,19 @@ process_content () {
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
+# Check bash version
+if ((${BASH_VERSINFO[0]}<4)); then
+  echo
+  echo "ERROR: Bash v4+ required."
+  # Extra help for OSX
+  if [[ "$(uname -s)" == "Darwin" ]]; then
+    echo
+    echo "Ensure you are up to date on the following packages:"
+    echo "$ brew install md5sha1sum bash jq"
+  fi
+  echo
+fi
+
 # This variable can be injected, as in the verify script.
 LICENSE_ROOT="${LICENSE_ROOT:-${KUBE_ROOT}}"
 cd "${LICENSE_ROOT}"
