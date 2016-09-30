@@ -196,7 +196,7 @@ func componentProbe(port int, path string) *api.Probe {
 		InitialDelaySeconds: 60,
 		TimeoutSeconds:      15,
 		PeriodSeconds:       60,
-		FailureThreshold:    5
+		FailureThreshold:    5,
 	}
 }
 
