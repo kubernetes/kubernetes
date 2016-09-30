@@ -186,7 +186,12 @@ func (s *GenericAPIServer) MinRequestTimeout() time.Duration {
 	return s.minRequestTimeout
 }
 
-func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
+type preparedGenericAPIServer struct {
+	*GenericAPIServer
+}
+
+// PrepareRun does post API installation setup steps.
+func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 	// install APIs which depend on other APIs to be installed
 	if s.enableSwaggerSupport {
 		routes.Swagger{ExternalAddress: s.ExternalAddress}.Install(s.HandlerContainer)
@@ -198,7 +203,10 @@ func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
 			Definitions:     s.openAPIDefinitions,
 		}.Install(s.HandlerContainer)
 	}
+	return preparedGenericAPIServer{s}
+}
 
+func (s preparedGenericAPIServer) Run(options *options.ServerRunOptions) {
 	secureStartedCh := make(chan struct{})
 	if options.SecurePort != 0 && s.Handler != nil {
 		secureLocation := net.JoinHostPort(options.BindAddress.String(), strconv.Itoa(options.SecurePort))

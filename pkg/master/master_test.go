@@ -46,7 +46,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/generated/openapi"
 	"k8s.io/kubernetes/pkg/genericapiserver"
-	"k8s.io/kubernetes/pkg/genericapiserver/routes"
 	"k8s.io/kubernetes/pkg/kubelet/client"
 	ipallocator "k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
@@ -545,7 +544,7 @@ func TestValidOpenAPISpec(t *testing.T) {
 		t.Fatalf("Error in bringing up the master: %v", err)
 	}
 
-	// make sure swagger.json is not registered before calling install api.
+	// make sure swagger.json is not registered before calling PrepareRun.
 	server := httptest.NewServer(master.HandlerContainer.ServeMux)
 	resp, err := http.Get(server.URL + "/swagger.json")
 	if !assert.NoError(err) {
@@ -553,10 +552,8 @@ func TestValidOpenAPISpec(t *testing.T) {
 	}
 	assert.Equal(http.StatusNotFound, resp.StatusCode)
 
-	routes.OpenAPI{
-		Definitions: config.GenericConfig.OpenAPIDefinitions,
-		Info:        config.GenericConfig.OpenAPIInfo,
-	}.Install(master.HandlerContainer)
+	master.GenericAPIServer.PrepareRun()
+
 	resp, err = http.Get(server.URL + "/swagger.json")
 	if !assert.NoError(err) {
 		t.Errorf("unexpected error: %v", err)
