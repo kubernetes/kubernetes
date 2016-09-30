@@ -189,7 +189,7 @@ func GenerateSelfSignedCert(host, certPath, keyPath string, alternateIPs []net.I
 	return nil
 }
 
-// Recives byte array certificate and formats in human-readable format.
+// FormatBytesCert receives byte array certificate and formats in human-readable format
 func FormatBytesCert(cert []byte) (string, error) {
 	block, _ := pem.Decode(cert)
 	c, err := x509.ParseCertificate(block.Bytes)
@@ -199,7 +199,7 @@ func FormatBytesCert(cert []byte) (string, error) {
 	return FormatCert(c), nil
 }
 
-// Receives certificate and formats in human-readable format.
+// FormatCert receives certificate and formats in human-readable format
 func FormatCert(c *x509.Certificate) string {
 	var ips []string
 	for _, ip := range c.IPAddresses {
