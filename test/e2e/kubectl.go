@@ -1279,7 +1279,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			By("adding the taint " + testTaint.ToString() + " to a node")
 			framework.RunKubectlOrDie("taint", "nodes", nodeName, testTaint.ToString())
 			By("verifying the node has the taint " + testTaint.ToString())
-			output := framework.RunKubectlOrDie("describe", "node", nodeName)
+			output := runKubectlRetryOrDie("describe", "node", nodeName)
 			requiredStrings := [][]string{
 				{"Name:", nodeName},
 				{"Taints:"},
@@ -1290,7 +1290,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			By("removing the taint " + testTaint.ToString() + " of a node")
 			framework.RunKubectlOrDie("taint", "nodes", nodeName, testTaint.Key+":"+string(testTaint.Effect)+"-")
 			By("verifying the node doesn't have the taint " + testTaint.Key)
-			output = framework.RunKubectlOrDie("describe", "node", nodeName)
+			output = runKubectlRetryOrDie("describe", "node", nodeName)
 			if strings.Contains(output, testTaint.Key) {
 				framework.Failf("Failed removing taint " + testTaint.Key + " of the node " + nodeName)
 			}
@@ -1312,7 +1312,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			By("adding the taint " + testTaint.ToString() + " to a node")
 			framework.RunKubectlOrDie("taint", "nodes", nodeName, testTaint.ToString())
 			By("verifying the node has the taint " + testTaint.ToString())
-			output := framework.RunKubectlOrDie("describe", "node", nodeName)
+			output := runKubectlRetryOrDie("describe", "node", nodeName)
 			requiredStrings := [][]string{
 				{"Name:", nodeName},
 				{"Taints:"},
@@ -1328,7 +1328,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			By("adding another taint " + newTestTaint.ToString() + " to the node")
 			framework.RunKubectlOrDie("taint", "nodes", nodeName, newTestTaint.ToString())
 			By("verifying the node has the taint " + newTestTaint.ToString())
-			output = framework.RunKubectlOrDie("describe", "node", nodeName)
+			output = runKubectlRetryOrDie("describe", "node", nodeName)
 			requiredStrings = [][]string{
 				{"Name:", nodeName},
 				{"Taints:"},
@@ -1339,7 +1339,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			By("removing all taints that have the same key " + testTaint.Key + " of the node")
 			framework.RunKubectlOrDie("taint", "nodes", nodeName, testTaint.Key+"-")
 			By("verifying the node doesn't have the taints that have the same key " + testTaint.Key)
-			output = framework.RunKubectlOrDie("describe", "node", nodeName)
+			output = runKubectlRetryOrDie("describe", "node", nodeName)
 			if strings.Contains(output, testTaint.Key) {
 				framework.Failf("Failed removing taints " + testTaint.Key + " of the node " + nodeName)
 			}
