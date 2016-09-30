@@ -1133,7 +1133,7 @@ function start-rescheduler {
 # Setup working directory for kubelet.
 function setup-kubelet-dir {
     echo "Making /var/lib/kubelet executable for kubelet"
-    mount --bind /var/lib/kubelet /var/lib/kubelet/
+    mount -B /var/lib/kubelet /var/lib/kubelet/
     mount -B -o remount,exec,suid,dev /var/lib/kubelet
 }
 
