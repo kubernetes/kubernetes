@@ -90,6 +90,7 @@ const (
 	kubeCtlManifestPath      = "test/e2e/testing-manifests/kubectl"
 	redisControllerFilename  = "redis-master-controller.json"
 	redisServiceFilename     = "redis-master-service.json"
+	kubectlInPodFilename     = "kubectl-in-pod.json"
 )
 
 var (
@@ -522,6 +523,25 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			}
 			if !strings.Contains(body, nginxDefaultOutput) {
 				framework.Failf("Container port output missing expected value. Wanted:'%s', got: %s", nginxDefaultOutput, body)
+			}
+		})
+	})
+
+	framework.KubeDescribe("Kubectl should be able to talk to api server", func() {
+		It("kubectl runing in a pod should talk to api server [Conformance]", func() {
+			nsFlag := fmt.Sprintf("--namespace=%v", ns)
+			podJson := readTestFileOrDie(kubectlInPodFilename)
+			By("validating api verions")
+			framework.RunKubectlOrDieInput(string(podJson), "create", "-f", "-", nsFlag)
+			for i := 0; i < 20; i++ {
+				output := framework.RunKubectlOrDie("get", "pods/kubectl-in-pod", nsFlag)
+				if !strings.Contains(output, "ContainerCreating") {
+					break
+				}
+			}
+			output := framework.RunKubectlOrDie("exec", "kubectl-in-pod", nsFlag, "--", "kubectl", "version")
+			if !strings.Contains(output, "Server Version") {
+				framework.Failf("kubectl in the pod fails to talk to api server")
 			}
 		})
 	})
