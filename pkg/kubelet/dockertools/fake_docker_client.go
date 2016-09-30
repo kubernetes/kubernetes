@@ -86,6 +86,9 @@ func newClientWithVersionAndClock(version, apiVersion string, c clock.Clock) *Fa
 		Errors:       make(map[string]error),
 		ContainerMap: make(map[string]*dockertypes.ContainerJSON),
 		Clock:        c,
+
+		// default this to an empty result, so that we never have a nil non-error response from InspectImage
+		Image: &dockertypes.ImageInspect{},
 	}
 }
 
