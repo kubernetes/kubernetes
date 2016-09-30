@@ -18,6 +18,7 @@ package genericapiserver
 
 import (
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"testing"
@@ -103,4 +104,32 @@ func TestGenerateSSHKey(t *testing.T) {
 	os.Remove(publicKey)
 
 	// TODO: testing error cases where the file can not be removed?
+}
+
+type FakeTunneler struct {
+	SecondsSinceSyncValue       int64
+	SecondsSinceSSHKeySyncValue int64
+}
+
+func (t *FakeTunneler) Run(AddressFunc)                         {}
+func (t *FakeTunneler) Stop()                                   {}
+func (t *FakeTunneler) Dial(net, addr string) (net.Conn, error) { return nil, nil }
+func (t *FakeTunneler) SecondsSinceSync() int64                 { return t.SecondsSinceSyncValue }
+func (t *FakeTunneler) SecondsSinceSSHKeySync() int64           { return t.SecondsSinceSSHKeySyncValue }
+
+// TestIsTunnelSyncHealthy verifies that the 600 second lag test
+// is honored.
+func TestIsTunnelSyncHealthy(t *testing.T) {
+	tunneler := &FakeTunneler{}
+
+	// Pass case: 540 second lag
+	tunneler.SecondsSinceSyncValue = 540
+	healthFn := TunnelSyncHealthChecker(tunneler)
+	err := healthFn(nil)
+	assert.NoError(t, err, "IsTunnelSyncHealthy() should not have returned an error.")
+
+	// Fail case: 720 second lag
+	tunneler.SecondsSinceSyncValue = 720
+	err = healthFn(nil)
+	assert.Error(t, err, "IsTunnelSyncHealthy() should have returned an error.")
 }
