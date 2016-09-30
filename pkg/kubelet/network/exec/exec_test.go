@@ -29,6 +29,7 @@ import (
 	"testing"
 	"text/template"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/network"
@@ -226,7 +227,15 @@ func TestPluginSetupHook(t *testing.T) {
 
 	plug, err := network.InitNetworkPlugin(ProbeNetworkPlugins(testPluginPath), pluginName, nettest.NewFakeHost(nil), componentconfig.HairpinNone, "10.0.0.0/8", network.UseDefaultMTU)
 
-	err = plug.SetUpPod("podNamespace", "podName", kubecontainer.ContainerID{Type: "docker", ID: "dockerid2345"})
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			UID:       "12345678",
+			Name:      "podName",
+			Namespace: "podNamespace",
+		},
+	}
+
+	err = plug.SetUpPod(pod, kubecontainer.ContainerID{Type: "docker", ID: "dockerid2345"})
 	if err != nil {
 		t.Errorf("Expected nil: %v", err)
 	}

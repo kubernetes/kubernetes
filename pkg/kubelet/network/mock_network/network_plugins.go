@@ -22,6 +22,7 @@ package mock_network
 
 import (
 	gomock "github.com/golang/mock/gomock"
+	api "k8s.io/kubernetes/pkg/api"
 	componentconfig "k8s.io/kubernetes/pkg/apis/componentconfig"
 	container "k8s.io/kubernetes/pkg/kubelet/container"
 	network "k8s.io/kubernetes/pkg/kubelet/network"
@@ -98,14 +99,14 @@ func (_mr *_MockNetworkPluginRecorder) Name() *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "Name")
 }
 
-func (_m *MockNetworkPlugin) SetUpPod(_param0 string, _param1 string, _param2 container.ContainerID) error {
-	ret := _m.ctrl.Call(_m, "SetUpPod", _param0, _param1, _param2)
+func (_m *MockNetworkPlugin) SetUpPod(_param0 *api.Pod, _param1 container.ContainerID) error {
+	ret := _m.ctrl.Call(_m, "SetUpPod", _param0, _param1)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-func (_mr *_MockNetworkPluginRecorder) SetUpPod(arg0, arg1, arg2 interface{}) *gomock.Call {
-	return _mr.mock.ctrl.RecordCall(_mr.mock, "SetUpPod", arg0, arg1, arg2)
+func (_mr *_MockNetworkPluginRecorder) SetUpPod(arg0, arg1 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "SetUpPod", arg0, arg1)
 }
 
 func (_m *MockNetworkPlugin) Status() error {
