@@ -226,9 +226,8 @@ func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
 		s.InstallOpenAPI()
 	}
 
-	secureStartedCh := make(chan struct{})
+	secureLocation := net.JoinHostPort(options.BindAddress.String(), strconv.Itoa(options.SecurePort))
 	if options.SecurePort != 0 {
-		secureLocation := net.JoinHostPort(options.BindAddress.String(), strconv.Itoa(options.SecurePort))
 		secureServer := &http.Server{
 			Addr:           secureLocation,
 			Handler:        s.Handler,
@@ -277,20 +276,13 @@ func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
 		go func() {
 			defer utilruntime.HandleCrash()
 
-			notifyStarted := sync.Once{}
 			for {
 				if err := secureServer.ListenAndServeTLS(options.TLSCertFile, options.TLSPrivateKeyFile); err != nil {
 					glog.Errorf("Unable to listen for secure (%v); will try again.", err)
-				} else {
-					notifyStarted.Do(func() {
-						close(secureStartedCh)
-					})
 				}
 				time.Sleep(15 * time.Second)
 			}
 		}()
-	} else {
-		close(secureStartedCh)
 	}
 
 	insecureLocation := net.JoinHostPort(options.InsecureBindAddress.String(), strconv.Itoa(options.InsecurePort))
@@ -299,26 +291,30 @@ func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
 		Handler:        s.InsecureHandler,
 		MaxHeaderBytes: 1 << 20,
 	}
-	insecureStartedCh := make(chan struct{})
 	glog.Infof("Serving insecurely on %s", insecureLocation)
 	go func() {
 		defer utilruntime.HandleCrash()
 
-		notifyStarted := sync.Once{}
 		for {
 			if err := insecureServer.ListenAndServe(); err != nil {
 				glog.Errorf("Unable to listen for insecure (%v); will try again.", err)
-			} else {
-				notifyStarted.Do(func() {
-					close(insecureStartedCh)
-				})
 			}
 			time.Sleep(15 * time.Second)
 		}
 	}()
 
-	<-secureStartedCh
-	<-insecureStartedCh
+	// Attempt to verify the server came up for 20 seconds (100 tries * 100ms, 100ms timeout per try) per port
+	if options.SecurePort > 0 {
+		if err := waitForSuccessfulDial(true, "tcp", secureLocation, 100*time.Millisecond, 100*time.Millisecond, 100); err != nil {
+			glog.Fatalf("Secure server never started: %v", err)
+		}
+	}
+	if options.InsecurePort > 0 {
+		if err := waitForSuccessfulDial(false, "tcp", insecureLocation, 100*time.Millisecond, 100*time.Millisecond, 100); err != nil {
+			glog.Fatalf("Insecure server never started: %v", err)
+		}
+	}
+
 	s.RunPostStartHooks()
 
 	// err == systemd.SdNotifyNoSocket when not running on a systemd system
@@ -574,4 +570,28 @@ func NewDefaultAPIGroupInfo(group string) APIGroupInfo {
 		ParameterCodec:               api.ParameterCodec,
 		NegotiatedSerializer:         api.Codecs,
 	}
+}
+
+// waitForSuccessfulDial attempts to connect to the given address, closing and returning nil on the first successful connection.
+func waitForSuccessfulDial(https bool, network, address string, timeout, interval time.Duration, retries int) error {
+	var (
+		conn net.Conn
+		err  error
+	)
+	for i := 0; i <= retries; i++ {
+		dialer := net.Dialer{Timeout: timeout}
+		if https {
+			conn, err = tls.DialWithDialer(&dialer, network, address, &tls.Config{InsecureSkipVerify: true})
+		} else {
+			conn, err = dialer.Dial(network, address)
+		}
+		if err != nil {
+			glog.V(5).Infof("Got error %#v, trying again: %#v\n", err, address)
+			time.Sleep(interval)
+			continue
+		}
+		conn.Close()
+		return nil
+	}
+	return err
 }
