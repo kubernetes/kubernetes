@@ -310,9 +310,19 @@ func (f *FakeDockerClient) InspectContainer(id string) (*dockertypes.ContainerJS
 	return nil, fmt.Errorf("container %q not found", id)
 }
 
-// InspectImage is a test-spy implementation of DockerInterface.InspectImage.
+// InspectImageByRef is a test-spy implementation of DockerInterface.InspectImageByRef.
 // It adds an entry "inspect" to the internal method call record.
-func (f *FakeDockerClient) InspectImage(name string) (*dockertypes.ImageInspect, error) {
+func (f *FakeDockerClient) InspectImageByRef(name string) (*dockertypes.ImageInspect, error) {
+	f.Lock()
+	defer f.Unlock()
+	f.called = append(f.called, calledDetail{name: "inspect_image"})
+	err := f.popError("inspect_image")
+	return f.Image, err
+}
+
+// InspectImageByID is a test-spy implementation of DockerInterface.InspectImageByID.
+// It adds an entry "inspect" to the internal method call record.
+func (f *FakeDockerClient) InspectImageByID(name string) (*dockertypes.ImageInspect, error) {
 	f.Lock()
 	defer f.Unlock()
 	f.called = append(f.called, calledDetail{name: "inspect_image"})
