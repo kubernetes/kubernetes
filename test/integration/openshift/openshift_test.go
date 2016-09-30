@@ -34,8 +34,7 @@ func TestMasterExportsSymbols(t *testing.T) {
 		EnableUISupport:       false,
 		EnableLogsSupport:     false,
 	}
-	m := &master.Master{
+	_ = &master.Master{
 		GenericAPIServer: &genericapiserver.GenericAPIServer{},
 	}
-	_ = (m).NewBootstrapController(master.EndpointReconcilerConfig{})
 }
