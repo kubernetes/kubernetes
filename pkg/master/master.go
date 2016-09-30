@@ -19,7 +19,6 @@ package master
 import (
 	"fmt"
 	"net"
-	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
@@ -51,6 +50,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/storage"
 	storageapiv1beta1 "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
 	"k8s.io/kubernetes/pkg/apiserver"
+	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/healthz"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
@@ -123,9 +123,7 @@ type Master struct {
 	*genericapiserver.GenericAPIServer
 
 	legacyRESTStorageProvider corerest.LegacyRESTStorageProvider
-	legacyRESTStorage         corerest.LegacyRESTStorage
 
-	enableCoreControllers   bool
 	deleteCollectionWorkers int
 
 	// storage for third party objects
@@ -137,8 +135,8 @@ type Master struct {
 	// Useful for reliable testing.  Shouldn't be used otherwise.
 	disableThirdPartyControllerForTesting bool
 
-	// Used to start and monitor tunneling
-	tunneler genericapiserver.Tunneler
+	// nodeClient is used to back the tunneler
+	nodeClient coreclient.NodeInterface
 
 	restOptionsFactory restOptionsFactory
 }
@@ -167,6 +165,16 @@ func (c *Config) Complete() completedConfig {
 
 	// enable swagger UI only if general UI support is on
 	c.GenericConfig.EnableSwaggerUI = c.GenericConfig.EnableSwaggerUI && c.EnableUISupport
+
+	if c.EndpointReconcilerConfig.Interval == 0 {
+		c.EndpointReconcilerConfig.Interval = DefaultEndpointReconcilerInterval
+	}
+
+	if c.EndpointReconcilerConfig.Reconciler == nil {
+		// use a default endpoint reconciler if nothing is set
+		endpointClient := coreclient.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
+		c.EndpointReconcilerConfig.Reconciler = NewMasterCountEndpointReconciler(c.GenericConfig.MasterCount, endpointClient)
+	}
 
 	return completedConfig{c}
 }
@@ -199,9 +207,8 @@ func (c completedConfig) New() (*Master, error) {
 
 	m := &Master{
 		GenericAPIServer:        s,
-		enableCoreControllers:   c.EnableCoreControllers,
 		deleteCollectionWorkers: c.DeleteCollectionWorkers,
-		tunneler:                c.Tunneler,
+		nodeClient:              coreclient.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig).Nodes(),
 
 		disableThirdPartyControllerForTesting: c.disableThirdPartyControllerForTesting,
 
@@ -248,11 +255,6 @@ func (c completedConfig) New() (*Master, error) {
 	c.RESTStorageProviders[storage.GroupName] = storagerest.RESTStorageProvider{}
 	m.InstallAPIs(c.Config)
 
-	// TODO: Attempt clean shutdown?
-	if m.enableCoreControllers {
-		m.NewBootstrapController(c.EndpointReconcilerConfig).Start()
-	}
-
 	return m, nil
 }
 
@@ -269,20 +271,26 @@ func (m *Master) InstallAPIs(c *Config) {
 		if err != nil {
 			glog.Fatalf("Error building core storage: %v", err)
 		}
-		m.legacyRESTStorage = legacyRESTStorage
+
+		if c.EnableCoreControllers {
+			bootstrapController := c.NewBootstrapController(legacyRESTStorage)
+			if err := m.GenericAPIServer.AddPostStartHook("bootstrap-controller", bootstrapController.PostStartHook); err != nil {
+				glog.Fatalf("Error registering PostStartHook %q: %v", "bootstrap-controller", err)
+			}
+		}
 
 		apiGroupsInfo = append(apiGroupsInfo, apiGroupInfo)
 	}
 
 	// Run the tunneler.
 	healthzChecks := []healthz.HealthzChecker{}
-	if m.tunneler != nil {
-		m.tunneler.Run(m.getNodeAddresses)
-		healthzChecks = append(healthzChecks, healthz.NamedCheck("SSH Tunnel Check", m.IsTunnelSyncHealthy))
+	if c.Tunneler != nil {
+		c.Tunneler.Run(m.getNodeAddresses)
+		healthzChecks = append(healthzChecks, healthz.NamedCheck("SSH Tunnel Check", genericapiserver.TunnelSyncHealthChecker(c.Tunneler)))
 		prometheus.NewGaugeFunc(prometheus.GaugeOpts{
 			Name: "apiserver_proxy_tunnel_sync_latency_secs",
 			Help: "The time since the last successful synchronization of the SSH tunnels for proxy requests.",
-		}, func() float64 { return float64(m.tunneler.SecondsSinceSync()) })
+		}, func() float64 { return float64(c.Tunneler.SecondsSinceSync()) })
 	}
 	healthz.InstallHandler(&m.HandlerContainer.NonSwaggerRoutes, healthzChecks...)
 
@@ -335,51 +343,6 @@ func (m *Master) InstallAPIs(c *Config) {
 		if err := m.InstallAPIGroup(&apiGroupsInfo[i]); err != nil {
 			glog.Fatalf("Error in registering group versions: %v", err)
 		}
-	}
-}
-
-// NewBootstrapController returns a controller for watching the core capabilities of the master.  If
-// endpointReconcilerConfig.Interval is 0, the default value of DefaultEndpointReconcilerInterval
-// will be used instead.  If endpointReconcilerConfig.Reconciler is nil, the default
-// MasterCountEndpointReconciler will be used.
-// TODO this should be kicked off as a server PostHook
-func (m *Master) NewBootstrapController(endpointReconcilerConfig EndpointReconcilerConfig) *Controller {
-	if endpointReconcilerConfig.Interval == 0 {
-		endpointReconcilerConfig.Interval = DefaultEndpointReconcilerInterval
-	}
-
-	if endpointReconcilerConfig.Reconciler == nil {
-		// use a default endpoint	reconciler if nothing is set
-		// m.endpointRegistry is set via m.InstallAPIs -> m.initV1ResourcesStorage
-		endpointReconcilerConfig.Reconciler = NewMasterCountEndpointReconciler(m.MasterCount, m.legacyRESTStorage.EndpointRegistry)
-	}
-
-	return &Controller{
-		NamespaceRegistry: m.legacyRESTStorage.NamespaceRegistry,
-		ServiceRegistry:   m.legacyRESTStorage.ServiceRegistry,
-
-		EndpointReconciler: endpointReconcilerConfig.Reconciler,
-		EndpointInterval:   endpointReconcilerConfig.Interval,
-
-		SystemNamespaces:         []string{api.NamespaceSystem},
-		SystemNamespacesInterval: 1 * time.Minute,
-
-		ServiceClusterIPRegistry: m.legacyRESTStorage.ServiceClusterIPAllocator,
-		ServiceClusterIPRange:    m.legacyRESTStorageProvider.ServiceClusterIPRange,
-		ServiceClusterIPInterval: 3 * time.Minute,
-
-		ServiceNodePortRegistry: m.legacyRESTStorage.ServiceNodePortAllocator,
-		ServiceNodePortRange:    m.legacyRESTStorageProvider.ServiceNodePortRange,
-		ServiceNodePortInterval: 3 * time.Minute,
-
-		PublicIP: m.ClusterIP,
-
-		ServiceIP:                 m.ServiceReadWriteIP,
-		ServicePort:               m.ServiceReadWritePort,
-		ExtraServicePorts:         m.ExtraServicePorts,
-		ExtraEndpointPorts:        m.ExtraEndpointPorts,
-		PublicServicePort:         m.PublicReadWritePort,
-		KubernetesServiceNodePort: m.KubernetesServiceNodePort,
 	}
 }
 
@@ -697,7 +660,7 @@ func findExternalAddress(node *api.Node) (string, error) {
 }
 
 func (m *Master) getNodeAddresses() ([]string, error) {
-	nodes, err := m.legacyRESTStorage.NodeRegistry.ListNodes(api.NewDefaultContext(), nil)
+	nodes, err := m.nodeClient.List(api.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -711,21 +674,6 @@ func (m *Master) getNodeAddresses() ([]string, error) {
 		addrs = append(addrs, addr)
 	}
 	return addrs, nil
-}
-
-func (m *Master) IsTunnelSyncHealthy(req *http.Request) error {
-	if m.tunneler == nil {
-		return nil
-	}
-	lag := m.tunneler.SecondsSinceSync()
-	if lag > 600 {
-		return fmt.Errorf("Tunnel sync is taking to long: %d", lag)
-	}
-	sshKeyLag := m.tunneler.SecondsSinceSSHKeySync()
-	if sshKeyLag > 600 {
-		return fmt.Errorf("SSHKey sync is taking to long: %d", sshKeyLag)
-	}
-	return nil
 }
 
 func DefaultAPIResourceConfigSource() *genericapiserver.ResourceConfig {
