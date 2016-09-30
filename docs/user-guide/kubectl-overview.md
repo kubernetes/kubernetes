@@ -134,41 +134,25 @@ The following table includes a list of all the supported resource types and thei
 
 Resource type	| Abbreviated alias
 -------------------- | --------------------
-`certificatesigningrequests` | `csr`
-`clusterrolebindings` |
-`clusterroles` |
-`clusters` |
-`componentstatuses`    |       `cs`
-`configmaps` | `cm`
+`componentstatuses`	|	`cs`
 `daemonsets` | `ds`
-`deployments` | `deploy`
-`endpoints` | `ep`
+`deployments` |
 `events` | `ev`
+`endpoints` | `ep`
 `horizontalpodautoscalers` | `hpa`
 `ingresses` | `ing`
 `jobs` |
 `limitranges` | `limits`
-`namespaces` | `ns`
-`networkpolicies` |
 `nodes` | `no`
-`persistentvolumeclaims` | `pvc`
-`persistentvolumes` | `pv`
-`petsets` |
-`podSecurityPolicies` | `psp`
+`namespaces` | `ns`
 `pods` | `po`
-`podtemplates` |
-`replicasets` | `rs`
-`replicationcontrollers` | `rc`
+`persistentvolumes` | `pv`
+`persistentvolumeclaims` | `pvc`
 `resourcequotas` | `quota`
-`rolebindings` |
-`roles` |
-`scheduledjobs` |
+`replicationcontrollers` | `rc`
 `secrets` |
-`serviceaccounts` | `sa`
+`serviceaccounts` |
 `services` | `svc`
-`storageclasses` |
-`thirdpartyresourcedatas` |
-`thirdpartyresources` |
 
 ## Output options
 

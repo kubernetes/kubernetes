@@ -169,9 +169,6 @@ __custom_func() {
 	// and add a short forms entry in expandResourceShortcut() when appropriate.
 	// TODO: This should be populated using the discovery information from apiserver.
 	valid_resources = `Valid resource types include:
-   * certificatesigningrequests (aka 'csr')
-   * clusterrolebindings
-   * clusterroles
    * clusters (valid only for federation apiservers)
    * componentstatuses (aka 'cs')
    * configmaps (aka 'cm')
@@ -188,21 +185,17 @@ __custom_func() {
    * nodes (aka 'no')
    * persistentvolumeclaims (aka 'pvc')
    * persistentvolumes (aka 'pv')
-   * petsets (alpha feature, may be unstable)
-   * podSecurityPolicies (aka 'psp')
    * pods (aka 'po')
+   * podsecuritypolicies (aka 'psp')
    * podtemplates
    * replicasets (aka 'rs')
    * replicationcontrollers (aka 'rc')
    * resourcequotas (aka 'quota')
-   * rolebindings
-   * roles
    * scheduledjobs
    * secrets
    * serviceaccounts (aka 'sa')
    * services (aka 'svc')
    * storageclasses
-   * thirdpartyresourcedatas
    * thirdpartyresources
 `
 	usage_template = `{{if gt .Aliases 0}}
