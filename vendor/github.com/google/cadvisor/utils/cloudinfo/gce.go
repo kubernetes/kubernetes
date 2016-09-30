@@ -20,8 +20,8 @@ import (
 
 	info "github.com/google/cadvisor/info/v1"
 
+	"cloud.google.com/go/compute/metadata"
 	"github.com/golang/glog"
-	"google.golang.org/cloud/compute/metadata"
 )
 
 const (
