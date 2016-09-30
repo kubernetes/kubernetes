@@ -67,7 +67,7 @@ func init() {
 	// EqualPriority is a prioritizer function that gives an equal weight of one to all nodes
 	// Register the priority function so that its available
 	// but do not include it as part of the default priorities
-	factory.RegisterPriorityFunction("EqualPriority", scheduler.EqualPriority, 1)
+	factory.RegisterPriorityFunction2("EqualPriority", scheduler.EqualPriorityMap, nil, 1)
 
 	// ServiceSpreadingPriority is a priority config factory that spreads pods by minimizing
 	// the number of pods (belonging to the same service) on the same node.

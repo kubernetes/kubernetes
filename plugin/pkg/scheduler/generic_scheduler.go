@@ -243,7 +243,15 @@ func PrioritizeNodes(
 	// If no priority configs are provided, then the EqualPriority function is applied
 	// This is required to generate the priority list in the required format
 	if len(priorityConfigs) == 0 && len(extenders) == 0 {
-		return EqualPriority(pod, nodeNameToInfo, nodes)
+		result := make(schedulerapi.HostPriorityList, 0, len(nodes))
+		for i := range nodes {
+			hostPriority, err := EqualPriorityMap(pod, meta, nodeNameToInfo[nodes[i].Name])
+			if err != nil {
+				return nil, err
+			}
+			result = append(result, hostPriority)
+		}
+		return result, nil
 	}
 
 	var (
@@ -355,15 +363,15 @@ func PrioritizeNodes(
 }
 
 // EqualPriority is a prioritizer function that gives an equal weight of one to all nodes
-func EqualPriority(_ *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodes []*api.Node) (schedulerapi.HostPriorityList, error) {
-	result := make(schedulerapi.HostPriorityList, len(nodes))
-	for _, node := range nodes {
-		result = append(result, schedulerapi.HostPriority{
-			Host:  node.Name,
-			Score: 1,
-		})
+func EqualPriorityMap(_ *api.Pod, _ interface{}, nodeInfo *schedulercache.NodeInfo) (schedulerapi.HostPriority, error) {
+	node := nodeInfo.Node()
+	if node == nil {
+		return schedulerapi.HostPriority{}, fmt.Errorf("node not found")
 	}
-	return result, nil
+	return schedulerapi.HostPriority{
+		Host:  node.Name,
+		Score: 1,
+	}, nil
 }
 
 func NewGenericScheduler(
