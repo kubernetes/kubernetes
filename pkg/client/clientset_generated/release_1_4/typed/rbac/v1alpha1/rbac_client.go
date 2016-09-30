@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1beta1
+package v1alpha1
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
@@ -23,22 +23,37 @@ import (
 	serializer "k8s.io/kubernetes/pkg/runtime/serializer"
 )
 
-type AuthorizationInterface interface {
+type RbacInterface interface {
 	GetRESTClient() *restclient.RESTClient
-	SubjectAccessReviewsGetter
+	ClusterRolesGetter
+	ClusterRoleBindingsGetter
+	RolesGetter
+	RoleBindingsGetter
 }
 
-// AuthorizationClient is used to interact with features provided by the Authorization group.
-type AuthorizationClient struct {
+// RbacClient is used to interact with features provided by the Rbac group.
+type RbacClient struct {
 	*restclient.RESTClient
 }
 
-func (c *AuthorizationClient) SubjectAccessReviews() SubjectAccessReviewInterface {
-	return newSubjectAccessReviews(c)
+func (c *RbacClient) ClusterRoles() ClusterRoleInterface {
+	return newClusterRoles(c)
 }
 
-// NewForConfig creates a new AuthorizationClient for the given config.
-func NewForConfig(c *restclient.Config) (*AuthorizationClient, error) {
+func (c *RbacClient) ClusterRoleBindings() ClusterRoleBindingInterface {
+	return newClusterRoleBindings(c)
+}
+
+func (c *RbacClient) Roles(namespace string) RoleInterface {
+	return newRoles(c, namespace)
+}
+
+func (c *RbacClient) RoleBindings(namespace string) RoleBindingInterface {
+	return newRoleBindings(c, namespace)
+}
+
+// NewForConfig creates a new RbacClient for the given config.
+func NewForConfig(c *restclient.Config) (*RbacClient, error) {
 	config := *c
 	if err := setConfigDefaults(&config); err != nil {
 		return nil, err
@@ -47,12 +62,12 @@ func NewForConfig(c *restclient.Config) (*AuthorizationClient, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &AuthorizationClient{client}, nil
+	return &RbacClient{client}, nil
 }
 
-// NewForConfigOrDie creates a new AuthorizationClient for the given config and
+// NewForConfigOrDie creates a new RbacClient for the given config and
 // panics if there is an error in the config.
-func NewForConfigOrDie(c *restclient.Config) *AuthorizationClient {
+func NewForConfigOrDie(c *restclient.Config) *RbacClient {
 	client, err := NewForConfig(c)
 	if err != nil {
 		panic(err)
@@ -60,14 +75,14 @@ func NewForConfigOrDie(c *restclient.Config) *AuthorizationClient {
 	return client
 }
 
-// New creates a new AuthorizationClient for the given RESTClient.
-func New(c *restclient.RESTClient) *AuthorizationClient {
-	return &AuthorizationClient{c}
+// New creates a new RbacClient for the given RESTClient.
+func New(c *restclient.RESTClient) *RbacClient {
+	return &RbacClient{c}
 }
 
 func setConfigDefaults(config *restclient.Config) error {
-	// if authorization group is not registered, return an error
-	g, err := registered.Group("authorization.k8s.io")
+	// if rbac group is not registered, return an error
+	g, err := registered.Group("rbac.authorization.k8s.io")
 	if err != nil {
 		return err
 	}
@@ -88,7 +103,7 @@ func setConfigDefaults(config *restclient.Config) error {
 
 // GetRESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *AuthorizationClient) GetRESTClient() *restclient.RESTClient {
+func (c *RbacClient) GetRESTClient() *restclient.RESTClient {
 	if c == nil {
 		return nil
 	}

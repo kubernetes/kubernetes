@@ -14,22 +14,24 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1beta1
+package fake
 
 import (
-	authorizationapi "k8s.io/kubernetes/pkg/apis/authorization/v1beta1"
+	v1beta1 "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4/typed/storage/v1beta1"
+	restclient "k8s.io/kubernetes/pkg/client/restclient"
+	core "k8s.io/kubernetes/pkg/client/testing/core"
 )
 
-type SelfSubjectAccessReviewExpansion interface {
-	Create(sar *authorizationapi.SelfSubjectAccessReview) (result *authorizationapi.SelfSubjectAccessReview, err error)
+type FakeStorage struct {
+	*core.Fake
 }
 
-func (c *selfSubjectAccessReviews) Create(sar *authorizationapi.SelfSubjectAccessReview) (result *authorizationapi.SelfSubjectAccessReview, err error) {
-	result = &authorizationapi.SelfSubjectAccessReview{}
-	err = c.client.Post().
-		Resource("selfsubjectaccessreviews").
-		Body(sar).
-		Do().
-		Into(result)
-	return
+func (c *FakeStorage) StorageClasses() v1beta1.StorageClassInterface {
+	return &FakeStorageClasses{c}
+}
+
+// GetRESTClient returns a RESTClient that is used to communicate
+// with API server by this client implementation.
+func (c *FakeStorage) GetRESTClient() *restclient.RESTClient {
+	return nil
 }
