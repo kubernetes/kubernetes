@@ -246,6 +246,7 @@ func initKubeletConfigSync(s *options.KubeletServer) (*componentconfig.KubeletCo
 		if err != nil {
 			return nil, err
 		}
+		api.Scheme.Default(&extKC)
 		kc := componentconfig.KubeletConfiguration{}
 		err = api.Scheme.Convert(&extKC, &kc, nil)
 		if err != nil {

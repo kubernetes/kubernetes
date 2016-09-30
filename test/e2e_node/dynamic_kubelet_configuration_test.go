@@ -142,6 +142,8 @@ func decodeConfigz(resp *http.Response) (*componentconfig.KubeletConfiguration, 
 		return nil, err
 	}
 
+	api.Scheme.Default(&configz.ComponentConfig)
+
 	err = api.Scheme.Convert(&configz.ComponentConfig, &kubeCfg, nil)
 	if err != nil {
 		return nil, err
