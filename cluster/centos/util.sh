@@ -28,9 +28,6 @@ readonly ROOT=$(dirname "${BASH_SOURCE}")
 source "${ROOT}/${KUBE_CONFIG_FILE:-"config-default.sh"}"
 source "$KUBE_ROOT/cluster/common.sh"
 
-
-KUBECTL_PATH=${KUBE_ROOT}/cluster/centos/binaries/kubectl
-
 # Directory to be used for master and node provisioning.
 KUBE_TEMP="~/kube_temp"
 
