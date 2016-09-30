@@ -32,6 +32,7 @@ import (
 	internalApi "k8s.io/kubernetes/pkg/kubelet/api"
 	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/dockershim"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
@@ -851,5 +852,12 @@ func (m *kubeGenericRuntimeManager) GetPodContainerID(pod *kubecontainer.Pod) (k
 
 // Forward the specified port from the specified pod to the stream.
 func (m *kubeGenericRuntimeManager) PortForward(pod *kubecontainer.Pod, port uint16, stream io.ReadWriteCloser) error {
+	// Use docker portforward directly for in-process docker integration
+	// now to unblock other tests.
+	// TODO: remove this hack after portforward is defined in CRI.
+	if ds, ok := m.runtimeService.(dockershim.DockerLegacyService); ok {
+		return ds.PortForward(pod, port, stream)
+	}
+
 	return fmt.Errorf("not implemented")
 }
