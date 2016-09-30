@@ -510,7 +510,7 @@ func TestValidOpenAPISpec(t *testing.T) {
 		t.Fatalf("Error in bringing up the master: %v", err)
 	}
 
-	// make sure swagger.json is not registered before calling install api.
+	// make sure swagger.json is not registered before calling PrepareRun.
 	server := httptest.NewServer(master.GenericAPIServer.HandlerContainer.ServeMux)
 	resp, err := http.Get(server.URL + "/swagger.json")
 	if !assert.NoError(err) {
@@ -518,7 +518,8 @@ func TestValidOpenAPISpec(t *testing.T) {
 	}
 	assert.Equal(http.StatusNotFound, resp.StatusCode)
 
-	master.GenericAPIServer.InstallOpenAPI()
+	master.GenericAPIServer.PrepareRun()
+
 	resp, err = http.Get(server.URL + "/swagger.json")
 	if !assert.NoError(err) {
 		t.Errorf("unexpected error: %v", err)

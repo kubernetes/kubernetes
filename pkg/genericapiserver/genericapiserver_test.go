@@ -169,6 +169,31 @@ func TestInstallAPIGroups(t *testing.T) {
 	}
 }
 
+func TestPrepareRun(t *testing.T) {
+	s, etcdserver, config, assert := newMaster(t)
+	defer etcdserver.Terminate(t)
+
+	s.PrepareRun()
+
+	// swagger and openapi must be installed during PrepareRun
+	assert.True(config.EnableSwaggerSupport)
+	assert.True(config.EnableOpenAPISupport)
+	wss := s.HandlerContainer.RegisteredWebServices()
+	var foundSwagger, foundOpenAPI bool
+	for _, ws := range wss {
+		switch ws.RootPath() {
+		case "/swaggerapi/":
+			foundSwagger = true
+		case "/openapi/":
+			foundOpenAPI = true
+			t.Error("OpenAPI shouldn't be installed before other APIs")
+		}
+	}
+
+	assert.True(foundSwagger, "SwaggerAPI should be installed")
+	assert.True(foundOpenAPI, "OpenAPI should be installed")
+}
+
 // TestCustomHandlerChain verifies the handler chain with custom handler chain builder functions.
 func TestCustomHandlerChain(t *testing.T) {
 	etcdserver, config, _ := setUp(t)
