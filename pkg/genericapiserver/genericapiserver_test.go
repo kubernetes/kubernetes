@@ -36,12 +36,13 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/auth/user"
-	genericmux "k8s.io/kubernetes/pkg/genericapiserver/mux"
+	openapigen "k8s.io/kubernetes/pkg/generated/openapi"
 	ipallocator "k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/version"
 
+	"github.com/go-openapi/spec"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -53,6 +54,16 @@ func setUp(t *testing.T) (*etcdtesting.EtcdTestServer, Config, *assert.Assertion
 	config.PublicAddress = net.ParseIP("192.168.10.4")
 	config.RequestContextMapper = api.NewRequestContextMapper()
 	config.LegacyAPIGroupPrefixes = sets.NewString("/api")
+
+	config.EnableOpenAPISupport = true
+	config.EnableSwaggerSupport = true
+	config.OpenAPIConfig.Definitions = openapigen.OpenAPIDefinitions
+	config.OpenAPIConfig.Info = &spec.Info{
+		InfoProps: spec.InfoProps{
+			Title:   "Kubernetes",
+			Version: "unversioned",
+		},
+	}
 
 	return etcdServer, *config, assert.New(t)
 }
@@ -140,6 +151,29 @@ func TestInstallAPIGroups(t *testing.T) {
 			t.Errorf("unexpected error: %v, for path: %s", err, path)
 		}
 	}
+}
+
+func TestPrepareRun(t *testing.T) {
+	s, etcdserver, config, assert := newMaster(t)
+	defer etcdserver.Terminate(t)
+
+	assert.True(config.EnableSwaggerSupport)
+	assert.True(config.EnableOpenAPISupport)
+
+	server := httptest.NewServer(s.HandlerContainer.ServeMux)
+	defer server.Close()
+
+	s.PrepareRun()
+
+	// openapi is installed in PrepareRun
+	resp, err := http.Get(server.URL + "/swagger.json")
+	assert.NoError(err)
+	assert.Equal(http.StatusOK, resp.StatusCode)
+
+	// swagger is installed in PrepareRun
+	resp, err = http.Get(server.URL + "/swaggerapi/")
+	assert.NoError(err)
+	assert.Equal(http.StatusOK, resp.StatusCode)
 }
 
 // TestCustomHandlerChain verifies the handler chain with custom handler chain builder functions.
@@ -266,41 +300,6 @@ func (authn *mockAuthenticator) AuthenticateRequest(req *http.Request) (user.Inf
 	}, true, nil
 }
 
-// TestInstallSwaggerAPI verifies that the swagger api is added
-// at the proper endpoint.
-func TestInstallSwaggerAPI(t *testing.T) {
-	etcdserver, _, assert := setUp(t)
-	defer etcdserver.Terminate(t)
-
-	mux := http.NewServeMux()
-	server := &GenericAPIServer{}
-	server.HandlerContainer = genericmux.NewAPIContainer(mux, nil)
-
-	// Ensure swagger isn't installed without the call
-	ws := server.HandlerContainer.RegisteredWebServices()
-	if !assert.Equal(len(ws), 0) {
-		for x := range ws {
-			assert.NotEqual("/swaggerapi", ws[x].RootPath(), "SwaggerAPI was installed without a call to InstallSwaggerAPI()")
-		}
-	}
-
-	// Install swagger and test
-	server.InstallSwaggerAPI()
-	ws = server.HandlerContainer.RegisteredWebServices()
-	if assert.NotEqual(0, len(ws), "SwaggerAPI not installed.") {
-		assert.Equal("/swaggerapi/", ws[0].RootPath(), "SwaggerAPI did not install to the proper path. %s != /swaggerapi", ws[0].RootPath())
-	}
-
-	// Empty externalHost verification
-	mux = http.NewServeMux()
-	server.HandlerContainer = genericmux.NewAPIContainer(mux, nil)
-	server.ExternalAddress = ""
-	server.InstallSwaggerAPI()
-	if assert.NotEqual(0, len(ws), "SwaggerAPI not installed.") {
-		assert.Equal("/swaggerapi/", ws[0].RootPath(), "SwaggerAPI did not install to the proper path. %s != /swaggerapi", ws[0].RootPath())
-	}
-}
-
 func decodeResponse(resp *http.Response, obj interface{}) error {
 	defer resp.Body.Close()
 
@@ -385,8 +384,7 @@ func TestGetServerAddressByClientCIDRs(t *testing.T) {
 
 	publicAddressCIDRMap := []unversioned.ServerAddressByClientCIDR{
 		{
-			ClientCIDR: "0.0.0.0/0",
-
+			ClientCIDR:    "0.0.0.0/0",
 			ServerAddress: s.ExternalAddress,
 		},
 	}
