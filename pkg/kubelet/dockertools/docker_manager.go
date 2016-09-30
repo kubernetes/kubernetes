@@ -1273,11 +1273,16 @@ func noPodInfraContainerError(podName, podNamespace string) error {
 //  - should we support nsenter + socat on the host? (current impl)
 //  - should we support nsenter + socat in a container, running with elevated privs and --pid=host?
 func (dm *DockerManager) PortForward(pod *kubecontainer.Pod, port uint16, stream io.ReadWriteCloser) error {
+	return PortForward(dm.client, pod, port, stream)
+}
+
+// Temporarily export this function to share with dockershim.
+func PortForward(client DockerInterface, pod *kubecontainer.Pod, port uint16, stream io.ReadWriteCloser) error {
 	podInfraContainer := pod.FindContainerByName(PodInfraContainerName)
 	if podInfraContainer == nil {
 		return noPodInfraContainerError(pod.Name, pod.Namespace)
 	}
-	container, err := dm.client.InspectContainer(podInfraContainer.ID.ID)
+	container, err := client.InspectContainer(podInfraContainer.ID.ID)
 	if err != nil {
 		return err
 	}
