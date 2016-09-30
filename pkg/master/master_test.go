@@ -43,7 +43,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	extensionsapiv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/apis/rbac"
-	"k8s.io/kubernetes/pkg/apiserver/openapi"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	openapigen "k8s.io/kubernetes/pkg/generated/openapi"
@@ -487,21 +486,22 @@ func TestValidOpenAPISpec(t *testing.T) {
 			Version: "unversioned",
 		},
 	}
-	config.GenericConfig.OpenAPIConfig.GetOperationID = openapi.GetOperationID
 	master, err := config.Complete().New()
 	if err != nil {
 		t.Fatalf("Error in bringing up the master: %v", err)
 	}
 
-	// make sure swagger.json is not registered before calling install api.
+	// make sure swagger.json is not registered before calling PrepareRun.
 	server := httptest.NewServer(master.GenericAPIServer.HandlerContainer.ServeMux)
+	defer server.Close()
 	resp, err := http.Get(server.URL + "/swagger.json")
 	if !assert.NoError(err) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	assert.Equal(http.StatusNotFound, resp.StatusCode)
 
-	master.GenericAPIServer.InstallOpenAPI()
+	master.GenericAPIServer.PrepareRun()
+
 	resp, err = http.Get(server.URL + "/swagger.json")
 	if !assert.NoError(err) {
 		t.Errorf("unexpected error: %v", err)

@@ -42,7 +42,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/apiserver/authenticator"
-	"k8s.io/kubernetes/pkg/apiserver/openapi"
 	authorizerunion "k8s.io/kubernetes/pkg/auth/authorizer/union"
 	"k8s.io/kubernetes/pkg/auth/user"
 	"k8s.io/kubernetes/pkg/capabilities"
@@ -307,7 +306,6 @@ func Run(s *options.APIServer) error {
 	genericConfig.MasterServiceNamespace = s.MasterServiceNamespace
 	genericConfig.OpenAPIConfig.Info.Title = "Kubernetes"
 	genericConfig.OpenAPIConfig.Definitions = generatedopenapi.OpenAPIDefinitions
-	genericConfig.OpenAPIConfig.GetOperationID = openapi.GetOperationID
 	genericConfig.EnableOpenAPISupport = true
 	genericConfig.OpenAPIConfig.SecurityDefinitions = securityDefinitions
 
@@ -339,6 +337,6 @@ func Run(s *options.APIServer) error {
 	}
 
 	sharedInformers.Start(wait.NeverStop)
-	m.GenericAPIServer.Run()
+	m.GenericAPIServer.PrepareRun().Run()
 	return nil
 }

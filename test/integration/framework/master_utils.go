@@ -259,6 +259,7 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 	// TODO have this start method actually use the normal start sequence for the API server
 	// this method never actually calls the `Run` method for the API server
 	// fire the post hooks ourselves
+	m.GenericAPIServer.PrepareRun()
 	m.GenericAPIServer.RunPostStartHooks()
 
 	// wait for services to be ready
@@ -350,7 +351,6 @@ func NewMasterConfig() *master.Config {
 	genericConfig.APIResourceConfigSource = master.DefaultAPIResourceConfigSource()
 	genericConfig.Authorizer = authorizer.NewAlwaysAllowAuthorizer()
 	genericConfig.AdmissionControl = admit.NewAlwaysAdmit()
-	genericConfig.EnableOpenAPISupport = true
 
 	return &master.Config{
 		GenericConfig:         genericConfig,
