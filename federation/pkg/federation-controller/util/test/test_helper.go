@@ -24,6 +24,7 @@ import (
 
 	federation_api "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
+	"k8s.io/kubernetes/pkg/api"
 	api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -54,8 +55,12 @@ func (wd *WatcherDispatcher) Add(obj runtime.Object) {
 	defer wd.Unlock()
 	wd.eventsSoFar = append(wd.eventsSoFar, &watch.Event{Type: watch.Added, Object: obj})
 	for _, watcher := range wd.watchers {
+		objCopy, err := api.Scheme.Copy(obj)
+		if err != nil {
+			panic(err)
+		}
 		if !watcher.IsStopped() {
-			watcher.Add(obj)
+			watcher.Add(objCopy)
 		}
 	}
 }
@@ -65,13 +70,18 @@ func (wd *WatcherDispatcher) Modify(obj runtime.Object) {
 	wd.Lock()
 	defer wd.Unlock()
 	glog.V(4).Infof("->WatcherDispatcher.Modify(%v)", obj)
+	time.Sleep(time.Second)
 	wd.eventsSoFar = append(wd.eventsSoFar, &watch.Event{Type: watch.Modified, Object: obj})
 	for i, watcher := range wd.watchers {
+		objCopy, err := api.Scheme.Copy(obj)
+		if err != nil {
+			panic(err)
+		}
 		if !watcher.IsStopped() {
-			glog.V(4).Infof("->Watcher(%d).Modify(%v)", i, obj)
-			watcher.Modify(obj)
+			glog.V(4).Infof("->Watcher(%d).Modify(%v)", i, objCopy)
+			watcher.Modify(objCopy)
 		} else {
-			glog.V(4).Infof("->Watcher(%d) is stopped.  Not calling Modify(%v)", i, obj)
+			glog.V(4).Infof("->Watcher(%d) is stopped.  Not calling Modify(%v)", i, objCopy)
 		}
 	}
 }
@@ -82,8 +92,12 @@ func (wd *WatcherDispatcher) Delete(lastValue runtime.Object) {
 	defer wd.Unlock()
 	wd.eventsSoFar = append(wd.eventsSoFar, &watch.Event{Type: watch.Deleted, Object: lastValue})
 	for _, watcher := range wd.watchers {
+		objCopy, err := api.Scheme.Copy(lastValue)
+		if err != nil {
+			panic(err)
+		}
 		if !watcher.IsStopped() {
-			watcher.Delete(lastValue)
+			watcher.Delete(objCopy)
 		}
 	}
 }
@@ -94,8 +108,12 @@ func (wd *WatcherDispatcher) Error(errValue runtime.Object) {
 	defer wd.Unlock()
 	wd.eventsSoFar = append(wd.eventsSoFar, &watch.Event{Type: watch.Error, Object: errValue})
 	for _, watcher := range wd.watchers {
+		objCopy, err := api.Scheme.Copy(errValue)
+		if err != nil {
+			panic(err)
+		}
 		if !watcher.IsStopped() {
-			watcher.Error(errValue)
+			watcher.Error(objCopy)
 		}
 	}
 }
@@ -106,8 +124,12 @@ func (wd *WatcherDispatcher) Action(action watch.EventType, obj runtime.Object) 
 	defer wd.Unlock()
 	wd.eventsSoFar = append(wd.eventsSoFar, &watch.Event{Type: action, Object: obj})
 	for _, watcher := range wd.watchers {
+		objCopy, err := api.Scheme.Copy(obj)
+		if err != nil {
+			panic(err)
+		}
 		if !watcher.IsStopped() {
-			watcher.Action(action, obj)
+			watcher.Action(action, objCopy)
 		}
 	}
 }
@@ -144,10 +166,8 @@ func RegisterFakeCopyOnCreate(resource string, client *core.Fake, watcher *Watch
 	client.AddReactor("create", resource, func(action core.Action) (bool, runtime.Object, error) {
 		createAction := action.(core.CreateAction)
 		obj := createAction.GetObject()
-		go func() {
-			watcher.Add(obj)
-			objChan <- obj
-		}()
+		watcher.Add(obj)
+		objChan <- obj
 		return true, obj, nil
 	})
 	return objChan
@@ -161,11 +181,9 @@ func RegisterFakeCopyOnUpdate(resource string, client *core.Fake, watcher *Watch
 	client.AddReactor("update", resource, func(action core.Action) (bool, runtime.Object, error) {
 		updateAction := action.(core.UpdateAction)
 		obj := updateAction.GetObject()
-		go func() {
-			glog.V(4).Infof("Object updated. Writing to channel: %v", obj)
-			watcher.Modify(obj)
-			objChan <- obj
-		}()
+		glog.V(4).Infof("Object updated. Writing to channel: %v", obj)
+		watcher.Modify(obj)
+		objChan <- obj
 		return true, obj, nil
 	})
 	return objChan
