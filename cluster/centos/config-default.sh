@@ -37,6 +37,16 @@ export ETCD_SERVERS=${ETCD_SERVERS:-"http://$MASTER_IP:2379"}
 # according to rfc 1918 ref: https://tools.ietf.org/html/rfc1918 choose a private ip range here.
 export SERVICE_CLUSTER_IP_RANGE=${SERVICE_CLUSTER_IP_RANGE:-"192.168.3.0/24"}
 
+# Optional: Install cluster DNS.
+ENABLE_CLUSTER_DNS="${KUBE_ENABLE_CLUSTER_DNS:-true}"
+# DNS_SERVER_IP must be a IP in SERVICE_CLUSTER_IP_RANGE
+DNS_SERVER_IP=${DNS_SERVER_IP:-"192.168.3.100"}
+DNS_DOMAIN=${DNS_DOMAIN:-"cluster.local"}
+DNS_REPLICAS=${DNS_REPLICAS:-1}
+
+# Optional: Install Kubernetes UI
+ENABLE_CLUSTER_UI="${KUBE_ENABLE_CLUSTER_UI:-true}"
+
 # define the IP range used for flannel overlay network, should not conflict with above SERVICE_CLUSTER_IP_RANGE
 export FLANNEL_NET=${FLANNEL_NET:-"172.16.0.0/16"}
 

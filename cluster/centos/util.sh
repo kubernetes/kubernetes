@@ -252,6 +252,8 @@ function provision-node() {
   local master_ip=${MASTER#*@}
   local node=$1
   local node_ip=${node#*@}
+  local dns_ip=${DNS_SERVER_IP#*@}
+  local dns_domain=${DNS_DOMAIN#*@}
   ensure-setup-dir ${node}
 
   kube-scp ${node} "${ROOT}/binaries/node ${ROOT}/node ${ROOT}/config-default.sh ${ROOT}/util.sh" ${KUBE_TEMP}
@@ -262,7 +264,7 @@ function provision-node() {
     sudo ln -s /opt/kubernetes/bin/* /usr/local/bin/; \
     sudo bash ${KUBE_TEMP}/node/scripts/flannel.sh ${ETCD_SERVERS} ${FLANNEL_NET}; \
     sudo bash ${KUBE_TEMP}/node/scripts/docker.sh \"${DOCKER_OPTS}\"; \
-    sudo bash ${KUBE_TEMP}/node/scripts/kubelet.sh ${master_ip} ${node_ip}; \
+    sudo bash ${KUBE_TEMP}/node/scripts/kubelet.sh ${master_ip} ${node_ip} ${dns_ip} ${dns_domain}; \
     sudo bash ${KUBE_TEMP}/node/scripts/proxy.sh ${master_ip}"
 }
 

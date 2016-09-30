@@ -17,6 +17,8 @@
 
 MASTER_ADDRESS=${1:-"8.8.8.18"}
 NODE_ADDRESS=${2:-"8.8.8.20"}
+DNS_SERVER_IP=${3:-"192.168.3.100"}
+DNS_DOMAIN=${4:-"cluster.local"}
 
 
 cat <<EOF >/opt/kubernetes/cfg/kubelet
@@ -42,6 +44,10 @@ KUBELET_API_SERVER="--api-servers=${MASTER_ADDRESS}:8080"
 # --allow-privileged=false: If true, allow containers to request privileged mode. [default=false]
 KUBE_ALLOW_PRIV="--allow-privileged=false"
 
+# DNS info
+KUBELET__DNS_IP="--cluster-dns=${DNS_SERVER_IP}"
+KUBELET_DNS_DOMAIN="--cluster-domain=${DNS_DOMAIN}"
+
 # Add your own!
 KUBELET_ARGS=""
 EOF
@@ -53,6 +59,8 @@ KUBE_PROXY_OPTS="   \${KUBE_LOGTOSTDERR}     \\
                     \${NODE_HOSTNAME}        \\
                     \${KUBELET_API_SERVER}   \\
                     \${KUBE_ALLOW_PRIV}      \\
+                    \${KUBELET__DNS_IP}      \\
+                    \${KUBELET_DNS_DOMAIN}      \\
                     \${KUBELET_ARGS}"
 
 cat <<EOF >/usr/lib/systemd/system/kubelet.service
