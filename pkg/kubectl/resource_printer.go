@@ -275,7 +275,13 @@ func (p *JSONPrinter) AfterPrint(w io.Writer, res string) error {
 func (p *JSONPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 	switch obj := obj.(type) {
 	case *runtime.Unknown:
-		_, err := w.Write(obj.Raw)
+		var buf bytes.Buffer
+		err := json.Indent(&buf, obj.Raw, "", "    ")
+		if err != nil {
+			return err
+		}
+		buf.WriteRune('\n')
+		_, err = buf.WriteTo(w)
 		return err
 	}
 
