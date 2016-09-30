@@ -303,10 +303,10 @@ func cleanupServiceShardsAndProviderResources(namespace string, service *v1.Serv
 			} else if errors.IsNotFound(err) {
 				cSvc = nil
 				By(fmt.Sprintf("Service %q in namespace %q in cluster %q not found", service.Name, namespace, name))
-				return true, nil
+				return true, err
 			}
 			By(fmt.Sprintf("Service %q in namespace %q in cluster %q found", service.Name, namespace, name))
-			return true, nil
+			return true, err
 		})
 
 		if err != nil || cSvc == nil {
