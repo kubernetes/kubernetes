@@ -32,7 +32,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/workqueue"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
-	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
@@ -62,13 +61,14 @@ func (f *FitError) Error() string {
 }
 
 type genericScheduler struct {
-	cache             schedulercache.Cache
-	predicates        map[string]algorithm.FitPredicate
-	prioritizers      []algorithm.PriorityConfig
-	extenders         []algorithm.SchedulerExtender
-	pods              algorithm.PodLister
-	lastNodeIndexLock sync.Mutex
-	lastNodeIndex     uint64
+	cache                schedulercache.Cache
+	predicates           map[string]algorithm.FitPredicate
+	priorityMetaProducer algorithm.MetadataProducer
+	prioritizers         []algorithm.PriorityConfig
+	extenders            []algorithm.SchedulerExtender
+	pods                 algorithm.PodLister
+	lastNodeIndexLock    sync.Mutex
+	lastNodeIndex        uint64
 
 	cachedNodeInfoMap map[string]*schedulercache.NodeInfo
 }
@@ -113,7 +113,8 @@ func (g *genericScheduler) Schedule(pod *api.Pod, nodeLister algorithm.NodeListe
 	}
 
 	trace.Step("Prioritizing")
-	priorityList, err := PrioritizeNodes(pod, g.cachedNodeInfoMap, g.prioritizers, filteredNodes, g.extenders)
+	meta := g.priorityMetaProducer(pod)
+	priorityList, err := PrioritizeNodes(pod, g.cachedNodeInfoMap, meta, g.prioritizers, filteredNodes, g.extenders)
 	if err != nil {
 		return "", err
 	}
@@ -234,6 +235,7 @@ func podFitsOnNode(pod *api.Pod, meta interface{}, info *schedulercache.NodeInfo
 func PrioritizeNodes(
 	pod *api.Pod,
 	nodeNameToInfo map[string]*schedulercache.NodeInfo,
+	meta interface{},
 	priorityConfigs []algorithm.PriorityConfig,
 	nodes []*api.Node,
 	extenders []algorithm.SchedulerExtender,
@@ -255,7 +257,6 @@ func PrioritizeNodes(
 		errs = append(errs, err)
 	}
 
-	meta := priorities.PriorityMetadata(pod)
 	results := make([]schedulerapi.HostPriorityList, 0, len(priorityConfigs))
 	for range priorityConfigs {
 		results = append(results, nil)
@@ -365,12 +366,18 @@ func EqualPriority(_ *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInf
 	return result, nil
 }
 
-func NewGenericScheduler(cache schedulercache.Cache, predicates map[string]algorithm.FitPredicate, prioritizers []algorithm.PriorityConfig, extenders []algorithm.SchedulerExtender) algorithm.ScheduleAlgorithm {
+func NewGenericScheduler(
+	cache schedulercache.Cache,
+	predicates map[string]algorithm.FitPredicate,
+	priorityMetaProducer algorithm.MetadataProducer,
+	prioritizers []algorithm.PriorityConfig,
+	extenders []algorithm.SchedulerExtender) algorithm.ScheduleAlgorithm {
 	return &genericScheduler{
-		cache:             cache,
-		predicates:        predicates,
-		prioritizers:      prioritizers,
-		extenders:         extenders,
-		cachedNodeInfoMap: make(map[string]*schedulercache.NodeInfo),
+		cache:                cache,
+		predicates:           predicates,
+		priorityMetaProducer: priorityMetaProducer,
+		prioritizers:         prioritizers,
+		extenders:            extenders,
+		cachedNodeInfoMap:    make(map[string]*schedulercache.NodeInfo),
 	}
 }

@@ -58,6 +58,12 @@ func init() {
 	// Cluster autoscaler friendly scheduling algorithm.
 	factory.RegisterAlgorithmProvider(ClusterAutoscalerProvider, defaultPredicates(),
 		replace(defaultPriorities(), "LeastRequestedPriority", "MostRequestedPriority"))
+
+	factory.RegisterPriorityMetadataProducerFactory(
+		func(args factory.PluginFactoryArgs) algorithm.MetadataProducer {
+			return priorities.PriorityMetadata
+		})
+
 	// EqualPriority is a prioritizer function that gives an equal weight of one to all nodes
 	// Register the priority function so that its available
 	// but do not include it as part of the default priorities
