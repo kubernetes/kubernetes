@@ -513,7 +513,7 @@ func TestSysctlsFromPodAnnotation(t *testing.T) {
 			expectErr:  true,
 		},
 		{
-			annotation: "foo.bar=",
+			annotation:  "foo.bar=",
 			expectValue: []Sysctl{{Name: "foo.bar", Value: ""}},
 		},
 		{
