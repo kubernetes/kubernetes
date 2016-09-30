@@ -286,7 +286,6 @@ func TestSelectorSpreadPriority(t *testing.T) {
 	for _, test := range tests {
 		nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(test.pods, nil)
 		selectorSpread := SelectorSpread{
-			podLister:        algorithm.FakePodLister(test.pods),
 			serviceLister:    algorithm.FakeServiceLister(test.services),
 			controllerLister: algorithm.FakeControllerLister(test.rcs),
 			replicaSetLister: algorithm.FakeReplicaSetLister(test.rss),
@@ -494,7 +493,6 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 	for _, test := range tests {
 		nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(test.pods, nil)
 		selectorSpread := SelectorSpread{
-			podLister:        algorithm.FakePodLister(test.pods),
 			serviceLister:    algorithm.FakeServiceLister(test.services),
 			controllerLister: algorithm.FakeControllerLister(test.rcs),
 			replicaSetLister: algorithm.FakeReplicaSetLister(test.rss),
