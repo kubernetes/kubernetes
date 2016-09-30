@@ -577,7 +577,7 @@ func SysctlsFromPodAnnotation(annotation string) ([]Sysctl, error) {
 	sysctls := make([]Sysctl, len(kvs))
 	for i, kv := range kvs {
 		cs := strings.Split(kv, "=")
-		if len(cs) != 2 {
+		if len(cs) != 2 || len(cs[0]) == 0 {
 			return nil, fmt.Errorf("sysctl %q not of the format sysctl_name=value", kv)
 		}
 		sysctls[i].Name = cs[0]
