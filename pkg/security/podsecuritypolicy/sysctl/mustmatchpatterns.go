@@ -35,15 +35,15 @@ var (
 	defaultSysctlsPatterns = []string{"*"}
 )
 
-// NewMustMatchPatterns creates a new mustMatchPattern strategy that will provide validation.
+// NewMustMatchPatterns creates a new mustMatchPatterns strategy that will provide validation.
 // Passing nil means the default pattern, passing an empty list means to disallow all sysctls.
-func NewMustMatchPatterns(patterns []string) (SysctlsStrategy, error) {
+func NewMustMatchPatterns(patterns []string) SysctlsStrategy {
 	if patterns == nil {
 		patterns = defaultSysctlsPatterns
 	}
 	return &mustMatchPatterns{
 		patterns: patterns,
-	}, nil
+	}
 }
 
 // Validate ensures that the specified values fall within the range of the strategy.
