@@ -161,23 +161,22 @@ func TestNew(t *testing.T) {
 	defer etcdserver.Terminate(t)
 
 	// Verify many of the variables match their config counterparts
-	assert.Equal(master.RequestContextMapper(), config.GenericConfig.RequestContextMapper)
-	assert.Equal(master.ClusterIP, config.GenericConfig.PublicAddress)
+	assert.Equal(master.GenericAPIServer.RequestContextMapper(), config.GenericConfig.RequestContextMapper)
+	assert.Equal(master.GenericAPIServer.ClusterIP, config.GenericConfig.PublicAddress)
 
 	// these values get defaulted
 	_, serviceClusterIPRange, _ := net.ParseCIDR("10.0.0.0/24")
 	serviceReadWriteIP, _ := ipallocator.GetIndexedIP(serviceClusterIPRange, 1)
-	assert.Equal(master.MasterCount, 1)
-	assert.Equal(master.PublicReadWritePort, 6443)
-	assert.Equal(master.ServiceReadWriteIP, serviceReadWriteIP)
+	assert.Equal(master.GenericAPIServer.MasterCount, 1)
+	assert.Equal(master.GenericAPIServer.ServiceReadWriteIP, serviceReadWriteIP)
 
 	// These functions should point to the same memory location
-	masterDialer, _ := utilnet.Dialer(master.ProxyTransport)
+	masterDialer, _ := utilnet.Dialer(master.GenericAPIServer.ProxyTransport)
 	masterDialerFunc := fmt.Sprintf("%p", masterDialer)
 	configDialerFunc := fmt.Sprintf("%p", config.GenericConfig.ProxyDialer)
 	assert.Equal(masterDialerFunc, configDialerFunc)
 
-	assert.Equal(master.ProxyTransport.(*http.Transport).TLSClientConfig, config.GenericConfig.ProxyTLSClientConfig)
+	assert.Equal(master.GenericAPIServer.ProxyTransport.(*http.Transport).TLSClientConfig, config.GenericConfig.ProxyTLSClientConfig)
 }
 
 // TestVersion tests /version
@@ -187,7 +186,7 @@ func TestVersion(t *testing.T) {
 
 	req, _ := http.NewRequest("GET", "/version", nil)
 	resp := httptest.NewRecorder()
-	s.InsecureHandler.ServeHTTP(resp, req)
+	s.GenericAPIServer.InsecureHandler.ServeHTTP(resp, req)
 	if resp.Code != 200 {
 		t.Fatalf("expected http 200, got: %d", resp.Code)
 	}
@@ -302,7 +301,7 @@ func TestAPIVersionOfDiscoveryEndpoints(t *testing.T) {
 	master, etcdserver, _, assert := newMaster(t)
 	defer etcdserver.Terminate(t)
 
-	server := httptest.NewServer(master.HandlerContainer.ServeMux)
+	server := httptest.NewServer(master.GenericAPIServer.HandlerContainer.ServeMux)
 
 	// /api exists in release-1.1
 	resp, err := http.Get(server.URL + "/api")
@@ -376,7 +375,7 @@ func TestDiscoveryAtAPIS(t *testing.T) {
 	master, etcdserver, _, assert := newLimitedMaster(t)
 	defer etcdserver.Terminate(t)
 
-	server := httptest.NewServer(master.HandlerContainer.ServeMux)
+	server := httptest.NewServer(master.GenericAPIServer.HandlerContainer.ServeMux)
 	resp, err := http.Get(server.URL + "/apis")
 	if !assert.NoError(err) {
 		t.Errorf("unexpected error: %v", err)
@@ -515,14 +514,14 @@ func TestValidOpenAPISpec(t *testing.T) {
 	}
 
 	// make sure swagger.json is not registered before calling install api.
-	server := httptest.NewServer(master.HandlerContainer.ServeMux)
+	server := httptest.NewServer(master.GenericAPIServer.HandlerContainer.ServeMux)
 	resp, err := http.Get(server.URL + "/swagger.json")
 	if !assert.NoError(err) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	assert.Equal(http.StatusNotFound, resp.StatusCode)
 
-	master.InstallOpenAPI()
+	master.GenericAPIServer.InstallOpenAPI()
 	resp, err = http.Get(server.URL + "/swagger.json")
 	if !assert.NoError(err) {
 		t.Errorf("unexpected error: %v", err)
