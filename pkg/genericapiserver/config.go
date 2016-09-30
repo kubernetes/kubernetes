@@ -23,6 +23,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"path"
 	"regexp"
 	"strconv"
 	"strings"
@@ -100,6 +101,9 @@ type Config struct {
 	// same value for this field. (Numbers > 1 currently untested.)
 	MasterCount int
 
+	SecureServingInfo   *ServingInfo
+	InsecureServingInfo *ServingInfo
+
 	// The port on PublicAddress where a read-write server will be installed.
 	// Defaults to 6443 if not set.
 	ReadWritePort int
@@ -167,6 +171,22 @@ type Config struct {
 	LongRunningFunc genericfilters.LongRunningRequestCheck
 }
 
+type ServingInfo struct {
+	// BindAddress is the ip:port to serve on
+	BindAddress string
+	// ServerCert is the TLS cert info for serving secure traffic
+	ServerCert CertInfo
+	// ClientCA is the certificate bundle for all the signers that you'll recognize for incoming client certificates
+	ClientCA string
+}
+
+type CertInfo struct {
+	// CertFile is a file containing a PEM-encoded certificate
+	CertFile string
+	// KeyFile is a file containing a PEM-encoded private key for the certificate specified by CertFile
+	KeyFile string
+}
+
 func NewConfig(options *options.ServerRunOptions) *Config {
 	longRunningRE := regexp.MustCompile(options.LongRunningRequestRE)
 
@@ -177,6 +197,29 @@ func NewConfig(options *options.ServerRunOptions) *Config {
 			MaxAge:     options.AuditLogMaxAge,
 			MaxBackups: options.AuditLogMaxBackups,
 			MaxSize:    options.AuditLogMaxSize,
+		}
+	}
+
+	var secureServingInfo *ServingInfo
+	if options.SecurePort > 0 {
+		secureServingInfo = &ServingInfo{
+			BindAddress: net.JoinHostPort(options.BindAddress.String(), strconv.Itoa(options.SecurePort)),
+			ServerCert: CertInfo{
+				CertFile: options.TLSCertFile,
+				KeyFile:  options.TLSPrivateKeyFile,
+			},
+			ClientCA: options.ClientCAFile,
+		}
+		if options.TLSCertFile == "" && options.TLSPrivateKeyFile == "" {
+			secureServingInfo.ServerCert.CertFile = path.Join(options.CertDirectory, "apiserver.crt")
+			secureServingInfo.ServerCert.KeyFile = path.Join(options.CertDirectory, "apiserver.key")
+		}
+	}
+
+	var insecureServingInfo *ServingInfo
+	if options.InsecurePort > 0 {
+		insecureServingInfo = &ServingInfo{
+			BindAddress: net.JoinHostPort(options.InsecureBindAddress.String(), strconv.Itoa(options.InsecurePort)),
 		}
 	}
 
@@ -195,6 +238,8 @@ func NewConfig(options *options.ServerRunOptions) *Config {
 		KubernetesServiceNodePort: options.KubernetesServiceNodePort,
 		MasterCount:               options.MasterCount,
 		MinRequestTimeout:         options.MinRequestTimeout,
+		SecureServingInfo:         secureServingInfo,
+		InsecureServingInfo:       insecureServingInfo,
 		PublicAddress:             options.AdvertiseAddress,
 		ReadWritePort:             options.SecurePort,
 		ServiceClusterIPRange:     &options.ServiceClusterIPRange,
@@ -319,6 +364,8 @@ func (c completedConfig) New() (*GenericAPIServer, error) {
 		enableSwaggerSupport: c.EnableSwaggerSupport,
 
 		MasterCount:          c.MasterCount,
+		SecureServingInfo:    c.SecureServingInfo,
+		InsecureServingInfo:  c.InsecureServingInfo,
 		ExternalAddress:      c.ExternalHost,
 		ClusterIP:            c.PublicAddress,
 		PublicReadWritePort:  c.ReadWritePort,

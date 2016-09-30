@@ -22,7 +22,6 @@ import (
 	"mime"
 	"net"
 	"net/http"
-	"path"
 	"sort"
 	"strconv"
 	"strings"
@@ -44,7 +43,6 @@ import (
 	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/genericapiserver/openapi"
 	"k8s.io/kubernetes/pkg/genericapiserver/openapi/common"
-	"k8s.io/kubernetes/pkg/genericapiserver/options"
 	"k8s.io/kubernetes/pkg/runtime"
 	certutil "k8s.io/kubernetes/pkg/util/cert"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
@@ -119,6 +117,9 @@ type GenericAPIServer struct {
 	Mux              *apiserver.PathRecorderMux
 	HandlerContainer *restful.Container
 	MasterCount      int
+
+	SecureServingInfo   *ServingInfo
+	InsecureServingInfo *ServingInfo
 
 	// ExternalAddress is the address (hostname or IP and port) that should be used in
 	// external (public internet) URLs for this GenericAPIServer.
@@ -213,7 +214,7 @@ func NewHandlerContainer(mux *http.ServeMux, s runtime.NegotiatedSerializer) *re
 	return container
 }
 
-func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
+func (s *GenericAPIServer) Run() {
 	// install APIs which depend on other APIs to be installed
 	if s.enableSwaggerSupport {
 		s.InstallSwaggerAPI()
@@ -223,10 +224,9 @@ func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
 	}
 
 	secureStartedCh := make(chan struct{})
-	if options.SecurePort != 0 {
-		secureLocation := net.JoinHostPort(options.BindAddress.String(), strconv.Itoa(options.SecurePort))
+	if s.SecureServingInfo != nil {
 		secureServer := &http.Server{
-			Addr:           secureLocation,
+			Addr:           s.SecureServingInfo.BindAddress,
 			Handler:        s.Handler,
 			MaxHeaderBytes: 1 << 20,
 			TLSConfig: &tls.Config{
@@ -237,8 +237,8 @@ func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
 			},
 		}
 
-		if len(options.ClientCAFile) > 0 {
-			clientCAs, err := certutil.NewPool(options.ClientCAFile)
+		if len(s.SecureServingInfo.ClientCA) > 0 {
+			clientCAs, err := certutil.NewPool(s.SecureServingInfo.ClientCA)
 			if err != nil {
 				glog.Fatalf("Unable to load client CA file: %v", err)
 			}
@@ -252,30 +252,26 @@ func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
 
 		}
 
-		glog.Infof("Serving securely on %s", secureLocation)
-		if options.TLSCertFile == "" && options.TLSPrivateKeyFile == "" {
-			options.TLSCertFile = path.Join(options.CertDirectory, "apiserver.crt")
-			options.TLSPrivateKeyFile = path.Join(options.CertDirectory, "apiserver.key")
-			// TODO (cjcullen): Is ClusterIP the right address to sign a cert with?
-			alternateIPs := []net.IP{s.ServiceReadWriteIP}
-			alternateDNS := []string{"kubernetes.default.svc", "kubernetes.default", "kubernetes", "localhost"}
-			// It would be nice to set a fqdn subject alt name, but only the kubelets know, the apiserver is clueless
-			// alternateDNS = append(alternateDNS, "kubernetes.default.svc.CLUSTER.DNS.NAME")
-			if !certutil.CanReadCertOrKey(options.TLSCertFile, options.TLSPrivateKeyFile) {
-				if err := certutil.GenerateSelfSignedCert(s.ClusterIP.String(), options.TLSCertFile, options.TLSPrivateKeyFile, alternateIPs, alternateDNS); err != nil {
-					glog.Errorf("Unable to generate self signed cert: %v", err)
-				} else {
-					glog.Infof("Using self-signed cert (%s, %s)", options.TLSCertFile, options.TLSPrivateKeyFile)
-				}
+		// TODO (cjcullen): Is ClusterIP the right address to sign a cert with?
+		alternateIPs := []net.IP{s.ServiceReadWriteIP}
+		alternateDNS := []string{"kubernetes.default.svc", "kubernetes.default", "kubernetes", "localhost"}
+		// It would be nice to set a fqdn subject alt name, but only the kubelets know, the apiserver is clueless
+		// alternateDNS = append(alternateDNS, "kubernetes.default.svc.CLUSTER.DNS.NAME")
+		if !certutil.CanReadCertOrKey(s.SecureServingInfo.ServerCert.CertFile, s.SecureServingInfo.ServerCert.KeyFile) {
+			if err := certutil.GenerateSelfSignedCert(s.ClusterIP.String(), s.SecureServingInfo.ServerCert.CertFile, s.SecureServingInfo.ServerCert.KeyFile, alternateIPs, alternateDNS); err != nil {
+				glog.Errorf("Unable to generate self signed cert: %v", err)
+			} else {
+				glog.Infof("Using self-signed cert (%s, %s)", s.SecureServingInfo.ServerCert.CertFile, s.SecureServingInfo.ServerCert.KeyFile)
 			}
 		}
 
+		glog.Infof("Serving securely on %s", s.SecureServingInfo.BindAddress)
 		go func() {
 			defer utilruntime.HandleCrash()
 
 			notifyStarted := sync.Once{}
 			for {
-				if err := secureServer.ListenAndServeTLS(options.TLSCertFile, options.TLSPrivateKeyFile); err != nil {
+				if err := secureServer.ListenAndServeTLS(s.SecureServingInfo.ServerCert.CertFile, s.SecureServingInfo.ServerCert.KeyFile); err != nil {
 					glog.Errorf("Unable to listen for secure (%v); will try again.", err)
 				} else {
 					notifyStarted.Do(func() {
@@ -289,29 +285,32 @@ func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
 		close(secureStartedCh)
 	}
 
-	insecureLocation := net.JoinHostPort(options.InsecureBindAddress.String(), strconv.Itoa(options.InsecurePort))
-	insecureServer := &http.Server{
-		Addr:           insecureLocation,
-		Handler:        s.InsecureHandler,
-		MaxHeaderBytes: 1 << 20,
-	}
 	insecureStartedCh := make(chan struct{})
-	glog.Infof("Serving insecurely on %s", insecureLocation)
-	go func() {
-		defer utilruntime.HandleCrash()
-
-		notifyStarted := sync.Once{}
-		for {
-			if err := insecureServer.ListenAndServe(); err != nil {
-				glog.Errorf("Unable to listen for insecure (%v); will try again.", err)
-			} else {
-				notifyStarted.Do(func() {
-					close(insecureStartedCh)
-				})
-			}
-			time.Sleep(15 * time.Second)
+	if s.InsecureServingInfo != nil {
+		insecureServer := &http.Server{
+			Addr:           s.InsecureServingInfo.BindAddress,
+			Handler:        s.InsecureHandler,
+			MaxHeaderBytes: 1 << 20,
 		}
-	}()
+		glog.Infof("Serving insecurely on %s", s.InsecureServingInfo.BindAddress)
+		go func() {
+			defer utilruntime.HandleCrash()
+
+			notifyStarted := sync.Once{}
+			for {
+				if err := insecureServer.ListenAndServe(); err != nil {
+					glog.Errorf("Unable to listen for insecure (%v); will try again.", err)
+				} else {
+					notifyStarted.Do(func() {
+						close(insecureStartedCh)
+					})
+				}
+				time.Sleep(15 * time.Second)
+			}
+		}()
+	} else {
+		close(insecureStartedCh)
+	}
 
 	<-secureStartedCh
 	<-insecureStartedCh
