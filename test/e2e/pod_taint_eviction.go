@@ -34,36 +34,22 @@ var _ = framework.KubeDescribe("Eviction based on taints [Slow] [Destructive]", 
 
 		It("that don't tolerate NoSchedule taint should be evicted", func() {
 
-			annotationsWithTolerance := map[string]string{
-				api.TolerationsAnnotationKey: `
-						[{
-							"key": "test",
-							"operator": "Equal",
-							"value": "test",
-							"effect": "NoSchedule"
-						}]`,
-			}
-			annotationsWithTaint := map[string]string{
-				api.TaintsAnnotationKey: `
-						[{
-							"key": "test",
-							"value": "test",
-							"effect": "NoSchedule"
-						}]`,
-			}
-			// TODO rework this ASAP
+			testTaint := api.Taint{Key: "test", Value: "test", Effect: api.TaintEffectNoSchedule}
+			testToleration := api.Toleration{Key: "test", Operator: api.TolerationOpEqual, Value: "test", Effect: api.TaintEffectNoSchedule}
+
 			By("updating kube-system pods with tolerations")
 			systemPods, err := f.Client.Pods("kube-system").List(api.ListOptions{})
 			for _, pod := range systemPods.Items {
-				pod.Annotations = annotationsWithTaint
+				api.AddTolerations(&pod, testToleration)
 				f.Client.Pods("kube-system").Update(&pod)
 			}
 			nodes := framework.GetReadySchedulableNodesOrDie(f.Client)
 			node := nodes.Items[0]
 			By("creating three pods in namespace " + f.Namespace.Name + ", 2 without toleration to NoSchedule taint on node " + node.Name)
-			pod1 := createPod("eviction-pod1-no-tolerance", node.Name, make(map[string]string))
-			pod2 := createPod("eviction-pod2-no-tolerance", node.Name, make(map[string]string))
-			podWithTolerance := createPod("eviction-pod3-with-tolerance", node.Name, annotationsWithTolerance)
+			pod1 := createPod("eviction-pod1-no-tolerance", node.Name)
+			pod2 := createPod("eviction-pod2-no-tolerance", node.Name)
+			podWithTolerance := createPod("eviction-pod3-with-tolerance", node.Name)
+			api.AddToScheme(podWithTolerance, testToleration)
 			pods := []*api.Pod{pod1, pod2, podWithTolerance}
 
 			defer func() {
@@ -74,13 +60,13 @@ var _ = framework.KubeDescribe("Eviction based on taints [Slow] [Destructive]", 
 				By("removing annotations from kube-system pods")
 				systemPods, err := f.Client.Pods("kube-system").List(api.ListOptions{})
 				for _, pod := range systemPods.Items {
-					pod.Annotations = make(map[string]string)
+					api.RemoveTolerations(&pod, testToleration)
 					_, err := f.Client.Pods("kube-system").Update(&pod)
 					Expect(err).NotTo(HaveOccurred())
 				}
 				By("removing annotations from a chosen node")
 				node, _ := f.Client.Nodes().Get(node.Name)
-				node.Annotations = make(map[string]string)
+				api.RemoveTaints(node, testTaint)
 				_, err = f.Client.Nodes().Update(node)
 				Expect(err).NotTo(HaveOccurred())
 			}()
@@ -90,7 +76,7 @@ var _ = framework.KubeDescribe("Eviction based on taints [Slow] [Destructive]", 
 			}
 
 			By("updating node " + node.Name + " with NoSchedule taint")
-			node.Annotations = annotationsWithTaint
+			api.AddTaints(node, testTaint)
 			_, err = f.Client.Nodes().Update(&node)
 			Expect(err).NotTo(HaveOccurred())
 
@@ -118,11 +104,10 @@ var _ = framework.KubeDescribe("Eviction based on taints [Slow] [Destructive]", 
 	})
 })
 
-func createPod(name, nodeName string, annotations map[string]string) *api.Pod {
+func createPod(name, nodeName string) *api.Pod {
 	return &api.Pod{
 		ObjectMeta: api.ObjectMeta{
-			Name:        name,
-			Annotations: annotations,
+			Name: name,
 		},
 		Spec: api.PodSpec{
 			Containers: []api.Container{

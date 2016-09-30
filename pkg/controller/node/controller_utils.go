@@ -17,7 +17,6 @@ limitations under the License.
 package node
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -40,32 +39,6 @@ const (
 	// Number of Nodes that needs to be in the cluster for it to be treated as "large"
 	LargeClusterThreshold = 20
 )
-
-func tolerationsToleratesTaints(tolerations []api.Toleration, taints []api.Taint) bool {
-	// If the taint list is nil/empty, it is tolerated by all tolerations by default.
-	if len(taints) == 0 {
-		return true
-	}
-
-	// The taint list isn't nil/empty, a nil/empty toleration list can't tolerate them.
-	if len(tolerations) == 0 {
-		return false
-	}
-
-	for i := range taints {
-		taint := &taints[i]
-		// skip taints that have effect PreferNoSchedule, since it is for priorities
-		if taint.Effect == api.TaintEffectPreferNoSchedule {
-			continue
-		}
-
-		if !api.TaintToleratedByTolerations(taint, tolerations) {
-			return false
-		}
-	}
-
-	return true
-}
 
 func deletePod(kubeClient clientset.Interface, pod *api.Pod, recorder record.EventRecorder, daemonStore cache.StoreToDaemonSetLister) (bool, error) {
 	// if the pod has already been marked for deletion, we still return true that there are remaining pods.
@@ -325,56 +298,28 @@ func terminatePod(kubeClient clientset.Interface, recorder record.EventRecorder,
 
 func addNodeOutageTaint(kubeClient clientset.Interface, node *api.Node) error {
 	taintNodeOutage := api.Taint{Key: "operator", Value: "node-outage", Effect: api.TaintEffectNoSchedule}
-	annotations := node.GetAnnotations()
-	if annotations == nil {
-		annotations = make(map[string]string)
-	}
-	taints, err := api.GetTaintsFromNodeAnnotations(annotations)
+	updated, err := api.AddTaints(node, taintNodeOutage)
+	glog.Errorf("UPDATED ---------------- %v", updated)
 	if err != nil {
 		return err
 	}
-	for _, taint := range taints {
-		if taint.Key == taintNodeOutage.Key && taint.Effect == taintNodeOutage.Effect {
-			glog.V(2).Infof("operator taint already exists with value %v", taint.Effect)
-			return nil
-		}
+	if !updated {
+		return nil
 	}
-	taints = append(taints, taintNodeOutage)
-	taintsData, err := json.Marshal(taints)
-	if err != nil {
-		return err
-	}
-	annotations[api.TaintsAnnotationKey] = string(taintsData)
-	node.SetAnnotations(annotations)
 	_, err = kubeClient.Core().Nodes().Update(node)
 	return err
 }
 
 func removeNodeOutageTaint(kubeClient clientset.Interface, node *api.Node) error {
 	taintNodeOutage := api.Taint{Key: "operator", Value: "node-outage", Effect: api.TaintEffectNoSchedule}
-	annotations := node.GetAnnotations()
-	if annotations == nil {
-		annotations = make(map[string]string)
+	updated, err := api.RemoveTaints(node, taintNodeOutage)
+	glog.Errorf("UPDATED ---------------- %v", updated)
+	if err != nil {
+		return err
 	}
-	taints, err := api.GetTaintsFromNodeAnnotations(annotations)
-	if len(taints) == 0 {
+	if !updated {
 		return nil
 	}
-	if err != nil {
-		return err
-	}
-	var newTaints []api.Taint
-	for _, taint := range taints {
-		if !(taint.Key == taintNodeOutage.Key && taint.Effect == taintNodeOutage.Effect && taint.Value == taintNodeOutage.Value) {
-			newTaints = append(newTaints, taint)
-		}
-	}
-	taintsData, err := json.Marshal(newTaints)
-	if err != nil {
-		return err
-	}
-	annotations[api.TaintsAnnotationKey] = string(taintsData)
-	node.SetAnnotations(annotations)
 	_, err = kubeClient.Core().Nodes().Update(node)
 	return err
 }

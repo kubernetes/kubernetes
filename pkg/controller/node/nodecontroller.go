@@ -42,6 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/system"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/version"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
 )
 
 func init() {
@@ -254,8 +255,8 @@ func NewNodeController(
 					utilruntime.HandleError(fmt.Errorf("Error allocating CIDR: %v", err))
 				}
 			},
-			UpdateFunc: func(_, cur interface{}) {
-				node := cur.(*api.Node)
+			UpdateFunc: func(_, obj interface{}) {
+				node := obj.(*api.Node)
 				// If the PodCIDR is not empty we either:
 				// - already processed a Node that already had a CIDR after NC restarted
 				//   (cidr is marked as used),
@@ -576,7 +577,7 @@ func (nc *NodeController) monitorNodeTaints() error {
 				return err
 			}
 
-			if !tolerationsToleratesTaints(tolerations, taints) {
+			if !predicates.TolerationsToleratesTaints(tolerations, taints) {
 				nc.evictPods(&node, pod)
 			} else {
 				nc.cancelPodsEviction(&node, pod)
