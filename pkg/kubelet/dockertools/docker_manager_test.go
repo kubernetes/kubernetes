@@ -151,6 +151,9 @@ func createTestDockerManager(fakeHTTPClient *fakeHTTP, fakeDocker *FakeDockerCli
 		fakeHTTPClient,
 		flowcontrol.NewBackOff(time.Second, 300*time.Second))
 
+	// default this to an empty result, so that we never have a nil non-error response from InspectImage
+	fakeDocker.Image = &dockertypes.ImageInspect{}
+
 	return dockerManager, fakeDocker
 }
 

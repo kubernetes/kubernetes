@@ -43,6 +43,7 @@ import (
 const (
 	PodInfraContainerName = leaky.PodInfraContainerName
 	DockerPrefix          = "docker://"
+	DockerPullablePrefix  = "docker-pullable://"
 	LogSuffix             = "log"
 	ext4MaxFileNameLen    = 255
 )
