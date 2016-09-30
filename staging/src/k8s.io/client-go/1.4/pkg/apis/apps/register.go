@@ -50,6 +50,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&PetSet{},
 		&PetSetList{},
 		&api.ListOptions{},
+		&api.DeleteOptions{},
 	)
 	return nil
 }
