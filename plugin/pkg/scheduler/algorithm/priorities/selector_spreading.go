@@ -56,6 +56,7 @@ func NewSelectorSpreadPriority(
 	return selectorSpread.CalculateSpreadPriority
 }
 
+// Returns selectors of services, RCs and RSs matching the given pod.
 func getSelectors(pod *api.Pod, sl algorithm.ServiceLister, cl algorithm.ControllerLister, rsl algorithm.ReplicaSetLister) []labels.Selector {
 	selectors := make([]labels.Selector, 0, 3)
 	if services, err := sl.GetPodServices(pod); err == nil {
@@ -83,10 +84,10 @@ func (s *SelectorSpread) getSelectors(pod *api.Pod) []labels.Selector {
 }
 
 // CalculateSpreadPriority spreads pods across hosts and zones, considering pods belonging to the same service or replication controller.
-// When a pod is scheduled, it looks for services or RCs that match the pod, then finds existing pods that match those selectors.
+// When a pod is scheduled, it looks for services, RCs or RSs that match the pod, then finds existing pods that match those selectors.
 // It favors nodes that have fewer existing matching pods.
 // i.e. it pushes the scheduler towards a node where there's the smallest number of
-// pods which match the same service selectors or RC selectors as the pod being scheduled.
+// pods which match the same service, RC or RS selectors as the pod being scheduled.
 // Where zone information is included on the nodes, it favors nodes in zones with fewer existing matching pods.
 func (s *SelectorSpread) CalculateSpreadPriority(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodes []*api.Node) (schedulerapi.HostPriorityList, error) {
 	selectors := s.getSelectors(pod)
