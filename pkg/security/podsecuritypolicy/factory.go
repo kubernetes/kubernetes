@@ -79,10 +79,7 @@ func (f *simpleStrategyFactory) CreateStrategies(psp *extensions.PodSecurityPoli
 			errs = append(errs, err)
 		}
 	}
-	sysctlsStrat, err := createSysctlsStrategy(unsafeSysctls)
-	if err != nil {
-		errs = append(errs, err)
-	}
+	sysctlsStrat := createSysctlsStrategy(unsafeSysctls)
 
 	if len(errs) > 0 {
 		return nil, errors.NewAggregate(errs)
@@ -162,6 +159,6 @@ func createCapabilitiesStrategy(defaultAddCaps, requiredDropCaps, allowedCaps []
 }
 
 // createSysctlsStrategy creates a new unsafe sysctls strategy.
-func createSysctlsStrategy(sysctlsPatterns []string) (sysctl.SysctlsStrategy, error) {
+func createSysctlsStrategy(sysctlsPatterns []string) sysctl.SysctlsStrategy {
 	return sysctl.NewMustMatchPatterns(sysctlsPatterns)
 }

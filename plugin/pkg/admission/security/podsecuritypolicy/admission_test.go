@@ -1117,12 +1117,12 @@ func TestAdmitSysctls(t *testing.T) {
 			shouldPass:  true,
 			expectedPSP: mixedSysctls.Name,
 		},
-		"pod with not-matching unsafe sysctls request allowed under mixedSysctls PSP": {
+		"pod with not-matching unsafe sysctls request disallowed under mixedSysctls PSP": {
 			pod:        podWithSysctls([]string{"a.b", "b.c", "c", "d.e.f"}, []string{"e"}),
 			psps:       []*extensions.PodSecurityPolicy{mixedSysctls},
 			shouldPass: false,
 		},
-		"pod with not-matching safe sysctls request allowed under mixedSysctls PSP": {
+		"pod with not-matching safe sysctls request disallowed under mixedSysctls PSP": {
 			pod:        podWithSysctls([]string{"a.b", "b.c", "c", "d.e.f", "e"}, []string{}),
 			psps:       []*extensions.PodSecurityPolicy{mixedSysctls},
 			shouldPass: false,
