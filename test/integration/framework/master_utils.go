@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
@@ -45,6 +46,7 @@ import (
 	authorizerunion "k8s.io/kubernetes/pkg/auth/authorizer/union"
 	"k8s.io/kubernetes/pkg/auth/user"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/core/v1"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
@@ -60,6 +62,7 @@ import (
 	"k8s.io/kubernetes/pkg/storage/storagebackend"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/util/wait"
+	"k8s.io/kubernetes/pkg/watch"
 	"k8s.io/kubernetes/plugin/pkg/admission/admit"
 	authenticatorunion "k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/union"
 
@@ -257,6 +260,28 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 	// fire the post hooks ourselves
 	m.GenericAPIServer.RunPostStartHooks()
 
+	// wait for services to be ready
+	if masterConfig.EnableCoreControllers {
+		// TODO Once /healthz is updated for posthooks, we'll wait for good health
+		coreClient := coreclient.NewForConfigOrDie(&cfg)
+		svcWatch, err := coreClient.Services(api.NamespaceDefault).Watch(v1.ListOptions{})
+		if err != nil {
+			glog.Fatal(err)
+		}
+		_, err = watch.Until(30*time.Second, svcWatch, func(event watch.Event) (bool, error) {
+			if event.Type != watch.Added {
+				return false, nil
+			}
+			if event.Object.(*v1.Service).Name == "kubernetes" {
+				return true, nil
+			}
+			return false, nil
+		})
+		if err != nil {
+			glog.Fatal(err)
+		}
+	}
+
 	return m, s
 }
 
@@ -333,9 +358,10 @@ func NewMasterConfig() *master.Config {
 			OpenAPIDefinitions:    openapi.OpenAPIDefinitions,
 			EnableOpenAPISupport:  true,
 		},
-		StorageFactory:   storageFactory,
-		EnableWatchCache: true,
-		KubeletClient:    kubeletclient.FakeKubeletClient{},
+		StorageFactory:        storageFactory,
+		EnableCoreControllers: true,
+		EnableWatchCache:      true,
+		KubeletClient:         kubeletclient.FakeKubeletClient{},
 	}
 }
 
