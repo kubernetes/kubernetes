@@ -264,8 +264,10 @@ until [[ "${ready}" -ge "${NUM_NODES}" ]]; do
       echo "Got error while trying to list Nodes. Probably API server is down."
     fi
     pods=$("${KUBECTL}" get pods --namespace=kubemark) || true
+    running=$(($(echo "${pods}" | grep "Running" | wc -l)))
+    echo "${running} HollowNode pods are reported as 'Running'"
     not_running=$(($(echo "${pods}" | grep -v "Running" | wc -l) - 1))
-    echo "${not_running} HollowNode pods are reported as not running"
+    echo "${not_running} HollowNode pods are reported as NOT 'Running'"
     echo $(echo "${pods}" | grep -v "Running")
     exit 1
   fi
