@@ -78,11 +78,11 @@ func PerformTLSBootstrap(s *kubeadmapi.KubeadmConfig, apiEndpoint string, caCert
 	if err != nil {
 		return nil, fmt.Errorf("<node/csr> failed to request signed certificate from the API server [%v]", err)
 	}
-	fmtCert, err := certutil.FormatCert(cert)
+	fmtCert, err := certutil.FormatBytesCert(cert)
 	if err != nil {
 		return nil, fmt.Errorf("<node/csr> failed to format certificate [%v]", err)
 	}
-	fmt.Println("<node/csr> received signed certificate from the API server ", fmtCert)
+	fmt.Printf("<node/csr> received signed certificate from the API server:\n%s\n", fmtCert)
 	fmt.Println("<node/csr> generating kubelet configuration")
 	finalConfig := kubeadmutil.MakeClientConfigWithCerts(
 		bareClientConfig, "kubernetes", fmt.Sprintf("kubelet-%s", nodeName),
