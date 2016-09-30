@@ -297,9 +297,8 @@ func terminatePod(kubeClient clientset.Interface, recorder record.EventRecorder,
 }
 
 func addNodeOutageTaint(kubeClient clientset.Interface, node *api.Node) error {
-	taintNodeOutage := api.Taint{Key: "operator", Value: "node-outage", Effect: api.TaintEffectNoSchedule}
+	taintNodeOutage := api.Taint{Key: "operator", Value: "node-outage", Effect: api.TaintEffectNoExecute}
 	updated, err := api.AddTaints(node, taintNodeOutage)
-	glog.Errorf("UPDATED ---------------- %v", updated)
 	if err != nil {
 		return err
 	}
@@ -311,9 +310,8 @@ func addNodeOutageTaint(kubeClient clientset.Interface, node *api.Node) error {
 }
 
 func removeNodeOutageTaint(kubeClient clientset.Interface, node *api.Node) error {
-	taintNodeOutage := api.Taint{Key: "operator", Value: "node-outage", Effect: api.TaintEffectNoSchedule}
+	taintNodeOutage := api.Taint{Key: "operator", Value: "node-outage", Effect: api.TaintEffectNoExecute}
 	updated, err := api.RemoveTaints(node, taintNodeOutage)
-	glog.Errorf("UPDATED ---------------- %v", updated)
 	if err != nil {
 		return err
 	}

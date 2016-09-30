@@ -34,8 +34,8 @@ var _ = framework.KubeDescribe("Eviction based on taints [Slow] [Destructive]", 
 
 		It("that don't tolerate NoSchedule taint should be evicted", func() {
 
-			testTaint := api.Taint{Key: "test", Value: "test", Effect: api.TaintEffectNoSchedule}
-			testToleration := api.Toleration{Key: "test", Operator: api.TolerationOpEqual, Value: "test", Effect: api.TaintEffectNoSchedule}
+			testTaint := api.Taint{Key: "test", Value: "test", Effect: api.TaintEffectNoExecute}
+			testToleration := api.Toleration{Key: "test", Operator: api.TolerationOpEqual, Value: "test", Effect: api.TaintEffectNoExecute}
 
 			By("updating kube-system pods with tolerations")
 			systemPods, err := f.Client.Pods("kube-system").List(api.ListOptions{})
@@ -49,7 +49,7 @@ var _ = framework.KubeDescribe("Eviction based on taints [Slow] [Destructive]", 
 			pod1 := createPod("eviction-pod1-no-tolerance", node.Name)
 			pod2 := createPod("eviction-pod2-no-tolerance", node.Name)
 			podWithTolerance := createPod("eviction-pod3-with-tolerance", node.Name)
-			api.AddToScheme(podWithTolerance, testToleration)
+			api.AddTolerations(podWithTolerance, testToleration)
 			pods := []*api.Pod{pod1, pod2, podWithTolerance}
 
 			defer func() {
@@ -76,7 +76,7 @@ var _ = framework.KubeDescribe("Eviction based on taints [Slow] [Destructive]", 
 			}
 
 			By("updating node " + node.Name + " with NoSchedule taint")
-			api.AddTaints(node, testTaint)
+			api.AddTaints(&node, testTaint)
 			_, err = f.Client.Nodes().Update(&node)
 			Expect(err).NotTo(HaveOccurred())
 

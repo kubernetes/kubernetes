@@ -42,7 +42,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/system"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/version"
-	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
 )
 
 func init() {
@@ -577,7 +576,7 @@ func (nc *NodeController) monitorNodeTaints() error {
 				return err
 			}
 
-			if !predicates.TolerationsToleratesTaints(tolerations, taints) {
+			if !api.TolerationsToleratesNoExecuteTaints(tolerations, taints) {
 				nc.evictPods(&node, pod)
 			} else {
 				nc.cancelPodsEviction(&node, pod)

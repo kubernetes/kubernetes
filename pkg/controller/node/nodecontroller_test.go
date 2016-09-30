@@ -822,7 +822,7 @@ func TestMonitorNodeTaints(t *testing.T) {
 							"key": "test",
 							"operator": "Equal",
 							"value": "test",
-							"effect": "NoSchedule"
+							"effect": "NoExecute"
 						}]`,
 	}
 	fakeNow := unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC)
@@ -833,7 +833,7 @@ func TestMonitorNodeTaints(t *testing.T) {
 		expectedPods []string
 		podsToCancel []string
 	}{
-		// Node with NoSchedule taint, 1 pod has a toleration for such taint
+		// Node with NoExecute taint, 1 pod has a toleration for such taint
 		{
 			nodeList: []*api.Node{
 				{
@@ -845,7 +845,7 @@ func TestMonitorNodeTaints(t *testing.T) {
 						[{
 							"key": "test",
 							"value": "test",
-							"effect": "NoSchedule"
+							"effect": "NoExecute"
 						}]`,
 						},
 					},
@@ -908,7 +908,7 @@ func TestMonitorNodeTaints(t *testing.T) {
 						[{
 							"key": "test",
 							"value": "test",
-							"effect": "NoSchedule"
+							"effect": "NoExecute"
 						}]`,
 						},
 					},

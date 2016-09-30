@@ -700,6 +700,25 @@ func RemoveTolerations(obj runtime.Object, tolerations ...Toleration) (bool, err
 	return true, nil
 }
 
+func TolerationsToleratesNoExecuteTaints(tolerations []Toleration, taints []Taint) bool {
+	if len(taints) == 0 {
+		return true
+	}
+
+	for _, taint := range taints {
+		// node controller interested only in NoExecute taints
+		if !(taint.Effect == TaintEffectNoExecute) {
+			continue
+		}
+
+		if !TaintToleratedByTolerations(&taint, tolerations) {
+			return false
+		}
+	}
+
+	return true
+}
+
 // taint.ToString() converts taint struct to string in format key=value:effect or key:effect.
 func (t *Taint) ToString() string {
 	if len(t.Value) == 0 {
