@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1beta1
+package v1alpha1
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
@@ -23,22 +23,22 @@ import (
 	serializer "k8s.io/kubernetes/pkg/runtime/serializer"
 )
 
-type AuthorizationInterface interface {
+type AppsInterface interface {
 	GetRESTClient() *restclient.RESTClient
-	SubjectAccessReviewsGetter
+	PetSetsGetter
 }
 
-// AuthorizationClient is used to interact with features provided by the Authorization group.
-type AuthorizationClient struct {
+// AppsClient is used to interact with features provided by the Apps group.
+type AppsClient struct {
 	*restclient.RESTClient
 }
 
-func (c *AuthorizationClient) SubjectAccessReviews() SubjectAccessReviewInterface {
-	return newSubjectAccessReviews(c)
+func (c *AppsClient) PetSets(namespace string) PetSetInterface {
+	return newPetSets(c, namespace)
 }
 
-// NewForConfig creates a new AuthorizationClient for the given config.
-func NewForConfig(c *restclient.Config) (*AuthorizationClient, error) {
+// NewForConfig creates a new AppsClient for the given config.
+func NewForConfig(c *restclient.Config) (*AppsClient, error) {
 	config := *c
 	if err := setConfigDefaults(&config); err != nil {
 		return nil, err
@@ -47,12 +47,12 @@ func NewForConfig(c *restclient.Config) (*AuthorizationClient, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &AuthorizationClient{client}, nil
+	return &AppsClient{client}, nil
 }
 
-// NewForConfigOrDie creates a new AuthorizationClient for the given config and
+// NewForConfigOrDie creates a new AppsClient for the given config and
 // panics if there is an error in the config.
-func NewForConfigOrDie(c *restclient.Config) *AuthorizationClient {
+func NewForConfigOrDie(c *restclient.Config) *AppsClient {
 	client, err := NewForConfig(c)
 	if err != nil {
 		panic(err)
@@ -60,14 +60,14 @@ func NewForConfigOrDie(c *restclient.Config) *AuthorizationClient {
 	return client
 }
 
-// New creates a new AuthorizationClient for the given RESTClient.
-func New(c *restclient.RESTClient) *AuthorizationClient {
-	return &AuthorizationClient{c}
+// New creates a new AppsClient for the given RESTClient.
+func New(c *restclient.RESTClient) *AppsClient {
+	return &AppsClient{c}
 }
 
 func setConfigDefaults(config *restclient.Config) error {
-	// if authorization group is not registered, return an error
-	g, err := registered.Group("authorization.k8s.io")
+	// if apps group is not registered, return an error
+	g, err := registered.Group("apps")
 	if err != nil {
 		return err
 	}
@@ -88,7 +88,7 @@ func setConfigDefaults(config *restclient.Config) error {
 
 // GetRESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *AuthorizationClient) GetRESTClient() *restclient.RESTClient {
+func (c *AppsClient) GetRESTClient() *restclient.RESTClient {
 	if c == nil {
 		return nil
 	}

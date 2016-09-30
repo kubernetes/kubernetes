@@ -23,22 +23,22 @@ import (
 	serializer "k8s.io/kubernetes/pkg/runtime/serializer"
 )
 
-type AuthorizationInterface interface {
+type StorageInterface interface {
 	GetRESTClient() *restclient.RESTClient
-	SubjectAccessReviewsGetter
+	StorageClassesGetter
 }
 
-// AuthorizationClient is used to interact with features provided by the Authorization group.
-type AuthorizationClient struct {
+// StorageClient is used to interact with features provided by the Storage group.
+type StorageClient struct {
 	*restclient.RESTClient
 }
 
-func (c *AuthorizationClient) SubjectAccessReviews() SubjectAccessReviewInterface {
-	return newSubjectAccessReviews(c)
+func (c *StorageClient) StorageClasses() StorageClassInterface {
+	return newStorageClasses(c)
 }
 
-// NewForConfig creates a new AuthorizationClient for the given config.
-func NewForConfig(c *restclient.Config) (*AuthorizationClient, error) {
+// NewForConfig creates a new StorageClient for the given config.
+func NewForConfig(c *restclient.Config) (*StorageClient, error) {
 	config := *c
 	if err := setConfigDefaults(&config); err != nil {
 		return nil, err
@@ -47,12 +47,12 @@ func NewForConfig(c *restclient.Config) (*AuthorizationClient, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &AuthorizationClient{client}, nil
+	return &StorageClient{client}, nil
 }
 
-// NewForConfigOrDie creates a new AuthorizationClient for the given config and
+// NewForConfigOrDie creates a new StorageClient for the given config and
 // panics if there is an error in the config.
-func NewForConfigOrDie(c *restclient.Config) *AuthorizationClient {
+func NewForConfigOrDie(c *restclient.Config) *StorageClient {
 	client, err := NewForConfig(c)
 	if err != nil {
 		panic(err)
@@ -60,14 +60,14 @@ func NewForConfigOrDie(c *restclient.Config) *AuthorizationClient {
 	return client
 }
 
-// New creates a new AuthorizationClient for the given RESTClient.
-func New(c *restclient.RESTClient) *AuthorizationClient {
-	return &AuthorizationClient{c}
+// New creates a new StorageClient for the given RESTClient.
+func New(c *restclient.RESTClient) *StorageClient {
+	return &StorageClient{c}
 }
 
 func setConfigDefaults(config *restclient.Config) error {
-	// if authorization group is not registered, return an error
-	g, err := registered.Group("authorization.k8s.io")
+	// if storage group is not registered, return an error
+	g, err := registered.Group("storage.k8s.io")
 	if err != nil {
 		return err
 	}
@@ -88,7 +88,7 @@ func setConfigDefaults(config *restclient.Config) error {
 
 // GetRESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *AuthorizationClient) GetRESTClient() *restclient.RESTClient {
+func (c *StorageClient) GetRESTClient() *restclient.RESTClient {
 	if c == nil {
 		return nil
 	}
