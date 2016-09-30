@@ -226,6 +226,18 @@ func TestValidatePodSecurityContextFailures(t *testing.T) {
 		},
 	}
 
+	failOtherSysctlsAllowedPSP := defaultPSP()
+	failOtherSysctlsAllowedPSP.Annotations[extensions.SysctlsPodSecurityPolicyAnnotationKey] = "bar,abc"
+
+	failNoSysctlAllowedPSP := defaultPSP()
+	failNoSysctlAllowedPSP.Annotations[extensions.SysctlsPodSecurityPolicyAnnotationKey] = ""
+
+	failSafeSysctlFooPod := defaultPod()
+	failSafeSysctlFooPod.Annotations[api.SysctlsPodAnnotationKey] = "foo=1"
+
+	failUnsafeSysctlFooPod := defaultPod()
+	failUnsafeSysctlFooPod.Annotations[api.UnsafeSysctlsPodAnnotationKey] = "foo=1"
+
 	errorCases := map[string]struct {
 		pod           *api.Pod
 		psp           *extensions.PodSecurityPolicy
@@ -280,6 +292,26 @@ func TestValidatePodSecurityContextFailures(t *testing.T) {
 			pod:           failHostDirPod,
 			psp:           defaultPSP(),
 			expectedError: "hostPath volumes are not allowed to be used",
+		},
+		"failSafeSysctlFooPod with failNoSysctlAllowedSCC": {
+			pod:           failSafeSysctlFooPod,
+			psp:           failNoSysctlAllowedPSP,
+			expectedError: "sysctls are not allowed",
+		},
+		"failUnsafeSysctlFooPod with failNoSysctlAllowedSCC": {
+			pod:           failUnsafeSysctlFooPod,
+			psp:           failNoSysctlAllowedPSP,
+			expectedError: "sysctls are not allowed",
+		},
+		"failSafeSysctlFooPod with failOtherSysctlsAllowedSCC": {
+			pod:           failSafeSysctlFooPod,
+			psp:           failOtherSysctlsAllowedPSP,
+			expectedError: "sysctl \"foo\" is not allowed",
+		},
+		"failUnsafeSysctlFooPod with failOtherSysctlsAllowedSCC": {
+			pod:           failUnsafeSysctlFooPod,
+			psp:           failOtherSysctlsAllowedPSP,
+			expectedError: "sysctl \"foo\" is not allowed",
 		},
 	}
 	for k, v := range errorCases {
@@ -471,6 +503,15 @@ func TestValidatePodSecurityContextSuccess(t *testing.T) {
 		Level: "level",
 	}
 
+	sysctlAllowFooPSP := defaultPSP()
+	sysctlAllowFooPSP.Annotations[extensions.SysctlsPodSecurityPolicyAnnotationKey] = "foo"
+
+	safeSysctlFooPod := defaultPod()
+	safeSysctlFooPod.Annotations[api.SysctlsPodAnnotationKey] = "foo=1"
+
+	unsafeSysctlFooPod := defaultPod()
+	unsafeSysctlFooPod.Annotations[api.UnsafeSysctlsPodAnnotationKey] = "foo=1"
+
 	errorCases := map[string]struct {
 		pod *api.Pod
 		psp *extensions.PodSecurityPolicy
@@ -498,6 +539,22 @@ func TestValidatePodSecurityContextSuccess(t *testing.T) {
 		"pass selinux validating PSP": {
 			pod: seLinuxPod,
 			psp: seLinuxPSP,
+		},
+		"pass sysctl specific profile with safe sysctl": {
+			pod: safeSysctlFooPod,
+			psp: sysctlAllowFooPSP,
+		},
+		"pass sysctl specific profile with unsafe sysctl": {
+			pod: unsafeSysctlFooPod,
+			psp: sysctlAllowFooPSP,
+		},
+		"pass empty profile with safe sysctl": {
+			pod: safeSysctlFooPod,
+			psp: defaultPSP(),
+		},
+		"pass empty profile with unsafe sysctl": {
+			pod: unsafeSysctlFooPod,
+			psp: defaultPSP(),
 		},
 	}
 
@@ -755,7 +812,8 @@ func TestGenerateContainerSecurityContextReadOnlyRootFS(t *testing.T) {
 func defaultPSP() *extensions.PodSecurityPolicy {
 	return &extensions.PodSecurityPolicy{
 		ObjectMeta: api.ObjectMeta{
-			Name: "psp-sa",
+			Name:        "psp-sa",
+			Annotations: map[string]string{},
 		},
 		Spec: extensions.PodSecurityPolicySpec{
 			RunAsUser: extensions.RunAsUserStrategyOptions{
@@ -777,6 +835,9 @@ func defaultPSP() *extensions.PodSecurityPolicy {
 func defaultPod() *api.Pod {
 	var notPriv bool = false
 	return &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			Annotations: map[string]string{},
+		},
 		Spec: api.PodSpec{
 			SecurityContext: &api.PodSecurityContext{
 			// fill in for test cases
