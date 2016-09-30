@@ -227,7 +227,8 @@ func (ds *dockerService) ContainerStatus(containerID string) (*runtimeApi.Contai
 
 	// Convert the mounts.
 	mounts := []*runtimeApi.Mount{}
-	for _, m := range r.Mounts {
+	for i := range r.Mounts {
+		m := r.Mounts[i]
 		readonly := !m.RW
 		mounts = append(mounts, &runtimeApi.Mount{
 			Name:          &m.Name,
