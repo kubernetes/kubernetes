@@ -312,7 +312,6 @@ func (c completedConfig) New() (*GenericAPIServer, error) {
 
 	s := &GenericAPIServer{
 		ServiceClusterIPRange: c.ServiceClusterIPRange,
-		ServiceNodePortRange:  c.ServiceNodePortRange,
 		LoopbackClientConfig:  c.LoopbackClientConfig,
 		legacyAPIPrefix:       c.APIPrefix,
 		apiPrefix:             c.APIGroupPrefix,
@@ -326,11 +325,8 @@ func (c completedConfig) New() (*GenericAPIServer, error) {
 		MasterCount:          c.MasterCount,
 		ExternalAddress:      c.ExternalHost,
 		ClusterIP:            c.PublicAddress,
-		PublicReadWritePort:  c.ReadWritePort,
 		ServiceReadWriteIP:   c.ServiceReadWriteIP,
 		ServiceReadWritePort: c.ServiceReadWritePort,
-		ExtraServicePorts:    c.ExtraServicePorts,
-		ExtraEndpointPorts:   c.ExtraEndpointPorts,
 
 		KubernetesServiceNodePort: c.KubernetesServiceNodePort,
 		apiGroupsForDiscovery:     map[string]unversioned.APIGroup{},

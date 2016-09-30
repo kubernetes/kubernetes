@@ -91,10 +91,6 @@ type GenericAPIServer struct {
 	// truth for its value.
 	ServiceClusterIPRange *net.IPNet
 
-	// ServiceNodePortRange is only used for `master.go` to construct its RESTStorage for the legacy API group
-	// TODO refactor this closer to the point of use.
-	ServiceNodePortRange utilnet.PortRange
-
 	// LoopbackClientConfig is a config for a privileged loopback connection to the API server
 	LoopbackClientConfig *restclient.Config
 
@@ -129,11 +125,8 @@ type GenericAPIServer struct {
 	ExternalAddress string
 	// ClusterIP is the IP address of the GenericAPIServer within the cluster.
 	ClusterIP            net.IP
-	PublicReadWritePort  int
 	ServiceReadWriteIP   net.IP
 	ServiceReadWritePort int
-	ExtraServicePorts    []api.ServicePort
-	ExtraEndpointPorts   []api.EndpointPort
 
 	// storage contains the RESTful endpoints exposed by this GenericAPIServer
 	storage map[string]rest.Storage
