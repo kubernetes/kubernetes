@@ -25,6 +25,7 @@ import (
 	"github.com/emicklei/go-restful"
 	"github.com/go-openapi/spec"
 
+	genericmux "k8s.io/kubernetes/pkg/genericapiserver/mux"
 	"k8s.io/kubernetes/pkg/genericapiserver/openapi/common"
 	"k8s.io/kubernetes/pkg/util/json"
 )
@@ -63,7 +64,7 @@ type openAPI struct {
 }
 
 // RegisterOpenAPIService registers a handler to provides standard OpenAPI specification.
-func RegisterOpenAPIService(config *Config, containers *restful.Container) (err error) {
+func RegisterOpenAPIService(config *Config, container *genericmux.APIContainer) (err error) {
 	o := openAPI{
 		config: config,
 		swagger: &spec.Swagger{
@@ -81,7 +82,7 @@ func RegisterOpenAPIService(config *Config, containers *restful.Container) (err 
 		return err
 	}
 
-	containers.ServeMux.HandleFunc(config.OpenAPIServePath, func(w http.ResponseWriter, r *http.Request) {
+	container.SecretRoutes.HandleFunc(config.OpenAPIServePath, func(w http.ResponseWriter, r *http.Request) {
 		resp := restful.NewResponse(w)
 		if r.URL.Path != config.OpenAPIServePath {
 			resp.WriteErrorString(http.StatusNotFound, "Path not found!")

@@ -51,7 +51,7 @@ func (oa OpenAPI) Install(c *mux.APIContainer) {
 			Info:               &wsInfo,
 			DefaultResponse:    &oa.DefaultResponse,
 			OpenAPIDefinitions: oa.Definitions,
-		}, c.Container)
+		}, c)
 		if err != nil {
 			glog.Fatalf("Failed to register open api spec for %v: %v", w.RootPath(), err)
 		}
@@ -64,7 +64,7 @@ func (oa OpenAPI) Install(c *mux.APIContainer) {
 		Info:               &oa.Info,
 		DefaultResponse:    &oa.DefaultResponse,
 		OpenAPIDefinitions: oa.Definitions,
-	}, c.Container)
+	}, c)
 	if err != nil {
 		glog.Fatalf("Failed to register open api spec for root: %v", err)
 	}
