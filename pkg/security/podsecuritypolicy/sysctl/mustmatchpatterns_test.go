@@ -58,11 +58,7 @@ func TestValidate(t *testing.T) {
 	}
 
 	for k, v := range tests {
-		strategy, err := NewMustMatchPatterns(v.patterns)
-		if err != nil {
-			t.Errorf("%s failed: %v", k, err)
-			continue
-		}
+		strategy := NewMustMatchPatterns(v.patterns)
 
 		pod := &api.Pod{}
 		errs := strategy.Validate(pod)
