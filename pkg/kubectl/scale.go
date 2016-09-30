@@ -55,8 +55,8 @@ func ScalerFor(kind unversioned.GroupKind, c internalclientset.Interface) (Scale
 		return &ReplicationControllerScaler{c.Core()}, nil
 	case extensions.Kind("ReplicaSet"):
 		return &ReplicaSetScaler{c.Extensions()}, nil
-	case extensions.Kind("Job"), batch.Kind("Job"):
-		return &JobScaler{c.Batch()}, nil // Either kind of job can be scaled with Batch interface.
+	case batch.Kind("Job"):
+		return &JobScaler{c.Batch()}, nil
 	case apps.Kind("PetSet"):
 		return &PetSetScaler{c.Apps()}, nil
 	case extensions.Kind("Deployment"):

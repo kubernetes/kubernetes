@@ -85,7 +85,7 @@ func ReaperFor(kind unversioned.GroupKind, c internalclientset.Interface) (Reape
 	case api.Kind("Service"):
 		return &ServiceReaper{c.Core()}, nil
 
-	case extensions.Kind("Job"), batch.Kind("Job"):
+	case batch.Kind("Job"):
 		return &JobReaper{c.Batch(), c.Core(), Interval, Timeout}, nil
 
 	case apps.Kind("PetSet"):

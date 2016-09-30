@@ -111,7 +111,6 @@ func describerMap(c clientset.Interface) map[unversioned.GroupKind]Describer {
 		autoscaling.Kind("HorizontalPodAutoscaler"):    &HorizontalPodAutoscalerDescriber{c},
 		extensions.Kind("DaemonSet"):                   &DaemonSetDescriber{c},
 		extensions.Kind("Deployment"):                  &DeploymentDescriber{c},
-		extensions.Kind("Job"):                         &JobDescriber{c},
 		extensions.Kind("Ingress"):                     &IngressDescriber{c},
 		batch.Kind("Job"):                              &JobDescriber{c},
 		batch.Kind("ScheduledJob"):                     &ScheduledJobDescriber{c},
