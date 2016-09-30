@@ -89,10 +89,6 @@ var _ = framework.KubeDescribe("Downward API volume", func() {
 		podName := "labelsupdate" + string(uuid.NewUUID())
 		pod := downwardAPIVolumePodForUpdateTest(podName, labels, map[string]string{}, "/etc/labels")
 		containerName := "client-container"
-		defer func() {
-			By("Deleting the pod")
-			podClient.Delete(pod.Name, api.NewDeleteOptions(0))
-		}()
 		By("Creating the pod")
 		podClient.CreateSync(pod)
 
@@ -119,10 +115,6 @@ var _ = framework.KubeDescribe("Downward API volume", func() {
 		pod := downwardAPIVolumePodForUpdateTest(podName, map[string]string{}, annotations, "/etc/annotations")
 
 		containerName := "client-container"
-		defer func() {
-			By("Deleting the pod")
-			podClient.Delete(pod.Name, api.NewDeleteOptions(0))
-		}()
 		By("Creating the pod")
 		podClient.CreateSync(pod)
 
