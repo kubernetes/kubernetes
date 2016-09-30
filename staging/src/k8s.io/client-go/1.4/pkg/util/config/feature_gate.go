@@ -216,6 +216,7 @@ func (f *featureGate) AddFlag(fs *pflag.FlagSet) {
 		}
 		known = append(known, fmt.Sprintf("%s=true|false (%sdefault=%t)", k, pre, v.enabled))
 	}
+	sort.Strings(known)
 	fs.Var(f, flagName, ""+
 		"A set of key=value pairs that describe feature gates for alpha/experimental features. "+
 		"Options are:\n"+strings.Join(known, "\n"))

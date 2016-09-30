@@ -438,6 +438,11 @@ func ValidateObjectMetaUpdate(newMeta, oldMeta *api.ObjectMeta, fldPath *field.P
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("deletionTimestamp"), newMeta.DeletionTimestamp, "field is immutable; may only be changed via deletion"))
 	}
 
+	// Finalizers cannot be added if the object is already being deleted.
+	if oldMeta.DeletionTimestamp != nil {
+		allErrs = append(allErrs, ValidateNoNewFinalizers(newMeta.Finalizers, oldMeta.Finalizers, fldPath.Child("finalizers"))...)
+	}
+
 	// Reject updates that don't specify a resource version
 	if len(newMeta.ResourceVersion) == 0 {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("resourceVersion"), newMeta.ResourceVersion, "must be specified for an update"))
@@ -458,6 +463,16 @@ func ValidateObjectMetaUpdate(newMeta, oldMeta *api.ObjectMeta, fldPath *field.P
 	allErrs = append(allErrs, ValidateAnnotations(newMeta.Annotations, fldPath.Child("annotations"))...)
 	allErrs = append(allErrs, ValidateOwnerReferences(newMeta.OwnerReferences, fldPath.Child("ownerReferences"))...)
 
+	return allErrs
+}
+
+func ValidateNoNewFinalizers(newFinalizers []string, oldFinalizers []string, fldPath *field.Path) field.ErrorList {
+	const newFinalizersErrorMsg string = `no new finalizers can be added if the object is being deleted`
+	allErrs := field.ErrorList{}
+	extra := sets.NewString(newFinalizers...).Difference(sets.NewString(oldFinalizers...))
+	if len(extra) != 0 {
+		allErrs = append(allErrs, field.Forbidden(fldPath, fmt.Sprintf("no new finalizers can be added if the object is being deleted, found new finalizers %#v", extra.List())))
+	}
 	return allErrs
 }
 
@@ -2553,6 +2568,9 @@ func ValidateServiceUpdate(service, oldService *api.Service) field.ErrorList {
 		allErrs = append(allErrs, ValidateImmutableField(service.Spec.ClusterIP, oldService.Spec.ClusterIP, field.NewPath("spec", "clusterIP"))...)
 	}
 
+	// TODO(freehan): allow user to update loadbalancerSourceRanges
+	allErrs = append(allErrs, ValidateImmutableField(service.Spec.LoadBalancerSourceRanges, oldService.Spec.LoadBalancerSourceRanges, field.NewPath("spec", "loadBalancerSourceRanges"))...)
+
 	allErrs = append(allErrs, ValidateService(service)...)
 	return allErrs
 }
@@ -3435,9 +3453,11 @@ func validateEndpointAddress(address *api.EndpointAddress, fldPath *field.Path, 
 	if len(address.Hostname) > 0 {
 		allErrs = append(allErrs, ValidateDNS1123Label(address.Hostname, fldPath.Child("hostname"))...)
 	}
-	// During endpoint update, validate NodeName is DNS1123 compliant and transition rules allow the update
+	// During endpoint update, verify that NodeName is a DNS subdomain and transition rules allow the update
 	if address.NodeName != nil {
-		allErrs = append(allErrs, ValidateDNS1123Label(*address.NodeName, fldPath.Child("nodeName"))...)
+		for _, msg := range ValidateNodeName(*address.NodeName, false) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("nodeName"), *address.NodeName, msg))
+		}
 	}
 	allErrs = append(allErrs, validateEpAddrNodeNameTransition(address, ipToNodeName, fldPath.Child("nodeName"))...)
 	if len(allErrs) > 0 {

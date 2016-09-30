@@ -257,8 +257,14 @@ type KubeletConfiguration struct {
 	// computed (such as IPSEC).
 	NetworkPluginMTU int32 `json:"networkPluginMTU"`
 	// networkPluginDir is the full path of the directory in which to search
-	// for network plugins
+	// for network plugins (and, for backwards-compat, CNI config files)
 	NetworkPluginDir string `json:"networkPluginDir"`
+	// CNIConfDir is the full path of the directory in which to search for
+	// CNI config files
+	CNIConfDir string `json:"cniConfDir"`
+	// CNIBinDir is the full path of the directory in which to search for
+	// CNI plugin binaries
+	CNIBinDir string `json:"cniBinDir"`
 	// volumePluginDir is the full path of the directory in which to search
 	// for additional third party volume plugins
 	VolumePluginDir string `json:"volumePluginDir"`
@@ -398,12 +404,12 @@ type KubeletConfiguration struct {
 	// A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G) pairs
 	// that describe resources reserved for non-kubernetes components.
 	// Currently only cpu and memory are supported. [default=none]
-	// See http://releases.k8s.io/HEAD/docs/user-guide/compute-resources.md for more detail.
+	// See http://releases.k8s.io/release-1.4/docs/user-guide/compute-resources.md for more detail.
 	SystemReserved utilconfig.ConfigurationMap `json:"systemReserved"`
 	// A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G) pairs
 	// that describe resources reserved for kubernetes system components.
 	// Currently only cpu and memory are supported. [default=none]
-	// See http://releases.k8s.io/HEAD/docs/user-guide/compute-resources.md for more detail.
+	// See http://releases.k8s.io/release-1.4/docs/user-guide/compute-resources.md for more detail.
 	KubeReserved utilconfig.ConfigurationMap `json:"kubeReserved"`
 	// Default behaviour for kernel tuning
 	ProtectKernelDefaults bool `json:"protectKernelDefaults"`
