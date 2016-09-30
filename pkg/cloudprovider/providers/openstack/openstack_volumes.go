@@ -59,6 +59,7 @@ func (os *OpenStack) AttachDisk(instanceID string, diskName string) (string, err
 			if err != nil {
 				glog.Errorf(err.Error())
 			}
+			return "", errors.New(errMsg)
 		}
 	}
 	// add read only flag here if possible spothanis
