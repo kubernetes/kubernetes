@@ -81,39 +81,6 @@ func effectiveHairpinMode(hairpinMode componentconfig.HairpinMode, containerRunt
 	return hairpinMode, nil
 }
 
-// Validate given node IP belongs to the current host
-func (kl *Kubelet) validateNodeIP() error {
-	if kl.nodeIP == nil {
-		return nil
-	}
-
-	// Honor IP limitations set in setNodeStatus()
-	if kl.nodeIP.IsLoopback() {
-		return fmt.Errorf("nodeIP can't be loopback address")
-	}
-	if kl.nodeIP.To4() == nil {
-		return fmt.Errorf("nodeIP must be IPv4 address")
-	}
-
-	addrs, err := net.InterfaceAddrs()
-	if err != nil {
-		return err
-	}
-	for _, addr := range addrs {
-		var ip net.IP
-		switch v := addr.(type) {
-		case *net.IPNet:
-			ip = v.IP
-		case *net.IPAddr:
-			ip = v.IP
-		}
-		if ip != nil && ip.Equal(kl.nodeIP) {
-			return nil
-		}
-	}
-	return fmt.Errorf("Node IP: %q not found in the host's network interfaces", kl.nodeIP.String())
-}
-
 // providerRequiresNetworkingConfiguration returns whether the cloud provider
 // requires special networking configuration.
 func (kl *Kubelet) providerRequiresNetworkingConfiguration() bool {
