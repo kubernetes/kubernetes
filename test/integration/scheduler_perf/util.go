@@ -51,7 +51,7 @@ func mustSetupScheduler() (schedulerConfigFactory *factory.ConfigFactory, destro
 		panic("error in brining up the master: " + err.Error())
 	}
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		m.Handler.ServeHTTP(w, req)
+		m.GenericAPIServer.Handler.ServeHTTP(w, req)
 	}))
 
 	c := client.NewOrDie(&restclient.Config{

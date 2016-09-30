@@ -120,9 +120,7 @@ type EndpointReconcilerConfig struct {
 
 // Master contains state for a Kubernetes cluster master/api server.
 type Master struct {
-	*genericapiserver.GenericAPIServer
-
-	legacyRESTStorageProvider corerest.LegacyRESTStorageProvider
+	GenericAPIServer *genericapiserver.GenericAPIServer
 
 	deleteCollectionWorkers int
 
@@ -217,23 +215,25 @@ func (c completedConfig) New() (*Master, error) {
 			enableGarbageCollection: c.GenericConfig.EnableGarbageCollection,
 			storageFactory:          c.StorageFactory,
 		},
-
-		legacyRESTStorageProvider: corerest.LegacyRESTStorageProvider{
-			StorageFactory:            c.StorageFactory,
-			ProxyTransport:            s.ProxyTransport,
-			KubeletClient:             c.KubeletClient,
-			EventTTL:                  c.EventTTL,
-			ServiceClusterIPRange:     c.GenericConfig.ServiceClusterIPRange,
-			ServiceNodePortRange:      c.GenericConfig.ServiceNodePortRange,
-			ComponentStatusServerFunc: func() map[string]apiserver.Server { return getServersToValidate(c.StorageFactory) },
-			LoopbackClientConfig:      c.GenericConfig.LoopbackClientConfig,
-		},
 	}
 
 	if c.EnableWatchCache {
 		m.restOptionsFactory.storageDecorator = registry.StorageWithCacher
 	} else {
 		m.restOptionsFactory.storageDecorator = generic.UndecoratedStorage
+	}
+
+	// install legacy rest storage
+	// because of other hacks, this always has to come first
+	legacyRESTStorageProvider := corerest.LegacyRESTStorageProvider{
+		StorageFactory:            c.StorageFactory,
+		ProxyTransport:            s.ProxyTransport,
+		KubeletClient:             c.KubeletClient,
+		EventTTL:                  c.EventTTL,
+		ServiceClusterIPRange:     c.GenericConfig.ServiceClusterIPRange,
+		ServiceNodePortRange:      c.GenericConfig.ServiceNodePortRange,
+		ComponentStatusServerFunc: func() map[string]apiserver.Server { return getServersToValidate(c.StorageFactory) },
+		LoopbackClientConfig:      c.GenericConfig.LoopbackClientConfig,
 	}
 
 	// Add some hardcoded storage for now.  Append to the map.
@@ -253,12 +253,37 @@ func (c completedConfig) New() (*Master, error) {
 	c.RESTStorageProviders[policy.GroupName] = policyrest.RESTStorageProvider{}
 	c.RESTStorageProviders[rbac.GroupName] = &rbacrest.RESTStorageProvider{AuthorizerRBACSuperUser: c.GenericConfig.AuthorizerRBACSuperUser}
 	c.RESTStorageProviders[storage.GroupName] = storagerest.RESTStorageProvider{}
-	m.InstallAPIs(c.Config)
+	m.InstallAPIs(c.Config, legacyRESTStorageProvider)
+
+	m.InstallGeneralEndpoints(c.Config)
 
 	return m, nil
 }
 
-func (m *Master) InstallAPIs(c *Config) {
+// TODO this needs to be refactored so we have a way to add general health checks to genericapiserver
+// TODO profiling should be generic
+func (m *Master) InstallGeneralEndpoints(c *Config) {
+	// Run the tunneler.
+	healthzChecks := []healthz.HealthzChecker{}
+	if c.Tunneler != nil {
+		c.Tunneler.Run(m.getNodeAddresses)
+		healthzChecks = append(healthzChecks, healthz.NamedCheck("SSH Tunnel Check", genericapiserver.TunnelSyncHealthChecker(c.Tunneler)))
+		prometheus.NewGaugeFunc(prometheus.GaugeOpts{
+			Name: "apiserver_proxy_tunnel_sync_latency_secs",
+			Help: "The time since the last successful synchronization of the SSH tunnels for proxy requests.",
+		}, func() float64 { return float64(c.Tunneler.SecondsSinceSync()) })
+	}
+	healthz.InstallHandler(&m.GenericAPIServer.HandlerContainer.NonSwaggerRoutes, healthzChecks...)
+
+	if c.GenericConfig.EnableProfiling {
+		routes.MetricsWithReset{}.Install(m.GenericAPIServer.HandlerContainer)
+	} else {
+		routes.DefaultMetrics{}.Install(m.GenericAPIServer.HandlerContainer)
+	}
+
+}
+
+func (m *Master) InstallAPIs(c *Config, legacyRESTStorageProvider corerest.LegacyRESTStorageProvider) {
 	restOptionsGetter := func(resource unversioned.GroupResource) generic.RESTOptions {
 		return m.restOptionsFactory.NewFor(resource)
 	}
@@ -267,7 +292,7 @@ func (m *Master) InstallAPIs(c *Config) {
 
 	// Install v1 unless disabled.
 	if c.GenericConfig.APIResourceConfigSource.AnyResourcesForVersionEnabled(apiv1.SchemeGroupVersion) {
-		legacyRESTStorage, apiGroupInfo, err := m.legacyRESTStorageProvider.NewLegacyRESTStorage(restOptionsGetter)
+		legacyRESTStorage, apiGroupInfo, err := legacyRESTStorageProvider.NewLegacyRESTStorage(restOptionsGetter)
 		if err != nil {
 			glog.Fatalf("Error building core storage: %v", err)
 		}
@@ -280,24 +305,6 @@ func (m *Master) InstallAPIs(c *Config) {
 		}
 
 		apiGroupsInfo = append(apiGroupsInfo, apiGroupInfo)
-	}
-
-	// Run the tunneler.
-	healthzChecks := []healthz.HealthzChecker{}
-	if c.Tunneler != nil {
-		c.Tunneler.Run(m.getNodeAddresses)
-		healthzChecks = append(healthzChecks, healthz.NamedCheck("SSH Tunnel Check", genericapiserver.TunnelSyncHealthChecker(c.Tunneler)))
-		prometheus.NewGaugeFunc(prometheus.GaugeOpts{
-			Name: "apiserver_proxy_tunnel_sync_latency_secs",
-			Help: "The time since the last successful synchronization of the SSH tunnels for proxy requests.",
-		}, func() float64 { return float64(c.Tunneler.SecondsSinceSync()) })
-	}
-	healthz.InstallHandler(&m.HandlerContainer.NonSwaggerRoutes, healthzChecks...)
-
-	if c.GenericConfig.EnableProfiling {
-		routes.MetricsWithReset{}.Install(m.HandlerContainer)
-	} else {
-		routes.DefaultMetrics{}.Install(m.HandlerContainer)
 	}
 
 	// Install third party resource support if requested
@@ -340,7 +347,7 @@ func (m *Master) InstallAPIs(c *Config) {
 	}
 
 	for i := range apiGroupsInfo {
-		if err := m.InstallAPIGroup(&apiGroupsInfo[i]); err != nil {
+		if err := m.GenericAPIServer.InstallAPIGroup(&apiGroupsInfo[i]); err != nil {
 			glog.Fatalf("Error in registering group versions: %v", err)
 		}
 	}
@@ -423,7 +430,7 @@ func (m *Master) removeThirdPartyStorage(path, resource string) error {
 	delete(entry.storage, resource)
 	if len(entry.storage) == 0 {
 		delete(m.thirdPartyResources, path)
-		m.RemoveAPIGroupForDiscovery(extensionsrest.GetThirdPartyGroupName(path))
+		m.GenericAPIServer.RemoveAPIGroupForDiscovery(extensionsrest.GetThirdPartyGroupName(path))
 	} else {
 		m.thirdPartyResources[path] = entry
 	}
@@ -443,11 +450,11 @@ func (m *Master) RemoveThirdPartyResource(path string) error {
 		return err
 	}
 
-	services := m.HandlerContainer.RegisteredWebServices()
+	services := m.GenericAPIServer.HandlerContainer.RegisteredWebServices()
 	for ix := range services {
 		root := services[ix].RootPath()
 		if root == path || strings.HasPrefix(root, path+"/") {
-			m.HandlerContainer.Remove(services[ix])
+			m.GenericAPIServer.HandlerContainer.Remove(services[ix])
 		}
 	}
 	return nil
@@ -523,7 +530,7 @@ func (m *Master) addThirdPartyResourceStorage(path, resource string, storage *th
 	}
 	entry.storage[resource] = storage
 	if !found {
-		m.AddAPIGroupForDiscovery(apiGroup)
+		m.GenericAPIServer.AddAPIGroupForDiscovery(apiGroup)
 	}
 }
 
@@ -562,13 +569,13 @@ func (m *Master) InstallThirdPartyResource(rsrc *extensions.ThirdPartyResource) 
 	// the group with the new API
 	if m.hasThirdPartyGroupStorage(path) {
 		m.addThirdPartyResourceStorage(path, plural.Resource, thirdparty.Storage[plural.Resource].(*thirdpartyresourcedataetcd.REST), apiGroup)
-		return thirdparty.UpdateREST(m.HandlerContainer.Container)
+		return thirdparty.UpdateREST(m.GenericAPIServer.HandlerContainer.Container)
 	}
 
-	if err := thirdparty.InstallREST(m.HandlerContainer.Container); err != nil {
+	if err := thirdparty.InstallREST(m.GenericAPIServer.HandlerContainer.Container); err != nil {
 		glog.Errorf("Unable to setup thirdparty api: %v", err)
 	}
-	m.HandlerContainer.Add(apiserver.NewGroupWebService(api.Codecs, path, apiGroup))
+	m.GenericAPIServer.HandlerContainer.Add(apiserver.NewGroupWebService(api.Codecs, path, apiGroup))
 
 	m.addThirdPartyResourceStorage(path, plural.Resource, thirdparty.Storage[plural.Resource].(*thirdpartyresourcedataetcd.REST), apiGroup)
 	return nil
@@ -611,9 +618,9 @@ func (m *Master) thirdpartyapi(group, kind, version, pluralResource string) *api
 		Serializer:     thirdpartyresourcedata.NewNegotiatedSerializer(api.Codecs, kind, externalVersion, internalVersion),
 		ParameterCodec: thirdpartyresourcedata.NewThirdPartyParameterCodec(api.ParameterCodec),
 
-		Context: m.RequestContextMapper(),
+		Context: m.GenericAPIServer.RequestContextMapper(),
 
-		MinRequestTimeout: m.MinRequestTimeout(),
+		MinRequestTimeout: m.GenericAPIServer.MinRequestTimeout(),
 
 		ResourceLister: dynamicLister{m, extensionsrest.MakeThirdPartyPath(group)},
 	}
