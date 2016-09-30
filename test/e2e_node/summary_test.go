@@ -46,10 +46,10 @@ var _ = framework.KubeDescribe("Summary API [Flaky]", func() {
 
 			// Setup expectations.
 			const (
-				kb = 1000
-				mb = 1000 * kb
-				gb = 1000 * mb
-				tb = 1000 * gb
+				kb int64 = 1000
+				mb int64 = 1000 * kb
+				gb int64 = 1000 * mb
+				tb int64 = 1000 * gb
 
 				maxStartAge = time.Hour * 24 * 365 // 1 year
 				maxStatsAge = time.Minute
