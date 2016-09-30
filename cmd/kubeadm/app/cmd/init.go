@@ -44,7 +44,7 @@ var (
 
 // NewCmdInit returns "kubeadm init" command.
 func NewCmdInit(out io.Writer, s *kubeadmapi.KubeadmConfig) *cobra.Command {
-	advertiseAddrs := &[]string{} // TODO(pahse1+) make it work somehow else, custom flag or whatever
+	advertiseAddrs := &[]string{} // TODO(phase1+) make it work somehow else, custom flag or whatever
 	cmd := &cobra.Command{
 		Use:   "init",
 		Short: "Run this in order to set up the Kubernetes master.",
