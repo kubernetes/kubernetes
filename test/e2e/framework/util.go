@@ -2145,7 +2145,6 @@ func (f *Framework) MatchContainerOutput(
 	podClient := f.PodClient()
 	ns := f.Namespace.Name
 
-	defer podClient.Delete(pod.Name, api.NewDeleteOptions(0))
 	podClient.Create(pod)
 
 	// Wait for client pod to complete.
@@ -4320,7 +4319,6 @@ func CheckConnectivityToHost(f *Framework, nodeName, podName, host string, timeo
 	if err != nil {
 		return err
 	}
-	defer podClient.Delete(podName, nil)
 	err = WaitForPodSuccessInNamespace(f.Client, podName, f.Namespace.Name)
 
 	if err != nil {
