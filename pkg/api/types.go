@@ -2264,7 +2264,7 @@ const (
 
 const (
 	// Namespace prefix for opaque counted resources (alpha).
-	ResourceOpaqueIntPrefix = "opaque-int.alpha.kubernetes.io/"
+	ResourceOpaqueIntPrefix = "pod.alpha.kubernetes.io/opaque-int-resource-"
 )
 
 // ResourceList is a set of (resource name, quantity) pairs.
