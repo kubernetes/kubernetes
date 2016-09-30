@@ -384,6 +384,7 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache schedulercache.
 	algo := NewGenericScheduler(
 		scache,
 		predicateMap,
+		algorithm.EmptyMetadataProducer,
 		[]algorithm.PriorityConfig{},
 		[]algorithm.SchedulerExtender{})
 	bindingChan := make(chan *api.Binding, 1)

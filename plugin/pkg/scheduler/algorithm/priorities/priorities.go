@@ -29,33 +29,6 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
 
-// priorityMetadata is a type that is passed as metadata for priority functions
-type priorityMetadata struct {
-	nonZeroRequest *schedulercache.Resource
-	podTolerations []api.Toleration
-	affinity       *api.Affinity
-}
-
-func PriorityMetadata(pod *api.Pod) interface{} {
-	// If we cannot compute metadata, just return nil
-	if pod == nil {
-		return nil
-	}
-	tolerations, err := getTolerationListFromPod(pod)
-	if err != nil {
-		return nil
-	}
-	affinity, err := api.GetAffinityFromPodAnnotations(pod.Annotations)
-	if err != nil {
-		return nil
-	}
-	return &priorityMetadata{
-		nonZeroRequest: getNonZeroRequests(pod),
-		podTolerations: tolerations,
-		affinity:       affinity,
-	}
-}
-
 func getNonZeroRequests(pod *api.Pod) *schedulercache.Resource {
 	result := &schedulercache.Resource{}
 	for i := range pod.Spec.Containers {

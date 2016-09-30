@@ -300,7 +300,9 @@ func TestGenericScheduler(t *testing.T) {
 		for _, name := range test.nodes {
 			cache.AddNode(&api.Node{ObjectMeta: api.ObjectMeta{Name: name}})
 		}
-		scheduler := NewGenericScheduler(cache, test.predicates, test.prioritizers, []algorithm.SchedulerExtender{})
+		scheduler := NewGenericScheduler(
+			cache, test.predicates, algorithm.EmptyMetadataProducer,
+			test.prioritizers, []algorithm.SchedulerExtender{})
 		machine, err := scheduler.Schedule(test.pod, algorithm.FakeNodeLister(makeNodeList(test.nodes)))
 
 		if !reflect.DeepEqual(err, test.wErr) {
@@ -501,7 +503,7 @@ func TestZeroRequest(t *testing.T) {
 		}
 		nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(test.pods, test.nodes)
 		list, err := PrioritizeNodes(
-			test.pod, nodeNameToInfo, priorityConfigs,
+			test.pod, nodeNameToInfo, algorithm.EmptyMetadataProducer, priorityConfigs,
 			algorithm.FakeNodeLister(test.nodes), []algorithm.SchedulerExtender{})
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
