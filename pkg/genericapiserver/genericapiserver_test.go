@@ -90,7 +90,6 @@ func TestNew(t *testing.T) {
 	serviceReadWriteIP, _ := ipallocator.GetIndexedIP(serviceClusterIPRange, 1)
 	assert.Equal(s.ServiceReadWriteIP, serviceReadWriteIP)
 	assert.Equal(s.ExternalAddress, net.JoinHostPort(config.PublicAddress.String(), "6443"))
-	assert.Equal(s.PublicReadWritePort, 6443)
 
 	// These functions should point to the same memory location
 	serverDialer, _ := utilnet.Dialer(s.ProxyTransport)
@@ -312,7 +311,6 @@ func TestInstallSwaggerAPI(t *testing.T) {
 	server.HandlerContainer = genericmux.NewAPIContainer(mux, nil)
 	server.ExternalAddress = ""
 	server.ClusterIP = net.IPv4(10, 10, 10, 10)
-	server.PublicReadWritePort = 1010
 	server.InstallSwaggerAPI()
 	if assert.NotEqual(0, len(ws), "SwaggerAPI not installed.") {
 		assert.Equal("/swaggerapi/", ws[0].RootPath(), "SwaggerAPI did not install to the proper path. %s != /swaggerapi", ws[0].RootPath())
