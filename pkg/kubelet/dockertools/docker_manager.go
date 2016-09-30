@@ -399,7 +399,7 @@ func (dm *DockerManager) inspectContainer(id string, podName, podNamespace strin
 
 	// default to the image ID, but try and inspect for the RepoDigests
 	imageID := DockerPrefix + iResult.Image
-	imgInspectResult, err := dm.client.InspectImage(iResult.Image)
+	imgInspectResult, err := dm.client.InspectImageByID(iResult.Image)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("unable to inspect docker image %q while inspecting docker container %q: %v", containerName, iResult.Image, err))
 	} else {

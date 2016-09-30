@@ -75,6 +75,9 @@ func NewFakeDockerClientWithVersion(version, apiVersion string) *FakeDockerClien
 		VersionInfo:  dockertypes.Version{Version: version, APIVersion: apiVersion},
 		Errors:       make(map[string]error),
 		ContainerMap: make(map[string]*dockertypes.ContainerJSON),
+
+		// default this to an empty result, so that we never have a nil non-error response from InspectImage
+		Image: &dockertypes.ImageInspect{},
 	}
 }
 
