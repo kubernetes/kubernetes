@@ -512,6 +512,7 @@ func TestValidOpenAPISpec(t *testing.T) {
 
 	// make sure swagger.json is not registered before calling PrepareRun.
 	server := httptest.NewServer(master.GenericAPIServer.HandlerContainer.ServeMux)
+	defer server.Close()
 	resp, err := http.Get(server.URL + "/swagger.json")
 	if !assert.NoError(err) {
 		t.Errorf("unexpected error: %v", err)

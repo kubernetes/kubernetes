@@ -35,13 +35,16 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apiserver/openapi"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/auth/user"
+	openapigen "k8s.io/kubernetes/pkg/generated/openapi"
 	ipallocator "k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/util/sets"
 
+	"github.com/go-openapi/spec"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -58,6 +61,14 @@ func setUp(t *testing.T) (*etcdtesting.EtcdTestServer, Config, *assert.Assertion
 	config.APIGroupPrefix = "/apis"
 	config.EnableOpenAPISupport = true
 	config.EnableSwaggerSupport = true
+	config.OpenAPIConfig.Definitions = openapigen.OpenAPIDefinitions
+	config.OpenAPIConfig.Info = &spec.Info{
+		InfoProps: spec.InfoProps{
+			Title:   "Kubernetes",
+			Version: "unversioned",
+		},
+	}
+	config.OpenAPIConfig.GetOperationID = openapi.GetOperationID
 
 	return etcdServer, *config, assert.New(t)
 }
@@ -97,19 +108,6 @@ func TestNew(t *testing.T) {
 	configDialerFunc := fmt.Sprintf("%p", config.ProxyDialer)
 	assert.Equal(serverDialerFunc, configDialerFunc)
 	assert.Equal(s.ProxyTransport.(*http.Transport).TLSClientConfig, config.ProxyTLSClientConfig)
-
-	// swagger and openapi must only be installed after all api groups
-	assert.True(config.EnableSwaggerSupport)
-	assert.True(config.EnableOpenAPISupport)
-	wss := s.HandlerContainer.RegisteredWebServices()
-	for _, ws := range wss {
-		switch ws.RootPath() {
-		case "/swaggerapi/":
-			t.Error("SwaggerAPI shouldn't be installed before other APIs")
-		case "/openapi/":
-			t.Error("OpenAPI shouldn't be installed before other APIs")
-		}
-	}
 }
 
 // Verifies that AddGroupVersions works as expected.
@@ -173,25 +171,23 @@ func TestPrepareRun(t *testing.T) {
 	s, etcdserver, config, assert := newMaster(t)
 	defer etcdserver.Terminate(t)
 
-	s.PrepareRun()
-
-	// swagger and openapi must be installed during PrepareRun
 	assert.True(config.EnableSwaggerSupport)
 	assert.True(config.EnableOpenAPISupport)
-	wss := s.HandlerContainer.RegisteredWebServices()
-	var foundSwagger, foundOpenAPI bool
-	for _, ws := range wss {
-		switch ws.RootPath() {
-		case "/swaggerapi/":
-			foundSwagger = true
-		case "/openapi/":
-			foundOpenAPI = true
-			t.Error("OpenAPI shouldn't be installed before other APIs")
-		}
-	}
 
-	assert.True(foundSwagger, "SwaggerAPI should be installed")
-	assert.True(foundOpenAPI, "OpenAPI should be installed")
+	server := httptest.NewServer(s.HandlerContainer.ServeMux)
+	defer server.Close()
+
+	s.PrepareRun()
+
+	// openapi is installed in PrepareRun
+	resp, err := http.Get(server.URL + "/swagger.json")
+	assert.NoError(err)
+	assert.Equal(http.StatusOK, resp.StatusCode)
+
+	// swagger is installed in PrepareRun
+	resp, err = http.Get(server.URL + "/swaggerapi/")
+	assert.NoError(err)
+	assert.Equal(http.StatusOK, resp.StatusCode)
 }
 
 // TestCustomHandlerChain verifies the handler chain with custom handler chain builder functions.
@@ -401,8 +397,7 @@ func TestGetServerAddressByClientCIDRs(t *testing.T) {
 
 	publicAddressCIDRMap := []unversioned.ServerAddressByClientCIDR{
 		{
-			ClientCIDR: "0.0.0.0/0",
-
+			ClientCIDR:    "0.0.0.0/0",
 			ServerAddress: s.ExternalAddress,
 		},
 	}

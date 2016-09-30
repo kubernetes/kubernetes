@@ -46,12 +46,12 @@ func (oa OpenAPI) Install(c *mux.APIContainer) {
 		config.Info = new(spec.Info)
 		*config.Info = *oa.Config.Info
 		config.Info.Title = config.Info.Title + " " + w.RootPath()
-		err := openapi.RegisterOpenAPIService(w.RootPath()+"/swagger.json", []*restful.WebService{w}, &config, c.Container)
+		err := openapi.RegisterOpenAPIService(w.RootPath()+"/swagger.json", []*restful.WebService{w}, &config, c)
 		if err != nil {
 			glog.Fatalf("Failed to register open api spec for %v: %v", w.RootPath(), err)
 		}
 	}
-	err := openapi.RegisterOpenAPIService("/swagger.json", c.RegisteredWebServices(), oa.Config, c.Container)
+	err := openapi.RegisterOpenAPIService("/swagger.json", c.RegisteredWebServices(), oa.Config, c)
 	if err != nil {
 		glog.Fatalf("Failed to register open api spec for root: %v", err)
 	}
