@@ -281,7 +281,7 @@ func (m *VersionResponse) GetRuntimeApiVersion() string {
 	return ""
 }
 
-// DNSConfig specifies the DNS servers and search domains.
+// DNSConfig specifies the DNS servers and search domains of a sandbox.
 type DNSConfig struct {
 	// List of DNS servers of the cluster.
 	Servers []string `protobuf:"bytes,1,rep,name=servers" json:"servers,omitempty"`
@@ -319,7 +319,7 @@ func (m *DNSConfig) GetOptions() []string {
 	return nil
 }
 
-// PortMapping specifies the port mapping configurations of sandbox
+// PortMapping specifies the port mapping configurations of a sandbox.
 type PortMapping struct {
 	// The name of the port mapping
 	Name *string `protobuf:"bytes,1,opt,name=name" json:"name,omitempty"`
@@ -374,7 +374,7 @@ func (m *PortMapping) GetHostIp() string {
 	return ""
 }
 
-// Mount specifies the volume mount for the sandbox
+// Mount specifies a host volume to mount into a container.
 type Mount struct {
 	// The name of the volume mount.
 	Name *string `protobuf:"bytes,1,opt,name=name" json:"name,omitempty"`
@@ -433,9 +433,9 @@ func (m *Mount) GetSelinuxRelabel() bool {
 type NamespaceOption struct {
 	// If set, use the host's network namespace.
 	HostNetwork *bool `protobuf:"varint,1,opt,name=host_network,json=hostNetwork" json:"host_network,omitempty"`
-	// If set, use the host's pid namesapce.
+	// If set, use the host's PID namespace.
 	HostPid *bool `protobuf:"varint,2,opt,name=host_pid,json=hostPid" json:"host_pid,omitempty"`
-	// If set, use the host's ipc namespace.
+	// If set, use the host's IPC namespace.
 	HostIpc          *bool  `protobuf:"varint,3,opt,name=host_ipc,json=hostIpc" json:"host_ipc,omitempty"`
 	XXX_unrecognized []byte `json:"-"`
 }
@@ -466,12 +466,12 @@ func (m *NamespaceOption) GetHostIpc() bool {
 	return false
 }
 
-// LinuxPodSandboxConfig holds platform-specific configuraions for Linux
+// LinuxPodSandboxConfig holds platform-specific configurations for Linux
 // host platforms and Linux-based containers.
 type LinuxPodSandboxConfig struct {
 	// The parent cgroup of the pod sandbox.
 	// The cgroupfs style syntax will be used, but the container runtime can
-	// convert it to systemd semantices if needed.
+	// convert it to systemd semantics if needed.
 	CgroupParent *string `protobuf:"bytes,1,opt,name=cgroup_parent,json=cgroupParent" json:"cgroup_parent,omitempty"`
 	// The configurations for the sandbox's namespaces.
 	// This will be used only if the PodSandbox uses namespace for isolation.
@@ -500,12 +500,12 @@ func (m *LinuxPodSandboxConfig) GetNamespaceOptions() *NamespaceOption {
 
 // PodSandboxMetadata holds all necessary information for building the sandbox name.
 // The container runtime is encouraged to expose the metadata associated with the
-// PodSandbox in its user interface for better user experience. E.g., runtime can
-// construct a unique PodSandboxName based on the metadata.
+// PodSandbox in its user interface for better user experience. For example,
+// the runtime can construct a unique PodSandboxName based on the metadata.
 type PodSandboxMetadata struct {
 	// The pod name of the sandbox. Same as the pod name in the PodSpec.
 	Name *string `protobuf:"bytes,1,opt,name=name" json:"name,omitempty"`
-	// The pod uid of the sandbox. Same as the pod UID in the PodSpec.
+	// The pod UID of the sandbox. Same as the pod UID in the PodSpec.
 	Uid *string `protobuf:"bytes,2,opt,name=uid" json:"uid,omitempty"`
 	// The pod namespace of the sandbox. Same as the pod namespace in the PodSpec.
 	Namespace *string `protobuf:"bytes,3,opt,name=namespace" json:"namespace,omitempty"`
@@ -649,7 +649,7 @@ func (m *PodSandboxConfig) GetLinux() *LinuxPodSandboxConfig {
 }
 
 type RunPodSandboxRequest struct {
-	// The configuration for creating a PodSandBox.
+	// The configuration for creating a PodSandbox.
 	Config           *PodSandboxConfig `protobuf:"bytes,1,opt,name=config" json:"config,omitempty"`
 	XXX_unrecognized []byte            `json:"-"`
 }
@@ -667,7 +667,7 @@ func (m *RunPodSandboxRequest) GetConfig() *PodSandboxConfig {
 }
 
 type RunPodSandboxResponse struct {
-	// The id of the PodSandBox
+	// The id of the PodSandbox
 	PodSandboxId     *string `protobuf:"bytes,1,opt,name=pod_sandbox_id,json=podSandboxId" json:"pod_sandbox_id,omitempty"`
 	XXX_unrecognized []byte  `json:"-"`
 }
@@ -685,7 +685,7 @@ func (m *RunPodSandboxResponse) GetPodSandboxId() string {
 }
 
 type StopPodSandboxRequest struct {
-	// The id of the PodSandBox
+	// The id of the PodSandbox
 	PodSandboxId     *string `protobuf:"bytes,1,opt,name=pod_sandbox_id,json=podSandboxId" json:"pod_sandbox_id,omitempty"`
 	XXX_unrecognized []byte  `json:"-"`
 }
@@ -712,7 +712,7 @@ func (*StopPodSandboxResponse) ProtoMessage()               {}
 func (*StopPodSandboxResponse) Descriptor() ([]byte, []int) { return fileDescriptorApi, []int{12} }
 
 type RemovePodSandboxRequest struct {
-	// The id of the PodSandBox
+	// The id of the PodSandbox
 	PodSandboxId     *string `protobuf:"bytes,1,opt,name=pod_sandbox_id,json=podSandboxId" json:"pod_sandbox_id,omitempty"`
 	XXX_unrecognized []byte  `json:"-"`
 }
@@ -739,7 +739,7 @@ func (*RemovePodSandboxResponse) ProtoMessage()               {}
 func (*RemovePodSandboxResponse) Descriptor() ([]byte, []int) { return fileDescriptorApi, []int{14} }
 
 type PodSandboxStatusRequest struct {
-	// The id of the PodSandBox
+	// The id of the PodSandbox
 	PodSandboxId     *string `protobuf:"bytes,1,opt,name=pod_sandbox_id,json=podSandboxId" json:"pod_sandbox_id,omitempty"`
 	XXX_unrecognized []byte  `json:"-"`
 }
