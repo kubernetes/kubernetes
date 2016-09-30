@@ -73,8 +73,6 @@ In order to fulfill the above goals, the rkt CRI integration will make the follo
 
 The current rkt container runtime integration is able to be deployed simply by deploying the kubelet binary.
 
-Similarly, the Docker integration (as visible in the [dockershim](https://github.com/kubernetes/kubernetes/blob/v1.5.0-alpha.0/pkg/kubelet/api/v1alpha1/runtime/api.proto) package) is making the choice to remain there.
-
 This is, in no small part, to make it *Easy to Deploy*.
 
 Remaining in-process also helps this integration not regress on performance, one axis of being *Full-Featured*.
