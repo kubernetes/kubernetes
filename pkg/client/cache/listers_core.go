@@ -203,3 +203,42 @@ func (s *StoreToReplicationControllerLister) GetPodControllers(pod *api.Pod) (co
 	}
 	return
 }
+
+// StoreToLimitRangeLister helps list limit ranges
+type StoreToLimitRangeLister struct {
+	Indexer Indexer
+}
+
+func (s *StoreToLimitRangeLister) List(selector labels.Selector) (ret []*api.LimitRange, err error) {
+	err = ListAll(s.Indexer, selector, func(m interface{}) {
+		ret = append(ret, m.(*api.LimitRange))
+	})
+	return ret, err
+}
+
+func (s *StoreToLimitRangeLister) LimitRanges(namespace string) storeLimitRangesNamespacer {
+	return storeLimitRangesNamespacer{s.Indexer, namespace}
+}
+
+type storeLimitRangesNamespacer struct {
+	indexer   Indexer
+	namespace string
+}
+
+func (s storeLimitRangesNamespacer) List(selector labels.Selector) (ret []*api.LimitRange, err error) {
+	err = ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
+		ret = append(ret, m.(*api.LimitRange))
+	})
+	return ret, err
+}
+
+func (s storeLimitRangesNamespacer) Get(name string) (*api.LimitRange, error) {
+	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, errors.NewNotFound(api.Resource("limitrange"), name)
+	}
+	return obj.(*api.LimitRange), nil
+}

@@ -38,6 +38,7 @@ type SharedInformerFactory interface {
 	PersistentVolumes() PVInformer
 
 	DaemonSets() DaemonSetInformer
+	LimitRanges() LimitRangeInformer
 }
 
 type sharedInformerFactory struct {
@@ -99,6 +100,12 @@ func (f *sharedInformerFactory) PersistentVolumes() PVInformer {
 	return &pvInformer{sharedInformerFactory: f}
 }
 
+// DaemonSets returns a SharedIndexInformer that lists and watches all daemon sets.
 func (f *sharedInformerFactory) DaemonSets() DaemonSetInformer {
 	return &daemonSetInformer{sharedInformerFactory: f}
+}
+
+// LimitRanges returns a SharedIndexInformer that lists and watches all limit ranges.
+func (f *sharedInformerFactory) LimitRanges() LimitRangeInformer {
+	return &limitRangeInformer{sharedInformerFactory: f}
 }

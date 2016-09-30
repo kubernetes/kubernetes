@@ -783,3 +783,90 @@ func TestStoreToServiceLister(t *testing.T) {
 		t.Errorf("Expected service %q, got %q", e, a)
 	}
 }
+
+func TestStoreToLimitRangeLister(t *testing.T) {
+	testCases := []struct {
+		description              string
+		in                       []*api.LimitRange
+		list                     func(StoreToLimitRangeLister) ([]*api.LimitRange, error)
+		outNames                 sets.String
+		expectErr                bool
+		onlyIfIndexedByNamespace bool
+	}{
+		{
+			description: "Verify we can search all namespaces",
+			in: []*api.LimitRange{
+				{
+					ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "bar"},
+				},
+				{
+					ObjectMeta: api.ObjectMeta{Name: "hmm", Namespace: "hmm"},
+				},
+			},
+			list: func(lister StoreToLimitRangeLister) ([]*api.LimitRange, error) {
+				return lister.LimitRanges(api.NamespaceAll).List(labels.Set{}.AsSelectorPreValidated())
+			},
+			outNames: sets.NewString("hmm", "foo"),
+		},
+		{
+			description: "Verify we can search a specific namespace",
+			in: []*api.LimitRange{
+				{
+					ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "bar"},
+				},
+				{
+					ObjectMeta: api.ObjectMeta{Name: "hmm", Namespace: "hmm"},
+				},
+			},
+			list: func(lister StoreToLimitRangeLister) ([]*api.LimitRange, error) {
+				return lister.LimitRanges("hmm").List(labels.Set{}.AsSelectorPreValidated())
+			},
+			outNames: sets.NewString("hmm"),
+		},
+		{
+			description: "Basic listing with all labels and no selectors",
+			in: []*api.LimitRange{
+				{ObjectMeta: api.ObjectMeta{Name: "basic"}},
+			},
+			list: func(lister StoreToLimitRangeLister) ([]*api.LimitRange, error) {
+				return lister.List(labels.Everything())
+			},
+			outNames: sets.NewString("basic"),
+		},
+	}
+	for _, c := range testCases {
+		for _, withIndex := range []bool{true, false} {
+			if c.onlyIfIndexedByNamespace && !withIndex {
+				continue
+			}
+			var store Indexer
+			if withIndex {
+				store = NewIndexer(MetaNamespaceKeyFunc, Indexers{NamespaceIndex: MetaNamespaceIndexFunc})
+			} else {
+				store = NewIndexer(MetaNamespaceKeyFunc, Indexers{})
+			}
+
+			for _, r := range c.in {
+				store.Add(r)
+			}
+
+			got, err := c.list(StoreToLimitRangeLister{store})
+			if err != nil && c.expectErr {
+				continue
+			} else if c.expectErr {
+				t.Errorf("(%q, withIndex=%v) Expected error, got none", c.description, withIndex)
+				continue
+			} else if err != nil {
+				t.Errorf("(%q, withIndex=%v) Unexpected error %#v", c.description, withIndex, err)
+				continue
+			}
+			gotNames := make([]string, len(got))
+			for ix := range got {
+				gotNames[ix] = got[ix].Name
+			}
+			if !c.outNames.HasAll(gotNames...) || len(gotNames) != len(c.outNames) {
+				t.Errorf("(%q, withIndex=%v) Unexpected got %+v expected %+v", c.description, withIndex, gotNames, c.outNames)
+			}
+		}
+	}
+}
