@@ -46,6 +46,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/generated/openapi"
 	"k8s.io/kubernetes/pkg/genericapiserver"
+	"k8s.io/kubernetes/pkg/genericapiserver/routes"
 	"k8s.io/kubernetes/pkg/kubelet/client"
 	ipallocator "k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
@@ -552,7 +553,10 @@ func TestValidOpenAPISpec(t *testing.T) {
 	}
 	assert.Equal(http.StatusNotFound, resp.StatusCode)
 
-	master.InstallOpenAPI()
+	routes.OpenAPI{
+		Definitions: config.GenericConfig.OpenAPIDefinitions,
+		Info:        config.GenericConfig.OpenAPIInfo,
+	}.Install(master.HandlerContainer)
 	resp, err = http.Get(server.URL + "/swagger.json")
 	if !assert.NoError(err) {
 		t.Errorf("unexpected error: %v", err)
