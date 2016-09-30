@@ -37,7 +37,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/auth/user"
-	genericmux "k8s.io/kubernetes/pkg/genericapiserver/mux"
 	ipallocator "k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
@@ -57,6 +56,8 @@ func setUp(t *testing.T) (*etcdtesting.EtcdTestServer, Config, *assert.Assertion
 	config.ProxyTLSClientConfig = &tls.Config{}
 	config.LegacyAPIGroupPrefixes = sets.NewString("/api")
 	config.APIGroupPrefix = "/apis"
+	config.EnableOpenAPISupport = true
+	config.EnableSwaggerSupport = true
 
 	return etcdServer, *config, assert.New(t)
 }
@@ -95,8 +96,20 @@ func TestNew(t *testing.T) {
 	serverDialerFunc := fmt.Sprintf("%p", serverDialer)
 	configDialerFunc := fmt.Sprintf("%p", config.ProxyDialer)
 	assert.Equal(serverDialerFunc, configDialerFunc)
-
 	assert.Equal(s.ProxyTransport.(*http.Transport).TLSClientConfig, config.ProxyTLSClientConfig)
+
+	// swagger and openapi must only be installed after all api groups
+	assert.True(config.EnableSwaggerSupport)
+	assert.True(config.EnableOpenAPISupport)
+	wss := s.HandlerContainer.RegisteredWebServices()
+	for _, ws := range wss {
+		switch ws.RootPath() {
+		case "/swaggerapi/":
+			t.Error("SwaggerAPI shouldn't be installed before other APIs")
+		case "/openapi/":
+			t.Error("OpenAPI shouldn't be installed before other APIs")
+		}
+	}
 }
 
 // Verifies that AddGroupVersions works as expected.
@@ -277,41 +290,6 @@ func (authn *mockAuthenticator) AuthenticateRequest(req *http.Request) (user.Inf
 	return &user.DefaultInfo{
 		Name: "foo",
 	}, true, nil
-}
-
-// TestInstallSwaggerAPI verifies that the swagger api is added
-// at the proper endpoint.
-func TestInstallSwaggerAPI(t *testing.T) {
-	etcdserver, _, assert := setUp(t)
-	defer etcdserver.Terminate(t)
-
-	mux := http.NewServeMux()
-	server := &GenericAPIServer{}
-	server.HandlerContainer = genericmux.NewAPIContainer(mux, nil)
-
-	// Ensure swagger isn't installed without the call
-	ws := server.HandlerContainer.RegisteredWebServices()
-	if !assert.Equal(len(ws), 0) {
-		for x := range ws {
-			assert.NotEqual("/swaggerapi", ws[x].RootPath(), "SwaggerAPI was installed without a call to InstallSwaggerAPI()")
-		}
-	}
-
-	// Install swagger and test
-	server.InstallSwaggerAPI()
-	ws = server.HandlerContainer.RegisteredWebServices()
-	if assert.NotEqual(0, len(ws), "SwaggerAPI not installed.") {
-		assert.Equal("/swaggerapi/", ws[0].RootPath(), "SwaggerAPI did not install to the proper path. %s != /swaggerapi", ws[0].RootPath())
-	}
-
-	// Empty externalHost verification
-	mux = http.NewServeMux()
-	server.HandlerContainer = genericmux.NewAPIContainer(mux, nil)
-	server.ExternalAddress = ""
-	server.InstallSwaggerAPI()
-	if assert.NotEqual(0, len(ws), "SwaggerAPI not installed.") {
-		assert.Equal("/swaggerapi/", ws[0].RootPath(), "SwaggerAPI did not install to the proper path. %s != /swaggerapi", ws[0].RootPath())
-	}
 }
 
 func decodeResponse(resp *http.Response, obj interface{}) error {
