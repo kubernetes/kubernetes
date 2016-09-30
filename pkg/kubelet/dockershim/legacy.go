@@ -40,7 +40,7 @@ func (ds *dockerService) GetContainerLogs(pod *api.Pod, containerID kubecontaine
 }
 
 func (ds *dockerService) PortForward(pod *kubecontainer.Pod, port uint16, stream io.ReadWriteCloser) error {
-	return fmt.Errorf("not implemented")
+	return dockertools.PortForward(ds.client, pod, port, stream)
 }
 
 func (ds *dockerService) ExecInContainer(containerID kubecontainer.ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size) error {
