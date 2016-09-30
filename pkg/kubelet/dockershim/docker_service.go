@@ -69,7 +69,7 @@ type DockerLegacyService interface {
 	// Supporting legacy methods for docker.
 	GetContainerLogs(pod *api.Pod, containerID kubecontainer.ContainerID, logOptions *api.PodLogOptions, stdout, stderr io.Writer) (err error)
 	kubecontainer.ContainerAttacher
-	PortForward(pod *kubecontainer.Pod, port uint16, stream io.ReadWriteCloser) error
+	PortForward(sandboxID string, port uint16, stream io.ReadWriteCloser) error
 
 	// TODO: Remove this once exec is properly defined in CRI.
 	ExecInContainer(containerID kubecontainer.ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size) error

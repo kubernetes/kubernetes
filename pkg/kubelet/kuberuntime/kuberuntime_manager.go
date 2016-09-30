@@ -833,17 +833,10 @@ func (m *kubeGenericRuntimeManager) GarbageCollect(gcPolicy kubecontainer.Contai
 
 // GetPodContainerID gets pod sandbox ID
 func (m *kubeGenericRuntimeManager) GetPodContainerID(pod *kubecontainer.Pod) (kubecontainer.ContainerID, error) {
-	// TODO: add a format function for kubecontainer.Pod
-	podFullName := format.Pod(&api.Pod{
-		ObjectMeta: api.ObjectMeta{
-			Name:      pod.Name,
-			Namespace: pod.Namespace,
-			UID:       pod.ID,
-		},
-	})
+	formattedPod := kubecontainer.FormatPod(pod)
 	if len(pod.Sandboxes) == 0 {
-		glog.Errorf("No sandboxes are found for pod %q", podFullName)
-		return kubecontainer.ContainerID{}, fmt.Errorf("sandboxes for pod %q not found", podFullName)
+		glog.Errorf("No sandboxes are found for pod %q", formattedPod)
+		return kubecontainer.ContainerID{}, fmt.Errorf("sandboxes for pod %q not found", formattedPod)
 	}
 
 	// return sandboxID of the first sandbox since it is the latest one
@@ -852,11 +845,17 @@ func (m *kubeGenericRuntimeManager) GetPodContainerID(pod *kubecontainer.Pod) (k
 
 // Forward the specified port from the specified pod to the stream.
 func (m *kubeGenericRuntimeManager) PortForward(pod *kubecontainer.Pod, port uint16, stream io.ReadWriteCloser) error {
+	formattedPod := kubecontainer.FormatPod(pod)
+	if len(pod.Sandboxes) == 0 {
+		glog.Errorf("No sandboxes are found for pod %q", formattedPod)
+		return fmt.Errorf("sandbox for pod %q not found", formattedPod)
+	}
+
 	// Use docker portforward directly for in-process docker integration
 	// now to unblock other tests.
 	// TODO: remove this hack after portforward is defined in CRI.
 	if ds, ok := m.runtimeService.(dockershim.DockerLegacyService); ok {
-		return ds.PortForward(pod, port, stream)
+		return ds.PortForward(pod.Sandboxes[0].ID.ID, port, stream)
 	}
 
 	return fmt.Errorf("not implemented")
