@@ -193,8 +193,10 @@ func componentProbe(port int, path string) *api.Probe {
 				Port: intstr.FromInt(port),
 			},
 		},
-		InitialDelaySeconds: 15,
+		InitialDelaySeconds: 60,
 		TimeoutSeconds:      15,
+		PeriodSeconds:       60,
+		FailureThreshold:    5
 	}
 }
 
