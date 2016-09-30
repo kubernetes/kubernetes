@@ -494,7 +494,6 @@ func TestZeroRequest(t *testing.T) {
 			{Map: algorithmpriorities.BalancedResourceAllocationMap, Weight: 1},
 			{
 				Function: algorithmpriorities.NewSelectorSpreadPriority(
-					algorithm.FakePodLister(test.pods),
 					algorithm.FakeServiceLister([]*api.Service{}),
 					algorithm.FakeControllerLister([]*api.ReplicationController{}),
 					algorithm.FakeReplicaSetLister([]extensions.ReplicaSet{})),
