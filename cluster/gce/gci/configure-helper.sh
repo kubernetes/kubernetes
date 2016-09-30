@@ -590,7 +590,7 @@ function start-kube-proxy {
     params+=" --feature-gates=${FEATURE_GATES}"
   fi
   if [[ -n "${KUBEPROXY_TEST_ARGS:-}" ]]; then
-    params+=" ${KUBE_PROXY_TEST_ARGS}"
+    params+=" ${KUBEPROXY_TEST_ARGS}"
   fi
   sed -i -e "s@{{kubeconfig}}@${kubeconfig}@g" ${src_file}
   sed -i -e "s@{{pillar\['kube_docker_registry'\]}}@${kube_docker_registry}@g" ${src_file}
@@ -1130,8 +1130,8 @@ function start-rescheduler {
 # Setup working directory for kubelet.
 function setup-kubelet-dir {
     echo "Making /var/lib/kubelet executable for kubelet"
-    mount --bind /var/lib/kubelet /var/lib/kubelet/
-    mount -B -o remount,exec,suid,dev /var/lib/kubelet    
+    mount -B /var/lib/kubelet /var/lib/kubelet/
+    mount -B -o remount,exec,suid,dev /var/lib/kubelet
 }
 
 function reset-motd {
