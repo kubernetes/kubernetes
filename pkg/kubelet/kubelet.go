@@ -392,10 +392,8 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 	// TODO(mtaufen): remove when internal cbr0 implementation gets removed in favor
 	//                of the kubenet network plugin
 	var myConfigureCBR0 bool = kubeCfg.ConfigureCBR0
-	var myFlannelExperimentalOverlay bool = kubeCfg.ExperimentalFlannelOverlay
 	if kubeCfg.NetworkPluginName == "kubenet" {
 		myConfigureCBR0 = false
-		myFlannelExperimentalOverlay = false
 	}
 
 	klet := &Kubelet{
@@ -443,8 +441,6 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		cpuCFSQuota:                kubeCfg.CPUCFSQuota,
 		daemonEndpoints:            daemonEndpoints,
 		containerManager:           kubeDeps.ContainerManager,
-		flannelExperimentalOverlay: myFlannelExperimentalOverlay,
-		flannelHelper:              nil,
 		nodeIP:                     net.ParseIP(kubeCfg.NodeIP),
 		clock:                      clock.RealClock{},
 		outOfDiskTransitionFrequency: kubeCfg.OutOfDiskTransitionFrequency.Duration,
@@ -458,10 +454,6 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		iptablesDropBit:              int(kubeCfg.IPTablesDropBit),
 	}
 
-	if klet.flannelExperimentalOverlay {
-		klet.flannelHelper = NewFlannelHelper()
-		glog.Infof("Flannel is in charge of podCIDR and overlay networking.")
-	}
 	if klet.nodeIP != nil {
 		if err := klet.validateNodeIP(); err != nil {
 			return nil, err
@@ -970,15 +962,6 @@ type Kubelet struct {
 
 	// oneTimeInitializer is used to initialize modules that are dependent on the runtime to be up.
 	oneTimeInitializer sync.Once
-
-	// flannelExperimentalOverlay determines whether the experimental flannel
-	// network overlay is active.
-	flannelExperimentalOverlay bool
-
-	// TODO: Flannelhelper doesn't store any state, we can instantiate it
-	// on the fly if we're confident the dbus connetions it opens doesn't
-	// put the system under duress.
-	flannelHelper *FlannelHelper
 
 	// If non-nil, use this IP address for the node
 	nodeIP net.IP

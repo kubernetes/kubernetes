@@ -317,22 +317,7 @@ func (kl *Kubelet) tryUpdateNodeStatus() error {
 		return fmt.Errorf("no node instance returned for %q", kl.nodeName)
 	}
 
-	// Flannel is the authoritative source of pod CIDR, if it's running.
-	// This is a short term compromise till we get flannel working in
-	// reservation mode.
-	if kl.flannelExperimentalOverlay {
-		flannelPodCIDR := kl.runtimeState.podCIDR()
-		if node.Spec.PodCIDR != flannelPodCIDR {
-			node.Spec.PodCIDR = flannelPodCIDR
-			glog.Infof("Updating podcidr to %v", node.Spec.PodCIDR)
-			if updatedNode, err := kl.kubeClient.Core().Nodes().Update(node); err != nil {
-				glog.Warningf("Failed to update podCIDR: %v", err)
-			} else {
-				// Update the node resourceVersion so the status update doesn't fail.
-				node = updatedNode
-			}
-		}
-	} else if kl.reconcileCIDR {
+	if kl.reconcileCIDR {
 		kl.updatePodCIDR(node.Spec.PodCIDR)
 	}
 
