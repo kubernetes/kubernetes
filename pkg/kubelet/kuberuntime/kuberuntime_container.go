@@ -569,6 +569,12 @@ func (m *kubeGenericRuntimeManager) killContainersWithSyncResult(pod *api.Pod, r
 
 // AttachContainer attaches to the container's console
 func (m *kubeGenericRuntimeManager) AttachContainer(id kubecontainer.ContainerID, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size) (err error) {
+	// Use `docker attach` directly for in-process docker integration for
+	// now to unblock other tests.
+	// TODO: remove this hack after attach is defined in CRI.
+	if ds, ok := m.runtimeService.(dockershim.DockerLegacyService); ok {
+		return ds.AttachContainer(id, stdin, stdout, stderr, tty, resize)
+	}
 	return fmt.Errorf("not implemented")
 }
 
