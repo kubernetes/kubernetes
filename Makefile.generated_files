@@ -37,6 +37,9 @@ SHELL := /bin/bash
 .PHONY: generated_files
 generated_files: gen_deepcopy gen_conversion gen_openapi
 
+.PHONY: verify_generated_files
+verify_generated_files: verify_gen_deepcopy verify_gen_conversion verify_gen_openapi
+
 # Code-generation logic.
 #
 # This stuff can be pretty tricky, and there's probably some corner cases that
@@ -219,8 +222,13 @@ gen_deepcopy: $(DEEPCOPY_FILES)
 	        --logtostderr                                               \
 	        -i $$(cat $(META_DIR)/$(DEEPCOPY_GEN).todo | paste -sd, -)  \
 	        --bounding-dirs $(PRJ_SRC_PATH)                             \
-	        -O $(DEEPCOPY_BASENAME);                                    \
+	        -O $(DEEPCOPY_BASENAME)                                     \
+	        $(DEEPCOPY_EXTRA_FLAGS);                                    \
 	fi
+
+.PHONY: verify_gen_deepcopy
+verify_gen_deepcopy: DEEPCOPY_EXTRA_FLAGS = --verify-only
+verify_gen_deepcopy: gen_deepcopy
 
 # For each dir in DEEPCOPY_DIRS, this establishes a dependency between the
 # output file and the input files that should trigger a rebuild.
@@ -317,6 +325,10 @@ OPENAPI_OUTFILE := $(OPENAPI_OUTPUT_PKG)/$(OPENAPI_FILENAME)
 .PHONY: gen_openapi
 gen_openapi: $(OPENAPI_OUTFILE)
 
+.PHONY: verify_gen_openapi
+verify_gen_openapi: OPENAPI_EXTRA_FLAGS = --verify-only
+verify_gen_openapi: gen_openapi
+
 # For each dir in OPENAPI_DIRS, this establishes a dependency between the
 # output file and the input files that should trigger a rebuild.
 #
@@ -341,7 +353,8 @@ $(OPENAPI_OUTFILE): $(OPENAPI_GEN)
 	    --logtostderr                                                               \
 	    -i $$(echo $(addprefix $(PRJ_SRC_PATH)/, $(OPENAPI_DIRS)) | sed 's/ /,/g')  \
 	    -p $(PRJ_SRC_PATH)/$(OPENAPI_OUTPUT_PKG)                                    \
-	    -O $(OPENAPI_BASENAME)
+	    -O $(OPENAPI_BASENAME)                                                      \
+	    $(OPENAPI_EXTRA_FLAGS)
 
 # This calculates the dependencies for the generator tool, so we only rebuild
 # it when needed.  It is PHONY so that it always runs, but it only updates the
@@ -427,10 +440,16 @@ gen_conversion: $(CONVERSION_FILES)
 	if [[ -f $(META_DIR)/$(CONVERSION_GEN).todo ]]; then                  \
 	    ./hack/run-in-gopath.sh $(CONVERSION_GEN)                         \
 	        --v $(KUBE_VERBOSE)                                           \
-	        --logtostderr                                               \
+	        --logtostderr                                                 \
 	        -i $$(cat $(META_DIR)/$(CONVERSION_GEN).todo | paste -sd, -)  \
-	        -O $(CONVERSION_BASENAME);                                    \
+	        -O $(CONVERSION_BASENAME)                                     \
+	        $(CONVERSION_EXTRA_FLAGS);                                    \
 	fi
+
+.PHONY: verify_gen_conversion
+verify_gen_conversion: CONVERSION_EXTRA_FLAGS = --verify-only
+verify_gen_conversion: gen_conversion
+
 
 # Establish a dependency between the deps file and the dir.  Whenever a dir
 # changes (files added or removed) the deps file will be considered stale.
