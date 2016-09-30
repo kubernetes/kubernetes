@@ -129,7 +129,6 @@ func verifyRemainingObjects(t *testing.T, clientSet clientset.Interface, namespa
 
 func rmSetup(t *testing.T, enableGarbageCollector bool) (*httptest.Server, *replicaset.ReplicaSetController, cache.SharedIndexInformer, clientset.Interface) {
 	masterConfig := framework.NewIntegrationTestMasterConfig()
-	masterConfig.EnableCoreControllers = false
 	_, s := framework.RunAMaster(masterConfig)
 
 	config := restclient.Config{Host: s.URL}
