@@ -18,13 +18,13 @@ package e2e
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	api_v1 "k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_3"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -38,18 +38,21 @@ const (
 // Create/delete ingress api objects
 var _ = framework.KubeDescribe("Federation namespace [Feature:Federation]", func() {
 	f := framework.NewDefaultFederatedFramework("federation-namespace")
-	clusterClientSet := make(map[string]*release_1_3.Clientset)
 
 	Describe("Namespace objects", func() {
+		var federationName string
+		var clusters map[string]*cluster // All clusters, keyed by cluster name
+
 		BeforeEach(func() {
 			framework.SkipUnlessFederated(f.Client)
-			clusters := buildClustersOrFail_14(f)
-			for _, cluster := range clusters {
-				if _, found := clusterClientSet[cluster.Name]; !found {
-					clientset := createClientsetForCluster(*cluster, 1, "e2e-test")
-					clusterClientSet[cluster.Name] = clientset
-				}
+
+			// TODO: Federation API server should be able to answer this.
+			if federationName = os.Getenv("FEDERATION_NAME"); federationName == "" {
+				federationName = DefaultFederationName
 			}
+
+			clusters = map[string]*cluster{}
+			registerClusters(clusters, UserAgentName, federationName, f)
 		})
 
 		AfterEach(func() {
@@ -57,11 +60,12 @@ var _ = framework.KubeDescribe("Federation namespace [Feature:Federation]", func
 			deleteAllTestNamespaces(
 				f.FederationClientset_1_4.Core().Namespaces().List,
 				f.FederationClientset_1_4.Core().Namespaces().Delete)
-			for _, clientset := range clusterClientSet {
+			for _, cluster := range clusters {
 				deleteAllTestNamespaces(
-					clientset.Core().Namespaces().List,
-					clientset.Core().Namespaces().Delete)
+					cluster.Core().Namespaces().List,
+					cluster.Core().Namespaces().Delete)
 			}
+			unregisterClusters(clusters, f)
 		})
 
 		It("should be created and deleted successfully", func() {
@@ -78,8 +82,8 @@ var _ = framework.KubeDescribe("Federation namespace [Feature:Federation]", func
 
 			// Check subclusters if the namespace was created there.
 			err = wait.Poll(5*time.Second, 2*time.Minute, func() (bool, error) {
-				for _, client := range clusterClientSet {
-					_, err := client.Core().Namespaces().Get(ns.Name)
+				for _, cluster := range clusters {
+					_, err := cluster.Core().Namespaces().Get(ns.Name)
 					if err != nil && !errors.IsNotFound(err) {
 						return false, err
 					}
