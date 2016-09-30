@@ -197,7 +197,7 @@ func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
 	}
 
 	secureStartedCh := make(chan struct{})
-	if options.SecurePort != 0 {
+	if options.SecurePort != 0 && s.Handler != nil {
 		secureLocation := net.JoinHostPort(options.BindAddress.String(), strconv.Itoa(options.SecurePort))
 		secureServer := &http.Server{
 			Addr:           secureLocation,
@@ -263,29 +263,33 @@ func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
 		close(secureStartedCh)
 	}
 
-	insecureLocation := net.JoinHostPort(options.InsecureBindAddress.String(), strconv.Itoa(options.InsecurePort))
-	insecureServer := &http.Server{
-		Addr:           insecureLocation,
-		Handler:        s.InsecureHandler,
-		MaxHeaderBytes: 1 << 20,
-	}
 	insecureStartedCh := make(chan struct{})
-	glog.Infof("Serving insecurely on %s", insecureLocation)
-	go func() {
-		defer utilruntime.HandleCrash()
-
-		notifyStarted := sync.Once{}
-		for {
-			if err := insecureServer.ListenAndServe(); err != nil {
-				glog.Errorf("Unable to listen for insecure (%v); will try again.", err)
-			} else {
-				notifyStarted.Do(func() {
-					close(insecureStartedCh)
-				})
-			}
-			time.Sleep(15 * time.Second)
+	if options.InsecurePort != 0 && s.InsecureHandler != nil {
+		insecureLocation := net.JoinHostPort(options.InsecureBindAddress.String(), strconv.Itoa(options.InsecurePort))
+		insecureServer := &http.Server{
+			Addr:           insecureLocation,
+			Handler:        s.InsecureHandler,
+			MaxHeaderBytes: 1 << 20,
 		}
-	}()
+		glog.Infof("Serving insecurely on %s", insecureLocation)
+		go func() {
+			defer utilruntime.HandleCrash()
+
+			notifyStarted := sync.Once{}
+			for {
+				if err := insecureServer.ListenAndServe(); err != nil {
+					glog.Errorf("Unable to listen for insecure (%v); will try again.", err)
+				} else {
+					notifyStarted.Do(func() {
+						close(insecureStartedCh)
+					})
+				}
+				time.Sleep(15 * time.Second)
+			}
+		}()
+	} else {
+		close(insecureStartedCh)
+	}
 
 	<-secureStartedCh
 	<-insecureStartedCh
