@@ -19,7 +19,10 @@ package testing
 import "k8s.io/kubernetes/pkg/util/iptables"
 
 // no-op implementation of iptables Interface
-type fake struct{}
+type fake struct {
+	// RestoreData keeps the data from the last call to RestoreAll
+	RestoreData []byte
+}
 
 func NewFake() *fake {
 	return &fake{}
@@ -65,7 +68,8 @@ func (*fake) Restore(table iptables.Table, data []byte, flush iptables.FlushFlag
 	return nil
 }
 
-func (*fake) RestoreAll(data []byte, flush iptables.FlushFlag, counters iptables.RestoreCountersFlag) error {
+func (f *fake) RestoreAll(data []byte, flush iptables.FlushFlag, counters iptables.RestoreCountersFlag) error {
+	f.RestoreData = data
 	return nil
 }
 func (*fake) AddReloadFunc(reloadFunc func()) {}
