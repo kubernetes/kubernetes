@@ -18,8 +18,6 @@ limitations under the License.
 // components.  This includes replication controllers, service endpoints and
 // nodes.
 //
-// CAUTION: If you update code in this file, you may need to also update code
-//          in contrib/mesos/pkg/controllermanager/controllermanager.go
 package app
 
 import (

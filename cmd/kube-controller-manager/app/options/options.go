@@ -16,8 +16,6 @@ limitations under the License.
 
 // Package options provides the flags used for the controller manager.
 //
-// CAUTION: If you update code in this file, you may need to also update code
-//          in contrib/mesos/pkg/controllermanager/controllermanager.go
 package options
 
 import (
