@@ -71,7 +71,7 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 		"Amount of time to retain events. Default is 1h.")
 
 	fs.StringVar(&s.ServiceAccountKeyFile, "service-account-key-file", s.ServiceAccountKeyFile, ""+
-		"File containing PEM-encoded x509 RSA private or public key, used to verify "+
+		"File containing PEM-encoded x509 RSA or ECDSA private or public key, used to verify "+
 		"ServiceAccount tokens. If unspecified, --tls-private-key-file is used.")
 
 	fs.BoolVar(&s.ServiceAccountLookup, "service-account-lookup", s.ServiceAccountLookup,
