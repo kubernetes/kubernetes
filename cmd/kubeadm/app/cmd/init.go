@@ -21,14 +21,18 @@ import (
 	"io"
 	"net"
 	"strings"
+	"time"
 
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/api"
+	kubeimages "k8s.io/kubernetes/cmd/kubeadm/app/images"
 	kubemaster "k8s.io/kubernetes/cmd/kubeadm/app/master"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	netutil "k8s.io/kubernetes/pkg/util/net"
 )
 
@@ -40,6 +44,9 @@ var (
 
 		kubeadm join --token %s %s
 		`)
+	dockerEndpoint = "unix:///var/run/docker.sock"
+	// 2 minutes by default for kubelet, but for kubeadm we can assume local and much less:
+	dockerClientTimeout = unversioned.Duration{Duration: 10 * time.Second}
 )
 
 // NewCmdInit returns "kubeadm init" command.
@@ -148,6 +155,18 @@ func RunInit(out io.Writer, cmd *cobra.Command, args []string, s *kubeadmapi.Kub
 	}
 
 	if err := kubemaster.CreateTokenAuthFile(s); err != nil {
+		return err
+	}
+
+	// TODO: Shut off glog info level here:
+	// This call doesn't actually die if it cannot connect... check the version
+	// and see if we get an error:
+	dockerClient := dockertools.ConnectToDockerOrDie(dockerEndpoint, dockerClientTimeout.Duration)
+	if _, err := dockerClient.Version(); err != nil {
+		return err
+	}
+
+	if err := kubeimages.PrePullImages(s, dockerClient); err != nil {
 		return err
 	}
 
