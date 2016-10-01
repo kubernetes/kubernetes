@@ -113,7 +113,7 @@ func ReadDockercfgFile(searchPaths []string) (cfg DockerConfig, err error) {
 	return nil, fmt.Errorf("couldn't find valid .dockercfg after checking in %v", searchPaths)
 }
 
-// DefaultDockerConfigJSONPaths attempts to read a docker config.json file from the given paths.
+// ReadDockerConfigJSONFile attempts to read a docker config.json file from the given paths.
 // if searchPaths is empty, the default paths are used.
 func ReadDockerConfigJSONFile(searchPaths []string) (cfg DockerConfig, err error) {
 	if len(searchPaths) == 0 {
