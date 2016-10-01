@@ -73,7 +73,7 @@ message VersionResponse {
     optional string runtime_api_version = 4;
 }
 
-// DNSConfig specifies the DNS servers and search domains.
+// DNSConfig specifies the DNS servers and search domains of a sandbox.
 message DNSConfig {
     // List of DNS servers of the cluster.
     repeated string servers = 1;
@@ -89,7 +89,7 @@ enum Protocol {
     UDP = 1;
 }
 
-// PortMapping specifies the port mapping configurations of sandbox
+// PortMapping specifies the port mapping configurations of a sandbox.
 message PortMapping {
     // The name of the port mapping
     optional string name = 1;
@@ -103,7 +103,7 @@ message PortMapping {
     optional string host_ip = 5;
 }
 
-// Mount specifies the volume mount for the sandbox
+// Mount specifies a host volume to mount into a container.
 message Mount {
     // The name of the volume mount.
     optional string name = 1;
@@ -121,18 +121,18 @@ message Mount {
 message NamespaceOption {
     // If set, use the host's network namespace.
     optional bool host_network = 1;
-    // If set, use the host's pid namesapce.
+    // If set, use the host's PID namespace.
     optional bool host_pid = 2;
-    // If set, use the host's ipc namespace.
+    // If set, use the host's IPC namespace.
     optional bool host_ipc = 3;
 }
 
-// LinuxPodSandboxConfig holds platform-specific configuraions for Linux
+// LinuxPodSandboxConfig holds platform-specific configurations for Linux
 // host platforms and Linux-based containers.
 message LinuxPodSandboxConfig {
     // The parent cgroup of the pod sandbox.
-    // The cgroupfs style syntax will be used, but the container runtime can 
-    // convert it to systemd semantices if needed.
+    // The cgroupfs style syntax will be used, but the container runtime can
+    // convert it to systemd semantics if needed.
     optional string cgroup_parent = 1;
     // The configurations for the sandbox's namespaces.
     // This will be used only if the PodSandbox uses namespace for isolation.
@@ -141,12 +141,12 @@ message LinuxPodSandboxConfig {
 
 // PodSandboxMetadata holds all necessary information for building the sandbox name.
 // The container runtime is encouraged to expose the metadata associated with the
-// PodSandbox in its user interface for better user experience. E.g., runtime can
-// construct a unique PodSandboxName based on the metadata.
+// PodSandbox in its user interface for better user experience. For example,
+// the runtime can construct a unique PodSandboxName based on the metadata.
 message PodSandboxMetadata {
     // The pod name of the sandbox. Same as the pod name in the PodSpec.
     optional string name = 1;
-    // The pod uid of the sandbox. Same as the pod UID in the PodSpec.
+    // The pod UID of the sandbox. Same as the pod UID in the PodSpec.
     optional string uid = 2;
     // The pod namespace of the sandbox. Same as the pod namespace in the PodSpec.
     optional string namespace = 3;
@@ -194,31 +194,31 @@ message PodSandboxConfig {
 }
 
 message RunPodSandboxRequest {
-    // The configuration for creating a PodSandBox.
+    // The configuration for creating a PodSandbox.
     optional PodSandboxConfig config = 1;
 }
 
 message RunPodSandboxResponse {
-    // The id of the PodSandBox
+    // The id of the PodSandbox
     optional string pod_sandbox_id = 1;
 }
 
 message StopPodSandboxRequest {
-    // The id of the PodSandBox
+    // The id of the PodSandbox
     optional string pod_sandbox_id = 1;
 }
 
 message StopPodSandboxResponse {}
 
 message RemovePodSandboxRequest {
-    // The id of the PodSandBox
+    // The id of the PodSandbox
     optional string pod_sandbox_id = 1;
 }
 
 message RemovePodSandboxResponse {}
 
 message PodSandboxStatusRequest {
-    // The id of the PodSandBox
+    // The id of the PodSandbox
     optional string pod_sandbox_id = 1;
 }
 
