@@ -42,6 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/apimachinery"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apiserver"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/genericapiserver/openapi"
 	"k8s.io/kubernetes/pkg/genericapiserver/openapi/common"
 	"k8s.io/kubernetes/pkg/genericapiserver/options"
@@ -93,6 +94,9 @@ type GenericAPIServer struct {
 	// ServiceNodePortRange is only used for `master.go` to construct its RESTStorage for the legacy API group
 	// TODO refactor this closer to the point of use.
 	ServiceNodePortRange utilnet.PortRange
+
+	// LoopbackClientConfig is a config for a privileged loopback connection to the API server
+	LoopbackClientConfig *restclient.Config
 
 	// minRequestTimeout is how short the request timeout can be.  This is used to build the RESTHandler
 	minRequestTimeout time.Duration
@@ -315,7 +319,7 @@ func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
 
 	<-secureStartedCh
 	<-insecureStartedCh
-	s.RunPostStartHooks(PostStartHookContext{})
+	s.RunPostStartHooks()
 
 	// err == systemd.SdNotifyNoSocket when not running on a systemd system
 	if err := systemd.SdNotify("READY=1\n"); err != nil && err != systemd.SdNotifyNoSocket {

@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/apis/rbac/validation"
+	"k8s.io/kubernetes/pkg/auth/user"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
@@ -42,9 +43,17 @@ func NewStorage(s rest.StandardStorage, ruleResolver validation.AuthorizationRul
 }
 
 func (s *Storage) Create(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
-	if user, ok := api.UserFrom(ctx); ok {
-		if s.superUser != "" && user.GetName() == s.superUser {
+	if u, ok := api.UserFrom(ctx); ok {
+		if s.superUser != "" && u.GetName() == s.superUser {
 			return s.StandardStorage.Create(ctx, obj)
+		}
+
+		// system:masters is special because the API server uses it for privileged loopback connections
+		// therefore we know that a member of system:masters can always do anything
+		for _, group := range u.GetGroups() {
+			if group == user.SystemPrivilegedGroup {
+				return s.StandardStorage.Create(ctx, obj)
+			}
 		}
 	}
 
