@@ -26,6 +26,7 @@ import (
 
 	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
+	"k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 const (
@@ -207,6 +208,9 @@ func (ds *dockerService) makeSandboxDockerConfig(c *runtimeApi.PodSandboxConfig,
 	labels := makeLabels(c.GetLabels(), c.GetAnnotations())
 	// Apply a label to distinguish sandboxes from regular containers.
 	labels[containerTypeLabelKey] = containerTypeLabelSandbox
+	// Apply a container name label for infra container. This is used in summary api.
+	// TODO(random-liu): Deprecate this label once container metrics is directly got from CRI.
+	labels[types.KubernetesContainerNameLabel] = sandboxContainerName
 
 	hc := &dockercontainer.HostConfig{}
 	createConfig := &dockertypes.ContainerCreateConfig{

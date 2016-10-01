@@ -29,6 +29,7 @@ import (
 
 	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
+	"k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 const (
@@ -87,14 +88,19 @@ func extractLabels(input map[string]string) (map[string]string, map[string]strin
 		// Check if the key is used internally by the shim.
 		internal := false
 		for _, internalKey := range internalLabelKeys {
-			// TODO: containerTypeLabelKey is the only internal label the shim uses
-			// right now. Expand this to a list later.
 			if k == internalKey {
 				internal = true
 				break
 			}
 		}
 		if internal {
+			continue
+		}
+
+		// Delete the container name label for the sandbox. It is added in the shim,
+		// should not be exposed via CRI.
+		if k == types.KubernetesContainerNameLabel &&
+			input[containerTypeLabelKey] == containerTypeLabelSandbox {
 			continue
 		}
 

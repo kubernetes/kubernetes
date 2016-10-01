@@ -24,15 +24,12 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
 )
 
-var (
-	fakeImageSize uint64 = 1
-)
-
 type FakeImageService struct {
 	sync.Mutex
 
-	Called []string
-	Images map[string]*runtimeApi.Image
+	FakeImageSize uint64
+	Called        []string
+	Images        map[string]*runtimeApi.Image
 }
 
 func (r *FakeImageService) SetFakeImages(images []string) {
@@ -41,8 +38,15 @@ func (r *FakeImageService) SetFakeImages(images []string) {
 
 	r.Images = make(map[string]*runtimeApi.Image)
 	for _, image := range images {
-		r.Images[image] = makeFakeImage(image)
+		r.Images[image] = r.makeFakeImage(image)
 	}
+}
+
+func (r *FakeImageService) SetFakeImageSize(size uint64) {
+	r.Lock()
+	defer r.Unlock()
+
+	r.FakeImageSize = size
 }
 
 func NewFakeImageService() *FakeImageService {
@@ -52,10 +56,10 @@ func NewFakeImageService() *FakeImageService {
 	}
 }
 
-func makeFakeImage(image string) *runtimeApi.Image {
+func (r *FakeImageService) makeFakeImage(image string) *runtimeApi.Image {
 	return &runtimeApi.Image{
 		Id:       &image,
-		Size_:    &fakeImageSize,
+		Size_:    &r.FakeImageSize,
 		RepoTags: []string{image},
 	}
 }
@@ -102,7 +106,7 @@ func (r *FakeImageService) PullImage(image *runtimeApi.ImageSpec, auth *runtimeA
 	// image's name for easily making fake images.
 	imageID := image.GetImage()
 	if _, ok := r.Images[imageID]; !ok {
-		r.Images[imageID] = makeFakeImage(image.GetImage())
+		r.Images[imageID] = r.makeFakeImage(image.GetImage())
 	}
 
 	return nil
