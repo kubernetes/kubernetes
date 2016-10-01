@@ -304,14 +304,18 @@ runTests() {
   if [[ -z "${version}" ]]; then
     kube_flags=(
       -s "http://127.0.0.1:${API_PORT}"
-      --match-server-version
     )
+    if [[ -z "${ALLOW_SKEW:-}" ]]; then
+      kube_flags+=("--match-server-version")
+    fi
     [ "$(kubectl get nodes -o go-template='{{ .apiVersion }}' "${kube_flags[@]}")" == "v1" ]
   else
     kube_flags=(
       -s "http://127.0.0.1:${API_PORT}"
-      --match-server-version
     )
+    if [[ -z "${ALLOW_SKEW:-}" ]]; then
+      kube_flags+=("--match-server-version")
+    fi
     [ "$(kubectl get nodes -o go-template='{{ .apiVersion }}' "${kube_flags[@]}")" == "${version}" ]
   fi
   id_field=".metadata.name"
