@@ -68,10 +68,10 @@ func WriteStaticPodManifests(s *kubeadmapi.KubeadmConfig) error {
 			Name:          kubeControllerManager,
 			Image:         images.GetCoreImage(images.KubeControllerManagerImage, s, s.EnvParams["hyperkube_image"]),
 			Command:       getComponentCommand(controllerManager, s),
-			VolumeMounts:  []api.VolumeMount{k8sVolumeMount()},
+			VolumeMounts:  []api.VolumeMount{certsVolumeMount(), k8sVolumeMount()},
 			LivenessProbe: componentProbe(10252, "/healthz"),
 			Resources:     componentResources("200m"),
-		}, k8sVolume(s)),
+		}, certsVolume(s), k8sVolume(s)),
 		kubeScheduler: componentPod(api.Container{
 			Name:          kubeScheduler,
 			Image:         images.GetCoreImage(images.KubeSchedulerImage, s, s.EnvParams["hyperkube_image"]),
