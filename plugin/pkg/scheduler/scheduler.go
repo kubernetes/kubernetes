@@ -16,9 +16,6 @@ limitations under the License.
 
 package scheduler
 
-// Note: if you change code in this file, you might need to change code in
-// contrib/mesos/pkg/scheduler/.
-
 import (
 	"time"
 
