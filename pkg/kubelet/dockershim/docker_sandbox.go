@@ -25,7 +25,9 @@ import (
 	"github.com/golang/glog"
 
 	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
+	"k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 const (
@@ -124,6 +126,9 @@ func (ds *dockerService) PodSandboxStatus(podSandboxID string) (*runtimeApi.PodS
 	}
 
 	labels, annotations := extractLabels(r.Config.Labels)
+	// Delete the container name label for infra container. It is added in dockershim, should
+	// not be exposed to CRI.
+	delete(labels, types.KubernetesContainerNameLabel)
 	return &runtimeApi.PodSandboxStatus{
 		Id:          &r.ID,
 		State:       &state,
@@ -199,6 +204,9 @@ func makeSandboxDockerConfig(c *runtimeApi.PodSandboxConfig, image string) *dock
 	labels := makeLabels(c.GetLabels(), c.GetAnnotations())
 	// Apply a label to distinguish sandboxes from regular containers.
 	labels[containerTypeLabelKey] = containerTypeLabelSandbox
+	// Apply a container name label for infra container. This is used in summary api.
+	// TODO(random-liu): Deprecate this label once container metrics is directly got from CRI.
+	labels[types.KubernetesContainerNameLabel] = dockertools.PodInfraContainerName
 
 	hc := &dockercontainer.HostConfig{}
 	createConfig := &dockertypes.ContainerCreateConfig{

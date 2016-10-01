@@ -23,6 +23,7 @@ import (
 	dockertypes "github.com/docker/engine-api/types"
 
 	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	"k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 // This file contains helper functions to convert docker API types to runtime
@@ -115,6 +116,9 @@ func toRuntimeAPISandbox(c *dockertypes.Container) (*runtimeApi.PodSandbox, erro
 		return nil, err
 	}
 	labels, annotations := extractLabels(c.Labels)
+	// Delete the container name label for infra container. It is added in dockershim, should
+	// not be exposed to CRI.
+	delete(labels, types.KubernetesContainerNameLabel)
 	return &runtimeApi.PodSandbox{
 		Id:          &c.ID,
 		Metadata:    metadata,
