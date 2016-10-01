@@ -113,7 +113,7 @@ func (p *petSyncer) Sync(pet *pcb) error {
 	}
 	if p.blockingPet != nil {
 		message := errUnhealthyPet(fmt.Sprintf("Create of %v in PetSet %v blocked by unhealthy pet %v", pet.pod.Name, pet.parent.Name, p.blockingPet.pod.Name))
-		glog.V(2).Infof(message)
+		glog.V(2).Infof(message.Error())
 		return message
 	}
 	// This is counted as a create, even if it fails. We can't skip indices
