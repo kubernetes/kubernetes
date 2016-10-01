@@ -76,12 +76,10 @@ func GetPreferredDockercfgPath() string {
 
 func DefaultDockercfgPaths() []string {
 	return []string{GetPreferredDockercfgPath(), workingDirPath, homeDirPath, rootDirPath}
-
 }
 
 func DefaultDockerConfigJSONPaths() []string {
 	return []string{GetPreferredDockercfgPath(), workingDirPath, homeJsonDirPath, rootJsonDirPath}
-
 }
 
 // ReadDockercfgFile attempts to read a legacy dockercfg file from the given paths.
