@@ -17,21 +17,33 @@ limitations under the License.
 package fake
 
 import (
-	v1beta1 "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4/typed/authorization/v1beta1"
+	v1alpha1 "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4/typed/rbac/v1alpha1"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 )
 
-type FakeAuthorization struct {
+type FakeRbac struct {
 	*core.Fake
 }
 
-func (c *FakeAuthorization) SubjectAccessReviews() v1beta1.SubjectAccessReviewInterface {
-	return &FakeSubjectAccessReviews{c}
+func (c *FakeRbac) ClusterRoles() v1alpha1.ClusterRoleInterface {
+	return &FakeClusterRoles{c}
+}
+
+func (c *FakeRbac) ClusterRoleBindings() v1alpha1.ClusterRoleBindingInterface {
+	return &FakeClusterRoleBindings{c}
+}
+
+func (c *FakeRbac) Roles(namespace string) v1alpha1.RoleInterface {
+	return &FakeRoles{c, namespace}
+}
+
+func (c *FakeRbac) RoleBindings(namespace string) v1alpha1.RoleBindingInterface {
+	return &FakeRoleBindings{c, namespace}
 }
 
 // GetRESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeAuthorization) GetRESTClient() *restclient.RESTClient {
+func (c *FakeRbac) GetRESTClient() *restclient.RESTClient {
 	return nil
 }

@@ -16,21 +16,25 @@ limitations under the License.
 
 package v1beta1
 
-import (
-	authorizationapi "k8s.io/kubernetes/pkg/apis/authorization/v1beta1"
-)
-
-type LocalSubjectAccessReviewExpansion interface {
-	Create(sar *authorizationapi.LocalSubjectAccessReview) (result *authorizationapi.LocalSubjectAccessReview, err error)
+// TokenReviewsGetter has a method to return a TokenReviewInterface.
+// A group's client should implement this interface.
+type TokenReviewsGetter interface {
+	TokenReviews() TokenReviewInterface
 }
 
-func (c *localSubjectAccessReviews) Create(sar *authorizationapi.LocalSubjectAccessReview) (result *authorizationapi.LocalSubjectAccessReview, err error) {
-	result = &authorizationapi.LocalSubjectAccessReview{}
-	err = c.client.Post().
-		Namespace(c.ns).
-		Resource("localsubjectaccessreviews").
-		Body(sar).
-		Do().
-		Into(result)
-	return
+// TokenReviewInterface has methods to work with TokenReview resources.
+type TokenReviewInterface interface {
+	TokenReviewExpansion
+}
+
+// tokenReviews implements TokenReviewInterface
+type tokenReviews struct {
+	client *AuthenticationClient
+}
+
+// newTokenReviews returns a TokenReviews
+func newTokenReviews(c *AuthenticationClient) *tokenReviews {
+	return &tokenReviews{
+		client: c,
+	}
 }

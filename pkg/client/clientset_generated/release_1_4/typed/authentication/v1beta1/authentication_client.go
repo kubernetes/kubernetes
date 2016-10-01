@@ -23,22 +23,22 @@ import (
 	serializer "k8s.io/kubernetes/pkg/runtime/serializer"
 )
 
-type AuthorizationInterface interface {
+type AuthenticationInterface interface {
 	GetRESTClient() *restclient.RESTClient
-	SubjectAccessReviewsGetter
+	TokenReviewsGetter
 }
 
-// AuthorizationClient is used to interact with features provided by the Authorization group.
-type AuthorizationClient struct {
+// AuthenticationClient is used to interact with features provided by the Authentication group.
+type AuthenticationClient struct {
 	*restclient.RESTClient
 }
 
-func (c *AuthorizationClient) SubjectAccessReviews() SubjectAccessReviewInterface {
-	return newSubjectAccessReviews(c)
+func (c *AuthenticationClient) TokenReviews() TokenReviewInterface {
+	return newTokenReviews(c)
 }
 
-// NewForConfig creates a new AuthorizationClient for the given config.
-func NewForConfig(c *restclient.Config) (*AuthorizationClient, error) {
+// NewForConfig creates a new AuthenticationClient for the given config.
+func NewForConfig(c *restclient.Config) (*AuthenticationClient, error) {
 	config := *c
 	if err := setConfigDefaults(&config); err != nil {
 		return nil, err
@@ -47,12 +47,12 @@ func NewForConfig(c *restclient.Config) (*AuthorizationClient, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &AuthorizationClient{client}, nil
+	return &AuthenticationClient{client}, nil
 }
 
-// NewForConfigOrDie creates a new AuthorizationClient for the given config and
+// NewForConfigOrDie creates a new AuthenticationClient for the given config and
 // panics if there is an error in the config.
-func NewForConfigOrDie(c *restclient.Config) *AuthorizationClient {
+func NewForConfigOrDie(c *restclient.Config) *AuthenticationClient {
 	client, err := NewForConfig(c)
 	if err != nil {
 		panic(err)
@@ -60,14 +60,14 @@ func NewForConfigOrDie(c *restclient.Config) *AuthorizationClient {
 	return client
 }
 
-// New creates a new AuthorizationClient for the given RESTClient.
-func New(c *restclient.RESTClient) *AuthorizationClient {
-	return &AuthorizationClient{c}
+// New creates a new AuthenticationClient for the given RESTClient.
+func New(c *restclient.RESTClient) *AuthenticationClient {
+	return &AuthenticationClient{c}
 }
 
 func setConfigDefaults(config *restclient.Config) error {
-	// if authorization group is not registered, return an error
-	g, err := registered.Group("authorization.k8s.io")
+	// if authentication group is not registered, return an error
+	g, err := registered.Group("authentication.k8s.io")
 	if err != nil {
 		return err
 	}
@@ -88,7 +88,7 @@ func setConfigDefaults(config *restclient.Config) error {
 
 // GetRESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *AuthorizationClient) GetRESTClient() *restclient.RESTClient {
+func (c *AuthenticationClient) GetRESTClient() *restclient.RESTClient {
 	if c == nil {
 		return nil
 	}

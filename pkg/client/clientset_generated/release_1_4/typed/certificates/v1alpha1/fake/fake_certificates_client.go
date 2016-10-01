@@ -17,21 +17,21 @@ limitations under the License.
 package fake
 
 import (
-	v1beta1 "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4/typed/authorization/v1beta1"
+	v1alpha1 "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4/typed/certificates/v1alpha1"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 )
 
-type FakeAuthorization struct {
+type FakeCertificates struct {
 	*core.Fake
 }
 
-func (c *FakeAuthorization) SubjectAccessReviews() v1beta1.SubjectAccessReviewInterface {
-	return &FakeSubjectAccessReviews{c}
+func (c *FakeCertificates) CertificateSigningRequests() v1alpha1.CertificateSigningRequestInterface {
+	return &FakeCertificateSigningRequests{c}
 }
 
 // GetRESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeAuthorization) GetRESTClient() *restclient.RESTClient {
+func (c *FakeCertificates) GetRESTClient() *restclient.RESTClient {
 	return nil
 }
