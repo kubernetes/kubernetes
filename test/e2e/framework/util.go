@@ -507,8 +507,8 @@ func logPodStates(pods []api.Pod) {
 }
 
 // errorBadPodsStates create error message of basic info of bad pods for debugging.
-func errorBadPodsStates(badPods []api.Pod, desiredPods int, ns string, timeout time.Duration) string {
-	errStr := fmt.Sprintf("%d / %d pods in namespace %q are NOT in the desired state in %v\n", len(badPods), desiredPods, ns, timeout)
+func errorBadPodsStates(badPods []api.Pod, desiredPods int, ns, desiredState string, timeout time.Duration) string {
+	errStr := fmt.Sprintf("%d / %d pods in namespace %q are NOT in %s state in %v\n", len(badPods), desiredPods, ns, desiredState, timeout)
 	// Pirnt bad pods info only if there are fewer than 10 bad pods
 	if len(badPods) > 10 {
 		return errStr + "There are too many bad pods. Please check log for details."
@@ -580,7 +580,7 @@ func hasReplicationControllersForPod(rcs *api.ReplicationControllerList, pod api
 // pods have been created.
 func WaitForPodsSuccess(c *client.Client, ns string, successPodLabels map[string]string, timeout time.Duration) error {
 	successPodSelector := labels.SelectorFromSet(successPodLabels)
-	start, badPods := time.Now(), []api.Pod{}
+	start, badPods, desiredPods := time.Now(), []api.Pod{}, 0
 
 	if wait.PollImmediate(30*time.Second, timeout, func() (bool, error) {
 		podList, err := c.Pods(ns).List(api.ListOptions{LabelSelector: successPodSelector})
@@ -593,6 +593,7 @@ func WaitForPodsSuccess(c *client.Client, ns string, successPodLabels map[string
 			return true, nil
 		}
 		badPods = []api.Pod{}
+		desiredPods = len(podList.Items)
 		for _, pod := range podList.Items {
 			if pod.Status.Phase != api.PodSucceeded {
 				badPods = append(badPods, pod)
@@ -608,7 +609,8 @@ func WaitForPodsSuccess(c *client.Client, ns string, successPodLabels map[string
 	}) != nil {
 		logPodStates(badPods)
 		LogPodsWithLabels(c, ns, successPodLabels)
-		return fmt.Errorf("Not all pods in namespace %q are successful within %v", ns, timeout)
+		return errors.New(errorBadPodsStates(badPods, desiredPods, ns, "SUCCESS", timeout))
+
 	}
 	return nil
 }
@@ -695,7 +697,7 @@ func WaitForPodsRunningReady(c *client.Client, ns string, minPods int32, timeout
 		logPodStates(badPods)
 		return false, nil
 	}) != nil {
-		return errors.New(errorBadPodsStates(badPods, desiredPods, ns, timeout))
+		return errors.New(errorBadPodsStates(badPods, desiredPods, ns, "RUNNING and READY", timeout))
 	}
 	wg.Wait()
 	if waitForSuccessError != nil {
