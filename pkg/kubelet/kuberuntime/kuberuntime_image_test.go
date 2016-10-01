@@ -78,3 +78,18 @@ func TestRemoveImage(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 0, len(fakeImageService.Images))
 }
+
+func TestImageStats(t *testing.T) {
+	_, fakeImageService, fakeManager, err := createTestRuntimeManager()
+	assert.NoError(t, err)
+
+	const imageSize = 64
+	fakeImageService.SetFakeImageSize(imageSize)
+	images := []string{"1111", "2222", "3333"}
+	fakeImageService.SetFakeImages(images)
+
+	actualStats, err := fakeManager.ImageStats()
+	assert.NoError(t, err)
+	expectedStats := &kubecontainer.ImageStats{TotalStorageBytes: imageSize * uint64(len(images))}
+	assert.Equal(t, expectedStats, actualStats)
+}
