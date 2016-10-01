@@ -71,7 +71,7 @@ should not prevent future work to allow out-of-tree provisioners.
 
 ## Design
 
-This design represents the minimally viable changes required to provision based on storage classe configuration.  Additional incremental features may be added as a separte effort.
+This design represents the minimally viable changes required to provision based on storage class configuration.  Additional incremental features may be added as a separate effort.
 
 We propose that:
 
@@ -99,7 +99,7 @@ We propose that:
 6.  The existing provisioner plugin implementations be modified to accept
     parameters as specified via `StorageClass`.
 
-7.  The persistent volume controller modified to invoke provisioners using `StorageClass` configuration and bind claims with `PersistentVolumeClaim.Spec.Class` to volumes with equivilant `PersistentVolume.Spec.Class`
+7.  The persistent volume controller modified to invoke provisioners using `StorageClass` configuration and bind claims with `PersistentVolumeClaim.Spec.Class` to volumes with equivalent `PersistentVolume.Spec.Class`
 
 8.  The existing alpha dynamic provisioning feature be phased out in the
     next release.
