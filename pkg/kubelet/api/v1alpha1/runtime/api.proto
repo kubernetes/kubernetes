@@ -3,7 +3,7 @@ syntax = 'proto2';
 
 package runtime;
 
-// Runtime service defines the public APIs for remote container runtimes
+// RuntimeService defines the public APIs for remote container runtimes
 service RuntimeService {
     // Version returns the runtime name, runtime version and runtime API version
     rpc Version(VersionRequest) returns (VersionResponse) {}
@@ -42,7 +42,7 @@ service RuntimeService {
     rpc Exec(stream ExecRequest) returns (stream ExecResponse) {}
 }
 
-// Image service defines the public APIs for managing images
+// ImageService defines the public APIs for managing images
 service ImageService {
     // ListImages lists existing images.
     rpc ListImages(ListImagesRequest) returns (ListImagesResponse) {}
@@ -103,7 +103,7 @@ message PortMapping {
     optional string host_ip = 5;
 }
 
-// Mount specifies the volume mount for the sandbox
+// Mount specifies a volume mount for a container.
 message Mount {
     // The name of the volume mount.
     optional string name = 1;
