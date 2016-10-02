@@ -2881,10 +2881,12 @@ message ServiceSpec {
   // +k8s:conversion-gen=false
   repeated string deprecatedPublicIPs = 6;
 
-  // Supports "ClientIP" and "None". Used to maintain session affinity.
-  // Enable client IP based session affinity.
-  // Must be ClientIP or None.
-  // Defaults to None.
+  // Optional, used to select endpoints and maintain session affinity.
+  // Supports "ClientIP" (sticky sessions, where traffic from the same client
+  // IP tends to go consistently to the same pod), "AlphaRequireNodeLocal"
+  // (traffic goes to a pod running on the same node or, if absent, the
+  // service will be host-unreachable. Makes most sense with `Type:
+  // ClusterIP`.) and "None" (pick a random pod). Defaults to None.
   // More info: http://releases.k8s.io/HEAD/docs/user-guide/services.md#virtual-ips-and-service-proxies
   optional string sessionAffinity = 7;
 

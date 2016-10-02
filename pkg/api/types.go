@@ -1801,6 +1801,10 @@ const (
 
 	// ServiceAffinityNone - no session affinity.
 	ServiceAffinityNone ServiceAffinity = "None"
+
+	// ServiceAffinityRequireNodeLocal - only talk to a pod on the same node,
+	// typically managed by a Daemonset.
+	ServiceAffinityRequireNodeLocal ServiceAffinity = "AlphaRequireNodeLocal"
 )
 
 // Service Type string describes ingress methods for a service
@@ -1908,7 +1912,12 @@ type ServiceSpec struct {
 	// This field will be ignored if the cloud-provider does not support the feature.
 	LoadBalancerIP string `json:"loadBalancerIP,omitempty"`
 
-	// Optional: Supports "ClientIP" and "None".  Used to maintain session affinity.
+	// Optional, used to select endpoints and maintain session affinity.
+	// Supports "ClientIP" (sticky sessions, where traffic from the same client
+	// IP tends to go consistently to the same pod), "AlphaRequireNodeLocal"
+	// (traffic goes to a pod running on the same node or, if absent, the
+	// service will be host-unreachable. Makes most sense with `Type:
+	// ClusterIP`.) and "None" (pick a random pod). Defaults to None.
 	SessionAffinity ServiceAffinity `json:"sessionAffinity,omitempty"`
 
 	// Optional: If specified and supported by the platform, this will restrict traffic through the cloud-provider

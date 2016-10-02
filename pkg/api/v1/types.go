@@ -2110,6 +2110,10 @@ const (
 
 	// ServiceAffinityNone - no session affinity.
 	ServiceAffinityNone ServiceAffinity = "None"
+
+	// ServiceAffinityRequireNodeLocal - only talk to a pod on the same node,
+	// typically managed by a Daemonset.
+	ServiceAffinityRequireNodeLocal ServiceAffinity = "AlphaRequireNodeLocal"
 )
 
 // Service Type string describes ingress methods for a service
@@ -2219,10 +2223,12 @@ type ServiceSpec struct {
 	// +k8s:conversion-gen=false
 	DeprecatedPublicIPs []string `json:"deprecatedPublicIPs,omitempty" protobuf:"bytes,6,rep,name=deprecatedPublicIPs"`
 
-	// Supports "ClientIP" and "None". Used to maintain session affinity.
-	// Enable client IP based session affinity.
-	// Must be ClientIP or None.
-	// Defaults to None.
+	// Optional, used to select endpoints and maintain session affinity.
+	// Supports "ClientIP" (sticky sessions, where traffic from the same client
+	// IP tends to go consistently to the same pod), "AlphaRequireNodeLocal"
+	// (traffic goes to a pod running on the same node or, if absent, the
+	// service will be host-unreachable. Makes most sense with `Type:
+	// ClusterIP`.) and "None" (pick a random pod). Defaults to None.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/services.md#virtual-ips-and-service-proxies
 	SessionAffinity ServiceAffinity `json:"sessionAffinity,omitempty" protobuf:"bytes,7,opt,name=sessionAffinity,casttype=ServiceAffinity"`
 
