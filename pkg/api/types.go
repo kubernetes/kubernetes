@@ -1648,7 +1648,7 @@ type PodStatus struct {
 	// The list has one entry per init container in the manifest. The most recent successful
 	// init container will have ready = true, the most recently started container will have
 	// startTime set.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-statuses
+	// More info: http://kubernetes.io/docs/user-guide/pod-states#container-statuses
 	InitContainerStatuses []ContainerStatus `json:"-"`
 	// The list has one entry per container in the manifest. Each entry is
 	// currently the output of `docker inspect`. This output format is *not*
@@ -1867,7 +1867,7 @@ type ServiceSpec struct {
 	// "LoadBalancer" builds on NodePort and creates an
 	// external load-balancer (if supported in the current cloud) which routes
 	// to the clusterIP.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/services.md#overview
+	// More info: http://kubernetes.io/docs/user-guide/services#overview
 	Type ServiceType `json:"type,omitempty"`
 
 	// Required: The list of ports that are exposed by this service.
@@ -1878,7 +1878,7 @@ type ServiceSpec struct {
 	// external process managing its endpoints, which Kubernetes will not
 	// modify. Only applies to types ClusterIP, NodePort, and LoadBalancer.
 	// Ignored if type is ExternalName.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/services.md#overview
+	// More info: http://kubernetes.io/docs/user-guide/services#overview
 	Selector map[string]string `json:"selector"`
 
 	// ClusterIP is the IP address of the service and is usually assigned
@@ -1889,7 +1889,7 @@ type ServiceSpec struct {
 	// can be specified for headless services when proxying is not required.
 	// Only applies to types ClusterIP, NodePort, and LoadBalancer. Ignored if
 	// type is ExternalName.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/services.md#virtual-ips-and-service-proxies
+	// More info: http://kubernetes.io/docs/user-guide/services#virtual-ips-and-service-proxies
 	ClusterIP string `json:"clusterIP,omitempty"`
 
 	// ExternalName is the external reference that kubedns or equivalent will
@@ -2537,10 +2537,10 @@ type OwnerReference struct {
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
 	Kind string `json:"kind"`
 	// Name of the referent.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#names
+	// More info: http://kubernetes.io/docs/user-guide/identifiers#names
 	Name string `json:"name"`
 	// UID of the referent.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#uids
+	// More info: http://kubernetes.io/docs/user-guide/identifiers#uids
 	UID types.UID `json:"uid"`
 	// If true, this reference points to the managing controller.
 	Controller *bool `json:"controller,omitempty"`

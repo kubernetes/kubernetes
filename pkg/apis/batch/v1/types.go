@@ -57,7 +57,7 @@ type JobSpec struct {
 	// run at any given time. The actual number of pods running in steady state will
 	// be less than this number when ((.spec.completions - .status.successful) < .spec.parallelism),
 	// i.e. when the work left to do is less than max parallelism.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/jobs.md
+	// More info: http://kubernetes.io/docs/user-guide/jobs
 	Parallelism *int32 `json:"parallelism,omitempty" protobuf:"varint,1,opt,name=parallelism"`
 
 	// Completions specifies the desired number of successfully finished pods the
@@ -65,7 +65,7 @@ type JobSpec struct {
 	// pod signals the success of all pods, and allows parallelism to have any positive
 	// value.  Setting to 1 means that parallelism is limited to 1 and the success of that
 	// pod signals the success of the job.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/jobs.md
+	// More info: http://kubernetes.io/docs/user-guide/jobs
 	Completions *int32 `json:"completions,omitempty" protobuf:"varint,2,opt,name=completions"`
 
 	// Optional duration in seconds relative to the startTime that the job may be active
@@ -74,7 +74,7 @@ type JobSpec struct {
 
 	// Selector is a label query over pods that should match the pod count.
 	// Normally, the system sets this field for you.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors
+	// More info: http://kubernetes.io/docs/user-guide/labels#label-selectors
 	Selector *LabelSelector `json:"selector,omitempty" protobuf:"bytes,4,opt,name=selector"`
 
 	// ManualSelector controls generation of pod labels and pod selectors.
@@ -91,7 +91,7 @@ type JobSpec struct {
 
 	// Template is the object that describes the pod that will be created when
 	// executing a job.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/jobs.md
+	// More info: http://kubernetes.io/docs/user-guide/jobs
 	Template v1.PodTemplateSpec `json:"template" protobuf:"bytes,6,opt,name=template"`
 }
 
@@ -99,7 +99,7 @@ type JobSpec struct {
 type JobStatus struct {
 
 	// Conditions represent the latest available observations of an object's current state.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/jobs.md
+	// More info: http://kubernetes.io/docs/user-guide/jobs
 	Conditions []JobCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
 
 	// StartTime represents time when the job was acknowledged by the Job Manager.

@@ -821,7 +821,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 cluster.  If you want to expose this service to the external internet, you may
 need to set up firewall rules for the service port(s) (%s) to serve traffic.
 
-See http://releases.k8s.io/HEAD/docs/user-guide/services-firewalls.md for more details.
+See http://kubernetes.io/docs/user-guide/services-firewalls for more details.
 `,
 						makePortsString(obj.Spec.Ports, true))
 					out.Write([]byte(msg))
@@ -833,7 +833,7 @@ See http://releases.k8s.io/HEAD/docs/user-guide/services-firewalls.md for more d
 It has been promoted to field [loadBalancerSourceRanges] in service spec. This annotation will be deprecated in the future.
 Please use the loadBalancerSourceRanges field instead.
 
-See http://releases.k8s.io/HEAD/docs/user-guide/services-firewalls.md for more details.
+See http://kubernetes.io/docs/user-guide/services-firewalls for more details.
 `)
 					out.Write([]byte(msg))
 				}
