@@ -33,13 +33,6 @@ cmd/libs/go2idl/parser
 cmd/libs/go2idl/set-gen
 cmd/libs/go2idl/set-gen/generators
 cmd/linkcheck
-contrib/mesos/cmd/k8sm-controller-manager
-contrib/mesos/cmd/k8sm-executor
-contrib/mesos/cmd/k8sm-scheduler
-contrib/mesos/pkg/executor/config
-contrib/mesos/pkg/flagutil
-contrib/mesos/pkg/scheduler/components/algorithm
-contrib/mesos/pkg/scheduler/service
 docs/user-guide/environment-guide/containers/backend
 docs/user-guide/environment-guide/containers/show
 docs/user-guide/liveness/image
