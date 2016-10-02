@@ -300,14 +300,18 @@ func cleanupServiceShardsAndProviderResources(namespace string, service *v1.Serv
 				// Get failed with an error, try again.
 				framework.Logf("Failed to find service %q in namespace %q, in cluster %q: %v. Trying again in %s", service.Name, namespace, name, err, framework.Poll)
 				return false, nil
+			} else if errors.IsNotFound(err) {
+				cSvc = nil
+				By(fmt.Sprintf("Service %q in namespace %q in cluster %q not found", service.Name, namespace, name))
+				return true, err
 			}
 			By(fmt.Sprintf("Service %q in namespace %q in cluster %q found", service.Name, namespace, name))
-			return true, nil
+			return true, err
 		})
 
 		if err != nil || cSvc == nil {
 			By(fmt.Sprintf("Failed to find service %q in namespace %q, in cluster %q in %s", service.Name, namespace, name, FederatedServiceTimeout))
-			return
+			continue
 		}
 
 		err = cleanupServiceShard(c.Clientset, name, namespace, cSvc, FederatedServiceTimeout)
