@@ -376,12 +376,6 @@ func NewMainKubelet(
 		klet.flannelHelper = NewFlannelHelper()
 		glog.Infof("Flannel is in charge of podCIDR and overlay networking.")
 	}
-	if klet.nodeIP != nil {
-		if err := klet.validateNodeIP(); err != nil {
-			return nil, err
-		}
-		glog.Infof("Using node IP: %q", klet.nodeIP.String())
-	}
 
 	if mode, err := effectiveHairpinMode(componentconfig.HairpinMode(hairpinMode), containerRuntime, configureCBR0, networkPluginName); err != nil {
 		// This is a non-recoverable error. Returning it up the callstack will just
@@ -2968,6 +2962,14 @@ func (kl *Kubelet) syncNetworkStatus() {
 
 // Set addresses for the node.
 func (kl *Kubelet) setNodeAddress(node *api.Node) error {
+
+	if kl.nodeIP != nil {
+		if err := kl.validateNodeIP(); err != nil {
+			return err
+		}
+		glog.Infof("Using node IP: %q", kl.nodeIP.String())
+	}
+
 	// Set addresses for the node.
 	if kl.cloud != nil {
 		instances, ok := kl.cloud.Instances()
@@ -2983,15 +2985,10 @@ func (kl *Kubelet) setNodeAddress(node *api.Node) error {
 		}
 
 		if kl.nodeIP != nil {
-			for _, nodeAddress := range nodeAddresses {
-				if nodeAddress.Address == kl.nodeIP.String() {
-					node.Status.Addresses = []api.NodeAddress{
-						{Type: nodeAddress.Type, Address: nodeAddress.Address},
-					}
-					return nil
-				}
+			node.Status.Addresses = []api.NodeAddress{
+				{Type: api.NodeInternalIP, Address: kl.nodeIP.String()},
 			}
-			return fmt.Errorf("failed to get node address from cloud provider that matches ip: %v", kl.nodeIP)
+			return nil
 		}
 
 		node.Status.Addresses = nodeAddresses
