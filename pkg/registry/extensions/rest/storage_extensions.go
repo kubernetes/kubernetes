@@ -27,7 +27,6 @@ import (
 	extensionsapiv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	horizontalpodautoscaleretcd "k8s.io/kubernetes/pkg/registry/autoscaling/horizontalpodautoscaler/etcd"
-	jobetcd "k8s.io/kubernetes/pkg/registry/batch/job/etcd"
 	expcontrolleretcd "k8s.io/kubernetes/pkg/registry/extensions/controller/etcd"
 	daemonetcd "k8s.io/kubernetes/pkg/registry/extensions/daemonset/etcd"
 	deploymentetcd "k8s.io/kubernetes/pkg/registry/extensions/deployment/etcd"
@@ -98,11 +97,6 @@ func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource genericapise
 		storage["deployments/status"] = deploymentStorage.Status
 		storage["deployments/rollback"] = deploymentStorage.Rollback
 		storage["deployments/scale"] = deploymentStorage.Scale
-	}
-	if apiResourceConfigSource.ResourceEnabled(version.WithResource("jobs")) {
-		jobsStorage, jobsStatusStorage := jobetcd.NewREST(restOptionsGetter(extensions.Resource("jobs")))
-		storage["jobs"] = jobsStorage
-		storage["jobs/status"] = jobsStatusStorage
 	}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("ingresses")) {
 		ingressStorage, ingressStatusStorage := ingressetcd.NewREST(restOptionsGetter(extensions.Resource("ingresses")))

@@ -29,7 +29,6 @@ type ExtensionsInterface interface {
 	ScaleNamespacer
 	DaemonSetsNamespacer
 	DeploymentsNamespacer
-	JobsNamespacer
 	IngressNamespacer
 	NetworkPolicyNamespacer
 	ThirdPartyResourceNamespacer
@@ -58,10 +57,6 @@ func (c *ExtensionsClient) DaemonSets(namespace string) DaemonSetInterface {
 
 func (c *ExtensionsClient) Deployments(namespace string) DeploymentInterface {
 	return newDeployments(c, namespace)
-}
-
-func (c *ExtensionsClient) Jobs(namespace string) JobInterface {
-	return newJobs(c, namespace)
 }
 
 func (c *ExtensionsClient) Ingress(namespace string) IngressInterface {

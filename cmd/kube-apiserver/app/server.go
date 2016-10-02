@@ -158,7 +158,6 @@ func Run(s *options.APIServer) error {
 	if err != nil {
 		glog.Fatalf("error in initializing storage factory: %s", err)
 	}
-	storageFactory.AddCohabitatingResources(batch.Resource("jobs"), extensions.Resource("jobs"))
 	storageFactory.AddCohabitatingResources(autoscaling.Resource("horizontalpodautoscalers"), extensions.Resource("horizontalpodautoscalers"))
 	for _, override := range s.EtcdServersOverrides {
 		tokens := strings.Split(override, "#")

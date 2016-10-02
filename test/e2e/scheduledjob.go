@@ -335,3 +335,9 @@ func filterActiveJobs(jobs *batch.JobList) (active []*batch.Job) {
 	}
 	return
 }
+
+func newBool(val bool) *bool {
+	p := new(bool)
+	*p = val
+	return p
+}

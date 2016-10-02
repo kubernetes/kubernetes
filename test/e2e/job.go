@@ -37,7 +37,7 @@ const (
 	jobTimeout = 15 * time.Minute
 
 	// Job selector name
-	jobSelectorKey = "job"
+	jobSelectorKey = "job-name"
 )
 
 var _ = framework.KubeDescribe("Job", func() {
@@ -216,12 +216,11 @@ func newTestJob(behavior, name string, rPol api.RestartPolicy, parallelism, comp
 			Name: name,
 		},
 		Spec: batch.JobSpec{
-			Parallelism:    &parallelism,
-			Completions:    &completions,
-			ManualSelector: newBool(true),
+			Parallelism: &parallelism,
+			Completions: &completions,
 			Template: api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
-					Labels: map[string]string{jobSelectorKey: name},
+					Labels: map[string]string{"somekey": "somevalue"},
 				},
 				Spec: api.PodSpec{
 					RestartPolicy: rPol,
@@ -273,19 +272,19 @@ func newTestJob(behavior, name string, rPol api.RestartPolicy, parallelism, comp
 }
 
 func getJob(c *client.Client, ns, name string) (*batch.Job, error) {
-	return c.Extensions().Jobs(ns).Get(name)
+	return c.Batch().Jobs(ns).Get(name)
 }
 
 func createJob(c *client.Client, ns string, job *batch.Job) (*batch.Job, error) {
-	return c.Extensions().Jobs(ns).Create(job)
+	return c.Batch().Jobs(ns).Create(job)
 }
 
 func updateJob(c *client.Client, ns string, job *batch.Job) (*batch.Job, error) {
-	return c.Extensions().Jobs(ns).Update(job)
+	return c.Batch().Jobs(ns).Update(job)
 }
 
 func deleteJob(c *client.Client, ns, name string) error {
-	return c.Extensions().Jobs(ns).Delete(name, nil)
+	return c.Batch().Jobs(ns).Delete(name, api.NewDeleteOptions(0))
 }
 
 // Wait for all pods to become Running.  Only use when pods will run for a long time, or it will be racy.
@@ -310,7 +309,7 @@ func waitForAllPodsRunning(c *client.Client, ns, jobName string, parallelism int
 // Wait for job to reach completions.
 func waitForJobFinish(c *client.Client, ns, jobName string, completions int32) error {
 	return wait.Poll(framework.Poll, jobTimeout, func() (bool, error) {
-		curr, err := c.Extensions().Jobs(ns).Get(jobName)
+		curr, err := c.Batch().Jobs(ns).Get(jobName)
 		if err != nil {
 			return false, err
 		}
@@ -321,7 +320,7 @@ func waitForJobFinish(c *client.Client, ns, jobName string, completions int32) e
 // Wait for job fail.
 func waitForJobFail(c *client.Client, ns, jobName string, timeout time.Duration) error {
 	return wait.Poll(framework.Poll, timeout, func() (bool, error) {
-		curr, err := c.Extensions().Jobs(ns).Get(jobName)
+		curr, err := c.Batch().Jobs(ns).Get(jobName)
 		if err != nil {
 			return false, err
 		}
@@ -332,10 +331,4 @@ func waitForJobFail(c *client.Client, ns, jobName string, timeout time.Duration)
 		}
 		return false, nil
 	})
-}
-
-func newBool(val bool) *bool {
-	p := new(bool)
-	*p = val
-	return p
 }
