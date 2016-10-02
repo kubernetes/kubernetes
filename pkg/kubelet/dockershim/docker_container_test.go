@@ -73,13 +73,14 @@ func TestListContainers(t *testing.T) {
 		// Prepend to the expected list because ListContainers returns
 		// the most recent containers first.
 		expected = append([]*runtimeApi.Container{{
-			Metadata:    configs[i].Metadata,
-			Id:          &id,
-			State:       &state,
-			Image:       configs[i].Image,
-			ImageRef:    &imageRef,
-			Labels:      configs[i].Labels,
-			Annotations: configs[i].Annotations,
+			Metadata:     configs[i].Metadata,
+			Id:           &id,
+			PodSandboxId: &sandboxID,
+			State:        &state,
+			Image:        configs[i].Image,
+			ImageRef:     &imageRef,
+			Labels:       configs[i].Labels,
+			Annotations:  configs[i].Annotations,
 		}}, expected...)
 	}
 	containers, err := ds.ListContainers(nil)
