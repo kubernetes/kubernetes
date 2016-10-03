@@ -341,9 +341,9 @@ type Image struct {
 	// ID of the image.
 	ID string
 	// Other names by which this image is known.
-	RepoTags []string
+	Names []string
 	// Digests by which this image is known.
-	RepoDigests []string
+	Digests []string
 	// The size of the image in bytes.
 	Size int64
 }

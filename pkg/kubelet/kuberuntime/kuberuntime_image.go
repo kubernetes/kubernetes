@@ -105,10 +105,10 @@ func (m *kubeGenericRuntimeManager) ListImages() ([]kubecontainer.Image, error) 
 
 	for _, img := range allImages {
 		images = append(images, kubecontainer.Image{
-			ID:          img.GetId(),
-			Size:        int64(img.GetSize_()),
-			RepoTags:    img.RepoTags,
-			RepoDigests: img.RepoDigests,
+			ID:      img.GetId(),
+			Size:    int64(img.GetSize_()),
+			Names:   img.Names,
+			Digests: img.Digests,
 		})
 	}
 

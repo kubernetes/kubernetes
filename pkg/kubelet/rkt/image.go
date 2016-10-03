@@ -103,9 +103,10 @@ func (r *Runtime) ListImages() ([]kubecontainer.Image, error) {
 	images := make([]kubecontainer.Image, len(listResp.Images))
 	for i, image := range listResp.Images {
 		images[i] = kubecontainer.Image{
-			ID:       image.Id,
-			RepoTags: []string{buildImageName(image)},
-			Size:     image.Size,
+			ID:      image.Id,
+			Names:   []string{buildImageName(image)},
+			Digests: []string{image.Id},
+			Size:    image.Size,
 		}
 	}
 	return images, nil
