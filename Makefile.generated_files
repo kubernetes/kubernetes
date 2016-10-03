@@ -216,6 +216,10 @@ DEEPCOPY_FILES := $(addsuffix /$(DEEPCOPY_FILENAME), $(DEEPCOPY_DIRS))
 # in a single run of the tool.
 .PHONY: gen_deepcopy
 gen_deepcopy: $(DEEPCOPY_FILES)
+	$(MAKE) -f $(firstword $(MAKEFILE_LIST)) run_gen_deepcopy
+
+.PHONY: run_gen_deepcopy
+run_gen_deepcopy: $(DEEPCOPY_GEN)
 	if [[ -f $(META_DIR)/$(DEEPCOPY_GEN).todo ]]; then                  \
 	    ./hack/run-in-gopath.sh $(DEEPCOPY_GEN)                         \
 	        --v $(KUBE_VERBOSE)                                         \
@@ -227,8 +231,8 @@ gen_deepcopy: $(DEEPCOPY_FILES)
 	fi
 
 .PHONY: verify_gen_deepcopy
-verify_gen_deepcopy: DEEPCOPY_EXTRA_FLAGS = --verify-only
-verify_gen_deepcopy: gen_deepcopy
+verify_gen_deepcopy:
+	$(MAKE) -f $(firstword $(MAKEFILE_LIST)) run_gen_deepcopy DEEPCOPY_EXTRA_FLAGS=--verify-only
 
 # For each dir in DEEPCOPY_DIRS, this establishes a dependency between the
 # output file and the input files that should trigger a rebuild.
@@ -326,8 +330,8 @@ OPENAPI_OUTFILE := $(OPENAPI_OUTPUT_PKG)/$(OPENAPI_FILENAME)
 gen_openapi: $(OPENAPI_OUTFILE)
 
 .PHONY: verify_gen_openapi
-verify_gen_openapi: OPENAPI_EXTRA_FLAGS = --verify-only
-verify_gen_openapi: gen_openapi
+verify_gen_openapi:
+	$(MAKE) -f $(firstword $(MAKEFILE_LIST)) run_gen_openapi OPENAPI_EXTRA_FLAGS=--verify-only
 
 # For each dir in OPENAPI_DIRS, this establishes a dependency between the
 # output file and the input files that should trigger a rebuild.
@@ -348,6 +352,10 @@ $(foreach dir, $(OPENAPI_DIRS), $(eval                                     \
 
 # How to regenerate open-api code.  This emits a single file for all results.
 $(OPENAPI_OUTFILE): $(OPENAPI_GEN)
+	$(MAKE) -f $(firstword $(MAKEFILE_LIST)) run_gen_openapi
+
+.PHONY: run_gen_openapi
+run_gen_openapi: $(OPENAPI_GEN)
 	./hack/run-in-gopath.sh $(OPENAPI_GEN)                                          \
 	    --v $(KUBE_VERBOSE)                                                         \
 	    --logtostderr                                                               \
@@ -437,6 +445,10 @@ CONVERSION_FILES := $(addsuffix /$(CONVERSION_FILENAME), $(CONVERSION_DIRS))
 # in a single run of the tool.
 .PHONY: gen_conversion
 gen_conversion: $(CONVERSION_FILES)
+	$(MAKE) -f $(firstword $(MAKEFILE_LIST)) run_gen_conversion
+
+.PHONY: run_gen_conversion
+run_gen_conversion: $(CONVERSION_GEN)
 	if [[ -f $(META_DIR)/$(CONVERSION_GEN).todo ]]; then                  \
 	    ./hack/run-in-gopath.sh $(CONVERSION_GEN)                         \
 	        --v $(KUBE_VERBOSE)                                           \
@@ -447,8 +459,8 @@ gen_conversion: $(CONVERSION_FILES)
 	fi
 
 .PHONY: verify_gen_conversion
-verify_gen_conversion: CONVERSION_EXTRA_FLAGS = --verify-only
-verify_gen_conversion: gen_conversion
+verify_gen_conversion:
+	$(MAKE) -f $(firstword $(MAKEFILE_LIST)) run_gen_conversion CONVERSION_EXTRA_FLAGS=--verify-only
 
 
 # Establish a dependency between the deps file and the dir.  Whenever a dir
