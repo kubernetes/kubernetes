@@ -31,13 +31,13 @@ const (
 )
 
 func init() {
-	dnsprovider.RegisterDnsProvider(ProviderName, func(config io.Reader) (dnsprovider.Interface, error) {
-		return newRoute53(config)
+	dnsprovider.RegisterDnsProvider(ProviderName, func(config io.Reader, zoneName string) (dnsprovider.Interface, error) {
+		return newRoute53(config, zoneName)
 	})
 }
 
 // newRoute53 creates a new instance of an AWS Route53 DNS Interface.
-func newRoute53(config io.Reader) (*Interface, error) {
+func newRoute53(config io.Reader, zoneName string) (*Interface, error) {
 	// Connect to AWS Route53 - TODO: Do more sophisticated auth
 	svc := route53.New(session.New())
 	return newInterfaceWithStub(svc), nil

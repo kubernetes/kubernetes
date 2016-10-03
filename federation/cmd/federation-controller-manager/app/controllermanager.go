@@ -143,7 +143,7 @@ func StartControllers(s *options.CMServer, restClientCfg *restclient.Config) err
 	ccClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, "cluster-controller"))
 	glog.Infof("Running cluster controller")
 	go clustercontroller.NewclusterController(ccClientset, s.ClusterMonitorPeriod.Duration).Run()
-	dns, err := dnsprovider.InitDnsProvider(s.DnsProvider, s.DnsConfigFile)
+	dns, err := dnsprovider.InitDnsProvider(s.DnsProvider, s.ZoneName, s.DnsConfigFile)
 	if err != nil {
 		glog.Fatalf("Cloud provider could not be initialized: %v", err)
 	}

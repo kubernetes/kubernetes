@@ -29,7 +29,7 @@ import (
 // The config parameter provides an io.Reader handler to the factory in
 // order to load specific configurations. If no configuration is provided
 // the parameter is nil.
-type Factory func(config io.Reader) (Interface, error)
+type Factory func(config io.Reader, zoneName string) (Interface, error)
 
 // All registered dns providers.
 var providersMutex sync.Mutex
@@ -52,14 +52,14 @@ func RegisterDnsProvider(name string, cloud Factory) {
 // was known but failed to initialize. The config parameter specifies the
 // io.Reader handler of the configuration file for the DNS provider, or nil
 // for no configuation.
-func GetDnsProvider(name string, config io.Reader) (Interface, error) {
+func GetDnsProvider(name string, zoneName string, config io.Reader) (Interface, error) {
 	providersMutex.Lock()
 	defer providersMutex.Unlock()
 	f, found := providers[name]
 	if !found {
 		return nil, nil
 	}
-	return f(config)
+	return f(config, zoneName)
 }
 
 // Returns a list of registered dns providers.
@@ -74,7 +74,7 @@ func RegisteredDnsProviders() []string {
 }
 
 // InitDnsProvider creates an instance of the named DNS provider.
-func InitDnsProvider(name string, configFilePath string) (Interface, error) {
+func InitDnsProvider(name string, zoneName string, configFilePath string) (Interface, error) {
 	var dns Interface
 	var err error
 
@@ -91,11 +91,11 @@ func InitDnsProvider(name string, configFilePath string) (Interface, error) {
 		}
 
 		defer config.Close()
-		dns, err = GetDnsProvider(name, config)
+		dns, err = GetDnsProvider(name, zoneName, config)
 	} else {
 		// Pass explicit nil so plugins can actually check for nil. See
 		// "Why is my nil error value not equal to nil?" in golang.org/doc/faq.
-		dns, err = GetDnsProvider(name, nil)
+		dns, err = GetDnsProvider(name, zoneName, nil)
 	}
 
 	if err != nil {

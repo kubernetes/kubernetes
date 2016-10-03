@@ -39,8 +39,8 @@ const (
 )
 
 func init() {
-	dnsprovider.RegisterDnsProvider(ProviderName, func(config io.Reader) (dnsprovider.Interface, error) {
-		return newCloudDns(config)
+	dnsprovider.RegisterDnsProvider(ProviderName, func(config io.Reader, zoneName string) (dnsprovider.Interface, error) {
+		return newCloudDns(config, zoneName)
 	})
 }
 
@@ -53,7 +53,7 @@ type Config struct {
 }
 
 // newCloudDns creates a new instance of a Google Cloud DNS Interface.
-func newCloudDns(config io.Reader) (*Interface, error) {
+func newCloudDns(config io.Reader, zoneName string) (*Interface, error) {
 	projectID, _ := metadata.ProjectID() // On error we get an empty string, which is fine for now.
 	var tokenSource oauth2.TokenSource
 	// Possibly override defaults with config below
