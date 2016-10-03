@@ -45,6 +45,7 @@ We need to make changes in the API, the API Server, and the garbage collector to
 
 ## API changes
 
+**DeleteOptions**
 ```go
 DeleteOptions {
   …
@@ -56,17 +57,32 @@ DeleteOptions {
 }
 ```
 
+**OwnerReference**
+```go
+OwnerReference {
+    ...
+    // Should the owner be deleted from the key-value store after this object is deleted during synchronous garbage collection.
+    // If the user creates the OwnerReference has delete permission of the owner, BlockSynchronousGC defaults to true; otherwise the field defaults to false, also 422 will be returned if the field is set to false.
+    BlockSynchronousGC *bool
+}
+```
+
+The object will be garbage collected disregard for the value of `BlockSynchronousGC`, but if `BlockSynchronousGC` is false, then during a synchronous GC, the owner object can be deleted before this object is deleted. If the user who creates the ownerReference does not have the delete permission of the owner object, then he should not be able to affect the synchronous deletion of the owner, so this field must be set to false (forced by the API server).
+
+**Standard Finalizers**
 We will introduce a new standard finalizer: const GCFinalizer string = “CollectingGarbage”
 
 ## Components changes
 
 ### API Server
 
-Delete() function needs to check the `DeleteOptions.SynchronousGarbageCollection`.
+`Delete()` function needs to check the `DeleteOptions.SynchronousGarbageCollection`.
 
 * The request is rejected with 400 if both `DeleteOptions.SynchronousGarbageCollection` and `DeleteOptions.OrphanDependents` are true.
 * If `DeleteOptions.SynchronousGarbageCollection` is explicitly set to true and `DeleteOptions.OrphanDependents` is nil, the API server will default `DeleteOptions.OrphanDependents` to false, regardless of the [default orphaning policy](https://github.com/kubernetes/kubernetes/blob/release-1.4/pkg/registry/generic/registry/store.go#L500) of the resource.
 * If the option is set, the API server will update the object instead of deleting it, add the finalizer, and set the `ObjectMeta.DeletionTimestamp`.
+
+`validation.ValidateObjectMeta()` function needs to validate `OwnerReference.BlockSynchronousGC`. It needs to query the `Authorizer` to check if the user has delete permission of the owner object.
 
 ### Garbage Collector
 
@@ -88,7 +104,7 @@ Currently `processItem()` consumes the `dirtyQueue`, requests the API server to 
 In addition, if an object popped from `dirtyQueue` is marked as "GC in progress", `processItem()` treats it specially:
 
 * To avoid racing with another controller, it requeues the object if `observedGeneration < Generation`. This is best-effort, see [unhandled cases](#unhandled-cases).
-* Checks if the object has dependents
+* Checks if the object has dependents with `BlockSynchronousGC==true`
   * If not, send a PUT request to remove the `GCFinalizer`;
   * If so, then add all dependents to the `dirtryQueue`; we need bookkeeping to avoid adding the dependents repeatedly if the owner gets in the `synchronousGC queue` multiple times.
 
