@@ -293,8 +293,6 @@ func TestCreateCleanWithPrefix(t *testing.T) {
 		{"anything", "anything"},
 	}
 
-	// WARNING: EnvVarCluster.Server is set during package loading time and can not be overridden by os.Setenv inside this test
-	EnvVarCluster.Server = ""
 	tt = append(tt, struct{ server, host string }{"", "http://localhost:8080"})
 
 	for _, tc := range tt {
@@ -305,7 +303,7 @@ func TestCreateCleanWithPrefix(t *testing.T) {
 		config.Clusters["clean"] = cleanConfig
 
 		clientBuilder := NewNonInteractiveClientConfig(*config, "clean", &ConfigOverrides{
-			ClusterDefaults: DefaultCluster,
+			ClusterDefaults: clientcmdapi.Cluster{Server: "http://localhost:8080"},
 		}, nil)
 
 		clientConfig, err := clientBuilder.ClientConfig()
@@ -334,7 +332,7 @@ func TestCreateCleanDefault(t *testing.T) {
 func TestCreateCleanDefaultCluster(t *testing.T) {
 	config := createValidTestConfig()
 	clientBuilder := NewDefaultClientConfig(*config, &ConfigOverrides{
-		ClusterDefaults: DefaultCluster,
+		ClusterDefaults: clientcmdapi.Cluster{Server: "http://localhost:8080"},
 	})
 
 	clientConfig, err := clientBuilder.ClientConfig()
@@ -361,7 +359,7 @@ func TestCreateMissingContext(t *testing.T) {
 	const expectedErrorContains = "Context was not found for specified context"
 	config := createValidTestConfig()
 	clientBuilder := NewNonInteractiveClientConfig(*config, "not-present", &ConfigOverrides{
-		ClusterDefaults: DefaultCluster,
+		ClusterDefaults: clientcmdapi.Cluster{Server: "http://localhost:8080"},
 	}, nil)
 
 	clientConfig, err := clientBuilder.ClientConfig()

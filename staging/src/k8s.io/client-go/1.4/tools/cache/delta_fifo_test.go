@@ -336,6 +336,29 @@ func TestDeltaFIFO_ReplaceMakesDeletions(t *testing.T) {
 	}
 }
 
+func TestDeltaFIFO_UpdateResyncRace(t *testing.T) {
+	f := NewDeltaFIFO(
+		testFifoObjectKeyFunc,
+		nil,
+		keyLookupFunc(func() []testFifoObject {
+			return []testFifoObject{mkFifoObj("foo", 5)}
+		}),
+	)
+	f.Update(mkFifoObj("foo", 6))
+	f.Resync()
+
+	expectedList := []Deltas{
+		{{Updated, mkFifoObj("foo", 6)}},
+	}
+
+	for _, expected := range expectedList {
+		cur := Pop(f).(Deltas)
+		if e, a := expected, cur; !reflect.DeepEqual(e, a) {
+			t.Errorf("Expected %#v, got %#v", e, a)
+		}
+	}
+}
+
 func TestDeltaFIFO_detectLineJumpers(t *testing.T) {
 	f := NewDeltaFIFO(testFifoObjectKeyFunc, nil, nil)
 

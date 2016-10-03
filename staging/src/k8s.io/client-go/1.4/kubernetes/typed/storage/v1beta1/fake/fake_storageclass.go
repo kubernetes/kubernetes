@@ -19,7 +19,7 @@ package fake
 import (
 	api "k8s.io/client-go/1.4/pkg/api"
 	unversioned "k8s.io/client-go/1.4/pkg/api/unversioned"
-	v1beta1 "k8s.io/client-go/1.4/pkg/apis/extensions/v1beta1"
+	v1beta1 "k8s.io/client-go/1.4/pkg/apis/storage/v1beta1"
 	labels "k8s.io/client-go/1.4/pkg/labels"
 	watch "k8s.io/client-go/1.4/pkg/watch"
 	testing "k8s.io/client-go/1.4/testing"
@@ -27,10 +27,10 @@ import (
 
 // FakeStorageClasses implements StorageClassInterface
 type FakeStorageClasses struct {
-	Fake *FakeExtensions
+	Fake *FakeStorage
 }
 
-var storageclassesResource = unversioned.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "storageclasses"}
+var storageclassesResource = unversioned.GroupVersionResource{Group: "storage.k8s.io", Version: "v1beta1", Resource: "storageclasses"}
 
 func (c *FakeStorageClasses) Create(storageClass *v1beta1.StorageClass) (result *v1beta1.StorageClass, err error) {
 	obj, err := c.Fake.
