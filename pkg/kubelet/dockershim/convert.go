@@ -56,14 +56,16 @@ func toRuntimeAPIContainer(c *dockertypes.Container) (*runtimeApi.Container, err
 		return nil, err
 	}
 	labels, annotations := extractLabels(c.Labels)
+	sandboxID := c.Labels[sandboxIDLabelKey]
 	return &runtimeApi.Container{
-		Id:          &c.ID,
-		Metadata:    metadata,
-		Image:       &runtimeApi.ImageSpec{Image: &c.Image},
-		ImageRef:    &c.ImageID,
-		State:       &state,
-		Labels:      labels,
-		Annotations: annotations,
+		Id:           &c.ID,
+		PodSandboxId: &sandboxID,
+		Metadata:     metadata,
+		Image:        &runtimeApi.ImageSpec{Image: &c.Image},
+		ImageRef:     &c.ImageID,
+		State:        &state,
+		Labels:       labels,
+		Annotations:  annotations,
 	}, nil
 }
 
