@@ -218,7 +218,7 @@ func udevadmChangeToNewDrives(sdBeforeSet sets.String) error {
 }
 
 // Calls "udevadm trigger --action=change" on the specified drive.
-// drivePath must be the the block device path to trigger on, in the format "/dev/sd*", or a symlink to it.
+// drivePath must be the block device path to trigger on, in the format "/dev/sd*", or a symlink to it.
 // This is workaround for Issue #7972. Once the underlying issue has been resolved, this may be removed.
 func udevadmChangeToDrive(drivePath string) error {
 	glog.V(5).Infof("udevadmChangeToDrive: drive=%q", drivePath)

@@ -67,7 +67,7 @@ func getFakeDeviceName(host volume.VolumeHost, pdName string) string {
 }
 
 // Real Cinder AttachDisk attaches a cinder volume. If it is not yet mounted,
-// it mounts it it to globalPDPath.
+// it mounts it to globalPDPath.
 // We create a dummy directory (="device") and bind-mount it to globalPDPath
 func (fake *fakePDManager) AttachDisk(b *cinderVolumeMounter, globalPDPath string) error {
 	globalPath := makeGlobalPDName(b.plugin.host, b.pdName)
