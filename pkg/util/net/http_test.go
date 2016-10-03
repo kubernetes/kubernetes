@@ -48,6 +48,8 @@ func TestCloneTLSConfig(t *testing.T) {
 		"ClientAuth",
 		"ClientCAs",
 		"ClientSessionCache",
+		"DynamicRecordSizingDisabled",
+		"Renegotiation",
 
 		// These fields are not copied
 		"SessionTicketsDisabled",
