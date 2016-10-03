@@ -14,14 +14,29 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package app
+package coredns
 
-// This file exists to force the desired plugin implementations to be linked.
-// This should probably be part of some configuration fed into the build for a
-// given binary target.
 import (
-	// DNS providers
-	_ "k8s.io/kubernetes/federation/pkg/dnsprovider/providers/aws/route53"
-	_ "k8s.io/kubernetes/federation/pkg/dnsprovider/providers/coredns"
-	_ "k8s.io/kubernetes/federation/pkg/dnsprovider/providers/google/clouddns"
+	"k8s.io/kubernetes/federation/pkg/dnsprovider"
 )
+
+// Compile time check for interface adherence
+var _ dnsprovider.Zone = Zone{}
+
+type Zone struct {
+	domain string
+	id     string
+	zones  *Zones
+}
+
+func (zone Zone) Name() string {
+	return zone.domain
+}
+
+func (zone Zone) ID() string {
+	return zone.id
+}
+
+func (zone Zone) ResourceRecordSets() (dnsprovider.ResourceRecordSets, bool) {
+	return &ResourceRecordSets{zone: &zone}, true
+}
