@@ -20,10 +20,12 @@ import (
 	"fmt"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/securitycontextconstraints/capabilities"
 	"k8s.io/kubernetes/pkg/securitycontextconstraints/group"
 	"k8s.io/kubernetes/pkg/securitycontextconstraints/seccomp"
 	"k8s.io/kubernetes/pkg/securitycontextconstraints/selinux"
+	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/sysctl"
 	"k8s.io/kubernetes/pkg/securitycontextconstraints/user"
 	sccutil "k8s.io/kubernetes/pkg/securitycontextconstraints/util"
 	"k8s.io/kubernetes/pkg/util/validation/field"
@@ -45,6 +47,7 @@ type simpleProvider struct {
 	supplementalGroupStrategy group.GroupSecurityContextConstraintsStrategy
 	capabilitiesStrategy      capabilities.CapabilitiesSecurityContextConstraintsStrategy
 	seccompStrategy           seccomp.SeccompStrategy
+	sysctlsStrategy           sysctl.SysctlsStrategy
 }
 
 // ensure we implement the interface correctly.
@@ -86,6 +89,19 @@ func NewSimpleProvider(scc *api.SecurityContextConstraints) (SecurityContextCons
 		return nil, err
 	}
 
+	var unsafeSysctls []string
+	if ann, found := scc.Annotations[extensions.SysctlsPodSecurityPolicyAnnotationKey]; found {
+		var err error
+		unsafeSysctls, err = extensions.SysctlsFromPodSecurityPolicyAnnotation(ann)
+		if err != nil {
+			return nil, err
+		}
+	}
+	sysctlsStrat, err := createSysctlsStrategy(unsafeSysctls)
+	if err != nil {
+		return nil, err
+	}
+
 	return &simpleProvider{
 		scc:                       scc,
 		runAsUserStrategy:         userStrat,
@@ -94,6 +110,7 @@ func NewSimpleProvider(scc *api.SecurityContextConstraints) (SecurityContextCons
 		supplementalGroupStrategy: supGroupStrat,
 		capabilitiesStrategy:      capStrat,
 		seccompStrategy:           seccompStrat,
+		sysctlsStrategy:           sysctlsStrat,
 	}, nil
 }
 
@@ -264,6 +281,8 @@ func (s *simpleProvider) ValidatePodSecurityContext(pod *api.Pod, fldPath *field
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("hostIPC"), pod.Spec.SecurityContext.HostIPC, "Host IPC is not allowed to be used"))
 	}
 
+	allErrs = append(allErrs, s.sysctlsStrategy.Validate(pod)...)
+
 	return allErrs
 }
 
@@ -417,4 +436,9 @@ func createCapabilitiesStrategy(defaultAddCaps, requiredDropCaps, allowedCaps []
 // createSeccompStrategy creates a new seccomp strategy
 func createSeccompStrategy(allowedProfiles []string) (seccomp.SeccompStrategy, error) {
 	return seccomp.NewWithSeccompProfile(allowedProfiles)
+}
+
+// createSysctlsStrategy creates a new unsafe sysctls strategy.
+func createSysctlsStrategy(sysctlsPatterns []string) (sysctl.SysctlsStrategy, error) {
+	return sysctl.NewMustMatchPatterns(sysctlsPatterns)
 }
