@@ -36,7 +36,6 @@ import (
 	resourcequotacontroller "k8s.io/kubernetes/pkg/controller/resourcequota"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/master"
 	quotainstall "k8s.io/kubernetes/pkg/quota/install"
 	"k8s.io/kubernetes/pkg/watch"
 	"k8s.io/kubernetes/plugin/pkg/admission/resourcequota"
@@ -55,14 +54,14 @@ func init() {
 // 	quota_test.go:100: Took 4.196205966s to scale up without quota
 // 	quota_test.go:115: Took 12.021640372s to scale up with quota
 func TestQuota(t *testing.T) {
-	initializationCh := make(chan struct{})
 	// Set up a master
-	var m *master.Master
+	h := &framework.MasterHolder{Initialized: make(chan struct{})}
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		<-initializationCh
-		m.Handler.ServeHTTP(w, req)
+		<-h.Initialized
+		h.M.Handler.ServeHTTP(w, req)
 	}))
 	defer s.Close()
+
 	admissionCh := make(chan struct{})
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{QPS: -1, Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 	admission, err := resourcequota.NewResourceQuota(clientset, quotainstall.NewRegistry(clientset), 5, admissionCh)
@@ -73,11 +72,7 @@ func TestQuota(t *testing.T) {
 
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	masterConfig.GenericConfig.AdmissionControl = admission
-	m, err = masterConfig.Complete().New()
-	if err != nil {
-		t.Fatalf("Error in bringing up the master: %v", err)
-	}
-	close(initializationCh)
+	framework.RunAMasterUsingServer(masterConfig, s, h)
 
 	ns := framework.CreateTestingNamespace("quotaed", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
