@@ -30,7 +30,7 @@ import (
 
 func generateTokenIfNeeded(s *kubeadmapi.KubeadmConfig) error {
 	ok, err := kubeadmutil.UseGivenTokenIfValid(s)
-	// TODO(phase1+) @krousey: I know it won't happen with the way it is currently implemented, but this doesn't handle case where ok is true and err is non-nil.
+	// TODO(phase1+) https://github.com/kubernetes/kubernetes/issues/33911
 	if !ok {
 		if err != nil {
 			return err
@@ -56,7 +56,7 @@ func CreateTokenAuthFile(s *kubeadmapi.KubeadmConfig) error {
 		return fmt.Errorf("<master/tokens> failed to create directory %q [%v]", s.EnvParams["host_pki_path"], err)
 	}
 	serialized := []byte(fmt.Sprintf("%s,kubeadm-node-csr,%s,system:kubelet-bootstrap\n", s.Secrets.BearerToken, uuid.NewUUID()))
-	// DumpReaderToFile create a file with mode 0600
+	// DumpReaderToFile will create a file with mode 0600
 	if err := cmdutil.DumpReaderToFile(bytes.NewReader(serialized), tokenAuthFilePath); err != nil {
 		return fmt.Errorf("<master/tokens> failed to save token auth file (%q) [%v]", tokenAuthFilePath, err)
 	}

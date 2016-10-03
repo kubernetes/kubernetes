@@ -44,6 +44,7 @@ var (
 // NewCmdJoin returns "kubeadm join" command.
 func NewCmdJoin(out io.Writer, s *kubeadmapi.KubeadmConfig) *cobra.Command {
 	cmd := &cobra.Command{
+		// TODO(phase1+) https://github.com/kubernetes/kubernetes/issues/33920
 		Use:   "join",
 		Short: "Run this on any machine you wish to join an existing cluster.",
 		Run: func(cmd *cobra.Command, args []string) {
@@ -62,12 +63,11 @@ func NewCmdJoin(out io.Writer, s *kubeadmapi.KubeadmConfig) *cobra.Command {
 
 // RunJoin executes worked node provisioning and tries to join an existing cluster.
 func RunJoin(out io.Writer, cmd *cobra.Command, args []string, s *kubeadmapi.KubeadmConfig) error {
-	// TODO(phase1+) this we are missing args from the help text, there should be a way to tell cobra about it
 	if len(args) == 0 {
 		return fmt.Errorf("<cmd/join> must specify master IP address (see --help)")
 	}
 	for _, i := range args {
-		addr := net.ParseIP(i) // TODO(phase1+) should allow resolvable names too
+		addr := net.ParseIP(i) // TODO(phase1+) https://github.com/kubernetes/kubernetes/issues/33919
 		if addr == nil {
 			return fmt.Errorf("<cmd/join> failed to parse argument (%q) as an IP address", i)
 		}

@@ -30,6 +30,8 @@ const (
 	TokenBytes = 8
 )
 
+// TODO(phase1+) https://github.com/kubernetes/kubernetes/issues/33911
+
 func RandBytes(length int) ([]byte, string, error) {
 	b := make([]byte, length)
 	_, err := rand.Read(b)
@@ -66,8 +68,7 @@ func UseGivenTokenIfValid(s *kubeadmapi.KubeadmConfig) (bool, error) {
 	}
 	fmt.Println("<util/tokens> validating provided token")
 	givenToken := strings.Split(strings.ToLower(s.Secrets.GivenToken), ".")
-	// TODO(phase1+) print desired format
-	// TODO(phase1+) could also print more specific messages in each case
+	// TODO(phase1+) https://github.com/kubernetes/kubernetes/issues/33930
 	invalidErr := "<util/tokens> provided token is invalid - %s"
 	if len(givenToken) != 2 {
 		return false, fmt.Errorf(invalidErr, "not in 2-part dot-separated format")

@@ -284,7 +284,7 @@ func getComponentCommand(component string, s *kubeadmapi.KubeadmConfig) (command
 			command = append(command, "--cloud-provider="+s.InitFlags.CloudProvider)
 
 			// Only append the --cloud-config option if there's a such file
-			// TODO(phase1+) this won't work unless it's in one of the few directories we bind-mount
+			// TODO(phase1+) https://github.com/kubernetes/kubernetes/issues/33915
 			if _, err := os.Stat(DefaultCloudConfigPath); err == nil {
 				command = append(command, "--cloud-config="+DefaultCloudConfigPath)
 			}
