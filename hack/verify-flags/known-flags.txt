@@ -118,6 +118,7 @@ delete-collection-workers
 delete-instances
 delete-local-data
 delete-namespace
+delete-namespace-on-failure
 deleting-pods-burst
 deleting-pods-qps
 deployment-controller-sync-period
