@@ -62,7 +62,7 @@ runTests() {
   # TODO: Re-enable race detection when we switch to a thread-safe etcd client
   # KUBE_RACE="-race"
   make -C "${KUBE_ROOT}" test \
-      WHAT="$(kube::test::find_integration_test_dirs ${2-} | paste -sd' ' -)" \
+      WHAT="$(kube::test::find_integration_test_dirs ${2-} | paste -sd' ' -) $(echo ${@:3})" \
       KUBE_GOFLAGS="${KUBE_GOFLAGS:-} -short=true -tags 'integration no-docker'" \
       KUBE_TEST_ARGS="${KUBE_TEST_ARGS:-} --vmodule=garbage*collector*=6 --alsologtostderr=true" \
       KUBE_RACE="" \
@@ -90,8 +90,20 @@ if [[ -n "${KUBE_TEST_ARGS}" ]]; then
   runTests v1
 fi
 
+# Pass arguments that begin with "-" and move them to goflags.
+what_flags=()
+for arg in "$@"; do
+  if [[ "${arg}" == -* ]]; then
+    what_flags+=("${arg}")
+  fi
+done
+if [[ "${#what_flags[@]}" -eq 0 ]]; then
+  what_flags=''
+fi
+
+
 # Convert the CSV to an array of API versions to test
 IFS=';' read -a apiVersions <<< "${KUBE_TEST_API_VERSIONS}"
 for apiVersion in "${apiVersions[@]}"; do
-  runTests "${apiVersion}" "${1-}"
+  runTests "${apiVersion}" "${1-}" "${what_flags[@]}"
 done
