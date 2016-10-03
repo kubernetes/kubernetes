@@ -455,6 +455,13 @@ func verifyPDContentsViaContainer(f *framework.Framework, podName, containerName
 		}
 		framework.ExpectNoError(err)
 		framework.Logf("Read file %q with content: %v", filePath, v)
+		if strings.TrimSpace(v) != strings.TrimSpace(expectedContents) {
+			size, err := f.CheckFileSizeViaContainer(podName, containerName, filePath)
+			if err != nil {
+				framework.Logf("Error reading file: %v", err)
+			}
+			framework.Logf("Check file %q size: %q", filePath, size)
+		}
 		Expect(strings.TrimSpace(v)).To(Equal(strings.TrimSpace(expectedContents)))
 	}
 }
