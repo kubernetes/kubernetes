@@ -91,30 +91,26 @@ enum Protocol {
 
 // PortMapping specifies the port mapping configurations of a sandbox.
 message PortMapping {
-    // The name of the port mapping
-    optional string name = 1;
     // The protocol of the port mapping.
-    optional Protocol protocol = 2;
+    optional Protocol protocol = 1;
     // The port number within the container.
-    optional int32 container_port = 3;
+    optional int32 container_port = 2;
     // The port number on the host.
-    optional int32 host_port = 4;
+    optional int32 host_port = 3;
     // The host IP.
-    optional string host_ip = 5;
+    optional string host_ip = 4;
 }
 
 // Mount specifies a host volume to mount into a container.
 message Mount {
-    // The name of the volume mount.
-    optional string name = 1;
     // The path of the mount within the container.
-    optional string container_path = 2;
+    optional string container_path = 1;
     // The path of the mount on the host.
-    optional string host_path = 3;
+    optional string host_path = 2;
     // If set, the mount is read-only.
-    optional bool readonly = 4;
+    optional bool readonly = 3;
     // If set, the mount needs SELinux relabeling
-    optional bool selinux_relabel = 5;
+    optional bool selinux_relabel = 4;
 }
 
 // NamespaceOption provides options for Linux namespaces.

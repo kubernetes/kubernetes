@@ -249,7 +249,6 @@ func makeMounts(opts *kubecontainer.RunContainerOptions, container *api.Containe
 	for idx := range opts.Mounts {
 		v := opts.Mounts[idx]
 		m := &runtimeApi.Mount{
-			Name:          &v.Name,
 			HostPath:      &v.HostPath,
 			ContainerPath: &v.ContainerPath,
 			Readonly:      &v.ReadOnly,
