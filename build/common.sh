@@ -544,15 +544,27 @@ function kube::build::ensure_data_container() {
       --volume "${REMOTE_OUTPUT_ROOT}"   # white-out the whole output dir
       --volume "${REMOTE_OUTPUT_GOPATH}" # make a non-root owned mountpoint
       "${KUBE_BUILD_IMAGE}"
-      chown -R $(id -u).$(id -g) "${REMOTE_OUTPUT_ROOT}"
+      chown -R $(kube::build::docker_user_group_id) "${REMOTE_OUTPUT_ROOT}"
     )
     "${docker_cmd[@]}"
   fi
 }
 
+# Return the "userId:groupId" for the docker user.
+# Either return the pair from the curent platform, or from the vm's
+# platform running in docker-machine
+function kube::build::docker_user_group_id() {
+    if [[ -n "$(which docker-machine)" ]]; then
+        echo "$(docker-machine ssh ${DOCKER_MACHINE_NAME} id -u):$(docker-machine ssh ${DOCKER_MACHINE_NAME} id -g)"
+    else
+        echo "$(id -u):$(id -g)"
+    fi
+}
+
 # Run a command in the kube-build image.  This assumes that the image has
 # already been built.  This will sync out all output data from the build.
 function kube::build::run_build_command() {
+
   kube::log::status "Running build command...."
   [[ $# != 0 ]] || { echo "Invalid input - please specify a command to run." >&2; return 4; }
 
@@ -561,7 +573,7 @@ function kube::build::run_build_command() {
 
   local -a docker_run_opts=(
     "--name=${KUBE_BUILD_CONTAINER_NAME}"
-    "--user=$(id -u):$(id -g)"
+    "--user=$(kube::build::docker_user_group_id)"
     "--hostname=${HOSTNAME}"
     "${DOCKER_MOUNT_ARGS[@]}"
   )
