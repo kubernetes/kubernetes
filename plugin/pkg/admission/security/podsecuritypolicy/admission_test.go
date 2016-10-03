@@ -1106,6 +1106,38 @@ func TestAdmitSysctls(t *testing.T) {
 			psps:       []*extensions.PodSecurityPolicy{emptySysctls},
 			shouldPass: false,
 		},
+		"pod with unsafe sysctls a, b request disallowed under aSysctls SCC": {
+			pod:        podWithSysctls([]string{}, []string{"a", "b"}),
+			psps:       []*extensions.PodSecurityPolicy{aSysctl},
+			shouldPass: false,
+		},
+		"pod with unsafe sysctls b request disallowed under aSysctls SCC": {
+			pod:        podWithSysctls([]string{}, []string{"b"}),
+			psps:       []*extensions.PodSecurityPolicy{aSysctl},
+			shouldPass: false,
+		},
+		"pod with unsafe sysctls a request allowed under aSysctls SCC": {
+			pod:         podWithSysctls([]string{}, []string{"a"}),
+			psps:        []*extensions.PodSecurityPolicy{aSysctl},
+			shouldPass:  true,
+			expectedPSP: aSysctl.Name,
+		},
+		"pod with safe sysctls a, b request disallowed under aSysctls SCC": {
+			pod:        podWithSysctls([]string{"a", "b"}, []string{}),
+			psps:       []*extensions.PodSecurityPolicy{aSysctl},
+			shouldPass: false,
+		},
+		"pod with safe sysctls b request disallowed under aSysctls SCC": {
+			pod:        podWithSysctls([]string{"b"}, []string{}),
+			psps:       []*extensions.PodSecurityPolicy{aSysctl},
+			shouldPass: false,
+		},
+		"pod with safe sysctls a request allowed under aSysctls SCC": {
+			pod:         podWithSysctls([]string{"a"}, []string{}),
+			psps:        []*extensions.PodSecurityPolicy{aSysctl},
+			shouldPass:  true,
+			expectedPSP: aSysctl.Name,
+		},
 		"pod with unsafe sysctls request disallowed under emptySysctls PSP": {
 			pod:        podWithSysctls([]string{}, []string{"a", "b"}),
 			psps:       []*extensions.PodSecurityPolicy{emptySysctls},
@@ -1117,12 +1149,12 @@ func TestAdmitSysctls(t *testing.T) {
 			shouldPass:  true,
 			expectedPSP: mixedSysctls.Name,
 		},
-		"pod with not-matching unsafe sysctls request allowed under mixedSysctls PSP": {
+		"pod with not-matching unsafe sysctls request disallowed under mixedSysctls PSP": {
 			pod:        podWithSysctls([]string{"a.b", "b.c", "c", "d.e.f"}, []string{"e"}),
 			psps:       []*extensions.PodSecurityPolicy{mixedSysctls},
 			shouldPass: false,
 		},
-		"pod with not-matching safe sysctls request allowed under mixedSysctls PSP": {
+		"pod with not-matching safe sysctls request disallowed under mixedSysctls PSP": {
 			pod:        podWithSysctls([]string{"a.b", "b.c", "c", "d.e.f", "e"}, []string{}),
 			psps:       []*extensions.PodSecurityPolicy{mixedSysctls},
 			shouldPass: false,
