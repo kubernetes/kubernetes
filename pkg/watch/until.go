@@ -40,7 +40,7 @@ func Until(timeout time.Duration, watcher Interface, conditions ...ConditionFunc
 		after = time.After(timeout)
 	} else {
 		ch := make(chan time.Time)
-		close(ch)
+		defer close(ch)
 		after = ch
 	}
 	var lastEvent *Event
