@@ -15,7 +15,7 @@ labels:
     color: eb6420
   - name: priority/P2
     color: fbca04
-  - name: 'cla: no'
+  - name: 'cncf-cla: no'
     color: e11d21
   - name: area/networking
     color: 006b75
@@ -123,7 +123,7 @@ labels:
     color: d2b48c
   - name: area/cluster-lifecycle
     color: d4c5f9
-  - name: 'cla: yes'
+  - name: 'cncf-cla: yes'
     color: bfe5bf
   - name: team/test-infra
     color: d2b48c
