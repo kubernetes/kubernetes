@@ -17,6 +17,7 @@ limitations under the License.
 package testutil
 
 import (
+	"fmt"
 	"os"
 	"runtime/pprof"
 	"sync"
@@ -210,4 +211,21 @@ func NewCluster(name string, readyStatus api_v1.ConditionStatus) *federation_api
 			},
 		},
 	}
+}
+
+// Ensure a key is in the store before returning (or timeout w/ error)
+func WaitForStoreUpdate(store util.FederatedReadOnlyStore, clusterName, key string, timeout time.Duration) error {
+	timeoutEnd := time.Now().Add(timeout)
+	retryInterval := 100 * time.Millisecond
+	for time.Now().Before(timeoutEnd) {
+		_, found, err := store.GetByKey(clusterName, key)
+		if err != nil {
+			return err
+		}
+		if found {
+			return nil
+		}
+		<-time.After(retryInterval)
+	}
+	return fmt.Errorf("timeout waiting for key to appear in store")
 }

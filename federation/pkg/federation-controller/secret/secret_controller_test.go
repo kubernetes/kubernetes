@@ -96,6 +96,12 @@ func TestSecretController(t *testing.T) {
 	assert.Equal(t, secret1.Name, createdSecret.Name)
 	assert.True(t, secretsEqual(secret1, *createdSecret))
 
+	// Wait for the secret to appear in the informer store
+	err := WaitForStoreUpdate(
+		secretController.secretFederatedInformer.GetTargetStore(),
+		cluster1.Name, getSecretKey(secret1.Namespace, secret1.Name), 10*time.Second)
+	assert.Nil(t, err, "secret should have appeared in the informer store")
+
 	// Test update federated secret.
 	secret1.Annotations = map[string]string{
 		"A": "B",

@@ -111,6 +111,12 @@ func TestNamespaceController(t *testing.T) {
 	assert.NotNil(t, createdNamespace)
 	assert.Equal(t, ns1.Name, createdNamespace.Name)
 
+	// Wait for the secret to appear in the informer store
+	err := WaitForStoreUpdate(
+		namespaceController.namespaceFederatedInformer.GetTargetStore(),
+		cluster1.Name, ns1.Name, 10*time.Second)
+	assert.Nil(t, err, "namespace should have appeared in the informer store")
+
 	// Test update federated namespace.
 	ns1.Annotations = map[string]string{
 		"A": "B",
