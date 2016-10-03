@@ -142,6 +142,9 @@
         "readOnly": true},
         { "name": "etcpki",
         "mountPath": "/etc/pki",
+        "readOnly": true},
+        { "name": "usrsharecacerts",
+        "mountPath": "/usr/share/ca-certificates",
         "readOnly": true}
       ]
     }
@@ -172,6 +175,10 @@
   { "name": "etcpki",
     "hostPath": {
         "path": "/etc/pki"}
+  },
+  { "name": "usrsharecacerts",
+    "hostPath": {
+        "path": "/usr/share/ca-certificates" }
   }
 ]
 }}
