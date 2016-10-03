@@ -110,9 +110,9 @@ func NewCmdDelete(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().Bool("cascade", true, "If true, cascade the deletion of the resources managed by this resource (e.g. Pods created by a ReplicationController).  Default true.")
 	cmd.Flags().Int("grace-period", -1, "Period of time in seconds given to the resource to terminate gracefully. Ignored if negative.")
 	cmd.Flags().Bool("now", false, "If true, resources are force terminated without graceful deletion (same as --grace-period=0).")
+	cmd.Flags().Duration("timeout", 0, "The length of time to wait before giving up on a delete, zero means determine a timeout from the size of the object")
 	cmdutil.AddOutputFlagsForMutation(cmd)
 	cmdutil.AddInclude3rdPartyFlags(cmd)
-
 	return cmd
 }
 

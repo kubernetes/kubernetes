@@ -74,11 +74,8 @@ var (
 
 var (
 	updatePeriod, _ = time.ParseDuration("1m0s")
-
-	// Max time to wait for a replication controller to update before giving up.
-	// Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
-	defaultTimeout, _ = time.ParseDuration("5m0s")
-	pollInterval, _   = time.ParseDuration("3s")
+	timeout, _      = time.ParseDuration("5m0s")
+	pollInterval, _ = time.ParseDuration("3s")
 )
 
 func NewCmdRollingUpdate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
@@ -98,6 +95,7 @@ func NewCmdRollingUpdate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	}
 	cmd.Flags().Duration("update-period", updatePeriod, `Time to wait between updating pods. Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".`)
 	cmd.Flags().Duration("poll-interval", pollInterval, `Time delay between polling for replication controller status after the update. Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".`)
+	cmd.Flags().Duration("timeout", timeout, `Max time to wait for a replication controller to update before giving up. Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".`)
 	usage := "Filename or URL to file to use to create the new replication controller."
 	kubectl.AddJsonFilenameFlag(cmd, &options.Filenames, usage)
 	cmd.MarkFlagRequired("filename")
@@ -156,12 +154,6 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 		return err
 	}
 
-	// set default rc timeout
-	timeout := cmdutil.GetFlagDuration(cmd, "timeout")
-	if timeout == 0 {
-		timeout = defaultTimeout
-	}
-
 	deploymentKey := cmdutil.GetFlagString(cmd, "deployment-label-key")
 	filename := ""
 	image := cmdutil.GetFlagString(cmd, "image")
@@ -170,6 +162,7 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 	rollback := cmdutil.GetFlagBool(cmd, "rollback")
 	period := cmdutil.GetFlagDuration(cmd, "update-period")
 	interval := cmdutil.GetFlagDuration(cmd, "poll-interval")
+	timeout := cmdutil.GetFlagDuration(cmd, "timeout")
 	dryrun := cmdutil.GetDryRunFlag(cmd)
 	outputFormat := cmdutil.GetFlagString(cmd, "output")
 	container := cmdutil.GetFlagString(cmd, "container")

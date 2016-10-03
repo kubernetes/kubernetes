@@ -18,7 +18,6 @@ package clientcmd
 
 import (
 	"strconv"
-	"time"
 
 	"github.com/spf13/pflag"
 
@@ -34,7 +33,7 @@ type ConfigOverrides struct {
 	ClusterInfo     clientcmdapi.Cluster
 	Context         clientcmdapi.Context
 	CurrentContext  string
-	Timeout         time.Duration
+	Timeout         string
 }
 
 // ConfigOverrideFlags holds the flag names to be used for binding command line flags.  Notice that this structure tightly
@@ -108,20 +107,6 @@ func (f FlagInfo) BindBoolFlag(flags *pflag.FlagSet, target *bool) {
 	}
 }
 
-// BindDurationFlag binds the flag based on the provided info.  If LongName == "", nothing is registered
-func (f FlagInfo) BindDurationFlag(flags *pflag.FlagSet, target *time.Duration) {
-	// you can't register a flag without a long name
-	if len(f.LongName) > 0 {
-		// try to parse Default as a Duration.  If it fails, default to 0s
-		durationVal, err := time.ParseDuration(f.Default)
-		if err != nil {
-			durationVal = 0
-		}
-
-		flags.DurationVarP(target, f.LongName, f.ShortName, durationVal, f.Description)
-	}
-}
-
 const (
 	FlagClusterName  = "cluster"
 	FlagAuthInfoName = "user"
@@ -138,7 +123,7 @@ const (
 	FlagImpersonate  = "as"
 	FlagUsername     = "username"
 	FlagPassword     = "password"
-	FlagTimeout      = "timeout"
+	FlagTimeout      = "request-timeout"
 )
 
 // RecommendedAuthOverrideFlags is a convenience method to return recommended flag names prefixed with a string of your choosing
@@ -171,7 +156,7 @@ func RecommendedConfigOverrideFlags(prefix string) ConfigOverrideFlags {
 		ContextOverrideFlags: RecommendedContextOverrideFlags(prefix),
 
 		CurrentContext: FlagInfo{prefix + FlagContext, "", "", "The name of the kubeconfig context to use"},
-		Timeout:        FlagInfo{prefix + FlagTimeout, "", "", "The length of time to wait before giving up on a single server request. Non-zero values should contain a corresponding time unit (e.g. 1s, 2m, 3h). A value of zero means don't timeout requests."},
+		Timeout:        FlagInfo{prefix + FlagTimeout, "", "0", "The length of time to wait before giving up on a single server request. Non-zero values should contain a corresponding time unit (e.g. 1s, 2m, 3h). A value of zero means don't timeout requests."},
 	}
 }
 
@@ -210,7 +195,7 @@ func BindOverrideFlags(overrides *ConfigOverrides, flags *pflag.FlagSet, flagNam
 	BindClusterFlags(&overrides.ClusterInfo, flags, flagNames.ClusterOverrideFlags)
 	BindContextFlags(&overrides.Context, flags, flagNames.ContextOverrideFlags)
 	flagNames.CurrentContext.BindStringFlag(flags, &overrides.CurrentContext)
-	flagNames.Timeout.BindDurationFlag(flags, &overrides.Timeout)
+	flagNames.Timeout.BindStringFlag(flags, &overrides.Timeout)
 }
 
 // BindFlags is a convenience method to bind the specified flags to their associated variables
