@@ -21,6 +21,9 @@ import (
 	"runtime"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/api"
+	"k8s.io/kubernetes/pkg/kubelet/dockertools"
+
+	dockertypes "github.com/docker/engine-api/types"
 )
 
 const (
@@ -42,6 +45,28 @@ const (
 	dnsmasqVersion     = "1.3"
 	exechealthzVersion = "1.1"
 )
+
+func PrePullImages(s *kubeadmapi.KubeadmConfig, dockerClient dockertools.DockerInterface) error {
+	opts := dockertypes.ImagePullOptions{}
+	images := []string{
+		GetCoreImage(KubeAPIServerImage, s, s.EnvParams["hyperkube_image"]),
+		GetCoreImage(KubeControllerManagerImage, s, s.EnvParams["hyperkube_image"]),
+		GetCoreImage(KubeSchedulerImage, s, s.EnvParams["hyperkube_image"]),
+		s.EnvParams["discovery_image"],
+	}
+	if len(s.InitFlags.API.Etcd.ExternalEndpoints) == 0 {
+		images = append(images, GetCoreImage(KubeEtcdImage, s, s.EnvParams["etcd_image"]))
+	}
+
+	for _, img := range images {
+		fmt.Printf("<images/images> Pulling image: %s\n", img)
+		if err := dockerClient.PullImage(img, dockertypes.AuthConfig{}, opts); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
 
 func GetCoreImage(image string, cfg *kubeadmapi.KubeadmConfig, overrideImage string) string {
 	if overrideImage != "" {
