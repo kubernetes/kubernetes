@@ -611,6 +611,7 @@ func RemoveTaints(obj runtime.Object, taints ...Taint) (bool, error) {
 			newTaints = append(newTaints, oldTaint)
 		}
 	}
+
 	if len(oldTaints) == len(newTaints) {
 		return false, nil
 	}

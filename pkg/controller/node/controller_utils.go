@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/record"
@@ -297,7 +298,7 @@ func terminatePod(kubeClient clientset.Interface, recorder record.EventRecorder,
 }
 
 func addNodeOutageTaint(kubeClient clientset.Interface, node *api.Node) error {
-	taintNodeOutage := api.Taint{Key: "operator", Value: "node-outage", Effect: api.TaintEffectNoExecute}
+	taintNodeOutage := api.Taint{Key: unversioned.TaintNodeOutage, Effect: api.TaintEffectNoExecute}
 	updated, err := api.AddTaints(node, taintNodeOutage)
 	if err != nil {
 		return err
@@ -310,7 +311,7 @@ func addNodeOutageTaint(kubeClient clientset.Interface, node *api.Node) error {
 }
 
 func removeNodeOutageTaint(kubeClient clientset.Interface, node *api.Node) error {
-	taintNodeOutage := api.Taint{Key: "operator", Value: "node-outage", Effect: api.TaintEffectNoExecute}
+	taintNodeOutage := api.Taint{Key: unversioned.TaintNodeOutage, Effect: api.TaintEffectNoExecute}
 	updated, err := api.RemoveTaints(node, taintNodeOutage)
 	if err != nil {
 		return err
