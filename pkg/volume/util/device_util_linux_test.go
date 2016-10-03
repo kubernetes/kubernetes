@@ -128,7 +128,7 @@ func TestFindDeviceForPath(t *testing.T) {
 		t.Fatalf("link is to incorrect dev")
 	}
 
-	_, err = findDeviceForPath("/path/doesnt/exist", &osIOHandler{})
+	_, err = findDeviceForPath("/path/doesn't/exist", &osIOHandler{})
 	if err == nil {
 		t.Fatalf("path shouldn't exist but still doesn't give an error")
 	}
