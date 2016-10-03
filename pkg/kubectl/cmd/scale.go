@@ -82,7 +82,7 @@ func NewCmdScale(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().Int("current-replicas", -1, "Precondition for current size. Requires that the current size of the resource match this value in order to scale.")
 	cmd.Flags().Int("replicas", -1, "The new desired number of replicas. Required.")
 	cmd.MarkFlagRequired("replicas")
-	cmd.Flags().Duration("timeout", 0, "The length of time to wait before giving up on a scale operation, zero means don't wait. Any other values should contain a corresponding time unit (e.g. 1s, 2m, 3h).")
+	cmd.Flags().Duration("scale-timeout", 0, "The length of time to wait before giving up on a scale operation, zero means don't wait. Any other values should contain a corresponding time unit (e.g. 1s, 2m, 3h).")
 	cmdutil.AddOutputFlagsForMutation(cmd)
 	cmdutil.AddRecordFlag(cmd)
 	cmdutil.AddInclude3rdPartyFlags(cmd)
@@ -154,7 +154,7 @@ func RunScale(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 		retry := kubectl.NewRetryParams(kubectl.Interval, kubectl.Timeout)
 
 		var waitForReplicas *kubectl.RetryParams
-		if timeout := cmdutil.GetFlagDuration(cmd, "timeout"); timeout != 0 {
+		if timeout := cmdutil.GetFlagDuration(cmd, "scale-timeout"); timeout != 0 {
 			waitForReplicas = kubectl.NewRetryParams(kubectl.Interval, timeout)
 		}
 
