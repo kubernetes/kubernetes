@@ -666,35 +666,12 @@ func (rsc *ReplicaSetController) syncReplicaSet(key string) error {
 		filteredPods = controller.FilterActivePods(pods)
 	}
 
-	var oldConditions []extensions.ReplicaSetCondition
-	copy(oldConditions, rs.Status.Conditions)
-
+	var manageReplicasErr error
 	if rsNeedsSync && rs.DeletionTimestamp == nil {
 		manageReplicasErr = rsc.manageReplicas(filteredPods, &rs)
 	}
 
 	newStatus := calculateStatus(rs, filteredPods, manageReplicasErr)
-
-	// Count the number of pods that have labels matching the labels of the pod
-	// template of the replicaSet, the matching pods may have more labels than
-	// are in the template. Because the label of podTemplateSpec is a superset
-	// of the selector of the replicaset, so the possible matching pods must be
-	// part of the filteredPods.
-	fullyLabeledReplicasCount := 0
-	readyReplicasCount := 0
-	availableReplicasCount := 0
-	templateLabel := labels.Set(rs.Spec.Template.Labels).AsSelectorPreValidated()
-	for _, pod := range filteredPods {
-		if templateLabel.Matches(labels.Set(pod.Labels)) {
-			fullyLabeledReplicasCount++
-		}
-		if api.IsPodReady(pod) {
-			readyReplicasCount++
-			if api.IsPodAvailable(pod, rs.Spec.MinReadySeconds, unversioned.Now()) {
-				availableReplicasCount++
-			}
-		}
-	}
 
 	// Always updates status as pods come up or die.
 	if err := updateReplicaSetStatus(rsc.kubeClient.Extensions().ReplicaSets(rs.Namespace), rs, newStatus); err != nil {

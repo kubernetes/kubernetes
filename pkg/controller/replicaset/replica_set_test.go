@@ -334,6 +334,7 @@ func TestSyncReplicaSetDormancy(t *testing.T) {
 	fakeHandler := utiltesting.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: "{}",
+		T:            t,
 	}
 	testServer := httptest.NewServer(&fakeHandler)
 	defer testServer.Close()
@@ -388,9 +389,9 @@ func TestSyncReplicaSetDormancy(t *testing.T) {
 	manager.syncReplicaSet(getKey(rsSpec, t))
 	validateSyncReplicaSet(t, &fakePodControl, 1, 0, 0)
 
-	// 1 PUT for the ReplicaSet status during dormancy window.
+	// 2 PUT for the ReplicaSet status during dormancy window.
 	// Note that the pod creates go through pod control so they're not recorded.
-	fakeHandler.ValidateRequestCount(t, 1)
+	fakeHandler.ValidateRequestCount(t, 2)
 }
 
 func TestPodControllerLookup(t *testing.T) {
@@ -658,8 +659,9 @@ func TestControllerUpdateStatusWithFailure(t *testing.T) {
 		return true, &extensions.ReplicaSet{}, fmt.Errorf("Fake error")
 	})
 	fakeRSClient := fakeClient.Extensions().ReplicaSets("default")
-	numReplicas := 10
-	updateReplicaCount(fakeRSClient, *rs, numReplicas, 0, 0, 0)
+	numReplicas := int32(10)
+	newStatus := extensions.ReplicaSetStatus{Replicas: numReplicas}
+	updateReplicaSetStatus(fakeRSClient, *rs, newStatus)
 	updates, gets := 0, 0
 	for _, a := range fakeClient.Actions() {
 		if a.GetResource().Resource != "replicasets" {
@@ -680,7 +682,7 @@ func TestControllerUpdateStatusWithFailure(t *testing.T) {
 			// returned a ReplicaSet with replicas=1.
 			if c, ok := action.GetObject().(*extensions.ReplicaSet); !ok {
 				t.Errorf("Expected a ReplicaSet as the argument to update, got %T", c)
-			} else if int(c.Status.Replicas) != numReplicas {
+			} else if c.Status.Replicas != numReplicas {
 				t.Errorf("Expected update for ReplicaSet to contain replicas %v, got %v instead",
 					numReplicas, c.Status.Replicas)
 			}

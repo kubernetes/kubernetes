@@ -704,9 +704,6 @@ func (rm *ReplicationManager) syncReplicationController(key string) error {
 		filteredPods = controller.FilterActivePods(pods)
 	}
 
-	var oldConditions []api.ReplicationControllerCondition
-	copy(oldConditions, rc.Status.Conditions)
-
 	var manageReplicasErr error
 	if rcNeedsSync && rc.DeletionTimestamp == nil {
 		manageReplicasErr = rm.manageReplicas(filteredPods, &rc)

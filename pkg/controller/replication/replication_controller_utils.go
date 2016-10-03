@@ -132,9 +132,20 @@ func NewReplicationControllerCondition(condType api.ReplicationControllerConditi
 		Type:               condType,
 		Status:             status,
 		LastTransitionTime: unversioned.Now(),
+		LastProbeTime:      unversioned.Now(),
 		Reason:             reason,
 		Message:            msg,
 	}
+}
+
+func GetCondition(status api.ReplicationControllerStatus, condType api.ReplicationControllerConditionType) *api.ReplicationControllerCondition {
+	for i := range status.Conditions {
+		c := status.Conditions[i]
+		if c.Type == condType {
+			return &c
+		}
+	}
+	return nil
 }
 
 func SetCondition(status *api.ReplicationControllerStatus, cond api.ReplicationControllerCondition) {

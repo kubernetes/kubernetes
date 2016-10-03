@@ -133,9 +133,20 @@ func NewReplicaSetCondition(condType extensions.ReplicaSetConditionType, status 
 		Type:               condType,
 		Status:             status,
 		LastTransitionTime: unversioned.Now(),
+		LastProbeTime:      unversioned.Now(),
 		Reason:             reason,
 		Message:            msg,
 	}
+}
+
+func GetCondition(status extensions.ReplicaSetStatus, condType extensions.ReplicaSetConditionType) *extensions.ReplicaSetCondition {
+	for i := range status.Conditions {
+		c := status.Conditions[i]
+		if c.Type == condType {
+			return &c
+		}
+	}
+	return nil
 }
 
 func SetCondition(status *extensions.ReplicaSetStatus, cond extensions.ReplicaSetCondition) {
