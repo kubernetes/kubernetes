@@ -275,7 +275,7 @@ func (ed *emptyDir) setupDir(dir string) error {
 
 	if fileinfo.Mode().Perm() != perm.Perm() {
 		// If the permissions on the created directory are wrong, the
-		// kubelet is probably running with a umask set.  In order to
+		// kubelet is probably running with an umask set.  In order to
 		// avoid clearing the umask for the entire process or locking
 		// the thread, clearing the umask, creating the dir, restoring
 		// the umask, and unlocking the thread, we do a chmod to set

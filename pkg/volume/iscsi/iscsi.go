@@ -241,5 +241,5 @@ func getVolumeSource(spec *volume.Spec) (*api.ISCSIVolumeSource, bool, error) {
 		return spec.PersistentVolume.Spec.ISCSI, spec.ReadOnly, nil
 	}
 
-	return nil, false, fmt.Errorf("Spec does not reference a ISCSI volume type")
+	return nil, false, fmt.Errorf("Spec does not reference an ISCSI volume type")
 }

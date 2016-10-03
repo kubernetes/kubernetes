@@ -240,7 +240,7 @@ func (mounter *quobyteMounter) SetUpAt(dir string, fsGroup *int64) error {
 		options = append(options, "ro")
 	}
 
-	//if a trailling slash is missing we add it here
+	//if a trailing slash is missing we add it here
 	if err := mounter.mounter.Mount(mounter.correctTraillingSlash(mounter.registry), dir, "quobyte", options); err != nil {
 		return fmt.Errorf("quobyte: mount failed: %v", err)
 	}
@@ -390,11 +390,11 @@ func (provisioner *quobyteVolumeProvisioner) Provision() (*api.PersistentVolume,
 	}
 
 	if !validateRegistry(provisioner.registry) {
-		return nil, fmt.Errorf("Quoybte registry missing or malformed: must be a host:port pair or multiple pairs seperated by commas")
+		return nil, fmt.Errorf("Quoybte registry missing or malformed: must be a host:port pair or multiple pairs separated by commas")
 	}
 
 	if len(apiServer) == 0 {
-		return nil, fmt.Errorf("Quoybte API server missing or malformed: must be a http(s)://host:port pair or multiple pairs seperated by commas")
+		return nil, fmt.Errorf("Quoybte API server missing or malformed: must be a http(s)://host:port pair or multiple pairs separated by commas")
 	}
 
 	// create random image name
