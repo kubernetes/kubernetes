@@ -77,8 +77,11 @@ type privilegedGroupAuthorizer struct {
 }
 
 func (r *privilegedGroupAuthorizer) Authorize(attr authorizer.Attributes) (bool, string, error) {
-	for attr_group := range attr.GetUser().GetGroups() {
-		for priv_group := range r.groups {
+	if attr.GetUser() == nil {
+		return false, "Error", errors.New("no user on request.")
+	}
+	for _, attr_group := range attr.GetUser().GetGroups() {
+		for _, priv_group := range r.groups {
 			if priv_group == attr_group {
 				return true, "", nil
 			}
