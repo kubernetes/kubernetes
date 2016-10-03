@@ -666,10 +666,14 @@ func (rsc *ReplicaSetController) syncReplicaSet(key string) error {
 		filteredPods = controller.FilterActivePods(pods)
 	}
 
-	var manageReplicasErr error
+	var oldConditions []extensions.ReplicaSetCondition
+	copy(oldConditions, rs.Status.Conditions)
+
 	if rsNeedsSync && rs.DeletionTimestamp == nil {
 		manageReplicasErr = rsc.manageReplicas(filteredPods, &rs)
 	}
+
+	newStatus := calculateStatus(rs, filteredPods, manageReplicasErr)
 
 	// Count the number of pods that have labels matching the labels of the pod
 	// template of the replicaSet, the matching pods may have more labels than
@@ -693,14 +697,7 @@ func (rsc *ReplicaSetController) syncReplicaSet(key string) error {
 	}
 
 	// Always updates status as pods come up or die.
-	if err := updateReplicaCount(
-		rsc.kubeClient.Extensions().ReplicaSets(rs.Namespace),
-		rs,
-		len(filteredPods),
-		fullyLabeledReplicasCount,
-		readyReplicasCount,
-		availableReplicasCount,
-	); err != nil {
+	if err := updateReplicaSetStatus(rsc.kubeClient.Extensions().ReplicaSets(rs.Namespace), rs, newStatus); err != nil {
 		// Multiple things could lead to this update failing. Requeuing the replica set ensures
 		// Returning an error causes a requeue without forcing a hotloop
 		return err

@@ -30,44 +30,40 @@ import (
 )
 
 // updateReplicationControllerStatus attempts to update the Status.Replicas of the given controller, with a single GET/PUT retry.
-func updateReplicationControllerStatus(
-	rcClient unversionedcore.ReplicationControllerInterface,
-	controller api.ReplicationController,
-	newStatus api.ReplicationControllerStatus,
-) (updateErr error) {
+func updateReplicationControllerStatus(c unversionedcore.ReplicationControllerInterface, rc api.ReplicationController, newStatus api.ReplicationControllerStatus) (updateErr error) {
 	// This is the steady state. It happens when the rc doesn't have any expectations, since
 	// we do a periodic relist every 30s. If the generations differ but the replicas are
 	// the same, a caller might've resized to the same replica count.
-	if controller.Status.Replicas == newStatus.Replicas &&
-		controller.Status.FullyLabeledReplicas == newStatus.FullyLabeledReplicas &&
-		controller.Status.ReadyReplicas == newStatus.ReadyReplicas &&
-		controller.Status.AvailableReplicas == newStatus.AvailableReplicas &&
-		controller.Generation == controller.Status.ObservedGeneration &&
-		reflect.DeepEqual(controller.Status.Conditions, newStatus.Conditions) {
+	if rc.Status.Replicas == newStatus.Replicas &&
+		rc.Status.FullyLabeledReplicas == newStatus.FullyLabeledReplicas &&
+		rc.Status.ReadyReplicas == newStatus.ReadyReplicas &&
+		rc.Status.AvailableReplicas == newStatus.AvailableReplicas &&
+		rc.Generation == rc.Status.ObservedGeneration &&
+		reflect.DeepEqual(rc.Status.Conditions, newStatus.Conditions) {
 		return nil
 	}
 	// Save the generation number we acted on, otherwise we might wrongfully indicate
 	// that we've seen a spec update when we retry.
 	// TODO: This can clobber an update if we allow multiple agents to write to the
 	// same status.
-	newStatus.ObservedGeneration = controller.Generation
+	newStatus.ObservedGeneration = rc.Generation
 
 	var getErr error
-	for i, rc := 0, &controller; ; i++ {
-		glog.V(4).Infof(fmt.Sprintf("Updating replica count for rc: %s/%s, ", controller.Namespace, controller.Name) +
-			fmt.Sprintf("replicas %d->%d (need %d), ", controller.Status.Replicas, newStatus.Replicas, controller.Spec.Replicas) +
-			fmt.Sprintf("fullyLabeledReplicas %d->%d, ", controller.Status.FullyLabeledReplicas, newStatus.FullyLabeledReplicas) +
-			fmt.Sprintf("readyReplicas %d->%d, ", controller.Status.ReadyReplicas, newStatus.ReadyReplicas) +
-			fmt.Sprintf("availableReplicas %d->%d, ", controller.Status.AvailableReplicas, newStatus.AvailableReplicas) +
-			fmt.Sprintf("sequence No: %v->%v", controller.Status.ObservedGeneration, newStatus.ObservedGeneration))
+	for i, rc := 0, &rc; ; i++ {
+		glog.V(4).Infof(fmt.Sprintf("Updating replica count for rc: %s/%s, ", rc.Namespace, rc.Name) +
+			fmt.Sprintf("replicas %d->%d (need %d), ", rc.Status.Replicas, newStatus.Replicas, rc.Spec.Replicas) +
+			fmt.Sprintf("fullyLabeledReplicas %d->%d, ", rc.Status.FullyLabeledReplicas, newStatus.FullyLabeledReplicas) +
+			fmt.Sprintf("readyReplicas %d->%d, ", rc.Status.ReadyReplicas, newStatus.ReadyReplicas) +
+			fmt.Sprintf("availableReplicas %d->%d, ", rc.Status.AvailableReplicas, newStatus.AvailableReplicas) +
+			fmt.Sprintf("sequence No: %v->%v", rc.Status.ObservedGeneration, newStatus.ObservedGeneration))
 
 		rc.Status = newStatus
-		_, updateErr = rcClient.UpdateStatus(rc)
+		_, updateErr = c.UpdateStatus(rc)
 		if updateErr == nil || i >= statusUpdateRetries {
 			return updateErr
 		}
 		// Update the controller with the latest resource version for the next poll
-		if rc, getErr = rcClient.Get(controller.Name); getErr != nil {
+		if rc, getErr = c.Get(rc.Name); getErr != nil {
 			// If the GET fails we can't trust status.Replicas anymore. This error
 			// is bound to be more interesting than the update failure.
 			return getErr
@@ -150,7 +146,7 @@ func RemoveCondition(status *api.ReplicationControllerStatus, condType api.Repli
 	status.Conditions = filterOutCondition(status.Conditions, condType)
 }
 
-// filterOutCondition returns a new slice of deployment conditions without conditions with the provided type.
+// filterOutCondition returns a new slice of replication controller conditions without conditions with the provided type.
 func filterOutCondition(conditions []api.ReplicationControllerCondition, condType api.ReplicationControllerConditionType) []api.ReplicationControllerCondition {
 	var newConditions []api.ReplicationControllerCondition
 	for _, c := range conditions {
