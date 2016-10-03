@@ -460,7 +460,7 @@ func (proxier *Proxier) OnServiceUpdate(allServices []api.Service) {
 				p := apiservice.GetServiceHealthCheckNodePort(service)
 				if p == 0 {
 					glog.Errorf("Service does not contain necessary annotation %v",
-						apiservice.AnnotationHealthCheckNodePort)
+						apiservice.BetaAnnotationHealthCheckNodePort)
 				} else {
 					info.healthCheckNodePort = int(p)
 					// Turn on healthcheck responder to listen on the health check nodePort

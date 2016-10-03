@@ -736,9 +736,7 @@ func (gce *GCECloud) EnsureLoadBalancer(clusterName string, apiService *api.Serv
 			// This logic exists to detect a transition for a pre-existing service and turn on
 			// the tpNeedsUpdate flag to delete/recreate fwdrule/tpool adding the health check
 			// to the target pool.
-			glog.V(2).Infof("Annotation %s=%s added to new or pre-existing service",
-				apiservice.AnnotationExternalTraffic,
-				apiservice.AnnotationValueExternalTrafficLocal)
+			glog.V(2).Infof("Annotation external-traffic=OnlyLocal added to new or pre-existing service")
 			tpNeedsUpdate = true
 		}
 		hcToCreate, err = gce.ensureHttpHealthCheck(loadBalancerName, path, healthCheckNodePort)
