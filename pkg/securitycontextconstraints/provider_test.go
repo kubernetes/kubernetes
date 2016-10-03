@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	sccutil "k8s.io/kubernetes/pkg/securitycontextconstraints/util"
 	"k8s.io/kubernetes/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/util/validation/field"
@@ -220,6 +221,18 @@ func TestValidatePodSecurityContextFailures(t *testing.T) {
 	failInvalidSeccompProfileSCC := defaultSCC()
 	failInvalidSeccompProfileSCC.SeccompProfiles = []string{"foo"}
 
+	failOtherSysctlsAllowedSCC := defaultSCC()
+	failOtherSysctlsAllowedSCC.Annotations[extensions.SysctlsPodSecurityPolicyAnnotationKey] = "bar,abc"
+
+	failNoSysctlAllowedSCC := defaultSCC()
+	failNoSysctlAllowedSCC.Annotations[extensions.SysctlsPodSecurityPolicyAnnotationKey] = ""
+
+	failSafeSysctlFooPod := defaultPod()
+	failSafeSysctlFooPod.Annotations[api.SysctlsPodAnnotationKey] = "foo=1"
+
+	failUnsafeSysctlFooPod := defaultPod()
+	failUnsafeSysctlFooPod.Annotations[api.UnsafeSysctlsPodAnnotationKey] = "foo=1"
+
 	errorCases := map[string]struct {
 		pod           *api.Pod
 		scc           *api.SecurityContextConstraints
@@ -279,6 +292,26 @@ func TestValidatePodSecurityContextFailures(t *testing.T) {
 			pod:           failInvalidSeccompProfile,
 			scc:           failInvalidSeccompProfileSCC,
 			expectedError: "bar is not a valid seccomp profile",
+		},
+		"failSafeSysctlFooPod with failNoSysctlAllowedSCC": {
+			pod:           failSafeSysctlFooPod,
+			scc:           failNoSysctlAllowedSCC,
+			expectedError: "sysctls are not allowed",
+		},
+		"failUnsafeSysctlFooPod with failNoSysctlAllowedSCC": {
+			pod:           failUnsafeSysctlFooPod,
+			scc:           failNoSysctlAllowedSCC,
+			expectedError: "sysctls are not allowed",
+		},
+		"failSafeSysctlFooPod with failOtherSysctlsAllowedSCC": {
+			pod:           failSafeSysctlFooPod,
+			scc:           failOtherSysctlsAllowedSCC,
+			expectedError: "sysctl \"foo\" is not allowed",
+		},
+		"failUnsafeSysctlFooPod with failOtherSysctlsAllowedSCC": {
+			pod:           failUnsafeSysctlFooPod,
+			scc:           failOtherSysctlsAllowedSCC,
+			expectedError: "sysctl \"foo\" is not allowed",
 		},
 	}
 	for k, v := range errorCases {
@@ -353,8 +386,8 @@ func TestValidateContainerSecurityContextFailures(t *testing.T) {
 
 	failNoSeccompAllowed := defaultPod()
 	failNoSeccompAllowed.Annotations[api.SeccompContainerAnnotationKeyPrefix+failNoSeccompAllowed.Spec.Containers[0].Name] = "bar"
-	failNoSeccompAllowedPSP := defaultSCC()
-	failNoSeccompAllowedPSP.SeccompProfiles = nil
+	failNoSeccompAllowedSCC := defaultSCC()
+	failNoSeccompAllowedSCC.SeccompProfiles = nil
 
 	failInvalidSeccompProfile := defaultPod()
 	failInvalidSeccompProfile.Annotations[api.SeccompContainerAnnotationKeyPrefix+failNoSeccompAllowed.Spec.Containers[0].Name] = "bar"
@@ -408,7 +441,7 @@ func TestValidateContainerSecurityContextFailures(t *testing.T) {
 		},
 		"failNoSeccompAllowed": {
 			pod:           failNoSeccompAllowed,
-			scc:           failNoSeccompAllowedPSP,
+			scc:           failNoSeccompAllowedSCC,
 			expectedError: "seccomp may not be set",
 		},
 		"failInvalidSeccompPod": {
@@ -503,6 +536,15 @@ func TestValidatePodSecurityContextSuccess(t *testing.T) {
 	seccompFooPod := defaultPod()
 	seccompFooPod.Annotations[api.SeccompPodAnnotationKey] = "foo"
 
+	sysctlAllowFooSCC := defaultSCC()
+	sysctlAllowFooSCC.Annotations[extensions.SysctlsPodSecurityPolicyAnnotationKey] = "foo"
+
+	safeSysctlFooPod := defaultPod()
+	safeSysctlFooPod.Annotations[api.SysctlsPodAnnotationKey] = "foo=1"
+
+	unsafeSysctlFooPod := defaultPod()
+	unsafeSysctlFooPod.Annotations[api.UnsafeSysctlsPodAnnotationKey] = "foo=1"
+
 	errorCases := map[string]struct {
 		pod *api.Pod
 		scc *api.SecurityContextConstraints
@@ -546,6 +588,22 @@ func TestValidatePodSecurityContextSuccess(t *testing.T) {
 		"pass seccomp specific profile": {
 			pod: seccompFooPod,
 			scc: seccompAllowFooSCC,
+		},
+		"pass sysctl specific profile with safe sysctl": {
+			pod: safeSysctlFooPod,
+			scc: sysctlAllowFooSCC,
+		},
+		"pass sysctl specific profile with unsafe sysctl": {
+			pod: unsafeSysctlFooPod,
+			scc: sysctlAllowFooSCC,
+		},
+		"pass empty profile with safe sysctl": {
+			pod: safeSysctlFooPod,
+			scc: defaultSCC(),
+		},
+		"pass empty profile with unsafe sysctl": {
+			pod: unsafeSysctlFooPod,
+			scc: defaultSCC(),
 		},
 	}
 
@@ -826,7 +884,8 @@ func TestGenerateContainerSecurityContextReadOnlyRootFS(t *testing.T) {
 func defaultSCC() *api.SecurityContextConstraints {
 	return &api.SecurityContextConstraints{
 		ObjectMeta: api.ObjectMeta{
-			Name: "scc-sa",
+			Name:        "scc-sa",
+			Annotations: map[string]string{},
 		},
 		RunAsUser: api.RunAsUserStrategyOptions{
 			Type: api.RunAsUserStrategyRunAsAny,
