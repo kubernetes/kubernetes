@@ -69,6 +69,17 @@ func Run() error {
 	pflag.CommandLine.MarkHidden("google-json-key")
 	pflag.CommandLine.MarkHidden("log-flush-frequency")
 
+	if err := checkPermissions(); !err {
+		return err
+	}
+
 	cmd := cmd.NewKubeadmCommand(cmdutil.NewFactory(nil), os.Stdin, os.Stdout, os.Stderr, getEnvParams())
 	return cmd.Execute()
+}
+
+func checkPermissions() error {
+	if uid := os.Getuid(); uid != 0 {
+		return fmt.Errorf("Kubeadm needs to run as uid `0`. It is being run as %d", uid)
+	}
+	return nil
 }
