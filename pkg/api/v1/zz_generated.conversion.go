@@ -6250,10 +6250,6 @@ func autoConvert_v1_Service_To_api_Service(in *Service, out *api.Service, s conv
 	return nil
 }
 
-func Convert_v1_Service_To_api_Service(in *Service, out *api.Service, s conversion.Scope) error {
-	return autoConvert_v1_Service_To_api_Service(in, out, s)
-}
-
 func autoConvert_api_Service_To_v1_Service(in *api.Service, out *Service, s conversion.Scope) error {
 	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
@@ -6268,10 +6264,6 @@ func autoConvert_api_Service_To_v1_Service(in *api.Service, out *Service, s conv
 		return err
 	}
 	return nil
-}
-
-func Convert_api_Service_To_v1_Service(in *api.Service, out *Service, s conversion.Scope) error {
-	return autoConvert_api_Service_To_v1_Service(in, out, s)
 }
 
 func autoConvert_v1_ServiceAccount_To_api_ServiceAccount(in *ServiceAccount, out *api.ServiceAccount, s conversion.Scope) error {
