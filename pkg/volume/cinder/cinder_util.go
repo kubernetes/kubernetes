@@ -31,7 +31,7 @@ import (
 type CinderDiskUtil struct{}
 
 // Attaches a disk specified by a volume.CinderPersistenDisk to the current kubelet.
-// Mounts the disk to it's global path.
+// Mounts the disk to its global path.
 func (util *CinderDiskUtil) AttachDisk(b *cinderVolumeMounter, globalPDPath string) error {
 	options := []string{}
 	if b.readOnly {
