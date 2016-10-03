@@ -66,7 +66,7 @@ func (plugin *azureDataDiskPlugin) NewAttacher() (volume.Attacher, error) {
 	}, nil
 }
 
-// Attach attaches a volume.Spec to a Azure VM referenced by NodeName, returning the disk's LUN
+// Attach attaches a volume.Spec to an Azure VM referenced by NodeName, returning the disk's LUN
 func (attacher *azureDiskAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string, error) {
 	volumeSource, err := getVolumeSource(spec)
 	if err != nil {
