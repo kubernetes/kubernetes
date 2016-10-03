@@ -18,6 +18,7 @@ package common
 
 import (
 	"fmt"
+	"os"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/util/uuid"
@@ -30,122 +31,12 @@ var _ = framework.KubeDescribe("Secrets", func() {
 	f := framework.NewDefaultFramework("secrets")
 
 	It("should be consumable from pods in volume [Conformance]", func() {
-		name := "secret-test-" + string(uuid.NewUUID())
-		volumeName := "secret-volume"
-		volumeMountPath := "/etc/secret-volume"
-		secret := secretForTest(f.Namespace.Name, name)
-
-		By(fmt.Sprintf("Creating secret with name %s", secret.Name))
-		defer func() {
-			By("Cleaning up the secret")
-			if err := f.Client.Secrets(f.Namespace.Name).Delete(secret.Name); err != nil {
-				framework.Failf("unable to delete secret %v: %v", secret.Name, err)
-			}
-		}()
-		var err error
-		if secret, err = f.Client.Secrets(f.Namespace.Name).Create(secret); err != nil {
-			framework.Failf("unable to create test secret %s: %v", secret.Name, err)
-		}
-
-		pod := &api.Pod{
-			ObjectMeta: api.ObjectMeta{
-				Name: "pod-secrets-" + string(uuid.NewUUID()),
-			},
-			Spec: api.PodSpec{
-				Volumes: []api.Volume{
-					{
-						Name: volumeName,
-						VolumeSource: api.VolumeSource{
-							Secret: &api.SecretVolumeSource{
-								SecretName: name,
-							},
-						},
-					},
-				},
-				Containers: []api.Container{
-					{
-						Name:  "secret-volume-test",
-						Image: "gcr.io/google_containers/mounttest:0.7",
-						Args: []string{
-							"--file_content=/etc/secret-volume/data-1",
-							"--file_mode=/etc/secret-volume/data-1"},
-						VolumeMounts: []api.VolumeMount{
-							{
-								Name:      volumeName,
-								MountPath: volumeMountPath,
-							},
-						},
-					},
-				},
-				RestartPolicy: api.RestartPolicyNever,
-			},
-		}
-
-		f.TestContainerOutput("consume secrets", pod, 0, []string{
-			"content of file \"/etc/secret-volume/data-1\": value-1",
-			"mode of file \"/etc/secret-volume/data-1\": -rw-r--r--",
-		})
+		doSecretE2E(f, nil)
 	})
 
 	It("should be consumable from pods in volume with defaultMode set [Conformance]", func() {
-		name := "secret-test-defaultmode-" + string(uuid.NewUUID())
-		volumeName := "secret-volume"
-		volumeMountPath := "/etc/secret-volume"
-		secret := secretForTest(f.Namespace.Name, name)
-
-		By(fmt.Sprintf("Creating secret with name %s", secret.Name))
-		defer func() {
-			By("Cleaning up the secret")
-			if err := f.Client.Secrets(f.Namespace.Name).Delete(secret.Name); err != nil {
-				framework.Failf("unable to delete secret %v: %v", secret.Name, err)
-			}
-		}()
-		var err error
-		if secret, err = f.Client.Secrets(f.Namespace.Name).Create(secret); err != nil {
-			framework.Failf("unable to create test secret %s: %v", secret.Name, err)
-		}
-
 		defaultMode := int32(0400)
-		pod := &api.Pod{
-			ObjectMeta: api.ObjectMeta{
-				Name: "pod-secrets-" + string(uuid.NewUUID()),
-			},
-			Spec: api.PodSpec{
-				Volumes: []api.Volume{
-					{
-						Name: volumeName,
-						VolumeSource: api.VolumeSource{
-							Secret: &api.SecretVolumeSource{
-								SecretName:  name,
-								DefaultMode: &defaultMode,
-							},
-						},
-					},
-				},
-				Containers: []api.Container{
-					{
-						Name:  "secret-volume-test",
-						Image: "gcr.io/google_containers/mounttest:0.7",
-						Args: []string{
-							"--file_content=/etc/secret-volume/data-1",
-							"--file_mode=/etc/secret-volume/data-1"},
-						VolumeMounts: []api.VolumeMount{
-							{
-								Name:      volumeName,
-								MountPath: volumeMountPath,
-								ReadOnly:  true,
-							},
-						},
-					},
-				},
-				RestartPolicy: api.RestartPolicyNever,
-			},
-		}
-
-		f.TestContainerOutput("consume secrets", pod, 0, []string{
-			"content of file \"/etc/secret-volume/data-1\": value-1",
-			"mode of file \"/etc/secret-volume/data-1\": -r--------",
-		})
+		doSecretE2E(f, &defaultMode)
 	})
 
 	It("should be consumable from pods in volume with Mode set in the item [Conformance]", func() {
@@ -356,4 +247,74 @@ func secretForTest(namespace, name string) *api.Secret {
 			"data-3": []byte("value-3\n"),
 		},
 	}
+}
+
+func doSecretE2E(f *framework.Framework, defaultMode *int32) {
+	var (
+		name            = "secret-test-" + string(uuid.NewUUID())
+		volumeName      = "secret-volume"
+		volumeMountPath = "/etc/secret-volume"
+		secret          = secretForTest(f.Namespace.Name, name)
+	)
+
+	By(fmt.Sprintf("Creating secret with name %s", secret.Name))
+	defer func() {
+		By("Cleaning up the secret")
+		if err := f.Client.Secrets(f.Namespace.Name).Delete(secret.Name); err != nil {
+			framework.Failf("unable to delete secret %v: %v", secret.Name, err)
+		}
+	}()
+	var err error
+	if secret, err = f.Client.Secrets(f.Namespace.Name).Create(secret); err != nil {
+		framework.Failf("unable to create test secret %s: %v", secret.Name, err)
+	}
+
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			Name: "pod-secrets-" + string(uuid.NewUUID()),
+		},
+		Spec: api.PodSpec{
+			Volumes: []api.Volume{
+				{
+					Name: volumeName,
+					VolumeSource: api.VolumeSource{
+						Secret: &api.SecretVolumeSource{
+							SecretName: name,
+						},
+					},
+				},
+			},
+			Containers: []api.Container{
+				{
+					Name:  "secret-volume-test",
+					Image: "gcr.io/google_containers/mounttest:0.7",
+					Args: []string{
+						"--file_content=/etc/secret-volume/data-1",
+						"--file_mode=/etc/secret-volume/data-1"},
+					VolumeMounts: []api.VolumeMount{
+						{
+							Name:      volumeName,
+							MountPath: volumeMountPath,
+						},
+					},
+				},
+			},
+			RestartPolicy: api.RestartPolicyNever,
+		},
+	}
+
+	if defaultMode != nil {
+		pod.Spec.Volumes[0].VolumeSource.Secret.DefaultMode = defaultMode
+	} else {
+		mode := int32(0644)
+		defaultMode = &mode
+	}
+
+	modeString := fmt.Sprintf("%v", os.FileMode(*defaultMode))
+	expectedOutput := []string{
+		"content of file \"/etc/secret-volume/data-1\": value-1",
+		"mode of file \"/etc/secret-volume/data-1\": " + modeString,
+	}
+
+	f.TestContainerOutput("consume secrets", pod, 0, expectedOutput)
 }
