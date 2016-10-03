@@ -66,6 +66,7 @@ func TestAssumePodScheduled(t *testing.T) {
 			},
 			allocatableResource: &Resource{},
 			pods:                []*api.Pod{testPods[0]},
+			podsWithAffinity:    []*api.Pod{},
 		},
 	}, {
 		pods: []*api.Pod{testPods[1], testPods[2]},
@@ -80,6 +81,7 @@ func TestAssumePodScheduled(t *testing.T) {
 			},
 			allocatableResource: &Resource{},
 			pods:                []*api.Pod{testPods[1], testPods[2]},
+			podsWithAffinity:    []*api.Pod{},
 		},
 	}, { // test non-zero request
 		pods: []*api.Pod{testPods[3]},
@@ -94,6 +96,7 @@ func TestAssumePodScheduled(t *testing.T) {
 			},
 			allocatableResource: &Resource{},
 			pods:                []*api.Pod{testPods[3]},
+			podsWithAffinity:    []*api.Pod{},
 		},
 	}}
 
@@ -161,6 +164,7 @@ func TestExpirePod(t *testing.T) {
 			},
 			allocatableResource: &Resource{},
 			pods:                []*api.Pod{testPods[1]},
+			podsWithAffinity:    []*api.Pod{},
 		},
 	}}
 
@@ -209,6 +213,7 @@ func TestAddPodWillConfirm(t *testing.T) {
 			},
 			allocatableResource: &Resource{},
 			pods:                []*api.Pod{testPods[0]},
+			podsWithAffinity:    []*api.Pod{},
 		},
 	}}
 
@@ -253,6 +258,7 @@ func TestAddPodAfterExpiration(t *testing.T) {
 			},
 			allocatableResource: &Resource{},
 			pods:                []*api.Pod{basePod},
+			podsWithAffinity:    []*api.Pod{},
 		},
 	}}
 
@@ -305,6 +311,7 @@ func TestUpdatePod(t *testing.T) {
 			},
 			allocatableResource: &Resource{},
 			pods:                []*api.Pod{testPods[1]},
+			podsWithAffinity:    []*api.Pod{},
 		}, {
 			requestedResource: &Resource{
 				MilliCPU: 100,
@@ -316,6 +323,7 @@ func TestUpdatePod(t *testing.T) {
 			},
 			allocatableResource: &Resource{},
 			pods:                []*api.Pod{testPods[0]},
+			podsWithAffinity:    []*api.Pod{},
 		}},
 	}}
 
@@ -370,6 +378,7 @@ func TestExpireAddUpdatePod(t *testing.T) {
 			},
 			allocatableResource: &Resource{},
 			pods:                []*api.Pod{testPods[1]},
+			podsWithAffinity:    []*api.Pod{},
 		}, {
 			requestedResource: &Resource{
 				MilliCPU: 100,
@@ -381,6 +390,7 @@ func TestExpireAddUpdatePod(t *testing.T) {
 			},
 			allocatableResource: &Resource{},
 			pods:                []*api.Pod{testPods[0]},
+			podsWithAffinity:    []*api.Pod{},
 		}},
 	}}
 
@@ -435,6 +445,7 @@ func TestRemovePod(t *testing.T) {
 			},
 			allocatableResource: &Resource{},
 			pods:                []*api.Pod{basePod},
+			podsWithAffinity:    []*api.Pod{},
 		},
 	}}
 

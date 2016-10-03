@@ -70,6 +70,7 @@ func NewNodeInfo(pods ...*api.Pod) *NodeInfo {
 		allocatableResource: &Resource{},
 		allowedPodNumber:    0,
 		generation:          0,
+		podsWithAffinity:    make([]*api.Pod, 0),
 	}
 	for _, pod := range pods {
 		ni.addPod(pod)
