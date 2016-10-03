@@ -235,7 +235,6 @@ func (ds *dockerService) ContainerStatus(containerID string) (*runtimeApi.Contai
 		m := r.Mounts[i]
 		readonly := !m.RW
 		mounts = append(mounts, &runtimeApi.Mount{
-			Name:          &m.Name,
 			HostPath:      &m.Source,
 			ContainerPath: &m.Destination,
 			Readonly:      &readonly,
