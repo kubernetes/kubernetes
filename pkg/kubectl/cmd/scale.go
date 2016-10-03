@@ -89,6 +89,7 @@ func NewCmdScale(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().Int("current-replicas", -1, "Precondition for current size. Requires that the current size of the resource match this value in order to scale.")
 	cmd.Flags().Int("replicas", -1, "The new desired number of replicas. Required.")
 	cmd.MarkFlagRequired("replicas")
+	cmd.Flags().Duration("timeout", 0, "The length of time to wait before giving up on a scale operation, zero means don't wait. Any other values should contain a corresponding time unit (e.g. 1s, 2m, 3h).")
 	cmdutil.AddOutputFlagsForMutation(cmd)
 	cmdutil.AddRecordFlag(cmd)
 	cmdutil.AddInclude3rdPartyFlags(cmd)
@@ -101,9 +102,6 @@ func NewCmdScale(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 
 // RunScale executes the scaling
 func RunScale(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, shortOutput bool, options *ScaleOptions) error {
-	timeoutFlag := cmdutil.GetFlagDuration(cmd, "timeout")
-	fmt.Printf("Timeout %v\n", timeoutFlag)
-
 	if len(os.Args) > 1 && os.Args[1] == "resize" {
 		printDeprecationWarning("scale", "resize")
 	}
