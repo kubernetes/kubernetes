@@ -382,19 +382,21 @@ Loop:
 // parseField scans a field until a terminator
 func (p *Parser) parseField(cur *ListNode) error {
 	p.consumeText()
-	var r rune
+Loop:
 	for {
-		r = p.next()
-		if isTerminator(r) {
+		switch r := p.next(); {
+		case r == '\\':
+			p.next()
+		case isTerminator(r):
 			p.backup()
-			break
+			break Loop
 		}
 	}
 	value := p.consumeText()
 	if value == "*" {
 		cur.append(newWildcard())
 	} else {
-		cur.append(newField(value))
+		cur.append(newField(strings.Replace(value, "\\", "", -1)))
 	}
 	return p.parseInsideAction(cur)
 }
