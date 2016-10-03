@@ -34,6 +34,13 @@ function create-dirs {
   fi
 }
 
+# Create directories referenced in the kube-controller-manager manifest for
+# bindmounts. This is used under the rkt runtime to work around
+# https://github.com/kubernetes/kubernetes/issues/26816
+function create-kube-controller-manager-dirs {
+  mkdir -p /etc/srv/kubernetes /var/ssl /etc/{ssl,openssl,pki}
+}
+
 # Formats the given device ($1) if needed and mounts it at given mount point
 # ($2).
 function safe-format-and-mount() {
@@ -305,26 +312,6 @@ current-context: service-account-context
 EOF
 }
 
-# A helper function that loads a single docker image into either docker or rkt,
-# Depends on:
-#   CONTAINER_RUNTIME: What container runtime to load the image for. docker or rkt
-#   RKT_BIN: Must be set if container-runtime is rkt. Path to rkt binary
-#   DOCKER2ACI_BIN: Must be set if container-runtime is rkt. Path to docker2aci binary
-#
-# $1: Full path of the docker image
-function load-docker-image {
-  if [[ "${CONTAINER_RUNTIME:-}" == "rkt" ]]; then
-    local aci_tmpdir="$(mktemp -d docker2aci.XXXXX)"
-    (cd "${aci_tmpdir}"; "${DOCKER2ACI_BIN}" "$1")
-    "${RKT_BIN}" fetch --insecure-options=image "${aci_tmpdir}/*.aci"
-  else
-    docker load -i "$1"
-  fi
-}
-# This helper function is called from a subshell for timeout purposes so it
-# should be exported
-export -f load-docker-image
-
 # A helper function for loading a docker image. It keeps trying up to 5 times.
 #
 # $1: Full path of the docker image
@@ -335,15 +322,37 @@ function try-load-docker-image {
   set +e
   local -r max_attempts=5
   local -i attempt_num=1
-  until timeout 30 $SHELL -c "load-docker-image \"${img}\""; do
-    if [[ "${attempt_num}" == "${max_attempts}" ]]; then
-      echo "Fail to load docker image file ${img} after ${max_attempts} retries. Exit!!"
-      exit 1
-    else
-      attempt_num=$((attempt_num+1))
+
+  if [[ "${CONTAINER_RUNTIME:-}" == "rkt" ]]; then
+    for attempt_num in $(seq 1 "${max_attempts}"); do
+      local aci_tmpdir="$(mktemp -t -d docker2aci.XXXXX)"
+      (cd "${aci_tmpdir}"; timeout 40 "${DOCKER2ACI_BIN}" "$1")
+      local aci_success=$?
+      timeout 40 "${RKT_BIN}" fetch --insecure-options=image "${aci_tmpdir}"/*.aci
+      local fetch_success=$?
+      rm -f "${aci_tmpdir}"/*.aci
+      rmdir "${aci_tmpdir}"
+      if [[ ${fetch_success} && ${aci_success} ]]; then
+        echo "rkt: Loaded ${img}"
+        break
+      fi
+      if [[ "${attempt}" == "${max_attempts}" ]]; then
+        echo "rkt: Failed to load image file ${img} after ${max_attempts} retries."
+        exit 1
+      fi
       sleep 5
-    fi
-  done
+    done
+  else
+    until timeout 30 docker load -i "${img}"; do
+      if [[ "${attempt_num}" == "${max_attempts}" ]]; then
+        echo "Fail to load docker image file ${img} after ${max_attempts} retries."
+        exit 1
+      else
+        attempt_num=$((attempt_num+1))
+        sleep 5
+      fi
+    done
+  fi
   # Re-enable errexit.
   set -e
 }
@@ -1046,19 +1055,45 @@ function setup-kubelet-dir {
 # Sets the following variables:
 #   RKT_BIN: the path to the rkt binary
 function setup-rkt {
+    local rkt_bin="${KUBE_DIR}/bin/rkt"
+    if [[ -x "${rkt_bin}" ]]; then
+      # idempotency, skip downloading this time
+      # TODO(euank): this might get in the way of updates, but 'file busy'
+      # because of rkt-api would too
+      RKT_BIN="${rkt_bin}"
+      return
+    fi
     mkdir -p /etc/rkt "${KUBE_DIR}/download/"
     local rkt_tar="${KUBE_DIR}/download/rkt.tar.gz"
+    local rkt_tmpdir=$(mktemp -d "${KUBE_DIR}/rkt_download.XXXXX")
     curl --fail --silent --show-error \
       --location --create-dirs --output "${rkt_tar}" \
       https://github.com/coreos/rkt/releases/download/v${RKT_VERSION}/rkt-v${RKT_VERSION}.tar.gz
-    tar --strip-components=1 -xf "${rkt_tar}" -C "${KUBE_DIR}/bin" --overwrite
-    RKT_BIN="${KUBE_DIR}/bin/rkt"
-    if [[ ! -x "${RKT_BIN}" ]]; then
+    tar --strip-components=1 -xf "${rkt_tar}" -C "${rkt_tmpdir}" --overwrite
+    mv "${rkt_tmpdir}/rkt" "${rkt_bin}"
+    if [[ ! -x "${rkt_bin}" ]]; then
       echo "Could not download requested rkt binary"
       exit 1
     fi
+    RKT_BIN="${rkt_bin}"
     # Cache rkt stage1 images for speed
-    "${RKT_BIN}" fetch --insecure-options=image ${KUBE_DIR}/bin/*.aci
+    "${RKT_BIN}" fetch --insecure-options=image "${rkt_tmpdir}"/*.aci
+    rm -rf "${rkt_tmpdir}"
+
+    cat > /etc/systemd/system/rkt-api.service <<EOF
+[Unit]
+Description=rkt api service
+Documentation=http://github.com/coreos/rkt
+After=network.target
+
+[Service]
+ExecStart=${RKT_BIN} api-service --listen=127.0.0.1:15441
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    systemctl enable rkt-api.service
+    systemctl start rkt-api.service
 }
 
 # Install docker2aci, needed to load server images if using rkt runtime
@@ -1113,13 +1148,15 @@ else
   create-kubeproxy-kubeconfig
 fi
 
-load-docker-images
 if [[ "${CONTAINER_RUNTIME:-}" == "rkt" ]]; then
   systemctl stop docker
   systemctl disable docker
   setup-rkt
   install-docker2aci
+  create-kube-controller-manager-dirs
 fi
+
+load-docker-images
 start-kubelet
 
 if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
