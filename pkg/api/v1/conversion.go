@@ -22,6 +22,7 @@ import (
 	"reflect"
 
 	"k8s.io/kubernetes/pkg/api"
+	apiservice "k8s.io/kubernetes/pkg/api/service"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -139,17 +140,42 @@ func addFastPathConversionFuncs(scheme *runtime.Scheme) error {
 	return nil
 }
 
+func Convert_v1_Service_To_api_Service(in *Service, out *api.Service, s conversion.Scope) error {
+	// If the user specifies an alpha annotation, move it to beta (#33625).
+	if valueAlpha, ok := in.Annotations[apiservice.AlphaAnnotationHealthCheckNodePort]; ok {
+		in.Annotations[apiservice.BetaAnnotationHealthCheckNodePort] = valueAlpha
+	}
+	if valueAlpha, ok := in.Annotations[apiservice.AlphaAnnotationExternalTraffic]; ok {
+		in.Annotations[apiservice.BetaAnnotationExternalTraffic] = valueAlpha
+	}
+	return autoConvert_v1_Service_To_api_Service(in, out, s)
+}
+
+func Convert_api_Service_To_v1_Service(in *api.Service, out *Service, s conversion.Scope) error {
+	// If the system writes a beta annotation, move it to alpha (#33625).
+	if valueBeta, ok := in.Annotations[apiservice.BetaAnnotationHealthCheckNodePort]; ok {
+		in.Annotations[apiservice.AlphaAnnotationHealthCheckNodePort] = valueBeta
+	}
+	if valueBeta, ok := in.Annotations[apiservice.BetaAnnotationExternalTraffic]; ok {
+		in.Annotations[apiservice.AlphaAnnotationExternalTraffic] = valueBeta
+	}
+
+	return autoConvert_api_Service_To_v1_Service(in, out, s)
+}
+
 func addConversionFuncs(scheme *runtime.Scheme) error {
 	// Add non-generated conversion functions
 	err := scheme.AddConversionFuncs(
 		Convert_api_Pod_To_v1_Pod,
 		Convert_api_PodSpec_To_v1_PodSpec,
 		Convert_api_ReplicationControllerSpec_To_v1_ReplicationControllerSpec,
+		Convert_api_Service_To_v1_Service,
 		Convert_api_ServiceSpec_To_v1_ServiceSpec,
 		Convert_v1_Pod_To_api_Pod,
 		Convert_v1_PodSpec_To_api_PodSpec,
 		Convert_v1_ReplicationControllerSpec_To_api_ReplicationControllerSpec,
 		Convert_v1_Secret_To_api_Secret,
+		Convert_v1_Service_To_api_Service,
 		Convert_v1_ServiceSpec_To_api_ServiceSpec,
 		Convert_v1_ResourceList_To_api_ResourceList,
 		Convert_v1_ReplicationController_to_extensions_ReplicaSet,
