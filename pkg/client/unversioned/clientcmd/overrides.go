@@ -138,7 +138,7 @@ const (
 	FlagImpersonate  = "as"
 	FlagUsername     = "username"
 	FlagPassword     = "password"
-	FlagTimeout      = "timeout"
+	FlagTimeout      = "request-timeout"
 )
 
 // RecommendedAuthOverrideFlags is a convenience method to return recommended flag names prefixed with a string of your choosing
