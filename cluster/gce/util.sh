@@ -1296,7 +1296,7 @@ function kube-down() {
         "${NODE_TAG}-all"
     fi
     # Delete firewall rule for etcd servers.
-    if ! gcloud compute firewall-rules --project "${PROJECT}" describe "${MASTER_NAME}-etcd" &>/dev/null; then
+    if gcloud compute firewall-rules --project "${PROJECT}" describe "${MASTER_NAME}-etcd" &>/dev/null; then
       gcloud compute firewall-rules delete  \
         --project "${PROJECT}" \
         --quiet \
