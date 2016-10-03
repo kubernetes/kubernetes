@@ -127,7 +127,7 @@ func RunStatus(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []str
 
 	// if the rollout isn't done yet, keep watching deployment status
 	intr := interrupt.New(nil, w.Stop)
-	intr.Run(func() error {
+	return intr.Run(func() error {
 		_, err := watch.Until(0, w, func(e watch.Event) (bool, error) {
 			// print deployment's status
 			status, done, err := statusViewer.Status(cmdNamespace, info.Name)
@@ -143,5 +143,4 @@ func RunStatus(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []str
 		})
 		return err
 	})
-	return nil
 }
