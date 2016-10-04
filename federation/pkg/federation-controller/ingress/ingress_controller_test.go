@@ -200,7 +200,6 @@ func NewConfigMap(uid string) *api_v1.ConfigMap {
 			Name:      uidConfigMapName,
 			Namespace: uidConfigMapNamespace,
 			SelfLink:  "/api/v1/namespaces/" + uidConfigMapNamespace + "/configmap/" + uidConfigMapName,
-			// TODO: Remove: Annotations: map[string]string{},
 		},
 		Data: map[string]string{
 			uidKey: uid,
