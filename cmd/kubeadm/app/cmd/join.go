@@ -26,7 +26,6 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/api"
 	kubenode "k8s.io/kubernetes/cmd/kubeadm/app/node"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
 var (
@@ -47,8 +46,8 @@ func NewCmdJoin(out io.Writer) *cobra.Command {
 		Use:   "join",
 		Short: "Run this on any machine you wish to join an existing cluster.",
 		Run: func(cmd *cobra.Command, args []string) {
-			err := RunJoin(out, cmd, args, cfg)
-			cmdutil.CheckErr(err)
+			err := RunJoin(out, cmd, args, s)
+			kubeadmutil.CheckErr(err)
 		},
 	}
 
@@ -63,6 +62,9 @@ func NewCmdJoin(out io.Writer) *cobra.Command {
 // RunJoin executes worked node provisioning and tries to join an existing cluster.
 func RunJoin(out io.Writer, cmd *cobra.Command, args []string, s *kubeadmapi.NodeConfiguration) error {
 	// TODO(phase1+) this we are missing args from the help text, there should be a way to tell cobra about it
+	if u, ok := kubeadmutil.IsRoot(); !ok {
+		return &kubeadmutil.NotRootError{"Requires root priviledges", u}
+	}
 	if len(args) == 0 {
 		return fmt.Errorf("<cmd/join> must specify master IP address (see --help)")
 	}

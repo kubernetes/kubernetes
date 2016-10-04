@@ -62,8 +62,6 @@ func NewKubeadmCommand(f *cmdutil.Factory, in io.Reader, out, err io.Writer) *co
 
 		`),
 	}
-	// TODO(phase2+) figure out how to avoid running as root
-	//
 	// TODO(phase2) detect interactive vs non-interactive use and adjust output accordingly
 	// i.e. make it automation friendly
 	//
