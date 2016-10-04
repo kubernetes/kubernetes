@@ -902,3 +902,73 @@ func (m *kubeGenericRuntimeManager) UpdatePodCIDR(podCIDR string) error {
 			},
 		})
 }
+
+// getSandboxInfoFromStatus returns the sandbox's ID, IP and sandbox config.
+func (m *kubeGenericRuntimeManager) getSandboxInfoAndConfig(pod *v1.Pod, sandboxStatus *runtimeapi.PodSandboxStatus) (id string, ip string, config *runtimeapi.PodSandboxConfig, err error) {
+	id = sandboxStatus.GetId()
+	ip = m.determinePodSandboxIP(pod.Namespace, pod.Name, sandboxStatus)
+	config, err = m.generatePodSandboxConfig(pod, sandboxStatus.Metadata.GetAttempt())
+	return id, ip, config, err
+}
+
+// getSandboxStatus returns the latest sandbox status.
+func (m *kubeGenericRuntimeManager) getSandboxStatus(sandboxID string) (*runtimeapi.PodSandboxStatus, error) {
+	return m.runtimeService.PodSandboxStatus(sandboxID)
+}
+
+func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, _ v1.PodStatus, podStatus *kubecontainer.PodStatus, pullSecrets []v1.Secret, backoff *flowcontrol.Backoff) (podSyncResult kubecontainer.PodSyncResult) {
+	// Split the pod status.
+	statuses := newStatusGroup(pod, podStatus)
+
+	// Try to prune the init containers before every sync iteration.
+	m.pruneInitContainers(pod, statuses.initContainerStatuses, false)
+
+	action := newSyncAction(pod, pullSecrets)
+	action.computeSyncAction(pod, statuses, m.livenessManager)
+
+	if action.needsToKillContainers() {
+		result, err := action.killContainers(m)
+		podSyncResult.AddSyncResult(result...)
+		if err != nil {
+			glog.Errorf("Error during killing containers: %v", err)
+			return
+		}
+	}
+
+	if action.needsToKillSandboxes() {
+		result, err := action.killSandboxes(m)
+		podSyncResult.AddSyncResult(result...)
+		if err != nil {
+			glog.Errorf("Error during killing sandboxes: %v", err)
+			return
+		}
+	}
+
+	if action.needsToStartSandbox() {
+		// Prune all old init containers if we are starting
+		// a new pod.
+		if err := m.pruneInitContainers(pod, statuses.initContainerStatuses, true); err != nil {
+			// TODO(yifan): Add sync result.
+			glog.Errorf("Error pruning init containers: %v", err)
+			return
+		}
+
+		result, err := action.startSandbox(m)
+		podSyncResult.AddSyncResult(result...)
+		if err != nil {
+			glog.Errorf("Error during starting sandbox: %v", err)
+			return
+		}
+	}
+
+	if action.needsToStartContainers() {
+		result, err := action.startContainers(m, backoff)
+		podSyncResult.AddSyncResult(result...)
+		if err != nil {
+			glog.Errorf("Error during starting containers: %v", err)
+			return
+		}
+	}
+
+	return
+}

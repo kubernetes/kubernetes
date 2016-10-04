@@ -266,3 +266,66 @@ func (m *kubeGenericRuntimeManager) GetPortForward(podName, podNamespace string,
 	}
 	return url.Parse(resp.Url)
 }
+
+// killPodSandbox stops the pod sandbox.
+func (m *kubeGenericRuntimeManager) killPodSandbox(sandboxID, sandboxName, reason string) error {
+	glog.V(4).Infof("Stopping pod sandbox %s:%s, reason: %s", sandboxName, sandboxID, reason)
+	err := m.runtimeService.StopPodSandbox(sandboxID)
+	if err != nil {
+		glog.Errorf("Failed to stop pod sandbox %s:%s, %v", sandboxName, sandboxID, err)
+	}
+	return err
+}
+
+// runPodSandbox launches the pod sandbox.
+// On success, it returns the sandbox ID and the sandbox config.
+func (m *kubeGenericRuntimeManager) runPodSandbox(pod *v1.Pod, attempt int, reason string) (string, error) {
+	glog.V(4).Infof("Launching pod sandbox for pod %q, attempt %d, reason %q", format.Pod(pod), attempt, reason)
+
+	podSandboxConfig, err := m.generatePodSandboxConfig(pod, uint32(attempt))
+	if err != nil {
+		err := fmt.Errorf("GeneratePodSandboxConfig for pod %q failed, %v", format.Pod(pod), err)
+		glog.Error(err)
+		return "", err
+	}
+
+	podSandBoxID, err := m.runtimeService.RunPodSandbox(podSandboxConfig)
+	if err != nil {
+		err := fmt.Errorf("CreatePodSandbox for pod %q failed, %v", format.Pod(pod), err)
+		glog.Error(err)
+		return "", err
+	}
+
+	return podSandBoxID, nil
+}
+
+// teardownPodNetwork tears down the pod's network.
+func (m *kubeGenericRuntimeManager) teardownPodNetwork(pod *v1.Pod, sandboxID string) error {
+	glog.V(4).Infof("Tearing down network for pod %s:%s", format.Pod(pod), sandboxID)
+
+	containerID := kubecontainer.ContainerID{Type: m.runtimeName, ID: sandboxID}
+	if err := m.networkPlugin.TearDownPod(pod.Namespace, pod.Name, containerID); err != nil {
+		err := fmt.Errorf("TearDownPod for pod %s:%s failed, %v", format.Pod(pod), sandboxID, err)
+		glog.Error(err)
+		return err
+	}
+	return nil
+}
+
+// setupPodNetwork sets up the pod's network.
+// On success, it returns the IP of the pod sandbox.
+func (m *kubeGenericRuntimeManager) setupPodNetwork(pod *v1.Pod, sandboxID string) error {
+	glog.V(4).Infof("Setting up network for pod %s:%s", format.Pod(pod), sandboxID)
+
+	if kubecontainer.IsHostNetworkPod(pod) {
+		return nil
+	}
+
+	containerID := kubecontainer.ContainerID{Type: m.runtimeName, ID: sandboxID}
+	if err := m.networkPlugin.SetUpPod(pod.Namespace, pod.Name, containerID); err != nil {
+		err := fmt.Errorf("SetUpPod for pod %s:%s failed, %v", format.Pod(pod), sandboxID, err)
+		glog.Error(err)
+		return err
+	}
+	return nil
+}
