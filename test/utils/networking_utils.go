@@ -174,19 +174,27 @@ func (config *NetworkingTestConfig) DialFromContainer(protocol, containerIP, tar
 	eps := sets.NewString()
 
 	for i := 0; i < maxTries; i++ {
-		stdout := config.f.ExecShellInPod(config.HostTestContainerPod.Name, cmd)
+		stdout, stderr, err := config.f.ExecShellInPodWithFullOutput(config.HostTestContainerPod.Name, cmd)
+		if err != nil {
+			// A failure to kubectl exec counts as a try, not a hard fail.
+			// Also note that we will keep failing for maxTries in tests where
+			// we confirm unreachability.
+			framework.Logf("Failed to execute %q: %v, stdout: %q, stderr %q", cmd, err, stdout, stderr)
+		} else {
+			var output map[string][]string
+			if err := json.Unmarshal([]byte(stdout), &output); err != nil {
+				framework.Logf("WARNING: Failed to unmarshal curl response. Cmd %v run in %v, output: %s, err: %v",
+					cmd, config.HostTestContainerPod.Name, stdout, err)
+				continue
+			}
 
-		var output map[string][]string
-		if err := json.Unmarshal([]byte(stdout), &output); err != nil {
-			framework.Logf("WARNING: Failed to unmarshal curl response. Cmd %v run in %v, output: %s, err: %v",
-				cmd, config.HostTestContainerPod.Name, stdout, err)
-			continue
+			for _, hostName := range output["responses"] {
+				trimmed := strings.TrimSpace(hostName)
+				if trimmed != "" {
+					eps.Insert(trimmed)
+				}
+			}
 		}
-
-		for _, hostName := range output["responses"] {
-			eps.Insert(hostName)
-		}
-
 		framework.Logf("Waiting for endpoints: %v", expectedEps.Difference(eps))
 
 		// Check against i+1 so we exit if minTries == maxTries.
@@ -224,8 +232,18 @@ func (config *NetworkingTestConfig) DialFromNode(protocol, targetIP string, targ
 
 	filterCmd := fmt.Sprintf("%s | grep -v '^\\s*$'", cmd)
 	for i := 0; i < maxTries; i++ {
-		stdout := config.f.ExecShellInPod(config.HostTestContainerPod.Name, filterCmd)
-		eps.Insert(strings.TrimSpace(stdout))
+		stdout, stderr, err := config.f.ExecShellInPodWithFullOutput(config.HostTestContainerPod.Name, filterCmd)
+		if err != nil || len(stderr) > 0 {
+			// A failure to exec command counts as a try, not a hard fail.
+			// Also note that we will keep failing for maxTries in tests where
+			// we confirm unreachability.
+			framework.Logf("Failed to execute %q: %v, stdout: %q, stderr: %q", filterCmd, err, stdout, stderr)
+		} else {
+			trimmed := strings.TrimSpace(stdout)
+			if trimmed != "" {
+				eps.Insert(trimmed)
+			}
+		}
 		framework.Logf("Waiting for %+v endpoints, got endpoints %+v", expectedEps.Difference(eps), eps)
 
 		// Check against i+1 so we exit if minTries == maxTries.

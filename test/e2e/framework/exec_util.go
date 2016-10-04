@@ -33,6 +33,14 @@ import (
 // ExecCommandInContainer execute a command in the specified container.
 // Pass in stdin, tty if needed in the future.
 func (f *Framework) ExecCommandInContainer(podName, containerName string, cmd ...string) string {
+	stdout, stderr, err := f.ExecCommandInContainerWithFullOutput(podName, containerName, cmd...)
+	Logf("Exec stderr: %q", stderr)
+	Expect(err).NotTo(HaveOccurred(), "fail to execute command")
+	return stdout
+}
+
+// ExecCommandInContainerWithFullOutput executes a command in the specified container and return stdout, stderr and error
+func (f *Framework) ExecCommandInContainerWithFullOutput(podName, containerName string, cmd ...string) (string, string, error) {
 	Logf("Exec running '%s'", strings.Join(cmd, " "))
 	config, err := LoadConfig()
 	Expect(err).NotTo(HaveOccurred(), "failed to load restclient config")
@@ -55,9 +63,7 @@ func (f *Framework) ExecCommandInContainer(podName, containerName string, cmd ..
 	}, api.ParameterCodec)
 
 	err = execute("POST", req.URL(), config, stdin, &stdout, &stderr, tty)
-	Logf("Exec stderr: %q", stderr.String())
-	Expect(err).NotTo(HaveOccurred(), "post request failed")
-	return strings.TrimSpace(stdout.String())
+	return strings.TrimSpace(stdout.String()), strings.TrimSpace(stderr.String()), err
 }
 
 func (f *Framework) ExecShellInContainer(podName, containerName string, cmd string) string {
@@ -71,8 +77,19 @@ func (f *Framework) ExecCommandInPod(podName string, cmd ...string) string {
 	return f.ExecCommandInContainer(podName, pod.Spec.Containers[0].Name, cmd...)
 }
 
+func (f *Framework) ExecCommandInPodWithFullOutput(podName string, cmd ...string) (string, string, error) {
+	pod, err := f.PodClient().Get(podName)
+	Expect(err).NotTo(HaveOccurred(), "failed to get pod")
+	Expect(pod.Spec.Containers).NotTo(BeEmpty())
+	return f.ExecCommandInContainerWithFullOutput(podName, pod.Spec.Containers[0].Name, cmd...)
+}
+
 func (f *Framework) ExecShellInPod(podName string, cmd string) string {
 	return f.ExecCommandInPod(podName, "/bin/sh", "-c", cmd)
+}
+
+func (f *Framework) ExecShellInPodWithFullOutput(podName string, cmd string) (string, string, error) {
+	return f.ExecCommandInPodWithFullOutput(podName, "/bin/sh", "-c", cmd)
 }
 
 func execute(method string, url *url.URL, config *restclient.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool) error {
