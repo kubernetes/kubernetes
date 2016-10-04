@@ -24,10 +24,9 @@ import (
 	"github.com/spf13/cobra"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubechecks "k8s.io/kubernetes/cmd/kubeadm/app/checks"
 	kubenode "k8s.io/kubernetes/cmd/kubeadm/app/node"
+	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
 var (
@@ -44,13 +43,13 @@ var (
 // NewCmdJoin returns "kubeadm join" command.
 func NewCmdJoin(out io.Writer) *cobra.Command {
 	cfg := &kubeadmapi.NodeConfiguration{}
-	var skipChecks bool
+	var skipPreFlight bool
 	cmd := &cobra.Command{
 		Use:   "join",
 		Short: "Run this on any machine you wish to join an existing cluster.",
 		Run: func(cmd *cobra.Command, args []string) {
-			err := RunJoin(out, cmd, args, cfg, skipChecks)
-			cmdutil.CheckErr(err)
+			err := RunJoin(out, cmd, args, cfg, skipPreFlight)
+			kubeadmutil.CheckErr(err)
 		},
 	}
 
@@ -60,24 +59,26 @@ func NewCmdJoin(out io.Writer) *cobra.Command {
 	)
 
 	cmd.PersistentFlags().BoolVar(
-		&skipChecks, "skip-checks", false,
-		"skip checks normally run before modifying the system",
+		&skipPreFlight, "skip-preflight-checks", false,
+		"skip preflight checks normally run before modifying the system",
 	)
 
 	return cmd
 }
 
 // RunJoin executes worked node provisioning and tries to join an existing cluster.
-func RunJoin(out io.Writer, cmd *cobra.Command, args []string, s *kubeadmapi.NodeConfiguration, skipChecks bool) error {
-
-	if !skipChecks {
+func RunJoin(out io.Writer, cmd *cobra.Command, args []string, s *kubeadmapi.NodeConfiguration, skipPreFlight bool) error {
+	// TODO(phase1+) this we are missing args from the help text, there should be a way to tell cobra about it
+	if !skipPreFlight {
 		fmt.Println("Running pre-flight checks")
-		kubechecks.RunJoinNodeChecks()
+		err := preflight.RunJoinNodeChecks()
+		if err != nil {
+			return err
+		}
 	} else {
 		fmt.Println("Skipping pre-flight checks")
 	}
 
-	// TODO(phase1+) this we are missing args from the help text, there should be a way to tell cobra about it
 	if len(args) == 0 {
 		return fmt.Errorf("<cmd/join> must specify master IP address (see --help)")
 	}

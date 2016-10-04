@@ -25,8 +25,8 @@ import (
 	"github.com/spf13/cobra"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubechecks "k8s.io/kubernetes/cmd/kubeadm/app/checks"
 	kubemaster "k8s.io/kubernetes/cmd/kubeadm/app/master"
+	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/cloudprovider"
@@ -50,7 +50,7 @@ var (
 func NewCmdInit(out io.Writer) *cobra.Command {
 	cfg := &kubeadmapi.MasterConfiguration{}
 	var cfgPath string
-	var skipChecks bool
+	var skipPreFlight bool
 	cmd := &cobra.Command{
 		Use:   "init",
 		Short: "Run this in order to set up the Kubernetes master.",
@@ -60,7 +60,7 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 					cmdutil.CheckErr(fmt.Errorf("<cmd/init> %v", err))
 				}
 			}
-			i, err := NewInit(cfgPath, cfg, skipChecks)
+			i, err := NewInit(cfgPath, cfg, skipPreFlight)
 			check(err)
 			check(i.Run(out))
 		},
@@ -127,8 +127,8 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 	)
 	cmd.PersistentFlags().MarkDeprecated("external-etcd-keyfile", "this flag will be removed when componentconfig exists")
 	cmd.PersistentFlags().BoolVar(
-		&skipChecks, "skip-checks", false,
-		"skip checks normally run before modifying the system",
+		&skipPreFlight, "skip-preflight-checks", false,
+		"skip preflight checks normally run before modifying the system",
 	)
 
 	return cmd
@@ -138,7 +138,7 @@ type Init struct {
 	cfg *kubeadmapi.MasterConfiguration
 }
 
-func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipChecks bool) (*Init, error) {
+func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight bool) (*Init, error) {
 	if cfgPath != "" {
 		b, err := ioutil.ReadFile(cfgPath)
 		if err != nil {
@@ -149,9 +149,12 @@ func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipChecks boo
 		}
 	}
 
-	if !skipChecks {
+	if !skipPreFlight {
 		fmt.Println("Running pre-flight checks")
-		kubechecks.RunInitMasterChecks()
+		err := preflight.RunInitMasterChecks()
+		if err != nil {
+			return nil, err
+		}
 	} else {
 		fmt.Println("Skipping pre-flight checks")
 	}
