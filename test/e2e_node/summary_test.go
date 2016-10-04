@@ -69,9 +69,9 @@ var _ = framework.KubeDescribe("Summary API [Flaky]", func() {
 					"Time": recent(maxStatsAge),
 					// We don't limit system container memory.
 					"AvailableBytes":  BeNil(),
-					"UsageBytes":      bounded(5*mb, 1*gb),
-					"WorkingSetBytes": bounded(5*mb, 1*gb),
-					"RSSBytes":        bounded(5*mb, 1*gb),
+					"UsageBytes":      bounded(1*mb, 1*gb),
+					"WorkingSetBytes": bounded(1*mb, 1*gb),
+					"RSSBytes":        bounded(1*mb, 1*gb),
 					"PageFaults":      bounded(1000, 1E9),
 					"MajorPageFaults": bounded(0, 100000),
 				}),
@@ -96,7 +96,7 @@ var _ = framework.KubeDescribe("Summary API [Flaky]", func() {
 						"Memory": ptrMatchAllFields(gstruct.Fields{
 							"Time":            recent(maxStatsAge),
 							"AvailableBytes":  bounded(1*mb, 10*mb),
-							"UsageBytes":      bounded(10*kb, mb),
+							"UsageBytes":      bounded(10*kb, 5*mb),
 							"WorkingSetBytes": bounded(10*kb, mb),
 							"RSSBytes":        bounded(1*kb, mb),
 							"PageFaults":      bounded(100, 100000),
