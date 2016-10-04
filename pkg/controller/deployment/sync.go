@@ -106,7 +106,7 @@ func (dc *DeploymentController) getAllReplicaSetsAndSyncRevision(deployment *ext
 func (dc *DeploymentController) rsAndPodsWithHashKeySynced(deployment *extensions.Deployment) ([]extensions.ReplicaSet, *api.PodList, error) {
 	rsList, err := deploymentutil.ListReplicaSets(deployment,
 		func(namespace string, options api.ListOptions) ([]extensions.ReplicaSet, error) {
-			return dc.rsStore.ReplicaSets(namespace).List(options.LabelSelector)
+			return dc.rsLister.ReplicaSets(namespace).List(options.LabelSelector)
 		})
 	if err != nil {
 		return nil, nil, fmt.Errorf("error listing ReplicaSets: %v", err)
@@ -174,7 +174,7 @@ func (dc *DeploymentController) addHashKeyToRSAndPods(rs extensions.ReplicaSet) 
 		return nil, fmt.Errorf("error in converting selector to label selector for replica set %s: %s", updatedRS.Name, err)
 	}
 	options := api.ListOptions{LabelSelector: selector}
-	pods, err := dc.podStore.Pods(namespace).List(options.LabelSelector)
+	pods, err := dc.podLister.Pods(namespace).List(options.LabelSelector)
 	if err != nil {
 		return nil, fmt.Errorf("error in getting pod list for namespace %s and list options %+v: %s", namespace, options, err)
 	}
@@ -228,7 +228,7 @@ func (dc *DeploymentController) addHashKeyToRSAndPods(rs extensions.ReplicaSet) 
 func (dc *DeploymentController) listPods(deployment *extensions.Deployment) (*api.PodList, error) {
 	return deploymentutil.ListPods(deployment,
 		func(namespace string, options api.ListOptions) (*api.PodList, error) {
-			pods, err := dc.podStore.Pods(namespace).List(options.LabelSelector)
+			pods, err := dc.podLister.Pods(namespace).List(options.LabelSelector)
 			result := api.PodList{Items: make([]api.Pod, 0, len(pods))}
 			for i := range pods {
 				result.Items = append(result.Items, *pods[i])

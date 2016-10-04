@@ -38,6 +38,7 @@ type SharedInformerFactory interface {
 	PersistentVolumes() PVInformer
 
 	DaemonSets() DaemonSetInformer
+	Deployments() DeploymentInformer
 }
 
 type sharedInformerFactory struct {
@@ -101,4 +102,8 @@ func (f *sharedInformerFactory) PersistentVolumes() PVInformer {
 
 func (f *sharedInformerFactory) DaemonSets() DaemonSetInformer {
 	return &daemonSetInformer{sharedInformerFactory: f}
+}
+
+func (f *sharedInformerFactory) Deployments() DeploymentInformer {
+	return &deploymentInformer{sharedInformerFactory: f}
 }
