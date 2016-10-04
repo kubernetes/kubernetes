@@ -43,7 +43,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_4"
+	"k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5"
 	"k8s.io/kubernetes/pkg/api"
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
@@ -941,7 +941,7 @@ func WaitForDefaultServiceAccountInNamespace(c *client.Client, namespace string)
 
 // WaitForFederationApiserverReady waits for the federation apiserver to be ready.
 // It tests the readiness by sending a GET request and expecting a non error response.
-func WaitForFederationApiserverReady(c *federation_release_1_4.Clientset) error {
+func WaitForFederationApiserverReady(c *federation_release_1_5.Clientset) error {
 	return wait.PollImmediate(time.Second, 1*time.Minute, func() (bool, error) {
 		_, err := c.Federation().Clusters().List(v1.ListOptions{})
 		if err != nil {
@@ -1959,13 +1959,13 @@ func setTimeouts(cs ...*http.Client) {
 	}
 }
 
-func LoadFederationClientset_1_4() (*federation_release_1_4.Clientset, error) {
+func LoadFederationClientset_1_5() (*federation_release_1_5.Clientset, error) {
 	config, err := LoadFederatedConfig(&clientcmd.ConfigOverrides{})
 	if err != nil {
 		return nil, err
 	}
 
-	c, err := federation_release_1_4.NewForConfig(config)
+	c, err := federation_release_1_5.NewForConfig(config)
 	if err != nil {
 		return nil, fmt.Errorf("error creating federation clientset: %v", err.Error())
 	}

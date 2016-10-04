@@ -28,7 +28,7 @@ import (
 
 func createClusterObjectOrFail_14(f *framework.Framework, context *framework.E2EContext) {
 	framework.Logf("Looking up cluster: %s", context.Name)
-	foundCluster, err := f.FederationClientset_1_4.Federation().Clusters().Get(context.Name)
+	foundCluster, err := f.FederationClientset_1_5.Federation().Clusters().Get(context.Name)
 	if err == nil && foundCluster != nil {
 		return
 	}
@@ -53,7 +53,7 @@ func createClusterObjectOrFail_14(f *framework.Framework, context *framework.E2E
 			},
 		},
 	}
-	_, err = f.FederationClientset_1_4.Federation().Clusters().Create(&cluster)
+	_, err = f.FederationClientset_1_5.Federation().Clusters().Create(&cluster)
 	framework.ExpectNoError(err, fmt.Sprintf("creating cluster: %+v", err))
 	framework.Logf("Successfully created cluster object: %s (%s, secret: %s)", context.Name, context.Cluster.Cluster.Server, context.Name)
 }
@@ -68,7 +68,7 @@ func buildClustersOrFail_14(f *framework.Framework) []*federation_api.Cluster {
 	// Wait for all clusters to become ready for up to 5 min.
 	if err := wait.PollImmediate(5*time.Second, 5*time.Minute, func() (bool, error) {
 		for _, context := range contexts {
-			cluster, err := f.FederationClientset_1_4.Federation().Clusters().Get(context.Name)
+			cluster, err := f.FederationClientset_1_5.Federation().Clusters().Get(context.Name)
 			if err != nil {
 				return false, err
 			}
@@ -87,7 +87,7 @@ func buildClustersOrFail_14(f *framework.Framework) []*federation_api.Cluster {
 		framework.Failf("Not all clusters are ready: %v", err)
 	}
 
-	clusterList, err := f.FederationClientset_1_4.Federation().Clusters().List(api_v1.ListOptions{})
+	clusterList, err := f.FederationClientset_1_5.Federation().Clusters().List(api_v1.ListOptions{})
 	if err != nil {
 		framework.Failf("Error in get clusters: %v", err)
 	}

@@ -24,7 +24,7 @@ import (
 	"strconv"
 	"time"
 
-	"k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_4"
+	"k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
@@ -54,10 +54,10 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 		AfterEach(func() {
 			nsName := f.FederationNamespace.Name
 			// Delete registered ingresses.
-			ingressList, err := f.FederationClientset_1_4.Extensions().Ingresses(nsName).List(v1.ListOptions{})
+			ingressList, err := f.FederationClientset_1_5.Extensions().Ingresses(nsName).List(v1.ListOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			for _, ingress := range ingressList.Items {
-				err := f.FederationClientset_1_4.Extensions().Ingresses(nsName).Delete(ingress.Name, &v1.DeleteOptions{})
+				err := f.FederationClientset_1_5.Extensions().Ingresses(nsName).Delete(ingress.Name, &v1.DeleteOptions{})
 				Expect(err).NotTo(HaveOccurred())
 			}
 		})
@@ -66,10 +66,10 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 			framework.SkipUnlessFederated(f.Client)
 
 			nsName := f.FederationNamespace.Name
-			ingress := createIngressOrFail(f.FederationClientset_1_4, nsName)
+			ingress := createIngressOrFail(f.FederationClientset_1_5, nsName)
 			By(fmt.Sprintf("Creation of ingress %q in namespace %q succeeded.  Deleting ingress.", ingress.Name, nsName))
 			// Cleanup
-			err := f.FederationClientset_1_4.Extensions().Ingresses(nsName).Delete(ingress.Name, &v1.DeleteOptions{})
+			err := f.FederationClientset_1_5.Extensions().Ingresses(nsName).Delete(ingress.Name, &v1.DeleteOptions{})
 			framework.ExpectNoError(err, "Error deleting ingress %q in namespace %q", ingress.Name, ingress.Namespace)
 			By(fmt.Sprintf("Deletion of ingress %q in namespace %q succeeded.", ingress.Name, nsName))
 		})
@@ -89,7 +89,7 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 			if federationName = os.Getenv("FEDERATION_NAME"); federationName == "" {
 				federationName = DefaultFederationName
 			}
-			jig = newFederationTestJig(f.FederationClientset_1_4)
+			jig = newFederationTestJig(f.FederationClientset_1_5)
 			clusters = map[string]*cluster{}
 			primaryClusterName = registerClusters(clusters, UserAgentName, federationName, f)
 			ns = f.FederationNamespace.Name
@@ -100,15 +100,15 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 		})
 
 		It("should create and update matching ingresses in underlying clusters", func() {
-			ingress := createIngressOrFail(f.FederationClientset_1_4, ns)
+			ingress := createIngressOrFail(f.FederationClientset_1_5, ns)
 			defer func() { // Cleanup
 				By(fmt.Sprintf("Deleting ingress %q in namespace %q", ingress.Name, ns))
-				err := f.FederationClientset_1_4.Ingresses(ns).Delete(ingress.Name, &v1.DeleteOptions{})
+				err := f.FederationClientset_1_5.Ingresses(ns).Delete(ingress.Name, &v1.DeleteOptions{})
 				framework.ExpectNoError(err, "Error deleting ingress %q in namespace %q", ingress.Name, ns)
 			}()
 			// wait for ingress shards being created
 			waitForIngressShardsOrFail(ns, ingress, clusters)
-			ingress = updateIngressOrFail(f.FederationClientset_1_4, ns)
+			ingress = updateIngressOrFail(f.FederationClientset_1_5, ns)
 			waitForIngressShardsUpdatedOrFail(ns, ingress, clusters)
 		})
 
@@ -123,9 +123,9 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 				// create backend pod
 				createBackendPodsOrFail(clusters, ns, FederatedIngressServicePodName)
 				// create backend service
-				service = createServiceOrFail(f.FederationClientset_1_4, ns, FederatedIngressServiceName)
+				service = createServiceOrFail(f.FederationClientset_1_5, ns, FederatedIngressServiceName)
 				// create ingress object
-				jig.ing = createIngressOrFail(f.FederationClientset_1_4, ns)
+				jig.ing = createIngressOrFail(f.FederationClientset_1_5, ns)
 				// wait for services objects sync
 				waitForServiceShardsOrFail(ns, service, clusters)
 				// wait for ingress objects sync
@@ -135,14 +135,14 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 			AfterEach(func() {
 				deleteBackendPodsOrFail(clusters, ns)
 				if service != nil {
-					deleteServiceOrFail(f.FederationClientset_1_4, ns, service.Name)
+					deleteServiceOrFail(f.FederationClientset_1_5, ns, service.Name)
 					cleanupServiceShardsAndProviderResources(ns, service, clusters)
 					service = nil
 				} else {
 					By("No service to delete. Service is nil")
 				}
 				if jig.ing != nil {
-					deleteIngressOrFail(f.FederationClientset_1_4, ns, jig.ing.Name)
+					deleteIngressOrFail(f.FederationClientset_1_5, ns, jig.ing.Name)
 					jig.ing = nil
 				} else {
 					By("No ingress to delete. Ingress is nil")
@@ -260,7 +260,7 @@ func waitForIngressShardsGoneOrFail(namespace string, ingress *v1beta1.Ingress, 
 	}
 }
 
-func deleteIngressOrFail(clientset *federation_release_1_4.Clientset, namespace string, ingressName string) {
+func deleteIngressOrFail(clientset *federation_release_1_5.Clientset, namespace string, ingressName string) {
 	if clientset == nil || len(namespace) == 0 || len(ingressName) == 0 {
 		Fail(fmt.Sprintf("Internal error: invalid parameters passed to deleteIngressOrFail: clientset: %v, namespace: %v, ingress: %v", clientset, namespace, ingressName))
 	}
@@ -268,7 +268,7 @@ func deleteIngressOrFail(clientset *federation_release_1_4.Clientset, namespace 
 	framework.ExpectNoError(err, "Error deleting ingress %q from namespace %q", ingressName, namespace)
 }
 
-func createIngressOrFail(clientset *federation_release_1_4.Clientset, namespace string) *v1beta1.Ingress {
+func createIngressOrFail(clientset *federation_release_1_5.Clientset, namespace string) *v1beta1.Ingress {
 	if clientset == nil || len(namespace) == 0 {
 		Fail(fmt.Sprintf("Internal error: invalid parameters passed to createIngressOrFail: clientset: %v, namespace: %v", clientset, namespace))
 	}
@@ -292,7 +292,7 @@ func createIngressOrFail(clientset *federation_release_1_4.Clientset, namespace 
 	return newIng
 }
 
-func updateIngressOrFail(clientset *federation_release_1_4.Clientset, namespace string) (newIng *v1beta1.Ingress) {
+func updateIngressOrFail(clientset *federation_release_1_5.Clientset, namespace string) (newIng *v1beta1.Ingress) {
 	var err error
 	if clientset == nil || len(namespace) == 0 {
 		Fail(fmt.Sprintf("Internal error: invalid parameters passed to createIngressOrFail: clientset: %v, namespace: %v", clientset, namespace))
@@ -353,15 +353,15 @@ type federationTestJig struct {
 	rootCAs map[string][]byte
 	address string
 	ing     *v1beta1.Ingress
-	client  *federation_release_1_4.Clientset
+	client  *federation_release_1_5.Clientset
 }
 
-func newFederationTestJig(c *federation_release_1_4.Clientset) *federationTestJig {
+func newFederationTestJig(c *federation_release_1_5.Clientset) *federationTestJig {
 	return &federationTestJig{client: c, rootCAs: map[string][]byte{}}
 }
 
 // WaitForFederatedIngressAddress waits for the Ingress to acquire an address.
-func waitForFederatedIngressAddress(c *federation_release_1_4.Clientset, ns, ingName string, timeout time.Duration) (string, error) {
+func waitForFederatedIngressAddress(c *federation_release_1_5.Clientset, ns, ingName string, timeout time.Duration) (string, error) {
 	var address string
 	err := wait.PollImmediate(10*time.Second, timeout, func() (bool, error) {
 		ipOrNameList, err := getFederatedIngressAddress(c, ns, ingName)
@@ -376,7 +376,7 @@ func waitForFederatedIngressAddress(c *federation_release_1_4.Clientset, ns, ing
 }
 
 // waitForFederatedIngressExists waits for the Ingress object exists.
-func waitForFederatedIngressExists(c *federation_release_1_4.Clientset, ns, ingName string, timeout time.Duration) error {
+func waitForFederatedIngressExists(c *federation_release_1_5.Clientset, ns, ingName string, timeout time.Duration) error {
 	err := wait.PollImmediate(10*time.Second, timeout, func() (bool, error) {
 		_, err := c.Extensions().Ingresses(ns).Get(ingName)
 		if err != nil {
@@ -389,7 +389,7 @@ func waitForFederatedIngressExists(c *federation_release_1_4.Clientset, ns, ingN
 }
 
 // getFederatedIngressAddress returns the ips/hostnames associated with the Ingress.
-func getFederatedIngressAddress(client *federation_release_1_4.Clientset, ns, name string) ([]string, error) {
+func getFederatedIngressAddress(client *federation_release_1_5.Clientset, ns, name string) ([]string, error) {
 	ing, err := client.Extensions().Ingresses(ns).Get(name)
 	if err != nil {
 		return nil, err

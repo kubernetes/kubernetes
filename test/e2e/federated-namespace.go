@@ -58,8 +58,8 @@ var _ = framework.KubeDescribe("Federation namespace [Feature:Federation]", func
 		AfterEach(func() {
 			framework.SkipUnlessFederated(f.Client)
 			deleteAllTestNamespacesWithVersionedOptions(
-				f.FederationClientset_1_4.Core().Namespaces().List,
-				f.FederationClientset_1_4.Core().Namespaces().Delete)
+				f.FederationClientset_1_5.Core().Namespaces().List,
+				f.FederationClientset_1_5.Core().Namespaces().Delete)
 			for _, cluster := range clusters {
 				deleteAllTestNamespaces(
 					cluster.Core().Namespaces().List,
@@ -77,7 +77,7 @@ var _ = framework.KubeDescribe("Federation namespace [Feature:Federation]", func
 				},
 			}
 			By(fmt.Sprintf("Creating namespace %s", ns.Name))
-			_, err := f.FederationClientset_1_4.Core().Namespaces().Create(&ns)
+			_, err := f.FederationClientset_1_5.Core().Namespaces().Create(&ns)
 			framework.ExpectNoError(err, "Failed to create namespace %s", ns.Name)
 
 			// Check subclusters if the namespace was created there.
@@ -96,8 +96,8 @@ var _ = framework.KubeDescribe("Federation namespace [Feature:Federation]", func
 			framework.ExpectNoError(err, "Not all namespaces created")
 
 			deleteAllTestNamespacesWithVersionedOptions(
-				f.FederationClientset_1_4.Core().Namespaces().List,
-				f.FederationClientset_1_4.Core().Namespaces().Delete)
+				f.FederationClientset_1_5.Core().Namespaces().List,
+				f.FederationClientset_1_5.Core().Namespaces().Delete)
 		})
 	})
 })
