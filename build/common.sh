@@ -20,7 +20,6 @@ set -o nounset
 set -o pipefail
 
 DOCKER_OPTS=${DOCKER_OPTS:-""}
-DOCKER_NATIVE=${DOCKER_NATIVE:-""}
 DOCKER=(docker ${DOCKER_OPTS})
 DOCKER_HOST=${DOCKER_HOST:-""}
 DOCKER_MACHINE_NAME=${DOCKER_MACHINE_NAME:-"kube-dev"}
@@ -173,7 +172,7 @@ function kube::build::verify_prereqs() {
   LOCAL_OUTPUT_BUILD_CONTEXT="${LOCAL_OUTPUT_IMAGE_STAGING}/${KUBE_BUILD_IMAGE}"
 
   kube::version::get_version_vars
-  kube::version::save_version_vars "${KUBE_ROOT}/.dockerized-kube-version-defs"  
+  kube::version::save_version_vars "${KUBE_ROOT}/.dockerized-kube-version-defs"
 }
 
 # ---------------------------------------------------------------------------
