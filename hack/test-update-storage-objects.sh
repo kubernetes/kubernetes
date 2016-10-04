@@ -103,6 +103,7 @@ make -C "${KUBE_ROOT}" WHAT=cmd/kube-apiserver
 make -C "${KUBE_ROOT}" WHAT=cluster/images/etcd/attachlease
 
 kube::etcd::start
+echo "${ETCD_VERSION}/${STORAGE_BACKEND_ETCD2}" > "${ETCD_DIR}/version.txt"
 
 ### BEGIN TEST DEFINITION CUSTOMIZATION ###
 
@@ -159,6 +160,7 @@ killApiServer
 
 kube::etcd::stop
 TARGET_STORAGE="etcd3" \
+  TARGET_VERSION="3.0.10" \
   DATA_DIRECTORY="${ETCD_DIR}" \
   ETCD=$(which etcd) \
   ETCDCTL=$(which etcdctl) \
