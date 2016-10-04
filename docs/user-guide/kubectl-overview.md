@@ -134,25 +134,34 @@ The following table includes a list of all the supported resource types and thei
 
 Resource type	| Abbreviated alias
 -------------------- | --------------------
-`componentstatuses`	|	`cs`
-`daemonsets` | `ds`
-`deployments` |
-`events` | `ev`
-`endpoints` | `ep`
-`horizontalpodautoscalers` | `hpa`
-`ingresses` | `ing`
+`clusters` |
+`componentstatuses` |`cs`
+`configmaps` |`cm`
+`daemonsets` |`ds`
+`deployments` |`deploy`
+`endpoints` |`ep`
+`events` |`ev`
+`horizontalpodautoscalers` |`hpa`
+`ingresses` |`ing`
 `jobs` |
-`limitranges` | `limits`
-`nodes` | `no`
-`namespaces` | `ns`
-`pods` | `po`
-`persistentvolumes` | `pv`
-`persistentvolumeclaims` | `pvc`
-`resourcequotas` | `quota`
-`replicationcontrollers` | `rc`
+`limitranges` |`limits`
+`namespaces` |`ns`
+`networkpolicies` |
+`nodes` |`no`
+`persistentvolumeclaims` |`pvc`
+`persistentvolumes` |`pv`
+`pods` |`po`
+`podsecuritypolicies` |`psp`
+`podtemplates` |
+`replicasets` |`rs`
+`replicationcontrollers` |`rc`
+`resourcequotas` |`quota`
+`scheduledjobs` |
 `secrets` |
-`serviceaccounts` |
-`services` | `svc`
+`serviceaccounts` |`sa`
+`services` |`svc`
+`storageclasses` |
+`thirdpartyresources` |
 
 ## Output options
 
