@@ -111,6 +111,7 @@ function return_to_kansas {
 }
 trap return_to_kansas EXIT
 
+SUBJECTS=()
 function make-a-pr() {
   local rel="$(basename "${BRANCH}")"
   echo
@@ -125,6 +126,8 @@ function make-a-pr() {
 Automated cherry pick of ${PULLSUBJ}
 
 Cherry pick of ${PULLSUBJ} on ${rel}.
+
+$(printf '%s\n' "${SUBJECTS[@]}")
 EOF
 
   hub pull-request -F "${prtext}" -h "${GITHUB_USER}:${NEWBRANCH}" -b "kubernetes:${rel}"
@@ -165,6 +168,9 @@ for pull in "${PULLS[@]}"; do
       exit 1
     fi
   }
+  # set the subject
+  subject=$(grep "^Subject" "/tmp/${pull}.patch" | sed -e 's/Subject: \[PATCH\] //g')
+  SUBJECTS+=("#${pull}: ${subject}")
 done
 gitamcleanup=false
 
