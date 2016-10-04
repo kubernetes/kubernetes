@@ -48,7 +48,7 @@ type AuthenticatorConfig struct {
 	OIDCCAFile                  string
 	OIDCUsernameClaim           string
 	OIDCGroupsClaim             string
-	ServiceAccountKeyFile       string
+	ServiceAccountKeyFiles      []string
 	ServiceAccountLookup        bool
 	ServiceAccountTokenGetter   serviceaccount.ServiceAccountTokenGetter
 	KeystoneURL                 string
@@ -94,8 +94,8 @@ func New(config AuthenticatorConfig) (authenticator.Request, error) {
 		}
 		authenticators = append(authenticators, tokenAuth)
 	}
-	if len(config.ServiceAccountKeyFile) > 0 {
-		serviceAccountAuth, err := newServiceAccountAuthenticator(config.ServiceAccountKeyFile, config.ServiceAccountLookup, config.ServiceAccountTokenGetter)
+	if len(config.ServiceAccountKeyFiles) > 0 {
+		serviceAccountAuth, err := newServiceAccountAuthenticator(config.ServiceAccountKeyFiles, config.ServiceAccountLookup, config.ServiceAccountTokenGetter)
 		if err != nil {
 			return nil, err
 		}
@@ -152,7 +152,7 @@ func New(config AuthenticatorConfig) (authenticator.Request, error) {
 
 // IsValidServiceAccountKeyFile returns true if a valid public RSA key can be read from the given file
 func IsValidServiceAccountKeyFile(file string) bool {
-	_, err := serviceaccount.ReadPublicKey(file)
+	_, err := serviceaccount.ReadPublicKeys(file)
 	return err == nil
 }
 
@@ -198,13 +198,17 @@ func newAuthenticatorFromOIDCIssuerURL(issuerURL, clientID, caFile, usernameClai
 }
 
 // newServiceAccountAuthenticator returns an authenticator.Request or an error
-func newServiceAccountAuthenticator(keyfile string, lookup bool, serviceAccountGetter serviceaccount.ServiceAccountTokenGetter) (authenticator.Request, error) {
-	publicKey, err := serviceaccount.ReadPublicKey(keyfile)
-	if err != nil {
-		return nil, err
+func newServiceAccountAuthenticator(keyfiles []string, lookup bool, serviceAccountGetter serviceaccount.ServiceAccountTokenGetter) (authenticator.Request, error) {
+	allPublicKeys := []interface{}{}
+	for _, keyfile := range keyfiles {
+		publicKeys, err := serviceaccount.ReadPublicKeys(keyfile)
+		if err != nil {
+			return nil, err
+		}
+		allPublicKeys = append(allPublicKeys, publicKeys...)
 	}
 
-	tokenAuthenticator := serviceaccount.JWTTokenAuthenticator([]interface{}{publicKey}, lookup, serviceAccountGetter)
+	tokenAuthenticator := serviceaccount.JWTTokenAuthenticator(allPublicKeys, lookup, serviceAccountGetter)
 	return bearertoken.New(tokenAuthenticator), nil
 }
 
