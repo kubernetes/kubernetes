@@ -71,7 +71,7 @@ func (f *daemonSetInformer) Lister() *cache.StoreToDaemonSetLister {
 
 // Deployment is type of SharedIndexInformer which watches and lists all pods.
 // Interface provides constructor for informer and lister for pods
-type Deployment interface {
+type DeploymentInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() *cache.StoreToDeploymentLister
 }
@@ -109,5 +109,5 @@ func (f *deploymentInformer) Informer() cache.SharedIndexInformer {
 
 func (f *deploymentInformer) Lister() *cache.StoreToDeploymentLister {
 	informer := f.Informer()
-	return &cache.StoreToDeploymentLister{Store: informer.GetIndexer()}
+	return &cache.StoreToDeploymentLister{Indexer: informer.GetIndexer()}
 }

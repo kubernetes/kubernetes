@@ -142,7 +142,7 @@ func NewDisruptionController(podInformer cache.SharedIndexInformer, kubeClient i
 
 	dc.rcLister.Indexer = dc.rcIndexer
 
-	dc.rsStore, dc.rsController = cache.NewInformer(
+	dc.rsLister.Indexer, dc.rsController = cache.NewIndexerInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				return dc.kubeClient.Extensions().ReplicaSets(api.NamespaceAll).List(options)
@@ -154,9 +154,9 @@ func NewDisruptionController(podInformer cache.SharedIndexInformer, kubeClient i
 		&extensions.ReplicaSet{},
 		30*time.Second,
 		cache.ResourceEventHandlerFuncs{},
+		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)
-
-	dc.rsLister.Store = dc.rsStore
+	dc.rsStore = dc.rsLister.Indexer
 
 	dc.dIndexer, dc.dController = cache.NewIndexerInformer(
 		&cache.ListWatch{
@@ -202,7 +202,7 @@ func (dc *DisruptionController) getPodReplicaSets(pod *api.Pod) ([]controllerAnd
 	for _, rs := range rss {
 		// GetDeploymentsForReplicaSet returns an error only if no matching
 		// deployments are found.
-		_, err := dc.dLister.GetDeploymentsForReplicaSet(&rs)
+		_, err := dc.dLister.GetDeploymentsForReplicaSet(rs)
 		if err == nil { // A deployment was found, so this finder will not count this RS.
 			continue
 		}
@@ -227,7 +227,7 @@ func (dc *DisruptionController) getPodDeployments(pod *api.Pod) ([]controllerAnd
 	}
 	controllerScale := map[types.UID]int32{}
 	for _, rs := range rss {
-		ds, err := dc.dLister.GetDeploymentsForReplicaSet(&rs)
+		ds, err := dc.dLister.GetDeploymentsForReplicaSet(rs)
 		// GetDeploymentsForReplicaSet returns an error only if no matching
 		// deployments are found.  In that case we skip this ReplicaSet.
 		if err != nil {

@@ -129,7 +129,7 @@ func NewDeploymentController(client clientset.Interface, resyncPeriod controller
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)
 
-	dc.rsLister.Store, dc.rsController = cache.NewInformer(
+	dc.rsLister.Indexer, dc.rsController = cache.NewIndexerInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				return dc.client.Extensions().ReplicaSets(api.NamespaceAll).List(options)
@@ -145,6 +145,7 @@ func NewDeploymentController(client clientset.Interface, resyncPeriod controller
 			UpdateFunc: dc.updateReplicaSet,
 			DeleteFunc: dc.deleteReplicaSet,
 		},
+		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)
 
 	dc.podLister.Indexer, dc.podController = cache.NewIndexerInformer(

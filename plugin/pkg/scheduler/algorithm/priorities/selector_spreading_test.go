@@ -58,7 +58,7 @@ func TestSelectorSpreadPriority(t *testing.T) {
 		pods         []*api.Pod
 		nodes        []string
 		rcs          []*api.ReplicationController
-		rss          []extensions.ReplicaSet
+		rss          []*extensions.ReplicaSet
 		services     []*api.Service
 		expectedList schedulerapi.HostPriorityList
 		test         string
@@ -197,7 +197,7 @@ func TestSelectorSpreadPriority(t *testing.T) {
 			},
 			nodes:    []string{"machine1", "machine2"},
 			services: []*api.Service{{Spec: api.ServiceSpec{Selector: map[string]string{"baz": "blah"}}}},
-			rss:      []extensions.ReplicaSet{{Spec: extensions.ReplicaSetSpec{Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}}}}},
+			rss:      []*extensions.ReplicaSet{{Spec: extensions.ReplicaSetSpec{Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}}}}},
 			// We use ReplicaSet, instead of ReplicationController. The result should be exactly as above.
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 0}, {Host: "machine2", Score: 5}},
 			test:         "service with partial pod label matches with service and replica set",
@@ -225,7 +225,7 @@ func TestSelectorSpreadPriority(t *testing.T) {
 			},
 			nodes:    []string{"machine1", "machine2"},
 			services: []*api.Service{{Spec: api.ServiceSpec{Selector: map[string]string{"bar": "foo"}}}},
-			rss:      []extensions.ReplicaSet{{Spec: extensions.ReplicaSetSpec{Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}}}}},
+			rss:      []*extensions.ReplicaSet{{Spec: extensions.ReplicaSetSpec{Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}}}}},
 			// We use ReplicaSet, instead of ReplicationController. The result should be exactly as above.
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 0}, {Host: "machine2", Score: 5}},
 			test:         "disjoined service and replica set should be treated equally",
@@ -251,7 +251,7 @@ func TestSelectorSpreadPriority(t *testing.T) {
 				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicaSet", "name", "abc123")}},
 			},
 			nodes: []string{"machine1", "machine2"},
-			rss:   []extensions.ReplicaSet{{Spec: extensions.ReplicaSetSpec{Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}}}}},
+			rss:   []*extensions.ReplicaSet{{Spec: extensions.ReplicaSetSpec{Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}}}}},
 			// We use ReplicaSet, instead of ReplicationController. The result should be exactly as above.
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 0}, {Host: "machine2", Score: 0}},
 			test:         "Replica set with partial pod label matches",
@@ -276,7 +276,7 @@ func TestSelectorSpreadPriority(t *testing.T) {
 				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicaSet", "name", "abc123")}},
 			},
 			nodes: []string{"machine1", "machine2"},
-			rss:   []extensions.ReplicaSet{{Spec: extensions.ReplicaSetSpec{Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{"baz": "blah"}}}}},
+			rss:   []*extensions.ReplicaSet{{Spec: extensions.ReplicaSetSpec{Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{"baz": "blah"}}}}},
 			// We use ReplicaSet, instead of ReplicationController. The result should be exactly as above.
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 0}, {Host: "machine2", Score: 5}},
 			test:         "Another replication set with partial pod label matches",
@@ -344,7 +344,7 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 		pods         []*api.Pod
 		nodes        []string
 		rcs          []*api.ReplicationController
-		rss          []extensions.ReplicaSet
+		rss          []*extensions.ReplicaSet
 		services     []*api.Service
 		expectedList schedulerapi.HostPriorityList
 		test         string
