@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package checks
+package initsystem
 
 import (
 	"fmt"
@@ -73,7 +73,7 @@ func (sysd SystemdInitSystem) ServiceIsActive(service string) bool {
 // getInitSystem returns an InitSystem for the current system, or nil
 // if we cannot detect a supported init system for pre-flight checks.
 // This indicates we will skip init system checks, not an error.
-func getInitSystem() InitSystem {
+func GetInitSystem() InitSystem {
 	// Assume existence of systemctl in path implies this is a systemd system:
 	_, err := exec.LookPath("systemctl")
 	if err == nil {
