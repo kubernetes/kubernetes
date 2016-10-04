@@ -28,6 +28,7 @@ import (
 	api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/watch"
 
 	"github.com/golang/glog"
@@ -210,4 +211,14 @@ func NewCluster(name string, readyStatus api_v1.ConditionStatus) *federation_api
 			},
 		},
 	}
+}
+
+// Ensure a key is in the store before returning (or timeout w/ error)
+func WaitForStoreUpdate(store util.FederatedReadOnlyStore, clusterName, key string, timeout time.Duration) error {
+	retryInterval := 100 * time.Millisecond
+	err := wait.PollImmediate(retryInterval, timeout, func() (bool, error) {
+		_, found, err := store.GetByKey(clusterName, key)
+		return found, err
+	})
+	return err
 }
