@@ -382,16 +382,7 @@ Loop:
 // parseField scans a field until a terminator
 func (p *Parser) parseField(cur *ListNode) error {
 	p.consumeText()
-Loop:
-	for {
-		switch r := p.next(); {
-		case r == '\\':
-			p.next()
-		case isTerminator(r):
-			p.backup()
-			break Loop
-		}
-	}
+	for p.advance() {}
 	value := p.consumeText()
 	if value == "*" {
 		cur.append(newWildcard())
@@ -399,6 +390,18 @@ Loop:
 		cur.append(newField(strings.Replace(value, "\\", "", -1)))
 	}
 	return p.parseInsideAction(cur)
+}
+
+// advance scans until next non-escaped terminator
+func (p *Parser) advance() bool {
+	r := p.next()
+	if r == '\\' {
+		p.next()
+	} else if isTerminator(r) {
+		p.backup()
+		return false
+	}
+	return true
 }
 
 // isTerminator reports whether the input is at valid termination character to appear after an identifier.
