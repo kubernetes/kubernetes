@@ -153,6 +153,8 @@ var _ = framework.KubeDescribe("PetSet [Slow] [Feature:PetSet]", func() {
 			By("Waiting for pet at index 1 to enter running.")
 			pst.waitForRunning(2, ps)
 
+			// TODO: verify petset status.replicas
+
 			// Now we have 1 healthy and 1 unhealthy pet. Deleting the healthy pet should *not*
 			// create a new pet till the remaining pet becomes healthy, which won't happen till
 			// we set the healthy bit.
@@ -458,6 +460,8 @@ func (p *petSetTester) saturate(ps *apps.PetSet) {
 		framework.Logf("Marking pet at index " + fmt.Sprintf("%v", i) + " healthy")
 		p.setHealthy(ps)
 	}
+	framework.Logf("Waiting for pet set status.replicas updated to %d", ps.Spec.Replicas)
+	p.waitForStatus(ps, ps.Spec.Replicas)
 }
 
 func (p *petSetTester) deletePetAtIndex(index int, ps *apps.PetSet) {
@@ -586,6 +590,25 @@ func (p *petSetTester) setHealthy(ps *apps.PetSet) {
 		ExpectNoError(err)
 		framework.Logf("Set annotation %v to %v on pod %v", petset.PetSetInitAnnotation, p.Annotations[petset.PetSetInitAnnotation], pod.Name)
 		markedHealthyPod = pod.Name
+	}
+}
+
+func (p *petSetTester) waitForStatus(ps *apps.PetSet, expectedReplicas int) {
+	ns, name := ps.Namespace, ps.Name
+	pollErr := wait.PollImmediate(petsetPoll, petsetTimeout,
+		func() (bool, error) {
+			psGet, err := p.c.Apps().PetSets(ns).Get(name)
+			if err != nil {
+				return false, err
+			}
+			if psGet.Status.Replicas != expectedReplicas {
+				framework.Logf("Waiting for pet set status to become %d, currently %d", expectedReplicas, ps.Status.Replicas)
+				return false, nil
+			}
+			return true, nil
+		})
+	if pollErr != nil {
+		framework.Failf("Failed waiting for pet set status.replicas updated to %d, got %d: %v", expectedReplicas, ps.Status.Replicas, pollErr)
 	}
 }
 
