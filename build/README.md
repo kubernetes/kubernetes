@@ -92,7 +92,7 @@ Look at `docker-machine stop`, `docker-machine start` and `docker-machine rm` to
 
 ## Releasing
 
-The `build/release.sh` script will build a release.  It will build binaries, run tests, (optionally) build runtime Docker images and then (optionally) upload all build artifacts to a GCS bucket.
+The `build/release.sh` script will build a release.  It will build binaries, run tests, (optionally) build runtime Docker images.
 
 The main output is a tar file: `kubernetes.tar.gz`.  This includes:
 * Cross compiled client utilities.
@@ -106,18 +106,6 @@ In addition, there are some other tar files that are created:
 * `kubernetes-client-*.tar.gz` Client binaries for a specific platform.
 * `kubernetes-server-*.tar.gz` Server binaries for a specific platform.
 * `kubernetes-salt.tar.gz` The salt script/tree shared across multiple deployment scripts.
-
-The release utilities grab a set of environment variables to modify behavior.  Arguably, these should be command line flags:
-
-Env Variable | Default | Description
--------------|---------|------------
-`KUBE_SKIP_CONFIRMATIONS` | `n` | If `y` then no questions are asked and the scripts just continue.
-`KUBE_GCS_UPLOAD_RELEASE` | `n` | Upload release artifacts to GCS
-`KUBE_GCS_RELEASE_BUCKET` | `kubernetes-releases-${project_hash}` | The bucket to upload releases to
-`KUBE_GCS_RELEASE_PREFIX` | `devel` | The path under the release bucket to put releases
-`KUBE_GCS_MAKE_PUBLIC` | `y` | Make GCS links readable from anywhere
-`KUBE_GCS_NO_CACHING` | `y` | Disable HTTP caching of GCS release artifacts.  By default GCS will cache public objects for up to an hour.  When doing "devel" releases this can cause problems.
-`KUBE_GCS_DOCKER_REG_PREFIX` | `docker-reg` | *Experimental* When uploading docker images, the bucket that backs the registry.
 
 When building final release tars, they are first staged into `_output/release-stage` before being tar'd up and put into `_output/release-tars`.
 
