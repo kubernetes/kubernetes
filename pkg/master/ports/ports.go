@@ -29,8 +29,6 @@ const (
 	// ControllerManagerPort is the default port for the controller manager status server.
 	// May be overridden by a flag at startup.
 	ControllerManagerPort = 10252
-	// Port for flannel daemon.
-	FlannelDaemonPort = 10253
 	// KubeletReadOnlyPort exposes basic read-only services from the kubelet.
 	// May be overridden by a flag at startup.
 	// This is necessary for heapster to collect monitoring stats from the kubelet
