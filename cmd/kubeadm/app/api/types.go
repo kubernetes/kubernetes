@@ -16,9 +16,7 @@ limitations under the License.
 
 package api
 
-import (
-	"net"
-)
+import "net"
 
 // KubeadmConfig TODO add description
 // TODO(phase1+) @krousey: Please don't embed structs. It obfuscates the source of the fields and doesn't really buy you anything.

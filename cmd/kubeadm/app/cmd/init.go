@@ -28,7 +28,6 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/api"
 	kubemaster "k8s.io/kubernetes/cmd/kubeadm/app/master"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	netutil "k8s.io/kubernetes/pkg/util/net"
 )
 
@@ -50,7 +49,7 @@ func NewCmdInit(out io.Writer, s *kubeadmapi.KubeadmConfig) *cobra.Command {
 		Short: "Run this in order to set up the Kubernetes master.",
 		Run: func(cmd *cobra.Command, args []string) {
 			err := RunInit(out, cmd, args, s, advertiseAddrs)
-			cmdutil.CheckErr(err)
+			kubeadmutil.CheckErr(err)
 		},
 	}
 
@@ -111,6 +110,9 @@ func NewCmdInit(out io.Writer, s *kubeadmapi.KubeadmConfig) *cobra.Command {
 
 // RunInit executes master node provisioning, including certificates, needed static pod manifests, etc.
 func RunInit(out io.Writer, cmd *cobra.Command, args []string, s *kubeadmapi.KubeadmConfig, advertiseAddrs *[]string) error {
+	if u, ok := kubeadmutil.IsRoot(); !ok {
+		return &kubeadmutil.NotRootError{"Requires root priviledges", u}
+	}
 	// Auto-detect the IP
 	if len(*advertiseAddrs) == 0 {
 		// TODO(phase1+) perhaps we could actually grab eth0 and eth1
