@@ -196,6 +196,8 @@ E2E_STORAGE_TEST_ENVIRONMENT=${KUBE_E2E_STORAGE_TEST_ENVIRONMENT:-false}
 # TODO: Pipe this through GKE e2e clusters once we know it helps.
 PREPULL_E2E_IMAGES="${PREPULL_E2E_IMAGES:-true}"
 
+ENABLE_DNSMASQ="${ENABLE_DNSMASQ:-true}"
+
 # Evict pods whenever compute resource availability on the nodes gets below a threshold.
 # TODO: Get rid of the conditionals once https://github.com/kubernetes/kubernetes/issues/33444 is resolved.
 if [[ "${NODE_OS_DISTRIBUTION}" == "debian" ]]; then
@@ -206,3 +208,4 @@ fi
 
 # Optional: custom scheduling algorithm
 SCHEDULING_ALGORITHM_PROVIDER="${SCHEDULING_ALGORITHM_PROVIDER:-}"
+
