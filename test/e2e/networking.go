@@ -20,10 +20,10 @@ import (
 	"fmt"
 	"net/http"
 
-	. "github.com/onsi/ginkgo"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/test/e2e/framework"
-	networking_util "k8s.io/kubernetes/test/utils"
+
+	. "github.com/onsi/ginkgo"
 )
 
 var _ = framework.KubeDescribe("Networking", func() {
@@ -77,114 +77,148 @@ var _ = framework.KubeDescribe("Networking", func() {
 	It("should check kube-proxy urls", func() {
 		// TODO: this is overkill we just need the host networking pod
 		// to hit kube-proxy urls.
-		config := networking_util.NewNetworkingTestConfig(f)
+		config := NewNetworkingTestConfig(f)
 
 		By("checking kube-proxy URLs")
-		config.GetSelfURL("/healthz", "ok")
-		config.GetSelfURL("/proxyMode", "iptables") // the default
+		config.getSelfURL("/healthz", "ok")
+		config.getSelfURL("/proxyMode", "iptables") // the default
+	})
+
+	framework.KubeDescribe("Granular Checks: Pods", func() {
+
+		// Try to hit all endpoints through a test container, retry 5 times,
+		// expect exactly one unique hostname. Each of these endpoints reports
+		// its own hostname.
+		It("should function for intra-pod communication: http [Conformance]", func() {
+			config := NewNetworkingTestConfig(f)
+			for _, endpointPod := range config.endpointPods {
+				config.dialFromTestContainer("http", endpointPod.Status.PodIP, endpointHttpPort, config.maxTries, 0, sets.NewString(endpointPod.Name))
+			}
+		})
+
+		It("should function for intra-pod communication: udp [Conformance]", func() {
+			config := NewNetworkingTestConfig(f)
+			for _, endpointPod := range config.endpointPods {
+				config.dialFromTestContainer("udp", endpointPod.Status.PodIP, endpointUdpPort, config.maxTries, 0, sets.NewString(endpointPod.Name))
+			}
+		})
+
+		It("should function for node-pod communication: http [Conformance]", func() {
+			config := NewNetworkingTestConfig(f)
+			for _, endpointPod := range config.endpointPods {
+				config.dialFromNode("http", endpointPod.Status.PodIP, endpointHttpPort, config.maxTries, 0, sets.NewString(endpointPod.Name))
+			}
+		})
+
+		It("should function for node-pod communication: udp [Conformance]", func() {
+			config := NewNetworkingTestConfig(f)
+			for _, endpointPod := range config.endpointPods {
+				config.dialFromNode("udp", endpointPod.Status.PodIP, endpointUdpPort, config.maxTries, 0, sets.NewString(endpointPod.Name))
+			}
+		})
 	})
 
 	// TODO: Remove [Slow] when this has had enough bake time to prove presubmit worthiness.
 	framework.KubeDescribe("Granular Checks: Services [Slow]", func() {
 
 		It("should function for pod-Service: http", func() {
-			config := networking_util.NewNetworkingTestConfig(f)
-			By(fmt.Sprintf("dialing(http) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.ClusterIP, networking_util.ClusterHttpPort))
-			config.DialFromTestContainer("http", config.ClusterIP, networking_util.ClusterHttpPort, config.MaxTries, 0, config.EndpointHostnames())
+			config := NewNetworkingTestConfig(f)
+			By(fmt.Sprintf("dialing(http) %v --> %v:%v (config.clusterIP)", config.testContainerPod.Name, config.clusterIP, clusterHttpPort))
+			config.dialFromTestContainer("http", config.clusterIP, clusterHttpPort, config.maxTries, 0, config.endpointHostnames())
 
-			By(fmt.Sprintf("dialing(http) %v --> %v:%v (nodeIP)", config.TestContainerPod.Name, config.ExternalAddrs[0], config.NodeHttpPort))
-			config.DialFromTestContainer("http", config.NodeIP, config.NodeHttpPort, config.MaxTries, 0, config.EndpointHostnames())
+			By(fmt.Sprintf("dialing(http) %v --> %v:%v (nodeIP)", config.testContainerPod.Name, config.externalAddrs[0], config.nodeHttpPort))
+			config.dialFromTestContainer("http", config.nodeIP, config.nodeHttpPort, config.maxTries, 0, config.endpointHostnames())
 		})
 
 		It("should function for pod-Service: udp", func() {
-			config := networking_util.NewNetworkingTestConfig(f)
-			By(fmt.Sprintf("dialing(udp) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.ClusterIP, networking_util.ClusterUdpPort))
-			config.DialFromTestContainer("udp", config.ClusterIP, networking_util.ClusterUdpPort, config.MaxTries, 0, config.EndpointHostnames())
+			config := NewNetworkingTestConfig(f)
+			By(fmt.Sprintf("dialing(udp) %v --> %v:%v (config.clusterIP)", config.testContainerPod.Name, config.clusterIP, clusterUdpPort))
+			config.dialFromTestContainer("udp", config.clusterIP, clusterUdpPort, config.maxTries, 0, config.endpointHostnames())
 
-			By(fmt.Sprintf("dialing(udp) %v --> %v:%v (nodeIP)", config.TestContainerPod.Name, config.ExternalAddrs[0], config.NodeUdpPort))
-			config.DialFromTestContainer("udp", config.NodeIP, config.NodeUdpPort, config.MaxTries, 0, config.EndpointHostnames())
+			By(fmt.Sprintf("dialing(udp) %v --> %v:%v (nodeIP)", config.testContainerPod.Name, config.externalAddrs[0], config.nodeUdpPort))
+			config.dialFromTestContainer("udp", config.nodeIP, config.nodeUdpPort, config.maxTries, 0, config.endpointHostnames())
 		})
 
 		It("should function for node-Service: http", func() {
-			config := networking_util.NewNetworkingTestConfig(f)
-			By(fmt.Sprintf("dialing(http) %v (node) --> %v:%v (config.clusterIP)", config.NodeIP, config.ClusterIP, networking_util.ClusterHttpPort))
-			config.DialFromNode("http", config.ClusterIP, networking_util.ClusterHttpPort, config.MaxTries, 0, config.EndpointHostnames())
+			config := NewNetworkingTestConfig(f)
+			By(fmt.Sprintf("dialing(http) %v (node) --> %v:%v (config.clusterIP)", config.nodeIP, config.clusterIP, clusterHttpPort))
+			config.dialFromNode("http", config.clusterIP, clusterHttpPort, config.maxTries, 0, config.endpointHostnames())
 
-			By(fmt.Sprintf("dialing(http) %v (node) --> %v:%v (nodeIP)", config.NodeIP, config.NodeIP, config.NodeHttpPort))
-			config.DialFromNode("http", config.NodeIP, config.NodeHttpPort, config.MaxTries, 0, config.EndpointHostnames())
+			By(fmt.Sprintf("dialing(http) %v (node) --> %v:%v (nodeIP)", config.nodeIP, config.nodeIP, config.nodeHttpPort))
+			config.dialFromNode("http", config.nodeIP, config.nodeHttpPort, config.maxTries, 0, config.endpointHostnames())
 		})
 
 		It("should function for node-Service: udp", func() {
-			config := networking_util.NewNetworkingTestConfig(f)
-			By(fmt.Sprintf("dialing(udp) %v (node) --> %v:%v (config.clusterIP)", config.NodeIP, config.ClusterIP, networking_util.ClusterUdpPort))
-			config.DialFromNode("udp", config.ClusterIP, networking_util.ClusterUdpPort, config.MaxTries, 0, config.EndpointHostnames())
+			config := NewNetworkingTestConfig(f)
+			By(fmt.Sprintf("dialing(udp) %v (node) --> %v:%v (config.clusterIP)", config.nodeIP, config.clusterIP, clusterUdpPort))
+			config.dialFromNode("udp", config.clusterIP, clusterUdpPort, config.maxTries, 0, config.endpointHostnames())
 
-			By(fmt.Sprintf("dialing(udp) %v (node) --> %v:%v (nodeIP)", config.NodeIP, config.NodeIP, config.NodeUdpPort))
-			config.DialFromNode("udp", config.NodeIP, config.NodeUdpPort, config.MaxTries, 0, config.EndpointHostnames())
+			By(fmt.Sprintf("dialing(udp) %v (node) --> %v:%v (nodeIP)", config.nodeIP, config.nodeIP, config.nodeUdpPort))
+			config.dialFromNode("udp", config.nodeIP, config.nodeUdpPort, config.maxTries, 0, config.endpointHostnames())
 		})
 
 		It("should function for endpoint-Service: http", func() {
-			config := networking_util.NewNetworkingTestConfig(f)
-			By(fmt.Sprintf("dialing(http) %v (endpoint) --> %v:%v (config.clusterIP)", config.EndpointPods[0].Name, config.ClusterIP, networking_util.ClusterHttpPort))
-			config.DialFromEndpointContainer("http", config.ClusterIP, networking_util.ClusterHttpPort, config.MaxTries, 0, config.EndpointHostnames())
+			config := NewNetworkingTestConfig(f)
+			By(fmt.Sprintf("dialing(http) %v (endpoint) --> %v:%v (config.clusterIP)", config.endpointPods[0].Name, config.clusterIP, clusterHttpPort))
+			config.dialFromEndpointContainer("http", config.clusterIP, clusterHttpPort, config.maxTries, 0, config.endpointHostnames())
 
-			By(fmt.Sprintf("dialing(http) %v (endpoint) --> %v:%v (nodeIP)", config.EndpointPods[0].Name, config.NodeIP, config.NodeHttpPort))
-			config.DialFromEndpointContainer("http", config.NodeIP, config.NodeHttpPort, config.MaxTries, 0, config.EndpointHostnames())
+			By(fmt.Sprintf("dialing(http) %v (endpoint) --> %v:%v (nodeIP)", config.endpointPods[0].Name, config.nodeIP, config.nodeHttpPort))
+			config.dialFromEndpointContainer("http", config.nodeIP, config.nodeHttpPort, config.maxTries, 0, config.endpointHostnames())
 		})
 
 		It("should function for endpoint-Service: udp", func() {
-			config := networking_util.NewNetworkingTestConfig(f)
-			By(fmt.Sprintf("dialing(udp) %v (endpoint) --> %v:%v (config.clusterIP)", config.EndpointPods[0].Name, config.ClusterIP, networking_util.ClusterUdpPort))
-			config.DialFromEndpointContainer("udp", config.ClusterIP, networking_util.ClusterUdpPort, config.MaxTries, 0, config.EndpointHostnames())
+			config := NewNetworkingTestConfig(f)
+			By(fmt.Sprintf("dialing(udp) %v (endpoint) --> %v:%v (config.clusterIP)", config.endpointPods[0].Name, config.clusterIP, clusterUdpPort))
+			config.dialFromEndpointContainer("udp", config.clusterIP, clusterUdpPort, config.maxTries, 0, config.endpointHostnames())
 
-			By(fmt.Sprintf("dialing(udp) %v (endpoint) --> %v:%v (nodeIP)", config.EndpointPods[0].Name, config.NodeIP, config.NodeUdpPort))
-			config.DialFromEndpointContainer("udp", config.NodeIP, config.NodeUdpPort, config.MaxTries, 0, config.EndpointHostnames())
+			By(fmt.Sprintf("dialing(udp) %v (endpoint) --> %v:%v (nodeIP)", config.endpointPods[0].Name, config.nodeIP, config.nodeUdpPort))
+			config.dialFromEndpointContainer("udp", config.nodeIP, config.nodeUdpPort, config.maxTries, 0, config.endpointHostnames())
 		})
 
 		It("should update endpoints: http", func() {
-			config := networking_util.NewNetworkingTestConfig(f)
-			By(fmt.Sprintf("dialing(http) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.ClusterIP, networking_util.ClusterHttpPort))
-			config.DialFromTestContainer("http", config.ClusterIP, networking_util.ClusterHttpPort, config.MaxTries, 0, config.EndpointHostnames())
+			config := NewNetworkingTestConfig(f)
+			By(fmt.Sprintf("dialing(http) %v --> %v:%v (config.clusterIP)", config.testContainerPod.Name, config.clusterIP, clusterHttpPort))
+			config.dialFromTestContainer("http", config.clusterIP, clusterHttpPort, config.maxTries, 0, config.endpointHostnames())
 
-			config.DeleteNetProxyPod()
+			config.deleteNetProxyPod()
 
-			By(fmt.Sprintf("dialing(http) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.ClusterIP, networking_util.ClusterHttpPort))
-			config.DialFromTestContainer("http", config.ClusterIP, networking_util.ClusterHttpPort, config.MaxTries, config.MaxTries, config.EndpointHostnames())
+			By(fmt.Sprintf("dialing(http) %v --> %v:%v (config.clusterIP)", config.testContainerPod.Name, config.clusterIP, clusterHttpPort))
+			config.dialFromTestContainer("http", config.clusterIP, clusterHttpPort, config.maxTries, config.maxTries, config.endpointHostnames())
 		})
 
 		It("should update endpoints: udp", func() {
-			config := networking_util.NewNetworkingTestConfig(f)
-			By(fmt.Sprintf("dialing(udp) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.ClusterIP, networking_util.ClusterUdpPort))
-			config.DialFromTestContainer("udp", config.ClusterIP, networking_util.ClusterUdpPort, config.MaxTries, 0, config.EndpointHostnames())
+			config := NewNetworkingTestConfig(f)
+			By(fmt.Sprintf("dialing(udp) %v --> %v:%v (config.clusterIP)", config.testContainerPod.Name, config.clusterIP, clusterUdpPort))
+			config.dialFromTestContainer("udp", config.clusterIP, clusterUdpPort, config.maxTries, 0, config.endpointHostnames())
 
-			config.DeleteNetProxyPod()
+			config.deleteNetProxyPod()
 
-			By(fmt.Sprintf("dialing(udp) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.ClusterIP, networking_util.ClusterUdpPort))
-			config.DialFromTestContainer("udp", config.ClusterIP, networking_util.ClusterUdpPort, config.MaxTries, config.MaxTries, config.EndpointHostnames())
+			By(fmt.Sprintf("dialing(udp) %v --> %v:%v (config.clusterIP)", config.testContainerPod.Name, config.clusterIP, clusterUdpPort))
+			config.dialFromTestContainer("udp", config.clusterIP, clusterUdpPort, config.maxTries, config.maxTries, config.endpointHostnames())
 		})
 
 		// Slow because we confirm that the nodePort doesn't serve traffic, which requires a period of polling.
 		It("should update nodePort: http [Slow]", func() {
-			config := networking_util.NewNetworkingTestConfig(f)
-			By(fmt.Sprintf("dialing(http) %v (node) --> %v:%v (nodeIP)", config.NodeIP, config.NodeIP, config.NodeHttpPort))
-			config.DialFromNode("http", config.NodeIP, config.NodeHttpPort, config.MaxTries, 0, config.EndpointHostnames())
+			config := NewNetworkingTestConfig(f)
+			By(fmt.Sprintf("dialing(http) %v (node) --> %v:%v (nodeIP)", config.nodeIP, config.nodeIP, config.nodeHttpPort))
+			config.dialFromNode("http", config.nodeIP, config.nodeHttpPort, config.maxTries, 0, config.endpointHostnames())
 
-			config.DeleteNodePortService()
+			config.deleteNodePortService()
 
-			By(fmt.Sprintf("dialing(http) %v (node) --> %v:%v (nodeIP)", config.NodeIP, config.NodeIP, config.NodeHttpPort))
-			config.DialFromNode("http", config.NodeIP, config.NodeHttpPort, config.MaxTries, config.MaxTries, sets.NewString())
+			By(fmt.Sprintf("dialing(http) %v (node) --> %v:%v (nodeIP)", config.nodeIP, config.nodeIP, config.nodeHttpPort))
+			config.dialFromNode("http", config.nodeIP, config.nodeHttpPort, config.maxTries, config.maxTries, sets.NewString())
 		})
 
 		// Slow because we confirm that the nodePort doesn't serve traffic, which requires a period of polling.
 		It("should update nodePort: udp [Slow]", func() {
-			config := networking_util.NewNetworkingTestConfig(f)
-			By(fmt.Sprintf("dialing(udp) %v (node) --> %v:%v (nodeIP)", config.NodeIP, config.NodeIP, config.NodeUdpPort))
-			config.DialFromNode("udp", config.NodeIP, config.NodeUdpPort, config.MaxTries, 0, config.EndpointHostnames())
+			config := NewNetworkingTestConfig(f)
+			By(fmt.Sprintf("dialing(udp) %v (node) --> %v:%v (nodeIP)", config.nodeIP, config.nodeIP, config.nodeUdpPort))
+			config.dialFromNode("udp", config.nodeIP, config.nodeUdpPort, config.maxTries, 0, config.endpointHostnames())
 
-			config.DeleteNodePortService()
+			config.deleteNodePortService()
 
-			By(fmt.Sprintf("dialing(udp) %v (node) --> %v:%v (nodeIP)", config.NodeIP, config.NodeIP, config.NodeUdpPort))
-			config.DialFromNode("udp", config.NodeIP, config.NodeUdpPort, config.MaxTries, config.MaxTries, sets.NewString())
+			By(fmt.Sprintf("dialing(udp) %v (node) --> %v:%v (nodeIP)", config.nodeIP, config.nodeIP, config.nodeUdpPort))
+			config.dialFromNode("udp", config.nodeIP, config.nodeUdpPort, config.maxTries, config.maxTries, sets.NewString())
 		})
 		// TODO: Test sessionAffinity #31712
 	})
