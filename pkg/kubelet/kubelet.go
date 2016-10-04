@@ -39,11 +39,13 @@ import (
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/fields"
+	internalApi "k8s.io/kubernetes/pkg/kubelet/api"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim"
+	dockerremote "k8s.io/kubernetes/pkg/kubelet/dockershim/remote"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
@@ -475,8 +477,6 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 	klet.podManager = kubepod.NewBasicPodManager(kubepod.NewBasicMirrorClient(klet.kubeClient))
 
 	if kubeCfg.RemoteRuntimeEndpoint != "" {
-		kubeCfg.ContainerRuntime = "remote"
-
 		// kubeCfg.RemoteImageEndpoint is same as kubeCfg.RemoteRuntimeEndpoint if not explicitly specified
 		if kubeCfg.RemoteImageEndpoint == "" {
 			kubeCfg.RemoteImageEndpoint = kubeCfg.RemoteRuntimeEndpoint
@@ -488,7 +488,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 	case "docker":
 		switch kubeCfg.ExperimentalRuntimeIntegrationType {
 		case "cri":
-			// Use the new CRI shim for docker. This is need for testing the
+			// Use the new CRI shim for docker. This is needed for testing the
 			// docker integration through CRI, and may be removed in the future.
 			dockerService := dockershim.NewDockerService(klet.dockerClient, kubeCfg.SeccompProfileRoot, kubeCfg.PodInfraContainerImage)
 			klet.containerRuntime, err = kuberuntime.NewKubeGenericRuntimeManager(
@@ -508,6 +508,53 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 				klet.cpuCFSQuota,
 				dockerService,
 				dockerService,
+			)
+			if err != nil {
+				return nil, err
+			}
+		case "remote":
+			// kubelet will talk to the shim over a unix socket using grpc. This may become the default in the near future.
+			dockerService := dockershim.NewDockerService(klet.dockerClient, kubeCfg.SeccompProfileRoot, kubeCfg.PodInfraContainerImage)
+			// Start the in process dockershim grpc server.
+			server := dockerremote.NewDockerServer(kubeCfg.RemoteRuntimeEndpoint, dockerService)
+			if err := server.Start(); err != nil {
+				return nil, err
+			}
+			// Start the remote kuberuntime manager.
+			remoteRuntimeService, err := remote.NewRemoteRuntimeService(kubeCfg.RemoteRuntimeEndpoint, kubeCfg.RuntimeRequestTimeout.Duration)
+			if err != nil {
+				return nil, err
+			}
+			remoteImageService, err := remote.NewRemoteImageService(kubeCfg.RemoteImageEndpoint, kubeCfg.RuntimeRequestTimeout.Duration)
+			if err != nil {
+				return nil, err
+			}
+			klet.containerRuntime, err = kuberuntime.NewKubeGenericRuntimeManager(
+				kubecontainer.FilterEventRecorder(kubeDeps.Recorder),
+				klet.livenessManager,
+				containerRefManager,
+				machineInfo,
+				klet.podManager,
+				kubeDeps.OSInterface,
+				klet.networkPlugin,
+				klet,
+				klet.httpClient,
+				imageBackOff,
+				kubeCfg.SerializeImagePulls,
+				float32(kubeCfg.RegistryPullQPS),
+				int(kubeCfg.RegistryBurst),
+				klet.cpuCFSQuota,
+				// Use DockerLegacyService directly to workaround unimplemented functions.
+				// We add short hack here to keep other code clean.
+				// TODO: Remove this hack after CRI is fully designed and implemented.
+				&struct {
+					internalApi.RuntimeService
+					dockershim.DockerLegacyService
+				}{
+					RuntimeService:      remoteRuntimeService,
+					DockerLegacyService: dockerService,
+				},
+				remoteImageService,
 			)
 			if err != nil {
 				return nil, err
