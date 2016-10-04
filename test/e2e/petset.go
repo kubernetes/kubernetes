@@ -251,6 +251,73 @@ var _ = framework.KubeDescribe("PetSet [Slow] [Feature:PetSet]", func() {
 	})
 })
 
+var _ = framework.KubeDescribe("PetSet keeps working even after a node gets restarted [Slow] [Disruptive] [Feature:PetSet]", func() {
+	f := framework.NewDefaultFramework("pet-set-node-restart")
+	var c *client.Client
+	var ns string
+
+	psName := "pet"
+	labels := map[string]string{
+		"foo": "bar",
+	}
+	headlessSvcName := "test"
+
+	BeforeEach(func() {
+		framework.SkipUnlessProviderIs("gce", "gke")
+		By("creating service " + headlessSvcName + " in namespace " + f.Namespace.Name)
+		headlessService := createServiceSpec(headlessSvcName, "", true, labels)
+		_, err := f.Client.Services(f.Namespace.Name).Create(headlessService)
+		framework.ExpectNoError(err)
+		c = f.Client
+		ns = f.Namespace.Name
+	})
+
+	AfterEach(func() {
+		if CurrentGinkgoTestDescription().Failed {
+			dumpDebugInfo(c, ns)
+		}
+		framework.Logf("Deleting all petset in ns %v", ns)
+		deleteAllPetSets(c, ns)
+	})
+
+	It("should come back up if node goes down [Slow] [Disruptive] [Feature:PetSet]", func() {
+		petMounts := []api.VolumeMount{{Name: "datadir", MountPath: "/data/"}}
+		podMounts := []api.VolumeMount{{Name: "home", MountPath: "/home"}}
+		ps := newPetSet(psName, ns, headlessSvcName, 3, petMounts, podMounts, labels)
+		_, err := c.Apps().PetSets(ns).Create(ps)
+		Expect(err).NotTo(HaveOccurred())
+
+		pst := petSetTester{c: c}
+		pst.saturate(ps)
+
+		nn := framework.TestContext.CloudConfig.NumNodes
+		nodeNames, err := framework.CheckNodesReady(f.Client, framework.NodeReadyInitialTimeout, nn)
+		framework.ExpectNoError(err)
+		restartNodes(f, nodeNames)
+
+		By("waiting for pods to be running again")
+		pst.waitForRunning(ps.Spec.Replicas, ps)
+	})
+
+	It("should not reschedule pets if there is a network partition [Slow] [Disruptive] [Feature:PetSet]", func() {
+		ps := newPetSet(psName, ns, headlessSvcName, 3, []api.VolumeMount{}, []api.VolumeMount{}, labels)
+		_, err := c.Apps().PetSets(ns).Create(ps)
+		Expect(err).NotTo(HaveOccurred())
+
+		pst := petSetTester{c: c}
+		pst.saturate(ps)
+
+		pod := pst.getPodList(ps).Items[0]
+		node, err := c.Nodes().Get(pod.Spec.NodeName)
+		framework.ExpectNoError(err)
+
+		simulatePetSetNodeFailure(c, ns, pod.Name, pod.ResourceVersion, node)
+
+		By("waiting for pods to be running again")
+		pst.waitForRunning(ps.Spec.Replicas, ps)
+	})
+})
+
 var _ = framework.KubeDescribe("Pet set recreate [Slow] [Feature:PetSet]", func() {
 	f := framework.NewDefaultFramework("pet-set-recreate")
 	var c *client.Client
@@ -893,4 +960,39 @@ func newPetSet(name, ns, governingSvcName string, replicas int32, petMounts []ap
 			ServiceName:          governingSvcName,
 		},
 	}
+}
+
+// Blocks outgoing network traffic on 'node'. Then verifies that 'podNameToDisappear',
+// that belongs to petset 'petSetName', _does not_ disappear due to forced deletion from the apiserver.
+// At the end (even in case of errors), the network traffic is brought back to normal.
+// This function executes commands on a node so it will work only for some
+// environments.
+func simulatePetSetNodeFailure(c *client.Client, ns, podName, resourceVersion string, node *api.Node) {
+	host := getNodeExternalIP(node)
+	master := getMaster(c)
+	By(fmt.Sprintf("block network traffic from node %s to the master", node.Name))
+	defer func() {
+		// This code will execute even if setting the iptables rule failed.
+		// It is on purpose because we may have an error even if the new rule
+		// had been inserted. (yes, we could look at the error code and ssh error
+		// separately, but I prefer to stay on the safe side).
+		By(fmt.Sprintf("Unblock network traffic from node %s to the master", node.Name))
+		framework.UnblockNetwork(host, master)
+	}()
+
+	framework.Logf("Waiting %v to ensure node %s is ready before beginning test...", resizeNodeReadyTimeout, node.Name)
+	if !framework.WaitForNodeToBe(c, node.Name, api.NodeReady, true, resizeNodeReadyTimeout) {
+		framework.Failf("Node %s did not become ready within %v", node.Name, resizeNodeReadyTimeout)
+	}
+	framework.BlockNetwork(host, master)
+
+	framework.Logf("Waiting %v for node %s to be not ready after simulated network failure", resizeNodeNotReadyTimeout, node.Name)
+	if !framework.WaitForNodeToBe(c, node.Name, api.NodeReady, false, resizeNodeNotReadyTimeout) {
+		framework.Failf("Node %s did not become not-ready within %v", node.Name, resizeNodeNotReadyTimeout)
+	}
+
+	framework.Logf("Checking that the NodeController does not force delete pet %v", podName)
+	err := framework.WaitTimeoutForPodNoLongerRunningInNamespace(c, podName, ns, resourceVersion, 10*time.Minute)
+	Expect(err).To(Equal(wait.ErrWaitTimeout), "Pet was not deleted during network partition.")
+	// network traffic is unblocked in a deferred function
 }
