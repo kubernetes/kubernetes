@@ -131,5 +131,25 @@ func PostStartHook(hookContext genericapiserver.PostStartHookContext) error {
 		glog.Infof("Created clusterrole.%s/%s", rbac.GroupName, clusterRole.Name)
 	}
 
+	existingClusterRoleBindings, err := clientset.ClusterRoleBindings().List(api.ListOptions{})
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("unable to initialize clusterrolebindings: %v", err))
+		return nil
+	}
+	// if clusterrolebindings already exist, then assume we don't have work to do because we've already
+	// initialized or another API server has started this task
+	if len(existingClusterRoleBindings.Items) > 0 {
+		return nil
+	}
+
+	for _, clusterRoleBinding := range append(bootstrappolicy.ClusterRoleBindings(), bootstrappolicy.ControllerRoleBindings()...) {
+		if _, err := clientset.ClusterRoleBindings().Create(&clusterRoleBinding); err != nil {
+			// don't fail on failures, try to create as many as you can
+			utilruntime.HandleError(fmt.Errorf("unable to initialize clusterrolebindings: %v", err))
+			continue
+		}
+		glog.Infof("Created clusterrolebinding.%s/%s", rbac.GroupName, clusterRoleBinding.Name)
+	}
+
 	return nil
 }
