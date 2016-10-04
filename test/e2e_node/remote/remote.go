@@ -165,6 +165,27 @@ func RunRemote(archive string, host string, cleanup bool, junitFilePrefix string
 		return "", false, err
 	}
 
+	// Configure iptables firewall rules
+	// TODO: consider calling bootstrap script to configure host based on OS
+	cmd := getSshCommand("&&",
+		`iptables -L INPUT | grep "Chain INPUT (policy DROP)"`,
+		"(iptables -C INPUT -w -p TCP -j ACCEPT || iptables -A INPUT -w -p TCP -j ACCEPT)",
+		"(iptables -C INPUT -w -p UDP -j ACCEPT || iptables -A INPUT -w -p UDP -j ACCEPT)",
+		"(iptables -C INPUT -w -p ICMP -j ACCEPT || iptables -A INPUT -w -p ICMP -j ACCEPT)")
+	output, err := RunSshCommand("ssh", GetHostnameOrIp(host), "--", "sudo", "sh", "-c", cmd)
+	if err != nil {
+		glog.Errorf("Failed to configured firewall: %v output: %v", err, output)
+	}
+	cmd = getSshCommand("&&",
+		`iptables -L FORWARD | grep "Chain FORWARD (policy DROP)" > /dev/null`,
+		"(iptables -C FORWARD -w -p TCP -j ACCEPT || iptables -A FORWARD -w -p TCP -j ACCEPT)",
+		"(iptables -C FORWARD -w -p UDP -j ACCEPT || iptables -A FORWARD -w -p UDP -j ACCEPT)",
+		"(iptables -C FORWARD -w -p ICMP -j ACCEPT || iptables -A FORWARD -w -p ICMP -j ACCEPT)")
+	output, err = RunSshCommand("ssh", GetHostnameOrIp(host), "--", "sudo", "sh", "-c", cmd)
+	if err != nil {
+		glog.Errorf("Failed to configured firewall: %v output: %v", err, output)
+	}
+
 	// Copy the archive to the staging directory
 	_, err = RunSshCommand("scp", archive, fmt.Sprintf("%s:%s/", GetHostnameOrIp(host), tmp))
 	if err != nil {
@@ -173,7 +194,7 @@ func RunRemote(archive string, host string, cleanup bool, junitFilePrefix string
 	}
 
 	// Kill any running node processes
-	cmd := getSshCommand(" ; ",
+	cmd = getSshCommand(" ; ",
 		"sudo pkill kubelet",
 		"sudo pkill kube-apiserver",
 		"sudo pkill etcd",
@@ -187,7 +208,7 @@ func RunRemote(archive string, host string, cleanup bool, junitFilePrefix string
 	// Extract the archive
 	cmd = getSshCommand(" && ", fmt.Sprintf("cd %s", tmp), fmt.Sprintf("tar -xzvf ./%s", archiveName))
 	glog.Infof("Extracting tar on %s", host)
-	output, err := RunSshCommand("ssh", GetHostnameOrIp(host), "--", "sh", "-c", cmd)
+	output, err = RunSshCommand("ssh", GetHostnameOrIp(host), "--", "sh", "-c", cmd)
 	if err != nil {
 		// Exit failure with the error
 		return "", false, err
