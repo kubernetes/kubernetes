@@ -134,6 +134,7 @@ be passed as annotations.
 The preferences are expressed by the following structure, passed as a
 serialized json inside annotations.
 
+```
 type FederatedReplicaSetPreferences struct {  
     // Map from cluster name to preferences for that cluster. It is assumed that if a cluster   
     // doesn’t have a matching entry then it should not have local replica. The cluster matches   
@@ -150,16 +151,19 @@ type LocalReplicaSetPreferences struct {
     //  This weight should be used when spreading replicas across clusters  
     Weight int  
 }
+```
 
 How this works in practice:
 
 **Scenario 1**. I want to spread my 50 replicas evenly across all available clusters. Config:
 
-FederatedReplicaSetPreferences {  
-   Clusters : map[string]LocalReplicaSet {  
-     "*" : LocalReplicaSet{ Weight: 1}  
-   }  
+```
+FederatedReplicaSetPreferences {
+   Clusters : map[string]LocalReplicaSet {
+     "*" : LocalReplicaSet{ Weight: 1}
+   } 
 }
+```
 
 This configuration is also used if no annotation is provided. Example:
 
@@ -172,47 +176,59 @@ This configuration is also used if no annotation is provided. Example:
 
 **Scenario 2**. I want to have only 2 replicas in each of the clusters.
 
-FederatedReplicaSetPreferences {  
-   Clusters : map[string]LocalReplicaSet {  
-     "*" : LocalReplicaSet{ MaxReplicas: 2; Weight: 1}  
-   }  
+```
+FederatedReplicaSetPreferences {
+   Clusters : map[string]LocalReplicaSet {
+     "*" : LocalReplicaSet{ MaxReplicas: 2; Weight: 1}
+   } 
 }
+```
 
 Or 
 
-FederatedReplicaSetPreferences {  
-   Clusters : map[string]LocalReplicaSet {  
-     "*" : LocalReplicaSet{ MinReplicas: 2; Weight: 0}  
-   }  
-}  
+```
+FederatedReplicaSetPreferences {
+   Clusters : map[string]LocalReplicaSet {
+     "*" : LocalReplicaSet{ MinReplicas: 2; Weight: 0 }
+	 }
+ }
+
+```
+   
 Or 
 
+```
 FederatedReplicaSetPreferences {  
    Clusters : map[string]LocalReplicaSet {  
      "*" : LocalReplicaSet{ MinReplicas: 2; MaxReplicas: 2}   
    }  
 }
+```
 
 There is a global target for 50, however if there are 3 clusters there will be only 6 replicas running. 
 
 **Scenario 3**. I want to have 20 replicas in each of 3 clusters.
 
+```
 FederatedReplicaSetPreferences {  
    Clusters : map[string]LocalReplicaSet {  
      "*" : LocalReplicaSet{ MinReplicas: 20; Weight: 0}  
    }  
 }
+```
 
 There is a global target for 50, however clusters require 60. So some clusters will have less replicas. Replica layout: A=20 B=20 C=10.
 
 **Scenario 4**. I want to have equal number of replicas in clusters A,B,C, however don’t put more than 20 replicas to cluster C.
 
+```
 FederatedReplicaSetPreferences {  
    Clusters : map[string]LocalReplicaSet {  
      "*" : LocalReplicaSet{ Weight: 1}  
      “C” : LocalReplicaSet{ MaxReplicas: 20,  Weight: 1}  
    }  
 }
+```
 
 Example:
 
@@ -225,6 +241,7 @@ Example:
 
 **Scenario 5**. I want to run my application in cluster A, however if there are troubles FRS can also use clusters B and C, equally.
 
+```
 FederatedReplicaSetPreferences {  
    Clusters : map[string]LocalReplicaSet {  
      “A” : LocalReplicaSet{ Weight: 1000000}  
@@ -232,6 +249,7 @@ FederatedReplicaSetPreferences {
      “C” : LocalReplicaSet{ Weight: 1}  
    }  
 }
+```
 
 Example:
 
@@ -242,6 +260,7 @@ Example:
 
 **Scenario 6**. I want to run my application in clusters A, B and C. Cluster A gets twice the QPS than other clusters.
 
+```
 FederatedReplicaSetPreferences {  
    Clusters : map[string]LocalReplicaSet {  
      “A” : LocalReplicaSet{ Weight: 2}  
@@ -249,6 +268,7 @@ FederatedReplicaSetPreferences {
      “C” : LocalReplicaSet{ Weight: 1}  
    }  
 }
+```
 
 Example: 
 
