@@ -353,23 +353,23 @@ func (nc *NamespaceController) delete(namespace *api_v1.Namespace) error {
 	// Right now there is just 5 types of objects: ReplicaSet, Secret, Ingress, Events and Service.
 	// Temporarly these items are simply deleted one by one to squeeze this code into 1.4.
 	// TODO: Make it generic (like in the regular namespace controller) and parallel.
-	err := nc.federatedApiClient.Core().Services(namespace.Name).DeleteCollection(&api.DeleteOptions{}, api.ListOptions{})
+	err := nc.federatedApiClient.Core().Services(namespace.Name).DeleteCollection(&api_v1.DeleteOptions{}, api_v1.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to delete service list: %v", err)
 	}
-	err = nc.federatedApiClient.Extensions().ReplicaSets(namespace.Name).DeleteCollection(&api.DeleteOptions{}, api.ListOptions{})
+	err = nc.federatedApiClient.Extensions().ReplicaSets(namespace.Name).DeleteCollection(&api_v1.DeleteOptions{}, api_v1.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to delete replicaset list from namespace: %v", err)
 	}
-	err = nc.federatedApiClient.Core().Secrets(namespace.Name).DeleteCollection(&api.DeleteOptions{}, api.ListOptions{})
+	err = nc.federatedApiClient.Core().Secrets(namespace.Name).DeleteCollection(&api_v1.DeleteOptions{}, api_v1.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to delete secret list from namespace: %v", err)
 	}
-	err = nc.federatedApiClient.Extensions().Ingresses(namespace.Name).DeleteCollection(&api.DeleteOptions{}, api.ListOptions{})
+	err = nc.federatedApiClient.Extensions().Ingresses(namespace.Name).DeleteCollection(&api_v1.DeleteOptions{}, api_v1.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to delete ingresses list from namespace: %v", err)
 	}
-	err = nc.federatedApiClient.Core().Events(namespace.Name).DeleteCollection(&api.DeleteOptions{}, api.ListOptions{})
+	err = nc.federatedApiClient.Core().Events(namespace.Name).DeleteCollection(&api_v1.DeleteOptions{}, api_v1.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to delete events list from namespace: %v", err)
 	}

@@ -192,13 +192,17 @@ func NewIngressController(client federationclientset.Interface) *IngressControll
 						if targetClient == nil {
 							glog.Errorf("Internal error: targetClient is nil")
 						}
-						return targetClient.Core().ConfigMaps(uidConfigMapNamespace).List(options) // we only want to list one by name - unfortunately Kubernetes don't have a selector for that.
+						// TODO: remove this when Reflector takes an interface rather than a particular ListOptions as input parameter.
+						versionedOptions := util.VersionizeV1ListOptions(options)
+						return targetClient.Core().ConfigMaps(uidConfigMapNamespace).List(versionedOptions) // we only want to list one by name - unfortunately Kubernetes don't have a selector for that.
 					},
 					WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 						if targetClient == nil {
 							glog.Errorf("Internal error: targetClient is nil")
 						}
-						return targetClient.Core().ConfigMaps(uidConfigMapNamespace).Watch(options) // as above
+						// TODO: remove this when Reflector takes an interface rather than a particular ListOptions as input parameter.
+						versionedOptions := util.VersionizeV1ListOptions(options)
+						return targetClient.Core().ConfigMaps(uidConfigMapNamespace).Watch(versionedOptions) // as above
 					},
 				},
 				&v1.ConfigMap{},
@@ -275,7 +279,7 @@ func NewIngressController(client federationclientset.Interface) *IngressControll
 			configMap := obj.(*v1.ConfigMap)
 			configMapName := types.NamespacedName{Name: configMap.Name, Namespace: configMap.Namespace}
 			glog.Errorf("Internal error: Incorrectly attempting to delete ConfigMap: %q", configMapName)
-			err := client.Core().ConfigMaps(configMap.Namespace).Delete(configMap.Name, &api.DeleteOptions{})
+			err := client.Core().ConfigMaps(configMap.Namespace).Delete(configMap.Name, &v1.DeleteOptions{})
 			return err
 		})
 	return ic
