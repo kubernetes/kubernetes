@@ -27,6 +27,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/genericapiserver/openapi/common"
 	"k8s.io/kubernetes/pkg/util/json"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 const (
@@ -134,7 +135,7 @@ func (o *openAPI) buildDefinitionForType(sample interface{}) (string, error) {
 
 // buildPaths builds OpenAPI paths using go-restful's web services.
 func (o *openAPI) buildPaths() error {
-	pathsToIgnore := createTrie(o.config.IgnorePrefixes)
+	pathsToIgnore := util.CreateTrie(o.config.IgnorePrefixes)
 	duplicateOpId := make(map[string]bool)
 	// Find duplicate operation IDs.
 	for _, service := range o.config.WebServices {
