@@ -26,7 +26,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/net"
@@ -37,7 +37,7 @@ import (
 )
 
 var _ = framework.KubeDescribe("Proxy", func() {
-	version := testapi.Default.GroupVersion().Version
+	version := registered.GroupOrDie(api.GroupName).GroupVersion.Version
 	Context("version "+version, func() { proxyContext(version) })
 })
 

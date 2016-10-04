@@ -28,12 +28,13 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
 )
 
 func TestDecodeUnstructured(t *testing.T) {
-	groupVersionString := testapi.Default.GroupVersion().String()
+	groupVersionString := registered.GroupOrDie(api.GroupName).GroupVersion.String()
 	rawJson := fmt.Sprintf(`{"kind":"Pod","apiVersion":"%s","metadata":{"name":"test"}}`, groupVersionString)
 	pl := &api.List{
 		Items: []runtime.Object{
