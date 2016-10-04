@@ -331,7 +331,6 @@ func DeepCopy_v1alpha1_KubeletConfiguration(in interface{}, out interface{}, c *
 		} else {
 			out.SerializeImagePulls = nil
 		}
-		out.ExperimentalFlannelOverlay = in.ExperimentalFlannelOverlay
 		out.OutOfDiskTransitionFrequency = in.OutOfDiskTransitionFrequency
 		out.NodeIP = in.NodeIP
 		if in.NodeLabels != nil {

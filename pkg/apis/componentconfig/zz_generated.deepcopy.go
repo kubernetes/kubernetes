@@ -297,7 +297,6 @@ func DeepCopy_componentconfig_KubeletConfiguration(in interface{}, out interface
 		out.KubeAPIQPS = in.KubeAPIQPS
 		out.KubeAPIBurst = in.KubeAPIBurst
 		out.SerializeImagePulls = in.SerializeImagePulls
-		out.ExperimentalFlannelOverlay = in.ExperimentalFlannelOverlay
 		out.OutOfDiskTransitionFrequency = in.OutOfDiskTransitionFrequency
 		out.NodeIP = in.NodeIP
 		if in.NodeLabels != nil {

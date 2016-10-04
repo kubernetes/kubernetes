@@ -290,7 +290,6 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_componentconfig_KubeletConfigu
 	if err := api.Convert_Pointer_bool_To_bool(&in.SerializeImagePulls, &out.SerializeImagePulls, s); err != nil {
 		return err
 	}
-	out.ExperimentalFlannelOverlay = in.ExperimentalFlannelOverlay
 	out.OutOfDiskTransitionFrequency = in.OutOfDiskTransitionFrequency
 	out.NodeIP = in.NodeIP
 	out.NodeLabels = in.NodeLabels
@@ -471,7 +470,6 @@ func autoConvert_componentconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigu
 	if err := api.Convert_bool_To_Pointer_bool(&in.SerializeImagePulls, &out.SerializeImagePulls, s); err != nil {
 		return err
 	}
-	out.ExperimentalFlannelOverlay = in.ExperimentalFlannelOverlay
 	out.OutOfDiskTransitionFrequency = in.OutOfDiskTransitionFrequency
 	out.NodeIP = in.NodeIP
 	out.NodeLabels = in.NodeLabels
