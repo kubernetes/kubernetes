@@ -48,4 +48,10 @@ func (s *ServerRunOptions) AddEtcdStorageFlags(fs *pflag.FlagSet) {
 
 	fs.BoolVar(&s.StorageConfig.Quorum, "etcd-quorum-read", s.StorageConfig.Quorum,
 		"If true, enable quorum read.")
+
+	fs.StringVar(&s.EncryptionProvider, "encryption-provider", s.StorageConfig.EncryptionConfig.Provider, ""+
+		"If set, the encrytion type to encrypt secrets in backend store.")
+
+	fs.StringVar(&s.EncryptionConfig, "encryption-config", s.StorageConfig.EncryptionConfig.Config, ""+
+		"The encrytion config to setup encryption.")
 }

@@ -25,12 +25,13 @@ import (
 	"github.com/coreos/etcd/pkg/transport"
 
 	"k8s.io/kubernetes/pkg/storage"
+	"k8s.io/kubernetes/pkg/storage/encryptionprovider"
 	"k8s.io/kubernetes/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/storage/storagebackend"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 )
 
-func newETCD2Storage(c storagebackend.Config) (storage.Interface, DestroyFunc, error) {
+func newETCD2Storage(c storagebackend.Config, encryptionProvider encryptionprovider.Interface) (storage.Interface, DestroyFunc, error) {
 	tr, err := newTransportForETCD2(c.CertFile, c.KeyFile, c.CAFile)
 	if err != nil {
 		return nil, nil, err
@@ -39,7 +40,8 @@ func newETCD2Storage(c storagebackend.Config) (storage.Interface, DestroyFunc, e
 	if err != nil {
 		return nil, nil, err
 	}
-	s := etcd.NewEtcdStorage(client, c.Codec, c.Prefix, c.Quorum, c.DeserializationCacheSize)
+
+	s := etcd.NewEtcdStorage(client, c.Codec, c.Prefix, c.Quorum, c.DeserializationCacheSize, encryptionProvider)
 	return s, tr.CloseIdleConnections, nil
 }
 

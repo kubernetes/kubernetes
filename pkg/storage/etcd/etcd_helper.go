@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
+	"k8s.io/kubernetes/pkg/storage/encryptionprovider"
 	"k8s.io/kubernetes/pkg/storage/etcd/metrics"
 	etcdutil "k8s.io/kubernetes/pkg/storage/etcd/util"
 	"k8s.io/kubernetes/pkg/util"
@@ -42,16 +43,17 @@ import (
 
 // Creates a new storage interface from the client
 // TODO: deprecate in favor of storage.Config abstraction over time
-func NewEtcdStorage(client etcd.Client, codec runtime.Codec, prefix string, quorum bool, cacheSize int) storage.Interface {
+func NewEtcdStorage(client etcd.Client, codec runtime.Codec, prefix string, quorum bool, cacheSize int, encryptionProvider encryptionprovider.Interface) storage.Interface {
 	return &etcdHelper{
-		etcdMembersAPI: etcd.NewMembersAPI(client),
-		etcdKeysAPI:    etcd.NewKeysAPI(client),
-		codec:          codec,
-		versioner:      APIObjectVersioner{},
-		copier:         api.Scheme,
-		pathPrefix:     path.Join("/", prefix),
-		quorum:         quorum,
-		cache:          utilcache.NewCache(cacheSize),
+		etcdMembersAPI:     etcd.NewMembersAPI(client),
+		etcdKeysAPI:        etcd.NewKeysAPI(client),
+		codec:              codec,
+		versioner:          APIObjectVersioner{},
+		copier:             api.Scheme,
+		pathPrefix:         path.Join("/", prefix),
+		quorum:             quorum,
+		cache:              utilcache.NewCache(cacheSize),
+		encryptionProvider: encryptionProvider,
 	}
 }
 
@@ -79,6 +81,8 @@ type etcdHelper struct {
 	// Number of entries stored in the cache is controlled by maxEtcdCacheEntries constant.
 	// TODO: Measure how much this cache helps after the conversion code is optimized.
 	cache utilcache.Cache
+
+	encryptionProvider encryptionprovider.Interface
 }
 
 func init() {
@@ -107,6 +111,16 @@ func (h *etcdHelper) Create(ctx context.Context, key string, obj, out runtime.Ob
 		return errors.New("resourceVersion may not be set on objects to be created")
 	}
 	trace.Step("Version checked")
+
+	// Encrypt secrets data
+	if strings.HasPrefix(key, "/registry/secrets") && h.encryptionProvider != nil {
+		encryptedData, err := h.encryptionProvider.Encrypt(string(data))
+		data = []byte(encryptedData)
+
+		if err != nil {
+			glog.Errorf("Attempt to encrypt failed: ", err)
+		}
+	}
 
 	startTime := time.Now()
 	opts := etcd.SetOptions{
@@ -233,11 +247,13 @@ func (h *etcdHelper) WatchList(ctx context.Context, key string, resourceVersion 
 
 // Implements storage.Interface.
 func (h *etcdHelper) Get(ctx context.Context, key string, objPtr runtime.Object, ignoreNotFound bool) error {
+	var err error
 	if ctx == nil {
 		glog.Errorf("Context is nil")
 	}
+
 	key = h.prefixEtcdKey(key)
-	_, _, _, err := h.bodyAndExtractObj(ctx, key, objPtr, ignoreNotFound)
+	_, _, _, err = h.bodyAndExtractObj(ctx, key, objPtr, ignoreNotFound)
 	return err
 }
 
@@ -259,6 +275,16 @@ func (h *etcdHelper) bodyAndExtractObj(ctx context.Context, key string, objPtr r
 		return "", nil, nil, toStorageErr(err, key, 0)
 	}
 	body, node, err = h.extractObj(response, err, objPtr, ignoreNotFound, false)
+
+	// Decrypt secrets data
+	if strings.HasPrefix(key, "/registry/secrets") && h.encryptionProvider != nil {
+		body, err = h.encryptionProvider.Decrypt(body)
+
+		if err != nil {
+			glog.Error("Attempt to decrypt failed: ", err)
+		}
+	}
+
 	return body, node, response, toStorageErr(err, key, 0)
 }
 

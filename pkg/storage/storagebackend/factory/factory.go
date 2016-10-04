@@ -19,7 +19,10 @@ package factory
 import (
 	"fmt"
 
+	"github.com/golang/glog"
+
 	"k8s.io/kubernetes/pkg/storage"
+	"k8s.io/kubernetes/pkg/storage/encryptionprovider"
 	"k8s.io/kubernetes/pkg/storage/storagebackend"
 )
 
@@ -28,15 +31,25 @@ type DestroyFunc func()
 
 // Create creates a storage backend based on given config.
 func Create(c storagebackend.Config) (storage.Interface, DestroyFunc, error) {
+
+	glog.Error("STEVE: test (before setup)")
+
+	// Setup Encryption Providers
+	// STEVESLOKA: TODO! Fix error
+	encryptionProvider, _ := encryptionprovider.InitEncryptionProvider(
+		c.EncryptionConfig.Provider, c.EncryptionConfig.Config)
+
+	glog.Error("STEVE: test: ", encryptionProvider)
+
 	switch c.Type {
 	case storagebackend.StorageTypeUnset, storagebackend.StorageTypeETCD2:
-		return newETCD2Storage(c)
+		return newETCD2Storage(c, encryptionProvider)
 	case storagebackend.StorageTypeETCD3:
 		// TODO: We have the following features to implement:
 		// - Support secure connection by using key, cert, and CA files.
 		// - Honor "https" scheme to support secure connection in gRPC.
 		// - Support non-quorum read.
-		return newETCD3Storage(c)
+		return newETCD3Storage(c, encryptionProvider)
 	default:
 		return nil, nil, fmt.Errorf("unknown storage type: %s", c.Type)
 	}

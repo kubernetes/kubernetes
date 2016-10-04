@@ -52,6 +52,7 @@ func TestUpdateEtcdOverrides(t *testing.T) {
 			Prefix:     options.DefaultEtcdPathPrefix,
 			ServerList: defaultEtcdLocation,
 		}
+
 		storageFactory := NewDefaultStorageFactory(defaultConfig, "", api.Codecs, NewDefaultResourceEncodingConfig(), NewResourceConfig())
 		storageFactory.SetEtcdLocation(test.resource, test.servers)
 

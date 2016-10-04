@@ -18,6 +18,7 @@ package factory
 
 import (
 	"k8s.io/kubernetes/pkg/storage"
+	"k8s.io/kubernetes/pkg/storage/encryptionprovider"
 	"k8s.io/kubernetes/pkg/storage/etcd3"
 	"k8s.io/kubernetes/pkg/storage/storagebackend"
 
@@ -26,7 +27,7 @@ import (
 	"golang.org/x/net/context"
 )
 
-func newETCD3Storage(c storagebackend.Config) (storage.Interface, DestroyFunc, error) {
+func newETCD3Storage(c storagebackend.Config, encryptionProvider encryptionprovider.Interface) (storage.Interface, DestroyFunc, error) {
 	tlsInfo := transport.TLSInfo{
 		CertFile: c.CertFile,
 		KeyFile:  c.KeyFile,
@@ -55,5 +56,5 @@ func newETCD3Storage(c storagebackend.Config) (storage.Interface, DestroyFunc, e
 		cancel()
 		client.Close()
 	}
-	return etcd3.New(client, c.Codec, c.Prefix), destroyFunc, nil
+	return etcd3.New(client, c.Codec, c.Prefix, encryptionProvider), destroyFunc, nil
 }
