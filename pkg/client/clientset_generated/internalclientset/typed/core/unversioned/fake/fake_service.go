@@ -94,7 +94,7 @@ func (c *FakeServices) List(opts api.ListOptions) (result *api.ServiceList, err 
 		return nil, err
 	}
 
-	label := opts.LabelSelector
+	label, _, _ := core.ExtractFromListOptions(opts)
 	if label == nil {
 		label = labels.Everything()
 	}

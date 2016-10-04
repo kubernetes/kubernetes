@@ -18,6 +18,7 @@ package v1beta1
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
+	v1 "k8s.io/kubernetes/pkg/api/v1"
 	v1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
@@ -33,11 +34,11 @@ type DaemonSetInterface interface {
 	Create(*v1beta1.DaemonSet) (*v1beta1.DaemonSet, error)
 	Update(*v1beta1.DaemonSet) (*v1beta1.DaemonSet, error)
 	UpdateStatus(*v1beta1.DaemonSet) (*v1beta1.DaemonSet, error)
-	Delete(name string, options *api.DeleteOptions) error
-	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
+	Delete(name string, options *v1.DeleteOptions) error
+	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
 	Get(name string) (*v1beta1.DaemonSet, error)
-	List(opts api.ListOptions) (*v1beta1.DaemonSetList, error)
-	Watch(opts api.ListOptions) (watch.Interface, error)
+	List(opts v1.ListOptions) (*v1beta1.DaemonSetList, error)
+	Watch(opts v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1beta1.DaemonSet, err error)
 	DaemonSetExpansion
 }
@@ -95,7 +96,7 @@ func (c *daemonSets) UpdateStatus(daemonSet *v1beta1.DaemonSet) (result *v1beta1
 }
 
 // Delete takes name of the daemonSet and deletes it. Returns an error if one occurs.
-func (c *daemonSets) Delete(name string, options *api.DeleteOptions) error {
+func (c *daemonSets) Delete(name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("daemonsets").
@@ -106,7 +107,7 @@ func (c *daemonSets) Delete(name string, options *api.DeleteOptions) error {
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *daemonSets) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+func (c *daemonSets) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("daemonsets").
@@ -129,7 +130,7 @@ func (c *daemonSets) Get(name string) (result *v1beta1.DaemonSet, err error) {
 }
 
 // List takes label and field selectors, and returns the list of DaemonSets that match those selectors.
-func (c *daemonSets) List(opts api.ListOptions) (result *v1beta1.DaemonSetList, err error) {
+func (c *daemonSets) List(opts v1.ListOptions) (result *v1beta1.DaemonSetList, err error) {
 	result = &v1beta1.DaemonSetList{}
 	err = c.client.Get().
 		Namespace(c.ns).
@@ -141,7 +142,7 @@ func (c *daemonSets) List(opts api.ListOptions) (result *v1beta1.DaemonSetList, 
 }
 
 // Watch returns a watch.Interface that watches the requested daemonSets.
-func (c *daemonSets) Watch(opts api.ListOptions) (watch.Interface, error) {
+func (c *daemonSets) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Namespace(c.ns).

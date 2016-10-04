@@ -603,28 +603,6 @@ message LabelSelectorRequirement {
   repeated string values = 3;
 }
 
-// ListOptions is the query options to a standard REST list call.
-message ListOptions {
-  // A selector to restrict the list of returned objects by their labels.
-  // Defaults to everything.
-  optional string labelSelector = 1;
-
-  // A selector to restrict the list of returned objects by their fields.
-  // Defaults to everything.
-  optional string fieldSelector = 2;
-
-  // Watch for changes to the described resources and return them as a stream of
-  // add, update, and remove notifications. Specify resourceVersion.
-  optional bool watch = 3;
-
-  // When specified with a watch call, shows changes that occur after that particular version of a resource.
-  // Defaults to changes from the beginning of history.
-  optional string resourceVersion = 4;
-
-  // Timeout for the list/watch call.
-  optional int64 timeoutSeconds = 5;
-}
-
 message NetworkPolicy {
   // Standard object's metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata

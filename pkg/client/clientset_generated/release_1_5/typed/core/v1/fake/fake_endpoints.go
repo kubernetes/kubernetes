@@ -53,14 +53,14 @@ func (c *FakeEndpoints) Update(endpoints *v1.Endpoints) (result *v1.Endpoints, e
 	return obj.(*v1.Endpoints), err
 }
 
-func (c *FakeEndpoints) Delete(name string, options *api.DeleteOptions) error {
+func (c *FakeEndpoints) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(core.NewDeleteAction(endpointsResource, c.ns, name), &v1.Endpoints{})
 
 	return err
 }
 
-func (c *FakeEndpoints) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+func (c *FakeEndpoints) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := core.NewDeleteCollectionAction(endpointsResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &v1.EndpointsList{})
@@ -77,7 +77,7 @@ func (c *FakeEndpoints) Get(name string) (result *v1.Endpoints, err error) {
 	return obj.(*v1.Endpoints), err
 }
 
-func (c *FakeEndpoints) List(opts api.ListOptions) (result *v1.EndpointsList, err error) {
+func (c *FakeEndpoints) List(opts v1.ListOptions) (result *v1.EndpointsList, err error) {
 	obj, err := c.Fake.
 		Invokes(core.NewListAction(endpointsResource, c.ns, opts), &v1.EndpointsList{})
 
@@ -85,7 +85,7 @@ func (c *FakeEndpoints) List(opts api.ListOptions) (result *v1.EndpointsList, er
 		return nil, err
 	}
 
-	label := opts.LabelSelector
+	label, _, _ := core.ExtractFromListOptions(opts)
 	if label == nil {
 		label = labels.Everything()
 	}
@@ -99,7 +99,7 @@ func (c *FakeEndpoints) List(opts api.ListOptions) (result *v1.EndpointsList, er
 }
 
 // Watch returns a watch.Interface that watches the requested endpoints.
-func (c *FakeEndpoints) Watch(opts api.ListOptions) (watch.Interface, error) {
+func (c *FakeEndpoints) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(core.NewWatchAction(endpointsResource, c.ns, opts))
 

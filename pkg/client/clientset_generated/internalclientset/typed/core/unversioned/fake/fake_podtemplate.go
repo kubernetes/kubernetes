@@ -84,7 +84,7 @@ func (c *FakePodTemplates) List(opts api.ListOptions) (result *api.PodTemplateLi
 		return nil, err
 	}
 
-	label := opts.LabelSelector
+	label, _, _ := core.ExtractFromListOptions(opts)
 	if label == nil {
 		label = labels.Everything()
 	}

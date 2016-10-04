@@ -18,6 +18,7 @@ package v1alpha1
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
+	v1 "k8s.io/kubernetes/pkg/api/v1"
 	v1alpha1 "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
@@ -32,11 +33,11 @@ type RoleBindingsGetter interface {
 type RoleBindingInterface interface {
 	Create(*v1alpha1.RoleBinding) (*v1alpha1.RoleBinding, error)
 	Update(*v1alpha1.RoleBinding) (*v1alpha1.RoleBinding, error)
-	Delete(name string, options *api.DeleteOptions) error
-	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
+	Delete(name string, options *v1.DeleteOptions) error
+	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
 	Get(name string) (*v1alpha1.RoleBinding, error)
-	List(opts api.ListOptions) (*v1alpha1.RoleBindingList, error)
-	Watch(opts api.ListOptions) (watch.Interface, error)
+	List(opts v1.ListOptions) (*v1alpha1.RoleBindingList, error)
+	Watch(opts v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1alpha1.RoleBinding, err error)
 	RoleBindingExpansion
 }
@@ -81,7 +82,7 @@ func (c *roleBindings) Update(roleBinding *v1alpha1.RoleBinding) (result *v1alph
 }
 
 // Delete takes name of the roleBinding and deletes it. Returns an error if one occurs.
-func (c *roleBindings) Delete(name string, options *api.DeleteOptions) error {
+func (c *roleBindings) Delete(name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("rolebindings").
@@ -92,7 +93,7 @@ func (c *roleBindings) Delete(name string, options *api.DeleteOptions) error {
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *roleBindings) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+func (c *roleBindings) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("rolebindings").
@@ -115,7 +116,7 @@ func (c *roleBindings) Get(name string) (result *v1alpha1.RoleBinding, err error
 }
 
 // List takes label and field selectors, and returns the list of RoleBindings that match those selectors.
-func (c *roleBindings) List(opts api.ListOptions) (result *v1alpha1.RoleBindingList, err error) {
+func (c *roleBindings) List(opts v1.ListOptions) (result *v1alpha1.RoleBindingList, err error) {
 	result = &v1alpha1.RoleBindingList{}
 	err = c.client.Get().
 		Namespace(c.ns).
@@ -127,7 +128,7 @@ func (c *roleBindings) List(opts api.ListOptions) (result *v1alpha1.RoleBindingL
 }
 
 // Watch returns a watch.Interface that watches the requested roleBindings.
-func (c *roleBindings) Watch(opts api.ListOptions) (watch.Interface, error) {
+func (c *roleBindings) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Namespace(c.ns).
