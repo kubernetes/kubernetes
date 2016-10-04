@@ -268,13 +268,30 @@ type GroupVersions []GroupVersion
 
 // KindForGroupVersionKinds identifies the preferred GroupVersionKind out of a list. It returns ok false
 // if none of the options match the group.
-func (gvs GroupVersions) KindForGroupVersionKinds(kinds []GroupVersionKind) (target GroupVersionKind, ok bool) {
+func (gvs GroupVersions) KindForGroupVersionKinds(kinds []GroupVersionKind) (GroupVersionKind, bool) {
+	targets := []GroupVersionKind{}
 	for _, gv := range gvs {
 		target, ok := gv.KindForGroupVersionKinds(kinds)
 		if !ok {
 			continue
 		}
-		return target, true
+		targets = append(targets, target)
+	}
+	if len(targets) == 1 {
+		return targets[0], true
+	} else if len(targets) > 1 {
+		return bestMatch(kinds, targets)
+	}
+	return GroupVersionKind{}, false
+}
+
+func bestMatch(kinds []GroupVersionKind, gvks []GroupVersionKind) (GroupVersionKind, bool) {
+	for _, gvk := range gvks {
+		for _, k := range kinds {
+			if k == gvk {
+				return k, true
+			}
+		}
 	}
 	return GroupVersionKind{}, false
 }
