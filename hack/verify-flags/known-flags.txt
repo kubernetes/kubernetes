@@ -276,6 +276,7 @@ keep-gogoproto
 km-path
 kops-cluster
 kops-nodes
+kops-ssh-key
 kops-state
 kops-zones
 kube-api-burst
