@@ -14,20 +14,30 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package preflight
 
 import (
 	"fmt"
 	"os"
-
-	"k8s.io/kubernetes/cmd/kubeadm/app"
-	"k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
 
-func main() {
-	if err := app.Run(); err != nil {
-		fmt.Printf(util.AlphaWarningOnExit)
-		os.Exit(1)
+const (
+	sudoUser = 0
+)
+
+type NotRootError struct {
+	Msg string
+	Uid int
+}
+
+func (e *NotRootError) Error() string {
+	return fmt.Sprintf("%s: Current User Uid: %d", e.Msg, e.Uid)
+}
+
+func IsRoot() (int, bool) {
+	u := os.Getuid()
+	if u != sudoUser {
+		return u, false
 	}
-	os.Exit(0)
+	return u, true
 }

@@ -24,12 +24,11 @@ import (
 	"github.com/spf13/cobra"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubechecks "k8s.io/kubernetes/cmd/kubeadm/app/checks"
 	kubemaster "k8s.io/kubernetes/cmd/kubeadm/app/master"
+	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	_ "k8s.io/kubernetes/pkg/cloudprovider/providers"
-	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	netutil "k8s.io/kubernetes/pkg/util/net"
 )
 
@@ -52,7 +51,7 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 		Short: "Run this in order to set up the Kubernetes master.",
 		Run: func(cmd *cobra.Command, args []string) {
 			err := RunInit(out, cmd, args, cfg, skipChecks)
-			cmdutil.CheckErr(err)
+			kubeadmutil.CheckErr(err)
 		},
 	}
 
@@ -124,14 +123,19 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 
 // RunInit executes master node provisioning, including certificates, needed static pod manifests, etc.
 func RunInit(out io.Writer, cmd *cobra.Command, args []string, cfg *kubeadmapi.MasterConfiguration, skipChecks bool) error {
+	if u, ok := preflight.IsRoot(); !ok {
+		return &preflight.NotRootError{"<cmd/init> Requires root priviledges", u}
+	}
 
 	if !skipChecks {
 		fmt.Println("Running pre-flight checks")
-		kubechecks.RunInitMasterChecks()
+		err := preflight.RunInitMasterChecks()
+		if err != nil {
+			return err
+		}
 	} else {
 		fmt.Println("Skipping pre-flight checks")
 	}
-	//os.Exit(1)
 
 	// Auto-detect the IP
 	if len(cfg.API.AdvertiseAddresses) == 0 {
