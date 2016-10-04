@@ -162,6 +162,7 @@ func DeepCopy_componentconfig_KubeProxyConfiguration(in interface{}, out interfa
 		out.UDPIdleTimeout = in.UDPIdleTimeout
 		out.ConntrackMax = in.ConntrackMax
 		out.ConntrackMaxPerCore = in.ConntrackMaxPerCore
+		out.ConntrackMin = in.ConntrackMin
 		out.ConntrackTCPEstablishedTimeout = in.ConntrackTCPEstablishedTimeout
 		return nil
 	}

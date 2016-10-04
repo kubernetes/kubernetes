@@ -85,9 +85,12 @@ func (s *ProxyServerConfig) AddFlags(fs *pflag.FlagSet) {
 	fs.Int32Var(&s.KubeAPIBurst, "kube-api-burst", s.KubeAPIBurst, "Burst to use while talking with kubernetes apiserver")
 	fs.DurationVar(&s.UDPIdleTimeout.Duration, "udp-timeout", s.UDPIdleTimeout.Duration, "How long an idle UDP connection will be kept open (e.g. '250ms', '2s').  Must be greater than 0. Only applicable for proxy-mode=userspace")
 	fs.Int32Var(&s.ConntrackMax, "conntrack-max", s.ConntrackMax,
-		"Maximum number of NAT connections to track (0 to leave as-is).")
+		"Maximum number of NAT connections to track (0 to leave as-is). This overrides conntrack-max-per-core and conntrack-min.")
+	fs.MarkDeprecated("conntrack-max", "This feature will be removed in a later release.")
 	fs.Int32Var(&s.ConntrackMaxPerCore, "conntrack-max-per-core", s.ConntrackMaxPerCore,
-		"Maximum number of NAT connections to track per CPU core (0 to leave as-is). This is only considered if conntrack-max is 0.")
+		"Maximum number of NAT connections to track per CPU core (0 to leave the limit as-is and ignore conntrack-min).")
+	fs.Int32Var(&s.ConntrackMin, "conntrack-min", s.ConntrackMin,
+		"Minimum number of conntrack entries to allocate, regardless of conntrack-max-per-core (set conntrack-max-per-core=0 to leave the limit as-is).")
 	fs.DurationVar(&s.ConntrackTCPEstablishedTimeout.Duration, "conntrack-tcp-timeout-established", s.ConntrackTCPEstablishedTimeout.Duration, "Idle timeout for established TCP connections (0 to leave as-is)")
 	config.DefaultFeatureGate.AddFlag(fs)
 }
