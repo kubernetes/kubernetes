@@ -57,6 +57,7 @@ BASH_TARGETS="
 	generated-docs
 	generated-swagger-docs
 	swagger-spec
+	openapi-spec
 	api-reference-docs"
 
 
