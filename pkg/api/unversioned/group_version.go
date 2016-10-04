@@ -268,15 +268,35 @@ type GroupVersions []GroupVersion
 
 // KindForGroupVersionKinds identifies the preferred GroupVersionKind out of a list. It returns ok false
 // if none of the options match the group.
-func (gvs GroupVersions) KindForGroupVersionKinds(kinds []GroupVersionKind) (target GroupVersionKind, ok bool) {
+func (gvs GroupVersions) KindForGroupVersionKinds(kinds []GroupVersionKind) (GroupVersionKind, bool) {
+	var targets []GroupVersionKind
 	for _, gv := range gvs {
 		target, ok := gv.KindForGroupVersionKinds(kinds)
 		if !ok {
 			continue
 		}
-		return target, true
+		targets = append(targets, target)
+	}
+	if len(targets) == 1 {
+		return targets[0], true
+	}
+	if len(targets) > 1 {
+		return bestMatch(kinds, targets), true
 	}
 	return GroupVersionKind{}, false
+}
+
+// bestMatch tries to pick best matching GroupVersionKind and falls back to the first
+// found if no exact match exists.
+func bestMatch(kinds []GroupVersionKind, targets []GroupVersionKind) GroupVersionKind {
+	for _, gvk := range targets {
+		for _, k := range kinds {
+			if k == gvk {
+				return k
+			}
+		}
+	}
+	return targets[0]
 }
 
 // ToAPIVersionAndKind is a convenience method for satisfying runtime.Object on types that
