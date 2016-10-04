@@ -92,7 +92,7 @@ func TestListContainers(t *testing.T) {
 // TestContainerStatus tests the basic lifecycle operations and verify that
 // the status returned reflects the operations performed.
 func TestContainerStatus(t *testing.T) {
-	ds, _, fClock := newTestDockerService()
+	ds, fDocker, fClock := newTestDockerService()
 	sConfig := makeSandboxConfig("foo", "bar", "1", 0)
 	labels := map[string]string{"abc.xyz": "foo"}
 	annotations := map[string]string{"foo.bar.baz": "abc"}
@@ -126,7 +126,15 @@ func TestContainerStatus(t *testing.T) {
 	// Create the container.
 	fClock.SetTime(time.Now().Add(-1 * time.Hour))
 	*expected.CreatedAt = fClock.Now().Unix()
-	id, err := ds.CreateContainer("sandboxid", config, sConfig)
+	const sandboxId = "sandboxid"
+	id, err := ds.CreateContainer(sandboxId, config, sConfig)
+
+	// Check internal labels
+	c, err := fDocker.InspectContainer(id)
+	assert.NoError(t, err)
+	assert.Equal(t, c.Config.Labels[containerTypeLabelKey], containerTypeLabelContainer)
+	assert.Equal(t, c.Config.Labels[sandboxIDLabelKey], sandboxId)
+
 	// Set the id manually since we don't know the id until it's created.
 	expected.Id = &id
 	assert.NoError(t, err)
