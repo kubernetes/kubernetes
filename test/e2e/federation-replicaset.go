@@ -23,7 +23,6 @@ import (
 
 	"k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5"
 	fedutil "k8s.io/kubernetes/federation/pkg/federation-controller/util"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -102,7 +101,7 @@ var _ = framework.KubeDescribe("Federation replicasets [Feature:Federation]", fu
 				rs.Spec.Replicas = &replicas
 				f.FederationClientset_1_5.ReplicaSets(nsName).Update(rs)
 				waitForReplicaSetOrFail(f.FederationClientset_1_5, nsName, rs.Name, clusters)
-				f.FederationClientset_1_5.ReplicaSets(nsName).Delete(rs.Name, &api.DeleteOptions{})
+				f.FederationClientset_1_5.ReplicaSets(nsName).Delete(rs.Name, &v1.DeleteOptions{})
 			}()
 
 			waitForReplicaSetOrFail(f.FederationClientset_1_5, nsName, rs.Name, clusters)

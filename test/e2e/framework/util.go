@@ -2827,11 +2827,11 @@ func dumpPodDebugInfo(c *client.Client, pods []*api.Pod) {
 	DumpNodeDebugInfo(c, badNodes.List())
 }
 
-type EventsLister func(opts api.ListOptions, ns string) (*v1.EventList, error)
+type EventsLister func(opts v1.ListOptions, ns string) (*v1.EventList, error)
 
 func DumpEventsInNamespace(eventsLister EventsLister, namespace string) {
 	By(fmt.Sprintf("Collecting events from namespace %q.", namespace))
-	events, err := eventsLister(api.ListOptions{}, namespace)
+	events, err := eventsLister(v1.ListOptions{}, namespace)
 	Expect(err).NotTo(HaveOccurred())
 
 	// Sort events by their first timestamp
@@ -2848,7 +2848,7 @@ func DumpEventsInNamespace(eventsLister EventsLister, namespace string) {
 }
 
 func DumpAllNamespaceInfo(c *client.Client, cs *release_1_5.Clientset, namespace string) {
-	DumpEventsInNamespace(func(opts api.ListOptions, ns string) (*v1.EventList, error) {
+	DumpEventsInNamespace(func(opts v1.ListOptions, ns string) (*v1.EventList, error) {
 		return cs.Core().Events(ns).List(opts)
 	}, namespace)
 

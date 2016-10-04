@@ -371,7 +371,7 @@ func (f *Framework) AfterEach() {
 		LogContainersInPodsWithLabels(f.Client, api.NamespaceSystem, ImagePullerLabels, "image-puller")
 		if f.federated {
 			// Dump federation events in federation namespace.
-			DumpEventsInNamespace(func(opts api.ListOptions, ns string) (*v1.EventList, error) {
+			DumpEventsInNamespace(func(opts v1.ListOptions, ns string) (*v1.EventList, error) {
 				return f.FederationClientset_1_5.Core().Events(ns).List(opts)
 			}, f.FederationNamespace.Name)
 			// Print logs of federation control plane pods (federation-apiserver and federation-controller-manager)
