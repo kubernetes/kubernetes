@@ -68,3 +68,45 @@ func (f *daemonSetInformer) Lister() *cache.StoreToDaemonSetLister {
 	informer := f.Informer()
 	return &cache.StoreToDaemonSetLister{Store: informer.GetIndexer()}
 }
+
+// DeploymentInformer is atype of SharedIndexInformer which watches and lists all deployments.
+type DeploymentInformer interface {
+	Informer() cache.SharedIndexInformer
+	Lister() *cache.StoreToDeploymentLister
+}
+
+type deploymentInformer struct {
+	*sharedInformerFactory
+}
+
+func (f *deploymentInformer) Informer() cache.SharedIndexInformer {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+
+	informerType := reflect.TypeOf(&extensions.Deployment{})
+	informer, exists := f.informers[informerType]
+	if exists {
+		return informer
+	}
+	informer = cache.NewSharedIndexInformer(
+		&cache.ListWatch{
+			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+				return f.client.Extensions().Deployments(api.NamespaceAll).List(options)
+			},
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+				return f.client.Extensions().Deployments(api.NamespaceAll).Watch(options)
+			},
+		},
+		&extensions.Deployment{},
+		f.defaultResync,
+		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
+	)
+	f.informers[informerType] = informer
+
+	return informer
+}
+
+func (f *deploymentInformer) Lister() *cache.StoreToDeploymentLister {
+	informer := f.Informer()
+	return &cache.StoreToDeploymentLister{Store: informer.GetIndexer()}
+}

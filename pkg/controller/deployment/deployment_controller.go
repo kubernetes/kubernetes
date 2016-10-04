@@ -67,27 +67,27 @@ type DeploymentController struct {
 	syncHandler func(dKey string) error
 
 	// A store of deployments, populated by the dController
-	dStore cache.StoreToDeploymentLister
+	dLister cache.StoreToDeploymentLister
 	// Watches changes to all deployments
 	dController *cache.Controller
 	// A store of ReplicaSets, populated by the rsController
-	rsStore cache.StoreToReplicaSetLister
+	rsLister cache.StoreToReplicaSetLister
 	// Watches changes to all ReplicaSets
 	rsController *cache.Controller
 	// A store of pods, populated by the podController
-	podStore cache.StoreToPodLister
+	podLister cache.StoreToPodLister
 	// Watches changes to all pods
 	podController *cache.Controller
 
-	// dStoreSynced returns true if the Deployment store has been synced at least once.
+	// dListerSynced returns true if the Deployment store has been synced at least once.
 	// Added as a member to the struct to allow injection for testing.
-	dStoreSynced func() bool
-	// rsStoreSynced returns true if the ReplicaSet store has been synced at least once.
+	dListerSynced func() bool
+	// rsListerSynced returns true if the ReplicaSet store has been synced at least once.
 	// Added as a member to the struct to allow injection for testing.
-	rsStoreSynced func() bool
-	// podStoreSynced returns true if the pod store has been synced at least once.
+	rsListerSynced func() bool
+	// podListerSynced returns true if the pod store has been synced at least once.
 	// Added as a member to the struct to allow injection for testing.
-	podStoreSynced func() bool
+	podListerSynced func() bool
 
 	// Deployments that need to be synced
 	queue workqueue.RateLimitingInterface
@@ -109,7 +109,7 @@ func NewDeploymentController(client clientset.Interface, resyncPeriod controller
 		queue:         workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "deployment"),
 	}
 
-	dc.dStore.Indexer, dc.dController = cache.NewIndexerInformer(
+	dc.dLister.Indexer, dc.dController = cache.NewIndexerInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				return dc.client.Extensions().Deployments(api.NamespaceAll).List(options)
@@ -129,7 +129,7 @@ func NewDeploymentController(client clientset.Interface, resyncPeriod controller
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)
 
-	dc.rsStore.Store, dc.rsController = cache.NewInformer(
+	dc.rsLister.Store, dc.rsController = cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				return dc.client.Extensions().ReplicaSets(api.NamespaceAll).List(options)
@@ -147,7 +147,7 @@ func NewDeploymentController(client clientset.Interface, resyncPeriod controller
 		},
 	)
 
-	dc.podStore.Indexer, dc.podController = cache.NewIndexerInformer(
+	dc.podLister.Indexer, dc.podController = cache.NewIndexerInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				return dc.client.Core().Pods(api.NamespaceAll).List(options)
@@ -167,9 +167,9 @@ func NewDeploymentController(client clientset.Interface, resyncPeriod controller
 	)
 
 	dc.syncHandler = dc.syncDeployment
-	dc.dStoreSynced = dc.dController.HasSynced
-	dc.rsStoreSynced = dc.rsController.HasSynced
-	dc.podStoreSynced = dc.podController.HasSynced
+	dc.dListerSynced = dc.dController.HasSynced
+	dc.rsListerSynced = dc.rsController.HasSynced
+	dc.podListerSynced = dc.podController.HasSynced
 	return dc
 }
 
@@ -183,7 +183,7 @@ func (dc *DeploymentController) Run(workers int, stopCh <-chan struct{}) {
 
 	// Wait for the rc and dc stores to sync before starting any work in this controller.
 	ready := make(chan struct{})
-	go dc.waitForSyncedStores(ready, stopCh)
+	go dc.waitForSyncedListers(ready, stopCh)
 	select {
 	case <-ready:
 	case <-stopCh:
@@ -199,10 +199,10 @@ func (dc *DeploymentController) Run(workers int, stopCh <-chan struct{}) {
 	dc.queue.ShutDown()
 }
 
-func (dc *DeploymentController) waitForSyncedStores(ready chan<- struct{}, stopCh <-chan struct{}) {
+func (dc *DeploymentController) waitForSyncedListers(ready chan<- struct{}, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 
-	for !dc.dStoreSynced() || !dc.rsStoreSynced() || !dc.podStoreSynced() {
+	for !dc.dListerSynced() || !dc.rsListerSynced() || !dc.podListerSynced() {
 		select {
 		case <-time.After(StoreSyncedPollPeriod):
 		case <-stopCh:
@@ -255,7 +255,7 @@ func (dc *DeploymentController) addReplicaSet(obj interface{}) {
 
 // getDeploymentForReplicaSet returns the deployment managing the given ReplicaSet.
 func (dc *DeploymentController) getDeploymentForReplicaSet(rs *extensions.ReplicaSet) *extensions.Deployment {
-	deployments, err := dc.dStore.GetDeploymentsForReplicaSet(rs)
+	deployments, err := dc.dLister.GetDeploymentsForReplicaSet(rs)
 	if err != nil || len(deployments) == 0 {
 		glog.V(4).Infof("Error: %v. No deployment found for ReplicaSet %v, deployment controller will avoid syncing.", err, rs.Name)
 		return nil
@@ -268,7 +268,7 @@ func (dc *DeploymentController) getDeploymentForReplicaSet(rs *extensions.Replic
 		sort.Sort(util.BySelectorLastUpdateTime(deployments))
 		glog.Errorf("user error! more than one deployment is selecting replica set %s/%s with labels: %#v, returning %s/%s", rs.Namespace, rs.Name, rs.Labels, deployments[0].Namespace, deployments[0].Name)
 	}
-	return &deployments[0]
+	return deployments[0]
 }
 
 // updateReplicaSet figures out what deployment(s) manage a ReplicaSet when the ReplicaSet
@@ -328,7 +328,7 @@ func (dc *DeploymentController) deleteReplicaSet(obj interface{}) {
 // getDeploymentForPod returns the deployment that manages the given Pod.
 // If there are multiple deployments for a given Pod, only return the oldest one.
 func (dc *DeploymentController) getDeploymentForPod(pod *api.Pod) *extensions.Deployment {
-	deployments, err := dc.dStore.GetDeploymentsForPod(pod)
+	deployments, err := dc.dLister.GetDeploymentsForPod(pod)
 	if err != nil || len(deployments) == 0 {
 		glog.V(4).Infof("Error: %v. No deployment found for Pod %v, deployment controller will avoid syncing.", err, pod.Name)
 		return nil
@@ -338,7 +338,7 @@ func (dc *DeploymentController) getDeploymentForPod(pod *api.Pod) *extensions.De
 		sort.Sort(util.BySelectorLastUpdateTime(deployments))
 		glog.Errorf("user error! more than one deployment is selecting pod %s/%s with labels: %#v, returning %s/%s", pod.Namespace, pod.Name, pod.Labels, deployments[0].Namespace, deployments[0].Name)
 	}
-	return &deployments[0]
+	return deployments[0]
 }
 
 // When a pod is created, ensure its controller syncs
@@ -478,7 +478,7 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 		glog.V(4).Infof("Finished syncing deployment %q (%v)", key, time.Now().Sub(startTime))
 	}()
 
-	obj, exists, err := dc.dStore.Indexer.GetByKey(key)
+	obj, exists, err := dc.dLister.Indexer.GetByKey(key)
 	if err != nil {
 		glog.Errorf("Unable to retrieve deployment %v from store: %v", key, err)
 		return err
@@ -548,24 +548,27 @@ func (dc *DeploymentController) handleOverlap(d *extensions.Deployment) error {
 	if err != nil {
 		return fmt.Errorf("deployment %s/%s has invalid label selector: %v", d.Namespace, d.Name, err)
 	}
-	deployments, err := dc.dStore.Deployments(d.Namespace).List(labels.Everything())
+	deployments, err := dc.dLister.Deployments(d.Namespace).List(labels.Everything())
 	if err != nil {
 		return fmt.Errorf("error listing deployments in namespace %s: %v", d.Namespace, err)
 	}
 	overlapping := false
-	for i := range deployments {
-		other := &deployments[i]
+	for _, other := range deployments {
 		if !selector.Empty() && selector.Matches(labels.Set(other.Spec.Template.Labels)) && d.UID != other.UID {
+			deploymentCopy, err := util.DeploymentDeepCopy(other)
+			if err != nil {
+				return err
+			}
 			overlapping = true
 			// We don't care if the overlapping annotation update failed or not (we don't make decision on it)
 			d, _ = dc.markDeploymentOverlap(d, other.Name)
-			other, _ = dc.markDeploymentOverlap(other, d.Name)
+			deploymentCopy, _ = dc.markDeploymentOverlap(deploymentCopy, d.Name)
 			// Skip syncing this one if older overlapping one is found
 			// TODO: figure out a better way to determine which deployment to skip,
 			// either with controller reference, or with validation.
 			// Using oldest active replica set to determine which deployment to skip wouldn't make much difference,
 			// since new replica set hasn't been created after selector update
-			if util.SelectorUpdatedBefore(other, d) {
+			if util.SelectorUpdatedBefore(deploymentCopy, d) {
 				return fmt.Errorf("found deployment %s/%s has overlapping selector with an older deployment %s/%s, skip syncing it", d.Namespace, d.Name, other.Namespace, other.Name)
 			}
 		}
