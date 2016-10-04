@@ -91,10 +91,10 @@ func newRBACAuthorizer(t *testing.T, superUser string, config *master.Config) au
 		return generic.RESTOptions{StorageConfig: storageConfig, Decorator: generic.UndecoratedStorage, ResourcePrefix: resource}
 	}
 
-	roleRegistry := role.NewRegistry(roleetcd.NewREST(newRESTOptions("roles")))
-	roleBindingRegistry := rolebinding.NewRegistry(rolebindingetcd.NewREST(newRESTOptions("rolebindings")))
-	clusterRoleRegistry := clusterrole.NewRegistry(clusterroleetcd.NewREST(newRESTOptions("clusterroles")))
-	clusterRoleBindingRegistry := clusterrolebinding.NewRegistry(clusterrolebindingetcd.NewREST(newRESTOptions("clusterrolebindings")))
+	roleRegistry := role.AuthorizerAdapter{Registry: role.NewRegistry(roleetcd.NewREST(newRESTOptions("roles")))}
+	roleBindingRegistry := rolebinding.AuthorizerAdapter{Registry: rolebinding.NewRegistry(rolebindingetcd.NewREST(newRESTOptions("rolebindings")))}
+	clusterRoleRegistry := clusterrole.AuthorizerAdapter{Registry: clusterrole.NewRegistry(clusterroleetcd.NewREST(newRESTOptions("clusterroles")))}
+	clusterRoleBindingRegistry := clusterrolebinding.AuthorizerAdapter{Registry: clusterrolebinding.NewRegistry(clusterrolebindingetcd.NewREST(newRESTOptions("clusterrolebindings")))}
 	return rbac.New(roleRegistry, roleBindingRegistry, clusterRoleRegistry, clusterRoleBindingRegistry, superUser)
 }
 
