@@ -826,12 +826,12 @@ func LastSelectorUpdate(d *extensions.Deployment) unversioned.Time {
 
 // BySelectorLastUpdateTime sorts a list of deployments by the last update time of their selector,
 // first using their creation timestamp and then their names as a tie breaker.
-type BySelectorLastUpdateTime []extensions.Deployment
+type BySelectorLastUpdateTime []*extensions.Deployment
 
 func (o BySelectorLastUpdateTime) Len() int      { return len(o) }
 func (o BySelectorLastUpdateTime) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
 func (o BySelectorLastUpdateTime) Less(i, j int) bool {
-	ti, tj := LastSelectorUpdate(&o[i]), LastSelectorUpdate(&o[j])
+	ti, tj := LastSelectorUpdate(o[i]), LastSelectorUpdate(o[j])
 	if ti.Equal(tj) {
 		if o[i].CreationTimestamp.Equal(o[j].CreationTimestamp) {
 			return o[i].Name < o[j].Name
