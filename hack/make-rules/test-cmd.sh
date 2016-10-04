@@ -624,6 +624,22 @@ runTests() {
   # Post-condition: valid-pod is labelled
   kube::test::get_object_assert 'pod valid-pod' "{{range$labels_field}}{{.}}:{{end}}" 'valid-pod:new-valid-pod:'
 
+  ### Label the valid-pod POD with empty label value
+  # Pre-condition: valid-pod does not have label "emptylabel"
+  kube::test::get_object_assert 'pod valid-pod' "{{range$labels_field}}{{.}}:{{end}}" 'valid-pod:new-valid-pod:'
+  # Command
+  kubectl label pods valid-pod emptylabel="" "${kube_flags[@]}"
+  # Post-condition: valid pod contains "emptylabel" with no value
+  kube::test::get_object_assert 'pod valid-pod' "{{${labels_field}.emptylabel}}" ''
+
+  ### Annotate the valid-pod POD with empty annotation value
+  # Pre-condition: valid-pod does not have annotation "emptyannotation"
+  kube::test::get_object_assert 'pod valid-pod' "{{${annotations_field}.emptyannotation}}" '<no value>'
+  # Command
+  kubectl annotate pods valid-pod emptyannotation="" "${kube_flags[@]}"
+  # Post-condition: valid pod contains "emptyannotation" with no value
+  kube::test::get_object_assert 'pod valid-pod' "{{${annotations_field}.emptyannotation}}" ''
+
   ### Record label change
   # Pre-condition: valid-pod does not have record annotation
   kube::test::get_object_assert 'pod valid-pod' "{{range.items}}{{$annotations_field}}:{{end}}" ''

@@ -143,15 +143,16 @@ func TestParseAnnotations(t *testing.T) {
 			expectErr:   true,
 		},
 		{
-			annotations: []string{"a="},
-			expectedErr: "invalid annotation format: a=",
-			scenario:    "incorrect annotation input (missing value)",
-			expectErr:   true,
+			annotations:    []string{"a="},
+			expected:       map[string]string{"a": ""},
+			expectedRemove: []string{},
+			scenario:       "add valid annotation with empty value",
+			expectErr:      false,
 		},
 		{
 			annotations: []string{"ab", "a="},
-			expectedErr: "invalid annotation format: ab, a=",
-			scenario:    "incorrect multiple annotation input (missing value)",
+			expectedErr: "invalid annotation format: ab",
+			scenario:    "incorrect annotation input (missing =value)",
 			expectErr:   true,
 		},
 	}

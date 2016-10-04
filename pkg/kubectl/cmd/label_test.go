@@ -128,8 +128,8 @@ func TestParseLabels(t *testing.T) {
 			expectErr: true,
 		},
 		{
-			labels:    []string{"a="},
-			expectErr: true,
+			labels:   []string{"a="},
+			expected: map[string]string{"a": ""},
 		},
 		{
 			labels:    []string{"a=%^$"},
