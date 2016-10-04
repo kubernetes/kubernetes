@@ -251,6 +251,55 @@ var _ = framework.KubeDescribe("PetSet [Slow] [Feature:PetSet]", func() {
 	})
 })
 
+var _ = framework.KubeDescribe("PetSet keeps working even after a node gets restarted [Slow] [Disruptive] [Feature:PetSet]", func() {
+	f := framework.NewDefaultFramework("pet-set-node-restart")
+	var c *client.Client
+	var ns string
+
+	psName := "pet"
+	labels := map[string]string{
+		"foo": "bar",
+	}
+	headlessSvcName := "test"
+
+	BeforeEach(func() {
+		framework.SkipUnlessProviderIs("gce", "gke")
+		By("creating service " + headlessSvcName + " in namespace " + f.Namespace.Name)
+		headlessService := createServiceSpec(headlessSvcName, "", true, labels)
+		_, err := f.Client.Services(f.Namespace.Name).Create(headlessService)
+		framework.ExpectNoError(err)
+		c = f.Client
+		ns = f.Namespace.Name
+	})
+
+	AfterEach(func() {
+		if CurrentGinkgoTestDescription().Failed {
+			dumpDebugInfo(c, ns)
+		}
+		framework.Logf("Deleting all petset in ns %v", ns)
+		deleteAllPetSets(c, ns)
+	})
+
+	It("should come back up if node goes down [Feature:PetSet]", func() {
+		petMounts := []api.VolumeMount{{Name: "datadir", MountPath: "/data/"}}
+		podMounts := []api.VolumeMount{{Name: "home", MountPath: "/home"}}
+		ps := newPetSet(psName, ns, headlessSvcName, 3, petMounts, podMounts, labels)
+		_, err := c.Apps().PetSets(ns).Create(ps)
+		Expect(err).NotTo(HaveOccurred())
+
+		pst := petSetTester{c: c}
+		pst.saturate(ps)
+
+		nn := framework.TestContext.CloudConfig.NumNodes
+		nodeNames, err := framework.CheckNodesReady(f.Client, framework.NodeReadyInitialTimeout, nn)
+		framework.ExpectNoError(err)
+		restartNodes(f, nodeNames)
+
+		By("waiting for pods to be running again")
+		pst.waitForRunning(ps.Spec.Replicas, ps)
+	})
+})
+
 var _ = framework.KubeDescribe("Pet set recreate [Slow] [Feature:PetSet]", func() {
 	f := framework.NewDefaultFramework("pet-set-recreate")
 	var c *client.Client
