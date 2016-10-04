@@ -419,6 +419,10 @@ runTests() {
 
   kubectl get "${kube_flags[@]}" --raw /version
 
+  # make sure the server was properly bootstrapped with clusterroles and bindings
+  kube::test::get_object_assert clusterroles/cluster-admin "{{.metadata.name}}" 'cluster-admin'
+  kube::test::get_object_assert clusterrolebindings/cluster-admin "{{.metadata.name}}" 'cluster-admin'
+
   ###########################
   # POD creation / deletion #
   ###########################
