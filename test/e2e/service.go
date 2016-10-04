@@ -2346,7 +2346,10 @@ func execSourceipTest(f *framework.Framework, c *client.Client, ns, nodeName, se
 	// the stdout return from RunHostCmd seems to come with "\n", so TrimSpace is needed
 	// desired stdout in this format: client_address=x.x.x.x
 	outputs := strings.Split(strings.TrimSpace(stdout), "=")
-	sourceIp := outputs[1]
-
-	return execPodIp, sourceIp
+	if len(outputs) != 2 {
+		// fail the test if output format is unexpected
+		framework.Failf("exec pod returned unexpected stdout format: [%v]\n", stdout)
+		return execPodIp, ""
+	}
+	return execPodIp, outputs[1]
 }
