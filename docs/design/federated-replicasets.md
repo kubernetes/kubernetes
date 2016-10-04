@@ -320,7 +320,13 @@ enumerated key idea elements:
       should be handled by cluster liveness probe and deletion
       [[I6]](#heading=h.z90979gc2216)
 
-+  [I4] It is assumed that a not scheduled pod is a normal situation and can last up to X min if there is a huge traffic on the cluster. However if the replicas are not scheduled in that time then FRSC should consider moving most of the unscheduled replicas elsewhere. For that purpose FRSC will maintain a data structure where for each FRS controlled LRS we store a list of pods belonging to that LRS along with their current status and status change timestamp.  
++ [I4] It is assumed that a not scheduled pod is a normal situation
+and can last up to X min if there is a huge traffic on the
+cluster. However if the replicas are not scheduled in that time then
+FRSC should consider moving most of the unscheduled replicas
+elsewhere. For that purpose FRSC will maintain a data structure
+where for each FRS controlled LRS we store a list of pods belonging
+to that LRS along with their current status and status change timestamp.
 
 + [I5] If a new cluster is added to the federation then it doesn’t
    have a LRS and the situation is equal to
@@ -341,7 +347,8 @@ enumerated key idea elements:
    (configurable) to check whether some replica move between clusters
    is needed or not.
 
-   +  FRSC never moves replicas to LRS that have not scheduled/running pods or that has pods that failed to be created.  
++  FRSC never moves replicas to LRS that have not scheduled/running
+pods or that has pods that failed to be created.  
 
    + When FRSC notices that a number of pods are not scheduler/running
       or not_even_created in one LRS for more than Y minutes it takes
