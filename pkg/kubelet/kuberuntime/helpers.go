@@ -20,12 +20,16 @@ import (
 	"fmt"
 	"path/filepath"
 	"strconv"
+	"time"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api/v1"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
+	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/util/flowcontrol"
 )
 
 const (
@@ -150,13 +154,88 @@ func (m *kubeGenericRuntimeManager) getImageUser(image string) (*int64, *string,
 	return new(int64), nil, nil
 }
 
-// isContainerFailed returns true if container has exited and exitcode is not zero.
+// isContainerFailed returns true if the container has exited and exitcode is not zero.
 func isContainerFailed(status *kubecontainer.ContainerStatus) bool {
-	if status.State == kubecontainer.ContainerStateExited && status.ExitCode != 0 {
+	switch status.State {
+	case kubecontainer.ContainerStateUnknown:
 		return true
+	case kubecontainer.ContainerStateExited:
+		return status.ExitCode != 0
+	}
+	return false
+}
+
+// isContainerRunning returns true if the container is running.
+func isContainerRunning(status *kubecontainer.ContainerStatus) bool {
+	return status.State == kubecontainer.ContainerStateRunning
+}
+
+// isContainerActive returns true if the container is created or running.
+func isContainerActive(status *kubecontainer.ContainerStatus) bool {
+	return status.State == kubecontainer.ContainerStateRunning || status.State == kubecontainer.ContainerStateCreated
+}
+
+// isContainerExited returns true if the container is exited.
+func isContainerExited(status *kubecontainer.ContainerStatus) bool {
+	return status.State == kubecontainer.ContainerStateExited
+}
+
+// foundInitContainerSpec returns the init container's spec if found.
+func foundInitContainerSpec(pod *v1.Pod, status *kubecontainer.ContainerStatus) *v1.Container {
+	for _, c := range pod.Spec.InitContainers {
+		if c.Name == status.Name {
+			return &c
+		}
+	}
+	return nil
+}
+
+// containerChanged returns true if the container's spec has changed.
+func containerChanged(container *v1.Container, status *kubecontainer.ContainerStatus) bool {
+	return kubecontainer.HashContainer(container) != status.Hash
+}
+
+// initContainersChanged returns true if any init container's spec has been changed.
+// It's done by comparing the latest init container hash with the old one.
+//
+// TODO(yifan): Implement this by storing the init container hash in the pod annotation.
+func initContainersChanged(pod *v1.Pod, sandboxStatus *runtimeapi.PodSandboxStatus) bool {
+	return false
+}
+
+// containerUnhealthy returns true if the container's liveness probing result
+// is found but not success.
+func containerUnhealthy(manager proberesults.Manager, status *kubecontainer.ContainerStatus) bool {
+	liveness, found := manager.Get(status.ID)
+	return found && liveness != proberesults.Success
+}
+
+// findContainerSpecByName returns the init or app container spec that has
+// the given name.
+func findContainerSpecByName(name string, pod *v1.Pod) *v1.Container {
+	for _, c := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
+		if name == c.Name {
+			return &c
+		}
+	}
+	return nil
+}
+
+// isInBackOff returns true and the backoff time if the container is still in back-off.
+func isInBackOff(pod *v1.Pod, container *v1.Container, finishedAt time.Time, backoff *flowcontrol.Backoff) (bool, time.Duration) {
+	glog.V(4).Infof("Checking backoff for container %q in pod %q", container.Name, format.Pod(pod))
+	// Use the finished time of the latest exited container as the start point to calculate whether to do back-off.
+	var backoffTime time.Duration
+	// backoff requires a unique key to identify the container.
+	key := getStableKey(pod, container)
+	if backoff.IsInBackOffSince(key, finishedAt) {
+		backoffTime = backoff.Get(key)
+		glog.V(4).Infof("The container %q of pod %q is in back-off, will restart in %v", container.Name, format.Pod(pod), backoffTime)
+		return true, backoffTime
 	}
 
-	return false
+	backoff.Next(key, finishedAt)
+	return false, backoffTime
 }
 
 // milliCPUToShares converts milliCPU to CPU shares
