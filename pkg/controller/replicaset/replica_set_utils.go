@@ -74,7 +74,7 @@ func updateReplicaCount(rsClient client.ReplicaSetInterface, rs extensions.Repli
 }
 
 // overlappingReplicaSets sorts a list of ReplicaSets by creation timestamp, using their names as a tie breaker.
-type overlappingReplicaSets []extensions.ReplicaSet
+type overlappingReplicaSets []*extensions.ReplicaSet
 
 func (o overlappingReplicaSets) Len() int      { return len(o) }
 func (o overlappingReplicaSets) Swap(i, j int) { o[i], o[j] = o[j], o[i] }

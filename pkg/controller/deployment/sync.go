@@ -103,15 +103,15 @@ func (dc *DeploymentController) getAllReplicaSetsAndSyncRevision(deployment *ext
 }
 
 // rsAndPodsWithHashKeySynced returns the RSes and pods the given deployment targets, with pod-template-hash information synced.
-func (dc *DeploymentController) rsAndPodsWithHashKeySynced(deployment *extensions.Deployment) ([]extensions.ReplicaSet, *api.PodList, error) {
+func (dc *DeploymentController) rsAndPodsWithHashKeySynced(deployment *extensions.Deployment) ([]*extensions.ReplicaSet, *api.PodList, error) {
 	rsList, err := deploymentutil.ListReplicaSets(deployment,
-		func(namespace string, options api.ListOptions) ([]extensions.ReplicaSet, error) {
+		func(namespace string, options api.ListOptions) ([]*extensions.ReplicaSet, error) {
 			return dc.rsLister.ReplicaSets(namespace).List(options.LabelSelector)
 		})
 	if err != nil {
 		return nil, nil, fmt.Errorf("error listing ReplicaSets: %v", err)
 	}
-	syncedRSList := []extensions.ReplicaSet{}
+	syncedRSList := []*extensions.ReplicaSet{}
 	for _, rs := range rsList {
 		// Add pod-template-hash information if it's not in the RS.
 		// Otherwise, new RS produced by Deployment will overlap with pre-existing ones
@@ -120,7 +120,7 @@ func (dc *DeploymentController) rsAndPodsWithHashKeySynced(deployment *extension
 		if err != nil {
 			return nil, nil, err
 		}
-		syncedRSList = append(syncedRSList, *syncedRS)
+		syncedRSList = append(syncedRSList, syncedRS)
 	}
 	syncedPodList, err := dc.listPods(deployment)
 	if err != nil {
@@ -133,8 +133,13 @@ func (dc *DeploymentController) rsAndPodsWithHashKeySynced(deployment *extension
 // 1. Add hash label to the rs's pod template, and make sure the controller sees this update so that no orphaned pods will be created
 // 2. Add hash label to all pods this rs owns, wait until replicaset controller reports rs.Status.FullyLabeledReplicas equal to the desired number of replicas
 // 3. Add hash label to the rs's label and selector
-func (dc *DeploymentController) addHashKeyToRSAndPods(rs extensions.ReplicaSet) (updatedRS *extensions.ReplicaSet, err error) {
-	updatedRS = &rs
+func (dc *DeploymentController) addHashKeyToRSAndPods(rs *extensions.ReplicaSet) (updatedRS *extensions.ReplicaSet, err error) {
+	objCopy, err := api.Scheme.Copy(rs)
+	if err != nil {
+		return nil, err
+	}
+	updatedRS = objCopy.(*extensions.ReplicaSet)
+
 	// If the rs already has the new hash label in its selector, it's done syncing
 	if labelsutil.SelectorHasLabel(rs.Spec.Selector, extensions.DefaultDeploymentUniqueLabelKey) {
 		return
@@ -158,7 +163,7 @@ func (dc *DeploymentController) addHashKeyToRSAndPods(rs extensions.ReplicaSet) 
 	if !rsUpdated {
 		// If RS wasn't updated but didn't return error in step 1, we've hit a RS not found error.
 		// Return here and retry in the next sync loop.
-		return &rs, nil
+		return rs, nil
 	}
 	// Make sure rs pod template is updated so that it won't create pods without the new label (orphaned pods).
 	if updatedRS.Generation > updatedRS.Status.ObservedGeneration {
@@ -242,7 +247,7 @@ func (dc *DeploymentController) listPods(deployment *extensions.Deployment) (*ap
 // 2. If there's existing new RS, update its revision number if it's smaller than (maxOldRevision + 1), where maxOldRevision is the max revision number among all old RSes.
 // 3. If there's no existing new RS and createIfNotExisted is true, create one with appropriate revision number (maxOldRevision + 1) and replicas.
 // Note that the pod-template-hash will be added to adopted RSes and pods.
-func (dc *DeploymentController) getNewReplicaSet(deployment *extensions.Deployment, rsList []extensions.ReplicaSet, maxOldRevision int64, oldRSs []*extensions.ReplicaSet, createIfNotExisted bool) (*extensions.ReplicaSet, error) {
+func (dc *DeploymentController) getNewReplicaSet(deployment *extensions.Deployment, rsList []*extensions.ReplicaSet, maxOldRevision int64, oldRSs []*extensions.ReplicaSet, createIfNotExisted bool) (*extensions.ReplicaSet, error) {
 	// Calculate revision number for this new replica set
 	newRevision := strconv.FormatInt(maxOldRevision+1, 10)
 
@@ -250,11 +255,17 @@ func (dc *DeploymentController) getNewReplicaSet(deployment *extensions.Deployme
 	if err != nil {
 		return nil, err
 	} else if existingNewRS != nil {
-		// Set existing new replica set's annotation
-		if deploymentutil.SetNewReplicaSetAnnotations(deployment, existingNewRS, newRevision, true) {
-			return dc.client.Extensions().ReplicaSets(deployment.ObjectMeta.Namespace).Update(existingNewRS)
+		objCopy, err := api.Scheme.Copy(existingNewRS)
+		if err != nil {
+			return nil, err
 		}
-		return existingNewRS, nil
+		rsCopy := objCopy.(*extensions.ReplicaSet)
+
+		// Set existing new replica set's annotation
+		if deploymentutil.SetNewReplicaSetAnnotations(deployment, rsCopy, newRevision, true) {
+			return dc.client.Extensions().ReplicaSets(deployment.ObjectMeta.Namespace).Update(rsCopy)
+		}
+		return rsCopy, nil
 	}
 
 	if !createIfNotExisted {
