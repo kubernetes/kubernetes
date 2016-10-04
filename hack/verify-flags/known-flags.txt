@@ -275,6 +275,7 @@ k8s-build-output
 keep-gogoproto
 km-path
 kops-cluster
+kops-kubernetes-version
 kops-nodes
 kops-ssh-key
 kops-state
