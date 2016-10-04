@@ -218,7 +218,7 @@ func doTestPlugin(t *testing.T, config pluginTestConfig) {
 	}
 	physicalMounter.ResetLog()
 
-	// Make a unmounter for the volume
+	// Make an unmounter for the volume
 	teardownMedium := mediumUnknown
 	if config.medium == api.StorageMediumMemory {
 		teardownMedium = mediumMemory
