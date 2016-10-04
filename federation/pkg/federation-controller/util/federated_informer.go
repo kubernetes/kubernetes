@@ -156,12 +156,10 @@ func NewFederatedInformer(
 	federatedInformer.clusterInformer.store, federatedInformer.clusterInformer.controller = cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (pkg_runtime.Object, error) {
-				// TODO: remove this when Reflector takes an interface rather than a particular ListOptions as input parameter.
 				versionedOptions := VersionizeV1ListOptions(options)
 				return federationClient.Federation().Clusters().List(versionedOptions)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				// TODO: remove this when Reflector takes an interface rather than a particular ListOptions as input parameter.
 				versionedOptions := VersionizeV1ListOptions(options)
 				return federationClient.Federation().Clusters().Watch(versionedOptions)
 			},

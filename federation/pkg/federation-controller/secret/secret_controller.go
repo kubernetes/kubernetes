@@ -99,12 +99,10 @@ func NewSecretController(client federationclientset.Interface) *SecretController
 	secretcontroller.secretInformerStore, secretcontroller.secretInformerController = cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (pkg_runtime.Object, error) {
-				// TODO: remove this when Reflector takes an interface rather than a particular ListOptions as input parameter.
 				versionedOptions := util.VersionizeV1ListOptions(options)
 				return client.Core().Secrets(api_v1.NamespaceAll).List(versionedOptions)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				// TODO: remove this when Reflector takes an interface rather than a particular ListOptions as input parameter.
 				versionedOptions := util.VersionizeV1ListOptions(options)
 				return client.Core().Secrets(api_v1.NamespaceAll).Watch(versionedOptions)
 			},
@@ -120,12 +118,10 @@ func NewSecretController(client federationclientset.Interface) *SecretController
 			return cache.NewInformer(
 				&cache.ListWatch{
 					ListFunc: func(options api.ListOptions) (pkg_runtime.Object, error) {
-						// TODO: remove this when Reflector takes an interface rather than a particular ListOptions as input parameter.
 						versionedOptions := util.VersionizeV1ListOptions(options)
 						return targetClient.Core().Secrets(api_v1.NamespaceAll).List(versionedOptions)
 					},
 					WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-						// TODO: remove this when Reflector takes an interface rather than a particular ListOptions as input parameter.
 						versionedOptions := util.VersionizeV1ListOptions(options)
 						return targetClient.Core().Secrets(api_v1.NamespaceAll).Watch(versionedOptions)
 					},

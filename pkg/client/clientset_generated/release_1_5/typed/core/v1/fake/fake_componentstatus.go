@@ -50,13 +50,13 @@ func (c *FakeComponentStatuses) Update(componentStatus *v1.ComponentStatus) (res
 	return obj.(*v1.ComponentStatus), err
 }
 
-func (c *FakeComponentStatuses) Delete(name string, options *api.DeleteOptions) error {
+func (c *FakeComponentStatuses) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(core.NewRootDeleteAction(componentstatusesResource, name), &v1.ComponentStatus{})
 	return err
 }
 
-func (c *FakeComponentStatuses) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+func (c *FakeComponentStatuses) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := core.NewRootDeleteCollectionAction(componentstatusesResource, listOptions)
 
 	_, err := c.Fake.Invokes(action, &v1.ComponentStatusList{})
@@ -72,14 +72,14 @@ func (c *FakeComponentStatuses) Get(name string) (result *v1.ComponentStatus, er
 	return obj.(*v1.ComponentStatus), err
 }
 
-func (c *FakeComponentStatuses) List(opts api.ListOptions) (result *v1.ComponentStatusList, err error) {
+func (c *FakeComponentStatuses) List(opts v1.ListOptions) (result *v1.ComponentStatusList, err error) {
 	obj, err := c.Fake.
 		Invokes(core.NewRootListAction(componentstatusesResource, opts), &v1.ComponentStatusList{})
 	if obj == nil {
 		return nil, err
 	}
 
-	label := opts.LabelSelector
+	label, _, _ := core.ExtractFromListOptions(opts)
 	if label == nil {
 		label = labels.Everything()
 	}
@@ -93,7 +93,7 @@ func (c *FakeComponentStatuses) List(opts api.ListOptions) (result *v1.Component
 }
 
 // Watch returns a watch.Interface that watches the requested componentStatuses.
-func (c *FakeComponentStatuses) Watch(opts api.ListOptions) (watch.Interface, error) {
+func (c *FakeComponentStatuses) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(core.NewRootWatchAction(componentstatusesResource, opts))
 }

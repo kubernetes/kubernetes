@@ -18,6 +18,7 @@ package v1beta1
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
+	v1 "k8s.io/kubernetes/pkg/api/v1"
 	v1beta1 "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
@@ -32,11 +33,11 @@ type StorageClassesGetter interface {
 type StorageClassInterface interface {
 	Create(*v1beta1.StorageClass) (*v1beta1.StorageClass, error)
 	Update(*v1beta1.StorageClass) (*v1beta1.StorageClass, error)
-	Delete(name string, options *api.DeleteOptions) error
-	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
+	Delete(name string, options *v1.DeleteOptions) error
+	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
 	Get(name string) (*v1beta1.StorageClass, error)
-	List(opts api.ListOptions) (*v1beta1.StorageClassList, error)
-	Watch(opts api.ListOptions) (watch.Interface, error)
+	List(opts v1.ListOptions) (*v1beta1.StorageClassList, error)
+	Watch(opts v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1beta1.StorageClass, err error)
 	StorageClassExpansion
 }
@@ -77,7 +78,7 @@ func (c *storageClasses) Update(storageClass *v1beta1.StorageClass) (result *v1b
 }
 
 // Delete takes name of the storageClass and deletes it. Returns an error if one occurs.
-func (c *storageClasses) Delete(name string, options *api.DeleteOptions) error {
+func (c *storageClasses) Delete(name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
 		Resource("storageclasses").
 		Name(name).
@@ -87,7 +88,7 @@ func (c *storageClasses) Delete(name string, options *api.DeleteOptions) error {
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *storageClasses) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+func (c *storageClasses) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Resource("storageclasses").
 		VersionedParams(&listOptions, api.ParameterCodec).
@@ -108,7 +109,7 @@ func (c *storageClasses) Get(name string) (result *v1beta1.StorageClass, err err
 }
 
 // List takes label and field selectors, and returns the list of StorageClasses that match those selectors.
-func (c *storageClasses) List(opts api.ListOptions) (result *v1beta1.StorageClassList, err error) {
+func (c *storageClasses) List(opts v1.ListOptions) (result *v1beta1.StorageClassList, err error) {
 	result = &v1beta1.StorageClassList{}
 	err = c.client.Get().
 		Resource("storageclasses").
@@ -119,7 +120,7 @@ func (c *storageClasses) List(opts api.ListOptions) (result *v1beta1.StorageClas
 }
 
 // Watch returns a watch.Interface that watches the requested storageClasses.
-func (c *storageClasses) Watch(opts api.ListOptions) (watch.Interface, error) {
+func (c *storageClasses) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Resource("storageclasses").

@@ -94,7 +94,7 @@ func (c *FakeReplicationControllers) List(opts api.ListOptions) (result *api.Rep
 		return nil, err
 	}
 
-	label := opts.LabelSelector
+	label, _, _ := core.ExtractFromListOptions(opts)
 	if label == nil {
 		label = labels.Everything()
 	}

@@ -20,6 +20,7 @@ import (
 	v1beta1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	api "k8s.io/kubernetes/pkg/api"
 	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
+	v1 "k8s.io/kubernetes/pkg/api/v1"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 	labels "k8s.io/kubernetes/pkg/labels"
 	watch "k8s.io/kubernetes/pkg/watch"
@@ -59,13 +60,13 @@ func (c *FakeClusters) UpdateStatus(cluster *v1beta1.Cluster) (*v1beta1.Cluster,
 	return obj.(*v1beta1.Cluster), err
 }
 
-func (c *FakeClusters) Delete(name string, options *api.DeleteOptions) error {
+func (c *FakeClusters) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(core.NewRootDeleteAction(clustersResource, name), &v1beta1.Cluster{})
 	return err
 }
 
-func (c *FakeClusters) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+func (c *FakeClusters) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := core.NewRootDeleteCollectionAction(clustersResource, listOptions)
 
 	_, err := c.Fake.Invokes(action, &v1beta1.ClusterList{})
@@ -81,14 +82,14 @@ func (c *FakeClusters) Get(name string) (result *v1beta1.Cluster, err error) {
 	return obj.(*v1beta1.Cluster), err
 }
 
-func (c *FakeClusters) List(opts api.ListOptions) (result *v1beta1.ClusterList, err error) {
+func (c *FakeClusters) List(opts v1.ListOptions) (result *v1beta1.ClusterList, err error) {
 	obj, err := c.Fake.
 		Invokes(core.NewRootListAction(clustersResource, opts), &v1beta1.ClusterList{})
 	if obj == nil {
 		return nil, err
 	}
 
-	label := opts.LabelSelector
+	label, _, _ := core.ExtractFromListOptions(opts)
 	if label == nil {
 		label = labels.Everything()
 	}
@@ -102,7 +103,7 @@ func (c *FakeClusters) List(opts api.ListOptions) (result *v1beta1.ClusterList, 
 }
 
 // Watch returns a watch.Interface that watches the requested clusters.
-func (c *FakeClusters) Watch(opts api.ListOptions) (watch.Interface, error) {
+func (c *FakeClusters) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(core.NewRootWatchAction(clustersResource, opts))
 }

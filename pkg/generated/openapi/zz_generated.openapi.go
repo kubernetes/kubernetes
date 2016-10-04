@@ -16395,51 +16395,6 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		},
 		Dependencies: []string{},
 	},
-	"v1beta1.ListOptions": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "ListOptions is the query options to a standard REST list call.",
-				Properties: map[string]spec.Schema{
-					"labelSelector": {
-						SchemaProps: spec.SchemaProps{
-							Description: "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"fieldSelector": {
-						SchemaProps: spec.SchemaProps{
-							Description: "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"watch": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
-							Type:        []string{"boolean"},
-							Format:      "",
-						},
-					},
-					"resourceVersion": {
-						SchemaProps: spec.SchemaProps{
-							Description: "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"timeoutSeconds": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Timeout for the list/watch call.",
-							Type:        []string{"integer"},
-							Format:      "int64",
-						},
-					},
-				},
-			},
-		},
-		Dependencies: []string{},
-	},
 	"v1beta1.LocalSubjectAccessReview": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{

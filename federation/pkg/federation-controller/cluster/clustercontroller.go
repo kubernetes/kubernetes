@@ -67,12 +67,10 @@ func NewclusterController(federationClient federationclientset.Interface, cluste
 	cc.clusterStore.Store, cc.clusterController = cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				// TODO: remove this when Reflector takes an interface rather than a particular ListOptions as input parameter.
 				versionedOptions := util.VersionizeV1ListOptions(options)
 				return cc.federationClient.Federation().Clusters().List(versionedOptions)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				// TODO: remove this when Reflector takes an interface rather than a particular ListOptions as input parameter.
 				versionedOptions := util.VersionizeV1ListOptions(options)
 				return cc.federationClient.Federation().Clusters().Watch(versionedOptions)
 			},

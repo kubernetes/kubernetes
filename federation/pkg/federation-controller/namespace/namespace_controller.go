@@ -102,12 +102,10 @@ func NewNamespaceController(client federationclientset.Interface) *NamespaceCont
 	nc.namespaceInformerStore, nc.namespaceInformerController = cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (pkg_runtime.Object, error) {
-				// TODO: remove this when Reflector takes an interface rather than a particular ListOptions as input parameter.
 				versionedOptions := util.VersionizeV1ListOptions(options)
 				return client.Core().Namespaces().List(versionedOptions)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				// TODO: remove this when Reflector takes an interface rather than a particular ListOptions as input parameter.
 				versionedOptions := util.VersionizeV1ListOptions(options)
 				return client.Core().Namespaces().Watch(versionedOptions)
 			},
@@ -123,12 +121,10 @@ func NewNamespaceController(client federationclientset.Interface) *NamespaceCont
 			return cache.NewInformer(
 				&cache.ListWatch{
 					ListFunc: func(options api.ListOptions) (pkg_runtime.Object, error) {
-						// TODO: remove this when Reflector takes an interface rather than a particular ListOptions as input parameter.
 						versionedOptions := util.VersionizeV1ListOptions(options)
 						return targetClient.Core().Namespaces().List(versionedOptions)
 					},
 					WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-						// TODO: remove this when Reflector takes an interface rather than a particular ListOptions as input parameter.
 						versionedOptions := util.VersionizeV1ListOptions(options)
 						return targetClient.Core().Namespaces().Watch(versionedOptions)
 					},

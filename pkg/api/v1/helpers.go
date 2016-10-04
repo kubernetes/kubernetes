@@ -21,7 +21,7 @@ import "k8s.io/kubernetes/pkg/types"
 // NewDeleteOptions returns a DeleteOptions indicating the resource should
 // be deleted within the specified grace period. Use zero to indicate
 // immediate deletion. If you would prefer to use the default grace period,
-// use &api.DeleteOptions{} directly.
+// use &v1.DeleteOptions{} directly.
 func NewDeleteOptions(grace int64) *DeleteOptions {
 	return &DeleteOptions{GracePeriodSeconds: &grace}
 }

@@ -160,12 +160,10 @@ func New(federationClient fedclientset.Interface, dns dnsprovider.Interface, fed
 	s.serviceStore.Indexer, s.serviceController = cache.NewIndexerInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (pkg_runtime.Object, error) {
-				// TODO: remove this when Reflector takes an interface rather than a particular ListOptions as input parameter.
 				versionedOptions := util.VersionizeV1ListOptions(options)
 				return s.federationClient.Core().Services(v1.NamespaceAll).List(versionedOptions)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				// TODO: remove this when Reflector takes an interface rather than a particular ListOptions as input parameter.
 				versionedOptions := util.VersionizeV1ListOptions(options)
 				return s.federationClient.Core().Services(v1.NamespaceAll).Watch(versionedOptions)
 			},
@@ -187,12 +185,10 @@ func New(federationClient fedclientset.Interface, dns dnsprovider.Interface, fed
 	s.clusterStore.Store, s.clusterController = cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (pkg_runtime.Object, error) {
-				// TODO: remove this when Reflector takes an interface rather than a particular ListOptions as input parameter.
 				versionedOptions := util.VersionizeV1ListOptions(options)
 				return s.federationClient.Federation().Clusters().List(versionedOptions)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				// TODO: remove this when Reflector takes an interface rather than a particular ListOptions as input parameter.
 				versionedOptions := util.VersionizeV1ListOptions(options)
 				return s.federationClient.Federation().Clusters().Watch(versionedOptions)
 			},
