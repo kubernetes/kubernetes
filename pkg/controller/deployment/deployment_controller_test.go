@@ -157,9 +157,9 @@ type fixture struct {
 
 	client *fake.Clientset
 	// Objects to put in the store.
-	dStore   []*exp.Deployment
-	rsStore  []*exp.ReplicaSet
-	podStore []*api.Pod
+	dLister   []*exp.Deployment
+	rsLister  []*exp.ReplicaSet
+	podLister []*api.Pod
 
 	// Actions expected to happen on the client. Objects from here are also
 	// preloaded into NewSimpleFake.
@@ -200,16 +200,16 @@ func (f *fixture) run(deploymentName string) {
 	f.client = fake.NewSimpleClientset(f.objects...)
 	c := NewDeploymentController(f.client, controller.NoResyncPeriodFunc)
 	c.eventRecorder = &record.FakeRecorder{}
-	c.rsStoreSynced = alwaysReady
-	c.podStoreSynced = alwaysReady
-	for _, d := range f.dStore {
-		c.dStore.Indexer.Add(d)
+	c.rsListerSynced = alwaysReady
+	c.podListerSynced = alwaysReady
+	for _, d := range f.dLister {
+		c.dLister.Indexer.Add(d)
 	}
-	for _, rs := range f.rsStore {
-		c.rsStore.Store.Add(rs)
+	for _, rs := range f.rsLister {
+		c.rsLister.Store.Add(rs)
 	}
-	for _, pod := range f.podStore {
-		c.podStore.Indexer.Add(pod)
+	for _, pod := range f.podLister {
+		c.podLister.Indexer.Add(pod)
 	}
 
 	err := c.syncDeployment(deploymentName)
@@ -240,7 +240,7 @@ func TestSyncDeploymentCreatesReplicaSet(t *testing.T) {
 	f := newFixture(t)
 
 	d := newDeployment(1, nil)
-	f.dStore = append(f.dStore, d)
+	f.dLister = append(f.dLister, d)
 	f.objects = append(f.objects, d)
 
 	rs := newReplicaSet(d, "deploymentrs-4186632231", 1)
@@ -258,7 +258,7 @@ func TestSyncDeploymentDontDoAnythingDuringDeletion(t *testing.T) {
 	d := newDeployment(1, nil)
 	now := unversioned.Now()
 	d.DeletionTimestamp = &now
-	f.dStore = append(f.dStore, d)
+	f.dLister = append(f.dLister, d)
 
 	f.run(getKey(d, t))
 }
@@ -269,13 +269,13 @@ func TestDeploymentController_dontSyncDeploymentsWithEmptyPodSelector(t *testing
 	controller := NewDeploymentController(fake, controller.NoResyncPeriodFunc)
 
 	controller.eventRecorder = &record.FakeRecorder{}
-	controller.rsStoreSynced = alwaysReady
-	controller.podStoreSynced = alwaysReady
+	controller.rsListerSynced = alwaysReady
+	controller.podListerSynced = alwaysReady
 
 	d := newDeployment(1, nil)
 	empty := unversioned.LabelSelector{}
 	d.Spec.Selector = &empty
-	controller.dStore.Indexer.Add(d)
+	controller.dLister.Indexer.Add(d)
 	// We expect the deployment controller to not take action here since it's configuration
 	// is invalid, even though no replicasets exist that match it's selector.
 	controller.syncDeployment(fmt.Sprintf("%s/%s", d.ObjectMeta.Namespace, d.ObjectMeta.Name))

@@ -108,7 +108,7 @@ func (dc *DeploymentController) waitForInactiveReplicaSets(oldRSs []*extensions.
 		statusReplicas := rs.Status.Replicas
 
 		if err := wait.ExponentialBackoff(unversionedclient.DefaultRetry, func() (bool, error) {
-			replicaSet, err := dc.rsStore.ReplicaSets(rs.Namespace).Get(rs.Name)
+			replicaSet, err := dc.rsLister.ReplicaSets(rs.Namespace).Get(rs.Name)
 			if err != nil {
 				return false, err
 			}
