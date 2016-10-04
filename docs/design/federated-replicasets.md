@@ -18,11 +18,6 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
-<!-- TAG RELEASE_LINK, added by the munger automatically -->
-<strong>
-The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.4/docs/design/federated-services.md).
-
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
 </strong>
@@ -38,8 +33,8 @@ Documentation for other releases can be found at
 
 This document is a markdown version converted from a working [Google Doc](https://docs.google.com/a/google.com/document/d/1C1HEHQ1fwWtEhyl9JYu6wOiIUJffSmFmZgkGta4720I/edit?usp=sharing). Please refer to the original for extended commentary and discussion.
 
-Author: Marcin Wielgus [mwielgus@google.com](mailto:mwielgus@google.com)  
-Based on discussions with  
+Author: Marcin Wielgus [mwielgus@google.com](mailto:mwielgus@google.com)
+Based on discussions with
 Quinton Hoole [quinton@google.com](mailto:quinton@google.com), Wojtek Tyczyński [wojtekt@google.com](mailto:wojtekt@google.com)
 
 ## Approvals
@@ -78,7 +73,7 @@ Federation Cluster - a cluster that is a member of federation.
 Local ReplicaSet (LRS) - ReplicaSet defined and running on a cluster
 that is a member of federation.
 
-Federated ReplicaSet (FRS) - ReplicaSet defined and running inside of Federated K8S server.  
+Federated ReplicaSet (FRS) - ReplicaSet defined and running inside of Federated K8S server.
 
 Federated ReplicaSet Controller (FRSC) - A controller running inside
 of Federated K8S server that controlls FRS.
@@ -99,12 +94,12 @@ of Federated K8S server that controlls FRS.
 
 ### Features Enabling Critical User Journeys
 
-Feature #1 -> CUJ1:  
+Feature #1 -> CUJ1:
 A component which looks for newly created Federated ReplicaSets and
 creates the appropriate Local ReplicaSet definitions in the federated
 clusters.
 
-Feature #2 -> CUJ2:  
+Feature #2 -> CUJ2:
 A component that checks how many replicas are actually running in each
 of the subclusters and if the number matches to the
 FederatedReplicaSet preferences (by default spread replicas evenly
@@ -112,7 +107,7 @@ across the clusters but custom preferences are allowed - see
 below). If it doesn’t and the situation is unlikely to improve soon
 then the replicas should be moved to other subclusters.
 
-### API and CLI  
+### API and CLI
 
 All interaction with FederatedReplicaSet will be done by issuing
 kubectl commands pointing on the Federated Master API Server. All the
@@ -167,12 +162,12 @@ FederatedReplicaSetPreferences {
 
 This configuration is also used if no annotation is provided. Example:
 
-+  Clusters A,B,C,  all have capacity.   
-   Replica layout: A=16 B=17 C=17. 
-+  Clusters A,B,C and C has capacity for 6 replicas.  
-   Replica layout: A=22 B=22 C=6 
-+  Clusters A,B,C. B and C are offline:   
-   Replica layout: A=50 
++  Clusters A,B,C,  all have capacity.
+   Replica layout: A=16 B=17 C=17.
++  Clusters A,B,C and C has capacity for 6 replicas.
+   Replica layout: A=22 B=22 C=6
++  Clusters A,B,C. B and C are offline:
+   Replica layout: A=50
 
 **Scenario 2**. I want to have only 2 replicas in each of the clusters.
 
@@ -184,7 +179,7 @@ FederatedReplicaSetPreferences {
 }
 ```
 
-Or 
+Or
 
 ```
 FederatedReplicaSetPreferences {
@@ -194,8 +189,8 @@ FederatedReplicaSetPreferences {
  }
 
 ```
-   
-Or 
+
+Or
 
 ```
 FederatedReplicaSetPreferences {  
@@ -205,7 +200,7 @@ FederatedReplicaSetPreferences {
 }
 ```
 
-There is a global target for 50, however if there are 3 clusters there will be only 6 replicas running. 
+There is a global target for 50, however if there are 3 clusters there will be only 6 replicas running.
 
 **Scenario 3**. I want to have 20 replicas in each of 3 clusters.
 
@@ -232,12 +227,12 @@ FederatedReplicaSetPreferences {
 
 Example:
 
-+  All have capacity.   
-   Replica layout: A=16 B=17 C=17. 
-+  B is offline/has no capacity  
-   Replica layout: A=30 B=0 C=20 
-+  A and B are offline:   
-   Replica layout: C=20 
++  All have capacity.
+   Replica layout: A=16 B=17 C=17.
++  B is offline/has no capacity
+   Replica layout: A=30 B=0 C=20
++  A and B are offline:
+   Replica layout: C=20
 
 **Scenario 5**. I want to run my application in cluster A, however if there are troubles FRS can also use clusters B and C, equally.
 
@@ -253,10 +248,10 @@ FederatedReplicaSetPreferences {
 
 Example:
 
-+  All have capacity.   
-   Replica layout: A=50 B=0 C=0. 
-+  A has capacity for only 40 replicas  
-   Replica layout: A=40 B=5 C=5 
++  All have capacity.
+   Replica layout: A=50 B=0 C=0.
++  A has capacity for only 40 replicas
+   Replica layout: A=40 B=5 C=5
 
 **Scenario 6**. I want to run my application in clusters A, B and C. Cluster A gets twice the QPS than other clusters.
 
@@ -270,7 +265,7 @@ FederatedReplicaSetPreferences {
 }
 ```
 
-Example: 
+Example:
 
 +  Want to schedule 60 replicas. A = 30, B = 15, C = 15.
 
@@ -314,7 +309,7 @@ enumerated key idea elements:
    only interesting in case of troubles. Otherwise it is assumed that
    LRS runs trouble free and there is always the right number of pod
    created but possibly not scheduled.
- 
+
 
    + [E4] LRS is manually deleted from the local cluster. In this case
       a new LRS should be created. It is the same case as
@@ -368,7 +363,7 @@ to that LRS along with their current status and status change timestamp.
    is needed or not.
 
 +  FRSC never moves replicas to LRS that have not scheduled/running
-pods or that has pods that failed to be created.  
+pods or that has pods that failed to be created.
 
    + When FRSC notices that a number of pods are not scheduler/running
       or not_even_created in one LRS for more than Y minutes it takes
@@ -387,13 +382,13 @@ pods or that has pods that failed to be created.
 
 To calculate the (re)scheduling moves for a given FRS:
 
-1. Create a list of UNHEALTHY clusters that have some pods unscheduled or not created [E1]/[E5]/[I4].     
+1. Create a list of UNHEALTHY clusters that have some pods unscheduled or not created [E1]/[E5]/[I4].
 1. Create a list of of HEALTHY clusters that have all of the replicas
    up and running. A brand new(or yet to be created) LRS is considered
    healthy.
 1. Sum pods that are running and ready in UNHEALTHY clusters. Name it
    UNHEALTHY_COUNT.
-1. Calculate how to distribute (TOTAL - UNHEALTHY_COUNT) pods among HEALTHY clusters according to FRS preferences (weighted/equal etc spreading). Update the targets on LRS in HEALTHY. Decrease target count only if no pods need to be created. To avoid abrupt changes the update can be possibly performed in small steps.  
+1. Calculate how to distribute (TOTAL - UNHEALTHY_COUNT) pods among HEALTHY clusters according to FRS preferences (weighted/equal etc spreading). Update the targets on LRS in HEALTHY. Decrease target count only if no pods need to be created. To avoid abrupt changes the update can be possibly performed in small steps.
 1. Decrease the targets on UNHEALTHY but don’t make them equal to the
    number of running ready pods so that they don’t become
    automatically HEALTHY in the next iteration. They will become
@@ -482,8 +477,8 @@ federated clusters are added to the federation.
 Step 1. the client sends an RS create request to the
 federation-apiserver
 
-Step 2. federation-apiserver persists an FRS into the federation etcd  
-   
+Step 2. federation-apiserver persists an FRS into the federation etcd
+
 Note c: federation-apiserver populates the clusterid field in the FRS
 before persisting it into the federation etcd
 
@@ -505,3 +500,8 @@ target cluster, to watch changes in every target cluster etcd
 regarding the posted LRS’s and if any violation from the scheduled
 number of replicase is detected the scheduling code is re-called for
 re-scheduling purposes.
+
+
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/federated-replicasets.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->
