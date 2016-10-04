@@ -25,6 +25,7 @@ import (
 
 type ExtensionsInterface interface {
 	GetRESTClient() *restclient.RESTClient
+	DeploymentsGetter
 	IngressesGetter
 	ReplicaSetsGetter
 }
@@ -32,6 +33,10 @@ type ExtensionsInterface interface {
 // ExtensionsClient is used to interact with features provided by the Extensions group.
 type ExtensionsClient struct {
 	*restclient.RESTClient
+}
+
+func (c *ExtensionsClient) Deployments(namespace string) DeploymentInterface {
+	return newDeployments(c, namespace)
 }
 
 func (c *ExtensionsClient) Ingresses(namespace string) IngressInterface {
