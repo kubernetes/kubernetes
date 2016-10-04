@@ -38,8 +38,6 @@ import (
 )
 
 const (
-	DefaultDeserializationCacheSize = 50000
-
 	// TODO: This can be tightened up. It still matches objects named watch or proxy.
 	defaultLongRunningRequestRE = "(/|^)((watch|proxy)(/|$)|(logs?|portforward|exec|attach)/?$)"
 )
@@ -157,7 +155,9 @@ func NewServerRunOptions() *ServerRunOptions {
 func (o *ServerRunOptions) WithEtcdOptions() *ServerRunOptions {
 	o.StorageConfig = storagebackend.Config{
 		Prefix: DefaultEtcdPathPrefix,
-		DeserializationCacheSize: DefaultDeserializationCacheSize,
+		// Default cache size to 0 - if unset, its size will be set based on target
+		// memory usage.
+		DeserializationCacheSize: 0,
 	}
 	return o
 }

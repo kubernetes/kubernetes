@@ -140,6 +140,28 @@ func Run(s *options.APIServer) error {
 		glog.Fatalf("Failed to start kubelet client: %v", err)
 	}
 
+	if s.StorageConfig.DeserializationCacheSize == 0 {
+		// When size of cache is not explicitly set, estimate its size based on
+		// target memory usage.
+		glog.V(2).Infof("Initalizing deserialization cache size based on %dMB limit", s.TargetRAMMB)
+
+		// This is the heuristics that from memory capacity is trying to infer
+		// the maximum number of nodes in the cluster and set cache sizes based
+		// on that value.
+		// From our documentation, we officially recomment 120GB machines for
+		// 2000 nodes, and we scale from that point. Thus we assume ~60MB of
+		// capacity per node.
+		// TODO: We may consider deciding that some percentage of memory will
+		// be used for the deserialization cache and divide it by the max object
+		// size to compute its size. We may even go further and measure
+		// collective sizes of the objects in the cache.
+		clusterSize := s.TargetRAMMB / 60
+		s.StorageConfig.DeserializationCacheSize = 25 * clusterSize
+		if s.StorageConfig.DeserializationCacheSize < 1000 {
+			s.StorageConfig.DeserializationCacheSize = 1000
+		}
+	}
+
 	storageGroupsToEncodingVersion, err := s.StorageGroupsToEncodingVersion()
 	if err != nil {
 		glog.Fatalf("error generating storage version map: %s", err)
