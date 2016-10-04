@@ -53,9 +53,11 @@ const (
 
 var internalLabelKeys []string = []string{containerTypeLabelKey, sandboxIDLabelKey}
 
-func NewDockerService(client dockertools.DockerInterface) DockerLegacyService {
+// NOTE: Anything passed to DockerService should be eventually handled in another way when we switch to running the shim as a different process.
+func NewDockerService(client dockertools.DockerInterface, seccompProfileRoot string) DockerLegacyService {
 	return &dockerService{
-		client: dockertools.NewInstrumentedDockerInterface(client),
+		seccompProfileRoot: seccompProfileRoot,
+		client:             dockertools.NewInstrumentedDockerInterface(client),
 	}
 }
 
@@ -76,7 +78,8 @@ type DockerLegacyService interface {
 }
 
 type dockerService struct {
-	client dockertools.DockerInterface
+	seccompProfileRoot string
+	client             dockertools.DockerInterface
 }
 
 // Version returns the runtime name, runtime version and runtime API version
