@@ -20,8 +20,8 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 )
 
 func TestConfigMapStrategy(t *testing.T) {
@@ -71,7 +71,7 @@ func TestConfigMapStrategy(t *testing.T) {
 
 func TestSelectableFieldLabelConversions(t *testing.T) {
 	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
-		testapi.Default.GroupVersion().String(),
+		registered.GroupOrDie(api.GroupName).GroupVersion.String(),
 		"ConfigMap",
 		ConfigMapToSelectableFields(&api.ConfigMap{}),
 		nil,

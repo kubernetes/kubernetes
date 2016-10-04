@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/runtime"
 	k8syaml "k8s.io/kubernetes/pkg/util/yaml"
@@ -35,7 +36,7 @@ import (
 )
 
 func readPod(filename string) ([]byte, error) {
-	data, err := ioutil.ReadFile("testdata/" + testapi.Default.GroupVersion().Version + "/" + filename)
+	data, err := ioutil.ReadFile("testdata/" + registered.GroupOrDie(api.GroupName).GroupVersion.Version + "/" + filename)
 	if err != nil {
 		return nil, err
 	}

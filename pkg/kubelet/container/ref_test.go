@@ -20,8 +20,8 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 )
 
 func TestFieldPath(t *testing.T) {
@@ -67,14 +67,14 @@ func TestGenerateContainerRef(t *testing.T) {
 		okPod = api.Pod{
 			TypeMeta: unversioned.TypeMeta{
 				Kind:       "Pod",
-				APIVersion: testapi.Default.GroupVersion().String(),
+				APIVersion: registered.GroupOrDie(api.GroupName).GroupVersion.String(),
 			},
 			ObjectMeta: api.ObjectMeta{
 				Name:            "ok",
 				Namespace:       "test-ns",
 				UID:             "bar",
 				ResourceVersion: "42",
-				SelfLink:        "/api/" + testapi.Default.GroupVersion().String() + "/pods/foo",
+				SelfLink:        "/api/" + registered.GroupOrDie(api.GroupName).GroupVersion.String() + "/pods/foo",
 			},
 			Spec: api.PodSpec{
 				Containers: []api.Container{
@@ -91,7 +91,7 @@ func TestGenerateContainerRef(t *testing.T) {
 	noSelfLinkPod.Kind = ""
 	noSelfLinkPod.APIVersion = ""
 	noSelfLinkPod.ObjectMeta.SelfLink = ""
-	defaultedSelfLinkPod.ObjectMeta.SelfLink = "/api/" + testapi.Default.GroupVersion().String() + "/pods/ok"
+	defaultedSelfLinkPod.ObjectMeta.SelfLink = "/api/" + registered.GroupOrDie(api.GroupName).GroupVersion.String() + "/pods/ok"
 
 	cases := []struct {
 		name      string
@@ -108,7 +108,7 @@ func TestGenerateContainerRef(t *testing.T) {
 			},
 			expected: &api.ObjectReference{
 				Kind:            "Pod",
-				APIVersion:      testapi.Default.GroupVersion().String(),
+				APIVersion:      registered.GroupOrDie(api.GroupName).GroupVersion.String(),
 				Name:            "ok",
 				Namespace:       "test-ns",
 				UID:             "bar",
@@ -123,7 +123,7 @@ func TestGenerateContainerRef(t *testing.T) {
 			container: &api.Container{},
 			expected: &api.ObjectReference{
 				Kind:            "Pod",
-				APIVersion:      testapi.Default.GroupVersion().String(),
+				APIVersion:      registered.GroupOrDie(api.GroupName).GroupVersion.String(),
 				Name:            "ok",
 				Namespace:       "test-ns",
 				UID:             "bar",
@@ -147,7 +147,7 @@ func TestGenerateContainerRef(t *testing.T) {
 			},
 			expected: &api.ObjectReference{
 				Kind:            "Pod",
-				APIVersion:      testapi.Default.GroupVersion().String(),
+				APIVersion:      registered.GroupOrDie(api.GroupName).GroupVersion.String(),
 				Name:            "ok",
 				Namespace:       "test-ns",
 				UID:             "bar",
@@ -164,7 +164,7 @@ func TestGenerateContainerRef(t *testing.T) {
 			},
 			expected: &api.ObjectReference{
 				Kind:            "Pod",
-				APIVersion:      testapi.Default.GroupVersion().String(),
+				APIVersion:      registered.GroupOrDie(api.GroupName).GroupVersion.String(),
 				Name:            "ok",
 				Namespace:       "test-ns",
 				UID:             "bar",
