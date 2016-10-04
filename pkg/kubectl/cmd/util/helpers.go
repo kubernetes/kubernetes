@@ -605,7 +605,7 @@ func ParsePairs(pairArgs []string, pairType string, supportRemove bool) (newPair
 	for _, pairArg := range pairArgs {
 		if strings.Index(pairArg, "=") != -1 {
 			parts := strings.SplitN(pairArg, "=", 2)
-			if len(parts) != 2 || len(parts[1]) == 0 {
+			if len(parts) != 2 {
 				if invalidBuf.Len() > 0 {
 					invalidBuf.WriteString(", ")
 				}
