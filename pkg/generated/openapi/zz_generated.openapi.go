@@ -5004,6 +5004,23 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		Dependencies: []string{
 			"api.ObjectMeta", "rbac.RoleRef", "rbac.Subject", "unversioned.TypeMeta"},
 	},
+	"rbac.ClusterRoleBindingBuilder": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ClusterRoleBindingBuilder let's us attach methods.  A no-no for API types. We use it to construct bindings in code.  It's more compact than trying to write them out in a literal.",
+				Properties: map[string]spec.Schema{
+					"ClusterRoleBinding": {
+						SchemaProps: spec.SchemaProps{
+							Ref: spec.MustCreateRef("#/definitions/rbac.ClusterRoleBinding"),
+						},
+					},
+				},
+				Required: []string{"ClusterRoleBinding"},
+			},
+		},
+		Dependencies: []string{
+			"rbac.ClusterRoleBinding"},
+	},
 	"rbac.ClusterRoleBindingList": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{

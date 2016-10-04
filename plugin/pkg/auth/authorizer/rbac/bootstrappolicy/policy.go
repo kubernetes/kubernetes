@@ -19,6 +19,7 @@ package bootstrappolicy
 import (
 	"k8s.io/kubernetes/pkg/api"
 	rbac "k8s.io/kubernetes/pkg/apis/rbac"
+	"k8s.io/kubernetes/pkg/auth/user"
 )
 
 var (
@@ -46,5 +47,12 @@ func ClusterRoles() []rbac.ClusterRole {
 				rbac.NewRule("get").URLs("/version", "/api", "/api/*", "/apis", "/apis/*").RuleOrDie(),
 			},
 		},
+	}
+}
+
+func ClusterRoleBindings() []rbac.ClusterRoleBinding {
+	return []rbac.ClusterRoleBinding{
+		rbac.NewClusterBinding("cluster-admin").Groups(user.SystemPrivilegedGroup).BindingOrDie(),
+		rbac.NewClusterBinding("system:discovery").Groups(user.AllAuthenticated, user.AllUnauthenticated).BindingOrDie(),
 	}
 }

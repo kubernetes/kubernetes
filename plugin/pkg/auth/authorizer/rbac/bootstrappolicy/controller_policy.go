@@ -25,14 +25,18 @@ import (
 	rbac "k8s.io/kubernetes/pkg/apis/rbac"
 )
 
+const SARolePrefix = "system:controller:"
+
 var (
 	// controllerRoles is a slice of roles used for controllers
 	controllerRoles = []rbac.ClusterRole{}
+	// controllerRoleBindings is a slice of roles used for controllers
+	controllerRoleBindings = []rbac.ClusterRoleBinding{}
 )
 
 func addControllerRole(role rbac.ClusterRole) {
-	if !strings.HasPrefix(role.Name, "system:controller:") {
-		glog.Fatalf(`role %q must start with "system:controller:"`, role.Name)
+	if !strings.HasPrefix(role.Name, SARolePrefix) {
+		glog.Fatalf(`role %q must start with %q`, role.Name, SARolePrefix)
 	}
 
 	for _, existingRole := range controllerRoles {
@@ -42,6 +46,8 @@ func addControllerRole(role rbac.ClusterRole) {
 	}
 
 	controllerRoles = append(controllerRoles, role)
+	controllerRoleBindings = append(controllerRoleBindings,
+		rbac.NewClusterBinding(role.Name).SAs("kube-system", role.Name[len(SARolePrefix):]).BindingOrDie())
 }
 
 func eventsRule() rbac.PolicyRule {
@@ -50,7 +56,7 @@ func eventsRule() rbac.PolicyRule {
 
 func init() {
 	addControllerRole(rbac.ClusterRole{
-		ObjectMeta: api.ObjectMeta{Name: "system:controller:replication-controller"},
+		ObjectMeta: api.ObjectMeta{Name: SARolePrefix + "replication-controller"},
 		Rules: []rbac.PolicyRule{
 			rbac.NewRule("get", "list", "watch", "update").Groups(legacyGroup).Resources("replicationcontrollers").RuleOrDie(),
 			rbac.NewRule("update").Groups(legacyGroup).Resources("replicationcontrollers/status").RuleOrDie(),
@@ -63,4 +69,8 @@ func init() {
 // ControllerRoles returns the cluster roles used by controllers
 func ControllerRoles() []rbac.ClusterRole {
 	return controllerRoles
+}
+
+func ControllerRoleBindings() []rbac.ClusterRoleBinding {
+	return controllerRoleBindings
 }

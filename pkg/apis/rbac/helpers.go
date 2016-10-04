@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"strings"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
@@ -161,4 +162,62 @@ func (r *PolicyRuleBuilder) Rule() (PolicyRule, error) {
 	}
 
 	return r.PolicyRule, nil
+}
+
+// +k8s:deepcopy-gen=false
+// ClusterRoleBindingBuilder let's us attach methods.  A no-no for API types.
+// We use it to construct bindings in code.  It's more compact than trying to write them
+// out in a literal.
+type ClusterRoleBindingBuilder struct {
+	ClusterRoleBinding ClusterRoleBinding
+}
+
+func NewClusterBinding(clusterRoleName string) *ClusterRoleBindingBuilder {
+	return &ClusterRoleBindingBuilder{
+		ClusterRoleBinding: ClusterRoleBinding{
+			ObjectMeta: api.ObjectMeta{Name: clusterRoleName},
+			RoleRef: RoleRef{
+				APIGroup: GroupName,
+				Kind:     "ClusterRole",
+				Name:     clusterRoleName,
+			},
+		},
+	}
+}
+
+func (r *ClusterRoleBindingBuilder) Groups(groups ...string) *ClusterRoleBindingBuilder {
+	for _, group := range groups {
+		r.ClusterRoleBinding.Subjects = append(r.ClusterRoleBinding.Subjects, Subject{Kind: GroupKind, Name: group})
+	}
+	return r
+}
+
+func (r *ClusterRoleBindingBuilder) Users(users ...string) *ClusterRoleBindingBuilder {
+	for _, user := range users {
+		r.ClusterRoleBinding.Subjects = append(r.ClusterRoleBinding.Subjects, Subject{Kind: UserKind, Name: user})
+	}
+	return r
+}
+
+func (r *ClusterRoleBindingBuilder) SAs(namespace string, serviceAccountNames ...string) *ClusterRoleBindingBuilder {
+	for _, saName := range serviceAccountNames {
+		r.ClusterRoleBinding.Subjects = append(r.ClusterRoleBinding.Subjects, Subject{Kind: ServiceAccountKind, Namespace: namespace, Name: saName})
+	}
+	return r
+}
+
+func (r *ClusterRoleBindingBuilder) BindingOrDie() ClusterRoleBinding {
+	ret, err := r.Binding()
+	if err != nil {
+		panic(err)
+	}
+	return ret
+}
+
+func (r *ClusterRoleBindingBuilder) Binding() (ClusterRoleBinding, error) {
+	if len(r.ClusterRoleBinding.Subjects) == 0 {
+		return ClusterRoleBinding{}, fmt.Errorf("subjects are required: %#v", r.ClusterRoleBinding)
+	}
+
+	return r.ClusterRoleBinding, nil
 }
