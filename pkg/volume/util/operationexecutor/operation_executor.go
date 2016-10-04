@@ -492,9 +492,9 @@ func (oe *operationExecutor) generateAttachVolumeFunc(
 				volumeToAttach.VolumeSpec.Name(),
 				volumeToAttach.NodeName,
 				attachErr)
-			for _, pod := range volumeToAttach.ScheduledPods {
-				oe.recorder.Eventf(pod, api.EventTypeWarning, kevents.FailedMountVolume, err.Error())
-			}
+			//for _, pod := range volumeToAttach.ScheduledPods {
+			//	oe.recorder.Eventf(pod, api.EventTypeWarning, kevents.FailedMountVolume, err.Error())
+			//}
 			return err
 		}
 

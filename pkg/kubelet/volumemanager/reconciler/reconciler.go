@@ -452,7 +452,7 @@ func (rc *reconciler) reconstructVolume(volume podVolume) (*operationexecutor.Vo
 	if attachablePlugin != nil {
 		uniqueVolumeName = volumehelper.GetUniqueVolumeName(volume.pluginName, volumeName)
 	} else {
-		uniqueVolumeName = volumehelper.GetUniqueVolumeNameForNonAttachableVolume(volume.podName, plugin, volumeSpec)
+		uniqueVolumeName = volumehelper.GetUniqueVolumeNameForNonAttachableVolume(volume.podName, plugin, volumeSpec.Name())
 	}
 
 	volumeToMount := &operationexecutor.VolumeToMount{
