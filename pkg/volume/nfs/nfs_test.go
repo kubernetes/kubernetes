@@ -93,7 +93,7 @@ func TestRecycler(t *testing.T) {
 	}
 	recycler, err := plug.NewRecycler("pv-name", spec, nil)
 	if err != nil {
-		t.Errorf("Failed to make a new Recyler: %v", err)
+		t.Errorf("Failed to make a new Recycler: %v", err)
 	}
 	if recycler.GetPath() != spec.PersistentVolume.Spec.NFS.Path {
 		t.Errorf("Expected %s but got %s", spec.PersistentVolume.Spec.NFS.Path, recycler.GetPath())

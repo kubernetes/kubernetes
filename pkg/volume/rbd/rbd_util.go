@@ -371,7 +371,7 @@ func (util *RBDUtil) DeleteImage(p *rbdVolumeDeleter) error {
 		if err == nil {
 			return nil
 		} else {
-			glog.Errorf("failed to delete rbd image, error %v ouput %v", err, string(output))
+			glog.Errorf("failed to delete rbd image, error %v output %v", err, string(output))
 		}
 	}
 	return err

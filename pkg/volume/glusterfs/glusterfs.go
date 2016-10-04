@@ -290,7 +290,7 @@ func (b *glusterfsMounter) setUpAtInternal(dir string) error {
 
 	// adding log-level ERROR to remove noise
 	// and more specific log path so each pod has
-	// it's own log based on PV + Pod
+	// its own log based on PV + Pod
 	log := path.Join(p, b.pod.Name+"-glusterfs.log")
 	options = append(options, "log-level=ERROR")
 	options = append(options, "log-file="+log)
@@ -313,7 +313,7 @@ func (b *glusterfsMounter) setUpAtInternal(dir string) error {
 	}
 
 	// Failed mount scenario.
-	// Since gluster does not return eror text
+	// Since gluster does not return error text
 	// it all goes in a log file, we will read the log file
 	logerror := readGlusterLog(log, b.pod.Name)
 	if logerror != nil {
