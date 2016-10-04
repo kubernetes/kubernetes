@@ -44,9 +44,9 @@ cluster/saltbase/salt/etcd/etcd.manifest:        "value": "{{ storage_backend }}
 cluster/saltbase/salt/etcd/etcd.manifest:{% set storage_backend = pillar.get('storage_backend', 'etcd2') -%}
 cluster/saltbase/salt/kube-admission-controls/init.sls:{% if 'LimitRanger' in pillar.get('admission_control', '') %}
 cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:{% set params = address + " " + storage_backend + " " + etcd_servers + " " + etcd_servers_overrides + " " + cloud_provider + " " + cloud_config + " " + runtime_config + " " + feature_gates + " " + admission_control + " " + target_ram_mb + " " + service_cluster_ip_range + " " + client_ca_file + basic_auth_file + " " + min_request_timeout + " " + enable_garbage_collector -%}
+cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:{% if pillar.get('enable_hostpath_provisioner', '').lower() == 'true' -%}
 cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:{% set params = "--master=127.0.0.1:8080" + " " + cluster_name + " " + cluster_cidr + " " + allocate_node_cidrs + " " + service_cluster_ip_range + " " + terminated_pod_gc + " " + enable_garbage_collector + " " + cloud_provider  + " " + cloud_config + " " + service_account_key + " " + log_level + " " + root_ca_file -%}
 cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:{% set params = params + " " + feature_gates -%}
-cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:{% if pillar.get('enable_hostpath_provisioner', '').lower() == 'true' -%}
 cluster/saltbase/salt/kube-proxy/kube-proxy.manifest:  {% set api_servers_with_port = api_servers + ":6443" -%}
 cluster/saltbase/salt/kube-proxy/kube-proxy.manifest:  {% set api_servers_with_port = api_servers -%}
 cluster/saltbase/salt/kube-proxy/kube-proxy.manifest:  {% set cluster_cidr=" --cluster-cidr=" + pillar['cluster_cidr'] %}
@@ -97,9 +97,9 @@ hack/test-update-storage-objects.sh:  local storage_media_type=${3:-""}
 hack/test-update-storage-objects.sh:  local storage_versions=${2:-""}
 hack/test-update-storage-objects.sh:  source_file=${test_data[0]}
 hack/test-update-storage-objects.sh:# source_file,resource,namespace,name,old_version,new_version
-pkg/kubelet/api/v1alpha1/runtime/api.pb.go:	ContainerPort *int32 `protobuf:"varint,3,opt,name=container_port,json=containerPort" json:"container_port,omitempty"`
+pkg/kubelet/api/v1alpha1/runtime/api.pb.go:	ContainerPort *int32 `protobuf:"varint,2,opt,name=container_port,json=containerPort" json:"container_port,omitempty"`
 pkg/kubelet/api/v1alpha1/runtime/api.pb.go:	OomScoreAdj      *int64 `protobuf:"varint,5,opt,name=oom_score_adj,json=oomScoreAdj" json:"oom_score_adj,omitempty"`
-pkg/kubelet/api/v1alpha1/runtime/api.proto:    optional int32 container_port = 3;
+pkg/kubelet/api/v1alpha1/runtime/api.proto:    optional int32 container_port = 2;
 pkg/kubelet/api/v1alpha1/runtime/api.proto:    optional int64 oom_score_adj = 5;
 pkg/kubelet/cm/container_manager_linux.go:		glog.V(3).Infof("Failed to apply oom_score_adj %d for pid %d: %v", oomScoreAdj, pid, err)
 pkg/kubelet/cm/container_manager_linux.go:	glog.V(5).Infof("attempting to apply oom_score_adj of %d to pid %d", oomScoreAdj, pid)
