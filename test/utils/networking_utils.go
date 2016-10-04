@@ -224,8 +224,15 @@ func (config *NetworkingTestConfig) DialFromNode(protocol, targetIP string, targ
 
 	filterCmd := fmt.Sprintf("%s | grep -v '^\\s*$'", cmd)
 	for i := 0; i < maxTries; i++ {
-		stdout := config.f.ExecShellInPod(config.HostTestContainerPod.Name, filterCmd)
-		eps.Insert(strings.TrimSpace(stdout))
+		stdout, stderr, err := config.f.ExecShellInPodWithFullOutput(config.HostTestContainerPod.Name, filterCmd)
+		if err != nil || len(stderr) > 0 {
+			// A failure to exec command counts as a try, not a hard fail.
+			// Also note that we will keep failing for maxTries in tests where
+			// we confirm unreachability.
+			framework.Logf("Failed to execute %v: %v, stdout: %v, stderr: %v", filterCmd, err, stdout, stderr)
+		} else {
+			eps.Insert(strings.TrimSpace(stdout))
+		}
 		framework.Logf("Waiting for %+v endpoints, got endpoints %+v", expectedEps.Difference(eps), eps)
 
 		// Check against i+1 so we exit if minTries == maxTries.
