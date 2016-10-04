@@ -183,7 +183,7 @@ type Pod struct {
 	// List of sandboxes associated with this pod. The sandboxes are converted
 	// to Container temporariliy to avoid substantial changes to other
 	// components. This is only populated by kuberuntime.
-	// TODO: use the runtimeApi.PodSandbox type directly.
+	// TODO: use the runtimeapi.PodSandbox type directly.
 	Sandboxes []*Container
 }
 
