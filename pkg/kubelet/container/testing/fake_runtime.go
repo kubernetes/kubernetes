@@ -219,13 +219,13 @@ func (f *FakeRuntime) SyncPod(pod *api.Pod, _ api.PodStatus, _ *PodStatus, _ []a
 	return
 }
 
-func (f *FakeRuntime) KillPod(pod *api.Pod, runningPod Pod, gracePeriodOverride *int64) error {
+func (f *FakeRuntime) KillPod(pod *api.Pod, podStatus *PodStatus, gracePeriodOverride *int64) error {
 	f.Lock()
 	defer f.Unlock()
 
 	f.CalledFunctions = append(f.CalledFunctions, "KillPod")
-	f.KilledPods = append(f.KilledPods, string(runningPod.ID))
-	for _, c := range runningPod.Containers {
+	f.KilledPods = append(f.KilledPods, string(podStatus.ID))
+	for _, c := range podStatus.ContainerStatuses {
 		f.KilledContainers = append(f.KilledContainers, c.Name)
 	}
 	return f.Err

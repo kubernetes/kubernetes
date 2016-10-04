@@ -494,7 +494,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *api.Pod, _ api.PodStatus, podSt
 			glog.V(4).Infof("Stopping PodSandbox for %q, will start new one", format.Pod(pod))
 		}
 
-		killResult := m.killPodWithSyncResult(pod, kubecontainer.ConvertPodStatusToRunningPod(m.runtimeName, podStatus), nil)
+		killResult := m.killPodWithSyncResult(pod, podStatus, nil)
 		result.AddPodSyncResult(killResult)
 		if killResult.Error() != nil {
 			glog.Errorf("killPodWithSyncResult failed: %v", killResult.Error())
@@ -653,54 +653,61 @@ func (m *kubeGenericRuntimeManager) doBackOff(pod *api.Pod, container *api.Conta
 // gracePeriodOverride if specified allows the caller to override the pod default grace period.
 // only hard kill paths are allowed to specify a gracePeriodOverride in the kubelet in order to not corrupt user data.
 // it is useful when doing SIGKILL for hard eviction scenarios, or max grace period during soft eviction scenarios.
-func (m *kubeGenericRuntimeManager) KillPod(pod *api.Pod, runningPod kubecontainer.Pod, gracePeriodOverride *int64) error {
-	err := m.killPodWithSyncResult(pod, runningPod, gracePeriodOverride)
+func (m *kubeGenericRuntimeManager) KillPod(pod *api.Pod, podStatus *kubecontainer.PodStatus, gracePeriodOverride *int64) error {
+	err := m.killPodWithSyncResult(pod, podStatus, gracePeriodOverride)
 	return err.Error()
 }
 
 // killPodWithSyncResult kills a runningPod and returns SyncResult.
 // Note: The pod passed in could be *nil* when kubelet restarted.
-func (m *kubeGenericRuntimeManager) killPodWithSyncResult(pod *api.Pod, runningPod kubecontainer.Pod, gracePeriodOverride *int64) (result kubecontainer.PodSyncResult) {
-	killContainerResults := m.killContainersWithSyncResult(pod, runningPod, gracePeriodOverride)
+func (m *kubeGenericRuntimeManager) killPodWithSyncResult(pod *api.Pod, podStatus *kubecontainer.PodStatus, gracePeriodOverride *int64) (result kubecontainer.PodSyncResult) {
+	killContainerResults := m.killContainersWithSyncResult(pod, podStatus, gracePeriodOverride)
 	for _, containerResult := range killContainerResults {
 		result.AddSyncResult(containerResult)
 	}
 
 	// Teardown network plugin
-	if len(runningPod.Sandboxes) == 0 {
-		glog.V(4).Infof("Can not find pod sandbox by UID %q, assuming already removed.", runningPod.ID)
+	if len(podStatus.SandboxStatuses) == 0 {
+		glog.V(4).Infof("Can not find pod sandbox by UID %q, assuming already removed.", podStatus.ID)
 		return
 	}
 
-	sandboxID := runningPod.Sandboxes[0].ID.ID
-	isHostNetwork, err := m.isHostNetwork(sandboxID, pod)
-	if err != nil {
-		result.Fail(err)
-		return
-	}
-	if !isHostNetwork {
-		teardownNetworkResult := kubecontainer.NewSyncResult(kubecontainer.TeardownNetwork, runningPod.ID)
-		result.AddSyncResult(teardownNetworkResult)
-		// Tear down network plugin with sandbox id
-		if err := m.networkPlugin.TearDownPod(runningPod.Namespace, runningPod.Name, kubecontainer.ContainerID{
-			Type: m.runtimeName,
-			ID:   sandboxID,
-		}); err != nil {
-			message := fmt.Sprintf("Failed to teardown network for pod %s_%s(%s) using network plugins %q: %v",
-				runningPod.Name, runningPod.Namespace, runningPod.ID, m.networkPlugin.Name(), err)
-			teardownNetworkResult.Fail(kubecontainer.ErrTeardownNetwork, message)
-			glog.Error(message)
+	if podStatus.SandboxStatuses[0] != nil && podStatus.SandboxStatuses[0].Id != nil {
+		sandboxID := *podStatus.SandboxStatuses[0].Id
+		isHostNetwork, err := m.isHostNetwork(sandboxID, pod)
+		if err != nil {
+			result.Fail(err)
+			return
 		}
+		if !isHostNetwork {
+			teardownNetworkResult := kubecontainer.NewSyncResult(kubecontainer.TeardownNetwork, pod.UID)
+			result.AddSyncResult(teardownNetworkResult)
+			// Tear down network plugin with sandbox id
+			if err := m.networkPlugin.TearDownPod(podStatus.Namespace, podStatus.Name, kubecontainer.ContainerID{
+				Type: m.runtimeName,
+				ID:   sandboxID,
+			}); err != nil {
+				message := fmt.Sprintf("Failed to teardown network for pod %q using network plugins %q: %v",
+					format.Pod(pod), m.networkPlugin.Name(), err)
+				teardownNetworkResult.Fail(kubecontainer.ErrTeardownNetwork, message)
+				glog.Error(message)
+			}
+		}
+
 	}
 
 	// stop sandbox, the sandbox will be removed in GarbageCollect
-	killSandboxResult := kubecontainer.NewSyncResult(kubecontainer.KillPodSandbox, runningPod.ID)
+	killSandboxResult := kubecontainer.NewSyncResult(kubecontainer.KillPodSandbox, podStatus.ID)
 	result.AddSyncResult(killSandboxResult)
 	// Stop all sandboxes belongs to same pod
-	for _, podSandbox := range runningPod.Sandboxes {
-		if err := m.runtimeService.StopPodSandbox(podSandbox.ID.ID); err != nil {
+	for _, podSandboxStatus := range podStatus.SandboxStatuses {
+		if podSandboxStatus == nil || podSandboxStatus.Id == nil {
+			glog.Warningf("SandboxStatus data invalid: %#q", podSandboxStatus)
+			continue
+		}
+		if err := m.runtimeService.StopPodSandbox(*podSandboxStatus.Id); err != nil {
 			killSandboxResult.Fail(kubecontainer.ErrKillPodSandbox, err.Error())
-			glog.Errorf("Failed to stop sandbox %q", podSandbox.ID)
+			glog.Errorf("Failed to stop sandbox %q", *podSandboxStatus.Id)
 		}
 	}
 

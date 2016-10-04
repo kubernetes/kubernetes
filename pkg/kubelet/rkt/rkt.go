@@ -908,16 +908,16 @@ func newUnitOption(section, name, value string) *unit.UnitOption {
 	return &unit.UnitOption{Section: section, Name: name, Value: value}
 }
 
-// apiPodToruntimePod converts an api.Pod to kubelet/container.Pod.
-func apiPodToruntimePod(uuid string, pod *api.Pod) *kubecontainer.Pod {
-	p := &kubecontainer.Pod{
+// apiPodToPodStatus converts an api.Pod to kubelet/container.PodStatus.
+func apiPodToPodStatus(uuid string, pod *api.Pod) *kubecontainer.PodStatus {
+	p := &kubecontainer.PodStatus{
 		ID:        pod.UID,
 		Name:      pod.Name,
 		Namespace: pod.Namespace,
 	}
 	for i := range pod.Spec.Containers {
 		c := &pod.Spec.Containers[i]
-		p.Containers = append(p.Containers, &kubecontainer.Container{
+		p.ContainerStatuses = append(p.ContainerStatuses, &kubecontainer.ContainerStatus{
 			ID:    buildContainerID(&containerID{uuid, c.Name}),
 			Name:  c.Name,
 			Image: c.Image,
@@ -1114,7 +1114,7 @@ func (r *Runtime) getSelinuxContext(opt *api.SELinuxOptions) (string, error) {
 //
 // On success, it will return a string that represents name of the unit file
 // and the runtime pod.
-func (r *Runtime) preparePod(pod *api.Pod, podIP string, pullSecrets []api.Secret, netnsName string) (string, *kubecontainer.Pod, error) {
+func (r *Runtime) preparePod(pod *api.Pod, podIP string, pullSecrets []api.Secret, netnsName string) (string, *kubecontainer.PodStatus, error) {
 	// Generate the appc pod manifest from the k8s pod spec.
 	manifest, err := r.makePodManifest(pod, podIP, pullSecrets)
 	if err != nil {
@@ -1201,14 +1201,14 @@ func (r *Runtime) preparePod(pod *api.Pod, podIP string, pullSecrets []api.Secre
 	}
 	serviceFile.Close()
 
-	return serviceName, apiPodToruntimePod(uuid, pod), nil
+	return serviceName, apiPodToPodStatus(uuid, pod), nil
 }
 
 // generateEvents is a helper function that generates some container
 // life cycle events for containers in a pod.
-func (r *Runtime) generateEvents(runtimePod *kubecontainer.Pod, reason string, failure error) {
+func (r *Runtime) generateEvents(podStatus *kubecontainer.PodStatus, reason string, failure error) {
 	// Set up container references.
-	for _, c := range runtimePod.Containers {
+	for _, c := range podStatus.ContainerStatuses {
 		containerID := c.ID
 		id, err := parseContainerID(containerID)
 		if err != nil {
@@ -1306,7 +1306,7 @@ func (r *Runtime) RunPod(pod *api.Pod, pullSecrets []api.Secret) error {
 		return err
 	}
 
-	name, runtimePod, prepareErr := r.preparePod(pod, podIP, pullSecrets, netnsName)
+	name, podStatus, prepareErr := r.preparePod(pod, podIP, pullSecrets, netnsName)
 
 	// Set container references and generate events.
 	// If preparedPod fails, then send out 'failed' events for each container.
@@ -1321,7 +1321,7 @@ func (r *Runtime) RunPod(pod *api.Pod, pullSecrets []api.Secret) error {
 			r.recorder.Eventf(ref, api.EventTypeWarning, events.FailedToCreateContainer, "Failed to create rkt container with error: %v", prepareErr)
 			continue
 		}
-		containerID := runtimePod.Containers[i].ID
+		containerID := podStatus.ContainerStatuses[i].ID
 		r.containerRefManager.SetRef(containerID, ref)
 	}
 
@@ -1330,14 +1330,14 @@ func (r *Runtime) RunPod(pod *api.Pod, pullSecrets []api.Secret) error {
 		return prepareErr
 	}
 
-	r.generateEvents(runtimePod, "Created", nil)
+	r.generateEvents(podStatus, "Created", nil)
 
 	// RestartUnit has the same effect as StartUnit if the unit is not running, besides it can restart
 	// a unit if the unit file is changed and reloaded.
 	reschan := make(chan string)
 	_, err = r.systemd.RestartUnit(name, "replace", reschan)
 	if err != nil {
-		r.generateEvents(runtimePod, "Failed", err)
+		r.generateEvents(podStatus, "Failed", err)
 		r.cleanupPodNetwork(pod)
 		return err
 	}
@@ -1345,17 +1345,17 @@ func (r *Runtime) RunPod(pod *api.Pod, pullSecrets []api.Secret) error {
 	res := <-reschan
 	if res != "done" {
 		err := fmt.Errorf("Failed to restart unit %q: %s", name, res)
-		r.generateEvents(runtimePod, "Failed", err)
+		r.generateEvents(podStatus, "Failed", err)
 		r.cleanupPodNetwork(pod)
 		return err
 	}
 
-	r.generateEvents(runtimePod, "Started", nil)
+	r.generateEvents(podStatus, "Started", nil)
 
 	// This is a temporary solution until we have a clean design on how
 	// kubelet handles events. See https://github.com/kubernetes/kubernetes/issues/23084.
-	if err := r.runLifecycleHooks(pod, runtimePod, lifecyclePostStartHook); err != nil {
-		if errKill := r.KillPod(pod, *runtimePod, nil); errKill != nil {
+	if err := r.runLifecycleHooks(pod, podStatus, lifecyclePostStartHook); err != nil {
+		if errKill := r.KillPod(pod, podStatus, nil); errKill != nil {
 			return errors.NewAggregate([]error{err, errKill})
 		}
 		r.cleanupPodNetwork(pod)
@@ -1428,7 +1428,7 @@ const (
 	lifecyclePreStopHook   lifecycleHookType = "pre-stop"
 )
 
-func (r *Runtime) runLifecycleHooks(pod *api.Pod, runtimePod *kubecontainer.Pod, typ lifecycleHookType) error {
+func (r *Runtime) runLifecycleHooks(pod *api.Pod, podStatus *kubecontainer.PodStatus, typ lifecycleHookType) error {
 	var wg sync.WaitGroup
 	var errlist []error
 	errCh := make(chan error, len(pod.Spec.Containers))
@@ -1457,7 +1457,7 @@ func (r *Runtime) runLifecycleHooks(pod *api.Pod, runtimePod *kubecontainer.Pod,
 		}
 
 		container := &pod.Spec.Containers[i]
-		runtimeContainer := runtimePod.FindContainerByName(container.Name)
+		runtimeContainer := podStatus.FindContainerStatusByName(container.Name)
 		if runtimeContainer == nil {
 			// Container already gone.
 			wg.Done()
@@ -1611,12 +1611,12 @@ func getPodTerminationGracePeriodInSecond(pod *api.Pod) int64 {
 	return gracePeriod
 }
 
-func (r *Runtime) waitPreStopHooks(pod *api.Pod, runningPod *kubecontainer.Pod) {
+func (r *Runtime) waitPreStopHooks(pod *api.Pod, podStatus *kubecontainer.PodStatus) {
 	gracePeriod := getPodTerminationGracePeriodInSecond(pod)
 
 	done := make(chan struct{})
 	go func() {
-		if err := r.runLifecycleHooks(pod, runningPod, lifecyclePreStopHook); err != nil {
+		if err := r.runLifecycleHooks(pod, podStatus, lifecyclePreStopHook); err != nil {
 			glog.Errorf("rkt: Some pre-stop hooks failed for pod %q: %v", format.Pod(pod), err)
 		}
 		close(done)
@@ -1631,28 +1631,29 @@ func (r *Runtime) waitPreStopHooks(pod *api.Pod, runningPod *kubecontainer.Pod) 
 
 // KillPod invokes 'systemctl kill' to kill the unit that runs the pod.
 // TODO: add support for gracePeriodOverride which is used in eviction scenarios
-func (r *Runtime) KillPod(pod *api.Pod, runningPod kubecontainer.Pod, gracePeriodOverride *int64) error {
-	glog.V(4).Infof("Rkt is killing pod: name %q.", runningPod.Name)
+func (r *Runtime) KillPod(pod *api.Pod, podStatus *kubecontainer.PodStatus, gracePeriodOverride *int64) error {
+	glog.V(4).Infof("Rkt is killing pod: name %q.", podStatus.Name)
 
-	if len(runningPod.Containers) == 0 {
-		glog.V(4).Infof("rkt: Pod %q is already being killed, no action will be taken", runningPod.Name)
+	if len(podStatus.ContainerStatuses) == 0 {
+		glog.V(4).Infof("rkt: Pod %q is already being killed, no action will be taken", podStatus.Name)
 		return nil
 	}
 
 	if pod != nil {
-		r.waitPreStopHooks(pod, &runningPod)
+		r.waitPreStopHooks(pod, podStatus)
 	}
 
-	containerID, err := parseContainerID(runningPod.Containers[0].ID)
+	containerID, err := parseContainerID(podStatus.ContainerStatuses[0].ID)
 	if err != nil {
-		glog.Errorf("rkt: Failed to get rkt uuid of the pod %q: %v", runningPod.Name, err)
+		glog.Errorf("rkt: Failed to get rkt uuid of the pod %q: %v", podStatus.Name, err)
 		return err
 	}
 	serviceName := makePodServiceFileName(containerID.uuid)
 	serviceFile := serviceFilePath(serviceName)
 
-	r.generateEvents(&runningPod, "Killing", nil)
-	for _, c := range runningPod.Containers {
+	r.generateEvents(podStatus, "Killing", nil)
+	runningContainerStatues := podStatus.GetRunningContainerStatuses()
+	for _, c := range runningContainerStatues {
 		r.containerRefManager.ClearRef(c.ID)
 	}
 
@@ -1709,11 +1710,9 @@ func (r *Runtime) SyncPod(pod *api.Pod, _ api.PodStatus, podStatus *kubecontaine
 			result.Fail(err)
 		}
 	}()
-	// TODO: (random-liu) Stop using running pod in SyncPod()
-	runningPod := kubecontainer.ConvertPodStatusToRunningPod(r.Type(), podStatus)
 	// Add references to all containers.
-	unidentifiedContainers := make(map[kubecontainer.ContainerID]*kubecontainer.Container)
-	for _, c := range runningPod.Containers {
+	unidentifiedContainers := make(map[kubecontainer.ContainerID]*kubecontainer.ContainerStatus)
+	for _, c := range podStatus.ContainerStatuses {
 		unidentifiedContainers[c.ID] = c
 	}
 
@@ -1721,7 +1720,7 @@ func (r *Runtime) SyncPod(pod *api.Pod, _ api.PodStatus, podStatus *kubecontaine
 	for _, container := range pod.Spec.Containers {
 		expectedHash := kubecontainer.HashContainer(&container)
 
-		c := runningPod.FindContainerByName(container.Name)
+		c := podStatus.FindContainerStatusByName(container.Name)
 		if c == nil {
 			if kubecontainer.ShouldContainerBeRestarted(&container, pod, podStatus) {
 				glog.V(3).Infof("Container %+v is dead, but RestartPolicy says that we should restart it.", container)
@@ -1760,8 +1759,8 @@ func (r *Runtime) SyncPod(pod *api.Pod, _ api.PodStatus, podStatus *kubecontaine
 
 	if restartPod {
 		// Kill the pod only if the pod is actually running.
-		if len(runningPod.Containers) > 0 {
-			if err = r.KillPod(pod, runningPod, nil); err != nil {
+		if len(podStatus.ContainerStatuses) > 0 {
+			if err = r.KillPod(pod, podStatus, nil); err != nil {
 				return
 			}
 		}
