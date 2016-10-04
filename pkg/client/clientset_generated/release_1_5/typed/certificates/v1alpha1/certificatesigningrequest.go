@@ -18,6 +18,7 @@ package v1alpha1
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
+	v1 "k8s.io/kubernetes/pkg/api/v1"
 	v1alpha1 "k8s.io/kubernetes/pkg/apis/certificates/v1alpha1"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
@@ -33,11 +34,11 @@ type CertificateSigningRequestInterface interface {
 	Create(*v1alpha1.CertificateSigningRequest) (*v1alpha1.CertificateSigningRequest, error)
 	Update(*v1alpha1.CertificateSigningRequest) (*v1alpha1.CertificateSigningRequest, error)
 	UpdateStatus(*v1alpha1.CertificateSigningRequest) (*v1alpha1.CertificateSigningRequest, error)
-	Delete(name string, options *api.DeleteOptions) error
-	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
+	Delete(name string, options *v1.DeleteOptions) error
+	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
 	Get(name string) (*v1alpha1.CertificateSigningRequest, error)
-	List(opts api.ListOptions) (*v1alpha1.CertificateSigningRequestList, error)
-	Watch(opts api.ListOptions) (watch.Interface, error)
+	List(opts v1.ListOptions) (*v1alpha1.CertificateSigningRequestList, error)
+	Watch(opts v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1alpha1.CertificateSigningRequest, err error)
 	CertificateSigningRequestExpansion
 }
@@ -90,7 +91,7 @@ func (c *certificateSigningRequests) UpdateStatus(certificateSigningRequest *v1a
 }
 
 // Delete takes name of the certificateSigningRequest and deletes it. Returns an error if one occurs.
-func (c *certificateSigningRequests) Delete(name string, options *api.DeleteOptions) error {
+func (c *certificateSigningRequests) Delete(name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
 		Resource("certificatesigningrequests").
 		Name(name).
@@ -100,7 +101,7 @@ func (c *certificateSigningRequests) Delete(name string, options *api.DeleteOpti
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *certificateSigningRequests) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+func (c *certificateSigningRequests) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Resource("certificatesigningrequests").
 		VersionedParams(&listOptions, api.ParameterCodec).
@@ -121,7 +122,7 @@ func (c *certificateSigningRequests) Get(name string) (result *v1alpha1.Certific
 }
 
 // List takes label and field selectors, and returns the list of CertificateSigningRequests that match those selectors.
-func (c *certificateSigningRequests) List(opts api.ListOptions) (result *v1alpha1.CertificateSigningRequestList, err error) {
+func (c *certificateSigningRequests) List(opts v1.ListOptions) (result *v1alpha1.CertificateSigningRequestList, err error) {
 	result = &v1alpha1.CertificateSigningRequestList{}
 	err = c.client.Get().
 		Resource("certificatesigningrequests").
@@ -132,7 +133,7 @@ func (c *certificateSigningRequests) List(opts api.ListOptions) (result *v1alpha
 }
 
 // Watch returns a watch.Interface that watches the requested certificateSigningRequests.
-func (c *certificateSigningRequests) Watch(opts api.ListOptions) (watch.Interface, error) {
+func (c *certificateSigningRequests) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Resource("certificatesigningrequests").

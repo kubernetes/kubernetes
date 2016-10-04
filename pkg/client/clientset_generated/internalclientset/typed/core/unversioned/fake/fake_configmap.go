@@ -84,7 +84,7 @@ func (c *FakeConfigMaps) List(opts api.ListOptions) (result *api.ConfigMapList, 
 		return nil, err
 	}
 
-	label := opts.LabelSelector
+	label, _, _ := core.ExtractFromListOptions(opts)
 	if label == nil {
 		label = labels.Everything()
 	}
