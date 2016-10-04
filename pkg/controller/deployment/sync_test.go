@@ -329,7 +329,7 @@ func TestDeploymentController_cleanupDeployment(t *testing.T) {
 		controller.rsListerSynced = alwaysReady
 		controller.podListerSynced = alwaysReady
 		for _, rs := range test.oldRSs {
-			controller.rsLister.Add(rs)
+			controller.rsLister.Indexer.Add(rs)
 		}
 
 		d := newDeployment(1, &tests[i].revisionHistoryLimit)

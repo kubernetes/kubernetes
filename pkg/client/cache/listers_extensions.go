@@ -37,9 +37,7 @@ import (
 // l := StoreToDeploymentLister{s}
 // l.List()
 
-// StoreToDeploymentLister helps list pods
-
-// StoreToDeploymentLister gives a store List and Exists methods. The store must contain only Deployments.
+// StoreToDeploymentLister helps list deployments
 type StoreToDeploymentLister struct {
 	Indexer Indexer
 }
@@ -136,6 +134,77 @@ func (s *StoreToDeploymentLister) GetDeploymentsForPod(pod *api.Pod) (deployment
 	}
 	if len(deployments) == 0 {
 		err = fmt.Errorf("could not find deployments set for Pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
+	}
+	return
+}
+
+// StoreToReplicaSetLister helps list replicasets
+type StoreToReplicaSetLister struct {
+	Indexer Indexer
+}
+
+func (s *StoreToReplicaSetLister) List(selector labels.Selector) (ret []*extensions.ReplicaSet, err error) {
+	err = ListAll(s.Indexer, selector, func(m interface{}) {
+		ret = append(ret, m.(*extensions.ReplicaSet))
+	})
+	return ret, err
+}
+
+func (s *StoreToReplicaSetLister) ReplicaSets(namespace string) storeReplicaSetsNamespacer {
+	return storeReplicaSetsNamespacer{Indexer: s.Indexer, namespace: namespace}
+}
+
+type storeReplicaSetsNamespacer struct {
+	Indexer   Indexer
+	namespace string
+}
+
+func (s storeReplicaSetsNamespacer) List(selector labels.Selector) (ret []*extensions.ReplicaSet, err error) {
+	err = ListAllByNamespace(s.Indexer, s.namespace, selector, func(m interface{}) {
+		ret = append(ret, m.(*extensions.ReplicaSet))
+	})
+	return ret, err
+}
+
+func (s storeReplicaSetsNamespacer) Get(name string) (*extensions.ReplicaSet, error) {
+	obj, exists, err := s.Indexer.GetByKey(s.namespace + "/" + name)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, errors.NewNotFound(extensions.Resource("replicaset"), name)
+	}
+	return obj.(*extensions.ReplicaSet), nil
+}
+
+// GetPodReplicaSets returns a list of ReplicaSets managing a pod. Returns an error only if no matching ReplicaSets are found.
+func (s *StoreToReplicaSetLister) GetPodReplicaSets(pod *api.Pod) (rss []*extensions.ReplicaSet, err error) {
+	if len(pod.Labels) == 0 {
+		err = fmt.Errorf("no ReplicaSets found for pod %v because it has no labels", pod.Name)
+		return
+	}
+
+	list, err := s.ReplicaSets(pod.Namespace).List(labels.Everything())
+	if err != nil {
+		return
+	}
+	for _, rs := range list {
+		if rs.Namespace != pod.Namespace {
+			continue
+		}
+		selector, err := unversioned.LabelSelectorAsSelector(rs.Spec.Selector)
+		if err != nil {
+			return nil, fmt.Errorf("invalid selector: %v", err)
+		}
+
+		// If a ReplicaSet with a nil or empty selector creeps in, it should match nothing, not everything.
+		if selector.Empty() || !selector.Matches(labels.Set(pod.Labels)) {
+			continue
+		}
+		rss = append(rss, rs)
+	}
+	if len(rss) == 0 {
+		err = fmt.Errorf("could not find ReplicaSet for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
 	}
 	return
 }

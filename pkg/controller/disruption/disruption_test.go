@@ -80,7 +80,7 @@ func newFakeDisruptionController() (*DisruptionController, *pdbStates) {
 		pdbLister:   cache.StoreToPodDisruptionBudgetLister{Store: cache.NewStore(controller.KeyFunc)},
 		podLister:   cache.StoreToPodLister{Indexer: cache.NewIndexer(controller.KeyFunc, cache.Indexers{})},
 		rcLister:    cache.StoreToReplicationControllerLister{Indexer: cache.NewIndexer(controller.KeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})},
-		rsLister:    cache.StoreToReplicaSetLister{Store: cache.NewStore(controller.KeyFunc)},
+		rsLister:    cache.StoreToReplicaSetLister{Indexer: cache.NewIndexer(controller.KeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})},
 		dLister:     cache.StoreToDeploymentLister{Indexer: cache.NewIndexer(controller.KeyFunc, cache.Indexers{})},
 		getUpdater:  func() updater { return ps.Set },
 		broadcaster: record.NewBroadcaster(),
@@ -310,7 +310,7 @@ func TestReplicaSet(t *testing.T) {
 	add(t, dc.pdbLister.Store, pdb)
 
 	rs, _ := newReplicaSet(t, 10)
-	add(t, dc.rsLister.Store, rs)
+	add(t, dc.rsLister.Indexer, rs)
 
 	pod, _ := newPod(t, "pod")
 	add(t, dc.podLister.Indexer, pod)
@@ -459,7 +459,7 @@ func TestTwoControllers(t *testing.T) {
 	rs, _ := newReplicaSet(t, collectionSize)
 	rs.Spec.Selector = newSel(dLabels)
 	rs.Labels = dLabels
-	add(t, dc.rsLister.Store, rs)
+	add(t, dc.rsLister.Indexer, rs)
 	dc.sync(pdbName)
 	ps.VerifyPdbStatus(t, pdbName, true, minimumOne+1, minimumOne, collectionSize)
 

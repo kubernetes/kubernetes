@@ -21,7 +21,6 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/apps"
@@ -133,94 +132,6 @@ func (s storeToNodeConditionLister) List() (nodes []*api.Node, err error) {
 		} else {
 			glog.V(5).Infof("Node %s matches none of the conditions", node.Name)
 		}
-	}
-	return
-}
-
-// StoreToReplicaSetLister gives a store List and Exists methods. The store must contain only ReplicaSets.
-type StoreToReplicaSetLister struct {
-	Store
-}
-
-// Exists checks if the given ReplicaSet exists in the store.
-func (s *StoreToReplicaSetLister) Exists(rs *extensions.ReplicaSet) (bool, error) {
-	_, exists, err := s.Store.Get(rs)
-	if err != nil {
-		return false, err
-	}
-	return exists, nil
-}
-
-// List lists all ReplicaSets in the store.
-// TODO: converge on the interface in pkg/client
-func (s *StoreToReplicaSetLister) List() (rss []extensions.ReplicaSet, err error) {
-	for _, rs := range s.Store.List() {
-		rss = append(rss, *(rs.(*extensions.ReplicaSet)))
-	}
-	return rss, nil
-}
-
-type storeReplicaSetsNamespacer struct {
-	store     Store
-	namespace string
-}
-
-func (s storeReplicaSetsNamespacer) List(selector labels.Selector) (rss []extensions.ReplicaSet, err error) {
-	for _, c := range s.store.List() {
-		rs := *(c.(*extensions.ReplicaSet))
-		if s.namespace == api.NamespaceAll || s.namespace == rs.Namespace {
-			if selector.Matches(labels.Set(rs.Labels)) {
-				rss = append(rss, rs)
-			}
-		}
-	}
-	return
-}
-
-func (s storeReplicaSetsNamespacer) Get(name string) (*extensions.ReplicaSet, error) {
-	obj, exists, err := s.store.GetByKey(s.namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(extensions.Resource("replicaset"), name)
-	}
-	return obj.(*extensions.ReplicaSet), nil
-}
-
-func (s *StoreToReplicaSetLister) ReplicaSets(namespace string) storeReplicaSetsNamespacer {
-	return storeReplicaSetsNamespacer{s.Store, namespace}
-}
-
-// GetPodReplicaSets returns a list of ReplicaSets managing a pod. Returns an error only if no matching ReplicaSets are found.
-func (s *StoreToReplicaSetLister) GetPodReplicaSets(pod *api.Pod) (rss []extensions.ReplicaSet, err error) {
-	var selector labels.Selector
-	var rs extensions.ReplicaSet
-
-	if len(pod.Labels) == 0 {
-		err = fmt.Errorf("no ReplicaSets found for pod %v because it has no labels", pod.Name)
-		return
-	}
-
-	for _, m := range s.Store.List() {
-		rs = *m.(*extensions.ReplicaSet)
-		if rs.Namespace != pod.Namespace {
-			continue
-		}
-		selector, err = unversioned.LabelSelectorAsSelector(rs.Spec.Selector)
-		if err != nil {
-			err = fmt.Errorf("invalid selector: %v", err)
-			return
-		}
-
-		// If a ReplicaSet with a nil or empty selector creeps in, it should match nothing, not everything.
-		if selector.Empty() || !selector.Matches(labels.Set(pod.Labels)) {
-			continue
-		}
-		rss = append(rss, rs)
-	}
-	if len(rss) == 0 {
-		err = fmt.Errorf("could not find ReplicaSet for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
 	}
 	return
 }

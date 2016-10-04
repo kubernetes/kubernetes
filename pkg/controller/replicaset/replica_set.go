@@ -142,7 +142,7 @@ func newReplicaSetController(eventRecorder record.EventRecorder, podInformer cac
 		garbageCollectorEnabled: garbageCollectorEnabled,
 	}
 
-	rsc.rsStore.Store, rsc.rsController = cache.NewInformer(
+	rsc.rsStore.Indexer, rsc.rsController = cache.NewIndexerInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				return rsc.kubeClient.Extensions().ReplicaSets(api.NamespaceAll).List(options)
@@ -162,6 +162,7 @@ func newReplicaSetController(eventRecorder record.EventRecorder, podInformer cac
 			// way of achieving this is by performing a `stop` operation on the replica set.
 			DeleteFunc: rsc.enqueueReplicaSet,
 		},
+		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)
 
 	podInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -251,9 +252,9 @@ func (rsc *ReplicaSetController) getPodReplicaSet(pod *api.Pod) *extensions.Repl
 	}
 
 	// update lookup cache
-	rsc.lookupCache.Update(pod, &rss[0])
+	rsc.lookupCache.Update(pod, rss[0])
 
-	return &rss[0]
+	return rss[0]
 }
 
 // callback when RS is updated
@@ -296,9 +297,9 @@ func (rsc *ReplicaSetController) updateRS(old, cur interface{}) {
 
 // isCacheValid check if the cache is valid
 func (rsc *ReplicaSetController) isCacheValid(pod *api.Pod, cachedRS *extensions.ReplicaSet) bool {
-	_, exists, err := rsc.rsStore.Get(cachedRS)
+	_, err := rsc.rsStore.ReplicaSets(cachedRS.Namespace).Get(cachedRS.Name)
 	// rs has been deleted or updated, cache is invalid
-	if err != nil || !exists || !isReplicaSetMatch(pod, cachedRS) {
+	if err != nil || !isReplicaSetMatch(pod, cachedRS) {
 		return false
 	}
 	return true
@@ -564,7 +565,7 @@ func (rsc *ReplicaSetController) syncReplicaSet(key string) error {
 		return nil
 	}
 
-	obj, exists, err := rsc.rsStore.Store.GetByKey(key)
+	obj, exists, err := rsc.rsStore.Indexer.GetByKey(key)
 	if !exists {
 		glog.Infof("ReplicaSet has been deleted %v", key)
 		rsc.expectations.DeleteExpectations(key)

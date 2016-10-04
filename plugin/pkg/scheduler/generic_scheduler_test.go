@@ -496,7 +496,7 @@ func TestZeroRequest(t *testing.T) {
 				Function: algorithmpriorities.NewSelectorSpreadPriority(
 					algorithm.FakeServiceLister([]*api.Service{}),
 					algorithm.FakeControllerLister([]*api.ReplicationController{}),
-					algorithm.FakeReplicaSetLister([]extensions.ReplicaSet{})),
+					algorithm.FakeReplicaSetLister([]*extensions.ReplicaSet{})),
 				Weight: 1,
 			},
 		}

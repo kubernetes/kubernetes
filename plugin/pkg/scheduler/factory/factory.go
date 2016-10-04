@@ -110,7 +110,7 @@ func NewConfigFactory(client *client.Client, schedulerName string, hardPodAffini
 		PVCLister:                      &cache.StoreToPVCFetcher{Store: cache.NewStore(cache.MetaNamespaceKeyFunc)},
 		ServiceLister:                  &cache.StoreToServiceLister{Indexer: cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})},
 		ControllerLister:               &cache.StoreToReplicationControllerLister{Indexer: cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})},
-		ReplicaSetLister:               &cache.StoreToReplicaSetLister{Store: cache.NewStore(cache.MetaNamespaceKeyFunc)},
+		ReplicaSetLister:               &cache.StoreToReplicaSetLister{Indexer: cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})},
 		schedulerCache:                 schedulerCache,
 		StopEverything:                 stopEverything,
 		SchedulerName:                  schedulerName,
@@ -425,7 +425,7 @@ func (f *ConfigFactory) Run() {
 	// Watch and cache all ReplicaSet objects. Scheduler needs to find all pods
 	// created by the same services or ReplicationControllers/ReplicaSets, so that it can spread them correctly.
 	// Cache this locally.
-	cache.NewReflector(f.createReplicaSetLW(), &extensions.ReplicaSet{}, f.ReplicaSetLister.Store, 0).RunUntil(f.StopEverything)
+	cache.NewReflector(f.createReplicaSetLW(), &extensions.ReplicaSet{}, f.ReplicaSetLister.Indexer, 0).RunUntil(f.StopEverything)
 }
 
 func (f *ConfigFactory) getNextPod() *api.Pod {

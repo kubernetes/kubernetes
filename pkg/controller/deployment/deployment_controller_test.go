@@ -206,7 +206,7 @@ func (f *fixture) run(deploymentName string) {
 		c.dLister.Indexer.Add(d)
 	}
 	for _, rs := range f.rsLister {
-		c.rsLister.Store.Add(rs)
+		c.rsLister.Indexer.Add(rs)
 	}
 	for _, pod := range f.podLister {
 		c.podLister.Indexer.Add(pod)
