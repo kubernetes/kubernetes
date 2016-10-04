@@ -23,7 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/apis/rbac/validation"
-	"k8s.io/kubernetes/pkg/auth/user"
+	rbacregistry "k8s.io/kubernetes/pkg/registry/rbac"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
@@ -43,18 +43,8 @@ func NewStorage(s rest.StandardStorage, ruleResolver validation.AuthorizationRul
 }
 
 func (s *Storage) Create(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
-	if u, ok := api.UserFrom(ctx); ok {
-		if s.superUser != "" && u.GetName() == s.superUser {
-			return s.StandardStorage.Create(ctx, obj)
-		}
-
-		// system:masters is special because the API server uses it for privileged loopback connections
-		// therefore we know that a member of system:masters can always do anything
-		for _, group := range u.GetGroups() {
-			if group == user.SystemPrivilegedGroup {
-				return s.StandardStorage.Create(ctx, obj)
-			}
-		}
+	if rbacregistry.EscalationAllowed(ctx, s.superUser) {
+		return s.StandardStorage.Create(ctx, obj)
 	}
 
 	role := obj.(*rbac.Role)
@@ -66,10 +56,8 @@ func (s *Storage) Create(ctx api.Context, obj runtime.Object) (runtime.Object, e
 }
 
 func (s *Storage) Update(ctx api.Context, name string, obj rest.UpdatedObjectInfo) (runtime.Object, bool, error) {
-	if user, ok := api.UserFrom(ctx); ok {
-		if s.superUser != "" && user.GetName() == s.superUser {
-			return s.StandardStorage.Update(ctx, name, obj)
-		}
+	if rbacregistry.EscalationAllowed(ctx, s.superUser) {
+		return s.StandardStorage.Update(ctx, name, obj)
 	}
 
 	nonEscalatingInfo := wrapUpdatedObjectInfo(obj, func(ctx api.Context, obj runtime.Object, oldObj runtime.Object) (runtime.Object, error) {
