@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/diff"
 )
@@ -44,7 +45,7 @@ func BenchmarkPodConversion(b *testing.B) {
 	scheme := api.Scheme
 	for i := 0; i < b.N; i++ {
 		pod := &items[i%width]
-		versionedObj, err := scheme.UnsafeConvertToVersion(pod, *testapi.Default.GroupVersion())
+		versionedObj, err := scheme.UnsafeConvertToVersion(pod, registered.GroupOrDie(api.GroupName).GroupVersion)
 		if err != nil {
 			b.Fatalf("Conversion error: %v", err)
 		}
@@ -68,7 +69,7 @@ func BenchmarkNodeConversion(b *testing.B) {
 	var result *api.Node
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		versionedObj, err := scheme.UnsafeConvertToVersion(&node, *testapi.Default.GroupVersion())
+		versionedObj, err := scheme.UnsafeConvertToVersion(&node, registered.GroupOrDie(api.GroupName).GroupVersion)
 		if err != nil {
 			b.Fatalf("Conversion error: %v", err)
 		}
@@ -98,7 +99,7 @@ func BenchmarkReplicationControllerConversion(b *testing.B) {
 	var result *api.ReplicationController
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		versionedObj, err := scheme.UnsafeConvertToVersion(&replicationController, *testapi.Default.GroupVersion())
+		versionedObj, err := scheme.UnsafeConvertToVersion(&replicationController, registered.GroupOrDie(api.GroupName).GroupVersion)
 		if err != nil {
 			b.Fatalf("Conversion error: %v", err)
 		}
