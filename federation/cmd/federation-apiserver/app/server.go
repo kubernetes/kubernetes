@@ -32,7 +32,6 @@ import (
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/apiserver/authenticator"
 	apiserveropenapi "k8s.io/kubernetes/pkg/apiserver/openapi"
 	authorizerunion "k8s.io/kubernetes/pkg/auth/authorizer/union"
@@ -41,19 +40,10 @@ import (
 	"k8s.io/kubernetes/pkg/generated/openapi"
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/genericapiserver/authorizer"
-	genericoptions "k8s.io/kubernetes/pkg/genericapiserver/options"
 	genericvalidation "k8s.io/kubernetes/pkg/genericapiserver/validation"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/generic/registry"
-	"k8s.io/kubernetes/pkg/registry/rbac/clusterrole"
-	clusterroleetcd "k8s.io/kubernetes/pkg/registry/rbac/clusterrole/etcd"
-	"k8s.io/kubernetes/pkg/registry/rbac/clusterrolebinding"
-	clusterrolebindingetcd "k8s.io/kubernetes/pkg/registry/rbac/clusterrolebinding/etcd"
-	"k8s.io/kubernetes/pkg/registry/rbac/role"
-	roleetcd "k8s.io/kubernetes/pkg/registry/rbac/role/etcd"
-	"k8s.io/kubernetes/pkg/registry/rbac/rolebinding"
-	rolebindingetcd "k8s.io/kubernetes/pkg/registry/rbac/rolebinding/etcd"
 	"k8s.io/kubernetes/pkg/routes"
 	"k8s.io/kubernetes/pkg/util/wait"
 	authenticatorunion "k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/union"
@@ -136,48 +126,7 @@ func Run(s *options.ServerRunOptions) error {
 		glog.Fatalf("Invalid Authentication Config: %v", err)
 	}
 
-	authorizationModeNames := strings.Split(s.AuthorizationMode, ",")
-
-	modeEnabled := func(mode string) bool {
-		for _, m := range authorizationModeNames {
-			if m == mode {
-				return true
-			}
-		}
-		return false
-	}
-
-	authorizationConfig := authorizer.AuthorizationConfig{
-		PolicyFile:                  s.AuthorizationPolicyFile,
-		WebhookConfigFile:           s.AuthorizationWebhookConfigFile,
-		WebhookCacheAuthorizedTTL:   s.AuthorizationWebhookCacheAuthorizedTTL,
-		WebhookCacheUnauthorizedTTL: s.AuthorizationWebhookCacheUnauthorizedTTL,
-		RBACSuperUser:               s.AuthorizationRBACSuperUser,
-	}
-	if modeEnabled(genericoptions.ModeRBAC) {
-		mustGetRESTOptions := func(resource string) generic.RESTOptions {
-			config, err := storageFactory.NewConfig(rbac.Resource(resource))
-			if err != nil {
-				glog.Fatalf("Unable to get %s storage: %v", resource, err)
-			}
-			return generic.RESTOptions{StorageConfig: config, Decorator: generic.UndecoratedStorage, ResourcePrefix: storageFactory.ResourcePrefix(rbac.Resource(resource))}
-		}
-
-		// For initial bootstrapping go directly to etcd to avoid privillege escalation check.
-		authorizationConfig.RBACRoleRegistry = role.NewRegistry(roleetcd.NewREST(mustGetRESTOptions("roles")))
-		authorizationConfig.RBACRoleBindingRegistry = rolebinding.NewRegistry(rolebindingetcd.NewREST(mustGetRESTOptions("rolebindings")))
-		authorizationConfig.RBACClusterRoleRegistry = clusterrole.NewRegistry(clusterroleetcd.NewREST(mustGetRESTOptions("clusterroles")))
-		authorizationConfig.RBACClusterRoleBindingRegistry = clusterrolebinding.NewRegistry(clusterrolebindingetcd.NewREST(mustGetRESTOptions("clusterrolebindings")))
-	}
-
-	apiAuthorizer, err := authorizer.NewAuthorizerFromAuthorizationConfig(authorizationModeNames, authorizationConfig)
-	if err != nil {
-		glog.Fatalf("Invalid Authorization Config: %v", err)
-	}
-
-	admissionControlPluginNames := strings.Split(s.AdmissionControl, ",")
 	privilegedLoopbackToken := uuid.NewRandom().String()
-
 	selfClientConfig, err := s.NewSelfClientConfig(privilegedLoopbackToken)
 	if err != nil {
 		glog.Fatalf("Failed to create clientset: %v", err)
@@ -186,6 +135,23 @@ func Run(s *options.ServerRunOptions) error {
 	if err != nil {
 		glog.Errorf("Failed to create clientset: %v", err)
 	}
+	sharedInformers := informers.NewSharedInformerFactory(client, 10*time.Minute)
+
+	authorizationConfig := authorizer.AuthorizationConfig{
+		PolicyFile:                  s.AuthorizationPolicyFile,
+		WebhookConfigFile:           s.AuthorizationWebhookConfigFile,
+		WebhookCacheAuthorizedTTL:   s.AuthorizationWebhookCacheAuthorizedTTL,
+		WebhookCacheUnauthorizedTTL: s.AuthorizationWebhookCacheUnauthorizedTTL,
+		RBACSuperUser:               s.AuthorizationRBACSuperUser,
+		InformerFactory:             sharedInformers,
+	}
+	authorizationModeNames := strings.Split(s.AuthorizationMode, ",")
+	apiAuthorizer, err := authorizer.NewAuthorizerFromAuthorizationConfig(authorizationModeNames, authorizationConfig)
+	if err != nil {
+		glog.Fatalf("Invalid Authorization Config: %v", err)
+	}
+
+	admissionControlPluginNames := strings.Split(s.AdmissionControl, ",")
 
 	// TODO(dims): We probably need to add an option "EnableLoopbackToken"
 	if apiAuthenticator != nil {
@@ -204,7 +170,6 @@ func Run(s *options.ServerRunOptions) error {
 		apiAuthorizer = authorizerunion.New(tokenAuthorizer, apiAuthorizer)
 	}
 
-	sharedInformers := informers.NewSharedInformerFactory(client, 10*time.Minute)
 	pluginInitializer := admission.NewPluginInitializer(sharedInformers, apiAuthorizer)
 
 	admissionController, err := admission.NewFromPlugins(client, admissionControlPluginNames, s.AdmissionControlConfigFile, pluginInitializer)
