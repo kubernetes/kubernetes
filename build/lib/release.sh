@@ -14,16 +14,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Incoming options
-readonly KUBE_SKIP_CONFIRMATIONS="${KUBE_SKIP_CONFIRMATIONS:-n}"
-readonly KUBE_GCS_UPLOAD_RELEASE="${KUBE_GCS_UPLOAD_RELEASE:-n}"
-readonly KUBE_GCS_NO_CACHING="${KUBE_GCS_NO_CACHING:-y}"
-readonly KUBE_GCS_MAKE_PUBLIC="${KUBE_GCS_MAKE_PUBLIC:-y}"
-# KUBE_GCS_RELEASE_BUCKET default: kubernetes-releases-${project_hash}
-readonly KUBE_GCS_RELEASE_PREFIX=${KUBE_GCS_RELEASE_PREFIX-devel}/
-readonly KUBE_GCS_DOCKER_REG_PREFIX=${KUBE_GCS_DOCKER_REG_PREFIX-docker-reg}/
-readonly KUBE_GCS_PUBLISH_VERSION=${KUBE_GCS_PUBLISH_VERSION:-}
-readonly KUBE_GCS_DELETE_EXISTING="${KUBE_GCS_DELETE_EXISTING:-n}"
+# This file creates release artifacts (tar files, container images) that are
+# ready to distribute to install or distribute to end users.
+
+###############################################################################
+# Most of the ::release:: namespace functions have been moved to
+# github.com/kubernetes/release.  Have a look in that repo and specifically in
+# lib/releaselib.sh for ::release::-related functionality.
+###############################################################################
 
 # This is where the final release artifacts are created locally
 readonly RELEASE_STAGE="${LOCAL_OUTPUT_ROOT}/release-stage"
@@ -442,9 +440,3 @@ function kube::release::create_tarball() {
 
   "${TAR}" czf "${tarfile}" -C "${stagingdir}" kubernetes --owner=0 --group=0
 }
-
-###############################################################################
-# Most of the ::release:: namespace functions have been moved to
-# github.com/kubernetes/release.  Have a look in that repo and specifically in
-# lib/releaselib.sh for ::release::-related functionality.
-###############################################################################
