@@ -42,10 +42,10 @@ func toRuntimeAPIImage(image *dockertypes.Image) (*runtimeApi.Image, error) {
 
 	size := uint64(image.VirtualSize)
 	return &runtimeApi.Image{
-		Id:          &image.ID,
-		RepoTags:    image.RepoTags,
-		RepoDigests: image.RepoDigests,
-		Size_:       &size,
+		Id:      &image.ID,
+		Names:   image.RepoTags,
+		Digests: image.RepoDigests,
+		Size_:   &size,
 	}, nil
 }
 

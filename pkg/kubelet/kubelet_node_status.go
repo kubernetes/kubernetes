@@ -531,7 +531,7 @@ func (kl *Kubelet) setNodeStatusImages(node *api.Node) {
 		}
 
 		for _, image := range containerImages {
-			names := append(image.RepoDigests, image.RepoTags...)
+			names := append(image.Digests, image.Names...)
 			// Report up to maxNamesPerImageInNodeStatus names per image.
 			if len(names) > maxNamesPerImageInNodeStatus {
 				names = names[0:maxNamesPerImageInNodeStatus]

@@ -628,9 +628,9 @@ message Image {
     // ID of the image.
     optional string id = 1;
     // Other names by which this image is known.
-    repeated string repo_tags = 2;
+    repeated string names = 2;
     // Digests by which this image is known.
-    repeated string repo_digests = 3;
+    repeated string digests = 3;
     // The size of the image in bytes.
     optional uint64 size = 4;
 }
