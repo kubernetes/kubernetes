@@ -71,10 +71,10 @@ func (p *RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource genericapi
 	newRuleValidator := func() rbacvalidation.AuthorizationRuleResolver {
 		once.Do(func() {
 			authorizationRuleResolver = rbacvalidation.NewDefaultRuleResolver(
-				role.NewRegistry(roleetcd.NewREST(restOptionsGetter(rbac.Resource("roles")))),
-				rolebinding.NewRegistry(rolebindingetcd.NewREST(restOptionsGetter(rbac.Resource("rolebindings")))),
-				clusterrole.NewRegistry(clusterroleetcd.NewREST(restOptionsGetter(rbac.Resource("clusterroles")))),
-				clusterrolebinding.NewRegistry(clusterrolebindingetcd.NewREST(restOptionsGetter(rbac.Resource("clusterrolebindings")))),
+				role.AuthorizerAdapter{Registry: role.NewRegistry(roleetcd.NewREST(restOptionsGetter(rbac.Resource("roles"))))},
+				rolebinding.AuthorizerAdapter{Registry: rolebinding.NewRegistry(rolebindingetcd.NewREST(restOptionsGetter(rbac.Resource("rolebindings"))))},
+				clusterrole.AuthorizerAdapter{Registry: clusterrole.NewRegistry(clusterroleetcd.NewREST(restOptionsGetter(rbac.Resource("clusterroles"))))},
+				clusterrolebinding.AuthorizerAdapter{Registry: clusterrolebinding.NewRegistry(clusterrolebindingetcd.NewREST(restOptionsGetter(rbac.Resource("clusterrolebindings"))))},
 			)
 		})
 		return authorizationRuleResolver

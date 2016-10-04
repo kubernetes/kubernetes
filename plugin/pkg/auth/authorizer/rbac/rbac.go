@@ -59,10 +59,10 @@ func New(roleRegistry role.Registry, roleBindingRegistry rolebinding.Registry, c
 	authorizer := &RBACAuthorizer{
 		superUser: superUser,
 		authorizationRuleResolver: validation.NewDefaultRuleResolver(
-			roleRegistry,
-			roleBindingRegistry,
-			clusterRoleRegistry,
-			clusterRoleBindingRegistry,
+			role.AuthorizerAdapter{Registry: roleRegistry},
+			rolebinding.AuthorizerAdapter{Registry: roleBindingRegistry},
+			clusterrole.AuthorizerAdapter{Registry: clusterRoleRegistry},
+			clusterrolebinding.AuthorizerAdapter{Registry: clusterRoleBindingRegistry},
 		),
 	}
 	return authorizer

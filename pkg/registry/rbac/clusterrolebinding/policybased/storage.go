@@ -48,7 +48,7 @@ func (s *Storage) Create(ctx api.Context, obj runtime.Object) (runtime.Object, e
 	}
 
 	clusterRoleBinding := obj.(*rbac.ClusterRoleBinding)
-	rules, err := s.ruleResolver.GetRoleReferenceRules(ctx, clusterRoleBinding.RoleRef, clusterRoleBinding.Namespace)
+	rules, err := s.ruleResolver.GetRoleReferenceRules(clusterRoleBinding.RoleRef, clusterRoleBinding.Namespace)
 	if err != nil {
 		return nil, err
 	}
@@ -66,7 +66,7 @@ func (s *Storage) Update(ctx api.Context, name string, obj rest.UpdatedObjectInf
 	nonEscalatingInfo := wrapUpdatedObjectInfo(obj, func(ctx api.Context, obj runtime.Object, oldObj runtime.Object) (runtime.Object, error) {
 		clusterRoleBinding := obj.(*rbac.ClusterRoleBinding)
 
-		rules, err := s.ruleResolver.GetRoleReferenceRules(ctx, clusterRoleBinding.RoleRef, clusterRoleBinding.Namespace)
+		rules, err := s.ruleResolver.GetRoleReferenceRules(clusterRoleBinding.RoleRef, clusterRoleBinding.Namespace)
 		if err != nil {
 			return nil, err
 		}
