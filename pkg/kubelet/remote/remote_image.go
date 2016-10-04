@@ -34,7 +34,7 @@ type RemoteImageService struct {
 // NewRemoteImageService creates a new internalApi.ImageManagerService.
 func NewRemoteImageService(addr string, connectionTimout time.Duration) (internalApi.ImageManagerService, error) {
 	glog.V(3).Infof("Connecting to image service %s", addr)
-	conn, err := grpc.Dial(addr, grpc.WithInsecure(), grpc.WithDialer(dial))
+	conn, err := grpc.Dial(addr, grpc.WithInsecure(), grpc.WithTimeout(connectionTimout), grpc.WithDialer(dial))
 	if err != nil {
 		glog.Errorf("Connect remote image service %s failed: %v", addr, err)
 		return nil, err
