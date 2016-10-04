@@ -48,7 +48,7 @@ type AuthenticatorConfig struct {
 	OIDCCAFile                  string
 	OIDCUsernameClaim           string
 	OIDCGroupsClaim             string
-	ServiceAccountKeyFile       string
+	ServiceAccountKeyFiles      []string
 	ServiceAccountLookup        bool
 	ServiceAccountTokenGetter   serviceaccount.ServiceAccountTokenGetter
 	KeystoneURL                 string
@@ -94,8 +94,8 @@ func New(config AuthenticatorConfig) (authenticator.Request, error) {
 		}
 		authenticators = append(authenticators, tokenAuth)
 	}
-	if len(config.ServiceAccountKeyFile) > 0 {
-		serviceAccountAuth, err := newServiceAccountAuthenticator(config.ServiceAccountKeyFile, config.ServiceAccountLookup, config.ServiceAccountTokenGetter)
+	if len(config.ServiceAccountKeyFiles) > 0 {
+		serviceAccountAuth, err := newServiceAccountAuthenticator(config.ServiceAccountKeyFiles, config.ServiceAccountLookup, config.ServiceAccountTokenGetter)
 		if err != nil {
 			return nil, err
 		}
@@ -198,13 +198,17 @@ func newAuthenticatorFromOIDCIssuerURL(issuerURL, clientID, caFile, usernameClai
 }
 
 // newServiceAccountAuthenticator returns an authenticator.Request or an error
-func newServiceAccountAuthenticator(keyfile string, lookup bool, serviceAccountGetter serviceaccount.ServiceAccountTokenGetter) (authenticator.Request, error) {
-	publicKey, err := serviceaccount.ReadPublicKey(keyfile)
-	if err != nil {
-		return nil, err
+func newServiceAccountAuthenticator(keyfiles []string, lookup bool, serviceAccountGetter serviceaccount.ServiceAccountTokenGetter) (authenticator.Request, error) {
+	publicKeys := []interface{}{}
+	for _, keyfile := range keyfiles {
+		publicKey, err := serviceaccount.ReadPublicKey(keyfile)
+		if err != nil {
+			return nil, err
+		}
+		publicKeys = append(publicKeys, publicKey)
 	}
 
-	tokenAuthenticator := serviceaccount.JWTTokenAuthenticator([]interface{}{publicKey}, lookup, serviceAccountGetter)
+	tokenAuthenticator := serviceaccount.JWTTokenAuthenticator(publicKeys, lookup, serviceAccountGetter)
 	return bearertoken.New(tokenAuthenticator), nil
 }
 
