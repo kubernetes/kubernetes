@@ -101,6 +101,6 @@ func Run(serverOptions *genericoptions.ServerRunOptions) error {
 	if err := s.InstallAPIGroup(&apiGroupInfo); err != nil {
 		return fmt.Errorf("Error in installing API: %v", err)
 	}
-	s.Run(serverOptions)
+	s.Run()
 	return nil
 }
