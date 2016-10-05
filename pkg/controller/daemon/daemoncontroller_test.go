@@ -569,3 +569,29 @@ func TestNodeAffinityDaemonLaunchesPods(t *testing.T) {
 	manager.dsStore.Add(daemon)
 	syncAndValidateDaemonSets(t, manager, daemon, podControl, 3, 0)
 }
+
+func TestNumberReadyStatus(t *testing.T) {
+	manager, podControl := newTestController()
+	addNodes(manager.nodeStore.Store, 0, 2, simpleNodeLabel)
+	addPods(manager.podStore.Indexer, "node-0", simpleDaemonSetLabel, 1)
+	addPods(manager.podStore.Indexer, "node-1", simpleDaemonSetLabel, 1)
+	daemon := newDaemonSet("foo")
+	manager.dsStore.Add(daemon)
+
+	syncAndValidateDaemonSets(t, manager, daemon, podControl, 0, 0)
+	if daemon.Status.NumberReady != 0 {
+		t.Errorf("Wrong daemon %s status: %v", daemon.Name, daemon.Status)
+	}
+
+	selector, _ := unversioned.LabelSelectorAsSelector(daemon.Spec.Selector)
+	daemonPods, _ := manager.podStore.Pods(daemon.Namespace).List(selector)
+	for _, pod := range daemonPods {
+		condition := api.PodCondition{Type: api.PodReady, Status: api.ConditionTrue}
+		pod.Status.Conditions = append(pod.Status.Conditions, condition)
+	}
+
+	syncAndValidateDaemonSets(t, manager, daemon, podControl, 0, 0)
+	if daemon.Status.NumberReady != 2 {
+		t.Errorf("Wrong daemon %s status: %v", daemon.Name, daemon.Status)
+	}
+}

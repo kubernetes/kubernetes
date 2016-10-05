@@ -44,6 +44,7 @@ func TestValidateDaemonSetStatusUpdate(t *testing.T) {
 					CurrentNumberScheduled: 1,
 					NumberMisscheduled:     2,
 					DesiredNumberScheduled: 3,
+					NumberReady:            1,
 				},
 			},
 			update: extensions.DaemonSet{
@@ -52,6 +53,7 @@ func TestValidateDaemonSetStatusUpdate(t *testing.T) {
 					CurrentNumberScheduled: 1,
 					NumberMisscheduled:     1,
 					DesiredNumberScheduled: 3,
+					NumberReady:            1,
 				},
 			},
 		},
@@ -76,6 +78,7 @@ func TestValidateDaemonSetStatusUpdate(t *testing.T) {
 					CurrentNumberScheduled: 1,
 					NumberMisscheduled:     2,
 					DesiredNumberScheduled: 3,
+					NumberReady:            1,
 				},
 			},
 			update: extensions.DaemonSet{
@@ -88,6 +91,7 @@ func TestValidateDaemonSetStatusUpdate(t *testing.T) {
 					CurrentNumberScheduled: -1,
 					NumberMisscheduled:     -1,
 					DesiredNumberScheduled: -3,
+					NumberReady:            -1,
 				},
 			},
 		},
