@@ -51,7 +51,7 @@ func isRangeEqual(a, b *rangePerm) bool {
 // If there are equal ranges, removeSubsetRangePerms only keeps one of them.
 func removeSubsetRangePerms(perms []*rangePerm) []*rangePerm {
 	// TODO(mitake): currently it is O(n^2), we need a better algorithm
-	newp := make([]*rangePerm, 0)
+	var newp []*rangePerm
 
 	for i := range perms {
 		skip := false
@@ -86,7 +86,7 @@ func removeSubsetRangePerms(perms []*rangePerm) []*rangePerm {
 
 // mergeRangePerms merges adjacent rangePerms.
 func mergeRangePerms(perms []*rangePerm) []*rangePerm {
-	merged := make([]*rangePerm, 0)
+	var merged []*rangePerm
 	perms = removeSubsetRangePerms(perms)
 	sort.Sort(RangePermSliceByBegin(perms))
 

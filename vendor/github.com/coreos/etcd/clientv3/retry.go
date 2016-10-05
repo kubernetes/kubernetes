@@ -15,9 +15,11 @@
 package clientv3
 
 import (
+	"github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes"
 	pb "github.com/coreos/etcd/etcdserver/etcdserverpb"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 )
 
 type rpcFunc func(ctx context.Context) error
@@ -27,8 +29,16 @@ func (c *Client) newRetryWrapper() retryRpcFunc {
 	return func(rpcCtx context.Context, f rpcFunc) {
 		for {
 			err := f(rpcCtx)
-			// ignore grpc conn closing on fail-fast calls; they are transient errors
-			if err == nil || !isConnClosing(err) {
+			if err == nil {
+				return
+			}
+			// only retry if unavailable
+			if grpc.Code(err) != codes.Unavailable {
+				return
+			}
+			// always stop retry on etcd errors
+			eErr := rpctypes.Error(err)
+			if _, ok := eErr.(rpctypes.EtcdError); ok {
 				return
 			}
 			select {

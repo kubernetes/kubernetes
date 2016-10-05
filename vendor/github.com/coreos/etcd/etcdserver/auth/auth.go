@@ -46,7 +46,7 @@ const (
 )
 
 var (
-	plog = capnslog.NewPackageLogger("github.com/coreos/etcd/etcdserver", "auth")
+	plog = capnslog.NewPackageLogger("github.com/coreos/etcd", "etcdserver/auth")
 )
 
 var rootRole = Role{

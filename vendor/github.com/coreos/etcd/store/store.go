@@ -141,8 +141,6 @@ func (s *store) Get(nodePath string, recursive, sorted bool) (*Event, error) {
 		}
 	}()
 
-	nodePath = path.Clean(path.Join("/", nodePath))
-
 	n, err := s.internalGet(nodePath)
 	if err != nil {
 		return nil, err

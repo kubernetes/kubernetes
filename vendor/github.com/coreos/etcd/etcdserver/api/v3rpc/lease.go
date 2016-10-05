@@ -54,6 +54,15 @@ func (ls *LeaseServer) LeaseRevoke(ctx context.Context, rr *pb.LeaseRevokeReques
 	return resp, nil
 }
 
+func (ls *LeaseServer) LeaseTimeToLive(ctx context.Context, rr *pb.LeaseTimeToLiveRequest) (*pb.LeaseTimeToLiveResponse, error) {
+	resp, err := ls.le.LeaseTimeToLive(ctx, rr)
+	if err != nil {
+		return nil, rpctypes.ErrGRPCLeaseNotFound
+	}
+	ls.hdr.fill(resp.Header)
+	return resp, nil
+}
+
 func (ls *LeaseServer) LeaseKeepAlive(stream pb.Lease_LeaseKeepAliveServer) error {
 	for {
 		req, err := stream.Recv()

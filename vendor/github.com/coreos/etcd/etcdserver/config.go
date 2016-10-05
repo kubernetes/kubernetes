@@ -104,11 +104,11 @@ func (c *ServerConfig) verifyLocalMember(strict bool) error {
 		return fmt.Errorf("couldn't find local name %q in the initial cluster configuration", c.Name)
 	}
 
-	// Advertised peer URLs must match those in the cluster peer list
-	apurls := c.PeerURLs.StringSlice()
-	sort.Strings(apurls)
-	urls.Sort()
 	if strict {
+		// Advertised peer URLs must match those in the cluster peer list
+		apurls := c.PeerURLs.StringSlice()
+		sort.Strings(apurls)
+		urls.Sort()
 		if !netutil.URLStringsEqual(apurls, urls.StringSlice()) {
 			umap := map[string]types.URLs{c.Name: c.PeerURLs}
 			return fmt.Errorf("--initial-cluster must include %s given --initial-advertise-peer-urls=%s", types.URLsMap(umap).String(), strings.Join(apurls, ","))

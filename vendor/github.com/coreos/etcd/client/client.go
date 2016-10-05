@@ -305,7 +305,7 @@ func (c *httpClusterClient) SetEndpoints(eps []string) error {
 		// If endpoints doesn't have the lu, just keep c.pinned = 0.
 		// Forwarding between follower and leader would be required but it works.
 	default:
-		return errors.New(fmt.Sprintf("invalid endpoint selection mode: %d", c.selectionMode))
+		return fmt.Errorf("invalid endpoint selection mode: %d", c.selectionMode)
 	}
 
 	return nil
@@ -404,7 +404,7 @@ func (c *httpClusterClient) Sync(ctx context.Context) error {
 	c.Lock()
 	defer c.Unlock()
 
-	eps := make([]string, 0)
+	var eps []string
 	for _, m := range ms {
 		eps = append(eps, m.ClientURLs...)
 	}

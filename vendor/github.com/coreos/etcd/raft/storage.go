@@ -130,6 +130,9 @@ func (ms *MemoryStorage) Term(i uint64) (uint64, error) {
 	if i < offset {
 		return 0, ErrCompacted
 	}
+	if int(i-offset) >= len(ms.ents) {
+		return 0, ErrUnavailable
+	}
 	return ms.ents[i-offset].Term, nil
 }
 
@@ -168,7 +171,13 @@ func (ms *MemoryStorage) ApplySnapshot(snap pb.Snapshot) error {
 	ms.Lock()
 	defer ms.Unlock()
 
-	// TODO: return ErrSnapOutOfDate?
+	//handle check for old snapshot being applied
+	msIndex := ms.snapshot.Metadata.Index
+	snapIndex := snap.Metadata.Index
+	if msIndex >= snapIndex {
+		return ErrSnapOutOfDate
+	}
+
 	ms.snapshot = snap
 	ms.ents = []pb.Entry{{Term: snap.Metadata.Term, Index: snap.Metadata.Index}}
 	return nil

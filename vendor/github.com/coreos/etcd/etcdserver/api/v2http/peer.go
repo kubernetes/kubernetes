@@ -26,7 +26,6 @@ import (
 
 const (
 	peerMembersPrefix = "/members"
-	leasesPrefix      = "/leases"
 )
 
 // NewPeerHandler generates an http.Handler to handle etcd peer requests.
@@ -49,7 +48,8 @@ func newPeerHandler(cluster api.Cluster, raftHandler http.Handler, leaseHandler 
 	mux.Handle(rafthttp.RaftPrefix+"/", raftHandler)
 	mux.Handle(peerMembersPrefix, mh)
 	if leaseHandler != nil {
-		mux.Handle(leasesPrefix, leaseHandler)
+		mux.Handle(leasehttp.LeasePrefix, leaseHandler)
+		mux.Handle(leasehttp.LeaseInternalPrefix, leaseHandler)
 	}
 	mux.HandleFunc(versionPath, versionHandler(cluster, serveVersion))
 	return mux

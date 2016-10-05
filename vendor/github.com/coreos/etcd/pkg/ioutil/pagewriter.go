@@ -38,9 +38,12 @@ type PageWriter struct {
 	bufWatermarkBytes int
 }
 
-func NewPageWriter(w io.Writer, pageBytes int) *PageWriter {
+// NewPageWriter creates a new PageWriter. pageBytes is the number of bytes
+// to write per page. pageOffset is the starting offset of io.Writer.
+func NewPageWriter(w io.Writer, pageBytes, pageOffset int) *PageWriter {
 	return &PageWriter{
 		w:                 w,
+		pageOffset:        pageOffset,
 		pageBytes:         pageBytes,
 		buf:               make([]byte, defaultBufferBytes+pageBytes),
 		bufWatermarkBytes: defaultBufferBytes,

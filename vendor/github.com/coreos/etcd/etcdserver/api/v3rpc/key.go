@@ -26,7 +26,7 @@ import (
 )
 
 var (
-	plog = capnslog.NewPackageLogger("github.com/coreos/etcd/etcdserver/api", "v3rpc")
+	plog = capnslog.NewPackageLogger("github.com/coreos/etcd", "etcdserver/api/v3rpc")
 
 	// Max operations per txn list. For example, Txn.Success can have at most 128 operations,
 	// and Txn.Failure can have at most 128 operations.

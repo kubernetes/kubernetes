@@ -48,7 +48,7 @@ func max(a, b uint64) uint64 {
 
 func IsLocalMsg(msgt pb.MessageType) bool {
 	return msgt == pb.MsgHup || msgt == pb.MsgBeat || msgt == pb.MsgUnreachable ||
-		msgt == pb.MsgSnapStatus || msgt == pb.MsgCheckQuorum || msgt == pb.MsgTransferLeader
+		msgt == pb.MsgSnapStatus || msgt == pb.MsgCheckQuorum
 }
 
 func IsResponseMsg(msgt pb.MessageType) bool {

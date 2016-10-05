@@ -106,7 +106,6 @@ type peer struct {
 	msgAppV2Reader *streamReader
 	msgAppReader   *streamReader
 
-	sendc chan raftpb.Message
 	recvc chan raftpb.Message
 	propc chan raftpb.Message
 
@@ -145,7 +144,6 @@ func startPeer(transport *Transport, urls types.URLs, peerID types.ID, fs *stats
 		writer:         startStreamWriter(peerID, status, fs, r),
 		pipeline:       pipeline,
 		snapSender:     newSnapshotSender(transport, picker, peerID, status),
-		sendc:          make(chan raftpb.Message),
 		recvc:          make(chan raftpb.Message, recvBufSize),
 		propc:          make(chan raftpb.Message, maxPendingProposals),
 		stopc:          make(chan struct{}),

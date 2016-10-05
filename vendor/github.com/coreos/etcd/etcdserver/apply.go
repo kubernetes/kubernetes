@@ -159,6 +159,22 @@ func (a *applierV3backend) Put(txnID int64, p *pb.PutRequest) (*pb.PutResponse, 
 		rev int64
 		err error
 	)
+
+	var rr *mvcc.RangeResult
+	if p.PrevKv {
+		if txnID != noTxn {
+			rr, err = a.s.KV().TxnRange(txnID, p.Key, nil, mvcc.RangeOptions{})
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			rr, err = a.s.KV().Range(p.Key, nil, mvcc.RangeOptions{})
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
 	if txnID != noTxn {
 		rev, err = a.s.KV().TxnPut(txnID, p.Key, p.Value, lease.LeaseID(p.Lease))
 		if err != nil {
@@ -174,6 +190,9 @@ func (a *applierV3backend) Put(txnID int64, p *pb.PutRequest) (*pb.PutResponse, 
 		rev = a.s.KV().Put(p.Key, p.Value, leaseID)
 	}
 	resp.Header.Revision = rev
+	if rr != nil && len(rr.KVs) != 0 {
+		resp.PrevKv = &rr.KVs[0]
+	}
 	return resp, nil
 }
 
@@ -191,6 +210,21 @@ func (a *applierV3backend) DeleteRange(txnID int64, dr *pb.DeleteRangeRequest) (
 		dr.RangeEnd = []byte{}
 	}
 
+	var rr *mvcc.RangeResult
+	if dr.PrevKv {
+		if txnID != noTxn {
+			rr, err = a.s.KV().TxnRange(txnID, dr.Key, dr.RangeEnd, mvcc.RangeOptions{})
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			rr, err = a.s.KV().Range(dr.Key, dr.RangeEnd, mvcc.RangeOptions{})
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
 	if txnID != noTxn {
 		n, rev, err = a.s.KV().TxnDeleteRange(txnID, dr.Key, dr.RangeEnd)
 		if err != nil {
@@ -201,6 +235,11 @@ func (a *applierV3backend) DeleteRange(txnID int64, dr *pb.DeleteRangeRequest) (
 	}
 
 	resp.Deleted = n
+	if rr != nil {
+		for i := range rr.KVs {
+			resp.PrevKvs = append(resp.PrevKvs, &rr.KVs[i])
+		}
+	}
 	resp.Header.Revision = rev
 	return resp, nil
 }
@@ -219,7 +258,9 @@ func (a *applierV3backend) Range(txnID int64, r *pb.RangeRequest) (*pb.RangeResp
 	}
 
 	limit := r.Limit
-	if r.SortOrder != pb.RangeRequest_NONE {
+	if r.SortOrder != pb.RangeRequest_NONE ||
+		r.MinModRevision != 0 || r.MaxModRevision != 0 ||
+		r.MinCreateRevision != 0 || r.MaxCreateRevision != 0 {
 		// fetch everything; sort and truncate afterwards
 		limit = 0
 	}
@@ -244,6 +285,23 @@ func (a *applierV3backend) Range(txnID int64, r *pb.RangeRequest) (*pb.RangeResp
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	if r.MaxModRevision != 0 {
+		f := func(kv *mvccpb.KeyValue) bool { return kv.ModRevision > r.MaxModRevision }
+		pruneKVs(rr, f)
+	}
+	if r.MinModRevision != 0 {
+		f := func(kv *mvccpb.KeyValue) bool { return kv.ModRevision < r.MinModRevision }
+		pruneKVs(rr, f)
+	}
+	if r.MaxCreateRevision != 0 {
+		f := func(kv *mvccpb.KeyValue) bool { return kv.CreateRevision > r.MaxCreateRevision }
+		pruneKVs(rr, f)
+	}
+	if r.MinCreateRevision != 0 {
+		f := func(kv *mvccpb.KeyValue) bool { return kv.CreateRevision < r.MinCreateRevision }
+		pruneKVs(rr, f)
 	}
 
 	if r.SortOrder != pb.RangeRequest_NONE {
@@ -306,34 +364,23 @@ func (a *applierV3backend) Txn(rt *pb.TxnRequest) (*pb.TxnResponse, error) {
 		return nil, err
 	}
 
-	revision := a.s.KV().Rev()
-
 	// When executing the operations of txn, we need to hold the txn lock.
 	// So the reader will not see any intermediate results.
 	txnID := a.s.KV().TxnBegin()
-	defer func() {
-		err := a.s.KV().TxnEnd(txnID)
-		if err != nil {
-			panic(fmt.Sprint("unexpected error when closing txn", txnID))
-		}
-	}()
 
 	resps := make([]*pb.ResponseOp, len(reqs))
-	changedKV := false
 	for i := range reqs {
-		if reqs[i].GetRequestRange() == nil {
-			changedKV = true
-		}
 		resps[i] = a.applyUnion(txnID, reqs[i])
 	}
 
-	if changedKV {
-		revision += 1
+	err := a.s.KV().TxnEnd(txnID)
+	if err != nil {
+		panic(fmt.Sprint("unexpected error when closing txn", txnID))
 	}
 
 	txnResp := &pb.TxnResponse{}
 	txnResp.Header = &pb.ResponseHeader{}
-	txnResp.Header.Revision = revision
+	txnResp.Header.Revision = a.s.KV().Rev()
 	txnResp.Responses = resps
 	txnResp.Succeeded = ok
 	return txnResp, nil
@@ -744,4 +791,37 @@ func compareInt64(a, b int64) int {
 // sending empty byte strings as nil; >= is encoded in the range end as '\0'.
 func isGteRange(rangeEnd []byte) bool {
 	return len(rangeEnd) == 1 && rangeEnd[0] == 0
+}
+
+func noSideEffect(r *pb.InternalRaftRequest) bool {
+	return r.Range != nil || r.AuthUserGet != nil || r.AuthRoleGet != nil
+}
+
+func removeNeedlessRangeReqs(txn *pb.TxnRequest) {
+	f := func(ops []*pb.RequestOp) []*pb.RequestOp {
+		j := 0
+		for i := 0; i < len(ops); i++ {
+			if _, ok := ops[i].Request.(*pb.RequestOp_RequestRange); ok {
+				continue
+			}
+			ops[j] = ops[i]
+			j++
+		}
+
+		return ops[:j]
+	}
+
+	txn.Success = f(txn.Success)
+	txn.Failure = f(txn.Failure)
+}
+
+func pruneKVs(rr *mvcc.RangeResult, isPrunable func(*mvccpb.KeyValue) bool) {
+	j := 0
+	for i := range rr.KVs {
+		rr.KVs[j] = rr.KVs[i]
+		if !isPrunable(&rr.KVs[i]) {
+			j++
+		}
+	}
+	rr.KVs = rr.KVs[:j]
 }

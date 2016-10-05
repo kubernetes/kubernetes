@@ -166,7 +166,9 @@ func (t *batchTx) commit(stop bool) {
 			return
 		}
 		start := time.Now()
+		// gofail: var beforeCommit struct{}
 		err = t.tx.Commit()
+		// gofail: var afterCommit struct{}
 		commitDurations.Observe(time.Since(start).Seconds())
 		atomic.AddInt64(&t.backend.commits, 1)
 

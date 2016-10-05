@@ -68,7 +68,7 @@ func (a *v2apiStore) processRaftRequest(ctx context.Context, r *pb.Request) (Res
 		proposalsFailed.Inc()
 		a.s.w.Trigger(r.ID, nil) // GC wait
 		return Response{}, a.s.parseProposeCtxErr(ctx.Err(), start)
-	case <-a.s.done:
+	case <-a.s.stopping:
 	}
 	return Response{}, ErrStopped
 }

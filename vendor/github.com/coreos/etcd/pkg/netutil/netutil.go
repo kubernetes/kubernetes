@@ -26,7 +26,7 @@ import (
 )
 
 var (
-	plog = capnslog.NewPackageLogger("github.com/coreos/etcd/pkg", "netutil")
+	plog = capnslog.NewPackageLogger("github.com/coreos/etcd", "pkg/netutil")
 
 	// indirection for testing
 	resolveTCPAddr = net.ResolveTCPAddr

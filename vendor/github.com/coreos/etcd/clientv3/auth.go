@@ -43,6 +43,7 @@ type (
 	AuthRoleListResponse             pb.AuthRoleListResponse
 
 	PermissionType authpb.Permission_Type
+	Permission     authpb.Permission
 )
 
 const (

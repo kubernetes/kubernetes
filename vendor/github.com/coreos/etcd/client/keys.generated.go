@@ -8,10 +8,11 @@ package client
 import (
 	"errors"
 	"fmt"
-	codec1978 "github.com/ugorji/go/codec"
 	"reflect"
 	"runtime"
 	time "time"
+
+	codec1978 "github.com/ugorji/go/codec"
 )
 
 const (

@@ -18,6 +18,7 @@ import (
 	"encoding/binary"
 	"hash"
 	"io"
+	"os"
 	"sync"
 
 	"github.com/coreos/etcd/pkg/crc"
@@ -26,8 +27,8 @@ import (
 )
 
 // walPageBytes is the alignment for flushing records to the backing Writer.
-// It should be a multiple of the minimum sector size so that WAL repair can
-// safely between torn writes and ordinary data corruption.
+// It should be a multiple of the minimum sector size so that WAL can safely
+// distinguish between torn writes and ordinary data corruption.
 const walPageBytes = 8 * minSectorSize
 
 type encoder struct {
@@ -39,14 +40,23 @@ type encoder struct {
 	uint64buf []byte
 }
 
-func newEncoder(w io.Writer, prevCrc uint32) *encoder {
+func newEncoder(w io.Writer, prevCrc uint32, pageOffset int) *encoder {
 	return &encoder{
-		bw:  ioutil.NewPageWriter(w, walPageBytes),
+		bw:  ioutil.NewPageWriter(w, walPageBytes, pageOffset),
 		crc: crc.New(prevCrc, crcTable),
 		// 1MB buffer
 		buf:       make([]byte, 1024*1024),
 		uint64buf: make([]byte, 8),
 	}
+}
+
+// newFileEncoder creates a new encoder with current file offset for the page writer.
+func newFileEncoder(f *os.File, prevCrc uint32) (*encoder, error) {
+	offset, err := f.Seek(0, os.SEEK_CUR)
+	if err != nil {
+		return nil, err
+	}
+	return newEncoder(f, prevCrc, int(offset)), nil
 }
 
 func (e *encoder) encode(rec *walpb.Record) error {

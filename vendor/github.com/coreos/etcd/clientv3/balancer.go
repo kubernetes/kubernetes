@@ -42,6 +42,11 @@ type simpleBalancer struct {
 	// upc closes when upEps transitions from empty to non-zero or the balancer closes.
 	upc chan struct{}
 
+	// grpc issues TLS cert checks using the string passed into dial so
+	// that string must be the host. To recover the full scheme://host URL,
+	// have a map from hosts to the original endpoint.
+	host2ep map[string]string
+
 	// pinAddr is the currently pinned address; set to the empty string on
 	// intialization and shutdown.
 	pinAddr string
@@ -62,6 +67,7 @@ func newSimpleBalancer(eps []string) *simpleBalancer {
 		readyc:   make(chan struct{}),
 		upEps:    make(map[string]struct{}),
 		upc:      make(chan struct{}),
+		host2ep:  getHost2ep(eps),
 	}
 	return sb
 }
@@ -72,6 +78,49 @@ func (b *simpleBalancer) ConnectNotify() <-chan struct{} {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	return b.upc
+}
+
+func (b *simpleBalancer) getEndpoint(host string) string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.host2ep[host]
+}
+
+func getHost2ep(eps []string) map[string]string {
+	hm := make(map[string]string, len(eps))
+	for i := range eps {
+		_, host, _ := parseEndpoint(eps[i])
+		hm[host] = eps[i]
+	}
+	return hm
+}
+
+func (b *simpleBalancer) updateAddrs(eps []string) {
+	np := getHost2ep(eps)
+
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	match := len(np) == len(b.host2ep)
+	for k, v := range np {
+		if b.host2ep[k] != v {
+			match = false
+			break
+		}
+	}
+	if match {
+		// same endpoints, so no need to update address
+		return
+	}
+
+	b.host2ep = np
+
+	addrs := make([]grpc.Address, 0, len(eps))
+	for i := range eps {
+		addrs = append(addrs, grpc.Address{Addr: getHost(eps[i])})
+	}
+	b.addrs = addrs
+	b.notifyCh <- addrs
 }
 
 func (b *simpleBalancer) Up(addr grpc.Address) func(error) {

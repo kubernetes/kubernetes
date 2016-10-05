@@ -45,6 +45,8 @@
 		LeaseRevokeResponse
 		LeaseKeepAliveRequest
 		LeaseKeepAliveResponse
+		LeaseTimeToLiveRequest
+		LeaseTimeToLiveResponse
 		Member
 		MemberAddRequest
 		MemberAddResponse
@@ -102,9 +104,9 @@ import (
 	proto "github.com/golang/protobuf/proto"
 
 	math "math"
-)
 
-import io "io"
+	io "io"
+)
 
 // Reference imports to suppress errors if they are not otherwise used.
 var _ = proto.Marshal
