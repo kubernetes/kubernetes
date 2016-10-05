@@ -83,8 +83,9 @@ func TestJwtProvider(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error creating temp file: %v", err)
 	}
-
 	filename := file.Name()
+	defer os.Remove(filename)
+
 	_, err = file.WriteString(jsonKey)
 	if err != nil {
 		t.Fatalf("Error writing temp file: %v", err)
