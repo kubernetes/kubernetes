@@ -32,7 +32,11 @@ import (
 
 var (
 	status_long = dedent.Dedent(`
-		Watch the status of current rollout, until it's done.`)
+		Show the status of the newest rollout.
+
+		By default 'rollout status' will watch the status of the newest rollout
+		until it's done. If you don't want to wait for the rollout to finish then
+		you can use --watch=false.`)
 	status_example = dedent.Dedent(`
 		# Watch the rollout status of a deployment
 		kubectl rollout status deployment/nginx`)
@@ -46,7 +50,7 @@ func NewCmdRolloutStatus(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "status (TYPE NAME | TYPE/NAME) [flags]",
-		Short:   "Watch rollout status until it's done",
+		Short:   "Show the status of newest rollout",
 		Long:    status_long,
 		Example: status_example,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -58,6 +62,7 @@ func NewCmdRolloutStatus(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 
 	usage := "identifying the resource to get from a server."
 	cmdutil.AddFilenameOptionFlags(cmd, options, usage)
+	cmd.Flags().BoolP("watch", "w", true, "Watch the status of the newest rollout until it's done.")
 	return cmd
 }
 
@@ -116,6 +121,11 @@ func RunStatus(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []str
 	}
 	fmt.Fprintf(out, "%s", status)
 	if done {
+		return nil
+	}
+
+	shouldWatch := cmdutil.GetFlagBool(cmd, "watch")
+	if !shouldWatch {
 		return nil
 	}
 
