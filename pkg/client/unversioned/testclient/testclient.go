@@ -527,3 +527,7 @@ func (c *FakeDiscovery) ServerVersion() (*version.Info, error) {
 	versionInfo := version.Get()
 	return &versionInfo, nil
 }
+
+func (c *FakeDiscovery) GetRESTClient() restclient.RESTClientInterface {
+	return nil
+}

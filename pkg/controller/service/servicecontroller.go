@@ -175,7 +175,7 @@ func (s *ServiceController) Run(workers int) {
 	for i := 0; i < workers; i++ {
 		go wait.Until(s.worker, time.Second, wait.NeverStop)
 	}
-	nodeLW := cache.NewListWatchFromClient(s.kubeClient.(*clientset.Clientset).CoreClient, "nodes", api.NamespaceAll, fields.Everything())
+	nodeLW := cache.NewListWatchFromClient(s.kubeClient.(*clientset.Clientset).CoreClient.GetRESTClient(), "nodes", api.NamespaceAll, fields.Everything())
 	cache.NewReflector(nodeLW, &api.Node{}, s.nodeLister.Store, 0).Run()
 	go wait.Until(s.nodeSyncLoop, nodeSyncPeriod, wait.NeverStop)
 }

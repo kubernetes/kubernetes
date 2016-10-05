@@ -29,10 +29,10 @@ type PodExpansion interface {
 
 // Bind applies the provided binding to the named pod in the current namespace (binding.Namespace is ignored).
 func (c *pods) Bind(binding *api.Binding) error {
-	return c.client.Post().Namespace(c.ns).Resource("pods").Name(binding.Name).SubResource("binding").Body(binding).Do().Error()
+	return c.client.GetRESTClient().Post().Namespace(c.ns).Resource("pods").Name(binding.Name).SubResource("binding").Body(binding).Do().Error()
 }
 
 // Get constructs a request for getting the logs for a pod
 func (c *pods) GetLogs(name string, opts *api.PodLogOptions) *restclient.Request {
-	return c.client.Get().Namespace(c.ns).Name(name).Resource("pods").SubResource("log").VersionedParams(opts, api.ParameterCodec)
+	return c.client.GetRESTClient().Get().Namespace(c.ns).Name(name).Resource("pods").SubResource("log").VersionedParams(opts, api.ParameterCodec)
 }

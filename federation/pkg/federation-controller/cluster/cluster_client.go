@@ -99,7 +99,7 @@ func (self *ClusterClient) GetClusterHealthStatus() *federation_v1beta1.ClusterS
 		LastProbeTime:      currentTime,
 		LastTransitionTime: currentTime,
 	}
-	body, err := self.discoveryClient.Get().AbsPath("/healthz").Do().Raw()
+	body, err := self.discoveryClient.GetRESTClient().Get().AbsPath("/healthz").Do().Raw()
 	if err != nil {
 		clusterStatus.Conditions = append(clusterStatus.Conditions, newNodeOfflineCondition)
 	} else {

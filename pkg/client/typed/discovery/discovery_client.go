@@ -38,6 +38,7 @@ import (
 // DiscoveryInterface holds the methods that discover server-supported API groups,
 // versions and resources.
 type DiscoveryInterface interface {
+	GetRESTClient() restclient.RESTClientInterface
 	ServerGroupsInterface
 	ServerResourcesInterface
 	ServerVersionInterface
@@ -80,7 +81,7 @@ type SwaggerSchemaInterface interface {
 // DiscoveryClient implements the functions that discover server-supported API groups,
 // versions and resources.
 type DiscoveryClient struct {
-	*restclient.RESTClient
+	RESTClient restclient.RESTClientInterface
 
 	LegacyPrefix string
 }
@@ -107,7 +108,7 @@ func apiVersionsToAPIGroup(apiVersions *unversioned.APIVersions) (apiGroup unver
 func (d *DiscoveryClient) ServerGroups() (apiGroupList *unversioned.APIGroupList, err error) {
 	// Get the groupVersions exposed at /api
 	v := &unversioned.APIVersions{}
-	err = d.Get().AbsPath(d.LegacyPrefix).Do().Into(v)
+	err = d.RESTClient.Get().AbsPath(d.LegacyPrefix).Do().Into(v)
 	apiGroup := unversioned.APIGroup{}
 	if err == nil {
 		apiGroup = apiVersionsToAPIGroup(v)
@@ -118,7 +119,7 @@ func (d *DiscoveryClient) ServerGroups() (apiGroupList *unversioned.APIGroupList
 
 	// Get the groupVersions exposed at /apis
 	apiGroupList = &unversioned.APIGroupList{}
-	err = d.Get().AbsPath("/apis").Do().Into(apiGroupList)
+	err = d.RESTClient.Get().AbsPath("/apis").Do().Into(apiGroupList)
 	if err != nil && !errors.IsNotFound(err) && !errors.IsForbidden(err) {
 		return nil, err
 	}
@@ -144,7 +145,7 @@ func (d *DiscoveryClient) ServerResourcesForGroupVersion(groupVersion string) (r
 		url.Path = "/apis/" + groupVersion
 	}
 	resources = &unversioned.APIResourceList{}
-	err = d.Get().AbsPath(url.String()).Do().Into(resources)
+	err = d.RESTClient.Get().AbsPath(url.String()).Do().Into(resources)
 	if err != nil {
 		// ignore 403 or 404 error to be compatible with an v1.0 server.
 		if groupVersion == "v1" && (errors.IsNotFound(err) || errors.IsForbidden(err)) {
@@ -248,7 +249,7 @@ func (d *DiscoveryClient) ServerPreferredNamespacedResources() ([]unversioned.Gr
 
 // ServerVersion retrieves and parses the server's version (git version).
 func (d *DiscoveryClient) ServerVersion() (*version.Info, error) {
-	body, err := d.Get().AbsPath("/version").Do().Raw()
+	body, err := d.RESTClient.Get().AbsPath("/version").Do().Raw()
 	if err != nil {
 		return nil, err
 	}
@@ -282,7 +283,7 @@ func (d *DiscoveryClient) SwaggerSchema(version unversioned.GroupVersion) (*swag
 		path = "/swaggerapi/apis/" + version.Group + "/" + version.Version
 	}
 
-	body, err := d.Get().AbsPath(path).Do().Raw()
+	body, err := d.RESTClient.Get().AbsPath(path).Do().Raw()
 	if err != nil {
 		return nil, err
 	}
@@ -331,7 +332,7 @@ func NewDiscoveryClientForConfigOrDie(c *restclient.Config) *DiscoveryClient {
 }
 
 // New creates a new DiscoveryClient for the given RESTClient.
-func NewDiscoveryClient(c *restclient.RESTClient) *DiscoveryClient {
+func NewDiscoveryClient(c restclient.RESTClientInterface) *DiscoveryClient {
 	return &DiscoveryClient{RESTClient: c, LegacyPrefix: "/api"}
 }
 
@@ -342,4 +343,13 @@ func stringDoesntExistIn(str string, slice []string) bool {
 		}
 	}
 	return true
+}
+
+// GetRESTClient returns a RESTClient that is used to communicate
+// with API server by this client implementation.
+func (c *DiscoveryClient) GetRESTClient() restclient.RESTClientInterface {
+	if c == nil {
+		return nil
+	}
+	return c.RESTClient
 }

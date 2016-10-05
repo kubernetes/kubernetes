@@ -92,7 +92,7 @@ func (g *genClientset) GenerateType(c *generator.Context, t *types.Type, w io.Wr
 		"allGroups":                        allGroups,
 		"Config":                           c.Universe.Type(types.Name{Package: pkgRESTClient, Name: "Config"}),
 		"DefaultKubernetesUserAgent":       c.Universe.Function(types.Name{Package: pkgRESTClient, Name: "DefaultKubernetesUserAgent"}),
-		"RESTClient":                       c.Universe.Type(types.Name{Package: pkgRESTClient, Name: "RESTClient"}),
+		"RESTClient":                       c.Universe.Type(types.Name{Package: pkgRESTClient, Name: "RESTClientInterface"}),
 		"DiscoveryInterface":               c.Universe.Type(types.Name{Package: pkgDiscovery, Name: "DiscoveryInterface"}),
 		"DiscoveryClient":                  c.Universe.Type(types.Name{Package: pkgDiscovery, Name: "DiscoveryClient"}),
 		"NewDiscoveryClientForConfig":      c.Universe.Function(types.Name{Package: pkgDiscovery, Name: "NewDiscoveryClientForConfig"}),
@@ -183,7 +183,7 @@ $end$
 
 var newClientsetForRESTClientTemplate = `
 // New creates a new Clientset for the given RESTClient.
-func New(c *$.RESTClient|raw$) *Clientset {
+func New(c $.RESTClient|raw$) *Clientset {
 	var clientset Clientset
 $range .allGroups$    clientset.$.Group$Client =$.PackageName$.New(c)
 $end$

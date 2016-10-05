@@ -63,7 +63,7 @@ func (g *genFakeForGroup) GenerateType(c *generator.Context, t *types.Type, w io
 		"group":      g.group,
 		"Group":      namer.IC(g.group),
 		"Fake":       c.Universe.Type(types.Name{Package: pkgTestingCore, Name: "Fake"}),
-		"RESTClient": c.Universe.Type(types.Name{Package: pkgRESTClient, Name: "RESTClient"}),
+		"RESTClient": c.Universe.Type(types.Name{Package: pkgRESTClient, Name: "RESTClientInterface"}),
 	}
 	sw.Do(groupClientTemplate, m)
 	for _, t := range g.types {
@@ -105,7 +105,7 @@ func (c *Fake$.Group$) $.type|publicPlural$() $.realClientPackage$.$.type|public
 var getRESTClient = `
 // GetRESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *Fake$.Group$) GetRESTClient() *$.RESTClient|raw$ {
+func (c *Fake$.Group$) GetRESTClient() $.RESTClient|raw$ {
   return nil
 }
 `

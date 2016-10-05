@@ -26,6 +26,6 @@ type NamespaceExpansion interface {
 // Finalize takes the representation of a namespace to update.  Returns the server's representation of the namespace, and an error, if it occurs.
 func (c *namespaces) Finalize(namespace *v1.Namespace) (result *v1.Namespace, err error) {
 	result = &v1.Namespace{}
-	err = c.client.Put().Resource("namespaces").Name(namespace.Name).SubResource("finalize").Body(namespace).Do().Into(result)
+	err = c.client.GetRESTClient().Put().Resource("namespaces").Name(namespace.Name).SubResource("finalize").Body(namespace).Do().Into(result)
 	return
 }

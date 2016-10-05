@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/pkg/client/restclient"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -82,6 +83,13 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 	})
 })
 
+func setTimeout(client restclient.RESTClientInterface) {
+	httpClient := client.(*restclient.RESTClient).Client
+	if httpClient.Timeout == 0 {
+		httpClient.Timeout = framework.SingleCallTimeout
+	}
+}
+
 func invalidAuthFederationClientSet(user *framework.KubeUser) (*federation_release_1_5.Clientset, error) {
 	overrides := &clientcmd.ConfigOverrides{}
 	if user != nil {
@@ -110,10 +118,10 @@ func invalidAuthFederationClientSet(user *framework.KubeUser) (*federation_relea
 		return nil, fmt.Errorf("error creating federation clientset: %v", err)
 	}
 	// Set timeout for each client in the set.
-	c.DiscoveryClient.Client.Timeout = framework.SingleCallTimeout
-	c.FederationClient.Client.Timeout = framework.SingleCallTimeout
-	c.CoreClient.Client.Timeout = framework.SingleCallTimeout
-	c.ExtensionsClient.Client.Timeout = framework.SingleCallTimeout
+	setTimeout(c.DiscoveryClient.GetRESTClient())
+	setTimeout(c.FederationClient.GetRESTClient())
+	setTimeout(c.CoreClient.GetRESTClient())
+	setTimeout(c.ExtensionsClient.GetRESTClient())
 
 	return c, nil
 }

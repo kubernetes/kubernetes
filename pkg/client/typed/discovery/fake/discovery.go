@@ -22,6 +22,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/version"
+	"k8s.io/kubernetes/pkg/client/restclient"
 )
 
 type FakeDiscovery struct {
@@ -79,4 +80,8 @@ func (c *FakeDiscovery) SwaggerSchema(version unversioned.GroupVersion) (*swagge
 
 	c.Invokes(action, nil)
 	return &swagger.ApiDeclaration{}, nil
+}
+
+func (c *FakeDiscovery) GetRESTClient() restclient.RESTClientInterface {
+	return nil
 }

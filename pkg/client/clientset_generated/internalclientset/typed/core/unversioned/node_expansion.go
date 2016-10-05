@@ -29,7 +29,7 @@ type NodeExpansion interface {
 // the node that the server returns, or an error.
 func (c *nodes) PatchStatus(nodeName string, data []byte) (*api.Node, error) {
 	result := &api.Node{}
-	err := c.client.Patch(api.StrategicMergePatchType).
+	err := c.client.GetRESTClient().Patch(api.StrategicMergePatchType).
 		Resource("nodes").
 		Name(nodeName).
 		SubResource("status").

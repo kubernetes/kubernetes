@@ -38,6 +38,18 @@ const (
 	envBackoffDuration = "KUBE_CLIENT_BACKOFF_DURATION"
 )
 
+// RESTClient for Kubernetes API
+type RESTClientInterface interface {
+	GetRateLimiter() flowcontrol.RateLimiter
+	Verb(verb string) *Request
+	Post() *Request
+	Put() *Request
+	Patch(pt api.PatchType) *Request
+	Get() *Request
+	Delete() *Request
+	APIVersion() unversioned.GroupVersion
+}
+
 // RESTClient imposes common Kubernetes API conventions on a set of resource paths.
 // The baseURL is expected to point to an HTTP or HTTPS path that is the parent
 // of one or more resources.  The server should return a decodable API resource

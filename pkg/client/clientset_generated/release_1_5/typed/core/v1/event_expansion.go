@@ -48,7 +48,7 @@ func (e *events) CreateWithEventNamespace(event *v1.Event) (*v1.Event, error) {
 		return nil, fmt.Errorf("can't create an event with namespace '%v' in namespace '%v'", event.Namespace, e.ns)
 	}
 	result := &v1.Event{}
-	err := e.client.Post().
+	err := e.client.GetRESTClient().Post().
 		NamespaceIfScoped(event.Namespace, len(event.Namespace) > 0).
 		Resource("events").
 		Body(event).
@@ -64,7 +64,7 @@ func (e *events) CreateWithEventNamespace(event *v1.Event) (*v1.Event, error) {
 // object.
 func (e *events) UpdateWithEventNamespace(event *v1.Event) (*v1.Event, error) {
 	result := &v1.Event{}
-	err := e.client.Put().
+	err := e.client.GetRESTClient().Put().
 		NamespaceIfScoped(event.Namespace, len(event.Namespace) > 0).
 		Resource("events").
 		Name(event.Name).
@@ -84,7 +84,7 @@ func (e *events) PatchWithEventNamespace(incompleteEvent *v1.Event, data []byte)
 		return nil, fmt.Errorf("can't patch an event with namespace '%v' in namespace '%v'", incompleteEvent.Namespace, e.ns)
 	}
 	result := &v1.Event{}
-	err := e.client.Patch(api.StrategicMergePatchType).
+	err := e.client.GetRESTClient().Patch(api.StrategicMergePatchType).
 		NamespaceIfScoped(incompleteEvent.Namespace, len(incompleteEvent.Namespace) > 0).
 		Resource("events").
 		Name(incompleteEvent.Name).
@@ -122,7 +122,7 @@ func (e *events) Search(objOrRef runtime.Object) (*v1.EventList, error) {
 // Returns the appropriate field selector based on the API version being used to communicate with the server.
 // The returned field selector can be used with List and Watch to filter desired events.
 func (e *events) GetFieldSelector(involvedObjectName, involvedObjectNamespace, involvedObjectKind, involvedObjectUID *string) fields.Selector {
-	apiVersion := e.client.APIVersion().String()
+	apiVersion := e.client.GetRESTClient().APIVersion().String()
 	field := fields.Set{}
 	if involvedObjectName != nil {
 		field[GetInvolvedObjectNameFieldLabel(apiVersion)] = *involvedObjectName

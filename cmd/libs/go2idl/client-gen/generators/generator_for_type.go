@@ -134,7 +134,7 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 
 // group client will implement this interface.
 var getterComment = `
-// $.type|publicPlural$Getter has a method to return a $.type|public$Interface. 
+// $.type|publicPlural$Getter has a method to return a $.type|public$Interface.
 // A group's client should implement this interface.`
 
 var getterNamesapced = `
@@ -215,7 +215,7 @@ var listTemplate = `
 // List takes label and field selectors, and returns the list of $.type|publicPlural$ that match those selectors.
 func (c *$.type|privatePlural$) List(opts $.ListOptions|raw$) (result *$.type|raw$List, err error) {
 	result = &$.type|raw$List{}
-	err = c.client.Get().
+	err = c.client.GetRESTClient().Get().
 		$if .namespaced$Namespace(c.ns).$end$
 		Resource("$.type|allLowercasePlural$").
 		VersionedParams(&opts, $.apiParameterCodec|raw$).
@@ -228,7 +228,7 @@ var getTemplate = `
 // Get takes name of the $.type|private$, and returns the corresponding $.type|private$ object, and an error if there is any.
 func (c *$.type|privatePlural$) Get(name string) (result *$.type|raw$, err error) {
 	result = &$.type|raw${}
-	err = c.client.Get().
+	err = c.client.GetRESTClient().Get().
 		$if .namespaced$Namespace(c.ns).$end$
 		Resource("$.type|allLowercasePlural$").
 		Name(name).
@@ -241,7 +241,7 @@ func (c *$.type|privatePlural$) Get(name string) (result *$.type|raw$, err error
 var deleteTemplate = `
 // Delete takes name of the $.type|private$ and deletes it. Returns an error if one occurs.
 func (c *$.type|privatePlural$) Delete(name string, options *$.DeleteOptions|raw$) error {
-	return c.client.Delete().
+	return c.client.GetRESTClient().Delete().
 		$if .namespaced$Namespace(c.ns).$end$
 		Resource("$.type|allLowercasePlural$").
 		Name(name).
@@ -254,7 +254,7 @@ func (c *$.type|privatePlural$) Delete(name string, options *$.DeleteOptions|raw
 var deleteCollectionTemplate = `
 // DeleteCollection deletes a collection of objects.
 func (c *$.type|privatePlural$) DeleteCollection(options *$.DeleteOptions|raw$, listOptions $.ListOptions|raw$) error {
-	return c.client.Delete().
+	return c.client.GetRESTClient().Delete().
 		$if .namespaced$Namespace(c.ns).$end$
 		Resource("$.type|allLowercasePlural$").
 		VersionedParams(&listOptions, $.apiParameterCodec|raw$).
@@ -268,7 +268,7 @@ var createTemplate = `
 // Create takes the representation of a $.type|private$ and creates it.  Returns the server's representation of the $.type|private$, and an error, if there is any.
 func (c *$.type|privatePlural$) Create($.type|private$ *$.type|raw$) (result *$.type|raw$, err error) {
 	result = &$.type|raw${}
-	err = c.client.Post().
+	err = c.client.GetRESTClient().Post().
 		$if .namespaced$Namespace(c.ns).$end$
 		Resource("$.type|allLowercasePlural$").
 		Body($.type|private$).
@@ -282,7 +282,7 @@ var updateTemplate = `
 // Update takes the representation of a $.type|private$ and updates it. Returns the server's representation of the $.type|private$, and an error, if there is any.
 func (c *$.type|privatePlural$) Update($.type|private$ *$.type|raw$) (result *$.type|raw$, err error) {
 	result = &$.type|raw${}
-	err = c.client.Put().
+	err = c.client.GetRESTClient().Put().
 		$if .namespaced$Namespace(c.ns).$end$
 		Resource("$.type|allLowercasePlural$").
 		Name($.type|private$.Name).
@@ -296,7 +296,7 @@ func (c *$.type|privatePlural$) Update($.type|private$ *$.type|raw$) (result *$.
 var updateStatusTemplate = `
 func (c *$.type|privatePlural$) UpdateStatus($.type|private$ *$.type|raw$) (result *$.type|raw$, err error) {
 	result = &$.type|raw${}
-	err = c.client.Put().
+	err = c.client.GetRESTClient().Put().
 		$if .namespaced$Namespace(c.ns).$end$
 		Resource("$.type|allLowercasePlural$").
 		Name($.type|private$.Name).
@@ -311,7 +311,7 @@ func (c *$.type|privatePlural$) UpdateStatus($.type|private$ *$.type|raw$) (resu
 var watchTemplate = `
 // Watch returns a $.watchInterface|raw$ that watches the requested $.type|privatePlural$.
 func (c *$.type|privatePlural$) Watch(opts $.ListOptions|raw$) ($.watchInterface|raw$, error) {
-	return c.client.Get().
+	return c.client.GetRESTClient().Get().
 		Prefix("watch").
 		$if .namespaced$Namespace(c.ns).$end$
 		Resource("$.type|allLowercasePlural$").
@@ -324,7 +324,7 @@ var patchTemplate = `
 // Patch applies the patch and returns the patched $.type|private$.
 func (c *$.type|privatePlural$) Patch(name string, pt $.PatchType|raw$, data []byte, subresources ...string) (result *$.type|raw$, err error) {
 	result = &$.type|raw${}
-	err = c.client.Patch(pt).
+	err = c.client.GetRESTClient().Patch(pt).
 		$if .namespaced$Namespace(c.ns).$end$
 		Resource("$.type|allLowercasePlural$").
 		SubResource(subresources...).

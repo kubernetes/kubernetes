@@ -357,7 +357,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 
 	serviceStore := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 	if kubeClient != nil {
-		serviceLW := cache.NewListWatchFromClient(kubeClient.(*clientset.Clientset).CoreClient, "services", api.NamespaceAll, fields.Everything())
+		serviceLW := cache.NewListWatchFromClient(kubeClient.(*clientset.Clientset).CoreClient.GetRESTClient(), "services", api.NamespaceAll, fields.Everything())
 		cache.NewReflector(serviceLW, &api.Service{}, serviceStore, 0).Run()
 	}
 	serviceLister := &cache.StoreToServiceLister{Indexer: serviceStore}
@@ -365,7 +365,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 	nodeStore := cache.NewStore(cache.MetaNamespaceKeyFunc)
 	if kubeClient != nil {
 		fieldSelector := fields.Set{api.ObjectNameField: string(nodeName)}.AsSelector()
-		nodeLW := cache.NewListWatchFromClient(kubeClient.(*clientset.Clientset).CoreClient, "nodes", api.NamespaceAll, fieldSelector)
+		nodeLW := cache.NewListWatchFromClient(kubeClient.(*clientset.Clientset).CoreClient.GetRESTClient(), "nodes", api.NamespaceAll, fieldSelector)
 		cache.NewReflector(nodeLW, &api.Node{}, nodeStore, 0).Run()
 	}
 	nodeLister := &cache.StoreToNodeLister{Store: nodeStore}

@@ -165,5 +165,5 @@ func (c *ClientCache) FederationClientForVersion(version *unversioned.GroupVersi
 	if err != nil {
 		return nil, err
 	}
-	return fedClientSet.(*fed_clientset.Clientset).FederationClient.RESTClient, nil
+	return fedClientSet.(*fed_clientset.Clientset).FederationClient.GetRESTClient().(*restclient.RESTClient), nil
 }
