@@ -22,12 +22,11 @@ import (
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/api"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/util/flag"
 )
 
-func NewKubeadmCommand(f *cmdutil.Factory, in io.Reader, out, err io.Writer, envParams map[string]string) *cobra.Command {
+func NewKubeadmCommand(f *cmdutil.Factory, in io.Reader, out, err io.Writer) *cobra.Command {
 	cmds := &cobra.Command{
 		Use:   "kubeadm",
 		Short: "kubeadm: easily bootstrap a secure Kubernetes cluster.",
@@ -76,14 +75,11 @@ func NewKubeadmCommand(f *cmdutil.Factory, in io.Reader, out, err io.Writer, env
 	// would then be able to look at files users has given an diff or validate if those are sane, we could also warn
 	// if any of the files had been deprecated
 
-	s := new(kubeadmapi.KubeadmConfig)
-	s.EnvParams = envParams
-
 	cmds.ResetFlags()
 	cmds.SetGlobalNormalizationFunc(flag.WarnWordSepNormalizeFunc)
 
-	cmds.AddCommand(NewCmdInit(out, s))
-	cmds.AddCommand(NewCmdJoin(out, s))
+	cmds.AddCommand(NewCmdInit(out))
+	cmds.AddCommand(NewCmdJoin(out))
 	cmds.AddCommand(NewCmdVersion(out))
 
 	return cmds
