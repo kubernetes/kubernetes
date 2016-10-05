@@ -17,6 +17,7 @@ limitations under the License.
 package eviction
 
 import (
+	"fmt"
 	"sort"
 	"sync"
 	"time"
@@ -25,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/client/record"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
@@ -146,7 +148,7 @@ func (m *managerImpl) IsUnderInodePressure() bool {
 	return hasNodeCondition(m.nodeConditions, api.NodeInodePressure)
 }
 
-func startMemoryThresholdNotifier(thresholds []Threshold, observations signalObservations, hard bool, handler func()) error {
+func startMemoryThresholdNotifier(thresholds []Threshold, observations signalObservations, hard bool, handler ThresholdNotifierHandlerFunc) error {
 	for _, threshold := range thresholds {
 		if threshold.Signal != SignalMemoryAvailable ||
 			(hard && threshold.GracePeriod != time.Duration(0)) ||
@@ -157,15 +159,20 @@ func startMemoryThresholdNotifier(thresholds []Threshold, observations signalObs
 		if !found {
 			continue
 		}
-		// TODO: remove hardcoded root memory cgroup path
-		cgpath := "/sys/fs/cgroup/memory"
+		cgroups, err := cm.GetCgroupSubsystems()
+		if err != nil {
+			return err
+		}
+		cgpath, found := cgroups.MountPoints["memory"]
+		if !found || len(cgpath) == 0 {
+			return fmt.Errorf("memory cgroup mount point not found")
+		}
 		attribute := "memory.usage_in_bytes"
 		quantity := getThresholdQuantity(threshold.Value, observed.capacity)
 		threshold := resource.NewQuantity(observed.capacity.Value(), resource.DecimalSI)
 		threshold.Sub(*quantity)
 		memcgThresholdNotifier, err := NewMemCGThresholdNotifier(cgpath, attribute, threshold.String(), handler)
 		if err != nil {
-			glog.Warningf("eviction manager: failed to create threshold notifier: %v", err)
 			return err
 		}
 		go memcgThresholdNotifier.Start(wait.NeverStop)
@@ -210,11 +217,17 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 			// TODO wait grace period for soft memory limit
 			m.synchronize(diskInfoProvider, podFunc)
 		})
+		if err != nil {
+			glog.Warningf("eviction manager: failed to create hard memory threshold notifier: %v", err)
+		}
 		// start hard memory notification
 		startMemoryThresholdNotifier(m.config.Thresholds, observations, true, func() {
 			glog.Infof("hard memory eviction threshold crossed")
 			m.synchronize(diskInfoProvider, podFunc)
 		})
+		if err != nil {
+			glog.Warningf("eviction manager: failed to create soft memory threshold notifier: %v", err)
+		}
 	}
 
 	// determine the set of thresholds met independent of grace period

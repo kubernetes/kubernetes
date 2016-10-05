@@ -33,6 +33,9 @@ type ThresholdNotifier interface {
 	Start(stopCh <-chan struct{})
 }
 
+// ThresholdNotifierHandlerFunc is called when a threshold is crossed
+type ThresholdNotifierHandlerFunc func()
+
 type memcgThresholdNotifier struct {
 	watchfd   int
 	controlfd int
@@ -44,7 +47,7 @@ var _ ThresholdNotifier = &memcgThresholdNotifier{}
 
 // NewMemCGThresholdNotifier sends notifications when a cgroup threshold
 // is crossed (in either direction) for a given cgroup attribute
-func NewMemCGThresholdNotifier(path string, attribute string, threshold string, handler func()) (ThresholdNotifier, error) {
+func NewMemCGThresholdNotifier(path string, attribute string, threshold string, handler ThresholdNotifierHandlerFunc) (ThresholdNotifier, error) {
 	watchfd, err := syscall.Open(fmt.Sprintf("%s/%s", path, attribute), syscall.O_RDONLY, 0)
 	if err != nil {
 		return nil, err
