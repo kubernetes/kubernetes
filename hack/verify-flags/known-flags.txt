@@ -384,6 +384,7 @@ node-monitor-period
 node-name
 node-os-distro
 node-path-override
+node-port
 node-startup-grace-period
 node-status-update-frequency
 node-sync-period

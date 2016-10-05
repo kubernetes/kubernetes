@@ -73,16 +73,23 @@ func TestAllocate(t *testing.T) {
 	if err := r.Release(released); err != nil {
 		t.Fatal(err)
 	}
-	if err := r.Allocate(1); err != ErrNotInRange {
+
+	err = r.Allocate(1)
+	if _, ok := err.(*ErrNotInRange); !ok {
 		t.Fatal(err)
 	}
+
 	if err := r.Allocate(10001); err != ErrAllocated {
 		t.Fatal(err)
 	}
-	if err := r.Allocate(20000); err != ErrNotInRange {
+
+	err = r.Allocate(20000)
+	if _, ok := err.(*ErrNotInRange); !ok {
 		t.Fatal(err)
 	}
-	if err := r.Allocate(10201); err != ErrNotInRange {
+
+	err = r.Allocate(10201)
+	if _, ok := err.(*ErrNotInRange); !ok {
 		t.Fatal(err)
 	}
 	if f := r.Free(); f != 1 {
