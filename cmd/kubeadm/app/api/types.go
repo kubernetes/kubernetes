@@ -21,7 +21,7 @@ import (
 )
 
 // KubeadmConfig TODO add description
-// TODO(phase1+) @krousey: Please don't embed structs. It obfuscates the source of the fields and doesn't really buy you anything.
+// TODO(phase1+) https://github.com/kubernetes/kubernetes/issues/33912
 type KubeadmConfig struct {
 	InitFlags
 	JoinFlags
@@ -35,11 +35,6 @@ type KubeadmConfig struct {
 }
 
 // TODO(phase2) should we add validation functions for these structs?
-
-// TODO(phase1+) refactor token handling
-// - https://github.com/kubernetes/kubernetes/pull/33262/files#r80333662
-// - https://github.com/kubernetes/kubernetes/pull/33262/files#r80336374
-// - https://github.com/kubernetes/kubernetes/pull/33262/files#r80333982
 
 // InitFlags holds values for "kubeadm init" command flags.
 type InitFlags struct {
@@ -94,12 +89,10 @@ func init() {
 // JoinFlags holds values for "kubeadm join" command flags.
 type JoinFlags struct {
 	MasterAddrs []net.IP
-	// TODO(phase1+) add manual mode flags here, e.g. RootCACertPath
 }
 
 // ClusterInfo TODO add description
 type ClusterInfo struct {
-	// TODO(phase1+) this may become simply `api.Config`
 	CertificateAuthorities []string `json:"certificateAuthorities"`
 	Endpoints              []string `json:"endpoints"`
 }

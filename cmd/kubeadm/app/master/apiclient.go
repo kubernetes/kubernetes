@@ -187,7 +187,7 @@ func attemptToUpdateMasterRoleLabelsAndTaints(client *clientset.Clientset, sched
 }
 
 func UpdateMasterRoleLabelsAndTaints(client *clientset.Clientset, schedulable bool) error {
-	// TODO(phase1+) use iterate instead of recursion
+	// TODO(phase1+) https://github.com/kubernetes/kubernetes/issues/33913
 	err := attemptToUpdateMasterRoleLabelsAndTaints(client, schedulable)
 	if err != nil {
 		return fmt.Errorf("<master/apiclient> failed to update master node - %v", err)

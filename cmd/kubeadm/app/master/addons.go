@@ -30,7 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
-// TODO(phase1+): kube-proxy should be a daemonset, three different daemonsets should not be here
+// TODO(phase1+): https://github.com/kubernetes/kubernetes/issues/33916
 func createKubeProxyPodSpec(s *kubeadmapi.KubeadmConfig, architecture string) api.PodSpec {
 	privilegedTrue := true
 	return api.PodSpec{

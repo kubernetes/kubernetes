@@ -44,7 +44,7 @@ var (
 
 // NewCmdInit returns "kubeadm init" command.
 func NewCmdInit(out io.Writer, s *kubeadmapi.KubeadmConfig) *cobra.Command {
-	advertiseAddrs := &[]string{} // TODO(pahse1+) make it work somehow else, custom flag or whatever
+	advertiseAddrs := &[]string{} // TODO(pahse1+) https://github.com/kubernetes/kubernetes/issues/33921
 	cmd := &cobra.Command{
 		Use:   "init",
 		Short: "Run this in order to set up the Kubernetes master.",
@@ -88,7 +88,6 @@ func NewCmdInit(out io.Writer, s *kubeadmapi.KubeadmConfig) *cobra.Command {
 		`Choose a specific Kubernetes version for the control plane`,
 	)
 
-	// TODO (phase1+) @errordeveloper make the flags below not show up in --help but rather on --advanced-help
 	cmd.PersistentFlags().StringSliceVar(
 		&s.InitFlags.API.Etcd.ExternalEndpoints, "external-etcd-endpoints", []string{},
 		"etcd endpoints to use, in case you have an external cluster",
@@ -113,7 +112,7 @@ func NewCmdInit(out io.Writer, s *kubeadmapi.KubeadmConfig) *cobra.Command {
 func RunInit(out io.Writer, cmd *cobra.Command, args []string, s *kubeadmapi.KubeadmConfig, advertiseAddrs *[]string) error {
 	// Auto-detect the IP
 	if len(*advertiseAddrs) == 0 {
-		// TODO(phase1+) perhaps we could actually grab eth0 and eth1
+		// TODO(phase1+) perhaps we could actually grab eth0 and eth1 - https://github.com/kubernetes/kubernetes/issues/33638
 		ip, err := netutil.ChooseHostInterface()
 		if err != nil {
 			return err
@@ -123,14 +122,14 @@ func RunInit(out io.Writer, cmd *cobra.Command, args []string, s *kubeadmapi.Kub
 		for _, i := range *advertiseAddrs {
 			addr := net.ParseIP(i)
 			if addr == nil {
-				// TODO(phase1+) custom flag will help to get this error message into a better place
+				// TODO(phase1+) https://github.com/kubernetes/kubernetes/issues/33921
 				return fmt.Errorf("<cmd/init> failed to parse %q (in %q) as an IP address", i, "--api-advertise-addresses="+strings.Join(*advertiseAddrs, ","))
 			}
 			s.InitFlags.API.AdvertiseAddrs = append(s.InitFlags.API.AdvertiseAddrs, addr)
 		}
 	}
 
-	// TODO(phase1+) create a custom flag
+	// TODO(phase1+) https://github.com/kubernetes/kubernetes/issues/33923
 	if s.InitFlags.CloudProvider != "" {
 		found := false
 		for _, provider := range kubeadmapi.ListOfCloudProviders {
@@ -165,15 +164,7 @@ func RunInit(out io.Writer, cmd *cobra.Command, args []string, s *kubeadmapi.Kub
 		return err
 	}
 
-	// kubeadm is responsible for writing the following kubeconfig file, which
-	// kubelet should be waiting for. Help user avoid foot-shooting by refusing to
-	// write a file that has already been written (the kubelet will be up and
-	// running in that case - they'd need to stop the kubelet, remove the file, and
-	// start it again in that case).
-	// TODO(phase1+) this is no longer the right place to guard agains foo-shooting,
-	// we need to decide how to handle existing files (it may be handy to support
-	// importing existing files, may be we could even make our command idempotant,
-	// or at least allow for external PKI and stuff)
+	// TODO(phase1+) https://github.com/kubernetes/kubernetes/issues/33924
 	for name, kubeconfig := range kubeconfigs {
 		if err := kubeadmutil.WriteKubeconfigIfNotExists(s, name, kubeconfig); err != nil {
 			return err
@@ -198,7 +189,7 @@ func RunInit(out io.Writer, cmd *cobra.Command, args []string, s *kubeadmapi.Kub
 		return err
 	}
 
-	// TODO(phase1+) use templates to reference struct fields directly as order of args is fragile
+	// TODO(phase1+) order of args is fragile - https://github.com/kubernetes/kubernetes/issues/33929
 	fmt.Fprintf(out, initDoneMsgf,
 		s.Secrets.GivenToken,
 		s.InitFlags.API.AdvertiseAddrs[0].String(),
