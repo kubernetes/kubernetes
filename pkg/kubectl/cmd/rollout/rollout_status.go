@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/util/interrupt"
 	"k8s.io/kubernetes/pkg/watch"
 
 	"github.com/spf13/cobra"
@@ -125,18 +126,21 @@ func RunStatus(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []str
 	}
 
 	// if the rollout isn't done yet, keep watching deployment status
-	kubectl.WatchLoop(w, func(e watch.Event) error {
-		// print deployment's status
-		status, done, err := statusViewer.Status(cmdNamespace, info.Name)
-		if err != nil {
-			return err
-		}
-		fmt.Fprintf(out, "%s", status)
-		// Quit waiting if the rollout is done
-		if done {
-			w.Stop()
-		}
-		return nil
+	intr := interrupt.New(nil, w.Stop)
+	return intr.Run(func() error {
+		_, err := watch.Until(0, w, func(e watch.Event) (bool, error) {
+			// print deployment's status
+			status, done, err := statusViewer.Status(cmdNamespace, info.Name)
+			if err != nil {
+				return false, err
+			}
+			fmt.Fprintf(out, "%s", status)
+			// Quit waiting if the rollout is done
+			if done {
+				return true, nil
+			}
+			return false, nil
+		})
+		return err
 	})
-	return nil
 }
