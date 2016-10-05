@@ -58,8 +58,8 @@ var _ = framework.KubeDescribe("Federation namespace [Feature:Federation]", func
 		AfterEach(func() {
 			framework.SkipUnlessFederated(f.Client)
 			deleteAllTestNamespaces(
-				f.FederationClientset_1_4.Core().Namespaces().List,
-				f.FederationClientset_1_4.Core().Namespaces().Delete)
+				f.FederationClientset_1_5.Core().Namespaces().List,
+				f.FederationClientset_1_5.Core().Namespaces().Delete)
 			for _, cluster := range clusters {
 				deleteAllTestNamespaces(
 					cluster.Core().Namespaces().List,
@@ -77,7 +77,7 @@ var _ = framework.KubeDescribe("Federation namespace [Feature:Federation]", func
 				},
 			}
 			By(fmt.Sprintf("Creating namespace %s", ns.Name))
-			_, err := f.FederationClientset_1_4.Core().Namespaces().Create(&ns)
+			_, err := f.FederationClientset_1_5.Core().Namespaces().Create(&ns)
 			framework.ExpectNoError(err, "Failed to create namespace %s", ns.Name)
 
 			// Check subclusters if the namespace was created there.
@@ -96,21 +96,21 @@ var _ = framework.KubeDescribe("Federation namespace [Feature:Federation]", func
 			framework.ExpectNoError(err, "Not all namespaces created")
 
 			deleteAllTestNamespaces(
-				f.FederationClientset_1_4.Core().Namespaces().List,
-				f.FederationClientset_1_4.Core().Namespaces().Delete)
+				f.FederationClientset_1_5.Core().Namespaces().List,
+				f.FederationClientset_1_5.Core().Namespaces().Delete)
 		})
 	})
 })
 
-func deleteAllTestNamespaces(lister func(api.ListOptions) (*api_v1.NamespaceList, error), deleter func(string, *api.DeleteOptions) error) {
-	list, err := lister(api.ListOptions{})
+func deleteAllTestNamespaces(lister func(api_v1.ListOptions) (*api_v1.NamespaceList, error), deleter func(string, *api_v1.DeleteOptions) error) {
+	list, err := lister(api_v1.ListOptions{})
 	if err != nil {
 		framework.Failf("Failed to get all namespaes: %v", err)
 		return
 	}
 	for _, namespace := range list.Items {
 		if strings.HasPrefix(namespace.Name, namespacePrefix) {
-			err := deleter(namespace.Name, &api.DeleteOptions{})
+			err := deleter(namespace.Name, &api_v1.DeleteOptions{})
 			if err != nil {
 				framework.Failf("Failed to set %s for deletion: %v", namespace.Name, err)
 			}
@@ -119,9 +119,9 @@ func deleteAllTestNamespaces(lister func(api.ListOptions) (*api_v1.NamespaceList
 	waitForNoTestNamespaces(lister)
 }
 
-func waitForNoTestNamespaces(lister func(api.ListOptions) (*api_v1.NamespaceList, error)) {
+func waitForNoTestNamespaces(lister func(api_v1.ListOptions) (*api_v1.NamespaceList, error)) {
 	err := wait.Poll(5*time.Second, 2*time.Minute, func() (bool, error) {
-		list, err := lister(api.ListOptions{})
+		list, err := lister(api_v1.ListOptions{})
 		if err != nil {
 			return false, err
 		}

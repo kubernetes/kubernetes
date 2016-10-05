@@ -22,12 +22,11 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_4"
+	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_3"
+	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
@@ -60,22 +59,21 @@ var _ = framework.KubeDescribe("Federation secrets [Feature:Federation12]", func
 		It("should be created and deleted successfully", func() {
 			framework.SkipUnlessFederated(f.Client)
 			nsName := f.FederationNamespace.Name
-			secret := createSecretOrFail(f.FederationClientset_1_4, nsName)
-
+			secret := createSecretOrFail(f.FederationClientset_1_5, nsName)
 			defer func() { // Cleanup
 				By(fmt.Sprintf("Deleting secret %q in namespace %q", secret.Name, nsName))
-				err := f.FederationClientset_1_4.Core().Secrets(nsName).Delete(secret.Name, &api.DeleteOptions{})
+				err := f.FederationClientset_1_5.Core().Secrets(nsName).Delete(secret.Name, &v1.DeleteOptions{})
 				framework.ExpectNoError(err, "Error deleting secret %q in namespace %q", secret.Name, nsName)
 			}()
 			// wait for secret shards being created
 			waitForSecretShardsOrFail(nsName, secret, clusters)
-			secret = updateSecretOrFail(f.FederationClientset_1_4, nsName)
+			secret = updateSecretOrFail(f.FederationClientset_1_5, nsName)
 			waitForSecretShardsUpdatedOrFail(nsName, secret, clusters)
 		})
 	})
 })
 
-func createSecretOrFail(clientset *federation_release_1_4.Clientset, namespace string) *v1.Secret {
+func createSecretOrFail(clientset *fedclientset.Clientset, namespace string) *v1.Secret {
 	if clientset == nil || len(namespace) == 0 {
 		Fail(fmt.Sprintf("Internal error: invalid parameters passed to createSecretOrFail: clientset: %v, namespace: %v", clientset, namespace))
 	}
@@ -92,7 +90,7 @@ func createSecretOrFail(clientset *federation_release_1_4.Clientset, namespace s
 	return secret
 }
 
-func updateSecretOrFail(clientset *federation_release_1_4.Clientset, namespace string) *v1.Secret {
+func updateSecretOrFail(clientset *fedclientset.Clientset, namespace string) *v1.Secret {
 	if clientset == nil || len(namespace) == 0 {
 		Fail(fmt.Sprintf("Internal error: invalid parameters passed to updateSecretOrFail: clientset: %v, namespace: %v", clientset, namespace))
 	}
@@ -127,7 +125,7 @@ func waitForSecretShardsOrFail(namespace string, secret *v1.Secret, clusters map
 	}
 }
 
-func waitForSecretOrFail(clientset *release_1_3.Clientset, namespace string, secret *v1.Secret, present bool, timeout time.Duration) {
+func waitForSecretOrFail(clientset *kubeclientset.Clientset, namespace string, secret *v1.Secret, present bool, timeout time.Duration) {
 	By(fmt.Sprintf("Fetching a federated secret shard of secret %q in namespace %q from cluster", secret.Name, namespace))
 	var clusterSecret *v1.Secret
 	err := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
@@ -157,7 +155,7 @@ func waitForSecretShardsUpdatedOrFail(namespace string, secret *v1.Secret, clust
 	}
 }
 
-func waitForSecretUpdateOrFail(clientset *release_1_3.Clientset, namespace string, secret *v1.Secret, timeout time.Duration) {
+func waitForSecretUpdateOrFail(clientset *kubeclientset.Clientset, namespace string, secret *v1.Secret, timeout time.Duration) {
 	By(fmt.Sprintf("Fetching a federated secret shard of secret %q in namespace %q from cluster", secret.Name, namespace))
 	err := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
 		clusterSecret, err := clientset.Core().Secrets(namespace).Get(secret.Name)

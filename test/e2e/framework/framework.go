@@ -29,7 +29,7 @@ import (
 	staging "k8s.io/client-go/1.5/kubernetes"
 	"k8s.io/client-go/1.5/pkg/util/sets"
 	clientreporestclient "k8s.io/client-go/1.5/rest"
-	"k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_4"
+	"k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5"
 	"k8s.io/kubernetes/pkg/api"
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -96,7 +96,7 @@ type Framework struct {
 	federated bool
 
 	// Federation specific params. These are set only if federated = true.
-	FederationClientset_1_4 *federation_release_1_4.Clientset
+	FederationClientset_1_5 *federation_release_1_5.Clientset
 	FederationNamespace     *v1.Namespace
 }
 
@@ -210,14 +210,14 @@ func (f *Framework) BeforeEach() {
 	}
 
 	if f.federated {
-		if f.FederationClientset_1_4 == nil {
+		if f.FederationClientset_1_5 == nil {
 			By("Creating a release 1.4 federation Clientset")
 			var err error
-			f.FederationClientset_1_4, err = LoadFederationClientset_1_4()
+			f.FederationClientset_1_5, err = LoadFederationClientset_1_5()
 			Expect(err).NotTo(HaveOccurred())
 		}
 		By("Waiting for federation-apiserver to be ready")
-		err := WaitForFederationApiserverReady(f.FederationClientset_1_4)
+		err := WaitForFederationApiserverReady(f.FederationClientset_1_5)
 		Expect(err).NotTo(HaveOccurred())
 		By("federation-apiserver is ready")
 
@@ -276,9 +276,9 @@ func (f *Framework) deleteFederationNs() {
 		timeout = f.NamespaceDeletionTimeout
 	}
 
-	clientset := f.FederationClientset_1_4
+	clientset := f.FederationClientset_1_5
 	// First delete the namespace from federation apiserver.
-	if err := clientset.Core().Namespaces().Delete(ns.Name, &api.DeleteOptions{}); err != nil {
+	if err := clientset.Core().Namespaces().Delete(ns.Name, &v1.DeleteOptions{}); err != nil {
 		Failf("Error while deleting federation namespace %s: %s", ns.Name, err)
 	}
 	// Verify that it got deleted.
@@ -353,11 +353,11 @@ func (f *Framework) AfterEach() {
 
 	if f.federated {
 		defer func() {
-			if f.FederationClientset_1_4 == nil {
+			if f.FederationClientset_1_5 == nil {
 				Logf("Warning: framework is marked federated, but has no federation 1.4 clientset")
 				return
 			}
-			if err := f.FederationClientset_1_4.Federation().Clusters().DeleteCollection(nil, api.ListOptions{}); err != nil {
+			if err := f.FederationClientset_1_5.Federation().Clusters().DeleteCollection(nil, v1.ListOptions{}); err != nil {
 				Logf("Error: failed to delete Clusters: %+v", err)
 			}
 		}()
@@ -371,8 +371,8 @@ func (f *Framework) AfterEach() {
 		LogContainersInPodsWithLabels(f.Client, api.NamespaceSystem, ImagePullerLabels, "image-puller")
 		if f.federated {
 			// Dump federation events in federation namespace.
-			DumpEventsInNamespace(func(opts api.ListOptions, ns string) (*v1.EventList, error) {
-				return f.FederationClientset_1_4.Core().Events(ns).List(opts)
+			DumpEventsInNamespace(func(opts v1.ListOptions, ns string) (*v1.EventList, error) {
+				return f.FederationClientset_1_5.Core().Events(ns).List(opts)
 			}, f.FederationNamespace.Name)
 			// Print logs of federation control plane pods (federation-apiserver and federation-controller-manager)
 			LogPodsWithLabels(f.Client, "federation", map[string]string{"app": "federated-cluster"})
@@ -449,7 +449,7 @@ func (f *Framework) CreateNamespace(baseName string, labels map[string]string) (
 }
 
 func (f *Framework) createFederationNamespace(baseName string) (*v1.Namespace, error) {
-	clientset := f.FederationClientset_1_4
+	clientset := f.FederationClientset_1_5
 	namespaceObj := &v1.Namespace{
 		ObjectMeta: v1.ObjectMeta{
 			GenerateName: fmt.Sprintf("e2e-tests-%v-", baseName),
