@@ -1,3 +1,32 @@
+<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
+
+<!-- BEGIN STRIP_FOR_RELEASE -->
+
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
+     width="25" height="25">
+
+<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
+
+If you are using a released version of Kubernetes, you should
+refer to the docs that go with that version.
+
+Documentation for other releases can be found at
+[releases.k8s.io](http://releases.k8s.io).
+</strong>
+--
+
+<!-- END STRIP_FOR_RELEASE -->
+
+<!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Support HostPath volume existence qualifiers
 
 ## Introduction
@@ -98,3 +127,8 @@ Ideally the validation would be done at the time the bindmounts are created, els
 The only way to solve this problem is to integrate these sorts of qualification into container runtimes themselves.
 
 I don't think this problem is severe enough that we need to push to solve it; rather I think we can simply accept this minor race, and if runtimes eventually allow this we can begin to leverage them.
+
+
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/proposals/volume-hostpath-qualifiers.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->
