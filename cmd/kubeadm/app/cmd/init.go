@@ -19,11 +19,13 @@ package cmd
 import (
 	"fmt"
 	"io"
+	"os"
 
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubechecks "k8s.io/kubernetes/cmd/kubeadm/app/checks"
 	kubemaster "k8s.io/kubernetes/cmd/kubeadm/app/master"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/pkg/cloudprovider"
@@ -117,6 +119,10 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 
 // RunInit executes master node provisioning, including certificates, needed static pod manifests, etc.
 func RunInit(out io.Writer, cmd *cobra.Command, args []string, cfg *kubeadmapi.MasterConfiguration) error {
+
+	kubechecks.RunMasterChecks()
+	os.Exit(1)
+
 	// Auto-detect the IP
 	if len(cfg.API.AdvertiseAddresses) == 0 {
 		// TODO(phase1+) perhaps we could actually grab eth0 and eth1

@@ -1,0 +1,55 @@
+/*
+Copyright 2016 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package checks
+
+import (
+	"fmt"
+	"os/exec"
+)
+
+type InitSystem interface {
+
+	// ServiceIsEnabled ensures the service is enabled to start on each boot.
+	ServiceIsEnabled(service string) bool
+
+	// ServiceIsActive ensures the service is running, or attempting to run. (crash looping in the case of kubelet)
+	//ServiceIsActive(service string) bool
+}
+
+type SystemdInitSystem struct{}
+
+func (sysd SystemdInitSystem) ServiceIsEnabled(service string) bool {
+	args := []string{"is-enabled", service}
+	_, err := exec.Command("systemctl", args...).Output()
+	if err != nil {
+		fmt.Println(err)
+		return false
+	}
+	return true
+}
+
+// getInitSystem returns an InitSystem for the current system, or nil
+// if we cannot detect a supported init system for pre-flight checks.
+// This indicates we will skip init system checks, not an error.
+func getInitSystem() InitSystem {
+	// Assume existence of systemctl in path implies this is a systemd system:
+	_, err := exec.LookPath("systemctl")
+	if err == nil {
+		return &SystemdInitSystem{}
+	}
+	return nil
+}
