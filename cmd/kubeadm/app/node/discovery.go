@@ -28,8 +28,8 @@ import (
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 )
 
-func RetrieveTrustedClusterInfo(s *kubeadmapi.KubeadmConfig) (*clientcmdapi.Config, error) {
-	host, port := s.JoinFlags.MasterAddrs[0].String(), 9898
+func RetrieveTrustedClusterInfo(s *kubeadmapi.NodeConfiguration) (*clientcmdapi.Config, error) {
+	host, port := s.MasterAddresses[0], 9898
 	requestURL := fmt.Sprintf("http://%s:%d/cluster-info/v1/?token-id=%s", host, port, s.Secrets.TokenID)
 	req, err := http.NewRequest("GET", requestURL, nil)
 	if err != nil {

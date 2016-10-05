@@ -32,8 +32,10 @@ import (
 type Factory func(config io.Reader) (Interface, error)
 
 // All registered cloud providers.
-var providersMutex sync.Mutex
-var providers = make(map[string]Factory)
+var (
+	providersMutex sync.Mutex
+	providers      = make(map[string]Factory)
+)
 
 // RegisterCloudProvider registers a cloudprovider.Factory by name.  This
 // is expected to happen during app startup.
@@ -45,6 +47,27 @@ func RegisterCloudProvider(name string, cloud Factory) {
 	}
 	glog.V(1).Infof("Registered cloud provider %q", name)
 	providers[name] = cloud
+}
+
+// IsCloudProvider returns true if name corresponds to an already registered
+// cloud provider.
+func IsCloudProvider(name string) bool {
+	providersMutex.Lock()
+	defer providersMutex.Unlock()
+	_, found := providers[name]
+	return found
+}
+
+// CloudProviders returns the name of all registered cloud providers in a
+// string slice
+func CloudProviders() []string {
+	names := []string{}
+	providersMutex.Lock()
+	defer providersMutex.Unlock()
+	for name := range providers {
+		names = append(names, name)
+	}
+	return names
 }
 
 // GetCloudProvider creates an instance of the named cloud provider, or nil if
