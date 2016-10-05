@@ -791,6 +791,67 @@
     ]
    },
    {
+    "path": "/apis/extensions/v1beta1/namespaces/{namespace}/daemonsets/{name}/rollback",
+    "description": "API at /apis/extensions/v1beta1",
+    "operations": [
+     {
+      "type": "v1beta1.DaemonSetRollback",
+      "method": "POST",
+      "summary": "create rollback of a DaemonSetRollback",
+      "nickname": "createNamespacedDaemonSetRollbackRollback",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta1.DaemonSetRollback",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the DaemonSetRollback",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.DaemonSetRollback"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
     "path": "/apis/extensions/v1beta1/namespaces/{namespace}/daemonsets/{name}/status",
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
@@ -7798,6 +7859,23 @@
      "template": {
       "$ref": "v1.PodTemplateSpec",
       "description": "Template is the object that describes the pod that will be created. The DaemonSet will create exactly one copy of this pod on every node that matches the template's node selector (or on every node if no node selector is specified). More info: http://kubernetes.io/docs/user-guide/replication-controller#pod-template"
+     },
+     "paused": {
+      "type": "boolean",
+      "description": "Indicates that the DaemonSet is paused and will not be processed by the DaemonSet controller."
+     },
+     "minReadySeconds": {
+      "type": "integer",
+      "format": "int32",
+      "description": "Minimum number of seconds for which a newly created DaemonSet pod should be ready without any of its container crashing, for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready)."
+     },
+     "updateStrategy": {
+      "$ref": "v1beta1.DaemonSetUpdateStrategy",
+      "description": "Update strategy to replace existing DaemonSet pods with new pods."
+     },
+     "rollbackTo": {
+      "$ref": "v1beta1.RollbackConfig",
+      "description": "The config this daemon set is rolling back to. Will be cleared after rollback is done."
      }
     }
    },
@@ -9179,15 +9257,59 @@
      }
     }
    },
+   "v1beta1.DaemonSetUpdateStrategy": {
+    "id": "v1beta1.DaemonSetUpdateStrategy",
+    "properties": {
+     "type": {
+      "type": "string",
+      "description": "Type of daemon set update. Only \"RollingUpdate\" is supported at this time. Default is RollingUpdate."
+     },
+     "rollingUpdate": {
+      "$ref": "v1beta1.RollingUpdateDaemonSet",
+      "description": "Rolling update config params. Present only if DaemonSetUpdateStrategy = RollingUpdate."
+     }
+    }
+   },
+   "v1beta1.RollingUpdateDaemonSet": {
+    "id": "v1beta1.RollingUpdateDaemonSet",
+    "description": "Spec to control the desired behavior of daemon set rolling update.",
+    "properties": {
+     "maxUnavailable": {
+      "type": "string",
+      "description": "The maximum number of DaemonSet pods that can be unavailable during the update. Value can be an absolute number (ex: 5) or a percentage of total number of DaemonSet pods at the start of the update (ex: 10%). Absolute number is calculated from percentage by rounding up. This cannot be 0. Default value is 1. Example: when this is set to 30%, 30% of the currently running DaemonSet pods can be stopped for an update at any given time. The update starts by stopping at most 30% of the currently running DaemonSet pods and then brings up new DaemonSet pods in their place. Once the new pods are ready, it then proceeds onto other DaemonSet pods, thus ensuring that at least 70% of original number of DaemonSet pods are available at all times during the update."
+     },
+     "minReadySeconds": {
+      "type": "integer",
+      "format": "int32",
+      "description": "Minimum number of seconds for which a newly created DaemonSet pod should be ready without any of its container crashing, for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready)."
+     }
+    }
+   },
+   "v1beta1.RollbackConfig": {
+    "id": "v1beta1.RollbackConfig",
+    "properties": {
+     "revision": {
+      "type": "integer",
+      "format": "int64",
+      "description": "The revision to rollback to. If set to 0, rollbck to the last revision."
+     }
+    }
+   },
    "v1beta1.DaemonSetStatus": {
     "id": "v1beta1.DaemonSetStatus",
     "description": "DaemonSetStatus represents the current status of a daemon set.",
     "required": [
      "currentNumberScheduled",
      "numberMisscheduled",
-     "desiredNumberScheduled"
+     "desiredNumberScheduled",
+     "updatedNumberScheduled"
     ],
     "properties": {
+     "observedGeneration": {
+      "type": "integer",
+      "format": "int64",
+      "description": "The generation observed by the daemonset controller."
+     },
      "currentNumberScheduled": {
       "type": "integer",
       "format": "int32",
@@ -9202,6 +9324,11 @@
       "type": "integer",
       "format": "int32",
       "description": "DesiredNumberScheduled is the total number of nodes that should be running the daemon pod (including nodes correctly running the daemon pod). More info: http://releases.k8s.io/HEAD/docs/admin/daemons.md"
+     },
+     "updatedNumberScheduled": {
+      "type": "integer",
+      "format": "int32",
+      "description": "UpdatedNumberScheduled is the total number of nodes that are running updated daemon pod"
      }
     }
    },
@@ -9353,6 +9480,36 @@
     "id": "types.UID",
     "properties": {}
    },
+   "v1beta1.DaemonSetRollback": {
+    "id": "v1beta1.DaemonSetRollback",
+    "description": "DaemonSetRollback stores the information required to rollback a daemonset.",
+    "required": [
+     "name",
+     "rollbackTo"
+    ],
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "name": {
+      "type": "string",
+      "description": "Required: This must match the Name of a daemon set."
+     },
+     "updatedAnnotations": {
+      "type": "object",
+      "description": "The annotations to be updated to a daemon set"
+     },
+     "rollbackTo": {
+      "$ref": "v1beta1.RollbackConfig",
+      "description": "The config of this daemon set rollback."
+     }
+    }
+   },
    "v1beta1.DeploymentList": {
     "id": "v1beta1.DeploymentList",
     "description": "DeploymentList is a list of Deployments.",
@@ -9476,16 +9633,6 @@
      "maxSurge": {
       "type": "string",
       "description": "The maximum number of pods that can be scheduled above the desired number of pods. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). This can not be 0 if MaxUnavailable is 0. Absolute number is calculated from percentage by rounding up. By default, a value of 1 is used. Example: when this is set to 30%, the new RC can be scaled up immediately when the rolling update starts, such that the total number of old and new pods do not exceed 130% of desired pods. Once old pods have been killed, new RC can be scaled up further, ensuring that total number of pods running at any time during the update is atmost 130% of desired pods."
-     }
-    }
-   },
-   "v1beta1.RollbackConfig": {
-    "id": "v1beta1.RollbackConfig",
-    "properties": {
-     "revision": {
-      "type": "integer",
-      "format": "int64",
-      "description": "The revision to rollback to. If set to 0, rollbck to the last revision."
      }
     }
    },
