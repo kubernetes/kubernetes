@@ -40,7 +40,7 @@ import (
 // test it fulfills the NetworkPlugin interface
 var _ network.NetworkPlugin = &kubenetNetworkPlugin{}
 
-func newFakeKubenetPlugin(initMap map[kubecontainer.ContainerID]string, execer exec.Interface, host network.Host) *kubenetNetworkPlugin {
+func newFakeKubenetPlugin(initMap map[kubecontainer.ContainerID]*podInfo, execer exec.Interface, host network.Host) *kubenetNetworkPlugin {
 	return &kubenetNetworkPlugin{
 		podIPs: initMap,
 		execer: execer,
@@ -50,9 +50,9 @@ func newFakeKubenetPlugin(initMap map[kubecontainer.ContainerID]string, execer e
 }
 
 func TestGetPodNetworkStatus(t *testing.T) {
-	podIPMap := make(map[kubecontainer.ContainerID]string)
-	podIPMap[kubecontainer.ContainerID{ID: "1"}] = "10.245.0.2"
-	podIPMap[kubecontainer.ContainerID{ID: "2"}] = "10.245.0.3"
+	podIPMap := make(map[kubecontainer.ContainerID]*podInfo)
+	podIPMap[kubecontainer.ContainerID{ID: "1"}] = &podInfo{ip: "10.245.0.2"}
+	podIPMap[kubecontainer.ContainerID{ID: "2"}] = &podInfo{ip: "10.245.0.3"}
 
 	testCases := []struct {
 		id          string
@@ -85,11 +85,11 @@ func TestGetPodNetworkStatus(t *testing.T) {
 		fCmd := exec.FakeCmd{
 			CombinedOutputScript: []exec.FakeCombinedOutputAction{
 				func() ([]byte, error) {
-					ip, ok := podIPMap[kubecontainer.ContainerID{ID: t.id}]
+					podInfo, ok := podIPMap[kubecontainer.ContainerID{ID: t.id}]
 					if !ok {
 						return nil, fmt.Errorf("Pod IP %q not found", t.id)
 					}
-					return []byte(ip), nil
+					return []byte(podInfo.ip), nil
 				},
 			},
 		}
@@ -137,7 +137,7 @@ func TestTeardownCallsShaper(t *testing.T) {
 	fhost := nettest.NewFakeHost(nil)
 	fshaper := &bandwidth.FakeShaper{}
 	mockcni := &mock_cni.MockCNI{}
-	kubenet := newFakeKubenetPlugin(map[kubecontainer.ContainerID]string{}, fexec, fhost)
+	kubenet := newFakeKubenetPlugin(map[kubecontainer.ContainerID]*podInfo{}, fexec, fhost)
 	kubenet.cniConfig = mockcni
 	kubenet.iptables = ipttest.NewFake()
 	kubenet.bandwidthShaper = fshaper
@@ -150,7 +150,7 @@ func TestTeardownCallsShaper(t *testing.T) {
 	kubenet.Event(network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE, details)
 
 	existingContainerID := kubecontainer.BuildContainerID("docker", "123")
-	kubenet.podIPs[existingContainerID] = "10.0.0.1"
+	kubenet.podIPs[existingContainerID] = &podInfo{ip: "10.0.0.1"}
 
 	if err := kubenet.TearDownPod("namespace", "name", existingContainerID); err != nil {
 		t.Fatalf("Unexpected error in TearDownPod: %v", err)
@@ -185,7 +185,7 @@ func TestInit_MTU(t *testing.T) {
 	}
 
 	fhost := nettest.NewFakeHost(nil)
-	kubenet := newFakeKubenetPlugin(map[kubecontainer.ContainerID]string{}, fexec, fhost)
+	kubenet := newFakeKubenetPlugin(map[kubecontainer.ContainerID]*podInfo{}, fexec, fhost)
 	kubenet.iptables = ipttest.NewFake()
 
 	sysctl := sysctltest.NewFake()
