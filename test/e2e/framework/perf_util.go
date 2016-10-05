@@ -52,7 +52,7 @@ func ApiCallToPerfData(apicalls APIResponsiveness) *perftype.PerfData {
 
 // currentKubeletPerfMetricsVersion is the current kubelet performance metrics version. We should
 // bump up the version each time we make incompatible change to the metrics.
-const currentKubeletPerfMetricsVersion = "v1"
+const currentKubeletPerfMetricsVersion = "v2"
 
 // ResourceUsageToPerfData transforms ResourceUsagePerNode to PerfData. Notice that this function
 // only cares about memory usage, because cpu usage information will be extracted from NodesCPUSummary.
@@ -78,7 +78,7 @@ func PrintPerfData(p *perftype.PerfData) {
 // Notice that this function only cares about memory usage, because cpu usage information will be extracted from NodesCPUSummary.
 func ResourceUsageToPerfDataWithLabels(usagePerNode ResourceUsagePerNode, labels map[string]string) *perftype.PerfData {
 	items := []perftype.DataItem{}
-	for _, usages := range usagePerNode {
+	for node, usages := range usagePerNode {
 		for c, usage := range usages {
 			item := perftype.DataItem{
 				Data: map[string]float64{
@@ -88,6 +88,7 @@ func ResourceUsageToPerfDataWithLabels(usagePerNode ResourceUsagePerNode, labels
 				},
 				Unit: "MB",
 				Labels: map[string]string{
+					"node":      node,
 					"container": c,
 					"datatype":  "resource",
 					"resource":  "memory",
@@ -106,7 +107,7 @@ func ResourceUsageToPerfDataWithLabels(usagePerNode ResourceUsagePerNode, labels
 // CPUUsageToPerfDataWithLabels transforms NodesCPUSummary to PerfData with additional labels.
 func CPUUsageToPerfDataWithLabels(usagePerNode NodesCPUSummary, labels map[string]string) *perftype.PerfData {
 	items := []perftype.DataItem{}
-	for _, usages := range usagePerNode {
+	for node, usages := range usagePerNode {
 		for c, usage := range usages {
 			data := map[string]float64{}
 			for perc, value := range usage {
@@ -117,6 +118,7 @@ func CPUUsageToPerfDataWithLabels(usagePerNode NodesCPUSummary, labels map[strin
 				Data: data,
 				Unit: "mCPU",
 				Labels: map[string]string{
+					"node":      node,
 					"container": c,
 					"datatype":  "resource",
 					"resource":  "cpu",
