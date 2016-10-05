@@ -24,15 +24,17 @@ import (
 type event struct {
 	key       string
 	value     []byte
+	prevValue []byte
 	rev       int64
 	isDeleted bool
 	isCreated bool
 }
 
-func parseKV(kv *mvccpb.KeyValue) *event {
+func parseKV(kv *mvccpb.KeyValue, prevVal []byte) *event {
 	return &event{
 		key:       string(kv.Key),
 		value:     kv.Value,
+		prevValue: prevVal,
 		rev:       kv.ModRevision,
 		isDeleted: false,
 		isCreated: kv.ModRevision == kv.CreateRevision,
@@ -40,11 +42,15 @@ func parseKV(kv *mvccpb.KeyValue) *event {
 }
 
 func parseEvent(e *clientv3.Event) *event {
-	return &event{
+	ret := &event{
 		key:       string(e.Kv.Key),
 		value:     e.Kv.Value,
 		rev:       e.Kv.ModRevision,
 		isDeleted: e.Type == clientv3.EventTypeDelete,
 		isCreated: e.IsCreate(),
 	}
+	if e.PrevKv != nil {
+		ret.prevValue = e.PrevKv.Value
+	}
+	return ret
 }
