@@ -332,7 +332,7 @@ func prepareObjs(ctx context.Context, e *event, client *clientv3.Client, codec r
 		}
 	}
 	if e.isDeleted || !e.isCreated {
-		getResp, err := client.Get(ctx, e.key, clientv3.WithRev(e.rev-1))
+		getResp, err := client.Get(ctx, e.key, clientv3.WithRev(e.rev-1), clientv3.WithSerializable())
 		if err != nil {
 			return nil, nil, err
 		}
