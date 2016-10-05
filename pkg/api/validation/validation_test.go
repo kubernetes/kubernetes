@@ -6448,6 +6448,22 @@ func TestValidateServiceUpdate(t *testing.T) {
 			},
 			numErrs: 1,
 		},
+		{
+			name: "`None` ClusterIP cannot be changed",
+			tweakSvc: func(oldSvc, newSvc *api.Service) {
+				oldSvc.Spec.ClusterIP = "None"
+				newSvc.Spec.ClusterIP = "1.2.3.4"
+			},
+			numErrs: 1,
+		},
+		{
+			name: "`None` ClusterIP cannot be removed",
+			tweakSvc: func(oldSvc, newSvc *api.Service) {
+				oldSvc.Spec.ClusterIP = "None"
+				newSvc.Spec.ClusterIP = ""
+			},
+			numErrs: 1,
+		},
 	}
 
 	for _, tc := range testCases {
