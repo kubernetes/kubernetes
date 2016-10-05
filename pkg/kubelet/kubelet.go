@@ -625,7 +625,16 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 	klet.pleg = pleg.NewGenericPLEG(klet.containerRuntime, plegChannelCapacity, plegRelistPeriod, klet.podCache, clock.RealClock{})
 	klet.runtimeState = newRuntimeState(maxWaitForContainerRuntime)
 	klet.updatePodCIDR(kubeCfg.PodCIDR)
+	klet.resolvers = map[api.DNSPolicy]DNSPlugin{
+		// TODO: Pipe the name of the bridge some other way, even using the name is a hack.
+		api.DNSNodeFirst: &bridgeBoundResolver{"dbr0", klet.clusterDomain},
 
+		// for a pod with DNSClusterFirst policy, the cluster DNS server is the only nameserver configured for
+		// the pod. The cluster DNS server itself will forward queries to other nameservers that is configured to use,
+		// in case the cluster DNS server cannot resolve the DNS query itself
+		api.DNSClusterFirst: &clusterFirst{&rawResolver{klet.clusterDNS}, klet.clusterDomain},
+		api.DNSDefault:      &hostResolver{&rawResolver{net.ParseIP("127.0.0.1")}, klet},
+	}
 	// setup containerGC
 	containerGC, err := kubecontainer.NewContainerGC(klet.containerRuntime, containerGCPolicy)
 	if err != nil {
@@ -815,6 +824,9 @@ type Kubelet struct {
 	// Last timestamp when runtime responded on ping.
 	// Mutex is used to protect this value.
 	runtimeState *runtimeState
+
+	// resolver has information about any local/remote DNS resolvers.
+	resolvers map[api.DNSPolicy]DNSPlugin
 
 	// Volume plugins.
 	volumePluginMgr *volume.VolumePluginMgr
@@ -1179,61 +1191,35 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 // GetClusterDNS returns a list of the DNS servers and a list of the DNS search
 // domains of the cluster.
 func (kl *Kubelet) GetClusterDNS(pod *api.Pod) ([]string, []string, error) {
-	var hostDNS, hostSearch []string
-	// Get host DNS settings
-	if kl.resolverConfig != "" {
-		f, err := os.Open(kl.resolverConfig)
-		if err != nil {
-			return nil, nil, err
-		}
-		defer f.Close()
-
-		hostDNS, hostSearch, err = kl.parseResolvConf(f)
-		if err != nil {
-			return nil, nil, err
-		}
-	}
-	useClusterFirstPolicy := pod.Spec.DNSPolicy == api.DNSClusterFirst
-	if useClusterFirstPolicy && kl.clusterDNS == nil {
-		// clusterDNS is not known.
-		// pod with ClusterDNSFirst Policy cannot be created
-		kl.recorder.Eventf(pod, api.EventTypeWarning, "MissingClusterDNS", "kubelet does not have ClusterDNS IP configured and cannot create Pod using %q policy. Falling back to DNSDefault policy.", pod.Spec.DNSPolicy)
-		log := fmt.Sprintf("kubelet does not have ClusterDNS IP configured and cannot create Pod using %q policy. pod: %q. Falling back to DNSDefault policy.", pod.Spec.DNSPolicy, format.Pod(pod))
+	resolvers, err := kl.resolvers[pod.Spec.DNSPolicy].GetResolvers()
+	if err != nil {
+		kl.recorder.Eventf(pod, api.EventTypeWarning, "MissingNodeLocalDNS", "kubelet cannot create Pod using %q policy. Falling back to DNSDefault policy. Error %v.", pod.Spec.DNSPolicy, err)
+		log := fmt.Sprintf("kubelet cannot create Pod using %q policy. pod: %q. Falling back to DNSDefault policy. Error %v.", pod.Spec.DNSPolicy, format.Pod(pod), err)
 		kl.recorder.Eventf(kl.nodeRef, api.EventTypeWarning, "MissingClusterDNS", log)
 
-		// fallback to DNSDefault
-		useClusterFirstPolicy = false
-	}
-
-	if !useClusterFirstPolicy {
-		// When the kubelet --resolv-conf flag is set to the empty string, use
-		// DNS settings that override the docker default (which is to use
-		// /etc/resolv.conf) and effectively disable DNS lookups. According to
-		// the bind documentation, the behavior of the DNS client library when
-		// "nameservers" are not specified is to "use the nameserver on the
-		// local machine". A nameserver setting of localhost is equivalent to
-		// this documented behavior.
-		if kl.resolverConfig == "" {
-			hostDNS = []string{"127.0.0.1"}
-			hostSearch = []string{"."}
+		// We have a hardcoded default resolvers, so just log errors and carry on
+		resolvers, err = kl.resolvers[api.DNSDefault].GetResolvers()
+		if err != nil {
+			glog.Errorf("Error finding default resolver %v, ignoring and using host resolution settings.", err)
 		}
-		return hostDNS, hostSearch, nil
 	}
 
-	// for a pod with DNSClusterFirst policy, the cluster DNS server is the only nameserver configured for
-	// the pod. The cluster DNS server itself will forward queries to other nameservers that is configured to use,
-	// in case the cluster DNS server cannot resolve the DNS query itself
-	dns := []string{kl.clusterDNS.String()}
+	// We have a hardcoded default search path, so just log errors and carry on
+	// TODO: Is it ok to append "." always?
+	dnsSearch, err := kl.resolvers[api.DNSDefault].GetSearchPaths(pod)
+	if err != nil {
+		glog.Errorf("Error finding default search path %v, using host search path", err)
+	}
 
-	var dnsSearch []string
-	if kl.clusterDomain != "" {
-		nsSvcDomain := fmt.Sprintf("%s.svc.%s", pod.Namespace, kl.clusterDomain)
-		svcDomain := fmt.Sprintf("svc.%s", kl.clusterDomain)
-		dnsSearch = append([]string{nsSvcDomain, svcDomain, kl.clusterDomain}, hostSearch...)
+	policySearch, err := kl.resolvers[pod.Spec.DNSPolicy].GetSearchPaths(pod)
+	if err != nil {
+		kl.recorder.Eventf(pod, api.EventTypeWarning, "MissingNodeLocalDNS", "kubelet does not have a local resolver and cannot create Pod using %q policy. Falling back to DNSDefault policy. Error %v.", pod.Spec.DNSPolicy, err)
+		log := fmt.Sprintf("kubelet does not have local DNS resolver IP configured and cannot create Pod using %q policy. pod: %q. Falling back to DNSDefault policy. Error %v.", pod.Spec.DNSPolicy, format.Pod(pod), err)
+		kl.recorder.Eventf(kl.nodeRef, api.EventTypeWarning, "MissingClusterDNS", log)
 	} else {
-		dnsSearch = hostSearch
+		dnsSearch = append(policySearch, dnsSearch...)
 	}
-	return dns, dnsSearch, nil
+	return resolvers, dnsSearch, nil
 }
 
 // syncPod is the transaction script for the sync of a single pod.

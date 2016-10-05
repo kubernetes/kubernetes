@@ -1486,6 +1486,12 @@ const (
 	// determined by kubelet) DNS settings.
 	DNSDefault DNSPolicy = "Default"
 
+	// DNSNodeFirst indicates that the pod should consult the node
+	// it's running on for DNS resolution. Usually this means the
+	// node is running a daemon like dnsmasq capable of redirecting
+	// the query to the appropriate nameserver.
+	DNSNodeFirst DNSPolicy = "NodeFirst"
+
 	DefaultTerminationGracePeriodSeconds = 30
 )
 
