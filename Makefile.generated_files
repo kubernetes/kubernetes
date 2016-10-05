@@ -214,7 +214,7 @@ DEEPCOPY_FILES := $(addsuffix /$(DEEPCOPY_FILENAME), $(DEEPCOPY_DIRS))
 .PHONY: gen_deepcopy
 gen_deepcopy: $(DEEPCOPY_FILES)
 	if [[ -f $(META_DIR)/$(DEEPCOPY_GEN).todo ]]; then                  \
-	    ./hack/run-in-gopath.sh $(DEEPCOPY_GEN)                         \
+	    $(DEEPCOPY_GEN)                                                 \
 	        --v $(KUBE_VERBOSE)                                         \
 	        --logtostderr                                               \
 	        -i $$(cat $(META_DIR)/$(DEEPCOPY_GEN).todo | paste -sd, -)  \
@@ -255,12 +255,11 @@ $(DEEPCOPY_FILES): $(DEEPCOPY_GEN)
 $(META_DIR)/$(DEEPCOPY_GEN).mk:
 	mkdir -p $(@D);                                                       \
 	(echo -n "$(DEEPCOPY_GEN): ";                                         \
-	 ./hack/run-in-gopath.sh go list                                      \
+	 go list                                                              \
 	     -f '{{.ImportPath}}{{"\n"}}{{range .Deps}}{{.}}{{"\n"}}{{end}}'  \
 	     ./cmd/libs/go2idl/deepcopy-gen                                   \
 	     | grep --color=never "^$(PRJ_SRC_PATH)/"                         \
-	     | xargs ./hack/run-in-gopath.sh go list                          \
-	         -f '{{.Dir}} {{.Dir}}/*.go'                                  \
+	     | xargs go list -f '{{.Dir}} {{.Dir}}/*.go'                      \
 	     | paste -sd' ' -                                                 \
 	     | sed 's/ / \\=,/g'                                              \
 	     | tr '=,' '\n\t'                                                 \
@@ -335,7 +334,7 @@ $(foreach dir, $(OPENAPI_DIRS), $(eval                                     \
 
 # How to regenerate open-api code.  This emits a single file for all results.
 $(OPENAPI_OUTFILE): $(OPENAPI_GEN)
-	./hack/run-in-gopath.sh $(OPENAPI_GEN)                                          \
+	$(OPENAPI_GEN)                                                                  \
 	    --v $(KUBE_VERBOSE)                                                         \
 	    --logtostderr                                                               \
 	    -i $$(echo $(addprefix $(PRJ_SRC_PATH)/, $(OPENAPI_DIRS)) | sed 's/ /,/g')  \
@@ -349,12 +348,11 @@ $(OPENAPI_OUTFILE): $(OPENAPI_GEN)
 $(META_DIR)/$(OPENAPI_GEN).mk:
 	mkdir -p $(@D);                                                       \
 	(echo -n "$(OPENAPI_GEN): ";                                          \
-	 ./hack/run-in-gopath.sh go list                                      \
+	 go list                                                              \
 	     -f '{{.ImportPath}}{{"\n"}}{{range .Deps}}{{.}}{{"\n"}}{{end}}'  \
 	     ./cmd/libs/go2idl/openapi-gen                                    \
 	     | grep --color=never "^$(PRJ_SRC_PATH)/"                         \
-	     | xargs ./hack/run-in-gopath.sh go list                          \
-	         -f '{{.Dir}} {{.Dir}}/*.go'                                  \
+	     | xargs go list -f '{{.Dir}} {{.Dir}}/*.go'                      \
 	     | paste -sd' ' -                                                 \
 	     | sed 's/ / \\=,/g'                                              \
 	     | tr '=,' '\n\t'                                                 \
@@ -423,9 +421,9 @@ CONVERSION_FILES := $(addsuffix /$(CONVERSION_FILENAME), $(CONVERSION_DIRS))
 .PHONY: gen_conversion
 gen_conversion: $(CONVERSION_FILES)
 	if [[ -f $(META_DIR)/$(CONVERSION_GEN).todo ]]; then                  \
-	    ./hack/run-in-gopath.sh $(CONVERSION_GEN)                         \
+	    $(CONVERSION_GEN)                                                 \
 	        --v $(KUBE_VERBOSE)                                           \
-	        --logtostderr                                               \
+	        --logtostderr                                                 \
 	        -i $$(cat $(META_DIR)/$(CONVERSION_GEN).todo | paste -sd, -)  \
 	        -O $(CONVERSION_BASENAME);                                    \
 	fi
@@ -531,12 +529,11 @@ $(CONVERSION_FILES): $(CONVERSION_GEN)
 $(META_DIR)/$(CONVERSION_GEN).mk:
 	mkdir -p $(@D);                                                       \
 	(echo -n "$(CONVERSION_GEN): ";                                       \
-	 ./hack/run-in-gopath.sh go list                                      \
+	 go list                                                              \
 	     -f '{{.ImportPath}}{{"\n"}}{{range .Deps}}{{.}}{{"\n"}}{{end}}'  \
 	     ./cmd/libs/go2idl/conversion-gen                                 \
 	     | grep --color=never "^$(PRJ_SRC_PATH)/"                         \
-	     | xargs ./hack/run-in-gopath.sh go list                          \
-	         -f '{{.Dir}} {{.Dir}}/*.go'                                  \
+	     | xargs go list -f '{{.Dir}} {{.Dir}}/*.go'                      \
 	     | paste -sd' ' -                                                 \
 	     | sed 's/ / \\=,/g'                                              \
 	     | tr '=,' '\n\t'                                                 \
