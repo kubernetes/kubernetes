@@ -677,6 +677,25 @@ runTests() {
   # Cleanup
   kubectl delete pod pod-with-precision "${kube_flags[@]}"
 
+  ### Annotate POD YAML file locally without effecting the live pod.
+  kubectl create -f hack/testdata/pod.yaml "${kube_flags[@]}"
+  # Command
+  kubectl annotate -f hack/testdata/pod.yaml annotatekey=annotatevalue "${kube_flags[@]}"
+
+  # Pre-condition: annotationkey is annotationvalue
+  kube::test::get_object_assert 'pod test-pod' "{{${annotations_field}.annotatekey}}" 'annotatevalue'
+
+  # Command
+  output_message=$(kubectl annotate --local -f hack/testdata/pod.yaml annotatekey=localvalue -o yaml "${kube_flags[@]}")
+  echo $output_message
+
+  # Post-condition: annotationkey is still annotationvalue in the live pod, but command output is the new value
+  kube::test::get_object_assert 'pod test-pod' "{{${annotations_field}.annotatekey}}" 'annotatevalue'
+  kube::test::if_has_string "${output_message}" "localvalue"
+
+  # Cleanup
+  kubectl delete -f hack/testdata/pod.yaml "${kube_flags[@]}"
+
   ### Create valid-pod POD
   # Pre-condition: no POD exists
   create_and_use_new_namespace
