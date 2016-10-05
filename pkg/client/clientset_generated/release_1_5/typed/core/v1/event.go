@@ -58,7 +58,7 @@ func newEvents(c *CoreClient, namespace string) *events {
 // Create takes the representation of a event and creates it.  Returns the server's representation of the event, and an error, if there is any.
 func (c *events) Create(event *v1.Event) (result *v1.Event, err error) {
 	result = &v1.Event{}
-	err = c.client.Post().
+	err = c.client.GetRESTClient().Post().
 		Namespace(c.ns).
 		Resource("events").
 		Body(event).
@@ -70,7 +70,7 @@ func (c *events) Create(event *v1.Event) (result *v1.Event, err error) {
 // Update takes the representation of a event and updates it. Returns the server's representation of the event, and an error, if there is any.
 func (c *events) Update(event *v1.Event) (result *v1.Event, err error) {
 	result = &v1.Event{}
-	err = c.client.Put().
+	err = c.client.GetRESTClient().Put().
 		Namespace(c.ns).
 		Resource("events").
 		Name(event.Name).
@@ -82,7 +82,7 @@ func (c *events) Update(event *v1.Event) (result *v1.Event, err error) {
 
 // Delete takes name of the event and deletes it. Returns an error if one occurs.
 func (c *events) Delete(name string, options *v1.DeleteOptions) error {
-	return c.client.Delete().
+	return c.client.GetRESTClient().Delete().
 		Namespace(c.ns).
 		Resource("events").
 		Name(name).
@@ -93,7 +93,7 @@ func (c *events) Delete(name string, options *v1.DeleteOptions) error {
 
 // DeleteCollection deletes a collection of objects.
 func (c *events) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	return c.client.Delete().
+	return c.client.GetRESTClient().Delete().
 		Namespace(c.ns).
 		Resource("events").
 		VersionedParams(&listOptions, api.ParameterCodec).
@@ -105,7 +105,7 @@ func (c *events) DeleteCollection(options *v1.DeleteOptions, listOptions v1.List
 // Get takes name of the event, and returns the corresponding event object, and an error if there is any.
 func (c *events) Get(name string) (result *v1.Event, err error) {
 	result = &v1.Event{}
-	err = c.client.Get().
+	err = c.client.GetRESTClient().Get().
 		Namespace(c.ns).
 		Resource("events").
 		Name(name).
@@ -117,7 +117,7 @@ func (c *events) Get(name string) (result *v1.Event, err error) {
 // List takes label and field selectors, and returns the list of Events that match those selectors.
 func (c *events) List(opts v1.ListOptions) (result *v1.EventList, err error) {
 	result = &v1.EventList{}
-	err = c.client.Get().
+	err = c.client.GetRESTClient().Get().
 		Namespace(c.ns).
 		Resource("events").
 		VersionedParams(&opts, api.ParameterCodec).
@@ -128,7 +128,7 @@ func (c *events) List(opts v1.ListOptions) (result *v1.EventList, err error) {
 
 // Watch returns a watch.Interface that watches the requested events.
 func (c *events) Watch(opts v1.ListOptions) (watch.Interface, error) {
-	return c.client.Get().
+	return c.client.GetRESTClient().Get().
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("events").
@@ -139,7 +139,7 @@ func (c *events) Watch(opts v1.ListOptions) (watch.Interface, error) {
 // Patch applies the patch and returns the patched event.
 func (c *events) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1.Event, err error) {
 	result = &v1.Event{}
-	err = c.client.Patch(pt).
+	err = c.client.GetRESTClient().Patch(pt).
 		Namespace(c.ns).
 		Resource("events").
 		SubResource(subresources...).

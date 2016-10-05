@@ -32,6 +32,6 @@ func (c *FakePolicy) PodDisruptionBudgets(namespace string) unversioned.PodDisru
 
 // GetRESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakePolicy) GetRESTClient() *restclient.RESTClient {
+func (c *FakePolicy) GetRESTClient() restclient.RESTClientInterface {
 	return nil
 }

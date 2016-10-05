@@ -60,7 +60,7 @@ func newDaemonSets(c *ExtensionsClient, namespace string) *daemonSets {
 // Create takes the representation of a daemonSet and creates it.  Returns the server's representation of the daemonSet, and an error, if there is any.
 func (c *daemonSets) Create(daemonSet *v1beta1.DaemonSet) (result *v1beta1.DaemonSet, err error) {
 	result = &v1beta1.DaemonSet{}
-	err = c.client.Post().
+	err = c.client.GetRESTClient().Post().
 		Namespace(c.ns).
 		Resource("daemonsets").
 		Body(daemonSet).
@@ -72,7 +72,7 @@ func (c *daemonSets) Create(daemonSet *v1beta1.DaemonSet) (result *v1beta1.Daemo
 // Update takes the representation of a daemonSet and updates it. Returns the server's representation of the daemonSet, and an error, if there is any.
 func (c *daemonSets) Update(daemonSet *v1beta1.DaemonSet) (result *v1beta1.DaemonSet, err error) {
 	result = &v1beta1.DaemonSet{}
-	err = c.client.Put().
+	err = c.client.GetRESTClient().Put().
 		Namespace(c.ns).
 		Resource("daemonsets").
 		Name(daemonSet.Name).
@@ -84,7 +84,7 @@ func (c *daemonSets) Update(daemonSet *v1beta1.DaemonSet) (result *v1beta1.Daemo
 
 func (c *daemonSets) UpdateStatus(daemonSet *v1beta1.DaemonSet) (result *v1beta1.DaemonSet, err error) {
 	result = &v1beta1.DaemonSet{}
-	err = c.client.Put().
+	err = c.client.GetRESTClient().Put().
 		Namespace(c.ns).
 		Resource("daemonsets").
 		Name(daemonSet.Name).
@@ -97,7 +97,7 @@ func (c *daemonSets) UpdateStatus(daemonSet *v1beta1.DaemonSet) (result *v1beta1
 
 // Delete takes name of the daemonSet and deletes it. Returns an error if one occurs.
 func (c *daemonSets) Delete(name string, options *v1.DeleteOptions) error {
-	return c.client.Delete().
+	return c.client.GetRESTClient().Delete().
 		Namespace(c.ns).
 		Resource("daemonsets").
 		Name(name).
@@ -108,7 +108,7 @@ func (c *daemonSets) Delete(name string, options *v1.DeleteOptions) error {
 
 // DeleteCollection deletes a collection of objects.
 func (c *daemonSets) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	return c.client.Delete().
+	return c.client.GetRESTClient().Delete().
 		Namespace(c.ns).
 		Resource("daemonsets").
 		VersionedParams(&listOptions, api.ParameterCodec).
@@ -120,7 +120,7 @@ func (c *daemonSets) DeleteCollection(options *v1.DeleteOptions, listOptions v1.
 // Get takes name of the daemonSet, and returns the corresponding daemonSet object, and an error if there is any.
 func (c *daemonSets) Get(name string) (result *v1beta1.DaemonSet, err error) {
 	result = &v1beta1.DaemonSet{}
-	err = c.client.Get().
+	err = c.client.GetRESTClient().Get().
 		Namespace(c.ns).
 		Resource("daemonsets").
 		Name(name).
@@ -132,7 +132,7 @@ func (c *daemonSets) Get(name string) (result *v1beta1.DaemonSet, err error) {
 // List takes label and field selectors, and returns the list of DaemonSets that match those selectors.
 func (c *daemonSets) List(opts v1.ListOptions) (result *v1beta1.DaemonSetList, err error) {
 	result = &v1beta1.DaemonSetList{}
-	err = c.client.Get().
+	err = c.client.GetRESTClient().Get().
 		Namespace(c.ns).
 		Resource("daemonsets").
 		VersionedParams(&opts, api.ParameterCodec).
@@ -143,7 +143,7 @@ func (c *daemonSets) List(opts v1.ListOptions) (result *v1beta1.DaemonSetList, e
 
 // Watch returns a watch.Interface that watches the requested daemonSets.
 func (c *daemonSets) Watch(opts v1.ListOptions) (watch.Interface, error) {
-	return c.client.Get().
+	return c.client.GetRESTClient().Get().
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("daemonsets").
@@ -154,7 +154,7 @@ func (c *daemonSets) Watch(opts v1.ListOptions) (watch.Interface, error) {
 // Patch applies the patch and returns the patched daemonSet.
 func (c *daemonSets) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1beta1.DaemonSet, err error) {
 	result = &v1beta1.DaemonSet{}
-	err = c.client.Patch(pt).
+	err = c.client.GetRESTClient().Patch(pt).
 		Namespace(c.ns).
 		Resource("daemonsets").
 		SubResource(subresources...).

@@ -23,7 +23,7 @@ import (
 )
 
 type CoreInterface interface {
-	GetRESTClient() *restclient.RESTClient
+	GetRESTClient() restclient.RESTClientInterface
 	EventsGetter
 	NamespacesGetter
 	SecretsGetter
@@ -32,7 +32,7 @@ type CoreInterface interface {
 
 // CoreClient is used to interact with features provided by the Core group.
 type CoreClient struct {
-	*restclient.RESTClient
+	RESTClient restclient.RESTClientInterface
 }
 
 func (c *CoreClient) Events(namespace string) EventInterface {
@@ -75,7 +75,7 @@ func NewForConfigOrDie(c *restclient.Config) *CoreClient {
 }
 
 // New creates a new CoreClient for the given RESTClient.
-func New(c *restclient.RESTClient) *CoreClient {
+func New(c restclient.RESTClientInterface) *CoreClient {
 	return &CoreClient{c}
 }
 
@@ -106,7 +106,7 @@ func setConfigDefaults(config *restclient.Config) error {
 
 // GetRESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *CoreClient) GetRESTClient() *restclient.RESTClient {
+func (c *CoreClient) GetRESTClient() restclient.RESTClientInterface {
 	if c == nil {
 		return nil
 	}

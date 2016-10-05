@@ -59,7 +59,7 @@ func newPersistentVolumeClaims(c *CoreClient, namespace string) *persistentVolum
 // Create takes the representation of a persistentVolumeClaim and creates it.  Returns the server's representation of the persistentVolumeClaim, and an error, if there is any.
 func (c *persistentVolumeClaims) Create(persistentVolumeClaim *v1.PersistentVolumeClaim) (result *v1.PersistentVolumeClaim, err error) {
 	result = &v1.PersistentVolumeClaim{}
-	err = c.client.Post().
+	err = c.client.GetRESTClient().Post().
 		Namespace(c.ns).
 		Resource("persistentvolumeclaims").
 		Body(persistentVolumeClaim).
@@ -71,7 +71,7 @@ func (c *persistentVolumeClaims) Create(persistentVolumeClaim *v1.PersistentVolu
 // Update takes the representation of a persistentVolumeClaim and updates it. Returns the server's representation of the persistentVolumeClaim, and an error, if there is any.
 func (c *persistentVolumeClaims) Update(persistentVolumeClaim *v1.PersistentVolumeClaim) (result *v1.PersistentVolumeClaim, err error) {
 	result = &v1.PersistentVolumeClaim{}
-	err = c.client.Put().
+	err = c.client.GetRESTClient().Put().
 		Namespace(c.ns).
 		Resource("persistentvolumeclaims").
 		Name(persistentVolumeClaim.Name).
@@ -83,7 +83,7 @@ func (c *persistentVolumeClaims) Update(persistentVolumeClaim *v1.PersistentVolu
 
 func (c *persistentVolumeClaims) UpdateStatus(persistentVolumeClaim *v1.PersistentVolumeClaim) (result *v1.PersistentVolumeClaim, err error) {
 	result = &v1.PersistentVolumeClaim{}
-	err = c.client.Put().
+	err = c.client.GetRESTClient().Put().
 		Namespace(c.ns).
 		Resource("persistentvolumeclaims").
 		Name(persistentVolumeClaim.Name).
@@ -96,7 +96,7 @@ func (c *persistentVolumeClaims) UpdateStatus(persistentVolumeClaim *v1.Persiste
 
 // Delete takes name of the persistentVolumeClaim and deletes it. Returns an error if one occurs.
 func (c *persistentVolumeClaims) Delete(name string, options *v1.DeleteOptions) error {
-	return c.client.Delete().
+	return c.client.GetRESTClient().Delete().
 		Namespace(c.ns).
 		Resource("persistentvolumeclaims").
 		Name(name).
@@ -107,7 +107,7 @@ func (c *persistentVolumeClaims) Delete(name string, options *v1.DeleteOptions) 
 
 // DeleteCollection deletes a collection of objects.
 func (c *persistentVolumeClaims) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	return c.client.Delete().
+	return c.client.GetRESTClient().Delete().
 		Namespace(c.ns).
 		Resource("persistentvolumeclaims").
 		VersionedParams(&listOptions, api.ParameterCodec).
@@ -119,7 +119,7 @@ func (c *persistentVolumeClaims) DeleteCollection(options *v1.DeleteOptions, lis
 // Get takes name of the persistentVolumeClaim, and returns the corresponding persistentVolumeClaim object, and an error if there is any.
 func (c *persistentVolumeClaims) Get(name string) (result *v1.PersistentVolumeClaim, err error) {
 	result = &v1.PersistentVolumeClaim{}
-	err = c.client.Get().
+	err = c.client.GetRESTClient().Get().
 		Namespace(c.ns).
 		Resource("persistentvolumeclaims").
 		Name(name).
@@ -131,7 +131,7 @@ func (c *persistentVolumeClaims) Get(name string) (result *v1.PersistentVolumeCl
 // List takes label and field selectors, and returns the list of PersistentVolumeClaims that match those selectors.
 func (c *persistentVolumeClaims) List(opts v1.ListOptions) (result *v1.PersistentVolumeClaimList, err error) {
 	result = &v1.PersistentVolumeClaimList{}
-	err = c.client.Get().
+	err = c.client.GetRESTClient().Get().
 		Namespace(c.ns).
 		Resource("persistentvolumeclaims").
 		VersionedParams(&opts, api.ParameterCodec).
@@ -142,7 +142,7 @@ func (c *persistentVolumeClaims) List(opts v1.ListOptions) (result *v1.Persisten
 
 // Watch returns a watch.Interface that watches the requested persistentVolumeClaims.
 func (c *persistentVolumeClaims) Watch(opts v1.ListOptions) (watch.Interface, error) {
-	return c.client.Get().
+	return c.client.GetRESTClient().Get().
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("persistentvolumeclaims").
@@ -153,7 +153,7 @@ func (c *persistentVolumeClaims) Watch(opts v1.ListOptions) (watch.Interface, er
 // Patch applies the patch and returns the patched persistentVolumeClaim.
 func (c *persistentVolumeClaims) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1.PersistentVolumeClaim, err error) {
 	result = &v1.PersistentVolumeClaim{}
-	err = c.client.Patch(pt).
+	err = c.client.GetRESTClient().Patch(pt).
 		Namespace(c.ns).
 		Resource("persistentvolumeclaims").
 		SubResource(subresources...).

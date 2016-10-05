@@ -59,7 +59,7 @@ func newTestTypes(c *TestgroupClient, namespace string) *testTypes {
 // Create takes the representation of a testType and creates it.  Returns the server's representation of the testType, and an error, if there is any.
 func (c *testTypes) Create(testType *testgroup_k8s_io.TestType) (result *testgroup_k8s_io.TestType, err error) {
 	result = &testgroup_k8s_io.TestType{}
-	err = c.client.Post().
+	err = c.client.GetRESTClient().Post().
 		Namespace(c.ns).
 		Resource("testtypes").
 		Body(testType).
@@ -71,7 +71,7 @@ func (c *testTypes) Create(testType *testgroup_k8s_io.TestType) (result *testgro
 // Update takes the representation of a testType and updates it. Returns the server's representation of the testType, and an error, if there is any.
 func (c *testTypes) Update(testType *testgroup_k8s_io.TestType) (result *testgroup_k8s_io.TestType, err error) {
 	result = &testgroup_k8s_io.TestType{}
-	err = c.client.Put().
+	err = c.client.GetRESTClient().Put().
 		Namespace(c.ns).
 		Resource("testtypes").
 		Name(testType.Name).
@@ -83,7 +83,7 @@ func (c *testTypes) Update(testType *testgroup_k8s_io.TestType) (result *testgro
 
 func (c *testTypes) UpdateStatus(testType *testgroup_k8s_io.TestType) (result *testgroup_k8s_io.TestType, err error) {
 	result = &testgroup_k8s_io.TestType{}
-	err = c.client.Put().
+	err = c.client.GetRESTClient().Put().
 		Namespace(c.ns).
 		Resource("testtypes").
 		Name(testType.Name).
@@ -96,7 +96,7 @@ func (c *testTypes) UpdateStatus(testType *testgroup_k8s_io.TestType) (result *t
 
 // Delete takes name of the testType and deletes it. Returns an error if one occurs.
 func (c *testTypes) Delete(name string, options *api.DeleteOptions) error {
-	return c.client.Delete().
+	return c.client.GetRESTClient().Delete().
 		Namespace(c.ns).
 		Resource("testtypes").
 		Name(name).
@@ -107,7 +107,7 @@ func (c *testTypes) Delete(name string, options *api.DeleteOptions) error {
 
 // DeleteCollection deletes a collection of objects.
 func (c *testTypes) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
-	return c.client.Delete().
+	return c.client.GetRESTClient().Delete().
 		Namespace(c.ns).
 		Resource("testtypes").
 		VersionedParams(&listOptions, api.ParameterCodec).
@@ -119,7 +119,7 @@ func (c *testTypes) DeleteCollection(options *api.DeleteOptions, listOptions api
 // Get takes name of the testType, and returns the corresponding testType object, and an error if there is any.
 func (c *testTypes) Get(name string) (result *testgroup_k8s_io.TestType, err error) {
 	result = &testgroup_k8s_io.TestType{}
-	err = c.client.Get().
+	err = c.client.GetRESTClient().Get().
 		Namespace(c.ns).
 		Resource("testtypes").
 		Name(name).
@@ -131,7 +131,7 @@ func (c *testTypes) Get(name string) (result *testgroup_k8s_io.TestType, err err
 // List takes label and field selectors, and returns the list of TestTypes that match those selectors.
 func (c *testTypes) List(opts api.ListOptions) (result *testgroup_k8s_io.TestTypeList, err error) {
 	result = &testgroup_k8s_io.TestTypeList{}
-	err = c.client.Get().
+	err = c.client.GetRESTClient().Get().
 		Namespace(c.ns).
 		Resource("testtypes").
 		VersionedParams(&opts, api.ParameterCodec).
@@ -142,7 +142,7 @@ func (c *testTypes) List(opts api.ListOptions) (result *testgroup_k8s_io.TestTyp
 
 // Watch returns a watch.Interface that watches the requested testTypes.
 func (c *testTypes) Watch(opts api.ListOptions) (watch.Interface, error) {
-	return c.client.Get().
+	return c.client.GetRESTClient().Get().
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("testtypes").
@@ -153,7 +153,7 @@ func (c *testTypes) Watch(opts api.ListOptions) (watch.Interface, error) {
 // Patch applies the patch and returns the patched testType.
 func (c *testTypes) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *testgroup_k8s_io.TestType, err error) {
 	result = &testgroup_k8s_io.TestType{}
-	err = c.client.Patch(pt).
+	err = c.client.GetRESTClient().Patch(pt).
 		Namespace(c.ns).
 		Resource("testtypes").
 		SubResource(subresources...).

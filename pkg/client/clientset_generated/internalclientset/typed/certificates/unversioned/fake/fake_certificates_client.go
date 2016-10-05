@@ -32,6 +32,6 @@ func (c *FakeCertificates) CertificateSigningRequests() unversioned.CertificateS
 
 // GetRESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeCertificates) GetRESTClient() *restclient.RESTClient {
+func (c *FakeCertificates) GetRESTClient() restclient.RESTClientInterface {
 	return nil
 }

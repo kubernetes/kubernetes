@@ -58,7 +58,7 @@ func newNetworkPolicies(c *ExtensionsClient, namespace string) *networkPolicies 
 // Create takes the representation of a networkPolicy and creates it.  Returns the server's representation of the networkPolicy, and an error, if there is any.
 func (c *networkPolicies) Create(networkPolicy *extensions.NetworkPolicy) (result *extensions.NetworkPolicy, err error) {
 	result = &extensions.NetworkPolicy{}
-	err = c.client.Post().
+	err = c.client.GetRESTClient().Post().
 		Namespace(c.ns).
 		Resource("networkpolicies").
 		Body(networkPolicy).
@@ -70,7 +70,7 @@ func (c *networkPolicies) Create(networkPolicy *extensions.NetworkPolicy) (resul
 // Update takes the representation of a networkPolicy and updates it. Returns the server's representation of the networkPolicy, and an error, if there is any.
 func (c *networkPolicies) Update(networkPolicy *extensions.NetworkPolicy) (result *extensions.NetworkPolicy, err error) {
 	result = &extensions.NetworkPolicy{}
-	err = c.client.Put().
+	err = c.client.GetRESTClient().Put().
 		Namespace(c.ns).
 		Resource("networkpolicies").
 		Name(networkPolicy.Name).
@@ -82,7 +82,7 @@ func (c *networkPolicies) Update(networkPolicy *extensions.NetworkPolicy) (resul
 
 // Delete takes name of the networkPolicy and deletes it. Returns an error if one occurs.
 func (c *networkPolicies) Delete(name string, options *api.DeleteOptions) error {
-	return c.client.Delete().
+	return c.client.GetRESTClient().Delete().
 		Namespace(c.ns).
 		Resource("networkpolicies").
 		Name(name).
@@ -93,7 +93,7 @@ func (c *networkPolicies) Delete(name string, options *api.DeleteOptions) error 
 
 // DeleteCollection deletes a collection of objects.
 func (c *networkPolicies) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
-	return c.client.Delete().
+	return c.client.GetRESTClient().Delete().
 		Namespace(c.ns).
 		Resource("networkpolicies").
 		VersionedParams(&listOptions, api.ParameterCodec).
@@ -105,7 +105,7 @@ func (c *networkPolicies) DeleteCollection(options *api.DeleteOptions, listOptio
 // Get takes name of the networkPolicy, and returns the corresponding networkPolicy object, and an error if there is any.
 func (c *networkPolicies) Get(name string) (result *extensions.NetworkPolicy, err error) {
 	result = &extensions.NetworkPolicy{}
-	err = c.client.Get().
+	err = c.client.GetRESTClient().Get().
 		Namespace(c.ns).
 		Resource("networkpolicies").
 		Name(name).
@@ -117,7 +117,7 @@ func (c *networkPolicies) Get(name string) (result *extensions.NetworkPolicy, er
 // List takes label and field selectors, and returns the list of NetworkPolicies that match those selectors.
 func (c *networkPolicies) List(opts api.ListOptions) (result *extensions.NetworkPolicyList, err error) {
 	result = &extensions.NetworkPolicyList{}
-	err = c.client.Get().
+	err = c.client.GetRESTClient().Get().
 		Namespace(c.ns).
 		Resource("networkpolicies").
 		VersionedParams(&opts, api.ParameterCodec).
@@ -128,7 +128,7 @@ func (c *networkPolicies) List(opts api.ListOptions) (result *extensions.Network
 
 // Watch returns a watch.Interface that watches the requested networkPolicies.
 func (c *networkPolicies) Watch(opts api.ListOptions) (watch.Interface, error) {
-	return c.client.Get().
+	return c.client.GetRESTClient().Get().
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("networkpolicies").
@@ -139,7 +139,7 @@ func (c *networkPolicies) Watch(opts api.ListOptions) (watch.Interface, error) {
 // Patch applies the patch and returns the patched networkPolicy.
 func (c *networkPolicies) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *extensions.NetworkPolicy, err error) {
 	result = &extensions.NetworkPolicy{}
-	err = c.client.Patch(pt).
+	err = c.client.GetRESTClient().Patch(pt).
 		Namespace(c.ns).
 		Resource("networkpolicies").
 		SubResource(subresources...).

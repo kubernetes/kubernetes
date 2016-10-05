@@ -56,7 +56,7 @@ func newClusterRoleBindings(c *RbacClient) *clusterRoleBindings {
 // Create takes the representation of a clusterRoleBinding and creates it.  Returns the server's representation of the clusterRoleBinding, and an error, if there is any.
 func (c *clusterRoleBindings) Create(clusterRoleBinding *rbac.ClusterRoleBinding) (result *rbac.ClusterRoleBinding, err error) {
 	result = &rbac.ClusterRoleBinding{}
-	err = c.client.Post().
+	err = c.client.GetRESTClient().Post().
 		Resource("clusterrolebindings").
 		Body(clusterRoleBinding).
 		Do().
@@ -67,7 +67,7 @@ func (c *clusterRoleBindings) Create(clusterRoleBinding *rbac.ClusterRoleBinding
 // Update takes the representation of a clusterRoleBinding and updates it. Returns the server's representation of the clusterRoleBinding, and an error, if there is any.
 func (c *clusterRoleBindings) Update(clusterRoleBinding *rbac.ClusterRoleBinding) (result *rbac.ClusterRoleBinding, err error) {
 	result = &rbac.ClusterRoleBinding{}
-	err = c.client.Put().
+	err = c.client.GetRESTClient().Put().
 		Resource("clusterrolebindings").
 		Name(clusterRoleBinding.Name).
 		Body(clusterRoleBinding).
@@ -78,7 +78,7 @@ func (c *clusterRoleBindings) Update(clusterRoleBinding *rbac.ClusterRoleBinding
 
 // Delete takes name of the clusterRoleBinding and deletes it. Returns an error if one occurs.
 func (c *clusterRoleBindings) Delete(name string, options *api.DeleteOptions) error {
-	return c.client.Delete().
+	return c.client.GetRESTClient().Delete().
 		Resource("clusterrolebindings").
 		Name(name).
 		Body(options).
@@ -88,7 +88,7 @@ func (c *clusterRoleBindings) Delete(name string, options *api.DeleteOptions) er
 
 // DeleteCollection deletes a collection of objects.
 func (c *clusterRoleBindings) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
-	return c.client.Delete().
+	return c.client.GetRESTClient().Delete().
 		Resource("clusterrolebindings").
 		VersionedParams(&listOptions, api.ParameterCodec).
 		Body(options).
@@ -99,7 +99,7 @@ func (c *clusterRoleBindings) DeleteCollection(options *api.DeleteOptions, listO
 // Get takes name of the clusterRoleBinding, and returns the corresponding clusterRoleBinding object, and an error if there is any.
 func (c *clusterRoleBindings) Get(name string) (result *rbac.ClusterRoleBinding, err error) {
 	result = &rbac.ClusterRoleBinding{}
-	err = c.client.Get().
+	err = c.client.GetRESTClient().Get().
 		Resource("clusterrolebindings").
 		Name(name).
 		Do().
@@ -110,7 +110,7 @@ func (c *clusterRoleBindings) Get(name string) (result *rbac.ClusterRoleBinding,
 // List takes label and field selectors, and returns the list of ClusterRoleBindings that match those selectors.
 func (c *clusterRoleBindings) List(opts api.ListOptions) (result *rbac.ClusterRoleBindingList, err error) {
 	result = &rbac.ClusterRoleBindingList{}
-	err = c.client.Get().
+	err = c.client.GetRESTClient().Get().
 		Resource("clusterrolebindings").
 		VersionedParams(&opts, api.ParameterCodec).
 		Do().
@@ -120,7 +120,7 @@ func (c *clusterRoleBindings) List(opts api.ListOptions) (result *rbac.ClusterRo
 
 // Watch returns a watch.Interface that watches the requested clusterRoleBindings.
 func (c *clusterRoleBindings) Watch(opts api.ListOptions) (watch.Interface, error) {
-	return c.client.Get().
+	return c.client.GetRESTClient().Get().
 		Prefix("watch").
 		Resource("clusterrolebindings").
 		VersionedParams(&opts, api.ParameterCodec).
@@ -130,7 +130,7 @@ func (c *clusterRoleBindings) Watch(opts api.ListOptions) (watch.Interface, erro
 // Patch applies the patch and returns the patched clusterRoleBinding.
 func (c *clusterRoleBindings) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *rbac.ClusterRoleBinding, err error) {
 	result = &rbac.ClusterRoleBinding{}
-	err = c.client.Patch(pt).
+	err = c.client.GetRESTClient().Patch(pt).
 		Resource("clusterrolebindings").
 		SubResource(subresources...).
 		Name(name).

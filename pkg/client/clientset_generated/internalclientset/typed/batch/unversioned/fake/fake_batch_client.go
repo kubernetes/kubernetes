@@ -36,6 +36,6 @@ func (c *FakeBatch) ScheduledJobs(namespace string) unversioned.ScheduledJobInte
 
 // GetRESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeBatch) GetRESTClient() *restclient.RESTClient {
+func (c *FakeBatch) GetRESTClient() restclient.RESTClientInterface {
 	return nil
 }

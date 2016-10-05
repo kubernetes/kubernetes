@@ -58,7 +58,7 @@ func newServiceAccounts(c *CoreClient, namespace string) *serviceAccounts {
 // Create takes the representation of a serviceAccount and creates it.  Returns the server's representation of the serviceAccount, and an error, if there is any.
 func (c *serviceAccounts) Create(serviceAccount *v1.ServiceAccount) (result *v1.ServiceAccount, err error) {
 	result = &v1.ServiceAccount{}
-	err = c.client.Post().
+	err = c.client.GetRESTClient().Post().
 		Namespace(c.ns).
 		Resource("serviceaccounts").
 		Body(serviceAccount).
@@ -70,7 +70,7 @@ func (c *serviceAccounts) Create(serviceAccount *v1.ServiceAccount) (result *v1.
 // Update takes the representation of a serviceAccount and updates it. Returns the server's representation of the serviceAccount, and an error, if there is any.
 func (c *serviceAccounts) Update(serviceAccount *v1.ServiceAccount) (result *v1.ServiceAccount, err error) {
 	result = &v1.ServiceAccount{}
-	err = c.client.Put().
+	err = c.client.GetRESTClient().Put().
 		Namespace(c.ns).
 		Resource("serviceaccounts").
 		Name(serviceAccount.Name).
@@ -82,7 +82,7 @@ func (c *serviceAccounts) Update(serviceAccount *v1.ServiceAccount) (result *v1.
 
 // Delete takes name of the serviceAccount and deletes it. Returns an error if one occurs.
 func (c *serviceAccounts) Delete(name string, options *v1.DeleteOptions) error {
-	return c.client.Delete().
+	return c.client.GetRESTClient().Delete().
 		Namespace(c.ns).
 		Resource("serviceaccounts").
 		Name(name).
@@ -93,7 +93,7 @@ func (c *serviceAccounts) Delete(name string, options *v1.DeleteOptions) error {
 
 // DeleteCollection deletes a collection of objects.
 func (c *serviceAccounts) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	return c.client.Delete().
+	return c.client.GetRESTClient().Delete().
 		Namespace(c.ns).
 		Resource("serviceaccounts").
 		VersionedParams(&listOptions, api.ParameterCodec).
@@ -105,7 +105,7 @@ func (c *serviceAccounts) DeleteCollection(options *v1.DeleteOptions, listOption
 // Get takes name of the serviceAccount, and returns the corresponding serviceAccount object, and an error if there is any.
 func (c *serviceAccounts) Get(name string) (result *v1.ServiceAccount, err error) {
 	result = &v1.ServiceAccount{}
-	err = c.client.Get().
+	err = c.client.GetRESTClient().Get().
 		Namespace(c.ns).
 		Resource("serviceaccounts").
 		Name(name).
@@ -117,7 +117,7 @@ func (c *serviceAccounts) Get(name string) (result *v1.ServiceAccount, err error
 // List takes label and field selectors, and returns the list of ServiceAccounts that match those selectors.
 func (c *serviceAccounts) List(opts v1.ListOptions) (result *v1.ServiceAccountList, err error) {
 	result = &v1.ServiceAccountList{}
-	err = c.client.Get().
+	err = c.client.GetRESTClient().Get().
 		Namespace(c.ns).
 		Resource("serviceaccounts").
 		VersionedParams(&opts, api.ParameterCodec).
@@ -128,7 +128,7 @@ func (c *serviceAccounts) List(opts v1.ListOptions) (result *v1.ServiceAccountLi
 
 // Watch returns a watch.Interface that watches the requested serviceAccounts.
 func (c *serviceAccounts) Watch(opts v1.ListOptions) (watch.Interface, error) {
-	return c.client.Get().
+	return c.client.GetRESTClient().Get().
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("serviceaccounts").
@@ -139,7 +139,7 @@ func (c *serviceAccounts) Watch(opts v1.ListOptions) (watch.Interface, error) {
 // Patch applies the patch and returns the patched serviceAccount.
 func (c *serviceAccounts) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1.ServiceAccount, err error) {
 	result = &v1.ServiceAccount{}
-	err = c.client.Patch(pt).
+	err = c.client.GetRESTClient().Patch(pt).
 		Namespace(c.ns).
 		Resource("serviceaccounts").
 		SubResource(subresources...).

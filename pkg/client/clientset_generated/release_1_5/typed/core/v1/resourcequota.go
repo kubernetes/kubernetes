@@ -59,7 +59,7 @@ func newResourceQuotas(c *CoreClient, namespace string) *resourceQuotas {
 // Create takes the representation of a resourceQuota and creates it.  Returns the server's representation of the resourceQuota, and an error, if there is any.
 func (c *resourceQuotas) Create(resourceQuota *v1.ResourceQuota) (result *v1.ResourceQuota, err error) {
 	result = &v1.ResourceQuota{}
-	err = c.client.Post().
+	err = c.client.GetRESTClient().Post().
 		Namespace(c.ns).
 		Resource("resourcequotas").
 		Body(resourceQuota).
@@ -71,7 +71,7 @@ func (c *resourceQuotas) Create(resourceQuota *v1.ResourceQuota) (result *v1.Res
 // Update takes the representation of a resourceQuota and updates it. Returns the server's representation of the resourceQuota, and an error, if there is any.
 func (c *resourceQuotas) Update(resourceQuota *v1.ResourceQuota) (result *v1.ResourceQuota, err error) {
 	result = &v1.ResourceQuota{}
-	err = c.client.Put().
+	err = c.client.GetRESTClient().Put().
 		Namespace(c.ns).
 		Resource("resourcequotas").
 		Name(resourceQuota.Name).
@@ -83,7 +83,7 @@ func (c *resourceQuotas) Update(resourceQuota *v1.ResourceQuota) (result *v1.Res
 
 func (c *resourceQuotas) UpdateStatus(resourceQuota *v1.ResourceQuota) (result *v1.ResourceQuota, err error) {
 	result = &v1.ResourceQuota{}
-	err = c.client.Put().
+	err = c.client.GetRESTClient().Put().
 		Namespace(c.ns).
 		Resource("resourcequotas").
 		Name(resourceQuota.Name).
@@ -96,7 +96,7 @@ func (c *resourceQuotas) UpdateStatus(resourceQuota *v1.ResourceQuota) (result *
 
 // Delete takes name of the resourceQuota and deletes it. Returns an error if one occurs.
 func (c *resourceQuotas) Delete(name string, options *v1.DeleteOptions) error {
-	return c.client.Delete().
+	return c.client.GetRESTClient().Delete().
 		Namespace(c.ns).
 		Resource("resourcequotas").
 		Name(name).
@@ -107,7 +107,7 @@ func (c *resourceQuotas) Delete(name string, options *v1.DeleteOptions) error {
 
 // DeleteCollection deletes a collection of objects.
 func (c *resourceQuotas) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	return c.client.Delete().
+	return c.client.GetRESTClient().Delete().
 		Namespace(c.ns).
 		Resource("resourcequotas").
 		VersionedParams(&listOptions, api.ParameterCodec).
@@ -119,7 +119,7 @@ func (c *resourceQuotas) DeleteCollection(options *v1.DeleteOptions, listOptions
 // Get takes name of the resourceQuota, and returns the corresponding resourceQuota object, and an error if there is any.
 func (c *resourceQuotas) Get(name string) (result *v1.ResourceQuota, err error) {
 	result = &v1.ResourceQuota{}
-	err = c.client.Get().
+	err = c.client.GetRESTClient().Get().
 		Namespace(c.ns).
 		Resource("resourcequotas").
 		Name(name).
@@ -131,7 +131,7 @@ func (c *resourceQuotas) Get(name string) (result *v1.ResourceQuota, err error) 
 // List takes label and field selectors, and returns the list of ResourceQuotas that match those selectors.
 func (c *resourceQuotas) List(opts v1.ListOptions) (result *v1.ResourceQuotaList, err error) {
 	result = &v1.ResourceQuotaList{}
-	err = c.client.Get().
+	err = c.client.GetRESTClient().Get().
 		Namespace(c.ns).
 		Resource("resourcequotas").
 		VersionedParams(&opts, api.ParameterCodec).
@@ -142,7 +142,7 @@ func (c *resourceQuotas) List(opts v1.ListOptions) (result *v1.ResourceQuotaList
 
 // Watch returns a watch.Interface that watches the requested resourceQuotas.
 func (c *resourceQuotas) Watch(opts v1.ListOptions) (watch.Interface, error) {
-	return c.client.Get().
+	return c.client.GetRESTClient().Get().
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("resourcequotas").
@@ -153,7 +153,7 @@ func (c *resourceQuotas) Watch(opts v1.ListOptions) (watch.Interface, error) {
 // Patch applies the patch and returns the patched resourceQuota.
 func (c *resourceQuotas) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1.ResourceQuota, err error) {
 	result = &v1.ResourceQuota{}
-	err = c.client.Patch(pt).
+	err = c.client.GetRESTClient().Patch(pt).
 		Namespace(c.ns).
 		Resource("resourcequotas").
 		SubResource(subresources...).

@@ -60,7 +60,7 @@ func newReplicaSets(c *ExtensionsClient, namespace string) *replicaSets {
 // Create takes the representation of a replicaSet and creates it.  Returns the server's representation of the replicaSet, and an error, if there is any.
 func (c *replicaSets) Create(replicaSet *v1beta1.ReplicaSet) (result *v1beta1.ReplicaSet, err error) {
 	result = &v1beta1.ReplicaSet{}
-	err = c.client.Post().
+	err = c.client.GetRESTClient().Post().
 		Namespace(c.ns).
 		Resource("replicasets").
 		Body(replicaSet).
@@ -72,7 +72,7 @@ func (c *replicaSets) Create(replicaSet *v1beta1.ReplicaSet) (result *v1beta1.Re
 // Update takes the representation of a replicaSet and updates it. Returns the server's representation of the replicaSet, and an error, if there is any.
 func (c *replicaSets) Update(replicaSet *v1beta1.ReplicaSet) (result *v1beta1.ReplicaSet, err error) {
 	result = &v1beta1.ReplicaSet{}
-	err = c.client.Put().
+	err = c.client.GetRESTClient().Put().
 		Namespace(c.ns).
 		Resource("replicasets").
 		Name(replicaSet.Name).
@@ -84,7 +84,7 @@ func (c *replicaSets) Update(replicaSet *v1beta1.ReplicaSet) (result *v1beta1.Re
 
 func (c *replicaSets) UpdateStatus(replicaSet *v1beta1.ReplicaSet) (result *v1beta1.ReplicaSet, err error) {
 	result = &v1beta1.ReplicaSet{}
-	err = c.client.Put().
+	err = c.client.GetRESTClient().Put().
 		Namespace(c.ns).
 		Resource("replicasets").
 		Name(replicaSet.Name).
@@ -97,7 +97,7 @@ func (c *replicaSets) UpdateStatus(replicaSet *v1beta1.ReplicaSet) (result *v1be
 
 // Delete takes name of the replicaSet and deletes it. Returns an error if one occurs.
 func (c *replicaSets) Delete(name string, options *v1.DeleteOptions) error {
-	return c.client.Delete().
+	return c.client.GetRESTClient().Delete().
 		Namespace(c.ns).
 		Resource("replicasets").
 		Name(name).
@@ -108,7 +108,7 @@ func (c *replicaSets) Delete(name string, options *v1.DeleteOptions) error {
 
 // DeleteCollection deletes a collection of objects.
 func (c *replicaSets) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	return c.client.Delete().
+	return c.client.GetRESTClient().Delete().
 		Namespace(c.ns).
 		Resource("replicasets").
 		VersionedParams(&listOptions, api.ParameterCodec).
@@ -120,7 +120,7 @@ func (c *replicaSets) DeleteCollection(options *v1.DeleteOptions, listOptions v1
 // Get takes name of the replicaSet, and returns the corresponding replicaSet object, and an error if there is any.
 func (c *replicaSets) Get(name string) (result *v1beta1.ReplicaSet, err error) {
 	result = &v1beta1.ReplicaSet{}
-	err = c.client.Get().
+	err = c.client.GetRESTClient().Get().
 		Namespace(c.ns).
 		Resource("replicasets").
 		Name(name).
@@ -132,7 +132,7 @@ func (c *replicaSets) Get(name string) (result *v1beta1.ReplicaSet, err error) {
 // List takes label and field selectors, and returns the list of ReplicaSets that match those selectors.
 func (c *replicaSets) List(opts v1.ListOptions) (result *v1beta1.ReplicaSetList, err error) {
 	result = &v1beta1.ReplicaSetList{}
-	err = c.client.Get().
+	err = c.client.GetRESTClient().Get().
 		Namespace(c.ns).
 		Resource("replicasets").
 		VersionedParams(&opts, api.ParameterCodec).
@@ -143,7 +143,7 @@ func (c *replicaSets) List(opts v1.ListOptions) (result *v1beta1.ReplicaSetList,
 
 // Watch returns a watch.Interface that watches the requested replicaSets.
 func (c *replicaSets) Watch(opts v1.ListOptions) (watch.Interface, error) {
-	return c.client.Get().
+	return c.client.GetRESTClient().Get().
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("replicasets").
@@ -154,7 +154,7 @@ func (c *replicaSets) Watch(opts v1.ListOptions) (watch.Interface, error) {
 // Patch applies the patch and returns the patched replicaSet.
 func (c *replicaSets) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1beta1.ReplicaSet, err error) {
 	result = &v1beta1.ReplicaSet{}
-	err = c.client.Patch(pt).
+	err = c.client.GetRESTClient().Patch(pt).
 		Namespace(c.ns).
 		Resource("replicasets").
 		SubResource(subresources...).

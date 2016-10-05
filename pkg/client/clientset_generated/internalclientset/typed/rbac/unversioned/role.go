@@ -58,7 +58,7 @@ func newRoles(c *RbacClient, namespace string) *roles {
 // Create takes the representation of a role and creates it.  Returns the server's representation of the role, and an error, if there is any.
 func (c *roles) Create(role *rbac.Role) (result *rbac.Role, err error) {
 	result = &rbac.Role{}
-	err = c.client.Post().
+	err = c.client.GetRESTClient().Post().
 		Namespace(c.ns).
 		Resource("roles").
 		Body(role).
@@ -70,7 +70,7 @@ func (c *roles) Create(role *rbac.Role) (result *rbac.Role, err error) {
 // Update takes the representation of a role and updates it. Returns the server's representation of the role, and an error, if there is any.
 func (c *roles) Update(role *rbac.Role) (result *rbac.Role, err error) {
 	result = &rbac.Role{}
-	err = c.client.Put().
+	err = c.client.GetRESTClient().Put().
 		Namespace(c.ns).
 		Resource("roles").
 		Name(role.Name).
@@ -82,7 +82,7 @@ func (c *roles) Update(role *rbac.Role) (result *rbac.Role, err error) {
 
 // Delete takes name of the role and deletes it. Returns an error if one occurs.
 func (c *roles) Delete(name string, options *api.DeleteOptions) error {
-	return c.client.Delete().
+	return c.client.GetRESTClient().Delete().
 		Namespace(c.ns).
 		Resource("roles").
 		Name(name).
@@ -93,7 +93,7 @@ func (c *roles) Delete(name string, options *api.DeleteOptions) error {
 
 // DeleteCollection deletes a collection of objects.
 func (c *roles) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
-	return c.client.Delete().
+	return c.client.GetRESTClient().Delete().
 		Namespace(c.ns).
 		Resource("roles").
 		VersionedParams(&listOptions, api.ParameterCodec).
@@ -105,7 +105,7 @@ func (c *roles) DeleteCollection(options *api.DeleteOptions, listOptions api.Lis
 // Get takes name of the role, and returns the corresponding role object, and an error if there is any.
 func (c *roles) Get(name string) (result *rbac.Role, err error) {
 	result = &rbac.Role{}
-	err = c.client.Get().
+	err = c.client.GetRESTClient().Get().
 		Namespace(c.ns).
 		Resource("roles").
 		Name(name).
@@ -117,7 +117,7 @@ func (c *roles) Get(name string) (result *rbac.Role, err error) {
 // List takes label and field selectors, and returns the list of Roles that match those selectors.
 func (c *roles) List(opts api.ListOptions) (result *rbac.RoleList, err error) {
 	result = &rbac.RoleList{}
-	err = c.client.Get().
+	err = c.client.GetRESTClient().Get().
 		Namespace(c.ns).
 		Resource("roles").
 		VersionedParams(&opts, api.ParameterCodec).
@@ -128,7 +128,7 @@ func (c *roles) List(opts api.ListOptions) (result *rbac.RoleList, err error) {
 
 // Watch returns a watch.Interface that watches the requested roles.
 func (c *roles) Watch(opts api.ListOptions) (watch.Interface, error) {
-	return c.client.Get().
+	return c.client.GetRESTClient().Get().
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("roles").
@@ -139,7 +139,7 @@ func (c *roles) Watch(opts api.ListOptions) (watch.Interface, error) {
 // Patch applies the patch and returns the patched role.
 func (c *roles) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *rbac.Role, err error) {
 	result = &rbac.Role{}
-	err = c.client.Patch(pt).
+	err = c.client.GetRESTClient().Patch(pt).
 		Namespace(c.ns).
 		Resource("roles").
 		SubResource(subresources...).

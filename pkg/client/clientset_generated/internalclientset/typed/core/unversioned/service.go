@@ -58,7 +58,7 @@ func newServices(c *CoreClient, namespace string) *services {
 // Create takes the representation of a service and creates it.  Returns the server's representation of the service, and an error, if there is any.
 func (c *services) Create(service *api.Service) (result *api.Service, err error) {
 	result = &api.Service{}
-	err = c.client.Post().
+	err = c.client.GetRESTClient().Post().
 		Namespace(c.ns).
 		Resource("services").
 		Body(service).
@@ -70,7 +70,7 @@ func (c *services) Create(service *api.Service) (result *api.Service, err error)
 // Update takes the representation of a service and updates it. Returns the server's representation of the service, and an error, if there is any.
 func (c *services) Update(service *api.Service) (result *api.Service, err error) {
 	result = &api.Service{}
-	err = c.client.Put().
+	err = c.client.GetRESTClient().Put().
 		Namespace(c.ns).
 		Resource("services").
 		Name(service.Name).
@@ -82,7 +82,7 @@ func (c *services) Update(service *api.Service) (result *api.Service, err error)
 
 func (c *services) UpdateStatus(service *api.Service) (result *api.Service, err error) {
 	result = &api.Service{}
-	err = c.client.Put().
+	err = c.client.GetRESTClient().Put().
 		Namespace(c.ns).
 		Resource("services").
 		Name(service.Name).
@@ -95,7 +95,7 @@ func (c *services) UpdateStatus(service *api.Service) (result *api.Service, err 
 
 // Delete takes name of the service and deletes it. Returns an error if one occurs.
 func (c *services) Delete(name string, options *api.DeleteOptions) error {
-	return c.client.Delete().
+	return c.client.GetRESTClient().Delete().
 		Namespace(c.ns).
 		Resource("services").
 		Name(name).
@@ -106,7 +106,7 @@ func (c *services) Delete(name string, options *api.DeleteOptions) error {
 
 // DeleteCollection deletes a collection of objects.
 func (c *services) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
-	return c.client.Delete().
+	return c.client.GetRESTClient().Delete().
 		Namespace(c.ns).
 		Resource("services").
 		VersionedParams(&listOptions, api.ParameterCodec).
@@ -118,7 +118,7 @@ func (c *services) DeleteCollection(options *api.DeleteOptions, listOptions api.
 // Get takes name of the service, and returns the corresponding service object, and an error if there is any.
 func (c *services) Get(name string) (result *api.Service, err error) {
 	result = &api.Service{}
-	err = c.client.Get().
+	err = c.client.GetRESTClient().Get().
 		Namespace(c.ns).
 		Resource("services").
 		Name(name).
@@ -130,7 +130,7 @@ func (c *services) Get(name string) (result *api.Service, err error) {
 // List takes label and field selectors, and returns the list of Services that match those selectors.
 func (c *services) List(opts api.ListOptions) (result *api.ServiceList, err error) {
 	result = &api.ServiceList{}
-	err = c.client.Get().
+	err = c.client.GetRESTClient().Get().
 		Namespace(c.ns).
 		Resource("services").
 		VersionedParams(&opts, api.ParameterCodec).
@@ -141,7 +141,7 @@ func (c *services) List(opts api.ListOptions) (result *api.ServiceList, err erro
 
 // Watch returns a watch.Interface that watches the requested services.
 func (c *services) Watch(opts api.ListOptions) (watch.Interface, error) {
-	return c.client.Get().
+	return c.client.GetRESTClient().Get().
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("services").
@@ -152,7 +152,7 @@ func (c *services) Watch(opts api.ListOptions) (watch.Interface, error) {
 // Patch applies the patch and returns the patched service.
 func (c *services) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *api.Service, err error) {
 	result = &api.Service{}
-	err = c.client.Patch(pt).
+	err = c.client.GetRESTClient().Patch(pt).
 		Namespace(c.ns).
 		Resource("services").
 		SubResource(subresources...).

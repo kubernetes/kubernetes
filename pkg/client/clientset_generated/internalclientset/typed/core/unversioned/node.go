@@ -56,7 +56,7 @@ func newNodes(c *CoreClient) *nodes {
 // Create takes the representation of a node and creates it.  Returns the server's representation of the node, and an error, if there is any.
 func (c *nodes) Create(node *api.Node) (result *api.Node, err error) {
 	result = &api.Node{}
-	err = c.client.Post().
+	err = c.client.GetRESTClient().Post().
 		Resource("nodes").
 		Body(node).
 		Do().
@@ -67,7 +67,7 @@ func (c *nodes) Create(node *api.Node) (result *api.Node, err error) {
 // Update takes the representation of a node and updates it. Returns the server's representation of the node, and an error, if there is any.
 func (c *nodes) Update(node *api.Node) (result *api.Node, err error) {
 	result = &api.Node{}
-	err = c.client.Put().
+	err = c.client.GetRESTClient().Put().
 		Resource("nodes").
 		Name(node.Name).
 		Body(node).
@@ -78,7 +78,7 @@ func (c *nodes) Update(node *api.Node) (result *api.Node, err error) {
 
 func (c *nodes) UpdateStatus(node *api.Node) (result *api.Node, err error) {
 	result = &api.Node{}
-	err = c.client.Put().
+	err = c.client.GetRESTClient().Put().
 		Resource("nodes").
 		Name(node.Name).
 		SubResource("status").
@@ -90,7 +90,7 @@ func (c *nodes) UpdateStatus(node *api.Node) (result *api.Node, err error) {
 
 // Delete takes name of the node and deletes it. Returns an error if one occurs.
 func (c *nodes) Delete(name string, options *api.DeleteOptions) error {
-	return c.client.Delete().
+	return c.client.GetRESTClient().Delete().
 		Resource("nodes").
 		Name(name).
 		Body(options).
@@ -100,7 +100,7 @@ func (c *nodes) Delete(name string, options *api.DeleteOptions) error {
 
 // DeleteCollection deletes a collection of objects.
 func (c *nodes) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
-	return c.client.Delete().
+	return c.client.GetRESTClient().Delete().
 		Resource("nodes").
 		VersionedParams(&listOptions, api.ParameterCodec).
 		Body(options).
@@ -111,7 +111,7 @@ func (c *nodes) DeleteCollection(options *api.DeleteOptions, listOptions api.Lis
 // Get takes name of the node, and returns the corresponding node object, and an error if there is any.
 func (c *nodes) Get(name string) (result *api.Node, err error) {
 	result = &api.Node{}
-	err = c.client.Get().
+	err = c.client.GetRESTClient().Get().
 		Resource("nodes").
 		Name(name).
 		Do().
@@ -122,7 +122,7 @@ func (c *nodes) Get(name string) (result *api.Node, err error) {
 // List takes label and field selectors, and returns the list of Nodes that match those selectors.
 func (c *nodes) List(opts api.ListOptions) (result *api.NodeList, err error) {
 	result = &api.NodeList{}
-	err = c.client.Get().
+	err = c.client.GetRESTClient().Get().
 		Resource("nodes").
 		VersionedParams(&opts, api.ParameterCodec).
 		Do().
@@ -132,7 +132,7 @@ func (c *nodes) List(opts api.ListOptions) (result *api.NodeList, err error) {
 
 // Watch returns a watch.Interface that watches the requested nodes.
 func (c *nodes) Watch(opts api.ListOptions) (watch.Interface, error) {
-	return c.client.Get().
+	return c.client.GetRESTClient().Get().
 		Prefix("watch").
 		Resource("nodes").
 		VersionedParams(&opts, api.ParameterCodec).
@@ -142,7 +142,7 @@ func (c *nodes) Watch(opts api.ListOptions) (watch.Interface, error) {
 // Patch applies the patch and returns the patched node.
 func (c *nodes) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *api.Node, err error) {
 	result = &api.Node{}
-	err = c.client.Patch(pt).
+	err = c.client.GetRESTClient().Patch(pt).
 		Resource("nodes").
 		SubResource(subresources...).
 		Name(name).

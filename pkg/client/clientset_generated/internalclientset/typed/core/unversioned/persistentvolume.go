@@ -56,7 +56,7 @@ func newPersistentVolumes(c *CoreClient) *persistentVolumes {
 // Create takes the representation of a persistentVolume and creates it.  Returns the server's representation of the persistentVolume, and an error, if there is any.
 func (c *persistentVolumes) Create(persistentVolume *api.PersistentVolume) (result *api.PersistentVolume, err error) {
 	result = &api.PersistentVolume{}
-	err = c.client.Post().
+	err = c.client.GetRESTClient().Post().
 		Resource("persistentvolumes").
 		Body(persistentVolume).
 		Do().
@@ -67,7 +67,7 @@ func (c *persistentVolumes) Create(persistentVolume *api.PersistentVolume) (resu
 // Update takes the representation of a persistentVolume and updates it. Returns the server's representation of the persistentVolume, and an error, if there is any.
 func (c *persistentVolumes) Update(persistentVolume *api.PersistentVolume) (result *api.PersistentVolume, err error) {
 	result = &api.PersistentVolume{}
-	err = c.client.Put().
+	err = c.client.GetRESTClient().Put().
 		Resource("persistentvolumes").
 		Name(persistentVolume.Name).
 		Body(persistentVolume).
@@ -78,7 +78,7 @@ func (c *persistentVolumes) Update(persistentVolume *api.PersistentVolume) (resu
 
 func (c *persistentVolumes) UpdateStatus(persistentVolume *api.PersistentVolume) (result *api.PersistentVolume, err error) {
 	result = &api.PersistentVolume{}
-	err = c.client.Put().
+	err = c.client.GetRESTClient().Put().
 		Resource("persistentvolumes").
 		Name(persistentVolume.Name).
 		SubResource("status").
@@ -90,7 +90,7 @@ func (c *persistentVolumes) UpdateStatus(persistentVolume *api.PersistentVolume)
 
 // Delete takes name of the persistentVolume and deletes it. Returns an error if one occurs.
 func (c *persistentVolumes) Delete(name string, options *api.DeleteOptions) error {
-	return c.client.Delete().
+	return c.client.GetRESTClient().Delete().
 		Resource("persistentvolumes").
 		Name(name).
 		Body(options).
@@ -100,7 +100,7 @@ func (c *persistentVolumes) Delete(name string, options *api.DeleteOptions) erro
 
 // DeleteCollection deletes a collection of objects.
 func (c *persistentVolumes) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
-	return c.client.Delete().
+	return c.client.GetRESTClient().Delete().
 		Resource("persistentvolumes").
 		VersionedParams(&listOptions, api.ParameterCodec).
 		Body(options).
@@ -111,7 +111,7 @@ func (c *persistentVolumes) DeleteCollection(options *api.DeleteOptions, listOpt
 // Get takes name of the persistentVolume, and returns the corresponding persistentVolume object, and an error if there is any.
 func (c *persistentVolumes) Get(name string) (result *api.PersistentVolume, err error) {
 	result = &api.PersistentVolume{}
-	err = c.client.Get().
+	err = c.client.GetRESTClient().Get().
 		Resource("persistentvolumes").
 		Name(name).
 		Do().
@@ -122,7 +122,7 @@ func (c *persistentVolumes) Get(name string) (result *api.PersistentVolume, err 
 // List takes label and field selectors, and returns the list of PersistentVolumes that match those selectors.
 func (c *persistentVolumes) List(opts api.ListOptions) (result *api.PersistentVolumeList, err error) {
 	result = &api.PersistentVolumeList{}
-	err = c.client.Get().
+	err = c.client.GetRESTClient().Get().
 		Resource("persistentvolumes").
 		VersionedParams(&opts, api.ParameterCodec).
 		Do().
@@ -132,7 +132,7 @@ func (c *persistentVolumes) List(opts api.ListOptions) (result *api.PersistentVo
 
 // Watch returns a watch.Interface that watches the requested persistentVolumes.
 func (c *persistentVolumes) Watch(opts api.ListOptions) (watch.Interface, error) {
-	return c.client.Get().
+	return c.client.GetRESTClient().Get().
 		Prefix("watch").
 		Resource("persistentvolumes").
 		VersionedParams(&opts, api.ParameterCodec).
@@ -142,7 +142,7 @@ func (c *persistentVolumes) Watch(opts api.ListOptions) (watch.Interface, error)
 // Patch applies the patch and returns the patched persistentVolume.
 func (c *persistentVolumes) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *api.PersistentVolume, err error) {
 	result = &api.PersistentVolume{}
-	err = c.client.Patch(pt).
+	err = c.client.GetRESTClient().Patch(pt).
 		Resource("persistentvolumes").
 		SubResource(subresources...).
 		Name(name).

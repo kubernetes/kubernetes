@@ -23,7 +23,7 @@ import (
 )
 
 type RbacInterface interface {
-	GetRESTClient() *restclient.RESTClient
+	GetRESTClient() restclient.RESTClientInterface
 	ClusterRolesGetter
 	ClusterRoleBindingsGetter
 	RolesGetter
@@ -32,7 +32,7 @@ type RbacInterface interface {
 
 // RbacClient is used to interact with features provided by the Rbac group.
 type RbacClient struct {
-	*restclient.RESTClient
+	RESTClient restclient.RESTClientInterface
 }
 
 func (c *RbacClient) ClusterRoles() ClusterRoleInterface {
@@ -75,7 +75,7 @@ func NewForConfigOrDie(c *restclient.Config) *RbacClient {
 }
 
 // New creates a new RbacClient for the given RESTClient.
-func New(c *restclient.RESTClient) *RbacClient {
+func New(c restclient.RESTClientInterface) *RbacClient {
 	return &RbacClient{c}
 }
 
@@ -106,7 +106,7 @@ func setConfigDefaults(config *restclient.Config) error {
 
 // GetRESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *RbacClient) GetRESTClient() *restclient.RESTClient {
+func (c *RbacClient) GetRESTClient() restclient.RESTClientInterface {
 	if c == nil {
 		return nil
 	}

@@ -32,6 +32,6 @@ func (c *FakeBatch) Jobs(namespace string) v1.JobInterface {
 
 // GetRESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeBatch) GetRESTClient() *restclient.RESTClient {
+func (c *FakeBatch) GetRESTClient() restclient.RESTClientInterface {
 	return nil
 }

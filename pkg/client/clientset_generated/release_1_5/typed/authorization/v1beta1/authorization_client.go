@@ -24,7 +24,7 @@ import (
 )
 
 type AuthorizationInterface interface {
-	GetRESTClient() *restclient.RESTClient
+	GetRESTClient() restclient.RESTClientInterface
 	LocalSubjectAccessReviewsGetter
 	SelfSubjectAccessReviewsGetter
 	SubjectAccessReviewsGetter
@@ -32,7 +32,7 @@ type AuthorizationInterface interface {
 
 // AuthorizationClient is used to interact with features provided by the Authorization group.
 type AuthorizationClient struct {
-	*restclient.RESTClient
+	RESTClient restclient.RESTClientInterface
 }
 
 func (c *AuthorizationClient) LocalSubjectAccessReviews(namespace string) LocalSubjectAccessReviewInterface {
@@ -71,7 +71,7 @@ func NewForConfigOrDie(c *restclient.Config) *AuthorizationClient {
 }
 
 // New creates a new AuthorizationClient for the given RESTClient.
-func New(c *restclient.RESTClient) *AuthorizationClient {
+func New(c restclient.RESTClientInterface) *AuthorizationClient {
 	return &AuthorizationClient{c}
 }
 
@@ -98,7 +98,7 @@ func setConfigDefaults(config *restclient.Config) error {
 
 // GetRESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *AuthorizationClient) GetRESTClient() *restclient.RESTClient {
+func (c *AuthorizationClient) GetRESTClient() restclient.RESTClientInterface {
 	if c == nil {
 		return nil
 	}

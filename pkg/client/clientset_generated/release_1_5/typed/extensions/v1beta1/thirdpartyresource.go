@@ -57,7 +57,7 @@ func newThirdPartyResources(c *ExtensionsClient) *thirdPartyResources {
 // Create takes the representation of a thirdPartyResource and creates it.  Returns the server's representation of the thirdPartyResource, and an error, if there is any.
 func (c *thirdPartyResources) Create(thirdPartyResource *v1beta1.ThirdPartyResource) (result *v1beta1.ThirdPartyResource, err error) {
 	result = &v1beta1.ThirdPartyResource{}
-	err = c.client.Post().
+	err = c.client.GetRESTClient().Post().
 		Resource("thirdpartyresources").
 		Body(thirdPartyResource).
 		Do().
@@ -68,7 +68,7 @@ func (c *thirdPartyResources) Create(thirdPartyResource *v1beta1.ThirdPartyResou
 // Update takes the representation of a thirdPartyResource and updates it. Returns the server's representation of the thirdPartyResource, and an error, if there is any.
 func (c *thirdPartyResources) Update(thirdPartyResource *v1beta1.ThirdPartyResource) (result *v1beta1.ThirdPartyResource, err error) {
 	result = &v1beta1.ThirdPartyResource{}
-	err = c.client.Put().
+	err = c.client.GetRESTClient().Put().
 		Resource("thirdpartyresources").
 		Name(thirdPartyResource.Name).
 		Body(thirdPartyResource).
@@ -79,7 +79,7 @@ func (c *thirdPartyResources) Update(thirdPartyResource *v1beta1.ThirdPartyResou
 
 // Delete takes name of the thirdPartyResource and deletes it. Returns an error if one occurs.
 func (c *thirdPartyResources) Delete(name string, options *v1.DeleteOptions) error {
-	return c.client.Delete().
+	return c.client.GetRESTClient().Delete().
 		Resource("thirdpartyresources").
 		Name(name).
 		Body(options).
@@ -89,7 +89,7 @@ func (c *thirdPartyResources) Delete(name string, options *v1.DeleteOptions) err
 
 // DeleteCollection deletes a collection of objects.
 func (c *thirdPartyResources) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	return c.client.Delete().
+	return c.client.GetRESTClient().Delete().
 		Resource("thirdpartyresources").
 		VersionedParams(&listOptions, api.ParameterCodec).
 		Body(options).
@@ -100,7 +100,7 @@ func (c *thirdPartyResources) DeleteCollection(options *v1.DeleteOptions, listOp
 // Get takes name of the thirdPartyResource, and returns the corresponding thirdPartyResource object, and an error if there is any.
 func (c *thirdPartyResources) Get(name string) (result *v1beta1.ThirdPartyResource, err error) {
 	result = &v1beta1.ThirdPartyResource{}
-	err = c.client.Get().
+	err = c.client.GetRESTClient().Get().
 		Resource("thirdpartyresources").
 		Name(name).
 		Do().
@@ -111,7 +111,7 @@ func (c *thirdPartyResources) Get(name string) (result *v1beta1.ThirdPartyResour
 // List takes label and field selectors, and returns the list of ThirdPartyResources that match those selectors.
 func (c *thirdPartyResources) List(opts v1.ListOptions) (result *v1beta1.ThirdPartyResourceList, err error) {
 	result = &v1beta1.ThirdPartyResourceList{}
-	err = c.client.Get().
+	err = c.client.GetRESTClient().Get().
 		Resource("thirdpartyresources").
 		VersionedParams(&opts, api.ParameterCodec).
 		Do().
@@ -121,7 +121,7 @@ func (c *thirdPartyResources) List(opts v1.ListOptions) (result *v1beta1.ThirdPa
 
 // Watch returns a watch.Interface that watches the requested thirdPartyResources.
 func (c *thirdPartyResources) Watch(opts v1.ListOptions) (watch.Interface, error) {
-	return c.client.Get().
+	return c.client.GetRESTClient().Get().
 		Prefix("watch").
 		Resource("thirdpartyresources").
 		VersionedParams(&opts, api.ParameterCodec).
@@ -131,7 +131,7 @@ func (c *thirdPartyResources) Watch(opts v1.ListOptions) (watch.Interface, error
 // Patch applies the patch and returns the patched thirdPartyResource.
 func (c *thirdPartyResources) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1beta1.ThirdPartyResource, err error) {
 	result = &v1beta1.ThirdPartyResource{}
-	err = c.client.Patch(pt).
+	err = c.client.GetRESTClient().Patch(pt).
 		Resource("thirdpartyresources").
 		SubResource(subresources...).
 		Name(name).

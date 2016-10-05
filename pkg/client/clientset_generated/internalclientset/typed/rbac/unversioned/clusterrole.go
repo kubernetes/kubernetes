@@ -56,7 +56,7 @@ func newClusterRoles(c *RbacClient) *clusterRoles {
 // Create takes the representation of a clusterRole and creates it.  Returns the server's representation of the clusterRole, and an error, if there is any.
 func (c *clusterRoles) Create(clusterRole *rbac.ClusterRole) (result *rbac.ClusterRole, err error) {
 	result = &rbac.ClusterRole{}
-	err = c.client.Post().
+	err = c.client.GetRESTClient().Post().
 		Resource("clusterroles").
 		Body(clusterRole).
 		Do().
@@ -67,7 +67,7 @@ func (c *clusterRoles) Create(clusterRole *rbac.ClusterRole) (result *rbac.Clust
 // Update takes the representation of a clusterRole and updates it. Returns the server's representation of the clusterRole, and an error, if there is any.
 func (c *clusterRoles) Update(clusterRole *rbac.ClusterRole) (result *rbac.ClusterRole, err error) {
 	result = &rbac.ClusterRole{}
-	err = c.client.Put().
+	err = c.client.GetRESTClient().Put().
 		Resource("clusterroles").
 		Name(clusterRole.Name).
 		Body(clusterRole).
@@ -78,7 +78,7 @@ func (c *clusterRoles) Update(clusterRole *rbac.ClusterRole) (result *rbac.Clust
 
 // Delete takes name of the clusterRole and deletes it. Returns an error if one occurs.
 func (c *clusterRoles) Delete(name string, options *api.DeleteOptions) error {
-	return c.client.Delete().
+	return c.client.GetRESTClient().Delete().
 		Resource("clusterroles").
 		Name(name).
 		Body(options).
@@ -88,7 +88,7 @@ func (c *clusterRoles) Delete(name string, options *api.DeleteOptions) error {
 
 // DeleteCollection deletes a collection of objects.
 func (c *clusterRoles) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
-	return c.client.Delete().
+	return c.client.GetRESTClient().Delete().
 		Resource("clusterroles").
 		VersionedParams(&listOptions, api.ParameterCodec).
 		Body(options).
@@ -99,7 +99,7 @@ func (c *clusterRoles) DeleteCollection(options *api.DeleteOptions, listOptions 
 // Get takes name of the clusterRole, and returns the corresponding clusterRole object, and an error if there is any.
 func (c *clusterRoles) Get(name string) (result *rbac.ClusterRole, err error) {
 	result = &rbac.ClusterRole{}
-	err = c.client.Get().
+	err = c.client.GetRESTClient().Get().
 		Resource("clusterroles").
 		Name(name).
 		Do().
@@ -110,7 +110,7 @@ func (c *clusterRoles) Get(name string) (result *rbac.ClusterRole, err error) {
 // List takes label and field selectors, and returns the list of ClusterRoles that match those selectors.
 func (c *clusterRoles) List(opts api.ListOptions) (result *rbac.ClusterRoleList, err error) {
 	result = &rbac.ClusterRoleList{}
-	err = c.client.Get().
+	err = c.client.GetRESTClient().Get().
 		Resource("clusterroles").
 		VersionedParams(&opts, api.ParameterCodec).
 		Do().
@@ -120,7 +120,7 @@ func (c *clusterRoles) List(opts api.ListOptions) (result *rbac.ClusterRoleList,
 
 // Watch returns a watch.Interface that watches the requested clusterRoles.
 func (c *clusterRoles) Watch(opts api.ListOptions) (watch.Interface, error) {
-	return c.client.Get().
+	return c.client.GetRESTClient().Get().
 		Prefix("watch").
 		Resource("clusterroles").
 		VersionedParams(&opts, api.ParameterCodec).
@@ -130,7 +130,7 @@ func (c *clusterRoles) Watch(opts api.ListOptions) (watch.Interface, error) {
 // Patch applies the patch and returns the patched clusterRole.
 func (c *clusterRoles) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *rbac.ClusterRole, err error) {
 	result = &rbac.ClusterRole{}
-	err = c.client.Patch(pt).
+	err = c.client.GetRESTClient().Patch(pt).
 		Resource("clusterroles").
 		SubResource(subresources...).
 		Name(name).

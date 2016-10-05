@@ -32,6 +32,6 @@ func (c *FakeFederation) Clusters() v1beta1.ClusterInterface {
 
 // GetRESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeFederation) GetRESTClient() *restclient.RESTClient {
+func (c *FakeFederation) GetRESTClient() restclient.RESTClientInterface {
 	return nil
 }

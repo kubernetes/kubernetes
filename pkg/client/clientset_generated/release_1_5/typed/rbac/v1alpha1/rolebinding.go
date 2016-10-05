@@ -59,7 +59,7 @@ func newRoleBindings(c *RbacClient, namespace string) *roleBindings {
 // Create takes the representation of a roleBinding and creates it.  Returns the server's representation of the roleBinding, and an error, if there is any.
 func (c *roleBindings) Create(roleBinding *v1alpha1.RoleBinding) (result *v1alpha1.RoleBinding, err error) {
 	result = &v1alpha1.RoleBinding{}
-	err = c.client.Post().
+	err = c.client.GetRESTClient().Post().
 		Namespace(c.ns).
 		Resource("rolebindings").
 		Body(roleBinding).
@@ -71,7 +71,7 @@ func (c *roleBindings) Create(roleBinding *v1alpha1.RoleBinding) (result *v1alph
 // Update takes the representation of a roleBinding and updates it. Returns the server's representation of the roleBinding, and an error, if there is any.
 func (c *roleBindings) Update(roleBinding *v1alpha1.RoleBinding) (result *v1alpha1.RoleBinding, err error) {
 	result = &v1alpha1.RoleBinding{}
-	err = c.client.Put().
+	err = c.client.GetRESTClient().Put().
 		Namespace(c.ns).
 		Resource("rolebindings").
 		Name(roleBinding.Name).
@@ -83,7 +83,7 @@ func (c *roleBindings) Update(roleBinding *v1alpha1.RoleBinding) (result *v1alph
 
 // Delete takes name of the roleBinding and deletes it. Returns an error if one occurs.
 func (c *roleBindings) Delete(name string, options *v1.DeleteOptions) error {
-	return c.client.Delete().
+	return c.client.GetRESTClient().Delete().
 		Namespace(c.ns).
 		Resource("rolebindings").
 		Name(name).
@@ -94,7 +94,7 @@ func (c *roleBindings) Delete(name string, options *v1.DeleteOptions) error {
 
 // DeleteCollection deletes a collection of objects.
 func (c *roleBindings) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	return c.client.Delete().
+	return c.client.GetRESTClient().Delete().
 		Namespace(c.ns).
 		Resource("rolebindings").
 		VersionedParams(&listOptions, api.ParameterCodec).
@@ -106,7 +106,7 @@ func (c *roleBindings) DeleteCollection(options *v1.DeleteOptions, listOptions v
 // Get takes name of the roleBinding, and returns the corresponding roleBinding object, and an error if there is any.
 func (c *roleBindings) Get(name string) (result *v1alpha1.RoleBinding, err error) {
 	result = &v1alpha1.RoleBinding{}
-	err = c.client.Get().
+	err = c.client.GetRESTClient().Get().
 		Namespace(c.ns).
 		Resource("rolebindings").
 		Name(name).
@@ -118,7 +118,7 @@ func (c *roleBindings) Get(name string) (result *v1alpha1.RoleBinding, err error
 // List takes label and field selectors, and returns the list of RoleBindings that match those selectors.
 func (c *roleBindings) List(opts v1.ListOptions) (result *v1alpha1.RoleBindingList, err error) {
 	result = &v1alpha1.RoleBindingList{}
-	err = c.client.Get().
+	err = c.client.GetRESTClient().Get().
 		Namespace(c.ns).
 		Resource("rolebindings").
 		VersionedParams(&opts, api.ParameterCodec).
@@ -129,7 +129,7 @@ func (c *roleBindings) List(opts v1.ListOptions) (result *v1alpha1.RoleBindingLi
 
 // Watch returns a watch.Interface that watches the requested roleBindings.
 func (c *roleBindings) Watch(opts v1.ListOptions) (watch.Interface, error) {
-	return c.client.Get().
+	return c.client.GetRESTClient().Get().
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("rolebindings").
@@ -140,7 +140,7 @@ func (c *roleBindings) Watch(opts v1.ListOptions) (watch.Interface, error) {
 // Patch applies the patch and returns the patched roleBinding.
 func (c *roleBindings) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1alpha1.RoleBinding, err error) {
 	result = &v1alpha1.RoleBinding{}
-	err = c.client.Patch(pt).
+	err = c.client.GetRESTClient().Patch(pt).
 		Namespace(c.ns).
 		Resource("rolebindings").
 		SubResource(subresources...).

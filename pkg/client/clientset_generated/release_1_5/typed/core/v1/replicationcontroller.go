@@ -59,7 +59,7 @@ func newReplicationControllers(c *CoreClient, namespace string) *replicationCont
 // Create takes the representation of a replicationController and creates it.  Returns the server's representation of the replicationController, and an error, if there is any.
 func (c *replicationControllers) Create(replicationController *v1.ReplicationController) (result *v1.ReplicationController, err error) {
 	result = &v1.ReplicationController{}
-	err = c.client.Post().
+	err = c.client.GetRESTClient().Post().
 		Namespace(c.ns).
 		Resource("replicationcontrollers").
 		Body(replicationController).
@@ -71,7 +71,7 @@ func (c *replicationControllers) Create(replicationController *v1.ReplicationCon
 // Update takes the representation of a replicationController and updates it. Returns the server's representation of the replicationController, and an error, if there is any.
 func (c *replicationControllers) Update(replicationController *v1.ReplicationController) (result *v1.ReplicationController, err error) {
 	result = &v1.ReplicationController{}
-	err = c.client.Put().
+	err = c.client.GetRESTClient().Put().
 		Namespace(c.ns).
 		Resource("replicationcontrollers").
 		Name(replicationController.Name).
@@ -83,7 +83,7 @@ func (c *replicationControllers) Update(replicationController *v1.ReplicationCon
 
 func (c *replicationControllers) UpdateStatus(replicationController *v1.ReplicationController) (result *v1.ReplicationController, err error) {
 	result = &v1.ReplicationController{}
-	err = c.client.Put().
+	err = c.client.GetRESTClient().Put().
 		Namespace(c.ns).
 		Resource("replicationcontrollers").
 		Name(replicationController.Name).
@@ -96,7 +96,7 @@ func (c *replicationControllers) UpdateStatus(replicationController *v1.Replicat
 
 // Delete takes name of the replicationController and deletes it. Returns an error if one occurs.
 func (c *replicationControllers) Delete(name string, options *v1.DeleteOptions) error {
-	return c.client.Delete().
+	return c.client.GetRESTClient().Delete().
 		Namespace(c.ns).
 		Resource("replicationcontrollers").
 		Name(name).
@@ -107,7 +107,7 @@ func (c *replicationControllers) Delete(name string, options *v1.DeleteOptions) 
 
 // DeleteCollection deletes a collection of objects.
 func (c *replicationControllers) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	return c.client.Delete().
+	return c.client.GetRESTClient().Delete().
 		Namespace(c.ns).
 		Resource("replicationcontrollers").
 		VersionedParams(&listOptions, api.ParameterCodec).
@@ -119,7 +119,7 @@ func (c *replicationControllers) DeleteCollection(options *v1.DeleteOptions, lis
 // Get takes name of the replicationController, and returns the corresponding replicationController object, and an error if there is any.
 func (c *replicationControllers) Get(name string) (result *v1.ReplicationController, err error) {
 	result = &v1.ReplicationController{}
-	err = c.client.Get().
+	err = c.client.GetRESTClient().Get().
 		Namespace(c.ns).
 		Resource("replicationcontrollers").
 		Name(name).
@@ -131,7 +131,7 @@ func (c *replicationControllers) Get(name string) (result *v1.ReplicationControl
 // List takes label and field selectors, and returns the list of ReplicationControllers that match those selectors.
 func (c *replicationControllers) List(opts v1.ListOptions) (result *v1.ReplicationControllerList, err error) {
 	result = &v1.ReplicationControllerList{}
-	err = c.client.Get().
+	err = c.client.GetRESTClient().Get().
 		Namespace(c.ns).
 		Resource("replicationcontrollers").
 		VersionedParams(&opts, api.ParameterCodec).
@@ -142,7 +142,7 @@ func (c *replicationControllers) List(opts v1.ListOptions) (result *v1.Replicati
 
 // Watch returns a watch.Interface that watches the requested replicationControllers.
 func (c *replicationControllers) Watch(opts v1.ListOptions) (watch.Interface, error) {
-	return c.client.Get().
+	return c.client.GetRESTClient().Get().
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("replicationcontrollers").
@@ -153,7 +153,7 @@ func (c *replicationControllers) Watch(opts v1.ListOptions) (watch.Interface, er
 // Patch applies the patch and returns the patched replicationController.
 func (c *replicationControllers) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1.ReplicationController, err error) {
 	result = &v1.ReplicationController{}
-	err = c.client.Patch(pt).
+	err = c.client.GetRESTClient().Patch(pt).
 		Namespace(c.ns).
 		Resource("replicationcontrollers").
 		SubResource(subresources...).

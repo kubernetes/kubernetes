@@ -44,6 +44,6 @@ func (c *FakeExtensions) ReplicaSets(namespace string) v1beta1.ReplicaSetInterfa
 
 // GetRESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeExtensions) GetRESTClient() *restclient.RESTClient {
+func (c *FakeExtensions) GetRESTClient() restclient.RESTClientInterface {
 	return nil
 }

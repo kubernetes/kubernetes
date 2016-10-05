@@ -57,7 +57,7 @@ func newConfigMaps(c *CoreClient, namespace string) *configMaps {
 // Create takes the representation of a configMap and creates it.  Returns the server's representation of the configMap, and an error, if there is any.
 func (c *configMaps) Create(configMap *api.ConfigMap) (result *api.ConfigMap, err error) {
 	result = &api.ConfigMap{}
-	err = c.client.Post().
+	err = c.client.GetRESTClient().Post().
 		Namespace(c.ns).
 		Resource("configmaps").
 		Body(configMap).
@@ -69,7 +69,7 @@ func (c *configMaps) Create(configMap *api.ConfigMap) (result *api.ConfigMap, er
 // Update takes the representation of a configMap and updates it. Returns the server's representation of the configMap, and an error, if there is any.
 func (c *configMaps) Update(configMap *api.ConfigMap) (result *api.ConfigMap, err error) {
 	result = &api.ConfigMap{}
-	err = c.client.Put().
+	err = c.client.GetRESTClient().Put().
 		Namespace(c.ns).
 		Resource("configmaps").
 		Name(configMap.Name).
@@ -81,7 +81,7 @@ func (c *configMaps) Update(configMap *api.ConfigMap) (result *api.ConfigMap, er
 
 // Delete takes name of the configMap and deletes it. Returns an error if one occurs.
 func (c *configMaps) Delete(name string, options *api.DeleteOptions) error {
-	return c.client.Delete().
+	return c.client.GetRESTClient().Delete().
 		Namespace(c.ns).
 		Resource("configmaps").
 		Name(name).
@@ -92,7 +92,7 @@ func (c *configMaps) Delete(name string, options *api.DeleteOptions) error {
 
 // DeleteCollection deletes a collection of objects.
 func (c *configMaps) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
-	return c.client.Delete().
+	return c.client.GetRESTClient().Delete().
 		Namespace(c.ns).
 		Resource("configmaps").
 		VersionedParams(&listOptions, api.ParameterCodec).
@@ -104,7 +104,7 @@ func (c *configMaps) DeleteCollection(options *api.DeleteOptions, listOptions ap
 // Get takes name of the configMap, and returns the corresponding configMap object, and an error if there is any.
 func (c *configMaps) Get(name string) (result *api.ConfigMap, err error) {
 	result = &api.ConfigMap{}
-	err = c.client.Get().
+	err = c.client.GetRESTClient().Get().
 		Namespace(c.ns).
 		Resource("configmaps").
 		Name(name).
@@ -116,7 +116,7 @@ func (c *configMaps) Get(name string) (result *api.ConfigMap, err error) {
 // List takes label and field selectors, and returns the list of ConfigMaps that match those selectors.
 func (c *configMaps) List(opts api.ListOptions) (result *api.ConfigMapList, err error) {
 	result = &api.ConfigMapList{}
-	err = c.client.Get().
+	err = c.client.GetRESTClient().Get().
 		Namespace(c.ns).
 		Resource("configmaps").
 		VersionedParams(&opts, api.ParameterCodec).
@@ -127,7 +127,7 @@ func (c *configMaps) List(opts api.ListOptions) (result *api.ConfigMapList, err 
 
 // Watch returns a watch.Interface that watches the requested configMaps.
 func (c *configMaps) Watch(opts api.ListOptions) (watch.Interface, error) {
-	return c.client.Get().
+	return c.client.GetRESTClient().Get().
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("configmaps").
@@ -138,7 +138,7 @@ func (c *configMaps) Watch(opts api.ListOptions) (watch.Interface, error) {
 // Patch applies the patch and returns the patched configMap.
 func (c *configMaps) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *api.ConfigMap, err error) {
 	result = &api.ConfigMap{}
-	err = c.client.Patch(pt).
+	err = c.client.GetRESTClient().Patch(pt).
 		Namespace(c.ns).
 		Resource("configmaps").
 		SubResource(subresources...).

@@ -59,7 +59,7 @@ func newDeployments(c *ExtensionsClient, namespace string) *deployments {
 // Create takes the representation of a deployment and creates it.  Returns the server's representation of the deployment, and an error, if there is any.
 func (c *deployments) Create(deployment *extensions.Deployment) (result *extensions.Deployment, err error) {
 	result = &extensions.Deployment{}
-	err = c.client.Post().
+	err = c.client.GetRESTClient().Post().
 		Namespace(c.ns).
 		Resource("deployments").
 		Body(deployment).
@@ -71,7 +71,7 @@ func (c *deployments) Create(deployment *extensions.Deployment) (result *extensi
 // Update takes the representation of a deployment and updates it. Returns the server's representation of the deployment, and an error, if there is any.
 func (c *deployments) Update(deployment *extensions.Deployment) (result *extensions.Deployment, err error) {
 	result = &extensions.Deployment{}
-	err = c.client.Put().
+	err = c.client.GetRESTClient().Put().
 		Namespace(c.ns).
 		Resource("deployments").
 		Name(deployment.Name).
@@ -83,7 +83,7 @@ func (c *deployments) Update(deployment *extensions.Deployment) (result *extensi
 
 func (c *deployments) UpdateStatus(deployment *extensions.Deployment) (result *extensions.Deployment, err error) {
 	result = &extensions.Deployment{}
-	err = c.client.Put().
+	err = c.client.GetRESTClient().Put().
 		Namespace(c.ns).
 		Resource("deployments").
 		Name(deployment.Name).
@@ -96,7 +96,7 @@ func (c *deployments) UpdateStatus(deployment *extensions.Deployment) (result *e
 
 // Delete takes name of the deployment and deletes it. Returns an error if one occurs.
 func (c *deployments) Delete(name string, options *api.DeleteOptions) error {
-	return c.client.Delete().
+	return c.client.GetRESTClient().Delete().
 		Namespace(c.ns).
 		Resource("deployments").
 		Name(name).
@@ -107,7 +107,7 @@ func (c *deployments) Delete(name string, options *api.DeleteOptions) error {
 
 // DeleteCollection deletes a collection of objects.
 func (c *deployments) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
-	return c.client.Delete().
+	return c.client.GetRESTClient().Delete().
 		Namespace(c.ns).
 		Resource("deployments").
 		VersionedParams(&listOptions, api.ParameterCodec).
@@ -119,7 +119,7 @@ func (c *deployments) DeleteCollection(options *api.DeleteOptions, listOptions a
 // Get takes name of the deployment, and returns the corresponding deployment object, and an error if there is any.
 func (c *deployments) Get(name string) (result *extensions.Deployment, err error) {
 	result = &extensions.Deployment{}
-	err = c.client.Get().
+	err = c.client.GetRESTClient().Get().
 		Namespace(c.ns).
 		Resource("deployments").
 		Name(name).
@@ -131,7 +131,7 @@ func (c *deployments) Get(name string) (result *extensions.Deployment, err error
 // List takes label and field selectors, and returns the list of Deployments that match those selectors.
 func (c *deployments) List(opts api.ListOptions) (result *extensions.DeploymentList, err error) {
 	result = &extensions.DeploymentList{}
-	err = c.client.Get().
+	err = c.client.GetRESTClient().Get().
 		Namespace(c.ns).
 		Resource("deployments").
 		VersionedParams(&opts, api.ParameterCodec).
@@ -142,7 +142,7 @@ func (c *deployments) List(opts api.ListOptions) (result *extensions.DeploymentL
 
 // Watch returns a watch.Interface that watches the requested deployments.
 func (c *deployments) Watch(opts api.ListOptions) (watch.Interface, error) {
-	return c.client.Get().
+	return c.client.GetRESTClient().Get().
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("deployments").
@@ -153,7 +153,7 @@ func (c *deployments) Watch(opts api.ListOptions) (watch.Interface, error) {
 // Patch applies the patch and returns the patched deployment.
 func (c *deployments) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *extensions.Deployment, err error) {
 	result = &extensions.Deployment{}
-	err = c.client.Patch(pt).
+	err = c.client.GetRESTClient().Patch(pt).
 		Namespace(c.ns).
 		Resource("deployments").
 		SubResource(subresources...).

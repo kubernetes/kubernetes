@@ -32,6 +32,6 @@ func (c *FakeAuthentication) TokenReviews() unversioned.TokenReviewInterface {
 
 // GetRESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeAuthentication) GetRESTClient() *restclient.RESTClient {
+func (c *FakeAuthentication) GetRESTClient() restclient.RESTClientInterface {
 	return nil
 }

@@ -40,6 +40,6 @@ func (c *FakeAuthorization) SubjectAccessReviews() v1beta1.SubjectAccessReviewIn
 
 // GetRESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeAuthorization) GetRESTClient() *restclient.RESTClient {
+func (c *FakeAuthorization) GetRESTClient() restclient.RESTClientInterface {
 	return nil
 }

@@ -57,7 +57,7 @@ func newCertificateSigningRequests(c *CertificatesClient) *certificateSigningReq
 // Create takes the representation of a certificateSigningRequest and creates it.  Returns the server's representation of the certificateSigningRequest, and an error, if there is any.
 func (c *certificateSigningRequests) Create(certificateSigningRequest *certificates.CertificateSigningRequest) (result *certificates.CertificateSigningRequest, err error) {
 	result = &certificates.CertificateSigningRequest{}
-	err = c.client.Post().
+	err = c.client.GetRESTClient().Post().
 		Resource("certificatesigningrequests").
 		Body(certificateSigningRequest).
 		Do().
@@ -68,7 +68,7 @@ func (c *certificateSigningRequests) Create(certificateSigningRequest *certifica
 // Update takes the representation of a certificateSigningRequest and updates it. Returns the server's representation of the certificateSigningRequest, and an error, if there is any.
 func (c *certificateSigningRequests) Update(certificateSigningRequest *certificates.CertificateSigningRequest) (result *certificates.CertificateSigningRequest, err error) {
 	result = &certificates.CertificateSigningRequest{}
-	err = c.client.Put().
+	err = c.client.GetRESTClient().Put().
 		Resource("certificatesigningrequests").
 		Name(certificateSigningRequest.Name).
 		Body(certificateSigningRequest).
@@ -79,7 +79,7 @@ func (c *certificateSigningRequests) Update(certificateSigningRequest *certifica
 
 func (c *certificateSigningRequests) UpdateStatus(certificateSigningRequest *certificates.CertificateSigningRequest) (result *certificates.CertificateSigningRequest, err error) {
 	result = &certificates.CertificateSigningRequest{}
-	err = c.client.Put().
+	err = c.client.GetRESTClient().Put().
 		Resource("certificatesigningrequests").
 		Name(certificateSigningRequest.Name).
 		SubResource("status").
@@ -91,7 +91,7 @@ func (c *certificateSigningRequests) UpdateStatus(certificateSigningRequest *cer
 
 // Delete takes name of the certificateSigningRequest and deletes it. Returns an error if one occurs.
 func (c *certificateSigningRequests) Delete(name string, options *api.DeleteOptions) error {
-	return c.client.Delete().
+	return c.client.GetRESTClient().Delete().
 		Resource("certificatesigningrequests").
 		Name(name).
 		Body(options).
@@ -101,7 +101,7 @@ func (c *certificateSigningRequests) Delete(name string, options *api.DeleteOpti
 
 // DeleteCollection deletes a collection of objects.
 func (c *certificateSigningRequests) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
-	return c.client.Delete().
+	return c.client.GetRESTClient().Delete().
 		Resource("certificatesigningrequests").
 		VersionedParams(&listOptions, api.ParameterCodec).
 		Body(options).
@@ -112,7 +112,7 @@ func (c *certificateSigningRequests) DeleteCollection(options *api.DeleteOptions
 // Get takes name of the certificateSigningRequest, and returns the corresponding certificateSigningRequest object, and an error if there is any.
 func (c *certificateSigningRequests) Get(name string) (result *certificates.CertificateSigningRequest, err error) {
 	result = &certificates.CertificateSigningRequest{}
-	err = c.client.Get().
+	err = c.client.GetRESTClient().Get().
 		Resource("certificatesigningrequests").
 		Name(name).
 		Do().
@@ -123,7 +123,7 @@ func (c *certificateSigningRequests) Get(name string) (result *certificates.Cert
 // List takes label and field selectors, and returns the list of CertificateSigningRequests that match those selectors.
 func (c *certificateSigningRequests) List(opts api.ListOptions) (result *certificates.CertificateSigningRequestList, err error) {
 	result = &certificates.CertificateSigningRequestList{}
-	err = c.client.Get().
+	err = c.client.GetRESTClient().Get().
 		Resource("certificatesigningrequests").
 		VersionedParams(&opts, api.ParameterCodec).
 		Do().
@@ -133,7 +133,7 @@ func (c *certificateSigningRequests) List(opts api.ListOptions) (result *certifi
 
 // Watch returns a watch.Interface that watches the requested certificateSigningRequests.
 func (c *certificateSigningRequests) Watch(opts api.ListOptions) (watch.Interface, error) {
-	return c.client.Get().
+	return c.client.GetRESTClient().Get().
 		Prefix("watch").
 		Resource("certificatesigningrequests").
 		VersionedParams(&opts, api.ParameterCodec).
@@ -143,7 +143,7 @@ func (c *certificateSigningRequests) Watch(opts api.ListOptions) (watch.Interfac
 // Patch applies the patch and returns the patched certificateSigningRequest.
 func (c *certificateSigningRequests) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *certificates.CertificateSigningRequest, err error) {
 	result = &certificates.CertificateSigningRequest{}
-	err = c.client.Patch(pt).
+	err = c.client.GetRESTClient().Patch(pt).
 		Resource("certificatesigningrequests").
 		SubResource(subresources...).
 		Name(name).

@@ -59,7 +59,7 @@ func newScheduledJobs(c *BatchClient, namespace string) *scheduledJobs {
 // Create takes the representation of a scheduledJob and creates it.  Returns the server's representation of the scheduledJob, and an error, if there is any.
 func (c *scheduledJobs) Create(scheduledJob *batch.ScheduledJob) (result *batch.ScheduledJob, err error) {
 	result = &batch.ScheduledJob{}
-	err = c.client.Post().
+	err = c.client.GetRESTClient().Post().
 		Namespace(c.ns).
 		Resource("scheduledjobs").
 		Body(scheduledJob).
@@ -71,7 +71,7 @@ func (c *scheduledJobs) Create(scheduledJob *batch.ScheduledJob) (result *batch.
 // Update takes the representation of a scheduledJob and updates it. Returns the server's representation of the scheduledJob, and an error, if there is any.
 func (c *scheduledJobs) Update(scheduledJob *batch.ScheduledJob) (result *batch.ScheduledJob, err error) {
 	result = &batch.ScheduledJob{}
-	err = c.client.Put().
+	err = c.client.GetRESTClient().Put().
 		Namespace(c.ns).
 		Resource("scheduledjobs").
 		Name(scheduledJob.Name).
@@ -83,7 +83,7 @@ func (c *scheduledJobs) Update(scheduledJob *batch.ScheduledJob) (result *batch.
 
 func (c *scheduledJobs) UpdateStatus(scheduledJob *batch.ScheduledJob) (result *batch.ScheduledJob, err error) {
 	result = &batch.ScheduledJob{}
-	err = c.client.Put().
+	err = c.client.GetRESTClient().Put().
 		Namespace(c.ns).
 		Resource("scheduledjobs").
 		Name(scheduledJob.Name).
@@ -96,7 +96,7 @@ func (c *scheduledJobs) UpdateStatus(scheduledJob *batch.ScheduledJob) (result *
 
 // Delete takes name of the scheduledJob and deletes it. Returns an error if one occurs.
 func (c *scheduledJobs) Delete(name string, options *api.DeleteOptions) error {
-	return c.client.Delete().
+	return c.client.GetRESTClient().Delete().
 		Namespace(c.ns).
 		Resource("scheduledjobs").
 		Name(name).
@@ -107,7 +107,7 @@ func (c *scheduledJobs) Delete(name string, options *api.DeleteOptions) error {
 
 // DeleteCollection deletes a collection of objects.
 func (c *scheduledJobs) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
-	return c.client.Delete().
+	return c.client.GetRESTClient().Delete().
 		Namespace(c.ns).
 		Resource("scheduledjobs").
 		VersionedParams(&listOptions, api.ParameterCodec).
@@ -119,7 +119,7 @@ func (c *scheduledJobs) DeleteCollection(options *api.DeleteOptions, listOptions
 // Get takes name of the scheduledJob, and returns the corresponding scheduledJob object, and an error if there is any.
 func (c *scheduledJobs) Get(name string) (result *batch.ScheduledJob, err error) {
 	result = &batch.ScheduledJob{}
-	err = c.client.Get().
+	err = c.client.GetRESTClient().Get().
 		Namespace(c.ns).
 		Resource("scheduledjobs").
 		Name(name).
@@ -131,7 +131,7 @@ func (c *scheduledJobs) Get(name string) (result *batch.ScheduledJob, err error)
 // List takes label and field selectors, and returns the list of ScheduledJobs that match those selectors.
 func (c *scheduledJobs) List(opts api.ListOptions) (result *batch.ScheduledJobList, err error) {
 	result = &batch.ScheduledJobList{}
-	err = c.client.Get().
+	err = c.client.GetRESTClient().Get().
 		Namespace(c.ns).
 		Resource("scheduledjobs").
 		VersionedParams(&opts, api.ParameterCodec).
@@ -142,7 +142,7 @@ func (c *scheduledJobs) List(opts api.ListOptions) (result *batch.ScheduledJobLi
 
 // Watch returns a watch.Interface that watches the requested scheduledJobs.
 func (c *scheduledJobs) Watch(opts api.ListOptions) (watch.Interface, error) {
-	return c.client.Get().
+	return c.client.GetRESTClient().Get().
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("scheduledjobs").
@@ -153,7 +153,7 @@ func (c *scheduledJobs) Watch(opts api.ListOptions) (watch.Interface, error) {
 // Patch applies the patch and returns the patched scheduledJob.
 func (c *scheduledJobs) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *batch.ScheduledJob, err error) {
 	result = &batch.ScheduledJob{}
-	err = c.client.Patch(pt).
+	err = c.client.GetRESTClient().Patch(pt).
 		Namespace(c.ns).
 		Resource("scheduledjobs").
 		SubResource(subresources...).

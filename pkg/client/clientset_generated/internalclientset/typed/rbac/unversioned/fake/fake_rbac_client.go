@@ -44,6 +44,6 @@ func (c *FakeRbac) RoleBindings(namespace string) unversioned.RoleBindingInterfa
 
 // GetRESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeRbac) GetRESTClient() *restclient.RESTClient {
+func (c *FakeRbac) GetRESTClient() restclient.RESTClientInterface {
 	return nil
 }

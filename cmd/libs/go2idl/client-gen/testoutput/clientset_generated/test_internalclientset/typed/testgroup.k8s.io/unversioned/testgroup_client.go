@@ -23,13 +23,13 @@ import (
 )
 
 type TestgroupInterface interface {
-	GetRESTClient() *restclient.RESTClient
+	GetRESTClient() restclient.RESTClientInterface
 	TestTypesGetter
 }
 
 // TestgroupClient is used to interact with features provided by the Testgroup group.
 type TestgroupClient struct {
-	*restclient.RESTClient
+	RESTClient restclient.RESTClientInterface
 }
 
 func (c *TestgroupClient) TestTypes(namespace string) TestTypeInterface {
@@ -60,7 +60,7 @@ func NewForConfigOrDie(c *restclient.Config) *TestgroupClient {
 }
 
 // New creates a new TestgroupClient for the given RESTClient.
-func New(c *restclient.RESTClient) *TestgroupClient {
+func New(c restclient.RESTClientInterface) *TestgroupClient {
 	return &TestgroupClient{c}
 }
 
@@ -91,7 +91,7 @@ func setConfigDefaults(config *restclient.Config) error {
 
 // GetRESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *TestgroupClient) GetRESTClient() *restclient.RESTClient {
+func (c *TestgroupClient) GetRESTClient() restclient.RESTClientInterface {
 	if c == nil {
 		return nil
 	}

@@ -57,7 +57,7 @@ func newNamespaces(c *CoreClient) *namespaces {
 // Create takes the representation of a namespace and creates it.  Returns the server's representation of the namespace, and an error, if there is any.
 func (c *namespaces) Create(namespace *v1.Namespace) (result *v1.Namespace, err error) {
 	result = &v1.Namespace{}
-	err = c.client.Post().
+	err = c.client.GetRESTClient().Post().
 		Resource("namespaces").
 		Body(namespace).
 		Do().
@@ -68,7 +68,7 @@ func (c *namespaces) Create(namespace *v1.Namespace) (result *v1.Namespace, err 
 // Update takes the representation of a namespace and updates it. Returns the server's representation of the namespace, and an error, if there is any.
 func (c *namespaces) Update(namespace *v1.Namespace) (result *v1.Namespace, err error) {
 	result = &v1.Namespace{}
-	err = c.client.Put().
+	err = c.client.GetRESTClient().Put().
 		Resource("namespaces").
 		Name(namespace.Name).
 		Body(namespace).
@@ -79,7 +79,7 @@ func (c *namespaces) Update(namespace *v1.Namespace) (result *v1.Namespace, err 
 
 func (c *namespaces) UpdateStatus(namespace *v1.Namespace) (result *v1.Namespace, err error) {
 	result = &v1.Namespace{}
-	err = c.client.Put().
+	err = c.client.GetRESTClient().Put().
 		Resource("namespaces").
 		Name(namespace.Name).
 		SubResource("status").
@@ -91,7 +91,7 @@ func (c *namespaces) UpdateStatus(namespace *v1.Namespace) (result *v1.Namespace
 
 // Delete takes name of the namespace and deletes it. Returns an error if one occurs.
 func (c *namespaces) Delete(name string, options *v1.DeleteOptions) error {
-	return c.client.Delete().
+	return c.client.GetRESTClient().Delete().
 		Resource("namespaces").
 		Name(name).
 		Body(options).
@@ -101,7 +101,7 @@ func (c *namespaces) Delete(name string, options *v1.DeleteOptions) error {
 
 // DeleteCollection deletes a collection of objects.
 func (c *namespaces) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	return c.client.Delete().
+	return c.client.GetRESTClient().Delete().
 		Resource("namespaces").
 		VersionedParams(&listOptions, api.ParameterCodec).
 		Body(options).
@@ -112,7 +112,7 @@ func (c *namespaces) DeleteCollection(options *v1.DeleteOptions, listOptions v1.
 // Get takes name of the namespace, and returns the corresponding namespace object, and an error if there is any.
 func (c *namespaces) Get(name string) (result *v1.Namespace, err error) {
 	result = &v1.Namespace{}
-	err = c.client.Get().
+	err = c.client.GetRESTClient().Get().
 		Resource("namespaces").
 		Name(name).
 		Do().
@@ -123,7 +123,7 @@ func (c *namespaces) Get(name string) (result *v1.Namespace, err error) {
 // List takes label and field selectors, and returns the list of Namespaces that match those selectors.
 func (c *namespaces) List(opts v1.ListOptions) (result *v1.NamespaceList, err error) {
 	result = &v1.NamespaceList{}
-	err = c.client.Get().
+	err = c.client.GetRESTClient().Get().
 		Resource("namespaces").
 		VersionedParams(&opts, api.ParameterCodec).
 		Do().
@@ -133,7 +133,7 @@ func (c *namespaces) List(opts v1.ListOptions) (result *v1.NamespaceList, err er
 
 // Watch returns a watch.Interface that watches the requested namespaces.
 func (c *namespaces) Watch(opts v1.ListOptions) (watch.Interface, error) {
-	return c.client.Get().
+	return c.client.GetRESTClient().Get().
 		Prefix("watch").
 		Resource("namespaces").
 		VersionedParams(&opts, api.ParameterCodec).
@@ -143,7 +143,7 @@ func (c *namespaces) Watch(opts v1.ListOptions) (watch.Interface, error) {
 // Patch applies the patch and returns the patched namespace.
 func (c *namespaces) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1.Namespace, err error) {
 	result = &v1.Namespace{}
-	err = c.client.Patch(pt).
+	err = c.client.GetRESTClient().Patch(pt).
 		Resource("namespaces").
 		SubResource(subresources...).
 		Name(name).

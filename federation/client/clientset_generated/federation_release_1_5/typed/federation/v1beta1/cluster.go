@@ -58,7 +58,7 @@ func newClusters(c *FederationClient) *clusters {
 // Create takes the representation of a cluster and creates it.  Returns the server's representation of the cluster, and an error, if there is any.
 func (c *clusters) Create(cluster *v1beta1.Cluster) (result *v1beta1.Cluster, err error) {
 	result = &v1beta1.Cluster{}
-	err = c.client.Post().
+	err = c.client.GetRESTClient().Post().
 		Resource("clusters").
 		Body(cluster).
 		Do().
@@ -69,7 +69,7 @@ func (c *clusters) Create(cluster *v1beta1.Cluster) (result *v1beta1.Cluster, er
 // Update takes the representation of a cluster and updates it. Returns the server's representation of the cluster, and an error, if there is any.
 func (c *clusters) Update(cluster *v1beta1.Cluster) (result *v1beta1.Cluster, err error) {
 	result = &v1beta1.Cluster{}
-	err = c.client.Put().
+	err = c.client.GetRESTClient().Put().
 		Resource("clusters").
 		Name(cluster.Name).
 		Body(cluster).
@@ -80,7 +80,7 @@ func (c *clusters) Update(cluster *v1beta1.Cluster) (result *v1beta1.Cluster, er
 
 func (c *clusters) UpdateStatus(cluster *v1beta1.Cluster) (result *v1beta1.Cluster, err error) {
 	result = &v1beta1.Cluster{}
-	err = c.client.Put().
+	err = c.client.GetRESTClient().Put().
 		Resource("clusters").
 		Name(cluster.Name).
 		SubResource("status").
@@ -92,7 +92,7 @@ func (c *clusters) UpdateStatus(cluster *v1beta1.Cluster) (result *v1beta1.Clust
 
 // Delete takes name of the cluster and deletes it. Returns an error if one occurs.
 func (c *clusters) Delete(name string, options *v1.DeleteOptions) error {
-	return c.client.Delete().
+	return c.client.GetRESTClient().Delete().
 		Resource("clusters").
 		Name(name).
 		Body(options).
@@ -102,7 +102,7 @@ func (c *clusters) Delete(name string, options *v1.DeleteOptions) error {
 
 // DeleteCollection deletes a collection of objects.
 func (c *clusters) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	return c.client.Delete().
+	return c.client.GetRESTClient().Delete().
 		Resource("clusters").
 		VersionedParams(&listOptions, api.ParameterCodec).
 		Body(options).
@@ -113,7 +113,7 @@ func (c *clusters) DeleteCollection(options *v1.DeleteOptions, listOptions v1.Li
 // Get takes name of the cluster, and returns the corresponding cluster object, and an error if there is any.
 func (c *clusters) Get(name string) (result *v1beta1.Cluster, err error) {
 	result = &v1beta1.Cluster{}
-	err = c.client.Get().
+	err = c.client.GetRESTClient().Get().
 		Resource("clusters").
 		Name(name).
 		Do().
@@ -124,7 +124,7 @@ func (c *clusters) Get(name string) (result *v1beta1.Cluster, err error) {
 // List takes label and field selectors, and returns the list of Clusters that match those selectors.
 func (c *clusters) List(opts v1.ListOptions) (result *v1beta1.ClusterList, err error) {
 	result = &v1beta1.ClusterList{}
-	err = c.client.Get().
+	err = c.client.GetRESTClient().Get().
 		Resource("clusters").
 		VersionedParams(&opts, api.ParameterCodec).
 		Do().
@@ -134,7 +134,7 @@ func (c *clusters) List(opts v1.ListOptions) (result *v1beta1.ClusterList, err e
 
 // Watch returns a watch.Interface that watches the requested clusters.
 func (c *clusters) Watch(opts v1.ListOptions) (watch.Interface, error) {
-	return c.client.Get().
+	return c.client.GetRESTClient().Get().
 		Prefix("watch").
 		Resource("clusters").
 		VersionedParams(&opts, api.ParameterCodec).
@@ -144,7 +144,7 @@ func (c *clusters) Watch(opts v1.ListOptions) (watch.Interface, error) {
 // Patch applies the patch and returns the patched cluster.
 func (c *clusters) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1beta1.Cluster, err error) {
 	result = &v1beta1.Cluster{}
-	err = c.client.Patch(pt).
+	err = c.client.GetRESTClient().Patch(pt).
 		Resource("clusters").
 		SubResource(subresources...).
 		Name(name).

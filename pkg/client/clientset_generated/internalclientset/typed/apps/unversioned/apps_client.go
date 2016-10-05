@@ -23,13 +23,13 @@ import (
 )
 
 type AppsInterface interface {
-	GetRESTClient() *restclient.RESTClient
+	GetRESTClient() restclient.RESTClientInterface
 	PetSetsGetter
 }
 
 // AppsClient is used to interact with features provided by the Apps group.
 type AppsClient struct {
-	*restclient.RESTClient
+	RESTClient restclient.RESTClientInterface
 }
 
 func (c *AppsClient) PetSets(namespace string) PetSetInterface {
@@ -60,7 +60,7 @@ func NewForConfigOrDie(c *restclient.Config) *AppsClient {
 }
 
 // New creates a new AppsClient for the given RESTClient.
-func New(c *restclient.RESTClient) *AppsClient {
+func New(c restclient.RESTClientInterface) *AppsClient {
 	return &AppsClient{c}
 }
 
@@ -91,7 +91,7 @@ func setConfigDefaults(config *restclient.Config) error {
 
 // GetRESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *AppsClient) GetRESTClient() *restclient.RESTClient {
+func (c *AppsClient) GetRESTClient() restclient.RESTClientInterface {
 	if c == nil {
 		return nil
 	}

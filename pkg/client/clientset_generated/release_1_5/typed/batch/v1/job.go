@@ -60,7 +60,7 @@ func newJobs(c *BatchClient, namespace string) *jobs {
 // Create takes the representation of a job and creates it.  Returns the server's representation of the job, and an error, if there is any.
 func (c *jobs) Create(job *v1.Job) (result *v1.Job, err error) {
 	result = &v1.Job{}
-	err = c.client.Post().
+	err = c.client.GetRESTClient().Post().
 		Namespace(c.ns).
 		Resource("jobs").
 		Body(job).
@@ -72,7 +72,7 @@ func (c *jobs) Create(job *v1.Job) (result *v1.Job, err error) {
 // Update takes the representation of a job and updates it. Returns the server's representation of the job, and an error, if there is any.
 func (c *jobs) Update(job *v1.Job) (result *v1.Job, err error) {
 	result = &v1.Job{}
-	err = c.client.Put().
+	err = c.client.GetRESTClient().Put().
 		Namespace(c.ns).
 		Resource("jobs").
 		Name(job.Name).
@@ -84,7 +84,7 @@ func (c *jobs) Update(job *v1.Job) (result *v1.Job, err error) {
 
 func (c *jobs) UpdateStatus(job *v1.Job) (result *v1.Job, err error) {
 	result = &v1.Job{}
-	err = c.client.Put().
+	err = c.client.GetRESTClient().Put().
 		Namespace(c.ns).
 		Resource("jobs").
 		Name(job.Name).
@@ -97,7 +97,7 @@ func (c *jobs) UpdateStatus(job *v1.Job) (result *v1.Job, err error) {
 
 // Delete takes name of the job and deletes it. Returns an error if one occurs.
 func (c *jobs) Delete(name string, options *api_v1.DeleteOptions) error {
-	return c.client.Delete().
+	return c.client.GetRESTClient().Delete().
 		Namespace(c.ns).
 		Resource("jobs").
 		Name(name).
@@ -108,7 +108,7 @@ func (c *jobs) Delete(name string, options *api_v1.DeleteOptions) error {
 
 // DeleteCollection deletes a collection of objects.
 func (c *jobs) DeleteCollection(options *api_v1.DeleteOptions, listOptions api_v1.ListOptions) error {
-	return c.client.Delete().
+	return c.client.GetRESTClient().Delete().
 		Namespace(c.ns).
 		Resource("jobs").
 		VersionedParams(&listOptions, api.ParameterCodec).
@@ -120,7 +120,7 @@ func (c *jobs) DeleteCollection(options *api_v1.DeleteOptions, listOptions api_v
 // Get takes name of the job, and returns the corresponding job object, and an error if there is any.
 func (c *jobs) Get(name string) (result *v1.Job, err error) {
 	result = &v1.Job{}
-	err = c.client.Get().
+	err = c.client.GetRESTClient().Get().
 		Namespace(c.ns).
 		Resource("jobs").
 		Name(name).
@@ -132,7 +132,7 @@ func (c *jobs) Get(name string) (result *v1.Job, err error) {
 // List takes label and field selectors, and returns the list of Jobs that match those selectors.
 func (c *jobs) List(opts api_v1.ListOptions) (result *v1.JobList, err error) {
 	result = &v1.JobList{}
-	err = c.client.Get().
+	err = c.client.GetRESTClient().Get().
 		Namespace(c.ns).
 		Resource("jobs").
 		VersionedParams(&opts, api.ParameterCodec).
@@ -143,7 +143,7 @@ func (c *jobs) List(opts api_v1.ListOptions) (result *v1.JobList, err error) {
 
 // Watch returns a watch.Interface that watches the requested jobs.
 func (c *jobs) Watch(opts api_v1.ListOptions) (watch.Interface, error) {
-	return c.client.Get().
+	return c.client.GetRESTClient().Get().
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("jobs").
@@ -154,7 +154,7 @@ func (c *jobs) Watch(opts api_v1.ListOptions) (watch.Interface, error) {
 // Patch applies the patch and returns the patched job.
 func (c *jobs) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1.Job, err error) {
 	result = &v1.Job{}
-	err = c.client.Patch(pt).
+	err = c.client.GetRESTClient().Patch(pt).
 		Namespace(c.ns).
 		Resource("jobs").
 		SubResource(subresources...).

@@ -58,7 +58,7 @@ func newPods(c *CoreClient, namespace string) *pods {
 // Create takes the representation of a pod and creates it.  Returns the server's representation of the pod, and an error, if there is any.
 func (c *pods) Create(pod *api.Pod) (result *api.Pod, err error) {
 	result = &api.Pod{}
-	err = c.client.Post().
+	err = c.client.GetRESTClient().Post().
 		Namespace(c.ns).
 		Resource("pods").
 		Body(pod).
@@ -70,7 +70,7 @@ func (c *pods) Create(pod *api.Pod) (result *api.Pod, err error) {
 // Update takes the representation of a pod and updates it. Returns the server's representation of the pod, and an error, if there is any.
 func (c *pods) Update(pod *api.Pod) (result *api.Pod, err error) {
 	result = &api.Pod{}
-	err = c.client.Put().
+	err = c.client.GetRESTClient().Put().
 		Namespace(c.ns).
 		Resource("pods").
 		Name(pod.Name).
@@ -82,7 +82,7 @@ func (c *pods) Update(pod *api.Pod) (result *api.Pod, err error) {
 
 func (c *pods) UpdateStatus(pod *api.Pod) (result *api.Pod, err error) {
 	result = &api.Pod{}
-	err = c.client.Put().
+	err = c.client.GetRESTClient().Put().
 		Namespace(c.ns).
 		Resource("pods").
 		Name(pod.Name).
@@ -95,7 +95,7 @@ func (c *pods) UpdateStatus(pod *api.Pod) (result *api.Pod, err error) {
 
 // Delete takes name of the pod and deletes it. Returns an error if one occurs.
 func (c *pods) Delete(name string, options *api.DeleteOptions) error {
-	return c.client.Delete().
+	return c.client.GetRESTClient().Delete().
 		Namespace(c.ns).
 		Resource("pods").
 		Name(name).
@@ -106,7 +106,7 @@ func (c *pods) Delete(name string, options *api.DeleteOptions) error {
 
 // DeleteCollection deletes a collection of objects.
 func (c *pods) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
-	return c.client.Delete().
+	return c.client.GetRESTClient().Delete().
 		Namespace(c.ns).
 		Resource("pods").
 		VersionedParams(&listOptions, api.ParameterCodec).
@@ -118,7 +118,7 @@ func (c *pods) DeleteCollection(options *api.DeleteOptions, listOptions api.List
 // Get takes name of the pod, and returns the corresponding pod object, and an error if there is any.
 func (c *pods) Get(name string) (result *api.Pod, err error) {
 	result = &api.Pod{}
-	err = c.client.Get().
+	err = c.client.GetRESTClient().Get().
 		Namespace(c.ns).
 		Resource("pods").
 		Name(name).
@@ -130,7 +130,7 @@ func (c *pods) Get(name string) (result *api.Pod, err error) {
 // List takes label and field selectors, and returns the list of Pods that match those selectors.
 func (c *pods) List(opts api.ListOptions) (result *api.PodList, err error) {
 	result = &api.PodList{}
-	err = c.client.Get().
+	err = c.client.GetRESTClient().Get().
 		Namespace(c.ns).
 		Resource("pods").
 		VersionedParams(&opts, api.ParameterCodec).
@@ -141,7 +141,7 @@ func (c *pods) List(opts api.ListOptions) (result *api.PodList, err error) {
 
 // Watch returns a watch.Interface that watches the requested pods.
 func (c *pods) Watch(opts api.ListOptions) (watch.Interface, error) {
-	return c.client.Get().
+	return c.client.GetRESTClient().Get().
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("pods").
@@ -152,7 +152,7 @@ func (c *pods) Watch(opts api.ListOptions) (watch.Interface, error) {
 // Patch applies the patch and returns the patched pod.
 func (c *pods) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *api.Pod, err error) {
 	result = &api.Pod{}
-	err = c.client.Patch(pt).
+	err = c.client.GetRESTClient().Patch(pt).
 		Namespace(c.ns).
 		Resource("pods").
 		SubResource(subresources...).

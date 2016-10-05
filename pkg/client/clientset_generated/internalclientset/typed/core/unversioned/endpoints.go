@@ -57,7 +57,7 @@ func newEndpoints(c *CoreClient, namespace string) *endpoints {
 // Create takes the representation of a endpoints and creates it.  Returns the server's representation of the endpoints, and an error, if there is any.
 func (c *endpoints) Create(endpoints *api.Endpoints) (result *api.Endpoints, err error) {
 	result = &api.Endpoints{}
-	err = c.client.Post().
+	err = c.client.GetRESTClient().Post().
 		Namespace(c.ns).
 		Resource("endpoints").
 		Body(endpoints).
@@ -69,7 +69,7 @@ func (c *endpoints) Create(endpoints *api.Endpoints) (result *api.Endpoints, err
 // Update takes the representation of a endpoints and updates it. Returns the server's representation of the endpoints, and an error, if there is any.
 func (c *endpoints) Update(endpoints *api.Endpoints) (result *api.Endpoints, err error) {
 	result = &api.Endpoints{}
-	err = c.client.Put().
+	err = c.client.GetRESTClient().Put().
 		Namespace(c.ns).
 		Resource("endpoints").
 		Name(endpoints.Name).
@@ -81,7 +81,7 @@ func (c *endpoints) Update(endpoints *api.Endpoints) (result *api.Endpoints, err
 
 // Delete takes name of the endpoints and deletes it. Returns an error if one occurs.
 func (c *endpoints) Delete(name string, options *api.DeleteOptions) error {
-	return c.client.Delete().
+	return c.client.GetRESTClient().Delete().
 		Namespace(c.ns).
 		Resource("endpoints").
 		Name(name).
@@ -92,7 +92,7 @@ func (c *endpoints) Delete(name string, options *api.DeleteOptions) error {
 
 // DeleteCollection deletes a collection of objects.
 func (c *endpoints) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
-	return c.client.Delete().
+	return c.client.GetRESTClient().Delete().
 		Namespace(c.ns).
 		Resource("endpoints").
 		VersionedParams(&listOptions, api.ParameterCodec).
@@ -104,7 +104,7 @@ func (c *endpoints) DeleteCollection(options *api.DeleteOptions, listOptions api
 // Get takes name of the endpoints, and returns the corresponding endpoints object, and an error if there is any.
 func (c *endpoints) Get(name string) (result *api.Endpoints, err error) {
 	result = &api.Endpoints{}
-	err = c.client.Get().
+	err = c.client.GetRESTClient().Get().
 		Namespace(c.ns).
 		Resource("endpoints").
 		Name(name).
@@ -116,7 +116,7 @@ func (c *endpoints) Get(name string) (result *api.Endpoints, err error) {
 // List takes label and field selectors, and returns the list of Endpoints that match those selectors.
 func (c *endpoints) List(opts api.ListOptions) (result *api.EndpointsList, err error) {
 	result = &api.EndpointsList{}
-	err = c.client.Get().
+	err = c.client.GetRESTClient().Get().
 		Namespace(c.ns).
 		Resource("endpoints").
 		VersionedParams(&opts, api.ParameterCodec).
@@ -127,7 +127,7 @@ func (c *endpoints) List(opts api.ListOptions) (result *api.EndpointsList, err e
 
 // Watch returns a watch.Interface that watches the requested endpoints.
 func (c *endpoints) Watch(opts api.ListOptions) (watch.Interface, error) {
-	return c.client.Get().
+	return c.client.GetRESTClient().Get().
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("endpoints").
@@ -138,7 +138,7 @@ func (c *endpoints) Watch(opts api.ListOptions) (watch.Interface, error) {
 // Patch applies the patch and returns the patched endpoints.
 func (c *endpoints) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *api.Endpoints, err error) {
 	result = &api.Endpoints{}
-	err = c.client.Patch(pt).
+	err = c.client.GetRESTClient().Patch(pt).
 		Namespace(c.ns).
 		Resource("endpoints").
 		SubResource(subresources...).

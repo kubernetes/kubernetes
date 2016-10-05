@@ -92,6 +92,6 @@ func (c *FakeCore) ServiceAccounts(namespace string) v1.ServiceAccountInterface 
 
 // GetRESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeCore) GetRESTClient() *restclient.RESTClient {
+func (c *FakeCore) GetRESTClient() restclient.RESTClientInterface {
 	return nil
 }

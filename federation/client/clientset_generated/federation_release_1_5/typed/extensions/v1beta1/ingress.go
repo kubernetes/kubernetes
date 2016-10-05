@@ -60,7 +60,7 @@ func newIngresses(c *ExtensionsClient, namespace string) *ingresses {
 // Create takes the representation of a ingress and creates it.  Returns the server's representation of the ingress, and an error, if there is any.
 func (c *ingresses) Create(ingress *v1beta1.Ingress) (result *v1beta1.Ingress, err error) {
 	result = &v1beta1.Ingress{}
-	err = c.client.Post().
+	err = c.client.GetRESTClient().Post().
 		Namespace(c.ns).
 		Resource("ingresses").
 		Body(ingress).
@@ -72,7 +72,7 @@ func (c *ingresses) Create(ingress *v1beta1.Ingress) (result *v1beta1.Ingress, e
 // Update takes the representation of a ingress and updates it. Returns the server's representation of the ingress, and an error, if there is any.
 func (c *ingresses) Update(ingress *v1beta1.Ingress) (result *v1beta1.Ingress, err error) {
 	result = &v1beta1.Ingress{}
-	err = c.client.Put().
+	err = c.client.GetRESTClient().Put().
 		Namespace(c.ns).
 		Resource("ingresses").
 		Name(ingress.Name).
@@ -84,7 +84,7 @@ func (c *ingresses) Update(ingress *v1beta1.Ingress) (result *v1beta1.Ingress, e
 
 func (c *ingresses) UpdateStatus(ingress *v1beta1.Ingress) (result *v1beta1.Ingress, err error) {
 	result = &v1beta1.Ingress{}
-	err = c.client.Put().
+	err = c.client.GetRESTClient().Put().
 		Namespace(c.ns).
 		Resource("ingresses").
 		Name(ingress.Name).
@@ -97,7 +97,7 @@ func (c *ingresses) UpdateStatus(ingress *v1beta1.Ingress) (result *v1beta1.Ingr
 
 // Delete takes name of the ingress and deletes it. Returns an error if one occurs.
 func (c *ingresses) Delete(name string, options *v1.DeleteOptions) error {
-	return c.client.Delete().
+	return c.client.GetRESTClient().Delete().
 		Namespace(c.ns).
 		Resource("ingresses").
 		Name(name).
@@ -108,7 +108,7 @@ func (c *ingresses) Delete(name string, options *v1.DeleteOptions) error {
 
 // DeleteCollection deletes a collection of objects.
 func (c *ingresses) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	return c.client.Delete().
+	return c.client.GetRESTClient().Delete().
 		Namespace(c.ns).
 		Resource("ingresses").
 		VersionedParams(&listOptions, api.ParameterCodec).
@@ -120,7 +120,7 @@ func (c *ingresses) DeleteCollection(options *v1.DeleteOptions, listOptions v1.L
 // Get takes name of the ingress, and returns the corresponding ingress object, and an error if there is any.
 func (c *ingresses) Get(name string) (result *v1beta1.Ingress, err error) {
 	result = &v1beta1.Ingress{}
-	err = c.client.Get().
+	err = c.client.GetRESTClient().Get().
 		Namespace(c.ns).
 		Resource("ingresses").
 		Name(name).
@@ -132,7 +132,7 @@ func (c *ingresses) Get(name string) (result *v1beta1.Ingress, err error) {
 // List takes label and field selectors, and returns the list of Ingresses that match those selectors.
 func (c *ingresses) List(opts v1.ListOptions) (result *v1beta1.IngressList, err error) {
 	result = &v1beta1.IngressList{}
-	err = c.client.Get().
+	err = c.client.GetRESTClient().Get().
 		Namespace(c.ns).
 		Resource("ingresses").
 		VersionedParams(&opts, api.ParameterCodec).
@@ -143,7 +143,7 @@ func (c *ingresses) List(opts v1.ListOptions) (result *v1beta1.IngressList, err 
 
 // Watch returns a watch.Interface that watches the requested ingresses.
 func (c *ingresses) Watch(opts v1.ListOptions) (watch.Interface, error) {
-	return c.client.Get().
+	return c.client.GetRESTClient().Get().
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("ingresses").
@@ -154,7 +154,7 @@ func (c *ingresses) Watch(opts v1.ListOptions) (watch.Interface, error) {
 // Patch applies the patch and returns the patched ingress.
 func (c *ingresses) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1beta1.Ingress, err error) {
 	result = &v1beta1.Ingress{}
-	err = c.client.Patch(pt).
+	err = c.client.GetRESTClient().Patch(pt).
 		Namespace(c.ns).
 		Resource("ingresses").
 		SubResource(subresources...).
