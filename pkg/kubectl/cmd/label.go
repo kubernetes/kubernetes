@@ -93,6 +93,7 @@ func NewCmdLabel(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	}
 	cmdutil.AddPrinterFlags(cmd)
 	cmd.Flags().Bool("overwrite", false, "If true, allow labels to be overwritten, otherwise reject label updates that overwrite existing labels.")
+	cmd.Flags().Bool("local", false, "If true, label will NOT contact api-server but run locally.")
 	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on")
 	cmd.Flags().Bool("all", false, "select all resources in the namespace of the specified resource types")
 	cmd.Flags().String("resource-version", "", "If non-empty, the labels update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource.")
@@ -188,6 +189,7 @@ func RunLabel(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 	all := cmdutil.GetFlagBool(cmd, "all")
 	overwrite := cmdutil.GetFlagBool(cmd, "overwrite")
 	resourceVersion := cmdutil.GetFlagString(cmd, "resource-version")
+	local := cmdutil.GetFlagBool(cmd, "local")
 
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
@@ -203,11 +205,13 @@ func RunLabel(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, options).
-		SelectorParam(selector).
-		ResourceTypeOrNameArgs(all, resources...).
-		Flatten().
-		Latest()
+		Flatten()
 
+	if !local {
+		b = b.SelectorParam(selector).
+			ResourceTypeOrNameArgs(all, resources...).
+			Latest()
+	}
 	one := false
 	r := b.Do().IntoSingular(&one)
 	if err := r.Err(); err != nil {
@@ -227,7 +231,7 @@ func RunLabel(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 
 		var outputObj runtime.Object
 		dataChangeMsg := "not labeled"
-		if cmdutil.GetDryRunFlag(cmd) {
+		if cmdutil.GetDryRunFlag(cmd) || local {
 			err = labelFunc(info.Object, overwrite, resourceVersion, lbls, remove)
 			if err != nil {
 				return err
