@@ -88,7 +88,7 @@ func (kl *Kubelet) providerRequiresNetworkingConfiguration() bool {
 	// is used or whether we are using overlay networking. We should return
 	// true for cloud providers if they implement Routes() interface and
 	// we are not using overlay networking.
-	if kl.cloud == nil || kl.cloud.ProviderName() != "gce" || kl.flannelExperimentalOverlay {
+	if kl.cloud == nil || kl.cloud.ProviderName() != "gce" {
 		return false
 	}
 	_, supported := kl.cloud.Routes()
@@ -224,22 +224,13 @@ func (kl *Kubelet) reconcileCBR0(podCIDR string) error {
 
 // syncNetworkStatus updates the network state, ensuring that the network is
 // configured correctly if the kubelet is set to configure cbr0:
-// * handshake flannel helper if the flannel experimental overlay is being used.
 // * ensure that iptables masq rules are setup
 // * reconcile cbr0 with the pod CIDR
 func (kl *Kubelet) syncNetworkStatus() {
 	var err error
 	if kl.configureCBR0 {
-		if kl.flannelExperimentalOverlay {
-			podCIDR, err := kl.flannelHelper.Handshake()
-			if err != nil {
-				glog.Infof("Flannel server handshake failed %v", err)
-				return
-			}
-			kl.updatePodCIDR(podCIDR)
-		}
 		if err := ensureIPTablesMasqRule(kl.iptClient, kl.nonMasqueradeCIDR); err != nil {
-			err = fmt.Errorf("Error on adding ip table rules: %v", err)
+			err = fmt.Errorf("Error on adding iptables rules: %v", err)
 			glog.Error(err)
 			kl.runtimeState.setNetworkState(err)
 			return
