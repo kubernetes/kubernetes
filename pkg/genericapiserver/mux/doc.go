@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,20 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package routes
-
-import (
-	"net/http/pprof"
-
-	"k8s.io/kubernetes/pkg/genericapiserver/mux"
-)
-
-// Profiling adds handlers for pprof under /debug/pprof.
-type Profiling struct{}
-
-// Install adds the Profiling webservice to the given mux.
-func (d Profiling) Install(c *mux.APIContainer) {
-	c.SecretRoutes.HandleFunc("/debug/pprof/", pprof.Index)
-	c.SecretRoutes.HandleFunc("/debug/pprof/profile", pprof.Profile)
-	c.SecretRoutes.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
-}
+// Package mux contains abstractions for http multiplexing of APIs.
+package mux

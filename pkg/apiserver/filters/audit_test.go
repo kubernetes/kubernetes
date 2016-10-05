@@ -113,7 +113,7 @@ func (m *fakeRequestContextMapper) Get(req *http.Request) (api.Context, bool) {
 	}
 
 	resolver := newTestRequestInfoResolver()
-	info, err := resolver.GetRequestInfo(req)
+	info, err := resolver.NewRequestInfo(req)
 	if err == nil {
 		ctx = request.WithRequestInfo(ctx, info)
 	}

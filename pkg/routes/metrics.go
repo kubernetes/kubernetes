@@ -20,28 +20,27 @@ import (
 	"io"
 	"net/http"
 
-	"k8s.io/kubernetes/pkg/apiserver"
 	apiservermetrics "k8s.io/kubernetes/pkg/apiserver/metrics"
+	"k8s.io/kubernetes/pkg/genericapiserver/mux"
 	etcdmetrics "k8s.io/kubernetes/pkg/storage/etcd/metrics"
 
-	"github.com/emicklei/go-restful"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
 // DefaultMetrics installs the default prometheus metrics handler
 type DefaultMetrics struct{}
 
-func (m DefaultMetrics) Install(mux *apiserver.PathRecorderMux, c *restful.Container) {
-	mux.HandleFunc("/metrics", prometheus.Handler().ServeHTTP)
+func (m DefaultMetrics) Install(c *mux.APIContainer) {
+	c.NonSwaggerRoutes.Handle("/metrics", prometheus.Handler())
 }
 
 // MetricsWithReset install the prometheus metrics handler extended with support for the DELETE method
 // which resets the metrics.
 type MetricsWithReset struct{}
 
-func (m MetricsWithReset) Install(mux *apiserver.PathRecorderMux, c *restful.Container) {
+func (m MetricsWithReset) Install(c *mux.APIContainer) {
 	defaultMetricsHandler := prometheus.Handler().ServeHTTP
-	mux.HandleFunc("/metrics", func(w http.ResponseWriter, req *http.Request) {
+	c.NonSwaggerRoutes.HandleFunc("/metrics", func(w http.ResponseWriter, req *http.Request) {
 		if req.Method == "DELETE" {
 			apiservermetrics.Reset()
 			etcdmetrics.Reset()
