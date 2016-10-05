@@ -16,6 +16,8 @@ limitations under the License.
 
 package v1beta1
 
+type DaemonSetExpansion interface{}
+
 type IngressExpansion interface{}
 
 type ReplicaSetExpansion interface{}

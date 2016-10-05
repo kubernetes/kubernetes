@@ -16,6 +16,8 @@ limitations under the License.
 
 package unversioned
 
+type DaemonSetExpansion interface{}
+
 type DeploymentExpansion interface{}
 
 type IngressExpansion interface{}
