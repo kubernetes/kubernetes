@@ -273,14 +273,14 @@ $(DEEPCOPY_FILES): $(DEEPCOPY_GEN)
 $(META_DIR)/$(DEEPCOPY_GEN).mk:
 	mkdir -p $(@D);                                        \
 	(echo -n "$(DEEPCOPY_GEN): ";                          \
-	 DIRECT=$$(go list -f '{{.Dir}} {{.Dir}}/*.go'         \
+	 DIRECT=$$(./hack/run-in-gopath.sh go list -f '{{.Dir}} {{.Dir}}/*.go'         \
 	     ./cmd/libs/go2idl/deepcopy-gen);                  \
-	 INDIRECT=$$(go list                                   \
+	 INDIRECT=$$(./hack/run-in-gopath.sh go list                                   \
 	     -f '{{range .Deps}}{{.}}{{"\n"}}{{end}}'          \
 	     ./cmd/libs/go2idl/deepcopy-gen                    \
 	     | grep --color=never "^$(PRJ_SRC_PATH)"           \
 	     | sed 's|^$(PRJ_SRC_PATH)|./|'                    \
-	     | xargs go list -f '{{.Dir}} {{.Dir}}/*.go');     \
+	     | xargs ./hack/run-in-gopath.sh go list -f '{{.Dir}} {{.Dir}}/*.go');     \
 	 echo $$DIRECT $$INDIRECT                              \
 	     | sed 's/ / \\=,/g'                               \
 	     | tr '=,' '\n\t';                                 \
@@ -424,14 +424,14 @@ $(DEFAULTER_FILES): $(DEFAULTER_GEN)
 $(META_DIR)/$(DEFAULTER_GEN).mk:
 	mkdir -p $(@D);                                        \
 	(echo -n "$(DEFAULTER_GEN): ";                         \
-	 DIRECT=$$(go list -f '{{.Dir}} {{.Dir}}/*.go'         \
+	 DIRECT=$$(./hack/run-in-gopath.sh go list -f '{{.Dir}} {{.Dir}}/*.go'         \
 	     ./cmd/libs/go2idl/defaulter-gen);                 \
-	 INDIRECT=$$(go list                                   \
+	 INDIRECT=$$(./hack/run-in-gopath.sh go list                                   \
 	     -f '{{range .Deps}}{{.}}{{"\n"}}{{end}}'          \
 	     ./cmd/libs/go2idl/defaulter-gen                   \
 	     | grep --color=never "^$(PRJ_SRC_PATH)"           \
 	     | sed 's|^$(PRJ_SRC_PATH)|./|'                    \
-	     | xargs go list -f '{{.Dir}} {{.Dir}}/*.go');     \
+	     | xargs ./hack/run-in-gopath.sh go list -f '{{.Dir}} {{.Dir}}/*.go');     \
 	 echo $$DIRECT $$INDIRECT                              \
 	     | sed 's/ / \\=,/g'                               \
 	     | tr '=,' '\n\t';                                 \
@@ -531,14 +531,14 @@ $(OPENAPI_OUTFILE): $(OPENAPI_GEN) $(OPENAPI_GEN)
 $(META_DIR)/$(OPENAPI_GEN).mk:
 	mkdir -p $(@D);                                        \
 	(echo -n "$(OPENAPI_GEN): ";                           \
-	 DIRECT=$$(go list -f '{{.Dir}} {{.Dir}}/*.go'         \
+	 DIRECT=$$(./hack/run-in-gopath.sh go list -f '{{.Dir}} {{.Dir}}/*.go'         \
 	     ./cmd/libs/go2idl/openapi-gen);                   \
-	 INDIRECT=$$(go list                                   \
+	 INDIRECT=$$(./hack/run-in-gopath.sh go list                                   \
 	     -f '{{range .Deps}}{{.}}{{"\n"}}{{end}}'          \
 	     ./cmd/libs/go2idl/openapi-gen                     \
 	     | grep --color=never "^$(PRJ_SRC_PATH)"           \
 	     | sed 's|^$(PRJ_SRC_PATH)|./|'                    \
-	     | xargs go list -f '{{.Dir}} {{.Dir}}/*.go');     \
+	     | xargs ./hack/run-in-gopath.sh go list -f '{{.Dir}} {{.Dir}}/*.go');     \
 	 echo $$DIRECT $$INDIRECT                              \
 	     | sed 's/ / \\=,/g'                               \
 	     | tr '=,' '\n\t';                                 \
@@ -726,14 +726,14 @@ $(CONVERSION_FILES): $(CONVERSION_GEN)
 $(META_DIR)/$(CONVERSION_GEN).mk:
 	mkdir -p $(@D);                                        \
 	(echo -n "$(CONVERSION_GEN): ";                        \
-	 DIRECT=$$(go list -f '{{.Dir}} {{.Dir}}/*.go'         \
+	 DIRECT=$$(./hack/run-in-gopath.sh go list -f '{{.Dir}} {{.Dir}}/*.go'         \
 	     ./cmd/libs/go2idl/conversion-gen);                \
-	 INDIRECT=$$(go list                                   \
+	 INDIRECT=$$(./hack/run-in-gopath.sh go list                                   \
 	     -f '{{range .Deps}}{{.}}{{"\n"}}{{end}}'          \
 	     ./cmd/libs/go2idl/conversion-gen                  \
 	     | grep --color=never "^$(PRJ_SRC_PATH)"           \
 	     | sed 's|^$(PRJ_SRC_PATH)|./|'                    \
-	     | xargs go list -f '{{.Dir}} {{.Dir}}/*.go');     \
+	     | xargs ./hack/run-in-gopath.sh go list -f '{{.Dir}} {{.Dir}}/*.go');     \
 	 echo $$DIRECT $$INDIRECT                              \
 	     | sed 's/ / \\=,/g'                               \
 	     | tr '=,' '\n\t';                                 \
