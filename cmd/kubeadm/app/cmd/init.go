@@ -24,6 +24,7 @@ import (
 	"github.com/spf13/cobra"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubechecks "k8s.io/kubernetes/cmd/kubeadm/app/checks"
 	kubemaster "k8s.io/kubernetes/cmd/kubeadm/app/master"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/pkg/cloudprovider"
@@ -44,11 +45,12 @@ var (
 // NewCmdInit returns "kubeadm init" command.
 func NewCmdInit(out io.Writer) *cobra.Command {
 	cfg := &kubeadmapi.MasterConfiguration{}
+	var skipChecks bool
 	cmd := &cobra.Command{
 		Use:   "init",
 		Short: "Run this in order to set up the Kubernetes master.",
 		Run: func(cmd *cobra.Command, args []string) {
-			err := RunInit(out, cmd, args, cfg)
+			err := RunInit(out, cmd, args, cfg, skipChecks)
 			cmdutil.CheckErr(err)
 		},
 	}
@@ -111,12 +113,25 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 		"etcd client key file. Note: The path must be in /etc/ssl/certs",
 	)
 	cmd.PersistentFlags().MarkDeprecated("external-etcd-keyfile", "this flag will be removed when componentconfig exists")
+	cmd.PersistentFlags().BoolVar(
+		&skipChecks, "skip-checks", false,
+		"skip checks normally run before modifying the system",
+	)
 
 	return cmd
 }
 
 // RunInit executes master node provisioning, including certificates, needed static pod manifests, etc.
-func RunInit(out io.Writer, cmd *cobra.Command, args []string, cfg *kubeadmapi.MasterConfiguration) error {
+func RunInit(out io.Writer, cmd *cobra.Command, args []string, cfg *kubeadmapi.MasterConfiguration, skipChecks bool) error {
+
+	if !skipChecks {
+		fmt.Println("Running pre-flight checks")
+		kubechecks.RunInitMasterChecks()
+	} else {
+		fmt.Println("Skipping pre-flight checks")
+	}
+	//os.Exit(1)
+
 	// Auto-detect the IP
 	if len(cfg.API.AdvertiseAddresses) == 0 {
 		// TODO(phase1+) perhaps we could actually grab eth0 and eth1
