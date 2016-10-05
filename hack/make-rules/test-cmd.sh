@@ -808,6 +808,16 @@ __EOF__
   [ "$(EDITOR=cat kubectl edit --windows-line-endings pod/valid-pod | file - | grep CRLF)" ]
   [ ! "$(EDITOR=cat kubectl edit --windows-line-endings=false pod/valid-pod | file - | grep CRLF)" ]
 
+  ### Label POD YAML file locally without effecting the live pod.
+  # Pre-condition: name is valid-pod
+  kube::test::get_object_assert 'pod valid-pod' "{{${labels_field}.name}}" 'valid-pod'
+  # Command
+  output_message=$(kubectl label --local --overwrite -f hack/testdata/pod.yaml name=localonlyvalue -o yaml "${kube_flags[@]}")
+  echo $output_message
+  # Post-condition: name is still valid-pod in the live pod, but command output is the new value
+  kube::test::get_object_assert 'pod valid-pod' "{{${labels_field}.name}}" 'valid-pod'
+  kube::test::if_has_string "${output_message}" "localonlyvalue"
+
   ### Overwriting an existing label is not permitted
   # Pre-condition: name is valid-pod
   kube::test::get_object_assert 'pod valid-pod' "{{${labels_field}.name}}" 'valid-pod'
