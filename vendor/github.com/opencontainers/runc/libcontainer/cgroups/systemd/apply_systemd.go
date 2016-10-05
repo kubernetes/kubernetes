@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -67,12 +67,14 @@ var subsystems = subsystemSet{
 
 const (
 	testScopeWait = 4
+	testSliceWait = 4
 )
 
 var (
 	connLock                        sync.Mutex
 	theConn                         *systemdDbus.Conn
 	hasStartTransientUnit           bool
+	hasStartTransientSliceUnit      bool
 	hasTransientDefaultDependencies bool
 	hasDelegate                     bool
 )
@@ -159,8 +161,36 @@ func UseSystemd() bool {
 			}
 		}
 
+		// Assume we have the ability to start a transient unit as a slice
+		// This was broken until systemd v229, but has been back-ported on RHEL environments >= 219
+		// For details, see: https://bugzilla.redhat.com/show_bug.cgi?id=1370299
+		hasStartTransientSliceUnit = true
+
+		// To ensure simple clean-up, we create a slice off the root with no hierarchy
+		slice := fmt.Sprintf("libcontainer_%d_systemd_test_default.slice", os.Getpid())
+		if _, err := theConn.StartTransientUnit(slice, "replace", nil, nil); err != nil {
+			if _, ok := err.(dbus.Error); ok {
+				hasStartTransientSliceUnit = false
+			}
+		}
+
+		for i := 0; i <= testSliceWait; i++ {
+			if _, err := theConn.StopUnit(slice, "replace", nil); err != nil {
+				if dbusError, ok := err.(dbus.Error); ok {
+					if strings.Contains(dbusError.Name, "org.freedesktop.systemd1.NoSuchUnit") {
+						hasStartTransientSliceUnit = false
+						break
+					}
+				}
+			} else {
+				break
+			}
+			time.Sleep(time.Millisecond)
+		}
+
 		// Not critical because of the stop unit logic above.
 		theConn.StopUnit(scope, "replace", nil)
+		theConn.StopUnit(slice, "replace", nil)
 	}
 	return hasStartTransientUnit
 }
@@ -194,11 +224,24 @@ func (m *Manager) Apply(pid int) error {
 		slice = c.Parent
 	}
 
-	properties = append(properties,
-		systemdDbus.PropSlice(slice),
-		systemdDbus.PropDescription("docker container "+c.Name),
-		newProp("PIDs", []uint32{uint32(pid)}),
-	)
+	properties = append(properties, systemdDbus.PropDescription("libcontainer container "+c.Name))
+
+	// if we create a slice, the parent is defined via a Wants=
+	if strings.HasSuffix(unitName, ".slice") {
+		// This was broken until systemd v229, but has been back-ported on RHEL environments >= 219
+		if !hasStartTransientSliceUnit {
+			return fmt.Errorf("systemd version does not support ability to start a slice as transient unit")
+		}
+		properties = append(properties, systemdDbus.PropWants(slice))
+	} else {
+		// otherwise, we use Slice=
+		properties = append(properties, systemdDbus.PropSlice(slice))
+	}
+
+	// only add pid if its valid, -1 is used w/ general slice creation.
+	if pid != -1 {
+		properties = append(properties, newProp("PIDs", []uint32{uint32(pid)}))
+	}
 
 	if hasDelegate {
 		// This is only supported on systemd versions 218 and above.
@@ -240,8 +283,17 @@ func (m *Manager) Apply(pid int) error {
 		}
 	}
 
+	fmt.Printf("apply_systemd: start tranisent unit: %v %v\n", unitName, slice)
 	if _, err := theConn.StartTransientUnit(unitName, "replace", properties, nil); err != nil {
-		return err
+		fmt.Printf("apply_systemd: error start tranisent unit: %v %v\n", unitName, err)
+		if dbusError, ok := err.(dbus.Error); ok {
+			// if the unit already exists, its not a problem...
+			if !strings.Contains(dbusError.Name, "org.freedesktop.systemd1.UnitExists") {
+				return err
+			}
+		} else {
+			return err
+		}
 	}
 
 	if err := joinCgroups(c, pid); err != nil {
@@ -270,8 +322,13 @@ func (m *Manager) Destroy() error {
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	theConn.StopUnit(getUnitName(m.Cgroups), "replace", nil)
+	unitName := getUnitName(m.Cgroups)
+	fmt.Printf("destroy_systemd: stop unit: %v\n", unitName)
+	if _, err := theConn.StopUnit(unitName, "replace", nil); err != nil {
+		fmt.Printf("destroy_systemd: stop unit error: %v %v\n", unitName, err)
+	}
 	if err := cgroups.RemovePaths(m.Paths); err != nil {
+		fmt.Printf("destroy_systemd: unable to remove paths: %v %v\n", unitName, err)
 		return err
 	}
 	m.Paths = make(map[string]string)
@@ -302,10 +359,9 @@ func join(c *configs.Cgroup, subsystem string, pid int) (string, error) {
 	if err := os.MkdirAll(path, 0755); err != nil {
 		return "", err
 	}
-	if err := writeFile(path, "cgroup.procs", strconv.Itoa(pid)); err != nil {
+	if err := cgroups.WriteCgroupProc(path, pid); err != nil {
 		return "", err
 	}
-
 	return path, nil
 }
 
@@ -347,10 +403,15 @@ func joinCgroups(c *configs.Cgroup, pid int) error {
 	return nil
 }
 
+// test.slice/test-a.slice/test-a-b.slice becomes test-a-b.slice
+func Contract(cgroupfsName string) (string, error) {
+	return path.Base(cgroupfsName), nil
+}
+
 // systemd represents slice heirarchy using `-`, so we need to follow suit when
 // generating the path of slice. Essentially, test-a-b.slice becomes
 // test.slice/test-a.slice/test-a-b.slice.
-func expandSlice(slice string) (string, error) {
+func ExpandSlice(slice string) (string, error) {
 	suffix := ".slice"
 	// Name has to end with ".slice", but can't be just ".slice".
 	if len(slice) < len(suffix) || !strings.HasSuffix(slice, suffix) {
@@ -364,6 +425,10 @@ func expandSlice(slice string) (string, error) {
 
 	var path, prefix string
 	sliceName := strings.TrimSuffix(slice, suffix)
+	// if input was -.slice, we should just return root now
+	if sliceName == "-" {
+		return "/", nil
+	}
 	for _, component := range strings.Split(sliceName, "-") {
 		// test--a.slice isn't permitted, nor is -test.slice.
 		if component == "" {
@@ -396,7 +461,7 @@ func getSubsystemPath(c *configs.Cgroup, subsystem string) (string, error) {
 		slice = c.Parent
 	}
 
-	slice, err = expandSlice(slice)
+	slice, err = ExpandSlice(slice)
 	if err != nil {
 		return "", err
 	}
@@ -483,7 +548,11 @@ func (m *Manager) Set(container *configs.Config) error {
 }
 
 func getUnitName(c *configs.Cgroup) string {
-	return fmt.Sprintf("%s-%s.scope", c.ScopePrefix, c.Name)
+	// by default, we create a scope unless the user explicitly asks for a slice.
+	if !strings.HasSuffix(c.Name, ".slice") {
+		return fmt.Sprintf("%s-%s.scope", c.ScopePrefix, c.Name)
+	}
+	return c.Name
 }
 
 func setKernelMemory(c *configs.Cgroup) error {

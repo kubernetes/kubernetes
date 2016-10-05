@@ -199,7 +199,7 @@ func (cm *containerManagerImpl) NewPodContainerManager() PodContainerManager {
 		}
 	}
 	return &podContainerManagerNoop{
-		cgroupRoot: cm.NodeConfig.CgroupRoot,
+		cgroupRoot: CgroupName(cm.NodeConfig.CgroupRoot),
 	}
 }
 
@@ -232,6 +232,7 @@ const (
 // TODO(@dubstack) Add support for cgroup-root to work on both systemd and cgroupfs
 // drivers. Currently we only support systems running cgroupfs driver
 func InitQOS(rootContainer string, subsystems *CgroupSubsystems) (QOSContainersInfo, error) {
+	// TODO: need to know cgroup driver here
 	cm := NewCgroupManager(subsystems)
 	// Top level for Qos containers are created only for Burstable
 	// and Best Effort classes
@@ -240,15 +241,18 @@ func InitQOS(rootContainer string, subsystems *CgroupSubsystems) (QOSContainersI
 	// Create containers for both qos classes
 	for _, qosClass := range qosClasses {
 		// get the container's absolute name
-		absoluteContainerName := path.Join(rootContainer, string(qosClass))
+		absoluteContainerName := CgroupName(path.Join(rootContainer, string(qosClass)))
 		// containerConfig object stores the cgroup specifications
 		containerConfig := &CgroupConfig{
 			Name:               absoluteContainerName,
 			ResourceParameters: &ResourceConfig{},
 		}
-		// TODO(@dubstack) Add support on systemd cgroups driver
-		if err := cm.Create(containerConfig); err != nil {
-			return QOSContainersInfo{}, fmt.Errorf("failed to create top level %v QOS cgroup : %v", qosClass, err)
+		// check if it exists
+		if !cm.Exists(absoluteContainerName) {
+			// TODO(@dubstack) Add support on systemd cgroups driver
+			if err := cm.Create(containerConfig); err != nil {
+				return QOSContainersInfo{}, fmt.Errorf("failed to create top level %v QOS cgroup : %v", qosClass, err)
+			}
 		}
 	}
 	// Store the top level qos container names

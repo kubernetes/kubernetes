@@ -34,7 +34,11 @@ func NewCgroupManager(_ interface{}) CgroupManager {
 	return &unsupportedCgroupManager{}
 }
 
-func (m *unsupportedCgroupManager) Exists(_ string) bool {
+func (m *unsupportedCgroupManager) Name(_ CgroupName) string {
+	return ""
+}
+
+func (m *unsupportedCgroupManager) Exists(_ CgroupName) bool {
 	return false
 }
 
@@ -48,4 +52,8 @@ func (m *unsupportedCgroupManager) Update(_ *CgroupConfig) error {
 
 func (m *unsupportedCgroupManager) Create(_ *CgroupConfig) error {
 	return fmt.Errorf("Cgroup Manager is not supported in this build")
+}
+
+func (m *unsupportedCgroupManager) Pids(_ CgroupName) []int {
+	return nil
 }

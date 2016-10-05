@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/fieldpath"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/envvars"
 	"k8s.io/kubernetes/pkg/kubelet/images"
@@ -241,7 +242,11 @@ func (kl *Kubelet) GeneratePodHostNameAndDomain(pod *api.Pod) (string, string, e
 // the container runtime to set parameters for launching a container.
 func (kl *Kubelet) GenerateRunContainerOptions(pod *api.Pod, container *api.Container, podIP string) (*kubecontainer.RunContainerOptions, error) {
 	var err error
-	opts := &kubecontainer.RunContainerOptions{CgroupParent: kl.cgroupRoot}
+	pcm := kl.containerManager.NewPodContainerManager()
+	// TODO: the pod container name needs to be formatted based on cgroup driver of runtime (in this case docker expects slice syntax)
+	// THIS IS CONFUSING IN THE CASE OF DOCKER THAT NEEDS FORMAT AS EXPECTED
+	_, podContainerName := pcm.GetPodContainerName(pod)
+	opts := &kubecontainer.RunContainerOptions{CgroupParent: podContainerName}
 	hostname, hostDomainName, err := kl.GeneratePodHostNameAndDomain(pod)
 	if err != nil {
 		return nil, err
@@ -493,7 +498,35 @@ func (kl *Kubelet) killPod(pod *api.Pod, runningPod *kubecontainer.Pod, status *
 	} else if status != nil {
 		p = kubecontainer.ConvertPodStatusToRunningPod(kl.GetRuntime().Type(), status)
 	}
-	return kl.containerRuntime.KillPod(pod, p, gracePeriodOverride)
+	// cache the pod cgroup Name for reducing the cpu resource limits of the pod cgroup once the pod is killed
+	pcm := kl.containerManager.NewPodContainerManager()
+	var podCgroup cm.CgroupName
+	reduceCpuLimts := true
+	if pod != nil {
+		podCgroup, _ = pcm.GetPodContainerName(pod)
+	} else {
+		// If the pod is nil then cgroup limit must have already
+		// been decreased earlier
+		reduceCpuLimts = false
+	}
+
+	// Call the container runtime KillPod method which stops all running containers of the pod
+	if err := kl.containerRuntime.KillPod(pod, p, gracePeriodOverride); err != nil {
+		return err
+	}
+	// At this point the pod might not completely free up cpu and memory resources.
+	// In such a case deleting the pod's cgroup might cause the pod's charges to be transferred
+	// to the parent cgroup. There might be various kinds of pod charges at this point.
+	// One example is if there exists some tmpfs pages belonging to the pod
+	// which are not removed until the pod's volumes have been cleaned up.
+	// Hence we only reduce the cpu resource limits of the pod's cgroup
+	// and defer the responsibilty of destroying the pod's cgroup to the
+	// cleanup method and the housekeeping loop.
+	// Don't reduce the memory limits as that might trigger unwanted OOM_Kills
+	if reduceCpuLimts {
+		pcm.ReduceCpuLimits(podCgroup)
+	}
+	return nil
 }
 
 // makePodDataDirs creates the dirs for the pod datas.
@@ -651,6 +684,8 @@ func (kl *Kubelet) HandlePodCleanups() error {
 	if err != nil {
 		glog.Errorf("Failed cleaning up bandwidth limits: %v", err)
 	}
+
+	kl.cleanupOrphanedPodCgroups(allPods, runningPods)
 
 	kl.backOff.GC()
 	return nil
@@ -1207,4 +1242,43 @@ func (kl *Kubelet) PortForward(podFullName string, podUID types.UID, port uint16
 		return fmt.Errorf("pod not found (%q)", podFullName)
 	}
 	return kl.runner.PortForward(&pod, port, stream)
+}
+
+// cleanupOrphanedPodCgroups removes the Cgroups of pods that should not be
+// running and whose volumes have been cleanedup.
+func (kl *Kubelet) cleanupOrphanedPodCgroups(
+	pods []*api.Pod, runningPods []*kubecontainer.Pod) error {
+	// Add all running and existing terminated pods to a set allPods
+	allPods := sets.NewString()
+	for _, pod := range pods {
+		allPods.Insert(string(pod.UID))
+	}
+	for _, pod := range runningPods {
+		allPods.Insert(string(pod.ID))
+	}
+
+	pcm := kl.containerManager.NewPodContainerManager()
+	found, err := pcm.GetAllPodsFromCgroups()
+	if err != nil {
+		return fmt.Errorf("failed to get list of pods that still exist on cgroup mounts: %v", err)
+	}
+	// Iterate over all the found pods to verify if they should be running
+	for uid, val := range found {
+		if allPods.Has(string(uid)) {
+			continue
+		}
+		if podVolumesExist := kl.podVolumesExist(uid); podVolumesExist {
+			// If volumes have not been unmounted/detached, do not delete directory.
+			// Doing so may result in corruption of data.
+			glog.V(3).Infof("Orphaned pod %q found, but volumes are not cleaned up, Skipping cgroups deletion; err: %v", uid, err)
+			continue
+		}
+		glog.V(3).Infof("Orphaned pod %q found, removing pod cgroups", uid)
+		// Destroy all cgroups of pod that should not be running,
+		// by first killing all the attached processes to these cgroups.
+		// We ignore errors thrown by the method, as the housekeeping loop would
+		// again try to delete these unwanted pod cgroups
+		go pcm.Destroy(val)
+	}
+	return nil
 }

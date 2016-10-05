@@ -28,6 +28,10 @@ NET_PLUGIN=${NET_PLUGIN:-""}
 NET_PLUGIN_DIR=${NET_PLUGIN_DIR:-""}
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 SERVICE_CLUSTER_IP_RANGE=${SERVICE_CLUSTER_IP_RANGE:-"10.0.0.0/24"}
+CGROUPS_PER_QOS=${CGROUPS_PER_QOS:-true}
+# TODO: this should not error, and just default to /
+CGROUP_ROOT=${CGROUP_ROOT:-"/"}
+
 # We disable cluster DNS by default because this script uses docker0 (or whatever
 # container bridge docker is currently using) and we don't know the IP of the
 # DNS pod to pass in as --cluster-dns. To set this up by hand, set this flag
@@ -417,7 +421,8 @@ function start_kubelet {
         --api-servers="${API_HOST}:${API_PORT}" \
         --feature-gates="${FEATURE_GATES}" \
         --cpu-cfs-quota=${CPU_CFS_QUOTA} \
-        --enable-controller-attach-detach="${ENABLE_CONTROLLER_ATTACH_DETACH}" \
+        --cgroups-per-qos=${CGROUPS_PER_QOS} \
+        --cgroup-root=${CGROUP_ROOT} \
         ${dns_args} \
         ${net_plugin_dir_args} \
         ${net_plugin_args} \

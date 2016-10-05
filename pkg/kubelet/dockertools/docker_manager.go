@@ -41,6 +41,7 @@ import (
 	dockernat "github.com/docker/go-connections/nat"
 	"github.com/golang/glog"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
+	cgroupsystemd "github.com/opencontainers/runc/libcontainer/cgroups/systemd"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -136,6 +137,9 @@ type DockerManager struct {
 
 	// Root of the Docker runtime.
 	dockerRoot string
+
+	// cgroup driver used by Docker runtime.
+	cgroupDriver string
 
 	// Directory of container logs.
 	containerLogsDir string
@@ -233,6 +237,7 @@ func NewDockerManager(
 	// Work out the location of the Docker runtime, defaulting to /var/lib/docker
 	// if there are any problems.
 	dockerRoot := "/var/lib/docker"
+	cgroupDriver := "cgroupfs"
 	dockerInfo, err := client.Info()
 	if err != nil {
 		glog.Errorf("Failed to execute Info() call to the Docker client: %v", err)
@@ -240,6 +245,9 @@ func NewDockerManager(
 	} else {
 		dockerRoot = dockerInfo.DockerRootDir
 		glog.Infof("Setting dockerRoot to %s", dockerRoot)
+
+		cgroupDriver = dockerInfo.CgroupDriver
+		glog.Infof("Setting cgroupDriver to %s", cgroupDriver)
 	}
 
 	dm := &DockerManager{
@@ -251,6 +259,7 @@ func NewDockerManager(
 		podInfraContainerImage: podInfraContainerImage,
 		dockerPuller:           newDockerPuller(client),
 		dockerRoot:             dockerRoot,
+		cgroupDriver:           cgroupDriver,
 		containerLogsDir:       containerLogsDir,
 		networkPlugin:          networkPlugin,
 		livenessManager:        livenessManager,
@@ -699,7 +708,15 @@ func (dm *DockerManager) runContainer(
 	}
 
 	if len(opts.CgroupParent) > 0 {
-		hc.CgroupParent = opts.CgroupParent
+		cgroupParent := opts.CgroupParent
+		if dm.cgroupDriver == "systemd" {
+			cgroupParent, err = cgroupsystemd.Contract(opts.CgroupParent)
+			if err != nil {
+				return kubecontainer.ContainerID{}, err
+			}
+		}
+		glog.Infof("cgroup manager: launching container with cgroup parent: %v", cgroupParent)
+		hc.CgroupParent = cgroupParent
 	}
 
 	dockerOpts := dockertypes.ContainerCreateConfig{
