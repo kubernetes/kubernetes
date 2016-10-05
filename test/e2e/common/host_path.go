@@ -81,7 +81,7 @@ var _ = framework.KubeDescribe("HostPath", func() {
 		})
 	})
 
-	It("should support subPath [Conformance]", func() {
+	It("should support subPath", func() {
 		volumePath := "/test-volume"
 		subPath := "sub-path"
 		fileName := "test-file"
