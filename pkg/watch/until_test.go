@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 func TestUntil(t *testing.T) {
@@ -83,17 +82,33 @@ func TestUntilMultipleConditions(t *testing.T) {
 
 func TestUntilTimeout(t *testing.T) {
 	fw := NewFake()
+	go func() {
+		var obj *api.Pod
+		fw.Add(obj)
+		fw.Modify(obj)
+	}()
 	conditions := []ConditionFunc{
-		func(event Event) (bool, error) { return event.Type == Added, nil },
+		func(event Event) (bool, error) {
+			return event.Type == Added, nil
+		},
+		func(event Event) (bool, error) {
+			return event.Type == Modified, nil
+		},
 	}
 
 	timeout := time.Duration(0)
 	lastEvent, err := Until(timeout, fw, conditions...)
-	if err != wait.ErrWaitTimeout {
-		t.Fatalf("expected ErrWaitTimeout error, got %#v", err)
+	if err != nil {
+		t.Fatalf("expected nil error, got %#v", err)
 	}
-	if lastEvent != nil {
-		t.Fatalf("expected nil event, got %#v", lastEvent)
+	if lastEvent == nil {
+		t.Fatal("expected an event")
+	}
+	if lastEvent.Type != Modified {
+		t.Fatalf("expected MODIFIED event type, got %v", lastEvent.Type)
+	}
+	if got, isPod := lastEvent.Object.(*api.Pod); !isPod {
+		t.Fatalf("expected a pod event, got %#v", got)
 	}
 }
 
