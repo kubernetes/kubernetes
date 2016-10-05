@@ -67,6 +67,8 @@ cluster/ubuntu/util.sh:  local node_ip=${1}
 cluster/vagrant/provision-utils.sh:  api_servers: '$(echo "$MASTER_IP" | sed -e "s/'/''/g")'
 cluster/vagrant/provision-utils.sh:  node_ip: '$(echo "$MASTER_IP" | sed -e "s/'/''/g")'
 cluster/vagrant/provision-utils.sh:  runtime_config: '$(echo "$RUNTIME_CONFIG" | sed -e "s/'/''/g")'
+cluster/vsphere/templates/salt-master.sh:  cloud_config: $CLOUD_CONFIG
+cluster/vsphere/templates/salt-minion.sh:  cloud_config: $CLOUD_CONFIG
 cluster/vsphere/templates/salt-minion.sh:  hostname_override: $(ip route get 1.1.1.1 | awk '{print $7}')
 examples/cluster-dns/images/frontend/client.py:  service_address = socket.gethostbyname(hostname)
 examples/storage/cassandra/image/run.sh:	cluster_name \
