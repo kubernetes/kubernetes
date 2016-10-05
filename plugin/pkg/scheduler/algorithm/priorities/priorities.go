@@ -48,7 +48,7 @@ func calculateUnusedScore(requested int64, capacity int64, node string) int64 {
 		return 0
 	}
 	if requested > capacity {
-		glog.V(2).Infof("Combined requested resources %d from existing pods exceeds capacity %d on node %s",
+		glog.V(4).Infof("Combined requested resources %d from existing pods exceeds capacity %d on node %s",
 			requested, capacity, node)
 		return 0
 	}
@@ -67,7 +67,7 @@ func calculateUsedScore(requested int64, capacity int64, node string) int64 {
 		return 0
 	}
 	if requested > capacity {
-		glog.V(2).Infof("Combined requested resources %d from existing pods exceeds capacity %d on node %s",
+		glog.V(4).Infof("Combined requested resources %d from existing pods exceeds capacity %d on node %s",
 			requested, capacity, node)
 		return 0
 	}
