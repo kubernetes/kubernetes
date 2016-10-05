@@ -19,6 +19,8 @@ package etcd3
 import (
 	"fmt"
 	"net/http"
+	"reflect"
+	rt "runtime"
 	"strings"
 	"sync"
 
@@ -57,6 +59,9 @@ type watchChan struct {
 	incomingEventChan chan *event
 	resultChan        chan watch.Event
 	errChan           chan error
+	// TODO: Remove it when the hacky optimization in prepareObjs method
+	// is no longer needed.
+	isEverythingFilter bool
 }
 
 func newWatcher(client *clientv3.Client, codec runtime.Codec, versioner storage.Versioner) *watcher {
@@ -94,6 +99,8 @@ func (w *watcher) createWatchChan(ctx context.Context, key string, rev int64, re
 		resultChan:        make(chan watch.Event, outgoingBufSize),
 		errChan:           make(chan error, 1),
 	}
+	filterFuncName := rt.FuncForPC(reflect.ValueOf(filter).Pointer()).Name()
+	wc.isEverythingFilter = filterFuncName == "k8s.io/kubernetes/pkg/storage.EverythingFunc"
 	wc.ctx, wc.cancel = context.WithCancel(ctx)
 	return wc
 }
@@ -232,7 +239,7 @@ func (wc *watchChan) processEvent(wg *sync.WaitGroup) {
 //   - For PUT, we can save current and previous objects into the value.
 //   - For DELETE, See https://github.com/coreos/etcd/issues/4620
 func (wc *watchChan) transform(e *event) (res *watch.Event) {
-	curObj, oldObj, err := prepareObjs(wc.ctx, e, wc.watcher.client, wc.watcher.codec, wc.watcher.versioner)
+	curObj, oldObj, err := prepareObjs(wc.ctx, e, wc.watcher.client, wc.watcher.codec, wc.watcher.versioner, wc.isEverythingFilter)
 	if err != nil {
 		glog.Errorf("failed to prepare current and previous objects: %v", err)
 		wc.sendError(err)
@@ -324,7 +331,9 @@ func (wc *watchChan) sendEvent(e *event) {
 	}
 }
 
-func prepareObjs(ctx context.Context, e *event, client *clientv3.Client, codec runtime.Codec, versioner storage.Versioner) (curObj runtime.Object, oldObj runtime.Object, err error) {
+func prepareObjs(
+	ctx context.Context, e *event, client *clientv3.Client, codec runtime.Codec,
+	versioner storage.Versioner, isEverythingFilter bool) (curObj runtime.Object, oldObj runtime.Object, err error) {
 	if !e.isDeleted {
 		curObj, err = decodeObj(codec, versioner, e.value, e.rev)
 		if err != nil {
@@ -332,17 +341,30 @@ func prepareObjs(ctx context.Context, e *event, client *clientv3.Client, codec r
 		}
 	}
 	if e.isDeleted || !e.isCreated {
-		getResp, err := client.Get(ctx, e.key, clientv3.WithRev(e.rev-1), clientv3.WithSerializable())
-		if err != nil {
-			return nil, nil, err
-		}
-		// Note that this sends the *old* object with the etcd revision for the time at
-		// which it gets deleted.
-		// We assume old object is returned only in Deleted event. Users (e.g. cacher) need
-		// to have larger than previous rev to tell the ordering.
-		oldObj, err = decodeObj(codec, versioner, getResp.Kvs[0].Value, e.rev)
-		if err != nil {
-			return nil, nil, err
+		// TODO: Since we are using Cacher as a layer on top of etcd-specific implementations
+		// of storage.Interface, (allmost) all watches that are processed here have a filter
+		// that is not filtering out anything (i.e. storage.Everything filter).
+		// In this case, we don't actually need oldObj at all, and we can save request to etcd.
+		// This is to temporarily workaround #33653.
+		// We should remove this hack (by leaving only else block) once the proper optimization
+		// described in transform() method comment is done.
+		if !e.isDeleted && isEverythingFilter {
+			// We cannot return nil, because we need to be able to call get object labels
+			// and fields to check if it matches.
+			oldObj = curObj
+		} else {
+			getResp, err := client.Get(ctx, e.key, clientv3.WithRev(e.rev-1), clientv3.WithSerializable())
+			if err != nil {
+				return nil, nil, err
+			}
+			// Note that this sends the *old* object with the etcd revision for the time at
+			// which it gets deleted.
+			// We assume old object is returned only in Deleted event. Users (e.g. cacher) need
+			// to have larger than previous rev to tell the ordering.
+			oldObj, err = decodeObj(codec, versioner, getResp.Kvs[0].Value, e.rev)
+			if err != nil {
+				return nil, nil, err
+			}
 		}
 	}
 	return curObj, oldObj, nil
