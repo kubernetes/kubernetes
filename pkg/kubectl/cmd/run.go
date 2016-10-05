@@ -224,7 +224,7 @@ func Run(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cobr
 
 	params["env"] = cmdutil.GetFlagStringSlice(cmd, "env")
 
-	obj, _, mapper, mapping, err := createGeneratedObject(f, cmd, generator, names, params, cmdutil.GetFlagString(cmd, "overrides"), namespace)
+	obj, _, mapper, mapping, err := createGeneratedObject(f, cmd, args, generator, names, params, cmdutil.GetFlagString(cmd, "overrides"), namespace, cmdOut)
 	if err != nil {
 		return err
 	}
@@ -237,6 +237,10 @@ func Run(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cobr
 		if err := generateService(f, cmd, args, serviceGenerator, params, namespace, cmdOut); err != nil {
 			return err
 		}
+	}
+
+	if cmdutil.GetDryRunFlag(cmd) {
+		return err
 	}
 
 	attachFlag := cmd.Flags().Lookup("attach")
@@ -570,20 +574,11 @@ func generateService(f cmdutil.Factory, cmd *cobra.Command, args []string, servi
 		params["default-name"] = name
 	}
 
-	obj, _, mapper, mapping, err := createGeneratedObject(f, cmd, generator, names, params, cmdutil.GetFlagString(cmd, "service-overrides"), namespace)
-	if err != nil {
-		return err
-	}
-
-	if cmdutil.GetFlagString(cmd, "output") != "" || cmdutil.GetDryRunFlag(cmd) {
-		return f.PrintObject(cmd, mapper, obj, out)
-	}
-	cmdutil.PrintSuccess(mapper, false, out, mapping.Resource, args[0], cmdutil.GetDryRunFlag(cmd), "created")
-
-	return nil
+	_, _, _, _, err := createGeneratedObject(f, cmd, args, generator, names, params, cmdutil.GetFlagString(cmd, "service-overrides"), namespace, out)
+	return err
 }
 
-func createGeneratedObject(f cmdutil.Factory, cmd *cobra.Command, generator kubectl.Generator, names []kubectl.GeneratorParam, params map[string]interface{}, overrides, namespace string) (runtime.Object, string, meta.RESTMapper, *meta.RESTMapping, error) {
+func createGeneratedObject(f cmdutil.Factory, cmd *cobra.Command, args []string, generator kubectl.Generator, names []kubectl.GeneratorParam, params map[string]interface{}, overrides, namespace string, out io.Writer) (runtime.Object, string, meta.RESTMapper, *meta.RESTMapping, error) {
 	err := kubectl.ValidateParams(names, params)
 	if err != nil {
 		return nil, "", nil, nil, err
@@ -628,7 +623,9 @@ func createGeneratedObject(f cmdutil.Factory, cmd *cobra.Command, generator kube
 			return nil, "", nil, nil, err
 		}
 	}
-	if !cmdutil.GetDryRunFlag(cmd) {
+
+	dryRun := cmdutil.GetDryRunFlag(cmd)
+	if !dryRun {
 		resourceMapper := &resource.Mapper{
 			ObjectTyper:  typer,
 			RESTMapper:   mapper,
@@ -649,5 +646,15 @@ func createGeneratedObject(f cmdutil.Factory, cmd *cobra.Command, generator kube
 			return nil, "", nil, nil, err
 		}
 	}
+
+	if cmdutil.GetFlagString(cmd, "output") != "" || dryRun {
+		err = f.PrintObject(cmd, mapper, obj, out)
+		if err != nil {
+			return nil, "", nil, nil, err
+		}
+	} else {
+		cmdutil.PrintSuccess(mapper, false, out, mapping.Resource, args[0], cmdutil.GetDryRunFlag(cmd), "created")
+	}
+
 	return obj, groupVersionKind.Kind, mapper, mapping, err
 }
