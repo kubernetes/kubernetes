@@ -45,6 +45,7 @@ type AnnotateOptions struct {
 	selector          string
 
 	overwrite       bool
+	local           bool
 	all             bool
 	resourceVersion string
 
@@ -125,6 +126,7 @@ func NewCmdAnnotate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmdutil.AddInclude3rdPartyFlags(cmd)
 	cmd.Flags().StringVarP(&options.selector, "selector", "l", "", "Selector (label query) to filter on")
 	cmd.Flags().BoolVar(&options.overwrite, "overwrite", false, "If true, allow annotations to be overwritten, otherwise reject annotation updates that overwrite existing annotations.")
+	cmd.Flags().BoolVar(&options.local, "local", false, "If true, annotation will NOT contact api-server but run locally.")
 	cmd.Flags().BoolVar(&options.all, "all", false, "select all resources in the namespace of the specified resource types")
 	cmd.Flags().StringVar(&options.resourceVersion, "resource-version", "", "If non-empty, the annotation update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource.")
 	usage := "identifying the resource to update the annotation"
@@ -167,10 +169,12 @@ func (o *AnnotateOptions) Complete(f *cmdutil.Factory, out io.Writer, cmd *cobra
 		ContinueOnError().
 		NamespaceParam(namespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &o.FilenameOptions).
-		SelectorParam(o.selector).
-		ResourceTypeOrNameArgs(o.all, o.resources...).
-		Flatten().
-		Latest()
+		Flatten()
+	if !o.local {
+		o.builder = o.builder.SelectorParam(o.selector).
+			ResourceTypeOrNameArgs(o.all, o.resources...).
+			Latest()
+	}
 
 	o.f = f
 	o.out = out
@@ -207,49 +211,56 @@ func (o AnnotateOptions) RunAnnotate() error {
 			return err
 		}
 
+		var outputObj runtime.Object
 		obj, err := cmdutil.MaybeConvertObject(info.Object, info.Mapping.GroupVersionKind.GroupVersion(), info.Mapping)
 		if err != nil {
 			return err
 		}
-		name, namespace := info.Name, info.Namespace
-		oldData, err := json.Marshal(obj)
-		if err != nil {
-			return err
-		}
-		// If we should record change-cause, add it to new annotations
-		if cmdutil.ContainsChangeCause(info) || o.recordChangeCause {
-			o.newAnnotations[kubectl.ChangeCauseAnnotation] = o.changeCause
-		}
-		if err := o.updateAnnotations(obj); err != nil {
-			return err
-		}
-		newData, err := json.Marshal(obj)
-		if err != nil {
-			return err
-		}
-		patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, obj)
-		createdPatch := err == nil
-		if err != nil {
-			glog.V(2).Infof("couldn't compute patch: %v", err)
-		}
-
-		mapping := info.ResourceMapping()
-		client, err := o.f.ClientForMapping(mapping)
-		if err != nil {
-			return err
-		}
-		helper := resource.NewHelper(client, mapping)
-
-		var outputObj runtime.Object
-		if createdPatch {
-			outputObj, err = helper.Patch(namespace, name, api.StrategicMergePatchType, patchBytes)
+		if o.local {
+			if err := o.updateAnnotations(obj); err != nil {
+				return err
+			}
+			outputObj = obj
 		} else {
-			outputObj, err = helper.Replace(namespace, name, false, obj)
-		}
-		if err != nil {
-			return err
-		}
+			name, namespace := info.Name, info.Namespace
+			oldData, err := json.Marshal(obj)
+			if err != nil {
+				return err
+			}
+			// If we should record change-cause, add it to new annotations
+			if cmdutil.ContainsChangeCause(info) || o.recordChangeCause {
+				o.newAnnotations[kubectl.ChangeCauseAnnotation] = o.changeCause
+			}
+			if err := o.updateAnnotations(obj); err != nil {
+				return err
+			}
+			newData, err := json.Marshal(obj)
+			if err != nil {
+				return err
+			}
+			patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, obj)
+			createdPatch := err == nil
+			if err != nil {
+				glog.V(2).Infof("couldn't compute patch: %v", err)
+			}
 
+			mapping := info.ResourceMapping()
+			client, err := o.f.ClientForMapping(mapping)
+			if err != nil {
+				return err
+			}
+			helper := resource.NewHelper(client, mapping)
+
+			if createdPatch {
+				outputObj, err = helper.Patch(namespace, name, api.StrategicMergePatchType, patchBytes)
+			} else {
+				outputObj, err = helper.Replace(namespace, name, false, obj)
+			}
+			if err != nil {
+				return err
+			}
+
+		}
 		mapper, _ := o.f.Object()
 		outputFormat := cmdutil.GetFlagString(o.cmd, "output")
 		if outputFormat != "" {
