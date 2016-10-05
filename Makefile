@@ -21,6 +21,11 @@ else
     MAKEFLAGS += -s
 endif
 
+ERRS := $(shell hack/verify-build-preconditions.sh 2>&1)
+ifneq ($(ERRS),)
+    $(error Build preconditions failed: $(ERRS))
+endif
+
 
 # Old-skool build tools.
 #
