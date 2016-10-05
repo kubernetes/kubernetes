@@ -62,7 +62,7 @@ func ListAllByNamespace(indexer Indexer, namespace string, selector labels.Selec
 		return nil
 	}
 
-	items, err := indexer.Index(NamespaceIndex, api.ObjectMeta{Namespace: namespace})
+	items, err := indexer.Index(NamespaceIndex, &api.ObjectMeta{Namespace: namespace})
 	if err != nil {
 		// Ignore error; do slow search without index.
 		glog.Warningf("can not retrieve list of objects using index : %v", err)
