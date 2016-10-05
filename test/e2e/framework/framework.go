@@ -269,6 +269,10 @@ func (f *Framework) BeforeEach() {
 }
 
 func (f *Framework) deleteFederationNs() {
+	if !f.federated {
+		// Nothing to do if this is not a federation setup.
+		return
+	}
 	ns := f.FederationNamespace
 	By(fmt.Sprintf("Destroying federation namespace %q for this suite.", ns.Name))
 	timeout := 5 * time.Minute
@@ -327,10 +331,7 @@ func (f *Framework) AfterEach() {
 				}
 			}
 			// Delete the federation namespace.
-			// TODO(nikhiljindal): Uncomment this, once https://github.com/kubernetes/kubernetes/issues/31077 is fixed.
-			// In the meantime, we will have these extra namespaces in all clusters.
-			// Note: this will not cause any failure since we create a new namespace for each test in BeforeEach().
-			// f.deleteFederationNs()
+			f.deleteFederationNs()
 		} else {
 			Logf("Found DeleteNamespace=false, skipping namespace deletion!")
 		}
