@@ -25,6 +25,7 @@ import (
 	"github.com/spf13/cobra"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubechecks "k8s.io/kubernetes/cmd/kubeadm/app/checks"
 	kubemaster "k8s.io/kubernetes/cmd/kubeadm/app/master"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/pkg/api"
@@ -49,6 +50,7 @@ var (
 func NewCmdInit(out io.Writer) *cobra.Command {
 	cfg := &kubeadmapi.MasterConfiguration{}
 	var cfgPath string
+	var skipChecks bool
 	cmd := &cobra.Command{
 		Use:   "init",
 		Short: "Run this in order to set up the Kubernetes master.",
@@ -58,7 +60,7 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 					cmdutil.CheckErr(fmt.Errorf("<cmd/init> %v", err))
 				}
 			}
-			i, err := NewInit(cfgPath, cfg)
+			i, err := NewInit(cfgPath, cfg, skipChecks)
 			check(err)
 			check(i.Run(out))
 		},
@@ -124,6 +126,10 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 		"etcd client key file. Note: The path must be in /etc/ssl/certs",
 	)
 	cmd.PersistentFlags().MarkDeprecated("external-etcd-keyfile", "this flag will be removed when componentconfig exists")
+	cmd.PersistentFlags().BoolVar(
+		&skipChecks, "skip-checks", false,
+		"skip checks normally run before modifying the system",
+	)
 
 	return cmd
 }
@@ -132,7 +138,7 @@ type Init struct {
 	cfg *kubeadmapi.MasterConfiguration
 }
 
-func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration) (*Init, error) {
+func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipChecks bool) (*Init, error) {
 	if cfgPath != "" {
 		b, err := ioutil.ReadFile(cfgPath)
 		if err != nil {
@@ -142,6 +148,14 @@ func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration) (*Init, error)
 			return nil, fmt.Errorf("unable to decode config from %q [%v]", cfgPath, err)
 		}
 	}
+
+	if !skipChecks {
+		fmt.Println("Running pre-flight checks")
+		kubechecks.RunInitMasterChecks()
+	} else {
+		fmt.Println("Skipping pre-flight checks")
+	}
+
 	// Auto-detect the IP
 	if len(cfg.API.AdvertiseAddresses) == 0 {
 		// TODO(phase1+) perhaps we could actually grab eth0 and eth1
