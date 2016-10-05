@@ -18,17 +18,19 @@ package common
 
 import (
 	"strings"
+	"time"
 
+	"github.com/golang/glog"
 	. "github.com/onsi/ginkgo"
 	api "k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 const (
-	kubeletEtcHostsImageName          = "gcr.io/google_containers/netexec:1.7"
-	kubeletEtcHostsPodName            = "test-pod"
-	kubeletEtcHostsHostNetworkPodName = "test-host-network-pod"
-	etcHostsPartialContent            = "# Kubernetes-managed hosts file."
+	etcHostsImageName          = "gcr.io/google_containers/netexec:1.7"
+	etcHostsPodName            = "test-pod"
+	etcHostsHostNetworkPodName = "test-host-network-pod"
+	etcHostsPartialContent     = "# Kubernetes-managed hosts file."
 )
 
 type KubeletManagedHostConfig struct {
@@ -54,20 +56,15 @@ var _ = framework.KubeDescribe("KubeletManagedEtcHosts", func() {
 
 func (config *KubeletManagedHostConfig) verifyEtcHosts() {
 	By("Verifying /etc/hosts of container is kubelet-managed for pod with hostNetwork=false")
-	stdout := config.getEtcHostsContent(kubeletEtcHostsPodName, "busybox-1")
-	assertEtcHostsIsKubeletManaged(stdout)
-	stdout = config.getEtcHostsContent(kubeletEtcHostsPodName, "busybox-2")
-	assertEtcHostsIsKubeletManaged(stdout)
+	assertManagedStatus(config, etcHostsPodName, true, "busybox-1")
+	assertManagedStatus(config, etcHostsPodName, true, "busybox-2")
 
 	By("Verifying /etc/hosts of container is not kubelet-managed since container specifies /etc/hosts mount")
-	stdout = config.getEtcHostsContent(kubeletEtcHostsPodName, "busybox-3")
-	assertEtcHostsIsNotKubeletManaged(stdout)
+	assertManagedStatus(config, etcHostsPodName, false, "busybox-3")
 
 	By("Verifying /etc/hosts content of container is not kubelet-managed for pod with hostNetwork=true")
-	stdout = config.getEtcHostsContent(kubeletEtcHostsHostNetworkPodName, "busybox-1")
-	assertEtcHostsIsNotKubeletManaged(stdout)
-	stdout = config.getEtcHostsContent(kubeletEtcHostsHostNetworkPodName, "busybox-2")
-	assertEtcHostsIsNotKubeletManaged(stdout)
+	assertManagedStatus(config, etcHostsHostNetworkPodName, false, "busybox-1")
+	assertManagedStatus(config, etcHostsHostNetworkPodName, false, "busybox-2")
 }
 
 func (config *KubeletManagedHostConfig) setup() {
@@ -79,26 +76,64 @@ func (config *KubeletManagedHostConfig) setup() {
 }
 
 func (config *KubeletManagedHostConfig) createPodWithoutHostNetwork() {
-	podSpec := config.createPodSpec(kubeletEtcHostsPodName)
+	podSpec := config.createPodSpec(etcHostsPodName)
 	config.pod = config.f.PodClient().CreateSync(podSpec)
 }
 
 func (config *KubeletManagedHostConfig) createPodWithHostNetwork() {
-	podSpec := config.createPodSpecWithHostNetwork(kubeletEtcHostsHostNetworkPodName)
+	podSpec := config.createPodSpecWithHostNetwork(etcHostsHostNetworkPodName)
 	config.hostNetworkPod = config.f.PodClient().CreateSync(podSpec)
 }
 
-func assertEtcHostsIsKubeletManaged(etcHostsContent string) {
-	isKubeletManaged := strings.Contains(etcHostsContent, etcHostsPartialContent)
-	if !isKubeletManaged {
-		framework.Failf("/etc/hosts file should be kubelet managed, but is not: %q", etcHostsContent)
-	}
-}
+func assertManagedStatus(
+	config *KubeletManagedHostConfig, podName string, expectedIsManaged bool, name string) {
+	// See https://github.com/kubernetes/kubernetes/issues/27023
+	//
+	// Retry until timeout for the right contents of /etc/hosts to show
+	// up. There may be a low probability race here. We still fail the
+	// test if retry was necessary, but at least we will know whether or
+	// not it resolves or seems to be a permanent condition.
+	//
+	// If /etc/hosts is properly mounted, then this will succeed
+	// immediately.
+	const retryTimeout = 30 * time.Second
 
-func assertEtcHostsIsNotKubeletManaged(etcHostsContent string) {
-	isKubeletManaged := strings.Contains(etcHostsContent, etcHostsPartialContent)
-	if isKubeletManaged {
-		framework.Failf("/etc/hosts file should not be kubelet managed, but is: %q", etcHostsContent)
+	retryCount := 0
+	etcHostsContent := ""
+	matched := false
+
+	for startTime := time.Now(); time.Since(startTime) < retryTimeout; {
+		etcHostsContent = config.getEtcHostsContent(podName, name)
+		isManaged := strings.Contains(etcHostsContent, etcHostsPartialContent)
+
+		if expectedIsManaged == isManaged {
+			matched = true
+			break
+		}
+
+		glog.Errorf(
+			"For pod: %s, name: %s, expected %t, actual %t (/etc/hosts was %q), retryCount: %d",
+			podName, name, expectedIsManaged, isManaged, etcHostsContent, retryCount)
+
+		retryCount++
+		time.Sleep(100 * time.Millisecond)
+	}
+
+	if retryCount > 0 {
+		if matched {
+			conditionText := "should"
+			if !expectedIsManaged {
+				conditionText = "should not"
+			}
+
+			framework.Failf(
+				"/etc/hosts file %s be kubelet managed (name: %s, retries: %d). /etc/hosts contains %q",
+				conditionText, name, retryCount, etcHostsContent)
+		} else {
+			framework.Failf(
+				"had to retry %d times to get matching content in /etc/hosts (name: %s)",
+				retryCount, name)
+		}
 	}
 }
 
@@ -115,7 +150,7 @@ func (config *KubeletManagedHostConfig) createPodSpec(podName string) *api.Pod {
 			Containers: []api.Container{
 				{
 					Name:            "busybox-1",
-					Image:           kubeletEtcHostsImageName,
+					Image:           etcHostsImageName,
 					ImagePullPolicy: api.PullIfNotPresent,
 					Command: []string{
 						"sleep",
@@ -124,7 +159,7 @@ func (config *KubeletManagedHostConfig) createPodSpec(podName string) *api.Pod {
 				},
 				{
 					Name:            "busybox-2",
-					Image:           kubeletEtcHostsImageName,
+					Image:           etcHostsImageName,
 					ImagePullPolicy: api.PullIfNotPresent,
 					Command: []string{
 						"sleep",
@@ -133,7 +168,7 @@ func (config *KubeletManagedHostConfig) createPodSpec(podName string) *api.Pod {
 				},
 				{
 					Name:            "busybox-3",
-					Image:           kubeletEtcHostsImageName,
+					Image:           etcHostsImageName,
 					ImagePullPolicy: api.PullIfNotPresent,
 					Command: []string{
 						"sleep",
@@ -174,7 +209,7 @@ func (config *KubeletManagedHostConfig) createPodSpecWithHostNetwork(podName str
 			Containers: []api.Container{
 				{
 					Name:            "busybox-1",
-					Image:           kubeletEtcHostsImageName,
+					Image:           etcHostsImageName,
 					ImagePullPolicy: api.PullIfNotPresent,
 					Command: []string{
 						"sleep",
@@ -183,7 +218,7 @@ func (config *KubeletManagedHostConfig) createPodSpecWithHostNetwork(podName str
 				},
 				{
 					Name:            "busybox-2",
-					Image:           kubeletEtcHostsImageName,
+					Image:           etcHostsImageName,
 					ImagePullPolicy: api.PullIfNotPresent,
 					Command: []string{
 						"sleep",
