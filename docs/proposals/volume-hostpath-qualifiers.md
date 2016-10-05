@@ -58,6 +58,7 @@ Additional possible values, which are proposed to be excluded:
 | `block-device` |  | Granularity beyond `device` is likely to not help |
 | `new-file` | Like file, but if nothing exist an empty file is created instead | In general, bindmounting the parent directory of the file you intend to create addresses this usecase |
 
+
 ### Volume SubPaths
 
 Volumes may also have a `subPath` specified, which similarly may or may not exist. I similarly propose that the [v1.VolumeMount](https://github.com/kubernetes/kubernetes/blob/d26b4ca2859aa667ad520fb9518e0db67b74216a/pkg/api/types.go#L886-L897) type be augmented with a `SubPathType` field which the exact same semantics as above.
@@ -75,6 +76,9 @@ This feature does not make sense for any of the other volume types simply becaus
 
 Only the HostVolume and SubPath means of referencing a path have the potential to reference arbitrary incorrect or nonexistent things without erroring out.
 
+### Alternatives
+
+One alternative is to augment Host Volumes with a `MustExist` bool and provide no further granularity. This would allow toggling between the `auto` and `exists` behaviors described above. This would likely cover the "90%" use-case and would be a simpler API.
 
 ## Kubelet implementation
 
