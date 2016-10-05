@@ -2571,7 +2571,9 @@ func validateServicePort(sp *api.ServicePort, requireName, isHeadlessService boo
 func ValidateServiceUpdate(service, oldService *api.Service) field.ErrorList {
 	allErrs := ValidateObjectMetaUpdate(&service.ObjectMeta, &oldService.ObjectMeta, field.NewPath("metadata"))
 
-	if api.IsServiceIPSet(oldService) {
+	// ClusterIP should be mutable only for empty value, to allow assigning ClusterIP
+	// for service changing type to one that requires ClusterIP
+	if oldService.Spec.ClusterIP != "" {
 		allErrs = append(allErrs, ValidateImmutableField(service.Spec.ClusterIP, oldService.Spec.ClusterIP, field.NewPath("spec", "clusterIP"))...)
 	}
 
