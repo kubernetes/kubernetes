@@ -1,63 +1,52 @@
 /*
 Copyright 2016 The Kubernetes Authors.
+
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
+
     http://www.apache.org/licenses/LICENSE-2.0
+
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+
 package portforward
 
 import (
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"strconv"
 	"sync"
 	"time"
 
-	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/httpstream"
 	"k8s.io/kubernetes/pkg/util/httpstream/spdy"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
+
+	"github.com/golang/glog"
 )
 
-// PortForwarder knows how to forward content from a data stream to/from a port
-// in a pod.
-type PortForwarder interface {
-	// PortForwarder copies data between a data stream and a port in a pod.
-	PortForward(name string, uid types.UID, port uint16, stream io.ReadWriteCloser) error
-}
-
-// ServePortForward handles a port forwarding request.  A single request is
-// kept alive as long as the client is still alive and the connection has not
-// been timed out due to idleness. This function handles multiple forwarded
-// connections; i.e., multiple `curl http://localhost:8888/` requests will be
-// handled by a single invocation of ServePortForward.
-func ServePortForward(w http.ResponseWriter, req *http.Request, portForwarder PortForwarder, podName string, uid types.UID, idleTimeout time.Duration, streamCreationTimeout time.Duration) {
-	supportedProtocols := []string{ProtocolV1Name}
-	_, err := httpstream.Handshake(req, w, supportedProtocols)
+func handleHttpStreams(req *http.Request, w http.ResponseWriter, portForwarder PortForwarder, podName string, uid types.UID, supportedPortForwardProtocols []string, idleTimeout, streamCreationTimeout time.Duration) error {
+	_, err := httpstream.Handshake(req, w, supportedPortForwardProtocols)
 	// negotiated protocol isn't currently used server side, but could be in the future
 	if err != nil {
 		// Handshake writes the error to the client
-		utilruntime.HandleError(err)
-		return
+		return err
 	}
-
 	streamChan := make(chan httpstream.Stream, 1)
 
 	glog.V(5).Infof("Upgrading port forward response")
 	upgrader := spdy.NewResponseUpgrader()
 	conn := upgrader.UpgradeResponse(w, req, httpStreamReceived(streamChan))
 	if conn == nil {
-		return
+		return errors.New("Unable to upgrade websocket connection")
 	}
 	defer conn.Close()
 
@@ -74,6 +63,8 @@ func ServePortForward(w http.ResponseWriter, req *http.Request, portForwarder Po
 		forwarder: portForwarder,
 	}
 	h.run()
+
+	return nil
 }
 
 // httpStreamReceived is the httpstream.NewStreamHandler for port
