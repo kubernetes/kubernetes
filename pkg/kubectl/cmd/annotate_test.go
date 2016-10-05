@@ -517,6 +517,34 @@ func TestAnnotateObjectFromFile(t *testing.T) {
 	}
 }
 
+func TestAnnotateLocal(t *testing.T) {
+	f, tf, _, ns := NewAPIFactory()
+	tf.Client = &fake.RESTClient{
+		NegotiatedSerializer: ns,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			t.Fatalf("unexpected request: %s %#v\n%#v", req.Method, req.URL, req)
+			return nil, nil
+		}),
+	}
+	tf.Namespace = "test"
+	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}}
+
+	buf := bytes.NewBuffer([]byte{})
+	cmd := NewCmdAnnotate(f, buf)
+	options := &AnnotateOptions{local: true}
+	options.Filenames = []string{"../../../examples/storage/cassandra/cassandra-controller.yaml"}
+	args := []string{"a=b"}
+	if err := options.Complete(f, buf, cmd, args); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if err := options.Validate(args); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if err := options.RunAnnotate(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestAnnotateMultipleObjects(t *testing.T) {
 	pods, _, _ := testData()
 
