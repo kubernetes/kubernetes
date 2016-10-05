@@ -47,8 +47,8 @@ const (
 // A function that calculates how many pods from the list are in one of
 // the meaningful (from the replica set perspective) states. This function is
 // a temporary workaround against the current lack of ownerRef in pods.
-func AnalysePods(replicaSet *v1beta1.ReplicaSet, allPods []util.FederatedObject, currentTime time.Time) (map[string]PodAnalysisResult, error) {
-	selector, err := labelSelectorAsSelector(replicaSet.Spec.Selector)
+func AnalysePods(selectorv1 *v1beta1.LabelSelector, allPods []util.FederatedObject, currentTime time.Time) (map[string]PodAnalysisResult, error) {
+	selector, err := labelSelectorAsSelector(selectorv1)
 	if err != nil {
 		return nil, fmt.Errorf("invalid selector: %v", err)
 	}

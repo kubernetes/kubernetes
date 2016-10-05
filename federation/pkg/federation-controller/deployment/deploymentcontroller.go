@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package replicaset
+package deployment
 
 import (
 	"bytes"
@@ -29,6 +29,7 @@ import (
 	fed "k8s.io/kubernetes/federation/apis/federation"
 	fedv1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5"
+	"k8s.io/kubernetes/federation/pkg/federation-controller/replicaset"
 	planner "k8s.io/kubernetes/federation/pkg/federation-controller/replicaset/planner"
 	fedutil "k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/eventsink"
@@ -47,41 +48,41 @@ import (
 )
 
 const (
-	FedReplicaSetPreferencesAnnotation = "federation.kubernetes.io/replica-set-preferences"
+	FedDeploymentPreferencesAnnotation = "federation.kubernetes.io/deployment-preferences"
 	allClustersKey                     = "THE_ALL_CLUSTER_KEY"
-	UserAgentName                      = "Federation-replicaset-Controller"
+	UserAgentName                      = "Federation-Deployment-Controller"
 )
 
 var (
-	replicaSetReviewDelay    = 10 * time.Second
+	deploymentReviewDelay    = 10 * time.Second
 	clusterAvailableDelay    = 20 * time.Second
 	clusterUnavailableDelay  = 60 * time.Second
-	allReplicaSetReviewDelay = 2 * time.Minute
+	allDeploymentReviewDelay = 2 * time.Minute
 	updateTimeout            = 30 * time.Second
 )
 
-func parseFederationReplicaSetReference(frs *extensionsv1.ReplicaSet) (*fed.FederatedReplicaSetPreferences, error) {
-	if frs.Annotations == nil {
+func parseFederationDeploymentReference(fd *extensionsv1.Deployment) (*fed.FederatedReplicaSetPreferences, error) {
+	if fd.Annotations == nil {
 		return nil, nil
 	}
-	frsPrefString, found := frs.Annotations[FedReplicaSetPreferencesAnnotation]
+	fdPrefString, found := fd.Annotations[FedDeploymentPreferencesAnnotation]
 	if !found {
 		return nil, nil
 	}
-	var frsPref fed.FederatedReplicaSetPreferences
-	if err := json.Unmarshal([]byte(frsPrefString), &frsPref); err != nil {
+	var fdPref fed.FederatedReplicaSetPreferences
+	if err := json.Unmarshal([]byte(fdPrefString), &fdPref); err != nil {
 		return nil, err
 	}
-	return &frsPref, nil
+	return &fdPref, nil
 }
 
-type ReplicaSetController struct {
+type DeploymentController struct {
 	fedClient fedclientset.Interface
 
-	replicaSetController *cache.Controller
-	replicaSetStore      cache.StoreToReplicaSetLister
+	deploymentController *cache.Controller
+	deploymentStore      cache.Store
 
-	fedReplicaSetInformer fedutil.FederatedInformer
+	fedDeploymentInformer fedutil.FederatedInformer
 	fedPodInformer        fedutil.FederatedInformer
 
 	replicasetDeliverer *fedutil.DelayingDeliverer
@@ -90,7 +91,7 @@ type ReplicaSetController struct {
 	// For updating members of federation.
 	fedUpdater fedutil.FederatedUpdater
 
-	replicaSetBackoff *flowcontrol.Backoff
+	deploymentBackoff *flowcontrol.Backoff
 	// For events
 	eventRecorder record.EventRecorder
 
@@ -98,17 +99,17 @@ type ReplicaSetController struct {
 }
 
 // NewclusterController returns a new cluster controller
-func NewReplicaSetController(federationClient fedclientset.Interface) *ReplicaSetController {
+func NewDeploymentController(federationClient fedclientset.Interface) *DeploymentController {
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartRecordingToSink(eventsink.NewFederatedEventSink(federationClient))
-	recorder := broadcaster.NewRecorder(api.EventSource{Component: "federated-replicaset-controller"})
+	recorder := broadcaster.NewRecorder(api.EventSource{Component: "federated-deployment-controller"})
 
-	frsc := &ReplicaSetController{
+	fdc := &DeploymentController{
 		fedClient:           federationClient,
 		replicasetDeliverer: fedutil.NewDelayingDeliverer(),
 		clusterDeliverer:    fedutil.NewDelayingDeliverer(),
 		replicasetWorkQueue: workqueue.New(),
-		replicaSetBackoff:   flowcontrol.NewBackOff(5*time.Second, time.Minute),
+		deploymentBackoff:   flowcontrol.NewBackOff(5*time.Second, time.Minute),
 		defaultPlanner: planner.NewPlanner(&fed.FederatedReplicaSetPreferences{
 			Clusters: map[string]fed.ClusterReplicaSetPreferences{
 				"*": {Weight: 1},
@@ -117,34 +118,34 @@ func NewReplicaSetController(federationClient fedclientset.Interface) *ReplicaSe
 		eventRecorder: recorder,
 	}
 
-	replicaSetFedInformerFactory := func(cluster *fedv1.Cluster, clientset kubeclientset.Interface) (cache.Store, cache.ControllerInterface) {
+	deploymentFedInformerFactory := func(cluster *fedv1.Cluster, clientset kubeclientset.Interface) (cache.Store, cache.ControllerInterface) {
 		return cache.NewInformer(
 			&cache.ListWatch{
 				ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 					versionedOptions := fedutil.VersionizeV1ListOptions(options)
-					return clientset.Extensions().ReplicaSets(apiv1.NamespaceAll).List(versionedOptions)
+					return clientset.Extensions().Deployments(apiv1.NamespaceAll).List(versionedOptions)
 				},
 				WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 					versionedOptions := fedutil.VersionizeV1ListOptions(options)
-					return clientset.Extensions().ReplicaSets(apiv1.NamespaceAll).Watch(versionedOptions)
+					return clientset.Extensions().Deployments(apiv1.NamespaceAll).Watch(versionedOptions)
 				},
 			},
-			&extensionsv1.ReplicaSet{},
+			&extensionsv1.Deployment{},
 			controller.NoResyncPeriodFunc(),
 			fedutil.NewTriggerOnAllChanges(
-				func(obj runtime.Object) { frsc.deliverLocalReplicaSet(obj, replicaSetReviewDelay) },
+				func(obj runtime.Object) { fdc.deliverLocalDeployment(obj, deploymentReviewDelay) },
 			),
 		)
 	}
 	clusterLifecycle := fedutil.ClusterLifecycleHandlerFuncs{
 		ClusterAvailable: func(cluster *fedv1.Cluster) {
-			frsc.clusterDeliverer.DeliverAfter(allClustersKey, nil, clusterAvailableDelay)
+			fdc.clusterDeliverer.DeliverAfter(allClustersKey, nil, clusterAvailableDelay)
 		},
 		ClusterUnavailable: func(cluster *fedv1.Cluster, _ []interface{}) {
-			frsc.clusterDeliverer.DeliverAfter(allClustersKey, nil, clusterUnavailableDelay)
+			fdc.clusterDeliverer.DeliverAfter(allClustersKey, nil, clusterUnavailableDelay)
 		},
 	}
-	frsc.fedReplicaSetInformer = fedutil.NewFederatedInformer(federationClient, replicaSetFedInformerFactory, &clusterLifecycle)
+	fdc.fedDeploymentInformer = fedutil.NewFederatedInformer(federationClient, deploymentFedInformerFactory, &clusterLifecycle)
 
 	podFedInformerFactory := func(cluster *fedv1.Cluster, clientset kubeclientset.Interface) (cache.Store, cache.ControllerInterface) {
 		return cache.NewInformer(
@@ -162,214 +163,214 @@ func NewReplicaSetController(federationClient fedclientset.Interface) *ReplicaSe
 			controller.NoResyncPeriodFunc(),
 			fedutil.NewTriggerOnAllChanges(
 				func(obj runtime.Object) {
-					frsc.clusterDeliverer.DeliverAfter(allClustersKey, nil, allReplicaSetReviewDelay)
+					fdc.clusterDeliverer.DeliverAfter(allClustersKey, nil, allDeploymentReviewDelay)
 				},
 			),
 		)
 	}
-	frsc.fedPodInformer = fedutil.NewFederatedInformer(federationClient, podFedInformerFactory, &fedutil.ClusterLifecycleHandlerFuncs{})
+	fdc.fedPodInformer = fedutil.NewFederatedInformer(federationClient, podFedInformerFactory, &fedutil.ClusterLifecycleHandlerFuncs{})
 
-	frsc.replicaSetStore.Store, frsc.replicaSetController = cache.NewInformer(
+	fdc.deploymentStore, fdc.deploymentController = cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				versionedOptions := fedutil.VersionizeV1ListOptions(options)
-				return frsc.fedClient.Extensions().ReplicaSets(apiv1.NamespaceAll).List(versionedOptions)
+				return fdc.fedClient.Extensions().Deployments(apiv1.NamespaceAll).List(versionedOptions)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 				versionedOptions := fedutil.VersionizeV1ListOptions(options)
-				return frsc.fedClient.Extensions().ReplicaSets(apiv1.NamespaceAll).Watch(versionedOptions)
+				return fdc.fedClient.Extensions().Deployments(apiv1.NamespaceAll).Watch(versionedOptions)
 			},
 		},
-		&extensionsv1.ReplicaSet{},
+		&extensionsv1.Deployment{},
 		controller.NoResyncPeriodFunc(),
 		fedutil.NewTriggerOnMetaAndSpecChanges(
-			func(obj runtime.Object) { frsc.deliverFedReplicaSetObj(obj, replicaSetReviewDelay) },
+			func(obj runtime.Object) { fdc.deliverFedDeploymentObj(obj, deploymentReviewDelay) },
 		),
 	)
 
-	frsc.fedUpdater = fedutil.NewFederatedUpdater(frsc.fedReplicaSetInformer,
+	fdc.fedUpdater = fedutil.NewFederatedUpdater(fdc.fedDeploymentInformer,
 		func(client kubeclientset.Interface, obj runtime.Object) error {
-			rs := obj.(*extensionsv1.ReplicaSet)
-			_, err := client.Extensions().ReplicaSets(rs.Namespace).Create(rs)
+			rs := obj.(*extensionsv1.Deployment)
+			_, err := client.Extensions().Deployments(rs.Namespace).Create(rs)
 			return err
 		},
 		func(client kubeclientset.Interface, obj runtime.Object) error {
-			rs := obj.(*extensionsv1.ReplicaSet)
-			_, err := client.Extensions().ReplicaSets(rs.Namespace).Update(rs)
+			rs := obj.(*extensionsv1.Deployment)
+			_, err := client.Extensions().Deployments(rs.Namespace).Update(rs)
 			return err
 		},
 		func(client kubeclientset.Interface, obj runtime.Object) error {
-			rs := obj.(*extensionsv1.ReplicaSet)
-			err := client.Extensions().ReplicaSets(rs.Namespace).Delete(rs.Name, &apiv1.DeleteOptions{})
+			rs := obj.(*extensionsv1.Deployment)
+			err := client.Extensions().Deployments(rs.Namespace).Delete(rs.Name, &apiv1.DeleteOptions{})
 			return err
 		})
 
-	return frsc
+	return fdc
 }
 
-func (frsc *ReplicaSetController) Run(workers int, stopCh <-chan struct{}) {
-	go frsc.replicaSetController.Run(stopCh)
-	frsc.fedReplicaSetInformer.Start()
-	frsc.fedPodInformer.Start()
+func (fdc *DeploymentController) Run(workers int, stopCh <-chan struct{}) {
+	go fdc.deploymentController.Run(stopCh)
+	fdc.fedDeploymentInformer.Start()
+	fdc.fedPodInformer.Start()
 
-	frsc.replicasetDeliverer.StartWithHandler(func(item *fedutil.DelayingDelivererItem) {
-		frsc.replicasetWorkQueue.Add(item.Key)
+	fdc.replicasetDeliverer.StartWithHandler(func(item *fedutil.DelayingDelivererItem) {
+		fdc.replicasetWorkQueue.Add(item.Key)
 	})
-	frsc.clusterDeliverer.StartWithHandler(func(_ *fedutil.DelayingDelivererItem) {
-		frsc.reconcileReplicaSetsOnClusterChange()
+	fdc.clusterDeliverer.StartWithHandler(func(_ *fedutil.DelayingDelivererItem) {
+		fdc.reconcileDeploymentsOnClusterChange()
 	})
 
-	for !frsc.isSynced() {
+	for !fdc.isSynced() {
 		time.Sleep(5 * time.Millisecond)
 	}
 
 	for i := 0; i < workers; i++ {
-		go wait.Until(frsc.worker, time.Second, stopCh)
+		go wait.Until(fdc.worker, time.Second, stopCh)
 	}
 
 	go func() {
 		select {
 		case <-time.After(time.Minute):
-			frsc.replicaSetBackoff.GC()
+			fdc.deploymentBackoff.GC()
 		case <-stopCh:
 			return
 		}
 	}()
 
 	<-stopCh
-	glog.Infof("Shutting down ReplicaSetController")
-	frsc.replicasetDeliverer.Stop()
-	frsc.clusterDeliverer.Stop()
-	frsc.replicasetWorkQueue.ShutDown()
-	frsc.fedReplicaSetInformer.Stop()
-	frsc.fedPodInformer.Stop()
+	glog.Infof("Shutting down DeploymentController")
+	fdc.replicasetDeliverer.Stop()
+	fdc.clusterDeliverer.Stop()
+	fdc.replicasetWorkQueue.ShutDown()
+	fdc.fedDeploymentInformer.Stop()
+	fdc.fedPodInformer.Stop()
 }
 
-func (frsc *ReplicaSetController) isSynced() bool {
-	if !frsc.fedReplicaSetInformer.ClustersSynced() {
+func (fdc *DeploymentController) isSynced() bool {
+	if !fdc.fedDeploymentInformer.ClustersSynced() {
 		glog.V(2).Infof("Cluster list not synced")
 		return false
 	}
-	clusters, err := frsc.fedReplicaSetInformer.GetReadyClusters()
+	clusters, err := fdc.fedDeploymentInformer.GetReadyClusters()
 	if err != nil {
 		glog.Errorf("Failed to get ready clusters: %v", err)
 		return false
 	}
-	if !frsc.fedReplicaSetInformer.GetTargetStore().ClustersSynced(clusters) {
+	if !fdc.fedDeploymentInformer.GetTargetStore().ClustersSynced(clusters) {
 		return false
 	}
 
-	if !frsc.fedPodInformer.ClustersSynced() {
+	if !fdc.fedPodInformer.ClustersSynced() {
 		glog.V(2).Infof("Cluster list not synced")
 		return false
 	}
-	clusters2, err := frsc.fedPodInformer.GetReadyClusters()
+	clusters2, err := fdc.fedPodInformer.GetReadyClusters()
 	if err != nil {
 		glog.Errorf("Failed to get ready clusters: %v", err)
 		return false
 	}
 
-	// This also checks whether podInformer and replicaSetInformer have the
+	// This also checks whether podInformer and deploymentInformer have the
 	// same cluster lists.
-	if !frsc.fedPodInformer.GetTargetStore().ClustersSynced(clusters) {
+	if !fdc.fedPodInformer.GetTargetStore().ClustersSynced(clusters) {
 		return false
 	}
-	if !frsc.fedPodInformer.GetTargetStore().ClustersSynced(clusters2) {
+	if !fdc.fedPodInformer.GetTargetStore().ClustersSynced(clusters2) {
 		return false
 	}
 
-	if !frsc.replicaSetController.HasSynced() {
-		glog.V(2).Infof("federation replicaset list not synced")
+	if !fdc.deploymentController.HasSynced() {
+		glog.V(2).Infof("federation deployment list not synced")
 		return false
 	}
 	return true
 }
 
-func (frsc *ReplicaSetController) deliverLocalReplicaSet(obj interface{}, duration time.Duration) {
+func (fdc *DeploymentController) deliverLocalDeployment(obj interface{}, duration time.Duration) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
 		glog.Errorf("Couldn't get key for object %v: %v", obj, err)
 		return
 	}
-	_, exists, err := frsc.replicaSetStore.Store.GetByKey(key)
+	_, exists, err := fdc.deploymentStore.GetByKey(key)
 	if err != nil {
-		glog.Errorf("Couldn't get federation replicaset %v: %v", key, err)
+		glog.Errorf("Couldn't get federation deployment %v: %v", key, err)
 		return
 	}
 	if exists { // ignore replicasets exists only in local k8s
-		frsc.deliverReplicaSetByKey(key, duration, false)
+		fdc.deliverDeploymentByKey(key, duration, false)
 	}
 }
 
-func (frsc *ReplicaSetController) deliverFedReplicaSetObj(obj interface{}, delay time.Duration) {
+func (fdc *DeploymentController) deliverFedDeploymentObj(obj interface{}, delay time.Duration) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
 		glog.Errorf("Couldn't get key for object %+v: %v", obj, err)
 		return
 	}
-	frsc.deliverReplicaSetByKey(key, delay, false)
+	fdc.deliverDeploymentByKey(key, delay, false)
 }
 
-func (frsc *ReplicaSetController) deliverReplicaSetByKey(key string, delay time.Duration, failed bool) {
+func (fdc *DeploymentController) deliverDeploymentByKey(key string, delay time.Duration, failed bool) {
 	if failed {
-		frsc.replicaSetBackoff.Next(key, time.Now())
-		delay = delay + frsc.replicaSetBackoff.Get(key)
+		fdc.deploymentBackoff.Next(key, time.Now())
+		delay = delay + fdc.deploymentBackoff.Get(key)
 	} else {
-		frsc.replicaSetBackoff.Reset(key)
+		fdc.deploymentBackoff.Reset(key)
 	}
-	frsc.replicasetDeliverer.DeliverAfter(key, nil, delay)
+	fdc.replicasetDeliverer.DeliverAfter(key, nil, delay)
 }
 
-func (frsc *ReplicaSetController) worker() {
+func (fdc *DeploymentController) worker() {
 	for {
-		item, quit := frsc.replicasetWorkQueue.Get()
+		item, quit := fdc.replicasetWorkQueue.Get()
 		if quit {
 			return
 		}
 		key := item.(string)
-		status, err := frsc.reconcileReplicaSet(key)
-		frsc.replicasetWorkQueue.Done(item)
+		status, err := fdc.reconcileDeployment(key)
+		fdc.replicasetWorkQueue.Done(item)
 		if err != nil {
 			glog.Errorf("Error syncing cluster controller: %v", err)
-			frsc.deliverReplicaSetByKey(key, 0, true)
+			fdc.deliverDeploymentByKey(key, 0, true)
 		} else {
 			switch status {
 			case statusAllOk:
 				break
 			case statusError:
-				frsc.deliverReplicaSetByKey(key, 0, true)
+				fdc.deliverDeploymentByKey(key, 0, true)
 			case statusNeedRecheck:
-				frsc.deliverReplicaSetByKey(key, replicaSetReviewDelay, false)
+				fdc.deliverDeploymentByKey(key, deploymentReviewDelay, false)
 			case statusNotSynced:
-				frsc.deliverReplicaSetByKey(key, clusterAvailableDelay, false)
+				fdc.deliverDeploymentByKey(key, clusterAvailableDelay, false)
 			default:
 				glog.Errorf("Unhandled reconciliation status: %s", status)
-				frsc.deliverReplicaSetByKey(key, replicaSetReviewDelay, false)
+				fdc.deliverDeploymentByKey(key, deploymentReviewDelay, false)
 			}
 		}
 	}
 }
 
-func (frsc *ReplicaSetController) schedule(frs *extensionsv1.ReplicaSet, clusters []*fedv1.Cluster,
+func (fdc *DeploymentController) schedule(fd *extensionsv1.Deployment, clusters []*fedv1.Cluster,
 	current map[string]int64, estimatedCapacity map[string]int64) map[string]int64 {
 	// TODO: integrate real scheduler
 
-	plnr := frsc.defaultPlanner
-	frsPref, err := parseFederationReplicaSetReference(frs)
+	planer := fdc.defaultPlanner
+	fdPref, err := parseFederationDeploymentReference(fd)
 	if err != nil {
-		glog.Info("Invalid ReplicaSet specific preference, use default. rs: %v, err: %v", frs, err)
+		glog.Info("Invalid Deployment specific preference, use default. deployment: %v, err: %v", fd.Name, err)
 	}
-	if frsPref != nil { // create a new planner if user specified a preference
-		plnr = planner.NewPlanner(frsPref)
+	if fdPref != nil { // create a new planner if user specified a preference
+		planer = planner.NewPlanner(fdPref)
 	}
 
-	replicas := int64(*frs.Spec.Replicas)
+	replicas := int64(*fd.Spec.Replicas)
 	var clusterNames []string
 	for _, cluster := range clusters {
 		clusterNames = append(clusterNames, cluster.Name)
 	}
-	scheduleResult, overflow := plnr.Plan(replicas, clusterNames, current, estimatedCapacity,
-		frs.Namespace+"/"+frs.Name)
+	scheduleResult, overflow := planer.Plan(replicas, clusterNames, current, estimatedCapacity,
+		fd.Namespace+"/"+fd.Name)
 	// make sure the return contains clusters need to zero the replicas
 	result := make(map[string]int64)
 	for clusterName := range current {
@@ -382,7 +383,7 @@ func (frsc *ReplicaSetController) schedule(frs *extensionsv1.ReplicaSet, cluster
 		result[clusterName] += replicas
 	}
 	if glog.V(4) {
-		buf := bytes.NewBufferString(fmt.Sprintf("Schedule - ReplicaSet: %s/%s\n", frs.Namespace, frs.Name))
+		buf := bytes.NewBufferString(fmt.Sprintf("Schedule - Deployment: %s/%s\n", fd.Namespace, fd.Name))
 		sort.Strings(clusterNames)
 		for _, clusterName := range clusterNames {
 			cur := current[clusterName]
@@ -410,8 +411,8 @@ const (
 	statusNotSynced   = reconciliationStatus("NOSYNC")
 )
 
-func (frsc *ReplicaSetController) reconcileReplicaSet(key string) (reconciliationStatus, error) {
-	if !frsc.isSynced() {
+func (fdc *DeploymentController) reconcileDeployment(key string) (reconciliationStatus, error) {
+	if !fdc.isSynced() {
 		return statusNotSynced, nil
 	}
 
@@ -419,7 +420,7 @@ func (frsc *ReplicaSetController) reconcileReplicaSet(key string) (reconciliatio
 	startTime := time.Now()
 	defer glog.V(4).Infof("Finished reconcile replicaset %q (%v)", key, time.Now().Sub(startTime))
 
-	obj, exists, err := frsc.replicaSetStore.Store.GetByKey(key)
+	obj, exists, err := fdc.deploymentStore.GetByKey(key)
 	if err != nil {
 		return statusError, err
 	}
@@ -427,89 +428,93 @@ func (frsc *ReplicaSetController) reconcileReplicaSet(key string) (reconciliatio
 		// don't delete local replicasets for now. Do not reconcile it anymore.
 		return statusAllOk, nil
 	}
-	frs := obj.(*extensionsv1.ReplicaSet)
+	fd := obj.(*extensionsv1.Deployment)
 
-	clusters, err := frsc.fedReplicaSetInformer.GetReadyClusters()
+	clusters, err := fdc.fedDeploymentInformer.GetReadyClusters()
 	if err != nil {
 		return statusError, err
 	}
 
 	// collect current status and do schedule
-	allPods, err := frsc.fedPodInformer.GetTargetStore().List()
+	allPods, err := fdc.fedPodInformer.GetTargetStore().List()
 	if err != nil {
 		return statusError, err
 	}
-	podStatus, err := AnalysePods(frs.Spec.Selector, allPods, time.Now())
+	podStatus, err := replicaset.AnalysePods(fd.Spec.Selector, allPods, time.Now())
 	current := make(map[string]int64)
 	estimatedCapacity := make(map[string]int64)
 	for _, cluster := range clusters {
-		lrsObj, exists, err := frsc.fedReplicaSetInformer.GetTargetStore().GetByKey(cluster.Name, key)
+		ldObj, exists, err := fdc.fedDeploymentInformer.GetTargetStore().GetByKey(cluster.Name, key)
 		if err != nil {
 			return statusError, err
 		}
 		if exists {
-			lrs := lrsObj.(*extensionsv1.ReplicaSet)
+			ld := ldObj.(*extensionsv1.Deployment)
 			current[cluster.Name] = int64(podStatus[cluster.Name].RunningAndReady) // include pending as well?
 			unschedulable := int64(podStatus[cluster.Name].Unschedulable)
 			if unschedulable > 0 {
-				estimatedCapacity[cluster.Name] = int64(*lrs.Spec.Replicas) - unschedulable
+				estimatedCapacity[cluster.Name] = int64(*ld.Spec.Replicas) - unschedulable
 			}
 		}
 	}
 
-	scheduleResult := frsc.schedule(frs, clusters, current, estimatedCapacity)
+	scheduleResult := fdc.schedule(fd, clusters, current, estimatedCapacity)
 
 	glog.V(4).Infof("Start syncing local replicaset %s: %v", key, scheduleResult)
 
-	fedStatus := extensionsv1.ReplicaSetStatus{ObservedGeneration: frs.Generation}
+	fedStatus := extensionsv1.DeploymentStatus{ObservedGeneration: fd.Generation}
 	operations := make([]fedutil.FederatedOperation, 0)
 	for clusterName, replicas := range scheduleResult {
 
-		lrsObj, exists, err := frsc.fedReplicaSetInformer.GetTargetStore().GetByKey(clusterName, key)
+		ldObj, exists, err := fdc.fedDeploymentInformer.GetTargetStore().GetByKey(clusterName, key)
 		if err != nil {
 			return statusError, err
 		}
 
-		lrs := &extensionsv1.ReplicaSet{
-			ObjectMeta: fedutil.CopyObjectMeta(frs.ObjectMeta),
-			Spec:       frs.Spec,
+		ld := &extensionsv1.Deployment{
+			ObjectMeta: fedutil.CopyObjectMeta(fd.ObjectMeta),
+			Spec:       fd.Spec,
 		}
 		specReplicas := int32(replicas)
-		lrs.Spec.Replicas = &specReplicas
+		ld.Spec.Replicas = &specReplicas
 
 		if !exists {
 			if replicas > 0 {
-				frsc.eventRecorder.Eventf(frs, api.EventTypeNormal, "CreateInCluster",
-					"Creating replicaset in cluster %s", clusterName)
+				fdc.eventRecorder.Eventf(fd, api.EventTypeNormal, "CreateInCluster",
+					"Creating deployment in cluster %s", clusterName)
 
 				operations = append(operations, fedutil.FederatedOperation{
 					Type:        fedutil.OperationTypeAdd,
-					Obj:         lrs,
+					Obj:         ld,
 					ClusterName: clusterName,
 				})
 			}
 		} else {
-			currentLrs := lrsObj.(*extensionsv1.ReplicaSet)
+			// TODO: Update only one deployment at a time if update strategy is rolling udpate.
+
+			currentLd := ldObj.(*extensionsv1.Deployment)
 			// Update existing replica set, if needed.
-			if !fedutil.ObjectMetaEquivalent(lrs.ObjectMeta, currentLrs.ObjectMeta) ||
-				!reflect.DeepEqual(lrs.Spec, currentLrs.Spec) {
-				frsc.eventRecorder.Eventf(frs, api.EventTypeNormal, "UpdateInCluster",
-					"Updating replicaset in cluster %s", clusterName)
+			if !fedutil.ObjectMetaEquivalent(ld.ObjectMeta, currentLd.ObjectMeta) ||
+				!reflect.DeepEqual(ld.Spec, currentLd.Spec) {
+				fdc.eventRecorder.Eventf(fd, api.EventTypeNormal, "UpdateInCluster",
+					"Updating deployment in cluster %s", clusterName)
 
 				operations = append(operations, fedutil.FederatedOperation{
 					Type:        fedutil.OperationTypeUpdate,
-					Obj:         lrs,
+					Obj:         ld,
 					ClusterName: clusterName,
 				})
 			}
-			fedStatus.Replicas += currentLrs.Status.Replicas
-			fedStatus.FullyLabeledReplicas += currentLrs.Status.FullyLabeledReplicas
-			// leave the replicaset even the replicas dropped to 0
+			fedStatus.Replicas += currentLd.Status.Replicas
+			fedStatus.AvailableReplicas += currentLd.Status.AvailableReplicas
+			fedStatus.UnavailableReplicas += currentLd.Status.UnavailableReplicas
 		}
 	}
-	if fedStatus.Replicas != frs.Status.Replicas || fedStatus.FullyLabeledReplicas != frs.Status.FullyLabeledReplicas {
-		frs.Status = fedStatus
-		_, err = frsc.fedClient.Extensions().ReplicaSets(frs.Namespace).UpdateStatus(frs)
+	if fedStatus.Replicas != fd.Status.Replicas ||
+		fedStatus.AvailableReplicas != fd.Status.AvailableReplicas ||
+		fedStatus.UnavailableReplicas != fd.Status.UnavailableReplicas {
+		fd.Status = fedStatus
+		_, err = fdc.fedClient.Extensions().Deployments(fd.Namespace).UpdateStatus(fd)
 		if err != nil {
 			return statusError, err
 		}
@@ -519,9 +524,9 @@ func (frsc *ReplicaSetController) reconcileReplicaSet(key string) (reconciliatio
 		// Everything is in order
 		return statusAllOk, nil
 	}
-	err = frsc.fedUpdater.UpdateWithOnError(operations, updateTimeout, func(op fedutil.FederatedOperation, operror error) {
-		frsc.eventRecorder.Eventf(frs, api.EventTypeNormal, "FailedUpdateInCluster",
-			"Replicaset update in cluster %s failed: %v", op.ClusterName, operror)
+	err = fdc.fedUpdater.UpdateWithOnError(operations, updateTimeout, func(op fedutil.FederatedOperation, operror error) {
+		fdc.eventRecorder.Eventf(fd, api.EventTypeNormal, "FailedUpdateInCluster",
+			"Deployment update in cluster %s failed: %v", op.ClusterName, operror)
 	})
 	if err != nil {
 		glog.Errorf("Failed to execute updates for %s: %v", key, err)
@@ -532,13 +537,13 @@ func (frsc *ReplicaSetController) reconcileReplicaSet(key string) (reconciliatio
 	return statusNeedRecheck, nil
 }
 
-func (frsc *ReplicaSetController) reconcileReplicaSetsOnClusterChange() {
-	if !frsc.isSynced() {
-		frsc.clusterDeliverer.DeliverAfter(allClustersKey, nil, clusterAvailableDelay)
+func (fdc *DeploymentController) reconcileDeploymentsOnClusterChange() {
+	if !fdc.isSynced() {
+		fdc.clusterDeliverer.DeliverAfter(allClustersKey, nil, clusterAvailableDelay)
 	}
-	rss := frsc.replicaSetStore.Store.List()
-	for _, rs := range rss {
-		key, _ := controller.KeyFunc(rs)
-		frsc.deliverReplicaSetByKey(key, 0, false)
+	deps := fdc.deploymentStore.List()
+	for _, dep := range deps {
+		key, _ := controller.KeyFunc(dep)
+		fdc.deliverDeploymentByKey(key, 0, false)
 	}
 }
