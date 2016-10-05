@@ -224,7 +224,8 @@ func Run(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cobr
 
 	params["env"] = cmdutil.GetFlagStringSlice(cmd, "env")
 
-	obj, _, mapper, mapping, err := createGeneratedObject(f, cmd, generator, names, params, cmdutil.GetFlagString(cmd, "overrides"), namespace)
+	resourceName := args[0]
+	obj, _, mapper, mapping, err := createGeneratedObject(f, cmd, resourceName, generator, names, params, cmdutil.GetFlagString(cmd, "overrides"), namespace, cmdOut)
 	if err != nil {
 		return err
 	}
@@ -234,9 +235,13 @@ func Run(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cobr
 		if len(serviceGenerator) == 0 {
 			return cmdutil.UsageError(cmd, fmt.Sprintf("No service generator specified"))
 		}
-		if err := generateService(f, cmd, args, serviceGenerator, params, namespace, cmdOut); err != nil {
+		if err := generateService(f, cmd, serviceGenerator, params, namespace, cmdOut); err != nil {
 			return err
 		}
+	}
+
+	if cmdutil.GetDryRunFlag(cmd) {
+		return err
 	}
 
 	attachFlag := cmd.Flags().Lookup("attach")
@@ -352,7 +357,6 @@ func Run(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cobr
 	if outputFormat != "" || cmdutil.GetDryRunFlag(cmd) {
 		return f.PrintObject(cmd, mapper, obj, cmdOut)
 	}
-	cmdutil.PrintSuccess(mapper, false, cmdOut, mapping.Resource, args[0], cmdutil.GetDryRunFlag(cmd), "created")
 	return nil
 }
 
@@ -535,7 +539,7 @@ func verifyImagePullPolicy(cmd *cobra.Command) error {
 	}
 }
 
-func generateService(f cmdutil.Factory, cmd *cobra.Command, args []string, serviceGenerator string, paramsIn map[string]interface{}, namespace string, out io.Writer) error {
+func generateService(f cmdutil.Factory, cmd *cobra.Command, serviceGenerator string, paramsIn map[string]interface{}, namespace string, out io.Writer) error {
 	generators := f.Generators("expose")
 	generator, found := generators[serviceGenerator]
 	if !found {
@@ -570,20 +574,11 @@ func generateService(f cmdutil.Factory, cmd *cobra.Command, args []string, servi
 		params["default-name"] = name
 	}
 
-	obj, _, mapper, mapping, err := createGeneratedObject(f, cmd, generator, names, params, cmdutil.GetFlagString(cmd, "service-overrides"), namespace)
-	if err != nil {
-		return err
-	}
-
-	if cmdutil.GetFlagString(cmd, "output") != "" || cmdutil.GetDryRunFlag(cmd) {
-		return f.PrintObject(cmd, mapper, obj, out)
-	}
-	cmdutil.PrintSuccess(mapper, false, out, mapping.Resource, args[0], cmdutil.GetDryRunFlag(cmd), "created")
-
-	return nil
+	_, _, _, _, err := createGeneratedObject(f, cmd, name.(string), generator, names, params, cmdutil.GetFlagString(cmd, "service-overrides"), namespace, out)
+	return err
 }
 
-func createGeneratedObject(f cmdutil.Factory, cmd *cobra.Command, generator kubectl.Generator, names []kubectl.GeneratorParam, params map[string]interface{}, overrides, namespace string) (runtime.Object, string, meta.RESTMapper, *meta.RESTMapping, error) {
+func createGeneratedObject(f cmdutil.Factory, cmd *cobra.Command, resourceName string, generator kubectl.Generator, names []kubectl.GeneratorParam, params map[string]interface{}, overrides, namespace string, out io.Writer) (runtime.Object, string, meta.RESTMapper, *meta.RESTMapping, error) {
 	err := kubectl.ValidateParams(names, params)
 	if err != nil {
 		return nil, "", nil, nil, err
@@ -628,7 +623,9 @@ func createGeneratedObject(f cmdutil.Factory, cmd *cobra.Command, generator kube
 			return nil, "", nil, nil, err
 		}
 	}
-	if !cmdutil.GetDryRunFlag(cmd) {
+
+	dryRun := cmdutil.GetDryRunFlag(cmd)
+	if !dryRun {
 		resourceMapper := &resource.Mapper{
 			ObjectTyper:  typer,
 			RESTMapper:   mapper,
@@ -649,5 +646,15 @@ func createGeneratedObject(f cmdutil.Factory, cmd *cobra.Command, generator kube
 			return nil, "", nil, nil, err
 		}
 	}
+
+	if cmdutil.GetFlagString(cmd, "output") != "" || dryRun {
+		err = f.PrintObject(cmd, mapper, obj, out)
+		if err != nil {
+			return nil, "", nil, nil, err
+		}
+	} else {
+		cmdutil.PrintSuccess(mapper, false, out, mapping.Resource, resourceName, dryRun, "created")
+	}
+
 	return obj, groupVersionKind.Kind, mapper, mapping, err
 }
