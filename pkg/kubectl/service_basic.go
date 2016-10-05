@@ -31,6 +31,7 @@ type ServiceCommonGeneratorV1 struct {
 	TCP       []string
 	Type      api.ServiceType
 	ClusterIP string
+	NodePort  int
 }
 
 type ServiceClusterIPGeneratorV1 struct {
@@ -56,6 +57,7 @@ func (ServiceNodePortGeneratorV1) ParamNames() []GeneratorParam {
 	return []GeneratorParam{
 		{"name", true},
 		{"tcp", true},
+		{"nodeport", true},
 	}
 }
 func (ServiceLoadBalancerGeneratorV1) ParamNames() []GeneratorParam {
@@ -174,12 +176,14 @@ func (s ServiceCommonGeneratorV1) StructuredGenerate() (runtime.Object, error) {
 		if err != nil {
 			return nil, err
 		}
+
 		portName := strings.Replace(tcpString, ":", "-", -1)
 		ports = append(ports, api.ServicePort{
 			Name:       portName,
 			Port:       port,
 			TargetPort: targetPort,
 			Protocol:   api.Protocol("TCP"),
+			NodePort:   int32(s.NodePort),
 		})
 	}
 
