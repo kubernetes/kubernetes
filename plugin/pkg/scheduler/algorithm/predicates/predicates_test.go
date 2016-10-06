@@ -583,6 +583,59 @@ func TestAWSDiskConflicts(t *testing.T) {
 	}
 }
 
+func TestQingCloudDiskConflicts(t *testing.T) {
+	volState := api.PodSpec{
+		Volumes: []api.Volume{
+			{
+				VolumeSource: api.VolumeSource{
+					QingCloudStore: &api.QingCloudStoreVolumeSource{
+						VolumeID: "foo",
+					},
+				},
+			},
+		},
+	}
+	volState2 := api.PodSpec{
+		Volumes: []api.Volume{
+			{
+				VolumeSource: api.VolumeSource{
+					QingCloudStore: &api.QingCloudStoreVolumeSource{
+						VolumeID: "bar",
+					},
+				},
+			},
+		},
+	}
+	tests := []struct {
+		pod      *api.Pod
+		nodeInfo *schedulercache.NodeInfo
+		isOk     bool
+		test     string
+	}{
+		{&api.Pod{}, schedulercache.NewNodeInfo(), true, "nothing"},
+		{&api.Pod{}, schedulercache.NewNodeInfo(&api.Pod{Spec: volState}), true, "one state"},
+		{&api.Pod{Spec: volState}, schedulercache.NewNodeInfo(&api.Pod{Spec: volState}), false, "same state"},
+		{&api.Pod{Spec: volState2}, schedulercache.NewNodeInfo(&api.Pod{Spec: volState}), true, "different state"},
+	}
+	expectedFailureReasons := []algorithm.PredicateFailureReason{ErrDiskConflict}
+
+	for _, test := range tests {
+		ok, reasons, err := NoDiskConflict(test.pod, PredicateMetadata(test.pod, nil), test.nodeInfo)
+		if err != nil {
+			t.Errorf("%s: unexpected error: %v", test.test, err)
+		}
+		if !ok && !reflect.DeepEqual(reasons, expectedFailureReasons) {
+			t.Errorf("%s: unexpected failure reasons: %v, want: %v", test.test, reasons, expectedFailureReasons)
+		}
+		if test.isOk && !ok {
+			t.Errorf("%s: expected ok, got none.  %v %s %s", test.test, test.pod, test.nodeInfo, test.test)
+		}
+		if !test.isOk && ok {
+			t.Errorf("%s: expected no ok, got one.  %v %s %s", test.test, test.pod, test.nodeInfo, test.test)
+		}
+	}
+}
+
 func TestRBDDiskConflicts(t *testing.T) {
 	volState := api.PodSpec{
 		Volumes: []api.Volume{

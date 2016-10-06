@@ -1,0 +1,7 @@
+kind: StorageClass
+apiVersion: extensions/v1beta1
+metadata:
+  name: qingcloud
+provisioner: kubernetes.io/qingcloud-volume
+parameters:
+  type: "0"

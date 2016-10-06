@@ -3859,6 +3859,13 @@ The resulting set of endpoints can be viewed as:<br>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_azurediskvolumesource">v1.AzureDiskVolumeSource</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">qingCloudStore</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QingCloudStore represents a qingcloud volume that is attached to a kubelet&#8217;s host machine and then exposed to the pod.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_qingcloudstorevolumesource">v1.QingCloudStoreVolumeSource</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
 </tbody>
 </table>
 
@@ -6171,6 +6178,13 @@ The resulting set of endpoints can be viewed as:<br>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">qingCloudStore</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QingCloudStore represents a qingcloud volume that is attached to a kubelet&#8217;s host machine and then exposed to the pod.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_qingcloudstorevolumesource">v1.QingCloudStoreVolumeSource</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">accessModes</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">AccessModes contains all ways the volume can be mounted. More info: <a href="http://kubernetes.io/docs/user-guide/persistent-volumes#access-modes">http://kubernetes.io/docs/user-guide/persistent-volumes#access-modes</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
@@ -8144,6 +8158,57 @@ The resulting set of endpoints can be viewed as:<br>
 
 </div>
 <div class="sect2">
+<h3 id="_v1_qingcloudstorevolumesource">v1.QingCloudStoreVolumeSource</h3>
+<div class="paragraph">
+<p>Represents a Persistent Volume resource in qingcloud.</p>
+</div>
+<div class="paragraph">
+<p>A qingcloud volume must exist before mounting to a container. The volume must also be in the same qingcloud zone as the kubelet. A qingcloud volume can only be mounted as read/write once. qingcloud volumes support ownership management and SELinux relabeling.</p>
+</div>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">volumeID</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Unique id of the persistent volume resource. Used to identify the volume in qingcloud</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">fsType</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">readOnly</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect2">
 <h3 id="_v1_nodesysteminfo">v1.NodeSystemInfo</h3>
 <div class="paragraph">
 <p>NodeSystemInfo is a set of ids/uuids to uniquely identify the node.</p>
@@ -8558,7 +8623,7 @@ The resulting set of endpoints can be viewed as:<br>
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2016-10-20 13:15:21 UTC
+Last updated 2016-10-24 16:58:26 UTC
 </div>
 </div>
 </body>

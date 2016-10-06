@@ -319,6 +319,9 @@ type VolumeSource struct {
 	// AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.
 	// +optional
 	AzureDisk *AzureDiskVolumeSource `json:"azureDisk,omitempty" protobuf:"bytes,22,opt,name=azureDisk"`
+	// QingCloudStore represents a qingcloud volume that is attached to a
+	// kubelet's host machine and then exposed to the pod.
+	QingCloudStore *QingCloudStoreVolumeSource `json:"qingCloudStore,omitempty" protobuf:"bytes,23,opt,name=qingCloudStore"`
 }
 
 // PersistentVolumeClaimVolumeSource references the user's PVC in the same namespace.
@@ -402,6 +405,9 @@ type PersistentVolumeSource struct {
 	// AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.
 	// +optional
 	AzureDisk *AzureDiskVolumeSource `json:"azureDisk,omitempty" protobuf:"bytes,16,opt,name=azureDisk"`
+	// QingCloudStore represents a qingcloud volume that is attached to a
+	// kubelet's host machine and then exposed to the pod.
+	QingCloudStore *QingCloudStoreVolumeSource `json:"qingCloudStore,omitempty" protobuf:"bytes,17,opt,name=qingCloudStore"`
 }
 
 // +genclient=true
@@ -1046,6 +1052,25 @@ type AzureDiskVolumeSource struct {
 	// the ReadOnly setting in VolumeMounts.
 	// +optional
 	ReadOnly *bool `json:"readOnly,omitempty" protobuf:"varint,5,opt,name=readOnly"`
+}
+
+// Represents a Persistent Volume resource in qingcloud.
+//
+// A qingcloud volume must exist before mounting to a container. The volume
+// must also be in the same qingcloud zone as the kubelet. A qingcloud volume
+// can only be mounted as read/write once. qingcloud volumes support
+// ownership management and SELinux relabeling.
+type QingCloudStoreVolumeSource struct {
+	// Unique id of the persistent volume resource. Used to identify the volume in qingcloud
+	VolumeID string `json:"volumeID" protobuf:"bytes,1,opt,name=volumeID"`
+	// Filesystem type to mount.
+	// Must be a filesystem type supported by the host operating system.
+	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+	// TODO: how do we prevent errors in the filesystem from compromising the machine
+	FSType string `json:"fsType,omitempty" protobuf:"bytes,2,opt,name=fsType"`
+	// Optional: Defaults to false (read/write). ReadOnly here will force
+	// the ReadOnly setting in VolumeMounts.
+	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,3,opt,name=readOnly"`
 }
 
 // Adapts a ConfigMap into a volume.

@@ -281,6 +281,9 @@ type VolumeSource struct {
 	// AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.
 	// +optional
 	AzureDisk *AzureDiskVolumeSource `json:"azureDisk,omitempty"`
+	// QingCloudStore represents a qingcloud volume that is attached to a
+	// kubelet's host machine and then exposed to the pod.
+	QingCloudStore *QingCloudStoreVolumeSource `json:"qingCloudStore,omitempty"`
 }
 
 // Similar to VolumeSource but meant for the administrator who creates PVs.
@@ -341,6 +344,9 @@ type PersistentVolumeSource struct {
 	// AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.
 	// +optional
 	AzureDisk *AzureDiskVolumeSource `json:"azureDisk,omitempty"`
+	// QingCloudStore represents a qingcloud volume that is attached to a
+	// kubelet's host machine and then exposed to the pod.
+	QingCloudStore *QingCloudStoreVolumeSource `json:"qingCloudStore,omitempty"`
 }
 
 type PersistentVolumeClaimVolumeSource struct {
@@ -954,6 +960,25 @@ type AzureDiskVolumeSource struct {
 	// the ReadOnly setting in VolumeMounts.
 	// +optional
 	ReadOnly *bool `json:"readOnly,omitempty"`
+}
+
+// Represents a Persistent Volume resource in qingcloud.
+//
+// A qingcloud volume must exist before mounting to a container. The volume
+// must also be in the same qingcloud zone as the kubelet. A qingcloud volume
+// can only be mounted as read/write once. qingcloud volumes support
+// ownership management and SELinux relabeling.
+type QingCloudStoreVolumeSource struct {
+	// Unique id of the persistent volume resource. Used to identify the volume in qingcloud
+	VolumeID string `json:"volumeID"`
+	// Filesystem type to mount.
+	// Must be a filesystem type supported by the host operating system.
+	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+	// TODO: how do we prevent errors in the filesystem from compromising the machine
+	FSType string `json:"fsType,omitempty"`
+	// Optional: Defaults to false (read/write). ReadOnly here will force
+	// the ReadOnly setting in VolumeMounts.
+	ReadOnly bool `json:"readOnly,omitempty"`
 }
 
 // Adapts a ConfigMap into a volume.
