@@ -45,8 +45,20 @@ func (ksc KubeletServiceChecker) Check() (warnings []string, errors []string) {
 		return warnings, nil
 	}
 
+	if !ksc.initSystem.ServiceExists("kubelet") {
+		// TODO: Should this be a hard error?
+		warnings = append(warnings, "kubelet service does not exist")
+		return warnings, nil
+	}
+
 	if !ksc.initSystem.ServiceIsEnabled("kubelet") {
-		warnings = append(warnings, "kubelet service is not enabled, please run systemctl enable kubelet")
+		// TODO: Should we enable it?
+		warnings = append(warnings, "kubelet service is not enabled, please run 'systemctl enable kubelet'")
+	}
+
+	if !ksc.initSystem.ServiceIsActive("kubelet") {
+		// TODO: Should we start it? This might count as a hard error, we know service exists here.
+		errors = append(errors, "kubelet service is not active, please run 'systemctl start kubelet'")
 	}
 
 	return warnings, nil

@@ -18,19 +18,31 @@ package checks
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
+	"strings"
 )
 
 type InitSystem interface {
+
+	// ServiceExists ensures the service is defined for this init system.
+	ServiceExists(service string) bool
 
 	// ServiceIsEnabled ensures the service is enabled to start on each boot.
 	ServiceIsEnabled(service string) bool
 
 	// ServiceIsActive ensures the service is running, or attempting to run. (crash looping in the case of kubelet)
-	//ServiceIsActive(service string) bool
+	ServiceIsActive(service string) bool
 }
 
 type SystemdInitSystem struct{}
+
+func (sysd SystemdInitSystem) ServiceExists(service string) bool {
+	if _, err := os.Stat(fmt.Sprintf("/etc/systemd/system/%s.service", service)); err == nil {
+		return true
+	}
+	return false
+}
 
 func (sysd SystemdInitSystem) ServiceIsEnabled(service string) bool {
 	args := []string{"is-enabled", service}
@@ -40,6 +52,20 @@ func (sysd SystemdInitSystem) ServiceIsEnabled(service string) bool {
 		return false
 	}
 	return true
+}
+
+// ServiceIsActive will check is the service is "active". In the case of
+// crash looping services (kubelet in our case) status will return as
+// "activating", so we will consider this active as well.
+func (sysd SystemdInitSystem) ServiceIsActive(service string) bool {
+	args := []string{"is-active", service}
+	// Ignoring error here, command returns non-0 if in "activating" status:
+	outBytes, _ := exec.Command("systemctl", args...).Output()
+	output := strings.TrimSpace(string(outBytes))
+	if output == "active" || output == "activating" {
+		return true
+	}
+	return false
 }
 
 // getInitSystem returns an InitSystem for the current system, or nil
