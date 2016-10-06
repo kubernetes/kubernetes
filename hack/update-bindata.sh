@@ -19,8 +19,8 @@ set -o pipefail
 set -o nounset
 
 if [[ -z "${KUBE_ROOT:-}" ]]; then
-	# Relative to test/e2e/generated/
-	KUBE_ROOT="../../../"
+    source $(dirname "${BASH_SOURCE[0]}")"/lib/init.sh"
+    KUBE_ROOT=$(kube::readlinkdashf $KUBE_ROOT)
 fi
 
 source "${KUBE_ROOT}/cluster/lib/logging.sh"
