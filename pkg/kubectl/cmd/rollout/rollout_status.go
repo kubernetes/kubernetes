@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/util/interrupt"
 	"k8s.io/kubernetes/pkg/watch"
 
 	"github.com/spf13/cobra"
@@ -31,7 +32,11 @@ import (
 
 var (
 	status_long = dedent.Dedent(`
-		Watch the status of current rollout, until it's done.`)
+		Show the status of the newest rollout.
+
+		By default 'rollout status' will watch the status of the newest rollout
+		until it's done. If you don't want to wait for the rollout to finish then
+		you can use --watch=false.`)
 	status_example = dedent.Dedent(`
 		# Watch the rollout status of a deployment
 		kubectl rollout status deployment/nginx`)
@@ -45,7 +50,7 @@ func NewCmdRolloutStatus(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "status (TYPE NAME | TYPE/NAME) [flags]",
-		Short:   "Watch rollout status until it's done",
+		Short:   "Show the status of newest rollout",
 		Long:    status_long,
 		Example: status_example,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -57,6 +62,7 @@ func NewCmdRolloutStatus(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 
 	usage := "identifying the resource to get from a server."
 	cmdutil.AddFilenameOptionFlags(cmd, options, usage)
+	cmd.Flags().BoolP("watch", "w", true, "Watch the status of the newest rollout until it's done.")
 	return cmd
 }
 
@@ -118,6 +124,11 @@ func RunStatus(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []str
 		return nil
 	}
 
+	shouldWatch := cmdutil.GetFlagBool(cmd, "watch")
+	if !shouldWatch {
+		return nil
+	}
+
 	// watch for changes to the deployment
 	w, err := r.Watch(rv)
 	if err != nil {
@@ -125,18 +136,21 @@ func RunStatus(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []str
 	}
 
 	// if the rollout isn't done yet, keep watching deployment status
-	kubectl.WatchLoop(w, func(e watch.Event) error {
-		// print deployment's status
-		status, done, err := statusViewer.Status(cmdNamespace, info.Name)
-		if err != nil {
-			return err
-		}
-		fmt.Fprintf(out, "%s", status)
-		// Quit waiting if the rollout is done
-		if done {
-			w.Stop()
-		}
-		return nil
+	intr := interrupt.New(nil, w.Stop)
+	return intr.Run(func() error {
+		_, err := watch.Until(0, w, func(e watch.Event) (bool, error) {
+			// print deployment's status
+			status, done, err := statusViewer.Status(cmdNamespace, info.Name)
+			if err != nil {
+				return false, err
+			}
+			fmt.Fprintf(out, "%s", status)
+			// Quit waiting if the rollout is done
+			if done {
+				return true, nil
+			}
+			return false, nil
+		})
+		return err
 	})
-	return nil
 }

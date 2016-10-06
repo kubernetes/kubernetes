@@ -371,8 +371,8 @@ provisioned.
 
 #### I have Vagrant up but the nodes won't validate!
 
-Log on to one of the nodes (`vagrant ssh node-1`) and inspect the salt minion
-log (`sudo cat /var/log/salt/minion`).
+Log on to one of the nodes (`vagrant ssh node-1`) and inspect the salt node
+log (`sudo cat /var/log/salt/node`).
 
 #### I want to change the number of nodes!
 

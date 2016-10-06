@@ -69,9 +69,10 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(pod *api.Pod, attem
 		if err != nil {
 			return nil, err
 		}
-		podSandboxConfig.DnsOptions = &runtimeApi.DNSOption{
+		podSandboxConfig.DnsConfig = &runtimeApi.DNSConfig{
 			Servers:  dnsServers,
 			Searches: dnsSearches,
+			Options:  defaultDNSOptions,
 		}
 		// TODO: Add domain support in new runtime interface
 		hostname, _, err := m.runtimeHelper.GeneratePodHostNameAndDomain(pod)
@@ -100,7 +101,6 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(pod *api.Pod, attem
 				HostPort:      &hostPort,
 				ContainerPort: &containerPort,
 				Protocol:      &protocol,
-				Name:          &port.Name,
 			})
 		}
 

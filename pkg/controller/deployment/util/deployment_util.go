@@ -368,11 +368,18 @@ func GetNewReplicaSet(deployment *extensions.Deployment, c clientset.Interface) 
 }
 
 // listReplicaSets lists all RSes the given deployment targets with the given client interface.
-func listReplicaSets(deployment *extensions.Deployment, c clientset.Interface) ([]extensions.ReplicaSet, error) {
+func listReplicaSets(deployment *extensions.Deployment, c clientset.Interface) ([]*extensions.ReplicaSet, error) {
 	return ListReplicaSets(deployment,
-		func(namespace string, options api.ListOptions) ([]extensions.ReplicaSet, error) {
+		func(namespace string, options api.ListOptions) ([]*extensions.ReplicaSet, error) {
 			rsList, err := c.Extensions().ReplicaSets(namespace).List(options)
-			return rsList.Items, err
+			if err != nil {
+				return nil, err
+			}
+			ret := []*extensions.ReplicaSet{}
+			for i := range rsList.Items {
+				ret = append(ret, &rsList.Items[i])
+			}
+			return ret, err
 		})
 }
 
@@ -385,11 +392,11 @@ func listPods(deployment *extensions.Deployment, c clientset.Interface) (*api.Po
 }
 
 // TODO: switch this to full namespacers
-type rsListFunc func(string, api.ListOptions) ([]extensions.ReplicaSet, error)
+type rsListFunc func(string, api.ListOptions) ([]*extensions.ReplicaSet, error)
 type podListFunc func(string, api.ListOptions) (*api.PodList, error)
 
 // ListReplicaSets returns a slice of RSes the given deployment targets.
-func ListReplicaSets(deployment *extensions.Deployment, getRSList rsListFunc) ([]extensions.ReplicaSet, error) {
+func ListReplicaSets(deployment *extensions.Deployment, getRSList rsListFunc) ([]*extensions.ReplicaSet, error) {
 	// TODO: Right now we list replica sets by their labels. We should list them by selector, i.e. the replica set's selector
 	//       should be a superset of the deployment's selector, see https://github.com/kubernetes/kubernetes/issues/19830;
 	//       or use controllerRef, see https://github.com/kubernetes/kubernetes/issues/2210
@@ -442,7 +449,7 @@ func equalIgnoreHash(template1, template2 api.PodTemplateSpec) (bool, error) {
 }
 
 // FindNewReplicaSet returns the new RS this given deployment targets (the one with the same pod template).
-func FindNewReplicaSet(deployment *extensions.Deployment, rsList []extensions.ReplicaSet) (*extensions.ReplicaSet, error) {
+func FindNewReplicaSet(deployment *extensions.Deployment, rsList []*extensions.ReplicaSet) (*extensions.ReplicaSet, error) {
 	newRSTemplate := GetNewReplicaSetTemplate(deployment)
 	for i := range rsList {
 		equal, err := equalIgnoreHash(rsList[i].Spec.Template, newRSTemplate)
@@ -451,7 +458,7 @@ func FindNewReplicaSet(deployment *extensions.Deployment, rsList []extensions.Re
 		}
 		if equal {
 			// This is the new ReplicaSet.
-			return &rsList[i], nil
+			return rsList[i], nil
 		}
 	}
 	// new ReplicaSet does not exist.
@@ -460,11 +467,11 @@ func FindNewReplicaSet(deployment *extensions.Deployment, rsList []extensions.Re
 
 // FindOldReplicaSets returns the old replica sets targeted by the given Deployment, with the given PodList and slice of RSes.
 // Note that the first set of old replica sets doesn't include the ones with no pods, and the second set of old replica sets include all old replica sets.
-func FindOldReplicaSets(deployment *extensions.Deployment, rsList []extensions.ReplicaSet, podList *api.PodList) ([]*extensions.ReplicaSet, []*extensions.ReplicaSet, error) {
+func FindOldReplicaSets(deployment *extensions.Deployment, rsList []*extensions.ReplicaSet, podList *api.PodList) ([]*extensions.ReplicaSet, []*extensions.ReplicaSet, error) {
 	// Find all pods whose labels match deployment.Spec.Selector, and corresponding replica sets for pods in podList.
 	// All pods and replica sets are labeled with pod-template-hash to prevent overlapping
-	oldRSs := map[string]extensions.ReplicaSet{}
-	allOldRSs := map[string]extensions.ReplicaSet{}
+	oldRSs := map[string]*extensions.ReplicaSet{}
+	allOldRSs := map[string]*extensions.ReplicaSet{}
 	newRSTemplate := GetNewReplicaSetTemplate(deployment)
 	for _, pod := range podList.Items {
 		podLabelsSelector := labels.Set(pod.ObjectMeta.Labels)
@@ -490,12 +497,12 @@ func FindOldReplicaSets(deployment *extensions.Deployment, rsList []extensions.R
 	requiredRSs := []*extensions.ReplicaSet{}
 	for key := range oldRSs {
 		value := oldRSs[key]
-		requiredRSs = append(requiredRSs, &value)
+		requiredRSs = append(requiredRSs, value)
 	}
 	allRSs := []*extensions.ReplicaSet{}
 	for key := range allOldRSs {
 		value := allOldRSs[key]
-		allRSs = append(allRSs, &value)
+		allRSs = append(allRSs, value)
 	}
 	return requiredRSs, allRSs, nil
 }
@@ -826,12 +833,12 @@ func LastSelectorUpdate(d *extensions.Deployment) unversioned.Time {
 
 // BySelectorLastUpdateTime sorts a list of deployments by the last update time of their selector,
 // first using their creation timestamp and then their names as a tie breaker.
-type BySelectorLastUpdateTime []extensions.Deployment
+type BySelectorLastUpdateTime []*extensions.Deployment
 
 func (o BySelectorLastUpdateTime) Len() int      { return len(o) }
 func (o BySelectorLastUpdateTime) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
 func (o BySelectorLastUpdateTime) Less(i, j int) bool {
-	ti, tj := LastSelectorUpdate(&o[i]), LastSelectorUpdate(&o[j])
+	ti, tj := LastSelectorUpdate(o[i]), LastSelectorUpdate(o[j])
 	if ti.Equal(tj) {
 		if o[i].CreationTimestamp.Equal(o[j].CreationTimestamp) {
 			return o[i].Name < o[j].Name

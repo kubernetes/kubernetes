@@ -99,7 +99,6 @@ func TestIngressController(t *testing.T) {
 			Name:      "test-ingress",
 			Namespace: "mynamespace",
 			SelfLink:  "/api/v1/namespaces/mynamespace/ingress/test-ingress",
-			// TODO: Remove: Annotations: map[string]string{},
 		},
 		Status: extensions_v1beta1.IngressStatus{
 			LoadBalancer: api_v1.LoadBalancerStatus{
@@ -152,6 +151,7 @@ func TestIngressController(t *testing.T) {
 	assert.Equal(t, updatedIngress2.ObjectMeta.Annotations["A"], updatedIngress.ObjectMeta.Annotations["A"], "Updated annotation not transferred from federated to cluster ingress.")
 	// Test add cluster
 	t.Log("Adding a second cluster")
+	ing1.Annotations = make(map[string]string)
 	ing1.Annotations[staticIPNameKeyWritable] = "foo" // Make sure that the base object has a static IP name first.
 	fedIngressWatch.Modify(&ing1)
 	clusterWatch.Add(cluster2)

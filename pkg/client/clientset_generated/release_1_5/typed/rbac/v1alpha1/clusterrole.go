@@ -18,6 +18,7 @@ package v1alpha1
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
+	v1 "k8s.io/kubernetes/pkg/api/v1"
 	v1alpha1 "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
@@ -32,11 +33,11 @@ type ClusterRolesGetter interface {
 type ClusterRoleInterface interface {
 	Create(*v1alpha1.ClusterRole) (*v1alpha1.ClusterRole, error)
 	Update(*v1alpha1.ClusterRole) (*v1alpha1.ClusterRole, error)
-	Delete(name string, options *api.DeleteOptions) error
-	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
+	Delete(name string, options *v1.DeleteOptions) error
+	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
 	Get(name string) (*v1alpha1.ClusterRole, error)
-	List(opts api.ListOptions) (*v1alpha1.ClusterRoleList, error)
-	Watch(opts api.ListOptions) (watch.Interface, error)
+	List(opts v1.ListOptions) (*v1alpha1.ClusterRoleList, error)
+	Watch(opts v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1alpha1.ClusterRole, err error)
 	ClusterRoleExpansion
 }
@@ -77,7 +78,7 @@ func (c *clusterRoles) Update(clusterRole *v1alpha1.ClusterRole) (result *v1alph
 }
 
 // Delete takes name of the clusterRole and deletes it. Returns an error if one occurs.
-func (c *clusterRoles) Delete(name string, options *api.DeleteOptions) error {
+func (c *clusterRoles) Delete(name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
 		Resource("clusterroles").
 		Name(name).
@@ -87,7 +88,7 @@ func (c *clusterRoles) Delete(name string, options *api.DeleteOptions) error {
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *clusterRoles) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+func (c *clusterRoles) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Resource("clusterroles").
 		VersionedParams(&listOptions, api.ParameterCodec).
@@ -108,7 +109,7 @@ func (c *clusterRoles) Get(name string) (result *v1alpha1.ClusterRole, err error
 }
 
 // List takes label and field selectors, and returns the list of ClusterRoles that match those selectors.
-func (c *clusterRoles) List(opts api.ListOptions) (result *v1alpha1.ClusterRoleList, err error) {
+func (c *clusterRoles) List(opts v1.ListOptions) (result *v1alpha1.ClusterRoleList, err error) {
 	result = &v1alpha1.ClusterRoleList{}
 	err = c.client.Get().
 		Resource("clusterroles").
@@ -119,7 +120,7 @@ func (c *clusterRoles) List(opts api.ListOptions) (result *v1alpha1.ClusterRoleL
 }
 
 // Watch returns a watch.Interface that watches the requested clusterRoles.
-func (c *clusterRoles) Watch(opts api.ListOptions) (watch.Interface, error) {
+func (c *clusterRoles) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Resource("clusterroles").

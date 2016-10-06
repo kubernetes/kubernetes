@@ -189,7 +189,7 @@ func TestGenericScheduler(t *testing.T) {
 	}{
 		{
 			predicates:   map[string]algorithm.FitPredicate{"false": falsePredicate},
-			prioritizers: []algorithm.PriorityConfig{{Function: EqualPriority, Weight: 1}},
+			prioritizers: []algorithm.PriorityConfig{{Map: EqualPriorityMap, Weight: 1}},
 			nodes:        []string{"machine1", "machine2"},
 			expectsErr:   true,
 			pod:          &api.Pod{ObjectMeta: api.ObjectMeta{Name: "2"}},
@@ -203,7 +203,7 @@ func TestGenericScheduler(t *testing.T) {
 		},
 		{
 			predicates:    map[string]algorithm.FitPredicate{"true": truePredicate},
-			prioritizers:  []algorithm.PriorityConfig{{Function: EqualPriority, Weight: 1}},
+			prioritizers:  []algorithm.PriorityConfig{{Map: EqualPriorityMap, Weight: 1}},
 			nodes:         []string{"machine1", "machine2"},
 			expectedHosts: sets.NewString("machine1", "machine2"),
 			name:          "test 2",
@@ -212,7 +212,7 @@ func TestGenericScheduler(t *testing.T) {
 		{
 			// Fits on a machine where the pod ID matches the machine name
 			predicates:    map[string]algorithm.FitPredicate{"matches": matchesPredicate},
-			prioritizers:  []algorithm.PriorityConfig{{Function: EqualPriority, Weight: 1}},
+			prioritizers:  []algorithm.PriorityConfig{{Map: EqualPriorityMap, Weight: 1}},
 			nodes:         []string{"machine1", "machine2"},
 			pod:           &api.Pod{ObjectMeta: api.ObjectMeta{Name: "machine2"}},
 			expectedHosts: sets.NewString("machine2"),
@@ -300,7 +300,9 @@ func TestGenericScheduler(t *testing.T) {
 		for _, name := range test.nodes {
 			cache.AddNode(&api.Node{ObjectMeta: api.ObjectMeta{Name: name}})
 		}
-		scheduler := NewGenericScheduler(cache, test.predicates, test.prioritizers, []algorithm.SchedulerExtender{})
+		scheduler := NewGenericScheduler(
+			cache, test.predicates, algorithm.EmptyMetadataProducer,
+			test.prioritizers, []algorithm.SchedulerExtender{})
 		machine, err := scheduler.Schedule(test.pod, algorithm.FakeNodeLister(makeNodeList(test.nodes)))
 
 		if !reflect.DeepEqual(err, test.wErr) {
@@ -492,16 +494,15 @@ func TestZeroRequest(t *testing.T) {
 			{Map: algorithmpriorities.BalancedResourceAllocationMap, Weight: 1},
 			{
 				Function: algorithmpriorities.NewSelectorSpreadPriority(
-					algorithm.FakePodLister(test.pods),
 					algorithm.FakeServiceLister([]*api.Service{}),
 					algorithm.FakeControllerLister([]*api.ReplicationController{}),
-					algorithm.FakeReplicaSetLister([]extensions.ReplicaSet{})),
+					algorithm.FakeReplicaSetLister([]*extensions.ReplicaSet{})),
 				Weight: 1,
 			},
 		}
 		nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(test.pods, test.nodes)
 		list, err := PrioritizeNodes(
-			test.pod, nodeNameToInfo, priorityConfigs,
+			test.pod, nodeNameToInfo, algorithm.EmptyMetadataProducer, priorityConfigs,
 			algorithm.FakeNodeLister(test.nodes), []algorithm.SchedulerExtender{})
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)

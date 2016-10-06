@@ -67,10 +67,6 @@ type APIGroupVersion struct {
 	// GroupVersion is the external group version
 	GroupVersion unversioned.GroupVersion
 
-	// RequestInfoResolver is used to parse URLs for the legacy proxy handler.  Don't use this for anything else
-	// TODO: refactor proxy handler to use sub resources
-	RequestInfoResolver *RequestInfoResolver
-
 	// OptionsExternalVersion controls the Kubernetes APIVersion used for common objects in the apiserver
 	// schema like api.Status, api.DeleteOptions, and api.ListOptions. Other implementors may
 	// define a version "v1beta1" but want to use the Kubernetes "v1" internal objects. If
@@ -175,7 +171,6 @@ func (g *APIGroupVersion) newInstaller() *APIInstaller {
 	prefix := path.Join(g.Root, g.GroupVersion.Group, g.GroupVersion.Version)
 	installer := &APIInstaller{
 		group:             g,
-		info:              g.RequestInfoResolver,
 		prefix:            prefix,
 		minRequestTimeout: g.MinRequestTimeout,
 	}

@@ -19,12 +19,13 @@ package scheduler
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
-	schedulertesting "k8s.io/kubernetes/plugin/pkg/scheduler/testing"
 )
 
 type fitPredicate func(pod *api.Pod, node *api.Node) (bool, error)
@@ -170,7 +171,7 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 	}{
 		{
 			predicates:   map[string]algorithm.FitPredicate{"true": truePredicate},
-			prioritizers: []algorithm.PriorityConfig{{Function: EqualPriority, Weight: 1}},
+			prioritizers: []algorithm.PriorityConfig{{Map: EqualPriorityMap, Weight: 1}},
 			extenders: []FakeExtender{
 				{
 					predicates: []fitPredicate{truePredicateExtender},
@@ -185,7 +186,7 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 		},
 		{
 			predicates:   map[string]algorithm.FitPredicate{"true": truePredicate},
-			prioritizers: []algorithm.PriorityConfig{{Function: EqualPriority, Weight: 1}},
+			prioritizers: []algorithm.PriorityConfig{{Map: EqualPriorityMap, Weight: 1}},
 			extenders: []FakeExtender{
 				{
 					predicates: []fitPredicate{truePredicateExtender},
@@ -200,7 +201,7 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 		},
 		{
 			predicates:   map[string]algorithm.FitPredicate{"true": truePredicate},
-			prioritizers: []algorithm.PriorityConfig{{Function: EqualPriority, Weight: 1}},
+			prioritizers: []algorithm.PriorityConfig{{Map: EqualPriorityMap, Weight: 1}},
 			extenders: []FakeExtender{
 				{
 					predicates: []fitPredicate{truePredicateExtender},
@@ -215,7 +216,7 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 		},
 		{
 			predicates:   map[string]algorithm.FitPredicate{"true": truePredicate},
-			prioritizers: []algorithm.PriorityConfig{{Function: EqualPriority, Weight: 1}},
+			prioritizers: []algorithm.PriorityConfig{{Map: EqualPriorityMap, Weight: 1}},
 			extenders: []FakeExtender{
 				{
 					predicates: []fitPredicate{machine2PredicateExtender},
@@ -230,7 +231,7 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 		},
 		{
 			predicates:   map[string]algorithm.FitPredicate{"true": truePredicate},
-			prioritizers: []algorithm.PriorityConfig{{Function: EqualPriority, Weight: 1}},
+			prioritizers: []algorithm.PriorityConfig{{Map: EqualPriorityMap, Weight: 1}},
 			extenders: []FakeExtender{
 				{
 					predicates:   []fitPredicate{truePredicateExtender},
@@ -244,7 +245,7 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 		},
 		{
 			predicates:   map[string]algorithm.FitPredicate{"true": truePredicate},
-			prioritizers: []algorithm.PriorityConfig{{Function: EqualPriority, Weight: 1}},
+			prioritizers: []algorithm.PriorityConfig{{Map: EqualPriorityMap, Weight: 1}},
 			extenders: []FakeExtender{
 				{
 					predicates:   []fitPredicate{truePredicateExtender},
@@ -282,7 +283,16 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 		for ii := range test.extenders {
 			extenders = append(extenders, &test.extenders[ii])
 		}
-		scheduler := NewGenericScheduler(schedulertesting.PodsToCache(test.pods), test.predicates, test.prioritizers, extenders)
+		cache := schedulercache.New(time.Duration(0), wait.NeverStop)
+		for _, pod := range test.pods {
+			cache.AddPod(pod)
+		}
+		for _, name := range test.nodes {
+			cache.AddNode(&api.Node{ObjectMeta: api.ObjectMeta{Name: name}})
+		}
+		scheduler := NewGenericScheduler(
+			cache, test.predicates, algorithm.EmptyMetadataProducer,
+			test.prioritizers, extenders)
 		machine, err := scheduler.Schedule(test.pod, algorithm.FakeNodeLister(makeNodeList(test.nodes)))
 		if test.expectsErr {
 			if err == nil {

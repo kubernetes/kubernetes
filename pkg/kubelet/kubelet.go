@@ -68,7 +68,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager"
 	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/bandwidth"
@@ -88,7 +87,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/volume"
-	"k8s.io/kubernetes/pkg/watch"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
 )
 
@@ -359,36 +357,16 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 
 	serviceStore := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 	if kubeClient != nil {
-		// TODO: cache.NewListWatchFromClient is limited as it takes a client implementation rather
-		// than an interface. There is no way to construct a list+watcher using resource name.
-		listWatch := &cache.ListWatch{
-			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return kubeClient.Core().Services(api.NamespaceAll).List(options)
-			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return kubeClient.Core().Services(api.NamespaceAll).Watch(options)
-			},
-		}
-		cache.NewReflector(listWatch, &api.Service{}, serviceStore, 0).Run()
+		serviceLW := cache.NewListWatchFromClient(kubeClient.(*clientset.Clientset).CoreClient, "services", api.NamespaceAll, fields.Everything())
+		cache.NewReflector(serviceLW, &api.Service{}, serviceStore, 0).Run()
 	}
 	serviceLister := &cache.StoreToServiceLister{Indexer: serviceStore}
 
 	nodeStore := cache.NewStore(cache.MetaNamespaceKeyFunc)
 	if kubeClient != nil {
-		// TODO: cache.NewListWatchFromClient is limited as it takes a client implementation rather
-		// than an interface. There is no way to construct a list+watcher using resource name.
 		fieldSelector := fields.Set{api.ObjectNameField: string(nodeName)}.AsSelector()
-		listWatch := &cache.ListWatch{
-			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				options.FieldSelector = fieldSelector
-				return kubeClient.Core().Nodes().List(options)
-			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				options.FieldSelector = fieldSelector
-				return kubeClient.Core().Nodes().Watch(options)
-			},
-		}
-		cache.NewReflector(listWatch, &api.Node{}, nodeStore, 0).Run()
+		nodeLW := cache.NewListWatchFromClient(kubeClient.(*clientset.Clientset).CoreClient, "nodes", api.NamespaceAll, fieldSelector)
+		cache.NewReflector(nodeLW, &api.Node{}, nodeStore, 0).Run()
 	}
 	nodeLister := &cache.StoreToNodeLister{Store: nodeStore}
 	nodeInfo := &predicates.CachedNodeInfo{StoreToNodeLister: nodeLister}
@@ -414,10 +392,8 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 	// TODO(mtaufen): remove when internal cbr0 implementation gets removed in favor
 	//                of the kubenet network plugin
 	var myConfigureCBR0 bool = kubeCfg.ConfigureCBR0
-	var myFlannelExperimentalOverlay bool = kubeCfg.ExperimentalFlannelOverlay
 	if kubeCfg.NetworkPluginName == "kubenet" {
 		myConfigureCBR0 = false
-		myFlannelExperimentalOverlay = false
 	}
 
 	klet := &Kubelet{
@@ -448,27 +424,25 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		nodeRef:                   nodeRef,
 		nodeLabels:                kubeCfg.NodeLabels,
 		nodeStatusUpdateFrequency: kubeCfg.NodeStatusUpdateFrequency.Duration,
-		os:                         kubeDeps.OSInterface,
-		oomWatcher:                 oomWatcher,
-		cgroupsPerQOS:              kubeCfg.CgroupsPerQOS,
-		cgroupRoot:                 kubeCfg.CgroupRoot,
-		mounter:                    kubeDeps.Mounter,
-		writer:                     kubeDeps.Writer,
-		configureCBR0:              myConfigureCBR0,
-		nonMasqueradeCIDR:          kubeCfg.NonMasqueradeCIDR,
-		reconcileCIDR:              kubeCfg.ReconcileCIDR,
-		maxPods:                    int(kubeCfg.MaxPods),
-		podsPerCore:                int(kubeCfg.PodsPerCore),
-		nvidiaGPUs:                 int(kubeCfg.NvidiaGPUs),
-		syncLoopMonitor:            atomic.Value{},
-		resolverConfig:             kubeCfg.ResolverConfig,
-		cpuCFSQuota:                kubeCfg.CPUCFSQuota,
-		daemonEndpoints:            daemonEndpoints,
-		containerManager:           kubeDeps.ContainerManager,
-		flannelExperimentalOverlay: myFlannelExperimentalOverlay,
-		flannelHelper:              nil,
-		nodeIP:                     net.ParseIP(kubeCfg.NodeIP),
-		clock:                      clock.RealClock{},
+		os:                kubeDeps.OSInterface,
+		oomWatcher:        oomWatcher,
+		cgroupsPerQOS:     kubeCfg.CgroupsPerQOS,
+		cgroupRoot:        kubeCfg.CgroupRoot,
+		mounter:           kubeDeps.Mounter,
+		writer:            kubeDeps.Writer,
+		configureCBR0:     myConfigureCBR0,
+		nonMasqueradeCIDR: kubeCfg.NonMasqueradeCIDR,
+		reconcileCIDR:     kubeCfg.ReconcileCIDR,
+		maxPods:           int(kubeCfg.MaxPods),
+		podsPerCore:       int(kubeCfg.PodsPerCore),
+		nvidiaGPUs:        int(kubeCfg.NvidiaGPUs),
+		syncLoopMonitor:   atomic.Value{},
+		resolverConfig:    kubeCfg.ResolverConfig,
+		cpuCFSQuota:       kubeCfg.CPUCFSQuota,
+		daemonEndpoints:   daemonEndpoints,
+		containerManager:  kubeDeps.ContainerManager,
+		nodeIP:            net.ParseIP(kubeCfg.NodeIP),
+		clock:             clock.RealClock{},
 		outOfDiskTransitionFrequency: kubeCfg.OutOfDiskTransitionFrequency.Duration,
 		reservation:                  *reservation,
 		enableCustomMetrics:          kubeCfg.EnableCustomMetrics,
@@ -478,17 +452,6 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		makeIPTablesUtilChains:       kubeCfg.MakeIPTablesUtilChains,
 		iptablesMasqueradeBit:        int(kubeCfg.IPTablesMasqueradeBit),
 		iptablesDropBit:              int(kubeCfg.IPTablesDropBit),
-	}
-
-	if klet.flannelExperimentalOverlay {
-		klet.flannelHelper = NewFlannelHelper()
-		glog.Infof("Flannel is in charge of podCIDR and overlay networking.")
-	}
-	if klet.nodeIP != nil {
-		if err := klet.validateNodeIP(); err != nil {
-			return nil, err
-		}
-		glog.Infof("Using node IP: %q", klet.nodeIP.String())
 	}
 
 	if mode, err := effectiveHairpinMode(componentconfig.HairpinMode(kubeCfg.HairpinMode), kubeCfg.ContainerRuntime, kubeCfg.ConfigureCBR0, kubeCfg.NetworkPluginName); err != nil {
@@ -535,7 +498,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		case "cri":
 			// Use the new CRI shim for docker. This is need for testing the
 			// docker integration through CRI, and may be removed in the future.
-			dockerService := dockershim.NewDockerService(klet.dockerClient)
+			dockerService := dockershim.NewDockerService(klet.dockerClient, kubeCfg.SeccompProfileRoot, kubeCfg.PodInfraContainerImage)
 			klet.containerRuntime, err = kuberuntime.NewKubeGenericRuntimeManager(
 				kubecontainer.FilterEventRecorder(kubeDeps.Recorder),
 				klet.livenessManager,
@@ -992,15 +955,6 @@ type Kubelet struct {
 
 	// oneTimeInitializer is used to initialize modules that are dependent on the runtime to be up.
 	oneTimeInitializer sync.Once
-
-	// flannelExperimentalOverlay determines whether the experimental flannel
-	// network overlay is active.
-	flannelExperimentalOverlay bool
-
-	// TODO: Flannelhelper doesn't store any state, we can instantiate it
-	// on the fly if we're confident the dbus connetions it opens doesn't
-	// put the system under duress.
-	flannelHelper *FlannelHelper
 
 	// If non-nil, use this IP address for the node
 	nodeIP net.IP

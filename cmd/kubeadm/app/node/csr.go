@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/golang/glog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/api"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/pkg/apis/certificates"
@@ -35,7 +34,7 @@ import (
 )
 
 // PerformTLSBootstrap creates a RESTful client in order to execute certificate signing request.
-func PerformTLSBootstrap(s *kubeadmapi.KubeadmConfig, apiEndpoint string, caCert []byte) (*clientcmdapi.Config, error) {
+func PerformTLSBootstrap(s *kubeadmapi.NodeConfiguration, apiEndpoint string, caCert []byte) (*clientcmdapi.Config, error) {
 	// TODO(phase1+) try all the api servers until we find one that works
 	bareClientConfig := kubeadmutil.CreateBasicClientConfig("kubernetes", apiEndpoint, caCert)
 
@@ -44,9 +43,7 @@ func PerformTLSBootstrap(s *kubeadmapi.KubeadmConfig, apiEndpoint string, caCert
 		return nil, fmt.Errorf("<node/csr> failed to get node hostname [%v]", err)
 	}
 
-	// TODO: hostname == nodename doesn't hold on all clouds (AWS).
-	// But we don't have a cloudprovider, so we're stuck.
-	glog.Errorf("assuming that hostname is the same as NodeName")
+	// TODO(phase1+) https://github.com/kubernetes/kubernetes/issues/33641
 	nodeName := types.NodeName(hostName)
 
 	bootstrapClientConfig, err := clientcmd.NewDefaultClientConfig(
@@ -65,9 +62,7 @@ func PerformTLSBootstrap(s *kubeadmapi.KubeadmConfig, apiEndpoint string, caCert
 	}
 	csrClient := client.CertificateSigningRequests()
 
-	// TODO(phase1+) checkCertsAPI() has a side-effect of making first attempt of communicating with the API,
-	// we should _make it more explicit_ and have a user-settable _retry timeout_ to account for potential connectivity issues
-	// (for example user may be bringing up machines in parallel and for some reasons master is slow to boot)
+	// TODO(phase1+) https://github.com/kubernetes/kubernetes/issues/33643
 
 	if err := checkCertsAPI(bootstrapClientConfig); err != nil {
 		return nil, fmt.Errorf("<node/csr> failed to proceed due to API compatibility issue - %v", err)
@@ -79,15 +74,16 @@ func PerformTLSBootstrap(s *kubeadmapi.KubeadmConfig, apiEndpoint string, caCert
 	if err != nil {
 		return nil, fmt.Errorf("<node/csr> failed to generating private key [%v]", err)
 	}
-
 	cert, err := csr.RequestNodeCertificate(csrClient, key, nodeName)
 	if err != nil {
 		return nil, fmt.Errorf("<node/csr> failed to request signed certificate from the API server [%v]", err)
 	}
-
-	// TODO(phase1+) print some basic info about the cert
-	fmt.Println("<node/csr> received signed certificate from the API server, generating kubelet configuration")
-
+	fmtCert, err := certutil.FormatBytesCert(cert)
+	if err != nil {
+		return nil, fmt.Errorf("<node/csr> failed to format certificate [%v]", err)
+	}
+	fmt.Printf("<node/csr> received signed certificate from the API server:\n%s\n", fmtCert)
+	fmt.Println("<node/csr> generating kubelet configuration")
 	finalConfig := kubeadmutil.MakeClientConfigWithCerts(
 		bareClientConfig, "kubernetes", fmt.Sprintf("kubelet-%s", nodeName),
 		key, cert,

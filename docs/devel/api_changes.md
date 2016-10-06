@@ -590,10 +590,11 @@ out. Put `grep` or `ack` to good use.
 If you added functionality, you should consider documenting it and/or writing
 an example to illustrate your change.
 
-Make sure you update the swagger API spec by running:
+Make sure you update the swagger and OpenAPI spec by running:
 
 ```sh
 hack/update-swagger-spec.sh
+hack/update-openapi-spec.sh
 ```
 
 The API spec changes should be in a commit separate from your other changes.

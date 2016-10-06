@@ -52,7 +52,7 @@ const (
 	execUsageStr = "expected 'exec POD_NAME COMMAND [ARG1] [ARG2] ... [ARGN]'.\nPOD_NAME and COMMAND are required arguments for the exec command"
 )
 
-func NewCmdExec(cmdFullName string, f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *cobra.Command {
+func NewCmdExec(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *cobra.Command {
 	options := &ExecOptions{
 		StreamOptions: StreamOptions{
 			In:  cmdIn,
@@ -60,8 +60,7 @@ func NewCmdExec(cmdFullName string, f *cmdutil.Factory, cmdIn io.Reader, cmdOut,
 			Err: cmdErr,
 		},
 
-		FullCmdName: cmdFullName,
-		Executor:    &DefaultRemoteExecutor{},
+		Executor: &DefaultRemoteExecutor{},
 	}
 	cmd := &cobra.Command{
 		Use:     "exec POD [-c CONTAINER] -- COMMAND [args...]",
@@ -131,18 +130,16 @@ type ExecOptions struct {
 
 	Command []string
 
-	FullCmdName string
-	Executor    RemoteExecutor
-	PodClient   coreclient.PodsGetter
-	Config      *restclient.Config
+	FullCmdName       string
+	SuggestedCmdUsage string
+
+	Executor  RemoteExecutor
+	PodClient coreclient.PodsGetter
+	Config    *restclient.Config
 }
 
 // Complete verifies command line arguments and loads data from the command environment
 func (p *ExecOptions) Complete(f *cmdutil.Factory, cmd *cobra.Command, argsIn []string, argsLenAtDash int) error {
-	if len(p.FullCmdName) == 0 {
-		p.FullCmdName = "kubectl"
-	}
-
 	// Let kubectl exec follow rules for `--`, see #13004 issue
 	if len(p.PodName) == 0 && (len(argsIn) == 0 || argsLenAtDash == 0) {
 		return cmdutil.UsageError(cmd, execUsageStr)
@@ -159,6 +156,14 @@ func (p *ExecOptions) Complete(f *cmdutil.Factory, cmd *cobra.Command, argsIn []
 		if len(p.Command) < 1 {
 			return cmdutil.UsageError(cmd, execUsageStr)
 		}
+	}
+
+	cmdParent := cmd.Parent()
+	if cmdParent != nil {
+		p.FullCmdName = cmdParent.CommandPath()
+	}
+	if len(p.FullCmdName) > 0 && cmdutil.IsSiblingCommandExists(cmd, "describe") {
+		p.SuggestedCmdUsage = fmt.Sprintf("Use '%s describe pod/%s' to see all of the containers in this pod.", p.FullCmdName, p.PodName)
 	}
 
 	namespace, _, err := f.DefaultNamespace()
@@ -265,7 +270,11 @@ func (p *ExecOptions) Run() error {
 	containerName := p.ContainerName
 	if len(containerName) == 0 {
 		if len(pod.Spec.Containers) > 1 {
-			fmt.Fprintf(p.Err, "defaulting container name to %s, use '%s describe pod/%s' to see all container names\n", pod.Spec.Containers[0].Name, p.FullCmdName, p.PodName)
+			usageString := fmt.Sprintf("Defaulting container name to %s.", pod.Spec.Containers[0].Name)
+			if len(p.SuggestedCmdUsage) > 0 {
+				usageString = fmt.Sprintf("%s\n%s", usageString, p.SuggestedCmdUsage)
+			}
+			fmt.Fprintf(p.Err, "%s\n", usageString)
 		}
 		containerName = pod.Spec.Containers[0].Name
 	}

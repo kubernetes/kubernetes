@@ -34,7 +34,7 @@ type ScaleStatus struct {
 	// actual number of observed instances of the scaled object.
 	Replicas int32 `json:"replicas" protobuf:"varint,1,opt,name=replicas"`
 
-	// label query over pods that should match the replicas count. More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors
+	// label query over pods that should match the replicas count. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors
 	Selector map[string]string `json:"selector,omitempty" protobuf:"bytes,2,rep,name=selector"`
 
 	// label selector for pods that should match the replicas count. This is a serializated
@@ -42,7 +42,7 @@ type ScaleStatus struct {
 	// avoid introspection in the clients. The string will be in the same format as the
 	// query-param syntax. If the target type only supports map-based selectors, both this
 	// field and map-based selector field are populated.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors
+	// More info: http://kubernetes.io/docs/user-guide/labels#label-selectors
 	TargetSelector string `json:"targetSelector,omitempty" protobuf:"bytes,3,opt,name=targetSelector"`
 }
 
@@ -71,7 +71,7 @@ type ReplicationControllerDummy struct {
 type SubresourceReference struct {
 	// Kind of the referent; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
 	Kind string `json:"kind,omitempty" protobuf:"bytes,1,opt,name=kind"`
-	// Name of the referent; More info: http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#names
+	// Name of the referent; More info: http://kubernetes.io/docs/user-guide/identifiers#names
 	Name string `json:"name,omitempty" protobuf:"bytes,2,opt,name=name"`
 	// API version of the referent
 	APIVersion string `json:"apiVersion,omitempty" protobuf:"bytes,3,opt,name=apiVersion"`
@@ -410,14 +410,14 @@ type DaemonSetSpec struct {
 	// Selector is a label query over pods that are managed by the daemon set.
 	// Must match in order to be controlled.
 	// If empty, defaulted to labels on Pod template.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors
+	// More info: http://kubernetes.io/docs/user-guide/labels#label-selectors
 	Selector *LabelSelector `json:"selector,omitempty" protobuf:"bytes,1,opt,name=selector"`
 
 	// Template is the object that describes the pod that will be created.
 	// The DaemonSet will create exactly one copy of this pod on every node
 	// that matches the template's node selector (or on every node if no node
 	// selector is specified).
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/replication-controller.md#pod-template
+	// More info: http://kubernetes.io/docs/user-guide/replication-controller#pod-template
 	Template v1.PodTemplateSpec `json:"template" protobuf:"bytes,2,opt,name=template"`
 
 	// TODO(madhusudancs): Uncomment while implementing DaemonSet updates.
@@ -540,7 +540,7 @@ type JobSpec struct {
 	// run at any given time. The actual number of pods running in steady state will
 	// be less than this number when ((.spec.completions - .status.successful) < .spec.parallelism),
 	// i.e. when the work left to do is less than max parallelism.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/jobs.md
+	// More info: http://kubernetes.io/docs/user-guide/jobs
 	Parallelism *int32 `json:"parallelism,omitempty" protobuf:"varint,1,opt,name=parallelism"`
 
 	// Completions specifies the desired number of successfully finished pods the
@@ -548,7 +548,7 @@ type JobSpec struct {
 	// pod signals the success of all pods, and allows parallelism to have any positive
 	// value.  Setting to 1 means that parallelism is limited to 1 and the success of that
 	// pod signals the success of the job.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/jobs.md
+	// More info: http://kubernetes.io/docs/user-guide/jobs
 	Completions *int32 `json:"completions,omitempty" protobuf:"varint,2,opt,name=completions"`
 
 	// Optional duration in seconds relative to the startTime that the job may be active
@@ -557,7 +557,7 @@ type JobSpec struct {
 
 	// Selector is a label query over pods that should match the pod count.
 	// Normally, the system sets this field for you.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors
+	// More info: http://kubernetes.io/docs/user-guide/labels#label-selectors
 	Selector *LabelSelector `json:"selector,omitempty" protobuf:"bytes,4,opt,name=selector"`
 
 	// AutoSelector controls generation of pod labels and pod selectors.
@@ -569,7 +569,7 @@ type JobSpec struct {
 
 	// Template is the object that describes the pod that will be created when
 	// executing a job.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/jobs.md
+	// More info: http://kubernetes.io/docs/user-guide/jobs
 	Template v1.PodTemplateSpec `json:"template" protobuf:"bytes,6,opt,name=template"`
 }
 
@@ -577,7 +577,7 @@ type JobSpec struct {
 type JobStatus struct {
 
 	// Conditions represent the latest available observations of an object's current state.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/jobs.md
+	// More info: http://kubernetes.io/docs/user-guide/jobs
 	Conditions []JobCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
 
 	// StartTime represents time when the job was acknowledged by the Job Manager.
@@ -787,26 +787,6 @@ type ExportOptions struct {
 	Exact bool `json:"exact" protobuf:"varint,2,opt,name=exact"`
 }
 
-// ListOptions is the query options to a standard REST list call.
-type ListOptions struct {
-	unversioned.TypeMeta `json:",inline"`
-
-	// A selector to restrict the list of returned objects by their labels.
-	// Defaults to everything.
-	LabelSelector string `json:"labelSelector,omitempty" protobuf:"bytes,1,opt,name=labelSelector"`
-	// A selector to restrict the list of returned objects by their fields.
-	// Defaults to everything.
-	FieldSelector string `json:"fieldSelector,omitempty" protobuf:"bytes,2,opt,name=fieldSelector"`
-	// Watch for changes to the described resources and return them as a stream of
-	// add, update, and remove notifications. Specify resourceVersion.
-	Watch bool `json:"watch,omitempty" protobuf:"varint,3,opt,name=watch"`
-	// When specified with a watch call, shows changes that occur after that particular version of a resource.
-	// Defaults to changes from the beginning of history.
-	ResourceVersion string `json:"resourceVersion,omitempty" protobuf:"bytes,4,opt,name=resourceVersion"`
-	// Timeout for the list/watch call.
-	TimeoutSeconds *int64 `json:"timeoutSeconds,omitempty" protobuf:"varint,5,opt,name=timeoutSeconds"`
-}
-
 // A label selector is a label query over a set of resources. The result of matchLabels and
 // matchExpressions are ANDed. An empty label selector matches all objects. A null
 // label selector matches no objects.
@@ -875,7 +855,7 @@ type ReplicaSetList struct {
 	unversioned.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// List of ReplicaSets.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/replication-controller.md
+	// More info: http://kubernetes.io/docs/user-guide/replication-controller
 	Items []ReplicaSet `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
@@ -884,7 +864,7 @@ type ReplicaSetSpec struct {
 	// Replicas is the number of desired replicas.
 	// This is a pointer to distinguish between explicit zero and unspecified.
 	// Defaults to 1.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/replication-controller.md#what-is-a-replication-controller
+	// More info: http://kubernetes.io/docs/user-guide/replication-controller#what-is-a-replication-controller
 	Replicas *int32 `json:"replicas,omitempty" protobuf:"varint,1,opt,name=replicas"`
 
 	// Minimum number of seconds for which a newly created pod should be ready
@@ -895,19 +875,19 @@ type ReplicaSetSpec struct {
 	// Selector is a label query over pods that should match the replica count.
 	// If the selector is empty, it is defaulted to the labels present on the pod template.
 	// Label keys and values that must match in order to be controlled by this replica set.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors
+	// More info: http://kubernetes.io/docs/user-guide/labels#label-selectors
 	Selector *LabelSelector `json:"selector,omitempty" protobuf:"bytes,2,opt,name=selector"`
 
 	// Template is the object that describes the pod that will be created if
 	// insufficient replicas are detected.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/replication-controller.md#pod-template
+	// More info: http://kubernetes.io/docs/user-guide/replication-controller#pod-template
 	Template v1.PodTemplateSpec `json:"template,omitempty" protobuf:"bytes,3,opt,name=template"`
 }
 
 // ReplicaSetStatus represents the current status of a ReplicaSet.
 type ReplicaSetStatus struct {
 	// Replicas is the most recently oberved number of replicas.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/replication-controller.md#what-is-a-replication-controller
+	// More info: http://kubernetes.io/docs/user-guide/replication-controller#what-is-a-replication-controller
 	Replicas int32 `json:"replicas" protobuf:"varint,1,opt,name=replicas"`
 
 	// The number of pods that have labels matching the labels of the pod template of the replicaset.

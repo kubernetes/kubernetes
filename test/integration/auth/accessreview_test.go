@@ -21,7 +21,6 @@ package auth
 import (
 	"errors"
 	"net/http"
-	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -33,7 +32,6 @@ import (
 	"k8s.io/kubernetes/pkg/auth/user"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/restclient"
-	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/plugin/pkg/admission/admit"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -57,20 +55,12 @@ func alwaysAlice(req *http.Request) (user.Info, bool, error) {
 }
 
 func TestSubjectAccessReview(t *testing.T) {
-	var m *master.Master
-	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		m.Handler.ServeHTTP(w, req)
-	}))
-	defer s.Close()
-
 	masterConfig := framework.NewIntegrationTestMasterConfig()
-	masterConfig.Authenticator = authenticator.RequestFunc(alwaysAlice)
-	masterConfig.Authorizer = sarAuthorizer{}
-	masterConfig.AdmissionControl = admit.NewAlwaysAdmit()
-	m, err := master.New(masterConfig)
-	if err != nil {
-		t.Fatalf("error in bringing up the master: %v", err)
-	}
+	masterConfig.GenericConfig.Authenticator = authenticator.RequestFunc(alwaysAlice)
+	masterConfig.GenericConfig.Authorizer = sarAuthorizer{}
+	masterConfig.GenericConfig.AdmissionControl = admit.NewAlwaysAdmit()
+	_, s := framework.RunAMaster(masterConfig)
+	defer s.Close()
 
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 
@@ -113,7 +103,7 @@ func TestSubjectAccessReview(t *testing.T) {
 			},
 			expectedStatus: authorizationapi.SubjectAccessReviewStatus{
 				Allowed:         false,
-				Reason:          "no",
+				Reason:          "Not in privileged list.\nno",
 				EvaluationError: "I'm sorry, Dave",
 			},
 		},
@@ -156,23 +146,15 @@ func TestSubjectAccessReview(t *testing.T) {
 }
 
 func TestSelfSubjectAccessReview(t *testing.T) {
-	var m *master.Master
-	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		m.Handler.ServeHTTP(w, req)
-	}))
-	defer s.Close()
-
 	username := "alice"
 	masterConfig := framework.NewIntegrationTestMasterConfig()
-	masterConfig.Authenticator = authenticator.RequestFunc(func(req *http.Request) (user.Info, bool, error) {
+	masterConfig.GenericConfig.Authenticator = authenticator.RequestFunc(func(req *http.Request) (user.Info, bool, error) {
 		return &user.DefaultInfo{Name: username}, true, nil
 	})
-	masterConfig.Authorizer = sarAuthorizer{}
-	masterConfig.AdmissionControl = admit.NewAlwaysAdmit()
-	m, err := master.New(masterConfig)
-	if err != nil {
-		t.Fatalf("error in bringing up the master: %v", err)
-	}
+	masterConfig.GenericConfig.Authorizer = sarAuthorizer{}
+	masterConfig.GenericConfig.AdmissionControl = admit.NewAlwaysAdmit()
+	_, s := framework.RunAMaster(masterConfig)
+	defer s.Close()
 
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 
@@ -216,7 +198,7 @@ func TestSelfSubjectAccessReview(t *testing.T) {
 			},
 			expectedStatus: authorizationapi.SubjectAccessReviewStatus{
 				Allowed:         false,
-				Reason:          "no",
+				Reason:          "Not in privileged list.\nno",
 				EvaluationError: "I'm sorry, Dave",
 			},
 		},
@@ -247,20 +229,12 @@ func TestSelfSubjectAccessReview(t *testing.T) {
 }
 
 func TestLocalSubjectAccessReview(t *testing.T) {
-	var m *master.Master
-	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		m.Handler.ServeHTTP(w, req)
-	}))
-	defer s.Close()
-
 	masterConfig := framework.NewIntegrationTestMasterConfig()
-	masterConfig.Authenticator = authenticator.RequestFunc(alwaysAlice)
-	masterConfig.Authorizer = sarAuthorizer{}
-	masterConfig.AdmissionControl = admit.NewAlwaysAdmit()
-	m, err := master.New(masterConfig)
-	if err != nil {
-		t.Fatalf("error in bringing up the master: %v", err)
-	}
+	masterConfig.GenericConfig.Authenticator = authenticator.RequestFunc(alwaysAlice)
+	masterConfig.GenericConfig.Authorizer = sarAuthorizer{}
+	masterConfig.GenericConfig.AdmissionControl = admit.NewAlwaysAdmit()
+	_, s := framework.RunAMaster(masterConfig)
+	defer s.Close()
 
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 
@@ -310,7 +284,7 @@ func TestLocalSubjectAccessReview(t *testing.T) {
 			},
 			expectedStatus: authorizationapi.SubjectAccessReviewStatus{
 				Allowed:         false,
-				Reason:          "no",
+				Reason:          "Not in privileged list.\nno",
 				EvaluationError: "I'm sorry, Dave",
 			},
 		},
@@ -367,7 +341,7 @@ func TestLocalSubjectAccessReview(t *testing.T) {
 			continue
 		}
 		if response.Status != test.expectedStatus {
-			t.Errorf("%s: expected %v, got %v", test.name, test.expectedStatus, response.Status)
+			t.Errorf("%s: expected %#v, got %#v", test.name, test.expectedStatus, response.Status)
 			continue
 		}
 	}

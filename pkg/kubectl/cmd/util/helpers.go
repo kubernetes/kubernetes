@@ -296,7 +296,7 @@ func isWatch(cmd *cobra.Command) bool {
 func GetFlagString(cmd *cobra.Command, flag string) string {
 	s, err := cmd.Flags().GetString(flag)
 	if err != nil {
-		glog.Fatalf("err accessing flag %s for command %s: %v", flag, cmd.Name(), err)
+		glog.Fatalf("error accessing flag %s for command %s: %v", flag, cmd.Name(), err)
 	}
 	return s
 }
@@ -305,7 +305,7 @@ func GetFlagString(cmd *cobra.Command, flag string) string {
 func GetFlagStringSlice(cmd *cobra.Command, flag string) []string {
 	s, err := cmd.Flags().GetStringSlice(flag)
 	if err != nil {
-		glog.Fatalf("err accessing flag %s for command %s: %v", flag, cmd.Name(), err)
+		glog.Fatalf("error accessing flag %s for command %s: %v", flag, cmd.Name(), err)
 	}
 	return s
 }
@@ -331,7 +331,7 @@ func GetWideFlag(cmd *cobra.Command) bool {
 func GetFlagBool(cmd *cobra.Command, flag string) bool {
 	b, err := cmd.Flags().GetBool(flag)
 	if err != nil {
-		glog.Fatalf("err accessing flag %s for command %s: %v", flag, cmd.Name(), err)
+		glog.Fatalf("error accessing flag %s for command %s: %v", flag, cmd.Name(), err)
 	}
 	return b
 }
@@ -340,7 +340,7 @@ func GetFlagBool(cmd *cobra.Command, flag string) bool {
 func GetFlagInt(cmd *cobra.Command, flag string) int {
 	i, err := cmd.Flags().GetInt(flag)
 	if err != nil {
-		glog.Fatalf("err accessing flag %s for command %s: %v", flag, cmd.Name(), err)
+		glog.Fatalf("error accessing flag %s for command %s: %v", flag, cmd.Name(), err)
 	}
 	return i
 }
@@ -349,7 +349,7 @@ func GetFlagInt(cmd *cobra.Command, flag string) int {
 func GetFlagInt64(cmd *cobra.Command, flag string) int64 {
 	i, err := cmd.Flags().GetInt64(flag)
 	if err != nil {
-		glog.Fatalf("err accessing flag %s for command %s: %v", flag, cmd.Name(), err)
+		glog.Fatalf("error accessing flag %s for command %s: %v", flag, cmd.Name(), err)
 	}
 	return i
 }
@@ -357,7 +357,7 @@ func GetFlagInt64(cmd *cobra.Command, flag string) int64 {
 func GetFlagDuration(cmd *cobra.Command, flag string) time.Duration {
 	d, err := cmd.Flags().GetDuration(flag)
 	if err != nil {
-		glog.Fatalf("err accessing flag %s for command %s: %v", flag, cmd.Name(), err)
+		glog.Fatalf("error accessing flag %s for command %s: %v", flag, cmd.Name(), err)
 	}
 	return d
 }
@@ -605,7 +605,7 @@ func ParsePairs(pairArgs []string, pairType string, supportRemove bool) (newPair
 	for _, pairArg := range pairArgs {
 		if strings.Index(pairArg, "=") != -1 {
 			parts := strings.SplitN(pairArg, "=", 2)
-			if len(parts) != 2 || len(parts[1]) == 0 {
+			if len(parts) != 2 {
 				if invalidBuf.Len() > 0 {
 					invalidBuf.WriteString(", ")
 				}
@@ -715,4 +715,16 @@ func ObjectListToVersionedObject(objects []runtime.Object, version unversioned.G
 		return nil, err
 	}
 	return converted, nil
+}
+
+// IsSiblingCommandExists receives a pointer to a cobra command and a target string.
+// Returns true if the target string is found in the list of sibling commands.
+func IsSiblingCommandExists(cmd *cobra.Command, targetCmdName string) bool {
+	for _, c := range cmd.Parent().Commands() {
+		if c.Name() == targetCmdName {
+			return true
+		}
+	}
+
+	return false
 }

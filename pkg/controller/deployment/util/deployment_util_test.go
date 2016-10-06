@@ -512,19 +512,19 @@ func TestFindNewReplicaSet(t *testing.T) {
 	tests := []struct {
 		test       string
 		deployment extensions.Deployment
-		rsList     []extensions.ReplicaSet
+		rsList     []*extensions.ReplicaSet
 		expected   *extensions.ReplicaSet
 	}{
 		{
 			test:       "Get new ReplicaSet with the same spec but different pod-template-hash value",
 			deployment: deployment,
-			rsList:     []extensions.ReplicaSet{newRS, oldRS},
+			rsList:     []*extensions.ReplicaSet{&newRS, &oldRS},
 			expected:   &newRS,
 		},
 		{
 			test:       "Get nil new ReplicaSet",
 			deployment: deployment,
-			rsList:     []extensions.ReplicaSet{oldRS},
+			rsList:     []*extensions.ReplicaSet{&oldRS},
 			expected:   nil,
 		},
 	}
@@ -550,14 +550,14 @@ func TestFindOldReplicaSets(t *testing.T) {
 	tests := []struct {
 		test       string
 		deployment extensions.Deployment
-		rsList     []extensions.ReplicaSet
+		rsList     []*extensions.ReplicaSet
 		podList    *api.PodList
 		expected   []*extensions.ReplicaSet
 	}{
 		{
 			test:       "Get old ReplicaSets",
 			deployment: deployment,
-			rsList:     []extensions.ReplicaSet{newRS, oldRS},
+			rsList:     []*extensions.ReplicaSet{&newRS, &oldRS},
 			podList: &api.PodList{
 				Items: []api.Pod{
 					newPod,
@@ -569,7 +569,7 @@ func TestFindOldReplicaSets(t *testing.T) {
 		{
 			test:       "Get old ReplicaSets with no new ReplicaSet",
 			deployment: deployment,
-			rsList:     []extensions.ReplicaSet{oldRS},
+			rsList:     []*extensions.ReplicaSet{&oldRS},
 			podList: &api.PodList{
 				Items: []api.Pod{
 					oldPod,
@@ -580,7 +580,7 @@ func TestFindOldReplicaSets(t *testing.T) {
 		{
 			test:       "Get empty old ReplicaSets",
 			deployment: deployment,
-			rsList:     []extensions.ReplicaSet{newRS},
+			rsList:     []*extensions.ReplicaSet{&newRS},
 			podList: &api.PodList{
 				Items: []api.Pod{
 					newPod,

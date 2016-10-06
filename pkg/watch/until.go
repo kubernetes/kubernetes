@@ -19,6 +19,9 @@ package watch
 import (
 	"time"
 
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
@@ -32,6 +35,7 @@ type ConditionFunc func(event Event) (bool, error)
 // encountered. The first condition that returns an error terminates the watch (and the event is also returned).
 // If no event has been received, the returned event will be nil.
 // Conditions are satisfied sequentially so as to provide a useful primitive for higher level composition.
+// A zero timeout means to wait forever.
 func Until(timeout time.Duration, watcher Interface, conditions ...ConditionFunc) (*Event, error) {
 	ch := watcher.ResultChan()
 	defer watcher.Stop()
@@ -40,7 +44,7 @@ func Until(timeout time.Duration, watcher Interface, conditions ...ConditionFunc
 		after = time.After(timeout)
 	} else {
 		ch := make(chan time.Time)
-		close(ch)
+		defer close(ch)
 		after = ch
 	}
 	var lastEvent *Event
@@ -52,7 +56,7 @@ func Until(timeout time.Duration, watcher Interface, conditions ...ConditionFunc
 				return lastEvent, err
 			}
 			if done {
-				break
+				continue
 			}
 		}
 	ConditionSucceeded:
@@ -79,4 +83,79 @@ func Until(timeout time.Duration, watcher Interface, conditions ...ConditionFunc
 		}
 	}
 	return lastEvent, nil
+}
+
+// ListerWatcher is any object that knows how to perform an initial list and start a watch on a resource.
+type ListerWatcher interface {
+	// List should return a list type object; the Items field will be extracted, and the
+	// ResourceVersion field will be used to start the watch in the right place.
+	List(options api.ListOptions) (runtime.Object, error)
+	// Watch should begin a watch at the specified version.
+	Watch(options api.ListOptions) (Interface, error)
+}
+
+// TODO: check for watch expired error and retry watch from latest point?  Same issue exists for Until.
+func ListWatchUntil(timeout time.Duration, lw ListerWatcher, conditions ...ConditionFunc) (*Event, error) {
+	if len(conditions) == 0 {
+		return nil, nil
+	}
+
+	list, err := lw.List(api.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+	initialItems, err := meta.ExtractList(list)
+	if err != nil {
+		return nil, err
+	}
+
+	// use the initial items as simulated "adds"
+	var lastEvent *Event
+	currIndex := 0
+	passedConditions := 0
+	for _, condition := range conditions {
+		// check the next condition against the previous event and short circuit waiting for the next watch
+		if lastEvent != nil {
+			done, err := condition(*lastEvent)
+			if err != nil {
+				return lastEvent, err
+			}
+			if done {
+				passedConditions = passedConditions + 1
+				continue
+			}
+		}
+
+	ConditionSucceeded:
+		for currIndex < len(initialItems) {
+			lastEvent = &Event{Type: Added, Object: initialItems[currIndex]}
+			currIndex++
+
+			done, err := condition(*lastEvent)
+			if err != nil {
+				return lastEvent, err
+			}
+			if done {
+				passedConditions = passedConditions + 1
+				break ConditionSucceeded
+			}
+		}
+	}
+	if passedConditions == len(conditions) {
+		return lastEvent, nil
+	}
+	remainingConditions := conditions[passedConditions:]
+
+	metaObj, err := meta.ListAccessor(list)
+	if err != nil {
+		return nil, err
+	}
+	currResourceVersion := metaObj.GetResourceVersion()
+
+	watch, err := lw.Watch(api.ListOptions{ResourceVersion: currResourceVersion})
+	if err != nil {
+		return nil, err
+	}
+
+	return Until(timeout, watch, remainingConditions...)
 }

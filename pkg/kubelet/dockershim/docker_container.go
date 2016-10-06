@@ -166,7 +166,11 @@ func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeApi
 		// Note: ShmSize is handled in kube_docker_client.go
 	}
 
-	hc.SecurityOpt = []string{getSeccompOpts()}
+	var err error
+	hc.SecurityOpt, err = getContainerSecurityOpts(config.Metadata.GetName(), sandboxConfig, ds.seccompProfileRoot)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate container security options for container %q: %v", config.Metadata.GetName(), err)
+	}
 	// TODO: Add or drop capabilities.
 
 	createConfig.HostConfig = hc
@@ -227,10 +231,10 @@ func (ds *dockerService) ContainerStatus(containerID string) (*runtimeApi.Contai
 
 	// Convert the mounts.
 	mounts := []*runtimeApi.Mount{}
-	for _, m := range r.Mounts {
+	for i := range r.Mounts {
+		m := r.Mounts[i]
 		readonly := !m.RW
 		mounts = append(mounts, &runtimeApi.Mount{
-			Name:          &m.Name,
 			HostPath:      &m.Source,
 			ContainerPath: &m.Destination,
 			Readonly:      &readonly,

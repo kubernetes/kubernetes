@@ -25,6 +25,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	"k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 // A helper to create a basic config.
@@ -48,7 +49,7 @@ func makeSandboxConfigWithLabelsAndAnnotations(name, namespace, uid string, atte
 // TestListSandboxes creates several sandboxes and then list them to check
 // whether the correct metadatas, states, and labels are returned.
 func TestListSandboxes(t *testing.T) {
-	ds, _, _ := newTestDockerSevice()
+	ds, _, _ := newTestDockerService()
 	name, namespace := "foo", "bar"
 	configs := []*runtimeApi.PodSandboxConfig{}
 	for i := 0; i < 3; i++ {
@@ -86,7 +87,7 @@ func TestListSandboxes(t *testing.T) {
 // TestSandboxStatus tests the basic lifecycle operations and verify that
 // the status returned reflects the operations performed.
 func TestSandboxStatus(t *testing.T) {
-	ds, _, fClock := newTestDockerSevice()
+	ds, fDocker, fClock := newTestDockerService()
 	labels := map[string]string{"label": "foobar1"}
 	annotations := map[string]string{"annotation": "abc"}
 	config := makeSandboxConfigWithLabelsAndAnnotations("foo", "bar", "1", 0, labels, annotations)
@@ -112,6 +113,13 @@ func TestSandboxStatus(t *testing.T) {
 	fClock.SetTime(time.Now())
 	*expected.CreatedAt = fClock.Now().Unix()
 	id, err := ds.RunPodSandbox(config)
+
+	// Check internal labels
+	c, err := fDocker.InspectContainer(id)
+	assert.NoError(t, err)
+	assert.Equal(t, c.Config.Labels[containerTypeLabelKey], containerTypeLabelSandbox)
+	assert.Equal(t, c.Config.Labels[types.KubernetesContainerNameLabel], sandboxContainerName)
+
 	expected.Id = &id // ID is only known after the creation.
 	status, err := ds.PodSandboxStatus(id)
 	assert.NoError(t, err)

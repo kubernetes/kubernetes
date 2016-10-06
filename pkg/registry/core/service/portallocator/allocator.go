@@ -37,10 +37,17 @@ type Interface interface {
 
 var (
 	ErrFull              = errors.New("range is full")
-	ErrNotInRange        = errors.New("provided port is not in the valid range")
 	ErrAllocated         = errors.New("provided port is already allocated")
 	ErrMismatchedNetwork = errors.New("the provided port range does not match the current port range")
 )
+
+type ErrNotInRange struct {
+	ValidPorts string
+}
+
+func (e *ErrNotInRange) Error() string {
+	return fmt.Sprintf("provided port is not in the valid range. The range of valid ports is %s", e.ValidPorts)
+}
 
 type PortAllocator struct {
 	portRange net.PortRange
@@ -82,7 +89,9 @@ func (r *PortAllocator) Free() int {
 func (r *PortAllocator) Allocate(port int) error {
 	ok, offset := r.contains(port)
 	if !ok {
-		return ErrNotInRange
+		// include valid port range in error
+		validPorts := r.portRange.String()
+		return &ErrNotInRange{validPorts}
 	}
 
 	allocated, err := r.alloc.Allocate(offset)

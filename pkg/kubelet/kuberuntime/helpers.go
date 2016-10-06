@@ -37,6 +37,11 @@ const (
 	minQuotaPeriod = 1000
 )
 
+var (
+	// The default dns opt strings
+	defaultDNSOptions = []string{"ndots:5"}
+)
+
 type podsByID []*kubecontainer.Pod
 
 func (b podsByID) Len() int           { return len(b) }
@@ -121,6 +126,31 @@ func (m *kubeGenericRuntimeManager) sandboxToKubeContainer(s *runtimeApi.PodSand
 		ID:    kubecontainer.ContainerID{Type: m.runtimeName, ID: s.GetId()},
 		State: kubecontainer.SandboxToContainerState(s.GetState()),
 	}, nil
+}
+
+// getContainerSpec gets the container spec by containerName.
+func getContainerSpec(pod *api.Pod, containerName string) *api.Container {
+	for i, c := range pod.Spec.Containers {
+		if containerName == c.Name {
+			return &pod.Spec.Containers[i]
+		}
+	}
+	for i, c := range pod.Spec.InitContainers {
+		if containerName == c.Name {
+			return &pod.Spec.InitContainers[i]
+		}
+	}
+
+	return nil
+}
+
+// isContainerFailed returns true if container has exited and exitcode is not zero.
+func isContainerFailed(status *kubecontainer.ContainerStatus) bool {
+	if status.State == kubecontainer.ContainerStateExited && status.ExitCode != 0 {
+		return true
+	}
+
+	return false
 }
 
 // milliCPUToShares converts milliCPU to CPU shares

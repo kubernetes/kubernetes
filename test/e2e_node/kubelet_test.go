@@ -162,8 +162,10 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 		Context("when querying /stats/summary", func() {
 			It("it should report resource usage through the stats api", func() {
 				podNamePrefix := "stats-busybox-" + string(uuid.NewUUID())
-				volumeNamePrefix := "test-empty-dir"
-				podNames, volumes := createSummaryTestPods(f.PodClient(), podNamePrefix, 2, volumeNamePrefix)
+				podNames := sets.NewString(podNamePrefix+"0", podNamePrefix+"1")
+				volumes := sets.NewString("test-empty-dir")
+
+				createSummaryTestPods(f, podNames.List()...)
 				By("Returning stats summary")
 				summary := stats.Summary{}
 				Eventually(func() error {
@@ -198,54 +200,6 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 		})
 	})
 })
-
-const (
-	containerSuffix = "-c"
-)
-
-func createSummaryTestPods(podClient *framework.PodClient, podNamePrefix string, count int, volumeNamePrefix string) (sets.String, sets.String) {
-	podNames := sets.NewString()
-	volumes := sets.NewString(volumeNamePrefix)
-	for i := 0; i < count; i++ {
-		podNames.Insert(fmt.Sprintf("%s%v", podNamePrefix, i))
-	}
-
-	var pods []*api.Pod
-	for _, podName := range podNames.List() {
-		pods = append(pods, &api.Pod{
-			ObjectMeta: api.ObjectMeta{
-				Name: podName,
-			},
-			Spec: api.PodSpec{
-				// Don't restart the Pod since it is expected to exit
-				RestartPolicy: api.RestartPolicyNever,
-				Containers: []api.Container{
-					{
-						Image:   "gcr.io/google_containers/busybox:1.24",
-						Command: []string{"sh", "-c", "while true; do echo 'hello world' | tee /test-empty-dir-mnt/file ; sleep 1; done"},
-						Name:    podName + containerSuffix,
-						VolumeMounts: []api.VolumeMount{
-							{MountPath: "/test-empty-dir-mnt", Name: volumeNamePrefix},
-						},
-					},
-				},
-				SecurityContext: &api.PodSecurityContext{
-					SELinuxOptions: &api.SELinuxOptions{
-						Level: "s0",
-					},
-				},
-				Volumes: []api.Volume{
-					// TODO: Test secret volumes
-					// TODO: Test hostpath volumes
-					{Name: volumeNamePrefix, VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},
-				},
-			},
-		})
-	}
-	podClient.CreateBatch(pods)
-
-	return podNames, volumes
-}
 
 // Returns pods missing from summary.
 func podsMissingFromSummary(s stats.Summary, expectedPods sets.String) sets.String {
@@ -372,7 +326,7 @@ func testSummaryMetrics(s stats.Summary, podNamePrefix string) error {
 		}
 		container := pod.Containers[0]
 
-		if container.Name != (pod.PodRef.Name + containerSuffix) {
+		if container.Name != "busybox-container" {
 			return fmt.Errorf("unexpected container name - %q", container.Name)
 		}
 

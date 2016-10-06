@@ -185,6 +185,7 @@ func TestSchedulerNoPhantomPodAfterExpire(t *testing.T) {
 	scache := schedulercache.New(100*time.Millisecond, stop)
 	pod := podWithPort("pod.Name", "", 8080)
 	node := api.Node{ObjectMeta: api.ObjectMeta{Name: "machine1"}}
+	scache.AddNode(&node)
 	nodeLister := algorithm.FakeNodeLister([]*api.Node{&node})
 	predicateMap := map[string]algorithm.FitPredicate{"PodFitsHostPorts": predicates.PodFitsHostPorts}
 	scheduler, bindingChan, _ := setupTestSchedulerWithOnePodOnNode(t, queuedPodStore, scache, nodeLister, predicateMap, pod, &node)
@@ -242,6 +243,7 @@ func TestSchedulerNoPhantomPodAfterDelete(t *testing.T) {
 	scache := schedulercache.New(10*time.Minute, stop)
 	firstPod := podWithPort("pod.Name", "", 8080)
 	node := api.Node{ObjectMeta: api.ObjectMeta{Name: "machine1"}}
+	scache.AddNode(&node)
 	nodeLister := algorithm.FakeNodeLister([]*api.Node{&node})
 	predicateMap := map[string]algorithm.FitPredicate{"PodFitsHostPorts": predicates.PodFitsHostPorts}
 	scheduler, bindingChan, errChan := setupTestSchedulerWithOnePodOnNode(t, queuedPodStore, scache, nodeLister, predicateMap, firstPod, &node)
@@ -384,6 +386,7 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache schedulercache.
 	algo := NewGenericScheduler(
 		scache,
 		predicateMap,
+		algorithm.EmptyMetadataProducer,
 		[]algorithm.PriorityConfig{},
 		[]algorithm.SchedulerExtender{})
 	bindingChan := make(chan *api.Binding, 1)

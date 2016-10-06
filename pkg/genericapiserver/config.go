@@ -23,11 +23,12 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"path"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
-	"github.com/emicklei/go-restful"
 	"github.com/go-openapi/spec"
 	"github.com/golang/glog"
 	"gopkg.in/natefinch/lumberjack.v2"
@@ -37,11 +38,14 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apiserver"
 	apiserverfilters "k8s.io/kubernetes/pkg/apiserver/filters"
+	"k8s.io/kubernetes/pkg/apiserver/request"
 	"k8s.io/kubernetes/pkg/auth/authenticator"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	authhandlers "k8s.io/kubernetes/pkg/auth/handlers"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	genericfilters "k8s.io/kubernetes/pkg/genericapiserver/filters"
+	"k8s.io/kubernetes/pkg/genericapiserver/mux"
 	"k8s.io/kubernetes/pkg/genericapiserver/openapi/common"
 	"k8s.io/kubernetes/pkg/genericapiserver/options"
 	"k8s.io/kubernetes/pkg/genericapiserver/routes"
@@ -49,6 +53,7 @@ import (
 	ipallocator "k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/runtime"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 // Config is a structure used to configure a GenericAPIServer.
@@ -80,14 +85,14 @@ type Config struct {
 	// TODO(ericchiang): Determine if policy escalation checks should be an admission controller.
 	AuthorizerRBACSuperUser string
 
+	// LoopbackClientConfig is a config for a privileged loopback connection to the API server
+	LoopbackClientConfig *restclient.Config
+
 	// Map requests to contexts. Exported so downstream consumers can provider their own mappers
 	RequestContextMapper api.RequestContextMapper
 
 	// Required, the interface for serializing and converting objects to and from the wire
 	Serializer runtime.NegotiatedSerializer
-
-	// If specified, all web services will be registered into this container
-	RestfulContainer *restful.Container
 
 	// If specified, requests will be allocated a random timeout between this value, and twice this value.
 	// Note that it is up to the request handlers to ignore or honor this timeout. In seconds.
@@ -96,6 +101,9 @@ type Config struct {
 	// Number of masters running; all masters must be started with the
 	// same value for this field. (Numbers > 1 currently untested.)
 	MasterCount int
+
+	SecureServingInfo   *ServingInfo
+	InsecureServingInfo *ServingInfo
 
 	// The port on PublicAddress where a read-write server will be installed.
 	// Defaults to 6443 if not set.
@@ -141,6 +149,8 @@ type Config struct {
 	// Port names should align with ports defined in ExtraServicePorts
 	ExtraEndpointPorts []api.EndpointPort
 
+	// If non-zero, the "kubernetes" services uses this port as NodePort.
+	// TODO(sttts): move into master
 	KubernetesServiceNodePort int
 
 	// EnableOpenAPISupport enables OpenAPI support. Allow downstream customers to disable OpenAPI spec.
@@ -162,6 +172,27 @@ type Config struct {
 
 	// Predicate which is true for paths of long-running http requests
 	LongRunningFunc genericfilters.LongRunningRequestCheck
+
+	// Build the handler chains by decorating the apiHandler.
+	BuildHandlerChainsFunc func(apiHandler http.Handler, c *Config) (secure, insecure http.Handler)
+}
+
+type ServingInfo struct {
+	// BindAddress is the ip:port to serve on
+	BindAddress string
+	// ServerCert is the TLS cert info for serving secure traffic
+	ServerCert CertInfo
+	// ClientCA is the certificate bundle for all the signers that you'll recognize for incoming client certificates
+	ClientCA string
+}
+
+type CertInfo struct {
+	// CertFile is a file containing a PEM-encoded certificate
+	CertFile string
+	// KeyFile is a file containing a PEM-encoded private key for the certificate specified by CertFile
+	KeyFile string
+	// Generate indicates that the cert/key pair should be generated if its not present.
+	Generate bool
 }
 
 func NewConfig(options *options.ServerRunOptions) *Config {
@@ -174,6 +205,30 @@ func NewConfig(options *options.ServerRunOptions) *Config {
 			MaxAge:     options.AuditLogMaxAge,
 			MaxBackups: options.AuditLogMaxBackups,
 			MaxSize:    options.AuditLogMaxSize,
+		}
+	}
+
+	var secureServingInfo *ServingInfo
+	if options.SecurePort > 0 {
+		secureServingInfo = &ServingInfo{
+			BindAddress: net.JoinHostPort(options.BindAddress.String(), strconv.Itoa(options.SecurePort)),
+			ServerCert: CertInfo{
+				CertFile: options.TLSCertFile,
+				KeyFile:  options.TLSPrivateKeyFile,
+			},
+			ClientCA: options.ClientCAFile,
+		}
+		if options.TLSCertFile == "" && options.TLSPrivateKeyFile == "" {
+			secureServingInfo.ServerCert.Generate = true
+			secureServingInfo.ServerCert.CertFile = path.Join(options.CertDirectory, "apiserver.crt")
+			secureServingInfo.ServerCert.KeyFile = path.Join(options.CertDirectory, "apiserver.key")
+		}
+	}
+
+	var insecureServingInfo *ServingInfo
+	if options.InsecurePort > 0 {
+		insecureServingInfo = &ServingInfo{
+			BindAddress: net.JoinHostPort(options.InsecureBindAddress.String(), strconv.Itoa(options.InsecurePort)),
 		}
 	}
 
@@ -192,6 +247,8 @@ func NewConfig(options *options.ServerRunOptions) *Config {
 		KubernetesServiceNodePort: options.KubernetesServiceNodePort,
 		MasterCount:               options.MasterCount,
 		MinRequestTimeout:         options.MinRequestTimeout,
+		SecureServingInfo:         secureServingInfo,
+		InsecureServingInfo:       insecureServingInfo,
 		PublicAddress:             options.AdvertiseAddress,
 		ReadWritePort:             options.SecurePort,
 		ServiceClusterIPRange:     &options.ServiceClusterIPRange,
@@ -210,8 +267,12 @@ func NewConfig(options *options.ServerRunOptions) *Config {
 	}
 }
 
-// setDefaults fills in any fields not set that are required to have valid data.
-func (c *Config) setDefaults() {
+type completedConfig struct {
+	*Config
+}
+
+// Complete fills in any fields not set that are required to have valid data. It's mutating the receiver.
+func (c *Config) Complete() completedConfig {
 	if c.ServiceClusterIPRange == nil {
 		defaultNet := "10.0.0.0/24"
 		glog.Warningf("Network range for service cluster IPs is unspecified. Defaulting to %v.", defaultNet)
@@ -264,6 +325,15 @@ func (c *Config) setDefaults() {
 		}
 		c.ExternalHost = hostAndPort
 	}
+	if c.BuildHandlerChainsFunc == nil {
+		c.BuildHandlerChainsFunc = DefaultBuildHandlerChain
+	}
+	return completedConfig{c}
+}
+
+// SkipComplete provides a way to construct a server instance without config completion.
+func (c *Config) SkipComplete() completedConfig {
+	return completedConfig{c}
 }
 
 // New returns a new instance of GenericAPIServer from the given config.
@@ -288,16 +358,15 @@ func (c *Config) setDefaults() {
 //   If the caller wants to add additional endpoints not using the GenericAPIServer's
 //   auth, then the caller should create a handler for those endpoints, which delegates the
 //   any unhandled paths to "Handler".
-func (c Config) New() (*GenericAPIServer, error) {
+func (c completedConfig) New() (*GenericAPIServer, error) {
 	if c.Serializer == nil {
 		return nil, fmt.Errorf("Genericapiserver.New() called with config.Serializer == nil")
 	}
 
-	c.setDefaults()
-
 	s := &GenericAPIServer{
 		ServiceClusterIPRange: c.ServiceClusterIPRange,
 		ServiceNodePortRange:  c.ServiceNodePortRange,
+		LoopbackClientConfig:  c.LoopbackClientConfig,
 		legacyAPIPrefix:       c.APIPrefix,
 		apiPrefix:             c.APIGroupPrefix,
 		admissionControl:      c.AdmissionControl,
@@ -308,6 +377,8 @@ func (c Config) New() (*GenericAPIServer, error) {
 		enableSwaggerSupport: c.EnableSwaggerSupport,
 
 		MasterCount:          c.MasterCount,
+		SecureServingInfo:    c.SecureServingInfo,
+		InsecureServingInfo:  c.InsecureServingInfo,
 		ExternalAddress:      c.ExternalHost,
 		ClusterIP:            c.PublicAddress,
 		PublicReadWritePort:  c.ReadWritePort,
@@ -325,15 +396,7 @@ func (c Config) New() (*GenericAPIServer, error) {
 		openAPIDefinitions:     c.OpenAPIDefinitions,
 	}
 
-	if c.RestfulContainer != nil {
-		s.HandlerContainer = c.RestfulContainer
-	} else {
-		s.HandlerContainer = NewHandlerContainer(http.NewServeMux(), c.Serializer)
-	}
-	// Use CurlyRouter to be able to use regular expressions in paths. Regular expressions are required in paths for example for proxy (where the path is proxy/{kind}/{name}/{*})
-	s.HandlerContainer.Router(restful.CurlyRouter{})
-	s.Mux = apiserver.NewPathRecorderMux(s.HandlerContainer.ServeMux)
-	apiserver.InstallServiceErrorHandler(s.Serializer, s.HandlerContainer)
+	s.HandlerContainer = mux.NewAPIContainer(http.NewServeMux(), c.Serializer)
 
 	if c.ProxyDialer != nil || c.ProxyTLSClientConfig != nil {
 		s.ProxyTransport = utilnet.SetTransportDefaults(&http.Transport{
@@ -342,47 +405,51 @@ func (c Config) New() (*GenericAPIServer, error) {
 		})
 	}
 
-	s.installAPI(&c)
-	s.Handler, s.InsecureHandler = s.buildHandlerChains(&c, http.Handler(s.Mux.BaseMux().(*http.ServeMux)))
+	s.installAPI(c.Config)
+
+	s.Handler, s.InsecureHandler = c.BuildHandlerChainsFunc(s.HandlerContainer.ServeMux, c.Config)
 
 	return s, nil
 }
 
-func (s *GenericAPIServer) buildHandlerChains(c *Config, handler http.Handler) (secure http.Handler, insecure http.Handler) {
-	// filters which insecure and secure have in common
-	handler = genericfilters.WithCORS(handler, c.CorsAllowedOriginList, nil, nil, "true")
+func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) (secure, insecure http.Handler) {
+	attributeGetter := apiserverfilters.NewRequestAttributeGetter(c.RequestContextMapper)
 
-	// insecure filters
-	insecure = handler
-	insecure = genericfilters.WithPanicRecovery(insecure, s.NewRequestInfoResolver())
-	insecure = genericfilters.WithTimeoutForNonLongRunningRequests(insecure, c.LongRunningFunc)
+	generic := func(handler http.Handler) http.Handler {
+		handler = genericfilters.WithCORS(handler, c.CorsAllowedOriginList, nil, nil, nil, "true")
+		handler = genericfilters.WithPanicRecovery(handler, c.RequestContextMapper)
+		handler = apiserverfilters.WithRequestInfo(handler, NewRequestInfoResolver(c), c.RequestContextMapper)
+		handler = api.WithRequestContext(handler, c.RequestContextMapper)
+		handler = genericfilters.WithTimeoutForNonLongRunningRequests(handler, c.LongRunningFunc)
+		handler = genericfilters.WithMaxInFlightLimit(handler, c.MaxRequestsInFlight, c.LongRunningFunc)
+		return handler
+	}
+	audit := func(handler http.Handler) http.Handler {
+		return apiserverfilters.WithAudit(handler, attributeGetter, c.AuditWriter)
+	}
+	protect := func(handler http.Handler) http.Handler {
+		handler = apiserverfilters.WithAuthorization(handler, attributeGetter, c.Authorizer)
+		handler = apiserverfilters.WithImpersonation(handler, c.RequestContextMapper, c.Authorizer)
+		handler = audit(handler) // before impersonation to read original user
+		handler = authhandlers.WithAuthentication(handler, c.RequestContextMapper, c.Authenticator, authhandlers.Unauthorized(c.SupportsBasicAuth))
+		return handler
+	}
 
-	// secure filters
-	attributeGetter := apiserverfilters.NewRequestAttributeGetter(c.RequestContextMapper, s.NewRequestInfoResolver())
-	secure = handler
-	secure = apiserverfilters.WithAuthorization(secure, attributeGetter, c.Authorizer)
-	secure = apiserverfilters.WithImpersonation(secure, c.RequestContextMapper, c.Authorizer)
-	secure = apiserverfilters.WithAudit(secure, attributeGetter, c.AuditWriter) // before impersonation to read original user
-	secure = authhandlers.WithAuthentication(secure, c.RequestContextMapper, c.Authenticator, authhandlers.Unauthorized(c.SupportsBasicAuth))
-	secure = genericfilters.WithPanicRecovery(secure, s.NewRequestInfoResolver())
-	secure = genericfilters.WithTimeoutForNonLongRunningRequests(secure, c.LongRunningFunc)
-	secure = genericfilters.WithMaxInFlightLimit(secure, c.MaxRequestsInFlight, c.LongRunningFunc)
-
-	return
+	return generic(protect(apiHandler)), generic(audit(apiHandler))
 }
 
 func (s *GenericAPIServer) installAPI(c *Config) {
 	if c.EnableIndex {
-		routes.Index{}.Install(s.Mux, s.HandlerContainer)
+		routes.Index{}.Install(s.HandlerContainer)
 	}
 	if c.EnableSwaggerSupport && c.EnableSwaggerUI {
-		routes.SwaggerUI{}.Install(s.Mux, s.HandlerContainer)
+		routes.SwaggerUI{}.Install(s.HandlerContainer)
 	}
 	if c.EnableProfiling {
-		routes.Profiling{}.Install(s.Mux, s.HandlerContainer)
+		routes.Profiling{}.Install(s.HandlerContainer)
 	}
 	if c.EnableVersion {
-		routes.Version{}.Install(s.Mux, s.HandlerContainer)
+		routes.Version{}.Install(s.HandlerContainer)
 	}
 	s.HandlerContainer.Add(s.DynamicApisDiscovery())
 }
@@ -434,5 +501,12 @@ func DefaultAndValidateRunOptions(options *options.ServerRunOptions) {
 				}
 			}
 		}
+	}
+}
+
+func NewRequestInfoResolver(c *Config) *request.RequestInfoFactory {
+	return &request.RequestInfoFactory{
+		APIPrefixes:          sets.NewString(strings.Trim(c.APIPrefix, "/"), strings.Trim(c.APIGroupPrefix, "/")), // all possible API prefixes
+		GrouplessAPIPrefixes: sets.NewString(strings.Trim(c.APIPrefix, "/")),                                      // APIPrefixes that won't have groups (legacy)
 	}
 }

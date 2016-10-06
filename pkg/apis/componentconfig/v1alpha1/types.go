@@ -424,10 +424,6 @@ type KubeletConfiguration struct {
 	// run docker daemon with version  < 1.9 or an Aufs storage backend.
 	// Issue #10959 has more details.
 	SerializeImagePulls *bool `json:"serializeImagePulls"`
-	// experimentalFlannelOverlay enables experimental support for starting the
-	// kubelet with the default overlay network (flannel). Assumes flanneld
-	// is already running in client mode.
-	ExperimentalFlannelOverlay bool `json:"experimentalFlannelOverlay"`
 	// outOfDiskTransitionFrequency is duration for which the kubelet has to
 	// wait before transitioning out of out-of-disk node condition status.
 	OutOfDiskTransitionFrequency unversioned.Duration `json:"outOfDiskTransitionFrequency"`
@@ -461,12 +457,12 @@ type KubeletConfiguration struct {
 	// A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G) pairs
 	// that describe resources reserved for non-kubernetes components.
 	// Currently only cpu and memory are supported. [default=none]
-	// See http://releases.k8s.io/HEAD/docs/user-guide/compute-resources.md for more detail.
+	// See http://kubernetes.io/docs/user-guide/compute-resources for more detail.
 	SystemReserved map[string]string `json:"systemReserved"`
 	// A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G) pairs
 	// that describe resources reserved for kubernetes system components.
 	// Currently only cpu and memory are supported. [default=none]
-	// See http://releases.k8s.io/HEAD/docs/user-guide/compute-resources.md for more detail.
+	// See http://kubernetes.io/docs/user-guide/compute-resources for more detail.
 	KubeReserved map[string]string `json:"kubeReserved"`
 	// Default behaviour for kernel tuning
 	ProtectKernelDefaults bool `json:"protectKernelDefaults"`

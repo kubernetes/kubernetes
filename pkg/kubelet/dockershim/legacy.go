@@ -39,8 +39,8 @@ func (ds *dockerService) GetContainerLogs(pod *api.Pod, containerID kubecontaine
 	return dockertools.GetContainerLogs(ds.client, pod, containerID, logOptions, stdout, stderr)
 }
 
-func (ds *dockerService) PortForward(pod *kubecontainer.Pod, port uint16, stream io.ReadWriteCloser) error {
-	return fmt.Errorf("not implemented")
+func (ds *dockerService) PortForward(sandboxID string, port uint16, stream io.ReadWriteCloser) error {
+	return dockertools.PortForward(ds.client, sandboxID, port, stream)
 }
 
 func (ds *dockerService) ExecInContainer(containerID kubecontainer.ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size) error {

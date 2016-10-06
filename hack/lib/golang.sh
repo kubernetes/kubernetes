@@ -18,13 +18,6 @@
 readonly KUBE_GO_PACKAGE=k8s.io/kubernetes
 readonly KUBE_GOPATH="${KUBE_OUTPUT}/go"
 
-# Load contrib target functions
-if [ -n "${KUBERNETES_CONTRIB:-}" ]; then
-  for contrib in "${KUBERNETES_CONTRIB}"; do
-    source "${KUBE_ROOT}/contrib/${contrib}/target.sh"
-  done
-fi
-
 # The set of server targets that we are only building for Linux
 # Note: if you are adding something here, you might need to add it to
 # kube::build::source_targets in build/common.sh as well.
@@ -40,11 +33,6 @@ kube::golang::server_targets() {
     cmd/kube-discovery
     plugin/cmd/kube-scheduler
   )
-  if [ -n "${KUBERNETES_CONTRIB:-}" ]; then
-    for contrib in "${KUBERNETES_CONTRIB}"; do
-      targets+=($(eval "kube::contrib::${contrib}::server_targets"))
-    done
-  fi
   echo "${targets[@]}"
 }
 
@@ -77,9 +65,6 @@ else
   if [[ "${KUBE_BUILD_PPC64LE:-}" =~ ^[yY]$ ]]; then
     KUBE_SERVER_PLATFORMS+=(linux/ppc64le)
   fi
-  if [[ "${KUBE_BUILD_S390X:-}" =~ ^[yY]$ ]]; then
-    KUBE_SERVER_PLATFORMS+=(linux/s390x)
-  fi
   readonly KUBE_SERVER_PLATFORMS
 
   # If we update this we should also update the set of golang compilers we build
@@ -96,9 +81,6 @@ else
   )
   if [[ "${KUBE_BUILD_PPC64LE:-}" =~ ^[yY]$ ]]; then
     KUBE_CLIENT_PLATFORMS+=(linux/ppc64le)
-  fi
-  if [[ "${KUBE_BUILD_S390X:-}" =~ ^[yY]$ ]]; then
-    KUBE_CLIENT_PLATFORMS+=(linux/s390x)
   fi
   readonly KUBE_CLIENT_PLATFORMS
 
@@ -132,11 +114,6 @@ kube::golang::test_targets() {
     vendor/github.com/onsi/ginkgo/ginkgo
     test/e2e/e2e.test
   )
-  if [ -n "${KUBERNETES_CONTRIB:-}" ]; then
-    for contrib in "${KUBERNETES_CONTRIB}"; do
-      targets+=($(eval "kube::contrib::${contrib}::test_targets"))
-    done
-  fi
   echo "${targets[@]}"
 }
 readonly KUBE_TEST_TARGETS=($(kube::golang::test_targets))
@@ -167,12 +144,6 @@ readonly KUBE_TEST_SERVER_PLATFORMS=("${KUBE_SERVER_PLATFORMS[@]}")
 # Gigabytes desired for parallel platform builds. 11 is fairly
 # arbitrary, but is a reasonable splitting point for 2015
 # laptops-versus-not.
-#
-# If you are using boot2docker, the following seems to work (note
-# that 12000 rounds to 11G):
-#   boot2docker down
-#   VBoxManage modifyvm boot2docker-vm --memory 12000
-#   boot2docker up
 readonly KUBE_PARALLEL_BUILD_MEMORY=11
 
 readonly KUBE_ALL_TARGETS=(
@@ -259,6 +230,7 @@ kube::golang::set_platform_envs() {
     if [[ ${platform} == "linux/arm" ]]; then
       export CGO_ENABLED=1
       export CC=arm-linux-gnueabi-gcc
+      # See https://github.com/kubernetes/kubernetes/issues/29904
       export GOROOT=${K8S_PATCHED_GOROOT}
     elif [[ ${platform} == "linux/arm64" ]]; then
       export CGO_ENABLED=1
@@ -266,9 +238,9 @@ kube::golang::set_platform_envs() {
     elif [[ ${platform} == "linux/ppc64le" ]]; then
       export CGO_ENABLED=1
       export CC=powerpc64le-linux-gnu-gcc
-    elif [[ ${platform} == "linux/s390x" ]]; then
-      export CGO_ENABLED=1
-      export CC=s390x-linux-gnu-gcc
+    elif [[ ${platform} == "darwin/"* ]]; then
+      # See https://github.com/kubernetes/kubernetes/issues/32999
+      export GOROOT=${K8S_PATCHED_GOROOT}
     fi
   fi
 }
@@ -575,7 +547,7 @@ kube::golang::build_binaries_for_platform() {
         "${testpkg}"
 
     mkdir -p "$(dirname ${outfile})"
-    go test -c \
+    go test -i -c \
       "${goflags[@]:+${goflags[@]}}" \
       -gcflags "${gogcflags}" \
       -ldflags "${goldflags}" \

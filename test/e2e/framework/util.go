@@ -43,7 +43,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_4"
+	"k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5"
 	"k8s.io/kubernetes/pkg/api"
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
@@ -507,8 +507,8 @@ func logPodStates(pods []api.Pod) {
 }
 
 // errorBadPodsStates create error message of basic info of bad pods for debugging.
-func errorBadPodsStates(badPods []api.Pod, desiredPods int, ns string, timeout time.Duration) string {
-	errStr := fmt.Sprintf("%d / %d pods in namespace %q are NOT in the desired state in %v\n", len(badPods), desiredPods, ns, timeout)
+func errorBadPodsStates(badPods []api.Pod, desiredPods int, ns, desiredState string, timeout time.Duration) string {
+	errStr := fmt.Sprintf("%d / %d pods in namespace %q are NOT in %s state in %v\n", len(badPods), desiredPods, ns, desiredState, timeout)
 	// Pirnt bad pods info only if there are fewer than 10 bad pods
 	if len(badPods) > 10 {
 		return errStr + "There are too many bad pods. Please check log for details."
@@ -580,7 +580,7 @@ func hasReplicationControllersForPod(rcs *api.ReplicationControllerList, pod api
 // pods have been created.
 func WaitForPodsSuccess(c *client.Client, ns string, successPodLabels map[string]string, timeout time.Duration) error {
 	successPodSelector := labels.SelectorFromSet(successPodLabels)
-	start, badPods := time.Now(), []api.Pod{}
+	start, badPods, desiredPods := time.Now(), []api.Pod{}, 0
 
 	if wait.PollImmediate(30*time.Second, timeout, func() (bool, error) {
 		podList, err := c.Pods(ns).List(api.ListOptions{LabelSelector: successPodSelector})
@@ -593,6 +593,7 @@ func WaitForPodsSuccess(c *client.Client, ns string, successPodLabels map[string
 			return true, nil
 		}
 		badPods = []api.Pod{}
+		desiredPods = len(podList.Items)
 		for _, pod := range podList.Items {
 			if pod.Status.Phase != api.PodSucceeded {
 				badPods = append(badPods, pod)
@@ -608,7 +609,8 @@ func WaitForPodsSuccess(c *client.Client, ns string, successPodLabels map[string
 	}) != nil {
 		logPodStates(badPods)
 		LogPodsWithLabels(c, ns, successPodLabels)
-		return fmt.Errorf("Not all pods in namespace %q are successful within %v", ns, timeout)
+		return errors.New(errorBadPodsStates(badPods, desiredPods, ns, "SUCCESS", timeout))
+
 	}
 	return nil
 }
@@ -695,7 +697,7 @@ func WaitForPodsRunningReady(c *client.Client, ns string, minPods int32, timeout
 		logPodStates(badPods)
 		return false, nil
 	}) != nil {
-		return errors.New(errorBadPodsStates(badPods, desiredPods, ns, timeout))
+		return errors.New(errorBadPodsStates(badPods, desiredPods, ns, "RUNNING and READY", timeout))
 	}
 	wg.Wait()
 	if waitForSuccessError != nil {
@@ -939,9 +941,9 @@ func WaitForDefaultServiceAccountInNamespace(c *client.Client, namespace string)
 
 // WaitForFederationApiserverReady waits for the federation apiserver to be ready.
 // It tests the readiness by sending a GET request and expecting a non error response.
-func WaitForFederationApiserverReady(c *federation_release_1_4.Clientset) error {
+func WaitForFederationApiserverReady(c *federation_release_1_5.Clientset) error {
 	return wait.PollImmediate(time.Second, 1*time.Minute, func() (bool, error) {
-		_, err := c.Federation().Clusters().List(api.ListOptions{})
+		_, err := c.Federation().Clusters().List(v1.ListOptions{})
 		if err != nil {
 			return false, nil
 		}
@@ -1957,13 +1959,13 @@ func setTimeouts(cs ...*http.Client) {
 	}
 }
 
-func LoadFederationClientset_1_4() (*federation_release_1_4.Clientset, error) {
+func LoadFederationClientset_1_5() (*federation_release_1_5.Clientset, error) {
 	config, err := LoadFederatedConfig(&clientcmd.ConfigOverrides{})
 	if err != nil {
 		return nil, err
 	}
 
-	c, err := federation_release_1_4.NewForConfig(config)
+	c, err := federation_release_1_5.NewForConfig(config)
 	if err != nil {
 		return nil, fmt.Errorf("error creating federation clientset: %v", err.Error())
 	}
@@ -2825,11 +2827,11 @@ func dumpPodDebugInfo(c *client.Client, pods []*api.Pod) {
 	DumpNodeDebugInfo(c, badNodes.List())
 }
 
-type EventsLister func(opts api.ListOptions, ns string) (*v1.EventList, error)
+type EventsLister func(opts v1.ListOptions, ns string) (*v1.EventList, error)
 
 func DumpEventsInNamespace(eventsLister EventsLister, namespace string) {
 	By(fmt.Sprintf("Collecting events from namespace %q.", namespace))
-	events, err := eventsLister(api.ListOptions{}, namespace)
+	events, err := eventsLister(v1.ListOptions{}, namespace)
 	Expect(err).NotTo(HaveOccurred())
 
 	// Sort events by their first timestamp
@@ -2846,7 +2848,7 @@ func DumpEventsInNamespace(eventsLister EventsLister, namespace string) {
 }
 
 func DumpAllNamespaceInfo(c *client.Client, cs *release_1_5.Clientset, namespace string) {
-	DumpEventsInNamespace(func(opts api.ListOptions, ns string) (*v1.EventList, error) {
+	DumpEventsInNamespace(func(opts v1.ListOptions, ns string) (*v1.EventList, error) {
 		return cs.Core().Events(ns).List(opts)
 	}, namespace)
 

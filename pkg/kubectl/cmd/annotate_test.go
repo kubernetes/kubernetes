@@ -143,15 +143,16 @@ func TestParseAnnotations(t *testing.T) {
 			expectErr:   true,
 		},
 		{
-			annotations: []string{"a="},
-			expectedErr: "invalid annotation format: a=",
-			scenario:    "incorrect annotation input (missing value)",
-			expectErr:   true,
+			annotations:    []string{"a="},
+			expected:       map[string]string{"a": ""},
+			expectedRemove: []string{},
+			scenario:       "add valid annotation with empty value",
+			expectErr:      false,
 		},
 		{
 			annotations: []string{"ab", "a="},
-			expectedErr: "invalid annotation format: ab, a=",
-			scenario:    "incorrect multiple annotation input (missing value)",
+			expectedErr: "invalid annotation format: ab",
+			scenario:    "incorrect annotation input (missing =value)",
 			expectErr:   true,
 		},
 	}
@@ -506,6 +507,34 @@ func TestAnnotateObjectFromFile(t *testing.T) {
 	options := &AnnotateOptions{}
 	options.Filenames = []string{"../../../examples/storage/cassandra/cassandra-controller.yaml"}
 	args := []string{"a=b", "c-"}
+	if err := options.Complete(f, buf, cmd, args); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if err := options.Validate(args); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if err := options.RunAnnotate(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestAnnotateLocal(t *testing.T) {
+	f, tf, _, ns := NewAPIFactory()
+	tf.Client = &fake.RESTClient{
+		NegotiatedSerializer: ns,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			t.Fatalf("unexpected request: %s %#v\n%#v", req.Method, req.URL, req)
+			return nil, nil
+		}),
+	}
+	tf.Namespace = "test"
+	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}}
+
+	buf := bytes.NewBuffer([]byte{})
+	cmd := NewCmdAnnotate(f, buf)
+	options := &AnnotateOptions{local: true}
+	options.Filenames = []string{"../../../examples/storage/cassandra/cassandra-controller.yaml"}
+	args := []string{"a=b"}
 	if err := options.Complete(f, buf, cmd, args); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

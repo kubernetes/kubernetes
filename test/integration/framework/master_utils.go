@@ -38,12 +38,18 @@ import (
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/apis/storage"
+	"k8s.io/kubernetes/pkg/apiserver/authenticator"
+	authauthenticator "k8s.io/kubernetes/pkg/auth/authenticator"
+	authauthorizer "k8s.io/kubernetes/pkg/auth/authorizer"
+	authorizerunion "k8s.io/kubernetes/pkg/auth/authorizer/union"
+	"k8s.io/kubernetes/pkg/auth/user"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller"
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
+	"k8s.io/kubernetes/pkg/generated/openapi"
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/genericapiserver/authorizer"
 	"k8s.io/kubernetes/pkg/kubectl"
@@ -52,11 +58,12 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage/storagebackend"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
+	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/plugin/pkg/admission/admit"
+	authenticatorunion "k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/union"
 
 	"github.com/go-openapi/spec"
 	"github.com/pborman/uuid"
-	"k8s.io/kubernetes/pkg/generated/openapi"
 )
 
 const (
@@ -102,7 +109,7 @@ type Config struct {
 
 // NewMasterComponents creates, initializes and starts master components based on the given config.
 func NewMasterComponents(c *Config) *MasterComponents {
-	m, s := startMasterOrDie(c.MasterConfig)
+	m, s := startMasterOrDie(c.MasterConfig, nil, nil)
 	// TODO: Allow callers to pipe through a different master url and create a client/start components using it.
 	glog.Infof("Master %+v", s.URL)
 	// TODO: caesarxuchao: remove this client when the refactoring of client libraray is done.
@@ -125,39 +132,129 @@ func NewMasterComponents(c *Config) *MasterComponents {
 	}
 }
 
+// alwaysAllow always allows an action
+type alwaysAllow struct{}
+
+func (alwaysAllow) Authorize(requestAttributes authauthorizer.Attributes) (bool, string, error) {
+	return true, "always allow", nil
+}
+
+// alwaysEmpty simulates "no authentication" for old tests
+func alwaysEmpty(req *http.Request) (user.Info, bool, error) {
+	return &user.DefaultInfo{
+		Name: "",
+	}, true, nil
+}
+
+// MasterReceiver can be used to provide the master to a custom incoming server function
+type MasterReceiver interface {
+	SetMaster(m *master.Master)
+}
+
+// MasterHolder implements
+type MasterHolder struct {
+	Initialized chan struct{}
+	M           *master.Master
+}
+
+func (h *MasterHolder) SetMaster(m *master.Master) {
+	h.M = m
+	close(h.Initialized)
+}
+
 // startMasterOrDie starts a kubernetes master and an httpserver to handle api requests
-func startMasterOrDie(masterConfig *master.Config) (*master.Master, *httptest.Server) {
+func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Server, masterReceiver MasterReceiver) (*master.Master, *httptest.Server) {
 	var m *master.Master
-	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		m.Handler.ServeHTTP(w, req)
-	}))
+	var s *httptest.Server
+
+	if incomingServer != nil {
+		s = incomingServer
+	} else {
+		s = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			m.Handler.ServeHTTP(w, req)
+		}))
+	}
 
 	if masterConfig == nil {
 		masterConfig = NewMasterConfig()
-		masterConfig.EnableProfiling = true
-		masterConfig.EnableSwaggerSupport = true
-		masterConfig.EnableOpenAPISupport = true
-		masterConfig.OpenAPIInfo = spec.Info{
+		masterConfig.GenericConfig.EnableProfiling = true
+		masterConfig.GenericConfig.EnableSwaggerSupport = true
+		masterConfig.GenericConfig.EnableOpenAPISupport = true
+		masterConfig.GenericConfig.OpenAPIInfo = spec.Info{
 			InfoProps: spec.InfoProps{
 				Title:   "Kubernetes",
 				Version: "unversioned",
 			},
 		}
-		masterConfig.OpenAPIDefaultResponse = spec.Response{
+		masterConfig.GenericConfig.OpenAPIDefaultResponse = spec.Response{
 			ResponseProps: spec.ResponseProps{
 				Description: "Default Response.",
 			},
 		}
 	}
-	m, err := master.New(masterConfig)
+
+	// set the loopback client config
+	if masterConfig.GenericConfig.LoopbackClientConfig == nil {
+		masterConfig.GenericConfig.LoopbackClientConfig = &restclient.Config{QPS: 50, Burst: 100, ContentConfig: restclient.ContentConfig{NegotiatedSerializer: api.Codecs}}
+	}
+	masterConfig.GenericConfig.LoopbackClientConfig.Host = s.URL
+
+	privilegedLoopbackToken := uuid.NewRandom().String()
+	// wrap any available authorizer
+	tokens := make(map[string]*user.DefaultInfo)
+	tokens[privilegedLoopbackToken] = &user.DefaultInfo{
+		Name:   user.APIServerUser,
+		UID:    uuid.NewRandom().String(),
+		Groups: []string{user.SystemPrivilegedGroup},
+	}
+
+	tokenAuthenticator := authenticator.NewAuthenticatorFromTokens(tokens)
+	if masterConfig.GenericConfig.Authenticator == nil {
+		masterConfig.GenericConfig.Authenticator = authenticatorunion.New(tokenAuthenticator, authauthenticator.RequestFunc(alwaysEmpty))
+	} else {
+		masterConfig.GenericConfig.Authenticator = authenticatorunion.New(tokenAuthenticator, masterConfig.GenericConfig.Authenticator)
+	}
+
+	if masterConfig.GenericConfig.Authorizer != nil {
+		tokenAuthorizer := authorizer.NewPrivilegedGroups(user.SystemPrivilegedGroup)
+		masterConfig.GenericConfig.Authorizer = authorizerunion.New(tokenAuthorizer, masterConfig.GenericConfig.Authorizer)
+	} else {
+		masterConfig.GenericConfig.Authorizer = alwaysAllow{}
+	}
+
+	masterConfig.GenericConfig.LoopbackClientConfig.BearerToken = privilegedLoopbackToken
+
+	m, err := masterConfig.Complete().New()
 	if err != nil {
 		glog.Fatalf("error in bringing up the master: %v", err)
+	}
+	if masterReceiver != nil {
+		masterReceiver.SetMaster(m)
+	}
+
+	cfg := *masterConfig.GenericConfig.LoopbackClientConfig
+	cfg.ContentConfig.GroupVersion = &unversioned.GroupVersion{}
+	privilegedClient, err := restclient.RESTClientFor(&cfg)
+	if err != nil {
+		glog.Fatal(err)
+	}
+	err = wait.PollImmediate(100*time.Millisecond, 30*time.Second, func() (bool, error) {
+		result := privilegedClient.Get().AbsPath("/healthz").Do()
+		status := 0
+		result.StatusCode(&status)
+		if status == 200 {
+			return true, nil
+		}
+		return false, nil
+	})
+	if err != nil {
+		glog.Fatal(err)
 	}
 
 	// TODO have this start method actually use the normal start sequence for the API server
 	// this method never actually calls the `Run` method for the API server
 	// fire the post hooks ourselves
-	m.GenericAPIServer.RunPostStartHooks(genericapiserver.PostStartHookContext{})
+	m.GenericAPIServer.RunPostStartHooks()
 
 	return m, s
 }
@@ -221,7 +318,7 @@ func NewMasterConfig() *master.Config {
 		NewSingleContentTypeSerializer(api.Scheme, testapi.Storage.Codec(), runtime.ContentTypeJSON))
 
 	return &master.Config{
-		Config: &genericapiserver.Config{
+		GenericConfig: &genericapiserver.Config{
 			APIResourceConfigSource: master.DefaultAPIResourceConfigSource(),
 			APIPrefix:               "/api",
 			APIGroupPrefix:          "/apis",
@@ -245,10 +342,10 @@ func NewMasterConfig() *master.Config {
 func NewIntegrationTestMasterConfig() *master.Config {
 	masterConfig := NewMasterConfig()
 	masterConfig.EnableCoreControllers = true
-	masterConfig.EnableIndex = true
-	masterConfig.EnableVersion = true
-	masterConfig.PublicAddress = net.ParseIP("192.168.10.4")
-	masterConfig.APIResourceConfigSource = master.DefaultAPIResourceConfigSource()
+	masterConfig.GenericConfig.EnableIndex = true
+	masterConfig.GenericConfig.EnableVersion = true
+	masterConfig.GenericConfig.PublicAddress = net.ParseIP("192.168.10.4")
+	masterConfig.GenericConfig.APIResourceConfigSource = master.DefaultAPIResourceConfigSource()
 	return masterConfig
 }
 
@@ -332,9 +429,13 @@ func ScaleRC(name, ns string, replicas int32, clientset clientset.Interface) (*a
 func RunAMaster(masterConfig *master.Config) (*master.Master, *httptest.Server) {
 	if masterConfig == nil {
 		masterConfig = NewMasterConfig()
-		masterConfig.EnableProfiling = true
+		masterConfig.GenericConfig.EnableProfiling = true
 	}
-	return startMasterOrDie(masterConfig)
+	return startMasterOrDie(masterConfig, nil, nil)
+}
+
+func RunAMasterUsingServer(masterConfig *master.Config, s *httptest.Server, masterReceiver MasterReceiver) (*master.Master, *httptest.Server) {
+	return startMasterOrDie(masterConfig, s, masterReceiver)
 }
 
 // Task is a function passed to worker goroutines by RunParallel.

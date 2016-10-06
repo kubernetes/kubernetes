@@ -25,7 +25,7 @@ import (
 type CrossVersionObjectReference struct {
 	// Kind of the referent; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
 	Kind string `json:"kind" protobuf:"bytes,1,opt,name=kind"`
-	// Name of the referent; More info: http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#names
+	// Name of the referent; More info: http://kubernetes.io/docs/user-guide/identifiers#names
 	Name string `json:"name" protobuf:"bytes,2,opt,name=name"`
 	// API version of the referent
 	APIVersion string `json:"apiVersion,omitempty" protobuf:"bytes,3,opt,name=apiVersion"`
@@ -117,6 +117,6 @@ type ScaleStatus struct {
 	// label query over pods that should match the replicas count. This is same
 	// as the label selector but in the string format to avoid introspection
 	// by clients. The string will be in the same format as the query-param syntax.
-	// More info about label selectors: http://releases.k8s.io/HEAD/docs/user-guide/labels.md#label-selectors
+	// More info about label selectors: http://kubernetes.io/docs/user-guide/labels#label-selectors
 	Selector string `json:"selector,omitempty" protobuf:"bytes,2,opt,name=selector"`
 }

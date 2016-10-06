@@ -18,6 +18,7 @@ package v1
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
+	api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	v1 "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
@@ -33,11 +34,11 @@ type HorizontalPodAutoscalerInterface interface {
 	Create(*v1.HorizontalPodAutoscaler) (*v1.HorizontalPodAutoscaler, error)
 	Update(*v1.HorizontalPodAutoscaler) (*v1.HorizontalPodAutoscaler, error)
 	UpdateStatus(*v1.HorizontalPodAutoscaler) (*v1.HorizontalPodAutoscaler, error)
-	Delete(name string, options *api.DeleteOptions) error
-	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
+	Delete(name string, options *api_v1.DeleteOptions) error
+	DeleteCollection(options *api_v1.DeleteOptions, listOptions api_v1.ListOptions) error
 	Get(name string) (*v1.HorizontalPodAutoscaler, error)
-	List(opts api.ListOptions) (*v1.HorizontalPodAutoscalerList, error)
-	Watch(opts api.ListOptions) (watch.Interface, error)
+	List(opts api_v1.ListOptions) (*v1.HorizontalPodAutoscalerList, error)
+	Watch(opts api_v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1.HorizontalPodAutoscaler, err error)
 	HorizontalPodAutoscalerExpansion
 }
@@ -95,7 +96,7 @@ func (c *horizontalPodAutoscalers) UpdateStatus(horizontalPodAutoscaler *v1.Hori
 }
 
 // Delete takes name of the horizontalPodAutoscaler and deletes it. Returns an error if one occurs.
-func (c *horizontalPodAutoscalers) Delete(name string, options *api.DeleteOptions) error {
+func (c *horizontalPodAutoscalers) Delete(name string, options *api_v1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("horizontalpodautoscalers").
@@ -106,7 +107,7 @@ func (c *horizontalPodAutoscalers) Delete(name string, options *api.DeleteOption
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *horizontalPodAutoscalers) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+func (c *horizontalPodAutoscalers) DeleteCollection(options *api_v1.DeleteOptions, listOptions api_v1.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("horizontalpodautoscalers").
@@ -129,7 +130,7 @@ func (c *horizontalPodAutoscalers) Get(name string) (result *v1.HorizontalPodAut
 }
 
 // List takes label and field selectors, and returns the list of HorizontalPodAutoscalers that match those selectors.
-func (c *horizontalPodAutoscalers) List(opts api.ListOptions) (result *v1.HorizontalPodAutoscalerList, err error) {
+func (c *horizontalPodAutoscalers) List(opts api_v1.ListOptions) (result *v1.HorizontalPodAutoscalerList, err error) {
 	result = &v1.HorizontalPodAutoscalerList{}
 	err = c.client.Get().
 		Namespace(c.ns).
@@ -141,7 +142,7 @@ func (c *horizontalPodAutoscalers) List(opts api.ListOptions) (result *v1.Horizo
 }
 
 // Watch returns a watch.Interface that watches the requested horizontalPodAutoscalers.
-func (c *horizontalPodAutoscalers) Watch(opts api.ListOptions) (watch.Interface, error) {
+func (c *horizontalPodAutoscalers) Watch(opts api_v1.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Namespace(c.ns).

@@ -17,6 +17,7 @@
 NUM_NODES=4
 DISK=./kube/kube.vmdk
 GUEST_ID=debian7_64Guest
+ENABLE_UUID=TRUE
 
 INSTANCE_PREFIX=kubernetes
 MASTER_TAG="${INSTANCE_PREFIX}-master"

@@ -13,6 +13,7 @@
     - [Deployments](#deployments)
     - [kubectl rolling-update: < v1.4.0 client vs >=v1.4.0 cluster](#kubectl-rolling-update--v140-client-vs-v140-cluster)
     - [kubectl delete: < v1.4.0 client vs >=v1.4.0 cluster](#kubectl-delete--v140-client-vs-v140-cluster)
+    - [DELETE operation in REST API](#delete-operation-in-rest-api)
   - [Action Required Before Upgrading](#action-required-before-upgrading)
   - [Previous Releases Included in v1.4.0](#previous-releases-included-in-v140)
 - [v1.4.0-beta.11](#v140-beta11)
@@ -47,7 +48,7 @@
   - [Behavior changes caused by enabling the garbage collector](#behavior-changes-caused-by-enabling-the-garbage-collector)
     - [kubectl rolling-update](#kubectl-rolling-update)
     - [kubectl delete](#kubectl-delete)
-    - [DELETE operation in REST API](#delete-operation-in-rest-api)
+    - [DELETE operation in REST API](#delete-operation-in-rest-api-1)
 - [v1.4.0-beta.2](#v140-beta2)
   - [Downloads](#downloads-10)
   - [Changelog since v1.4.0-beta.1](#changelog-since-v140-beta1)
@@ -243,6 +244,7 @@ This is the first release tracked via the use of the [kubernetes/features](https
 - **API Machinery**
   - [alpha] Generate audit logs for every request user performs against secured API server endpoint. ([docs](http://kubernetes.io/docs/admin/audit/)) ([kubernetes/features#22](https://github.com/kubernetes/features/issues/22))
   - [beta] `kube-apiserver` now publishes a swagger 2.0 spec in addition to a swagger 1.2 spec ([kubernetes/features#53](https://github.com/kubernetes/features/issues/53))
+  - [beta] Server-side garbage collection is enabled by default. See [user-guide](http://kubernetes.io/docs/user-guide/garbage-collection/)
 - **Apps**
   - [alpha] Introducing 'ScheduledJobs', which allow running time based Jobs, namely once at a specified time or repeatedly at specified point in time. ([docs](http://kubernetes.io/docs/user-guide/scheduled-jobs/)) ([kubernetes/features#19](https://github.com/kubernetes/features/issues/19))
 - **Auth**
@@ -329,6 +331,12 @@ If this happens to you, you can wait at most 10 minutes for the replication cont
 ### kubectl delete: < v1.4.0 client vs >=v1.4.0 cluster
 
 If you use an old version kubectl to delete a replication controller or replicaset, then after the delete command has returned, the replication controller or the replicaset will continue to exist in the key-value store for a short period of time (<1s). You probably will not notice any difference if you use kubectl manually, but you might notice it if you are using kubectl in a script.
+
+### DELETE operation in REST API
+
+* **Replication controller & Replicaset**: the DELETE request of a replication controller or a replicaset becomes asynchronous by default. The object will continue to exist in the key-value store for some time. The API server will set its metadata.deletionTimestamp, add the "orphan" finalizer to its metadata.finalizers. The object will be deleted from the key-value store after the garbage collector orphans its dependents. Please refer to this [user-guide](http://kubernetes.io/docs/user-guide/garbage-collector/) for more information regarding the garbage collection.
+
+* **Other objects**: no changes unless you explicitly request orphaning.
 
 ## Action Required Before Upgrading
 

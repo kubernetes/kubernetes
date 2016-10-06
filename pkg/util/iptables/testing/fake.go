@@ -16,60 +16,107 @@ limitations under the License.
 
 package testing
 
-import "k8s.io/kubernetes/pkg/util/iptables"
+import (
+	"fmt"
+	"strings"
+
+	"k8s.io/kubernetes/pkg/util/iptables"
+)
+
+const (
+	Destination = "-d "
+	Source      = "-s "
+	DPort       = "--dport "
+	Protocol    = "-p "
+	Jump        = "-j "
+	Reject      = "REJECT"
+	ToDest      = "--to-destination "
+)
+
+type Rule map[string]string
 
 // no-op implementation of iptables Interface
-type fake struct{}
-
-func NewFake() *fake {
-	return &fake{}
+type FakeIPTables struct {
+	Lines []byte
 }
 
-func (*fake) GetVersion() (string, error) {
+func NewFake() *FakeIPTables {
+	return &FakeIPTables{}
+}
+
+func (*FakeIPTables) GetVersion() (string, error) {
 	return "0.0.0", nil
 }
 
-func (*fake) EnsureChain(table iptables.Table, chain iptables.Chain) (bool, error) {
+func (*FakeIPTables) EnsureChain(table iptables.Table, chain iptables.Chain) (bool, error) {
 	return true, nil
 }
 
-func (*fake) FlushChain(table iptables.Table, chain iptables.Chain) error {
+func (*FakeIPTables) FlushChain(table iptables.Table, chain iptables.Chain) error {
 	return nil
 }
 
-func (*fake) DeleteChain(table iptables.Table, chain iptables.Chain) error {
+func (*FakeIPTables) DeleteChain(table iptables.Table, chain iptables.Chain) error {
 	return nil
 }
 
-func (*fake) EnsureRule(position iptables.RulePosition, table iptables.Table, chain iptables.Chain, args ...string) (bool, error) {
+func (*FakeIPTables) EnsureRule(position iptables.RulePosition, table iptables.Table, chain iptables.Chain, args ...string) (bool, error) {
 	return true, nil
 }
 
-func (*fake) DeleteRule(table iptables.Table, chain iptables.Chain, args ...string) error {
+func (*FakeIPTables) DeleteRule(table iptables.Table, chain iptables.Chain, args ...string) error {
 	return nil
 }
 
-func (*fake) IsIpv6() bool {
+func (*FakeIPTables) IsIpv6() bool {
 	return false
 }
 
-func (*fake) Save(table iptables.Table) ([]byte, error) {
+func (*FakeIPTables) Save(table iptables.Table) ([]byte, error) {
 	return make([]byte, 0), nil
 }
 
-func (*fake) SaveAll() ([]byte, error) {
+func (*FakeIPTables) SaveAll() ([]byte, error) {
 	return make([]byte, 0), nil
 }
 
-func (*fake) Restore(table iptables.Table, data []byte, flush iptables.FlushFlag, counters iptables.RestoreCountersFlag) error {
+func (*FakeIPTables) Restore(table iptables.Table, data []byte, flush iptables.FlushFlag, counters iptables.RestoreCountersFlag) error {
 	return nil
 }
 
-func (*fake) RestoreAll(data []byte, flush iptables.FlushFlag, counters iptables.RestoreCountersFlag) error {
+func (f *FakeIPTables) RestoreAll(data []byte, flush iptables.FlushFlag, counters iptables.RestoreCountersFlag) error {
+	f.Lines = data
 	return nil
 }
-func (*fake) AddReloadFunc(reloadFunc func()) {}
+func (*FakeIPTables) AddReloadFunc(reloadFunc func()) {}
 
-func (*fake) Destroy() {}
+func (*FakeIPTables) Destroy() {}
 
-var _ = iptables.Interface(&fake{})
+func getToken(line, seperator string) string {
+	tokens := strings.Split(line, seperator)
+	if len(tokens) == 2 {
+		return strings.Split(tokens[1], " ")[0]
+	}
+	return ""
+}
+
+// GetChain returns a list of rules for the givne chain.
+// The chain name must match exactly.
+// The matching is pretty dumb, don't rely on it for anything but testing.
+func (f *FakeIPTables) GetRules(chainName string) (rules []Rule) {
+	for _, l := range strings.Split(string(f.Lines), "\n") {
+		if strings.Contains(l, fmt.Sprintf("-A %v", chainName)) {
+			newRule := Rule(map[string]string{})
+			for _, arg := range []string{Destination, Source, DPort, Protocol, Jump, ToDest} {
+				tok := getToken(l, arg)
+				if tok != "" {
+					newRule[arg] = tok
+				}
+			}
+			rules = append(rules, newRule)
+		}
+	}
+	return
+}
+
+var _ = iptables.Interface(&FakeIPTables{})

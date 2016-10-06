@@ -16,8 +16,10 @@
 
 # Build a Kubernetes release.  This will build the binaries, create the Docker
 # images and other build artifacts.
-# For pushing these artifacts publicly on Google Cloud Storage, see the 
-# associated build/push-* scripts.
+#
+# For pushing these artifacts publicly to Google Cloud Storage or to a registry
+# please refer to the kubernetes/release repo at
+# https://github.com/kubernetes/release.
 
 set -o errexit
 set -o nounset
@@ -25,6 +27,7 @@ set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/build/common.sh"
+source "${KUBE_ROOT}/build/lib/release.sh"
 
 KUBE_RELEASE_RUN_TESTS=${KUBE_RELEASE_RUN_TESTS-y}
 

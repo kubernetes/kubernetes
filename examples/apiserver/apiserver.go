@@ -70,7 +70,7 @@ func Run(serverOptions *genericoptions.ServerRunOptions) error {
 	config := genericapiserver.NewConfig(serverOptions)
 	config.Authorizer = authorizer.NewAlwaysAllowAuthorizer()
 	config.Serializer = api.Codecs
-	s, err := config.New()
+	s, err := config.Complete().New()
 	if err != nil {
 		return fmt.Errorf("Error in bringing up the server: %v", err)
 	}
@@ -101,6 +101,6 @@ func Run(serverOptions *genericoptions.ServerRunOptions) error {
 	if err := s.InstallAPIGroup(&apiGroupInfo); err != nil {
 		return fmt.Errorf("Error in installing API: %v", err)
 	}
-	s.Run(serverOptions)
+	s.Run()
 	return nil
 }

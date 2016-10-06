@@ -121,10 +121,12 @@ func NewReplicaSetController(federationClient fedclientset.Interface) *ReplicaSe
 		return cache.NewInformer(
 			&cache.ListWatch{
 				ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-					return clientset.Extensions().ReplicaSets(apiv1.NamespaceAll).List(options)
+					versionedOptions := fedutil.VersionizeV1ListOptions(options)
+					return clientset.Extensions().ReplicaSets(apiv1.NamespaceAll).List(versionedOptions)
 				},
 				WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-					return clientset.Extensions().ReplicaSets(apiv1.NamespaceAll).Watch(options)
+					versionedOptions := fedutil.VersionizeV1ListOptions(options)
+					return clientset.Extensions().ReplicaSets(apiv1.NamespaceAll).Watch(versionedOptions)
 				},
 			},
 			&extensionsv1.ReplicaSet{},
@@ -148,10 +150,12 @@ func NewReplicaSetController(federationClient fedclientset.Interface) *ReplicaSe
 		return cache.NewInformer(
 			&cache.ListWatch{
 				ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-					return clientset.Core().Pods(apiv1.NamespaceAll).List(options)
+					versionedOptions := fedutil.VersionizeV1ListOptions(options)
+					return clientset.Core().Pods(apiv1.NamespaceAll).List(versionedOptions)
 				},
 				WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-					return clientset.Core().Pods(apiv1.NamespaceAll).Watch(options)
+					versionedOptions := fedutil.VersionizeV1ListOptions(options)
+					return clientset.Core().Pods(apiv1.NamespaceAll).Watch(versionedOptions)
 				},
 			},
 			&apiv1.Pod{},
@@ -165,13 +169,15 @@ func NewReplicaSetController(federationClient fedclientset.Interface) *ReplicaSe
 	}
 	frsc.fedPodInformer = fedutil.NewFederatedInformer(federationClient, podFedInformerFactory, &fedutil.ClusterLifecycleHandlerFuncs{})
 
-	frsc.replicaSetStore.Store, frsc.replicaSetController = cache.NewInformer(
+	frsc.replicaSetStore.Indexer, frsc.replicaSetController = cache.NewIndexerInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return frsc.fedClient.Extensions().ReplicaSets(apiv1.NamespaceAll).List(options)
+				versionedOptions := fedutil.VersionizeV1ListOptions(options)
+				return frsc.fedClient.Extensions().ReplicaSets(apiv1.NamespaceAll).List(versionedOptions)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return frsc.fedClient.Extensions().ReplicaSets(apiv1.NamespaceAll).Watch(options)
+				versionedOptions := fedutil.VersionizeV1ListOptions(options)
+				return frsc.fedClient.Extensions().ReplicaSets(apiv1.NamespaceAll).Watch(versionedOptions)
 			},
 		},
 		&extensionsv1.ReplicaSet{},
@@ -179,6 +185,7 @@ func NewReplicaSetController(federationClient fedclientset.Interface) *ReplicaSe
 		fedutil.NewTriggerOnMetaAndSpecChanges(
 			func(obj runtime.Object) { frsc.deliverFedReplicaSetObj(obj, replicaSetReviewDelay) },
 		),
+		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)
 
 	frsc.fedUpdater = fedutil.NewFederatedUpdater(frsc.fedReplicaSetInformer,
@@ -194,7 +201,7 @@ func NewReplicaSetController(federationClient fedclientset.Interface) *ReplicaSe
 		},
 		func(client kubeclientset.Interface, obj runtime.Object) error {
 			rs := obj.(*extensionsv1.ReplicaSet)
-			err := client.Extensions().ReplicaSets(rs.Namespace).Delete(rs.Name, &api.DeleteOptions{})
+			err := client.Extensions().ReplicaSets(rs.Namespace).Delete(rs.Name, &apiv1.DeleteOptions{})
 			return err
 		})
 
@@ -285,7 +292,7 @@ func (frsc *ReplicaSetController) deliverLocalReplicaSet(obj interface{}, durati
 		glog.Errorf("Couldn't get key for object %v: %v", obj, err)
 		return
 	}
-	_, exists, err := frsc.replicaSetStore.Store.GetByKey(key)
+	_, exists, err := frsc.replicaSetStore.Indexer.GetByKey(key)
 	if err != nil {
 		glog.Errorf("Couldn't get federation replicaset %v: %v", key, err)
 		return
@@ -413,7 +420,7 @@ func (frsc *ReplicaSetController) reconcileReplicaSet(key string) (reconciliatio
 	startTime := time.Now()
 	defer glog.V(4).Infof("Finished reconcile replicaset %q (%v)", key, time.Now().Sub(startTime))
 
-	obj, exists, err := frsc.replicaSetStore.Store.GetByKey(key)
+	obj, exists, err := frsc.replicaSetStore.Indexer.GetByKey(key)
 	if err != nil {
 		return statusError, err
 	}
@@ -530,7 +537,7 @@ func (frsc *ReplicaSetController) reconcileReplicaSetsOnClusterChange() {
 	if !frsc.isSynced() {
 		frsc.clusterDeliverer.DeliverAfter(allClustersKey, nil, clusterAvailableDelay)
 	}
-	rss := frsc.replicaSetStore.Store.List()
+	rss := frsc.replicaSetStore.Indexer.List()
 	for _, rs := range rss {
 		key, _ := controller.KeyFunc(rs)
 		frsc.deliverReplicaSetByKey(key, 0, false)

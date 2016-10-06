@@ -1504,31 +1504,6 @@
 			"Rev": "fc2b8d3a73c4867e51861bbdd5ae3c1f0869dd6a"
 		},
 		{
-			"ImportPath": "github.com/mesos/mesos-go/auth",
-			"Comment": "before-0.26-protos-33-g45c8b08",
-			"Rev": "45c8b08e9af666add36a6f93ff8c1c75812367b0"
-		},
-		{
-			"ImportPath": "github.com/mesos/mesos-go/auth/callback",
-			"Comment": "before-0.26-protos-33-g45c8b08",
-			"Rev": "45c8b08e9af666add36a6f93ff8c1c75812367b0"
-		},
-		{
-			"ImportPath": "github.com/mesos/mesos-go/auth/sasl",
-			"Comment": "before-0.26-protos-33-g45c8b08",
-			"Rev": "45c8b08e9af666add36a6f93ff8c1c75812367b0"
-		},
-		{
-			"ImportPath": "github.com/mesos/mesos-go/auth/sasl/mech",
-			"Comment": "before-0.26-protos-33-g45c8b08",
-			"Rev": "45c8b08e9af666add36a6f93ff8c1c75812367b0"
-		},
-		{
-			"ImportPath": "github.com/mesos/mesos-go/auth/sasl/mech/crammd5",
-			"Comment": "before-0.26-protos-33-g45c8b08",
-			"Rev": "45c8b08e9af666add36a6f93ff8c1c75812367b0"
-		},
-		{
 			"ImportPath": "github.com/mesos/mesos-go/detector",
 			"Comment": "before-0.26-protos-33-g45c8b08",
 			"Rev": "45c8b08e9af666add36a6f93ff8c1c75812367b0"
@@ -1539,42 +1514,12 @@
 			"Rev": "45c8b08e9af666add36a6f93ff8c1c75812367b0"
 		},
 		{
-			"ImportPath": "github.com/mesos/mesos-go/executor",
-			"Comment": "before-0.26-protos-33-g45c8b08",
-			"Rev": "45c8b08e9af666add36a6f93ff8c1c75812367b0"
-		},
-		{
 			"ImportPath": "github.com/mesos/mesos-go/mesosproto",
 			"Comment": "before-0.26-protos-33-g45c8b08",
 			"Rev": "45c8b08e9af666add36a6f93ff8c1c75812367b0"
 		},
 		{
-			"ImportPath": "github.com/mesos/mesos-go/mesosproto/scheduler",
-			"Comment": "before-0.26-protos-33-g45c8b08",
-			"Rev": "45c8b08e9af666add36a6f93ff8c1c75812367b0"
-		},
-		{
 			"ImportPath": "github.com/mesos/mesos-go/mesosutil",
-			"Comment": "before-0.26-protos-33-g45c8b08",
-			"Rev": "45c8b08e9af666add36a6f93ff8c1c75812367b0"
-		},
-		{
-			"ImportPath": "github.com/mesos/mesos-go/mesosutil/process",
-			"Comment": "before-0.26-protos-33-g45c8b08",
-			"Rev": "45c8b08e9af666add36a6f93ff8c1c75812367b0"
-		},
-		{
-			"ImportPath": "github.com/mesos/mesos-go/messenger",
-			"Comment": "before-0.26-protos-33-g45c8b08",
-			"Rev": "45c8b08e9af666add36a6f93ff8c1c75812367b0"
-		},
-		{
-			"ImportPath": "github.com/mesos/mesos-go/messenger/sessionid",
-			"Comment": "before-0.26-protos-33-g45c8b08",
-			"Rev": "45c8b08e9af666add36a6f93ff8c1c75812367b0"
-		},
-		{
-			"ImportPath": "github.com/mesos/mesos-go/scheduler",
 			"Comment": "before-0.26-protos-33-g45c8b08",
 			"Rev": "45c8b08e9af666add36a6f93ff8c1c75812367b0"
 		},
@@ -1721,63 +1666,73 @@
 		},
 		{
 			"ImportPath": "github.com/onsi/gomega",
-			"Comment": "v1.0-115-g9ed8da1",
-			"Rev": "9ed8da19f2156b87a803a8fdf6d126f627a12db1"
+			"Comment": "v1.0-122-gd59fa0a",
+			"Rev": "d59fa0ac68bb5dd932ee8d24eed631cdd519efc3"
 		},
 		{
 			"ImportPath": "github.com/onsi/gomega/format",
-			"Comment": "v1.0-115-g9ed8da1",
-			"Rev": "9ed8da19f2156b87a803a8fdf6d126f627a12db1"
+			"Comment": "v1.0-122-gd59fa0a",
+			"Rev": "d59fa0ac68bb5dd932ee8d24eed631cdd519efc3"
+		},
+		{
+			"ImportPath": "github.com/onsi/gomega/gstruct",
+			"Comment": "v1.0-122-gd59fa0a",
+			"Rev": "d59fa0ac68bb5dd932ee8d24eed631cdd519efc3"
+		},
+		{
+			"ImportPath": "github.com/onsi/gomega/gstruct/errors",
+			"Comment": "v1.0-122-gd59fa0a",
+			"Rev": "d59fa0ac68bb5dd932ee8d24eed631cdd519efc3"
 		},
 		{
 			"ImportPath": "github.com/onsi/gomega/internal/assertion",
-			"Comment": "v1.0-115-g9ed8da1",
-			"Rev": "9ed8da19f2156b87a803a8fdf6d126f627a12db1"
+			"Comment": "v1.0-122-gd59fa0a",
+			"Rev": "d59fa0ac68bb5dd932ee8d24eed631cdd519efc3"
 		},
 		{
 			"ImportPath": "github.com/onsi/gomega/internal/asyncassertion",
-			"Comment": "v1.0-115-g9ed8da1",
-			"Rev": "9ed8da19f2156b87a803a8fdf6d126f627a12db1"
+			"Comment": "v1.0-122-gd59fa0a",
+			"Rev": "d59fa0ac68bb5dd932ee8d24eed631cdd519efc3"
 		},
 		{
 			"ImportPath": "github.com/onsi/gomega/internal/oraclematcher",
-			"Comment": "v1.0-115-g9ed8da1",
-			"Rev": "9ed8da19f2156b87a803a8fdf6d126f627a12db1"
+			"Comment": "v1.0-122-gd59fa0a",
+			"Rev": "d59fa0ac68bb5dd932ee8d24eed631cdd519efc3"
 		},
 		{
 			"ImportPath": "github.com/onsi/gomega/internal/testingtsupport",
-			"Comment": "v1.0-115-g9ed8da1",
-			"Rev": "9ed8da19f2156b87a803a8fdf6d126f627a12db1"
+			"Comment": "v1.0-122-gd59fa0a",
+			"Rev": "d59fa0ac68bb5dd932ee8d24eed631cdd519efc3"
 		},
 		{
 			"ImportPath": "github.com/onsi/gomega/matchers",
-			"Comment": "v1.0-115-g9ed8da1",
-			"Rev": "9ed8da19f2156b87a803a8fdf6d126f627a12db1"
+			"Comment": "v1.0-122-gd59fa0a",
+			"Rev": "d59fa0ac68bb5dd932ee8d24eed631cdd519efc3"
 		},
 		{
 			"ImportPath": "github.com/onsi/gomega/matchers/support/goraph/bipartitegraph",
-			"Comment": "v1.0-115-g9ed8da1",
-			"Rev": "9ed8da19f2156b87a803a8fdf6d126f627a12db1"
+			"Comment": "v1.0-122-gd59fa0a",
+			"Rev": "d59fa0ac68bb5dd932ee8d24eed631cdd519efc3"
 		},
 		{
 			"ImportPath": "github.com/onsi/gomega/matchers/support/goraph/edge",
-			"Comment": "v1.0-115-g9ed8da1",
-			"Rev": "9ed8da19f2156b87a803a8fdf6d126f627a12db1"
+			"Comment": "v1.0-122-gd59fa0a",
+			"Rev": "d59fa0ac68bb5dd932ee8d24eed631cdd519efc3"
 		},
 		{
 			"ImportPath": "github.com/onsi/gomega/matchers/support/goraph/node",
-			"Comment": "v1.0-115-g9ed8da1",
-			"Rev": "9ed8da19f2156b87a803a8fdf6d126f627a12db1"
+			"Comment": "v1.0-122-gd59fa0a",
+			"Rev": "d59fa0ac68bb5dd932ee8d24eed631cdd519efc3"
 		},
 		{
 			"ImportPath": "github.com/onsi/gomega/matchers/support/goraph/util",
-			"Comment": "v1.0-115-g9ed8da1",
-			"Rev": "9ed8da19f2156b87a803a8fdf6d126f627a12db1"
+			"Comment": "v1.0-122-gd59fa0a",
+			"Rev": "d59fa0ac68bb5dd932ee8d24eed631cdd519efc3"
 		},
 		{
 			"ImportPath": "github.com/onsi/gomega/types",
-			"Comment": "v1.0-115-g9ed8da1",
-			"Rev": "9ed8da19f2156b87a803a8fdf6d126f627a12db1"
+			"Comment": "v1.0-122-gd59fa0a",
+			"Rev": "d59fa0ac68bb5dd932ee8d24eed631cdd519efc3"
 		},
 		{
 			"ImportPath": "github.com/opencontainers/runc/libcontainer",

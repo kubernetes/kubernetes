@@ -158,6 +158,18 @@ else
 fi
 echo "${reset}"
 
+echo -ne "Checking for openapi spec that need updating... "
+if ! hack/verify-openapi-spec.sh > /dev/null; then
+  echo "${red}ERROR!"
+  echo "Openapi spec needs to be updated."
+  echo "To regenerate the spec, run:"
+  echo "  hack/update-openapi-spec.sh"
+  exit_code=1
+else
+  echo "${green}OK"
+fi
+echo "${reset}"
+
 if [[ "${exit_code}" != 0 ]]; then
   echo "${red}Aborting commit${reset}"
 fi

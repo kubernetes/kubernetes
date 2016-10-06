@@ -82,6 +82,10 @@ func Run(s *options.ServerRunOptions) error {
 	// TODO: register cluster federation resources here.
 	resourceConfig := genericapiserver.NewResourceConfig()
 
+	if s.StorageConfig.DeserializationCacheSize == 0 {
+		// When size of cache is not explicitly set, set it to 50000
+		s.StorageConfig.DeserializationCacheSize = 50000
+	}
 	storageGroupsToEncodingVersion, err := s.StorageGroupsToEncodingVersion()
 	if err != nil {
 		glog.Fatalf("error generating storage version map: %s", err)
@@ -115,6 +119,8 @@ func Run(s *options.ServerRunOptions) error {
 	}
 
 	apiAuthenticator, err := authenticator.New(authenticator.AuthenticatorConfig{
+		Anonymous:         s.AnonymousAuth,
+		AnyToken:          s.EnableAnyToken,
 		BasicAuthFile:     s.BasicAuthFile,
 		ClientCAFile:      s.ClientCAFile,
 		TokenAuthFile:     s.TokenAuthFile,
@@ -171,6 +177,10 @@ func Run(s *options.ServerRunOptions) error {
 	admissionControlPluginNames := strings.Split(s.AdmissionControl, ",")
 	privilegedLoopbackToken := uuid.NewRandom().String()
 
+	selfClientConfig, err := s.NewSelfClientConfig(privilegedLoopbackToken)
+	if err != nil {
+		glog.Fatalf("Failed to create clientset: %v", err)
+	}
 	client, err := s.NewSelfClient(privilegedLoopbackToken)
 	if err != nil {
 		glog.Errorf("Failed to create clientset: %v", err)
@@ -181,15 +191,15 @@ func Run(s *options.ServerRunOptions) error {
 		var uid = uuid.NewRandom().String()
 		tokens := make(map[string]*user.DefaultInfo)
 		tokens[privilegedLoopbackToken] = &user.DefaultInfo{
-			Name:   "system:apiserver",
+			Name:   user.APIServerUser,
 			UID:    uid,
-			Groups: []string{"system:masters"},
+			Groups: []string{user.SystemPrivilegedGroup},
 		}
 
 		tokenAuthenticator := authenticator.NewAuthenticatorFromTokens(tokens)
 		apiAuthenticator = authenticatorunion.New(tokenAuthenticator, apiAuthenticator)
 
-		tokenAuthorizer := authorizer.NewPrivilegedGroups("system:masters")
+		tokenAuthorizer := authorizer.NewPrivilegedGroups(user.SystemPrivilegedGroup)
 		apiAuthorizer = authorizerunion.New(tokenAuthorizer, apiAuthorizer)
 	}
 
@@ -202,6 +212,7 @@ func Run(s *options.ServerRunOptions) error {
 	}
 	genericConfig := genericapiserver.NewConfig(s.ServerRunOptions)
 	// TODO: Move the following to generic api server as well.
+	genericConfig.LoopbackClientConfig = selfClientConfig
 	genericConfig.Authenticator = apiAuthenticator
 	genericConfig.SupportsBasicAuth = len(s.BasicAuthFile) > 0
 	genericConfig.Authorizer = apiAuthorizer
@@ -219,13 +230,13 @@ func Run(s *options.ServerRunOptions) error {
 		cachesize.SetWatchCacheSizes(s.WatchCacheSizes)
 	}
 
-	m, err := genericConfig.New()
+	m, err := genericConfig.Complete().New()
 	if err != nil {
 		return err
 	}
 
-	routes.UIRedirect{}.Install(m.Mux, m.HandlerContainer)
-	routes.Logs{}.Install(m.Mux, m.HandlerContainer)
+	routes.UIRedirect{}.Install(m.HandlerContainer)
+	routes.Logs{}.Install(m.HandlerContainer)
 
 	restOptionsFactory := restOptionsFactory{
 		storageFactory:          storageFactory,
@@ -242,7 +253,7 @@ func Run(s *options.ServerRunOptions) error {
 	installExtensionsAPIs(m, restOptionsFactory)
 
 	sharedInformers.Start(wait.NeverStop)
-	m.Run(s.ServerRunOptions)
+	m.Run()
 	return nil
 }
 

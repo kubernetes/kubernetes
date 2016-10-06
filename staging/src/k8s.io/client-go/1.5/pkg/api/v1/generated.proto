@@ -769,7 +769,7 @@ message EventSource {
   // Component from which the event is generated.
   optional string component = 1;
 
-  // Host name on which the event is generated.
+  // Node name on which the event is generated.
   optional string host = 2;
 }
 
@@ -1200,7 +1200,7 @@ message NamespaceStatus {
   optional string phase = 1;
 }
 
-// Node is a worker node in Kubernetes, formerly known as minion.
+// Node is a worker node in Kubernetes.
 // Each node will have a unique identifier in the cache (i.e. in etcd).
 message Node {
   // Standard object's metadata.

@@ -326,10 +326,10 @@ func TestDeploymentController_cleanupDeployment(t *testing.T) {
 		controller := NewDeploymentController(fake, controller.NoResyncPeriodFunc)
 
 		controller.eventRecorder = &record.FakeRecorder{}
-		controller.rsStoreSynced = alwaysReady
-		controller.podStoreSynced = alwaysReady
+		controller.rsListerSynced = alwaysReady
+		controller.podListerSynced = alwaysReady
 		for _, rs := range test.oldRSs {
-			controller.rsStore.Add(rs)
+			controller.rsLister.Indexer.Add(rs)
 		}
 
 		d := newDeployment(1, &tests[i].revisionHistoryLimit)

@@ -145,6 +145,28 @@ func Run(s *options.APIServer) error {
 		glog.Fatalf("Failed to start kubelet client: %v", err)
 	}
 
+	if s.StorageConfig.DeserializationCacheSize == 0 {
+		// When size of cache is not explicitly set, estimate its size based on
+		// target memory usage.
+		glog.V(2).Infof("Initalizing deserialization cache size based on %dMB limit", s.TargetRAMMB)
+
+		// This is the heuristics that from memory capacity is trying to infer
+		// the maximum number of nodes in the cluster and set cache sizes based
+		// on that value.
+		// From our documentation, we officially recomment 120GB machines for
+		// 2000 nodes, and we scale from that point. Thus we assume ~60MB of
+		// capacity per node.
+		// TODO: We may consider deciding that some percentage of memory will
+		// be used for the deserialization cache and divide it by the max object
+		// size to compute its size. We may even go further and measure
+		// collective sizes of the objects in the cache.
+		clusterSize := s.TargetRAMMB / 60
+		s.StorageConfig.DeserializationCacheSize = 25 * clusterSize
+		if s.StorageConfig.DeserializationCacheSize < 1000 {
+			s.StorageConfig.DeserializationCacheSize = 1000
+		}
+	}
+
 	storageGroupsToEncodingVersion, err := s.StorageGroupsToEncodingVersion()
 	if err != nil {
 		glog.Fatalf("error generating storage version map: %s", err)
@@ -201,6 +223,8 @@ func Run(s *options.APIServer) error {
 	}
 
 	apiAuthenticator, err := authenticator.New(authenticator.AuthenticatorConfig{
+		Anonymous:                   s.AnonymousAuth,
+		AnyToken:                    s.EnableAnyToken,
 		BasicAuthFile:               s.BasicAuthFile,
 		ClientCAFile:                s.ClientCAFile,
 		TokenAuthFile:               s.TokenAuthFile,
@@ -263,6 +287,10 @@ func Run(s *options.APIServer) error {
 	admissionControlPluginNames := strings.Split(s.AdmissionControl, ",")
 	privilegedLoopbackToken := uuid.NewRandom().String()
 
+	selfClientConfig, err := s.NewSelfClientConfig(privilegedLoopbackToken)
+	if err != nil {
+		glog.Fatalf("Failed to create clientset: %v", err)
+	}
 	client, err := s.NewSelfClient(privilegedLoopbackToken)
 	if err != nil {
 		glog.Errorf("Failed to create clientset: %v", err)
@@ -273,15 +301,15 @@ func Run(s *options.APIServer) error {
 		var uid = uuid.NewRandom().String()
 		tokens := make(map[string]*user.DefaultInfo)
 		tokens[privilegedLoopbackToken] = &user.DefaultInfo{
-			Name:   "system:apiserver",
+			Name:   user.APIServerUser,
 			UID:    uid,
-			Groups: []string{"system:masters"},
+			Groups: []string{user.SystemPrivilegedGroup},
 		}
 
 		tokenAuthenticator := authenticator.NewAuthenticatorFromTokens(tokens)
 		apiAuthenticator = authenticatorunion.New(tokenAuthenticator, apiAuthenticator)
 
-		tokenAuthorizer := authorizer.NewPrivilegedGroups("system:masters")
+		tokenAuthorizer := authorizer.NewPrivilegedGroups(user.SystemPrivilegedGroup)
 		apiAuthorizer = authorizerunion.New(tokenAuthorizer, apiAuthorizer)
 	}
 
@@ -295,6 +323,7 @@ func Run(s *options.APIServer) error {
 
 	genericConfig := genericapiserver.NewConfig(s.ServerRunOptions)
 	// TODO: Move the following to generic api server as well.
+	genericConfig.LoopbackClientConfig = selfClientConfig
 	genericConfig.Authenticator = apiAuthenticator
 	genericConfig.SupportsBasicAuth = len(s.BasicAuthFile) > 0
 	genericConfig.Authorizer = apiAuthorizer
@@ -310,7 +339,7 @@ func Run(s *options.APIServer) error {
 	genericConfig.EnableOpenAPISupport = true
 
 	config := &master.Config{
-		Config: genericConfig,
+		GenericConfig: genericConfig,
 
 		StorageFactory:          storageFactory,
 		EnableWatchCache:        s.EnableWatchCache,
@@ -330,12 +359,12 @@ func Run(s *options.APIServer) error {
 		cachesize.SetWatchCacheSizes(s.WatchCacheSizes)
 	}
 
-	m, err := master.New(config)
+	m, err := config.Complete().New()
 	if err != nil {
 		return err
 	}
 
 	sharedInformers.Start(wait.NeverStop)
-	m.Run(s.ServerRunOptions)
+	m.Run()
 	return nil
 }

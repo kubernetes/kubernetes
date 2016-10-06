@@ -26,6 +26,14 @@ type FakeExtensions struct {
 	*core.Fake
 }
 
+func (c *FakeExtensions) DaemonSets(namespace string) unversioned.DaemonSetInterface {
+	return &FakeDaemonSets{c, namespace}
+}
+
+func (c *FakeExtensions) Deployments(namespace string) unversioned.DeploymentInterface {
+	return &FakeDeployments{c, namespace}
+}
+
 func (c *FakeExtensions) Ingresses(namespace string) unversioned.IngressInterface {
 	return &FakeIngresses{c, namespace}
 }

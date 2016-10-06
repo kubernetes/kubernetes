@@ -63,14 +63,14 @@ func (c *FakePersistentVolumeClaims) UpdateStatus(persistentVolumeClaim *v1.Pers
 	return obj.(*v1.PersistentVolumeClaim), err
 }
 
-func (c *FakePersistentVolumeClaims) Delete(name string, options *api.DeleteOptions) error {
+func (c *FakePersistentVolumeClaims) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(core.NewDeleteAction(persistentvolumeclaimsResource, c.ns, name), &v1.PersistentVolumeClaim{})
 
 	return err
 }
 
-func (c *FakePersistentVolumeClaims) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+func (c *FakePersistentVolumeClaims) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := core.NewDeleteCollectionAction(persistentvolumeclaimsResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &v1.PersistentVolumeClaimList{})
@@ -87,7 +87,7 @@ func (c *FakePersistentVolumeClaims) Get(name string) (result *v1.PersistentVolu
 	return obj.(*v1.PersistentVolumeClaim), err
 }
 
-func (c *FakePersistentVolumeClaims) List(opts api.ListOptions) (result *v1.PersistentVolumeClaimList, err error) {
+func (c *FakePersistentVolumeClaims) List(opts v1.ListOptions) (result *v1.PersistentVolumeClaimList, err error) {
 	obj, err := c.Fake.
 		Invokes(core.NewListAction(persistentvolumeclaimsResource, c.ns, opts), &v1.PersistentVolumeClaimList{})
 
@@ -95,7 +95,7 @@ func (c *FakePersistentVolumeClaims) List(opts api.ListOptions) (result *v1.Pers
 		return nil, err
 	}
 
-	label := opts.LabelSelector
+	label, _, _ := core.ExtractFromListOptions(opts)
 	if label == nil {
 		label = labels.Everything()
 	}
@@ -109,7 +109,7 @@ func (c *FakePersistentVolumeClaims) List(opts api.ListOptions) (result *v1.Pers
 }
 
 // Watch returns a watch.Interface that watches the requested persistentVolumeClaims.
-func (c *FakePersistentVolumeClaims) Watch(opts api.ListOptions) (watch.Interface, error) {
+func (c *FakePersistentVolumeClaims) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(core.NewWatchAction(persistentvolumeclaimsResource, c.ns, opts))
 

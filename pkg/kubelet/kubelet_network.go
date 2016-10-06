@@ -81,39 +81,6 @@ func effectiveHairpinMode(hairpinMode componentconfig.HairpinMode, containerRunt
 	return hairpinMode, nil
 }
 
-// Validate given node IP belongs to the current host
-func (kl *Kubelet) validateNodeIP() error {
-	if kl.nodeIP == nil {
-		return nil
-	}
-
-	// Honor IP limitations set in setNodeStatus()
-	if kl.nodeIP.IsLoopback() {
-		return fmt.Errorf("nodeIP can't be loopback address")
-	}
-	if kl.nodeIP.To4() == nil {
-		return fmt.Errorf("nodeIP must be IPv4 address")
-	}
-
-	addrs, err := net.InterfaceAddrs()
-	if err != nil {
-		return err
-	}
-	for _, addr := range addrs {
-		var ip net.IP
-		switch v := addr.(type) {
-		case *net.IPNet:
-			ip = v.IP
-		case *net.IPAddr:
-			ip = v.IP
-		}
-		if ip != nil && ip.Equal(kl.nodeIP) {
-			return nil
-		}
-	}
-	return fmt.Errorf("Node IP: %q not found in the host's network interfaces", kl.nodeIP.String())
-}
-
 // providerRequiresNetworkingConfiguration returns whether the cloud provider
 // requires special networking configuration.
 func (kl *Kubelet) providerRequiresNetworkingConfiguration() bool {
@@ -121,7 +88,7 @@ func (kl *Kubelet) providerRequiresNetworkingConfiguration() bool {
 	// is used or whether we are using overlay networking. We should return
 	// true for cloud providers if they implement Routes() interface and
 	// we are not using overlay networking.
-	if kl.cloud == nil || kl.cloud.ProviderName() != "gce" || kl.flannelExperimentalOverlay {
+	if kl.cloud == nil || kl.cloud.ProviderName() != "gce" {
 		return false
 	}
 	_, supported := kl.cloud.Routes()
@@ -257,22 +224,13 @@ func (kl *Kubelet) reconcileCBR0(podCIDR string) error {
 
 // syncNetworkStatus updates the network state, ensuring that the network is
 // configured correctly if the kubelet is set to configure cbr0:
-// * handshake flannel helper if the flannel experimental overlay is being used.
 // * ensure that iptables masq rules are setup
 // * reconcile cbr0 with the pod CIDR
 func (kl *Kubelet) syncNetworkStatus() {
 	var err error
 	if kl.configureCBR0 {
-		if kl.flannelExperimentalOverlay {
-			podCIDR, err := kl.flannelHelper.Handshake()
-			if err != nil {
-				glog.Infof("Flannel server handshake failed %v", err)
-				return
-			}
-			kl.updatePodCIDR(podCIDR)
-		}
 		if err := ensureIPTablesMasqRule(kl.iptClient, kl.nonMasqueradeCIDR); err != nil {
-			err = fmt.Errorf("Error on adding ip table rules: %v", err)
+			err = fmt.Errorf("Error on adding iptables rules: %v", err)
 			glog.Error(err)
 			kl.runtimeState.setNetworkState(err)
 			return

@@ -24,9 +24,11 @@ import (
 
 	federation_api "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
+	"k8s.io/kubernetes/pkg/api"
 	api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/watch"
 
 	"github.com/golang/glog"
@@ -48,14 +50,22 @@ func (wd *WatcherDispatcher) register(watcher *watch.FakeWatcher) {
 	}
 }
 
+func copy(obj runtime.Object) runtime.Object {
+	objCopy, err := api.Scheme.DeepCopy(obj)
+	if err != nil {
+		panic(err)
+	}
+	return objCopy.(runtime.Object)
+}
+
 // Add sends an add event.
 func (wd *WatcherDispatcher) Add(obj runtime.Object) {
 	wd.Lock()
 	defer wd.Unlock()
-	wd.eventsSoFar = append(wd.eventsSoFar, &watch.Event{Type: watch.Added, Object: obj})
+	wd.eventsSoFar = append(wd.eventsSoFar, &watch.Event{Type: watch.Added, Object: copy(obj)})
 	for _, watcher := range wd.watchers {
 		if !watcher.IsStopped() {
-			watcher.Add(obj)
+			watcher.Add(copy(obj))
 		}
 	}
 }
@@ -65,11 +75,11 @@ func (wd *WatcherDispatcher) Modify(obj runtime.Object) {
 	wd.Lock()
 	defer wd.Unlock()
 	glog.V(4).Infof("->WatcherDispatcher.Modify(%v)", obj)
-	wd.eventsSoFar = append(wd.eventsSoFar, &watch.Event{Type: watch.Modified, Object: obj})
+	wd.eventsSoFar = append(wd.eventsSoFar, &watch.Event{Type: watch.Modified, Object: copy(obj)})
 	for i, watcher := range wd.watchers {
 		if !watcher.IsStopped() {
 			glog.V(4).Infof("->Watcher(%d).Modify(%v)", i, obj)
-			watcher.Modify(obj)
+			watcher.Modify(copy(obj))
 		} else {
 			glog.V(4).Infof("->Watcher(%d) is stopped.  Not calling Modify(%v)", i, obj)
 		}
@@ -80,10 +90,10 @@ func (wd *WatcherDispatcher) Modify(obj runtime.Object) {
 func (wd *WatcherDispatcher) Delete(lastValue runtime.Object) {
 	wd.Lock()
 	defer wd.Unlock()
-	wd.eventsSoFar = append(wd.eventsSoFar, &watch.Event{Type: watch.Deleted, Object: lastValue})
+	wd.eventsSoFar = append(wd.eventsSoFar, &watch.Event{Type: watch.Deleted, Object: copy(lastValue)})
 	for _, watcher := range wd.watchers {
 		if !watcher.IsStopped() {
-			watcher.Delete(lastValue)
+			watcher.Delete(copy(lastValue))
 		}
 	}
 }
@@ -92,10 +102,10 @@ func (wd *WatcherDispatcher) Delete(lastValue runtime.Object) {
 func (wd *WatcherDispatcher) Error(errValue runtime.Object) {
 	wd.Lock()
 	defer wd.Unlock()
-	wd.eventsSoFar = append(wd.eventsSoFar, &watch.Event{Type: watch.Error, Object: errValue})
+	wd.eventsSoFar = append(wd.eventsSoFar, &watch.Event{Type: watch.Error, Object: copy(errValue)})
 	for _, watcher := range wd.watchers {
 		if !watcher.IsStopped() {
-			watcher.Error(errValue)
+			watcher.Error(copy(errValue))
 		}
 	}
 }
@@ -104,10 +114,10 @@ func (wd *WatcherDispatcher) Error(errValue runtime.Object) {
 func (wd *WatcherDispatcher) Action(action watch.EventType, obj runtime.Object) {
 	wd.Lock()
 	defer wd.Unlock()
-	wd.eventsSoFar = append(wd.eventsSoFar, &watch.Event{Type: action, Object: obj})
+	wd.eventsSoFar = append(wd.eventsSoFar, &watch.Event{Type: action, Object: copy(obj)})
 	for _, watcher := range wd.watchers {
 		if !watcher.IsStopped() {
-			watcher.Action(action, obj)
+			watcher.Action(action, copy(obj))
 		}
 	}
 }
@@ -146,7 +156,7 @@ func RegisterFakeCopyOnCreate(resource string, client *core.Fake, watcher *Watch
 		obj := createAction.GetObject()
 		go func() {
 			watcher.Add(obj)
-			objChan <- obj
+			objChan <- copy(obj)
 		}()
 		return true, obj, nil
 	})
@@ -164,7 +174,7 @@ func RegisterFakeCopyOnUpdate(resource string, client *core.Fake, watcher *Watch
 		go func() {
 			glog.V(4).Infof("Object updated. Writing to channel: %v", obj)
 			watcher.Modify(obj)
-			objChan <- obj
+			objChan <- copy(obj)
 		}()
 		return true, obj, nil
 	})
@@ -201,4 +211,14 @@ func NewCluster(name string, readyStatus api_v1.ConditionStatus) *federation_api
 			},
 		},
 	}
+}
+
+// Ensure a key is in the store before returning (or timeout w/ error)
+func WaitForStoreUpdate(store util.FederatedReadOnlyStore, clusterName, key string, timeout time.Duration) error {
+	retryInterval := 100 * time.Millisecond
+	err := wait.PollImmediate(retryInterval, timeout, func() (bool, error) {
+		_, found, err := store.GetByKey(clusterName, key)
+		return found, err
+	})
+	return err
 }

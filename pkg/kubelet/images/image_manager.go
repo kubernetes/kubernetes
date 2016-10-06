@@ -19,12 +19,14 @@ package images
 import (
 	"fmt"
 
+	dockerref "github.com/docker/distribution/reference"
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/record"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
+	"k8s.io/kubernetes/pkg/util/parsers"
 )
 
 // imageManager provides the functionalities for image pulling.
@@ -87,7 +89,15 @@ func (m *imageManager) EnsureImageExists(pod *api.Pod, container *api.Container,
 		glog.Errorf("Couldn't make a ref to pod %v, container %v: '%v'", pod.Name, container.Name, err)
 	}
 
-	spec := kubecontainer.ImageSpec{Image: container.Image}
+	// If the image contains no tag or digest, a default tag should be applied.
+	image, err := applyDefaultImageTag(container.Image)
+	if err != nil {
+		msg := fmt.Sprintf("Failed to apply default image tag %q: %v", container.Image, err)
+		m.logIt(ref, api.EventTypeWarning, events.FailedToInspectImage, logPrefix, msg, glog.Warning)
+		return ErrInvalidImageName, msg
+	}
+
+	spec := kubecontainer.ImageSpec{Image: image}
 	present, err := m.imageService.IsImagePresent(spec)
 	if err != nil {
 		msg := fmt.Sprintf("Failed to inspect image %q: %v", container.Image, err)
@@ -129,4 +139,23 @@ func (m *imageManager) EnsureImageExists(pod *api.Pod, container *api.Container,
 	m.logIt(ref, api.EventTypeNormal, events.PulledImage, logPrefix, fmt.Sprintf("Successfully pulled image %q", container.Image), glog.Info)
 	m.backOff.GC()
 	return nil, ""
+}
+
+// applyDefaultImageTag parses a docker image string, if it doesn't contain any tag or digest,
+// a default tag will be applied.
+func applyDefaultImageTag(image string) (string, error) {
+	named, err := dockerref.ParseNamed(image)
+	if err != nil {
+		return "", fmt.Errorf("couldn't parse image reference %q: %v", image, err)
+	}
+	_, isTagged := named.(dockerref.Tagged)
+	_, isDigested := named.(dockerref.Digested)
+	if !isTagged && !isDigested {
+		named, err := dockerref.WithTag(named, parsers.DefaultImageTag)
+		if err != nil {
+			return "", fmt.Errorf("failed to apply default image tag %q: %v", image, err)
+		}
+		image = named.String()
+	}
+	return image, nil
 }

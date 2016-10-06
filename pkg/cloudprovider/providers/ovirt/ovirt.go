@@ -283,7 +283,7 @@ func (m *OVirtInstanceMap) ListSortedNames() []string {
 	return names
 }
 
-// List enumerates the set of minions instances known by the cloud provider
+// List enumerates the set of nodes instances known by the cloud provider
 func (v *OVirtCloud) List(filter string) ([]types.NodeName, error) {
 	instances, err := v.fetchAllInstances()
 	if err != nil {
