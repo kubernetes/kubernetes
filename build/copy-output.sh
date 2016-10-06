@@ -14,10 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Copies any built binaries off the Docker machine.
-#
-# This is a no-op on Linux when the Docker daemon is local.  This is only
-# necessary on Mac OS X with boot2docker.
+# Copies any built binaries (and other generated files) out of the Docker build contianer.
 set -o errexit
 set -o nounset
 set -o pipefail

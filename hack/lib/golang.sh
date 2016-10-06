@@ -144,12 +144,6 @@ readonly KUBE_TEST_SERVER_PLATFORMS=("${KUBE_SERVER_PLATFORMS[@]}")
 # Gigabytes desired for parallel platform builds. 11 is fairly
 # arbitrary, but is a reasonable splitting point for 2015
 # laptops-versus-not.
-#
-# If you are using boot2docker, the following seems to work (note
-# that 12000 rounds to 11G):
-#   boot2docker down
-#   VBoxManage modifyvm boot2docker-vm --memory 12000
-#   boot2docker up
 readonly KUBE_PARALLEL_BUILD_MEMORY=11
 
 readonly KUBE_ALL_TARGETS=(
@@ -553,7 +547,7 @@ kube::golang::build_binaries_for_platform() {
         "${testpkg}"
 
     mkdir -p "$(dirname ${outfile})"
-    go test -c \
+    go test -i -c \
       "${goflags[@]:+${goflags[@]}}" \
       -gcflags "${gogcflags}" \
       -ldflags "${goldflags}" \

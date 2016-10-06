@@ -62,6 +62,9 @@ network_closure.sh
 
 .tags*
 
+# Version file for dockerized build
+.dockerized-kube-version-defs
+
 # Web UI
 /www/master/node_modules/
 /www/master/npm-debug.log

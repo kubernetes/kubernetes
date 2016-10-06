@@ -18,7 +18,6 @@
 # local-up.sh, but this one launches the three separate binaries.
 # You may need to run this as root to allow kubelet to open docker's socket.
 DOCKER_OPTS=${DOCKER_OPTS:-""}
-DOCKER_NATIVE=${DOCKER_NATIVE:-""}
 DOCKER=(docker ${DOCKER_OPTS})
 DOCKERIZE_KUBELET=${DOCKERIZE_KUBELET:-""}
 ALLOW_PRIVILEGED=${ALLOW_PRIVILEGED:-""}
