@@ -32,7 +32,7 @@ var _ = framework.KubeDescribe("Eviction based on taints [Slow] [Destructive]", 
 
 	framework.KubeDescribe("Pods", func() {
 
-		It("that don't tolerate NoSchedule taint should be evicted", func() {
+		It("that don't tolerate NoExecute taint should be evicted", func() {
 
 			testTaint := api.Taint{Key: "test", Value: "test", Effect: api.TaintEffectNoExecute}
 			testToleration := api.Toleration{Key: "test", Operator: api.TolerationOpEqual, Value: "test", Effect: api.TaintEffectNoExecute}
@@ -45,7 +45,7 @@ var _ = framework.KubeDescribe("Eviction based on taints [Slow] [Destructive]", 
 			}
 			nodes := framework.GetReadySchedulableNodesOrDie(f.Client)
 			node := nodes.Items[0]
-			By("creating three pods in namespace " + f.Namespace.Name + ", 2 without toleration to NoSchedule taint on node " + node.Name)
+			By("creating three pods in namespace " + f.Namespace.Name + ", 2 without toleration to NoExecute taint on node " + node.Name)
 			pod1 := createPod("eviction-pod1-no-tolerance", node.Name)
 			pod2 := createPod("eviction-pod2-no-tolerance", node.Name)
 			podWithTolerance := createPod("eviction-pod3-with-tolerance", node.Name)
@@ -75,7 +75,7 @@ var _ = framework.KubeDescribe("Eviction based on taints [Slow] [Destructive]", 
 				f.PodClient().Create(pod)
 			}
 
-			By("updating node " + node.Name + " with NoSchedule taint")
+			By("updating node " + node.Name + " with NoExecute taint")
 			api.AddTaints(&node, testTaint)
 			_, err = f.Client.Nodes().Update(&node)
 			Expect(err).NotTo(HaveOccurred())
@@ -101,6 +101,48 @@ var _ = framework.KubeDescribe("Eviction based on taints [Slow] [Destructive]", 
 				framework.Failf("pod %v expected to run (%v) in namespace %v", pod.Name, pod.Status.Phase, pod.Namespace)
 			}
 		})
+
+		It("that are on a node under maintenance should not be evicted", func() {
+			node := framework.GetReadySchedulableNodesOrDie(f.Client).Items[0]
+
+			By("creating a pod on a node " + node.Name)
+			pod1 := createPod("test1", node.Name)
+			pod2 := createPod("test2", node.Name)
+
+			pods := []*api.Pod{pod1, pod2}
+			for _, pod := range pods {
+				f.PodClient().Create(pod)
+			}
+
+			By("switching node " + node.Name + " into maintenance mode")
+			framework.RunKubectlOrDie("maintenance", node.Name, "on")
+
+			By("verifying that both pods are in running state on a node " + node.Name)
+			for _, pod := range pods {
+				if err := f.WaitForPodRunning(pod.Name); err != nil {
+					framework.Failf("Pod %v is not running: %v", pod.Name, err)
+				}
+			}
+
+			By("confirming that both pods are running")
+			Eventually(func() error {
+				pods, err := f.PodClient().List(api.ListOptions{})
+				Expect(err).NotTo(HaveOccurred())
+
+				for _, pod := range pods.Items {
+					if pod.Status.Phase != api.PodRunning {
+						return fmt.Errorf("pod %v expected to be running but %v", pod.Name, pod.Status.Phase)
+					}
+				}
+				return nil
+
+			}, 1*time.Minute, 5*time.Second).Should(BeNil())
+
+			By("removing node " + node.Name + " from maintenance mode")
+			framework.RunKubectlOrDie("maintenance", node.Name, "off")
+
+		})
+
 	})
 })
 
