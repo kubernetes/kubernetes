@@ -36,6 +36,9 @@ type KubeletClientConfig struct {
 	Port        uint
 	EnableHttps bool
 
+	// PreferredAddressType - used to select an address from Node.NodeStatus.Addresses
+	PreferredAddressType []string
+
 	// TLSClientConfig contains settings to enable transport layer security
 	restclient.TLSClientConfig
 

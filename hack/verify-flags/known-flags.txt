@@ -286,6 +286,7 @@ kube-api-qps
 kubecfg-file
 kubectl-path
 kubelet-address
+kubelet-address-type
 kubelet-api-servers
 kubelet-cadvisor-port
 kubelet-certificate-authority

@@ -20,6 +20,7 @@ package options
 import (
 	"time"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/validation"
 	genericoptions "k8s.io/kubernetes/pkg/genericapiserver/options"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
@@ -49,7 +50,19 @@ func NewAPIServer() *APIServer {
 		ServerRunOptions: genericoptions.NewServerRunOptions().WithEtcdOptions(),
 		EventTTL:         1 * time.Hour,
 		KubeletConfig: kubeletclient.KubeletClientConfig{
-			Port:        ports.KubeletPort,
+			Port: ports.KubeletPort,
+			PreferredAddressType: []string{
+				// --override-hostname
+				string(api.NodeHostName),
+
+				// internal, preferring DNS if reported
+				string(api.NodeInternalDNS),
+				string(api.NodeInternalIP),
+
+				// external, preferring DNS if reported
+				string(api.NodeExternalDNS),
+				string(api.NodeExternalIP),
+			},
 			EnableHttps: true,
 			HTTPTimeout: time.Duration(5) * time.Second,
 		},
@@ -100,6 +113,9 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 	// Kubelet related flags:
 	fs.BoolVar(&s.KubeletConfig.EnableHttps, "kubelet-https", s.KubeletConfig.EnableHttps,
 		"Use https for kubelet connections.")
+
+	fs.StringSliceVar(&s.KubeletConfig.PreferredAddressType, "kubelet-address-type", s.KubeletConfig.PreferredAddressType,
+		"The preferred NodeAddressType to use for kubelet connections.")
 
 	fs.UintVar(&s.KubeletConfig.Port, "kubelet-port", s.KubeletConfig.Port,
 		"DEPRECATED: kubelet port.")
