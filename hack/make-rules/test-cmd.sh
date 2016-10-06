@@ -342,6 +342,7 @@ runTests() {
   deployment_image_field="(index .spec.template.spec.containers 0).image"
   deployment_second_image_field="(index .spec.template.spec.containers 1).image"
   change_cause_annotation='.*kubernetes.io/change-cause.*'
+  revision_history_annotation='deployment.kubernetes.io/revision-history'
 
   # Passing no arguments to create is an error
   ! kubectl create
@@ -2066,6 +2067,8 @@ __EOF__
   kubectl-with-retry rollout resume deployment nginx "${kube_flags[@]}"
   # The resumed deployment can now be rolled back
   kubectl rollout undo deployment nginx "${kube_flags[@]}"
+  # Check that the new replica set (nginx-618515232) has all old revisions stored in an annotation
+  kube::test::get_object_assert 'rs nginx-618515232' "{{${annotations_field}.${revision_history_annotation}}}" '1,3'
   # Clean up
   kubectl delete deployment nginx "${kube_flags[@]}"
 
