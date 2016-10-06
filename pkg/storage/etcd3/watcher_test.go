@@ -92,7 +92,7 @@ func testWatch(t *testing.T, recursive bool) {
 		},
 	}}
 	for i, tt := range tests {
-		w, err := store.watch(ctx, tt.key, "0", storage.SimpleFilter(tt.pred), recursive)
+		w, err := store.watch(ctx, tt.key, "0", tt.pred, recursive)
 		if err != nil {
 			t.Fatalf("Watch failed: %v", err)
 		}
