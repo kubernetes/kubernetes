@@ -43,7 +43,8 @@ func init() {
 
 // WithAuthentication creates an http handler that tries to authenticate the given request as a user, and then
 // stores any such user found onto the provided context for the request. If authentication fails or returns an error
-// the failed handler is used. On success, handler is invoked to serve the request.
+// the failed handler is used. On success, "Authorization" header is removed from the request and handler
+// is invoked to serve the request.
 func WithAuthentication(handler http.Handler, mapper api.RequestContextMapper, auth authenticator.Request, failed http.Handler) http.Handler {
 	if auth == nil {
 		glog.Warningf("Authentication is disabled")
@@ -59,6 +60,9 @@ func WithAuthentication(handler http.Handler, mapper api.RequestContextMapper, a
 				failed.ServeHTTP(w, req)
 				return
 			}
+
+			// authorization header is not required anymore in case of a successful authentication.
+			req.Header.Del("Authorization")
 
 			if ctx, ok := mapper.Get(req); ok {
 				mapper.Update(req, api.WithUser(ctx, user))
