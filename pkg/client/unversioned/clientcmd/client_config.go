@@ -27,6 +27,9 @@ import (
 	"github.com/golang/glog"
 	"github.com/imdario/mergo"
 
+	"strconv"
+	"time"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	clientauth "k8s.io/kubernetes/pkg/client/unversioned/auth"
@@ -122,9 +125,21 @@ func (config *DirectClientConfig) ClientConfig() (*restclient.Config, error) {
 		return nil, err
 	}
 
+	var requestTimeout time.Duration
+	if len(config.overrides.Timeout) > 0 {
+		if i, err := strconv.ParseUint(config.overrides.Timeout, 10, 64); err == nil {
+			requestTimeout = time.Duration(i) * time.Second
+		} else {
+			if requestTimeout, err = time.ParseDuration(config.overrides.Timeout); err != nil {
+				err := fmt.Errorf("Invalid value for option '--request-timeout'. Value must be a single integer, or an integer followed by a corresponding time unit (e.g. 1s | 2m | 3h)")
+				return nil, err
+			}
+		}
+	}
+
 	clientConfig := &restclient.Config{}
 	clientConfig.Host = configClusterInfo.Server
-	clientConfig.Timeout = config.overrides.Timeout
+	clientConfig.Timeout = requestTimeout
 	if u, err := url.ParseRequestURI(clientConfig.Host); err == nil && u.Opaque == "" && len(u.Path) > 1 {
 		u.RawQuery = ""
 		u.Fragment = ""
