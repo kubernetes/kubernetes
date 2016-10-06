@@ -778,6 +778,7 @@ k8s.io/kubernetes/pkg/util/limitwriter,deads2k,1
 k8s.io/kubernetes/pkg/util/mount,xiang90,1
 k8s.io/kubernetes/pkg/util/net,spxtr,1
 k8s.io/kubernetes/pkg/util/net/sets,jdef,1
+k8s.io/kubernetes/pkg/util/node,liggitt,0
 k8s.io/kubernetes/pkg/util/oom,vishh,0
 k8s.io/kubernetes/pkg/util/parsers,derekwaynecarr,1
 k8s.io/kubernetes/pkg/util/procfs,roberthbailey,1

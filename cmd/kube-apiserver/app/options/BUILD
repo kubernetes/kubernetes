@@ -15,6 +15,7 @@ go_library(
     srcs = ["options.go"],
     tags = ["automanaged"],
     deps = [
+        "//pkg/api:go_default_library",
         "//pkg/api/validation:go_default_library",
         "//pkg/genericapiserver/options:go_default_library",
         "//pkg/kubelet/client:go_default_library",

@@ -35,6 +35,9 @@ type KubeletClientConfig struct {
 	Port        uint
 	EnableHttps bool
 
+	// PreferredAddressTypes - used to select an address from Node.NodeStatus.Addresses
+	PreferredAddressTypes []string
+
 	// TLSClientConfig contains settings to enable transport layer security
 	restclient.TLSClientConfig
 
@@ -119,6 +122,8 @@ type NodeConnectionInfoGetter struct {
 	defaultPort int
 	// transport is the transport to use to send a request to all kubelets
 	transport http.RoundTripper
+	// preferredAddressTypes specifies the preferred order to use to find a node address
+	preferredAddressTypes []api.NodeAddressType
 }
 
 func NewNodeConnectionInfoGetter(nodes NodeGetter, config KubeletClientConfig) (ConnectionInfoGetter, error) {
@@ -132,11 +137,18 @@ func NewNodeConnectionInfoGetter(nodes NodeGetter, config KubeletClientConfig) (
 		return nil, err
 	}
 
+	types := []api.NodeAddressType{}
+	for _, t := range config.PreferredAddressTypes {
+		types = append(types, api.NodeAddressType(t))
+	}
+
 	return &NodeConnectionInfoGetter{
 		nodes:       nodes,
 		scheme:      scheme,
 		defaultPort: int(config.Port),
 		transport:   transport,
+
+		preferredAddressTypes: types,
 	}, nil
 }
 
@@ -147,11 +159,10 @@ func (k *NodeConnectionInfoGetter) GetConnectionInfo(ctx api.Context, nodeName t
 	}
 
 	// Find a kubelet-reported address, using preferred address type
-	hostIP, err := nodeutil.GetNodeHostIP(node)
+	host, err := nodeutil.GetPreferredNodeAddress(node, k.preferredAddressTypes)
 	if err != nil {
 		return nil, err
 	}
-	host := hostIP.String()
 
 	// Use the kubelet-reported port, if present
 	port := int(node.Status.DaemonEndpoints.KubeletEndpoint.Port)
