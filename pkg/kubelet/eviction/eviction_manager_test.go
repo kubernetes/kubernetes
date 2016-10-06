@@ -613,7 +613,9 @@ func TestMinReclaim(t *testing.T) {
 				Value: ThresholdValue{
 					Quantity: quantityMustParse("1Gi"),
 				},
-				MinReclaim: quantityMustParse("500Mi"),
+				MinReclaim: &ThresholdValue{
+					Quantity: quantityMustParse("500Mi"),
+				},
 			},
 		},
 	}
@@ -788,7 +790,9 @@ func TestNodeReclaimFuncs(t *testing.T) {
 				Value: ThresholdValue{
 					Quantity: quantityMustParse("1Gi"),
 				},
-				MinReclaim: quantityMustParse("500Mi"),
+				MinReclaim: &ThresholdValue{
+					Quantity: quantityMustParse("500Mi"),
+				},
 			},
 		},
 	}
