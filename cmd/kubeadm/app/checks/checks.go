@@ -18,6 +18,7 @@ package checks
 
 import (
 	"fmt"
+	"net"
 	"os"
 )
 
@@ -60,6 +61,21 @@ func (sc ServiceChecker) Check() (warnings []string, errors []string) {
 	return warnings, nil
 }
 
+type PortOpenChecker struct {
+	port int
+}
+
+func (poc PortOpenChecker) Check() (warnings []string, errors []string) {
+	errors = []string{}
+	// TODO: Get IP from KubeadmConfig
+	conn, _ := net.Dial("tcp", fmt.Sprintf("127.0.0.1:%d", poc.port))
+	if conn != nil {
+		conn.Close()
+		errors = append(errors, fmt.Sprintf("Port %d is in use.", poc.port))
+	}
+	return nil, errors
+}
+
 func RunMasterChecks() {
 
 	checks := []PreFlightChecker{}
@@ -80,10 +96,17 @@ func RunMasterChecks() {
 		},
 	)
 
+	checks = append(checks,
+		PortOpenChecker{443},
+		PortOpenChecker{2379},
+		PortOpenChecker{8080},
+		PortOpenChecker{10250},
+		PortOpenChecker{10251},
+		PortOpenChecker{10252},
+	)
+
 	foundErrors := false
 	for _, check := range checks {
-		fmt.Printf("Running check %s\n", check)
-
 		warnings, errors := check.Check()
 		for _, warnMsg := range warnings {
 			fmt.Printf("WARNING: %s\n", warnMsg)
