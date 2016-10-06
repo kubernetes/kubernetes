@@ -582,26 +582,13 @@ function kube::build::run_build_command_ex() {
   fi
 }
 
-function kube::build::probe_address {
-  # Apple has an ancient version of netcat with custom timeout flags.  This is
-  # the best way I (jbeda) could find to test for that.
-  local netcat
-  if nc 2>&1 | grep -e 'apple' >/dev/null ; then
-    netcat="nc -G 1"
-  else
-    netcat="nc -w 1"
-  fi
-
+function kube::build::rsync_probe {
   # Wait unil rsync is up and running.
-  if ! which nc >/dev/null ; then
-    V=6 kube::log::info "netcat not installed, waiting for 1s"
-    sleep 1
-    return 0
-  fi
-
-  local tries=10
+  local tries=20
   while (( ${tries} > 0 )) ; do
-    if ${netcat} -z "$1" "$2" 2> /dev/null ; then
+    if rsync "rsync://k8s@${1}:${2}/" \
+         --password-file="${LOCAL_OUTPUT_BUILD_CONTEXT}/rsyncd.password" \
+         &> /dev/null ; then
       return 0
     fi
     tries=$(( ${tries} - 1))
@@ -637,13 +624,11 @@ function kube::build::start_rsyncd_container() {
   # machines) we have to talk directly to the container IP.  There is no one
   # strategy that works in all cases so we test to figure out which situation we
   # are in.
-  if kube::build::probe_address 127.0.0.1 ${mapped_port}; then
+  if kube::build::rsync_probe 127.0.0.1 ${mapped_port}; then
     KUBE_RSYNC_ADDR="127.0.0.1:${mapped_port}"
-    sleep 0.5
     return 0
-  elif kube::build::probe_address "${container_ip}" ${KUBE_CONTAINER_RSYNC_PORT}; then
+  elif kube::build::rsync_probe "${container_ip}" ${KUBE_CONTAINER_RSYNC_PORT}; then
     KUBE_RSYNC_ADDR="${container_ip}:${KUBE_CONTAINER_RSYNC_PORT}"
-    sleep 0.5
     return 0
   fi
 
