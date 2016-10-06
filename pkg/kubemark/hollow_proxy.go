@@ -20,13 +20,11 @@ import (
 	"time"
 
 	proxyapp "k8s.io/kubernetes/cmd/kube-proxy/app"
-	"k8s.io/kubernetes/cmd/kube-proxy/app/options"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	proxyconfig "k8s.io/kubernetes/pkg/proxy/config"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 
 	"github.com/golang/glog"
@@ -59,15 +57,36 @@ func NewHollowProxyOrDie(
 	recorder record.EventRecorder,
 ) *HollowProxy {
 	// Create and start Hollow Proxy
-	config := options.NewProxyConfig()
-	config.OOMScoreAdj = util.Int32Ptr(0)
-	config.ResourceContainer = ""
-	config.NodeRef = &api.ObjectReference{
+	//config := options.NewProxyConfig()
+	/* defaults are:
+		- client
+		  - content type
+		  - qps
+		  - burst
+		- config sync period
+		- bind address 0s
+		- healthz localhost 10249
+		- oom -999
+	  - resource container /kube-proxy
+	  - iptables sync period 30s
+	  - upd idle timeout 250ms
+	  - iptables masq bit 14
+
+	*/
+	// AG: they were setting this to 0 to override the -999 default, but it's only
+	// ever applied by NewDefaultProxyServer, so this is effectively unnecessary
+	//config.OOMScoreAdj = util.Int32Ptr(0)
+
+	// reset to ""
+	//config.ResourceContainer = ""
+
+	nodeRef := &api.ObjectReference{
 		Kind:      "Node",
 		Name:      nodeName,
 		UID:       types.UID(nodeName),
 		Namespace: "",
 	}
+
 	proxyconfig.NewSourceAPI(
 		client,
 		30*time.Second,
@@ -75,12 +94,16 @@ func NewHollowProxyOrDie(
 		endpointsConfig.Channel("api"),
 	)
 
-	hollowProxy, err := proxyapp.NewProxyServer(client, config, iptInterface, &FakeProxier{}, broadcaster, recorder, nil, "fake")
-	if err != nil {
-		glog.Fatalf("Error while creating ProxyServer: %v\n", err)
-	}
 	return &HollowProxy{
-		ProxyServer: hollowProxy,
+		ProxyServer: &proxyapp.ProxyServer{
+			Client:       client,
+			IptInterface: iptInterface,
+			Proxier:      &FakeProxier{},
+			Broadcaster:  broadcaster,
+			Recorder:     recorder,
+			ProxyMode:    "fake",
+			NodeRef:      nodeRef,
+		},
 	}
 }
 

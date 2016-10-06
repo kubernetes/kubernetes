@@ -24,7 +24,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"k8s.io/kubernetes/cmd/kube-proxy/app/options"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/util/iptables"
@@ -270,73 +269,66 @@ func Test_getProxyMode(t *testing.T) {
 // Config and iptinterface are not nil when CleanupAndExit is true.
 // To avoid proxy crash: https://github.com/kubernetes/kubernetes/pull/14736
 func TestProxyServerWithCleanupAndExit(t *testing.T) {
-	// creates default config
-	config := options.NewProxyConfig()
+	options := KubeProxyOptions{CleanupAndExit: true}
+	config := componentconfig.KubeProxyConfiguration{BindAddress: "0.0.0.0"}
 
-	// sets CleanupAndExit manually
-	config.CleanupAndExit = true
+	proxyserver, err := options.NewProxyServer(&config)
 
-	// creates new proxy server
-	proxyserver, err := NewProxyServerDefault(config)
-
-	// verifies that nothing is nill except error
 	assert.Nil(t, err)
 	assert.NotNil(t, proxyserver)
-	assert.NotNil(t, proxyserver.Config)
 	assert.NotNil(t, proxyserver.IptInterface)
 }
 
 func TestGetConntrackMax(t *testing.T) {
 	ncores := runtime.NumCPU()
 	testCases := []struct {
-		config   componentconfig.KubeProxyConfiguration
+		config   componentconfig.KubeProxyConntrackConfiguration
 		expected int
 		err      string
 	}{
 		{
-			config:   componentconfig.KubeProxyConfiguration{},
+			config:   componentconfig.KubeProxyConntrackConfiguration{},
 			expected: 0,
 		},
 		{
-			config: componentconfig.KubeProxyConfiguration{
-				ConntrackMax: 12345,
+			config: componentconfig.KubeProxyConntrackConfiguration{
+				Max: 12345,
 			},
 			expected: 12345,
 		},
 		{
-			config: componentconfig.KubeProxyConfiguration{
-				ConntrackMax:        12345,
-				ConntrackMaxPerCore: 67890,
+			config: componentconfig.KubeProxyConntrackConfiguration{
+				Max:        12345,
+				MaxPerCore: 67890,
 			},
 			expected: -1,
 			err:      "mutually exclusive",
 		},
 		{
-			config: componentconfig.KubeProxyConfiguration{
-				ConntrackMaxPerCore: 67890, // use this if Max is 0
-				ConntrackMin:        1,     // avoid 0 default
+			config: componentconfig.KubeProxyConntrackConfiguration{
+				MaxPerCore: 67890, // use this if Max is 0
+				Min:        1,     // avoid 0 default
 			},
 			expected: 67890 * ncores,
 		},
 		{
-			config: componentconfig.KubeProxyConfiguration{
-				ConntrackMaxPerCore: 1, // ensure that Min is considered
-				ConntrackMin:        123456,
+			config: componentconfig.KubeProxyConntrackConfiguration{
+				MaxPerCore: 1, // ensure that Min is considered
+				Min:        123456,
 			},
 			expected: 123456,
 		},
 		{
-			config: componentconfig.KubeProxyConfiguration{
-				ConntrackMaxPerCore: 0, // leave system setting
-				ConntrackMin:        123456,
+			config: componentconfig.KubeProxyConntrackConfiguration{
+				MaxPerCore: 0, // leave system setting
+				Min:        123456,
 			},
 			expected: 0,
 		},
 	}
 
 	for i, tc := range testCases {
-		cfg := options.ProxyServerConfig{KubeProxyConfiguration: tc.config}
-		x, e := getConntrackMax(&cfg)
+		x, e := getConntrackMax(tc.config)
 		if e != nil {
 			if tc.err == "" {
 				t.Errorf("[%d] unexpected error: %v", i, e)

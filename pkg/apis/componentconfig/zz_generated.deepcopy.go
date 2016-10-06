@@ -35,9 +35,12 @@ func init() {
 // to allow building arbitrary schemes.
 func RegisterDeepCopies(scheme *runtime.Scheme) error {
 	return scheme.AddGeneratedDeepCopyFuncs(
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_ClientConnectionConfiguration, InType: reflect.TypeOf(&ClientConnectionConfiguration{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_IPVar, InType: reflect.TypeOf(&IPVar{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_KubeControllerManagerConfiguration, InType: reflect.TypeOf(&KubeControllerManagerConfiguration{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_KubeProxyConfiguration, InType: reflect.TypeOf(&KubeProxyConfiguration{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_KubeProxyConntrackConfiguration, InType: reflect.TypeOf(&KubeProxyConntrackConfiguration{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_KubeProxyIPTablesConfiguration, InType: reflect.TypeOf(&KubeProxyIPTablesConfiguration{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_KubeSchedulerConfiguration, InType: reflect.TypeOf(&KubeSchedulerConfiguration{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_KubeletConfiguration, InType: reflect.TypeOf(&KubeletConfiguration{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_LeaderElectionConfiguration, InType: reflect.TypeOf(&LeaderElectionConfiguration{})},
@@ -45,6 +48,19 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_PortRangeVar, InType: reflect.TypeOf(&PortRangeVar{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_VolumeConfiguration, InType: reflect.TypeOf(&VolumeConfiguration{})},
 	)
+}
+
+func DeepCopy_componentconfig_ClientConnectionConfiguration(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*ClientConnectionConfiguration)
+		out := out.(*ClientConnectionConfiguration)
+		out.KubeConfigFile = in.KubeConfigFile
+		out.AcceptContentTypes = in.AcceptContentTypes
+		out.ContentType = in.ContentType
+		out.QPS = in.QPS
+		out.Burst = in.Burst
+		return nil
+	}
 }
 
 func DeepCopy_componentconfig_IPVar(in interface{}, out interface{}, c *conversion.Cloner) error {
@@ -135,21 +151,13 @@ func DeepCopy_componentconfig_KubeProxyConfiguration(in interface{}, out interfa
 		out := out.(*KubeProxyConfiguration)
 		out.TypeMeta = in.TypeMeta
 		out.BindAddress = in.BindAddress
-		out.ClusterCIDR = in.ClusterCIDR
 		out.HealthzBindAddress = in.HealthzBindAddress
-		out.HealthzPort = in.HealthzPort
+		out.ClusterCIDR = in.ClusterCIDR
 		out.HostnameOverride = in.HostnameOverride
-		if in.IPTablesMasqueradeBit != nil {
-			in, out := &in.IPTablesMasqueradeBit, &out.IPTablesMasqueradeBit
-			*out = new(int32)
-			**out = **in
-		} else {
-			out.IPTablesMasqueradeBit = nil
+		out.ClientConnection = in.ClientConnection
+		if err := DeepCopy_componentconfig_KubeProxyIPTablesConfiguration(&in.IPTablesConfiguration, &out.IPTablesConfiguration, c); err != nil {
+			return err
 		}
-		out.IPTablesSyncPeriod = in.IPTablesSyncPeriod
-		out.KubeconfigPath = in.KubeconfigPath
-		out.MasqueradeAll = in.MasqueradeAll
-		out.Master = in.Master
 		if in.OOMScoreAdj != nil {
 			in, out := &in.OOMScoreAdj, &out.OOMScoreAdj
 			*out = new(int32)
@@ -161,10 +169,37 @@ func DeepCopy_componentconfig_KubeProxyConfiguration(in interface{}, out interfa
 		out.PortRange = in.PortRange
 		out.ResourceContainer = in.ResourceContainer
 		out.UDPIdleTimeout = in.UDPIdleTimeout
-		out.ConntrackMax = in.ConntrackMax
-		out.ConntrackMaxPerCore = in.ConntrackMaxPerCore
-		out.ConntrackMin = in.ConntrackMin
-		out.ConntrackTCPEstablishedTimeout = in.ConntrackTCPEstablishedTimeout
+		out.ConntrackConfiguration = in.ConntrackConfiguration
+		out.ConfigSyncPeriod = in.ConfigSyncPeriod
+		return nil
+	}
+}
+
+func DeepCopy_componentconfig_KubeProxyConntrackConfiguration(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*KubeProxyConntrackConfiguration)
+		out := out.(*KubeProxyConntrackConfiguration)
+		out.Max = in.Max
+		out.MaxPerCore = in.MaxPerCore
+		out.Min = in.Min
+		out.TCPEstablishedTimeout = in.TCPEstablishedTimeout
+		return nil
+	}
+}
+
+func DeepCopy_componentconfig_KubeProxyIPTablesConfiguration(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*KubeProxyIPTablesConfiguration)
+		out := out.(*KubeProxyIPTablesConfiguration)
+		if in.MasqueradeBit != nil {
+			in, out := &in.MasqueradeBit, &out.MasqueradeBit
+			*out = new(int32)
+			**out = **in
+		} else {
+			out.MasqueradeBit = nil
+		}
+		out.MasqueradeAll = in.MasqueradeAll
+		out.SyncPeriod = in.SyncPeriod
 		return nil
 	}
 }
