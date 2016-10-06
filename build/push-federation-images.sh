@@ -23,7 +23,6 @@ set -o pipefail
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 
 source "${KUBE_ROOT}/build/util.sh"
-source "${KUBE_ROOT}/build/lib/release.sh"
 
 source "${KUBE_ROOT}/federation/cluster/common.sh"
 
