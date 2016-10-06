@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/crlf"
 	"k8s.io/kubernetes/pkg/util/strategicpatch"
+	"k8s.io/kubernetes/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/util/yaml"
 
 	"github.com/golang/glog"
@@ -220,7 +221,7 @@ func RunEdit(f *cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args
 					file: file,
 				}
 				containsError = true
-				results.header.reasons = append(results.header.reasons, editReason{head: fmt.Sprintf("The edited file fails validation: %v", err)})
+				fmt.Fprintln(out, results.addError(errors.NewInvalid(api.Kind(""), "", field.ErrorList{field.Invalid(nil, "The edited file failed validation", fmt.Sprintf("%v", err))}), info))
 				continue
 			}
 
