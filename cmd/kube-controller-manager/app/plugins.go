@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/openstack"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/qingcloud"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
 	utilconfig "k8s.io/kubernetes/pkg/util/config"
 	"k8s.io/kubernetes/pkg/util/io"
@@ -46,6 +47,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/glusterfs"
 	"k8s.io/kubernetes/pkg/volume/host_path"
 	"k8s.io/kubernetes/pkg/volume/nfs"
+	"k8s.io/kubernetes/pkg/volume/qingcloud_volume"
 	"k8s.io/kubernetes/pkg/volume/quobyte"
 	"k8s.io/kubernetes/pkg/volume/rbd"
 	"k8s.io/kubernetes/pkg/volume/vsphere_volume"
@@ -66,6 +68,7 @@ func ProbeAttachableVolumePlugins(config componentconfig.VolumeConfiguration) []
 	allPlugins = append(allPlugins, flexvolume.ProbeVolumePlugins(config.FlexVolumePluginDir)...)
 	allPlugins = append(allPlugins, vsphere_volume.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, azure_dd.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, qingcloud_volume.ProbeVolumePlugins()...)
 	return allPlugins
 }
 
@@ -121,6 +124,8 @@ func ProbeControllerVolumePlugins(cloud cloudprovider.Interface, config componen
 			allPlugins = append(allPlugins, cinder.ProbeVolumePlugins()...)
 		case vsphere.ProviderName == cloud.ProviderName():
 			allPlugins = append(allPlugins, vsphere_volume.ProbeVolumePlugins()...)
+		case qingcloud.ProviderName == cloud.ProviderName():
+			allPlugins = append(allPlugins, qingcloud_volume.ProbeVolumePlugins()...)
 		}
 	}
 
@@ -149,6 +154,8 @@ func NewAlphaVolumeProvisioner(cloud cloudprovider.Interface, config componentco
 		return getProvisionablePluginFromVolumePlugins(cinder.ProbeVolumePlugins())
 	case cloud != nil && vsphere.ProviderName == cloud.ProviderName():
 		return getProvisionablePluginFromVolumePlugins(vsphere_volume.ProbeVolumePlugins())
+	case cloud != nil && qingcloud.ProviderName == cloud.ProviderName():
+		return getProvisionablePluginFromVolumePlugins(qingcloud_volume.ProbeVolumePlugins())
 	}
 	return nil, nil
 }

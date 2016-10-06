@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-service
+  annotations:
+    service.beta.kubernetes.io/qingcloud-load-balancer-eip-ids: eip-jzqv33h6
+#    service.beta.kubernetes.io/qingcloud-load-balancer-type: "1"
+spec:
+  ports:
+  - port: 8000
+#    nodePort: 30061
+    targetPort: 80
+    protocol: TCP
+  type: LoadBalancer
+#  clusterIP: 10.0.0.204
+  selector:
+    app: nginx

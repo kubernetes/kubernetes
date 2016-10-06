@@ -154,6 +154,7 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_PreferAvoidPodsEntry, InType: reflect.TypeOf(&PreferAvoidPodsEntry{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_PreferredSchedulingTerm, InType: reflect.TypeOf(&PreferredSchedulingTerm{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_Probe, InType: reflect.TypeOf(&Probe{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_QingCloudStoreVolumeSource, InType: reflect.TypeOf(&QingCloudStoreVolumeSource{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_QuobyteVolumeSource, InType: reflect.TypeOf(&QuobyteVolumeSource{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_RBDVolumeSource, InType: reflect.TypeOf(&RBDVolumeSource{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_RangeAllocation, InType: reflect.TypeOf(&RangeAllocation{})},
@@ -2231,6 +2232,13 @@ func DeepCopy_v1_PersistentVolumeSource(in interface{}, out interface{}, c *conv
 		} else {
 			out.AzureDisk = nil
 		}
+		if in.QingCloudStore != nil {
+			in, out := &in.QingCloudStore, &out.QingCloudStore
+			*out = new(QingCloudStoreVolumeSource)
+			**out = **in
+		} else {
+			out.QingCloudStore = nil
+		}
 		return nil
 	}
 }
@@ -2830,6 +2838,17 @@ func DeepCopy_v1_Probe(in interface{}, out interface{}, c *conversion.Cloner) er
 		out.PeriodSeconds = in.PeriodSeconds
 		out.SuccessThreshold = in.SuccessThreshold
 		out.FailureThreshold = in.FailureThreshold
+		return nil
+	}
+}
+
+func DeepCopy_v1_QingCloudStoreVolumeSource(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*QingCloudStoreVolumeSource)
+		out := out.(*QingCloudStoreVolumeSource)
+		out.VolumeID = in.VolumeID
+		out.FSType = in.FSType
+		out.ReadOnly = in.ReadOnly
 		return nil
 	}
 }
@@ -3705,6 +3724,13 @@ func DeepCopy_v1_VolumeSource(in interface{}, out interface{}, c *conversion.Clo
 			}
 		} else {
 			out.AzureDisk = nil
+		}
+		if in.QingCloudStore != nil {
+			in, out := &in.QingCloudStore, &out.QingCloudStore
+			*out = new(QingCloudStoreVolumeSource)
+			**out = **in
+		} else {
+			out.QingCloudStore = nil
 		}
 		return nil
 	}
