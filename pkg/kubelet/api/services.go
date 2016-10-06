@@ -86,3 +86,9 @@ type ImageManagerService interface {
 	// RemoveImage removes the image.
 	RemoveImage(image *runtimeApi.ImageSpec) error
 }
+
+// RuntimeManagerService interface should be implemented by a container image manager.
+// The methods should be thread-safe.
+type RuntimeManagerService interface {
+	PushRuntimeConfig(config *runtimeApi.RuntimeConfig) error
+}

@@ -55,6 +55,12 @@ service ImageService {
     rpc RemoveImage(RemoveImageRequest) returns (RemoveImageResponse) {}
 }
 
+// Runtime manager service defines the public APIs for managing runtime
+service RuntimeManagerService {
+    // PUshRuntimeConfig pushes a RuntimeConfig to runtime.
+    rpc PushRuntimeConfig(PushRuntimeConfigRequest) returns (PushRuntimeConfigResponse) {}
+}
+
 message VersionRequest {
     // The version of kubelet runtime API.
     optional string version = 1;
@@ -676,3 +682,21 @@ message RemoveImageRequest {
 }
 
 message RemoveImageResponse {}
+
+enum ConfigKey {
+    POD_CIDR = 1;
+    HAIRPIN_MODE = 2;
+    NON_MASQUERADE_CIDRS = 3;
+    NETWORK_PLUGIN_DIR = 4;
+}
+
+message RuntimeConfig {
+    required ConfigKey key = 1;
+    optional string value = 2;
+}
+
+message PushRuntimeConfigRequest {
+    optional RuntimeConfig config = 1;
+}
+
+message PushRuntimeConfigResponse {}
