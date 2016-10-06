@@ -19,8 +19,8 @@ package app
 // This file exists to force the desired plugin implementations to be linked.
 import (
 	// Credential providers
-	_ "k8s.io/kubernetes/pkg/credentialprovider/aws"
-	_ "k8s.io/kubernetes/pkg/credentialprovider/gcp"
+	_ "k8s.io/kubernetes/pkg/credentialprovider/aws" // Note: aws isn't registered in the "normal" way; it has it's own Init() method
+	cred_gcp "k8s.io/kubernetes/pkg/credentialprovider/gcp"
 	// Network plugins
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/kubelet/network/cni"
@@ -50,8 +50,13 @@ import (
 	"k8s.io/kubernetes/pkg/volume/secret"
 	"k8s.io/kubernetes/pkg/volume/vsphere_volume"
 	// Cloud providers
-	_ "k8s.io/kubernetes/pkg/cloudprovider/providers"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers"
 )
+
+func RegisterPlugins() {
+	providers.RegisterCloudProviders()
+	cred_gcp.RegisterPlugin()
+}
 
 // ProbeVolumePlugins collects all volume plugins into an easy to use list.
 // PluginDir specifies the directory to search for additional third party

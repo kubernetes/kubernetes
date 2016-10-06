@@ -14,17 +14,30 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cloudprovider
+package providers
 
 import (
 	// Cloud providers
-	_ "k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
-	_ "k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
-	_ "k8s.io/kubernetes/pkg/cloudprovider/providers/cloudstack"
-	_ "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
-	_ "k8s.io/kubernetes/pkg/cloudprovider/providers/mesos"
-	_ "k8s.io/kubernetes/pkg/cloudprovider/providers/openstack"
-	_ "k8s.io/kubernetes/pkg/cloudprovider/providers/ovirt"
-	_ "k8s.io/kubernetes/pkg/cloudprovider/providers/rackspace"
-	_ "k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/cloudstack"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/mesos"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/openstack"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/ovirt"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/rackspace"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
 )
+
+// RegisterCloudProviders registers all cloud providers
+func RegisterCloudProviders() {
+	aws.RegisterCloudProvider()
+	azure.RegisterCloudProvider()
+	cloudstack.RegisterCloudProvider()
+	gce.RegisterCloudProvider()
+	mesos.RegisterCloudProvider()
+	openstack.RegisterCloudProvider()
+	ovirt.RegisterCloudProvider()
+	rackspace.RegisterCloudProvider()
+	vsphere.RegisterCloudProvider()
+}

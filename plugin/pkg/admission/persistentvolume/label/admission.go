@@ -32,7 +32,8 @@ import (
 	vol "k8s.io/kubernetes/pkg/volume"
 )
 
-func init() {
+// RegisterPlugin registers the current admission plugin
+func RegisterPlugin() {
 	admission.RegisterPlugin("PersistentVolumeLabel", func(client clientset.Interface, config io.Reader) (admission.Interface, error) {
 		persistentVolumeLabelAdmission := NewPersistentVolumeLabel()
 		return persistentVolumeLabelAdmission, nil

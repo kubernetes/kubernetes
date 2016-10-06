@@ -25,7 +25,8 @@ import (
 	"k8s.io/kubernetes/pkg/admission"
 )
 
-func init() {
+// RegisterPlugin registers the current admission plugin
+func RegisterPlugin() {
 	admission.RegisterPlugin("AlwaysDeny", func(client clientset.Interface, config io.Reader) (admission.Interface, error) {
 		return NewAlwaysDeny(), nil
 	})

@@ -42,11 +42,8 @@ import (
 	"k8s.io/kubernetes/pkg/admission"
 )
 
-var (
-	groupVersions = []unversioned.GroupVersion{v1alpha1.SchemeGroupVersion}
-)
-
-func init() {
+// RegisterPlugin registers the current admission plugin
+func RegisterPlugin() {
 	admission.RegisterPlugin("ImagePolicyWebhook", func(client clientset.Interface, config io.Reader) (admission.Interface, error) {
 		newImagePolicyWebhook, err := NewImagePolicyWebhook(client, config)
 		if err != nil {
@@ -223,6 +220,8 @@ func NewImagePolicyWebhook(client clientset.Interface, configFile io.Reader) (ad
 	if err := normalizeWebhookConfig(&whConfig); err != nil {
 		return nil, err
 	}
+
+	groupVersions := []unversioned.GroupVersion{v1alpha1.SchemeGroupVersion}
 
 	gw, err := webhook.NewGenericWebhook(whConfig.KubeConfigFile, groupVersions, whConfig.RetryBackoff)
 	if err != nil {

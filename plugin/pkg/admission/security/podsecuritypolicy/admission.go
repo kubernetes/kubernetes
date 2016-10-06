@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package admission
+package podsecuritypolicy // import "k8s.io/kubernetes/plugin/pkg/admission/security/podsecuritypolicy"
 
 import (
 	"fmt"
@@ -44,7 +44,8 @@ const (
 	PluginName = "PodSecurityPolicy"
 )
 
-func init() {
+// RegisterPlugin registers the current admission plugin
+func RegisterPlugin() {
 	admission.RegisterPlugin(PluginName, func(client clientset.Interface, config io.Reader) (admission.Interface, error) {
 		plugin := NewPlugin(client, psp.NewSimpleStrategyFactory(), getMatchingPolicies, false)
 		plugin.Run()

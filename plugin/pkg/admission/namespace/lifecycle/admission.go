@@ -48,7 +48,8 @@ const (
 	missingNamespaceWait = 50 * time.Millisecond
 )
 
-func init() {
+// RegisterPlugin registers the current admission plugin
+func RegisterPlugin() {
 	admission.RegisterPlugin(PluginName, func(client clientset.Interface, config io.Reader) (admission.Interface, error) {
 		return NewLifecycle(client, sets.NewString(api.NamespaceDefault, api.NamespaceSystem))
 	})

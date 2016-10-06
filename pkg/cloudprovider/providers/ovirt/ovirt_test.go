@@ -24,6 +24,10 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider"
 )
 
+func init() {
+	RegisterCloudProvider()
+}
+
 func TestOVirtCloudConfiguration(t *testing.T) {
 	config1 := (io.Reader)(nil)
 

@@ -34,7 +34,8 @@ import (
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
 )
 
-func init() {
+// RegisterPlugin registers the current admission plugin
+func RegisterPlugin() {
 	admission.RegisterPlugin("AlwaysPullImages", func(client clientset.Interface, config io.Reader) (admission.Interface, error) {
 		return NewAlwaysPullImages(), nil
 	})

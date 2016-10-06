@@ -30,7 +30,8 @@ import (
 	"k8s.io/kubernetes/pkg/controller/informers"
 )
 
-func init() {
+// RegisterPlugin registers the current admission plugin
+func RegisterPlugin() {
 	admission.RegisterPlugin("NamespaceExists", func(client clientset.Interface, config io.Reader) (admission.Interface, error) {
 		return NewExists(client), nil
 	})

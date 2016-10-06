@@ -28,7 +28,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/rest"
 )
 
-func init() {
+// RegisterPlugin registers the current admission plugin
+func RegisterPlugin() {
 	admission.RegisterPlugin("DenyEscalatingExec", func(client clientset.Interface, config io.Reader) (admission.Interface, error) {
 		return NewDenyEscalatingExec(client), nil
 	})

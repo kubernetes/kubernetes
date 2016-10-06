@@ -91,6 +91,7 @@ func TestRun(t *testing.T) {
 	s.ServiceClusterIPRange = *ipNet
 	s.StorageConfig.ServerList = []string{"http://localhost:2379"}
 	go func() {
+		app.RegisterPlugins()
 		if err := app.Run(s); err != nil {
 			t.Fatalf("Error in bringing up the server: %v", err)
 		}
