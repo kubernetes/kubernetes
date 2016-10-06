@@ -83,7 +83,7 @@ func (g *genericScheduler) Schedule(pod *api.Pod, nodeLister algorithm.NodeListe
 	} else {
 		trace = util.NewTrace("Scheduling <nil> pod")
 	}
-	defer trace.LogIfLong(20 * time.Millisecond)
+	defer trace.LogIfLong(100 * time.Millisecond)
 
 	nodes, err := nodeLister.List()
 	if err != nil {
