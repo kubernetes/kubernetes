@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/golang/glog"
@@ -43,6 +44,8 @@ import (
 const (
 	// RevisionAnnotation is the revision annotation of a deployment's replica sets which records its rollout sequence
 	RevisionAnnotation = "deployment.kubernetes.io/revision"
+	// RevisionHistoryAnnotation maintains the history of all old revisions that a replica set has served for a deployment.
+	RevisionHistoryAnnotation = "deployment.kubernetes.io/revision-history"
 	// DesiredReplicasAnnotation is the desired replicas for a deployment recorded as an annotation
 	// in its replica sets. Helps in separating scaling events from the rollout process and for
 	// determining if the new replica set for a deployment is really saturated.
@@ -59,12 +62,29 @@ const (
 	// RollbackDone is the done rollback event reason
 	RollbackDone = "DeploymentRollback"
 	// OverlapAnnotation marks deployments with overlapping selector with other deployments
-	// TODO: Delete this annotation when we gracefully handle overlapping selectors. See https://github.com/kubernetes/kubernetes/issues/2210
+	// TODO: Delete this annotation when we gracefully handle overlapping selectors.
+	// See https://github.com/kubernetes/kubernetes/issues/2210
 	OverlapAnnotation = "deployment.kubernetes.io/error-selector-overlapping-with"
 	// SelectorUpdateAnnotation marks the last time deployment selector update
-	// TODO: Delete this annotation when we gracefully handle overlapping selectors. See https://github.com/kubernetes/kubernetes/issues/2210
+	// TODO: Delete this annotation when we gracefully handle overlapping selectors.
+	// See https://github.com/kubernetes/kubernetes/issues/2210
 	SelectorUpdateAnnotation = "deployment.kubernetes.io/selector-updated-at"
 )
+
+// SetDeploymentRevision updates the revision for a deployment.
+func SetDeploymentRevision(deployment *extensions.Deployment, revision string) bool {
+	updated := false
+
+	if deployment.Annotations == nil {
+		deployment.Annotations = make(map[string]string)
+	}
+	if deployment.Annotations[RevisionAnnotation] != revision {
+		deployment.Annotations[RevisionAnnotation] = revision
+		updated = true
+	}
+
+	return updated
+}
 
 // MaxRevision finds the highest revision in the replica sets
 func MaxRevision(allRSs []*extensions.ReplicaSet) int64 {
@@ -97,6 +117,15 @@ func LastRevision(allRSs []*extensions.ReplicaSet) int64 {
 	return secMax
 }
 
+// Revision returns the revision number of the input replica set
+func Revision(rs *extensions.ReplicaSet) (int64, error) {
+	v, ok := rs.Annotations[RevisionAnnotation]
+	if !ok {
+		return 0, nil
+	}
+	return strconv.ParseInt(v, 10, 64)
+}
+
 // SetNewReplicaSetAnnotations sets new replica set's annotations appropriately by updating its revision and
 // copying required deployment annotations to it; it returns true if replica set's annotation is changed.
 func SetNewReplicaSetAnnotations(deployment *extensions.Deployment, newRS *extensions.ReplicaSet, newRevision string, exists bool) bool {
@@ -106,14 +135,29 @@ func SetNewReplicaSetAnnotations(deployment *extensions.Deployment, newRS *exten
 	if newRS.Annotations == nil {
 		newRS.Annotations = make(map[string]string)
 	}
+	oldRevision, ok := newRS.Annotations[RevisionAnnotation]
 	// The newRS's revision should be the greatest among all RSes. Usually, its revision number is newRevision (the max revision number
 	// of all old RSes + 1). However, it's possible that some of the old RSes are deleted after the newRS revision being updated, and
 	// newRevision becomes smaller than newRS's revision. We should only update newRS revision when it's smaller than newRevision.
-	if newRS.Annotations[RevisionAnnotation] < newRevision {
+	if oldRevision < newRevision {
 		newRS.Annotations[RevisionAnnotation] = newRevision
 		annotationChanged = true
 		glog.V(4).Infof("Updating replica set %q revision to %s", newRS.Name, newRevision)
 	}
+	// If a revision annotation already existed and this replica set was updated with a new revision
+	// then that means we are rolling back to this replica set. We need to preserve the old revisions
+	// for historical information.
+	if ok && annotationChanged {
+		revisionHistoryAnnotation := newRS.Annotations[RevisionHistoryAnnotation]
+		oldRevisions := strings.Split(revisionHistoryAnnotation, ",")
+		if len(oldRevisions[0]) == 0 {
+			newRS.Annotations[RevisionHistoryAnnotation] = oldRevision
+		} else {
+			oldRevisions = append(oldRevisions, oldRevision)
+			newRS.Annotations[RevisionHistoryAnnotation] = strings.Join(oldRevisions, ",")
+		}
+	}
+	// If the new replica set is about to be created, we need to add replica annotations to it.
 	if !exists && SetReplicasAnnotations(newRS, deployment.Spec.Replicas, deployment.Spec.Replicas+MaxSurge(*deployment)) {
 		annotationChanged = true
 	}
@@ -123,6 +167,7 @@ func SetNewReplicaSetAnnotations(deployment *extensions.Deployment, newRS *exten
 var annotationsToSkip = map[string]bool{
 	annotations.LastAppliedConfigAnnotation: true,
 	RevisionAnnotation:                      true,
+	RevisionHistoryAnnotation:               true,
 	DesiredReplicasAnnotation:               true,
 	MaxReplicasAnnotation:                   true,
 	OverlapAnnotation:                       true,
@@ -692,15 +737,6 @@ func filterPodsMatchingReplicaSets(replicaSets []*extensions.ReplicaSet, podList
 		allRSPods = append(allRSPods, podutil.Filter(podList, matchingFunc)...)
 	}
 	return allRSPods, nil
-}
-
-// Revision returns the revision number of the input replica set
-func Revision(rs *extensions.ReplicaSet) (int64, error) {
-	v, ok := rs.Annotations[RevisionAnnotation]
-	if !ok {
-		return 0, nil
-	}
-	return strconv.ParseInt(v, 10, 64)
 }
 
 // IsRollingUpdate returns true if the strategy type is a rolling update.
