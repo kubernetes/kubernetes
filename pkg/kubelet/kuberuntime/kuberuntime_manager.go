@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"time"
 
 	"github.com/coreos/go-semver/semver"
 	"github.com/golang/glog"
@@ -39,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/kubelet/util/cache"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	kubetypes "k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
@@ -52,6 +54,9 @@ const (
 	podLogsRootDirectory = "/var/log/pods"
 	// A minimal shutdown window for avoiding unnecessary SIGKILLs
 	minimumGracePeriodInSeconds = 2
+
+	// The expiration time of version cache.
+	versionCacheTTL = 60 * time.Second
 )
 
 var (
@@ -100,6 +105,9 @@ type kubeGenericRuntimeManager struct {
 	// gRPC service clients
 	runtimeService internalApi.RuntimeService
 	imageService   internalApi.ImageManagerService
+
+	// The version cache of runtime daemon.
+	versionCache *cache.ObjectCache
 }
 
 // NewKubeGenericRuntimeManager creates a new kubeGenericRuntimeManager
@@ -175,6 +183,13 @@ func NewKubeGenericRuntimeManager(
 	kubeRuntimeManager.runner = lifecycle.NewHandlerRunner(httpClient, kubeRuntimeManager, kubeRuntimeManager)
 	kubeRuntimeManager.containerGC = NewContainerGC(runtimeService, podGetter, kubeRuntimeManager)
 
+	kubeRuntimeManager.versionCache = cache.NewObjectCache(
+		func() (interface{}, error) {
+			return kubeRuntimeManager.getTypedVersion()
+		},
+		versionCacheTTL,
+	)
+
 	return kubeRuntimeManager, nil
 }
 
@@ -212,6 +227,15 @@ func (r runtimeVersion) Compare(other string) (int, error) {
 	return 0, nil
 }
 
+func (m *kubeGenericRuntimeManager) getTypedVersion() (*runtimeApi.VersionResponse, error) {
+	typedVersion, err := m.runtimeService.Version(kubeRuntimeAPIVersion)
+	if err != nil {
+		glog.Errorf("Get remote runtime typed version failed: %v", err)
+		return nil, err
+	}
+	return typedVersion, nil
+}
+
 // Version returns the version information of the container runtime.
 func (m *kubeGenericRuntimeManager) Version() (kubecontainer.Version, error) {
 	typedVersion, err := m.runtimeService.Version(kubeRuntimeAPIVersion)
@@ -227,11 +251,11 @@ func (m *kubeGenericRuntimeManager) Version() (kubecontainer.Version, error) {
 // runtime. Implementation is expected to update this cache periodically.
 // This may be different from the runtime engine's version.
 func (m *kubeGenericRuntimeManager) APIVersion() (kubecontainer.Version, error) {
-	typedVersion, err := m.runtimeService.Version(kubeRuntimeAPIVersion)
+	versionObject, err := m.versionCache.Get(m.machineInfo.MachineID)
 	if err != nil {
-		glog.Errorf("Get remote runtime version failed: %v", err)
 		return nil, err
 	}
+	typedVersion := versionObject.(*runtimeApi.VersionResponse)
 
 	return newRuntimeVersion(typedVersion.GetRuntimeApiVersion())
 }
