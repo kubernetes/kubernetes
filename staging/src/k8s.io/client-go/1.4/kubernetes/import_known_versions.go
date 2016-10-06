@@ -22,11 +22,16 @@ import (
 
 	_ "k8s.io/client-go/1.4/pkg/api/install"
 	"k8s.io/client-go/1.4/pkg/apimachinery/registered"
+	_ "k8s.io/client-go/1.4/pkg/apis/apps/install"
+	_ "k8s.io/client-go/1.4/pkg/apis/authentication/install"
 	_ "k8s.io/client-go/1.4/pkg/apis/authorization/install"
 	_ "k8s.io/client-go/1.4/pkg/apis/autoscaling/install"
 	_ "k8s.io/client-go/1.4/pkg/apis/batch/install"
+	_ "k8s.io/client-go/1.4/pkg/apis/certificates/install"
 	_ "k8s.io/client-go/1.4/pkg/apis/extensions/install"
 	_ "k8s.io/client-go/1.4/pkg/apis/policy/install"
+	_ "k8s.io/client-go/1.4/pkg/apis/rbac/install"
+	_ "k8s.io/client-go/1.4/pkg/apis/storage/install"
 )
 
 func init() {
