@@ -63,7 +63,7 @@ func filterPodsByNamespace(pods []*api.Pod, ns string) []*api.Pod {
 // createSelectorFromLabels is used to define the final selector which we will use to decide wether a pod
 // does, or does not, match a given node.
 func createSelectorFromLabels(aL map[string]string) labels.Selector {
-	if len(aL) == 0 {
+	if aL == nil || len(aL) == 0 {
 		return labels.Everything()
 	}
 	return labels.Set(aL).AsSelector()
