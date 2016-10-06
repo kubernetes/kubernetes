@@ -29,10 +29,15 @@ kube::util::wait_for_url() {
     exit 1
   }
 
+  local params="-gfs"
+  if [[ -n ${ROOT_CA_FILE:-} ]]; then
+      params="--cacert ${ROOT_CA_FILE} ${params}"
+  fi
+
   local i
   for i in $(seq 1 $times); do
     local out
-    if out=$(curl -gfs $url 2>/dev/null); then
+    if out=$(curl ${params} $url 2>/dev/null); then
       kube::log::status "On try ${i}, ${prefix}: ${out}"
       return 0
     fi
