@@ -27,47 +27,59 @@ type PreFlightChecker interface {
 	Check() (warnings []string, errors []string)
 }
 
-// KubeletServiceChecker verifies that if this is a systemd system, the
+// ServiceChecker verifies that if this is a systemd system, the
 // kubelet service exists, is enabled, and running.  We do not want to directly
 // assume systemd is being used, so if this does not appear to be the case we
 // just silently skip these checks and return no warnings or errors.
-type KubeletServiceChecker struct {
+type ServiceChecker struct {
 	initSystem InitSystem
+	service    string
 }
 
-func (ksc KubeletServiceChecker) Check() (warnings []string, errors []string) {
+func (sc ServiceChecker) Check() (warnings []string, errors []string) {
 
 	warnings = []string{}
 
-	// If we weren't able to detect a supported init system, warn and exit.
-	if ksc.initSystem == nil {
-		warnings = append(warnings, "no kubeadm supported init system detected, skipping service checks")
+	if !sc.initSystem.ServiceExists(sc.service) {
+		warnings = append(warnings, fmt.Sprintf("%s service does not exist", sc.service))
 		return warnings, nil
 	}
 
-	if !ksc.initSystem.ServiceExists("kubelet") {
-		// TODO: Should this be a hard error?
-		warnings = append(warnings, "kubelet service does not exist")
-		return warnings, nil
+	if !sc.initSystem.ServiceIsEnabled(sc.service) {
+		errors = append(errors,
+			fmt.Sprintf("%s service is not enabled, please run 'systemctl enable %s.service'",
+				sc.service, sc.service))
 	}
 
-	if !ksc.initSystem.ServiceIsEnabled("kubelet") {
-		// TODO: Should we enable it?
-		warnings = append(warnings, "kubelet service is not enabled, please run 'systemctl enable kubelet'")
-	}
-
-	if !ksc.initSystem.ServiceIsActive("kubelet") {
-		// TODO: Should we start it? This might count as a hard error, we know service exists here.
-		errors = append(errors, "kubelet service is not active, please run 'systemctl start kubelet'")
+	if !sc.initSystem.ServiceIsActive(sc.service) {
+		errors = append(errors,
+			fmt.Sprintf("%s service is not active, please run 'systemctl start %s.service'",
+				sc.service, sc.service))
 	}
 
 	return warnings, nil
 }
 
 func RunMasterChecks() {
-	checks := []PreFlightChecker{
-		KubeletServiceChecker{initSystem: getInitSystem()},
+
+	checks := []PreFlightChecker{}
+
+	initSystem := getInitSystem()
+	// Warn if we weren't able to detect a supported init system, and skip service checks:
+	if initSystem == nil {
+		fmt.Println("no kubeadm supported init system detected, skipping service checks")
 	}
+	checks = append(checks,
+		ServiceChecker{
+			service:    "kubelet",
+			initSystem: getInitSystem(),
+		},
+		ServiceChecker{
+			service:    "docker",
+			initSystem: getInitSystem(),
+		},
+	)
+
 	foundErrors := false
 	for _, check := range checks {
 		fmt.Printf("Running check %s\n", check)

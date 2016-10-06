@@ -18,7 +18,6 @@ package checks
 
 import (
 	"fmt"
-	"os"
 	"os/exec"
 	"strings"
 )
@@ -38,10 +37,13 @@ type InitSystem interface {
 type SystemdInitSystem struct{}
 
 func (sysd SystemdInitSystem) ServiceExists(service string) bool {
-	if _, err := os.Stat(fmt.Sprintf("/etc/systemd/system/%s.service", service)); err == nil {
-		return true
+	args := []string{"status", service}
+	outBytes, _ := exec.Command("systemctl", args...).Output()
+	output := string(outBytes)
+	if strings.Contains(output, "Loaded: not-found") {
+		return false
 	}
-	return false
+	return true
 }
 
 func (sysd SystemdInitSystem) ServiceIsEnabled(service string) bool {
