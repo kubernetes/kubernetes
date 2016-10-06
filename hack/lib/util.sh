@@ -428,7 +428,7 @@ kube::util::fetch-openapi-spec() {
       continue
     fi
     SUBPATH="apis/"${ver%/*}
-    OPEAN_JSON_NAME="${ver%/*}.json"
+    OPENAPI_JSON_NAME="${ver%/*}.json"
     curl -w "\n" -fs "${OPENAPI_PATH}${SUBPATH}/swagger.json" > "${OPENAPI_ROOT_DIR}/${OPENAPI_JSON_NAME}"
   done
 
