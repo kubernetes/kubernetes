@@ -77,7 +77,7 @@ type predicateMetadata struct {
 	// CheckServiceAffinity: pods cache, otherwise this is a large query, will slow things down
 	// when there are 100s of services/pods.
 	lock        sync.Mutex
-	servicePods []*api.Pod
+	servicePods map[string][]*api.Pod
 }
 
 type matchingPodAntiAffinityTerm struct {
@@ -85,7 +85,25 @@ type matchingPodAntiAffinityTerm struct {
 	node *api.Node
 }
 
-func PredicateMetadata(pod *api.Pod, nodeInfoMap map[string]*schedulercache.NodeInfo) interface{} {
+// A set of functions which take in the predicateMetadata type, and add information to it.
+// This map should only be modified when registering predicates.
+var predicatePrecomputations map[string]func(pm *predicateMetadata) = make(map[string]func(pm *predicateMetadata))
+
+func RegisterPredicatePrecomputation(predicateName string, precomp func(pm *predicateMetadata)) {
+	predicatePrecomputations[predicateName] = precomp
+}
+
+// PredicateMetadata generates whatever metadata will be used over time to process predicate logic.
+// Optional Vararg: PredicateMetadata is given access to all predicate information, so that it precompute data as necessary as an optimization.
+func PredicateMetadata(pod *api.Pod, nodeInfoMap map[string]*schedulercache.NodeInfo, predicatesOptionalArg ...map[string]algorithm.FitPredicate) interface{} {
+	var predicates map[string]algorithm.FitPredicate
+	if len(predicatesOptionalArg) == 1 {
+		predicates = predicatesOptionalArg[0]
+	} else if len(predicatesOptionalArg) > 1 {
+		glog.Errorf("You should only provide 0 or 1 predicates in the list.")
+	} else {
+		glog.Warning("No predicates provided, no precomputations will be enabled.")
+	}
 	// If we cannot compute metadata, just return nil
 	if pod == nil {
 		return nil
@@ -94,12 +112,25 @@ func PredicateMetadata(pod *api.Pod, nodeInfoMap map[string]*schedulercache.Node
 	if err != nil {
 		return nil
 	}
-	return &predicateMetadata{
+
+	predicateMetadata := &predicateMetadata{
 		podBestEffort:             isPodBestEffort(pod),
 		podRequest:                getResourceRequest(pod),
 		podPorts:                  getUsedPorts(pod),
 		matchingAntiAffinityTerms: matchingTerms,
+		servicePods:               make(map[string]([]*api.Pod)),
 	}
+
+	// predicates is optional: its just a mechanism for us to iterate and possible precompute some things.
+	if predicates != nil {
+		for predicateName, precomputationFunc := range predicatePrecomputations {
+			if predicates[predicateName] != nil {
+				glog.V(1).Info("Registering precomputation for %v", predicateName)
+				precomputationFunc(predicateMetadata)
+			}
+		}
+	}
+	return predicateMetadata
 }
 
 func isVolumeConflict(volume api.Volume, pod *api.Pod) bool {
@@ -632,22 +663,30 @@ type ServiceAffinity struct {
 	labels        []string
 }
 
-func NewServiceAffinityPredicate(podLister algorithm.PodLister, serviceLister algorithm.ServiceLister, nodeInfo NodeInfo, labels []string) algorithm.FitPredicate {
+func NewServiceAffinityPredicate(podLister algorithm.PodLister, serviceLister algorithm.ServiceLister, nodeInfo NodeInfo, labels []string) (algorithm.FitPredicate, func(pm *predicateMetadata)) {
 	affinity := &ServiceAffinity{
 		podLister:     podLister,
 		serviceLister: serviceLister,
 		nodeInfo:      nodeInfo,
 		labels:        labels,
 	}
-	return affinity.CheckServiceAffinity
+
+	return affinity.CheckServiceAffinity, func(pm *predicateMetadata) {
+		var err error
+		// We can't know at the start what labels we are selecting against.
+		pm.servicePods[""], err = podLister.List(createSelectorFromLabels(nil))
+		if err != nil {
+			glog.Errorf("Error while calculating ServiceAffinity matches: %v", err)
+		}
+	}
 }
 
 func (s *ServiceAffinity) UpdatePredicateMetaServicePods(selector labels.Selector, predicateMeta *predicateMetadata) error {
 	var err error
-	if predicateMeta.servicePods == nil {
+	if predicateMeta.servicePods[selector.String()] == nil {
 		predicateMeta.lock.Lock()
 		defer predicateMeta.lock.Unlock()
-		predicateMeta.servicePods, err = s.podLister.List(selector)
+		predicateMeta.servicePods[selector.String()], err = s.podLister.List(selector)
 	}
 	return err
 }
@@ -701,7 +740,7 @@ func (s *ServiceAffinity) CheckServiceAffinity(pod *api.Pod, meta interface{}, n
 			if err != nil {
 				return false, nil, err
 			}
-			nsServicePods := filterPodsByNamespace(predicateMeta.servicePods, pod.Namespace)
+			nsServicePods := filterPodsByNamespace(predicateMeta.servicePods[selector.String()], pod.Namespace)
 			if len(nsServicePods) > 0 {
 				nodeWithAffinityLabels, err := s.nodeInfo.GetNodeInfo(nsServicePods[0].Spec.NodeName)
 				if err != nil {
