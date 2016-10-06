@@ -383,6 +383,9 @@ sudo PATH=$PATH hack/local-up-cluster.sh
 This will start a single-node Kubernetes cluster than runs pods using the local
 docker daemon. Press Control-C to stop the cluster.
 
+You can generate a valid kubeconfig file by following instructions printed at the
+end of aforementioned script.
+
 #### Testing against local clusters
 
 In order to run an E2E test against a locally running cluster, point the tests
@@ -390,7 +393,9 @@ at a custom host directly:
 
 ```sh
 export KUBECONFIG=/path/to/kubeconfig
-go run hack/e2e.go -v --test --check_node_count=false
+export KUBE_MASTER_IP="http://127.0.0.1:<PORT>"
+export KUBE_MASTER=local
+go run hack/e2e.go -v --test
 ```
 
 To control the tests that are run:
