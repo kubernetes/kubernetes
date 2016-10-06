@@ -40,6 +40,9 @@ func (kl *Kubelet) ListVolumesForPod(podUID types.UID) (map[string]volume.Volume
 	podVolumes := kl.volumeManager.GetMountedVolumesForPod(
 		volumetypes.UniquePodName(podUID))
 	for outerVolumeSpecName, volume := range podVolumes {
+		if volume.Mounter == nil {
+			continue
+		}
 		volumesToReturn[outerVolumeSpecName] = volume.Mounter
 	}
 
