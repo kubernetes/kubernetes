@@ -425,7 +425,7 @@ kube::golang::fallback_if_stdlib_not_installable() {
 # TODO: This builds only the `teststale` binary right now. As we expand
 # this function's capabilities we need to find this a right home.
 # Ideally, not a shell script because testing shell scripts is painful.
-kube::golang::build_kube_toolchain() {
+kube::golang::install_kube_toolchain() {
   local targets=(
     hack/cmd/teststale
   )
@@ -540,25 +540,42 @@ kube::golang::build_binaries_for_platform() {
       continue
     fi
 
-    # `go test -c` below directly builds the binary. It builds the packages,
-    # but it never installs them. `go test -i` only installs the dependencies
-    # of the test, but not the test package itself. So neither `go test -c`
-    # nor `go test -i` installs, for example, test/e2e.a. And without that,
-    # doing a staleness check on k8s.io/kubernetes/test/e2e package always
-    # returns true (always stale). And that's why we need to install the
-    # test package.
-    go install "${goflags[@]:+${goflags[@]}}" \
+    if [[ ! -n ${use_go_build:-} ]]; then
+      # `go test -c` below directly builds the binary. It builds the packages,
+      # but it never installs them. `go test -i` only installs the dependencies
+      # of the test, but not the test package itself. So neither `go test -c`
+      # nor `go test -i` installs, for example, test/e2e.a. And without that,
+      # doing a staleness check on k8s.io/kubernetes/test/e2e package always
+      # returns true (always stale). And that's why we need to install the
+      # test package.
+      go install "${goflags[@]:+${goflags[@]}}" \
+          -gcflags "${gogcflags}" \
+          -ldflags "${goldflags}" \
+          "${testpkg}"
+    fi
+
+    test_install=false
+    for goflag in "${goflags[@]:+${goflags[@]}}"; do
+      if [[ "${goflag}" == "-i" ]]; then
+        test_install=true
+      fi
+    done
+
+    if ${test_install}; then
+      go test \
+        "${goflags[@]:+${goflags[@]}}" \
         -gcflags "${gogcflags}" \
         -ldflags "${goldflags}" \
         "${testpkg}"
-
-    mkdir -p "$(dirname ${outfile})"
-    go test -c \
-      "${goflags[@]:+${goflags[@]}}" \
-      -gcflags "${gogcflags}" \
-      -ldflags "${goldflags}" \
-      -o "${outfile}" \
-      "${testpkg}"
+    else
+      mkdir -p "$(dirname ${outfile})"
+      go test -c \
+        "${goflags[@]:+${goflags[@]}}" \
+        -gcflags "${gogcflags}" \
+        -ldflags "${goldflags}" \
+        -o "${outfile}" \
+        "${testpkg}"
+    fi
   done
 }
 
@@ -615,6 +632,7 @@ kube::golang::build_binaries() {
     gogcflags="${KUBE_GOGCFLAGS:-}"
 
     local use_go_build
+    local -a all_targets=()
     local -a targets=()
     local arg
 
@@ -636,13 +654,17 @@ kube::golang::build_binaries() {
         # Assume arguments starting with a dash are flags to pass to go.
         goflags+=("${arg}")
       else
-        targets+=("${arg}")
+        all_targets+=("${arg}")
       fi
     done
 
-    if [[ ${#targets[@]} -eq 0 ]]; then
-      targets=("${KUBE_ALL_TARGETS[@]}")
+    if [[ ${#all_targets[@]} -eq 0 ]]; then
+      all_targets=("${KUBE_ALL_TARGETS[@]}")
     fi
+
+    # Dedup the `all_targets` list.
+    # Credit: http://stackoverflow.com/a/13648438
+    targets=($(echo "${all_targets[@]}" | tr ' ' '\n' | sort -u | tr '\n' ' '))
 
     local -a platforms=(${KUBE_BUILD_PLATFORMS:-})
     if [[ ${#platforms[@]} -eq 0 ]]; then
@@ -666,8 +688,12 @@ kube::golang::build_binaries() {
       fi
     fi
 
-    # First build the toolchain before building any other targets
-    kube::golang::build_kube_toolchain
+    # First install the toolchain before building any other targets.
+    # We are only using this toolchain when installing packages, so
+    # it is not necessary to install them when we are just building
+    if [[ ! -n ${use_go_build:-} ]]; then
+      kube::golang::install_kube_toolchain
+    fi
 
     if [[ "${parallel}" == "true" ]]; then
       kube::log::status "Building go targets for {${platforms[*]}} in parallel (output will appear in a burst when complete):" "${targets[@]}"
