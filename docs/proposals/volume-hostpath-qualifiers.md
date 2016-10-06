@@ -33,16 +33,16 @@ Documentation for other releases can be found at
 
 A Host volume source is probably the simplest volume type to define, needing only a single path. However, that simplicity comes with many assumptions and caveats.
 
-This proposal describes the one of the issues associated with Host volumes &mdash; their silent and implicit creation of directories on the host &mdash; and proposes a better solution.
+This proposal describes one of the issues associated with Host volumes &mdash; their silent and implicit creation of directories on the host &mdash; and proposes a solution.
 
 ## Problem
 
-Right now, under Docker, when a user specifies a hostPath the target will be created as an empty directory owned by root if it does not already exist.
+Right now, under Docker, when a bindmount references a hostPath, that path will be created as an empty directory, owned by root, if it does not already exist.
 This is rarely what the user actually wants because hostPath volumes are typically used to express a dependency on an existing external file or directory.
-This problem was raised during the [initial implementation](https://github.com/docker/docker/issues/1279#issuecomment-22965058) of them in Docker and it was suggested that orchestration systems could better manage them
+This concern was raised during the [initial implementation](https://github.com/docker/docker/issues/1279#issuecomment-22965058) of this behavior in Docker and it was suggested that orchestration systems could better manage volume creation than Docker, but Docker does so as well anyways.
 
 To fix this problem, I propose allowing a pod to specify whether a given hostPath should exist prior to the pod running, whether it should be created, and what it should exist as.
-I also propose the inclusion of a sane default value which matches the current behavior to ensure backwards compatibility.
+I also propose the inclusion of a default value which matches the current behavior to ensure backwards compatibility.
 
 To understand exactly when this behavior will or won't be correct, it's important to look at the use-cases of Host Volumes.
 The table below broadly classifies the use-case of Host Volumes and asserts whether this change would be of benefit to that use-case.
@@ -86,6 +86,7 @@ Additional possible values, which are proposed to be excluded:
 | `character-device` |  | Granularity beyond `device` is likely to not help |
 | `block-device` |  | Granularity beyond `device` is likely to not help |
 | `new-file` | Like file, but if nothing exist an empty file is created instead | In general, bindmounting the parent directory of the file you intend to create addresses this usecase |
+| `optional` | If a path does not exist, then do not create any bindmount at all | This would better be handled by a new option entirely if this behavior is desirable |
 
 
 ### Volume SubPaths
