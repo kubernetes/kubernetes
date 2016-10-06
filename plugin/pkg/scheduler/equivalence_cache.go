@@ -22,7 +22,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
-	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	"sync"
 )
@@ -47,20 +46,18 @@ func newAlgorithmCache() AlgorithmCache {
 
 // Store a map of predicate cache with maxsize
 type EquivalenceCache struct {
-	getEquivalencePod         algorithm.GetEquivalencePodFunc
-	algorithmCache            map[string]AlgorithmCache
-	invalidAlgorithmCacheList sets.String
-	allCacheExpired           bool
-	expireLock                *sync.RWMutex
+	getEquivalencePod algorithm.GetEquivalencePodFunc
+	algorithmCache    map[string]AlgorithmCache
+	allCacheExpired   bool
+	expireLock        *sync.RWMutex
 }
 
 func NewEquivalenceCache(getEquivalencePodFunc algorithm.GetEquivalencePodFunc) *EquivalenceCache {
 	return &EquivalenceCache{
-		getEquivalencePod:         getEquivalencePodFunc,
-		algorithmCache:            make(map[string]AlgorithmCache),
-		invalidAlgorithmCacheList: sets.NewString(),
-		allCacheExpired:           false,
-		expireLock:                new(sync.RWMutex),
+		getEquivalencePod: getEquivalencePodFunc,
+		algorithmCache:    make(map[string]AlgorithmCache),
+		allCacheExpired:   false,
+		expireLock:        new(sync.RWMutex),
 	}
 }
 
@@ -119,7 +116,8 @@ func (ec *EquivalenceCache) SendInvalidAlgorithmCacheReq(nodeName string) {
 	if !allExpired {
 		ec.expireLock.Lock()
 		defer ec.expireLock.Unlock()
-		ec.invalidAlgorithmCacheList.Insert(nodeName)
+		// clear the cache of this node
+		delete(ec.algorithmCache, nodeName)
 	}
 }
 
@@ -131,28 +129,13 @@ func (ec *EquivalenceCache) SendClearAllCacheReq() {
 
 	if !allExpired {
 		ec.expireLock.Lock()
+		// clear cache of all nodes
+		for nodeName, _ := range ec.algorithmCache {
+			delete(ec.algorithmCache, nodeName)
+		}
 		ec.allCacheExpired = true
 		ec.expireLock.Unlock()
 	}
-}
-
-// HandleExpireDate removes expired AlgorithmCache
-func (ec *EquivalenceCache) HandleExpireDate() {
-	ec.expireLock.Lock()
-	defer ec.expireLock.Unlock()
-
-	// Remove expired AlgorithmCache
-	if ec.allCacheExpired {
-		ec.algorithmCache = make(map[string]AlgorithmCache)
-	} else {
-		for _, node := range ec.invalidAlgorithmCacheList.List() {
-			delete(ec.algorithmCache, node)
-		}
-	}
-
-	// Clear expired data records for next cycle
-	ec.invalidAlgorithmCacheList = sets.NewString()
-	ec.allCacheExpired = false
 }
 
 // hashEquivalencePod returns the hash of equivalence pod.
