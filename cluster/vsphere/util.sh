@@ -180,12 +180,17 @@ function kube-up-vm {
     -debug \
     -disk="${DISK}" \
     -g="${GUEST_ID}" \
+    -on=false \
     -link=true \
     "$@" \
     "${vm_name}"
 
+  govc vm.change -e="disk.enableUUID=${ENABLE_UUID}" -vm="${vm_name}"
+
+  govc vm.power -on=true "${vm_name}"
+
   # Retrieve IP first, to confirm the guest operations agent is running.
-  govc vm.ip "${vm_name}" > /dev/null
+  CURRENT_NODE_IP=$(govc vm.ip "${vm_name}")
 
   govc guest.mkdir \
     -l "kube:kube" \
@@ -395,6 +400,13 @@ function kube-up {
     echo "readonly MASTER_HTPASSWD='${htpasswd}'"
     echo "readonly E2E_STORAGE_TEST_ENVIRONMENT='${E2E_STORAGE_TEST_ENVIRONMENT:-}'"
     echo "readonly MASTER_EXTRA_SANS='${MASTER_EXTRA_SANS:-}'"
+    echo "readonly GOVC_USERNAME='${GOVC_USERNAME}'"
+    echo "readonly GOVC_PASSWORD='${GOVC_PASSWORD}'"
+    echo "readonly GOVC_URL='${GOVC_URL}'"
+    echo "readonly GOVC_PORT='${GOVC_PORT}'"
+    echo "readonly GOVC_INSECURE='${GOVC_INSECURE}'"
+    echo "readonly GOVC_DATACENTER='${GOVC_DATACENTER}'"
+    echo "readonly GOVC_DATASTORE='${GOVC_DATASTORE}'"
     grep -v "^#" "${KUBE_ROOT}/cluster/vsphere/templates/create-dynamic-salt-files.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/vsphere/templates/install-release.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/vsphere/templates/salt-master.sh"
@@ -416,11 +428,23 @@ function kube-up {
       echo "KUBE_MASTER=${KUBE_MASTER}"
       echo "KUBE_MASTER_IP=${KUBE_MASTER_IP}"
       echo "NODE_IP_RANGE=$NODE_IP_RANGES"
+      echo "readonly GOVC_USERNAME='${GOVC_USERNAME}'"
+      echo "readonly GOVC_PASSWORD='${GOVC_PASSWORD}'"
+      echo "readonly GOVC_URL='${GOVC_URL}'"
+      echo "readonly GOVC_PORT='${GOVC_PORT}'"
+      echo "readonly GOVC_INSECURE='${GOVC_INSECURE}'"
+      echo "readonly GOVC_DATACENTER='${GOVC_DATACENTER}'"
+      echo "readonly GOVC_DATASTORE='${GOVC_DATASTORE}'"
       grep -v "^#" "${KUBE_ROOT}/cluster/vsphere/templates/salt-minion.sh"
     ) > "${KUBE_TEMP}/node-start-${i}.sh"
 
     (
       kube-up-vm "${NODE_NAMES[$i]}" -c ${NODE_CPU-1} -m ${NODE_MEMORY_MB-1024}
+      add_to_hosts="${NODE_NAMES[$i]}    ${CURRENT_NODE_IP}"
+      node_ip_file=${NODE_NAMES[$i]}-ip
+      echo "sudo bash -c \"echo $add_to_hosts >> /etc/hosts\"" > ${KUBE_TEMP}/${node_ip_file}
+      kube-scp ${KUBE_MASTER_IP} ${KUBE_TEMP}/${node_ip_file} /tmp/
+      kube-ssh ${KUBE_MASTER_IP} "bash /tmp/${node_ip_file}"
       kube-run "${NODE_NAMES[$i]}" "${KUBE_TEMP}/node-start-${i}.sh"
     ) &
   done
@@ -441,17 +465,17 @@ function kube-up {
   printf "Waiting for salt-master to be up on ${KUBE_MASTER} ...\n"
   remote-pgrep ${KUBE_MASTER_IP} "salt-master"
 
-  printf "Waiting for all packages to be installed on ${KUBE_MASTER} ...\n"
-  kube-check  ${KUBE_MASTER_IP} 'sudo salt "kubernetes-master" state.highstate -t 30 | grep -E "Failed:[[:space:]]+0"'
-
   local i
   for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
     printf "Waiting for salt-minion to be up on ${NODE_NAMES[$i]} ....\n"
     remote-pgrep ${KUBE_NODE_IP_ADDRESSES[$i]} "salt-minion"
-    printf "Waiting for all salt packages to be installed on ${NODE_NAMES[$i]} .... \n"
-    kube-check  ${KUBE_MASTER_IP} 'sudo salt '"${NODE_NAMES[$i]}"' state.highstate -t 30 | grep -E "Failed:[[:space:]]+0"'
     printf " OK\n"
   done
+
+  printf "Waiting for init highstate to be done on all nodes (this can take a few minutes) ...\n"
+  kube-check  ${KUBE_MASTER_IP} 'sudo salt '\''*'\'' state.show_highstate -t 50'
+  printf "Waiting for all packages to be installed on all nodes (this can take a few minutes) ...\n"
+  kube-check  ${KUBE_MASTER_IP} 'sudo salt '\''*'\'' state.highstate -t 50 | grep -E "Failed:[[:space:]]+0"'
 
   echo
 
