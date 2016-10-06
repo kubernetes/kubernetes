@@ -251,7 +251,7 @@ message PodSandboxStatus {
     optional PodSandboxMetadata metadata = 2;
     // State of the sandbox.
     optional PodSandBoxState state = 3;
-    // Creation timestamp of the sandbox
+    // Creation timestamp of the sandbox in nanoseconds.
     optional int64 created_at = 4;
     // Network contains network status if network is handled by the runtime.
     optional PodSandboxNetworkStatus network = 5;
@@ -296,7 +296,7 @@ message PodSandbox {
     optional PodSandboxMetadata metadata = 2;
     // The state of the PodSandbox
     optional PodSandBoxState state = 3;
-    // Creation timestamps of the sandbox
+    // Creation timestamps of the sandbox in nanoseconds
     optional int64 created_at = 4;
     // The labels of the PodSandbox
     map<string, string> labels = 5;
@@ -533,7 +533,7 @@ message Container {
     optional string image_ref = 5;
     // State is the state of the container.
     optional ContainerState state = 6;
-    // Creation time of the container.
+    // Creation time of the container in nanoseconds.
     optional int64 created_at = 7;
     // Labels are key value pairs that may be used to scope and select individual resources.
     map<string, string> labels = 8;
@@ -560,11 +560,11 @@ message ContainerStatus {
     optional ContainerMetadata metadata = 2;
     // Status of the container.
     optional ContainerState state = 3;
-    // Creation time of the container.
+    // Creation time of the container in nanoseconds.
     optional int64 created_at = 4;
-    // Start time of the container.
+    // Start time of the container in nanoseconds.
     optional int64 started_at = 5;
-    // Finish time of the container.
+    // Finish time of the container in nanoseconds.
     optional int64 finished_at = 6;
     // Exit code of the container.
     optional int32 exit_code = 7;

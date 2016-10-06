@@ -141,7 +141,7 @@ func (cgc *containerGC) evictableContainers(minAge time.Duration) (containersByE
 			continue
 		}
 
-		createdAt := time.Unix(container.GetCreatedAt(), 0)
+		createdAt := time.Unix(0, container.GetCreatedAt())
 		if newestGCTime.Before(createdAt) {
 			continue
 		}

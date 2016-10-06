@@ -379,16 +379,16 @@ func (m *kubeGenericRuntimeManager) getPodContainerStatuses(uid kubetypes.UID, n
 			Hash:         annotatedInfo.Hash,
 			RestartCount: annotatedInfo.RestartCount,
 			State:        toKubeContainerState(c.GetState()),
-			CreatedAt:    time.Unix(status.GetCreatedAt(), 0),
+			CreatedAt:    time.Unix(0, status.GetCreatedAt()),
 		}
 
 		if c.GetState() == runtimeApi.ContainerState_RUNNING {
-			cStatus.StartedAt = time.Unix(status.GetStartedAt(), 0)
+			cStatus.StartedAt = time.Unix(0, status.GetStartedAt())
 		} else {
 			cStatus.Reason = status.GetReason()
 			cStatus.Message = status.GetMessage()
 			cStatus.ExitCode = int(status.GetExitCode())
-			cStatus.FinishedAt = time.Unix(status.GetFinishedAt(), 0)
+			cStatus.FinishedAt = time.Unix(0, status.GetFinishedAt())
 		}
 
 		tMessage := getTerminationMessage(status, cStatus, annotatedInfo.TerminationMessagePath)

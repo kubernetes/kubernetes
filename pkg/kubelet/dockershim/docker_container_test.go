@@ -61,6 +61,7 @@ func TestListContainers(t *testing.T) {
 
 	expected := []*runtimeApi.Container{}
 	state := runtimeApi.ContainerState_RUNNING
+	var createdAt int64 = 0
 	for i := range configs {
 		// We don't care about the sandbox id; pass a bogus one.
 		sandboxID := fmt.Sprintf("sandboxid%d", i)
@@ -77,6 +78,7 @@ func TestListContainers(t *testing.T) {
 			Id:           &id,
 			PodSandboxId: &sandboxID,
 			State:        &state,
+			CreatedAt:    &createdAt,
 			Image:        configs[i].Image,
 			ImageRef:     &imageRef,
 			Labels:       configs[i].Labels,
