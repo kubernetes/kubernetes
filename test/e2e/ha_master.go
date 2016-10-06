@@ -25,11 +25,12 @@ import (
 	"os/exec"
 	"path"
 	"strconv"
+	"strings"
 )
 
-func addMasterReplica() error {
+func addMasterReplica(zone string) error {
 	framework.Logf(fmt.Sprintf("Adding a new master replica:"))
-	v, _, err := framework.RunCmd(path.Join(framework.TestContext.RepoRoot, "hack/e2e-internal/e2e-add-master.sh"))
+	v, _, err := framework.RunCmd(path.Join(framework.TestContext.RepoRoot, "hack/e2e-internal/e2e-add-master.sh"), zone)
 	framework.Logf("%s", v)
 	if err != nil {
 		return err
@@ -37,9 +38,9 @@ func addMasterReplica() error {
 	return nil
 }
 
-func removeMasterReplica() error {
+func removeMasterReplica(zone string) error {
 	framework.Logf(fmt.Sprintf("Removing an existing master replica:"))
-	v, _, err := framework.RunCmd(path.Join(framework.TestContext.RepoRoot, "hack/e2e-internal/e2e-remove-master.sh"))
+	v, _, err := framework.RunCmd(path.Join(framework.TestContext.RepoRoot, "hack/e2e-internal/e2e-remove-master.sh"), zone)
 	framework.Logf("%s", v)
 	if err != nil {
 		return err
@@ -75,11 +76,46 @@ func verifyNumberOfMasterReplicas(expected int) {
 	}
 }
 
+func findRegionForZone(zone string) string {
+	output, err := exec.Command("gcloud", "compute", "regions", "list", "--quiet", "--format=[no-heading](name)").CombinedOutput()
+	framework.ExpectNoError(err)
+	regions := strings.Split(string(output), "\n")
+	for _, region := range regions {
+		if strings.HasPrefix(zone, region) {
+			return region
+		}
+	}
+	framework.Failf("Region not found; zone: %s, regions: %v", zone, regions)
+	return "" // unreachable
+}
+
+func findZonesForRegion(region string) []string {
+	output, err := exec.Command("gcloud", "compute", "zones", "list", "--regexp=^"+region+".*",
+		"--quiet", "--format=[no-heading](name)").CombinedOutput()
+	framework.ExpectNoError(err)
+	zones := strings.Split(string(output), "\n")
+	return zones
+}
+
+func removeZoneFromZones(zones []string, zone string) []string {
+	idx := -1
+	for j, z := range zones {
+		if z == zone {
+			idx = j
+			break
+		}
+	}
+	if idx >= 0 {
+		return zones[:idx+copy(zones[idx:], zones[idx+1:])]
+	}
+	return zones
+}
+
 var _ = framework.KubeDescribe("HA-master [Feature:HAMaster]", func() {
 	f := framework.NewDefaultFramework("ha-master")
 	var c *client.Client
 	var ns string
-	var additionalReplicas int
+	var additionalReplicaZones []string
 	var existingRCs []string
 
 	BeforeEach(func() {
@@ -87,14 +123,14 @@ var _ = framework.KubeDescribe("HA-master [Feature:HAMaster]", func() {
 		c = f.Client
 		ns = f.Namespace.Name
 		verifyNumberOfMasterReplicas(1)
-		additionalReplicas = 0
+		additionalReplicaZones = make([]string, 0)
 		existingRCs = make([]string, 0)
 	})
 
 	AfterEach(func() {
 		// Clean-up additional master replicas if the test execution was broken.
-		for i := 0; i < additionalReplicas; i++ {
-			removeMasterReplica()
+		for _, zone := range additionalReplicaZones {
+			removeMasterReplica(zone)
 		}
 	})
 
@@ -105,17 +141,17 @@ var _ = framework.KubeDescribe("HA-master [Feature:HAMaster]", func() {
 		RemoveReplica
 	)
 
-	step := func(action Action) {
+	step := func(action Action, zone string) {
 		switch action {
 		case None:
 		case AddReplica:
-			framework.ExpectNoError(addMasterReplica())
-			additionalReplicas++
+			framework.ExpectNoError(addMasterReplica(zone))
+			additionalReplicaZones = append(additionalReplicaZones, zone)
 		case RemoveReplica:
-			framework.ExpectNoError(removeMasterReplica())
-			additionalReplicas--
+			framework.ExpectNoError(removeMasterReplica(zone))
+			additionalReplicaZones = removeZoneFromZones(additionalReplicaZones, zone)
 		}
-		verifyNumberOfMasterReplicas(additionalReplicas + 1)
+		verifyNumberOfMasterReplicas(len(additionalReplicaZones) + 1)
 
 		// Verify that API server works correctly with HA master.
 		rcName := "ha-master-" + strconv.Itoa(len(existingRCs))
@@ -124,11 +160,28 @@ var _ = framework.KubeDescribe("HA-master [Feature:HAMaster]", func() {
 		verifyRCs(c, ns, existingRCs)
 	}
 
-	It("pods survive addition/removal [Slow]", func() {
-		step(None)
-		step(AddReplica)
-		step(AddReplica)
-		step(RemoveReplica)
-		step(RemoveReplica)
+	It("pods survive addition/removal same zone [Slow]", func() {
+		zone := framework.TestContext.CloudConfig.Zone
+		step(None, "")
+		step(AddReplica, zone)
+		step(AddReplica, zone)
+		step(RemoveReplica, zone)
+		step(RemoveReplica, zone)
+	})
+
+	It("pods survive addition/removal different zones [Slow]", func() {
+		zone := framework.TestContext.CloudConfig.Zone
+		region := findRegionForZone(zone)
+		zones := findZonesForRegion(region)
+		zones = removeZoneFromZones(zones, zone)
+
+		step(None, "")
+		numAdditionalReplicas := 2
+		for i := 0; i < numAdditionalReplicas; i++ {
+			step(AddReplica, zones[i%len(zones)])
+		}
+		for i := 0; i < numAdditionalReplicas; i++ {
+			step(RemoveReplica, zones[i%len(zones)])
+		}
 	})
 })
