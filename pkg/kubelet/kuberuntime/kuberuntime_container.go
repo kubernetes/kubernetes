@@ -35,8 +35,9 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/dockershim"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
+	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
-	"k8s.io/kubernetes/pkg/types"
+	kubetypes "k8s.io/kubernetes/pkg/types"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/term"
@@ -115,7 +116,7 @@ func (m *kubeGenericRuntimeManager) startContainer(podSandboxID string, podSandb
 }
 
 // getContainerLogsPath gets log path for container.
-func getContainerLogsPath(containerName string, podUID types.UID) string {
+func getContainerLogsPath(containerName string, podUID kubetypes.UID) string {
 	return path.Join(podLogsRootDirectory, string(podUID), fmt.Sprintf("%s.log", containerName))
 }
 
@@ -345,10 +346,11 @@ func getTerminationMessage(status *runtimeApi.ContainerStatus, kubeStatus *kubec
 	return message
 }
 
-// getKubeletContainerStatuses gets all containers' status for the pod sandbox.
-func (m *kubeGenericRuntimeManager) getKubeletContainerStatuses(podSandboxID string) ([]*kubecontainer.ContainerStatus, error) {
+// getPodContainerStatuses gets all containers' statuses for the pod.
+func (m *kubeGenericRuntimeManager) getPodContainerStatuses(uid kubetypes.UID, name, namespace string) ([]*kubecontainer.ContainerStatus, error) {
+	// Select all containers of the given pod.
 	containers, err := m.runtimeService.ListContainers(&runtimeApi.ContainerFilter{
-		PodSandboxId: &podSandboxID,
+		LabelSelector: map[string]string{types.KubernetesPodUIDLabel: string(uid)},
 	})
 	if err != nil {
 		glog.Errorf("ListContainers error: %v", err)
