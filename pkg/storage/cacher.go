@@ -713,9 +713,23 @@ func (c *cacheWatcher) sendWatchCacheEvent(event watchCacheEvent) {
 func (c *cacheWatcher) process(initEvents []watchCacheEvent, resourceVersion uint64) {
 	defer utilruntime.HandleCrash()
 
+	// Check how long we are processing initEvents.
+	// As long as these are not processed, we are not processing
+	// any incoming events, so if it takes long, we may actually
+	// block all watchers for some time.
+	// TODO: If it appears to be long in some cases, we may consider
+	// - longer result buffers if there are a lot of initEvents
+	// - try some parallelization
+	const initProcessThreshold = 5 * time.Millisecond
+	startTime := time.Now()
 	for _, event := range initEvents {
 		c.sendWatchCacheEvent(event)
 	}
+	processingTime := time.Since(startTime)
+	if processingTime > initProcessThreshold {
+		glog.V(2).Infof("processing %d initEvents took %v", len(initEvents), processingTime)
+	}
+
 	defer close(c.result)
 	defer c.Stop()
 	for {
