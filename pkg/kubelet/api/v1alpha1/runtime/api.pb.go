@@ -812,7 +812,7 @@ type PodSandboxStatus struct {
 	Metadata *PodSandboxMetadata `protobuf:"bytes,2,opt,name=metadata" json:"metadata,omitempty"`
 	// State of the sandbox.
 	State *PodSandBoxState `protobuf:"varint,3,opt,name=state,enum=runtime.PodSandBoxState" json:"state,omitempty"`
-	// Creation timestamp of the sandbox
+	// Creation timestamp of the sandbox in nanoseconds.
 	CreatedAt *int64 `protobuf:"varint,4,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
 	// Network contains network status if network is handled by the runtime.
 	Network *PodSandboxNetworkStatus `protobuf:"bytes,5,opt,name=network" json:"network,omitempty"`
@@ -971,7 +971,7 @@ type PodSandbox struct {
 	Metadata *PodSandboxMetadata `protobuf:"bytes,2,opt,name=metadata" json:"metadata,omitempty"`
 	// The state of the PodSandbox
 	State *PodSandBoxState `protobuf:"varint,3,opt,name=state,enum=runtime.PodSandBoxState" json:"state,omitempty"`
-	// Creation timestamps of the sandbox
+	// Creation timestamps of the sandbox in nanoseconds
 	CreatedAt *int64 `protobuf:"varint,4,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
 	// The labels of the PodSandbox
 	Labels map[string]string `protobuf:"bytes,5,rep,name=labels" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
@@ -1740,7 +1740,7 @@ type Container struct {
 	ImageRef *string `protobuf:"bytes,5,opt,name=image_ref,json=imageRef" json:"image_ref,omitempty"`
 	// State is the state of the container.
 	State *ContainerState `protobuf:"varint,6,opt,name=state,enum=runtime.ContainerState" json:"state,omitempty"`
-	// Creation time of the container.
+	// Creation time of the container in nanoseconds.
 	CreatedAt *int64 `protobuf:"varint,7,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
 	// Labels are key value pairs that may be used to scope and select individual resources.
 	Labels map[string]string `protobuf:"bytes,8,rep,name=labels" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
@@ -1862,11 +1862,11 @@ type ContainerStatus struct {
 	Metadata *ContainerMetadata `protobuf:"bytes,2,opt,name=metadata" json:"metadata,omitempty"`
 	// Status of the container.
 	State *ContainerState `protobuf:"varint,3,opt,name=state,enum=runtime.ContainerState" json:"state,omitempty"`
-	// Creation time of the container.
+	// Creation time of the container in nanoseconds.
 	CreatedAt *int64 `protobuf:"varint,4,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
-	// Start time of the container.
+	// Start time of the container in nanoseconds.
 	StartedAt *int64 `protobuf:"varint,5,opt,name=started_at,json=startedAt" json:"started_at,omitempty"`
-	// Finish time of the container.
+	// Finish time of the container in nanoseconds.
 	FinishedAt *int64 `protobuf:"varint,6,opt,name=finished_at,json=finishedAt" json:"finished_at,omitempty"`
 	// Exit code of the container.
 	ExitCode *int32 `protobuf:"varint,7,opt,name=exit_code,json=exitCode" json:"exit_code,omitempty"`
