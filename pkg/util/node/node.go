@@ -43,6 +43,17 @@ func GetHostname(hostnameOverride string) string {
 	return strings.ToLower(strings.TrimSpace(hostname))
 }
 
+func GetPreferredNodeAddress(node *api.Node, preferredAddressTypes []api.NodeAddressType) (string, error) {
+	for _, addressType := range preferredAddressTypes {
+		for _, address := range node.Status.Addresses {
+			if address.Type == addressType {
+				return address.Address, nil
+			}
+		}
+	}
+	return "", fmt.Errorf("no preferred addresses found; known addresses: %v", node.Status.Addresses)
+}
+
 // GetNodeHostIP returns the provided node's IP, based on the priority:
 // 1. NodeInternalIP
 // 2. NodeExternalIP

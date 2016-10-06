@@ -897,6 +897,24 @@ func (c *Cloud) NodeAddresses(name types.NodeName) ([]api.NodeAddress, error) {
 			addresses = append(addresses, api.NodeAddress{Type: api.NodeExternalIP, Address: externalIP})
 		}
 
+		internalDNS, err := c.metadata.GetMetadata("local-hostname")
+		if err != nil || len(internalDNS) == 0 {
+			//TODO: It would be nice to be able to determine the reason for the failure,
+			// but the AWS client masks all failures with the same error description.
+			glog.V(2).Info("Could not determine private DNS from AWS metadata.")
+		} else {
+			addresses = append(addresses, api.NodeAddress{Type: api.NodeInternalDNS, Address: internalDNS})
+		}
+
+		externalDNS, err := c.metadata.GetMetadata("public-hostname")
+		if err != nil || len(externalDNS) == 0 {
+			//TODO: It would be nice to be able to determine the reason for the failure,
+			// but the AWS client masks all failures with the same error description.
+			glog.V(2).Info("Could not determine public DNS from AWS metadata.")
+		} else {
+			addresses = append(addresses, api.NodeAddress{Type: api.NodeExternalDNS, Address: externalDNS})
+		}
+
 		return addresses, nil
 	}
 	instance, err := c.getInstanceByNodeName(name)
@@ -926,6 +944,14 @@ func (c *Cloud) NodeAddresses(name types.NodeName) ([]api.NodeAddress, error) {
 			return nil, fmt.Errorf("EC2 instance had invalid public address: %s (%s)", orEmpty(instance.InstanceId), ipAddress)
 		}
 		addresses = append(addresses, api.NodeAddress{Type: api.NodeExternalIP, Address: ip.String()})
+	}
+
+	if !isNilOrEmpty(instance.PrivateDnsName) {
+		addresses = append(addresses, api.NodeAddress{Type: api.NodeInternalDNS, Address: *instance.PrivateDnsName})
+	}
+
+	if !isNilOrEmpty(instance.PublicDnsName) {
+		addresses = append(addresses, api.NodeAddress{Type: api.NodeExternalDNS, Address: *instance.PublicDnsName})
 	}
 
 	return addresses, nil
