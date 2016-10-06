@@ -37,6 +37,7 @@ const (
 	// GCE instances can have up to 16 PD volumes attached.
 	DefaultMaxGCEPDVolumes    = 16
 	ClusterAutoscalerProvider = "ClusterAutoscalerProvider"
+	PetSetKind                = "PetSet"
 )
 
 // getMaxVols checks the max PD volumes environment variable, otherwise returning a default value
@@ -214,12 +215,12 @@ func GetEquivalencePod(pod *api.Pod) interface{} {
 	equivalencePod := EquivalencePod{}
 	// For now we only consider pods:
 	// 1. OwnerReferences is Controller
-	// 2. OwnerReferences kind is not PetSet
+	// 2. OwnerReferences kind is in valid controller kinds
 	// 3. with same OwnerReferences
 	// to be equivalent
 	if len(pod.OwnerReferences) != 0 {
 		for _, ref := range pod.OwnerReferences {
-			if *ref.Controller && ref.Kind != "PetSet" {
+			if *ref.Controller && isValidControllerKind(ref.Kind) {
 				equivalencePod.ControllerRef = ref
 				// a pod can only belongs to one controller
 				break
@@ -227,6 +228,17 @@ func GetEquivalencePod(pod *api.Pod) interface{} {
 		}
 	}
 	return &equivalencePod
+}
+
+// isValidControllerKind checks if a given controller's kind can be applied to equivalence pod algorithm.
+func isValidControllerKind(kind string) bool {
+	switch kind {
+	case
+		// kind list that we can not handle
+		PetSetKind:
+		return false
+	}
+	return true
 }
 
 // EquivalencePod is a group of pod attributes which can be reused as equivalence to schedule other pods.

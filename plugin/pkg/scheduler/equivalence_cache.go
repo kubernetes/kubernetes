@@ -22,11 +22,11 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
-	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	"sync"
 )
 
+// TODO(harryz) figure out the right number for this, 4096 may be too big
 const maxCacheEntries = 4096
 
 type HostPredicate struct {
@@ -47,20 +47,17 @@ func newAlgorithmCache() AlgorithmCache {
 
 // Store a map of predicate cache with maxsize
 type EquivalenceCache struct {
-	getEquivalencePod         algorithm.GetEquivalencePodFunc
-	algorithmCache            map[string]AlgorithmCache
-	invalidAlgorithmCacheList sets.String
-	allCacheExpired           bool
-	expireLock                *sync.RWMutex
+	sync.RWMutex
+	getEquivalencePod algorithm.GetEquivalencePodFunc
+	algorithmCache    map[string]AlgorithmCache
+	allCacheExpired   bool
 }
 
 func NewEquivalenceCache(getEquivalencePodFunc algorithm.GetEquivalencePodFunc) *EquivalenceCache {
 	return &EquivalenceCache{
-		getEquivalencePod:         getEquivalencePodFunc,
-		algorithmCache:            make(map[string]AlgorithmCache),
-		invalidAlgorithmCacheList: sets.NewString(),
-		allCacheExpired:           false,
-		expireLock:                new(sync.RWMutex),
+		getEquivalencePod: getEquivalencePodFunc,
+		algorithmCache:    make(map[string]AlgorithmCache),
+		allCacheExpired:   false,
 	}
 }
 
@@ -112,47 +109,33 @@ func (ec *EquivalenceCache) GetCachedPredicates(pod *api.Pod, nodes []*api.Node)
 
 // SendInvalidAlgorithmCacheReq marks AlgorithmCache item as invalid
 func (ec *EquivalenceCache) SendInvalidAlgorithmCacheReq(nodeName string) {
-	ec.expireLock.RLock()
+	ec.RLock()
 	allExpired := ec.allCacheExpired
-	ec.expireLock.RUnlock()
+	ec.RUnlock()
 
 	if !allExpired {
-		ec.expireLock.Lock()
-		defer ec.expireLock.Unlock()
-		ec.invalidAlgorithmCacheList.Insert(nodeName)
+		ec.Lock()
+		defer ec.Unlock()
+		// clear the cache of this node
+		delete(ec.algorithmCache, nodeName)
 	}
 }
 
 // SendClearAllCacheReq marks all cached item as invalid
 func (ec *EquivalenceCache) SendClearAllCacheReq() {
-	ec.expireLock.RLock()
+	ec.RLock()
 	allExpired := ec.allCacheExpired
-	ec.expireLock.RUnlock()
+	ec.RUnlock()
 
 	if !allExpired {
-		ec.expireLock.Lock()
-		ec.allCacheExpired = true
-		ec.expireLock.Unlock()
-	}
-}
-
-// HandleExpireDate removes expired AlgorithmCache
-func (ec *EquivalenceCache) HandleExpireDate() {
-	ec.expireLock.Lock()
-	defer ec.expireLock.Unlock()
-
-	// Remove expired AlgorithmCache
-	if ec.allCacheExpired {
-		ec.algorithmCache = make(map[string]AlgorithmCache)
-	} else {
-		for _, node := range ec.invalidAlgorithmCacheList.List() {
-			delete(ec.algorithmCache, node)
+		ec.Lock()
+		// clear cache of all nodes
+		for nodeName, _ := range ec.algorithmCache {
+			delete(ec.algorithmCache, nodeName)
 		}
+		ec.allCacheExpired = true
+		ec.Unlock()
 	}
-
-	// Clear expired data records for next cycle
-	ec.invalidAlgorithmCacheList = sets.NewString()
-	ec.allCacheExpired = false
 }
 
 // hashEquivalencePod returns the hash of equivalence pod.
