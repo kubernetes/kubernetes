@@ -140,8 +140,9 @@ function test_openssl_installed {
 set +e
 
 API_PORT=${API_PORT:-8080}
-API_HOST=${API_HOST:-127.0.0.1}
-API_HOST_IP=${API_HOST_IP:-${API_HOST}}
+API_SECURE_PORT=${API_SECURE_PORT:-6443}
+API_HOST=${API_HOST:-localhost}
+API_HOST_IP=${API_HOST_IP:-"127.0.0.1"}
 API_BIND_ADDR=${API_BIND_ADDR:-"0.0.0.0"}
 KUBELET_HOST=${KUBELET_HOST:-"127.0.0.1"}
 # By default only allow CORS for requests on localhost
@@ -158,15 +159,28 @@ CPU_CFS_QUOTA=${CPU_CFS_QUOTA:-true}
 ENABLE_HOSTPATH_PROVISIONER=${ENABLE_HOSTPATH_PROVISIONER:-"false"}
 CLAIM_BINDER_SYNC_PERIOD=${CLAIM_BINDER_SYNC_PERIOD:-"15s"} # current k8s default
 ENABLE_CONTROLLER_ATTACH_DETACH=${ENABLE_CONTROLLER_ATTACH_DETACH:-"true"} # current default
+CERT_DIR=${CERT_DIR:-"/var/run/kubernetes"}
+ROOT_CA_FILE=$CERT_DIR/apiserver.crt
+
 
 function test_apiserver_off {
     # For the common local scenario, fail fast if server is already running.
     # this can happen if you run local-up-cluster.sh twice and kill etcd in between.
-    curl --silent -g $API_HOST:$API_PORT
+    if [[ "${API_PORT}" -gt "0" ]]; then
+        curl --silent -g $API_HOST:$API_PORT
+        if [ ! $? -eq 0 ]; then
+            echo "API SERVER insecure port is free, proceeding..."
+        else
+            echo "ERROR starting API SERVER, exiting. Some process on $API_HOST is serving already on $API_PORT"
+            exit 1
+        fi
+    fi
+
+    curl --silent -k -g $API_HOST:$API_SECURE_PORT
     if [ ! $? -eq 0 ]; then
-        echo "API SERVER port is free, proceeding..."
+        echo "API SERVER secure port is free, proceeding..."
     else
-        echo "ERROR starting API SERVER, exiting.  Some host on $API_HOST is serving already on $API_PORT"
+        echo "ERROR starting API SERVER, exiting. Some process on $API_HOST is serving already on $API_SECURE_PORT"
         exit 1
     fi
 }
@@ -297,8 +311,6 @@ function start_apiserver {
     fi
     # This is the default dir and filename where the apiserver will generate a self-signed cert
     # which should be able to be used as the CA to verify itself
-    CERT_DIR=/var/run/kubernetes
-    ROOT_CA_FILE=$CERT_DIR/apiserver.crt
 
     anytoken_arg=""
     if [[ -n "${ALLOW_ANY_TOKEN:-}" ]]; then
@@ -324,6 +336,10 @@ function start_apiserver {
         advertise_address="--advertise_address=${API_HOST_IP}"
     fi
 
+    # Ensure CERT_DIR is created for auto-generated crt/key and kubeconfig
+    sudo mkdir -p "${CERT_DIR}"
+
+
     APISERVER_LOG=/tmp/kube-apiserver.log
     sudo -E "${GO_OUT}/hyperkube" apiserver ${anytoken_arg} ${authorizer_arg} ${priv_arg} ${runtime_config}\
       ${advertise_address} \
@@ -333,6 +349,8 @@ function start_apiserver {
       --service-account-lookup="${SERVICE_ACCOUNT_LOOKUP}" \
       --admission-control="${ADMISSION_CONTROL}" \
       --bind-address="${API_BIND_ADDR}" \
+      --secure-port="${API_SECURE_PORT}" \
+      --tls-ca-file="${ROOT_CA_FILE}" \
       --insecure-bind-address="${API_HOST_IP}" \
       --insecure-port="${API_PORT}" \
       --etcd-servers="http://${ETCD_HOST}:${ETCD_PORT}" \
@@ -343,9 +361,25 @@ function start_apiserver {
       --cors-allowed-origins="${API_CORS_ALLOWED_ORIGINS}" >"${APISERVER_LOG}" 2>&1 &
     APISERVER_PID=$!
 
+    # We created a kubeconfig that uses the apiserver.crt
+    cat <<EOF | sudo tee "${CERT_DIR}"/kubeconfig > /dev/null
+apiVersion: v1
+kind: Config
+clusters:
+  - cluster:
+      certificate-authority: ${ROOT_CA_FILE}
+      server: https://${API_HOST}:${API_SECURE_PORT}/
+    name: local-up-cluster
+contexts:
+  - context:
+      cluster: local-up-cluster
+    name: service-to-apiserver
+current-context: service-to-apiserver
+EOF
+
     # Wait for kube-apiserver to come up before launching the rest of the components.
     echo "Waiting for apiserver to come up"
-    kube::util::wait_for_url "http://${API_HOST}:${API_PORT}/api/v1/pods" "apiserver: " 1 ${WAIT_FOR_URL_API_SERVER} || exit 1
+    kube::util::wait_for_url "https://${API_HOST}:${API_SECURE_PORT}/api/v1/pods" "apiserver: " 1 ${WAIT_FOR_URL_API_SERVER} || exit 1
 }
 
 function start_controller_manager {
@@ -365,7 +399,8 @@ function start_controller_manager {
       --feature-gates="${FEATURE_GATES}" \
       --cloud-provider="${CLOUD_PROVIDER}" \
       --cloud-config="${CLOUD_CONFIG}" \
-      --master="${API_HOST}:${API_PORT}" >"${CTLRMGR_LOG}" 2>&1 &
+      --kubeconfig "$CERT_DIR"/kubeconfig \
+      --master="https://${API_HOST}:${API_SECURE_PORT}" >"${CTLRMGR_LOG}" 2>&1 &
     CTLRMGR_PID=$!
 }
 
@@ -436,7 +471,8 @@ function start_kubelet {
         --cloud-provider="${CLOUD_PROVIDER}" \
         --cloud-config="${CLOUD_CONFIG}" \
         --address="${KUBELET_HOST}" \
-        --api-servers="${API_HOST}:${API_PORT}" \
+        --require-kubeconfig \
+        --kubeconfig "$CERT_DIR"/kubeconfig \
         --feature-gates="${FEATURE_GATES}" \
         --cpu-cfs-quota=${CPU_CFS_QUOTA} \
         --enable-controller-attach-detach="${ENABLE_CONTROLLER_ATTACH_DETACH}" \
@@ -482,7 +518,7 @@ function start_kubelet {
         -i \
         --cidfile=$KUBELET_CIDFILE \
         gcr.io/google_containers/kubelet \
-        /kubelet --v=${LOG_LEVEL} --containerized ${priv_arg}--chaos-chance="${CHAOS_CHANCE}" --hostname-override="${HOSTNAME_OVERRIDE}" --cloud-provider="${CLOUD_PROVIDER}" --cloud-config="${CLOUD_CONFIG}" \ --address="127.0.0.1" --api-servers="${API_HOST}:${API_PORT}" --port="$KUBELET_PORT"  --enable-controller-attach-detach="${ENABLE_CONTROLLER_ATTACH_DETACH}" &> $KUBELET_LOG &
+        /kubelet --v=${LOG_LEVEL} --containerized ${priv_arg}--chaos-chance="${CHAOS_CHANCE}" --hostname-override="${HOSTNAME_OVERRIDE}" --cloud-provider="${CLOUD_PROVIDER}" --cloud-config="${CLOUD_CONFIG}" \ --address="127.0.0.1" --require-kubeconfig --kubeconfig "$CERT_DIR"/kubeconfig --api-servers="https://${API_HOST}:${API_SECURE_PORT}" --port="$KUBELET_PORT"  --enable-controller-attach-detach="${ENABLE_CONTROLLER_ATTACH_DETACH}" &> $KUBELET_LOG &
     fi
 }
 
@@ -492,13 +528,15 @@ function start_kubeproxy {
       --v=${LOG_LEVEL} \
       --hostname-override="${HOSTNAME_OVERRIDE}" \
       --feature-gates="${FEATURE_GATES}" \
-      --master="http://${API_HOST}:${API_PORT}" >"${PROXY_LOG}" 2>&1 &
+      --kubeconfig "$CERT_DIR"/kubeconfig \
+      --master="https://${API_HOST}:${API_SECURE_PORT}" >"${PROXY_LOG}" 2>&1 &
     PROXY_PID=$!
 
     SCHEDULER_LOG=/tmp/kube-scheduler.log
     sudo -E "${GO_OUT}/hyperkube" scheduler \
       --v=${LOG_LEVEL} \
-      --master="http://${API_HOST}:${API_PORT}" >"${SCHEDULER_LOG}" 2>&1 &
+      --kubeconfig "$CERT_DIR"/kubeconfig \
+      --master="https://${API_HOST}:${API_SECURE_PORT}" >"${SCHEDULER_LOG}" 2>&1 &
     SCHEDULER_PID=$!
 }
 
@@ -527,7 +565,7 @@ kind: Namespace
 metadata:
   name: kube-system
 EOF
-        ${KUBECTL} config set-cluster local --server=http://${API_HOST}:${API_PORT} --insecure-skip-tls-verify=true
+        ${KUBECTL} config set-cluster local --server=https://${API_HOST}:${API_SECURE_PORT} --certificate-authority=$(ROOT_CA_FILE)
         ${KUBECTL} config set-context local --cluster=local
         ${KUBECTL} config use-context local
 
@@ -568,8 +606,9 @@ To start using your cluster, open up another terminal/tab and run:
 
   export KUBERNETES_PROVIDER=local
 
-  cluster/kubectl.sh config set-cluster local --server=http://${API_HOST}:${API_PORT} --insecure-skip-tls-verify=true
-  cluster/kubectl.sh config set-context local --cluster=local
+  cluster/kubectl.sh config set-cluster local --server=https://${API_HOST}:${API_SECURE_PORT} --certificate-authority=${ROOT_CA_FILE}
+  cluster/kubectl.sh config set-credentials myself --username=admin --password=admin
+  cluster/kubectl.sh config set-context local --cluster=local --user=myself
   cluster/kubectl.sh config use-context local
   cluster/kubectl.sh
 EOF
