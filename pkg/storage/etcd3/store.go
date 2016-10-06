@@ -314,21 +314,21 @@ func (s *store) List(ctx context.Context, key, resourceVersion string, pred stor
 
 // Watch implements storage.Interface.Watch.
 func (s *store) Watch(ctx context.Context, key string, resourceVersion string, pred storage.SelectionPredicate) (watch.Interface, error) {
-	return s.watch(ctx, key, resourceVersion, storage.SimpleFilter(pred), false)
+	return s.watch(ctx, key, resourceVersion, pred, false)
 }
 
 // WatchList implements storage.Interface.WatchList.
 func (s *store) WatchList(ctx context.Context, key string, resourceVersion string, pred storage.SelectionPredicate) (watch.Interface, error) {
-	return s.watch(ctx, key, resourceVersion, storage.SimpleFilter(pred), true)
+	return s.watch(ctx, key, resourceVersion, pred, true)
 }
 
-func (s *store) watch(ctx context.Context, key string, rv string, filter storage.FilterFunc, recursive bool) (watch.Interface, error) {
+func (s *store) watch(ctx context.Context, key string, rv string, pred storage.SelectionPredicate, recursive bool) (watch.Interface, error) {
 	rev, err := storage.ParseWatchResourceVersion(rv)
 	if err != nil {
 		return nil, err
 	}
 	key = keyWithPrefix(s.pathPrefix, key)
-	return s.watcher.Watch(ctx, key, int64(rev), recursive, filter)
+	return s.watcher.Watch(ctx, key, int64(rev), recursive, storage.SimpleFilter(pred))
 }
 
 func (s *store) getState(getResp *clientv3.GetResponse, key string, v reflect.Value, ignoreNotFound bool) (*objState, error) {
