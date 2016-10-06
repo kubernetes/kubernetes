@@ -36,25 +36,26 @@ import (
 
 // AnnotateOptions have the data required to perform the annotate operation
 type AnnotateOptions struct {
+	// Filename options
 	resource.FilenameOptions
 
+	// Common user flags
+	overwrite         bool
+	local             bool
+	dryrun            bool
+	all               bool
+	resourceVersion   string
+	selector          string
+	outputFormat      string
+	recordChangeCause bool
+
+	// results of arg parsing
 	resources         []string
 	newAnnotations    map[string]string
 	removeAnnotations []string
-	builder           *resource.Builder
-	selector          string
 
-	overwrite       bool
-	local           bool
-	all             bool
-	resourceVersion string
-
-	changeCause       string
-	recordChangeCause bool
-
-	f   *cmdutil.Factory
+	// Common shared fields
 	out io.Writer
-	cmd *cobra.Command
 }
 
 var (
@@ -93,6 +94,7 @@ var (
 func NewCmdAnnotate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &AnnotateOptions{}
 
+	// retrieve a list of handled resources from printer as valid args
 	validArgs, argAliases := []string{}, []string{}
 	p, err := f.Printer(nil, kubectl.PrintOptions{
 		ColumnLabels: []string{},
@@ -110,38 +112,42 @@ func NewCmdAnnotate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 		Example: annotate_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			if err := options.Complete(f, out, cmd, args); err != nil {
-				cmdutil.CheckErr(err)
-			}
-			if err := options.Validate(args); err != nil {
 				cmdutil.CheckErr(cmdutil.UsageError(cmd, err.Error()))
 			}
-			if err := options.RunAnnotate(); err != nil {
-				cmdutil.CheckErr(err)
+			if err := options.Validate(); err != nil {
+				cmdutil.CheckErr(cmdutil.UsageError(cmd, err.Error()))
 			}
+			cmdutil.CheckErr(options.RunAnnotate(f, cmd))
 		},
 		ValidArgs:  validArgs,
 		ArgAliases: argAliases,
 	}
 	cmdutil.AddPrinterFlags(cmd)
-	cmdutil.AddInclude3rdPartyFlags(cmd)
-	cmd.Flags().StringVarP(&options.selector, "selector", "l", "", "Selector (label query) to filter on")
-	cmd.Flags().BoolVar(&options.overwrite, "overwrite", false, "If true, allow annotations to be overwritten, otherwise reject annotation updates that overwrite existing annotations.")
-	cmd.Flags().BoolVar(&options.local, "local", false, "If true, annotation will NOT contact api-server but run locally.")
-	cmd.Flags().BoolVar(&options.all, "all", false, "select all resources in the namespace of the specified resource types")
-	cmd.Flags().StringVar(&options.resourceVersion, "resource-version", "", "If non-empty, the annotation update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource.")
+	cmd.Flags().Bool("overwrite", false, "If true, allow annotations to be overwritten, otherwise reject annotation updates that overwrite existing annotations.")
+	cmd.Flags().Bool("local", false, "If true, annotation will NOT contact api-server but run locally.")
+	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on")
+	cmd.Flags().Bool("all", false, "select all resources in the namespace of the specified resource types")
+	cmd.Flags().String("resource-version", "", "If non-empty, the annotation update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource.")
 	usage := "identifying the resource to update the annotation"
 	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
+	cmdutil.AddDryRunFlag(cmd)
 	cmdutil.AddRecordFlag(cmd)
+	cmdutil.AddInclude3rdPartyFlags(cmd)
+
 	return cmd
 }
 
 // Complete adapts from the command line args and factory to the data required.
 func (o *AnnotateOptions) Complete(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) (err error) {
-
-	namespace, enforceNamespace, err := f.DefaultNamespace()
-	if err != nil {
-		return err
-	}
+	o.out = out
+	o.local = cmdutil.GetFlagBool(cmd, "local")
+	o.overwrite = cmdutil.GetFlagBool(cmd, "overwrite")
+	o.all = cmdutil.GetFlagBool(cmd, "all")
+	o.resourceVersion = cmdutil.GetFlagString(cmd, "resource-version")
+	o.selector = cmdutil.GetFlagString(cmd, "selector")
+	o.outputFormat = cmdutil.GetFlagString(cmd, "output")
+	o.dryrun = cmdutil.GetDryRunFlag(cmd)
+	o.recordChangeCause = cmdutil.GetRecordFlag(cmd)
 
 	// retrieves resource and annotation args from args
 	// also checks args to verify that all resources are specified before annotations
@@ -150,47 +156,42 @@ func (o *AnnotateOptions) Complete(f *cmdutil.Factory, out io.Writer, cmd *cobra
 		return err
 	}
 	o.resources = resources
-	if len(o.resources) < 1 && cmdutil.IsFilenameEmpty(o.Filenames) {
-		return fmt.Errorf("one or more resources must be specified as <resource> <name> or <resource>/<name>")
-	}
-	if len(annotationArgs) < 1 {
-		return fmt.Errorf("at least one annotation update is required")
-	}
-
-	if o.newAnnotations, o.removeAnnotations, err = parseAnnotations(annotationArgs); err != nil {
-		return err
-	}
-
-	o.recordChangeCause = cmdutil.GetRecordFlag(cmd)
-	o.changeCause = f.Command()
-
-	mapper, typer := f.Object()
-	o.builder = resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
-		ContinueOnError().
-		NamespaceParam(namespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, &o.FilenameOptions).
-		Flatten()
-	if !o.local {
-		o.builder = o.builder.SelectorParam(o.selector).
-			ResourceTypeOrNameArgs(o.all, o.resources...).
-			Latest()
-	}
-
-	o.f = f
-	o.out = out
-	o.cmd = cmd
-
-	return nil
+	o.newAnnotations, o.removeAnnotations, err = parseAnnotations(annotationArgs)
+	return err
 }
 
 // Validate checks to the AnnotateOptions to see if there is sufficient information run the command.
-func (o AnnotateOptions) Validate(args []string) error {
+func (o AnnotateOptions) Validate() error {
+	if len(o.resources) < 1 && cmdutil.IsFilenameEmpty(o.Filenames) {
+		return fmt.Errorf("one or more resources must be specified as <resource> <name> or <resource>/<name>")
+	}
+	if len(o.newAnnotations) < 1 && len(o.removeAnnotations) < 1 {
+		return fmt.Errorf("at least one annotation update is required")
+	}
 	return validateAnnotations(o.removeAnnotations, o.newAnnotations)
 }
 
 // RunAnnotate does the work
-func (o AnnotateOptions) RunAnnotate() error {
-	r := o.builder.Do()
+func (o AnnotateOptions) RunAnnotate(f *cmdutil.Factory, cmd *cobra.Command) error {
+	namespace, enforceNamespace, err := f.DefaultNamespace()
+	if err != nil {
+		return err
+	}
+
+	changeCause := f.Command()
+	mapper, typer := f.Object()
+	b := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
+		ContinueOnError().
+		NamespaceParam(namespace).DefaultNamespace().
+		FilenameParam(enforceNamespace, &o.FilenameOptions).
+		Flatten()
+
+	if !o.local {
+		b = b.SelectorParam(o.selector).
+			ResourceTypeOrNameArgs(o.all, o.resources...).
+			Latest()
+	}
+	r := b.Do()
 	if err := r.Err(); err != nil {
 		return err
 	}
@@ -216,7 +217,7 @@ func (o AnnotateOptions) RunAnnotate() error {
 		if err != nil {
 			return err
 		}
-		if o.local {
+		if o.dryrun || o.local {
 			if err := o.updateAnnotations(obj); err != nil {
 				return err
 			}
@@ -229,7 +230,7 @@ func (o AnnotateOptions) RunAnnotate() error {
 			}
 			// If we should record change-cause, add it to new annotations
 			if cmdutil.ContainsChangeCause(info) || o.recordChangeCause {
-				o.newAnnotations[kubectl.ChangeCauseAnnotation] = o.changeCause
+				o.newAnnotations[kubectl.ChangeCauseAnnotation] = changeCause
 			}
 			if err := o.updateAnnotations(obj); err != nil {
 				return err
@@ -245,7 +246,7 @@ func (o AnnotateOptions) RunAnnotate() error {
 			}
 
 			mapping := info.ResourceMapping()
-			client, err := o.f.ClientForMapping(mapping)
+			client, err := f.ClientForMapping(mapping)
 			if err != nil {
 				return err
 			}
@@ -259,15 +260,11 @@ func (o AnnotateOptions) RunAnnotate() error {
 			if err != nil {
 				return err
 			}
-
 		}
-		mapper, _ := o.f.Object()
-		outputFormat := cmdutil.GetFlagString(o.cmd, "output")
-		if outputFormat != "" {
-			return o.f.PrintObject(o.cmd, mapper, outputObj, o.out)
+		if o.outputFormat != "" {
+			return f.PrintObject(cmd, mapper, outputObj, o.out)
 		}
-
-		cmdutil.PrintSuccess(mapper, false, o.out, info.Mapping.Resource, info.Name, false, "annotated")
+		cmdutil.PrintSuccess(mapper, false, o.out, info.Mapping.Resource, info.Name, o.dryrun, "annotated")
 		return nil
 	})
 }
