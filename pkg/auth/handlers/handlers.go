@@ -60,6 +60,9 @@ func WithAuthentication(handler http.Handler, mapper api.RequestContextMapper, a
 				return
 			}
 
+			// authorization header is not required anymore in case of a successful authorization.
+			req.Header.Del("Authorization")
+
 			if ctx, ok := mapper.Get(req); ok {
 				mapper.Update(req, api.WithUser(ctx, user))
 			}
