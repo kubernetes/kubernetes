@@ -822,7 +822,13 @@ function kube::release::create_docker_images_for_server() {
 
         rm -rf ${docker_build_path}
         mkdir -p ${docker_build_path}
-        ln ${binary_dir}/${binary_name} ${docker_build_path}/${binary_name}
+        ln ${binary_dir}/${binary_name} ${docker_build_path}/${binary_name} && rc=$? || rc=$?
+        if [ $rc != 0 ]; then
+            # Handle filesystems that do not support hard links
+            #  (e.g. cross-partition directory trees, vagrant virtualbox shared mounts)
+            echo "Hard link unsuccessful.  Creating copy"
+            cp ${binary_dir}/${binary_name} ${docker_build_path}/${binary_name}
+        fi
         printf " FROM ${base_image} \n ADD ${binary_name} /usr/local/bin/${binary_name}\n" > ${docker_file_path}
 
         if [[ ${arch} == "amd64" ]]; then
