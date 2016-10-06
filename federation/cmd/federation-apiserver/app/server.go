@@ -75,6 +75,10 @@ func Run(s *options.ServerRunOptions) error {
 	// TODO: register cluster federation resources here.
 	resourceConfig := genericapiserver.NewResourceConfig()
 
+	if s.StorageConfig.DeserializationCacheSize == 0 {
+		// When size of cache is not explicitly set, set it to 50000
+		s.StorageConfig.DeserializationCacheSize = 50000
+	}
 	storageGroupsToEncodingVersion, err := s.StorageGroupsToEncodingVersion()
 	if err != nil {
 		glog.Fatalf("error generating storage version map: %s", err)
