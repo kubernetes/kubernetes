@@ -21,12 +21,11 @@ import (
 	"io"
 	"os"
 
-	"github.com/renstrom/dedent"
-
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -35,7 +34,7 @@ import (
 )
 
 var (
-	convert_long = dedent.Dedent(`
+	convert_long = templates.LongDesc(`
 		Convert config files between different API versions. Both YAML
 		and JSON formats are accepted.
 
@@ -44,10 +43,9 @@ var (
 		not supported, convert to latest version.
 
 		The default output will be printed to stdout in YAML format. One can use -o option
-		to change to output destination.
-		`)
+		to change to output destination.`)
 
-	convert_example = dedent.Dedent(`
+	convert_example = templates.Examples(`
 		# Convert 'pod.yaml' to latest version and print to stdout.
 		kubectl convert -f pod.yaml
 
@@ -56,8 +54,7 @@ var (
 		kubectl convert -f pod.yaml --local -o json
 
 		# Convert all files under current directory to latest version and create them all.
-		kubectl convert -f . | kubectl create -f -
-		`)
+		kubectl convert -f . | kubectl create -f -`)
 )
 
 // NewCmdConvert creates a command object for the generic "convert" action, which

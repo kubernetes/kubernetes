@@ -20,11 +20,11 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
@@ -47,15 +47,15 @@ func NewCmdCreateService(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 }
 
 var (
-	serviceClusterIPLong = dedent.Dedent(`
-                Create a clusterIP service with the specified name.`)
+	serviceClusterIPLong = templates.LongDesc(`
+    Create a clusterIP service with the specified name.`)
 
-	serviceClusterIPExample = dedent.Dedent(`
-                # Create a new clusterIP service named my-cs
-                kubectl create service clusterip my-cs --tcp=5678:8080
+	serviceClusterIPExample = templates.Examples(`
+    # Create a new clusterIP service named my-cs
+    kubectl create service clusterip my-cs --tcp=5678:8080
 
-                # Create a new clusterIP service named my-cs (in headless mode)
-                kubectl create service clusterip my-cs --clusterip="None"`)
+    # Create a new clusterIP service named my-cs (in headless mode)
+    kubectl create service clusterip my-cs --clusterip="None"`)
 )
 
 func addPortFlags(cmd *cobra.Command) {
@@ -110,12 +110,12 @@ func CreateServiceClusterIP(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Comm
 }
 
 var (
-	serviceNodePortLong = dedent.Dedent(`
-                Create a nodeport service with the specified name.`)
+	serviceNodePortLong = templates.LongDesc(`
+    Create a nodeport service with the specified name.`)
 
-	serviceNodePortExample = dedent.Dedent(`
-                # Create a new nodeport service named my-ns
-                kubectl create service nodeport my-ns --tcp=5678:8080`)
+	serviceNodePortExample = templates.Examples(`
+    # Create a new nodeport service named my-ns
+    kubectl create service nodeport my-ns --tcp=5678:8080`)
 )
 
 // NewCmdCreateServiceNodePort is a macro command for creating a NodePort service
@@ -167,12 +167,12 @@ func CreateServiceNodePort(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Comma
 }
 
 var (
-	serviceLoadBalancerLong = dedent.Dedent(`
-                Create a LoadBalancer service with the specified name.`)
+	serviceLoadBalancerLong = templates.LongDesc(`
+    Create a LoadBalancer service with the specified name.`)
 
-	serviceLoadBalancerExample = dedent.Dedent(`
-                # Create a new nodeport service named my-lbs
-                kubectl create service loadbalancer my-lbs --tcp=5678:8080`)
+	serviceLoadBalancerExample = templates.Examples(`
+    # Create a new nodeport service named my-lbs
+    kubectl create service loadbalancer my-lbs --tcp=5678:8080`)
 )
 
 // NewCmdCreateServiceLoadBalancer is a macro command for creating a LoadBalancer service

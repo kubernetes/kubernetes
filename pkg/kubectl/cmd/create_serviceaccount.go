@@ -20,20 +20,20 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
 var (
-	serviceAccountLong = dedent.Dedent(`
+	serviceAccountLong = templates.LongDesc(`
 		Create a service account with the specified name.`)
 
-	serviceAccountExample = dedent.Dedent(`
-		  # Create a new service account named my-service-account
-		  $ kubectl create serviceaccount my-service-account`)
+	serviceAccountExample = templates.Examples(`
+	  # Create a new service account named my-service-account
+	  $ kubectl create serviceaccount my-service-account`)
 )
 
 // NewCmdCreateServiceAccount is a macro command to create a new service account

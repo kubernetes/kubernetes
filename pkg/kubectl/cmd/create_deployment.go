@@ -20,20 +20,20 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
 var (
-	deploymentLong = dedent.Dedent(`
-                Create a deployment with the specified name.`)
+	deploymentLong = templates.LongDesc(`
+    Create a deployment with the specified name.`)
 
-	deploymentExample = dedent.Dedent(`
-                # Create a new deployment named my-dep that runs the busybox image.
-                kubectl create deployment my-dep --image=busybox`)
+	deploymentExample = templates.Examples(`
+    # Create a new deployment named my-dep that runs the busybox image.
+    kubectl create deployment my-dep --image=busybox`)
 )
 
 // NewCmdCreateDeployment is a macro command to create a new deployment

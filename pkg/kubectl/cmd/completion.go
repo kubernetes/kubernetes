@@ -20,36 +20,34 @@ import (
 	"bytes"
 	"io"
 
-	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
+	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
 var (
-	completion_long = dedent.Dedent(`
+	completion_long = templates.LongDesc(`
 		Output shell completion code for the given shell (bash or zsh).
 
 		This command prints shell code which must be evaluation to provide interactive
 		completion of kubectl commands.
-    `)
 
-	completion_example = dedent.Dedent(`
-		$ source <(kubectl completion bash)
+		    $ source <(kubectl completion bash)
 
 		will load the kubectl completion code for bash. Note that this depends on the
 		bash-completion framework. It must be sourced before sourcing the kubectl
 		completion, e.g. on the Mac:
 
-		$ brew install bash-completion
-		$ source $(brew --prefix)/etc/bash_completion
-		$ source <(kubectl completion bash)
+		    $ brew install bash-completion
+		    $ source $(brew --prefix)/etc/bash_completion
+		    $ source <(kubectl completion bash)
 
-		If you use zsh*, the following will load kubectl zsh completion:
+		If you use zsh[1], the following will load kubectl zsh completion:
 
-		$ source <(kubectl completion zsh)
+		    $ source <(kubectl completion zsh)
 
-		* zsh completions are only supported in versions of zsh >= 5.2`)
+		[1] zsh completions are only supported in versions of zsh >= 5.2`)
 )
 
 var (
@@ -66,10 +64,9 @@ func NewCmdCompletion(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	}
 
 	cmd := &cobra.Command{
-		Use:     "completion SHELL",
-		Short:   "Output shell completion code for the given shell (bash or zsh)",
-		Long:    completion_long,
-		Example: completion_example,
+		Use:   "completion SHELL",
+		Short: "Output shell completion code for the given shell (bash or zsh)",
+		Long:  completion_long,
 		Run: func(cmd *cobra.Command, args []string) {
 			err := RunCompletion(f, out, cmd, args)
 			cmdutil.CheckErr(err)

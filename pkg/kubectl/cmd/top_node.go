@@ -20,11 +20,11 @@ import (
 	"errors"
 	"io"
 
-	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/api"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/metricsutil"
 	"k8s.io/kubernetes/pkg/labels"
@@ -40,12 +40,12 @@ type TopNodeOptions struct {
 }
 
 var (
-	topNodeLong = dedent.Dedent(`
+	topNodeLong = templates.LongDesc(`
 		Display Resource (CPU/Memory/Storage) usage of nodes.
 
 		The top-node command allows you to see the resource consumption of nodes.`)
 
-	topNodeExample = dedent.Dedent(`
+	topNodeExample = templates.Examples(`
 		  # Show metrics for all nodes
 		  kubectl top node
 

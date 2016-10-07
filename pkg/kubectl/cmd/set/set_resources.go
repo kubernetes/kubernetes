@@ -25,10 +25,33 @@ import (
 	"k8s.io/kubernetes/pkg/api/meta"
 
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
+)
+
+var (
+	resources_long = templates.LongDesc(`
+		Specify compute resource requirements (cpu, memory) for any resource that defines a pod template.  If a pod is successfully scheduled, it is guaranteed the amount of resource requested, but may burst up to its specified limits.
+
+		for each compute resource, if a limit is specified and a request is omitted, the request will default to the limit.
+
+		Possible resources include (case insensitive):`)
+
+	resources_example = templates.Examples(`
+		# Set a deployments nginx container cpu limits to "200m" and memory to "512Mi"
+		kubectl set resources deployment nginx -c=nginx --limits=cpu=200m,memory=512Mi
+
+		# Set the resource request and limits for all containers in nginx
+		kubectl set resources deployment nginx --limits=cpu=200m,memory=512Mi --requests=cpu=100m,memory=256Mi
+
+		# Remove the resource requests for resources on containers in nginx
+		kubectl set resources deployment nginx --limits=cpu=0,memory=0 --requests=cpu=0,memory=0
+
+		# Print the result (in yaml format) of updating nginx container limits from a local, without hitting the server
+		kubectl set resources -f path/to/file.yaml --limits=cpu=200m,memory=512Mi --dry-run -o yaml`)
 )
 
 // ResourcesOptions is the start of the data required to perform the operation. As new fields are added, add them here instead of
@@ -59,32 +82,6 @@ type ResourcesOptions struct {
 	Resources              []string
 }
 
-const (
-	resources_long = `Specify compute resource requirements (cpu, memory) for any resource that defines a pod template.  If a pod is successfully scheduled, it is guaranteed the amount of resource requested, but may burst up to its specified limits.
-
-for each compute resource, if a limit is specified and a request is omitted, the request will default to the limit.
-
-Possible resources include (case insensitive):`
-
-	resources_example = `
-# Set a deployments nginx container cpu limits to "200m and memory to "512Mi"
-
-kubectl set resources deployment nginx -c=nginx --limits=cpu=200m,memory=512Mi
-
-# Set the resource request and limits for all containers in nginx
-
-kubectl set resources deployment nginx --limits=cpu=200m,memory=512Mi --requests=cpu=100m,memory=256Mi
-
-# Remove the resource requests for resources on containers in nginx
-
-kubectl set resources deployment nginx --limits=cpu=0,memory=0 --requests=cpu=0,memory=0
-
-# Print the result (in yaml format) of updating nginx container limits from a local, without hitting the server
-
-kubectl set resources -f path/to/file.yaml --limits=cpu=200m,memory=512Mi --dry-run -o yaml
-`
-)
-
 func NewCmdResources(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Command {
 	options := &ResourcesOptions{
 		Out: out,
@@ -100,7 +97,7 @@ func NewCmdResources(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.
 	cmd := &cobra.Command{
 		Use:     "resources (-f FILENAME | TYPE NAME)  ([--limits=LIMITS & --requests=REQUESTS]",
 		Short:   "update resource requests/limits on objects with pod templates",
-		Long:    resources_long + "\n" + pod_specs[2:],
+		Long:    resources_long + " " + pod_specs[2:],
 		Example: resources_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(options.Complete(f, cmd, args))

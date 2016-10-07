@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/renstrom/dedent"
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/util/interrupt"
@@ -31,7 +31,7 @@ import (
 )
 
 var (
-	status_long = dedent.Dedent(`
+	status_long = templates.LongDesc(`
 		Show the status of the rollout.
 
 		By default 'rollout status' will watch the status of the latest rollout
@@ -40,7 +40,8 @@ var (
 		'rollout status' will continue watching the latest revision. If you want to
 		pin to a specific revision and abort if it is rolled over by another revision,
 		use --revision=N where N is the revision you need to watch for.`)
-	status_example = dedent.Dedent(`
+
+	status_example = templates.Examples(`
 		# Watch the rollout status of a deployment
 		kubectl rollout status deployment/nginx`)
 )

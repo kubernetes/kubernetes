@@ -22,11 +22,13 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
-const help_long = `Help provides help for any command in the application.
-Simply type kubectl help [path to command] for full details.`
+var help_long = templates.LongDesc(`
+	Help provides help for any command in the application.
+	Simply type kubectl help [path to command] for full details.`)
 
 func NewCmdHelp(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{

@@ -22,11 +22,11 @@ import (
 	"strings"
 
 	"github.com/evanphx/json-patch"
-	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -48,14 +48,14 @@ type PatchOptions struct {
 }
 
 var (
-	patch_long = dedent.Dedent(`
+	patch_long = templates.LongDesc(`
 		Update field(s) of a resource using strategic merge patch
 
 		JSON and YAML formats are accepted.
 
 		Please refer to the models in https://htmlpreview.github.io/?https://github.com/kubernetes/kubernetes/blob/HEAD/docs/api-reference/v1/definitions.html to find if a field is mutable.`)
-	patch_example = dedent.Dedent(`
 
+	patch_example = templates.Examples(`
 		# Partially update a node using strategic merge patch
 		kubectl patch node k8s-node-1 -p '{"spec":{"unschedulable":true}}'
 

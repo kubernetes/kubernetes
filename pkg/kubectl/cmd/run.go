@@ -22,7 +22,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/distribution/reference"
@@ -36,6 +35,7 @@ import (
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
 	conditions "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -45,10 +45,12 @@ import (
 )
 
 var (
-	run_long = dedent.Dedent(`
+	run_long = templates.LongDesc(`
 		Create and run a particular image, possibly replicated.
+
 		Creates a deployment or job to manage the created container(s).`)
-	run_example = dedent.Dedent(`
+
+	run_example = templates.Examples(`
 		# Start a single instance of nginx.
 		kubectl run nginx --image=nginx
 
