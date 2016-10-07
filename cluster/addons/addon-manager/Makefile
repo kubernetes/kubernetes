@@ -66,7 +66,8 @@ push: build
 	gcloud docker -- push $(IMAGE)-$(ARCH):$(VERSION)
 ifeq ($(ARCH),amd64)
 	# Backward compatibility. TODO: deprecate this image tag
-	docker tag -f $(IMAGE)-$(ARCH):$(VERSION) $(IMAGE):$(VERSION)
+	docker rmi $(IMAGE):$(VERSION) || true
+	docker tag $(IMAGE)-$(ARCH):$(VERSION) $(IMAGE):$(VERSION)
 	gcloud docker -- push $(IMAGE):$(VERSION)
 endif
 
