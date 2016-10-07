@@ -278,7 +278,7 @@ func createPVPVC(c *client.Client, pvConfig persistentVolumeConfig, ns string, p
 // Create the desired number of PVs and PVCs and return them in separate maps. If the
 // number of PVs != the number of PVCs then the min of those two counts is the number of
 // PVs expected to bind.
-func createPVsPVCs(numpvs, numpvcs int, c *client.Client, ns, serverIP string) (pvmap, pvcmap) {
+func createPVsPVCs(numpvs, numpvcs int, c *client.Client, ns string, pvConfig persistentVolumeConfig) (pvmap, pvcmap) {
 
 	var i int
 	var pv *api.PersistentVolume
@@ -296,14 +296,14 @@ func createPVsPVCs(numpvs, numpvcs int, c *client.Client, ns, serverIP string) (
 
 	// create pvs and pvcs
 	for i = 0; i < pvsToCreate; i++ {
-		pv, pvc = createPVPVC(c, serverIP, ns, false)
+		pv, pvc = createPVPVC(c, pvConfig, ns, false)
 		pvMap[pv.Name] = pvval{}
 		pvcMap[makePvcKey(ns, pvc.Name)] = pvcval{}
 	}
 
 	// create extra pvs or pvcs as needed
 	for i = 0; i < extraPVs; i++ {
-		pv = makePersistentVolume(serverIP, nil)
+		pv = makePersistentVolume(pvConfig)
 		pv = createPV(c, pv)
 		pvMap[pv.Name] = pvval{}
 	}
@@ -499,16 +499,6 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 		serverArgs:  []string{"-G", "777", "/exports"},
 	}
 
-	pvConfig = persistentVolumeConfig {
-		pvsource: api.PersistentVolumeSource{
-			NFS: &api.NFSVolumeSource{
-				Server:   "",
-				Path:     "/exports",
-				ReadOnly: false,
-			},
-		},
-	}
-
 	BeforeEach(func() {
 		c = f.Client
 		ns = f.Namespace.Name
@@ -521,10 +511,6 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 			serverIP = nfsServerPod.Status.PodIP
 			framework.Logf("NFS server IP address: %v", serverIP)
 		}
-		if pvConfig.pvsource.NFS != nil {
-			pvConfig.pvsource.NFS.Server = serverIP
-		}
-
 	})
 
 	// Execute after *all* the tests have run
@@ -543,13 +529,23 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 	// and multiple unevenly paired PV/PVCs
 	framework.KubeDescribe("PV:NFS", func() {
 
+		pvConfig = persistentVolumeConfig {
+			pvsource: api.PersistentVolumeSource{
+				NFS: &api.NFSVolumeSource{
+					Server:   serverIP,
+					Path:     "/exports",
+					ReadOnly: false,
+				},
+			},
+		}
+
 		Context("with Single PV - PVC pairs", func() {
 
 			var pv *api.PersistentVolume
 			var pvc *api.PersistentVolumeClaim
 
 			pvConfig = persistentVolumeConfig{
-				pvsource: api.PersistentVolumeSource {
+				pvsource: api.PersistentVolumeSource{
 					NFS: &api.NFSVolumeSource{
 						Server:   serverIP,
 						Path:     "/exports",
@@ -622,54 +618,56 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 			})
 		})
 
-	// Create multiple pvs and pvcs, all in the same namespace. The PVs-PVCs are
-	// verified to bind, though it's not known in advanced which PV will bind to
-	// which claim. For each pv-pvc pair create a pod that writes to the nfs mount.
-	// Note: when the number of PVs exceeds the number of PVCs the max binding wait
-	//   time will occur for each PV in excess. This is expected but the delta
-	//   should be kept small so that the tests aren't unnecessarily slow.
-	// Note: future tests may wish to incorporate the following:
-	//   a) pre-binding, b) create pvcs before pvs, c) create pvcs and pods
-	//   in different namespaces.
-	Context("with multiple PVs and PVCs all in same ns", func() {
+		// Create multiple pvs and pvcs, all in the same namespace. The PVs-PVCs are
+		// verified to bind, though it's not known in advanced which PV will bind to
+		// which claim. For each pv-pvc pair create a pod that writes to the nfs mount.
+		// Note: when the number of PVs exceeds the number of PVCs the max binding wait
+		//   time will occur for each PV in excess. This is expected but the delta
+		//   should be kept small so that the tests aren't unnecessarily slow.
+		// Note: future tests may wish to incorporate the following:
+		//   a) pre-binding, b) create pvcs before pvs, c) create pvcs and pods
+		//   in different namespaces.
+		Context("with multiple PVs and PVCs all in same ns", func() {
 
-		// define the maximum number of PVs and PVCs supported by these tests
-		const maxNumPVs = 10
-		const maxNumPVCs = 10
-		// create the pv and pvc maps to be reused in the It blocks
-		pvols := make(pvmap, maxNumPVs)
-		claims := make(pvcmap, maxNumPVCs)
+			// define the maximum number of PVs and PVCs supported by these tests
+			const maxNumPVs = 10
+			const maxNumPVCs = 10
+			// create the pv and pvc maps to be reused in the It blocks
+			pvols := make(pvmap, maxNumPVs)
+			claims := make(pvcmap, maxNumPVCs)
 
-		AfterEach(func() {
-			pvPvcCleanup(c, ns, pvols, claims)
+			AfterEach(func() {
+				pvPvcCleanup(c, ns, pvols, claims)
+			})
+
+			// Create 2 PVs and 4 PVCs.
+			// Note: PVs are created before claims and no pre-binding
+			It("should create 2 PVs and 4 PVCs: test write access[Flaky]", func() {
+				numPVs, numPVCs := 2, 4
+				pvols, claims = createPVsPVCs(numPVs, numPVCs, c, ns, pvConfig)
+				waitAndVerifyBinds(c, ns, pvols, claims, true)
+				completeMultiTest(f, c, ns, pvols, claims)
+			})
+
+			// Create 3 PVs and 3 PVCs.
+			// Note: PVs are created before claims and no pre-binding
+			It("should create 3 PVs and 3 PVCs: test write access[Flaky]", func() {
+				numPVs, numPVCs := 3, 3
+				pvols, claims = createPVsPVCs(numPVs, numPVCs, c, ns, pvConfig)
+				waitAndVerifyBinds(c, ns, pvols, claims, true)
+				completeMultiTest(f, c, ns, pvols, claims)
+			})
+
+			// Create 4 PVs and 2 PVCs.
+			// Note: PVs are created before claims and no pre-binding.
+			It("should create 4 PVs and 2 PVCs: test write access[Flaky]", func() {
+				numPVs, numPVCs := 4, 2
+				pvols, claims = createPVsPVCs(numPVs, numPVCs, c, ns, pvConfig)
+				waitAndVerifyBinds(c, ns, pvols, claims, true)
+				completeMultiTest(f, c, ns, pvols, claims)
+			})
 		})
-
-		// Create 2 PVs and 4 PVCs.
-		// Note: PVs are created before claims and no pre-binding
-		It("should create 2 PVs and 4 PVCs: test write access[Flaky]", func() {
-			numPVs, numPVCs := 2, 4
-			pvols, claims = createPVsPVCs(numPVs, numPVCs, c, ns, serverIP)
-			waitAndVerifyBinds(c, ns, pvols, claims, true)
-			completeMultiTest(f, c, ns, pvols, claims)
-		})
-
-		// Create 3 PVs and 3 PVCs.
-		// Note: PVs are created before claims and no pre-binding
-		It("should create 3 PVs and 3 PVCs: test write access[Flaky]", func() {
-			numPVs, numPVCs := 3, 3
-			pvols, claims = createPVsPVCs(numPVs, numPVCs, c, ns, serverIP)
-			waitAndVerifyBinds(c, ns, pvols, claims, true)
-			completeMultiTest(f, c, ns, pvols, claims)
-		})
-
-		// Create 4 PVs and 2 PVCs.
-		// Note: PVs are created before claims and no pre-binding.
-		It("should create 4 PVs and 2 PVCs: test write access[Flaky]", func() {
-			numPVs, numPVCs := 4, 2
-			pvols, claims = createPVsPVCs(numPVs, numPVCs, c, ns, serverIP)
-			waitAndVerifyBinds(c, ns, pvols, claims, true)
-			completeMultiTest(f, c, ns, pvols, claims)
-
+	})
 	///////////////////////////////////////////////////////////////////////
 	//				GCE PD
 	///////////////////////////////////////////////////////////////////////
