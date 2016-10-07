@@ -66,6 +66,10 @@
 			"Rev": "2492d97b402e00797833c03ac5fa1c572c7bb29a"
 		},
 		{
+			"ImportPath": "github.com/MakeNowJust/heredoc",
+			"Rev": "1d91351acdc1cb2f2c995864674b754134b86ca7"
+		},
+		{
 			"ImportPath": "github.com/Microsoft/go-winio",
 			"Comment": "v0.1.0",
 			"Rev": "8f9387ea7efabb228a981b9c381142be7667967f"
@@ -1536,6 +1540,10 @@
 			"ImportPath": "github.com/mistifyio/go-zfs",
 			"Comment": "v2.1.1-5-g1b4ae6f",
 			"Rev": "1b4ae6fb4e77b095934d4430860ff202060169f8"
+		},
+		{
+			"ImportPath": "github.com/mitchellh/go-wordwrap",
+			"Rev": "ad45545899c7b13c020ea92b2072220eefad42b8"
 		},
 		{
 			"ImportPath": "github.com/mitchellh/mapstructure",
