@@ -225,13 +225,21 @@ runTests() {
   # must make sure the output from PARALLEL runs is not mixed. To achieve this,
   # we spawn a subshell for each PARALLEL process, redirecting the output to
   # separate files.
-  # cmd/libs/go2idl/generator is fragile when run under coverage, so ignore it for now.
-  # see: https://github.com/kubernetes/kubernetes/issues/24967
+
+  # ignore paths:
+  # cmd/libs/go2idl/generator: is fragile when run under coverage, so ignore it for now.
+  #                            https://github.com/kubernetes/kubernetes/issues/24967
+  # vendor/k8s.io/client-go/1.4/rest: causes cover internal errors
+  #                            https://github.com/golang/go/issues/16540
+  cover_ignore_dirs="cmd/libs/go2idl/generator|vendor/k8s.io/client-go/1.4/rest"
+  for path in $(echo $cover_ignore_dirs | sed 's/|/ /g'); do
+      echo -e "skipped\tk8s.io/kubernetes/$path"
+  done
   #
   # `go test` does not install the things it builds. `go test -i` installs
   # the build artifacts but doesn't run the tests.  The two together provide
   # a large speedup for tests that do not need to be rebuilt.
-  printf "%s\n" "${@}" | grep -v "cmd/libs/go2idl/generator"| xargs -I{} -n1 -P${KUBE_COVERPROCS} \
+  printf "%s\n" "${@}" | grep -Ev $cover_ignore_dirs | xargs -I{} -n1 -P${KUBE_COVERPROCS} \
     bash -c "set -o pipefail; _pkg=\"{}\"; _pkg_out=\${_pkg//\//_}; \
         go test -i ${goflags[@]:+${goflags[@]}} \
           ${KUBE_RACE} \
