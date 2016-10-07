@@ -133,6 +133,8 @@ message LinuxPodSandboxConfig {
     // The configurations for the sandbox's namespaces.
     // This will be used only if the PodSandbox uses namespace for isolation.
     optional NamespaceOption namespace_options = 2;
+    // Optional SELinux context to be applied.
+    optional SELinuxOption selinux_options = 3;
 }
 
 // PodSandboxMetadata holds all necessary information for building the sandbox name.
@@ -340,7 +342,7 @@ message LinuxContainerResources {
     optional int64 oom_score_adj = 5;
 }
 
-// SELinuxOption are the labels to be applied to the container.
+// SELinuxOption are the labels to be applied to a sandbox.
 message SELinuxOption {
     optional string user = 1;
     optional string role = 2;
@@ -363,10 +365,8 @@ message LinuxContainerConfig {
     optional LinuxContainerResources resources = 1;
     // Capabilities to add or drop.
     optional Capability capabilities = 2;
-    // Optional SELinux context to be applied.
-    optional SELinuxOption selinux_options = 3;
     // User contains the user for the container process.
-    optional LinuxUser user = 4;
+    optional LinuxUser user = 3;
 }
 
 message LinuxUser {
