@@ -75,9 +75,12 @@ else
     #exit 1
   fi
   [[ -n "${KUBE_GCS_RELEASE_BUCKET-}" ]] \
-   && bucket_flag="--bucket=${KUBE_GCS_RELEASE_BUCKET-}"
+    && bucket_flag="--bucket=${KUBE_GCS_RELEASE_BUCKET-}"
   ${FEDERATION} && federation_flag="--federation"
-  ${push_build} ${bucket_flag-} ${federation_flag-} --nomock --verbose --ci
+  [[ -n "${KUBE_GCS_RELEASE_SUFFIX-}" ]] \
+    && gcs_suffix_flag="--gcs-suffix=${KUBE_GCS_RELEASE_SUFFIX-}"
+  ${push_build} ${bucket_flag-} ${federation_flag-} ${gcs_suffix_flag-} \
+    --nomock --verbose --ci
 fi
 
 sha256sum _output/release-tars/kubernetes*.tar.gz
