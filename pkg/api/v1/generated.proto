@@ -2460,6 +2460,27 @@ message ReplicationController {
   optional ReplicationControllerStatus status = 3;
 }
 
+// ReplicationControllerCondition describes the state of a replication controller at a certain point.
+message ReplicationControllerCondition {
+  // Type of replication controller condition.
+  optional string type = 1;
+
+  // Status of the condition, one of True, False, Unknown.
+  optional string status = 2;
+
+  // Last time we probed the condition.
+  optional k8s.io.kubernetes.pkg.api.unversioned.Time lastProbeTime = 3;
+
+  // The last time the condition transitioned from one status to another.
+  optional k8s.io.kubernetes.pkg.api.unversioned.Time lastTransitionTime = 4;
+
+  // The reason for the condition's last transition.
+  optional string reason = 5;
+
+  // A human readable message indicating details about the transition.
+  optional string message = 6;
+}
+
 // ReplicationControllerList is a collection of replication controllers.
 message ReplicationControllerList {
   // Standard list metadata.
@@ -2515,6 +2536,9 @@ message ReplicationControllerStatus {
 
   // ObservedGeneration reflects the generation of the most recently observed replication controller.
   optional int64 observedGeneration = 3;
+
+  // Represents the latest available observations of a replication controller's current state.
+  repeated ReplicationControllerCondition conditions = 6;
 }
 
 // ResourceFieldSelector represents container resources (cpu, memory) and their output format

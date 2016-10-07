@@ -280,6 +280,8 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 		Convert_api_RangeAllocation_To_v1_RangeAllocation,
 		Convert_v1_ReplicationController_To_api_ReplicationController,
 		Convert_api_ReplicationController_To_v1_ReplicationController,
+		Convert_v1_ReplicationControllerCondition_To_api_ReplicationControllerCondition,
+		Convert_api_ReplicationControllerCondition_To_v1_ReplicationControllerCondition,
 		Convert_v1_ReplicationControllerList_To_api_ReplicationControllerList,
 		Convert_api_ReplicationControllerList_To_v1_ReplicationControllerList,
 		Convert_v1_ReplicationControllerSpec_To_api_ReplicationControllerSpec,
@@ -5601,6 +5603,42 @@ func Convert_api_ReplicationController_To_v1_ReplicationController(in *api.Repli
 	return autoConvert_api_ReplicationController_To_v1_ReplicationController(in, out, s)
 }
 
+func autoConvert_v1_ReplicationControllerCondition_To_api_ReplicationControllerCondition(in *ReplicationControllerCondition, out *api.ReplicationControllerCondition, s conversion.Scope) error {
+	out.Type = api.ReplicationControllerConditionType(in.Type)
+	out.Status = api.ConditionStatus(in.Status)
+	if err := api.Convert_unversioned_Time_To_unversioned_Time(&in.LastProbeTime, &out.LastProbeTime, s); err != nil {
+		return err
+	}
+	if err := api.Convert_unversioned_Time_To_unversioned_Time(&in.LastTransitionTime, &out.LastTransitionTime, s); err != nil {
+		return err
+	}
+	out.Reason = in.Reason
+	out.Message = in.Message
+	return nil
+}
+
+func Convert_v1_ReplicationControllerCondition_To_api_ReplicationControllerCondition(in *ReplicationControllerCondition, out *api.ReplicationControllerCondition, s conversion.Scope) error {
+	return autoConvert_v1_ReplicationControllerCondition_To_api_ReplicationControllerCondition(in, out, s)
+}
+
+func autoConvert_api_ReplicationControllerCondition_To_v1_ReplicationControllerCondition(in *api.ReplicationControllerCondition, out *ReplicationControllerCondition, s conversion.Scope) error {
+	out.Type = ReplicationControllerConditionType(in.Type)
+	out.Status = ConditionStatus(in.Status)
+	if err := api.Convert_unversioned_Time_To_unversioned_Time(&in.LastProbeTime, &out.LastProbeTime, s); err != nil {
+		return err
+	}
+	if err := api.Convert_unversioned_Time_To_unversioned_Time(&in.LastTransitionTime, &out.LastTransitionTime, s); err != nil {
+		return err
+	}
+	out.Reason = in.Reason
+	out.Message = in.Message
+	return nil
+}
+
+func Convert_api_ReplicationControllerCondition_To_v1_ReplicationControllerCondition(in *api.ReplicationControllerCondition, out *ReplicationControllerCondition, s conversion.Scope) error {
+	return autoConvert_api_ReplicationControllerCondition_To_v1_ReplicationControllerCondition(in, out, s)
+}
+
 func autoConvert_v1_ReplicationControllerList_To_api_ReplicationControllerList(in *ReplicationControllerList, out *api.ReplicationControllerList, s conversion.Scope) error {
 	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
@@ -5693,6 +5731,17 @@ func autoConvert_v1_ReplicationControllerStatus_To_api_ReplicationControllerStat
 	out.ReadyReplicas = in.ReadyReplicas
 	out.AvailableReplicas = in.AvailableReplicas
 	out.ObservedGeneration = in.ObservedGeneration
+	if in.Conditions != nil {
+		in, out := &in.Conditions, &out.Conditions
+		*out = make([]api.ReplicationControllerCondition, len(*in))
+		for i := range *in {
+			if err := Convert_v1_ReplicationControllerCondition_To_api_ReplicationControllerCondition(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Conditions = nil
+	}
 	return nil
 }
 
@@ -5706,6 +5755,17 @@ func autoConvert_api_ReplicationControllerStatus_To_v1_ReplicationControllerStat
 	out.ReadyReplicas = in.ReadyReplicas
 	out.AvailableReplicas = in.AvailableReplicas
 	out.ObservedGeneration = in.ObservedGeneration
+	if in.Conditions != nil {
+		in, out := &in.Conditions, &out.Conditions
+		*out = make([]ReplicationControllerCondition, len(*in))
+		for i := range *in {
+			if err := Convert_api_ReplicationControllerCondition_To_v1_ReplicationControllerCondition(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Conditions = nil
+	}
 	return nil
 }
 
