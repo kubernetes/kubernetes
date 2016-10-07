@@ -146,6 +146,11 @@ func FuzzerFor(t *testing.T, version schema.GroupVersion, src rand.Source) *fuzz
 			c.FuzzNoCustom(j) // fuzz self without calling this function again
 			//j.TemplateRef = nil // this is required for round trip
 		},
+		func(j *extensions.DeploymentSpec, c fuzz.Continue) {
+			c.FuzzNoCustom(j) // fuzz self without calling this function again
+			rhl := int32(c.Rand.Int31())
+			j.RevisionHistoryLimit = &rhl
+		},
 		func(j *extensions.DeploymentStrategy, c fuzz.Continue) {
 			c.FuzzNoCustom(j) // fuzz self without calling this function again
 			// Ensure that strategyType is one of valid values.

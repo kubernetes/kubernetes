@@ -148,7 +148,7 @@ func TestSetDefaultDaemonSet(t *testing.T) {
 }
 
 func TestSetDefaultDeployment(t *testing.T) {
-	defaultIntOrString := intstr.FromInt(1)
+	defaultIntOrString := intstr.FromString("25%")
 	differentIntOrString := intstr.FromInt(5)
 	period := int64(v1.DefaultTerminationGracePeriodSeconds)
 	defaultTemplate := v1.PodTemplateSpec{
@@ -176,7 +176,8 @@ func TestSetDefaultDeployment(t *testing.T) {
 							MaxUnavailable: &defaultIntOrString,
 						},
 					},
-					Template: defaultTemplate,
+					RevisionHistoryLimit: newInt32(3),
+					Template:             defaultTemplate,
 				},
 			},
 		},
@@ -201,7 +202,8 @@ func TestSetDefaultDeployment(t *testing.T) {
 							MaxUnavailable: &defaultIntOrString,
 						},
 					},
-					Template: defaultTemplate,
+					RevisionHistoryLimit: newInt32(3),
+					Template:             defaultTemplate,
 				},
 			},
 		},
@@ -225,7 +227,8 @@ func TestSetDefaultDeployment(t *testing.T) {
 							MaxUnavailable: &defaultIntOrString,
 						},
 					},
-					Template: defaultTemplate,
+					RevisionHistoryLimit: newInt32(3),
+					Template:             defaultTemplate,
 				},
 			},
 		},
@@ -236,6 +239,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 					Strategy: DeploymentStrategy{
 						Type: RecreateDeploymentStrategyType,
 					},
+					RevisionHistoryLimit: newInt32(0),
 				},
 			},
 			expected: &Deployment{
@@ -244,7 +248,8 @@ func TestSetDefaultDeployment(t *testing.T) {
 					Strategy: DeploymentStrategy{
 						Type: RecreateDeploymentStrategyType,
 					},
-					Template: defaultTemplate,
+					RevisionHistoryLimit: newInt32(0),
+					Template:             defaultTemplate,
 				},
 			},
 		},
@@ -256,6 +261,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 						Type: RecreateDeploymentStrategyType,
 					},
 					ProgressDeadlineSeconds: newInt32(30),
+					RevisionHistoryLimit:    newInt32(2),
 				},
 			},
 			expected: &Deployment{
@@ -264,8 +270,9 @@ func TestSetDefaultDeployment(t *testing.T) {
 					Strategy: DeploymentStrategy{
 						Type: RecreateDeploymentStrategyType,
 					},
+					ProgressDeadlineSeconds: newInt32(30),
+					RevisionHistoryLimit:    newInt32(2),
 					Template:                defaultTemplate,
-					ProgressDeadlineSeconds: newInt32(30),
 				},
 			},
 		},
@@ -283,6 +290,19 @@ func TestSetDefaultDeployment(t *testing.T) {
 		if !reflect.DeepEqual(got.Spec, expected.Spec) {
 			t.Errorf("object mismatch!\nexpected:\n\t%+v\ngot:\n\t%+v", got.Spec, expected.Spec)
 		}
+	}
+}
+
+func TestDefaultDeploymentAvailability(t *testing.T) {
+	d := roundTrip(t, runtime.Object(&Deployment{})).(*Deployment)
+
+	maxUnavailable, err := intstr.GetValueFromIntOrPercent(d.Spec.Strategy.RollingUpdate.MaxUnavailable, int(*(d.Spec.Replicas)), false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if *(d.Spec.Replicas)-int32(maxUnavailable) <= 0 {
+		t.Fatalf("the default value of maxUnavailable can lead to no active replicas during rolling update")
 	}
 }
 
