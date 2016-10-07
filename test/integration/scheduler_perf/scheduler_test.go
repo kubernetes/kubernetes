@@ -30,23 +30,23 @@ const (
 )
 
 // TestSchedule100Node3KPods schedules 3k pods on 100 nodes.
-func TestSchedule100Node3KPods(t *testing.T) {
-	if testing.Short() {
-		t.Skip("Skipping because we want to run short tests")
-	}
-	if min := schedulePods(100, 3000); min < threshold3K {
-		t.Errorf("To small pod scheduling throughput for 3k pods. Expected %v got %v", threshold3K, min)
-	} else {
-		fmt.Printf("Minimal observed throughput for 3k pod test: %v\n", min)
-	}
-}
+// func TestSchedule100Node3KPods(t *testing.T) {
+// 	if testing.Short() {
+// 		t.Skip("Skipping because we want to run short tests")
+// 	}
+// 	if min := schedulePods(testConfig{numNodes: 100, numPods: 3000, numAffinityGroups: 1}); min < threshold3K {
+// 		t.Errorf("To small pod scheduling throughput for 3k pods. Expected %v got %v", threshold3K, min)
+// 	} else {
+// 		fmt.Printf("Minimal observed throughput for 3k pod test: %v\n", min)
+// 	}
+// }
 
 // TestSchedule1000Node30KPods schedules 30k pods on 1000 nodes.
 func TestSchedule1000Node30KPods(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping because we want to run short tests")
 	}
-	if min := schedulePods(1000, 30000); min < threshold30K {
+	if min := schedulePods(testConfig{numNodes: 1000, numPods: 30000, numAffinityGroups: 100}); min < threshold30K {
 		t.Errorf("To small pod scheduling throughput for 30k pods. Expected %v got %v", threshold30K, min)
 	} else {
 		fmt.Printf("Minimal observed throughput for 30k pod test: %v\n", min)
@@ -59,25 +59,44 @@ func TestSchedule1000Node30KPods(t *testing.T) {
 // 	if testing.Short() {
 // 		t.Skip("Skipping because we want to run short tests")
 // 	}
-// 	if min := schedulePods(2000, 60000); min < threshold60K {
+// 	if min := schedulePods(testConfig{numNodes: 2000, numPods: 60000}); min < threshold60K {
 // 		t.Errorf("To small pod scheduling throughput for 60k pods. Expected %v got %v", threshold60K, min)
 // 	} else {
 // 		fmt.Printf("Minimal observed throughput for 60k pod test: %v\n", min)
 // 	}
 // }
 
+type testConfig struct {
+	numNodes          int
+	numPods           int
+	numAffinityGroups int
+}
+
+func perGroup(numObjects, numGroups int) int {
+	return (numObjects + numGroups - 1) / numGroups
+}
+
 // schedulePods schedules specific number of pods on specific number of nodes.
 // This is used to learn the scheduling throughput on various
 // sizes of cluster and changes as more and more pods are scheduled.
 // It won't stop until all pods are scheduled.
 // It retruns the minimum of throughput over whole run.
-func schedulePods(numNodes, numPods int) int32 {
+func schedulePods(config testConfig) int32 {
+
 	schedulerConfigFactory, destroyFunc := mustSetupScheduler()
 	defer destroyFunc()
 	c := schedulerConfigFactory.Client
 
-	makeNodes(c, numNodes)
-	makePodsFromRC(c, "rc1", numPods)
+	if config.numAffinityGroups < 1 {
+		makeNodes(c, config.numNodes)
+		makePodsFromRC(c, "rc1", config.numPods)
+	} else {
+		podsPerGroup := perGroup(config.numPods, config.numAffinityGroups)
+		nodesPerGroup := perGroup(config.numNodes, config.numAffinityGroups)
+		for i := 0; i < config.numAffinityGroups; i++ {
+			makeNodesAndPodsMatchingNodeAffinity(c, nodesPerGroup, podsPerGroup, fmt.Sprintf("affinity-%v", i))
+		}
+	}
 
 	prev := 0
 	minQps := int32(math.MaxInt32)
@@ -87,9 +106,9 @@ func schedulePods(numNodes, numPods int) int32 {
 		// Listing 10000 pods is an expensive operation, so running it frequently may impact scheduler.
 		// TODO: Setup watch on apiserver and wait until all pods scheduled.
 		scheduled := schedulerConfigFactory.ScheduledPodLister.Indexer.List()
-		if len(scheduled) >= numPods {
+		if len(scheduled) >= config.numPods {
 			fmt.Printf("Scheduled %v Pods in %v seconds (%v per second on average).\n",
-				numPods, int(time.Since(start)/time.Second), numPods/int(time.Since(start)/time.Second))
+				config.numPods, int(time.Since(start)/time.Second), config.numPods/int(time.Since(start)/time.Second))
 			return minQps
 		}
 		// There's no point in printing it for the last iteration, as the value is random

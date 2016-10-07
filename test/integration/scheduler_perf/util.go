@@ -17,6 +17,7 @@ limitations under the License.
 package benchmark
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 
@@ -78,6 +79,67 @@ func mustSetupScheduler() (schedulerConfigFactory *factory.ConfigFactory, destro
 		glog.Infof("destroyed")
 	}
 	return
+}
+
+func makeNodesAndPodsMatchingNodeAffinity(c client.Interface, nodeCount, podCount int, prefix string) {
+	glog.Infof("making %d nodes for prefix: %v", nodeCount, prefix)
+	baseNode := &api.Node{
+		ObjectMeta: api.ObjectMeta{
+			GenerateName: prefix + "-node-",
+			Labels:       map[string]string{"node-affinity-group": prefix},
+		},
+		Spec: api.NodeSpec{
+			ExternalID: "foobar",
+		},
+		Status: api.NodeStatus{
+			Capacity: api.ResourceList{
+				api.ResourcePods:   *resource.NewQuantity(110, resource.DecimalSI),
+				api.ResourceCPU:    resource.MustParse("4"),
+				api.ResourceMemory: resource.MustParse("32Gi"),
+			},
+			Phase: api.NodeRunning,
+			Conditions: []api.NodeCondition{
+				{Type: api.NodeReady, Status: api.ConditionTrue},
+			},
+		},
+	}
+	for i := 0; i < nodeCount; i++ {
+		if _, err := c.Nodes().Create(baseNode); err != nil {
+			panic("error creating node: " + err.Error())
+		}
+	}
+
+	glog.Infof("making %d pods for prefix: %v", podCount, prefix)
+	basePod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			GenerateName: prefix + "-pod-",
+			Annotations: map[string]string{
+				"scheduler.alpha.kubernetes.io/affinity": fmt.Sprintf(`
+					{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
+						"nodeSelectorTerms": [
+							{
+								"matchExpressions": [{
+									"key": "node-affinity-group",
+									"operator": "In",
+									"values": ["%v"]
+								}]
+							}
+						]
+					}}}`, prefix),
+			},
+		},
+		Spec: makePodSpec(),
+	}
+	createPod := func(i int) {
+		for {
+			if _, err := c.Pods("default").Create(basePod); err == nil {
+				break
+			} else {
+				glog.Errorf("Error while creating pod: %v", err)
+			}
+		}
+	}
+	workqueue.Parallelize(30, podCount, createPod)
 }
 
 func makeNodes(c client.Interface, nodeCount int) {
