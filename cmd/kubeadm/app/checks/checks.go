@@ -126,7 +126,7 @@ func (ipc InPathCheck) Check() (warnings []string, errors []string) {
 	return nil, nil
 }
 
-func RunMasterChecks() {
+func RunInitMasterChecks() {
 	// TODO: Some of these ports should come from kubeadm config eventually:
 	checks := []PreFlightCheck{
 		ServiceCheck{"kubelet"},
