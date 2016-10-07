@@ -1083,36 +1083,22 @@ func PodToleratesNodeTaints(pod *api.Pod, meta interface{}, nodeInfo *schedulerc
 		return false, nil, err
 	}
 
-	if tolerated, someUntoleratedTaintIsNoAdmit := tolerationsToleratesTaints(tolerations, taints); tolerated {
+	if tolerationsToleratesTaints(tolerations, taints) {
 		return true, nil, nil
-	} else {
-		return false, []algorithm.PredicateFailureReason{newErrTaintsTolerationsNotMatch(someUntoleratedTaintIsNoAdmit)}, nil
 	}
+	return false, []algorithm.PredicateFailureReason{ErrTaintsTolerationsNotMatch}, nil
 }
 
-// tolerationsToleratesTaints checks if given tolerations can live with given taints.
-// It returns:
-// 1. whether tolerated or not;
-// 2. whether kubelet should be aware if it's unfit.
-func tolerationsToleratesTaints(tolerations []api.Toleration, taints []api.Taint) (bool, bool) {
+func tolerationsToleratesTaints(tolerations []api.Toleration, taints []api.Taint) bool {
 	// If the taint list is nil/empty, it is tolerated by all tolerations by default.
 	if len(taints) == 0 {
-		return true, false
+		return true
 	}
 
 	// The taint list isn't nil/empty, a nil/empty toleration list can't tolerate them.
 	if len(tolerations) == 0 {
-		// if there's taint has TaintEffectNoScheduleNoAdmit, kubelet should also be aware of this.
-		for _, taint := range taints {
-			if taint.Effect == api.TaintEffectNoScheduleNoAdmit {
-				return false, true
-			}
-		}
-		return false, false
+		return false
 	}
-
-	someUntoleratedTaintIsNoAdmit := false
-	fits := true
 
 	for i := range taints {
 		taint := &taints[i]
@@ -1121,16 +1107,12 @@ func tolerationsToleratesTaints(tolerations []api.Toleration, taints []api.Taint
 			continue
 		}
 
-		if tolerated := api.TaintToleratedByTolerations(taint, tolerations); !tolerated {
-			fits = false
-			if taint.Effect == api.TaintEffectNoScheduleNoAdmit {
-				someUntoleratedTaintIsNoAdmit = true
-				return fits, someUntoleratedTaintIsNoAdmit
-			}
+		if !api.TaintToleratedByTolerations(taint, tolerations) {
+			return false
 		}
 	}
 
-	return fits, someUntoleratedTaintIsNoAdmit
+	return true
 }
 
 // Determine if a pod is scheduled with best-effort QoS
