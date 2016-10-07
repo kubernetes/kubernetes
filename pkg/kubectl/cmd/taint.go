@@ -24,11 +24,11 @@ import (
 	"encoding/json"
 
 	"github.com/golang/glog"
-	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -53,15 +53,16 @@ type TaintOptions struct {
 }
 
 var (
-	taint_long = dedent.Dedent(`
+	taint_long = templates.LongDesc(`
 		Update the taints on one or more nodes.
 
-		A taint consists of a key, value, and effect. As an argument here, it is expressed as key=value:effect.
-		The key must begin with a letter or number, and may contain letters, numbers, hyphens, dots, and underscores, up to %[1]d characters.
-		The value must begin with a letter or number, and may contain letters, numbers, hyphens, dots, and underscores, up to %[1]d characters.
-		The effect must be NoSchedule or PreferNoSchedule.
-		Currently taint can only apply to node.`)
-	taint_example = dedent.Dedent(`
+		* A taint consists of a key, value, and effect. As an argument here, it is expressed as key=value:effect.
+		* The key must begin with a letter or number, and may contain letters, numbers, hyphens, dots, and underscores, up to %[1]d characters.
+		* The value must begin with a letter or number, and may contain letters, numbers, hyphens, dots, and underscores, up to %[1]d characters.
+		* The effect must be NoSchedule or PreferNoSchedule.
+		* Currently taint can only apply to node.`)
+
+	taint_example = templates.Examples(`
 		# Update node 'foo' with a taint with key 'dedicated' and value 'special-user' and effect 'NoSchedule'.
 		# If a taint with that key and effect already exists, its value is replaced as specified.
 		kubectl taint nodes foo dedicated=special-user:NoSchedule

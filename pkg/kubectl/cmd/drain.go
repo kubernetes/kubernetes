@@ -23,7 +23,6 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -31,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/kubelet/types"
@@ -71,13 +71,12 @@ const (
 )
 
 var (
-	cordon_long = dedent.Dedent(`
-		Mark node as unschedulable.
-		`)
-	cordon_example = dedent.Dedent(`
+	cordon_long = templates.LongDesc(`
+		Mark node as unschedulable.`)
+
+	cordon_example = templates.Examples(`
 		# Mark node "foo" as unschedulable.
-		kubectl cordon foo
-		`)
+		kubectl cordon foo`)
 )
 
 func NewCmdCordon(f cmdutil.Factory, out io.Writer) *cobra.Command {
@@ -97,13 +96,12 @@ func NewCmdCordon(f cmdutil.Factory, out io.Writer) *cobra.Command {
 }
 
 var (
-	uncordon_long = dedent.Dedent(`
-		Mark node as schedulable.
-		`)
-	uncordon_example = dedent.Dedent(`
+	uncordon_long = templates.LongDesc(`
+		Mark node as schedulable.`)
+
+	uncordon_example = templates.Examples(`
 		# Mark node "foo" as schedulable.
-		$ kubectl uncordon foo
-		`)
+		$ kubectl uncordon foo`)
 )
 
 func NewCmdUncordon(f cmdutil.Factory, out io.Writer) *cobra.Command {
@@ -123,7 +121,7 @@ func NewCmdUncordon(f cmdutil.Factory, out io.Writer) *cobra.Command {
 }
 
 var (
-	drain_long = dedent.Dedent(`
+	drain_long = templates.LongDesc(`
 		Drain node in preparation for maintenance.
 
 		The given node will be marked unschedulable to prevent new pods from arriving.
@@ -139,16 +137,14 @@ var (
 		When you are ready to put the node back into service, use kubectl uncordon, which
 		will make the node schedulable again.
 
-		![Workflow](http://kubernetes.io/images/docs/kubectl_drain.svg)
-		`)
+		![Workflow](http://kubernetes.io/images/docs/kubectl_drain.svg)`)
 
-	drain_example = dedent.Dedent(`
+	drain_example = templates.Examples(`
 		# Drain node "foo", even if there are pods not managed by a ReplicationController, ReplicaSet, Job, or DaemonSet on it.
 		$ kubectl drain foo --force
 
 		# As above, but abort if there are pods not managed by a ReplicationController, ReplicaSet, Job, or DaemonSet, and use a grace period of 15 minutes.
-		$ kubectl drain foo --grace-period=900
-		`)
+		$ kubectl drain foo --grace-period=900`)
 )
 
 func NewCmdDrain(f cmdutil.Factory, out io.Writer) *cobra.Command {

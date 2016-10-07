@@ -20,15 +20,15 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
 var (
-	configMapLong = dedent.Dedent(`
+	configMapLong = templates.LongDesc(`
 		Create a configmap based on a file, directory, or specified literal value.
 
 		A single configmap may package one or more key/value pairs.
@@ -38,10 +38,9 @@ var (
 
 		When creating a configmap based on a directory, each file whose basename is a valid key in the directory will be
 		packaged into the configmap.  Any directory entries except regular files are ignored (e.g. subdirectories,
-		symlinks, devices, pipes, etc).
-		`)
+		symlinks, devices, pipes, etc).`)
 
-	configMapExample = dedent.Dedent(`
+	configMapExample = templates.Examples(`
 		  # Create a new configmap named my-config with keys for each file in folder bar
 		  kubectl create configmap my-config --from-file=path/to/bar
 

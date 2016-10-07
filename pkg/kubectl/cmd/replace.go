@@ -23,12 +23,12 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -36,15 +36,17 @@ import (
 )
 
 var (
-	replace_long = dedent.Dedent(`
+	replace_long = templates.LongDesc(`
 		Replace a resource by filename or stdin.
 
 		JSON and YAML formats are accepted. If replacing an existing resource, the
 		complete resource spec must be provided. This can be obtained by
-		$ kubectl get TYPE NAME -o yaml
+
+		    $ kubectl get TYPE NAME -o yaml
 
 		Please refer to the models in https://htmlpreview.github.io/?https://github.com/kubernetes/kubernetes/blob/HEAD/docs/api-reference/v1/definitions.html to find if a field is mutable.`)
-	replace_example = dedent.Dedent(`
+
+	replace_example = templates.Examples(`
 		# Replace a pod using the data in pod.json.
 		kubectl replace -f ./pod.json
 

@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"github.com/jonboulle/clockwork"
-	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -32,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/labels"
@@ -58,16 +58,16 @@ const (
 )
 
 var (
-	apply_long = dedent.Dedent(`
+	apply_long = templates.LongDesc(`
 		Apply a configuration to a resource by filename or stdin.
 		This resource will be created if it doesn't exist yet.
 		To use 'apply', always create the resource initially with either 'apply' or 'create --save-config'.
 
 		JSON and YAML formats are accepted.
-		
+
 		Alpha Disclaimer: the --prune functionality is not yet complete. Do not use unless you are aware of what the current state is. See https://issues.k8s.io/34274.`)
 
-	apply_example = dedent.Dedent(`
+	apply_example = templates.Examples(`
 		# Apply the configuration in pod.json to a pod.
 		kubectl apply -f ./pod.json
 
