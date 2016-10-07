@@ -52,11 +52,27 @@ type FakeHandler struct {
 	lock           sync.Mutex
 	requestCount   int
 	hasBeenChecked bool
+
+	SkipRequestFn func(verb string, url url.URL) bool
+}
+
+func (f *FakeHandler) SetResponseBody(responseBody string) {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+	f.ResponseBody = responseBody
 }
 
 func (f *FakeHandler) ServeHTTP(response http.ResponseWriter, request *http.Request) {
 	f.lock.Lock()
 	defer f.lock.Unlock()
+
+	if f.SkipRequestFn != nil && f.SkipRequestFn(request.Method, *request.URL) {
+		response.Header().Set("Content-Type", "application/json")
+		response.WriteHeader(f.StatusCode)
+		response.Write([]byte(f.ResponseBody))
+		return
+	}
+
 	f.requestCount++
 	if f.hasBeenChecked {
 		panic("got request after having been validated")
