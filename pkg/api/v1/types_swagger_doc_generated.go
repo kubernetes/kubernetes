@@ -1721,7 +1721,7 @@ var map_Taint = map[string]string{
 	"":       "The node this Taint is attached to has the effect \"effect\" on any pod that that does not tolerate the Taint.",
 	"key":    "Required. The taint key to be applied to a node.",
 	"value":  "Required. The taint value corresponding to the taint key.",
-	"effect": "Required. The effect of the taint on pods that do not tolerate the taint. Valid effects are NoSchedule, NoScheduleNoAdmit and PreferNoSchedule.",
+	"effect": "Required. The effect of the taint on pods that do not tolerate the taint. Valid effects are NoSchedule and PreferNoSchedule.",
 }
 
 func (Taint) SwaggerDoc() map[string]string {
@@ -1733,7 +1733,7 @@ var map_Toleration = map[string]string{
 	"key":      "Required. Key is the taint key that the toleration applies to.",
 	"operator": "operator represents a key's relationship to the value. Valid operators are Exists and Equal. Defaults to Equal. Exists is equivalent to wildcard for value, so that a pod can tolerate all taints of a particular category.",
 	"value":    "Value is the taint value the toleration matches to. If the operator is Exists, the value should be empty, otherwise just a regular string.",
-	"effect":   "Effect indicates the taint effect to match. Empty means match all taint effects. When specified, allowed values are NoSchedule, NoScheduleNoAdmit and PreferNoSchedule.",
+	"effect":   "Effect indicates the taint effect to match. Empty means match all taint effects. When specified, allowed values are NoSchedule and PreferNoSchedule.",
 }
 
 func (Toleration) SwaggerDoc() map[string]string {

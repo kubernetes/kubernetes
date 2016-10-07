@@ -1464,7 +1464,7 @@ type Taint struct {
 	Value string `json:"value,omitempty"`
 	// Required. The effect of the taint on pods
 	// that do not tolerate the taint.
-	// Valid effects are NoSchedule, NoScheduleNoAdmit and PreferNoSchedule.
+	// Valid effects are NoSchedule and PreferNoSchedule.
 	Effect TaintEffect `json:"effect"`
 }
 
@@ -1480,11 +1480,12 @@ const (
 	// new pods onto the node, rather than prohibiting new pods from scheduling
 	// onto the node entirely. Enforced by the scheduler.
 	TaintEffectPreferNoSchedule TaintEffect = "PreferNoSchedule"
+	// NOT YET IMPLEMENTED. TODO: Uncomment field once it is implemented.
 	// Do not allow new pods to schedule onto the node unless they tolerate the taint,
 	// do not allow pods to start on Kubelet unless they tolerate the taint,
 	// but allow all already-running pods to continue running.
 	// Enforced by the scheduler and Kubelet.
-	TaintEffectNoScheduleNoAdmit TaintEffect = "NoScheduleNoAdmit"
+	// TaintEffectNoScheduleNoAdmit TaintEffect = "NoScheduleNoAdmit"
 	// NOT YET IMPLEMENTED. TODO: Uncomment field once it is implemented.
 	// Do not allow new pods to schedule onto the node unless they tolerate the taint,
 	// do not allow pods to start on Kubelet unless they tolerate the taint,
@@ -1507,7 +1508,7 @@ type Toleration struct {
 	// If the operator is Exists, the value should be empty, otherwise just a regular string.
 	Value string `json:"value,omitempty"`
 	// Effect indicates the taint effect to match. Empty means match all taint effects.
-	// When specified, allowed values are NoSchedule,NoScheduleNoAdmit and PreferNoSchedule.
+	// When specified, allowed values are NoSchedule and PreferNoSchedule.
 	Effect TaintEffect `json:"effect,omitempty"`
 	// TODO: For forgiveness (#1574), we'd eventually add at least a grace period
 	// here, and possibly an occurrence threshold and period.
