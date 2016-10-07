@@ -24,8 +24,10 @@ import (
 	_ "k8s.io/kubernetes/pkg/api/install"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
 	. "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	deployutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
@@ -145,7 +147,7 @@ func TestSetDefaultDaemonSet(t *testing.T) {
 }
 
 func TestSetDefaultDeployment(t *testing.T) {
-	defaultIntOrString := intstr.FromInt(1)
+	defaultIntOrString := intstr.FromString("25%")
 	differentIntOrString := intstr.FromInt(5)
 	period := int64(v1.DefaultTerminationGracePeriodSeconds)
 	defaultTemplate := v1.PodTemplateSpec{
@@ -172,7 +174,8 @@ func TestSetDefaultDeployment(t *testing.T) {
 							MaxUnavailable: &defaultIntOrString,
 						},
 					},
-					Template: defaultTemplate,
+					RevisionHistoryLimit: newInt32(3),
+					Template:             defaultTemplate,
 				},
 			},
 		},
@@ -197,7 +200,8 @@ func TestSetDefaultDeployment(t *testing.T) {
 							MaxUnavailable: &defaultIntOrString,
 						},
 					},
-					Template: defaultTemplate,
+					RevisionHistoryLimit: newInt32(3),
+					Template:             defaultTemplate,
 				},
 			},
 		},
@@ -221,7 +225,8 @@ func TestSetDefaultDeployment(t *testing.T) {
 							MaxUnavailable: &defaultIntOrString,
 						},
 					},
-					Template: defaultTemplate,
+					RevisionHistoryLimit: newInt32(3),
+					Template:             defaultTemplate,
 				},
 			},
 		},
@@ -232,6 +237,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 					Strategy: DeploymentStrategy{
 						Type: RecreateDeploymentStrategyType,
 					},
+					RevisionHistoryLimit: newInt32(0),
 				},
 			},
 			expected: &Deployment{
@@ -240,7 +246,8 @@ func TestSetDefaultDeployment(t *testing.T) {
 					Strategy: DeploymentStrategy{
 						Type: RecreateDeploymentStrategyType,
 					},
-					Template: defaultTemplate,
+					RevisionHistoryLimit: newInt32(0),
+					Template:             defaultTemplate,
 				},
 			},
 		},
@@ -251,6 +258,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 					Strategy: DeploymentStrategy{
 						Type: RecreateDeploymentStrategyType,
 					},
+					RevisionHistoryLimit: newInt32(2),
 				},
 			},
 			expected: &Deployment{
@@ -259,7 +267,8 @@ func TestSetDefaultDeployment(t *testing.T) {
 					Strategy: DeploymentStrategy{
 						Type: RecreateDeploymentStrategyType,
 					},
-					Template: defaultTemplate,
+					RevisionHistoryLimit: newInt32(2),
+					Template:             defaultTemplate,
 				},
 			},
 		},
@@ -277,6 +286,26 @@ func TestSetDefaultDeployment(t *testing.T) {
 		if !reflect.DeepEqual(got.Spec, expected.Spec) {
 			t.Errorf("got different than expected:\n\t%+v\ngot:\n\t%+v", got.Spec, expected.Spec)
 		}
+	}
+}
+
+func TestDefaultDeploymentAvailability(t *testing.T) {
+	d := &Deployment{}
+	obj := roundTrip(t, runtime.Object(d))
+	in, ok := obj.(*Deployment)
+	if !ok {
+		t.Errorf("unexpected object: %v", in)
+		t.FailNow()
+	}
+
+	out := &extensions.Deployment{}
+	if err := api.Scheme.Convert(in, out, nil); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	maxUnavailable := deployutil.MaxUnavailable(*out)
+	if out.Spec.Replicas-maxUnavailable <= 0 {
+		t.Fatalf("rolling Deployment supports maximum unavailability by default")
 	}
 }
 
