@@ -50,6 +50,12 @@ type pvckey string // "namespace/pvc.Name"
 type pvcval struct{}
 type pvcmap map[pvckey]pvcval
 
+// TODO fill in some comment stuff here
+type persistentVolumeConfig struct{
+	prebind *api.PersistentVolumeClaim
+	pvsource api.PersistentVolumeSource
+}
+
 // return the pvc's namespace. Key is: "ns/pvcName"
 func (k pvckey) NS() string {
 	s := strings.Split(string(k), "/")
@@ -213,19 +219,18 @@ func createPVC(c *client.Client, ns string, pvc *api.PersistentVolumeClaim) *api
 // Note: in the pre-bind case the real PVC name, which is generated, is not
 //   known until after the PVC is instantiated. This is why the pvc is created
 //   before the pv.
-func createPVCPV(c *client.Client, serverIP, ns string, preBind bool) (*api.PersistentVolume, *api.PersistentVolumeClaim) {
+func createPVCPV(c *client.Client, pvConfig persistentVolumeConfig, ns string, preBind bool) (*api.PersistentVolume, *api.PersistentVolumeClaim) {
 
-	var bindTo *api.PersistentVolumeClaim
 	var preBindMsg string
 
 	// make the pvc definition first
 	pvc := makePersistentVolumeClaim(ns)
 	if preBind {
 		preBindMsg = " pre-bound"
-		bindTo = pvc
+		pvConfig.prebind = pvc
 	}
 	// make the pv spec
-	pv := makePersistentVolume(serverIP, bindTo)
+	pv := makePersistentVolume(pvConfig)
 
 	By(fmt.Sprintf("Creating a PVC followed by a%s PV", preBindMsg))
 	// instantiate the pvc
@@ -247,7 +252,7 @@ func createPVCPV(c *client.Client, serverIP, ns string, preBind bool) (*api.Pers
 // Note: in the pre-bind case the real PV name, which is generated, is not
 //   known until after the PV is instantiated. This is why the pv is created
 //   before the pvc.
-func createPVPVC(c *client.Client, serverIP, ns string, preBind bool) (*api.PersistentVolume, *api.PersistentVolumeClaim) {
+func createPVPVC(c *client.Client, pvConfig persistentVolumeConfig, ns string, preBind bool) (*api.PersistentVolume, *api.PersistentVolumeClaim) {
 
 	preBindMsg := ""
 	if preBind {
@@ -256,7 +261,7 @@ func createPVPVC(c *client.Client, serverIP, ns string, preBind bool) (*api.Pers
 	framework.Logf("Creating a PV followed by a%s PVC", preBindMsg)
 
 	// make the pv and pvc definitions
-	pv := makePersistentVolume(serverIP, nil)
+	pv := makePersistentVolume(pvConfig)
 	pvc := makePersistentVolumeClaim(ns)
 
 	// instantiate the pv
@@ -480,10 +485,10 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 	f := framework.NewDefaultFramework("pv")
 	var c *client.Client
 	var ns string
-
 	var NFSconfig VolumeTestConfig
 	var serverIP string
 	var nfsServerPod *api.Pod
+	var pvConfig persistentVolumeConfig
 
 	// config for the nfs-server pod in the default namespace
 	NFSconfig = VolumeTestConfig{
@@ -494,18 +499,32 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 		serverArgs:  []string{"-G", "777", "/exports"},
 	}
 
+	pvConfig = persistentVolumeConfig {
+		pvsource: api.PersistentVolumeSource{
+			NFS: &api.NFSVolumeSource{
+				Server:   "",
+				Path:     "/exports",
+				ReadOnly: false,
+			},
+		},
+	}
+
 	BeforeEach(func() {
 		c = f.Client
 		ns = f.Namespace.Name
 
-		// If it doesn't exist, create the nfs server pod in "default" ns
-		// The "default" ns is used so that individual tests can delete
-		// their ns without impacting the nfs-server pod.
+		// If it doesn't exist, create the nfs server pod in the "default" ns.
+		// The "default" ns is used so that individual tests can delete their
+		// ns without impacting the nfs-server pod.
 		if nfsServerPod == nil {
 			nfsServerPod = startVolumeServer(c, NFSconfig)
 			serverIP = nfsServerPod.Status.PodIP
 			framework.Logf("NFS server IP address: %v", serverIP)
 		}
+		if pvConfig.pvsource.NFS != nil {
+			pvConfig.pvsource.NFS.Server = serverIP
+		}
+
 	})
 
 	// Execute after *all* the tests have run
@@ -528,6 +547,16 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 
 			var pv *api.PersistentVolume
 			var pvc *api.PersistentVolumeClaim
+
+			pvConfig = persistentVolumeConfig{
+				pvsource: api.PersistentVolumeSource {
+					NFS: &api.NFSVolumeSource{
+						Server:   serverIP,
+						Path:     "/exports",
+						ReadOnly: false,
+					},
+				},
+			}
 
 			// Note: this is the only code where the pv is deleted.
 			AfterEach(func() {
@@ -564,7 +593,7 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 			// contains the claim. Verify that the PV and PVC bind correctly, and
 			// that the pod can write to the nfs volume.
 			It("should create a non-pre-bound PV and PVC: test write access [Flaky]", func() {
-				pv, pvc = createPVPVC(c, serverIP, ns, false)
+				pv, pvc = createPVPVC(c, pvConfig, ns, false)
 				completeTest(f, c, ns, pv, pvc)
 			})
 
@@ -572,7 +601,7 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 			// pod that contains the claim. Verify that the PV and PVC bind
 			// correctly, and that the pod can write to the nfs volume.
 			It("create a PVC and non-pre-bound PV: test write access [Flaky]", func() {
-				pv, pvc = createPVCPV(c, serverIP, ns, false)
+				pv, pvc = createPVCPV(c, pvConfig, ns, false)
 				completeTest(f, c, ns, pv, pvc)
 			})
 
@@ -580,7 +609,7 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 			// and a pod that contains the claim. Verify that the PV and PVC bind
 			// correctly, and that the pod can write to the nfs volume.
 			It("create a PVC and a pre-bound PV: test write access [Flaky]", func() {
-				pv, pvc = createPVCPV(c, serverIP, ns, true)
+				pv, pvc = createPVCPV(c, pvConfig, ns, true)
 				completeTest(f, c, ns, pv, pvc)
 			})
 
@@ -588,7 +617,7 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 			// and a pod that contains the claim. Verify that the PV and PVC bind
 			// correctly, and that the pod can write to the nfs volume.
 			It("create a PV and a pre-bound PVC: test write access [Flaky]", func() {
-				pv, pvc = createPVPVC(c, serverIP, ns, true)
+				pv, pvc = createPVPVC(c, pvConfig, ns, true)
 				completeTest(f, c, ns, pv, pvc)
 			})
 		})
@@ -653,7 +682,6 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 			pv        *api.PersistentVolume
 			pvc       *api.PersistentVolumeClaim
 			clientPod *api.Pod
-			pvSource  api.PersistentVolumeSource
 		)
 
 		BeforeEach(func() {
@@ -662,12 +690,15 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 			By("Creating a GCE Persistent Disk")
 			diskName, err = createPDWithRetry()
 			Expect(err).NotTo(HaveOccurred())
-			pvSource = api.PersistentVolumeSource{
-				GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{
-					PDName:   diskName,
-					FSType:   "ext3",
-					ReadOnly: false,
+			pvConfig = persistentVolumeConfig{
+				pvsource: api.PersistentVolumeSource{
+					GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{
+						PDName:   diskName,
+						FSType:   "ext3",
+						ReadOnly: false,
+					},
 				},
+				prebind: nil,
 			}
 		})
 
@@ -702,11 +733,7 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 
 		It("should test that deleting a PVC before the Pod does not cause unmount to fail on pod delete", func() {
 			By("Creating the PV and PVC")
-			pv = makePersistentVolume(serverIP, nil)
-			pv.Spec.PersistentVolumeSource = pvSource
-			pv = createPV(c, pv)
-			pvc = makePersistentVolumeClaim(ns)
-			pvc = createPVC(c, ns, pvc)
+			pv, pvc = createPVPVC(c, pvConfig, ns, false)
 
 			By("Creating the Client Pod")
 			clientPod = makeClientPod(ns, pvc.Name)
@@ -738,15 +765,15 @@ func makePvcKey(s1, s2 string) pvckey {
 //   (instantiated) and thus the PV's ClaimRef cannot be completely filled-in in
 //   this func. Therefore, the ClaimRef's name is added later in
 //   createPVCPV.
-func makePersistentVolume(serverIP string, pvc *api.PersistentVolumeClaim) *api.PersistentVolume {
+func makePersistentVolume(pvConfig persistentVolumeConfig) *api.PersistentVolume {
 	// Specs are expected to match this test's PersistentVolumeClaim
 
 	var claimRef *api.ObjectReference
 
-	if pvc != nil {
+	if pvConfig.prebind != nil {
 		claimRef = &api.ObjectReference{
-			Name:      pvc.Name,
-			Namespace: pvc.Namespace,
+			Name:      pvConfig.prebind.Name,
+			Namespace: pvConfig.prebind.Namespace,
 		}
 	}
 
@@ -762,13 +789,7 @@ func makePersistentVolume(serverIP string, pvc *api.PersistentVolumeClaim) *api.
 			Capacity: api.ResourceList{
 				api.ResourceName(api.ResourceStorage): resource.MustParse("2Gi"),
 			},
-			PersistentVolumeSource: api.PersistentVolumeSource{
-				NFS: &api.NFSVolumeSource{
-					Server:   serverIP,
-					Path:     "/exports",
-					ReadOnly: false,
-				},
-			},
+			PersistentVolumeSource: pvConfig.pvsource,
 			AccessModes: []api.PersistentVolumeAccessMode{
 				api.ReadWriteOnce,
 				api.ReadOnlyMany,
