@@ -262,7 +262,7 @@ Possible causes:
     - Linux: confirm via your init system
     - macOS w/ docker-machine: run `docker-machine ls` and `docker-machine start <name>`
     - macOS w/ Docker for Mac: Check the menu bar and start the Docker application
-  - DOCKER_HOST hasn't been set of is set incorrectly
+  - DOCKER_HOST hasn't been set or is set incorrectly
     - Linux: domain socket is used, DOCKER_* should be unset. In Bash run `unset ${!DOCKER_*}`
     - macOS w/ docker-machine: run `eval "$(docker-machine env <name>)"`
     - macOS w/ Docker for Mac: domain socket is used, DOCKER_* should be unset. In Bash run `unset ${!DOCKER_*}`
