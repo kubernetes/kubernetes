@@ -24,7 +24,8 @@ serve_hostname: serve_hostname.go
 container: serve_hostname
 	docker build -t $(PREFIX)/serve_hostname:$(TAG) .
 	if [ -n "$(TEST_PREFIX)" ]; then \
-	    docker tag -f $(PREFIX)/serve_hostname:$(TAG) $(TEST_PREFIX)/serve_hostname:$(TAG); \
+		docker rmi $(TEST_PREFIX)/serve_hostname:$(TAG) || true; \
+	    docker tag $(PREFIX)/serve_hostname:$(TAG) $(TEST_PREFIX)/serve_hostname:$(TAG); \
 	fi
 
 push:

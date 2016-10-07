@@ -40,7 +40,8 @@ ifeq ($(ARCH),amd64)
 	# If we should build an amd64 flannel image, go with the official one
 	docker pull quay.io/coreos/flannel:$(TAG)
 
-	docker tag -f quay.io/coreos/flannel:$(TAG) $(REGISTRY)/flannel-$(ARCH):$(TAG)
+	docker rmi $(REGISTRY)/flannel-$(ARCH):$(TAG) || true
+	docker tag quay.io/coreos/flannel:$(TAG) $(REGISTRY)/flannel-$(ARCH):$(TAG)
 else
 	# Copy the content in this dir to the temp dir
 	cp ./* $(TEMP_DIR)
