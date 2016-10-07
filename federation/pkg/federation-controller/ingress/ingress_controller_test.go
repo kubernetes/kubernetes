@@ -172,6 +172,12 @@ func TestIngressController(t *testing.T) {
 			fmt.Sprintf("UID's in configmaps in cluster's 1 and 2 are not equal (%q != %q)", cfg1.Data["uid"], updatedConfigMap2.Data["uid"]))
 	}
 
+	fedIngressWatch.Stop()
+	clusterWatch.Stop()
+	cluster1IngressWatch.Stop()
+	cluster1ConfigMapWatch.Stop()
+	cluster2IngressWatch.Stop()
+	cluster2ConfigMapWatch.Stop()
 	close(stop)
 }
 

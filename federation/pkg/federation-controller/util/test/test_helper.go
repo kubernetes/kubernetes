@@ -37,16 +37,24 @@ import (
 // A structure that distributes eventes to multiple watchers.
 type WatcherDispatcher struct {
 	sync.Mutex
-	watchers    []*watch.FakeWatcher
+	watchers    []*watch.RaceFreeFakeWatcher
 	eventsSoFar []*watch.Event
 }
 
-func (wd *WatcherDispatcher) register(watcher *watch.FakeWatcher) {
+func (wd *WatcherDispatcher) register(watcher *watch.RaceFreeFakeWatcher) {
 	wd.Lock()
 	defer wd.Unlock()
 	wd.watchers = append(wd.watchers, watcher)
 	for _, event := range wd.eventsSoFar {
 		watcher.Action(event.Type, event.Object)
+	}
+}
+
+func (wd *WatcherDispatcher) Stop() {
+	wd.Lock()
+	defer wd.Unlock()
+	for _, watcher := range wd.watchers {
+		watcher.Stop()
 	}
 }
 
@@ -126,12 +134,12 @@ func (wd *WatcherDispatcher) Action(action watch.EventType, obj runtime.Object) 
 // All subsequent requests for a watch on the client will result in returning this fake watcher.
 func RegisterFakeWatch(resource string, client *core.Fake) *WatcherDispatcher {
 	dispatcher := &WatcherDispatcher{
-		watchers:    make([]*watch.FakeWatcher, 0),
+		watchers:    make([]*watch.RaceFreeFakeWatcher, 0),
 		eventsSoFar: make([]*watch.Event, 0),
 	}
 
 	client.AddWatchReactor(resource, func(action core.Action) (bool, watch.Interface, error) {
-		watcher := watch.NewFakeWithChanSize(100)
+		watcher := watch.NewRaceFreeFake()
 		dispatcher.register(watcher)
 		return true, watcher, nil
 	})
