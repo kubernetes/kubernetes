@@ -68,7 +68,7 @@ func RetrieveTrustedClusterInfo(s *kubeadmapi.NodeConfiguration) (*kubeadmapi.Cl
 	}
 
 	// TODO(phase1+) print summary info about the CA certificate, along with the the checksum signature
-	// we also need an ability for the user to configure the client to validate recieved CA cert agains a checksum
+	// we also need an ability for the user to configure the client to validate received CA cert against a checksum
 	fmt.Printf("<node/discovery> cluster info signature and contents are valid, will use API endpoints %v\n", clusterInfo.Endpoints)
 	return &clusterInfo, nil
 }
