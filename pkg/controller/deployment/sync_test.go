@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
+	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
@@ -346,14 +347,20 @@ func TestDeploymentController_cleanupDeployment(t *testing.T) {
 	for i := range tests {
 		test := tests[i]
 		fake := &fake.Clientset{}
-		controller := NewDeploymentController(fake, controller.NoResyncPeriodFunc)
+		informers := informers.NewSharedInformerFactory(fake, controller.NoResyncPeriodFunc())
+		controller := NewDeploymentController(informers.Deployments(), informers.ReplicaSets(), informers.Pods(), fake)
 
 		controller.eventRecorder = &record.FakeRecorder{}
+		controller.dListerSynced = alwaysReady
 		controller.rsListerSynced = alwaysReady
 		controller.podListerSynced = alwaysReady
 		for _, rs := range test.oldRSs {
 			controller.rsLister.Indexer.Add(rs)
 		}
+
+		stopCh := make(chan struct{})
+		defer close(stopCh)
+		informers.Start(stopCh)
 
 		d := newDeployment("foo", 1, &test.revisionHistoryLimit, nil, nil, map[string]string{"foo": "bar"})
 		controller.cleanupDeployment(test.oldRSs, d)

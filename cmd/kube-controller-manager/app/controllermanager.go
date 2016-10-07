@@ -415,7 +415,7 @@ func StartControllers(s *options.CMServer, kubeconfig *restclient.Config, rootCl
 
 		if containsResource(resources, "deployments") {
 			glog.Infof("Starting deployment controller")
-			go deployment.NewDeploymentController(client("deployment-controller"), ResyncPeriod(s)).
+			go deployment.NewDeploymentController(sharedInformers.Deployments(), sharedInformers.ReplicaSets(), sharedInformers.Pods(), client("deployment-controller")).
 				Run(int(s.ConcurrentDeploymentSyncs), wait.NeverStop)
 			time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 		}
