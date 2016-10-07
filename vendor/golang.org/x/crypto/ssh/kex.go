@@ -46,7 +46,7 @@ type kexResult struct {
 	Hash crypto.Hash
 
 	// The session ID, which is the first H computed. This is used
-	// to signal data inside transport.
+	// to derive key material inside the transport.
 	SessionID []byte
 }
 
