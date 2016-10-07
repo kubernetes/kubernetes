@@ -21,6 +21,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"os/exec"
 )
 
 // PreFlightCheckers validate the state of the system to ensure kubeadm will be
@@ -101,13 +102,25 @@ func (dac DirAvailableChecker) Check() (warnings []string, errors []string) {
 	}
 	defer f.Close()
 
-	_, err = f.Readdirnames(1) // Or f.Readdir(1)
+	_, err = f.Readdirnames(1)
 	if err != io.EOF {
 		errors = append(errors, fmt.Sprintf("%s is not empty", dac.path))
 	}
 
 	return nil, errors
+}
 
+// InPathCheckers checks if the given executable is present in the path.
+type InPathChecker struct {
+	executable string
+}
+
+func (ipc InPathChecker) Check() (warnings []string, errors []string) {
+	_, err := exec.LookPath(ipc.executable)
+	if err != nil {
+		return nil, []string{fmt.Sprintf("%s not found in system path.", ipc.executable)}
+	}
+	return nil, nil
 }
 
 func RunMasterChecks() {
@@ -141,6 +154,8 @@ func RunMasterChecks() {
 		DirAvailableChecker{"/etc/kubernetes"},
 		DirAvailableChecker{"/var/lib/etcd"},
 		DirAvailableChecker{"/var/lib/kubelet"},
+		InPathChecker{"socat"},
+		InPathChecker{"ethtool"},
 	)
 
 	foundErrors := false
