@@ -125,21 +125,19 @@ func (config *DirectClientConfig) ClientConfig() (*restclient.Config, error) {
 		return nil, err
 	}
 
-	var requestTimeout time.Duration
+	clientConfig := &restclient.Config{}
+	clientConfig.Host = configClusterInfo.Server
+
 	if len(config.overrides.Timeout) > 0 {
-		if i, err := strconv.ParseUint(config.overrides.Timeout, 10, 64); err == nil {
-			requestTimeout = time.Duration(i) * time.Second
+		if i, err := strconv.ParseInt(config.overrides.Timeout, 10, 64); err == nil && i >= 0 {
+			clientConfig.Timeout = time.Duration(i) * time.Second
+		} else if requestTimeout, err := time.ParseDuration(config.overrides.Timeout); err == nil {
+			clientConfig.Timeout = requestTimeout
 		} else {
-			if requestTimeout, err = time.ParseDuration(config.overrides.Timeout); err != nil {
-				err := fmt.Errorf("Invalid value for option '--request-timeout'. Value must be a single integer, or an integer followed by a corresponding time unit (e.g. 1s | 2m | 3h)")
-				return nil, err
-			}
+			glog.Warningf("Invalid value for option '--request-timeout'. Value must be a single integer, or an integer followed by a corresponding time unit (e.g. 1s | 2m | 3h)")
 		}
 	}
 
-	clientConfig := &restclient.Config{}
-	clientConfig.Host = configClusterInfo.Server
-	clientConfig.Timeout = requestTimeout
 	if u, err := url.ParseRequestURI(clientConfig.Host); err == nil && u.Opaque == "" && len(u.Path) > 1 {
 		u.RawQuery = ""
 		u.Fragment = ""
