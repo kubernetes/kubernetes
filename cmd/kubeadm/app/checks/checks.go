@@ -147,6 +147,24 @@ func RunInitMasterChecks() {
 	runChecks(checks)
 }
 
+func RunJoinNodeChecks() {
+	// TODO: Some of these ports should come from kubeadm config eventually:
+	checks := []PreFlightCheck{
+		ServiceCheck{"kubelet"},
+		ServiceCheck{"docker"},
+		PortOpenCheck{8080},
+		PortOpenCheck{10250},
+		PortOpenCheck{10251},
+		PortOpenCheck{10252},
+		DirAvailableCheck{"/etc/kubernetes"},
+		DirAvailableCheck{"/var/lib/kubelet"},
+		InPathCheck{"socat"},
+		InPathCheck{"ethtool"},
+	}
+
+	runChecks(checks)
+}
+
 // runChecks runs each check, displays it's warnings/errors, and once all
 // are processed will exit if any errors occurred.
 func runChecks(checks []PreFlightCheck) {

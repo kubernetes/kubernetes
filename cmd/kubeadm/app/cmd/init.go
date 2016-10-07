@@ -19,7 +19,6 @@ package cmd
 import (
 	"fmt"
 	"io"
-	"os"
 
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
@@ -114,7 +113,10 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 		"etcd client key file. Note: The path must be in /etc/ssl/certs",
 	)
 	cmd.PersistentFlags().MarkDeprecated("external-etcd-keyfile", "this flag will be removed when componentconfig exists")
-	cmd.PersistentFlags().BoolVar(&skipChecks, "skip-checks", false, "skip checks normally run before modifying the system")
+	cmd.PersistentFlags().BoolVar(
+		&skipChecks, "skip-checks", false,
+		"skip checks normally run before modifying the system",
+	)
 
 	return cmd
 }
@@ -128,7 +130,7 @@ func RunInit(out io.Writer, cmd *cobra.Command, args []string, cfg *kubeadmapi.M
 	} else {
 		fmt.Println("Skipping pre-flight checks")
 	}
-	os.Exit(1)
+	//os.Exit(1)
 
 	// Auto-detect the IP
 	if len(cfg.API.AdvertiseAddresses) == 0 {
