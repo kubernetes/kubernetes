@@ -62,7 +62,7 @@ Aliases:
 		`{{if .HasExample}}
 
 Examples:
-{{ indentLines (.Example | trimLeft) 2 }}{{end}}` +
+{{ .Example}}{{end}}` +
 
 		// SUBCOMMANDS
 		`{{ if .HasAvailableSubCommands}}
