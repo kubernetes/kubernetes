@@ -101,53 +101,6 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 			Message: message,
 		}
 	}
-
-	// Check toleration against taints
-	// NOTE(harryz) consider move PodToleratesNodeTaints to GeneralPredicates to eliminate duplicate code here
-	fit, reasons, err = predicates.PodToleratesNodeTaints(pod, nil, nodeInfo)
-	if err != nil {
-		message := fmt.Sprintf("PodToleratesNodeTaints failed due to %v, which is unexpected.", err)
-		glog.Warningf("Failed to admit pod %v - %s", format.Pod(pod), message)
-		return PodAdmitResult{
-			Admit:   fit,
-			Reason:  "UnexpectedError",
-			Message: message,
-		}
-
-	}
-	if !fit {
-		var reason string
-		var message string
-		if len(reasons) == 0 {
-			message = fmt.Sprint("PodToleratesNodeTaints failed due to unknown reason, which is unexpected.")
-			glog.Warningf("Failed to admit pod %v - %s", format.Pod(pod), message)
-			return PodAdmitResult{
-				Admit:   fit,
-				Reason:  "UnknownReason",
-				Message: message,
-			}
-		}
-		r := reasons[0]
-		switch re := r.(type) {
-		case *predicates.ErrTaintsTolerationsNotMatch:
-			// if kubelet should not care this unfit
-			if !re.SomeUntoleratedTaintIsNoAdmit {
-				return PodAdmitResult{
-					Admit: true,
-				}
-			}
-			reason = "PodToleratesNodeTaints"
-			message = re.Error()
-			glog.Warningf("Failed to admit pod %v - %s", format.Pod(pod), message)
-		}
-
-		return PodAdmitResult{
-			Admit:   fit,
-			Reason:  reason,
-			Message: message,
-		}
-	}
-
 	return PodAdmitResult{
 		Admit: true,
 	}
