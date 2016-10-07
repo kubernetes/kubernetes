@@ -22,6 +22,8 @@ import (
 	"fmt"
 
 	"github.com/golang/glog"
+
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	unversionedextensions "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/unversioned"
 )
@@ -38,6 +40,15 @@ func updateReplicaCount(rsClient unversionedextensions.ReplicaSetInterface, rs e
 		rs.Generation == rs.Status.ObservedGeneration {
 		return nil
 	}
+
+	// deep copy to avoid mutation now.
+	// TODO this method need some work.  Retry on conflict probably, though I suspect this is stomping status to something it probably shouldn't
+	copyObj, err := api.Scheme.DeepCopy(rs)
+	if err != nil {
+		return err
+	}
+	rs = copyObj.(extensions.ReplicaSet)
+
 	// Save the generation number we acted on, otherwise we might wrongfully indicate
 	// that we've seen a spec update when we retry.
 	// TODO: This can clobber an update if we allow multiple agents to write to the
