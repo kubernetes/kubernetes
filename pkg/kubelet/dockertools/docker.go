@@ -43,6 +43,7 @@ import (
 const (
 	PodInfraContainerName = leaky.PodInfraContainerName
 	DockerPrefix          = "docker://"
+	DockerPullablePrefix  = "docker-pullable://"
 	LogSuffix             = "log"
 	ext4MaxFileNameLen    = 255
 )
@@ -66,7 +67,8 @@ type DockerInterface interface {
 	StartContainer(id string) error
 	StopContainer(id string, timeout int) error
 	RemoveContainer(id string, opts dockertypes.ContainerRemoveOptions) error
-	InspectImage(image string) (*dockertypes.ImageInspect, error)
+	InspectImageByRef(imageRef string) (*dockertypes.ImageInspect, error)
+	InspectImageByID(imageID string) (*dockertypes.ImageInspect, error)
 	ListImages(opts dockertypes.ImageListOptions) ([]dockertypes.Image, error)
 	PullImage(image string, auth dockertypes.AuthConfig, opts dockertypes.ImagePullOptions) error
 	RemoveImage(image string, opts dockertypes.ImageRemoveOptions) ([]dockertypes.ImageDelete, error)
@@ -136,7 +138,11 @@ func filterHTTPError(err error, image string) error {
 	}
 }
 
-// Check if the inspected image matches what we are looking for
+// matchImageTagOrSHA checks if the given image specifier is a valid image ref,
+// and that it matches the given image. It should fail on things like image IDs
+// (config digests) and other digest-only references, but succeed on image names
+// (`foo`), tag references (`foo:bar`), and manifest digest references
+// (`foo@sha256:xyz`).
 func matchImageTagOrSHA(inspected dockertypes.ImageInspect, image string) bool {
 	// The image string follows the grammar specified here
 	// https://github.com/docker/distribution/blob/master/reference/reference.go#L4
@@ -193,6 +199,43 @@ func matchImageTagOrSHA(inspected dockertypes.ImageInspect, image string) bool {
 	return false
 }
 
+// matchImageIDOnly checks that the given image specifier is a digest-only
+// reference, and that it matches the given image.
+func matchImageIDOnly(inspected dockertypes.ImageInspect, image string) bool {
+	// If the image ref is literally equal to the inspected image's ID,
+	// just return true here (this might be the case for Docker 1.9,
+	// where we won't have a digest for the ID)
+	if inspected.ID == image {
+		return true
+	}
+
+	// Otherwise, we should try actual parsing to be more correct
+	ref, err := dockerref.Parse(image)
+	if err != nil {
+		glog.V(4).Infof("couldn't parse image reference %q: %v", image, err)
+		return false
+	}
+
+	digest, isDigested := ref.(dockerref.Digested)
+	if !isDigested {
+		glog.V(4).Infof("the image reference %q was not a digest reference")
+		return false
+	}
+
+	id, err := dockerdigest.ParseDigest(inspected.ID)
+	if err != nil {
+		glog.V(4).Infof("couldn't parse image ID reference %q: %v", id, err)
+		return false
+	}
+
+	if digest.Digest().Algorithm().String() == id.Algorithm().String() && digest.Digest().Hex() == id.Hex() {
+		return true
+	}
+
+	glog.V(4).Infof("The reference %s does not directly refer to the given image's ID (%q)", image, inspected.ID)
+	return false
+}
+
 func (p dockerPuller) Pull(image string, secrets []api.Secret) error {
 	keyring, err := credentialprovider.MakeDockerKeyring(secrets, p.keyring)
 	if err != nil {
@@ -246,7 +289,7 @@ func (p dockerPuller) Pull(image string, secrets []api.Secret) error {
 }
 
 func (p dockerPuller) IsImagePresent(image string) (bool, error) {
-	_, err := p.client.InspectImage(image)
+	_, err := p.client.InspectImageByRef(image)
 	if err == nil {
 		return true, nil
 	}
