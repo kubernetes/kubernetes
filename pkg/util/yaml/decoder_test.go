@@ -106,7 +106,7 @@ func TestDecodeYAML(t *testing.T) {
 	s := NewYAMLToJSONDecoder(bytes.NewReader([]byte(`---
 stuff: 1
 
----
+---   
   `)))
 	obj := generic{}
 	if err := s.Decode(&obj); err != nil {
@@ -138,11 +138,11 @@ stuff: 1
 	obj := generic{}
 	err := s.Decode(&obj)
 	if err == nil {
-		t.Fatal("expected error with yaml: prefix, got no error")
+		t.Fatal("expected error with yaml: violate, got no error")
 	}
 	fmt.Printf("err: %s\n", err.Error())
-	if !strings.HasPrefix(err.Error(), "yaml: line 1:") {
-		t.Fatalf("expected %q to have 'yaml: line 1:' prefix", err.Error())
+	if !strings.HasPrefix(err.Error(), "yaml: line 2:") {
+		t.Fatalf("expected %q to have 'yaml: line 2:' found a tab character", err.Error())
 	}
 }
 
