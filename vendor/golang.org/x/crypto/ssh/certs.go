@@ -22,6 +22,7 @@ const (
 	CertAlgoECDSA256v01 = "ecdsa-sha2-nistp256-cert-v01@openssh.com"
 	CertAlgoECDSA384v01 = "ecdsa-sha2-nistp384-cert-v01@openssh.com"
 	CertAlgoECDSA521v01 = "ecdsa-sha2-nistp521-cert-v01@openssh.com"
+	CertAlgoED25519v01  = "ssh-ed25519-cert-v01@openssh.com"
 )
 
 // Certificate types distinguish between host and user
@@ -401,6 +402,7 @@ var certAlgoNames = map[string]string{
 	KeyAlgoECDSA256: CertAlgoECDSA256v01,
 	KeyAlgoECDSA384: CertAlgoECDSA384v01,
 	KeyAlgoECDSA521: CertAlgoECDSA521v01,
+	KeyAlgoED25519:  CertAlgoED25519v01,
 }
 
 // certToPrivAlgo returns the underlying algorithm for a certificate algorithm.
@@ -459,7 +461,7 @@ func (c *Certificate) Marshal() []byte {
 func (c *Certificate) Type() string {
 	algo, ok := certAlgoNames[c.Key.Type()]
 	if !ok {
-		panic("unknown cert key type")
+		panic("unknown cert key type " + c.Key.Type())
 	}
 	return algo
 }

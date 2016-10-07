@@ -7,6 +7,7 @@ package ssh
 import (
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/des"
 	"crypto/rc4"
 	"crypto/subtle"
 	"encoding/binary"
@@ -121,6 +122,9 @@ var cipherModes = map[string]*streamCipherMode{
 	// You should expect that an active attacker can recover plaintext if
 	// you do.
 	aes128cbcID: {16, aes.BlockSize, 0, nil},
+
+	// 3des-cbc is insecure and is disabled by default.
+	tripledescbcID: {24, des.BlockSize, 0, nil},
 }
 
 // prefixLen is the length of the packet prefix that contains the packet length
@@ -368,12 +372,7 @@ type cbcCipher struct {
 	oracleCamouflage uint32
 }
 
-func newAESCBCCipher(iv, key, macKey []byte, algs directionAlgorithms) (packetCipher, error) {
-	c, err := aes.NewCipher(key)
-	if err != nil {
-		return nil, err
-	}
-
+func newCBCCipher(c cipher.Block, iv, key, macKey []byte, algs directionAlgorithms) (packetCipher, error) {
 	cbc := &cbcCipher{
 		mac:        macModes[algs.MAC].new(macKey),
 		decrypter:  cipher.NewCBCDecrypter(c, iv),
@@ -382,6 +381,34 @@ func newAESCBCCipher(iv, key, macKey []byte, algs directionAlgorithms) (packetCi
 	}
 	if cbc.mac != nil {
 		cbc.macSize = uint32(cbc.mac.Size())
+	}
+
+	return cbc, nil
+}
+
+func newAESCBCCipher(iv, key, macKey []byte, algs directionAlgorithms) (packetCipher, error) {
+	c, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+
+	cbc, err := newCBCCipher(c, iv, key, macKey, algs)
+	if err != nil {
+		return nil, err
+	}
+
+	return cbc, nil
+}
+
+func newTripleDESCBCCipher(iv, key, macKey []byte, algs directionAlgorithms) (packetCipher, error) {
+	c, err := des.NewTripleDESCipher(key)
+	if err != nil {
+		return nil, err
+	}
+
+	cbc, err := newCBCCipher(c, iv, key, macKey, algs)
+	if err != nil {
+		return nil, err
 	}
 
 	return cbc, nil
