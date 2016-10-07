@@ -37,3 +37,4 @@ ENV KUBE_GIT_VERSION_FILE ${HOME}/.dockerized-kube-version-defs
 ADD rsyncd.password /
 RUN chmod a+r /rsyncd.password
 ADD rsyncd.sh /
+run chmod a+rx /rsyncd.sh
