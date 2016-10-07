@@ -56,8 +56,6 @@ CONFIG_CONTEXT="${KUBE_CONFIG_CONTEXT:-aws_${INSTANCE_PREFIX}}"
 CLUSTER_ID=${INSTANCE_PREFIX}
 VPC_NAME=${VPC_NAME:-kubernetes-vpc}
 AWS_SSH_KEY=${AWS_SSH_KEY:-$HOME/.ssh/kube_aws_rsa}
-IAM_PROFILE_MASTER="kubernetes-master-${INSTANCE_PREFIX}"
-IAM_PROFILE_NODE="kubernetes-minion-${INSTANCE_PREFIX}"
 
 LOG="/dev/null"
 
