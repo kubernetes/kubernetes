@@ -1945,18 +1945,7 @@ func loadClientFromConfig(config *restclient.Config) (*client.Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error creating client: %v", err.Error())
 	}
-	if c.Client.Timeout == 0 {
-		c.Client.Timeout = SingleCallTimeout
-	}
 	return c, nil
-}
-
-func setTimeouts(cs ...*http.Client) {
-	for _, client := range cs {
-		if client.Timeout == 0 {
-			client.Timeout = SingleCallTimeout
-		}
-	}
 }
 
 func LoadFederationClientset_1_5() (*federation_release_1_5.Clientset, error) {
@@ -1969,8 +1958,6 @@ func LoadFederationClientset_1_5() (*federation_release_1_5.Clientset, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error creating federation clientset: %v", err.Error())
 	}
-	// Set timeout for each client in the set.
-	setTimeouts(c.DiscoveryClient.Client, c.FederationClient.Client, c.CoreClient.Client, c.ExtensionsClient.Client)
 	return c, nil
 }
 
