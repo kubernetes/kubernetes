@@ -354,7 +354,7 @@ func NewMasterConfig() *master.Config {
 		StorageFactory:        storageFactory,
 		EnableCoreControllers: true,
 		EnableWatchCache:      true,
-		KubeletClient:         kubeletclient.FakeKubeletClient{},
+		KubeletClientConfig:   kubeletclient.KubeletClientConfig{Port: 10250},
 	}
 }
 
