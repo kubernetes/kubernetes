@@ -1169,20 +1169,17 @@ func (d *ReplicaSetDescriber) Describe(namespace, name string, describerSettings
 		return "", err
 	}
 
-	running, waiting, succeeded, failed, err := getPodStatusForController(pc, selector)
-	if err != nil {
-		return "", err
-	}
+	running, waiting, succeeded, failed, getPodErr := getPodStatusForController(pc, selector)
 
 	var events *api.EventList
 	if describerSettings.ShowEvents {
 		events, _ = d.Events(namespace).Search(rs)
 	}
 
-	return describeReplicaSet(rs, events, running, waiting, succeeded, failed)
+	return describeReplicaSet(rs, events, running, waiting, succeeded, failed, getPodErr)
 }
 
-func describeReplicaSet(rs *extensions.ReplicaSet, events *api.EventList, running, waiting, succeeded, failed int) (string, error) {
+func describeReplicaSet(rs *extensions.ReplicaSet, events *api.EventList, running, waiting, succeeded, failed int, getPodErr error) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", rs.Name)
 		fmt.Fprintf(out, "Namespace:\t%s\n", rs.Namespace)
@@ -1190,7 +1187,12 @@ func describeReplicaSet(rs *extensions.ReplicaSet, events *api.EventList, runnin
 		fmt.Fprintf(out, "Selector:\t%s\n", unversioned.FormatLabelSelector(rs.Spec.Selector))
 		printLabelsMultiline(out, "Labels", rs.Labels)
 		fmt.Fprintf(out, "Replicas:\t%d current / %d desired\n", rs.Status.Replicas, rs.Spec.Replicas)
-		fmt.Fprintf(out, "Pods Status:\t%d Running / %d Waiting / %d Succeeded / %d Failed\n", running, waiting, succeeded, failed)
+		fmt.Fprintf(out, "Pods Status:\t")
+		if getPodErr != nil {
+			fmt.Fprintf(out, "error in fetching pods: %s\n", getPodErr)
+		} else {
+			fmt.Fprintf(out, "%d Running / %d Waiting / %d Succeeded / %d Failed\n", running, waiting, succeeded, failed)
+		}
 		describeVolumes(rs.Spec.Template.Spec.Volumes, out, "")
 		if events != nil {
 			DescribeEvents(events, out)
