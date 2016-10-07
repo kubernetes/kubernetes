@@ -18,6 +18,7 @@ package checks
 
 import (
 	"fmt"
+	"io"
 	"net"
 	"os"
 )
@@ -80,6 +81,35 @@ func (poc PortOpenChecker) Check() (warnings []string, errors []string) {
 	return nil, errors
 }
 
+// DirAvailableChecker checks if the given directory either does not exist, or
+// is empty.
+type DirAvailableChecker struct {
+	path string
+}
+
+func (dac DirAvailableChecker) Check() (warnings []string, errors []string) {
+	errors = []string{}
+	// If it doesn't exist we are good:
+	if _, err := os.Stat(dac.path); os.IsNotExist(err) {
+		return nil, nil
+	}
+
+	f, err := os.Open(dac.path)
+	if err != nil {
+		errors = append(errors, fmt.Sprintf("Unable to check if %s is empty: %s", dac.path, err))
+		return nil, errors
+	}
+	defer f.Close()
+
+	_, err = f.Readdirnames(1) // Or f.Readdir(1)
+	if err != io.EOF {
+		errors = append(errors, fmt.Sprintf("%s is not empty", dac.path))
+	}
+
+	return nil, errors
+
+}
+
 func RunMasterChecks() {
 
 	checks := []PreFlightChecker{}
@@ -108,6 +138,9 @@ func RunMasterChecks() {
 		PortOpenChecker{10250},
 		PortOpenChecker{10251},
 		PortOpenChecker{10252},
+		DirAvailableChecker{"/etc/kubernetes"},
+		DirAvailableChecker{"/var/lib/etcd"},
+		DirAvailableChecker{"/var/lib/kubelet"},
 	)
 
 	foundErrors := false
