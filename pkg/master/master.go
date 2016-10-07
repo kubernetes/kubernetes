@@ -81,7 +81,6 @@ import (
 	storagerest "k8s.io/kubernetes/pkg/registry/storage/rest"
 
 	// direct etcd registry dependencies
-	podetcd "k8s.io/kubernetes/pkg/registry/core/pod/etcd"
 	"k8s.io/kubernetes/pkg/registry/extensions/thirdpartyresourcedata"
 	thirdpartyresourcedataetcd "k8s.io/kubernetes/pkg/registry/extensions/thirdpartyresourcedata/etcd"
 )
@@ -220,6 +219,7 @@ func (c completedConfig) New() (*Master, error) {
 			ServiceClusterIPRange:     c.GenericConfig.ServiceClusterIPRange,
 			ServiceNodePortRange:      c.GenericConfig.ServiceNodePortRange,
 			ComponentStatusServerFunc: func() map[string]apiserver.Server { return getServersToValidate(c.StorageFactory) },
+			LoopbackClientConfig:      c.GenericConfig.LoopbackClientConfig,
 		},
 	}
 
@@ -326,19 +326,6 @@ func (m *Master) InstallAPIs(c *Config) {
 			if err := m.GenericAPIServer.AddPostStartHook(name, hook); err != nil {
 				glog.Fatalf("Error registering PostStartHook %q: %v", name, err)
 			}
-		}
-
-		// This is here so that, if the policy group is present, the eviction
-		// subresource handler wil be able to find poddisruptionbudgets
-		// TODO(lavalamp) find a better way for groups to discover and interact
-		// with each other
-		if group == "policy" {
-			storage := apiGroupsInfo[0].VersionedResourcesStorageMap["v1"]["pods/eviction"]
-			evictionStorage := storage.(*podetcd.EvictionREST)
-
-			storage = apiGroupInfo.VersionedResourcesStorageMap["v1alpha1"]["poddisruptionbudgets"]
-			evictionStorage.PodDisruptionBudgetLister = storage.(rest.Lister)
-			evictionStorage.PodDisruptionBudgetUpdater = storage.(rest.Updater)
 		}
 
 		apiGroupsInfo = append(apiGroupsInfo, apiGroupInfo)
