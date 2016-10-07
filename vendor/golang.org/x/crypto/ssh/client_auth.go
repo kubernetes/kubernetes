@@ -321,8 +321,6 @@ func handleAuthResponse(c packetConn) (bool, []string, error) {
 			return false, msg.Methods, nil
 		case msgUserAuthSuccess:
 			return true, nil, nil
-		case msgDisconnect:
-			return false, nil, io.EOF
 		default:
 			return false, nil, unexpectedMessageError(msgUserAuthSuccess, packet[0])
 		}
@@ -438,4 +436,38 @@ func (cb KeyboardInteractiveChallenge) auth(session []byte, user string, c packe
 			return false, nil, err
 		}
 	}
+}
+
+type retryableAuthMethod struct {
+	authMethod AuthMethod
+	maxTries   int
+}
+
+func (r *retryableAuthMethod) auth(session []byte, user string, c packetConn, rand io.Reader) (ok bool, methods []string, err error) {
+	for i := 0; r.maxTries <= 0 || i < r.maxTries; i++ {
+		ok, methods, err = r.authMethod.auth(session, user, c, rand)
+		if ok || err != nil { // either success or error terminate
+			return ok, methods, err
+		}
+	}
+	return ok, methods, err
+}
+
+func (r *retryableAuthMethod) method() string {
+	return r.authMethod.method()
+}
+
+// RetryableAuthMethod is a decorator for other auth methods enabling them to
+// be retried up to maxTries before considering that AuthMethod itself failed.
+// If maxTries is <= 0, will retry indefinitely
+//
+// This is useful for interactive clients using challenge/response type
+// authentication (e.g. Keyboard-Interactive, Password, etc) where the user
+// could mistype their response resulting in the server issuing a
+// SSH_MSG_USERAUTH_FAILURE (rfc4252 #8 [password] and rfc4256 #3.4
+// [keyboard-interactive]); Without this decorator, the non-retryable
+// AuthMethod would be removed from future consideration, and never tried again
+// (and so the user would never be able to retry their entry).
+func RetryableAuthMethod(auth AuthMethod, maxTries int) AuthMethod {
+	return &retryableAuthMethod{authMethod: auth, maxTries: maxTries}
 }
