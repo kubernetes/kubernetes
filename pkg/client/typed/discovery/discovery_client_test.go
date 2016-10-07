@@ -454,3 +454,102 @@ func TestGetServerPreferredResources(t *testing.T) {
 		server.Close()
 	}
 }
+
+func TestGetServerPreferredResourcesRetries(t *testing.T) {
+	stable := unversioned.APIResourceList{
+		GroupVersion: "v1",
+		APIResources: []unversioned.APIResource{
+			{Name: "pods", Namespaced: true, Kind: "Pod"},
+		},
+	}
+	beta := unversioned.APIResourceList{
+		GroupVersion: "extensions/v1",
+		APIResources: []unversioned.APIResource{
+			{Name: "deployments", Namespaced: true, Kind: "Deployment"},
+		},
+	}
+
+	response := func(numErrors int) http.HandlerFunc {
+		var i = 0
+		return func(w http.ResponseWriter, req *http.Request) {
+			var list interface{}
+			switch req.URL.Path {
+			case "/apis/extensions/v1beta1":
+				if i < numErrors {
+					i++
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				list = &beta
+			case "/api/v1":
+				list = &stable
+			case "/api":
+				list = &unversioned.APIVersions{
+					Versions: []string{
+						"v1",
+					},
+				}
+			case "/apis":
+				list = &unversioned.APIGroupList{
+					Groups: []unversioned.APIGroup{
+						{
+							Name: "extensions",
+							Versions: []unversioned.GroupVersionForDiscovery{
+								{GroupVersion: "extensions/v1beta1"},
+							},
+							PreferredVersion: unversioned.GroupVersionForDiscovery{
+								GroupVersion: "extensions/v1beta1",
+								Version:      "v1beta1",
+							},
+						},
+					},
+				}
+			default:
+				t.Logf("unexpected request: %s", req.URL.Path)
+				w.WriteHeader(http.StatusNotFound)
+				return
+			}
+			output, err := json.Marshal(list)
+			if err != nil {
+				t.Errorf("unexpected encoding error: %v", err)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			w.Write(output)
+		}
+	}
+	tests := []struct {
+		responseErrors  int
+		expectResources int
+		expectedError   func(err error) bool
+	}{
+		{
+			responseErrors:  1,
+			expectResources: 2,
+			expectedError: func(err error) bool {
+				return err == nil
+			},
+		},
+		{
+			responseErrors:  2,
+			expectResources: 1,
+			expectedError:   IsGroupDiscoveryFailedError,
+		},
+	}
+
+	for i, tc := range tests {
+		server := httptest.NewServer(http.HandlerFunc(response(tc.responseErrors)))
+		defer server.Close()
+
+		client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
+		got, err := client.ServerPreferredResources()
+		if !tc.expectedError(err) {
+			t.Errorf("case %d: unexpected error: %v", i, err)
+		}
+		if len(got) != tc.expectResources {
+			t.Errorf("case %d: expect %d resources, got %#v", i, tc.expectResources, got)
+		}
+		server.Close()
+	}
+}
