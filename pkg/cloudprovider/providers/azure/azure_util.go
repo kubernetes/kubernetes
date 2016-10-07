@@ -31,7 +31,8 @@ const (
 	loadBalancerMinimumPriority = 500
 	loadBalancerMaximumPriority = 4096
 
-	machineResourceIDTemplate   = "/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/virtualMachines/%s"
+	machineIDTemplate           = "/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/virtualMachines/%s"
+	availabilitySetIDTemplate   = "/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/availabilitySets/%s"
 	frontendIPConfigIDTemplate  = "/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Network/loadBalancers/%s/frontendIPConfigurations/%s"
 	backendPoolIDTemplate       = "/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Network/loadBalancers/%s/backendAddressPools/%s"
 	loadBalancerRuleIDTemplate  = "/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Network/loadBalancers/%s/loadBalancingRules/%s"
@@ -42,10 +43,19 @@ const (
 // returns the full identifier of a machine
 func (az *Cloud) getMachineID(machineName string) string {
 	return fmt.Sprintf(
-		machineResourceIDTemplate,
+		machineIDTemplate,
 		az.SubscriptionID,
 		az.ResourceGroup,
 		machineName)
+}
+
+// returns the full identifier of an availabilitySet
+func (az *Cloud) getAvailabilitySetID(availabilitySetName string) string {
+	return fmt.Sprintf(
+		availabilitySetIDTemplate,
+		az.SubscriptionID,
+		az.ResourceGroup,
+		availabilitySetName)
 }
 
 // returns the full identifier of a loadbalancer frontendipconfiguration.
