@@ -62,11 +62,14 @@ func (nsu *nodeStatusUpdater) UpdateNodeStatuses() error {
 	for nodeName, attachedVolumes := range nodesToUpdate {
 		nodeObj, exists, err := nsu.nodeInformer.GetStore().GetByKey(nodeName)
 		if nodeObj == nil || !exists || err != nil {
-			// If node does not exist, its status cannot be updated, log error and move on.
-			glog.V(5).Infof(
+			// If node does not exist, its status cannot be updated, log error and
+			// reset flag statusUpdateNeeded back to true to indicate this node status
+			// needs to be udpated again
+			glog.V(2).Infof(
 				"Could not update node status. Failed to find node %q in NodeInformer cache. %v",
 				nodeName,
 				err)
+			nsu.actualStateOfWorld.SetNodeStatusUpdateNeeded(nodeName)
 			continue
 		}
 
@@ -115,11 +118,12 @@ func (nsu *nodeStatusUpdater) UpdateNodeStatuses() error {
 				nodeName,
 				err)
 		}
-
-		glog.V(3).Infof(
-			"Updating status for node %q succeeded. patchBytes: %q",
+		glog.V(2).Infof(
+			"Updating status for node %q succeeded. patchBytes: %q VolumesAttached: %v",
 			nodeName,
-			string(patchBytes))
+			string(patchBytes),
+			node.Status.VolumesAttached)
+
 	}
 	return nil
 }
