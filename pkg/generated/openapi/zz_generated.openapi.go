@@ -4220,6 +4220,58 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		Dependencies: []string{
 			"api.ObjectMeta", "extensions.ReplicaSetSpec", "extensions.ReplicaSetStatus"},
 	},
+	"extensions.ReplicaSetCondition": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ReplicaSetCondition describes the state of a replica set at a certain point.",
+				Properties: map[string]spec.Schema{
+					"type": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Type of replica set condition.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"status": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Status of the condition, one of True, False, Unknown.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"lastProbeTime": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Last time we probed the condition.",
+							Ref:         spec.MustCreateRef("#/definitions/unversioned.Time"),
+						},
+					},
+					"lastTransitionTime": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The last time the condition transitioned from one status to another.",
+							Ref:         spec.MustCreateRef("#/definitions/unversioned.Time"),
+						},
+					},
+					"reason": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The reason for the condition's last transition.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"message": {
+						SchemaProps: spec.SchemaProps{
+							Description: "A human readable message indicating details about the transition.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"type", "status"},
+			},
+		},
+		Dependencies: []string{
+			"unversioned.Time"},
+	},
 	"extensions.ReplicaSetList": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -4327,11 +4379,25 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 							Format:      "int64",
 						},
 					},
+					"conditions": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Represents the latest available observations of a replica set's current state.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: spec.MustCreateRef("#/definitions/extensions.ReplicaSetCondition"),
+									},
+								},
+							},
+						},
+					},
 				},
 				Required: []string{"replicas"},
 			},
 		},
-		Dependencies: []string{},
+		Dependencies: []string{
+			"extensions.ReplicaSetCondition"},
 	},
 	"extensions.ReplicationControllerDummy": {
 		Schema: spec.Schema{
@@ -11491,6 +11557,58 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		Dependencies: []string{
 			"v1.ObjectMeta", "v1.ReplicationControllerSpec", "v1.ReplicationControllerStatus"},
 	},
+	"v1.ReplicationControllerCondition": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ReplicationControllerCondition describes the state of a replication controller at a certain point.",
+				Properties: map[string]spec.Schema{
+					"type": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Type of replication controller condition.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"status": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Status of the condition, one of True, False, Unknown.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"lastProbeTime": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Last time we probed the condition.",
+							Ref:         spec.MustCreateRef("#/definitions/unversioned.Time"),
+						},
+					},
+					"lastTransitionTime": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The last time the condition transitioned from one status to another.",
+							Ref:         spec.MustCreateRef("#/definitions/unversioned.Time"),
+						},
+					},
+					"reason": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The reason for the condition's last transition.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"message": {
+						SchemaProps: spec.SchemaProps{
+							Description: "A human readable message indicating details about the transition.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"type", "status"},
+			},
+		},
+		Dependencies: []string{
+			"unversioned.Time"},
+	},
 	"v1.ReplicationControllerList": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -11607,11 +11725,25 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 							Format:      "int64",
 						},
 					},
+					"conditions": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Represents the latest available observations of a replication controller's current state.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: spec.MustCreateRef("#/definitions/v1.ReplicationControllerCondition"),
+									},
+								},
+							},
+						},
+					},
 				},
 				Required: []string{"replicas"},
 			},
 		},
-		Dependencies: []string{},
+		Dependencies: []string{
+			"v1.ReplicationControllerCondition"},
 	},
 	"v1.ResourceFieldSelector": {
 		Schema: spec.Schema{
@@ -16836,6 +16968,58 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		Dependencies: []string{
 			"v1.ObjectMeta", "v1beta1.ReplicaSetSpec", "v1beta1.ReplicaSetStatus"},
 	},
+	"v1beta1.ReplicaSetCondition": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ReplicaSetCondition describes the state of a replica set at a certain point.",
+				Properties: map[string]spec.Schema{
+					"type": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Type of replica set condition.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"status": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Status of the condition, one of True, False, Unknown.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"lastProbeTime": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Last time we probed the condition.",
+							Ref:         spec.MustCreateRef("#/definitions/unversioned.Time"),
+						},
+					},
+					"lastTransitionTime": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The last time the condition transitioned from one status to another.",
+							Ref:         spec.MustCreateRef("#/definitions/unversioned.Time"),
+						},
+					},
+					"reason": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The reason for the condition's last transition.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"message": {
+						SchemaProps: spec.SchemaProps{
+							Description: "A human readable message indicating details about the transition.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"type", "status"},
+			},
+		},
+		Dependencies: []string{
+			"unversioned.Time"},
+	},
 	"v1beta1.ReplicaSetList": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -16944,11 +17128,25 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 							Format:      "int64",
 						},
 					},
+					"conditions": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Represents the latest available observations of a replica set's current state.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: spec.MustCreateRef("#/definitions/v1beta1.ReplicaSetCondition"),
+									},
+								},
+							},
+						},
+					},
 				},
 				Required: []string{"replicas"},
 			},
 		},
-		Dependencies: []string{},
+		Dependencies: []string{
+			"v1beta1.ReplicaSetCondition"},
 	},
 	"v1beta1.ReplicationControllerDummy": {
 		Schema: spec.Schema{

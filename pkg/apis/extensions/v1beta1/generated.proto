@@ -785,6 +785,27 @@ message ReplicaSet {
   optional ReplicaSetStatus status = 3;
 }
 
+// ReplicaSetCondition describes the state of a replica set at a certain point.
+message ReplicaSetCondition {
+  // Type of replica set condition.
+  optional string type = 1;
+
+  // Status of the condition, one of True, False, Unknown.
+  optional string status = 2;
+
+  // Last time we probed the condition.
+  optional k8s.io.kubernetes.pkg.api.unversioned.Time lastProbeTime = 3;
+
+  // The last time the condition transitioned from one status to another.
+  optional k8s.io.kubernetes.pkg.api.unversioned.Time lastTransitionTime = 4;
+
+  // The reason for the condition's last transition.
+  optional string reason = 5;
+
+  // A human readable message indicating details about the transition.
+  optional string message = 6;
+}
+
 // ReplicaSetList is a collection of ReplicaSets.
 message ReplicaSetList {
   // Standard list metadata.
@@ -838,6 +859,9 @@ message ReplicaSetStatus {
 
   // ObservedGeneration reflects the generation of the most recently observed ReplicaSet.
   optional int64 observedGeneration = 3;
+
+  // Represents the latest available observations of a replica set's current state.
+  repeated ReplicaSetCondition conditions = 6;
 }
 
 // Dummy definition
