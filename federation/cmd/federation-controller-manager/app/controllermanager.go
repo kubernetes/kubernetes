@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/federation/cmd/federation-controller-manager/app/options"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider"
 	clustercontroller "k8s.io/kubernetes/federation/pkg/federation-controller/cluster"
+	daemonset "k8s.io/kubernetes/federation/pkg/federation-controller/daemonset"
 	ingresscontroller "k8s.io/kubernetes/federation/pkg/federation-controller/ingress"
 	namespacecontroller "k8s.io/kubernetes/federation/pkg/federation-controller/namespace"
 	replicasetcontroller "k8s.io/kubernetes/federation/pkg/federation-controller/replicaset"
@@ -155,6 +156,10 @@ func StartControllers(s *options.CMServer, restClientCfg *restclient.Config) err
 	secretcontrollerClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, "secret-controller"))
 	secretcontroller := secretcontroller.NewSecretController(secretcontrollerClientset)
 	secretcontroller.Run(wait.NeverStop)
+
+	daemonsetcontrollerClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, "daemonset-controller"))
+	daemonsetcontroller := daemonset.NewDaemonSetController(daemonsetcontrollerClientset)
+	daemonsetcontroller.Run(wait.NeverStop)
 
 	replicaSetClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, replicasetcontroller.UserAgentName))
 	replicaSetController := replicasetcontroller.NewReplicaSetController(replicaSetClientset)
