@@ -890,10 +890,11 @@ func (r *Request) transformResponse(resp *http.Response, req *http.Request) Resu
 	}
 
 	if glog.V(8) {
-		switch {
-		case bytes.IndexFunc(body, func(r rune) bool { return r < 0x0a }) != -1:
+		if bytes.IndexFunc(body, func(r rune) bool {
+			return r < 0x0a
+		}) != -1 {
 			glog.Infof("Response Body:\n%s", hex.Dump(body))
-		default:
+		} else {
 			glog.Infof("Response Body: %s", string(body))
 		}
 	}
