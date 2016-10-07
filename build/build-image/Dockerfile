@@ -15,8 +15,6 @@
 # This file creates a standard build environment for building Kubernetes
 FROM gcr.io/google_containers/kube-cross:KUBE_BUILD_IMAGE_CROSS_TAG
 
-ADD localtime /etc/localtime
-
 # Mark this as a kube-build container
 RUN touch /kube-build-image
 
@@ -34,6 +32,12 @@ ENV KUBE_OUTPUT_SUBPATH _output/dockerized
 # Pick up version stuff here as we don't copy our .git over.
 ENV KUBE_GIT_VERSION_FILE ${HOME}/.dockerized-kube-version-defs
 
+# Make log messages use the right timezone
+ADD localtime /etc/localtime
+RUN chmod a+r /etc/localtime
+
+# Set up rsyncd
 ADD rsyncd.password /
 RUN chmod a+r /rsyncd.password
 ADD rsyncd.sh /
+RUN chmod a+rx /rsyncd.sh
