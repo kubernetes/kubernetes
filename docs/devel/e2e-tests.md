@@ -137,6 +137,9 @@ go run hack/e2e.go -v --test --test_args="--ginkgo.skip=Pods.*env"
 # Run tests in parallel, skip any that must be run serially
 GINKGO_PARALLEL=y go run hack/e2e.go --v --test --test_args="--ginkgo.skip=\[Serial\]"
 
+# Run tests in parallel, skip any that must be run serially and keep the test namespace if test failed
+GINKGO_PARALLEL=y go run hack/e2e.go --v --test --test_args="--ginkgo.skip=\[Serial\] --delete-namespace-on-falure=false"
+
 # Flags can be combined, and their actions will take place in this order:
 # --build, --up, --test, --down
 #

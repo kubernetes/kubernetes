@@ -315,7 +315,10 @@ func (f *Framework) AfterEach() {
 	// expectation failures preventing deleting the namespace.
 	defer func() {
 		nsDeletionErrors := map[string]error{}
-		if TestContext.DeleteNamespace {
+		// Whether to delete namespace is determined by 3 factors: delete-namespace flag, delete-namespace-on-failure flag and the test result
+		// if delete-namespace set to false, namespace will always be preserved.
+		// if delete-namespace is true and delete-namespace-on-failure is false, namespace will be preserved if test failed.
+		if TestContext.DeleteNamespace && (TestContext.DeleteNamespaceOnFailure || !CurrentGinkgoTestDescription().Failed) {
 			for _, ns := range f.namespacesToDelete {
 				By(fmt.Sprintf("Destroying namespace %q for this suite.", ns.Name))
 				timeout := 5 * time.Minute
@@ -333,7 +336,12 @@ func (f *Framework) AfterEach() {
 			// Delete the federation namespace.
 			f.deleteFederationNs()
 		} else {
-			Logf("Found DeleteNamespace=false, skipping namespace deletion!")
+			if TestContext.DeleteNamespace {
+				Logf("Found DeleteNamespace=false, skipping namespace deletion!")
+			} else if TestContext.DeleteNamespaceOnFailure {
+				Logf("Found DeleteNamespaceOnFailure=false, skipping namespace deletion!")
+			}
+
 		}
 
 		// Paranoia-- prevent reuse!
