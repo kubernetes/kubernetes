@@ -23,6 +23,7 @@ import (
 	"strconv"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 
@@ -30,8 +31,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var longDescr = `Display addresses of the master and services with label kubernetes.io/cluster-service=true
-To further debug and diagnose cluster problems, use 'kubectl cluster-info dump'.`
+var longDescr = templates.LongDesc(`
+  Display addresses of the master and services with label kubernetes.io/cluster-service=true
+  To further debug and diagnose cluster problems, use 'kubectl cluster-info dump'.`)
 
 func NewCmdClusterInfo(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{

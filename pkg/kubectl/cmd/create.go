@@ -20,22 +20,23 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
 var (
-	create_long = dedent.Dedent(`
+	create_long = templates.LongDesc(`
 		Create a resource by filename or stdin.
 
 		JSON and YAML formats are accepted.`)
-	create_example = dedent.Dedent(`
+
+	create_example = templates.Examples(`
 		# Create a pod using the data in pod.json.
 		kubectl create -f ./pod.json
 

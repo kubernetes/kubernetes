@@ -20,12 +20,12 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -43,17 +43,18 @@ type GetOptions struct {
 }
 
 var (
-	get_long = dedent.Dedent(`
+	get_long = templates.LongDesc(`
 		Display one or many resources.
 
-		`) + valid_resources + dedent.Dedent(`
+		` + valid_resources + `
 
 		This command will hide resources that have completed. For instance, pods that are in the Succeeded or Failed phases.
 		You can see the full results for any resource by providing the '--show-all' flag.
 
 		By specifying the output as 'template' and providing a Go template as the value
 		of the --template flag, you can filter the attributes of the fetched resource(s).`)
-	get_example = dedent.Dedent(`
+
+	get_example = templates.Examples(`
 		# List all pods in ps output format.
 		kubectl get pods
 

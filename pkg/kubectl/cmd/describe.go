@@ -21,12 +21,12 @@ import (
 	"io"
 	"strings"
 
-	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -34,19 +34,19 @@ import (
 )
 
 var (
-	describe_long = dedent.Dedent(`
+	describe_long = templates.LongDesc(`
 		Show details of a specific resource or group of resources.
 		This command joins many API calls together to form a detailed description of a
 		given resource or group of resources.
 
-		$ kubectl describe TYPE NAME_PREFIX
+		    $ kubectl describe TYPE NAME_PREFIX
 
 		will first check for an exact match on TYPE and NAME_PREFIX. If no such resource
 		exists, it will output details for every resource that has a name prefixed with NAME_PREFIX.
 
-		`) + valid_resources
+		` + valid_resources)
 
-	describe_example = dedent.Dedent(`
+	describe_example = templates.Examples(`
 		# Describe a node
 		kubectl describe nodes kubernetes-node-emt8.c.myproject.internal
 

@@ -20,14 +20,14 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 )
 
 var (
-	stop_long = dedent.Dedent(`
+	stop_long = templates.LongDesc(`
 		Deprecated: Gracefully shut down a resource by name or filename.
 
 		The stop command is deprecated, all its functionalities are covered by delete command.
@@ -35,7 +35,8 @@ var (
 
 		Attempts to shut down and delete a resource that supports graceful termination.
 		If the resource is scalable it will be scaled to 0 before deletion.`)
-	stop_example = dedent.Dedent(`
+
+	stop_example = templates.Examples(`
 		# Shut down foo.
 		kubectl stop replicationcontroller foo
 

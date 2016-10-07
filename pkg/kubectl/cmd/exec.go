@@ -22,13 +22,13 @@ import (
 	"net/url"
 
 	dockerterm "github.com/docker/docker/pkg/term"
-	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/api"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	remotecommandserver "k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
 	"k8s.io/kubernetes/pkg/util/interrupt"
@@ -36,7 +36,7 @@ import (
 )
 
 var (
-	exec_example = dedent.Dedent(`
+	exec_example = templates.Examples(`
 		# Get output from running 'date' from pod 123456-7890, using the first container by default
 		kubectl exec 123456-7890 date
 

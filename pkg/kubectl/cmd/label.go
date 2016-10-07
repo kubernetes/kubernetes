@@ -24,11 +24,11 @@ import (
 	"strings"
 
 	"github.com/golang/glog"
-	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -61,13 +61,14 @@ type LabelOptions struct {
 }
 
 var (
-	label_long = dedent.Dedent(`
+	label_long = templates.LongDesc(`
 		Update the labels on a resource.
 
-		A label must begin with a letter or number, and may contain letters, numbers, hyphens, dots, and underscores, up to %[1]d characters.
-		If --overwrite is true, then existing labels can be overwritten, otherwise attempting to overwrite a label will result in an error.
-		If --resource-version is specified, then updates will use this resource version, otherwise the existing resource-version will be used.`)
-	label_example = dedent.Dedent(`
+		* A label must begin with a letter or number, and may contain letters, numbers, hyphens, dots, and underscores, up to %[1]d characters.
+		* If --overwrite is true, then existing labels can be overwritten, otherwise attempting to overwrite a label will result in an error.
+		* If --resource-version is specified, then updates will use this resource version, otherwise the existing resource-version will be used.`)
+
+	label_example = templates.Examples(`
 		# Update pod 'foo' with the label 'unhealthy' and the value 'true'.
 		kubectl label pods foo unhealthy=true
 
