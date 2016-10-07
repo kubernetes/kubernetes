@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"reflect"
 	"strconv"
 	"strings"
 	"sync"
@@ -100,7 +101,7 @@ type Config struct {
 	EndpointReconcilerConfig EndpointReconcilerConfig
 	DeleteCollectionWorkers  int
 	EventTTL                 time.Duration
-	KubeletClient            kubeletclient.KubeletClient
+	KubeletClientConfig      kubeletclient.KubeletClientConfig
 	// genericapiserver.RESTStorageProviders provides RESTStorage building methods keyed by groupName
 	RESTStorageProviders map[string]genericapiserver.RESTStorageProvider
 	// Used to start and monitor tunneling
@@ -183,10 +184,10 @@ func (c *Config) SkipComplete() completedConfig {
 // New returns a new instance of Master from the given config.
 // Certain config fields will be set to a default value if unset.
 // Certain config fields must be specified, including:
-//   KubeletClient
+//   KubeletClientConfig
 func (c completedConfig) New() (*Master, error) {
-	if c.KubeletClient == nil {
-		return nil, fmt.Errorf("Master.New() called with config.KubeletClient == nil")
+	if reflect.DeepEqual(c.KubeletClientConfig, kubeletclient.KubeletClientConfig{}) {
+		return nil, fmt.Errorf("Master.New() called with empty config.KubeletClientConfig")
 	}
 
 	s, err := c.Config.GenericConfig.SkipComplete().New() // completion is done in Complete, no need for a second time
@@ -226,7 +227,7 @@ func (c completedConfig) New() (*Master, error) {
 		legacyRESTStorageProvider := corerest.LegacyRESTStorageProvider{
 			StorageFactory:            c.StorageFactory,
 			ProxyTransport:            s.ProxyTransport,
-			KubeletClient:             c.KubeletClient,
+			KubeletClientConfig:       c.KubeletClientConfig,
 			EventTTL:                  c.EventTTL,
 			ServiceClusterIPRange:     c.GenericConfig.ServiceClusterIPRange,
 			ServiceNodePortRange:      c.GenericConfig.ServiceNodePortRange,

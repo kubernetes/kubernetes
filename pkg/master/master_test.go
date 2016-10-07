@@ -49,7 +49,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/restclient"
 	openapigen "k8s.io/kubernetes/pkg/generated/openapi"
 	"k8s.io/kubernetes/pkg/genericapiserver"
-	"k8s.io/kubernetes/pkg/kubelet/client"
+	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	ipallocator "k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -87,7 +87,6 @@ func setUp(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.
 	config.GenericConfig.LoopbackClientConfig = &restclient.Config{APIPath: "/api", ContentConfig: restclient.ContentConfig{NegotiatedSerializer: api.Codecs}}
 	config.GenericConfig.APIResourceConfigSource = DefaultAPIResourceConfigSource()
 	config.GenericConfig.PublicAddress = net.ParseIP("192.168.10.4")
-	config.KubeletClient = client.FakeKubeletClient{}
 	config.GenericConfig.LegacyAPIGroupPrefixes = sets.NewString("/api")
 	config.GenericConfig.APIGroupPrefix = "/apis"
 	config.GenericConfig.APIResourceConfigSource = DefaultAPIResourceConfigSource()
@@ -97,6 +96,7 @@ func setUp(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.
 	config.GenericConfig.EnableVersion = true
 	config.GenericConfig.LoopbackClientConfig = &restclient.Config{APIPath: "/api", ContentConfig: restclient.ContentConfig{NegotiatedSerializer: api.Codecs}}
 	config.EnableCoreControllers = false
+	config.KubeletClientConfig = kubeletclient.KubeletClientConfig{Port: 10250}
 
 	// TODO: this is kind of hacky.  The trouble is that the sync loop
 	// runs in a go-routine and there is no way to validate in the test
