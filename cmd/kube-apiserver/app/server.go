@@ -54,7 +54,6 @@ import (
 	"k8s.io/kubernetes/pkg/genericapiserver/authorizer"
 	genericoptions "k8s.io/kubernetes/pkg/genericapiserver/options"
 	genericvalidation "k8s.io/kubernetes/pkg/genericapiserver/validation"
-	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/generic"
@@ -147,11 +146,6 @@ func Run(s *options.APIServer) error {
 
 	// Proxying to pods and services is IP-based... don't expect to be able to verify the hostname
 	proxyTLSClientConfig := &tls.Config{InsecureSkipVerify: true}
-
-	kubeletClient, err := kubeletclient.NewStaticKubeletClient(&s.KubeletConfig)
-	if err != nil {
-		glog.Fatalf("Failed to start kubelet client: %v", err)
-	}
 
 	if s.StorageConfig.DeserializationCacheSize == 0 {
 		// When size of cache is not explicitly set, estimate its size based on
@@ -353,7 +347,7 @@ func Run(s *options.APIServer) error {
 		EnableCoreControllers:   true,
 		DeleteCollectionWorkers: s.DeleteCollectionWorkers,
 		EventTTL:                s.EventTTL,
-		KubeletClient:           kubeletClient,
+		KubeletClientConfig:     s.KubeletConfig,
 		EnableUISupport:         true,
 		EnableLogsSupport:       true,
 
