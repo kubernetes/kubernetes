@@ -40,6 +40,9 @@ service RuntimeService {
 
     // Exec executes the command in the container.
     rpc Exec(stream ExecRequest) returns (stream ExecResponse) {}
+
+    // UpdateRuntimeConfig updates the runtime configuration based on request
+    rpc UpdateRuntimeConfig(UpdateRuntimeConfigRequest) returns (UpdateRuntimeConfigResponse) {}
 }
 
 // Image service defines the public APIs for managing images
@@ -676,3 +679,17 @@ message RemoveImageRequest {
 }
 
 message RemoveImageResponse {}
+
+message NetworkConfig {
+    optional string podCIDR = 1;
+}
+
+message RuntimeConfig {
+    optional NetworkConfig networkConfig = 1;
+}
+
+message UpdateRuntimeConfigRequest {
+    optional RuntimeConfig runtimeConfig = 1;
+}
+
+message UpdateRuntimeConfigResponse {}

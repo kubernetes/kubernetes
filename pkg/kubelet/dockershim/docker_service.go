@@ -102,3 +102,7 @@ func (ds *dockerService) Version(_ string) (*runtimeApi.VersionResponse, error) 
 		RuntimeApiVersion: &apiVersion,
 	}, nil
 }
+
+func (ds *dockerService) UpdateRuntimeConfig(runtimeConfig *runtimeApi.RuntimeConfig) error {
+	return nil
+}
