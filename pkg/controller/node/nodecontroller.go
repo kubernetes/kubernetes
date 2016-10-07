@@ -440,7 +440,7 @@ func (nc *NodeController) monitorNodeStatus() error {
 				NewRateLimitedTimedQueue(
 					flowcontrol.NewTokenBucketRateLimiter(nc.evictionLimiterQPS, evictionRateLimiterBurst))
 			// Init the metric for the new zone.
-			glog.Infof("Initilizing eviction metric for zone: %v", zone)
+			glog.Infof("Initializing eviction metric for zone: %v", zone)
 			EvictionsNumber.WithLabelValues(zone).Add(0)
 		}
 		if _, found := nc.zoneTerminationEvictor[zone]; !found {
