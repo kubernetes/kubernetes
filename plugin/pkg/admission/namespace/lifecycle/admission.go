@@ -23,9 +23,9 @@ import (
 
 	lru "github.com/hashicorp/golang-lru"
 
+	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/controller/framework"
-	"k8s.io/kubernetes/pkg/controller/framework/informers"
+	"k8s.io/kubernetes/pkg/controller/informers"
 
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
@@ -52,7 +52,7 @@ type lifecycle struct {
 	*admission.Handler
 	client             clientset.Interface
 	immortalNamespaces sets.String
-	namespaceInformer  framework.SharedIndexInformer
+	namespaceInformer  cache.SharedIndexInformer
 	// forceLiveLookupCache holds a list of entries for namespaces that we have a strong reason to believe are stale in our local cache.
 	// if a namespace is in this cache, then we will ignore our local state and always fetch latest from api server.
 	forceLiveLookupCache *lru.Cache

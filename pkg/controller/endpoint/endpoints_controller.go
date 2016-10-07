@@ -34,8 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/controller/framework"
-	"k8s.io/kubernetes/pkg/controller/framework/informers"
+	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/metrics"
@@ -66,11 +65,11 @@ const (
 )
 
 var (
-	keyFunc = framework.DeletionHandlingMetaNamespaceKeyFunc
+	keyFunc = cache.DeletionHandlingMetaNamespaceKeyFunc
 )
 
 // NewEndpointController returns a new *EndpointController.
-func NewEndpointController(podInformer framework.SharedIndexInformer, client *clientset.Clientset) *EndpointController {
+func NewEndpointController(podInformer cache.SharedIndexInformer, client *clientset.Clientset) *EndpointController {
 	if client != nil && client.Core().GetRESTClient().GetRateLimiter() != nil {
 		metrics.RegisterMetricAndTrackRateLimiterUsage("endpoint_controller", client.Core().GetRESTClient().GetRateLimiter())
 	}
@@ -79,7 +78,7 @@ func NewEndpointController(podInformer framework.SharedIndexInformer, client *cl
 		queue:  workqueue.NewNamed("endpoint"),
 	}
 
-	e.serviceStore.Store, e.serviceController = framework.NewInformer(
+	e.serviceStore.Store, e.serviceController = cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				return e.client.Core().Services(api.NamespaceAll).List(options)
@@ -91,7 +90,7 @@ func NewEndpointController(podInformer framework.SharedIndexInformer, client *cl
 		&api.Service{},
 		// TODO: Can we have much longer period here?
 		FullServiceResyncPeriod,
-		framework.ResourceEventHandlerFuncs{
+		cache.ResourceEventHandlerFuncs{
 			AddFunc: e.enqueueService,
 			UpdateFunc: func(old, cur interface{}) {
 				e.enqueueService(cur)
@@ -100,7 +99,7 @@ func NewEndpointController(podInformer framework.SharedIndexInformer, client *cl
 		},
 	)
 
-	podInformer.AddEventHandler(framework.ResourceEventHandlerFuncs{
+	podInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    e.addPod,
 		UpdateFunc: e.updatePod,
 		DeleteFunc: e.deletePod,
@@ -133,7 +132,7 @@ type EndpointController struct {
 	// we have a personal informer, we must start it ourselves.   If you start
 	// the controller using NewEndpointController(passing SharedInformer), this
 	// will be null
-	internalPodInformer framework.SharedIndexInformer
+	internalPodInformer cache.SharedIndexInformer
 
 	// Services that need to be updated. A channel is inappropriate here,
 	// because it allows services with lots of pods to be serviced much
@@ -144,8 +143,8 @@ type EndpointController struct {
 
 	// Since we join two objects, we'll watch both of them with
 	// controllers.
-	serviceController *framework.Controller
-	podController     framework.ControllerInterface
+	serviceController *cache.Controller
+	podController     cache.ControllerInterface
 	// podStoreSynced returns true if the pod store has been synced at least once.
 	// Added as a member to the struct to allow injection for testing.
 	podStoreSynced func() bool

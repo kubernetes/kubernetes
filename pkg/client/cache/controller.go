@@ -14,13 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package framework
+package cache
 
 import (
 	"sync"
 	"time"
 
-	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/runtime"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -28,13 +27,13 @@ import (
 
 // Config contains all the settings for a Controller.
 type Config struct {
-	// The queue for your objects; either a cache.FIFO or
-	// a cache.DeltaFIFO. Your Process() function should accept
+	// The queue for your objects; either a FIFO or
+	// a DeltaFIFO. Your Process() function should accept
 	// the output of this Oueue's Pop() method.
-	cache.Queue
+	Queue
 
 	// Something that can list and watch your objects.
-	cache.ListerWatcher
+	ListerWatcher
 
 	// Something that can process your objects.
 	Process ProcessFunc
@@ -45,7 +44,7 @@ type Config struct {
 	// Reprocess everything at least this often.
 	// Note that if it takes longer for you to clear the queue than this
 	// period, you will end up processing items in the order determined
-	// by cache.FIFO.Replace(). Currently, this is random. If this is a
+	// by FIFO.Replace(). Currently, this is random. If this is a
 	// problem, we can change that replacement policy to append new
 	// things to the end of the queue instead of replacing the entire
 	// queue.
@@ -64,7 +63,7 @@ type ProcessFunc func(obj interface{}) error
 // Controller is a generic controller framework.
 type Controller struct {
 	config         Config
-	reflector      *cache.Reflector
+	reflector      *Reflector
 	reflectorMutex sync.RWMutex
 }
 
@@ -87,7 +86,7 @@ func New(c *Config) *Controller {
 // Run blocks; call via go.
 func (c *Controller) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
-	r := cache.NewReflector(
+	r := NewReflector(
 		c.config.ListerWatcher,
 		c.config.ObjectType,
 		c.config.Queue,
@@ -110,9 +109,9 @@ func (c *Controller) HasSynced() bool {
 
 // Requeue adds the provided object back into the queue if it does not already exist.
 func (c *Controller) Requeue(obj interface{}) error {
-	return c.config.Queue.AddIfNotPresent(cache.Deltas{
-		cache.Delta{
-			Type:   cache.Sync,
+	return c.config.Queue.AddIfNotPresent(Deltas{
+		Delta{
+			Type:   Sync,
 			Object: obj,
 		},
 	})
@@ -124,7 +123,7 @@ func (c *Controller) Requeue(obj interface{}) error {
 // concurrently.
 func (c *Controller) processLoop() {
 	for {
-		obj, err := c.config.Queue.Pop(cache.PopProcessFunc(c.config.Process))
+		obj, err := c.config.Queue.Pop(PopProcessFunc(c.config.Process))
 		if err != nil {
 			if c.config.RetryOnError {
 				// This is the safe way to re-enqueue.
@@ -145,7 +144,7 @@ func (c *Controller) processLoop() {
 //      get called even if nothing changed. This is useful for periodically
 //      evaluating or syncing something.
 //  * OnDelete will get the final state of the item if it is known, otherwise
-//      it will get an object of type cache.DeletedFinalStateUnknown. This can
+//      it will get an object of type DeletedFinalStateUnknown. This can
 //      happen if the watch is closed and misses the delete event and we don't
 //      notice the deletion until the subsequent re-list.
 type ResourceEventHandler interface {
@@ -185,18 +184,18 @@ func (r ResourceEventHandlerFuncs) OnDelete(obj interface{}) {
 }
 
 // DeletionHandlingMetaNamespaceKeyFunc checks for
-// cache.DeletedFinalStateUnknown objects before calling
-// cache.MetaNamespaceKeyFunc.
+// DeletedFinalStateUnknown objects before calling
+// MetaNamespaceKeyFunc.
 func DeletionHandlingMetaNamespaceKeyFunc(obj interface{}) (string, error) {
-	if d, ok := obj.(cache.DeletedFinalStateUnknown); ok {
+	if d, ok := obj.(DeletedFinalStateUnknown); ok {
 		return d.Key, nil
 	}
-	return cache.MetaNamespaceKeyFunc(obj)
+	return MetaNamespaceKeyFunc(obj)
 }
 
-// NewInformer returns a cache.Store and a controller for populating the store
+// NewInformer returns a Store and a controller for populating the store
 // while also providing event notifications. You should only used the returned
-// cache.Store for Get/List operations; Add/Modify/Deletes will cause the event
+// Store for Get/List operations; Add/Modify/Deletes will cause the event
 // notifications to be faulty.
 //
 // Parameters:
@@ -210,18 +209,18 @@ func DeletionHandlingMetaNamespaceKeyFunc(obj interface{}) (string, error) {
 //  * h is the object you want notifications sent to.
 //
 func NewInformer(
-	lw cache.ListerWatcher,
+	lw ListerWatcher,
 	objType runtime.Object,
 	resyncPeriod time.Duration,
 	h ResourceEventHandler,
-) (cache.Store, *Controller) {
+) (Store, *Controller) {
 	// This will hold the client state, as we know it.
-	clientState := cache.NewStore(DeletionHandlingMetaNamespaceKeyFunc)
+	clientState := NewStore(DeletionHandlingMetaNamespaceKeyFunc)
 
 	// This will hold incoming changes. Note how we pass clientState in as a
 	// KeyLister, that way resync operations will result in the correct set
 	// of update/delete deltas.
-	fifo := cache.NewDeltaFIFO(cache.MetaNamespaceKeyFunc, nil, clientState)
+	fifo := NewDeltaFIFO(MetaNamespaceKeyFunc, nil, clientState)
 
 	cfg := &Config{
 		Queue:            fifo,
@@ -232,9 +231,9 @@ func NewInformer(
 
 		Process: func(obj interface{}) error {
 			// from oldest to newest
-			for _, d := range obj.(cache.Deltas) {
+			for _, d := range obj.(Deltas) {
 				switch d.Type {
-				case cache.Sync, cache.Added, cache.Updated:
+				case Sync, Added, Updated:
 					if old, exists, err := clientState.Get(d.Object); err == nil && exists {
 						if err := clientState.Update(d.Object); err != nil {
 							return err
@@ -246,7 +245,7 @@ func NewInformer(
 						}
 						h.OnAdd(d.Object)
 					}
-				case cache.Deleted:
+				case Deleted:
 					if err := clientState.Delete(d.Object); err != nil {
 						return err
 					}
@@ -259,9 +258,9 @@ func NewInformer(
 	return clientState, New(cfg)
 }
 
-// NewIndexerInformer returns a cache.Indexer and a controller for populating the index
+// NewIndexerInformer returns a Indexer and a controller for populating the index
 // while also providing event notifications. You should only used the returned
-// cache.Index for Get/List operations; Add/Modify/Deletes will cause the event
+// Index for Get/List operations; Add/Modify/Deletes will cause the event
 // notifications to be faulty.
 //
 // Parameters:
@@ -275,19 +274,19 @@ func NewInformer(
 //  * h is the object you want notifications sent to.
 //
 func NewIndexerInformer(
-	lw cache.ListerWatcher,
+	lw ListerWatcher,
 	objType runtime.Object,
 	resyncPeriod time.Duration,
 	h ResourceEventHandler,
-	indexers cache.Indexers,
-) (cache.Indexer, *Controller) {
+	indexers Indexers,
+) (Indexer, *Controller) {
 	// This will hold the client state, as we know it.
-	clientState := cache.NewIndexer(DeletionHandlingMetaNamespaceKeyFunc, indexers)
+	clientState := NewIndexer(DeletionHandlingMetaNamespaceKeyFunc, indexers)
 
 	// This will hold incoming changes. Note how we pass clientState in as a
 	// KeyLister, that way resync operations will result in the correct set
 	// of update/delete deltas.
-	fifo := cache.NewDeltaFIFO(cache.MetaNamespaceKeyFunc, nil, clientState)
+	fifo := NewDeltaFIFO(MetaNamespaceKeyFunc, nil, clientState)
 
 	cfg := &Config{
 		Queue:            fifo,
@@ -298,9 +297,9 @@ func NewIndexerInformer(
 
 		Process: func(obj interface{}) error {
 			// from oldest to newest
-			for _, d := range obj.(cache.Deltas) {
+			for _, d := range obj.(Deltas) {
 				switch d.Type {
-				case cache.Sync, cache.Added, cache.Updated:
+				case Sync, Added, Updated:
 					if old, exists, err := clientState.Get(d.Object); err == nil && exists {
 						if err := clientState.Update(d.Object); err != nil {
 							return err
@@ -312,7 +311,7 @@ func NewIndexerInformer(
 						}
 						h.OnAdd(d.Object)
 					}
-				case cache.Deleted:
+				case Deleted:
 					if err := clientState.Delete(d.Object); err != nil {
 						return err
 					}

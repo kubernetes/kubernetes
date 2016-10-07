@@ -31,7 +31,6 @@ import (
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/record"
-	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/clock"
@@ -54,7 +53,7 @@ const (
 )
 
 var (
-	KeyFunc = framework.DeletionHandlingMetaNamespaceKeyFunc
+	KeyFunc = cache.DeletionHandlingMetaNamespaceKeyFunc
 )
 
 type ResyncPeriodFunc func() time.Duration

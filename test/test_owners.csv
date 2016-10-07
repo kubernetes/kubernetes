@@ -590,7 +590,6 @@ k8s.io/kubernetes/pkg/controller/deployment,asalkeld,0
 k8s.io/kubernetes/pkg/controller/deployment/util,saad-ali,1
 k8s.io/kubernetes/pkg/controller/disruption,fabioy,1
 k8s.io/kubernetes/pkg/controller/endpoint,mwielgus,1
-k8s.io/kubernetes/pkg/controller/framework,smarterclayton,1
 k8s.io/kubernetes/pkg/controller/garbagecollector,rmmh,1
 k8s.io/kubernetes/pkg/controller/garbagecollector/metaonly,cjcullen,1
 k8s.io/kubernetes/pkg/controller/gc,jdef,1

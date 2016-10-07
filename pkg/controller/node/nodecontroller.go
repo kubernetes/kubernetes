@@ -33,8 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/controller/framework"
-	"k8s.io/kubernetes/pkg/controller/framework/informers"
+	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -136,13 +135,13 @@ type NodeController struct {
 	maximumGracePeriod time.Duration
 	recorder           record.EventRecorder
 	// Pod framework and store
-	podController framework.ControllerInterface
+	podController cache.ControllerInterface
 	podStore      cache.StoreToPodLister
 	// Node framework and store
-	nodeController *framework.Controller
+	nodeController *cache.Controller
 	nodeStore      cache.StoreToNodeLister
 	// DaemonSet framework and store
-	daemonSetController *framework.Controller
+	daemonSetController *cache.Controller
 	daemonSetStore      cache.StoreToDaemonSetLister
 	// allocate/recycle CIDRs for node if allocateNodeCIDRs == true
 	cidrAllocator CIDRAllocator
@@ -164,7 +163,7 @@ type NodeController struct {
 	// we have a personal informer, we must start it ourselves.   If you start
 	// the controller using NewDaemonSetsController(passing SharedInformer), this
 	// will be null
-	internalPodInformer framework.SharedIndexInformer
+	internalPodInformer cache.SharedIndexInformer
 }
 
 // NewNodeController returns a new node controller to sync instances from cloudprovider.
@@ -172,7 +171,7 @@ type NodeController struct {
 // podCIDRs it has already allocated to nodes. Since we don't allow podCIDR changes
 // currently, this should be handled as a fatal error.
 func NewNodeController(
-	podInformer framework.SharedIndexInformer,
+	podInformer cache.SharedIndexInformer,
 	cloud cloudprovider.Interface,
 	kubeClient clientset.Interface,
 	podEvictionTimeout time.Duration,
@@ -241,16 +240,16 @@ func NewNodeController(
 	nc.enterFullDisruptionFunc = nc.HealthyQPSFunc
 	nc.computeZoneStateFunc = nc.ComputeZoneState
 
-	podInformer.AddEventHandler(framework.ResourceEventHandlerFuncs{
+	podInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    nc.maybeDeleteTerminatingPod,
 		UpdateFunc: func(_, obj interface{}) { nc.maybeDeleteTerminatingPod(obj) },
 	})
 	nc.podStore.Indexer = podInformer.GetIndexer()
 	nc.podController = podInformer.GetController()
 
-	nodeEventHandlerFuncs := framework.ResourceEventHandlerFuncs{}
+	nodeEventHandlerFuncs := cache.ResourceEventHandlerFuncs{}
 	if nc.allocateNodeCIDRs {
-		nodeEventHandlerFuncs = framework.ResourceEventHandlerFuncs{
+		nodeEventHandlerFuncs = cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				node := obj.(*api.Node)
 				err := nc.cidrAllocator.AllocateOrOccupyCIDR(node)
@@ -296,7 +295,7 @@ func NewNodeController(
 		}
 	}
 
-	nc.nodeStore.Store, nc.nodeController = framework.NewInformer(
+	nc.nodeStore.Store, nc.nodeController = cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				return nc.kubeClient.Core().Nodes().List(options)
@@ -310,7 +309,7 @@ func NewNodeController(
 		nodeEventHandlerFuncs,
 	)
 
-	nc.daemonSetStore.Store, nc.daemonSetController = framework.NewInformer(
+	nc.daemonSetStore.Store, nc.daemonSetController = cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				return nc.kubeClient.Extensions().DaemonSets(api.NamespaceAll).List(options)
@@ -321,7 +320,7 @@ func NewNodeController(
 		},
 		&extensions.DaemonSet{},
 		controller.NoResyncPeriodFunc(),
-		framework.ResourceEventHandlerFuncs{},
+		cache.ResourceEventHandlerFuncs{},
 	)
 
 	if allocateNodeCIDRs {

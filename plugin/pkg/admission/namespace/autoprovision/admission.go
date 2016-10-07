@@ -19,6 +19,7 @@ package autoprovision
 import (
 	"io"
 
+	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 
 	"fmt"
@@ -26,8 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/controller/framework"
-	"k8s.io/kubernetes/pkg/controller/framework/informers"
+	"k8s.io/kubernetes/pkg/controller/informers"
 )
 
 func init() {
@@ -42,7 +42,7 @@ func init() {
 type provision struct {
 	*admission.Handler
 	client            clientset.Interface
-	namespaceInformer framework.SharedIndexInformer
+	namespaceInformer cache.SharedIndexInformer
 }
 
 var _ = admission.WantsInformerFactory(&provision{})

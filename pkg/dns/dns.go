@@ -33,7 +33,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	kcache "k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	kframework "k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/validation"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -112,10 +111,10 @@ type KubeDNS struct {
 	domainPath []string
 
 	// endpointsController  invokes registered callbacks when endpoints change.
-	endpointsController *kframework.Controller
+	endpointsController *kcache.Controller
 
 	// serviceController invokes registered callbacks when services change.
-	serviceController *kframework.Controller
+	serviceController *kcache.Controller
 
 	// Map of federation names that the cluster in which this kube-dns is running belongs to, to
 	// the corresponding domain names.
@@ -188,7 +187,7 @@ func (kd *KubeDNS) GetCacheAsJSON() (string, error) {
 
 func (kd *KubeDNS) setServicesStore() {
 	// Returns a cache.ListWatch that gets all changes to services.
-	kd.servicesStore, kd.serviceController = kframework.NewInformer(
+	kd.servicesStore, kd.serviceController = kcache.NewInformer(
 		&kcache.ListWatch{
 			ListFunc: func(options kapi.ListOptions) (runtime.Object, error) {
 				return kd.kubeClient.Core().Services(kapi.NamespaceAll).List(options)
@@ -199,7 +198,7 @@ func (kd *KubeDNS) setServicesStore() {
 		},
 		&kapi.Service{},
 		resyncPeriod,
-		kframework.ResourceEventHandlerFuncs{
+		kcache.ResourceEventHandlerFuncs{
 			AddFunc:    kd.newService,
 			DeleteFunc: kd.removeService,
 			UpdateFunc: kd.updateService,
@@ -209,7 +208,7 @@ func (kd *KubeDNS) setServicesStore() {
 
 func (kd *KubeDNS) setEndpointsStore() {
 	// Returns a cache.ListWatch that gets all changes to endpoints.
-	kd.endpointsStore, kd.endpointsController = kframework.NewInformer(
+	kd.endpointsStore, kd.endpointsController = kcache.NewInformer(
 		&kcache.ListWatch{
 			ListFunc: func(options kapi.ListOptions) (runtime.Object, error) {
 				return kd.kubeClient.Core().Endpoints(kapi.NamespaceAll).List(options)
@@ -220,7 +219,7 @@ func (kd *KubeDNS) setEndpointsStore() {
 		},
 		&kapi.Endpoints{},
 		resyncPeriod,
-		kframework.ResourceEventHandlerFuncs{
+		kcache.ResourceEventHandlerFuncs{
 			AddFunc: kd.handleEndpointAdd,
 			UpdateFunc: func(oldObj, newObj interface{}) {
 				// TODO: Avoid unwanted updates.

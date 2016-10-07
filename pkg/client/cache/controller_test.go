@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package framework_test
+package cache
 
 import (
 	"fmt"
@@ -24,8 +24,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client/cache"
-	"k8s.io/kubernetes/pkg/controller/framework"
+	fcache "k8s.io/kubernetes/pkg/client/testing/cache"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -34,34 +33,22 @@ import (
 	"github.com/google/gofuzz"
 )
 
-type testLW struct {
-	ListFunc  func(options api.ListOptions) (runtime.Object, error)
-	WatchFunc func(options api.ListOptions) (watch.Interface, error)
-}
-
-func (t *testLW) List(options api.ListOptions) (runtime.Object, error) {
-	return t.ListFunc(options)
-}
-func (t *testLW) Watch(options api.ListOptions) (watch.Interface, error) {
-	return t.WatchFunc(options)
-}
-
 func Example() {
 	// source simulates an apiserver object endpoint.
-	source := framework.NewFakeControllerSource()
+	source := fcache.NewFakeControllerSource()
 
 	// This will hold the downstream state, as we know it.
-	downstream := cache.NewStore(framework.DeletionHandlingMetaNamespaceKeyFunc)
+	downstream := NewStore(DeletionHandlingMetaNamespaceKeyFunc)
 
 	// This will hold incoming changes. Note how we pass downstream in as a
 	// KeyLister, that way resync operations will result in the correct set
 	// of update/delete deltas.
-	fifo := cache.NewDeltaFIFO(cache.MetaNamespaceKeyFunc, nil, downstream)
+	fifo := NewDeltaFIFO(MetaNamespaceKeyFunc, nil, downstream)
 
 	// Let's do threadsafe output to get predictable test results.
 	deletionCounter := make(chan string, 1000)
 
-	cfg := &framework.Config{
+	cfg := &Config{
 		Queue:            fifo,
 		ListerWatcher:    source,
 		ObjectType:       &api.Pod{},
@@ -72,9 +59,9 @@ func Example() {
 		// everything that comes in.
 		Process: func(obj interface{}) error {
 			// Obj is from the Pop method of the Queue we make above.
-			newest := obj.(cache.Deltas).Newest()
+			newest := obj.(Deltas).Newest()
 
-			if newest.Type != cache.Deleted {
+			if newest.Type != Deleted {
 				// Update our downstream store.
 				err := downstream.Add(newest.Object)
 				if err != nil {
@@ -107,7 +94,7 @@ func Example() {
 	// Create the controller and run it until we close stop.
 	stop := make(chan struct{})
 	defer close(stop)
-	go framework.New(cfg).Run(stop)
+	go New(cfg).Run(stop)
 
 	// Let's add a few objects to the source.
 	testIDs := []string{"a-hello", "b-controller", "c-framework"}
@@ -132,25 +119,25 @@ func Example() {
 	// c-framework
 }
 
-func ExampleInformer() {
+func ExampleNewInformer() {
 	// source simulates an apiserver object endpoint.
-	source := framework.NewFakeControllerSource()
+	source := fcache.NewFakeControllerSource()
 
 	// Let's do threadsafe output to get predictable test results.
 	deletionCounter := make(chan string, 1000)
 
 	// Make a controller that immediately deletes anything added to it, and
 	// logs anything deleted.
-	_, controller := framework.NewInformer(
+	_, controller := NewInformer(
 		source,
 		&api.Pod{},
 		time.Millisecond*100,
-		framework.ResourceEventHandlerFuncs{
+		ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				source.Delete(obj.(runtime.Object))
 			},
 			DeleteFunc: func(obj interface{}) {
-				key, err := framework.DeletionHandlingMetaNamespaceKeyFunc(obj)
+				key, err := DeletionHandlingMetaNamespaceKeyFunc(obj)
 				if err != nil {
 					key = "oops something went wrong with the key"
 				}
@@ -196,7 +183,7 @@ func TestHammerController(t *testing.T) {
 	// race detector.
 
 	// source simulates an apiserver object endpoint.
-	source := framework.NewFakeControllerSource()
+	source := fcache.NewFakeControllerSource()
 
 	// Let's do threadsafe output to get predictable test results.
 	outputSetLock := sync.Mutex{}
@@ -204,7 +191,7 @@ func TestHammerController(t *testing.T) {
 	outputSet := map[string][]string{}
 
 	recordFunc := func(eventType string, obj interface{}) {
-		key, err := framework.DeletionHandlingMetaNamespaceKeyFunc(obj)
+		key, err := DeletionHandlingMetaNamespaceKeyFunc(obj)
 		if err != nil {
 			t.Errorf("something wrong with key: %v", err)
 			key = "oops something went wrong with the key"
@@ -217,11 +204,11 @@ func TestHammerController(t *testing.T) {
 	}
 
 	// Make a controller which just logs all the changes it gets.
-	_, controller := framework.NewInformer(
+	_, controller := NewInformer(
 		source,
 		&api.Pod{},
 		time.Millisecond*100,
-		framework.ResourceEventHandlerFuncs{
+		ResourceEventHandlerFuncs{
 			AddFunc:    func(obj interface{}) { recordFunc("add", obj) },
 			UpdateFunc: func(oldObj, newObj interface{}) { recordFunc("update", newObj) },
 			DeleteFunc: func(obj interface{}) { recordFunc("delete", obj) },
@@ -305,7 +292,7 @@ func TestUpdate(t *testing.T) {
 	// call to update.
 
 	// source simulates an apiserver object endpoint.
-	source := framework.NewFakeControllerSource()
+	source := fcache.NewFakeControllerSource()
 
 	const (
 		FROM = "from"
@@ -358,7 +345,7 @@ func TestUpdate(t *testing.T) {
 	// It calls Done() on the wait group on deletions so we can tell when
 	// everything we've added has been deleted.
 	watchCh := make(chan struct{})
-	_, controller := framework.NewInformer(
+	_, controller := NewInformer(
 		&testLW{
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 				watch, err := source.Watch(options)
@@ -371,7 +358,7 @@ func TestUpdate(t *testing.T) {
 		},
 		&api.Pod{},
 		0,
-		framework.ResourceEventHandlerFuncs{
+		ResourceEventHandlerFuncs{
 			UpdateFunc: func(oldObj, newObj interface{}) {
 				o, n := oldObj.(*api.Pod), newObj.(*api.Pod)
 				from, to := o.Labels["check"], n.Labels["check"]

@@ -14,14 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package framework
+package cache
 
 import (
 	"fmt"
 	"sync"
 	"time"
 
-	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/runtime"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 )
@@ -39,7 +38,7 @@ type SharedInformer interface {
 	// You may NOT add a handler *after* the SharedInformer is running.  That will result in an error being returned.
 	// TODO we should try to remove this restriction eventually.
 	AddEventHandler(handler ResourceEventHandler) error
-	GetStore() cache.Store
+	GetStore() Store
 	// GetController gives back a synthetic interface that "votes" to start the informer
 	GetController() ControllerInterface
 	Run(stopCh <-chan struct{})
@@ -50,24 +49,24 @@ type SharedInformer interface {
 type SharedIndexInformer interface {
 	SharedInformer
 	// AddIndexers add indexers to the informer before it starts.
-	AddIndexers(indexers cache.Indexers) error
-	GetIndexer() cache.Indexer
+	AddIndexers(indexers Indexers) error
+	GetIndexer() Indexer
 }
 
 // NewSharedInformer creates a new instance for the listwatcher.
 // TODO: create a cache/factory of these at a higher level for the list all, watch all of a given resource that can
 // be shared amongst all consumers.
-func NewSharedInformer(lw cache.ListerWatcher, objType runtime.Object, resyncPeriod time.Duration) SharedInformer {
-	return NewSharedIndexInformer(lw, objType, resyncPeriod, cache.Indexers{})
+func NewSharedInformer(lw ListerWatcher, objType runtime.Object, resyncPeriod time.Duration) SharedInformer {
+	return NewSharedIndexInformer(lw, objType, resyncPeriod, Indexers{})
 }
 
 // NewSharedIndexInformer creates a new instance for the listwatcher.
 // TODO: create a cache/factory of these at a higher level for the list all, watch all of a given resource that can
 // be shared amongst all consumers.
-func NewSharedIndexInformer(lw cache.ListerWatcher, objType runtime.Object, resyncPeriod time.Duration, indexers cache.Indexers) SharedIndexInformer {
+func NewSharedIndexInformer(lw ListerWatcher, objType runtime.Object, resyncPeriod time.Duration, indexers Indexers) SharedIndexInformer {
 	sharedIndexInformer := &sharedIndexInformer{
 		processor:        &sharedProcessor{},
-		indexer:          cache.NewIndexer(DeletionHandlingMetaNamespaceKeyFunc, indexers),
+		indexer:          NewIndexer(DeletionHandlingMetaNamespaceKeyFunc, indexers),
 		listerWatcher:    lw,
 		objectType:       objType,
 		fullResyncPeriod: resyncPeriod,
@@ -76,13 +75,13 @@ func NewSharedIndexInformer(lw cache.ListerWatcher, objType runtime.Object, resy
 }
 
 type sharedIndexInformer struct {
-	indexer    cache.Indexer
+	indexer    Indexer
 	controller *Controller
 
 	processor *sharedProcessor
 
 	// This block is tracked to handle late initialization of the controller
-	listerWatcher    cache.ListerWatcher
+	listerWatcher    ListerWatcher
 	objectType       runtime.Object
 	fullResyncPeriod time.Duration
 
@@ -129,7 +128,7 @@ type deleteNotification struct {
 func (s *sharedIndexInformer) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 
-	fifo := cache.NewDeltaFIFO(cache.MetaNamespaceKeyFunc, nil, s.indexer)
+	fifo := NewDeltaFIFO(MetaNamespaceKeyFunc, nil, s.indexer)
 
 	cfg := &Config{
 		Queue:            fifo,
@@ -180,15 +179,15 @@ func (s *sharedIndexInformer) LastSyncResourceVersion() string {
 	return s.controller.reflector.LastSyncResourceVersion()
 }
 
-func (s *sharedIndexInformer) GetStore() cache.Store {
+func (s *sharedIndexInformer) GetStore() Store {
 	return s.indexer
 }
 
-func (s *sharedIndexInformer) GetIndexer() cache.Indexer {
+func (s *sharedIndexInformer) GetIndexer() Indexer {
 	return s.indexer
 }
 
-func (s *sharedIndexInformer) AddIndexers(indexers cache.Indexers) error {
+func (s *sharedIndexInformer) AddIndexers(indexers Indexers) error {
 	s.startedLock.Lock()
 	defer s.startedLock.Unlock()
 
@@ -240,9 +239,9 @@ func (s *sharedIndexInformer) HandleDeltas(obj interface{}) error {
 	defer s.blockDeltas.Unlock()
 
 	// from oldest to newest
-	for _, d := range obj.(cache.Deltas) {
+	for _, d := range obj.(Deltas) {
 		switch d.Type {
-		case cache.Sync, cache.Added, cache.Updated:
+		case Sync, Added, Updated:
 			if old, exists, err := s.indexer.Get(d.Object); err == nil && exists {
 				if err := s.indexer.Update(d.Object); err != nil {
 					return err
@@ -254,7 +253,7 @@ func (s *sharedIndexInformer) HandleDeltas(obj interface{}) error {
 				}
 				s.processor.distribute(addNotification{newObj: d.Object})
 			}
-		case cache.Deleted:
+		case Deleted:
 			if err := s.indexer.Delete(d.Object); err != nil {
 				return err
 			}

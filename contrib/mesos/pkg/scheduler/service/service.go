@@ -79,7 +79,6 @@ import (
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	cloud "k8s.io/kubernetes/pkg/cloudprovider/providers/mesos"
-	controllerfw "k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/master/ports"
@@ -785,10 +784,10 @@ func (s *SchedulerServer) bootstrap(hks hyperkube.Interface, sc *schedcfg.Config
 		log.Fatalf("Cannot create client to watch nodes: %v", err)
 	}
 	nodeLW := cache.NewListWatchFromClient(nodesClient.CoreClient, "nodes", api.NamespaceAll, fields.Everything())
-	nodeStore, nodeCtl := controllerfw.NewInformer(nodeLW, &api.Node{}, s.nodeRelistPeriod, &controllerfw.ResourceEventHandlerFuncs{
+	nodeStore, nodeCtl := cache.NewInformer(nodeLW, &api.Node{}, s.nodeRelistPeriod, &cache.ResourceEventHandlerFuncs{
 		DeleteFunc: func(obj interface{}) {
 			if eiRegistry != nil {
-				// TODO(jdef) use controllerfw.DeletionHandlingMetaNamespaceKeyFunc at some point?
+				// TODO(jdef) use cache.DeletionHandlingMetaNamespaceKeyFunc at some point?
 				nodeName := ""
 				if tombstone, ok := obj.(cache.DeletedFinalStateUnknown); ok {
 					nodeName = tombstone.Key

@@ -25,7 +25,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	kcache "k8s.io/kubernetes/pkg/client/cache"
-	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
@@ -48,7 +47,7 @@ type DesiredStateOfWorldPopulator interface {
 // desiredStateOfWorld - the cache to populate
 func NewDesiredStateOfWorldPopulator(
 	loopSleepDuration time.Duration,
-	podInformer framework.SharedInformer,
+	podInformer kcache.SharedInformer,
 	desiredStateOfWorld cache.DesiredStateOfWorld) DesiredStateOfWorldPopulator {
 	return &desiredStateOfWorldPopulator{
 		loopSleepDuration:   loopSleepDuration,
@@ -59,7 +58,7 @@ func NewDesiredStateOfWorldPopulator(
 
 type desiredStateOfWorldPopulator struct {
 	loopSleepDuration   time.Duration
-	podInformer         framework.SharedInformer
+	podInformer         kcache.SharedInformer
 	desiredStateOfWorld cache.DesiredStateOfWorld
 }
 

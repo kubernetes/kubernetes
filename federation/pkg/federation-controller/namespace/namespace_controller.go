@@ -32,7 +32,6 @@ import (
 	kube_release_1_4 "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/controller/framework"
 	pkg_runtime "k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -62,7 +61,7 @@ type NamespaceController struct {
 	// Definitions of namespaces that should be federated.
 	namespaceInformerStore cache.Store
 	// Informer controller for namespaces that should be federated.
-	namespaceInformerController framework.ControllerInterface
+	namespaceInformerController cache.ControllerInterface
 
 	// Client to federated api server.
 	federatedApiClient federation_release_1_4.Interface
@@ -100,7 +99,7 @@ func NewNamespaceController(client federation_release_1_4.Interface) *NamespaceC
 	nc.clusterDeliverer = util.NewDelayingDeliverer()
 
 	// Start informer in federated API servers on namespaces that should be federated.
-	nc.namespaceInformerStore, nc.namespaceInformerController = framework.NewInformer(
+	nc.namespaceInformerStore, nc.namespaceInformerController = cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (pkg_runtime.Object, error) {
 				return client.Core().Namespaces().List(options)
@@ -116,8 +115,8 @@ func NewNamespaceController(client federation_release_1_4.Interface) *NamespaceC
 	// Federated informer on namespaces in members of federation.
 	nc.namespaceFederatedInformer = util.NewFederatedInformer(
 		client,
-		func(cluster *federation_api.Cluster, targetClient kube_release_1_4.Interface) (cache.Store, framework.ControllerInterface) {
-			return framework.NewInformer(
+		func(cluster *federation_api.Cluster, targetClient kube_release_1_4.Interface) (cache.Store, cache.ControllerInterface) {
+			return cache.NewInformer(
 				&cache.ListWatch{
 					ListFunc: func(options api.ListOptions) (pkg_runtime.Object, error) {
 						return targetClient.Core().Namespaces().List(options)

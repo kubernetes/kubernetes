@@ -18,6 +18,7 @@ package predicates
 
 import (
 	"fmt"
+
 	"k8s.io/kubernetes/pkg/api"
 )
 

@@ -25,7 +25,6 @@ import (
 	cache "k8s.io/kubernetes/pkg/client/cache"
 	release_1_4 "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4"
 	"k8s.io/kubernetes/pkg/client/restclient"
-	"k8s.io/kubernetes/pkg/controller/framework"
 	pkg_runtime "k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/util/workqueue"
@@ -43,11 +42,11 @@ type clusterCache struct {
 	// A store of services, populated by the serviceController
 	serviceStore cache.StoreToServiceLister
 	// Watches changes to all services
-	serviceController *framework.Controller
+	serviceController *cache.Controller
 	// A store of endpoint, populated by the serviceController
 	endpointStore cache.StoreToEndpointsLister
 	// Watches changes to all endpoints
-	endpointController *framework.Controller
+	endpointController *cache.Controller
 	// services that need to be synced
 	serviceQueue *workqueue.Type
 	// endpoints that need to be synced
@@ -91,7 +90,7 @@ func (cc *clusterClientCache) startClusterLW(cluster *v1beta1.Cluster, clusterNa
 			serviceQueue:  workqueue.New(),
 			endpointQueue: workqueue.New(),
 		}
-		cachedClusterClient.endpointStore.Store, cachedClusterClient.endpointController = framework.NewInformer(
+		cachedClusterClient.endpointStore.Store, cachedClusterClient.endpointController = cache.NewInformer(
 			&cache.ListWatch{
 				ListFunc: func(options api.ListOptions) (pkg_runtime.Object, error) {
 					return clientset.Core().Endpoints(v1.NamespaceAll).List(options)
@@ -102,7 +101,7 @@ func (cc *clusterClientCache) startClusterLW(cluster *v1beta1.Cluster, clusterNa
 			},
 			&v1.Endpoints{},
 			serviceSyncPeriod,
-			framework.ResourceEventHandlerFuncs{
+			cache.ResourceEventHandlerFuncs{
 				AddFunc: func(obj interface{}) {
 					cc.enqueueEndpoint(obj, clusterName)
 				},
@@ -115,7 +114,7 @@ func (cc *clusterClientCache) startClusterLW(cluster *v1beta1.Cluster, clusterNa
 			},
 		)
 
-		cachedClusterClient.serviceStore.Store, cachedClusterClient.serviceController = framework.NewInformer(
+		cachedClusterClient.serviceStore.Store, cachedClusterClient.serviceController = cache.NewInformer(
 			&cache.ListWatch{
 				ListFunc: func(options api.ListOptions) (pkg_runtime.Object, error) {
 					return clientset.Core().Services(v1.NamespaceAll).List(options)
@@ -126,7 +125,7 @@ func (cc *clusterClientCache) startClusterLW(cluster *v1beta1.Cluster, clusterNa
 			},
 			&v1.Service{},
 			serviceSyncPeriod,
-			framework.ResourceEventHandlerFuncs{
+			cache.ResourceEventHandlerFuncs{
 				AddFunc: func(obj interface{}) {
 					cc.enqueueService(obj, clusterName)
 				},

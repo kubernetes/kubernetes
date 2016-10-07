@@ -24,7 +24,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/cache"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	controllerframework "k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -192,7 +191,7 @@ var _ = framework.KubeDescribe("DaemonRestart [Disruptive]", func() {
 	existingPods := cache.NewStore(cache.MetaNamespaceKeyFunc)
 	var ns string
 	var config framework.RCConfig
-	var controller *controllerframework.Controller
+	var controller *cache.Controller
 	var newPods cache.Store
 	var stopCh chan struct{}
 	var tracker *podTracker
@@ -217,7 +216,7 @@ var _ = framework.KubeDescribe("DaemonRestart [Disruptive]", func() {
 
 		stopCh = make(chan struct{})
 		tracker = newPodTracker()
-		newPods, controller = controllerframework.NewInformer(
+		newPods, controller = cache.NewInformer(
 			&cache.ListWatch{
 				ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 					options.LabelSelector = labelSelector
@@ -230,7 +229,7 @@ var _ = framework.KubeDescribe("DaemonRestart [Disruptive]", func() {
 			},
 			&api.Pod{},
 			0,
-			controllerframework.ResourceEventHandlerFuncs{
+			cache.ResourceEventHandlerFuncs{
 				AddFunc: func(obj interface{}) {
 					tracker.remember(obj.(*api.Pod), ADD)
 				},

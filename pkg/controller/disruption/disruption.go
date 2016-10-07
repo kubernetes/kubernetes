@@ -28,7 +28,6 @@ import (
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/intstr"
@@ -47,22 +46,22 @@ type DisruptionController struct {
 	kubeClient *client.Client
 
 	pdbStore      cache.Store
-	pdbController *framework.Controller
+	pdbController *cache.Controller
 	pdbLister     cache.StoreToPodDisruptionBudgetLister
 
-	podController framework.ControllerInterface
+	podController cache.ControllerInterface
 	podLister     cache.StoreToPodLister
 
 	rcIndexer    cache.Indexer
-	rcController *framework.Controller
+	rcController *cache.Controller
 	rcLister     cache.StoreToReplicationControllerLister
 
 	rsStore      cache.Store
-	rsController *framework.Controller
+	rsController *cache.Controller
 	rsLister     cache.StoreToReplicaSetLister
 
 	dIndexer    cache.Indexer
-	dController *framework.Controller
+	dController *cache.Controller
 	dLister     cache.StoreToDeploymentLister
 
 	queue *workqueue.Type
@@ -84,7 +83,7 @@ type controllerAndScale struct {
 // controllers and their scale.
 type podControllerFinder func(*api.Pod) ([]controllerAndScale, error)
 
-func NewDisruptionController(podInformer framework.SharedIndexInformer, kubeClient *client.Client) *DisruptionController {
+func NewDisruptionController(podInformer cache.SharedIndexInformer, kubeClient *client.Client) *DisruptionController {
 	dc := &DisruptionController{
 		kubeClient:    kubeClient,
 		podController: podInformer.GetController(),
@@ -97,13 +96,13 @@ func NewDisruptionController(podInformer framework.SharedIndexInformer, kubeClie
 
 	dc.podLister.Indexer = podInformer.GetIndexer()
 
-	podInformer.AddEventHandler(framework.ResourceEventHandlerFuncs{
+	podInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    dc.addPod,
 		UpdateFunc: dc.updatePod,
 		DeleteFunc: dc.deletePod,
 	})
 
-	dc.pdbStore, dc.pdbController = framework.NewInformer(
+	dc.pdbStore, dc.pdbController = cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				return dc.kubeClient.Policy().PodDisruptionBudgets(api.NamespaceAll).List(options)
@@ -114,7 +113,7 @@ func NewDisruptionController(podInformer framework.SharedIndexInformer, kubeClie
 		},
 		&policy.PodDisruptionBudget{},
 		30*time.Second,
-		framework.ResourceEventHandlerFuncs{
+		cache.ResourceEventHandlerFuncs{
 			AddFunc:    dc.addDb,
 			UpdateFunc: dc.updateDb,
 			DeleteFunc: dc.removeDb,
@@ -122,7 +121,7 @@ func NewDisruptionController(podInformer framework.SharedIndexInformer, kubeClie
 	)
 	dc.pdbLister.Store = dc.pdbStore
 
-	dc.rcIndexer, dc.rcController = framework.NewIndexerInformer(
+	dc.rcIndexer, dc.rcController = cache.NewIndexerInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				return dc.kubeClient.ReplicationControllers(api.NamespaceAll).List(options)
@@ -133,13 +132,13 @@ func NewDisruptionController(podInformer framework.SharedIndexInformer, kubeClie
 		},
 		&api.ReplicationController{},
 		30*time.Second,
-		framework.ResourceEventHandlerFuncs{},
+		cache.ResourceEventHandlerFuncs{},
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)
 
 	dc.rcLister.Indexer = dc.rcIndexer
 
-	dc.rsStore, dc.rsController = framework.NewInformer(
+	dc.rsStore, dc.rsController = cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				return dc.kubeClient.Extensions().ReplicaSets(api.NamespaceAll).List(options)
@@ -150,12 +149,12 @@ func NewDisruptionController(podInformer framework.SharedIndexInformer, kubeClie
 		},
 		&extensions.ReplicaSet{},
 		30*time.Second,
-		framework.ResourceEventHandlerFuncs{},
+		cache.ResourceEventHandlerFuncs{},
 	)
 
 	dc.rsLister.Store = dc.rsStore
 
-	dc.dIndexer, dc.dController = framework.NewIndexerInformer(
+	dc.dIndexer, dc.dController = cache.NewIndexerInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				return dc.kubeClient.Extensions().Deployments(api.NamespaceAll).List(options)
@@ -166,7 +165,7 @@ func NewDisruptionController(podInformer framework.SharedIndexInformer, kubeClie
 		},
 		&extensions.Deployment{},
 		30*time.Second,
-		framework.ResourceEventHandlerFuncs{},
+		cache.ResourceEventHandlerFuncs{},
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)
 

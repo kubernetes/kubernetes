@@ -17,7 +17,7 @@ limitations under the License.
 package admission
 
 import (
-	"k8s.io/kubernetes/pkg/controller/framework/informers"
+	"k8s.io/kubernetes/pkg/controller/informers"
 )
 
 // Validator holds Validate functions, which are responsible for validation of initialized shared resources

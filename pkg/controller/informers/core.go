@@ -21,13 +21,12 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/cache"
-	"k8s.io/kubernetes/pkg/controller/framework"
 )
 
 // PodInformer is type of SharedIndexInformer which watches and lists all pods.
 // Interface provides constructor for informer and lister for pods
 type PodInformer interface {
-	Informer() framework.SharedIndexInformer
+	Informer() cache.SharedIndexInformer
 	Lister() *cache.StoreToPodLister
 }
 
@@ -37,7 +36,7 @@ type podInformer struct {
 
 // Informer checks whether podInformer exists in sharedInformerFactory and if not, it creates new informer of type
 // podInformer and connects it to sharedInformerFactory
-func (f *podInformer) Informer() framework.SharedIndexInformer {
+func (f *podInformer) Informer() cache.SharedIndexInformer {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
@@ -63,7 +62,7 @@ func (f *podInformer) Lister() *cache.StoreToPodLister {
 // NamespaceInformer is type of SharedIndexInformer which watches and lists all namespaces.
 // Interface provides constructor for informer and lister for namsespaces
 type NamespaceInformer interface {
-	Informer() framework.SharedIndexInformer
+	Informer() cache.SharedIndexInformer
 	Lister() *cache.IndexerToNamespaceLister
 }
 
@@ -73,7 +72,7 @@ type namespaceInformer struct {
 
 // Informer checks whether namespaceInformer exists in sharedInformerFactory and if not, it creates new informer of type
 // namespaceInformer and connects it to sharedInformerFactory
-func (f *namespaceInformer) Informer() framework.SharedIndexInformer {
+func (f *namespaceInformer) Informer() cache.SharedIndexInformer {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
@@ -99,7 +98,7 @@ func (f *namespaceInformer) Lister() *cache.IndexerToNamespaceLister {
 // NodeInformer is type of SharedIndexInformer which watches and lists all nodes.
 // Interface provides constructor for informer and lister for nodes
 type NodeInformer interface {
-	Informer() framework.SharedIndexInformer
+	Informer() cache.SharedIndexInformer
 	Lister() *cache.StoreToNodeLister
 }
 
@@ -109,7 +108,7 @@ type nodeInformer struct {
 
 // Informer checks whether nodeInformer exists in sharedInformerFactory and if not, it creates new informer of type
 // nodeInformer and connects it to sharedInformerFactory
-func (f *nodeInformer) Informer() framework.SharedIndexInformer {
+func (f *nodeInformer) Informer() cache.SharedIndexInformer {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
@@ -135,7 +134,7 @@ func (f *nodeInformer) Lister() *cache.StoreToNodeLister {
 // PVCInformer is type of SharedIndexInformer which watches and lists all persistent volume claims.
 // Interface provides constructor for informer and lister for persistent volume claims
 type PVCInformer interface {
-	Informer() framework.SharedIndexInformer
+	Informer() cache.SharedIndexInformer
 	Lister() *cache.StoreToPVCFetcher
 }
 
@@ -145,7 +144,7 @@ type pvcInformer struct {
 
 // Informer checks whether pvcInformer exists in sharedInformerFactory and if not, it creates new informer of type
 // pvcInformer and connects it to sharedInformerFactory
-func (f *pvcInformer) Informer() framework.SharedIndexInformer {
+func (f *pvcInformer) Informer() cache.SharedIndexInformer {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
@@ -171,7 +170,7 @@ func (f *pvcInformer) Lister() *cache.StoreToPVCFetcher {
 // PVInformer is type of SharedIndexInformer which watches and lists all persistent volumes.
 // Interface provides constructor for informer and lister for persistent volumes
 type PVInformer interface {
-	Informer() framework.SharedIndexInformer
+	Informer() cache.SharedIndexInformer
 	Lister() *cache.StoreToPVFetcher
 }
 
@@ -181,7 +180,7 @@ type pvInformer struct {
 
 // Informer checks whether pvInformer exists in sharedInformerFactory and if not, it creates new informer of type
 // pvInformer and connects it to sharedInformerFactory
-func (f *pvInformer) Informer() framework.SharedIndexInformer {
+func (f *pvInformer) Informer() cache.SharedIndexInformer {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 

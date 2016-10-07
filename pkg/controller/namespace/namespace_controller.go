@@ -25,7 +25,6 @@ import (
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/metrics"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
@@ -45,7 +44,7 @@ type NamespaceController struct {
 	// store that holds the namespaces
 	store cache.Store
 	// controller that observes the namespaces
-	controller *framework.Controller
+	controller *cache.Controller
 	// namespaces that have been queued up for processing by workers
 	queue workqueue.RateLimitingInterface
 	// list of preferred group versions and their corresponding resource set for namespace deletion
@@ -95,7 +94,7 @@ func NewNamespaceController(
 	}
 
 	// configure the backing store/controller
-	store, controller := framework.NewInformer(
+	store, controller := cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				return kubeClient.Core().Namespaces().List(options)
@@ -106,7 +105,7 @@ func NewNamespaceController(
 		},
 		&api.Namespace{},
 		resyncPeriod,
-		framework.ResourceEventHandlerFuncs{
+		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				namespace := obj.(*api.Namespace)
 				namespaceController.enqueueNamespace(namespace)

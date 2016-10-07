@@ -21,14 +21,14 @@ import (
 	"reflect"
 
 	api_v1 "k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/controller/framework"
+	"k8s.io/kubernetes/pkg/client/cache"
 	pkg_runtime "k8s.io/kubernetes/pkg/runtime"
 )
 
-// Returns framework.ResourceEventHandlerFuncs that trigger the given function
+// Returns cache.ResourceEventHandlerFuncs that trigger the given function
 // on all object changes.
-func NewTriggerOnAllChanges(triggerFunc func(pkg_runtime.Object)) *framework.ResourceEventHandlerFuncs {
-	return &framework.ResourceEventHandlerFuncs{
+func NewTriggerOnAllChanges(triggerFunc func(pkg_runtime.Object)) *cache.ResourceEventHandlerFuncs {
+	return &cache.ResourceEventHandlerFuncs{
 		DeleteFunc: func(old interface{}) {
 			oldObj := old.(pkg_runtime.Object)
 			triggerFunc(oldObj)
@@ -46,9 +46,9 @@ func NewTriggerOnAllChanges(triggerFunc func(pkg_runtime.Object)) *framework.Res
 	}
 }
 
-// Returns framework.ResourceEventHandlerFuncs that trigger the given function
+// Returns cache.ResourceEventHandlerFuncs that trigger the given function
 // on object add and delete as well as spec/object meta on update.
-func NewTriggerOnMetaAndSpecChanges(triggerFunc func(pkg_runtime.Object)) *framework.ResourceEventHandlerFuncs {
+func NewTriggerOnMetaAndSpecChanges(triggerFunc func(pkg_runtime.Object)) *cache.ResourceEventHandlerFuncs {
 	getFieldOrPanic := func(obj interface{}, fieldName string) interface{} {
 		val := reflect.ValueOf(obj).Elem().FieldByName(fieldName)
 		if val.IsValid() {
@@ -57,7 +57,7 @@ func NewTriggerOnMetaAndSpecChanges(triggerFunc func(pkg_runtime.Object)) *frame
 			panic(fmt.Errorf("field not found: %s", fieldName))
 		}
 	}
-	return &framework.ResourceEventHandlerFuncs{
+	return &cache.ResourceEventHandlerFuncs{
 		DeleteFunc: func(old interface{}) {
 			oldObj := old.(pkg_runtime.Object)
 			triggerFunc(oldObj)
