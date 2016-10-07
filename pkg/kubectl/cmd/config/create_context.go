@@ -21,11 +21,11 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	"k8s.io/kubernetes/pkg/util/flag"
 )
 
@@ -38,10 +38,12 @@ type createContextOptions struct {
 }
 
 var (
-	create_context_long = dedent.Dedent(`
+	create_context_long = templates.LongDesc(`
 		Sets a context entry in kubeconfig
+
 		Specifying a name that already exists will merge new fields on top of existing values for those fields.`)
-	create_context_example = dedent.Dedent(`
+
+	create_context_example = templates.Examples(`
 		# Set the user field on the gce context entry without touching other values
 		kubectl config set-context gce --user=cluster-admin`)
 )

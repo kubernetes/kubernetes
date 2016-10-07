@@ -20,20 +20,20 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
 var (
-	namespaceLong = dedent.Dedent(`
+	namespaceLong = templates.LongDesc(`
 		Create a namespace with the specified name.`)
 
-	namespaceExample = dedent.Dedent(`
-		  # Create a new namespace named my-namespace
-		  kubectl create namespace my-namespace`)
+	namespaceExample = templates.Examples(`
+	  # Create a new namespace named my-namespace
+	  kubectl create namespace my-namespace`)
 )
 
 // NewCmdCreateNamespace is a macro command to create a new namespace
