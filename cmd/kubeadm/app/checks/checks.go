@@ -24,37 +24,40 @@ import (
 	"os/exec"
 )
 
-// PreFlightCheckers validate the state of the system to ensure kubeadm will be
+// PreFlightCheck validates the state of the system to ensure kubeadm will be
 // successful as often as possilble.
-type PreFlightChecker interface {
+type PreFlightCheck interface {
 	Check() (warnings []string, errors []string)
 }
 
-// ServiceChecker verifies that if this is a systemd system, the
-// kubelet service exists, is enabled, and running.  We do not want to directly
-// assume systemd is being used, so if this does not appear to be the case we
-// just silently skip these checks and return no warnings or errors.
-type ServiceChecker struct {
-	initSystem InitSystem
-	service    string
+// ServiceCheck verifies that the given service is enabled and active. If we do not
+// detect a supported init system however, all checks are skipped and a warning is
+// returned.
+type ServiceCheck struct {
+	service string
 }
 
-func (sc ServiceChecker) Check() (warnings []string, errors []string) {
+func (sc ServiceCheck) Check() (warnings []string, errors []string) {
+
+	initSystem := getInitSystem()
+	if initSystem == nil {
+		return []string{"no supported init system detected, skipping service checks"}, nil
+	}
 
 	warnings = []string{}
 
-	if !sc.initSystem.ServiceExists(sc.service) {
+	if !initSystem.ServiceExists(sc.service) {
 		warnings = append(warnings, fmt.Sprintf("%s service does not exist", sc.service))
 		return warnings, nil
 	}
 
-	if !sc.initSystem.ServiceIsEnabled(sc.service) {
+	if !initSystem.ServiceIsEnabled(sc.service) {
 		errors = append(errors,
 			fmt.Sprintf("%s service is not enabled, please run 'systemctl enable %s.service'",
 				sc.service, sc.service))
 	}
 
-	if !sc.initSystem.ServiceIsActive(sc.service) {
+	if !initSystem.ServiceIsActive(sc.service) {
 		errors = append(errors,
 			fmt.Sprintf("%s service is not active, please run 'systemctl start %s.service'",
 				sc.service, sc.service))
@@ -63,12 +66,12 @@ func (sc ServiceChecker) Check() (warnings []string, errors []string) {
 	return warnings, nil
 }
 
-// PortOpenChecker ensures the given port is available for use.
-type PortOpenChecker struct {
+// PortOpenCheck ensures the given port is available for use.
+type PortOpenCheck struct {
 	port int
 }
 
-func (poc PortOpenChecker) Check() (warnings []string, errors []string) {
+func (poc PortOpenCheck) Check() (warnings []string, errors []string) {
 	errors = []string{}
 	// TODO: Get IP from KubeadmConfig
 	ln, err := net.Listen("tcp", fmt.Sprintf(":%d", poc.port))
@@ -82,13 +85,13 @@ func (poc PortOpenChecker) Check() (warnings []string, errors []string) {
 	return nil, errors
 }
 
-// DirAvailableChecker checks if the given directory either does not exist, or
+// DirAvailableCheck checks if the given directory either does not exist, or
 // is empty.
-type DirAvailableChecker struct {
+type DirAvailableCheck struct {
 	path string
 }
 
-func (dac DirAvailableChecker) Check() (warnings []string, errors []string) {
+func (dac DirAvailableCheck) Check() (warnings []string, errors []string) {
 	errors = []string{}
 	// If it doesn't exist we are good:
 	if _, err := os.Stat(dac.path); os.IsNotExist(err) {
@@ -110,12 +113,12 @@ func (dac DirAvailableChecker) Check() (warnings []string, errors []string) {
 	return nil, errors
 }
 
-// InPathCheckers checks if the given executable is present in the path.
-type InPathChecker struct {
+// InPathChecks checks if the given executable is present in the path.
+type InPathCheck struct {
 	executable string
 }
 
-func (ipc InPathChecker) Check() (warnings []string, errors []string) {
+func (ipc InPathCheck) Check() (warnings []string, errors []string) {
 	_, err := exec.LookPath(ipc.executable)
 	if err != nil {
 		return nil, []string{fmt.Sprintf("%s not found in system path.", ipc.executable)}
@@ -124,40 +127,29 @@ func (ipc InPathChecker) Check() (warnings []string, errors []string) {
 }
 
 func RunMasterChecks() {
-
-	checks := []PreFlightChecker{}
-
-	initSystem := getInitSystem()
-	// Warn if we weren't able to detect a supported init system, and skip service checks:
-	if initSystem == nil {
-		fmt.Println("no kubeadm supported init system detected, skipping service checks")
-	}
-	checks = append(checks,
-		ServiceChecker{
-			service:    "kubelet",
-			initSystem: getInitSystem(),
-		},
-		ServiceChecker{
-			service:    "docker",
-			initSystem: getInitSystem(),
-		},
-	)
-
 	// TODO: Some of these ports should come from kubeadm config eventually:
-	checks = append(checks,
-		PortOpenChecker{443},
-		PortOpenChecker{2379},
-		PortOpenChecker{8080},
-		PortOpenChecker{10250},
-		PortOpenChecker{10251},
-		PortOpenChecker{10252},
-		DirAvailableChecker{"/etc/kubernetes"},
-		DirAvailableChecker{"/var/lib/etcd"},
-		DirAvailableChecker{"/var/lib/kubelet"},
-		InPathChecker{"socat"},
-		InPathChecker{"ethtool"},
-	)
+	checks := []PreFlightCheck{
+		ServiceCheck{"kubelet"},
+		ServiceCheck{"docker"},
+		PortOpenCheck{443},
+		PortOpenCheck{2379},
+		PortOpenCheck{8080},
+		PortOpenCheck{10250},
+		PortOpenCheck{10251},
+		PortOpenCheck{10252},
+		DirAvailableCheck{"/etc/kubernetes"},
+		DirAvailableCheck{"/var/lib/etcd"},
+		DirAvailableCheck{"/var/lib/kubelet"},
+		InPathCheck{"socat"},
+		InPathCheck{"ethtool"},
+	}
 
+	runChecks(checks)
+}
+
+// runChecks runs each check, displays it's warnings/errors, and once all
+// are processed will exit if any errors occurred.
+func runChecks(checks []PreFlightCheck) {
 	foundErrors := false
 	for _, check := range checks {
 		warnings, errors := check.Check()
