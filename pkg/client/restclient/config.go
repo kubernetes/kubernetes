@@ -363,5 +363,6 @@ func AnonymousClientConfig(config *Config) *Config {
 		WrapTransport: config.WrapTransport,
 		QPS:           config.QPS,
 		Burst:         config.Burst,
+		Timeout:       config.Timeout,
 	}
 }
