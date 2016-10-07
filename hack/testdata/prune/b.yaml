@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: b
+  labels:
+    prune-group: "true"
+spec:
+  containers:
+  - name: kubernetes-pause
+    image: gcr.io/google-containers/pause:2.0

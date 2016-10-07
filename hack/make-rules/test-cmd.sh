@@ -1052,6 +1052,29 @@ __EOF__
   kubectl delete pods selector-test-pod
 
 
+  ## kubectl apply --prune
+  # Pre-Condition: no POD exists
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
+
+  # apply a
+  kubectl apply --prune -l prune-group=true -f hack/testdata/prune/a.yaml "${kube_flags[@]}"
+  # check right pod exists
+  kube::test::get_object_assert 'pods a' "{{${id_field}}}" 'a'
+  # check wrong pod doesn't exist
+  output_message=$(! kubectl get pods b 2>&1 "${kube_flags[@]}")
+  kube::test::if_has_string "${output_message}" 'pods "b" not found'
+
+  # apply b
+  kubectl apply --prune -l prune-group=true -f hack/testdata/prune/b.yaml "${kube_flags[@]}"
+  # check right pod exists
+  kube::test::get_object_assert 'pods b' "{{${id_field}}}" 'b'
+  # check wrong pod doesn't exist
+  output_message=$(! kubectl get pods a 2>&1 "${kube_flags[@]}")
+  kube::test::if_has_string "${output_message}" 'pods "a" not found'
+
+  # cleanup
+  kubectl delete pods b
+
   ## kubectl run should create deployments or jobs
   # Pre-Condition: no Job exists
   kube::test::get_object_assert jobs "{{range.items}}{{$id_field}}:{{end}}" ''
@@ -1161,7 +1184,7 @@ __EOF__
   ]
 }
 __EOF__
-  
+
   # Post-Condition: assertion object exist
   kube::test::get_object_assert thirdpartyresources "{{range.items}}{{$id_field}}:{{end}}" 'bar.company.com:foo.company.com:'
 
