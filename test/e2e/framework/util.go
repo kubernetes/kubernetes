@@ -3529,7 +3529,7 @@ func WaitForDeploymentStatusValid(c clientset.Interface, d *extensions.Deploymen
 		reason                    string
 	)
 
-	err := wait.Poll(Poll, 2*time.Minute, func() (bool, error) {
+	err := wait.Poll(Poll, 5*time.Minute, func() (bool, error) {
 		var err error
 		deployment, err = c.Extensions().Deployments(d.Namespace).Get(d.Name)
 		if err != nil {
