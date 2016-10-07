@@ -61,6 +61,7 @@ func (sc ServiceChecker) Check() (warnings []string, errors []string) {
 	return warnings, nil
 }
 
+// PortOpenChecker ensures the given port is available for use.
 type PortOpenChecker struct {
 	port int
 }
@@ -68,11 +69,14 @@ type PortOpenChecker struct {
 func (poc PortOpenChecker) Check() (warnings []string, errors []string) {
 	errors = []string{}
 	// TODO: Get IP from KubeadmConfig
-	conn, _ := net.Dial("tcp", fmt.Sprintf("127.0.0.1:%d", poc.port))
-	if conn != nil {
-		conn.Close()
+	ln, err := net.Listen("tcp", fmt.Sprintf(":%d", poc.port))
+	if err != nil {
 		errors = append(errors, fmt.Sprintf("Port %d is in use.", poc.port))
 	}
+	if ln != nil {
+		ln.Close()
+	}
+
 	return nil, errors
 }
 
@@ -96,6 +100,7 @@ func RunMasterChecks() {
 		},
 	)
 
+	// TODO: Some of these ports should come from kubeadm config eventually:
 	checks = append(checks,
 		PortOpenChecker{443},
 		PortOpenChecker{2379},
