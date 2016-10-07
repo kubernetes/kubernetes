@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/uuid"
@@ -168,8 +169,10 @@ func newFixture(t *testing.T) *fixture {
 
 func (f *fixture) run(deploymentName string) {
 	f.client = fake.NewSimpleClientset(f.objects...)
-	c := NewDeploymentController(f.client, controller.NoResyncPeriodFunc)
+	informers := informers.NewSharedInformerFactory(f.client, controller.NoResyncPeriodFunc())
+	c := NewDeploymentController(informers.Deployments(), informers.ReplicaSets(), informers.Pods(), f.client)
 	c.eventRecorder = &record.FakeRecorder{}
+	c.dListerSynced = alwaysReady
 	c.rsListerSynced = alwaysReady
 	c.podListerSynced = alwaysReady
 	for _, d := range f.dLister {
@@ -181,6 +184,9 @@ func (f *fixture) run(deploymentName string) {
 	for _, pod := range f.podLister {
 		c.podLister.Indexer.Add(pod)
 	}
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	informers.Start(stopCh)
 
 	err := c.syncDeployment(deploymentName)
 	if err != nil {
@@ -188,13 +194,25 @@ func (f *fixture) run(deploymentName string) {
 	}
 
 	actions := f.client.Actions()
+	informerActions := 0
 	for i, action := range actions {
-		if len(f.actions) < i+1 {
+		if len(action.GetNamespace()) == 0 &&
+			(action.Matches("list", "pods") ||
+				action.Matches("list", "replicasets") ||
+				action.Matches("list", "deployments") ||
+				action.Matches("watch", "pods") ||
+				action.Matches("watch", "replicasets") ||
+				action.Matches("watch", "deployments")) {
+			informerActions++
+			continue
+		}
+
+		if len(f.actions)+informerActions < i+1 {
 			f.t.Errorf("%d unexpected actions: %+v", len(actions)-len(f.actions), actions[i:])
 			break
 		}
 
-		expectedAction := f.actions[i]
+		expectedAction := f.actions[i-informerActions]
 		if !expectedAction.Matches(action.GetVerb(), action.GetResource().Resource) {
 			f.t.Errorf("Expected\n\t%#v\ngot\n\t%#v", expectedAction, action)
 			continue
@@ -236,11 +254,16 @@ func TestSyncDeploymentDontDoAnythingDuringDeletion(t *testing.T) {
 // issue: https://github.com/kubernetes/kubernetes/issues/23218
 func TestDeploymentController_dontSyncDeploymentsWithEmptyPodSelector(t *testing.T) {
 	fake := &fake.Clientset{}
-	controller := NewDeploymentController(fake, controller.NoResyncPeriodFunc)
-
+	informers := informers.NewSharedInformerFactory(fake, controller.NoResyncPeriodFunc())
+	controller := NewDeploymentController(informers.Deployments(), informers.ReplicaSets(), informers.Pods(), fake)
 	controller.eventRecorder = &record.FakeRecorder{}
+	controller.dListerSynced = alwaysReady
 	controller.rsListerSynced = alwaysReady
 	controller.podListerSynced = alwaysReady
+
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	informers.Start(stopCh)
 
 	d := newDeployment("foo", 1, nil, nil, nil, map[string]string{"foo": "bar"})
 	empty := unversioned.LabelSelector{}
