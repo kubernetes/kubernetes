@@ -109,7 +109,7 @@ function create-federation-api-objects {
 
     export FEDERATION_API_HOST=""
     export KUBE_MASTER_IP=""
-    local is_dns_name="false"
+    export IS_DNS_NAME="false"
     if [[ "$KUBERNETES_PROVIDER" == "vagrant" ]];then
 	# The vagrant approach is to use a nodeport service, and point kubectl at one of the nodes
 	$template "${manifests_root}/federation-apiserver-nodeport-service.yaml" | $host_kubectl create -f -
@@ -121,7 +121,7 @@ function create-federation-api-objects {
 	# Any providers where ingress is a DNS name should tick this box.
 	# TODO(chom): attempt to do this automatically
 	if [[ "$KUBERNETES_PROVIDER" == "aws" ]];then
-	    is_dns_name="true"
+	    IS_DNS_NAME="true"
 	fi
 	# any capable providers should use a loadbalancer service
 	# we check for ingress.ip and ingress.hostname, so should work for any loadbalancer-providing provider
@@ -186,8 +186,8 @@ function create-federation-api-objects {
 
     # Create server certificates.
     ensure-temp-dir
-    echo "Creating federation apiserver certs for federation api host: ${FEDERATION_API_HOST} ( is this a dns name?: ${is_dns_name} )"
-    MASTER_NAME="federation-apiserver" IS_DNS_NAME="${is_dns_name}" create-federation-apiserver-certs ${FEDERATION_API_HOST}
+    echo "Creating federation apiserver certs for federation api host: ${FEDERATION_API_HOST} ( is this a dns name?: ${IS_DNS_NAME} )"
+    MASTER_NAME="federation-apiserver" create-federation-apiserver-certs ${FEDERATION_API_HOST}
     export FEDERATION_APISERVER_CA_CERT_BASE64="${FEDERATION_APISERVER_CA_CERT_BASE64}"
     export FEDERATION_APISERVER_CERT_BASE64="${FEDERATION_APISERVER_CERT_BASE64}"
     export FEDERATION_APISERVER_KEY_BASE64="${FEDERATION_APISERVER_KEY_BASE64}"
