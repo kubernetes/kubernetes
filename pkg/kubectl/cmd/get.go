@@ -138,19 +138,11 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 		}
 		defer stream.Close()
 
-		for {
-			buffer := make([]byte, 1024, 1024)
-			bytesRead, err := stream.Read(buffer)
-			if bytesRead > 0 {
-				fmt.Printf("%s", string(buffer[:bytesRead]))
-			}
-			if err == io.EOF {
-				return nil
-			}
-			if err != nil {
-				return err
-			}
+		_, err = io.Copy(out, stream)
+		if err != nil && err != io.EOF {
+			return err
 		}
+		return nil
 	}
 
 	selector := cmdutil.GetFlagString(cmd, "selector")
