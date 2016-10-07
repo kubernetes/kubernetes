@@ -517,6 +517,18 @@ function start-kube-proxy {
   if [[ -n "${CLUSTER_IP_RANGE:-}" ]]; then
     sed -i -e "s@{{cluster_cidr}}@--cluster-cidr=${CLUSTER_IP_RANGE}@g" ${src_file}
   fi
+  if [[ "${CONTAINER_RUNTIME:-}" == "rkt" ]]; then
+    # Work arounds for https://github.com/coreos/rkt/issues/3245 and https://github.com/coreos/rkt/issues/3264
+    # This is an incredibly hacky workaround. It's fragile too. If the kube-proxy command changes too much, this breaks
+    # TODO, this could be done much better in many other places, such as an
+    # init script within the container, or even within kube-proxy's code.
+    local extra_workaround_cmd="ln -sf /proc/self/mounts /etc/mtab; \
+      mount -o remount,rw /proc; \
+      mount -o remount,rw /proc/sys; \
+      mount -o remount,rw /sys; "
+    sed -i -e "s@-\\s\\+kube-proxy@- ${extra_workaround_cmd} kube-proxy@g" "${src_file}"
+  fi
+
   cp "${src_file}" /etc/kubernetes/manifests
 }
 
