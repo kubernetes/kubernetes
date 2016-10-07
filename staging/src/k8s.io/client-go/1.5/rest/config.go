@@ -25,6 +25,7 @@ import (
 	"path"
 	gruntime "runtime"
 	"strings"
+	"time"
 
 	"github.com/golang/glog"
 
@@ -108,6 +109,9 @@ type Config struct {
 
 	// Rate limiter for limiting connections to the master from this client. If present overwrites QPS/Burst
 	RateLimiter flowcontrol.RateLimiter
+
+	// The maximum length of time to wait before giving up on a server request. A value of zero means no timeout.
+	Timeout time.Duration
 
 	// Version forces a specific version to be used (if registered)
 	// Do we need this?
