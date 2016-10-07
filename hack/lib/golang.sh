@@ -61,6 +61,7 @@ else
     linux/amd64
     linux/arm
     linux/arm64
+	linux/s390x
   )
   if [[ "${KUBE_BUILD_PPC64LE:-}" =~ ^[yY]$ ]]; then
     KUBE_SERVER_PLATFORMS+=(linux/ppc64le)
@@ -74,6 +75,7 @@ else
     linux/386
     linux/arm
     linux/arm64
+	linux/s390x
     darwin/amd64
     darwin/386
     windows/amd64
@@ -81,7 +83,7 @@ else
   )
   if [[ "${KUBE_BUILD_PPC64LE:-}" =~ ^[yY]$ ]]; then
     KUBE_CLIENT_PLATFORMS+=(linux/ppc64le)
-  fi
+  fi 
   readonly KUBE_CLIENT_PLATFORMS
 
   # Which platforms we should compile test targets for. Not all client platforms need these tests
@@ -238,6 +240,9 @@ kube::golang::set_platform_envs() {
     elif [[ ${platform} == "linux/ppc64le" ]]; then
       export CGO_ENABLED=1
       export CC=powerpc64le-linux-gnu-gcc
+    elif [[ ${platform} == "linux/s390x" ]]; then
+      export CGO_ENABLED=1
+      export CC=s390x-linux-gnu-gcc	  
     elif [[ ${platform} == "darwin/"* ]]; then
       # See https://github.com/kubernetes/kubernetes/issues/32999
       export GOROOT=${K8S_PATCHED_GOROOT}
