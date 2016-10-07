@@ -120,6 +120,9 @@ fi
 MASTER_SG_NAME="kubernetes-master-${CLUSTER_ID}"
 NODE_SG_NAME="kubernetes-minion-${CLUSTER_ID}"
 
+IAM_PROFILE_MASTER="kubernetes-master-${CLUSTER_ID}-${VPC_NAME}"
+IAM_PROFILE_NODE="kubernetes-minion-${CLUSTER_ID}-${VPC_NAME}"
+
 # Be sure to map all the ephemeral drives.  We can specify more than we actually have.
 # TODO: Actually mount the correct number (especially if we have more), though this is non-trivial, and
 #  only affects the big storage instance types, which aren't a typical use case right now.
