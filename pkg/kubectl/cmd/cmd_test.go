@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/typed/discovery"
@@ -64,7 +65,7 @@ func defaultClientConfig() *restclient.Config {
 		ContentConfig: restclient.ContentConfig{
 			NegotiatedSerializer: api.Codecs,
 			ContentType:          runtime.ContentTypeJSON,
-			GroupVersion:         testapi.Default.GroupVersion(),
+			GroupVersion:         &registered.GroupOrDie(api.GroupName).GroupVersion,
 		},
 	}
 }
@@ -132,7 +133,7 @@ func versionErrIfFalse(b bool) error {
 	return versionErr
 }
 
-var validVersion = testapi.Default.GroupVersion().Version
+var validVersion = registered.GroupOrDie(api.GroupName).GroupVersion.Version
 var internalGV = unversioned.GroupVersion{Group: "apitest", Version: runtime.APIVersionInternal}
 var unlikelyGV = unversioned.GroupVersion{Group: "apitest", Version: "unlikelyversion"}
 var validVersionGV = unversioned.GroupVersion{Group: "apitest", Version: validVersion}

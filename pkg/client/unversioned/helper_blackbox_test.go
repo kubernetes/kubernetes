@@ -26,8 +26,10 @@ import (
 	"strings"
 	"testing"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	uapi "k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
@@ -58,64 +60,64 @@ func TestNegotiateVersion(t *testing.T) {
 			name:            "server supports client default",
 			version:         &uapi.GroupVersion{Version: "version1"},
 			config:          &restclient.Config{},
-			serverVersions:  []string{"version1", testapi.Default.GroupVersion().String()},
-			clientVersions:  []uapi.GroupVersion{{Version: "version1"}, *testapi.Default.GroupVersion()},
+			serverVersions:  []string{"version1", registered.GroupOrDie(api.GroupName).GroupVersion.String()},
+			clientVersions:  []uapi.GroupVersion{{Version: "version1"}, registered.GroupOrDie(api.GroupName).GroupVersion},
 			expectedVersion: &uapi.GroupVersion{Version: "version1"},
 			statusCode:      http.StatusOK,
 		},
 		{
 			name:            "server falls back to client supported",
-			version:         testapi.Default.GroupVersion(),
+			version:         &registered.GroupOrDie(api.GroupName).GroupVersion,
 			config:          &restclient.Config{},
 			serverVersions:  []string{"version1"},
-			clientVersions:  []uapi.GroupVersion{{Version: "version1"}, *testapi.Default.GroupVersion()},
+			clientVersions:  []uapi.GroupVersion{{Version: "version1"}, registered.GroupOrDie(api.GroupName).GroupVersion},
 			expectedVersion: &uapi.GroupVersion{Version: "version1"},
 			statusCode:      http.StatusOK,
 		},
 		{
 			name:            "explicit version supported",
-			config:          &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}},
-			serverVersions:  []string{"/version1", testapi.Default.GroupVersion().String()},
-			clientVersions:  []uapi.GroupVersion{{Version: "version1"}, *testapi.Default.GroupVersion()},
-			expectedVersion: testapi.Default.GroupVersion(),
+			config:          &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}},
+			serverVersions:  []string{"/version1", registered.GroupOrDie(api.GroupName).GroupVersion.String()},
+			clientVersions:  []uapi.GroupVersion{{Version: "version1"}, registered.GroupOrDie(api.GroupName).GroupVersion},
+			expectedVersion: &registered.GroupOrDie(api.GroupName).GroupVersion,
 			statusCode:      http.StatusOK,
 		},
 		{
 			name:           "explicit version not supported",
-			config:         &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}},
+			config:         &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}},
 			serverVersions: []string{"version1"},
-			clientVersions: []uapi.GroupVersion{{Version: "version1"}, *testapi.Default.GroupVersion()},
+			clientVersions: []uapi.GroupVersion{{Version: "version1"}, registered.GroupOrDie(api.GroupName).GroupVersion},
 			expectErr:      func(err error) bool { return strings.Contains(err.Error(), `server does not support API version "v1"`) },
 			statusCode:     http.StatusOK,
 		},
 		{
 			name:           "connection refused error",
-			config:         &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}},
+			config:         &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}},
 			serverVersions: []string{"version1"},
-			clientVersions: []uapi.GroupVersion{{Version: "version1"}, *testapi.Default.GroupVersion()},
+			clientVersions: []uapi.GroupVersion{{Version: "version1"}, registered.GroupOrDie(api.GroupName).GroupVersion},
 			sendErr:        errors.New("connection refused"),
 			expectErr:      func(err error) bool { return strings.Contains(err.Error(), "connection refused") },
 			statusCode:     http.StatusOK,
 		},
 		{
 			name:            "discovery fails due to 403 Forbidden errors and thus serverVersions is empty, use default GroupVersion",
-			config:          &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}},
-			clientVersions:  []uapi.GroupVersion{{Version: "version1"}, *testapi.Default.GroupVersion()},
-			expectedVersion: testapi.Default.GroupVersion(),
+			config:          &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}},
+			clientVersions:  []uapi.GroupVersion{{Version: "version1"}, registered.GroupOrDie(api.GroupName).GroupVersion},
+			expectedVersion: &registered.GroupOrDie(api.GroupName).GroupVersion,
 			statusCode:      http.StatusForbidden,
 		},
 		{
 			name:            "discovery fails due to 404 Not Found errors and thus serverVersions is empty, use requested GroupVersion",
 			version:         &uapi.GroupVersion{Version: "version1"},
-			config:          &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}},
-			clientVersions:  []uapi.GroupVersion{{Version: "version1"}, *testapi.Default.GroupVersion()},
+			config:          &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}},
+			clientVersions:  []uapi.GroupVersion{{Version: "version1"}, registered.GroupOrDie(api.GroupName).GroupVersion},
 			expectedVersion: &uapi.GroupVersion{Version: "version1"},
 			statusCode:      http.StatusNotFound,
 		},
 		{
 			name:           "discovery fails due to 403 Forbidden errors and thus serverVersions is empty, no fallback GroupVersion",
 			config:         &restclient.Config{},
-			clientVersions: []uapi.GroupVersion{{Version: "version1"}, *testapi.Default.GroupVersion()},
+			clientVersions: []uapi.GroupVersion{{Version: "version1"}, registered.GroupOrDie(api.GroupName).GroupVersion},
 			expectErr:      func(err error) bool { return strings.Contains(err.Error(), "failed to negotiate an api version;") },
 			statusCode:     http.StatusForbidden,
 		},

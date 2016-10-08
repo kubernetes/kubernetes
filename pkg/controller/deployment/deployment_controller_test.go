@@ -21,8 +21,8 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/client/record"
@@ -63,7 +63,7 @@ func newRSWithStatus(name string, specReplicas, statusReplicas int, selector map
 
 func newDeployment(name string, replicas int, revisionHistoryLimit *int32, maxSurge, maxUnavailable *intstr.IntOrString, selector map[string]string) *extensions.Deployment {
 	d := extensions.Deployment{
-		TypeMeta: unversioned.TypeMeta{APIVersion: testapi.Default.GroupVersion().String()},
+		TypeMeta: unversioned.TypeMeta{APIVersion: registered.GroupOrDie(extensions.GroupName).GroupVersion.String()},
 		ObjectMeta: api.ObjectMeta{
 			UID:       uuid.NewUUID(),
 			Name:      name,

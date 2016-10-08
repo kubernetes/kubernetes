@@ -26,8 +26,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/service"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/pkg/util/intstr"
@@ -2341,7 +2341,7 @@ func TestValidateEnv(t *testing.T) {
 			Name: "abc",
 			ValueFrom: &api.EnvVarSource{
 				FieldRef: &api.ObjectFieldSelector{
-					APIVersion: testapi.Default.GroupVersion().String(),
+					APIVersion: registered.GroupOrDie(api.GroupName).GroupVersion.String(),
 					FieldPath:  "metadata.name",
 				},
 			},
@@ -2350,7 +2350,7 @@ func TestValidateEnv(t *testing.T) {
 			Name: "abc",
 			ValueFrom: &api.EnvVarSource{
 				FieldRef: &api.ObjectFieldSelector{
-					APIVersion: testapi.Default.GroupVersion().String(),
+					APIVersion: registered.GroupOrDie(api.GroupName).GroupVersion.String(),
 					FieldPath:  "spec.nodeName",
 				},
 			},
@@ -2359,7 +2359,7 @@ func TestValidateEnv(t *testing.T) {
 			Name: "abc",
 			ValueFrom: &api.EnvVarSource{
 				FieldRef: &api.ObjectFieldSelector{
-					APIVersion: testapi.Default.GroupVersion().String(),
+					APIVersion: registered.GroupOrDie(api.GroupName).GroupVersion.String(),
 					FieldPath:  "spec.serviceAccountName",
 				},
 			},
@@ -2413,7 +2413,7 @@ func TestValidateEnv(t *testing.T) {
 				Value: "foo",
 				ValueFrom: &api.EnvVarSource{
 					FieldRef: &api.ObjectFieldSelector{
-						APIVersion: testapi.Default.GroupVersion().String(),
+						APIVersion: registered.GroupOrDie(api.GroupName).GroupVersion.String(),
 						FieldPath:  "metadata.name",
 					},
 				},
@@ -2426,7 +2426,7 @@ func TestValidateEnv(t *testing.T) {
 				Name: "abc",
 				ValueFrom: &api.EnvVarSource{
 					FieldRef: &api.ObjectFieldSelector{
-						APIVersion: testapi.Default.GroupVersion().String(),
+						APIVersion: registered.GroupOrDie(api.GroupName).GroupVersion.String(),
 						FieldPath:  "metadata.name",
 					},
 					SecretKeyRef: &api.SecretKeySelector{
@@ -2445,7 +2445,7 @@ func TestValidateEnv(t *testing.T) {
 				Name: "some_var_name",
 				ValueFrom: &api.EnvVarSource{
 					FieldRef: &api.ObjectFieldSelector{
-						APIVersion: testapi.Default.GroupVersion().String(),
+						APIVersion: registered.GroupOrDie(api.GroupName).GroupVersion.String(),
 						FieldPath:  "metadata.name",
 					},
 					ConfigMapKeyRef: &api.ConfigMapKeySelector{
@@ -2464,7 +2464,7 @@ func TestValidateEnv(t *testing.T) {
 				Name: "abc",
 				ValueFrom: &api.EnvVarSource{
 					FieldRef: &api.ObjectFieldSelector{
-						APIVersion: testapi.Default.GroupVersion().String(),
+						APIVersion: registered.GroupOrDie(api.GroupName).GroupVersion.String(),
 						FieldPath:  "metadata.name",
 					},
 					SecretKeyRef: &api.SecretKeySelector{
@@ -2489,7 +2489,7 @@ func TestValidateEnv(t *testing.T) {
 				Name: "abc",
 				ValueFrom: &api.EnvVarSource{
 					FieldRef: &api.ObjectFieldSelector{
-						APIVersion: testapi.Default.GroupVersion().String(),
+						APIVersion: registered.GroupOrDie(api.GroupName).GroupVersion.String(),
 					},
 				},
 			}},
@@ -2514,7 +2514,7 @@ func TestValidateEnv(t *testing.T) {
 				ValueFrom: &api.EnvVarSource{
 					FieldRef: &api.ObjectFieldSelector{
 						FieldPath:  "metadata.whoops",
-						APIVersion: testapi.Default.GroupVersion().String(),
+						APIVersion: registered.GroupOrDie(api.GroupName).GroupVersion.String(),
 					},
 				},
 			}},
@@ -2553,7 +2553,7 @@ func TestValidateEnv(t *testing.T) {
 				ValueFrom: &api.EnvVarSource{
 					FieldRef: &api.ObjectFieldSelector{
 						FieldPath:  "status.phase",
-						APIVersion: testapi.Default.GroupVersion().String(),
+						APIVersion: registered.GroupOrDie(api.GroupName).GroupVersion.String(),
 					},
 				},
 			}},

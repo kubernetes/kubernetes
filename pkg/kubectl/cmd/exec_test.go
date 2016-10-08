@@ -30,7 +30,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
 	"k8s.io/kubernetes/pkg/util/term"
@@ -159,7 +159,7 @@ func TestPodAndContainer(t *testing.T) {
 }
 
 func TestExec(t *testing.T) {
-	version := testapi.Default.GroupVersion().Version
+	version := registered.GroupOrDie(api.GroupName).GroupVersion.Version
 	tests := []struct {
 		name, podPath, execPath, container string
 		pod                                *api.Pod

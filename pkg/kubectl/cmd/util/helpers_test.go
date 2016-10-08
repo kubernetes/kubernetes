@@ -33,6 +33,7 @@ import (
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/runtime"
 	uexec "k8s.io/kubernetes/pkg/util/exec"
@@ -55,7 +56,7 @@ func TestMerge(t *testing.T) {
 					Name: "foo",
 				},
 			},
-			fragment: fmt.Sprintf(`{ "apiVersion": "%s" }`, testapi.Default.GroupVersion().String()),
+			fragment: fmt.Sprintf(`{ "apiVersion": "%s" }`, registered.GroupOrDie(api.GroupName).GroupVersion.String()),
 			expected: &api.Pod{
 				ObjectMeta: api.ObjectMeta{
 					Name: "foo",
@@ -84,7 +85,7 @@ func TestMerge(t *testing.T) {
 					},
 				},
 			},
-			fragment: fmt.Sprintf(`{ "apiVersion": "%s", "spec": { "containers": [ { "name": "c1", "image": "green-image" } ] } }`, testapi.Default.GroupVersion().String()),
+			fragment: fmt.Sprintf(`{ "apiVersion": "%s", "spec": { "containers": [ { "name": "c1", "image": "green-image" } ] } }`, registered.GroupOrDie(api.GroupName).GroupVersion.String()),
 			expected: &api.Pod{
 				ObjectMeta: api.ObjectMeta{
 					Name: "foo",
@@ -110,7 +111,7 @@ func TestMerge(t *testing.T) {
 					Name: "foo",
 				},
 			},
-			fragment: fmt.Sprintf(`{ "apiVersion": "%s", "spec": { "volumes": [ {"name": "v1"}, {"name": "v2"} ] } }`, testapi.Default.GroupVersion().String()),
+			fragment: fmt.Sprintf(`{ "apiVersion": "%s", "spec": { "volumes": [ {"name": "v1"}, {"name": "v2"} ] } }`, registered.GroupOrDie(api.GroupName).GroupVersion.String()),
 			expected: &api.Pod{
 				ObjectMeta: api.ObjectMeta{
 					Name: "foo",
@@ -151,7 +152,7 @@ func TestMerge(t *testing.T) {
 			obj: &api.Service{
 				Spec: api.ServiceSpec{},
 			},
-			fragment: fmt.Sprintf(`{ "apiVersion": "%s", "spec": { "ports": [ { "port": 0 } ] } }`, testapi.Default.GroupVersion().String()),
+			fragment: fmt.Sprintf(`{ "apiVersion": "%s", "spec": { "ports": [ { "port": 0 } ] } }`, registered.GroupOrDie(api.GroupName).GroupVersion.String()),
 			expected: &api.Service{
 				Spec: api.ServiceSpec{
 					SessionAffinity: "None",
@@ -174,7 +175,7 @@ func TestMerge(t *testing.T) {
 					},
 				},
 			},
-			fragment: fmt.Sprintf(`{ "apiVersion": "%s", "spec": { "selector": { "version": "v2" } } }`, testapi.Default.GroupVersion().String()),
+			fragment: fmt.Sprintf(`{ "apiVersion": "%s", "spec": { "selector": { "version": "v2" } } }`, registered.GroupOrDie(api.GroupName).GroupVersion.String()),
 			expected: &api.Service{
 				Spec: api.ServiceSpec{
 					SessionAffinity: "None",

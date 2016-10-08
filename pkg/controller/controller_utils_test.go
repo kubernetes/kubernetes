@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/record"
@@ -53,7 +54,7 @@ func NewFakeControllerExpectationsLookup(ttl time.Duration) (*ControllerExpectat
 
 func newReplicationController(replicas int) *api.ReplicationController {
 	rc := &api.ReplicationController{
-		TypeMeta: unversioned.TypeMeta{APIVersion: testapi.Default.GroupVersion().String()},
+		TypeMeta: unversioned.TypeMeta{APIVersion: registered.GroupOrDie(api.GroupName).GroupVersion.String()},
 		ObjectMeta: api.ObjectMeta{
 			UID:             uuid.NewUUID(),
 			Name:            "foobar",
@@ -244,7 +245,7 @@ func TestCreatePods(t *testing.T) {
 	}
 	testServer := httptest.NewServer(&fakeHandler)
 	defer testServer.Close()
-	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
 
 	podControl := RealPodControl{
 		KubeClient: clientset,
