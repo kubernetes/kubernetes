@@ -38,6 +38,11 @@ type calledDetail struct {
 	arguments []interface{}
 }
 
+// NewCalledDetail create a new call detail item.
+func NewCalledDetail(name string, arguments []interface{}) calledDetail {
+	return calledDetail{name: name, arguments: arguments}
+}
+
 // FakeDockerClient is a simple fake docker client, so that kubelet can be run for testing without requiring a real docker setup.
 type FakeDockerClient struct {
 	sync.Mutex
@@ -86,6 +91,8 @@ func newClientWithVersionAndClock(version, apiVersion string, c clock.Clock) *Fa
 		Errors:       make(map[string]error),
 		ContainerMap: make(map[string]*dockertypes.ContainerJSON),
 		Clock:        c,
+		// Set an empty image inspect by default.
+		Image: &dockertypes.ImageInspect{},
 	}
 }
 
@@ -210,7 +217,7 @@ func (f *FakeDockerClient) AssertCalls(calls []string) (err error) {
 	return
 }
 
-func (f *FakeDockerClient) AssertCallDetails(calls []calledDetail) (err error) {
+func (f *FakeDockerClient) AssertCallDetails(calls ...calledDetail) (err error) {
 	f.Lock()
 	defer f.Unlock()
 

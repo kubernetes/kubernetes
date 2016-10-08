@@ -401,7 +401,7 @@ func (dm *DockerManager) inspectContainer(id string, podName, podNamespace strin
 	imageID := DockerPrefix + iResult.Image
 	imgInspectResult, err := dm.client.InspectImageByID(iResult.Image)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("unable to inspect docker image %q while inspecting docker container %q: %v", containerName, iResult.Image, err))
+		utilruntime.HandleError(fmt.Errorf("unable to inspect docker image %q while inspecting docker container %q: %v", iResult.Image, containerName, err))
 	} else {
 		if len(imgInspectResult.RepoDigests) > 1 {
 			glog.V(4).Infof("Container %q had more than one associated RepoDigest (%v), only using the first", containerName, imgInspectResult.RepoDigests)
