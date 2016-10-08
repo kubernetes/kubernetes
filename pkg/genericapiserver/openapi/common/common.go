@@ -16,7 +16,10 @@ limitations under the License.
 
 package common
 
-import "github.com/go-openapi/spec"
+import (
+	"github.com/emicklei/go-restful"
+	"github.com/go-openapi/spec"
+)
 
 // OpenAPIDefinition describes single type. Normally these definitions are auto-generated using gen-openapi.
 type OpenAPIDefinition struct {
@@ -33,6 +36,27 @@ type OpenAPIDefinitions map[string]OpenAPIDefinition
 // possible.
 type OpenAPIDefinitionGetter interface {
 	OpenAPIDefinition() *OpenAPIDefinition
+}
+
+// Config is set of configuration for openAPI spec generation.
+type Config struct {
+	// List of supported protocols such as https, http, etc.
+	ProtocolList []string
+
+	// Info is general information about the API.
+	Info *spec.Info
+	// DefaultResponse will be used if an operation does not have any responses listed. It
+	// will show up as ... "responses" : {"default" : $DefaultResponse} in the spec.
+	DefaultResponse *spec.Response
+	// List of webservice's path prefixes to ignore
+	IgnorePrefixes []string
+
+	// OpenAPIDefinitions should provide definition for all models used by routes. Failure to provide this map
+	// or any of the models will result in spec generation failure.
+	Definitions *OpenAPIDefinitions
+
+	// GetOperationID returns operation id for a restful route. It is an optional function to customize operation IDs.
+	GetOperationID func(servePath string, r *restful.Route) (string, error)
 }
 
 // This function is a reference for converting go (or any custom type) to a simple open API type,format pair. There are
