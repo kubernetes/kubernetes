@@ -2499,10 +2499,17 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 							Format:      "",
 						},
 					},
-					"CgroupsPerQOS": {
+					"cgroupsPerQOS": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Enable QoS based Cgroup hierarchy: top level cgroups for QoS Classes And all Burstable and BestEffort pods are brought up under their specific top level QoS cgroup.",
 							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"cgroupDriver": {
+						SchemaProps: spec.SchemaProps{
+							Description: "driver that the kubelet uses to manipulate cgroups on the host (cgroupfs or systemd)",
+							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
@@ -13963,10 +13970,17 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 							Format:      "",
 						},
 					},
-					"CgroupsPerQOS": {
+					"cgroupsPerQOS": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Enable QoS based Cgroup hierarchy: top level cgroups for QoS Classes And all Burstable and BestEffort pods are brought up under their specific top level QoS cgroup.",
 							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"cgroupDriver": {
+						SchemaProps: spec.SchemaProps{
+							Description: "driver that the kubelet uses to manipulate cgroups on the host (cgroupfs or systemd)",
+							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
