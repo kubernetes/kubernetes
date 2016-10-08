@@ -378,7 +378,9 @@ func StartControllers(controllers map[string]InitFunc, s *options.CMServer, root
 	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 
 	if s.AllocateNodeCIDRs && s.ConfigureCloudRoutes {
-		if cloud == nil {
+		if s.CloudProvider == "external" {
+			glog.Warning("configure-cloud-routes is set, but external cloudprovider is specified. This manager will not configure cloud provider routes.")
+		} else if cloud == nil {
 			glog.Warning("configure-cloud-routes is set, but no cloud provider specified. Will not configure cloud provider routes.")
 		} else if routes, ok := cloud.Routes(); !ok {
 			glog.Warning("configure-cloud-routes is set, but cloud provider does not support routes. Will not configure cloud provider routes.")
