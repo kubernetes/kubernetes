@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	daemonutil "k8s.io/kubernetes/pkg/controller/daemon/util"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/runtime"
 	sliceutil "k8s.io/kubernetes/pkg/util/slice"
@@ -42,6 +43,8 @@ func RollbackerFor(kind unversioned.GroupKind, c clientset.Interface) (Rollbacke
 	switch kind {
 	case extensions.Kind("Deployment"):
 		return &DeploymentRollbacker{c}, nil
+	case extensions.Kind("DaemonSet"):
+		return &DaemonSetRollbacker{c}, nil
 	}
 	return nil, fmt.Errorf("no rollbacker has been implemented for %q", kind)
 }
@@ -84,12 +87,12 @@ func (r *DeploymentRollbacker) Rollback(obj runtime.Object, updatedAnnotations m
 	if err != nil {
 		return result, err
 	}
-	result = watchRollbackEvent(watch)
+	result = watchRollbackEvent(watch, extensions.Kind("Deployment"))
 	return result, err
 }
 
 // watchRollbackEvent watches for rollback events and returns rollback result
-func watchRollbackEvent(w watch.Interface) string {
+func watchRollbackEvent(w watch.Interface, kind unversioned.GroupKind) string {
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, os.Interrupt, os.Kill, syscall.SIGTERM)
 	for {
@@ -103,7 +106,16 @@ func watchRollbackEvent(w watch.Interface) string {
 				w.Stop()
 				return ""
 			}
-			isRollback, result := isRollbackEvent(obj)
+			var isRollback bool
+			var result string
+			switch kind {
+			case extensions.Kind("Deployment"):
+				isRollback, result = isDeploymentRollbackEvent(obj)
+			case extensions.Kind("DaemonSet"):
+				isRollback, result = isDaemonSetRollbackEvent(obj)
+			default:
+				isRollback, result = false, ""
+			}
 			if isRollback {
 				w.Stop()
 				return result
@@ -116,7 +128,7 @@ func watchRollbackEvent(w watch.Interface) string {
 
 // isRollbackEvent checks if the input event is about rollback, and returns true and
 // related result string back if it is.
-func isRollbackEvent(e *api.Event) (bool, string) {
+func isDeploymentRollbackEvent(e *api.Event) (bool, string) {
 	rollbackEventReasons := []string{deploymentutil.RollbackRevisionNotFound, deploymentutil.RollbackTemplateUnchanged, deploymentutil.RollbackDone}
 	for _, reason := range rollbackEventReasons {
 		if e.Reason == reason {
@@ -174,4 +186,58 @@ func simpleDryRun(deployment *extensions.Deployment, c clientset.Interface, toRe
 	buf.WriteString("\n")
 	DescribePodTemplate(template, buf)
 	return buf.String(), nil
+}
+
+type DaemonSetRollbacker struct {
+	c clientset.Interface
+}
+
+func (r *DaemonSetRollbacker) Rollback(obj runtime.Object, updatedAnnotations map[string]string, toRevision int64, dryRun bool) (string, error) {
+	d, ok := obj.(*extensions.DaemonSet)
+	if !ok {
+		return "", fmt.Errorf("passed object is not a DaemonSet: %#v", obj)
+	}
+	if d.Spec.Paused {
+		return "", fmt.Errorf("you cannot rollback a paused DaemonSet; resume it first with 'kubectl rollout resume daemonset/%s' and try again", d.Name)
+	}
+	daemonRollback := &extensions.DaemonSetRollback{
+		Name:               d.Name,
+		UpdatedAnnotations: updatedAnnotations,
+		RollbackTo: extensions.RollbackConfig{
+			Revision: toRevision,
+		},
+	}
+	result := ""
+
+	// Get current events
+	events, err := r.c.Core().Events(d.Namespace).List(api.ListOptions{})
+	if err != nil {
+		return result, err
+	}
+	// Do the rollback
+	if err := r.c.Extensions().DaemonSets(d.Namespace).Rollback(daemonRollback); err != nil {
+		return result, err
+	}
+	// Watch for the changes of events
+	watch, err := r.c.Core().Events(d.Namespace).Watch(api.ListOptions{Watch: true, ResourceVersion: events.ResourceVersion})
+	if err != nil {
+		return result, err
+	}
+	result = watchRollbackEvent(watch, extensions.Kind("DaemonSet"))
+	return result, err
+}
+
+// isRollbackEvent checks if the input event is about rollback, and returns true and
+// related result string back if it is.
+func isDaemonSetRollbackEvent(e *api.Event) (bool, string) {
+	rollbackEventReasons := []string{daemonutil.RollbackRevisionNotFound, daemonutil.RollbackTemplateUnchanged, daemonutil.RollbackDone}
+	for _, reason := range rollbackEventReasons {
+		if e.Reason == reason {
+			if reason == daemonutil.RollbackDone {
+				return true, "rolled back"
+			}
+			return true, fmt.Sprintf("skipped rollback (%s: %s)", e.Reason, e.Message)
+		}
+	}
+	return false, ""
 }

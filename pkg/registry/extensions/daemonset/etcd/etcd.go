@@ -17,9 +17,14 @@ limitations under the License.
 package etcd
 
 import (
+	"fmt"
+
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
+	storeerr "k8s.io/kubernetes/pkg/api/errors/storage"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	extvalidation "k8s.io/kubernetes/pkg/apis/extensions/validation"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/extensions/daemonset"
 	"k8s.io/kubernetes/pkg/registry/generic"
@@ -34,7 +39,7 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against DaemonSets.
-func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
+func NewREST(opts generic.RESTOptions) (*REST, *StatusREST, *RollbackREST) {
 	prefix := "/" + opts.ResourcePrefix
 
 	newListFunc := func() runtime.Object { return &extensions.DaemonSetList{} }
@@ -86,7 +91,7 @@ func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
 	statusStore := *store
 	statusStore.UpdateStrategy = daemonset.StatusStrategy
 
-	return &REST{store}, &StatusREST{store: &statusStore}
+	return &REST{store}, &StatusREST{store: &statusStore}, &RollbackREST{store: store}
 }
 
 // StatusREST implements the REST endpoint for changing the status of a daemonset
@@ -106,4 +111,65 @@ func (r *StatusREST) Get(ctx api.Context, name string) (runtime.Object, error) {
 // Update alters the status subset of an object.
 func (r *StatusREST) Update(ctx api.Context, name string, objInfo rest.UpdatedObjectInfo) (runtime.Object, bool, error) {
 	return r.store.Update(ctx, name, objInfo)
+}
+
+// RollbackREST implements the REST endpoint for initiating the rollback of a daemon set
+type RollbackREST struct {
+	store *registry.Store
+}
+
+// New creates a rollback
+func (r *RollbackREST) New() runtime.Object {
+	return &extensions.DaemonSetRollback{}
+}
+
+var _ = rest.Creater(&RollbackREST{})
+
+func (r *RollbackREST) Create(ctx api.Context, obj runtime.Object) (out runtime.Object, err error) {
+	rollback, ok := obj.(*extensions.DaemonSetRollback)
+	if !ok {
+		return nil, fmt.Errorf("expected input object type to be DaemonSetRollback, but %T", obj)
+	}
+
+	if errs := extvalidation.ValidateDaemonSetRollback(rollback); len(errs) != 0 {
+		return nil, errors.NewInvalid(extensions.Kind("DaemonSetRollback"), rollback.Name, errs)
+	}
+
+	// Update the DaemonSet with information in DaemonSetRollback to trigger rollback
+	err = r.rollbackDaemonSet(ctx, rollback.Name, &rollback.RollbackTo, rollback.UpdatedAnnotations)
+	return
+}
+
+func (r *RollbackREST) rollbackDaemonSet(ctx api.Context, daemonID string, config *extensions.RollbackConfig, annotations map[string]string) (err error) {
+	if _, err = r.setDaemonSetRollback(ctx, daemonID, config, annotations); err != nil {
+		err = storeerr.InterpretGetError(err, extensions.Resource("daemonsets"), daemonID)
+		err = storeerr.InterpretUpdateError(err, extensions.Resource("daemonsets"), daemonID)
+		if _, ok := err.(*errors.StatusError); !ok {
+			err = errors.NewConflict(extensions.Resource("daemonsets/rollback"), daemonID, err)
+		}
+	}
+	return
+}
+
+func (r *RollbackREST) setDaemonSetRollback(ctx api.Context, daemonID string, config *extensions.RollbackConfig, annotations map[string]string) (finalDaemonSet *extensions.DaemonSet, err error) {
+	dKey, err := r.store.KeyFunc(ctx, daemonID)
+	if err != nil {
+		return nil, err
+	}
+	err = r.store.Storage.GuaranteedUpdate(ctx, dKey, &extensions.DaemonSet{}, false, nil, storage.SimpleUpdate(func(obj runtime.Object) (runtime.Object, error) {
+		d, ok := obj.(*extensions.DaemonSet)
+		if !ok {
+			return nil, fmt.Errorf("unexpected object: %#v", obj)
+		}
+		if d.Annotations == nil {
+			d.Annotations = make(map[string]string)
+		}
+		for k, v := range annotations {
+			d.Annotations[k] = v
+		}
+		d.Spec.RollbackTo = config
+		finalDaemonSet = d
+		return d, nil
+	}))
+	return finalDaemonSet, err
 }

@@ -28,13 +28,14 @@ import (
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/runtime"
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
+	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
-func newStorage(t *testing.T) (*REST, *StatusREST, *etcdtesting.EtcdTestServer) {
+func newStorage(t *testing.T) (*REST, *StatusREST, *RollbackREST, *etcdtesting.EtcdTestServer) {
 	etcdStorage, server := registrytest.NewEtcdStorage(t, extensions.GroupName)
 	restOptions := generic.RESTOptions{StorageConfig: etcdStorage, Decorator: generic.UndecoratedStorage, DeleteCollectionWorkers: 1}
-	daemonSetStorage, statusStorage := NewREST(restOptions)
-	return daemonSetStorage, statusStorage, server
+	daemonSetStorage, statusStorage, rollbackStorage := NewREST(restOptions)
+	return daemonSetStorage, statusStorage, rollbackStorage, server
 }
 
 func newValidDaemonSet() *extensions.DaemonSet {
@@ -61,6 +62,12 @@ func newValidDaemonSet() *extensions.DaemonSet {
 					DNSPolicy:     api.DNSClusterFirst,
 				},
 			},
+			UpdateStrategy: extensions.DaemonSetUpdateStrategy{
+				Type: extensions.RollingUpdateDaemonSetStrategyType,
+				RollingUpdate: &extensions.RollingUpdateDaemonSet{
+					MaxUnavailable: intstr.FromInt(1),
+				},
+			},
 		},
 	}
 }
@@ -68,7 +75,7 @@ func newValidDaemonSet() *extensions.DaemonSet {
 var validDaemonSet = newValidDaemonSet()
 
 func TestCreate(t *testing.T) {
-	storage, _, server := newStorage(t)
+	storage, _, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store)
@@ -95,7 +102,7 @@ func TestCreate(t *testing.T) {
 }
 
 func TestUpdate(t *testing.T) {
-	storage, _, server := newStorage(t)
+	storage, _, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store)
@@ -120,11 +127,21 @@ func TestUpdate(t *testing.T) {
 			object.Spec.Template.Spec.RestartPolicy = api.RestartPolicyOnFailure
 			return object
 		},
+		func(obj runtime.Object) runtime.Object {
+			object := obj.(*extensions.DaemonSet)
+			object.Spec.Selector = &unversioned.LabelSelector{MatchLabels: map[string]string{}}
+			return object
+		},
+		func(obj runtime.Object) runtime.Object {
+			object := obj.(*extensions.DaemonSet)
+			object.Spec.UpdateStrategy = extensions.DaemonSetUpdateStrategy{}
+			return object
+		},
 	)
 }
 
 func TestDelete(t *testing.T) {
-	storage, _, server := newStorage(t)
+	storage, _, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store)
@@ -132,7 +149,7 @@ func TestDelete(t *testing.T) {
 }
 
 func TestGet(t *testing.T) {
-	storage, _, server := newStorage(t)
+	storage, _, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store)
@@ -140,7 +157,7 @@ func TestGet(t *testing.T) {
 }
 
 func TestList(t *testing.T) {
-	storage, _, server := newStorage(t)
+	storage, _, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store)
@@ -148,7 +165,7 @@ func TestList(t *testing.T) {
 }
 
 func TestWatch(t *testing.T) {
-	storage, _, server := newStorage(t)
+	storage, _, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store)

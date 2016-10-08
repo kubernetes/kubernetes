@@ -75,6 +75,7 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 	f = framework.NewDefaultFramework("daemonsets")
 
 	image := "gcr.io/google_containers/serve_hostname:v1.4"
+	redisImage := "gcr.io/google_containers/redis:e2e"
 	dsName := "daemon-set"
 
 	var ns string
@@ -263,6 +264,53 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 		Expect(c.DaemonSets(ns).Delete(dsName)).NotTo(HaveOccurred())
 
 	})
+
+	It("should update pod when spec was updated and update strategy is rolling update", func() {
+		label := map[string]string{daemonsetNameLabel: dsName}
+
+		framework.Logf("Creating simple daemon set %s", dsName)
+		_, err := c.DaemonSets(ns).Create(&extensions.DaemonSet{
+			ObjectMeta: api.ObjectMeta{
+				Name: dsName,
+			},
+			Spec: extensions.DaemonSetSpec{
+				Template: api.PodTemplateSpec{
+					ObjectMeta: api.ObjectMeta{
+						Labels: label,
+					},
+					Spec: api.PodSpec{
+						Containers: []api.Container{
+							{
+								Name:  dsName,
+								Image: nginxImage,
+								Ports: []api.ContainerPort{{ContainerPort: 9376}},
+							},
+						},
+					},
+				},
+				UpdateStrategy: extensions.DaemonSetUpdateStrategy{
+					Type: extensions.RollingUpdateDaemonSetStrategyType,
+				},
+			},
+		})
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Check that daemon pods launch on every node of the cluster.")
+		Expect(err).NotTo(HaveOccurred())
+		err = wait.Poll(dsRetryPeriod, dsRetryTimeout, checkRunningOnAllNodes(f, label))
+		Expect(err).NotTo(HaveOccurred(), "error waiting for daemon pod to start")
+
+		By("Update daemon pods image.")
+		ds, err := c.DaemonSets(ns).Get(dsName)
+		ds.Spec.Template.Spec.Containers[0].Image = redisImage
+		_, err = c.DaemonSets(ns).Update(ds)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Check that demon pods have set updated image.")
+		err = wait.Poll(dsRetryPeriod, dsRetryTimeout, checkDaemonPodsImage(f, label, redisImage))
+		Expect(err).NotTo(HaveOccurred())
+
+	})
 })
 
 func separateDaemonSetNodeLabels(labels map[string]string) (map[string]string, map[string]string) {
@@ -373,4 +421,25 @@ func checkRunningOnAllNodes(f *framework.Framework, selector map[string]string) 
 
 func checkRunningOnNoNodes(f *framework.Framework, selector map[string]string) func() (bool, error) {
 	return checkDaemonPodOnNodes(f, selector, make([]string, 0))
+}
+
+func checkDaemonPodsImage(f *framework.Framework, selector map[string]string, image string) func() (bool, error) {
+	return func() (bool, error) {
+		selector := labels.Set(selector).AsSelector()
+		options := api.ListOptions{LabelSelector: selector}
+		podList, err := f.Client.Pods(f.Namespace.Name).List(options)
+		if err != nil {
+			return false, nil
+		}
+		pods := podList.Items
+
+		for _, pod := range pods {
+			podImage := pod.Spec.Containers[0].Image
+			if podImage != image {
+				err := fmt.Errorf("Wrong image for pod: %s. Expected: %s, got: %s", pod.Name, image, podImage)
+				return false, err
+			}
+		}
+		return true, nil
+	}
 }

@@ -35,6 +35,7 @@ type DaemonSetInterface interface {
 	UpdateStatus(ctrl *extensions.DaemonSet) (*extensions.DaemonSet, error)
 	Delete(name string) error
 	Watch(opts api.ListOptions) (watch.Interface, error)
+	Rollback(*extensions.DaemonSetRollback) error
 }
 
 // daemonSets implements DaemonsSetsNamespacer interface
@@ -97,4 +98,9 @@ func (c *daemonSets) Watch(opts api.ListOptions) (watch.Interface, error) {
 		Resource("daemonsets").
 		VersionedParams(&opts, api.ParameterCodec).
 		Watch()
+}
+
+// Rollback applied the provided DaemonSetRollback to the named daemon set in the current namespace.
+func (c *daemonSets) Rollback(daemonRollback *extensions.DaemonSetRollback) error {
+	return c.r.Post().Namespace(c.ns).Resource("daemonsets").Name(daemonRollback.Name).SubResource("rollback").Body(daemonRollback).Do().Error()
 }

@@ -3218,6 +3218,45 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		Dependencies: []string{
 			"extensions.DaemonSet", "unversioned.ListMeta"},
 	},
+	"extensions.DaemonSetRollback": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "DaemonSetRollback stores the information required to rollback a daemon set.",
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Required: This must match the Name of a damon set.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"updatedAnnotations": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The annotations to be updated to a daemon set",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Type:   []string{"string"},
+										Format: "",
+									},
+								},
+							},
+						},
+					},
+					"rollbackTo": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The config of this daemon set rollback.",
+							Ref:         spec.MustCreateRef("#/definitions/extensions.RollbackConfig"),
+						},
+					},
+				},
+				Required: []string{"name", "rollbackTo"},
+			},
+		},
+		Dependencies: []string{
+			"extensions.RollbackConfig"},
+	},
 	"extensions.DaemonSetSpec": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -3235,18 +3274,51 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 							Ref:         spec.MustCreateRef("#/definitions/api.PodTemplateSpec"),
 						},
 					},
+					"paused": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Indicates that the DaemonSet is paused and will not be processed by the DaemonSet controller.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"minReadySeconds": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Minimum number of seconds for which a newly created DaemonSet pod should be ready without any of its container crashing, for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready).",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"updateStrategy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Update strategy to replace existing DaemonSet pods with new pods.",
+							Ref:         spec.MustCreateRef("#/definitions/extensions.DaemonSetUpdateStrategy"),
+						},
+					},
+					"rollbackTo": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The config this daemon set is rolling back to. Will be cleared after rollback is done.",
+							Ref:         spec.MustCreateRef("#/definitions/extensions.RollbackConfig"),
+						},
+					},
 				},
 				Required: []string{"template"},
 			},
 		},
 		Dependencies: []string{
-			"api.PodTemplateSpec", "unversioned.LabelSelector"},
+			"api.PodTemplateSpec", "extensions.DaemonSetUpdateStrategy", "extensions.RollbackConfig", "unversioned.LabelSelector"},
 	},
 	"extensions.DaemonSetStatus": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
 				Description: "DaemonSetStatus represents the current status of a daemon set.",
 				Properties: map[string]spec.Schema{
+					"observedGeneration": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The generation observed by the daemonset controller.",
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
 					"currentNumberScheduled": {
 						SchemaProps: spec.SchemaProps{
 							Description: "CurrentNumberScheduled is the number of nodes that are running at least 1 daemon pod and are supposed to run the daemon pod.",
@@ -3268,11 +3340,41 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 							Format:      "int32",
 						},
 					},
+					"updatedNumberScheduled": {
+						SchemaProps: spec.SchemaProps{
+							Description: "UpdatedNumberScheduled is the total number of nodes that are running updated daemon pod",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
 				},
-				Required: []string{"currentNumberScheduled", "numberMisscheduled", "desiredNumberScheduled"},
+				Required: []string{"currentNumberScheduled", "numberMisscheduled", "desiredNumberScheduled", "updatedNumberScheduled"},
 			},
 		},
 		Dependencies: []string{},
+	},
+	"extensions.DaemonSetUpdateStrategy": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Properties: map[string]spec.Schema{
+					"type": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Type of daemon set update. Only \"RollingUpdate\" is supported at this time. Default is RollingUpdate.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"rollingUpdate": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Rolling update config params. Present only if DaemonSetUpdateStrategy = RollingUpdate.",
+							Ref:         spec.MustCreateRef("#/definitions/extensions.RollingUpdateDaemonSet"),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"extensions.RollingUpdateDaemonSet"},
 	},
 	"extensions.Deployment": {
 		Schema: spec.Schema{
@@ -4357,6 +4459,23 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 			},
 		},
 		Dependencies: []string{},
+	},
+	"extensions.RollingUpdateDaemonSet": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "Spec to control the desired behavior of daemon set rolling update.",
+				Properties: map[string]spec.Schema{
+					"maxUnavailable": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The maximum number of DaemonSet pods that can be unavailable during the update. Value can be an absolute number (ex: 5) or a percentage of total number of DaemonSet pods at the start of the update (ex: 10%). Absolute number is calculated from percentage by rounding up. This cannot be 0. Default value is 1. Example: when this is set to 30%, 30% of the currently running DaemonSet pods can be stopped for an update at any given time. The update starts by stopping at most 30% of the currently running DaemonSet pods and then brings up new DaemonSet pods in their place. Once the new pods are ready, it then proceeds onto other DaemonSet pods, thus ensuring that at least 70% of original number of DaemonSet pods are available at all times during the update.",
+							Ref:         spec.MustCreateRef("#/definitions/intstr.IntOrString"),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"intstr.IntOrString"},
 	},
 	"extensions.RollingUpdateDeployment": {
 		Schema: spec.Schema{
@@ -15300,6 +15419,45 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		Dependencies: []string{
 			"unversioned.ListMeta", "v1beta1.DaemonSet"},
 	},
+	"v1beta1.DaemonSetRollback": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "DaemonSetRollback stores the information required to rollback a daemonset.",
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Required: This must match the Name of a daemon set.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"updatedAnnotations": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The annotations to be updated to a daemon set",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Type:   []string{"string"},
+										Format: "",
+									},
+								},
+							},
+						},
+					},
+					"rollbackTo": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The config of this daemon set rollback.",
+							Ref:         spec.MustCreateRef("#/definitions/v1beta1.RollbackConfig"),
+						},
+					},
+				},
+				Required: []string{"name", "rollbackTo"},
+			},
+		},
+		Dependencies: []string{
+			"v1beta1.RollbackConfig"},
+	},
 	"v1beta1.DaemonSetSpec": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -15317,18 +15475,51 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 							Ref:         spec.MustCreateRef("#/definitions/v1.PodTemplateSpec"),
 						},
 					},
+					"paused": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Indicates that the DaemonSet is paused and will not be processed by the DaemonSet controller.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"minReadySeconds": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Minimum number of seconds for which a newly created DaemonSet pod should be ready without any of its container crashing, for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready).",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"updateStrategy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Update strategy to replace existing DaemonSet pods with new pods.",
+							Ref:         spec.MustCreateRef("#/definitions/v1beta1.DaemonSetUpdateStrategy"),
+						},
+					},
+					"rollbackTo": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The config this daemon set is rolling back to. Will be cleared after rollback is done.",
+							Ref:         spec.MustCreateRef("#/definitions/v1beta1.RollbackConfig"),
+						},
+					},
 				},
 				Required: []string{"template"},
 			},
 		},
 		Dependencies: []string{
-			"v1.PodTemplateSpec", "v1beta1.LabelSelector"},
+			"v1.PodTemplateSpec", "v1beta1.DaemonSetUpdateStrategy", "v1beta1.LabelSelector", "v1beta1.RollbackConfig"},
 	},
 	"v1beta1.DaemonSetStatus": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
 				Description: "DaemonSetStatus represents the current status of a daemon set.",
 				Properties: map[string]spec.Schema{
+					"observedGeneration": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The generation observed by the daemonset controller.",
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
 					"currentNumberScheduled": {
 						SchemaProps: spec.SchemaProps{
 							Description: "CurrentNumberScheduled is the number of nodes that are running at least 1 daemon pod and are supposed to run the daemon pod. More info: http://releases.k8s.io/HEAD/docs/admin/daemons.md",
@@ -15350,11 +15541,41 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 							Format:      "int32",
 						},
 					},
+					"updatedNumberScheduled": {
+						SchemaProps: spec.SchemaProps{
+							Description: "UpdatedNumberScheduled is the total number of nodes that are running updated daemon pod",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
 				},
-				Required: []string{"currentNumberScheduled", "numberMisscheduled", "desiredNumberScheduled"},
+				Required: []string{"currentNumberScheduled", "numberMisscheduled", "desiredNumberScheduled", "updatedNumberScheduled"},
 			},
 		},
 		Dependencies: []string{},
+	},
+	"v1beta1.DaemonSetUpdateStrategy": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Properties: map[string]spec.Schema{
+					"type": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Type of daemon set update. Only \"RollingUpdate\" is supported at this time. Default is RollingUpdate.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"rollingUpdate": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Rolling update config params. Present only if DaemonSetUpdateStrategy = RollingUpdate.",
+							Ref:         spec.MustCreateRef("#/definitions/v1beta1.RollingUpdateDaemonSet"),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"v1beta1.RollingUpdateDaemonSet"},
 	},
 	"v1beta1.Deployment": {
 		Schema: spec.Schema{
@@ -17033,6 +17254,30 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 			},
 		},
 		Dependencies: []string{},
+	},
+	"v1beta1.RollingUpdateDaemonSet": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "Spec to control the desired behavior of daemon set rolling update.",
+				Properties: map[string]spec.Schema{
+					"maxUnavailable": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The maximum number of DaemonSet pods that can be unavailable during the update. Value can be an absolute number (ex: 5) or a percentage of total number of DaemonSet pods at the start of the update (ex: 10%). Absolute number is calculated from percentage by rounding up. This cannot be 0. Default value is 1. Example: when this is set to 30%, 30% of the currently running DaemonSet pods can be stopped for an update at any given time. The update starts by stopping at most 30% of the currently running DaemonSet pods and then brings up new DaemonSet pods in their place. Once the new pods are ready, it then proceeds onto other DaemonSet pods, thus ensuring that at least 70% of original number of DaemonSet pods are available at all times during the update.",
+							Ref:         spec.MustCreateRef("#/definitions/intstr.IntOrString"),
+						},
+					},
+					"minReadySeconds": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Minimum number of seconds for which a newly created DaemonSet pod should be ready without any of its container crashing, for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready).",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"intstr.IntOrString"},
 	},
 	"v1beta1.RollingUpdateDeployment": {
 		Schema: spec.Schema{

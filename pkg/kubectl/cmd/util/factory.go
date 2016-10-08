@@ -610,6 +610,13 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 				t.Spec.Paused = true
 				_, err := clientset.Extensions().Deployments(t.Namespace).Update(t)
 				return false, err
+			case *extensions.DaemonSet:
+				if t.Spec.Paused {
+					return true, nil
+				}
+				t.Spec.Paused = true
+				_, err := clientset.Extensions().DaemonSets(t.Namespace).Update(t)
+				return false, err
 			default:
 				gvks, _, err := api.Scheme.ObjectKinds(object)
 				if err != nil {
@@ -631,6 +638,13 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 				}
 				t.Spec.Paused = false
 				_, err := clientset.Extensions().Deployments(t.Namespace).Update(t)
+				return false, err
+			case *extensions.DaemonSet:
+				if !t.Spec.Paused {
+					return true, nil
+				}
+				t.Spec.Paused = false
+				_, err := clientset.Extensions().DaemonSets(t.Namespace).Update(t)
 				return false, err
 			default:
 				gvks, _, err := api.Scheme.ObjectKinds(object)

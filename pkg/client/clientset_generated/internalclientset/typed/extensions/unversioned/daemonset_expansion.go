@@ -16,12 +16,14 @@ limitations under the License.
 
 package unversioned
 
-type IngressExpansion interface{}
+import "k8s.io/kubernetes/pkg/apis/extensions"
 
-type NetworkPolicyExpansion interface{}
+// The DeploymentExpansion interface allows manually adding extra methods to the DeploymentInterface.
+type DaemonSetExpansion interface {
+	Rollback(*extensions.DaemonSetRollback) error
+}
 
-type PodSecurityPolicyExpansion interface{}
-
-type ReplicaSetExpansion interface{}
-
-type ThirdPartyResourceExpansion interface{}
+// Rollback applied the provided DaemonSetRollback to the named daemon set in the current namespace.
+func (c *daemonSets) Rollback(daemonSetRollback *extensions.DaemonSetRollback) error {
+	return c.client.Post().Namespace(c.ns).Resource("daemonsets").Name(daemonSetRollback.Name).SubResource("rollback").Body(daemonSetRollback).Do().Error()
+}

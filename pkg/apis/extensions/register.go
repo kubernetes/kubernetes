@@ -63,6 +63,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&ThirdPartyResourceList{},
 		&DaemonSetList{},
 		&DaemonSet{},
+		&DaemonSetRollback{},
 		&ThirdPartyResourceData{},
 		&ThirdPartyResourceDataList{},
 		&Ingress{},

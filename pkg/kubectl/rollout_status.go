@@ -34,12 +34,18 @@ func StatusViewerFor(kind unversioned.GroupKind, c internalclientset.Interface) 
 	switch kind {
 	case extensions.Kind("Deployment"):
 		return &DeploymentStatusViewer{c.Extensions()}, nil
+	case extensions.Kind("DaemonSet"):
+		return &DaemonSetStatusViewer{c.Extensions()}, nil
 	}
 	return nil, fmt.Errorf("no status viewer has been implemented for %v", kind)
 }
 
 type DeploymentStatusViewer struct {
 	c extensionsclient.DeploymentsGetter
+}
+
+type DaemonSetStatusViewer struct {
+	c extensionsclient.DaemonSetsGetter
 }
 
 // Status returns a message describing deployment status, and a bool value indicating if the status is considered done
@@ -61,4 +67,18 @@ func (s *DeploymentStatusViewer) Status(namespace, name string) (string, bool, e
 		return fmt.Sprintf("deployment %s successfully rolled out\n", name), true, nil
 	}
 	return fmt.Sprintf("Waiting for deployment spec update to be observed...\n"), false, nil
+}
+
+func (s *DaemonSetStatusViewer) Status(namespace, name string) (string, bool, error) {
+	daemonset, err := s.c.DaemonSets(namespace).Get(name)
+	if err != nil {
+		return "", false, err
+	}
+	if daemonset.Generation <= daemonset.Status.ObservedGeneration {
+		if daemonset.Status.UpdatedNumberScheduled == daemonset.Status.DesiredNumberScheduled {
+			return fmt.Sprintf("DaemonSet %s successfully rolled out\n", name), true, nil
+		}
+		return fmt.Sprintf("Waiting for rollout to finish: %d out of %d new pods have been updated...\n", daemonset.Status.UpdatedNumberScheduled, daemonset.Status.DesiredNumberScheduled), false, nil
+	}
+	return fmt.Sprintf("Waiting for daemonset spec update to be observed...\n"), false, nil
 }

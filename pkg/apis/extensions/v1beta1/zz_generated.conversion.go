@@ -53,10 +53,14 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 		Convert_extensions_DaemonSet_To_v1beta1_DaemonSet,
 		Convert_v1beta1_DaemonSetList_To_extensions_DaemonSetList,
 		Convert_extensions_DaemonSetList_To_v1beta1_DaemonSetList,
+		Convert_v1beta1_DaemonSetRollback_To_extensions_DaemonSetRollback,
+		Convert_extensions_DaemonSetRollback_To_v1beta1_DaemonSetRollback,
 		Convert_v1beta1_DaemonSetSpec_To_extensions_DaemonSetSpec,
 		Convert_extensions_DaemonSetSpec_To_v1beta1_DaemonSetSpec,
 		Convert_v1beta1_DaemonSetStatus_To_extensions_DaemonSetStatus,
 		Convert_extensions_DaemonSetStatus_To_v1beta1_DaemonSetStatus,
+		Convert_v1beta1_DaemonSetUpdateStrategy_To_extensions_DaemonSetUpdateStrategy,
+		Convert_extensions_DaemonSetUpdateStrategy_To_v1beta1_DaemonSetUpdateStrategy,
 		Convert_v1beta1_Deployment_To_extensions_Deployment,
 		Convert_extensions_Deployment_To_v1beta1_Deployment,
 		Convert_v1beta1_DeploymentList_To_extensions_DeploymentList,
@@ -149,6 +153,8 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 		Convert_extensions_ReplicationControllerDummy_To_v1beta1_ReplicationControllerDummy,
 		Convert_v1beta1_RollbackConfig_To_extensions_RollbackConfig,
 		Convert_extensions_RollbackConfig_To_v1beta1_RollbackConfig,
+		Convert_v1beta1_RollingUpdateDaemonSet_To_extensions_RollingUpdateDaemonSet,
+		Convert_extensions_RollingUpdateDaemonSet_To_v1beta1_RollingUpdateDaemonSet,
 		Convert_v1beta1_RollingUpdateDeployment_To_extensions_RollingUpdateDeployment,
 		Convert_extensions_RollingUpdateDeployment_To_v1beta1_RollingUpdateDeployment,
 		Convert_v1beta1_RunAsUserStrategyOptions_To_extensions_RunAsUserStrategyOptions,
@@ -409,6 +415,38 @@ func Convert_extensions_DaemonSetList_To_v1beta1_DaemonSetList(in *extensions.Da
 	return autoConvert_extensions_DaemonSetList_To_v1beta1_DaemonSetList(in, out, s)
 }
 
+func autoConvert_v1beta1_DaemonSetRollback_To_extensions_DaemonSetRollback(in *DaemonSetRollback, out *extensions.DaemonSetRollback, s conversion.Scope) error {
+	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	out.Name = in.Name
+	out.UpdatedAnnotations = in.UpdatedAnnotations
+	if err := Convert_v1beta1_RollbackConfig_To_extensions_RollbackConfig(&in.RollbackTo, &out.RollbackTo, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_v1beta1_DaemonSetRollback_To_extensions_DaemonSetRollback(in *DaemonSetRollback, out *extensions.DaemonSetRollback, s conversion.Scope) error {
+	return autoConvert_v1beta1_DaemonSetRollback_To_extensions_DaemonSetRollback(in, out, s)
+}
+
+func autoConvert_extensions_DaemonSetRollback_To_v1beta1_DaemonSetRollback(in *extensions.DaemonSetRollback, out *DaemonSetRollback, s conversion.Scope) error {
+	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	out.Name = in.Name
+	out.UpdatedAnnotations = in.UpdatedAnnotations
+	if err := Convert_extensions_RollbackConfig_To_v1beta1_RollbackConfig(&in.RollbackTo, &out.RollbackTo, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_extensions_DaemonSetRollback_To_v1beta1_DaemonSetRollback(in *extensions.DaemonSetRollback, out *DaemonSetRollback, s conversion.Scope) error {
+	return autoConvert_extensions_DaemonSetRollback_To_v1beta1_DaemonSetRollback(in, out, s)
+}
+
 func autoConvert_v1beta1_DaemonSetSpec_To_extensions_DaemonSetSpec(in *DaemonSetSpec, out *extensions.DaemonSetSpec, s conversion.Scope) error {
 	if in.Selector != nil {
 		in, out := &in.Selector, &out.Selector
@@ -422,11 +460,21 @@ func autoConvert_v1beta1_DaemonSetSpec_To_extensions_DaemonSetSpec(in *DaemonSet
 	if err := v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
+	out.Paused = in.Paused
+	out.MinReadySeconds = int(in.MinReadySeconds)
+	if err := Convert_v1beta1_DaemonSetUpdateStrategy_To_extensions_DaemonSetUpdateStrategy(&in.UpdateStrategy, &out.UpdateStrategy, s); err != nil {
+		return err
+	}
+	if in.RollbackTo != nil {
+		in, out := &in.RollbackTo, &out.RollbackTo
+		*out = new(extensions.RollbackConfig)
+		if err := Convert_v1beta1_RollbackConfig_To_extensions_RollbackConfig(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.RollbackTo = nil
+	}
 	return nil
-}
-
-func Convert_v1beta1_DaemonSetSpec_To_extensions_DaemonSetSpec(in *DaemonSetSpec, out *extensions.DaemonSetSpec, s conversion.Scope) error {
-	return autoConvert_v1beta1_DaemonSetSpec_To_extensions_DaemonSetSpec(in, out, s)
 }
 
 func autoConvert_extensions_DaemonSetSpec_To_v1beta1_DaemonSetSpec(in *extensions.DaemonSetSpec, out *DaemonSetSpec, s conversion.Scope) error {
@@ -442,17 +490,29 @@ func autoConvert_extensions_DaemonSetSpec_To_v1beta1_DaemonSetSpec(in *extension
 	if err := v1.Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
+	out.Paused = in.Paused
+	out.MinReadySeconds = int32(in.MinReadySeconds)
+	if err := Convert_extensions_DaemonSetUpdateStrategy_To_v1beta1_DaemonSetUpdateStrategy(&in.UpdateStrategy, &out.UpdateStrategy, s); err != nil {
+		return err
+	}
+	if in.RollbackTo != nil {
+		in, out := &in.RollbackTo, &out.RollbackTo
+		*out = new(RollbackConfig)
+		if err := Convert_extensions_RollbackConfig_To_v1beta1_RollbackConfig(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.RollbackTo = nil
+	}
 	return nil
 }
 
-func Convert_extensions_DaemonSetSpec_To_v1beta1_DaemonSetSpec(in *extensions.DaemonSetSpec, out *DaemonSetSpec, s conversion.Scope) error {
-	return autoConvert_extensions_DaemonSetSpec_To_v1beta1_DaemonSetSpec(in, out, s)
-}
-
 func autoConvert_v1beta1_DaemonSetStatus_To_extensions_DaemonSetStatus(in *DaemonSetStatus, out *extensions.DaemonSetStatus, s conversion.Scope) error {
+	out.ObservedGeneration = in.ObservedGeneration
 	out.CurrentNumberScheduled = in.CurrentNumberScheduled
 	out.NumberMisscheduled = in.NumberMisscheduled
 	out.DesiredNumberScheduled = in.DesiredNumberScheduled
+	out.UpdatedNumberScheduled = in.UpdatedNumberScheduled
 	return nil
 }
 
@@ -461,14 +521,44 @@ func Convert_v1beta1_DaemonSetStatus_To_extensions_DaemonSetStatus(in *DaemonSet
 }
 
 func autoConvert_extensions_DaemonSetStatus_To_v1beta1_DaemonSetStatus(in *extensions.DaemonSetStatus, out *DaemonSetStatus, s conversion.Scope) error {
+	out.ObservedGeneration = in.ObservedGeneration
 	out.CurrentNumberScheduled = in.CurrentNumberScheduled
 	out.NumberMisscheduled = in.NumberMisscheduled
 	out.DesiredNumberScheduled = in.DesiredNumberScheduled
+	out.UpdatedNumberScheduled = in.UpdatedNumberScheduled
 	return nil
 }
 
 func Convert_extensions_DaemonSetStatus_To_v1beta1_DaemonSetStatus(in *extensions.DaemonSetStatus, out *DaemonSetStatus, s conversion.Scope) error {
 	return autoConvert_extensions_DaemonSetStatus_To_v1beta1_DaemonSetStatus(in, out, s)
+}
+
+func autoConvert_v1beta1_DaemonSetUpdateStrategy_To_extensions_DaemonSetUpdateStrategy(in *DaemonSetUpdateStrategy, out *extensions.DaemonSetUpdateStrategy, s conversion.Scope) error {
+	out.Type = extensions.DaemonSetUpdateStrategyType(in.Type)
+	if in.RollingUpdate != nil {
+		in, out := &in.RollingUpdate, &out.RollingUpdate
+		*out = new(extensions.RollingUpdateDaemonSet)
+		if err := Convert_v1beta1_RollingUpdateDaemonSet_To_extensions_RollingUpdateDaemonSet(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.RollingUpdate = nil
+	}
+	return nil
+}
+
+func autoConvert_extensions_DaemonSetUpdateStrategy_To_v1beta1_DaemonSetUpdateStrategy(in *extensions.DaemonSetUpdateStrategy, out *DaemonSetUpdateStrategy, s conversion.Scope) error {
+	out.Type = DaemonSetUpdateStrategyType(in.Type)
+	if in.RollingUpdate != nil {
+		in, out := &in.RollingUpdate, &out.RollingUpdate
+		*out = new(RollingUpdateDaemonSet)
+		if err := Convert_extensions_RollingUpdateDaemonSet_To_v1beta1_RollingUpdateDaemonSet(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.RollingUpdate = nil
+	}
+	return nil
 }
 
 func autoConvert_v1beta1_Deployment_To_extensions_Deployment(in *Deployment, out *extensions.Deployment, s conversion.Scope) error {
@@ -2298,6 +2388,17 @@ func autoConvert_extensions_RollbackConfig_To_v1beta1_RollbackConfig(in *extensi
 
 func Convert_extensions_RollbackConfig_To_v1beta1_RollbackConfig(in *extensions.RollbackConfig, out *RollbackConfig, s conversion.Scope) error {
 	return autoConvert_extensions_RollbackConfig_To_v1beta1_RollbackConfig(in, out, s)
+}
+
+func autoConvert_v1beta1_RollingUpdateDaemonSet_To_extensions_RollingUpdateDaemonSet(in *RollingUpdateDaemonSet, out *extensions.RollingUpdateDaemonSet, s conversion.Scope) error {
+	// WARNING: in.MaxUnavailable requires manual conversion: inconvertible types (*k8s.io/kubernetes/pkg/util/intstr.IntOrString vs k8s.io/kubernetes/pkg/util/intstr.IntOrString)
+	// WARNING: in.MinReadySeconds requires manual conversion: does not exist in peer-type
+	return nil
+}
+
+func autoConvert_extensions_RollingUpdateDaemonSet_To_v1beta1_RollingUpdateDaemonSet(in *extensions.RollingUpdateDaemonSet, out *RollingUpdateDaemonSet, s conversion.Scope) error {
+	// WARNING: in.MaxUnavailable requires manual conversion: inconvertible types (k8s.io/kubernetes/pkg/util/intstr.IntOrString vs *k8s.io/kubernetes/pkg/util/intstr.IntOrString)
+	return nil
 }
 
 func autoConvert_v1beta1_RollingUpdateDeployment_To_extensions_RollingUpdateDeployment(in *RollingUpdateDeployment, out *extensions.RollingUpdateDeployment, s conversion.Scope) error {

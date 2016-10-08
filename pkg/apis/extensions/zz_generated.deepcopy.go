@@ -44,8 +44,10 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_CustomMetricTargetList, InType: reflect.TypeOf(&CustomMetricTargetList{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_DaemonSet, InType: reflect.TypeOf(&DaemonSet{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_DaemonSetList, InType: reflect.TypeOf(&DaemonSetList{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_DaemonSetRollback, InType: reflect.TypeOf(&DaemonSetRollback{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_DaemonSetSpec, InType: reflect.TypeOf(&DaemonSetSpec{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_DaemonSetStatus, InType: reflect.TypeOf(&DaemonSetStatus{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_DaemonSetUpdateStrategy, InType: reflect.TypeOf(&DaemonSetUpdateStrategy{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_Deployment, InType: reflect.TypeOf(&Deployment{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_DeploymentList, InType: reflect.TypeOf(&DeploymentList{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_DeploymentRollback, InType: reflect.TypeOf(&DeploymentRollback{})},
@@ -80,6 +82,7 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_ReplicaSetStatus, InType: reflect.TypeOf(&ReplicaSetStatus{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_ReplicationControllerDummy, InType: reflect.TypeOf(&ReplicationControllerDummy{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_RollbackConfig, InType: reflect.TypeOf(&RollbackConfig{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_RollingUpdateDaemonSet, InType: reflect.TypeOf(&RollingUpdateDaemonSet{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_RollingUpdateDeployment, InType: reflect.TypeOf(&RollingUpdateDeployment{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_RunAsUserStrategyOptions, InType: reflect.TypeOf(&RunAsUserStrategyOptions{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_SELinuxStrategyOptions, InType: reflect.TypeOf(&SELinuxStrategyOptions{})},
@@ -198,6 +201,26 @@ func DeepCopy_extensions_DaemonSetList(in interface{}, out interface{}, c *conve
 	}
 }
 
+func DeepCopy_extensions_DaemonSetRollback(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*DaemonSetRollback)
+		out := out.(*DaemonSetRollback)
+		out.TypeMeta = in.TypeMeta
+		out.Name = in.Name
+		if in.UpdatedAnnotations != nil {
+			in, out := &in.UpdatedAnnotations, &out.UpdatedAnnotations
+			*out = make(map[string]string)
+			for key, val := range *in {
+				(*out)[key] = val
+			}
+		} else {
+			out.UpdatedAnnotations = nil
+		}
+		out.RollbackTo = in.RollbackTo
+		return nil
+	}
+}
+
 func DeepCopy_extensions_DaemonSetSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*DaemonSetSpec)
@@ -214,6 +237,18 @@ func DeepCopy_extensions_DaemonSetSpec(in interface{}, out interface{}, c *conve
 		if err := api.DeepCopy_api_PodTemplateSpec(&in.Template, &out.Template, c); err != nil {
 			return err
 		}
+		out.Paused = in.Paused
+		out.MinReadySeconds = in.MinReadySeconds
+		if err := DeepCopy_extensions_DaemonSetUpdateStrategy(&in.UpdateStrategy, &out.UpdateStrategy, c); err != nil {
+			return err
+		}
+		if in.RollbackTo != nil {
+			in, out := &in.RollbackTo, &out.RollbackTo
+			*out = new(RollbackConfig)
+			**out = **in
+		} else {
+			out.RollbackTo = nil
+		}
 		return nil
 	}
 }
@@ -222,9 +257,27 @@ func DeepCopy_extensions_DaemonSetStatus(in interface{}, out interface{}, c *con
 	{
 		in := in.(*DaemonSetStatus)
 		out := out.(*DaemonSetStatus)
+		out.ObservedGeneration = in.ObservedGeneration
 		out.CurrentNumberScheduled = in.CurrentNumberScheduled
 		out.NumberMisscheduled = in.NumberMisscheduled
 		out.DesiredNumberScheduled = in.DesiredNumberScheduled
+		out.UpdatedNumberScheduled = in.UpdatedNumberScheduled
+		return nil
+	}
+}
+
+func DeepCopy_extensions_DaemonSetUpdateStrategy(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*DaemonSetUpdateStrategy)
+		out := out.(*DaemonSetUpdateStrategy)
+		out.Type = in.Type
+		if in.RollingUpdate != nil {
+			in, out := &in.RollingUpdate, &out.RollingUpdate
+			*out = new(RollingUpdateDaemonSet)
+			**out = **in
+		} else {
+			out.RollingUpdate = nil
+		}
 		return nil
 	}
 }
@@ -890,6 +943,15 @@ func DeepCopy_extensions_RollbackConfig(in interface{}, out interface{}, c *conv
 		in := in.(*RollbackConfig)
 		out := out.(*RollbackConfig)
 		out.Revision = in.Revision
+		return nil
+	}
+}
+
+func DeepCopy_extensions_RollingUpdateDaemonSet(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*RollingUpdateDaemonSet)
+		out := out.(*RollingUpdateDaemonSet)
+		out.MaxUnavailable = in.MaxUnavailable
 		return nil
 	}
 }

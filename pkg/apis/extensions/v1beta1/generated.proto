@@ -95,6 +95,18 @@ message DaemonSetList {
   repeated DaemonSet items = 2;
 }
 
+// DaemonSetRollback stores the information required to rollback a daemonset.
+message DaemonSetRollback {
+  // Required: This must match the Name of a daemon set.
+  optional string name = 1;
+
+  // The annotations to be updated to a daemon set
+  map<string, string> updatedAnnotations = 2;
+
+  // The config of this daemon set rollback.
+  optional RollbackConfig rollbackTo = 3;
+}
+
 // DaemonSetSpec is the specification of a daemon set.
 message DaemonSetSpec {
   // Selector is a label query over pods that are managed by the daemon set.
@@ -109,10 +121,29 @@ message DaemonSetSpec {
   // selector is specified).
   // More info: http://kubernetes.io/docs/user-guide/replication-controller#pod-template
   optional k8s.io.kubernetes.pkg.api.v1.PodTemplateSpec template = 2;
+
+  // Indicates that the DaemonSet is paused and will not be processed by the
+  // DaemonSet controller.
+  optional bool paused = 3;
+
+  // Minimum number of seconds for which a newly created DaemonSet pod should
+  // be ready without any of its container crashing, for it to be considered
+  // available. Defaults to 0 (pod will be considered available as soon as it
+  // is ready).
+  optional int32 minReadySeconds = 5;
+
+  // Update strategy to replace existing DaemonSet pods with new pods.
+  optional DaemonSetUpdateStrategy updateStrategy = 6;
+
+  // The config this daemon set is rolling back to. Will be cleared after rollback is done.
+  optional RollbackConfig rollbackTo = 7;
 }
 
 // DaemonSetStatus represents the current status of a daemon set.
 message DaemonSetStatus {
+  // The generation observed by the daemonset controller.
+  optional int64 observedGeneration = 5;
+
   // CurrentNumberScheduled is the number of nodes that are running at least 1
   // daemon pod and are supposed to run the daemon pod.
   // More info: http://releases.k8s.io/HEAD/docs/admin/daemons.md
@@ -127,6 +158,22 @@ message DaemonSetStatus {
   // pod (including nodes correctly running the daemon pod).
   // More info: http://releases.k8s.io/HEAD/docs/admin/daemons.md
   optional int32 desiredNumberScheduled = 3;
+
+  // UpdatedNumberScheduled is the total number of nodes that are running updated
+  // daemon pod
+  optional int32 updatedNumberScheduled = 4;
+}
+
+message DaemonSetUpdateStrategy {
+  // Type of daemon set update. Only "RollingUpdate" is supported at this time. Default is RollingUpdate.
+  optional string type = 1;
+
+  // Rolling update config params. Present only if DaemonSetUpdateStrategy =
+  // RollingUpdate.
+  // ---
+  // TODO: Update this to follow our convention for oneOf, whatever we decide it
+  // to be. Same as DeploymentStrategy.RollingUpdate.
+  optional RollingUpdateDaemonSet rollingUpdate = 2;
 }
 
 // Deployment enables declarative updates for Pods and ReplicaSets.
@@ -847,6 +894,30 @@ message ReplicationControllerDummy {
 message RollbackConfig {
   // The revision to rollback to. If set to 0, rollbck to the last revision.
   optional int64 revision = 1;
+}
+
+// Spec to control the desired behavior of daemon set rolling update.
+message RollingUpdateDaemonSet {
+  // The maximum number of DaemonSet pods that can be unavailable during the
+  // update. Value can be an absolute number (ex: 5) or a percentage of total
+  // number of DaemonSet pods at the start of the update (ex: 10%). Absolute
+  // number is calculated from percentage by rounding up.
+  // This cannot be 0.
+  // Default value is 1.
+  // Example: when this is set to 30%, 30% of the currently running DaemonSet
+  // pods can be stopped for an update at any given time. The update starts
+  // by stopping at most 30% of the currently running DaemonSet pods and then
+  // brings up new DaemonSet pods in their place. Once the new pods are ready,
+  // it then proceeds onto other DaemonSet pods, thus ensuring that at least
+  // 70% of original number of DaemonSet pods are available at all times
+  // during the update.
+  optional k8s.io.kubernetes.pkg.util.intstr.IntOrString maxUnavailable = 1;
+
+  // Minimum number of seconds for which a newly created DaemonSet pod should
+  // be ready without any of its container crashing, for it to be considered
+  // available. Defaults to 0 (pod will be considered available as soon as it
+  // is ready).
+  optional int32 minReadySeconds = 2;
 }
 
 // Spec to control the desired behavior of rolling update.

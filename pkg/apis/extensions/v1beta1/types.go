@@ -301,6 +301,9 @@ const (
 
 	// Replace the old RCs by new one using rolling update i.e gradually scale down the old RCs and scale up the new one.
 	RollingUpdateDeploymentStrategyType DeploymentStrategyType = "RollingUpdate"
+
+	// Dont touch daemon pods.
+	NoopDaemonSetStrategyType DaemonSetUpdateStrategyType = "Noop"
 )
 
 // Spec to control the desired behavior of rolling update.
@@ -359,18 +362,16 @@ type DeploymentList struct {
 	Items []Deployment `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
-// TODO(madhusudancs): Uncomment while implementing DaemonSet updates.
-/* Commenting out for v1.2. We are planning to bring these types back with a more robust DaemonSet update implementation in v1.3, hence not deleting but just commenting the types out.
 type DaemonSetUpdateStrategy struct {
 	// Type of daemon set update. Only "RollingUpdate" is supported at this time. Default is RollingUpdate.
-	Type DaemonSetUpdateStrategyType `json:"type,omitempty"`
+	Type DaemonSetUpdateStrategyType `json:"type,omitempty" protobuf:"bytes,1,opt,name=type,casttype=DaemonSetUpdateStrategyType"`
 
 	// Rolling update config params. Present only if DaemonSetUpdateStrategy =
 	// RollingUpdate.
 	//---
 	// TODO: Update this to follow our convention for oneOf, whatever we decide it
 	// to be. Same as DeploymentStrategy.RollingUpdate.
-	RollingUpdate *RollingUpdateDaemonSet `json:"rollingUpdate,omitempty"`
+	RollingUpdate *RollingUpdateDaemonSet `json:"rollingUpdate,omitempty" protobuf:"bytes,2,opt,name=rollingUpdate"`
 }
 
 type DaemonSetUpdateStrategyType string
@@ -395,15 +396,14 @@ type RollingUpdateDaemonSet struct {
 	// it then proceeds onto other DaemonSet pods, thus ensuring that at least
 	// 70% of original number of DaemonSet pods are available at all times
 	// during the update.
-	MaxUnavailable *intstr.IntOrString `json:"maxUnavailable,omitempty"`
+	MaxUnavailable *intstr.IntOrString `json:"maxUnavailable,omitempty" protobuf:"bytes,1,opt,name=maxUnavailable"`
 
 	// Minimum number of seconds for which a newly created DaemonSet pod should
 	// be ready without any of its container crashing, for it to be considered
 	// available. Defaults to 0 (pod will be considered available as soon as it
 	// is ready).
-	MinReadySeconds int32 `json:"minReadySeconds,omitempty"`
+	MinReadySeconds int32 `json:"minReadySeconds,omitempty" protobuf:"varint,2,opt,name=minReadySeconds"`
 }
-*/
 
 // DaemonSetSpec is the specification of a daemon set.
 type DaemonSetSpec struct {
@@ -420,31 +420,46 @@ type DaemonSetSpec struct {
 	// More info: http://kubernetes.io/docs/user-guide/replication-controller#pod-template
 	Template v1.PodTemplateSpec `json:"template" protobuf:"bytes,2,opt,name=template"`
 
-	// TODO(madhusudancs): Uncomment while implementing DaemonSet updates.
-	/* Commenting out for v1.2. We are planning to bring these fields back with a more robust DaemonSet update implementation in v1.3, hence not deleting but just commenting these fields out.
-	// Update strategy to replace existing DaemonSet pods with new pods.
-	UpdateStrategy DaemonSetUpdateStrategy `json:"updateStrategy,omitempty"`
+	// Indicates that the DaemonSet is paused and will not be processed by the
+	// DaemonSet controller.
+	Paused bool `json:"paused,omitempty" protobuf:"varint,3,opt,name=paused"`
 
-	// Label key that is added to DaemonSet pods to distinguish between old and
-	// new pod templates during DaemonSet update.
-	// Users can set this to an empty string to indicate that the system should
-	// not add any label. If unspecified, system uses
-	// DefaultDaemonSetUniqueLabelKey("daemonset.kubernetes.io/podTemplateHash").
-	// Value of this key is hash of DaemonSetSpec.PodTemplateSpec.
-	// No label is added if this is set to empty string.
-	UniqueLabelKey *string `json:"uniqueLabelKey,omitempty"`
-	*/
+	// Minimum number of seconds for which a newly created DaemonSet pod should
+	// be ready without any of its container crashing, for it to be considered
+	// available. Defaults to 0 (pod will be considered available as soon as it
+	// is ready).
+	MinReadySeconds int32 `json:"minReadySeconds,omitempty" protobuf:"varint,5,opt,name=minReadySeconds"`
+
+	// Update strategy to replace existing DaemonSet pods with new pods.
+	UpdateStrategy DaemonSetUpdateStrategy `json:"updateStrategy,omitempty" protobuf:"bytes,6,opt,name=updateStrategy"`
+
+	// The config this daemon set is rolling back to. Will be cleared after rollback is done.
+	RollbackTo *RollbackConfig `json:"rollbackTo,omitempty" protobuf:"bytes,7,opt,name=rollbackTo"`
+}
+
+// DaemonSetRollback stores the information required to rollback a daemonset.
+type DaemonSetRollback struct {
+	unversioned.TypeMeta `json:",inline"`
+	// Required: This must match the Name of a daemon set.
+	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
+	// The annotations to be updated to a daemon set
+	UpdatedAnnotations map[string]string `json:"updatedAnnotations,omitempty" protobuf:"bytes,2,rep,name=updatedAnnotations"`
+	// The config of this daemon set rollback.
+	RollbackTo RollbackConfig `json:"rollbackTo" protobuf:"bytes,3,opt,name=rollbackTo"`
 }
 
 const (
 	// DefaultDaemonSetUniqueLabelKey is the default key of the labels that is added
 	// to daemon set pods to distinguish between old and new pod templates during
 	// DaemonSet update. See DaemonSetSpec's UniqueLabelKey field for more information.
-	DefaultDaemonSetUniqueLabelKey string = "daemonset.kubernetes.io/podTemplateHash"
+	DefaultDaemonSetUniqueLabelKey string = "pod-template-hash"
 )
 
 // DaemonSetStatus represents the current status of a daemon set.
 type DaemonSetStatus struct {
+	// The generation observed by the daemonset controller.
+	ObservedGeneration int64 `json:"observedGeneration,omitempty" protobuf:"varint,5,opt,name=observedGeneration"`
+
 	// CurrentNumberScheduled is the number of nodes that are running at least 1
 	// daemon pod and are supposed to run the daemon pod.
 	// More info: http://releases.k8s.io/HEAD/docs/admin/daemons.md
@@ -459,6 +474,10 @@ type DaemonSetStatus struct {
 	// pod (including nodes correctly running the daemon pod).
 	// More info: http://releases.k8s.io/HEAD/docs/admin/daemons.md
 	DesiredNumberScheduled int32 `json:"desiredNumberScheduled" protobuf:"varint,3,opt,name=desiredNumberScheduled"`
+
+	// UpdatedNumberScheduled is the total number of nodes that are running updated
+	// daemon pod
+	UpdatedNumberScheduled int32 `json:"updatedNumberScheduled" protobuf:"varint,4,opt,name=updatedNumberScheduled"`
 }
 
 // +genclient=true

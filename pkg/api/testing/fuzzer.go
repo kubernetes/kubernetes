@@ -158,6 +158,21 @@ func FuzzerFor(t *testing.T, version unversioned.GroupVersion, src rand.Source) 
 				j.RollingUpdate = &rollingUpdate
 			}
 		},
+		func(j *extensions.DaemonSetUpdateStrategy, c fuzz.Continue) {
+			c.FuzzNoCustom(j) // fuzz self without calling this function again
+			// Ensure that strategyType is one of valid values.
+			strategyTypes := []extensions.DaemonSetUpdateStrategyType{extensions.RollingUpdateDaemonSetStrategyType, extensions.NoopDaemonSetStrategyType}
+			j.Type = strategyTypes[c.Rand.Intn(len(strategyTypes))]
+			if j.Type != extensions.RollingUpdateDaemonSetStrategyType {
+				j.RollingUpdate = nil
+			} else {
+				rollingUpdate := extensions.RollingUpdateDaemonSet{}
+				if c.RandBool() {
+					rollingUpdate.MaxUnavailable = intstr.FromInt(int(c.RandUint64()))
+				}
+				j.RollingUpdate = &rollingUpdate
+			}
+		},
 		func(j *batch.JobSpec, c fuzz.Continue) {
 			c.FuzzNoCustom(j) // fuzz self without calling this function again
 			completions := int32(c.Rand.Int31())

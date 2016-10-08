@@ -114,6 +114,44 @@ func ValidateDaemonSetStatusUpdate(ds, oldDS *extensions.DaemonSet) field.ErrorL
 	return allErrs
 }
 
+func ValidateRollingUpdateDaemonSet(rollingUpdate *extensions.RollingUpdateDaemonSet, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, ValidatePositiveIntOrPercent(rollingUpdate.MaxUnavailable, fldPath.Child("maxUnavailable"))...)
+	if getIntOrPercentValue(rollingUpdate.MaxUnavailable) == 0 {
+		// MaxUnavailable cannot be 0.
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("maxUnavailable"), rollingUpdate.MaxUnavailable, "cannot be 0"))
+	}
+	// Validate that MaxUnavailable is not more than 100%.
+	allErrs = append(allErrs, IsNotMoreThan100Percent(rollingUpdate.MaxUnavailable, fldPath.Child("maxUnavailable"))...)
+	return allErrs
+}
+
+func ValidateDaemonSetUpdateStrategy(strategy *extensions.DaemonSetUpdateStrategy, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if strategy.Type == extensions.NoopDaemonSetStrategyType {
+		// nothing to do here for now
+	} else if strategy.Type == extensions.RollingUpdateDaemonSetStrategyType {
+		// Make sure RollingUpdate field isn't nil.
+		if strategy.RollingUpdate == nil {
+			allErrs = append(allErrs, field.Required(fldPath.Child("rollingUpdate"), ""))
+			return allErrs
+		}
+		allErrs = append(allErrs, ValidateRollingUpdateDaemonSet(strategy.RollingUpdate, fldPath.Child("rollingUpdate"))...)
+	} else {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("type"), strategy.Type, "RollingUpdate and Noop are only supported types"))
+	}
+	return allErrs
+}
+
+func ValidateDaemonSetRollback(obj *extensions.DaemonSetRollback) field.ErrorList {
+	allErrs := apivalidation.ValidateAnnotations(obj.UpdatedAnnotations, field.NewPath("updatedAnnotations"))
+	if len(obj.Name) == 0 {
+		allErrs = append(allErrs, field.Required(field.NewPath("name"), "name is required"))
+	}
+	allErrs = append(allErrs, ValidateRollback(&obj.RollbackTo, field.NewPath("rollback"))...)
+	return allErrs
+}
+
 // ValidateDaemonSetSpec tests if required fields in the DaemonSetSpec are set.
 func ValidateDaemonSetSpec(spec *extensions.DaemonSetSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -135,6 +173,13 @@ func ValidateDaemonSetSpec(spec *extensions.DaemonSetSpec, fldPath *field.Path) 
 	if spec.Template.Spec.RestartPolicy != api.RestartPolicyAlways {
 		allErrs = append(allErrs, field.NotSupported(fldPath.Child("template", "spec", "restartPolicy"), spec.Template.Spec.RestartPolicy, []string{string(api.RestartPolicyAlways)}))
 	}
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(spec.MinReadySeconds), fldPath.Child("minReadySeconds"))...)
+
+	allErrs = append(allErrs, ValidateDaemonSetUpdateStrategy(&spec.UpdateStrategy, fldPath.Child("updateStrategy"))...)
+	if spec.RollbackTo != nil {
+		allErrs = append(allErrs, ValidateRollback(spec.RollbackTo, fldPath.Child("rollback"))...)
+	}
+
 	return allErrs
 }
 
