@@ -166,6 +166,10 @@ func (plugin *cniNetworkPlugin) syncNetworkConfig() {
 	plugin.setDefaultNetwork(network)
 }
 
+func (plugin *cniNetworkPlugin) Status() error {
+	return plugin.checkInitialized()
+}
+
 func (plugin *cniNetworkPlugin) getDefaultNetwork() *cniNetwork {
 	plugin.RLock()
 	defer plugin.RUnlock()

@@ -454,6 +454,7 @@ func getNodeConditionPredicate() cache.NodeConditionPredicate {
 			// - NodeReady condition status is ConditionTrue,
 			// - NodeOutOfDisk condition status is ConditionFalse,
 			// - NodeNetworkUnavailable condition status is ConditionFalse.
+			// - NodeCloudNetworkUnavailable condition status is ConditionFalse.
 			if cond.Type == api.NodeReady && cond.Status != api.ConditionTrue {
 				glog.V(4).Infof("Ignoring node %v with %v condition status %v", node.Name, cond.Type, cond.Status)
 				return false
@@ -461,6 +462,9 @@ func getNodeConditionPredicate() cache.NodeConditionPredicate {
 				glog.V(4).Infof("Ignoring node %v with %v condition status %v", node.Name, cond.Type, cond.Status)
 				return false
 			} else if cond.Type == api.NodeNetworkUnavailable && cond.Status != api.ConditionFalse {
+				glog.V(4).Infof("Ignoring node %v with %v condition status %v", node.Name, cond.Type, cond.Status)
+				return false
+			} else if cond.Type == api.NodeCloudNetworkUnavailable && cond.Status != api.ConditionFalse {
 				glog.V(4).Infof("Ignoring node %v with %v condition status %v", node.Name, cond.Type, cond.Status)
 				return false
 			}
