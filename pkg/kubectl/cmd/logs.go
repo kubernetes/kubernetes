@@ -41,6 +41,9 @@ var (
 		# Return snapshot logs from pod nginx with only one container
 		kubectl logs nginx
 
+		# Return snapshot logs for the pods defined by label app=nginx
+		kubectl logs -lapp=nginx
+
 		# Return snapshot of previous terminated ruby container logs from pod web-1
 		kubectl logs -p -c ruby web-1
 
@@ -176,6 +179,9 @@ func (o *LogsOptions) Complete(f *cmdutil.Factory, out io.Writer, cmd *cobra.Com
 		if logOptions.Follow {
 			return cmdutil.UsageError(cmd, "only one of follow (-f) or selector (-l) is allowed")
 		}
+		if logOptions.Container != "" {
+			return cmdutil.UsageError(cmd, "a container cannot be specified when using a selector (-l)")
+		}
 		if logOptions.TailLines == nil {
 			logOptions.TailLines = &selectorTail
 		}
@@ -222,16 +228,33 @@ func (o LogsOptions) RunLogs() (int64, error) {
 	switch t := o.Object.(type) {
 	case *api.PodList:
 		cnt := int64(0)
-		for _, p := range t.Items {
-			fmt.Fprintf(o.Out, "======== %s\n", p.Name)
-			len, _ := o.runLogs(&p)
-			cnt += len
+		logsOptions, ok := o.Options.(*api.PodLogOptions)
+		if !ok {
+			return 0, errors.New("unexpected logs options object")
 		}
-		return cnt, nil
+		var err error
+		for _, p := range t.Items {
+			for _, c := range p.Spec.Containers {
+				fmt.Fprintf(o.Out, "======== %s %s\n", p.Name, c.Name)
+				logsOptions.Container = c.Name
+				len, cerr := o.runLogs(&p)
+				if cerr != nil {
+					msg, ok := cmdutil.StandardErrorMessage(cerr)
+					if !ok {
+						msg = cerr.Error()
+					}
+					fmt.Fprintln(o.Out, msg)
+					if err == nil {
+						err = errors.New("error(s) occurred")
+					}
+				}
+				cnt += len
+			}
+		}
+		return cnt, err
 	default:
 		return o.runLogs(o.Object)
 	}
-
 }
 
 func (o LogsOptions) runLogs(obj runtime.Object) (int64, error) {
