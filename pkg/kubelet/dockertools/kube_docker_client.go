@@ -626,3 +626,10 @@ type imageNotFoundError struct {
 func (e imageNotFoundError) Error() string {
 	return fmt.Sprintf("no such image: %q", e.ID)
 }
+
+// IsImageNotFoundError checks whether the error is image not found error. This is exposed
+// to share with dockershim.
+func IsImageNotFoundError(err error) bool {
+	_, ok := err.(imageNotFoundError)
+	return ok
+}
