@@ -31,9 +31,9 @@ import (
 	systemd "github.com/coreos/go-systemd/daemon"
 	"github.com/emicklei/go-restful"
 	"github.com/emicklei/go-restful/swagger"
-	"github.com/go-openapi/spec"
 	"github.com/golang/glog"
 
+	"github.com/go-openapi/spec"
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
@@ -147,6 +147,11 @@ type GenericAPIServer struct {
 	apiGroupsForDiscoveryLock sync.RWMutex
 	apiGroupsForDiscovery     map[string]unversioned.APIGroup
 
+	// See Config.$name for documentation of these flags
+
+	enableOpenAPISupport bool
+	openAPIConfig        *common.Config
+
 	// PostStartHooks are each called after the server has started listening, in a separate go func for each
 	// with no guaranteee of ordering between them.  The map key is a name used for error reporting.
 	// It may kill the process with a panic if it wishes to by returning an error
@@ -156,7 +161,6 @@ type GenericAPIServer struct {
 
 	// See Config.$name for documentation of these flags:
 
-	enableOpenAPISupport      bool
 	openAPIInfo               spec.Info
 	openAPIDefaultResponse    spec.Response
 	openAPIDefinitions        *common.OpenAPIDefinitions
@@ -462,33 +466,20 @@ func (s *GenericAPIServer) InstallOpenAPI() {
 	// Install one spec per web service, an ideal client will have a ClientSet containing one client
 	// per each of these specs.
 	for _, w := range s.HandlerContainer.RegisteredWebServices() {
-		if w.RootPath() == "/swaggerapi" {
+		if strings.HasPrefix(w.RootPath(), "/swaggerapi") {
 			continue
 		}
-		info := s.openAPIInfo
-		info.Title = info.Title + " " + w.RootPath()
-		err := openapi.RegisterOpenAPIService(&openapi.Config{
-			OpenAPIServePath:   w.RootPath() + "/swagger.json",
-			WebServices:        []*restful.WebService{w},
-			ProtocolList:       []string{"https"},
-			IgnorePrefixes:     []string{"/swaggerapi"},
-			Info:               &info,
-			DefaultResponse:    &s.openAPIDefaultResponse,
-			OpenAPIDefinitions: s.openAPIDefinitions,
-		}, s.HandlerContainer.Container)
+		config := *s.openAPIConfig
+		config.Info = new(spec.Info)
+		*config.Info = *s.openAPIConfig.Info
+		config.Info.Title = config.Info.Title + " " + w.RootPath()
+		err := openapi.RegisterOpenAPIService(w.RootPath()+"/swagger.json", []*restful.WebService{w}, &config, s.HandlerContainer.Container)
 		if err != nil {
 			glog.Fatalf("Failed to register open api spec for %v: %v", w.RootPath(), err)
 		}
 	}
-	err := openapi.RegisterOpenAPIService(&openapi.Config{
-		OpenAPIServePath:   "/swagger.json",
-		WebServices:        s.HandlerContainer.RegisteredWebServices(),
-		ProtocolList:       []string{"https"},
-		IgnorePrefixes:     []string{"/swaggerapi"},
-		Info:               &s.openAPIInfo,
-		DefaultResponse:    &s.openAPIDefaultResponse,
-		OpenAPIDefinitions: s.openAPIDefinitions,
-	}, s.HandlerContainer.Container)
+	err := openapi.RegisterOpenAPIService("/swagger.json", s.HandlerContainer.RegisteredWebServices(), s.openAPIConfig, s.HandlerContainer.Container)
+
 	if err != nil {
 		glog.Fatalf("Failed to register open api spec for root: %v", err)
 	}

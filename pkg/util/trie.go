@@ -20,8 +20,10 @@ package util
 type Trie struct {
 	children map[byte]*Trie
 	wordTail bool
+	word     string
 }
 
+// CreateTrie creates a Trie and add all strings in the provided list to it.
 func CreateTrie(list []string) Trie {
 	ret := Trie{
 		children: make(map[byte]*Trie),
@@ -33,6 +35,7 @@ func CreateTrie(list []string) Trie {
 	return ret
 }
 
+// Add adds a word to this trie
 func (t *Trie) Add(v string) {
 	root := t
 	for _, b := range []byte(v) {
@@ -47,24 +50,30 @@ func (t *Trie) Add(v string) {
 		root = child
 	}
 	root.wordTail = true
+	root.word = v
 }
 
+// HasPrefix returns true of v has any of the prefixes stored in this trie.
 func (t *Trie) HasPrefix(v string) bool {
+	_, has := t.GetPrefix(v)
+	return has
+}
+
+// GetPrefix is like HasPrefix but return the prefix in case of match or empty string otherwise.
+func (t *Trie) GetPrefix(v string) (string, bool) {
 	root := t
 	if root.wordTail {
-		return true
+		return root.word, true
 	}
 	for _, b := range []byte(v) {
 		child, exists := root.children[b]
 		if !exists {
-			return false
+			return "", false
 		}
 		if child.wordTail {
-			return true
+			return child.word, true
 		}
 		root = child
 	}
-	return false
+	return "", false
 }
-
-
