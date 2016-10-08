@@ -87,31 +87,25 @@ func (config *KubeletManagedHostConfig) createPodWithHostNetwork() {
 
 func assertManagedStatus(
 	config *KubeletManagedHostConfig, podName string, expectedIsManaged bool, name string) {
-	// See https://github.com/kubernetes/kubernetes/issues/27023
+	// TODO: workaround for https://github.com/kubernetes/kubernetes/issues/34256
 	//
-	// Retry until timeout for the right contents of /etc/hosts to show
-	// up. There may be a low probability race here. We still fail the
-	// test if retry was necessary, but at least we will know whether or
-	// not it resolves or seems to be a permanent condition.
-	//
-	// If /etc/hosts is properly mounted, then this will succeed
-	// immediately.
+	// Retry until timeout for the contents of /etc/hosts to show
+	// up. Note: if /etc/hosts is properly mounted, then this will
+	// succeed immediately.
 	const retryTimeout = 30 * time.Second
 
 	retryCount := 0
 	etcHostsContent := ""
-	matched := false
 
 	for startTime := time.Now(); time.Since(startTime) < retryTimeout; {
 		etcHostsContent = config.getEtcHostsContent(podName, name)
 		isManaged := strings.Contains(etcHostsContent, etcHostsPartialContent)
 
 		if expectedIsManaged == isManaged {
-			matched = true
-			break
+			return
 		}
 
-		glog.Errorf(
+		glog.Warningf(
 			"For pod: %s, name: %s, expected %t, actual %t (/etc/hosts was %q), retryCount: %d",
 			podName, name, expectedIsManaged, isManaged, etcHostsContent, retryCount)
 
@@ -119,21 +113,14 @@ func assertManagedStatus(
 		time.Sleep(100 * time.Millisecond)
 	}
 
-	if retryCount > 0 {
-		if matched {
-			conditionText := "should"
-			if !expectedIsManaged {
-				conditionText = "should not"
-			}
-
-			framework.Failf(
-				"/etc/hosts file %s be kubelet managed (name: %s, retries: %d). /etc/hosts contains %q",
-				conditionText, name, retryCount, etcHostsContent)
-		} else {
-			framework.Failf(
-				"had to retry %d times to get matching content in /etc/hosts (name: %s)",
-				retryCount, name)
-		}
+	if expectedIsManaged {
+		framework.Failf(
+			"/etc/hosts file should be kubelet managed (name: %s, retries: %d). /etc/hosts contains %q",
+			name, retryCount, etcHostsContent)
+	} else {
+		framework.Failf(
+			"/etc/hosts file should no be kubelet managed (name: %s, retries: %d). /etc/hosts contains %q",
+			name, retryCount, etcHostsContent)
 	}
 }
 
