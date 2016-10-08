@@ -2099,6 +2099,76 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		Dependencies: []string{
 			"componentconfig.LeaderElectionConfiguration", "unversioned.TypeMeta"},
 	},
+	"componentconfig.KubeletAnonymousAuthentication": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Properties: map[string]spec.Schema{
+					"enabled": {
+						SchemaProps: spec.SchemaProps{
+							Description: "enabled allows anonymous requests to the kubelet server. Requests that are not rejected by another authentication method are treated as anonymous requests. Anonymous requests have a username of system:anonymous, and a group name of system:unauthenticated.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"enabled"},
+			},
+		},
+		Dependencies: []string{},
+	},
+	"componentconfig.KubeletAuthentication": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Properties: map[string]spec.Schema{
+					"x509": {
+						SchemaProps: spec.SchemaProps{
+							Description: "x509 contains settings related to x509 client certificate authentication",
+							Ref:         spec.MustCreateRef("#/definitions/componentconfig.KubeletX509Authentication"),
+						},
+					},
+					"webhook": {
+						SchemaProps: spec.SchemaProps{
+							Description: "webhook contains settings related to webhook bearer token authentication",
+							Ref:         spec.MustCreateRef("#/definitions/componentconfig.KubeletWebhookAuthentication"),
+						},
+					},
+					"anonymous": {
+						SchemaProps: spec.SchemaProps{
+							Description: "anonymous contains settings related to anonymous authentication",
+							Ref:         spec.MustCreateRef("#/definitions/componentconfig.KubeletAnonymousAuthentication"),
+						},
+					},
+				},
+				Required: []string{"x509", "webhook", "anonymous"},
+			},
+		},
+		Dependencies: []string{
+			"componentconfig.KubeletAnonymousAuthentication", "componentconfig.KubeletWebhookAuthentication", "componentconfig.KubeletX509Authentication"},
+	},
+	"componentconfig.KubeletAuthorization": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Properties: map[string]spec.Schema{
+					"mode": {
+						SchemaProps: spec.SchemaProps{
+							Description: "mode is the authorization mode to apply to requests to the kubelet server. Valid values are AlwaysAllow and Webhook. Webhook mode uses the SubjectAccessReview API to determine authorization.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"webhook": {
+						SchemaProps: spec.SchemaProps{
+							Description: "webhook contains settings related to Webhook authorization.",
+							Ref:         spec.MustCreateRef("#/definitions/componentconfig.KubeletWebhookAuthorization"),
+						},
+					},
+				},
+				Required: []string{"mode", "webhook"},
+			},
+		},
+		Dependencies: []string{
+			"componentconfig.KubeletWebhookAuthorization"},
+	},
 	"componentconfig.KubeletConfiguration": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -2194,6 +2264,18 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 							Description: "certDirectory is the directory where the TLS certs are located (by default /var/run/kubernetes). If tlsCertFile and tlsPrivateKeyFile are provided, this flag will be ignored.",
 							Type:        []string{"string"},
 							Format:      "",
+						},
+					},
+					"authentication": {
+						SchemaProps: spec.SchemaProps{
+							Description: "authentication specifies how requests to the Kubelet's server are authenticated",
+							Ref:         spec.MustCreateRef("#/definitions/componentconfig.KubeletAuthentication"),
+						},
+					},
+					"authorization": {
+						SchemaProps: spec.SchemaProps{
+							Description: "authorization specifies how requests to the Kubelet's server are authorized",
+							Ref:         spec.MustCreateRef("#/definitions/componentconfig.KubeletAuthorization"),
 						},
 					},
 					"hostnameOverride": {
@@ -2889,11 +2971,75 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 						},
 					},
 				},
-				Required: []string{"TypeMeta", "podManifestPath", "syncFrequency", "fileCheckFrequency", "httpCheckFrequency", "manifestURL", "manifestURLHeader", "enableServer", "address", "port", "readOnlyPort", "tlsCertFile", "tlsPrivateKeyFile", "certDirectory", "hostnameOverride", "podInfraContainerImage", "dockerEndpoint", "rootDirectory", "seccompProfileRoot", "allowPrivileged", "hostNetworkSources", "hostPIDSources", "hostIPCSources", "registryPullQPS", "registryBurst", "eventRecordQPS", "eventBurst", "enableDebuggingHandlers", "minimumGCAge", "maxPerPodContainerCount", "maxContainerCount", "cAdvisorPort", "healthzPort", "healthzBindAddress", "oomScoreAdj", "registerNode", "clusterDomain", "masterServiceNamespace", "clusterDNS", "streamingConnectionIdleTimeout", "nodeStatusUpdateFrequency", "imageMinimumGCAge", "imageGCHighThresholdPercent", "imageGCLowThresholdPercent", "lowDiskSpaceThresholdMB", "volumeStatsAggPeriod", "networkPluginName", "networkPluginMTU", "networkPluginDir", "cniConfDir", "cniBinDir", "volumePluginDir", "containerRuntime", "remoteRuntimeEndpoint", "remoteImageEndpoint", "mounterPath", "lockFilePath", "exitOnLockContention", "hairpinMode", "babysitDaemons", "maxPods", "nvidiaGPUs", "dockerExecHandlerName", "podCIDR", "resolvConf", "cpuCFSQuota", "containerized", "maxOpenFiles", "reconcileCIDR", "registerSchedulable", "contentType", "kubeAPIQPS", "kubeAPIBurst", "serializeImagePulls", "nodeLabels", "nonMasqueradeCIDR", "enableCustomMetrics", "podsPerCore", "enableControllerAttachDetach", "systemReserved", "kubeReserved", "protectKernelDefaults", "makeIPTablesUtilChains", "iptablesMasqueradeBit", "iptablesDropBit"},
+				Required: []string{"TypeMeta", "podManifestPath", "syncFrequency", "fileCheckFrequency", "httpCheckFrequency", "manifestURL", "manifestURLHeader", "enableServer", "address", "port", "readOnlyPort", "tlsCertFile", "tlsPrivateKeyFile", "certDirectory", "authentication", "authorization", "hostnameOverride", "podInfraContainerImage", "dockerEndpoint", "rootDirectory", "seccompProfileRoot", "allowPrivileged", "hostNetworkSources", "hostPIDSources", "hostIPCSources", "registryPullQPS", "registryBurst", "eventRecordQPS", "eventBurst", "enableDebuggingHandlers", "minimumGCAge", "maxPerPodContainerCount", "maxContainerCount", "cAdvisorPort", "healthzPort", "healthzBindAddress", "oomScoreAdj", "registerNode", "clusterDomain", "masterServiceNamespace", "clusterDNS", "streamingConnectionIdleTimeout", "nodeStatusUpdateFrequency", "imageMinimumGCAge", "imageGCHighThresholdPercent", "imageGCLowThresholdPercent", "lowDiskSpaceThresholdMB", "volumeStatsAggPeriod", "networkPluginName", "networkPluginMTU", "networkPluginDir", "cniConfDir", "cniBinDir", "volumePluginDir", "containerRuntime", "remoteRuntimeEndpoint", "remoteImageEndpoint", "mounterPath", "lockFilePath", "exitOnLockContention", "hairpinMode", "babysitDaemons", "maxPods", "nvidiaGPUs", "dockerExecHandlerName", "podCIDR", "resolvConf", "cpuCFSQuota", "containerized", "maxOpenFiles", "reconcileCIDR", "registerSchedulable", "contentType", "kubeAPIQPS", "kubeAPIBurst", "serializeImagePulls", "nodeLabels", "nonMasqueradeCIDR", "enableCustomMetrics", "podsPerCore", "enableControllerAttachDetach", "systemReserved", "kubeReserved", "protectKernelDefaults", "makeIPTablesUtilChains", "iptablesMasqueradeBit", "iptablesDropBit"},
 			},
 		},
 		Dependencies: []string{
-			"unversioned.Duration", "unversioned.TypeMeta"},
+			"componentconfig.KubeletAuthentication", "componentconfig.KubeletAuthorization", "unversioned.Duration", "unversioned.TypeMeta"},
+	},
+	"componentconfig.KubeletWebhookAuthentication": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Properties: map[string]spec.Schema{
+					"enabled": {
+						SchemaProps: spec.SchemaProps{
+							Description: "enabled allows bearer token authentication backed by the tokenreviews.authentication.k8s.io API",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"cacheTTL": {
+						SchemaProps: spec.SchemaProps{
+							Description: "cacheTTL enables caching of authentication results",
+							Ref:         spec.MustCreateRef("#/definitions/unversioned.Duration"),
+						},
+					},
+				},
+				Required: []string{"enabled", "cacheTTL"},
+			},
+		},
+		Dependencies: []string{
+			"unversioned.Duration"},
+	},
+	"componentconfig.KubeletWebhookAuthorization": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Properties: map[string]spec.Schema{
+					"cacheAuthorizedTTL": {
+						SchemaProps: spec.SchemaProps{
+							Description: "cacheAuthorizedTTL is the duration to cache 'authorized' responses from the webhook authorizer.",
+							Ref:         spec.MustCreateRef("#/definitions/unversioned.Duration"),
+						},
+					},
+					"cacheUnauthorizedTTL": {
+						SchemaProps: spec.SchemaProps{
+							Description: "cacheUnauthorizedTTL is the duration to cache 'unauthorized' responses from the webhook authorizer.",
+							Ref:         spec.MustCreateRef("#/definitions/unversioned.Duration"),
+						},
+					},
+				},
+				Required: []string{"cacheAuthorizedTTL", "cacheUnauthorizedTTL"},
+			},
+		},
+		Dependencies: []string{
+			"unversioned.Duration"},
+	},
+	"componentconfig.KubeletX509Authentication": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Properties: map[string]spec.Schema{
+					"clientCAFile": {
+						SchemaProps: spec.SchemaProps{
+							Description: "clientCAFile is the path to a PEM-encoded certificate bundle. If set, any request presenting a client certificate signed by one of the authorities in the bundle is authenticated with a username corresponding to the CommonName, and groups corresponding to the Organization in the client certificate.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"clientCAFile"},
+			},
+		},
+		Dependencies: []string{},
 	},
 	"componentconfig.LeaderElectionConfiguration": {
 		Schema: spec.Schema{
@@ -13693,6 +13839,76 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		Dependencies: []string{
 			"unversioned.TypeMeta", "v1alpha1.LeaderElectionConfiguration"},
 	},
+	"v1alpha1.KubeletAnonymousAuthentication": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Properties: map[string]spec.Schema{
+					"enabled": {
+						SchemaProps: spec.SchemaProps{
+							Description: "enabled allows anonymous requests to the kubelet server. Requests that are not rejected by another authentication method are treated as anonymous requests. Anonymous requests have a username of system:anonymous, and a group name of system:unauthenticated.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"enabled"},
+			},
+		},
+		Dependencies: []string{},
+	},
+	"v1alpha1.KubeletAuthentication": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Properties: map[string]spec.Schema{
+					"x509": {
+						SchemaProps: spec.SchemaProps{
+							Description: "x509 contains settings related to x509 client certificate authentication",
+							Ref:         spec.MustCreateRef("#/definitions/v1alpha1.KubeletX509Authentication"),
+						},
+					},
+					"webhook": {
+						SchemaProps: spec.SchemaProps{
+							Description: "webhook contains settings related to webhook bearer token authentication",
+							Ref:         spec.MustCreateRef("#/definitions/v1alpha1.KubeletWebhookAuthentication"),
+						},
+					},
+					"anonymous": {
+						SchemaProps: spec.SchemaProps{
+							Description: "anonymous contains settings related to anonymous authentication",
+							Ref:         spec.MustCreateRef("#/definitions/v1alpha1.KubeletAnonymousAuthentication"),
+						},
+					},
+				},
+				Required: []string{"x509", "webhook", "anonymous"},
+			},
+		},
+		Dependencies: []string{
+			"v1alpha1.KubeletAnonymousAuthentication", "v1alpha1.KubeletWebhookAuthentication", "v1alpha1.KubeletX509Authentication"},
+	},
+	"v1alpha1.KubeletAuthorization": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Properties: map[string]spec.Schema{
+					"mode": {
+						SchemaProps: spec.SchemaProps{
+							Description: "mode is the authorization mode to apply to requests to the kubelet server. Valid values are AlwaysAllow and Webhook. Webhook mode uses the SubjectAccessReview API to determine authorization.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"webhook": {
+						SchemaProps: spec.SchemaProps{
+							Description: "webhook contains settings related to Webhook authorization.",
+							Ref:         spec.MustCreateRef("#/definitions/v1alpha1.KubeletWebhookAuthorization"),
+						},
+					},
+				},
+				Required: []string{"mode", "webhook"},
+			},
+		},
+		Dependencies: []string{
+			"v1alpha1.KubeletWebhookAuthorization"},
+	},
 	"v1alpha1.KubeletConfiguration": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -13788,6 +14004,18 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 							Description: "certDirectory is the directory where the TLS certs are located (by default /var/run/kubernetes). If tlsCertFile and tlsPrivateKeyFile are provided, this flag will be ignored.",
 							Type:        []string{"string"},
 							Format:      "",
+						},
+					},
+					"authentication": {
+						SchemaProps: spec.SchemaProps{
+							Description: "authentication specifies how requests to the Kubelet's server are authenticated",
+							Ref:         spec.MustCreateRef("#/definitions/v1alpha1.KubeletAuthentication"),
+						},
+					},
+					"authorization": {
+						SchemaProps: spec.SchemaProps{
+							Description: "authorization specifies how requests to the Kubelet's server are authorized",
+							Ref:         spec.MustCreateRef("#/definitions/v1alpha1.KubeletAuthorization"),
 						},
 					},
 					"hostnameOverride": {
@@ -14483,11 +14711,75 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 						},
 					},
 				},
-				Required: []string{"TypeMeta", "podManifestPath", "syncFrequency", "fileCheckFrequency", "httpCheckFrequency", "manifestURL", "manifestURLHeader", "enableServer", "address", "port", "readOnlyPort", "tlsCertFile", "tlsPrivateKeyFile", "certDirectory", "hostnameOverride", "podInfraContainerImage", "dockerEndpoint", "rootDirectory", "seccompProfileRoot", "allowPrivileged", "hostNetworkSources", "hostPIDSources", "hostIPCSources", "registryPullQPS", "registryBurst", "eventRecordQPS", "eventBurst", "enableDebuggingHandlers", "minimumGCAge", "maxPerPodContainerCount", "maxContainerCount", "cAdvisorPort", "healthzPort", "healthzBindAddress", "oomScoreAdj", "registerNode", "clusterDomain", "masterServiceNamespace", "clusterDNS", "streamingConnectionIdleTimeout", "nodeStatusUpdateFrequency", "imageMinimumGCAge", "imageGCHighThresholdPercent", "imageGCLowThresholdPercent", "lowDiskSpaceThresholdMB", "volumeStatsAggPeriod", "networkPluginName", "networkPluginDir", "cniConfDir", "cniBinDir", "networkPluginMTU", "volumePluginDir", "cloudProvider", "cloudConfigFile", "kubeletCgroups", "runtimeCgroups", "systemCgroups", "cgroupRoot", "containerRuntime", "remoteRuntimeEndpoint", "remoteImageEndpoint", "runtimeRequestTimeout", "rktPath", "mounterPath", "rktAPIEndpoint", "rktStage1Image", "lockFilePath", "exitOnLockContention", "hairpinMode", "babysitDaemons", "maxPods", "nvidiaGPUs", "dockerExecHandlerName", "podCIDR", "resolvConf", "cpuCFSQuota", "containerized", "maxOpenFiles", "reconcileCIDR", "registerSchedulable", "contentType", "kubeAPIQPS", "kubeAPIBurst", "serializeImagePulls", "outOfDiskTransitionFrequency", "nodeIP", "nodeLabels", "nonMasqueradeCIDR", "enableCustomMetrics", "evictionHard", "evictionSoft", "evictionSoftGracePeriod", "evictionPressureTransitionPeriod", "evictionMaxPodGracePeriod", "evictionMinimumReclaim", "podsPerCore", "enableControllerAttachDetach", "systemReserved", "kubeReserved", "protectKernelDefaults", "makeIPTablesUtilChains", "iptablesMasqueradeBit", "iptablesDropBit"},
+				Required: []string{"TypeMeta", "podManifestPath", "syncFrequency", "fileCheckFrequency", "httpCheckFrequency", "manifestURL", "manifestURLHeader", "enableServer", "address", "port", "readOnlyPort", "tlsCertFile", "tlsPrivateKeyFile", "certDirectory", "authentication", "authorization", "hostnameOverride", "podInfraContainerImage", "dockerEndpoint", "rootDirectory", "seccompProfileRoot", "allowPrivileged", "hostNetworkSources", "hostPIDSources", "hostIPCSources", "registryPullQPS", "registryBurst", "eventRecordQPS", "eventBurst", "enableDebuggingHandlers", "minimumGCAge", "maxPerPodContainerCount", "maxContainerCount", "cAdvisorPort", "healthzPort", "healthzBindAddress", "oomScoreAdj", "registerNode", "clusterDomain", "masterServiceNamespace", "clusterDNS", "streamingConnectionIdleTimeout", "nodeStatusUpdateFrequency", "imageMinimumGCAge", "imageGCHighThresholdPercent", "imageGCLowThresholdPercent", "lowDiskSpaceThresholdMB", "volumeStatsAggPeriod", "networkPluginName", "networkPluginDir", "cniConfDir", "cniBinDir", "networkPluginMTU", "volumePluginDir", "cloudProvider", "cloudConfigFile", "kubeletCgroups", "runtimeCgroups", "systemCgroups", "cgroupRoot", "containerRuntime", "remoteRuntimeEndpoint", "remoteImageEndpoint", "runtimeRequestTimeout", "rktPath", "mounterPath", "rktAPIEndpoint", "rktStage1Image", "lockFilePath", "exitOnLockContention", "hairpinMode", "babysitDaemons", "maxPods", "nvidiaGPUs", "dockerExecHandlerName", "podCIDR", "resolvConf", "cpuCFSQuota", "containerized", "maxOpenFiles", "reconcileCIDR", "registerSchedulable", "contentType", "kubeAPIQPS", "kubeAPIBurst", "serializeImagePulls", "outOfDiskTransitionFrequency", "nodeIP", "nodeLabels", "nonMasqueradeCIDR", "enableCustomMetrics", "evictionHard", "evictionSoft", "evictionSoftGracePeriod", "evictionPressureTransitionPeriod", "evictionMaxPodGracePeriod", "evictionMinimumReclaim", "podsPerCore", "enableControllerAttachDetach", "systemReserved", "kubeReserved", "protectKernelDefaults", "makeIPTablesUtilChains", "iptablesMasqueradeBit", "iptablesDropBit"},
 			},
 		},
 		Dependencies: []string{
-			"unversioned.Duration", "unversioned.TypeMeta"},
+			"unversioned.Duration", "unversioned.TypeMeta", "v1alpha1.KubeletAuthentication", "v1alpha1.KubeletAuthorization"},
+	},
+	"v1alpha1.KubeletWebhookAuthentication": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Properties: map[string]spec.Schema{
+					"enabled": {
+						SchemaProps: spec.SchemaProps{
+							Description: "enabled allows bearer token authentication backed by the tokenreviews.authentication.k8s.io API",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"cacheTTL": {
+						SchemaProps: spec.SchemaProps{
+							Description: "cacheTTL enables caching of authentication results",
+							Ref:         spec.MustCreateRef("#/definitions/unversioned.Duration"),
+						},
+					},
+				},
+				Required: []string{"enabled", "cacheTTL"},
+			},
+		},
+		Dependencies: []string{
+			"unversioned.Duration"},
+	},
+	"v1alpha1.KubeletWebhookAuthorization": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Properties: map[string]spec.Schema{
+					"cacheAuthorizedTTL": {
+						SchemaProps: spec.SchemaProps{
+							Description: "cacheAuthorizedTTL is the duration to cache 'authorized' responses from the webhook authorizer.",
+							Ref:         spec.MustCreateRef("#/definitions/unversioned.Duration"),
+						},
+					},
+					"cacheUnauthorizedTTL": {
+						SchemaProps: spec.SchemaProps{
+							Description: "cacheUnauthorizedTTL is the duration to cache 'unauthorized' responses from the webhook authorizer.",
+							Ref:         spec.MustCreateRef("#/definitions/unversioned.Duration"),
+						},
+					},
+				},
+				Required: []string{"cacheAuthorizedTTL", "cacheUnauthorizedTTL"},
+			},
+		},
+		Dependencies: []string{
+			"unversioned.Duration"},
+	},
+	"v1alpha1.KubeletX509Authentication": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Properties: map[string]spec.Schema{
+					"clientCAFile": {
+						SchemaProps: spec.SchemaProps{
+							Description: "clientCAFile is the path to a PEM-encoded certificate bundle. If set, any request presenting a client certificate signed by one of the authorities in the bundle is authenticated with a username corresponding to the CommonName, and groups corresponding to the Organization in the client certificate.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"clientCAFile"},
+			},
+		},
+		Dependencies: []string{},
 	},
 	"v1alpha1.LeaderElectionConfiguration": {
 		Schema: spec.Schema{
