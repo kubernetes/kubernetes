@@ -17,7 +17,6 @@ limitations under the License.
 package testing
 
 import (
-	"fmt"
 	"sync"
 
 	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
@@ -89,11 +88,7 @@ func (r *FakeImageService) ImageStatus(image *runtimeApi.ImageSpec) (*runtimeApi
 
 	r.Called = append(r.Called, "ImageStatus")
 
-	if img, ok := r.Images[image.GetImage()]; ok {
-		return img, nil
-	}
-
-	return nil, fmt.Errorf("image %q not found", image.GetImage())
+	return r.Images[image.GetImage()], nil
 }
 
 func (r *FakeImageService) PullImage(image *runtimeApi.ImageSpec, auth *runtimeApi.AuthConfig) error {

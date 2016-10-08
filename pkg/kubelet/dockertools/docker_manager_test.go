@@ -425,17 +425,17 @@ func TestDeleteImage(t *testing.T) {
 	manager, fakeDocker := newTestDockerManager()
 	fakeDocker.Image = &dockertypes.ImageInspect{ID: "1111", RepoTags: []string{"foo"}}
 	manager.RemoveImage(kubecontainer.ImageSpec{Image: "1111"})
-	fakeDocker.AssertCallDetails([]calledDetail{{name: "inspect_image"}, {name: "remove_image",
-		arguments: []interface{}{"1111", dockertypes.ImageRemoveOptions{PruneChildren: true}}}})
+	fakeDocker.AssertCallDetails(NewCalledDetail("inspect_image", nil), NewCalledDetail("remove_image",
+		[]interface{}{"1111", dockertypes.ImageRemoveOptions{PruneChildren: true}}))
 }
 
 func TestDeleteImageWithMultipleTags(t *testing.T) {
 	manager, fakeDocker := newTestDockerManager()
 	fakeDocker.Image = &dockertypes.ImageInspect{ID: "1111", RepoTags: []string{"foo", "bar"}}
 	manager.RemoveImage(kubecontainer.ImageSpec{Image: "1111"})
-	fakeDocker.AssertCallDetails([]calledDetail{{name: "inspect_image"},
-		{name: "remove_image", arguments: []interface{}{"foo", dockertypes.ImageRemoveOptions{PruneChildren: true}}},
-		{name: "remove_image", arguments: []interface{}{"bar", dockertypes.ImageRemoveOptions{PruneChildren: true}}}})
+	fakeDocker.AssertCallDetails(NewCalledDetail("inspect_image", nil),
+		NewCalledDetail("remove_image", []interface{}{"foo", dockertypes.ImageRemoveOptions{PruneChildren: true}}),
+		NewCalledDetail("remove_image", []interface{}{"bar", dockertypes.ImageRemoveOptions{PruneChildren: true}}))
 }
 
 func TestKillContainerInPod(t *testing.T) {
@@ -1409,6 +1409,7 @@ func TestVerifyNonRoot(t *testing.T) {
 		},
 		"nil image in inspect": {
 			container:     &api.Container{},
+			inspectImage:  nil,
 			expectedError: "unable to inspect image",
 		},
 		"nil config in image inspect": {
