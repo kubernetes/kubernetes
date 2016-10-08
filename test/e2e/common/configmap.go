@@ -153,7 +153,7 @@ var _ = framework.KubeDescribe("ConfigMap", func() {
 		configMap.ResourceVersion = "" // to force update
 		configMap.Data["data-1"] = "value-2"
 		_, err = f.Client.ConfigMaps(f.Namespace.Name).Update(configMap)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(HaveOccurred(), "Failed to update configmap %q in namespace %q", configMap.Name, f.Namespace.Name)
 
 		By("waiting to observe update in volume")
 		Eventually(pollLogs, podLogTimeout, framework.Poll).Should(ContainSubstring("value-2"))
