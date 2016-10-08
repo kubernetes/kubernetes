@@ -53,6 +53,7 @@ grep -q "^${ETCD_VERSION}\$" binaries/.etcd 2>/dev/null || {
 }
 
 function get_latest_version_number {
+  # TODO(#33726): switch to dl.k8s.io
   local -r latest_url="https://storage.googleapis.com/kubernetes-release/release/stable.txt"
   if [[ $(which wget) ]]; then
     wget -qO- ${latest_url}
@@ -71,17 +72,17 @@ fi
 # k8s
 echo "Prepare kubernetes ${KUBE_VERSION} release ..."
 grep -q "^${KUBE_VERSION}\$" binaries/.kubernetes 2>/dev/null || {
-  curl -L https://github.com/kubernetes/kubernetes/releases/download/v${KUBE_VERSION}/kubernetes.tar.gz -o kubernetes.tar.gz
-  tar xzf kubernetes.tar.gz
-  pushd kubernetes/server
+  # TODO(#33726): switch to dl.k8s.io
+  curl -L https://storage.googleapis.com/kubernetes-release/release/v${KUBE_VERSION}/kubernetes-client-linux-amd64.tar.gz -o kubernetes-client-linux-amd64.tar.gz
+  curl -L https://storage.googleapis.com/kubernetes-release/release/v${KUBE_VERSION}/kubernetes-server-linux-amd64.tar.gz -o kubernetes-server-linux-amd64.tar.gz
+  tar xzf kubernetes-client-linux-amd64.tar.gz
   tar xzf kubernetes-server-linux-amd64.tar.gz
-  popd
-  cp kubernetes/server/kubernetes/server/bin/kube-apiserver \
-     kubernetes/server/kubernetes/server/bin/kube-controller-manager \
-     kubernetes/server/kubernetes/server/bin/kube-scheduler binaries/master
-  cp kubernetes/server/kubernetes/server/bin/kubelet \
-     kubernetes/server/kubernetes/server/bin/kube-proxy binaries/minion
-  cp kubernetes/server/kubernetes/server/bin/kubectl binaries/
+  cp kubernetes/client/bin/kubectl binaries/
+  cp kubernetes/server/bin/kube-apiserver \
+     kubernetes/server/bin/kube-controller-manager \
+     kubernetes/server/bin/kube-scheduler binaries/master
+  cp kubernetes/server/bin/kubelet \
+     kubernetes/server/bin/kube-proxy binaries/minion
   echo ${KUBE_VERSION} > binaries/.kubernetes
 }
 
