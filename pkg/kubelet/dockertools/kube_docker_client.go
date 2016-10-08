@@ -182,45 +182,23 @@ func (d *kubeDockerClient) RemoveContainer(id string, opts dockertypes.Container
 	return err
 }
 
-func (d *kubeDockerClient) inspectImageRaw(ref string) (*dockertypes.ImageInspect, error) {
+func (d *kubeDockerClient) InspectImage(image string) (*dockertypes.ImageInspect, error) {
 	ctx, cancel := d.getTimeoutContext()
 	defer cancel()
-	resp, _, err := d.client.ImageInspectWithRaw(ctx, ref, true)
+	resp, _, err := d.client.ImageInspectWithRaw(ctx, image, true)
 	if ctxErr := contextError(ctx); ctxErr != nil {
 		return nil, ctxErr
 	}
 	if err != nil {
 		if dockerapi.IsErrImageNotFound(err) {
-			err = imageNotFoundError{ID: ref}
+			err = imageNotFoundError{ID: image}
 		}
 		return nil, err
 	}
-
+	if !matchImageTagOrSHA(resp, image) {
+		return nil, imageNotFoundError{ID: image}
+	}
 	return &resp, nil
-}
-
-func (d *kubeDockerClient) InspectImageByID(imageID string) (*dockertypes.ImageInspect, error) {
-	resp, err := d.inspectImageRaw(imageID)
-	if err != nil {
-		return nil, err
-	}
-
-	if !matchImageIDOnly(*resp, imageID) {
-		return nil, imageNotFoundError{ID: imageID}
-	}
-	return resp, nil
-}
-
-func (d *kubeDockerClient) InspectImageByRef(imageRef string) (*dockertypes.ImageInspect, error) {
-	resp, err := d.inspectImageRaw(imageRef)
-	if err != nil {
-		return nil, err
-	}
-
-	if !matchImageTagOrSHA(*resp, imageRef) {
-		return nil, imageNotFoundError{ID: imageRef}
-	}
-	return resp, nil
 }
 
 func (d *kubeDockerClient) ImageHistory(id string) ([]dockertypes.ImageHistory, error) {
