@@ -42,12 +42,13 @@ func Run() error {
 	pflag.CommandLine.MarkHidden("google-json-key")
 	pflag.CommandLine.MarkHidden("log-flush-frequency")
 
-	// ensure kubeadm to be run as root.
+	// add checkPermissions() to ensure kubeadm running in root.
 	if err := checkPermissions(); !err {
 		return err
 	}
 
 	cmd := cmd.NewKubeadmCommand(cmdutil.NewFactory(nil), os.Stdin, os.Stdout, os.Stderr)
+
 	return cmd.Execute()
 }
 
