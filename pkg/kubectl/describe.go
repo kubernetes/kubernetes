@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/federation/apis/federation"
 	fed_clientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/annotations"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/events"
 	"k8s.io/kubernetes/pkg/api/resource"
@@ -1380,7 +1381,8 @@ func describeSecret(secret *api.Secret) (string, error) {
 		fmt.Fprintf(out, "Name:\t%s\n", secret.Name)
 		fmt.Fprintf(out, "Namespace:\t%s\n", secret.Namespace)
 		printLabelsMultiline(out, "Labels", secret.Labels)
-		printLabelsMultiline(out, "Annotations", secret.Annotations)
+		skipMap := map[string]bool{annotations.LastAppliedConfigAnnotation: true}
+		printLabelsMultilineWithFilter(out, "Annotations", secret.Annotations, skipMap)
 
 		fmt.Fprintf(out, "\nType:\t%s\n", secret.Type)
 
@@ -2526,13 +2528,18 @@ func (fn typeFunc) Describe(exact interface{}, extra ...interface{}) (string, er
 	return s, err
 }
 
+// printLabelsMultilineWithFilter prints filtered multiple labels with a proper alignment.
+func printLabelsMultilineWithFilter(out io.Writer, title string, labels map[string]string, skipMap map[string]bool) {
+	printLabelsMultilineWithIndent(out, "", title, "\t", labels, skipMap)
+}
+
 // printLabelsMultiline prints multiple labels with a proper alignment.
 func printLabelsMultiline(out io.Writer, title string, labels map[string]string) {
-	printLabelsMultilineWithIndent(out, "", title, "\t", labels)
+	printLabelsMultilineWithIndent(out, "", title, "\t", labels, nil)
 }
 
 // printLabelsMultiline prints multiple labels with a user-defined alignment.
-func printLabelsMultilineWithIndent(out io.Writer, initialIndent, title, innerIndent string, labels map[string]string) {
+func printLabelsMultilineWithIndent(out io.Writer, initialIndent, title, innerIndent string, labels map[string]string, skipMap map[string]bool) {
 
 	fmt.Fprintf(out, "%s%s:%s", initialIndent, title, innerIndent)
 
@@ -2544,7 +2551,16 @@ func printLabelsMultilineWithIndent(out io.Writer, initialIndent, title, innerIn
 	// to print labels in the sorted order
 	keys := make([]string, 0, len(labels))
 	for key := range labels {
+		if skipMap != nil {
+			if _, skip := skipMap[key]; skip {
+				continue
+			}
+		}
 		keys = append(keys, key)
+	}
+	if len(keys) == 0 {
+		fmt.Fprintln(out, "<none>")
+		return
 	}
 	sort.Strings(keys)
 
