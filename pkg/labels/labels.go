@@ -28,6 +28,8 @@ type Labels interface {
 
 	// Get returns the value for the provided label.
 	Get(label string) (value string)
+
+	String() string
 }
 
 // Set is a map of label:value. It implements Labels.
