@@ -28,6 +28,7 @@ audit-log-path
 auth-path
 auth-provider
 auth-provider-arg
+authentication-token-webhook
 authentication-token-webhook-cache-ttl
 authentication-token-webhook-config-file
 authorization-mode
