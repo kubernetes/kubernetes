@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package sysctl
+package sysfs
 
 import (
 	"io/ioutil"
@@ -39,24 +39,25 @@ const (
 
 // An injectable interface for running sysctl commands.
 type Interface interface {
-	// GetSysctl returns the value for the specified sysctl setting
-	GetSysctl(sysctl string) (int, error)
-	// SetSysctl modifies the specified sysctl flag to the new value
-	SetSysctl(sysctl string, newVal int) error
+	// GetInt returns the value for the specified sysctl setting
+	GetInt(sysctl string) (int, error)
+	// WriteInt modifies the specified sysctl flag to the new value
+	WriteInt(sysctl string, newVal int) error
 }
 
 // New returns a new Interface for accessing sysctl
 func New() Interface {
-	return &procSysctl{}
+	return &sysFsctl{}
 }
 
-// procSysctl implements Interface by reading and writing files under /proc/sys
-type procSysctl struct {
+// sysFsctl implements Interface by reading and writing system files, /proc/sys by default
+type sysFsctl struct {
 }
 
 // GetSysctl returns the value for the specified sysctl setting
-func (_ *procSysctl) GetSysctl(sysctl string) (int, error) {
-	data, err := ioutil.ReadFile(path.Join(sysctlBase, sysctl))
+func (_ *sysFsctl) GetInt(sysctl string) (int, error) {
+	absPath := getAbsPath(sysctl)
+	data, err := ioutil.ReadFile(absPath)
 	if err != nil {
 		return -1, err
 	}
@@ -68,6 +69,14 @@ func (_ *procSysctl) GetSysctl(sysctl string) (int, error) {
 }
 
 // SetSysctl modifies the specified sysctl flag to the new value
-func (_ *procSysctl) SetSysctl(sysctl string, newVal int) error {
-	return ioutil.WriteFile(path.Join(sysctlBase, sysctl), []byte(strconv.Itoa(newVal)), 0640)
+func (_ *sysFsctl) WriteInt(sysctl string, newVal int) error {
+	absPath := getAbsPath(sysctl)
+	return ioutil.WriteFile(absPath, []byte(strconv.Itoa(newVal)), 0640)
+}
+
+func getAbsPath(file string) string {
+	if strings.HasPrefix(file, "/") {
+		return file
+	}
+	return path.Join(sysctlBase, file)
 }

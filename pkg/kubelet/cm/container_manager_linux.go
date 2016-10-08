@@ -43,7 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/procfs"
 	"k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
-	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
+	utilsysctl "k8s.io/kubernetes/pkg/util/sysfs"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 

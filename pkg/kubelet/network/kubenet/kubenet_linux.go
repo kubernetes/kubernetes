@@ -44,7 +44,7 @@ import (
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 	utilsets "k8s.io/kubernetes/pkg/util/sets"
-	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
+	utilsysctl "k8s.io/kubernetes/pkg/util/sysfs"
 
 	"strconv"
 
