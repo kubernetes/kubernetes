@@ -1261,11 +1261,7 @@ func TestCloudProviderNoRateLimit(t *testing.T) {
 				},
 			},
 		},
-<<<<<<< HEAD
 		Clientset:      fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0"), *testutil.NewPod("pod1", "node0")}}),
-=======
-		Clientset:      fake.NewSimpleClientset(&api.PodList{Items: []api.Pod{*newPod("pod0", "node0"), *newPod("pod1", "node0")}}),
->>>>>>> start breaking up controller manager into two pieces
 		DeleteWaitChan: make(chan struct{}),
 	}
 	nodeController, _ := NewNodeControllerFromClient(nil, fnh, 10*time.Minute,
