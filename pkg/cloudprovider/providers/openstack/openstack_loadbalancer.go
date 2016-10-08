@@ -37,11 +37,12 @@ import (
 
 	"fmt"
 
+	"strings"
+
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/service"
 	"k8s.io/kubernetes/pkg/cloudprovider"
-	"strings"
 )
 
 // Note: when creating a new Loadbalancer (VM), it can take some time before it is ready for use,
@@ -60,7 +61,6 @@ type LbaasV2 struct {
 }
 
 type empty struct{}
-
 
 func getPortByIP(client *gophercloud.ServiceClient, ipAddress string) (neutron_ports.Port, error) {
 	var targetPort neutron_ports.Port
@@ -289,7 +289,7 @@ func getListenersByLoadBalancerID(client *gophercloud.ServiceClient, id string) 
 }
 
 // get listener for a port or nil if does not exist
-func getListenerForPort(existingListeners []listeners.Listener, port api.ServicePort) (*listeners.Listener) {
+func getListenerForPort(existingListeners []listeners.Listener, port api.ServicePort) *listeners.Listener {
 	for _, l := range existingListeners {
 		if l.Protocol == string(port.Protocol) && l.ProtocolPort == int(port.Port) {
 			return &l
@@ -392,7 +392,7 @@ func getMonitorByPoolID(client *gophercloud.ServiceClient, id string) (*v2_monit
 }
 
 // Check if a member exists for node
-func memberExists(members []v2_pools.Member, addr string, port int) (bool) {
+func memberExists(members []v2_pools.Member, addr string, port int) bool {
 	for _, member := range members {
 		if member.Address == addr && member.ProtocolPort == port {
 			return true
@@ -402,8 +402,7 @@ func memberExists(members []v2_pools.Member, addr string, port int) (bool) {
 	return false
 }
 
-
-func popListener(existingListeners []listeners.Listener, id string) ([]listeners.Listener) {
+func popListener(existingListeners []listeners.Listener, id string) []listeners.Listener {
 	for i, existingListener := range existingListeners {
 		if existingListener.ID == id {
 			existingListeners[i] = existingListeners[len(existingListeners)-1]
@@ -415,7 +414,7 @@ func popListener(existingListeners []listeners.Listener, id string) ([]listeners
 	return existingListeners
 }
 
-func popMember(members []v2_pools.Member, addr string, port int) ([]v2_pools.Member) {
+func popMember(members []v2_pools.Member, addr string, port int) []v2_pools.Member {
 	for i, member := range members {
 		if member.Address == addr && member.ProtocolPort == port {
 			members[i] = members[len(members)-1]
@@ -511,7 +510,6 @@ func stringInArray(x string, list []string) bool {
 	}
 	return false
 }
-
 
 func (lbaas *LbaasV2) createLoadBalancer(service *api.Service, name string) (*loadbalancers.LoadBalancer, error) {
 	createOpts := loadbalancers.CreateOpts{
@@ -1063,7 +1061,7 @@ func (lbaas *LbaasV2) UpdateLoadBalancer(clusterName string, service *api.Servic
 
 		// Remove any old members for this port
 		for _, member := range members {
-			if _, ok := addrs[member.Address]; ok  && member.ProtocolPort == int(port.NodePort) {
+			if _, ok := addrs[member.Address]; ok && member.ProtocolPort == int(port.NodePort) {
 				// Still present, do not delete member
 				continue
 			}
@@ -1252,14 +1250,13 @@ func (lbaas *LbaasV2) EnsureLoadBalancerDeleted(clusterName string, service *api
 		lbSecGroupID, err := groups.IDFromName(lbaas.network, lbSecGroupName)
 
 		if err != nil {
-			// We were getting this group to delete it anyway - let just continue
-			glog.V(1).Infof("Error occured finding security group: %s: %v", lbSecGroupName, err)
+			glog.V(1).Infof("Error occurred finding security group: %s: %v", lbSecGroupName, err)
+			return nil
+		}
 
-		} else {
-			lbSecGroup := groups.Delete(lbaas.network, lbSecGroupID)
-			if lbSecGroup.Err != nil && !isNotFound(lbSecGroup.Err) {
-				return lbSecGroup.Err
-			}
+		lbSecGroup := groups.Delete(lbaas.network, lbSecGroupID)
+		if lbSecGroup.Err != nil && !isNotFound(lbSecGroup.Err) {
+			return lbSecGroup.Err
 		}
 
 		// Delete the rules in the Node Security Group
@@ -1267,20 +1264,19 @@ func (lbaas *LbaasV2) EnsureLoadBalancerDeleted(clusterName string, service *api
 			SecGroupID:    lbaas.opts.NodeSecurityGroupID,
 			RemoteGroupID: lbSecGroupID,
 		}
-		rules_, err := getSecurityGroupRules(lbaas.network, opts)
+		secGroupRules, err := getSecurityGroupRules(lbaas.network, opts)
 
 		if err != nil && !isNotFound(err) {
 			glog.Errorf("Error finding rules for remote group id %s in security group id %s", lbSecGroupID, lbaas.opts.NodeSecurityGroupID)
 			return err
 		}
 
-		for _, rule := range rules_ {
+		for _, rule := range secGroupRules {
 			res := rules.Delete(lbaas.network, rule.ID)
 			if res.Err != nil && !isNotFound(res.Err) {
-				return res.Err
+				glog.V(1).Infof("Error occurred deleting security group rule: %s: %v", rule.ID, res.Err)
 			}
 		}
-
 	}
 
 	return nil
