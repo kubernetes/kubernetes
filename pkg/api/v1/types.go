@@ -2617,6 +2617,8 @@ const (
 	NodeDiskPressure NodeConditionType = "DiskPressure"
 	// NodeNetworkUnavailable means that network for the node is not correctly configured.
 	NodeNetworkUnavailable NodeConditionType = "NetworkUnavailable"
+	// NodeCloudNetworkUnavailable means that cloud provider networking for the node is not correctly configured.
+	NodeCloudNetworkUnavailable NodeConditionType = "CloudNetworkUnavailable"
 )
 
 // NodeCondition contains condition information for a node.

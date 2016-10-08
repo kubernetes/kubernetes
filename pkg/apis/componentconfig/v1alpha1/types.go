@@ -312,6 +312,10 @@ type KubeletConfiguration struct {
 	// networkPluginDir is the full path of the directory in which to search
 	// for network plugins (and, for backwards-compat, CNI config files)
 	NetworkPluginDir string `json:"networkPluginDir"`
+	// should be true when the network plugin requires cloud routes set up
+	// with a cloud provider for pod connectivity, which network plugins
+	// themselves may not be aware of
+	NetworkPluginRequiresCloudRoutes bool `json:"networkPluginRequiresCloudRoutes"`
 	// CNIConfDir is the full path of the directory in which to search for
 	// CNI config files
 	CNIConfDir string `json:"cniConfDir"`

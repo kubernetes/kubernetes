@@ -2457,6 +2457,13 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 							Format:      "",
 						},
 					},
+					"networkPluginRequiresCloudRoutes": {
+						SchemaProps: spec.SchemaProps{
+							Description: "should be true when the network plugin requires cloud routes set up with a cloud provider for pod connectivity, which network plugins themselves may not be aware of",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
 					"cniConfDir": {
 						SchemaProps: spec.SchemaProps{
 							Description: "CNIConfDir is the full path of the directory in which to search for CNI config files",
@@ -2889,7 +2896,7 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 						},
 					},
 				},
-				Required: []string{"TypeMeta", "podManifestPath", "syncFrequency", "fileCheckFrequency", "httpCheckFrequency", "manifestURL", "manifestURLHeader", "enableServer", "address", "port", "readOnlyPort", "tlsCertFile", "tlsPrivateKeyFile", "certDirectory", "hostnameOverride", "podInfraContainerImage", "dockerEndpoint", "rootDirectory", "seccompProfileRoot", "allowPrivileged", "hostNetworkSources", "hostPIDSources", "hostIPCSources", "registryPullQPS", "registryBurst", "eventRecordQPS", "eventBurst", "enableDebuggingHandlers", "minimumGCAge", "maxPerPodContainerCount", "maxContainerCount", "cAdvisorPort", "healthzPort", "healthzBindAddress", "oomScoreAdj", "registerNode", "clusterDomain", "masterServiceNamespace", "clusterDNS", "streamingConnectionIdleTimeout", "nodeStatusUpdateFrequency", "imageMinimumGCAge", "imageGCHighThresholdPercent", "imageGCLowThresholdPercent", "lowDiskSpaceThresholdMB", "volumeStatsAggPeriod", "networkPluginName", "networkPluginMTU", "networkPluginDir", "cniConfDir", "cniBinDir", "volumePluginDir", "containerRuntime", "remoteRuntimeEndpoint", "remoteImageEndpoint", "lockFilePath", "exitOnLockContention", "configureCbr0", "hairpinMode", "babysitDaemons", "maxPods", "nvidiaGPUs", "dockerExecHandlerName", "podCIDR", "resolvConf", "cpuCFSQuota", "containerized", "maxOpenFiles", "reconcileCIDR", "registerSchedulable", "contentType", "kubeAPIQPS", "kubeAPIBurst", "serializeImagePulls", "nodeLabels", "nonMasqueradeCIDR", "enableCustomMetrics", "podsPerCore", "enableControllerAttachDetach", "systemReserved", "kubeReserved", "protectKernelDefaults", "makeIPTablesUtilChains", "iptablesMasqueradeBit", "iptablesDropBit"},
+				Required: []string{"TypeMeta", "podManifestPath", "syncFrequency", "fileCheckFrequency", "httpCheckFrequency", "manifestURL", "manifestURLHeader", "enableServer", "address", "port", "readOnlyPort", "tlsCertFile", "tlsPrivateKeyFile", "certDirectory", "hostnameOverride", "podInfraContainerImage", "dockerEndpoint", "rootDirectory", "seccompProfileRoot", "allowPrivileged", "hostNetworkSources", "hostPIDSources", "hostIPCSources", "registryPullQPS", "registryBurst", "eventRecordQPS", "eventBurst", "enableDebuggingHandlers", "minimumGCAge", "maxPerPodContainerCount", "maxContainerCount", "cAdvisorPort", "healthzPort", "healthzBindAddress", "oomScoreAdj", "registerNode", "clusterDomain", "masterServiceNamespace", "clusterDNS", "streamingConnectionIdleTimeout", "nodeStatusUpdateFrequency", "imageMinimumGCAge", "imageGCHighThresholdPercent", "imageGCLowThresholdPercent", "lowDiskSpaceThresholdMB", "volumeStatsAggPeriod", "networkPluginName", "networkPluginMTU", "networkPluginDir", "networkPluginRequiresCloudRoutes", "cniConfDir", "cniBinDir", "volumePluginDir", "containerRuntime", "remoteRuntimeEndpoint", "remoteImageEndpoint", "lockFilePath", "exitOnLockContention", "configureCbr0", "hairpinMode", "babysitDaemons", "maxPods", "nvidiaGPUs", "dockerExecHandlerName", "podCIDR", "resolvConf", "cpuCFSQuota", "containerized", "maxOpenFiles", "reconcileCIDR", "registerSchedulable", "contentType", "kubeAPIQPS", "kubeAPIBurst", "serializeImagePulls", "nodeLabels", "nonMasqueradeCIDR", "enableCustomMetrics", "podsPerCore", "enableControllerAttachDetach", "systemReserved", "kubeReserved", "protectKernelDefaults", "makeIPTablesUtilChains", "iptablesMasqueradeBit", "iptablesDropBit"},
 			},
 		},
 		Dependencies: []string{
@@ -13917,6 +13924,13 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 							Format:      "",
 						},
 					},
+					"networkPluginRequiresCloudRoutes": {
+						SchemaProps: spec.SchemaProps{
+							Description: "should be true when the network plugin requires cloud routes set up with a cloud provider for pod connectivity, which network plugins themselves may not be aware of",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
 					"cniConfDir": {
 						SchemaProps: spec.SchemaProps{
 							Description: "CNIConfDir is the full path of the directory in which to search for CNI config files",
@@ -14356,7 +14370,7 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 						},
 					},
 				},
-				Required: []string{"TypeMeta", "podManifestPath", "syncFrequency", "fileCheckFrequency", "httpCheckFrequency", "manifestURL", "manifestURLHeader", "enableServer", "address", "port", "readOnlyPort", "tlsCertFile", "tlsPrivateKeyFile", "certDirectory", "hostnameOverride", "podInfraContainerImage", "dockerEndpoint", "rootDirectory", "seccompProfileRoot", "allowPrivileged", "hostNetworkSources", "hostPIDSources", "hostIPCSources", "registryPullQPS", "registryBurst", "eventRecordQPS", "eventBurst", "enableDebuggingHandlers", "minimumGCAge", "maxPerPodContainerCount", "maxContainerCount", "cAdvisorPort", "healthzPort", "healthzBindAddress", "oomScoreAdj", "registerNode", "clusterDomain", "masterServiceNamespace", "clusterDNS", "streamingConnectionIdleTimeout", "nodeStatusUpdateFrequency", "imageMinimumGCAge", "imageGCHighThresholdPercent", "imageGCLowThresholdPercent", "lowDiskSpaceThresholdMB", "volumeStatsAggPeriod", "networkPluginName", "networkPluginDir", "cniConfDir", "cniBinDir", "networkPluginMTU", "volumePluginDir", "cloudProvider", "cloudConfigFile", "kubeletCgroups", "runtimeCgroups", "systemCgroups", "cgroupRoot", "containerRuntime", "remoteRuntimeEndpoint", "remoteImageEndpoint", "runtimeRequestTimeout", "rktPath", "rktAPIEndpoint", "rktStage1Image", "lockFilePath", "exitOnLockContention", "configureCbr0", "hairpinMode", "babysitDaemons", "maxPods", "nvidiaGPUs", "dockerExecHandlerName", "podCIDR", "resolvConf", "cpuCFSQuota", "containerized", "maxOpenFiles", "reconcileCIDR", "registerSchedulable", "contentType", "kubeAPIQPS", "kubeAPIBurst", "serializeImagePulls", "outOfDiskTransitionFrequency", "nodeIP", "nodeLabels", "nonMasqueradeCIDR", "enableCustomMetrics", "evictionHard", "evictionSoft", "evictionSoftGracePeriod", "evictionPressureTransitionPeriod", "evictionMaxPodGracePeriod", "evictionMinimumReclaim", "podsPerCore", "enableControllerAttachDetach", "systemReserved", "kubeReserved", "protectKernelDefaults", "makeIPTablesUtilChains", "iptablesMasqueradeBit", "iptablesDropBit"},
+				Required: []string{"TypeMeta", "podManifestPath", "syncFrequency", "fileCheckFrequency", "httpCheckFrequency", "manifestURL", "manifestURLHeader", "enableServer", "address", "port", "readOnlyPort", "tlsCertFile", "tlsPrivateKeyFile", "certDirectory", "hostnameOverride", "podInfraContainerImage", "dockerEndpoint", "rootDirectory", "seccompProfileRoot", "allowPrivileged", "hostNetworkSources", "hostPIDSources", "hostIPCSources", "registryPullQPS", "registryBurst", "eventRecordQPS", "eventBurst", "enableDebuggingHandlers", "minimumGCAge", "maxPerPodContainerCount", "maxContainerCount", "cAdvisorPort", "healthzPort", "healthzBindAddress", "oomScoreAdj", "registerNode", "clusterDomain", "masterServiceNamespace", "clusterDNS", "streamingConnectionIdleTimeout", "nodeStatusUpdateFrequency", "imageMinimumGCAge", "imageGCHighThresholdPercent", "imageGCLowThresholdPercent", "lowDiskSpaceThresholdMB", "volumeStatsAggPeriod", "networkPluginName", "networkPluginDir", "networkPluginRequiresCloudRoutes", "cniConfDir", "cniBinDir", "networkPluginMTU", "volumePluginDir", "cloudProvider", "cloudConfigFile", "kubeletCgroups", "runtimeCgroups", "systemCgroups", "cgroupRoot", "containerRuntime", "remoteRuntimeEndpoint", "remoteImageEndpoint", "runtimeRequestTimeout", "rktPath", "rktAPIEndpoint", "rktStage1Image", "lockFilePath", "exitOnLockContention", "configureCbr0", "hairpinMode", "babysitDaemons", "maxPods", "nvidiaGPUs", "dockerExecHandlerName", "podCIDR", "resolvConf", "cpuCFSQuota", "containerized", "maxOpenFiles", "reconcileCIDR", "registerSchedulable", "contentType", "kubeAPIQPS", "kubeAPIBurst", "serializeImagePulls", "outOfDiskTransitionFrequency", "nodeIP", "nodeLabels", "nonMasqueradeCIDR", "enableCustomMetrics", "evictionHard", "evictionSoft", "evictionSoftGracePeriod", "evictionPressureTransitionPeriod", "evictionMaxPodGracePeriod", "evictionMinimumReclaim", "podsPerCore", "enableControllerAttachDetach", "systemReserved", "kubeReserved", "protectKernelDefaults", "makeIPTablesUtilChains", "iptablesMasqueradeBit", "iptablesDropBit"},
 			},
 		},
 		Dependencies: []string{
