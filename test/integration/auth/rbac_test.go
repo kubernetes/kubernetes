@@ -33,6 +33,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	rbacapi "k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/auth/authenticator"
 	"k8s.io/kubernetes/pkg/auth/authenticator/bearertoken"
@@ -204,7 +205,7 @@ var (
 `
 	podNamespace = `
 {
-  "apiVersion": "` + testapi.Default.GroupVersion().String() + `",
+  "apiVersion": "` + registered.GroupOrDie(api.GroupName).GroupVersion.String() + `",
   "kind": "Namespace",
   "metadata": {
 	"name": "pod-namespace"%s
@@ -213,7 +214,7 @@ var (
 `
 	jobNamespace = `
 {
-  "apiVersion": "` + testapi.Default.GroupVersion().String() + `",
+  "apiVersion": "` + registered.GroupOrDie(api.GroupName).GroupVersion.String() + `",
   "kind": "Namespace",
   "metadata": {
 	"name": "job-namespace"%s
@@ -222,7 +223,7 @@ var (
 `
 	forbiddenNamespace = `
 {
-  "apiVersion": "` + testapi.Default.GroupVersion().String() + `",
+  "apiVersion": "` + registered.GroupOrDie(api.GroupName).GroupVersion.String() + `",
   "kind": "Namespace",
   "metadata": {
 	"name": "forbidden-namespace"%s
@@ -443,7 +444,7 @@ func TestBootstrapping(t *testing.T) {
 	_, s := framework.RunAMaster(masterConfig)
 	defer s.Close()
 
-	clientset := clientset.NewForConfigOrDie(&restclient.Config{BearerToken: superUser, Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	clientset := clientset.NewForConfigOrDie(&restclient.Config{BearerToken: superUser, Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
 
 	watcher, err := clientset.Rbac().ClusterRoles().Watch(api.ListOptions{ResourceVersion: "0"})
 	if err != nil {

@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/typed/discovery"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
@@ -146,7 +147,7 @@ func TestGetUnknownSchemaObject(t *testing.T) {
 		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &internalType{Name: "foo"})},
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}}
+	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}}
 	buf := bytes.NewBuffer([]byte{})
 	errBuf := bytes.NewBuffer([]byte{})
 
@@ -172,9 +173,9 @@ func TestGetUnknownSchemaObject(t *testing.T) {
 //
 // The expected behavior of the `kubectl get` command is:
 // 1. objects using unrecognized schemes will always be returned using that scheme/version, "unlikelyversion" in this test;
-// 2. if the specified output-version is a recognized, valid Scheme, then the list should use that scheme, and otherwise it will default to the client version, testapi.Default.GroupVersion().String() in this test;
+// 2. if the specified output-version is a recognized, valid Scheme, then the list should use that scheme, and otherwise it will default to the client version, registered.GroupOrDie(api.GroupName).GroupVersion.String() in this test;
 // 3a. if the specified output-version is a recognized, valid Scheme, in which the requested object (replicationcontroller) can be represented, then the object should be returned using that version;
-// 3b. otherwise if the specified output-version is unrecognized, but the requested object (replicationcontroller) is recognized by the client's codec, then it will be converted to the client version, testapi.Default.GroupVersion().String() in this test.
+// 3b. otherwise if the specified output-version is unrecognized, but the requested object (replicationcontroller) is recognized by the client's codec, then it will be converted to the client version, registered.GroupOrDie(api.GroupName).GroupVersion.String() in this test.
 func TestGetUnknownSchemaObjectListGeneric(t *testing.T) {
 	testCases := map[string]struct {
 		outputVersion   string
@@ -183,22 +184,22 @@ func TestGetUnknownSchemaObjectListGeneric(t *testing.T) {
 		rcVersion       string
 	}{
 		"handles specific version": {
-			outputVersion:   testapi.Default.GroupVersion().String(),
-			listVersion:     testapi.Default.GroupVersion().String(),
+			outputVersion:   registered.GroupOrDie(api.GroupName).GroupVersion.String(),
+			listVersion:     registered.GroupOrDie(api.GroupName).GroupVersion.String(),
 			testtypeVersion: unlikelyGV.String(),
-			rcVersion:       testapi.Default.GroupVersion().String(),
+			rcVersion:       registered.GroupOrDie(api.GroupName).GroupVersion.String(),
 		},
 		"handles second specific version": {
 			outputVersion:   "unlikely.group/unlikelyversion",
-			listVersion:     testapi.Default.GroupVersion().String(),
+			listVersion:     registered.GroupOrDie(api.GroupName).GroupVersion.String(),
 			testtypeVersion: unlikelyGV.String(),
-			rcVersion:       testapi.Default.GroupVersion().String(), // see expected behavior 3b
+			rcVersion:       registered.GroupOrDie(api.GroupName).GroupVersion.String(), // see expected behavior 3b
 		},
 		"handles common version": {
-			outputVersion:   testapi.Default.GroupVersion().String(),
-			listVersion:     testapi.Default.GroupVersion().String(),
+			outputVersion:   registered.GroupOrDie(api.GroupName).GroupVersion.String(),
+			listVersion:     registered.GroupOrDie(api.GroupName).GroupVersion.String(),
 			testtypeVersion: unlikelyGV.String(),
-			rcVersion:       testapi.Default.GroupVersion().String(),
+			rcVersion:       registered.GroupOrDie(api.GroupName).GroupVersion.String(),
 		},
 	}
 	for k, test := range testCases {
@@ -223,7 +224,7 @@ func TestGetUnknownSchemaObjectListGeneric(t *testing.T) {
 			}),
 		}
 		tf.Namespace = "test"
-		tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}}
+		tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}}
 		buf := bytes.NewBuffer([]byte{})
 		errBuf := bytes.NewBuffer([]byte{})
 		cmd := NewCmdGet(f, buf, errBuf)
@@ -551,7 +552,7 @@ func TestGetMultipleTypeObjectsAsList(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}}
+	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}}
 	buf := bytes.NewBuffer([]byte{})
 	errBuf := bytes.NewBuffer([]byte{})
 
@@ -600,7 +601,7 @@ func TestGetMultipleTypeObjectsWithSelector(t *testing.T) {
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-			if req.URL.Query().Get(unversioned.LabelSelectorQueryParam(testapi.Default.GroupVersion().String())) != "a=b" {
+			if req.URL.Query().Get(unversioned.LabelSelectorQueryParam(registered.GroupOrDie(api.GroupName).GroupVersion.String())) != "a=b" {
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 			}
 			switch req.URL.Path {
@@ -790,7 +791,7 @@ func TestWatchSelector(t *testing.T) {
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-			if req.URL.Query().Get(unversioned.LabelSelectorQueryParam(testapi.Default.GroupVersion().String())) != "a=b" {
+			if req.URL.Query().Get(unversioned.LabelSelectorQueryParam(registered.GroupOrDie(api.GroupName).GroupVersion.String())) != "a=b" {
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 			}
 			switch req.URL.Path {
