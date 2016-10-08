@@ -1474,12 +1474,29 @@ func printNode(node *api.Node, w io.Writer, options PrintOptions) error {
 	if _, err := fmt.Fprintf(w, "%s\t%s\t%s", name, strings.Join(status, ","), translateTimestamp(node.CreationTimestamp)); err != nil {
 		return err
 	}
+
+	if options.Wide {
+		if _, err := fmt.Fprintf(w, "\t%s", getNodeExternalIP(node)); err != nil {
+			return err
+		}
+	}
 	// Display caller specify column labels first.
 	if _, err := fmt.Fprint(w, AppendLabels(node.Labels, options.ColumnLabels)); err != nil {
 		return err
 	}
 	_, err := fmt.Fprint(w, AppendAllLabels(options.ShowLabels, node.Labels))
 	return err
+}
+
+// Returns first external ip of the node or "<none>" if none is found.
+func getNodeExternalIP(node *api.Node) string {
+	for _, address := range node.Status.Addresses {
+		if address.Type == api.NodeExternalIP {
+			return address.Address
+		}
+	}
+
+	return "<none>"
 }
 
 func printNodeList(list *api.NodeList, w io.Writer, options PrintOptions) error {
@@ -2178,6 +2195,9 @@ func formatWideHeaders(wide bool, t reflect.Type) []string {
 		}
 		if t.String() == "*extensions.ReplicaSet" || t.String() == "*extensions.ReplicaSetList" {
 			return []string{"CONTAINER(S)", "IMAGE(S)", "SELECTOR"}
+		}
+		if t.String() == "*api.Node" || t.String() == "*api.NodeList" {
+			return []string{"EXTERNAL-IP"}
 		}
 	}
 	return nil
