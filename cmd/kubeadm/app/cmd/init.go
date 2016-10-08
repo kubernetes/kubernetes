@@ -92,18 +92,25 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 		&cfg.Etcd.Endpoints, "external-etcd-endpoints", []string{},
 		"etcd endpoints to use, in case you have an external cluster",
 	)
+	cmd.PersistentFlags().MarkDeprecated("external-etcd-endpoints", "this flag will be removed when componentconfig exists")
+
 	cmd.PersistentFlags().StringVar(
 		&cfg.Etcd.CAFile, "external-etcd-cafile", "",
 		"etcd certificate authority certificate file. Note: The path must be in /etc/ssl/certs",
 	)
+	cmd.PersistentFlags().MarkDeprecated("external-etcd-cafile", "this flag will be removed when componentconfig exists")
+
 	cmd.PersistentFlags().StringVar(
 		&cfg.Etcd.CertFile, "external-etcd-certfile", "",
 		"etcd client certificate file. Note: The path must be in /etc/ssl/certs",
 	)
+	cmd.PersistentFlags().MarkDeprecated("external-etcd-certfile", "this flag will be removed when componentconfig exists")
+
 	cmd.PersistentFlags().StringVar(
 		&cfg.Etcd.KeyFile, "external-etcd-keyfile", "",
 		"etcd client key file. Note: The path must be in /etc/ssl/certs",
 	)
+	cmd.PersistentFlags().MarkDeprecated("external-etcd-keyfile", "this flag will be removed when componentconfig exists")
 
 	return cmd
 }
