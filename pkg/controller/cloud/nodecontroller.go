@@ -22,9 +22,10 @@ import (
 
 	"github.com/golang/glog"
 
-	"k8s.io/kubernetes/pkg/api"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
+	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
+	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/core/v1"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller/informers"
@@ -61,11 +62,11 @@ func NewCloudNodeController(
 	nodeMonitorPeriod time.Duration) (*CloudNodeController, error) {
 
 	eventBroadcaster := record.NewBroadcaster()
-	recorder := eventBroadcaster.NewRecorder(api.EventSource{Component: "cloudcontrollermanager"})
+	recorder := eventBroadcaster.NewRecorder(v1.EventSource{Component: "cloudcontrollermanager"})
 	eventBroadcaster.StartLogging(glog.Infof)
 	if kubeClient != nil {
 		glog.V(0).Infof("Sending events to api server.")
-		eventBroadcaster.StartRecordingToSink(&unversionedcore.EventSinkImpl{Interface: kubeClient.Core().Events("")})
+		eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.Core().Events("")})
 	} else {
 		glog.V(0).Infof("No api server defined - no events will be sent to API server.")
 	}
@@ -87,23 +88,23 @@ func (cnc *CloudNodeController) Run() {
 		defer utilruntime.HandleCrash()
 
 		go wait.Until(func() {
-			nodes, err := cnc.kubeClient.Core().Nodes().List(api.ListOptions{ResourceVersion: "0"})
+			nodes, err := cnc.kubeClient.Core().Nodes().List(v1.ListOptions{ResourceVersion: "0"})
 			if err != nil {
 				glog.Errorf("Error monitoring node status: %v", err)
 			}
 
 			for i := range nodes.Items {
-				var currentReadyCondition *api.NodeCondition
+				var currentReadyCondition *v1.NodeCondition
 				node := &nodes.Items[i]
 				// Try to get the current node status
 				// If node status is empty, then kubelet has not posted ready status yet. In this case, process next node
 				for rep := 0; rep < nodeStatusUpdateRetry; rep++ {
-					_, currentReadyCondition = api.GetNodeCondition(&node.Status, api.NodeReady)
+					_, currentReadyCondition = v1.GetNodeCondition(&node.Status, v1.NodeReady)
 					if currentReadyCondition != nil {
 						break
 					}
 					name := node.Name
-					node, err = cnc.kubeClient.Core().Nodes().Get(name)
+					node, err = cnc.kubeClient.Core().Nodes().Get(name, metav1.GetOptions{})
 					if err != nil {
 						glog.Errorf("Failed while getting a Node to retry updating NodeStatus. Probably Node %s was deleted.", name)
 						break
@@ -117,7 +118,7 @@ func (cnc *CloudNodeController) Run() {
 				// If the known node status says that Node is NotReady, then check if the node has been removed
 				// from the cloud provider. If node cannot be found in cloudprovider, then delete the node immediately
 				if currentReadyCondition != nil {
-					if currentReadyCondition.Status != api.ConditionTrue {
+					if currentReadyCondition.Status != v1.ConditionTrue {
 						instances, ok := cnc.cloud.Instances()
 						if !ok {
 							glog.Errorf("cloud provider does not support instances.")
@@ -128,14 +129,14 @@ func (cnc *CloudNodeController) Run() {
 						if _, err := instances.ExternalID(types.NodeName(node.Name)); err != nil {
 							if err == cloudprovider.InstanceNotFound {
 								glog.V(2).Infof("Deleting node no longer present in cloud provider: %s", node.Name)
-								ref := &api.ObjectReference{
+								ref := &v1.ObjectReference{
 									Kind:      "Node",
 									Name:      node.Name,
 									UID:       types.UID(node.UID),
 									Namespace: "",
 								}
 								glog.V(2).Infof("Recording %s event message for node %s", "DeletingNode", node.Name)
-								cnc.recorder.Eventf(ref, api.EventTypeNormal, fmt.Sprintf("Deleting Node %v because it's not present according to cloud provider", node.Name), "Node %s event: %s", node.Name, "DeletingNode")
+								cnc.recorder.Eventf(ref, v1.EventTypeNormal, fmt.Sprintf("Deleting Node %v because it's not present according to cloud provider", node.Name), "Node %s event: %s", node.Name, "DeletingNode")
 								go func(nodeName string) {
 									defer utilruntime.HandleCrash()
 									if err := cnc.kubeClient.Core().Nodes().Delete(node.Name, nil); err != nil {
