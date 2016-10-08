@@ -62,6 +62,7 @@ import (
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/util/cert"
 	certutil "k8s.io/kubernetes/pkg/util/cert"
 	utilconfig "k8s.io/kubernetes/pkg/util/config"
 	"k8s.io/kubernetes/pkg/util/configz"
@@ -399,6 +400,18 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 		kubeDeps.EventClient = eventClient
 	}
 
+	if kubeDeps.Auth == nil {
+		nodeName, err := getNodeName(kubeDeps.Cloud, nodeutil.GetHostname(s.HostnameOverride))
+		if err != nil {
+			return err
+		}
+		auth, err := buildAuth(nodeName, kubeDeps.KubeClient, s.KubeletConfiguration)
+		if err != nil {
+			return err
+		}
+		kubeDeps.Auth = auth
+	}
+
 	if kubeDeps.CAdvisorInterface == nil {
 		kubeDeps.CAdvisorInterface, err = cadvisor.New(uint(s.CAdvisorPort), s.ContainerRuntime)
 		if err != nil {
@@ -501,12 +514,22 @@ func InitializeTLS(kc *componentconfig.KubeletConfiguration) (*server.TLSOptions
 			// Can't use TLSv1.0 because of POODLE and BEAST using CBC cipher
 			// Can't use TLSv1.1 because of RC4 cipher usage
 			MinVersion: tls.VersionTLS12,
-			// Populate PeerCertificates in requests, but don't yet reject connections without certificates.
-			ClientAuth: tls.RequestClientCert,
 		},
 		CertFile: kc.TLSCertFile,
 		KeyFile:  kc.TLSPrivateKeyFile,
 	}
+
+	if len(kc.Authentication.X509.ClientCAFile) > 0 {
+		clientCAs, err := cert.NewPool(kc.Authentication.X509.ClientCAFile)
+		if err != nil {
+			return nil, fmt.Errorf("unable to load client CA file %s: %v", kc.Authentication.X509.ClientCAFile, err)
+		}
+		// Specify allowed CAs for client certificates
+		tlsOptions.Config.ClientCAs = clientCAs
+		// Populate PeerCertificates in requests, but don't reject connections without verified certificates
+		tlsOptions.Config.ClientAuth = tls.RequestClientCert
+	}
+
 	return tlsOptions, nil
 }
 
