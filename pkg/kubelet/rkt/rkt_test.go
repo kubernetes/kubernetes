@@ -314,6 +314,33 @@ func TestListImages(t *testing.T) {
 				},
 			},
 		},
+		{
+			[]*rktapi.Image{
+				{
+					Id:      "sha512-a2fb8f390702",
+					Name:    "quay.io_443/coreos/alpine-sh",
+					Version: "latest",
+					Annotations: []*rktapi.KeyValue{
+						{
+							Key:   appcDockerRegistryURL,
+							Value: "quay.io:443",
+						},
+						{
+							Key:   appcDockerRepository,
+							Value: "coreos/alpine-sh",
+						},
+					},
+					Size: 400,
+				},
+			},
+			[]kubecontainer.Image{
+				{
+					ID:       "sha512-a2fb8f390702",
+					RepoTags: []string{"quay.io:443/coreos/alpine-sh:latest"},
+					Size:     400,
+				},
+			},
+		},
 	}
 
 	for i, tt := range tests {
