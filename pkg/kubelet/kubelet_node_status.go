@@ -184,13 +184,24 @@ func (kl *Kubelet) initialNode() (*api.Node, error) {
 			Unschedulable: !kl.registerSchedulable,
 		},
 	}
-	// Initially, set NodeNetworkUnavailable to true.
-	if kl.providerRequiresNetworkingConfiguration() {
+	// Initially, set NodeCloudNetworkUnavailable to true if the cloud
+	// provider needs do to some setup
+	if kl.cloudProviderRequiresNetworkingConfiguration() {
 		node.Status.Conditions = append(node.Status.Conditions, api.NodeCondition{
-			Type:               api.NodeNetworkUnavailable,
+			Type:               api.NodeCloudNetworkUnavailable,
 			Status:             api.ConditionTrue,
 			Reason:             "NoRouteCreated",
 			Message:            "Node created without a route",
+			LastTransitionTime: unversioned.NewTime(kl.clock.Now()),
+		})
+	}
+
+	if kl.networkPlugin != nil {
+		node.Status.Conditions = append(node.Status.Conditions, api.NodeCondition{
+			Type:               api.NodeNetworkUnavailable,
+			Status:             api.ConditionTrue,
+			Reason:             "NetworkPluginNotReady",
+			Message:            "Network plugin not ready",
 			LastTransitionTime: unversioned.NewTime(kl.clock.Now()),
 		})
 	}

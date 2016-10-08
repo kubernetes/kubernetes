@@ -24,11 +24,15 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/util/bandwidth"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	"k8s.io/kubernetes/pkg/util/sets"
+
+	nodeutil "k8s.io/kubernetes/pkg/util/node"
 )
 
 const (
@@ -77,12 +81,12 @@ func effectiveHairpinMode(hairpinMode componentconfig.HairpinMode, containerRunt
 
 // providerRequiresNetworkingConfiguration returns whether the cloud provider
 // requires special networking configuration.
-func (kl *Kubelet) providerRequiresNetworkingConfiguration() bool {
+func (kl *Kubelet) cloudProviderRequiresNetworkingConfiguration() bool {
 	// TODO: We should have a mechanism to say whether native cloud provider
 	// is used or whether we are using overlay networking. We should return
 	// true for cloud providers if they implement Routes() interface and
 	// we are not using overlay networking.
-	if kl.cloud == nil || kl.cloud.ProviderName() != "gce" {
+	if kl.cloud == nil || !kl.networkPluginRequiresCloudRoutes {
 		return false
 	}
 	_, supported := kl.cloud.Routes()
@@ -189,9 +193,48 @@ func (kl *Kubelet) cleanupBandwidthLimits(allPods []*api.Pod) error {
 	return nil
 }
 
+const (
+	// Maximum number of retries of node status update.
+	updateNodeStatusMaxRetries int = 3
+)
+
+// Clear NetworkUnavailable condition when the network plugin signals it is
+// ready by not indicating an error from its Status() method
+func (kl *Kubelet) clearNetworkingCondition() {
+	if kl.kubeClient == nil {
+		return
+	}
+
+	var err error
+	for i := 0; i < updateNodeStatusMaxRetries; i++ {
+		// Patch could also fail, even though the chance is very slim. So we still do
+		// patch in the retry loop.
+		err = nodeutil.SetNodeCondition(kl.kubeClient, kl.nodeName, api.NodeCondition{
+			Type:               api.NodeNetworkUnavailable,
+			Status:             api.ConditionFalse,
+			Reason:             "NetworkPluginReady",
+			Message:            "Network plugin now ready",
+			LastTransitionTime: unversioned.Now(),
+		})
+		if err == nil {
+			return
+		}
+		if i == updateNodeStatusMaxRetries || !errors.IsConflict(err) {
+			glog.Errorf("Error updating node %s: %v", kl.nodeName, err)
+			return
+		}
+		glog.Errorf("Error updating node %s, retrying: %v", kl.nodeName, err)
+	}
+	return
+}
+
 // syncNetworkStatus updates the network state
 func (kl *Kubelet) syncNetworkStatus() {
-	kl.runtimeState.setNetworkState(kl.networkPlugin.Status())
+	pluginErr := kl.networkPlugin.Status()
+	kl.runtimeState.setNetworkState(pluginErr)
+	if pluginErr == nil {
+		kl.clearNetworkingCondition()
+	}
 }
 
 // updatePodCIDR updates the pod CIDR in the runtime state if it is different
