@@ -107,20 +107,11 @@ func (in instrumentedDockerInterface) RemoveContainer(id string, opts dockertype
 	return err
 }
 
-func (in instrumentedDockerInterface) InspectImageByRef(image string) (*dockertypes.ImageInspect, error) {
+func (in instrumentedDockerInterface) InspectImage(image string) (*dockertypes.ImageInspect, error) {
 	const operation = "inspect_image"
 	defer recordOperation(operation, time.Now())
 
-	out, err := in.client.InspectImageByRef(image)
-	recordError(operation, err)
-	return out, err
-}
-
-func (in instrumentedDockerInterface) InspectImageByID(image string) (*dockertypes.ImageInspect, error) {
-	const operation = "inspect_image"
-	defer recordOperation(operation, time.Now())
-
-	out, err := in.client.InspectImageByID(image)
+	out, err := in.client.InspectImage(image)
 	recordError(operation, err)
 	return out, err
 }
