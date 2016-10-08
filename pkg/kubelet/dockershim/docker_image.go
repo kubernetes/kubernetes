@@ -17,10 +17,9 @@ limitations under the License.
 package dockershim
 
 import (
-	"fmt"
-
 	dockertypes "github.com/docker/engine-api/types"
 	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 )
 
 // This file implements methods in ImageManagerService.
@@ -41,7 +40,7 @@ func (ds *dockerService) ListImages(filter *runtimeApi.ImageFilter) ([]*runtimeA
 
 	result := []*runtimeApi.Image{}
 	for _, i := range images {
-		apiImage, err := toRuntimeAPIImage(&i)
+		apiImage, err := imageToRuntimeAPIImage(&i)
 		if err != nil {
 			// TODO: log an error message?
 			continue
@@ -51,16 +50,16 @@ func (ds *dockerService) ListImages(filter *runtimeApi.ImageFilter) ([]*runtimeA
 	return result, nil
 }
 
-// ImageStatus returns the status of the image.
+// ImageStatus returns the status of the image, returns nil if the image doesn't present.
 func (ds *dockerService) ImageStatus(image *runtimeApi.ImageSpec) (*runtimeApi.Image, error) {
-	images, err := ds.ListImages(&runtimeApi.ImageFilter{Image: image})
+	imageInspect, err := ds.client.InspectImageByRef(image.GetImage())
 	if err != nil {
+		if dockertools.IsImageNotFoundError(err) {
+			return nil, nil
+		}
 		return nil, err
 	}
-	if len(images) != 1 {
-		return nil, fmt.Errorf("ImageStatus returned more than one image: %+v", images)
-	}
-	return images[0], nil
+	return imageInspectToRuntimeAPIImage(imageInspect)
 }
 
 // PullImage pulls an image with authentication config.
@@ -79,6 +78,19 @@ func (ds *dockerService) PullImage(image *runtimeApi.ImageSpec, auth *runtimeApi
 
 // RemoveImage removes the image.
 func (ds *dockerService) RemoveImage(image *runtimeApi.ImageSpec) error {
-	_, err := ds.client.RemoveImage(image.GetImage(), dockertypes.ImageRemoveOptions{PruneChildren: true})
+	// If the image has multiple tags, we need to remove all the tags
+	// TODO: We assume image.Image is image ID here, which is true in the current implementation
+	// of kubelet, but we should still clarify this in CRI.
+	imageInspect, err := ds.client.InspectImageByID(image.GetImage())
+	if err == nil && imageInspect != nil && len(imageInspect.RepoTags) > 1 {
+		for _, tag := range imageInspect.RepoTags {
+			if _, err := ds.client.RemoveImage(tag, dockertypes.ImageRemoveOptions{PruneChildren: true}); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
+	_, err = ds.client.RemoveImage(image.GetImage(), dockertypes.ImageRemoveOptions{PruneChildren: true})
 	return err
 }
