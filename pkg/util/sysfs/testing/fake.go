@@ -17,7 +17,7 @@ limitations under the License.
 package testing
 
 import (
-	"k8s.io/kubernetes/pkg/util/sysctl"
+	"k8s.io/kubernetes/pkg/util/sysfs"
 	"os"
 )
 
@@ -32,8 +32,8 @@ func NewFake() *fake {
 	}
 }
 
-// GetSysctl returns the value for the specified sysctl setting
-func (m *fake) GetSysctl(sysctl string) (int, error) {
+// GetInt returns the value for the specified sysctl setting
+func (m *fake) GetInt(sysctl string) (int, error) {
 	v, found := m.Settings[sysctl]
 	if !found {
 		return -1, os.ErrNotExist
@@ -41,10 +41,10 @@ func (m *fake) GetSysctl(sysctl string) (int, error) {
 	return v, nil
 }
 
-// SetSysctl modifies the specified sysctl flag to the new value
-func (m *fake) SetSysctl(sysctl string, newVal int) error {
+// WriteInt modifies the specified sysctl flag to the new value
+func (m *fake) WriteInt(sysctl string, newVal int) error {
 	m.Settings[sysctl] = newVal
 	return nil
 }
 
-var _ = sysctl.Interface(&fake{})
+var _ = sysfs.Interface(&fake{})

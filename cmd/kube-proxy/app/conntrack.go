@@ -18,13 +18,11 @@ package app
 
 import (
 	"errors"
-	"io/ioutil"
-	"strconv"
 
 	"github.com/golang/glog"
 
 	"k8s.io/kubernetes/pkg/util/mount"
-	"k8s.io/kubernetes/pkg/util/sysctl"
+	"k8s.io/kubernetes/pkg/util/sysfs"
 )
 
 type Conntracker interface {
@@ -38,7 +36,7 @@ var readOnlySysFSError = errors.New("ReadOnlySysFS")
 
 func (realConntracker) SetMax(max int) error {
 	glog.Infof("Setting nf_conntrack_max to %d", max)
-	if err := sysctl.New().SetSysctl("net/netfilter/nf_conntrack_max", max); err != nil {
+	if err := sysfs.New().WriteInt("net/netfilter/nf_conntrack_max", max); err != nil {
 		return err
 	}
 	// sysfs is expected to be mounted as 'rw'. However, it may be unexpectedly mounted as
@@ -53,14 +51,13 @@ func (realConntracker) SetMax(max int) error {
 	if !writable {
 		return readOnlySysFSError
 	}
-	// TODO: generify this and sysctl to a new sysfs.WriteInt()
 	glog.Infof("Setting conntrack hashsize to %d", max/4)
-	return ioutil.WriteFile("/sys/module/nf_conntrack/parameters/hashsize", []byte(strconv.Itoa(max/4)), 0640)
+	return sysfs.New().WriteInt("/sys/module/nf_conntrack/parameters/hashsize", max/4)
 }
 
 func (realConntracker) SetTCPEstablishedTimeout(seconds int) error {
 	glog.Infof("Setting nf_conntrack_tcp_timeout_established to %d", seconds)
-	return sysctl.New().SetSysctl("net/netfilter/nf_conntrack_tcp_timeout_established", seconds)
+	return sysfs.New().WriteInt("net/netfilter/nf_conntrack_tcp_timeout_established", seconds)
 }
 
 // isSysFSWritable checks /proc/mounts to see whether sysfs is 'rw' or not.

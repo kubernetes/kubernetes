@@ -47,7 +47,7 @@ import (
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/util/resourcecontainer"
-	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
+	utilsysctl "k8s.io/kubernetes/pkg/util/sysfs"
 	"k8s.io/kubernetes/pkg/util/wait"
 
 	"github.com/golang/glog"

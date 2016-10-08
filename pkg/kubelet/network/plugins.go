@@ -31,7 +31,7 @@ import (
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
 	utilsets "k8s.io/kubernetes/pkg/util/sets"
-	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
+	utilsysctl "k8s.io/kubernetes/pkg/util/sysfs"
 	"k8s.io/kubernetes/pkg/util/validation"
 )
 
@@ -169,7 +169,7 @@ func (plugin *NoopNetworkPlugin) Init(host Host, hairpinMode componentconfig.Hai
 	// Ensure the netfilter module is loaded on kernel >= 3.18; previously
 	// it was built-in.
 	utilexec.New().Command("modprobe", "br-netfilter").CombinedOutput()
-	if err := utilsysctl.New().SetSysctl(sysctlBridgeCallIPTables, 1); err != nil {
+	if err := utilsysctl.New().WriteInt(sysctlBridgeCallIPTables, 1); err != nil {
 		glog.Warningf("can't set sysctl %s: %v", sysctlBridgeCallIPTables, err)
 	}
 

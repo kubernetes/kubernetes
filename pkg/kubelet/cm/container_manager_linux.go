@@ -43,7 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/procfs"
 	"k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
-	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
+	utilsysctl "k8s.io/kubernetes/pkg/util/sysfs"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
@@ -274,7 +274,7 @@ func setupKernelTunables(option KernelTunableBehavior) error {
 
 	errList := []error{}
 	for flag, expectedValue := range desiredState {
-		val, err := sysctl.GetSysctl(flag)
+		val, err := sysctl.GetInt(flag)
 		if err != nil {
 			errList = append(errList, err)
 			continue
@@ -290,7 +290,7 @@ func setupKernelTunables(option KernelTunableBehavior) error {
 			glog.V(2).Infof("Invalid kernel flag: %v, expected value: %v, actual value: %v", flag, expectedValue, val)
 		case KernelTunableModify:
 			glog.V(2).Infof("Updating kernel flag: %v, expected value: %v, actual value: %v", flag, expectedValue, val)
-			err = sysctl.SetSysctl(flag, expectedValue)
+			err = sysctl.WriteInt(flag, expectedValue)
 			if err != nil {
 				errList = append(errList, err)
 			}

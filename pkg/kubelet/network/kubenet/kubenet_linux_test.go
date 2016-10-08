@@ -34,7 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/bandwidth"
 	"k8s.io/kubernetes/pkg/util/exec"
 	ipttest "k8s.io/kubernetes/pkg/util/iptables/testing"
-	sysctltest "k8s.io/kubernetes/pkg/util/sysctl/testing"
+	sysctltest "k8s.io/kubernetes/pkg/util/sysfs/testing"
 )
 
 // test it fulfills the NetworkPlugin interface
