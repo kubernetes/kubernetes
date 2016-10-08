@@ -22,82 +22,82 @@ import (
 
 	"github.com/golang/glog"
 
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
+	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/fake"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/informers"
-	"k8s.io/kubernetes/pkg/controller/node"
+	"k8s.io/kubernetes/pkg/controller/node/testutil"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 // This test checks that the node is deleted when kubelet stops reporting
 // and cloud provider says node is gone
 func TestNodeDeleted(t *testing.T) {
-	pod0 := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
+	pod0 := &v1.Pod{
+		ObjectMeta: v1.ObjectMeta{
 			Namespace: "default",
 			Name:      "pod0",
 		},
-		Spec: api.PodSpec{
+		Spec: v1.PodSpec{
 			NodeName: "node0",
 		},
-		Status: api.PodStatus{
-			Conditions: []api.PodCondition{
+		Status: v1.PodStatus{
+			Conditions: []v1.PodCondition{
 				{
-					Type:   api.PodReady,
-					Status: api.ConditionTrue,
+					Type:   v1.PodReady,
+					Status: v1.ConditionTrue,
 				},
 			},
 		},
 	}
 
-	pod1 := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
+	pod1 := &v1.Pod{
+		ObjectMeta: v1.ObjectMeta{
 			Namespace: "default",
 			Name:      "pod1",
 		},
-		Spec: api.PodSpec{
+		Spec: v1.PodSpec{
 			NodeName: "node0",
 		},
-		Status: api.PodStatus{
-			Conditions: []api.PodCondition{
+		Status: v1.PodStatus{
+			Conditions: []v1.PodCondition{
 				{
-					Type:   api.PodReady,
-					Status: api.ConditionTrue,
+					Type:   v1.PodReady,
+					Status: v1.ConditionTrue,
 				},
 			},
 		},
 	}
 
-	fnh := &node.FakeNodeHandler{
-		Existing: []*api.Node{
+	fnh := &testutil.FakeNodeHandler{
+		Existing: []*v1.Node{
 			{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: v1.ObjectMeta{
 					Name:              "node0",
-					CreationTimestamp: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 				},
-				Status: api.NodeStatus{
-					Conditions: []api.NodeCondition{
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
 						{
-							Type:               api.NodeReady,
-							Status:             api.ConditionUnknown,
-							LastHeartbeatTime:  unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-							LastTransitionTime: unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							Type:               v1.NodeReady,
+							Status:             v1.ConditionUnknown,
+							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
 						},
 					},
 				},
 			},
 		},
-		Clientset:      fake.NewSimpleClientset(&api.PodList{Items: []api.Pod{*pod0, *pod1}}),
+		Clientset:      fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*pod0, *pod1}}),
 		DeleteWaitChan: make(chan struct{}),
 	}
 
-	factory := informers.NewSharedInformerFactory(fnh, controller.NoResyncPeriodFunc())
+	factory := informers.NewSharedInformerFactory(fnh, nil, controller.NoResyncPeriodFunc())
 
 	eventBroadcaster := record.NewBroadcaster()
 	cloudNodeController := &CloudNodeController{
@@ -105,7 +105,7 @@ func TestNodeDeleted(t *testing.T) {
 		nodeInformer:      factory.Nodes(),
 		cloud:             &fakecloud.FakeCloud{Err: cloudprovider.InstanceNotFound},
 		nodeMonitorPeriod: 5 * time.Second,
-		recorder:          eventBroadcaster.NewRecorder(api.EventSource{Component: "controllermanager"}),
+		recorder:          eventBroadcaster.NewRecorder(v1.EventSource{Component: "controllermanager"}),
 	}
 	eventBroadcaster.StartLogging(glog.Infof)
 
