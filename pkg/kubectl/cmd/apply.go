@@ -104,6 +104,7 @@ func NewCmdApply(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmdutil.AddOutputFlagsForMutation(cmd)
 	cmdutil.AddRecordFlag(cmd)
 	cmdutil.AddInclude3rdPartyFlags(cmd)
+	cmdutil.AddDryRunFlag(cmd)
 	return cmd
 }
 
@@ -156,6 +157,7 @@ func RunApply(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *Ap
 	visitedNamespacedRESTMappings := map[unversioned.GroupVersionKind]*meta.RESTMapping{}
 	visitedNonNamespacedRESTMappings := map[unversioned.GroupVersionKind]*meta.RESTMapping{}
 
+	dryrun := cmdutil.GetDryRunFlag(cmd)
 	count := 0
 	err = r.Visit(func(info *resource.Info, err error) error {
 		// In this method, info.Object contains the object retrieved from the server
@@ -180,7 +182,7 @@ func RunApply(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *Ap
 		}
 
 		if err := info.Get(); err != nil {
-			if !errors.IsNotFound(err) {
+			if dryrun || !errors.IsNotFound(err) {
 				return cmdutil.AddSourceToErr(fmt.Sprintf("retrieving current configuration of:\n%v\nfrom server for:", info), info.Source, err)
 			}
 			// Create the resource if it doesn't exist
@@ -213,12 +215,15 @@ func RunApply(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *Ap
 		helper := resource.NewHelper(info.Client, info.Mapping)
 		patcher := NewPatcher(encoder, decoder, info.Mapping, helper, overwrite)
 
-		patchBytes, err := patcher.patch(info.Object, modified, info.Source, info.Namespace, info.Name)
+		patchBytes, err := patcher.patch(info.Object, modified, info.Source, info.Namespace, info.Name, dryrun)
 		if err != nil {
 			return cmdutil.AddSourceToErr(fmt.Sprintf("applying patch:\n%s\nto:\n%v\nfor:", patchBytes, info), info.Source, err)
 		}
 
-		if cmdutil.ShouldRecord(cmd, info) {
+		if dryrun {
+			out.Write(patchBytes)
+			out.Write([]byte{'\n'})
+		} else if cmdutil.ShouldRecord(cmd, info) {
 			patch, err := cmdutil.ChangeResourcePatch(info, f.Command())
 			if err != nil {
 				return err
@@ -235,7 +240,9 @@ func RunApply(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *Ap
 			visitedUids.Insert(string(uid))
 		}
 		count++
-		cmdutil.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, false, "configured")
+		if !dryrun {
+			cmdutil.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, false, "configured")
+		}
 		return nil
 	})
 
@@ -384,7 +391,7 @@ func NewPatcher(encoder runtime.Encoder, decoder runtime.Decoder, mapping *meta.
 	}
 }
 
-func (p *patcher) patchSimple(obj runtime.Object, modified []byte, source, namespace, name string) ([]byte, error) {
+func (p *patcher) patchSimple(obj runtime.Object, modified []byte, source, namespace, name string, dryrun bool) ([]byte, error) {
 	// Serialize the current configuration of the object from the server.
 	current, err := runtime.Encode(p.encoder, obj)
 	if err != nil {
@@ -414,13 +421,16 @@ func (p *patcher) patchSimple(obj runtime.Object, modified []byte, source, names
 		return nil, cmdutil.AddSourceToErr(fmt.Sprintf(format, original, modified, current), source, err)
 	}
 
-	_, err = p.helper.Patch(namespace, name, api.StrategicMergePatchType, patch)
+	if !dryrun {
+		_, err = p.helper.Patch(namespace, name, api.StrategicMergePatchType, patch)
+	}
+
 	return patch, err
 }
 
-func (p *patcher) patch(current runtime.Object, modified []byte, source, namespace, name string) ([]byte, error) {
+func (p *patcher) patch(current runtime.Object, modified []byte, source, namespace, name string, dryrun bool) ([]byte, error) {
 	var getErr error
-	patchBytes, err := p.patchSimple(current, modified, source, namespace, name)
+	patchBytes, err := p.patchSimple(current, modified, source, namespace, name, dryrun)
 	for i := 1; i <= maxPatchRetry && errors.IsConflict(err); i++ {
 		if i > triesBeforeBackOff {
 			p.backOff.Sleep(backOffPeriod)
@@ -429,7 +439,7 @@ func (p *patcher) patch(current runtime.Object, modified []byte, source, namespa
 		if getErr != nil {
 			return nil, getErr
 		}
-		patchBytes, err = p.patchSimple(current, modified, source, namespace, name)
+		patchBytes, err = p.patchSimple(current, modified, source, namespace, name, dryrun)
 	}
 
 	return patchBytes, err
