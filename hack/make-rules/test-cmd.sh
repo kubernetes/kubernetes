@@ -1075,6 +1075,38 @@ __EOF__
   # cleanup
   kubectl delete pods b
 
+  # same thing without prune for a sanity check
+  # Pre-Condition: no POD exists
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
+
+  # apply a
+  kubectl apply -l prune-group=true -f hack/testdata/prune/a.yaml "${kube_flags[@]}"
+  # check right pod exists
+  kube::test::get_object_assert 'pods a' "{{${id_field}}}" 'a'
+  # check wrong pod doesn't exist
+  output_message=$(! kubectl get pods b 2>&1 "${kube_flags[@]}")
+  kube::test::if_has_string "${output_message}" 'pods "b" not found'
+
+  # apply b
+  kubectl apply -l prune-group=true -f hack/testdata/prune/b.yaml "${kube_flags[@]}"
+  # check both pods exist
+  kube::test::get_object_assert 'pods a' "{{${id_field}}}" 'a'
+  kube::test::get_object_assert 'pods b' "{{${id_field}}}" 'b'
+  # check wrong pod doesn't exist
+
+  # cleanup
+  kubectl delete pod/a pod/b
+
+  ## kubectl apply --prune requires a --all flag to select everything
+  output_message=$(! kubectl apply --prune -f hack/testdata/prune 2>&1 "${kube_flags[@]}")
+  kube::test::if_has_string "${output_message}" \
+    'all resources selected for prune without explicitly passing --all'
+  # should apply everything
+  kubectl apply --all --prune -f hack/testdata/prune
+  kube::test::get_object_assert 'pods a' "{{${id_field}}}" 'a'
+  kube::test::get_object_assert 'pods b' "{{${id_field}}}" 'b'
+  kubectl delete pod/a pod/b
+
   ## kubectl run should create deployments or jobs
   # Pre-Condition: no Job exists
   kube::test::get_object_assert jobs "{{range.items}}{{$id_field}}:{{end}}" ''
