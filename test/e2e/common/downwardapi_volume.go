@@ -127,7 +127,7 @@ var _ = framework.KubeDescribe("Downward API volume", func() {
 		podClient.CreateSync(pod)
 
 		pod, err := podClient.Get(pod.Name)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(HaveOccurred(), "Failed to get pod %q", pod.Name)
 
 		Eventually(func() (string, error) {
 			return framework.GetPodLogs(f.Client, f.Namespace.Name, pod.Name, containerName)

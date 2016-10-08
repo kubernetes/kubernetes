@@ -56,7 +56,7 @@ func testHostIP(podClient *framework.PodClient, pod *api.Pod) {
 	t := time.Now()
 	for {
 		p, err := podClient.Get(pod.Name)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(HaveOccurred(), "Failed to get pod %q", pod.Name)
 		if p.Status.HostIP != "" {
 			framework.Logf("Pod %s has hostIP: %s", p.Name, p.Status.HostIP)
 			break
