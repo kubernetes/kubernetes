@@ -677,7 +677,7 @@ func WaitForPodsRunningReady(c *client.Client, ns string, minPods int32, timeout
 				}
 			} else {
 				if pod.Status.Phase != api.PodFailed {
-					Logf("The status of Pod %s is %s, waiting for it to be either Running or Failed", pod.ObjectMeta.Name, pod.Status.Phase)
+					Logf("The status of Pod %s is %s (Ready = false), waiting for it to be either Running (with Ready = true) or Failed", pod.ObjectMeta.Name, pod.Status.Phase)
 					badPods = append(badPods, pod)
 				} else if !hasReplicationControllersForPod(rcList, pod) {
 					Logf("Pod %s is Failed, but it's not controlled by a ReplicationController", pod.ObjectMeta.Name)
