@@ -14,15 +14,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This script will build the hyperkube image and push it to the repository
-# referred to by KUBE_DOCKER_REGISTRY and KUBE_DOCKER_OWNER. The image will
-# be given a version tag with the value from KUBE_DOCKER_VERSION.
-# e.g. run as: 
-# KUBE_DOCKER_REGISTRY=localhost:5000 KUBE_DOCKER_OWNER=liyi \
-# KUBE_DOCKER_VERSION=1.3.0-dev ./hack/dev-push-hyperkube.sh
-#
-# will build image localhost:5000/liyi/hyperkube-amd64:1.3.0-dev
- 
+# This script builds hyperkube and then the hyperkube image.
+# REGISTRY and VERSION must be set.
+# Example usage:
+#   $ export REGISTRY=gcr.io/someone
+#   $ export VERSION=v1.4.0-testfix
+#   ./hack/dev-push-hyperkube.sh
+# That will build and push gcr.io/someone/hyperkube-amd64:v1.4.0-testfix
+
 set -o errexit
 set -o nounset
 set -o pipefail
@@ -30,25 +29,21 @@ set -o pipefail
 KUBE_ROOT="$(dirname "${BASH_SOURCE}")/.."
 source "${KUBE_ROOT}/build/common.sh"
 
-if [[ -z "${KUBE_DOCKER_REGISTRY:-}" ]]; then
-	echo "KUBE_DOCKER_REGISTRY must be set"
+if [[ -z "${REGISTRY:-}" ]]; then
+	echo "REGISTRY must be set"
 	exit -1
 fi
-if [[ -z "${KUBE_DOCKER_OWNER:-}" ]]; then
-	echo "KUBE_DOCKER_OWNER must be set"
+if [[ -z "${VERSION:-}" ]]; then
+	echo "VERSION must be set"
 	exit -1
 fi
-if [[ -z "${KUBE_DOCKER_VERSION:-}" ]]; then
-	echo "KUBE_DOCKER_VERSION must be set"
-	exit -1
-fi
+
+IMAGE="${REGISTRY}/hyperkube-amd64:${VERSION}"
 
 kube::build::verify_prereqs
 kube::build::build_image
 kube::build::run_build_command make WHAT=cmd/hyperkube
+kube::build::copy_output
 
-REGISTRY="${KUBE_DOCKER_REGISTRY}/${KUBE_DOCKER_OWNER}" \
-VERSION="${KUBE_DOCKER_VERSION}" \
-	make -C "${KUBE_ROOT}/cluster/images/hyperkube" build
-
-docker push "${KUBE_DOCKER_REGISTRY}/${KUBE_DOCKER_OWNER}/hyperkube-amd64:${KUBE_DOCKER_VERSION}"
+make -C "${KUBE_ROOT}/cluster/images/hyperkube" build
+docker push "${IMAGE}"
