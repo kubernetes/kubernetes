@@ -23,7 +23,7 @@ import (
 	"sync"
 )
 
-// HealthzChecker is a named healthz check.
+// HealthzChecker is a named healthz checker.
 type HealthzChecker interface {
 	Name() string
 	Check(req *http.Request) error
@@ -41,7 +41,7 @@ func DefaultHealthz(checks ...HealthzChecker) {
 // PingHealthz returns true automatically when checked
 var PingHealthz HealthzChecker = ping{}
 
-// ping implements the simplest possible health checker.
+// ping implements the simplest possible healthz checker.
 type ping struct{}
 
 func (ping) Name() string {
@@ -53,7 +53,7 @@ func (ping) Check(_ *http.Request) error {
 	return nil
 }
 
-// NamedCheck returns a health checker for the given name and function.
+// NamedCheck returns a healthz checker for the given name and function.
 func NamedCheck(name string, check func(r *http.Request) error) HealthzChecker {
 	return &healthzCheck{name, check}
 }
@@ -125,7 +125,7 @@ func adaptCheckToHandler(c func(r *http.Request) error) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		err := c(r)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("Internal server error: %v", err), http.StatusInternalServerError)
+			http.Error(w, fmt.Sprintf("internal server error: %v", err), http.StatusInternalServerError)
 		} else {
 			fmt.Fprint(w, "ok")
 		}
