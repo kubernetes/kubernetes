@@ -876,15 +876,14 @@ func (m *kubeGenericRuntimeManager) GetPodStatus(uid kubetypes.UID, name, namesp
 			UID:       uid,
 		},
 	})
-	glog.V(4).Infof("getSandboxIDByPodUID got sandbox IDs %q for pod %q(UID:%q)", podSandboxIDs, podFullName, string(uid))
+	glog.V(4).Infof("getSandboxIDByPodUID got sandbox IDs %q for pod %q", podSandboxIDs, podFullName)
 
 	sandboxStatuses := make([]*runtimeApi.PodSandboxStatus, len(podSandboxIDs))
-	containerStatuses := []*kubecontainer.ContainerStatus{}
 	podIP := ""
 	for idx, podSandboxID := range podSandboxIDs {
 		podSandboxStatus, err := m.runtimeService.PodSandboxStatus(podSandboxID)
 		if err != nil {
-			glog.Errorf("PodSandboxStatus for pod (uid:%v, name:%s, namespace:%s) error: %v", uid, name, namespace, err)
+			glog.Errorf("PodSandboxStatus of sandbox %q for pod %q error: %v", podSandboxID, podFullName, err)
 			return nil, err
 		}
 		sandboxStatuses[idx] = podSandboxStatus
@@ -893,13 +892,13 @@ func (m *kubeGenericRuntimeManager) GetPodStatus(uid kubetypes.UID, name, namesp
 		if idx == 0 && podSandboxStatus.GetState() == runtimeApi.PodSandBoxState_READY {
 			podIP = m.determinePodSandboxIP(namespace, name, podSandboxStatus)
 		}
+	}
 
-		statuses, err := m.getKubeletContainerStatuses(podSandboxID)
-		if err != nil {
-			glog.Errorf("getKubeletContainerStatuses for sandbox %s failed: %v", podSandboxID, err)
-			return nil, err
-		}
-		containerStatuses = append(containerStatuses, statuses...)
+	// Get statuses of all containers visible in the pod.
+	containerStatuses, err := m.getPodContainerStatuses(uid, name, namespace)
+	if err != nil {
+		glog.Errorf("getPodContainerStatuses for pod %q failed: %v", podFullName, err)
+		return nil, err
 	}
 
 	return &kubecontainer.PodStatus{

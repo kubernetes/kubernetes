@@ -27,6 +27,20 @@ import (
 	"k8s.io/kubernetes/pkg/types"
 )
 
+// sandboxMinGCAge is the minimum age for an empty sandbox before it is garbage collected.
+// This is introduced to avoid a sandbox being garbage collected before its containers are
+// created.
+// Notice that if the first container of a sandbox is created too late (exceeds sandboxMinGCAge),
+// the sandbox could still be garbaged collected. In that case, SyncPod will recreate the
+// sandbox and make sure old containers are all stopped.
+// In the following figure, 'o' is a stopped sandbox, 'x' is a removed sandbox. It shows
+// that, approximately if a sandbox keeps crashing and MinAge = 1/n GC Period, there will
+// be 1/n more sandboxes not garbage collected.
+//      oooooo|xxxxxx|xxxxxx|  <--- MinAge = 0
+//     gc     gc     gc    gc
+//      oooooo|oooxxx|xxxxxx|  <--- MinAge = 1/2 GC Perod
+const sandboxMinGCAge time.Duration = 30 * time.Second
+
 // containerGC is the manager of garbage collection.
 type containerGC struct {
 	client    internalApi.RuntimeService
@@ -141,7 +155,7 @@ func (cgc *containerGC) evictableContainers(minAge time.Duration) (containersByE
 			continue
 		}
 
-		createdAt := time.Unix(container.GetCreatedAt(), 0)
+		createdAt := time.Unix(0, container.GetCreatedAt())
 		if newestGCTime.Before(createdAt) {
 			continue
 		}
@@ -182,6 +196,7 @@ func (cgc *containerGC) evictableSandboxes() ([]string, error) {
 	}
 
 	evictSandboxes := make([]string, 0)
+	newestGCTime := time.Now().Add(-sandboxMinGCAge)
 	for _, sandbox := range sandboxes {
 		// Prune out ready sandboxes.
 		if sandbox.GetState() == runtimeApi.PodSandBoxState_READY {
@@ -198,6 +213,12 @@ func (cgc *containerGC) evictableSandboxes() ([]string, error) {
 			}
 		}
 		if found {
+			continue
+		}
+
+		// Only garbage collect sandboxes older than sandboxMinGCAge.
+		createdAt := time.Unix(0, sandbox.GetCreatedAt())
+		if createdAt.After(newestGCTime) {
 			continue
 		}
 
