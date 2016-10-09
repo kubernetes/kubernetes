@@ -41,11 +41,13 @@ Documentation for other releases can be found at
   - [Background](#background)
   - [Goals](#goals)
   - [User Experience](#user-experience)
-        - [Federation Control Plane Deployment Experience](#federation-control-plane-deployment-experience)
-        - [Cluster Registration/Deregistration Experience](#cluster-registrationderegistration-experience)
+      - [Federation Control Plane Deployment Experience](#federation-control-plane-deployment-experience)
+      - [Cluster Registration/Deregistration Experience](#cluster-registrationderegistration-experience)
   - [Design](#design)
-        - [Federation Control Plane Deployment](#federation-control-plane-deployment)
-        - [Cluster Registration/Deregistration](#cluster-registrationderegistration)
+      - [Federation Control Plane Bootstrap](#federation-control-plane-bootstrap)
+        - [Caveats](#caveats)
+      - [Cluster Registration/Deregistration](#cluster-registrationderegistration)
+  - [Test Plan](#test-plan)
   - [Timeline](#timeline)
   - [Maturity Level](#maturity-level)
 
@@ -77,6 +79,9 @@ clusters with/from their federation. In order to register a cluster,
 users should supply the cluster's credentials and its API server
 endpoint.
 
+**Side note**: It is a mouthful to always prefix "federation" to each of
+its control plane components. But it is necessary to disambiguate these
+components from the almost identical components in a Kubernetes cluster.
 
 ## Goals
 
@@ -106,7 +111,7 @@ registration and deregistration will be facilitated through
 [`kubectl`](http://kubernetes.io/docs/user-guide/kubectl-overview/).
 
 
-##### Federation Control Plane Deployment Experience
+#### Federation Control Plane Deployment Experience
 
 1. User provisions their cloud/compute resources: a VM or a physical
    machine.
@@ -123,7 +128,7 @@ registration and deregistration will be facilitated through
    on that machine.
 
 
-##### Cluster Registration/Deregistration Experience
+#### Cluster Registration/Deregistration Experience
 
 1. User downloads the
    [`kubectl`](http://kubernetes.io/docs/getting-started-guides/kubeadm/)
@@ -141,12 +146,103 @@ registration and deregistration will be facilitated through
 ## Design
 
 
-##### Federation Control Plane Deployment
+#### Federation Control Plane Bootstrap
+
+`kubeadm init` initializes a Kubernetes control plane. In order to do
+that, it generates the manifests for the various control plane
+components and starts them. It also generates the certificates and the
+credentials required for those components to interact with the API
+server.
+
+Federation control plane deployment builds on top of this functionality.
+Running `kubeadm init federation` first performs all the operations
+involved in bootstrapping a Kubernetes control plane, as running
+`kubeadm init` would. We henceforth call this Kubernetes cluster for
+which the control plane was initialized, the "bootstrap cluster". Upon
+initializing the bootstrap cluster, we perform the following operations
+to bootstrap a federation control plane.
+
+**1. Create a namespace for federation system components**
+
+* Call this namespace `federation-system` to keep it consistent with
+  Kubernetes.
+* The namespace is created in the bootstrap cluster.
+
+**2. Expose a network endpoint for the federation API server**
+
+* Create a "Loadbalancer" type Kubernetes service in the
+  `federation-system` namespace in the bootstrap cluster to expose the
+  yet to be created federation API server.
+* Wait until a load balancer IP address is allocated to the service.
+
+**3. Generate TLS certificates and credentials**
+
+* Using `kubeadm`'s PKI infrastructure, generate TLS certificates for a
+  new CA, yet to be created federation API server and federation
+  controller manager.
+* Generate credentials for the federation API server.
+
+**4. Create a kubeconfig secret**
+
+* Using the load balancer IP address of the federation API server and
+  the generated certificates and credentials, generate a kubeconfig
+  file for the federation controller manager.
+* Create a secret in the bootstrap cluster's `federation-system`
+  namespace and populate it with the contents of the generated
+  kubeconfig file.
+
+**5. Create a persistent volume and a claim to store the federation API server's state**
+
+* Create a peristent volume claim in the `federation-system` namespace.
+* Also request a dynamically provisioned persistent storage device for
+  the PVC.
+
+**6. Create federation API server**
+
+* Create a deployment for the federation API server in the
+  `federation-system` namespace.
+* The pod template spec is composed of two containers: one for `etcd`
+  and the other one for the federation API server.
+* The pod template spec references the PVC created in the previous step
+  as a volume and the `etcd` container mounts that volume to store
+  `etcd`'s data.
+* The federation API server container uses the official `hyperkube`
+  release image.
+* Since the API server is stateless, it needs no persistent storage.
+  However, the certificates and the credentials are made available to
+  the API server by mounting them as volumes inside the API server
+  container.
+
+**7. Create federation controller manager**
+
+* Create a deployment for the federation controller manager in the
+  `federation-system` namespace.
+* The pod template spec consists of a single container for the
+  federation controller manager and it also uses the same official
+  `hyperkube` release image as the federation API server.
+* Kubeconfig required by the federation controller manager to discover
+  and authenticate with the federation API server is referenced as a
+  secret in the pod template spec and mounted as a volume inside the
+  container.
+* The mounted kubeconfig file is passed as an argument to the federation
+  controller manager's `--kubeconfig` flag.
+
+##### Caveats
+
+* In the first phase of this implementation, we only create a single
+  instance of `etcd`. This neither makes `etcd` nor the federation
+  control plane HA. HA federation control plane is on the roadmap and
+  will arrive in one of the future releases.
+* Federation control plane components aren't started until additional
+  nodes join the bootstrap cluster. In other words, these components
+  aren't pinned to the bootstrap cluster's master node. We just create
+  their manifests at this stage and they are started when additional
+  schedulable nodes join the bootstrap cluster.
 
 
+#### Cluster Registration/Deregistration
 
 
-##### Cluster Registration/Deregistration
 
 
 ## Test Plan
