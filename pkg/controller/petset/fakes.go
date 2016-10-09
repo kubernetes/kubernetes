@@ -84,7 +84,7 @@ func newPetSetWithVolumes(replicas int, name string, petMounts []api.VolumeMount
 			Selector: &unversioned.LabelSelector{
 				MatchLabels: map[string]string{"foo": "bar"},
 			},
-			Replicas: replicas,
+			Replicas: int32(replicas),
 			Template: api.PodTemplateSpec{
 				Spec: api.PodSpec{
 					Containers: []api.Container{

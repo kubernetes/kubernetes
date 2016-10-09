@@ -45,7 +45,7 @@ func (o overlappingPetSets) Less(i, j int) bool {
 
 // updatePetCount attempts to update the Status.Replicas of the given PetSet, with a single GET/PUT retry.
 func updatePetCount(psClient appsclientset.PetSetsGetter, ps apps.PetSet, numPets int) (updateErr error) {
-	if ps.Status.Replicas == numPets || psClient == nil {
+	if ps.Status.Replicas == int32(numPets) || psClient == nil {
 		return nil
 	}
 	var getErr error
@@ -53,7 +53,7 @@ func updatePetCount(psClient appsclientset.PetSetsGetter, ps apps.PetSet, numPet
 		glog.V(4).Infof(fmt.Sprintf("Updating replica count for PetSet: %s/%s, ", ps.Namespace, ps.Name) +
 			fmt.Sprintf("replicas %d->%d (need %d), ", ps.Status.Replicas, numPets, ps.Spec.Replicas))
 
-		ps.Status = apps.PetSetStatus{Replicas: numPets}
+		ps.Status = apps.PetSetStatus{Replicas: int32(numPets)}
 		_, updateErr = psClient.PetSets(ps.Namespace).UpdateStatus(ps)
 		if updateErr == nil || i >= statusUpdateRetries {
 			return updateErr
