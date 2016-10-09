@@ -573,7 +573,8 @@ func (p *petSetTester) execInPets(ps *apps.PetSet, cmd string) error {
 
 func (p *petSetTester) saturate(ps *apps.PetSet) {
 	// TODO: Watch events and check that creation timestamps don't overlap
-	for i := 0; i < ps.Spec.Replicas; i++ {
+	var i int32
+	for i = 0; i < ps.Spec.Replicas; i++ {
 		framework.Logf("Waiting for pet at index " + fmt.Sprintf("%v", i+1) + " to enter Running")
 		p.waitForRunning(i+1, ps)
 		framework.Logf("Marking pet at index " + fmt.Sprintf("%v", i) + " healthy")
@@ -593,7 +594,7 @@ func (p *petSetTester) deletePetAtIndex(index int, ps *apps.PetSet) {
 	}
 }
 
-func (p *petSetTester) scale(ps *apps.PetSet, count int) error {
+func (p *petSetTester) scale(ps *apps.PetSet, count int32) error {
 	name := ps.Name
 	ns := ps.Namespace
 	p.update(ns, name, func(ps *apps.PetSet) { ps.Spec.Replicas = count })
@@ -601,7 +602,7 @@ func (p *petSetTester) scale(ps *apps.PetSet, count int) error {
 	var petList *api.PodList
 	pollErr := wait.PollImmediate(petsetPoll, petsetTimeout, func() (bool, error) {
 		petList = p.getPodList(ps)
-		if len(petList.Items) == count {
+		if int32(len(petList.Items)) == count {
 			return true, nil
 		}
 		return false, nil
@@ -665,15 +666,15 @@ func (p *petSetTester) confirmPetCount(count int, ps *apps.PetSet, timeout time.
 	}
 }
 
-func (p *petSetTester) waitForRunning(numPets int, ps *apps.PetSet) {
+func (p *petSetTester) waitForRunning(numPets int32, ps *apps.PetSet) {
 	pollErr := wait.PollImmediate(petsetPoll, petsetTimeout,
 		func() (bool, error) {
 			podList := p.getPodList(ps)
-			if len(podList.Items) < numPets {
+			if int32(len(podList.Items)) < numPets {
 				framework.Logf("Found %d pets, waiting for %d", len(podList.Items), numPets)
 				return false, nil
 			}
-			if len(podList.Items) > numPets {
+			if int32(len(podList.Items)) > numPets {
 				return false, fmt.Errorf("Too many pods scheduled, expected %d got %d", numPets, len(podList.Items))
 			}
 			for _, p := range podList.Items {
@@ -712,7 +713,7 @@ func (p *petSetTester) setHealthy(ps *apps.PetSet) {
 	}
 }
 
-func (p *petSetTester) waitForStatus(ps *apps.PetSet, expectedReplicas int) {
+func (p *petSetTester) waitForStatus(ps *apps.PetSet, expectedReplicas int32) {
 	ns, name := ps.Namespace, ps.Name
 	pollErr := wait.PollImmediate(petsetPoll, petsetTimeout,
 		func() (bool, error) {
@@ -840,7 +841,7 @@ func newPVC(name string) api.PersistentVolumeClaim {
 	}
 }
 
-func newPetSet(name, ns, governingSvcName string, replicas int, petMounts []api.VolumeMount, podMounts []api.VolumeMount, labels map[string]string) *apps.PetSet {
+func newPetSet(name, ns, governingSvcName string, replicas int32, petMounts []api.VolumeMount, podMounts []api.VolumeMount, labels map[string]string) *apps.PetSet {
 	mounts := append(petMounts, podMounts...)
 	claims := []api.PersistentVolumeClaim{}
 	for _, m := range petMounts {

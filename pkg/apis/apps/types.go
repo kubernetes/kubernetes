@@ -49,7 +49,7 @@ type PetSetSpec struct {
 	// same Template, but individual replicas also have a consistent identity.
 	// If unspecified, defaults to 1.
 	// TODO: Consider a rename of this field.
-	Replicas int `json:"replicas,omitempty"`
+	Replicas int32 `json:"replicas,omitempty"`
 
 	// Selector is a label query over pods that should match the replica count.
 	// If empty, defaulted to labels on the pod template.
@@ -85,7 +85,7 @@ type PetSetStatus struct {
 	ObservedGeneration *int64 `json:"observedGeneration,omitempty"`
 
 	// Replicas is the number of actual replicas.
-	Replicas int `json:"replicas"`
+	Replicas int32 `json:"replicas"`
 }
 
 // PetSetList is a collection of PetSets.
