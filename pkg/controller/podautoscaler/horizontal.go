@@ -63,9 +63,6 @@ type HorizontalController struct {
 	controller *cache.Controller
 }
 
-var downscaleForbiddenWindow = 5 * time.Minute
-var upscaleForbiddenWindow = 3 * time.Minute
-
 func newInformer(controller *HorizontalController, resyncPeriod time.Duration) (cache.Store, *cache.Controller) {
 	return cache.NewInformer(
 		&cache.ListWatch{
@@ -360,13 +357,15 @@ func shouldScale(hpa *autoscaling.HorizontalPodAutoscaler, currentReplicas, desi
 
 	// Going down only if the usageRatio dropped significantly below the target
 	// and there was no rescaling in the last downscaleForbiddenWindow.
-	if desiredReplicas < currentReplicas && hpa.Status.LastScaleTime.Add(downscaleForbiddenWindow).Before(timestamp) {
+	downForbiddenWindowDuration := time.Duration(*hpa.Spec.DownscaleForbiddenWindowMinutes) * time.Minute
+	if desiredReplicas < currentReplicas && hpa.Status.LastScaleTime.Add(downForbiddenWindowDuration).Before(timestamp) {
 		return true
 	}
 
 	// Going up only if the usage ratio increased significantly above the target
 	// and there was no rescaling in the last upscaleForbiddenWindow.
-	if desiredReplicas > currentReplicas && hpa.Status.LastScaleTime.Add(upscaleForbiddenWindow).Before(timestamp) {
+	upForbiddenWindowDuration := time.Duration(*hpa.Spec.UpscaleForbiddenWindowMinutes) * time.Minute
+	if desiredReplicas > currentReplicas && hpa.Status.LastScaleTime.Add(upForbiddenWindowDuration).Before(timestamp) {
 		return true
 	}
 	return false

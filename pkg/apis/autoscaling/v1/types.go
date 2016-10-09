@@ -43,6 +43,10 @@ type HorizontalPodAutoscalerSpec struct {
 	// target average CPU utilization (represented as a percentage of requested CPU) over all the pods;
 	// if not specified the default autoscaling policy will be used.
 	TargetCPUUtilizationPercentage *int32 `json:"targetCPUUtilizationPercentage,omitempty" protobuf:"varint,4,opt,name=targetCPUUtilizationPercentage"`
+	// downscale forbidden window minutes, defaults to 5 Minutes
+	DownscaleForbiddenWindowMinutes *int64 `json:"downScaleForbiddenWindowMinutes,omiteempty" protobuf:"varint,5,opt,name=downScaleForbiddenWindowMinutes"`
+	// upscale forbidden window minutes, defaults to 3 Minutes
+	UpscaleForbiddenWindowMinutes *int64 `json:"upScaleForbiddenWindowMinutes,omiteempty" protobuf:"varint,6,opt,name=upScaleForbiddenWindowMinutes"`
 }
 
 // current status of a horizontal pod autoscaler
