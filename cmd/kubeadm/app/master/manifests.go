@@ -296,7 +296,9 @@ func getComponentCommand(component string, s *kubeadmapi.MasterConfiguration) (c
 		}
 		// Let the controller-manager allocate Node CIDRs for the Pod network.
 		// Each node will get a subspace of the address CIDR provided with --pod-network-cidr.
-		command = append(command, "--allocate-node-cidrs=true", "--cluster-cidr="+s.Networking.PodSubnet)
+		if s.Networking.PodSubnet != "" {
+			command = append(command, "--allocate-node-cidrs=true", "--cluster-cidr="+s.Networking.PodSubnet)
+		}
 	}
 
 	return
