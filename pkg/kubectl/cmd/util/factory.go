@@ -707,10 +707,18 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 				if err != nil {
 					return nil, err
 				}
-				return &clientSwaggerSchema{
+				swaggerSchema := &clientSwaggerSchema{
 					c:        restclient,
 					fedc:     fedClient,
 					cacheDir: dir,
+				}
+				return validation.ConjunctiveSchema{
+					Schemas: []validation.Schema{
+						// Validates swagger API spec
+						swaggerSchema,
+						// Validates that there are no double keys in labels and annotations
+						validation.NoDoubleKeySchema{},
+					},
 				}, nil
 			}
 			return validation.NullSchema{}, nil
