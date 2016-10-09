@@ -19,6 +19,7 @@ package dockershim
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	dockertypes "github.com/docker/engine-api/types"
 
@@ -57,6 +58,8 @@ func toRuntimeAPIContainer(c *dockertypes.Container) (*runtimeApi.Container, err
 	}
 	labels, annotations := extractLabels(c.Labels)
 	sandboxID := c.Labels[sandboxIDLabelKey]
+	// The timestamp in dockertypes.Container is in seconds.
+	createdAt := c.Created * int64(time.Second)
 	return &runtimeApi.Container{
 		Id:           &c.ID,
 		PodSandboxId: &sandboxID,
@@ -64,6 +67,7 @@ func toRuntimeAPIContainer(c *dockertypes.Container) (*runtimeApi.Container, err
 		Image:        &runtimeApi.ImageSpec{Image: &c.Image},
 		ImageRef:     &c.ImageID,
 		State:        &state,
+		CreatedAt:    &createdAt,
 		Labels:       labels,
 		Annotations:  annotations,
 	}, nil
@@ -117,11 +121,13 @@ func toRuntimeAPISandbox(c *dockertypes.Container) (*runtimeApi.PodSandbox, erro
 		return nil, err
 	}
 	labels, annotations := extractLabels(c.Labels)
+	// The timestamp in dockertypes.Container is in seconds.
+	createdAt := c.Created * int64(time.Second)
 	return &runtimeApi.PodSandbox{
 		Id:          &c.ID,
 		Metadata:    metadata,
 		State:       &state,
-		CreatedAt:   &c.Created,
+		CreatedAt:   &createdAt,
 		Labels:      labels,
 		Annotations: annotations,
 	}, nil
