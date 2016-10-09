@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -41,10 +41,6 @@ func (o orderedGroupVersionKinds) Less(i, j int) bool {
 }
 
 // TODO: add a reflexive test that verifies that all SetDefaults functions are registered
-
-// TODO: once we remove defaulting from conversion, convert this test to ensuring
-// that all objects that say they have defaulting are verified to mutate the originating
-// object.
 func TestDefaulting(t *testing.T) {
 	// these are the known types with defaulters - you must add to this list if you add a top level defaulter
 	typesWithDefaulting := map[unversioned.GroupVersionKind]struct{}{
@@ -110,16 +106,6 @@ func TestDefaulting(t *testing.T) {
 			s.MatchExpressions = nil // need to fuzz this specially
 		},
 		func(s *apiv1.ListOptions, c fuzz.Continue) {
-			c.FuzzNoCustom(s)
-			s.LabelSelector = "" // need to fuzz requirement strings specially
-			s.FieldSelector = "" // need to fuzz requirement strings specially
-		},
-		// No longer necessary when we remove defaulting from conversion
-		/*func(s *apiv1.Secret, c fuzz.Continue) {
-			c.FuzzNoCustom(s)
-			s.StringData = nil // is mapped into Data, which cannot easily be tested
-		},*/
-		func(s *extensionsv1beta1.ListOptions, c fuzz.Continue) {
 			c.FuzzNoCustom(s)
 			s.LabelSelector = "" // need to fuzz requirement strings specially
 			s.FieldSelector = "" // need to fuzz requirement strings specially

@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
+	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 )
 
 // NewCodecForScheme is a convenience method for callers that are using a scheme.
@@ -124,6 +125,7 @@ func (c *codec) Decode(data []byte, defaultGVK *unversioned.GroupVersionKind, in
 			if isVersioned {
 				copied, err := c.copier.Copy(obj)
 				if err != nil {
+					utilruntime.HandleError(err)
 					copied = obj
 				}
 				versioned.Objects = []runtime.Object{copied}
@@ -151,6 +153,7 @@ func (c *codec) Decode(data []byte, defaultGVK *unversioned.GroupVersionKind, in
 		// create a copy, because ConvertToVersion does not guarantee non-mutation of objects
 		copied, err := c.copier.Copy(obj)
 		if err != nil {
+			utilruntime.HandleError(err)
 			copied = obj
 		}
 		versioned.Objects = []runtime.Object{copied}

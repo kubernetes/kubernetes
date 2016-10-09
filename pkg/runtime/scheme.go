@@ -428,17 +428,16 @@ func (s *Scheme) AddDefaultingFuncs(defaultingFuncs ...interface{}) error {
 
 // AddTypeDefaultingFuncs registers a function that is passed a pointer to an
 // object and can default fields on the object. These functions will be invoked
-// when Default() is called. The newly added functions are invoked before older
-// functions. The function will never be called unless the defaulted object matches
-// srcType.
+// when Default() is called. The function will never be called unless the
+// defaulted object matches srcType. If this function is invoked twice with the
+// same srcType, the fn passed to the later call will be used instead.
 func (s *Scheme) AddTypeDefaultingFunc(srcType Object, fn func(interface{})) {
 	s.defaulterFuncs[reflect.TypeOf(srcType)] = fn
 }
 
 // Default sets defaults on the provided Object.
 func (s *Scheme) Default(src Object) {
-	fn, ok := s.defaulterFuncs[reflect.TypeOf(src)]
-	if ok {
+	if fn, ok := s.defaulterFuncs[reflect.TypeOf(src)]; ok {
 		fn(src)
 	}
 }

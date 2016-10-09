@@ -60,13 +60,7 @@ func main() {
 
 	// Custom args.
 	customArgs := &generators.CustomArgs{
-		ExtraPeerDirs: []string{
-			"k8s.io/kubernetes/pkg/api",
-			"k8s.io/kubernetes/pkg/api/v1",
-			"k8s.io/kubernetes/pkg/api/unversioned",
-			"k8s.io/kubernetes/pkg/conversion",
-			"k8s.io/kubernetes/pkg/runtime",
-		},
+		ExtraPeerDirs: []string{},
 	}
 	pflag.CommandLine.StringSliceVar(&customArgs.ExtraPeerDirs, "extra-peer-dirs", customArgs.ExtraPeerDirs,
 		"Comma-separated list of import paths which are considered, after tag-specified peers, for conversions.")
