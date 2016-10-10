@@ -46,7 +46,7 @@ func createSynthLogger(f *framework.Framework, podName string, linesCount int) {
 			Containers: []api.Container{
 				{
 					Name:  podName,
-					Image: "gcr.io/google_containers/busybox",
+					Image: "gcr.io/google_containers/busybox:latest",
 					// notice: the subshell syntax is escaped with `$$`
 					Command: []string{"/bin/sh", "-c", fmt.Sprintf("i=0; while [ $i -lt %d ]; do echo $i; i=`expr $i + 1`; done", linesCount)},
 				},
