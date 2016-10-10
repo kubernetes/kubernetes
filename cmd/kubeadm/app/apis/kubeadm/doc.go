@@ -14,7 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// +k8s:deepcopy-gen=package,register
-
 // +groupName=kubeadm.k8s.io
 package api // import "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
