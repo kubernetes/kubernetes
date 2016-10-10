@@ -341,6 +341,41 @@ var _ = framework.KubeDescribe("PetSet [Slow] [Feature:PetSet]", func() {
 				previous = event.pod.Name
 			}
 		})
+
+		It("scaling down before scale up is finished will wait until current pod will be running and ready", func() {
+			By("creating petset " + psName + " in namespace " + ns)
+			testProbe := &api.Probe{Handler: api.Handler{HTTPGet: &api.HTTPGetAction{Path: "/index.html", Port: intstr.IntOrString{IntVal: 80}}}}
+			ps := newPetSet(psName, ns, headlessSvcName, 1, nil, nil, labels, testProbe)
+			ps, err := c.Apps().PetSets(ns).Create(ps)
+			pst := &petSetTester{c: c}
+			Expect(err).NotTo(HaveOccurred())
+			pst.waitForRunningAndReady(1, ps)
+
+			By("verifying that scaling down before scale up is finished will wait until current pod will be running and ready")
+			// pet-2 should be the last pet scale up will create before will start scale down
+			lastPet := "pet-2"
+			podTracker = []podEvent{}
+			pst.setHealthy(ps)
+			pst.update(ps.Namespace, ps.Name, func(ps *apps.PetSet) { ps.Spec.Replicas = 3 })
+			pst.waitForRunningAndReady(2, ps)
+			pst.breakProbe(ps, testProbe)
+			pst.waitForRunningAndNotReady(2, ps)
+			pst.setHealthy(ps)
+			pst.update(ps.Namespace, ps.Name, func(ps *apps.PetSet) { ps.Spec.Replicas = 1 })
+			pst.restoreProbe(ps, testProbe)
+			for i := len(podTracker) - 1; i >= 0; i-- {
+				event := podTracker[i]
+				if event.pod.Name != lastPet {
+					continue
+				}
+				isReady := api.IsPodReady(event.pod)
+				if event.pod.Status.Phase != api.PodRunning || !isReady {
+					framework.Failf("%v expected to be running != %v and ready != %v", event.pod.Name, event.pod.Status.Phase, isReady)
+				}
+				break
+			}
+			pst.scale(ps, 1)
+		})
 	})
 
 	framework.KubeDescribe("Deploy clustered applications [Slow] [Feature:PetSet]", func() {
