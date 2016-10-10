@@ -1432,6 +1432,29 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		Dependencies: []string{
 			"certificates.CertificateSigningRequestCondition"},
 	},
+	"componentconfig.ApiServerConfiguration": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "Configuration of the API server. Kept in ApiServerConfigMapName config map under ApiServerConfigMapKey key.",
+				Properties: map[string]spec.Schema{
+					"TypeMeta": {
+						SchemaProps: spec.SchemaProps{
+							Ref: spec.MustCreateRef("#/definitions/unversioned.TypeMeta"),
+						},
+					},
+					"numberOfMasterReplicas": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"integer"},
+							Format: "int32",
+						},
+					},
+				},
+				Required: []string{"TypeMeta", "numberOfMasterReplicas"},
+			},
+		},
+		Dependencies: []string{
+			"unversioned.TypeMeta"},
+	},
 	"componentconfig.IPVar": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -12866,6 +12889,29 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		},
 		Dependencies: []string{
 			"v1.PodAffinityTerm"},
+	},
+	"v1alpha1.ApiServerConfiguration": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "Configuration of the API server. Kept in ApiServerConfigMapName config map under ApiServerConfigMapKey key.",
+				Properties: map[string]spec.Schema{
+					"TypeMeta": {
+						SchemaProps: spec.SchemaProps{
+							Ref: spec.MustCreateRef("#/definitions/unversioned.TypeMeta"),
+						},
+					},
+					"numberOfMasterReplicas": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"integer"},
+							Format: "int32",
+						},
+					},
+				},
+				Required: []string{"TypeMeta", "numberOfMasterReplicas"},
+			},
+		},
+		Dependencies: []string{
+			"unversioned.TypeMeta"},
 	},
 	"v1alpha1.CertificateSigningRequest": {
 		Schema: spec.Schema{

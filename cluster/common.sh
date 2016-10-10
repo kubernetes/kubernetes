@@ -933,3 +933,19 @@ function parse-master-env() {
   KUBELET_CERT_BASE64=$(get-env-val "${master_env}" "KUBELET_CERT")
   KUBELET_KEY_BASE64=$(get-env-val "${master_env}" "KUBELET_KEY")
 }
+
+# Writes the number of master replicas ($1) to the cluster config map.
+function update-cluster-config-map() {
+  local num_replicas="${1}"
+  echo "Updating cluster config map, the new number of replicas: ${num_replicas}"
+  local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
+  "${kubectl}" replace --force -f - <<EOF
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: apiserver-config
+  namespace: kube-system
+data:
+  configuration: '{ "numberOfMasterReplicas": ${num_replicas} }'
+EOF
+}

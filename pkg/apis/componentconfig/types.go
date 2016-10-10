@@ -710,3 +710,15 @@ type PersistentVolumeRecyclerConfiguration struct {
 	// in a multi-node cluster.
 	IncrementTimeoutHostPath int32 `json:"incrementTimeoutHostPath"`
 }
+
+const (
+	ApiServerConfigMapName string = "apiserver-config"
+	ApiServerConfigMapKey  string = "configuration"
+)
+
+// Configuration of the API server. Kept in ApiServerConfigMapName config map under ApiServerConfigMapKey key.
+type ApiServerConfiguration struct {
+	unversioned.TypeMeta
+
+	NumberOfMasterReplicas int32 `json:"numberOfMasterReplicas"`
+}

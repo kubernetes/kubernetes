@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/registry/core/componentstatus"
+	"k8s.io/kubernetes/pkg/registry/core/configmap"
 	configmapetcd "k8s.io/kubernetes/pkg/registry/core/configmap/etcd"
 	controlleretcd "k8s.io/kubernetes/pkg/registry/core/controller/etcd"
 	"k8s.io/kubernetes/pkg/registry/core/endpoint"
@@ -88,6 +89,7 @@ type LegacyRESTStorage struct {
 	NamespaceRegistry         namespace.Registry
 	ServiceRegistry           service.Registry
 	EndpointRegistry          endpoint.Registry
+	ConfigmapRegistry         configmap.Registry
 	ServiceClusterIPAllocator rangeallocation.RangeRegistry
 	ServiceNodePortAllocator  rangeallocation.RangeRegistry
 }
@@ -129,6 +131,7 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 	persistentVolumeStorage, persistentVolumeStatusStorage := pvetcd.NewREST(restOptionsGetter(api.Resource("persistentVolumes")))
 	persistentVolumeClaimStorage, persistentVolumeClaimStatusStorage := pvcetcd.NewREST(restOptionsGetter(api.Resource("persistentVolumeClaims")))
 	configMapStorage := configmapetcd.NewREST(restOptionsGetter(api.Resource("configMaps")))
+	restStorage.ConfigmapRegistry = configmap.NewRegistry(configMapStorage)
 
 	namespaceStorage, namespaceStatusStorage, namespaceFinalizeStorage := namespaceetcd.NewREST(restOptionsGetter(api.Resource("namespaces")))
 	restStorage.NamespaceRegistry = namespace.NewRegistry(namespaceStorage)
@@ -203,7 +206,8 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 		"services/proxy":  serviceRest.Proxy,
 		"services/status": serviceStatusStorage,
 
-		"endpoints": endpointsStorage,
+		"endpoints":  endpointsStorage,
+		"configMaps": configMapStorage,
 
 		"nodes":        nodeStorage.Node,
 		"nodes/status": nodeStorage.Status,
@@ -223,7 +227,6 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 		"persistentVolumes/status":      persistentVolumeStatusStorage,
 		"persistentVolumeClaims":        persistentVolumeClaimStorage,
 		"persistentVolumeClaims/status": persistentVolumeClaimStatusStorage,
-		"configMaps":                    configMapStorage,
 
 		"componentStatuses": componentstatus.NewStorage(c.ComponentStatusServerFunc),
 	}

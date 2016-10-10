@@ -625,6 +625,12 @@ function kube-up() {
       remove-replica-from-etcd 2379 || true
       remove-replica-from-etcd 4002 || true
     fi
+
+    local REMAINING_MASTER_COUNT=$(gcloud compute instances list \
+      --project "${PROJECT}" \
+      --regexp "$(get-replica-name-regexp)" \
+      --format "value(zone)" | wc -l)
+    update-cluster-config-map ${REMAINING_MASTER_COUNT}
   else
     check-existing
     create-network
@@ -1250,6 +1256,8 @@ function kube-down() {
     --project "${PROJECT}" \
     --regexp "$(get-replica-name-regexp)" \
     --format "value(zone)" | wc -l)
+
+  update-cluster-config-map ${REMAINING_MASTER_COUNT}
 
   # In the replicated scenario, if there's only a single master left, we should also delete load balancer in front of it.
   if [[ "${REMAINING_MASTER_COUNT}" == "1" ]]; then

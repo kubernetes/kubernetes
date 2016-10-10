@@ -487,3 +487,15 @@ type KubeletConfiguration struct {
 	// using the new Container Runtine Interface.
 	ExperimentalRuntimeIntegrationType string `json:"experimentalRuntimeIntegrationType,omitempty"`
 }
+
+const (
+	ApiServerConfigMapName string = "apiserver-config"
+	ApiServerConfigMapKey  string = "configuration"
+)
+
+// Configuration of the API server. Kept in ApiServerConfigMapName config map under ApiServerConfigMapKey key.
+type ApiServerConfiguration struct {
+	unversioned.TypeMeta
+
+	NumberOfMasterReplicas int32 `json:"numberOfMasterReplicas"`
+}

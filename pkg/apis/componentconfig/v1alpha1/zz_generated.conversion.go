@@ -36,6 +36,8 @@ func init() {
 // Public to allow building arbitrary schemes.
 func RegisterConversions(scheme *runtime.Scheme) error {
 	return scheme.AddGeneratedConversionFuncs(
+		Convert_v1alpha1_ApiServerConfiguration_To_componentconfig_ApiServerConfiguration,
+		Convert_componentconfig_ApiServerConfiguration_To_v1alpha1_ApiServerConfiguration,
 		Convert_v1alpha1_KubeProxyConfiguration_To_componentconfig_KubeProxyConfiguration,
 		Convert_componentconfig_KubeProxyConfiguration_To_v1alpha1_KubeProxyConfiguration,
 		Convert_v1alpha1_KubeSchedulerConfiguration_To_componentconfig_KubeSchedulerConfiguration,
@@ -45,6 +47,30 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 		Convert_v1alpha1_LeaderElectionConfiguration_To_componentconfig_LeaderElectionConfiguration,
 		Convert_componentconfig_LeaderElectionConfiguration_To_v1alpha1_LeaderElectionConfiguration,
 	)
+}
+
+func autoConvert_v1alpha1_ApiServerConfiguration_To_componentconfig_ApiServerConfiguration(in *ApiServerConfiguration, out *componentconfig.ApiServerConfiguration, s conversion.Scope) error {
+	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	out.NumberOfMasterReplicas = in.NumberOfMasterReplicas
+	return nil
+}
+
+func Convert_v1alpha1_ApiServerConfiguration_To_componentconfig_ApiServerConfiguration(in *ApiServerConfiguration, out *componentconfig.ApiServerConfiguration, s conversion.Scope) error {
+	return autoConvert_v1alpha1_ApiServerConfiguration_To_componentconfig_ApiServerConfiguration(in, out, s)
+}
+
+func autoConvert_componentconfig_ApiServerConfiguration_To_v1alpha1_ApiServerConfiguration(in *componentconfig.ApiServerConfiguration, out *ApiServerConfiguration, s conversion.Scope) error {
+	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	out.NumberOfMasterReplicas = in.NumberOfMasterReplicas
+	return nil
+}
+
+func Convert_componentconfig_ApiServerConfiguration_To_v1alpha1_ApiServerConfiguration(in *componentconfig.ApiServerConfiguration, out *ApiServerConfiguration, s conversion.Scope) error {
+	return autoConvert_componentconfig_ApiServerConfiguration_To_v1alpha1_ApiServerConfiguration(in, out, s)
 }
 
 func autoConvert_v1alpha1_KubeProxyConfiguration_To_componentconfig_KubeProxyConfiguration(in *KubeProxyConfiguration, out *componentconfig.KubeProxyConfiguration, s conversion.Scope) error {

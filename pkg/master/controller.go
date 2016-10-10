@@ -17,6 +17,7 @@ limitations under the License.
 package master
 
 import (
+	"encoding/json"
 	"fmt"
 	"net"
 	"time"
@@ -26,6 +27,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/endpoints"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/rest"
+	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	"k8s.io/kubernetes/pkg/registry/core/configmap"
 	"k8s.io/kubernetes/pkg/registry/core/endpoint"
 	"k8s.io/kubernetes/pkg/registry/core/namespace"
 	"k8s.io/kubernetes/pkg/registry/core/rangeallocation"
@@ -257,18 +260,20 @@ type EndpointReconciler interface {
 // masterCountEndpointReconciler reconciles endpoints based on a specified expected number of
 // masters. masterCountEndpointReconciler implements EndpointReconciler.
 type masterCountEndpointReconciler struct {
-	masterCount      int
-	endpointRegistry endpoint.Registry
+	masterCount       int
+	endpointRegistry  endpoint.Registry
+	configmapRegistry configmap.Registry
 }
 
 var _ EndpointReconciler = &masterCountEndpointReconciler{}
 
 // NewMasterCountEndpointReconciler creates a new EndpointReconciler that reconciles based on a
 // specified expected number of masters.
-func NewMasterCountEndpointReconciler(masterCount int, endpointRegistry endpoint.Registry) *masterCountEndpointReconciler {
+func NewMasterCountEndpointReconciler(masterCount int, endpointRegistry endpoint.Registry, configmapRegistry configmap.Registry) *masterCountEndpointReconciler {
 	return &masterCountEndpointReconciler{
-		masterCount:      masterCount,
-		endpointRegistry: endpointRegistry,
+		masterCount:       masterCount,
+		endpointRegistry:  endpointRegistry,
+		configmapRegistry: configmapRegistry,
 	}
 }
 
@@ -282,11 +287,11 @@ func NewMasterCountEndpointReconciler(masterCount int, endpointRegistry endpoint
 //  * All apiservers MUST use ReconcileEndpoints and only ReconcileEndpoints to manage the
 //      endpoints for their {rw, ro} services.
 //  * All apiservers MUST know and agree on the number of apiservers expected
-//      to be running (c.masterCount).
+//      to be running (masterCount).
 //  * ReconcileEndpoints is called periodically from all apiservers.
 func (r *masterCountEndpointReconciler) ReconcileEndpoints(serviceName string, ip net.IP, endpointPorts []api.EndpointPort, reconcilePorts bool) error {
-	ctx := api.NewDefaultContext()
-	e, err := r.endpointRegistry.GetEndpoints(ctx, serviceName)
+	ctxDefault := api.NewDefaultContext()
+	e, err := r.endpointRegistry.GetEndpoints(ctxDefault, serviceName)
 	if err != nil {
 		e = &api.Endpoints{
 			ObjectMeta: api.ObjectMeta{
@@ -301,12 +306,27 @@ func (r *masterCountEndpointReconciler) ReconcileEndpoints(serviceName string, i
 			Addresses: []api.EndpointAddress{{IP: ip.String()}},
 			Ports:     endpointPorts,
 		}}
-		return r.endpointRegistry.UpdateEndpoints(ctx, e)
+		return r.endpointRegistry.UpdateEndpoints(ctxDefault, e)
+	}
+
+	// Determine master count.
+	masterCount := r.masterCount
+
+	ctxSystem := api.WithNamespace(api.NewContext(), api.NamespaceSystem)
+	m, err := r.configmapRegistry.GetConfigMap(ctxSystem, componentconfig.ApiServerConfigMapName)
+	if err == nil {
+		if str, ok := m.Data[componentconfig.ApiServerConfigMapKey]; ok {
+			var config componentconfig.ApiServerConfiguration
+			err := json.Unmarshal([]byte(str), &config)
+			if err == nil {
+				masterCount = int(config.NumberOfMasterReplicas)
+			}
+		}
 	}
 
 	// First, determine if the endpoint is in the format we expect (one
 	// subset, ports matching endpointPorts, N IP addresses).
-	formatCorrect, ipCorrect, portsCorrect := checkEndpointSubsetFormat(e, ip.String(), endpointPorts, r.masterCount, reconcilePorts)
+	formatCorrect, ipCorrect, portsCorrect := checkEndpointSubsetFormat(e, ip.String(), endpointPorts, masterCount, reconcilePorts)
 	if !formatCorrect {
 		// Something is egregiously wrong, just re-make the endpoints record.
 		e.Subsets = []api.EndpointSubset{{
@@ -314,7 +334,7 @@ func (r *masterCountEndpointReconciler) ReconcileEndpoints(serviceName string, i
 			Ports:     endpointPorts,
 		}}
 		glog.Warningf("Resetting endpoints for master service %q to %#v", serviceName, e)
-		return r.endpointRegistry.UpdateEndpoints(ctx, e)
+		return r.endpointRegistry.UpdateEndpoints(ctxDefault, e)
 	}
 	if ipCorrect && portsCorrect {
 		return nil
@@ -330,11 +350,11 @@ func (r *masterCountEndpointReconciler) ReconcileEndpoints(serviceName string, i
 		// own IP address.  Given the requirements stated at the top of
 		// this function, this should cause the list of IP addresses to
 		// become eventually correct.
-		if addrs := &e.Subsets[0].Addresses; len(*addrs) > r.masterCount {
+		if addrs := &e.Subsets[0].Addresses; len(*addrs) > masterCount {
 			// addrs is a pointer because we're going to mutate it.
 			for i, addr := range *addrs {
 				if addr.IP == ip.String() {
-					for len(*addrs) > r.masterCount {
+					for len(*addrs) > masterCount {
 						// wrap around if necessary.
 						remove := (i + 1) % len(*addrs)
 						*addrs = append((*addrs)[:remove], (*addrs)[remove+1:]...)
@@ -349,7 +369,7 @@ func (r *masterCountEndpointReconciler) ReconcileEndpoints(serviceName string, i
 		e.Subsets[0].Ports = endpointPorts
 	}
 	glog.Warningf("Resetting endpoints for master service %q to %v", serviceName, e)
-	return r.endpointRegistry.UpdateEndpoints(ctx, e)
+	return r.endpointRegistry.UpdateEndpoints(ctxDefault, e)
 }
 
 // Determine if the endpoint is in the format ReconcileEndpoints expects.

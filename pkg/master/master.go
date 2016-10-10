@@ -55,7 +55,6 @@ import (
 	"k8s.io/kubernetes/pkg/healthz"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master/ports"
-
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/routes"
@@ -351,7 +350,7 @@ func (m *Master) NewBootstrapController(endpointReconcilerConfig EndpointReconci
 	if endpointReconcilerConfig.Reconciler == nil {
 		// use a default endpoint	reconciler if nothing is set
 		// m.endpointRegistry is set via m.InstallAPIs -> m.initV1ResourcesStorage
-		endpointReconcilerConfig.Reconciler = NewMasterCountEndpointReconciler(m.MasterCount, m.legacyRESTStorage.EndpointRegistry)
+		endpointReconcilerConfig.Reconciler = NewMasterCountEndpointReconciler(m.MasterCount, m.legacyRESTStorage.EndpointRegistry, m.legacyRESTStorage.ConfigmapRegistry)
 	}
 
 	return &Controller{

@@ -37,6 +37,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&KubeProxyConfiguration{},
 		&KubeSchedulerConfiguration{},
 		&KubeletConfiguration{},
+		&ApiServerConfiguration{},
 	)
 	return nil
 }

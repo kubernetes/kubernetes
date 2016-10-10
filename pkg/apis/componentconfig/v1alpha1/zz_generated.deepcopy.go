@@ -34,11 +34,22 @@ func init() {
 // to allow building arbitrary schemes.
 func RegisterDeepCopies(scheme *runtime.Scheme) error {
 	return scheme.AddGeneratedDeepCopyFuncs(
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_ApiServerConfiguration, InType: reflect.TypeOf(&ApiServerConfiguration{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_KubeProxyConfiguration, InType: reflect.TypeOf(&KubeProxyConfiguration{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_KubeSchedulerConfiguration, InType: reflect.TypeOf(&KubeSchedulerConfiguration{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_KubeletConfiguration, InType: reflect.TypeOf(&KubeletConfiguration{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_LeaderElectionConfiguration, InType: reflect.TypeOf(&LeaderElectionConfiguration{})},
 	)
+}
+
+func DeepCopy_v1alpha1_ApiServerConfiguration(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*ApiServerConfiguration)
+		out := out.(*ApiServerConfiguration)
+		out.TypeMeta = in.TypeMeta
+		out.NumberOfMasterReplicas = in.NumberOfMasterReplicas
+		return nil
+	}
 }
 
 func DeepCopy_v1alpha1_KubeProxyConfiguration(in interface{}, out interface{}, c *conversion.Cloner) error {
