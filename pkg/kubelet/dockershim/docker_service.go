@@ -24,6 +24,7 @@ import (
 	internalApi "k8s.io/kubernetes/pkg/kubelet/api"
 	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/dockershim/cm"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/util/term"
 )
@@ -54,11 +55,12 @@ const (
 var internalLabelKeys []string = []string{containerTypeLabelKey, sandboxIDLabelKey}
 
 // NOTE: Anything passed to DockerService should be eventually handled in another way when we switch to running the shim as a different process.
-func NewDockerService(client dockertools.DockerInterface, seccompProfileRoot string, podSandboxImage string) DockerLegacyService {
+func NewDockerService(client dockertools.DockerInterface, seccompProfileRoot string, podSandboxImage string, dockerCgroupsName string) DockerLegacyService {
 	return &dockerService{
 		seccompProfileRoot: seccompProfileRoot,
 		client:             dockertools.NewInstrumentedDockerInterface(client),
 		podSandboxImage:    podSandboxImage,
+		containerManager:   cm.NewContainerManager(dockerCgroupsName),
 	}
 }
 
@@ -76,12 +78,15 @@ type DockerLegacyService interface {
 
 	// TODO: Remove this once exec is properly defined in CRI.
 	ExecInContainer(containerID kubecontainer.ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size) error
+
+	Start() error
 }
 
 type dockerService struct {
 	seccompProfileRoot string
 	client             dockertools.DockerInterface
 	podSandboxImage    string
+	containerManager   cm.ContainerManager
 }
 
 // Version returns the runtime name, runtime version and runtime API version
@@ -104,5 +109,13 @@ func (ds *dockerService) Version(_ string) (*runtimeApi.VersionResponse, error) 
 }
 
 func (ds *dockerService) UpdateRuntimeConfig(runtimeConfig *runtimeApi.RuntimeConfig) error {
+	return nil
+}
+
+// Start initializes and starts components in dockerService.
+func (ds *dockerService) Start() error {
+	if err := ds.containerManager.Start(); err != nil {
+		return err
+	}
 	return nil
 }
