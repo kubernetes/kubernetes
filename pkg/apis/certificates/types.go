@@ -43,6 +43,10 @@ type CertificateSigningRequestSpec struct {
 	// Base64-encoded PKCS#10 CSR data
 	Request []byte `json:"request"`
 
+	// signingProfile specifies a requested signing profile for a CA to use
+	// when issuing the certificate.
+	// SigningProfile string `json:"signingProfile,omitempty"`
+
 	// Information about the requesting user (if relevant)
 	// See user.Info interface for details
 	Username string   `json:"username,omitempty"`
@@ -83,3 +87,58 @@ type CertificateSigningRequestList struct {
 
 	Items []CertificateSigningRequest `json:"items,omitempty"`
 }
+
+type CertificateSigningProfileList struct {
+	unversioned.TypeMeta `json:",inline"`
+	unversioned.ListMeta `json:"metadata,omitempty"`
+
+	Items []CertificateSigningProfile `json:"itmes,omitempty"`
+}
+
+// CertificateSigningProfile specifies certian certificate attributes
+// that a certificate signing requestor can request of a certificate.
+// The Certificate Authority will take this profile into account when
+// issuing the requested certificate.
+type CertificateSigningProfile struct {
+	unversioned.TypeMeta `json:",inline"`
+	api.ObjectMeta       `json:"metadata,omitempty"`
+
+	// expiry denotes a duration the certificate should be issued for
+	// after which it becomes invalid.
+	Expiry unversioned.Duration
+
+	// allowedUsages specifies a set of usage context the key will be
+	// valid for.
+	// See: https://tools.ietf.org/html/rfc5280#section-4.2.1.3
+	//      https://tools.ietf.org/html/rfc5280#section-4.2.1.12
+	AllowedUsages []KeyUsage
+}
+
+type KeyUsage string
+
+const (
+	UsageSigning            = "signing"
+	UsageDigitalSignature   = "digital signature"
+	UsageContentCommittment = "content committment"
+	UsageKeyEncipherment    = "key encipherment"
+	UsageKeyAgreement       = "key agreement"
+	UsageDataEncipherment   = "data encipherment"
+	UsageCertSign           = "cert sign"
+	UsageCRLSign            = "crl sign"
+	UsageEncipherOnly       = "encipher only"
+	UsageDecipherOnly       = "decipher only"
+	// extended usages
+	UsageAny             KeyUsage = "any"
+	UsageServerAuth               = "server auth"
+	UsageClientAuth               = "client auth"
+	UsageCodeSigning              = "code signing"
+	UsageEmailProtection          = "email protection"
+	UsageSMIME                    = "s/mime"
+	UsageIPsecEndSystem           = "ipsec end system"
+	UsageIPsecTunnel              = "ipsec tunnel"
+	UsageIPsecUser                = "ipsec user"
+	UsageTimestamping             = "timestamping"
+	UsageOCSPSigning              = "ocsp signing"
+	UsageMicrosoftSGC             = "microsoft sgc"
+	UsageNetscapSGC               = "netscape sgc"
+)
