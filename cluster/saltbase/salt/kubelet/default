@@ -142,6 +142,7 @@
 {% endif -%}
 
 {% set network_plugin = "" -%}
+{% set network_plugin_requires_cloud_routes = "" -%}
 {% if pillar.get('network_provider', '').lower() == 'opencontrail' %}
   {% set network_plugin = "--network-plugin=opencontrail" %}
 {% elif pillar.get('network_provider', '').lower() == 'cni' %}
@@ -152,6 +153,10 @@
   {% set network_plugin = "--network-plugin=kubenet" -%}
   {% if reconcile_cidr_args == '' -%}
     {% set reconcile_cidr_args =  "--reconcile-cidr=true" -%}
+  {% endif -%}
+  # kubenet requires cloud routes when running in a cloud provider
+  {% if grains.cloud is defined and grains.cloud not in ['vagrant', 'photon-controller', 'azure-legacy'] -%}
+    {% set network_plugin_requires_cloud_routes = "--network-plugin-requires-cloud-routes=true" -%}
   {% endif -%}
 {% endif -%}
 
@@ -199,4 +204,4 @@
 {% endif -%}
 
 # test_args has to be kept at the end, so they'll overwrite any prior configuration
-DAEMON_ARGS="{{daemon_args}} {{api_servers_with_port}} {{debugging_handlers}} {{hostname_override}} {{cloud_provider}} {{cloud_config}} {{config}} {{manifest_url}} --allow-privileged={{pillar['allow_privileged']}} {{log_level}} {{cluster_dns}} {{cluster_domain}} {{docker_root}} {{kubelet_root}} {{configure_cbr0}} {{non_masquerade_cidr}} {{cgroup_root}} {{system_container}} {{pod_cidr}} {{ master_kubelet_args }} {{cpu_cfs_quota}} {{network_plugin}} {{kubelet_port}} {{ reconcile_cidr_args }} {{ hairpin_mode }} {{enable_custom_metrics}} {{runtime_container}} {{kubelet_container}} {{node_labels}} {{babysit_daemons}} {{eviction_hard}} {{feature_gates}} {{test_args}}"
+DAEMON_ARGS="{{daemon_args}} {{api_servers_with_port}} {{debugging_handlers}} {{hostname_override}} {{cloud_provider}} {{cloud_config}} {{config}} {{manifest_url}} --allow-privileged={{pillar['allow_privileged']}} {{log_level}} {{cluster_dns}} {{cluster_domain}} {{docker_root}} {{kubelet_root}} {{configure_cbr0}} {{non_masquerade_cidr}} {{cgroup_root}} {{system_container}} {{pod_cidr}} {{ master_kubelet_args }} {{cpu_cfs_quota}} {{network_plugin}} {{network_plugin_requires_cloud_routes}} {{kubelet_port}} {{ reconcile_cidr_args }} {{ hairpin_mode }} {{enable_custom_metrics}} {{runtime_container}} {{kubelet_container}} {{node_labels}} {{babysit_daemons}} {{eviction_hard}} {{feature_gates}} {{test_args}}"
