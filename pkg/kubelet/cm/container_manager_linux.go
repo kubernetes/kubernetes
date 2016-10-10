@@ -327,7 +327,27 @@ func (cm *containerManagerImpl) setupNode() error {
 	systemContainers := []*systemContainer{}
 	if cm.ContainerRuntime == "docker" {
 		dockerVersion := getDockerVersion(cm.cadvisorInterface)
-		if cm.RuntimeCgroupsName != "" {
+		if cm.RuntimeIntegrationType == "cri" {
+			// If kubelet uses CRI, dockershim will manage the cgroups and oom
+			// score for the docker processes.
+			// In the future, NodeSpec should mandate the cgroup that the
+			// runtime processes need to be in. For now, we still check the
+			// cgroup for docker periodically, so that kubelet can recognize
+			// the cgroup for docker and serve stats for the runtime.
+			// TODO(#27097): Fix this after NodeSpec is clearly defined.
+			cm.periodicTasks = append(cm.periodicTasks, func() {
+				glog.V(4).Infof("[ContainerManager]: Adding periodic tasks for docker CRI integration")
+				cont, err := getContainerNameForProcess(dockerProcessName, dockerPidFile)
+				if err != nil {
+					glog.Error(err)
+					return
+				}
+				glog.V(2).Infof("[ContainerManager]: Discovered runtime cgroups name: %s", cont)
+				cm.Lock()
+				defer cm.Unlock()
+				cm.RuntimeCgroupsName = cont
+			})
+		} else if cm.RuntimeCgroupsName != "" {
 			cont := newSystemCgroups(cm.RuntimeCgroupsName)
 			var capacity = api.ResourceList{}
 			if info, err := cm.cadvisorInterface.MachineInfo(); err == nil {
@@ -353,13 +373,13 @@ func (cm *containerManagerImpl) setupNode() error {
 				},
 			}
 			cont.ensureStateFunc = func(manager *fs.Manager) error {
-				return ensureDockerInContainer(dockerVersion, qos.DockerOOMScoreAdj, dockerContainer)
+				return EnsureDockerInContainer(dockerVersion, qos.DockerOOMScoreAdj, dockerContainer)
 			}
 			systemContainers = append(systemContainers, cont)
 		} else {
 			cm.periodicTasks = append(cm.periodicTasks, func() {
 				glog.V(10).Infof("Adding docker daemon periodic tasks")
-				if err := ensureDockerInContainer(dockerVersion, qos.DockerOOMScoreAdj, nil); err != nil {
+				if err := EnsureDockerInContainer(dockerVersion, qos.DockerOOMScoreAdj, nil); err != nil {
 					glog.Error(err)
 					return
 				}
@@ -572,7 +592,10 @@ func getPidsForProcess(name, pidFile string) ([]int, error) {
 }
 
 // Ensures that the Docker daemon is in the desired container.
-func ensureDockerInContainer(dockerVersion semver.Version, oomScoreAdj int, manager *fs.Manager) error {
+// Temporarily export the function to be used by dockershim.
+// TODO(yujuhong): Move this function to dockershim once kubelet migrates to
+// dockershim as the default.
+func EnsureDockerInContainer(dockerVersion semver.Version, oomScoreAdj int, manager *fs.Manager) error {
 	type process struct{ name, file string }
 	dockerProcs := []process{{dockerProcessName, dockerPidFile}}
 	if dockerVersion.GTE(containerdVersion) {
