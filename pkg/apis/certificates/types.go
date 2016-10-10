@@ -46,6 +46,12 @@ type CertificateSigningRequestSpec struct {
 	// Base64-encoded PKCS#10 CSR data
 	Request []byte `json:"request"`
 
+	// allowedUsages specifies a set of usage context the key will be
+	// valid for.
+	// See: https://tools.ietf.org/html/rfc5280#section-4.2.1.3
+	//      https://tools.ietf.org/html/rfc5280#section-4.2.1.12
+	AllowedUsages []KeyUsage
+
 	// Information about the requesting user (if relevant)
 	// See user.Info interface for details
 	// +optional
@@ -96,3 +102,34 @@ type CertificateSigningRequestList struct {
 	// +optional
 	Items []CertificateSigningRequest `json:"items,omitempty"`
 }
+
+// KeyUsages specifies valid usage contexts for keys.
+// See: https://tools.ietf.org/html/rfc5280#section-4.2.1.3
+//      https://tools.ietf.org/html/rfc5280#section-4.2.1.12
+type KeyUsage string
+
+const (
+	UsageSigning            KeyUsage = "signing"
+	UsageDigitalSignature            = "digital signature"
+	UsageContentCommittment          = "content committment"
+	UsageKeyEncipherment             = "key encipherment"
+	UsageKeyAgreement                = "key agreement"
+	UsageDataEncipherment            = "data encipherment"
+	UsageCertSign                    = "cert sign"
+	UsageCRLSign                     = "crl sign"
+	UsageEncipherOnly                = "encipher only"
+	UsageDecipherOnly                = "decipher only"
+	UsageAny                         = "any"
+	UsageServerAuth                  = "server auth"
+	UsageClientAuth                  = "client auth"
+	UsageCodeSigning                 = "code signing"
+	UsageEmailProtection             = "email protection"
+	UsageSMIME                       = "s/mime"
+	UsageIPsecEndSystem              = "ipsec end system"
+	UsageIPsecTunnel                 = "ipsec tunnel"
+	UsageIPsecUser                   = "ipsec user"
+	UsageTimestamping                = "timestamping"
+	UsageOCSPSigning                 = "ocsp signing"
+	UsageMicrosoftSGC                = "microsoft sgc"
+	UsageNetscapSGC                  = "netscape sgc"
+)
