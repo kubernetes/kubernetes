@@ -55,6 +55,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/limitwriter"
 	"k8s.io/kubernetes/pkg/util/term"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/apis/componentconfig"
 )
 
 const (
@@ -62,6 +63,7 @@ const (
 	specPath    = "/spec/"
 	statsPath   = "/stats/"
 	logsPath    = "/logs/"
+	configsPath = "/configs"
 )
 
 // Server is a http.Handler which exposes kubelet functionality over HTTP.
@@ -160,6 +162,7 @@ type HostInterface interface {
 	GetRawContainerInfo(containerName string, req *cadvisorapi.ContainerInfoRequest, subcontainers bool) (map[string]*cadvisorapi.ContainerInfo, error)
 	GetCachedMachineInfo() (*cadvisorapi.MachineInfo, error)
 	GetPods() []*api.Pod
+	GetComponentConfigs() componentconfig.KubeletConfiguration
 	GetRunningPods() ([]*api.Pod, error)
 	GetPodByName(namespace, name string) (*api.Pod, bool)
 	RunInContainer(name string, uid types.UID, container string, cmd []string) ([]byte, error)
@@ -271,6 +274,15 @@ func (s *Server) InstallDefaultHandlers() {
 		To(s.getSpec).
 		Operation("getSpec").
 		Writes(cadvisorapi.MachineInfo{}))
+	s.restfulCont.Add(ws)
+
+	ws = new(restful.WebService)
+	ws.
+		Path(configsPath).
+		Produces(restful.MIME_JSON)
+	ws.Route(ws.GET("").
+		To(s.getComponentConfigs).
+		Operation("getComponentConfigs"))
 	s.restfulCont.Add(ws)
 }
 
@@ -563,6 +575,10 @@ func (s *Server) getSpec(request *restful.Request, response *restful.Response) {
 		return
 	}
 	response.WriteEntity(info)
+}
+
+func (s *Server) getComponentConfigs(request *restful.Request, response *restful.Response) {
+	response.WriteEntity(s.host.GetComponentConfigs())
 }
 
 func getContainerCoordinates(request *restful.Request) (namespace, pod string, uid types.UID, container string) {
