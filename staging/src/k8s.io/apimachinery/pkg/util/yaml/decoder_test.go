@@ -106,8 +106,8 @@ func TestDecodeYAML(t *testing.T) {
 	s := NewYAMLToJSONDecoder(bytes.NewReader([]byte(`---
 stuff: 1
 
----   
-  `)))
+---
+  `)), nil, false)
 	obj := generic{}
 	if err := s.Decode(&obj); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -123,6 +123,30 @@ stuff: 1
 		t.Fatalf("unexpected object: %#v", obj)
 	}
 	obj = generic{}
+	if err := s.Decode(&obj); err != io.EOF {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestDecodeStdinYAML(t *testing.T) {
+	byteStream := []byte(`---
+stuff: 1
+
+---
+  `)
+	s := NewYAMLToJSONDecoder(nil, byteStream, true)
+	obj := generic{}
+	if err := s.Decode(&obj); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fmt.Sprintf("%#v", obj) != `yaml.generic{"stuff":1}` {
+		t.Errorf("unexpected object: %#v", obj)
+	}
+
+	obj = generic{}
+	if len(obj) != 0 {
+		t.Fatalf("unexpected object: %#v", obj)
+	}
 	if err := s.Decode(&obj); err != io.EOF {
 		t.Fatalf("unexpected error: %v", err)
 	}
