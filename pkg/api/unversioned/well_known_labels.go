@@ -27,4 +27,12 @@ const (
 
 	LabelOS   = "beta.kubernetes.io/os"
 	LabelArch = "beta.kubernetes.io/arch"
+
+	// TaintNodeNotReady would be automatically added by node controller when node is not ready.
+	// and removed when node becomes ready.
+	TaintNodeNotReady = "node.alpha.kubernetes.io/notready"
+
+	// TaintNodeUnreachable would be automatically added by node controller when node becomes unknown
+	// and removed when node becomes ready.
+	TaintNodeUnreachable = "node.alpha.kubernetes.io/unreachable"
 )

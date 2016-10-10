@@ -6656,6 +6656,9 @@ func autoConvert_v1_Taint_To_api_Taint(in *Taint, out *api.Taint, s conversion.S
 	out.Key = in.Key
 	out.Value = in.Value
 	out.Effect = api.TaintEffect(in.Effect)
+	if err := api.Convert_unversioned_Time_To_unversioned_Time(&in.AddedTime, &out.AddedTime, s); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -6667,6 +6670,9 @@ func autoConvert_api_Taint_To_v1_Taint(in *api.Taint, out *Taint, s conversion.S
 	out.Key = in.Key
 	out.Value = in.Value
 	out.Effect = TaintEffect(in.Effect)
+	if err := api.Convert_unversioned_Time_To_unversioned_Time(&in.AddedTime, &out.AddedTime, s); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -6679,6 +6685,7 @@ func autoConvert_v1_Toleration_To_api_Toleration(in *Toleration, out *api.Tolera
 	out.Operator = api.TolerationOperator(in.Operator)
 	out.Value = in.Value
 	out.Effect = api.TaintEffect(in.Effect)
+	out.ForgivenessSeconds = in.ForgivenessSeconds
 	return nil
 }
 
@@ -6691,6 +6698,7 @@ func autoConvert_api_Toleration_To_v1_Toleration(in *api.Toleration, out *Tolera
 	out.Operator = TolerationOperator(in.Operator)
 	out.Value = in.Value
 	out.Effect = TaintEffect(in.Effect)
+	out.ForgivenessSeconds = in.ForgivenessSeconds
 	return nil
 }
 

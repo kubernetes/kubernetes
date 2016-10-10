@@ -2957,8 +2957,17 @@ message Taint {
 
   // Required. The effect of the taint on pods
   // that do not tolerate the taint.
-  // Valid effects are NoSchedule and PreferNoSchedule.
+  // Valid effects are NoSchedule, PreferNoSchedule, and NoExecute.
   optional string effect = 3;
+
+  // AddedTime represents the time at which the taint was added.
+  // Taint's effect must be NoExecute, otherwise this field is ignored.
+  // Toleration with forgivenessSeconds will tolerate the taint for
+  // only a duration (indicated with toleration.forgivenessSeconds)
+  // that starts at addedTime. By default, it is not set, which means
+  // the taint can only be tolerated by toleration that tolerates
+  // infinite duration.
+  optional k8s.io.kubernetes.pkg.api.unversioned.Time addedTime = 4;
 }
 
 // The pod this Toleration is attached to tolerates any taint that matches
@@ -2978,8 +2987,14 @@ message Toleration {
   optional string value = 3;
 
   // Effect indicates the taint effect to match. Empty means match all taint effects.
-  // When specified, allowed values are NoSchedule and PreferNoSchedule.
+  // When specified, allowed values are NoSchedule, PreferNoSchedule, and NoExecute.
   optional string effect = 4;
+
+  // ForgivenessSeconds represents the period of time the toleration (which must be
+  // of effect NoExecute, otherwise this field is ignored) tolerates the taint. By default,
+  // it is not set, which means tolerate the taint forever (do not evict). Zero and
+  // negative values are not allowed.
+  optional int64 forgivenessSeconds = 5;
 }
 
 // Volume represents a named volume in a pod that may be accessed by any container in the pod.
