@@ -238,9 +238,6 @@ kube::golang::set_platform_envs() {
     elif [[ ${platform} == "linux/ppc64le" ]]; then
       export CGO_ENABLED=1
       export CC=powerpc64le-linux-gnu-gcc
-    elif [[ ${platform} == "darwin/"* ]]; then
-      # See https://github.com/kubernetes/kubernetes/issues/32999
-      export GOROOT=${K8S_PATCHED_GOROOT}
     fi
   fi
 }
