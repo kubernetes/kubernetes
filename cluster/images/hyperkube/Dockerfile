@@ -39,17 +39,11 @@ RUN cp /usr/bin/nsenter /nsenter
 # Copy the hyperkube binary
 COPY hyperkube /hyperkube
 
-# Manifests for the docker guide
-COPY static-pods/master.json \
-     static-pods/etcd.json \
-     static-pods/addon-manager-singlenode.json \
-     static-pods/kube-proxy.json \
-        /etc/kubernetes/manifests/
+# Manifests for singlenode
+COPY static-pods/singlenode /etc/kubernetes/manifests/
 
-# Manifests for the docker-multinode guide
-COPY static-pods/master-multi.json \
-     static-pods/addon-manager-multinode.json \
-        /etc/kubernetes/manifests-multi/
+# Manifests for the multinode
+COPY static-pods/multinode /etc/kubernetes/manifests-multi/
 
 # Copy over all addons
 COPY addons /etc/kubernetes/addons
