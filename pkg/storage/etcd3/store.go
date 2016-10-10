@@ -328,7 +328,13 @@ func (s *store) watch(ctx context.Context, key string, rv string, pred storage.S
 		return nil, err
 	}
 	key = keyWithPrefix(s.pathPrefix, key)
-	return s.watcher.Watch(ctx, key, int64(rev), recursive, storage.SimpleFilter(pred))
+	var filter storage.FilterFunc
+	if pred.Label.Empty() && pred.Field.Empty() {
+		filter = storage.EverythingFunc
+	} else {
+		filter = storage.SimpleFilter(pred)
+	}
+	return s.watcher.Watch(ctx, key, int64(rev), recursive, filter)
 }
 
 func (s *store) getState(getResp *clientv3.GetResponse, key string, v reflect.Value, ignoreNotFound bool) (*objState, error) {
