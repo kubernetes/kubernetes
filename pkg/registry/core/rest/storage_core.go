@@ -96,11 +96,10 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 	apiGroupInfo := genericapiserver.APIGroupInfo{
 		GroupMeta:                    *registered.GroupOrDie(api.GroupName),
 		VersionedResourcesStorageMap: map[string]map[string]rest.Storage{},
-		IsLegacyGroup:                true,
-		Scheme:                       api.Scheme,
-		ParameterCodec:               api.ParameterCodec,
-		NegotiatedSerializer:         api.Codecs,
-		SubresourceGroupVersionKind:  map[string]unversioned.GroupVersionKind{},
+		Scheme:                      api.Scheme,
+		ParameterCodec:              api.ParameterCodec,
+		NegotiatedSerializer:        api.Codecs,
+		SubresourceGroupVersionKind: map[string]unversioned.GroupVersionKind{},
 	}
 	if autoscalingGroupVersion := (unversioned.GroupVersion{Group: "autoscaling", Version: "v1"}); registered.IsEnabledVersion(autoscalingGroupVersion) {
 		apiGroupInfo.SubresourceGroupVersionKind["replicationcontrollers/scale"] = autoscalingGroupVersion.WithKind("Scale")
