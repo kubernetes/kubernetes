@@ -196,7 +196,7 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 	isWatch, isWatchOnly := cmdutil.GetFlagBool(cmd, "watch"), cmdutil.GetFlagBool(cmd, "watch-only")
 	if isWatch || isWatchOnly {
 		r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
-			NamespaceParam(cmdNamespace).DefaultNamespace().AllNamespaces(allNamespaces).
+			NamespaceParam(cmdNamespace).DefaultNamespace().AllNamespaces(allNamespaces).AllowNamespacePrefix().
 			FilenameParam(enforceNamespace, &options.FilenameOptions).
 			SelectorParam(selector).
 			ExportParam(export).
@@ -281,7 +281,7 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 	}
 
 	r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
-		NamespaceParam(cmdNamespace).DefaultNamespace().AllNamespaces(allNamespaces).
+		NamespaceParam(cmdNamespace).DefaultNamespace().AllNamespaces(allNamespaces).AllowNamespacePrefix().
 		FilenameParam(enforceNamespace, &options.FilenameOptions).
 		SelectorParam(selector).
 		ExportParam(export).
