@@ -418,7 +418,7 @@ func (t *thirdPartyResourceDataDecoder) Decode(data []byte, gvk *unversioned.Gro
 			return nil, nil, fmt.Errorf("unexpected object for 'kind': %v", kindObj)
 		}
 		if len(t.kind) > 0 && kindStr != t.kind {
-			return nil, nil, fmt.Errorf("kind doesn't match, expecting: %s, got %s", gvk.Kind, kindStr)
+			return nil, nil, fmt.Errorf("kind doesn't match, expecting: %s, got %s", t.kind, kindStr)
 		}
 		actual.Kind = kindStr
 	}
