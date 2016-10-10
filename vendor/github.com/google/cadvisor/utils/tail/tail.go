@@ -88,7 +88,7 @@ func (t *Tail) attemptOpen() error {
 		t.file, err = os.Open(t.filename)
 		if err == nil {
 			// TODO: not interested in old events?
-			//t.file.Seek(0, os.SEEK_END)
+			// t.file.Seek(0, os.SEEK_END)
 			t.reader = bufio.NewReader(t.file)
 			return nil
 		}
