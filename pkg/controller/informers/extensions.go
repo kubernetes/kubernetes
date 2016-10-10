@@ -18,6 +18,7 @@ package informers
 
 import (
 	"reflect"
+	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -98,7 +99,9 @@ func (f *deploymentInformer) Informer() cache.SharedIndexInformer {
 			},
 		},
 		&extensions.Deployment{},
-		f.defaultResync,
+		// TODO remove this.  It is hardcoded so that "Waiting for the second deployment to clear overlapping annotation" in
+		// "overlapping deployment should not fight with each other" will work since it requires a full resync to work properly.
+		30*time.Second,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)
 	f.informers[informerType] = informer
