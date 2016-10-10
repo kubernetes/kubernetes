@@ -328,7 +328,7 @@ func (s *store) watch(ctx context.Context, key string, rv string, pred storage.S
 		return nil, err
 	}
 	key = keyWithPrefix(s.pathPrefix, key)
-	return s.watcher.Watch(ctx, key, int64(rev), recursive, storage.SimpleFilter(pred))
+	return s.watcher.Watch(ctx, key, int64(rev), recursive, pred)
 }
 
 func (s *store) getState(getResp *clientv3.GetResponse, key string, v reflect.Value, ignoreNotFound bool) (*objState, error) {
