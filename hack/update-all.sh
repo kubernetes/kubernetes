@@ -58,7 +58,8 @@ BASH_TARGETS="
 	generated-swagger-docs
 	swagger-spec
 	openapi-spec
-	api-reference-docs"
+	api-reference-docs
+	staging-client-go"
 
 
 for t in $BASH_TARGETS
