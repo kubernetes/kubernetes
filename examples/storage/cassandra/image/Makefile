@@ -27,6 +27,6 @@ build: kubernetes-cassandra.jar
 	docker build -t gcr.io/google_samples/cassandra:${VERSION} .
 
 push: build
-	gcloud docker push gcr.io/google_samples/cassandra:${VERSION}
+	gcloud docker -- push gcr.io/google_samples/cassandra:${VERSION}
 
 .PHONY: all build push

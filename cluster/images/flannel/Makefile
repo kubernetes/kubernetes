@@ -60,7 +60,7 @@ else
 endif
 
 push: build
-	gcloud docker push $(REGISTRY)/flannel-$(ARCH):$(TAG)
+	gcloud docker -- push $(REGISTRY)/flannel-$(ARCH):$(TAG)
 
 all: build
 .PHONY: build push

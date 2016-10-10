@@ -27,7 +27,7 @@ image: netexec
 	docker build -t $(PREFIX)/netexec:$(TAG) .
 
 push: image
-	gcloud docker push $(PREFIX)/netexec:$(TAG)
+	gcloud docker -- push $(PREFIX)/netexec:$(TAG)
 
 clean:
 	rm -f netexec

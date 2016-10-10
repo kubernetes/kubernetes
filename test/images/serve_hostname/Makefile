@@ -28,9 +28,9 @@ container: serve_hostname
 	fi
 
 push:
-	gcloud docker push $(PREFIX)/serve_hostname:$(TAG)
+	gcloud docker -- push $(PREFIX)/serve_hostname:$(TAG)
 	if [ -n "$(TEST_PREFIX)" ]; then \
-	    gcloud docker push $(TEST_PREFIX)/serve_hostname:$(TAG); \
+	    gcloud docker -- push $(TEST_PREFIX)/serve_hostname:$(TAG); \
 	fi
 
 clean:
