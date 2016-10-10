@@ -75,7 +75,7 @@ func TestAnalyze(t *testing.T) {
 		{ClusterName: "c2", Object: podOtherRS},
 	}
 
-	raport, err := AnalysePods(replicaSet, federatedObjects, now)
+	raport, err := AnalysePods(replicaSet.Spec.Selector, federatedObjects, now)
 	assert.NoError(t, err)
 	assert.Equal(t, 2, len(raport))
 	c1Raport := raport["c1"]
