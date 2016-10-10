@@ -42,12 +42,19 @@ Documentation for other releases can be found at
   - [Goals](#goals)
   - [User Experience](#user-experience)
       - [Federation Control Plane Deployment Experience](#federation-control-plane-deployment-experience)
-      - [Cluster Registration/Deregistration Experience](#cluster-registrationderegistration-experience)
+      - [Cluster Registration Experience](#cluster-registration-experience)
+      - [Cluster Deregistration Experience](#cluster-deregistration-experience)
+    - [Points for Discussion:](#points-for-discussion)
   - [Design](#design)
       - [Federation Control Plane Bootstrap](#federation-control-plane-bootstrap)
+        - [Additional enhancements](#additional-enhancements)
         - [Caveats](#caveats)
       - [Cluster Registration/Deregistration](#cluster-registrationderegistration)
+        - [Registration](#registration)
+        - [Deregistration](#deregistration)
   - [Test Plan](#test-plan)
+      - [Federation Control Plane Bootstrap](#federation-control-plane-bootstrap-1)
+      - [Cluster Registration/Deregistration](#cluster-registrationderegistration-1)
   - [Timeline](#timeline)
   - [Maturity Level](#maturity-level)
 
@@ -175,6 +182,7 @@ involved in bootstrapping a Kubernetes control plane, as running
 which the control plane was initialized, the "bootstrap cluster". Upon
 initializing the bootstrap cluster, we perform the following operations
 to bootstrap a federation control plane.
+
 
 **1. Create a namespace for federation system components**
 
