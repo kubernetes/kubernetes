@@ -228,14 +228,7 @@ func (frsc *ReplicaSetController) Run(workers int, stopCh <-chan struct{}) {
 		go wait.Until(frsc.worker, time.Second, stopCh)
 	}
 
-	go func() {
-		select {
-		case <-time.After(time.Minute):
-			frsc.replicaSetBackoff.GC()
-		case <-stopCh:
-			return
-		}
-	}()
+	fedutil.StartBackoffGC(frsc.replicaSetBackoff, stopCh)
 
 	<-stopCh
 	glog.Infof("Shutting down ReplicaSetController")
