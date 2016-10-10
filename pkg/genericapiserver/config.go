@@ -56,6 +56,11 @@ import (
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
+const (
+	// LegacyAPIPrefix is where the the legacy APIs will be located
+	LegacyAPIPrefix = "/api"
+)
+
 // Config is a structure used to configure a GenericAPIServer.
 type Config struct {
 	// Destination for audit logs
@@ -73,7 +78,6 @@ type Config struct {
 	EnableProfiling         bool
 	EnableVersion           bool
 	EnableGarbageCollection bool
-	APIPrefix               string
 	APIGroupPrefix          string
 	CorsAllowedOriginList   []string
 	Authenticator           authenticator.Request
@@ -175,6 +179,10 @@ type Config struct {
 
 	// Build the handler chains by decorating the apiHandler.
 	BuildHandlerChainsFunc func(apiHandler http.Handler, c *Config) (secure, insecure http.Handler)
+
+	// LegacyAPIGroupPrefixes is used to set up URL parsing for authorization and for validating requests
+	// to InstallLegacyAPIGroup
+	LegacyAPIGroupPrefixes sets.String
 }
 
 type ServingInfo struct {
@@ -234,7 +242,6 @@ func NewConfig(options *options.ServerRunOptions) *Config {
 
 	return &Config{
 		APIGroupPrefix:            options.APIGroupPrefix,
-		APIPrefix:                 options.APIPrefix,
 		CorsAllowedOriginList:     options.CorsAllowedOriginList,
 		AuditWriter:               auditWriter,
 		EnableGarbageCollection:   options.EnableGarbageCollection,
@@ -262,8 +269,9 @@ func NewConfig(options *options.ServerRunOptions) *Config {
 				Version: "unversioned",
 			},
 		},
-		MaxRequestsInFlight: options.MaxRequestsInFlight,
-		LongRunningFunc:     genericfilters.BasicLongRunningRequestCheck(longRunningRE, map[string]string{"watch": "true"}),
+		MaxRequestsInFlight:    options.MaxRequestsInFlight,
+		LongRunningFunc:        genericfilters.BasicLongRunningRequestCheck(longRunningRE, map[string]string{"watch": "true"}),
+		LegacyAPIGroupPrefixes: sets.NewString(LegacyAPIPrefix),
 	}
 }
 
@@ -364,13 +372,13 @@ func (c completedConfig) New() (*GenericAPIServer, error) {
 	}
 
 	s := &GenericAPIServer{
-		ServiceClusterIPRange: c.ServiceClusterIPRange,
-		LoopbackClientConfig:  c.LoopbackClientConfig,
-		legacyAPIPrefix:       c.APIPrefix,
-		apiPrefix:             c.APIGroupPrefix,
-		admissionControl:      c.AdmissionControl,
-		requestContextMapper:  c.RequestContextMapper,
-		Serializer:            c.Serializer,
+		ServiceClusterIPRange:  c.ServiceClusterIPRange,
+		LoopbackClientConfig:   c.LoopbackClientConfig,
+		apiPrefix:              c.APIGroupPrefix,
+		legacyAPIGroupPrefixes: c.LegacyAPIGroupPrefixes,
+		admissionControl:       c.AdmissionControl,
+		requestContextMapper:   c.RequestContextMapper,
+		Serializer:             c.Serializer,
 
 		minRequestTimeout:    time.Duration(c.MinRequestTimeout) * time.Second,
 		enableSwaggerSupport: c.EnableSwaggerSupport,
@@ -501,8 +509,15 @@ func DefaultAndValidateRunOptions(options *options.ServerRunOptions) {
 }
 
 func NewRequestInfoResolver(c *Config) *request.RequestInfoFactory {
+	apiPrefixes := sets.NewString(strings.Trim(c.APIGroupPrefix, "/")) // all possible API prefixes
+	legacyAPIPrefixes := sets.String{}                                 // APIPrefixes that won't have groups (legacy)
+	for legacyAPIPrefix := range c.LegacyAPIGroupPrefixes {
+		apiPrefixes.Insert(strings.Trim(legacyAPIPrefix, "/"))
+		legacyAPIPrefixes.Insert(strings.Trim(legacyAPIPrefix, "/"))
+	}
+
 	return &request.RequestInfoFactory{
-		APIPrefixes:          sets.NewString(strings.Trim(c.APIPrefix, "/"), strings.Trim(c.APIGroupPrefix, "/")), // all possible API prefixes
-		GrouplessAPIPrefixes: sets.NewString(strings.Trim(c.APIPrefix, "/")),                                      // APIPrefixes that won't have groups (legacy)
+		APIPrefixes:          apiPrefixes,
+		GrouplessAPIPrefixes: legacyAPIPrefixes,
 	}
 }
