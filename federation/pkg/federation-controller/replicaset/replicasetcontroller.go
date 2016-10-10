@@ -440,7 +440,7 @@ func (frsc *ReplicaSetController) reconcileReplicaSet(key string) (reconciliatio
 	if err != nil {
 		return statusError, err
 	}
-	podStatus, err := AnalysePods(frs, allPods, time.Now())
+	podStatus, err := AnalysePods(frs.Spec.Selector, allPods, time.Now())
 	current := make(map[string]int64)
 	estimatedCapacity := make(map[string]int64)
 	for _, cluster := range clusters {
