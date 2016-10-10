@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/uuid"
@@ -48,6 +49,7 @@ type pausePodConfig struct {
 
 var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 	var c *client.Client
+	var cs clientset.Interface
 	var nodeList *api.NodeList
 	var systemPodsNo int
 	var totalPodCapacity int64
@@ -67,6 +69,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 
 	BeforeEach(func() {
 		c = f.Client
+		cs = f.ClientSet
 		ns = f.Namespace.Name
 		nodeList = &api.NodeList{}
 
@@ -262,9 +265,9 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		By("Trying to apply a random label on the found node.")
 		k := fmt.Sprintf("kubernetes.io/e2e-%s", string(uuid.NewUUID()))
 		v := "42"
-		framework.AddOrUpdateLabelOnNode(c, nodeName, k, v)
-		framework.ExpectNodeHasLabel(c, nodeName, k, v)
-		defer framework.RemoveLabelOffNode(c, nodeName, k)
+		framework.AddOrUpdateLabelOnNode(cs, nodeName, k, v)
+		framework.ExpectNodeHasLabel(cs, nodeName, k, v)
+		defer framework.RemoveLabelOffNode(cs, nodeName, k)
 
 		By("Trying to relaunch the pod, now with labels.")
 		labelPodName := "with-labels"
@@ -333,9 +336,9 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		By("Trying to apply a random label on the found node.")
 		k := fmt.Sprintf("kubernetes.io/e2e-%s", string(uuid.NewUUID()))
 		v := "42"
-		framework.AddOrUpdateLabelOnNode(c, nodeName, k, v)
-		framework.ExpectNodeHasLabel(c, nodeName, k, v)
-		defer framework.RemoveLabelOffNode(c, nodeName, k)
+		framework.AddOrUpdateLabelOnNode(cs, nodeName, k, v)
+		framework.ExpectNodeHasLabel(cs, nodeName, k, v)
+		defer framework.RemoveLabelOffNode(cs, nodeName, k)
 
 		By("Trying to relaunch the pod, now with labels.")
 		labelPodName := "with-labels"
@@ -378,9 +381,9 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		By("Trying to apply a label with fake az info on the found node.")
 		k := "kubernetes.io/e2e-az-name"
 		v := "e2e-az1"
-		framework.AddOrUpdateLabelOnNode(c, nodeName, k, v)
-		framework.ExpectNodeHasLabel(c, nodeName, k, v)
-		defer framework.RemoveLabelOffNode(c, nodeName, k)
+		framework.AddOrUpdateLabelOnNode(cs, nodeName, k, v)
+		framework.ExpectNodeHasLabel(cs, nodeName, k, v)
+		defer framework.RemoveLabelOffNode(cs, nodeName, k)
 
 		By("Trying to launch a pod that with NodeAffinity setting as embedded JSON string in the annotation value.")
 		pod := createPodWithNodeAffinity(f)
@@ -466,9 +469,9 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		By("Trying to apply a random label on the found node.")
 		k := "e2e.inter-pod-affinity.kubernetes.io/zone"
 		v := "china-e2etest"
-		framework.AddOrUpdateLabelOnNode(c, nodeName, k, v)
-		framework.ExpectNodeHasLabel(c, nodeName, k, v)
-		defer framework.RemoveLabelOffNode(c, nodeName, k)
+		framework.AddOrUpdateLabelOnNode(cs, nodeName, k, v)
+		framework.ExpectNodeHasLabel(cs, nodeName, k, v)
+		defer framework.RemoveLabelOffNode(cs, nodeName, k)
 
 		By("Trying to launch the pod, now with podAffinity.")
 		labelPodName := "with-podaffinity-" + string(uuid.NewUUID())
@@ -521,9 +524,9 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		k := "e2e.inter-pod-affinity.kubernetes.io/zone"
 		v := "china-e2etest"
 		for _, nodeName := range nodeNames {
-			framework.AddOrUpdateLabelOnNode(c, nodeName, k, v)
-			framework.ExpectNodeHasLabel(c, nodeName, k, v)
-			defer framework.RemoveLabelOffNode(c, nodeName, k)
+			framework.AddOrUpdateLabelOnNode(cs, nodeName, k, v)
+			framework.ExpectNodeHasLabel(cs, nodeName, k, v)
+			defer framework.RemoveLabelOffNode(cs, nodeName, k)
 		}
 
 		By("Trying to launch another pod on the first node with the service label.")
@@ -569,9 +572,9 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		By("Trying to apply a random label on the found node.")
 		k := "e2e.inter-pod-affinity.kubernetes.io/zone"
 		v := "kubernetes-e2e"
-		framework.AddOrUpdateLabelOnNode(c, nodeName, k, v)
-		framework.ExpectNodeHasLabel(c, nodeName, k, v)
-		defer framework.RemoveLabelOffNode(c, nodeName, k)
+		framework.AddOrUpdateLabelOnNode(cs, nodeName, k, v)
+		framework.ExpectNodeHasLabel(cs, nodeName, k, v)
+		defer framework.RemoveLabelOffNode(cs, nodeName, k)
 
 		By("Trying to launch the pod, now with multiple pod affinities with diff LabelOperators.")
 		labelPodName := "with-podaffinity-" + string(uuid.NewUUID())
@@ -620,9 +623,9 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		By("Trying to apply a random label on the found node.")
 		k := "e2e.inter-pod-affinity.kubernetes.io/zone"
 		v := "e2e-testing"
-		framework.AddOrUpdateLabelOnNode(c, nodeName, k, v)
-		framework.ExpectNodeHasLabel(c, nodeName, k, v)
-		defer framework.RemoveLabelOffNode(c, nodeName, k)
+		framework.AddOrUpdateLabelOnNode(cs, nodeName, k, v)
+		framework.ExpectNodeHasLabel(cs, nodeName, k, v)
+		defer framework.RemoveLabelOffNode(cs, nodeName, k)
 
 		By("Trying to launch the pod, now with Pod affinity and anti affinity.")
 		pod := createPodWithPodAffinity(f, k)
@@ -645,9 +648,9 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		By("Trying to apply a label with fake az info on the found node.")
 		k := "e2e.inter-pod-affinity.kubernetes.io/zone"
 		v := "e2e-az1"
-		framework.AddOrUpdateLabelOnNode(c, nodeName, k, v)
-		framework.ExpectNodeHasLabel(c, nodeName, k, v)
-		defer framework.RemoveLabelOffNode(c, nodeName, k)
+		framework.AddOrUpdateLabelOnNode(cs, nodeName, k, v)
+		framework.ExpectNodeHasLabel(cs, nodeName, k, v)
+		defer framework.RemoveLabelOffNode(cs, nodeName, k)
 
 		By("Trying to launch a pod that with PodAffinity & PodAntiAffinity setting as embedded JSON string in the annotation value.")
 		pod := createPodWithPodAffinity(f, "kubernetes.io/hostname")
@@ -682,9 +685,9 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		By("Trying to apply a random label on the found node.")
 		labelKey := fmt.Sprintf("kubernetes.io/e2e-label-key-%s", string(uuid.NewUUID()))
 		labelValue := "testing-label-value"
-		framework.AddOrUpdateLabelOnNode(c, nodeName, labelKey, labelValue)
-		framework.ExpectNodeHasLabel(c, nodeName, labelKey, labelValue)
-		defer framework.RemoveLabelOffNode(c, nodeName, labelKey)
+		framework.AddOrUpdateLabelOnNode(cs, nodeName, labelKey, labelValue)
+		framework.ExpectNodeHasLabel(cs, nodeName, labelKey, labelValue)
+		defer framework.RemoveLabelOffNode(cs, nodeName, labelKey)
 
 		By("Trying to relaunch the pod, now with tolerations.")
 		tolerationPodName := "with-tolerations"
@@ -734,9 +737,9 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		By("Trying to apply a random label on the found node.")
 		labelKey := fmt.Sprintf("kubernetes.io/e2e-label-key-%s", string(uuid.NewUUID()))
 		labelValue := "testing-label-value"
-		framework.AddOrUpdateLabelOnNode(c, nodeName, labelKey, labelValue)
-		framework.ExpectNodeHasLabel(c, nodeName, labelKey, labelValue)
-		defer framework.RemoveLabelOffNode(c, nodeName, labelKey)
+		framework.AddOrUpdateLabelOnNode(cs, nodeName, labelKey, labelValue)
+		framework.ExpectNodeHasLabel(cs, nodeName, labelKey, labelValue)
+		defer framework.RemoveLabelOffNode(cs, nodeName, labelKey)
 
 		By("Trying to relaunch the pod, still no tolerations.")
 		podNameNoTolerations := "still-no-tolerations"
