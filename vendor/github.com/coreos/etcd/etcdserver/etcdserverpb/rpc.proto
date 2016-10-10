@@ -396,10 +396,16 @@ message PutRequest {
   // lease is the lease ID to associate with the key in the key-value store. A lease
   // value of 0 indicates no lease.
   int64 lease = 3;
+
+  // If prev_kv is set, etcd gets the previous key-value pair before changing it.
+  // The previous key-value pair will be returned in the put response.
+  bool prev_kv = 4;
 }
 
 message PutResponse {
   ResponseHeader header = 1;
+  // if prev_kv is set in the request, the previous key-value pair will be returned.
+  mvccpb.KeyValue prev_kv = 2;
 }
 
 message DeleteRangeRequest {
@@ -409,12 +415,17 @@ message DeleteRangeRequest {
   // If range_end is not given, the range is defined to contain only the key argument.
   // If range_end is '\0', the range is all keys greater than or equal to the key argument.
   bytes range_end = 2;
+  // If prev_kv is set, etcd gets the previous key-value pairs before deleting it.
+  // The previous key-value pairs will be returned in the delte response.
+  bool prev_kv = 3;
 }
 
 message DeleteRangeResponse {
   ResponseHeader header = 1;
   // deleted is the number of keys deleted by the delete range request.
   int64 deleted = 2;
+  // if prev_kv is set in the request, the previous key-value pairs will be returned.
+  repeated mvccpb.KeyValue prev_kvs = 3;
 }
 
 message RequestOp {
@@ -563,6 +574,9 @@ message WatchCreateRequest {
   // wish to recover a disconnected watcher starting from a recent known revision.
   // The etcd server may decide how often it will send notifications based on current load.
   bool progress_notify = 4;
+  // If prev_kv is set, created watcher gets the previous KV before the event happens.
+  // If the previous KV is already compacted, nothing will be returned.
+  bool prev_kv = 6;
 }
 
 message WatchCancelRequest {
