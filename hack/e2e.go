@@ -207,6 +207,11 @@ func run(deploy deployer) error {
 	}
 
 	if *up {
+		// If we tried to bring the Kubemark cluster up, make a courtesy
+		// attempt to bring it down so we're not leaving resources around.
+		if *down {
+			defer xmlWrap("TearDown", deploy.Down)
+		}
 		// Start the cluster using this version.
 		if err := xmlWrap("Up", deploy.Up); err != nil {
 			return fmt.Errorf("starting e2e cluster: %s", err)
@@ -563,6 +568,9 @@ func KubemarkTest() error {
 	if err != nil {
 		return err
 	}
+	// If we tried to bring the Kubemark cluster up, make a courtesy
+	// attempt to bring it down so we're not leaving resources around.
+	defer finishRunning("Stop kubemark", exec.Command("./test/kubemark/stop-kubemark.sh"))
 
 	// Start new run
 	backups := []string{"NUM_NODES", "MASTER_SIZE"}
