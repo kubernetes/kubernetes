@@ -33,6 +33,8 @@ import (
 	"github.com/vmware/govmomi/find"
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/property"
+	"github.com/vmware/govmomi/session"
+	"github.com/vmware/govmomi/vim25"
 	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/soap"
 	"github.com/vmware/govmomi/vim25/types"
@@ -61,6 +63,7 @@ const (
 	EagerZeroedThickDiskType  = "eagerZeroedThick"
 	ZeroedThickDiskType       = "zeroedThick"
 	VolDir                    = "kubevols"
+	RoundTripperDefaultCount  = 3
 )
 
 // Controller types that are currently supported for hot attach of disks
@@ -89,7 +92,8 @@ var ErrFileAlreadyExist = errors.New("File requested already exist")
 
 // VSphere is an implementation of cloud provider Interface for VSphere.
 type VSphere struct {
-	cfg *VSphereConfig
+	client govmomi.Client
+	cfg    *VSphereConfig
 	// InstanceID of the server where this VSphere object is instantiated.
 	localInstanceID string
 	// Cluster that VirtualMachine belongs to
@@ -114,6 +118,8 @@ type VSphereConfig struct {
 		Datastore string `gcfg:"datastore"`
 		// WorkingDir is path where VMs can be found.
 		WorkingDir string `gcfg:"working-dir"`
+		// Soap round tripper count (retries = RoundTripper - 1)
+		RoundTripperCount uint `gcfg:"soap-roundtrip-count"`
 	}
 
 	Network struct {
@@ -190,7 +196,7 @@ func init() {
 // Returns the name of the VM and its Cluster on which this code is running.
 // This is done by searching for the name of virtual machine by current IP.
 // Prerequisite: this code assumes VMWare vmtools or open-vm-tools to be installed in the VM.
-func readInstance(cfg *VSphereConfig) (string, string, error) {
+func readInstance(client *govmomi.Client, cfg *VSphereConfig) (string, string, error) {
 	addrs, err := net.InterfaceAddrs()
 	if err != nil {
 		return "", "", err
@@ -205,7 +211,7 @@ func readInstance(cfg *VSphereConfig) (string, string, error) {
 	defer cancel()
 
 	// Create vSphere client
-	c, err := vsphereLogin(cfg, ctx)
+	c, err := vsphereLogin(client, cfg)
 	if err != nil {
 		return "", "", err
 	}
@@ -267,11 +273,6 @@ func readInstance(cfg *VSphereConfig) (string, string, error) {
 }
 
 func newVSphere(cfg VSphereConfig) (*VSphere, error) {
-	id, cluster, err := readInstance(&cfg)
-	if err != nil {
-		return nil, err
-	}
-
 	if cfg.Disk.SCSIControllerType == "" {
 		cfg.Disk.SCSIControllerType = LSILogicSASControllerType
 	} else if !checkControllerSupported(cfg.Disk.SCSIControllerType) {
@@ -281,7 +282,22 @@ func newVSphere(cfg VSphereConfig) (*VSphere, error) {
 	if cfg.Global.WorkingDir != "" {
 		cfg.Global.WorkingDir = path.Clean(cfg.Global.WorkingDir) + "/"
 	}
+	if cfg.Global.RoundTripperCount == 0 {
+		cfg.Global.RoundTripperCount = RoundTripperDefaultCount
+	}
+
+	c, err := newClient(&cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	id, cluster, err := readInstance(c, &cfg)
+	if err != nil {
+		return nil, err
+	}
+
 	vs := VSphere{
+		client:          *c,
 		cfg:             &cfg,
 		localInstanceID: id,
 		clusterName:     cluster,
@@ -299,9 +315,7 @@ func checkControllerSupported(ctrlType string) bool {
 	return false
 }
 
-// Returns a client which communicates with vCenter.
-// This client can used to perform further vCenter operations.
-func vsphereLogin(cfg *VSphereConfig, ctx context.Context) (*govmomi.Client, error) {
+func newClient(cfg *VSphereConfig) (*govmomi.Client, error) {
 	// Parse URL from string
 	u, err := url.Parse(fmt.Sprintf("https://%s:%s/sdk", cfg.Global.VCenterIP, cfg.Global.VCenterPort))
 	if err != nil {
@@ -311,12 +325,53 @@ func vsphereLogin(cfg *VSphereConfig, ctx context.Context) (*govmomi.Client, err
 	u.User = url.UserPassword(cfg.Global.User, cfg.Global.Password)
 
 	// Connect and log in to ESX or vCenter
-	c, err := govmomi.NewClient(ctx, u, cfg.Global.InsecureFlag)
+	c, err := govmomi.NewClient(context.TODO(), u, cfg.Global.InsecureFlag)
 	if err != nil {
 		return nil, err
 	}
 
+	// Add retry functionality
+	c.RoundTripper = vim25.Retry(c.RoundTripper, vim25.TemporaryNetworkError(int(cfg.Global.RoundTripperCount)))
+
 	return c, nil
+}
+
+// Returns a client which communicates with vCenter.
+// This client can used to perform further vCenter operations.
+func vsphereLogin(client *govmomi.Client, cfg *VSphereConfig) (*govmomi.Client, error) {
+	var err error
+	if client == nil {
+		client, err = newClient(cfg)
+		if err != nil {
+			return nil, err
+		}
+		return client, nil
+	}
+
+	m := session.NewManager(client.Client)
+	var updateClient bool
+	// retrieve client's current session
+	u, err := m.UserSession(context.TODO())
+	if err != nil {
+		if soap.IsSoapFault(err) {
+			fault := soap.ToSoapFault(err).VimFault()
+			// If the PropertyCollector is not found, the saved session for this URL is not valid
+			if _, ok := fault.(types.ManagedObjectNotFound); ok {
+				updateClient = true
+			}
+		}
+		return nil, err
+	}
+
+	// create new client session if existing session is not valid or not authenticated
+	if u == nil || updateClient == true {
+		client, err = newClient(cfg)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return client, nil
 }
 
 // Returns vSphere object `virtual machine` by its name.
@@ -399,24 +454,24 @@ func getInstances(cfg *VSphereConfig, ctx context.Context, c *govmomi.Client, fi
 }
 
 type Instances struct {
+	client govmomi.Client
 	cfg             *VSphereConfig
 	localInstanceID string
 }
 
 // Instances returns an implementation of Instances for vSphere.
 func (vs *VSphere) Instances() (cloudprovider.Instances, bool) {
-	return &Instances{vs.cfg, vs.localInstanceID}, true
+	return &Instances{vs.client, vs.cfg, vs.localInstanceID}, true
 }
 
 // List returns names of VMs (inside vm folder) by applying filter and which are currently running.
 func (i *Instances) List(filter string) ([]k8stypes.NodeName, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	c, err := vsphereLogin(i.cfg, ctx)
+	c, err := vsphereLogin(&i.client, i.cfg)
 	if err != nil {
 		return nil, err
 	}
-	defer c.Logout(ctx)
 
 	vmList, err := getInstances(i.cfg, ctx, c, filter)
 	if err != nil {
@@ -442,11 +497,10 @@ func (i *Instances) NodeAddresses(nodeName k8stypes.NodeName) ([]api.NodeAddress
 	defer cancel()
 
 	// Create vSphere client
-	c, err := vsphereLogin(i.cfg, ctx)
+	c, err := vsphereLogin(&i.client, i.cfg)
 	if err != nil {
 		return nil, err
-	}
-	defer c.Logout(ctx)
+	}	
 
 	vm, err := getVirtualMachineByName(i.cfg, ctx, c, nodeName)
 	if err != nil {
@@ -504,11 +558,10 @@ func (i *Instances) ExternalID(nodeName k8stypes.NodeName) (string, error) {
 	defer cancel()
 
 	// Create vSphere client
-	c, err := vsphereLogin(i.cfg, ctx)
+	c, err := vsphereLogin(&i.client, i.cfg)
 	if err != nil {
 		return "", err
 	}
-	defer c.Logout(ctx)
 
 	vm, err := getVirtualMachineByName(i.cfg, ctx, c, nodeName)
 	if err != nil {
@@ -544,11 +597,10 @@ func (i *Instances) InstanceID(nodeName k8stypes.NodeName) (string, error) {
 	defer cancel()
 
 	// Create vSphere client
-	c, err := vsphereLogin(i.cfg, ctx)
+	c, err := vsphereLogin(&i.client, i.cfg)
 	if err != nil {
 		return "", err
 	}
-	defer c.Logout(ctx)
 
 	vm, err := getVirtualMachineByName(i.cfg, ctx, c, nodeName)
 	if err != nil {
@@ -680,11 +732,10 @@ func (vs *VSphere) AttachDisk(vmDiskPath string, nodeName k8stypes.NodeName) (di
 	defer cancel()
 
 	// Create vSphere client
-	c, err := vsphereLogin(vs.cfg, ctx)
+	c, err := vsphereLogin(&vs.client, vs.cfg)
 	if err != nil {
 		return "", "", err
 	}
-	defer c.Logout(ctx)
 
 	// Find virtual machine to attach disk to
 	var vSphereInstance string
@@ -895,12 +946,11 @@ func (vs *VSphere) DiskIsAttached(volPath string, nodeName k8stypes.NodeName) (b
 	defer cancel()
 
 	// Create vSphere client
-	c, err := vsphereLogin(vs.cfg, ctx)
+	c, err := vsphereLogin(&vs.client, vs.cfg)
 	if err != nil {
 		glog.Errorf("Failed to create vSphere client. err: %s", err)
 		return false, err
 	}
-	defer c.Logout(ctx)
 
 	// Find VM to detach disk from
 	var vSphereInstance string
@@ -1068,11 +1118,10 @@ func (vs *VSphere) DetachDisk(volPath string, nodeName k8stypes.NodeName) error 
 	defer cancel()
 
 	// Create vSphere client
-	c, err := vsphereLogin(vs.cfg, ctx)
+	c, err := vsphereLogin(&vs.client, vs.cfg)
 	if err != nil {
 		return err
 	}
-	defer c.Logout(ctx)
 
 	// Find virtual machine to attach disk to
 	var vSphereInstance string
@@ -1146,11 +1195,10 @@ func (vs *VSphere) CreateVolume(volumeOptions *VolumeOptions) (volumePath string
 	defer cancel()
 
 	// Create vSphere client
-	c, err := vsphereLogin(vs.cfg, ctx)
+	c, err := vsphereLogin(&vs.client, vs.cfg)
 	if err != nil {
 		return "", err
 	}
-	defer c.Logout(ctx)
 
 	// Create a new finder
 	f := find.NewFinder(c.Client, true)
@@ -1207,11 +1255,10 @@ func (vs *VSphere) DeleteVolume(vmDiskPath string) error {
 	defer cancel()
 
 	// Create vSphere client
-	c, err := vsphereLogin(vs.cfg, ctx)
+	c, err := vsphereLogin(&vs.client, vs.cfg)
 	if err != nil {
 		return err
 	}
-	defer c.Logout(ctx)
 
 	// Create a new finder
 	f := find.NewFinder(c.Client, true)
