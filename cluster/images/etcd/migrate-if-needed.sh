@@ -18,7 +18,7 @@
 # This script performs etcd upgrade based on the following environmental
 # variables:
 # TARGET_STORAGE - API of etcd to be used (supported: 'etcd2', 'etcd3')
-# TARGET_VERSION - etcd release to be used (supported: '2.2.1', '2.3.7', '3.0.10')
+# TARGET_VERSION - etcd release to be used (supported: '2.2.1', '2.3.7', '3.0.12')
 # DATA_DIRECTORY - directory with etcd data
 #
 # The current etcd version and storage format is detected based on the
@@ -27,8 +27,8 @@
 #
 # The update workflow support the following upgrade steps:
 # - 2.2.1/etcd2 -> 2.3.7/etcd2
-# - 2.3.7/etcd2 -> 3.0.10/etcd2
-# - 3.0.10/etcd2 -> 3.0.10/etcd3
+# - 2.3.7/etcd2 -> 3.0.12/etcd2
+# - 3.0.12/etcd2 -> 3.0.12/etcd3
 #
 # NOTE: The releases supported in this script has to match release binaries
 # present in the etcd image (to make this script work correctly).
@@ -59,7 +59,7 @@ fi
 
 # NOTE: SUPPORTED_VERSION has to match release binaries present in the
 # etcd image (to make this script work correctly).
-SUPPORTED_VERSIONS=("2.2.1" "2.3.7" "3.0.10")
+SUPPORTED_VERSIONS=("2.2.1" "2.3.7" "3.0.12")
 
 VERSION_FILE="version.txt"
 CURRENT_STORAGE="etcd2"
@@ -71,6 +71,18 @@ if [ -e "${DATA_DIRECTORY}/${VERSION_FILE}" ]; then
   # - CURRENT_STORAGE would be 'etcd2'
   CURRENT_VERSION="$(echo $VERSION_CONTENTS | cut -d '/' -f 1)"
   CURRENT_STORAGE="$(echo $VERSION_CONTENTS | cut -d '/' -f 2)"
+fi
+
+# If there is no data in DATA_DIRECTORY, this means that we are
+# starting etcd from scratch. In that case, we don't need to do
+# any migration.
+if [ ! -d "${DATA_DIRECTORY}" ]; then
+  mkdir -p "${DATA_DIRECTORY}"
+fi
+if [ ! "$(ls -A ${DATA_DIRECTORY})" ]; then
+  echo "${DATA_DIRECTORY} is empty - skipping migration"
+  echo "${TARGET_VERSION}/${TARGET_STORAGE}" > "${DATA_DIRECTORY}/${VERSION_FILE}"
+	exit 0
 fi
 
 # Starts 'etcd' version ${START_VERSION} and writes to it:
@@ -138,30 +150,26 @@ for step in "${SUPPORTED_VERSIONS[@]}"; do
   if [ "${CURRENT_VERSION:0:2}" == "3." -a "${CURRENT_STORAGE}" == "etcd2" -a "${TARGET_STORAGE}" == "etcd3" ]; then
     # If it is the first 3.x release in the list and we are migrating
     # also from 'etcd2' to 'etcd3', do the migration now.
-    if [ -d "${DATA_DIRECTORY}" ]; then
-      if [ "$(ls -A ${DATA_DIRECTORY})" ]; then
-        echo "Performing etcd2 -> etcd3 migration"
-        START_VERSION="${step}"
-        START_STORAGE="etcd3"
-        ETCDCTL_CMD="${ETCDCTL:-/usr/local/bin/etcdctl-${START_VERSION}}"
-        ETCDCTL_API=3 ${ETCDCTL_CMD} migrate --data-dir=${DATA_DIRECTORY}
-        echo "Attaching leases to TTL entries"
-        # Now attach lease to all keys.
-        # To do it, we temporarily start etcd on a random port (so that
-        # apiserver actually cannot access it).
-        if ! start_etcd; then
-          echo "Starting etcd ${step} in v3 mode failed"
-          exit 1
-        fi
-        # Create a lease and attach all keys to it.
-        ${ATTACHLEASE} \
-          --etcd-address http://127.0.0.1:${ETCD_PORT} \
-          --ttl-keys-prefix "${TTL_KEYS_DIRECTORY:-/registry/events}" \
-          --lease-duration 1h
-        # Kill etcd and wait until this is down.
-        stop_etcd
-      fi
+    echo "Performing etcd2 -> etcd3 migration"
+    START_VERSION="${step}"
+    START_STORAGE="etcd3"
+    ETCDCTL_CMD="${ETCDCTL:-/usr/local/bin/etcdctl-${START_VERSION}}"
+    ETCDCTL_API=3 ${ETCDCTL_CMD} migrate --data-dir=${DATA_DIRECTORY}
+    echo "Attaching leases to TTL entries"
+    # Now attach lease to all keys.
+    # To do it, we temporarily start etcd on a random port (so that
+    # apiserver actually cannot access it).
+    if ! start_etcd; then
+      echo "Starting etcd ${step} in v3 mode failed"
+      exit 1
     fi
+    # Create a lease and attach all keys to it.
+    ${ATTACHLEASE} \
+      --etcd-address http://127.0.0.1:${ETCD_PORT} \
+      --ttl-keys-prefix "${TTL_KEYS_DIRECTORY:-/registry/events}" \
+      --lease-duration 1h
+    # Kill etcd and wait until this is down.
+    stop_etcd
     CURRENT_STORAGE="etcd3"
     echo "${CURRENT_VERSION}/${CURRENT_STORAGE}" > "${DATA_DIRECTORY}/${VERSION_FILE}"
   fi
@@ -178,15 +186,11 @@ if [ "${CURRENT_STORAGE}" == "etcd3" -a "${TARGET_STORAGE}" == "etcd2" ]; then
     echo "etcd3 -> etcd2 downgrade is supported only between 3.0.x and 2.3.7"
     return 0
   fi
-  if [ -d "${DATA_DIRECTORY}" ]; then
-    if [ "$(ls -A ${DATA_DIRECTORY})" ]; then
-      echo "Performing etcd3 -> etcd2 rollback"
-      ${ROLLBACK} --data-dir "${DATA_DIRECTORY}"
-      if [ "$?" -ne "0" ]; then
-        echo "Rollback to etcd2 failed"
-        exit 1
-      fi
-    fi
+  echo "Performing etcd3 -> etcd2 rollback"
+  ${ROLLBACK} --data-dir "${DATA_DIRECTORY}"
+  if [ "$?" -ne "0" ]; then
+    echo "Rollback to etcd2 failed"
+    exit 1
   fi
   CURRENT_STORAGE="etcd2"
   CURRENT_VERSION="2.3.7"
