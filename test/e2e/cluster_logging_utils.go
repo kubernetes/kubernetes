@@ -28,6 +28,9 @@ const (
 	// ingestionTimeout is how long to keep retrying to wait for all the
 	// logs to be ingested.
 	ingestionTimeout = 10 * time.Minute
+	// ingestionRetryDelay is how long test should wait between
+	// two attempts to check for ingestion
+	ingestionRetryDelay = 25 * time.Second
 
 	// expectedLinesCount is the number of log lines emitted (and checked) for each synthetic logging pod.
 	expectedLinesCount = 100
@@ -36,15 +39,16 @@ const (
 func createSynthLogger(f *framework.Framework, podName string, linesCount int) {
 	f.PodClient().Create(&api.Pod{
 		ObjectMeta: api.ObjectMeta{
-			Name: podName,
+			Name:      podName,
+			Namespace: f.Namespace.Name,
 		},
 		Spec: api.PodSpec{
 			Containers: []api.Container{
 				{
 					Name:  podName,
-					Image: "gcr.io/google_containers/ubuntu:14.04",
+					Image: "gcr.io/google_containers/busybox",
 					// notice: the subshell syntax is escaped with `$$`
-					Command: []string{"bash", "-c", fmt.Sprintf("i=0; while ((i < %d)); do echo $i; i=$$(($i+1)); done", linesCount)},
+					Command: []string{"/bin/sh", "-c", fmt.Sprintf("i=0; while [ $i -lt %d ]; do echo $i; i=`expr $i + 1`; done", linesCount)},
 				},
 			},
 		},

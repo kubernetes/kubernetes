@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -42,13 +42,15 @@ var _ = framework.KubeDescribe("Cluster level logging using GCL", func() {
 	It("should check that logs from containers are ingested in GCL", func() {
 		synthLoggerPodName := f.Namespace.Name + "-synthlogger"
 
-		By("Creating synthetic logger")
+		By("Running synthetic logger")
 		createSynthLogger(f, synthLoggerPodName, expectedLinesCount)
 		defer f.PodClient().Delete(synthLoggerPodName, &api.DeleteOptions{})
+		err := framework.WaitForPodSuccessInNamespace(f.Client, synthLoggerPodName, synthLoggerPodName, f.Namespace.Name)
+		framework.ExpectNoError(err, fmt.Sprintf("Should've successfully waited for pod %s to succeed", synthLoggerPodName))
 
 		By("Waiting for logs to ingest")
 		totalMissing := expectedLinesCount
-		for start := time.Now(); totalMissing > 0 && time.Since(start) < ingestionTimeout; time.Sleep(25 * time.Second) {
+		for start := time.Now(); time.Since(start) < ingestionTimeout; time.Sleep(ingestionRetryDelay) {
 			var err error
 			totalMissing, err = getMissingLinesCountGcl(synthLoggerPodName, expectedLinesCount)
 			if err != nil {
@@ -56,6 +58,10 @@ var _ = framework.KubeDescribe("Cluster level logging using GCL", func() {
 				totalMissing = expectedLinesCount
 			} else if totalMissing > 0 {
 				framework.Logf("Still missing %d lines", totalMissing)
+			}
+
+			if totalMissing == 0 {
+				break
 			}
 		}
 
@@ -87,6 +93,10 @@ func getMissingLinesCountGcl(podName string, expectedCount int) (int, error) {
 	return expectedCount - len(occurrences), nil
 }
 
+type LogEntry struct {
+	TextPayload string
+}
+
 // Since GCL API is not easily available from the outside of cluster
 // we use gcloud command to perform search with filter
 func readFilteredEntriesFromGcl(filter string) ([]string, error) {
@@ -105,36 +115,18 @@ func readFilteredEntriesFromGcl(filter string) ([]string, error) {
 		return nil, err
 	}
 
-	var jsonArray []interface{}
-	if err = json.Unmarshal(output, &jsonArray); err != nil {
+	var entries []*LogEntry
+	if err = json.Unmarshal(output, &entries); err != nil {
 		return nil, err
 	}
-	framework.Logf("Read %d entries from GCL", len(jsonArray))
+	framework.Logf("Read %d entries from GCL", len(entries))
 
-	var entries []string
-	for _, obj := range jsonArray {
-		jsonObject, ok := obj.(map[string]interface{})
-
-		if !ok {
-			// All elements in returned array are expected to be objects
-			continue
+	var result []string
+	for _, entry := range entries {
+		if entry.TextPayload != "" {
+			result = append(result, entry.TextPayload)
 		}
-
-		textPayloadObj, ok := jsonObject["textPayload"]
-		if !ok {
-			// Entry does not contain textPayload field
-			// In this test, we don't deal with jsonPayload or structPayload
-			continue
-		}
-
-		textPayload, ok := textPayloadObj.(string)
-		if !ok {
-			// Text payload should be string
-			continue
-		}
-
-		entries = append(entries, textPayload)
 	}
 
-	return entries, nil
+	return result, nil
 }

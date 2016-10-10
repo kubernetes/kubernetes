@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -52,19 +52,25 @@ var _ = framework.KubeDescribe("Cluster level logging using Elasticsearch [Featu
 
 		synthLoggerPodName := f.Namespace.Name + "-synthlogger-pod"
 
-		By("Creating synthetic logger")
+		By("Running synthetic logger")
 		createSynthLogger(f, synthLoggerPodName, expectedLinesCount)
 		defer f.PodClient().Delete(synthLoggerPodName, &api.DeleteOptions{})
+		err = framework.WaitForPodSuccessInNamespace(f.Client, synthLoggerPodName, synthLoggerPodName, f.Namespace.Name)
+		framework.ExpectNoError(err, fmt.Sprintf("Should've successfully waited for pod %s to succeed", synthLoggerPodName))
 
 		By("Waiting for logs to ingest")
 		totalMissing := expectedLinesCount
-		for start := time.Now(); totalMissing > 0 && time.Since(start) < ingestionTimeout; time.Sleep(25 * time.Second) {
+		for start := time.Now(); time.Since(start) < ingestionTimeout; time.Sleep(ingestionRetryDelay) {
 			totalMissing, err = getMissingLinesCountElasticsearch(f, expectedLinesCount)
 			if err != nil {
 				framework.Logf("Failed to get missing lines count due to %v", err)
 				totalMissing = expectedLinesCount
 			} else if totalMissing > 0 {
 				framework.Logf("Still missing %d lines", totalMissing)
+			}
+
+			if totalMissing == 0 {
+				break
 			}
 		}
 
