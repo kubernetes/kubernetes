@@ -27,7 +27,6 @@ import (
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/util/workqueue"
 	"k8s.io/kubernetes/plugin/pkg/scheduler"
 	_ "k8s.io/kubernetes/plugin/pkg/scheduler/algorithmprovider"
@@ -44,15 +43,14 @@ import (
 // Notes on rate limiter:
 //   - client rate limit is set to 5000.
 func mustSetupScheduler() (schedulerConfigFactory *factory.ConfigFactory, destroyFunc func()) {
-	var m *master.Master
-	masterConfig := framework.NewIntegrationTestMasterConfig()
-	m, err := masterConfig.Complete().New()
-	if err != nil {
-		panic("error in brining up the master: " + err.Error())
-	}
+
+	h := &framework.MasterHolder{Initialized: make(chan struct{})}
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		m.GenericAPIServer.Handler.ServeHTTP(w, req)
+		<-h.Initialized
+		h.M.GenericAPIServer.Handler.ServeHTTP(w, req)
 	}))
+
+	framework.RunAMasterUsingServer(framework.NewIntegrationTestMasterConfig(), s, h)
 
 	c := client.NewOrDie(&restclient.Config{
 		Host:          s.URL,
@@ -62,6 +60,7 @@ func mustSetupScheduler() (schedulerConfigFactory *factory.ConfigFactory, destro
 	})
 
 	schedulerConfigFactory = factory.NewConfigFactory(c, api.DefaultSchedulerName, api.DefaultHardPodAffinitySymmetricWeight, api.DefaultFailureDomains)
+
 	schedulerConfig, err := schedulerConfigFactory.Create()
 	if err != nil {
 		panic("Couldn't create scheduler config")
