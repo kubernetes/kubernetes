@@ -489,7 +489,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		case "cri":
 			// Use the new CRI shim for docker. This is needed for testing the
 			// docker integration through CRI, and may be removed in the future.
-			dockerService, err := dockershim.NewDockerService(klet.dockerClient, kubeCfg.SeccompProfileRoot, kubeCfg.PodInfraContainerImage, nil)
+			dockerService, err := dockershim.NewDockerService(klet.dockerClient, kubeCfg.SeccompProfileRoot, kubeCfg.PodInfraContainerImage, nil, kubeCfg.RuntimeCgroups)
 			if err != nil {
 				return nil, err
 			}
@@ -520,6 +520,8 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 					return nil, err
 				}
 			}
+			dockerService.Start()
+
 			klet.containerRuntime, err = kuberuntime.NewKubeGenericRuntimeManager(
 				kubecontainer.FilterEventRecorder(kubeDeps.Recorder),
 				klet.livenessManager,
