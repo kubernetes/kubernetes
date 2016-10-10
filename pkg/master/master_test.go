@@ -44,6 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	extensionsapiv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/apis/rbac"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/generated/openapi"
 	"k8s.io/kubernetes/pkg/genericapiserver"
@@ -67,9 +68,6 @@ import (
 func setUp(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.Assertions) {
 	server, storageConfig := etcdtesting.NewUnsecuredEtcd3TestClientServer(t)
 
-	master := &Master{
-		GenericAPIServer: &genericapiserver.GenericAPIServer{},
-	}
 	config := &Config{
 		GenericConfig: &genericapiserver.Config{},
 	}
@@ -85,6 +83,7 @@ func setUp(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.
 	storageFactory := genericapiserver.NewDefaultStorageFactory(*storageConfig, testapi.StorageMediaType(), api.Codecs, resourceEncoding, DefaultAPIResourceConfigSource())
 
 	config.StorageFactory = storageFactory
+	config.GenericConfig.LoopbackClientConfig = &restclient.Config{APIPath: "/api", ContentConfig: restclient.ContentConfig{NegotiatedSerializer: api.Codecs}}
 	config.GenericConfig.APIResourceConfigSource = DefaultAPIResourceConfigSource()
 	config.GenericConfig.PublicAddress = net.ParseIP("192.168.10.4")
 	config.GenericConfig.Serializer = api.Codecs
@@ -112,7 +111,8 @@ func setUp(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.
 		t.Fatal(err)
 	}
 
-	master.legacyRESTStorage.NodeRegistry = registrytest.NewNodeRegistry([]string{"node1", "node2"}, api.NodeResources{})
+	fakeNodeClient := fake.NewSimpleClientset(registrytest.MakeNodeList([]string{"node1", "node2"}, api.NodeResources{}))
+	master.nodeClient = fakeNodeClient.Core().Nodes()
 
 	return master, server, *config, assert.New(t)
 }
@@ -161,8 +161,6 @@ func TestNew(t *testing.T) {
 	defer etcdserver.Terminate(t)
 
 	// Verify many of the variables match their config counterparts
-	assert.Equal(master.enableCoreControllers, config.EnableCoreControllers)
-	assert.Equal(master.tunneler, config.Tunneler)
 	assert.Equal(master.RequestContextMapper(), config.GenericConfig.RequestContextMapper)
 	assert.Equal(master.ClusterIP, config.GenericConfig.PublicAddress)
 
@@ -258,25 +256,27 @@ func TestGetNodeAddresses(t *testing.T) {
 	defer etcdserver.Terminate(t)
 
 	// Fail case (no addresses associated with nodes)
-	nodes, _ := master.legacyRESTStorage.NodeRegistry.ListNodes(api.NewDefaultContext(), nil)
+	nodes, _ := master.nodeClient.List(api.ListOptions{})
 	addrs, err := master.getNodeAddresses()
 
 	assert.Error(err, "getNodeAddresses should have caused an error as there are no addresses.")
 	assert.Equal([]string(nil), addrs)
 
 	// Pass case with External type IP
-	nodes, _ = master.legacyRESTStorage.NodeRegistry.ListNodes(api.NewDefaultContext(), nil)
+	nodes, _ = master.nodeClient.List(api.ListOptions{})
 	for index := range nodes.Items {
 		nodes.Items[index].Status.Addresses = []api.NodeAddress{{Type: api.NodeExternalIP, Address: "127.0.0.1"}}
+		master.nodeClient.Update(&nodes.Items[index])
 	}
 	addrs, err = master.getNodeAddresses()
 	assert.NoError(err, "getNodeAddresses should not have returned an error.")
 	assert.Equal([]string{"127.0.0.1", "127.0.0.1"}, addrs)
 
 	// Pass case with LegacyHost type IP
-	nodes, _ = master.legacyRESTStorage.NodeRegistry.ListNodes(api.NewDefaultContext(), nil)
+	nodes, _ = master.nodeClient.List(api.ListOptions{})
 	for index := range nodes.Items {
 		nodes.Items[index].Status.Addresses = []api.NodeAddress{{Type: api.NodeLegacyHostIP, Address: "127.0.0.2"}}
+		master.nodeClient.Update(&nodes.Items[index])
 	}
 	addrs, err = master.getNodeAddresses()
 	assert.NoError(err, "getNodeAddresses failback should not have returned an error.")
@@ -482,38 +482,6 @@ func TestDiscoveryAtAPIS(t *testing.T) {
 		assert.Equal(expectVersions[group.Name], group.Versions)
 		assert.Equal(expectPreferredVersion[group.Name], group.PreferredVersion)
 	}
-}
-
-type FakeTunneler struct {
-	SecondsSinceSyncValue       int64
-	SecondsSinceSSHKeySyncValue int64
-}
-
-func (t *FakeTunneler) Run(genericapiserver.AddressFunc)        {}
-func (t *FakeTunneler) Stop()                                   {}
-func (t *FakeTunneler) Dial(net, addr string) (net.Conn, error) { return nil, nil }
-func (t *FakeTunneler) SecondsSinceSync() int64                 { return t.SecondsSinceSyncValue }
-func (t *FakeTunneler) SecondsSinceSSHKeySync() int64           { return t.SecondsSinceSSHKeySyncValue }
-
-// TestIsTunnelSyncHealthy verifies that the 600 second lag test
-// is honored.
-func TestIsTunnelSyncHealthy(t *testing.T) {
-	assert := assert.New(t)
-	tunneler := &FakeTunneler{}
-	master := &Master{
-		GenericAPIServer: &genericapiserver.GenericAPIServer{},
-		tunneler:         tunneler,
-	}
-
-	// Pass case: 540 second lag
-	tunneler.SecondsSinceSyncValue = 540
-	err := master.IsTunnelSyncHealthy(nil)
-	assert.NoError(err, "IsTunnelSyncHealthy() should not have returned an error.")
-
-	// Fail case: 720 second lag
-	tunneler.SecondsSinceSyncValue = 720
-	err = master.IsTunnelSyncHealthy(nil)
-	assert.Error(err, "IsTunnelSyncHealthy() should have returned an error.")
 }
 
 func writeResponseToFile(resp *http.Response, filename string) error {
