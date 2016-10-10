@@ -1100,15 +1100,15 @@ var _ = framework.KubeDescribe("Services", func() {
 		svc = jig.WaitForLoadBalancerOrFail(namespace, serviceName, loadBalancerCreateTimeout)
 		jig.SanityCheckService(svc, api.ServiceTypeLoadBalancer)
 		svcTcpPort := int(svc.Spec.Ports[0].Port)
-		framework.Logf("service port : %d", svcTcpPort)
+		jig.Logf("service port : %d", svcTcpPort)
 		tcpNodePort := int(svc.Spec.Ports[0].NodePort)
-		framework.Logf("TCP node port: %d", tcpNodePort)
+		jig.Logf("TCP node port: %d", tcpNodePort)
 		ingressIP := getIngressPoint(&svc.Status.LoadBalancer.Ingress[0])
-		framework.Logf("TCP load balancer: %s", ingressIP)
+		jig.Logf("TCP load balancer: %s", ingressIP)
 		healthCheckNodePort := int(service.GetServiceHealthCheckNodePort(svc))
 		By("checking health check node port allocated")
 		if healthCheckNodePort == 0 {
-			framework.Failf("Service HealthCheck NodePort was not allocated")
+			jig.Failf("Service HealthCheck NodePort was not allocated")
 		}
 		nodeIP := pickNodeIP(jig.Client)
 		By("hitting the TCP service's NodePort on " + nodeIP + ":" + fmt.Sprintf("%d", tcpNodePort))
@@ -1118,25 +1118,25 @@ var _ = framework.KubeDescribe("Services", func() {
 		By("reading clientIP using the TCP service's NodePort")
 		content := jig.GetHTTPContent(nodeIP, tcpNodePort, kubeProxyLagTimeout, "/clientip")
 		clientIP := content.String()
-		framework.Logf("ClientIP detected by target pod using NodePort is %s", clientIP)
+		jig.Logf("ClientIP detected by target pod using NodePort is %s", clientIP)
 		By("reading clientIP using the TCP service's service port via its external VIP")
 		content = jig.GetHTTPContent(ingressIP, svcTcpPort, kubeProxyLagTimeout, "/clientip")
 		clientIP = content.String()
-		framework.Logf("ClientIP detected by target pod using VIP:SvcPort is %s", clientIP)
+		jig.Logf("ClientIP detected by target pod using VIP:SvcPort is %s", clientIP)
 		By("checking if Source IP is preserved")
 		if strings.HasPrefix(clientIP, "10.") {
-			framework.Failf("Source IP was NOT preserved")
+			jig.Failf("Source IP was NOT preserved")
 		}
 		By("finding nodes for all service endpoints")
 		endpoints, err := c.Endpoints(namespace).Get(serviceName)
 		if err != nil {
-			framework.Failf("Get endpoints for service %s/%s failed (%s)", namespace, serviceName, err)
+			jig.Failf("Get endpoints for service %s/%s failed (%s)", namespace, serviceName, err)
 		}
 		if len(endpoints.Subsets[0].Addresses) == 0 {
-			framework.Failf("Expected Ready endpoints - found none")
+			jig.Failf("Expected Ready endpoints - found none")
 		}
-		readyHostName := *endpoints.Subsets[0].Addresses[0].NodeName
-		framework.Logf("Pod for service %s/%s is on node %s", namespace, serviceName, readyHostName)
+		endpointNodeName := *endpoints.Subsets[0].Addresses[0].NodeName
+		jig.Logf("Pod for service %s/%s is on node %s", namespace, serviceName, endpointNodeName)
 		// HealthCheck responder validation - iterate over all node IPs and check their HC responses
 		// Collect all node names and their public IPs - the nodes and ips slices parallel each other
 		nodes := framework.GetReadySchedulableNodesOrDie(jig.Client)
@@ -1146,12 +1146,97 @@ var _ = framework.KubeDescribe("Services", func() {
 		}
 		By("checking kube-proxy health check responses are correct")
 		for n, publicIP := range ips {
-			framework.Logf("Checking health check response for node %s, public IP %s", nodes.Items[n].Name, publicIP)
+			jig.Logf("Checking health check response for node %s, public IP %s", nodes.Items[n].Name, publicIP)
 			// HealthCheck should pass only on the node where num(endpoints) > 0
 			// All other nodes should fail the healthcheck on the service healthCheckNodePort
-			expectedSuccess := nodes.Items[n].Name == readyHostName
+			expectedSuccess := nodes.Items[n].Name == endpointNodeName
 			jig.TestHTTPHealthCheckNodePort(publicIP, healthCheckNodePort, "/healthz", expectedSuccess)
 		}
+
+		By("changing ESIPP annotation off and checking behaviour")
+		// Toggle ESIPP annotation off and check client ip and healthchecks
+		svc = jig.UpdateServiceOrFail(svc.Namespace, svc.Name, func(svc *api.Service) {
+			svc.ObjectMeta.Annotations[service.AnnotationExternalTraffic] =
+				service.AnnotationValueExternalTrafficGlobal
+		})
+		pollErr := wait.PollImmediate(framework.Poll, kubeProxyLagTimeout, func() (bool, error) {
+			By("reading clientIP using the TCP service's NodePort")
+			content := jig.GetHTTPContent(nodeIP, tcpNodePort, kubeProxyLagTimeout, "/clientip")
+			clientIP := content.String()
+			jig.Logf("ClientIP detected by target pod using NodePort is %s", clientIP)
+			By("reading clientIP using the TCP service's service port via its external VIP")
+			content = jig.GetHTTPContent(ingressIP, svcTcpPort, kubeProxyLagTimeout, "/clientip")
+			clientIP = content.String()
+			jig.Logf("ClientIP detected by target pod using VIP:SvcPort is %s", clientIP)
+			By("checking if Source IP is not preserved")
+			if strings.HasPrefix(clientIP, "10.") {
+				jig.Logf("Source IP was (correctly) not preserved when ESIPP annotation was off")
+				return true, nil
+			}
+			return false, fmt.Errorf("Source IP is the client IP")
+		})
+		if pollErr != nil {
+			jig.Failf("Source IP was preserved even when the ESIPP annotation was off")
+		}
+		By("checking health check node port annotation is cleared when ESIPP is toggled off")
+		if service.GetServiceHealthCheckNodePort(svc) > 0 {
+			jig.Failf("Service HealthCheck NodePort annotation still present")
+		}
+		By("checking kube-proxy health checks fail on all nodes when ESIPP annotation is off")
+		for n, publicIP := range ips {
+			jig.Logf("Checking health check response for node %s, public IP %s", nodes.Items[n].Name, publicIP)
+			// All nodes should fail the healthcheck on the service healthCheckNodePort
+			jig.TestHTTPHealthCheckNodePort(publicIP, healthCheckNodePort, "/healthz", false)
+		}
+		// TODO
+		// We need to attempt to create another service with the previously allocated healthcheck nodePort
+		// If the health check nodePort has been freed, the new service creation will succeed, upon which we cleanup.
+		// If the health check nodePort has NOT been freed, the new service creation will fail.
+
+		By("changing ESIPP annotation back on and checking behaviour")
+		// Toggle ESIPP annotation back on and check client ip and healthchecks
+		svc = jig.UpdateServiceOrFail(svc.Namespace, svc.Name, func(svc *api.Service) {
+			svc.ObjectMeta.Annotations[service.AnnotationExternalTraffic] =
+				service.AnnotationValueExternalTrafficLocal
+			// Request the same healthCheckNodePort as before, to test the user-requested allocation path
+			svc.ObjectMeta.Annotations[service.AnnotationHealthCheckNodePort] =
+				fmt.Sprintf("%d", healthCheckNodePort)
+		})
+		pollErr = wait.PollImmediate(framework.Poll, kubeProxyLagTimeout, func() (bool, error) {
+			By("reading clientIP using the TCP service's NodePort")
+			content := jig.GetHTTPContent(nodeIP, tcpNodePort, kubeProxyLagTimeout, "/clientip")
+			clientIP := content.String()
+			jig.Logf("ClientIP detected by target pod using NodePort is %s", clientIP)
+			By("reading clientIP using the TCP service's service port via its external VIP")
+			content = jig.GetHTTPContent(ingressIP, svcTcpPort, kubeProxyLagTimeout, "/clientip")
+			clientIP = content.String()
+			jig.Logf("ClientIP detected by target pod using VIP:SvcPort is %s", clientIP)
+			By("checking if Source IP is correctly preserved")
+			if !strings.HasPrefix(clientIP, "10.") {
+				jig.Logf("Source IP was correctly preserved when ESIPP annotation was on")
+				return true, nil
+			}
+			return false, fmt.Errorf("Source IP is not the client IP")
+		})
+		if pollErr != nil {
+			jig.Logf("Source IP was not preserved when the ESIPP annotation was on")
+		}
+		By("checking kube-proxy health checks fail on all nodes when ESIPP annotation is off")
+		for n, publicIP := range ips {
+			jig.Logf("Checking health check response for node %s, public IP %s", nodes.Items[n].Name, publicIP)
+			// HealthCheck should pass only on the node where num(endpoints) > 0
+			// All other nodes should fail the healthcheck on the service healthCheckNodePort
+			expectedSuccess := nodes.Items[n].Name == endpointNodeName
+			jig.TestHTTPHealthCheckNodePort(publicIP, healthCheckNodePort, "/healthz", expectedSuccess)
+		}
+		By("checking health check node port annotation is added when ESIPP is toggled on again")
+		if service.GetServiceHealthCheckNodePort(svc) == 0 {
+			jig.Failf("Service HealthCheck NodePort annotation not present")
+		}
+		By("by deleting original service " + svc.Name)
+		err = jig.Client.Services(svc.Namespace).Delete(svc.Name)
+		Expect(err).NotTo(HaveOccurred())
+
 	})
 })
 
@@ -1426,8 +1511,6 @@ func testReachableHTTPWithContent(ip string, port int, request string, expect st
 		return false, nil
 	}
 
-	framework.Logf("Testing HTTP reachability of %v", url)
-
 	resp, err := httpGetNoConnectionPool(url)
 	if err != nil {
 		framework.Logf("Got error testing for reachability of %s: %v", url, err)
@@ -1458,7 +1541,6 @@ func testHTTPHealthCheckNodePort(ip string, port int, request string) (bool, err
 		framework.Failf("Got empty IP for reachability check (%s)", url)
 		return false, fmt.Errorf("Invalid input ip or port")
 	}
-	framework.Logf("Testing HTTP health check on %v", url)
 	resp, err := httpGetNoConnectionPool(url)
 	if err != nil {
 		framework.Logf("Got error testing for reachability of %s: %v", url, err)
@@ -1495,7 +1577,6 @@ func testNotReachableHTTP(ip string, port int) (bool, error) {
 
 	resp, err := httpGetNoConnectionPool(url)
 	if err != nil {
-		framework.Logf("Confirmed that %s is not reachable", url)
 		return true, nil
 	}
 	resp.Body.Close()
@@ -1777,6 +1858,7 @@ type ServiceTestJig struct {
 	Name   string
 	Client *client.Client
 	Labels map[string]string
+	buffer bytes.Buffer
 }
 
 // NewServiceTestJig allocates and inits a new ServiceTestJig.
@@ -1786,7 +1868,6 @@ func NewServiceTestJig(client *client.Client, name string) *ServiceTestJig {
 	j.Name = name
 	j.ID = j.Name + "-" + string(uuid.NewUUID())
 	j.Labels = map[string]string{"testid": j.ID}
-
 	return j
 }
 
@@ -1823,7 +1904,7 @@ func (j *ServiceTestJig) CreateTCPServiceWithPort(namespace string, tweak func(s
 	}
 	result, err := j.Client.Services(namespace).Create(svc)
 	if err != nil {
-		framework.Failf("Failed to create TCP Service %q: %v", svc.Name, err)
+		j.Failf("Failed to create TCP Service %q: %v", svc.Name, err)
 	}
 	return result
 }
@@ -1838,7 +1919,7 @@ func (j *ServiceTestJig) CreateTCPServiceOrFail(namespace string, tweak func(svc
 	}
 	result, err := j.Client.Services(namespace).Create(svc)
 	if err != nil {
-		framework.Failf("Failed to create TCP Service %q: %v", svc.Name, err)
+		j.Failf("Failed to create TCP Service %q: %v", svc.Name, err)
 	}
 	return result
 }
@@ -1853,14 +1934,14 @@ func (j *ServiceTestJig) CreateUDPServiceOrFail(namespace string, tweak func(svc
 	}
 	result, err := j.Client.Services(namespace).Create(svc)
 	if err != nil {
-		framework.Failf("Failed to create UDP Service %q: %v", svc.Name, err)
+		j.Failf("Failed to create UDP Service %q: %v", svc.Name, err)
 	}
 	return result
 }
 
 func (j *ServiceTestJig) SanityCheckService(svc *api.Service, svcType api.ServiceType) {
 	if svc.Spec.Type != svcType {
-		framework.Failf("unexpected Spec.Type (%s) for service, expected %s", svc.Spec.Type, svcType)
+		j.Failf("unexpected Spec.Type (%s) for service, expected %s", svc.Spec.Type, svcType)
 	}
 	expectNodePorts := false
 	if svcType != api.ServiceTypeClusterIP {
@@ -1869,11 +1950,11 @@ func (j *ServiceTestJig) SanityCheckService(svc *api.Service, svcType api.Servic
 	for i, port := range svc.Spec.Ports {
 		hasNodePort := (port.NodePort != 0)
 		if hasNodePort != expectNodePorts {
-			framework.Failf("unexpected Spec.Ports[%d].NodePort (%d) for service", i, port.NodePort)
+			j.Failf("unexpected Spec.Ports[%d].NodePort (%d) for service", i, port.NodePort)
 		}
 		if hasNodePort {
 			if !ServiceNodePortRange.Contains(int(port.NodePort)) {
-				framework.Failf("out-of-range nodePort (%d) for service", port.NodePort)
+				j.Failf("out-of-range nodePort (%d) for service", port.NodePort)
 			}
 		}
 	}
@@ -1883,12 +1964,12 @@ func (j *ServiceTestJig) SanityCheckService(svc *api.Service, svcType api.Servic
 	}
 	hasIngress := len(svc.Status.LoadBalancer.Ingress) != 0
 	if hasIngress != expectIngress {
-		framework.Failf("unexpected number of Status.LoadBalancer.Ingress (%d) for service", len(svc.Status.LoadBalancer.Ingress))
+		j.Failf("unexpected number of Status.LoadBalancer.Ingress (%d) for service", len(svc.Status.LoadBalancer.Ingress))
 	}
 	if hasIngress {
 		for i, ing := range svc.Status.LoadBalancer.Ingress {
 			if ing.IP == "" && ing.Hostname == "" {
-				framework.Failf("unexpected Status.LoadBalancer.Ingress[%d] for service: %#v", i, ing)
+				j.Failf("unexpected Status.LoadBalancer.Ingress[%d] for service: %#v", i, ing)
 			}
 		}
 	}
@@ -1922,7 +2003,7 @@ func (j *ServiceTestJig) UpdateService(namespace, name string, update func(*api.
 func (j *ServiceTestJig) UpdateServiceOrFail(namespace, name string, update func(*api.Service)) *api.Service {
 	svc, err := j.UpdateService(namespace, name, update)
 	if err != nil {
-		framework.Failf(err.Error())
+		j.Failf(err.Error())
 	}
 	return svc
 }
@@ -1938,21 +2019,21 @@ func (j *ServiceTestJig) ChangeServiceNodePortOrFail(namespace, name string, ini
 			s.Spec.Ports[0].NodePort = int32(newPort)
 		})
 		if err != nil && strings.Contains(err.Error(), "provided port is already allocated") {
-			framework.Logf("tried nodePort %d, but it is in use, will try another", newPort)
+			j.Logf("tried nodePort %d, but it is in use, will try another", newPort)
 			continue
 		}
 		// Otherwise err was nil or err was a real error
 		break
 	}
 	if err != nil {
-		framework.Failf("Could not change the nodePort: %v", err)
+		j.Failf("Could not change the nodePort: %v", err)
 	}
 	return service
 }
 
 func (j *ServiceTestJig) WaitForLoadBalancerOrFail(namespace, name string, timeout time.Duration) *api.Service {
 	var service *api.Service
-	framework.Logf("Waiting up to %v for service %q to have a LoadBalancer", timeout, name)
+	j.Logf("Waiting up to %v for service %q to have a LoadBalancer", timeout, name)
 	pollFunc := func() (bool, error) {
 		svc, err := j.Client.Services(namespace).Get(name)
 		if err != nil {
@@ -1965,7 +2046,7 @@ func (j *ServiceTestJig) WaitForLoadBalancerOrFail(namespace, name string, timeo
 		return false, nil
 	}
 	if err := wait.PollImmediate(framework.Poll, timeout, pollFunc); err != nil {
-		framework.Failf("Timeout waiting for service %q to have a load balancer", name)
+		j.Failf("Timeout waiting for service %q to have a load balancer", name)
 	}
 	return service
 }
@@ -1974,12 +2055,12 @@ func (j *ServiceTestJig) WaitForLoadBalancerDestroyOrFail(namespace, name string
 	// TODO: once support ticket 21807001 is resolved, reduce this timeout back to something reasonable
 	defer func() {
 		if err := framework.EnsureLoadBalancerResourcesDeleted(ip, strconv.Itoa(port)); err != nil {
-			framework.Logf("Failed to delete cloud resources for service: %s %d (%v)", ip, port, err)
+			j.Logf("Failed to delete cloud resources for service: %s %d (%v)", ip, port, err)
 		}
 	}()
 
 	var service *api.Service
-	framework.Logf("Waiting up to %v for service %q to have no LoadBalancer", timeout, name)
+	j.Logf("Waiting up to %v for service %q to have no LoadBalancer", timeout, name)
 	pollFunc := func() (bool, error) {
 		svc, err := j.Client.Services(namespace).Get(name)
 		if err != nil {
@@ -1992,56 +2073,57 @@ func (j *ServiceTestJig) WaitForLoadBalancerDestroyOrFail(namespace, name string
 		return false, nil
 	}
 	if err := wait.PollImmediate(framework.Poll, timeout, pollFunc); err != nil {
-		framework.Failf("Timeout waiting for service %q to have no load balancer", name)
+		j.Failf("Timeout waiting for service %q to have no load balancer", name)
 	}
 	return service
 }
 
 func (j *ServiceTestJig) TestReachableHTTP(host string, port int, timeout time.Duration) {
 	if err := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) { return testReachableHTTP(host, port, "/echo?msg=hello", "hello") }); err != nil {
-		framework.Failf("Could not reach HTTP service through %v:%v after %v: %v", host, port, timeout, err)
+		j.Failf("Could not reach HTTP service through %v:%v after %v: %v", host, port, timeout, err)
 	}
 }
 
 func (j *ServiceTestJig) TestNotReachableHTTP(host string, port int, timeout time.Duration) {
 	if err := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) { return testNotReachableHTTP(host, port) }); err != nil {
-		framework.Failf("Could still reach HTTP service through %v:%v after %v: %v", host, port, timeout, err)
+		j.Failf("Could still reach HTTP service through %v:%v after %v: %v", host, port, timeout, err)
 	}
 }
 
 func (j *ServiceTestJig) TestReachableUDP(host string, port int, timeout time.Duration) {
 	if err := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) { return testReachableUDP(host, port, "echo hello", "hello") }); err != nil {
-		framework.Failf("Could not reach UDP service through %v:%v after %v: %v", host, port, timeout, err)
+		j.Failf("Could not reach UDP service through %v:%v after %v: %v", host, port, timeout, err)
 	}
 }
 
 func (j *ServiceTestJig) TestNotReachableUDP(host string, port int, timeout time.Duration) {
 	if err := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) { return testNotReachableUDP(host, port, "echo hello") }); err != nil {
-		framework.Failf("Could still reach UDP service through %v:%v after %v: %v", host, port, timeout, err)
+		j.Failf("Could still reach UDP service through %v:%v after %v: %v", host, port, timeout, err)
 	}
 }
 
 func (j *ServiceTestJig) GetHTTPContent(host string, port int, timeout time.Duration, url string) bytes.Buffer {
 	var body bytes.Buffer
 	if err := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) { return testReachableHTTPWithContent(host, port, url, "", &body) }); err != nil {
-		framework.Failf("Could not reach HTTP service through %v:%v/%v after %v: %v", host, port, url, timeout, err)
+		j.Failf("Could not reach HTTP service through %v:%v/%v after %v: %v", host, port, url, timeout, err)
 		return body
 	}
 	return body
 }
 
+// TestHTTPHealthCheckNodePort Check quickly (5 second timeout) if the health check node port is responding on /healthz
 func (j *ServiceTestJig) TestHTTPHealthCheckNodePort(host string, port int, request string, expectedSuccess bool) {
 	success, err := testHTTPHealthCheckNodePort(host, port, request)
 	if expectedSuccess && success {
-		framework.Logf("HealthCheck successful for node %v:%v, as expected", host, port)
+		j.Logf("HealthCheck successful for node %v:%v, as expected", host, port)
 		return
 	} else if !expectedSuccess && (!success || err != nil) {
-		framework.Logf("HealthCheck failed for node %v:%v, as expected", host, port)
+		j.Logf("HealthCheck failed for node %v:%v, as expected", host, port)
 		return
 	} else if expectedSuccess {
-		framework.Failf("HealthCheck NodePort incorrectly reporting unhealthy on %v:%v: %v", host, port, err)
+		j.Failf("HealthCheck NodePort incorrectly reporting unhealthy on %v:%v: %v", host, port, err)
 	}
-	framework.Failf("Unexpected HealthCheck NodePort still reporting healthy %v:%v: %v", host, port, err)
+	j.Failf("Unexpected HealthCheck NodePort still reporting healthy %v:%v: %v", host, port, err)
 }
 
 func getIngressPoint(ing *api.LoadBalancerIngress) string {
@@ -2104,14 +2186,14 @@ func (j *ServiceTestJig) RunOrFail(namespace string, tweak func(rc *api.Replicat
 	}
 	result, err := j.Client.ReplicationControllers(namespace).Create(rc)
 	if err != nil {
-		framework.Failf("Failed to created RC %q: %v", rc.Name, err)
+		j.Failf("Failed to created RC %q: %v", rc.Name, err)
 	}
 	pods, err := j.waitForPodsCreated(namespace, int(rc.Spec.Replicas))
 	if err != nil {
-		framework.Failf("Failed to create pods: %v", err)
+		j.Failf("Failed to create pods: %v", err)
 	}
 	if err := j.waitForPodsReady(namespace, pods); err != nil {
-		framework.Failf("Failed waiting for pods to be running: %v", err)
+		j.Failf("Failed waiting for pods to be running: %v", err)
 	}
 	return result
 }
@@ -2120,7 +2202,7 @@ func (j *ServiceTestJig) waitForPodsCreated(namespace string, replicas int) ([]s
 	timeout := 2 * time.Minute
 	// List the pods, making sure we observe all the replicas.
 	label := labels.SelectorFromSet(labels.Set(j.Labels))
-	framework.Logf("Waiting up to %v for %d pods to be created", timeout, replicas)
+	j.Logf("Waiting up to %v for %d pods to be created", timeout, replicas)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(2 * time.Second) {
 		options := api.ListOptions{LabelSelector: label}
 		pods, err := j.Client.Pods(namespace).List(options)
@@ -2136,10 +2218,10 @@ func (j *ServiceTestJig) waitForPodsCreated(namespace string, replicas int) ([]s
 			found = append(found, pod.Name)
 		}
 		if len(found) == replicas {
-			framework.Logf("Found all %d pods", replicas)
+			j.Logf("Found all %d pods", replicas)
 			return found, nil
 		}
-		framework.Logf("Found %d/%d pods - will retry", len(found), replicas)
+		j.Logf("Found %d/%d pods - will retry", len(found), replicas)
 	}
 	return nil, fmt.Errorf("Timeout waiting for %d pods to be created", replicas)
 }
@@ -2302,7 +2384,7 @@ func newEchoServerPodSpec(podName string) *api.Pod {
 // as the target for source IP preservation test. The client's source ip would
 // be echoed back by the web server.
 func (j *ServiceTestJig) launchEchoserverPodOnNode(f *framework.Framework, nodeName, podName string) {
-	framework.Logf("Creating echo server pod %q in namespace %q", podName, f.Namespace.Name)
+	j.Logf("Creating echo server pod %q in namespace %q", podName, f.Namespace.Name)
 	pod := newEchoServerPodSpec(podName)
 	pod.Spec.NodeName = nodeName
 	pod.ObjectMeta.Labels = j.Labels
@@ -2310,7 +2392,17 @@ func (j *ServiceTestJig) launchEchoserverPodOnNode(f *framework.Framework, nodeN
 	_, err := podClient.Create(pod)
 	framework.ExpectNoError(err)
 	framework.ExpectNoError(f.WaitForPodRunning(podName))
-	framework.Logf("Echo server pod %q in namespace %q running", pod.Name, f.Namespace.Name)
+	j.Logf("Echo server pod %q in namespace %q running", pod.Name, f.Namespace.Name)
+}
+
+func (j *ServiceTestJig) Logf(format string, args ...interface{}) {
+	fmt.Fprintf(&j.buffer, "DEBUG: "+format+"\n", args...)
+}
+
+func (j *ServiceTestJig) Failf(format string, args ...interface{}) {
+	// Dump the contents of the verbose logging before the Failf output
+	framework.Logf(j.buffer.String())
+	framework.Failf(format, args...)
 }
 
 func execSourceipTest(f *framework.Framework, c *client.Client, ns, nodeName, serviceIp string, servicePort int) (string, string) {
