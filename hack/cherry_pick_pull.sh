@@ -169,7 +169,7 @@ for pull in "${PULLS[@]}"; do
     fi
   }
   # set the subject
-  subject=$(grep "^Subject" "/tmp/${pull}.patch" | sed -e 's/Subject: \[PATCH\] //g')
+  subject=$(grep -m 1 "^Subject" "/tmp/${pull}.patch" | sed -e 's/Subject: \[PATCH//g' | sed 's/.*] //')
   SUBJECTS+=("#${pull}: ${subject}")
 done
 gitamcleanup=false
