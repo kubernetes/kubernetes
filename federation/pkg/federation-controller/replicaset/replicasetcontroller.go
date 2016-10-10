@@ -229,11 +229,13 @@ func (frsc *ReplicaSetController) Run(workers int, stopCh <-chan struct{}) {
 	}
 
 	go func() {
-		select {
-		case <-time.After(time.Minute):
-			frsc.replicaSetBackoff.GC()
-		case <-stopCh:
-			return
+		for {
+			select {
+			case <-time.After(time.Minute):
+				frsc.replicaSetBackoff.GC()
+			case <-stopCh:
+				return
+			}
 		}
 	}()
 
