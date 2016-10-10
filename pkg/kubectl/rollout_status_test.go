@@ -85,7 +85,7 @@ func TestDeploymentStatusViewerStatus(t *testing.T) {
 				UnavailableReplicas: 0,
 			},
 
-			msg:  "deployment foo successfully rolled out\n",
+			msg:  "deployment \"foo\" successfully rolled out\n",
 			done: true,
 		},
 		{
@@ -119,7 +119,7 @@ func TestDeploymentStatusViewerStatus(t *testing.T) {
 		}
 		client := fake.NewSimpleClientset(d).Extensions()
 		dsv := &DeploymentStatusViewer{c: client}
-		msg, done, err := dsv.Status("bar", "foo")
+		msg, done, err := dsv.Status("bar", "foo", 0)
 		if err != nil {
 			t.Fatalf("DeploymentStatusViewer.Status(): %v", err)
 		}
