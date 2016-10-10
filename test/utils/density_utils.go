@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	// "k8s.io/kubernetes/pkg/labels"
 
 	"github.com/golang/glog"
 )
@@ -31,6 +32,51 @@ import (
 const (
 	retries = 5
 )
+
+// type SaturationStrategy interface {
+// 	PrepareNodes(c clientset.Interface) error
+// 	Saturate(c clientset.Interface) error
+// 	CleanupNodes(c clientset.Interface) error
+// }
+
+// type SaturationConfig struct {
+// 	podsCount  int
+// 	nodesCount int
+// 	strategy   SaturationStrategy
+// }
+
+// func CreateNodesWithLabels(c clientset.Interface, num int, namePrefix string, labels map[string]string) error {
+// 	glog.Infof("Making %d nodes for prefix: %v", nodeCount, namePrefix)
+
+// 	baseNode := &api.Node{
+// 		ObjectMeta: api.ObjectMeta{
+// 			GenerateName: namePrefix,
+// 		},
+// 		Spec: api.NodeSpec{
+// 			ExternalID: "foobar",
+// 		},
+// 		Status: api.NodeStatus{
+// 			Capacity: api.ResourceList{
+// 				api.ResourcePods:   *resource.NewQuantity(110, resource.DecimalSI),
+// 				api.ResourceCPU:    resource.MustParse("4"),
+// 				api.ResourceMemory: resource.MustParse("32Gi"),
+// 			},
+// 			Phase: api.NodeRunning,
+// 			Conditions: []api.NodeCondition{
+// 				{Type: api.NodeReady, Status: api.ConditionTrue},
+// 			},
+// 		},
+// 	}
+// 	if len(labels) > 0 {
+// 		baseNode.ObjectMeta.Labels = labels
+// 	}
+
+// 	for i := 0; i < nodeCount; i++ {
+// 		if _, err := c.Core().Nodes().Create(baseNode); err != nil {
+// 			return err
+// 		}
+// 	}
+// }
 
 func AddLabelsToNode(c clientset.Interface, nodeName string, labels map[string]string) error {
 	tokens := make([]string, 0, len(labels))

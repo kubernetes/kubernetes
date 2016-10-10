@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
+	testutils "k8s.io/kubernetes/test/utils"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -186,8 +187,8 @@ var _ = framework.KubeDescribe("kubelet", func() {
 				By(fmt.Sprintf("Creating a RC of %d pods and wait until all pods of this RC are running", totalPods))
 				rcName := fmt.Sprintf("cleanup%d-%s", totalPods, string(uuid.NewUUID()))
 
-				Expect(framework.RunRC(framework.RCConfig{
-					Client:       f.Client,
+				Expect(testutils.RunRC(testutils.RCConfig{
+					ClientSet:    f.ClientSet,
 					Name:         rcName,
 					Namespace:    f.Namespace.Name,
 					Image:        framework.GetPauseImageName(f.Client),
@@ -205,7 +206,7 @@ var _ = framework.KubeDescribe("kubelet", func() {
 				}
 
 				By("Deleting the RC")
-				framework.DeleteRCAndPods(f.Client, f.ClientSet, f.Namespace.Name, rcName)
+				framework.DeleteRCAndPods(f.ClientSet, f.Namespace.Name, rcName)
 				// Check that the pods really are gone by querying /runningpods on the
 				// node. The /runningpods handler checks the container runtime (or its
 				// cache) and  returns a list of running pods. Some possible causes of

@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/watch"
 	"k8s.io/kubernetes/test/e2e/framework"
+	testutils "k8s.io/kubernetes/test/utils"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -175,7 +176,7 @@ func getContainerRestarts(c *client.Client, ns string, labelSelector labels.Sele
 	failedContainers := 0
 	containerRestartNodes := sets.NewString()
 	for _, p := range pods.Items {
-		for _, v := range framework.FailedContainers(&p) {
+		for _, v := range testutils.FailedContainers(&p) {
 			failedContainers = failedContainers + v.Restarts
 			containerRestartNodes.Insert(p.Spec.NodeName)
 		}
@@ -190,7 +191,7 @@ var _ = framework.KubeDescribe("DaemonRestart [Disruptive]", func() {
 	labelSelector := labels.Set(map[string]string{"name": rcName}).AsSelector()
 	existingPods := cache.NewStore(cache.MetaNamespaceKeyFunc)
 	var ns string
-	var config framework.RCConfig
+	var config testutils.RCConfig
 	var controller *cache.Controller
 	var newPods cache.Store
 	var stopCh chan struct{}
@@ -203,15 +204,15 @@ var _ = framework.KubeDescribe("DaemonRestart [Disruptive]", func() {
 
 		// All the restart tests need an rc and a watch on pods of the rc.
 		// Additionally some of them might scale the rc during the test.
-		config = framework.RCConfig{
-			Client:      f.Client,
+		config = testutils.RCConfig{
+			ClientSet:   f.ClientSet,
 			Name:        rcName,
 			Namespace:   ns,
 			Image:       framework.GetPauseImageName(f.Client),
 			Replicas:    numPods,
 			CreatedPods: &[]*api.Pod{},
 		}
-		Expect(framework.RunRC(config)).NotTo(HaveOccurred())
+		Expect(testutils.RunRC(config)).NotTo(HaveOccurred())
 		replacePods(*config.CreatedPods, existingPods)
 
 		stopCh = make(chan struct{})
@@ -261,7 +262,7 @@ var _ = framework.KubeDescribe("DaemonRestart [Disruptive]", func() {
 		// that it had the opportunity to create/delete pods, if it were going to do so. Scaling the RC
 		// to the same size achieves this, because the scale operation advances the RC's sequence number
 		// and awaits it to be observed and reported back in the RC's status.
-		framework.ScaleRC(f.Client, f.ClientSet, ns, rcName, numPods, true)
+		framework.ScaleRC(f.ClientSet, ns, rcName, numPods, true)
 
 		// Only check the keys, the pods can be different if the kubelet updated it.
 		// TODO: Can it really?
@@ -292,9 +293,9 @@ var _ = framework.KubeDescribe("DaemonRestart [Disruptive]", func() {
 		restarter.kill()
 		// This is best effort to try and create pods while the scheduler is down,
 		// since we don't know exactly when it is restarted after the kill signal.
-		framework.ExpectNoError(framework.ScaleRC(f.Client, f.ClientSet, ns, rcName, numPods+5, false))
+		framework.ExpectNoError(framework.ScaleRC(f.ClientSet, ns, rcName, numPods+5, false))
 		restarter.waitUp()
-		framework.ExpectNoError(framework.ScaleRC(f.Client, f.ClientSet, ns, rcName, numPods+5, true))
+		framework.ExpectNoError(framework.ScaleRC(f.ClientSet, ns, rcName, numPods+5, true))
 	})
 
 	It("Kubelet should not restart containers across restart", func() {

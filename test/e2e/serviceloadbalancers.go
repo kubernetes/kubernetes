@@ -22,6 +22,7 @@ import (
 	"net/http"
 
 	"k8s.io/kubernetes/pkg/api"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -34,25 +35,26 @@ import (
 )
 
 // getLoadBalancerControllers returns a list of LBCtesters.
-func getLoadBalancerControllers(client *client.Client) []LBCTester {
+func getLoadBalancerControllers(client *client.Client, cs clientset.Interface) []LBCTester {
 	return []LBCTester{
 		&haproxyControllerTester{
 			name:   "haproxy",
 			cfg:    "test/e2e/testing-manifests/serviceloadbalancer/haproxyrc.yaml",
 			client: client,
+			cs:     cs,
 		},
 	}
 }
 
 // getIngManagers returns a list of ingManagers.
-func getIngManagers(client *client.Client) []*ingManager {
+func getIngManagers(clientSet clientset.Interface) []*ingManager {
 	return []*ingManager{
 		{
 			name:        "netexec",
 			rcCfgPaths:  []string{"test/e2e/testing-manifests/serviceloadbalancer/netexecrc.yaml"},
 			svcCfgPaths: []string{"test/e2e/testing-manifests/serviceloadbalancer/netexecsvc.yaml"},
 			svcNames:    []string{},
-			client:      client,
+			clientSet:   clientSet,
 		},
 	}
 }
@@ -72,6 +74,7 @@ type LBCTester interface {
 // haproxyControllerTester implements LBCTester for bare metal haproxy LBs.
 type haproxyControllerTester struct {
 	client      *client.Client
+	cs          clientset.Interface
 	cfg         string
 	rcName      string
 	rcNamespace string
@@ -102,7 +105,7 @@ func (h *haproxyControllerTester) start(namespace string) (err error) {
 	if err != nil {
 		return
 	}
-	if err = framework.WaitForRCPodsRunning(h.client, namespace, rc.Name); err != nil {
+	if err = framework.WaitForRCPodsRunning(h.cs, namespace, rc.Name); err != nil {
 		return
 	}
 	h.rcName = rc.Name
@@ -151,7 +154,7 @@ type ingManager struct {
 	ingCfgPath  string
 	name        string
 	namespace   string
-	client      *client.Client
+	clientSet   clientset.Interface
 	svcNames    []string
 }
 
@@ -165,11 +168,11 @@ func (s *ingManager) start(namespace string) (err error) {
 		rc := rcFromManifest(rcPath)
 		rc.Namespace = namespace
 		rc.Spec.Template.Labels["name"] = rc.Name
-		rc, err = s.client.ReplicationControllers(rc.Namespace).Create(rc)
+		rc, err = s.clientSet.Core().ReplicationControllers(rc.Namespace).Create(rc)
 		if err != nil {
 			return
 		}
-		if err = framework.WaitForRCPodsRunning(s.client, rc.Namespace, rc.Name); err != nil {
+		if err = framework.WaitForRCPodsRunning(s.clientSet, rc.Namespace, rc.Name); err != nil {
 			return
 		}
 	}
@@ -179,7 +182,7 @@ func (s *ingManager) start(namespace string) (err error) {
 	for _, svcPath := range s.svcCfgPaths {
 		svc := svcFromManifest(svcPath)
 		svc.Namespace = namespace
-		svc, err = s.client.Services(svc.Namespace).Create(svc)
+		svc, err = s.clientSet.Core().Services(svc.Namespace).Create(svc)
 		if err != nil {
 			return
 		}
@@ -208,20 +211,22 @@ var _ = framework.KubeDescribe("ServiceLoadBalancer [Feature:ServiceLoadBalancer
 	// These variables are initialized after framework's beforeEach.
 	var ns string
 	var client *client.Client
+	var cs clientset.Interface
 
 	f := framework.NewDefaultFramework("servicelb")
 
 	BeforeEach(func() {
 		client = f.Client
+		cs = f.ClientSet
 		ns = f.Namespace.Name
 	})
 
 	It("should support simple GET on Ingress ips", func() {
-		for _, t := range getLoadBalancerControllers(client) {
+		for _, t := range getLoadBalancerControllers(client, cs) {
 			By(fmt.Sprintf("Starting loadbalancer controller %v in namespace %v", t.getName(), ns))
 			Expect(t.start(ns)).NotTo(HaveOccurred())
 
-			for _, s := range getIngManagers(client) {
+			for _, s := range getIngManagers(cs) {
 				By(fmt.Sprintf("Starting ingress manager %v in namespace %v", s.getName(), ns))
 				Expect(s.start(ns)).NotTo(HaveOccurred())
 

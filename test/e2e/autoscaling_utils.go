@@ -22,9 +22,10 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/test/e2e/framework"
+	testutils "k8s.io/kubernetes/test/utils"
 
 	. "github.com/onsi/ginkgo"
 )
@@ -96,7 +97,7 @@ cpuLimit argument is in millicores, cpuLimit is a maximum amount of cpu that can
 func newResourceConsumer(name, kind string, replicas, initCPUTotal, initMemoryTotal, initCustomMetric, consumptionTimeInSeconds, requestSizeInMillicores,
 	requestSizeInMegabytes int, requestSizeCustomMetric int, cpuLimit, memLimit int64, f *framework.Framework) *ResourceConsumer {
 
-	runServiceAndWorkloadForResourceConsumer(f.Client, f.Namespace.Name, name, kind, replicas, cpuLimit, memLimit)
+	runServiceAndWorkloadForResourceConsumer(f.ClientSet, f.Namespace.Name, name, kind, replicas, cpuLimit, memLimit)
 	rc := &ResourceConsumer{
 		name:                     name,
 		controllerName:           name + "-ctrl",
@@ -302,15 +303,15 @@ func (rc *ResourceConsumer) CleanUp() {
 	rc.stopCustomMetric <- 0
 	// Wait some time to ensure all child goroutines are finished.
 	time.Sleep(10 * time.Second)
-	framework.ExpectNoError(framework.DeleteRCAndPods(rc.framework.Client, rc.framework.ClientSet, rc.framework.Namespace.Name, rc.name))
+	framework.ExpectNoError(framework.DeleteRCAndPods(rc.framework.ClientSet, rc.framework.Namespace.Name, rc.name))
 	framework.ExpectNoError(rc.framework.Client.Services(rc.framework.Namespace.Name).Delete(rc.name))
-	framework.ExpectNoError(framework.DeleteRCAndPods(rc.framework.Client, rc.framework.ClientSet, rc.framework.Namespace.Name, rc.controllerName))
+	framework.ExpectNoError(framework.DeleteRCAndPods(rc.framework.ClientSet, rc.framework.Namespace.Name, rc.controllerName))
 	framework.ExpectNoError(rc.framework.Client.Services(rc.framework.Namespace.Name).Delete(rc.controllerName))
 }
 
-func runServiceAndWorkloadForResourceConsumer(c *client.Client, ns, name, kind string, replicas int, cpuLimitMillis, memLimitMb int64) {
+func runServiceAndWorkloadForResourceConsumer(c clientset.Interface, ns, name, kind string, replicas int, cpuLimitMillis, memLimitMb int64) {
 	By(fmt.Sprintf("Running consuming RC %s via %s with %v replicas", name, kind, replicas))
-	_, err := c.Services(ns).Create(&api.Service{
+	_, err := c.Core().Services(ns).Create(&api.Service{
 		ObjectMeta: api.ObjectMeta{
 			Name: name,
 		},
@@ -327,8 +328,8 @@ func runServiceAndWorkloadForResourceConsumer(c *client.Client, ns, name, kind s
 	})
 	framework.ExpectNoError(err)
 
-	rcConfig := framework.RCConfig{
-		Client:     c,
+	rcConfig := testutils.RCConfig{
+		ClientSet:  c,
 		Image:      resourceConsumerImage,
 		Name:       name,
 		Namespace:  ns,
@@ -338,23 +339,24 @@ func runServiceAndWorkloadForResourceConsumer(c *client.Client, ns, name, kind s
 		CpuLimit:   cpuLimitMillis,
 		MemRequest: memLimitMb * 1024 * 1024, // MemLimit is in bytes
 		MemLimit:   memLimitMb * 1024 * 1024,
+		LogFunc:    framework.Logf,
 	}
 
 	switch kind {
 	case kindRC:
-		framework.ExpectNoError(framework.RunRC(rcConfig))
+		framework.ExpectNoError(testutils.RunRC(rcConfig))
 		break
 	case kindDeployment:
-		dpConfig := framework.DeploymentConfig{
+		dpConfig := testutils.DeploymentConfig{
 			RCConfig: rcConfig,
 		}
-		framework.ExpectNoError(framework.RunDeployment(dpConfig))
+		framework.ExpectNoError(testutils.RunDeployment(dpConfig))
 		break
 	case kindReplicaSet:
-		rsConfig := framework.ReplicaSetConfig{
+		rsConfig := testutils.ReplicaSetConfig{
 			RCConfig: rcConfig,
 		}
-		framework.ExpectNoError(framework.RunReplicaSet(rsConfig))
+		framework.ExpectNoError(testutils.RunReplicaSet(rsConfig))
 		break
 	default:
 		framework.Failf(invalidKind)
@@ -362,7 +364,7 @@ func runServiceAndWorkloadForResourceConsumer(c *client.Client, ns, name, kind s
 
 	By(fmt.Sprintf("Running controller"))
 	controllerName := name + "-ctrl"
-	_, err = c.Services(ns).Create(&api.Service{
+	_, err = c.Core().Services(ns).Create(&api.Service{
 		ObjectMeta: api.ObjectMeta{
 			Name: controllerName,
 		},
@@ -380,8 +382,8 @@ func runServiceAndWorkloadForResourceConsumer(c *client.Client, ns, name, kind s
 	framework.ExpectNoError(err)
 
 	dnsClusterFirst := api.DNSClusterFirst
-	controllerRcConfig := framework.RCConfig{
-		Client:    c,
+	controllerRcConfig := testutils.RCConfig{
+		ClientSet: c,
 		Image:     resourceConsumerControllerImage,
 		Name:      controllerName,
 		Namespace: ns,
@@ -389,8 +391,9 @@ func runServiceAndWorkloadForResourceConsumer(c *client.Client, ns, name, kind s
 		Replicas:  1,
 		Command:   []string{"/controller", "--consumer-service-name=" + name, "--consumer-service-namespace=" + ns, "--consumer-port=80"},
 		DNSPolicy: &dnsClusterFirst,
+		LogFunc:   framework.Logf,
 	}
-	framework.ExpectNoError(framework.RunRC(controllerRcConfig))
+	framework.ExpectNoError(testutils.RunRC(controllerRcConfig))
 
 	// Make sure endpoints are propagated.
 	// TODO(piosz): replace sleep with endpoints watch.

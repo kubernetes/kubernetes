@@ -43,6 +43,7 @@ import (
 	"google.golang.org/api/googleapi"
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/labels"
@@ -53,6 +54,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/wait"
 	utilyaml "k8s.io/kubernetes/pkg/util/yaml"
 	"k8s.io/kubernetes/test/e2e/framework"
+	testutils "k8s.io/kubernetes/test/utils"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -843,6 +845,7 @@ type NginxIngressController struct {
 	rc         *api.ReplicationController
 	pod        *api.Pod
 	c          *client.Client
+	cs         clientset.Interface
 	externalIP string
 }
 
@@ -859,7 +862,7 @@ func (cont *NginxIngressController) init() {
 
 	framework.Logf("waiting for pods with label %v", rc.Spec.Selector)
 	sel := labels.SelectorFromSet(labels.Set(rc.Spec.Selector))
-	ExpectNoError(framework.WaitForPodsWithLabelRunning(cont.c, cont.ns, sel))
+	ExpectNoError(testutils.WaitForPodsWithLabelRunning(cont.cs, cont.ns, sel))
 	pods, err := cont.c.Pods(cont.ns).List(api.ListOptions{LabelSelector: sel})
 	ExpectNoError(err)
 	if len(pods.Items) == 0 {

@@ -90,7 +90,7 @@ var _ = framework.KubeDescribe("ClusterDns [Feature:Example]", func() {
 
 		// wait for objects
 		for _, ns := range namespaces {
-			framework.WaitForRCPodsRunning(c, ns.Name, backendRcName)
+			framework.WaitForRCPodsRunning(f.ClientSet, ns.Name, backendRcName)
 			framework.WaitForService(c, ns.Name, backendSvcName, true, framework.Poll, framework.ServiceStartTimeout)
 		}
 		// it is not enough that pods are running because they may be set to running, but

@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
+	testutils "k8s.io/kubernetes/test/utils"
 )
 
 var _ = framework.KubeDescribe("Multi-AZ Clusters", func() {
@@ -98,7 +99,7 @@ func SpreadServiceOrFail(f *framework.Framework, replicaCount int, image string)
 	// Based on the callers, replicas is always positive number: zoneCount >= 0 implies (2*zoneCount)+1 > 0.
 	// Thus, no need to test for it. Once the precondition changes to zero number of replicas,
 	// test for replicaCount > 0. Otherwise, StartPods panics.
-	framework.StartPods(f.Client, replicaCount, f.Namespace.Name, serviceName, *podSpec, false)
+	testutils.StartPods(f.ClientSet, replicaCount, f.Namespace.Name, serviceName, *podSpec, false)
 
 	// Wait for all of them to be scheduled
 	selector := labels.SelectorFromSet(labels.Set(map[string]string{"service": serviceName}))
@@ -219,7 +220,7 @@ func SpreadRCOrFail(f *framework.Framework, replicaCount int32, image string) {
 	// Cleanup the replication controller when we are done.
 	defer func() {
 		// Resize the replication controller to zero to get rid of pods.
-		if err := framework.DeleteRCAndPods(f.Client, f.ClientSet, f.Namespace.Name, controller.Name); err != nil {
+		if err := framework.DeleteRCAndPods(f.ClientSet, f.Namespace.Name, controller.Name); err != nil {
 			framework.Logf("Failed to cleanup replication controller %v: %v.", controller.Name, err)
 		}
 	}()

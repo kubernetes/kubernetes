@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
+	testutil "k8s.io/kubernetes/test/utils"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -62,7 +63,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		rc, err := c.ReplicationControllers(ns).Get(RCName)
 		if err == nil && rc.Spec.Replicas != 0 {
 			By("Cleaning up the replication controller")
-			err := framework.DeleteRCAndPods(c, f.ClientSet, ns, RCName)
+			err := framework.DeleteRCAndPods(f.ClientSet, ns, RCName)
 			framework.ExpectNoError(err)
 		}
 	})
@@ -126,7 +127,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		// and there is no need to create additional pods.
 		// StartPods requires at least one pod to replicate.
 		if podsNeededForSaturation > 0 {
-			framework.StartPods(c, podsNeededForSaturation, ns, "maxp",
+			testutil.StartPods(cs, podsNeededForSaturation, ns, "maxp",
 				*initPausePod(f, pausePodConfig{
 					Name:   "",
 					Labels: map[string]string{"name": ""},
@@ -187,7 +188,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		// and there is no need to create additional pods.
 		// StartPods requires at least one pod to replicate.
 		if podsNeededForSaturation > 0 {
-			framework.StartPods(c, podsNeededForSaturation, ns, "overcommit",
+			testutil.StartPods(cs, podsNeededForSaturation, ns, "overcommit",
 				*initPausePod(f, pausePodConfig{
 					Name:   "",
 					Labels: map[string]string{"name": ""},
@@ -513,7 +514,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		// cannot be scheduled onto it.
 		By("Launching two pods on two distinct nodes to get two node names")
 		CreateHostPortPods(f, "host-port", 2, true)
-		defer framework.DeleteRCAndPods(c, f.ClientSet, ns, "host-port")
+		defer framework.DeleteRCAndPods(f.ClientSet, ns, "host-port")
 		podList, err := c.Pods(ns).List(api.ListOptions{})
 		ExpectNoError(err)
 		Expect(len(podList.Items)).To(Equal(2))
