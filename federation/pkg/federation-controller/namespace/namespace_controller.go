@@ -180,14 +180,7 @@ func (nc *NamespaceController) Run(stopChan <-chan struct{}) {
 	nc.clusterDeliverer.StartWithHandler(func(_ *util.DelayingDelivererItem) {
 		nc.reconcileNamespacesOnClusterChange()
 	})
-	go func() {
-		select {
-		case <-time.After(time.Minute):
-			nc.namespaceBackoff.GC()
-		case <-stopChan:
-			return
-		}
-	}()
+	util.StartBackoffGC(nc.namespaceBackoff, stopChan)
 }
 
 func (nc *NamespaceController) deliverNamespaceObj(obj interface{}, delay time.Duration, failed bool) {

@@ -179,14 +179,7 @@ func (secretcontroller *SecretController) Run(stopChan <-chan struct{}) {
 	secretcontroller.clusterDeliverer.StartWithHandler(func(_ *util.DelayingDelivererItem) {
 		secretcontroller.reconcileSecretsOnClusterChange()
 	})
-	go func() {
-		select {
-		case <-time.After(time.Minute):
-			secretcontroller.secretBackoff.GC()
-		case <-stopChan:
-			return
-		}
-	}()
+	util.StartBackoffGC(secretcontroller.secretBackoff, stopChan)
 }
 
 func getSecretKey(namespace, name string) string {

@@ -228,17 +228,7 @@ func (fdc *DeploymentController) Run(workers int, stopCh <-chan struct{}) {
 		go wait.Until(fdc.worker, time.Second, stopCh)
 	}
 
-	go func() {
-		for {
-			// Perform backof registry cleanup from time to time.
-			select {
-			case <-time.After(time.Minute):
-				fdc.deploymentBackoff.GC()
-			case <-stopCh:
-				return
-			}
-		}
-	}()
+	fedutil.StartBackoffGC(fdc.deploymentBackoff, stopCh)
 
 	<-stopCh
 	glog.Infof("Shutting down DeploymentController")
