@@ -16,84 +16,75 @@ limitations under the License.
 
 package templates
 
-import "strings"
-
-func MainHelpTemplate() string {
-	return decorate(mainHelpTemplate, false)
-}
-
-func MainUsageTemplate() string {
-	return decorate(mainUsageTemplate, true) + "\n"
-}
-
-func OptionsHelpTemplate() string {
-	return decorate(optionsHelpTemplate, false)
-}
-
-func OptionsUsageTemplate() string {
-	return decorate(optionsUsageTemplate, false)
-}
-
-func decorate(template string, trim bool) string {
-	if trim && len(strings.Trim(template, " ")) > 0 {
-		template = strings.Trim(template, "\n")
-	}
-	return template
-}
+import (
+	"strings"
+	"unicode"
+)
 
 const (
-	vars = `{{$isRootCmd := isRootCmd .}}` +
+	SectionVars = `{{$isRootCmd := isRootCmd .}}` +
 		`{{$rootCmd := rootCmd .}}` +
 		`{{$visibleFlags := visibleFlags (flagsNotIntersected .LocalFlags .PersistentFlags)}}` +
 		`{{$explicitlyExposedFlags := exposed .}}` +
 		`{{$optionsCmdFor := optionsCmdFor .}}` +
 		`{{$usageLine := usageLine .}}`
 
-	mainHelpTemplate = `{{with or .Long .Short }}{{. | trim}}{{end}}{{if or .Runnable .HasSubCommands}}{{.UsageString}}{{end}}`
+	SectionAliases = `{{if gt .Aliases 0}}Aliases:
+{{.NameAndAliases}}
 
-	mainUsageTemplate = vars +
-		// ALIASES
-		`{{if gt .Aliases 0}}
+{{end}}`
 
-Aliases:
-{{.NameAndAliases}}{{end}}` +
+	SectionExamples = `{{if .HasExample}}Examples:
+{{trimRight .Example}}
 
-		// EXAMPLES
-		`{{if .HasExample}}
+{{end}}`
 
-Examples:
-{{ .Example}}{{end}}` +
+	SectionSubcommands = `{{if .HasAvailableSubCommands}}{{cmdGroupsString .}}
 
-		// SUBCOMMANDS
-		`{{ if .HasAvailableSubCommands}}
-{{range cmdGroups . .Commands}}
-{{.Message}}
-{{range .Commands}}{{if .Runnable}}  {{rpad .Name .NamePadding }} {{.Short}}
-{{end}}{{end}}{{end}}{{end}}` +
+{{end}}`
 
-		// VISIBLE FLAGS
-		`{{ if or $visibleFlags.HasFlags $explicitlyExposedFlags.HasFlags}}
+	SectionFlags = `{{ if or $visibleFlags.HasFlags $explicitlyExposedFlags.HasFlags}}Options:
+{{ if $visibleFlags.HasFlags}}{{trimRight (flagsUsages $visibleFlags)}}{{end}}{{ if $explicitlyExposedFlags.HasFlags}}{{trimRight (flagsUsages $explicitlyExposedFlags)}}{{end}}
 
-Options:
-{{ if $visibleFlags.HasFlags}}{{flagsUsages $visibleFlags}}{{end}}{{ if $explicitlyExposedFlags.HasFlags}}{{flagsUsages $explicitlyExposedFlags}}{{end}}{{end}}` +
+{{end}}`
 
-		// USAGE LINE
-		`{{if and .Runnable (ne .UseLine "") (ne .UseLine $rootCmd)}}
-Usage:
+	SectionUsage = `{{if and .Runnable (ne .UseLine "") (ne .UseLine $rootCmd)}}Usage:
   {{$usageLine}}
-{{end}}` +
 
-		// TIPS: --help
-		`{{ if .HasSubCommands }}
-Use "{{$rootCmd}} <command> --help" for more information about a given command.{{end}}` +
+{{end}}`
 
-		// TIPS: global options
-		`{{ if $optionsCmdFor}}
-Use "{{$optionsCmdFor}}" for a list of global command-line options (applies to all commands).{{end}}`
+	SectionTipsHelp = `{{if .HasSubCommands}}Use "{{$rootCmd}} <command> --help" for more information about a given command.
+{{end}}`
 
-	optionsHelpTemplate = ``
+	SectionTipsGlobalOptions = `{{if $optionsCmdFor}}Use "{{$optionsCmdFor}}" for a list of global command-line options (applies to all commands).
+{{end}}`
+)
 
-	optionsUsageTemplate = `{{ if .HasInheritedFlags}}The following options can be passed to any command:
+func MainHelpTemplate() string {
+	return `{{with or .Long .Short }}{{. | trim}}{{end}}{{if or .Runnable .HasSubCommands}}{{.UsageString}}{{end}}`
+}
+
+func MainUsageTemplate() string {
+	sections := []string{
+		"\n\n",
+		SectionVars,
+		SectionAliases,
+		SectionExamples,
+		SectionSubcommands,
+		SectionFlags,
+		SectionUsage,
+		SectionTipsHelp,
+		SectionTipsGlobalOptions,
+	}
+	return strings.TrimRightFunc(strings.Join(sections, ""), unicode.IsSpace)
+}
+
+func OptionsHelpTemplate() string {
+	return ""
+}
+
+func OptionsUsageTemplate() string {
+	return `{{ if .HasInheritedFlags}}The following options can be passed to any command:
 
 {{flagsUsages .InheritedFlags}}{{end}}`
-)
+}
