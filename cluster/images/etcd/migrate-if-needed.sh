@@ -79,7 +79,7 @@ fi
 if [ ! -d "${DATA_DIRECTORY}" ]; then
   mkdir -p "${DATA_DIRECTORY}"
 fi
-if [ ! "$(ls -A ${DATA_DIRECTORY})" ]; then
+if [ -z "$(ls -A ${DATA_DIRECTORY})" ]; then
   echo "${DATA_DIRECTORY} is empty - skipping migration"
   echo "${TARGET_VERSION}/${TARGET_STORAGE}" > "${DATA_DIRECTORY}/${VERSION_FILE}"
 	exit 0
