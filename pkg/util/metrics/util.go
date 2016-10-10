@@ -34,7 +34,7 @@ const (
 
 var (
 	metricsLock        sync.Mutex
-	rateLimiterMetrics map[string]prometheus.Gauge = make(map[string]prometheus.Gauge)
+	rateLimiterMetrics = make(map[string]prometheus.Gauge)
 )
 
 func registerRateLimiterMetric(ownerName string) error {
