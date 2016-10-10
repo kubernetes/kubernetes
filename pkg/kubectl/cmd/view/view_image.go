@@ -23,6 +23,7 @@ import (
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 )
@@ -94,7 +95,13 @@ func (o *imageOptions) Run(f *cmdutil.Factory, cmd *cobra.Command, args []string
 	for _, i := range infos {
 		f.VisitPodSpecForObject(i.Object, func(ps *api.PodSpec) error {
 			for _, c := range ps.Containers {
-				fmt.Fprintf(o.out, "%s\n", c.Image)
+				var resourceName string
+				if alias, ok := kubectl.ResourceShortFormFor(i.ResourceMapping().Resource); ok {
+					resourceName = alias
+				} else if resourceName == "" {
+					resourceName = "none"
+				}
+				fmt.Fprintf(o.out, "%s/%s %s\n", resourceName, i.Name, c.Image)
 			}
 			return nil
 		})

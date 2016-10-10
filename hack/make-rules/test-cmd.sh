@@ -2071,7 +2071,7 @@ __EOF__
   # Get image of a deployment
   output_message=$(kubectl view image deployment/nginx-deployment)
   # Post condition: both images are listed
-  expected_message=$(echo ${IMAGE_DEPLOYMENT_R1}; echo ${IMAGE_PERL})
+  expected_message=$(echo "deploy/nginx-deployment ${IMAGE_DEPLOYMENT_R1}"; echo "deploy/nginx-deployment ${IMAGE_PERL}")
   kube::test::if_has_string "${output_message}" "${expected_message}"
   # Clean up
   kubectl delete deployment nginx-deployment "${kube_flags[@]}"
