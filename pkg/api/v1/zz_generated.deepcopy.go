@@ -3465,6 +3465,7 @@ func DeepCopy_v1_Taint(in interface{}, out interface{}, c *conversion.Cloner) er
 		out.Key = in.Key
 		out.Value = in.Value
 		out.Effect = in.Effect
+		out.AddedTime = in.AddedTime.DeepCopy()
 		return nil
 	}
 }
@@ -3477,6 +3478,13 @@ func DeepCopy_v1_Toleration(in interface{}, out interface{}, c *conversion.Clone
 		out.Operator = in.Operator
 		out.Value = in.Value
 		out.Effect = in.Effect
+		if in.ForgivenessSeconds != nil {
+			in, out := &in.ForgivenessSeconds, &out.ForgivenessSeconds
+			*out = new(int64)
+			**out = **in
+		} else {
+			out.ForgivenessSeconds = nil
+		}
 		return nil
 	}
 }
