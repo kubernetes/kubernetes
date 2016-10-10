@@ -137,7 +137,7 @@ func (d *YAMLDecoder) Close() error {
 }
 
 const yamlSeparator = "\n---"
-const separator = "---\n"
+const separator = "---"
 
 // splitYAMLDocument is a bufio.SplitFunc for splitting YAML streams into individual documents.
 func splitYAMLDocument(data []byte, atEOF bool) (advance int, token []byte, err error) {
@@ -246,16 +246,28 @@ func (r *YAMLReader) Read() ([]byte, error) {
 			return nil, err
 		}
 
-		if string(line) == separator || err == io.EOF {
+		sep := len([]byte(separator))
+		if i := bytes.Index(line, []byte(separator)); i == 0 {
+			// We have a potential document terminator
+			i += sep
+			after := line[i:]
+			if len(strings.TrimRightFunc(string(after), unicode.IsSpace)) == 0 {
+				if buffer.Len() != 0 {
+					return buffer.Bytes(), nil
+				}
+				if err == io.EOF {
+					return nil, err
+				}
+			}
+		}
+		if err == io.EOF {
 			if buffer.Len() != 0 {
+				// If we're at EOF, we have a final, non-terminated line. Return it.
 				return buffer.Bytes(), nil
 			}
-			if err == io.EOF {
-				return nil, err
-			}
-		} else {
-			buffer.Write(line)
+			return nil, err
 		}
+		buffer.Write(line)
 	}
 }
 
