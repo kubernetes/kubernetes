@@ -301,23 +301,24 @@ Sample command skeleton:
 // MineRecommendedName is the recommended command name for kubectl mine.
 const MineRecommendedName = "mine"
 
+// Long command description and examples.
+var (
+  mineLong = templates.LongDesc(`
+    mine which is described here
+    with lots of details.`)
+
+  mineExample = templates.Examples(`
+    # Run my command's first action
+    kubectl mine first_action
+
+    # Run my command's second action on latest stuff
+    kubectl mine second_action --flag`)
+)
+
 // MineConfig contains all the options for running the mine cli command.
 type MineConfig struct {
   mineLatest bool
 }
-
-var (
-  mineLong = dedent.Dedent(`
-        mine which is described here
-        with lots of details.`)
-
-  mineExample = dedent.Dedent(`
-          # Run my command's first action
-          kubectl mine first_action
-
-          # Run my command's second action on latest stuff
-          kubectl mine second_action --flag`)
-)
 
 // NewCmdMine implements the kubectl mine command.
 func NewCmdMine(parent, name string, f *cmdutil.Factory, out io.Writer) *cobra.Command {
