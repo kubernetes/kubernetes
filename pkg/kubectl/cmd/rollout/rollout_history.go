@@ -68,6 +68,9 @@ func RunHistory(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []st
 		return cmdutil.UsageError(cmd, "Required resource not specified.")
 	}
 	revision := cmdutil.GetFlagInt64(cmd, "revision")
+	if revision < 0 {
+		return fmt.Errorf("revision must be a positive integer: %v", revision)
+	}
 
 	mapper, typer := f.Object()
 
