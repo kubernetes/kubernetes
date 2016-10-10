@@ -22,43 +22,43 @@ import (
 )
 
 type Config struct {
-	//the endpoint to hit to scrape metrics
+	// the endpoint to hit to scrape metrics
 	Endpoint EndpointConfig `json:"endpoint"`
 
-	//holds information about different metrics that can be collected
+	// holds information about different metrics that can be collected
 	MetricsConfig []MetricConfig `json:"metrics_config"`
 }
 
 // metricConfig holds information extracted from the config file about a metric
 type MetricConfig struct {
-	//the name of the metric
+	// the name of the metric
 	Name string `json:"name"`
 
-	//enum type for the metric type
+	// enum type for the metric type
 	MetricType v1.MetricType `json:"metric_type"`
 
 	// metric units to display on UI and in storage (eg: MB, cores)
 	// this is only used for display.
 	Units string `json:"units"`
 
-	//data type of the metric (eg: int, float)
+	// data type of the metric (eg: int, float)
 	DataType v1.DataType `json:"data_type"`
 
-	//the frequency at which the metric should be collected
+	// the frequency at which the metric should be collected
 	PollingFrequency time.Duration `json:"polling_frequency"`
 
-	//the regular expression that can be used to extract the metric
+	// the regular expression that can be used to extract the metric
 	Regex string `json:"regex"`
 }
 
 type Prometheus struct {
-	//the endpoint to hit to scrape metrics
+	// the endpoint to hit to scrape metrics
 	Endpoint EndpointConfig `json:"endpoint"`
 
-	//the frequency at which metrics should be collected
+	// the frequency at which metrics should be collected
 	PollingFrequency time.Duration `json:"polling_frequency"`
 
-	//holds names of different metrics that can be collected
+	// holds names of different metrics that can be collected
 	MetricsConfig []string `json:"metrics_config"`
 }
 

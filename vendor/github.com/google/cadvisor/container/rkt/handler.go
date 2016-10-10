@@ -84,7 +84,7 @@ func newRktContainerHandler(name string, rktClient rktapi.PublicAPIClient, rktPa
 		return nil, fmt.Errorf("this should be impossible!, new handler failing, but factory allowed, name = %s", name)
 	}
 
-	//rktnetes uses containerID: rkt://fff40827-b994-4e3a-8f88-6427c2c8a5ac:nginx
+	// rktnetes uses containerID: rkt://fff40827-b994-4e3a-8f88-6427c2c8a5ac:nginx
 	if parsed.Container == "" {
 		isPod = true
 		aliases = append(aliases, "rkt://"+parsed.Pod)
