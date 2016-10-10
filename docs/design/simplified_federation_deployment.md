@@ -128,7 +128,7 @@ registration and deregistration will be facilitated through
    on that machine.
 
 
-#### Cluster Registration/Deregistration Experience
+#### Cluster Registration Experience
 
 1. User downloads the
    [`kubectl`](http://kubernetes.io/docs/getting-started-guides/kubeadm/)
@@ -140,7 +140,21 @@ registration and deregistration will be facilitated through
     $ kubectl register mycluster
     ```
 
-   to register their cluster named `mycluster`.
+   to register their cluster named `mycluster`, where `mycluster` is the
+   name of the cluster's context in the local kubeconfig.
+
+#### Cluster Deregistration Experience
+
+1. To deregister a cluster, user runs:
+
+    ```shell
+    $ kubectl deregister mycluster
+    ```
+
+### Points for Discussion:
+
+1. Is `unregister` a better verb than `deregister`?
+2. Does the verb pair `join/unjoin` make more sense in this context?
 
 
 ## Design
@@ -193,14 +207,14 @@ to bootstrap a federation control plane.
 
 **5. Create a persistent volume and a claim to store the federation API server's state**
 
-* Create a peristent volume claim in the `federation-system` namespace.
+* Create a persistent volume claim in the `federation-system` namespace.
 * Also request a dynamically provisioned persistent storage device for
   the PVC.
 
 **6. Create federation API server**
 
-* Create a deployment for the federation API server in the
-  `federation-system` namespace.
+* Create a deployment for the federation API server in the `federation-
+  system` namespace.
 * The pod template spec is composed of two containers: one for `etcd`
   and the other one for the federation API server.
 * The pod template spec references the PVC created in the previous step
@@ -227,11 +241,19 @@ to bootstrap a federation control plane.
 * The mounted kubeconfig file is passed as an argument to the federation
   controller manager's `--kubeconfig` flag.
 
+##### Additional enhancements
+
+Users can pass `--register` as an additional flag to `kubeadm init
+federation` to also register the cluster with federation. See the
+[Cluster Registration/Deregistration](#cluster-
+registrationderegistration) section below for details on how this is
+done.
+
 ##### Caveats
 
 * In the first phase of this implementation, we only create a single
   instance of `etcd`. This neither makes `etcd` nor the federation
-  control plane HA. HA federation control plane is on the roadmap and
+  control plane HA. HA federation control plane is on the road map and
   will arrive in one of the future releases.
 * Federation control plane components aren't started until additional
   nodes join the bootstrap cluster. In other words, these components
@@ -242,10 +264,63 @@ to bootstrap a federation control plane.
 
 #### Cluster Registration/Deregistration
 
+`kubectl` is Kubernetes' client-side CLI used for ongoing day-to-day
+interactions with a set of clusters. `kubectl` is already being extended
+to enable interactions with federation. Users can also already use
+`kubectl` to register clusters with and deregister clusters from
+federation. As already described, this process is manual, tedious and
+error-prone. Hence, we aim to reduce these processes to a single command
+each.
 
+##### Registration
 
+When a user runs `kubectl register <cluster-context-name> --bootstrap-
+cluster=<bootstrap-cluster-context>`, we perform the following operations
+assuming that the current kubeconfig context is a federation endpoint:
+
+**1. Create a kubeconfig secret for the cluster in federation**
+
+* Read the kubeconfig fields: `cluster`, `user` and `context`
+  corresponding to the context `<cluster-context-name>` into a separate
+  kubeconfig and create a secret for that in the the bootstrap cluster
+  indicated by the `--bootstrap-cluster` flag.
+
+**2. Retrieve the cluster endpoint**
+
+* Read the API server endpoint for `<cluster-context-name>` from the
+  `cluster` field in the local kubeconfig file.
+
+**3. Create the cluster resource in federation**
+
+* Using the `<cluster-context-name>`'s API server endpoint and the
+  kubeconfig secret name, create the cluster API resource in federation.
+
+##### Deregistration
+
+When a user runs `kubectl unregister <cluster-context-name> --bootstrap-
+cluster`, we perform the following operations, again assuming that the
+current kubeconfig context is a federation endpoint:
+
+**1. Remove the cluster resource from federation**
+
+* Remove the cluster API resource corresponding to `<cluster-context-
+name>` from federation.
+
+**2. Remove the credentials secret**
+
+* Remove the kubeconfig secret that we created during the registration
+  process from the bootstrap cluster.
+
+**Note:** `--bootstrap-cluster` flag is only required because federation
+still doesn't support selecting specific clusters in federated secrets.
+It copies them to all the underlying clusters. It is unnecessary to copy
+the credentials in clusters other than the bootstrap cluster. And since
+these are secrets that include cluster credentials, we want to err on
+the side of being too conservative. This flag can be deprecated once
+federated secrets gain cluster selection support.
 
 ## Test Plan
+
 
 
 
@@ -253,13 +328,13 @@ to bootstrap a federation control plane.
 
 Both the federation control plane deployment functionality via `kubeadm`
 and the cluster registration/deregistration functionality via `kubectl`
-are planned to be implemented in the v1.5 timeframe and are considered a
+are planned to be implemented in the v1.5 time frame and are considered a
 P0 feature for v1.5.
 
 
 ## Maturity Level
 
-Both functionalities will be labelled "alpha" in v1.5.
+Both functionalities will be labeled "alpha" in v1.5.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
