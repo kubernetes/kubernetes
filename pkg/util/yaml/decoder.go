@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"os"
 	"strings"
 	"unicode"
 
@@ -52,10 +53,16 @@ type YAMLToJSONDecoder struct {
 // stream in chunks by converting each document (as defined by
 // the YAML spec) into its own chunk, converting it to JSON via
 // yaml.YAMLToJSON, and then passing it to json.Decoder.
-func NewYAMLToJSONDecoder(r io.Reader) *YAMLToJSONDecoder {
+func NewYAMLToJSONDecoder(r io.Reader, bytes []byte, isStdin bool) *YAMLToJSONDecoder {
 	reader := bufio.NewReader(r)
-	return &YAMLToJSONDecoder{
-		reader: NewYAMLReader(reader),
+	if isStdin && sessionIsTTY() {
+		return &YAMLToJSONDecoder{
+			reader: NewYAMLByteReader(bytes),
+		}
+	} else {
+		return &YAMLToJSONDecoder{
+			reader: NewYAMLReader(reader),
+		}
 	}
 }
 
@@ -198,13 +205,14 @@ func NewYAMLOrJSONDecoder(r io.Reader, bufferSize int) *YAMLOrJSONDecoder {
 // provide object, or returns an error.
 func (d *YAMLOrJSONDecoder) Decode(into interface{}) error {
 	if d.decoder == nil {
-		buffer, isJSON := GuessJSONStream(d.r, d.bufferSize)
+		buffer, b, isJSON := GuessJSONStream(d.r, d.bufferSize)
+		isStdinReader := d.r == os.Stdin
 		if isJSON {
 			glog.V(4).Infof("decoding stream as JSON")
 			d.decoder = json.NewDecoder(buffer)
 		} else {
 			glog.V(4).Infof("decoding stream as YAML")
-			d.decoder = NewYAMLToJSONDecoder(buffer)
+			d.decoder = NewYAMLToJSONDecoder(buffer, b, isStdinReader)
 		}
 	}
 	err := d.decoder.Decode(into)
@@ -235,6 +243,32 @@ func NewYAMLReader(r *bufio.Reader) *YAMLReader {
 	return &YAMLReader{
 		reader: &LineReader{reader: r},
 	}
+}
+
+type YAMLByteReader struct {
+	bytes []byte
+}
+
+func NewYAMLByteReader(b []byte) *YAMLByteReader {
+	return &YAMLByteReader{bytes: b}
+}
+
+func (r *YAMLByteReader) Read() ([]byte, error) {
+	if len(r.bytes) == 0 {
+		return nil, io.EOF
+	}
+
+	var buffer bytes.Buffer
+	var lines = strings.SplitAfter(string(r.bytes), "\n")
+	for _, line := range lines {
+		var lineByte = []byte(line)
+		if line == separator && buffer.Len() != 0 {
+			return buffer.Bytes(), nil
+		} else {
+			buffer.Write(lineByte)
+		}
+	}
+	return buffer.Bytes(), nil
 }
 
 // Read returns a full YAML document.
@@ -296,10 +330,10 @@ func (r *LineReader) Read() ([]byte, error) {
 // GuessJSONStream scans the provided reader up to size, looking
 // for an open brace indicating this is JSON. It will return the
 // bufio.Reader it creates for the consumer.
-func GuessJSONStream(r io.Reader, size int) (io.Reader, bool) {
+func GuessJSONStream(r io.Reader, size int) (io.Reader, []byte, bool) {
 	buffer := bufio.NewReaderSize(r, size)
 	b, _ := buffer.Peek(size)
-	return buffer, hasJSONPrefix(b)
+	return buffer, b, hasJSONPrefix(b)
 }
 
 var jsonPrefix = []byte("{")
@@ -315,4 +349,15 @@ func hasJSONPrefix(buf []byte) bool {
 func hasPrefix(buf []byte, prefix []byte) bool {
 	trim := bytes.TrimLeftFunc(buf, unicode.IsSpace)
 	return bytes.HasPrefix(trim, prefix)
+}
+
+// sessionIsTTY returns true when the Stdin reader is reading from terminal
+// as opposed to having data being piped in
+func sessionIsTTY() bool {
+	stat, _ := os.Stdin.Stat()
+	if (stat.Mode() & os.ModeCharDevice) == 0 {
+		return false
+	} else {
+		return true
+	}
 }
