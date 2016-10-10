@@ -19,5 +19,5 @@ package api
 const (
 	DefaultServiceDNSDomain  = "cluster.local"
 	DefaultServicesSubnet    = "10.12.0.0/12"
-	DefaultKubernetesVersion = "v1.4.0"
+	DefaultKubernetesVersion = "v1.4.1"
 )
