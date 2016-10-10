@@ -321,15 +321,53 @@ federated secrets gain cluster selection support.
 
 ## Test Plan
 
+#### Federation Control Plane Bootstrap
 
+End-to-end testing of `kubeadm` functionality is somewhat tricky because
+`kubeadm init` and hence `kubeadm init federation` prints out a token to
+STDOUT that must be used in all the `kubeadm join` invocations on the
+non-master Kubernetes nodes. Given that, here is an overview of how we
+plan to test the federation bootstrap functionality.
+
+**1. kubernetes-anywhere for resource provisioning**
+
+* We use
+  [kubernetes-anywhere](https://github.com/kubernetes/kubernetes-anywhere)
+  to provision cloud resources, i.e. VMs, Networking etc.
+
+**2. Provide a customized VM startup script**
+
+* We provide a customized `configure-vm.sh` script to run during VM
+  startup.
+* On the master VM, this script runs `kubeadm init federation` which
+  prints out a token.
+* The token is written to an object store (GCS on GCP and S3 on AWS).
+* On the non-master nodes, `configure-vm.sh` script polls for the token
+  object in the pre-configured storage bucket.
+* Once that appears, it uses the token to run `kubeadm join <token>`.
+
+**3. Verify that the federation control plane is up and running**
+
+* We verify that the federation control plane pods are up and are in
+  "Running" state.
+* We verify that the request to a discovery endpoint on the federation
+  API server returns a valid response.
+
+#### Cluster Registration/Deregistration
+
+This should be as simple as running `kubectl register <cluster-context>`
+and verifying that the registered cluster reports "Ready" status.
+
+Running `kubectl unregister <cluster-context>` should not list the
+unregistered cluster.
 
 
 ## Timeline
 
 Both the federation control plane deployment functionality via `kubeadm`
 and the cluster registration/deregistration functionality via `kubectl`
-are planned to be implemented in the v1.5 time frame and are considered a
-P0 feature for v1.5.
+are planned to be implemented in the v1.5 time frame and are considered
+a P0 feature for v1.5.
 
 
 ## Maturity Level
