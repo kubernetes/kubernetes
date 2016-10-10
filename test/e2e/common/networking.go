@@ -20,7 +20,6 @@ import (
 	. "github.com/onsi/ginkgo"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/test/e2e/framework"
-	networking_util "k8s.io/kubernetes/test/utils"
 )
 
 var _ = framework.KubeDescribe("Networking", func() {
@@ -32,30 +31,30 @@ var _ = framework.KubeDescribe("Networking", func() {
 		// expect exactly one unique hostname. Each of these endpoints reports
 		// its own hostname.
 		It("should function for intra-pod communication: http [Conformance]", func() {
-			config := networking_util.NewCoreNetworkingTestConfig(f)
+			config := framework.NewCoreNetworkingTestConfig(f)
 			for _, endpointPod := range config.EndpointPods {
-				config.DialFromTestContainer("http", endpointPod.Status.PodIP, networking_util.EndpointHttpPort, config.MaxTries, 0, sets.NewString(endpointPod.Name))
+				config.DialFromTestContainer("http", endpointPod.Status.PodIP, framework.EndpointHttpPort, config.MaxTries, 0, sets.NewString(endpointPod.Name))
 			}
 		})
 
 		It("should function for intra-pod communication: udp [Conformance]", func() {
-			config := networking_util.NewCoreNetworkingTestConfig(f)
+			config := framework.NewCoreNetworkingTestConfig(f)
 			for _, endpointPod := range config.EndpointPods {
-				config.DialFromTestContainer("udp", endpointPod.Status.PodIP, networking_util.EndpointUdpPort, config.MaxTries, 0, sets.NewString(endpointPod.Name))
+				config.DialFromTestContainer("udp", endpointPod.Status.PodIP, framework.EndpointUdpPort, config.MaxTries, 0, sets.NewString(endpointPod.Name))
 			}
 		})
 
 		It("should function for node-pod communication: http [Conformance]", func() {
-			config := networking_util.NewCoreNetworkingTestConfig(f)
+			config := framework.NewCoreNetworkingTestConfig(f)
 			for _, endpointPod := range config.EndpointPods {
-				config.DialFromNode("http", endpointPod.Status.PodIP, networking_util.EndpointHttpPort, config.MaxTries, 0, sets.NewString(endpointPod.Name))
+				config.DialFromNode("http", endpointPod.Status.PodIP, framework.EndpointHttpPort, config.MaxTries, 0, sets.NewString(endpointPod.Name))
 			}
 		})
 
 		It("should function for node-pod communication: udp [Conformance]", func() {
-			config := networking_util.NewCoreNetworkingTestConfig(f)
+			config := framework.NewCoreNetworkingTestConfig(f)
 			for _, endpointPod := range config.EndpointPods {
-				config.DialFromNode("udp", endpointPod.Status.PodIP, networking_util.EndpointUdpPort, config.MaxTries, 0, sets.NewString(endpointPod.Name))
+				config.DialFromNode("udp", endpointPod.Status.PodIP, framework.EndpointUdpPort, config.MaxTries, 0, sets.NewString(endpointPod.Name))
 			}
 		})
 	})
