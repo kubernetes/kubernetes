@@ -147,3 +147,47 @@ func TestGroupVersionMarshalJSON(t *testing.T) {
 		}
 	}
 }
+
+func TestKindForGroupVersionKinds(t *testing.T) {
+	gvks := GroupVersions{
+		GroupVersion{Group: "batch", Version: "v1"},
+		GroupVersion{Group: "batch", Version: "v2alpha1"},
+		GroupVersion{Group: "policy", Version: "v1alpha1"},
+	}
+	cases := []struct {
+		input  []GroupVersionKind
+		target GroupVersionKind
+		ok     bool
+	}{
+		{
+			input:  []GroupVersionKind{{Group: "batch", Version: "v2alpha1", Kind: "ScheduledJob"}},
+			target: GroupVersionKind{Group: "batch", Version: "v2alpha1", Kind: "ScheduledJob"},
+			ok:     true,
+		},
+		{
+			input:  []GroupVersionKind{{Group: "batch", Version: "v3alpha1", Kind: "CronJob"}},
+			target: GroupVersionKind{Group: "batch", Version: "v1", Kind: "CronJob"},
+			ok:     true,
+		},
+		{
+			input:  []GroupVersionKind{{Group: "policy", Version: "v1alpha1", Kind: "PodDisruptionBudget"}},
+			target: GroupVersionKind{Group: "policy", Version: "v1alpha1", Kind: "PodDisruptionBudget"},
+			ok:     true,
+		},
+		{
+			input:  []GroupVersionKind{{Group: "apps", Version: "v1alpha1", Kind: "PetSet"}},
+			target: GroupVersionKind{},
+			ok:     false,
+		},
+	}
+
+	for i, c := range cases {
+		target, ok := gvks.KindForGroupVersionKinds(c.input)
+		if c.target != target {
+			t.Errorf("%d: unexpected target: %v, expected %v", i, target, c.target)
+		}
+		if c.ok != ok {
+			t.Errorf("%d: unexpected ok: %v, expected %v", i, ok, c.ok)
+		}
+	}
+}
