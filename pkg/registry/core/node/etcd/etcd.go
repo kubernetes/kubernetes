@@ -30,6 +30,8 @@ import (
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/types"
+	nodeutil "k8s.io/kubernetes/pkg/util/node"
 )
 
 // NodeStorage includes storage for nodes and all sub resources
@@ -126,30 +128,31 @@ func (r *REST) ResourceLocation(ctx api.Context, id string) (*url.URL, http.Roun
 
 var _ = client.ConnectionInfoGetter(&REST{})
 
-func (r *REST) getKubeletPort(ctx api.Context, nodeName string) (int, error) {
-	// We probably shouldn't care about context when looking for Node object.
-	obj, err := r.Get(ctx, nodeName)
+func (r *REST) GetConnectionInfo(ctx api.Context, nodeName types.NodeName) (string, string, uint, http.RoundTripper, error) {
+	scheme, port, transport, err := r.connection.GetRawConnectionInfo(ctx, nodeName)
 	if err != nil {
-		return 0, err
+		return "", "", 0, nil, err
+	}
+
+	// We probably shouldn't care about context when looking for Node object.
+	obj, err := r.Get(ctx, string(nodeName))
+	if err != nil {
+		return "", "", 0, nil, err
 	}
 	node, ok := obj.(*api.Node)
 	if !ok {
-		return 0, fmt.Errorf("Unexpected object type: %#v", node)
+		return "", "", 0, nil, fmt.Errorf("Unexpected object type: %#v", node)
 	}
-	return int(node.Status.DaemonEndpoints.KubeletEndpoint.Port), nil
-}
 
-func (c *REST) GetConnectionInfo(ctx api.Context, nodeName string) (string, uint, http.RoundTripper, error) {
-	scheme, port, transport, err := c.connection.GetRawConnectionInfo(ctx, nodeName)
+	hostIP, err := nodeutil.GetNodeHostIP(node)
 	if err != nil {
-		return "", 0, nil, err
+		return "", "", 0, nil, err
 	}
-	daemonPort, err := c.getKubeletPort(ctx, nodeName)
-	if err != nil {
-		return "", 0, nil, err
-	}
+	host := hostIP.String()
+
+	daemonPort := int(node.Status.DaemonEndpoints.KubeletEndpoint.Port)
 	if daemonPort > 0 {
-		return scheme, uint(daemonPort), transport, nil
+		return scheme, host, uint(daemonPort), transport, nil
 	}
-	return scheme, port, transport, nil
+	return scheme, host, port, transport, nil
 }
