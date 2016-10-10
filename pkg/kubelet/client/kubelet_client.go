@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/transport"
+	"k8s.io/kubernetes/pkg/types"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 )
 
@@ -51,11 +52,11 @@ type KubeletClientConfig struct {
 
 // KubeletClient is an interface for all kubelet functionality
 type KubeletClient interface {
-	GetRawConnectionInfo(ctx api.Context, nodeName string) (scheme string, port uint, transport http.RoundTripper, err error)
+	GetRawConnectionInfo(ctx api.Context, nodeName types.NodeName) (scheme string, port uint, transport http.RoundTripper, err error)
 }
 
 type ConnectionInfoGetter interface {
-	GetConnectionInfo(ctx api.Context, nodeName string) (scheme string, port uint, transport http.RoundTripper, err error)
+	GetConnectionInfo(ctx api.Context, nodeName types.NodeName) (scheme string, host string, port uint, transport http.RoundTripper, err error)
 }
 
 // HTTPKubeletClient is the default implementation of KubeletHealthchecker, accesses the kubelet over HTTP.
@@ -98,8 +99,8 @@ func NewStaticKubeletClient(config *KubeletClientConfig) (KubeletClient, error) 
 }
 
 // In default HTTPKubeletClient ctx is unused.
-func (c *HTTPKubeletClient) GetRawConnectionInfo(ctx api.Context, nodeName string) (string, uint, http.RoundTripper, error) {
-	if errs := validation.ValidateNodeName(nodeName, false); len(errs) != 0 {
+func (c *HTTPKubeletClient) GetRawConnectionInfo(ctx api.Context, nodeName types.NodeName) (string, uint, http.RoundTripper, error) {
+	if errs := validation.ValidateNodeName(string(nodeName), false); len(errs) != 0 {
 		return "", 0, nil, fmt.Errorf("invalid node name: %s", strings.Join(errs, ";"))
 	}
 	scheme := "http"
@@ -114,7 +115,7 @@ func (c *HTTPKubeletClient) GetRawConnectionInfo(ctx api.Context, nodeName strin
 // no kubelets.
 type FakeKubeletClient struct{}
 
-func (c FakeKubeletClient) GetRawConnectionInfo(ctx api.Context, nodeName string) (string, uint, http.RoundTripper, error) {
+func (c FakeKubeletClient) GetRawConnectionInfo(ctx api.Context, nodeName types.NodeName) (string, uint, http.RoundTripper, error) {
 	return "", 0, nil, errors.New("Not Implemented")
 }
 

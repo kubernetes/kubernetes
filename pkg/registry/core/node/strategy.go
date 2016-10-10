@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/runtime"
 	pkgstorage "k8s.io/kubernetes/pkg/storage"
+	"k8s.io/kubernetes/pkg/types"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/validation/field"
@@ -189,13 +190,13 @@ func ResourceLocation(getter ResourceGetter, connection client.ConnectionInfoGet
 	// We check if we want to get a default Kubelet's transport. It happens if either:
 	// - no port is specified in request (Kubelet's port is default),
 	// - we're using Port stored as a DaemonEndpoint and requested port is a Kubelet's port stored in the DaemonEndpoint,
-	// - there's no information in the API about DaemonEnpoint (legacy cluster) and requested port is equal to ports.KubeletPort (cluster-wide config)
+	// - there's no information in the API about DaemonEndpoint (legacy cluster) and requested port is equal to ports.KubeletPort (cluster-wide config)
 	kubeletPort := node.Status.DaemonEndpoints.KubeletEndpoint.Port
 	if kubeletPort == 0 {
 		kubeletPort = ports.KubeletPort
 	}
 	if portReq == "" || strconv.Itoa(int(kubeletPort)) == portReq {
-		scheme, port, kubeletTransport, err := connection.GetConnectionInfo(ctx, node.Name)
+		scheme, host, port, kubeletTransport, err := connection.GetConnectionInfo(ctx, types.NodeName(node.Name))
 		if err != nil {
 			return nil, nil, err
 		}
