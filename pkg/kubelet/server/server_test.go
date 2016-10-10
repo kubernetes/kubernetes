@@ -49,6 +49,7 @@ import (
 	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubecontainertesting "k8s.io/kubernetes/pkg/kubelet/container/testing"
@@ -64,6 +65,7 @@ const (
 )
 
 type fakeKubelet struct {
+	kubeletConfigurationFunc           func() componentconfig.KubeletConfiguration
 	podByNameFunc                      func(namespace, name string) (*v1.Pod, bool)
 	containerInfoFunc                  func(podFullName string, uid types.UID, containerName string, req *cadvisorapi.ContainerInfoRequest) (*cadvisorapi.ContainerInfo, error)
 	rawInfoFunc                        func(query *cadvisorapi.ContainerInfoRequest) (map[string]*cadvisorapi.ContainerInfo, error)
@@ -110,6 +112,10 @@ func (fk *fakeKubelet) GetCachedMachineInfo() (*cadvisorapi.MachineInfo, error) 
 
 func (fk *fakeKubelet) GetPods() []*v1.Pod {
 	return fk.podsFunc()
+}
+
+func (fk *fakeKubelet) GetComponentConfigs() componentconfig.KubeletConfiguration {
+	return fk.kubeletConfigurationFunc()
 }
 
 func (fk *fakeKubelet) GetRunningPods() ([]*v1.Pod, error) {
@@ -268,6 +274,51 @@ func getPodName(name, namespace string) string {
 		namespace = metav1.NamespaceDefault
 	}
 	return name + "_" + namespace
+}
+
+func TestConfigs(t *testing.T) {
+	fw := newServerTest()
+	defer fw.testHTTPServer.Close()
+	expectedManifestPath := "/data/some/path"
+	expectedMaxPods := int32(5050)
+	expectedEnableServer := true
+	expectedAddress := "192.168.1.568"
+	expectedPort := int32(12512)
+
+	// set configuration to server.
+	fw.fakeKubelet.kubeletConfigurationFunc = func() componentconfig.KubeletConfiguration {
+		return componentconfig.KubeletConfiguration{
+			PodManifestPath: expectedManifestPath,
+			MaxPods:         expectedMaxPods,
+			EnableServer:    expectedEnableServer,
+			Address:         expectedAddress,
+			Port:            expectedPort,
+		}
+	}
+
+	// Test endpoint returns expected output.
+	result := assertConfigsOk(t, fw.testHTTPServer.URL+configsPath)
+
+	if result.PodManifestPath != expectedManifestPath {
+		t.Errorf("received wrong data: %#v", result)
+	}
+
+	if result.MaxPods != expectedMaxPods {
+		t.Errorf("received wrong data: %#v", result)
+	}
+
+	if result.EnableServer != expectedEnableServer {
+		t.Errorf("received wrong data: %#v", result)
+	}
+
+	if result.Address != expectedAddress {
+		t.Errorf("received wrong data: %#v", result)
+	}
+
+	if result.Port != expectedPort {
+		t.Errorf("received wrong data: %#v", result)
+	}
+
 }
 
 func TestContainerInfo(t *testing.T) {
@@ -642,6 +693,8 @@ func TestAuthFilters(t *testing.T) {
 			return "log"
 		case isSubpath(path, metricsPath):
 			return "metrics"
+		case isSubpath(path, configsPath):
+			return "configs"
 
 		// Cases for subpaths we expect to map to the "proxy" subresource
 		case isSubpath(path, "/attach"),
@@ -887,6 +940,25 @@ func assertHealthIsOk(t *testing.T, httpURL string) {
 	if !strings.Contains(result, "ok") {
 		t.Errorf("expected body contains ok, got %s", result)
 	}
+}
+
+func assertConfigsOk(t *testing.T, httpURL string) componentconfig.KubeletConfiguration {
+	resp, err := http.Get(httpURL)
+	if err != nil {
+		t.Fatalf("Got error GETing: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected status code %d, got %d", http.StatusOK, resp.StatusCode)
+	}
+
+	var result componentconfig.KubeletConfiguration
+	err = json.NewDecoder(resp.Body).Decode(&result)
+	if err != nil {
+		t.Fatalf("received invalid json data: %v", err)
+	}
+
+	return result
 }
 
 func setPodByNameFunc(fw *serverTestFramework, namespace, pod, container string) {
