@@ -24,7 +24,7 @@ image:
 	docker build -t $(PREFIX)/hostexec:$(TAG) .
 
 push: image
-	gcloud docker push $(PREFIX)/hostexec:$(TAG)
+	gcloud docker -- push $(PREFIX)/hostexec:$(TAG)
 
 clean:
 	rm -f hostexec

@@ -41,7 +41,7 @@ image:
 
 push:
 	$(if $(TAG),,$(error TAG is not defined. Use 'make tag' after committing changes to see a suggestion))
-	gcloud docker push $(PREFIX)/porter:$(TAG)
+	gcloud docker -- push $(PREFIX)/porter:$(TAG)
 
 clean:
 	rm -f porter

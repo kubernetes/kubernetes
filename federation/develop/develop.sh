@@ -127,7 +127,7 @@ function push() {
   fi
 
   kube::log::status "Pushing hyperkube image to the registry"
-  gcloud docker push "${KUBE_REGISTRY}/hyperkube-amd64:${kube_version}"
+  gcloud docker -- push "${KUBE_REGISTRY}/hyperkube-amd64:${kube_version}"
 
   # Update config after build and push, but before turning up the clusters
   # to ensure the config has the right image version tags.

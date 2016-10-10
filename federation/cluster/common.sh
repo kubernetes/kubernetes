@@ -318,7 +318,7 @@ function push-federation-images {
         kube::log::status "Pushing ${docker_image_tag}"
         if [[ "${FEDERATION_PUSH_REPO_BASE}" == "gcr.io/"* ]]; then
             echo " -> GCR repository detected. Using gcloud"
-            gcloud docker push "${docker_image_tag}"
+            gcloud docker -- push "${docker_image_tag}"
         else
             docker push "${docker_image_tag}"
         fi
