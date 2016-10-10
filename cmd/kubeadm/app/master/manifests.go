@@ -265,6 +265,10 @@ func getComponentCommand(component string, s *kubeadmapi.MasterConfiguration) (c
 	command = append(command, envParams["component_loglevel"])
 	command = append(command, baseFlags[component]...)
 
+	if component == proxy && envParams["proxy_flags"] != "" {
+		command = append(command, strings.Split(envParams["proxy_flags"], " ")...)
+	}
+
 	if component == apiServer {
 		// Check if the user decided to use an external etcd cluster
 		if len(s.Etcd.Endpoints) > 0 {
