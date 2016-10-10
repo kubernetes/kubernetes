@@ -317,17 +317,9 @@ func (ic *IngressController) Run(stopChan <-chan struct{}) {
 		}
 		ic.reconcileConfigMapForCluster(clusterName)
 	})
-	go func() {
-		select {
-		case <-time.After(time.Minute):
-			glog.V(4).Infof("Ingress controller is garbage collecting")
-			ic.ingressBackoff.GC()
-			ic.configMapBackoff.GC()
-			glog.V(4).Infof("Ingress controller garbage collection complete")
-		case <-stopChan:
-			return
-		}
-	}()
+
+	util.StartBackoffGC(ic.ingressBackoff, stopChan)
+	util.StartBackoffGC(ic.configMapBackoff, stopChan)
 }
 
 func (ic *IngressController) deliverIngressObj(obj interface{}, delay time.Duration, failed bool) {
