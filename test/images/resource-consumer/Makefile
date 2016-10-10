@@ -32,8 +32,8 @@ run_container:
 	docker run --publish=8080:8080 $(PREFIX)/resource_consumer:$(TAG)
 
 push:
-	gcloud docker push ${PREFIX}/resource_consumer:${TAG}
-	gcloud docker push ${PREFIX}/resource_consumer/controller:${TAG}
+	gcloud docker -- push ${PREFIX}/resource_consumer:${TAG}
+	gcloud docker -- push ${PREFIX}/resource_consumer/controller:${TAG}
 
 clean:
 	rm -f consumer
