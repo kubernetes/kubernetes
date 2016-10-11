@@ -218,6 +218,7 @@ func TestIsQualifiedName(t *testing.T) {
 		"1.2.3.4/5678",
 		"Uppercase_Is_OK_123",
 		"example.com/Uppercase_Is_OK_123",
+		"requests.storage-foo",
 		strings.Repeat("a", 63),
 		strings.Repeat("a", 253) + "/" + strings.Repeat("b", 63),
 	}
