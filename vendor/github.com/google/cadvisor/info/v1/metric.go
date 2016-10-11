@@ -26,10 +26,10 @@ const (
 	MetricGauge MetricType = "gauge"
 
 	// A counter-like value that is only expected to increase.
-	MetricCumulative = "cumulative"
+	MetricCumulative MetricType = "cumulative"
 
 	// Rate over a time period.
-	MetricDelta = "delta"
+	MetricDelta MetricType = "delta"
 )
 
 // DataType for metric being exported.
@@ -37,7 +37,7 @@ type DataType string
 
 const (
 	IntType   DataType = "int"
-	FloatType          = "float"
+	FloatType DataType = "float"
 )
 
 // Spec for custom metric.

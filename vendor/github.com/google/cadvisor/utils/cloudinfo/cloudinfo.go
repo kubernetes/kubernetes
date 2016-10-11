@@ -97,7 +97,7 @@ func detectInstanceID(cloudProvider info.CloudProvider) info.InstanceID {
 	return info.UnNamedInstance
 }
 
-//TODO: Implement method.
+// TODO: Implement method.
 func onBaremetal() bool {
 	return false
 }
