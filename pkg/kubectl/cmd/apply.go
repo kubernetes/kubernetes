@@ -94,6 +94,7 @@ func NewCmdApply(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	usage := "that contains the configuration to apply"
 	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
 	cmd.MarkFlagRequired("filename")
+	cmd.Flags().Bool("dry-run", false, "If true, only print validation for objects that would be created.")
 	cmd.Flags().Bool("overwrite", true, "Automatically resolve conflicts between the modified and live configuration by using values from the modified configuration")
 	cmd.Flags().BoolVar(&options.Prune, "prune", false, "Automatically delete resource objects that do not appear in the configs")
 	cmd.Flags().BoolVar(&options.Cascade, "cascade", true, "Only relevant during a prune. If true, cascade the deletion of the resources managed by pruned resources (e.g. Pods created by a ReplicationController).")
@@ -101,7 +102,7 @@ func NewCmdApply(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmdutil.AddValidateFlags(cmd)
 	cmd.Flags().StringVarP(&options.Selector, "selector", "l", "", "Selector (label query) to filter on")
 	cmd.Flags().Bool("all", false, "[-all] to select all the specified resources.")
-	cmdutil.AddOutputFlagsForMutation(cmd)
+	cmdutil.AddPrinterFlags(cmd)
 	cmdutil.AddRecordFlag(cmd)
 	cmdutil.AddInclude3rdPartyFlags(cmd)
 	return cmd
@@ -147,6 +148,8 @@ func RunApply(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *Ap
 	if err != nil {
 		return err
 	}
+
+	dryRun := cmdutil.GetFlagBool(cmd, "dry-run")
 
 	encoder := f.JSONEncoder()
 	decoder := f.Decoder(false)
@@ -195,47 +198,52 @@ func RunApply(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *Ap
 				}
 			}
 
-			// Then create the resource and skip the three-way merge
-			if err := createAndRefresh(info); err != nil {
-				return cmdutil.AddSourceToErr("creating", info.Source, err)
+			if !dryRun {
+				// Then create the resource and skip the three-way merge
+				if err := createAndRefresh(info); err != nil {
+					return cmdutil.AddSourceToErr("creating", info.Source, err)
+				}
+				if uid, err := info.Mapping.UID(info.Object); err != nil {
+					return err
+				} else {
+					visitedUids.Insert(string(uid))
+				}
 			}
+
+			count++
+			cmdutil.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, dryRun, "created")
+			return nil
+		}
+
+		if !dryRun {
+			overwrite := cmdutil.GetFlagBool(cmd, "overwrite")
+			helper := resource.NewHelper(info.Client, info.Mapping)
+			patcher := NewPatcher(encoder, decoder, info.Mapping, helper, overwrite)
+
+			patchBytes, err := patcher.patch(info.Object, modified, info.Source, info.Namespace, info.Name)
+			if err != nil {
+				return cmdutil.AddSourceToErr(fmt.Sprintf("applying patch:\n%s\nto:\n%v\nfor:", patchBytes, info), info.Source, err)
+			}
+
+			if cmdutil.ShouldRecord(cmd, info) {
+				patch, err := cmdutil.ChangeResourcePatch(info, f.Command())
+				if err != nil {
+					return err
+				}
+				_, err = helper.Patch(info.Namespace, info.Name, api.StrategicMergePatchType, patch)
+				if err != nil {
+					return cmdutil.AddSourceToErr(fmt.Sprintf("applying patch:\n%s\nto:\n%v\nfor:", patch, info), info.Source, err)
+				}
+			}
+
 			if uid, err := info.Mapping.UID(info.Object); err != nil {
 				return err
 			} else {
 				visitedUids.Insert(string(uid))
 			}
-			count++
-			cmdutil.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, false, "created")
-			return nil
-		}
-
-		overwrite := cmdutil.GetFlagBool(cmd, "overwrite")
-		helper := resource.NewHelper(info.Client, info.Mapping)
-		patcher := NewPatcher(encoder, decoder, info.Mapping, helper, overwrite)
-
-		patchBytes, err := patcher.patch(info.Object, modified, info.Source, info.Namespace, info.Name)
-		if err != nil {
-			return cmdutil.AddSourceToErr(fmt.Sprintf("applying patch:\n%s\nto:\n%v\nfor:", patchBytes, info), info.Source, err)
-		}
-
-		if cmdutil.ShouldRecord(cmd, info) {
-			patch, err := cmdutil.ChangeResourcePatch(info, f.Command())
-			if err != nil {
-				return err
-			}
-			_, err = helper.Patch(info.Namespace, info.Name, api.StrategicMergePatchType, patch)
-			if err != nil {
-				return cmdutil.AddSourceToErr(fmt.Sprintf("applying patch:\n%s\nto:\n%v\nfor:", patch, info), info.Source, err)
-			}
-		}
-
-		if uid, err := info.Mapping.UID(info.Object); err != nil {
-			return err
-		} else {
-			visitedUids.Insert(string(uid))
 		}
 		count++
-		cmdutil.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, false, "configured")
+		cmdutil.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, dryRun, "configured")
 		return nil
 	})
 
