@@ -28,12 +28,21 @@ import (
 func TestServiceEvaluatorMatchesResources(t *testing.T) {
 	kubeClient := fake.NewSimpleClientset()
 	evaluator := NewServiceEvaluator(kubeClient)
+	// we give a lot of resources
+	input := []api.ResourceName{
+		api.ResourceConfigMaps,
+		api.ResourceCPU,
+		api.ResourceServices,
+		api.ResourceServicesNodePorts,
+		api.ResourceServicesLoadBalancers,
+	}
+	// but we only match these...
 	expected := quota.ToSet([]api.ResourceName{
 		api.ResourceServices,
 		api.ResourceServicesNodePorts,
 		api.ResourceServicesLoadBalancers,
 	})
-	actual := quota.ToSet(evaluator.MatchesResources())
+	actual := quota.ToSet(evaluator.MatchesResources(input))
 	if !expected.Equal(actual) {
 		t.Errorf("expected: %v, actual: %v", expected, actual)
 	}

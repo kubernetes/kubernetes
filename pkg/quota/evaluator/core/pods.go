@@ -72,19 +72,16 @@ func NewPodEvaluator(kubeClient clientset.Interface, f informers.SharedInformerF
 	return &generic.GenericEvaluator{
 		Name:              "Evaluator.Pod",
 		InternalGroupKind: api.Kind("Pod"),
-		InternalOperationResources: map[admission.Operation][]api.ResourceName{
-			admission.Create: allResources,
-			// TODO: the quota system can only charge for deltas on compute resources when pods support updates.
-			// admission.Update: computeResources,
-		},
+		// TODO: the quota system will need to handle updates when pods support updates for compute resources.
+		Operations: []admission.Operation{admission.Create},
 		GetFuncByNamespace: func(namespace, name string) (runtime.Object, error) {
 			return kubeClient.Core().Pods(namespace).Get(name)
 		},
-		ConstraintsFunc:      PodConstraintsFunc,
-		MatchedResourceNames: allResources,
-		MatchesScopeFunc:     PodMatchesScopeFunc,
-		UsageFunc:            PodUsageFunc,
-		ListFuncByNamespace:  listFuncByNamespace,
+		ConstraintsFunc:          PodConstraintsFunc,
+		MatchedResourceNamesFunc: generic.StaticMatchedResourceNamesFunc(allResources),
+		MatchesScopeFunc:         PodMatchesScopeFunc,
+		UsageFunc:                PodUsageFunc,
+		ListFuncByNamespace:      listFuncByNamespace,
 	}
 }
 

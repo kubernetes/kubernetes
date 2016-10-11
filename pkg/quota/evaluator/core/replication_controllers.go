@@ -29,15 +29,13 @@ import (
 func NewReplicationControllerEvaluator(kubeClient clientset.Interface) quota.Evaluator {
 	allResources := []api.ResourceName{api.ResourceReplicationControllers}
 	return &generic.GenericEvaluator{
-		Name:              "Evaluator.ReplicationController",
-		InternalGroupKind: api.Kind("ReplicationController"),
-		InternalOperationResources: map[admission.Operation][]api.ResourceName{
-			admission.Create: allResources,
-		},
-		MatchedResourceNames: allResources,
-		MatchesScopeFunc:     generic.MatchesNoScopeFunc,
-		ConstraintsFunc:      generic.ObjectCountConstraintsFunc(api.ResourceReplicationControllers),
-		UsageFunc:            generic.ObjectCountUsageFunc(api.ResourceReplicationControllers),
+		Name:                     "Evaluator.ReplicationController",
+		InternalGroupKind:        api.Kind("ReplicationController"),
+		Operations:               []admission.Operation{admission.Create},
+		MatchedResourceNamesFunc: generic.StaticMatchedResourceNamesFunc(allResources),
+		MatchesScopeFunc:         generic.MatchesNoScopeFunc,
+		ConstraintsFunc:          generic.ObjectCountConstraintsFunc(api.ResourceReplicationControllers),
+		UsageFunc:                generic.ObjectCountUsageFunc(api.ResourceReplicationControllers),
 		ListFuncByNamespace: func(namespace string, options api.ListOptions) ([]runtime.Object, error) {
 			itemList, err := kubeClient.Core().ReplicationControllers(namespace).List(options)
 			if err != nil {

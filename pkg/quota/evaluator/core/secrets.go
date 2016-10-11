@@ -29,15 +29,13 @@ import (
 func NewSecretEvaluator(kubeClient clientset.Interface) quota.Evaluator {
 	allResources := []api.ResourceName{api.ResourceSecrets}
 	return &generic.GenericEvaluator{
-		Name:              "Evaluator.Secret",
-		InternalGroupKind: api.Kind("Secret"),
-		InternalOperationResources: map[admission.Operation][]api.ResourceName{
-			admission.Create: allResources,
-		},
-		MatchedResourceNames: allResources,
-		MatchesScopeFunc:     generic.MatchesNoScopeFunc,
-		ConstraintsFunc:      generic.ObjectCountConstraintsFunc(api.ResourceSecrets),
-		UsageFunc:            generic.ObjectCountUsageFunc(api.ResourceSecrets),
+		Name:                     "Evaluator.Secret",
+		InternalGroupKind:        api.Kind("Secret"),
+		Operations:               []admission.Operation{admission.Create},
+		MatchedResourceNamesFunc: generic.StaticMatchedResourceNamesFunc(allResources),
+		MatchesScopeFunc:         generic.MatchesNoScopeFunc,
+		ConstraintsFunc:          generic.ObjectCountConstraintsFunc(api.ResourceSecrets),
+		UsageFunc:                generic.ObjectCountUsageFunc(api.ResourceSecrets),
 		ListFuncByNamespace: func(namespace string, options api.ListOptions) ([]runtime.Object, error) {
 			itemList, err := kubeClient.Core().Secrets(namespace).List(options)
 			if err != nil {
