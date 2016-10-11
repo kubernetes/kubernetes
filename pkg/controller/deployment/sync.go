@@ -259,10 +259,11 @@ func (dc *DeploymentController) getNewReplicaSet(deployment *extensions.Deployme
 		rsCopy := objCopy.(*extensions.ReplicaSet)
 
 		// Set existing new replica set's annotation
-		if deploymentutil.SetNewReplicaSetAnnotations(deployment, rsCopy, newRevision, true) {
-			if rsCopy, err = dc.client.Extensions().ReplicaSets(rsCopy.Namespace).Update(rsCopy); err != nil {
-				return nil, err
-			}
+		annotationsUpdated := deploymentutil.SetNewReplicaSetAnnotations(deployment, rsCopy, newRevision, true)
+		minReadySecondsNeedsUpdate := rsCopy.Spec.MinReadySeconds != deployment.Spec.MinReadySeconds
+		if annotationsUpdated || minReadySecondsNeedsUpdate {
+			rsCopy.Spec.MinReadySeconds = deployment.Spec.MinReadySeconds
+			return dc.client.Extensions().ReplicaSets(rsCopy.ObjectMeta.Namespace).Update(rsCopy)
 		}
 
 		updateConditions := deploymentutil.SetDeploymentRevision(deployment, newRevision)
@@ -294,9 +295,10 @@ func (dc *DeploymentController) getNewReplicaSet(deployment *extensions.Deployme
 			Namespace: namespace,
 		},
 		Spec: extensions.ReplicaSetSpec{
-			Replicas: 0,
-			Selector: newRSSelector,
-			Template: newRSTemplate,
+			Replicas:        0,
+			MinReadySeconds: deployment.Spec.MinReadySeconds,
+			Selector:        newRSSelector,
+			Template:        newRSTemplate,
 		},
 	}
 	allRSs := append(oldRSs, &newRS)
@@ -478,21 +480,20 @@ func (dc *DeploymentController) cleanupDeployment(oldRSs []*extensions.ReplicaSe
 
 // syncDeploymentStatus checks if the status is up-to-date and sync it if necessary
 func (dc *DeploymentController) syncDeploymentStatus(allRSs []*extensions.ReplicaSet, newRS *extensions.ReplicaSet, d *extensions.Deployment) error {
-	newStatus, err := dc.calculateStatus(allRSs, newRS, d)
-	if err != nil {
-		return err
+	newStatus := dc.calculateStatus(allRSs, newRS, d)
+
+	if reflect.DeepEqual(d.Status, newStatus) {
+		return nil
 	}
-	if !reflect.DeepEqual(d.Status, newStatus) {
-		return dc.updateDeploymentStatus(allRSs, newRS, d)
-	}
-	return nil
+
+	newDeployment := d
+	newDeployment.Status = newStatus
+	_, err := dc.client.Extensions().Deployments(newDeployment.Namespace).UpdateStatus(newDeployment)
+	return err
 }
 
-func (dc *DeploymentController) calculateStatus(allRSs []*extensions.ReplicaSet, newRS *extensions.ReplicaSet, deployment *extensions.Deployment) (extensions.DeploymentStatus, error) {
-	availableReplicas, err := dc.getAvailablePodsForReplicaSets(deployment, allRSs)
-	if err != nil {
-		return deployment.Status, fmt.Errorf("failed to count available pods: %v", err)
-	}
+func (dc *DeploymentController) calculateStatus(allRSs []*extensions.ReplicaSet, newRS *extensions.ReplicaSet, deployment *extensions.Deployment) extensions.DeploymentStatus {
+	availableReplicas := deploymentutil.GetAvailableReplicaCountForReplicaSets(allRSs)
 	totalReplicas := deploymentutil.GetReplicaCountForReplicaSets(allRSs)
 
 	return extensions.DeploymentStatus{
@@ -502,26 +503,7 @@ func (dc *DeploymentController) calculateStatus(allRSs []*extensions.ReplicaSet,
 		UpdatedReplicas:     deploymentutil.GetActualReplicaCountForReplicaSets([]*extensions.ReplicaSet{newRS}),
 		AvailableReplicas:   availableReplicas,
 		UnavailableReplicas: totalReplicas - availableReplicas,
-	}, nil
-}
-
-func (dc *DeploymentController) getAvailablePodsForReplicaSets(deployment *extensions.Deployment, rss []*extensions.ReplicaSet) (int32, error) {
-	podList, err := dc.listPods(deployment)
-	if err != nil {
-		return 0, err
 	}
-	return deploymentutil.CountAvailablePodsForReplicaSets(podList, rss, deployment.Spec.MinReadySeconds)
-}
-
-func (dc *DeploymentController) updateDeploymentStatus(allRSs []*extensions.ReplicaSet, newRS *extensions.ReplicaSet, deployment *extensions.Deployment) error {
-	newStatus, err := dc.calculateStatus(allRSs, newRS, deployment)
-	if err != nil {
-		return err
-	}
-	newDeployment := deployment
-	newDeployment.Status = newStatus
-	_, err = dc.client.Extensions().Deployments(deployment.Namespace).UpdateStatus(newDeployment)
-	return err
 }
 
 // isScalingEvent checks whether the provided deployment has been updated with a scaling event
