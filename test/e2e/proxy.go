@@ -62,11 +62,11 @@ func proxyContext(version string) {
 	// Port here has to be kept in sync with default kubelet port.
 	It("should proxy logs on node with explicit kubelet port [Conformance]", func() { nodeProxyTest(f, prefix+"/proxy/nodes/", ":10250/logs/") })
 	It("should proxy logs on node [Conformance]", func() { nodeProxyTest(f, prefix+"/proxy/nodes/", "/logs/") })
-	It("should proxy to cadvisor [Conformance]", func() { nodeProxyTest(f, prefix+"/proxy/nodes/", ":4194/containers/") })
+	It("should proxy to cadvisor", func() { nodeProxyTest(f, prefix+"/proxy/nodes/", ":4194/containers/") })
 
 	It("should proxy logs on node with explicit kubelet port using proxy subresource [Conformance]", func() { nodeProxyTest(f, prefix+"/nodes/", ":10250/proxy/logs/") })
 	It("should proxy logs on node using proxy subresource [Conformance]", func() { nodeProxyTest(f, prefix+"/nodes/", "/proxy/logs/") })
-	It("should proxy to cadvisor using proxy subresource [Conformance]", func() { nodeProxyTest(f, prefix+"/nodes/", ":4194/proxy/containers/") })
+	It("should proxy to cadvisor using proxy subresource", func() { nodeProxyTest(f, prefix+"/nodes/", ":4194/proxy/containers/") })
 
 	// using the porter image to serve content, access the content
 	// (of multiple pods?) from multiple (endpoints/services?)
