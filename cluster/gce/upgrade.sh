@@ -179,8 +179,8 @@ function upgrade-nodes() {
 function setup-base-image() {
   if [[ "${env_os_distro}" == "false" ]]; then
     echo "== Ensuring that new Node base OS image matched the existing Node base OS image"
-    node_os_distribution=$(get-node-os "${NODE_NAMES[0]}")
-    source "${KUBE_ROOT}/cluster/gce/${node_os_distribution}/node-helper.sh"
+    NODE_OS_DISTRIBUTION=$(get-node-os "${NODE_NAMES[0]}")
+    source "${KUBE_ROOT}/cluster/gce/${NODE_OS_DISTRIBUTION}/node-helper.sh"
     # Reset the node image based on current os distro
     set-node-image
 fi
