@@ -31,22 +31,17 @@ Documentation for other releases can be found at
 <!-- BEGIN MUNGE: GENERATED_TOC -->
 
 - [Overview](#overview)
-- [Design I. Exposing synchronous garbage collection mode via DeleteOptions](#design-i-exposing-synchronous-garbage-collection-mode-via-deleteoptions)
-  - [API changes](#api-changes)
-  - [Components changes](#components-changes)
-    - [API Server](#api-server)
-    - [Garbage Collector](#garbage-collector)
-  - [Handling circular dependencies](#handling-circular-dependencies)
-  - [Unhandled cases](#unhandled-cases)
-  - [Implications to existing clients](#implications-to-existing-clients)
-  - [Security implications](#security-implications)
-- [Design II: Exposing synchronous garbage collection mode via OwnerReferences](#design-ii-exposing-synchronous-garbage-collection-mode-via-ownerreferences)
-  - [API changes](#api-changes-1)
-  - [Components Changes](#components-changes-1)
-    - [API Server](#api-server-1)
-    - [Garbage Collector](#garbage-collector-1)
-    - [Controllers](#controllers)
-  - [Implications to existing clients](#implications-to-existing-clients-1)
+- [API Design](#api-design)
+  - [Standard Finalizers](#standard-finalizers)
+  - [OwnerReference](#ownerreference)
+  - [DeleteOptions](#deleteoptions)
+- [Components changes](#components-changes)
+  - [API Server](#api-server)
+  - [Garbage Collector](#garbage-collector)
+  - [Controllers](#controllers)
+- [Handling circular dependencies](#handling-circular-dependencies)
+- [Unhandled cases](#unhandled-cases)
+- [Implications to existing clients](#implications-to-existing-clients)
 
 <!-- END MUNGE: GENERATED_TOC -->
 
@@ -62,39 +57,78 @@ Synchronous Garbage Collection is a best-effort (see [unhandled cases](#unhandle
 
 Tracking issue: https://github.com/kubernetes/kubernetes/issues/29891
 
-# Design I. Exposing synchronous garbage collection mode via DeleteOptions
+# API Design
 
-We need to make changes in the API, the API Server, and the garbage collector to support synchronous garbage collection.
+## Standard Finalizers
 
-## API changes
+We will introduce a new standard finalizer:
 
-**DeleteOptions**
+```go
+const GCFinalizer string = “CollectingGarbage”
+```
+
+This finalizer indicates the object is terminating and is waiting for its dependents whose `OwnerReference.BlockOwnerDeletion` is true get deleted.
+
+## OwnerReference
+
+```go
+OwnerReference {
+     ...
+     // If true, AND if the owner has the "CollectingGarbage" finalizer, then the owner cannot be deleted from the key-value store until this reference is removed.
+     // Defaults to false.
+     // To set this field, a user needs "update" and "delete" permission of the owner, otherwise 422 (Unprocessable Entity) will be returned.
+     BlockOwnerDeletion *bool
+}
+```
+
+The initial draft of the proposal did not include this field and it had a security loophole: a user who is only authorized to update one resource can set ownerReference to block the synchronous GC of other resources. Requiring users to explicitly set `BlockOwnerDeletion` allows the master to properly authorize the request.
+
+## DeleteOptions
 
 ```go
 DeleteOptions {
   …
-  // If DeleteAfterDependentsDeleted is set, the object will not be deleted immediately. Instead, a CollectingGarbage finalizer will be placed on the object. The garbage collector will remove the finalizer from the object when all depdendents are deleted.
-  // DeleteAfterDependentsDeleted and OrphanDependents are exclusive.
-  // DeleteAfterDependentsDeleted defaults to false.
-  // DeleteAfterDependentsDeleted is cascading, i.e., the object’s dependents will be deleted with the same DeleteAfterDependentsDeleted.
-  DeleteAfterDependentsDeleted *bool
+  // Whether and how garbage collection will be performed.
+  // Defaults to GarbageCollectionDefault
+  GarbageCollectionPolicy GarbageCollectionPolicy
 }
+
+type GarabgeCollectionPolicy string
+
+const (
+    // Respects the existing garbage collection related finalizers on the object and the default garbage collection policy of the resource.
+    GarbageCollectionDefault GarbageCollectionPolicy = "Default"
+    // Orphans the dependents
+    GarbageCollectionOrphan GarbageCollectionPolicy = "Orphan"
+    // Deletes the object from the key-value store, the garbage collector will delete the dependents in the background.
+    GarbageCollectionAsynchronous GarbageCollectionPolicy = "AsynchronousGarbageCollection"
+    // The object exists in the key-value store until the garbage collector deletes all the dependents whose ownerReference.blockOwnerDeletion=true from the key-value store.
+    // API sever will put the "CollectingGarbage" finalizer on the object, and sets its deletionTimestamp.
+    // This policy is cascading, i.e., the dependents will be deleted with GarbageCollectionSynchronous.
+    GarbageCollectionSynchronous GarbageCollectionPolicy = "SynchronousGarbageCollection"
+)
 ```
 
-**Standard Finalizers**
-We will introduce a new standard finalizer: const GCFinalizer string = “CollectingGarbage”
+`DeleteOptions.OrphanDependents *bool` will be removed. We decided not to add a `DeleteOptions.SynchronousGC *bool`, because together with `DeleteOptions.OrphanDependents` it results in 9 possible combinations and is thus confusing. This is a breaking change, so the new DeleteOptions will live in `api.k8s.io` group with version `v1`, as proposed in [#33900](https://github.com/kubernetes/kubernetes/pull/33900).
 
-## Components changes
+The conversion rules are described in the following table:
 
-### API Server
+| 1.5                           | pre 1.4/1.4              |
+|-------------------------------|--------------------------|
+| GarbageCollectionDefault      | OrphanDependents==nil    |
+| GarbageCollectionOrphan       | *OrphanDependents==true  |
+| GarbageCollectionAsynchronous | *OrphanDependents==false |
+| GarbageCollectionSynchronous  | N/A                      |
 
-`Delete()` function needs to check the `DeleteOptions.DeleteAfterDependentsDeleted`.
+# Components changes
 
-* The request is rejected with 400 if both `DeleteOptions.DeleteAfterDependentsDeleted` and `DeleteOptions.OrphanDependents` are true.
-* If `DeleteOptions.DeleteAfterDependentsDeleted` is explicitly set to true and `DeleteOptions.OrphanDependents` is nil, the API server will default `DeleteOptions.OrphanDependents` to false, regardless of the [default orphaning policy](https://github.com/kubernetes/kubernetes/blob/release-1.4/pkg/registry/generic/registry/store.go#L500) of the resource.
-* If the option is set, the API server will update the object instead of deleting it, add the finalizer, and set the `ObjectMeta.DeletionTimestamp`.
+## API Server
 
-### Garbage Collector
+`Delete()` function checks `DeleteOptions.GarbageCollectionPolicy`. If the policy is `GarbageCollectionSynchronous`, the API server will update the object instead of deleting it, add the finalizer, and set the `ObjectMeta.DeletionTimestamp`.
+
+When validating the ownerReference, API server needs to query the `Authorizer` to check if the user has "update" and "delete" permission of the owner object. It returns 422 if the user does not have the permissions but intends to set `OwnerReference.BlockOwnerDeletion` to true.
+
+## Garbage Collector
 
 **Modifications to processEvent()**
 
@@ -108,7 +142,7 @@ Currently `processEvent()` manages GC’s internal owner-dependency relationship
 Currently `processItem()` consumes the `dirtyQueue`, requests the API server to delete an item if all of its owners do not exist. To support synchronous GC, it has to:
 
 * treat an owner as "not exist" if `owner.DeletionTimestamp != nil && !owner.Finalizers.Has(OrphanFinalizer)`, otherwise Synchronous GC will not progress because the owner keeps existing in the key-value store.
-* when deleting dependents, it should use the same `DeleteOptions.SynchronousGC` as the owner’s finalizers suggest.
+* when deleting dependents, if the owner's finalizers include `CollectingGarbage`, it should use the `GarbageCollectionSynchronous` as GC policy.
 * if an object has multiple owners, some owners still exist while other owners are in the synchronous GC stage, then according to the existing logic of GC, the object wouldn't be deleted. To unblock the synchronous GC of owners, `processItem()` has to remove the ownerReferences pointing to them.
 
 In addition, if an object popped from `dirtyQueue` is marked as "GC in progress", `processItem()` treats it specially:
@@ -118,7 +152,11 @@ In addition, if an object popped from `dirtyQueue` is marked as "GC in progress"
   * If not, send a PUT request to remove the `GCFinalizer`;
   * If so, then add all dependents to the `dirtryQueue`; we need bookkeeping to avoid adding the dependents repeatedly if the owner gets in the `synchronousGC queue` multiple times.
 
-## Handling circular dependencies
+## Controllers
+
+To utilize the Synchronous Garbage Collection feature, controllers (e.g., the replicaset controller) need to set `OwnerReference.BlockOwnerDeletion` when creating dependent objects (e.g. pods).
+
+# Handling circular dependencies
 
 SynchronousGC will enter a deadlock in the presence of circular dependencies. The garbage collector can break the circle by lazily breaking circular dependencies: when `processItem()` processes an object, if it finds the object and all of its owners have the `GCFinalizer`, it removes the `GCFinalizer` from the object.
 
@@ -126,12 +164,11 @@ Note that the approach is not rigorous and thus having false positives. For exam
 
 Circular dependencies are regarded as user error. If needed, we can add more guarantees to handle such cases later.
 
-## Unhandled cases
+# Unhandled cases
 
 * If the GC observes the owning object with the `GCFinalizer` before it observes the creation of all the dependents, GC will remove the finalizer from the owning object before all dependents are gone. Hence, “Synchronous GC” is best-effort, though we guarantee that the dependents will be deleted eventually. We face a similar case when handling OrphanFinalizer, see [GC known issues](https://github.com/kubernetes/kubernetes/issues/26120).
 
-
-## Implications to existing clients
+# Implications to existing clients
 
 Finalizer breaks an assumption that many Kubernetes components have: a deletion request with `grace period=0` will immediately remove the object from the key-value store. This is not true if an object has pending finalizers, the object will continue to exist, and currently the API server will not return an error in this case.
 
@@ -155,50 +192,9 @@ Note that this **changes the behavior** of `kubectl delete`. The command will be
 
 To make the new kubectl compatible with the 1.4 and earlier masters, kubectl needs to switch to use the old reaper logic if it finds Synchronous GC is not supported by the master.
 
-Old kubectl is compatible with new master, because `DeleteOptions.DeleteAfterDependentsDeleted` defaults to false.
+1.4 `kubectl delete rc/rs` uses `DeleteOptions.OrphanDependents=true`, which is going to be converted to `GarbageCollectionAsynchronous` (see [API Design](#api-changes)) by a 1.5 master, so its behavior keeps the same.
 
-## Security implications
-
-A user who is authorized to update one object can affect the synchronous GC behavior of another object. Specifically, by setting an object as a pod's owner, and setting a very long grace termination period for the pod, a user can make the synchronous GC of the owner to take long time.
-
-# Design II: Exposing synchronous garbage collection mode via OwnerReferences
-
-Instead of letting the user who issues the delete request decide whether invoking synchronous garbage collection, this design leaves the decision to the creator of the ownerReferences. The benefit is that we can do proper permission check to mitigate the [security concern](#security-implications) in design I.
-
-## API changes
-
-```go
-OwnerReference {
-     ...
-     // If true, the owner cannot be deleted from the key-value store until this reference is removed.
-     // Defaults to false.
-     // To set this field, a user needs "update" and "delete" permission of the owner, otherwise 422 (Unprocessable Entity) will be returned.
-     // If a user sets this field to true, she also needs to add the "CollectingGarbage" finalizer to the owner at any time before its deletion, otherwise its deletion will not be blocked.
-     BlockOwnerDeletion *bool
-}
-```
-
-Note that setting `BlockOwnerDeletion` alone is not enough, user also needs to add the "CollectingGarbage" finalizer to the owner. Considering most ownerReferences are set by controllers (e.g., replicaset controller), we think the burden is acceptable.
-
-## Components Changes
-
-### API Server
-
-When validating the ownerReference, API server needs to query the `Authorizer` to check if the user has "update" and "delete" permission of the owner object. It returns 422 if the user does not have the permissions.
-
-### Garbage Collector
-
-Required changes are mostly the same as in Design I. One difference is that `processItem()` should check if any ownerReference pointing to the owner has `BlockOwnerDeletion==true`. If not, it sends a PUT request to remove the `GCFinalizer`.
-
-### Controllers
-
-To utilize the Synchronous Garbage Collection feature, controllers (e.g., replicaset controller) need to set `OwnerReference.BlockOwnerDeletion` when creating dependent objects (e.g. pods). They also need to add the "CollectingGarbage" finalizer to the owner object (e.g., replicaset).
-
-## Implications to existing clients
-
-The implications are mostly the same as Design I. One difference is that it causes behavior change of old version `kubectl delete`. Old version kubectl issues the delete request for the owner object after all dependent objects are terminating. An old version API server will delete the owner from the key-value store immediately, but a new version API server will keep the owner object around until all dependents are deleted. This can be solved by making API server remove the "CollectingGarbage" finalizer if the deletion request is issued by an old version kubectl.
-
-
+Pre 1.4 `kubectl delete` uses `DeleteOptions.OrphanDependents=nil`, so does the 1.4 `kubectl delete` for resources other than rc and rs. The option is going to be converted to `GarbageCollectionDefault` (see [API Design](#api-changes)) by a 1.5 master, so these commands behave the same as when working with a 1.4 master.
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/proposals/synchronous-garbage-collection.md?pixel)]()
