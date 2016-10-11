@@ -99,7 +99,7 @@ func TestExtractFieldPathAsString(t *testing.T) {
 					Namespace: "object-namespace",
 				},
 			},
-			expectedMessageFragment: "Unsupported fieldPath",
+			expectedMessageFragment: "unsupported fieldPath",
 		},
 	}
 
@@ -108,13 +108,13 @@ func TestExtractFieldPathAsString(t *testing.T) {
 		if err != nil {
 			if tc.expectedMessageFragment != "" {
 				if !strings.Contains(err.Error(), tc.expectedMessageFragment) {
-					t.Errorf("%v: Unexpected error message: %q, expected to contain %q", tc.name, err, tc.expectedMessageFragment)
+					t.Errorf("%v: unexpected error message: %q, expected to contain %q", tc.name, err, tc.expectedMessageFragment)
 				}
 			} else {
 				t.Errorf("%v: unexpected error: %v", tc.name, err)
 			}
 		} else if e := tc.expectedValue; e != "" && e != actual {
-			t.Errorf("%v: Unexpected result; got %q, expected %q", tc.name, actual, e)
+			t.Errorf("%v: unexpected result; got %q, expected %q", tc.name, actual, e)
 		}
 	}
 }
