@@ -71,6 +71,8 @@ type genericScheduler struct {
 	lastNodeIndex        uint64
 
 	cachedNodeInfoMap map[string]*schedulercache.NodeInfo
+
+	equivalenceCache *EquivalenceCache
 }
 
 // Schedule tries to schedule the given pod to one of node in the node list.
@@ -98,6 +100,8 @@ func (g *genericScheduler) Schedule(pod *api.Pod, nodeLister algorithm.NodeListe
 	if err != nil {
 		return "", err
 	}
+
+	// TODO(harryz) Check if equivalenceCache is enabled and call scheduleWithEquivalenceClass here
 
 	trace.Step("Computing predicates")
 	filteredNodes, failedPredicateMap, err := findNodesThatFit(pod, g.cachedNodeInfoMap, nodes, g.predicates, g.extenders)
