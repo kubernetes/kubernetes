@@ -77,6 +77,12 @@ This is, in no small part, to make it *Easy to Deploy*.
 
 Remaining in-process also helps this integration not regress on performance, one axis of being *Full-Featured*.
 
+### Communicate through gRPC
+
+Although the kubelet and rktlet will be compiled together, the runtime and kubelet will still communicate through gRPC interface for better API abstraction.
+
+For the near short term, they will still talk through a unix socket before we implement a custom gRPC connection that skips the network stack.
+
 ### Developed as a Separate Repository
 
 Brian Grant's discussion on splitting the Kubernetes project into [separate repos](https://github.com/kubernetes/kubernetes/issues/24343) is a compelling argument for why it makes sense to split this work into a separate repo.
@@ -117,7 +123,8 @@ In the future, some of these decisions are expected to be changed such that rkt 
 
 3. rktlet integrate with kubelet, pass 100% e2e and node e2e tests, with nspawn stage1.
 4. rktlet integrate with kubelet, pass 100% e2e and node e2e tests, with kvm stage1.
-5. Revendor rktlet into `pkg/kubelet/rkt` to replace the current rkt.
+5. Revendor rktlet into `pkg/kubelet/rktshim`, and start deprecating the `pkg/kubelet/rkt` package.
+6. Eventually replace the current `pkg/kubelet/rkt` package.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
