@@ -193,20 +193,9 @@ func (f *fixture) run(deploymentName string) {
 		f.t.Errorf("error syncing deployment: %v", err)
 	}
 
-	actions := f.client.Actions()
+	actions := filterInformerActions(f.client.Actions())
 	informerActions := 0
 	for i, action := range actions {
-		if len(action.GetNamespace()) == 0 &&
-			(action.Matches("list", "pods") ||
-				action.Matches("list", "replicasets") ||
-				action.Matches("list", "deployments") ||
-				action.Matches("watch", "pods") ||
-				action.Matches("watch", "replicasets") ||
-				action.Matches("watch", "deployments")) {
-			informerActions++
-			continue
-		}
-
 		if len(f.actions)+informerActions < i+1 {
 			f.t.Errorf("%d unexpected actions: %+v", len(actions)-len(f.actions), actions[i:])
 			break
@@ -275,8 +264,26 @@ func TestDeploymentController_dontSyncDeploymentsWithEmptyPodSelector(t *testing
 	if len(fake.Actions()) == 0 {
 		return
 	}
-	for _, action := range fake.Actions() {
+	for _, action := range filterInformerActions(fake.Actions()) {
 		t.Logf("unexpected action: %#v", action)
 	}
 	t.Errorf("expected deployment controller to not take action")
+}
+
+func filterInformerActions(actions []core.Action) []core.Action {
+	ret := []core.Action{}
+	for _, action := range actions {
+		if len(action.GetNamespace()) == 0 &&
+			(action.Matches("list", "pods") ||
+				action.Matches("list", "deployments") ||
+				action.Matches("list", "replicasets") ||
+				action.Matches("watch", "pods") ||
+				action.Matches("watch", "deployments") ||
+				action.Matches("watch", "replicasets")) {
+			continue
+		}
+		ret = append(ret, action)
+	}
+
+	return ret
 }
