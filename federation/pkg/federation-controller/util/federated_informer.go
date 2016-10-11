@@ -74,6 +74,9 @@ type FederationView interface {
 	// GetClientsetForCluster returns a clientset for the cluster, if present.
 	GetClientsetForCluster(clusterName string) (kubeclientset.Interface, error)
 
+	// GetUnreadyClusters returns a list of all clusters that are not ready yet.
+	GetUnreadyClusters() ([]*federation_api.Cluster, error)
+
 	// GetReadyClusers returns all clusters for which the sub-informers are run.
 	GetReadyClusters() ([]*federation_api.Cluster, error)
 
@@ -260,6 +263,9 @@ type federatedInformerImpl struct {
 	clientFactory func(*federation_api.Cluster) (kubeclientset.Interface, error)
 }
 
+// *federatedInformerImpl implements FederatedInformer interface.
+var _ FederatedInformer = &federatedInformerImpl{}
+
 type federatedStoreImpl struct {
 	federatedInformer *federatedInformerImpl
 }
@@ -311,6 +317,24 @@ func (f *federatedInformerImpl) getClientsetForClusterUnlocked(clusterName strin
 		}
 	}
 	return nil, fmt.Errorf("cluster %q not found", clusterName)
+}
+
+func (f *federatedInformerImpl) GetUnreadyClusters() ([]*federation_api.Cluster, error) {
+	f.Lock()
+	defer f.Unlock()
+
+	items := f.clusterInformer.store.List()
+	result := make([]*federation_api.Cluster, 0, len(items))
+	for _, item := range items {
+		if cluster, ok := item.(*federation_api.Cluster); ok {
+			if !isClusterReady(cluster) {
+				result = append(result, cluster)
+			}
+		} else {
+			return nil, fmt.Errorf("wrong data in FederatedInformerImpl cluster store: %v", item)
+		}
+	}
+	return result, nil
 }
 
 // GetReadyClusers returns all clusters for which the sub-informers are run.
