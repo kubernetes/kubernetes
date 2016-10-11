@@ -171,6 +171,7 @@ var standardResources = sets.NewString(
 	string(ResourceConfigMaps),
 	string(ResourcePersistentVolumeClaims),
 	string(ResourceStorage),
+	string(ResourceRequestsStorage),
 )
 
 // IsStandardResourceName returns true if the resource is known to the system
