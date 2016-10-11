@@ -30,19 +30,37 @@ import (
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
+const storageClassSuffix string = ".storage-class.kubernetes.io/"
+
 // NewPersistentVolumeClaimEvaluator returns an evaluator that can evaluate persistent volume claims
 func NewPersistentVolumeClaimEvaluator(kubeClient clientset.Interface) quota.Evaluator {
-	allResources := []api.ResourceName{api.ResourcePersistentVolumeClaims, api.ResourceRequestsStorage}
+	fixedResources := []api.ResourceName{api.ResourcePersistentVolumeClaims, api.ResourceRequestsStorage}
+	usageFunc := PersistentVolumeClaimUsageFunc
+	constraintsFunc := makePersistentVolumeClaimConstraintsFunc(usageFunc)
 	return &generic.GenericEvaluator{
 		Name:              "Evaluator.PersistentVolumeClaim",
 		InternalGroupKind: api.Kind("PersistentVolumeClaim"),
-		InternalOperationResources: map[admission.Operation][]api.ResourceName{
-			admission.Create: allResources,
+		Operations:        []admission.Operation{admission.Create},
+		MatchedResourceNamesFunc: func(items []api.ResourceName) (result []api.ResourceName) {
+			for _, item := range items {
+				if quota.Contains(fixedResources, item) {
+					result = append(result, item)
+					continue
+				}
+				// match pvc resources scoped by storage class (<storage-class-name>.storage-class.kubernetes.io/<resource>)
+				for _, resource := range fixedResources {
+					byStorageClass := storageClassSuffix + string(resource)
+					if strings.HasSuffix(string(item), byStorageClass) {
+						result = append(result, item)
+						break
+					}
+				}
+			}
+			return result
 		},
-		MatchedResourceNames: allResources,
-		MatchesScopeFunc:     generic.MatchesNoScopeFunc,
-		ConstraintsFunc:      PersistentVolumeClaimConstraintsFunc,
-		UsageFunc:            PersistentVolumeClaimUsageFunc,
+		MatchesScopeFunc: generic.MatchesNoScopeFunc,
+		ConstraintsFunc:  constraintsFunc,
+		UsageFunc:        usageFunc,
 		ListFuncByNamespace: func(namespace string, options api.ListOptions) ([]runtime.Object, error) {
 			itemList, err := kubeClient.Core().PersistentVolumeClaims(namespace).List(options)
 			if err != nil {
@@ -67,27 +85,52 @@ func PersistentVolumeClaimUsageFunc(object runtime.Object) api.ResourceList {
 	result[api.ResourcePersistentVolumeClaims] = resource.MustParse("1")
 	if request, found := pvc.Spec.Resources.Requests[api.ResourceStorage]; found {
 		result[api.ResourceRequestsStorage] = request
+		// charge usage to the storage class (if present)
+		// TODO: it would be great if there was a common utility to reference here so we can use it when promoting to beta...
+		if storageClassRef, storageClassFound := pvc.Annotations["volume.beta.kubernetes.io/storage-class"]; storageClassFound {
+			storageClassClaim := api.ResourceName(storageClassRef + storageClassSuffix + string(api.ResourcePersistentVolumeClaims))
+			storageClassStorage := api.ResourceName(storageClassRef + storageClassSuffix + string(api.ResourceRequestsStorage))
+			result[storageClassStorage] = request
+			result[storageClassClaim] = resource.MustParse("1")
+		}
 	}
 	return result
 }
 
-// PersistentVolumeClaimConstraintsFunc verifies that all required resources are present on the claim
-// In addition, it validates that the resources are valid (i.e. requests < limits)
-func PersistentVolumeClaimConstraintsFunc(required []api.ResourceName, object runtime.Object) error {
-	pvc, ok := object.(*api.PersistentVolumeClaim)
-	if !ok {
-		return fmt.Errorf("unexpected input object %v", object)
-	}
+// makePersistentVolumeClaimConstraintsFunc returns a function that knows how to enforce constraints.
+func makePersistentVolumeClaimConstraintsFunc(usageFunc generic.UsageFunc) generic.ConstraintsFunc {
+	return func(required []api.ResourceName, object runtime.Object) error {
+		pvc, ok := object.(*api.PersistentVolumeClaim)
+		if !ok {
+			return fmt.Errorf("unexpected input object %v", object)
+		}
 
-	requiredSet := quota.ToSet(required)
-	missingSet := sets.NewString()
-	pvcUsage := PersistentVolumeClaimUsageFunc(pvc)
-	pvcSet := quota.ToSet(quota.ResourceNames(pvcUsage))
-	if diff := requiredSet.Difference(pvcSet); len(diff) > 0 {
-		missingSet.Insert(diff.List()...)
+		// these are the items that we will be handling based on the objects actual storage-class
+		pvcRequiredSet := []api.ResourceName{api.ResourceRequestsStorage, api.ResourcePersistentVolumeClaims}
+		if storageClassRef, storageClassFound := pvc.Annotations["volume.beta.kubernetes.io/storage-class"]; storageClassFound {
+			storageClassClaim := api.ResourceName(storageClassRef + storageClassSuffix + string(api.ResourcePersistentVolumeClaims))
+			storageClassStorage := api.ResourceName(storageClassRef + storageClassSuffix + string(api.ResourceRequestsStorage))
+			pvcRequiredSet = append(pvcRequiredSet, storageClassClaim)
+			pvcRequiredSet = append(pvcRequiredSet, storageClassStorage)
+		}
+
+		// in effect, this will remove things from the required set that are not tied to this pvcs storage class
+		// for example, if a quota has bronze and gold storage class items defined, we should not error a bronze pvc for not being gold.
+		// but we should error a bronze pvc if it doesn't make a storage request size...
+		requiredResources := quota.Intersection(required, pvcRequiredSet)
+		requiredSet := quota.ToSet(requiredResources)
+
+		// usage for this pvc will only include global pvc items + this storage class specific items
+		pvcUsage := usageFunc(pvc)
+
+		missingSet := sets.NewString()
+		pvcSet := quota.ToSet(quota.ResourceNames(pvcUsage))
+		if diff := requiredSet.Difference(pvcSet); len(diff) > 0 {
+			missingSet.Insert(diff.List()...)
+		}
+		if len(missingSet) == 0 {
+			return nil
+		}
+		return fmt.Errorf("must specify %s", strings.Join(missingSet.List(), ","))
 	}
-	if len(missingSet) == 0 {
-		return nil
-	}
-	return fmt.Errorf("must specify %s", strings.Join(missingSet.List(), ","))
 }

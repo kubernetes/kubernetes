@@ -34,6 +34,9 @@ func testVolumeClaim(name string, namespace string, spec api.PersistentVolumeCla
 }
 
 func TestPersistentVolumeClaimsConstraintsFunc(t *testing.T) {
+	// the function we are testing
+	constraintFunc := makePersistentVolumeClaimConstraintsFunc(PersistentVolumeClaimUsageFunc)
+
 	validClaim := testVolumeClaim("foo", "ns", api.PersistentVolumeClaimSpec{
 		Selector: &unversioned.LabelSelector{
 			MatchExpressions: []unversioned.LabelSelectorRequirement{
@@ -95,7 +98,7 @@ func TestPersistentVolumeClaimsConstraintsFunc(t *testing.T) {
 		},
 	}
 	for testName, test := range testCases {
-		err := PersistentVolumeClaimConstraintsFunc(test.required, test.pvc)
+		err := constraintFunc(test.required, test.pvc)
 		switch {
 		case err != nil && len(test.err) == 0,
 			err == nil && len(test.err) != 0,

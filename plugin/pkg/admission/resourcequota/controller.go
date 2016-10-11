@@ -327,8 +327,7 @@ func (e *quotaEvaluator) checkRequest(quotas []api.ResourceQuota, a admission.At
 	}
 
 	op := a.GetOperation()
-	operationResources := evaluator.OperationResources(op)
-	if len(operationResources) == 0 {
+	if !evaluator.Handles(op) {
 		return quotas, nil
 	}
 
@@ -346,8 +345,7 @@ func (e *quotaEvaluator) checkRequest(quotas []api.ResourceQuota, a admission.At
 		}
 
 		hardResources := quota.ResourceNames(resourceQuota.Status.Hard)
-		evaluatorResources := evaluator.MatchesResources()
-		requiredResources := quota.Intersection(hardResources, evaluatorResources)
+		requiredResources := evaluator.MatchesResources(hardResources)
 		if err := evaluator.Constraints(requiredResources, inputObject); err != nil {
 			return nil, admission.NewForbidden(a, fmt.Errorf("failed quota: %s: %v", resourceQuota.Name, err))
 		}
@@ -446,8 +444,7 @@ func (e *quotaEvaluator) Evaluate(a admission.Attributes) error {
 	// for this kind, check if the operation could mutate any quota resources
 	// if no resources tracked by quota are impacted, then just return
 	op := a.GetOperation()
-	operationResources := evaluator.OperationResources(op)
-	if len(operationResources) == 0 {
+	if !evaluator.Handles(op) {
 		return nil
 	}
 

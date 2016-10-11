@@ -181,9 +181,8 @@ func (rq *ResourceQuotaController) addQuota(obj interface{}) {
 	for constraint := range resourceQuota.Status.Hard {
 		if _, usageFound := resourceQuota.Status.Used[constraint]; !usageFound {
 			matchedResources := []api.ResourceName{constraint}
-
 			for _, evaluator := range rq.registry.Evaluators() {
-				if intersection := quota.Intersection(evaluator.MatchesResources(), matchedResources); len(intersection) != 0 {
+				if intersection := evaluator.MatchesResources(matchedResources); len(intersection) > 0 {
 					rq.missingUsageQueue.Add(key)
 					return
 				}
@@ -338,11 +337,10 @@ func (rq *ResourceQuotaController) replenishQuota(groupKind unversioned.GroupKin
 	}
 
 	// only queue those quotas that are tracking a resource associated with this kind.
-	matchedResources := evaluator.MatchesResources()
 	for i := range resourceQuotas {
 		resourceQuota := resourceQuotas[i].(*api.ResourceQuota)
 		resourceQuotaResources := quota.ResourceNames(resourceQuota.Status.Hard)
-		if len(quota.Intersection(matchedResources, resourceQuotaResources)) > 0 {
+		if intersection := evaluator.MatchesResources(resourceQuotaResources); len(intersection) > 0 {
 			// TODO: make this support targeted replenishment to a specific kind, right now it does a full recalc on that quota.
 			rq.enqueueResourceQuota(resourceQuota)
 		}

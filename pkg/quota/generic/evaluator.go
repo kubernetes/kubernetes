@@ -55,6 +55,9 @@ type MatchesScopeFunc func(scope api.ResourceQuotaScope, object runtime.Object) 
 // UsageFunc knows how to measure usage associated with an object
 type UsageFunc func(object runtime.Object) api.ResourceList
 
+// MatchesResourceNamesFunc is a function that returns the list of resources matched
+type MatchesResourceNamesFunc func(input []api.ResourceName) []api.ResourceName
+
 // MatchesNoScopeFunc returns false on all match checks
 func MatchesNoScopeFunc(scope api.ResourceQuotaScope, object runtime.Object) bool {
 	return false
@@ -81,16 +84,24 @@ func ObjectCountUsageFunc(resourceName api.ResourceName) UsageFunc {
 	}
 }
 
+// StaticMatchedResourceNamesFunc returns a MatchesResourceNamesFunc for a fixed set of resources.
+func StaticMatchedResourceNamesFunc(input []api.ResourceName) MatchesResourceNamesFunc {
+	return func(items []api.ResourceName) []api.ResourceName {
+		return quota.Intersection(items, input)
+	}
+}
+
 // GenericEvaluator provides an implementation for quota.Evaluator
 type GenericEvaluator struct {
 	// Name used for logging
 	Name string
 	// The GroupKind that this evaluator tracks
 	InternalGroupKind unversioned.GroupKind
-	// The set of resources that are pertinent to the mapped operation
-	InternalOperationResources map[admission.Operation][]api.ResourceName
-	// The set of resource names this evaluator matches
-	MatchedResourceNames []api.ResourceName
+	// Operations are the set of operations that are handled by this evaluator
+	Operations []admission.Operation
+	// A hook to allow an evaluator to support dynamic resource name matching.
+	// If specified, MatchedResourceNames field is ignored.
+	MatchedResourceNamesFunc MatchesResourceNamesFunc
 	// A function that knows how to evaluate a matches scope request
 	MatchesScopeFunc MatchesScopeFunc
 	// A function that knows how to return usage for an object
@@ -117,11 +128,14 @@ func (g *GenericEvaluator) Get(namespace, name string) (runtime.Object, error) {
 	return g.GetFuncByNamespace(namespace, name)
 }
 
-// OperationResources returns the set of resources that could be updated for the
-// specified operation for this kind.  If empty, admission control will ignore
-// quota processing for the operation.
-func (g *GenericEvaluator) OperationResources(operation admission.Operation) []api.ResourceName {
-	return g.InternalOperationResources[operation]
+// Handles returns true of the evalutor should handle the specified operation.
+func (g *GenericEvaluator) Handles(operation admission.Operation) bool {
+	for _, op := range g.Operations {
+		if op == operation {
+			return true
+		}
+	}
+	return false
 }
 
 // GroupKind that this evaluator tracks
@@ -129,9 +143,14 @@ func (g *GenericEvaluator) GroupKind() unversioned.GroupKind {
 	return g.InternalGroupKind
 }
 
-// MatchesResources is the list of resources that this evaluator matches
-func (g *GenericEvaluator) MatchesResources() []api.ResourceName {
-	return g.MatchedResourceNames
+// MatchesResources takes the input specified list of resources and returns the set of resources it matches.
+func (g *GenericEvaluator) MatchesResources(input []api.ResourceName) []api.ResourceName {
+	return g.MatchedResourceNamesFunc(input)
+}
+
+// MatchesResource returns true if this evaluator can match on the specified resource
+func (g *GenericEvaluator) MatchesResource(resourceName api.ResourceName) bool {
+	return len(g.MatchesResources([]api.ResourceName{resourceName})) > 0
 }
 
 // Matches returns true if the evaluator matches the specified quota with the provided input item
@@ -156,16 +175,6 @@ func (g *GenericEvaluator) Matches(resourceQuota *api.ResourceQuota, item runtim
 	return matchResource && matchScope
 }
 
-// MatchesResource returns true if this evaluator can match on the specified resource
-func (g *GenericEvaluator) MatchesResource(resourceName api.ResourceName) bool {
-	for _, matchedResourceName := range g.MatchedResourceNames {
-		if resourceName == matchedResourceName {
-			return true
-		}
-	}
-	return false
-}
-
 // MatchesScope returns true if the input object matches the specified scope
 func (g *GenericEvaluator) MatchesScope(scope api.ResourceQuotaScope, object runtime.Object) bool {
 	return g.MatchesScopeFunc(scope, object)
@@ -180,7 +189,7 @@ func (g *GenericEvaluator) Usage(object runtime.Object) api.ResourceList {
 func (g *GenericEvaluator) UsageStats(options quota.UsageStatsOptions) (quota.UsageStats, error) {
 	// default each tracked resource to zero
 	result := quota.UsageStats{Used: api.ResourceList{}}
-	for _, resourceName := range g.MatchedResourceNames {
+	for _, resourceName := range options.Resources {
 		result.Used[resourceName] = resource.MustParse("0")
 	}
 	items, err := g.ListFuncByNamespace(options.Namespace, api.ListOptions{

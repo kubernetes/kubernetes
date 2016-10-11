@@ -38,16 +38,13 @@ func NewServiceEvaluator(kubeClient clientset.Interface) quota.Evaluator {
 		api.ResourceServicesLoadBalancers,
 	}
 	return &generic.GenericEvaluator{
-		Name:              "Evaluator.Service",
-		InternalGroupKind: api.Kind("Service"),
-		InternalOperationResources: map[admission.Operation][]api.ResourceName{
-			admission.Create: allResources,
-			admission.Update: allResources,
-		},
-		MatchedResourceNames: allResources,
-		MatchesScopeFunc:     generic.MatchesNoScopeFunc,
-		ConstraintsFunc:      ServiceConstraintsFunc,
-		UsageFunc:            ServiceUsageFunc,
+		Name:                     "Evaluator.Service",
+		InternalGroupKind:        api.Kind("Service"),
+		Operations:               []admission.Operation{admission.Create, admission.Update},
+		MatchedResourceNamesFunc: generic.StaticMatchedResourceNamesFunc(allResources),
+		MatchesScopeFunc:         generic.MatchesNoScopeFunc,
+		ConstraintsFunc:          ServiceConstraintsFunc,
+		UsageFunc:                ServiceUsageFunc,
 		ListFuncByNamespace: func(namespace string, options api.ListOptions) ([]runtime.Object, error) {
 			itemList, err := kubeClient.Core().Services(namespace).List(options)
 			if err != nil {
