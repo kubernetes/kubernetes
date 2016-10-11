@@ -44,7 +44,7 @@ Available Loggers are:
  * FATAL
 
 These each are loggers based on the log standard library and follow the
-standard usage. Eg..
+standard usage. e.g..
 
 ```go
     import (
