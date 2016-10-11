@@ -98,6 +98,9 @@ type Framework struct {
 	// Federation specific params. These are set only if federated = true.
 	FederationClientset_1_5 *federation_release_1_5.Clientset
 	FederationNamespace     *v1.Namespace
+
+	// Cached PodClient
+	podClient *PodClient
 }
 
 type TestDataSummary interface {
