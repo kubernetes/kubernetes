@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/util/wait"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 // A wrapper around api.PodStatus that includes a version to enforce that stale pod statuses are
@@ -435,6 +436,18 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 				glog.V(3).Infof("Pod %q is terminated, but some containers are still running", format.Pod(pod))
 				return
 			}
+
+			// remove the safe-delete finalizer prior to no-grace deletion.
+			finalizers := sets.NewString(pod.GetFinalizers()...)
+			if finalizers.Has("k8s.io/safe-delete") {
+				finalizers.Delete("k8s.io/safe-delete")
+				pod.SetFinalizers(finalizers.List())
+				_, err := m.kubeClient.Core().Pods(pod.Namespace).Update(pod)
+				if err != nil {
+					return
+				}
+			}
+
 			deleteOptions := api.NewDeleteOptions(0)
 			// Use the pod UID as the precondition for deletion to prevent deleting a newly created pod with the same name and namespace.
 			deleteOptions.Preconditions = api.NewUIDPreconditions(string(pod.UID))
