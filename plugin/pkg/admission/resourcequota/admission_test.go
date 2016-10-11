@@ -923,15 +923,13 @@ func TestAdmissionSetsMissingNamespace(t *testing.T) {
 	}
 
 	podEvaluator := &generic.GenericEvaluator{
-		Name:              "Test-Evaluator.Pod",
-		InternalGroupKind: api.Kind("Pod"),
-		InternalOperationResources: map[admission.Operation][]api.ResourceName{
-			admission.Create: computeResources,
-		},
-		ConstraintsFunc:      core.PodConstraintsFunc,
-		MatchedResourceNames: computeResources,
-		MatchesScopeFunc:     core.PodMatchesScopeFunc,
-		UsageFunc:            usageFunc,
+		Name:                     "Test-Evaluator.Pod",
+		InternalGroupKind:        api.Kind("Pod"),
+		Operations:               []admission.Operation{admission.Create},
+		ConstraintsFunc:          core.PodConstraintsFunc,
+		MatchedResourceNamesFunc: generic.StaticMatchedResourceNamesFunc(computeResources),
+		MatchesScopeFunc:         core.PodMatchesScopeFunc,
+		UsageFunc:                usageFunc,
 	}
 
 	registry := &generic.GenericRegistry{

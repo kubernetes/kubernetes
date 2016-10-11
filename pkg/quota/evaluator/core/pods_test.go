@@ -86,8 +86,10 @@ func TestPodConstraintsFunc(t *testing.T) {
 			err:      `must specify memory`,
 		},
 	}
+	kubeClient := fake.NewSimpleClientset()
+	evaluator := NewPodEvaluator(kubeClient, nil)
 	for testName, test := range testCases {
-		err := PodConstraintsFunc(test.required, test.pod)
+		err := evaluator.Constraints(test.required, test.pod)
 		switch {
 		case err != nil && len(test.err) == 0,
 			err == nil && len(test.err) != 0,
