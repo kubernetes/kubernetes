@@ -1,0 +1,18 @@
+{
+    "signing": {
+        "default": {
+            "usages": [
+                "digital signature",
+                "cert sign",
+                "crl sign",
+                "signing",
+                "key encipherment",
+                "client auth"
+            ],
+            "expiry": "876000h",
+            "ca_constraint": {
+                "is_ca": true
+            }
+        }
+    }
+}
