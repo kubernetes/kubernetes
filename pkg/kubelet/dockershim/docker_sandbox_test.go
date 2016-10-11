@@ -111,7 +111,7 @@ func TestSandboxStatus(t *testing.T) {
 
 	// Create the sandbox.
 	fClock.SetTime(time.Now())
-	*expected.CreatedAt = fClock.Now().Unix()
+	*expected.CreatedAt = fClock.Now().UnixNano()
 	id, err := ds.RunPodSandbox(config)
 
 	// Check internal labels
