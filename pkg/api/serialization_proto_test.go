@@ -36,7 +36,9 @@ import (
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
-var nonProtobaleAPIGroups = sets.NewString()
+var nonProtobaleAPIGroups = sets.NewString(
+	"kubeadm.k8s.io",
+)
 
 func init() {
 	codecsToTest = append(codecsToTest, func(version unversioned.GroupVersion, item runtime.Object) (runtime.Codec, bool, error) {
