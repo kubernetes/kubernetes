@@ -69,7 +69,7 @@ func setUp(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.
 	server, storageConfig := etcdtesting.NewUnsecuredEtcd3TestClientServer(t)
 
 	config := &Config{
-		GenericConfig: &genericapiserver.Config{},
+		GenericConfig: genericapiserver.NewConfig(),
 	}
 
 	resourceEncoding := genericapiserver.NewDefaultResourceEncodingConfig()
@@ -159,10 +159,6 @@ func newLimitedMaster(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Confi
 func TestNew(t *testing.T) {
 	master, etcdserver, config, assert := newMaster(t)
 	defer etcdserver.Terminate(t)
-
-	// Verify many of the variables match their config counterparts
-	assert.Equal(master.GenericAPIServer.RequestContextMapper(), config.GenericConfig.RequestContextMapper)
-	assert.Equal(master.GenericAPIServer.ClusterIP, config.GenericConfig.PublicAddress)
 
 	// these values get defaulted
 	_, serviceClusterIPRange, _ := net.ParseCIDR("10.0.0.0/24")
