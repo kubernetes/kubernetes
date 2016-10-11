@@ -42,7 +42,7 @@ const (
 	// StatusSuccess represents the successful completion of command.
 	StatusSuccess = "Success"
 	// StatusFailed represents that the command failed.
-	StatusFailure = "Failed"
+	StatusFailure = "Failure"
 	// StatusNotSupported represents that the command is not supported.
 	StatusNotSupported = "Not supported"
 )
