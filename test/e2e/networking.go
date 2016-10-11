@@ -49,7 +49,7 @@ var _ = framework.KubeDescribe("Networking", func() {
 	})
 
 	// First test because it has no dependencies on variables created later on.
-	It("should provide unchanging, static URL paths for kubernetes api services [Conformance]", func() {
+	It("should provide unchanging, static URL paths for kubernetes api services", func() {
 		tests := []struct {
 			path string
 		}{

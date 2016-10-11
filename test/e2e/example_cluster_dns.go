@@ -50,7 +50,7 @@ var _ = framework.KubeDescribe("ClusterDns [Feature:Example]", func() {
 		c = f.Client
 	})
 
-	It("should create pod that uses dns [Conformance]", func() {
+	It("should create pod that uses dns", func() {
 		mkpath := func(file string) string {
 			return filepath.Join(framework.TestContext.RepoRoot, "examples/cluster-dns", file)
 		}
