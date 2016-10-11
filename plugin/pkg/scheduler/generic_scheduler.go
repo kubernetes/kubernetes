@@ -71,6 +71,8 @@ type genericScheduler struct {
 	lastNodeIndex        uint64
 
 	cachedNodeInfoMap map[string]*schedulercache.NodeInfo
+
+	equivalenceCache *EquivalenceCache
 }
 
 // Schedule tries to schedule the given pod to one of node in the node list.
@@ -97,6 +99,11 @@ func (g *genericScheduler) Schedule(pod *api.Pod, nodeLister algorithm.NodeListe
 	err = g.cache.UpdateNodeNameToInfoMap(g.cachedNodeInfoMap)
 	if err != nil {
 		return "", err
+	}
+
+	// If equivalenceCache is enabled
+	if g.equivalenceCache != nil {
+		g.scheduleWithEquivalenceClass(pod, nodes, trace)
 	}
 
 	trace.Step("Computing predicates")
@@ -376,16 +383,68 @@ func EqualPriorityMap(_ *api.Pod, _ interface{}, nodeInfo *schedulercache.NodeIn
 
 func NewGenericScheduler(
 	cache schedulercache.Cache,
+	eCache *EquivalenceCache,
 	predicates map[string]algorithm.FitPredicate,
 	priorityMetaProducer algorithm.MetadataProducer,
 	prioritizers []algorithm.PriorityConfig,
 	extenders []algorithm.SchedulerExtender) algorithm.ScheduleAlgorithm {
 	return &genericScheduler{
 		cache:                cache,
+		equivalenceCache:     eCache,
 		predicates:           predicates,
 		priorityMetaProducer: priorityMetaProducer,
 		prioritizers:         prioritizers,
 		extenders:            extenders,
 		cachedNodeInfoMap:    make(map[string]*schedulercache.NodeInfo),
 	}
+}
+
+func (g *genericScheduler) scheduleWithEquivalenceClass(pod *api.Pod, nodes []*api.Node, trace *util.Trace) (string, error) {
+	trace.Step("Computing predicates")
+
+	// Get cached predicates, returns:
+	// 1. valid nodes
+	// 2. failed reasons
+	// 3. nodes without predicate cache
+	cachedFilteredNodes, cachedFailedPredicateMap, noCacheNodes := g.equivalenceCache.GetCachedPredicates(pod, nodes)
+
+	var err error
+
+	filteredNodes := []*api.Node{}
+	failedPredicateMap := FailedPredicateMap{}
+
+	// Only check nodes without predicate cache
+	if len(noCacheNodes) > 0 {
+		filteredNodes, failedPredicateMap, err = findNodesThatFit(pod, g.cachedNodeInfoMap, noCacheNodes, g.predicates, g.extenders)
+		if err != nil {
+			return "", err
+		}
+		// And cache predicates result for them
+		g.equivalenceCache.AddPodPredicatesCache(pod, filteredNodes, &failedPredicateMap)
+	}
+
+	for _, node := range cachedFilteredNodes {
+		filteredNodes = append(filteredNodes, node)
+	}
+	for node, failReason := range cachedFailedPredicateMap {
+		failedPredicateMap[node] = failReason
+	}
+
+	if len(filteredNodes) == 0 {
+		return "", &FitError{
+			Pod:              pod,
+			FailedPredicates: failedPredicateMap,
+		}
+	}
+
+	trace.Step("Prioritizing")
+
+	meta := g.priorityMetaProducer(pod)
+	priorityList, err := PrioritizeNodes(pod, g.cachedNodeInfoMap, meta, g.prioritizers, filteredNodes, g.extenders)
+	if err != nil {
+		return "", err
+	}
+
+	trace.Step("Selecting host")
+	return g.selectHost(priorityList)
 }
