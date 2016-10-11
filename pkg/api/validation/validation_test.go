@@ -6467,8 +6467,14 @@ func TestValidateResourceNames(t *testing.T) {
 		success bool
 		expect  string
 	}{
-		{"memory", true, ""},
+		{"memory", true, ""},		
 		{"cpu", true, ""},
+		{"storage", true, ""},
+		{"requests.cpu", true, ""},
+		{"requests.memory", true, ""},		
+		{"requests.storage", true, ""},
+		{"limits.cpu", true, ""},
+		{"limits.memory", true, ""},		
 		{"network", false, ""},
 		{"disk", false, ""},
 		{"", false, ""},
