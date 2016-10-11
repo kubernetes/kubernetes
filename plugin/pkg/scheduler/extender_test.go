@@ -291,7 +291,7 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			cache.AddNode(&api.Node{ObjectMeta: api.ObjectMeta{Name: name}})
 		}
 		scheduler := NewGenericScheduler(
-			cache, test.predicates, algorithm.EmptyMetadataProducer,
+			cache, test.predicates, algorithm.EmptyMetadataProducer, algorithm.EmptyMetadataProducer,
 			test.prioritizers, extenders)
 		machine, err := scheduler.Schedule(test.pod, algorithm.FakeNodeLister(makeNodeList(test.nodes)))
 		if test.expectsErr {

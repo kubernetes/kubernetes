@@ -28,7 +28,7 @@ type priorityMetadata struct {
 	affinity       *api.Affinity
 }
 
-func PriorityMetadata(pod *api.Pod) interface{} {
+func PriorityMetadata(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo) interface{} {
 	// If we cannot compute metadata, just return nil
 	if pod == nil {
 		return nil

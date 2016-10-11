@@ -78,7 +78,8 @@ var (
 	algorithmProviderMap = make(map[string]AlgorithmProviderConfig)
 
 	// Registered metadata producers
-	priorityMetadataProducer MetadataProducerFactory
+	priorityMetadataProducer  MetadataProducerFactory
+	predicateMetadataProducer MetadataProducerFactory
 
 	// get equivalence pod function
 	getEquivalencePodFunc algorithm.GetEquivalencePodFunc = nil
@@ -165,6 +166,12 @@ func RegisterPriorityMetadataProducerFactory(factory MetadataProducerFactory) {
 	schedulerFactoryMutex.Lock()
 	defer schedulerFactoryMutex.Unlock()
 	priorityMetadataProducer = factory
+}
+
+func RegisterPredicateMetadataProducerFactory(factory MetadataProducerFactory) {
+	schedulerFactoryMutex.Lock()
+	defer schedulerFactoryMutex.Unlock()
+	predicateMetadataProducer = factory
 }
 
 // DEPRECATED
@@ -314,6 +321,17 @@ func getPriorityMetadataProducer(args PluginFactoryArgs) (algorithm.MetadataProd
 		return algorithm.EmptyMetadataProducer, nil
 	}
 	return priorityMetadataProducer(args), nil
+}
+
+func getPredicateMetadataProducer(args PluginFactoryArgs) (algorithm.MetadataProducer, error) {
+	schedulerFactoryMutex.Lock()
+	defer schedulerFactoryMutex.Unlock()
+
+	if predicateMetadataProducer == nil {
+		fmt.Println("WARNING: EMpty metadataproducer !!!!!")
+		return algorithm.EmptyMetadataProducer, nil
+	}
+	return predicateMetadataProducer(args), nil
 }
 
 func getPriorityFunctionConfigs(names sets.String, args PluginFactoryArgs) ([]algorithm.PriorityConfig, error) {
