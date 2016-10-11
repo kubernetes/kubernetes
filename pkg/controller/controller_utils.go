@@ -374,6 +374,12 @@ func getPodsLabelSet(template *api.PodTemplateSpec) labels.Set {
 	return desiredLabels
 }
 
+func getPodsFinalizers(template *api.PodTemplateSpec) []string {
+	desiredFinalizers := make([]string, len(template.Finalizers))
+	copy(desiredFinalizers, template.Finalizers)
+	return desiredFinalizers
+}
+
 func getPodsAnnotationSet(template *api.PodTemplateSpec, object runtime.Object) (labels.Set, error) {
 	desiredAnnotations := make(labels.Set)
 	for k, v := range template.Annotations {
@@ -439,6 +445,7 @@ func (r RealPodControl) PatchPod(namespace, name string, data []byte) error {
 
 func GetPodFromTemplate(template *api.PodTemplateSpec, parentObject runtime.Object, controllerRef *api.OwnerReference) (*api.Pod, error) {
 	desiredLabels := getPodsLabelSet(template)
+	desiredFinalizers := getPodsFinalizers(template)
 	desiredAnnotations, err := getPodsAnnotationSet(template, parentObject)
 	if err != nil {
 		return nil, err
@@ -454,6 +461,7 @@ func GetPodFromTemplate(template *api.PodTemplateSpec, parentObject runtime.Obje
 			Labels:       desiredLabels,
 			Annotations:  desiredAnnotations,
 			GenerateName: prefix,
+			Finalizers:   desiredFinalizers,
 		},
 	}
 	if controllerRef != nil {
