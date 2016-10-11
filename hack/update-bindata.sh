@@ -32,6 +32,7 @@ fi
 if ! which go-bindata &>/dev/null ; then
 	echo "Cannot find go-bindata. Install with"
 	echo "  go get -u github.com/jteeuwen/go-bindata/go-bindata"
+	echo "  and make sure GOBIN is in the system PATH"
 	exit 5
 fi
 
