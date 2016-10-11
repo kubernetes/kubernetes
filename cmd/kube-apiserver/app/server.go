@@ -203,11 +203,11 @@ func Run(s *options.APIServer) error {
 	}
 
 	// Default to the private server key for service account token signing
-	if s.ServiceAccountKeyFile == "" && s.TLSPrivateKeyFile != "" {
+	if len(s.ServiceAccountKeyFiles) == 0 && s.TLSPrivateKeyFile != "" {
 		if authenticator.IsValidServiceAccountKeyFile(s.TLSPrivateKeyFile) {
-			s.ServiceAccountKeyFile = s.TLSPrivateKeyFile
+			s.ServiceAccountKeyFiles = []string{s.TLSPrivateKeyFile}
 		} else {
-			glog.Warning("No RSA key provided, service account token authentication disabled")
+			glog.Warning("No TLS key provided, service account token authentication disabled")
 		}
 	}
 
@@ -233,7 +233,7 @@ func Run(s *options.APIServer) error {
 		OIDCCAFile:                  s.OIDCCAFile,
 		OIDCUsernameClaim:           s.OIDCUsernameClaim,
 		OIDCGroupsClaim:             s.OIDCGroupsClaim,
-		ServiceAccountKeyFile:       s.ServiceAccountKeyFile,
+		ServiceAccountKeyFiles:      s.ServiceAccountKeyFiles,
 		ServiceAccountLookup:        s.ServiceAccountLookup,
 		ServiceAccountTokenGetter:   serviceAccountGetter,
 		KeystoneURL:                 s.KeystoneURL,
