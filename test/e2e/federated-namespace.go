@@ -98,6 +98,13 @@ var _ = framework.KubeDescribe("Federation namespace [Feature:Federation]", func
 			deleteAllTestNamespaces(
 				f.FederationClientset_1_5.Core().Namespaces().List,
 				f.FederationClientset_1_5.Core().Namespaces().Delete)
+			// Verify that the namespace was deleted from all underlying clusters as well.
+			for clusterName, clusterClientset := range clusters {
+				_, err := clusterClientset.Core().Namespaces().Get(ns.Name)
+				if err == nil || !errors.IsNotFound(err) {
+					framework.Failf("expected NotFound error for namespace %s in cluster %s, got error: %v", ns.Name, clusterName, err)
+				}
+			}
 		})
 	})
 })
@@ -110,7 +117,9 @@ func deleteAllTestNamespaces(lister func(api_v1.ListOptions) (*api_v1.NamespaceL
 	}
 	for _, namespace := range list.Items {
 		if strings.HasPrefix(namespace.Name, namespacePrefix) {
-			err := deleter(namespace.Name, &api_v1.DeleteOptions{})
+			// Do not orphan dependents (corresponding namespaces in underlying clusters).
+			orphanDependents := false
+			err := deleter(namespace.Name, &api_v1.DeleteOptions{OrphanDependents: &orphanDependents})
 			if err != nil {
 				framework.Failf("Failed to set %s for deletion: %v", namespace.Name, err)
 			}
