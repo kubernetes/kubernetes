@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"time"
 
+	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	"k8s.io/kubernetes/pkg/api"
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	unversionedapi "k8s.io/kubernetes/pkg/api/unversioned"
@@ -95,6 +96,8 @@ func CreateClientAndWaitForAPI(adminConfig *clientcmdapi.Config) (*clientset.Cli
 		fmt.Printf("<master/apiclient> first node is ready after %f seconds\n", time.Since(start).Seconds())
 		return true, nil
 	})
+
+	createDummyDeployment(client)
 
 	return client, nil
 }
@@ -218,4 +221,42 @@ func SetMasterNodeAffinity(meta *api.ObjectMeta) {
 		meta.Annotations = map[string]string{}
 	}
 	meta.Annotations[api.AffinityAnnotationKey] = string(affinityAnnotation)
+}
+
+func createDummyDeployment(client *clientset.Clientset) {
+	fmt.Println("<master/apiclient> attempting a test deployment")
+	dummyDeployment := NewDeployment("dummy", 1, api.PodSpec{
+		SecurityContext: &api.PodSecurityContext{HostNetwork: true},
+		Containers: []api.Container{{
+			Name:  "dummy",
+			Image: images.GetAddonImage("pause"),
+		}},
+	})
+
+	wait.PollInfinite(apiCallRetryInterval, func() (bool, error) {
+		// TODO: we should check the error, as some cases may be fatal
+		if _, err := client.Extensions().Deployments(api.NamespaceSystem).Create(dummyDeployment); err != nil {
+			fmt.Printf("<master/apiclient> failed to create test deployment [%v] (will retry)", err)
+			return false, nil
+		}
+		return true, nil
+	})
+
+	wait.PollInfinite(apiCallRetryInterval, func() (bool, error) {
+		d, err := client.Extensions().Deployments(api.NamespaceSystem).Get("dummy")
+		if err != nil {
+			fmt.Printf("<master/apiclient> failed to get test deployment [%v] (will retry)", err)
+			return false, nil
+		}
+		if d.Status.AvailableReplicas < 1 {
+			return false, nil
+		}
+		return true, nil
+	})
+
+	fmt.Println("<master/apiclient> test deployment succeeded")
+
+	if err := client.Extensions().Deployments(api.NamespaceSystem).Delete("dummy", &api.DeleteOptions{}); err != nil {
+		fmt.Printf("<master/apiclient> failed to delete test deployment [%v] (will ignore)", err)
+	}
 }
