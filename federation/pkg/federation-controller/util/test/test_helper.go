@@ -17,7 +17,9 @@ limitations under the License.
 package testutil
 
 import (
+	"fmt"
 	"os"
+	"reflect"
 	"runtime/pprof"
 	"sync"
 	"time"
@@ -199,6 +201,49 @@ func GetObjectFromChan(c chan runtime.Object) runtime.Object {
 		pprof.Lookup("goroutine").WriteTo(os.Stderr, 1)
 		return nil
 	}
+}
+
+type CheckingFunction func(runtime.Object) error
+
+// CheckObjectFromChan tries to get an object matching the given check function
+// within a reasonable time.
+func CheckObjectFromChan(c chan runtime.Object, checkFunction CheckingFunction) error {
+	delay := 20 * time.Second
+	var lastError error
+	for {
+		select {
+		case obj := <-c:
+			if lastError = checkFunction(obj); lastError == nil {
+				return nil
+			}
+			glog.Infof("Check function failed with %v", lastError)
+			delay = 5 * time.Second
+		case <-time.After(delay):
+			pprof.Lookup("goroutine").WriteTo(os.Stderr, 1)
+			if lastError == nil {
+				return fmt.Errorf("Failed to get an object from channel")
+			} else {
+				return lastError
+			}
+		}
+	}
+}
+
+// CompareObjectMeta returns an error when the given objects are not equivalent.
+func CompareObjectMeta(a, b api_v1.ObjectMeta) error {
+	if a.Namespace != b.Namespace {
+		return fmt.Errorf("Different namespace expected:%s observed:%s", a.Namespace, b.Namespace)
+	}
+	if a.Name != b.Name {
+		return fmt.Errorf("Different name expected:%s observed:%s", a.Namespace, b.Namespace)
+	}
+	if !reflect.DeepEqual(a.Annotations, b.Annotations) {
+		return fmt.Errorf("Annotations are different expected:%v observerd:%v", a.Annotations, b.Annotations)
+	}
+	if !reflect.DeepEqual(a.Labels, b.Labels) {
+		return fmt.Errorf("Annotations are different expected:%v observerd:%v", a.Labels, b.Labels)
+	}
+	return nil
 }
 
 func ToFederatedInformerForTestOnly(informer util.FederatedInformer) util.FederatedInformerForTestOnly {

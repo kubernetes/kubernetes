@@ -119,34 +119,34 @@ func TestDeploymentController(t *testing.T) {
 	// Create deployment. Expect to see it in cluster1.
 	dep1 := newDeploymentWithReplicas("depA", 6)
 	deploymentsWatch.Add(dep1)
-	createdDep1 := GetDeploymentFromChan(cluster1CreateChan)
-	assert.NotNil(t, createdDep1)
-	assert.Equal(t, dep1.Namespace, createdDep1.Namespace)
-	assert.Equal(t, dep1.Name, createdDep1.Name)
-	assert.Equal(t, dep1.Spec.Replicas, createdDep1.Spec.Replicas)
+	checkDeployment := func(base *extensionsv1.Deployment, replicas int32) CheckingFunction {
+		return func(obj runtime.Object) error {
+			if obj == nil {
+				return fmt.Errorf("Observed object is nil")
+			}
+			d := obj.(*extensionsv1.Deployment)
+			if err := CompareObjectMeta(base.ObjectMeta, d.ObjectMeta); err != nil {
+				return err
+			}
+			if replicas != *d.Spec.Replicas {
+				return fmt.Errorf("Replica count is different expected:%d observed:%d", replicas, *d.Spec.Replicas)
+			}
+			return nil
+		}
+	}
+	assert.NoError(t, CheckObjectFromChan(cluster1CreateChan, checkDeployment(dep1, *dep1.Spec.Replicas)))
 
 	// Increase replica count. Expect to see the update in cluster1.
 	newRep := int32(8)
 	dep1.Spec.Replicas = &newRep
 	deploymentsWatch.Modify(dep1)
-	updatedDep1 := GetDeploymentFromChan(cluster1UpdateChan)
-	assert.NotNil(t, updatedDep1)
-	assert.Equal(t, dep1.Namespace, updatedDep1.Namespace)
-	assert.Equal(t, dep1.Name, updatedDep1.Name)
-	assert.Equal(t, dep1.Spec.Replicas, updatedDep1.Spec.Replicas)
+	assert.NoError(t, CheckObjectFromChan(cluster1UpdateChan, checkDeployment(dep1, *dep1.Spec.Replicas)))
 
 	// Add new cluster. Although rebalance = false, no pods have been created yet so it should
 	// rebalance anyway.
 	clusterWatch.Add(cluster2)
-	updatedDep1 = GetDeploymentFromChan(cluster1UpdateChan)
-	createdDep2 := GetDeploymentFromChan(cluster2CreateChan)
-	assert.NotNil(t, updatedDep1)
-	assert.NotNil(t, createdDep2)
-
-	assert.Equal(t, dep1.Namespace, createdDep2.Namespace)
-	assert.Equal(t, dep1.Name, createdDep2.Name)
-	assert.Equal(t, *dep1.Spec.Replicas/2, *createdDep2.Spec.Replicas)
-	assert.Equal(t, *dep1.Spec.Replicas/2, *updatedDep1.Spec.Replicas)
+	assert.NoError(t, CheckObjectFromChan(cluster1UpdateChan, checkDeployment(dep1, *dep1.Spec.Replicas/2)))
+	assert.NoError(t, CheckObjectFromChan(cluster2CreateChan, checkDeployment(dep1, *dep1.Spec.Replicas/2)))
 }
 
 func GetDeploymentFromChan(c chan runtime.Object) *extensionsv1.Deployment {
