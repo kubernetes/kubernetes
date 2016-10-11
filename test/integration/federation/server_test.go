@@ -331,7 +331,7 @@ func testExtensionsResourceList(t *testing.T) {
 	assert.Equal(t, "", apiResourceList.APIVersion)
 	assert.Equal(t, ext_v1b1.SchemeGroupVersion.String(), apiResourceList.GroupVersion)
 	// Assert that there are exactly 5 resources.
-	assert.Equal(t, 5, len(apiResourceList.APIResources))
+	assert.Equal(t, 7, len(apiResourceList.APIResources))
 
 	// Verify replicasets.
 	found := findResource(apiResourceList.APIResources, "replicasets")
@@ -349,6 +349,14 @@ func testExtensionsResourceList(t *testing.T) {
 	assert.NotNil(t, found)
 	assert.True(t, found.Namespaced)
 	found = findResource(apiResourceList.APIResources, "ingresses/status")
+	assert.NotNil(t, found)
+	assert.True(t, found.Namespaced)
+
+	// Verify daemonsets.
+	found = findResource(apiResourceList.APIResources, "daemonsets")
+	assert.NotNil(t, found)
+	assert.True(t, found.Namespaced)
+	found = findResource(apiResourceList.APIResources, "daemonsets/status")
 	assert.NotNil(t, found)
 	assert.True(t, found.Namespaced)
 }
