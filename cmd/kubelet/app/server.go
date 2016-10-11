@@ -39,7 +39,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
-	v1alpha1 "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
+	componentconfigv1alpha1 "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/client/chaosclient"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
@@ -241,7 +241,7 @@ func initKubeletConfigSync(s *options.KubeletServer) (*componentconfig.KubeletCo
 		startKubeletConfigSyncLoop(s, jsonstr)
 
 		// Convert json from API server to external type struct, and convert that to internal type struct
-		extKC := v1alpha1.KubeletConfiguration{}
+		extKC := componentconfigv1alpha1.KubeletConfiguration{}
 		err := runtime.DecodeInto(api.Codecs.UniversalDecoder(), []byte(jsonstr), &extKC)
 		if err != nil {
 			return nil, err
@@ -282,7 +282,7 @@ func checkPermissions() error {
 }
 
 func setConfigz(cz *configz.Config, kc *componentconfig.KubeletConfiguration) {
-	tmp := v1alpha1.KubeletConfiguration{}
+	tmp := componentconfigv1alpha1.KubeletConfiguration{}
 	api.Scheme.Convert(kc, &tmp, nil)
 	cz.Set(tmp)
 }
@@ -345,7 +345,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 		var kubeClient, eventClient *clientset.Clientset
 		var cloud cloudprovider.Interface
 
-		if s.CloudProvider != v1alpha1.AutoDetectCloudProvider {
+		if s.CloudProvider != componentconfigv1alpha1.AutoDetectCloudProvider {
 			cloud, err = cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
 			if err != nil {
 				return err
