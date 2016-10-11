@@ -36,9 +36,6 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update -y \
 
 RUN cp /usr/bin/nsenter /nsenter
 
-# Copy the hyperkube binary
-COPY hyperkube /hyperkube
-
 # Manifests for the docker guide
 COPY static-pods/master.json \
      static-pods/etcd.json \
@@ -78,3 +75,7 @@ RUN ln -s /hyperkube /apiserver \
  && ln -s /hyperkube /kubelet \
  && ln -s /hyperkube /proxy \
  && ln -s /hyperkube /scheduler
+
+# Copy the hyperkube binary
+COPY hyperkube /hyperkube
+
