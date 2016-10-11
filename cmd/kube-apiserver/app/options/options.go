@@ -37,7 +37,7 @@ type APIServer struct {
 	MaxConnectionBytesPerSec    int64
 	SSHKeyfile                  string
 	SSHUser                     string
-	ServiceAccountKeyFile       string
+	ServiceAccountKeyFiles      []string
 	ServiceAccountLookup        bool
 	WebhookTokenAuthnConfigFile string
 	WebhookTokenAuthnCacheTTL   time.Duration
@@ -70,9 +70,10 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&s.EventTTL, "event-ttl", s.EventTTL,
 		"Amount of time to retain events. Default is 1h.")
 
-	fs.StringVar(&s.ServiceAccountKeyFile, "service-account-key-file", s.ServiceAccountKeyFile, ""+
-		"File containing PEM-encoded x509 RSA or ECDSA private or public key, used to verify "+
-		"ServiceAccount tokens. If unspecified, --tls-private-key-file is used.")
+	fs.StringArrayVar(&s.ServiceAccountKeyFiles, "service-account-key-file", s.ServiceAccountKeyFiles, ""+
+		"File containing PEM-encoded x509 RSA or ECDSA private or public keys, used to verify "+
+		"ServiceAccount tokens. If unspecified, --tls-private-key-file is used. "+
+		"The specified file can contain multiple keys, and the flag can be specified multiple times with different files.")
 
 	fs.BoolVar(&s.ServiceAccountLookup, "service-account-lookup", s.ServiceAccountLookup,
 		"If true, validate ServiceAccount tokens exist in etcd as part of authentication.")
