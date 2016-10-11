@@ -1078,7 +1078,7 @@ function setup-rkt {
     mkdir -p /etc/rkt "${KUBE_DIR}/download/"
     local rkt_tar="${KUBE_DIR}/download/rkt.tar.gz"
     local rkt_tmpdir=$(mktemp -d "${KUBE_DIR}/rkt_download.XXXXX")
-    curl --fail --silent --show-error \
+    curl --retry 5 --retry-delay 3 --fail --silent --show-error \
       --location --create-dirs --output "${rkt_tar}" \
       https://github.com/coreos/rkt/releases/download/v${RKT_VERSION}/rkt-v${RKT_VERSION}.tar.gz
     tar --strip-components=1 -xf "${rkt_tar}" -C "${rkt_tmpdir}" --overwrite
@@ -1116,7 +1116,7 @@ function install-docker2aci {
   local tar_path="${KUBE_DIR}/download/docker2aci.tar.gz"
   local tmp_path="${KUBE_DIR}/docker2aci"
   mkdir -p "${KUBE_DIR}/download/" "${tmp_path}"
-  curl --fail --silent --show-error \
+  curl --retry 5 --retry-delay 3 --fail --silent --show-error \
     --location --create-dirs --output "${tar_path}" \
     https://github.com/appc/docker2aci/releases/download/v0.12.3/docker2aci-v0.12.3.tar.gz
   tar --strip-components=1 -xf "${tar_path}" -C "${tmp_path}" --overwrite
