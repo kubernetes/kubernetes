@@ -27,6 +27,7 @@ import (
 	kubemaster "k8s.io/kubernetes/cmd/kubeadm/app/master"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	_ "k8s.io/kubernetes/pkg/cloudprovider/providers"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	netutil "k8s.io/kubernetes/pkg/util/net"
 )
