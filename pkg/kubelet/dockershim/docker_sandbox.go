@@ -102,7 +102,7 @@ func (ds *dockerService) PodSandboxStatus(podSandboxID string) (*runtimeApi.PodS
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse timestamp for container %q: %v", podSandboxID, err)
 	}
-	ct := createdAt.Unix()
+	ct := createdAt.UnixNano()
 
 	// Translate container to sandbox state.
 	state := runtimeApi.PodSandBoxState_NOTREADY
