@@ -1834,7 +1834,7 @@
 		},
 		{
 			"ImportPath": "github.com/pkg/sftp",
-			"Rev": "a71e8f580e3b622ebff585309160b1cc549ef4d2"
+			"Rev": "4d0e916071f68db74f8a73926335f809396d6b42"
 		},
 		{
 			"ImportPath": "github.com/pmezard/go-difflib/difflib",
