@@ -358,6 +358,14 @@ func (nc *NamespaceController) delete(namespace *api_v1.Namespace) error {
 	if err != nil {
 		return fmt.Errorf("failed to delete ingresses list from namespace: %v", err)
 	}
+	err = nc.federatedApiClient.Extensions().DaemonSets(namespace.Name).DeleteCollection(&api_v1.DeleteOptions{}, api_v1.ListOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to delete daemonsets list from namespace: %v", err)
+	}
+	err = nc.federatedApiClient.Extensions().Deployments(namespace.Name).DeleteCollection(&api_v1.DeleteOptions{}, api_v1.ListOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to delete deployments list from namespace: %v", err)
+	}
 	err = nc.federatedApiClient.Core().Events(namespace.Name).DeleteCollection(&api_v1.DeleteOptions{}, api_v1.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to delete events list from namespace: %v", err)
