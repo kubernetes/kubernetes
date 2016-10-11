@@ -381,13 +381,13 @@ func Convert_autoscaling_HorizontalPodAutoscalerSpec_To_v1beta1_HorizontalPodAut
 	if in.TargetCPUUtilizationPercentage != nil {
 		out.CPUUtilization = &CPUTargetUtilization{TargetPercentage: *in.TargetCPUUtilizationPercentage}
 	}
-	if in.DownscaleForbiddenWindowMinutes != nil {
-		out.DownscaleForbiddenWindowMinutes = new(int64)
-		*out.DownscaleForbiddenWindowMinutes = *in.DownscaleForbiddenWindowMinutes
+	if in.DownscaleForbiddenWindowSeconds != nil {
+		out.DownscaleForbiddenWindowSeconds = new(int64)
+		*out.DownscaleForbiddenWindowSeconds = *in.DownscaleForbiddenWindowSeconds
 	}
-	if in.UpscaleForbiddenWindowMinutes != nil {
-		out.UpscaleForbiddenWindowMinutes = new(int64)
-		*out.UpscaleForbiddenWindowMinutes = *in.UpscaleForbiddenWindowMinutes
+	if in.UpscaleForbiddenWindowSeconds != nil {
+		out.UpscaleForbiddenWindowSeconds = new(int64)
+		*out.UpscaleForbiddenWindowSeconds = *in.UpscaleForbiddenWindowSeconds
 	}
 	return nil
 }
@@ -407,13 +407,13 @@ func Convert_v1beta1_HorizontalPodAutoscalerSpec_To_autoscaling_HorizontalPodAut
 		out.TargetCPUUtilizationPercentage = new(int32)
 		*out.TargetCPUUtilizationPercentage = int32(in.CPUUtilization.TargetPercentage)
 	}
-	if in.DownscaleForbiddenWindowMinutes != nil {
-		out.DownscaleForbiddenWindowMinutes = new(int64)
-		*out.DownscaleForbiddenWindowMinutes = *in.DownscaleForbiddenWindowMinutes
+	if in.DownscaleForbiddenWindowSeconds != nil {
+		out.DownscaleForbiddenWindowSeconds = new(int64)
+		*out.DownscaleForbiddenWindowSeconds = *in.DownscaleForbiddenWindowSeconds
 	}
-	if in.UpscaleForbiddenWindowMinutes != nil {
-		out.UpscaleForbiddenWindowMinutes = new(int64)
-		*out.UpscaleForbiddenWindowMinutes = *in.UpscaleForbiddenWindowMinutes
+	if in.UpscaleForbiddenWindowSeconds != nil {
+		out.UpscaleForbiddenWindowSeconds = new(int64)
+		*out.UpscaleForbiddenWindowSeconds = *in.UpscaleForbiddenWindowSeconds
 	}
 	return nil
 }

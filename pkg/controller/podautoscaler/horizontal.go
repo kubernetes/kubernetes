@@ -357,14 +357,14 @@ func shouldScale(hpa *autoscaling.HorizontalPodAutoscaler, currentReplicas, desi
 
 	// Going down only if the usageRatio dropped significantly below the target
 	// and there was no rescaling in the last downscaleForbiddenWindow.
-	downForbiddenWindowDuration := time.Duration(*hpa.Spec.DownscaleForbiddenWindowMinutes) * time.Minute
+	downForbiddenWindowDuration := time.Duration(*hpa.Spec.DownscaleForbiddenWindowSeconds) * time.Second
 	if desiredReplicas < currentReplicas && hpa.Status.LastScaleTime.Add(downForbiddenWindowDuration).Before(timestamp) {
 		return true
 	}
 
 	// Going up only if the usage ratio increased significantly above the target
 	// and there was no rescaling in the last upscaleForbiddenWindow.
-	upForbiddenWindowDuration := time.Duration(*hpa.Spec.UpscaleForbiddenWindowMinutes) * time.Minute
+	upForbiddenWindowDuration := time.Duration(*hpa.Spec.UpscaleForbiddenWindowSeconds) * time.Second
 	if desiredReplicas > currentReplicas && hpa.Status.LastScaleTime.Add(upForbiddenWindowDuration).Before(timestamp) {
 		return true
 	}
