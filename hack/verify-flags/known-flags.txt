@@ -570,3 +570,5 @@ www-prefix
 zone-name
 garbage-collector-enabled
 viper-config
+log-lines-total
+run-duration
