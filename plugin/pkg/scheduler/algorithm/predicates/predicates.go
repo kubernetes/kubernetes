@@ -808,16 +808,14 @@ func GeneralPredicates(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.
 }
 
 type PodAffinityChecker struct {
-	info           NodeInfo
-	podLister      algorithm.PodLister
-	failureDomains priorityutil.Topologies
+	info      NodeInfo
+	podLister algorithm.PodLister
 }
 
-func NewPodAffinityPredicate(info NodeInfo, podLister algorithm.PodLister, failureDomains []string) algorithm.FitPredicate {
+func NewPodAffinityPredicate(info NodeInfo, podLister algorithm.PodLister) algorithm.FitPredicate {
 	checker := &PodAffinityChecker{
-		info:           info,
-		podLister:      podLister,
-		failureDomains: priorityutil.Topologies{DefaultKeys: failureDomains},
+		info:      info,
+		podLister: podLister,
 	}
 	return checker.InterPodAffinityMatches
 }
@@ -869,7 +867,11 @@ func (c *PodAffinityChecker) anyPodMatchesPodAffinityTerm(pod *api.Pod, allPods 
 			if err != nil {
 				return false, matchingPodExists, err
 			}
-			if c.failureDomains.NodesHaveSameTopologyKey(node, existingPodNode, term.TopologyKey) {
+			sameTopologyKey, err := priorityutil.NodesHaveSameTopologyKey(node, existingPodNode, term.TopologyKey)
+			if err != nil {
+				return false, matchingPodExists, err
+			}
+			if sameTopologyKey {
 				return true, matchingPodExists, nil
 			}
 		}
@@ -1005,7 +1007,12 @@ func (c *PodAffinityChecker) satisfiesExistingPodsAntiAffinity(pod *api.Pod, met
 		}
 	}
 	for _, term := range matchingTerms {
-		if c.failureDomains.NodesHaveSameTopologyKey(node, term.node, term.term.TopologyKey) {
+		sameTopologyKey, err := priorityutil.NodesHaveSameTopologyKey(node, term.node, term.term.TopologyKey)
+		if err != nil {
+			glog.V(10).Infof("Failed to check node topology, %+v", err)
+			return false
+		}
+		if sameTopologyKey {
 			glog.V(10).Infof("Cannot schedule pod %+v onto node %v,because of PodAntiAffinityTerm %v",
 				podName(pod), node.Name, term.term)
 			return false

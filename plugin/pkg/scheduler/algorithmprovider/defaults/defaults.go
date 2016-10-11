@@ -169,7 +169,7 @@ func defaultPredicates() sets.String {
 		factory.RegisterFitPredicateFactory(
 			"MatchInterPodAffinity",
 			func(args factory.PluginFactoryArgs) algorithm.FitPredicate {
-				return predicates.NewPodAffinityPredicate(args.NodeInfo, args.PodLister, args.FailureDomains)
+				return predicates.NewPodAffinityPredicate(args.NodeInfo, args.PodLister)
 			},
 		),
 	)

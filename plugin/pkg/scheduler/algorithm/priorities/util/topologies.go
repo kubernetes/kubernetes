@@ -17,6 +17,7 @@ limitations under the License.
 package util
 
 import (
+	"errors"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
@@ -75,4 +76,13 @@ func (tps *Topologies) NodesHaveSameTopologyKey(nodeA, nodeB *api.Node, topology
 	} else {
 		return nodesHaveSameTopologyKeyInternal(nodeA, nodeB, topologyKey)
 	}
+}
+
+// NodesHaveSameTopologyKey checks if nodeA and nodeB have same label value with given topologyKey as label key.
+// Empty topologyKey is not allowed.
+func NodesHaveSameTopologyKey(nodeA, nodeB *api.Node, topologyKey string) (bool, error) {
+	if len(topologyKey) == 0 {
+		return false, errors.New("Empty topologyKey is not allowed except for PreferredDuringScheduling pod anti-affinity")
+	}
+	return nodeA.Labels != nil && nodeB.Labels != nil && len(nodeA.Labels[topologyKey]) > 0 && nodeA.Labels[topologyKey] == nodeB.Labels[topologyKey], nil
 }
