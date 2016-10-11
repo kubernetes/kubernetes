@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/watch"
 	"k8s.io/kubernetes/test/e2e/framework"
+	testutils "k8s.io/kubernetes/test/utils"
 
 	. "github.com/onsi/ginkgo"
 )
@@ -115,7 +116,7 @@ var _ = framework.KubeDescribe("Service endpoints latency", func() {
 })
 
 func runServiceLatencies(f *framework.Framework, inParallel, total int) (output []time.Duration, err error) {
-	cfg := framework.RCConfig{
+	cfg := testutils.RCConfig{
 		Client:       f.Client,
 		Image:        framework.GetPauseImageName(f.Client),
 		Name:         "svc-latency-rc",
@@ -123,7 +124,7 @@ func runServiceLatencies(f *framework.Framework, inParallel, total int) (output 
 		Replicas:     1,
 		PollInterval: time.Second,
 	}
-	if err := framework.RunRC(cfg); err != nil {
+	if err := testutils.RunRC(cfg); err != nil {
 		return nil, err
 	}
 	defer framework.DeleteRCAndPods(f.Client, f.ClientSet, f.Namespace.Name, cfg.Name)

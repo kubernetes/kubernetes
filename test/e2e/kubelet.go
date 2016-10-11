@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
+	testutils "k8s.io/kubernetes/test/utils"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -186,7 +187,7 @@ var _ = framework.KubeDescribe("kubelet", func() {
 				By(fmt.Sprintf("Creating a RC of %d pods and wait until all pods of this RC are running", totalPods))
 				rcName := fmt.Sprintf("cleanup%d-%s", totalPods, string(uuid.NewUUID()))
 
-				Expect(framework.RunRC(framework.RCConfig{
+				Expect(testutils.RunRC(testutils.RCConfig{
 					Client:       f.Client,
 					Name:         rcName,
 					Namespace:    f.Namespace.Name,
@@ -196,7 +197,7 @@ var _ = framework.KubeDescribe("kubelet", func() {
 				})).NotTo(HaveOccurred())
 				// Perform a sanity check so that we know all desired pods are
 				// running on the nodes according to kubelet. The timeout is set to
-				// only 30 seconds here because framework.RunRC already waited for all pods to
+				// only 30 seconds here because testutils.RunRC already waited for all pods to
 				// transition to the running status.
 				Expect(waitTillNPodsRunningOnNodes(f.Client, nodeNames, rcName, f.Namespace.Name, totalPods,
 					time.Second*30)).NotTo(HaveOccurred())

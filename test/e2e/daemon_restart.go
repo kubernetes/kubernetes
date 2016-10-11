@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/watch"
 	"k8s.io/kubernetes/test/e2e/framework"
+	testutils "k8s.io/kubernetes/test/utils"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -190,7 +191,7 @@ var _ = framework.KubeDescribe("DaemonRestart [Disruptive]", func() {
 	labelSelector := labels.Set(map[string]string{"name": rcName}).AsSelector()
 	existingPods := cache.NewStore(cache.MetaNamespaceKeyFunc)
 	var ns string
-	var config framework.RCConfig
+	var config testutils.RCConfig
 	var controller *cache.Controller
 	var newPods cache.Store
 	var stopCh chan struct{}
@@ -203,7 +204,7 @@ var _ = framework.KubeDescribe("DaemonRestart [Disruptive]", func() {
 
 		// All the restart tests need an rc and a watch on pods of the rc.
 		// Additionally some of them might scale the rc during the test.
-		config = framework.RCConfig{
+		config = testutils.RCConfig{
 			Client:      f.Client,
 			Name:        rcName,
 			Namespace:   ns,
@@ -211,7 +212,7 @@ var _ = framework.KubeDescribe("DaemonRestart [Disruptive]", func() {
 			Replicas:    numPods,
 			CreatedPods: &[]*api.Pod{},
 		}
-		Expect(framework.RunRC(config)).NotTo(HaveOccurred())
+		Expect(testutils.RunRC(config)).NotTo(HaveOccurred())
 		replacePods(*config.CreatedPods, existingPods)
 
 		stopCh = make(chan struct{})

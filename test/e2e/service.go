@@ -44,6 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
+	testutils "k8s.io/kubernetes/test/utils"
 )
 
 const (
@@ -1604,7 +1605,7 @@ func startServeHostnameService(c *client.Client, ns, name string, port, replicas
 
 	var createdPods []*api.Pod
 	maxContainerFailures := 0
-	config := framework.RCConfig{
+	config := testutils.RCConfig{
 		Client:               c,
 		Image:                "gcr.io/google_containers/serve_hostname:v1.4",
 		Name:                 name,
@@ -1615,7 +1616,7 @@ func startServeHostnameService(c *client.Client, ns, name string, port, replicas
 		CreatedPods:          &createdPods,
 		MaxContainerFailures: &maxContainerFailures,
 	}
-	err = framework.RunRC(config)
+	err = testutils.RunRC(config)
 	if err != nil {
 		return podNames, "", err
 	}

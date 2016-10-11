@@ -104,7 +104,7 @@ func startPodsOnNodes(ns string, numPods, numNodes int, restClient *client.Clien
 		podsPerNode = 1
 	}
 	framework.RunParallel(func(id int) error {
-		return framework.StartPods(podsPerNode, fmt.Sprintf("host.%d", id), restClient)
+		return testutils.StartPods(podsPerNode, fmt.Sprintf("host.%d", id), restClient)
 	}, numNodes, -1)
 }
 

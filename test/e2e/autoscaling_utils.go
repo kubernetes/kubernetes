@@ -25,6 +25,7 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/test/e2e/framework"
+	testutils "k8s.io/kubernetes/test/utils"
 
 	. "github.com/onsi/ginkgo"
 )
@@ -327,7 +328,7 @@ func runServiceAndWorkloadForResourceConsumer(c *client.Client, ns, name, kind s
 	})
 	framework.ExpectNoError(err)
 
-	rcConfig := framework.RCConfig{
+	rcConfig := testutils.RCConfig{
 		Client:     c,
 		Image:      resourceConsumerImage,
 		Name:       name,
@@ -342,19 +343,19 @@ func runServiceAndWorkloadForResourceConsumer(c *client.Client, ns, name, kind s
 
 	switch kind {
 	case kindRC:
-		framework.ExpectNoError(framework.RunRC(rcConfig))
+		framework.ExpectNoError(testutils.RunRC(rcConfig))
 		break
 	case kindDeployment:
-		dpConfig := framework.DeploymentConfig{
+		dpConfig := testutils.DeploymentConfig{
 			RCConfig: rcConfig,
 		}
-		framework.ExpectNoError(framework.RunDeployment(dpConfig))
+		framework.ExpectNoError(testutils.RunDeployment(dpConfig))
 		break
 	case kindReplicaSet:
-		rsConfig := framework.ReplicaSetConfig{
+		rsConfig := testutils.ReplicaSetConfig{
 			RCConfig: rcConfig,
 		}
-		framework.ExpectNoError(framework.RunReplicaSet(rsConfig))
+		framework.ExpectNoError(testutils.RunReplicaSet(rsConfig))
 		break
 	default:
 		framework.Failf(invalidKind)
@@ -380,7 +381,7 @@ func runServiceAndWorkloadForResourceConsumer(c *client.Client, ns, name, kind s
 	framework.ExpectNoError(err)
 
 	dnsClusterFirst := api.DNSClusterFirst
-	controllerRcConfig := framework.RCConfig{
+	controllerRcConfig := testutils.RCConfig{
 		Client:    c,
 		Image:     resourceConsumerControllerImage,
 		Name:      controllerName,
@@ -390,7 +391,7 @@ func runServiceAndWorkloadForResourceConsumer(c *client.Client, ns, name, kind s
 		Command:   []string{"/controller", "--consumer-service-name=" + name, "--consumer-service-namespace=" + ns, "--consumer-port=80"},
 		DNSPolicy: &dnsClusterFirst,
 	}
-	framework.ExpectNoError(framework.RunRC(controllerRcConfig))
+	framework.ExpectNoError(testutils.RunRC(controllerRcConfig))
 
 	// Make sure endpoints are propagated.
 	// TODO(piosz): replace sleep with endpoints watch.

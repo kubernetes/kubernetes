@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/test/e2e/framework"
+	testutils "k8s.io/kubernetes/test/utils"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -209,7 +210,7 @@ func printStatusAndLogsForNotReadyPods(c *client.Client, ns string, podNames []s
 func rebootNode(c *client.Client, provider, name, rebootCmd string) bool {
 	// Setup
 	ns := api.NamespaceSystem
-	ps := framework.NewPodStore(c, ns, labels.Everything(), fields.OneTermEqualSelector(api.PodHostField, name))
+	ps := testutils.NewPodStore(c, ns, labels.Everything(), fields.OneTermEqualSelector(api.PodHostField, name))
 	defer ps.Stop()
 
 	// Get the node initially.

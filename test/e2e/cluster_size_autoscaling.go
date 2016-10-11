@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/test/e2e/framework"
+	testutils "k8s.io/kubernetes/test/utils"
 
 	"github.com/golang/glog"
 	. "github.com/onsi/ginkgo"
@@ -456,7 +457,7 @@ func doPut(url, content string) (string, error) {
 func CreateNodeSelectorPods(f *framework.Framework, id string, replicas int, nodeSelector map[string]string, expectRunning bool) {
 	By(fmt.Sprintf("Running RC which reserves host port and defines node selector"))
 
-	config := &framework.RCConfig{
+	config := &testutils.RCConfig{
 		Client:       f.Client,
 		Name:         "node-selector",
 		Namespace:    f.Namespace.Name,
@@ -466,7 +467,7 @@ func CreateNodeSelectorPods(f *framework.Framework, id string, replicas int, nod
 		HostPorts:    map[string]int{"port1": 4321},
 		NodeSelector: map[string]string{"cluster-autoscaling-test.special-node": "true"},
 	}
-	err := framework.RunRC(*config)
+	err := testutils.RunRC(*config)
 	if expectRunning {
 		framework.ExpectNoError(err)
 	}
@@ -474,7 +475,7 @@ func CreateNodeSelectorPods(f *framework.Framework, id string, replicas int, nod
 
 func CreateHostPortPods(f *framework.Framework, id string, replicas int, expectRunning bool) {
 	By(fmt.Sprintf("Running RC which reserves host port"))
-	config := &framework.RCConfig{
+	config := &testutils.RCConfig{
 		Client:    f.Client,
 		Name:      id,
 		Namespace: f.Namespace.Name,
@@ -483,7 +484,7 @@ func CreateHostPortPods(f *framework.Framework, id string, replicas int, expectR
 		Replicas:  replicas,
 		HostPorts: map[string]int{"port1": 4321},
 	}
-	err := framework.RunRC(*config)
+	err := testutils.RunRC(*config)
 	if expectRunning {
 		framework.ExpectNoError(err)
 	}
@@ -492,7 +493,7 @@ func CreateHostPortPods(f *framework.Framework, id string, replicas int, expectR
 func ReserveCpu(f *framework.Framework, id string, replicas, millicores int) {
 	By(fmt.Sprintf("Running RC which reserves %v millicores", millicores))
 	request := int64(millicores / replicas)
-	config := &framework.RCConfig{
+	config := &testutils.RCConfig{
 		Client:     f.Client,
 		Name:       id,
 		Namespace:  f.Namespace.Name,
@@ -501,13 +502,13 @@ func ReserveCpu(f *framework.Framework, id string, replicas, millicores int) {
 		Replicas:   replicas,
 		CpuRequest: request,
 	}
-	framework.ExpectNoError(framework.RunRC(*config))
+	framework.ExpectNoError(testutils.RunRC(*config))
 }
 
 func ReserveMemory(f *framework.Framework, id string, replicas, megabytes int, expectRunning bool) {
 	By(fmt.Sprintf("Running RC which reserves %v MB of memory", megabytes))
 	request := int64(1024 * 1024 * megabytes / replicas)
-	config := &framework.RCConfig{
+	config := &testutils.RCConfig{
 		Client:     f.Client,
 		Name:       id,
 		Namespace:  f.Namespace.Name,
@@ -516,7 +517,7 @@ func ReserveMemory(f *framework.Framework, id string, replicas, megabytes int, e
 		Replicas:   replicas,
 		MemRequest: request,
 	}
-	err := framework.RunRC(*config)
+	err := testutils.RunRC(*config)
 	if expectRunning {
 		framework.ExpectNoError(err)
 	}
