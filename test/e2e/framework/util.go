@@ -4011,6 +4011,43 @@ func WaitForClusterSize(c clientset.Interface, size int, timeout time.Duration) 
 	return fmt.Errorf("timeout waiting %v for cluster size to be %d", timeout, size)
 }
 
+// waitForMasters waits until the cluster has the desired number of ready masters in it.
+func WaitForMasters(masterPrefix string, c clientset.Interface, size int, timeout time.Duration) error {
+	for start := time.Now(); time.Since(start) < timeout; time.Sleep(20 * time.Second) {
+		nodes, err := c.Core().Nodes().List(api.ListOptions{})
+		if err != nil {
+			Logf("Failed to list nodes: %v", err)
+			continue
+		}
+
+		// Filter out nodes that are not master replicas
+		FilterNodes(nodes, func(node api.Node) bool {
+			res, err := regexp.Match(masterPrefix+"(-...)?", ([]byte)(node.Name))
+			if err != nil {
+				Logf("Failed to match regexp to node name: %v", err)
+				return false
+			}
+			return res
+		})
+
+		numNodes := len(nodes.Items)
+
+		// Filter out not-ready nodes.
+		FilterNodes(nodes, func(node api.Node) bool {
+			return IsNodeConditionSetAsExpected(&node, api.NodeReady, true)
+		})
+
+		numReady := len(nodes.Items)
+
+		if numNodes == size && numReady == size {
+			Logf("Cluster has reached the desired number of masters %d", size)
+			return nil
+		}
+		Logf("Waiting for the number of masters %d, current %d, not ready master nodes %d", size, numNodes, numNodes-numReady)
+	}
+	return fmt.Errorf("timeout waiting %v for the number of masters to be %d", timeout, size)
+}
+
 // GetHostExternalAddress gets the node for a pod and returns the first External
 // address. Returns an error if the node the pod is on doesn't have an External
 // address.
