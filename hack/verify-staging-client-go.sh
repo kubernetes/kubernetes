@@ -17,29 +17,6 @@
 set -o errexit
 set -o nounset
 set -o pipefail
-set -o xtrace
 
-retry() {
-  for i in {1..5}; do
-    "$@" && return 0 || sleep $i
-  done
-  "$@"
-}
-
-# This script is intended to be run from kubekins-test container with a
-# kubernetes repo mapped in. See hack/jenkins/gotest-dockerized.sh
-
-export PATH=${GOPATH}/bin:${PWD}/third_party/etcd:/usr/local/go/bin:${PATH}
-
-retry go get github.com/tools/godep && godep version
-retry go get github.com/jteeuwen/go-bindata/go-bindata
-
-export LOG_LEVEL=4
-
-cd /go/src/k8s.io/kubernetes
-
-# hack/verify-client-go.sh requires all dependencies exist in the GOPATH.
-godep restore
-
-./hack/install-etcd.sh
-make verify
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+"${KUBE_ROOT}"/staging/copy.sh -v

@@ -25,6 +25,7 @@ source "${KUBE_ROOT}/cluster/lib/util.sh"
 EXCLUDED_CHECKS=(
   "verify-linkcheck.sh"  # runs in separate Jenkins job once per day due to high network usage
   "verify-govet.sh"      # it has a separate make vet target
+  "verify-staging-client-go.sh" # TODO: enable the script after 1.5 code freeze
   )
 
 function is-excluded {

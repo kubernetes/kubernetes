@@ -38,6 +38,7 @@ KUBE_VERBOSE=3 "${KUBE_ROOT}/hack/update-generated-runtime.sh"
 diff -I "gzipped FileDescriptorProto" -I "0x" -Naupr ${KUBE_REMOTE_RUNTIME_ROOT}/_tmp/api.pb.go ${KUBE_REMOTE_RUNTIME_ROOT}/api.pb.go || ret=$?
 if [[ $ret -eq 0 ]]; then
     echo "Generated container runtime api is up to date."
+    cp ${KUBE_REMOTE_RUNTIME_ROOT}/_tmp/api.pb.go ${KUBE_REMOTE_RUNTIME_ROOT}/
 else
     echo "Generated container runtime api is out of date. Please run hack/update-generated-runtime.sh"
     exit 1
