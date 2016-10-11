@@ -124,9 +124,6 @@ type GenericAPIServer struct {
 	// external (public internet) URLs for this GenericAPIServer.
 	ExternalAddress string
 
-	// ClusterIP is the IP address of the GenericAPIServer within the cluster.
-	ClusterIP net.IP
-
 	// storage contains the RESTful endpoints exposed by this GenericAPIServer
 	storage map[string]rest.Storage
 
@@ -223,20 +220,6 @@ func (s *GenericAPIServer) Run() {
 			// "h2" NextProtos is necessary for enabling HTTP2 for go's 1.7 HTTP Server
 			secureServer.TLSConfig.NextProtos = []string{"h2"}
 
-		}
-
-		// It would be nice to set a fqdn subject alt name, but only the kubelets know, the apiserver is clueless
-		// alternateDNS = append(alternateDNS, "kubernetes.default.svc.CLUSTER.DNS.NAME")
-		if s.SecureServingInfo.ServerCert.Generate && !certutil.CanReadCertOrKey(s.SecureServingInfo.ServerCert.CertFile, s.SecureServingInfo.ServerCert.KeyFile) {
-			// TODO (cjcullen): Is ClusterIP the right address to sign a cert with?
-			alternateIPs := []net.IP{s.ServiceReadWriteIP}
-			alternateDNS := []string{"kubernetes.default.svc", "kubernetes.default", "kubernetes", "localhost"}
-
-			if err := certutil.GenerateSelfSignedCert(s.ClusterIP.String(), s.SecureServingInfo.ServerCert.CertFile, s.SecureServingInfo.ServerCert.KeyFile, alternateIPs, alternateDNS); err != nil {
-				glog.Errorf("Unable to generate self signed cert: %v", err)
-			} else {
-				glog.Infof("Using self-signed cert (%s, %s)", s.SecureServingInfo.ServerCert.CertFile, s.SecureServingInfo.ServerCert.KeyFile)
-			}
 		}
 
 		glog.Infof("Serving securely on %s", s.SecureServingInfo.BindAddress)
