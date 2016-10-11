@@ -28,7 +28,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/rand"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -94,7 +93,6 @@ type NetworkingTestConfig struct {
 	// 1 pod per node running the netexecImage.
 	EndpointPods []*api.Pod
 	f            *Framework
-	podClient    *PodClient
 	// NodePortService is a Service with Type=NodePort spanning over all
 	// endpointPods.
 	NodePortService *api.Service
@@ -381,19 +379,15 @@ func (config *NetworkingTestConfig) createTestPods() {
 	testContainerPod := config.createTestPodSpec()
 	hostTestContainerPod := NewHostExecPodSpec(config.Namespace, hostTestPodName)
 
-	config.createPod(testContainerPod)
-	config.createPod(hostTestContainerPod)
-
-	ExpectNoError(config.f.WaitForPodRunning(testContainerPod.Name))
-	ExpectNoError(config.f.WaitForPodRunning(hostTestContainerPod.Name))
+	config.f.PodClient().CreateBatch([]*api.Pod{testContainerPod, hostTestContainerPod})
 
 	var err error
-	config.TestContainerPod, err = config.getPodClient().Get(testContainerPod.Name)
+	config.TestContainerPod, err = config.f.PodClient().Get(testContainerPod.Name)
 	if err != nil {
 		Failf("Failed to retrieve %s pod: %v", testContainerPod.Name, err)
 	}
 
-	config.HostTestContainerPod, err = config.getPodClient().Get(hostTestContainerPod.Name)
+	config.HostTestContainerPod, err = config.f.PodClient().Get(hostTestContainerPod.Name)
 	if err != nil {
 		Failf("Failed to retrieve %s pod: %v", hostTestContainerPod.Name, err)
 	}
@@ -494,54 +488,27 @@ func (config *NetworkingTestConfig) createNetProxyPods(podName string, selector 
 	}
 
 	// create pods, one for each node
-	createdPods := make([]*api.Pod, 0, len(nodes))
+	pods := make([]*api.Pod, 0, len(nodes))
 	for i, n := range nodes {
 		podName := fmt.Sprintf("%s-%d", podName, i)
 		pod := config.createNetShellPodSpec(podName, n.Name)
 		pod.ObjectMeta.Labels = selector
-		createdPod := config.createPod(pod)
-		createdPods = append(createdPods, createdPod)
+		pods = append(pods, pod)
 	}
-
-	// wait that all of them are up
-	runningPods := make([]*api.Pod, 0, len(nodes))
-	for _, p := range createdPods {
-		ExpectNoError(config.f.WaitForPodReady(p.Name))
-		rp, err := config.getPodClient().Get(p.Name)
-		ExpectNoError(err)
-		runningPods = append(runningPods, rp)
-	}
-
-	return runningPods
+	return config.f.PodClient().CreateBatch(pods)
 }
 
 func (config *NetworkingTestConfig) DeleteNetProxyPod() {
 	pod := config.EndpointPods[0]
-	config.getPodClient().Delete(pod.Name, api.NewDeleteOptions(0))
+	config.f.PodClient().DeleteSync(pod.Name, api.NewDeleteOptions(0), wait.ForeverTestTimeout)
 	config.EndpointPods = config.EndpointPods[1:]
-	// wait for pod being deleted.
-	err := WaitForPodToDisappear(config.f.Client, config.Namespace, pod.Name, labels.Everything(), time.Second, wait.ForeverTestTimeout)
-	if err != nil {
-		Failf("Failed to delete %s pod: %v", pod.Name, err)
-	}
 	// wait for endpoint being removed.
-	err = WaitForServiceEndpointsNum(config.f.Client, config.Namespace, nodePortServiceName, len(config.EndpointPods), time.Second, wait.ForeverTestTimeout)
+	err := WaitForServiceEndpointsNum(config.f.Client, config.Namespace, nodePortServiceName, len(config.EndpointPods), time.Second, wait.ForeverTestTimeout)
 	if err != nil {
 		Failf("Failed to remove endpoint from service: %s", nodePortServiceName)
 	}
 	// wait for kube-proxy to catch up with the pod being deleted.
 	time.Sleep(5 * time.Second)
-}
-
-func (config *NetworkingTestConfig) createPod(pod *api.Pod) *api.Pod {
-	return config.getPodClient().Create(pod)
-}
-
-func (config *NetworkingTestConfig) getPodClient() *PodClient {
-	if config.podClient == nil {
-		config.podClient = config.f.PodClient()
-	}
-	return config.podClient
 }
 
 func (config *NetworkingTestConfig) getServiceClient() client.ServiceInterface {

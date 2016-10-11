@@ -96,9 +96,9 @@ func ClusterLevelLoggingWithElasticsearch(f *framework.Framework) {
 	By("Checking to make sure the Elasticsearch pods are running")
 	label := labels.SelectorFromSet(labels.Set(map[string]string{k8sAppKey: esValue}))
 	options := api.ListOptions{LabelSelector: label}
-	pods, err := f.Client.Pods(api.NamespaceSystem).List(options)
+	esPods, err := f.Client.Pods(api.NamespaceSystem).List(options)
 	Expect(err).NotTo(HaveOccurred())
-	for _, pod := range pods.Items {
+	for _, pod := range esPods.Items {
 		err = framework.WaitForPodRunningInNamespace(f.Client, &pod)
 		Expect(err).NotTo(HaveOccurred())
 	}
@@ -255,17 +255,14 @@ func ClusterLevelLoggingWithElasticsearch(f *framework.Framework) {
 	// Replace '-' characters with '_' to prevent the analyzer from breaking apart names.
 	taintName := strings.Replace(ns+name, "-", "_", -1)
 	framework.Logf("Tainting log lines with %v", taintName)
-	// podNames records the names of the synthetic logging pods that are created in the
-	// loop below.
-	var podNames []string
+	// pods records the pods that are created in the loop below.
+	var pods []*api.Pod
 	// countTo is the number of log lines emitted (and checked) for each synthetic logging pod.
 	const countTo = 100
-	// Instantiate a synthetic logger pod on each node.
 	for i, node := range nodes.Items {
-		podName := fmt.Sprintf("%s-%d", name, i)
-		_, err := f.Client.Pods(ns).Create(&api.Pod{
+		pods = append(pods, &api.Pod{
 			ObjectMeta: api.ObjectMeta{
-				Name:   podName,
+				Name:   fmt.Sprintf("%s-%d", name, i),
 				Labels: map[string]string{"name": name},
 			},
 			Spec: api.PodSpec{
@@ -281,25 +278,10 @@ func ClusterLevelLoggingWithElasticsearch(f *framework.Framework) {
 				RestartPolicy: api.RestartPolicyNever,
 			},
 		})
-		Expect(err).NotTo(HaveOccurred())
-		podNames = append(podNames, podName)
 	}
 
-	// Cleanup the pods when we are done.
-	defer func() {
-		for _, pod := range podNames {
-			if err = f.Client.Pods(ns).Delete(pod, nil); err != nil {
-				framework.Logf("Failed to delete pod %s: %v", pod, err)
-			}
-		}
-	}()
-
-	// Wait for the synthetic logging pods to finish.
-	By("Waiting for the pods to succeed.")
-	for _, pod := range podNames {
-		err = framework.WaitForPodSuccessInNamespace(f.Client, pod, "synth-logger", ns)
-		Expect(err).NotTo(HaveOccurred())
-	}
+	// Instantiate a synthetic logger pod on each node.
+	f.PodClient().CreateBatch(pods)
 
 	// Make several attempts to observe the logs ingested into Elasticsearch.
 	By("Checking all the log lines were ingested into Elasticsearch")
@@ -449,12 +431,12 @@ func ClusterLevelLoggingWithElasticsearch(f *framework.Framework) {
 		if missingPerNode[n] > 0 {
 			framework.Logf("Node %d %s is missing %d logs", n, nodes.Items[n].Name, missingPerNode[n])
 			opts := &api.PodLogOptions{}
-			body, err = f.Client.Pods(ns).GetLogs(podNames[n], opts).DoRaw()
+			body, err = f.Client.Pods(ns).GetLogs(pods[n].Name, opts).DoRaw()
 			if err != nil {
-				framework.Logf("Cannot get logs from pod %v", podNames[n])
+				framework.Logf("Cannot get logs from pod %v", pods[n].Name)
 				continue
 			}
-			framework.Logf("Pod %s has the following logs: %s", podNames[n], body)
+			framework.Logf("Pod %s has the following logs: %s", pods[n].Name, body)
 
 			for _, pod := range fluentdPods.Items {
 				if pod.Spec.NodeName == nodes.Items[n].Name {

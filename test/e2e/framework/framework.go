@@ -666,14 +666,13 @@ func (f *Framework) CreatePodsPerNodeForSimpleApp(appName string, podSpec func(n
 		// one per node, but no more than maxCount.
 		if i <= maxCount {
 			Logf("%v/%v : Creating container with label app=%v-pod", i, maxCount, appName)
-			_, err := f.Client.Pods(f.Namespace.Name).Create(&api.Pod{
+			f.PodClient().Create(&api.Pod{
 				ObjectMeta: api.ObjectMeta{
 					Name:   fmt.Sprintf(appName+"-pod-%v", i),
 					Labels: labels,
 				},
 				Spec: podSpec(node),
 			})
-			ExpectNoError(err)
 		}
 	}
 	return labels

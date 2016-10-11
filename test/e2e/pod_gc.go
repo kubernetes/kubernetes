@@ -36,10 +36,10 @@ var _ = framework.KubeDescribe("Pod garbage collector [Feature:PodGarbageCollect
 	It("should handle the creation of 1000 pods", func() {
 		var count int
 		for count < 1000 {
-			pod, err := createTerminatingPod(f)
+			pod := createTerminatingPod(f)
 			pod.ResourceVersion = ""
 			pod.Status.Phase = api.PodFailed
-			pod, err = f.Client.Pods(f.Namespace.Name).UpdateStatus(pod)
+			pod, err := f.Client.Pods(f.Namespace.Name).UpdateStatus(pod)
 			if err != nil {
 				framework.Failf("err failing pod: %v", err)
 			}
@@ -78,7 +78,7 @@ var _ = framework.KubeDescribe("Pod garbage collector [Feature:PodGarbageCollect
 	})
 })
 
-func createTerminatingPod(f *framework.Framework) (*api.Pod, error) {
+func createTerminatingPod(f *framework.Framework) *api.Pod {
 	uuid := uuid.NewUUID()
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
@@ -96,5 +96,5 @@ func createTerminatingPod(f *framework.Framework) (*api.Pod, error) {
 			},
 		},
 	}
-	return f.Client.Pods(f.Namespace.Name).Create(pod)
+	return f.PodClient().Create(pod)
 }
