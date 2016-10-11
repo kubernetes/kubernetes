@@ -12,10 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM scratch
+FROM gcr.io/google_containers/ubuntu-slim:0.4
 
 MAINTAINER Mik Vyatskov <vmik@google.com>
 
 COPY logs-generator /
 
-ENTRYPOINT [ "/logs-generator" ]
+ENTRYPOINT /logs-generator --logtostderr \
+  --log-lines-total=${LOGS_GENERATOR_LINES_TOTAL} \
+  --run-duration=${LOGS_GENERATOR_DURATION}
