@@ -388,6 +388,7 @@ ReplicationController should surface a failure condition on a common issue like 
 Rescheduler should ensure that critical pod is scheduled in case there is no resources available,mtaufen,1
 Resource-usage regular resource usage tracking resource tracking for * pods per node,janetkuo,1
 ResourceQuota should create a ResourceQuota and capture the life of a configMap.,timstclair,1
+ResourceQuota should create a ResourceQuota and capture the life of a persistent volume claim with a storage class.,derekwaynecarr,0
 ResourceQuota should create a ResourceQuota and capture the life of a persistent volume claim.,bgrant0607,1
 ResourceQuota should create a ResourceQuota and capture the life of a pod.,pmorie,1
 ResourceQuota should create a ResourceQuota and capture the life of a replication controller.,jdef,1

@@ -22,6 +22,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apis/storage/util"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/fake"
 	"k8s.io/kubernetes/pkg/quota"
 )
@@ -34,6 +35,9 @@ func testVolumeClaim(name string, namespace string, spec api.PersistentVolumeCla
 }
 
 func TestPersistentVolumeClaimsConstraintsFunc(t *testing.T) {
+	// the function we are testing
+	constraintFunc := makePersistentVolumeClaimConstraintsFunc(PersistentVolumeClaimUsageFunc)
+
 	validClaim := testVolumeClaim("foo", "ns", api.PersistentVolumeClaimSpec{
 		Selector: &unversioned.LabelSelector{
 			MatchExpressions: []unversioned.LabelSelectorRequirement{
@@ -95,7 +99,7 @@ func TestPersistentVolumeClaimsConstraintsFunc(t *testing.T) {
 		},
 	}
 	for testName, test := range testCases {
-		err := PersistentVolumeClaimConstraintsFunc(test.required, test.pvc)
+		err := constraintFunc(test.required, test.pvc)
 		switch {
 		case err != nil && len(test.err) == 0,
 			err == nil && len(test.err) != 0,
@@ -125,6 +129,29 @@ func TestPersistentVolumeClaimEvaluatorUsage(t *testing.T) {
 			},
 		},
 	})
+	validClaimByStorageClass := testVolumeClaim("foo", "ns", api.PersistentVolumeClaimSpec{
+		Selector: &unversioned.LabelSelector{
+			MatchExpressions: []unversioned.LabelSelectorRequirement{
+				{
+					Key:      "key2",
+					Operator: "Exists",
+				},
+			},
+		},
+		AccessModes: []api.PersistentVolumeAccessMode{
+			api.ReadWriteOnce,
+			api.ReadOnlyMany,
+		},
+		Resources: api.ResourceRequirements{
+			Requests: api.ResourceList{
+				api.ResourceName(api.ResourceStorage): resource.MustParse("10Gi"),
+			},
+		},
+	})
+	storageClassName := "gold"
+	validClaimByStorageClass.Annotations = map[string]string{
+		util.StorageClassAnnotation: storageClassName,
+	}
 
 	kubeClient := fake.NewSimpleClientset()
 	evaluator := NewPersistentVolumeClaimEvaluator(kubeClient, nil)
@@ -137,6 +164,15 @@ func TestPersistentVolumeClaimEvaluatorUsage(t *testing.T) {
 			usage: api.ResourceList{
 				api.ResourceRequestsStorage:        resource.MustParse("10Gi"),
 				api.ResourcePersistentVolumeClaims: resource.MustParse("1"),
+			},
+		},
+		"pvc-usage-by-class": {
+			pvc: validClaimByStorageClass,
+			usage: api.ResourceList{
+				api.ResourceRequestsStorage:                                                  resource.MustParse("10Gi"),
+				api.ResourcePersistentVolumeClaims:                                           resource.MustParse("1"),
+				ResourceByStorageClass(storageClassName, api.ResourceRequestsStorage):        resource.MustParse("10Gi"),
+				ResourceByStorageClass(storageClassName, api.ResourcePersistentVolumeClaims): resource.MustParse("1"),
 			},
 		},
 	}

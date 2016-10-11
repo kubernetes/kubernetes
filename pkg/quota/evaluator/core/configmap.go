@@ -30,15 +30,13 @@ import (
 func NewConfigMapEvaluator(kubeClient clientset.Interface) quota.Evaluator {
 	allResources := []api.ResourceName{api.ResourceConfigMaps}
 	return &generic.GenericEvaluator{
-		Name:              "Evaluator.ConfigMap",
-		InternalGroupKind: api.Kind("ConfigMap"),
-		InternalOperationResources: map[admission.Operation][]api.ResourceName{
-			admission.Create: allResources,
-		},
-		MatchedResourceNames: allResources,
-		MatchesScopeFunc:     generic.MatchesNoScopeFunc,
-		ConstraintsFunc:      generic.ObjectCountConstraintsFunc(api.ResourceConfigMaps),
-		UsageFunc:            generic.ObjectCountUsageFunc(api.ResourceConfigMaps),
+		Name:                     "Evaluator.ConfigMap",
+		InternalGroupKind:        api.Kind("ConfigMap"),
+		Operations:               []admission.Operation{admission.Create},
+		MatchedResourceNamesFunc: generic.StaticMatchedResourceNamesFunc(allResources),
+		MatchesScopeFunc:         generic.MatchesNoScopeFunc,
+		ConstraintsFunc:          generic.ObjectCountConstraintsFunc(api.ResourceConfigMaps),
+		UsageFunc:                generic.ObjectCountUsageFunc(api.ResourceConfigMaps),
 		ListFuncByNamespace: func(namespace string, options v1.ListOptions) ([]runtime.Object, error) {
 			itemList, err := kubeClient.Core().ConfigMaps(namespace).List(options)
 			if err != nil {
