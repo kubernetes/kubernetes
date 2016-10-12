@@ -128,6 +128,9 @@ func (c *PodClient) mungeSpec(pod *api.Pod) {
 		if !TestContext.PrepullImages {
 			return
 		}
+		// Node e2e does not support the default DNSClusterFirst policy. Set
+		// the policy to DNSDefault, which is configured per node.
+		pod.Spec.DNSPolicy = api.DNSDefault
 		// If prepull is enabled, munge the container spec to make sure the images are not pulled
 		// during the test.
 		for i := range pod.Spec.Containers {
