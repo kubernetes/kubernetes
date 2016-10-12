@@ -23,8 +23,8 @@ The kubernetes charms require a relation to a distributed key value store
 objects.
 
 ```
-juju deploy trusty/etcd
-juju deploy local:trusty/kubernetes
+juju deploy etcd
+juju deploy kubernetes
 juju add-relation kubernetes etcd
 ```
 
@@ -40,6 +40,8 @@ of the [kubernetes github project](https://github.com/kubernetes/kubernetes).
 Changing the version causes the all the Kubernetes containers to be restarted.
 
 **cidr**: Set the IP range for the Kubernetes cluster. eg: 10.1.0.0/16
+
+**dns_domain**: Set the DNS domain for the Kubernetes cluster.
 
 # Storage
 The kubernetes charm is built to handle multiple storage devices if the cloud
@@ -90,7 +92,7 @@ application along with the configuration needed to contact the cluster
 securely. You will need to download the `/home/ubuntu/kubectl_package.tar.gz`
 from the kubernetes leader unit to your machine so you can control the cluster.
 
-**skydns.available** - Indicates when the Domain Name System (DNS) for the
+**kubedns.available** - Indicates when the Domain Name System (DNS) for the
 cluster is operational.
 
 
