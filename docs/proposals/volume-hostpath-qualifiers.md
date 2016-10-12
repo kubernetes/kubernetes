@@ -31,21 +31,37 @@ Documentation for other releases can be found at
 
 ## Introduction
 
-A Host volume source is probably the simplest volume type to define, needing only a single path. However, that simplicity comes with many assumptions and caveats.
+A Host volume source is probably the simplest volume type to define, needing
+only a single path. However, that simplicity comes with many assumptions and
+caveats.
 
-This proposal describes one of the issues associated with Host volumes &mdash; their silent and implicit creation of directories on the host &mdash; and proposes a solution.
+This proposal describes one of the issues associated with Host volumes &mdash;
+their silent and implicit creation of directories on the host &mdash; and
+proposes a solution.
 
 ## Problem
 
-Right now, under Docker, when a bindmount references a hostPath, that path will be created as an empty directory, owned by root, if it does not already exist.
-This is rarely what the user actually wants because hostPath volumes are typically used to express a dependency on an existing external file or directory.
-This concern was raised during the [initial implementation](https://github.com/docker/docker/issues/1279#issuecomment-22965058) of this behavior in Docker and it was suggested that orchestration systems could better manage volume creation than Docker, but Docker does so as well anyways.
+Right now, under Docker, when a bindmount references a hostPath, that path will
+be created as an empty directory, owned by root, if it does not already exist.
+This is rarely what the user actually wants because hostPath volumes are
+typically used to express a dependency on an existing external file or
+directory.
+This concern was raised during the [initial
+implementation](https://github.com/docker/docker/issues/1279#issuecomment-22965058)
+of this behavior in Docker and it was suggested that orchestration systems
+could better manage volume creation than Docker, but Docker does so as well
+anyways.
 
-To fix this problem, I propose allowing a pod to specify whether a given hostPath should exist prior to the pod running, whether it should be created, and what it should exist as.
-I also propose the inclusion of a default value which matches the current behavior to ensure backwards compatibility.
+To fix this problem, I propose allowing a pod to specify whether a given
+hostPath should exist prior to the pod running, whether it should be created,
+and what it should exist as.
+I also propose the inclusion of a default value which matches the current
+behavior to ensure backwards compatibility.
 
-To understand exactly when this behavior will or won't be correct, it's important to look at the use-cases of Host Volumes.
-The table below broadly classifies the use-case of Host Volumes and asserts whether this change would be of benefit to that use-case.
+To understand exactly when this behavior will or won't be correct, it's
+important to look at the use-cases of Host Volumes.
+The table below broadly classifies the use-case of Host Volumes and asserts
+whether this change would be of benefit to that use-case.
 
 ### HostPath volume Use-cases
 
@@ -58,14 +74,18 @@ The table below broadly classifies the use-case of Host Volumes and asserts whet
 
 ### Other motivating factors
 
-One additional motivating factor for this change is that under the rkt runtime paths are not created when they do not exist. This change moves the management of these volumes into the Kubelet to the benefit of the rkt container runtime.
+One additional motivating factor for this change is that under the rkt runtime
+paths are not created when they do not exist. This change moves the management
+of these volumes into the Kubelet to the benefit of the rkt container runtime.
 
 
 ## Proposed API Change
 
 ### Host Volume
 
-I propose that the [`v1.HostPathVolumeSource`](https://github.com/kubernetes/kubernetes/blob/d26b4ca2859aa667ad520fb9518e0db67b74216a/pkg/api/types.go#L447-L451) object be changed to include the following additional field:
+I propose that the
+[`v1.HostPathVolumeSource`](https://github.com/kubernetes/kubernetes/blob/d26b4ca2859aa667ad520fb9518e0db67b74216a/pkg/api/types.go#L447-L451)
+object be changed to include the following additional field:
 
 `Type` - An optional string of `auto|exists|file|device|socket|directory` - If not set, defaults to `auto`. These values have the following behavior:
 
@@ -91,43 +111,73 @@ Additional possible values, which are proposed to be excluded:
 
 ### Volume SubPaths
 
-Volumes may also have a `subPath` specified, which similarly may or may not exist. I similarly propose that the [v1.VolumeMount](https://github.com/kubernetes/kubernetes/blob/d26b4ca2859aa667ad520fb9518e0db67b74216a/pkg/api/types.go#L886-L897) type be augmented with a `SubPathType` field which the exact same semantics as above.
-While I propose exposing the same set of possible values for consistency, in reality a `SubPath` is useful primarily under a network mount. Because of this, the `device` and `socket` values would likely not be useful.
+Volumes may also have a `subPath` specified, which similarly may or may not
+exist. I similarly propose that the
+[v1.VolumeMount](https://github.com/kubernetes/kubernetes/blob/d26b4ca2859aa667ad520fb9518e0db67b74216a/pkg/api/types.go#L886-L897)
+type be augmented with a `SubPathType` field which the exact same semantics as
+above.
+While I propose exposing the same set of possible values for consistency, in
+reality a `SubPath` is useful primarily under a network mount. Because of this,
+the `device` and `socket` values would likely not be useful.
 
-I do not have any examples of concrete examples from the Kubernetes project for this, in part because there are very few examples of `SubPath` to begin with.
-However, each of the use-cases described for Host Volumes also could conceivably occur as subdirectories of a network mount using this feature, and thus still offer insight into why it would be of value.
+I do not have any examples of concrete examples from the Kubernetes project for
+this, in part because there are very few examples of `SubPath` to begin with.
+However, each of the use-cases described for Host Volumes also could
+conceivably occur as subdirectories of a network mount using this feature, and
+thus still offer insight into why it would be of value.
 
 <!-- uncomment if this comes up :) An argument against providing this feature for SubPaths is that it might not increase correctness as much; while adding such qualifications to Host volumes allows a pod to express a dependency that the node may not meet, adding it to subPath allows the pod to express an assumption about a given filesystem it's mounting. This assumption is not node specific and, when it fails, likely means the given volume was not pre-populated/provisioned appropriately. It's arguable whether this sort of failure is as likely or as important to handle well. -->
 
 
 ### Why not as part of any other volume types?
 
-This feature does not make sense for any of the other volume types simply because all of the other types are already fully qualified. For example, NFS volumes are known to always be in existence else they will not mount. Similarly, EmptyDir volumes will always exist as a directory.
+This feature does not make sense for any of the other volume types simply
+because all of the other types are already fully qualified. For example, NFS
+volumes are known to always be in existence else they will not mount.
+Similarly, EmptyDir volumes will always exist as a directory.
 
-Only the HostVolume and SubPath means of referencing a path have the potential to reference arbitrary incorrect or nonexistent things without erroring out.
+Only the HostVolume and SubPath means of referencing a path have the potential
+to reference arbitrary incorrect or nonexistent things without erroring out.
 
 ### Alternatives
 
-One alternative is to augment Host Volumes with a `MustExist` bool and provide no further granularity. This would allow toggling between the `auto` and `exists` behaviors described above. This would likely cover the "90%" use-case and would be a simpler API. It would be sufficient for all of the examples linked above in my opionion.
+One alternative is to augment Host Volumes with a `MustExist` bool and provide
+no further granularity. This would allow toggling between the `auto` and
+`exists` behaviors described above. This would likely cover the "90%" use-case
+and would be a simpler API. It would be sufficient for all of the examples
+linked above in my opionion.
 
 ## Kubelet implementation
 
-It's proposed that prior to starting a pod, the Kubelet validates that the given path meets the qualifications of its type. Namely, if the type is `auto` the Kubelet will create an empty directory if none exists there, and for each of the others the Kubelet will perform the given validation prior to running the pod. This validation might be done by a volume plugin, but further technical consideration (out of scope of this proposal) is needed.
+It's proposed that prior to starting a pod, the Kubelet validates that the
+given path meets the qualifications of its type. Namely, if the type is `auto`
+the Kubelet will create an empty directory if none exists there, and for each
+of the others the Kubelet will perform the given validation prior to running
+the pod. This validation might be done by a volume plugin, but further
+technical consideration (out of scope of this proposal) is needed.
 
 
 ## Possible concerns
 
 ### Containerized Kubelet
 
-A containerized kubelet would have difficulty creating directories. The implementation will likely respect the `containerized` flag, or similar, allowing it to either break out or be "/rootfs/" aware and thus operate as desired.
+A containerized kubelet would have difficulty creating directories. The
+implementation will likely respect the `containerized` flag, or similar,
+allowing it to either break out or be "/rootfs/" aware and thus operate as
+desired.
 
 ### Racy Validation
 
-Ideally the validation would be done at the time the bindmounts are created, else it's possible for a given path or directory to change in the duration from when it's validated and the container runtime attempts to create said mount.
+Ideally the validation would be done at the time the bindmounts are created,
+else it's possible for a given path or directory to change in the duration from
+when it's validated and the container runtime attempts to create said mount.
 
-The only way to solve this problem is to integrate these sorts of qualification into container runtimes themselves.
+The only way to solve this problem is to integrate these sorts of qualification
+into container runtimes themselves.
 
-I don't think this problem is severe enough that we need to push to solve it; rather I think we can simply accept this minor race, and if runtimes eventually allow this we can begin to leverage them.
+I don't think this problem is severe enough that we need to push to solve it;
+rather I think we can simply accept this minor race, and if runtimes eventually
+allow this we can begin to leverage them.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
