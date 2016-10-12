@@ -305,7 +305,7 @@ var _ = framework.KubeDescribe("Pet set recreate [Slow] [Feature:PetSet]", func(
 				NodeName: node.Name,
 			},
 		}
-		pod = f.PodClient().Create(pod)
+		pod = f.PodClient().CreateSync(pod)
 
 		By("creating petset with conflicting port in namespace " + f.Namespace.Name)
 		ps := newPetSet(petSetName, f.Namespace.Name, headlessSvcName, 1, nil, nil, labels)
@@ -314,11 +314,6 @@ var _ = framework.KubeDescribe("Pet set recreate [Slow] [Feature:PetSet]", func(
 		ps.Spec.Template.Spec.NodeName = node.Name
 		_, err := f.Client.Apps().PetSets(f.Namespace.Name).Create(ps)
 		framework.ExpectNoError(err)
-
-		By("waiting until pod " + podName + " will start running in namespace " + f.Namespace.Name)
-		if err := f.WaitForPodRunning(podName); err != nil {
-			framework.Failf("Pod %v did not start running: %v", podName, err)
-		}
 
 		var initialPetPodUID types.UID
 		By("waiting until pet pod " + petPodName + " will be recreated and deleted at least once in namespace " + f.Namespace.Name)
