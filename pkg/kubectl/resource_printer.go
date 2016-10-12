@@ -60,6 +60,9 @@ const (
 	loadBalancerWidth = 16
 )
 
+// This indicates that a particular StorageClass nominates itself as the system default.
+const betaAnnotation = "storageclass.beta.kubernetes.io/is-default-class"
+
 // GetPrinter takes a format type, an optional format argument. It will return true
 // if the format is generic (untyped), otherwise it will return false. The printer
 // is agnostic to schema versions, so you must send arguments to PrintObj in the
@@ -2078,8 +2081,16 @@ func printNetworkPolicyList(list *extensions.NetworkPolicyList, w io.Writer, opt
 	return nil
 }
 
+func hasDefaultAnnotation(obj api.ObjectMeta) bool {
+	return obj.Annotations[betaAnnotation] == "true"
+}
+
 func printStorageClass(sc *storage.StorageClass, w io.Writer, options PrintOptions) error {
+
 	name := sc.Name
+	if hasDefaultAnnotation(sc.ObjectMeta) {
+		name += " (default)"
+	}
 	provtype := sc.Provisioner
 
 	if _, err := fmt.Fprintf(w, "%s\t%s\t", name, provtype); err != nil {
