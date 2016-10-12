@@ -30,21 +30,20 @@ import (
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/flag"
 )
 
 type createAuthInfoOptions struct {
 	configAccess      clientcmd.ConfigAccess
 	name              string
-	authPath          util.StringFlag
-	clientCertificate util.StringFlag
-	clientKey         util.StringFlag
-	token             util.StringFlag
-	username          util.StringFlag
-	password          util.StringFlag
+	authPath          flag.StringFlag
+	clientCertificate flag.StringFlag
+	clientKey         flag.StringFlag
+	token             flag.StringFlag
+	username          flag.StringFlag
+	password          flag.StringFlag
 	embedCertData     flag.Tristate
-	authProvider      util.StringFlag
+	authProvider      flag.StringFlag
 
 	authProviderArgs         map[string]string
 	authProviderArgsToRemove []string
