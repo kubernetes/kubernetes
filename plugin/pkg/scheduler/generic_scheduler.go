@@ -159,9 +159,10 @@ func findNodesThatFit(
 	 * instead, we use its GetMetadata function to capture the interface, and forward the interface to the
 	 * fit functions later on.
 	 */
-	pFactory := metaFactory.(predicates.PredicateMetadataFactory)
-	predicateMetadataAnonymousStruct := pFactory.GetMetadata(pod, nodeNameToInfo)
-
+	pFactory := algorithm.EmptyMetadataProducer
+	if metaFactory != nil {
+		pFactory = metaFactory.(algorithm.MetadataProducer)
+	}
 	var filtered []*api.Node
 	failedPredicateMap := FailedPredicateMap{}
 
@@ -179,7 +180,7 @@ func findNodesThatFit(
 		checkNode := func(i int) {
 			nodeName := nodes[i].Name
 			// We don't know necessarily about details of the predicateMeta type, that is for the predicates package functions to handle.
-			fits, failedPredicates, err := podFitsOnNode(pod, predicateMetadataAnonymousStruct, nodeNameToInfo[nodeName], predicateFuncs)
+			fits, failedPredicates, err := podFitsOnNode(pod, pFactory(pod, nodeNameToInfo), nodeNameToInfo[nodeName], predicateFuncs)
 			if err != nil {
 				predicateResultLock.Lock()
 				errs = append(errs, err)
