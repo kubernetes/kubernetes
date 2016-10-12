@@ -18,7 +18,6 @@ package namespace
 
 import (
 	"fmt"
-	"reflect"
 	"time"
 
 	federation_api "k8s.io/kubernetes/federation/apis/federation/v1beta1"
@@ -289,8 +288,7 @@ func (nc *NamespaceController) reconcileNamespace(namespace string) {
 			clusterNamespace := clusterNamespaceObj.(*api_v1.Namespace)
 
 			// Update existing namespace, if needed.
-			if !util.ObjectMetaEquivalent(desiredNamespace.ObjectMeta, clusterNamespace.ObjectMeta) ||
-				!reflect.DeepEqual(desiredNamespace.Spec, clusterNamespace.Spec) {
+			if !util.ObjectMetaAndSpecEquivalent(desiredNamespace, clusterNamespace) {
 				nc.eventRecorder.Eventf(baseNamespace, api.EventTypeNormal, "UpdateInCluster",
 					"Updating namespace in cluster %s", cluster.Name)
 

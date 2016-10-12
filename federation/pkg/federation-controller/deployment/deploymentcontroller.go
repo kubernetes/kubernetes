@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"reflect"
 	"sort"
 	"time"
 
@@ -489,8 +488,7 @@ func (fdc *DeploymentController) reconcileDeployment(key string) (reconciliation
 
 			currentLd := ldObj.(*extensionsv1.Deployment)
 			// Update existing replica set, if needed.
-			if !fedutil.ObjectMetaEquivalent(ld.ObjectMeta, currentLd.ObjectMeta) ||
-				!reflect.DeepEqual(ld.Spec, currentLd.Spec) {
+			if !fedutil.ObjectMetaAndSpecEquivalent(ld, currentLd) {
 				fdc.eventRecorder.Eventf(fd, api.EventTypeNormal, "UpdateInCluster",
 					"Updating deployment in cluster %s", clusterName)
 
