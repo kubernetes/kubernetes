@@ -2722,8 +2722,6 @@ func (config *RCConfig) start() error {
 			startupStatus.Print(config.Name)
 		}
 
-		promPushRunningPending(startupStatus.Running, startupStatus.Pending)
-
 		if config.PodStatusFile != nil {
 			fmt.Fprintf(config.PodStatusFile, "%d, running, %d, pending, %d, waiting, %d, inactive, %d, unknown, %d, runningButNotReady\n", startupStatus.Running, startupStatus.Pending, startupStatus.Waiting, startupStatus.Inactive, startupStatus.Unknown, startupStatus.RunningButNotReady)
 		}
