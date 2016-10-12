@@ -90,7 +90,7 @@ DeleteOptions {
   …
   // Whether and how garbage collection will be performed.
   // Defaults to DefaultPropagationPolicy
-  DeletePropagationPolicy *DeletePropagationPolicy
+  PropagationPolicy *DeletePropagationPolicy
 }
 
 type DeletePropagationPolicy string
@@ -111,7 +111,7 @@ const (
 
 The `DeleteAfterBlockingDependentsAreDeleted` policy represents the synchronous GC mode.
 
-`DeleteOptions.OrphanDependents *bool` will be marked as deprecated and will be removed in 1.7. Validation code will make sure only one of `OrphanDependents` and `DeletePropagationPolicy` may be set. We decided not to add another `DeleteAfterDependentsDeleted *bool`, because together with `OrphanDependents`, it will result in 9 possible combinations and is thus confusing.
+`DeleteOptions.OrphanDependents *bool` will be marked as deprecated and will be removed in 1.7. Validation code will make sure only one of `OrphanDependents` and `PropagationPolicy` may be set. We decided not to add another `DeleteAfterDependentsDeleted *bool`, because together with `OrphanDependents`, it will result in 9 possible combinations and is thus confusing.
 
 The conversion rules are described in the following table:
 
@@ -126,7 +126,7 @@ The conversion rules are described in the following table:
 
 ## API Server
 
-`Delete()` function checks `DeleteOptions.DeletePropagationPolicy`. If the policy is `DeleteAfterBlockingDependentsAreDeleted`, the API server will update the object instead of deleting it, add the finalizer, and set the `ObjectMeta.DeletionTimestamp`.
+`Delete()` function checks `DeleteOptions.PropagationPolicy`. If the policy is `DeleteAfterBlockingDependentsAreDeleted`, the API server will update the object instead of deleting it, add the finalizer, and set the `ObjectMeta.DeletionTimestamp`.
 
 When validating the ownerReference, API server needs to query the `Authorizer` to check if the user has "delete" permission of the owner object. It returns 422 if the user does not have the permissions but intends to set `OwnerReference.BlockOwnerDeletion` to true.
 
@@ -190,7 +190,7 @@ Finalizer breaks an assumption that many Kubernetes components have: a deletion 
 
 **kubectl**: synchronous GC can simplify the **kubectl delete** reapers. Let's take the `deployment reaper` as an example, since it's the most complicated one. Currently, the reaper finds all `RS` with matching labels, scales them down, polls until `RS.Status.Replica` reaches 0, deletes the `RS`es, and finally deletes the `deployment`. If using synchronous GC, `kubectl delete deployment` is as easy as sending a synchronous GC delete request for the deployment, and polls until the deployment is deleted from the key-value store.
 
-Note that this **changes the behavior** of `kubectl delete`. The command will be blocked until all pods are deleted from the key-value store, instead of being blocked until pods are in the terminating state. This means `kubectl delete` blocks for longer time, but it has the benefit that the resources used by the pods are released when the `kubectl delete` returns. To allow kubectl user not waiting for the cleanup, we will add a `--wait` flag. It defaults to true; if it's set to `false`, `kubectl delete` will send the delete request with `DeletePropagationPolicy=DeleteDependentsInBackground` and return immediately.
+Note that this **changes the behavior** of `kubectl delete`. The command will be blocked until all pods are deleted from the key-value store, instead of being blocked until pods are in the terminating state. This means `kubectl delete` blocks for longer time, but it has the benefit that the resources used by the pods are released when the `kubectl delete` returns. To allow kubectl user not waiting for the cleanup, we will add a `--wait` flag. It defaults to true; if it's set to `false`, `kubectl delete` will send the delete request with `PropagationPolicy=DeleteDependentsInBackground` and return immediately.
 
 To make the new kubectl compatible with the 1.4 and earlier masters, kubectl needs to switch to use the old reaper logic if it finds synchronous GC is not supported by the master.
 
