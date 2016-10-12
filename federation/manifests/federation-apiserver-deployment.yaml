@@ -23,7 +23,9 @@ spec:
         - --etcd-servers=http://localhost:2379
         - --service-cluster-ip-range={{.FEDERATION_SERVICE_CIDR}}
         - --secure-port=443
+        {{if eq .IS_DNS_NAME "false"}}
         - --advertise-address={{.FEDERATION_API_HOST}}
+        {{end}}
         - --client-ca-file=/srv/kubernetes/ca.crt
         - --basic-auth-file=/srv/kubernetes/basic-auth.csv
         - --tls-cert-file=/srv/kubernetes/server.cert
