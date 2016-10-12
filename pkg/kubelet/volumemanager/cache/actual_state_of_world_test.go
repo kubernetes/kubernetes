@@ -383,7 +383,7 @@ func Test_MarkDeviceAsMounted_Positive_NewVolume(t *testing.T) {
 	}
 
 	// Act
-	err = asw.MarkDeviceAsMounted(generatedVolumeName)
+	err = asw.MarkDeviceAsMounted(generatedVolumeName, devicePath)
 
 	// Assert
 	if err != nil {
@@ -393,6 +393,8 @@ func Test_MarkDeviceAsMounted_Positive_NewVolume(t *testing.T) {
 	verifyVolumeExistsAsw(t, generatedVolumeName, true /* shouldExist */, asw)
 	verifyVolumeExistsInUnmountedVolumes(t, generatedVolumeName, asw)
 	verifyVolumeExistsInGloballyMountedVolumes(t, generatedVolumeName, asw)
+	verifyVolumeDevicePath(t, generatedVolumeName, devicePath, asw)
+
 }
 
 func verifyVolumeExistsInGloballyMountedVolumes(
@@ -520,4 +522,20 @@ func verifyPodDoesntExistInVolumeAsw(
 			"Invalid devicePath. Expected: <\"\"> Actual: <%q> ",
 			devicePath)
 	}
+}
+
+func verifyVolumeDevicePath(
+	t *testing.T, expectedVolumeName api.UniqueVolumeName, devicePath string, asw ActualStateOfWorld) {
+	globallyMountedVolumes := asw.GetGloballyMountedVolumes()
+	for _, volume := range globallyMountedVolumes {
+		if volume.VolumeName == expectedVolumeName && volume.DevicePath == devicePath {
+			return
+		}
+	}
+
+	t.Fatalf(
+		"Could not find volume %v in the list of GloballyMountedVolumes for actual state of world %+v and devicePath is %v",
+		expectedVolumeName,
+		globallyMountedVolumes,
+		devicePath)
 }
