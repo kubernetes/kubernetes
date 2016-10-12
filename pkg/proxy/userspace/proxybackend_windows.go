@@ -171,35 +171,3 @@ func (proxier *Proxier) netshIpv4AddressDeleteArgs(destIP net.IP) []string {
 
 	return args
 }
-
-// From Destination IP : Destination Port to redirect Proxy IP: Proxy port
-// TODO check on addPhysicalInterfaceMatch and addDstLocalMatch on Windows, is it required?? ignoring for now for MVP
-func winContainerPortalArgs(destIP net.IP, addPhysicalInterfaceMatch bool, addDstLocalMatch bool, destPort int, protocol api.Protocol, proxyIP net.IP, proxyPort int, service proxy.ServicePortName) []string {
-	return nil
-}
-
-// ensureRule, checks if a given netsh portproxy rule exists, if not add a rule
-// TODO, parse output of `netsh interface portproxy show all`
-func ensureRule(localIP net.IP, localPort int, connectIP net.IP, connectPort int) {
-
-}
-
-// From Destination IP : Destination Port to redirect Proxy IP: Proxy port
-// TODO check on addPhysicalInterfaceMatch and addDstLocalMatch on Windows, is it required?? ignoring for now for MVP
-// Difference between winContainerPortalArgs and winHostPortalArgs??
-func winHostPortalArgs(destIP net.IP, addPhysicalInterfaceMatch bool, addDstLocalMatch bool, destPort int, protocol api.Protocol, proxyIP net.IP, proxyPort int, service proxy.ServicePortName) []string {
-	return nil
-}
-
-// TODO difference between Redirect and DNAT
-
-func openNodePort(nodePort int, protocol api.Protocol, proxyIP net.IP, proxyPort int, name proxy.ServicePortName) error {
-	// Claim the node port
-	// iptablesContainerNodePortArgs - From nodeport redirect/dnat to proxyIP:proxyPort, redirect if zero ip if not dnat //Adds the rule to ContainerNodePort chain
-	// iptablesContainerHostPortArgs - Same as above except for if ip is zero ip, use host ip and no redirect just dnat  // Adds the rule to HostNodePort chain
-	// iptablesNonLocalNodePortArgs - Adds the rule to NonLocalNodePort chain and start accept for new connection
-	return nil
-}
-
-// ClosePortal - Follows exactly opposite approach. Gets the arguments first and deleteRule deletes the rule
-// OpenPortal - Gets arguments first, EnsureRule - Adds the rule
