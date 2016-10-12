@@ -272,7 +272,7 @@ func init() {
 }
 
 func (g TestGroup) ContentConfig() (string, *unversioned.GroupVersion, runtime.Codec) {
-	return "application/json", g.GroupVersion(), g.Codec()
+	return "application/json", &g.externalGroupVersion, g.Codec()
 }
 
 // InternalGroupVersion returns the group,version used to identify the internal
@@ -294,10 +294,14 @@ func (g TestGroup) ExternalTypes() map[string]reflect.Type {
 // Codec returns the codec for the API version to test against, as set by the
 // KUBE_TEST_API_TYPE env var.
 func (g TestGroup) Codec() runtime.Codec {
+	return Codec(g.externalGroupVersion)
+}
+
+func Codec(version unversioned.GroupVersion) runtime.Codec {
 	if serializer.Serializer == nil {
-		return api.Codecs.LegacyCodec(g.externalGroupVersion)
+		return api.Codecs.LegacyCodec(version)
 	}
-	return api.Codecs.CodecForVersions(serializer, api.Codecs.UniversalDeserializer(), unversioned.GroupVersions{g.externalGroupVersion}, nil)
+	return api.Codecs.CodecForVersions(serializer, api.Codecs.UniversalDeserializer(), unversioned.GroupVersions{version}, nil)
 }
 
 // NegotiatedSerializer returns the negotiated serializer for the server.
@@ -412,8 +416,7 @@ func (g TestGroup) RESTMapper() meta.RESTMapper {
 func ExternalGroupVersions() unversioned.GroupVersions {
 	versions := []unversioned.GroupVersion{}
 	for _, g := range Groups {
-		gv := g.GroupVersion()
-		versions = append(versions, *gv)
+		versions = append(versions, g.externalGroupVersion)
 	}
 	return versions
 }
@@ -427,7 +430,7 @@ func GetCodecForObject(obj runtime.Object) (runtime.Codec, error) {
 	kind := kinds[0]
 
 	for _, group := range Groups {
-		if group.GroupVersion().Group != kind.Group {
+		if group.externalGroupVersion.Group != kind.Group {
 			continue
 		}
 

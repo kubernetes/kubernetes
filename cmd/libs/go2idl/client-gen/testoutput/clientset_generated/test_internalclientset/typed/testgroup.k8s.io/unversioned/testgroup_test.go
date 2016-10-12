@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apimachinery"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient/simple"
@@ -34,12 +35,14 @@ import (
 )
 
 var testHelper testapi.TestGroup
+var testGroupMeta *apimachinery.GroupMeta
 
 func init() {
 	if _, found := testapi.Groups[testgroup.SchemeGroupVersion.Group]; found {
 		return
 	}
-	externalGroupVersion := registered.GroupOrDie(testgroup.SchemeGroupVersion.Group).GroupVersion
+	testGroupMeta = registered.GroupOrDie(testgroup.SchemeGroupVersion.Group)
+	externalGroupVersion := testGroupMeta.GroupVersion
 	testapi.Groups[testgroup.SchemeGroupVersion.Group] = testapi.NewTestGroup(
 		externalGroupVersion,
 		testgroup.SchemeGroupVersion,
@@ -209,7 +212,7 @@ func TestListTestTypes(t *testing.T) {
 
 func TestListTestTypesLabels(t *testing.T) {
 	ns := api.NamespaceDefault
-	labelSelectorQueryParamName := unversioned.LabelSelectorQueryParam(testHelper.GroupVersion().String())
+	labelSelectorQueryParamName := unversioned.LabelSelectorQueryParam(testGroupMeta.GroupVersion.String())
 	c := DecoratedSimpleClient{
 		simpleClient: simple.Client{
 			Request: simple.Request{

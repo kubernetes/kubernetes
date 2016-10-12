@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient/simple"
@@ -32,7 +33,7 @@ func getScheduledJobsResource() string {
 
 func TestListScheduledJob(t *testing.T) {
 	// scheduled jobs should be tested only when batch/v2alpha1 is enabled
-	if *testapi.Batch.GroupVersion() != v2alpha1.SchemeGroupVersion {
+	if registered.GroupOrDie(batch.GroupName).GroupVersion != v2alpha1.SchemeGroupVersion {
 		return
 	}
 
@@ -73,7 +74,7 @@ func TestListScheduledJob(t *testing.T) {
 
 func TestGetScheduledJob(t *testing.T) {
 	// scheduled jobs should be tested only when batch/v2alpha1 is enabled
-	if *testapi.Batch.GroupVersion() != v2alpha1.SchemeGroupVersion {
+	if registered.GroupOrDie(batch.GroupName).GroupVersion != v2alpha1.SchemeGroupVersion {
 		return
 	}
 
@@ -112,7 +113,7 @@ func TestGetScheduledJob(t *testing.T) {
 
 func TestUpdateScheduledJob(t *testing.T) {
 	// scheduled jobs should be tested only when batch/v2alpha1 is enabled
-	if *testapi.Batch.GroupVersion() != v2alpha1.SchemeGroupVersion {
+	if registered.GroupOrDie(batch.GroupName).GroupVersion != v2alpha1.SchemeGroupVersion {
 		return
 	}
 
@@ -158,7 +159,7 @@ func TestUpdateScheduledJob(t *testing.T) {
 
 func TestUpdateScheduledJobStatus(t *testing.T) {
 	// scheduled jobs should be tested only when batch/v2alpha1 is enabled
-	if *testapi.Batch.GroupVersion() != v2alpha1.SchemeGroupVersion {
+	if registered.GroupOrDie(batch.GroupName).GroupVersion != v2alpha1.SchemeGroupVersion {
 		return
 	}
 
@@ -208,7 +209,7 @@ func TestUpdateScheduledJobStatus(t *testing.T) {
 
 func TestDeleteScheduledJob(t *testing.T) {
 	// scheduled jobs should be tested only when batch/v2alpha1 is enabled
-	if *testapi.Batch.GroupVersion() != v2alpha1.SchemeGroupVersion {
+	if registered.GroupOrDie(batch.GroupName).GroupVersion != v2alpha1.SchemeGroupVersion {
 		return
 	}
 
@@ -229,7 +230,7 @@ func TestDeleteScheduledJob(t *testing.T) {
 
 func TestCreateScheduledJob(t *testing.T) {
 	// scheduled jobs should be tested only when batch/v2alpha1 is enabled
-	if *testapi.Batch.GroupVersion() != v2alpha1.SchemeGroupVersion {
+	if registered.GroupOrDie(batch.GroupName).GroupVersion != v2alpha1.SchemeGroupVersion {
 		return
 	}
 

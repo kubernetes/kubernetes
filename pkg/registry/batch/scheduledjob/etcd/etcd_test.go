@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
 	"k8s.io/kubernetes/pkg/fields"
@@ -64,7 +64,7 @@ func validNewScheduledJob() *batch.ScheduledJob {
 
 func TestCreate(t *testing.T) {
 	// scheduled jobs should be tested only when batch/v2alpha1 is enabled
-	if *testapi.Batch.GroupVersion() != v2alpha1.SchemeGroupVersion {
+	if registered.GroupOrDie(batch.GroupName).GroupVersion != v2alpha1.SchemeGroupVersion {
 		return
 	}
 
@@ -86,7 +86,7 @@ func TestCreate(t *testing.T) {
 
 func TestUpdate(t *testing.T) {
 	// scheduled jobs should be tested only when batch/v2alpha1 is enabled
-	if *testapi.Batch.GroupVersion() != v2alpha1.SchemeGroupVersion {
+	if registered.GroupOrDie(batch.GroupName).GroupVersion != v2alpha1.SchemeGroupVersion {
 		return
 	}
 
@@ -115,7 +115,7 @@ func TestUpdate(t *testing.T) {
 
 func TestDelete(t *testing.T) {
 	// scheduled jobs should be tested only when batch/v2alpha1 is enabled
-	if *testapi.Batch.GroupVersion() != v2alpha1.SchemeGroupVersion {
+	if registered.GroupOrDie(batch.GroupName).GroupVersion != v2alpha1.SchemeGroupVersion {
 		return
 	}
 
@@ -128,7 +128,7 @@ func TestDelete(t *testing.T) {
 
 func TestGet(t *testing.T) {
 	// scheduled jobs should be tested only when batch/v2alpha1 is enabled
-	if *testapi.Batch.GroupVersion() != v2alpha1.SchemeGroupVersion {
+	if registered.GroupOrDie(batch.GroupName).GroupVersion != v2alpha1.SchemeGroupVersion {
 		return
 	}
 
@@ -141,7 +141,7 @@ func TestGet(t *testing.T) {
 
 func TestList(t *testing.T) {
 	// scheduled jobs should be tested only when batch/v2alpha1 is enabled
-	if *testapi.Batch.GroupVersion() != v2alpha1.SchemeGroupVersion {
+	if registered.GroupOrDie(batch.GroupName).GroupVersion != v2alpha1.SchemeGroupVersion {
 		return
 	}
 
@@ -154,7 +154,7 @@ func TestList(t *testing.T) {
 
 func TestWatch(t *testing.T) {
 	// scheduled jobs should be tested only when batch/v2alpha1 is enabled
-	if *testapi.Batch.GroupVersion() != v2alpha1.SchemeGroupVersion {
+	if registered.GroupOrDie(batch.GroupName).GroupVersion != v2alpha1.SchemeGroupVersion {
 		return
 	}
 

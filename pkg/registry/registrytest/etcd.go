@@ -164,7 +164,7 @@ func getCodec(obj runtime.Object) (runtime.Codec, error) {
 	var codec runtime.Codec
 	if api.Scheme.Recognizes(registered.GroupOrDie(api.GroupName).GroupVersion.WithKind(fqKind.Kind)) {
 		codec = testapi.Default.Codec()
-	} else if api.Scheme.Recognizes(testapi.Extensions.GroupVersion().WithKind(fqKind.Kind)) {
+	} else if api.Scheme.Recognizes(registered.GroupOrDie("extensions").GroupVersion.WithKind(fqKind.Kind)) {
 		codec = testapi.Extensions.Codec()
 	} else {
 		return nil, fmt.Errorf("unexpected kind: %v", fqKind)

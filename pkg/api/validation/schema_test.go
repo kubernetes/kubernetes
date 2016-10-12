@@ -27,8 +27,11 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	extensionsv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/runtime"
 	k8syaml "k8s.io/kubernetes/pkg/util/yaml"
 
@@ -44,16 +47,16 @@ func readPod(filename string) ([]byte, error) {
 }
 
 func readSwaggerFile() ([]byte, error) {
-	return readSwaggerApiFile(testapi.Default)
+	return readSwaggerApiFile(apiv1.SchemeGroupVersion)
 }
 
-func readSwaggerApiFile(group testapi.TestGroup) ([]byte, error) {
+func readSwaggerApiFile(version unversioned.GroupVersion) ([]byte, error) {
 	// TODO: Figure out a better way of finding these files
 	var pathToSwaggerSpec string
-	if group.GroupVersion().Group == "" {
-		pathToSwaggerSpec = "../../../api/swagger-spec/" + group.GroupVersion().Version + ".json"
+	if version.Group == "" {
+		pathToSwaggerSpec = "../../../api/swagger-spec/" + version.Version + ".json"
 	} else {
-		pathToSwaggerSpec = "../../../api/swagger-spec/" + group.GroupVersion().Group + "_" + group.GroupVersion().Version + ".json"
+		pathToSwaggerSpec = "../../../api/swagger-spec/" + version.Group + "_" + version.Version + ".json"
 	}
 
 	return ioutil.ReadFile(pathToSwaggerSpec)
@@ -103,8 +106,8 @@ func loadSchemaForTest() (Schema, error) {
 	return NewSwaggerSchemaFromBytes(data, nil)
 }
 
-func loadSchemaForTestWithFactory(group testapi.TestGroup, factory Schema) (Schema, error) {
-	data, err := readSwaggerApiFile(group)
+func loadSchemaForTestWithFactory(version unversioned.GroupVersion, factory Schema) (Schema, error) {
+	data, err := readSwaggerApiFile(version)
 	if err != nil {
 		return nil, err
 	}
@@ -113,12 +116,12 @@ func loadSchemaForTestWithFactory(group testapi.TestGroup, factory Schema) (Sche
 
 func NewFactory() (*Factory, error) {
 	f := &Factory{}
-	defaultSchema, err := loadSchemaForTestWithFactory(testapi.Default, f)
+	defaultSchema, err := loadSchemaForTestWithFactory(apiv1.SchemeGroupVersion, f)
 	if err != nil {
 		return nil, err
 	}
 	f.defaultSchema = defaultSchema
-	extensionSchema, err := loadSchemaForTestWithFactory(testapi.Extensions, f)
+	extensionSchema, err := loadSchemaForTestWithFactory(extensionsv1beta1.SchemeGroupVersion, f)
 	if err != nil {
 		return nil, err
 	}

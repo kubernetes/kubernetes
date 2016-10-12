@@ -74,12 +74,12 @@ func setUp(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.
 
 	resourceEncoding := genericapiserver.NewDefaultResourceEncodingConfig()
 	resourceEncoding.SetVersionEncoding(api.GroupName, registered.GroupOrDie(api.GroupName).GroupVersion, unversioned.GroupVersion{Group: api.GroupName, Version: runtime.APIVersionInternal})
-	resourceEncoding.SetVersionEncoding(autoscaling.GroupName, *testapi.Autoscaling.GroupVersion(), unversioned.GroupVersion{Group: autoscaling.GroupName, Version: runtime.APIVersionInternal})
-	resourceEncoding.SetVersionEncoding(batch.GroupName, *testapi.Batch.GroupVersion(), unversioned.GroupVersion{Group: batch.GroupName, Version: runtime.APIVersionInternal})
-	resourceEncoding.SetVersionEncoding(apps.GroupName, *testapi.Apps.GroupVersion(), unversioned.GroupVersion{Group: apps.GroupName, Version: runtime.APIVersionInternal})
-	resourceEncoding.SetVersionEncoding(extensions.GroupName, *testapi.Extensions.GroupVersion(), unversioned.GroupVersion{Group: extensions.GroupName, Version: runtime.APIVersionInternal})
-	resourceEncoding.SetVersionEncoding(rbac.GroupName, *testapi.Rbac.GroupVersion(), unversioned.GroupVersion{Group: rbac.GroupName, Version: runtime.APIVersionInternal})
-	resourceEncoding.SetVersionEncoding(certificates.GroupName, *testapi.Certificates.GroupVersion(), unversioned.GroupVersion{Group: certificates.GroupName, Version: runtime.APIVersionInternal})
+	resourceEncoding.SetVersionEncoding(autoscaling.GroupName, registered.GroupOrDie(autoscaling.GroupName).GroupVersion, unversioned.GroupVersion{Group: autoscaling.GroupName, Version: runtime.APIVersionInternal})
+	resourceEncoding.SetVersionEncoding(batch.GroupName, registered.GroupOrDie(batch.GroupName).GroupVersion, unversioned.GroupVersion{Group: batch.GroupName, Version: runtime.APIVersionInternal})
+	resourceEncoding.SetVersionEncoding(apps.GroupName, registered.GroupOrDie(apps.GroupName).GroupVersion, unversioned.GroupVersion{Group: apps.GroupName, Version: runtime.APIVersionInternal})
+	resourceEncoding.SetVersionEncoding(extensions.GroupName, registered.GroupOrDie(extensions.GroupName).GroupVersion, unversioned.GroupVersion{Group: extensions.GroupName, Version: runtime.APIVersionInternal})
+	resourceEncoding.SetVersionEncoding(rbac.GroupName, registered.GroupOrDie(rbac.GroupName).GroupVersion, unversioned.GroupVersion{Group: rbac.GroupName, Version: runtime.APIVersionInternal})
+	resourceEncoding.SetVersionEncoding(certificates.GroupName, registered.GroupOrDie(certificates.GroupName).GroupVersion, unversioned.GroupVersion{Group: certificates.GroupName, Version: runtime.APIVersionInternal})
 	storageFactory := genericapiserver.NewDefaultStorageFactory(*storageConfig, testapi.StorageMediaType(), api.Codecs, resourceEncoding, DefaultAPIResourceConfigSource())
 
 	config.StorageFactory = storageFactory
@@ -393,8 +393,8 @@ func TestDiscoveryAtAPIS(t *testing.T) {
 	expectVersions := map[string][]unversioned.GroupVersionForDiscovery{
 		autoscaling.GroupName: {
 			{
-				GroupVersion: testapi.Autoscaling.GroupVersion().String(),
-				Version:      testapi.Autoscaling.GroupVersion().Version,
+				GroupVersion: registered.GroupOrDie(autoscaling.GroupName).GroupVersion.String(),
+				Version:      registered.GroupOrDie(autoscaling.GroupName).GroupVersion.Version,
 			},
 		},
 		// batch is using its pkg/apis/batch/ types here since during installation
@@ -412,14 +412,14 @@ func TestDiscoveryAtAPIS(t *testing.T) {
 		},
 		apps.GroupName: {
 			{
-				GroupVersion: testapi.Apps.GroupVersion().String(),
-				Version:      testapi.Apps.GroupVersion().Version,
+				GroupVersion: registered.GroupOrDie(apps.GroupName).GroupVersion.String(),
+				Version:      registered.GroupOrDie(apps.GroupName).GroupVersion.Version,
 			},
 		},
 		extensions.GroupName: {
 			{
-				GroupVersion: testapi.Extensions.GroupVersion().String(),
-				Version:      testapi.Extensions.GroupVersion().Version,
+				GroupVersion: registered.GroupOrDie(extensions.GroupName).GroupVersion.String(),
+				Version:      registered.GroupOrDie(extensions.GroupName).GroupVersion.Version,
 			},
 		},
 	}

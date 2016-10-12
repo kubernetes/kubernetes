@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -362,8 +363,8 @@ func FuzzerFor(t *testing.T, version unversioned.GroupVersion, src rand.Source) 
 				ev.ValueFrom.FieldRef = &api.ObjectFieldSelector{}
 
 				var versions []unversioned.GroupVersion
-				for _, testGroup := range testapi.Groups {
-					versions = append(versions, *testGroup.GroupVersion())
+				for _, groupVersion := range registered.EnabledVersions() {
+					versions = append(versions, groupVersion)
 				}
 
 				ev.ValueFrom.FieldRef.APIVersion = versions[c.Rand.Intn(len(versions))].String()

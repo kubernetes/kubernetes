@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
@@ -35,11 +36,11 @@ func TestResourcePathWithPrefix(t *testing.T) {
 		name      string
 		expected  string
 	}{
-		{"prefix", "resource", "mynamespace", "myresource", "/api/" + Default.GroupVersion().Version + "/prefix/namespaces/mynamespace/resource/myresource"},
-		{"prefix", "resource", "", "myresource", "/api/" + Default.GroupVersion().Version + "/prefix/resource/myresource"},
-		{"prefix", "resource", "mynamespace", "", "/api/" + Default.GroupVersion().Version + "/prefix/namespaces/mynamespace/resource"},
-		{"prefix", "resource", "", "", "/api/" + Default.GroupVersion().Version + "/prefix/resource"},
-		{"", "resource", "mynamespace", "myresource", "/api/" + Default.GroupVersion().Version + "/namespaces/mynamespace/resource/myresource"},
+		{"prefix", "resource", "mynamespace", "myresource", "/api/" + registered.GroupOrDie("").GroupVersion.Version + "/prefix/namespaces/mynamespace/resource/myresource"},
+		{"prefix", "resource", "", "myresource", "/api/" + registered.GroupOrDie("").GroupVersion.Version + "/prefix/resource/myresource"},
+		{"prefix", "resource", "mynamespace", "", "/api/" + registered.GroupOrDie("").GroupVersion.Version + "/prefix/namespaces/mynamespace/resource"},
+		{"prefix", "resource", "", "", "/api/" + registered.GroupOrDie("").GroupVersion.Version + "/prefix/resource"},
+		{"", "resource", "mynamespace", "myresource", "/api/" + registered.GroupOrDie("").GroupVersion.Version + "/namespaces/mynamespace/resource/myresource"},
 	}
 	for _, item := range testCases {
 		if actual := Default.ResourcePathWithPrefix(item.prefix, item.resource, item.namespace, item.name); actual != item.expected {
@@ -55,10 +56,10 @@ func TestResourcePath(t *testing.T) {
 		name      string
 		expected  string
 	}{
-		{"resource", "mynamespace", "myresource", "/api/" + Default.GroupVersion().Version + "/namespaces/mynamespace/resource/myresource"},
-		{"resource", "", "myresource", "/api/" + Default.GroupVersion().Version + "/resource/myresource"},
-		{"resource", "mynamespace", "", "/api/" + Default.GroupVersion().Version + "/namespaces/mynamespace/resource"},
-		{"resource", "", "", "/api/" + Default.GroupVersion().Version + "/resource"},
+		{"resource", "mynamespace", "myresource", "/api/" + registered.GroupOrDie("").GroupVersion.Version + "/namespaces/mynamespace/resource/myresource"},
+		{"resource", "", "myresource", "/api/" + registered.GroupOrDie("").GroupVersion.Version + "/resource/myresource"},
+		{"resource", "mynamespace", "", "/api/" + registered.GroupOrDie("").GroupVersion.Version + "/namespaces/mynamespace/resource"},
+		{"resource", "", "", "/api/" + registered.GroupOrDie("").GroupVersion.Version + "/resource"},
 	}
 	for _, item := range testCases {
 		if actual := Default.ResourcePath(item.resource, item.namespace, item.name); actual != item.expected {

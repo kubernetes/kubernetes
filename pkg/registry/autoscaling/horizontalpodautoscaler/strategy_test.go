@@ -20,14 +20,14 @@ import (
 	"testing"
 
 	_ "k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 )
 
 func TestSelectableFieldLabelConversions(t *testing.T) {
 	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
-		testapi.Autoscaling.GroupVersion().String(),
+		registered.GroupOrDie(autoscaling.GroupName).GroupVersion.String(),
 		"Autoscaler",
 		AutoscalerToSelectableFields(&autoscaling.HorizontalPodAutoscaler{}),
 		nil,
