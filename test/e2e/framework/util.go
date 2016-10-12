@@ -1467,22 +1467,18 @@ func waitForPodTerminatedInNamespace(c *client.Client, podName, reason, namespac
 // waitForPodSuccessInNamespaceTimeout returns nil if the pod reached state success, or an error if it reached failure or ran too long.
 func waitForPodSuccessInNamespaceTimeout(c *client.Client, podName string, contName string, namespace string, timeout time.Duration) error {
 	return waitForPodCondition(c, namespace, podName, "success or failure", timeout, func(pod *api.Pod) (bool, error) {
-		// Cannot use pod.Status.Phase == api.PodSucceeded/api.PodFailed due to #2632
-		// TODO: This was not true from long time ago. We can use api.PodSucceeded now.
-		ci, ok := api.GetContainerStatus(pod.Status.ContainerStatuses, contName)
-		if !ok {
-			Logf("No Status.Info for container '%s' in pod '%s' yet", contName, podName)
-		} else {
-			if ci.State.Terminated != nil {
-				if ci.State.Terminated.ExitCode == 0 {
-					By("Saw pod success")
-					return true, nil
-				}
-				return true, fmt.Errorf("pod '%s' terminated with failure: %+v", podName, ci.State.Terminated)
-			}
-			Logf("Nil State.Terminated for container '%s' in pod '%s' in namespace '%s' so far", contName, podName, namespace)
+		if pod.Spec.RestartPolicy == api.RestartPolicyAlways {
+			return false, fmt.Errorf("pod %q will never terminate with a succeeded state since its restart policy is Always", podName)
 		}
-		return false, nil
+		switch pod.Status.Phase {
+		case api.PodSucceeded:
+			By("Saw pod success")
+			return true, nil
+		case api.PodFailed:
+			return true, fmt.Errorf("pod %q terminated with failure: %+v", podName, pod.Status.ContainerStatuses)
+		default:
+			return false, nil
+		}
 	})
 }
 
