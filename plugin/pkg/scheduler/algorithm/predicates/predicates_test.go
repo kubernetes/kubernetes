@@ -119,6 +119,11 @@ func newResourceInitPod(pod *api.Pod, usage ...schedulercache.Resource) *api.Pod
 	return pod
 }
 
+func PredicateMetadata(p *api.Pod, nodeInfo map[string]*schedulercache.NodeInfo) interface{} {
+	pm := PredicateMetadataFactory{algorithm.FakePodLister{p}}
+	return pm.GetMetadata(p, nodeInfo)
+}
+
 func TestPodFitsResources(t *testing.T) {
 	enoughPodsTests := []struct {
 		pod      *api.Pod
@@ -233,7 +238,6 @@ func TestPodFitsResources(t *testing.T) {
 	for _, test := range enoughPodsTests {
 		node := api.Node{Status: api.NodeStatus{Capacity: makeResources(10, 20, 0, 32).Capacity, Allocatable: makeAllocatableResources(10, 20, 0, 32)}}
 		test.nodeInfo.SetNode(&node)
-
 		fits, reasons, err := PodFitsResources(test.pod, PredicateMetadata(test.pod, nil), test.nodeInfo)
 		if err != nil {
 			t.Errorf("%s: unexpected error: %v", test.test, err)
@@ -289,7 +293,6 @@ func TestPodFitsResources(t *testing.T) {
 	for _, test := range notEnoughPodsTests {
 		node := api.Node{Status: api.NodeStatus{Capacity: api.ResourceList{}, Allocatable: makeAllocatableResources(10, 20, 0, 1)}}
 		test.nodeInfo.SetNode(&node)
-
 		fits, reasons, err := PodFitsResources(test.pod, PredicateMetadata(test.pod, nil), test.nodeInfo)
 		if err != nil {
 			t.Errorf("%s: unexpected error: %v", test.test, err)
@@ -1207,13 +1210,14 @@ func TestServiceAffinity(t *testing.T) {
 	node4 := api.Node{ObjectMeta: api.ObjectMeta{Name: "machine4", Labels: labels4}}
 	node5 := api.Node{ObjectMeta: api.ObjectMeta{Name: "machine5", Labels: labels4}}
 	tests := []struct {
-		pod      *api.Pod
-		pods     []*api.Pod
-		services []*api.Service
-		node     *api.Node
-		labels   []string
-		fits     bool
-		test     string
+		pod            *api.Pod
+		pods           []*api.Pod
+		services       []*api.Service
+		node           *api.Node
+		labels         []string
+		fits           bool
+		test           string
+		skipPrecompute bool
 	}{
 		{
 			pod:    new(api.Pod),
@@ -1308,23 +1312,52 @@ func TestServiceAffinity(t *testing.T) {
 			labels:   []string{"region", "zone"},
 			test:     "service pod on different node, multiple labels, all match",
 		},
+		{
+			skipPrecompute: true,
+			fits:           false,
+
+			// These are a copy of the last test, any "true" scheduling event will do to confirm the expected result.
+			pod:      &api.Pod{ObjectMeta: api.ObjectMeta{Labels: selector}},
+			pods:     []*api.Pod{{Spec: api.PodSpec{NodeName: "machine5"}, ObjectMeta: api.ObjectMeta{Labels: selector}}},
+			node:     &node4,
+			services: []*api.Service{{Spec: api.ServiceSpec{Selector: selector}}},
+			labels:   []string{"region", "zone"},
+			test:     "Same as the last test, but don't fit when we skip precomp",
+		},
 	}
 	expectedFailureReasons := []algorithm.PredicateFailureReason{ErrServiceAffinityViolated}
-
 	for _, test := range tests {
 		nodes := []api.Node{node1, node2, node3, node4, node5}
-		serviceAffinity := ServiceAffinity{algorithm.FakePodLister(test.pods), algorithm.FakeServiceLister(test.services), FakeNodeListInfo(nodes), test.labels}
 		nodeInfo := schedulercache.NewNodeInfo()
 		nodeInfo.SetNode(test.node)
-		fits, reasons, err := serviceAffinity.CheckServiceAffinity(test.pod, PredicateMetadata(test.pod, nil), nodeInfo)
-		if err != nil {
-			t.Errorf("%s: unexpected error: %v", test.test, err)
-		}
-		if !fits && !reflect.DeepEqual(reasons, expectedFailureReasons) {
-			t.Errorf("%s: unexpected failure reasons: %v, want: %v", test.test, reasons, expectedFailureReasons)
-		}
-		if fits != test.fits {
-			t.Errorf("%s: expected: %v got %v", test.test, test.fits, fits)
+		nodeInfoMap := map[string]*schedulercache.NodeInfo{test.node.Name: nodeInfo}
+		// Reimplementing the logic that the scheduler implements: Any time it makes a predicate, it registers any precomputations.
+		predicate, precompute := NewServiceAffinityPredicate(algorithm.FakePodLister(test.pods), algorithm.FakeServiceLister(test.services), FakeNodeListInfo(nodes), test.labels)
+		// Register a precomputation or Rewrite the precomputation to a no-op, depending on the state we want to test.
+		RegisterPredicatePrecomputation("checkServiceAffinity-unitTestPredicate", func(pm *predicateMetadata) {
+			if !test.skipPrecompute {
+				precompute(pm)
+			}
+		})
+		if pmeta, ok := (PredicateMetadata(test.pod, nodeInfoMap)).(*predicateMetadata); ok {
+			fits, reasons, err := predicate(test.pod, pmeta, nodeInfo)
+			if !test.skipPrecompute {
+				if err != nil {
+					t.Errorf("%s: unexpected error: %v", test.test, err)
+				}
+				if !fits && !reflect.DeepEqual(reasons, expectedFailureReasons) {
+					t.Errorf("%s: unexpected failure reasons: %v, want: %v", test.test, reasons, expectedFailureReasons)
+				}
+				if fits != test.fits {
+					t.Errorf("%s: expected: %v got %v", test.test, test.fits, fits)
+				}
+			} else {
+				if fits == true || err == nil {
+					t.Errorf("Something went wrong: we should return an error when we didn't do the predicate precomputation %v %v", fits, err)
+				}
+			}
+		} else {
+			t.Errorf("Error casting.")
 		}
 	}
 }
@@ -1586,7 +1619,6 @@ func TestEBSVolumeCountConflicts(t *testing.T) {
 			}
 			return "", false
 		},
-
 		FilterPersistentVolume: func(pv *api.PersistentVolume) (string, bool) {
 			if pv.Spec.AWSElasticBlockStore != nil {
 				return pv.Spec.AWSElasticBlockStore.VolumeID, true
@@ -1652,7 +1684,7 @@ func TestPredicatesRegistered(t *testing.T) {
 		if err == nil {
 			functions = append(functions, fileFunctions...)
 		} else {
-			t.Errorf("unexpected error when parsing %s", filePath)
+			t.Errorf("unexpected error %s when parsing %s", err, filePath)
 		}
 	}
 
