@@ -111,6 +111,7 @@ var (
 	IsRegisteredVersion           = DefaultAPIRegistrationManager.IsRegisteredVersion
 	IsRegistered                  = DefaultAPIRegistrationManager.IsRegistered
 	Group                         = DefaultAPIRegistrationManager.Group
+	EnabledGroups                 = DefaultAPIRegistrationManager.EnabledGroups
 	EnabledVersionsForGroup       = DefaultAPIRegistrationManager.EnabledVersionsForGroup
 	EnabledVersions               = DefaultAPIRegistrationManager.EnabledVersions
 	IsEnabledVersion              = DefaultAPIRegistrationManager.IsEnabledVersion
@@ -174,6 +175,25 @@ func (m *APIRegistrationManager) IsAllowedVersion(v unversioned.GroupVersion) bo
 func (m *APIRegistrationManager) IsEnabledVersion(v unversioned.GroupVersion) bool {
 	_, found := m.enabledVersions[v]
 	return found
+}
+
+// EnabledGroups returns all enabled groups.
+func (m *APIRegistrationManager) EnabledGroups() []*apimachinery.GroupMeta {
+	ret := []*apimachinery.GroupMeta{}
+	for _, groupMeta := range m.groupMetaMap {
+		enabled := false
+		for _, version := range groupMeta.GroupVersions {
+			if m.IsEnabledVersion(version) {
+				enabled = true
+				break
+			}
+		}
+
+		if enabled {
+			ret = append(ret, groupMeta)
+		}
+	}
+	return ret
 }
 
 // EnabledVersions returns all enabled versions.  Groups are randomly ordered, but versions within groups

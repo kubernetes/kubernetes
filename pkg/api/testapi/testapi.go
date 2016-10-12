@@ -275,11 +275,6 @@ func (g TestGroup) ContentConfig() (string, *unversioned.GroupVersion, runtime.C
 	return "application/json", g.GroupVersion(), g.Codec()
 }
 
-func (g TestGroup) GroupVersion() *unversioned.GroupVersion {
-	copyOfGroupVersion := g.externalGroupVersion
-	return &copyOfGroupVersion
-}
-
 // InternalGroupVersion returns the group,version used to identify the internal
 // types for this API
 func (g TestGroup) InternalGroupVersion() unversioned.GroupVersion {
