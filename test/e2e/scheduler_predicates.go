@@ -126,11 +126,11 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		// and there is no need to create additional pods.
 		// StartPods requires at least one pod to replicate.
 		if podsNeededForSaturation > 0 {
-			framework.StartPods(c, podsNeededForSaturation, ns, "maxp",
+			framework.ExpectNoError(framework.StartPods(c, podsNeededForSaturation, ns, "maxp",
 				*initPausePod(f, pausePodConfig{
 					Name:   "",
 					Labels: map[string]string{"name": ""},
-				}), true)
+				}), true, framework.Logf))
 		}
 		podName := "additional-pod"
 		createPausePod(f, pausePodConfig{
@@ -187,7 +187,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		// and there is no need to create additional pods.
 		// StartPods requires at least one pod to replicate.
 		if podsNeededForSaturation > 0 {
-			framework.StartPods(c, podsNeededForSaturation, ns, "overcommit",
+			framework.ExpectNoError(framework.StartPods(c, podsNeededForSaturation, ns, "overcommit",
 				*initPausePod(f, pausePodConfig{
 					Name:   "",
 					Labels: map[string]string{"name": ""},
@@ -199,7 +199,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 							"cpu": *resource.NewMilliQuantity(milliCpuPerPod, "DecimalSI"),
 						},
 					},
-				}), true)
+				}), true, framework.Logf))
 		}
 		podName := "additional-pod"
 		createPausePod(f, pausePodConfig{
