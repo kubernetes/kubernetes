@@ -119,6 +119,11 @@ func newResourceInitPod(pod *api.Pod, usage ...schedulercache.Resource) *api.Pod
 	return pod
 }
 
+func PredicateMetadata(p *api.Pod, nodeInfo map[string]*schedulercache.NodeInfo) interface{} {
+	pm := PredicateMetadataFactory{algorithm.FakePodLister{p}}
+	return pm.GetMetadata(p, nodeInfo)
+}
+
 func TestPodFitsResources(t *testing.T) {
 	enoughPodsTests := []struct {
 		pod      *api.Pod
@@ -233,7 +238,6 @@ func TestPodFitsResources(t *testing.T) {
 	for _, test := range enoughPodsTests {
 		node := api.Node{Status: api.NodeStatus{Capacity: makeResources(10, 20, 0, 32).Capacity, Allocatable: makeAllocatableResources(10, 20, 0, 32)}}
 		test.nodeInfo.SetNode(&node)
-
 		fits, reasons, err := PodFitsResources(test.pod, PredicateMetadata(test.pod, nil), test.nodeInfo)
 		if err != nil {
 			t.Errorf("%s: unexpected error: %v", test.test, err)
@@ -289,7 +293,6 @@ func TestPodFitsResources(t *testing.T) {
 	for _, test := range notEnoughPodsTests {
 		node := api.Node{Status: api.NodeStatus{Capacity: api.ResourceList{}, Allocatable: makeAllocatableResources(10, 20, 0, 1)}}
 		test.nodeInfo.SetNode(&node)
-
 		fits, reasons, err := PodFitsResources(test.pod, PredicateMetadata(test.pod, nil), test.nodeInfo)
 		if err != nil {
 			t.Errorf("%s: unexpected error: %v", test.test, err)
@@ -1310,22 +1313,38 @@ func TestServiceAffinity(t *testing.T) {
 		},
 	}
 	expectedFailureReasons := []algorithm.PredicateFailureReason{ErrServiceAffinityViolated}
-
 	for _, test := range tests {
-		nodes := []api.Node{node1, node2, node3, node4, node5}
-		serviceAffinity := ServiceAffinity{algorithm.FakePodLister(test.pods), algorithm.FakeServiceLister(test.services), FakeNodeListInfo(nodes), test.labels}
-		nodeInfo := schedulercache.NewNodeInfo()
-		nodeInfo.SetNode(test.node)
-		fits, reasons, err := serviceAffinity.CheckServiceAffinity(test.pod, PredicateMetadata(test.pod, nil), nodeInfo)
-		if err != nil {
-			t.Errorf("%s: unexpected error: %v", test.test, err)
+		testIt := func(skipPrecompute bool) {
+			nodes := []api.Node{node1, node2, node3, node4, node5}
+			nodeInfo := schedulercache.NewNodeInfo()
+			nodeInfo.SetNode(test.node)
+			nodeInfoMap := map[string]*schedulercache.NodeInfo{test.node.Name: nodeInfo}
+			// Reimplementing the logic that the scheduler implements: Any time it makes a predicate, it registers any precomputations.
+			predicate, precompute := NewServiceAffinityPredicate(algorithm.FakePodLister(test.pods), algorithm.FakeServiceLister(test.services), FakeNodeListInfo(nodes), test.labels)
+			// Register a precomputation or Rewrite the precomputation to a no-op, depending on the state we want to test.
+			RegisterPredicatePrecomputation("checkServiceAffinity-unitTestPredicate", func(pm *predicateMetadata) {
+				if !skipPrecompute {
+					precompute(pm)
+				}
+			})
+			if pmeta, ok := (PredicateMetadata(test.pod, nodeInfoMap)).(*predicateMetadata); ok {
+				fits, reasons, err := predicate(test.pod, pmeta, nodeInfo)
+				if err != nil {
+					t.Errorf("%s: unexpected error: %v", test.test, err)
+				}
+				if !fits && !reflect.DeepEqual(reasons, expectedFailureReasons) {
+					t.Errorf("%s: unexpected failure reasons: %v, want: %v", test.test, reasons, expectedFailureReasons)
+				}
+				if fits != test.fits {
+					t.Errorf("%s: expected: %v got %v", test.test, test.fits, fits)
+				}
+			} else {
+				t.Errorf("Error casting.")
+			}
 		}
-		if !fits && !reflect.DeepEqual(reasons, expectedFailureReasons) {
-			t.Errorf("%s: unexpected failure reasons: %v, want: %v", test.test, reasons, expectedFailureReasons)
-		}
-		if fits != test.fits {
-			t.Errorf("%s: expected: %v got %v", test.test, test.fits, fits)
-		}
+
+		testIt(false) // Confirm that the predicate works without precomputed data (resilience)
+		testIt(true)  // Confirm that the predicate works with the precomputed data (better performance)
 	}
 }
 
@@ -1586,7 +1605,6 @@ func TestEBSVolumeCountConflicts(t *testing.T) {
 			}
 			return "", false
 		},
-
 		FilterPersistentVolume: func(pv *api.PersistentVolume) (string, bool) {
 			if pv.Spec.AWSElasticBlockStore != nil {
 				return pv.Spec.AWSElasticBlockStore.VolumeID, true
@@ -1652,7 +1670,7 @@ func TestPredicatesRegistered(t *testing.T) {
 		if err == nil {
 			functions = append(functions, fileFunctions...)
 		} else {
-			t.Errorf("unexpected error when parsing %s", filePath)
+			t.Errorf("unexpected error %s when parsing %s", err, filePath)
 		}
 	}
 
