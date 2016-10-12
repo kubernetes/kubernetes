@@ -342,7 +342,7 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclie
 	h := &framework.MasterHolder{Initialized: make(chan struct{})}
 	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		<-h.Initialized
-		h.M.Handler.ServeHTTP(w, req)
+		h.M.GenericAPIServer.Handler.ServeHTTP(w, req)
 	}))
 
 	// Anonymous client config

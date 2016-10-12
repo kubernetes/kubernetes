@@ -90,10 +90,6 @@ type GenericAPIServer struct {
 	// truth for its value.
 	ServiceClusterIPRange *net.IPNet
 
-	// ServiceNodePortRange is only used for `master.go` to construct its RESTStorage for the legacy API group
-	// TODO refactor this closer to the point of use.
-	ServiceNodePortRange utilnet.PortRange
-
 	// LoopbackClientConfig is a config for a privileged loopback connection to the API server
 	LoopbackClientConfig *restclient.Config
 
@@ -166,11 +162,8 @@ type GenericAPIServer struct {
 	openAPIDefinitions        *common.OpenAPIDefinitions
 	MasterCount               int
 	KubernetesServiceNodePort int // TODO(sttts): move into master
-	PublicReadWritePort       int
 	ServiceReadWriteIP        net.IP
 	ServiceReadWritePort      int
-	ExtraServicePorts         []api.ServicePort
-	ExtraEndpointPorts        []api.EndpointPort
 }
 
 func init() {

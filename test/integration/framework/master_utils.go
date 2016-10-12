@@ -175,7 +175,7 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 		s = incomingServer
 	} else {
 		s = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			m.Handler.ServeHTTP(w, req)
+			m.GenericAPIServer.Handler.ServeHTTP(w, req)
 		}))
 	}
 
