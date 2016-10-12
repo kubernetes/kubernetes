@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	storageutil "k8s.io/kubernetes/pkg/apis/storage/util"
 )
 
 func TestMatchVolume(t *testing.T) {
@@ -177,7 +178,7 @@ func TestMatchVolume(t *testing.T) {
 					Name:      "claim01",
 					Namespace: "myns",
 					Annotations: map[string]string{
-						annClass: "silver",
+						storageutil.StorageClassAnnotation: "silver",
 					},
 				},
 				Spec: api.PersistentVolumeClaimSpec{
@@ -202,7 +203,7 @@ func TestMatchVolume(t *testing.T) {
 					Name:      "claim01",
 					Namespace: "myns",
 					Annotations: map[string]string{
-						annClass: "silver",
+						storageutil.StorageClassAnnotation: "silver",
 					},
 				},
 				Spec: api.PersistentVolumeClaimSpec{
@@ -626,7 +627,7 @@ func createTestVolumes() []*api.PersistentVolume {
 					"should-exist": "true",
 				},
 				Annotations: map[string]string{
-					annClass: "silver",
+					storageutil.StorageClassAnnotation: "silver",
 				},
 			},
 			Spec: api.PersistentVolumeSpec{
@@ -646,7 +647,7 @@ func createTestVolumes() []*api.PersistentVolume {
 				UID:  "gce-pd-silver2",
 				Name: "gce0024",
 				Annotations: map[string]string{
-					annClass: "silver",
+					storageutil.StorageClassAnnotation: "silver",
 				},
 			},
 			Spec: api.PersistentVolumeSpec{
@@ -666,7 +667,7 @@ func createTestVolumes() []*api.PersistentVolume {
 				UID:  "gce-pd-gold",
 				Name: "gce0025",
 				Annotations: map[string]string{
-					annClass: "gold",
+					storageutil.StorageClassAnnotation: "gold",
 				},
 			},
 			Spec: api.PersistentVolumeSpec{
