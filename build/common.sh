@@ -669,6 +669,7 @@ function kube::build::sync_to_container() {
   V=6 kube::log::status "Running rsync"
   rsync ${rsync_extra} \
     --archive \
+    --delete \
     --prune-empty-dirs \
     --password-file="${LOCAL_OUTPUT_BUILD_CONTEXT}/rsyncd.password" \
     --filter='- /.git/' \
