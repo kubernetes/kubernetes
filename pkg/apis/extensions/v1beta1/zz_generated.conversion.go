@@ -455,6 +455,7 @@ func autoConvert_v1beta1_DaemonSetStatus_To_extensions_DaemonSetStatus(in *Daemo
 	out.CurrentNumberScheduled = in.CurrentNumberScheduled
 	out.NumberMisscheduled = in.NumberMisscheduled
 	out.DesiredNumberScheduled = in.DesiredNumberScheduled
+	out.NumberReady = in.NumberReady
 	return nil
 }
 
@@ -466,6 +467,7 @@ func autoConvert_extensions_DaemonSetStatus_To_v1beta1_DaemonSetStatus(in *exten
 	out.CurrentNumberScheduled = in.CurrentNumberScheduled
 	out.NumberMisscheduled = in.NumberMisscheduled
 	out.DesiredNumberScheduled = in.DesiredNumberScheduled
+	out.NumberReady = in.NumberReady
 	return nil
 }
 
