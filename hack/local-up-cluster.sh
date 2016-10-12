@@ -285,6 +285,10 @@ function start_apiserver {
     if [[ -n "${ALLOW_ANY_TOKEN:-}" ]]; then
       anytoken_arg="--insecure-allow-any-token "
     fi
+    authorizer_arg=""
+    if [[ -n "${ENABLE_RBAC:-}" ]]; then
+      authorizer_arg="--authorization-mode=RBAC "
+    fi
     priv_arg=""
     if [[ -n "${ALLOW_PRIVILEGED}" ]]; then
       priv_arg="--allow-privileged "
@@ -302,7 +306,7 @@ function start_apiserver {
     fi
 
     APISERVER_LOG=/tmp/kube-apiserver.log
-    sudo -E "${GO_OUT}/hyperkube" apiserver ${anytoken_arg} ${priv_arg} ${runtime_config}\
+    sudo -E "${GO_OUT}/hyperkube" apiserver ${anytoken_arg} ${authorizer_arg} ${priv_arg} ${runtime_config}\
       ${advertise_address} \
       --v=${LOG_LEVEL} \
       --cert-dir="${CERT_DIR}" \
