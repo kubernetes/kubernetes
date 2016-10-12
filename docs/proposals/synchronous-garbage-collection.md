@@ -76,7 +76,7 @@ OwnerReference {
      ...
      // If true, AND if the owner has the "DeletingDependents" finalizer, then the owner cannot be deleted from the key-value store until this reference is removed.
      // Defaults to false.
-     // To set this field, a user needs "update" and "delete" permission of the owner, otherwise 422 (Unprocessable Entity) will be returned.
+     // To set this field, a user needs "delete" permission of the owner, otherwise 422 (Unprocessable Entity) will be returned.
      BlockOwnerDeletion *bool
 }
 ```
@@ -90,43 +90,45 @@ DeleteOptions {
   …
   // Whether and how garbage collection will be performed.
   // Defaults to DefaultPropagationPolicy
-  DeletionPropagationPolicy *DeletionPropagationPolicy
+  DeletePropagationPolicy *DeletePropagationPolicy
 }
 
-type DeletionPropagationPolicy string
+type DeletePropagationPolicy string
 
 const (
     // Respects the existing garbage collection related finalizers on the object and the default garbage collection policy of the resource.
-    DefaultPropagationPolicy DeletionPropagationPolicy = "Default"
+    DefaultPropagationPolicy DeletePropagationPolicy = "Default"
     // Orphans the dependents
-    OrphanDependents DeletionPropagationPolicy = "Orphan"
+    OrphanDependents DeletePropagationPolicy = "Orphan"
     // Deletes the object from the key-value store, the garbage collector will delete the dependents in the background.
-    DeleteDependentsInBackground DeletionPropagationPolicy = "DeleteDependentsInBackground"
+    DeleteDependentsInBackground DeletePropagationPolicy = "DeleteDependentsInBackground"
     // The object exists in the key-value store until the garbage collector deletes all the dependents whose ownerReference.blockOwnerDeletion=true from the key-value store.
     // API sever will put the "DeletingDependents" finalizer on the object, and sets its deletionTimestamp.
     // This policy is cascading, i.e., the dependents will be deleted with GarbageCollectionSynchronous.
-    DeleteAfterDependentsAreDeleted DeletionPropagationPolicy = "DeleteAfterDependentsAreDeleted"
+    DeleteAfterBlockingDependentsAreDeleted DeletePropagationPolicy = "DeleteAfterBlockingDependentsAreDeleted"
 )
 ```
 
-`DeleteOptions.OrphanDependents *bool` will be marked as deprecated and will be removed in 1.7. Validation code will make sure only one of `OrphanDependents` and `DeletionPropagationPolicy` may be set. We decided not to add another `DeleteAfterDependentsDeleted *bool`, because together with `OrphanDependents`, it will result in 9 possible combinations and is thus confusing.
+The `DeleteAfterBlockingDependentsAreDeleted` policy represents the synchronous GC mode.
+
+`DeleteOptions.OrphanDependents *bool` will be marked as deprecated and will be removed in 1.7. Validation code will make sure only one of `OrphanDependents` and `DeletePropagationPolicy` may be set. We decided not to add another `DeleteAfterDependentsDeleted *bool`, because together with `OrphanDependents`, it will result in 9 possible combinations and is thus confusing.
 
 The conversion rules are described in the following table:
 
-| 1.5                              | pre 1.4/1.4              |
-|----------------------------------|--------------------------|
-| DefaultPropagationPolicy         | OrphanDependents==nil    |
-| OrphanDependents                 | *OrphanDependents==true  |
-| DeleteDependentsInBackground     | *OrphanDependents==false |
-| DeleteAfterDependentsAreDeleted  | N/A                      |
+| 1.5                                      | pre 1.4/1.4              |
+|------------------------------------------|--------------------------|
+| DefaultPropagationPolicy                 | OrphanDependents==nil    |
+| OrphanDependents                         | *OrphanDependents==true  |
+| DeleteDependentsInBackground             | *OrphanDependents==false |
+| DeleteAfterBlockingDependentsAreDeleted  | N/A                      |
 
 # Components changes
 
 ## API Server
 
-`Delete()` function checks `DeleteOptions.DeletionPropagationPolicy`. If the policy is `GarbageCollectionSynchronous`, the API server will update the object instead of deleting it, add the finalizer, and set the `ObjectMeta.DeletionTimestamp`.
+`Delete()` function checks `DeleteOptions.DeletePropagationPolicy`. If the policy is `DeleteAfterBlockingDependentsAreDeleted`, the API server will update the object instead of deleting it, add the finalizer, and set the `ObjectMeta.DeletionTimestamp`.
 
-When validating the ownerReference, API server needs to query the `Authorizer` to check if the user has "update" and "delete" permission of the owner object. It returns 422 if the user does not have the permissions but intends to set `OwnerReference.BlockOwnerDeletion` to true.
+When validating the ownerReference, API server needs to query the `Authorizer` to check if the user has "delete" permission of the owner object. It returns 422 if the user does not have the permissions but intends to set `OwnerReference.BlockOwnerDeletion` to true.
 
 ## Garbage Collector
 
@@ -141,7 +143,7 @@ Currently `processEvent()` manages GC’s internal owner-dependency relationship
 
 Currently `processItem()` consumes the `dirtyQueue`, requests the API server to delete an item if all of its owners do not exist. To support synchronous GC, it has to:
 
-* treat an owner as "not exist" if `owner.DeletionTimestamp != nil && !owner.Finalizers.Has(OrphanFinalizer)`, otherwise Synchronous GC will not progress because the owner keeps existing in the key-value store.
+* treat an owner as "not exist" if `owner.DeletionTimestamp != nil && !owner.Finalizers.Has(OrphanFinalizer)`, otherwise synchronous GC will not progress because the owner keeps existing in the key-value store.
 * when deleting dependents, if the owner's finalizers include `DeletingDependents`, it should use the `GarbageCollectionSynchronous` as GC policy.
 * if an object has multiple owners, some owners still exist while other owners are in the synchronous GC stage, then according to the existing logic of GC, the object wouldn't be deleted. To unblock the synchronous GC of owners, `processItem()` has to remove the ownerReferences pointing to them.
 
@@ -154,7 +156,7 @@ In addition, if an object popped from `dirtyQueue` is marked as "GC in progress"
 
 ## Controllers
 
-To utilize the Synchronous Garbage Collection feature, controllers (e.g., the replicaset controller) need to set `OwnerReference.BlockOwnerDeletion` when creating dependent objects (e.g. pods).
+To utilize the synchronous garbage collection feature, controllers (e.g., the replicaset controller) need to set `OwnerReference.BlockOwnerDeletion` when creating dependent objects (e.g. pods).
 
 # Handling circular dependencies
 
@@ -166,7 +168,7 @@ Circular dependencies are regarded as user error. If needed, we can add more gua
 
 # Unhandled cases
 
-* If the GC observes the owning object with the `GCFinalizer` before it observes the creation of all the dependents, GC will remove the finalizer from the owning object before all dependents are gone. Hence, “Synchronous GC” is best-effort, though we guarantee that the dependents will be deleted eventually. We face a similar case when handling OrphanFinalizer, see [GC known issues](https://github.com/kubernetes/kubernetes/issues/26120).
+* If the GC observes the owning object with the `GCFinalizer` before it observes the creation of all the dependents, GC will remove the finalizer from the owning object before all dependents are gone. Hence, synchronous GC is best-effort, though we guarantee that the dependents will be deleted eventually. We face a similar case when handling OrphanFinalizer, see [GC known issues](https://github.com/kubernetes/kubernetes/issues/26120).
 
 # Implications to existing clients
 
@@ -174,7 +176,7 @@ Finalizer breaks an assumption that many Kubernetes components have: a deletion 
 
 **Namespace controller** suffered from this [problem](https://github.com/kubernetes/kubernetes/issues/32519) and was fixed in [#32524](https://github.com/kubernetes/kubernetes/pull/32524) by retrying every 15s if there are objects with pending finalizers to be removed from the key-value store. Object with pending `GCFinalizer` might take arbitrary long time be deleted, so namespace deletion might time out.
 
-**kubelet** deletes the pod from the key-value store after all its containers are terminated ([code](../../pkg/kubelet/status/status_manager.go#L441-L443)). It also assumes that if the API server does not return an error, the pod is removed from the key-value store. Breaking the assumption will not break `kubelet` though, because the `pod` must have already been in the terminated `phase`, `kubelet` will not care to manage it.
+**kubelet** deletes the pod from the key-value store after all its containers are terminated ([code](../../pkg/kubelet/status/status_manager.go#L441-L443)). It also assumes that if the API server does not return an error, the pod is removed from the key-value store. Breaking the assumption will not break `kubelet` though, because the `pod` must have already been in the terminated phase, `kubelet` will not care to manage it.
 
 **Node controller** forcefully deletes pod if the pod is scheduled to a node that does not exist ([code](../../pkg/controller/node/nodecontroller.go#L474)). The pod will continue to exist if it has pending finalizers. The node controller will futilely retry the deletion. Also, the `node controller` forcefully deletes pods before deleting the node ([code](../../pkg/controller/node/nodecontroller.go#L592)). If the pods have pending finalizers, the `node controller` will go ahead deleting the node, leaving those pods behind. These pods will be deleted from the key-value store when the pending finalizers are removed.
 
@@ -184,13 +186,13 @@ Finalizer breaks an assumption that many Kubernetes components have: a deletion 
 
 **Replication controller manager**, **Job controller**, and **ReplicaSet controller** ignore pods in terminated phase, so pods with pending finalizers will not block these controllers.
 
-**PetSet controller** will be blocked by a pod with pending finalizers, so Synchronous GC might slow down its progress.
+**PetSet controller** will be blocked by a pod with pending finalizers, so synchronous GC might slow down its progress.
 
-**kubectl**: synchronous GC can simplify the **kubectl delete** reapers. Let's take the `deployment reaper` as an example, since it's the most complicated one. Currently, the reaper finds all `RS` with matching labels, scales them down, polls until `RS.Status.Replica` reaches 0, deletes the `RS`es, and finally deletes the `deployment`. If using the synchronous GC, `kubectl delete deployment` is as easy as sending a synchronous GC delete request for the deployment, and polls until the deployment is deleted from the key-value store.
+**kubectl**: synchronous GC can simplify the **kubectl delete** reapers. Let's take the `deployment reaper` as an example, since it's the most complicated one. Currently, the reaper finds all `RS` with matching labels, scales them down, polls until `RS.Status.Replica` reaches 0, deletes the `RS`es, and finally deletes the `deployment`. If using synchronous GC, `kubectl delete deployment` is as easy as sending a synchronous GC delete request for the deployment, and polls until the deployment is deleted from the key-value store.
 
-Note that this **changes the behavior** of `kubectl delete`. The command will be blocked until all pods are deleted from the key-value store, instead of being blocked until pods are in the terminating state. This means `kubectl delete` blocks for longer time, but it has the benefit that the resources used by the pods are released when the `kubectl delete` returns.
+Note that this **changes the behavior** of `kubectl delete`. The command will be blocked until all pods are deleted from the key-value store, instead of being blocked until pods are in the terminating state. This means `kubectl delete` blocks for longer time, but it has the benefit that the resources used by the pods are released when the `kubectl delete` returns. To allow kubectl user not waiting for the cleanup, we will add a `--wait` flag. It defaults to true; if it's set to `false`, `kubectl delete` will send the delete request with `DeletePropagationPolicy=DeleteDependentsInBackground` and return immediately.
 
-To make the new kubectl compatible with the 1.4 and earlier masters, kubectl needs to switch to use the old reaper logic if it finds Synchronous GC is not supported by the master.
+To make the new kubectl compatible with the 1.4 and earlier masters, kubectl needs to switch to use the old reaper logic if it finds synchronous GC is not supported by the master.
 
 1.4 `kubectl delete rc/rs` uses `DeleteOptions.OrphanDependents=true`, which is going to be converted to `DeleteDependentsInBackground` (see [API Design](#api-changes)) by a 1.5 master, so its behavior keeps the same.
 
