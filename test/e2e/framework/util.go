@@ -1465,35 +1465,31 @@ func waitForPodTerminatedInNamespace(c *client.Client, podName, reason, namespac
 }
 
 // waitForPodSuccessInNamespaceTimeout returns nil if the pod reached state success, or an error if it reached failure or ran too long.
-func waitForPodSuccessInNamespaceTimeout(c *client.Client, podName string, contName string, namespace string, timeout time.Duration) error {
+func waitForPodSuccessInNamespaceTimeout(c *client.Client, podName string, namespace string, timeout time.Duration) error {
 	return waitForPodCondition(c, namespace, podName, "success or failure", timeout, func(pod *api.Pod) (bool, error) {
-		// Cannot use pod.Status.Phase == api.PodSucceeded/api.PodFailed due to #2632
-		// TODO: This was not true from long time ago. We can use api.PodSucceeded now.
-		ci, ok := api.GetContainerStatus(pod.Status.ContainerStatuses, contName)
-		if !ok {
-			Logf("No Status.Info for container '%s' in pod '%s' yet", contName, podName)
-		} else {
-			if ci.State.Terminated != nil {
-				if ci.State.Terminated.ExitCode == 0 {
-					By("Saw pod success")
-					return true, nil
-				}
-				return true, fmt.Errorf("pod '%s' terminated with failure: %+v", podName, ci.State.Terminated)
-			}
-			Logf("Nil State.Terminated for container '%s' in pod '%s' in namespace '%s' so far", contName, podName, namespace)
+		if pod.Spec.RestartPolicy == api.RestartPolicyAlways {
+			return false, fmt.Errorf("pod %q will never terminate with a succeeded state since its restart policy is Always", podName)
 		}
-		return false, nil
+		switch pod.Status.Phase {
+		case api.PodSucceeded:
+			By("Saw pod success")
+			return true, nil
+		case api.PodFailed:
+			return true, fmt.Errorf("pod %q failed with status: %+v", podName, pod.Status)
+		default:
+			return false, nil
+		}
 	})
 }
 
 // WaitForPodSuccessInNamespace returns nil if the pod reached state success, or an error if it reached failure or until podStartupTimeout.
-func WaitForPodSuccessInNamespace(c *client.Client, podName string, contName string, namespace string) error {
-	return waitForPodSuccessInNamespaceTimeout(c, podName, contName, namespace, PodStartTimeout)
+func WaitForPodSuccessInNamespace(c *client.Client, podName string, namespace string) error {
+	return waitForPodSuccessInNamespaceTimeout(c, podName, namespace, PodStartTimeout)
 }
 
 // WaitForPodSuccessInNamespaceSlow returns nil if the pod reached state success, or an error if it reached failure or until slowPodStartupTimeout.
-func WaitForPodSuccessInNamespaceSlow(c *client.Client, podName string, contName string, namespace string) error {
-	return waitForPodSuccessInNamespaceTimeout(c, podName, contName, namespace, slowPodStartTimeout)
+func WaitForPodSuccessInNamespaceSlow(c *client.Client, podName string, namespace string) error {
+	return waitForPodSuccessInNamespaceTimeout(c, podName, namespace, slowPodStartTimeout)
 }
 
 // waitForRCPodOnNode returns the pod from the given replication controller (described by rcName) which is scheduled on the given node.
@@ -2307,11 +2303,9 @@ func (f *Framework) MatchContainerOutput(
 	defer podClient.Delete(pod.Name, api.NewDeleteOptions(0))
 	podClient.Create(pod)
 
-	// Wait for client pod to complete. All containers should succeed.
-	for _, container := range pod.Spec.Containers {
-		if err := WaitForPodSuccessInNamespace(f.Client, pod.Name, container.Name, ns); err != nil {
-			return fmt.Errorf("expected container %s success: %v", container.Name, err)
-		}
+	// Wait for client pod to complete.
+	if err := WaitForPodSuccessInNamespace(f.Client, pod.Name, ns); err != nil {
+		return fmt.Errorf("expected pod %q success: %v", pod.Name, err)
 	}
 
 	// Grab its logs.  Get host first.
@@ -4986,7 +4980,7 @@ func CheckConnectivityToHost(f *Framework, nodeName, podName, host string, timeo
 		return err
 	}
 	defer podClient.Delete(podName, nil)
-	err = WaitForPodSuccessInNamespace(f.Client, podName, contName, f.Namespace.Name)
+	err = WaitForPodSuccessInNamespace(f.Client, podName, f.Namespace.Name)
 
 	if err != nil {
 		logs, logErr := GetPodLogs(f.Client, f.Namespace.Name, pod.Name, contName)
