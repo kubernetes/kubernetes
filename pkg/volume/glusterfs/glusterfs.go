@@ -336,9 +336,6 @@ func getVolumeSource(
 }
 
 func (plugin *glusterfsPlugin) NewProvisioner(options volume.VolumeOptions) (volume.Provisioner, error) {
-	if len(options.AccessModes) == 0 {
-		options.AccessModes = plugin.GetAccessModes()
-	}
 	return plugin.newProvisionerInternal(options)
 }
 
@@ -441,7 +438,7 @@ func (d *glusterfsVolumeDeleter) Delete() error {
 
 func (r *glusterfsVolumeProvisioner) Provision() (*api.PersistentVolume, error) {
 	var err error
-	if r.options.Selector != nil {
+	if r.options.PVC.Spec.Selector != nil {
 		glog.V(4).Infof("glusterfs: not able to parse your claim Selector")
 		return nil, fmt.Errorf("glusterfs: not able to parse your claim Selector")
 	}
@@ -507,7 +504,10 @@ func (r *glusterfsVolumeProvisioner) Provision() (*api.PersistentVolume, error) 
 	pv := new(api.PersistentVolume)
 	pv.Spec.PersistentVolumeSource.Glusterfs = glusterfs
 	pv.Spec.PersistentVolumeReclaimPolicy = r.options.PersistentVolumeReclaimPolicy
-	pv.Spec.AccessModes = r.options.AccessModes
+	pv.Spec.AccessModes = r.options.PVC.Spec.AccessModes
+	if len(pv.Spec.AccessModes) == 0 {
+		pv.Spec.AccessModes = r.plugin.GetAccessModes()
+	}
 	pv.Spec.Capacity = api.ResourceList{
 		api.ResourceName(api.ResourceStorage): resource.MustParse(fmt.Sprintf("%dGi", sizeGB)),
 	}
@@ -516,7 +516,8 @@ func (r *glusterfsVolumeProvisioner) Provision() (*api.PersistentVolume, error) 
 }
 
 func (p *glusterfsVolumeProvisioner) CreateVolume() (r *api.GlusterfsVolumeSource, size int, err error) {
-	volSizeBytes := p.options.Capacity.Value()
+	capacity := p.options.PVC.Spec.Resources.Requests[api.ResourceName(api.ResourceStorage)]
+	volSizeBytes := capacity.Value()
 	sz := int(volume.RoundUpSize(volSizeBytes, 1024*1024*1024))
 	glog.V(2).Infof("glusterfs: create volume of size: %d bytes and configuration %+v", volSizeBytes, p.provisioningConfig)
 	if p.url == "" {

@@ -1148,15 +1148,17 @@ func (plugin *mockVolumePlugin) Provision() (*api.PersistentVolume, error) {
 	}
 	if call.ret == nil {
 		// Create a fake PV with known GCE volume (to match expected volume)
+		capacity := plugin.provisionOptions.PVC.Spec.Resources.Requests[api.ResourceName(api.ResourceStorage)]
+		accessModes := plugin.provisionOptions.PVC.Spec.AccessModes
 		pv = &api.PersistentVolume{
 			ObjectMeta: api.ObjectMeta{
 				Name: plugin.provisionOptions.PVName,
 			},
 			Spec: api.PersistentVolumeSpec{
 				Capacity: api.ResourceList{
-					api.ResourceName(api.ResourceStorage): plugin.provisionOptions.Capacity,
+					api.ResourceName(api.ResourceStorage): capacity,
 				},
-				AccessModes:                   plugin.provisionOptions.AccessModes,
+				AccessModes:                   accessModes,
 				PersistentVolumeReclaimPolicy: plugin.provisionOptions.PersistentVolumeReclaimPolicy,
 				PersistentVolumeSource: api.PersistentVolumeSource{
 					GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{},
