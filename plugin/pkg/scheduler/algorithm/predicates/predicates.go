@@ -94,7 +94,10 @@ type predicateMetadata struct {
 // This map should only be modified when registering predicates.
 var predicatePrecomputations map[string]func(pm *predicateMetadata) = make(map[string]func(pm *predicateMetadata))
 
+var registerLock sync.Mutex
 func RegisterPredicatePrecomputation(predicateName string, precomp func(pm *predicateMetadata)) {
+	registerLock.Lock()
+	defer registerLock.Unlock()
 	predicatePrecomputations[predicateName] = precomp
 }
 
