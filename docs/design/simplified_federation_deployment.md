@@ -64,7 +64,7 @@ Documentation for other releases can be found at
 
 Kubernetes Cluster Federation has its own control plane which is similar
 to the control plane of a Kubernetes cluster. Like Kubernetes, a
-federation control plane is composed an API server and a controller
+federation control plane is composed of an API server and a controller
 manager that bundles all the core controllers. While that looks simple
 on paper, deploying a federation control plane comes with its own set of
 challenges. Deploying a federation control plane not just involves
@@ -138,7 +138,7 @@ registration and deregistration will be facilitated through
 #### Cluster Registration Experience
 
 1. User downloads the
-   [`kubectl`](http://kubernetes.io/docs/getting-started-guides/kubeadm/)
+   [`kubectl`](http://kubernetes.io/docs/user-guide/kubectl-overview/)
    executable on their local computer, i.e. the computer they use for
    their day-to-day activities.
 2. Runs:
@@ -206,7 +206,7 @@ to bootstrap a federation control plane.
 
 **4. Create a kubeconfig secret**
 
-* Using the load balancer IP address of the federation API server and
+* Using the cluster-local DNS name of the federation API server and
   the generated certificates and credentials, generate a kubeconfig
   file for the federation controller manager.
 * Create a secret in the bootstrap cluster's `federation-system`
@@ -306,8 +306,8 @@ assuming that the current kubeconfig context is a federation endpoint:
 ##### Deregistration
 
 When a user runs `kubectl unregister <cluster-context-name> --bootstrap-
-cluster`, we perform the following operations, again assuming that the
-current kubeconfig context is a federation endpoint:
+cluster=<cluster-name>`, we perform the following operations, again
+assuming that the current kubeconfig context is a federation endpoint:
 
 **1. Remove the cluster resource from federation**
 
@@ -366,8 +366,7 @@ plan to test the federation bootstrap functionality.
 This should be as simple as running `kubectl register <cluster-context>`
 and verifying that the registered cluster reports "Ready" status.
 
-Running `kubectl unregister <cluster-context>` should not list the
-unregistered cluster.
+Running `kubectl get clusters` should not list the unregistered cluster.
 
 
 ## Timeline
