@@ -105,7 +105,7 @@ func TestContainerStatus(t *testing.T) {
 	ct, st, ft := dt, dt, dt
 	state := runtimeApi.ContainerState_CREATED
 	// The following variables are not set in FakeDockerClient.
-	imageRef := ""
+	imageRef := DockerImageIDPrefix + ""
 	exitCode := int32(0)
 	var reason, message string
 

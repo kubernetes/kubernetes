@@ -80,17 +80,12 @@ func (m *kubeGenericRuntimeManager) PullImage(image kubecontainer.ImageSpec, pul
 
 // IsImagePresent checks whether the container image is already in the local storage.
 func (m *kubeGenericRuntimeManager) IsImagePresent(image kubecontainer.ImageSpec) (bool, error) {
-	images, err := m.imageService.ListImages(&runtimeApi.ImageFilter{
-		Image: &runtimeApi.ImageSpec{
-			Image: &image.Image,
-		},
-	})
+	status, err := m.imageService.ImageStatus(&runtimeApi.ImageSpec{Image: &image.Image})
 	if err != nil {
-		glog.Errorf("ListImages failed: %v", err)
+		glog.Errorf("ImageStatus for image %q failed: %v", image, err)
 		return false, err
 	}
-
-	return len(images) > 0, nil
+	return status != nil, nil
 }
 
 // ListImages gets all images currently on the machine.
