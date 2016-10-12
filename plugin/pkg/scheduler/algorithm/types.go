@@ -54,9 +54,14 @@ type PriorityConfig struct {
 	Weight   int
 }
 
-func EmptyMetadataProducer(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo) interface{} {
-	return nil
+// emptyMetadataProducer returns a no-op MetadataProducer.
+func emptyMetadataProducer() MetadataProducer {
+	return func(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo) interface{} {
+		return nil
+	}
 }
+
+var EmptyMetadataProducer MetadataProducer = emptyMetadataProducer()
 
 type PredicateFailureReason interface {
 	GetReason() string
