@@ -38,7 +38,7 @@ source "${KUBE_ROOT}/cluster/lib/logging.sh"
 readonly KUBE_ANYWHERE_FEDERATION_IMAGE="gcr.io/madhusudancs-containers/kubernetes-anywhere-federation"
 readonly KUBE_ANYWHERE_FEDERATION_VERSION="v0.9.0"
 readonly KUBE_ANYWHERE_FEDERATION_CHARTS_IMAGE="gcr.io/madhusudancs-containers/federation-charts"
-readonly KUBE_ANYWHERE_FEDERATION_CHARTS_VERSION="v0.9.0"
+readonly KUBE_ANYWHERE_FEDERATION_CHARTS_VERSION="v0.9.1"
 
 readonly GOOGLE_APPLICATION_CREDENTIALS="${GOOGLE_APPLICATION_CREDENTIALS:-${HOME}/.config/gcloud/application_default_credentials.json}"
 readonly KUBE_CONFIG_DIR="${KUBE_CONFIG_DIR:-${HOME}/.kube}"
@@ -89,13 +89,13 @@ function federation_action() {
 
   local -r action="${1:-}"
   kube::log::status "Action: ${action} federation components"
+  # For non-GKE clusters just mounting kubeconfig is sufficient. But we
+  # need gcloud credentials for GKE clusters, so we pass both kubeconfig
+  # and gcloud credentials
   docker run \
     -m 12G \
-    # For non-GKE clusters just mounting kubeconfig is sufficient. But we need
-    # gcloud credentials for GKE clusters, so we pass both kubeconfig and
-    # gcloud credentials
     -v "${GOOGLE_APPLICATION_CREDENTIALS}:/root/.config/gcloud/application_default_credentials.json:ro" \
-    -v "${KUBE_CONFIG}:/root/.kube/config:ro" \
+    -v "${KUBE_CONFIG}:/root/.kube/config" \
     -v "${FEDERATION_OUTPUT_ROOT}:/_output" \
     "${KUBE_ANYWHERE_FEDERATION_CHARTS_IMAGE}:${KUBE_ANYWHERE_FEDERATION_CHARTS_VERSION}" \
     "${action}"
