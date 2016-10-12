@@ -47,7 +47,7 @@ func TestKubectlValidation(t *testing.T) {
 	ctx := clientcmdapi.NewContext()
 	cfg := clientcmdapi.NewConfig()
 	// Enable swagger api on master.
-	components.KubeMaster.InstallSwaggerAPI()
+	components.KubeMaster.GenericAPIServer.InstallSwaggerAPI()
 	cluster := clientcmdapi.NewCluster()
 
 	cluster.Server = components.ApiServer.URL
