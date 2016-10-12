@@ -172,11 +172,11 @@ func logPodStartupStatus(c *client.Client, expectedPods int, ns string, observed
 		case <-ticker.C:
 			pods := podStore.List()
 			startupStatus := framework.ComputeRCStartupStatus(pods, expectedPods)
-			startupStatus.Print("Density")
+			framework.Logf(startupStatus.String("Density"))
 		case <-stopCh:
 			pods := podStore.List()
 			startupStatus := framework.ComputeRCStartupStatus(pods, expectedPods)
-			startupStatus.Print("Density")
+			framework.Logf(startupStatus.String("Density"))
 			return
 		}
 	}

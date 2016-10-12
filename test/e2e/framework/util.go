@@ -334,6 +334,16 @@ type RCConfig struct {
 
 	// If set to false starting RC will print progress, otherwise only errors will be printed.
 	Silent bool
+
+	// If set this function will be used to print log lines instead of glog.
+	LogFunc func(fmt string, args ...interface{})
+}
+
+func (rc *RCConfig) RCConfigLog(fmt string, args ...interface{}) {
+	if rc.LogFunc != nil {
+		rc.LogFunc(fmt, args...)
+	}
+	glog.Infof(fmt, args...)
 }
 
 type DeploymentConfig struct {
@@ -609,7 +619,7 @@ func WaitForPodsSuccess(c *client.Client, ns string, successPodLabels map[string
 		return false, nil
 	}) != nil {
 		logPodStates(badPods)
-		LogPodsWithLabels(c, ns, successPodLabels)
+		LogPodsWithLabels(c, ns, successPodLabels, Logf)
 		return errors.New(errorBadPodsStates(badPods, desiredPods, ns, "SUCCESS", timeout))
 
 	}
@@ -753,7 +763,7 @@ func RunKubernetesServiceTestContainer(c *client.Client, ns string) {
 	}
 }
 
-func kubectlLogPod(c *client.Client, pod api.Pod, containerNameSubstr string) {
+func kubectlLogPod(c *client.Client, pod api.Pod, containerNameSubstr string, logFunc func(ftm string, args ...interface{})) {
 	for _, container := range pod.Spec.Containers {
 		if strings.Contains(container.Name, containerNameSubstr) {
 			// Contains() matches all strings if substr is empty
@@ -761,49 +771,49 @@ func kubectlLogPod(c *client.Client, pod api.Pod, containerNameSubstr string) {
 			if err != nil {
 				logs, err = getPreviousPodLogs(c, pod.Namespace, pod.Name, container.Name)
 				if err != nil {
-					Logf("Failed to get logs of pod %v, container %v, err: %v", pod.Name, container.Name, err)
+					logFunc("Failed to get logs of pod %v, container %v, err: %v", pod.Name, container.Name, err)
 				}
 			}
 			By(fmt.Sprintf("Logs of %v/%v:%v on node %v", pod.Namespace, pod.Name, container.Name, pod.Spec.NodeName))
-			Logf("%s : STARTLOG\n%s\nENDLOG for container %v:%v:%v", containerNameSubstr, logs, pod.Namespace, pod.Name, container.Name)
+			logFunc("%s : STARTLOG\n%s\nENDLOG for container %v:%v:%v", containerNameSubstr, logs, pod.Namespace, pod.Name, container.Name)
 		}
 	}
 }
 
-func LogFailedContainers(c *client.Client, ns string) {
+func LogFailedContainers(c *client.Client, ns string, logFunc func(ftm string, args ...interface{})) {
 	podList, err := c.Pods(ns).List(api.ListOptions{})
 	if err != nil {
-		Logf("Error getting pods in namespace '%s': %v", ns, err)
+		logFunc("Error getting pods in namespace '%s': %v", ns, err)
 		return
 	}
-	Logf("Running kubectl logs on non-ready containers in %v", ns)
+	logFunc("Running kubectl logs on non-ready containers in %v", ns)
 	for _, pod := range podList.Items {
 		if res, err := PodRunningReady(&pod); !res || err != nil {
-			kubectlLogPod(c, pod, "")
+			kubectlLogPod(c, pod, "", Logf)
 		}
 	}
 }
 
-func LogPodsWithLabels(c *client.Client, ns string, match map[string]string) {
+func LogPodsWithLabels(c *client.Client, ns string, match map[string]string, logFunc func(ftm string, args ...interface{})) {
 	podList, err := c.Pods(ns).List(api.ListOptions{LabelSelector: labels.SelectorFromSet(match)})
 	if err != nil {
-		Logf("Error getting pods in namespace %q: %v", ns, err)
+		logFunc("Error getting pods in namespace %q: %v", ns, err)
 		return
 	}
-	Logf("Running kubectl logs on pods with labels %v in %v", match, ns)
+	logFunc("Running kubectl logs on pods with labels %v in %v", match, ns)
 	for _, pod := range podList.Items {
-		kubectlLogPod(c, pod, "")
+		kubectlLogPod(c, pod, "", logFunc)
 	}
 }
 
-func LogContainersInPodsWithLabels(c *client.Client, ns string, match map[string]string, containerSubstr string) {
+func LogContainersInPodsWithLabels(c *client.Client, ns string, match map[string]string, containerSubstr string, logFunc func(ftm string, args ...interface{})) {
 	podList, err := c.Pods(ns).List(api.ListOptions{LabelSelector: labels.SelectorFromSet(match)})
 	if err != nil {
 		Logf("Error getting pods in namespace %q: %v", ns, err)
 		return
 	}
 	for _, pod := range podList.Items {
-		kubectlLogPod(c, pod, containerSubstr)
+		kubectlLogPod(c, pod, containerSubstr, logFunc)
 	}
 }
 
@@ -2346,13 +2356,14 @@ type podInfo struct {
 type PodDiff map[string]*podInfo
 
 // Print formats and prints the give PodDiff.
-func (p PodDiff) Print(ignorePhases sets.String) {
+func (p PodDiff) String(ignorePhases sets.String) string {
+	ret := ""
 	for name, info := range p {
 		if ignorePhases.Has(info.phase) {
 			continue
 		}
 		if info.phase == nonExist {
-			Logf("Pod %v was deleted, had phase %v and host %v", name, info.oldPhase, info.oldHostname)
+			ret += fmt.Sprintf("Pod %v was deleted, had phase %v and host %v\n", name, info.oldPhase, info.oldHostname)
 			continue
 		}
 		phaseChange, hostChange := false, false
@@ -2374,9 +2385,10 @@ func (p PodDiff) Print(ignorePhases sets.String) {
 			}
 		}
 		if phaseChange || hostChange {
-			Logf(msg)
+			ret += msg + "\n"
 		}
 	}
+	return ret
 }
 
 // Diff computes a PodDiff given 2 lists of pods.
@@ -2448,7 +2460,7 @@ func (config *DeploymentConfig) create() error {
 	if err != nil {
 		return fmt.Errorf("Error creating deployment: %v", err)
 	}
-	Logf("Created deployment with name: %v, namespace: %v, replica count: %v", deployment.Name, config.Namespace, deployment.Spec.Replicas)
+	config.RCConfigLog("Created deployment with name: %v, namespace: %v, replica count: %v", deployment.Name, config.Namespace, deployment.Spec.Replicas)
 	return nil
 }
 
@@ -2501,7 +2513,7 @@ func (config *ReplicaSetConfig) create() error {
 	if err != nil {
 		return fmt.Errorf("Error creating replica set: %v", err)
 	}
-	Logf("Created replica set with name: %v, namespace: %v, replica count: %v", rs.Name, config.Namespace, rs.Spec.Replicas)
+	config.RCConfigLog("Created replica set with name: %v, namespace: %v, replica count: %v", rs.Name, config.Namespace, rs.Spec.Replicas)
 	return nil
 }
 
@@ -2559,7 +2571,7 @@ func (config *RCConfig) create() error {
 	if err != nil {
 		return fmt.Errorf("Error creating replication controller: %v", err)
 	}
-	Logf("Created replication controller with name: %v, namespace: %v, replica count: %v", rc.Name, config.Namespace, rc.Spec.Replicas)
+	config.RCConfigLog("Created replication controller with name: %v, namespace: %v, replica count: %v", rc.Name, config.Namespace, rc.Spec.Replicas)
 	return nil
 }
 
@@ -2633,8 +2645,8 @@ type RCStartupStatus struct {
 	ContainerRestartNodes sets.String
 }
 
-func (s *RCStartupStatus) Print(name string) {
-	Logf("%v Pods: %d out of %d created, %d running, %d pending, %d waiting, %d inactive, %d terminating, %d unknown, %d runningButNotReady ",
+func (s *RCStartupStatus) String(name string) string {
+	return fmt.Sprintf("%v Pods: %d out of %d created, %d running, %d pending, %d waiting, %d inactive, %d terminating, %d unknown, %d runningButNotReady ",
 		name, len(s.Created), s.Expected, s.Running, s.Pending, s.Waiting, s.Inactive, s.Terminating, s.Unknown, s.RunningButNotReady)
 }
 
@@ -2719,7 +2731,7 @@ func (config *RCConfig) start() error {
 			*config.CreatedPods = pods
 		}
 		if !config.Silent {
-			startupStatus.Print(config.Name)
+			config.RCConfigLog(startupStatus.String(config.Name))
 		}
 
 		promPushRunningPending(startupStatus.Running, startupStatus.Pending)
@@ -2729,9 +2741,9 @@ func (config *RCConfig) start() error {
 		}
 
 		if startupStatus.FailedContainers > maxContainerFailures {
-			DumpNodeDebugInfo(config.Client, startupStatus.ContainerRestartNodes.List())
+			DumpNodeDebugInfo(config.Client, startupStatus.ContainerRestartNodes.List(), config.RCConfigLog)
 			// Get the logs from the failed containers to help diagnose what caused them to fail
-			LogFailedContainers(config.Client, config.Namespace)
+			LogFailedContainers(config.Client, config.Namespace, config.RCConfigLog)
 			return fmt.Errorf("%d containers failed which is more than allowed %d", startupStatus.FailedContainers, maxContainerFailures)
 		}
 		if len(pods) < len(oldPods) || len(pods) > config.Replicas {
@@ -2741,8 +2753,8 @@ func (config *RCConfig) start() error {
 			// pod is unhealthy, so replication controller creates another to take its place
 			//	- diagnose by comparing the previous "2 Pod states" lines for inactive pods
 			errorStr := fmt.Sprintf("Number of reported pods for %s changed: %d vs %d", config.Name, len(pods), len(oldPods))
-			Logf("%v, pods that changed since the last iteration:", errorStr)
-			Diff(oldPods, pods).Print(sets.NewString())
+			config.RCConfigLog("%v, pods that changed since the last iteration:", errorStr)
+			config.RCConfigLog(Diff(oldPods, pods).String(sets.NewString()))
 			return fmt.Errorf(errorStr)
 		}
 
@@ -2753,7 +2765,6 @@ func (config *RCConfig) start() error {
 		oldRunning = startupStatus.Running
 
 		if time.Since(lastChange) > timeout {
-			dumpPodDebugInfo(config.Client, pods)
 			break
 		}
 	}
@@ -2764,10 +2775,10 @@ func (config *RCConfig) start() error {
 		if pods, err := config.Client.Pods(api.NamespaceAll).List(options); err == nil {
 
 			for _, pod := range pods.Items {
-				Logf("Pod %s\t%s\t%s\t%s", pod.Name, pod.Spec.NodeName, pod.Status.Phase, pod.DeletionTimestamp)
+				config.RCConfigLog("Pod %s\t%s\t%s\t%s", pod.Name, pod.Spec.NodeName, pod.Status.Phase, pod.DeletionTimestamp)
 			}
 		} else {
-			Logf("Can't list pod debug info: %v", err)
+			config.RCConfigLog("Can't list pod debug info: %v", err)
 		}
 		return fmt.Errorf("Only %d pods started out of %d", oldRunning, config.Replicas)
 	}
@@ -2798,21 +2809,6 @@ func StartPods(c *client.Client, replicas int, namespace string, podNamePrefix s
 		err := WaitForPodsWithLabelRunning(c, namespace, label)
 		ExpectNoError(err, "Error waiting for %d pods to be running - probably a timeout", replicas)
 	}
-}
-
-func dumpPodDebugInfo(c *client.Client, pods []*api.Pod) {
-	badNodes := sets.NewString()
-	for _, p := range pods {
-		if p.Status.Phase != api.PodRunning {
-			if p.Spec.NodeName != "" {
-				Logf("Pod %v assigned to host %v (IP: %v) in %v", p.Name, p.Spec.NodeName, p.Status.HostIP, p.Status.Phase)
-				badNodes.Insert(p.Spec.NodeName)
-			} else {
-				Logf("Pod %v still unassigned", p.Name)
-			}
-		}
-	}
-	DumpNodeDebugInfo(c, badNodes.List())
 }
 
 type EventsLister func(opts v1.ListOptions, ns string) (*v1.EventList, error)
@@ -2889,41 +2885,41 @@ func dumpAllNodeInfo(c *client.Client) {
 	for ix := range nodes.Items {
 		names[ix] = nodes.Items[ix].Name
 	}
-	DumpNodeDebugInfo(c, names)
+	DumpNodeDebugInfo(c, names, Logf)
 }
 
-func DumpNodeDebugInfo(c *client.Client, nodeNames []string) {
+func DumpNodeDebugInfo(c *client.Client, nodeNames []string, logFunc func(fmt string, args ...interface{})) {
 	for _, n := range nodeNames {
-		Logf("\nLogging node info for node %v", n)
+		logFunc("\nLogging node info for node %v", n)
 		node, err := c.Nodes().Get(n)
 		if err != nil {
-			Logf("Error getting node info %v", err)
+			logFunc("Error getting node info %v", err)
 		}
-		Logf("Node Info: %v", node)
+		logFunc("Node Info: %v", node)
 
-		Logf("\nLogging kubelet events for node %v", n)
+		logFunc("\nLogging kubelet events for node %v", n)
 		for _, e := range getNodeEvents(c, n) {
-			Logf("source %v type %v message %v reason %v first ts %v last ts %v, involved obj %+v",
+			logFunc("source %v type %v message %v reason %v first ts %v last ts %v, involved obj %+v",
 				e.Source, e.Type, e.Message, e.Reason, e.FirstTimestamp, e.LastTimestamp, e.InvolvedObject)
 		}
-		Logf("\nLogging pods the kubelet thinks is on node %v", n)
+		logFunc("\nLogging pods the kubelet thinks is on node %v", n)
 		podList, err := GetKubeletPods(c, n)
 		if err != nil {
-			Logf("Unable to retrieve kubelet pods for node %v", n)
+			logFunc("Unable to retrieve kubelet pods for node %v", n)
 			continue
 		}
 		for _, p := range podList.Items {
-			Logf("%v started at %v (%d+%d container statuses recorded)", p.Name, p.Status.StartTime, len(p.Status.InitContainerStatuses), len(p.Status.ContainerStatuses))
+			logFunc("%v started at %v (%d+%d container statuses recorded)", p.Name, p.Status.StartTime, len(p.Status.InitContainerStatuses), len(p.Status.ContainerStatuses))
 			for _, c := range p.Status.InitContainerStatuses {
-				Logf("\tInit container %v ready: %v, restart count %v",
+				logFunc("\tInit container %v ready: %v, restart count %v",
 					c.Name, c.Ready, c.RestartCount)
 			}
 			for _, c := range p.Status.ContainerStatuses {
-				Logf("\tContainer %v ready: %v, restart count %v",
+				logFunc("\tContainer %v ready: %v, restart count %v",
 					c.Name, c.Ready, c.RestartCount)
 			}
 		}
-		HighLatencyKubeletOperations(c, 10*time.Second, n)
+		HighLatencyKubeletOperations(c, 10*time.Second, n, logFunc)
 		// TODO: Log node resource info
 	}
 }
