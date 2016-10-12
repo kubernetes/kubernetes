@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"reflect"
 	"sort"
 	"time"
 
@@ -486,8 +485,7 @@ func (frsc *ReplicaSetController) reconcileReplicaSet(key string) (reconciliatio
 		} else {
 			currentLrs := lrsObj.(*extensionsv1.ReplicaSet)
 			// Update existing replica set, if needed.
-			if !fedutil.ObjectMetaEquivalent(lrs.ObjectMeta, currentLrs.ObjectMeta) ||
-				!reflect.DeepEqual(lrs.Spec, currentLrs.Spec) {
+			if !fedutil.ObjectMetaAndSpecEquivalent(lrs, currentLrs) {
 				frsc.eventRecorder.Eventf(frs, api.EventTypeNormal, "UpdateInCluster",
 					"Updating replicaset in cluster %s", clusterName)
 
