@@ -51,9 +51,10 @@ import (
 
 var fuzzIters = flag.Int("fuzz-iters", 20, "How many fuzzing iterations to do.")
 
-var codecsToTest = []func(version unversioned.GroupVersion, item runtime.Object) (runtime.Codec, error){
-	func(version unversioned.GroupVersion, item runtime.Object) (runtime.Codec, error) {
-		return testapi.GetCodecForObject(item)
+var codecsToTest = []func(version unversioned.GroupVersion, item runtime.Object) (runtime.Codec, bool, error){
+	func(version unversioned.GroupVersion, item runtime.Object) (runtime.Codec, bool, error) {
+		c, err := testapi.GetCodecForObject(item)
+		return c, true, err
 	},
 }
 
@@ -135,10 +136,13 @@ func roundTripSame(t *testing.T, group testapi.TestGroup, item runtime.Object, e
 	version := *group.GroupVersion()
 	codecs := []runtime.Codec{}
 	for _, fn := range codecsToTest {
-		codec, err := fn(version, item)
+		codec, ok, err := fn(version, item)
 		if err != nil {
 			t.Errorf("unable to get codec: %v", err)
 			return
+		}
+		if !ok {
+			continue
 		}
 		codecs = append(codecs, codec)
 	}
