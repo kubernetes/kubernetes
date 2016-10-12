@@ -320,10 +320,6 @@ func (plugin *quobytePlugin) newDeleterInternal(spec *volume.Spec) (volume.Delet
 }
 
 func (plugin *quobytePlugin) NewProvisioner(options volume.VolumeOptions) (volume.Provisioner, error) {
-	if len(options.AccessModes) == 0 {
-		options.AccessModes = plugin.GetAccessModes()
-	}
-
 	return plugin.newProvisionerInternal(options)
 }
 
@@ -344,7 +340,7 @@ type quobyteVolumeProvisioner struct {
 }
 
 func (provisioner *quobyteVolumeProvisioner) Provision() (*api.PersistentVolume, error) {
-	if provisioner.options.Selector != nil {
+	if provisioner.options.PVC.Spec.Selector != nil {
 		return nil, fmt.Errorf("claim Selector is not supported")
 	}
 	var apiServer, adminSecretName, quobyteUser, quobytePassword string
@@ -416,7 +412,10 @@ func (provisioner *quobyteVolumeProvisioner) Provision() (*api.PersistentVolume,
 	pv := new(api.PersistentVolume)
 	pv.Spec.PersistentVolumeSource.Quobyte = vol
 	pv.Spec.PersistentVolumeReclaimPolicy = provisioner.options.PersistentVolumeReclaimPolicy
-	pv.Spec.AccessModes = provisioner.options.AccessModes
+	pv.Spec.AccessModes = provisioner.options.PVC.Spec.AccessModes
+	if len(pv.Spec.AccessModes) == 0 {
+		pv.Spec.AccessModes = provisioner.plugin.GetAccessModes()
+	}
 	pv.Spec.Capacity = api.ResourceList{
 		api.ResourceName(api.ResourceStorage): resource.MustParse(fmt.Sprintf("%dGi", sizeGB)),
 	}
