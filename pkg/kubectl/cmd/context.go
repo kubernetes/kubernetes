@@ -19,13 +19,12 @@ import (
   "io"
 )
 
-type CmdCustomizations struct {
-  baseCmd       string
-  cmdName       string
-  cmdDetailsURL string
-}
-
 type CmdContext struct {
-  out            io.Writer
-  customizations CmdCustomizations
+  In            io.Reader
+  Out           io.Writer
+  ErrOut        io.Writer
+  BaseCmd       string
+  CmdName       string
+  FullName      string
+  CmdDetailsURL string
 }
