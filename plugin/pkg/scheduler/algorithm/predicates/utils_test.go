@@ -49,7 +49,11 @@ func ExampleFindLabelsInSet() {
 			},
 		},
 
-		{}, // a third pod which will have no effect on anything.
+		{
+			ObjectMeta: api.ObjectMeta{
+				Name: "pod3ThatWeWontSee",
+			},
+		},
 	}
 	fmt.Println(FindLabelsInSet([]string{"label1", "label2", "label3"}, nsPods[0].ObjectMeta.Labels)["label3"])
 	AddUnsetLabelsToMap(labelSubset, []string{"label1", "label2", "label3"}, nsPods[0].ObjectMeta.Labels)
