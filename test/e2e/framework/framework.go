@@ -377,16 +377,16 @@ func (f *Framework) AfterEach() {
 		// Pass both unversioned client and and versioned clientset, till we have removed all uses of the unversioned client.
 		DumpAllNamespaceInfo(f.Client, f.ClientSet_1_5, f.Namespace.Name)
 		By(fmt.Sprintf("Dumping a list of prepulled images on each node"))
-		LogContainersInPodsWithLabels(f.Client, api.NamespaceSystem, ImagePullerLabels, "image-puller")
+		LogContainersInPodsWithLabels(f.Client, api.NamespaceSystem, ImagePullerLabels, "image-puller", Logf)
 		if f.federated {
 			// Dump federation events in federation namespace.
 			DumpEventsInNamespace(func(opts v1.ListOptions, ns string) (*v1.EventList, error) {
 				return f.FederationClientset_1_5.Core().Events(ns).List(opts)
 			}, f.FederationNamespace.Name)
 			// Print logs of federation control plane pods (federation-apiserver and federation-controller-manager)
-			LogPodsWithLabels(f.Client, "federation", map[string]string{"app": "federated-cluster"})
+			LogPodsWithLabels(f.Client, "federation", map[string]string{"app": "federated-cluster"}, Logf)
 			// Print logs of kube-dns pod
-			LogPodsWithLabels(f.Client, "kube-system", map[string]string{"k8s-app": "kube-dns"})
+			LogPodsWithLabels(f.Client, "kube-system", map[string]string{"k8s-app": "kube-dns"}, Logf)
 		}
 	}
 
