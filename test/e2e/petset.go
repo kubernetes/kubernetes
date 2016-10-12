@@ -157,8 +157,6 @@ var _ = framework.KubeDescribe("PetSet [Slow] [Feature:PetSet]", func() {
 			By("Waiting for pet at index 1 to enter running.")
 			pst.waitForRunning(2, ps)
 
-			// TODO: verify petset status.replicas
-
 			// Now we have 1 healthy and 1 unhealthy pet. Deleting the healthy pet should *not*
 			// create a new pet till the remaining pet becomes healthy, which won't happen till
 			// we set the healthy bit.
@@ -580,8 +578,6 @@ func (p *petSetTester) saturate(ps *apps.PetSet) {
 		framework.Logf("Marking pet at index " + fmt.Sprintf("%v", i) + " healthy")
 		p.setHealthy(ps)
 	}
-	framework.Logf("Waiting for pet set status.replicas updated to %d", ps.Spec.Replicas)
-	p.waitForStatus(ps, ps.Spec.Replicas)
 }
 
 func (p *petSetTester) deletePetAtIndex(index int, ps *apps.PetSet) {
@@ -689,6 +685,8 @@ func (p *petSetTester) waitForRunning(numPets int32, ps *apps.PetSet) {
 	if pollErr != nil {
 		framework.Failf("Failed waiting for pods to enter running: %v", pollErr)
 	}
+
+	p.waitForStatus(ps, numPets)
 }
 
 func (p *petSetTester) setHealthy(ps *apps.PetSet) {
@@ -714,6 +712,8 @@ func (p *petSetTester) setHealthy(ps *apps.PetSet) {
 }
 
 func (p *petSetTester) waitForStatus(ps *apps.PetSet, expectedReplicas int32) {
+	framework.Logf("Waiting for petset status.replicas updated to %d", expectedReplicas)
+
 	ns, name := ps.Namespace, ps.Name
 	pollErr := wait.PollImmediate(petsetPoll, petsetTimeout,
 		func() (bool, error) {
@@ -722,13 +722,13 @@ func (p *petSetTester) waitForStatus(ps *apps.PetSet, expectedReplicas int32) {
 				return false, err
 			}
 			if psGet.Status.Replicas != expectedReplicas {
-				framework.Logf("Waiting for pet set status to become %d, currently %d", expectedReplicas, ps.Status.Replicas)
+				framework.Logf("Waiting for pet set status to become %d, currently %d", expectedReplicas, psGet.Status.Replicas)
 				return false, nil
 			}
 			return true, nil
 		})
 	if pollErr != nil {
-		framework.Failf("Failed waiting for pet set status.replicas updated to %d, got %d: %v", expectedReplicas, ps.Status.Replicas, pollErr)
+		framework.Failf("Failed waiting for pet set status.replicas updated to %d: %v", expectedReplicas, pollErr)
 	}
 }
 
@@ -745,6 +745,7 @@ func deleteAllPetSets(c *client.Client, ns string) {
 		if err := pst.scale(&ps, 0); err != nil {
 			errList = append(errList, fmt.Sprintf("%v", err))
 		}
+		pst.waitForStatus(&ps, 0)
 		framework.Logf("Deleting petset %v", ps.Name)
 		if err := c.Apps().PetSets(ps.Namespace).Delete(ps.Name, nil); err != nil {
 			errList = append(errList, fmt.Sprintf("%v", err))
