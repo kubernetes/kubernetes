@@ -2145,15 +2145,15 @@ func (f *Framework) MatchContainerOutput(
 	podClient := f.PodClient()
 	ns := f.Namespace.Name
 
-	podClient.Create(pod)
+	createdPod := podClient.Create(pod)
 
 	// Wait for client pod to complete.
-	if err := WaitForPodSuccessInNamespace(f.Client, pod.Name, ns); err != nil {
+	if err := WaitForPodSuccessInNamespace(f.Client, createdPod.Name, ns); err != nil {
 		return fmt.Errorf("expected pod %q success: %v", pod.Name, err)
 	}
 
 	// Grab its logs.  Get host first.
-	podStatus, err := podClient.Get(pod.Name)
+	podStatus, err := podClient.Get(createdPod.Name)
 	if err != nil {
 		return fmt.Errorf("failed to get pod status: %v", err)
 	}
@@ -2162,7 +2162,7 @@ func (f *Framework) MatchContainerOutput(
 		podStatus.Spec.NodeName, podStatus.Name, containerName, err)
 
 	// Sometimes the actual containers take a second to get started, try to get logs for 60s
-	logs, err := GetPodLogs(f.Client, ns, pod.Name, containerName)
+	logs, err := GetPodLogs(f.Client, ns, podStatus.Name, containerName)
 	if err != nil {
 		Logf("Failed to get logs from node %q pod %q container %q. %v",
 			podStatus.Spec.NodeName, podStatus.Name, containerName, err)
