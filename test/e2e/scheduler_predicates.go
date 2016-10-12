@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
+	testutils "k8s.io/kubernetes/test/utils"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -126,7 +127,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		// and there is no need to create additional pods.
 		// StartPods requires at least one pod to replicate.
 		if podsNeededForSaturation > 0 {
-			framework.ExpectNoError(framework.StartPods(c, podsNeededForSaturation, ns, "maxp",
+			framework.ExpectNoError(testutils.StartPods(c, podsNeededForSaturation, ns, "maxp",
 				*initPausePod(f, pausePodConfig{
 					Name:   "",
 					Labels: map[string]string{"name": ""},
@@ -187,7 +188,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		// and there is no need to create additional pods.
 		// StartPods requires at least one pod to replicate.
 		if podsNeededForSaturation > 0 {
-			framework.ExpectNoError(framework.StartPods(c, podsNeededForSaturation, ns, "overcommit",
+			framework.ExpectNoError(testutils.StartPods(c, podsNeededForSaturation, ns, "overcommit",
 				*initPausePod(f, pausePodConfig{
 					Name:   "",
 					Labels: map[string]string{"name": ""},

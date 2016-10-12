@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
+	testutils "k8s.io/kubernetes/test/utils"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -68,7 +69,7 @@ func runResourceTrackingTest(f *framework.Framework, podsPerNode int, nodeNames 
 	rcName := fmt.Sprintf("resource%d-%s", totalPods, string(uuid.NewUUID()))
 
 	// TODO: Use a more realistic workload
-	Expect(framework.RunRC(framework.RCConfig{
+	Expect(framework.RunRC(testutils.RCConfig{
 		Client:    f.Client,
 		Name:      rcName,
 		Namespace: f.Namespace.Name,
