@@ -205,6 +205,7 @@ var accessReviewResources = map[unversioned.GroupResource]bool{
 	unversioned.GroupResource{Group: "", Resource: "resourceaccessreviews"}:      true,
 	unversioned.GroupResource{Group: "", Resource: "localresourceaccessreviews"}: true,
 	unversioned.GroupResource{Group: "", Resource: "selfsubjectrulesreviews"}:    true,
+	unversioned.GroupResource{Group: "", Resource: "subjectrulesreviews"}:        true,
 }
 
 func isAccessReview(a admission.Attributes) bool {
