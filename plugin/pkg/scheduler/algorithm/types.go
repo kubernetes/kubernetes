@@ -54,6 +54,7 @@ type PriorityConfig struct {
 	Weight   int
 }
 
+// EmptyMetadataProducer returns a no-op MetadataProducer type.
 func EmptyMetadataProducer(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo) interface{} {
 	return nil
 }
