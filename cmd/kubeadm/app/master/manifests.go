@@ -266,6 +266,10 @@ func getComponentCommand(component string, s *kubeadmapi.MasterConfiguration) (c
 	command = append(command, baseFlags[component]...)
 
 	if component == apiServer {
+		// Use first address we are given
+		if len(s.API.AdvertiseAddresses) > 0 {
+			command = append(command, fmt.Sprintf("--advertise-address=%s", s.API.AdvertiseAddresses[0]))
+		}
 		// Check if the user decided to use an external etcd cluster
 		if len(s.Etcd.Endpoints) > 0 {
 			command = append(command, fmt.Sprintf("--etcd-servers=%s", strings.Join(s.Etcd.Endpoints, ",")))
