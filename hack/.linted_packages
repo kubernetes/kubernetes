@@ -223,6 +223,7 @@ test/images/clusterapi-tester
 test/images/entrypoint-tester
 test/images/fakegitserver
 test/images/goproxy
+test/images/logs-generator
 test/images/mount-tester
 test/images/n-way-http
 test/images/port-forward-tester
