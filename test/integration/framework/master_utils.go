@@ -303,45 +303,46 @@ func NewMasterConfig() *master.Config {
 		Prefix: uuid.New(),
 	}
 
-	negotiatedSerializer := NewSingleContentTypeSerializer(api.Scheme, testapi.Default.Codec(), runtime.ContentTypeJSON)
+	info, _ := runtime.SerializerInfoForMediaType(api.Codecs.SupportedMediaTypes(), runtime.ContentTypeJSON)
+	ns := NewSingleContentTypeSerializer(api.Scheme, info)
 
-	storageFactory := genericapiserver.NewDefaultStorageFactory(config, runtime.ContentTypeJSON, negotiatedSerializer, genericapiserver.NewDefaultResourceEncodingConfig(), master.DefaultAPIResourceConfigSource())
+	storageFactory := genericapiserver.NewDefaultStorageFactory(config, runtime.ContentTypeJSON, ns, genericapiserver.NewDefaultResourceEncodingConfig(), master.DefaultAPIResourceConfigSource())
 	storageFactory.SetSerializer(
 		unversioned.GroupResource{Group: api.GroupName, Resource: genericapiserver.AllResources},
 		"",
-		NewSingleContentTypeSerializer(api.Scheme, testapi.Default.Codec(), runtime.ContentTypeJSON))
+		ns)
 	storageFactory.SetSerializer(
 		unversioned.GroupResource{Group: autoscaling.GroupName, Resource: genericapiserver.AllResources},
 		"",
-		NewSingleContentTypeSerializer(api.Scheme, testapi.Autoscaling.Codec(), runtime.ContentTypeJSON))
+		ns)
 	storageFactory.SetSerializer(
 		unversioned.GroupResource{Group: batch.GroupName, Resource: genericapiserver.AllResources},
 		"",
-		NewSingleContentTypeSerializer(api.Scheme, testapi.Batch.Codec(), runtime.ContentTypeJSON))
+		ns)
 	storageFactory.SetSerializer(
 		unversioned.GroupResource{Group: apps.GroupName, Resource: genericapiserver.AllResources},
 		"",
-		NewSingleContentTypeSerializer(api.Scheme, testapi.Apps.Codec(), runtime.ContentTypeJSON))
+		ns)
 	storageFactory.SetSerializer(
 		unversioned.GroupResource{Group: extensions.GroupName, Resource: genericapiserver.AllResources},
 		"",
-		NewSingleContentTypeSerializer(api.Scheme, testapi.Extensions.Codec(), runtime.ContentTypeJSON))
+		ns)
 	storageFactory.SetSerializer(
 		unversioned.GroupResource{Group: policy.GroupName, Resource: genericapiserver.AllResources},
 		"",
-		NewSingleContentTypeSerializer(api.Scheme, testapi.Policy.Codec(), runtime.ContentTypeJSON))
+		ns)
 	storageFactory.SetSerializer(
 		unversioned.GroupResource{Group: rbac.GroupName, Resource: genericapiserver.AllResources},
 		"",
-		NewSingleContentTypeSerializer(api.Scheme, testapi.Rbac.Codec(), runtime.ContentTypeJSON))
+		ns)
 	storageFactory.SetSerializer(
 		unversioned.GroupResource{Group: certificates.GroupName, Resource: genericapiserver.AllResources},
 		"",
-		NewSingleContentTypeSerializer(api.Scheme, testapi.Certificates.Codec(), runtime.ContentTypeJSON))
+		ns)
 	storageFactory.SetSerializer(
 		unversioned.GroupResource{Group: storage.GroupName, Resource: genericapiserver.AllResources},
 		"",
-		NewSingleContentTypeSerializer(api.Scheme, testapi.Storage.Codec(), runtime.ContentTypeJSON))
+		ns)
 
 	genericConfig := genericapiserver.NewConfig()
 	kubeVersion := version.Get()

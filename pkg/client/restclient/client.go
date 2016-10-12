@@ -18,6 +18,7 @@ package restclient
 
 import (
 	"fmt"
+	"mime"
 	"net/http"
 	"net/url"
 	"os"
@@ -153,34 +154,48 @@ func readExpBackoffConfig() BackoffManager {
 }
 
 // createSerializers creates all necessary serializers for given contentType.
+// TODO: the negotiated serializer passed to this method should probably return
+//   serializers that control decoding and versioning without this package
+//   being aware of the types. Depends on whether RESTClient must deal with
+//   generic infrastructure.
 func createSerializers(config ContentConfig) (*Serializers, error) {
-	negotiated := config.NegotiatedSerializer
+	mediaTypes := config.NegotiatedSerializer.SupportedMediaTypes()
 	contentType := config.ContentType
-	info, ok := negotiated.SerializerForMediaType(contentType, nil)
-	if !ok {
-		return nil, fmt.Errorf("serializer for %s not registered", contentType)
+	mediaType, _, err := mime.ParseMediaType(contentType)
+	if err != nil {
+		return nil, fmt.Errorf("the content type specified in the client configuration is not recognized: %v", err)
 	}
-	streamInfo, ok := negotiated.StreamingSerializerForMediaType(contentType, nil)
+	info, ok := runtime.SerializerInfoForMediaType(mediaTypes, mediaType)
 	if !ok {
-		return nil, fmt.Errorf("streaming serializer for %s not registered", contentType)
+		if len(contentType) != 0 || len(mediaTypes) == 0 {
+			return nil, fmt.Errorf("no serializers registered for %s", contentType)
+		}
+		info = mediaTypes[0]
 	}
+
 	internalGV := unversioned.GroupVersion{
 		Group:   config.GroupVersion.Group,
 		Version: runtime.APIVersionInternal,
 	}
-	return &Serializers{
-		Encoder:             negotiated.EncoderForVersion(info.Serializer, *config.GroupVersion),
-		Decoder:             negotiated.DecoderToVersion(info.Serializer, internalGV),
-		StreamingSerializer: streamInfo.Serializer,
-		Framer:              streamInfo.Framer,
+
+	s := &Serializers{
+		Encoder: config.NegotiatedSerializer.EncoderForVersion(info.Serializer, *config.GroupVersion),
+		Decoder: config.NegotiatedSerializer.DecoderToVersion(info.Serializer, internalGV),
+
 		RenegotiatedDecoder: func(contentType string, params map[string]string) (runtime.Decoder, error) {
-			renegotiated, ok := negotiated.SerializerForMediaType(contentType, params)
+			info, ok := runtime.SerializerInfoForMediaType(mediaTypes, contentType)
 			if !ok {
 				return nil, fmt.Errorf("serializer for %s not registered", contentType)
 			}
-			return negotiated.DecoderToVersion(renegotiated.Serializer, internalGV), nil
+			return config.NegotiatedSerializer.DecoderToVersion(info.Serializer, internalGV), nil
 		},
-	}, nil
+	}
+	if info.StreamSerializer != nil {
+		s.StreamingSerializer = info.StreamSerializer.Serializer
+		s.Framer = info.StreamSerializer.Framer
+	}
+
+	return s, nil
 }
 
 // Verb begins a request with a verb (GET, POST, PUT, DELETE).

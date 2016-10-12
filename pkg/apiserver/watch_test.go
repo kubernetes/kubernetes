@@ -234,7 +234,8 @@ func TestWatchRead(t *testing.T) {
 		}
 
 		if response.StatusCode != http.StatusOK {
-			t.Fatalf("Unexpected response %#v", response)
+			b, _ := ioutil.ReadAll(response.Body)
+			t.Fatalf("Unexpected response for accept: %q: %#v\n%s", accept, response, string(b))
 		}
 		return response.Body, response.Header.Get("Content-Type")
 	}
@@ -262,6 +263,11 @@ func TestWatchRead(t *testing.T) {
 		{
 			Accept:              "application/json",
 			ExpectedContentType: "application/json",
+			MediaType:           "application/json",
+		},
+		{
+			Accept:              "application/json;stream=watch",
+			ExpectedContentType: "application/json", // legacy behavior
 			MediaType:           "application/json",
 		},
 		// TODO: yaml stream serialization requires that RawExtension.MarshalJSON
@@ -295,10 +301,11 @@ func TestWatchRead(t *testing.T) {
 
 	for _, protocol := range protocols {
 		for _, test := range testCases {
-			serializer, ok := api.Codecs.StreamingSerializerForMediaType(test.MediaType, nil)
-			if !ok {
-				t.Fatal(serializer)
+			info, ok := runtime.SerializerInfoForMediaType(api.Codecs.SupportedMediaTypes(), test.MediaType)
+			if !ok || info.StreamSerializer == nil {
+				t.Fatal(info)
 			}
+			streamSerializer := info.StreamSerializer
 
 			r, contentType := protocol.fn(test.Accept)
 			defer r.Close()
@@ -306,17 +313,13 @@ func TestWatchRead(t *testing.T) {
 			if contentType != "__default__" && contentType != test.ExpectedContentType {
 				t.Errorf("Unexpected content type: %#v", contentType)
 			}
-			objectSerializer, ok := api.Codecs.SerializerForMediaType(test.MediaType, nil)
-			if !ok {
-				t.Fatal(objectSerializer)
-			}
-			objectCodec := api.Codecs.DecoderToVersion(objectSerializer, testInternalGroupVersion)
+			objectCodec := api.Codecs.DecoderToVersion(info.Serializer, testInternalGroupVersion)
 
 			var fr io.ReadCloser = r
 			if !protocol.selfFraming {
-				fr = serializer.Framer.NewFrameReader(r)
+				fr = streamSerializer.Framer.NewFrameReader(r)
 			}
-			d := streaming.NewDecoder(fr, serializer)
+			d := streaming.NewDecoder(fr, streamSerializer.Serializer)
 
 			var w *watch.FakeWatcher
 			for w == nil {
@@ -568,10 +571,11 @@ func TestWatchHTTPTimeout(t *testing.T) {
 	timeoutCh := make(chan time.Time)
 	done := make(chan struct{})
 
-	serializer, ok := api.Codecs.StreamingSerializerForMediaType("application/json", nil)
-	if !ok {
-		t.Fatal(serializer)
+	info, ok := runtime.SerializerInfoForMediaType(api.Codecs.SupportedMediaTypes(), runtime.ContentTypeJSON)
+	if !ok || info.StreamSerializer == nil {
+		t.Fatal(info)
 	}
+	serializer := info.StreamSerializer
 
 	// Setup a new watchserver
 	watchServer := &WatchServer{

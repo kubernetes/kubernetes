@@ -153,20 +153,8 @@ var fakeWrapperFunc = func(http.RoundTripper) http.RoundTripper {
 
 type fakeNegotiatedSerializer struct{}
 
-func (n *fakeNegotiatedSerializer) SupportedMediaTypes() []string {
-	return []string{}
-}
-
-func (n *fakeNegotiatedSerializer) SerializerForMediaType(mediaType string, params map[string]string) (s runtime.SerializerInfo, ok bool) {
-	return runtime.SerializerInfo{}, true
-}
-
-func (n *fakeNegotiatedSerializer) SupportedStreamingMediaTypes() []string {
-	return []string{}
-}
-
-func (n *fakeNegotiatedSerializer) StreamingSerializerForMediaType(mediaType string, params map[string]string) (s runtime.StreamSerializerInfo, ok bool) {
-	return runtime.StreamSerializerInfo{}, true
+func (n *fakeNegotiatedSerializer) SupportedMediaTypes() []runtime.SerializerInfo {
+	return nil
 }
 
 func (n *fakeNegotiatedSerializer) EncoderForVersion(serializer runtime.Encoder, gv runtime.GroupVersioner) runtime.Encoder {
