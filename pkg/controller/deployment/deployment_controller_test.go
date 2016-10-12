@@ -194,14 +194,13 @@ func (f *fixture) run(deploymentName string) {
 	}
 
 	actions := filterInformerActions(f.client.Actions())
-	informerActions := 0
 	for i, action := range actions {
-		if len(f.actions)+informerActions < i+1 {
+		if len(f.actions) < i+1 {
 			f.t.Errorf("%d unexpected actions: %+v", len(actions)-len(f.actions), actions[i:])
 			break
 		}
 
-		expectedAction := f.actions[i-informerActions]
+		expectedAction := f.actions[i]
 		if !expectedAction.Matches(action.GetVerb(), action.GetResource().Resource) {
 			f.t.Errorf("Expected\n\t%#v\ngot\n\t%#v", expectedAction, action)
 			continue
@@ -261,10 +260,12 @@ func TestDeploymentController_dontSyncDeploymentsWithEmptyPodSelector(t *testing
 	// We expect the deployment controller to not take action here since it's configuration
 	// is invalid, even though no replicasets exist that match it's selector.
 	controller.syncDeployment(fmt.Sprintf("%s/%s", d.ObjectMeta.Namespace, d.ObjectMeta.Name))
-	if len(fake.Actions()) == 0 {
+
+	filteredActions := filterInformerActions(fake.Actions())
+	if len(filteredActions) == 0 {
 		return
 	}
-	for _, action := range filterInformerActions(fake.Actions()) {
+	for _, action := range filteredActions {
 		t.Logf("unexpected action: %#v", action)
 	}
 	t.Errorf("expected deployment controller to not take action")
