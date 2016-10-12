@@ -490,7 +490,7 @@ func (rc *reconciler) updateStates(volumeToMount *operationexecutor.VolumeToMoun
 		return fmt.Errorf("Could not add pod to volume information to actual state of world: %v", err)
 	}
 	if volumeToMount.PluginIsAttachable {
-		err = rc.actualStateOfWorld.MarkDeviceAsMounted(volumeToMount.VolumeName)
+		err = rc.actualStateOfWorld.MarkDeviceAsMounted(volumeToMount.VolumeName, volumeToMount.DevicePath)
 		if err != nil {
 			return fmt.Errorf("Could not mark device is mounted to actual state of world: %v", err)
 		}
