@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
+	testutils "k8s.io/kubernetes/test/utils"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -40,8 +41,8 @@ var _ = framework.KubeDescribe("Etcd failure [Disruptive]", func() {
 		// providers that provide those capabilities.
 		framework.SkipUnlessProviderIs("gce")
 
-		Expect(framework.RunRC(framework.RCConfig{
-			Client:    f.Client,
+		Expect(testutils.RunRC(testutils.RCConfig{
+			ClientSet: f.ClientSet,
 			Name:      "baz",
 			Namespace: f.Namespace.Name,
 			Image:     framework.GetPauseImageName(f.Client),

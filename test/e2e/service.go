@@ -33,7 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/service"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller/endpoint"
 	"k8s.io/kubernetes/pkg/labels"
@@ -44,6 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
+	testutils "k8s.io/kubernetes/test/utils"
 )
 
 const (
@@ -73,9 +74,11 @@ var _ = framework.KubeDescribe("Services", func() {
 	f := framework.NewDefaultFramework("services")
 
 	var c *client.Client
+	var cs clientset.Interface
 
 	BeforeEach(func() {
 		c = f.Client
+		cs = f.ClientSet
 	})
 
 	// TODO: We get coverage of TCP/UDP and multi-port services through the DNS test. We should have a simpler test for multi-port TCP here.
@@ -289,10 +292,10 @@ var _ = framework.KubeDescribe("Services", func() {
 		numPods, servicePort := 3, 80
 
 		By("creating service1 in namespace " + ns)
-		podNames1, svc1IP, err := startServeHostnameService(c, ns, "service1", servicePort, numPods)
+		podNames1, svc1IP, err := startServeHostnameService(cs, ns, "service1", servicePort, numPods)
 		Expect(err).NotTo(HaveOccurred())
 		By("creating service2 in namespace " + ns)
-		podNames2, svc2IP, err := startServeHostnameService(c, ns, "service2", servicePort, numPods)
+		podNames2, svc2IP, err := startServeHostnameService(cs, ns, "service2", servicePort, numPods)
 		Expect(err).NotTo(HaveOccurred())
 
 		hosts, err := framework.NodeSSHHosts(c)
@@ -310,7 +313,7 @@ var _ = framework.KubeDescribe("Services", func() {
 
 		// Stop service 1 and make sure it is gone.
 		By("stopping service1")
-		framework.ExpectNoError(stopServeHostnameService(c, f.ClientSet, ns, "service1"))
+		framework.ExpectNoError(stopServeHostnameService(cs, ns, "service1"))
 
 		By("verifying service1 is not up")
 		framework.ExpectNoError(verifyServeHostnameServiceDown(c, host, svc1IP, servicePort))
@@ -319,7 +322,7 @@ var _ = framework.KubeDescribe("Services", func() {
 
 		// Start another service and verify both are up.
 		By("creating service3 in namespace " + ns)
-		podNames3, svc3IP, err := startServeHostnameService(c, ns, "service3", servicePort, numPods)
+		podNames3, svc3IP, err := startServeHostnameService(cs, ns, "service3", servicePort, numPods)
 		Expect(err).NotTo(HaveOccurred())
 
 		if svc2IP == svc3IP {
@@ -343,12 +346,12 @@ var _ = framework.KubeDescribe("Services", func() {
 		svc1 := "service1"
 		svc2 := "service2"
 
-		defer func() { framework.ExpectNoError(stopServeHostnameService(c, f.ClientSet, ns, svc1)) }()
-		podNames1, svc1IP, err := startServeHostnameService(c, ns, svc1, servicePort, numPods)
+		defer func() { framework.ExpectNoError(stopServeHostnameService(cs, ns, svc1)) }()
+		podNames1, svc1IP, err := startServeHostnameService(cs, ns, svc1, servicePort, numPods)
 		Expect(err).NotTo(HaveOccurred())
 
-		defer func() { framework.ExpectNoError(stopServeHostnameService(c, f.ClientSet, ns, svc2)) }()
-		podNames2, svc2IP, err := startServeHostnameService(c, ns, svc2, servicePort, numPods)
+		defer func() { framework.ExpectNoError(stopServeHostnameService(cs, ns, svc2)) }()
+		podNames2, svc2IP, err := startServeHostnameService(cs, ns, svc2, servicePort, numPods)
 		Expect(err).NotTo(HaveOccurred())
 
 		if svc1IP == svc2IP {
@@ -392,8 +395,8 @@ var _ = framework.KubeDescribe("Services", func() {
 		ns := f.Namespace.Name
 		numPods, servicePort := 3, 80
 
-		defer func() { framework.ExpectNoError(stopServeHostnameService(c, f.ClientSet, ns, "service1")) }()
-		podNames1, svc1IP, err := startServeHostnameService(c, ns, "service1", servicePort, numPods)
+		defer func() { framework.ExpectNoError(stopServeHostnameService(cs, ns, "service1")) }()
+		podNames1, svc1IP, err := startServeHostnameService(cs, ns, "service1", servicePort, numPods)
 		Expect(err).NotTo(HaveOccurred())
 
 		hosts, err := framework.NodeSSHHosts(c)
@@ -417,8 +420,8 @@ var _ = framework.KubeDescribe("Services", func() {
 		framework.ExpectNoError(verifyServeHostnameServiceUp(c, ns, host, podNames1, svc1IP, servicePort))
 
 		// Create a new service and check if it's not reusing IP.
-		defer func() { framework.ExpectNoError(stopServeHostnameService(c, f.ClientSet, ns, "service2")) }()
-		podNames2, svc2IP, err := startServeHostnameService(c, ns, "service2", servicePort, numPods)
+		defer func() { framework.ExpectNoError(stopServeHostnameService(cs, ns, "service2")) }()
+		podNames2, svc2IP, err := startServeHostnameService(cs, ns, "service2", servicePort, numPods)
 		Expect(err).NotTo(HaveOccurred())
 
 		if svc1IP == svc2IP {
@@ -1579,11 +1582,11 @@ func testNotReachableUDP(ip string, port int, request string) (bool, error) {
 }
 
 // Creates a replication controller that serves its hostname and a service on top of it.
-func startServeHostnameService(c *client.Client, ns, name string, port, replicas int) ([]string, string, error) {
+func startServeHostnameService(cs clientset.Interface, ns, name string, port, replicas int) ([]string, string, error) {
 	podNames := make([]string, replicas)
 
 	By("creating service " + name + " in namespace " + ns)
-	_, err := c.Services(ns).Create(&api.Service{
+	_, err := cs.Core().Services(ns).Create(&api.Service{
 		ObjectMeta: api.ObjectMeta{
 			Name: name,
 		},
@@ -1604,8 +1607,8 @@ func startServeHostnameService(c *client.Client, ns, name string, port, replicas
 
 	var createdPods []*api.Pod
 	maxContainerFailures := 0
-	config := framework.RCConfig{
-		Client:               c,
+	config := testutils.RCConfig{
+		ClientSet:            cs,
 		Image:                "gcr.io/google_containers/serve_hostname:v1.4",
 		Name:                 name,
 		Namespace:            ns,
@@ -1615,7 +1618,7 @@ func startServeHostnameService(c *client.Client, ns, name string, port, replicas
 		CreatedPods:          &createdPods,
 		MaxContainerFailures: &maxContainerFailures,
 	}
-	err = framework.RunRC(config)
+	err = testutils.RunRC(config)
 	if err != nil {
 		return podNames, "", err
 	}
@@ -1629,7 +1632,7 @@ func startServeHostnameService(c *client.Client, ns, name string, port, replicas
 	}
 	sort.StringSlice(podNames).Sort()
 
-	service, err := c.Services(ns).Get(name)
+	service, err := cs.Core().Services(ns).Get(name)
 	if err != nil {
 		return podNames, "", err
 	}
@@ -1640,11 +1643,11 @@ func startServeHostnameService(c *client.Client, ns, name string, port, replicas
 	return podNames, serviceIP, nil
 }
 
-func stopServeHostnameService(c *client.Client, clientset internalclientset.Interface, ns, name string) error {
-	if err := framework.DeleteRCAndPods(c, clientset, ns, name); err != nil {
+func stopServeHostnameService(cs clientset.Interface, ns, name string) error {
+	if err := framework.DeleteRCAndPods(cs, ns, name); err != nil {
 		return err
 	}
-	if err := c.Services(ns).Delete(name); err != nil {
+	if err := cs.Core().Services(ns).Delete(name, &api.DeleteOptions{}); err != nil {
 		return err
 	}
 	return nil

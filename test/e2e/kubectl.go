@@ -46,6 +46,7 @@ import (
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -57,6 +58,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/test/e2e/framework"
+	testutils "k8s.io/kubernetes/test/utils"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -184,9 +186,11 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 		clusterState().ForEach(podFunc)
 	}
 	var c *client.Client
+	var cs clientset.Interface
 	var ns string
 	BeforeEach(func() {
 		c = f.Client
+		cs = f.ClientSet
 		ns = f.Namespace.Name
 	})
 
@@ -271,7 +275,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			})
 
 			By("validating guestbook app")
-			validateGuestbookApp(c, ns)
+			validateGuestbookApp(c, f.ClientSet, ns)
 		})
 	})
 
@@ -1172,7 +1176,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 
 			By("verifying the pod " + podName + " is running")
 			label := labels.SelectorFromSet(labels.Set(map[string]string{"run": podName}))
-			err := framework.WaitForPodsWithLabelRunning(c, ns, label)
+			err := testutils.WaitForPodsWithLabelRunning(cs, ns, label)
 			if err != nil {
 				framework.Failf("Failed getting pod %s: %v", podName, err)
 			}
@@ -1516,10 +1520,10 @@ func curl(url string) (string, error) {
 	return curlTransport(url, utilnet.SetTransportDefaults(&http.Transport{}))
 }
 
-func validateGuestbookApp(c *client.Client, ns string) {
+func validateGuestbookApp(c *client.Client, cs clientset.Interface, ns string) {
 	framework.Logf("Waiting for all frontend pods to be Running.")
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"tier": "frontend", "app": "guestbook"}))
-	err := framework.WaitForPodsWithLabelRunning(c, ns, label)
+	err := testutils.WaitForPodsWithLabelRunning(cs, ns, label)
 	Expect(err).NotTo(HaveOccurred())
 	framework.Logf("Waiting for frontend to serve content.")
 	if !waitForGuestbookResponse(c, "get", "", `{"data": ""}`, guestbookStartupTimeout, ns) {
