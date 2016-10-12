@@ -43,18 +43,12 @@ type serializerType struct {
 	// be expected to pass into or a gvk to Decode, since no type information will be available on
 	// the object itself.
 	RawSerializer runtime.Serializer
-	// Specialize gives the type the opportunity to return a different serializer implementation if
-	// the content type contains alternate operations. Here it is used to implement "pretty" as an
-	// option to application/json, but could also be used to allow serializers to perform type
-	// defaulting or alter output.
-	Specialize func(map[string]string) (runtime.Serializer, bool)
 
 	AcceptStreamContentTypes []string
 	StreamContentType        string
 
 	Framer           runtime.Framer
 	StreamSerializer runtime.Serializer
-	StreamSpecialize func(map[string]string) (runtime.Serializer, bool)
 }
 
 func newSerializersForScheme(scheme *runtime.Scheme, mf json.MetaFactory) []serializerType {
@@ -254,13 +248,6 @@ func (f CodecFactory) SerializerForMediaType(mediaType string, params map[string
 	for _, s := range f.serializers {
 		for _, accepted := range s.AcceptContentTypes {
 			if accepted == mediaType {
-				// specialization abstracts variants to the content type
-				if s.Specialize != nil && len(params) > 0 {
-					serializer, ok := s.Specialize(params)
-					// TODO: return formatted mediaType+params
-					return runtime.SerializerInfo{Serializer: serializer, MediaType: s.ContentType, EncodesAsText: s.EncodesAsText}, ok
-				}
-
 				// legacy support for ?pretty=1 continues, but this is more formally defined
 				if v, ok := params["pretty"]; ok && v == "1" && s.PrettySerializer != nil {
 					return runtime.SerializerInfo{Serializer: s.PrettySerializer, MediaType: s.ContentType, EncodesAsText: s.EncodesAsText}, true
@@ -284,20 +271,6 @@ func (f CodecFactory) StreamingSerializerForMediaType(mediaType string, params m
 				nested, ok := f.SerializerForMediaType(s.ContentType, nil)
 				if !ok {
 					panic("no serializer defined for internal content type")
-				}
-
-				if s.StreamSpecialize != nil && len(params) > 0 {
-					serializer, ok := s.StreamSpecialize(params)
-					// TODO: return formatted mediaType+params
-					return runtime.StreamSerializerInfo{
-						SerializerInfo: runtime.SerializerInfo{
-							Serializer:    serializer,
-							MediaType:     s.StreamContentType,
-							EncodesAsText: s.EncodesAsText,
-						},
-						Framer:   s.Framer,
-						Embedded: nested,
-					}, ok
 				}
 
 				return runtime.StreamSerializerInfo{
