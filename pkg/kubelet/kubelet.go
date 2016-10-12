@@ -2972,10 +2972,17 @@ func (kl *Kubelet) setNodeAddress(node *api.Node) error {
 
 	// Set addresses for the node.
 	if kl.cloud != nil {
+		if kl.nodeIP != nil {
+			node.Status.Addresses = []api.NodeAddress{
+				{Type: api.NodeInternalIP, Address: kl.nodeIP.String()},
+			}
+			return nil
+		}
 		instances, ok := kl.cloud.Instances()
 		if !ok {
 			return fmt.Errorf("failed to get instances from cloud provider")
 		}
+
 		// TODO(roberthbailey): Can we do this without having credentials to talk
 		// to the cloud provider?
 		// TODO(justinsb): We can if CurrentNodeName() was actually CurrentNode() and returned an interface
@@ -2983,14 +2990,6 @@ func (kl *Kubelet) setNodeAddress(node *api.Node) error {
 		if err != nil {
 			return fmt.Errorf("failed to get node address from cloud provider: %v", err)
 		}
-
-		if kl.nodeIP != nil {
-			node.Status.Addresses = []api.NodeAddress{
-				{Type: api.NodeInternalIP, Address: kl.nodeIP.String()},
-			}
-			return nil
-		}
-
 		node.Status.Addresses = nodeAddresses
 	} else {
 		if kl.nodeIP != nil {
