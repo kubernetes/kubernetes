@@ -89,44 +89,45 @@ The initial draft of the proposal did not include this field and it had a securi
 DeleteOptions {
   …
   // Whether and how garbage collection will be performed.
-  // Defaults to DefaultPropagationPolicy
-  DeletePropagationPolicy *DeletePropagationPolicy
+  // Defaults to DeletePropagationDefault
+  // Either this field or OrphanDependents may be set, but not both.
+  PropagationPolicy *DeletePropagationPolicy
 }
 
 type DeletePropagationPolicy string
 
 const (
-    // Respects the existing garbage collection related finalizers on the object and the default garbage collection policy of the resource.
-    DefaultPropagationPolicy DeletePropagationPolicy = "Default"
+    // The default depends on the existing finalizers on the object and the type of the object.
+    DeletePropagationDefault DeletePropagationPolicy = "DeletePropagationDefault"
     // Orphans the dependents
-    OrphanDependents DeletePropagationPolicy = "Orphan"
+    DeletePropagationOrphan DeletePropagationPolicy = "DeletePropagationOrphan"
     // Deletes the object from the key-value store, the garbage collector will delete the dependents in the background.
-    DeleteDependentsInBackground DeletePropagationPolicy = "DeleteDependentsInBackground"
+    DeletePropagationBackground DeletePropagationPolicy = "DeletePropagationBackground"
     // The object exists in the key-value store until the garbage collector deletes all the dependents whose ownerReference.blockOwnerDeletion=true from the key-value store.
     // API sever will put the "DeletingDependents" finalizer on the object, and sets its deletionTimestamp.
     // This policy is cascading, i.e., the dependents will be deleted with GarbageCollectionSynchronous.
-    DeleteAfterBlockingDependentsAreDeleted DeletePropagationPolicy = "DeleteAfterBlockingDependentsAreDeleted"
+    DeletePropagationForeground DeletePropagationPolicy = "DeletePropagationForeground"
 )
 ```
 
-The `DeleteAfterBlockingDependentsAreDeleted` policy represents the synchronous GC mode.
+The `DeletePropagationForeground` policy represents the synchronous GC mode.
 
-`DeleteOptions.OrphanDependents *bool` will be marked as deprecated and will be removed in 1.7. Validation code will make sure only one of `OrphanDependents` and `DeletePropagationPolicy` may be set. We decided not to add another `DeleteAfterDependentsDeleted *bool`, because together with `OrphanDependents`, it will result in 9 possible combinations and is thus confusing.
+`DeleteOptions.OrphanDependents *bool` will be marked as deprecated and will be removed in 1.7. Validation code will make sure only one of `OrphanDependents` and `PropagationPolicy` may be set. We decided not to add another `DeleteAfterDependentsDeleted *bool`, because together with `OrphanDependents`, it will result in 9 possible combinations and is thus confusing.
 
 The conversion rules are described in the following table:
 
 | 1.5                                      | pre 1.4/1.4              |
 |------------------------------------------|--------------------------|
-| DefaultPropagationPolicy                 | OrphanDependents==nil    |
-| OrphanDependents                         | *OrphanDependents==true  |
-| DeleteDependentsInBackground             | *OrphanDependents==false |
-| DeleteAfterBlockingDependentsAreDeleted  | N/A                      |
+| DeletePropagationDefault                 | OrphanDependents==nil    |
+| DeletePropagationOrphan                  | *OrphanDependents==true  |
+| DeletePropagationBackground              | *OrphanDependents==false |
+| DeletePropagationForeground              | N/A                      |
 
 # Components changes
 
 ## API Server
 
-`Delete()` function checks `DeleteOptions.DeletePropagationPolicy`. If the policy is `DeleteAfterBlockingDependentsAreDeleted`, the API server will update the object instead of deleting it, add the finalizer, and set the `ObjectMeta.DeletionTimestamp`.
+`Delete()` function checks `DeleteOptions.PropagationPolicy`. If the policy is `DeletePropagationForeground`, the API server will update the object instead of deleting it, add the "DeletingDependents" finalizer, remove the "OrphanDependents" finalizer if it's present, and set the `ObjectMeta.DeletionTimestamp`.
 
 When validating the ownerReference, API server needs to query the `Authorizer` to check if the user has "delete" permission of the owner object. It returns 422 if the user does not have the permissions but intends to set `OwnerReference.BlockOwnerDeletion` to true.
 
@@ -190,13 +191,13 @@ Finalizer breaks an assumption that many Kubernetes components have: a deletion 
 
 **kubectl**: synchronous GC can simplify the **kubectl delete** reapers. Let's take the `deployment reaper` as an example, since it's the most complicated one. Currently, the reaper finds all `RS` with matching labels, scales them down, polls until `RS.Status.Replica` reaches 0, deletes the `RS`es, and finally deletes the `deployment`. If using synchronous GC, `kubectl delete deployment` is as easy as sending a synchronous GC delete request for the deployment, and polls until the deployment is deleted from the key-value store.
 
-Note that this **changes the behavior** of `kubectl delete`. The command will be blocked until all pods are deleted from the key-value store, instead of being blocked until pods are in the terminating state. This means `kubectl delete` blocks for longer time, but it has the benefit that the resources used by the pods are released when the `kubectl delete` returns. To allow kubectl user not waiting for the cleanup, we will add a `--wait` flag. It defaults to true; if it's set to `false`, `kubectl delete` will send the delete request with `DeletePropagationPolicy=DeleteDependentsInBackground` and return immediately.
+Note that this **changes the behavior** of `kubectl delete`. The command will be blocked until all pods are deleted from the key-value store, instead of being blocked until pods are in the terminating state. This means `kubectl delete` blocks for longer time, but it has the benefit that the resources used by the pods are released when the `kubectl delete` returns. To allow kubectl user not waiting for the cleanup, we will add a `--wait` flag. It defaults to true; if it's set to `false`, `kubectl delete` will send the delete request with `PropagationPolicy=DeletePropagationBackground` and return immediately.
 
 To make the new kubectl compatible with the 1.4 and earlier masters, kubectl needs to switch to use the old reaper logic if it finds synchronous GC is not supported by the master.
 
-1.4 `kubectl delete rc/rs` uses `DeleteOptions.OrphanDependents=true`, which is going to be converted to `DeleteDependentsInBackground` (see [API Design](#api-changes)) by a 1.5 master, so its behavior keeps the same.
+1.4 `kubectl delete rc/rs` uses `DeleteOptions.OrphanDependents=true`, which is going to be converted to `DeletePropagationBackground` (see [API Design](#api-changes)) by a 1.5 master, so its behavior keeps the same.
 
-Pre 1.4 `kubectl delete` uses `DeleteOptions.OrphanDependents=nil`, so does the 1.4 `kubectl delete` for resources other than rc and rs. The option is going to be converted to `DefaultPropagationPolicy` (see [API Design](#api-changes)) by a 1.5 master, so these commands behave the same as when working with a 1.4 master.
+Pre 1.4 `kubectl delete` uses `DeleteOptions.OrphanDependents=nil`, so does the 1.4 `kubectl delete` for resources other than rc and rs. The option is going to be converted to `DeletePropagationDefault` (see [API Design](#api-changes)) by a 1.5 master, so these commands behave the same as when working with a 1.4 master.
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/proposals/synchronous-garbage-collection.md?pixel)]()
