@@ -147,6 +147,18 @@ func TestDeploymentController(t *testing.T) {
 	clusterWatch.Add(cluster2)
 	assert.NoError(t, CheckObjectFromChan(cluster1UpdateChan, checkDeployment(dep1, *dep1.Spec.Replicas/2)))
 	assert.NoError(t, CheckObjectFromChan(cluster2CreateChan, checkDeployment(dep1, *dep1.Spec.Replicas/2)))
+
+	// Add new deployment with non-default replica placement preferences.
+	dep2 := newDeploymentWithReplicas("deployment2", 9)
+	dep2.Annotations = make(map[string]string)
+	dep2.Annotations[FedDeploymentPreferencesAnnotation] = `{"rebalance": true,
+		  "clusters": {
+		    "cluster1": {"weight": 2},
+		    "cluster2": {"weight": 1}
+		}}`
+	deploymentsWatch.Add(dep2)
+	assert.NoError(t, CheckObjectFromChan(cluster1CreateChan, checkDeployment(dep2, 6)))
+	assert.NoError(t, CheckObjectFromChan(cluster2CreateChan, checkDeployment(dep2, 3)))
 }
 
 func GetDeploymentFromChan(c chan runtime.Object) *extensionsv1.Deployment {
