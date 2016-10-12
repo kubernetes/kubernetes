@@ -18,6 +18,7 @@ package e2e
 
 import (
 	"fmt"
+	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
@@ -29,6 +30,7 @@ import (
 
 var _ = framework.KubeDescribe("LimitRange", func() {
 	f := framework.NewDefaultFramework("limitrange")
+	f.NamespaceDeletionTimeout = 10 * time.Minute
 
 	It("should create a LimitRange with defaults and ensure pod has those defaults applied.", func() {
 		By("Creating a LimitRange")
