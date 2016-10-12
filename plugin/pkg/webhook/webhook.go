@@ -56,10 +56,7 @@ func NewGenericWebhook(kubeConfigFile string, groupVersions []unversioned.GroupV
 		return nil, err
 	}
 	codec := api.Codecs.LegacyCodec(groupVersions...)
-	clientConfig.ContentConfig.NegotiatedSerializer = runtimeserializer.NegotiatedSerializerWrapper(
-		runtime.SerializerInfo{Serializer: codec},
-		runtime.StreamSerializerInfo{},
-	)
+	clientConfig.ContentConfig.NegotiatedSerializer = runtimeserializer.NegotiatedSerializerWrapper(runtime.SerializerInfo{Serializer: codec})
 
 	restClient, err := restclient.UnversionedRESTClientFor(clientConfig)
 	if err != nil {

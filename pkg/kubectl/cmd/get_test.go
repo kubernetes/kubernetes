@@ -193,9 +193,7 @@ func TestGetUnknownSchemaObjectListGeneric(t *testing.T) {
 		}
 
 		f, tf, codec := cmdtesting.NewMixedFactory(regularClient)
-		negotiatedSerializer := serializer.NegotiatedSerializerWrapper(
-			runtime.SerializerInfo{Serializer: codec},
-			runtime.StreamSerializerInfo{})
+		negotiatedSerializer := serializer.NegotiatedSerializerWrapper(runtime.SerializerInfo{Serializer: codec})
 		tf.Printer = &testPrinter{}
 		tf.Client = &fake.RESTClient{
 			NegotiatedSerializer: negotiatedSerializer,

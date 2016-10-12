@@ -157,9 +157,7 @@ func NewTestFactory() (cmdutil.Factory, *TestFactory, runtime.Codec, runtime.Neg
 		Mapper:    mapper,
 		Typer:     scheme,
 	}
-	negotiatedSerializer := serializer.NegotiatedSerializerWrapper(
-		runtime.SerializerInfo{Serializer: codec},
-		runtime.StreamSerializerInfo{})
+	negotiatedSerializer := serializer.NegotiatedSerializerWrapper(runtime.SerializerInfo{Serializer: codec})
 	return &FakeFactory{
 		tf:    t,
 		Codec: codec,

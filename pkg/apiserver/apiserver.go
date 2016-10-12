@@ -211,6 +211,7 @@ func AddApiWebService(s runtime.NegotiatedSerializer, container *restful.Contain
 	// Because in release 1.1, /api returns response with empty APIVersion, we
 	// use StripVersionNegotiatedSerializer to keep the response backwards
 	// compatible.
+	mediaTypes, _ := mediaTypesForSerializer(s)
 	ss := StripVersionNegotiatedSerializer{s}
 	versionHandler := APIVersionHandler(ss, getAPIVersionsFunc)
 	ws := new(restful.WebService)
@@ -219,8 +220,8 @@ func AddApiWebService(s runtime.NegotiatedSerializer, container *restful.Contain
 	ws.Route(ws.GET("/").To(versionHandler).
 		Doc("get available API versions").
 		Operation("getAPIVersions").
-		Produces(s.SupportedMediaTypes()...).
-		Consumes(s.SupportedMediaTypes()...).
+		Produces(mediaTypes...).
+		Consumes(mediaTypes...).
 		Writes(unversioned.APIVersions{}))
 	container.Add(ws)
 }
@@ -277,6 +278,7 @@ func NewApisWebService(s runtime.NegotiatedSerializer, apiPrefix string, f func(
 	// use StripVersionNegotiatedSerializer to keep the response backwards
 	// compatible.
 	ss := StripVersionNegotiatedSerializer{s}
+	mediaTypes, _ := mediaTypesForSerializer(s)
 	rootAPIHandler := RootAPIHandler(ss, f)
 	ws := new(restful.WebService)
 	ws.Path(apiPrefix)
@@ -284,8 +286,8 @@ func NewApisWebService(s runtime.NegotiatedSerializer, apiPrefix string, f func(
 	ws.Route(ws.GET("/").To(rootAPIHandler).
 		Doc("get available API versions").
 		Operation("getAPIVersions").
-		Produces(s.SupportedMediaTypes()...).
-		Consumes(s.SupportedMediaTypes()...).
+		Produces(mediaTypes...).
+		Consumes(mediaTypes...).
 		Writes(unversioned.APIGroupList{}))
 	return ws
 }
@@ -300,6 +302,7 @@ func NewGroupWebService(s runtime.NegotiatedSerializer, path string, group unver
 		// response backwards compatible.
 		ss = StripVersionNegotiatedSerializer{s}
 	}
+	mediaTypes, _ := mediaTypesForSerializer(s)
 	groupHandler := GroupHandler(ss, group)
 	ws := new(restful.WebService)
 	ws.Path(path)
@@ -307,8 +310,8 @@ func NewGroupWebService(s runtime.NegotiatedSerializer, path string, group unver
 	ws.Route(ws.GET("/").To(groupHandler).
 		Doc("get information of a group").
 		Operation("getAPIGroup").
-		Produces(s.SupportedMediaTypes()...).
-		Consumes(s.SupportedMediaTypes()...).
+		Produces(mediaTypes...).
+		Consumes(mediaTypes...).
 		Writes(unversioned.APIGroup{}))
 	return ws
 }
@@ -323,12 +326,13 @@ func AddSupportedResourcesWebService(s runtime.NegotiatedSerializer, ws *restful
 		// keep the response backwards compatible.
 		ss = StripVersionNegotiatedSerializer{s}
 	}
+	mediaTypes, _ := mediaTypesForSerializer(s)
 	resourceHandler := SupportedResourcesHandler(ss, groupVersion, lister)
 	ws.Route(ws.GET("/").To(resourceHandler).
 		Doc("get available resources").
 		Operation("getAPIResources").
-		Produces(s.SupportedMediaTypes()...).
-		Consumes(s.SupportedMediaTypes()...).
+		Produces(mediaTypes...).
+		Consumes(mediaTypes...).
 		Writes(unversioned.APIResourceList{}))
 }
 
@@ -417,7 +421,7 @@ func writeNegotiated(s runtime.NegotiatedSerializer, gv unversioned.GroupVersion
 	w.Header().Set("Content-Type", serializer.MediaType)
 	w.WriteHeader(statusCode)
 
-	encoder := s.EncoderForVersion(serializer, gv)
+	encoder := s.EncoderForVersion(serializer.Serializer, gv)
 	if err := encoder.Encode(object, w); err != nil {
 		errorJSONFatal(err, encoder, w)
 	}

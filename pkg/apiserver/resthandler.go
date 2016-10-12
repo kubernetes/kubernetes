@@ -364,7 +364,7 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 			scope.err(err, res.ResponseWriter, req.Request)
 			return
 		}
-		decoder := scope.Serializer.DecoderToVersion(s, unversioned.GroupVersion{Group: gv.Group, Version: runtime.APIVersionInternal})
+		decoder := scope.Serializer.DecoderToVersion(s.Serializer, unversioned.GroupVersion{Group: gv.Group, Version: runtime.APIVersionInternal})
 
 		body, err := readBody(req.Request)
 		if err != nil {
@@ -480,15 +480,15 @@ func PatchResource(r rest.Patcher, scope RequestScope, typer runtime.ObjectTyper
 			return
 		}
 
-		s, ok := scope.Serializer.SerializerForMediaType("application/json", nil)
+		s, ok := runtime.SerializerInfoForMediaType(scope.Serializer.SupportedMediaTypes(), runtime.ContentTypeJSON)
 		if !ok {
 			scope.err(fmt.Errorf("no serializer defined for JSON"), res.ResponseWriter, req.Request)
 			return
 		}
 		gv := scope.Kind.GroupVersion()
 		codec := runtime.NewCodec(
-			scope.Serializer.EncoderForVersion(s, gv),
-			scope.Serializer.DecoderToVersion(s, unversioned.GroupVersion{Group: gv.Group, Version: runtime.APIVersionInternal}),
+			scope.Serializer.EncoderForVersion(s.Serializer, gv),
+			scope.Serializer.DecoderToVersion(s.Serializer, unversioned.GroupVersion{Group: gv.Group, Version: runtime.APIVersionInternal}),
 		)
 
 		updateAdmit := func(updatedObject runtime.Object, currentObject runtime.Object) error {
@@ -685,7 +685,7 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 		defaultGVK := scope.Kind
 		original := r.New()
 		trace.Step("About to convert to expected version")
-		obj, gvk, err := scope.Serializer.DecoderToVersion(s, defaultGVK.GroupVersion()).Decode(body, &defaultGVK, original)
+		obj, gvk, err := scope.Serializer.DecoderToVersion(s.Serializer, defaultGVK.GroupVersion()).Decode(body, &defaultGVK, original)
 		if err != nil {
 			err = transformDecodeError(typer, err, original, gvk, body)
 			scope.err(err, res.ResponseWriter, req.Request)
@@ -772,7 +772,7 @@ func DeleteResource(r rest.GracefulDeleter, checkBody bool, scope RequestScope, 
 					return
 				}
 				defaultGVK := scope.Kind.GroupVersion().WithKind("DeleteOptions")
-				obj, _, err := scope.Serializer.DecoderToVersion(s, defaultGVK.GroupVersion()).Decode(body, &defaultGVK, options)
+				obj, _, err := scope.Serializer.DecoderToVersion(s.Serializer, defaultGVK.GroupVersion()).Decode(body, &defaultGVK, options)
 				if err != nil {
 					scope.err(err, res.ResponseWriter, req.Request)
 					return
@@ -889,7 +889,7 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestSco
 					return
 				}
 				defaultGVK := scope.Kind.GroupVersion().WithKind("DeleteOptions")
-				obj, _, err := scope.Serializer.DecoderToVersion(s, defaultGVK.GroupVersion()).Decode(body, &defaultGVK, options)
+				obj, _, err := scope.Serializer.DecoderToVersion(s.Serializer, defaultGVK.GroupVersion()).Decode(body, &defaultGVK, options)
 				if err != nil {
 					scope.err(err, res.ResponseWriter, req.Request)
 					return
