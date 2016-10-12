@@ -61,14 +61,15 @@ func (f *FitError) Error() string {
 }
 
 type genericScheduler struct {
-	cache                schedulercache.Cache
-	predicates           map[string]algorithm.FitPredicate
-	priorityMetaProducer algorithm.MetadataProducer
-	prioritizers         []algorithm.PriorityConfig
-	extenders            []algorithm.SchedulerExtender
-	pods                 algorithm.PodLister
-	lastNodeIndexLock    sync.Mutex
-	lastNodeIndex        uint64
+	cache                 schedulercache.Cache
+	predicates            map[string]algorithm.FitPredicate
+	priorityMetaProducer  algorithm.MetadataProducer
+	predicateMetaProducer algorithm.MetadataProducer
+	prioritizers          []algorithm.PriorityConfig
+	extenders             []algorithm.SchedulerExtender
+	pods                  algorithm.PodLister
+	lastNodeIndexLock     sync.Mutex
+	lastNodeIndex         uint64
 
 	cachedNodeInfoMap map[string]*schedulercache.NodeInfo
 
@@ -104,7 +105,7 @@ func (g *genericScheduler) Schedule(pod *api.Pod, nodeLister algorithm.NodeListe
 	// TODO(harryz) Check if equivalenceCache is enabled and call scheduleWithEquivalenceClass here
 
 	trace.Step("Computing predicates")
-	filteredNodes, failedPredicateMap, err := findNodesThatFit(pod, g.cachedNodeInfoMap, nodes, g.predicates, g.extenders)
+	filteredNodes, failedPredicateMap, err := findNodesThatFit(pod, g.cachedNodeInfoMap, nodes, g.predicates, g.extenders, g.predicateMetaProducer)
 	if err != nil {
 		return "", err
 	}
@@ -153,7 +154,9 @@ func findNodesThatFit(
 	nodeNameToInfo map[string]*schedulercache.NodeInfo,
 	nodes []*api.Node,
 	predicateFuncs map[string]algorithm.FitPredicate,
-	extenders []algorithm.SchedulerExtender) ([]*api.Node, FailedPredicateMap, error) {
+	extenders []algorithm.SchedulerExtender,
+	metadataProducer algorithm.MetadataProducer,
+) ([]*api.Node, FailedPredicateMap, error) {
 	var filtered []*api.Node
 	failedPredicateMap := FailedPredicateMap{}
 
@@ -163,11 +166,12 @@ func findNodesThatFit(
 		// Create filtered list with enough space to avoid growing it
 		// and allow assigning.
 		filtered = make([]*api.Node, len(nodes))
-		meta := predicates.PredicateMetadata(pod, nodeNameToInfo)
 		errs := []error{}
-
 		var predicateResultLock sync.Mutex
 		var filteredLen int32
+
+		// We can use the same metadata producer for all nodes.
+		meta := metadataProducer(pod, nodeNameToInfo)
 		checkNode := func(i int) {
 			nodeName := nodes[i].Name
 			fits, failedPredicates, err := podFitsOnNode(pod, meta, nodeNameToInfo[nodeName], predicateFuncs)
@@ -381,15 +385,17 @@ func EqualPriorityMap(_ *api.Pod, _ interface{}, nodeInfo *schedulercache.NodeIn
 func NewGenericScheduler(
 	cache schedulercache.Cache,
 	predicates map[string]algorithm.FitPredicate,
-	priorityMetaProducer algorithm.MetadataProducer,
+	predicateMetaProducer algorithm.MetadataProducer,
 	prioritizers []algorithm.PriorityConfig,
+	priorityMetaProducer algorithm.MetadataProducer,
 	extenders []algorithm.SchedulerExtender) algorithm.ScheduleAlgorithm {
 	return &genericScheduler{
-		cache:                cache,
-		predicates:           predicates,
-		priorityMetaProducer: priorityMetaProducer,
-		prioritizers:         prioritizers,
-		extenders:            extenders,
-		cachedNodeInfoMap:    make(map[string]*schedulercache.NodeInfo),
+		cache:                 cache,
+		predicates:            predicates,
+		predicateMetaProducer: predicateMetaProducer,
+		prioritizers:          prioritizers,
+		priorityMetaProducer:  priorityMetaProducer,
+		extenders:             extenders,
+		cachedNodeInfoMap:     make(map[string]*schedulercache.NodeInfo),
 	}
 }

@@ -78,7 +78,8 @@ var (
 	algorithmProviderMap = make(map[string]AlgorithmProviderConfig)
 
 	// Registered metadata producers
-	priorityMetadataProducer MetadataProducerFactory
+	priorityMetadataProducer  MetadataProducerFactory
+	predicateMetadataProducer MetadataProducerFactory
 
 	// get equivalence pod function
 	getEquivalencePodFunc algorithm.GetEquivalencePodFunc = nil
@@ -121,12 +122,16 @@ func RegisterCustomFitPredicate(policy schedulerapi.PredicatePolicy) string {
 	if policy.Argument != nil {
 		if policy.Argument.ServiceAffinity != nil {
 			predicateFactory = func(args PluginFactoryArgs) algorithm.FitPredicate {
-				return predicates.NewServiceAffinityPredicate(
+				predicate, precomputationFunction := predicates.NewServiceAffinityPredicate(
 					args.PodLister,
 					args.ServiceLister,
 					args.NodeInfo,
 					policy.Argument.ServiceAffinity.Labels,
 				)
+
+				// Once we generate the predicate we should also Register the Precomputation
+				predicates.RegisterPredicatePrecomputation(policy.Name, precomputationFunction)
+				return predicate
 			}
 		} else if policy.Argument.LabelsPresence != nil {
 			predicateFactory = func(args PluginFactoryArgs) algorithm.FitPredicate {
@@ -161,6 +166,12 @@ func RegisterPriorityMetadataProducerFactory(factory MetadataProducerFactory) {
 	schedulerFactoryMutex.Lock()
 	defer schedulerFactoryMutex.Unlock()
 	priorityMetadataProducer = factory
+}
+
+func RegisterPredicateMetadataProducerFactory(factory MetadataProducerFactory) {
+	schedulerFactoryMutex.Lock()
+	defer schedulerFactoryMutex.Unlock()
+	predicateMetadataProducer = factory
 }
 
 // DEPRECATED
@@ -310,6 +321,16 @@ func getPriorityMetadataProducer(args PluginFactoryArgs) (algorithm.MetadataProd
 		return algorithm.EmptyMetadataProducer, nil
 	}
 	return priorityMetadataProducer(args), nil
+}
+
+func getPredicateMetadataProducer(args PluginFactoryArgs) (algorithm.MetadataProducer, error) {
+	schedulerFactoryMutex.Lock()
+	defer schedulerFactoryMutex.Unlock()
+
+	if predicateMetadataProducer == nil {
+		return algorithm.EmptyMetadataProducer, nil
+	}
+	return predicateMetadataProducer(args), nil
 }
 
 func getPriorityFunctionConfigs(names sets.String, args PluginFactoryArgs) ([]algorithm.PriorityConfig, error) {
