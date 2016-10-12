@@ -16,15 +16,33 @@ limitations under the License.
 package cmd
 
 import (
-  "io"
+	"io"
 )
 
 type CmdContext struct {
-  In            io.Reader
-  Out           io.Writer
-  ErrOut        io.Writer
-  BaseCmd       string
-  CmdName       string
-  FullName      string
-  CmdDetailsURL string
+	In            io.Reader
+	Out           io.Writer
+	ErrOut        io.Writer
+	BaseCmd       string
+	CmdName       string
+	FullName      string
+	CmdDetailsURL string
+	SubCmdNames   []string
+}
+
+func (ctx CmdContext) New(CmdName string, CmdDetailsURL string) *CmdContext {
+	return ctx.NewForSub(CmdName, CmdDetailsURL, nil)
+}
+
+func (ctx CmdContext) NewForSub(CmdName string, CmdDetailsURL string, SubCmdNames []string) *CmdContext {
+	newCtx := &CmdContext{
+		ctx.In,
+		ctx.Out,
+		ctx.ErrOut,
+		ctx.BaseCmd,
+		CmdName,
+		ctx.FullName,
+		CmdDetailsURL,
+		SubCmdNames}
+	return newCtx
 }
