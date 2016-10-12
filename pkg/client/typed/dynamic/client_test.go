@@ -529,6 +529,7 @@ func TestPatch(t *testing.T) {
 				return
 			}
 
+			w.Header().Set("Content-Type", "application/json")
 			w.Write(data)
 		})
 		if err != nil {
