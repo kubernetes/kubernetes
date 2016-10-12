@@ -1423,6 +1423,9 @@ const (
 	PodReady PodConditionType = "Ready"
 	// PodInitialized means that all init containers in the pod have started successfully.
 	PodInitialized PodConditionType = "Initialized"
+	// PodReasonUnschedulable reason in PodScheduled PodCondition means that the scheduler
+	// can't schedule the pod right now, for example due to insufficient resources in the cluster.
+	PodReasonUnschedulable = "Unschedulable"
 )
 
 type PodCondition struct {
