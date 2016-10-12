@@ -39,7 +39,8 @@ type PriorityMapFunction func(pod *api.Pod, meta interface{}, nodeInfo *schedule
 type PriorityReduceFunction func(pod *api.Pod, result schedulerapi.HostPriorityList) error
 
 // MetdataProducer is a function that computes metadata for a given pod.
-type MetadataProducer func(pod *api.Pod) interface{}
+// In some cases NodeInfo is required in order for certain types of metadata caching, but leaving nil may be ok in many cases also.
+type MetadataProducer func(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo) interface{}
 
 // DEPRECATED
 // Use Map-Reduce pattern for priority functions.
@@ -54,7 +55,7 @@ type PriorityConfig struct {
 	Weight   int
 }
 
-func EmptyMetadataProducer(pod *api.Pod) interface{} {
+func EmptyMetadataProducer(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo) interface{} {
 	return nil
 }
 
