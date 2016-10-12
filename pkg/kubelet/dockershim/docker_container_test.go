@@ -101,7 +101,7 @@ func TestContainerStatus(t *testing.T) {
 	config := makeContainerConfig(sConfig, "pause", "iamimage", 0, labels, annotations)
 
 	var defaultTime time.Time
-	dt := defaultTime.Unix()
+	dt := defaultTime.UnixNano()
 	ct, st, ft := dt, dt, dt
 	state := runtimeApi.ContainerState_CREATED
 	// The following variables are not set in FakeDockerClient.
@@ -127,7 +127,7 @@ func TestContainerStatus(t *testing.T) {
 
 	// Create the container.
 	fClock.SetTime(time.Now().Add(-1 * time.Hour))
-	*expected.CreatedAt = fClock.Now().Unix()
+	*expected.CreatedAt = fClock.Now().UnixNano()
 	const sandboxId = "sandboxid"
 	id, err := ds.CreateContainer(sandboxId, config, sConfig)
 
@@ -146,7 +146,7 @@ func TestContainerStatus(t *testing.T) {
 
 	// Advance the clock and start the container.
 	fClock.SetTime(time.Now())
-	*expected.StartedAt = fClock.Now().Unix()
+	*expected.StartedAt = fClock.Now().UnixNano()
 	*expected.State = runtimeApi.ContainerState_RUNNING
 
 	err = ds.StartContainer(id)
@@ -156,7 +156,7 @@ func TestContainerStatus(t *testing.T) {
 
 	// Advance the clock and stop the container.
 	fClock.SetTime(time.Now().Add(1 * time.Hour))
-	*expected.FinishedAt = fClock.Now().Unix()
+	*expected.FinishedAt = fClock.Now().UnixNano()
 	*expected.State = runtimeApi.ContainerState_EXITED
 	*expected.Reason = "Completed"
 
