@@ -27,7 +27,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = framework.KubeDescribe("Kibana Logging Instances Is Alive", func() {
+var _ = framework.KubeDescribe("Kibana Logging Instances Is Alive [Feature:Elasticsearch]", func() {
 	f := framework.NewDefaultFramework("kibana-logging")
 
 	BeforeEach(func() {
