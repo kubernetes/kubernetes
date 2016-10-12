@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package util
+package flag
 
 // StringFlag is a string flag compatible with flags and pflags that keeps track of whether it had a value supplied or not.
 type StringFlag struct {
