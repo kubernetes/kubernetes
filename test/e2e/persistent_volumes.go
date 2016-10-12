@@ -277,7 +277,7 @@ func testPodSuccessOrFail(f *framework.Framework, c *client.Client, ns string, p
 
 	By("Pod should terminate with exitcode 0 (success)")
 
-	err := framework.WaitForPodSuccessInNamespace(c, pod.Name, pod.Spec.Containers[0].Name, ns)
+	err := framework.WaitForPodSuccessInNamespace(c, pod.Name, ns)
 	if err != nil {
 		return fmt.Errorf("Pod %v returned non-zero exitcode: %+v", pod.Name, err)
 	}
