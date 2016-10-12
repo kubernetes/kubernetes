@@ -66,6 +66,11 @@ func init() {
 			return priorities.PriorityMetadata
 		})
 
+	factory.RegisterPredicateMetadataProducerFactory(
+		func(args factory.PluginFactoryArgs) algorithm.MetadataProducer {
+			return predicates.NewPredicateMetadataFactory(args.PodLister)
+		})
+
 	// EqualPriority is a prioritizer function that gives an equal weight of one to all nodes
 	// Register the priority function so that its available
 	// but do not include it as part of the default priorities
