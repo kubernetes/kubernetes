@@ -26,6 +26,7 @@ import (
 	api "k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/apis/storage"
+	storageutil "k8s.io/kubernetes/pkg/apis/storage/util"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -94,12 +95,6 @@ func (a *claimDefaulterPlugin) Stop() {
 	}
 }
 
-// This is a stand-in until we have a real field.  This string should be a const somewhere.
-const classAnnotation = "volume.beta.kubernetes.io/storage-class"
-
-// This indicates that a particular StorageClass nominates itself as the system default.
-const isDefaultAnnotation = "storageclass.beta.kubernetes.io/is-default-class"
-
 // Admit sets the default value of a PersistentVolumeClaim's storage class, in case the user did
 // not provide a value.
 //
@@ -121,8 +116,7 @@ func (c *claimDefaulterPlugin) Admit(a admission.Attributes) error {
 		return nil
 	}
 
-	_, found := pvc.Annotations[classAnnotation]
-	if found {
+	if storageutil.HasStorageClassAnnotation(pvc.ObjectMeta) {
 		// The user asked for a class.
 		return nil
 	}
@@ -142,7 +136,7 @@ func (c *claimDefaulterPlugin) Admit(a admission.Attributes) error {
 	if pvc.ObjectMeta.Annotations == nil {
 		pvc.ObjectMeta.Annotations = map[string]string{}
 	}
-	pvc.Annotations[classAnnotation] = def.Name
+	pvc.Annotations[storageutil.StorageClassAnnotation] = def.Name
 	return nil
 }
 
@@ -154,7 +148,7 @@ func getDefaultClass(store cache.Store) (*storage.StorageClass, error) {
 		if !ok {
 			return nil, errors.NewInternalError(fmt.Errorf("error converting stored object to StorageClass: %v", c))
 		}
-		if class.Annotations[isDefaultAnnotation] == "true" {
+		if storageutil.IsDefaultAnnotation(class.ObjectMeta) {
 			defaultClasses = append(defaultClasses, class)
 			glog.V(4).Infof("getDefaultClass added: %s", class.Name)
 		}
