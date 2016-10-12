@@ -162,6 +162,25 @@ func init() {
 	DefaultObjectDescriber = d
 }
 
+func getStorageClassAnnotation(obj api.ObjectMeta) string {
+	if obj.Annotations[storage.BetaStorageClassAnnotation] != "" {
+		return obj.Annotations[storage.BetaStorageClassAnnotation]
+	}
+	if obj.Annotations[storage.AlphaStorageClassAnnotation] != "" {
+		return obj.Annotations[storage.AlphaStorageClassAnnotation]
+	}
+
+	return ""
+}
+
+func isDefaultAnnotation(obj api.ObjectMeta) string {
+	if obj.Annotations[storage.BetaIsDefaultStorageClassAnnotation] == "true" {
+		return "Yes"
+	}
+
+	return "No"
+}
+
 // NamespaceDescriber generates information about a namespace
 type NamespaceDescriber struct {
 	clientset.Interface
@@ -791,6 +810,7 @@ func (d *PersistentVolumeDescriber) Describe(namespace, name string, describerSe
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", pv.Name)
 		printLabelsMultiline(out, "Labels", pv.Labels)
+		fmt.Fprintf(out, "StorageClass:\t%s\n", getStorageClassAnnotation(pv.ObjectMeta))
 		fmt.Fprintf(out, "Status:\t%s\n", pv.Status.Phase)
 		if pv.Spec.ClaimRef != nil {
 			fmt.Fprintf(out, "Claim:\t%s\n", pv.Spec.ClaimRef.Namespace+"/"+pv.Spec.ClaimRef.Name)
@@ -860,6 +880,7 @@ func (d *PersistentVolumeClaimDescriber) Describe(namespace, name string, descri
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", pvc.Name)
 		fmt.Fprintf(out, "Namespace:\t%s\n", pvc.Namespace)
+		fmt.Fprintf(out, "StorageClass:\t%s\n", getStorageClassAnnotation(pvc.ObjectMeta))
 		fmt.Fprintf(out, "Status:\t%v\n", pvc.Status.Phase)
 		fmt.Fprintf(out, "Volume:\t%s\n", pvc.Spec.VolumeName)
 		printLabelsMultiline(out, "Labels", pvc.Labels)
@@ -2422,6 +2443,7 @@ func (s *StorageClassDescriber) Describe(namespace, name string, describerSettin
 	}
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", sc.Name)
+		fmt.Fprintf(out, "IsDefaultClass:\t%s\n", isDefaultAnnotation(sc.ObjectMeta))
 		fmt.Fprintf(out, "Annotations:\t%s\n", labels.FormatLabels(sc.Annotations))
 		fmt.Fprintf(out, "Provisioner:\t%s\n", sc.Provisioner)
 		fmt.Fprintf(out, "Parameters:\t%s\n", labels.FormatLabels(sc.Parameters))

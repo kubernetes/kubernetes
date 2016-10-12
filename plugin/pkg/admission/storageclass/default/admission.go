@@ -94,12 +94,6 @@ func (a *claimDefaulterPlugin) Stop() {
 	}
 }
 
-// This is a stand-in until we have a real field.  This string should be a const somewhere.
-const classAnnotation = "volume.beta.kubernetes.io/storage-class"
-
-// This indicates that a particular StorageClass nominates itself as the system default.
-const isDefaultAnnotation = "storageclass.beta.kubernetes.io/is-default-class"
-
 // Admit sets the default value of a PersistentVolumeClaim's storage class, in case the user did
 // not provide a value.
 //
@@ -121,7 +115,7 @@ func (c *claimDefaulterPlugin) Admit(a admission.Attributes) error {
 		return nil
 	}
 
-	_, found := pvc.Annotations[classAnnotation]
+	_, found := pvc.Annotations[storage.BetaStorageClassAnnotation]
 	if found {
 		// The user asked for a class.
 		return nil
@@ -142,7 +136,7 @@ func (c *claimDefaulterPlugin) Admit(a admission.Attributes) error {
 	if pvc.ObjectMeta.Annotations == nil {
 		pvc.ObjectMeta.Annotations = map[string]string{}
 	}
-	pvc.Annotations[classAnnotation] = def.Name
+	pvc.Annotations[storage.BetaStorageClassAnnotation] = def.Name
 	return nil
 }
 
@@ -154,7 +148,7 @@ func getDefaultClass(store cache.Store) (*storage.StorageClass, error) {
 		if !ok {
 			return nil, errors.NewInternalError(fmt.Errorf("error converting stored object to StorageClass: %v", c))
 		}
-		if class.Annotations[isDefaultAnnotation] == "true" {
+		if class.Annotations[storage.BetaIsDefaultStorageClassAnnotation] == "true" {
 			defaultClasses = append(defaultClasses, class)
 			glog.V(4).Infof("getDefaultClass added: %s", class.Name)
 		}

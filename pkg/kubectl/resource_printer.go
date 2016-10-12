@@ -2078,8 +2078,16 @@ func printNetworkPolicyList(list *extensions.NetworkPolicyList, w io.Writer, opt
 	return nil
 }
 
+func hasDefaultAnnotation(obj api.ObjectMeta) bool {
+	return obj.Annotations[storage.BetaIsDefaultStorageClassAnnotation] == "true"
+}
+
 func printStorageClass(sc *storage.StorageClass, w io.Writer, options PrintOptions) error {
 	name := sc.Name
+
+	if hasDefaultAnnotation(sc.ObjectMeta) {
+		name += " (default)"
+	}
 	provtype := sc.Provisioner
 
 	if _, err := fmt.Fprintf(w, "%s\t%s\t", name, provtype); err != nil {

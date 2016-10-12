@@ -21,6 +21,13 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
+// StorageClass annotations
+const (
+	BetaIsDefaultStorageClassAnnotation = "storageclass.beta.kubernetes.io/is-default-class"
+	AlphaStorageClassAnnotation         = "volume.alpha.kubernetes.io/storage-class"
+	BetaStorageClassAnnotation          = "volume.beta.kubernetes.io/storage-class"
+)
+
 // +genclient=true
 // +nonNamespaced=true
 
