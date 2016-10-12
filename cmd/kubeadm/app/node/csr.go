@@ -18,55 +18,19 @@ package node
 
 import (
 	"fmt"
-	"os"
 
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/pkg/apis/certificates"
-	unversionedcertificates "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/certificates/unversioned"
-	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/typed/discovery"
-	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	"k8s.io/kubernetes/pkg/kubelet/util/csr"
-	"k8s.io/kubernetes/pkg/types"
 	certutil "k8s.io/kubernetes/pkg/util/cert"
 )
 
-// PerformTLSBootstrap creates a RESTful client in order to execute certificate signing request.
-func PerformTLSBootstrap(s *kubeadmapi.NodeConfiguration, apiEndpoint string, caCert []byte) (*clientcmdapi.Config, error) {
-	// TODO(phase1+) try all the api servers until we find one that works
-	bareClientConfig := kubeadmutil.CreateBasicClientConfig("kubernetes", apiEndpoint, caCert)
-
-	hostName, err := os.Hostname()
-	if err != nil {
-		return nil, fmt.Errorf("<node/csr> failed to get node hostname [%v]", err)
-	}
-
-	// TODO(phase1+) https://github.com/kubernetes/kubernetes/issues/33641
-	nodeName := types.NodeName(hostName)
-
-	bootstrapClientConfig, err := clientcmd.NewDefaultClientConfig(
-		*kubeadmutil.MakeClientConfigWithToken(
-			bareClientConfig, "kubernetes", fmt.Sprintf("kubelet-%s", nodeName), s.Secrets.BearerToken,
-		),
-		&clientcmd.ConfigOverrides{},
-	).ClientConfig()
-	if err != nil {
-		return nil, fmt.Errorf("<node/csr> failed to create API client configuration [%v]", err)
-	}
-
-	client, err := unversionedcertificates.NewForConfig(bootstrapClientConfig)
-	if err != nil {
-		return nil, fmt.Errorf("<node/csr> failed to create API client [%v]", err)
-	}
-	csrClient := client.CertificateSigningRequests()
-
-	// TODO(phase1+) https://github.com/kubernetes/kubernetes/issues/33643
-
-	if err := checkCertsAPI(bootstrapClientConfig); err != nil {
-		return nil, fmt.Errorf("<node/csr> failed to proceed due to API compatibility issue - %v", err)
-	}
+// PerformTLSBootstrap executes a certificate signing request with the
+// provided connection details.
+func PerformTLSBootstrap(connection *ConnectionDetails) (*clientcmdapi.Config, error) {
+	csrClient := connection.CertClient.CertificateSigningRequests()
 
 	fmt.Println("<node/csr> created API client to obtain unique certificate for this node, generating keys and certificate signing request")
 
@@ -74,7 +38,7 @@ func PerformTLSBootstrap(s *kubeadmapi.NodeConfiguration, apiEndpoint string, ca
 	if err != nil {
 		return nil, fmt.Errorf("<node/csr> failed to generating private key [%v]", err)
 	}
-	cert, err := csr.RequestNodeCertificate(csrClient, key, nodeName)
+	cert, err := csr.RequestNodeCertificate(csrClient, key, connection.NodeName)
 	if err != nil {
 		return nil, fmt.Errorf("<node/csr> failed to request signed certificate from the API server [%v]", err)
 	}
@@ -84,21 +48,18 @@ func PerformTLSBootstrap(s *kubeadmapi.NodeConfiguration, apiEndpoint string, ca
 	}
 	fmt.Printf("<node/csr> received signed certificate from the API server:\n%s\n", fmtCert)
 	fmt.Println("<node/csr> generating kubelet configuration")
+
+	bareClientConfig := kubeadmutil.CreateBasicClientConfig("kubernetes", connection.Endpoint, connection.CACert)
 	finalConfig := kubeadmutil.MakeClientConfigWithCerts(
-		bareClientConfig, "kubernetes", fmt.Sprintf("kubelet-%s", nodeName),
+		bareClientConfig, "kubernetes", fmt.Sprintf("kubelet-%s", connection.NodeName),
 		key, cert,
 	)
 
 	return finalConfig, nil
 }
 
-func checkCertsAPI(config *restclient.Config) error {
-	discoveryClient, err := discovery.NewDiscoveryClientForConfig(config)
-
-	if err != nil {
-		return fmt.Errorf("failed to create API discovery client [%v]", err)
-	}
-
+// Checks if the certificates API for this endpoint is functional
+func checkCertsAPI(discoveryClient *discovery.DiscoveryClient) error {
 	serverGroups, err := discoveryClient.ServerGroups()
 
 	if err != nil {

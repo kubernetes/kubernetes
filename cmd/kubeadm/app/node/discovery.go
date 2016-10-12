@@ -25,10 +25,9 @@ import (
 
 	jose "github.com/square/go-jose"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 )
 
-func RetrieveTrustedClusterInfo(s *kubeadmapi.NodeConfiguration) (*clientcmdapi.Config, error) {
+func RetrieveTrustedClusterInfo(s *kubeadmapi.NodeConfiguration) (*kubeadmapi.ClusterInfo, error) {
 	host, port := s.MasterAddresses[0], 9898
 	requestURL := fmt.Sprintf("http://%s:%d/cluster-info/v1/?token-id=%s", host, port, s.Secrets.TokenID)
 	req, err := http.NewRequest("GET", requestURL, nil)
@@ -71,9 +70,5 @@ func RetrieveTrustedClusterInfo(s *kubeadmapi.NodeConfiguration) (*clientcmdapi.
 	// TODO(phase1+) print summary info about the CA certificate, along with the the checksum signature
 	// we also need an ability for the user to configure the client to validate recieved CA cert agains a checksum
 	fmt.Printf("<node/discovery> cluster info signature and contents are valid, will use API endpoints %v\n", clusterInfo.Endpoints)
-
-	apiServer := clusterInfo.Endpoints[0]
-	caCert := []byte(clusterInfo.CertificateAuthorities[0])
-
-	return PerformTLSBootstrap(s, apiServer, caCert)
+	return &clusterInfo, nil
 }
