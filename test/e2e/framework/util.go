@@ -2786,7 +2786,8 @@ func (config *RCConfig) start() error {
 // Simplified version of RunRC, that does not create RC, but creates plain Pods.
 // Optionally waits for pods to start running (if waitForRunning == true).
 // The number of replicas must be non-zero.
-func StartPods(c *client.Client, replicas int, namespace string, podNamePrefix string, pod api.Pod, waitForRunning bool) {
+func StartPods(c *client.Client, replicas int, namespace string, podNamePrefix string,
+	pod api.Pod, waitForRunning bool, logFunc func(fmt string, args ...interface{})) error {
 	// no pod to start
 	if replicas < 1 {
 		panic("StartPods: number of replicas must be non-zero")
@@ -2799,14 +2800,15 @@ func StartPods(c *client.Client, replicas int, namespace string, podNamePrefix s
 		pod.ObjectMeta.Labels["startPodsID"] = startPodsID
 		pod.Spec.Containers[0].Name = podName
 		_, err := c.Pods(namespace).Create(&pod)
-		ExpectNoError(err)
+		return err
 	}
-	Logf("Waiting for running...")
+	logFunc("Waiting for running...")
 	if waitForRunning {
 		label := labels.SelectorFromSet(labels.Set(map[string]string{"startPodsID": startPodsID}))
 		err := WaitForPodsWithLabelRunning(c, namespace, label)
-		ExpectNoError(err, "Error waiting for %d pods to be running - probably a timeout", replicas)
+		return fmt.Errorf("Error waiting for %d pods to be running - probably a timeout: %v", replicas, err)
 	}
+	return nil
 }
 
 type EventsLister func(opts v1.ListOptions, ns string) (*v1.EventList, error)
