@@ -45,6 +45,7 @@ func createSynthLogger(f *framework.Framework, linesCount int) {
 			Namespace: f.Namespace.Name,
 		},
 		Spec: api.PodSpec{
+			RestartPolicy: api.RestartPolicyOnFailure,
 			Containers: []api.Container{
 				{
 					Name:  synthLoggerPodName,
