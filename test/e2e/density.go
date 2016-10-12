@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/workqueue"
 	"k8s.io/kubernetes/pkg/watch"
 	"k8s.io/kubernetes/test/e2e/framework"
+	testutils "k8s.io/kubernetes/test/utils"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -53,7 +54,7 @@ const (
 var MaxContainerFailures = 0
 
 type DensityTestConfig struct {
-	Configs      []framework.RCConfig
+	Configs      []testutils.RCConfig
 	Client       *client.Client
 	ClientSet    internalclientset.Interface
 	Namespace    string
@@ -163,7 +164,7 @@ func density30AddonResourceVerifier(numNodes int) map[string]framework.ResourceC
 
 func logPodStartupStatus(c *client.Client, expectedPods int, ns string, observedLabels map[string]string, period time.Duration, stopCh chan struct{}) {
 	label := labels.SelectorFromSet(labels.Set(observedLabels))
-	podStore := framework.NewPodStore(c, ns, label, fields.Everything())
+	podStore := testutils.NewPodStore(c, ns, label, fields.Everything())
 	defer podStore.Stop()
 	ticker := time.NewTicker(period)
 	defer ticker.Stop()
@@ -171,11 +172,11 @@ func logPodStartupStatus(c *client.Client, expectedPods int, ns string, observed
 		select {
 		case <-ticker.C:
 			pods := podStore.List()
-			startupStatus := framework.ComputeRCStartupStatus(pods, expectedPods)
+			startupStatus := testutils.ComputeRCStartupStatus(pods, expectedPods)
 			framework.Logf(startupStatus.String("Density"))
 		case <-stopCh:
 			pods := podStore.List()
-			startupStatus := framework.ComputeRCStartupStatus(pods, expectedPods)
+			startupStatus := testutils.ComputeRCStartupStatus(pods, expectedPods)
 			framework.Logf(startupStatus.String("Density"))
 			return
 		}
@@ -471,10 +472,10 @@ var _ = framework.KubeDescribe("Density", func() {
 
 			// TODO: loop to podsPerNode instead of 1 when we're ready.
 			numberOrRCs := 1
-			RCConfigs := make([]framework.RCConfig, numberOrRCs)
+			RCConfigs := make([]testutils.RCConfig, numberOrRCs)
 			for i := 0; i < numberOrRCs; i++ {
 				RCName := "density" + strconv.Itoa(totalPods) + "-" + strconv.Itoa(i) + "-" + uuid
-				RCConfigs[i] = framework.RCConfig{Client: c,
+				RCConfigs[i] = testutils.RCConfig{Client: c,
 					Image:                framework.GetPauseImageName(f.Client),
 					Name:                 RCName,
 					Namespace:            ns,
@@ -690,14 +691,14 @@ var _ = framework.KubeDescribe("Density", func() {
 		framework.ExpectNoError(err)
 		defer fileHndl.Close()
 		rcCnt := 1
-		RCConfigs := make([]framework.RCConfig, rcCnt)
+		RCConfigs := make([]testutils.RCConfig, rcCnt)
 		podsPerRC := int(totalPods / rcCnt)
 		for i := 0; i < rcCnt; i++ {
 			if i == rcCnt-1 {
 				podsPerRC += int(math.Mod(float64(totalPods), float64(rcCnt)))
 			}
 			RCName = "density" + strconv.Itoa(totalPods) + "-" + strconv.Itoa(i) + "-" + uuid
-			RCConfigs[i] = framework.RCConfig{Client: c,
+			RCConfigs[i] = testutils.RCConfig{Client: c,
 				Image:                framework.GetPauseImageName(f.Client),
 				Name:                 RCName,
 				Namespace:            ns,

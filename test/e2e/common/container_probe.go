@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
+	testutils "k8s.io/kubernetes/test/utils"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -51,7 +52,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 
 		p, err := podClient.Get(p.Name)
 		framework.ExpectNoError(err)
-		isReady, err := framework.PodRunningReady(p)
+		isReady, err := testutils.PodRunningReady(p)
 		framework.ExpectNoError(err)
 		Expect(isReady).To(BeTrue(), "pod should be ready")
 
@@ -85,7 +86,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 		p, err := podClient.Get(p.Name)
 		framework.ExpectNoError(err)
 
-		isReady, err := framework.PodRunningReady(p)
+		isReady, err := testutils.PodRunningReady(p)
 		Expect(isReady).NotTo(BeTrue(), "pod should be not ready")
 
 		restartCount := getRestartCount(p)

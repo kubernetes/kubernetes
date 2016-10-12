@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/test/e2e/framework"
+	testutils "k8s.io/kubernetes/test/utils"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -116,7 +117,7 @@ func proxyContext(version string) {
 		// environmental variables below.
 		By("starting an echo server on multiple ports")
 		pods := []*api.Pod{}
-		cfg := framework.RCConfig{
+		cfg := testutils.RCConfig{
 			Client:       f.Client,
 			Image:        "gcr.io/google_containers/porter:cd5cb5791ebaa8641955f0e8c2a9bed669b1eaab",
 			Name:         service.Name,
