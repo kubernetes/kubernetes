@@ -150,9 +150,7 @@ var _ = framework.KubeDescribe("ResourceQuota", func() {
 		requests := api.ResourceList{}
 		requests[api.ResourceCPU] = resource.MustParse("500m")
 		requests[api.ResourceMemory] = resource.MustParse("252Mi")
-		pod := newTestPodForQuota(f, podName, requests, api.ResourceList{})
-		pod, err = f.Client.Pods(f.Namespace.Name).Create(pod)
-		Expect(err).NotTo(HaveOccurred())
+		pod := f.PodClient().Create(newTestPodForQuota(f, podName, requests, api.ResourceList{}))
 		podToUpdate := pod
 
 		By("Ensuring ResourceQuota status captures the pod usage")
@@ -167,9 +165,7 @@ var _ = framework.KubeDescribe("ResourceQuota", func() {
 		requests = api.ResourceList{}
 		requests[api.ResourceCPU] = resource.MustParse("600m")
 		requests[api.ResourceMemory] = resource.MustParse("100Mi")
-		pod = newTestPodForQuota(f, "fail-pod", requests, api.ResourceList{})
-		pod, err = f.Client.Pods(f.Namespace.Name).Create(pod)
-		Expect(err).To(HaveOccurred())
+		pod = f.PodClient().Create(newTestPodForQuota(f, "fail-pod", requests, api.ResourceList{}))
 
 		By("Ensuring a pod cannot update its resource requirements")
 		// a pod cannot dynamically update its resource requirements.
@@ -334,9 +330,7 @@ var _ = framework.KubeDescribe("ResourceQuota", func() {
 		limits := api.ResourceList{}
 		limits[api.ResourceCPU] = resource.MustParse("1")
 		limits[api.ResourceMemory] = resource.MustParse("400Mi")
-		pod := newTestPodForQuota(f, podName, requests, limits)
-		pod, err = f.Client.Pods(f.Namespace.Name).Create(pod)
-		Expect(err).NotTo(HaveOccurred())
+		pod := f.PodClient().Create(newTestPodForQuota(f, podName, requests, limits))
 
 		By("Ensuring resource quota with not terminating scope captures the pod usage")
 		usedResources[api.ResourcePods] = resource.MustParse("1")
@@ -374,8 +368,7 @@ var _ = framework.KubeDescribe("ResourceQuota", func() {
 		pod = newTestPodForQuota(f, podName, requests, limits)
 		activeDeadlineSeconds := int64(3600)
 		pod.Spec.ActiveDeadlineSeconds = &activeDeadlineSeconds
-		pod, err = f.Client.Pods(f.Namespace.Name).Create(pod)
-		Expect(err).NotTo(HaveOccurred())
+		pod = f.PodClient().Create(pod)
 
 		By("Ensuring resource quota with terminating scope captures the pod usage")
 		usedResources[api.ResourcePods] = resource.MustParse("1")
@@ -430,8 +423,7 @@ var _ = framework.KubeDescribe("ResourceQuota", func() {
 
 		By("Creating a best-effort pod")
 		pod := newTestPodForQuota(f, podName, api.ResourceList{}, api.ResourceList{})
-		pod, err = f.Client.Pods(f.Namespace.Name).Create(pod)
-		Expect(err).NotTo(HaveOccurred())
+		pod = f.PodClient().Create(pod)
 
 		By("Ensuring resource quota with best effort scope captures the pod usage")
 		usedResources[api.ResourcePods] = resource.MustParse("1")
@@ -459,9 +451,7 @@ var _ = framework.KubeDescribe("ResourceQuota", func() {
 		limits := api.ResourceList{}
 		limits[api.ResourceCPU] = resource.MustParse("1")
 		limits[api.ResourceMemory] = resource.MustParse("400Mi")
-		pod = newTestPodForQuota(f, "burstable-pod", requests, limits)
-		pod, err = f.Client.Pods(f.Namespace.Name).Create(pod)
-		Expect(err).NotTo(HaveOccurred())
+		pod = f.PodClient().Create(newTestPodForQuota(f, "burstable-pod", requests, limits))
 
 		By("Ensuring resource quota with not best effort scope captures the pod usage")
 		usedResources[api.ResourcePods] = resource.MustParse("1")

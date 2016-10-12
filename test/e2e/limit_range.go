@@ -54,8 +54,7 @@ var _ = framework.KubeDescribe("LimitRange", func() {
 
 		By("Creating a Pod with no resource requirements")
 		pod := newTestPod(f, "pod-no-resources", api.ResourceList{}, api.ResourceList{})
-		pod, err = f.Client.Pods(f.Namespace.Name).Create(pod)
-		Expect(err).NotTo(HaveOccurred())
+		pod = f.PodClient().Create(pod)
 
 		By("Ensuring Pod has resource requirements applied from LimitRange")
 		pod, err = f.Client.Pods(f.Namespace.Name).Get(pod.Name)
@@ -71,8 +70,7 @@ var _ = framework.KubeDescribe("LimitRange", func() {
 
 		By("Creating a Pod with partial resource requirements")
 		pod = newTestPod(f, "pod-partial-resources", getResourceList("", "150Mi"), getResourceList("300m", ""))
-		pod, err = f.Client.Pods(f.Namespace.Name).Create(pod)
-		Expect(err).NotTo(HaveOccurred())
+		pod = f.PodClient().Create(pod)
 
 		By("Ensuring Pod has merged resource requirements applied from LimitRange")
 		pod, err = f.Client.Pods(f.Namespace.Name).Get(pod.Name)
@@ -92,13 +90,11 @@ var _ = framework.KubeDescribe("LimitRange", func() {
 
 		By("Failing to create a Pod with less than min resources")
 		pod = newTestPod(f, podName, getResourceList("10m", "50Mi"), api.ResourceList{})
-		pod, err = f.Client.Pods(f.Namespace.Name).Create(pod)
-		Expect(err).To(HaveOccurred())
+		pod = f.PodClient().Create(pod)
 
 		By("Failing to create a Pod with more than max resources")
 		pod = newTestPod(f, podName, getResourceList("600m", "600Mi"), api.ResourceList{})
-		pod, err = f.Client.Pods(f.Namespace.Name).Create(pod)
-		Expect(err).To(HaveOccurred())
+		pod = f.PodClient().Create(pod)
 	})
 
 })

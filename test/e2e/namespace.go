@@ -102,11 +102,7 @@ func ensurePodsAreRemovedWhenNamespaceIsDeleted(f *framework.Framework) {
 			},
 		},
 	}
-	pod, err = f.Client.Pods(namespace.Name).Create(pod)
-	Expect(err).NotTo(HaveOccurred())
-
-	By("Waiting for the pod to have running status")
-	framework.ExpectNoError(framework.WaitForPodRunningInNamespace(f.Client, pod))
+	pod = f.PodClient().CreateSync(pod)
 
 	By("Deleting the namespace")
 	err = f.Client.Namespaces().Delete(namespace.Name)

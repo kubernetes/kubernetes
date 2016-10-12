@@ -41,10 +41,13 @@ var ImageWhiteList sets.String
 // possibly applying test-suite specific transformations to the pod spec, e.g. for
 // node e2e pod scheduling.
 func (f *Framework) PodClient() *PodClient {
-	return &PodClient{
-		f:            f,
-		PodInterface: f.Client.Pods(f.Namespace.Name),
+	if f.podClient == nil {
+		f.podClient = &PodClient{
+			f:            f,
+			PodInterface: f.Client.Pods(f.Namespace.Name),
+		}
 	}
+	return f.podClient
 }
 
 type PodClient struct {

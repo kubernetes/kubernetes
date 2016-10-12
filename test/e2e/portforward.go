@@ -177,12 +177,7 @@ var _ = framework.KubeDescribe("Port forwarding", func() {
 		It("should support a client that connects, sends no data, and disconnects [Conformance]", func() {
 			By("creating the target pod")
 			pod := pfPod("abc", "1", "1", "1")
-			if _, err := f.Client.Pods(f.Namespace.Name).Create(pod); err != nil {
-				framework.Failf("Couldn't create pod: %v", err)
-			}
-			if err := f.WaitForPodRunning(pod.Name); err != nil {
-				framework.Failf("Pod did not start running: %v", err)
-			}
+			f.PodClient().CreateSync(pod)
 			defer func() {
 				logs, err := framework.GetPodLogs(f.Client, f.Namespace.Name, pod.Name, "portforwardtester")
 				if err != nil {
@@ -222,12 +217,7 @@ var _ = framework.KubeDescribe("Port forwarding", func() {
 		It("should support a client that connects, sends data, and disconnects [Conformance]", func() {
 			By("creating the target pod")
 			pod := pfPod("abc", "10", "10", "100")
-			if _, err := f.Client.Pods(f.Namespace.Name).Create(pod); err != nil {
-				framework.Failf("Couldn't create pod: %v", err)
-			}
-			if err := f.WaitForPodRunning(pod.Name); err != nil {
-				framework.Failf("Pod did not start running: %v", err)
-			}
+			f.PodClient().CreateSync(pod)
 			defer func() {
 				logs, err := framework.GetPodLogs(f.Client, f.Namespace.Name, pod.Name, "portforwardtester")
 				if err != nil {
@@ -290,12 +280,7 @@ var _ = framework.KubeDescribe("Port forwarding", func() {
 		It("should support a client that connects, sends no data, and disconnects [Conformance]", func() {
 			By("creating the target pod")
 			pod := pfPod("", "10", "10", "100")
-			if _, err := f.Client.Pods(f.Namespace.Name).Create(pod); err != nil {
-				framework.Failf("Couldn't create pod: %v", err)
-			}
-			if err := f.WaitForPodRunning(pod.Name); err != nil {
-				framework.Failf("Pod did not start running: %v", err)
-			}
+			f.PodClient().CreateSync(pod)
 			defer func() {
 				logs, err := framework.GetPodLogs(f.Client, f.Namespace.Name, pod.Name, "portforwardtester")
 				if err != nil {
