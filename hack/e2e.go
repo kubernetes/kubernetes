@@ -223,6 +223,15 @@ func run(deploy deployer) error {
 	}
 
 	if *up {
+		// If we tried to bring the cluster up, make a courtesy
+		// attempt to bring it down so we're not leaving resources around.
+		//
+		// TODO: We should try calling deploy.Down exactly once. Though to
+		// stop the leaking resources for now, we want to be on the safe side
+		// and call it explictly in defer if the other one is not called.
+		if *down {
+			defer xmlWrap("Deferred TearDown", deploy.Down)
+		}
 		// Start the cluster using this version.
 		if err := xmlWrap("Up", deploy.Up); err != nil {
 			return fmt.Errorf("starting e2e cluster: %s", err)
@@ -579,6 +588,15 @@ func KubemarkTest() error {
 	if err != nil {
 		return err
 	}
+	// If we tried to bring the Kubemark cluster up, make a courtesy
+	// attempt to bring it down so we're not leaving resources around.
+	//
+	// TODO: We should try calling stop-kubemark exactly once. Though to
+	// stop the leaking resources for now, we want to be on the safe side
+	// and call it explictly in defer if the other one is not called.
+	defer xmlWrap("Deferred Stop kubemark", func() error {
+		return finishRunning("Stop kubemark", exec.Command("./test/kubemark/stop-kubemark.sh"))
+	})
 
 	// Start new run
 	backups := []string{"NUM_NODES", "MASTER_SIZE"}
@@ -592,7 +610,9 @@ func KubemarkTest() error {
 	}
 	os.Setenv("NUM_NODES", os.Getenv("KUBEMARK_NUM_NODES"))
 	os.Setenv("MASTER_SIZE", os.Getenv("KUBEMARK_MASTER_SIZE"))
-	err = finishRunning("Start Kubemark", exec.Command("./test/kubemark/start-kubemark.sh"))
+	err = xmlWrap("Start kubemark", func() error {
+		return finishRunning("Start kubemark", exec.Command("./test/kubemark/start-kubemark.sh"))
+	})
 	if err != nil {
 		return err
 	}
@@ -609,7 +629,9 @@ func KubemarkTest() error {
 		return err
 	}
 
-	err = finishRunning("Stop kubemark", exec.Command("./test/kubemark/stop-kubemark.sh"))
+	err = xmlWrap("Stop kubemark", func() error {
+		return finishRunning("Stop kubemark", exec.Command("./test/kubemark/stop-kubemark.sh"))
+	})
 	if err != nil {
 		return err
 	}
