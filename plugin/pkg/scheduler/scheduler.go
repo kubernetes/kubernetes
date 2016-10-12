@@ -100,7 +100,7 @@ func (s *Scheduler) scheduleOne() {
 		s.config.PodConditionUpdater.Update(pod, &api.PodCondition{
 			Type:   api.PodScheduled,
 			Status: api.ConditionFalse,
-			Reason: "Unschedulable",
+			Reason: api.PodReasonUnschedulable,
 		})
 		return
 	}
