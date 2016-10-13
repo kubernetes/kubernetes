@@ -18,6 +18,7 @@ package unversioned
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
+	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
@@ -43,14 +44,14 @@ type ResourceQuotaInterface interface {
 
 // resourceQuotas implements ResourceQuotaInterface
 type resourceQuotas struct {
-	client *CoreClient
+	client restclient.Interface
 	ns     string
 }
 
 // newResourceQuotas returns a ResourceQuotas
 func newResourceQuotas(c *CoreClient, namespace string) *resourceQuotas {
 	return &resourceQuotas{
-		client: c,
+		client: c.RESTClient(),
 		ns:     namespace,
 	}
 }

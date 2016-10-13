@@ -19,6 +19,7 @@ package v1
 import (
 	api "k8s.io/kubernetes/pkg/api"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
+	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
@@ -43,13 +44,13 @@ type ComponentStatusInterface interface {
 
 // componentStatuses implements ComponentStatusInterface
 type componentStatuses struct {
-	client *CoreClient
+	client restclient.Interface
 }
 
 // newComponentStatuses returns a ComponentStatuses
 func newComponentStatuses(c *CoreClient) *componentStatuses {
 	return &componentStatuses{
-		client: c,
+		client: c.RESTClient(),
 	}
 }
 

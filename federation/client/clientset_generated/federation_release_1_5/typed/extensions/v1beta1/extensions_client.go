@@ -24,7 +24,7 @@ import (
 )
 
 type ExtensionsInterface interface {
-	GetRESTClient() *restclient.RESTClient
+	RESTClient() restclient.Interface
 	DaemonSetsGetter
 	DeploymentsGetter
 	IngressesGetter
@@ -33,7 +33,7 @@ type ExtensionsInterface interface {
 
 // ExtensionsClient is used to interact with features provided by the Extensions group.
 type ExtensionsClient struct {
-	*restclient.RESTClient
+	restClient restclient.Interface
 }
 
 func (c *ExtensionsClient) DaemonSets(namespace string) DaemonSetInterface {
@@ -76,7 +76,7 @@ func NewForConfigOrDie(c *restclient.Config) *ExtensionsClient {
 }
 
 // New creates a new ExtensionsClient for the given RESTClient.
-func New(c *restclient.RESTClient) *ExtensionsClient {
+func New(c restclient.Interface) *ExtensionsClient {
 	return &ExtensionsClient{c}
 }
 
@@ -101,11 +101,11 @@ func setConfigDefaults(config *restclient.Config) error {
 	return nil
 }
 
-// GetRESTClient returns a RESTClient that is used to communicate
+// RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *ExtensionsClient) GetRESTClient() *restclient.RESTClient {
+func (c *ExtensionsClient) RESTClient() restclient.Interface {
 	if c == nil {
 		return nil
 	}
-	return c.RESTClient
+	return c.restClient
 }

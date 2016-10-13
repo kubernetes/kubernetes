@@ -18,6 +18,7 @@ package unversioned
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
+	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
@@ -42,14 +43,14 @@ type SecretInterface interface {
 
 // secrets implements SecretInterface
 type secrets struct {
-	client *CoreClient
+	client restclient.Interface
 	ns     string
 }
 
 // newSecrets returns a Secrets
 func newSecrets(c *CoreClient, namespace string) *secrets {
 	return &secrets{
-		client: c,
+		client: c.RESTClient(),
 		ns:     namespace,
 	}
 }

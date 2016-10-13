@@ -19,6 +19,7 @@ package v1
 import (
 	api "k8s.io/kubernetes/pkg/api"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
+	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
@@ -43,14 +44,14 @@ type ServiceAccountInterface interface {
 
 // serviceAccounts implements ServiceAccountInterface
 type serviceAccounts struct {
-	client *CoreClient
+	client restclient.Interface
 	ns     string
 }
 
 // newServiceAccounts returns a ServiceAccounts
 func newServiceAccounts(c *CoreClient, namespace string) *serviceAccounts {
 	return &serviceAccounts{
-		client: c,
+		client: c.RESTClient(),
 		ns:     namespace,
 	}
 }

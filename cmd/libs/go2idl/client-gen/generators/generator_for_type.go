@@ -69,14 +69,15 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 	pkg := filepath.Base(t.Name.Package)
 	namespaced := !extractBoolTagOrDie("nonNamespaced", t.SecondClosestCommentLines)
 	m := map[string]interface{}{
-		"type":              t,
-		"package":           pkg,
-		"Package":           namer.IC(pkg),
-		"Group":             namer.IC(g.group),
-		"watchInterface":    c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/watch", Name: "Interface"}),
-		"apiParameterCodec": c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/api", Name: "ParameterCodec"}),
-		"PatchType":         c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/api", Name: "PatchType"}),
-		"namespaced":        namespaced,
+		"type":                t,
+		"package":             pkg,
+		"Package":             namer.IC(pkg),
+		"Group":               namer.IC(g.group),
+		"watchInterface":      c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/watch", Name: "Interface"}),
+		"RESTClientInterface": c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/client/restclient", Name: "Interface"}),
+		"apiParameterCodec":   c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/api", Name: "ParameterCodec"}),
+		"PatchType":           c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/api", Name: "PatchType"}),
+		"namespaced":          namespaced,
 	}
 
 	if g.version == "unversioned" {
@@ -134,7 +135,7 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 
 // group client will implement this interface.
 var getterComment = `
-// $.type|publicPlural$Getter has a method to return a $.type|public$Interface. 
+// $.type|publicPlural$Getter has a method to return a $.type|public$Interface.
 // A group's client should implement this interface.`
 
 var getterNamesapced = `
@@ -179,7 +180,7 @@ var interfaceTemplate4 = `
 var structNamespaced = `
 // $.type|privatePlural$ implements $.type|public$Interface
 type $.type|privatePlural$ struct {
-	client *$.Group$Client
+	client $.RESTClientInterface|raw$
 	ns     string
 }
 `
@@ -188,7 +189,7 @@ type $.type|privatePlural$ struct {
 var structNonNamespaced = `
 // $.type|privatePlural$ implements $.type|public$Interface
 type $.type|privatePlural$ struct {
-	client *$.Group$Client
+	client $.RESTClientInterface|raw$
 }
 `
 
@@ -196,7 +197,7 @@ var newStructNamespaced = `
 // new$.type|publicPlural$ returns a $.type|publicPlural$
 func new$.type|publicPlural$(c *$.Group$Client, namespace string) *$.type|privatePlural$ {
 	return &$.type|privatePlural${
-		client: c,
+		client: c.RESTClient(),
 		ns:     namespace,
 	}
 }
@@ -206,7 +207,7 @@ var newStructNonNamespaced = `
 // new$.type|publicPlural$ returns a $.type|publicPlural$
 func new$.type|publicPlural$(c *$.Group$Client) *$.type|privatePlural$ {
 	return &$.type|privatePlural${
-		client: c,
+		client: c.RESTClient(),
 	}
 }
 `

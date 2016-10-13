@@ -65,8 +65,8 @@ func NewScheduledJobController(kubeClient clientset.Interface) *ScheduledJobCont
 	// TODO: remove the wrapper when every clients have moved to use the clientset.
 	eventBroadcaster.StartRecordingToSink(&unversionedcore.EventSinkImpl{Interface: kubeClient.Core().Events("")})
 
-	if kubeClient != nil && kubeClient.Core().GetRESTClient().GetRateLimiter() != nil {
-		metrics.RegisterMetricAndTrackRateLimiterUsage("scheduledjob_controller", kubeClient.Core().GetRESTClient().GetRateLimiter())
+	if kubeClient != nil && kubeClient.Core().RESTClient().GetRateLimiter() != nil {
+		metrics.RegisterMetricAndTrackRateLimiterUsage("scheduledjob_controller", kubeClient.Core().RESTClient().GetRateLimiter())
 	}
 
 	jm := &ScheduledJobController{

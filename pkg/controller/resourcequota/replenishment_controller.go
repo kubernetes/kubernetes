@@ -113,8 +113,8 @@ func NewReplenishmentControllerFactoryFromClient(kubeClient clientset.Interface)
 
 func (r *replenishmentControllerFactory) NewController(options *ReplenishmentControllerOptions) (cache.ControllerInterface, error) {
 	var result cache.ControllerInterface
-	if r.kubeClient != nil && r.kubeClient.Core().GetRESTClient().GetRateLimiter() != nil {
-		metrics.RegisterMetricAndTrackRateLimiterUsage("replenishment_controller", r.kubeClient.Core().GetRESTClient().GetRateLimiter())
+	if r.kubeClient != nil && r.kubeClient.Core().RESTClient().GetRateLimiter() != nil {
+		metrics.RegisterMetricAndTrackRateLimiterUsage("replenishment_controller", r.kubeClient.Core().RESTClient().GetRateLimiter())
 	}
 
 	switch options.GroupKind {

@@ -20,6 +20,7 @@ import (
 	api "k8s.io/kubernetes/pkg/api"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	v1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
@@ -45,14 +46,14 @@ type JobInterface interface {
 
 // jobs implements JobInterface
 type jobs struct {
-	client *ExtensionsClient
+	client restclient.Interface
 	ns     string
 }
 
 // newJobs returns a Jobs
 func newJobs(c *ExtensionsClient, namespace string) *jobs {
 	return &jobs{
-		client: c,
+		client: c.RESTClient(),
 		ns:     namespace,
 	}
 }

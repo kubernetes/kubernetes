@@ -243,7 +243,7 @@ func RunRollingUpdate(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args
 	// than the old rc. This selector is the hash of the rc, with a suffix to provide uniqueness for
 	// same-image updates.
 	if len(image) != 0 {
-		codec := api.Codecs.LegacyCodec(clientset.CoreClient.APIVersion())
+		codec := api.Codecs.LegacyCodec(clientset.CoreClient.RESTClient().APIVersion())
 		keepOldName = len(args) == 1
 		newName := findNewName(args, oldRc)
 		if newRc, err = kubectl.LoadExistingNextReplicationController(coreClient, cmdNamespace, newName); err != nil {

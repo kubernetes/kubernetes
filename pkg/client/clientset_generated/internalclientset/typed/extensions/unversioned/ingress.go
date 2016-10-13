@@ -19,6 +19,7 @@ package unversioned
 import (
 	api "k8s.io/kubernetes/pkg/api"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions"
+	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
@@ -44,14 +45,14 @@ type IngressInterface interface {
 
 // ingresses implements IngressInterface
 type ingresses struct {
-	client *ExtensionsClient
+	client restclient.Interface
 	ns     string
 }
 
 // newIngresses returns a Ingresses
 func newIngresses(c *ExtensionsClient, namespace string) *ingresses {
 	return &ingresses{
-		client: c,
+		client: c.RESTClient(),
 		ns:     namespace,
 	}
 }

@@ -19,6 +19,7 @@ package unversioned
 import (
 	api "k8s.io/kubernetes/pkg/api"
 	certificates "k8s.io/kubernetes/pkg/apis/certificates"
+	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
@@ -44,13 +45,13 @@ type CertificateSigningRequestInterface interface {
 
 // certificateSigningRequests implements CertificateSigningRequestInterface
 type certificateSigningRequests struct {
-	client *CertificatesClient
+	client restclient.Interface
 }
 
 // newCertificateSigningRequests returns a CertificateSigningRequests
 func newCertificateSigningRequests(c *CertificatesClient) *certificateSigningRequests {
 	return &certificateSigningRequests{
-		client: c,
+		client: c.RESTClient(),
 	}
 }
 
