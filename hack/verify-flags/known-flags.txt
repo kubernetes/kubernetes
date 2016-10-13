@@ -512,6 +512,7 @@ since-seconds
 since-time
 skip-generated-rewrite
 skip-munges
+skip-preflight-checks
 sort-by
 source-file
 ssh-env
