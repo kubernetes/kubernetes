@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/apiserver/authenticator"
+	apiserveropenapi "k8s.io/kubernetes/pkg/apiserver/openapi"
 	authorizerunion "k8s.io/kubernetes/pkg/auth/authorizer/union"
 	"k8s.io/kubernetes/pkg/auth/user"
 	"k8s.io/kubernetes/pkg/controller/informers"
@@ -221,7 +222,10 @@ func Run(s *options.ServerRunOptions) error {
 	genericConfig.APIResourceConfigSource = storageFactory.APIResourceConfigSource
 	genericConfig.MasterServiceNamespace = s.MasterServiceNamespace
 	genericConfig.Serializer = api.Codecs
-	genericConfig.OpenAPIDefinitions = openapi.OpenAPIDefinitions
+	genericConfig.OpenAPIConfig.Definitions = openapi.OpenAPIDefinitions
+	// Reusing api-server's GetOperationID function. if federation and api-server spec diverge and
+	// this method does not provide good operation IDs for federation, we should create federation's own GetOperationID.
+	genericConfig.OpenAPIConfig.GetOperationID = apiserveropenapi.GetOperationID
 	genericConfig.EnableOpenAPISupport = true
 
 	// TODO: Move this to generic api server (Need to move the command line flag).

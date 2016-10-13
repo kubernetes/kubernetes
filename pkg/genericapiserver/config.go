@@ -156,15 +156,8 @@ type Config struct {
 	// EnableOpenAPISupport enables OpenAPI support. Allow downstream customers to disable OpenAPI spec.
 	EnableOpenAPISupport bool
 
-	// OpenAPIInfo will be directly available as Info section of Open API spec.
-	OpenAPIInfo spec.Info
-
-	// OpenAPIDefaultResponse will be used if an web service operation does not have any responses listed.
-	OpenAPIDefaultResponse spec.Response
-
-	// OpenAPIDefinitions is a map of type to OpenAPI spec for all types used in this API server. Failure to provide
-	// this map or any of the models used by the server APIs will result in spec generation failure.
-	OpenAPIDefinitions *common.OpenAPIDefinitions
+	// OpenAPIConfig will be used in generating OpenAPI spec.
+	OpenAPIConfig *common.Config
 
 	// MaxRequestsInFlight is the maximum number of parallel non-long-running requests. Every further
 	// request has to wait.
@@ -253,13 +246,19 @@ func NewConfig(options *options.ServerRunOptions) *Config {
 		ReadWritePort:             options.SecurePort,
 		ServiceClusterIPRange:     &options.ServiceClusterIPRange,
 		ServiceNodePortRange:      options.ServiceNodePortRange,
-		OpenAPIDefaultResponse: spec.Response{
-			ResponseProps: spec.ResponseProps{
-				Description: "Default Response."}},
-		OpenAPIInfo: spec.Info{
-			InfoProps: spec.InfoProps{
-				Title:   "Generic API Server",
-				Version: "unversioned",
+		OpenAPIConfig: &common.Config{
+			ProtocolList:   []string{"https"},
+			IgnorePrefixes: []string{"/swaggerapi"},
+			Info: &spec.Info{
+				InfoProps: spec.InfoProps{
+					Title:   "Generic API Server",
+					Version: "unversioned",
+				},
+			},
+			DefaultResponse: &spec.Response{
+				ResponseProps: spec.ResponseProps{
+					Description: "Default Response.",
+				},
 			},
 		},
 		MaxRequestsInFlight: options.MaxRequestsInFlight,
@@ -386,10 +385,8 @@ func (c completedConfig) New() (*GenericAPIServer, error) {
 		KubernetesServiceNodePort: c.KubernetesServiceNodePort,
 		apiGroupsForDiscovery:     map[string]unversioned.APIGroup{},
 
-		enableOpenAPISupport:   c.EnableOpenAPISupport,
-		openAPIInfo:            c.OpenAPIInfo,
-		openAPIDefaultResponse: c.OpenAPIDefaultResponse,
-		openAPIDefinitions:     c.OpenAPIDefinitions,
+		enableOpenAPISupport: c.EnableOpenAPISupport,
+		openAPIConfig:        c.OpenAPIConfig,
 	}
 
 	s.HandlerContainer = mux.NewAPIContainer(http.NewServeMux(), c.Serializer)

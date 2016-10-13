@@ -68,6 +68,7 @@ import (
 
 	"github.com/go-openapi/spec"
 	"github.com/pborman/uuid"
+	"k8s.io/kubernetes/pkg/genericapiserver/openapi/common"
 )
 
 const (
@@ -184,17 +185,18 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 		masterConfig.GenericConfig.EnableProfiling = true
 		masterConfig.GenericConfig.EnableSwaggerSupport = true
 		masterConfig.GenericConfig.EnableOpenAPISupport = true
-		masterConfig.GenericConfig.OpenAPIInfo = spec.Info{
+		masterConfig.GenericConfig.OpenAPIConfig.Info = &spec.Info{
 			InfoProps: spec.InfoProps{
 				Title:   "Kubernetes",
 				Version: "unversioned",
 			},
 		}
-		masterConfig.GenericConfig.OpenAPIDefaultResponse = spec.Response{
+		masterConfig.GenericConfig.OpenAPIConfig.DefaultResponse = &spec.Response{
 			ResponseProps: spec.ResponseProps{
 				Description: "Default Response.",
 			},
 		}
+		masterConfig.GenericConfig.OpenAPIConfig.Definitions = openapi.OpenAPIDefinitions
 	}
 
 	// set the loopback client config
@@ -355,8 +357,8 @@ func NewMasterConfig() *master.Config {
 			ServiceClusterIPRange: parseCIDROrDie("10.0.0.0/24"),
 			ServiceNodePortRange:  utilnet.PortRange{Base: 30000, Size: 2768},
 			EnableVersion:         true,
-			OpenAPIDefinitions:    openapi.OpenAPIDefinitions,
 			EnableOpenAPISupport:  true,
+			OpenAPIConfig:         &common.Config{},
 		},
 		StorageFactory:        storageFactory,
 		EnableCoreControllers: true,
