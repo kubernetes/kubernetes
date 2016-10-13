@@ -66,6 +66,7 @@ func NewCmdRolloutStatus(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	usage := "Filename, directory, or URL to a file identifying the resource to get from a server."
 	kubectl.AddJsonFilenameFlag(cmd, &options.Filenames, usage)
 	cmdutil.AddRecursiveFlag(cmd, &options.Recursive)
+	cmd.Flags().Int64("revision", 0, "Pin to a specific revision for showing its status. Defaults to 0 (last revision).")
 	return cmd
 }
 
@@ -117,8 +118,13 @@ func RunStatus(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []str
 		return err
 	}
 
+	revision := cmdutil.GetFlagInt64(cmd, "revision")
+	if revision < 0 {
+		return fmt.Errorf("revision must be a positive integer: %v", revision)
+	}
+
 	// check if deployment's has finished the rollout
-	status, done, err := statusViewer.Status(cmdNamespace, info.Name)
+	status, done, err := statusViewer.Status(cmdNamespace, info.Name, revision)
 	if err != nil {
 		return err
 	}
@@ -138,7 +144,7 @@ func RunStatus(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []str
 	return intr.Run(func() error {
 		_, err := watch.Until(0, w, func(e watch.Event) (bool, error) {
 			// print deployment's status
-			status, done, err := statusViewer.Status(cmdNamespace, info.Name)
+			status, done, err := statusViewer.Status(cmdNamespace, info.Name, revision)
 			if err != nil {
 				return false, err
 			}

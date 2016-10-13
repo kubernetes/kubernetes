@@ -26,11 +26,13 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/annotations"
+	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/integer"
 	intstrutil "k8s.io/kubernetes/pkg/util/intstr"
@@ -686,8 +688,12 @@ func filterPodsMatchingReplicaSets(replicaSets []*extensions.ReplicaSet, podList
 }
 
 // Revision returns the revision number of the input replica set
-func Revision(rs *extensions.ReplicaSet) (int64, error) {
-	v, ok := rs.Annotations[RevisionAnnotation]
+func Revision(obj runtime.Object) (int64, error) {
+	acc, err := meta.Accessor(obj)
+	if err != nil {
+		return 0, err
+	}
+	v, ok := acc.GetAnnotations()[RevisionAnnotation]
 	if !ok {
 		return 0, nil
 	}
