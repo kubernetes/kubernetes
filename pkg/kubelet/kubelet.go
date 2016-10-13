@@ -52,6 +52,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/network"
+	"k8s.io/kubernetes/pkg/kubelet/network/hostport"
 	"k8s.io/kubernetes/pkg/kubelet/pleg"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/prober"
@@ -1898,6 +1899,88 @@ func (kl *Kubelet) cleanUpContainersInPod(podId types.UID, exitedContainerID str
 		}
 		kl.containerDeletor.deleteContainersInPod(exitedContainerID, podStatus, removeAll)
 	}
+}
+
+// GetPodSandboxNetNS returns the network namespace path of the given podSandbox
+func (kl *Kubelet) GetPodSandboxNetNS(podSandboxID string) (string, error) {
+	containerID := kubecontainer.ContainerID{
+		Type: kl.GetRuntime().Type(),
+		ID:   podSandboxID,
+	}
+	return kl.GetRuntime().GetNetNS(containerID)
+}
+
+func (kl *Kubelet) GetPodHostportMapping() ([]*hostport.PodPortMapping, error) {
+	pods, err := kl.GetRuntime().GetPods(true)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to retrieve pods from runtime: %v", err)
+	}
+	podHostportMapping := make([]*hostport.PodPortMapping, 0)
+	for _, p := range pods {
+		if podIsExited(p) {
+			continue
+		}
+
+		containerID, err := kl.GetRuntime().GetPodContainerID(p)
+		if err != nil {
+			continue
+		}
+
+		pod, found := kl.GetPodByName(p.Namespace, p.Name)
+		if !found {
+			continue
+		}
+
+		portMappings := make([]hostport.PortMapping, 0)
+		for _, container := range pod.Spec.Containers {
+			for _, port := range container.Ports {
+				if port.HostPort != 0 {
+					newPortMapping := hostport.PortMapping{
+						Name:          port.Name,
+						HostPort:      port.HostPort,
+						Protocol:      port.Protocol,
+						ContainerPort: port.ContainerPort,
+						HostIP:        port.HostIP,
+					}
+					portMappings = append(portMappings, newPortMapping)
+				}
+			}
+		}
+		if len(portMappings) > 0 {
+			newHostportMapping := hostport.PodPortMapping{
+				Namespace:    pod.Namespace,
+				Name:         pod.Name,
+				PodSandboxID: containerID.ID,
+				PortMappings: portMappings,
+				HostNetwork:  pod.Spec.SecurityContext.HostNetwork,
+			}
+			podHostportMapping = append(podHostportMapping, &newHostportMapping)
+		}
+	}
+	return podHostportMapping, nil
+}
+
+func (kl *Kubelet) GetPodAnnotations(namespace, name, podSandboxID string) (map[string]string, error) {
+	pod, found := kl.GetPodByName(namespace, name)
+	if !found {
+		return nil, fmt.Errorf("pod %q/%q cannot be found", namespace, name)
+	}
+	return pod.Annotations, nil
+}
+
+// podIsExited returns true if the pod is exited (all containers inside are exited).
+func podIsExited(p *kubecontainer.Pod) bool {
+	for _, c := range p.Containers {
+		if c.State != kubecontainer.ContainerStateExited {
+			return false
+		}
+	}
+	for _, c := range p.Sandboxes {
+		if c.State != kubecontainer.ContainerStateExited {
+			return false
+		}
+	}
+	return true
 }
 
 // isSyncPodWorthy filters out events that are not worthy of pod syncing

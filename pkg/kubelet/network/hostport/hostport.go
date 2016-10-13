@@ -26,8 +26,8 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+
 	"k8s.io/kubernetes/pkg/api"
-	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	iptablesproxy "k8s.io/kubernetes/pkg/proxy/iptables"
 	utildbus "k8s.io/kubernetes/pkg/util/dbus"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
@@ -42,13 +42,26 @@ const (
 )
 
 type HostportHandler interface {
-	OpenPodHostportsAndSync(newPod *ActivePod, natInterfaceName string, activePods []*ActivePod) error
-	SyncHostports(natInterfaceName string, activePods []*ActivePod) error
+	SyncHostports(natInterfaceName string, activePortMapping []*PodPortMapping) error
+	OpenPodHostportsAndSync(newPortMapping *PodPortMapping, natInterfaceName string, activePortMapping []*PodPortMapping) error
 }
 
-type ActivePod struct {
-	Pod *api.Pod
-	IP  net.IP
+// PortMapping represents a network port in a single container
+type PortMapping struct {
+	Name          string
+	HostPort      int32
+	ContainerPort int32
+	Protocol      api.Protocol
+	HostIP        string
+}
+
+type PodPortMapping struct {
+	Namespace    string
+	Name         string
+	PodSandboxID string
+	PortMappings []PortMapping
+	HostNetwork  bool
+	IP           net.IP
 }
 
 type hostportOpener func(*hostport) (closeable, error)
@@ -87,35 +100,35 @@ func (hp *hostport) String() string {
 }
 
 //openPodHostports opens all hostport for pod and returns the map of hostport and socket
-func (h *handler) openHostports(pod *api.Pod) error {
+func (h *handler) openHostports(podHostportMapping *PodPortMapping) error {
 	var retErr error
 	ports := make(map[hostport]closeable)
-	for _, container := range pod.Spec.Containers {
-		for _, port := range container.Ports {
-			if port.HostPort <= 0 {
-				// Ignore
-				continue
-			}
-			hp := hostport{
-				port:     port.HostPort,
-				protocol: strings.ToLower(string(port.Protocol)),
-			}
-			socket, err := h.portOpener(&hp)
-			if err != nil {
-				retErr = fmt.Errorf("Cannot open hostport %d for pod %s: %v", port.HostPort, kubecontainer.GetPodFullName(pod), err)
-				break
-			}
-			ports[hp] = socket
+	for _, port := range podHostportMapping.PortMappings {
+		if port.HostPort <= 0 {
+			// Ignore
+			continue
 		}
+		hp := hostport{
+			port:     port.HostPort,
+			protocol: strings.ToLower(string(port.Protocol)),
+		}
+		socket, err := h.portOpener(&hp)
+		if err != nil {
+			retErr = fmt.Errorf("Cannot open hostport %d for pod %s: %v", port.HostPort, getPodFullName(podHostportMapping), err)
+			break
+		}
+		ports[hp] = socket
+
 		if retErr != nil {
 			break
 		}
 	}
+
 	// If encounter any error, close all hostports that just got opened.
 	if retErr != nil {
 		for hp, socket := range ports {
 			if err := socket.Close(); err != nil {
-				glog.Errorf("Cannot clean up hostport %d for pod %s: %v", hp.port, kubecontainer.GetPodFullName(pod), err)
+				glog.Errorf("Cannot clean up hostport %d for pod %s: %v", hp.port, getPodFullName(podHostportMapping), err)
 			}
 		}
 		return retErr
@@ -128,27 +141,28 @@ func (h *handler) openHostports(pod *api.Pod) error {
 	return nil
 }
 
+func getPodFullName(pod *PodPortMapping) string {
+	// Use underscore as the delimiter because it is not allowed in pod name
+	// (DNS subdomain format), while allowed in the container name format.
+	return pod.Name + "_" + pod.Namespace
+}
+
 // gatherAllHostports returns all hostports that should be presented on node,
 // given the list of pods running on that node and ignoring host network
 // pods (which don't need hostport <-> container port mapping).
-func gatherAllHostports(activePods []*ActivePod) (map[api.ContainerPort]targetPod, error) {
-	podHostportMap := make(map[api.ContainerPort]targetPod)
-	for _, r := range activePods {
-		if r.IP.To4() == nil {
-			return nil, fmt.Errorf("Invalid or missing pod %s IP", kubecontainer.GetPodFullName(r.Pod))
+func gatherAllHostports(activePortMapping []*PodPortMapping) (map[PortMapping]targetPod, error) {
+	podHostportMap := make(map[PortMapping]targetPod)
+	for _, pm := range activePortMapping {
+		if pm.IP.To4() == nil {
+			return nil, fmt.Errorf("Invalid or missing pod %s IP", getPodFullName(pm))
 		}
-
 		// should not handle hostports for hostnetwork pods
-		if r.Pod.Spec.SecurityContext != nil && r.Pod.Spec.SecurityContext.HostNetwork {
+		if pm.HostNetwork {
 			continue
 		}
 
-		for _, container := range r.Pod.Spec.Containers {
-			for _, port := range container.Ports {
-				if port.HostPort != 0 {
-					podHostportMap[port] = targetPod{podFullName: kubecontainer.GetPodFullName(r.Pod), podIP: r.IP.String()}
-				}
-			}
+		for _, port := range pm.PortMappings {
+			podHostportMap[port] = targetPod{podFullName: getPodFullName(pm), podIP: pm.IP.String()}
 		}
 	}
 	return podHostportMap, nil
@@ -164,8 +178,8 @@ func writeLine(buf *bytes.Buffer, words ...string) {
 // then encoding to base32 and truncating with the prefix "KUBE-SVC-".  We do
 // this because IPTables Chain Names must be <= 28 chars long, and the longer
 // they are the harder they are to read.
-func hostportChainName(cp api.ContainerPort, podFullName string) utiliptables.Chain {
-	hash := sha256.Sum256([]byte(string(cp.HostPort) + string(cp.Protocol) + podFullName))
+func hostportChainName(pm PortMapping, podFullName string) utiliptables.Chain {
+	hash := sha256.Sum256([]byte(string(pm.HostPort) + string(pm.Protocol) + podFullName))
 	encoded := base32.StdEncoding.EncodeToString(hash[:])
 	return utiliptables.Chain(kubeHostportChainPrefix + encoded[:16])
 }
@@ -173,35 +187,35 @@ func hostportChainName(cp api.ContainerPort, podFullName string) utiliptables.Ch
 // OpenPodHostportsAndSync opens hostports for a new pod, gathers all hostports on
 // node, sets up iptables rules enable them. And finally clean up stale hostports.
 // 'newPod' must also be present in 'activePods'.
-func (h *handler) OpenPodHostportsAndSync(newPod *ActivePod, natInterfaceName string, activePods []*ActivePod) error {
+func (h *handler) OpenPodHostportsAndSync(newPortMapping *PodPortMapping, natInterfaceName string, activePortMapping []*PodPortMapping) error {
 	// try to open pod host port if specified
-	if err := h.openHostports(newPod.Pod); err != nil {
+	if err := h.openHostports(newPortMapping); err != nil {
 		return err
 	}
 
 	// Add the new pod to active pods if it's not present.
 	var found bool
-	for _, p := range activePods {
-		if p.Pod.UID == newPod.Pod.UID {
+	for _, pm := range activePortMapping {
+		if pm.PodSandboxID == newPortMapping.PodSandboxID {
 			found = true
 			break
 		}
 	}
 	if !found {
-		activePods = append(activePods, newPod)
+		activePortMapping = append(activePortMapping, newPortMapping)
 	}
 
-	return h.SyncHostports(natInterfaceName, activePods)
+	return h.SyncHostports(natInterfaceName, activePortMapping)
 }
 
 // SyncHostports gathers all hostports on node and setup iptables rules enable them. And finally clean up stale hostports
-func (h *handler) SyncHostports(natInterfaceName string, activePods []*ActivePod) error {
+func (h *handler) SyncHostports(natInterfaceName string, activePortMapping []*PodPortMapping) error {
 	start := time.Now()
 	defer func() {
 		glog.V(4).Infof("syncHostportsRules took %v", time.Since(start))
 	}()
 
-	containerPortMap, err := gatherAllHostports(activePods)
+	hostportPodMap, err := gatherAllHostports(activePortMapping)
 	if err != nil {
 		return err
 	}
@@ -256,9 +270,9 @@ func (h *handler) SyncHostports(natInterfaceName string, activePods []*ActivePod
 	// Accumulate NAT chains to keep.
 	activeNATChains := map[utiliptables.Chain]bool{} // use a map as a set
 
-	for containerPort, target := range containerPortMap {
-		protocol := strings.ToLower(string(containerPort.Protocol))
-		hostportChain := hostportChainName(containerPort, target.podFullName)
+	for port, target := range hostportPodMap {
+		protocol := strings.ToLower(string(port.Protocol))
+		hostportChain := hostportChainName(port, target.podFullName)
 		if chain, ok := existingNATChains[hostportChain]; ok {
 			writeLine(natChains, chain)
 		} else {
@@ -270,9 +284,9 @@ func (h *handler) SyncHostports(natInterfaceName string, activePods []*ActivePod
 		// Redirect to hostport chain
 		args := []string{
 			"-A", string(kubeHostportsChain),
-			"-m", "comment", "--comment", fmt.Sprintf(`"%s hostport %d"`, target.podFullName, containerPort.HostPort),
+			"-m", "comment", "--comment", fmt.Sprintf(`"%s hostport %d"`, target.podFullName, port.HostPort),
 			"-m", protocol, "-p", protocol,
-			"--dport", fmt.Sprintf("%d", containerPort.HostPort),
+			"--dport", fmt.Sprintf("%d", port.HostPort),
 			"-j", string(hostportChain),
 		}
 		writeLine(natRules, args...)
@@ -281,7 +295,7 @@ func (h *handler) SyncHostports(natInterfaceName string, activePods []*ActivePod
 		// If the request comes from the pod that is serving the hostport, then SNAT
 		args = []string{
 			"-A", string(hostportChain),
-			"-m", "comment", "--comment", fmt.Sprintf(`"%s hostport %d"`, target.podFullName, containerPort.HostPort),
+			"-m", "comment", "--comment", fmt.Sprintf(`"%s hostport %d"`, target.podFullName, port.HostPort),
 			"-s", target.podIP, "-j", string(iptablesproxy.KubeMarkMasqChain),
 		}
 		writeLine(natRules, args...)
@@ -290,9 +304,9 @@ func (h *handler) SyncHostports(natInterfaceName string, activePods []*ActivePod
 		// IPTables will maintained the stats for this chain
 		args = []string{
 			"-A", string(hostportChain),
-			"-m", "comment", "--comment", fmt.Sprintf(`"%s hostport %d"`, target.podFullName, containerPort.HostPort),
+			"-m", "comment", "--comment", fmt.Sprintf(`"%s hostport %d"`, target.podFullName, port.HostPort),
 			"-m", protocol, "-p", protocol,
-			"-j", "DNAT", fmt.Sprintf("--to-destination=%s:%d", target.podIP, containerPort.ContainerPort),
+			"-j", "DNAT", fmt.Sprintf("--to-destination=%s:%d", target.podIP, port.ContainerPort),
 		}
 		writeLine(natRules, args...)
 	}
@@ -321,7 +335,7 @@ func (h *handler) SyncHostports(natInterfaceName string, activePods []*ActivePod
 		return fmt.Errorf("Failed to execute iptables-restore: %v", err)
 	}
 
-	h.cleanupHostportMap(containerPortMap)
+	h.cleanupHostportMap(hostportPodMap)
 	return nil
 }
 
@@ -364,7 +378,7 @@ func openLocalPort(hp *hostport) (closeable, error) {
 }
 
 // cleanupHostportMap closes obsolete hostports
-func (h *handler) cleanupHostportMap(containerPortMap map[api.ContainerPort]targetPod) {
+func (h *handler) cleanupHostportMap(containerPortMap map[PortMapping]targetPod) {
 	// compute hostports that are supposed to be open
 	currentHostports := make(map[hostport]bool)
 	for containerPort := range containerPortMap {

@@ -21,13 +21,11 @@ import (
 	"net"
 	"strings"
 
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/network/hostport"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
 	utilsets "k8s.io/kubernetes/pkg/util/sets"
@@ -95,16 +93,16 @@ type PodNetworkStatus struct {
 	IP net.IP `json:"ip" description:"Primary IP address of the pod"`
 }
 
-// Host is an interface that plugins can use to access the kubelet.
+// Host is an interface that plugins can use to access the kubelet or runtime shims.
 type Host interface {
-	// Get the pod structure by its name, namespace
-	GetPodByName(namespace, name string) (*api.Pod, bool)
+	// GetPodSandboxNetNS returns the path of pod sandbox's network namespace
+	GetPodSandboxNetNS(podSandboxID string) (string, error)
 
-	// GetKubeClient returns a client interface
-	GetKubeClient() clientset.Interface
+	// GetPodHostportMapping returns all active and ready to run pod hostport mapping
+	GetPodHostportMapping() ([]*hostport.PodPortMapping, error)
 
-	// GetContainerRuntime returns the container runtime that implements the containers (e.g. docker/rkt)
-	GetRuntime() kubecontainer.Runtime
+	// GetPodAnnotations returns the pod annotations
+	GetPodAnnotations(namespace, name, podSandboxID string) (map[string]string, error)
 }
 
 // InitNetworkPlugin inits the plugin that matches networkPluginName. Plugins must have unique names.

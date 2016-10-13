@@ -132,7 +132,7 @@ func createTestDockerManager(fakeHTTPClient *fakeHTTP, fakeDocker *FakeDockerCli
 	networkPlugin, _ := network.InitNetworkPlugin(
 		[]network.NetworkPlugin{},
 		"",
-		nettest.NewFakeHost(nil),
+		nettest.NewFakeHost(nil, nil, nil),
 		componentconfig.HairpinNone,
 		"10.0.0.0/8",
 		network.UseDefaultMTU)

@@ -20,29 +20,35 @@ package testing
 // a fake host is created here that can be used by plugins for testing
 
 import (
-	"k8s.io/kubernetes/pkg/api"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
+	"k8s.io/kubernetes/pkg/kubelet/network/hostport"
 )
 
 type fakeNetworkHost struct {
-	kubeClient clientset.Interface
+	netNS          map[string]string
+	annotations    map[string]string
+	podPortMapping []*hostport.PodPortMapping
 }
 
-func NewFakeHost(kubeClient clientset.Interface) *fakeNetworkHost {
-	host := &fakeNetworkHost{kubeClient: kubeClient}
-	return host
+func NewFakeHost(netNS map[string]string, annotations map[string]string, podPortMapping []*hostport.PodPortMapping) *fakeNetworkHost {
+	return &fakeNetworkHost{
+		netNS:          netNS,
+		annotations:    annotations,
+		podPortMapping: podPortMapping,
+	}
 }
 
-func (fnh *fakeNetworkHost) GetPodByName(name, namespace string) (*api.Pod, bool) {
-	return nil, false
+func (nh *fakeNetworkHost) GetPodSandboxNetNS(podSandboxID string) (string, error) {
+	netns, ok := nh.netNS[podSandboxID]
+	if !ok {
+		return "", nil
+	}
+	return netns, nil
 }
 
-func (fnh *fakeNetworkHost) GetKubeClient() clientset.Interface {
-	return nil
+func (nh *fakeNetworkHost) GetPodHostportMapping() ([]*hostport.PodPortMapping, error) {
+	return nh.podPortMapping, nil
 }
 
-func (nh *fakeNetworkHost) GetRuntime() kubecontainer.Runtime {
-	return &containertest.FakeRuntime{}
+func (nh *fakeNetworkHost) GetPodAnnotations(namespace, name, podSandboxID string) (map[string]string, error) {
+	return nh.annotations, nil
 }
