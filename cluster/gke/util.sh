@@ -387,7 +387,6 @@ function test-teardown() {
       if ! "${GCLOUD}" compute networks delete --project "${PROJECT}" --quiet "${NETWORK}"; then
         echo "Failed to delete network '${NETWORK}'. Listing firewall-rules:"
         "${GCLOUD}" compute firewall-rules --project "${PROJECT}" list --filter="network=${NETWORK}"
-        return 1
       fi
     fi
   fi
