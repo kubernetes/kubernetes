@@ -2652,7 +2652,7 @@ func printTaintsMultilineWithIndent(out io.Writer, initialIndent, title, innerIn
 
 // printTolerationsMultiline prints multiple tolerations with a proper alignment.
 func printTolerationsInAnnotationMultiline(out io.Writer, title string, annotations map[string]string) {
-	tolerations, err := api.GetTolerationsFromPodAnnotations(annotations)
+	tolerations, err := api.GetTolerationsFromAnnotations(annotations)
 	if err != nil {
 		tolerations = []api.Toleration{}
 	}

@@ -469,9 +469,9 @@ func GetAffinityFromPodAnnotations(annotations map[string]string) (*Affinity, er
 	return nil, nil
 }
 
-// GetTolerationsFromPodAnnotations gets the json serialized tolerations data from Pod.Annotations
+// GetTolerationsFromAnnotations gets the json serialized tolerations data from Annotations
 // and converts it to the []Toleration type in api.
-func GetTolerationsFromPodAnnotations(annotations map[string]string) ([]Toleration, error) {
+func GetTolerationsFromAnnotations(annotations map[string]string) ([]Toleration, error) {
 	var tolerations []Toleration
 	if len(annotations) > 0 && annotations[TolerationsAnnotationKey] != "" {
 		err := json.Unmarshal([]byte(annotations[TolerationsAnnotationKey]), &tolerations)

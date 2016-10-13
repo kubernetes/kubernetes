@@ -1078,7 +1078,7 @@ func PodToleratesNodeTaints(pod *api.Pod, meta interface{}, nodeInfo *schedulerc
 		return false, nil, err
 	}
 
-	tolerations, err := api.GetTolerationsFromPodAnnotations(pod.Annotations)
+	tolerations, err := api.GetTolerationsFromAnnotations(pod.Annotations)
 	if err != nil {
 		return false, nil, err
 	}

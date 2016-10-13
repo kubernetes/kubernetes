@@ -53,7 +53,7 @@ func getAllTolerationPreferNoSchedule(tolerations []api.Toleration) (tolerationL
 }
 
 func getTolerationListFromPod(pod *api.Pod) ([]api.Toleration, error) {
-	tolerations, err := api.GetTolerationsFromPodAnnotations(pod.Annotations)
+	tolerations, err := api.GetTolerationsFromAnnotations(pod.Annotations)
 	if err != nil {
 		return nil, err
 	}
