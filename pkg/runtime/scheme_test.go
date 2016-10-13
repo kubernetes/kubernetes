@@ -602,12 +602,15 @@ func TestConvertToVersion(t *testing.T) {
 			gv:     unversioned.GroupVersion{Version: "__internal"},
 			out:    &TestType1{A: "test"},
 		},
-		// prefers the first group version in the list
+		// prefers the best match
 		{
 			scheme: GetTestScheme(),
 			in:     &ExternalTestType1{A: "test"},
 			gv:     unversioned.GroupVersions{{Version: "__internal"}, {Version: "v1"}},
-			out:    &TestType1{A: "test"},
+			out: &ExternalTestType1{
+				MyWeirdCustomEmbeddedVersionKindField: MyWeirdCustomEmbeddedVersionKindField{APIVersion: "v1", ObjectKind: "TestType1"},
+				A: "test",
+			},
 		},
 		// unversioned type returned as-is
 		{
