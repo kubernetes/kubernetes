@@ -248,7 +248,7 @@ func (plugin *azureDataDiskPlugin) NewDetacher() (volume.Detacher, error) {
 }
 
 // Detach detaches disk from Azure VM.
-func (detacher *azureDiskDetacher) Detach(diskName string, nodeName types.NodeName) error {
+func (detacher *azureDiskDetacher) Detach(_ *volume.Spec, diskName string, nodeName types.NodeName) error {
 	if diskName == "" {
 		return fmt.Errorf("invalid disk to detach: %q", diskName)
 	}
@@ -271,7 +271,7 @@ func (detacher *azureDiskDetacher) Detach(diskName string, nodeName types.NodeNa
 }
 
 // UnmountDevice unmounts the volume on the node
-func (detacher *azureDiskDetacher) UnmountDevice(deviceMountPath string) error {
+func (detacher *azureDiskDetacher) UnmountDevice(_ *volume.Spec, deviceMountPath string) error {
 	volume := path.Base(deviceMountPath)
 	if err := util.UnmountPath(deviceMountPath, detacher.mounter); err != nil {
 		glog.Errorf("Error unmounting %q: %v", volume, err)

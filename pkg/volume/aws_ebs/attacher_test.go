@@ -112,7 +112,7 @@ func TestAttachDetach(t *testing.T) {
 			test: func(testcase *testcase) (string, error) {
 				detacher := newDetacher(testcase)
 				mountPath := "/mnt/" + string(diskName)
-				return "", detacher.Detach(mountPath, nodeName)
+				return "", detacher.Detach(nil, mountPath, nodeName)
 			},
 		},
 
@@ -123,7 +123,7 @@ func TestAttachDetach(t *testing.T) {
 			test: func(testcase *testcase) (string, error) {
 				detacher := newDetacher(testcase)
 				mountPath := "/mnt/" + string(diskName)
-				return "", detacher.Detach(mountPath, nodeName)
+				return "", detacher.Detach(nil, mountPath, nodeName)
 			},
 		},
 
@@ -135,7 +135,7 @@ func TestAttachDetach(t *testing.T) {
 			test: func(testcase *testcase) (string, error) {
 				detacher := newDetacher(testcase)
 				mountPath := "/mnt/" + string(diskName)
-				return "", detacher.Detach(mountPath, nodeName)
+				return "", detacher.Detach(nil, mountPath, nodeName)
 			},
 		},
 
@@ -147,7 +147,7 @@ func TestAttachDetach(t *testing.T) {
 			test: func(testcase *testcase) (string, error) {
 				detacher := newDetacher(testcase)
 				mountPath := "/mnt/" + string(diskName)
-				return "", detacher.Detach(mountPath, nodeName)
+				return "", detacher.Detach(nil, mountPath, nodeName)
 			},
 			expectedError: detachError,
 		},

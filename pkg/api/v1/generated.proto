@@ -207,11 +207,15 @@ message CinderVolumeSource {
   // +optional
   optional string fsType = 2;
 
+  // Optional: Used to configure the Cinder credentials instead of using the
+  // Cloud Provider.
+  optional LocalObjectReference secretRef = 3;
+
   // Optional: Defaults to false (read/write). ReadOnly here will force
   // the ReadOnly setting in VolumeMounts.
   // More info: http://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md
   // +optional
-  optional bool readOnly = 3;
+  optional bool readOnly = 4;
 }
 
 // Information about the condition of a component.

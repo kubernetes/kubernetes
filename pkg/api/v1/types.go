@@ -712,11 +712,14 @@ type CinderVolumeSource struct {
 	// More info: http://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md
 	// +optional
 	FSType string `json:"fsType,omitempty" protobuf:"bytes,2,opt,name=fsType"`
+	// Optional: Used to configure the Cinder credentials instead of using the
+	// Cloud Provider.
+	SecretRef *LocalObjectReference `json:"secretRef" protobuf:"bytes,3,opt,name=secretRef"`
 	// Optional: Defaults to false (read/write). ReadOnly here will force
 	// the ReadOnly setting in VolumeMounts.
 	// More info: http://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md
 	// +optional
-	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,3,opt,name=readOnly"`
+	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,4,opt,name=readOnly"`
 }
 
 // Represents a Ceph Filesystem mount that lasts the lifetime of a pod

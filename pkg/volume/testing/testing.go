@@ -415,7 +415,7 @@ func (fv *FakeVolume) GetMountDeviceCallCount() int {
 	return fv.MountDeviceCallCount
 }
 
-func (fv *FakeVolume) Detach(deviceMountPath string, nodeName types.NodeName) error {
+func (fv *FakeVolume) Detach(_ *Spec, deviceMountPath string, nodeName types.NodeName) error {
 	fv.Lock()
 	defer fv.Unlock()
 	fv.DetachCallCount++
@@ -434,7 +434,7 @@ func (fv *FakeVolume) GetDetachCallCount() int {
 	return fv.DetachCallCount
 }
 
-func (fv *FakeVolume) UnmountDevice(globalMountPath string) error {
+func (fv *FakeVolume) UnmountDevice(_ *Spec, globalMountPath string) error {
 	fv.Lock()
 	defer fv.Unlock()
 	fv.UnmountDeviceCallCount++

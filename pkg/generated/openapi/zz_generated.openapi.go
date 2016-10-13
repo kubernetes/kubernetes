@@ -735,6 +735,12 @@ var OpenAPIDefinitions *openapi.OpenAPIDefinitions = &openapi.OpenAPIDefinitions
 							Format:      "",
 						},
 					},
+					"secretRef": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Optional: Used to configure the Cinder credentials instead of using the Cloud Provider.",
+							Ref:         spec.MustCreateRef("#/definitions/v1.LocalObjectReference"),
+						},
+					},
 					"readOnly": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts. More info: http://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md",
@@ -743,10 +749,11 @@ var OpenAPIDefinitions *openapi.OpenAPIDefinitions = &openapi.OpenAPIDefinitions
 						},
 					},
 				},
-				Required: []string{"volumeID"},
+				Required: []string{"volumeID", "secretRef"},
 			},
 		},
-		Dependencies: []string{},
+		Dependencies: []string{
+			"v1.LocalObjectReference"},
 	},
 	"v1.ComponentCondition": {
 		Schema: spec.Schema{

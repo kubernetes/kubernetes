@@ -842,6 +842,9 @@ type CinderVolumeSource struct {
 	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
 	// +optional
 	FSType string
+	// Optional: Used to configure the Cinder credentials instead of using the
+	// Cloud Provider.
+	SecretRef *LocalObjectReference
 	// Optional: Defaults to false (read/write). ReadOnly here will force
 	// the ReadOnly setting in VolumeMounts.
 	// +optional

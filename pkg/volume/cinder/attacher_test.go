@@ -64,9 +64,11 @@ func TestGetDeviceMountPath(t *testing.T) {
 	host := volumetest.NewFakeVolumeHost(rootDir, nil, nil)
 
 	attacher := &cinderDiskAttacher{
-		host: host,
+		cinderVolume: &cinderVolume{
+			plugin: &cinderPlugin{host: host},
+		},
 	}
-
+	
 	//test the path
 	path, err := attacher.GetDeviceMountPath(spec)
 	if err != nil {
@@ -183,7 +185,7 @@ func TestAttachDetach(t *testing.T) {
 			detach:         detachCall{diskName, instanceID, nil},
 			test: func(testcase *testcase) (string, error) {
 				detacher := newDetacher(testcase)
-				return "", detacher.Detach(diskName, nodeName)
+				return "", detacher.Detach(spec, diskName, nodeName)
 			},
 		},
 
@@ -194,7 +196,7 @@ func TestAttachDetach(t *testing.T) {
 			diskIsAttached: diskIsAttachedCall{diskName, instanceID, false, nil},
 			test: func(testcase *testcase) (string, error) {
 				detacher := newDetacher(testcase)
-				return "", detacher.Detach(diskName, nodeName)
+				return "", detacher.Detach(spec, diskName, nodeName)
 			},
 		},
 
@@ -206,7 +208,7 @@ func TestAttachDetach(t *testing.T) {
 			detach:         detachCall{diskName, instanceID, nil},
 			test: func(testcase *testcase) (string, error) {
 				detacher := newDetacher(testcase)
-				return "", detacher.Detach(diskName, nodeName)
+				return "", detacher.Detach(spec, diskName, nodeName)
 			},
 		},
 
@@ -218,7 +220,7 @@ func TestAttachDetach(t *testing.T) {
 			detach:         detachCall{diskName, instanceID, detachError},
 			test: func(testcase *testcase) (string, error) {
 				detacher := newDetacher(testcase)
-				return "", detacher.Detach(diskName, nodeName)
+				return "", detacher.Detach(spec, diskName, nodeName)
 			},
 			expectedError: detachError,
 		},
@@ -249,14 +251,21 @@ func newPlugin() *cinderPlugin {
 
 func newAttacher(testcase *testcase) *cinderDiskAttacher {
 	return &cinderDiskAttacher{
-		host:           nil,
-		cinderProvider: testcase,
+		cinderVolume: &cinderVolume{
+			plugin: &cinderPlugin{
+				cinderProvider: testcase,
+			},
+		},
 	}
 }
 
 func newDetacher(testcase *testcase) *cinderDiskDetacher {
 	return &cinderDiskDetacher{
-		cinderProvider: testcase,
+		cinderVolume: &cinderVolume{
+			plugin: &cinderPlugin{
+				cinderProvider: testcase,
+			},
+		},
 	}
 }
 

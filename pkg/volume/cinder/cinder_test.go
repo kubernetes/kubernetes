@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -65,64 +65,41 @@ func getFakeDeviceName(host volume.VolumeHost, pdName string) string {
 	return path.Join(host.GetPluginDir(cinderVolumePluginName), "device", pdName)
 }
 
-// Real Cinder AttachDisk attaches a cinder volume. If it is not yet mounted,
-// it mounts it to globalPDPath.
-// We create a dummy directory (="device") and bind-mount it to globalPDPath
-func (fake *fakePDManager) AttachDisk(b *cinderVolumeMounter, globalPDPath string) error {
-	globalPath := makeGlobalPDName(b.plugin.host, b.pdName)
-	fakeDeviceName := getFakeDeviceName(b.plugin.host, b.pdName)
-	err := os.MkdirAll(fakeDeviceName, 0750)
-	if err != nil {
-		return err
-	}
-	// Attaching a Cinder volume can be slow...
-	time.Sleep(fake.attachDetachDuration)
+func (fake *fakePDManager) GetName() string {
+	return "fake"
+}
 
-	// The volume is "attached", bind-mount it if it's not mounted yet.
-	notmnt, err := b.mounter.IsLikelyNotMountPoint(globalPath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			if err := os.MkdirAll(globalPath, 0750); err != nil {
-				return err
-			}
-			notmnt = true
-		} else {
-			return err
-		}
-	}
-	if notmnt {
-		err = b.mounter.Mount(fakeDeviceName, globalPath, "", []string{"bind"})
-		if err != nil {
-			return err
-		}
-	}
+func (fake *fakePDManager) Attach(spec *volume.Spec, nodeName types.NodeName) (string, error) {
+	return "", nil
+}
+
+func (fake *fakePDManager) VolumesAreAttached(specs []*volume.Spec, nodeName types.NodeName) (map[*volume.Spec]bool, error) {
+	return map[*volume.Spec]bool{}, nil
+}
+
+func (fake *fakePDManager) WaitForAttach(spec *volume.Spec, devicePath string, timeout time.Duration) (string, error) {
+	return "", nil
+}
+
+func (fake *fakePDManager) Detach(spec *volume.Spec, deviceName string, nodeName types.NodeName) error {
 	return nil
 }
 
-func (fake *fakePDManager) DetachDisk(c *cinderVolumeUnmounter) error {
-	globalPath := makeGlobalPDName(c.plugin.host, c.pdName)
-	fakeDeviceName := getFakeDeviceName(c.plugin.host, c.pdName)
-	// unmount the bind-mount - should be fast
-	err := c.mounter.Unmount(globalPath)
-	if err != nil {
-		return err
-	}
-
-	// "Detach" the fake "device"
-	err = os.RemoveAll(fakeDeviceName)
-	if err != nil {
-		return err
-	}
+func (fake *fakePDManager) WaitForDetach(spec *volume.Spec, devicePath string, timeout time.Duration) error {
 	return nil
 }
 
-func (fake *fakePDManager) CreateVolume(c *cinderVolumeProvisioner) (volumeID string, volumeSizeGB int, err error) {
-	return "test-volume-name", 1, nil
+func (fake *fakePDManager) UnmountDevice(spec *volume.Spec, deviceMountPath string, mounter mount.Interface) error {
+	return nil
 }
 
-func (fake *fakePDManager) DeleteVolume(cd *cinderVolumeDeleter) error {
-	if cd.pdName != "test-volume-name" {
-		return fmt.Errorf("Deleter got unexpected volume name: %s", cd.pdName)
+func (fake *fakePDManager) CreateVolume(provisioner *cinderVolumeProvisioner) (volumeID string, volumeSizeGB int, secretRef *v1.LocalObjectReference, err error) {
+	return "test-volume-name", 1, nil, nil
+}
+
+func (fake *fakePDManager) DeleteVolume(deleter *cinderVolumeDeleter) error {
+	if deleter.pdName != "test-volume-name" {
+		return fmt.Errorf("Deleter got unexpected volume name: %s", deleter.pdName)
 	}
 	return nil
 }
@@ -149,7 +126,7 @@ func TestPlugin(t *testing.T) {
 			},
 		},
 	}
-	mounter, err := plug.(*cinderPlugin).newMounterInternal(volume.NewSpecFromVolume(spec), types.UID("poduid"), &fakePDManager{0}, &mount.FakeMounter{})
+	mounter, err := newMounter(volume.NewSpecFromVolume(spec), types.UID("poduid"), plug.(*cinderPlugin), &mount.FakeMounter{})
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)
 	}
@@ -162,17 +139,17 @@ func TestPlugin(t *testing.T) {
 		t.Errorf("Got unexpected path: %s", path)
 	}
 
-	if err := mounter.SetUp(nil); err != nil {
+	if err = mounter.SetUp(nil); err != nil {
 		t.Errorf("Expected success, got: %v", err)
 	}
-	if _, err := os.Stat(path); err != nil {
+	if _, err = os.Stat(path); err != nil {
 		if os.IsNotExist(err) {
 			t.Errorf("SetUp() failed, volume path not created: %s", path)
 		} else {
 			t.Errorf("SetUp() failed: %v", err)
 		}
 	}
-	if _, err := os.Stat(path); err != nil {
+	if _, err = os.Stat(path); err != nil {
 		if os.IsNotExist(err) {
 			t.Errorf("SetUp() failed, volume path not created: %s", path)
 		} else {
@@ -180,7 +157,7 @@ func TestPlugin(t *testing.T) {
 		}
 	}
 
-	unmounter, err := plug.(*cinderPlugin).newUnmounterInternal("vol1", types.UID("poduid"), &fakePDManager{0}, &mount.FakeMounter{})
+	unmounter, err := newUnmounter("vol1", types.UID("poduid"), plug.(*cinderPlugin), &mount.FakeMounter{})
 	if err != nil {
 		t.Errorf("Failed to make a new Unmounter: %v", err)
 	}
@@ -188,10 +165,10 @@ func TestPlugin(t *testing.T) {
 		t.Errorf("Got a nil Unmounter")
 	}
 
-	if err := unmounter.TearDown(); err != nil {
+	if err = unmounter.TearDown(); err != nil {
 		t.Errorf("Expected success, got: %v", err)
 	}
-	if _, err := os.Stat(path); err == nil {
+	if _, err = os.Stat(path); err == nil {
 		t.Errorf("TearDown() failed, volume path still exists: %s", path)
 	} else if !os.IsNotExist(err) {
 		t.Errorf("SetUp() failed: %v", err)
@@ -202,7 +179,7 @@ func TestPlugin(t *testing.T) {
 		PVC: volumetest.CreateTestPVC("100Mi", []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}),
 		PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
 	}
-	provisioner, err := plug.(*cinderPlugin).newProvisionerInternal(options, &fakePDManager{0})
+	provisioner, err := newProvisioner(options, plug.(*cinderPlugin), &fakePDManager{0})
 	persistentSpec, err := provisioner.Provision()
 	if err != nil {
 		t.Errorf("Provision() failed: %v", err)
@@ -221,7 +198,7 @@ func TestPlugin(t *testing.T) {
 	volSpec := &volume.Spec{
 		PersistentVolume: persistentSpec,
 	}
-	deleter, err := plug.(*cinderPlugin).newDeleterInternal(volSpec, &fakePDManager{0})
+	deleter, err := newDeleter(volSpec, plug.(*cinderPlugin), &fakePDManager{0})
 	err = deleter.Delete()
 	if err != nil {
 		t.Errorf("Deleter() failed: %v", err)

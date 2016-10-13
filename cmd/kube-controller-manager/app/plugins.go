@@ -115,14 +115,14 @@ func ProbeControllerVolumePlugins(cloud cloudprovider.Interface, config componen
 
 	allPlugins = append(allPlugins, flocker.ProbeVolumePlugins()...)
 
+	allPlugins = append(allPlugins, cinder.ProbeVolumePlugins()...)
+
 	if cloud != nil {
 		switch {
 		case aws.ProviderName == cloud.ProviderName():
 			allPlugins = append(allPlugins, aws_ebs.ProbeVolumePlugins()...)
 		case gce.ProviderName == cloud.ProviderName():
 			allPlugins = append(allPlugins, gce_pd.ProbeVolumePlugins()...)
-		case openstack.ProviderName == cloud.ProviderName():
-			allPlugins = append(allPlugins, cinder.ProbeVolumePlugins()...)
 		case vsphere.ProviderName == cloud.ProviderName():
 			allPlugins = append(allPlugins, vsphere_volume.ProbeVolumePlugins()...)
 		case azure.CloudProviderName == cloud.ProviderName():

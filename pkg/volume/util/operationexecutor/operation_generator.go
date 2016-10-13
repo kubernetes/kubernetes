@@ -276,7 +276,7 @@ func (og *operationGenerator) GenerateDetachVolumeFunc(
 			err = og.verifyVolumeIsSafeToDetach(volumeToDetach)
 		}
 		if err == nil {
-			err = volumeDetacher.Detach(volumeName, volumeToDetach.NodeName)
+			err = volumeDetacher.Detach(volumeToDetach.VolumeSpec, volumeName, volumeToDetach.NodeName)
 		}
 		if err != nil {
 			// On failure, add volume back to ReportAsAttached list
@@ -663,7 +663,7 @@ func (og *operationGenerator) GenerateUnmountDeviceFunc(
 				err)
 		}
 		// Execute unmount
-		unmountDeviceErr := volumeDetacher.UnmountDevice(deviceMountPath)
+		unmountDeviceErr := volumeDetacher.UnmountDevice(deviceToDetach.VolumeSpec, deviceMountPath)
 		if unmountDeviceErr != nil {
 			// On failure, return error. Caller will log and retry.
 			return fmt.Errorf(
