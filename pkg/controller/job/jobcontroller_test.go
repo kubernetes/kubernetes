@@ -30,7 +30,6 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/testing/core"
-	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/util/rand"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -613,11 +612,6 @@ func TestSyncJobExpectations(t *testing.T) {
 	if len(fakePodControl.DeletePodName) != 0 {
 		t.Errorf("Unexpected number of deletes.  Expected %d, saw %d\n", 0, len(fakePodControl.DeletePodName))
 	}
-}
-
-type FakeWatcher struct {
-	w *watch.FakeWatcher
-	*testclient.Fake
 }
 
 func TestWatchJobs(t *testing.T) {
