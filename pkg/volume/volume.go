@@ -199,12 +199,12 @@ type Attacher interface {
 // Detacher can detach a volume from a node.
 type Detacher interface {
 	// Detach the given device from the node with the given Name.
-	Detach(deviceName string, nodeName types.NodeName) error
+	Detach(spec *Spec, deviceName string, nodeName types.NodeName) error
 
 	// UnmountDevice unmounts the global mount of the disk. This
 	// should only be called once all bind mounts have been
 	// unmounted.
-	UnmountDevice(deviceMountPath string) error
+	UnmountDevice(spec *Spec, deviceMountPath string) error
 }
 
 // NewDeletedVolumeInUseError returns a new instance of DeletedVolumeInUseError

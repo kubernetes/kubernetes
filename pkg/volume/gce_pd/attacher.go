@@ -245,7 +245,7 @@ func (plugin *gcePersistentDiskPlugin) NewDetacher() (volume.Detacher, error) {
 // Callers are responsible for retrying on failure.
 // Callers are responsible for thread safety between concurrent attach and detach
 // operations.
-func (detacher *gcePersistentDiskDetacher) Detach(deviceMountPath string, nodeName types.NodeName) error {
+func (detacher *gcePersistentDiskDetacher) Detach(_ *volume.Spec, deviceMountPath string, nodeName types.NodeName) error {
 	pdName := path.Base(deviceMountPath)
 
 	attached, err := detacher.gceDisks.DiskIsAttached(pdName, nodeName)
@@ -270,6 +270,6 @@ func (detacher *gcePersistentDiskDetacher) Detach(deviceMountPath string, nodeNa
 	return nil
 }
 
-func (detacher *gcePersistentDiskDetacher) UnmountDevice(deviceMountPath string) error {
+func (detacher *gcePersistentDiskDetacher) UnmountDevice(_ *volume.Spec, deviceMountPath string) error {
 	return volumeutil.UnmountPath(deviceMountPath, detacher.host.GetMounter())
 }

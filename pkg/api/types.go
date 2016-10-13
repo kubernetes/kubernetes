@@ -834,7 +834,7 @@ type RBDVolumeSource struct {
 // in the same region as the kubelet. Cinder volumes support ownership
 // management and SELinux relabeling.
 type CinderVolumeSource struct {
-	// Unique id of the volume used to identify the cinder volume
+	// Unique id of the volume used to identify the Cinder volume.
 	VolumeID string `json:"volumeID"`
 	// Filesystem type to mount.
 	// Must be a filesystem type supported by the host operating system.
@@ -845,6 +845,9 @@ type CinderVolumeSource struct {
 	// the ReadOnly setting in VolumeMounts.
 	// +optional
 	ReadOnly bool `json:"readOnly,omitempty"`
+	// Optional: Used to configure the Cinder credentials instead of using the
+	// Cloud Provider.
+	SecretRef string `json:"secretRef"`
 }
 
 // Represents a Ceph Filesystem mount that lasts the lifetime of a pod

@@ -225,7 +225,7 @@ func (plugin *vsphereVolumePlugin) NewDetacher() (volume.Detacher, error) {
 }
 
 // Detach the given device from the given node.
-func (detacher *vsphereVMDKDetacher) Detach(deviceMountPath string, nodeName types.NodeName) error {
+func (detacher *vsphereVMDKDetacher) Detach(_ *volume.Spec, deviceMountPath string, nodeName types.NodeName) error {
 
 	volPath := getVolPathfromDeviceMountPath(deviceMountPath)
 	attached, err := detacher.vsphereVolumes.DiskIsAttached(volPath, nodeName)
@@ -251,6 +251,6 @@ func (detacher *vsphereVMDKDetacher) Detach(deviceMountPath string, nodeName typ
 	return nil
 }
 
-func (detacher *vsphereVMDKDetacher) UnmountDevice(deviceMountPath string) error {
+func (detacher *vsphereVMDKDetacher) UnmountDevice(_ *volume.Spec, deviceMountPath string) error {
 	return volumeutil.UnmountPath(deviceMountPath, detacher.mounter)
 }

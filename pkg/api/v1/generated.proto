@@ -211,6 +211,10 @@ message CinderVolumeSource {
   // More info: http://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md
   // +optional
   optional bool readOnly = 3;
+
+  // Optional: Used to configure the Cinder credentials instead of using the
+  // Cloud Provider.
+  optional string secretRef = 4;
 }
 
 // Information about the condition of a component.

@@ -15,8 +15,15 @@ go_library(
     srcs = [
         "attacher.go",
         "cinder.go",
-        "cinder_util.go",
+        "deleter.go",
         "doc.go",
+        "manager.go",
+        "manager_cp.go",
+        "manager_local.go",
+        "mounter.go",
+        "provisioner.go",
+        "unmounter.go",
+        "util.go",
     ],
     tags = ["automanaged"],
     deps = [
@@ -31,8 +38,13 @@ go_library(
         "//pkg/util/mount:go_default_library",
         "//pkg/util/strings:go_default_library",
         "//pkg/volume:go_default_library",
+        "//pkg/volume/cinder/drivers:go_default_library",
         "//pkg/volume/util:go_default_library",
         "//vendor:github.com/golang/glog",
+        "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/openstack",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/blockstorage/extensions/volumeactions",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/blockstorage/v2/volumes",
     ],
 )
 

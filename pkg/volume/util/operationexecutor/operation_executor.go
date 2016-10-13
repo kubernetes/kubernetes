@@ -561,7 +561,7 @@ func (oe *operationExecutor) generateVolumesAreAttachedFunc(
 				if !check {
 					actualStateOfWorld.MarkVolumeAsDetached(volumeSpecMap[spec], nodeName)
 					glog.V(1).Infof("VerifyVolumesAreAttached determined volume %q (spec.Name: %q) is no longer attached to node %q, therefore it was marked as detached.",
-						volumeSpecMap[spec], spec.Name())
+						volumeSpecMap[spec], spec.Name(), nodeName)
 				}
 			}
 		}
@@ -678,7 +678,7 @@ func (oe *operationExecutor) generateDetachVolumeFunc(
 			err = oe.verifyVolumeIsSafeToDetach(volumeToDetach)
 		}
 		if err == nil {
-			err = volumeDetacher.Detach(volumeName, volumeToDetach.NodeName)
+			err = volumeDetacher.Detach(volumeToDetach.VolumeSpec, volumeName, volumeToDetach.NodeName)
 		}
 		if err != nil {
 			// On failure, add volume back to ReportAsAttached list
@@ -1064,7 +1064,7 @@ func (oe *operationExecutor) generateUnmountDeviceFunc(
 				err)
 		}
 		// Execute unmount
-		unmountDeviceErr := volumeDetacher.UnmountDevice(deviceMountPath)
+		unmountDeviceErr := volumeDetacher.UnmountDevice(deviceToDetach.VolumeSpec, deviceMountPath)
 		if unmountDeviceErr != nil {
 			// On failure, return error. Caller will log and retry.
 			return fmt.Errorf(
