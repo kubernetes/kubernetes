@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"strings"
 
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
@@ -41,7 +42,7 @@ var (
 
 		You can now join any number of machines by running the following on each node:
 
-		kubeadm join --token %s %s
+		kubeadm join %s
 		`)
 )
 
@@ -126,6 +127,16 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 		"skip preflight checks normally run before modifying the system",
 	)
 
+	cmd.PersistentFlags().Int32Var(
+		&cfg.API.BindPort, "api-port", kubeadmapi.DefaultAPIBindPort,
+		"Port for API to bind to",
+	)
+
+	cmd.PersistentFlags().Int32Var(
+		&cfg.Discovery.BindPort, "discovery-port", kubeadmapi.DefaultDiscoveryBindPort,
+		"Port for JWS discovery service to bind to",
+	)
+
 	return cmd
 }
 
@@ -146,7 +157,7 @@ func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight 
 
 	if !skipPreFlight {
 		fmt.Println("Running pre-flight checks")
-		err := preflight.RunInitMasterChecks()
+		err := preflight.RunInitMasterChecks(cfg)
 		if err != nil {
 			return nil, &preflight.PreFlightError{Msg: err.Error()}
 		}
@@ -190,7 +201,7 @@ func (i *Init) Run(out io.Writer) error {
 		return err
 	}
 
-	kubeconfigs, err := kubemaster.CreateCertsAndConfigForClients(i.cfg.API.AdvertiseAddresses, []string{"kubelet", "admin"}, caKey, caCert)
+	kubeconfigs, err := kubemaster.CreateCertsAndConfigForClients(i.cfg.API, []string{"kubelet", "admin"}, caKey, caCert)
 	if err != nil {
 		return err
 	}
@@ -228,11 +239,16 @@ func (i *Init) Run(out io.Writer) error {
 		return err
 	}
 
-	// TODO(phase1+) use templates to reference struct fields directly as order of args is fragile
-	fmt.Fprintf(out, initDoneMsgf,
-		i.cfg.Secrets.GivenToken,
-		i.cfg.API.AdvertiseAddresses[0],
-	)
+	// TODO(phase1+) we could probably use templates for this logic, and reference struct fields directly etc
+	joinArgs := []string{fmt.Sprintf("--token=%s", i.cfg.Secrets.GivenToken)}
+	if i.cfg.API.BindPort != kubeadmapi.DefaultAPIBindPort {
+		joinArgs = append(joinArgs, fmt.Sprintf("--api-port=%d", i.cfg.API.BindPort))
+	}
+	if i.cfg.Discovery.BindPort != kubeadmapi.DefaultDiscoveryBindPort {
+		joinArgs = append(joinArgs, fmt.Sprintf("--discovery-port=%d", i.cfg.Discovery.BindPort))
+	}
+	joinArgs = append(joinArgs, i.cfg.API.AdvertiseAddresses[0])
+	fmt.Fprintf(out, initDoneMsgf, strings.Join(joinArgs, " "))
 
 	return nil
 }
