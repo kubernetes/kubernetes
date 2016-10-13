@@ -26,11 +26,12 @@ import (
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubemaster "k8s.io/kubernetes/cmd/kubeadm/app/master"
+	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
+	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	_ "k8s.io/kubernetes/pkg/cloudprovider/providers"
-	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/runtime"
 	netutil "k8s.io/kubernetes/pkg/util/net"
 )
@@ -49,6 +50,7 @@ var (
 func NewCmdInit(out io.Writer) *cobra.Command {
 	cfg := &kubeadmapi.MasterConfiguration{}
 	var cfgPath string
+	var skipPreFlight bool
 	cmd := &cobra.Command{
 		Use:   "init",
 		Short: "Run this in order to set up the Kubernetes master.",
@@ -58,7 +60,7 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 					cmdutil.CheckErr(fmt.Errorf("<cmd/init> %v", err))
 				}
 			}
-			i, err := NewInit(cfgPath, cfg)
+			i, err := NewInit(cfgPath, cfg, skipPreFlight)
 			check(err)
 			check(i.Run(out))
 		},
@@ -124,6 +126,10 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 		"etcd client key file. Note: The path must be in /etc/ssl/certs",
 	)
 	cmd.PersistentFlags().MarkDeprecated("external-etcd-keyfile", "this flag will be removed when componentconfig exists")
+	cmd.PersistentFlags().BoolVar(
+		&skipPreFlight, "skip-preflight-checks", false,
+		"skip preflight checks normally run before modifying the system",
+	)
 
 	return cmd
 }
@@ -132,7 +138,7 @@ type Init struct {
 	cfg *kubeadmapi.MasterConfiguration
 }
 
-func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration) (*Init, error) {
+func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight bool) (*Init, error) {
 	if cfgPath != "" {
 		b, err := ioutil.ReadFile(cfgPath)
 		if err != nil {
@@ -142,6 +148,17 @@ func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration) (*Init, error)
 			return nil, fmt.Errorf("unable to decode config from %q [%v]", cfgPath, err)
 		}
 	}
+
+	if !skipPreFlight {
+		fmt.Println("<cmd/init> Running pre-flight checks")
+		err := preflight.RunInitMasterChecks()
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		fmt.Println("Skipping pre-flight checks")
+	}
+
 	// Auto-detect the IP
 	if len(cfg.API.AdvertiseAddresses) == 0 {
 		// TODO(phase1+) perhaps we could actually grab eth0 and eth1

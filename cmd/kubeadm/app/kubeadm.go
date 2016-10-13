@@ -19,19 +19,12 @@ package app
 import (
 	"os"
 
-	"github.com/renstrom/dedent"
 	"github.com/spf13/pflag"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/util/logs"
 )
-
-var AlphaWarningOnExit = dedent.Dedent(`
-	kubeadm: I am an alpha version, my authors welcome your feedback and bug reports
-	kubeadm: please create an issue using https://github.com/kubernetes/kubernetes/issues/new
-	kubeadm: and make sure to mention @kubernetes/sig-cluster-lifecycle. Thank you!
-`)
 
 func Run() error {
 	logs.InitLogs()
