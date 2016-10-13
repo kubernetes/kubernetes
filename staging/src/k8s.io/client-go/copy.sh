@@ -71,7 +71,7 @@ ls "${CLIENT_REPO}" | { grep -v '_tmp' || true; } | xargs rm -rf
 mv "${CLIENT_REPO_TEMP}"/* "${CLIENT_REPO}"
 rm -r "${CLIENT_REPO_TEMP}"
 
-echo "moving vendor/k8s.io/kuberentes"
+echo "moving vendor/k8s.io/kubernetes"
 cp -rn "${CLIENT_REPO}"/vendor/k8s.io/kubernetes/. "${CLIENT_REPO}"/
 rm -rf "${CLIENT_REPO}"/vendor/k8s.io/kubernetes
 # client-go will share the vendor of the main repo for now. When client-go

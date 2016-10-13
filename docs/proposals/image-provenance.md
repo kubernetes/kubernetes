@@ -61,7 +61,7 @@ Non-goals include:
   * A third-party implementation of an image policy checker could optionally use ThirdPartyResource to store its policy.
 * Kubernetes core code dealing with concepts of image layers, build processes, source repositories, etc.
   * We expect there will be multiple PaaSes and/or de-facto programming environments, each with different takes on
-    these concepts.  At any rate, Kuberenetes is not ready to be opinionated on these concepts.
+    these concepts.  At any rate, Kubernetes is not ready to be opinionated on these concepts.
 * Sending more information than strictly needed to a third-party service.
   * Information sent by Kubernetes to a third-party service constitutes an API of Kubernetes, and we want to
     avoid making these broader than necessary, as it restricts future evolution of Kubernetes, and makes
