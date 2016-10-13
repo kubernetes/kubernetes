@@ -33,12 +33,20 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/serializer/protobuf"
 	"k8s.io/kubernetes/pkg/util/diff"
+	"k8s.io/kubernetes/pkg/util/sets"
+)
+
+var nonProtobaleAPIGroups = sets.NewString(
+	"kubeadm.k8s.io",
 )
 
 func init() {
-	codecsToTest = append(codecsToTest, func(version unversioned.GroupVersion, item runtime.Object) (runtime.Codec, error) {
+	codecsToTest = append(codecsToTest, func(version unversioned.GroupVersion, item runtime.Object) (runtime.Codec, bool, error) {
+		if nonProtobaleAPIGroups.Has(version.Group) {
+			return nil, false, nil
+		}
 		s := protobuf.NewSerializer(api.Scheme, api.Scheme, "application/arbitrary.content.type")
-		return api.Codecs.CodecForVersions(s, s, testapi.ExternalGroupVersions(), nil), nil
+		return api.Codecs.CodecForVersions(s, s, testapi.ExternalGroupVersions(), nil), true, nil
 	})
 }
 

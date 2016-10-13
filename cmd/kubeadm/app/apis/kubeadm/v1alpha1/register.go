@@ -18,6 +18,7 @@ package v1alpha1
 
 import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
@@ -27,7 +28,7 @@ var (
 )
 
 // GroupName is the group name use in this package
-const GroupName = "kubeadm"
+const GroupName = "kubeadm.k8s.io"
 
 // SchemeGroupVersion is group version used to register these objects
 var SchemeGroupVersion = unversioned.GroupVersion{Group: GroupName, Version: "v1alpha1"}
@@ -47,6 +48,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&MasterConfiguration{},
 		&NodeConfiguration{},
 		&ClusterInfo{},
+		&v1.ListOptions{},
+		&v1.DeleteOptions{},
 	)
 	return nil
 }

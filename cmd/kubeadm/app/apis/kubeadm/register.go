@@ -14,9 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package api
+package kubeadm
 
 import (
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 )
@@ -27,7 +28,7 @@ var (
 )
 
 // GroupName is the group name use in this package
-const GroupName = "kubeadm"
+const GroupName = "kubeadm.k8s.io"
 
 // SchemeGroupVersion is group version used to register these objects
 var SchemeGroupVersion = unversioned.GroupVersion{Group: GroupName, Version: runtime.APIVersionInternal}
@@ -47,6 +48,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&MasterConfiguration{},
 		&NodeConfiguration{},
 		&ClusterInfo{},
+		&api.ListOptions{},
+		&api.DeleteOptions{},
 	)
 	return nil
 }

@@ -16,6 +16,7 @@ cmd/kube-dns
 cmd/kube-proxy
 cmd/kubeadm
 cmd/kubeadm
+cmd/kubeadm/app/apis/kubeadm/install
 cmd/kubectl
 cmd/kubelet
 cmd/kubernetes-discovery
