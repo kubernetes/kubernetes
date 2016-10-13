@@ -67,7 +67,7 @@ func getTestTokenAuth() authenticator.Request {
 	tokenAuthenticator := tokentest.New()
 	tokenAuthenticator.Tokens[AliceToken] = &user.DefaultInfo{Name: "alice", UID: "1"}
 	tokenAuthenticator.Tokens[BobToken] = &user.DefaultInfo{Name: "bob", UID: "2"}
-	return bearertoken.New(tokenAuthenticator)
+	return bearertoken.New(tokenAuthenticator, "")
 }
 
 func getTestWebhookTokenAuth(serverURL string) (authenticator.Request, error) {
@@ -90,7 +90,7 @@ func getTestWebhookTokenAuth(serverURL string) (authenticator.Request, error) {
 	if err != nil {
 		return nil, err
 	}
-	return bearertoken.New(webhookTokenAuth), nil
+	return bearertoken.New(webhookTokenAuth, ""), nil
 }
 
 func path(resource, namespace, name string) string {

@@ -31,7 +31,7 @@ func TestAuthenticateRequest(t *testing.T) {
 			t.Errorf("unexpected token: %s", token)
 		}
 		return &user.DefaultInfo{Name: "user"}, true, nil
-	}))
+	}), "")
 	user, ok, err := auth.AuthenticateRequest(&http.Request{
 		Header: http.Header{"Authorization": []string{"Bearer token"}},
 	})
@@ -43,7 +43,7 @@ func TestAuthenticateRequest(t *testing.T) {
 func TestAuthenticateRequestTokenInvalid(t *testing.T) {
 	auth := New(authenticator.TokenFunc(func(token string) (user.Info, bool, error) {
 		return nil, false, nil
-	}))
+	}), "")
 	user, ok, err := auth.AuthenticateRequest(&http.Request{
 		Header: http.Header{"Authorization": []string{"Bearer token"}},
 	})
@@ -55,7 +55,7 @@ func TestAuthenticateRequestTokenInvalid(t *testing.T) {
 func TestAuthenticateRequestTokenError(t *testing.T) {
 	auth := New(authenticator.TokenFunc(func(token string) (user.Info, bool, error) {
 		return nil, false, errors.New("error")
-	}))
+	}), "")
 	user, ok, err := auth.AuthenticateRequest(&http.Request{
 		Header: http.Header{"Authorization": []string{"Bearer token"}},
 	})
@@ -77,7 +77,7 @@ func TestAuthenticateRequestBadValue(t *testing.T) {
 		auth := New(authenticator.TokenFunc(func(token string) (user.Info, bool, error) {
 			t.Errorf("authentication should not have been called")
 			return nil, false, nil
-		}))
+		}), "")
 		user, ok, err := auth.AuthenticateRequest(testCase.Req)
 		if ok || user != nil || err != nil {
 			t.Errorf("%d: expected not authenticated (no token)", i)

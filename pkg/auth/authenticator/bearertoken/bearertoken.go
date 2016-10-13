@@ -20,16 +20,19 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/go-openapi/spec"
 	"k8s.io/kubernetes/pkg/auth/authenticator"
 	"k8s.io/kubernetes/pkg/auth/user"
 )
 
 type Authenticator struct {
 	auth authenticator.Token
+	// name is used in OpenAPI SecurityDefinition to distinguish different bearer authenticator
+	name string
 }
 
-func New(auth authenticator.Token) *Authenticator {
-	return &Authenticator{auth}
+func New(auth authenticator.Token, name string) *Authenticator {
+	return &Authenticator{auth, strings.Title(name)}
 }
 
 func (a *Authenticator) AuthenticateRequest(req *http.Request) (user.Info, bool, error) {
@@ -44,4 +47,18 @@ func (a *Authenticator) AuthenticateRequest(req *http.Request) (user.Info, bool,
 
 	token := parts[1]
 	return a.auth.AuthenticateToken(token)
+}
+
+// GetOpenAPISecurityDefinition returns a Bearer authentication SecurityDefinition.
+func (a *Authenticator) GetOpenAPISecurityDefinition() (spec.SecurityDefinitions, error) {
+	ret := spec.SecurityDefinitions{}
+	ret[a.name+"Bearer"] = &spec.SecurityScheme{
+		SecuritySchemeProps: spec.SecuritySchemeProps{
+			Type:        "apiKey",
+			Name:        "authorization",
+			In:          "header",
+			Description: "Bearer " + a.name + " authentication",
+		},
+	}
+	return ret, nil
 }

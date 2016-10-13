@@ -124,7 +124,7 @@ func New(config AuthenticatorConfig) (authenticator.Request, error) {
 
 	// always add anytoken last, so that every other token authenticator gets to try first
 	if config.AnyToken {
-		authenticators = append(authenticators, bearertoken.New(anytoken.AnyTokenAuthenticator{}))
+		authenticators = append(authenticators, bearertoken.New(anytoken.AnyTokenAuthenticator{}, "AnyToken"))
 	}
 
 	if len(authenticators) == 0 {
@@ -173,12 +173,12 @@ func newAuthenticatorFromTokenFile(tokenAuthFile string) (authenticator.Request,
 		return nil, err
 	}
 
-	return bearertoken.New(tokenAuthenticator), nil
+	return bearertoken.New(tokenAuthenticator, "TokenFile"), nil
 }
 
 // newAuthenticatorFromToken returns an authenticator.Request or an error
 func NewAuthenticatorFromTokens(tokens map[string]*user.DefaultInfo) authenticator.Request {
-	return bearertoken.New(tokenfile.New(tokens))
+	return bearertoken.New(tokenfile.New(tokens), "Token")
 }
 
 // newAuthenticatorFromOIDCIssuerURL returns an authenticator.Request or an error.
@@ -194,7 +194,7 @@ func newAuthenticatorFromOIDCIssuerURL(issuerURL, clientID, caFile, usernameClai
 		return nil, err
 	}
 
-	return bearertoken.New(tokenAuthenticator), nil
+	return bearertoken.New(tokenAuthenticator, "OIDC"), nil
 }
 
 // newServiceAccountAuthenticator returns an authenticator.Request or an error
@@ -209,7 +209,7 @@ func newServiceAccountAuthenticator(keyfiles []string, lookup bool, serviceAccou
 	}
 
 	tokenAuthenticator := serviceaccount.JWTTokenAuthenticator(allPublicKeys, lookup, serviceAccountGetter)
-	return bearertoken.New(tokenAuthenticator), nil
+	return bearertoken.New(tokenAuthenticator, "ServiceAccount"), nil
 }
 
 // newAuthenticatorFromClientCAFile returns an authenticator.Request or an error
@@ -241,5 +241,5 @@ func newWebhookTokenAuthenticator(webhookConfigFile string, ttl time.Duration) (
 		return nil, err
 	}
 
-	return bearertoken.New(webhookTokenAuthenticator), nil
+	return bearertoken.New(webhookTokenAuthenticator, "Webhook"), nil
 }

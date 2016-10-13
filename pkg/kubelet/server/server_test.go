@@ -33,6 +33,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-openapi/spec"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"k8s.io/kubernetes/pkg/api"
@@ -166,6 +167,9 @@ type fakeAuth struct {
 
 func (f *fakeAuth) AuthenticateRequest(req *http.Request) (user.Info, bool, error) {
 	return f.authenticateFunc(req)
+}
+func (f *fakeAuth) GetOpenAPISecurityDefinition() (spec.SecurityDefinitions, error) {
+	return spec.SecurityDefinitions{}, nil
 }
 func (f *fakeAuth) GetRequestAttributes(u user.Info, req *http.Request) authorizer.Attributes {
 	return f.attributesFunc(u, req)
