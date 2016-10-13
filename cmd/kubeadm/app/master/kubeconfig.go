@@ -22,19 +22,20 @@ import (
 	"fmt"
 
 	// TODO: "k8s.io/client-go/client/tools/clientcmd/api"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	certutil "k8s.io/kubernetes/pkg/util/cert"
 )
 
-func CreateCertsAndConfigForClients(advertiseAddresses, clientNames []string, caKey *rsa.PrivateKey, caCert *x509.Certificate) (map[string]*clientcmdapi.Config, error) {
+func CreateCertsAndConfigForClients(cfg kubeadmapi.API, clientNames []string, caKey *rsa.PrivateKey, caCert *x509.Certificate) (map[string]*clientcmdapi.Config, error) {
 
 	basicClientConfig := kubeadmutil.CreateBasicClientConfig(
 		"kubernetes",
 		// TODO this is not great, but there is only one address we can use here
 		// so we'll pick the first one, there is much of chance to have an empty
 		// slice by the time this gets called
-		fmt.Sprintf("https://%s:443", advertiseAddresses[0]),
+		fmt.Sprintf("https://%s:%d", cfg.AdvertiseAddresses[0], cfg.BindPort),
 		certutil.EncodeCertPEM(caCert),
 	)
 
