@@ -417,7 +417,7 @@ func (adc *attachDetachController) createVolumeSpec(
 		return nil, fmt.Errorf("failed to cast clonedPodVolume %#v to api.Volume", clonedPodVolumeObj)
 	}
 
-	return volume.NewSpecFromVolume(&clonedPodVolume), nil
+	return volume.NewSpecFromVolumeWithNS(&clonedPodVolume, podNamespace), nil
 }
 
 // getPVCFromCacheExtractPV fetches the PVC object with the given namespace and
@@ -510,7 +510,7 @@ func (adc *attachDetachController) getPVSpecFromCache(
 			"failed to cast %q clonedPV %#v to PersistentVolume", name, pvObj)
 	}
 
-	return volume.NewSpecFromPersistentVolume(&clonedPV, pvcReadOnly), nil
+	return volume.NewSpecFromPersistentVolumeWithNS(&clonedPV, pvcReadOnly, pv.Spec.ClaimRef.Namespace), nil
 }
 
 // processVolumesInUse processes the list of volumes marked as "in-use"
