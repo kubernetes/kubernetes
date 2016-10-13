@@ -17,6 +17,6 @@
 
 all:
 	docker build -t gcr.io/$(PROJECT)/kubemark .
-	gcloud docker push gcr.io/$(PROJECT)/kubemark
+	gcloud docker -- push gcr.io/$(PROJECT)/kubemark
 
 .PHONY: all
