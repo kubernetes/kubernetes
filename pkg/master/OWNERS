@@ -1,11 +1,5 @@
-assignees:
+approvers:
 - derekwaynecarr
 - lavalamp
 - mikedanese
 - nikhiljindal
-to_migrate_to_approvers:
-  approvers:
-  - derekwaynecarr
-  - lavalamp
-  - mikedanese
-  - nikhiljindal

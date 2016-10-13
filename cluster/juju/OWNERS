@@ -1,16 +1,5 @@
-assignees:
-- chuckbutler
-- mbruzek
-- marcoceppi
+approvers:
 - castrojo
-owners:
 - chuckbutler
+- marcoceppi
 - mbruzek
-to_migrate_to_approvers:
-  approvers:
-  - chuckbutler
-  - mbruzek
-  - marcoceppi
-  - castrojo
-  - chuckbutler
-  - mbruzek

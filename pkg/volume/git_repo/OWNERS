@@ -1,5 +1,2 @@
-maintainers:
+approvers:
 - thockin
-to_migrate_to_approvers:
-  approvers:
-  - thockin

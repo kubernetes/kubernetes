@@ -1,11 +1,5 @@
-assignees:
-- mikedanese
+approvers:
 - errordeveloper
-- luxas
 - jbeda
-to_migrate_to_approvers:
-  approvers:
-  - mikedanese
-  - errordeveloper
-  - luxas
-  - jbeda
+- luxas
+- mikedanese
