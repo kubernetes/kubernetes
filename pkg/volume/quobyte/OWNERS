@@ -1,3 +1,6 @@
 approvers:
 - johscheuer
 - quofelix
+reviewers:
+- johscheuer
+- pigmej

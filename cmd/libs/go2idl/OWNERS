@@ -1,3 +1,7 @@
 approvers:
 - lavalamp
 - wojtek-t
+reviewers:
+- caesarxuchao
+- thockin
+- wojtek-t

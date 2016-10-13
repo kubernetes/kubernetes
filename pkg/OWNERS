@@ -4,3 +4,7 @@ approvers:
 - lavalamp
 - smarterclayton
 - thockin
+reviewers:
+- brendandburns
+- smarterclayton
+- wojtek-t

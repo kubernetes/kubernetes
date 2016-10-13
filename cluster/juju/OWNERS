@@ -3,3 +3,7 @@ approvers:
 - chuckbutler
 - marcoceppi
 - mbruzek
+reviewers:
+- chuckbutler
+- mbruzek
+- mrhohn

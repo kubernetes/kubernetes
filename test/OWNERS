@@ -2,3 +2,7 @@ approvers:
 - fejta
 - ixdy
 - spxtr
+reviewers:
+- gmarek
+- random-liu
+- wojtek-t

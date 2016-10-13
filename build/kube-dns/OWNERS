@@ -1,3 +1,7 @@
 approvers:
 - artfulcoder
 - thockin
+reviewers:
+- artfulcoder
+- girishkalele
+- mrhohn

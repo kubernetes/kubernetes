@@ -1,3 +1,7 @@
 approvers:
 - erictune
 - liggitt
+reviewers:
+- goltermann
+- therc
+- vishh
