@@ -87,11 +87,13 @@ I propose that the
 [`v1.HostPathVolumeSource`](https://github.com/kubernetes/kubernetes/blob/d26b4ca2859aa667ad520fb9518e0db67b74216a/pkg/api/types.go#L447-L451)
 object be changed to include the following additional field:
 
-`Type` - An optional string of `auto|exists|file|device|socket|directory` - If not set, defaults to `auto`. These values have the following behavior:
+`Type` - An optional string of `exists|file|device|socket|directory` - If not
+set, it will default to a backwards-compatible default behavior described
+below.
 
 | Value | Behavior |
 |:------|:---------|
-| `auto ` | If nothing exists at the given path, an empty directory will be created there. Otherwise, behaves like `exists` |
+| *unset* | If nothing exists at the given path, an empty directory will be created there. Otherwise, behaves like `exists` |
 | `exists` | If nothing exists at the given path, the pod will fail to run and provide an informative error message |
 | `file` | If a file does not exist at the given path, the pod will fail to run and provide an informative error message |
 | `device` | If a block or character device does not exist at the given path, the pod will fail to run and provide an informative error message |
@@ -158,6 +160,18 @@ technical consideration (out of scope of this proposal) is needed.
 
 
 ## Possible concerns
+
+### Permissions
+
+This proposal does not attempt to change the state of volume permissions. Currently, a HostPath volume is created with `root` ownership and `755` permissions. This behavior will be retained. An argument for this behavior is given [here](https://github.com/kubernetes/kubernetes/blob/master/docs/proposals/volumes.md#shared-storage-hostpath).
+
+### SELinux
+
+This proposal should not impact SELinux relabeling. Verifying the presence and
+type of a given path will be logically separate from SELinux labeling.
+Similarly, creating the directory when it doesn't exist will happen before any
+SELinux operations and should not impact it.
+
 
 ### Containerized Kubelet
 
