@@ -17,6 +17,7 @@ limitations under the License.
 package admission
 
 import (
+	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/controller/informers"
 )
 
@@ -27,13 +28,15 @@ type PluginInitializer interface {
 }
 
 type pluginInitializer struct {
-	informers informers.SharedInformerFactory
+	informers  informers.SharedInformerFactory
+	authorizer authorizer.Authorizer
 }
 
 // NewPluginInitializer constructs new instance of PluginInitializer
-func NewPluginInitializer(sharedInformers informers.SharedInformerFactory) PluginInitializer {
+func NewPluginInitializer(sharedInformers informers.SharedInformerFactory, authz authorizer.Authorizer) PluginInitializer {
 	plugInit := &pluginInitializer{
-		informers: sharedInformers,
+		informers:  sharedInformers,
+		authorizer: authz,
 	}
 	return plugInit
 }
@@ -44,6 +47,10 @@ func (i *pluginInitializer) Initialize(plugins []Interface) {
 	for _, plugin := range plugins {
 		if wantsInformerFactory, ok := plugin.(WantsInformerFactory); ok {
 			wantsInformerFactory.SetInformerFactory(i.informers)
+		}
+
+		if wantsAuthorizer, ok := plugin.(WantsAuthorizer); ok {
+			wantsAuthorizer.SetAuthorizer(i.authorizer)
 		}
 	}
 }

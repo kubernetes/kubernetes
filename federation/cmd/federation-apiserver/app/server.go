@@ -205,7 +205,7 @@ func Run(s *options.ServerRunOptions) error {
 	}
 
 	sharedInformers := informers.NewSharedInformerFactory(client, 10*time.Minute)
-	pluginInitializer := admission.NewPluginInitializer(sharedInformers)
+	pluginInitializer := admission.NewPluginInitializer(sharedInformers, apiAuthorizer)
 
 	admissionController, err := admission.NewFromPlugins(client, admissionControlPluginNames, s.AdmissionControlConfigFile, pluginInitializer)
 	if err != nil {
