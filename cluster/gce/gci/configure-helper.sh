@@ -1176,8 +1176,9 @@ function download-and-setup-rkt {
     ln -s ${KUBE_HOME}/bin/rkt-v1.16.0/rkt ${KUBE_HOME}/bin/rkt
 }
 
-function setup-custom-toolbox {
-    cat > ${KUBE_HOME}/bin/toolbox <<EOF
+function setup-custom-mounter {
+    local mounter="${KUBE_HOME}/bin/mounter"
+    cat > ${mounter} <<EOF
 #!/bin/bash
 set -e	
 set -o pipefail
@@ -1191,11 +1192,6 @@ if [ -f "${toolboxrc}" ]; then
 	source "${toolboxrc}"
 fi
 
-exec="$@"
-if [ -z $exec ]; then
-	exec=/bin/bash
-fi
-
 sudo /home/kubernetes/bin/rkt run --stage1-name="coreos.com/rkt/stage1-fly:1.16.0" \
 	--insecure-options=image \
 	--interactive \
@@ -1207,11 +1203,11 @@ sudo /home/kubernetes/bin/rkt run --stage1-name="coreos.com/rkt/stage1-fly:1.16.
 	--mount volume=usr,target=/media/root/usr \
 	--mount volume=run,target=/media/root/run \
 	--mount volume=klet,target=/var/lib/kubelet \
-	docker://${TOOLBOX_DOCKER_IMAGE}:${TOOLBOX_DOCKER_TAG} --user=root --exec $exec
+	docker://${TOOLBOX_DOCKER_IMAGE}:${TOOLBOX_DOCKER_TAG} --user=root --exec /bin/mount -- "$@"
 EOF
-    chmod a+rx ${KUBE_HOME}/bin/toolbox
-    # Pre-warm toolbox
-    ${KUBE_HOME}/bin/toolbox /bin/true
+    chmod a+rx ${mounter}
+    # Pre-warm mounter
+    ${mounter} &> /dev/nul
 }
 
 ########### Main Function ###########
@@ -1238,7 +1234,7 @@ config-ip-firewall
 create-dirs
 setup-kubelet-dir
 download-and-setup-rkt
-setup-custom-toolbox
+setup-custom-mounter
 ensure-local-ssds
 setup-logrotate
 if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
