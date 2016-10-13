@@ -1083,13 +1083,13 @@ func PodToleratesNodeTaints(pod *api.Pod, meta interface{}, nodeInfo *schedulerc
 		return false, nil, err
 	}
 
-	if tolerationsToleratesTaints(tolerations, taints) {
+	if TolerationsToleratesTaints(tolerations, taints) {
 		return true, nil, nil
 	}
 	return false, []algorithm.PredicateFailureReason{ErrTaintsTolerationsNotMatch}, nil
 }
 
-func tolerationsToleratesTaints(tolerations []api.Toleration, taints []api.Taint) bool {
+func TolerationsToleratesTaints(tolerations []api.Toleration, taints []api.Taint) bool {
 	// If the taint list is nil/empty, it is tolerated by all tolerations by default.
 	if len(taints) == 0 {
 		return true
