@@ -95,6 +95,9 @@ type KubeDNS struct {
 	// TODO(nikhiljindal): Remove this. It can be recreated using clusterIPServiceMap.
 	reverseRecordMap map[string]*skymsg.Service
 
+	// Map of the fqdn for headless services to pod ips. The value of this map is a set of ips.
+	fqdn2IPsMap map[string]map[string]bool
+
 	// Map of cluster IP to service object. Headless services are not part of this map.
 	// Used to get a service when given its cluster IP.
 	// Access to this is coordinated using cacheLock. We use the same lock for cache and this map
@@ -141,6 +144,7 @@ func NewKubeDNS(client clientset.Interface, domain string, federations map[strin
 		cacheLock:           sync.RWMutex{},
 		nodesStore:          kcache.NewStore(kcache.MetaNamespaceKeyFunc),
 		reverseRecordMap:    make(map[string]*skymsg.Service),
+		fqdn2IPsMap:         make(map[string]map[string]bool),
 		clusterIPServiceMap: make(map[string]*kapi.Service),
 		domainPath:          reverseArray(strings.Split(strings.TrimRight(domain, "."), ".")),
 		federations:         federations,
@@ -222,6 +226,20 @@ func (kd *KubeDNS) setEndpointsStore() {
 		kcache.ResourceEventHandlerFuncs{
 			AddFunc: kd.handleEndpointAdd,
 			UpdateFunc: func(oldObj, newObj interface{}) {
+				if oldEndPoint, ok := oldObj.(*kapi.Endpoints); ok {
+					if svc, err := kd.getServiceFromEndpoints(oldEndPoint); err == nil && svc != nil {
+						if !kapi.IsServiceIPSet(svc) {
+							// When endpoints for headless services update, delete old reverse dns records.
+							host := kd.getServiceFQDN(svc)
+							m := kd.fqdn2IPsMap[host]
+							for ip := range m {
+								delete(kd.reverseRecordMap, ip)
+							}
+							// All ips to the host have been deleted from reverseRecordMap
+							delete(kd.fqdn2IPsMap, host)
+						}
+					}
+				}
 				// TODO: Avoid unwanted updates.
 				kd.handleEndpointAdd(newObj)
 			},
@@ -269,6 +287,14 @@ func (kd *KubeDNS) removeService(obj interface{}) {
 		if kapi.IsServiceIPSet(s) {
 			delete(kd.reverseRecordMap, s.Spec.ClusterIP)
 			delete(kd.clusterIPServiceMap, s.Spec.ClusterIP)
+		} else {
+			// Delete reverse dns records for headless services.
+			host := kd.getServiceFQDN(s)
+			m := kd.fqdn2IPsMap[host]
+			for ip := range m {
+				delete(kd.reverseRecordMap, ip)
+			}
+			delete(kd.fqdn2IPsMap, host)
 		}
 	}
 }
@@ -364,10 +390,17 @@ func (kd *KubeDNS) generateRecordsForHeadlessService(e *kapi.Endpoints, svc *kap
 	}
 	subCache := NewTreeCache()
 	glog.V(4).Infof("Endpoints Annotations: %v", e.Annotations)
+	// Generate reverse dns records for headless services.
+	host := kd.getServiceFQDN(svc)
+	reverseRecord, _ := getSkyMsg(host, 0)
+	// podIPs is a set of pods' ip
+	podIPs := make(map[string]bool)
 	for idx := range e.Subsets {
 		for subIdx := range e.Subsets[idx].Addresses {
 			address := &e.Subsets[idx].Addresses[subIdx]
 			endpointIP := address.IP
+			podIPs[endpointIP] = true
+			kd.reverseRecordMap[endpointIP] = reverseRecord
 			recordValue, endpointName := getSkyMsg(endpointIP, 0)
 			if hostLabel, exists := getHostname(address, podHostnames); exists {
 				endpointName = hostLabel
@@ -384,6 +417,7 @@ func (kd *KubeDNS) generateRecordsForHeadlessService(e *kapi.Endpoints, svc *kap
 			}
 		}
 	}
+	kd.fqdn2IPsMap[host] = podIPs
 	subCachePath := append(kd.domainPath, serviceSubdomain, svc.Namespace)
 	kd.cacheLock.Lock()
 	defer kd.cacheLock.Unlock()
