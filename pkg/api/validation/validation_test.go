@@ -6519,6 +6519,242 @@ func TestValidateServiceUpdate(t *testing.T) {
 			},
 			numErrs: 0,
 		},
+		{
+			name: "`None` ClusterIP cannot be changed",
+			tweakSvc: func(oldSvc, newSvc *api.Service) {
+				oldSvc.Spec.ClusterIP = "None"
+				newSvc.Spec.ClusterIP = "1.2.3.4"
+			},
+			numErrs: 1,
+		},
+		{
+			name: "`None` ClusterIP cannot be removed",
+			tweakSvc: func(oldSvc, newSvc *api.Service) {
+				oldSvc.Spec.ClusterIP = "None"
+				newSvc.Spec.ClusterIP = ""
+			},
+			numErrs: 1,
+		},
+		{
+			name: "Service with ClusterIP type cannot change its set ClusterIP",
+			tweakSvc: func(oldSvc, newSvc *api.Service) {
+				oldSvc.Spec.Type = api.ServiceTypeClusterIP
+				newSvc.Spec.Type = api.ServiceTypeClusterIP
+
+				oldSvc.Spec.ClusterIP = "1.2.3.4"
+				newSvc.Spec.ClusterIP = "1.2.3.5"
+			},
+			numErrs: 1,
+		},
+		{
+			name: "Service with ClusterIP type can change its empty ClusterIP",
+			tweakSvc: func(oldSvc, newSvc *api.Service) {
+				oldSvc.Spec.Type = api.ServiceTypeClusterIP
+				newSvc.Spec.Type = api.ServiceTypeClusterIP
+
+				oldSvc.Spec.ClusterIP = ""
+				newSvc.Spec.ClusterIP = "1.2.3.5"
+			},
+			numErrs: 0,
+		},
+		{
+			name: "Service with ClusterIP type cannot change its set ClusterIP when changing type to NodePort",
+			tweakSvc: func(oldSvc, newSvc *api.Service) {
+				oldSvc.Spec.Type = api.ServiceTypeClusterIP
+				newSvc.Spec.Type = api.ServiceTypeNodePort
+
+				oldSvc.Spec.ClusterIP = "1.2.3.4"
+				newSvc.Spec.ClusterIP = "1.2.3.5"
+			},
+			numErrs: 1,
+		},
+		{
+			name: "Service with ClusterIP type can change its empty ClusterIP when changing type to NodePort",
+			tweakSvc: func(oldSvc, newSvc *api.Service) {
+				oldSvc.Spec.Type = api.ServiceTypeClusterIP
+				newSvc.Spec.Type = api.ServiceTypeNodePort
+
+				oldSvc.Spec.ClusterIP = ""
+				newSvc.Spec.ClusterIP = "1.2.3.5"
+			},
+			numErrs: 0,
+		},
+		{
+			name: "Service with ClusterIP type cannot change its ClusterIP when changing type to LoadBalancer",
+			tweakSvc: func(oldSvc, newSvc *api.Service) {
+				oldSvc.Spec.Type = api.ServiceTypeClusterIP
+				newSvc.Spec.Type = api.ServiceTypeLoadBalancer
+
+				oldSvc.Spec.ClusterIP = "1.2.3.4"
+				newSvc.Spec.ClusterIP = "1.2.3.5"
+			},
+			numErrs: 1,
+		},
+		{
+			name: "Service with ClusterIP type can change its empty ClusterIP when changing type to LoadBalancer",
+			tweakSvc: func(oldSvc, newSvc *api.Service) {
+				oldSvc.Spec.Type = api.ServiceTypeClusterIP
+				newSvc.Spec.Type = api.ServiceTypeLoadBalancer
+
+				oldSvc.Spec.ClusterIP = ""
+				newSvc.Spec.ClusterIP = "1.2.3.5"
+			},
+			numErrs: 0,
+		},
+		{
+			name: "Service with NodePort type cannot change its set ClusterIP",
+			tweakSvc: func(oldSvc, newSvc *api.Service) {
+				oldSvc.Spec.Type = api.ServiceTypeNodePort
+				newSvc.Spec.Type = api.ServiceTypeNodePort
+
+				oldSvc.Spec.ClusterIP = "1.2.3.4"
+				newSvc.Spec.ClusterIP = "1.2.3.5"
+			},
+			numErrs: 1,
+		},
+		{
+			name: "Service with NodePort type can change its empty ClusterIP",
+			tweakSvc: func(oldSvc, newSvc *api.Service) {
+				oldSvc.Spec.Type = api.ServiceTypeNodePort
+				newSvc.Spec.Type = api.ServiceTypeNodePort
+
+				oldSvc.Spec.ClusterIP = ""
+				newSvc.Spec.ClusterIP = "1.2.3.5"
+			},
+			numErrs: 0,
+		},
+		{
+			name: "Service with NodePort type cannot change its set ClusterIP when changing type to ClusterIP",
+			tweakSvc: func(oldSvc, newSvc *api.Service) {
+				oldSvc.Spec.Type = api.ServiceTypeNodePort
+				newSvc.Spec.Type = api.ServiceTypeClusterIP
+
+				oldSvc.Spec.ClusterIP = "1.2.3.4"
+				newSvc.Spec.ClusterIP = "1.2.3.5"
+			},
+			numErrs: 1,
+		},
+		{
+			name: "Service with NodePort type can change its empty ClusterIP when changing type to ClusterIP",
+			tweakSvc: func(oldSvc, newSvc *api.Service) {
+				oldSvc.Spec.Type = api.ServiceTypeNodePort
+				newSvc.Spec.Type = api.ServiceTypeClusterIP
+
+				oldSvc.Spec.ClusterIP = ""
+				newSvc.Spec.ClusterIP = "1.2.3.5"
+			},
+			numErrs: 0,
+		},
+		{
+			name: "Service with NodePort type cannot change its set ClusterIP when changing type to LoadBalancer",
+			tweakSvc: func(oldSvc, newSvc *api.Service) {
+				oldSvc.Spec.Type = api.ServiceTypeNodePort
+				newSvc.Spec.Type = api.ServiceTypeLoadBalancer
+
+				oldSvc.Spec.ClusterIP = "1.2.3.4"
+				newSvc.Spec.ClusterIP = "1.2.3.5"
+			},
+			numErrs: 1,
+		},
+		{
+			name: "Service with NodePort type can change its empty ClusterIP when changing type to LoadBalancer",
+			tweakSvc: func(oldSvc, newSvc *api.Service) {
+				oldSvc.Spec.Type = api.ServiceTypeNodePort
+				newSvc.Spec.Type = api.ServiceTypeLoadBalancer
+
+				oldSvc.Spec.ClusterIP = ""
+				newSvc.Spec.ClusterIP = "1.2.3.5"
+			},
+			numErrs: 0,
+		},
+		{
+			name: "Service with LoadBalancer type cannot change its set ClusterIP",
+			tweakSvc: func(oldSvc, newSvc *api.Service) {
+				oldSvc.Spec.Type = api.ServiceTypeLoadBalancer
+				newSvc.Spec.Type = api.ServiceTypeLoadBalancer
+
+				oldSvc.Spec.ClusterIP = "1.2.3.4"
+				newSvc.Spec.ClusterIP = "1.2.3.5"
+			},
+			numErrs: 1,
+		},
+		{
+			name: "Service with LoadBalancer type can change its empty ClusterIP",
+			tweakSvc: func(oldSvc, newSvc *api.Service) {
+				oldSvc.Spec.Type = api.ServiceTypeLoadBalancer
+				newSvc.Spec.Type = api.ServiceTypeLoadBalancer
+
+				oldSvc.Spec.ClusterIP = ""
+				newSvc.Spec.ClusterIP = "1.2.3.5"
+			},
+			numErrs: 0,
+		},
+		{
+			name: "Service with LoadBalancer type cannot change its set ClusterIP when changing type to ClusterIP",
+			tweakSvc: func(oldSvc, newSvc *api.Service) {
+				oldSvc.Spec.Type = api.ServiceTypeLoadBalancer
+				newSvc.Spec.Type = api.ServiceTypeClusterIP
+
+				oldSvc.Spec.ClusterIP = "1.2.3.4"
+				newSvc.Spec.ClusterIP = "1.2.3.5"
+			},
+			numErrs: 1,
+		},
+		{
+			name: "Service with LoadBalancer type can change its empty ClusterIP when changing type to ClusterIP",
+			tweakSvc: func(oldSvc, newSvc *api.Service) {
+				oldSvc.Spec.Type = api.ServiceTypeLoadBalancer
+				newSvc.Spec.Type = api.ServiceTypeClusterIP
+
+				oldSvc.Spec.ClusterIP = ""
+				newSvc.Spec.ClusterIP = "1.2.3.5"
+			},
+			numErrs: 0,
+		},
+		{
+			name: "Service with LoadBalancer type cannot change its set ClusterIP when changing type to NodePort",
+			tweakSvc: func(oldSvc, newSvc *api.Service) {
+				oldSvc.Spec.Type = api.ServiceTypeLoadBalancer
+				newSvc.Spec.Type = api.ServiceTypeNodePort
+
+				oldSvc.Spec.ClusterIP = "1.2.3.4"
+				newSvc.Spec.ClusterIP = "1.2.3.5"
+			},
+			numErrs: 1,
+		},
+		{
+			name: "Service with LoadBalancer type can change its empty ClusterIP when changing type to NodePort",
+			tweakSvc: func(oldSvc, newSvc *api.Service) {
+				oldSvc.Spec.Type = api.ServiceTypeLoadBalancer
+				newSvc.Spec.Type = api.ServiceTypeNodePort
+
+				oldSvc.Spec.ClusterIP = ""
+				newSvc.Spec.ClusterIP = "1.2.3.5"
+			},
+			numErrs: 0,
+		},
+		{
+			name: "Service with ExternalName type can change its empty ClusterIP when changing type to ClusterIP",
+			tweakSvc: func(oldSvc, newSvc *api.Service) {
+				oldSvc.Spec.Type = api.ServiceTypeExternalName
+				newSvc.Spec.Type = api.ServiceTypeClusterIP
+
+				oldSvc.Spec.ClusterIP = ""
+				newSvc.Spec.ClusterIP = "1.2.3.5"
+			},
+			numErrs: 0,
+		},
+		{
+			name: "Service with ExternalName type can change its set ClusterIP when changing type to ClusterIP",
+			tweakSvc: func(oldSvc, newSvc *api.Service) {
+				oldSvc.Spec.Type = api.ServiceTypeExternalName
+				newSvc.Spec.Type = api.ServiceTypeClusterIP
+
+				oldSvc.Spec.ClusterIP = "1.2.3.4"
+				newSvc.Spec.ClusterIP = "1.2.3.5"
+			},
+			numErrs: 0,
+		},
 	}
 
 	for _, tc := range testCases {
