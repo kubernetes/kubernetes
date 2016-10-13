@@ -35,7 +35,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
-	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/watch"
 
 	"github.com/golang/glog"
@@ -178,26 +177,7 @@ func NewNamespaceController(client federationclientset.Interface) *NamespaceCont
 			}
 			return false
 		},
-		// removeFinalizerFunc
-		func(obj runtime.Object, finalizer string) (runtime.Object, error) {
-			namespace := obj.(*api_v1.Namespace)
-			finalizerSet := sets.NewString()
-			for i := range namespace.Spec.Finalizers {
-				if string(namespace.Spec.Finalizers[i]) != finalizer {
-					finalizerSet.Insert(string(namespace.Spec.Finalizers[i]))
-				}
-			}
-			// Remove the finalizer.
-			namespace.Spec.Finalizers = make([]api_v1.FinalizerName, 0, len(finalizerSet))
-			for _, value := range finalizerSet.List() {
-				namespace.Spec.Finalizers = append(namespace.Spec.Finalizers, api_v1.FinalizerName(value))
-			}
-			namespace, err := nc.federatedApiClient.Core().Namespaces().Finalize(namespace)
-			if err != nil {
-				return nil, fmt.Errorf("failed to finalize namespace: %v", err)
-			}
-			return namespace, nil
-		},
+		nc.removeFinalizerFunc,
 		// objNameFunc
 		func(obj runtime.Object) string {
 			namespace := obj.(*api_v1.Namespace)
@@ -209,6 +189,23 @@ func NewNamespaceController(client federationclientset.Interface) *NamespaceCont
 		nc.federatedUpdater,
 	)
 	return nc
+}
+
+// Removes the finalizer from the given obj. Assumes that the given object is a namespace.
+func (nc *NamespaceController) removeFinalizerFunc(obj runtime.Object, finalizer string) (runtime.Object, error) {
+	namespace := obj.(*api_v1.Namespace)
+	newFinalizers := []api_v1.FinalizerName{}
+	for i := range namespace.Spec.Finalizers {
+		if string(namespace.Spec.Finalizers[i]) != finalizer {
+			newFinalizers = append(newFinalizers, namespace.Spec.Finalizers[i])
+		}
+	}
+	namespace.Spec.Finalizers = newFinalizers
+	namespace, err := nc.federatedApiClient.Core().Namespaces().Finalize(namespace)
+	if err != nil {
+		return nil, fmt.Errorf("failed to remove finalizer %s from namespace %s: %v", finalizer, namespace.Name, err)
+	}
+	return namespace, nil
 }
 
 func (nc *NamespaceController) Run(stopChan <-chan struct{}) {
@@ -421,26 +418,16 @@ func (nc *NamespaceController) delete(namespace *api_v1.Namespace) error {
 	if err != nil {
 		return err
 	}
-	updatedNamespace = updatedNamespaceObj.(*api_v1.Namespace)
 
-	// Remove kube_api.FinalzerKubernetes
+	// Remove kube_api.FinalizerKubernetes
 	if len(updatedNamespace.Spec.Finalizers) != 0 {
-		finalizerSet := sets.NewString()
-		for i := range namespace.Spec.Finalizers {
-			if namespace.Spec.Finalizers[i] != api_v1.FinalizerKubernetes {
-				finalizerSet.Insert(string(namespace.Spec.Finalizers[i]))
-			}
-		}
-		updatedNamespace.Spec.Finalizers = make([]api_v1.FinalizerName, 0, len(finalizerSet))
-		for _, value := range finalizerSet.List() {
-			updatedNamespace.Spec.Finalizers = append(updatedNamespace.Spec.Finalizers, api_v1.FinalizerName(value))
-		}
-		_, err := nc.federatedApiClient.Core().Namespaces().Finalize(updatedNamespace)
+		updatedNamespaceObj, err = nc.removeFinalizerFunc(updatedNamespaceObj, string(api_v1.FinalizerKubernetes))
 		if err != nil {
-			return fmt.Errorf("failed to finalize namespace: %v", err)
+			return err
 		}
 	}
 
+	updatedNamespace = updatedNamespaceObj.(*api_v1.Namespace)
 	err = nc.federatedApiClient.Core().Namespaces().Delete(updatedNamespace.Name, &api_v1.DeleteOptions{})
 	if err != nil {
 		// Its all good if the error is not found error. That means it is deleted already and we do not have to do anything.
