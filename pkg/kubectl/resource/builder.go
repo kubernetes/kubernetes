@@ -291,7 +291,7 @@ func (b *Builder) DefaultNamespace() *Builder {
 }
 
 // AllNamespaces instructs the builder to use NamespaceAll as a namespace to request resources
-// acroll all namespace. This overrides the namespace set by NamespaceParam().
+// across all of the namespace. This overrides the namespace set by NamespaceParam().
 func (b *Builder) AllNamespaces(allNamespace bool) *Builder {
 	if allNamespace {
 		b.namespace = api.NamespaceAll

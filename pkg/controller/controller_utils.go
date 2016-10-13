@@ -348,7 +348,7 @@ func NewUIDTrackingControllerExpectations(ce ControllerExpectationsInterface) *U
 type PodControlInterface interface {
 	// CreatePods creates new pods according to the spec.
 	CreatePods(namespace string, template *api.PodTemplateSpec, object runtime.Object) error
-	// CreatePodsOnNode creates a new pod accorting to the spec on the specified node.
+	// CreatePodsOnNode creates a new pod according to the spec on the specified node.
 	CreatePodsOnNode(nodeName, namespace string, template *api.PodTemplateSpec, object runtime.Object) error
 	// CreatePodsWithControllerRef creates new pods according to the spec, and sets object as the pod's controller.
 	CreatePodsWithControllerRef(namespace string, template *api.PodTemplateSpec, object runtime.Object, controllerRef *api.OwnerReference) error
