@@ -1480,12 +1480,11 @@ const (
 	// new pods onto the node, rather than prohibiting new pods from scheduling
 	// onto the node entirely. Enforced by the scheduler.
 	TaintEffectPreferNoSchedule TaintEffect = "PreferNoSchedule"
-	// NOT YET IMPLEMENTED. TODO: Uncomment field once it is implemented.
 	// Do not allow new pods to schedule onto the node unless they tolerate the taint,
 	// do not allow pods to start on Kubelet unless they tolerate the taint,
 	// but allow all already-running pods to continue running.
 	// Enforced by the scheduler and Kubelet.
-	// TaintEffectNoScheduleNoAdmit TaintEffect = "NoScheduleNoAdmit"
+	TaintEffectNoExecute TaintEffect = "NoExecute"
 	// NOT YET IMPLEMENTED. TODO: Uncomment field once it is implemented.
 	// Do not allow new pods to schedule onto the node unless they tolerate the taint,
 	// do not allow pods to start on Kubelet unless they tolerate the taint,

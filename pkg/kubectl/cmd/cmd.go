@@ -279,6 +279,7 @@ Find more information at https://github.com/kubernetes/kubernetes.`,
 				NewCmdUncordon(f, out),
 				NewCmdDrain(f, out),
 				NewCmdTaint(f, out),
+				NewCmdMaintenance(f, out),
 			},
 		},
 		{
