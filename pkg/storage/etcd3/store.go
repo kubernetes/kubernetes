@@ -38,7 +38,10 @@ import (
 )
 
 type store struct {
-	client     *clientv3.Client
+	client *clientv3.Client
+	// getOpts contains additional options that should be passed
+	// to all Get() calls.
+	getOps     []clientv3.OpOption
 	codec      runtime.Codec
 	versioner  storage.Versioner
 	pathPrefix string
@@ -58,19 +61,25 @@ type objState struct {
 }
 
 // New returns an etcd3 implementation of storage.Interface.
-func New(c *clientv3.Client, codec runtime.Codec, prefix string) storage.Interface {
-	return newStore(c, codec, prefix)
+func New(c *clientv3.Client, quorumRead bool, codec runtime.Codec, prefix string) storage.Interface {
+	return newStore(c, quorumRead, codec, prefix)
 }
 
-func newStore(c *clientv3.Client, codec runtime.Codec, prefix string) *store {
+func newStore(c *clientv3.Client, quorumRead bool, codec runtime.Codec, prefix string) *store {
 	versioner := etcd.APIObjectVersioner{}
-	return &store{
+	result := &store{
 		client:     c,
 		versioner:  versioner,
 		codec:      codec,
 		pathPrefix: prefix,
 		watcher:    newWatcher(c, codec, versioner),
 	}
+	if !quorumRead {
+		// In case of non-quorum reads, we can set WithSerializable()
+		// options for all Get operations.
+		result.getOps = append(result.getOps, clientv3.WithSerializable())
+	}
+	return result
 }
 
 // Versioner implements storage.Interface.Versioner.
@@ -81,7 +90,7 @@ func (s *store) Versioner() storage.Versioner {
 // Get implements storage.Interface.Get.
 func (s *store) Get(ctx context.Context, key string, out runtime.Object, ignoreNotFound bool) error {
 	key = keyWithPrefix(s.pathPrefix, key)
-	getResp, err := s.client.KV.Get(ctx, key)
+	getResp, err := s.client.KV.Get(ctx, key, s.getOps...)
 	if err != nil {
 		return err
 	}
@@ -202,7 +211,7 @@ func (s *store) GuaranteedUpdate(ctx context.Context, key string, out runtime.Ob
 		panic("unable to convert output object to pointer")
 	}
 	key = keyWithPrefix(s.pathPrefix, key)
-	getResp, err := s.client.KV.Get(ctx, key)
+	getResp, err := s.client.KV.Get(ctx, key, s.getOps...)
 	if err != nil {
 		return err
 	}
@@ -262,7 +271,7 @@ func (s *store) GetToList(ctx context.Context, key string, pred storage.Selectio
 	}
 	key = keyWithPrefix(s.pathPrefix, key)
 
-	getResp, err := s.client.KV.Get(ctx, key)
+	getResp, err := s.client.KV.Get(ctx, key, s.getOps...)
 	if err != nil {
 		return err
 	}
