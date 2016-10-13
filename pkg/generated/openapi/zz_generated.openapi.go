@@ -6927,8 +6927,15 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 							Format:      "",
 						},
 					},
+					"secretRef": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Optional: Used to configure the Cinder credentials instead of using the Cloud Provider.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 				},
-				Required: []string{"volumeID"},
+				Required: []string{"volumeID", "secretRef"},
 			},
 		},
 		Dependencies: []string{},
