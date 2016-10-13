@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/set"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/view"
 	"k8s.io/kubernetes/pkg/util/flag"
 
 	"github.com/golang/glog"
@@ -250,6 +251,7 @@ Find more information at https://github.com/kubernetes/kubernetes.`,
 				NewCmdExposeService(f, out),
 				NewCmdRun(f, in, out, err),
 				set.NewCmdSet(f, out),
+				view.NewCmdView(f, out),
 			},
 		},
 		{

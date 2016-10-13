@@ -149,9 +149,9 @@ type Factory struct {
 	CanBeAutoscaled func(kind unversioned.GroupKind) error
 	// AttachablePodForObject returns the pod to which to attach given an object.
 	AttachablePodForObject func(object runtime.Object) (*api.Pod, error)
-	// UpdatePodSpecForObject will call the provided function on the pod spec this object supports,
+	// VisitPodSpecForObject will call the provided function on the pod spec this object supports,
 	// return false if no pod spec is supported, or return an error.
-	UpdatePodSpecForObject func(obj runtime.Object, fn func(*api.PodSpec) error) (bool, error)
+	VisitPodSpecForObject func(obj runtime.Object, fn func(*api.PodSpec) error) (bool, error)
 	// EditorEnvs returns a group of environment variables that the edit command
 	// can range over in order to determine if the user has specified an editor
 	// of their choice.
@@ -784,8 +784,9 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 				return nil, fmt.Errorf("cannot attach to %v: not implemented", gvks[0])
 			}
 		},
-		// UpdatePodSpecForObject update the pod specification for the provided object
-		UpdatePodSpecForObject: func(obj runtime.Object, fn func(*api.PodSpec) error) (bool, error) {
+		// VisitPodSpecForObject runs the provided function against the object if it's
+		// a pod or has a pod template. Returns false otherwise.
+		VisitPodSpecForObject: func(obj runtime.Object, fn func(*api.PodSpec) error) (bool, error) {
 			// TODO: replace with a swagger schema based approach (identify pod template via schema introspection)
 			switch t := obj.(type) {
 			case *api.Pod:
