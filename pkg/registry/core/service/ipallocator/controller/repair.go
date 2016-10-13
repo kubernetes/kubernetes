@@ -23,7 +23,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/retry"
 	"k8s.io/kubernetes/pkg/registry/core/rangeallocation"
 	"k8s.io/kubernetes/pkg/registry/core/service"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
@@ -75,7 +75,7 @@ func (c *Repair) RunUntil(ch chan struct{}) {
 
 // RunOnce verifies the state of the cluster IP allocations and returns an error if an unrecoverable problem occurs.
 func (c *Repair) RunOnce() error {
-	return client.RetryOnConflict(client.DefaultBackoff, c.runOnce)
+	return retry.RetryOnConflict(retry.DefaultBackoff, c.runOnce)
 }
 
 // runOnce verifies the state of the cluster IP allocations and returns an error if an unrecoverable problem occurs.
