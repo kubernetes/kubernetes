@@ -21,6 +21,7 @@ import (
 	"encoding/asn1"
 	"net/http"
 
+	"github.com/go-openapi/spec"
 	"k8s.io/kubernetes/pkg/auth/user"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 )
@@ -83,6 +84,11 @@ func (a *Authenticator) AuthenticateRequest(req *http.Request) (user.Info, bool,
 		}
 	}
 	return nil, false, utilerrors.NewAggregate(errlist)
+}
+
+// GetOpenAPISecurityDefinition returns an empty SecurityDefinition, to make sure we implement authenticator.Request interface.
+func (a *Authenticator) GetOpenAPISecurityDefinition() (spec.SecurityDefinitions, error) {
+	return spec.SecurityDefinitions{}, nil
 }
 
 // DefaultVerifyOptions returns VerifyOptions that use the system root certificates, current time,

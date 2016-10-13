@@ -19,6 +19,7 @@ package basicauth
 import (
 	"net/http"
 
+	"github.com/go-openapi/spec"
 	"k8s.io/kubernetes/pkg/auth/authenticator"
 	"k8s.io/kubernetes/pkg/auth/user"
 )
@@ -40,4 +41,16 @@ func (a *Authenticator) AuthenticateRequest(req *http.Request) (user.Info, bool,
 		return nil, false, nil
 	}
 	return a.auth.AuthenticatePassword(username, password)
+}
+
+// GetOpenAPISecurityDefinition returns SecurityDefinition for basic authenticator.
+func (a *Authenticator) GetOpenAPISecurityDefinition() (spec.SecurityDefinitions, error) {
+	ret := spec.SecurityDefinitions{}
+	ret["Basic"] = &spec.SecurityScheme{
+		SecuritySchemeProps: spec.SecuritySchemeProps{
+			Type:        "basic",
+			Description: "HTTP Basic Authorization",
+		},
+	}
+	return ret, nil
 }

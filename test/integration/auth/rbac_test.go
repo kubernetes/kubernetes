@@ -64,7 +64,7 @@ func newFakeAuthenticator() authenticator.Request {
 		}
 		// Set the bearer token as the user name.
 		return &user.DefaultInfo{Name: token, UID: token}, true, nil
-	}))
+	}), "")
 }
 
 func clientForUser(user string) *http.Client {

@@ -23,6 +23,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/go-openapi/spec"
 	"k8s.io/kubernetes/pkg/auth/user"
 )
 
@@ -39,6 +40,10 @@ var (
 
 func (mock *mockAuthRequestHandler) AuthenticateRequest(req *http.Request) (user.Info, bool, error) {
 	return mock.returnUser, mock.isAuthenticated, mock.err
+}
+
+func (mock *mockAuthRequestHandler) GetOpenAPISecurityDefinition() (spec.SecurityDefinitions, error) {
+	return spec.SecurityDefinitions{}, nil
 }
 
 func TestAuthenticateRequestSecondPasses(t *testing.T) {

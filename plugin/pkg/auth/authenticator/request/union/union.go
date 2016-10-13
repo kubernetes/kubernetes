@@ -19,6 +19,8 @@ package union
 import (
 	"net/http"
 
+	"fmt"
+	"github.com/go-openapi/spec"
 	"k8s.io/kubernetes/pkg/auth/authenticator"
 	"k8s.io/kubernetes/pkg/auth/user"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
@@ -69,4 +71,22 @@ func (authHandler *unionAuthRequestHandler) AuthenticateRequest(req *http.Reques
 	}
 
 	return nil, false, utilerrors.NewAggregate(errlist)
+}
+
+// GetOpenAPISecurityDefinition returns union of all authenticator.Request SecurityDefinitions.
+func (authHandler *unionAuthRequestHandler) GetOpenAPISecurityDefinition() (spec.SecurityDefinitions, error) {
+	ret := spec.SecurityDefinitions{}
+	for _, handler := range authHandler.Handlers {
+		definitions, err := handler.GetOpenAPISecurityDefinition()
+		if err != nil {
+			return ret, err
+		}
+		for k, v := range definitions {
+			if _, exists := ret[k]; exists {
+				return ret, fmt.Errorf("duplicate OpenAPI security definition: %v", k)
+			}
+			ret[k] = v
+		}
+	}
+	return ret, nil
 }
