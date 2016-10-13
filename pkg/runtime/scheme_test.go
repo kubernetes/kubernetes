@@ -84,7 +84,7 @@ func TestScheme(t *testing.T) {
 
 	codecs := serializer.NewCodecFactory(scheme)
 	codec := codecs.LegacyCodec(externalGV)
-	jsonserializer, _ := codecs.SerializerForFileExtension("json")
+	jsonserializer, _ := runtime.SerializerInfoForMediaType(codecs, runtime.ContentTypeJSON)
 
 	simple := &InternalSimple{
 		TestString: "foo",
@@ -150,7 +150,7 @@ func TestScheme(t *testing.T) {
 func TestBadJSONRejection(t *testing.T) {
 	scheme := runtime.NewScheme()
 	codecs := serializer.NewCodecFactory(scheme)
-	jsonserializer, _ := codecs.SerializerForFileExtension("json")
+	jsonserializer, _ := runtime.SerializerInfoForMediaType(codecs, runtime.ContentTypeJSON)
 
 	badJSONMissingKind := []byte(`{ }`)
 	if _, err := runtime.Decode(jsonserializer, badJSONMissingKind); err == nil {
