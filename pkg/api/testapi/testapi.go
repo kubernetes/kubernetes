@@ -30,6 +30,7 @@ import (
 	"reflect"
 	"strings"
 
+	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/federation/apis/federation"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
@@ -47,6 +48,7 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/serializer/recognizer"
 
+	_ "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/install"
 	_ "k8s.io/kubernetes/federation/apis/federation/install"
 	_ "k8s.io/kubernetes/pkg/api/install"
 	_ "k8s.io/kubernetes/pkg/apis/apps/install"
@@ -247,13 +249,21 @@ func init() {
 			externalTypes:        api.Scheme.KnownTypes(externalGroupVersion),
 		}
 	}
-
 	if _, ok := Groups[imagepolicy.GroupName]; !ok {
 		externalGroupVersion := unversioned.GroupVersion{Group: imagepolicy.GroupName, Version: registered.GroupOrDie(imagepolicy.GroupName).GroupVersion.Version}
 		Groups[imagepolicy.GroupName] = TestGroup{
 			externalGroupVersion: externalGroupVersion,
 			internalGroupVersion: imagepolicy.SchemeGroupVersion,
 			internalTypes:        api.Scheme.KnownTypes(imagepolicy.SchemeGroupVersion),
+			externalTypes:        api.Scheme.KnownTypes(externalGroupVersion),
+		}
+	}
+	if _, ok := Groups[kubeadm.GroupName]; !ok {
+		externalGroupVersion := unversioned.GroupVersion{Group: kubeadm.GroupName, Version: registered.GroupOrDie(kubeadm.GroupName).GroupVersion.Version}
+		Groups[kubeadm.GroupName] = TestGroup{
+			externalGroupVersion: externalGroupVersion,
+			internalGroupVersion: kubeadm.SchemeGroupVersion,
+			internalTypes:        api.Scheme.KnownTypes(kubeadm.SchemeGroupVersion),
 			externalTypes:        api.Scheme.KnownTypes(externalGroupVersion),
 		}
 	}

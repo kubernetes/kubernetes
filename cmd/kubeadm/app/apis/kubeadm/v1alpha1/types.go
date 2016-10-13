@@ -23,6 +23,7 @@ type MasterConfiguration struct {
 
 	Secrets           Secrets    `json:"secrets"`
 	API               API        `json:"api"`
+	Etcd              Etcd       `json:"etcd"`
 	Networking        Networking `json:"networking"`
 	KubernetesVersion string     `json:"kubernetesVersion"`
 	CloudProvider     string     `json:"cloudProvider"`
@@ -57,6 +58,7 @@ type NodeConfiguration struct {
 	unversioned.TypeMeta
 
 	MasterAddresses []string `json:"masterAddresses"`
+	Secrets         Secrets  `json:"secrets"`
 }
 
 // ClusterInfo TODO add description
