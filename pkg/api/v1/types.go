@@ -3138,6 +3138,8 @@ const (
 	LimitTypePod LimitType = "Pod"
 	// Limit that applies to all containers in a namespace
 	LimitTypeContainer LimitType = "Container"
+	// Limit that applies to all persistent volume claims in a namespace
+	LimitTypePersistentVolumeClaim LimitType = "PersistentVolumeClaim"
 )
 
 // LimitRangeItem defines a min/max usage limit for any resource that matches on kind.

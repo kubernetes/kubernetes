@@ -123,6 +123,7 @@ func IsStandardContainerResourceName(str string) bool {
 var standardLimitRangeTypes = sets.NewString(
 	string(LimitTypePod),
 	string(LimitTypeContainer),
+	string(LimitTypePersistentVolumeClaim),
 )
 
 // IsStandardLimitRangeType returns true if the type is Pod or Container
