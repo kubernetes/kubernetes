@@ -258,7 +258,7 @@ Shakespeare.
 Take the Zeppelin pod from above and port-forward the WebUI port:
 
 ```console
-$ kubectl port-forward zeppelin-controller-ja09s 8080:8080
+$ kubectl port-forward --namespace=spark-cluster zeppelin-controller-ja09s 8080:8080
 ```
 
 This forwards `localhost` 8080 to container port 8080. You can then find
@@ -290,18 +290,18 @@ After it's setup:
 ```console
 kubectl get pods # Make sure everything is running
 kubectl proxy --port=8001 # Start an application proxy, if you want to see the Spark Master WebUI
-kubectl get pods -lcomponent=zeppelin # Get the driver pod to interact with.
+kubectl --namespace=spark-cluster get pods -lcomponent=zeppelin # Get the driver pod to interact with.
 ```
 
 At which point the Master UI will be available at
-[http://localhost:8001/api/v1/proxy/namespaces/spark-cluster/services/spark-webui/](http://localhost:8001/api/v1/proxy/namespaces/default/services/spark-webui/).
+[http://localhost:8001/api/v1/proxy/namespaces/spark-cluster/services/spark-webui/](http://localhost:8001/api/v1/proxy/namespaces/spark-cluster/services/spark-webui/).
 
 You can either interact with the Spark cluster the traditional `spark-shell` /
 `spark-subsubmit` / `pyspark` commands by using `kubectl exec` against the
 `zeppelin-controller` pod, or if you want to interact with Zeppelin:
 
 ```console
-kubectl port-forward zeppelin-controller-abc123 8080:8080 &
+kubectl port-forward --namespace=spark-cluster zeppelin-controller-abc123 8080:8080 &
 ```
 
 Then visit [http://localhost:8080/](http://localhost:8080/).
