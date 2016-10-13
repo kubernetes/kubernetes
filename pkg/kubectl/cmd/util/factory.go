@@ -65,6 +65,7 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/serializer/json"
 	utilflag "k8s.io/kubernetes/pkg/util/flag"
+	set "k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -120,7 +121,7 @@ type Factory struct {
 	// MapBasedSelectorForObject returns the map-based selector associated with the provided object. If a
 	// new set-based selector is provided, an error is returned if the selector cannot be converted to a
 	// map-based selector
-	MapBasedSelectorForObject func(object runtime.Object) (string, error)
+	MapBasedSelectorForObject func(object runtime.Object, ignoreLabels set.String) (string, error)
 	// PortsForObject returns the ports associated with the provided object
 	PortsForObject func(object runtime.Object) ([]string, error)
 	// ProtocolsForObject returns the <port, protocol> mapping associated with the provided object
@@ -455,35 +456,30 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 		Printer: func(mapping *meta.RESTMapping, options kubectl.PrintOptions) (kubectl.ResourcePrinter, error) {
 			return kubectl.NewHumanReadablePrinter(options), nil
 		},
-		MapBasedSelectorForObject: func(object runtime.Object) (string, error) {
+		MapBasedSelectorForObject: func(object runtime.Object, ignoreLabels set.String) (string, error) {
 			// TODO: replace with a swagger schema based approach (identify pod selector via schema introspection)
+			var allLabels map[string]string
 			switch t := object.(type) {
 			case *api.ReplicationController:
-				return kubectl.MakeLabels(t.Spec.Selector), nil
+				allLabels = t.Spec.Selector
 			case *api.Pod:
-				if len(t.Labels) == 0 {
-					return "", fmt.Errorf("the pod has no labels and cannot be exposed")
-				}
-				return kubectl.MakeLabels(t.Labels), nil
+				allLabels = t.Labels
 			case *api.Service:
-				if t.Spec.Selector == nil {
-					return "", fmt.Errorf("the service has no pod selector set")
-				}
-				return kubectl.MakeLabels(t.Spec.Selector), nil
+				allLabels = t.Spec.Selector
 			case *extensions.Deployment:
 				// TODO(madhusudancs): Make this smarter by admitting MatchExpressions with Equals
 				// operator, DoubleEquals operator and In operator with only one element in the set.
 				if len(t.Spec.Selector.MatchExpressions) > 0 {
 					return "", fmt.Errorf("couldn't convert expressions - \"%+v\" to map-based selector format", t.Spec.Selector.MatchExpressions)
 				}
-				return kubectl.MakeLabels(t.Spec.Selector.MatchLabels), nil
+				allLabels = t.Spec.Selector.MatchLabels
 			case *extensions.ReplicaSet:
 				// TODO(madhusudancs): Make this smarter by admitting MatchExpressions with Equals
 				// operator, DoubleEquals operator and In operator with only one element in the set.
 				if len(t.Spec.Selector.MatchExpressions) > 0 {
 					return "", fmt.Errorf("couldn't convert expressions - \"%+v\" to map-based selector format", t.Spec.Selector.MatchExpressions)
 				}
-				return kubectl.MakeLabels(t.Spec.Selector.MatchLabels), nil
+				allLabels = t.Spec.Selector.MatchLabels
 			default:
 				gvks, _, err := api.Scheme.ObjectKinds(object)
 				if err != nil {
@@ -491,6 +487,23 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 				}
 				return "", fmt.Errorf("cannot extract pod selector from %v", gvks[0])
 			}
+			labelSet := set.StringKeySet(allLabels)
+			usableLabels := labelSet.Difference(ignoreLabels)
+			if len(usableLabels) == 0 {
+				gvks, _, err := api.Scheme.ObjectKinds(object)
+				if err != nil {
+					return "", err
+				}
+				return "", fmt.Errorf(
+					"Cannot find any labels suitable to create the selector for this %v.",
+					gvks[0].Kind,
+				)
+			}
+			effLabels := map[string]string{}
+			for label, _ := range usableLabels {
+				effLabels[label] = allLabels[label]
+			}
+			return kubectl.MakeLabels(effLabels), nil
 		},
 		PortsForObject: func(object runtime.Object) ([]string, error) {
 			// TODO: replace with a swagger schema based approach (identify pod selector via schema introspection)

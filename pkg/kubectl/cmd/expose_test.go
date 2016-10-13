@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -450,7 +451,7 @@ func TestRunExposeService(t *testing.T) {
 		tf.Namespace = test.ns
 		buf := bytes.NewBuffer([]byte{})
 
-		cmd := NewCmdExposeService(f, buf)
+		cmd := NewCmdExposeService(f, buf, clientcmd.NewDefaultPathOptions())
 		cmd.SetOutput(buf)
 		for flag, value := range test.flags {
 			cmd.Flags().Set(flag, value)
