@@ -1362,7 +1362,7 @@ function kube-down() {
     "${NETWORK}-default-ssh" \
     "${NETWORK}-default-internal"  # Pre-1.5 clusters
   if [[ "${KUBE_DELETE_NETWORK}" == "true" ]]; then
-    delete-network
+    delete-network || true  # might fail if there are leaked firewall rules
   fi
 
   # If there are no more remaining master replicas, we should update kubeconfig.
