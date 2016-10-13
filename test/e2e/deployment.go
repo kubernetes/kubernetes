@@ -1166,8 +1166,6 @@ func testScaledRolloutDeployment(f *framework.Framework) {
 	By(fmt.Sprintf("Waiting for deployment status to sync (current available: %d, minimum available: %d)", deployment.Status.AvailableReplicas, deploymentutil.MinAvailable(deployment)))
 	err = framework.WaitForDeploymentStatusValid(c, deployment)
 	Expect(err).NotTo(HaveOccurred())
-	err = framework.WaitForDeploymentStatus(c, deployment)
-	Expect(err).NotTo(HaveOccurred())
 
 	// Update the deployment with a non-existent image so that the new replica set will be blocked.
 	By(fmt.Sprintf("Updating deployment %q with a non-existent image", deploymentName))
@@ -1226,8 +1224,6 @@ func testScaledRolloutDeployment(f *framework.Framework) {
 
 	By(fmt.Sprintf("Waiting for deployment status to sync (current available: %d, minimum available: %d)", deployment.Status.AvailableReplicas, deploymentutil.MinAvailable(deployment)))
 	err = framework.WaitForDeploymentStatusValid(c, deployment)
-	Expect(err).NotTo(HaveOccurred())
-	err = framework.WaitForDeploymentStatus(c, deployment)
 	Expect(err).NotTo(HaveOccurred())
 }
 
