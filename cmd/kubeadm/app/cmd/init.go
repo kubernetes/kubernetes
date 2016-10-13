@@ -27,11 +27,11 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubemaster "k8s.io/kubernetes/cmd/kubeadm/app/master"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
+	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	_ "k8s.io/kubernetes/pkg/cloudprovider/providers"
-	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/runtime"
 	netutil "k8s.io/kubernetes/pkg/util/net"
 )
@@ -150,7 +150,7 @@ func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight 
 	}
 
 	if !skipPreFlight {
-		fmt.Println("Running pre-flight checks")
+		fmt.Println("<cmd/init> Running pre-flight checks")
 		err := preflight.RunInitMasterChecks()
 		if err != nil {
 			return nil, err

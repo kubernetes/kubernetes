@@ -49,7 +49,6 @@ type ServiceCheck struct {
 }
 
 func (sc ServiceCheck) Check() (warnings, errors []error) {
-
 	initSystem := initsystem.GetInitSystem()
 	if initSystem == nil {
 		return []error{fmt.Errorf("no supported init system detected, skipping service checks for %s", sc.service)}, nil
@@ -74,7 +73,7 @@ func (sc ServiceCheck) Check() (warnings, errors []error) {
 				sc.service, sc.service))
 	}
 
-	return warnings, nil
+	return warnings, errors
 }
 
 // PortOpenCheck ensures the given port is available for use.
@@ -219,7 +218,7 @@ func runChecks(checks []PreFlightCheck) error {
 	for _, c := range checks {
 		warnings, errors := c.Check()
 		for _, w := range warnings {
-			fmt.Printf("WARNING: %s\n", w)
+			fmt.Printf("<preflight/checks> WARNING: %s\n", w)
 		}
 		for _, e := range errors {
 			found = append(found, e)

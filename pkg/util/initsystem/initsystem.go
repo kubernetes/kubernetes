@@ -17,13 +17,11 @@ limitations under the License.
 package initsystem
 
 import (
-	"fmt"
 	"os/exec"
 	"strings"
 )
 
 type InitSystem interface {
-
 	// ServiceExists ensures the service is defined for this init system.
 	ServiceExists(service string) bool
 
@@ -50,7 +48,6 @@ func (sysd SystemdInitSystem) ServiceIsEnabled(service string) bool {
 	args := []string{"is-enabled", service}
 	_, err := exec.Command("systemctl", args...).Output()
 	if err != nil {
-		fmt.Println(err)
 		return false
 	}
 	return true
