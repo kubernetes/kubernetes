@@ -1373,7 +1373,7 @@ function kube-down() {
 function get-replica-name() {
   echo $(gcloud compute instances list \
     --project "${PROJECT}" \
-    --zones "${ZONE}" \
+    --zone "${ZONE}" \
     --regexp "$(get-replica-name-regexp)" \
     --format "value(name)" | head -n1)
 }
