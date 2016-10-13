@@ -232,7 +232,7 @@ func getComponentCommand(component string, s *kubeadmapi.MasterConfiguration) (c
 			"--tls-cert-file=" + pkiDir + "/apiserver.pem",
 			"--tls-private-key-file=" + pkiDir + "/apiserver-key.pem",
 			"--token-auth-file=" + pkiDir + "/tokens.csv",
-			"--secure-port=443",
+			fmt.Sprintf("--secure-port=%d", s.API.BindPort),
 			"--allow-privileged",
 		},
 		controllerManager: {

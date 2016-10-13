@@ -70,6 +70,16 @@ func NewCmdJoin(out io.Writer) *cobra.Command {
 		"skip preflight checks normally run before modifying the system",
 	)
 
+	cmd.PersistentFlags().Int32Var(
+		&cfg.APIPort, "api-port", kubeadmapi.DefaultAPIBindPort,
+		"(optional) API server port on the master",
+	)
+
+	cmd.PersistentFlags().Int32Var(
+		&cfg.DiscoveryPort, "discovery-port", kubeadmapi.DefaultDiscoveryBindPort,
+		"(optional) Discovery port on the master",
+	)
+
 	return cmd
 }
 
