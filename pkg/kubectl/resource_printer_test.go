@@ -1446,9 +1446,10 @@ func TestPrintDaemonSet(t *testing.T) {
 				Status: extensions.DaemonSetStatus{
 					CurrentNumberScheduled: 2,
 					DesiredNumberScheduled: 3,
+					NumberReady:            1,
 				},
 			},
-			"test1\t3\t2\t<none>\t0s\n",
+			"test1\t3\t2\t1\t<none>\t0s\n",
 		},
 	}
 

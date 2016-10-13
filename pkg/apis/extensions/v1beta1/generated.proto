@@ -127,6 +127,10 @@ message DaemonSetStatus {
   // pod (including nodes correctly running the daemon pod).
   // More info: http://releases.k8s.io/HEAD/docs/admin/daemons.md
   optional int32 desiredNumberScheduled = 3;
+
+  // NumberReady is the number of nodes that should be running the daemon pod and have one
+  // or more of the daemon pod running and ready.
+  optional int32 numberReady = 4;
 }
 
 // Deployment enables declarative updates for Pods and ReplicaSets.
