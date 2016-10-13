@@ -523,21 +523,11 @@ func (h *consulHelper) listInternal(fnName string, key string, filter storage.Fi
 		return 0, err
 	}
 
-	kvPairs, _, err := h.consulKv.List(key, nil)
+	kvPairs, queryMeta, err := h.consulKv.List(key, nil)
 
 	// TODO: record metrics
 	if err != nil {
 		return 0, toStorageErr(err, key, 0)
-	}
-
-	// unlike etcd, reads are not rafted, so they don't get an index of their own
-	// so in order to version the resulting list consistantly, we apply the index
-	// of the most recent member
-	maxIndex := uint64(0)
-	for _, item := range kvPairs {
-		if item.ModifyIndex > maxIndex {
-			maxIndex = item.ModifyIndex
-		}
 	}
 
 	err = h.decodeKVPairList(kvPairs, filter, listPtr)
@@ -545,11 +535,11 @@ func (h *consulHelper) listInternal(fnName string, key string, filter storage.Fi
 		return 0, err
 	}
 
-	if err := h.versioner.UpdateList(listObj, maxIndex); err != nil {
+	if err := h.versioner.UpdateList(listObj, queryMeta.LastIndex); err != nil {
 		return 0, err
 	}
 
-	return maxIndex, nil
+	return queryMeta.LastIndex, nil
 }
 
 func (h *consulHelper) decodeKVPairList(kvPairs []*consulapi.KVPair, filter storage.FilterFunc, slicePtr interface{}) error {
