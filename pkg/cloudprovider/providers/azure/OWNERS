@@ -1,3 +1,7 @@
 assignees:
+- colemickens
+- brendandburns
+to_migrate_to_approvers:
+  approvers:
   - colemickens
   - brendandburns

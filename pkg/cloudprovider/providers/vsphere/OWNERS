@@ -5,3 +5,11 @@ maintainers:
 - abrarshivani
 - kerneltime
 - luomiao
+to_migrate_to_approvers:
+  approvers:
+  - dagnello
+  - abithap
+  - imkin
+  - abrarshivani
+  - kerneltime
+  - luomiao

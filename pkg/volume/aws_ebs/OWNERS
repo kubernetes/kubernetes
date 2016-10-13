@@ -1,3 +1,7 @@
 maintainers:
 - jsafrane
 - justinsb
+to_migrate_to_approvers:
+  approvers:
+  - jsafrane
+  - justinsb

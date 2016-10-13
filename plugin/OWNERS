@@ -1,4 +1,11 @@
 assignees:
+- brendandburns
+- davidopp
+- dchen1107
+- lavalamp
+- thockin
+to_migrate_to_approvers:
+  approvers:
   - brendandburns
   - davidopp
   - dchen1107
