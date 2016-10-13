@@ -28,7 +28,7 @@ import (
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
-func NewCmdApiVersions(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+func NewCmdApiVersions(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "api-versions",
 		// apiversions is deprecated.
@@ -42,7 +42,7 @@ func NewCmdApiVersions(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func RunApiVersions(f *cmdutil.Factory, w io.Writer) error {
+func RunApiVersions(f cmdutil.Factory, w io.Writer) error {
 	if len(os.Args) > 1 && os.Args[1] == "apiversions" {
 		printDeprecationWarning("api-versions", "apiversions")
 	}

@@ -30,7 +30,6 @@ import (
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/resource"
 	remotecommandserver "k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
 	"k8s.io/kubernetes/pkg/util/interrupt"
 	"k8s.io/kubernetes/pkg/util/term"
@@ -53,7 +52,7 @@ const (
 	execUsageStr = "expected 'exec POD_NAME COMMAND [ARG1] [ARG2] ... [ARGN]'.\nPOD_NAME and COMMAND are required arguments for the exec command"
 )
 
-func NewCmdExec(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *cobra.Command {
+func NewCmdExec(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *cobra.Command {
 	options := &ExecOptions{
 		StreamOptions: StreamOptions{
 			In:  cmdIn,
@@ -140,7 +139,7 @@ type ExecOptions struct {
 }
 
 // Complete verifies command line arguments and loads data from the command environment
-func (p *ExecOptions) Complete(f *cmdutil.Factory, cmd *cobra.Command, argsIn []string, argsLenAtDash int) error {
+func (p *ExecOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, argsIn []string, argsLenAtDash int) error {
 	// Let kubectl exec follow rules for `--`, see #13004 issue
 	if len(p.PodName) == 0 && (len(argsIn) == 0 || argsLenAtDash == 0) {
 		return cmdutil.UsageError(cmd, execUsageStr)
@@ -158,29 +157,6 @@ func (p *ExecOptions) Complete(f *cmdutil.Factory, cmd *cobra.Command, argsIn []
 			return cmdutil.UsageError(cmd, execUsageStr)
 		}
 	}
-	namespace, _, err := f.DefaultNamespace()
-	if err != nil {
-		return err
-	}
-	p.Namespace = namespace
-
-	clientMapper := resource.ClientMapperFunc(f.ClientForMapping)
-	mapper, typer := f.Object()
-	decoder := f.Decoder(true)
-
-	infos, err := resource.NewBuilder(mapper, typer, clientMapper, decoder).
-		NamespaceParam(p.Namespace).DefaultNamespace().
-		ResourceNames("pods", p.PodName).
-		SingleResourceType().
-		Do().Infos()
-	if err != nil {
-		return err
-	}
-	if len(infos) != 1 {
-		return cmdutil.UsageError(cmd, execUsageStr)
-	}
-
-	p.PodName = infos[0].Name
 
 	cmdParent := cmd.Parent()
 	if cmdParent != nil {
@@ -189,6 +165,12 @@ func (p *ExecOptions) Complete(f *cmdutil.Factory, cmd *cobra.Command, argsIn []
 	if len(p.FullCmdName) > 0 && cmdutil.IsSiblingCommandExists(cmd, "describe") {
 		p.SuggestedCmdUsage = fmt.Sprintf("Use '%s describe pod/%s' to see all of the containers in this pod.", p.FullCmdName, p.PodName)
 	}
+
+	namespace, _, err := f.DefaultNamespace()
+	if err != nil {
+		return err
+	}
+	p.Namespace = namespace
 
 	config, err := f.ClientConfig()
 	if err != nil {
