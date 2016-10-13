@@ -40,7 +40,7 @@ import (
 type DrainOptions struct {
 	client             *internalclientset.Clientset
 	restClient         *restclient.RESTClient
-	factory            *cmdutil.Factory
+	factory            cmdutil.Factory
 	Force              bool
 	GracePeriodSeconds int
 	IgnoreDaemonsets   bool
@@ -80,7 +80,7 @@ var (
 		`)
 )
 
-func NewCmdCordon(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+func NewCmdCordon(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &DrainOptions{factory: f, out: out}
 
 	cmd := &cobra.Command{
@@ -106,7 +106,7 @@ var (
 		`)
 )
 
-func NewCmdUncordon(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+func NewCmdUncordon(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &DrainOptions{factory: f, out: out}
 
 	cmd := &cobra.Command{
@@ -151,7 +151,7 @@ var (
 		`)
 )
 
-func NewCmdDrain(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+func NewCmdDrain(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &DrainOptions{factory: f, out: out}
 
 	cmd := &cobra.Command{
@@ -419,6 +419,7 @@ func (o *DrainOptions) RunCordonOrUncordon(desired bool) error {
 			unsched.SetBool(desired)
 			_, err := helper.Replace(cmdNamespace, o.nodeInfo.Name, true, o.nodeInfo.Object)
 			if err != nil {
+				fmt.Println("get error here")
 				return err
 			}
 			cmdutil.PrintSuccess(o.mapper, false, o.out, o.nodeInfo.Mapping.Resource, o.nodeInfo.Name, false, changed(desired))

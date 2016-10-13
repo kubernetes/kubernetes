@@ -43,7 +43,7 @@ var (
 		cat pod.json | kubectl create -f -`)
 )
 
-func NewCmdCreate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+func NewCmdCreate(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &resource.FilenameOptions{}
 
 	cmd := &cobra.Command{
@@ -89,7 +89,7 @@ func ValidateArgs(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func RunCreate(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *resource.FilenameOptions) error {
+func RunCreate(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *resource.FilenameOptions) error {
 	schema, err := f.Validator(cmdutil.GetFlagBool(cmd, "validate"), cmdutil.GetFlagString(cmd, "schema-cache-dir"))
 	if err != nil {
 		return err
@@ -183,7 +183,7 @@ type CreateSubcommandOptions struct {
 }
 
 // RunCreateSubcommand executes a create subcommand using the specified options
-func RunCreateSubcommand(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *CreateSubcommandOptions) error {
+func RunCreateSubcommand(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *CreateSubcommandOptions) error {
 	namespace, _, err := f.DefaultNamespace()
 	if err != nil {
 		return err
