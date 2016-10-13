@@ -28,6 +28,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.APIVersions"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     }
@@ -55,6 +58,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.APIResourceList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     }
@@ -73,13 +79,16 @@
      "schemes": [
       "https"
      ],
-     "operationId": "listEventForAllNamespaces",
+     "operationId": "listCoreV1EventForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
        "schema": {
         "$ref": "#/definitions/v1.EventList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -142,7 +151,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "listNamespace",
+     "operationId": "listCoreV1Namespace",
      "parameters": [
       {
        "uniqueItems": true,
@@ -186,6 +195,9 @@
        "schema": {
         "$ref": "#/definitions/v1.NamespaceList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -202,7 +214,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "createNamespace",
+     "operationId": "createCoreV1Namespace",
      "parameters": [
       {
        "name": "body",
@@ -219,6 +231,9 @@
        "schema": {
         "$ref": "#/definitions/v1.Namespace"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -235,7 +250,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "deletecollectionNamespace",
+     "operationId": "deleteCoreV1CollectionNamespace",
      "parameters": [
       {
        "uniqueItems": true,
@@ -279,6 +294,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -306,7 +324,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "listNamespacedEvent",
+     "operationId": "listCoreV1NamespacedEvent",
      "parameters": [
       {
        "uniqueItems": true,
@@ -350,6 +368,9 @@
        "schema": {
         "$ref": "#/definitions/v1.EventList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -366,7 +387,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "createNamespacedEvent",
+     "operationId": "createCoreV1NamespacedEvent",
      "parameters": [
       {
        "name": "body",
@@ -383,6 +404,9 @@
        "schema": {
         "$ref": "#/definitions/v1.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -399,7 +423,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "deletecollectionNamespacedEvent",
+     "operationId": "deleteCoreV1CollectionNamespacedEvent",
      "parameters": [
       {
        "uniqueItems": true,
@@ -443,6 +467,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -478,7 +505,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "readNamespacedEvent",
+     "operationId": "readCoreV1NamespacedEvent",
      "parameters": [
       {
        "uniqueItems": true,
@@ -501,6 +528,9 @@
        "schema": {
         "$ref": "#/definitions/v1.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -517,7 +547,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "replaceNamespacedEvent",
+     "operationId": "replaceCoreV1NamespacedEvent",
      "parameters": [
       {
        "name": "body",
@@ -534,6 +564,9 @@
        "schema": {
         "$ref": "#/definitions/v1.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -550,7 +583,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "deleteNamespacedEvent",
+     "operationId": "deleteCoreV1NamespacedEvent",
      "parameters": [
       {
        "name": "body",
@@ -567,6 +600,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -585,7 +621,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "patchNamespacedEvent",
+     "operationId": "patchCoreV1NamespacedEvent",
      "parameters": [
       {
        "name": "body",
@@ -602,6 +638,9 @@
        "schema": {
         "$ref": "#/definitions/v1.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -645,7 +684,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "listNamespacedSecret",
+     "operationId": "listCoreV1NamespacedSecret",
      "parameters": [
       {
        "uniqueItems": true,
@@ -689,6 +728,9 @@
        "schema": {
         "$ref": "#/definitions/v1.SecretList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -705,7 +747,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "createNamespacedSecret",
+     "operationId": "createCoreV1NamespacedSecret",
      "parameters": [
       {
        "name": "body",
@@ -722,6 +764,9 @@
        "schema": {
         "$ref": "#/definitions/v1.Secret"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -738,7 +783,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "deletecollectionNamespacedSecret",
+     "operationId": "deleteCoreV1CollectionNamespacedSecret",
      "parameters": [
       {
        "uniqueItems": true,
@@ -782,6 +827,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -817,7 +865,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "readNamespacedSecret",
+     "operationId": "readCoreV1NamespacedSecret",
      "parameters": [
       {
        "uniqueItems": true,
@@ -840,6 +888,9 @@
        "schema": {
         "$ref": "#/definitions/v1.Secret"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -856,7 +907,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "replaceNamespacedSecret",
+     "operationId": "replaceCoreV1NamespacedSecret",
      "parameters": [
       {
        "name": "body",
@@ -873,6 +924,9 @@
        "schema": {
         "$ref": "#/definitions/v1.Secret"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -889,7 +943,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "deleteNamespacedSecret",
+     "operationId": "deleteCoreV1NamespacedSecret",
      "parameters": [
       {
        "name": "body",
@@ -906,6 +960,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -924,7 +981,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "patchNamespacedSecret",
+     "operationId": "patchCoreV1NamespacedSecret",
      "parameters": [
       {
        "name": "body",
@@ -941,6 +998,9 @@
        "schema": {
         "$ref": "#/definitions/v1.Secret"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -984,7 +1044,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "listNamespacedService",
+     "operationId": "listCoreV1NamespacedService",
      "parameters": [
       {
        "uniqueItems": true,
@@ -1028,6 +1088,9 @@
        "schema": {
         "$ref": "#/definitions/v1.ServiceList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -1044,7 +1107,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "createNamespacedService",
+     "operationId": "createCoreV1NamespacedService",
      "parameters": [
       {
        "name": "body",
@@ -1061,6 +1124,9 @@
        "schema": {
         "$ref": "#/definitions/v1.Service"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -1077,7 +1143,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "deletecollectionNamespacedService",
+     "operationId": "deleteCoreV1CollectionNamespacedService",
      "parameters": [
       {
        "uniqueItems": true,
@@ -1121,6 +1187,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -1156,7 +1225,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "readNamespacedService",
+     "operationId": "readCoreV1NamespacedService",
      "parameters": [
       {
        "uniqueItems": true,
@@ -1179,6 +1248,9 @@
        "schema": {
         "$ref": "#/definitions/v1.Service"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -1195,7 +1267,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "replaceNamespacedService",
+     "operationId": "replaceCoreV1NamespacedService",
      "parameters": [
       {
        "name": "body",
@@ -1212,6 +1284,9 @@
        "schema": {
         "$ref": "#/definitions/v1.Service"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -1228,7 +1303,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "deleteNamespacedService",
+     "operationId": "deleteCoreV1NamespacedService",
      "parameters": [
       {
        "name": "body",
@@ -1245,6 +1320,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -1263,7 +1341,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "patchNamespacedService",
+     "operationId": "patchCoreV1NamespacedService",
      "parameters": [
       {
        "name": "body",
@@ -1280,6 +1358,9 @@
        "schema": {
         "$ref": "#/definitions/v1.Service"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -1323,13 +1404,16 @@
      "schemes": [
       "https"
      ],
-     "operationId": "readNamespacedServiceStatus",
+     "operationId": "readCoreV1NamespacedServiceStatus",
      "responses": {
       "200": {
        "description": "OK",
        "schema": {
         "$ref": "#/definitions/v1.Service"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -1346,7 +1430,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "replaceNamespacedServiceStatus",
+     "operationId": "replaceCoreV1NamespacedServiceStatus",
      "parameters": [
       {
        "name": "body",
@@ -1363,6 +1447,9 @@
        "schema": {
         "$ref": "#/definitions/v1.Service"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -1381,7 +1468,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "patchNamespacedServiceStatus",
+     "operationId": "patchCoreV1NamespacedServiceStatus",
      "parameters": [
       {
        "name": "body",
@@ -1398,6 +1485,9 @@
        "schema": {
         "$ref": "#/definitions/v1.Service"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -1441,7 +1531,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "readNamespace",
+     "operationId": "readCoreV1Namespace",
      "parameters": [
       {
        "uniqueItems": true,
@@ -1464,6 +1554,9 @@
        "schema": {
         "$ref": "#/definitions/v1.Namespace"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -1480,7 +1573,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "replaceNamespace",
+     "operationId": "replaceCoreV1Namespace",
      "parameters": [
       {
        "name": "body",
@@ -1497,6 +1590,9 @@
        "schema": {
         "$ref": "#/definitions/v1.Namespace"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -1513,7 +1609,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "deleteNamespace",
+     "operationId": "deleteCoreV1Namespace",
      "parameters": [
       {
        "name": "body",
@@ -1530,6 +1626,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -1548,7 +1647,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "patchNamespace",
+     "operationId": "patchCoreV1Namespace",
      "parameters": [
       {
        "name": "body",
@@ -1565,6 +1664,9 @@
        "schema": {
         "$ref": "#/definitions/v1.Namespace"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -1600,13 +1702,16 @@
      "schemes": [
       "https"
      ],
-     "operationId": "replaceNamespaceFinalize",
+     "operationId": "replaceCoreV1NamespaceFinalize",
      "responses": {
       "200": {
        "description": "OK",
        "schema": {
         "$ref": "#/definitions/v1.Namespace"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -1650,13 +1755,16 @@
      "schemes": [
       "https"
      ],
-     "operationId": "readNamespaceStatus",
+     "operationId": "readCoreV1NamespaceStatus",
      "responses": {
       "200": {
        "description": "OK",
        "schema": {
         "$ref": "#/definitions/v1.Namespace"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -1673,7 +1781,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "replaceNamespaceStatus",
+     "operationId": "replaceCoreV1NamespaceStatus",
      "parameters": [
       {
        "name": "body",
@@ -1690,6 +1798,9 @@
        "schema": {
         "$ref": "#/definitions/v1.Namespace"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -1708,7 +1819,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "patchNamespaceStatus",
+     "operationId": "patchCoreV1NamespaceStatus",
      "parameters": [
       {
        "name": "body",
@@ -1725,6 +1836,9 @@
        "schema": {
         "$ref": "#/definitions/v1.Namespace"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -1760,13 +1874,16 @@
      "schemes": [
       "https"
      ],
-     "operationId": "listSecretForAllNamespaces",
+     "operationId": "listCoreV1SecretForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
        "schema": {
         "$ref": "#/definitions/v1.SecretList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -1829,13 +1946,16 @@
      "schemes": [
       "https"
      ],
-     "operationId": "listServiceForAllNamespaces",
+     "operationId": "listCoreV1ServiceForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
        "schema": {
         "$ref": "#/definitions/v1.ServiceList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -1899,13 +2019,16 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchEventListForAllNamespaces",
+     "operationId": "watchCoreV1EventListForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -1969,13 +2092,16 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchNamespaceList",
+     "operationId": "watchCoreV1NamespaceList",
      "responses": {
       "200": {
        "description": "OK",
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -2039,13 +2165,16 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchNamespacedEventList",
+     "operationId": "watchCoreV1NamespacedEventList",
      "responses": {
       "200": {
        "description": "OK",
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -2117,13 +2246,16 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchNamespacedEvent",
+     "operationId": "watchCoreV1NamespacedEvent",
      "responses": {
       "200": {
        "description": "OK",
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -2203,13 +2335,16 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchNamespacedSecretList",
+     "operationId": "watchCoreV1NamespacedSecretList",
      "responses": {
       "200": {
        "description": "OK",
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -2281,13 +2416,16 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchNamespacedSecret",
+     "operationId": "watchCoreV1NamespacedSecret",
      "responses": {
       "200": {
        "description": "OK",
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -2367,13 +2505,16 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchNamespacedServiceList",
+     "operationId": "watchCoreV1NamespacedServiceList",
      "responses": {
       "200": {
        "description": "OK",
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -2445,13 +2586,16 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchNamespacedService",
+     "operationId": "watchCoreV1NamespacedService",
      "responses": {
       "200": {
        "description": "OK",
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -2531,13 +2675,16 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchNamespace",
+     "operationId": "watchCoreV1Namespace",
      "responses": {
       "200": {
        "description": "OK",
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -2609,13 +2756,16 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchSecretListForAllNamespaces",
+     "operationId": "watchCoreV1SecretListForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -2679,13 +2829,16 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchServiceListForAllNamespaces",
+     "operationId": "watchCoreV1ServiceListForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -2757,6 +2910,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.APIGroupList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     }
@@ -2784,6 +2940,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.APIGroup"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     }
@@ -2811,13 +2970,16 @@
        "schema": {
         "$ref": "#/definitions/unversioned.APIResourceList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     }
    },
-   "/apis/extensions/v1beta1/ingresses": {
+   "/apis/extensions/v1beta1/daemonsets": {
     "get": {
-     "description": "list or watch objects of kind Ingress",
+     "description": "list or watch objects of kind DaemonSet",
      "consumes": [
       "*/*"
      ],
@@ -2829,13 +2991,16 @@
      "schemes": [
       "https"
      ],
-     "operationId": "listIngressForAllNamespaces",
+     "operationId": "listExtensionsV1beta1DaemonSetForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/v1beta1.IngressList"
+        "$ref": "#/definitions/v1beta1.DaemonSetList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -2884,6 +3049,1312 @@
      }
     ]
    },
+   "/apis/extensions/v1beta1/deployments": {
+    "get": {
+     "description": "list or watch objects of kind Deployment",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "operationId": "listExtensionsV1beta1DeploymentForAllNamespaces",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v1beta1.DeploymentList"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+      "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+      "name": "labelSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+      "name": "resourceVersion",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "integer",
+      "description": "Timeout for the list/watch call.",
+      "name": "timeoutSeconds",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+      "name": "watch",
+      "in": "query"
+     }
+    ]
+   },
+   "/apis/extensions/v1beta1/ingresses": {
+    "get": {
+     "description": "list or watch objects of kind Ingress",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "operationId": "listExtensionsV1beta1IngressForAllNamespaces",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v1beta1.IngressList"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+      "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+      "name": "labelSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+      "name": "resourceVersion",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "integer",
+      "description": "Timeout for the list/watch call.",
+      "name": "timeoutSeconds",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+      "name": "watch",
+      "in": "query"
+     }
+    ]
+   },
+   "/apis/extensions/v1beta1/namespaces/{namespace}/daemonsets": {
+    "get": {
+     "description": "list or watch objects of kind DaemonSet",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "operationId": "listExtensionsV1beta1NamespacedDaemonSet",
+     "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+       "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+       "name": "labelSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+       "name": "resourceVersion",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "integer",
+       "description": "Timeout for the list/watch call.",
+       "name": "timeoutSeconds",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+       "name": "watch",
+       "in": "query"
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v1beta1.DaemonSetList"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "post": {
+     "description": "create a DaemonSet",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "operationId": "createExtensionsV1beta1NamespacedDaemonSet",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/v1beta1.DaemonSet"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v1beta1.DaemonSet"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "delete": {
+     "description": "delete collection of DaemonSet",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "operationId": "deleteExtensionsV1beta1CollectionNamespacedDaemonSet",
+     "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+       "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+       "name": "labelSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+       "name": "resourceVersion",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "integer",
+       "description": "Timeout for the list/watch call.",
+       "name": "timeoutSeconds",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+       "name": "watch",
+       "in": "query"
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/unversioned.Status"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "object name and auth scope, such as for teams and projects",
+      "name": "namespace",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     }
+    ]
+   },
+   "/apis/extensions/v1beta1/namespaces/{namespace}/daemonsets/{name}": {
+    "get": {
+     "description": "read the specified DaemonSet",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "operationId": "readExtensionsV1beta1NamespacedDaemonSet",
+     "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'",
+       "name": "exact",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Should this value be exported.  Export strips fields that a user can not specify.",
+       "name": "export",
+       "in": "query"
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v1beta1.DaemonSet"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "put": {
+     "description": "replace the specified DaemonSet",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "operationId": "replaceExtensionsV1beta1NamespacedDaemonSet",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/v1beta1.DaemonSet"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v1beta1.DaemonSet"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "delete": {
+     "description": "delete a DaemonSet",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "operationId": "deleteExtensionsV1beta1NamespacedDaemonSet",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/v1.DeleteOptions"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/unversioned.Status"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "patch": {
+     "description": "partially update the specified DaemonSet",
+     "consumes": [
+      "application/json-patch+json",
+      "application/merge-patch+json",
+      "application/strategic-merge-patch+json"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "operationId": "patchExtensionsV1beta1NamespacedDaemonSet",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/unversioned.Patch"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v1beta1.DaemonSet"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "name of the DaemonSet",
+      "name": "name",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "object name and auth scope, such as for teams and projects",
+      "name": "namespace",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     }
+    ]
+   },
+   "/apis/extensions/v1beta1/namespaces/{namespace}/daemonsets/{name}/status": {
+    "get": {
+     "description": "read status of the specified DaemonSet",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "operationId": "readExtensionsV1beta1NamespacedDaemonSetStatus",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v1beta1.DaemonSet"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "put": {
+     "description": "replace status of the specified DaemonSet",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "operationId": "replaceExtensionsV1beta1NamespacedDaemonSetStatus",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/v1beta1.DaemonSet"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v1beta1.DaemonSet"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "patch": {
+     "description": "partially update status of the specified DaemonSet",
+     "consumes": [
+      "application/json-patch+json",
+      "application/merge-patch+json",
+      "application/strategic-merge-patch+json"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "operationId": "patchExtensionsV1beta1NamespacedDaemonSetStatus",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/unversioned.Patch"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v1beta1.DaemonSet"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "name of the DaemonSet",
+      "name": "name",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "object name and auth scope, such as for teams and projects",
+      "name": "namespace",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     }
+    ]
+   },
+   "/apis/extensions/v1beta1/namespaces/{namespace}/deployments": {
+    "get": {
+     "description": "list or watch objects of kind Deployment",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "operationId": "listExtensionsV1beta1NamespacedDeployment",
+     "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+       "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+       "name": "labelSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+       "name": "resourceVersion",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "integer",
+       "description": "Timeout for the list/watch call.",
+       "name": "timeoutSeconds",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+       "name": "watch",
+       "in": "query"
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v1beta1.DeploymentList"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "post": {
+     "description": "create a Deployment",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "operationId": "createExtensionsV1beta1NamespacedDeployment",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/v1beta1.Deployment"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v1beta1.Deployment"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "delete": {
+     "description": "delete collection of Deployment",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "operationId": "deleteExtensionsV1beta1CollectionNamespacedDeployment",
+     "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+       "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+       "name": "labelSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+       "name": "resourceVersion",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "integer",
+       "description": "Timeout for the list/watch call.",
+       "name": "timeoutSeconds",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+       "name": "watch",
+       "in": "query"
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/unversioned.Status"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "object name and auth scope, such as for teams and projects",
+      "name": "namespace",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     }
+    ]
+   },
+   "/apis/extensions/v1beta1/namespaces/{namespace}/deployments/{name}": {
+    "get": {
+     "description": "read the specified Deployment",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "operationId": "readExtensionsV1beta1NamespacedDeployment",
+     "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'",
+       "name": "exact",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Should this value be exported.  Export strips fields that a user can not specify.",
+       "name": "export",
+       "in": "query"
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v1beta1.Deployment"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "put": {
+     "description": "replace the specified Deployment",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "operationId": "replaceExtensionsV1beta1NamespacedDeployment",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/v1beta1.Deployment"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v1beta1.Deployment"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "delete": {
+     "description": "delete a Deployment",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "operationId": "deleteExtensionsV1beta1NamespacedDeployment",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/v1.DeleteOptions"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/unversioned.Status"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "patch": {
+     "description": "partially update the specified Deployment",
+     "consumes": [
+      "application/json-patch+json",
+      "application/merge-patch+json",
+      "application/strategic-merge-patch+json"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "operationId": "patchExtensionsV1beta1NamespacedDeployment",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/unversioned.Patch"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v1beta1.Deployment"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "name of the Deployment",
+      "name": "name",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "object name and auth scope, such as for teams and projects",
+      "name": "namespace",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     }
+    ]
+   },
+   "/apis/extensions/v1beta1/namespaces/{namespace}/deployments/{name}/rollback": {
+    "post": {
+     "description": "create rollback of a DeploymentRollback",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "operationId": "createExtensionsV1beta1NamespacedDeploymentRollbackRollback",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v1beta1.DeploymentRollback"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "name": "body",
+      "in": "body",
+      "required": true,
+      "schema": {
+       "$ref": "#/definitions/v1beta1.DeploymentRollback"
+      }
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "name of the DeploymentRollback",
+      "name": "name",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "object name and auth scope, such as for teams and projects",
+      "name": "namespace",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     }
+    ]
+   },
+   "/apis/extensions/v1beta1/namespaces/{namespace}/deployments/{name}/scale": {
+    "get": {
+     "description": "read scale of the specified Scale",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "operationId": "readExtensionsV1beta1NamespacedDeploymentsScale",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v1beta1.Scale"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "put": {
+     "description": "replace scale of the specified Scale",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "operationId": "replaceExtensionsV1beta1NamespacedDeploymentsScale",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/v1beta1.Scale"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v1beta1.Scale"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "patch": {
+     "description": "partially update scale of the specified Scale",
+     "consumes": [
+      "application/json-patch+json",
+      "application/merge-patch+json",
+      "application/strategic-merge-patch+json"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "operationId": "patchExtensionsV1beta1NamespacedDeploymentsScale",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/unversioned.Patch"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v1beta1.Scale"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "name of the Scale",
+      "name": "name",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "object name and auth scope, such as for teams and projects",
+      "name": "namespace",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     }
+    ]
+   },
+   "/apis/extensions/v1beta1/namespaces/{namespace}/deployments/{name}/status": {
+    "get": {
+     "description": "read status of the specified Deployment",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "operationId": "readExtensionsV1beta1NamespacedDeploymentStatus",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v1beta1.Deployment"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "put": {
+     "description": "replace status of the specified Deployment",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "operationId": "replaceExtensionsV1beta1NamespacedDeploymentStatus",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/v1beta1.Deployment"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v1beta1.Deployment"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "patch": {
+     "description": "partially update status of the specified Deployment",
+     "consumes": [
+      "application/json-patch+json",
+      "application/merge-patch+json",
+      "application/strategic-merge-patch+json"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "operationId": "patchExtensionsV1beta1NamespacedDeploymentStatus",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/unversioned.Patch"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v1beta1.Deployment"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "name of the Deployment",
+      "name": "name",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "object name and auth scope, such as for teams and projects",
+      "name": "namespace",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     }
+    ]
+   },
    "/apis/extensions/v1beta1/namespaces/{namespace}/ingresses": {
     "get": {
      "description": "list or watch objects of kind Ingress",
@@ -2898,7 +4369,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "listNamespacedIngress",
+     "operationId": "listExtensionsV1beta1NamespacedIngress",
      "parameters": [
       {
        "uniqueItems": true,
@@ -2942,6 +4413,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.IngressList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -2958,7 +4432,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "createNamespacedIngress",
+     "operationId": "createExtensionsV1beta1NamespacedIngress",
      "parameters": [
       {
        "name": "body",
@@ -2975,6 +4449,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.Ingress"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -2991,7 +4468,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "deletecollectionNamespacedIngress",
+     "operationId": "deleteExtensionsV1beta1CollectionNamespacedIngress",
      "parameters": [
       {
        "uniqueItems": true,
@@ -3035,6 +4512,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -3070,7 +4550,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "readNamespacedIngress",
+     "operationId": "readExtensionsV1beta1NamespacedIngress",
      "parameters": [
       {
        "uniqueItems": true,
@@ -3093,6 +4573,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.Ingress"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -3109,7 +4592,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "replaceNamespacedIngress",
+     "operationId": "replaceExtensionsV1beta1NamespacedIngress",
      "parameters": [
       {
        "name": "body",
@@ -3126,6 +4609,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.Ingress"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -3142,7 +4628,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "deleteNamespacedIngress",
+     "operationId": "deleteExtensionsV1beta1NamespacedIngress",
      "parameters": [
       {
        "name": "body",
@@ -3159,6 +4645,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -3177,7 +4666,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "patchNamespacedIngress",
+     "operationId": "patchExtensionsV1beta1NamespacedIngress",
      "parameters": [
       {
        "name": "body",
@@ -3194,6 +4683,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.Ingress"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -3237,13 +4729,16 @@
      "schemes": [
       "https"
      ],
-     "operationId": "readNamespacedIngressStatus",
+     "operationId": "readExtensionsV1beta1NamespacedIngressStatus",
      "responses": {
       "200": {
        "description": "OK",
        "schema": {
         "$ref": "#/definitions/v1beta1.Ingress"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -3260,7 +4755,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "replaceNamespacedIngressStatus",
+     "operationId": "replaceExtensionsV1beta1NamespacedIngressStatus",
      "parameters": [
       {
        "name": "body",
@@ -3277,6 +4772,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.Ingress"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -3295,7 +4793,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "patchNamespacedIngressStatus",
+     "operationId": "patchExtensionsV1beta1NamespacedIngressStatus",
      "parameters": [
       {
        "name": "body",
@@ -3312,6 +4810,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.Ingress"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -3355,7 +4856,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "listNamespacedReplicaSet",
+     "operationId": "listExtensionsV1beta1NamespacedReplicaSet",
      "parameters": [
       {
        "uniqueItems": true,
@@ -3399,6 +4900,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.ReplicaSetList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -3415,7 +4919,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "createNamespacedReplicaSet",
+     "operationId": "createExtensionsV1beta1NamespacedReplicaSet",
      "parameters": [
       {
        "name": "body",
@@ -3432,6 +4936,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.ReplicaSet"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -3448,7 +4955,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "deletecollectionNamespacedReplicaSet",
+     "operationId": "deleteExtensionsV1beta1CollectionNamespacedReplicaSet",
      "parameters": [
       {
        "uniqueItems": true,
@@ -3492,6 +4999,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -3527,7 +5037,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "readNamespacedReplicaSet",
+     "operationId": "readExtensionsV1beta1NamespacedReplicaSet",
      "parameters": [
       {
        "uniqueItems": true,
@@ -3550,6 +5060,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.ReplicaSet"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -3566,7 +5079,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "replaceNamespacedReplicaSet",
+     "operationId": "replaceExtensionsV1beta1NamespacedReplicaSet",
      "parameters": [
       {
        "name": "body",
@@ -3583,6 +5096,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.ReplicaSet"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -3599,7 +5115,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "deleteNamespacedReplicaSet",
+     "operationId": "deleteExtensionsV1beta1NamespacedReplicaSet",
      "parameters": [
       {
        "name": "body",
@@ -3616,6 +5132,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -3634,7 +5153,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "patchNamespacedReplicaSet",
+     "operationId": "patchExtensionsV1beta1NamespacedReplicaSet",
      "parameters": [
       {
        "name": "body",
@@ -3651,6 +5170,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.ReplicaSet"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -3694,13 +5216,16 @@
      "schemes": [
       "https"
      ],
-     "operationId": "readNamespacedScaleScale",
+     "operationId": "readExtensionsV1beta1NamespacedReplicasetsScale",
      "responses": {
       "200": {
        "description": "OK",
        "schema": {
         "$ref": "#/definitions/v1beta1.Scale"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -3717,7 +5242,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "replaceNamespacedScaleScale",
+     "operationId": "replaceExtensionsV1beta1NamespacedReplicasetsScale",
      "parameters": [
       {
        "name": "body",
@@ -3734,6 +5259,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.Scale"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -3752,7 +5280,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "patchNamespacedScaleScale",
+     "operationId": "patchExtensionsV1beta1NamespacedReplicasetsScale",
      "parameters": [
       {
        "name": "body",
@@ -3769,6 +5297,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.Scale"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -3812,13 +5343,16 @@
      "schemes": [
       "https"
      ],
-     "operationId": "readNamespacedReplicaSetStatus",
+     "operationId": "readExtensionsV1beta1NamespacedReplicaSetStatus",
      "responses": {
       "200": {
        "description": "OK",
        "schema": {
         "$ref": "#/definitions/v1beta1.ReplicaSet"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -3835,7 +5369,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "replaceNamespacedReplicaSetStatus",
+     "operationId": "replaceExtensionsV1beta1NamespacedReplicaSetStatus",
      "parameters": [
       {
        "name": "body",
@@ -3852,6 +5386,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.ReplicaSet"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -3870,7 +5407,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "patchNamespacedReplicaSetStatus",
+     "operationId": "patchExtensionsV1beta1NamespacedReplicaSetStatus",
      "parameters": [
       {
        "name": "body",
@@ -3887,6 +5424,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.ReplicaSet"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -3930,13 +5470,162 @@
      "schemes": [
       "https"
      ],
-     "operationId": "listReplicaSetForAllNamespaces",
+     "operationId": "listExtensionsV1beta1ReplicaSetForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
        "schema": {
         "$ref": "#/definitions/v1beta1.ReplicaSetList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+      "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+      "name": "labelSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+      "name": "resourceVersion",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "integer",
+      "description": "Timeout for the list/watch call.",
+      "name": "timeoutSeconds",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+      "name": "watch",
+      "in": "query"
+     }
+    ]
+   },
+   "/apis/extensions/v1beta1/watch/daemonsets": {
+    "get": {
+     "description": "watch individual changes to a list of DaemonSet",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf",
+      "application/vnd.kubernetes.protobuf;stream=watch"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "operationId": "watchExtensionsV1beta1DaemonSetListForAllNamespaces",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/versioned.Event"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+      "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+      "name": "labelSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+      "name": "resourceVersion",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "integer",
+      "description": "Timeout for the list/watch call.",
+      "name": "timeoutSeconds",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+      "name": "watch",
+      "in": "query"
+     }
+    ]
+   },
+   "/apis/extensions/v1beta1/watch/deployments": {
+    "get": {
+     "description": "watch individual changes to a list of Deployment",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf",
+      "application/vnd.kubernetes.protobuf;stream=watch"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "operationId": "watchExtensionsV1beta1DeploymentListForAllNamespaces",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/versioned.Event"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -4000,13 +5689,16 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchIngressListForAllNamespaces",
+     "operationId": "watchExtensionsV1beta1IngressListForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -4055,6 +5747,346 @@
      }
     ]
    },
+   "/apis/extensions/v1beta1/watch/namespaces/{namespace}/daemonsets": {
+    "get": {
+     "description": "watch individual changes to a list of DaemonSet",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf",
+      "application/vnd.kubernetes.protobuf;stream=watch"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "operationId": "watchExtensionsV1beta1NamespacedDaemonSetList",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/versioned.Event"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+      "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+      "name": "labelSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "object name and auth scope, such as for teams and projects",
+      "name": "namespace",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+      "name": "resourceVersion",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "integer",
+      "description": "Timeout for the list/watch call.",
+      "name": "timeoutSeconds",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+      "name": "watch",
+      "in": "query"
+     }
+    ]
+   },
+   "/apis/extensions/v1beta1/watch/namespaces/{namespace}/daemonsets/{name}": {
+    "get": {
+     "description": "watch changes to an object of kind DaemonSet",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf",
+      "application/vnd.kubernetes.protobuf;stream=watch"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "operationId": "watchExtensionsV1beta1NamespacedDaemonSet",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/versioned.Event"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+      "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+      "name": "labelSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "name of the DaemonSet",
+      "name": "name",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "object name and auth scope, such as for teams and projects",
+      "name": "namespace",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+      "name": "resourceVersion",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "integer",
+      "description": "Timeout for the list/watch call.",
+      "name": "timeoutSeconds",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+      "name": "watch",
+      "in": "query"
+     }
+    ]
+   },
+   "/apis/extensions/v1beta1/watch/namespaces/{namespace}/deployments": {
+    "get": {
+     "description": "watch individual changes to a list of Deployment",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf",
+      "application/vnd.kubernetes.protobuf;stream=watch"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "operationId": "watchExtensionsV1beta1NamespacedDeploymentList",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/versioned.Event"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+      "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+      "name": "labelSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "object name and auth scope, such as for teams and projects",
+      "name": "namespace",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+      "name": "resourceVersion",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "integer",
+      "description": "Timeout for the list/watch call.",
+      "name": "timeoutSeconds",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+      "name": "watch",
+      "in": "query"
+     }
+    ]
+   },
+   "/apis/extensions/v1beta1/watch/namespaces/{namespace}/deployments/{name}": {
+    "get": {
+     "description": "watch changes to an object of kind Deployment",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf",
+      "application/vnd.kubernetes.protobuf;stream=watch"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "operationId": "watchExtensionsV1beta1NamespacedDeployment",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/versioned.Event"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+      "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+      "name": "labelSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "name of the Deployment",
+      "name": "name",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "object name and auth scope, such as for teams and projects",
+      "name": "namespace",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+      "name": "resourceVersion",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "integer",
+      "description": "Timeout for the list/watch call.",
+      "name": "timeoutSeconds",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+      "name": "watch",
+      "in": "query"
+     }
+    ]
+   },
    "/apis/extensions/v1beta1/watch/namespaces/{namespace}/ingresses": {
     "get": {
      "description": "watch individual changes to a list of Ingress",
@@ -4070,13 +6102,16 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchNamespacedIngressList",
+     "operationId": "watchExtensionsV1beta1NamespacedIngressList",
      "responses": {
       "200": {
        "description": "OK",
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -4148,13 +6183,16 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchNamespacedIngress",
+     "operationId": "watchExtensionsV1beta1NamespacedIngress",
      "responses": {
       "200": {
        "description": "OK",
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -4234,13 +6272,16 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchNamespacedReplicaSetList",
+     "operationId": "watchExtensionsV1beta1NamespacedReplicaSetList",
      "responses": {
       "200": {
        "description": "OK",
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -4312,13 +6353,16 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchNamespacedReplicaSet",
+     "operationId": "watchExtensionsV1beta1NamespacedReplicaSet",
      "responses": {
       "200": {
        "description": "OK",
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -4398,13 +6442,16 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchReplicaSetListForAllNamespaces",
+     "operationId": "watchExtensionsV1beta1ReplicaSetListForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -4476,6 +6523,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.APIGroup"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     }
@@ -4503,6 +6553,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.APIResourceList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     }
@@ -4521,7 +6574,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "listCluster",
+     "operationId": "listFederationV1beta1Cluster",
      "parameters": [
       {
        "uniqueItems": true,
@@ -4565,6 +6618,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.ClusterList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -4581,7 +6637,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "createCluster",
+     "operationId": "createFederationV1beta1Cluster",
      "parameters": [
       {
        "name": "body",
@@ -4598,6 +6654,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.Cluster"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -4614,7 +6673,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "deletecollectionCluster",
+     "operationId": "deleteFederationV1beta1CollectionCluster",
      "parameters": [
       {
        "uniqueItems": true,
@@ -4658,6 +6717,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -4685,7 +6747,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "readCluster",
+     "operationId": "readFederationV1beta1Cluster",
      "parameters": [
       {
        "uniqueItems": true,
@@ -4708,6 +6770,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.Cluster"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -4724,7 +6789,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "replaceCluster",
+     "operationId": "replaceFederationV1beta1Cluster",
      "parameters": [
       {
        "name": "body",
@@ -4741,6 +6806,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.Cluster"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -4757,7 +6825,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "deleteCluster",
+     "operationId": "deleteFederationV1beta1Cluster",
      "parameters": [
       {
        "name": "body",
@@ -4774,6 +6842,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -4792,7 +6863,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "patchCluster",
+     "operationId": "patchFederationV1beta1Cluster",
      "parameters": [
       {
        "name": "body",
@@ -4809,6 +6880,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.Cluster"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -4844,13 +6918,16 @@
      "schemes": [
       "https"
      ],
-     "operationId": "replaceClusterStatus",
+     "operationId": "replaceFederationV1beta1ClusterStatus",
      "responses": {
       "200": {
        "description": "OK",
        "schema": {
         "$ref": "#/definitions/v1beta1.Cluster"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -4895,13 +6972,16 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchClusterList",
+     "operationId": "watchFederationV1beta1ClusterList",
      "responses": {
       "200": {
        "description": "OK",
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -4965,13 +7045,16 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchCluster",
+     "operationId": "watchFederationV1beta1Cluster",
      "responses": {
       "200": {
        "description": "OK",
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -5035,8 +7118,8 @@
      ],
      "operationId": "logFileListHandler",
      "responses": {
-      "default": {
-       "description": "Default Response."
+      "401": {
+       "description": "Unauthorized"
       }
      }
     }
@@ -5048,8 +7131,8 @@
      ],
      "operationId": "logFileHandler",
      "responses": {
-      "default": {
-       "description": "Default Response."
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -5083,6 +7166,9 @@
        "schema": {
         "$ref": "#/definitions/version.Info"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     }
@@ -6607,6 +8693,235 @@
      }
     }
    },
+   "v1beta1.DaemonSet": {
+    "description": "DaemonSet represents the configuration of a daemon set.",
+    "properties": {
+     "metadata": {
+      "description": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+      "$ref": "#/definitions/v1.ObjectMeta"
+     },
+     "spec": {
+      "description": "Spec defines the desired behavior of this daemon set. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
+      "$ref": "#/definitions/v1beta1.DaemonSetSpec"
+     },
+     "status": {
+      "description": "Status is the current status of this daemon set. This data may be out of date by some window of time. Populated by the system. Read-only. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
+      "$ref": "#/definitions/v1beta1.DaemonSetStatus"
+     }
+    }
+   },
+   "v1beta1.DaemonSetList": {
+    "description": "DaemonSetList is a collection of daemon sets.",
+    "required": [
+     "items"
+    ],
+    "properties": {
+     "items": {
+      "description": "Items is a list of daemon sets.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/v1beta1.DaemonSet"
+      }
+     },
+     "metadata": {
+      "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+      "$ref": "#/definitions/unversioned.ListMeta"
+     }
+    }
+   },
+   "v1beta1.DaemonSetSpec": {
+    "description": "DaemonSetSpec is the specification of a daemon set.",
+    "required": [
+     "template"
+    ],
+    "properties": {
+     "selector": {
+      "description": "Selector is a label query over pods that are managed by the daemon set. Must match in order to be controlled. If empty, defaulted to labels on Pod template. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors",
+      "$ref": "#/definitions/v1beta1.LabelSelector"
+     },
+     "template": {
+      "description": "Template is the object that describes the pod that will be created. The DaemonSet will create exactly one copy of this pod on every node that matches the template's node selector (or on every node if no node selector is specified). More info: http://kubernetes.io/docs/user-guide/replication-controller#pod-template",
+      "$ref": "#/definitions/v1.PodTemplateSpec"
+     }
+    }
+   },
+   "v1beta1.DaemonSetStatus": {
+    "description": "DaemonSetStatus represents the current status of a daemon set.",
+    "required": [
+     "currentNumberScheduled",
+     "numberMisscheduled",
+     "desiredNumberScheduled",
+     "numberReady"
+    ],
+    "properties": {
+     "currentNumberScheduled": {
+      "description": "CurrentNumberScheduled is the number of nodes that are running at least 1 daemon pod and are supposed to run the daemon pod. More info: http://releases.k8s.io/HEAD/docs/admin/daemons.md",
+      "type": "integer",
+      "format": "int32"
+     },
+     "desiredNumberScheduled": {
+      "description": "DesiredNumberScheduled is the total number of nodes that should be running the daemon pod (including nodes correctly running the daemon pod). More info: http://releases.k8s.io/HEAD/docs/admin/daemons.md",
+      "type": "integer",
+      "format": "int32"
+     },
+     "numberMisscheduled": {
+      "description": "NumberMisscheduled is the number of nodes that are running the daemon pod, but are not supposed to run the daemon pod. More info: http://releases.k8s.io/HEAD/docs/admin/daemons.md",
+      "type": "integer",
+      "format": "int32"
+     },
+     "numberReady": {
+      "description": "NumberReady is the number of nodes that should be running the daemon pod and have one or more of the daemon pod running and ready.",
+      "type": "integer",
+      "format": "int32"
+     }
+    }
+   },
+   "v1beta1.Deployment": {
+    "description": "Deployment enables declarative updates for Pods and ReplicaSets.",
+    "properties": {
+     "metadata": {
+      "description": "Standard object metadata.",
+      "$ref": "#/definitions/v1.ObjectMeta"
+     },
+     "spec": {
+      "description": "Specification of the desired behavior of the Deployment.",
+      "$ref": "#/definitions/v1beta1.DeploymentSpec"
+     },
+     "status": {
+      "description": "Most recently observed status of the Deployment.",
+      "$ref": "#/definitions/v1beta1.DeploymentStatus"
+     }
+    }
+   },
+   "v1beta1.DeploymentList": {
+    "description": "DeploymentList is a list of Deployments.",
+    "required": [
+     "items"
+    ],
+    "properties": {
+     "items": {
+      "description": "Items is the list of Deployments.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/v1beta1.Deployment"
+      }
+     },
+     "metadata": {
+      "description": "Standard list metadata.",
+      "$ref": "#/definitions/unversioned.ListMeta"
+     }
+    }
+   },
+   "v1beta1.DeploymentRollback": {
+    "description": "DeploymentRollback stores the information required to rollback a deployment.",
+    "required": [
+     "name",
+     "rollbackTo"
+    ],
+    "properties": {
+     "name": {
+      "description": "Required: This must match the Name of a deployment.",
+      "type": "string"
+     },
+     "rollbackTo": {
+      "description": "The config of this deployment rollback.",
+      "$ref": "#/definitions/v1beta1.RollbackConfig"
+     },
+     "updatedAnnotations": {
+      "description": "The annotations to be updated to a deployment",
+      "type": "object",
+      "additionalProperties": {
+       "type": "string"
+      }
+     }
+    }
+   },
+   "v1beta1.DeploymentSpec": {
+    "description": "DeploymentSpec is the specification of the desired behavior of the Deployment.",
+    "required": [
+     "template"
+    ],
+    "properties": {
+     "minReadySeconds": {
+      "description": "Minimum number of seconds for which a newly created pod should be ready without any of its container crashing, for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready)",
+      "type": "integer",
+      "format": "int32"
+     },
+     "paused": {
+      "description": "Indicates that the deployment is paused and will not be processed by the deployment controller.",
+      "type": "boolean"
+     },
+     "replicas": {
+      "description": "Number of desired pods. This is a pointer to distinguish between explicit zero and not specified. Defaults to 1.",
+      "type": "integer",
+      "format": "int32"
+     },
+     "revisionHistoryLimit": {
+      "description": "The number of old ReplicaSets to retain to allow rollback. This is a pointer to distinguish between explicit zero and not specified.",
+      "type": "integer",
+      "format": "int32"
+     },
+     "rollbackTo": {
+      "description": "The config this deployment is rolling back to. Will be cleared after rollback is done.",
+      "$ref": "#/definitions/v1beta1.RollbackConfig"
+     },
+     "selector": {
+      "description": "Label selector for pods. Existing ReplicaSets whose pods are selected by this will be the ones affected by this deployment.",
+      "$ref": "#/definitions/v1beta1.LabelSelector"
+     },
+     "strategy": {
+      "description": "The deployment strategy to use to replace existing pods with new ones.",
+      "$ref": "#/definitions/v1beta1.DeploymentStrategy"
+     },
+     "template": {
+      "description": "Template describes the pods that will be created.",
+      "$ref": "#/definitions/v1.PodTemplateSpec"
+     }
+    }
+   },
+   "v1beta1.DeploymentStatus": {
+    "description": "DeploymentStatus is the most recently observed status of the Deployment.",
+    "properties": {
+     "availableReplicas": {
+      "description": "Total number of available pods (ready for at least minReadySeconds) targeted by this deployment.",
+      "type": "integer",
+      "format": "int32"
+     },
+     "observedGeneration": {
+      "description": "The generation observed by the deployment controller.",
+      "type": "integer",
+      "format": "int64"
+     },
+     "replicas": {
+      "description": "Total number of non-terminated pods targeted by this deployment (their labels match the selector).",
+      "type": "integer",
+      "format": "int32"
+     },
+     "unavailableReplicas": {
+      "description": "Total number of unavailable pods targeted by this deployment.",
+      "type": "integer",
+      "format": "int32"
+     },
+     "updatedReplicas": {
+      "description": "Total number of non-terminated pods targeted by this deployment that have the desired template spec.",
+      "type": "integer",
+      "format": "int32"
+     }
+    }
+   },
+   "v1beta1.DeploymentStrategy": {
+    "description": "DeploymentStrategy describes how to replace existing pods with new ones.",
+    "properties": {
+     "rollingUpdate": {
+      "description": "Rolling update config params. Present only if DeploymentStrategyType = RollingUpdate.",
+      "$ref": "#/definitions/v1beta1.RollingUpdateDeployment"
+     },
+     "type": {
+      "description": "Type of deployment. Can be \"Recreate\" or \"RollingUpdate\". Default is RollingUpdate.",
+      "type": "string"
+     }
+    }
+   },
    "v1beta1.Ingress": {
     "description": "Ingress is a collection of rules that allow inbound connections to reach the endpoints defined by a backend. An Ingress can be configured to give services externally-reachable urls, load balance traffic, terminate SSL, offer name based virtual hosting etc.",
     "properties": {
@@ -6777,6 +9092,39 @@
      }
     }
    },
+   "v1beta1.ReplicaSetCondition": {
+    "description": "ReplicaSetCondition describes the state of a replica set at a certain point.",
+    "required": [
+     "type",
+     "status"
+    ],
+    "properties": {
+     "lastProbeTime": {
+      "description": "Last time we probed the condition.",
+      "$ref": "#/definitions/unversioned.Time"
+     },
+     "lastTransitionTime": {
+      "description": "The last time the condition transitioned from one status to another.",
+      "$ref": "#/definitions/unversioned.Time"
+     },
+     "message": {
+      "description": "A human readable message indicating details about the transition.",
+      "type": "string"
+     },
+     "reason": {
+      "description": "The reason for the condition's last transition.",
+      "type": "string"
+     },
+     "status": {
+      "description": "Status of the condition, one of True, False, Unknown.",
+      "type": "string"
+     },
+     "type": {
+      "description": "Type of replica set condition.",
+      "type": "string"
+     }
+    }
+   },
    "v1beta1.ReplicaSetList": {
     "description": "ReplicaSetList is a collection of ReplicaSets.",
     "required": [
@@ -6830,6 +9178,13 @@
       "type": "integer",
       "format": "int32"
      },
+     "conditions": {
+      "description": "Represents the latest available observations of a replica set's current state.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/v1beta1.ReplicaSetCondition"
+      }
+     },
      "fullyLabeledReplicas": {
       "description": "The number of pods that have labels matching the labels of the pod template of the replicaset.",
       "type": "integer",
@@ -6849,6 +9204,28 @@
       "description": "Replicas is the most recently oberved number of replicas. More info: http://kubernetes.io/docs/user-guide/replication-controller#what-is-a-replication-controller",
       "type": "integer",
       "format": "int32"
+     }
+    }
+   },
+   "v1beta1.RollbackConfig": {
+    "properties": {
+     "revision": {
+      "description": "The revision to rollback to. If set to 0, rollbck to the last revision.",
+      "type": "integer",
+      "format": "int64"
+     }
+    }
+   },
+   "v1beta1.RollingUpdateDeployment": {
+    "description": "Spec to control the desired behavior of rolling update.",
+    "properties": {
+     "maxSurge": {
+      "description": "The maximum number of pods that can be scheduled above the desired number of pods. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). This can not be 0 if MaxUnavailable is 0. Absolute number is calculated from percentage by rounding up. By default, a value of 1 is used. Example: when this is set to 30%, the new RC can be scaled up immediately when the rolling update starts, such that the total number of old and new pods do not exceed 130% of desired pods. Once old pods have been killed, new RC can be scaled up further, ensuring that total number of pods running at any time during the update is atmost 130% of desired pods.",
+      "$ref": "#/definitions/intstr.IntOrString"
+     },
+     "maxUnavailable": {
+      "description": "The maximum number of pods that can be unavailable during the update. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). Absolute number is calculated from percentage by rounding up. This can not be 0 if MaxSurge is 0. By default, a fixed value of 1 is used. Example: when this is set to 30%, the old RC can be scaled down to 70% of desired pods immediately when the rolling update starts. Once new pods are ready, old RC can be scaled down further, followed by scaling up the new RC, ensuring that the total number of pods available at all times during the update is at least 70% of desired pods.",
+      "$ref": "#/definitions/intstr.IntOrString"
      }
     }
    },
@@ -6979,5 +9356,18 @@
      }
     }
    }
-  }
+  },
+  "securityDefinitions": {
+   "Bearer": {
+    "description": "Bearer authorization",
+    "type": "apiKey",
+    "name": "authorization",
+    "in": "header"
+   }
+  },
+  "security": [
+   {
+    "Bearer": []
+   }
+  ]
  }
