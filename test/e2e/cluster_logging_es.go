@@ -218,17 +218,16 @@ func getMissingLinesCountElasticsearch(f *framework.Framework, expectedCount int
 		return 0, fmt.Errorf("Failed to get services proxy request: %v", errProxy)
 	}
 
-	// Ask Elasticsearch to return all the log lines that were tagged with the underscore
-	// version of the name. Ask for twice as many log lines as we expect to check for
-	// duplication bugs.
+	// Ask Elasticsearch to return all the log lines that were tagged with the
+	// pod name. Ask for ten times as many log lines because duplication is possible.
 	body, err := proxyRequest.Namespace(api.NamespaceSystem).
 		Name("elasticsearch-logging").
 		Suffix("_search").
 		// TODO: Change filter to only match records from current test run
 		// after fluent-plugin-kubernetes_metadata_filter is enabled
 		// and optimize current query
-		Param("q", "tag:*synthlogger*").
-		Param("size", strconv.Itoa(expectedCount)).
+		Param("q", fmt.Sprintf("tag:*%s*", synthLoggerPodName)).
+		Param("size", strconv.Itoa(expectedCount*10)).
 		DoRaw()
 	if err != nil {
 		return 0, fmt.Errorf("Failed to make proxy call to elasticsearch-logging: %v", err)
