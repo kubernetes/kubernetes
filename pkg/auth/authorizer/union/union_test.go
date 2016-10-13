@@ -38,46 +38,53 @@ func (mock *mockAuthzHandler) Authorize(a authorizer.Attributes) (bool, string, 
 	return true, "", nil
 }
 
-func TestAuthorizationSecondPasses(t *testing.T) {
-	handler1 := &mockAuthzHandler{isAuthorized: false}
-	handler2 := &mockAuthzHandler{isAuthorized: true}
-	authzHandler := New(handler1, handler2)
-
-	authorized, _, _ := authzHandler.Authorize(nil)
-	if !authorized {
-		t.Errorf("Unexpected authorization failure")
+func TestAuthorization(t *testing.T) {
+	tests := []struct {
+		firstHandler    *mockAuthzHandler
+		secondHandler   *mockAuthzHandler
+		expectedFailure bool
+		expectedError   bool
+	}{
+		{
+			firstHandler:    &mockAuthzHandler{isAuthorized: false},
+			secondHandler:   &mockAuthzHandler{isAuthorized: true},
+			expectedFailure: false,
+			expectedError:   false,
+		},
+		{
+			firstHandler:    &mockAuthzHandler{isAuthorized: true},
+			secondHandler:   &mockAuthzHandler{isAuthorized: false},
+			expectedFailure: false,
+			expectedError:   false,
+		},
+		{
+			firstHandler:    &mockAuthzHandler{isAuthorized: false},
+			secondHandler:   &mockAuthzHandler{isAuthorized: false},
+			expectedFailure: true,
+			expectedError:   false,
+		},
+		{
+			firstHandler:    &mockAuthzHandler{err: fmt.Errorf("foo")},
+			secondHandler:   &mockAuthzHandler{err: fmt.Errorf("foo")},
+			expectedFailure: true,
+			expectedError:   true,
+		},
 	}
-}
 
-func TestAuthorizationFirstPasses(t *testing.T) {
-	handler1 := &mockAuthzHandler{isAuthorized: true}
-	handler2 := &mockAuthzHandler{isAuthorized: false}
-	authzHandler := New(handler1, handler2)
+	for _, tc := range tests {
+		authzHandler := New(tc.firstHandler, tc.secondHandler)
 
-	authorized, _, _ := authzHandler.Authorize(nil)
-	if !authorized {
-		t.Errorf("Unexpected authorization failure")
-	}
-}
+		authorized, _, err := authzHandler.Authorize(nil)
+		if tc.expectedError && err == nil {
+			t.Errorf("Expected error")
+		} else if !tc.expectedError && err != nil {
+			t.Fatal(err)
+		}
 
-func TestAuthorizationNonePasses(t *testing.T) {
-	handler1 := &mockAuthzHandler{isAuthorized: false}
-	handler2 := &mockAuthzHandler{isAuthorized: false}
-	authzHandler := New(handler1, handler2)
-
-	authorized, _, _ := authzHandler.Authorize(nil)
-	if authorized {
-		t.Errorf("Expected failed authorization")
-	}
-}
-
-func TestAuthorizationError(t *testing.T) {
-	handler1 := &mockAuthzHandler{err: fmt.Errorf("foo")}
-	handler2 := &mockAuthzHandler{err: fmt.Errorf("foo")}
-	authzHandler := New(handler1, handler2)
-
-	_, _, err := authzHandler.Authorize(nil)
-	if err == nil {
-		t.Errorf("Expected error: %v", err)
+		if tc.expectedFailure && authorized {
+			t.Errorf("Expected failed authorization")
+		} else if !tc.expectedFailure && !authorized {
+			t.Errorf("Unexpected authorization failure")
+		}
 	}
 }
