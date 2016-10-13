@@ -770,7 +770,7 @@ func testConfigCommand(args []string, startingConfig clientcmdapi.Config, t *tes
 
 	buf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdConfig(clientcmd.NewDefaultPathOptions(), buf)
+	cmd := NewCmdConfig(clientcmd.NewDefaultPathOptions(), buf, buf)
 	cmd.SetArgs(argsToUse)
 	cmd.Execute()
 

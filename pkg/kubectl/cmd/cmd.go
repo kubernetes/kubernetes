@@ -258,7 +258,7 @@ Find more information at https://github.com/kubernetes/kubernetes.`,
 		{
 			Message: "Basic Commands (Beginner):",
 			Commands: []*cobra.Command{
-				NewCmdCreate(f, out),
+				NewCmdCreate(f, out, err),
 				NewCmdExposeService(f, out),
 				NewCmdRun(f, in, out, err),
 				set.NewCmdSet(f, out, err),
@@ -276,7 +276,7 @@ Find more information at https://github.com/kubernetes/kubernetes.`,
 		{
 			Message: "Deploy Commands:",
 			Commands: []*cobra.Command{
-				rollout.NewCmdRollout(f, out),
+				rollout.NewCmdRollout(f, out, err),
 				NewCmdRollingUpdate(f, out),
 				NewCmdScale(f, out),
 				NewCmdAutoscale(f, out),
@@ -286,7 +286,7 @@ Find more information at https://github.com/kubernetes/kubernetes.`,
 			Message: "Cluster Management Commands:",
 			Commands: []*cobra.Command{
 				NewCmdClusterInfo(f, out),
-				NewCmdTop(f, out),
+				NewCmdTop(f, out, err),
 				NewCmdCordon(f, out),
 				NewCmdUncordon(f, out),
 				NewCmdDrain(f, out),
@@ -341,7 +341,7 @@ Find more information at https://github.com/kubernetes/kubernetes.`,
 		)
 	}
 
-	cmds.AddCommand(cmdconfig.NewCmdConfig(clientcmd.NewDefaultPathOptions(), out))
+	cmds.AddCommand(cmdconfig.NewCmdConfig(clientcmd.NewDefaultPathOptions(), out, err))
 	cmds.AddCommand(NewCmdVersion(f, out))
 	cmds.AddCommand(NewCmdApiVersions(f, out))
 	cmds.AddCommand(NewCmdOptions(out))
