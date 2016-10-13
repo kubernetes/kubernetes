@@ -79,7 +79,7 @@ func TestReconcileLoadBalancerRemoveAllPortsRemovesFrontendConfig(t *testing.T) 
 		t.Error("Expected the loadbalancer to need an update")
 	}
 
-	// ensure we abandonded the frontend ip configuration
+	// ensure we abandoned the frontend ip configuration
 	if len(*lb.Properties.FrontendIPConfigurations) != 0 {
 		t.Error("Expected the loadbalancer to have no frontend ip configuration")
 	}

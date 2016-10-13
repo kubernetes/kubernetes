@@ -32,7 +32,7 @@ Documentation for other releases can be found at
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
-## Java Web Application with Tomcat and Sidercar Container
+## Java Web Application with Tomcat and Sidecar Container
 
 The following document describes the deployment of a Java Web application using Tomcat. Instead of packaging `war` file inside the Tomcat image or mount the `war` as a volume, we use a sidecar container as `war` file provider.
 
