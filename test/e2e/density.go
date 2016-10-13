@@ -247,6 +247,7 @@ func runDensityTest(dtc DensityTestConfig) time.Duration {
 	for i := range dtc.Configs {
 		rcConfig := dtc.Configs[i]
 		go func() {
+			defer GinkgoRecover()
 			framework.ExpectNoError(framework.RunRC(rcConfig))
 			wg.Done()
 		}()
