@@ -55,7 +55,7 @@ import (
 func TestNewFactoryDefaultFlagBindings(t *testing.T) {
 	factory := NewFactory(nil)
 
-	if !factory.flags.HasFlags() {
+	if !factory.FlagSet().HasFlags() {
 		t.Errorf("Expected flags, but didn't get any")
 	}
 }
@@ -64,8 +64,8 @@ func TestNewFactoryNoFlagBindings(t *testing.T) {
 	clientConfig := clientcmd.NewDefaultClientConfig(*clientcmdapi.NewConfig(), &clientcmd.ConfigOverrides{})
 	factory := NewFactory(clientConfig)
 
-	if factory.flags.HasFlags() {
-		t.Errorf("Expected zero flags, but got %v", factory.flags)
+	if factory.FlagSet().HasFlags() {
+		t.Errorf("Expected zero flags, but got %v", factory.FlagSet())
 	}
 }
 
@@ -229,12 +229,12 @@ func TestCanBeExposed(t *testing.T) {
 func TestFlagUnderscoreRenaming(t *testing.T) {
 	factory := NewFactory(nil)
 
-	factory.flags.SetNormalizeFunc(flag.WordSepNormalizeFunc)
-	factory.flags.Bool("valid_flag", false, "bool value")
+	factory.FlagSet().SetNormalizeFunc(flag.WordSepNormalizeFunc)
+	factory.FlagSet().Bool("valid_flag", false, "bool value")
 
 	// In case of failure of this test check this PR: spf13/pflag#23
-	if factory.flags.Lookup("valid_flag").Name != "valid-flag" {
-		t.Fatalf("Expected flag name to be valid-flag, got %s", factory.flags.Lookup("valid_flag").Name)
+	if factory.FlagSet().Lookup("valid_flag").Name != "valid-flag" {
+		t.Fatalf("Expected flag name to be valid-flag, got %s", factory.FlagSet().Lookup("valid_flag").Name)
 	}
 }
 
