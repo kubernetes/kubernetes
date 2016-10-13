@@ -178,26 +178,6 @@ func GetTestScheme() (*runtime.Scheme, runtime.Codec) {
 	return s, codec
 }
 
-func objDiff(a, b interface{}) string {
-	ab, err := json.Marshal(a)
-	if err != nil {
-		panic("a")
-	}
-	bb, err := json.Marshal(b)
-	if err != nil {
-		panic("b")
-	}
-	return diff.StringDiff(string(ab), string(bb))
-
-	// An alternate diff attempt, in case json isn't showing you
-	// the difference. (reflect.DeepEqual makes a distinction between
-	// nil and empty slices, for example.)
-	//return diff.StringDiff(
-	//  fmt.Sprintf("%#v", a),
-	//  fmt.Sprintf("%#v", b),
-	//)
-}
-
 var semantic = conversion.EqualitiesOrDie(
 	func(a, b MyWeirdCustomEmbeddedVersionKindField) bool {
 		a.APIVersion, a.ObjectKind = "", ""
@@ -231,7 +211,7 @@ func runTest(t *testing.T, source interface{}) {
 		return
 	}
 	if !semantic.DeepEqual(source, obj3) {
-		t.Errorf("3: %v: diff: %v", name, objDiff(source, obj3))
+		t.Errorf("3: %v: diff: %v", name, diff.ObjectDiff(source, obj3))
 		return
 	}
 }
