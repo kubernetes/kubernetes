@@ -463,7 +463,7 @@ func TestFederationService(t *testing.T) {
 		t, kd)
 }
 
-func TestFederationQueryWithoutCache(t *testing.T) {
+func TestFederationSvcQueryWithoutCache(t *testing.T) {
 	kd := newKubeDNS()
 	kd.federations = map[string]string{
 		"myfederation":     "example.com",
@@ -471,11 +471,11 @@ func TestFederationQueryWithoutCache(t *testing.T) {
 	}
 	kd.kubeClient = fake.NewSimpleClientset(newNodes())
 
-	testValidFederationQueries(t, kd)
-	testInvalidFederationQueries(t, kd)
+	testValidFederationSvcQueries(t, kd)
+	testInvalidFederationSvcQueries(t, kd)
 }
 
-func TestFederationQueryWithCache(t *testing.T) {
+func TestFederationSvcQueryWithCache(t *testing.T) {
 	kd := newKubeDNS()
 	kd.federations = map[string]string{
 		"myfederation":     "example.com",
@@ -488,11 +488,39 @@ func TestFederationQueryWithCache(t *testing.T) {
 		t.Errorf("failed to add the node to the cache: %v", err)
 	}
 
-	testValidFederationQueries(t, kd)
-	testInvalidFederationQueries(t, kd)
+	testValidFederationSvcQueries(t, kd)
+	testInvalidFederationSvcQueries(t, kd)
 }
 
-func testValidFederationQueries(t *testing.T, kd *KubeDNS) {
+func TestFederationIngress(t *testing.T) {
+	queries := []struct {
+		q string
+		a string
+	}{
+		{
+			q: "testservice.default.myfederation.ing.cluster.local.",
+			a: "testservice.default.myfederation.ing.testcontinent-testreg-testzone.testcontinent-testreg.example.com.",
+		},
+		{
+			q: "secservice.testnamespace.secfederation.ing.cluster.local.",
+			a: "secservice.testnamespace.secfederation.ing.testcontinent-testreg-testzone.testcontinent-testreg.second.noexist.test.",
+		},
+	}
+
+	kd := newKubeDNS()
+	kd.federations = map[string]string{
+		"myfederation":  "example.com",
+		"secfederation": "second.noexist.test",
+	}
+	kd.kubeClient = fake.NewSimpleClientset(newNodes())
+	for _, query := range queries {
+		// Verify that the federation ingress query returns the corresponding
+		// federation CNAME target.
+		verifyRecord(query.q, query.a, t, kd)
+	}
+}
+
+func testValidFederationSvcQueries(t *testing.T, kd *KubeDNS) {
 	queries := []struct {
 		q string
 		a string
@@ -514,7 +542,7 @@ func testValidFederationQueries(t *testing.T, kd *KubeDNS) {
 	}
 }
 
-func testInvalidFederationQueries(t *testing.T, kd *KubeDNS) {
+func testInvalidFederationSvcQueries(t *testing.T, kd *KubeDNS) {
 	noAnswerQueries := []string{
 		"mysvc.myns.svc.cluster.local.",
 		"mysvc.default.nofederation.svc.cluster.local.",

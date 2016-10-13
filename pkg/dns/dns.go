@@ -44,11 +44,14 @@ import (
 const (
 	kubernetesSvcName = "kubernetes"
 
-	// A subdomain added to the user specified domain for all services.
-	serviceSubdomain = "svc"
+	// A subdomain added to the user specified domain for all ingresses.
+	ingSubdomain = "ing"
 
 	// A subdomain added to the user specified dmoain for all pods.
 	podSubdomain = "pod"
+
+	// A subdomain added to the user specified domain for all services.
+	serviceSubdomain = "svc"
 
 	// arpaSuffix is the standard suffix for PTR IP reverse lookups.
 	arpaSuffix = ".in-addr.arpa."
@@ -495,11 +498,32 @@ func (kd *KubeDNS) Records(name string, exact bool) (retval []skymsg.Service, er
 		return nil, etcd.Error{Code: etcd.ErrorCodeKeyNotFound}
 	}
 
-	// For federation query, verify that the local service has endpoints.
+	records, err = kd.getFederationLocalSvcRecords(path, records)
+	// If it is an error or if a local shard was found just return them.
+	// Otherwise continue.
+	if err != nil || len(records) > 0 {
+		return records, err
+	}
+
+	// If the name query is not an exact query and does not match any records
+	// in the local store, attempt to send a federation redirect (CNAME)
+	// response.
+	if !exact {
+		glog.V(2).Infof("federation query: Did not find a local endpoint. Trying federation redirect (CNAME) response")
+		return kd.federationRecords(reverseArray(federationSegments))
+	}
+
+	return nil, etcd.Error{Code: etcd.ErrorCodeKeyNotFound}
+}
+
+func (kd *KubeDNS) getFederationLocalSvcRecords(path []string, records []skymsg.Service) ([]skymsg.Service, error) {
+	// For federation service query, verify that the local service has
+	// endpoints.
 	validRecord := false
 	for _, val := range records {
-		// We know that a headless service has endpoints for sure if a record was returned for it.
-		// The record contains endpoint IPs. So nothing to check for headless services.
+		// We know that a headless service has endpoints for sure if a record
+		// was returned for it. The record contains endpoint IPs. So nothing
+		// to check for headless services.
 		if !kd.isHeadlessServiceRecord(&val) {
 			ok, err := kd.serviceWithClusterIPHasEndpoints(&val)
 			if err != nil {
@@ -514,27 +538,20 @@ func (kd *KubeDNS) Records(name string, exact bool) (retval []skymsg.Service, er
 		validRecord = true
 		break
 	}
-	if validRecord {
-		// There is a local service with valid endpoints, return its CNAME.
-		name := strings.Join(reverseArray(path), ".")
-		// Ensure that this name that we are returning as a CNAME response is a fully qualified
-		// domain name so that the client's resolver library doesn't have to go through its
-		// search list all over again.
-		if !strings.HasSuffix(name, ".") {
-			name = name + "."
-		}
-		glog.Infof("federation service query: Returning CNAME for local service : %s", name)
-		return []skymsg.Service{{Host: name}}, nil
+	if !validRecord {
+		return []skymsg.Service{}, nil
 	}
 
-	// If the name query is not an exact query and does not match any records in the local store,
-	// attempt to send a federation redirect (CNAME) response.
-	if !exact {
-		glog.V(2).Infof("federation service query: Did not find a local service. Trying federation redirect (CNAME) response")
-		return kd.federationRecords(reverseArray(federationSegments))
+	// There is a local service with valid endpoints, return its CNAME.
+	name := strings.Join(reverseArray(path), ".")
+	// Ensure that this name that we are returning as a CNAME response is
+	// a fully qualified domain name so that the client's resolver library
+	// doesn't have to go through its search list all over again.
+	if !strings.HasSuffix(name, ".") {
+		name = name + "."
 	}
-
-	return nil, etcd.Error{Code: etcd.ErrorCodeKeyNotFound}
+	glog.Infof("federation service query: Returning CNAME for local service : %s", name)
+	return []skymsg.Service{{Host: name}}, nil
 }
 
 func (kd *KubeDNS) getRecordsForPath(path []string, exact bool) ([]skymsg.Service, error) {
@@ -695,19 +712,22 @@ func getSkyMsg(ip string, port int) (*skymsg.Service, string) {
 	return msg, fmt.Sprintf("%x", hash)
 }
 
-// isFederationQuery checks if the given query `path` matches the federated service query pattern.
-// The conjunction of the following conditions forms the test for the federated service query
-// pattern:
-//   1. `path` has exactly 4+len(domainPath) segments: mysvc.myns.myfederation.svc.domain.path.
-//   2. Service name component must be a valid RFC 1035 name.
+// isFederationQuery checks if the given query `path` matches the federated
+// service/ingress query pattern. The conjunction of the following conditions
+// form the test for the federated query pattern:
+//   1. `path` has exactly 4+len(domainPath) segments: E.g.
+//      mysvc.myns.myfederation.svc.domain.path. or
+//      mysvc.myns.myfederation.ing.domain.path.
+//   2. Service or Ingress name component must be a valid RFC 1035 name.
 //   3. Namespace component must be a valid RFC 1123 name.
 //   4. Federation component must also be a valid RFC 1123 name.
 //   5. Fourth segment is exactly "svc"
 //   6. The remaining segments match kd.domainPath.
 //   7. And federation must be one of the listed federations in the config.
-//   Note: Because of the above conditions, this method will treat wildcard queries such as
-//   *.mysvc.myns.myfederation.svc.domain.path as non-federation queries.
-//   We can add support for wildcard queries later, if needed.
+//   Note: Because of the above conditions, this method will treat wildcard
+//         queries such as *.mysvc.myns.myfederation.svc.domain.path as
+//         non-federation queries. We can add support for wildcard queries
+//         later, if needed.
 func (kd *KubeDNS) isFederationQuery(path []string) bool {
 	if len(path) != 4+len(kd.domainPath) {
 		glog.V(2).Infof("not a federation query: len(%q) != 4+len(%q)", path, kd.domainPath)
@@ -725,8 +745,8 @@ func (kd *KubeDNS) isFederationQuery(path []string) bool {
 		glog.V(2).Infof("not a federation query: %q is not an RFC 1123 label: %q", path[2], errs)
 		return false
 	}
-	if path[3] != serviceSubdomain {
-		glog.V(2).Infof("not a federation query: %q != %q (serviceSubdomain)", path[3], serviceSubdomain)
+	if path[3] != serviceSubdomain && path[3] != ingSubdomain {
+		glog.V(2).Infof("not a federation query: %q != %q (service subdomain) or %q (ingress subdomain)", path[3], serviceSubdomain, ingSubdomain)
 		return false
 	}
 	for i, domComp := range kd.domainPath {
