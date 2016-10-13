@@ -41,6 +41,7 @@ Documentation for other releases can be found at
 * [Kubelet as a Container and Self-Hosted Kubernetes](https://docs.google.com/document/d/1_I6xT0XHCoOqZUT-dtpxzwvYpTR5JmFQY0S4gL2PPkU/edit#)
 * [user-space checkpointing](https://github.com/kubernetes-incubator/bootkube/tree/master/cmd/checkpoint)
 * [More musings on checkpointing](https://docs.google.com/document/d/172T6T9R35wbs5wYERnne-2-Pivy4wL58PM5mVbEbkHo/edit#)
+* [kubelet persisten store](https://github.com/kubernetes/kubernetes/pull/13861)
 
 ## Abstract
 
