@@ -48,6 +48,8 @@ const (
 var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func() {
 	f := framework.NewDefaultFederatedFramework("federated-ingress")
 
+	// Making a no on change to create a PR to test "@k8s-bot federation gce e2e test this".
+
 	// Create/delete ingress api objects
 	// Validate federation apiserver, does not rely on underlying clusters or federation ingress controller.
 	Describe("Federated Ingresses", func() {
