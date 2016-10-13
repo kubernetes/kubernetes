@@ -177,7 +177,6 @@ func (h *consulHelper) Create(ctx context.Context, key string, obj, out runtime.
 
 	startTime := time.Now()
 	pair := &consulapi.KVPair{
-		//Verb:  consulapi.KVCAS,
 		Key:   key,
 		Value: data,
 	}
@@ -454,7 +453,6 @@ func (h *consulHelper) GuaranteedUpdate(ctx context.Context, key string, ptrToTy
 		}
 
 		index := uint64(0)
-		//ttl := uint64(0)
 		if kv != nil {
 			index = kv.ModifyIndex
 		}
@@ -639,8 +637,6 @@ func (h *consulHelper) archiveEvent(key string, objType reflect.Type, eventType 
 	}
 
 	eventKey := fmt.Sprintf("%s/%s/%s", h.eventHistoryPrefix, key, rv)
-	log.Printf("Key: %s", key)
-	log.Printf("EventKey: %s", eventKey)
 
 	//create KVPair to store it
 	pair := &consulapi.KVPair{
