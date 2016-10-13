@@ -74,12 +74,12 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(pod *api.Pod, attem
 			Searches: dnsSearches,
 			Options:  defaultDNSOptions,
 		}
-		// TODO: Add domain support in new runtime interface
-		hostname, _, err := m.runtimeHelper.GeneratePodHostNameAndDomain(pod)
+		hostname, hostDomain, err := m.runtimeHelper.GeneratePodHostNameAndDomain(pod)
 		if err != nil {
 			return nil, err
 		}
 		podSandboxConfig.Hostname = &hostname
+		podSandboxConfig.HostDomain = &hostDomain
 	}
 
 	cgroupParent := ""
