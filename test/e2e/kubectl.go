@@ -1598,8 +1598,6 @@ func readReplicationControllerFromString(contents string) *api.ReplicationContro
 func modifyReplicationControllerConfiguration(contents string) io.Reader {
 	rc := readReplicationControllerFromString(contents)
 	rc.Labels[applyTestLabel] = "ADDED"
-	rc.Spec.Selector[applyTestLabel] = "ADDED"
-	rc.Spec.Template.Labels[applyTestLabel] = "ADDED"
 	data, err := json.Marshal(rc)
 	if err != nil {
 		framework.Failf("json marshal failed: %s\n", err)
