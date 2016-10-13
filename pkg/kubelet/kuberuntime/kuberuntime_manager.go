@@ -941,9 +941,7 @@ func (m *kubeGenericRuntimeManager) GetPodStatus(uid kubetypes.UID, name, namesp
 // TODO: Rename param name to sandboxID in kubecontainer.Runtime.GetNetNS().
 // TODO: Remove GetNetNS after networking is delegated to the container runtime.
 func (m *kubeGenericRuntimeManager) GetNetNS(sandboxID kubecontainer.ContainerID) (string, error) {
-	readyState := runtimeApi.PodSandBoxState_READY
 	filter := &runtimeApi.PodSandboxFilter{
-		State:         &readyState,
 		Id:            &sandboxID.ID,
 		LabelSelector: map[string]string{kubernetesManagedLabel: "true"},
 	}
