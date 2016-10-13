@@ -48,6 +48,8 @@ type SharedInformerFactory interface {
 	RoleBindings() RoleBindingInformer
 
 	LimitRanges() LimitRangeInformer
+
+	StorageClasses() StorageClassInformer
 }
 
 type sharedInformerFactory struct {
@@ -72,14 +74,14 @@ func NewSharedInformerFactory(client clientset.Interface, defaultResync time.Dur
 }
 
 // Start initializes all requested informers.
-func (s *sharedInformerFactory) Start(stopCh <-chan struct{}) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
+func (f *sharedInformerFactory) Start(stopCh <-chan struct{}) {
+	f.lock.Lock()
+	defer f.lock.Unlock()
 
-	for informerType, informer := range s.informers {
-		if !s.startedInformers[informerType] {
+	for informerType, informer := range f.informers {
+		if !f.startedInformers[informerType] {
 			go informer.Run(stopCh)
-			s.startedInformers[informerType] = true
+			f.startedInformers[informerType] = true
 		}
 	}
 }
@@ -146,4 +148,9 @@ func (f *sharedInformerFactory) RoleBindings() RoleBindingInformer {
 // LimitRanges returns a SharedIndexInformer that lists and watches all limit ranges.
 func (f *sharedInformerFactory) LimitRanges() LimitRangeInformer {
 	return &limitRangeInformer{sharedInformerFactory: f}
+}
+
+// StorageClasses returns a SharedIndexInformer that lists and watches all storage classes
+func (f *sharedInformerFactory) StorageClasses() StorageClassInformer {
+	return &storageClassInformer{sharedInformerFactory: f}
 }
