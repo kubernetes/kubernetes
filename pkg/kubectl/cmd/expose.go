@@ -116,6 +116,7 @@ func NewCmdExposeService(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().String("cluster-ip", "", "ClusterIP to be assigned to the service. Leave empty to auto-allocate, or set to 'None' to create a headless service.")
 
 	usage := "identifying the resource to expose a service"
+	cmdutil.AddValidateFlags(cmd)
 	cmdutil.AddFilenameOptionFlags(cmd, options, usage)
 	cmdutil.AddDryRunFlag(cmd)
 	cmdutil.AddApplyAnnotationFlags(cmd)
@@ -230,7 +231,11 @@ func RunExpose(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 
 		if inline := cmdutil.GetFlagString(cmd, "overrides"); len(inline) > 0 {
 			codec := runtime.NewCodec(f.JSONEncoder(), f.Decoder(true))
-			object, err = cmdutil.Merge(codec, object, inline, mapping.GroupVersionKind.Kind)
+			schema, err := f.Validator(cmdutil.GetFlagBool(cmd, "validate"), cmdutil.GetFlagString(cmd, "schema-cache-dir"))
+			if err != nil {
+				return err
+			}
+			object, err = cmdutil.Merge(codec, object, inline, schema)
 			if err != nil {
 				return err
 			}

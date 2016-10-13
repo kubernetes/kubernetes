@@ -99,6 +99,7 @@ func NewCmdRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *co
 	}
 	cmdutil.AddPrinterFlags(cmd)
 	addRunFlags(cmd)
+	cmdutil.AddValidateFlags(cmd)
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddRecordFlag(cmd)
 	cmdutil.AddInclude3rdPartyFlags(cmd)
@@ -604,12 +605,15 @@ func createGeneratedObject(f cmdutil.Factory, cmd *cobra.Command, generator kube
 
 	if len(overrides) > 0 {
 		codec := runtime.NewCodec(f.JSONEncoder(), f.Decoder(true))
-		obj, err = cmdutil.Merge(codec, obj, overrides, groupVersionKind.Kind)
+		schema, err := f.Validator(cmdutil.GetFlagBool(cmd, "validate"), cmdutil.GetFlagString(cmd, "schema-cache-dir"))
+		if err != nil {
+			return nil, "", nil, nil, err
+		}
+		obj, err = cmdutil.Merge(codec, obj, overrides, schema)
 		if err != nil {
 			return nil, "", nil, nil, err
 		}
 	}
-
 	mapping, err := mapper.RESTMapping(groupVersionKind.GroupKind(), groupVersionKind.Version)
 	if err != nil {
 		return nil, "", nil, nil, err

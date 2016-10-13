@@ -32,6 +32,7 @@ import (
 	kerrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/typed/discovery"
@@ -404,7 +405,7 @@ func ReadConfigDataFromReader(reader io.Reader, source string) ([]byte, error) {
 
 // Merge requires JSON serialization
 // TODO: merge assumes JSON serialization, and does not properly abstract API retrieval
-func Merge(codec runtime.Codec, dst runtime.Object, fragment, kind string) (runtime.Object, error) {
+func Merge(codec runtime.Codec, dst runtime.Object, fragment string, schema validation.Schema) (runtime.Object, error) {
 	// encode dst into versioned json and apply fragment directly too it
 	target, err := runtime.Encode(codec, dst)
 	if err != nil {
@@ -413,6 +414,9 @@ func Merge(codec runtime.Codec, dst runtime.Object, fragment, kind string) (runt
 	patched, err := jsonpatch.MergePatch(target, []byte(fragment))
 	if err != nil {
 		return nil, err
+	}
+	if err = resource.ValidateSchema(patched, schema); err != nil {
+		return nil, fmt.Errorf("error validating resource json after merging with override string: %s\n%v", patched[:], err)
 	}
 	out, err := runtime.Decode(codec, patched)
 	if err != nil {
