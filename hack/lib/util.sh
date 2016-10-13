@@ -478,4 +478,25 @@ kube::util::has_changes_against_upstream_branch() {
   return 1
 }
 
+kube::util::download_file() {
+  local -r url=$1
+  local -r destination_file=$2
+
+  rm  ${destination_file} >/dev/null || true
+
+  n=0
+  for i in {1..5}
+  do
+    if ! curl -fsSL --retry 3 --keepalive-time 2 ${url} -o ${destination_file}; then
+      n=$((n+1))
+      echo "Downloading '${url}' failed. Retrying."
+      echo "$((5-i)) retries left."
+      sleep 1
+    else
+      echo "Downloading ${url} succeed"
+      break
+    fi
+  done
+}
+
 # ex: ts=2 sw=2 et filetype=sh
