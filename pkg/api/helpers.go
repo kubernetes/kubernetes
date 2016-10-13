@@ -24,6 +24,7 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/conversion"
@@ -35,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/sets"
 
 	"github.com/davecgh/go-spew/spew"
+	"github.com/golang/glog"
 )
 
 // Conversion error conveniently packages up errors in conversions.
@@ -527,10 +529,195 @@ func TaintToleratedByTolerations(taint *Taint, tolerations []Toleration) bool {
 	return tolerated
 }
 
+// MatchToleration checks if the one toleration is equal to another toleration (tolerationToMatch).
+func (t *Toleration) MatchToleration(tolerationToMatch Toleration) bool {
+	return t.Key == tolerationToMatch.Key && t.Effect == tolerationToMatch.Effect && t.Value == tolerationToMatch.Value && t.Operator == tolerationToMatch.Operator
+}
+
 // MatchTaint checks if the taint matches taintToMatch. Taints are unique by key:effect,
 // if the two taints have same key:effect, regard as they match.
 func (t *Taint) MatchTaint(taintToMatch Taint) bool {
 	return t.Key == taintToMatch.Key && t.Effect == taintToMatch.Effect
+}
+
+type annotationKeyManager interface {
+	Add(obj runtime.Object)
+}
+
+// AddTaints adds a taint to object if it wasn't added yet.
+func AddTaints(obj runtime.Object, newTaints ...Taint) (bool, error) {
+	accessor, err := meta.Accessor(obj)
+	if err != nil {
+		return false, err
+	}
+	annotations := accessor.GetAnnotations()
+	if annotations == nil {
+		annotations = make(map[string]string)
+	}
+	oldTaints, err := GetTaintsFromNodeAnnotations(annotations)
+	if err != nil {
+		return false, err
+	}
+
+	var taints []Taint
+	for _, newTaint := range newTaints {
+		match := false
+		for _, oldTaint := range oldTaints {
+			match = oldTaint.MatchTaint(newTaint)
+		}
+		if match {
+			glog.V(5).Infof("taint %v already exists", newTaint)
+		} else {
+			taints = append(taints, newTaint)
+		}
+	}
+
+	if len(taints) == 0 {
+		return false, nil
+	}
+	taints = append(taints, oldTaints...)
+
+	taintsData, err := json.Marshal(taints)
+	if err != nil {
+		return false, err
+	}
+	annotations[TaintsAnnotationKey] = string(taintsData)
+	accessor.SetAnnotations(annotations)
+	return true, nil
+}
+
+// RemoveTaints removes taints if they are present in object
+func RemoveTaints(obj runtime.Object, taints ...Taint) (bool, error) {
+	if len(taints) == 0 {
+		return false, nil
+	}
+
+	accessor, err := meta.Accessor(obj)
+	annotations := accessor.GetAnnotations()
+	if annotations == nil {
+		annotations = make(map[string]string)
+	}
+	oldTaints, err := GetTaintsFromNodeAnnotations(annotations)
+
+	if err != nil {
+		return false, err
+	}
+	var newTaints []Taint
+	for _, oldTaint := range oldTaints {
+		match := false
+		for _, taint := range taints {
+			match = oldTaint.MatchTaint(taint)
+		}
+		if !match {
+			newTaints = append(newTaints, oldTaint)
+		}
+	}
+	if len(oldTaints) == len(newTaints) {
+		return false, nil
+	}
+	taintsData, err := json.Marshal(newTaints)
+	if err != nil {
+		return false, err
+	}
+	annotations[TaintsAnnotationKey] = string(taintsData)
+	accessor.SetAnnotations(annotations)
+	return true, nil
+}
+
+// AddTolerations adds a toleration to an object if it wasn't added yet.
+func AddTolerations(obj runtime.Object, newTolerations ...Toleration) (bool, error) {
+	accessor, err := meta.Accessor(obj)
+	if err != nil {
+		return false, err
+	}
+	annotations := accessor.GetAnnotations()
+	if annotations == nil {
+		annotations = make(map[string]string)
+	}
+	oldTolerations, err := GetTolerationsFromPodAnnotations(annotations)
+	if err != nil {
+		return false, err
+	}
+
+	var tolerations []Toleration
+	for _, newToleration := range newTolerations {
+		match := false
+		for _, oldToleration := range oldTolerations {
+			match = oldToleration.MatchToleration(newToleration)
+		}
+		if match {
+			glog.V(5).Infof("toleration %v already exists", newToleration)
+		} else {
+			tolerations = append(tolerations, newToleration)
+		}
+	}
+
+	if len(tolerations) == 0 {
+		return false, nil
+	}
+	tolerations = append(tolerations, oldTolerations...)
+
+	data, err := json.Marshal(tolerations)
+	if err != nil {
+		return false, err
+	}
+	annotations[TolerationsAnnotationKey] = string(data)
+	accessor.SetAnnotations(annotations)
+	return true, nil
+}
+
+// RemoveTolerations removes tolerations if they are present in object
+func RemoveTolerations(obj runtime.Object, tolerations ...Toleration) (bool, error) {
+	if len(tolerations) == 0 {
+		return false, nil
+	}
+
+	accessor, err := meta.Accessor(obj)
+	annotations := accessor.GetAnnotations()
+	if annotations == nil {
+		annotations = make(map[string]string)
+	}
+	oldTolerations, err := GetTolerationsFromPodAnnotations(annotations)
+
+	if err != nil {
+		return false, err
+	}
+	var newTolerations []Toleration
+	for _, oldToleration := range oldTolerations {
+		match := false
+		for _, toleration := range tolerations {
+			match = oldToleration.MatchToleration(toleration)
+		}
+		if !match {
+			newTolerations = append(newTolerations, oldToleration)
+		}
+	}
+	data, err := json.Marshal(newTolerations)
+	if err != nil {
+		return false, err
+	}
+	annotations[TolerationsAnnotationKey] = string(data)
+	accessor.SetAnnotations(annotations)
+	return true, nil
+}
+
+func TolerationsToleratesNoExecuteTaints(tolerations []Toleration, taints []Taint) bool {
+	if len(taints) == 0 {
+		return true
+	}
+
+	for _, taint := range taints {
+		// node controller interested only in NoExecute taints
+		if !(taint.Effect == TaintEffectNoExecute) {
+			continue
+		}
+
+		if !TaintToleratedByTolerations(&taint, tolerations) {
+			return false
+		}
+	}
+
+	return true
 }
 
 // taint.ToString() converts taint struct to string in format key=value:effect or key:effect.

@@ -216,7 +216,6 @@ func (q *RateLimitedTimedQueue) Try(fn ActionFunc) {
 		if now.Before(val.ProcessAt) {
 			break
 		}
-
 		if ok, wait := fn(val); !ok {
 			val.ProcessAt = now.Add(wait + 1)
 			q.queue.Replace(val)
