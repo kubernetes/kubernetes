@@ -58,6 +58,7 @@ func NewDockerService(client dockertools.DockerInterface, seccompProfileRoot str
 	return &dockerService{
 		seccompProfileRoot: seccompProfileRoot,
 		client:             dockertools.NewInstrumentedDockerInterface(client),
+		os:                 kubecontainer.RealOS{},
 		podSandboxImage:    podSandboxImage,
 	}
 }
@@ -81,6 +82,7 @@ type DockerLegacyService interface {
 type dockerService struct {
 	seccompProfileRoot string
 	client             dockertools.DockerInterface
+	os                 kubecontainer.OSInterface
 	podSandboxImage    string
 }
 

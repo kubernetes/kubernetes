@@ -183,7 +183,24 @@ func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeApi
 
 // StartContainer starts the container.
 func (ds *dockerService) StartContainer(containerID string) error {
-	return ds.client.StartContainer(containerID)
+	err := ds.client.StartContainer(containerID)
+	if err != nil {
+		return fmt.Errorf("failed to start container %q: %v", containerID, err)
+	}
+
+	info, err := ds.client.InspectContainer(containerID)
+	if err != nil {
+		return fmt.Errorf("failed to inspect container %q: %v", containerID, err)
+	}
+
+	// Create legacy symlink to the container log file for cluster logging.
+	// TODO: Deprecate this when the cluster logging is updated to use the new log path.
+	symlinkFile := logSymlink(info.Config.Labels, containerID)
+	if err = ds.os.Symlink(info.LogPath, symlinkFile); err != nil {
+		return fmt.Errorf("failed to create symbolic link %q to the log container log file %q for container %q",
+			symlinkFile, info.LogPath, containerID)
+	}
+	return nil
 }
 
 // StopContainer stops a running container with a grace period (i.e., timeout).
