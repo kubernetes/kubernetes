@@ -161,6 +161,8 @@ message PodSandboxConfig {
     optional PodSandboxMetadata metadata = 1;
     // The hostname of the sandbox.
     optional string hostname = 2;
+    // The host domain of the sandbox.
+    optional string host_domain = 3;
     // Path to the directory on the host in which container log files are
     // stored.
     // By default the log of a container going into the LogDirectory will be
@@ -176,18 +178,18 @@ message PodSandboxConfig {
     // container logs are under active discussion in
     // https://issues.k8s.io/24677. There *may* be future change of direction
     // for logging as the discussion carries on.
-    optional string log_directory = 3;
+    optional string log_directory = 4;
     // The DNS config for the sandbox.
-    optional DNSConfig dns_config = 4;
+    optional DNSConfig dns_config = 5;
     // The port mappings for the sandbox.
-    repeated PortMapping port_mappings = 5;
+    repeated PortMapping port_mappings = 6;
     // Labels are key value pairs that may be used to scope and select individual resources.
-    map<string, string> labels = 6;
+    map<string, string> labels = 7;
     // Annotations is an unstructured key value map that may be set by external
     // tools to store and retrieve arbitrary metadata.
-    map<string, string> annotations = 7;
+    map<string, string> annotations = 8;
     // Optional configurations specific to Linux hosts.
-    optional LinuxPodSandboxConfig linux = 8;
+    optional LinuxPodSandboxConfig linux = 9;
 }
 
 message RunPodSandboxRequest {
