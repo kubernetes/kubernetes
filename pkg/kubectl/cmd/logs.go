@@ -74,7 +74,7 @@ type LogsOptions struct {
 }
 
 // NewCmdLog creates a new pod logs command
-func NewCmdLogs(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+func NewCmdLogs(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	o := &LogsOptions{}
 	cmd := &cobra.Command{
 		Use:     "logs [-f] [-p] POD [-c CONTAINER]",
@@ -111,7 +111,7 @@ func NewCmdLogs(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func (o *LogsOptions) Complete(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) error {
+func (o *LogsOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) error {
 	containerName := cmdutil.GetFlagString(cmd, "container")
 	switch len(args) {
 	case 0:

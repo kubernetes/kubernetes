@@ -88,7 +88,7 @@ var (
 		kubectl label pods foo bar-`)
 )
 
-func NewCmdLabel(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+func NewCmdLabel(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &LabelOptions{}
 
 	// retrieve a list of handled resources from printer as valid args
@@ -135,7 +135,7 @@ func NewCmdLabel(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 }
 
 // Complete adapts from the command line args and factory to the data required.
-func (o *LabelOptions) Complete(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) (err error) {
+func (o *LabelOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) (err error) {
 	o.out = out
 	o.local = cmdutil.GetFlagBool(cmd, "local")
 	o.overwrite = cmdutil.GetFlagBool(cmd, "overwrite")
@@ -166,7 +166,7 @@ func (o *LabelOptions) Validate() error {
 }
 
 // RunLabel does the work
-func (o *LabelOptions) RunLabel(f *cmdutil.Factory, cmd *cobra.Command) error {
+func (o *LabelOptions) RunLabel(f cmdutil.Factory, cmd *cobra.Command) error {
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err

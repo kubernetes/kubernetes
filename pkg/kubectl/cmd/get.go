@@ -81,7 +81,7 @@ var (
 
 // NewCmdGet creates a command object for the generic "get" action, which
 // retrieves one or more resources from a server.
-func NewCmdGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Command {
+func NewCmdGet(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Command {
 	options := &GetOptions{}
 
 	// retrieve a list of handled resources from printer as valid args
@@ -125,7 +125,7 @@ func NewCmdGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Comma
 
 // RunGet implements the generic Get command
 // TODO: convert all direct flag accessors to a struct and pass that instead of cmd
-func RunGet(f *cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args []string, options *GetOptions) error {
+func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args []string, options *GetOptions) error {
 	if len(options.Raw) > 0 {
 		restClient, err := f.RESTClient()
 		if err != nil {

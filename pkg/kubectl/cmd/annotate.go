@@ -54,7 +54,7 @@ type AnnotateOptions struct {
 	newAnnotations    map[string]string
 	removeAnnotations []string
 
-	// Common shared fields
+	// Common share fields
 	out io.Writer
 }
 
@@ -91,7 +91,7 @@ var (
 		kubectl annotate pods foo description-`)
 )
 
-func NewCmdAnnotate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+func NewCmdAnnotate(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &AnnotateOptions{}
 
 	// retrieve a list of handled resources from printer as valid args
@@ -138,7 +138,7 @@ func NewCmdAnnotate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 }
 
 // Complete adapts from the command line args and factory to the data required.
-func (o *AnnotateOptions) Complete(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) (err error) {
+func (o *AnnotateOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) (err error) {
 	o.out = out
 	o.local = cmdutil.GetFlagBool(cmd, "local")
 	o.overwrite = cmdutil.GetFlagBool(cmd, "overwrite")
@@ -172,7 +172,7 @@ func (o AnnotateOptions) Validate() error {
 }
 
 // RunAnnotate does the work
-func (o AnnotateOptions) RunAnnotate(f *cmdutil.Factory, cmd *cobra.Command) error {
+func (o AnnotateOptions) RunAnnotate(f cmdutil.Factory, cmd *cobra.Command) error {
 	namespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err

@@ -35,7 +35,7 @@ var (
 		The top command allows you to see the resource consumption for nodes or pods.`)
 )
 
-func NewCmdTop(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+func NewCmdTop(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &TopOptions{}
 
 	cmd := &cobra.Command{
@@ -55,6 +55,6 @@ func NewCmdTop(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func (o TopOptions) RunTop(f *cmdutil.Factory, cmd *cobra.Command, args []string, out io.Writer) error {
+func (o TopOptions) RunTop(f cmdutil.Factory, cmd *cobra.Command, args []string, out io.Writer) error {
 	return cmd.Help()
 }

@@ -26,7 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/flag"
 )
 
-func NewKubeadmCommand(f *cmdutil.Factory, in io.Reader, out, err io.Writer) *cobra.Command {
+func NewKubeadmCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cobra.Command {
 	cmds := &cobra.Command{
 		Use:   "kubeadm",
 		Short: "kubeadm: easily bootstrap a secure Kubernetes cluster.",
