@@ -31,7 +31,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = framework.KubeDescribe("Cluster level logging using GCL", func() {
+var _ = framework.KubeDescribe("Cluster level logging using GCL [Flaky]", func() {
 	f := framework.NewDefaultFramework("gcl-logging")
 
 	BeforeEach(func() {
