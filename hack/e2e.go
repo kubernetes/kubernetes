@@ -236,6 +236,20 @@ func run(deploy deployer) error {
 		if err := xmlWrap("Up", deploy.Up); err != nil {
 			return fmt.Errorf("starting e2e cluster: %s", err)
 		}
+		if *dump != "" {
+			cmd := exec.Command("./cluster/kubectl.sh", "--match-server-version=false", "get", "nodes", "-oyaml")
+			b, err := cmd.CombinedOutput()
+			if *verbose {
+				log.Printf("kubectl get nodes:\n%s", string(b))
+			}
+			if err == nil {
+				if err := ioutil.WriteFile(filepath.Join(*dump, "nodes.yaml"), b, 0644); err != nil {
+					errs = appendError(errs, fmt.Errorf("error writing nodes.yaml: %v", err))
+				}
+			} else {
+				errs = appendError(errs, fmt.Errorf("error running get nodes: %v", err))
+			}
+		}
 	}
 
 	if *checkLeakedResources {
