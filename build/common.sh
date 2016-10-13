@@ -331,7 +331,7 @@ function kube::build::docker_delete_old_images() {
   #    docker images "$1" --format "{{.Tag}}"
   for tag in $("${DOCKER[@]}" images ${1} | tail -n +2 | awk '{print $2}') ; do
     if [[ "${tag}" != "${2}"* ]] ; then
-      V=6 kube::log::status "Keeping image ${1}:${tag}"
+      V=3 kube::log::status "Keeping image ${1}:${tag}"
       continue
     fi
 
@@ -339,7 +339,7 @@ function kube::build::docker_delete_old_images() {
       V=2 kube::log::status "Deleting image ${1}:${tag}"
       "${DOCKER[@]}" rmi "${1}:${tag}" >/dev/null
     else
-      V=6 kube::log::status "Keeping image ${1}:${tag}"
+      V=3 kube::log::status "Keeping image ${1}:${tag}"
     fi
   done
 }
@@ -353,14 +353,14 @@ function kube::build::docker_delete_old_containers() {
   #   docker ps -a --format="{{.Names}}"
   for container in $("${DOCKER[@]}" ps -a | tail -n +2 | awk '{print $NF}') ; do
     if [[ "${container}" != "${1}"* ]] ; then
-      V=6 kube::log::status "Keeping container ${container}"
+      V=3 kube::log::status "Keeping container ${container}"
       continue
     fi
     if [[ -z "${2:-}" || "${container}" != "${2}" ]] ; then
       V=2 kube::log::status "Deleting container ${container}"
       kube::build::destroy_container "${container}"
     else
-      V=6 kube::log::status "Keeping container ${container}"
+      V=3 kube::log::status "Keeping container ${container}"
     fi
   done
 }
@@ -613,7 +613,7 @@ function kube::build::rsync_probe {
 # rsync daemon can be reached out.
 function kube::build::start_rsyncd_container() {
   kube::build::stop_rsyncd_container
-  V=6 kube::log::status "Starting rsyncd container"
+  V=3 kube::log::status "Starting rsyncd container"
   kube::build::run_build_command_ex \
     "${KUBE_RSYNC_CONTAINER_NAME}" -p 127.0.0.1:${KUBE_RSYNC_PORT}:${KUBE_CONTAINER_RSYNC_PORT} -d \
     -- /rsyncd.sh >/dev/null
@@ -645,7 +645,7 @@ function kube::build::start_rsyncd_container() {
 }
 
 function kube::build::stop_rsyncd_container() {
-  V=6 kube::log::status "Stopping any currently running rsyncd container"
+  V=3 kube::log::status "Stopping any currently running rsyncd container"
   unset KUBE_RSYNC_ADDR
   kube::build::destroy_container "${KUBE_RSYNC_CONTAINER_NAME}"
 }
@@ -666,7 +666,7 @@ function kube::build::sync_to_container() {
   # output only directories and things that are not necessary like the git
   # directory. The '- /' filter prevents rsync from trying to set the
   # uid/gid/perms on the root of the sync tree.
-  V=6 kube::log::status "Running rsync"
+  V=3 kube::log::status "Running rsync"
   rsync ${rsync_extra} \
     --archive \
     --delete \
@@ -701,7 +701,7 @@ function kube::build::copy_output() {
   #
   # We are looking to copy out all of the built binaries along with various
   # generated files.
-  V=6 kube::log::status "Running rsync"
+  V=3 kube::log::status "Running rsync"
   rsync ${rsync_extra} \
     --archive \
     --prune-empty-dirs \

@@ -38,7 +38,7 @@ for APIROOT in ${APIROOTS}; do
   cp -a -T "${KUBE_ROOT}/${APIROOT}" "${_tmp}/${APIROOT}"
 done
 
-"${KUBE_ROOT}/hack/update-generated-protobuf.sh"
+KUBE_VERBOSE=3 "${KUBE_ROOT}/hack/update-generated-protobuf.sh"
 for APIROOT in ${APIROOTS}; do
   TMP_APIROOT="${_tmp}/${APIROOT}"
   echo "diffing ${APIROOT} against freshly generated protobuf"
