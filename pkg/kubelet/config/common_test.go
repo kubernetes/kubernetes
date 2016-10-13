@@ -71,7 +71,7 @@ func TestDecodeSinglePod(t *testing.T) {
 	}
 
 	for _, gv := range registered.EnabledVersionsForGroup(api.GroupName) {
-		s, _ := api.Codecs.SerializerForFileExtension("yaml")
+		s, _ := runtime.SerializerInfoForMediaType(api.Codecs, "application/yaml")
 		encoder := api.Codecs.EncoderForVersion(s, gv)
 		yaml, err := runtime.Encode(encoder, pod)
 		if err != nil {
@@ -134,7 +134,7 @@ func TestDecodePodList(t *testing.T) {
 	}
 
 	for _, gv := range registered.EnabledVersionsForGroup(api.GroupName) {
-		s, _ := api.Codecs.SerializerForFileExtension("yaml")
+		s, _ := runtime.SerializerInfoForMediaType(api.Codecs, "application/yaml")
 		encoder := api.Codecs.EncoderForVersion(s, gv)
 		yaml, err := runtime.Encode(encoder, podList)
 		if err != nil {

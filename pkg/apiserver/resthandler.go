@@ -480,7 +480,7 @@ func PatchResource(r rest.Patcher, scope RequestScope, typer runtime.ObjectTyper
 			return
 		}
 
-		s, ok := scope.Serializer.SerializerForMediaType("application/json", nil)
+		s, ok := runtime.SerializerInfoForMediaType(scope.Serializer, runtime.ContentTypeJSON)
 		if !ok {
 			scope.err(fmt.Errorf("no serializer defined for JSON"), res.ResponseWriter, req.Request)
 			return

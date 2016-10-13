@@ -87,7 +87,7 @@ func verfiyMetadata(description string, t *testing.T, in *MetadataOnlyObject) {
 func TestDecodeToMetadataOnlyObject(t *testing.T) {
 	data := getPodJson(t)
 	cf := serializer.DirectCodecFactory{CodecFactory: NewMetadataCodecFactory()}
-	serializer, ok := cf.SerializerForMediaType(runtime.ContentTypeJSON, nil)
+	serializer, ok := runtime.SerializerInfoForMediaType(cf, runtime.ContentTypeJSON)
 	if !ok {
 		t.Fatalf("expected to get a JSON serializer")
 	}
@@ -133,7 +133,7 @@ func verifyListMetadata(t *testing.T, metaOnlyList *MetadataOnlyObjectList) {
 func TestDecodeToMetadataOnlyObjectList(t *testing.T) {
 	data := getPodListJson(t)
 	cf := serializer.DirectCodecFactory{CodecFactory: NewMetadataCodecFactory()}
-	serializer, ok := cf.SerializerForMediaType(runtime.ContentTypeJSON, nil)
+	serializer, ok := runtime.SerializerInfoForMediaType(cf, runtime.ContentTypeJSON)
 	if !ok {
 		t.Fatalf("expected to get a JSON serializer")
 	}

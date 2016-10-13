@@ -1224,11 +1224,12 @@ func TestMetadata(t *testing.T) {
 			matches[s] = i + 1
 		}
 	}
+
 	if matches["text/plain,application/json,application/yaml,application/vnd.kubernetes.protobuf"] == 0 ||
-		matches["application/json,application/json;stream=watch,application/vnd.kubernetes.protobuf,application/vnd.kubernetes.protobuf;stream=watch"] == 0 ||
+		matches["application/json;stream=watch,application/vnd.kubernetes.protobuf;stream=watch"] == 0 ||
 		matches["application/json,application/yaml,application/vnd.kubernetes.protobuf"] == 0 ||
 		matches["*/*"] == 0 ||
-		len(matches) != 4 {
+		len(matches) != 5 {
 		t.Errorf("unexpected mime types: %v", matches)
 	}
 }
@@ -2719,7 +2720,7 @@ func TestCreateYAML(t *testing.T) {
 	simple := &apiservertesting.Simple{
 		Other: "bar",
 	}
-	serializer, ok := api.Codecs.SerializerForMediaType("application/yaml", nil)
+	serializer, ok := runtime.SerializerInfoForMediaType(api.Codecs, "application/yaml")
 	if !ok {
 		t.Fatal("No yaml serializer")
 	}
@@ -3216,7 +3217,7 @@ func BenchmarkUpdateProtobuf(b *testing.B) {
 	dest.Path = "/" + prefix + "/" + newGroupVersion.Group + "/" + newGroupVersion.Version + "/namespaces/foo/simples/bar"
 	dest.RawQuery = ""
 
-	info, _ := api.Codecs.SerializerForMediaType("application/vnd.kubernetes.protobuf", nil)
+	info, _ := runtime.SerializerInfoForMediaType(api.Codecs, "application/vnd.kubernetes.protobuf")
 	e := api.Codecs.EncoderForVersion(info.Serializer, newGroupVersion)
 	data, err := runtime.Encode(e, &items[0])
 	if err != nil {

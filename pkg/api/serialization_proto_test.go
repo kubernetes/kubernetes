@@ -54,7 +54,7 @@ func TestUniversalDeserializer(t *testing.T) {
 	expected := &v1.Pod{ObjectMeta: v1.ObjectMeta{Name: "test"}}
 	d := api.Codecs.UniversalDeserializer()
 	for _, mediaType := range []string{"application/json", "application/yaml", "application/vnd.kubernetes.protobuf"} {
-		e, ok := api.Codecs.SerializerForMediaType(mediaType, nil)
+		e, ok := runtime.SerializerInfoForMediaType(api.Codecs, mediaType)
 		if !ok {
 			t.Fatal(mediaType)
 		}
