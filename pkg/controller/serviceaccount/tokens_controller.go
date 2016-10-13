@@ -26,7 +26,7 @@ import (
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	clientretry "k8s.io/kubernetes/pkg/client/retry"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/registry/core/secret"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -298,7 +298,7 @@ func (e *TokensController) syncSecret() {
 		// If the service account exists
 		if sa, saErr := e.getServiceAccount(secretInfo.namespace, secretInfo.saName, secretInfo.saUID, false); saErr == nil && sa != nil {
 			// secret no longer exists, so delete references to this secret from the service account
-			if err := client.RetryOnConflict(RemoveTokenBackoff, func() error {
+			if err := clientretry.RetryOnConflict(RemoveTokenBackoff, func() error {
 				return e.removeSecretReference(secretInfo.namespace, secretInfo.saName, secretInfo.saUID, secretInfo.name)
 			}); err != nil {
 				glog.Error(err)
