@@ -43,6 +43,7 @@ import (
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/util/sets"
 
+	"github.com/go-openapi/spec"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -280,6 +281,10 @@ func (authn *mockAuthenticator) AuthenticateRequest(req *http.Request) (user.Inf
 	return &user.DefaultInfo{
 		Name: "foo",
 	}, true, nil
+}
+
+func (authn *mockAuthenticator) GetOpenAPISecurityDefinition() (spec.SecurityDefinitions, error) {
+	return spec.SecurityDefinitions{}, nil
 }
 
 // TestInstallSwaggerAPI verifies that the swagger api is added

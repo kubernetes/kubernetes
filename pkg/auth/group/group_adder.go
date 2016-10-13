@@ -19,6 +19,7 @@ package group
 import (
 	"net/http"
 
+	"github.com/go-openapi/spec"
 	"k8s.io/kubernetes/pkg/auth/authenticator"
 	"k8s.io/kubernetes/pkg/auth/user"
 )
@@ -47,4 +48,9 @@ func (g *GroupAdder) AuthenticateRequest(req *http.Request) (user.Info, bool, er
 		Groups: append(u.GetGroups(), g.Groups...),
 		Extra:  u.GetExtra(),
 	}, true, nil
+}
+
+// GetOpenAPISecurityDefinition returns wrapped authenticator's SecurityDefinition.
+func (g *GroupAdder) GetOpenAPISecurityDefinition() (spec.SecurityDefinitions, error) {
+	return g.Authenticator.GetOpenAPISecurityDefinition()
 }

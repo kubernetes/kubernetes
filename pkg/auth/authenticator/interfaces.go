@@ -19,6 +19,7 @@ package authenticator
 import (
 	"net/http"
 
+	"github.com/go-openapi/spec"
 	"k8s.io/kubernetes/pkg/auth/user"
 )
 
@@ -34,6 +35,7 @@ type Token interface {
 // or an error if the request could not be checked.
 type Request interface {
 	AuthenticateRequest(req *http.Request) (user.Info, bool, error)
+	GetOpenAPISecurityDefinition() (spec.SecurityDefinitions, error)
 }
 
 // Password checks a username and password against a backing authentication store and
@@ -57,6 +59,11 @@ type RequestFunc func(req *http.Request) (user.Info, bool, error)
 // AuthenticateRequest implements authenticator.Request.
 func (f RequestFunc) AuthenticateRequest(req *http.Request) (user.Info, bool, error) {
 	return f(req)
+}
+
+// GetOpenAPISecurityDefinition implements authenticator.Request.
+func (f RequestFunc) GetOpenAPISecurityDefinition() (spec.SecurityDefinitions, error) {
+	return spec.SecurityDefinitions{}, nil
 }
 
 // PasswordFunc is a function that implements the Password interface.

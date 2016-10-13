@@ -335,6 +335,30 @@ func (c *Config) Complete() completedConfig {
 	if c.BuildHandlerChainsFunc == nil {
 		c.BuildHandlerChainsFunc = DefaultBuildHandlerChain
 	}
+	if c.OpenAPIConfig == nil {
+		c.OpenAPIConfig = &common.Config{}
+	}
+	if c.OpenAPIConfig.SecurityDefinitions == nil && c.Authenticator != nil {
+		definitions, err := c.Authenticator.GetOpenAPISecurityDefinition()
+		if err != nil {
+			glog.Fatalf("failed to generate OpenAPI security definitions: %v", err)
+		}
+		c.OpenAPIConfig.SecurityDefinitions = &definitions
+		c.OpenAPIConfig.DefaultSecurity = []map[string][]string{}
+		for k := range definitions {
+			c.OpenAPIConfig.DefaultSecurity = append(c.OpenAPIConfig.DefaultSecurity, map[string][]string{k: {}})
+		}
+		if c.OpenAPIConfig.CommonResponses == nil {
+			c.OpenAPIConfig.CommonResponses = &map[int]spec.Response{}
+		}
+		if _, exists := (*c.OpenAPIConfig.CommonResponses)[http.StatusUnauthorized]; !exists {
+			(*c.OpenAPIConfig.CommonResponses)[http.StatusUnauthorized] = spec.Response{
+				ResponseProps: spec.ResponseProps{
+					Description: "Unauthorized",
+				},
+			}
+		}
+	}
 	return completedConfig{c}
 }
 

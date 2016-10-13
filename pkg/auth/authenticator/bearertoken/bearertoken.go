@@ -20,6 +20,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/go-openapi/spec"
 	"k8s.io/kubernetes/pkg/auth/authenticator"
 	"k8s.io/kubernetes/pkg/auth/user"
 )
@@ -44,4 +45,18 @@ func (a *Authenticator) AuthenticateRequest(req *http.Request) (user.Info, bool,
 
 	token := parts[1]
 	return a.auth.AuthenticateToken(token)
+}
+
+// GetOpenAPISecurityDefinition returns a Bearer authentication SecurityDefinition.
+func (a *Authenticator) GetOpenAPISecurityDefinition() (spec.SecurityDefinitions, error) {
+	ret := spec.SecurityDefinitions{}
+	ret["Bearer"] = &spec.SecurityScheme{
+		SecuritySchemeProps: spec.SecuritySchemeProps{
+			Type:        "apiKey",
+			Name:        "authorization",
+			In:          "header",
+			Description: "Bearer authorization",
+		},
+	}
+	return ret, nil
 }
