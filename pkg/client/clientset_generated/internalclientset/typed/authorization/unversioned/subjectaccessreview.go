@@ -16,6 +16,10 @@ limitations under the License.
 
 package unversioned
 
+import (
+	restclient "k8s.io/kubernetes/pkg/client/restclient"
+)
+
 // SubjectAccessReviewsGetter has a method to return a SubjectAccessReviewInterface.
 // A group's client should implement this interface.
 type SubjectAccessReviewsGetter interface {
@@ -29,12 +33,12 @@ type SubjectAccessReviewInterface interface {
 
 // subjectAccessReviews implements SubjectAccessReviewInterface
 type subjectAccessReviews struct {
-	client *AuthorizationClient
+	client restclient.Interface
 }
 
 // newSubjectAccessReviews returns a SubjectAccessReviews
 func newSubjectAccessReviews(c *AuthorizationClient) *subjectAccessReviews {
 	return &subjectAccessReviews{
-		client: c,
+		client: c.RESTClient(),
 	}
 }

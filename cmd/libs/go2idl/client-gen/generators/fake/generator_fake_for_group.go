@@ -60,10 +60,11 @@ func (g *genFakeForGroup) GenerateType(c *generator.Context, t *types.Type, w io
 	const pkgTestingCore = "k8s.io/kubernetes/pkg/client/testing/core"
 	const pkgRESTClient = "k8s.io/kubernetes/pkg/client/restclient"
 	m := map[string]interface{}{
-		"group":      g.group,
-		"Group":      namer.IC(g.group),
-		"Fake":       c.Universe.Type(types.Name{Package: pkgTestingCore, Name: "Fake"}),
-		"RESTClient": c.Universe.Type(types.Name{Package: pkgRESTClient, Name: "RESTClient"}),
+		"group":               g.group,
+		"Group":               namer.IC(g.group),
+		"Fake":                c.Universe.Type(types.Name{Package: pkgTestingCore, Name: "Fake"}),
+		"RESTClientInterface": c.Universe.Type(types.Name{Package: pkgRESTClient, Name: "Interface"}),
+		"RESTClient":          c.Universe.Type(types.Name{Package: pkgRESTClient, Name: "RESTClient"}),
 	}
 	sw.Do(groupClientTemplate, m)
 	for _, t := range g.types {
@@ -103,9 +104,10 @@ func (c *Fake$.Group$) $.type|publicPlural$() $.realClientPackage$.$.type|public
 `
 
 var getRESTClient = `
-// GetRESTClient returns a RESTClient that is used to communicate
+// RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *Fake$.Group$) GetRESTClient() *$.RESTClient|raw$ {
-  return nil
+func (c *Fake$.Group$) RESTClient() $.RESTClientInterface|raw$ {
+	var ret *$.RESTClient|raw$
+	return ret
 }
 `

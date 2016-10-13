@@ -19,6 +19,7 @@ package unversioned
 import (
 	api "k8s.io/kubernetes/pkg/api"
 	apps "k8s.io/kubernetes/pkg/apis/apps"
+	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
@@ -44,14 +45,14 @@ type PetSetInterface interface {
 
 // petSets implements PetSetInterface
 type petSets struct {
-	client *AppsClient
+	client restclient.Interface
 	ns     string
 }
 
 // newPetSets returns a PetSets
 func newPetSets(c *AppsClient, namespace string) *petSets {
 	return &petSets{
-		client: c,
+		client: c.RESTClient(),
 		ns:     namespace,
 	}
 }

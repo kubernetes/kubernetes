@@ -140,7 +140,7 @@ func TestNegotiateVersion(t *testing.T) {
 			}),
 		}
 		c := unversioned.NewOrDie(test.config)
-		c.DiscoveryClient.Client = fakeClient.Client
+		c.DiscoveryClient.RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
 		response, err := unversioned.NegotiateVersion(c, test.config, test.version, test.clientVersions)
 		if err == nil && test.expectErr != nil {
 			t.Errorf("expected error, got nil for [%s].", test.name)
