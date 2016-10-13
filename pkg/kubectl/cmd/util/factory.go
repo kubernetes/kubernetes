@@ -178,6 +178,8 @@ type Factory interface {
 	PrinterForMapping(cmd *cobra.Command, mapping *meta.RESTMapping, withNamespace bool) (kubectl.ResourcePrinter, error)
 	// One stop shopping for a Builder
 	NewBuilder() *resource.Builder
+
+	ResourcesWithPodSpecs() []*meta.RESTMapping
 }
 
 const (
@@ -1397,7 +1399,7 @@ func registerThirdPartyResources(discoveryClient discovery.DiscoveryInterface) e
 	return nil
 }
 
-func (f *Factory) ResourcesWithPodSpecs() []*meta.RESTMapping {
+func (f *factory) ResourcesWithPodSpecs() []*meta.RESTMapping {
 	restMaps := []*meta.RESTMapping{}
 	resourcesWithTemplates := []string{"ReplicationController", "Deployment", "DaemonSet", "Job", "ReplicaSet"}
 	mapper, _ := f.Object()

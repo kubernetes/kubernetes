@@ -85,7 +85,7 @@ kubectl set resources -f path/to/file.yaml --limits=cpu=200m,memory=512Mi --dry-
 `
 )
 
-func NewCmdResources(f *cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Command {
+func NewCmdResources(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Command {
 	options := &ResourcesOptions{
 		Out: out,
 		Err: errOut,
@@ -124,7 +124,7 @@ func NewCmdResources(f *cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra
 	return cmd
 }
 
-func (o *ResourcesOptions) Complete(f *cmdutil.Factory, cmd *cobra.Command, args []string) error {
+func (o *ResourcesOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	o.Mapper, o.Typer = f.Object()
 	o.UpdatePodSpecForObject = f.UpdatePodSpecForObject
 	o.Encoder = f.JSONEncoder()
