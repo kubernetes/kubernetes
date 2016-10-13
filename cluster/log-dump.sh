@@ -96,7 +96,7 @@ function copy-logs-from-node() {
       scp -oLogLevel=quiet -oConnectTimeout=30 -oStrictHostKeyChecking=no -i "${LOG_DUMP_SSH_KEY}" "${LOG_DUMP_SSH_USER}@${node}:${scp_files}" "${dir}" > /dev/null || true
     else
       case "${KUBERNETES_PROVIDER}" in
-        gce|gke)
+        gce|gke|kubemark)
           gcloud compute copy-files --project "${PROJECT}" --zone "${ZONE}" "${node}:${scp_files}" "${dir}" > /dev/null || true
           ;;
         aws)
@@ -120,7 +120,7 @@ function save-logs() {
       fi
     else
       case "${KUBERNETES_PROVIDER}" in
-        gce|gke)
+        gce|gke|kubemark)
           files="${files} ${gce_logfiles}"
           ;;
         aws)
