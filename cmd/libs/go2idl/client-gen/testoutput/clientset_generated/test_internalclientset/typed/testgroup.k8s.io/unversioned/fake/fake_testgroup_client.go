@@ -30,8 +30,9 @@ func (c *FakeTestgroup) TestTypes(namespace string) unversioned.TestTypeInterfac
 	return &FakeTestTypes{c, namespace}
 }
 
-// GetRESTClient returns a RESTClient that is used to communicate
+// RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeTestgroup) GetRESTClient() *restclient.RESTClient {
-	return nil
+func (c *FakeTestgroup) RESTClient() restclient.Interface {
+	var ret *restclient.RESTClient
+	return ret
 }

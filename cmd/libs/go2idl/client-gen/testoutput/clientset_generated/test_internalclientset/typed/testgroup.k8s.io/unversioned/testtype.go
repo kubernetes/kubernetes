@@ -19,6 +19,7 @@ package unversioned
 import (
 	testgroup_k8s_io "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/test_apis/testgroup.k8s.io"
 	api "k8s.io/kubernetes/pkg/api"
+	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
@@ -44,14 +45,14 @@ type TestTypeInterface interface {
 
 // testTypes implements TestTypeInterface
 type testTypes struct {
-	client *TestgroupClient
+	client restclient.Interface
 	ns     string
 }
 
 // newTestTypes returns a TestTypes
 func newTestTypes(c *TestgroupClient, namespace string) *testTypes {
 	return &testTypes{
-		client: c,
+		client: c.RESTClient(),
 		ns:     namespace,
 	}
 }

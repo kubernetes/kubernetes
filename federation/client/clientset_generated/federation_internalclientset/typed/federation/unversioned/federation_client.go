@@ -23,13 +23,13 @@ import (
 )
 
 type FederationInterface interface {
-	GetRESTClient() *restclient.RESTClient
+	RESTClient() restclient.Interface
 	ClustersGetter
 }
 
 // FederationClient is used to interact with features provided by the Federation group.
 type FederationClient struct {
-	*restclient.RESTClient
+	restClient restclient.Interface
 }
 
 func (c *FederationClient) Clusters() ClusterInterface {
@@ -60,7 +60,7 @@ func NewForConfigOrDie(c *restclient.Config) *FederationClient {
 }
 
 // New creates a new FederationClient for the given RESTClient.
-func New(c *restclient.RESTClient) *FederationClient {
+func New(c restclient.Interface) *FederationClient {
 	return &FederationClient{c}
 }
 
@@ -89,11 +89,11 @@ func setConfigDefaults(config *restclient.Config) error {
 	return nil
 }
 
-// GetRESTClient returns a RESTClient that is used to communicate
+// RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FederationClient) GetRESTClient() *restclient.RESTClient {
+func (c *FederationClient) RESTClient() restclient.Interface {
 	if c == nil {
 		return nil
 	}
-	return c.RESTClient
+	return c.restClient
 }

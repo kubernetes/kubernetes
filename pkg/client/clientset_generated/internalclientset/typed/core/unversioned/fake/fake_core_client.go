@@ -90,8 +90,9 @@ func (c *FakeCore) ServiceAccounts(namespace string) unversioned.ServiceAccountI
 	return &FakeServiceAccounts{c, namespace}
 }
 
-// GetRESTClient returns a RESTClient that is used to communicate
+// RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeCore) GetRESTClient() *restclient.RESTClient {
-	return nil
+func (c *FakeCore) RESTClient() restclient.Interface {
+	var ret *restclient.RESTClient
+	return ret
 }

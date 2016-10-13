@@ -19,6 +19,7 @@ package unversioned
 import (
 	api "k8s.io/kubernetes/pkg/api"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions"
+	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
@@ -43,13 +44,13 @@ type ThirdPartyResourceInterface interface {
 
 // thirdPartyResources implements ThirdPartyResourceInterface
 type thirdPartyResources struct {
-	client *ExtensionsClient
+	client restclient.Interface
 }
 
 // newThirdPartyResources returns a ThirdPartyResources
 func newThirdPartyResources(c *ExtensionsClient) *thirdPartyResources {
 	return &thirdPartyResources{
-		client: c,
+		client: c.RESTClient(),
 	}
 }
 

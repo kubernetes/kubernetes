@@ -19,6 +19,7 @@ package v1
 import (
 	api "k8s.io/kubernetes/pkg/api"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
+	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
@@ -43,14 +44,14 @@ type LimitRangeInterface interface {
 
 // limitRanges implements LimitRangeInterface
 type limitRanges struct {
-	client *CoreClient
+	client restclient.Interface
 	ns     string
 }
 
 // newLimitRanges returns a LimitRanges
 func newLimitRanges(c *CoreClient, namespace string) *limitRanges {
 	return &limitRanges{
-		client: c,
+		client: c.RESTClient(),
 		ns:     namespace,
 	}
 }

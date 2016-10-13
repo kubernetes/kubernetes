@@ -19,6 +19,7 @@ package v1
 import (
 	api "k8s.io/kubernetes/pkg/api"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
+	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
@@ -44,14 +45,14 @@ type PodInterface interface {
 
 // pods implements PodInterface
 type pods struct {
-	client *CoreClient
+	client restclient.Interface
 	ns     string
 }
 
 // newPods returns a Pods
 func newPods(c *CoreClient, namespace string) *pods {
 	return &pods{
-		client: c,
+		client: c.RESTClient(),
 		ns:     namespace,
 	}
 }

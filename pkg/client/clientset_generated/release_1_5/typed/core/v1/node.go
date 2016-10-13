@@ -19,6 +19,7 @@ package v1
 import (
 	api "k8s.io/kubernetes/pkg/api"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
+	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
@@ -44,13 +45,13 @@ type NodeInterface interface {
 
 // nodes implements NodeInterface
 type nodes struct {
-	client *CoreClient
+	client restclient.Interface
 }
 
 // newNodes returns a Nodes
 func newNodes(c *CoreClient) *nodes {
 	return &nodes{
-		client: c,
+		client: c.RESTClient(),
 	}
 }
 
