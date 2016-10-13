@@ -102,9 +102,8 @@ func isBind(options []string) (bool, []string) {
 func doMount(source string, target string, fstype string, options []string) error {
 	glog.V(5).Infof("Mounting %s %s %s %v", source, target, fstype, options)
 	mountArgs := makeMountArgs(source, target, fstype, options)
-	args := []string{"mount"}
-	args = append(args, mountArgs...)
-	command := exec.Command("/home/kubernetes/bin/toolbox", args...)
+	glog.V(5).Infof("About to run %s %v", "/home/kubernetes/bin/toolbox", mountArgs)
+	command := exec.Command("/home/kubernetes/bin/mounter", mountArgs...)
 	output, err := command.CombinedOutput()
 	if err != nil {
 		glog.Errorf("Mount failed: %v\nMounting arguments: %s %s %s %v\nOutput: %s\n", err, source, target, fstype, options, string(output))
