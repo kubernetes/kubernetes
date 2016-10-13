@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/certificates"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/policy"
+	"k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/labels"
 )
 
@@ -449,4 +450,21 @@ func (s *StoreToPodDisruptionBudgetLister) GetPodPodDisruptionBudgets(pod *api.P
 		err = fmt.Errorf("could not find PodDisruptionBudget for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
 	}
 	return
+}
+
+// IndexerToStorageClassLister gives an Indexer List method
+type IndexerToStorageClassLister struct {
+	Indexer
+}
+
+// List returns a list of storage classes
+func (i *IndexerToStorageClassLister) List(selector labels.Selector) ([]*storage.StorageClass, error) {
+	result := []*storage.StorageClass{}
+	for _, m := range i.Indexer.List() {
+		storageClass := m.(*storage.StorageClass)
+		if selector.Matches(labels.Set(storageClass.Labels)) {
+			result = append(result, storageClass)
+		}
+	}
+	return result, nil
 }
