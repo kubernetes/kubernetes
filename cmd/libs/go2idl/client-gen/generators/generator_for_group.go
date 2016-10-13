@@ -89,7 +89,7 @@ func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer
 		"types":                      g.types,
 		"Config":                     c.Universe.Type(types.Name{Package: pkgRESTClient, Name: "Config"}),
 		"DefaultKubernetesUserAgent": c.Universe.Function(types.Name{Package: pkgRESTClient, Name: "DefaultKubernetesUserAgent"}),
-		"RESTClient":                 c.Universe.Type(types.Name{Package: pkgRESTClient, Name: "RESTClient"}),
+		"RESTClientInterface":        c.Universe.Type(types.Name{Package: pkgRESTClient, Name: "Interface"}),
 		"RESTClientFor":              c.Universe.Function(types.Name{Package: pkgRESTClient, Name: "RESTClientFor"}),
 		"latestGroup":                c.Universe.Variable(types.Name{Package: pkgRegistered, Name: "Group"}),
 		"GroupOrDie":                 c.Universe.Variable(types.Name{Package: pkgRegistered, Name: "GroupOrDie"}),
@@ -128,7 +128,7 @@ func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer
 
 var groupInterfaceTemplate = `
 type $.Group$Interface interface {
-    GetRESTClient() *$.RESTClient|raw$
+    GetRESTClient() $.RESTClientInterface|raw$
     $range .types$ $.|publicPlural$Getter
     $end$
 }
@@ -137,7 +137,7 @@ type $.Group$Interface interface {
 var groupClientTemplate = `
 // $.Group$Client is used to interact with features provided by the $.Group$ group.
 type $.Group$Client struct {
-	*$.RESTClient|raw$
+	RESTClient $.RESTClientInterface|raw$
 }
 `
 
@@ -183,7 +183,7 @@ func NewForConfigOrDie(c *$.Config|raw$) *$.Group$Client {
 var getRESTClient = `
 // GetRESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *$.Group$Client) GetRESTClient() *$.RESTClient|raw$ {
+func (c *$.Group$Client) GetRESTClient() $.RESTClientInterface|raw$ {
 	if c == nil {
 		return nil
 	}
@@ -193,7 +193,7 @@ func (c *$.Group$Client) GetRESTClient() *$.RESTClient|raw$ {
 
 var newClientForRESTClientTemplate = `
 // New creates a new $.Group$Client for the given RESTClient.
-func New(c *$.RESTClient|raw$) *$.Group$Client {
+func New(c $.RESTClientInterface|raw$) *$.Group$Client {
 	return &$.Group$Client{c}
 }
 `
