@@ -54,12 +54,12 @@ func TestUniversalDeserializer(t *testing.T) {
 	expected := &v1.Pod{ObjectMeta: v1.ObjectMeta{Name: "test"}}
 	d := api.Codecs.UniversalDeserializer()
 	for _, mediaType := range []string{"application/json", "application/yaml", "application/vnd.kubernetes.protobuf"} {
-		e, ok := api.Codecs.SerializerForMediaType(mediaType, nil)
+		info, ok := runtime.SerializerInfoForMediaType(api.Codecs.SupportedMediaTypes(), mediaType)
 		if !ok {
 			t.Fatal(mediaType)
 		}
 		buf := &bytes.Buffer{}
-		if err := e.Encode(expected, buf); err != nil {
+		if err := info.Serializer.Encode(expected, buf); err != nil {
 			t.Fatalf("%s: %v", mediaType, err)
 		}
 		obj, _, err := d.Decode(buf.Bytes(), &unversioned.GroupVersionKind{Kind: "Pod", Version: "v1"}, nil)

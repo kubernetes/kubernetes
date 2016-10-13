@@ -312,7 +312,7 @@ func (g TestGroup) Codec() runtime.Codec {
 	if serializer.Serializer == nil {
 		return api.Codecs.LegacyCodec(g.externalGroupVersion)
 	}
-	return api.Codecs.CodecForVersions(serializer, api.Codecs.UniversalDeserializer(), unversioned.GroupVersions{g.externalGroupVersion}, nil)
+	return api.Codecs.CodecForVersions(serializer.Serializer, api.Codecs.UniversalDeserializer(), unversioned.GroupVersions{g.externalGroupVersion}, nil)
 }
 
 // NegotiatedSerializer returns the negotiated serializer for the server.
@@ -456,7 +456,7 @@ func GetCodecForObject(obj runtime.Object) (runtime.Codec, error) {
 		if !ok {
 			return nil, fmt.Errorf("no serializer registered for json")
 		}
-		return serializer, nil
+		return serializer.Serializer, nil
 	}
 	return nil, fmt.Errorf("unexpected kind: %v", kind)
 }
