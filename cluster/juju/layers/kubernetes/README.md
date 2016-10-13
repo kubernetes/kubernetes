@@ -67,7 +67,7 @@ command. At this point the charm will have two raidz pools added together, both
 of which could handle the  loss of one disk each.
 
 The storage code handles the addition of devices to the charm and when it
-recieves three disks creates a raidz pool that is mounted at the /srv/kubernetes
+receives three disks creates a raidz pool that is mounted at the /srv/kubernetes
 directory by default. If you need the storage in another location you must
 change the `mount-point` value in layer.yaml before the charms is deployed.
 
