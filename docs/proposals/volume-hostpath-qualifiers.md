@@ -105,30 +105,10 @@ Additional possible values, which are proposed to be excluded:
 |Value | Behavior | Reason for exclusion |
 |:-----|:---------|:---------------------|
 | `new-directory` | Like `auto`, but the given path must be a directory if it exists | `auto` mostly fills this use-case |
-| `character-device` |  | Granularity beyond `device` is likely to not help |
-| `block-device` |  | Granularity beyond `device` is likely to not help |
+| `character-device` |  | Granularity beyond `device` shouldn't matter often |
+| `block-device` |  | Granularity beyond `device` shouldn't matter often |
 | `new-file` | Like file, but if nothing exist an empty file is created instead | In general, bindmounting the parent directory of the file you intend to create addresses this usecase |
-| `optional` | If a path does not exist, then do not create any bindmount at all | This would better be handled by a new option entirely if this behavior is desirable |
-
-
-### Volume SubPaths
-
-Volumes may also have a `subPath` specified, which similarly may or may not
-exist. I similarly propose that the
-[v1.VolumeMount](https://github.com/kubernetes/kubernetes/blob/d26b4ca2859aa667ad520fb9518e0db67b74216a/pkg/api/types.go#L886-L897)
-type be augmented with a `SubPathType` field which the exact same semantics as
-above.
-While I propose exposing the same set of possible values for consistency, in
-reality a `SubPath` is useful primarily under a network mount. Because of this,
-the `device` and `socket` values would likely not be useful.
-
-I do not have any examples of concrete examples from the Kubernetes project for
-this, in part because there are very few examples of `SubPath` to begin with.
-However, each of the use-cases described for Host Volumes also could
-conceivably occur as subdirectories of a network mount using this feature, and
-thus still offer insight into why it would be of value.
-
-<!-- uncomment if this comes up :) An argument against providing this feature for SubPaths is that it might not increase correctness as much; while adding such qualifications to Host volumes allows a pod to express a dependency that the node may not meet, adding it to subPath allows the pod to express an assumption about a given filesystem it's mounting. This assumption is not node specific and, when it fails, likely means the given volume was not pre-populated/provisioned appropriately. It's arguable whether this sort of failure is as likely or as important to handle well. -->
+| `optional` | If a path does not exist, then do not create any container-mount at all | This would better be handled by a new field entirely if this behavior is desirable |
 
 
 ### Why not as part of any other volume types?
