@@ -117,3 +117,4 @@ kubernetes.tar.gz
 !\.drone\.sec
 
 /bazel-*
+*.pyc
