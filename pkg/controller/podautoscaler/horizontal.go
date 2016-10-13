@@ -265,9 +265,12 @@ func (a *HorizontalController) reconcileAutoscaler(hpa *autoscaling.HorizontalPo
 	rescaleReason := ""
 	timestamp := time.Now()
 
+	rescale := true
+
 	if scale.Spec.Replicas == 0 {
 		// Autoscaling is disabled for this resource
 		desiredReplicas = 0
+		rescale = false
 	} else if currentReplicas > hpa.Spec.MaxReplicas {
 		rescaleReason = "Current number of replicas above Spec.MaxReplicas"
 		desiredReplicas = hpa.Spec.MaxReplicas
@@ -329,9 +332,10 @@ func (a *HorizontalController) reconcileAutoscaler(hpa *autoscaling.HorizontalPo
 		if desiredReplicas > hpa.Spec.MaxReplicas {
 			desiredReplicas = hpa.Spec.MaxReplicas
 		}
+
+		rescale = shouldScale(hpa, currentReplicas, desiredReplicas, timestamp)
 	}
 
-	rescale := shouldScale(hpa, currentReplicas, desiredReplicas, timestamp)
 	if rescale {
 		scale.Spec.Replicas = desiredReplicas
 		_, err = a.scaleNamespacer.Scales(hpa.Namespace).Update(hpa.Spec.ScaleTargetRef.Kind, scale)
