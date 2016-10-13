@@ -25,8 +25,8 @@ import (
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubenode "k8s.io/kubernetes/cmd/kubeadm/app/node"
+	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
 var (
@@ -43,12 +43,13 @@ var (
 // NewCmdJoin returns "kubeadm join" command.
 func NewCmdJoin(out io.Writer) *cobra.Command {
 	cfg := &kubeadmapi.NodeConfiguration{}
+	var skipPreFlight bool
 	cmd := &cobra.Command{
 		Use:   "join",
 		Short: "Run this on any machine you wish to join an existing cluster.",
 		Run: func(cmd *cobra.Command, args []string) {
-			err := RunJoin(out, cmd, args, cfg)
-			cmdutil.CheckErr(err)
+			err := RunJoin(out, cmd, args, cfg, skipPreFlight)
+			kubeadmutil.CheckErr(err)
 		},
 	}
 
@@ -57,12 +58,27 @@ func NewCmdJoin(out io.Writer) *cobra.Command {
 		"(required) Shared secret used to secure bootstrap. Must match the output of 'kubeadm init'",
 	)
 
+	cmd.PersistentFlags().BoolVar(
+		&skipPreFlight, "skip-preflight-checks", false,
+		"skip preflight checks normally run before modifying the system",
+	)
+
 	return cmd
 }
 
 // RunJoin executes worked node provisioning and tries to join an existing cluster.
-func RunJoin(out io.Writer, cmd *cobra.Command, args []string, s *kubeadmapi.NodeConfiguration) error {
+func RunJoin(out io.Writer, cmd *cobra.Command, args []string, s *kubeadmapi.NodeConfiguration, skipPreFlight bool) error {
 	// TODO(phase1+) this we are missing args from the help text, there should be a way to tell cobra about it
+	if !skipPreFlight {
+		fmt.Println("Running pre-flight checks")
+		err := preflight.RunJoinNodeChecks()
+		if err != nil {
+			return err
+		}
+	} else {
+		fmt.Println("Skipping pre-flight checks")
+	}
+
 	if len(args) == 0 {
 		return fmt.Errorf("<cmd/join> must specify master IP address (see --help)")
 	}
