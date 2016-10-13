@@ -58,7 +58,7 @@ func newConsulStorage(c storagebackend.Config) (storage.Interface, func(), error
 		//TODO: do something here
 	}
 
-	return consul.NewConsulStorage(*consulClient, c.Codec, c.Prefix, *clientConfig), destroyFunc, nil
+	return consul.NewConsulStorage(*consulClient, c.Codec, c.Prefix, c.Quorum, *clientConfig), destroyFunc, nil
 }
 
 func getConsulAPIConfig(server *url.URL, KeyFile, CertFile, CAFile string) *consulapi.Config {

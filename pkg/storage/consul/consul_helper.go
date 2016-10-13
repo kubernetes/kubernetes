@@ -52,6 +52,7 @@ type consulHelper struct {
 	codec              runtime.Codec
 	consulKv           *consulapi.KV
 	versioner          storage.Versioner
+	quorum             bool
 	pathPrefix         string
 	eventHistoryPrefix string
 }
@@ -67,7 +68,7 @@ func init() {
 	gob.Register(api.Pod{})
 }
 
-func NewConsulStorage(client consulapi.Client, codec runtime.Codec, prefix string, config consulapi.Config) storage.Interface {
+func NewConsulStorage(client consulapi.Client, codec runtime.Codec, prefix string, quorum bool, config consulapi.Config) storage.Interface {
 	//ensure we have some prefix otherwise watcher on / will fail because this results in an empty key to watch
 	if prefix == "" {
 		prefix = fmt.Sprintf("pref%d", rand.Intn(800000))
@@ -79,6 +80,7 @@ func NewConsulStorage(client consulapi.Client, codec runtime.Codec, prefix strin
 		consulKv:           client.KV(),
 		versioner:          etcd.APIObjectVersioner{},
 		pathPrefix:         path.Join("/", prefix),
+		quorum:             quorum,
 		eventHistoryPrefix: "past_events",
 	}
 }
@@ -159,8 +161,13 @@ func (h *consulHelper) Create(ctx context.Context, key string, obj, out runtime.
 	}
 	trace.Step("Version checked")
 
+	queryOpt := &consulapi.QueryOptions{}
+	if h.quorum == true {
+		queryOpt.RequireConsistent = true
+	}
+
 	//check if key already exists
-	storedPair, _, err := h.consulKv.Get(key, nil)
+	storedPair, _, err := h.consulKv.Get(key, queryOpt)
 	if err != nil {
 		return toStorageErr(err, key, 0)
 	}
@@ -182,7 +189,7 @@ func (h *consulHelper) Create(ctx context.Context, key string, obj, out runtime.
 		return toStorageErr(err, key, 0)
 	}
 
-	storedPair, _, err = h.consulKv.Get(key, nil)
+	storedPair, _, err = h.consulKv.Get(key, queryOpt)
 	if err != nil {
 		return toStorageErr(err, key, 0)
 	}
@@ -211,7 +218,13 @@ func (h *consulHelper) Get(ctx context.Context, key string, out runtime.Object, 
 
 	key = h.prefixConsulKey(key)
 	key = h.transformKeyName(key)
-	kv, _, err := h.consulKv.Get(key, nil)
+
+	queryOpt := &consulapi.QueryOptions{}
+	if h.quorum == true {
+		queryOpt.RequireConsistent = true
+	}
+
+	kv, _, err := h.consulKv.Get(key, queryOpt)
 	metrics.RecordConsulRequestLatency("get", getTypeName(out), startTime)
 	if err != nil {
 		return toStorageErr(err, key, 0)
@@ -233,8 +246,13 @@ func (h *consulHelper) Delete(ctx context.Context, key string, out runtime.Objec
 		panic("unable to convert output object to pointer: " + err.Error())
 	}
 
+	queryOpt := &consulapi.QueryOptions{}
+	if h.quorum == true {
+		queryOpt.RequireConsistent = true
+	}
+
 	if preconditions == nil {
-		kv, _, err := h.consulKv.Get(key, &consulapi.QueryOptions{})
+		kv, _, err := h.consulKv.Get(key, queryOpt)
 		if err != nil {
 			return toStorageErr(err, key, 0)
 		}
@@ -263,7 +281,7 @@ func (h *consulHelper) Delete(ctx context.Context, key string, out runtime.Objec
 	for {
 		// empty QueryOptions is explicitly setting AllowStale to false
 		startTime := time.Now()
-		kv, _, err := h.consulKv.Get(key, &consulapi.QueryOptions{})
+		kv, _, err := h.consulKv.Get(key, queryOpt)
 		metrics.RecordConsulRequestLatency("get", getTypeName(out), startTime)
 		if err != nil {
 			return toStorageErr(err, key, 0)
@@ -351,8 +369,13 @@ func (h *consulHelper) GetToList(ctx context.Context, key string, pred storage.S
 	key = h.prefixConsulKey(key)
 	key = h.transformKeyName(key)
 
+	queryOpt := &consulapi.QueryOptions{}
+	if h.quorum == true {
+		queryOpt.RequireConsistent = true
+	}
+
 	trace.Step("About ot read from Consul KV")
-	kv, _, err := h.consulKv.Get(key, nil)
+	kv, _, err := h.consulKv.Get(key, queryOpt)
 	trace.Step("Consul KV read")
 	metrics.RecordConsulRequestLatency("get", getTypeName(listPtr), startTime)
 	if err != nil {
@@ -392,9 +415,14 @@ func (h *consulHelper) GuaranteedUpdate(ctx context.Context, key string, ptrToTy
 	key = h.prefixConsulKey(key)
 	key = h.transformKeyName(key)
 
+	queryOpt := &consulapi.QueryOptions{}
+	if h.quorum == true {
+		queryOpt.RequireConsistent = true
+	}
+
 	for {
 		startTime := time.Now()
-		kv, _, err := h.consulKv.Get(key, nil)
+		kv, _, err := h.consulKv.Get(key, queryOpt)
 		metrics.RecordConsulRequestLatency("get", getTypeName(v), startTime)
 		if err != nil {
 			return toStorageErr(err, key, 0)
@@ -457,7 +485,7 @@ func (h *consulHelper) GuaranteedUpdate(ctx context.Context, key string, ptrToTy
 
 			//retrieve value from consul again because the Put call does not return the added KVPair
 			startTime = time.Now()
-			addedKV, _, err := h.consulKv.Get(key, nil)
+			addedKV, _, err := h.consulKv.Get(key, queryOpt)
 			metrics.RecordConsulRequestLatency("get", getTypeName(v), startTime)
 			if err != nil {
 				glog.Infof("Error getting new key in GuaranteeUpdaed: %v", err)
@@ -485,7 +513,7 @@ func (h *consulHelper) GuaranteedUpdate(ctx context.Context, key string, ptrToTy
 		}
 
 		startTime = time.Now()
-		kvPair, _, err = h.consulKv.Get(key, nil)
+		kvPair, _, err = h.consulKv.Get(key, queryOpt)
 		metrics.RecordConsulRequestLatency("get", getTypeName(v), startTime)
 		if err != nil {
 			return toStorageErr(err, key, 0)
@@ -523,7 +551,12 @@ func (h *consulHelper) listInternal(fnName string, key string, filter storage.Fi
 		return 0, err
 	}
 
-	kvPairs, queryMeta, err := h.consulKv.List(key, nil)
+	queryOpt := &consulapi.QueryOptions{}
+	if h.quorum == true {
+		queryOpt.RequireConsistent = true
+	}
+
+	kvPairs, queryMeta, err := h.consulKv.List(key, queryOpt)
 
 	// TODO: record metrics
 	if err != nil {

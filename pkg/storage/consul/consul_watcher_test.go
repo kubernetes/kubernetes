@@ -35,8 +35,8 @@ import (
 	consulapi "github.com/hashicorp/consul/api"
 )
 
-func newConsulHelper(client consulapi.Client, codec runtime.Codec, prefix string, config consulapi.Config) consulHelper {
-	return *NewConsulStorage(client, codec, prefix, config).(*consulHelper)
+func newConsulHelper(client consulapi.Client, codec runtime.Codec, prefix string, quorum bool, config consulapi.Config) consulHelper {
+	return *NewConsulStorage(client, codec, prefix, quorum, config).(*consulHelper)
 }
 
 func TestOldWatcherEvents(t *testing.T) {
@@ -44,7 +44,7 @@ func TestOldWatcherEvents(t *testing.T) {
 	server := consultesting.NewConsulTestClientServer(t)
 	defer server.Terminate(t)
 	key := "/some/key"
-	h := newConsulHelper(*server.Client, codec, consultest.PathPrefix(), *server.ClientConfig)
+	h := newConsulHelper(*server.Client, codec, consultest.PathPrefix(), true, *server.ClientConfig)
 
 	// Test normal case
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
