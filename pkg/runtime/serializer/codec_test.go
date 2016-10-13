@@ -252,7 +252,7 @@ func TestTypes(t *testing.T) {
 func TestVersionedEncoding(t *testing.T) {
 	s, _ := GetTestScheme()
 	cf := newCodecFactory(s, newSerializersForScheme(s, testMetaFactory{}))
-	encoder, _ := cf.SerializerForFileExtension("json")
+	encoder, _ := runtime.SerializerInfoForMediaType(cf, runtime.ContentTypeJSON)
 
 	codec := cf.CodecForVersions(encoder, nil, unversioned.GroupVersion{Version: "v2"}, nil)
 	out, err := runtime.Encode(codec, &TestType1{})
@@ -415,7 +415,7 @@ func GetDirectCodecTestScheme() *runtime.Scheme {
 func TestDirectCodec(t *testing.T) {
 	s := GetDirectCodecTestScheme()
 	cf := newCodecFactory(s, newSerializersForScheme(s, testMetaFactory{}))
-	serializer, _ := cf.SerializerForFileExtension("json")
+	serializer, _ := runtime.SerializerInfoForMediaType(cf, runtime.ContentTypeJSON)
 	df := DirectCodecFactory{cf}
 	ignoredGV, err := unversioned.ParseGroupVersion("ignored group/ignored version")
 	if err != nil {

@@ -199,6 +199,15 @@ func (s base64Serializer) Decode(data []byte, defaults *unversioned.GroupVersion
 	return s.Serializer.Decode(out[:n], defaults, into)
 }
 
+func SerializerInfoForMediaType(ns NegotiatedSerializer, mediaType string) (SerializerInfo, bool) {
+	for _, info := range ns.SupportedMediaTypes() {
+		if info.MediaType == mediaType {
+			return info, true
+		}
+	}
+	return SerializerInfo{}, false
+}
+
 var (
 	// InternalGroupVersioner will always prefer the internal version for a given group version kind.
 	InternalGroupVersioner GroupVersioner = internalGroupVersioner{}
