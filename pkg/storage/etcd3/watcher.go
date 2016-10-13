@@ -158,7 +158,7 @@ func (wc *watchChan) sync() error {
 	wc.initialRev = getResp.Header.Revision
 
 	for _, kv := range getResp.Kvs {
-		prevResp, err := wc.watcher.client.Get(wc.ctx, string(kv.Key), clientv3.WithRev(kv.ModRevision-1))
+		prevResp, err := wc.watcher.client.Get(wc.ctx, string(kv.Key), clientv3.WithRev(kv.ModRevision-1), clientv3.WithSerializable())
 		if err != nil {
 			return err
 		}
