@@ -24,6 +24,7 @@ type MasterConfiguration struct {
 	Secrets           Secrets    `json:"secrets"`
 	API               API        `json:"api"`
 	Etcd              Etcd       `json:"etcd"`
+	Discovery         Discovery  `json:"discovery"`
 	Networking        Networking `json:"networking"`
 	KubernetesVersion string     `json:"kubernetesVersion"`
 	CloudProvider     string     `json:"cloudProvider"`
@@ -32,6 +33,11 @@ type MasterConfiguration struct {
 type API struct {
 	AdvertiseAddresses []string `json:"advertiseAddresses"`
 	ExternalDNSNames   []string `json:"externalDNSNames"`
+	BindPort           int32    `json:"bindPort"`
+}
+
+type Discovery struct {
+	BindPort int32 `json:"bindPort"`
 }
 
 type Networking struct {
@@ -59,6 +65,8 @@ type NodeConfiguration struct {
 
 	MasterAddresses []string `json:"masterAddresses"`
 	Secrets         Secrets  `json:"secrets"`
+	APIPort         int32    `json:"apiPort"`
+	DiscoveryPort   int32    `json:"discoveryPort"`
 }
 
 // ClusterInfo TODO add description

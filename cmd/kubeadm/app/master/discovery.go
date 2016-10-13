@@ -48,7 +48,7 @@ func encodeKubeDiscoverySecretData(s *kubeadmapi.MasterConfiguration, caCert *x5
 	)
 
 	for _, addr := range s.API.AdvertiseAddresses {
-		endpointList = append(endpointList, fmt.Sprintf("https://%s:443", addr))
+		endpointList = append(endpointList, fmt.Sprintf("https://%s:%d", addr, s.API.BindPort))
 	}
 
 	tokenMap[s.Secrets.TokenID] = s.Secrets.BearerToken
@@ -60,7 +60,7 @@ func encodeKubeDiscoverySecretData(s *kubeadmapi.MasterConfiguration, caCert *x5
 	return data
 }
 
-func newKubeDiscoveryPodSpec() api.PodSpec {
+func newKubeDiscoveryPodSpec(s *kubeadmapi.MasterConfiguration) api.PodSpec {
 	envParams := kubeadmapi.GetEnvParams()
 	return api.PodSpec{
 		// We have to use host network namespace, as `HostPort`/`HostIP` are Docker's
@@ -80,7 +80,7 @@ func newKubeDiscoveryPodSpec() api.PodSpec {
 			Ports: []api.ContainerPort{
 				// TODO when CNI issue (#31307) is resolved, we should consider adding
 				// `HostIP: s.API.AdvertiseAddrs[0]`, if there is only one address`
-				{Name: "http", ContainerPort: 9898, HostPort: 9898},
+				{Name: "http", ContainerPort: kubeadmapi.DefaultDiscoveryBindPort, HostPort: s.Discovery.BindPort},
 			},
 			SecurityContext: &api.SecurityContext{
 				SELinuxOptions: &api.SELinuxOptions{
@@ -103,7 +103,7 @@ func newKubeDiscoveryPodSpec() api.PodSpec {
 
 func newKubeDiscovery(s *kubeadmapi.MasterConfiguration, caCert *x509.Certificate) kubeDiscovery {
 	kd := kubeDiscovery{
-		Deployment: NewDeployment(kubeDiscoveryName, 1, newKubeDiscoveryPodSpec()),
+		Deployment: NewDeployment(kubeDiscoveryName, 1, newKubeDiscoveryPodSpec(s)),
 		Secret: &api.Secret{
 			ObjectMeta: api.ObjectMeta{Name: kubeDiscoverySecretName},
 			Type:       api.SecretTypeOpaque,

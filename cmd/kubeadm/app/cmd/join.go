@@ -57,6 +57,16 @@ func NewCmdJoin(out io.Writer) *cobra.Command {
 		"(required) Shared secret used to secure bootstrap. Must match the output of 'kubeadm init'",
 	)
 
+	cmd.PersistentFlags().Int32Var(
+		&cfg.APIPort, "api-port", kubeadmapi.DefaultAPIBindPort,
+		"(optional) API server port on the master",
+	)
+
+	cmd.PersistentFlags().Int32Var(
+		&cfg.DiscoveryPort, "discovery-port", kubeadmapi.DefaultDiscoveryBindPort,
+		"(optional) Discovery port on the master",
+	)
+
 	return cmd
 }
 
