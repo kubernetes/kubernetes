@@ -78,7 +78,7 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 	)
 	cmd.PersistentFlags().StringVar(
 		&cfg.Networking.ServiceSubnet, "service-cidr", kubeadmapi.DefaultServicesSubnet,
-		"Use alterantive range of IP address for service VIPs",
+		"Use alternative range of IP address for service VIPs",
 	)
 	cmd.PersistentFlags().StringVar(
 		&cfg.Networking.PodSubnet, "pod-network-cidr", "",
