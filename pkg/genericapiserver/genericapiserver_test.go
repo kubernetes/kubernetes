@@ -41,6 +41,7 @@ import (
 	ipallocator "k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
+	"k8s.io/kubernetes/pkg/util/sets"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -55,7 +56,7 @@ func setUp(t *testing.T) (*etcdtesting.EtcdTestServer, Config, *assert.Assertion
 	config.ProxyDialer = func(network, addr string) (net.Conn, error) { return nil, nil }
 	config.ProxyTLSClientConfig = &tls.Config{}
 	config.Serializer = api.Codecs
-	config.APIPrefix = "/api"
+	config.LegacyAPIGroupPrefixes = sets.NewString("/api")
 	config.APIGroupPrefix = "/apis"
 
 	return etcdServer, config, assert.New(t)
@@ -79,7 +80,7 @@ func TestNew(t *testing.T) {
 
 	// Verify many of the variables match their config counterparts
 	assert.Equal(s.enableSwaggerSupport, config.EnableSwaggerSupport)
-	assert.Equal(s.legacyAPIPrefix, config.APIPrefix)
+	assert.Equal(s.legacyAPIGroupPrefixes, config.LegacyAPIGroupPrefixes)
 	assert.Equal(s.apiPrefix, config.APIGroupPrefix)
 	assert.Equal(s.admissionControl, config.AdmissionControl)
 	assert.Equal(s.RequestContextMapper(), config.RequestContextMapper)
@@ -105,7 +106,7 @@ func TestInstallAPIGroups(t *testing.T) {
 	etcdserver, config, assert := setUp(t)
 	defer etcdserver.Terminate(t)
 
-	config.APIPrefix = "/apiPrefix"
+	config.LegacyAPIGroupPrefixes = sets.NewString("/apiPrefix")
 	config.APIGroupPrefix = "/apiGroupPrefix"
 
 	s, err := config.Complete().New()
@@ -115,15 +116,15 @@ func TestInstallAPIGroups(t *testing.T) {
 
 	apiGroupMeta := registered.GroupOrDie(api.GroupName)
 	extensionsGroupMeta := registered.GroupOrDie(extensions.GroupName)
+	s.InstallLegacyAPIGroup("/apiPrefix", &APIGroupInfo{
+		// legacy group version
+		GroupMeta:                    *apiGroupMeta,
+		VersionedResourcesStorageMap: map[string]map[string]rest.Storage{},
+		ParameterCodec:               api.ParameterCodec,
+		NegotiatedSerializer:         api.Codecs,
+	})
+
 	apiGroupsInfo := []APIGroupInfo{
-		{
-			// legacy group version
-			GroupMeta:                    *apiGroupMeta,
-			VersionedResourcesStorageMap: map[string]map[string]rest.Storage{},
-			IsLegacyGroup:                true,
-			ParameterCodec:               api.ParameterCodec,
-			NegotiatedSerializer:         api.Codecs,
-		},
 		{
 			// extensions group version
 			GroupMeta:                    *extensionsGroupMeta,
@@ -141,9 +142,9 @@ func TestInstallAPIGroups(t *testing.T) {
 	defer server.Close()
 	validPaths := []string{
 		// "/api"
-		config.APIPrefix,
+		config.LegacyAPIGroupPrefixes.List()[0],
 		// "/api/v1"
-		config.APIPrefix + "/" + apiGroupMeta.GroupVersion.Version,
+		config.LegacyAPIGroupPrefixes.List()[0] + "/" + apiGroupMeta.GroupVersion.Version,
 		// "/apis/extensions"
 		config.APIGroupPrefix + "/" + extensionsGroupMeta.GroupVersion.Group,
 		// "/apis/extensions/v1beta1"
@@ -224,7 +225,7 @@ func TestNotRestRoutesHaveAuth(t *testing.T) {
 
 	authz := mockAuthorizer{}
 
-	config.APIPrefix = "/apiPrefix"
+	config.LegacyAPIGroupPrefixes = sets.NewString("/apiPrefix")
 	config.APIGroupPrefix = "/apiGroupPrefix"
 	config.Authorizer = &authz
 

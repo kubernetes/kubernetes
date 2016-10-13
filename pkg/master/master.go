@@ -135,8 +135,6 @@ type Master struct {
 
 	// nodeClient is used to back the tunneler
 	nodeClient coreclient.NodeInterface
-
-	restOptionsFactory restOptionsFactory
 }
 
 // thirdPartyEntry combines objects storage and API group into one struct
@@ -209,31 +207,33 @@ func (c completedConfig) New() (*Master, error) {
 		nodeClient:              coreclient.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig).Nodes(),
 
 		disableThirdPartyControllerForTesting: c.disableThirdPartyControllerForTesting,
+	}
 
-		restOptionsFactory: restOptionsFactory{
-			deleteCollectionWorkers: c.DeleteCollectionWorkers,
-			enableGarbageCollection: c.GenericConfig.EnableGarbageCollection,
-			storageFactory:          c.StorageFactory,
-		},
+	restOptionsFactory := restOptionsFactory{
+		deleteCollectionWorkers: c.DeleteCollectionWorkers,
+		enableGarbageCollection: c.GenericConfig.EnableGarbageCollection,
+		storageFactory:          c.StorageFactory,
 	}
 
 	if c.EnableWatchCache {
-		m.restOptionsFactory.storageDecorator = registry.StorageWithCacher
+		restOptionsFactory.storageDecorator = registry.StorageWithCacher
 	} else {
-		m.restOptionsFactory.storageDecorator = generic.UndecoratedStorage
+		restOptionsFactory.storageDecorator = generic.UndecoratedStorage
 	}
 
 	// install legacy rest storage
-	// because of other hacks, this always has to come first
-	legacyRESTStorageProvider := corerest.LegacyRESTStorageProvider{
-		StorageFactory:            c.StorageFactory,
-		ProxyTransport:            s.ProxyTransport,
-		KubeletClient:             c.KubeletClient,
-		EventTTL:                  c.EventTTL,
-		ServiceClusterIPRange:     c.GenericConfig.ServiceClusterIPRange,
-		ServiceNodePortRange:      c.GenericConfig.ServiceNodePortRange,
-		ComponentStatusServerFunc: func() map[string]apiserver.Server { return getServersToValidate(c.StorageFactory) },
-		LoopbackClientConfig:      c.GenericConfig.LoopbackClientConfig,
+	if c.GenericConfig.APIResourceConfigSource.AnyResourcesForVersionEnabled(apiv1.SchemeGroupVersion) {
+		legacyRESTStorageProvider := corerest.LegacyRESTStorageProvider{
+			StorageFactory:            c.StorageFactory,
+			ProxyTransport:            s.ProxyTransport,
+			KubeletClient:             c.KubeletClient,
+			EventTTL:                  c.EventTTL,
+			ServiceClusterIPRange:     c.GenericConfig.ServiceClusterIPRange,
+			ServiceNodePortRange:      c.GenericConfig.ServiceNodePortRange,
+			ComponentStatusServerFunc: func() map[string]apiserver.Server { return getServersToValidate(c.StorageFactory) },
+			LoopbackClientConfig:      c.GenericConfig.LoopbackClientConfig,
+		}
+		m.InstallLegacyAPI(c.Config, restOptionsFactory.NewFor, legacyRESTStorageProvider)
 	}
 
 	// Add some hardcoded storage for now.  Append to the map.
@@ -253,11 +253,29 @@ func (c completedConfig) New() (*Master, error) {
 	c.RESTStorageProviders[policy.GroupName] = policyrest.RESTStorageProvider{}
 	c.RESTStorageProviders[rbac.GroupName] = &rbacrest.RESTStorageProvider{AuthorizerRBACSuperUser: c.GenericConfig.AuthorizerRBACSuperUser}
 	c.RESTStorageProviders[storage.GroupName] = storagerest.RESTStorageProvider{}
-	m.InstallAPIs(c.Config, legacyRESTStorageProvider)
+	m.InstallAPIs(c.Config, restOptionsFactory.NewFor)
 
 	m.InstallGeneralEndpoints(c.Config)
 
 	return m, nil
+}
+
+func (m *Master) InstallLegacyAPI(c *Config, restOptionsGetter genericapiserver.RESTOptionsGetter, legacyRESTStorageProvider corerest.LegacyRESTStorageProvider) {
+	legacyRESTStorage, apiGroupInfo, err := legacyRESTStorageProvider.NewLegacyRESTStorage(restOptionsGetter)
+	if err != nil {
+		glog.Fatalf("Error building core storage: %v", err)
+	}
+
+	if c.EnableCoreControllers {
+		bootstrapController := c.NewBootstrapController(legacyRESTStorage)
+		if err := m.GenericAPIServer.AddPostStartHook("bootstrap-controller", bootstrapController.PostStartHook); err != nil {
+			glog.Fatalf("Error registering PostStartHook %q: %v", "bootstrap-controller", err)
+		}
+	}
+
+	if err := m.GenericAPIServer.InstallLegacyAPIGroup(genericapiserver.LegacyAPIPrefix, &apiGroupInfo); err != nil {
+		glog.Fatalf("Error in registering group versions: %v", err)
+	}
 }
 
 // TODO this needs to be refactored so we have a way to add general health checks to genericapiserver
@@ -283,29 +301,8 @@ func (m *Master) InstallGeneralEndpoints(c *Config) {
 
 }
 
-func (m *Master) InstallAPIs(c *Config, legacyRESTStorageProvider corerest.LegacyRESTStorageProvider) {
-	restOptionsGetter := func(resource unversioned.GroupResource) generic.RESTOptions {
-		return m.restOptionsFactory.NewFor(resource)
-	}
-
+func (m *Master) InstallAPIs(c *Config, restOptionsGetter genericapiserver.RESTOptionsGetter) {
 	apiGroupsInfo := []genericapiserver.APIGroupInfo{}
-
-	// Install v1 unless disabled.
-	if c.GenericConfig.APIResourceConfigSource.AnyResourcesForVersionEnabled(apiv1.SchemeGroupVersion) {
-		legacyRESTStorage, apiGroupInfo, err := legacyRESTStorageProvider.NewLegacyRESTStorage(restOptionsGetter)
-		if err != nil {
-			glog.Fatalf("Error building core storage: %v", err)
-		}
-
-		if c.EnableCoreControllers {
-			bootstrapController := c.NewBootstrapController(legacyRESTStorage)
-			if err := m.GenericAPIServer.AddPostStartHook("bootstrap-controller", bootstrapController.PostStartHook); err != nil {
-				glog.Fatalf("Error registering PostStartHook %q: %v", "bootstrap-controller", err)
-			}
-		}
-
-		apiGroupsInfo = append(apiGroupsInfo, apiGroupInfo)
-	}
 
 	// Install third party resource support if requested
 	// TODO seems like this bit ought to be unconditional and the REST API is controlled by the config
