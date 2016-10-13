@@ -55,6 +55,31 @@ i.e. All nodes are down simultaneously (Say, massive power failure in a bare met
 
 ## Main proposal
 
+Kubelet will maintain a persistent store on disk (boltdb), containing:
+* all pod manifests scheduled to the node
+* all configmaps referenced by the above
+* all secrets referenced by the above
+
+When a pod addition, change, or delete is noticed, it's persisted first and then acted upon.
+
+During startup, if the database file does not exist:
+* The database file is created
+* Kubelet waits for the apiserver in `allSourcesReady` as normal
+If the database file does exist:
+* The internal store is populated from the persisted manifests
+* The apiserver source is marked as ready
+* kubelet proceeds to create the pods, when the apiserver is reachable things proceed as normal, as if kubelet had been connected to the apiserver all along.
+
+### Implementation details
+
+* Add `Checkpointing=true|false (ALPHA - default=false)` to `--feature-gates`
+* Store file will be at <root_dir>/checkpoint-store.db
+
+### Concerns
+
+@aaronlevy: Secrets will be persisted to disk. Is this ok? (Currently during operation they only end up in tmpfs mounts)
+Possible option: encrypt/decrypt using the kubelet's private key material. Presumably if the operator needs to they will have made that private key material secure.
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/proposals/kubelet-checkpointing.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
