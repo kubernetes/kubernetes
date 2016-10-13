@@ -493,46 +493,28 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			}
 		},
 		PortsForObject: func(object runtime.Object) ([]string, error) {
-			// TODO: replace with a swagger schema based approach (identify pod selector via schema introspection)
-			switch t := object.(type) {
-			case *api.ReplicationController:
-				return getPorts(t.Spec.Template.Spec), nil
-			case *api.Pod:
-				return getPorts(t.Spec), nil
-			case *api.Service:
-				return getServicePorts(t.Spec), nil
-			case *extensions.Deployment:
-				return getPorts(t.Spec.Template.Spec), nil
-			case *extensions.ReplicaSet:
-				return getPorts(t.Spec.Template.Spec), nil
-			default:
-				gvks, _, err := api.Scheme.ObjectKinds(object)
-				if err != nil {
-					return nil, err
-				}
-				return nil, fmt.Errorf("cannot extract ports from %v", gvks[0])
+			if podSpecer, ok := object.(api.PodSpecer); ok {
+				podSpec, _ := podSpecer.PodSpec()
+				return getPorts(*podSpec), nil
 			}
+
+			gvks, _, err := api.Scheme.ObjectKinds(object)
+			if err != nil {
+				return nil, err
+			}
+			return nil, fmt.Errorf("cannot extract ports from %v", gvks[0])
 		},
 		ProtocolsForObject: func(object runtime.Object) (map[string]string, error) {
-			// TODO: replace with a swagger schema based approach (identify pod selector via schema introspection)
-			switch t := object.(type) {
-			case *api.ReplicationController:
-				return getProtocols(t.Spec.Template.Spec), nil
-			case *api.Pod:
-				return getProtocols(t.Spec), nil
-			case *api.Service:
-				return getServiceProtocols(t.Spec), nil
-			case *extensions.Deployment:
-				return getProtocols(t.Spec.Template.Spec), nil
-			case *extensions.ReplicaSet:
-				return getProtocols(t.Spec.Template.Spec), nil
-			default:
-				gvks, _, err := api.Scheme.ObjectKinds(object)
-				if err != nil {
-					return nil, err
-				}
-				return nil, fmt.Errorf("cannot extract protocols from %v", gvks[0])
+			if podSpecer, ok := object.(api.PodSpecer); ok {
+				podSpec, _ := podSpecer.PodSpec()
+				return getProtocols(*podSpec), nil
 			}
+
+			gvks, _, err := api.Scheme.ObjectKinds(object)
+			if err != nil {
+				return nil, err
+			}
+			return nil, fmt.Errorf("cannot extract protocols from %v", gvks[0])
 		},
 		LabelsForObject: func(object runtime.Object) (map[string]string, error) {
 			return meta.NewAccessor().Labels(object)
@@ -786,28 +768,12 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 		},
 		// UpdatePodSpecForObject update the pod specification for the provided object
 		UpdatePodSpecForObject: func(obj runtime.Object, fn func(*api.PodSpec) error) (bool, error) {
-			// TODO: replace with a swagger schema based approach (identify pod template via schema introspection)
-			switch t := obj.(type) {
-			case *api.Pod:
-				return true, fn(&t.Spec)
-			case *api.ReplicationController:
-				if t.Spec.Template == nil {
-					t.Spec.Template = &api.PodTemplateSpec{}
-				}
-				return true, fn(&t.Spec.Template.Spec)
-			case *extensions.Deployment:
-				return true, fn(&t.Spec.Template.Spec)
-			case *extensions.DaemonSet:
-				return true, fn(&t.Spec.Template.Spec)
-			case *extensions.ReplicaSet:
-				return true, fn(&t.Spec.Template.Spec)
-			case *apps.PetSet:
-				return true, fn(&t.Spec.Template.Spec)
-			case *batch.Job:
-				return true, fn(&t.Spec.Template.Spec)
-			default:
-				return false, fmt.Errorf("the object is not a pod or does not have a pod template")
+			if podSpecer, ok := obj.(api.PodSpecer); ok {
+				podSpec, _ := podSpecer.PodSpec()
+				return true, fn(podSpec)
 			}
+
+			return false, fmt.Errorf("the object is not a pod or does not have a pod template")
 		},
 		EditorEnvs: func() []string {
 			return []string{"KUBE_EDITOR", "EDITOR"}
