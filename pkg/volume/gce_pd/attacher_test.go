@@ -148,7 +148,7 @@ func TestAttachDetach(t *testing.T) {
 			detach:         detachCall{diskName, nodeName, nil},
 			test: func(testcase *testcase) error {
 				detacher := newDetacher(testcase)
-				return detacher.Detach(diskName, nodeName)
+				return detacher.Detach(nil, diskName, nodeName)
 			},
 		},
 
@@ -158,7 +158,7 @@ func TestAttachDetach(t *testing.T) {
 			diskIsAttached: diskIsAttachedCall{diskName, nodeName, false, nil},
 			test: func(testcase *testcase) error {
 				detacher := newDetacher(testcase)
-				return detacher.Detach(diskName, nodeName)
+				return detacher.Detach(nil, diskName, nodeName)
 			},
 		},
 
@@ -169,7 +169,7 @@ func TestAttachDetach(t *testing.T) {
 			detach:         detachCall{diskName, nodeName, nil},
 			test: func(testcase *testcase) error {
 				detacher := newDetacher(testcase)
-				return detacher.Detach(diskName, nodeName)
+				return detacher.Detach(nil, diskName, nodeName)
 			},
 		},
 
@@ -180,7 +180,7 @@ func TestAttachDetach(t *testing.T) {
 			detach:         detachCall{diskName, nodeName, detachError},
 			test: func(testcase *testcase) error {
 				detacher := newDetacher(testcase)
-				return detacher.Detach(diskName, nodeName)
+				return detacher.Detach(nil, diskName, nodeName)
 			},
 			expectedReturn: detachError,
 		},

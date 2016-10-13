@@ -34,7 +34,7 @@ type flexVolumeDetacher struct {
 var _ volume.Detacher = &flexVolumeDetacher{}
 
 // Detach is part of the volume.Detacher interface.
-func (d *flexVolumeDetacher) Detach(deviceName string, hostName types.NodeName) error {
+func (d *flexVolumeDetacher) Detach(_ *volume.Spec, deviceName string, hostName types.NodeName) error {
 	call := d.plugin.NewDriverCall(detachCmd)
 	call.Append(deviceName)
 	call.Append(string(hostName))
@@ -59,7 +59,7 @@ func (d *flexVolumeDetacher) WaitForDetach(devicePath string, timeout time.Durat
 }
 
 // UnmountDevice is part of the volume.Detacher interface.
-func (d *flexVolumeDetacher) UnmountDevice(deviceMountPath string) error {
+func (d *flexVolumeDetacher) UnmountDevice(_ *volume.Spec, deviceMountPath string) error {
 
 	if pathExists, pathErr := util.PathExists(deviceMountPath); pathErr != nil {
 		return fmt.Errorf("Error checking if path exists: %v", pathErr)
