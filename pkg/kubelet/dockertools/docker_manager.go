@@ -1113,23 +1113,6 @@ func (dm *DockerManager) fmtDockerOpts(opts []dockerOpt) ([]string, error) {
 	return fmtOpts, nil
 }
 
-func (dm *DockerManager) getSecurityOpts(pod *api.Pod, ctrName string) ([]dockerOpt, error) {
-	var securityOpts []dockerOpt
-	if seccompOpts, err := dm.getSeccompOpts(pod, ctrName); err != nil {
-		return nil, err
-	} else {
-		securityOpts = append(securityOpts, seccompOpts...)
-	}
-
-	if appArmorOpts, err := dm.getAppArmorOpts(pod, ctrName); err != nil {
-		return nil, err
-	} else {
-		securityOpts = append(securityOpts, appArmorOpts...)
-	}
-
-	return securityOpts, nil
-}
-
 type dockerOpt struct {
 	// The key-value pair passed to docker.
 	key, value string
