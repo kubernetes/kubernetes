@@ -2635,8 +2635,12 @@ func validateServiceAnnotations(service *api.Service, oldService *api.Service) (
 func ValidateServiceUpdate(service, oldService *api.Service) field.ErrorList {
 	allErrs := ValidateObjectMetaUpdate(&service.ObjectMeta, &oldService.ObjectMeta, field.NewPath("metadata"))
 
-	if api.IsServiceIPSet(oldService) {
-		allErrs = append(allErrs, ValidateImmutableField(service.Spec.ClusterIP, oldService.Spec.ClusterIP, field.NewPath("spec", "clusterIP"))...)
+	// ClusterIP should be immutable for services using it (every type other than ExternalName)
+	// which do not have ClusterIP assigned yet (empty string value)
+	if service.Spec.Type != api.ServiceTypeExternalName {
+		if oldService.Spec.Type != api.ServiceTypeExternalName && oldService.Spec.ClusterIP != "" {
+			allErrs = append(allErrs, ValidateImmutableField(service.Spec.ClusterIP, oldService.Spec.ClusterIP, field.NewPath("spec", "clusterIP"))...)
+		}
 	}
 
 	// TODO(freehan): allow user to update loadbalancerSourceRanges
