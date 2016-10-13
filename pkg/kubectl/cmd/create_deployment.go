@@ -37,7 +37,7 @@ var (
 )
 
 // NewCmdCreateDeployment is a macro command to create a new deployment
-func NewCmdCreateDeployment(f *cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
+func NewCmdCreateDeployment(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "deployment NAME --image=image [--dry-run]",
 		Aliases: []string{"deploy"},
@@ -59,7 +59,7 @@ func NewCmdCreateDeployment(f *cmdutil.Factory, cmdOut io.Writer) *cobra.Command
 }
 
 // CreateDeployment implements the behavior to run the create deployment command
-func CreateDeployment(f *cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, args []string) error {
+func CreateDeployment(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
 		return err

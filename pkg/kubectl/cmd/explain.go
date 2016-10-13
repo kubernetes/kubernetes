@@ -44,7 +44,7 @@ var (
 )
 
 // NewCmdExplain returns a cobra command for swagger docs
-func NewCmdExplain(f *cmdutil.Factory, out, cmdErr io.Writer) *cobra.Command {
+func NewCmdExplain(f cmdutil.Factory, out, cmdErr io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "explain RESOURCE",
 		Short:   "Documentation of resources",
@@ -61,7 +61,7 @@ func NewCmdExplain(f *cmdutil.Factory, out, cmdErr io.Writer) *cobra.Command {
 }
 
 // RunExplain executes the appropriate steps to print a model's documentation
-func RunExplain(f *cmdutil.Factory, out, cmdErr io.Writer, cmd *cobra.Command, args []string) error {
+func RunExplain(f cmdutil.Factory, out, cmdErr io.Writer, cmd *cobra.Command, args []string) error {
 	if len(args) == 0 {
 		fmt.Fprint(cmdErr, "You must specify the type of resource to explain. ", valid_resources)
 		return cmdutil.UsageError(cmd, "Required resource not specified.")
