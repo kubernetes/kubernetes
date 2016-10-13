@@ -37,7 +37,7 @@ var (
 )
 
 // NewCmdCreateNamespace is a macro command to create a new namespace
-func NewCmdCreateNamespace(f *cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
+func NewCmdCreateNamespace(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "namespace NAME [--dry-run]",
 		Aliases: []string{"ns"},
@@ -58,7 +58,7 @@ func NewCmdCreateNamespace(f *cmdutil.Factory, cmdOut io.Writer) *cobra.Command 
 }
 
 // CreateNamespace implements the behavior to run the create namespace command
-func CreateNamespace(f *cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, args []string) error {
+func CreateNamespace(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
 		return err
