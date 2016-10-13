@@ -125,7 +125,7 @@ func NewCmdGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Comma
 
 // RunGet implements the generic Get command
 // TODO: convert all direct flag accessors to a struct and pass that instead of cmd
-func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Command, args []string, options *GetOptions) error {
+func RunGet(f *cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args []string, options *GetOptions) error {
 	if len(options.Raw) > 0 {
 		restClient, err := f.RESTClient()
 		if err != nil {
@@ -322,6 +322,9 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 			}
 			errs = append(errs, err)
 		}
+		if len(infos) == 0 {
+			outputEmptyListWarning(errOut)
+		}
 
 		res := ""
 		if len(infos) > 0 {
@@ -370,6 +373,9 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 	infos, err := r.Infos()
 	if err != nil {
 		allErrs = append(allErrs, err)
+	}
+	if len(infos) == 0 {
+		outputEmptyListWarning(errOut)
 	}
 
 	objs := make([]runtime.Object, len(infos))
@@ -491,4 +497,10 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 		cmdutil.PrintFilterCount(filteredResourceCount, lastMapping.Resource, errOut, filterOpts)
 	}
 	return utilerrors.NewAggregate(allErrs)
+}
+
+// outputEmptyListWarning outputs a warning indicating that no items are available to display
+func outputEmptyListWarning(out io.Writer) error {
+	_, err := fmt.Fprintf(out, "%s\n", "No resources found.")
+	return err
 }
