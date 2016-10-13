@@ -589,7 +589,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			route := ws.PATCH(action.Path).To(handler).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
-				Consumes(string(api.JSONPatchType), string(api.MergePatchType), string(api.StrategicMergePatchType)).
+				Consumes(string(api.JSONPatchType), string(api.MergePatchType), string(api.StrategicMergePatchType), string(api.StrategicMergePatchTypeV2)).
 				Operation("patch"+namespaced+kind+strings.Title(subresource)+operationSuffix).
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), a.group.Serializer.SupportedMediaTypes()...)...).
 				Returns(http.StatusOK, "OK", versionedObject).

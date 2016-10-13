@@ -1082,8 +1082,8 @@ func getPatchedJS(patchType api.PatchType, originalJS, patchJS []byte, obj runti
 		return patchObj.Apply(originalJS)
 	case api.MergePatchType:
 		return jsonpatch.MergePatch(originalJS, patchJS)
-	case api.StrategicMergePatchType:
-		return strategicpatch.StrategicMergePatchData(originalJS, patchJS, obj)
+	case api.StrategicMergePatchType, api.StrategicMergePatchTypeV2:
+		return strategicpatch.StrategicMergePatchData(originalJS, patchJS, obj, patchType)
 	default:
 		// only here as a safety net - go-restful filters content-type
 		return nil, fmt.Errorf("unknown Content-Type header for patch: %v", patchType)

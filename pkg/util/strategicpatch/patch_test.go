@@ -23,6 +23,8 @@ import (
 	"strings"
 	"testing"
 
+	"k8s.io/kubernetes/pkg/api"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/ghodss/yaml"
 )
@@ -1802,7 +1804,7 @@ func TestStrategicMergePatch(t *testing.T) {
 }
 
 func testStrategicMergePatchWithCustomArguments(t *testing.T, description, original, patch string, dataStruct interface{}, err error) {
-	_, err2 := StrategicMergePatch([]byte(original), []byte(patch), dataStruct)
+	_, err2 := StrategicMergePatch([]byte(original), []byte(patch), dataStruct, api.StrategicMergePatchTypeV2)
 	if err2 != err {
 		if err2 == nil {
 			t.Errorf("expected error: %s\ndid not occur in test case: %s", err, description)
@@ -1901,7 +1903,7 @@ func testPatchCreation(t *testing.T, expected, actual []byte, description string
 }
 
 func testPatchApplication(t *testing.T, original, patch, expected []byte, description string) {
-	result, err := StrategicMergePatch(original, patch, mergeItem)
+	result, err := StrategicMergePatch(original, patch, mergeItem, api.StrategicMergePatchTypeV2)
 	if err != nil {
 		t.Errorf("error: %s\nin test case: %s\ncannot apply patch:\n%s\nto original:\n%s\n",
 			err, description, jsonToYAMLOrError(patch), jsonToYAMLOrError(original))
@@ -2105,7 +2107,7 @@ func TestNumberConversion(t *testing.T) {
 			continue
 		}
 
-		result, err := StrategicMergePatch([]byte(tc.Old), patch, precisionItem)
+		result, err := StrategicMergePatch([]byte(tc.Old), patch, precisionItem, api.StrategicMergePatchTypeV2)
 		if err != nil {
 			t.Errorf("%s: unexpected error %v", k, err)
 			continue

@@ -35,7 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/yaml"
 )
 
-var patchTypes = map[string]api.PatchType{"json": api.JSONPatchType, "merge": api.MergePatchType, "strategic": api.StrategicMergePatchType}
+var patchTypes = map[string]api.PatchType{"json": api.JSONPatchType, "merge": api.MergePatchType, "strategic": api.StrategicMergePatchType, "strategicv2": api.StrategicMergePatchTypeV2}
 
 // PatchOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
 // referencing the cmd.Flags()
@@ -244,8 +244,8 @@ func getPatchedJSON(patchType api.PatchType, originalJS, patchJS []byte, obj run
 	case api.MergePatchType:
 		return jsonpatch.MergePatch(originalJS, patchJS)
 
-	case api.StrategicMergePatchType:
-		return strategicpatch.StrategicMergePatchData(originalJS, patchJS, obj)
+	case api.StrategicMergePatchType, api.StrategicMergePatchTypeV2:
+		return strategicpatch.StrategicMergePatchData(originalJS, patchJS, obj, patchType)
 
 	default:
 		// only here as a safety net - go-restful filters content-type

@@ -422,7 +422,7 @@ func (p *patcher) patchSimple(obj runtime.Object, modified []byte, source, names
 		return nil, cmdutil.AddSourceToErr(fmt.Sprintf(format, original, modified, current), source, err)
 	}
 
-	_, err = p.helper.Patch(namespace, name, api.StrategicMergePatchType, patch)
+	_, err = p.helper.Patch(namespace, name, api.StrategicMergePatchTypeV2, patch)
 	return patch, err
 }
 
