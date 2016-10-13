@@ -1245,6 +1245,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "readNamespacedDeploymentsScale",
      "responses": {
       "200": {
        "description": "OK",
@@ -1267,6 +1268,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "replaceNamespacedDeploymentsScale",
      "parameters": [
       {
        "name": "body",
@@ -1301,6 +1303,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "patchNamespacedDeploymentsScale",
      "parameters": [
       {
        "name": "body",
@@ -3527,6 +3530,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "readNamespacedReplicasetsScale",
      "responses": {
       "200": {
        "description": "OK",
@@ -3549,6 +3553,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "replaceNamespacedReplicasetsScale",
      "parameters": [
       {
        "name": "body",
@@ -3583,6 +3588,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "patchNamespacedReplicasetsScale",
      "parameters": [
       {
        "name": "body",
@@ -3760,6 +3766,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "readNamespacedReplicationcontrollersScale",
      "responses": {
       "200": {
        "description": "OK",
@@ -3782,6 +3789,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "replaceNamespacedReplicationcontrollersScale",
      "parameters": [
       {
        "name": "body",
@@ -3816,6 +3824,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "patchNamespacedReplicationcontrollersScale",
      "parameters": [
       {
        "name": "body",

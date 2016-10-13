@@ -21,6 +21,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "getCoreAPIVersions",
      "responses": {
       "200": {
        "description": "OK",
@@ -47,6 +48,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "getCoreV1APIResources",
      "responses": {
       "200": {
        "description": "OK",
@@ -2748,6 +2750,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "getAPIVersions",
      "responses": {
       "200": {
        "description": "OK",
@@ -2774,6 +2777,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "getExtensionsAPIGroup",
      "responses": {
       "200": {
        "description": "OK",
@@ -2800,6 +2804,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "getExtensionsV1beta1APIResources",
      "responses": {
       "200": {
        "description": "OK",
@@ -4464,6 +4469,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "getFederationAPIGroup",
      "responses": {
       "200": {
        "description": "OK",
@@ -4490,6 +4496,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "getFederationV1beta1APIResources",
      "responses": {
       "200": {
        "description": "OK",
