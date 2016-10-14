@@ -2339,6 +2339,10 @@ func (r *Runtime) GetPodStatus(uid kubetypes.UID, name, namespace string) (*kube
 	return podStatus, nil
 }
 
+func (r *Runtime) UpdatePodCIDR(podCIDR string) error {
+	return nil
+}
+
 // getOSReleaseInfo reads /etc/os-release and returns a map
 // that contains the key value pairs in that file.
 func getOSReleaseInfo() (map[string]string, error) {

@@ -153,3 +153,7 @@ func (r *Mock) ImageStats() (*ImageStats, error) {
 	args := r.Called()
 	return args.Get(0).(*ImageStats), args.Error(1)
 }
+
+func (f *Mock) UpdatePodCIDR(podCIDR string) error {
+	return nil
+}

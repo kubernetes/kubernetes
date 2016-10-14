@@ -418,10 +418,6 @@ func (plugin *kubenetNetworkPlugin) SetUpPod(namespace string, name string, podS
 		glog.V(4).Infof("SetUpPod took %v for %s/%s", time.Since(start), namespace, name)
 	}()
 
-	//pod, ok := plugin.host.GetPodByName(namespace, name)
-	//if !ok {
-	//	return fmt.Errorf("pod %q cannot be found", name)
-	//}
 	podAnnotation, err := plugin.host.GetPodAnnotations(namespace, name, podSandboxID)
 	if err != nil {
 		return err
@@ -430,7 +426,6 @@ func (plugin *kubenetNetworkPlugin) SetUpPod(namespace string, name string, podS
 	if err := plugin.Status(); err != nil {
 		return fmt.Errorf("Kubenet cannot SetUpPod: %v", err)
 	}
-
 	if err := plugin.setup(namespace, name, podSandboxID, podAnnotation); err != nil {
 		// Make sure everything gets cleaned up on errors
 		podIP, _ := plugin.podIPs[podSandboxID]

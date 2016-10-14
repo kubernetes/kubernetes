@@ -464,10 +464,19 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 	}
 	glog.Infof("Hairpin mode set to %q", klet.hairpinMode)
 
-	if plug, err := network.InitNetworkPlugin(kubeDeps.NetworkPlugins, kubeCfg.NetworkPluginName, &networkHost{klet}, klet.hairpinMode, klet.nonMasqueradeCIDR, int(kubeCfg.NetworkPluginMTU)); err != nil {
-		return nil, err
+	if kubeCfg.ExperimentalRuntimeIntegrationType == "" {
+		if plug, err := network.InitNetworkPlugin(kubeDeps.NetworkPlugins, kubeCfg.NetworkPluginName, &networkHost{klet}, klet.hairpinMode, klet.nonMasqueradeCIDR, int(kubeCfg.NetworkPluginMTU)); err != nil {
+			return nil, err
+		} else {
+			klet.networkPlugin = plug
+		}
 	} else {
-		klet.networkPlugin = plug
+		// initialize no-op network plugin for kubelet
+		if plug, err := network.InitNetworkPlugin(kubeDeps.NetworkPlugins, "", &networkHost{klet}, klet.hairpinMode, klet.nonMasqueradeCIDR, int(kubeCfg.NetworkPluginMTU)); err != nil {
+			return nil, err
+		} else {
+			klet.networkPlugin = plug
+		}
 	}
 
 	machineInfo, err := klet.GetCachedMachineInfo()
@@ -497,9 +506,18 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 	case "docker":
 		switch kubeCfg.ExperimentalRuntimeIntegrationType {
 		case "cri":
+			networkPlugin, err := network.PickNetworkPlugin(kubeDeps.NetworkPlugins, kubeCfg.NetworkPluginName)
+			if err != nil {
+				return nil, err
+			}
+
 			// Use the new CRI shim for docker. This is need for testing the
 			// docker integration through CRI, and may be removed in the future.
-			dockerService := dockershim.NewDockerService(klet.dockerClient, kubeCfg.SeccompProfileRoot, kubeCfg.PodInfraContainerImage)
+			dockerService, err := dockershim.NewDockerService(klet.dockerClient, kubeCfg.SeccompProfileRoot, kubeCfg.PodInfraContainerImage, networkPlugin, klet.hairpinMode, klet.nonMasqueradeCIDR, int(kubeCfg.NetworkPluginMTU))
+			if err != nil {
+				return nil, err
+			}
+
 			klet.containerRuntime, err = kuberuntime.NewKubeGenericRuntimeManager(
 				kubecontainer.FilterEventRecorder(kubeDeps.Recorder),
 				klet.livenessManager,

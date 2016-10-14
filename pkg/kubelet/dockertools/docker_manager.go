@@ -2631,6 +2631,10 @@ func (dm *DockerManager) getVersionInfo() (versionInfo, error) {
 	}, nil
 }
 
+func (dm *DockerManager) UpdatePodCIDR(podCIDR string) error {
+	return nil
+}
+
 // Truncate the message if it exceeds max length.
 func truncateMsg(msg string, max int) string {
 	if len(msg) <= max {

@@ -101,17 +101,13 @@ type Host interface {
 	GetPodAnnotations(namespace, name, podSandboxID string) (map[string]string, error)
 }
 
-// InitNetworkPlugin inits the plugin that matches networkPluginName. Plugins must have unique names.
-func InitNetworkPlugin(plugins []NetworkPlugin, networkPluginName string, host Host, hairpinMode componentconfig.HairpinMode, nonMasqueradeCIDR string, mtu int) (NetworkPlugin, error) {
+func PickNetworkPlugin(plugins []NetworkPlugin, networkPluginName string) (NetworkPlugin, error) {
 	if networkPluginName == "" {
 		// default to the no_op plugin
-		plug := &NoopNetworkPlugin{}
-		if err := plug.Init(host, hairpinMode, nonMasqueradeCIDR, mtu); err != nil {
-			return nil, err
-		}
-		return plug, nil
+		return &NoopNetworkPlugin{}, nil
 	}
 
+	var chosenPlugin NetworkPlugin
 	pluginMap := map[string]NetworkPlugin{}
 
 	allErrs := []error{}
@@ -129,19 +125,25 @@ func InitNetworkPlugin(plugins []NetworkPlugin, networkPluginName string, host H
 		pluginMap[name] = plugin
 	}
 
-	chosenPlugin := pluginMap[networkPluginName]
-	if chosenPlugin != nil {
-		err := chosenPlugin.Init(host, hairpinMode, nonMasqueradeCIDR, mtu)
-		if err != nil {
-			allErrs = append(allErrs, fmt.Errorf("Network plugin %q failed init: %v", networkPluginName, err))
-		} else {
-			glog.V(1).Infof("Loaded network plugin %q", networkPluginName)
-		}
-	} else {
+	chosenPlugin = pluginMap[networkPluginName]
+	if chosenPlugin == nil {
 		allErrs = append(allErrs, fmt.Errorf("Network plugin %q not found.", networkPluginName))
 	}
-
 	return chosenPlugin, utilerrors.NewAggregate(allErrs)
+}
+
+// InitNetworkPlugin inits the plugin that matches networkPluginName. Plugins must have unique names.
+func InitNetworkPlugin(plugins []NetworkPlugin, networkPluginName string, host Host, hairpinMode componentconfig.HairpinMode, nonMasqueradeCIDR string, mtu int) (NetworkPlugin, error) {
+	networkPlugin, err := PickNetworkPlugin(plugins, networkPluginName)
+	if err != nil {
+		return nil, err
+	}
+
+	err = networkPlugin.Init(host, hairpinMode, nonMasqueradeCIDR, mtu)
+	if err == nil {
+		glog.V(1).Infof("Loaded network plugin %q", networkPluginName)
+	}
+	return networkPlugin, err
 }
 
 func UnescapePluginName(in string) string {
