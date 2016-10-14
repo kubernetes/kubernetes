@@ -116,10 +116,9 @@ func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeApi
 	}
 
 	// Fill the HostConfig.
+	podHasSELinuxLabel := config.Linux != nil && config.Linux.SecurityContext != nil && config.Linux.SecurityContext.SelinuxOptions != nil
 	hc := &dockercontainer.HostConfig{
-		Binds:          generateMountBindings(config.GetMounts()),
-		ReadonlyRootfs: config.GetReadonlyRootfs(),
-		Privileged:     config.GetPrivileged(),
+		Binds: generateMountBindings(config.GetMounts(), podHasSELinuxLabel),
 	}
 
 	// Apply options derived from the sandbox config.
@@ -135,13 +134,19 @@ func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeApi
 		hc.UTSMode = ""
 		hc.PidMode = ""
 
-		nsOpts := lc.GetNamespaceOptions()
-		if nsOpts != nil {
-			if nsOpts.GetHostNetwork() {
-				hc.UTSMode = namespaceModeHost
-			}
-			if nsOpts.GetHostPid() {
-				hc.PidMode = namespaceModeHost
+		// Apply namespace options.
+		if podSc := lc.SecurityContext; podSc != nil {
+			nsOpts := podSc.GetNamespaceOptions()
+			if nsOpts != nil {
+				if nsOpts.GetHostNetwork() {
+					hc.UTSMode = namespaceModeHost
+				}
+				if nsOpts.GetHostPid() {
+					hc.PidMode = namespaceModeHost
+				}
+				if nsOpts.GetHostIpc() {
+					hc.IpcMode = namespaceModeHost
+				}
 			}
 		}
 	}
@@ -164,14 +169,34 @@ func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeApi
 			hc.OomScoreAdj = int(rOpts.GetOomScoreAdj())
 		}
 		// Note: ShmSize is handled in kube_docker_client.go
+
+		if sc := lc.GetSecurityContext(); sc != nil {
+			// Verify RunAsNonRoot
+			if sc.RunAsNonRoot != nil {
+				if sc.RunAsUser != nil {
+					return "", fmt.Errorf("container's runAsUser breaks non-root policy")
+				}
+
+				imgRoot, err := ds.isImageRoot(image)
+				if err != nil {
+					return "", fmt.Errorf("can't tell if image runs as root: %v", err)
+				}
+				if imgRoot {
+					return "", fmt.Errorf("container has runAsNonRoot and image will run as root")
+				}
+			}
+		}
 	}
 
+	// Apply security context.
+	applyContainerSecurityContext(sandboxConfig.GetLinux(), config.GetLinux(), createConfig.Config, hc)
+
+	// Apply appArmor and seccomp options.
 	var err error
 	hc.SecurityOpt, err = getContainerSecurityOpts(config.Metadata.GetName(), sandboxConfig, ds.seccompProfileRoot)
 	if err != nil {
 		return "", fmt.Errorf("failed to generate container security options for container %q: %v", config.Metadata.GetName(), err)
 	}
-	// TODO: Add or drop capabilities.
 
 	createConfig.HostConfig = hc
 	createResp, err := ds.client.CreateContainer(createConfig)

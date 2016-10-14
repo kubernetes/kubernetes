@@ -129,7 +129,6 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(container *api.Conta
 
 	command, args := kubecontainer.ExpandContainerCommandAndArgs(container, opts.Envs)
 	containerLogsPath := getContainerLogsPath(container.Name, pod.UID)
-	podHasSELinuxLabel := pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.SELinuxOptions != nil
 	restartCountUint32 := uint32(restartCount)
 	config := &runtimeApi.ContainerConfig{
 		Metadata: &runtimeApi.ContainerMetadata{
@@ -142,23 +141,12 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(container *api.Conta
 		WorkingDir:  &container.WorkingDir,
 		Labels:      newContainerLabels(container, pod),
 		Annotations: newContainerAnnotations(container, pod, restartCount),
-		Mounts:      makeMounts(opts, container, podHasSELinuxLabel),
+		Mounts:      makeMounts(opts, container),
 		LogPath:     &containerLogsPath,
 		Stdin:       &container.Stdin,
 		StdinOnce:   &container.StdinOnce,
 		Tty:         &container.TTY,
 		Linux:       m.generateLinuxContainerConfig(container, pod),
-	}
-
-	// set privileged and readonlyRootfs
-	if container.SecurityContext != nil {
-		securityContext := container.SecurityContext
-		if securityContext.Privileged != nil {
-			config.Privileged = securityContext.Privileged
-		}
-		if securityContext.ReadOnlyRootFilesystem != nil {
-			config.ReadonlyRootfs = securityContext.ReadOnlyRootFilesystem
-		}
 	}
 
 	// set environment variables
@@ -177,7 +165,7 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(container *api.Conta
 
 // generateLinuxContainerConfig generates linux container config for kubelet runtime api.
 func (m *kubeGenericRuntimeManager) generateLinuxContainerConfig(container *api.Container, pod *api.Pod) *runtimeApi.LinuxContainerConfig {
-	linuxConfig := &runtimeApi.LinuxContainerConfig{
+	lc := &runtimeApi.LinuxContainerConfig{
 		Resources: &runtimeApi.LinuxContainerResources{},
 	}
 
@@ -198,64 +186,76 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerConfig(container *api.
 		// of CPU shares.
 		cpuShares = milliCPUToShares(cpuRequest.MilliValue())
 	}
-	linuxConfig.Resources.CpuShares = &cpuShares
+	lc.Resources.CpuShares = &cpuShares
 	if memoryLimit != 0 {
-		linuxConfig.Resources.MemoryLimitInBytes = &memoryLimit
+		lc.Resources.MemoryLimitInBytes = &memoryLimit
 	}
 	// Set OOM score of the container based on qos policy. Processes in lower-priority pods should
 	// be killed first if the system runs out of memory.
-	linuxConfig.Resources.OomScoreAdj = &oomScoreAdj
+	lc.Resources.OomScoreAdj = &oomScoreAdj
 
 	if m.cpuCFSQuota {
 		// if cpuLimit.Amount is nil, then the appropriate default value is returned
 		// to allow full usage of cpu resource.
 		cpuQuota, cpuPeriod := milliCPUToQuota(cpuLimit.MilliValue())
-		linuxConfig.Resources.CpuQuota = &cpuQuota
-		linuxConfig.Resources.CpuPeriod = &cpuPeriod
+		lc.Resources.CpuQuota = &cpuQuota
+		lc.Resources.CpuPeriod = &cpuPeriod
 	}
 
 	// set security context options
 	if container.SecurityContext != nil {
-		securityContext := container.SecurityContext
-		if securityContext.Capabilities != nil {
-			linuxConfig.Capabilities = &runtimeApi.Capability{
-				AddCapabilities:  make([]string, len(securityContext.Capabilities.Add)),
-				DropCapabilities: make([]string, len(securityContext.Capabilities.Drop)),
+		sc := container.SecurityContext
+		lc.SecurityContext = &runtimeApi.SecurityContext{}
+		if sc.Privileged != nil {
+			lc.SecurityContext.Privileged = sc.Privileged
+		}
+		if sc.ReadOnlyRootFilesystem != nil {
+			lc.SecurityContext.ReadonlyRootfs = sc.ReadOnlyRootFilesystem
+		}
+		if sc.RunAsUser != nil {
+			lc.SecurityContext.RunAsUser = sc.RunAsUser
+		}
+		if sc.RunAsNonRoot != nil {
+			lc.SecurityContext.RunAsNonRoot = sc.RunAsNonRoot
+		}
+
+		if sc.Capabilities != nil {
+			lc.SecurityContext.Capabilities = &runtimeApi.Capability{
+				AddCapabilities:  make([]string, len(sc.Capabilities.Add)),
+				DropCapabilities: make([]string, len(sc.Capabilities.Drop)),
 			}
-			for index, value := range securityContext.Capabilities.Add {
-				linuxConfig.Capabilities.AddCapabilities[index] = string(value)
+			for index, value := range sc.Capabilities.Add {
+				lc.SecurityContext.Capabilities.AddCapabilities[index] = string(value)
 			}
-			for index, value := range securityContext.Capabilities.Drop {
-				linuxConfig.Capabilities.DropCapabilities[index] = string(value)
+			for index, value := range sc.Capabilities.Drop {
+				lc.SecurityContext.Capabilities.DropCapabilities[index] = string(value)
 			}
 		}
 
-		if securityContext.SELinuxOptions != nil {
-			linuxConfig.SelinuxOptions = &runtimeApi.SELinuxOption{
-				User:  &securityContext.SELinuxOptions.User,
-				Role:  &securityContext.SELinuxOptions.Role,
-				Type:  &securityContext.SELinuxOptions.Type,
-				Level: &securityContext.SELinuxOptions.Level,
+		if sc.SELinuxOptions != nil {
+			lc.SecurityContext.SelinuxOptions = &runtimeApi.SELinuxOption{
+				User:  &sc.SELinuxOptions.User,
+				Role:  &sc.SELinuxOptions.Role,
+				Type:  &sc.SELinuxOptions.Type,
+				Level: &sc.SELinuxOptions.Level,
 			}
 		}
 	}
 
-	return linuxConfig
+	return lc
 }
 
 // makeMounts generates container volume mounts for kubelet runtime api.
-func makeMounts(opts *kubecontainer.RunContainerOptions, container *api.Container, podHasSELinuxLabel bool) []*runtimeApi.Mount {
+func makeMounts(opts *kubecontainer.RunContainerOptions, container *api.Container) []*runtimeApi.Mount {
 	volumeMounts := []*runtimeApi.Mount{}
 
 	for idx := range opts.Mounts {
 		v := opts.Mounts[idx]
 		m := &runtimeApi.Mount{
-			HostPath:      &v.HostPath,
-			ContainerPath: &v.ContainerPath,
-			Readonly:      &v.ReadOnly,
-		}
-		if podHasSELinuxLabel && v.SELinuxRelabel {
-			m.SelinuxRelabel = &v.SELinuxRelabel
+			HostPath:       &v.HostPath,
+			ContainerPath:  &v.ContainerPath,
+			Readonly:       &v.ReadOnly,
+			SelinuxRelabel: &v.SELinuxRelabel,
 		}
 
 		volumeMounts = append(volumeMounts, m)
