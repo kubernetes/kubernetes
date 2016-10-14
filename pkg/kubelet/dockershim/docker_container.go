@@ -122,6 +122,13 @@ func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeApi
 		Privileged:     config.GetPrivileged(),
 	}
 
+	// Set sysctls if requested
+	sysctls, err := getSysctlsFromAnnotations(config.Annotations)
+	if err != nil {
+		return "", fmt.Errorf("failed to get sysctls from annotations %v for container %q: %v", config.Annotations, config.Metadata.GetName(), err)
+	}
+	hc.Sysctls = sysctls
+
 	// Apply options derived from the sandbox config.
 	if lc := sandboxConfig.GetLinux(); lc != nil {
 		// Apply Cgroup options.
@@ -166,7 +173,6 @@ func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeApi
 		// Note: ShmSize is handled in kube_docker_client.go
 	}
 
-	var err error
 	hc.SecurityOpt, err = getContainerSecurityOpts(config.Metadata.GetName(), sandboxConfig, ds.seccompProfileRoot)
 	if err != nil {
 		return "", fmt.Errorf("failed to generate container security options for container %q: %v", config.Metadata.GetName(), err)

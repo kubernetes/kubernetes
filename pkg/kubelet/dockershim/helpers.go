@@ -27,6 +27,7 @@ import (
 	dockernat "github.com/docker/go-connections/nat"
 	"github.com/golang/glog"
 
+	"k8s.io/kubernetes/pkg/api"
 	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/types"
@@ -214,6 +215,27 @@ func getSandboxSecurityOpts(sandboxConfig *runtimeApi.PodSandboxConfig, seccompP
 
 func getNetworkNamespace(c *dockertypes.ContainerJSON) string {
 	return fmt.Sprintf(dockerNetNSFmt, c.State.Pid)
+}
+
+// getSysctlsFromAnnotations gets sysctls from annotations.
+func getSysctlsFromAnnotations(annotations map[string]string) (map[string]string, error) {
+	var results map[string]string
+
+	sysctls, unsafeSysctls, err := api.SysctlsFromPodAnnotations(annotations)
+	if err != nil {
+		return nil, err
+	}
+	if len(sysctls)+len(unsafeSysctls) > 0 {
+		results = make(map[string]string, len(sysctls)+len(unsafeSysctls))
+		for _, c := range sysctls {
+			results[c.Name] = c.Value
+		}
+		for _, c := range unsafeSysctls {
+			results[c.Name] = c.Value
+		}
+	}
+
+	return results, nil
 }
 
 // dockerFilter wraps around dockerfilters.Args and provides methods to modify
