@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/runtime"
@@ -65,7 +66,7 @@ type ConfigFactory struct {
 	// a means to list all PersistentVolumes
 	PVLister *cache.StoreToPVFetcher
 	// a means to list all PersistentVolumeClaims
-	PVCLister *cache.StoreToPVCFetcher
+	PVCLister *cache.StoreToPersistentVolumeClaimLister
 	// a means to list all services
 	ServiceLister *cache.StoreToServiceLister
 	// a means to list all controllers
@@ -76,10 +77,11 @@ type ConfigFactory struct {
 	// Close this to stop all reflectors
 	StopEverything chan struct{}
 
+	informerFactory       informers.SharedInformerFactory
 	scheduledPodPopulator *cache.Controller
 	nodePopulator         *cache.Controller
 	pvPopulator           *cache.Controller
-	pvcPopulator          *cache.Controller
+	pvcPopulator          cache.ControllerInterface
 	servicePopulator      *cache.Controller
 	controllerPopulator   *cache.Controller
 
@@ -107,14 +109,20 @@ func NewConfigFactory(client clientset.Interface, schedulerName string, hardPodA
 	stopEverything := make(chan struct{})
 	schedulerCache := schedulercache.New(30*time.Second, stopEverything)
 
+	// TODO: pass this in as an argument...
+	informerFactory := informers.NewSharedInformerFactory(client, 0)
+	pvcInformer := informerFactory.PersistentVolumeClaims()
+
 	c := &ConfigFactory{
 		Client:             client,
 		PodQueue:           cache.NewFIFO(cache.MetaNamespaceKeyFunc),
 		ScheduledPodLister: &cache.StoreToPodLister{},
+		informerFactory:    informerFactory,
 		// Only nodes in the "Ready" condition with status == "True" are schedulable
 		NodeLister:                     &cache.StoreToNodeLister{},
 		PVLister:                       &cache.StoreToPVFetcher{Store: cache.NewStore(cache.MetaNamespaceKeyFunc)},
-		PVCLister:                      &cache.StoreToPVCFetcher{Store: cache.NewStore(cache.MetaNamespaceKeyFunc)},
+		PVCLister:                      pvcInformer.Lister(),
+		pvcPopulator:                   pvcInformer.Informer().GetController(),
 		ServiceLister:                  &cache.StoreToServiceLister{Indexer: cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})},
 		ControllerLister:               &cache.StoreToReplicationControllerLister{Indexer: cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})},
 		ReplicaSetLister:               &cache.StoreToReplicaSetLister{Indexer: cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})},
@@ -158,13 +166,6 @@ func NewConfigFactory(client clientset.Interface, schedulerName string, hardPodA
 	c.PVLister.Store, c.pvPopulator = cache.NewInformer(
 		c.createPersistentVolumeLW(),
 		&api.PersistentVolume{},
-		0,
-		cache.ResourceEventHandlerFuncs{},
-	)
-
-	c.PVCLister.Store, c.pvcPopulator = cache.NewInformer(
-		c.createPersistentVolumeClaimLW(),
-		&api.PersistentVolumeClaim{},
 		0,
 		cache.ResourceEventHandlerFuncs{},
 	)
@@ -434,7 +435,7 @@ func (f *ConfigFactory) getPluginArgs() (*PluginFactoryArgs, error) {
 		NodeLister: f.NodeLister.NodeCondition(getNodeConditionPredicate()),
 		NodeInfo:   &predicates.CachedNodeInfo{StoreToNodeLister: f.NodeLister},
 		PVInfo:     f.PVLister,
-		PVCInfo:    f.PVCLister,
+		PVCInfo:    &predicates.CachedPersistentVolumeClaimInfo{StoreToPersistentVolumeClaimLister: f.PVCLister},
 		HardPodAffinitySymmetricWeight: f.HardPodAffinitySymmetricWeight,
 		FailureDomains:                 sets.NewString(failureDomainArgs...).List(),
 	}, nil
@@ -459,6 +460,9 @@ func (f *ConfigFactory) Run() {
 
 	// Begin populating controllers
 	go f.controllerPopulator.Run(f.StopEverything)
+
+	// start informers...
+	f.informerFactory.Start(f.StopEverything)
 
 	// Watch and cache all ReplicaSet objects. Scheduler needs to find all pods
 	// created by the same services or ReplicationControllers/ReplicaSets, so that it can spread them correctly.
