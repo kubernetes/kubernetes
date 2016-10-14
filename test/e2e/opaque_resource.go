@@ -19,11 +19,13 @@ package e2e
 import (
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/util/system"
+	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -40,6 +42,7 @@ var _ = framework.KubeDescribe("Opaque resources", func() {
 
 	// Custom matcher to validate pod schedulability.
 	beScheduled := func() GomegaMatcher { return &scheduledMatcher{f} }
+	notBeScheduled := func() GomegaMatcher { return &notScheduledMatcher{f} }
 
 	BeforeEach(func() {
 		node = refresh(f, node)
@@ -116,7 +119,7 @@ var _ = framework.KubeDescribe("Opaque resources", func() {
 			// TODO(CD): Watch scheduler events instead to catch an indication of
 			//           insufficient resources or other unschedulable condition
 			//           instead of waiting for this to time out.
-			Expect(pod).NotTo(beScheduled())
+			Expect(pod).To(notBeScheduled())
 		})
 
 		It("should account opaque integer resources in pods with multiple containers.", func() {
@@ -187,7 +190,7 @@ var _ = framework.KubeDescribe("Opaque resources", func() {
 			// TODO(CD): Watch scheduler events instead to catch an indication of
 			//           insufficient resources or other unschedulable condition
 			//           instead of waiting for this to time out.
-			Expect(pod).NotTo(beScheduled())
+			Expect(pod).To(notBeScheduled())
 		})
 	})
 })
@@ -217,7 +220,7 @@ func refresh(f *framework.Framework, old *api.Node) *api.Node {
 // Waits for the supplied predicate to become true for the supplied node.
 func awaitNodePredicate(c *unversioned.Client, node *api.Node, p func(*api.Node) bool) {
 	// Allocatable is updated by the kubelet on next sync following the above
-	// patch operation. Wait up 16s polling every 2s (default interval: 10s).
+	// patch operation. Wait up 20s polling every 2s (default interval: 10s).
 	timeout := "20s"
 	pollInterval := "2s"
 	Eventually(func() bool {
@@ -250,22 +253,57 @@ func (m *scheduledMatcher) Match(actual interface{}) (success bool, err error) {
 
 func (m *scheduledMatcher) FailureMessage(actual interface{}) (message string) {
 	pod := actual.(*api.Pod)
-	podJSON, err := json.MarshalIndent(pod, "", "  ")
-	var runningPodJSON []byte
-	allPods, err := m.f.Client.Pods(m.f.Namespace.Name).List(api.ListOptions{})
-	if err == nil {
-		runningPodJSON, _ = json.MarshalIndent(allPods.Items, "", "  ")
-	}
+	podJSON, runningPodJSON := podErrorJSON(m.f, pod)
 	return fmt.Sprintf("Expected pod [%s] to be scheduled\n%v\n\nRunning pods are:\n\n%s", pod.Name, string(podJSON), string(runningPodJSON))
 }
 
 func (m *scheduledMatcher) NegatedFailureMessage(actual interface{}) (message string) {
 	pod := actual.(*api.Pod)
+	podJSON, runningPodJSON := podErrorJSON(m.f, pod)
+	return fmt.Sprintf("Expected pod [%s] not to be scheduled\n%v\n\nRunning pods are:\n\n%s", pod.Name, string(podJSON), string(runningPodJSON))
+}
+
+type notScheduledMatcher struct{ f *framework.Framework }
+
+func (m *notScheduledMatcher) Match(actual interface{}) (success bool, err error) {
+	pod := actual.(*api.Pod)
+	// Wait up 1 minute polling every 5 seconds.
+	timeout := time.Minute
+	interval := 5 * time.Second
+	err = wait.Poll(interval, timeout, func() (done bool, err error) {
+		p, err := m.f.Client.Pods(m.f.Namespace.Name).Get(pod.Name)
+		if err != nil {
+			return false, nil
+		}
+		// Return true if the unschedulable condition is present.
+		for _, cond := range p.Status.Conditions {
+			if cond.Reason == "Unschedulable" {
+				return true, nil
+			}
+		}
+		return false, nil
+	})
+	return err == nil, err
+}
+
+func (m *notScheduledMatcher) FailureMessage(actual interface{}) (message string) {
+	pod := actual.(*api.Pod)
+	podJSON, runningPodJSON := podErrorJSON(m.f, pod)
+	return fmt.Sprintf("Expected pod [%s] not to be scheduled\n%v\n\nRunning pods are:\n\n%s", pod.Name, string(podJSON), string(runningPodJSON))
+}
+
+func (m *notScheduledMatcher) NegatedFailureMessage(actual interface{}) (message string) {
+	pod := actual.(*api.Pod)
+	podJSON, runningPodJSON := podErrorJSON(m.f, pod)
+	return fmt.Sprintf("Expected pod [%s] to be scheduled\n%v\n\nRunning pods are:\n\n%s", pod.Name, string(podJSON), string(runningPodJSON))
+}
+
+func podErrorJSON(f *framework.Framework, pod *api.Pod) (podJSON []byte, runningPodJSON []byte) {
 	podJSON, err := json.MarshalIndent(pod, "", "  ")
-	var runningPodJSON []byte
-	allPods, err := m.f.Client.Pods(m.f.Namespace.Name).List(api.ListOptions{})
+	runningPodJSON = []byte{}
+	allPods, err := f.Client.Pods(f.Namespace.Name).List(api.ListOptions{})
 	if err == nil {
 		runningPodJSON, _ = json.MarshalIndent(allPods.Items, "", "  ")
 	}
-	return fmt.Sprintf("Expected pod [%s] not to be scheduled\n%v\n\nRunning pods are:\n\n%s", pod.Name, string(podJSON), string(runningPodJSON))
+	return
 }
