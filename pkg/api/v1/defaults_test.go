@@ -574,6 +574,31 @@ func TestSetDefaultObjectFieldSelectorAPIVersion(t *testing.T) {
 	}
 }
 
+func TestSetMinimumScalePod(t *testing.T) {
+	// verify we default if limits are specified (and that request=0 is preserved)
+	s := versioned.PodSpec{}
+	s.Containers = []versioned.Container{
+		{
+			Resources: versioned.ResourceRequirements{
+				Requests: versioned.ResourceList{
+					versioned.ResourceMemory: resource.MustParse("1n"),
+				},
+				Limits: versioned.ResourceList{
+					versioned.ResourceCPU: resource.MustParse("2n"),
+				},
+			},
+		},
+	}
+	pod := &versioned.Pod{
+		Spec: s,
+	}
+	versioned.SetObjectDefaults_Pod(pod)
+
+	if expect := resource.MustParse("1m"); expect.Cmp(pod.Spec.Containers[0].Resources.Requests[versioned.ResourceMemory]) != 0 {
+		t.Errorf("did not round resources: %#v", pod.Spec.Containers[0].Resources)
+	}
+}
+
 func TestSetDefaultRequestsPod(t *testing.T) {
 	// verify we default if limits are specified (and that request=0 is preserved)
 	s := versioned.PodSpec{}
