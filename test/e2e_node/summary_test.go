@@ -32,8 +32,7 @@ import (
 	"github.com/onsi/gomega/types"
 )
 
-// TODO(timstclair): Move this test out of the flaky suite once it has demonstrated stability.
-var _ = framework.KubeDescribe("Summary API [Flaky]", func() {
+var _ = framework.KubeDescribe("Summary API", func() {
 	f := framework.NewDefaultFramework("summary-test")
 	Context("when querying /stats/summary", func() {
 		It("should report resource usage through the stats api", func() {
