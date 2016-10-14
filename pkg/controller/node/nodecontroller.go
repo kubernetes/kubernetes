@@ -286,9 +286,21 @@ func NewNodeController(
 				}
 			},
 			DeleteFunc: func(obj interface{}) {
-				node := obj.(*api.Node)
-				err := nc.cidrAllocator.ReleaseCIDR(node)
-				if err != nil {
+				node, isNode := obj.(*api.Node)
+				// We can get DeletedFinalStateUnknown instead of *api.Node here and we need to handle that correctly. #34692
+				if !isNode {
+					deletedState, ok := obj.(cache.DeletedFinalStateUnknown)
+					if !ok {
+						glog.Errorf("Received unexpected object: %v", obj)
+						return
+					}
+					node, ok = deletedState.Obj.(*api.Node)
+					if !ok {
+						glog.Errorf("DeletedFinalStateUnknown contained non-Node object: %v", deletedState.Obj)
+						return
+					}
+				}
+				if err := nc.cidrAllocator.ReleaseCIDR(node); err != nil {
 					glog.Errorf("Error releasing CIDR: %v", err)
 				}
 			},
