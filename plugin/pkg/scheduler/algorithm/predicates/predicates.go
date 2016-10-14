@@ -45,7 +45,17 @@ type PersistentVolumeInfo interface {
 }
 
 type PersistentVolumeClaimInfo interface {
-	GetPersistentVolumeClaimInfo(namespace string, pvcID string) (*api.PersistentVolumeClaim, error)
+	GetPersistentVolumeClaimInfo(namespace string, name string) (*api.PersistentVolumeClaim, error)
+}
+
+// CachedPersistentVolumeClaimInfo implements PersistentVolumeClaimInfo
+type CachedPersistentVolumeClaimInfo struct {
+	*cache.StoreToPersistentVolumeClaimLister
+}
+
+// GetPersistentVolumeClaimInfo fetches the claim in specified namespace with specified name
+func (c *CachedPersistentVolumeClaimInfo) GetPersistentVolumeClaimInfo(namespace string, name string) (*api.PersistentVolumeClaim, error) {
+	return c.PersistentVolumeClaims(namespace).Get(name)
 }
 
 type CachedNodeInfo struct {
