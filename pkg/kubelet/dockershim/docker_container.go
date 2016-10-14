@@ -19,6 +19,8 @@ package dockershim
 import (
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"time"
 
 	dockertypes "github.com/docker/engine-api/types"
@@ -91,6 +93,8 @@ func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeApi
 	labels := makeLabels(config.GetLabels(), config.GetAnnotations())
 	// Apply a the container type label.
 	labels[containerTypeLabelKey] = containerTypeLabelContainer
+	// Write the container log path in the labels.
+	labels[containerLogPathLabelKey] = filepath.Join(sandboxConfig.GetLogDirectory(), config.GetLogPath())
 	// Write the sandbox ID in the labels.
 	labels[sandboxIDLabelKey] = podSandboxID
 
@@ -183,7 +187,20 @@ func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeApi
 
 // StartContainer starts the container.
 func (ds *dockerService) StartContainer(containerID string) error {
-	return ds.client.StartContainer(containerID)
+	err := ds.client.StartContainer(containerID)
+	if err != nil {
+		return fmt.Errorf("failed to start container %q: %v", containerID, err)
+	}
+	// TODO: Should we stop the container if an error occurs during start.
+	path, realPath, err := ds.getContainerLogPath(containerID)
+	if err != nil {
+		return fmt.Errorf("failed to get container %q log path: %v", containerID, err)
+	}
+	if err = ds.os.Symlink(realPath, path); err != nil {
+		return fmt.Errorf("failed to create symbolic link %q to the container log file %q for container %q",
+			path, realPath, containerID)
+	}
+	return nil
 }
 
 // StopContainer stops a running container with a grace period (i.e., timeout).
@@ -194,7 +211,37 @@ func (ds *dockerService) StopContainer(containerID string, timeout int64) error 
 // RemoveContainer removes the container.
 // TODO: If a container is still running, should we forcibly remove it?
 func (ds *dockerService) RemoveContainer(containerID string) error {
-	return ds.client.RemoveContainer(containerID, dockertypes.ContainerRemoveOptions{RemoveVolumes: true})
+	// Ideally, log lifecycle should be independent of container lifecycle.
+	// However, docker will remove container log after container is removed,
+	// we can't prevent that now, so we also cleanup the symlink here.
+	path, _, err := ds.getContainerLogPath(containerID)
+	if err != nil {
+		// TODO: Consider whether we should return here.
+		return fmt.Errorf("failed to get container %q log path: %v", containerID, err)
+	}
+	err = ds.os.Remove(path)
+	if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("failed to remove container %q log symlink %q: %v", containerID, path, err)
+	}
+	err = ds.client.RemoveContainer(containerID, dockertypes.ContainerRemoveOptions{RemoveVolumes: true})
+	if err != nil {
+		return fmt.Errorf("failed to remove container %q: %v", containerID, err)
+	}
+	return nil
+}
+
+// getContainerLogPath returns the container log path specified by kubelet and the real
+// path where docker stores the container log.
+func (ds *dockerService) getContainerLogPath(containerID string) (string, string, error) {
+	info, err := ds.client.InspectContainer(containerID)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to inspect container %q: %v", containerID, err)
+	}
+	path, ok := info.Config.Labels[containerLogPathLabelKey]
+	if !ok {
+		return "", "", fmt.Errorf("failed to get container %q log path from labels %+v", containerID, info.Config.Labels)
+	}
+	return path, info.LogPath, nil
 }
 
 func getContainerTimestamps(r *dockertypes.ContainerJSON) (time.Time, time.Time, time.Time, error) {
