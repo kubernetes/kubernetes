@@ -357,6 +357,8 @@ func NewNodeController(
 // Run starts an asynchronous loop that monitors the status of cluster nodes.
 func (nc *NodeController) Run() {
 	go func() {
+		defer utilruntime.HandleCrash()
+
 		if !cache.WaitForCacheSync(wait.NeverStop, nc.nodeInformer.Informer().HasSynced, nc.podInformer.Informer().HasSynced, nc.daemonSetInformer.Informer().HasSynced) {
 			glog.Errorf("NodeController timed out while waiting for informers to sync...")
 			return
