@@ -23,8 +23,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
-	"k8s.io/kubernetes/pkg/util"
 	utilconfig "k8s.io/kubernetes/pkg/util/config"
+	"k8s.io/kubernetes/pkg/util/flag"
 
 	"github.com/spf13/pflag"
 )
@@ -41,12 +41,12 @@ const (
 type KubeletServer struct {
 	componentconfig.KubeletConfiguration
 
-	KubeConfig          util.StringFlag
+	KubeConfig          flag.StringFlag
 	BootstrapKubeconfig string
 
 	// If true, an invalid KubeConfig will result in the Kubelet exiting with an error.
 	RequireKubeConfig bool
-	AuthPath          util.StringFlag // Deprecated -- use KubeConfig instead
+	AuthPath          flag.StringFlag // Deprecated -- use KubeConfig instead
 	APIServerList     []string        // Deprecated -- use KubeConfig instead
 
 	// Insert a probability of random errors during calls to the master.
@@ -67,7 +67,7 @@ func NewKubeletServer() *KubeletServer {
 	config := componentconfig.KubeletConfiguration{}
 	api.Scheme.Convert(&v1alpha1.KubeletConfiguration{}, &config, nil)
 	return &KubeletServer{
-		KubeConfig:           util.NewStringFlag("/var/lib/kubelet/kubeconfig"),
+		KubeConfig:           flag.NewStringFlag("/var/lib/kubelet/kubeconfig"),
 		RequireKubeConfig:    false, // in 1.5, default to true
 		KubeletConfiguration: config,
 	}
