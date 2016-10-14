@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/crlf"
 	"k8s.io/kubernetes/pkg/util/strategicpatch"
+	"k8s.io/kubernetes/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/util/yaml"
 
 	"github.com/golang/glog"
@@ -216,7 +217,12 @@ func RunEdit(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args 
 			}
 			err = schema.ValidateBytes(stripComments(edited))
 			if err != nil {
-				return preservedFile(err, file, errOut)
+				results = editResults{
+					file: file,
+				}
+				containsError = true
+				fmt.Fprintln(out, results.addError(errors.NewInvalid(api.Kind(""), "", field.ErrorList{field.Invalid(nil, "The edited file failed validation", fmt.Sprintf("%v", err))}), info))
+				continue
 			}
 
 			// Compare content without comments
@@ -295,8 +301,9 @@ func RunEdit(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args 
 				return nil
 			}
 
-			// loop again and edit the remaining items
-			infos = results.edit
+			if len(results.header.reasons) > 0 {
+				containsError = true
+			}
 		}
 	})
 	return err
