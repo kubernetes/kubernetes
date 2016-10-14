@@ -235,7 +235,11 @@ func AsVersionedObject(infos []*Info, forceList bool, version unversioned.GroupV
 	actualVersion := object.GetObjectKind().GroupVersionKind()
 	validSpecifiedVersion := (actualVersion.Version == version.Version)
 	if !validSpecifiedVersion {
-		glog.Warningf(" info: the output version specified (%s) is invalid, defaulting to %s\n", version.Version, actualVersion.Version)
+		defaultVersionInfo := ""
+		if len(actualVersion.Version) > 0 {
+			defaultVersionInfo = fmt.Sprintf(", defaulting to %q", actualVersion.Version)
+		}
+		glog.Warningf(" info: the output version specified is invalid%s\n", defaultVersionInfo)
 	}
 
 	return object, nil
