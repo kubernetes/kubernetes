@@ -71,7 +71,7 @@ func (ds *dockerService) RunPodSandbox(config *runtimeApi.PodSandboxConfig) (str
 	// Step 3: Start the sandbox container.
 	// Assume kubelet's garbage collector would remove the sandbox later, if
 	// startContainer failed.
-	err = ds.StartContainer(createResp.ID)
+	err = ds.client.StartContainer(createResp.ID)
 	return createResp.ID, err
 }
 

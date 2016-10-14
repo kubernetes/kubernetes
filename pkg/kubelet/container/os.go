@@ -29,6 +29,7 @@ type OSInterface interface {
 	Symlink(oldname string, newname string) error
 	Stat(path string) (os.FileInfo, error)
 	Remove(path string) error
+	RemoveAll(path string) error
 	Create(path string) (*os.File, error)
 	Hostname() (name string, err error)
 	Chtimes(path string, atime time.Time, mtime time.Time) error
@@ -57,6 +58,11 @@ func (RealOS) Stat(path string) (os.FileInfo, error) {
 // Remove will call os.Remove to remove the path.
 func (RealOS) Remove(path string) error {
 	return os.Remove(path)
+}
+
+// RemoveAll will call os.RemoveAll to remove the path and its children.
+func (RealOS) RemoveAll(path string) error {
+	return os.RemoveAll(path)
 }
 
 // Create will call os.Create to create and return a file
