@@ -125,6 +125,10 @@ type Volumes interface {
 	// Assumption: If node doesn't exist, disk is not attached to the node.
 	DiskIsAttached(volPath, nodeName string) (bool, error)
 
+	// DisksAreAttached checks if a list disks are attached to the given node.
+	// Assumption: If node doesn't exist, disks are not attached to the node.
+	DisksAreAttached(volPath []string, nodeName string) (map[string]bool, error)
+
 	// CreateVolume creates a new vmdk with specified parameters.
 	CreateVolume(name string, size int, tags *map[string]string) (volumePath string, err error)
 
@@ -874,6 +878,64 @@ func (vs *VSphere) DiskIsAttached(volPath string, nodeName string) (bool, error)
 	return attached, err
 }
 
+// DisksAreAttached returns if disks are attached to the VM using controllers supported by the plugin.
+func (vs *VSphere) DisksAreAttached(volPaths []string, nodeName string) (map[string]bool, error) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	attached := make(map[string]bool)
+	for _, volPath := range volPaths {
+		attached[volPath] = false
+	}
+
+	// Create vSphere client
+	c, err := vsphereLogin(vs.cfg, ctx)
+	if err != nil {
+		glog.Errorf("Failed to create vSphere client. err: %s", err)
+		return attached, err
+	}
+	defer c.Logout(ctx)
+
+	// Find VM to detach disk from
+	var vSphereInstance string
+	if nodeName == "" {
+		vSphereInstance = vs.localInstanceID
+	} else {
+		vSphereInstance = nodeName
+	}
+
+	nodeExist, err := vs.NodeExists(c, vSphereInstance)
+
+	if err != nil {
+		glog.Errorf("Failed to check whether node exist. err: %s.", err)
+		return attached, err
+	}
+
+	if !nodeExist {
+		glog.Warningf(
+			"Node %q does not exist. DisksAreAttached will assume vmdk %v are not attached to it.",
+			vSphereInstance,
+			volPaths)
+		return attached, nil
+	}
+
+	// Get VM device list
+	_, vmDevices, _, dc, err := getVirtualMachineDevices(vs.cfg, ctx, c, vSphereInstance)
+	if err != nil {
+		glog.Errorf("Failed to get VM devices for VM %#q. err: %s", vSphereInstance, err)
+		return attached, err
+	}
+
+	for _, volPath := range volPaths {
+		result, _ := checkDiskAttached(volPath, vmDevices, dc, c)
+		if result {
+			attached[volPath] = true
+		}
+	}
+
+	return attached, err
+}
+
 func checkDiskAttached(volPath string, vmdevices object.VirtualDeviceList, dc *object.Datacenter, client *govmomi.Client) (bool, error) {
 	virtualDiskControllerKey, err := getVirtualDiskControllerKey(volPath, vmdevices, dc, client)
 	if err != nil {
@@ -884,7 +946,7 @@ func checkDiskAttached(volPath string, vmdevices object.VirtualDeviceList, dc *o
 		return false, err
 	}
 	for _, controllerType := range supportedSCSIControllerType {
-		controllerkey, _ := getControllerKey(controllerType, vmdevices, dc, client)
+		controllerkey, _ := getControllerKey(controllerType, vmdevices)
 		if controllerkey == virtualDiskControllerKey {
 			return true, nil
 		}
@@ -916,7 +978,7 @@ func getVirtualDiskControllerKey(volPath string, vmDevices object.VirtualDeviceL
 
 // Returns key of the controller.
 // Key is unique id that distinguishes one device from other devices in the same virtual machine.
-func getControllerKey(scsiType string, vmDevices object.VirtualDeviceList, dc *object.Datacenter, client *govmomi.Client) (int32, error) {
+func getControllerKey(scsiType string, vmDevices object.VirtualDeviceList) (int32, error) {
 	for _, device := range vmDevices {
 		devType := vmDevices.Type(device)
 		if devType == scsiType {

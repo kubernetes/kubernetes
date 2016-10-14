@@ -61,6 +61,10 @@ func (c *mockVolumes) DiskIsAttached(volumeName, instanceID string) (bool, error
 	return false, fmt.Errorf("not implemented")
 }
 
+func (c *mockVolumes) DisksAreAttached(diskNames []string, nodeName string) (map[string]bool, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
 func mockVolumeFailure(err error) *mockVolumes {
 	return &mockVolumes{volumeLabelsError: err}
 }

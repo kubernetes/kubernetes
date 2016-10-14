@@ -351,6 +351,10 @@ func (testcase *testcase) DiskIsAttached(diskName, instanceID string) (bool, err
 	return expected.isAttached, expected.ret
 }
 
+func (testcase *testcase) DisksAreAttached(diskNames []string, nodeName string) (map[string]bool, error) {
+	return nil, errors.New("Not implemented")
+}
+
 func (testcase *testcase) CreateDisk(name string, diskType string, zone string, sizeGb int64, tags map[string]string) error {
 	return errors.New("Not implemented")
 }

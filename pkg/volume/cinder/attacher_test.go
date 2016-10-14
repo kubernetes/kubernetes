@@ -415,6 +415,10 @@ func (testcase *testcase) Instances() (cloudprovider.Instances, bool) {
 	return &instances{testcase.instanceID}, true
 }
 
+func (testcase *testcase) DisksAreAttached(diskNames []string, nodeName string) (map[string]bool, error) {
+	return nil, errors.New("Not implemented")
+}
+
 // Implementation of fake cloudprovider.Instances
 type instances struct {
 	instanceID string

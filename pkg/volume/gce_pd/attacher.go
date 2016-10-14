@@ -95,6 +95,40 @@ func (attacher *gcePersistentDiskAttacher) Attach(spec *volume.Spec, hostName st
 	return path.Join(diskByIdPath, diskGooglePrefix+pdName), nil
 }
 
+func (attacher *gcePersistentDiskAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName string) (map[*volume.Spec]bool, error) {
+	volumesAttachedCheck := make(map[*volume.Spec]bool)
+	volumePdNameMap := make(map[string]*volume.Spec)
+	pdNameList := []string{}
+	for _, spec := range specs {
+		volumeSource, _, err := getVolumeSource(spec)
+		// If error is occured, skip this volume and move to the next one
+		if err != nil {
+			glog.Errorf("Error getting volume (%q) source : %v", spec.Name(), err)
+			continue
+		}
+		pdNameList = append(pdNameList, volumeSource.PDName)
+		volumesAttachedCheck[spec] = true
+		volumePdNameMap[volumeSource.PDName] = spec
+	}
+	attachedResult, err := attacher.gceDisks.DisksAreAttached(pdNameList, nodeName)
+	if err != nil {
+		// Log error and continue with attach
+		glog.Errorf(
+			"Error checking if PDs (%v) are already attached to current node (%q). err=%v",
+			pdNameList, nodeName, err)
+		return volumesAttachedCheck, err
+	}
+
+	for pdName, attached := range attachedResult {
+		if !attached {
+			spec := volumePdNameMap[pdName]
+			volumesAttachedCheck[spec] = false
+			glog.V(2).Infof("VolumesAreAttached: check volume %q (specName: %q) is no longer attached", pdName, spec.Name())
+		}
+	}
+	return volumesAttachedCheck, nil
+}
+
 func (attacher *gcePersistentDiskAttacher) WaitForAttach(spec *volume.Spec, devicePath string, timeout time.Duration) (string, error) {
 	ticker := time.NewTicker(checkSleepDuration)
 	defer ticker.Stop()
