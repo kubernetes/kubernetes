@@ -107,7 +107,7 @@ func TestSyncResourceQuota(t *testing.T) {
 	resourceQuotaControllerOptions := &ResourceQuotaControllerOptions{
 		KubeClient:   kubeClient,
 		ResyncPeriod: controller.NoResyncPeriodFunc,
-		Registry:     install.NewRegistry(kubeClient),
+		Registry:     install.NewRegistry(kubeClient, nil),
 		GroupKindsToReplenish: []unversioned.GroupKind{
 			api.Kind("Pod"),
 			api.Kind("Service"),
@@ -192,7 +192,7 @@ func TestSyncResourceQuotaSpecChange(t *testing.T) {
 	resourceQuotaControllerOptions := &ResourceQuotaControllerOptions{
 		KubeClient:   kubeClient,
 		ResyncPeriod: controller.NoResyncPeriodFunc,
-		Registry:     install.NewRegistry(kubeClient),
+		Registry:     install.NewRegistry(kubeClient, nil),
 		GroupKindsToReplenish: []unversioned.GroupKind{
 			api.Kind("Pod"),
 			api.Kind("Service"),
@@ -280,7 +280,7 @@ func TestSyncResourceQuotaSpecHardChange(t *testing.T) {
 	resourceQuotaControllerOptions := &ResourceQuotaControllerOptions{
 		KubeClient:   kubeClient,
 		ResyncPeriod: controller.NoResyncPeriodFunc,
-		Registry:     install.NewRegistry(kubeClient),
+		Registry:     install.NewRegistry(kubeClient, nil),
 		GroupKindsToReplenish: []unversioned.GroupKind{
 			api.Kind("Pod"),
 			api.Kind("Service"),
@@ -368,7 +368,7 @@ func TestSyncResourceQuotaNoChange(t *testing.T) {
 	resourceQuotaControllerOptions := &ResourceQuotaControllerOptions{
 		KubeClient:   kubeClient,
 		ResyncPeriod: controller.NoResyncPeriodFunc,
-		Registry:     install.NewRegistry(kubeClient),
+		Registry:     install.NewRegistry(kubeClient, nil),
 		GroupKindsToReplenish: []unversioned.GroupKind{
 			api.Kind("Pod"),
 			api.Kind("Service"),
@@ -400,7 +400,7 @@ func TestAddQuota(t *testing.T) {
 	resourceQuotaControllerOptions := &ResourceQuotaControllerOptions{
 		KubeClient:   kubeClient,
 		ResyncPeriod: controller.NoResyncPeriodFunc,
-		Registry:     install.NewRegistry(kubeClient),
+		Registry:     install.NewRegistry(kubeClient, nil),
 		GroupKindsToReplenish: []unversioned.GroupKind{
 			api.Kind("Pod"),
 			api.Kind("ReplicationController"),
