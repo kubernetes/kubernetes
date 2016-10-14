@@ -150,7 +150,7 @@ func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight 
 	}
 
 	if !skipPreFlight {
-		fmt.Println("<cmd/init> Running pre-flight checks")
+		fmt.Println("Running pre-flight checks")
 		err := preflight.RunInitMasterChecks()
 		if err != nil {
 			return nil, err

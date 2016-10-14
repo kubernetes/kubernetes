@@ -22,6 +22,12 @@ import (
 )
 
 type InitSystem interface {
+	// ServiceStart tries to start a specific service
+	ServiceStart(service string) error
+
+	// ServiceStop tries to stop a specific service
+	ServiceStop(service string) error
+
 	// ServiceExists ensures the service is defined for this init system.
 	ServiceExists(service string) bool
 
@@ -33,6 +39,18 @@ type InitSystem interface {
 }
 
 type SystemdInitSystem struct{}
+
+func (sysd SystemdInitSystem) ServiceStart(service string) error {
+	args := []string{"start", service}
+	_, err := exec.Command("systemctl", args...).Output()
+	return err
+}
+
+func (sysd SystemdInitSystem) ServiceStop(service string) error {
+	args := []string{"stop", service}
+	_, err := exec.Command("systemctl", args...).Output()
+	return err
+}
 
 func (sysd SystemdInitSystem) ServiceExists(service string) bool {
 	args := []string{"status", service}

@@ -191,10 +191,7 @@ func RunJoinNodeChecks() error {
 		IsRootCheck{root: true},
 		ServiceCheck{service: "docker"},
 		ServiceCheck{service: "kubelet"},
-		PortOpenCheck{port: 8080},
 		PortOpenCheck{port: 10250},
-		PortOpenCheck{port: 10251},
-		PortOpenCheck{port: 10252},
 		DirAvailableCheck{path: "/etc/kubernetes"},
 		DirAvailableCheck{path: "/var/lib/kubelet"},
 		InPathCheck{executable: "ebtables", mandatory: true},
@@ -206,6 +203,14 @@ func RunJoinNodeChecks() error {
 		InPathCheck{executable: "socat", mandatory: true},
 		InPathCheck{executable: "tc", mandatory: false},
 		InPathCheck{executable: "touch", mandatory: false},
+	}
+
+	return runChecks(checks)
+}
+
+func RunResetCheck() error {
+	checks := []PreFlightCheck{
+		IsRootCheck{root: true},
 	}
 
 	return runChecks(checks)
