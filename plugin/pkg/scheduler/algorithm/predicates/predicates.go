@@ -495,7 +495,7 @@ func PodFitsResources(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.N
 		// We couldn't parse metadata - fallback to computing it.
 		podRequest = getResourceRequest(pod)
 	}
-	if podRequest.MilliCPU == 0 && podRequest.Memory == 0 && podRequest.NvidiaGPU == 0 {
+	if podRequest.MilliCPU == 0 && podRequest.Memory == 0 && podRequest.NvidiaGPU == 0 && len(podRequest.OpaqueIntResources) == 0 {
 		return len(predicateFails) == 0, predicateFails, nil
 	}
 
