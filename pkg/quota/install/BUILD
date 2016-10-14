@@ -16,6 +16,7 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
+        "//pkg/controller/informers:go_default_library",
         "//pkg/quota:go_default_library",
         "//pkg/quota/evaluator/core:go_default_library",
     ],

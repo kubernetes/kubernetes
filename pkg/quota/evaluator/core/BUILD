@@ -31,6 +31,7 @@ go_library(
         "//pkg/api/unversioned:go_default_library",
         "//pkg/api/validation:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
+        "//pkg/controller/informers:go_default_library",
         "//pkg/kubelet/qos:go_default_library",
         "//pkg/quota:go_default_library",
         "//pkg/quota/generic:go_default_library",
