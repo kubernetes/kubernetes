@@ -87,7 +87,6 @@ func setUp(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.
 	config.GenericConfig.LoopbackClientConfig = &restclient.Config{APIPath: "/api", ContentConfig: restclient.ContentConfig{NegotiatedSerializer: api.Codecs}}
 	config.GenericConfig.APIResourceConfigSource = DefaultAPIResourceConfigSource()
 	config.GenericConfig.PublicAddress = net.ParseIP("192.168.10.4")
-	config.GenericConfig.Serializer = api.Codecs
 	config.KubeletClient = client.FakeKubeletClient{}
 	config.GenericConfig.LegacyAPIGroupPrefixes = sets.NewString("/api")
 	config.GenericConfig.APIGroupPrefix = "/apis"

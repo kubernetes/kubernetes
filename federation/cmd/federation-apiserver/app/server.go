@@ -191,7 +191,6 @@ func Run(s *options.ServerRunOptions) error {
 	genericConfig.AdmissionControl = admissionController
 	genericConfig.APIResourceConfigSource = storageFactory.APIResourceConfigSource
 	genericConfig.MasterServiceNamespace = s.MasterServiceNamespace
-	genericConfig.Serializer = api.Codecs
 	genericConfig.OpenAPIConfig.Definitions = openapi.OpenAPIDefinitions
 	// Reusing api-server's GetOperationID function. if federation and api-server spec diverge and
 	// this method does not provide good operation IDs for federation, we should create federation's own GetOperationID.

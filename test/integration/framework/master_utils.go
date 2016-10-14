@@ -347,7 +347,6 @@ func NewMasterConfig() *master.Config {
 	genericConfig.APIResourceConfigSource = master.DefaultAPIResourceConfigSource()
 	genericConfig.Authorizer = authorizer.NewAlwaysAllowAuthorizer()
 	genericConfig.AdmissionControl = admit.NewAlwaysAdmit()
-	genericConfig.Serializer = api.Codecs
 	genericConfig.EnableOpenAPISupport = true
 
 	return &master.Config{
