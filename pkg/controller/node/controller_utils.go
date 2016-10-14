@@ -134,7 +134,16 @@ func forcefullyDeleteNode(kubeClient clientset.Interface, nodeName string, force
 func (nc *NodeController) maybeDeleteTerminatingPod(obj interface{}) {
 	pod, ok := obj.(*api.Pod)
 	if !ok {
-		return
+		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
+		if !ok {
+			glog.Errorf("Couldn't get object from tombstone %#v", obj)
+			return
+		}
+		pod, ok = tombstone.Obj.(*api.Pod)
+		if !ok {
+			glog.Errorf("Tombstone contained object that is not a Pod %#v", obj)
+			return
+		}
 	}
 
 	// consider only terminating pods
