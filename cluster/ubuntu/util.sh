@@ -479,7 +479,7 @@ function provision-master() {
       '${SERVICE_NODE_PORT_RANGE}' \
       '${MASTER_IP}' \
       '${ALLOW_PRIVILEGED}'
-    create-kube-controller-manager-opts '${NODE_IPS}'
+    create-kube-controller-manager-opts
     create-kube-scheduler-opts
     create-flanneld-opts '127.0.0.1' '${MASTER_IP}'
     FLANNEL_OTHER_NET_CONFIG='${FLANNEL_OTHER_NET_CONFIG}' sudo -E -p '[sudo] password to start master: ' -- /bin/bash -ce '
@@ -653,7 +653,7 @@ function provision-masterandnode() {
       '${SERVICE_NODE_PORT_RANGE}' \
       '${MASTER_IP}' \
       '${ALLOW_PRIVILEGED}'
-    create-kube-controller-manager-opts '${NODE_IPS}'
+    create-kube-controller-manager-opts
     create-kube-scheduler-opts
     create-kubelet-opts \
       '${MASTER_IP}' \
