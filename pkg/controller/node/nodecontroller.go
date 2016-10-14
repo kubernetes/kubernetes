@@ -356,113 +356,92 @@ func NewNodeController(
 
 // Run starts an asynchronous loop that monitors the status of cluster nodes.
 func (nc *NodeController) Run() {
-	syncedChan := make(chan struct{})
-	syncFailedChan := make(chan struct{})
-
 	go func() {
 		if !cache.WaitForCacheSync(wait.NeverStop, nc.nodeInformer.Informer().HasSynced, nc.podInformer.Informer().HasSynced, nc.daemonSetInformer.Informer().HasSynced) {
 			glog.Errorf("NodeController timed out while waiting for informers to sync...")
-			close(syncFailedChan)
 			return
 		}
 
-		close(syncedChan)
-	}()
+		// Incorporate the results of node status pushed from kubelet to master.
+		go wait.Until(func() {
+			if err := nc.monitorNodeStatus(); err != nil {
+				glog.Errorf("Error monitoring node status: %v", err)
+			}
+		}, nc.nodeMonitorPeriod, wait.NeverStop)
 
-	// Incorporate the results of node status pushed from kubelet to master.
-	go wait.Until(func() {
-		select {
-		case <-syncedChan:
-		case <-syncFailedChan:
-			return
-		}
-		if err := nc.monitorNodeStatus(); err != nil {
-			glog.Errorf("Error monitoring node status: %v", err)
-		}
-	}, nc.nodeMonitorPeriod, wait.NeverStop)
+		// Managing eviction of nodes:
+		// 1. when we delete pods off a node, if the node was not empty at the time we then
+		//    queue a termination watcher
+		//    a. If we hit an error, retry deletion
+		// 2. The terminator loop ensures that pods are eventually cleaned and we never
+		//    terminate a pod in a time period less than nc.maximumGracePeriod. AddedAt
+		//    is the time from which we measure "has this pod been terminating too long",
+		//    after which we will delete the pod with grace period 0 (force delete).
+		//    a. If we hit errors, retry instantly
+		//    b. If there are no pods left terminating, exit
+		//    c. If there are pods still terminating, wait for their estimated completion
+		//       before retrying
+		go wait.Until(func() {
+			nc.evictorLock.Lock()
+			defer nc.evictorLock.Unlock()
+			for k := range nc.zonePodEvictor {
+				nc.zonePodEvictor[k].Try(func(value TimedValue) (bool, time.Duration) {
+					obj, exists, err := nc.nodeStore.GetByKey(value.Value)
+					if err != nil {
+						glog.Warningf("Failed to get Node %v from the nodeStore: %v", value.Value, err)
+					} else if !exists {
+						glog.Warningf("Node %v no longer present in nodeStore!", value.Value)
+					} else {
+						node, _ := obj.(*api.Node)
+						zone := utilnode.GetZoneKey(node)
+						EvictionsNumber.WithLabelValues(zone).Inc()
+					}
 
-	// Managing eviction of nodes:
-	// 1. when we delete pods off a node, if the node was not empty at the time we then
-	//    queue a termination watcher
-	//    a. If we hit an error, retry deletion
-	// 2. The terminator loop ensures that pods are eventually cleaned and we never
-	//    terminate a pod in a time period less than nc.maximumGracePeriod. AddedAt
-	//    is the time from which we measure "has this pod been terminating too long",
-	//    after which we will delete the pod with grace period 0 (force delete).
-	//    a. If we hit errors, retry instantly
-	//    b. If there are no pods left terminating, exit
-	//    c. If there are pods still terminating, wait for their estimated completion
-	//       before retrying
-	go wait.Until(func() {
-		select {
-		case <-syncedChan:
-		case <-syncFailedChan:
-			return
-		}
-		nc.evictorLock.Lock()
-		defer nc.evictorLock.Unlock()
-		for k := range nc.zonePodEvictor {
-			nc.zonePodEvictor[k].Try(func(value TimedValue) (bool, time.Duration) {
-				obj, exists, err := nc.nodeStore.GetByKey(value.Value)
-				if err != nil {
-					glog.Warningf("Failed to get Node %v from the nodeStore: %v", value.Value, err)
-				} else if !exists {
-					glog.Warningf("Node %v no longer present in nodeStore!", value.Value)
-				} else {
-					node, _ := obj.(*api.Node)
-					zone := utilnode.GetZoneKey(node)
-					EvictionsNumber.WithLabelValues(zone).Inc()
-				}
+					nodeUid, _ := value.UID.(string)
+					remaining, err := deletePods(nc.kubeClient, nc.recorder, value.Value, nodeUid, nc.daemonSetStore)
+					if err != nil {
+						utilruntime.HandleError(fmt.Errorf("unable to evict node %q: %v", value.Value, err))
+						return false, 0
+					}
 
-				nodeUid, _ := value.UID.(string)
-				remaining, err := deletePods(nc.kubeClient, nc.recorder, value.Value, nodeUid, nc.daemonSetStore)
-				if err != nil {
-					utilruntime.HandleError(fmt.Errorf("unable to evict node %q: %v", value.Value, err))
-					return false, 0
-				}
-
-				if remaining {
-					nc.zoneTerminationEvictor[k].Add(value.Value, value.UID)
-				}
-				return true, 0
-			})
-		}
-	}, nodeEvictionPeriod, wait.NeverStop)
-
-	// TODO: replace with a controller that ensures pods that are terminating complete
-	// in a particular time period
-	go wait.Until(func() {
-		select {
-		case <-syncedChan:
-		case <-syncFailedChan:
-			return
-		}
-		nc.evictorLock.Lock()
-		defer nc.evictorLock.Unlock()
-		for k := range nc.zoneTerminationEvictor {
-			nc.zoneTerminationEvictor[k].Try(func(value TimedValue) (bool, time.Duration) {
-				nodeUid, _ := value.UID.(string)
-				completed, remaining, err := terminatePods(nc.kubeClient, nc.recorder, value.Value, nodeUid, value.AddedAt, nc.maximumGracePeriod)
-				if err != nil {
-					utilruntime.HandleError(fmt.Errorf("unable to terminate pods on node %q: %v", value.Value, err))
-					return false, 0
-				}
-
-				if completed {
-					glog.V(2).Infof("All pods terminated on %s", value.Value)
-					recordNodeEvent(nc.recorder, value.Value, nodeUid, api.EventTypeNormal, "TerminatedAllPods", fmt.Sprintf("Terminated all Pods on Node %s.", value.Value))
+					if remaining {
+						nc.zoneTerminationEvictor[k].Add(value.Value, value.UID)
+					}
 					return true, 0
-				}
+				})
+			}
+		}, nodeEvictionPeriod, wait.NeverStop)
 
-				glog.V(2).Infof("Pods terminating since %s on %q, estimated completion %s", value.AddedAt, value.Value, remaining)
-				// clamp very short intervals
-				if remaining < nodeEvictionPeriod {
-					remaining = nodeEvictionPeriod
-				}
-				return false, remaining
-			})
-		}
-	}, nodeEvictionPeriod, wait.NeverStop)
+		// TODO: replace with a controller that ensures pods that are terminating complete
+		// in a particular time period
+		go wait.Until(func() {
+			nc.evictorLock.Lock()
+			defer nc.evictorLock.Unlock()
+			for k := range nc.zoneTerminationEvictor {
+				nc.zoneTerminationEvictor[k].Try(func(value TimedValue) (bool, time.Duration) {
+					nodeUid, _ := value.UID.(string)
+					completed, remaining, err := terminatePods(nc.kubeClient, nc.recorder, value.Value, nodeUid, value.AddedAt, nc.maximumGracePeriod)
+					if err != nil {
+						utilruntime.HandleError(fmt.Errorf("unable to terminate pods on node %q: %v", value.Value, err))
+						return false, 0
+					}
+
+					if completed {
+						glog.V(2).Infof("All pods terminated on %s", value.Value)
+						recordNodeEvent(nc.recorder, value.Value, nodeUid, api.EventTypeNormal, "TerminatedAllPods", fmt.Sprintf("Terminated all Pods on Node %s.", value.Value))
+						return true, 0
+					}
+
+					glog.V(2).Infof("Pods terminating since %s on %q, estimated completion %s", value.AddedAt, value.Value, remaining)
+					// clamp very short intervals
+					if remaining < nodeEvictionPeriod {
+						remaining = nodeEvictionPeriod
+					}
+					return false, remaining
+				})
+			}
+		}, nodeEvictionPeriod, wait.NeverStop)
+	}()
 }
 
 // monitorNodeStatus verifies node status are constantly updated by kubelet, and if not,
