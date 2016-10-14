@@ -33,7 +33,7 @@ import (
 
 var opaqueResName api.ResourceName
 
-var _ = framework.KubeDescribe("Opaque resources [Feature:OpaqueResources]", func() {
+var _ = framework.KubeDescribe("Opaque resources", func() {
 	f := framework.NewDefaultFramework("opaque-resource")
 	opaqueResName = api.OpaqueIntResourceName("foo")
 	var node *api.Node
