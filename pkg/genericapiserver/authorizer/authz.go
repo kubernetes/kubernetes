@@ -24,8 +24,11 @@ import (
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/auth/authorizer/abac"
 	"k8s.io/kubernetes/pkg/auth/authorizer/union"
-	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/pkg/genericapiserver/options"
+	"k8s.io/kubernetes/pkg/registry/rbac/clusterrole"
+	"k8s.io/kubernetes/pkg/registry/rbac/clusterrolebinding"
+	"k8s.io/kubernetes/pkg/registry/rbac/role"
+	"k8s.io/kubernetes/pkg/registry/rbac/rolebinding"
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac"
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/webhook"
 )
@@ -114,7 +117,10 @@ type AuthorizationConfig struct {
 	// User which can bootstrap role policies
 	RBACSuperUser string
 
-	InformerFactory informers.SharedInformerFactory
+	RBACClusterRoleRegistry        clusterrole.Registry
+	RBACClusterRoleBindingRegistry clusterrolebinding.Registry
+	RBACRoleRegistry               role.Registry
+	RBACRoleBindingRegistry        rolebinding.Registry
 }
 
 // NewAuthorizerFromAuthorizationConfig returns the right sort of union of multiple authorizer.Authorizer objects
@@ -161,10 +167,10 @@ func NewAuthorizerFromAuthorizationConfig(authorizationModes []string, config Au
 			authorizers = append(authorizers, webhookAuthorizer)
 		case options.ModeRBAC:
 			rbacAuthorizer := rbac.New(
-				config.InformerFactory.Roles().Lister(),
-				config.InformerFactory.RoleBindings().Lister(),
-				config.InformerFactory.ClusterRoles().Lister(),
-				config.InformerFactory.ClusterRoleBindings().Lister(),
+				config.RBACRoleRegistry,
+				config.RBACRoleBindingRegistry,
+				config.RBACClusterRoleRegistry,
+				config.RBACClusterRoleBindingRegistry,
 				config.RBACSuperUser,
 			)
 			authorizers = append(authorizers, rbacAuthorizer)

@@ -22,6 +22,10 @@ import (
 	"k8s.io/kubernetes/pkg/apis/rbac/validation"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/auth/user"
+	"k8s.io/kubernetes/pkg/registry/rbac/clusterrole"
+	"k8s.io/kubernetes/pkg/registry/rbac/clusterrolebinding"
+	"k8s.io/kubernetes/pkg/registry/rbac/role"
+	"k8s.io/kubernetes/pkg/registry/rbac/rolebinding"
 )
 
 type RequestToRuleMapper interface {
@@ -51,11 +55,14 @@ func (r *RBACAuthorizer) Authorize(requestAttributes authorizer.Attributes) (boo
 	return false, "", ruleResolutionError
 }
 
-func New(roles validation.RoleGetter, roleBindings validation.RoleBindingLister, clusterRoles validation.ClusterRoleGetter, clusterRoleBindings validation.ClusterRoleBindingLister, superUser string) *RBACAuthorizer {
+func New(roleRegistry role.Registry, roleBindingRegistry rolebinding.Registry, clusterRoleRegistry clusterrole.Registry, clusterRoleBindingRegistry clusterrolebinding.Registry, superUser string) *RBACAuthorizer {
 	authorizer := &RBACAuthorizer{
 		superUser: superUser,
 		authorizationRuleResolver: validation.NewDefaultRuleResolver(
-			roles, roleBindings, clusterRoles, clusterRoleBindings,
+			roleRegistry,
+			roleBindingRegistry,
+			clusterRoleRegistry,
+			clusterRoleBindingRegistry,
 		),
 	}
 	return authorizer
