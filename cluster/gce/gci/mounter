@@ -1,0 +1,20 @@
+#!/bin/bash
+set -e	
+set -o pipefail
+
+TOOLBOX_DOCKER_IMAGE=vish/toolbox
+TOOLBOX_DOCKER_TAG=v1
+TOOLBOX_USER=root
+
+sudo /home/kubernetes/bin/rkt run --stage1-name="coreos.com/rkt/stage1-fly:1.16.0" \
+	--insecure-options=image \
+	--interactive \
+	--volume=root,kind=host,source=/,readOnly=false \
+	--volume=usr,kind=host,source=/usr,readOnly=false \
+	--volume=run,kind=host,source=/run,readOnly=false \
+	--volume=klet,kind=host,source=/var/lib/kubelet,readOnly=false \
+	--mount volume=root,target=/media/root \
+	--mount volume=usr,target=/media/root/usr \
+	--mount volume=run,target=/media/root/run \
+	--mount volume=klet,target=/var/lib/kubelet \
+	docker://${TOOLBOX_DOCKER_IMAGE}:${TOOLBOX_DOCKER_TAG} --user=${TOOLBOX_USER} --exec /bin/mount -- "$@"
