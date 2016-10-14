@@ -17,10 +17,12 @@ limitations under the License.
 package e2e
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
@@ -56,4 +58,34 @@ func createSynthLogger(f *framework.Framework, linesCount int) {
 			},
 		},
 	})
+}
+
+func reportLogsFromFluentdPod(f *framework.Framework) error {
+	synthLoggerPod, err := f.PodClient().Get(synthLoggerPodName)
+	if err != nil {
+		return fmt.Errorf("Failed to get synth logger pod due to %v", err)
+	}
+
+	synthLoggerNodeName := synthLoggerPod.Spec.NodeName
+	if synthLoggerNodeName == "" {
+		return errors.New("Synthlogger pod is not assigned to the node")
+	}
+
+	label := labels.SelectorFromSet(labels.Set(map[string]string{"k8s-app": "fluentd-logging"}))
+	options := api.ListOptions{LabelSelector: label}
+	fluentdPods, err := f.Client.Pods(api.NamespaceSystem).List(options)
+
+	for _, fluentdPod := range fluentdPods.Items {
+		if fluentdPod.Spec.NodeName == synthLoggerNodeName {
+			containerName := fluentdPod.Spec.Containers[0].Name
+			logs, err := framework.GetPodLogs(f.Client, api.NamespaceSystem, fluentdPod.Name, containerName)
+			if err != nil {
+				return fmt.Errorf("Failed to get logs from fluentd pod %s due to %v", fluentdPod.Name, err)
+			}
+			framework.Logf("Logs from fluentd pod %s:\n%s", fluentdPod.Name, logs)
+			return nil
+		}
+	}
+
+	return fmt.Errorf("Failed to find fluentd pod running on node %s", synthLoggerNodeName)
 }
