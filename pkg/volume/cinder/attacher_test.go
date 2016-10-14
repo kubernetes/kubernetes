@@ -417,6 +417,10 @@ func (testcase *testcase) Instances() (cloudprovider.Instances, bool) {
 	return &instances{testcase.instanceID}, true
 }
 
+func (testcase *testcase) DisksAreAttached(diskNames []string, nodeName types.NodeName) ([]bool, error) {
+	return nil, errors.New("Not implemented")
+}
+
 // Implementation of fake cloudprovider.Instances
 type instances struct {
 	instanceID string
@@ -448,4 +452,8 @@ func (instances *instances) AddSSHKeyToAllInstances(user string, keyData []byte)
 
 func (instances *instances) CurrentNodeName(hostname string) (types.NodeName, error) {
 	return "", errors.New("Not implemented")
+}
+
+func (instances *instances) DisksAreAttached(diskNames []string, nodeName types.NodeName) ([]bool, error) {
+	return nil, errors.New("Not implemented")
 }
