@@ -1111,6 +1111,14 @@ __EOF__
   kube::test::get_object_assert 'pods b' "{{${id_field}}}" 'b'
   kubectl delete pod/a pod/b
 
+  ## kubectl apply --prune should fallback to delete for non reapable types
+  kubectl apply --all --prune -f hack/testdata/prune-reap/a.yml 2>&1 "${kube_flags[@]}"
+  kube::test::get_object_assert 'pvc a-pvc' "{{${id_field}}}" 'a-pvc'
+  kubectl apply --all --prune -f hack/testdata/prune-reap/b.yml 2>&1 "${kube_flags[@]}"
+  kube::test::get_object_assert 'pvc b-pvc' "{{${id_field}}}" 'b-pvc'
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
+  kubectl delete pvc b-pvc 2>&1 "${kube_flags[@]}"
+
   ## kubectl run should create deployments or jobs
   # Pre-Condition: no Job exists
   kube::test::get_object_assert jobs "{{range.items}}{{$id_field}}:{{end}}" ''
