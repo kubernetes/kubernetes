@@ -55,3 +55,7 @@ func (ds *dockerService) ExecInContainer(containerID kubecontainer.ContainerID, 
 	handler := &dockertools.NativeExecHandler{}
 	return handler.ExecInContainer(ds.client, container, cmd, stdin, stdout, stderr, tty, resize)
 }
+
+func (ds *dockerService) isImageRoot(image string) (bool, error) {
+	return dockertools.IsImageRoot(ds.client, image)
+}

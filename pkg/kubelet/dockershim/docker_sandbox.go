@@ -230,25 +230,46 @@ func (ds *dockerService) makeSandboxDockerConfig(c *runtimeApi.PodSandboxConfig,
 		// TODO: Check if this works with per-pod cgroups.
 		hc.CgroupParent = lc.GetCgroupParent()
 
-		// Apply namespace options.
-		hc.NetworkMode, hc.UTSMode, hc.PidMode = "", "", ""
-		nsOpts := lc.GetNamespaceOptions()
-		if nsOpts != nil {
-			if nsOpts.GetHostNetwork() {
-				hc.NetworkMode = namespaceModeHost
-			} else {
-				// Assume kubelet uses either the cni or the kubenet plugin.
-				// TODO: support docker networking.
-				hc.NetworkMode = "none"
+		// Apply security context.
+		if podSc := lc.GetSecurityContext(); podSc != nil {
+			applySandboxSecurityContext(podSc, createConfig.Config, hc)
+
+			// Apply namespace options.
+			hc.NetworkMode, hc.UTSMode, hc.PidMode = "", "", ""
+			nsOpts := podSc.GetNamespaceOptions()
+			if nsOpts != nil {
+				if nsOpts.GetHostNetwork() {
+					hc.NetworkMode = namespaceModeHost
+				} else {
+					// Assume kubelet uses either the cni or the kubenet plugin.
+					// TODO: support docker networking.
+					hc.NetworkMode = "none"
+				}
+				if nsOpts.GetHostIpc() {
+					hc.IpcMode = namespaceModeHost
+				}
+				if nsOpts.GetHostPid() {
+					hc.PidMode = namespaceModeHost
+				}
 			}
-			if nsOpts.GetHostIpc() {
-				hc.IpcMode = namespaceModeHost
-			}
-			if nsOpts.GetHostPid() {
-				hc.PidMode = namespaceModeHost
+
+			// Verify RunAsNonRoot
+			if podSc.RunAsNonRoot != nil {
+				if podSc.RunAsUser != nil {
+					return nil, fmt.Errorf("container's runAsUser breaks non-root policy")
+				}
+
+				imgRoot, err := ds.isImageRoot(image)
+				if err != nil {
+					return nil, fmt.Errorf("can't tell if image runs as root: %v", err)
+				}
+				if imgRoot {
+					return nil, fmt.Errorf("container has runAsNonRoot and image will run as root")
+				}
 			}
 		}
 	}
+
 	// Set port mappings.
 	exposedPorts, portBindings := makePortsAndBindings(c.GetPortMappings())
 	createConfig.Config.ExposedPorts = exposedPorts
