@@ -205,7 +205,7 @@ Content-Disposition: attachment; filename="kube-master-health-monitoring.conf"
 
 #upstart-job
 
-description "Kubenetes master health monitoring"
+description "Kubernetes master health monitoring"
 
 start on stopped kube-docker
 
