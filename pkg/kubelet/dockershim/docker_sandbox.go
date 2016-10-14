@@ -224,6 +224,13 @@ func (ds *dockerService) makeSandboxDockerConfig(c *runtimeApi.PodSandboxConfig,
 		HostConfig: hc,
 	}
 
+	// Set sysctls if requested
+	if sysctls, err := getSysctlsFromAnnotations(c.Annotations); err != nil {
+		return nil, fmt.Errorf("failed to get sysctls for container %q: %v", c.Metadata.GetName(), err)
+	} else {
+		hc.Sysctls = sysctls
+	}
+
 	// Apply linux-specific options.
 	if lc := c.GetLinux(); lc != nil {
 		// Apply Cgroup options.

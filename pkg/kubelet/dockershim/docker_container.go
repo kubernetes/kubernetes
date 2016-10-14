@@ -122,6 +122,13 @@ func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeApi
 		Privileged:     config.GetPrivileged(),
 	}
 
+	// Set sysctls if requested
+	if sysctls, err := getSysctlsFromAnnotations(config.Annotations); err != nil {
+		return "", fmt.Errorf("failed to get sysctls for container %q: %v", config.Metadata.GetName(), err)
+	} else {
+		hc.Sysctls = sysctls
+	}
+
 	// Apply options derived from the sandbox config.
 	if lc := sandboxConfig.GetLinux(); lc != nil {
 		// Apply Cgroup options.
