@@ -224,6 +224,13 @@ func (ds *dockerService) makeSandboxDockerConfig(c *runtimeApi.PodSandboxConfig,
 		HostConfig: hc,
 	}
 
+	// Set sysctls if requested
+	sysctls, err := getSysctlsFromAnnotations(c.Annotations)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get sysctls from annotations %v for sandbox %q: %v", c.Annotations, c.Metadata.GetName(), err)
+	}
+	hc.Sysctls = sysctls
+
 	// Apply linux-specific options.
 	if lc := c.GetLinux(); lc != nil {
 		// Apply Cgroup options.
@@ -265,7 +272,6 @@ func (ds *dockerService) makeSandboxDockerConfig(c *runtimeApi.PodSandboxConfig,
 	setSandboxResources(hc)
 
 	// Set security options.
-	var err error
 	hc.SecurityOpt, err = getSandboxSecurityOpts(c, ds.seccompProfileRoot)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate sandbox security options for sandbox %q: %v", c.Metadata.GetName(), err)
