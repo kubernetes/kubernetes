@@ -185,7 +185,7 @@ func (mounter *Mounter) PathIsDevice(pathname string) (bool, error) {
 }
 
 func exclusiveOpenFailsOnDevice(pathname string) (bool, error) {
-	if isDevice, err := pathIsDevice(pathname); !isDevice {
+	if isDevice, err := pathIsDevice(pathname); !isDevice && !os.IsNotExist(err) {
 		return false, fmt.Errorf(
 			"PathIsDevice failed for path %q: %v",
 			pathname,
@@ -208,9 +208,6 @@ func exclusiveOpenFailsOnDevice(pathname string) (bool, error) {
 
 func pathIsDevice(pathname string) (bool, error) {
 	finfo, err := os.Stat(pathname)
-	if os.IsNotExist(err) {
-		return false, nil
-	}
 	// err in call to os.Stat
 	if err != nil {
 		return false, err
