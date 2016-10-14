@@ -251,29 +251,21 @@ func (m *scheduledMatcher) Match(actual interface{}) (success bool, err error) {
 func (m *scheduledMatcher) FailureMessage(actual interface{}) (message string) {
 	pod := actual.(*api.Pod)
 	podJSON, err := json.MarshalIndent(pod, "", "  ")
-	runningPodNames := ""
+	var runningPodJSON []byte
 	allPods, err := m.f.Client.Pods(m.f.Namespace.Name).List(api.ListOptions{})
 	if err == nil {
-		for _, p := range allPods.Items {
-			if p.Status.Phase == api.PodRunning {
-				runningPodNames = fmt.Sprintf("%s%s\n", runningPodNames, p.Name)
-			}
-		}
+		runningPodJSON, _ = json.MarshalIndent(allPods.Items, "", "  ")
 	}
-	return fmt.Sprintf("Expected pod [%s] to be scheduled\n%v\n\nRunning pods are:\n%s", pod.Name, string(podJSON), runningPodNames)
+	return fmt.Sprintf("Expected pod [%s] to be scheduled\n%v\n\nRunning pods are:\n\n%s", pod.Name, string(podJSON), string(runningPodJSON))
 }
 
 func (m *scheduledMatcher) NegatedFailureMessage(actual interface{}) (message string) {
 	pod := actual.(*api.Pod)
 	podJSON, err := json.MarshalIndent(pod, "", "  ")
-	runningPodNames := ""
+	var runningPodJSON []byte
 	allPods, err := m.f.Client.Pods(m.f.Namespace.Name).List(api.ListOptions{})
 	if err == nil {
-		for _, p := range allPods.Items {
-			if p.Status.Phase == api.PodRunning {
-				runningPodNames = fmt.Sprintf("%s%s\n", runningPodNames, p.Name)
-			}
-		}
+		runningPodJSON, _ = json.MarshalIndent(allPods.Items, "", "  ")
 	}
-	return fmt.Sprintf("Expected pod [%s] not to be scheduled\n%v\n\nRunning pods are:\n%s", pod.Name, string(podJSON), runningPodNames)
+	return fmt.Sprintf("Expected pod [%s] not to be scheduled\n%v\n\nRunning pods are:\n\n%s", pod.Name, string(podJSON), string(runningPodJSON))
 }
