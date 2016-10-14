@@ -27,7 +27,6 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubemaster "k8s.io/kubernetes/cmd/kubeadm/app/master"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
-	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/cloudprovider"
@@ -55,14 +54,9 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 		Use:   "init",
 		Short: "Run this in order to set up the Kubernetes master.",
 		Run: func(cmd *cobra.Command, args []string) {
-			check := func(err error) {
-				if err != nil {
-					cmdutil.CheckErr(fmt.Errorf("<cmd/init> %v", err))
-				}
-			}
 			i, err := NewInit(cfgPath, cfg, skipPreFlight)
-			check(err)
-			check(i.Run(out))
+			kubeadmutil.CheckErr(err)
+			kubeadmutil.CheckErr(i.Run(out))
 		},
 	}
 
@@ -126,6 +120,7 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 		"etcd client key file. Note: The path must be in /etc/ssl/certs",
 	)
 	cmd.PersistentFlags().MarkDeprecated("external-etcd-keyfile", "this flag will be removed when componentconfig exists")
+
 	cmd.PersistentFlags().BoolVar(
 		&skipPreFlight, "skip-preflight-checks", false,
 		"skip preflight checks normally run before modifying the system",
@@ -150,10 +145,10 @@ func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight 
 	}
 
 	if !skipPreFlight {
-		fmt.Println("<cmd/init> Running pre-flight checks")
+		fmt.Println("Running pre-flight checks")
 		err := preflight.RunInitMasterChecks()
 		if err != nil {
-			return nil, err
+			return nil, &preflight.PreFlightError{Msg: err.Error()}
 		}
 	} else {
 		fmt.Println("Skipping pre-flight checks")
@@ -180,9 +175,8 @@ func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight 
 	return &Init{cfg: cfg}, nil
 }
 
-// RunInit executes master node provisioning, including certificates, needed static pod manifests, etc.
+// Run executes master node provisioning, including certificates, needed static pod manifests, etc.
 func (i *Init) Run(out io.Writer) error {
-
 	if err := kubemaster.CreateTokenAuthFile(&i.cfg.Secrets); err != nil {
 		return err
 	}
