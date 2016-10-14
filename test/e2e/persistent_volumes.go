@@ -416,7 +416,7 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 		namespace:   api.NamespaceDefault,
 		prefix:      "nfs",
 		serverImage: "gcr.io/google_containers/volume-nfs:0.7",
-		serverPorts: []int{2049},
+		serverPorts: []int{2049, 111, 1067, 1066},
 		serverArgs:  []string{"-G", "777", "/exports"},
 	}
 

@@ -1171,9 +1171,15 @@ EOF
 }
 
 function download-and-setup-rkt {
-    wget  https://github.com/coreos/rkt/releases/download/v1.16.0/rkt-v1.16.0.tar.gz -O ${KUBE_HOME}/rkt.tar
-    tar -zxvf ${KUBE_HOME}/rkt.tar -C ${KUBE_HOME}/bin/
-    ln -s ${KUBE_HOME}/bin/rkt-v1.16.0/rkt ${KUBE_HOME}/bin/rkt
+    if [[ ! -e ${KUBE_HOME}/rkt.tar ]]; then
+	wget  https://github.com/coreos/rkt/releases/download/v1.16.0/rkt-v1.16.0.tar.gz -O ${KUBE_HOME}/rkt.tar
+    fi
+    if [[ ! -e ${KUBE_HOME}/bin/rkt-v1.16.0/rkt ]]; then
+	tar -zxvf ${KUBE_HOME}/rkt.tar -C ${KUBE_HOME}/bin/
+    fi
+    if [[ ! -e ${KUBE_HOME}/bin/rkt ]]; then
+	ln -s ${KUBE_HOME}/bin/rkt-v1.16.0/rkt ${KUBE_HOME}/bin/rkt
+    fi 
 }
 
 ########### Main Function ###########
