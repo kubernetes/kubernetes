@@ -55,7 +55,7 @@ Note, this example uses an NFS container that doesn't support NFSv4.
 [nfs pv example]: nfs-pv.png
 
 
-## tl;dr Quickstart
+## Quickstart
 
 ```console
 $ kubectl create -f examples/volumes/nfs/provisioner/nfs-server-gce-pv.yaml
