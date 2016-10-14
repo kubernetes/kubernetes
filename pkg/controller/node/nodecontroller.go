@@ -399,6 +399,10 @@ func (nc *NodeController) Run() {
 
 	// Incorporate the results of node status pushed from kubelet to master.
 	go wait.Until(func() {
+		if !nc.nodeController.HasSynced() || !nc.podController.HasSynced() || !nc.daemonSetController.HasSynced() {
+			glog.V(2).Infof("NodeController is waiting for informers to sync...")
+			return
+		}
 		if err := nc.monitorNodeStatus(); err != nil {
 			glog.Errorf("Error monitoring node status: %v", err)
 		}
@@ -417,6 +421,10 @@ func (nc *NodeController) Run() {
 	//    c. If there are pods still terminating, wait for their estimated completion
 	//       before retrying
 	go wait.Until(func() {
+		if !nc.nodeController.HasSynced() || !nc.podController.HasSynced() || !nc.daemonSetController.HasSynced() {
+			glog.V(2).Infof("NodeController is waiting for informers to sync...")
+			return
+		}
 		nc.evictorLock.Lock()
 		defer nc.evictorLock.Unlock()
 		for k := range nc.zonePodEvictor {
@@ -450,6 +458,10 @@ func (nc *NodeController) Run() {
 	// TODO: replace with a controller that ensures pods that are terminating complete
 	// in a particular time period
 	go wait.Until(func() {
+		if !nc.nodeController.HasSynced() || !nc.podController.HasSynced() || !nc.daemonSetController.HasSynced() {
+			glog.V(2).Infof("NodeController is waiting for informers to sync...")
+			return
+		}
 		nc.evictorLock.Lock()
 		defer nc.evictorLock.Unlock()
 		for k := range nc.zoneTerminationEvictor {
@@ -478,6 +490,10 @@ func (nc *NodeController) Run() {
 	}, nodeEvictionPeriod, wait.NeverStop)
 
 	go wait.Until(func() {
+		if !nc.nodeController.HasSynced() || !nc.podController.HasSynced() || !nc.daemonSetController.HasSynced() {
+			glog.V(2).Infof("NodeController is waiting for informers to sync...")
+			return
+		}
 		pods, err := nc.podStore.List(labels.Everything())
 		if err != nil {
 			utilruntime.HandleError(err)
