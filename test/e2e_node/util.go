@@ -22,9 +22,14 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"strconv"
 	"strings"
 
+	"github.com/golang/glog"
+
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
+	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 // TODO(random-liu): Get this automatically from kubelet flag.
@@ -59,4 +64,58 @@ func getNodeSummary() (*stats.Summary, error) {
 		return nil, fmt.Errorf("failed to parse /stats/summary to go struct: %+v", resp)
 	}
 	return &summary, nil
+}
+
+func createMemhogPod(f *framework.Framework, genName string, ctnName string, res api.ResourceRequirements, noWait bool) *api.Pod {
+	env := []api.EnvVar{
+		{
+			Name: "MEMORY_LIMIT",
+			ValueFrom: &api.EnvVarSource{
+				ResourceFieldRef: &api.ResourceFieldSelector{
+					Resource: "limits.memory",
+				},
+			},
+		},
+	}
+
+	// If there is a limit specified, pass 80% of it for -mem-total, otherwise use the downward API
+	// to pass limits.memory, which will be the total memory available.
+	// This helps prevent a guaranteed pod from triggering an OOM kill due to it's low memory limit,
+	// which will cause the test to fail inappropriately.
+	var memLimit string
+	if limit, ok := res.Limits["memory"]; ok {
+		memLimit = strconv.Itoa(int(
+			float64(limit.Value()) * 0.6))
+	} else {
+		memLimit = "$(MEMORY_LIMIT)"
+	}
+	args := []string{"-mem-alloc-size", "12Mi", "-mem-alloc-sleep", "10s", "-mem-total", memLimit}
+	if noWait {
+		args = []string{"-mem-alloc-size", memLimit, "-mem-alloc-sleep", "10s", "-mem-total", memLimit}
+	}
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			GenerateName: genName,
+		},
+		Spec: api.PodSpec{
+			RestartPolicy: api.RestartPolicyNever,
+			Containers: []api.Container{
+				{
+					Name:            ctnName,
+					Image:           "gcr.io/google-containers/stress:v1",
+					ImagePullPolicy: "Always",
+					Env:             env,
+					// 60 min timeout * 60s / tick per 10s = 360 ticks before timeout => ~11.11Mi/tick
+					// to fill ~4Gi of memory, so initial ballpark 12Mi/tick.
+					// We might see flakes due to timeout if the total memory on the nodes increases.
+					Args:      args,
+					Resources: res,
+				},
+			},
+		},
+	}
+	// The generated pod.Name will be on the pod spec returned by CreateSync
+	pod = f.PodClient().CreateSync(pod)
+	glog.Infof("pod created with name: %s", pod.Name)
+	return pod
 }
