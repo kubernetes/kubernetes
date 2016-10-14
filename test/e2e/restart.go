@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
+	testutils "k8s.io/kubernetes/test/utils"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -55,14 +56,14 @@ func filterIrrelevantPods(pods []*api.Pod) []*api.Pod {
 
 var _ = framework.KubeDescribe("Restart [Disruptive]", func() {
 	f := framework.NewDefaultFramework("restart")
-	var ps *framework.PodStore
+	var ps *testutils.PodStore
 
 	BeforeEach(func() {
 		// This test requires the ability to restart all nodes, so the provider
 		// check must be identical to that call.
 		framework.SkipUnlessProviderIs("gce", "gke")
 
-		ps = framework.NewPodStore(f.Client, api.NamespaceSystem, labels.Everything(), fields.Everything())
+		ps = testutils.NewPodStore(f.Client, api.NamespaceSystem, labels.Everything(), fields.Everything())
 	})
 
 	AfterEach(func() {
@@ -125,7 +126,7 @@ var _ = framework.KubeDescribe("Restart [Disruptive]", func() {
 
 // waitForNPods tries to list pods using c until it finds expect of them,
 // returning their names if it can do so before timeout.
-func waitForNPods(ps *framework.PodStore, expect int, timeout time.Duration) ([]string, error) {
+func waitForNPods(ps *testutils.PodStore, expect int, timeout time.Duration) ([]string, error) {
 	// Loop until we find expect pods or timeout is passed.
 	var pods []*api.Pod
 	var errLast error

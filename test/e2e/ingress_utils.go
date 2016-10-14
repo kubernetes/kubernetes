@@ -53,6 +53,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/wait"
 	utilyaml "k8s.io/kubernetes/pkg/util/yaml"
 	"k8s.io/kubernetes/test/e2e/framework"
+	testutils "k8s.io/kubernetes/test/utils"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -859,7 +860,7 @@ func (cont *NginxIngressController) init() {
 
 	framework.Logf("waiting for pods with label %v", rc.Spec.Selector)
 	sel := labels.SelectorFromSet(labels.Set(rc.Spec.Selector))
-	ExpectNoError(framework.WaitForPodsWithLabelRunning(cont.c, cont.ns, sel))
+	ExpectNoError(testutils.WaitForPodsWithLabelRunning(cont.c, cont.ns, sel))
 	pods, err := cont.c.Pods(cont.ns).List(api.ListOptions{LabelSelector: sel})
 	ExpectNoError(err)
 	if len(pods.Items) == 0 {

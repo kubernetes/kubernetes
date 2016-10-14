@@ -40,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/watch"
+	testutils "k8s.io/kubernetes/test/utils"
 )
 
 const (
@@ -571,7 +572,7 @@ var _ = framework.KubeDescribe("Nodes [Disruptive]", func() {
 				}
 				node := nodes.Items[0]
 				podOpts = api.ListOptions{FieldSelector: fields.OneTermEqualSelector(api.PodHostField, node.Name)}
-				if err = framework.WaitForMatchPodsCondition(c, podOpts, "Running and Ready", podReadyTimeout, framework.PodRunningReady); err != nil {
+				if err = framework.WaitForMatchPodsCondition(c, podOpts, "Running and Ready", podReadyTimeout, testutils.PodRunningReady); err != nil {
 					framework.Failf("Pods on node %s are not ready and running within %v: %v", node.Name, podReadyTimeout, err)
 				}
 
@@ -623,7 +624,7 @@ var _ = framework.KubeDescribe("Nodes [Disruptive]", func() {
 
 					By("Expect to observe node and pod status change from NotReady to Ready after network connectivity recovers")
 					expectNodeReadiness(true, newNode)
-					if err = framework.WaitForMatchPodsCondition(c, podOpts, "Running and Ready", podReadyTimeout, framework.PodRunningReady); err != nil {
+					if err = framework.WaitForMatchPodsCondition(c, podOpts, "Running and Ready", podReadyTimeout, testutils.PodRunningReady); err != nil {
 						framework.Failf("Pods on node %s did not become ready and running within %v: %v", node.Name, podReadyTimeout, err)
 					}
 				}()
@@ -632,7 +633,7 @@ var _ = framework.KubeDescribe("Nodes [Disruptive]", func() {
 
 				By("Expect to observe node and pod status change from Ready to NotReady after network partition")
 				expectNodeReadiness(false, newNode)
-				if err = framework.WaitForMatchPodsCondition(c, podOpts, "NotReady", podNotReadyTimeout, framework.PodNotReady); err != nil {
+				if err = framework.WaitForMatchPodsCondition(c, podOpts, "NotReady", podNotReadyTimeout, testutils.PodNotReady); err != nil {
 					framework.Failf("Pods on node %s did not become NotReady within %v: %v", node.Name, podNotReadyTimeout, err)
 				}
 			})
