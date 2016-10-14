@@ -32,7 +32,7 @@ type TestType struct {
 	// +optional
 	api.ObjectMeta `json:"metadata,omitempty"`
 	// +optional
-	Status         TestTypeStatus `json:"status,omitempty"`
+	Status TestTypeStatus `json:"status,omitempty"`
 }
 
 type TestTypeList struct {
