@@ -360,7 +360,7 @@ func (nc *NodeController) Run() {
 		defer utilruntime.HandleCrash()
 
 		if !cache.WaitForCacheSync(wait.NeverStop, nc.nodeInformer.Informer().HasSynced, nc.podInformer.Informer().HasSynced, nc.daemonSetInformer.Informer().HasSynced) {
-			glog.Errorf("NodeController timed out while waiting for informers to sync...")
+			utilruntime.HandleError(errors.New("NodeController timed out while waiting for informers to sync..."))
 			return
 		}
 
