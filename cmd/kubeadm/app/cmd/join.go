@@ -73,7 +73,7 @@ func RunJoin(out io.Writer, cmd *cobra.Command, args []string, s *kubeadmapi.Nod
 		fmt.Println("Running pre-flight checks")
 		err := preflight.RunJoinNodeChecks()
 		if err != nil {
-			return err
+			return &preflight.PreFlightError{Msg: err.Error()}
 		}
 	} else {
 		fmt.Println("Skipping pre-flight checks")
