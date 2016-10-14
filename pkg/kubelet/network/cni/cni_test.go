@@ -171,7 +171,7 @@ func TestCNIPlugin(t *testing.T) {
 	}
 
 	// Set up the pod
-	err = plug.SetUpPod("podNamespace", "podName", containerID)
+	err = plug.SetUpPod("podNamespace", "podName", containerID.ID)
 	if err != nil {
 		t.Errorf("Expected nil: %v", err)
 	}
@@ -188,7 +188,7 @@ func TestCNIPlugin(t *testing.T) {
 	}
 
 	// Get its IP address
-	status, err := plug.GetPodNetworkStatus("podNamespace", "podName", containerID)
+	status, err := plug.GetPodNetworkStatus("podNamespace", "podName", containerID.ID)
 	if err != nil {
 		t.Errorf("Failed to read pod network status: %v", err)
 	}
@@ -197,7 +197,7 @@ func TestCNIPlugin(t *testing.T) {
 	}
 
 	// Tear it down
-	err = plug.TearDownPod("podNamespace", "podName", containerID)
+	err = plug.TearDownPod("podNamespace", "podName", containerID.ID)
 	if err != nil {
 		t.Errorf("Expected nil: %v", err)
 	}

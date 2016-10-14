@@ -26,7 +26,6 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
-	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/kubelet/network/cni/testing"
 	hostporttest "k8s.io/kubernetes/pkg/kubelet/network/hostport/testing"
@@ -108,7 +107,7 @@ func TestGetPodNetworkStatus(t *testing.T) {
 	fakeKubenet := newFakeKubenetPlugin(podIPMap, &fexec, fhost)
 
 	for i, tc := range testCases {
-		out, err := fakeKubenet.GetPodNetworkStatus("", "", kubecontainer.ContainerID{ID: tc.id})
+		out, err := fakeKubenet.GetPodNetworkStatus("", "", tc.id)
 		if tc.expectError {
 			if err == nil {
 				t.Errorf("Test case %d expects error but got none", i)
@@ -149,8 +148,8 @@ func TestTeardownCallsShaper(t *testing.T) {
 	details[network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE_DETAIL_CIDR] = "10.0.0.1/24"
 	kubenet.Event(network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE, details)
 
-	existingContainerID := kubecontainer.BuildContainerID("docker", "123")
-	kubenet.podIPs[existingContainerID.ID] = "10.0.0.1"
+	existingContainerID := "123"
+	kubenet.podIPs[existingContainerID] = "10.0.0.1"
 
 	if err := kubenet.TearDownPod("namespace", "name", existingContainerID); err != nil {
 		t.Fatalf("Unexpected error in TearDownPod: %v", err)

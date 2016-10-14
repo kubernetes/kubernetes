@@ -30,7 +30,6 @@ import (
 	"text/template"
 
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
-	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	nettest "k8s.io/kubernetes/pkg/kubelet/network/testing"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -226,7 +225,7 @@ func TestPluginSetupHook(t *testing.T) {
 
 	plug, err := network.InitNetworkPlugin(ProbeNetworkPlugins(testPluginPath), pluginName, nettest.NewFakeHost(nil, nil, nil), componentconfig.HairpinNone, "10.0.0.0/8", network.UseDefaultMTU)
 
-	err = plug.SetUpPod("podNamespace", "podName", kubecontainer.ContainerID{Type: "docker", ID: "dockerid2345"})
+	err = plug.SetUpPod("podNamespace", "podName", "dockerid2345")
 	if err != nil {
 		t.Errorf("Expected nil: %v", err)
 	}
@@ -254,7 +253,7 @@ func TestPluginTearDownHook(t *testing.T) {
 
 	plug, err := network.InitNetworkPlugin(ProbeNetworkPlugins(testPluginPath), pluginName, nettest.NewFakeHost(nil, nil, nil), componentconfig.HairpinNone, "10.0.0.0/8", network.UseDefaultMTU)
 
-	err = plug.TearDownPod("podNamespace", "podName", kubecontainer.ContainerID{Type: "docker", ID: "dockerid2345"})
+	err = plug.TearDownPod("podNamespace", "podName", "dockerid2345")
 	if err != nil {
 		t.Errorf("Expected nil")
 	}
@@ -282,7 +281,7 @@ func TestPluginStatusHook(t *testing.T) {
 
 	plug, err := network.InitNetworkPlugin(ProbeNetworkPlugins(testPluginPath), pluginName, nettest.NewFakeHost(nil, nil, nil), componentconfig.HairpinNone, "10.0.0.0/8", network.UseDefaultMTU)
 
-	ip, err := plug.GetPodNetworkStatus("namespace", "name", kubecontainer.ContainerID{Type: "docker", ID: "dockerid2345"})
+	ip, err := plug.GetPodNetworkStatus("namespace", "name", "dockerid2345")
 	if err != nil {
 		t.Errorf("Expected nil got %v", err)
 	}
@@ -321,7 +320,7 @@ func TestPluginStatusHookIPv6(t *testing.T) {
 		t.Errorf("InitNetworkPlugin() failed: %v", err)
 	}
 
-	ip, err := plug.GetPodNetworkStatus("namespace", "name", kubecontainer.ContainerID{Type: "docker", ID: "dockerid2345"})
+	ip, err := plug.GetPodNetworkStatus("namespace", "name", "dockerid2345")
 	if err != nil {
 		t.Errorf("Status() failed: %v", err)
 	}

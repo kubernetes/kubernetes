@@ -24,7 +24,6 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
-	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/network/hostport"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
@@ -66,16 +65,13 @@ type NetworkPlugin interface {
 	// SetUpPod is the method called after the infra container of
 	// the pod has been created but before the other containers of the
 	// pod are launched.
-	// TODO: rename podInfraContainerID to sandboxID
-	SetUpPod(namespace string, name string, podInfraContainerID kubecontainer.ContainerID) error
+	SetUpPod(namespace string, name string, podSandboxID string) error
 
 	// TearDownPod is the method called before a pod's infra container will be deleted
-	// TODO: rename podInfraContainerID to sandboxID
-	TearDownPod(namespace string, name string, podInfraContainerID kubecontainer.ContainerID) error
+	TearDownPod(namespace string, name string, podSandboxID string) error
 
 	// Status is the method called to obtain the ipv4 or ipv6 addresses of the container
-	// TODO: rename podInfraContainerID to sandboxID
-	GetPodNetworkStatus(namespace string, name string, podInfraContainerID kubecontainer.ContainerID) (*PodNetworkStatus, error)
+	GetPodNetworkStatus(namespace string, name string, podSandboxID string) (*PodNetworkStatus, error)
 
 	// NetworkStatus returns error if the network plugin is in error state
 	Status() error
@@ -185,15 +181,15 @@ func (plugin *NoopNetworkPlugin) Capabilities() utilsets.Int {
 	return utilsets.NewInt()
 }
 
-func (plugin *NoopNetworkPlugin) SetUpPod(namespace string, name string, id kubecontainer.ContainerID) error {
+func (plugin *NoopNetworkPlugin) SetUpPod(namespace string, name string, podSandboxID string) error {
 	return nil
 }
 
-func (plugin *NoopNetworkPlugin) TearDownPod(namespace string, name string, id kubecontainer.ContainerID) error {
+func (plugin *NoopNetworkPlugin) TearDownPod(namespace string, name string, podSandboxID string) error {
 	return nil
 }
 
-func (plugin *NoopNetworkPlugin) GetPodNetworkStatus(namespace string, name string, id kubecontainer.ContainerID) (*PodNetworkStatus, error) {
+func (plugin *NoopNetworkPlugin) GetPodNetworkStatus(namespace string, name string, podSandboxID string) (*PodNetworkStatus, error) {
 	return nil, nil
 }
 

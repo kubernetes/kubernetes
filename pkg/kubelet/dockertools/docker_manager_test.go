@@ -2284,7 +2284,7 @@ func TestGetPodStatusFromNetworkPlugin(t *testing.T) {
 		if test.fakePodIP != "" {
 			podNetworkStatus = &network.PodNetworkStatus{IP: net.ParseIP(test.fakePodIP)}
 		}
-		fnp.EXPECT().GetPodNetworkStatus(test.pod.Namespace, test.pod.Name, kubecontainer.DockerID(test.infraContainerID).ContainerID()).Return(podNetworkStatus, test.networkStatusError)
+		fnp.EXPECT().GetPodNetworkStatus(test.pod.Namespace, test.pod.Name, test.infraContainerID).Return(podNetworkStatus, test.networkStatusError)
 
 		podStatus, err := dm.GetPodStatus(test.pod.UID, test.pod.Name, test.pod.Namespace)
 		if err != nil {

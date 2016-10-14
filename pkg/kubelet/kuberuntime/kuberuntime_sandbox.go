@@ -179,10 +179,7 @@ func (m *kubeGenericRuntimeManager) determinePodSandboxIP(podNamespace, podName 
 
 	if m.networkPlugin.Name() != network.DefaultPluginName {
 		// TODO: podInfraContainerID in GetPodNetworkStatus() interface should be renamed to sandboxID
-		netStatus, err := m.networkPlugin.GetPodNetworkStatus(podNamespace, podName, kubecontainer.ContainerID{
-			Type: m.runtimeName,
-			ID:   podSandbox.GetId(),
-		})
+		netStatus, err := m.networkPlugin.GetPodNetworkStatus(podNamespace, podName, podSandbox.GetId())
 		if err != nil {
 			glog.Errorf("NetworkPlugin %s failed on the status hook for pod '%s' - %v", m.networkPlugin.Name(), kubecontainer.BuildPodFullName(podName, podNamespace), err)
 		} else if netStatus != nil {

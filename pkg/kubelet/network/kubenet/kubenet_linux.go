@@ -33,7 +33,6 @@ import (
 	"github.com/vishvananda/netlink/nl"
 	"io/ioutil"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
-	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/util/bandwidth"
 	utildbus "k8s.io/kubernetes/pkg/util/dbus"
@@ -328,23 +327,23 @@ func (plugin *kubenetNetworkPlugin) Capabilities() utilsets.Int {
 	return utilsets.NewInt(network.NET_PLUGIN_CAPABILITY_SHAPING)
 }
 
-func (plugin *kubenetNetworkPlugin) setup(namespace string, name string, id kubecontainer.ContainerID, podAnnotation map[string]string) error {
+func (plugin *kubenetNetworkPlugin) setup(namespace string, name string, podSandboxID string, podAnnotation map[string]string) error {
 	// Bring up container loopback interface
-	if _, err := plugin.addContainerToNetwork(plugin.loConfig, "lo", namespace, name, id); err != nil {
+	if _, err := plugin.addContainerToNetwork(plugin.loConfig, "lo", namespace, name, podSandboxID); err != nil {
 		return err
 	}
 
 	// Hook container up with our bridge
-	res, err := plugin.addContainerToNetwork(plugin.netConfig, network.DefaultInterfaceName, namespace, name, id)
+	res, err := plugin.addContainerToNetwork(plugin.netConfig, network.DefaultInterfaceName, namespace, name, podSandboxID)
 	if err != nil {
 		return err
 	}
 	if res.IP4 == nil {
-		return fmt.Errorf("CNI plugin reported no IPv4 address for container %v.", id)
+		return fmt.Errorf("CNI plugin reported no IPv4 address for container %v.", podSandboxID)
 	}
 	ip4 := res.IP4.IP.IP.To4()
 	if ip4 == nil {
-		return fmt.Errorf("CNI plugin reported an invalid IPv4 address for container %v: %+v.", id, res.IP4)
+		return fmt.Errorf("CNI plugin reported an invalid IPv4 address for container %v: %+v.", podSandboxID, res.IP4)
 	}
 
 	// Explicitly assign mac address to cbr0. If bridge mac address is not explicitly set will adopt the lowest MAC address of the attached veths.
@@ -391,7 +390,7 @@ func (plugin *kubenetNetworkPlugin) setup(namespace string, name string, id kube
 			return fmt.Errorf("Failed to add pod to shaper: %v", err)
 		}
 	}
-	plugin.podIPs[id.ID] = ip4.String()
+	plugin.podIPs[podSandboxID] = ip4.String()
 
 	// Handle hostport if specified
 	activePodHostportMapping, err := plugin.getActivePodPortMapping()
@@ -410,7 +409,7 @@ func (plugin *kubenetNetworkPlugin) setup(namespace string, name string, id kube
 	return nil
 }
 
-func (plugin *kubenetNetworkPlugin) SetUpPod(namespace string, name string, id kubecontainer.ContainerID) error {
+func (plugin *kubenetNetworkPlugin) SetUpPod(namespace string, name string, podSandboxID string) error {
 	plugin.mu.Lock()
 	defer plugin.mu.Unlock()
 
@@ -423,7 +422,7 @@ func (plugin *kubenetNetworkPlugin) SetUpPod(namespace string, name string, id k
 	//if !ok {
 	//	return fmt.Errorf("pod %q cannot be found", name)
 	//}
-	podAnnotation, err := plugin.host.GetPodAnnotations(namespace, name, id.ID)
+	podAnnotation, err := plugin.host.GetPodAnnotations(namespace, name, podSandboxID)
 	if err != nil {
 		return err
 	}
@@ -432,10 +431,10 @@ func (plugin *kubenetNetworkPlugin) SetUpPod(namespace string, name string, id k
 		return fmt.Errorf("Kubenet cannot SetUpPod: %v", err)
 	}
 
-	if err := plugin.setup(namespace, name, id, podAnnotation); err != nil {
+	if err := plugin.setup(namespace, name, podSandboxID, podAnnotation); err != nil {
 		// Make sure everything gets cleaned up on errors
-		podIP, _ := plugin.podIPs[id.ID]
-		if err := plugin.teardown(namespace, name, id, podIP); err != nil {
+		podIP, _ := plugin.podIPs[podSandboxID]
+		if err := plugin.teardown(namespace, name, podSandboxID, podIP); err != nil {
 			// Not a hard error or warning
 			glog.V(4).Infof("Failed to clean up %s/%s after SetUpPod failure: %v", namespace, name, err)
 		}
@@ -452,7 +451,7 @@ func (plugin *kubenetNetworkPlugin) SetUpPod(namespace string, name string, id k
 
 // Tears down as much of a pod's network as it can even if errors occur.  Returns
 // an aggregate error composed of all errors encountered during the teardown.
-func (plugin *kubenetNetworkPlugin) teardown(namespace string, name string, id kubecontainer.ContainerID, podIP string) error {
+func (plugin *kubenetNetworkPlugin) teardown(namespace string, name string, podSandboxID string, podIP string) error {
 	errList := []error{}
 
 	if podIP != "" {
@@ -463,10 +462,10 @@ func (plugin *kubenetNetworkPlugin) teardown(namespace string, name string, id k
 			glog.V(4).Infof("Failed to remove pod IP %s from shaper: %v", podIP, err)
 		}
 
-		delete(plugin.podIPs, id.ID)
+		delete(plugin.podIPs, podSandboxID)
 	}
 
-	if err := plugin.delContainerFromNetwork(plugin.netConfig, network.DefaultInterfaceName, namespace, name, id); err != nil {
+	if err := plugin.delContainerFromNetwork(plugin.netConfig, network.DefaultInterfaceName, namespace, name, podSandboxID); err != nil {
 		// This is to prevent returning error when TearDownPod is called twice on the same pod. This helps to reduce event pollution.
 		if podIP != "" {
 			glog.Warningf("Failed to delete container from kubenet: %v", err)
@@ -486,7 +485,7 @@ func (plugin *kubenetNetworkPlugin) teardown(namespace string, name string, id k
 	return utilerrors.NewAggregate(errList)
 }
 
-func (plugin *kubenetNetworkPlugin) TearDownPod(namespace string, name string, id kubecontainer.ContainerID) error {
+func (plugin *kubenetNetworkPlugin) TearDownPod(namespace string, name string, podSandboxID string) error {
 	plugin.mu.Lock()
 	defer plugin.mu.Unlock()
 
@@ -500,8 +499,8 @@ func (plugin *kubenetNetworkPlugin) TearDownPod(namespace string, name string, i
 	}
 
 	// no cached IP is Ok during teardown
-	podIP, _ := plugin.podIPs[id.ID]
-	if err := plugin.teardown(namespace, name, id, podIP); err != nil {
+	podIP, _ := plugin.podIPs[podSandboxID]
+	if err := plugin.teardown(namespace, name, podSandboxID, podIP); err != nil {
 		return err
 	}
 
@@ -515,15 +514,15 @@ func (plugin *kubenetNetworkPlugin) TearDownPod(namespace string, name string, i
 
 // TODO: Use the addToNetwork function to obtain the IP of the Pod. That will assume idempotent ADD call to the plugin.
 // Also fix the runtime's call to Status function to be done only in the case that the IP is lost, no need to do periodic calls
-func (plugin *kubenetNetworkPlugin) GetPodNetworkStatus(namespace string, name string, id kubecontainer.ContainerID) (*network.PodNetworkStatus, error) {
+func (plugin *kubenetNetworkPlugin) GetPodNetworkStatus(namespace string, name string, podSandboxID string) (*network.PodNetworkStatus, error) {
 	plugin.mu.Lock()
 	defer plugin.mu.Unlock()
 	// Assuming the ip of pod does not change. Try to retrieve ip from kubenet map first.
-	if podIP, ok := plugin.podIPs[id.ID]; ok {
+	if podIP, ok := plugin.podIPs[podSandboxID]; ok {
 		return &network.PodNetworkStatus{IP: net.ParseIP(podIP)}, nil
 	}
 
-	netnsPath, err := plugin.host.GetPodSandboxNetNS(id.ID)
+	netnsPath, err := plugin.host.GetPodSandboxNetNS(podSandboxID)
 	if err != nil {
 		return nil, fmt.Errorf("Kubenet failed to retrieve network namespace path: %v", err)
 	}
@@ -532,7 +531,7 @@ func (plugin *kubenetNetworkPlugin) GetPodNetworkStatus(namespace string, name s
 		return nil, err
 	}
 
-	plugin.podIPs[id.ID] = ip.String()
+	plugin.podIPs[podSandboxID] = ip.String()
 	return &network.PodNetworkStatus{IP: ip}, nil
 }
 
@@ -608,21 +607,21 @@ func (plugin *kubenetNetworkPlugin) getActivePodPortMapping() ([]*hostport.PodPo
 	return activePodHostportMapping, nil
 }
 
-func (plugin *kubenetNetworkPlugin) buildCNIRuntimeConf(ifName string, id kubecontainer.ContainerID) (*libcni.RuntimeConf, error) {
-	netnsPath, err := plugin.host.GetPodSandboxNetNS(id.ID)
+func (plugin *kubenetNetworkPlugin) buildCNIRuntimeConf(ifName string, podSandboxID string) (*libcni.RuntimeConf, error) {
+	netnsPath, err := plugin.host.GetPodSandboxNetNS(podSandboxID)
 	if err != nil {
 		return nil, fmt.Errorf("Kubenet failed to retrieve network namespace path: %v", err)
 	}
 
 	return &libcni.RuntimeConf{
-		ContainerID: id.ID,
+		ContainerID: podSandboxID,
 		NetNS:       netnsPath,
 		IfName:      ifName,
 	}, nil
 }
 
-func (plugin *kubenetNetworkPlugin) addContainerToNetwork(config *libcni.NetworkConfig, ifName, namespace, name string, id kubecontainer.ContainerID) (*cnitypes.Result, error) {
-	rt, err := plugin.buildCNIRuntimeConf(ifName, id)
+func (plugin *kubenetNetworkPlugin) addContainerToNetwork(config *libcni.NetworkConfig, ifName, namespace, name string, podSandboxID string) (*cnitypes.Result, error) {
+	rt, err := plugin.buildCNIRuntimeConf(ifName, podSandboxID)
 	if err != nil {
 		return nil, fmt.Errorf("Error building CNI config: %v", err)
 	}
@@ -635,8 +634,8 @@ func (plugin *kubenetNetworkPlugin) addContainerToNetwork(config *libcni.Network
 	return res, nil
 }
 
-func (plugin *kubenetNetworkPlugin) delContainerFromNetwork(config *libcni.NetworkConfig, ifName, namespace, name string, id kubecontainer.ContainerID) error {
-	rt, err := plugin.buildCNIRuntimeConf(ifName, id)
+func (plugin *kubenetNetworkPlugin) delContainerFromNetwork(config *libcni.NetworkConfig, ifName, namespace, name string, podSandboxID string) error {
+	rt, err := plugin.buildCNIRuntimeConf(ifName, podSandboxID)
 	if err != nil {
 		return fmt.Errorf("Error building CNI config: %v", err)
 	}

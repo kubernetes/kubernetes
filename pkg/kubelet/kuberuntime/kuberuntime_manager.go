@@ -646,10 +646,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *api.Pod, _ api.PodStatus, podSt
 			glog.V(3).Infof("Calling network plugin %s to setup pod for %s", m.networkPlugin.Name(), format.Pod(pod))
 			// Setup pod network plugin with sandbox id
 			// TODO: rename the last param to sandboxID
-			err = m.networkPlugin.SetUpPod(pod.Namespace, pod.Name, kubecontainer.ContainerID{
-				Type: m.runtimeName,
-				ID:   podSandboxID,
-			})
+			err = m.networkPlugin.SetUpPod(pod.Namespace, pod.Name, podSandboxID)
 			if err != nil {
 				message := fmt.Sprintf("Failed to setup network for pod %q using network plugins %q: %v", format.Pod(pod), m.networkPlugin.Name(), err)
 				setupNetworkResult.Fail(kubecontainer.ErrSetupNetwork, message)
@@ -830,10 +827,7 @@ func (m *kubeGenericRuntimeManager) killPodWithSyncResult(pod *api.Pod, runningP
 		teardownNetworkResult := kubecontainer.NewSyncResult(kubecontainer.TeardownNetwork, runningPod.ID)
 		result.AddSyncResult(teardownNetworkResult)
 		// Tear down network plugin with sandbox id
-		if err := m.networkPlugin.TearDownPod(runningPod.Namespace, runningPod.Name, kubecontainer.ContainerID{
-			Type: m.runtimeName,
-			ID:   sandboxID,
-		}); err != nil {
+		if err := m.networkPlugin.TearDownPod(runningPod.Namespace, runningPod.Name, sandboxID); err != nil {
 			message := fmt.Sprintf("Failed to teardown network for pod %s_%s(%s) using network plugins %q: %v",
 				runningPod.Name, runningPod.Namespace, runningPod.ID, m.networkPlugin.Name(), err)
 			teardownNetworkResult.Fail(kubecontainer.ErrTeardownNetwork, message)
