@@ -118,10 +118,11 @@ Pod termination is divided into the following steps:
   * If no grace period is provided, the default from the pod is leveraged
 * When the kubelet observes the deletion, it starts a timer equal to the
   grace period and performs the following actions:
-  * Executes the pre-stop hook, if specified, waiting up **grace period**
-    before continuing
-  * Sends the termination signal to the container runtime (SIGTERM)
-  * Waits 2 seconds, or the remaining grace period, which ever is longer
+  * Executes the pre-stop hook, if specified, waiting up to **grace period**
+    seconds before continuing
+  * Sends the termination signal to the container runtime (SIGTERM or the
+    container image's STOPSIGNAL on Docker)
+  * Waits 2 seconds, or the remaining grace period, whichever is longer
   * Sends the force termination signal to the container runtime (SIGKILL)
 * Once the kubelet observes the container is fully terminated, it issues
   a status update to the REST API for the pod indicating termination, then
@@ -141,7 +142,7 @@ force deleting a pod means that the pod processes may continue
 to run for an arbitary amount of time. If a higher level component like the
 PetSet controller treats the existence of the pod API object as a strongly
 consistent entity, deleting the pod in this fashion will violate the
-at-most-one guarantees we wish to offer for pet sets.
+at-most-one guarantee we wish to offer for pet sets.
 
 
 ### Guarantees provided by replica sets and replication controllers
@@ -149,9 +150,9 @@ at-most-one guarantees we wish to offer for pet sets.
 ReplicaSets and ReplicationControllers both attempt to preserve availability
 of their constituent pods over ensuring **at most one** semantics. So a
 replica set to scale 1 will immediately create a new pod when it observes an
-old pod is delete, and as a result at many points in the lifetime of a replica
-set there will be 2 copies of a pod's processes running concurrently. Only
-access to exclusive resources like storage can prevent that simultaneous
+old pod has been deleted, and as a result at many points in the lifetime of
+a replica set there will be 2 copies of a pod's processes running concurrently.
+Only access to exclusive resources like storage can prevent that simultaneous
 execution.
 
 Deployments, being based on replica sets, can offer no stronger guarantee.
@@ -170,7 +171,7 @@ If a PV is assigned a iSCSI, Fibre Channel, or NFS mount point and that PV
 is used by two pods on different nodes simultaneously, concurrent access may
 result in corruption, even if the PV or PVC is identified as "read write one".
 PVC consumers must ensure these volume types are *never* referenced from
-mulitple pods without some external synchronization. As described above, it
+multiple pods without some external synchronization. As described above, it
 is not safe to use persistent volumes that lack RWO guarantees with a
 replica set or deployment, even at scale 1.
 
@@ -193,11 +194,12 @@ To do that, we will:
 * Application owners must be free to force delete pods, but they *must*
   understand the implications of doing so, and all client UI must be able
   to communicate those implications.
-* All existing controllers in the system must be limited signaling pod
+* All existing controllers in the system must be limited to signaling pod
   termination (starting graceful deletion), and are not allowed to force
   delete a pod.
   * The node controller will no longer be allowed to force delete pods -
-    it may only signal deletion
+    it may only signal deletion by beginning (but not completing) a
+    graceful deletion.
   * The GC controller may not force delete pods
   * The namespace controller used to force delete pods, but no longer
     does so. This means a node partition can block namespace deletion
@@ -236,8 +238,20 @@ The changes above allow Pet Sets to ensure at-most-one pod, but provide no
 recourse for the automatic resolution of cluster partitions during normal
 operation. For that, we propose a **fencing controller** which exists above
 the current controller plane and is capable of detecting and automatically
-resolving partitions. While the methods and algorithms may vary, the basic
-pattern would be:
+resolving partitions. The fencing controller is an agent empowered to make
+similar decisions as a human administrator would make to resolve partitions,
+and to take corresponding steps to prevent a dead machine from coming back
+to life automatically.
+
+Fencing controllers most benefit services that are not innately replicated
+by reducing the amount of time it takes to detect a failure of a node or
+process, isolate that node or process so it cannot initiate or receive
+communication from clients, and then spawn another process. It is expected
+that many PetSets of size 1 would prefer to be fenced, given that most
+applications in the real world of size 1 have no other alternative for HA
+except reducing mean-time-to-recovery.
+
+While the methods and algorithms may vary, the basic pattern would be:
 
 1. Detect a partitioned pod or node via the Kubernetes API or via external
    means.
@@ -254,7 +268,7 @@ would be able to leverage a number of systems including but not limited to:
 * Additional agents running on each host to force kill process or trigger reboots
 * Agents integrated with or communicating with hypervisors running hosts to stop VMs
 * Hardware IPMI interfaces to reboot a host
-* Rack level power units to power cycle a blad
+* Rack level power units to power cycle a blade
 * Network routers, backplane switches, software defined networks, or system firewalls
 * Storage server APIs to block client access
 
@@ -270,6 +284,15 @@ It may be desirable for users to be able to request fencing when they suspect a
 component is malfunctioning. It is outside the scope of this proposal but would
 allow administrators to take an action that is safer than force deletion, and
 decide at the end whether to force delete.
+
+How the fencing controller decides to fence is left undefined, but it is likely
+it could use a combination of pod forgiveness (as a signal of how much disruption
+a pod author is likely to accept) and pod disruption budget (as a measurement of
+the amount of disruption already undergone) to measure how much latency between
+failure and fencing the app is willing to tolerate. Likewise, it can use its own
+understanding of the latency of the various failure detectors - the node controller,
+any hypothetical information it gathers from service proxies or node peers, any
+heartbeat agents in the system - to describe an upper bound on reaction.
 
 
 ### Storage Consistency
@@ -304,8 +327,8 @@ Possible sequence of operations:
 5. The kubelet on node `A` observes the pod references a PVC that specifies RWO which
    requires "attach" to be successful
 6. The attach/detach controller observes that a pod has been bound with a PVC that
-   requires "attach", and attempts to execute a CAS update on the PVC/PV attaching
-   it to node `A` and pod 1
+   requires "attach", and attempts to execute a compare and swap update on the PVC/PV
+   attaching it to node `A` and pod 1
 7. The kubelet observes the attach of the PVC/PV and executes the pod
 8. The user terminates the pod
 9. The user creates a new pod that references the PVC
@@ -382,6 +405,14 @@ would be desirable, although possibly non-blocking for this proposal.
 
 ## Open Questions
 
+* Should node deletion be treated as "node was down and all processes terminated"
+  * Pro: it's a convenient signal that we use in other places today
+  * Con: the kubelet recreates its Node object, so if a node is partitioned and
+    the admin deletes the node, when the partition is healed the node would be
+    recreated, and the processes are *definitely* not terminated
+  * Implies we must alter the pod GC controller to only signal graceful deletion,
+    and only to flag pods on nodes that don't exist as partitioned, rather than
+    force deleting them.
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/proposals/pod-termination.md?pixel)]()
