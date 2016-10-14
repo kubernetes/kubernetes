@@ -17,6 +17,7 @@ limitations under the License.
 package preflight
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -27,12 +28,11 @@ import (
 )
 
 type PreFlightError struct {
-	Msg   string
-	Count int
+	Msg string
 }
 
 func (e *PreFlightError) Error() string {
-	return fmt.Sprintf("preflight check error\n  count: %d \n  msg: %s", e.Count, e.Msg)
+	return fmt.Sprintf("preflight check errors:\n%s", e.Msg)
 }
 
 // PreFlightCheck validates the state of the system to ensure kubeadm will be
@@ -216,23 +216,20 @@ func RunJoinNodeChecks() error {
 func runChecks(checks []PreFlightCheck) error {
 	found := []error{}
 	for _, c := range checks {
-		warnings, errors := c.Check()
+		warnings, errs := c.Check()
 		for _, w := range warnings {
-			fmt.Printf("<preflight/checks> WARNING: %s\n", w)
+			fmt.Printf("WARNING: %s\n", w)
 		}
-		for _, e := range errors {
+		for _, e := range errs {
 			found = append(found, e)
 		}
 	}
 	if len(found) > 0 {
-		errors := "\n"
+		errs := ""
 		for _, i := range found {
-			errors += "\t" + i.Error() + "\n"
+			errs += "\t" + i.Error() + "\n"
 		}
-		return &PreFlightError{
-			Msg:   errors,
-			Count: len(found),
-		}
+		return errors.New(errs)
 	}
 	return nil
 }
