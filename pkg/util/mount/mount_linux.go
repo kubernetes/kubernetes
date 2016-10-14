@@ -185,12 +185,14 @@ func (mounter *Mounter) PathIsDevice(pathname string) (bool, error) {
 }
 
 func exclusiveOpenFailsOnDevice(pathname string) (bool, error) {
-	if isDevice, err := pathIsDevice(pathname); !isDevice {
+	// stat the path, return error if the path exists but is not a device
+	if isDevice, err := pathIsDevice(pathname); !isDevice && !os.IsNotExist(err) {
 		return false, fmt.Errorf(
 			"PathIsDevice failed for path %q: %v",
 			pathname,
 			err)
 	}
+	// open with O_EXCL flag. On Linux 2.6 and later, open() should fail if device is busy
 	fd, errno := syscall.Open(pathname, syscall.O_RDONLY|syscall.O_EXCL, 0)
 	// If the device is in use, open will return an invalid fd.
 	// When this happens, it is expected that Close will fail and throw an error.
@@ -208,11 +210,12 @@ func exclusiveOpenFailsOnDevice(pathname string) (bool, error) {
 
 func pathIsDevice(pathname string) (bool, error) {
 	finfo, err := os.Stat(pathname)
-	if os.IsNotExist(err) {
-		return false, nil
-	}
 	// err in call to os.Stat
 	if err != nil {
+		// if the device doesn't exist, log an error
+		if os.IsNotExist(err) {
+			glog.Warningf("device %s doesn't exist", pathname)
+		}
 		return false, err
 	}
 	// path refers to a device
