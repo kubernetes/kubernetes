@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -233,13 +232,12 @@ func AsVersionedObject(infos []*Info, forceList bool, version unversioned.GroupV
 	// validSpecifiedVersion resolves to true if the version passed to this function matches the
 	// version assigned to the converted object
 	actualVersion := object.GetObjectKind().GroupVersionKind()
-	validSpecifiedVersion := (actualVersion.Version == version.Version)
-	if !validSpecifiedVersion {
+	if actualVersion.Version != version.Version {
 		defaultVersionInfo := ""
 		if len(actualVersion.Version) > 0 {
-			defaultVersionInfo = fmt.Sprintf(", defaulting to %q", actualVersion.Version)
+			defaultVersionInfo = fmt.Sprintf("Defaulting to %q", actualVersion.Version)
 		}
-		glog.Warningf(" info: the output version specified is invalid%s\n", defaultVersionInfo)
+		fmt.Errorf(" info: the output version specified is invalid. %s\n", defaultVersionInfo)
 	}
 
 	return object, nil
