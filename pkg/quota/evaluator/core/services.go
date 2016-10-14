@@ -48,8 +48,16 @@ func NewServiceEvaluator(kubeClient clientset.Interface) quota.Evaluator {
 		MatchesScopeFunc:     generic.MatchesNoScopeFunc,
 		ConstraintsFunc:      ServiceConstraintsFunc,
 		UsageFunc:            ServiceUsageFunc,
-		ListFuncByNamespace: func(namespace string, options api.ListOptions) (runtime.Object, error) {
-			return kubeClient.Core().Services(namespace).List(options)
+		ListFuncByNamespace: func(namespace string, options api.ListOptions) ([]runtime.Object, error) {
+			itemList, err := kubeClient.Core().Services(namespace).List(options)
+			if err != nil {
+				return nil, err
+			}
+			results := make([]runtime.Object, 0, len(itemList.Items))
+			for i := range itemList.Items {
+				results = append(results, &itemList.Items[i])
+			}
+			return results, nil
 		},
 	}
 }

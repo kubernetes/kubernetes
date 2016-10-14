@@ -64,7 +64,7 @@ func TestQuota(t *testing.T) {
 
 	admissionCh := make(chan struct{})
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{QPS: -1, Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
-	admission, err := resourcequota.NewResourceQuota(clientset, quotainstall.NewRegistry(clientset), 5, admissionCh)
+	admission, err := resourcequota.NewResourceQuota(clientset, quotainstall.NewRegistry(clientset, nil), 5, admissionCh)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -85,7 +85,7 @@ func TestQuota(t *testing.T) {
 	go replicationcontroller.NewReplicationManagerFromClientForIntegration(clientset, controller.NoResyncPeriodFunc, replicationcontroller.BurstReplicas, 4096).
 		Run(3, controllerCh)
 
-	resourceQuotaRegistry := quotainstall.NewRegistry(clientset)
+	resourceQuotaRegistry := quotainstall.NewRegistry(clientset, nil)
 	groupKindsToReplenish := []unversioned.GroupKind{
 		api.Kind("Pod"),
 	}

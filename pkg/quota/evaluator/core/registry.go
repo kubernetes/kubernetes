@@ -19,13 +19,15 @@ package core
 import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/pkg/quota"
 	"k8s.io/kubernetes/pkg/quota/generic"
 )
 
 // NewRegistry returns a registry that knows how to deal with core kubernetes resources
-func NewRegistry(kubeClient clientset.Interface) quota.Registry {
-	pod := NewPodEvaluator(kubeClient)
+// If an informer factory is provided, evaluators will use them.
+func NewRegistry(kubeClient clientset.Interface, f informers.SharedInformerFactory) quota.Registry {
+	pod := NewPodEvaluator(kubeClient, f)
 	service := NewServiceEvaluator(kubeClient)
 	replicationController := NewReplicationControllerEvaluator(kubeClient)
 	resourceQuota := NewResourceQuotaEvaluator(kubeClient)
