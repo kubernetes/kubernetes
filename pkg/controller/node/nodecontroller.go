@@ -356,10 +356,24 @@ func NewNodeController(
 
 // Run starts an asynchronous loop that monitors the status of cluster nodes.
 func (nc *NodeController) Run() {
-	// Incorporate the results of node status pushed from kubelet to master.
-	go wait.Until(func() {
+	syncedChan := make(chan struct{})
+	syncFailedChan := make(chan struct{})
+
+	go func() {
 		if !cache.WaitForCacheSync(wait.NeverStop, nc.nodeInformer.Informer().HasSynced, nc.podInformer.Informer().HasSynced, nc.daemonSetInformer.Informer().HasSynced) {
 			glog.Errorf("NodeController timed out while waiting for informers to sync...")
+			close(syncFailedChan)
+			return
+		}
+
+		close(syncedChan)
+	}()
+
+	// Incorporate the results of node status pushed from kubelet to master.
+	go wait.Until(func() {
+		select {
+		case <-syncedChan:
+		case <-syncFailedChan:
 			return
 		}
 		if err := nc.monitorNodeStatus(); err != nil {
@@ -380,8 +394,9 @@ func (nc *NodeController) Run() {
 	//    c. If there are pods still terminating, wait for their estimated completion
 	//       before retrying
 	go wait.Until(func() {
-		if !cache.WaitForCacheSync(wait.NeverStop, nc.nodeInformer.Informer().HasSynced, nc.podInformer.Informer().HasSynced, nc.daemonSetInformer.Informer().HasSynced) {
-			glog.Errorf("NodeController timed out while waiting for informers to sync...")
+		select {
+		case <-syncedChan:
+		case <-syncFailedChan:
 			return
 		}
 		nc.evictorLock.Lock()
@@ -417,8 +432,9 @@ func (nc *NodeController) Run() {
 	// TODO: replace with a controller that ensures pods that are terminating complete
 	// in a particular time period
 	go wait.Until(func() {
-		if !cache.WaitForCacheSync(wait.NeverStop, nc.nodeInformer.Informer().HasSynced, nc.podInformer.Informer().HasSynced, nc.daemonSetInformer.Informer().HasSynced) {
-			glog.Errorf("NodeController timed out while waiting for informers to sync...")
+		select {
+		case <-syncedChan:
+		case <-syncFailedChan:
 			return
 		}
 		nc.evictorLock.Lock()
