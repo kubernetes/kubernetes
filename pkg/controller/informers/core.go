@@ -139,7 +139,7 @@ func (f *nodeInformer) Lister() *cache.StoreToNodeLister {
 // Interface provides constructor for informer and lister for persistent volume claims
 type PVCInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() *cache.StoreToPVCFetcher
+	Lister() *cache.StoreToPersistentVolumeClaimLister
 }
 
 type pvcInformer struct {
@@ -164,9 +164,9 @@ func (f *pvcInformer) Informer() cache.SharedIndexInformer {
 }
 
 // Lister returns lister for pvcInformer
-func (f *pvcInformer) Lister() *cache.StoreToPVCFetcher {
+func (f *pvcInformer) Lister() *cache.StoreToPersistentVolumeClaimLister {
 	informer := f.Informer()
-	return &cache.StoreToPVCFetcher{Store: informer.GetStore()}
+	return &cache.StoreToPersistentVolumeClaimLister{Indexer: informer.GetIndexer()}
 }
 
 //*****************************************************************************
@@ -291,7 +291,8 @@ func NewPVCInformer(client clientset.Interface, resyncPeriod time.Duration) cach
 		},
 		&api.PersistentVolumeClaim{},
 		resyncPeriod,
-		cache.Indexers{})
+		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
+	)
 
 	return sharedIndexInformer
 }
