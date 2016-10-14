@@ -50,7 +50,7 @@ import (
 func setUp(t *testing.T) (*etcdtesting.EtcdTestServer, Config, *assert.Assertions) {
 	etcdServer, _ := etcdtesting.NewUnsecuredEtcd3TestClientServer(t)
 
-	config := Config{}
+	config := NewConfig()
 	config.PublicAddress = net.ParseIP("192.168.10.4")
 	config.RequestContextMapper = api.NewRequestContextMapper()
 	config.ProxyDialer = func(network, addr string) (net.Conn, error) { return nil, nil }
@@ -59,7 +59,7 @@ func setUp(t *testing.T) (*etcdtesting.EtcdTestServer, Config, *assert.Assertion
 	config.LegacyAPIGroupPrefixes = sets.NewString("/api")
 	config.APIGroupPrefix = "/apis"
 
-	return etcdServer, config, assert.New(t)
+	return etcdServer, *config, assert.New(t)
 }
 
 func newMaster(t *testing.T) (*GenericAPIServer, *etcdtesting.EtcdTestServer, Config, *assert.Assertions) {
@@ -84,7 +84,6 @@ func TestNew(t *testing.T) {
 	assert.Equal(s.apiPrefix, config.APIGroupPrefix)
 	assert.Equal(s.admissionControl, config.AdmissionControl)
 	assert.Equal(s.RequestContextMapper(), config.RequestContextMapper)
-	assert.Equal(s.ClusterIP, config.PublicAddress)
 
 	// these values get defaulted
 	_, serviceClusterIPRange, _ := net.ParseCIDR("10.0.0.0/24")
@@ -109,7 +108,7 @@ func TestInstallAPIGroups(t *testing.T) {
 	config.LegacyAPIGroupPrefixes = sets.NewString("/apiPrefix")
 	config.APIGroupPrefix = "/apiGroupPrefix"
 
-	s, err := config.Complete().New()
+	s, err := config.SkipComplete().New()
 	if err != nil {
 		t.Fatalf("Error in bringing up the server: %v", err)
 	}
@@ -179,7 +178,7 @@ func TestCustomHandlerChain(t *testing.T) {
 		called = true
 	})
 
-	s, err := config.Complete().New()
+	s, err := config.SkipComplete().New()
 	if err != nil {
 		t.Fatalf("Error in bringing up the server: %v", err)
 	}
@@ -235,7 +234,7 @@ func TestNotRestRoutesHaveAuth(t *testing.T) {
 	config.EnableSwaggerSupport = true
 	config.EnableVersion = true
 
-	s, err := config.Complete().New()
+	s, err := config.SkipComplete().New()
 	if err != nil {
 		t.Fatalf("Error in bringing up the server: %v", err)
 	}
@@ -311,7 +310,6 @@ func TestInstallSwaggerAPI(t *testing.T) {
 	mux = http.NewServeMux()
 	server.HandlerContainer = genericmux.NewAPIContainer(mux, nil)
 	server.ExternalAddress = ""
-	server.ClusterIP = net.IPv4(10, 10, 10, 10)
 	server.InstallSwaggerAPI()
 	if assert.NotEqual(0, len(ws), "SwaggerAPI not installed.") {
 		assert.Equal("/swaggerapi/", ws[0].RootPath(), "SwaggerAPI did not install to the proper path. %s != /swaggerapi", ws[0].RootPath())

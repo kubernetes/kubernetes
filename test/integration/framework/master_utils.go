@@ -60,8 +60,6 @@ import (
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage/storagebackend"
-	utilnet "k8s.io/kubernetes/pkg/util/net"
-	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/watch"
 	"k8s.io/kubernetes/plugin/pkg/admission/admit"
@@ -69,7 +67,6 @@ import (
 
 	"github.com/go-openapi/spec"
 	"github.com/pborman/uuid"
-	"k8s.io/kubernetes/pkg/genericapiserver/openapi/common"
 )
 
 const (
@@ -346,21 +343,15 @@ func NewMasterConfig() *master.Config {
 		"",
 		NewSingleContentTypeSerializer(api.Scheme, testapi.Storage.Codec(), runtime.ContentTypeJSON))
 
+	genericConfig := genericapiserver.NewConfig()
+	genericConfig.APIResourceConfigSource = master.DefaultAPIResourceConfigSource()
+	genericConfig.Authorizer = authorizer.NewAlwaysAllowAuthorizer()
+	genericConfig.AdmissionControl = admit.NewAlwaysAdmit()
+	genericConfig.Serializer = api.Codecs
+	genericConfig.EnableOpenAPISupport = true
+
 	return &master.Config{
-		GenericConfig: &genericapiserver.Config{
-			APIResourceConfigSource: master.DefaultAPIResourceConfigSource(),
-			LegacyAPIGroupPrefixes:  sets.NewString("/api"),
-			APIGroupPrefix:          "/apis",
-			Authorizer:              authorizer.NewAlwaysAllowAuthorizer(),
-			AdmissionControl:        admit.NewAlwaysAdmit(),
-			Serializer:              api.Codecs,
-			// Set those values to avoid annoying warnings in logs.
-			ServiceClusterIPRange: parseCIDROrDie("10.0.0.0/24"),
-			ServiceNodePortRange:  utilnet.PortRange{Base: 30000, Size: 2768},
-			EnableVersion:         true,
-			EnableOpenAPISupport:  true,
-			OpenAPIConfig:         &common.Config{},
-		},
+		GenericConfig:         genericConfig,
 		StorageFactory:        storageFactory,
 		EnableCoreControllers: true,
 		EnableWatchCache:      true,
@@ -372,8 +363,6 @@ func NewMasterConfig() *master.Config {
 func NewIntegrationTestMasterConfig() *master.Config {
 	masterConfig := NewMasterConfig()
 	masterConfig.EnableCoreControllers = true
-	masterConfig.GenericConfig.EnableIndex = true
-	masterConfig.GenericConfig.EnableVersion = true
 	masterConfig.GenericConfig.PublicAddress = net.ParseIP("192.168.10.4")
 	masterConfig.GenericConfig.APIResourceConfigSource = master.DefaultAPIResourceConfigSource()
 	return masterConfig

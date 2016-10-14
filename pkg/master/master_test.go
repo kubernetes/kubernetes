@@ -49,7 +49,6 @@ import (
 	"k8s.io/kubernetes/pkg/client/restclient"
 	openapigen "k8s.io/kubernetes/pkg/generated/openapi"
 	"k8s.io/kubernetes/pkg/genericapiserver"
-	"k8s.io/kubernetes/pkg/genericapiserver/openapi/common"
 	"k8s.io/kubernetes/pkg/kubelet/client"
 	ipallocator "k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
@@ -71,9 +70,7 @@ func setUp(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.
 	server, storageConfig := etcdtesting.NewUnsecuredEtcd3TestClientServer(t)
 
 	config := &Config{
-		GenericConfig: &genericapiserver.Config{
-			OpenAPIConfig: &common.Config{},
-		},
+		GenericConfig: genericapiserver.NewConfig(),
 	}
 
 	resourceEncoding := genericapiserver.NewDefaultResourceEncodingConfig()
@@ -163,10 +160,6 @@ func newLimitedMaster(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Confi
 func TestNew(t *testing.T) {
 	master, etcdserver, config, assert := newMaster(t)
 	defer etcdserver.Terminate(t)
-
-	// Verify many of the variables match their config counterparts
-	assert.Equal(master.GenericAPIServer.RequestContextMapper(), config.GenericConfig.RequestContextMapper)
-	assert.Equal(master.GenericAPIServer.ClusterIP, config.GenericConfig.PublicAddress)
 
 	// these values get defaulted
 	_, serviceClusterIPRange, _ := net.ParseCIDR("10.0.0.0/24")

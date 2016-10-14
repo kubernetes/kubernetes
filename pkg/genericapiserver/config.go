@@ -52,6 +52,7 @@ import (
 	genericvalidation "k8s.io/kubernetes/pkg/genericapiserver/validation"
 	ipallocator "k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/runtime"
+	certutil "k8s.io/kubernetes/pkg/util/cert"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
@@ -196,63 +197,22 @@ type CertInfo struct {
 	Generate bool
 }
 
-func NewConfig(options *options.ServerRunOptions) *Config {
-	longRunningRE := regexp.MustCompile(options.LongRunningRequestRE)
+// NewConfig returns a Config struct with the default values
+func NewConfig() *Config {
+	longRunningRE := regexp.MustCompile(options.DefaultLongRunningRequestRE)
 
-	var auditWriter io.Writer
-	if len(options.AuditLogPath) != 0 {
-		auditWriter = &lumberjack.Logger{
-			Filename:   options.AuditLogPath,
-			MaxAge:     options.AuditLogMaxAge,
-			MaxBackups: options.AuditLogMaxBackups,
-			MaxSize:    options.AuditLogMaxSize,
-		}
-	}
+	config := &Config{
+		MasterCount:            1,
+		ReadWritePort:          6443,
+		ServiceReadWritePort:   443,
+		CacheTimeout:           5 * time.Second,
+		RequestContextMapper:   api.NewRequestContextMapper(),
+		BuildHandlerChainsFunc: DefaultBuildHandlerChain,
+		LegacyAPIGroupPrefixes: sets.NewString(LegacyAPIPrefix),
 
-	var secureServingInfo *ServingInfo
-	if options.SecurePort > 0 {
-		secureServingInfo = &ServingInfo{
-			BindAddress: net.JoinHostPort(options.BindAddress.String(), strconv.Itoa(options.SecurePort)),
-			ServerCert: CertInfo{
-				CertFile: options.TLSCertFile,
-				KeyFile:  options.TLSPrivateKeyFile,
-			},
-			ClientCA: options.ClientCAFile,
-		}
-		if options.TLSCertFile == "" && options.TLSPrivateKeyFile == "" {
-			secureServingInfo.ServerCert.Generate = true
-			secureServingInfo.ServerCert.CertFile = path.Join(options.CertDirectory, "apiserver.crt")
-			secureServingInfo.ServerCert.KeyFile = path.Join(options.CertDirectory, "apiserver.key")
-		}
-	}
-
-	var insecureServingInfo *ServingInfo
-	if options.InsecurePort > 0 {
-		insecureServingInfo = &ServingInfo{
-			BindAddress: net.JoinHostPort(options.InsecureBindAddress.String(), strconv.Itoa(options.InsecurePort)),
-		}
-	}
-
-	return &Config{
-		APIGroupPrefix:            options.APIGroupPrefix,
-		CorsAllowedOriginList:     options.CorsAllowedOriginList,
-		AuditWriter:               auditWriter,
-		EnableGarbageCollection:   options.EnableGarbageCollection,
-		EnableIndex:               true,
-		EnableProfiling:           options.EnableProfiling,
-		EnableSwaggerSupport:      true,
-		EnableSwaggerUI:           options.EnableSwaggerUI,
-		EnableVersion:             true,
-		ExternalHost:              options.ExternalHost,
-		KubernetesServiceNodePort: options.KubernetesServiceNodePort,
-		MasterCount:               options.MasterCount,
-		MinRequestTimeout:         options.MinRequestTimeout,
-		SecureServingInfo:         secureServingInfo,
-		InsecureServingInfo:       insecureServingInfo,
-		PublicAddress:             options.AdvertiseAddress,
-		ReadWritePort:             options.SecurePort,
-		ServiceClusterIPRange:     &options.ServiceClusterIPRange,
-		ServiceNodePortRange:      options.ServiceNodePortRange,
+		EnableIndex:          true,
+		EnableSwaggerSupport: true,
+		EnableVersion:        true,
 		OpenAPIConfig: &common.Config{
 			ProtocolList:   []string{"https"},
 			IgnorePrefixes: []string{"/swaggerapi"},
@@ -268,19 +228,81 @@ func NewConfig(options *options.ServerRunOptions) *Config {
 				},
 			},
 		},
-		MaxRequestsInFlight:    options.MaxRequestsInFlight,
-		LongRunningFunc:        genericfilters.BasicLongRunningRequestCheck(longRunningRE, map[string]string{"watch": "true"}),
-		LegacyAPIGroupPrefixes: sets.NewString(LegacyAPIPrefix),
+		LongRunningFunc: genericfilters.BasicLongRunningRequestCheck(longRunningRE, map[string]string{"watch": "true"}),
 	}
+
+	// this keeps the defaults in sync
+	defaultOptions := options.NewServerRunOptions()
+	// unset fields that can be overridden to avoid setting values so that we won't end up with lingering values.
+	// TODO we probably want to run the defaults the other way.  A default here drives it in the CLI flags
+	defaultOptions.SecurePort = 0
+	defaultOptions.InsecurePort = 0
+	defaultOptions.AuditLogPath = ""
+	return config.ApplyOptions(defaultOptions)
+}
+
+// ApplyOptions applies the run options to the method receiver and returns self
+func (c *Config) ApplyOptions(options *options.ServerRunOptions) *Config {
+	if len(options.AuditLogPath) != 0 {
+		c.AuditWriter = &lumberjack.Logger{
+			Filename:   options.AuditLogPath,
+			MaxAge:     options.AuditLogMaxAge,
+			MaxBackups: options.AuditLogMaxBackups,
+			MaxSize:    options.AuditLogMaxSize,
+		}
+	}
+
+	if options.SecurePort > 0 {
+		secureServingInfo := &ServingInfo{
+			BindAddress: net.JoinHostPort(options.BindAddress.String(), strconv.Itoa(options.SecurePort)),
+			ServerCert: CertInfo{
+				CertFile: options.TLSCertFile,
+				KeyFile:  options.TLSPrivateKeyFile,
+			},
+			ClientCA: options.ClientCAFile,
+		}
+		if options.TLSCertFile == "" && options.TLSPrivateKeyFile == "" {
+			secureServingInfo.ServerCert.Generate = true
+			secureServingInfo.ServerCert.CertFile = path.Join(options.CertDirectory, "apiserver.crt")
+			secureServingInfo.ServerCert.KeyFile = path.Join(options.CertDirectory, "apiserver.key")
+		}
+
+		c.SecureServingInfo = secureServingInfo
+		c.ReadWritePort = options.SecurePort
+	}
+
+	if options.InsecurePort > 0 {
+		insecureServingInfo := &ServingInfo{
+			BindAddress: net.JoinHostPort(options.InsecureBindAddress.String(), strconv.Itoa(options.InsecurePort)),
+		}
+		c.InsecureServingInfo = insecureServingInfo
+	}
+
+	c.APIGroupPrefix = options.APIGroupPrefix
+	c.CorsAllowedOriginList = options.CorsAllowedOriginList
+	c.EnableGarbageCollection = options.EnableGarbageCollection
+	c.EnableProfiling = options.EnableProfiling
+	c.EnableSwaggerUI = options.EnableSwaggerUI
+	c.ExternalHost = options.ExternalHost
+	c.KubernetesServiceNodePort = options.KubernetesServiceNodePort
+	c.MasterCount = options.MasterCount
+	c.MinRequestTimeout = options.MinRequestTimeout
+	c.PublicAddress = options.AdvertiseAddress
+	c.ServiceClusterIPRange = &options.ServiceClusterIPRange
+	c.ServiceNodePortRange = options.ServiceNodePortRange
+	c.MaxRequestsInFlight = options.MaxRequestsInFlight
+
+	return c
 }
 
 type completedConfig struct {
 	*Config
 }
 
-// Complete fills in any fields not set that are required to have valid data. It's mutating the receiver.
+// Complete fills in any fields not set that are required to have valid data and can be derived
+// from other fields.  If you're going to `ApplyOptions`, do that first.  It's mutating the receiver.
 func (c *Config) Complete() completedConfig {
-	if c.ServiceClusterIPRange == nil {
+	if c.ServiceClusterIPRange == nil || c.ServiceClusterIPRange.IP == nil {
 		defaultNet := "10.0.0.0/24"
 		glog.Warningf("Network range for service cluster IPs is unspecified. Defaulting to %v.", defaultNet)
 		_, serviceClusterIPRange, err := net.ParseCIDR(defaultNet)
@@ -301,9 +323,6 @@ func (c *Config) Complete() completedConfig {
 		glog.V(4).Infof("Setting GenericAPIServer service IP to %q (read-write).", serviceReadWriteIP)
 		c.ServiceReadWriteIP = serviceReadWriteIP
 	}
-	if c.ServiceReadWritePort == 0 {
-		c.ServiceReadWritePort = 443
-	}
 	if c.ServiceNodePortRange.Size == 0 {
 		// TODO: Currently no way to specify an empty range (do we need to allow this?)
 		// We should probably allow this for clouds that don't require NodePort to do load-balancing (GCE)
@@ -312,28 +331,12 @@ func (c *Config) Complete() completedConfig {
 		c.ServiceNodePortRange = options.DefaultServiceNodePortRange
 		glog.Infof("Node port range unspecified. Defaulting to %v.", c.ServiceNodePortRange)
 	}
-	if c.MasterCount == 0 {
-		// Clearly, there will be at least one GenericAPIServer.
-		c.MasterCount = 1
-	}
-	if c.ReadWritePort == 0 {
-		c.ReadWritePort = 6443
-	}
-	if c.CacheTimeout == 0 {
-		c.CacheTimeout = 5 * time.Second
-	}
-	if c.RequestContextMapper == nil {
-		c.RequestContextMapper = api.NewRequestContextMapper()
-	}
 	if len(c.ExternalHost) == 0 && c.PublicAddress != nil {
 		hostAndPort := c.PublicAddress.String()
 		if c.ReadWritePort != 0 {
 			hostAndPort = net.JoinHostPort(hostAndPort, strconv.Itoa(c.ReadWritePort))
 		}
 		c.ExternalHost = hostAndPort
-	}
-	if c.BuildHandlerChainsFunc == nil {
-		c.BuildHandlerChainsFunc = DefaultBuildHandlerChain
 	}
 	return completedConfig{c}
 }
@@ -386,7 +389,6 @@ func (c completedConfig) New() (*GenericAPIServer, error) {
 		SecureServingInfo:    c.SecureServingInfo,
 		InsecureServingInfo:  c.InsecureServingInfo,
 		ExternalAddress:      c.ExternalHost,
-		ClusterIP:            c.PublicAddress,
 		ServiceReadWriteIP:   c.ServiceReadWriteIP,
 		ServiceReadWritePort: c.ServiceReadWritePort,
 
@@ -411,6 +413,25 @@ func (c completedConfig) New() (*GenericAPIServer, error) {
 	s.Handler, s.InsecureHandler = c.BuildHandlerChainsFunc(s.HandlerContainer.ServeMux, c.Config)
 
 	return s, nil
+}
+
+// MaybeGenerateServingCerts generates serving certificates if requested and needed.
+func (c completedConfig) MaybeGenerateServingCerts() error {
+	// It would be nice to set a fqdn subject alt name, but only the kubelets know, the apiserver is clueless
+	// alternateDNS = append(alternateDNS, "kubernetes.default.svc.CLUSTER.DNS.NAME")
+	if c.SecureServingInfo != nil && c.SecureServingInfo.ServerCert.Generate && !certutil.CanReadCertOrKey(c.SecureServingInfo.ServerCert.CertFile, c.SecureServingInfo.ServerCert.KeyFile) {
+		// TODO (cjcullen): Is ClusterIP the right address to sign a cert with?
+		alternateIPs := []net.IP{c.ServiceReadWriteIP}
+		alternateDNS := []string{"kubernetes.default.svc", "kubernetes.default", "kubernetes", "localhost"}
+
+		if err := certutil.GenerateSelfSignedCert(c.PublicAddress.String(), c.SecureServingInfo.ServerCert.CertFile, c.SecureServingInfo.ServerCert.KeyFile, alternateIPs, alternateDNS); err != nil {
+			return fmt.Errorf("Unable to generate self signed cert: %v", err)
+		} else {
+			glog.Infof("Generated self-signed cert (%s, %s)", c.SecureServingInfo.ServerCert.CertFile, c.SecureServingInfo.ServerCert.KeyFile)
+		}
+	}
+
+	return nil
 }
 
 func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) (secure, insecure http.Handler) {

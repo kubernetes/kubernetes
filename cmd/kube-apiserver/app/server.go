@@ -92,6 +92,13 @@ cluster's shared state through which all other components interact.`,
 func Run(s *options.APIServer) error {
 	genericvalidation.VerifyEtcdServersList(s.ServerRunOptions)
 	genericapiserver.DefaultAndValidateRunOptions(s.ServerRunOptions)
+	genericConfig := genericapiserver.NewConfig(). // create the new config
+							ApplyOptions(s.ServerRunOptions). // apply the options selected
+							Complete()                        // set default values based on the known values
+
+	if err := genericConfig.MaybeGenerateServingCerts(); err != nil {
+		glog.Fatalf("Failed to generate service certificate: %v", err)
+	}
 
 	capabilities.Initialize(capabilities.Capabilities{
 		AllowPrivileged: s.AllowPrivileged,
@@ -322,8 +329,6 @@ func Run(s *options.APIServer) error {
 		glog.Fatalf("Failed to initialize plugins: %v", err)
 	}
 
-	genericConfig := genericapiserver.NewConfig(s.ServerRunOptions)
-	// TODO: Move the following to generic api server as well.
 	genericConfig.LoopbackClientConfig = selfClientConfig
 	genericConfig.Authenticator = apiAuthenticator
 	genericConfig.SupportsBasicAuth = len(s.BasicAuthFile) > 0
@@ -341,7 +346,7 @@ func Run(s *options.APIServer) error {
 	genericConfig.EnableOpenAPISupport = true
 
 	config := &master.Config{
-		GenericConfig: genericConfig,
+		GenericConfig: genericConfig.Config,
 
 		StorageFactory:          storageFactory,
 		EnableWatchCache:        s.EnableWatchCache,
