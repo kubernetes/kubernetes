@@ -762,10 +762,14 @@ func (f *factory) Validator(validate bool, cacheDir string) (validation.Schema, 
 		if err != nil {
 			return nil, err
 		}
-		return &clientSwaggerSchema{
+		swaggerSchema := &clientSwaggerSchema{
 			c:        restclient,
 			fedc:     fedClient,
 			cacheDir: dir,
+		}
+		return validation.ConjunctiveSchema{
+			swaggerSchema,
+			validation.NoDoubleKeySchema{},
 		}, nil
 	}
 	return validation.NullSchema{}, nil
