@@ -40,16 +40,13 @@ func WithAuthorization(handler http.Handler, getAttribs RequestAttributeGetter, 
 			return
 		}
 		authorized, reason, err := a.Authorize(attrs)
-		if err != nil {
-			internalError(w, req, err)
+		if authorized {
+			handler.ServeHTTP(w, req)
 			return
 		}
-		if !authorized {
-			glog.V(4).Infof("Forbidden: %#v, Reason: %s", req.RequestURI, reason)
-			forbidden(w, req)
-			return
-		}
-		handler.ServeHTTP(w, req)
+
+		glog.V(4).Infof("Forbidden: %#v, Reason: %s, Error: %v", req.RequestURI, reason, err)
+		forbidden(w, req)
 	})
 }
 
