@@ -79,8 +79,6 @@ var (
 		  kubectl edit svc/docker-registry --output-version=v1 -o json`)
 )
 
-var errExit = fmt.Errorf("exit directly")
-
 func NewCmdEdit(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	options := &resource.FilenameOptions{}
 
@@ -102,9 +100,6 @@ func NewCmdEdit(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 		Example: fmt.Sprintf(editExample),
 		Run: func(cmd *cobra.Command, args []string) {
 			err := RunEdit(f, out, errOut, cmd, args, options)
-			if err == errExit {
-				os.Exit(1)
-			}
 			cmdutil.CheckErr(err)
 		},
 		ValidArgs:  validArgs,
@@ -285,11 +280,11 @@ func RunEdit(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args 
 			// 3. invalid: retry those on the spot by looping ie. reloading the editor
 			if results.retryable > 0 {
 				fmt.Fprintf(errOut, "You can run `%s replace -f %s` to try this update again.\n", filepath.Base(os.Args[0]), file)
-				return errExit
+				return cmdutil.ErrExit
 			}
 			if results.notfound > 0 {
 				fmt.Fprintf(errOut, "The edits you made on deleted resources have been saved to %q\n", file)
-				return errExit
+				return cmdutil.ErrExit
 			}
 
 			if len(results.edit) == 0 {
