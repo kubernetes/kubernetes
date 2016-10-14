@@ -343,10 +343,7 @@ func (p *pruner) prune(namespace string, mapping *meta.RESTMapping, shortOutput 
 
 func (p *pruner) delete(namespace, name string, mapping *meta.RESTMapping, c resource.RESTClient) error {
 	if !p.cascade {
-		if err := resource.NewHelper(c, mapping).Delete(namespace, name); err != nil {
-			return err
-		}
-		return nil
+		return resource.NewHelper(c, mapping).Delete(namespace, name)
 	}
 	cs, err := p.clientsetFunc()
 	if err != nil {
@@ -354,7 +351,10 @@ func (p *pruner) delete(namespace, name string, mapping *meta.RESTMapping, c res
 	}
 	r, err := kubectl.ReaperFor(mapping.GroupVersionKind.GroupKind(), cs)
 	if err != nil {
-		return err
+		if _, ok := err.(*kubectl.NoSuchReaperError); !ok {
+			return err
+		}
+		return resource.NewHelper(c, mapping).Delete(namespace, name)
 	}
 	if err := r.Stop(namespace, name, 2*time.Minute, api.NewDeleteOptions(int64(p.gracePeriod))); err != nil {
 		return err
