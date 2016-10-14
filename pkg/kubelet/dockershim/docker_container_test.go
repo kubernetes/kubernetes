@@ -18,12 +18,14 @@ package dockershim
 
 import (
 	"fmt"
+	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 
 	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 )
 
 // A helper to create a basic config.
@@ -170,4 +172,46 @@ func TestContainerStatus(t *testing.T) {
 	assert.NoError(t, err)
 	status, err = ds.ContainerStatus(id)
 	assert.Error(t, err, fmt.Sprintf("status of container: %+v", status))
+}
+
+// TestContainerLogPath tests the container log creation logic.
+func TestContainerLogPath(t *testing.T) {
+	ds, fDocker, _ := newTestDockerService()
+	podLogPath := "/pod/1"
+	containerLogPath := "0"
+	kubeletContainerLogPath := filepath.Join(podLogPath, containerLogPath)
+	sConfig := makeSandboxConfig("foo", "bar", "1", 0)
+	sConfig.LogDirectory = &podLogPath
+	config := makeContainerConfig(sConfig, "pause", "iamimage", 0, nil, nil)
+	config.LogPath = &containerLogPath
+
+	const sandboxId = "sandboxid"
+	id, err := ds.CreateContainer(sandboxId, config, sConfig)
+
+	// Check internal container log label
+	c, err := fDocker.InspectContainer(id)
+	assert.NoError(t, err)
+	assert.Equal(t, c.Config.Labels[containerLogPathLabelKey], kubeletContainerLogPath)
+
+	// Set docker container log path
+	dockerContainerLogPath := "/docker/container/log"
+	c.LogPath = dockerContainerLogPath
+
+	// Verify container log symlink creation
+	fakeOS := ds.os.(*containertest.FakeOS)
+	fakeOS.SymlinkFn = func(oldname, newname string) error {
+		assert.Equal(t, dockerContainerLogPath, oldname)
+		assert.Equal(t, kubeletContainerLogPath, newname)
+		return nil
+	}
+	err = ds.StartContainer(id)
+	assert.NoError(t, err)
+
+	err = ds.StopContainer(id, 0)
+	assert.NoError(t, err)
+
+	// Verify container log symlink deletion
+	err = ds.RemoveContainer(id)
+	assert.NoError(t, err)
+	assert.Equal(t, fakeOS.Removes, []string{kubeletContainerLogPath})
 }
