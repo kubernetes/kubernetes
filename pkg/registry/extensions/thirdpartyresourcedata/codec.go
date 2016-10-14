@@ -522,10 +522,13 @@ func (t *thirdPartyResourceDataEncoder) Encode(obj runtime.Object, stream io.Wri
 		}
 
 		encMap := struct {
-			Kind       string               `json:"kind,omitempty"`
-			Items      []json.RawMessage    `json:"items"`
-			Metadata   unversioned.ListMeta `json:"metadata,omitempty"`
-			APIVersion string               `json:"apiVersion,omitempty"`
+			// +optional
+			Kind  string            `json:"kind,omitempty"`
+			Items []json.RawMessage `json:"items"`
+			// +optional
+			Metadata unversioned.ListMeta `json:"metadata,omitempty"`
+			// +optional
+			APIVersion string `json:"apiVersion,omitempty"`
 		}{
 			Kind:       t.gvk.Kind + "List",
 			Items:      listItems,

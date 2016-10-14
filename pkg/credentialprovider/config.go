@@ -33,7 +33,8 @@ import (
 // DockerConfigJson represents ~/.docker/config.json file info
 // see https://github.com/docker/docker/pull/12009
 type DockerConfigJson struct {
-	Auths       DockerConfig      `json:"auths"`
+	Auths DockerConfig `json:"auths"`
+	// +optional
 	HttpHeaders map[string]string `json:"HttpHeaders,omitempty"`
 }
 
@@ -225,10 +226,14 @@ func readDockerConfigJsonFileFromBytes(contents []byte) (cfg DockerConfig, err e
 // dockerConfigEntryWithAuth is used solely for deserializing the Auth field
 // into a dockerConfigEntry during JSON deserialization.
 type dockerConfigEntryWithAuth struct {
+	// +optional
 	Username string `json:"username,omitempty"`
+	// +optional
 	Password string `json:"password,omitempty"`
-	Email    string `json:"email,omitempty"`
-	Auth     string `json:"auth,omitempty"`
+	// +optional
+	Email string `json:"email,omitempty"`
+	// +optional
+	Auth string `json:"auth,omitempty"`
 }
 
 func (ident *DockerConfigEntry) UnmarshalJSON(data []byte) error {

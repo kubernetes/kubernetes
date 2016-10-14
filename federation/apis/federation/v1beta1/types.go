@@ -42,6 +42,7 @@ type ClusterSpec struct {
 	// Admin needs to ensure that the required secret exists. Secret should be in the same namespace where federation control plane is hosted and it should have kubeconfig in its data with key "kubeconfig".
 	// This will later be changed to a reference to secret in federation control plane when the federation control plane supports secrets.
 	// This can be left empty if the cluster allows insecure access.
+	// +optional
 	SecretRef *v1.LocalObjectReference `json:"secretRef,omitempty" protobuf:"bytes,2,opt,name=secretRef"`
 }
 
@@ -62,23 +63,30 @@ type ClusterCondition struct {
 	// Status of the condition, one of True, False, Unknown.
 	Status v1.ConditionStatus `json:"status" protobuf:"bytes,2,opt,name=status,casttype=k8s.io/kubernetes/pkg/api/v1.ConditionStatus"`
 	// Last time the condition was checked.
+	// +optional
 	LastProbeTime unversioned.Time `json:"lastProbeTime,omitempty" protobuf:"bytes,3,opt,name=lastProbeTime"`
 	// Last time the condition transit from one status to another.
+	// +optional
 	LastTransitionTime unversioned.Time `json:"lastTransitionTime,omitempty" protobuf:"bytes,4,opt,name=lastTransitionTime"`
 	// (brief) reason for the condition's last transition.
+	// +optional
 	Reason string `json:"reason,omitempty" protobuf:"bytes,5,opt,name=reason"`
 	// Human readable message indicating details about last transition.
+	// +optional
 	Message string `json:"message,omitempty" protobuf:"bytes,6,opt,name=message"`
 }
 
 // ClusterStatus is information about the current status of a cluster updated by cluster controller peridocally.
 type ClusterStatus struct {
 	// Conditions is an array of current cluster conditions.
+	// +optional
 	Conditions []ClusterCondition `json:"conditions,omitempty" protobuf:"bytes,1,rep,name=conditions"`
 	// Zones is the list of availability zones in which the nodes of the cluster exist, e.g. 'us-east1-a'.
 	// These will always be in the same region.
+	// +optional
 	Zones []string `json:"zones,omitempty" protobuf:"bytes,5,rep,name=zones"`
 	// Region is the name of the region in which all of the nodes in the cluster exist.  e.g. 'us-east1'.
+	// +optional
 	Region string `json:"region,omitempty" protobuf:"bytes,6,opt,name=region"`
 }
 
@@ -90,11 +98,14 @@ type Cluster struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard object's metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+	// +optional
 	v1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Spec defines the behavior of the Cluster.
+	// +optional
 	Spec ClusterSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 	// Status describes the current status of a Cluster
+	// +optional
 	Status ClusterStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
 
@@ -103,6 +114,7 @@ type ClusterList struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard list metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
+	// +optional
 	unversioned.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// List of Cluster objects.
