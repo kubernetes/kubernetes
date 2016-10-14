@@ -236,6 +236,7 @@ func NewNodeController(
 	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    nc.maybeDeleteTerminatingPod,
 		UpdateFunc: func(_, obj interface{}) { nc.maybeDeleteTerminatingPod(obj) },
+		DeleteFunc: nc.maybeDeleteTerminatingPod,
 	})
 	nc.podStore = *podInformer.Lister()
 
