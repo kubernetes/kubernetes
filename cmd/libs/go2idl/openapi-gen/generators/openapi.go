@@ -36,6 +36,7 @@ import (
 
 // This is the comment tag that carries parameters for open API generation.
 const tagName = "k8s:openapi-gen"
+const tagOptional = "optional"
 
 // Known values for the tag.
 const (
@@ -54,6 +55,11 @@ func hasOpenAPITagValue(comments []string, value string) bool {
 		}
 	}
 	return false
+}
+
+func hasOptionalTag(comments []string) bool {
+	tagValues := types.ExtractCommentTags("+", comments)[tagOptional]
+	return tagValues != nil
 }
 
 // NameSystems returns the name system used by the generators in this package.
@@ -225,30 +231,6 @@ func getReferableName(m *types.Member) string {
 	}
 }
 
-func optionIndex(s, optionName string) int {
-	ret := 0
-	for s != "" {
-		var next string
-		i := strings.Index(s, ",")
-		if i >= 0 {
-			s, next = s[:i], s[i+1:]
-		}
-		if s == optionName {
-			return ret
-		}
-		s = next
-		ret++
-	}
-	return -1
-}
-
-func isPropertyRequired(m *types.Member) bool {
-	// A property is required if it does not have omitempty value in its json tag (documentation and implementation
-	// of json package requires omitempty to be at location 1 or higher.
-	// TODO: Move optional field definition from tags to comments.
-	return optionIndex(reflect.StructTag(m.Tags).Get("json"), "omitempty") < 1
-}
-
 type openAPITypeWriter struct {
 	*generator.SnippetWriter
 	refTypes               map[string]*types.Type
@@ -306,7 +288,7 @@ func (g openAPITypeWriter) generate(t *types.Type) error {
 			if name == "" {
 				continue
 			}
-			if isPropertyRequired(&m) {
+			if !hasOptionalTag(m.CommentLines) {
 				required = append(required, name)
 			}
 			if err := g.generateProperty(&m); err != nil {
