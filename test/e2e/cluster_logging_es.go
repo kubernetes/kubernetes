@@ -72,6 +72,12 @@ var _ = framework.KubeDescribe("Cluster level logging using Elasticsearch [Featu
 			}
 		}
 
+		if totalMissing > 0 {
+			if err := reportLogsFromFluentdPod(f); err != nil {
+				framework.Logf("Failed to report logs from fluentd pod due to %v", err)
+			}
+		}
+
 		Expect(totalMissing).To(Equal(0), "Some log lines are still missing")
 	})
 })
