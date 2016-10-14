@@ -382,7 +382,8 @@ Loop:
 // parseField scans a field until a terminator
 func (p *Parser) parseField(cur *ListNode) error {
 	p.consumeText()
-	for p.advance() {}
+	for p.advance() {
+	}
 	value := p.consumeText()
 	if value == "*" {
 		cur.append(newWildcard())
