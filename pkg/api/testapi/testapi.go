@@ -97,7 +97,7 @@ func init() {
 		if err != nil {
 			panic(err)
 		}
-		serializer, ok = runtime.SerializerInfoForMediaType(api.Codecs, mediaType)
+		serializer, ok = runtime.SerializerInfoForMediaType(api.Codecs.SupportedMediaTypes(), mediaType)
 		if !ok {
 			panic(fmt.Sprintf("no serializer for %s", apiMediaType))
 		}
@@ -109,7 +109,7 @@ func init() {
 		if err != nil {
 			panic(err)
 		}
-		storageSerializer, ok = runtime.SerializerInfoForMediaType(api.Codecs, mediaType)
+		storageSerializer, ok = runtime.SerializerInfoForMediaType(api.Codecs.SupportedMediaTypes(), mediaType)
 		if !ok {
 			panic(fmt.Sprintf("no serializer for %s", storageMediaType))
 		}
@@ -452,7 +452,7 @@ func GetCodecForObject(obj runtime.Object) (runtime.Codec, error) {
 	}
 	// Codec used for unversioned types
 	if api.Scheme.Recognizes(kind) {
-		serializer, ok := runtime.SerializerInfoForMediaType(api.Codecs, runtime.ContentTypeJSON)
+		serializer, ok := runtime.SerializerInfoForMediaType(api.Codecs.SupportedMediaTypes(), runtime.ContentTypeJSON)
 		if !ok {
 			return nil, fmt.Errorf("no serializer registered for json")
 		}

@@ -92,7 +92,7 @@ func (c *RESTClient) request(verb string) *restclient.Request {
 		NegotiatedSerializer: c.NegotiatedSerializer,
 	}
 	ns := c.NegotiatedSerializer
-	serializer, _ := runtime.SerializerInfoForMediaType(ns, runtime.ContentTypeJSON)
+	serializer, _ := runtime.SerializerInfoForMediaType(ns.SupportedMediaTypes(), runtime.ContentTypeJSON)
 	internalVersion := unversioned.GroupVersion{
 		Group:   registered.GroupOrDie(api.GroupName).GroupVersion.Group,
 		Version: runtime.APIVersionInternal,

@@ -153,21 +153,6 @@ func readExpBackoffConfig() BackoffManager {
 			time.Duration(backoffDurationInt)*time.Second)}
 }
 
-// negotiateSerializer selects the matching media type
-func negotiateSerializer(mediaTypes []runtime.SerializerInfo, mediaType string) (runtime.SerializerInfo, bool) {
-	for _, info := range mediaTypes {
-		if info.MediaType == mediaType {
-			return info, true
-		}
-	}
-	for _, info := range mediaTypes {
-		if len(info.MediaType) == 0 {
-			return info, true
-		}
-	}
-	return runtime.SerializerInfo{}, false
-}
-
 // createSerializers creates all necessary serializers for given contentType.
 // TODO: the negotiated serializer passed to this method should probably return
 //   serializers that control decoding and versioning without this package
@@ -180,7 +165,7 @@ func createSerializers(config ContentConfig) (*Serializers, error) {
 	if err != nil {
 		return nil, fmt.Errorf("the content type specified in the client configuration is not recognized: %v", err)
 	}
-	info, ok := negotiateSerializer(mediaTypes, mediaType)
+	info, ok := runtime.SerializerInfoForMediaType(mediaTypes, mediaType)
 	if !ok {
 		if len(contentType) != 0 || len(mediaTypes) == 0 {
 			return nil, fmt.Errorf("no serializers registered for %s", contentType)
@@ -198,7 +183,7 @@ func createSerializers(config ContentConfig) (*Serializers, error) {
 		Decoder: config.NegotiatedSerializer.DecoderToVersion(info.Serializer, internalGV),
 
 		RenegotiatedDecoder: func(contentType string, params map[string]string) (runtime.Decoder, error) {
-			info, ok := negotiateSerializer(mediaTypes, contentType)
+			info, ok := runtime.SerializerInfoForMediaType(mediaTypes, contentType)
 			if !ok {
 				return nil, fmt.Errorf("serializer for %s not registered", contentType)
 			}
