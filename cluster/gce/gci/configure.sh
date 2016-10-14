@@ -171,6 +171,7 @@ function install-kube-binary-config {
       xargs sed -ri "s@(image\":\s+\")gcr.io/google_containers@\1${kube_addon_registry}@"
   fi
   cp "${dst_dir}/kubernetes/gci-trusty/gci-configure-helper.sh" "${KUBE_HOME}/bin/configure-helper.sh"
+  cp "${dst_dir}/kubernetes/gci-trusty/gci-mounter" "${KUBE_HOME}/bin/mounter"
   cp "${dst_dir}/kubernetes/gci-trusty/health-monitor.sh" "${KUBE_HOME}/bin/health-monitor.sh"
   chmod -R 755 "${kube_bin}"
 
