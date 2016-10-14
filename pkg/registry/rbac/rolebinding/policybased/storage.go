@@ -48,7 +48,7 @@ func (s *Storage) Create(ctx api.Context, obj runtime.Object) (runtime.Object, e
 	}
 
 	roleBinding := obj.(*rbac.RoleBinding)
-	rules, err := s.ruleResolver.GetRoleReferenceRules(ctx, roleBinding.RoleRef, roleBinding.Namespace)
+	rules, err := s.ruleResolver.GetRoleReferenceRules(roleBinding.RoleRef, roleBinding.Namespace)
 	if err != nil {
 		return nil, err
 	}
@@ -66,7 +66,7 @@ func (s *Storage) Update(ctx api.Context, name string, obj rest.UpdatedObjectInf
 	nonEscalatingInfo := wrapUpdatedObjectInfo(obj, func(ctx api.Context, obj runtime.Object, oldObj runtime.Object) (runtime.Object, error) {
 		roleBinding := obj.(*rbac.RoleBinding)
 
-		rules, err := s.ruleResolver.GetRoleReferenceRules(ctx, roleBinding.RoleRef, roleBinding.Namespace)
+		rules, err := s.ruleResolver.GetRoleReferenceRules(roleBinding.RoleRef, roleBinding.Namespace)
 		if err != nil {
 			return nil, err
 		}
