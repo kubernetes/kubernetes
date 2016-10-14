@@ -95,7 +95,7 @@ type controllerTest struct {
 type testCall func(ctrl *PersistentVolumeController, reactor *volumeReactor, test controllerTest) error
 
 const testNamespace = "default"
-const mockPluginName = "MockVolumePlugin"
+const mockPluginName = "kubernetes.io/mock-volume"
 
 var versionConflictError = errors.New("VersionError")
 var novolumes []*api.PersistentVolume
