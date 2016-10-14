@@ -131,9 +131,9 @@ type NodeController struct {
 	// The maximum duration before a pod evicted from a node can be forcefully terminated.
 	maximumGracePeriod time.Duration
 	recorder           record.EventRecorder
-	podInformer        informers.PodInformer
-	nodeInformer       informers.NodeInformer
-	daemonSetInformer  informers.DaemonSetInformer
+	podInformer        cache.SharedInformer
+	nodeInformer       cache.SharedInformer
+	daemonSetInformer  cache.SharedInformer
 
 	podStore       cache.StoreToPodLister
 	nodeStore      cache.StoreToNodeLister
@@ -232,9 +232,9 @@ func NewNodeController(
 		largeClusterThreshold:       largeClusterThreshold,
 		unhealthyZoneThreshold:      unhealthyZoneThreshold,
 		zoneStates:                  make(map[string]zoneState),
-		podInformer:                 podInformer,
-		nodeInformer:                nodeInformer,
-		daemonSetInformer:           daemonSetInformer,
+		podInformer:                 podInformer.Informer(),
+		nodeInformer:                nodeInformer.Informer(),
+		daemonSetInformer:           daemonSetInformer.Informer(),
 	}
 	nc.enterPartialDisruptionFunc = nc.ReducedQPSFunc
 	nc.enterFullDisruptionFunc = nc.HealthyQPSFunc
@@ -358,7 +358,7 @@ func NewNodeController(
 func (nc *NodeController) Run() {
 	// Incorporate the results of node status pushed from kubelet to master.
 	go wait.Until(func() {
-		if !cache.WaitForCacheSync(wait.NeverStop, nc.nodeInformer.Informer().HasSynced, nc.podInformer.Informer().HasSynced, nc.daemonSetInformer.Informer().HasSynced) {
+		if !cache.WaitForCacheSync(wait.NeverStop, nc.nodeInformer.HasSynced, nc.podInformer.HasSynced, nc.daemonSetInformer.HasSynced) {
 			glog.Errorf("NodeController timed out while waiting for informers to sync...")
 			return
 		}
@@ -380,7 +380,7 @@ func (nc *NodeController) Run() {
 	//    c. If there are pods still terminating, wait for their estimated completion
 	//       before retrying
 	go wait.Until(func() {
-		if !cache.WaitForCacheSync(wait.NeverStop, nc.nodeInformer.Informer().HasSynced, nc.podInformer.Informer().HasSynced, nc.daemonSetInformer.Informer().HasSynced) {
+		if !cache.WaitForCacheSync(wait.NeverStop, nc.nodeInformer.HasSynced, nc.podInformer.HasSynced, nc.daemonSetInformer.HasSynced) {
 			glog.Errorf("NodeController timed out while waiting for informers to sync...")
 			return
 		}
@@ -417,7 +417,7 @@ func (nc *NodeController) Run() {
 	// TODO: replace with a controller that ensures pods that are terminating complete
 	// in a particular time period
 	go wait.Until(func() {
-		if !cache.WaitForCacheSync(wait.NeverStop, nc.nodeInformer.Informer().HasSynced, nc.podInformer.Informer().HasSynced, nc.daemonSetInformer.Informer().HasSynced) {
+		if !cache.WaitForCacheSync(wait.NeverStop, nc.nodeInformer.HasSynced, nc.podInformer.HasSynced, nc.daemonSetInformer.HasSynced) {
 			glog.Errorf("NodeController timed out while waiting for informers to sync...")
 			return
 		}
