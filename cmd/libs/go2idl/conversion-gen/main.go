@@ -60,7 +60,6 @@ func main() {
 			"k8s.io/kubernetes/pkg/conversion",
 			"k8s.io/kubernetes/pkg/runtime",
 		},
-		SkipDefaulters: true,
 	}
 	pflag.CommandLine.StringSliceVar(&customArgs.ExtraPeerDirs, "extra-peer-dirs", customArgs.ExtraPeerDirs,
 		"Comma-separated list of import paths which are considered, after tag-specified peers, for conversions.")
