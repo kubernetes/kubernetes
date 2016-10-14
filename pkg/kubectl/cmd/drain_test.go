@@ -476,6 +476,8 @@ func TestDrain(t *testing.T) {
 					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(testapi.Extensions.Codec(), &job)}, nil
 				case m.isFor("GET", "/namespaces/default/replicasets/rs"):
 					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(testapi.Extensions.Codec(), &test.replicaSets[0])}, nil
+				case m.isFor("GET", "/namespaces/default/pods/bar"):
+					return &http.Response{StatusCode: 404, Header: defaultHeader(), Body: objBody(codec, nil)}, nil
 				case m.isFor("GET", "/pods"):
 					values, err := url.ParseQuery(req.URL.RawQuery)
 					if err != nil {
