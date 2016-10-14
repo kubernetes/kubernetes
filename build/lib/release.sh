@@ -321,8 +321,8 @@ function kube::release::package_kube_manifests_tarball() {
   cp "${salt_dir}/e2e-image-puller/e2e-image-puller.manifest" "${dst_dir}/"
   cp "${KUBE_ROOT}/cluster/gce/trusty/configure-helper.sh" "${dst_dir}/trusty-configure-helper.sh"
   cp "${KUBE_ROOT}/cluster/gce/gci/configure-helper.sh" "${dst_dir}/gci-configure-helper.sh"
-  cp "${KUBE_ROOT}/cluster/gce/coreos/configure-helper.sh" "${dst_dir}/coreos-configure-helper.sh"
   cp "${KUBE_ROOT}/cluster/gce/gci/health-monitor.sh" "${dst_dir}/health-monitor.sh"
+  cp "${KUBE_ROOT}/cluster/gce/coreos/configure-helper.sh" "${dst_dir}/coreos-configure-helper.sh"
   cp -r "${salt_dir}/kube-admission-controls/limit-range" "${dst_dir}"
   local objects
   objects=$(cd "${KUBE_ROOT}/cluster/addons" && find . \( -name \*.yaml -or -name \*.yaml.in -or -name \*.json \) | grep -v demo)

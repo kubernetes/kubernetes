@@ -171,3 +171,6 @@ echo "Done for installing kubernetes files"
 # So we need to manually populdate the hosts file here on gce.
 echo "127.0.0.1 localhost" >> /etc/hosts
 echo "::1 localhost" >> /etc/hosts
+
+echo "Configuring hostname"
+hostnamectl set-hostname $(hostname | cut -f1 -d.)
