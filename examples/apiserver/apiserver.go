@@ -74,7 +74,6 @@ func Run(serverOptions *genericoptions.ServerRunOptions) error {
 	}
 
 	config.Authorizer = authorizer.NewAlwaysAllowAuthorizer()
-	config.Serializer = api.Codecs
 	s, err := config.New()
 	if err != nil {
 		return fmt.Errorf("Error in bringing up the server: %v", err)
