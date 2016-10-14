@@ -21,11 +21,11 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/flag"
 )
 
-func stringFlagFor(s string) util.StringFlag {
-	var f util.StringFlag
+func stringFlagFor(s string) flag.StringFlag {
+	var f flag.StringFlag
 	f.Set(s)
 	return f
 }

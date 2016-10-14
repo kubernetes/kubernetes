@@ -26,15 +26,15 @@ import (
 
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/flag"
 )
 
 type createContextOptions struct {
 	configAccess clientcmd.ConfigAccess
 	name         string
-	cluster      util.StringFlag
-	authInfo     util.StringFlag
-	namespace    util.StringFlag
+	cluster      flag.StringFlag
+	authInfo     flag.StringFlag
+	namespace    flag.StringFlag
 }
 
 var (
