@@ -129,6 +129,9 @@ func RunEdit(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args 
 	}
 
 	mapper, resourceMapper, r, cmdNamespace, err := getMapperAndResult(f, args, options)
+	if err != nil {
+		return err
+	}
 
 	clientConfig, err := f.ClientConfig()
 	if err != nil {
