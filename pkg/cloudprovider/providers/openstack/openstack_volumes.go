@@ -240,6 +240,24 @@ func (os *OpenStack) DiskIsAttached(diskName, instanceID string) (bool, error) {
 	return false, nil
 }
 
+// query if a list of volumes are attached to a compute instance
+func (os *OpenStack) DisksAreAttached(diskNames []string, instanceID string) (map[string]bool, error) {
+	attached := make(map[string]bool)
+	for _, diskName := range diskNames {
+		attached[diskName] = false
+	}
+	for _, diskName := range diskNames {
+		disk, err := os.getVolume(diskName)
+		if err != nil {
+			continue
+		}
+		if len(disk.Attachments) > 0 && disk.Attachments[0]["server_id"] != nil && instanceID == disk.Attachments[0]["server_id"] {
+			attached[diskName] = true
+		}
+	}
+	return attached, nil
+}
+
 // diskIsUsed returns true a disk is attached to any node.
 func (os *OpenStack) diskIsUsed(diskName string) (bool, error) {
 	disk, err := os.getVolume(diskName)
