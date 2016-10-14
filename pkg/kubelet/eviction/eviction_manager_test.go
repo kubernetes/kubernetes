@@ -67,39 +67,87 @@ func (m *mockImageGC) DeleteUnusedImages() (int64, error) {
 	return m.freed, m.err
 }
 
-// TestMemoryPressure
-func TestMemoryPressure(t *testing.T) {
-	podMaker := func(name string, requests api.ResourceList, limits api.ResourceList, memoryWorkingSet string) (*api.Pod, statsapi.PodStats) {
-		pod := newPod(name, []api.Container{
-			newContainer(name, requests, limits),
-		}, nil)
-		podStats := newPodMemoryStats(pod, resource.MustParse(memoryWorkingSet))
-		return pod, podStats
+func makePodWithMemoryStats(name string, requests api.ResourceList, limits api.ResourceList, memoryWorkingSet string) (*api.Pod, statsapi.PodStats) {
+	pod := newPod(name, []api.Container{
+		newContainer(name, requests, limits),
+	}, nil)
+	podStats := newPodMemoryStats(pod, resource.MustParse(memoryWorkingSet))
+	return pod, podStats
+}
+
+func makePodWithDiskStats(name string, requests api.ResourceList, limits api.ResourceList, rootFsUsed, logsUsed, perLocalVolumeUsed string) (*api.Pod, statsapi.PodStats) {
+	pod := newPod(name, []api.Container{
+		newContainer(name, requests, limits),
+	}, nil)
+	podStats := newPodDiskStats(pod, parseQuantity(rootFsUsed), parseQuantity(logsUsed), parseQuantity(perLocalVolumeUsed))
+	return pod, podStats
+}
+
+func makeMemoryStats(nodeAvailableBytes string, podStats map[*api.Pod]statsapi.PodStats) *statsapi.Summary {
+	val := resource.MustParse(nodeAvailableBytes)
+	availableBytes := uint64(val.Value())
+	WorkingSetBytes := uint64(val.Value())
+	result := &statsapi.Summary{
+		Node: statsapi.NodeStats{
+			Memory: &statsapi.MemoryStats{
+				AvailableBytes:  &availableBytes,
+				WorkingSetBytes: &WorkingSetBytes,
+			},
+		},
+		Pods: []statsapi.PodStats{},
 	}
-	summaryStatsMaker := func(nodeAvailableBytes string, podStats map[*api.Pod]statsapi.PodStats) *statsapi.Summary {
-		val := resource.MustParse(nodeAvailableBytes)
-		availableBytes := uint64(val.Value())
-		WorkingSetBytes := uint64(val.Value())
-		result := &statsapi.Summary{
-			Node: statsapi.NodeStats{
-				Memory: &statsapi.MemoryStats{
-					AvailableBytes:  &availableBytes,
-					WorkingSetBytes: &WorkingSetBytes,
+	for _, podStat := range podStats {
+		result.Pods = append(result.Pods, podStat)
+	}
+	return result
+}
+
+func makeDiskStats(rootFsAvailableBytes, imageFsAvailableBytes string, podStats map[*api.Pod]statsapi.PodStats) *statsapi.Summary {
+	rootFsVal := resource.MustParse(rootFsAvailableBytes)
+	rootFsBytes := uint64(rootFsVal.Value())
+	rootFsCapacityBytes := uint64(rootFsVal.Value() * 2)
+	imageFsVal := resource.MustParse(imageFsAvailableBytes)
+	imageFsBytes := uint64(imageFsVal.Value())
+	imageFsCapacityBytes := uint64(imageFsVal.Value() * 2)
+	result := &statsapi.Summary{
+		Node: statsapi.NodeStats{
+			Fs: &statsapi.FsStats{
+				AvailableBytes: &rootFsBytes,
+				CapacityBytes:  &rootFsCapacityBytes,
+			},
+			Runtime: &statsapi.RuntimeStats{
+				ImageFs: &statsapi.FsStats{
+					AvailableBytes: &imageFsBytes,
+					CapacityBytes:  &imageFsCapacityBytes,
 				},
 			},
-			Pods: []statsapi.PodStats{},
-		}
-		for _, podStat := range podStats {
-			result.Pods = append(result.Pods, podStat)
-		}
-		return result
+		},
+		Pods: []statsapi.PodStats{},
 	}
-	podsToMake := []struct {
-		name             string
-		requests         api.ResourceList
-		limits           api.ResourceList
-		memoryWorkingSet string
-	}{
+	for _, podStat := range podStats {
+		result.Pods = append(result.Pods, podStat)
+	}
+	return result
+}
+
+type podToMake struct {
+	name                     string
+	requests                 api.ResourceList
+	limits                   api.ResourceList
+	memoryWorkingSet         string
+	rootFsUsed               string
+	logsFsUsed               string
+	logsFsInodesUsed         string
+	rootFsInodesUsed         string
+	perLocalVolumeUsed       string
+	perLocalVolumeInodesUsed string
+}
+
+// TestMemoryPressure
+func TestMemoryPressure(t *testing.T) {
+	podMaker := makePodWithMemoryStats
+	summaryStatsMaker := makeMemoryStats
+	podsToMake := []podToMake{
 		{name: "guaranteed-low", requests: newResourceList("100m", "1Gi"), limits: newResourceList("100m", "1Gi"), memoryWorkingSet: "200Mi"},
 		{name: "guaranteed-high", requests: newResourceList("100m", "1Gi"), limits: newResourceList("100m", "1Gi"), memoryWorkingSet: "800Mi"},
 		{name: "burstable-low", requests: newResourceList("100m", "100Mi"), limits: newResourceList("200m", "1Gi"), memoryWorkingSet: "300Mi"},
@@ -314,48 +362,9 @@ func parseQuantity(value string) resource.Quantity {
 }
 
 func TestDiskPressureNodeFs(t *testing.T) {
-	podMaker := func(name string, requests api.ResourceList, limits api.ResourceList, rootFsUsed, logsUsed, perLocalVolumeUsed string) (*api.Pod, statsapi.PodStats) {
-		pod := newPod(name, []api.Container{
-			newContainer(name, requests, limits),
-		}, nil)
-		podStats := newPodDiskStats(pod, parseQuantity(rootFsUsed), parseQuantity(logsUsed), parseQuantity(perLocalVolumeUsed))
-		return pod, podStats
-	}
-	summaryStatsMaker := func(rootFsAvailableBytes, imageFsAvailableBytes string, podStats map[*api.Pod]statsapi.PodStats) *statsapi.Summary {
-		rootFsVal := resource.MustParse(rootFsAvailableBytes)
-		rootFsBytes := uint64(rootFsVal.Value())
-		rootFsCapacityBytes := uint64(rootFsVal.Value() * 2)
-		imageFsVal := resource.MustParse(imageFsAvailableBytes)
-		imageFsBytes := uint64(imageFsVal.Value())
-		imageFsCapacityBytes := uint64(imageFsVal.Value() * 2)
-		result := &statsapi.Summary{
-			Node: statsapi.NodeStats{
-				Fs: &statsapi.FsStats{
-					AvailableBytes: &rootFsBytes,
-					CapacityBytes:  &rootFsCapacityBytes,
-				},
-				Runtime: &statsapi.RuntimeStats{
-					ImageFs: &statsapi.FsStats{
-						AvailableBytes: &imageFsBytes,
-						CapacityBytes:  &imageFsCapacityBytes,
-					},
-				},
-			},
-			Pods: []statsapi.PodStats{},
-		}
-		for _, podStat := range podStats {
-			result.Pods = append(result.Pods, podStat)
-		}
-		return result
-	}
-	podsToMake := []struct {
-		name               string
-		requests           api.ResourceList
-		limits             api.ResourceList
-		rootFsUsed         string
-		logsFsUsed         string
-		perLocalVolumeUsed string
-	}{
+	podMaker := makePodWithDiskStats
+	summaryStatsMaker := makeDiskStats
+	podsToMake := []podToMake{
 		{name: "guaranteed-low", requests: newResourceList("100m", "1Gi"), limits: newResourceList("100m", "1Gi"), rootFsUsed: "200Mi"},
 		{name: "guaranteed-high", requests: newResourceList("100m", "1Gi"), limits: newResourceList("100m", "1Gi"), rootFsUsed: "800Mi"},
 		{name: "burstable-low", requests: newResourceList("100m", "100Mi"), limits: newResourceList("200m", "1Gi"), logsFsUsed: "300Mi"},
@@ -550,37 +559,9 @@ func TestDiskPressureNodeFs(t *testing.T) {
 
 // TestMinReclaim verifies that min-reclaim works as desired.
 func TestMinReclaim(t *testing.T) {
-	podMaker := func(name string, requests api.ResourceList, limits api.ResourceList, memoryWorkingSet string) (*api.Pod, statsapi.PodStats) {
-		pod := newPod(name, []api.Container{
-			newContainer(name, requests, limits),
-		}, nil)
-		podStats := newPodMemoryStats(pod, resource.MustParse(memoryWorkingSet))
-		return pod, podStats
-	}
-	summaryStatsMaker := func(nodeAvailableBytes string, podStats map[*api.Pod]statsapi.PodStats) *statsapi.Summary {
-		val := resource.MustParse(nodeAvailableBytes)
-		availableBytes := uint64(val.Value())
-		WorkingSetBytes := uint64(val.Value())
-		result := &statsapi.Summary{
-			Node: statsapi.NodeStats{
-				Memory: &statsapi.MemoryStats{
-					AvailableBytes:  &availableBytes,
-					WorkingSetBytes: &WorkingSetBytes,
-				},
-			},
-			Pods: []statsapi.PodStats{},
-		}
-		for _, podStat := range podStats {
-			result.Pods = append(result.Pods, podStat)
-		}
-		return result
-	}
-	podsToMake := []struct {
-		name             string
-		requests         api.ResourceList
-		limits           api.ResourceList
-		memoryWorkingSet string
-	}{
+	podMaker := makePodWithMemoryStats
+	summaryStatsMaker := makeMemoryStats
+	podsToMake := []podToMake{
 		{name: "guaranteed-low", requests: newResourceList("100m", "1Gi"), limits: newResourceList("100m", "1Gi"), memoryWorkingSet: "200Mi"},
 		{name: "guaranteed-high", requests: newResourceList("100m", "1Gi"), limits: newResourceList("100m", "1Gi"), memoryWorkingSet: "800Mi"},
 		{name: "burstable-low", requests: newResourceList("100m", "100Mi"), limits: newResourceList("200m", "1Gi"), memoryWorkingSet: "300Mi"},
@@ -716,48 +697,9 @@ func TestMinReclaim(t *testing.T) {
 }
 
 func TestNodeReclaimFuncs(t *testing.T) {
-	podMaker := func(name string, requests api.ResourceList, limits api.ResourceList, rootFsUsed, logsUsed, perLocalVolumeUsed string) (*api.Pod, statsapi.PodStats) {
-		pod := newPod(name, []api.Container{
-			newContainer(name, requests, limits),
-		}, nil)
-		podStats := newPodDiskStats(pod, parseQuantity(rootFsUsed), parseQuantity(logsUsed), parseQuantity(perLocalVolumeUsed))
-		return pod, podStats
-	}
-	summaryStatsMaker := func(rootFsAvailableBytes, imageFsAvailableBytes string, podStats map[*api.Pod]statsapi.PodStats) *statsapi.Summary {
-		rootFsVal := resource.MustParse(rootFsAvailableBytes)
-		rootFsBytes := uint64(rootFsVal.Value())
-		rootFsCapacityBytes := uint64(rootFsVal.Value() * 2)
-		imageFsVal := resource.MustParse(imageFsAvailableBytes)
-		imageFsBytes := uint64(imageFsVal.Value())
-		imageFsCapacityBytes := uint64(imageFsVal.Value() * 2)
-		result := &statsapi.Summary{
-			Node: statsapi.NodeStats{
-				Fs: &statsapi.FsStats{
-					AvailableBytes: &rootFsBytes,
-					CapacityBytes:  &rootFsCapacityBytes,
-				},
-				Runtime: &statsapi.RuntimeStats{
-					ImageFs: &statsapi.FsStats{
-						AvailableBytes: &imageFsBytes,
-						CapacityBytes:  &imageFsCapacityBytes,
-					},
-				},
-			},
-			Pods: []statsapi.PodStats{},
-		}
-		for _, podStat := range podStats {
-			result.Pods = append(result.Pods, podStat)
-		}
-		return result
-	}
-	podsToMake := []struct {
-		name               string
-		requests           api.ResourceList
-		limits             api.ResourceList
-		rootFsUsed         string
-		logsFsUsed         string
-		perLocalVolumeUsed string
-	}{
+	podMaker := makePodWithDiskStats
+	summaryStatsMaker := makeDiskStats
+	podsToMake := []podToMake{
 		{name: "guaranteed-low", requests: newResourceList("100m", "1Gi"), limits: newResourceList("100m", "1Gi"), rootFsUsed: "200Mi"},
 		{name: "guaranteed-high", requests: newResourceList("100m", "1Gi"), limits: newResourceList("100m", "1Gi"), rootFsUsed: "800Mi"},
 		{name: "burstable-low", requests: newResourceList("100m", "100Mi"), limits: newResourceList("200m", "1Gi"), rootFsUsed: "300Mi"},
@@ -950,14 +892,7 @@ func TestInodePressureNodeFsInodes(t *testing.T) {
 		}
 		return result
 	}
-	podsToMake := []struct {
-		name                     string
-		requests                 api.ResourceList
-		limits                   api.ResourceList
-		rootFsInodesUsed         string
-		logsFsInodesUsed         string
-		perLocalVolumeInodesUsed string
-	}{
+	podsToMake := []podToMake{
 		{name: "guaranteed-low", requests: newResourceList("100m", "1Gi"), limits: newResourceList("100m", "1Gi"), rootFsInodesUsed: "200Mi"},
 		{name: "guaranteed-high", requests: newResourceList("100m", "1Gi"), limits: newResourceList("100m", "1Gi"), rootFsInodesUsed: "800Mi"},
 		{name: "burstable-low", requests: newResourceList("100m", "100Mi"), limits: newResourceList("200m", "1Gi"), rootFsInodesUsed: "300Mi"},
