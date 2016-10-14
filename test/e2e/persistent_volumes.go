@@ -121,6 +121,22 @@ func deletePersistentVolume(c *client.Client, pv *api.PersistentVolume) {
 	Expect(err).NotTo(HaveOccurred())
 }
 
+func deletePersistentVolumeClaim(c *client.Client, pvc *api.PersistentVolumeClaim, ns string) {
+	deleteTimeout := 90*time.Second
+	pollPeriod := 2*time.Second
+	pvcname := pvc.Name
+
+	framework.Logf("Deleting PersistentVolumeClaim %v", pvcname)
+	err := c.PersistentVolumeClaims(ns).Delete(pvcname)
+	Expect(err).NotTo(HaveOccurred())
+ 	for start := time.Now(); time.Since(start) < deleteTimeout; time.Sleep(pollPeriod){
+		if pvc, err = c.PersistentVolumeClaims(ns).Get(pvcname); apierrs.IsNotFound(err) {
+			framework.Logf("PersistentVolumeClaim %v deleted.", pvcname)
+			break
+		}
+	}
+}
+
 // Delete the PVC and wait for the PV to become Available again. Validate that the PV
 // has recycled (assumption here about reclaimPolicy).
 // Note: if there are more claims than pvs then some of the remaining claims will bind to
@@ -731,50 +747,59 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 
 		// Attach a persistent disk to a pod using a PVC.
 		// Delete the PVC and then the pod.  Expect the pod to succeed in unmounting and detaching PD on delete.
-		It("should test that deleting a PVC before the pod does does not cause unmounting and detaching the PD"+
-			"to fail on pod deletion", func() {
+		It("should test that deleting a PVC before the pod does not cause pod deletion to fail on PD detach", func() {
 			By("Creating the PV and PVC")
 			pv, pvc = createPVPVC(c, pvConfig, ns, false)
 
 			By("Creating the Client Pod")
-			clientPod := makePod(ns, pvc.Name)
-			clientPod, err = c.Pods(ns).Create(clientPod)
-			framework.WaitForPodRunningInNamespace(c, clientPod)
+			clientPod = createClientPod(c, ns, pvc)
+			node := types.NodeName(clientPod.Spec.NodeName)
 
 			By("Deleting the Claim")
-			err = c.PersistentVolumeClaims(ns).Delete(pvc.Name)
-			Expect(err).NotTo(HaveOccurred())
-			// TODO verify PD umount & detach
+			deletePersistentVolumeClaim(c, pvc, ns)
+			verifyDiskAttached(diskName, node)
 
 			By("Deleting the Pod")
 			deletePod(f, c, ns, clientPod)
-			// TODO verify PD umount & detach
+
+			By("Verifying Persistent Disk detach")
+			err = waitForPDDetach(diskName, node)
+			Expect(err).NotTo(HaveOccurred())
 		})
 
 		// Attach a persistent disk to a pod using a PVC.
 		// Delete the PV and then the pod.  Expect the pod to succeed in unmounting and detaching PD on delete.
-		It("should test that deleting the PV before the pod does not cause unmounting and detaching the PD"+
-			"to fail on pod deletion", func() {
+		It("should test that deleting the PV before the pod does not cause pod deletion to fail on PD detach", func() {
 			By("Creating the PV and PVC")
 			pv, pvc = createPVPVC(c, pvConfig, ns, false)
 
 			By("Creating the Client Pod")
-			clientPod := makePod(ns, pvc.Name)
-			clientPod, err = c.Pods(ns).Create(clientPod)
-			framework.WaitForPodRunningInNamespace(c, clientPod)
+			clientPod = createClientPod(c, ns, pvc)
+			node := types.NodeName(clientPod.Spec.NodeName)
 
 			By("Deleting the Persistent Volume")
-			err = c.PersistentVolumes().Delete(pv.Name)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(framework.WaitForPersistentVolumeDeleted(c, pv.Name, 3*time.Second, 60*time.Second)).To(Succeed())
-			// TODO verify PD umount & detach
+			deletePersistentVolume(c, pv)
+			verifyDiskAttached(diskName, node)
 
 			By("Deleting the client pod")
 			deletePod(f, c, ns, clientPod)
-			// TODO verify PD umount & detach
+
+			By("Verifying Persistent Disk detaches")
+			err = waitForPDDetach(diskName, node)
+			Expect(err).NotTo(HaveOccurred())
 		})
 	})
 })
+
+// Sanity check for GCE testing.  Verify the persistent disk attached to the node.
+func verifyDiskAttached(diskName string, nodeName types.NodeName) bool {
+	gceCloud, err := getGCECloud()
+	Expect(err).NotTo(HaveOccurred())
+	isAttached, err := gceCloud.DiskIsAttached(diskName, nodeName)
+	Expect(err).NotTo(HaveOccurred())
+	return isAttached
+}
+
 
 // Return a pvckey struct.
 func makePvcKey(ns, name string) types.NamespacedName {
@@ -905,4 +930,18 @@ func makePod(ns string, pvcName string, command ...string) *api.Pod {
 			},
 		},
 	}
+}
+
+// Define and create a pod with a mounted PV.  Pod runs infinite loop until killed.
+func createClientPod(c *client.Client, ns string, pvc *api.PersistentVolumeClaim) (*api.Pod) {
+	clientPod := makePod(ns, pvc.Name)
+	clientPod, err := c.Pods(ns).Create(clientPod)
+	Expect(err).NotTo(HaveOccurred())
+
+	// Verify the pod is running before returning it
+	err = framework.WaitForPodRunningInNamespace(c, clientPod)
+	Expect(err).NotTo(HaveOccurred())
+	clientPod, err = c.Pods(ns).Get(clientPod.Name)
+	Expect(apierrs.IsNotFound(err)).To(BeFalse())
+	return clientPod
 }
