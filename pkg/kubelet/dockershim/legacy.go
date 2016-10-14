@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
+	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/util/term"
 )
 
@@ -54,4 +55,21 @@ func (ds *dockerService) ExecInContainer(containerID kubecontainer.ContainerID, 
 
 	handler := &dockertools.NativeExecHandler{}
 	return handler.ExecInContainer(ds.client, container, cmd, stdin, stdout, stderr, tty, resize)
+}
+
+const (
+	// legacyContainerLogDir is the legacy location of container logs. It is the same with
+	// kubelet.containerLogsDir.
+	legacyContainerLogDir = "/var/log/containers"
+)
+
+// logSymlink composes the container log path. It is only used for legacy cluster logging support.
+// Notice that this function directly uses labels written by kubelet which is not recommended. This is
+// only a temporary fix and will be removed after cluster logging supports the new container log path.
+func logSymlink(labels map[string]string, containerID string) string {
+	podName := labels[types.KubernetesPodNameLabel]
+	podNamespace := labels[types.KubernetesPodNamespaceLabel]
+	containerName := labels[types.KubernetesContainerNameLabel]
+	return dockertools.LogSymlink(legacyContainerLogDir, kubecontainer.BuildPodFullName(podName, podNamespace),
+		containerName, containerID)
 }
