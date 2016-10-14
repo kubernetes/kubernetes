@@ -325,7 +325,7 @@ func StartControllers(s *options.CMServer, kubeconfig *restclient.Config, rootCl
 	}
 
 	resourceQuotaControllerClient := client("resourcequota-controller")
-	resourceQuotaRegistry := quotainstall.NewRegistry(resourceQuotaControllerClient)
+	resourceQuotaRegistry := quotainstall.NewRegistry(resourceQuotaControllerClient, sharedInformers)
 	groupKindsToReplenish := []unversioned.GroupKind{
 		api.Kind("Pod"),
 		api.Kind("Service"),
@@ -338,7 +338,7 @@ func StartControllers(s *options.CMServer, kubeconfig *restclient.Config, rootCl
 		KubeClient:                resourceQuotaControllerClient,
 		ResyncPeriod:              controller.StaticResyncPeriodFunc(s.ResourceQuotaSyncPeriod.Duration),
 		Registry:                  resourceQuotaRegistry,
-		ControllerFactory:         resourcequotacontroller.NewReplenishmentControllerFactory(sharedInformers.Pods().Informer(), resourceQuotaControllerClient),
+		ControllerFactory:         resourcequotacontroller.NewReplenishmentControllerFactory(sharedInformers, resourceQuotaControllerClient),
 		ReplenishmentResyncPeriod: ResyncPeriod(s),
 		GroupKindsToReplenish:     groupKindsToReplenish,
 	}

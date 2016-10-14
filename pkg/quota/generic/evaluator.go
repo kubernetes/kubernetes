@@ -21,9 +21,9 @@ import (
 
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/quota"
 	"k8s.io/kubernetes/pkg/runtime"
 )
@@ -35,7 +35,7 @@ type ConstraintsFunc func(required []api.ResourceName, item runtime.Object) erro
 type GetFuncByNamespace func(namespace, name string) (runtime.Object, error)
 
 // ListFuncByNamespace knows how to list resources in a namespace
-type ListFuncByNamespace func(namespace string, options api.ListOptions) (runtime.Object, error)
+type ListFuncByNamespace func(namespace string, options api.ListOptions) ([]runtime.Object, error)
 
 // MatchesScopeFunc knows how to evaluate if an object matches a scope
 type MatchesScopeFunc func(scope api.ResourceQuotaScope, object runtime.Object) bool
@@ -171,17 +171,11 @@ func (g *GenericEvaluator) UsageStats(options quota.UsageStatsOptions) (quota.Us
 	for _, resourceName := range g.MatchedResourceNames {
 		result.Used[resourceName] = resource.MustParse("0")
 	}
-	list, err := g.ListFuncByNamespace(options.Namespace, api.ListOptions{})
+	items, err := g.ListFuncByNamespace(options.Namespace, api.ListOptions{
+		LabelSelector: labels.Everything(),
+	})
 	if err != nil {
 		return result, fmt.Errorf("%s: Failed to list %v: %v", g.Name, g.GroupKind(), err)
-	}
-	_, err = meta.ListAccessor(list)
-	if err != nil {
-		return result, fmt.Errorf("%s: Unable to understand list result, does not appear to be a list %#v", g.Name, list)
-	}
-	items, err := meta.ExtractList(list)
-	if err != nil {
-		return result, fmt.Errorf("%s: Unable to understand list result %#v (%v)", g.Name, list, err)
 	}
 	for _, item := range items {
 		// need to verify that the item matches the set of scopes
