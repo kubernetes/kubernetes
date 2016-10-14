@@ -22,6 +22,7 @@ import (
 	"strings"
 	"text/tabwriter"
 
+	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
@@ -41,14 +42,15 @@ type GetContextsOptions struct {
 	out          io.Writer
 }
 
-const (
-	getContextsLong = `Displays one or many contexts from the kubeconfig file.`
+var (
+	getContextsLong = dedent.Dedent(`Displays one or many contexts from the kubeconfig file`)
 
-	getContextsExample = `# List all the contexts in your kubeconfig file
-kubectl config get-contexts
+	getContextsExample = dedent.Dedent(`
+		# List all the contexts in your kubeconfig file
+		kubectl config get-contexts
 
-# Describe one context in your kubeconfig file.
-kubectl config get-contexts my-context`
+		# Describe one context in your kubeconfig file.
+		kubectl config get-contexts my-context`)
 )
 
 // NewCmdConfigGetContexts creates a command object for the "get-contexts" action, which
