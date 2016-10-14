@@ -54,6 +54,26 @@ var storageClasses = []*storage.StorageClass{
 		Provisioner: mockPluginName,
 		Parameters:  class2Parameters,
 	},
+	{
+		TypeMeta: unversioned.TypeMeta{
+			Kind: "StorageClass",
+		},
+		ObjectMeta: api.ObjectMeta{
+			Name: "external",
+		},
+		Provisioner: "vendor.com/my-volume",
+		Parameters:  class1Parameters,
+	},
+	{
+		TypeMeta: unversioned.TypeMeta{
+			Kind: "StorageClass",
+		},
+		ObjectMeta: api.ObjectMeta{
+			Name: "unknown-internal",
+		},
+		Provisioner: "kubernetes.io/unknown",
+		Parameters:  class1Parameters,
+	},
 }
 
 // call to storageClass 1, returning an error
@@ -313,6 +333,26 @@ func TestProvisionSync(t *testing.T) {
 			newClaimArray("claim11-15", "uid11-15", "1Gi", "", api.ClaimPending),
 			newClaimArray("claim11-15", "uid11-15", "1Gi", "", api.ClaimPending),
 			noevents, noerrors, wrapTestWithProvisionCalls([]provisionCall{}, testSyncClaim),
+		},
+		{
+			// No provisioning + normal event with external provisioner
+			"11-17 - external provisioner",
+			novolumes,
+			novolumes,
+			claimWithClass("external", newClaimArray("claim11-17", "uid11-17", "1Gi", "", api.ClaimPending)),
+			claimWithClass("external", newClaimArray("claim11-17", "uid11-17", "1Gi", "", api.ClaimPending)),
+			[]string{"Normal ExternalProvisioning"},
+			noerrors, wrapTestWithProvisionCalls([]provisionCall{}, testSyncClaim),
+		},
+		{
+			// No provisioning + warning event with unknown internal provisioner
+			"11-18 - unknown internal provisioner",
+			novolumes,
+			novolumes,
+			claimWithClass("unknown-internal", newClaimArray("claim11-18", "uid11-18", "1Gi", "", api.ClaimPending)),
+			claimWithClass("unknown-internal", newClaimArray("claim11-18", "uid11-18", "1Gi", "", api.ClaimPending)),
+			[]string{"Warning ProvisioningFailed"},
+			noerrors, wrapTestWithProvisionCalls([]provisionCall{}, testSyncClaim),
 		},
 	}
 	runSyncTests(t, tests, storageClasses)
