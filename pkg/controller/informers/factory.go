@@ -40,6 +40,11 @@ type SharedInformerFactory interface {
 	DaemonSets() DaemonSetInformer
 	Deployments() DeploymentInformer
 	ReplicaSets() ReplicaSetInformer
+
+	ClusterRoles() ClusterRoleInformer
+	ClusterRoleBindings() ClusterRoleBindingInformer
+	Roles() RoleInformer
+	RoleBindings() RoleBindingInformer
 }
 
 type sharedInformerFactory struct {
@@ -111,4 +116,20 @@ func (f *sharedInformerFactory) Deployments() DeploymentInformer {
 
 func (f *sharedInformerFactory) ReplicaSets() ReplicaSetInformer {
 	return &replicaSetInformer{sharedInformerFactory: f}
+}
+
+func (f *sharedInformerFactory) ClusterRoles() ClusterRoleInformer {
+	return &clusterRoleInformer{sharedInformerFactory: f}
+}
+
+func (f *sharedInformerFactory) ClusterRoleBindings() ClusterRoleBindingInformer {
+	return &clusterRoleBindingInformer{sharedInformerFactory: f}
+}
+
+func (f *sharedInformerFactory) Roles() RoleInformer {
+	return &roleInformer{sharedInformerFactory: f}
+}
+
+func (f *sharedInformerFactory) RoleBindings() RoleBindingInformer {
+	return &roleBindingInformer{sharedInformerFactory: f}
 }
