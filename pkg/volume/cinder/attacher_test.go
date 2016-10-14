@@ -449,3 +449,7 @@ func (instances *instances) AddSSHKeyToAllInstances(user string, keyData []byte)
 func (instances *instances) CurrentNodeName(hostname string) (types.NodeName, error) {
 	return "", errors.New("Not implemented")
 }
+
+func (instances *instances) DisksAreAttached(diskNames []string, nodeName types.NodeName) ([]bool, error) {
+	return nil, errors.New("Not implemented")
+}

@@ -660,3 +660,21 @@ func (rs *Rackspace) DiskIsAttached(diskName, instanceID string) (bool, error) {
 	}
 	return false, nil
 }
+
+// query if a list volumes are attached to a compute instance
+func (rs *Rackspace) DisksAreAttached(diskNames []string, instanceID string) ([]bool, error) {
+	attached := make([]bool, len(diskNames))
+	var returnedErr error
+	for i, diskName := range diskNames {
+		result, err := rs.DiskIsAttached(diskName, instanceID)
+		if err != nil {
+			returnedErr = fmt.Errorf("Error in checking disk %q attached: %v \n %v", diskName, err, returnedErr)
+			continue
+		}
+		if result {
+			attached[i] = true
+		}
+
+	}
+	return attached, returnedErr
+}
