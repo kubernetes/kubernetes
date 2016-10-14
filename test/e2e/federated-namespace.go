@@ -36,7 +36,7 @@ const (
 )
 
 // Create/delete ingress api objects
-var _ = framework.KubeDescribe("Federation namespace [Feature:Federation]", func() {
+var _ = framework.KubeDescribe("Federation namespace [Feature:Federation12]", func() {
 	f := framework.NewDefaultFederatedFramework("federation-namespace")
 
 	Describe("Namespace objects", func() {
