@@ -48,16 +48,18 @@ const (
 	containerTypeLabelKey       = "io.kubernetes.docker.type"
 	containerTypeLabelSandbox   = "podsandbox"
 	containerTypeLabelContainer = "container"
+	containerLogPathLabelKey    = "io.kubernetes.container.logpath"
 	sandboxIDLabelKey           = "io.kubernetes.sandbox.id"
 )
 
-var internalLabelKeys []string = []string{containerTypeLabelKey, sandboxIDLabelKey}
+var internalLabelKeys []string = []string{containerTypeLabelKey, containerLogPathLabelKey, sandboxIDLabelKey}
 
 // NOTE: Anything passed to DockerService should be eventually handled in another way when we switch to running the shim as a different process.
 func NewDockerService(client dockertools.DockerInterface, seccompProfileRoot string, podSandboxImage string) DockerLegacyService {
 	return &dockerService{
 		seccompProfileRoot: seccompProfileRoot,
 		client:             dockertools.NewInstrumentedDockerInterface(client),
+		os:                 kubecontainer.RealOS{},
 		podSandboxImage:    podSandboxImage,
 	}
 }
@@ -81,6 +83,7 @@ type DockerLegacyService interface {
 type dockerService struct {
 	seccompProfileRoot string
 	client             dockertools.DockerInterface
+	os                 kubecontainer.OSInterface
 	podSandboxImage    string
 }
 

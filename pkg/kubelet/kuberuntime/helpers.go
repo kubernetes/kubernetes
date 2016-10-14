@@ -18,12 +18,14 @@ package kuberuntime
 
 import (
 	"fmt"
+	"path/filepath"
 	"strconv"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/types"
 )
 
 const (
@@ -198,4 +200,14 @@ func milliCPUToQuota(milliCPU int64) (quota int64, period int64) {
 func getStableKey(pod *api.Pod, container *api.Container) string {
 	hash := strconv.FormatUint(kubecontainer.HashContainer(container), 16)
 	return fmt.Sprintf("%s_%s_%s_%s_%s", pod.Name, pod.Namespace, string(pod.UID), container.Name, hash)
+}
+
+// buildContainerLogsPath builds log path for container relative to pod logs directory.
+func buildContainerLogsPath(containerName string, restartCount int) string {
+	return fmt.Sprintf("%s_%d.log", containerName, restartCount)
+}
+
+// buildPodLogsDirectory builds absolute log directory path for a pod sandbox.
+func buildPodLogsDirectory(podUID types.UID) string {
+	return filepath.Join(podLogsRootDirectory, string(podUID))
 }
