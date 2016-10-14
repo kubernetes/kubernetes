@@ -21,10 +21,10 @@ limitations under the License.
 package v1beta1
 
 import (
-	api "k8s.io/kubernetes/pkg/api"
 	authorization "k8s.io/kubernetes/pkg/apis/authorization"
 	conversion "k8s.io/kubernetes/pkg/conversion"
 	runtime "k8s.io/kubernetes/pkg/runtime"
+	unsafe "unsafe"
 )
 
 func init() {
@@ -55,19 +55,7 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 }
 
 func autoConvert_v1beta1_LocalSubjectAccessReview_To_authorization_LocalSubjectAccessReview(in *LocalSubjectAccessReview, out *authorization.LocalSubjectAccessReview, s conversion.Scope) error {
-	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
-		return err
-	}
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
-		return err
-	}
-	if err := Convert_v1beta1_SubjectAccessReviewSpec_To_authorization_SubjectAccessReviewSpec(&in.Spec, &out.Spec, s); err != nil {
-		return err
-	}
-	if err := Convert_v1beta1_SubjectAccessReviewStatus_To_authorization_SubjectAccessReviewStatus(&in.Status, &out.Status, s); err != nil {
-		return err
-	}
+	out = (*authorization.LocalSubjectAccessReview)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -76,19 +64,7 @@ func Convert_v1beta1_LocalSubjectAccessReview_To_authorization_LocalSubjectAcces
 }
 
 func autoConvert_authorization_LocalSubjectAccessReview_To_v1beta1_LocalSubjectAccessReview(in *authorization.LocalSubjectAccessReview, out *LocalSubjectAccessReview, s conversion.Scope) error {
-	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
-		return err
-	}
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
-		return err
-	}
-	if err := Convert_authorization_SubjectAccessReviewSpec_To_v1beta1_SubjectAccessReviewSpec(&in.Spec, &out.Spec, s); err != nil {
-		return err
-	}
-	if err := Convert_authorization_SubjectAccessReviewStatus_To_v1beta1_SubjectAccessReviewStatus(&in.Status, &out.Status, s); err != nil {
-		return err
-	}
+	out = (*LocalSubjectAccessReview)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -97,8 +73,7 @@ func Convert_authorization_LocalSubjectAccessReview_To_v1beta1_LocalSubjectAcces
 }
 
 func autoConvert_v1beta1_NonResourceAttributes_To_authorization_NonResourceAttributes(in *NonResourceAttributes, out *authorization.NonResourceAttributes, s conversion.Scope) error {
-	out.Path = in.Path
-	out.Verb = in.Verb
+	out = (*authorization.NonResourceAttributes)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -107,8 +82,7 @@ func Convert_v1beta1_NonResourceAttributes_To_authorization_NonResourceAttribute
 }
 
 func autoConvert_authorization_NonResourceAttributes_To_v1beta1_NonResourceAttributes(in *authorization.NonResourceAttributes, out *NonResourceAttributes, s conversion.Scope) error {
-	out.Path = in.Path
-	out.Verb = in.Verb
+	out = (*NonResourceAttributes)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -117,13 +91,7 @@ func Convert_authorization_NonResourceAttributes_To_v1beta1_NonResourceAttribute
 }
 
 func autoConvert_v1beta1_ResourceAttributes_To_authorization_ResourceAttributes(in *ResourceAttributes, out *authorization.ResourceAttributes, s conversion.Scope) error {
-	out.Namespace = in.Namespace
-	out.Verb = in.Verb
-	out.Group = in.Group
-	out.Version = in.Version
-	out.Resource = in.Resource
-	out.Subresource = in.Subresource
-	out.Name = in.Name
+	out = (*authorization.ResourceAttributes)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -132,13 +100,7 @@ func Convert_v1beta1_ResourceAttributes_To_authorization_ResourceAttributes(in *
 }
 
 func autoConvert_authorization_ResourceAttributes_To_v1beta1_ResourceAttributes(in *authorization.ResourceAttributes, out *ResourceAttributes, s conversion.Scope) error {
-	out.Namespace = in.Namespace
-	out.Verb = in.Verb
-	out.Group = in.Group
-	out.Version = in.Version
-	out.Resource = in.Resource
-	out.Subresource = in.Subresource
-	out.Name = in.Name
+	out = (*ResourceAttributes)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -147,19 +109,7 @@ func Convert_authorization_ResourceAttributes_To_v1beta1_ResourceAttributes(in *
 }
 
 func autoConvert_v1beta1_SelfSubjectAccessReview_To_authorization_SelfSubjectAccessReview(in *SelfSubjectAccessReview, out *authorization.SelfSubjectAccessReview, s conversion.Scope) error {
-	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
-		return err
-	}
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
-		return err
-	}
-	if err := Convert_v1beta1_SelfSubjectAccessReviewSpec_To_authorization_SelfSubjectAccessReviewSpec(&in.Spec, &out.Spec, s); err != nil {
-		return err
-	}
-	if err := Convert_v1beta1_SubjectAccessReviewStatus_To_authorization_SubjectAccessReviewStatus(&in.Status, &out.Status, s); err != nil {
-		return err
-	}
+	out = (*authorization.SelfSubjectAccessReview)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -168,19 +118,7 @@ func Convert_v1beta1_SelfSubjectAccessReview_To_authorization_SelfSubjectAccessR
 }
 
 func autoConvert_authorization_SelfSubjectAccessReview_To_v1beta1_SelfSubjectAccessReview(in *authorization.SelfSubjectAccessReview, out *SelfSubjectAccessReview, s conversion.Scope) error {
-	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
-		return err
-	}
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
-		return err
-	}
-	if err := Convert_authorization_SelfSubjectAccessReviewSpec_To_v1beta1_SelfSubjectAccessReviewSpec(&in.Spec, &out.Spec, s); err != nil {
-		return err
-	}
-	if err := Convert_authorization_SubjectAccessReviewStatus_To_v1beta1_SubjectAccessReviewStatus(&in.Status, &out.Status, s); err != nil {
-		return err
-	}
+	out = (*SelfSubjectAccessReview)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -189,24 +127,7 @@ func Convert_authorization_SelfSubjectAccessReview_To_v1beta1_SelfSubjectAccessR
 }
 
 func autoConvert_v1beta1_SelfSubjectAccessReviewSpec_To_authorization_SelfSubjectAccessReviewSpec(in *SelfSubjectAccessReviewSpec, out *authorization.SelfSubjectAccessReviewSpec, s conversion.Scope) error {
-	if in.ResourceAttributes != nil {
-		in, out := &in.ResourceAttributes, &out.ResourceAttributes
-		*out = new(authorization.ResourceAttributes)
-		if err := Convert_v1beta1_ResourceAttributes_To_authorization_ResourceAttributes(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.ResourceAttributes = nil
-	}
-	if in.NonResourceAttributes != nil {
-		in, out := &in.NonResourceAttributes, &out.NonResourceAttributes
-		*out = new(authorization.NonResourceAttributes)
-		if err := Convert_v1beta1_NonResourceAttributes_To_authorization_NonResourceAttributes(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.NonResourceAttributes = nil
-	}
+	out = (*authorization.SelfSubjectAccessReviewSpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -215,24 +136,7 @@ func Convert_v1beta1_SelfSubjectAccessReviewSpec_To_authorization_SelfSubjectAcc
 }
 
 func autoConvert_authorization_SelfSubjectAccessReviewSpec_To_v1beta1_SelfSubjectAccessReviewSpec(in *authorization.SelfSubjectAccessReviewSpec, out *SelfSubjectAccessReviewSpec, s conversion.Scope) error {
-	if in.ResourceAttributes != nil {
-		in, out := &in.ResourceAttributes, &out.ResourceAttributes
-		*out = new(ResourceAttributes)
-		if err := Convert_authorization_ResourceAttributes_To_v1beta1_ResourceAttributes(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.ResourceAttributes = nil
-	}
-	if in.NonResourceAttributes != nil {
-		in, out := &in.NonResourceAttributes, &out.NonResourceAttributes
-		*out = new(NonResourceAttributes)
-		if err := Convert_authorization_NonResourceAttributes_To_v1beta1_NonResourceAttributes(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.NonResourceAttributes = nil
-	}
+	out = (*SelfSubjectAccessReviewSpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -241,19 +145,7 @@ func Convert_authorization_SelfSubjectAccessReviewSpec_To_v1beta1_SelfSubjectAcc
 }
 
 func autoConvert_v1beta1_SubjectAccessReview_To_authorization_SubjectAccessReview(in *SubjectAccessReview, out *authorization.SubjectAccessReview, s conversion.Scope) error {
-	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
-		return err
-	}
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
-		return err
-	}
-	if err := Convert_v1beta1_SubjectAccessReviewSpec_To_authorization_SubjectAccessReviewSpec(&in.Spec, &out.Spec, s); err != nil {
-		return err
-	}
-	if err := Convert_v1beta1_SubjectAccessReviewStatus_To_authorization_SubjectAccessReviewStatus(&in.Status, &out.Status, s); err != nil {
-		return err
-	}
+	out = (*authorization.SubjectAccessReview)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -262,19 +154,7 @@ func Convert_v1beta1_SubjectAccessReview_To_authorization_SubjectAccessReview(in
 }
 
 func autoConvert_authorization_SubjectAccessReview_To_v1beta1_SubjectAccessReview(in *authorization.SubjectAccessReview, out *SubjectAccessReview, s conversion.Scope) error {
-	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
-		return err
-	}
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
-		return err
-	}
-	if err := Convert_authorization_SubjectAccessReviewSpec_To_v1beta1_SubjectAccessReviewSpec(&in.Spec, &out.Spec, s); err != nil {
-		return err
-	}
-	if err := Convert_authorization_SubjectAccessReviewStatus_To_v1beta1_SubjectAccessReviewStatus(&in.Status, &out.Status, s); err != nil {
-		return err
-	}
+	out = (*SubjectAccessReview)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -283,40 +163,7 @@ func Convert_authorization_SubjectAccessReview_To_v1beta1_SubjectAccessReview(in
 }
 
 func autoConvert_v1beta1_SubjectAccessReviewSpec_To_authorization_SubjectAccessReviewSpec(in *SubjectAccessReviewSpec, out *authorization.SubjectAccessReviewSpec, s conversion.Scope) error {
-	if in.ResourceAttributes != nil {
-		in, out := &in.ResourceAttributes, &out.ResourceAttributes
-		*out = new(authorization.ResourceAttributes)
-		if err := Convert_v1beta1_ResourceAttributes_To_authorization_ResourceAttributes(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.ResourceAttributes = nil
-	}
-	if in.NonResourceAttributes != nil {
-		in, out := &in.NonResourceAttributes, &out.NonResourceAttributes
-		*out = new(authorization.NonResourceAttributes)
-		if err := Convert_v1beta1_NonResourceAttributes_To_authorization_NonResourceAttributes(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.NonResourceAttributes = nil
-	}
-	out.User = in.User
-	out.Groups = in.Groups
-	if in.Extra != nil {
-		in, out := &in.Extra, &out.Extra
-		*out = make(map[string]authorization.ExtraValue, len(*in))
-		for key, val := range *in {
-			newVal := new(authorization.ExtraValue)
-			// TODO: Inefficient conversion - can we improve it?
-			if err := s.Convert(&val, newVal, 0); err != nil {
-				return err
-			}
-			(*out)[key] = *newVal
-		}
-	} else {
-		out.Extra = nil
-	}
+	out = (*authorization.SubjectAccessReviewSpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -325,40 +172,7 @@ func Convert_v1beta1_SubjectAccessReviewSpec_To_authorization_SubjectAccessRevie
 }
 
 func autoConvert_authorization_SubjectAccessReviewSpec_To_v1beta1_SubjectAccessReviewSpec(in *authorization.SubjectAccessReviewSpec, out *SubjectAccessReviewSpec, s conversion.Scope) error {
-	if in.ResourceAttributes != nil {
-		in, out := &in.ResourceAttributes, &out.ResourceAttributes
-		*out = new(ResourceAttributes)
-		if err := Convert_authorization_ResourceAttributes_To_v1beta1_ResourceAttributes(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.ResourceAttributes = nil
-	}
-	if in.NonResourceAttributes != nil {
-		in, out := &in.NonResourceAttributes, &out.NonResourceAttributes
-		*out = new(NonResourceAttributes)
-		if err := Convert_authorization_NonResourceAttributes_To_v1beta1_NonResourceAttributes(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.NonResourceAttributes = nil
-	}
-	out.User = in.User
-	out.Groups = in.Groups
-	if in.Extra != nil {
-		in, out := &in.Extra, &out.Extra
-		*out = make(map[string]ExtraValue, len(*in))
-		for key, val := range *in {
-			newVal := new(ExtraValue)
-			// TODO: Inefficient conversion - can we improve it?
-			if err := s.Convert(&val, newVal, 0); err != nil {
-				return err
-			}
-			(*out)[key] = *newVal
-		}
-	} else {
-		out.Extra = nil
-	}
+	out = (*SubjectAccessReviewSpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -367,9 +181,7 @@ func Convert_authorization_SubjectAccessReviewSpec_To_v1beta1_SubjectAccessRevie
 }
 
 func autoConvert_v1beta1_SubjectAccessReviewStatus_To_authorization_SubjectAccessReviewStatus(in *SubjectAccessReviewStatus, out *authorization.SubjectAccessReviewStatus, s conversion.Scope) error {
-	out.Allowed = in.Allowed
-	out.Reason = in.Reason
-	out.EvaluationError = in.EvaluationError
+	out = (*authorization.SubjectAccessReviewStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -378,9 +190,7 @@ func Convert_v1beta1_SubjectAccessReviewStatus_To_authorization_SubjectAccessRev
 }
 
 func autoConvert_authorization_SubjectAccessReviewStatus_To_v1beta1_SubjectAccessReviewStatus(in *authorization.SubjectAccessReviewStatus, out *SubjectAccessReviewStatus, s conversion.Scope) error {
-	out.Allowed = in.Allowed
-	out.Reason = in.Reason
-	out.EvaluationError = in.EvaluationError
+	out = (*SubjectAccessReviewStatus)(unsafe.Pointer(in))
 	return nil
 }
 

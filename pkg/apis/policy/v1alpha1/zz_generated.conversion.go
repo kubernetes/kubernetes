@@ -21,11 +21,10 @@ limitations under the License.
 package v1alpha1
 
 import (
-	api "k8s.io/kubernetes/pkg/api"
-	v1 "k8s.io/kubernetes/pkg/api/v1"
 	policy "k8s.io/kubernetes/pkg/apis/policy"
 	conversion "k8s.io/kubernetes/pkg/conversion"
 	runtime "k8s.io/kubernetes/pkg/runtime"
+	unsafe "unsafe"
 )
 
 func init() {
@@ -50,23 +49,7 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 }
 
 func autoConvert_v1alpha1_Eviction_To_policy_Eviction(in *Eviction, out *policy.Eviction, s conversion.Scope) error {
-	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
-		return err
-	}
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
-		return err
-	}
-	if in.DeleteOptions != nil {
-		in, out := &in.DeleteOptions, &out.DeleteOptions
-		*out = new(api.DeleteOptions)
-		// TODO: Inefficient conversion - can we improve it?
-		if err := s.Convert(*in, *out, 0); err != nil {
-			return err
-		}
-	} else {
-		out.DeleteOptions = nil
-	}
+	out = (*policy.Eviction)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -75,23 +58,7 @@ func Convert_v1alpha1_Eviction_To_policy_Eviction(in *Eviction, out *policy.Evic
 }
 
 func autoConvert_policy_Eviction_To_v1alpha1_Eviction(in *policy.Eviction, out *Eviction, s conversion.Scope) error {
-	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
-		return err
-	}
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
-		return err
-	}
-	if in.DeleteOptions != nil {
-		in, out := &in.DeleteOptions, &out.DeleteOptions
-		*out = new(v1.DeleteOptions)
-		// TODO: Inefficient conversion - can we improve it?
-		if err := s.Convert(*in, *out, 0); err != nil {
-			return err
-		}
-	} else {
-		out.DeleteOptions = nil
-	}
+	out = (*Eviction)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -100,19 +67,7 @@ func Convert_policy_Eviction_To_v1alpha1_Eviction(in *policy.Eviction, out *Evic
 }
 
 func autoConvert_v1alpha1_PodDisruptionBudget_To_policy_PodDisruptionBudget(in *PodDisruptionBudget, out *policy.PodDisruptionBudget, s conversion.Scope) error {
-	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
-		return err
-	}
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
-		return err
-	}
-	if err := Convert_v1alpha1_PodDisruptionBudgetSpec_To_policy_PodDisruptionBudgetSpec(&in.Spec, &out.Spec, s); err != nil {
-		return err
-	}
-	if err := Convert_v1alpha1_PodDisruptionBudgetStatus_To_policy_PodDisruptionBudgetStatus(&in.Status, &out.Status, s); err != nil {
-		return err
-	}
+	out = (*policy.PodDisruptionBudget)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -121,19 +76,7 @@ func Convert_v1alpha1_PodDisruptionBudget_To_policy_PodDisruptionBudget(in *PodD
 }
 
 func autoConvert_policy_PodDisruptionBudget_To_v1alpha1_PodDisruptionBudget(in *policy.PodDisruptionBudget, out *PodDisruptionBudget, s conversion.Scope) error {
-	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
-		return err
-	}
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
-		return err
-	}
-	if err := Convert_policy_PodDisruptionBudgetSpec_To_v1alpha1_PodDisruptionBudgetSpec(&in.Spec, &out.Spec, s); err != nil {
-		return err
-	}
-	if err := Convert_policy_PodDisruptionBudgetStatus_To_v1alpha1_PodDisruptionBudgetStatus(&in.Status, &out.Status, s); err != nil {
-		return err
-	}
+	out = (*PodDisruptionBudget)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -142,23 +85,7 @@ func Convert_policy_PodDisruptionBudget_To_v1alpha1_PodDisruptionBudget(in *poli
 }
 
 func autoConvert_v1alpha1_PodDisruptionBudgetList_To_policy_PodDisruptionBudgetList(in *PodDisruptionBudgetList, out *policy.PodDisruptionBudgetList, s conversion.Scope) error {
-	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
-		return err
-	}
-	if err := api.Convert_unversioned_ListMeta_To_unversioned_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
-		return err
-	}
-	if in.Items != nil {
-		in, out := &in.Items, &out.Items
-		*out = make([]policy.PodDisruptionBudget, len(*in))
-		for i := range *in {
-			if err := Convert_v1alpha1_PodDisruptionBudget_To_policy_PodDisruptionBudget(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Items = nil
-	}
+	out = (*policy.PodDisruptionBudgetList)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -167,23 +94,7 @@ func Convert_v1alpha1_PodDisruptionBudgetList_To_policy_PodDisruptionBudgetList(
 }
 
 func autoConvert_policy_PodDisruptionBudgetList_To_v1alpha1_PodDisruptionBudgetList(in *policy.PodDisruptionBudgetList, out *PodDisruptionBudgetList, s conversion.Scope) error {
-	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
-		return err
-	}
-	if err := api.Convert_unversioned_ListMeta_To_unversioned_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
-		return err
-	}
-	if in.Items != nil {
-		in, out := &in.Items, &out.Items
-		*out = make([]PodDisruptionBudget, len(*in))
-		for i := range *in {
-			if err := Convert_policy_PodDisruptionBudget_To_v1alpha1_PodDisruptionBudget(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Items = nil
-	}
+	out = (*PodDisruptionBudgetList)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -192,10 +103,7 @@ func Convert_policy_PodDisruptionBudgetList_To_v1alpha1_PodDisruptionBudgetList(
 }
 
 func autoConvert_v1alpha1_PodDisruptionBudgetSpec_To_policy_PodDisruptionBudgetSpec(in *PodDisruptionBudgetSpec, out *policy.PodDisruptionBudgetSpec, s conversion.Scope) error {
-	if err := api.Convert_intstr_IntOrString_To_intstr_IntOrString(&in.MinAvailable, &out.MinAvailable, s); err != nil {
-		return err
-	}
-	out.Selector = in.Selector
+	out = (*policy.PodDisruptionBudgetSpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -204,10 +112,7 @@ func Convert_v1alpha1_PodDisruptionBudgetSpec_To_policy_PodDisruptionBudgetSpec(
 }
 
 func autoConvert_policy_PodDisruptionBudgetSpec_To_v1alpha1_PodDisruptionBudgetSpec(in *policy.PodDisruptionBudgetSpec, out *PodDisruptionBudgetSpec, s conversion.Scope) error {
-	if err := api.Convert_intstr_IntOrString_To_intstr_IntOrString(&in.MinAvailable, &out.MinAvailable, s); err != nil {
-		return err
-	}
-	out.Selector = in.Selector
+	out = (*PodDisruptionBudgetSpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -216,10 +121,7 @@ func Convert_policy_PodDisruptionBudgetSpec_To_v1alpha1_PodDisruptionBudgetSpec(
 }
 
 func autoConvert_v1alpha1_PodDisruptionBudgetStatus_To_policy_PodDisruptionBudgetStatus(in *PodDisruptionBudgetStatus, out *policy.PodDisruptionBudgetStatus, s conversion.Scope) error {
-	out.PodDisruptionAllowed = in.PodDisruptionAllowed
-	out.CurrentHealthy = in.CurrentHealthy
-	out.DesiredHealthy = in.DesiredHealthy
-	out.ExpectedPods = in.ExpectedPods
+	out = (*policy.PodDisruptionBudgetStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -228,10 +130,7 @@ func Convert_v1alpha1_PodDisruptionBudgetStatus_To_policy_PodDisruptionBudgetSta
 }
 
 func autoConvert_policy_PodDisruptionBudgetStatus_To_v1alpha1_PodDisruptionBudgetStatus(in *policy.PodDisruptionBudgetStatus, out *PodDisruptionBudgetStatus, s conversion.Scope) error {
-	out.PodDisruptionAllowed = in.PodDisruptionAllowed
-	out.CurrentHealthy = in.CurrentHealthy
-	out.DesiredHealthy = in.DesiredHealthy
-	out.ExpectedPods = in.ExpectedPods
+	out = (*PodDisruptionBudgetStatus)(unsafe.Pointer(in))
 	return nil
 }
 

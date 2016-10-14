@@ -21,10 +21,10 @@ limitations under the License.
 package v1alpha1
 
 import (
-	api "k8s.io/kubernetes/pkg/api"
 	imagepolicy "k8s.io/kubernetes/pkg/apis/imagepolicy"
 	conversion "k8s.io/kubernetes/pkg/conversion"
 	runtime "k8s.io/kubernetes/pkg/runtime"
+	unsafe "unsafe"
 )
 
 func init() {
@@ -47,19 +47,7 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 }
 
 func autoConvert_v1alpha1_ImageReview_To_imagepolicy_ImageReview(in *ImageReview, out *imagepolicy.ImageReview, s conversion.Scope) error {
-	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
-		return err
-	}
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
-		return err
-	}
-	if err := Convert_v1alpha1_ImageReviewSpec_To_imagepolicy_ImageReviewSpec(&in.Spec, &out.Spec, s); err != nil {
-		return err
-	}
-	if err := Convert_v1alpha1_ImageReviewStatus_To_imagepolicy_ImageReviewStatus(&in.Status, &out.Status, s); err != nil {
-		return err
-	}
+	out = (*imagepolicy.ImageReview)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -68,19 +56,7 @@ func Convert_v1alpha1_ImageReview_To_imagepolicy_ImageReview(in *ImageReview, ou
 }
 
 func autoConvert_imagepolicy_ImageReview_To_v1alpha1_ImageReview(in *imagepolicy.ImageReview, out *ImageReview, s conversion.Scope) error {
-	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
-		return err
-	}
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
-		return err
-	}
-	if err := Convert_imagepolicy_ImageReviewSpec_To_v1alpha1_ImageReviewSpec(&in.Spec, &out.Spec, s); err != nil {
-		return err
-	}
-	if err := Convert_imagepolicy_ImageReviewStatus_To_v1alpha1_ImageReviewStatus(&in.Status, &out.Status, s); err != nil {
-		return err
-	}
+	out = (*ImageReview)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -89,7 +65,7 @@ func Convert_imagepolicy_ImageReview_To_v1alpha1_ImageReview(in *imagepolicy.Ima
 }
 
 func autoConvert_v1alpha1_ImageReviewContainerSpec_To_imagepolicy_ImageReviewContainerSpec(in *ImageReviewContainerSpec, out *imagepolicy.ImageReviewContainerSpec, s conversion.Scope) error {
-	out.Image = in.Image
+	out = (*imagepolicy.ImageReviewContainerSpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -98,7 +74,7 @@ func Convert_v1alpha1_ImageReviewContainerSpec_To_imagepolicy_ImageReviewContain
 }
 
 func autoConvert_imagepolicy_ImageReviewContainerSpec_To_v1alpha1_ImageReviewContainerSpec(in *imagepolicy.ImageReviewContainerSpec, out *ImageReviewContainerSpec, s conversion.Scope) error {
-	out.Image = in.Image
+	out = (*ImageReviewContainerSpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -107,19 +83,7 @@ func Convert_imagepolicy_ImageReviewContainerSpec_To_v1alpha1_ImageReviewContain
 }
 
 func autoConvert_v1alpha1_ImageReviewSpec_To_imagepolicy_ImageReviewSpec(in *ImageReviewSpec, out *imagepolicy.ImageReviewSpec, s conversion.Scope) error {
-	if in.Containers != nil {
-		in, out := &in.Containers, &out.Containers
-		*out = make([]imagepolicy.ImageReviewContainerSpec, len(*in))
-		for i := range *in {
-			if err := Convert_v1alpha1_ImageReviewContainerSpec_To_imagepolicy_ImageReviewContainerSpec(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Containers = nil
-	}
-	out.Annotations = in.Annotations
-	out.Namespace = in.Namespace
+	out = (*imagepolicy.ImageReviewSpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -128,19 +92,7 @@ func Convert_v1alpha1_ImageReviewSpec_To_imagepolicy_ImageReviewSpec(in *ImageRe
 }
 
 func autoConvert_imagepolicy_ImageReviewSpec_To_v1alpha1_ImageReviewSpec(in *imagepolicy.ImageReviewSpec, out *ImageReviewSpec, s conversion.Scope) error {
-	if in.Containers != nil {
-		in, out := &in.Containers, &out.Containers
-		*out = make([]ImageReviewContainerSpec, len(*in))
-		for i := range *in {
-			if err := Convert_imagepolicy_ImageReviewContainerSpec_To_v1alpha1_ImageReviewContainerSpec(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Containers = nil
-	}
-	out.Annotations = in.Annotations
-	out.Namespace = in.Namespace
+	out = (*ImageReviewSpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -149,8 +101,7 @@ func Convert_imagepolicy_ImageReviewSpec_To_v1alpha1_ImageReviewSpec(in *imagepo
 }
 
 func autoConvert_v1alpha1_ImageReviewStatus_To_imagepolicy_ImageReviewStatus(in *ImageReviewStatus, out *imagepolicy.ImageReviewStatus, s conversion.Scope) error {
-	out.Allowed = in.Allowed
-	out.Reason = in.Reason
+	out = (*imagepolicy.ImageReviewStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -159,8 +110,7 @@ func Convert_v1alpha1_ImageReviewStatus_To_imagepolicy_ImageReviewStatus(in *Ima
 }
 
 func autoConvert_imagepolicy_ImageReviewStatus_To_v1alpha1_ImageReviewStatus(in *imagepolicy.ImageReviewStatus, out *ImageReviewStatus, s conversion.Scope) error {
-	out.Allowed = in.Allowed
-	out.Reason = in.Reason
+	out = (*ImageReviewStatus)(unsafe.Pointer(in))
 	return nil
 }
 

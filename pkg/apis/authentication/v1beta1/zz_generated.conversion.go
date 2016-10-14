@@ -21,10 +21,10 @@ limitations under the License.
 package v1beta1
 
 import (
-	api "k8s.io/kubernetes/pkg/api"
 	authentication "k8s.io/kubernetes/pkg/apis/authentication"
 	conversion "k8s.io/kubernetes/pkg/conversion"
 	runtime "k8s.io/kubernetes/pkg/runtime"
+	unsafe "unsafe"
 )
 
 func init() {
@@ -47,19 +47,7 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 }
 
 func autoConvert_v1beta1_TokenReview_To_authentication_TokenReview(in *TokenReview, out *authentication.TokenReview, s conversion.Scope) error {
-	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
-		return err
-	}
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
-		return err
-	}
-	if err := Convert_v1beta1_TokenReviewSpec_To_authentication_TokenReviewSpec(&in.Spec, &out.Spec, s); err != nil {
-		return err
-	}
-	if err := Convert_v1beta1_TokenReviewStatus_To_authentication_TokenReviewStatus(&in.Status, &out.Status, s); err != nil {
-		return err
-	}
+	out = (*authentication.TokenReview)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -68,19 +56,7 @@ func Convert_v1beta1_TokenReview_To_authentication_TokenReview(in *TokenReview, 
 }
 
 func autoConvert_authentication_TokenReview_To_v1beta1_TokenReview(in *authentication.TokenReview, out *TokenReview, s conversion.Scope) error {
-	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
-		return err
-	}
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
-		return err
-	}
-	if err := Convert_authentication_TokenReviewSpec_To_v1beta1_TokenReviewSpec(&in.Spec, &out.Spec, s); err != nil {
-		return err
-	}
-	if err := Convert_authentication_TokenReviewStatus_To_v1beta1_TokenReviewStatus(&in.Status, &out.Status, s); err != nil {
-		return err
-	}
+	out = (*TokenReview)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -89,7 +65,7 @@ func Convert_authentication_TokenReview_To_v1beta1_TokenReview(in *authenticatio
 }
 
 func autoConvert_v1beta1_TokenReviewSpec_To_authentication_TokenReviewSpec(in *TokenReviewSpec, out *authentication.TokenReviewSpec, s conversion.Scope) error {
-	out.Token = in.Token
+	out = (*authentication.TokenReviewSpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -98,7 +74,7 @@ func Convert_v1beta1_TokenReviewSpec_To_authentication_TokenReviewSpec(in *Token
 }
 
 func autoConvert_authentication_TokenReviewSpec_To_v1beta1_TokenReviewSpec(in *authentication.TokenReviewSpec, out *TokenReviewSpec, s conversion.Scope) error {
-	out.Token = in.Token
+	out = (*TokenReviewSpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -107,11 +83,7 @@ func Convert_authentication_TokenReviewSpec_To_v1beta1_TokenReviewSpec(in *authe
 }
 
 func autoConvert_v1beta1_TokenReviewStatus_To_authentication_TokenReviewStatus(in *TokenReviewStatus, out *authentication.TokenReviewStatus, s conversion.Scope) error {
-	out.Authenticated = in.Authenticated
-	if err := Convert_v1beta1_UserInfo_To_authentication_UserInfo(&in.User, &out.User, s); err != nil {
-		return err
-	}
-	out.Error = in.Error
+	out = (*authentication.TokenReviewStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -120,11 +92,7 @@ func Convert_v1beta1_TokenReviewStatus_To_authentication_TokenReviewStatus(in *T
 }
 
 func autoConvert_authentication_TokenReviewStatus_To_v1beta1_TokenReviewStatus(in *authentication.TokenReviewStatus, out *TokenReviewStatus, s conversion.Scope) error {
-	out.Authenticated = in.Authenticated
-	if err := Convert_authentication_UserInfo_To_v1beta1_UserInfo(&in.User, &out.User, s); err != nil {
-		return err
-	}
-	out.Error = in.Error
+	out = (*TokenReviewStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -133,23 +101,7 @@ func Convert_authentication_TokenReviewStatus_To_v1beta1_TokenReviewStatus(in *a
 }
 
 func autoConvert_v1beta1_UserInfo_To_authentication_UserInfo(in *UserInfo, out *authentication.UserInfo, s conversion.Scope) error {
-	out.Username = in.Username
-	out.UID = in.UID
-	out.Groups = in.Groups
-	if in.Extra != nil {
-		in, out := &in.Extra, &out.Extra
-		*out = make(map[string]authentication.ExtraValue, len(*in))
-		for key, val := range *in {
-			newVal := new(authentication.ExtraValue)
-			// TODO: Inefficient conversion - can we improve it?
-			if err := s.Convert(&val, newVal, 0); err != nil {
-				return err
-			}
-			(*out)[key] = *newVal
-		}
-	} else {
-		out.Extra = nil
-	}
+	out = (*authentication.UserInfo)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -158,23 +110,7 @@ func Convert_v1beta1_UserInfo_To_authentication_UserInfo(in *UserInfo, out *auth
 }
 
 func autoConvert_authentication_UserInfo_To_v1beta1_UserInfo(in *authentication.UserInfo, out *UserInfo, s conversion.Scope) error {
-	out.Username = in.Username
-	out.UID = in.UID
-	out.Groups = in.Groups
-	if in.Extra != nil {
-		in, out := &in.Extra, &out.Extra
-		*out = make(map[string]ExtraValue, len(*in))
-		for key, val := range *in {
-			newVal := new(ExtraValue)
-			// TODO: Inefficient conversion - can we improve it?
-			if err := s.Convert(&val, newVal, 0); err != nil {
-				return err
-			}
-			(*out)[key] = *newVal
-		}
-	} else {
-		out.Extra = nil
-	}
+	out = (*UserInfo)(unsafe.Pointer(in))
 	return nil
 }
 
