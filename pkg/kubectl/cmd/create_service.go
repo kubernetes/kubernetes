@@ -42,6 +42,7 @@ func NewCmdCreateService(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	cmd.AddCommand(NewCmdCreateServiceClusterIP(f, cmdOut))
 	cmd.AddCommand(NewCmdCreateServiceNodePort(f, cmdOut))
 	cmd.AddCommand(NewCmdCreateServiceLoadBalancer(f, cmdOut))
+	cmd.AddCommand(NewCmdCreteServiceExternalName(f, cmdOut))
 
 	return cmd
 }
@@ -171,7 +172,7 @@ var (
                 Create a LoadBalancer service with the specified name.`)
 
 	serviceLoadBalancerExample = dedent.Dedent(`
-                # Create a new nodeport service named my-lbs
+                # Create a new loadbalancer service named my-lbs
                 kubectl create service loadbalancer my-lbs --tcp=5678:8080`)
 )
 
@@ -217,6 +218,59 @@ func CreateServiceLoadBalancer(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.C
 		Name:                name,
 		StructuredGenerator: generator,
 		DryRun:              cmdutil.GetFlagBool(cmd, "dry-run"),
+		OutputFormat:        cmdutil.GetFlagString(cmd, "output"),
+	})
+}
+
+var (
+	serviceExternalNameLong = dedent.Dedent(`
+                Create an ExternalName service with the specified name.`)
+
+	serviceExternalNameExample = dedent.Dedent(`
+                # Create a new externalname service named bar.com 
+                kubectl create service externalname bar.com`)
+)
+
+// NewCmdCreateServiceExternalName is a macro command for creating a ExternalName service
+func NewCmdCreteServiceExternalName(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "externalname NAME [--dry-run]",
+		Short:   "Create an ExternalName service.",
+		Long:    serviceExternalNameLong,
+		Example: serviceExternalNameExample,
+		Run: func(cmd *cobra.Command, args []string) {
+			err := CreateExternalNameService(f, cmdOut, cmd, args)
+			cmdutil.CheckErr(err)
+		},
+	}
+	cmdutil.AddApplyAnnotationFlags(cmd)
+	cmdutil.AddValidateFlags(cmd)
+	cmdutil.AddPrinterFlags(cmd)
+	cmdutil.AddGeneratorFlags(cmd, cmdutil.ServiceExternalNameGeneratorV1Name)
+	addPortFlags(cmd)
+	return cmd
+}
+
+// CreateExternalNameService is the implementation of the service externalname command
+func CreateExternalNameService(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, args []string) error {
+	name, err := NameFromCommandArgs(cmd, args)
+	if err != nil {
+		return err
+	}
+	var generator kubectl.StructuredGenerator
+	switch generatorName := cmdutil.GetFlagString(cmd, "generator"); generatorName {
+	case cmdutil.ServiceExternalNameGeneratorV1Name:
+		generator = &kubectl.ServiceCommonGeneratorV1{
+			Name: name,
+			Type: api.ServiceTypeExternalName,
+		}
+	default:
+		return cmdutil.UsageError(cmd, fmt.Sprintf("Generator: %s not supported.", generatorName))
+	}
+	return RunCreateSubcommand(f, cmd, cmdOut, &CreateSubcommandOptions{
+		Name:                name,
+		StructuredGenerator: generator,
+		DryRun:              cmdutil.GetDryRunFlag(cmd),
 		OutputFormat:        cmdutil.GetFlagString(cmd, "output"),
 	})
 }

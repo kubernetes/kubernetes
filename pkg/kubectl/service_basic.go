@@ -46,6 +46,11 @@ type ServiceLoadBalancerGeneratorV1 struct {
 	ServiceCommonGeneratorV1
 }
 
+// TODO: is this really necessary?
+type ServiceExternalNameGeneratorV1 struct {
+	ServiceCommonGeneratorV1
+}
+
 func (ServiceClusterIPGeneratorV1) ParamNames() []GeneratorParam {
 	return []GeneratorParam{
 		{"name", true},
@@ -64,6 +69,12 @@ func (ServiceLoadBalancerGeneratorV1) ParamNames() []GeneratorParam {
 	return []GeneratorParam{
 		{"name", true},
 		{"tcp", true},
+	}
+}
+
+func (ServiceExternalNameGeneratorV1) ParamNames() []GeneratorParam {
+	return []GeneratorParam{
+		{"name", true},
 	}
 }
 
@@ -161,6 +172,9 @@ func (s ServiceCommonGeneratorV1) validate() error {
 	}
 	if s.ClusterIP != api.ClusterIPNone && len(s.TCP) == 0 {
 		return fmt.Errorf("at least one tcp port specifier must be provided")
+	}
+	if s.Type == api.ServiceTypeExternalName && s.ClusterIP != "" {
+		return fmt.Errorf("clusterIP must be empty for ExternalName services")
 	}
 	return nil
 }
