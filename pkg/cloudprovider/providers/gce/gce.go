@@ -2832,6 +2832,7 @@ func (gce *GCECloud) getInstancesByNames(names []string) ([]*gceInstance, error)
 
 	instanceArray := make([]*gceInstance, len(names))
 	for i, name := range names {
+		name = canonicalizeInstanceName(name)
 		instance := instances[name]
 		if instance == nil {
 			glog.Errorf("Failed to retrieve instance: %q", name)
