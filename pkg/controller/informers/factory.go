@@ -23,6 +23,8 @@ import (
 
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+
+	"github.com/golang/glog"
 )
 
 // SharedInformerFactory provides interface which holds unique informers for pods, nodes, namespaces, persistent volume
@@ -30,6 +32,7 @@ import (
 type SharedInformerFactory interface {
 	// Start starts informers that can start AFTER the API server and controllers have started
 	Start(stopCh <-chan struct{})
+	WaitForSync()
 
 	Pods() PodInformer
 	Nodes() NodeInformer
@@ -72,6 +75,20 @@ func (s *sharedInformerFactory) Start(stopCh <-chan struct{}) {
 		if !s.startedInformers[informerType] {
 			go informer.Run(stopCh)
 			s.startedInformers[informerType] = true
+		}
+	}
+}
+
+func (s *sharedInformerFactory) WaitForSync() {
+	for informerType, informer := range s.informers {
+		if s.startedInformers[informerType] {
+			glog.Infof("Waiting for informer %v to sync...", informerType)
+			for {
+				if informer.HasSynced() {
+					break
+				}
+				time.Sleep(100 * time.Millisecond)
+			}
 		}
 	}
 }

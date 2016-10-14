@@ -227,6 +227,9 @@ func StartControllers(s *options.CMServer, kubeconfig *restclient.Config, rootCl
 	discoveryClient := client("controller-discovery").Discovery()
 	sharedInformers := informers.NewSharedInformerFactory(client("shared-informers"), ResyncPeriod(s)())
 
+	sharedInformers.Start(stop)
+	sharedInformers.WaitForSync()
+
 	// always start the SA token controller first using a full-power client, since it needs to mint tokens for the rest
 	if len(s.ServiceAccountKeyFile) > 0 {
 		privateKey, err := serviceaccount.ReadPrivateKey(s.ServiceAccountKeyFile)
@@ -557,8 +560,6 @@ func StartControllers(s *options.CMServer, kubeconfig *restclient.Config, rootCl
 			go garbageCollector.Run(workers, wait.NeverStop)
 		}
 	}
-
-	sharedInformers.Start(stop)
 
 	select {}
 }
