@@ -202,6 +202,7 @@ func NewConfig() *Config {
 	longRunningRE := regexp.MustCompile(options.DefaultLongRunningRequestRE)
 
 	config := &Config{
+		Serializer:             api.Codecs,
 		MasterCount:            1,
 		ReadWritePort:          6443,
 		ServiceReadWritePort:   443,
