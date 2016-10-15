@@ -72,7 +72,7 @@ type OIDCOptions struct {
 	UsernameClaim string
 
 	// GroupsClaim, if specified, causes the OIDCAuthenticator to try to populate the user's
-	// groups with a ID Token field. If the GrouppClaim field is present in a ID Token the value
+	// groups with an ID Token field. If the GrouppClaim field is present in an ID Token the value
 	// must be a string or list of strings.
 	GroupsClaim string
 }
@@ -206,7 +206,7 @@ func (a *OIDCAuthenticator) client() (*oidc.Client, error) {
 	return client, nil
 }
 
-// AuthenticateToken decodes and verifies a ID Token using the OIDC client, if the verification succeeds,
+// AuthenticateToken decodes and verifies an ID Token using the OIDC client, if the verification succeeds,
 // then it will extract the user info from the JWT claims.
 func (a *OIDCAuthenticator) AuthenticateToken(value string) (user.Info, bool, error) {
 	jwt, err := jose.ParseJWT(value)

@@ -297,7 +297,7 @@ func calculateBalancedResourceAllocation(pod *api.Pod, podRequests *schedulercac
 	memoryFraction := fractionOfCapacity(totalResources.Memory, allocatableResources.Memory)
 	score := int(0)
 	if cpuFraction >= 1 || memoryFraction >= 1 {
-		// if requested >= capacity, the corresponding host should never be preferrred.
+		// if requested >= capacity, the corresponding host should never be preferred.
 		score = 0
 	} else {
 		// Upper and lower boundary of difference between cpuFraction and memoryFraction are -1 and 1

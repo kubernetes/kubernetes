@@ -316,7 +316,7 @@ func copyQuotas(in []api.ResourceQuota) ([]api.ResourceQuota, error) {
 	return out, nil
 }
 
-// checkRequest verifies that the request does not exceed any quota constraint. it returns back a copy of quotas not yet persisted
+// checkRequest verifies that the request does not exceed any quota constraint. it returns a copy of quotas not yet persisted
 // that capture what the usage would be if the request succeeded.  It return an error if the is insufficient quota to satisfy the request
 func (e *quotaEvaluator) checkRequest(quotas []api.ResourceQuota, a admission.Attributes) ([]api.ResourceQuota, error) {
 	namespace := a.GetNamespace()
@@ -361,7 +361,7 @@ func (e *quotaEvaluator) checkRequest(quotas []api.ResourceQuota, a admission.At
 		return quotas, nil
 	}
 
-	// Usage of some resources cannot be counted in isolation. For example when
+	// Usage of some resources cannot be counted in isolation. For example, when
 	// the resource represents a number of unique references to external
 	// resource. In such a case an evaluator needs to process other objects in
 	// the same namespace which needs to be known.
