@@ -312,6 +312,41 @@ current-context: service-account-context
 EOF
 }
 
+function configure-docker-daemon {
+  echo "Configuring the Docker daemon"
+  local docker_opts="-p /var/run/docker.pid --iptables=false --ip-masq=false"
+  if [[ "${TEST_CLUSTER:-}" == "true" ]]; then
+    docker_opts+=" --log-level=debug"
+  else
+    docker_opts+=" --log-level=warn"
+  fi
+  local use_net_plugin="true"
+  if [[ "${NETWORK_PROVIDER:-}" == "kubenet" || "${NETWORK_PROVIDER:-}" == "cni" ]]; then
+    # set docker0 cidr to private ip address range to avoid conflict with cbr0 cidr range
+    docker_opts+=" --bip=169.254.123.1/24"
+  else
+    use_net_plugin="false"
+    docker_opts+=" --bridge=cbr0"
+  fi
+
+  # Decide whether to enable a docker registry mirror. This is taken from
+  # the "kube-env" metadata value.
+  if [[ -n "${DOCKER_REGISTRY_MIRROR_URL:-}" ]]; then
+    echo "Enable docker registry mirror at: ${DOCKER_REGISTRY_MIRROR_URL}"
+    docker_opts+=" --registry-mirror=${DOCKER_REGISTRY_MIRROR_URL}"
+  fi
+
+  mkdir -p /etc/systemd/system/docker.service.d/
+  local kubernetes_conf_dropin="/etc/systemd/system/docker.service.d/00_kubelet.conf"
+  cat > "${kubernetes_conf_dropin}" <<EOF
+[Service]
+Environment="DOCKER_OPTS=${docker_opts} ${EXTRA_DOCKER_OPTS:-}"
+EOF
+  # Always restart to get the cbr0 change
+  echo "Docker daemon options updated. Restarting docker..."
+  systemctl daemon-reload
+  systemctl restart docker
+}
 # A helper function for loading a docker image. It keeps trying up to 5 times.
 #
 # $1: Full path of the docker image
@@ -1166,6 +1201,8 @@ if [[ "${CONTAINER_RUNTIME:-}" == "rkt" ]]; then
   setup-rkt
   install-docker2aci
   create-kube-controller-manager-dirs
+else
+  configure-docker-daemon
 fi
 
 load-docker-images
