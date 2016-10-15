@@ -55,7 +55,6 @@ func setUp(t *testing.T) (*etcdtesting.EtcdTestServer, Config, *assert.Assertion
 	config.RequestContextMapper = api.NewRequestContextMapper()
 	config.ProxyDialer = func(network, addr string) (net.Conn, error) { return nil, nil }
 	config.ProxyTLSClientConfig = &tls.Config{}
-	config.Serializer = api.Codecs
 	config.LegacyAPIGroupPrefixes = sets.NewString("/api")
 	config.APIGroupPrefix = "/apis"
 
@@ -164,7 +163,6 @@ func TestCustomHandlerChain(t *testing.T) {
 
 	var protected, called bool
 
-	config.Serializer = api.Codecs
 	config.BuildHandlerChainsFunc = func(apiHandler http.Handler, c *Config) (secure, insecure http.Handler) {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 				protected = true

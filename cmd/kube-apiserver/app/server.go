@@ -303,7 +303,6 @@ func Run(s *options.APIServer) error {
 	genericConfig.MasterServiceNamespace = s.MasterServiceNamespace
 	genericConfig.ProxyDialer = proxyDialerFn
 	genericConfig.ProxyTLSClientConfig = proxyTLSClientConfig
-	genericConfig.Serializer = api.Codecs
 	genericConfig.OpenAPIConfig.Info.Title = "Kubernetes"
 	genericConfig.OpenAPIConfig.Definitions = generatedopenapi.OpenAPIDefinitions
 	genericConfig.OpenAPIConfig.GetOperationID = openapi.GetOperationID
