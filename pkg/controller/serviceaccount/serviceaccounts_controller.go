@@ -71,8 +71,8 @@ func NewServiceAccountsController(cl clientset.Interface, options ServiceAccount
 		client:                  cl,
 		serviceAccountsToEnsure: options.ServiceAccounts,
 	}
-	if cl != nil && cl.Core().GetRESTClient().GetRateLimiter() != nil {
-		metrics.RegisterMetricAndTrackRateLimiterUsage("serviceaccount_controller", cl.Core().GetRESTClient().GetRateLimiter())
+	if cl != nil && cl.Core().RESTClient().GetRateLimiter() != nil {
+		metrics.RegisterMetricAndTrackRateLimiterUsage("serviceaccount_controller", cl.Core().RESTClient().GetRateLimiter())
 	}
 	accountSelector := fields.Everything()
 	if len(options.ServiceAccounts) == 1 {

@@ -126,8 +126,8 @@ func NewReplicaSetController(podInformer cache.SharedIndexInformer, kubeClient c
 
 // newReplicaSetController configures a replica set controller with the specified event recorder
 func newReplicaSetController(eventRecorder record.EventRecorder, podInformer cache.SharedIndexInformer, kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFunc, burstReplicas int, lookupCacheSize int, garbageCollectorEnabled bool) *ReplicaSetController {
-	if kubeClient != nil && kubeClient.Core().GetRESTClient().GetRateLimiter() != nil {
-		metrics.RegisterMetricAndTrackRateLimiterUsage("replicaset_controller", kubeClient.Core().GetRESTClient().GetRateLimiter())
+	if kubeClient != nil && kubeClient.Core().RESTClient().GetRateLimiter() != nil {
+		metrics.RegisterMetricAndTrackRateLimiterUsage("replicaset_controller", kubeClient.Core().RESTClient().GetRateLimiter())
 	}
 
 	rsc := &ReplicaSetController{

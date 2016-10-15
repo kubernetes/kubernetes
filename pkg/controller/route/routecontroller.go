@@ -59,8 +59,8 @@ type RouteController struct {
 }
 
 func New(routes cloudprovider.Routes, kubeClient clientset.Interface, clusterName string, clusterCIDR *net.IPNet) *RouteController {
-	if kubeClient != nil && kubeClient.Core().GetRESTClient().GetRateLimiter() != nil {
-		metrics.RegisterMetricAndTrackRateLimiterUsage("route_controller", kubeClient.Core().GetRESTClient().GetRateLimiter())
+	if kubeClient != nil && kubeClient.Core().RESTClient().GetRateLimiter() != nil {
+		metrics.RegisterMetricAndTrackRateLimiterUsage("route_controller", kubeClient.Core().RESTClient().GetRateLimiter())
 	}
 	rc := &RouteController{
 		routes:      routes,
