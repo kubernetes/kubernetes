@@ -212,6 +212,71 @@ func describeNamespace(namespace *api.Namespace, resourceQuotaList *api.Resource
 	})
 }
 
+func describeLimitRangeSpec(spec api.LimitRangeSpec, prefix string, w io.Writer) {
+	for i := range spec.Limits {
+		item := spec.Limits[i]
+		maxResources := item.Max
+		minResources := item.Min
+		defaultLimitResources := item.Default
+		defaultRequestResources := item.DefaultRequest
+		ratio := item.MaxLimitRequestRatio
+
+		set := map[api.ResourceName]bool{}
+		for k := range maxResources {
+			set[k] = true
+		}
+		for k := range minResources {
+			set[k] = true
+		}
+		for k := range defaultLimitResources {
+			set[k] = true
+		}
+		for k := range defaultRequestResources {
+			set[k] = true
+		}
+		for k := range ratio {
+			set[k] = true
+		}
+
+		for k := range set {
+			// if no value is set, we output -
+			maxValue := "-"
+			minValue := "-"
+			defaultLimitValue := "-"
+			defaultRequestValue := "-"
+			ratioValue := "-"
+
+			maxQuantity, maxQuantityFound := maxResources[k]
+			if maxQuantityFound {
+				maxValue = maxQuantity.String()
+			}
+
+			minQuantity, minQuantityFound := minResources[k]
+			if minQuantityFound {
+				minValue = minQuantity.String()
+			}
+
+			defaultLimitQuantity, defaultLimitQuantityFound := defaultLimitResources[k]
+			if defaultLimitQuantityFound {
+				defaultLimitValue = defaultLimitQuantity.String()
+			}
+
+			defaultRequestQuantity, defaultRequestQuantityFound := defaultRequestResources[k]
+			if defaultRequestQuantityFound {
+				defaultRequestValue = defaultRequestQuantity.String()
+			}
+
+			ratioQuantity, ratioQuantityFound := ratio[k]
+			if ratioQuantityFound {
+				ratioValue = ratioQuantity.String()
+			}
+
+			msg := "%s%s\t%v\t%v\t%v\t%v\t%v\t%v\n"
+			fmt.Fprintf(w, msg, prefix, item.Type, k, minValue, maxValue, defaultRequestValue, defaultLimitValue, ratioValue)
+		}
+	}
+}
+
 // DescribeLimitRanges merges a set of limit range items into a single tabular description
 func DescribeLimitRanges(limitRanges *api.LimitRangeList, w io.Writer) {
 	if len(limitRanges.Items) == 0 {
@@ -221,68 +286,7 @@ func DescribeLimitRanges(limitRanges *api.LimitRangeList, w io.Writer) {
 	fmt.Fprintf(w, "Resource Limits\n Type\tResource\tMin\tMax\tDefault Request\tDefault Limit\tMax Limit/Request Ratio\n")
 	fmt.Fprintf(w, " ----\t--------\t---\t---\t---------------\t-------------\t-----------------------\n")
 	for _, limitRange := range limitRanges.Items {
-		for i := range limitRange.Spec.Limits {
-			item := limitRange.Spec.Limits[i]
-			maxResources := item.Max
-			minResources := item.Min
-			defaultLimitResources := item.Default
-			defaultRequestResources := item.DefaultRequest
-			ratio := item.MaxLimitRequestRatio
-
-			set := map[api.ResourceName]bool{}
-			for k := range maxResources {
-				set[k] = true
-			}
-			for k := range minResources {
-				set[k] = true
-			}
-			for k := range defaultLimitResources {
-				set[k] = true
-			}
-			for k := range defaultRequestResources {
-				set[k] = true
-			}
-			for k := range ratio {
-				set[k] = true
-			}
-
-			for k := range set {
-				// if no value is set, we output -
-				maxValue := "-"
-				minValue := "-"
-				defaultLimitValue := "-"
-				defaultRequestValue := "-"
-				ratioValue := "-"
-
-				maxQuantity, maxQuantityFound := maxResources[k]
-				if maxQuantityFound {
-					maxValue = maxQuantity.String()
-				}
-
-				minQuantity, minQuantityFound := minResources[k]
-				if minQuantityFound {
-					minValue = minQuantity.String()
-				}
-
-				defaultLimitQuantity, defaultLimitQuantityFound := defaultLimitResources[k]
-				if defaultLimitQuantityFound {
-					defaultLimitValue = defaultLimitQuantity.String()
-				}
-
-				defaultRequestQuantity, defaultRequestQuantityFound := defaultRequestResources[k]
-				if defaultRequestQuantityFound {
-					defaultRequestValue = defaultRequestQuantity.String()
-				}
-
-				ratioQuantity, ratioQuantityFound := ratio[k]
-				if ratioQuantityFound {
-					ratioValue = ratioQuantity.String()
-				}
-
-				msg := " %s\t%v\t%v\t%v\t%v\t%v\t%v\n"
-				fmt.Fprintf(w, msg, item.Type, k, minValue, maxValue, defaultRequestValue, defaultLimitValue, ratioValue)
-			}
-		}
+		describeLimitRangeSpec(limitRange.Spec, " ", w)
 	}
 }
 
@@ -350,68 +354,7 @@ func describeLimitRange(limitRange *api.LimitRange) (string, error) {
 		fmt.Fprintf(out, "Namespace:\t%s\n", limitRange.Namespace)
 		fmt.Fprintf(out, "Type\tResource\tMin\tMax\tDefault Request\tDefault Limit\tMax Limit/Request Ratio\n")
 		fmt.Fprintf(out, "----\t--------\t---\t---\t---------------\t-------------\t-----------------------\n")
-		for i := range limitRange.Spec.Limits {
-			item := limitRange.Spec.Limits[i]
-			maxResources := item.Max
-			minResources := item.Min
-			defaultLimitResources := item.Default
-			defaultRequestResources := item.DefaultRequest
-			ratio := item.MaxLimitRequestRatio
-
-			set := map[api.ResourceName]bool{}
-			for k := range maxResources {
-				set[k] = true
-			}
-			for k := range minResources {
-				set[k] = true
-			}
-			for k := range defaultLimitResources {
-				set[k] = true
-			}
-			for k := range defaultRequestResources {
-				set[k] = true
-			}
-			for k := range ratio {
-				set[k] = true
-			}
-
-			for k := range set {
-				// if no value is set, we output -
-				maxValue := "-"
-				minValue := "-"
-				defaultLimitValue := "-"
-				defaultRequestValue := "-"
-				ratioValue := "-"
-
-				maxQuantity, maxQuantityFound := maxResources[k]
-				if maxQuantityFound {
-					maxValue = maxQuantity.String()
-				}
-
-				minQuantity, minQuantityFound := minResources[k]
-				if minQuantityFound {
-					minValue = minQuantity.String()
-				}
-
-				defaultLimitQuantity, defaultLimitQuantityFound := defaultLimitResources[k]
-				if defaultLimitQuantityFound {
-					defaultLimitValue = defaultLimitQuantity.String()
-				}
-
-				defaultRequestQuantity, defaultRequestQuantityFound := defaultRequestResources[k]
-				if defaultRequestQuantityFound {
-					defaultRequestValue = defaultRequestQuantity.String()
-				}
-
-				ratioQuantity, ratioQuantityFound := ratio[k]
-				if ratioQuantityFound {
-					ratioValue = ratioQuantity.String()
-				}
-
-				msg := "%v\t%v\t%v\t%v\t%v\t%v\t%v\n"
-				fmt.Fprintf(out, msg, item.Type, k, minValue, maxValue, defaultRequestValue, defaultLimitValue, ratioValue)
-			}
-		}
+		describeLimitRangeSpec(limitRange.Spec, "", out)
 		return nil
 	})
 }
