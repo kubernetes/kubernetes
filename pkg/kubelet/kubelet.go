@@ -100,7 +100,7 @@ const (
 	nodeStatusUpdateRetry = 5
 
 	// Location of container logs.
-	containerLogsDir = "/var/log/containers"
+	ContainerLogsDir = "/var/log/containers"
 
 	// max backoff period, exported for the e2e test
 	MaxContainerBackOff = 300 * time.Second
@@ -619,7 +619,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 				kubeCfg.PodInfraContainerImage,
 				float32(kubeCfg.RegistryPullQPS),
 				int(kubeCfg.RegistryBurst),
-				containerLogsDir,
+				ContainerLogsDir,
 				kubeDeps.OSInterface,
 				klet.networkPlugin,
 				klet,
@@ -1149,9 +1149,9 @@ func (kl *Kubelet) initializeModules() error {
 	}
 
 	// Step 3: If the container logs directory does not exist, create it.
-	if _, err := os.Stat(containerLogsDir); err != nil {
-		if err := kl.os.MkdirAll(containerLogsDir, 0755); err != nil {
-			glog.Errorf("Failed to create directory %q: %v", containerLogsDir, err)
+	if _, err := os.Stat(ContainerLogsDir); err != nil {
+		if err := kl.os.MkdirAll(ContainerLogsDir, 0755); err != nil {
+			glog.Errorf("Failed to create directory %q: %v", ContainerLogsDir, err)
 		}
 	}
 
