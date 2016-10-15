@@ -82,6 +82,6 @@ func (c *FakeDiscovery) SwaggerSchema(version unversioned.GroupVersion) (*swagge
 	return &swagger.ApiDeclaration{}, nil
 }
 
-func (c *FakeDiscovery) GetRESTClient() restclient.Interface {
+func (c *FakeDiscovery) RESTClient() restclient.Interface {
 	return nil
 }

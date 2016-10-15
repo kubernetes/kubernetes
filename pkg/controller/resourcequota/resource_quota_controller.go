@@ -84,8 +84,8 @@ func NewResourceQuotaController(options *ResourceQuotaControllerOptions) *Resour
 		registry:                 options.Registry,
 		replenishmentControllers: []cache.ControllerInterface{},
 	}
-	if options.KubeClient != nil && options.KubeClient.Core().GetRESTClient().GetRateLimiter() != nil {
-		metrics.RegisterMetricAndTrackRateLimiterUsage("resource_quota_controller", options.KubeClient.Core().GetRESTClient().GetRateLimiter())
+	if options.KubeClient != nil && options.KubeClient.Core().RESTClient().GetRateLimiter() != nil {
+		metrics.RegisterMetricAndTrackRateLimiterUsage("resource_quota_controller", options.KubeClient.Core().RESTClient().GetRateLimiter())
 	}
 	// set the synchronization handler
 	rq.syncHandler = rq.syncResourceQuotaFromKey
