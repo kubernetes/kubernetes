@@ -211,36 +211,32 @@ func RegisterNodeFlags() {
 	flag.StringVar(&TestContext.RuntimeIntegrationType, "runtime-integration-type", "", "Choose the integration path for the container runtime, mainly used for CRI validation.")
 }
 
-// Enable viper configuration management of flags.
+// overwriteFlagsWithViperConfig finds and writes values to flags using viper as input.
+func overwriteFlagsWithViperConfig() {
+	viperFlagSetter := func(f *flag.Flag) {
+		if viper.IsSet(f.Name) {
+			f.Value.Set(viper.GetString(f.Name))
+		}
+	}
+	flag.VisitAll(viperFlagSetter)
+}
+
+// ViperizeFlags sets up all flag and config processing. Future configuration info should be added to viper, not to flags.
 func ViperizeFlags() {
-	// TODO @jayunit100: Maybe a more elegant viper-flag integration for the future?
-	// For now, we layer it on top, because 'flag' deps of 'go test' make pflag wrappers
-	// fragile, seeming to force 'flag' to have deep awareness of pflag params.
+
+	// Part 1: Set regular flags.
+	// TODO: Future, lets eliminate e2e 'flag' deps entirely in favor of viper only,
+	// since go test 'flag's are sort of incompatible w/ flag, glog, etc.
 	RegisterCommonFlags()
 	RegisterClusterFlags()
-
 	flag.Parse()
 
-	// Add viper in a minimal way.
-	// Flag interop isnt possible, since 'go test' coupling to flag.Parse.
+	// Part 2: Set Viper provided flags.
 	// This must be done after common flags are registered, since Viper is a flag option.
 	viper.SetConfigName(TestContext.Viper)
 	viper.AddConfigPath(".")
 	viper.ReadInConfig()
 
+	// TODO Consider wether or not we want to use overwriteFlagsWithViperConfig().
 	viper.Unmarshal(&TestContext)
-
-	/** This can be used to overwrite a flag value.
-	*
-	*	viperFlagSetter := func(f *flag.Flag) {
-	*		if viper.IsSet(f.Name) {
-	*			glog.V(4).Infof("[viper config] Overwriting, found a settting for %v %v", f.Name, f.Value)
-	*			viper.Unmarshal(&TestContext)
-	*			// f.Value.Set(viper.GetString(f.Name))
-	*		}
-	*	}
-	*	// Each flag that we've declared can be set via viper.
-	*	flag.VisitAll(viperFlagSetter)
-	*
-	 */
 }
