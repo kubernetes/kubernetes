@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
+	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
 type unsetOptions struct {
@@ -50,12 +51,9 @@ func NewCmdConfigUnset(out io.Writer, configAccess clientcmd.ConfigAccess) *cobr
 				return
 			}
 
-			err := options.run()
-			if err != nil {
-				fmt.Fprintf(out, "%v\n", err)
-			} else {
+			cmdutil.CheckErrOrRun(options.run(), func() {
 				fmt.Fprintf(out, "property %q unset.\n", options.propertyName)
-			}
+			})
 		},
 	}
 

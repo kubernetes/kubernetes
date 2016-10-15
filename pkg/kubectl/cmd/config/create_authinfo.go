@@ -109,12 +109,9 @@ func newCmdConfigSetAuthInfo(out io.Writer, options *createAuthInfoOptions) *cob
 				return
 			}
 
-			err := options.run()
-			if err != nil {
-				fmt.Fprintf(out, "%v\n", err)
-			} else {
+			cmdutil.CheckErrOrRun(options.run(), func() {
 				fmt.Fprintf(out, "user %q set.\n", options.name)
-			}
+			})
 		},
 	}
 

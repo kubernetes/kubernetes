@@ -114,17 +114,21 @@ var ErrExit = fmt.Errorf("exit")
 // This method is generic to the command in use and may be used by non-Kubectl
 // commands.
 func CheckErr(err error) {
-	checkErr("", err, fatalErrHandler)
+	checkErr("", err, fatalErrHandler, nil)
+}
+
+func CheckErrOrRun(err error, handler func()) {
+	checkErr("", err, fatalErrHandler, handler)
 }
 
 // checkErrWithPrefix works like CheckErr, but adds a caller-defined prefix to non-nil errors
 func checkErrWithPrefix(prefix string, err error) {
-	checkErr(prefix, err, fatalErrHandler)
+	checkErr(prefix, err, fatalErrHandler, nil)
 }
 
 // checkErr formats a given error as a string and calls the passed handleErr
 // func with that string and an kubectl exit code.
-func checkErr(prefix string, err error, handleErr func(string, int)) {
+func checkErr(prefix string, err error, handleErr func(string, int), handler func()) {
 	// unwrap aggregates of 1
 	if agg, ok := err.(utilerrors.Aggregate); ok && len(agg.Errors()) == 1 {
 		err = agg.Errors()[0]
@@ -132,6 +136,9 @@ func checkErr(prefix string, err error, handleErr func(string, int)) {
 
 	switch {
 	case err == nil:
+		if handler != nil {
+			handler()
+		}
 		return
 	case err == ErrExit:
 		handleErr("", DefaultErrorExitCode)
