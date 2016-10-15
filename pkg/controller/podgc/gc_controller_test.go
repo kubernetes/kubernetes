@@ -28,6 +28,14 @@ import (
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
+type FakeController struct{}
+
+func (*FakeController) Run(<-chan struct{}) {}
+
+func (*FakeController) HasSynced() bool {
+	return true
+}
+
 func TestGCTerminated(t *testing.T) {
 	type nameToPhase struct {
 		name  string
@@ -111,6 +119,8 @@ func TestGCTerminated(t *testing.T) {
 			ObjectMeta: api.ObjectMeta{Name: "node"},
 		})
 		gcc.nodeStore = cache.StoreToNodeLister{Store: store}
+		gcc.podController = &FakeController{}
+		gcc.nodeController = &FakeController{}
 
 		gcc.gc()
 
@@ -181,6 +191,8 @@ func TestGCOrphaned(t *testing.T) {
 
 		store := cache.NewStore(cache.MetaNamespaceKeyFunc)
 		gcc.nodeStore = cache.StoreToNodeLister{Store: store}
+		gcc.podController = &FakeController{}
+		gcc.nodeController = &FakeController{}
 
 		gcc.gc()
 
