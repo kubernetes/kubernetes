@@ -118,11 +118,11 @@ func TestVSphereLogin(t *testing.T) {
 	defer cancel()
 
 	// Create vSphere client
-	c, err := vsphereLogin(vs.cfg, ctx)
+	err = vSphereLogin(vs, ctx)
 	if err != nil {
 		t.Errorf("Failed to create vSpere client: %s", err)
 	}
-	defer c.Logout(ctx)
+	defer vs.client.Logout(ctx)
 }
 
 func TestZones(t *testing.T) {
