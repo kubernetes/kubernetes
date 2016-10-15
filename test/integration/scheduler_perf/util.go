@@ -24,9 +24,10 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/client/restclient"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/util/workqueue"
 	"k8s.io/kubernetes/plugin/pkg/scheduler"
 	_ "k8s.io/kubernetes/plugin/pkg/scheduler/algorithmprovider"
@@ -52,14 +53,14 @@ func mustSetupScheduler() (schedulerConfigFactory *factory.ConfigFactory, destro
 
 	framework.RunAMasterUsingServer(framework.NewIntegrationTestMasterConfig(), s, h)
 
-	c := client.NewOrDie(&restclient.Config{
+	clientSet := clientset.NewForConfigOrDie(&restclient.Config{
 		Host:          s.URL,
 		ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion},
 		QPS:           5000.0,
 		Burst:         5000,
 	})
 
-	schedulerConfigFactory = factory.NewConfigFactory(c, api.DefaultSchedulerName, api.DefaultHardPodAffinitySymmetricWeight, api.DefaultFailureDomains)
+	schedulerConfigFactory = factory.NewConfigFactory(clientSet, api.DefaultSchedulerName, api.DefaultHardPodAffinitySymmetricWeight, api.DefaultFailureDomains)
 
 	schedulerConfig, err := schedulerConfigFactory.Create()
 	if err != nil {
@@ -67,7 +68,7 @@ func mustSetupScheduler() (schedulerConfigFactory *factory.ConfigFactory, destro
 	}
 	eventBroadcaster := record.NewBroadcaster()
 	schedulerConfig.Recorder = eventBroadcaster.NewRecorder(api.EventSource{Component: "scheduler"})
-	eventBroadcaster.StartRecordingToSink(c.Events(""))
+	eventBroadcaster.StartRecordingToSink(&unversionedcore.EventSinkImpl{Interface: clientSet.Core().Events("")})
 	scheduler.New(schedulerConfig).Run()
 
 	destroyFunc = func() {
@@ -79,7 +80,7 @@ func mustSetupScheduler() (schedulerConfigFactory *factory.ConfigFactory, destro
 	return
 }
 
-func makeNodes(c client.Interface, nodeCount int) {
+func makeNodes(c clientset.Interface, nodeCount int) {
 	glog.Infof("making %d nodes", nodeCount)
 	baseNode := &api.Node{
 		ObjectMeta: api.ObjectMeta{
@@ -101,7 +102,7 @@ func makeNodes(c client.Interface, nodeCount int) {
 		},
 	}
 	for i := 0; i < nodeCount; i++ {
-		if _, err := c.Nodes().Create(baseNode); err != nil {
+		if _, err := c.Core().Nodes().Create(baseNode); err != nil {
 			panic("error creating node: " + err.Error())
 		}
 	}
@@ -129,7 +130,7 @@ func makePodSpec() api.PodSpec {
 
 // makePodsFromRC will create a ReplicationController object and
 // a given number of pods (imitating the controller).
-func makePodsFromRC(c client.Interface, name string, podCount int) {
+func makePodsFromRC(c clientset.Interface, name string, podCount int) {
 	rc := &api.ReplicationController{
 		ObjectMeta: api.ObjectMeta{
 			Name: name,
@@ -145,7 +146,7 @@ func makePodsFromRC(c client.Interface, name string, podCount int) {
 			},
 		},
 	}
-	if _, err := c.ReplicationControllers("default").Create(rc); err != nil {
+	if _, err := c.Core().ReplicationControllers("default").Create(rc); err != nil {
 		glog.Fatalf("unexpected error: %v", err)
 	}
 
@@ -158,7 +159,7 @@ func makePodsFromRC(c client.Interface, name string, podCount int) {
 	}
 	createPod := func(i int) {
 		for {
-			if _, err := c.Pods("default").Create(basePod); err == nil {
+			if _, err := c.Core().Pods("default").Create(basePod); err == nil {
 				break
 			}
 		}
