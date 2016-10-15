@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"time"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/util/rand"
 	"k8s.io/kubernetes/pkg/volume"
 
@@ -70,14 +71,15 @@ func (util *FlockerUtil) CreateVolume(c *flockerVolumeProvisioner) (datasetUUID 
 	node := nodes[rand.Intn(len(nodes))]
 	glog.V(2).Infof("selected flocker node with UUID '%s' to provision dataset", node.UUID)
 
-	requestBytes := c.options.Capacity.Value()
+	capacity := c.options.PVC.Spec.Resources.Requests[api.ResourceName(api.ResourceStorage)]
+	requestBytes := capacity.Value()
 	volumeSizeGB = int(volume.RoundUpSize(requestBytes, 1024*1024*1024))
 
 	createOptions := &flockerApi.CreateDatasetOptions{
 		MaximumSize: requestBytes,
 		Metadata: map[string]string{
 			"type": "k8s-dynamic-prov",
-			"pvc":  c.options.PVCName,
+			"pvc":  c.options.PVC.Name,
 		},
 		Primary: node.UUID,
 	}
