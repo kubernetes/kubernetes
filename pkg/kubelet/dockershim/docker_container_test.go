@@ -52,7 +52,7 @@ func TestListContainers(t *testing.T) {
 		s := makeSandboxConfig(fmt.Sprintf("%s%d", podName, i),
 			fmt.Sprintf("%s%d", namespace, i), fmt.Sprintf("%d", i), 0)
 		labels := map[string]string{"abc.xyz": fmt.Sprintf("label%d", i)}
-		annotations := map[string]string{"foo.bar.baz": fmt.Sprintf("annotaion%d", i)}
+		annotations := map[string]string{"foo.bar.baz": fmt.Sprintf("annotation%d", i)}
 		c := makeContainerConfig(s, fmt.Sprintf("%s%d", containerName, i),
 			fmt.Sprintf("%s:v%d", image, i), uint32(i), labels, annotations)
 		sConfigs = append(sConfigs, s)
