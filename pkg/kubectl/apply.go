@@ -71,7 +71,7 @@ func SetOriginalConfiguration(info *resource.Info, original []byte) error {
 }
 
 // GetModifiedConfiguration retrieves the modified configuration of the object.
-// If annotate is true, it embeds the result as an anotation in the modified
+// If annotate is true, it embeds the result as an annotation in the modified
 // configuration. If an object was read from the command input, it will use that
 // version of the object. Otherwise, it will use the version from the server.
 func GetModifiedConfiguration(info *resource.Info, annotate bool, codec runtime.Encoder) ([]byte, error) {
