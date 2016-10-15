@@ -378,9 +378,9 @@ func getMonitorByPoolID(client *gophercloud.ServiceClient, id string) (*v2_monit
 }
 
 // Check if a member exists for node
-func memberExists(members []v2_pools.Member, addr string) bool {
+func memberExists(members []v2_pools.Member, addr string, port int) bool {
 	for _, member := range members {
-		if member.Address == addr {
+		if member.Address == addr && member.ProtocolPort == port {
 			return true
 		}
 	}
@@ -400,9 +400,9 @@ func popListener(existingListeners []listeners.Listener, id string) []listeners.
 	return existingListeners
 }
 
-func popMember(members []v2_pools.Member, addr string) []v2_pools.Member {
+func popMember(members []v2_pools.Member, addr string, port int) []v2_pools.Member {
 	for i, member := range members {
-		if member.Address == addr {
+		if member.Address == addr && member.ProtocolPort == port {
 			members[i] = members[len(members)-1]
 			members = members[:len(members)-1]
 		}
@@ -678,7 +678,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *api.Ser
 				}
 			}
 
-			if !memberExists(members, addr) {
+			if !memberExists(members, addr, int(port.NodePort)) {
 				glog.V(4).Infof("Creating member for pool %s", pool.ID)
 				_, err := v2_pools.CreateAssociateMember(lbaas.network, pool.ID, v2_pools.MemberCreateOpts{
 					ProtocolPort: int(port.NodePort),
@@ -690,9 +690,10 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *api.Ser
 				}
 
 				waitLoadbalancerActiveProvisioningStatus(lbaas.network, loadbalancer.ID)
+			} else {
+				// After all members have been processed, remaining members are deleted as obsolete.
+				members = popMember(members, addr, int(port.NodePort))
 			}
-			// After all members have been processed, remaining members are deleted as obsolete.
-			members = popMember(members, addr)
 
 			glog.V(4).Infof("Ensured pool %s has member for %s at %s", pool.ID, nodeName, addr)
 		}
@@ -1025,7 +1026,7 @@ func (lbaas *LbaasV2) UpdateLoadBalancer(clusterName string, service *api.Servic
 
 		// Add any new members for this port
 		for addr := range addrs {
-			if _, ok := members[addr]; ok {
+			if _, ok := members[addr]; ok && members[addr].ProtocolPort == int(port.NodePort) {
 				// Already exists, do not create member
 				continue
 			}
@@ -1042,7 +1043,7 @@ func (lbaas *LbaasV2) UpdateLoadBalancer(clusterName string, service *api.Servic
 
 		// Remove any old members for this port
 		for _, member := range members {
-			if _, ok := addrs[member.Address]; ok {
+			if _, ok := addrs[member.Address]; ok && member.ProtocolPort == int(port.NodePort) {
 				// Still present, do not delete member
 				continue
 			}
