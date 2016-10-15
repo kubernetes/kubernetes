@@ -99,7 +99,7 @@ func NewJoin(cfgPath string, args []string, cfg *kubeadmapi.NodeConfiguration, s
 	}
 
 	// TODO(phase1+) this we are missing args from the help text, there should be a way to tell cobra about it
-	if len(args) == 0 {
+	if len(args) == 0 && len(cfg.MasterAddresses) == 0 {
 		return nil, fmt.Errorf("must specify master IP address (see --help)")
 	}
 	cfg.MasterAddresses = append(cfg.MasterAddresses, args...)
